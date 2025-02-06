@@ -35,7 +35,7 @@ class MergeConfig:
         default="np", metadata={"help": "Tensor type to use for the merge. Choose np(CPU Only) or pd (CPU/GPU)"}
     )
     n_process: int = field(default=1, metadata={"help": "Number of processes to use for the merge."})
-    merge_preifx: str = field(default="model", metadata={"help": "Prefix name: model or master_weights"})
+    merge_prefix: str = field(default="model", metadata={"help": "Prefix name: model or master_weights"})
     merge_method: str = field(default="linear", metadata={"help": "The merge strategy."})
     merge_type: str = field(default="linear", metadata={"help": "The type of merge process."})
     sparsify_type: str = field(default=None, metadata={"help": "The type of sparsify process."})
@@ -73,12 +73,11 @@ class MergeConfig:
     def config_check(self):
         if self.output_path is not None:
             os.makedirs(self.output_path, exist_ok=True)
-        if self.tensor_type not in ["np"]:
-            raise ValueError(f"Unsupported tensor type: {self.tensor_type}. Support 'np' only.")
-        if self.device != "cpu":
-            logger.warning(f"Currently only support cpu device, but got {self.device}. Setting `device` to `cpu`.")
+        if self.tensor_type not in ["np", "pd"]:
+            raise ValueError(f"Unsupported tensor type: {self.tensor_type}. Support 'np' and 'pd' only.")
+        if self.device == "gpu" and self.tensor_type == "np":
+            logger.warning("np only support cpu device, but got gpu. Setting `device` to `cpu`.")
             self.device = "cpu"
-            self.tensor_type = "np"
 
         elif self.merge_method not in ["linear", "ties", "slerp", "della_linear", "della", "dare_linear", "dare_ties"]:
             raise ValueError(

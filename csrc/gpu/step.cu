@@ -34,7 +34,8 @@ __global__ void free_and_dispatch_block(bool *stop_flags,
                                         const int bsz,
                                         const int block_size,
                                         const int block_num_per_seq,
-                                        const int max_decoder_block_num) {
+                                        const int max_decoder_block_num,
+                                        const int speculate_step_token_num) {
     typedef cub::BlockReduce<cub::KeyValuePair<int, int>, 512> BlockReduce;
     __shared__ typename BlockReduce::TempStorage temp_storage;
     const int tid = threadIdx.x;
@@ -57,7 +58,7 @@ __global__ void free_and_dispatch_block(bool *stop_flags,
                 encoder_block_lens[tid] = 0;
                 used_list_len[tid] = 0;
             }
-        } else if (seq_lens_decoder[tid] != 0 && block_table_now[seq_lens_decoder[tid] / block_size] == -1) {
+        } else if (seq_lens_decoder[tid] != 0 && block_table_now[(seq_lens_decoder[tid] + speculate_step_token_num) / block_size] == -1) {
             // 统计需要分配block的位置和总数
             const int ori_need_block_len = atomicAdd(need_block_len, 1);
             need_block_list[ori_need_block_len] = tid;
@@ -110,7 +111,7 @@ __global__ void free_and_dispatch_block(bool *stop_flags,
             used_list_len[need_block_id] += 1;
             const int ori_free_list_len = atomicSub(free_list_len, 1);
             int *block_table_now = block_tables + need_block_id * block_num_per_seq;
-            block_table_now[seq_lens_decoder[need_block_id] / block_size] = free_list[ori_free_list_len - 1];
+            block_table_now[(seq_lens_decoder[need_block_id] + speculate_step_token_num) / block_size] = free_list[ori_free_list_len - 1];
         }
         need_block_list[tid] = -1;
     }
@@ -235,7 +236,8 @@ void StepPaddle(const paddle::Tensor& stop_flags,
                 const paddle::Tensor& next_tokens,
                 const int block_size,
                 const int encoder_decoder_block_num,
-                const int64_t first_token_id) {
+                const int64_t first_token_id,
+                const int speculate_step_token_num) {
     auto cu_stream = seq_lens_this_time.stream();
     const int bsz = seq_lens_this_time.shape()[0];
     const int block_num_per_seq = block_tables.shape()[1];
@@ -265,7 +267,8 @@ void StepPaddle(const paddle::Tensor& stop_flags,
         bsz,
         block_size,
         block_num_per_seq,
-        max_decoder_block_num
+        max_decoder_block_num,
+        speculate_step_token_num
     );
 #ifdef DEBUG_STEP
 #ifdef PADDLE_WITH_HIP
@@ -337,7 +340,8 @@ PD_BUILD_OP(step_paddle)
              "next_tokens"})
     .Attrs({"block_size: int",
             "encoder_decoder_block_num: int",
-            "first_token_id: int64_t"})
+            "first_token_id: int64_t",
+            "speculate_step_token_num: int"})
     .Outputs({"stop_flags_out",
               "seq_lens_this_time_out",
               "seq_lens_encoder_out",

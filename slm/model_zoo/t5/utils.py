@@ -28,6 +28,7 @@ from paddlenlp.transformers import (
     LinearDecayWithWarmup,
     PolyDecayWithWarmup,
 )
+from paddlenlp.utils.serialization import SafeUnpickler
 
 
 def accuracy(targets, predictions):
@@ -158,5 +159,5 @@ def save_pickle(data, file_path):
 
 def load_pickle(input_file):
     with open(str(input_file), "rb") as f:
-        data = pickle.load(f)
+        data = SafeUnpickler(f).load()
     return data

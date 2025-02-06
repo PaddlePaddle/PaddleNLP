@@ -41,7 +41,6 @@ from paddlenlp.transformers import (
     LlamaTokenizer,
     Qwen2ForCausalLM,
     Qwen2ForCausalLMPipe,
-    register_sequence_parallel_allreduce_hooks,
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig
 from paddlenlp.trl import DataConfig, ModelConfig, QuantConfig, SFTConfig, SFTTrainer
@@ -162,10 +161,6 @@ def main():
     if model_args.flash_mask and not any(isinstance(model, cls) for cls in flash_mask_support_list):
         raise NotImplementedError(f"{model.__class__} not support flash mask.")
 
-    if training_args.sequence_parallel:
-        register_sequence_parallel_allreduce_hooks(
-            model, training_args.gradient_accumulation_steps, training_args.fuse_sequence_parallel_allreduce
-        )
     # Load tokenizer & dataset
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, from_aistudio=model_args.from_aistudio)
     # init chat_template for tokenizer

@@ -285,12 +285,15 @@ class TrainingArguments:
             Some additional config it highly affect the useage of sharding parallel, we provide some option to config it.
             following config is support:
               enable_stage1_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation
+              enable_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation only used for semi auto mode.
               enable_stage1_overlap, fuse small tensors into big tensor chunks to accelerate communications and do communication overlap with backward computation, may harm the backward speed
+              enable_overlap, fuse small tensors into big tensor chunks to accelerate communications and do communication overlap with backward computation, may harm the backward speed only used for semi auto mode.
               enable_stage2_overlap, overlap stage2 NCCL communication with computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for broadcast overlap and no other sync could be called during the training for broadcast overlap.
               enable_stage1_broadcast_overlap, overlap stage1 V1 broadcast with next step forward computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for broadcast overlap forward compute and no other sync could be called during the training for broadcast overlap.
               enable_stage1_allgather_overlap, overlap stage1 V2 allgather with next step forward computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for allgather overlap forward compute and no other sync could be called during the training for allgather overlap.
               disable_stage1_reduce_avg, replace reduce_avg with original reduce_sum+scale in stage1, which can be used for accuracy verification.
               enable_release_grads, reduce peak memory usage by releasing gradients after each iteration. The creation of gradients will be postponed until backward propagation of the next iteration.
+              enable_fuse_optimizer_states, fuse optimizer states to a single storage.
         recompute (`bool`, *optional*, defaults to `False`):
             Recompute the forward pass to calculate gradients. Used for saving memory.
             Only support for networks with transformer blocks.
@@ -616,6 +619,7 @@ class TrainingArguments:
             )
         },
     )
+
     tensor_parallel_degree: int = field(
         default=-1,
         metadata={
@@ -668,6 +672,13 @@ class TrainingArguments:
                 "gradient_sync_after_accumulate, move gradient sync operations from backward into optimizer step when gradient accumulate enabling, which reduce the sync times to improve performance, but will increase the memory usage. ONLY supported for auto mode now. \n"
             )
         },
+    )
+    sequence_parallel: bool = field(
+        default=False,
+        metadata={"help": "Whether to enable sequence parallel."},
+    )
+    fuse_sequence_parallel_allreduce: bool = field(
+        default=False, metadata={"help": "Whether to use fuse sequence parallel allreduce."}
     )
     sequence_parallel_config: str = field(
         default="",
@@ -723,12 +734,13 @@ class TrainingArguments:
                 "Some additional config it highly affect the useage of sharding parallel, we provide some option to config it."
                 "following config is support: \n"
                 "enable_stage1_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation\n"
+                "enable_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation only used for semi auto mode.\n"
                 "enable_stage1_overlap, fuse small tensors into big tensor chunks to accelerate communications and do communication overlap with backward computation, may harm the backward speed\n"
+                "enable_overlap, fuse small tensors into big tensor chunks to accelerate communications and do communication overlap with backward computation, may harm the backward speed only used for semi auto mode.\n"
                 "disable_stage1_reduce_avg, replace reduce_avg with original reduce_sum+scale in stage1, which can be used for accuracy verification.\n"
                 "enable_stage2_overlap, overlap stage2 NCCL communication with computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for broadcast overlap and no other sync could be called during the training for broadcast overlap\n"
                 "enable_stage1_broadcast_overlap, overlap stage1 V1 broadcast with next step forward computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for broadcast overlap forward compute and no other sync could be called during the training for broadcast overlap.\n"
                 "enable_stage1_allgather_overlap, overlap stage1 V2 allgather with next step forward computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for allgather overlap forward compute and no other sync could be called during the training for allgather overlap.\n"
-                "enable_stage1_tensor_fusion_blanced_save_load, convert unbalanced optimizer state to balanced state when using tensor fusion strategy, which may increase the memory occupation."
             )
         },
     )
@@ -1209,10 +1221,17 @@ class TrainingArguments:
                                     f"Found unknown pipeline mode config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
                                 )
 
+                    enable_partial_send_recv = "disable_partial_send_recv" not in pipeline_parallel_config
+                    if self.sequence_parallel and enable_partial_send_recv:
+                        logger.warning(
+                            "When use pipeline parallel and sequence parallel simultaneously, we should turn off partial send recv."
+                        )
+                        enable_partial_send_recv = False
+
                     strategy.pipeline_configs = {
                         "accumulate_steps": self.gradient_accumulation_steps,
                         "micro_batch_size": self.per_device_train_batch_size,
-                        "enable_partial_send_recv": "disable_partial_send_recv" not in pipeline_parallel_config,
+                        "enable_partial_send_recv": enable_partial_send_recv,
                         "p2p_cache_shape": False if "disable_p2p_cache_shape" in pipeline_parallel_config else True,
                         # "delay_scale_loss": True, Fix ME
                     }
@@ -1394,10 +1413,11 @@ class TrainingArguments:
                                 "enable_stage1_broadcast_overlap",
                                 "enable_stage1_allgather_overlap",
                                 "enable_release_grads",
+                                "enable_fuse_optimizer_states",
                             ]:
                                 raise ValueError(
-                                    f"Found unknown pipeline mode config {x}, "
-                                    f"accpet config is enable_stage1_tensor_fusion, enable_stage1_overlap, enable_stage2_overlap, split_param, disable_stage1_reduce_avg, enable_stage1_broadcast_overlap, enable_stage1_allgather_overlap."
+                                    f"Found unknown sharding mode config {x}, "
+                                    f"accpet config is enable_stage1_tensor_fusion, enable_stage1_overlap, enable_stage2_overlap, split_param, disable_stage1_reduce_avg, enable_stage1_broadcast_overlap, enable_stage1_allgather_overlap, enable_release_grads, enable_fuse_optimizer_states."
                                 )
                     if "disable_stage1_reduce_avg" in sharding_parallel_config:
                         assert self.sharding == [
@@ -1422,6 +1442,9 @@ class TrainingArguments:
 
                         if "enable_release_grads" in sharding_parallel_config:
                             strategy.hybrid_configs["sharding_configs"].release_gradients = True
+
+                        if "enable_fuse_optimizer_states" in sharding_parallel_config:
+                            strategy.hybrid_configs["sharding_configs"].enable_fuse_optimizer_states = True
 
                         if self.pipeline_parallel_degree == 1:
                             strategy.hybrid_configs["sharding_configs"].tensor_fusion = (
@@ -1645,28 +1668,32 @@ class TrainingArguments:
                 for x in sharding_parallel_config:
                     if len(x) > 0:
                         if x not in [
-                            "enable_stage1_tensor_fusion",
-                            "enable_stage1_overlap",
-                            "enable_stage2_overlap",
+                            "enable_tensor_fusion",
+                            "enable_overlap",
                             "enable_release_grads",
-                            "enable_stage1_tensor_fusion_blanced_save_load",
                         ]:
+                            if x in ["enable_stage1_overlap", "enable_stage2_overlap"]:
+                                raise ValueError(
+                                    "enable_stage1_overlap and enable_stage2_overlap are not supported in "
+                                    "auto_parallel mode. Please use enable_overlap instead."
+                                )
+                            elif x == "enable_stage1_tensor_fusion":
+                                raise ValueError(
+                                    "enable_stage1_tensor_fusion is not supported in auto_parallel mode. "
+                                    "Please use enable_tensor_fusion instead."
+                                )
                             raise ValueError(
-                                f"Found unknown pipeline mode config {x}, " f"accpet config is reduce_overlap."
+                                f"Found unknown sharding mode config {x}, "
+                                f"accpet config is enable_tensor_fusion, "
+                                "enable_overlap, enable_release_grads."
                             )
 
-                    if (
-                        "enable_stage1_overlap" in sharding_parallel_config
-                        or "enable_stage2_overlap" in sharding_parallel_config
-                    ):
+                    if "enable_overlap" in sharding_parallel_config:
                         sharding.enable_overlap = True
 
-                    if "enable_stage1_tensor_fusion" in sharding_parallel_config:
+                    if "enable_tensor_fusion" in sharding_parallel_config:
                         sharding.grad_bucket_size_numel = 210355872
-                        sharding.enable_stage1_tensor_fusion = True
-
-                    if "enable_stage1_tensor_fusion_blanced_save_load" in sharding_parallel_config:
-                        sharding.save_unbalanced_param = False
+                        sharding.enable_tensor_fusion = True
 
                     if "enable_release_grads" in sharding_parallel_config:
                         sharding.release_gradients = True
@@ -2242,3 +2269,13 @@ class TrainingArguments:
                     logger.debug("{:30}: {}".format(a, v))
 
         logger.debug("")
+
+    @property
+    def should_save_model_with_tensor_fusion(self):
+        return (
+            self.enable_auto_parallel
+            and self.to_static
+            and ShardingOption.SHARD_OP in self.sharding
+            and self.sharding_parallel_degree > 1
+            and "enable_tensor_fusion" in self.sharding_parallel_config
+        )

@@ -56,6 +56,8 @@ CONFIG_MAPPING_NAMES = OrderedDict(
         ("dallebart", "DalleBartConfig"),
         ("deberta", "DebertaConfig"),
         ("debertav2", "DebertaV2Config"),
+        ("deepseek_v2", "DeepseekV2Config"),
+        ("deepseek_v3", "DeepseekV3Config"),
         ("distilbert", "DistilBertConfig"),
         ("dpt", "DPTConfig"),
         ("electra", "ElectraConfig"),
@@ -113,6 +115,7 @@ CONFIG_MAPPING_NAMES = OrderedDict(
         ("unimo", "UNIMOConfig"),
         ("visualglm", "VisualGLMConfig"),
         ("xlm", "XLMConfig"),
+        ("xlm-roberta", "XLMRobertaConfig"),
         ("xlnet", "XLNetConfig"),
         ("yuan", "YuanConfig"),
     ]
@@ -145,6 +148,8 @@ MODEL_NAMES_MAPPING = OrderedDict(
         ("dallebart", "DalleBart"),
         ("deberta", "Deberta"),
         ("debertav2", "DebertaV2"),
+        ("deepseek_v2", "DeepseekV2"),
+        ("deepseek_v3", "DeepseekV3"),
         ("distilbert", "DistilBert"),
         ("dpt", "DPT"),
         ("electra", "Electra"),
@@ -202,6 +207,7 @@ MODEL_NAMES_MAPPING = OrderedDict(
         ("unimo", "UNIMO"),
         ("visualglm", "VisualGLM"),
         ("xlm", "XLM"),
+        ("xlm-roberta", "XLMRoberta"),
         ("xlnet", "XLNet"),
         ("yuan", "Yuan"),
     ]

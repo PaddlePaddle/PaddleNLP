@@ -15,9 +15,11 @@
 import json
 import os
 import queue
+import shutil
 import subprocess
 import threading
 import time
+from distutils.dir_util import copy_tree
 from enum import Enum
 from typing import List
 
@@ -27,6 +29,13 @@ PDC_AGENT_BIN = "/root/paddlejob/tools/agent"
 HASH_SUM_BIN = "/root/paddlejob/afs_tool/bin/b3sum"
 TRAIN_CONFIG = "/root/paddlejob/workspace/env_run/longjob/train.conf"
 TAR_BIN = "tar"
+
+FLASH_DEVICE = os.getenv("PDC_FLASH_DEVICE", "/shared/dev/shm/flash")
+
+
+def pdc_flash_device_available():
+    # TODO(@gexiao): need better check
+    return os.path.exists(FLASH_DEVICE)
 
 
 class PDCErrorCode(Enum):
@@ -48,6 +57,7 @@ class PDCErrorCode(Enum):
     InvalidArgument = 1503
     CommandTimeout = 1504
     CheckSumCommandFail = 1505
+    CopyTreeFailed = 1506
 
     UnknownError = 1999
 
@@ -493,14 +503,60 @@ class PDCTools:
             raise Exception(f"exec cmd {download_cmd_args} with error: {e}")
         return error_code
 
-    def pdc_fc_generate_checksum(self, path: str) -> PDCErrorCode:
+    def _pdc_backup_failed_directory(self, path):
+        base_dir, target_path = os.path.split(os.path.normpath(path))
+        failed_path = os.path.join(base_dir, f"{target_path}_failed")
+        if os.path.exists(path):
+            if os.path.exists(failed_path):
+                shutil.rmtree(failed_path)
+            # Backup failed files for debug
+            os.rename(path, failed_path)
+
+    def pdc_backup_to_flash_device(self, persistent_path: str, flash_device_path: str) -> PDCErrorCode:
+        """backup data to flash device
+
+        Args:
+        persistent_path str: persistent path
+        flash_device_path str: flash device path
+        """
+        if not os.path.exists(persistent_path):
+            logger.error(f"{persistent_path} not exist")
+            return PDCErrorCode.LocalPathNotExist
+
+        logger.info("starting backup to flash device...")
+
+        # step 1: generate checksum for recovery
+        result = self.pdc_generate_dir_checksum(persistent_path)
+        if result != PDCErrorCode.Success:
+            logger.error(f"[Error] [pdc_sdk] generating checksum for {persistent_path} failed")
+            return result
+
+        # step 2: copy persistent data to flash device
+        try:
+            copy_tree(persistent_path, flash_device_path)
+            logger.info(f"backup {persistent_path} to {flash_device_path} successed.")
+        except Exception as e:
+            logger.error(f"[Error] [pdc_sdk] copy tree {persistent_path} to {flash_device_path} failed, error: {e}")
+            self._pdc_backup_failed_directory(flash_device_path)
+            return PDCErrorCode.CopyTreeFailed
+
+        # step 3: do checksum for storage on flash device
+        result = self.pdc_flash_do_check(flash_device_path)
+        if result == PDCErrorCode.Success:
+            return result
+
+        logger.error(f"[Error] [pdc_sdk] checksum failed on {flash_device_path} after copy, backup for debug")
+        self._pdc_backup_failed_directory(flash_device_path)
+        return result
+
+    def pdc_generate_dir_checksum(self, path: str) -> PDCErrorCode:
         """
         Args
         :param localPath:
         :return:
         """
         if not os.path.exists(path):
-            logger.error(f"pdc_fc_generate_checksum gi{path} not exist")
+            logger.error(f"pdc_generate_dir_checksum gi{path} not exist")
             return PDCErrorCode.CommandFail
         generate_checksum_args = [self._pdc_agent_bin, "-mode", "command", "-type", "generateSum", "-path", f"{path}"]
         error_code = PDCErrorCode.Success
@@ -514,14 +570,14 @@ class PDCTools:
             return PDCErrorCode.CheckSumCommandFail
         return error_code
 
-    def pdc_fc_do_check(self, path: str) -> PDCErrorCode:
+    def pdc_flash_do_check(self, path: str) -> PDCErrorCode:
         """
         Args
         :param localPath:
         :return:
         """
         if not os.path.exists(path):
-            logger.error(f"pdc_fc_do_check {path} not exist")
+            logger.error(f"pdc_flash_do_check {path} not exist")
             return PDCErrorCode.CommandFail
         generate_checksum_args = [self._pdc_agent_bin, "-mode", "command", "-type", "checkSum", "-path", f"{path}"]
         error_code = PDCErrorCode.Success
@@ -530,8 +586,12 @@ class PDCTools:
             res, error_code = self._exec_cmd(generate_checksum_args)
             if error_code == PDCErrorCode.Success:
                 logger.info(f"check_sum {path} successfully")
+            else:
+                logger.error(f"[Error] [pdc_sdk] check_sum {path} failed, error code: {error_code}")
+                self._pdc_backup_failed_directory(path)
         except Exception as e:
-            logger.error(f"exec cmd {generate_checksum_args} with error: {e}")
+            logger.error(f"[Error] [pdc_sdk] exec cmd {generate_checksum_args} with error: {e}")
+            self._pdc_backup_failed_directory(path)
             return PDCErrorCode.CheckSumCommandFail
         return error_code
 
@@ -560,8 +620,10 @@ PDCErrorMessageMap = {
     PDCErrorCode.AFSToolsNotExist: "afs tools not exist",
     PDCErrorCode.TrainConfigNotExist: "train config not exist",
     PDCErrorCode.LocalPathNotExist: "local path not exist",
-    PDCErrorCode.CommandFail: "download command fail",
+    PDCErrorCode.CommandFail: "pdc agent command fail",
     PDCErrorCode.CalculateHashFail: "calculate hash fail",
     PDCErrorCode.InvalidArgument: "invalid argument",
-    PDCErrorCode.CommandTimeout: "command timeout",
+    PDCErrorCode.CommandTimeout: "pdc agent command timeout",
+    PDCErrorCode.CheckSumCommandFail: "checksum command fail",
+    PDCErrorCode.CopyTreeFailed: "copy directory failed",
 }
