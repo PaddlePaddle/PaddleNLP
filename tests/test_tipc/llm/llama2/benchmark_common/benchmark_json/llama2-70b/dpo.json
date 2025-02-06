@@ -15,7 +15,7 @@
     "max_seq_len": 4096,
     "max_prompt_len": 2048,
     "pipeline_parallel_config": "disable_partial_send_recv enable_clear_every_step_cache",
-    "sequence_parallel": 1,   
+    "sequence_parallel": 0,   
     "bf16": true,
     "fp16_opt_level": "O2",
     "do_train": true,

@@ -24,9 +24,9 @@ python setup.py install
 cd -
 
 # install paddlenlp_ops
-cd ../csrc/
-python setup_cuda.py install
-cd -
+# cd ../csrc/
+# python setup_cuda.py install
+# cd -
 
 cd ../llm
 cp -r ../tests/test_tipc/llm/llama2/benchmark_common/benchmark_json ./

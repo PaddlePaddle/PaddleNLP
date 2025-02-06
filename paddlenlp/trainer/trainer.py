@@ -87,6 +87,12 @@ try:
     from ..quantization.quantization_linear import QuantizationLinear
 except:
     QuantizationLinear = None
+try:
+    from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+        register_sequence_parallel_allreduce_hooks,
+    )
+except:
+    pass
 from ..transformers.context_parallel_utils import split_inputs_sequence_dim_load_balance
 from ..transformers.model_utils import (
     PretrainedModel,
@@ -2043,6 +2049,11 @@ class Trainer:
             else:
                 model, self.optimizer = decorated
 
+        if self.args.tensor_parallel_degree > 1 and self.args.sequence_parallel:
+            register_sequence_parallel_allreduce_hooks(
+                model, self.args.gradient_accumulation_steps, self.args.fuse_sequence_parallel_allreduce
+            )
+
         if self.args.world_size == 1:
             if self.args.amp_master_grad:
                 mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)
@@ -3112,6 +3123,9 @@ class Trainer:
             if self.model is self.model_wrapped and isinstance(self.model_wrapped, PipelineLayer):
                 # NOTE(gongenlei): when do_train=False, do_eval=True, we need to wrap model for pipeline
                 self.model_wrapped = fleet.distributed_model(self.model_wrapped)
+            if isinstance(self.model_wrapped, LoRAModel) and isinstance(self.model_wrapped.model, PipelineLayer):
+                # NOTE(liuting): when do_train=False, do_eval=True, lora=True, we need to wrap model for pipeline
+                self.model_wrapped = fleet.distributed_model(self.model_wrapped.model)
             model = self.model_wrapped
         else:
             model = self.model

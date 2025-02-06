@@ -162,12 +162,14 @@ class MoELayer(nn.Layer):
             self.moe_num_experts_per_device = self._parse_moe_expert_parallel(
                 self.moe_num_experts, self.expert_parallel_degree
             )
+            self.is_dummy_moe = False if self.expert_parallel_degree > 1 else True
         else:
             # when moe_group is dummy, we don't need to use all_to_all
             self.moe_group = None
             self.moe_rank = 0
             self.expert_parallel_degree = 1
             self.moe_num_experts_per_device = self.moe_num_experts
+            self.is_dummy_moe = True
 
         self.all_to_all_dropout = all_to_all_dropout
         self.enable_recompute = False
@@ -181,6 +183,7 @@ class MoELayer(nn.Layer):
 
         self.gate = gate
         self.gate.group = self.moe_group
+        self._post_init()
 
     def _parse_moe_expert_parallel(self, moe_num_experts, expert_parallel_degree):
         assert (

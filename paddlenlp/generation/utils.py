@@ -742,7 +742,7 @@ class GenerationMixin(object):
                 # ['是的', '嗯嗯']
         """
         if generation_config is None:
-            if self.generation_config._from_model_config:
+            if self.generation_config is None or self.generation_config._from_model_config:
                 new_generation_config = GenerationConfig.from_model_config(self.config)
                 if new_generation_config != self.generation_config:
                     logger.warning(

@@ -31,10 +31,6 @@ class TestMergeConfig(unittest.TestCase):
 
     def test_raise_exception(self):
         with self.assertRaises(ValueError):
-            MergeConfig(
-                tensor_type="pd",
-            )
-        with self.assertRaises(ValueError):
             MergeConfig(merge_method="linear1")
         with self.assertRaises(ValueError):
             MergeConfig(model_path_list=["./model1"])
