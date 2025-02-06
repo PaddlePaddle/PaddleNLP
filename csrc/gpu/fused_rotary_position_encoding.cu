@@ -103,7 +103,7 @@ void FusedRotaryPositionEncoding(
 
   dim3 grid(num_tokens);
   dim3 block(std::min<int64_t>(num_heads * rot_dim / 2, 512));
-  PD_DISPATCH_FLOATING_TYPES(
+  PD_DISPATCH_FLOATING_AND_HALF_TYPES(
       query.dtype(), "apply_rotary_embedding_kernel", [&] {
         if (is_neox) {
           apply_rotary_embedding_kernel<data_t, true>
