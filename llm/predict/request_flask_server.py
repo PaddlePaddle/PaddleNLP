@@ -49,39 +49,43 @@ def send_request(query, history=None):
         # "top_p": 0.7,
         # "temperature": 0.8,
         # "repetition_penalty": 1.3,
-        "max_length": 100,
-        "src_length": 100,
+        "max_length": 2048,
+        "src_length": 1024,
         "min_length": 1,
-        # 如有需要，可增加 model 字段
-        # "model": "custom-model"
     }
-    # 发送 POST 请求到服务端（地址与端口应与服务端保持一致）
+
     res = requests.post("http://127.0.0.1:8011/v1/chat/completions", json=payload, stream=True)
     result_text = ""
     for line in res.iter_lines():
+        # https://github.com/vllm-project/vllm/blob/433c4a49230a470f13657f06e7612cde86e4fb40/examples/online_serving/openai_chat_completion_with_reasoning_streaming.py#L67-L69
         if not line:
             continue
-        try:
-            response_data = json.loads(line)
-        except Exception as e:
-            print("解析响应出错:", e)
-            continue
 
-        # 如果返回中存在 error 字段，则直接中断并返回错误提示
-        if "error" in response_data:
-            error_message = response_data["error"].get("message", "Unknown error")
-            result_text = f"error-response: {error_message}"
-            break
+        decoded_line = line.decode("utf-8").strip()
+        # print(decoded_line)
+        # OpenAI 流返回每行以 "data:" 开头
+        if decoded_line.startswith("data:"):
+            data = decoded_line[5:].strip()  # Remove "data:" prefix
+            if data == "[DONE]":  # End of stream
+                print("\nclient: Stream completed.")
+                break
+            try:
+                response_data = json.loads(data)
+                if "error" in response_data:
+                    error_message = response_data["error"].get("message", "Unknown error")
+                    result_text = f"error-response: {error_message}"
+                    break
 
-        # 按 OpenAI 标准格式，结果在 choices 列表中，每个 choice 内有 message 对象
-        choices = response_data.get("choices", [])
-        if choices:
-            message = choices[0].get("message", {})
-            content = message.get("content", "")
-            # 如果返回文本以特定结束标志结束，则可以进行截断处理
-            if content.endswith("[END]"):
-                content = content[:-5]
-            result_text += content
+                # According to the OpenAI standard format, the result is in the choices list, and each choice has a message object
+                choices = response_data.get("choices", [])
+                if choices:
+                    message = choices[0].get("message", {})
+                    content = message.get("content", "")
+                    result_text += content
+
+            except Exception as e:
+                print("解析响应出错:", e)
+                continue
 
     print("result ->", result_text)
     return result_text
@@ -89,6 +93,7 @@ def send_request(query, history=None):
 
 if __name__ == "__main__":
     # 示例调用：仅发送当前用户消息
+    send_request("背诵 水调歌头")
     send_request("你好啊")
     # 示例调用：使用 history 为字符串列表（交替为用户与助手的对话）
     send_request("再加一等于多少", ["一加一等于多少", "一加一等于二"])

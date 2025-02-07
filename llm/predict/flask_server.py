@@ -212,10 +212,11 @@ class PredictorServer:
                         if not new_text:
                             continue
                         response_body = {
-                            "id": self.args.model_name_or_path,
+                            "id": "YouID",
                             "object": "chat.completion",
                             "created": int(sleep(0) or 0),
-                            "model": generation_args.get("model", "custom-model"),
+                            # "model": generation_args.get("model", "custom-model"),
+                            "model": self.args.model_name_or_path,
                             "choices": [
                                 {
                                     "index": 0,
@@ -227,7 +228,10 @@ class PredictorServer:
                                 }
                             ],
                         }
-                        yield json.dumps(response_body, ensure_ascii=False) + "\n"
+                        # https://github.com/vllm-project/vllm/blob/433c4a49230a470f13657f06e7612cde86e4fb40/vllm/entrypoints/openai/serving_chat.py#L399-L400
+                        data = json.dumps(response_body, ensure_ascii=False)
+                        yield f"data: {data}\n\n"
+                    yield "data: [DONE]\n\n"
                 else:
                     return "done"
 

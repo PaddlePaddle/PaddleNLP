@@ -218,12 +218,13 @@ class BasePredictor:
 
     def _preprocess(self, source):
         if self.tokenizer.chat_template is not None:
-            source = [source] if isinstance(source, str) else source
-            # source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
-            # source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
-            source = self.tokenizer.apply_chat_template(source, tokenize=False)
-
-        print(source)
+            # for str -> List[str] eg. "hello"
+            # for List[str] -> List[str]  eg. ["hello", "hello new"]
+            # for List[dict] -> List[List[dict]]  [{'role': 'user', 'content': 'hello'}, {'role': 'assistant', 'content': 'nice'}]
+            #                                 ->  [[{'role': 'user', 'content': 'hello'}, {'role': 'assistant', 'content': 'nice'}]]
+            if not isinstance(source, list) or isinstance(source[0], dict):
+                source = [source]
+            source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
 
         tokenized_source = self.tokenizer(
             source,
