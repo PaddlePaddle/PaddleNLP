@@ -168,7 +168,7 @@ def scaled_dot_product_attention(
     sequence_parallel=False,
 ):
     bsz, q_len, num_heads, head_dim = query_states.shape
-    _, kv_seq_len, _, v_head_dim = value_states.shape
+    _, kv_seq_len, v_num_heads, v_head_dim = value_states.shape
 
     if config.use_flash_attention and flash_attention:
         # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
@@ -178,6 +178,11 @@ def scaled_dot_product_attention(
         q_head_dim = query_states.shape[-1]
         softmax_scale = softmax_scale * (q_head_dim**0.5)
         query_states = query_states * softmax_scale
+        value_padding = paddle.zeros(
+            [bsz, kv_seq_len, v_num_heads, head_dim - v_head_dim],
+            dtype=value_states.dtype,
+        )
+        value_states = paddle.concat([value_states, value_padding], axis=-1)
 
         outputs = fusion_ops.fusion_flash_attention(
             query_states,
@@ -189,6 +194,15 @@ def scaled_dot_product_attention(
             attn_mask_startend_row_indices=attn_mask_startend_row_indices,
             sequence_parallel=sequence_parallel,
         )
+
+        if isinstance(outputs, tuple):
+            outputs[0] = outputs[0].reshape([bsz, kv_seq_len, v_num_heads, head_dim])
+            outputs[0] = outputs[0][..., :v_head_dim]
+            outputs[0] = outputs[0].reshape([bsz, kv_seq_len, -1])
+        else:
+            outputs = outputs.reshape([bsz, kv_seq_len, v_num_heads, head_dim])
+            outputs = outputs[..., :v_head_dim]
+            outputs = outputs.reshape([bsz, kv_seq_len, -1])
         return outputs
 
     else:
@@ -687,7 +701,6 @@ class DeepseekV2MoE(MoELayer):
     """
 
     def __init__(self, config: DeepseekV2Config):
-
         gate = MoEGate(
             config=config,
             num_experts=config.n_routed_experts,
@@ -1251,7 +1264,6 @@ class DeepseekV2PretrainedModel(PretrainedModel):
                 linear_utils.ColumnSequenceParallelLinear,
             ),
         ):
-
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
             # and reset the `state_dict` to update parameter in static mode.
             if isinstance(layer.weight, paddle.Tensor):
