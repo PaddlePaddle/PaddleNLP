@@ -71,4 +71,4 @@ python PaddleNLP/llm/auto_parallel/utils/convert_to_safetensors.py --input_path 
 
     [PPO 训练教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/rlhf.md)
 
-- 注：PPO 训练教程中 PKU-Alignment/alpaca-7b-reproduced 模型是一个类 llama 模型，但结构稍有差异，具体为 embedding 层和 lm_head 层 shape 不同，原生 llama 的 shape 为 [4096, 32000]，但 PKU-Alignment/alpaca-7b-reproduced 的 shape 为 [4096, 32001]。
+- 注：PPO 训练教程中 PKU-Alignment/alpaca-7b-reproduced 模型是一个类 llama 模型，但与原生 llama 模型结构存在一定差异，具体为 embedding 层和 lm_head 层 shape 不同，原生 llama 的 shape 为 [4096, 32000]，但 PKU-Alignment/alpaca-7b-reproduced 的 shape 为 [4096, 32001]。
