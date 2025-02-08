@@ -28,7 +28,7 @@ def setup_args():
     parser.add_argument("--port", type=int, default=8073)
     parser.add_argument("--api_key", type=str, default=None, help="Your API key")
     parser.add_argument("--model", type=str, default="", help="Model name")
-    parser.add_argument("--title", type=str, default="LLM Chat", helqp="UI Title")
+    parser.add_argument("--title", type=str, default="LLM Chat", help="UI Title")
     parser.add_argument("--sub_title", type=str, default="LLM-subtitle", help="UI Sub Title")
     parser.add_argument("--flask_port", type=int, default=None, help="The port of flask service")
     args = parser.parse_args()
@@ -74,7 +74,7 @@ def launch(args, default_params: dict = {}):
             gr.Warning("没有可撤回的对话历史")
             return None, get_shown_context(context), context, state
 
-    def regen(state, top_k, top_p, temperature, repetition_penalty, max_length, src_length):
+    def regen(state, top_k, top_p, temperature, repetition_penalty, max_tokens, src_length):
         """Regenerate response."""
         context = state.setdefault("context", [])
         if len(context) < 2:
@@ -105,7 +105,7 @@ def launch(args, default_params: dict = {}):
         shown_context = get_shown_context(context)
         return content, shown_context, context, state
 
-    def infer(content, state, top_k, top_p, temperature, repetition_penalty, max_length, src_length):
+    def infer(content, state, top_k, top_p, temperature, repetition_penalty, max_tokens, src_length):
         """调用 OpenAI 接口生成回答，并以流式返回部分结果。"""
         content = content.strip().replace("<br>", "\n")
         context = state.setdefault("context", [])
@@ -127,7 +127,7 @@ def launch(args, default_params: dict = {}):
             "messages": messages,
             "temperature": temperature,
             "repetition_penalty": repetition_penalty,
-            "max_tokens": max_length,
+            "max_tokens": max_tokens,
             "top_p": top_p,
             "top_k": top_k,
             "stream": True,
@@ -136,7 +136,6 @@ def launch(args, default_params: dict = {}):
             # "Authorization": "Bearer " + args.api_key,
             "Content-Type": "application/json"
         }
-        # url = "https://api.openai.com/v1/chat/completions"
         url = f"http://0.0.0.0:{args.flask_port}/v1/chat/completions"
         try:
             res = requests.post(url, json=payload, headers=headers, stream=True)
@@ -159,7 +158,7 @@ def launch(args, default_params: dict = {}):
                         data_json = json.loads(data_str)
 
                         # delta 中可能包含部分回复内容
-                        delta = data_json["choices"][0]["message"].get("content", "")
+                        delta = data_json["choices"][0]["delta"].get("content", "")
                         if delta:
                             # 替换换行符为 <br> 保持显示效果
                             context[-1]["content"] += delta.replace("\n", "<br>")
@@ -173,7 +172,7 @@ def launch(args, default_params: dict = {}):
     def get_shown_context(context):
         """将对话上下文转换为 gr.Chatbot 显示格式，每一对 [用户, 助手]"""
         shown_context = []
-        # 由于内部存储是以 [user, bot] 对出现，因此每两项组成一对
+        # 每两项组成一对
         for turn_idx in range(0, len(context), 2):
             user_text = context[turn_idx]["content"]
             bot_text = context[turn_idx + 1]["content"] if turn_idx + 1 < len(context) else ""
@@ -184,8 +183,6 @@ def launch(args, default_params: dict = {}):
         gr.Markdown(f"# {args.title} <font style='color: red !important' size=2>{args.sub_title}</font>")
         with gr.Row():
             with gr.Column(scale=1):
-                # 虽然 openai 接口不支持 top_k、repetition_penalty 和 src_length，
-                # 但为了保留原 UI，这里保留对应控件（实际调用时忽略它们）
                 top_k = gr.Slider(
                     minimum=0,
                     maximum=100,
@@ -219,27 +216,36 @@ def launch(args, default_params: dict = {}):
                     info="该参数在 OpenAI 接口中不生效。",
                 )
                 default_src_length = default_params.get("src_length", 128)
-                total_length = default_src_length + default_params.get("max_length", 50)
+                total_length = default_src_length + default_params.get("max_tokens", 50)
                 src_length = create_src_slider(default_src_length, total_length)
-                max_length = create_max_slider(max(total_length - default_src_length, 50), total_length)
+                max_tokens = create_max_slider(max(total_length - default_src_length, 50), total_length)
 
-                def src_length_change_event(src_length_value, max_length_value):
+                def src_length_change_event(src_length_value, max_tokens_value):
                     return create_max_slider(
-                        min(total_length - src_length_value, max_length_value),
+                        min(total_length - src_length_value, max_tokens_value),
                         total_length - src_length_value,
                     )
 
-                def max_length_change_event(src_length_value, max_length_value):
+                def max_tokens_change_event(src_length_value, max_tokens_value):
                     return create_src_slider(
-                        min(total_length - max_length_value, src_length_value),
-                        total_length - max_length_value,
+                        min(total_length - max_tokens_value, src_length_value),
+                        total_length - max_tokens_value,
                     )
 
-                src_length.change(src_length_change_event, inputs=[src_length, max_length], outputs=max_length)
-                max_length.change(max_length_change_event, inputs=[src_length, max_length], outputs=src_length)
+                src_length.change(src_length_change_event, inputs=[src_length, max_tokens], outputs=max_tokens)
+                max_tokens.change(max_tokens_change_event, inputs=[src_length, max_tokens], outputs=src_length)
             with gr.Column(scale=4):
                 state = gr.State({})
-                context_chatbot = gr.Chatbot(label="Context")
+                # 这里修改 gr.Chatbot 组件，启用 Markdown 渲染并支持 LaTeX 展示
+                context_chatbot = gr.Chatbot(
+                    label="Context",
+                    render_markdown=True,
+                    latex_delimiters=[
+                        {"left": "$$", "right": "$$", "display": True},
+                        {"left": "\\[", "right": "\\]", "display": True},
+                        {"left": "$", "right": "$", "display": True},
+                    ],
+                )
                 utt_text = gr.Textbox(placeholder="请输入...", label="Content")
                 with gr.Row():
                     clear_btn = gr.Button("清空")
@@ -257,7 +263,7 @@ def launch(args, default_params: dict = {}):
                 api_name="chat",
             ).then(
                 infer,
-                inputs=[utt_text, state, top_k, top_p, temperature, repetition_penalty, max_length, src_length],
+                inputs=[utt_text, state, top_k, top_p, temperature, repetition_penalty, max_tokens, src_length],
                 outputs=[utt_text, context_chatbot, raw_context_json, state],
             )
 
@@ -276,13 +282,13 @@ def launch(args, default_params: dict = {}):
             )
             regen_btn.click(
                 regen,
-                inputs=[state, top_k, top_p, temperature, repetition_penalty, max_length, src_length],
+                inputs=[state, top_k, top_p, temperature, repetition_penalty, max_tokens, src_length],
                 outputs=[utt_text, context_chatbot, raw_context_json, state],
                 queue=False,
                 api_name="chat",
             ).then(
                 infer,
-                inputs=[utt_text, state, top_k, top_p, temperature, repetition_penalty, max_length, src_length],
+                inputs=[utt_text, state, top_k, top_p, temperature, repetition_penalty, max_tokens, src_length],
                 outputs=[utt_text, context_chatbot, raw_context_json, state],
             )
 
@@ -294,7 +300,7 @@ def launch(args, default_params: dict = {}):
                 api_name="chat",
             ).then(
                 infer,
-                inputs=[utt_text, state, top_k, top_p, temperature, repetition_penalty, max_length, src_length],
+                inputs=[utt_text, state, top_k, top_p, temperature, repetition_penalty, max_tokens, src_length],
                 outputs=[utt_text, context_chatbot, raw_context_json, state],
             )
 
@@ -306,10 +312,10 @@ def main(args, default_params: dict = {}):
 
 
 if __name__ == "__main__":
-    # 可以在 default_params 中设置默认参数，如 src_length, max_length, temperature, top_p 等
+    # 可以在 default_params 中设置默认参数，如 src_length, max_tokens, temperature, top_p 等
     default_params = {
         "src_length": 1024,
-        "max_length": 2048,
+        "max_tokens": 2048,
         "temperature": 0.95,
         "top_p": 0.7,
     }

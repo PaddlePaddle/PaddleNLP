@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import os
 import socket
+import time
 from contextlib import closing
 from dataclasses import asdict, dataclass, field
 from time import sleep
@@ -97,8 +98,11 @@ class PredictorServer:
                 f.write(json.dumps(data) + "\n")
             print("rank:", predictor.tensor_parallel_rank, " port info saving done.")
 
-    def predict(self, input_texts: str | list[str]):
+    def stream_predict(self, input_texts: str | list[str]):
         return self.predictor.stream_predict(input_texts)
+
+    def predict(self, input_texts: str | list[str]):
+        return self.predictor.predict(input_texts)
 
     def broadcast_msg(self, data):
         for _, peer_port in self.peer_ports.items():
@@ -115,12 +119,11 @@ class PredictorServer:
             data = request.get_json()
             logger.info(f"Request: {json.dumps(data, indent=2, ensure_ascii=False)}")
 
-            # 如果请求中包含 "messages"，则按照 OpenAI 标准格式处理
+            # 处理 OpenAI 格式消息（支持 messages 字段）以及兼容原有格式
             if "messages" in data:
                 messages = data["messages"]
                 if not messages:
                     return json.dumps({"error": "Empty messages"}), 400
-                # 假设最后一条消息来自用户，将其作为当前对话的输入(query)
                 if messages[-1].get("role") == "user":
                     query = messages[-1].get("content", "")
                     history = []
@@ -129,7 +132,6 @@ class PredictorServer:
                         for msg in messages[:-1]:
                             if msg.get("role") in ["user", "assistant"]:
                                 temp.append(msg.get("content", ""))
-                        # 如果数量为奇数，则忽略最早的一条，以保证交替格式
                         if len(temp) % 2 != 0:
                             temp = temp[1:]
                         history = temp
@@ -139,7 +141,6 @@ class PredictorServer:
                 data["context"] = query
                 data["history"] = history
             else:
-                # 向后兼容处理
                 data["context"] = data.get("context", "")
                 data["history"] = data.get("history", "")
 
@@ -147,21 +148,19 @@ class PredictorServer:
             if self.predictor.tensor_parallel_rank == 0:
                 self.broadcast_msg(data)
 
-            def streaming(data):
-                # 移除无用的 extra_info 字段
-                data.pop("extra_info", None)
-                query = data.pop("context", "")
-                history = data.pop("history", [])
+            # 判断是否采用流式返回，默认为非流式（可根据需求调整默认值）
+            is_stream = data.get("stream", False)
+
+            # 统一对 context/history 做处理，兼容 chat_template 格式
+            def process_input(query, history):
                 if isinstance(history, str):
                     try:
                         history = json.loads(history)
                     except Exception:
                         history = [history]
-
                 # 如果模型支持 chat_template，则转换为消息格式处理
                 if self.predictor.tokenizer.chat_template is not None:
                     messages = []
-                    # 将历史对话转换为交替格式（用户与助手成对出现）
                     for idx in range(0, len(history), 2):
                         user_msg = history[idx] if isinstance(history[idx], str) else history[idx].get("utterance", "")
                         messages.append({"role": "user", "content": user_msg})
@@ -172,55 +171,59 @@ class PredictorServer:
                                 else history[idx + 1].get("utterance", "")
                             )
                             messages.append({"role": "assistant", "content": assistant_msg})
-                    # 将当前查询作为新的用户输入追加到消息列表中
                     messages.append({"role": "user", "content": query})
-                    query = messages
-                # 否则保持原有 context/history 格式
+                    return messages
+                return query
 
-                generation_args = data
-                self.predictor.config.max_length = generation_args.get("max_length", self.predictor.config.max_length)
-                if "src_length" in generation_args:
-                    self.predictor.config.src_length = generation_args["src_length"]
+            # 提取生成参数
+            generation_args = data.copy()
+            query = generation_args.pop("context", "")
+            history = generation_args.pop("history", [])
+            query = process_input(query, history)
 
-                if self.predictor.config.src_length + self.predictor.config.max_length > self.total_max_length:
-                    output = {
-                        "error_code": 1,
-                        "error_msg": (
-                            f"The sum of src_length<{self.predictor.config.src_length}> and max_length<{self.predictor.config.max_length}> "
-                            f"should be smaller than or equal to the max-total-length<{self.total_max_length}>"
-                        ),
-                    }
-                    yield json.dumps(output, ensure_ascii=False) + "\n"
-                    return
+            # 更新生成相关配置参数
+            self.predictor.config.max_length = generation_args.get(
+                "max_tokens", generation_args.get("max_length", self.predictor.config.max_length)
+            )
+            if "src_length" in generation_args:
+                self.predictor.config.src_length = generation_args["src_length"]
 
-                self.predictor.config.top_p = generation_args.get("top_p", self.predictor.config.top_p)
-                self.predictor.config.temperature = generation_args.get(
-                    "temperature", self.predictor.config.temperature
-                )
-                self.predictor.config.top_k = generation_args.get("top_k", self.predictor.config.top_k)
-                self.predictor.config.repetition_penalty = generation_args.get(
-                    "repetition_penalty", self.predictor.config.repetition_penalty
-                )
+            if self.predictor.config.src_length + self.predictor.config.max_length > self.total_max_length:
+                output = {
+                    "error_code": 1,
+                    "error_msg": (
+                        f"The sum of src_length<{self.predictor.config.src_length}> and max_length<{self.predictor.config.max_length}> "
+                        f"should be smaller than or equal to the max-total-length<{self.total_max_length}>"
+                    ),
+                }
+                return json.dumps(output, ensure_ascii=False), 400
 
-                for key, value in generation_args.items():
-                    setattr(self.args, key, value)
+            self.predictor.config.top_p = generation_args.get("top_p", self.predictor.config.top_p)
+            self.predictor.config.temperature = generation_args.get("temperature", self.predictor.config.temperature)
+            self.predictor.config.top_k = generation_args.get("top_k", self.predictor.config.top_k)
+            self.predictor.config.repetition_penalty = generation_args.get(
+                "repetition_penalty", self.predictor.config.repetition_penalty
+            )
 
-                streamer = self.predict(query)
-                # 流式返回生成结果，构造 OpenAI 标准响应格式
-                if self.predictor.tensor_parallel_rank == 0:
-                    for new_text in streamer:
+            for key, value in generation_args.items():
+                setattr(self.args, key, value)
+
+            # 根据是否流式返回选择不同处理方式
+            if is_stream:
+                # 流式返回生成结果
+                def streaming(data):
+                    for new_text in self.stream_predict(query):
                         if not new_text:
                             continue
                         response_body = {
                             "id": "YouID",
                             "object": "chat.completion",
-                            "created": int(sleep(0) or 0),
-                            # "model": generation_args.get("model", "custom-model"),
+                            "created": int(time.time()),
                             "model": self.args.model_name_or_path,
                             "choices": [
                                 {
                                     "index": 0,
-                                    "message": {
+                                    "delta": {
                                         "role": "assistant",
                                         "content": new_text,
                                     },
@@ -228,14 +231,38 @@ class PredictorServer:
                                 }
                             ],
                         }
-                        # https://github.com/vllm-project/vllm/blob/433c4a49230a470f13657f06e7612cde86e4fb40/vllm/entrypoints/openai/serving_chat.py#L399-L400
-                        data = json.dumps(response_body, ensure_ascii=False)
-                        yield f"data: {data}\n\n"
+                        yield f"data: {json.dumps(response_body, ensure_ascii=False)}\n\n"
                     yield "data: [DONE]\n\n"
+
+                # 流式响应需要保证只在 rank 0 输出有效数据，其它 rank 返回占位
+                if self.predictor.tensor_parallel_rank == 0:
+                    return app.response_class(stream_with_context(streaming(data)), mimetype="text/event-stream")
                 else:
                     return "done"
-
-            return app.response_class(stream_with_context(streaming(data)))
+            else:
+                # 非流式：一次性返回完整结果
+                if self.predictor.tensor_parallel_rank == 0:
+                    result = self.predict(query)
+                    if type(result) is list and len(result) == 1:
+                        result = result[0]
+                    response_body = {
+                        "id": "YouID",
+                        "object": "chat.completion",
+                        "created": int(time.time()),
+                        "model": self.args.model_name_or_path,
+                        "choices": [
+                            {
+                                "index": 0,
+                                "message": {"role": "assistant", "content": result},
+                                "finish_reason": "stop",
+                            }
+                        ],
+                    }
+                    # data = f"data: {json.dumps(response_body, ensure_ascii=False)}\n\n"
+                    data = f"{json.dumps(response_body, ensure_ascii=False)}"
+                    return app.response_class(data, mimetype="application/json")
+                else:
+                    return "done"
 
         # 启动 Flask 服务（单线程预测）
         app.run(host="0.0.0.0", port=self.port, threaded=False)

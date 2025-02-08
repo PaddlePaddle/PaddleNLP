@@ -40,7 +40,7 @@ def build_messages(query, history=None):
     return messages
 
 
-def send_request(query, history=None):
+def send_request(query, history=None, stream=True):
     # 构造 OpenAI 格式的请求体
     payload = {
         "messages": build_messages(query, history),
@@ -49,52 +49,66 @@ def send_request(query, history=None):
         # "top_p": 0.7,
         # "temperature": 0.8,
         # "repetition_penalty": 1.3,
-        "max_length": 2048,
+        "max_length": 1024,
         "src_length": 1024,
         "min_length": 1,
+        "stream": stream,
     }
-
-    res = requests.post("http://127.0.0.1:8011/v1/chat/completions", json=payload, stream=True)
+    res = requests.post("http://localhost:8011/v1/chat/completions", json=payload, stream=True)
     result_text = ""
+    printed_reasoning_content = False
+    printed_content = False
     for line in res.iter_lines():
         # https://github.com/vllm-project/vllm/blob/433c4a49230a470f13657f06e7612cde86e4fb40/examples/online_serving/openai_chat_completion_with_reasoning_streaming.py#L67-L69
         if not line:
             continue
 
         decoded_line = line.decode("utf-8").strip()
-        # print(decoded_line)
         # OpenAI 流返回每行以 "data:" 开头
         if decoded_line.startswith("data:"):
             data = decoded_line[5:].strip()  # Remove "data:" prefix
             if data == "[DONE]":  # End of stream
-                print("\nclient: Stream completed.")
+                print("\nclient: Stream completed.\n")
                 break
             try:
-                response_data = json.loads(data)
-                if "error" in response_data:
-                    error_message = response_data["error"].get("message", "Unknown error")
-                    result_text = f"error-response: {error_message}"
-                    break
+                # Parse the JSON data
+                chunk = json.loads(data)
+                reasoning_content = chunk["choices"][0]["delta"].get("reasoning_content", "")
+                content = chunk["choices"][0]["delta"].get("content", "")
 
-                # According to the OpenAI standard format, the result is in the choices list, and each choice has a message object
-                choices = response_data.get("choices", [])
-                if choices:
-                    message = choices[0].get("message", {})
-                    content = message.get("content", "")
+                if reasoning_content:
+                    if not printed_reasoning_content:
+                        printed_reasoning_content = True
+                        print("reasoning_content:", end="", flush=True)
+                    print(reasoning_content, end="", flush=True)
+                elif content:
+                    if not printed_content:
+                        printed_content = True
+                        print("\ncontent:", end="", flush=True)
+                    # Extract and print the content
+                    print(content, end="", flush=True)
                     result_text += content
-
+            except Exception as e:
+                print("解析响应出错:", e)
+                continue
+        else:
+            try:
+                data = json.loads(decoded_line)
+                content = data["choices"][0]["message"].get("content", "")
+                print(content, end="", flush=True)
+                result_text += content
             except Exception as e:
                 print("解析响应出错:", e)
                 continue
 
-    print("result ->", result_text)
+    print()
     return result_text
 
 
 if __name__ == "__main__":
     # 示例调用：仅发送当前用户消息
-    send_request("背诵 水调歌头")
     send_request("你好啊")
+    send_request("你好啊", stream=False)
     # 示例调用：使用 history 为字符串列表（交替为用户与助手的对话）
     send_request("再加一等于多少", ["一加一等于多少", "一加一等于二"])
     # 示例调用：history 为字典格式，明确指定对话角色
