@@ -17,9 +17,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
+import re
 
 import gradio as gr
 import requests
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+console_handler.setFormatter(formatter)
+logger.addHandler(console_handler)
 
 
 def setup_args():
@@ -28,8 +38,8 @@ def setup_args():
     parser.add_argument("--port", type=int, default=8073)
     parser.add_argument("--api_key", type=str, default=None, help="Your API key")
     parser.add_argument("--model", type=str, default="", help="Model name")
-    parser.add_argument("--title", type=str, default="LLM Chat", help="UI Title")
-    parser.add_argument("--sub_title", type=str, default="LLM-subtitle", help="UI Sub Title")
+    parser.add_argument("--title", type=str, default="PaddleNLP Chat", help="UI Title")
+    parser.add_argument("--sub_title", type=str, default="powered by paddlenlp team.", help="UI Sub Title")
     parser.add_argument("--flask_port", type=int, default=None, help="The port of flask service")
     args = parser.parse_args()
     return args
@@ -57,6 +67,22 @@ def create_max_slider(value, maximum):
     )
 
 
+def remove_think_tags(text):
+    """
+    清除文本中 <think> 和 </think> 标签之间的所有字符。
+
+    Args:
+        text: 要处理的文本字符串。
+
+    Returns:
+        清除 <think> 和 </think> 标签之间内容的文本字符串。
+    """
+    pattern = re.compile(r"\\<think\\>.*?\\<\\\/think\\>", re.DOTALL)
+    # 将匹配到的部分替换为空字符串
+    cleaned_text = pattern.sub("", text).strip()
+    return cleaned_text
+
+
 def launch(args, default_params: dict = {}):
     """Launch chat UI with OpenAI API."""
 
@@ -78,7 +104,7 @@ def launch(args, default_params: dict = {}):
         """Regenerate response."""
         context = state.setdefault("context", [])
         if len(context) < 2:
-            gr.Warning("没有对话历史")
+            gr.Warning("No chat history!")
             shown_context = get_shown_context(context)
             return None, shown_context, context, state
 
@@ -92,11 +118,10 @@ def launch(args, default_params: dict = {}):
 
     def begin(content, state):
         """记录用户输入，并初始化 bot 回复为空。"""
-        content = content.strip().replace("<br>", "\n")
         context = state.setdefault("context", [])
 
         if not content:
-            gr.Warning("请输入有效的问题")
+            gr.Warning("Invalid inputs")
             shown_context = get_shown_context(context)
             return None, shown_context, context, state
 
@@ -107,18 +132,16 @@ def launch(args, default_params: dict = {}):
 
     def infer(content, state, top_k, top_p, temperature, repetition_penalty, max_tokens, src_length):
         """调用 OpenAI 接口生成回答，并以流式返回部分结果。"""
-        content = content.strip().replace("<br>", "\n")
         context = state.setdefault("context", [])
-
         if not content:
-            gr.Warning("请输入有效的问题")
+            gr.Warning("Invalid inputs")
             shown_context = get_shown_context(context)
             return None, shown_context, context, state
 
         # 构造 OpenAI API 要求的 messages 格式
         messages = []
-        for turn in context:
-            messages.append({"role": turn["role"], "content": turn["content"]})
+        for turn in context[:-1]:
+            messages.append({"role": turn["role"], "content": remove_think_tags(turn["content"])})
 
         # 默认模型名称从参数中获取
         model = getattr(args, "model", default_params.get("model", ""))
@@ -128,6 +151,7 @@ def launch(args, default_params: dict = {}):
             "temperature": temperature,
             "repetition_penalty": repetition_penalty,
             "max_tokens": max_tokens,
+            "src_length": src_length,
             "top_p": top_p,
             "top_k": top_k,
             "stream": True,
@@ -154,18 +178,25 @@ def launch(args, default_params: dict = {}):
                     if decoded_line.startswith("data:"):
                         data_str = decoded_line[len("data:") :].strip()
                         if data_str == "[DONE]":
+                            logger.info("Conversation round over.")
                             break
                         data_json = json.loads(data_str)
 
                         # delta 中可能包含部分回复内容
                         delta = data_json["choices"][0]["delta"].get("content", "")
                         if delta:
-                            # 替换换行符为 <br> 保持显示效果
-                            context[-1]["content"] += delta.replace("\n", "<br>")
+                            # Reformat <think> tags to show in chatbot
+                            delta = delta.replace("<think>", r"\<think\>")
+                            delta = delta.replace("</think>", r"\<\/think\>")
+                            context[-1]["content"] += delta
                             shown_context = get_shown_context(context)
                             yield None, shown_context, context, state
+                    else:
+                        logger.error(f"{decoded_line}")
+                        gr.Warning(f"{decoded_line}")
 
                 except Exception as e:
+                    logger.error(f"解析返回结果异常: {e}")
                     gr.Warning(f"解析返回结果异常: {e}")
                     continue
 
@@ -189,7 +220,7 @@ def launch(args, default_params: dict = {}):
                     value=0,
                     step=1,
                     label="Top-k",
-                    info="该参数在 OpenAI 接口中不生效。",
+                    info="控制采样token个数。(不建议设置)",
                 )
                 top_p = gr.Slider(
                     minimum=0,
@@ -213,7 +244,7 @@ def launch(args, default_params: dict = {}):
                     value=default_params.get("repetition_penalty", 1.2),
                     step=0.05,
                     label="Repetition Penalty",
-                    info="该参数在 OpenAI 接口中不生效。",
+                    info="生成结果重复惩罚。(不建议设置)",
                 )
                 default_src_length = default_params.get("src_length", 128)
                 total_length = default_src_length + default_params.get("max_tokens", 50)
@@ -315,7 +346,7 @@ if __name__ == "__main__":
     # 可以在 default_params 中设置默认参数，如 src_length, max_tokens, temperature, top_p 等
     default_params = {
         "src_length": 1024,
-        "max_tokens": 2048,
+        "max_tokens": 1024,
         "temperature": 0.95,
         "top_p": 0.7,
     }

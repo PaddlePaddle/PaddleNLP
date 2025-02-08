@@ -73,7 +73,7 @@ class PredictorServer:
             self.args.flask_port + port_interval * predictor.tensor_parallel_rank,
             self.args.flask_port + port_interval * (predictor.tensor_parallel_rank + 1),
         )
-        self.total_max_length = predictor.config.src_length + predictor.config.max_length
+        self.total_max_length = predictor.config.total_max_length
 
         if self.predictor.tensor_parallel_rank == 0:
             self.port = find_free_ports(scan_l, scan_u)

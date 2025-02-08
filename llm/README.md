@@ -379,6 +379,13 @@ python  ./predict/flask_server.py \
 ```shell
 python predict/request_flask_server.py
 ```
+或者直接使用 curl,调用开始对话
+```
+curl 127.0.0.1:8011/v1/chat/completions \
+-H 'Content-Type: application/json' \
+-d '{"message": [{"role": "user", "content": "你好"}]}'
+```
+
 
 
 #### 7.2 大模型服务化部署工具
