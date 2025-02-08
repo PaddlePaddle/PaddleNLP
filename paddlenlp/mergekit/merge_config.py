@@ -36,7 +36,7 @@ class MergeConfig:
     merge_type: str = field(default="linear", metadata={"help": "The type of merge process."})
     sparsify_type: str = field(default=None, metadata={"help": "The type of sparsify process."})
     split_pieces: int = field(default=8, metadata={"help": "Split large tensor to multi-piece"})
-    max_tensor_mem: float = field(default=1, metadata={"help": "Split tensor if exceed setting max_tensor_mem."})
+    max_tensor_mem: float = field(default=0.5, metadata={"help": "Split tensor if exceed setting max_tensor_mem."})
 
     # Model parameters
     model_path_list: Optional[List[str]] = field(default=None, metadata={"help": "Merge model name or path list"})

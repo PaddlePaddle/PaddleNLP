@@ -155,36 +155,62 @@ class MergeModel:
                 )
         for key in local_keys:
             # Tensor preprocess
-            is_bf16 = False
-            tensor_list = []
-            for i in range(model_num):
-                if self.merge_config.tensor_type == "np" and str(state_dict_list[i][key].dtype) == "uint16":
-                    is_bf16 = True
-                    state_dict_list[i][key] = (
-                        paddle.Tensor(state_dict_list[i][key], zero_copy=True).astype("float32").numpy()
-                    )
-                elif self.merge_config.tensor_type == "pd":
-                    state_dict_list[i][key] = paddle.Tensor(state_dict_list[i][key], zero_copy=True)
-                    if i == 0:
-                        tensor_dtype = state_dict_list[i][key].dtype
-                    # Using float32 to reduce precision loss
-                    state_dict_list[i][key] = state_dict_list[i][key].astype("float32")
-                tensor_list.append(state_dict_list[i].pop(key))
+            is_bf16 = str(state_dict_list[0][key].dtype) == "uint16"
+            tensor_list = [state_dict_list[i].pop(key) for i in range(model_num)]
+            tensor_mem = int(np.prod(tensor_list[0].shape) * self.numpy_dtype_map[str(tensor_list[0].dtype)]) / (
+                1024**3
+            )
+            if self.merge_config.tensor_type == "pd" and tensor_mem > self.merge_config.max_tensor_mem:
+                tensor_split_list = [
+                    np.array_split(tensor, self.merge_config.split_pieces, axis=0) for tensor in tensor_list
+                ]
+                merge_split = []
+                for sp in range(self.merge_config.split_pieces):
+                    tensor_list = [tensor_split[sp] for tensor_split in tensor_split_list]
+                    if is_bf16:
+                        tensor_list = [
+                            paddle.Tensor(tensor, zero_copy=True).astype("float32") for tensor in tensor_list
+                        ]
+                    else:
+                        tensor_list = [paddle.Tensor(tensor, zero_copy=True) for tensor in tensor_list]
+                    if self.merge_config.base_model_path is not None:
+                        base_tensor = tensor_list.pop()
+                        tensor_list = [tensor - base_tensor for tensor in tensor_list]
+                    merge_tensor = self.merge_method.merge(tensor_list)
+                    if self.merge_config.base_model_path is not None:
+                        merge_tensor += base_tensor
+                    if is_bf16:
+                        merge_split.append(merge_tensor.astype("bfloat16").numpy())
+                    else:
+                        merge_split.append(merge_tensor.numpy())
+                merge_state_dict[key] = np.concatenate(merge_split, axis=0)
+            else:
+                if self.merge_config.tensor_type == "pd":
+                    if is_bf16:
+                        tensor_list = [
+                            paddle.Tensor(tensor, zero_copy=True).astype("float32") for tensor in tensor_list
+                        ]
+                    else:
+                        tensor_list = [paddle.Tensor(tensor, zero_copy=True) for tensor in tensor_list]
+                elif self.merge_config.tensor_type == "np" and is_bf16:
+                    tensor_list = [
+                        paddle.Tensor(tensor, zero_copy=True).astype("float32").numpy() for tensor in tensor_list
+                    ]
 
-            # Tensor merge
-            if self.merge_config.base_model_path is not None:
-                base_tensor = tensor_list.pop()
-                tensor_list = [tensor - base_tensor for tensor in tensor_list]
-            merge_state_dict[key] = self.merge_method.merge(tensor_list)
-            if self.merge_config.base_model_path is not None:
-                merge_state_dict[key] += base_tensor
-
-            # Tensor postprocess
-            # dtype==bfloat16: numpy(float32) -> paddle(float32) -> paddle(bfloat16) -> numpy(uint16)
-            if self.merge_config.tensor_type == "np" and is_bf16:
-                merge_state_dict[key] = paddle.Tensor(merge_state_dict[key], zero_copy=True).astype("bfloat16").numpy()
-            elif self.merge_config.tensor_type == "pd":
-                merge_state_dict[key] = merge_state_dict[key].astype(tensor_dtype).numpy()
+                if self.merge_config.base_model_path is not None:
+                    base_tensor = tensor_list.pop()
+                    tensor_list = [tensor - base_tensor for tensor in tensor_list]
+                merge_tensor = self.merge_method.merge(tensor_list)
+                if self.merge_config.base_model_path is not None:
+                    merge_tensor += base_tensor
+                if self.merge_config.tensor_type == "pd":
+                    if is_bf16:
+                        merge_state_dict[key] = merge_tensor.astype("bfloat16").numpy()
+                    else:
+                        merge_state_dict[key] = merge_tensor.numpy()
+                elif self.merge_config.tensor_type == "np" and is_bf16:
+                    # dtype==bfloat16: numpy(float32) -> paddle(float32) -> paddle(bfloat16) -> numpy(uint16)
+                    merge_state_dict[key] = paddle.Tensor(merge_tensor, zero_copy=True).astype("bfloat16").numpy()
 
         # Save safetensor file
         save_file(
