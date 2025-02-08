@@ -14,7 +14,6 @@
 import json
 import math
 import os
-import random
 import shutil
 from multiprocessing import Process
 
@@ -141,17 +140,17 @@ class MergeModel:
         # Merge state dict
         merge_state_dict = {}
         index = {"metadata": {"total_size": 0}, "weight_map": {}}
-        key_list = list(state_dict_list[0].keys())
-        random.shuffle(key_list)
+
+        key_list = list(state_dict_list[file_type_list.index("pdparams")].keys())
         model_num = len(state_dict_list)
-        i = dist.get_rank()
+        rank = dist.get_rank()
         positions = divide_positions(len(key_list), dist.get_world_size())
-        local_keys = key_list[positions[i] : positions[i + 1]]
+        local_keys = key_list[positions[rank] : positions[rank + 1]]
         for ii in range(len(positions) - 1):
             shard_file = f"{self.merge_config.merge_prefix}-{ii+1:05d}-of-{dist.get_world_size():05d}.safetensors"
             for key in key_list[positions[ii] : positions[ii + 1]]:
                 index["weight_map"][key] = shard_file
-                index["metadata"]["total_size"] += (
+                index["metadata"]["total_size"] += int(
                     np.prod(state_dict_list[0][key].shape) * self.numpy_dtype_map[str(state_dict_list[0][key].dtype)]
                 )
         for key in local_keys:
@@ -192,7 +191,7 @@ class MergeModel:
             merge_state_dict,
             os.path.join(
                 self.merge_config.output_path,
-                f"{self.merge_config.merge_prefix}-{i+1:05d}-of-{dist.get_world_size():05d}.safetensors",
+                f"{self.merge_config.merge_prefix}-{rank+1:05d}-of-{dist.get_world_size():05d}.safetensors",
             ),
             metadata={"format": "np"},
         )
@@ -260,7 +259,7 @@ class MergeModel:
             with safe_open(os.path.join(model_path, self.safe_weight_name()), framework="numpy") as f:
                 for key in f.keys():
                     tensor = f.get_tensor(key)
-                    total_size += np.prod(tensor.shape) * self.numpy_dtype_map[str(tensor.dtype)]
+                    total_size += int(np.prod(tensor.shape) * self.numpy_dtype_map[str(tensor.dtype)])
                     weight_map[key] = self.safe_weight_name()
             index = {"metadata": {"total_size": total_size}, "weight_map": weight_map}
         return index
@@ -290,7 +289,6 @@ class MergeModel:
             key_list, positions = divide_safetensor_key_list(index_list[0]["weight_map"], num)
         else:
             key_list = list(index_list[0]["weight_map"].keys())
-            random.shuffle(key_list)
             positions = divide_positions(len(key_list), num)
         if not self.is_cpu:
             i = dist.get_rank()
@@ -382,27 +380,56 @@ class MergeModel:
             tensor_list = []
             for i, model_path in enumerate(self.merge_config.model_path_list):
                 with fast_safe_open(os.path.join(model_path, index_list[i]["weight_map"][k]), framework="np") as w:
-                    tensor = w.get_tensor(k)
-                    tensor = paddle.Tensor(tensor, zero_copy=True)
-                    if i == 0:
-                        tensor_dtype = tensor.dtype
-                    # Using float32 to reduce precision loss
-                    tensor = tensor.astype("float32")
-                    tensor_list.append(tensor)
+                    tensor_list.append(w.get_tensor(k))
             if self.merge_config.base_model_path is not None:
                 with fast_safe_open(
                     os.path.join(self.merge_config.base_model_path, index_list[-1]["weight_map"][k]),
                     framework="np",
                 ) as w:
-                    base_tensor = w.get_tensor(k)
-                    base_tensor = paddle.Tensor(base_tensor, zero_copy=True).astype("float32")
-                tensor_list = [tensor - base_tensor for tensor in tensor_list]
-            merge_tensor = self.merge_method.merge(tensor_list)
-
-            if self.merge_config.base_model_path is not None:
-                merge_tensor += base_tensor
-            merge_state_dict[k] = merge_tensor.astype(tensor_dtype).numpy()
-
+                    tensor_list.append(w.get_tensor(k))
+            is_bf16 = str(tensor_list[0].dtype) == "uint16"
+            tensor_mem = int(np.prod(tensor_list[0].shape) * self.numpy_dtype_map[str(tensor_list[0].dtype)]) / (
+                1024**3
+            )
+            if tensor_mem > self.merge_config.max_tensor_mem:
+                tensor_split_list = [
+                    np.array_split(tensor, self.merge_config.split_pieces, axis=0) for tensor in tensor_list
+                ]
+                merge_split = []
+                for sp in range(self.merge_config.split_pieces):
+                    tensor_list = [tensor_split[sp] for tensor_split in tensor_split_list]
+                    if is_bf16:
+                        tensor_list = [
+                            paddle.Tensor(tensor, zero_copy=True).astype("float32") for tensor in tensor_list
+                        ]
+                    else:
+                        tensor_list = [paddle.Tensor(tensor, zero_copy=True) for tensor in tensor_list]
+                    if self.merge_config.base_model_path is not None:
+                        base_tensor = tensor_list.pop()
+                        tensor_list = [tensor - base_tensor for tensor in tensor_list]
+                    merge_tensor = self.merge_method.merge(tensor_list)
+                    if self.merge_config.base_model_path is not None:
+                        merge_tensor += base_tensor
+                    if is_bf16:
+                        merge_split.append(merge_tensor.astype("bfloat16").numpy())
+                    else:
+                        merge_split.append(merge_tensor.numpy())
+                merge_state_dict[k] = np.concatenate(merge_split, axis=0)
+            else:
+                if is_bf16:
+                    tensor_list = [paddle.Tensor(tensor, zero_copy=True).astype("float32") for tensor in tensor_list]
+                else:
+                    tensor_list = [paddle.Tensor(tensor, zero_copy=True) for tensor in tensor_list]
+                if self.merge_config.base_model_path is not None:
+                    base_tensor = tensor_list.pop()
+                    tensor_list = [tensor - base_tensor for tensor in tensor_list]
+                merge_tensor = self.merge_method.merge(tensor_list)
+                if self.merge_config.base_model_path is not None:
+                    merge_tensor += base_tensor
+                if is_bf16:
+                    merge_state_dict[k] = merge_tensor.astype("bfloat16").numpy()
+                else:
+                    merge_state_dict[k] = merge_tensor.numpy()
         save_file(
             merge_state_dict,
             os.path.join(self.merge_config.output_path, shard_file),
@@ -515,10 +542,10 @@ class MergeModel:
         # LoRA Merge
         key_list = list(base_index["weight_map"].keys())
         if not self.is_cpu:
-            i = dist.get_rank()
+            rank = dist.get_rank()
             divided_key_list = divide_lora_key_list(key_list, dist.get_world_size(), lora_config)
-            local_keys = divided_key_list[i]
-            shard_file = f"{self.merge_config.merge_prefix}-{i+1:05d}-of-{dist.get_world_size():05d}.safetensors"
+            local_keys = divided_key_list[rank]
+            shard_file = f"{self.merge_config.merge_prefix}-{rank+1:05d}-of-{dist.get_world_size():05d}.safetensors"
             self.shard_lora_merge(local_keys, base_index, shard_file, lora_config, file_type_list)
 
             for i in range(len(divided_key_list)):
@@ -580,7 +607,6 @@ class MergeModel:
         merge_state_dict = {}
         index = {"metadata": {"total_size": 0}, "weight_map": {}}
         key_list = list(base_state_dict.keys())
-        random.shuffle(key_list)
         positions = divide_positions(len(key_list), dist.get_world_size())
         for ii in range(len(positions) - 1):
             shard_file = f"{self.merge_config.merge_prefix}-{ii+1:05d}-of-{dist.get_world_size():05d}.safetensors"
@@ -591,8 +617,8 @@ class MergeModel:
                 )
 
         # Merge state dict
-        i = dist.get_rank()
-        local_keys = key_list[positions[i] : positions[i + 1]]
+        rank = dist.get_rank()
+        local_keys = key_list[positions[rank] : positions[rank + 1]]
         for k in local_keys:
             if k in lora_state_dict.keys():
                 tensor = lora_state_dict[k]
@@ -623,7 +649,7 @@ class MergeModel:
             merge_state_dict,
             os.path.join(
                 self.merge_config.output_path,
-                f"{self.merge_config.merge_prefix}-{i+1:05d}-of-{dist.get_world_size():05d}.safetensors",
+                f"{self.merge_config.merge_prefix}-{rank+1:05d}-of-{dist.get_world_size():05d}.safetensors",
             ),
             metadata={"format": "np"},
         )
