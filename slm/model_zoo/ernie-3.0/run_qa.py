@@ -105,7 +105,7 @@ def main():
             train_dataset = train_dataset.map(
                 partial(prepare_train_features, tokenizer=tokenizer, args=data_args),
                 batched=True,
-                num_proc=4,
+                num_proc=1,
                 batch_size=4,
                 remove_columns=column_names,
                 load_from_cache_file=not data_args.overwrite_cache,
@@ -118,7 +118,7 @@ def main():
             eval_dataset = eval_examples.map(
                 partial(prepare_validation_features, tokenizer=tokenizer, args=data_args),
                 batched=True,
-                num_proc=4,
+                num_proc=1,
                 batch_size=4,
                 remove_columns=column_names,
                 load_from_cache_file=not data_args.overwrite_cache,
@@ -132,7 +132,7 @@ def main():
             predict_dataset = predict_examples.map(
                 partial(prepare_validation_features, tokenizer=tokenizer, args=data_args),
                 batched=True,
-                num_proc=4,
+                num_proc=1,
                 batch_size=4,
                 remove_columns=column_names,
                 load_from_cache_file=not data_args.overwrite_cache,

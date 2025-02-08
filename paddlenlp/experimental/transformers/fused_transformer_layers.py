@@ -141,6 +141,7 @@ class AvxConfig:
 class SpeculateConfig:
     speculate_max_draft_token_num: int = 5
     speculate_method: str = None
+    return_full_hidden_states: bool = False
 
 
 class FusedMultiTransformerConfig:
@@ -740,7 +741,7 @@ class FusedMultiTransformerBase(Layer):
         return self._dtype
 
     def compute_layernorm_before_qkv(self, src, i):
-        if i == 0:
+        if i == 0 and not self.config.speculate_config.speculate_method == "eagle":
             ln_out = self.norm_func(src, self.ln_scales[i], self.ln_biases[i], self._epsilon, begin_norm_axis=1)[0]
         else:
             ln_out = src
@@ -2290,16 +2291,19 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
         seq_lens_decoder = kwargs.get("seq_lens_decoder", None)
         max_input_length = kwargs.get("max_input_length", -1)
         output_padding_offset = kwargs.get("output_padding_offset", None)  # only used in speculative decoding
-        out = rebuild_padding_v2(
-            multi_block_output,
-            cum_offsets,
-            seq_lens_decoder,
-            seq_lens_encoder,
-            output_padding_offset,
-            max_input_length,
-        )
 
-        return out
+        if self.config.speculate_config.return_full_hidden_states:
+            return multi_block_output
+        else:
+            out = rebuild_padding_v2(
+                multi_block_output,
+                cum_offsets,
+                seq_lens_decoder,
+                seq_lens_encoder,
+                output_padding_offset,
+                max_input_length,
+            )
+            return out
 
 
 class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMultiTransformerWeightOnly):

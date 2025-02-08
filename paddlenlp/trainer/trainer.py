@@ -3123,6 +3123,9 @@ class Trainer:
             if self.model is self.model_wrapped and isinstance(self.model_wrapped, PipelineLayer):
                 # NOTE(gongenlei): when do_train=False, do_eval=True, we need to wrap model for pipeline
                 self.model_wrapped = fleet.distributed_model(self.model_wrapped)
+            if isinstance(self.model_wrapped, LoRAModel) and isinstance(self.model_wrapped.model, PipelineLayer):
+                # NOTE(liuting): when do_train=False, do_eval=True, lora=True, we need to wrap model for pipeline
+                self.model_wrapped = fleet.distributed_model(self.model_wrapped.model)
             model = self.model_wrapped
         else:
             model = self.model
