@@ -12,7 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Paddle Qwen2Moe model."""
+"""Paddle Qwen2Moe model."""
+
 from __future__ import annotations
 
 import math
@@ -32,6 +33,8 @@ from ...utils.log import logger
 from .. import linear_utils
 from ..activations import ACT2FN
 from ..conversion_utils import StateDictNameMapping, init_name_mappings
+from ..linear_utils import Linear
+from ..llama import fusion_ops
 from ..model_outputs import MoECausalLMOutputWithPast, MoEModelOutputWithPast
 from ..model_utils import PretrainedModel, register_base_model
 from ..moe_gate import PretrainedMoEGate
@@ -356,6 +359,9 @@ class Qwen2MoeRMSNorm(nn.Layer):
             mark_as_sequence_parallel_parameter(self.weight)
 
     def forward(self, hidden_states):
+        if self.config.use_fused_rms_norm:
+            return fusion_ops.fusion_rms_norm(hidden_states, self.weight, self.variance_epsilon, False)
+
         if paddle.in_dynamic_mode():
             with paddle.amp.auto_cast(False):
                 hidden_states = hidden_states.astype("float32")
@@ -437,6 +443,7 @@ class Qwen2MoeMLP(nn.Layer):
             config.moe_intermediate_size if not is_shared else config.shared_expert_intermediate_size
         )
         self.tensor_parallel_degree = config.tensor_parallel_degree
+        self.fuse_attention_ffn = config.fuse_attention_ffn
 
         if config.sequence_parallel:
             ColumnParallelLinear = linear_utils.ColumnSequenceParallelLinear
@@ -446,18 +453,26 @@ class Qwen2MoeMLP(nn.Layer):
             RowParallelLinear = linear_utils.RowParallelLinear
 
         if config.tensor_parallel_degree > 1:
-            self.gate_proj = ColumnParallelLinear(
-                self.hidden_size,
-                self.intermediate_size,
-                gather_output=False,
-                has_bias=False,
-            )
-            self.up_proj = ColumnParallelLinear(
-                self.hidden_size,
-                self.intermediate_size,
-                gather_output=False,
-                has_bias=False,
-            )
+            if self.fuse_attention_ffn:
+                self.gate_up_fused_proj = ColumnParallelLinear(
+                    self.hidden_size,
+                    self.intermediate_size * 2,
+                    gather_output=False,
+                    has_bias=False,
+                )
+            else:
+                self.gate_proj = ColumnParallelLinear(
+                    self.hidden_size,
+                    self.intermediate_size,
+                    gather_output=False,
+                    has_bias=False,
+                )
+                self.up_proj = ColumnParallelLinear(
+                    self.hidden_size,
+                    self.intermediate_size,
+                    gather_output=False,
+                    has_bias=False,
+                )
             self.down_proj = RowParallelLinear(
                 self.intermediate_size,
                 self.hidden_size,
@@ -465,14 +480,36 @@ class Qwen2MoeMLP(nn.Layer):
                 has_bias=False,
             )
         else:
-            self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)  # w1
-            self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)  # w3
+            if self.fuse_attention_ffn:
+                self.gate_up_fused_proj = Linear(self.hidden_size, self.intermediate_size * 2, bias_attr=False)
+            else:
+                self.gate_proj = Linear(self.hidden_size, self.intermediate_size, bias_attr=False)  # w1
+                self.up_proj = Linear(self.hidden_size, self.intermediate_size, bias_attr=False)  # w3
             self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)  # w2
 
-        self.act_fn = ACT2FN[config.hidden_act]
+        if config.hidden_act == "silu":
+            self.act_fn = fusion_ops.swiglu
+            self.fuse_swiglu = True
+        else:
+            self.act_fn = ACT2FN[config.hidden_act]
+            self.fuse_swiglu = False
 
     def forward(self, x):
-        return self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
+        if self.fuse_attention_ffn:
+            x = self.gate_up_fused_proj(x)
+            if self.fuse_swiglu:
+                y = None
+            else:
+                x, y = x.chunk(2, axis=-1)
+        else:
+            x, y = self.gate_proj(x), self.up_proj(x)
+
+        if self.fuse_swiglu:
+            x = self.act_fn(x, y)
+        else:
+            x = self.act_fn(x) * y
+
+        return self.down_proj(x)
 
 
 def repeat_kv(hidden_states: paddle.Tensor, n_rep: int) -> paddle.Tensor:
@@ -515,6 +552,8 @@ class Qwen2MoeAttention(nn.Layer):
         self.seq_length = config.seq_length
         self.sequence_parallel = config.sequence_parallel
 
+        self.fuse_attention_qkv = config.fuse_attention_qkv
+
         # Note that we will actually perform a recompute only if both enable_recompute and layerwise_recompute are set to True
         # Enable_recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
@@ -548,18 +587,43 @@ class Qwen2MoeAttention(nn.Layer):
             RowParallelLinear = linear_utils.RowParallelLinear
 
         if config.tensor_parallel_degree > 1:
-            self.q_proj = ColumnParallelLinear(self.hidden_size, self.hidden_size, has_bias=True, gather_output=False)
-            self.k_proj = ColumnParallelLinear(
-                self.hidden_size, self.config.num_key_value_heads * self.head_dim, has_bias=True, gather_output=False
-            )
-            self.v_proj = ColumnParallelLinear(
-                self.hidden_size, self.config.num_key_value_heads * self.head_dim, has_bias=True, gather_output=False
-            )
+            if self.fuse_attention_qkv:
+                self.qkv_proj = ColumnParallelLinear(
+                    self.hidden_size,
+                    self.hidden_size + 2 * self.config.num_key_value_heads * self.head_dim,
+                    has_bias=True,
+                    gather_output=False,
+                )
+            else:
+                self.q_proj = ColumnParallelLinear(
+                    self.hidden_size, self.hidden_size, has_bias=True, gather_output=False
+                )
+                self.k_proj = ColumnParallelLinear(
+                    self.hidden_size,
+                    self.config.num_key_value_heads * self.head_dim,
+                    has_bias=True,
+                    gather_output=False,
+                )
+                self.v_proj = ColumnParallelLinear(
+                    self.hidden_size,
+                    self.config.num_key_value_heads * self.head_dim,
+                    has_bias=True,
+                    gather_output=False,
+                )
             self.o_proj = RowParallelLinear(self.hidden_size, self.hidden_size, has_bias=False, input_is_parallel=True)
         else:
-            self.q_proj = nn.Linear(self.hidden_size, self.hidden_size, bias_attr=True)
-            self.k_proj = nn.Linear(self.hidden_size, self.config.num_key_value_heads * self.head_dim, bias_attr=True)
-            self.v_proj = nn.Linear(self.hidden_size, self.config.num_key_value_heads * self.head_dim, bias_attr=True)
+            if self.fuse_attention_qkv:
+                self.qkv_proj = Linear(
+                    self.hidden_size, self.hidden_size + 2 * self.config.num_key_value_heads * self.head_dim
+                )
+            else:
+                self.q_proj = nn.Linear(self.hidden_size, self.hidden_size, bias_attr=True)
+                self.k_proj = nn.Linear(
+                    self.hidden_size, self.config.num_key_value_heads * self.head_dim, bias_attr=True
+                )
+                self.v_proj = nn.Linear(
+                    self.hidden_size, self.config.num_key_value_heads * self.head_dim, bias_attr=True
+                )
             self.o_proj = nn.Linear(self.hidden_size, self.hidden_size, bias_attr=False)
 
         self.rotary_emb = Qwen2MoeRotaryEmbedding(
@@ -583,19 +647,39 @@ class Qwen2MoeAttention(nn.Layer):
 
         batch_size, seq_len, _ = hidden_states.shape
 
-        query_states = self.q_proj(hidden_states)
-        key_states = self.k_proj(hidden_states)
-        value_states = self.v_proj(hidden_states)
-
-        if self.sequence_parallel:
-            target_query_shape = [-1, self.seq_length, self.num_heads, self.head_dim]
-            target_key_value_shape = [-1, self.seq_length, self.num_key_value_heads, self.head_dim]
+        if self.fuse_attention_qkv:
+            mix_layer = self.qkv_proj(hidden_states)
+            if self.sequence_parallel:
+                target_shape = [
+                    -1,
+                    self.seq_length,
+                    self.num_key_value_heads,
+                    (self.num_key_value_groups + 2) * self.head_dim,
+                ]
+            else:
+                target_shape = [0, 0, self.num_key_value_heads, (self.num_key_value_groups + 2) * self.head_dim]
+            mix_layer = paddle.reshape_(mix_layer, target_shape)
+            query_states, key_states, value_states = paddle.split(
+                mix_layer,
+                num_or_sections=[self.num_key_value_groups * self.head_dim, self.head_dim, self.head_dim],
+                axis=-1,
+            )
+            if self.gqa_or_mqa:
+                query_states = paddle.reshape_(query_states, [0, 0, self.num_heads, self.head_dim])
         else:
-            target_query_shape = [0, 0, self.num_heads, self.head_dim]
-            target_key_value_shape = [0, 0, self.num_key_value_heads, self.head_dim]
-        query_states = query_states.reshape(shape=target_query_shape)
-        key_states = key_states.reshape(shape=target_key_value_shape)
-        value_states = value_states.reshape(shape=target_key_value_shape)
+            query_states = self.q_proj(hidden_states)
+            key_states = self.k_proj(hidden_states)
+            value_states = self.v_proj(hidden_states)
+
+            if self.sequence_parallel:
+                target_query_shape = [-1, self.seq_length, self.num_heads, self.head_dim]
+                target_key_value_shape = [-1, self.seq_length, self.num_key_value_heads, self.head_dim]
+            else:
+                target_query_shape = [0, 0, self.num_heads, self.head_dim]
+                target_key_value_shape = [0, 0, self.num_key_value_heads, self.head_dim]
+            query_states = query_states.reshape(shape=target_query_shape)
+            key_states = key_states.reshape(shape=target_key_value_shape)
+            value_states = value_states.reshape(shape=target_key_value_shape)
 
         kv_seq_len = key_states.shape[-3]
 
@@ -626,8 +710,10 @@ class Qwen2MoeAttention(nn.Layer):
 
         # TODO(wj-Mcat): use broadcast strategy when n_kv_heads = 1
         # repeat k/v heads if n_kv_heads < n_heads
-        key_states = repeat_kv(key_states, self.num_key_value_groups)
-        value_states = repeat_kv(value_states, self.num_key_value_groups)
+        paddle_version = float(paddle.__version__[:3])
+        if not self.config.use_flash_attention or ((paddle_version != 0.0) and (paddle_version <= 2.6)):
+            key_states = repeat_kv(key_states, self.num_key_value_groups)
+            value_states = repeat_kv(value_states, self.num_key_value_groups)
 
         has_gradient = not (query_states.stop_gradient and key_states.stop_gradient and value_states.stop_gradient)
         if (
@@ -953,14 +1039,18 @@ class Qwen2MoePretrainedModel(PretrainedModel):
                 base_actions.pop("embed_tokens.weight")
 
             # Column Linear
-            base_actions["layers.0.self_attn.q_proj.weight"] = partial(fn, is_column=True)
-            base_actions["layers.0.self_attn.q_proj.bias"] = partial(fn, is_column=True)
-            # if we have enough num_key_value_heads to split, then split it.
-            if config.num_key_value_heads % config.tensor_parallel_degree == 0:
-                base_actions["layers.0.self_attn.k_proj.weight"] = partial(fn, is_column=True)
-                base_actions["layers.0.self_attn.v_proj.weight"] = partial(fn, is_column=True)
-                base_actions["layers.0.self_attn.k_proj.bias"] = partial(fn, is_column=True)
-                base_actions["layers.0.self_attn.v_proj.bias"] = partial(fn, is_column=True)
+            if config.fuse_attention_qkv:
+                base_actions["layers.0.self_attn.qkv_proj.weight"] = partial(fn, is_column=True)
+                base_actions["layers.0.self_attn.qkv_proj.bias"] = partial(fn, is_column=True)
+            else:
+                base_actions["layers.0.self_attn.q_proj.weight"] = partial(fn, is_column=True)
+                base_actions["layers.0.self_attn.q_proj.bias"] = partial(fn, is_column=True)
+                # if we have enough num_key_value_heads to split, then split it.
+                if config.num_key_value_heads % config.tensor_parallel_degree == 0:
+                    base_actions["layers.0.self_attn.k_proj.weight"] = partial(fn, is_column=True)
+                    base_actions["layers.0.self_attn.v_proj.weight"] = partial(fn, is_column=True)
+                    base_actions["layers.0.self_attn.k_proj.bias"] = partial(fn, is_column=True)
+                    base_actions["layers.0.self_attn.v_proj.bias"] = partial(fn, is_column=True)
 
             for key, action in base_actions.items():
                 if "layers.0." in key:
@@ -969,11 +1059,18 @@ class Qwen2MoePretrainedModel(PretrainedModel):
                 final_actions[key] = action
 
             # Add tp split for expert params.
-            base_actions = {
-                "layers.0.mlp.experts.0.gate_proj.weight": partial(fn, is_column=True),
-                "layers.0.mlp.experts.0.down_proj.weight": partial(fn, is_column=False),
-                "layers.0.mlp.experts.0.up_proj.weight": partial(fn, is_column=True),
-            }
+            if config.fuse_attention_ffn:
+                base_actions = {
+                    "layers.0.mlp.experts.0.gate_up_fused_proj.weight": partial(
+                        fn, is_column=True, is_naive_2fuse=True
+                    )
+                }
+            else:
+                base_actions = {
+                    "layers.0.mlp.experts.0.gate_proj.weight": partial(fn, is_column=True),
+                    "layers.0.mlp.experts.0.up_proj.weight": partial(fn, is_column=True),
+                }
+            base_actions["layers.0.mlp.experts.0.down_proj.weight"] = partial(fn, is_column=False)
             for key, action in base_actions.items():
                 for i in range(num_layers):
                     newkey = key.replace("layers.0.", f"layers.{i}.")
@@ -982,9 +1079,18 @@ class Qwen2MoePretrainedModel(PretrainedModel):
                         final_actions[newkey2] = action
 
             # Add tp split for shared expert params.
+            if config.fuse_attention_ffn:
+                base_actions = {
+                    "layers.0.mlp.shared_expert.gate_up_fused_proj.weight": partial(
+                        fn, is_column=True, is_naive_2fuse=True
+                    )
+                }
+            else:
+                base_actions = {
+                    "layers.0.mlp.shared_expert.gate_proj.weight": partial(fn, is_column=True),
+                    "layers.0.mlp.shared_expert.up_proj.weight": partial(fn, is_column=True),
+                }
             base_actions = {
-                "layers.0.mlp.shared_expert.gate_proj.weight": partial(fn, is_column=True),
-                "layers.0.mlp.shared_expert.up_proj.weight": partial(fn, is_column=True),
                 "layers.0.mlp.shared_expert.down_proj.weight": partial(fn, is_column=False),
             }
             for key, action in base_actions.items():
@@ -998,6 +1104,92 @@ class Qwen2MoePretrainedModel(PretrainedModel):
         mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers, config.num_experts)
 
         return mappings
+
+    @classmethod
+    def _get_fuse_or_split_param_mappings(cls, config: Qwen2MoeConfig, is_fuse=False):
+        # return parameter fuse utils
+        from paddlenlp.transformers.conversion_utils import split_or_fuse_func
+
+        fn = split_or_fuse_func(is_fuse=is_fuse)
+
+        # last key is fused key, other keys are to be fused.
+        fuse_qkv_keys = [
+            (
+                "layers.0.self_attn.q_proj.weight",
+                "layers.0.self_attn.k_proj.weight",
+                "layers.0.self_attn.v_proj.weight",
+                "layers.0.self_attn.qkv_proj.weight",
+            ),
+            (
+                "layers.0.self_attn.q_proj.bias",
+                "layers.0.self_attn.k_proj.bias",
+                "layers.0.self_attn.v_proj.bias",
+                "layers.0.self_attn.qkv_proj.bias",
+            ),
+        ]
+
+        fuse_gate_up_keys = [
+            (
+                "layers.0.mlp.gate_proj.weight",
+                "layers.0.mlp.up_proj.weight",
+                "layers.0.mlp.gate_up_fused_proj.weight",
+            ),
+            (
+                "layers.0.mlp.experts.0.gate_proj.weight",
+                "layers.0.mlp.experts.0.up_proj.weight",
+                "layers.0.mlp.experts.0.gate_up_fused_proj.weight",
+            ),
+            (
+                "layers.0.mlp.shared_expert.gate_proj.weight",
+                "layers.0.mlp.shared_expert.up_proj.weight",
+                "layers.0.mlp.shared_expert.gate_up_fused_proj.weight",
+            ),
+        ]
+        num_heads = config.num_attention_heads
+        num_key_value_heads = getattr(config, "num_key_value_heads", num_heads)
+        fuse_attention_qkv = getattr(config, "fuse_attention_qkv", False)
+        fuse_attention_ffn = getattr(config, "fuse_attention_ffn", False)
+
+        final_actions = {}
+        if is_fuse:
+            if fuse_attention_qkv:
+                for i in range(config.num_hidden_layers):
+                    for fuse_keys in fuse_qkv_keys:
+                        keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_keys])
+                        final_actions[keys] = partial(
+                            fn, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
+                        )
+            if fuse_attention_ffn:
+                for fuse_keys in fuse_gate_up_keys:
+                    if any(["exports.0" in key for key in fuse_keys]):
+                        fuse_keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_keys])
+                        for i in range(config.num_experts):
+                            keys = tuple([key.replace("experts.0.", f"experts.{i}.") for key in fuse_keys])
+                            final_actions[keys] = fn
+                    else:
+                        for i in range(config.num_hidden_layers):
+                            keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_keys])
+                            final_actions[keys] = fn
+        else:
+            if not fuse_attention_qkv:
+                for i in range(config.num_hidden_layers):
+                    for fuse_keys in fuse_qkv_keys:
+                        keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_keys])
+                        final_actions[keys] = partial(
+                            fn, split_nums=3, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
+                        )
+            if not fuse_attention_ffn:
+                for fuse_keys in fuse_gate_up_keys:
+                    if any(["exports.0" in key for key in fuse_keys]):
+                        fuse_keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_keys])
+                        for i in range(config.num_experts):
+                            keys = tuple([key.replace("experts.0.", f"experts.{i}.") for key in fuse_keys])
+                            final_actions[keys] = partial(fn, split_nums=2)
+                    else:
+                        for i in range(config.num_hidden_layers):
+                            keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_keys])
+                            final_actions[keys] = partial(fn, split_nums=2)
+        return final_actions
 
     def _init_weights(self, layer):
         """Initialization hook"""
@@ -1425,7 +1617,7 @@ class Qwen2MoeForCausalLM(Qwen2MoePretrainedModel):
         attention_mask=None,
         inputs_embeds=None,
         output_router_logits=False,
-        **kwargs
+        **kwargs,
     ):
         batch_size, seq_length = input_ids.shape
         position_ids = kwargs.get("position_ids", paddle.arange(seq_length).expand((batch_size, seq_length)))
