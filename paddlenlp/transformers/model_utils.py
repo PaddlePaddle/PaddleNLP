@@ -1161,7 +1161,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         tensor_parallel_degree = kwargs.pop("tensor_parallel_degree", 1)
         tensor_parallel_rank = kwargs.pop("tensor_parallel_rank", 0)
 
-        if predictor_args.mode == "dynamic":
+        if predictor_args.mode == "dynamic" or predictor_args.speculate_method in ["eagle"]:
             config.tensor_parallel_degree = tensor_parallel_degree
             config.tensor_parallel_rank = tensor_parallel_rank
             config.model_name_or_path = predictor_args.model_name_or_path
@@ -1203,7 +1203,11 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             config.speculate_max_ngram_size = predictor_args.speculate_max_ngram_size
             config.speculate_verify_window = predictor_args.speculate_verify_window
             config.speculate_max_candidate_len = predictor_args.speculate_max_candidate_len
-            config.decode_strategy = "speculate_decoding"
+            if predictor_args.speculate_method == "eagle":
+                config.decode_strategy = "draft_model_sample"
+            else:
+                config.decode_strategy = "speculate_decoding"
+            config.return_full_hidden_states = predictor_args.return_full_hidden_states
 
     @classmethod
     def confirm_inference_model(cls, predictor_args, **kwargs):
