@@ -91,10 +91,6 @@ class PreTrainingArguments(AutoTrainingArguments):
         default=False,
         metadata={"help": "Weather to run benchmark by autotuner. True for from_scratch and pad_max_length."},
     )
-    use_intermediate_api: bool = field(
-        default=False,
-        metadata={"help": "Weather to use auto_parallel intermediate api"},
-    )
 
     def __post_init__(self):
         super().__post_init__()
@@ -228,15 +224,6 @@ class ModelArguments:
 
     hidden_dropout_prob: float = field(default=0.1, metadata={"help": "The hidden dropout prob."})
     attention_probs_dropout_prob: float = field(default=0.1, metadata={"help": "The attention hidden dropout prob."})
-
-    sequence_parallel: bool = field(
-        default=False,
-        metadata={"help": "whether to use sequence parallel"},
-    )
-    fuse_sequence_parallel_allreduce: bool = field(
-        default=False,
-        metadata={"help": "whether to use fuse sequence parallel allreduce"},
-    )
     use_fused_rope: Optional[bool] = field(
         default=False,
         metadata={"help": "Enable rope fusion or not."},
@@ -506,8 +493,8 @@ def main():
     config.fuse_attention_ffn = model_args.fuse_attention_ffn
     config.recompute_granularity = model_args.recompute_granularity
     config.virtual_pp_degree = model_args.virtual_pp_degree
-    config.sequence_parallel = model_args.sequence_parallel
-    config.fuse_sequence_parallel_allreduce = model_args.fuse_sequence_parallel_allreduce
+    config.sequence_parallel = training_args.sequence_parallel
+    config.fuse_sequence_parallel_allreduce = training_args.fuse_sequence_parallel_allreduce
     config.use_fused_rope = model_args.use_fused_rope
     config.no_recompute_layers = model_args.no_recompute_layers
     config.pp_recompute_interval = model_args.pp_recompute_interval
@@ -577,9 +564,6 @@ def main():
         tokenizer,
         need_data=training_args.should_load_dataset,
     )
-
-    # load_model_auto(model)
-    # model = shard_model(model)
 
     trainer = PretrainingTrainer(
         model=model,

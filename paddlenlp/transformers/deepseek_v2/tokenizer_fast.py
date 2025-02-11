@@ -15,6 +15,10 @@ from typing import List, Optional, Union
 
 from ..llama import LlamaTokenizerFast
 
+__all__ = [
+    "DeepseekTokenizerFast",
+]
+
 
 class DeepseekTokenizerFast(LlamaTokenizerFast):
     def convert_ids_to_tokens(

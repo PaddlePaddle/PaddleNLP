@@ -86,7 +86,3 @@ class ModelArgument:
         default=1,
         metadata={"help": "virtual_pp_degree"},
     )
-    sequence_parallel: bool = field(
-        default=False,
-        metadata={"help": "whether to use sequence parallel"},
-    )

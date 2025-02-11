@@ -107,6 +107,9 @@ __global__ void speculate_verify_and_update_kernel(int64_t* accept_tokens,
 
             int i = 0;
             for (; i < seq_lens_this_time[bid] - 1; i++) {
+                if (seq_lens_encoder[bid] != 0) {
+                    break;
+                }
                 if (USE_TOPK) {
                     if (verify_tokens_now[i * max_candidate_len] == draft_tokens_now[i + 1]) {
                         accept_num_now++;

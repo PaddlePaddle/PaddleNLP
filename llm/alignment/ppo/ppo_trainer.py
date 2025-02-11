@@ -66,6 +66,7 @@ from paddlenlp.trainer.trainer import (
     speed_metrics,
 )
 from paddlenlp.transformers import PretrainedModel, PretrainedTokenizer
+from paddlenlp.utils import empty_device_cache
 
 
 class StepTrainer(Trainer):
@@ -1032,7 +1033,7 @@ class PPOTrainer(Trainer):
                     ptx_batches = [None for _ in range(len(rl_batches))]
                 self.timers and self.timers("ptx-batch").stop()
 
-                paddle.device.cuda.empty_cache()
+                empty_device_cache()
 
                 self.set_train()
                 for _ in range(self.args.update_iters):
@@ -1152,7 +1153,7 @@ class PPOTrainer(Trainer):
 
         # ##### model and optimizer related setting #####
         policy_model, value_model = self.init_train_model_opt(max_steps, resume_from_checkpoint)
-        paddle.device.cuda.empty_cache()
+        empty_device_cache()
 
         # ##### traing statistic logging #####
         # Number of trainable parameters only account for policy_model
@@ -1208,7 +1209,7 @@ class PPOTrainer(Trainer):
                     # with self.enable(self.value_trainer.optimizer):
                     with self.enable():  # put value optimizer guard in rl_step
                         rl_info = self.rl_step(rl_batch)
-                    paddle.device.cuda.empty_cache()
+                    empty_device_cache()
                     self.timers and self.timers("rl_step").stop()
 
                     if self.use_ptx:
@@ -1224,7 +1225,7 @@ class PPOTrainer(Trainer):
                             ptx_info = self.ptx_step(ptx_batch)
                         rl_info.update(ptx_info)
                         self.timers and self.timers("ptx_step").stop()
-                paddle.device.cuda.empty_cache()
+                empty_device_cache()
 
                 self.state.global_step += 1
                 self.state.epoch = epoch + (step + 1) / steps_in_epoch

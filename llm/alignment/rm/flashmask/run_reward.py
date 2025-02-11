@@ -35,11 +35,7 @@ from paddlenlp.trainer import (
     get_last_checkpoint,
     set_seed,
 )
-from paddlenlp.transformers import (
-    AutoConfig,
-    AutoTokenizer,
-    register_sequence_parallel_allreduce_hooks,
-)
+from paddlenlp.transformers import AutoConfig, AutoTokenizer
 from paddlenlp.utils.log import logger
 
 
@@ -126,10 +122,6 @@ def main():
         logger.warning("`flash_mask` must use with zero padding and flash attention.")
         model.config.use_flash_attention = True
 
-    if model_args.sequence_parallel:
-        register_sequence_parallel_allreduce_hooks(
-            model, training_args.gradient_accumulation_steps, training_args.fuse_sequence_parallel_allreduce
-        )
     if model_args.tokenizer_name_or_path is not None:
         tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
     else:
