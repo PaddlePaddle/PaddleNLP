@@ -163,6 +163,16 @@ if cc == 89 and cuda_version >= 12.4:
         "gpu/fp8_gemm_with_cutlass/fp8_fp8_fp8_dual_gemm.cu",
     ]
 
+if cc >= 89 and cuda_version >= 12.4:
+    nvcc_compile_args += [
+        "-std=c++17",
+        "--use_fast_math",
+        "--threads=8",
+        "-D_GLIBCXX_USE_CXX11_ABI=1",
+    ]
+    sources += find_end_files("./gpu/sage_attn_kernels", ".cu")
+    sources += ["./gpu/sage_attn_kernels/sageattn.cc"]
+
 if cc >= 90 and cuda_version >= 12.0:
     nvcc_compile_args += ["-DNDEBUG"]
     os.system("python utils/auto_gen_fp8_fp8_gemm_fused_kernels_sm90.py --cuda_arch 90")
@@ -178,7 +188,7 @@ setup(
     name="paddlenlp_ops",
     ext_modules=CUDAExtension(
         sources=sources,
-        extra_compile_args={"cxx": ["-O3"], "nvcc": nvcc_compile_args},
+        extra_compile_args={"cxx": ["-O3", "-fopenmp", "-lgomp", "-std=c++17", "-DENABLE_BF16"], "nvcc": nvcc_compile_args},
         libraries=["cublasLt"],
         library_dirs=[library_path],
     ),
