@@ -997,7 +997,7 @@ class FusedMultiTransformerBase(Layer):
             key_nope, value = key_value.split(
                 [self.config.mla_config.qk_nope_head_dim, self.config.mla_config.v_head_dim], axis=-1
             )
-
+            # [TODO](liuzichang) Need fix 'self.position_ids' bug in speculate mode 
             query_pe, key_pe = self.config.rotary_emb(self.position_ids, query_pe, key_pe)
 
             query[..., self.config.mla_config.qk_nope_head_dim :] = query_pe
@@ -1297,6 +1297,7 @@ class FusedMultiTransformerBase(Layer):
         return ffn2_out
 
     def pre_process(self, **kwargs):
+        # [TODO](liuzichang) Need fix 'self.position_ids' bug in speculate mode 
         if self.config.mla_config.use_mla():
             seq_lens_encoder = kwargs.get("seq_lens_encoder", None)
             seq_lens_decoder = kwargs.get("seq_lens_decoder", None)
