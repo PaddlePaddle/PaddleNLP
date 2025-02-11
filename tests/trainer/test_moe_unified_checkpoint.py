@@ -38,7 +38,7 @@ environment_variables = {
 }
 
 moe_arguments = {
-    "model_name_or_path": "./tests/trainer/unified-ckpt-qwen2moe",
+    "model_name_or_path": "__internal_testing__/unified-ckpt-qwen2moe",
     "dataset_name_or_path": "./unified_checkpoint/peft_input/data/",
     "output_dir": "./unified_checkpoint/checkpoints/qwen2moe_sft_ckpts",
     "per_device_train_batch_size": 1,
