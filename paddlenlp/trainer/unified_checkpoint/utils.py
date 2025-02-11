@@ -758,3 +758,31 @@ def save_model_config(model_to_save, save_directory):
     # save generation config
     if model_to_save.can_generate():
         model_to_save.generation_config.save_pretrained(save_directory)
+
+
+def filter_sync_parameters(model_state_dict, optim_state_dict=None, master_weights=None, is_model_weight=True):
+    """Filter sync parameters under expert parallel mode."""
+
+    hcg = fleet.get_hybrid_communicate_group()
+    dp_group = hcg.get_data_parallel_group()
+    dp_rank = dp_group.rank if dp_group.nranks > 1 else 0
+
+    if is_model_weight:
+        for key in list(model_state_dict.keys()):
+            if dp_rank > 0 and not getattr(model_state_dict[key], "no_sync", False):
+                model_state_dict.pop(key)
+    else:
+        no_sync_kname = []
+        for k, v in model_state_dict.items():
+            if getattr(v, "no_sync", False):
+                no_sync_kname.append(k)
+
+        for key in list(optim_state_dict.keys()):
+            model_key = key.split("/")[0]
+            if dp_rank > 0 and model_key not in no_sync_kname:
+                optim_state_dict.pop(key)
+
+        if master_weights is not None:
+            for key in list(master_weights.keys()):
+                if dp_rank > 0 and key not in no_sync_kname:
+                    master_weights.pop(key)
