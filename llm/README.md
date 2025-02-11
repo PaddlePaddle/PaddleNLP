@@ -332,6 +332,11 @@ python ./predict/export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat
 # step2: 静态图推理
 python ./predict/predictor.py --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static"
 ```
+参数说明：
+1. **`--inference_model`** 参数表示使用高性能自定义算子推理，否则使用普通动态图推理(如果可以安装算子，建议打开此开关)。打开时，请前往[此处安装](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/csrc)高性能推理自定义算子，
+2. **`--mode`** 有两种模式可选 `dynamic`, `static`。分别表示动态图和静态图模式。静态图模型需要进行参数导出步骤，动态图不需要。具体可以参考上述命令执行。静态图情况下，导出和推理的参数`--inference_model`需要一致。
+3. 推理速度简要比较。`static+inference_model` > `dynamic+inference_model` >> `static w/o inference_model` > `dynamic w/o inference_mode`。推荐安装高性能算子，使用 `动态图+inference_model` 模式，方便快捷。
+
 
 更多模型推理使用方法详见[大模型推理文档](./docs/predict/inference.md)。
 
@@ -367,7 +372,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./predict/flask_ser
 
 #### 7.2 大模型服务化部署工具
 
-该部署工具是基于英伟达Triton框架专为服务器场景的大模型服务化部署而设计。它提供了支持gRPC、HTTP协议的服务接口，以及流式Token输出能力。底层推理引擎支持连续批处理、weight only int8、后训练量化（PTQ）等加速优化策略，为用户带来易用且高性能的部署体验。
+该部署工具是基于英伟达 Triton 框架专为服务器场景的大模型服务化部署而设计。它提供了支持 gRPC、HTTP 协议的服务接口，以及流式 Token 输出能力。底层推理引擎支持连续批处理、weight only int8、后训练量化（PTQ）等加速优化策略，为用户带来易用且高性能的部署体验。
 
 基于预编译镜像部署，本节以 Meta-Llama-3-8B-Instruct-A8W8C8 为例，更多模型请参考[LLaMA](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/llama.md)、[Qwen](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/qwen.md)、[Mixtral](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/mixtral.md), 更细致的模型推理、量化教程可以参考[大模型推理教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/inference.md)：
 

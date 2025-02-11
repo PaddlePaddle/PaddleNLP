@@ -12,13 +12,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Paddle Qwen2Moe model."""
+"""Paddle Qwen2Moe model."""
+
 from __future__ import annotations
 
 import math
 import warnings
 from functools import partial
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 import paddle
 import paddle.distributed.fleet.meta_parallel as mpu
@@ -28,14 +29,19 @@ from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
 
-from ...utils.log import logger
+from paddlenlp.utils.tools import get_env_device
+
 from .. import linear_utils
 from ..activations import ACT2FN
 from ..conversion_utils import StateDictNameMapping, init_name_mappings
+from ..linear_utils import Linear
+from ..llama import fusion_ops
+from ..llama.modeling import get_use_casual_mask
 from ..model_outputs import MoECausalLMOutputWithPast, MoEModelOutputWithPast
 from ..model_utils import PretrainedModel, register_base_model
 from ..moe_gate import PretrainedMoEGate
 from ..moe_layer import MoELayer
+from ..utils import logger
 from .configuration import Qwen2MoeConfig
 
 try:
@@ -219,8 +225,10 @@ def scaled_dot_product_attention(
     value_states,
     attention_mask,
     output_attentions,
+    attn_mask_startend_row_indices=None,
     training=True,
     sequence_parallel=False,
+    skip_recompute=False,
 ):
     bsz, q_len, num_heads, head_dim = query_states.shape
     _, kv_seq_len, _, _ = value_states.shape
@@ -229,40 +237,25 @@ def scaled_dot_product_attention(
         # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
 
-        version = paddle.version.full_version
-        if version != "0.0.0" and version <= "2.5.2":
-            attn_output, attn_weights = flash_attention(
-                query_states,
-                key_states,
-                value_states,
-                causal=True,
-                return_softmax=output_attentions,
-            )
-        else:
-            attn_output = F.scaled_dot_product_attention(
-                query_states,
-                key_states,
-                value_states,
-                attn_mask=attention_mask,
-                is_causal=attention_mask is None,
-                dropout_p=config.attention_dropout if training else 0.0,
-                training=training,
-            )
-            attn_weights = None
-
-        if sequence_parallel:
-            attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
-        else:
-            attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
-        return (attn_output, attn_weights) if output_attentions else attn_output
+        return fusion_ops.fusion_flash_attention(
+            query_states,
+            config,
+            key_states,
+            value_states,
+            attention_mask,
+            output_attentions,
+            attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+            sequence_parallel=sequence_parallel,
+            skip_recompute=skip_recompute,
+        )
     else:
         #  [ bz, seqlen, nhead, head_dim] -> [bs, nhead, seq_len, head_dim]
         query_states = paddle.transpose(query_states, [0, 2, 1, 3])
-        # merge with the next tranpose
+        # merge with the next transpose
         key_states = paddle.transpose(key_states, [0, 2, 1, 3])
         value_states = paddle.transpose(value_states, [0, 2, 1, 3])
 
-        # matmul and devide by sqrt(head_dim)
+        # matmul and divide by sqrt(head_dim)
         attn_weights = paddle.matmul(query_states / math.sqrt(head_dim), key_states.transpose([0, 1, 3, 2]))
 
         if attn_weights.shape != [bsz, num_heads, q_len, kv_seq_len]:
@@ -356,14 +349,15 @@ class Qwen2MoeRMSNorm(nn.Layer):
             mark_as_sequence_parallel_parameter(self.weight)
 
     def forward(self, hidden_states):
+        if self.config.use_fused_rms_norm:
+            return fusion_ops.fusion_rms_norm(hidden_states, self.weight, self.variance_epsilon, False)
+
         if paddle.in_dynamic_mode():
             with paddle.amp.auto_cast(False):
-                hidden_states = hidden_states.astype("float32")
-                variance = hidden_states.pow(2).mean(-1, keepdim=True)
+                variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
                 hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
         else:
-            hidden_states = hidden_states.astype("float32")
-            variance = hidden_states.pow(2).mean(-1, keepdim=True)
+            variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
             hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
 
         if self.weight.dtype in [paddle.float16, paddle.bfloat16]:
@@ -436,6 +430,8 @@ class Qwen2MoeMLP(nn.Layer):
         self.intermediate_size = (
             config.moe_intermediate_size if not is_shared else config.shared_expert_intermediate_size
         )
+        self.fuse_attention_ffn = config.fuse_attention_ffn
+
         self.tensor_parallel_degree = config.tensor_parallel_degree
 
         if config.sequence_parallel:
@@ -446,18 +442,26 @@ class Qwen2MoeMLP(nn.Layer):
             RowParallelLinear = linear_utils.RowParallelLinear
 
         if config.tensor_parallel_degree > 1:
-            self.gate_proj = ColumnParallelLinear(
-                self.hidden_size,
-                self.intermediate_size,
-                gather_output=False,
-                has_bias=False,
-            )
-            self.up_proj = ColumnParallelLinear(
-                self.hidden_size,
-                self.intermediate_size,
-                gather_output=False,
-                has_bias=False,
-            )
+            if self.fuse_attention_ffn:
+                self.gate_up_fused_proj = ColumnParallelLinear(
+                    self.hidden_size,
+                    self.intermediate_size * 2,
+                    gather_output=False,
+                    has_bias=False,
+                )
+            else:
+                self.gate_proj = ColumnParallelLinear(
+                    self.hidden_size,
+                    self.intermediate_size,
+                    gather_output=False,
+                    has_bias=False,
+                )
+                self.up_proj = ColumnParallelLinear(
+                    self.hidden_size,
+                    self.intermediate_size,
+                    gather_output=False,
+                    has_bias=False,
+                )
             self.down_proj = RowParallelLinear(
                 self.intermediate_size,
                 self.hidden_size,
@@ -465,14 +469,36 @@ class Qwen2MoeMLP(nn.Layer):
                 has_bias=False,
             )
         else:
-            self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)  # w1
-            self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)  # w3
-            self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)  # w2
+            if self.fuse_attention_ffn:
+                self.gate_up_fused_proj = Linear(self.hidden_size, self.intermediate_size * 2, bias_attr=False)
+            else:
+                self.gate_proj = Linear(self.hidden_size, self.intermediate_size, bias_attr=False)  # w1
+                self.up_proj = Linear(self.hidden_size, self.intermediate_size, bias_attr=False)  # w3
+            self.down_proj = Linear(self.intermediate_size, self.hidden_size, bias_attr=False)  # w2
 
-        self.act_fn = ACT2FN[config.hidden_act]
+        if config.hidden_act == "silu":
+            self.act_fn = fusion_ops.swiglu
+            self.fuse_swiglu = True
+        else:
+            self.act_fn = ACT2FN[config.hidden_act]
+            self.fuse_swiglu = False
 
     def forward(self, x):
-        return self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
+        if self.fuse_attention_ffn:
+            x = self.gate_up_fused_proj(x)
+            if self.fuse_swiglu:
+                y = None
+            else:
+                x, y = x.chunk(2, axis=-1)
+        else:
+            x, y = self.gate_proj(x), self.up_proj(x)
+
+        if self.fuse_swiglu:
+            x = self.act_fn(x, y)
+        else:
+            x = self.act_fn(x) * y
+
+        return self.down_proj(x)
 
 
 def repeat_kv(hidden_states: paddle.Tensor, n_rep: int) -> paddle.Tensor:
@@ -515,6 +541,8 @@ class Qwen2MoeAttention(nn.Layer):
         self.seq_length = config.seq_length
         self.sequence_parallel = config.sequence_parallel
 
+        self.fuse_attention_qkv = config.fuse_attention_qkv
+
         # Note that we will actually perform a recompute only if both enable_recompute and layerwise_recompute are set to True
         # Enable_recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
@@ -533,7 +561,7 @@ class Qwen2MoeAttention(nn.Layer):
 
         self.use_fused_rope = config.use_fused_rope
         if self.use_fused_rope:
-            if "gpu" not in paddle.device.get_device() or fused_rotary_position_embedding is None:
+            if get_env_device() not in ["gpu", "xpu"] or fused_rotary_position_embedding is None:
                 warnings.warn(
                     "Enable fuse rope in the config, but fuse rope is not available. "
                     "Will disable fuse rope. Try using latest gpu version of Paddle."
@@ -548,25 +576,38 @@ class Qwen2MoeAttention(nn.Layer):
             RowParallelLinear = linear_utils.RowParallelLinear
 
         if config.tensor_parallel_degree > 1:
-            self.q_proj = ColumnParallelLinear(self.hidden_size, self.hidden_size, has_bias=True, gather_output=False)
-            self.k_proj = ColumnParallelLinear(
-                self.hidden_size, self.config.num_key_value_heads * self.head_dim, has_bias=True, gather_output=False
-            )
-            self.v_proj = ColumnParallelLinear(
-                self.hidden_size, self.config.num_key_value_heads * self.head_dim, has_bias=True, gather_output=False
-            )
+            if self.fuse_attention_qkv:
+                self.qkv_proj = ColumnParallelLinear(
+                    self.hidden_size,
+                    self.hidden_size + 2 * self.config.num_key_value_heads * self.head_dim,
+                    has_bias=True,
+                    gather_output=False,
+                )
+            else:
+                self.q_proj = ColumnParallelLinear(
+                    self.hidden_size, self.hidden_size, has_bias=True, gather_output=False
+                )
+                self.k_proj = ColumnParallelLinear(self.hidden_size, self.config.num_key_value_heads * self.head_dim, has_bias=True, gather_output=False)  # fmt:skip
+                self.v_proj = ColumnParallelLinear(self.hidden_size, self.config.num_key_value_heads * self.head_dim, has_bias=True, gather_output=False)  # fmt:skip
             self.o_proj = RowParallelLinear(self.hidden_size, self.hidden_size, has_bias=False, input_is_parallel=True)
         else:
-            self.q_proj = nn.Linear(self.hidden_size, self.hidden_size, bias_attr=True)
-            self.k_proj = nn.Linear(self.hidden_size, self.config.num_key_value_heads * self.head_dim, bias_attr=True)
-            self.v_proj = nn.Linear(self.hidden_size, self.config.num_key_value_heads * self.head_dim, bias_attr=True)
-            self.o_proj = nn.Linear(self.hidden_size, self.hidden_size, bias_attr=False)
+            if self.fuse_attention_qkv:
+                self.qkv_proj = Linear(
+                    self.hidden_size, self.hidden_size + 2 * self.config.num_key_value_heads * self.head_dim
+                )
+            else:
+                self.q_proj = Linear(self.hidden_size, self.hidden_size, bias_attr=True)
+                self.k_proj = Linear(self.hidden_size, self.config.num_key_value_heads * self.head_dim, bias_attr=True)
+                self.v_proj = Linear(self.hidden_size, self.config.num_key_value_heads * self.head_dim, bias_attr=True)
+            self.o_proj = Linear(self.hidden_size, self.hidden_size, bias_attr=False)
 
         self.rotary_emb = Qwen2MoeRotaryEmbedding(
             self.head_dim,
             max_position_embeddings=self.max_position_embeddings,
             base=self.rope_theta,
         )
+
+        self.attn_func = scaled_dot_product_attention
 
     def forward(
         self,
@@ -576,26 +617,45 @@ class Qwen2MoeAttention(nn.Layer):
         attention_mask: Optional[paddle.Tensor] = None,
         output_attentions: bool = False,
         use_cache: bool = False,
+        attn_mask_startend_row_indices: Optional[paddle.Tensor] = None,
         **kwargs,
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
         # [bs, seq_len, num_head * head_dim] -> [seq_len / n, bs, num_head * head_dim] (n is model parallelism)
 
-        batch_size, seq_len, _ = hidden_states.shape
-
-        query_states = self.q_proj(hidden_states)
-        key_states = self.k_proj(hidden_states)
-        value_states = self.v_proj(hidden_states)
-
-        if self.sequence_parallel:
-            target_query_shape = [-1, self.seq_length, self.num_heads, self.head_dim]
-            target_key_value_shape = [-1, self.seq_length, self.num_key_value_heads, self.head_dim]
+        if self.fuse_attention_qkv:
+            mix_layer = self.qkv_proj(hidden_states)
+            if self.sequence_parallel:
+                target_shape = [
+                    -1,
+                    self.seq_length,
+                    self.num_key_value_heads,
+                    (self.num_key_value_groups + 2) * self.head_dim,
+                ]
+            else:
+                target_shape = [0, 0, self.num_key_value_heads, (self.num_key_value_groups + 2) * self.head_dim]
+            mix_layer = paddle.reshape_(mix_layer, target_shape)
+            query_states, key_states, value_states = paddle.split(
+                mix_layer,
+                num_or_sections=[self.num_key_value_groups * self.head_dim, self.head_dim, self.head_dim],
+                axis=-1,
+            )
+            if self.gqa_or_mqa:
+                query_states = paddle.reshape_(query_states, [0, 0, self.num_heads, self.head_dim])
         else:
-            target_query_shape = [0, 0, self.num_heads, self.head_dim]
-            target_key_value_shape = [0, 0, self.num_key_value_heads, self.head_dim]
-        query_states = query_states.reshape(shape=target_query_shape)
-        key_states = key_states.reshape(shape=target_key_value_shape)
-        value_states = value_states.reshape(shape=target_key_value_shape)
+            query_states = self.q_proj(hidden_states)
+            key_states = self.k_proj(hidden_states)
+            value_states = self.v_proj(hidden_states)
+
+            if self.sequence_parallel:
+                target_query_shape = [-1, self.seq_length, self.num_heads, self.head_dim]
+                target_key_value_shape = [-1, self.seq_length, self.num_key_value_heads, self.head_dim]
+            else:
+                target_query_shape = [0, 0, self.num_heads, self.head_dim]
+                target_key_value_shape = [0, 0, self.num_key_value_heads, self.head_dim]
+            query_states = query_states.reshape(shape=target_query_shape)
+            key_states = key_states.reshape(shape=target_key_value_shape)
+            value_states = value_states.reshape(shape=target_key_value_shape)
 
         kv_seq_len = key_states.shape[-3]
 
@@ -626,8 +686,10 @@ class Qwen2MoeAttention(nn.Layer):
 
         # TODO(wj-Mcat): use broadcast strategy when n_kv_heads = 1
         # repeat k/v heads if n_kv_heads < n_heads
-        key_states = repeat_kv(key_states, self.num_key_value_groups)
-        value_states = repeat_kv(value_states, self.num_key_value_groups)
+        paddle_version = float(paddle.__version__[:3])
+        if not self.config.use_flash_attention or ((paddle_version != 0.0) and (paddle_version <= 2.6)):
+            key_states = repeat_kv(key_states, self.num_key_value_groups)
+            value_states = repeat_kv(value_states, self.num_key_value_groups)
 
         has_gradient = not (query_states.stop_gradient and key_states.stop_gradient and value_states.stop_gradient)
         if (
@@ -637,27 +699,29 @@ class Qwen2MoeAttention(nn.Layer):
             and self.recompute_granularity == "core_attn"
         ):
             outputs = recompute(
-                scaled_dot_product_attention,
+                self.attn_func,
                 query_states,
                 self.config,
                 key_states,
                 value_states,
                 attention_mask,
                 output_attentions,
-                self.training,
-                self.sequence_parallel,
+                attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+                training=self.training,
+                sequence_parallel=self.sequence_parallel,
                 use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
-            outputs = scaled_dot_product_attention(
+            outputs = self.attn_func(
                 query_states,
                 self.config,
                 key_states,
                 value_states,
                 attention_mask,
                 output_attentions,
-                self.training,
-                self.sequence_parallel,
+                attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+                training=self.training,
+                sequence_parallel=self.sequence_parallel,
             )
         if output_attentions:
             attn_output, attn_weights = outputs
@@ -729,7 +793,7 @@ class Qwen2MoeSparseMoEBlock(MoELayer):
             config,
             moe_num_experts=config.num_experts,
             expert_class=Qwen2MoeMLP,
-            expert_kwargs=config,
+            expert_kwargs={"config": config},
             gate=gate,
             capacity=2.0,
         )
@@ -776,12 +840,13 @@ class Qwen2MoeDecoderLayer(nn.Layer):
     def forward(
         self,
         hidden_states: paddle.Tensor,
-        position_ids: Optional[Tuple[paddle.Tensor]] = None,
+        position_ids: Optional[paddle.Tensor] = None,
         attention_mask: Optional[paddle.Tensor] = None,
         output_attentions: Optional[bool] = False,
         output_router_logits: Optional[bool] = False,
         past_key_value: Optional[Tuple[paddle.Tensor]] = None,
         use_cache: Optional[bool] = False,
+        attn_mask_startend_row_indices: Optional[paddle.Tensor] = None,
         **kwargs,
     ) -> Tuple[paddle.Tensor, Optional[Tuple[paddle.Tensor, paddle.Tensor]]]:
         """
@@ -822,6 +887,7 @@ class Qwen2MoeDecoderLayer(nn.Layer):
                 attention_mask,
                 output_attentions,
                 use_cache,
+                attn_mask_startend_row_indices,
                 use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
@@ -832,6 +898,7 @@ class Qwen2MoeDecoderLayer(nn.Layer):
                 attention_mask,
                 output_attentions,
                 use_cache,
+                attn_mask_startend_row_indices=attn_mask_startend_row_indices,
             )
 
         if type(outputs) is tuple:
@@ -999,6 +1066,66 @@ class Qwen2MoePretrainedModel(PretrainedModel):
 
         return mappings
 
+    @classmethod
+    def _get_fuse_or_split_param_mappings(cls, config: Qwen2MoeConfig, is_fuse=False):
+        # return parameter fuse utils
+        from paddlenlp.transformers.conversion_utils import split_or_fuse_func
+
+        fn = split_or_fuse_func(is_fuse=is_fuse)
+
+        # last key is fused key, other keys are to be fused.
+        fuse_qkv_keys = [
+            (
+                "layers.0.self_attn.q_proj.weight",
+                "layers.0.self_attn.k_proj.weight",
+                "layers.0.self_attn.v_proj.weight",
+                "layers.0.self_attn.qkv_proj.weight",
+            ),
+            (
+                "layers.0.self_attn.q_proj.bias",
+                "layers.0.self_attn.k_proj.bias",
+                "layers.0.self_attn.v_proj.bias",
+                "layers.0.self_attn.qkv_proj.bias",
+            ),
+        ]
+
+        fuse_gate_up_keys = (
+            "layers.0.mlp.gate_proj.weight",
+            "layers.0.mlp.up_proj.weight",
+            "layers.0.mlp.gate_up_fused_proj.weight",
+        )
+        num_heads = config.num_attention_heads
+        num_key_value_heads = getattr(config, "num_key_value_heads", num_heads)
+        fuse_attention_qkv = getattr(config, "fuse_attention_qkv", False)
+        fuse_attention_ffn = getattr(config, "fuse_attention_ffn", False)
+
+        final_actions = {}
+        if is_fuse:
+            if fuse_attention_qkv:
+                for i in range(config.num_hidden_layers):
+                    for fuse_keys in fuse_qkv_keys:
+                        keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_keys])
+                        final_actions[keys] = partial(
+                            fn, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
+                        )
+            if fuse_attention_ffn:
+                for i in range(config.num_hidden_layers):
+                    keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_gate_up_keys])
+                    final_actions[keys] = fn
+        else:
+            if not fuse_attention_qkv:
+                for i in range(config.num_hidden_layers):
+                    for fuse_keys in fuse_qkv_keys:
+                        keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_keys])
+                        final_actions[keys] = partial(
+                            fn, split_nums=3, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
+                        )
+            if not fuse_attention_ffn:
+                for i in range(config.num_hidden_layers):
+                    keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_gate_up_keys])
+                    final_actions[keys] = partial(fn, split_nums=2)
+        return final_actions
+
     def _init_weights(self, layer):
         """Initialization hook"""
         if self.config.tensor_parallel_degree > 1:
@@ -1009,11 +1136,11 @@ class Qwen2MoePretrainedModel(PretrainedModel):
                 nn.Linear,
                 nn.Embedding,
                 mpu.VocabParallelEmbedding,
-                mpu.ColumnParallelLinear,
                 mpu.RowParallelLinear,
-                Qwen2MoeLMHead,
-                linear_utils.ColumnSequenceParallelLinear,
+                mpu.ColumnParallelLinear,
                 linear_utils.RowSequenceParallelLinear,
+                linear_utils.ColumnSequenceParallelLinear,
+                Qwen2MoeLMHead,
             ),
         ):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -1087,7 +1214,10 @@ class Qwen2MoeModel(Qwen2MoePretrainedModel):
 
         self.layers = nn.LayerList(
             [
-                Qwen2MoeDecoderLayer(config, layerwise_recompute=layer_idx not in self.no_recompute_layers)
+                Qwen2MoeDecoderLayer(
+                    config=config,
+                    layerwise_recompute=layer_idx not in self.no_recompute_layers,
+                )
                 for layer_idx in range(config.num_hidden_layers)
             ]
         )
@@ -1138,6 +1268,7 @@ class Qwen2MoeModel(Qwen2MoePretrainedModel):
         output_router_logits: bool,
         past_key_value: Tensor,
         use_cache: bool,
+        attn_mask_startend_row_indices=None,
     ):
         def create_custom_forward(module):
             def custom_forward(*inputs):
@@ -1154,6 +1285,7 @@ class Qwen2MoeModel(Qwen2MoePretrainedModel):
             output_router_logits,
             past_key_value,
             use_cache,
+            attn_mask_startend_row_indices,
             use_reentrant=self.config.recompute_use_reentrant,
         )
 
@@ -1161,21 +1293,19 @@ class Qwen2MoeModel(Qwen2MoePretrainedModel):
 
     def forward(
         self,
-        input_ids=None,
-        position_ids=None,
-        attention_mask=None,
-        inputs_embeds=None,
-        use_cache=None,
-        past_key_values=None,
-        output_attentions=False,
-        output_hidden_states=None,
+        input_ids: paddle.Tensor = None,
+        position_ids: Optional[paddle.Tensor] = None,
+        attention_mask: Optional[paddle.Tensor] = None,
+        inputs_embeds: Optional[paddle.Tensor] = None,
+        use_cache: Optional[bool] = None,
+        past_key_values: Optional[List[paddle.Tensor]] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
         output_router_logits: Optional[bool] = None,
-        return_dict=False,
+        return_dict: Optional[bool] = None,
+        attn_mask_startend_row_indices=None,
         **kwargs,
-    ):
-        if self.sequence_parallel and use_cache:
-            raise ValueError("We currently only support sequence parallel without cache.")
-
+    ) -> Union[Tuple, MoEModelOutputWithPast]:
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
 
         output_router_logits = (
@@ -1185,7 +1315,6 @@ class Qwen2MoeModel(Qwen2MoePretrainedModel):
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
         use_cache = use_cache if use_cache is not None else self.config.use_cache
-
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         # retrieve input_ids and inputs_embeds
@@ -1209,6 +1338,7 @@ class Qwen2MoeModel(Qwen2MoePretrainedModel):
             cache_length = past_key_values[0][0].shape[1]
             seq_length_with_past += cache_length
         if inputs_embeds is None:
+            # [bs, seq_len, dim]
             inputs_embeds = self.embed_tokens(input_ids)
 
         if self.sequence_parallel:
@@ -1219,20 +1349,24 @@ class Qwen2MoeModel(Qwen2MoePretrainedModel):
             inputs_embeds = ScatterOp.apply(inputs_embeds)
 
         # embed positions
-        if attention_mask is None:
+        if attn_mask_startend_row_indices is not None or get_use_casual_mask():
+            attention_mask = None
+        else:
             # [bs, seq_len]
-            attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
+            attention_mask = (
+                paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
+                if attention_mask is None
+                else attention_mask
+            )
+            attention_mask = self._prepare_decoder_attention_mask(
+                attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
+            )  # [bs, 1, seq_len, seq_len]
+            if self.config.use_flash_attention:
+                attention_mask = None if is_casual_mask(attention_mask) else attention_mask
 
         if position_ids is None:
             position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
 
-        attention_mask = self._prepare_decoder_attention_mask(
-            attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
-        )  # [bs, 1, seq_len, seq_len]
-        if self.config.use_flash_attention:
-            is_casual = is_casual_mask(attention_mask)
-            if is_casual:
-                attention_mask = None
         hidden_states = inputs_embeds
 
         # decoder layers
@@ -1262,6 +1396,7 @@ class Qwen2MoeModel(Qwen2MoePretrainedModel):
                     output_router_logits,
                     past_key_value,
                     use_cache,
+                    attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                 )
             else:
                 layer_outputs = decoder_layer(
@@ -1272,6 +1407,7 @@ class Qwen2MoeModel(Qwen2MoePretrainedModel):
                     output_router_logits,
                     past_key_value,
                     use_cache,
+                    attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                 )
 
             # NOTE: clear outdate cache after it has been used for memory saving
@@ -1334,7 +1470,7 @@ class Qwen2MoePretrainingCriterion(nn.Layer):
         if self.enable_parallel_cross_entropy:
             if prediction_scores.shape[-1] == self.config.vocab_size:
                 warnings.warn(
-                    f"enable_parallel_cross_entropy, the vocab_size should be splited: {prediction_scores.shape[-1]}, {self.config.vocab_size}"
+                    f"enable_parallel_cross_entropy, the vocab_size should be splitted: {prediction_scores.shape[-1]}, {self.config.vocab_size}"
                 )
                 self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
 
@@ -1342,8 +1478,16 @@ class Qwen2MoePretrainingCriterion(nn.Layer):
             masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
 
             # skip ignore_index which loss == 0
-            masked_lm_loss = masked_lm_loss[masked_lm_loss > 0]
-            loss = paddle.mean(masked_lm_loss)
+            # masked_lm_loss = masked_lm_loss[masked_lm_loss > 0]
+            # loss = paddle.mean(masked_lm_loss)
+            binary_sequence = paddle.where(
+                masked_lm_loss > 0, paddle.ones_like(masked_lm_loss), paddle.zeros_like(masked_lm_loss)
+            )
+            count = paddle.sum(binary_sequence)
+            if count == 0:
+                loss = paddle.sum(masked_lm_loss * binary_sequence)
+            else:
+                loss = paddle.sum(masked_lm_loss * binary_sequence) / count
 
         return loss
 
@@ -1429,7 +1573,6 @@ class Qwen2MoeForCausalLM(Qwen2MoePretrainedModel):
     ):
         batch_size, seq_length = input_ids.shape
         position_ids = kwargs.get("position_ids", paddle.arange(seq_length).expand((batch_size, seq_length)))
-        attention_mask = kwargs.get("attention_mask", None)
         if past_key_values:
             input_ids = input_ids[:, -1].unsqueeze(axis=-1)
             position_ids = position_ids[:, -1].unsqueeze(-1)
@@ -1473,26 +1616,35 @@ class Qwen2MoeForCausalLM(Qwen2MoePretrainedModel):
             model_kwargs["position_ids"] = paddle.concat([position_ids, position_ids[..., -1:] + 1], axis=-1)
 
         if not is_encoder_decoder and "attention_mask" in model_kwargs:
+            # TODO: support attention mask for other models
             attention_mask = model_kwargs["attention_mask"]
-            model_kwargs["attention_mask"] = paddle.concat(
-                [attention_mask, paddle.ones([attention_mask.shape[0], 1], dtype=attention_mask.dtype)], axis=-1
-            )
+            if len(attention_mask.shape) == 2:
+                model_kwargs["attention_mask"] = paddle.concat(
+                    [attention_mask, paddle.ones([attention_mask.shape[0], 1], dtype=attention_mask.dtype)],
+                    axis=-1,
+                )
+            elif len(attention_mask.shape) == 4:
+                model_kwargs["attention_mask"] = paddle.concat(
+                    [attention_mask, paddle.ones([*attention_mask.shape[:3], 1], dtype=attention_mask.dtype)],
+                    axis=-1,
+                )[:, :, -1:, :]
 
         return model_kwargs
 
     def forward(
         self,
-        input_ids=None,
-        position_ids=None,
-        attention_mask=None,
-        inputs_embeds=None,
-        labels=None,
-        use_cache=False,
-        past_key_values=None,
-        output_attentions=None,
-        output_hidden_states=None,
+        input_ids: paddle.Tensor = None,
+        position_ids: Optional[paddle.Tensor] = None,
+        attention_mask: Optional[paddle.Tensor] = None,
+        inputs_embeds: Optional[paddle.Tensor] = None,
+        labels: Optional[paddle.Tensor] = None,
+        use_cache: Optional[bool] = None,
+        past_key_values: Optional[List[paddle.Tensor]] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
         output_router_logits: Optional[bool] = None,
-        return_dict=None,
+        return_dict: Optional[bool] = None,
+        attn_mask_startend_row_indices=None,
     ):
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
@@ -1502,6 +1654,13 @@ class Qwen2MoeForCausalLM(Qwen2MoePretrainedModel):
             output_router_logits if output_router_logits is not None else self.config.output_router_logits
         )
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        if attn_mask_startend_row_indices is not None and attention_mask is not None:
+            logger.warning(
+                "You have provided both attn_mask_startend_row_indices and attention_mask. "
+                "The attn_mask_startend_row_indices will be used."
+            )
+            attention_mask = None
 
         # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
         outputs = self.qwen2_moe(
@@ -1515,12 +1674,13 @@ class Qwen2MoeForCausalLM(Qwen2MoePretrainedModel):
             output_hidden_states=output_hidden_states,
             output_router_logits=output_router_logits,
             return_dict=return_dict,
+            attn_mask_startend_row_indices=attn_mask_startend_row_indices,
         )
 
         hidden_states = outputs[0]  # [bs, seq_len, dim]
 
         # if labels is None，means we need full output, instead of tensor_parallel_output
-        # tensor_parallel_output is togather with ParallelCrossEntropy
+        # tensor_parallel_output is together with ParallelCrossEntropy
         tensor_parallel_output = self.config.tensor_parallel_output and self.config.tensor_parallel_degree > 1
 
         logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)

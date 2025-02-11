@@ -1,6 +1,9 @@
-# PaddleNLP 自定义 OP
+# PaddleNLP 大模型高性能自定义推理算子
 
-此文档介绍如何编译安装 PaddleNLP 自定义 OP。
+此文档介绍如何编译安装 PaddleNLP 大模型高性能自定义推理算子的安装教程。
+
+使用这些高性能算子，可以大幅提升大模型推理速度。
+大模型推理相关教程详见[此处](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/README.md#6-%E6%8E%A8%E7%90%86)。
 
 ## 安装 C++ 依赖
 

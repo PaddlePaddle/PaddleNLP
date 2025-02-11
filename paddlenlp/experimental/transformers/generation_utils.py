@@ -646,7 +646,15 @@ class GenerationBlockInferenceModel(GenerationMixin):
         model_kwargs["accept_num"] = accept_num
         model_kwargs["actual_draft_token_num"] = actual_draft_token_num
 
-        if self.config.decode_strategy == "speculate_decoding":
+        if self.config.decode_strategy == "draft_model_sample":
+            ret = self.draft_model_sample(
+                eos_token_id,
+                top_k=0,
+                top_p=top_p,
+                temperature=temperature,
+                **model_kwargs,
+            )
+        elif self.config.decode_strategy == "speculate_decoding":
             ret = self.speculate_decoding(
                 eos_token_id,
                 top_k=0,
@@ -891,8 +899,8 @@ class GenerationBlockInferenceModel(GenerationMixin):
         # encoder
         outputs = _forward_(**model_kwargs)  # [bs, 1, dim_embed]
         # first decoder
-        next_tokens = _post_process_(
-            outputs,
+        _post_process_(
+            outputs[0] if isinstance(outputs, tuple) else outputs,
             top_k,
             top_p,
             penalty_score,
@@ -901,8 +909,79 @@ class GenerationBlockInferenceModel(GenerationMixin):
             temperature,
             model_kwargs,
         )
+        if self.return_full_hidden_states:
+            return outputs[1]
+        else:
+            return None
 
-        return next_tokens
+    def draft_model_sample(
+        self,
+        eos_token_id,
+        top_k,
+        top_p,
+        penalty_score,
+        frequency_score,
+        presence_score,
+        temperature=None,
+        min_tokens_to_keep=1,
+        **model_kwargs
+    ):
+        def _forward_(**args):
+            model_inputs = self.prepare_inputs_for_generation(**args)
+            return self(**model_inputs)
+
+        def _post_process_(
+            outputs,
+            top_k,
+            top_p,
+            penalty_score,
+            frequency_score,
+            presence_score,
+            temperature,
+            model_kwargs,
+        ):
+            logits = paddle.cast(outputs, paddle.float32)
+
+            probs = F.softmax(logits)
+
+            _, inter_next_tokens = paddle.tensor.top_p_sampling(probs, top_p, seed=-1)
+
+            if self.config.tensor_parallel_degree > 1:
+                paddle.distributed.broadcast(inter_next_tokens, 0)
+
+            from paddlenlp_ops import draft_model_update
+
+            draft_model_update(
+                inter_next_tokens,
+                model_kwargs["draft_tokens"],
+                model_kwargs["pre_ids"],
+                model_kwargs["seq_lens_this_time"],
+                model_kwargs["seq_lens_encoder"],
+                model_kwargs["seq_lens_decoder"],
+                model_kwargs["step_idx"],
+                model_kwargs["output_cum_offsets"],
+                model_kwargs["stop_flags"],
+                model_kwargs["not_need_stop"],
+                model_kwargs["max_dec_len"],
+                eos_token_id,
+                model_kwargs["base_model_draft_tokens"],  # Write generated tokens
+                self.max_seq_len,
+                model_kwargs["substep"],
+            )
+
+        output_padding_offset, output_cum_offsets = self.get_output_padding_offset(
+            model_kwargs["seq_lens_this_time"], model_kwargs["seq_lens_encoder"], model_kwargs["seq_lens_decoder"]
+        )
+        model_kwargs["output_padding_offset"] = output_padding_offset
+        model_kwargs["output_cum_offsets"] = output_cum_offsets
+
+        outputs, eagle_hidden_states = _forward_(**model_kwargs)  # [bs, 1, dim_embed]
+        # first decoder
+        _post_process_(
+            outputs, top_k, top_p, penalty_score, frequency_score, presence_score, temperature, model_kwargs
+        )
+
+        return eagle_hidden_states
 
 
 class GenerationAvxInferenceModel(GenerationMixin):

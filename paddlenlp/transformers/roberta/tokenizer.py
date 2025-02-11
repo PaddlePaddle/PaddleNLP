@@ -21,14 +21,9 @@ from paddle.utils import try_import
 
 from paddlenlp.utils.download import resolve_file_path
 
-from .. import (
-    AddedToken,
-    BasicTokenizer,
-    GPTTokenizer,
-    PretrainedTokenizer,
-    WordpieceTokenizer,
-)
-from ..gpt.tokenizer import bytes_to_unicode
+from ..bert.tokenizer import BasicTokenizer, WordpieceTokenizer
+from ..gpt.tokenizer import GPTTokenizer, bytes_to_unicode
+from ..tokenizer_utils import AddedToken, PretrainedTokenizer
 
 __all__ = ["RobertaTokenizer", "RobertaChineseTokenizer", "RobertaBPETokenizer"]
 

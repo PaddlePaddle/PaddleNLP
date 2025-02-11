@@ -12,15 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-param="model_item=meta-llama-Llama-2-70b_pretrain_dy2st "
-param+="run_mode=DP1_MP4_PP8_VPP5 "
+param="model_item=gpt-3-13b_pretrain "
+param+="run_mode=DP1_MP4_PP1_VPP5_Sharding8_Stage1 "
 param+="device_num=N4C32 "
-param+="global_batch_size=32 "
+param+="global_batch_size=128 "
 param+="nnodes=4 "
-param+="model_type=llama2_70b "
+param+="model_type=gpt3_13b "
 
 cd ./tests
-bash ./test_tipc/static/auto_parallel/llama2/benchmark_common/prepare.sh
+bash ./test_tipc/dygraph/hybrid_parallelism/gpt3/benchmark_common/prepare.sh
 
-bash -c "${param} bash ./test_tipc/static/auto_parallel/llama2/benchmark_common/run_benchmark.sh"
-
+bash -c "${param} bash ./test_tipc/dygraph/hybrid_parallelism/gpt3/benchmark_common/run_benchmark.sh"

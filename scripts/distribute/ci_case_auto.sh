@@ -612,7 +612,7 @@ function llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2() {
             --sharding "stage2" \
             --pipeline_parallel_config "enable_send_recv_overlap" \
             --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate" \
-            --sharding_parallel_config "enable_stage2_overlap" \
+            --sharding_parallel_config "enable_overlap" \
             --tensor_parallel_config "enable_mp_async_allreduce" \
             --to_static 1 \
             --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
@@ -712,7 +712,7 @@ function llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw() {
             --sharding "stage2" \
             --pipeline_parallel_config "enable_send_recv_overlap enable_split_backward" \
             --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate" \
-            --sharding_parallel_config "enable_stage2_overlap" \
+            --sharding_parallel_config "enable_overlap" \
             --tensor_parallel_config "enable_mp_async_allreduce" \
             --to_static 1 \
             --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
@@ -1806,7 +1806,7 @@ function llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2(){
         --sequence_parallel false \
         --sharding "stage1" \
         --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate " \
-        --sharding_parallel_config "enable_stage1_overlap" \
+        --sharding_parallel_config "enable_overlap" \
         --tensor_parallel_config "enable_mp_async_allreduce" \
         --pipeline_parallel_config "enable_send_recv_overlap" \
         --auto_parallel_resume_form_hybrid_parallel true \
@@ -1878,7 +1878,7 @@ function llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2_intermediate
         --sequence_parallel false \
         --sharding "stage1" \
         --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate " \
-        --sharding_parallel_config "enable_stage1_overlap" \
+        --sharding_parallel_config "enable_overlap" \
         --tensor_parallel_config "enable_mp_async_allreduce" \
         --pipeline_parallel_config "enable_send_recv_overlap" \
         --auto_parallel_resume_form_hybrid_parallel true \
@@ -2430,7 +2430,7 @@ function llm_gpt_pir_auto_bs8_DP2_TP2_PP2(){
         --fp16_opt_level "O2" \
         --num_hidden_layers 2 \
         --intermediate_size 1024 \
-        --sharding_parallel_config "enable_stage1_tensor_fusion enable_stage1_overlap" \
+        --sharding_parallel_config "enable_tensor_fusion enable_overlap" \
         --tensor_parallel_config "enable_mp_async_allreduce" \
         --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate" \
         --pipeline_parallel_config "enable_send_recv_overlap enable_split_backward" \
@@ -2497,7 +2497,7 @@ function llm_gpt_pir_auto_bs8_DP2_TP2_PP2_intermediate(){
         --fp16_opt_level "O2" \
         --num_hidden_layers 2 \
         --intermediate_size 1024 \
-        --sharding_parallel_config "enable_stage1_tensor_fusion enable_stage1_overlap" \
+        --sharding_parallel_config "enable_tensor_fusion enable_overlap" \
         --tensor_parallel_config "enable_mp_async_allreduce" \
         --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate" \
         --pipeline_parallel_config "enable_send_recv_overlap enable_split_backward" \

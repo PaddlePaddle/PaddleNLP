@@ -52,6 +52,7 @@ class QuantizationConfig:
         weight_double_quant_block_size=256,
         weight_quant_method="abs_max_channel_wise",
         act_quant_method="abs_max",
+        **kwargs,
     ):
         if weight_quantize_algo is not None and weight_quantize_algo not in [
             "weight_only_int8",

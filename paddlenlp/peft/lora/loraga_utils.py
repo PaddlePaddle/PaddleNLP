@@ -16,6 +16,13 @@ import paddle
 import paddle.distributed as dist
 from paddle.distributed import fleet
 
+try:
+    from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+        register_sequence_parallel_allreduce_hooks,
+    )
+except:
+    pass
+
 from paddlenlp.peft import LoRAModel
 from paddlenlp.peft.lora.lora_layers import (
     ColumnParallelLoRALinear,
@@ -82,6 +89,11 @@ class LoRAGATrainer(Trainer):
 
     def _wrap_model(self, model):
         """Wrap Model without optimizer, support dp, tp and sharding"""
+
+        if self.args.tensor_parallel_degree > 1 and self.args.sequence_parallel:
+            register_sequence_parallel_allreduce_hooks(
+                model, self.args.gradient_accumulation_steps, self.args.fuse_sequence_parallel_allreduce
+            )
 
         in_pipeline_parallel_mode = self.args.pipeline_parallel_degree > 1
         in_sharding_parallel_mode = self.sharding is not None
