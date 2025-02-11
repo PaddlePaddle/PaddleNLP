@@ -141,16 +141,18 @@ class FlashEMAProcessor:
         master_min_offset = min(
             self.optimizer_fusion_storage_helper.master_weights_meta.values(), key=lambda i: i["start"]
         )["start"]
-        ema_buffer = paddle.Tensor(
-            self.optimizer_fusion_storage_helper.cpu_buffer._slice(master_min_offset, master_max_offset),
-            place=paddle.CPUPlace(),
-        )
-        # ema model params, only works on float32 model weights (aka, moe gates)
-        ema_buffer_model_params = {
-            k: cpu_buf.clone()
-            for k, (cuda_buf, cpu_buf) in self.param_fusion_storage_helper.inited_buffers.items()
-            if cuda_buf.dtype == paddle.float32
-        }
+        with device_guard("cpu"):
+            ema_buffer = paddle.zeros(
+                [master_max_offset - master_min_offset],
+                dtype="float32",
+            )
+            # ema model params, only works on float32 model weights (aka, moe gates)
+            ema_buffer_model_params = {
+                k: paddle.zeros_like(cpu_buf)
+                for k, (cuda_buf, cpu_buf) in self.param_fusion_storage_helper.inited_buffers.items()
+                if cuda_buf.dtype == paddle.float32
+            }
+        logger.info(f"[FC] build buffer done:{ema_buffer.dtype} {ema_buffer.place}")
         return ema_buffer, ema_buffer_model_params, master_min_offset, master_max_offset
 
     def ema_reset(self):
@@ -165,47 +167,49 @@ class FlashEMAProcessor:
         """
         # logger.info(f'[FC EMA] wait all done, doing EMA w/ coef: {self.ema_coef}, status:{self.status()}')
         # do update: ema = alpha * ema + (1-alpha) * model
-        logger.info("[FC EMA] start")
-        cpu_master_weights = self.optimizer_fusion_storage_helper.cpu_buffer._slice(
-            self.master_min_offset, self.master_max_offset
-        ).cpu()
-        self.ema_buffer = self.ema_coef * self.ema_buffer + (1 - self.ema_coef) * cpu_master_weights
-        # logger.info(f'[FC EMA2] wait all done, doing EMA w/ coef: {self.ema_coef}, status:{self.status()}')
-        for index, ema_buf in self.ema_buffer_model_params.items():
-            _, cpu_buf = self.param_fusion_storage_helper.inited_buffers[index]
-            updated_ema = self.ema_coef * ema_buf + (1 - self.ema_coef) * cpu_buf
-            self.ema_buffer_model_params[index] = updated_ema
-        logger.info(f"[FC EMA] done, buffer type:{self.ema_buffer.dtype}")
+        logger.info(f"[FC EMA] accmulating, buffer type:{self.ema_buffer.place} {self.ema_buffer.dtype}")
+        with device_guard("cpu"):
+            cpu_master_weights = self.optimizer_fusion_storage_helper.cpu_buffer._slice(
+                self.master_min_offset, self.master_max_offset
+            ).cpu()
+            self.ema_buffer = self.ema_coef * self.ema_buffer + (1 - self.ema_coef) * cpu_master_weights
+            # logger.info(f'[FC EMA2] wait all done, doing EMA w/ coef: {self.ema_coef}, status:{self.status()}')
+            for index, ema_buf in self.ema_buffer_model_params.items():
+                _, cpu_buf = self.param_fusion_storage_helper.inited_buffers[index]
+                updated_ema = self.ema_coef * ema_buf + (1 - self.ema_coef) * cpu_buf
+                self.ema_buffer_model_params[index] = updated_ema
 
     @imperative_base.no_grad()
     def ema_state_dict(self):
         assert self.optimizer_fusion_storage_helper is not None
         logger.info("[FC EMA] convert ema master weights state dict")
-        ema_state_dict = {}
-        for k, tensor_meta in self.param_fusion_storage_helper.model_weights_metas.items():
-            shape = tensor_meta["shape"]
-            name = tensor_meta["name"]
-            start = tensor_meta["start"]
-            end = tensor_meta["end"]
-            if tensor_meta["buffer_index"] not in self.ema_buffer_model_params:
-                continue  # non fp32 has no `self.ema_buffer_model_params`
-            cpu_buffer = self.ema_buffer_model_params[tensor_meta["buffer_index"]]
-            tensor = cpu_buffer._slice(start, end)
-            tensor.get_tensor()._set_dims(shape)
-            tensor.name = name
-            ema_state_dict[k] = tensor
-        ema_state_dict_master_weights = {}
-        for k, meta in self.optimizer_fusion_storage_helper.master_weights_meta.items():
-            t = self.ema_buffer._slice(meta["start"] - self.master_min_offset, meta["end"] - self.master_min_offset)
-            t.get_tensor()._set_dims(meta["shape"])
-            t.name = meta["name"]
-            ema_state_dict_master_weights[k] = t
-        ema_state_dict["master_weights"] = ema_state_dict_master_weights
-        logger.info("[FC EMA] done covert")
+        with device_guard("cpu"):
+            ema_state_dict = {}
+            for k, tensor_meta in self.param_fusion_storage_helper.model_weights_metas.items():
+                shape = tensor_meta["shape"]
+                name = tensor_meta["name"]
+                start = tensor_meta["start"]
+                end = tensor_meta["end"]
+                if tensor_meta["buffer_index"] not in self.ema_buffer_model_params:
+                    continue  # non fp32 has no `self.ema_buffer_model_params`
+                cpu_buffer = self.ema_buffer_model_params[tensor_meta["buffer_index"]]
+                tensor = cpu_buffer._slice(start, end)
+                tensor.get_tensor()._set_dims(shape)
+                tensor.name = name
+                ema_state_dict[k] = tensor
+            ema_state_dict_master_weights = {}
+            for k, meta in self.optimizer_fusion_storage_helper.master_weights_meta.items():
+                t = self.ema_buffer._slice(
+                    meta["start"] - self.master_min_offset, meta["end"] - self.master_min_offset
+                )
+                t.get_tensor()._set_dims(meta["shape"])
+                t.name = meta["name"]
+                ema_state_dict_master_weights[k] = t
+            ema_state_dict["master_weights"] = ema_state_dict_master_weights
         return ema_state_dict
 
     def load_ema_state_dict(self, path):
-        with device_guard():
+        with device_guard("cpu"):
             logger.info(f"[FC EMA] load state dict from {path}")
             state_dict = paddle.load(path)
             for k, tensor_meta in self.param_fusion_storage_helper.model_weights_metas.items():
