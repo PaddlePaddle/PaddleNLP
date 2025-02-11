@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import numpy as np
+import paddle
 
 
 class MergeMethod:
@@ -46,8 +47,13 @@ class MergeMethod:
         if self.merge_config.tensor_type == "np":
             tensor_output = sum(weight * tensor for weight, tensor in zip(weight_list, tensor_list))
             return tensor_output
+        elif self.merge_config.tensor_type == "pd":
+            tensor_output = paddle.zeros_like(tensor_list[0])
+            for i, tensor in enumerate(tensor_list):
+                tensor_output += tensor * weight_list[i]
+            return tensor_output
         else:
-            raise NotImplementedError("Paddle Tensor is not supported yet.")
+            raise ValueError(f"Unkonwn tensor type {self.merge_config.tensor_type}")
 
     def slerp(self, tensor_list):
         """
@@ -86,8 +92,37 @@ class MergeMethod:
             s1 = sin_theta_t / sin_theta_0
 
             return s0 * t0_copy + s1 * t1_copy
+        elif self.merge_config.tensor_type == "pd":
+            t0, t1 = tensor_list
+            # Copy the tensors to reuse them later
+            t0_copy = t0.clone()
+            t1_copy = t1.clone()
+
+            # Normalize the tensors to get the directions and angles
+            t0 = self.normalize(t0)
+            t1 = self.normalize(t1)
+
+            # Dot product with the normalized tensors
+            dot = paddle.sum(t0 * t1)
+            # If absolute value of dot product is almost 1, vectors are ~colinear, so use lerp
+            if paddle.abs(dot) > self.merge_config.slerp_dot_threshold:
+                return (1 - self.merge_config.slerp_alpha) * t0_copy + self.merge_config.slerp_alpha * t1_copy
+
+            # Calculate initial angle between t0 and t1
+            theta_0 = paddle.acos(dot)
+            sin_theta_0 = paddle.sin(theta_0)
+
+            # Angle at timestep t
+            theta_t = theta_0 * self.merge_config.slerp_alpha
+            sin_theta_t = paddle.sin(theta_t)
+
+            # Finish the slerp algorithm
+            s0 = paddle.sin(theta_0 - theta_t) / sin_theta_0
+            s1 = sin_theta_t / sin_theta_0
+
+            return s0 * t0_copy + s1 * t1_copy
         else:
-            raise NotImplementedError("Paddle Tensor is not supported yet.")
+            raise ValueError(f"Unkonwn tensor type {self.merge_config.tensor_type}")
 
     def ties(self, tensor_list):
         if self.merge_config.tensor_type == "np":
@@ -95,7 +130,6 @@ class MergeMethod:
             mask_dtype = tensor_list[0].dtype
             weight_list = self.merge_config.weight_list
             tensor_list = [weight * tensor for (weight, tensor) in zip(weight_list, tensor_list)]
-
             # Elect majority sign
             sign_tensor_list = [np.sign(tensor).astype(mask_dtype) for tensor in tensor_list]
             if self.merge_config.ties_elect_type == "sum":
@@ -117,14 +151,57 @@ class MergeMethod:
                 divisor[np.abs(divisor) < 1e-8] = 1
                 merge_tensor /= divisor
             return merge_tensor
+
+        elif self.merge_config.tensor_type == "pd":
+            mask_dtype = tensor_list[0].dtype
+
+            # Elect majority sign
+            majority_sign = paddle.zeros_like(tensor_list[0])
+            for i, tensor in enumerate(tensor_list):
+                if self.merge_config.ties_elect_type == "sum":
+                    majority_sign += tensor * self.merge_config.weight_list[i]
+                elif self.merge_config.ties_elect_type == "count":
+                    majority_sign += tensor.sign()
+                else:
+                    raise NotImplementedError(f"ties_elect_type: {self.merge_config.ties_elect_type} is unknown.")
+            majority_sign = (majority_sign >= 0).astype(mask_dtype) * 2 - 1
+
+            # Merge
+            merge_tensor = paddle.zeros_like(tensor_list[0])
+            if self.merge_config.normalize:
+                divisor = paddle.zeros_like(tensor_list[0])
+            for i, tensor in enumerate(tensor_list):
+                if self.merge_config.normalize:
+                    mask = (tensor.sign() == majority_sign).astype(mask_dtype) * self.merge_config.weight_list[i]
+                    divisor += mask
+                    merge_tensor += mask * tensor
+                else:
+                    merge_tensor += (
+                        (tensor.sign() == majority_sign).astype(mask_dtype) * tensor * self.merge_config.weight_list[i]
+                    )
+
+            # Normalize
+            if self.merge_config.normalize:
+                divisor = paddle.where(paddle.abs(divisor) < 1e-8, paddle.ones_like(divisor), divisor)
+                merge_tensor /= divisor
+
+            return merge_tensor
         else:
-            raise NotImplementedError("Paddle Tensor is not supported yet.")
+            raise ValueError(f"Unkonwn tensor type {self.merge_config.tensor_type}")
 
     def normalize(self, t):
         """
         Normalize a vector by its L2 norm.
         """
-        norm_t = np.linalg.norm(t)
-        if norm_t > self.merge_config.slerp_normalize_eps:
-            t = t / norm_t
-        return t
+        if self.merge_config.tensor_type == "np":
+            norm_t = np.linalg.norm(t)
+            if norm_t > self.merge_config.slerp_normalize_eps:
+                t = t / norm_t
+            return t
+        elif self.merge_config.tensor_type == "pd":
+            norm_t = paddle.norm(t, p=2)
+            if norm_t > self.merge_config.slerp_normalize_eps:
+                t = t / norm_t
+            return t
+        else:
+            raise ValueError(f"Unkonwn tensor type {self.merge_config.tensor_type}")
