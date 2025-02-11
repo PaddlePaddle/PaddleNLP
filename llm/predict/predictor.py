@@ -221,11 +221,15 @@ class BasePredictor:
             source = [source] if isinstance(source, str) else source
             source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
 
+        return_attention_mask = False
+        if len(source) > 1:
+            return_attention_mask = True
         tokenized_source = self.tokenizer(
             source,
             max_length=self.config.src_length,
             truncation=True,
             return_position_ids=True if not isinstance(self.tokenizer, ChatGLMTokenizer) else False,
+            return_attention_mask=return_attention_mask,
             truncation_side="left",
             return_tensors=self.return_tensors,
             padding=True,

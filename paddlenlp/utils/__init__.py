@@ -21,6 +21,7 @@ from .env import CONFIG_NAME, GENERATION_CONFIG_NAME, LEGACY_CONFIG_NAME
 from .import_utils import *
 from .infohub import infohub
 from .initializer import to
+from .memory_utils import empty_device_cache
 from .optimizer import *
 from .serialization import load_torch
 
