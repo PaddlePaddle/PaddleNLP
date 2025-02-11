@@ -99,15 +99,30 @@ class PredictorServer:
             print("rank:", predictor.tensor_parallel_rank, " port info saving done.")
 
     def stream_predict(self, input_texts: str | list[str]):
-        return self.predictor.stream_predict(input_texts)
+        if hasattr(self.predictor, "stream_predict"):
+            return self.predictor.stream_predict(input_texts)
+        else:
+            return self.predictor.predict(input_texts)
 
     def predict(self, input_texts: str | list[str]):
         return self.predictor.predict(input_texts)
 
     def broadcast_msg(self, data):
+        import threading
+
+        def send_request(peer_port, data):
+            try:
+                url = f"http://0.0.0.0:{peer_port}/v1/chat/completions"
+                requests.post(url, json=data)
+            except Exception:
+                pass
+
         for _, peer_port in self.peer_ports.items():
             if peer_port != self.port:
-                _ = requests.post(f"http://0.0.0.0:{peer_port}/v1/chat/completions", json=data)
+                logger.info(f"broadcast_msg to {peer_port}")
+                # Here we need async call send_request to other card.
+                thread = threading.Thread(target=send_request, args=(peer_port, data))
+                thread.start()
 
     def start_flask_server(self):
         from flask import Flask, request, stream_with_context
@@ -117,6 +132,9 @@ class PredictorServer:
         @app.post("/v1/chat/completions")
         def _server():
             data = request.get_json()
+
+            if self.predictor.tensor_parallel_rank == 0:
+                self.broadcast_msg(data)
             logger.info(f"Request: {json.dumps(data, indent=2, ensure_ascii=False)}")
 
             # 处理 OpenAI 格式消息（支持 messages 字段）以及兼容原有格式
@@ -143,10 +161,6 @@ class PredictorServer:
             else:
                 data["context"] = data.get("context", "")
                 data["history"] = data.get("history", "")
-
-            # 如果当前 rank 为 0，则向其它进程广播请求数据
-            if self.predictor.tensor_parallel_rank == 0:
-                self.broadcast_msg(data)
 
             # 判断是否采用流式返回，默认为非流式（可根据需求调整默认值）
             is_stream = data.get("stream", False)
@@ -212,7 +226,11 @@ class PredictorServer:
             if is_stream:
                 # 流式返回生成结果
                 def streaming(data):
-                    for new_text in self.stream_predict(query):
+                    streamer = self.stream_predict(query)
+                    if self.predictor.tensor_parallel_rank != 0:
+                        return "done"
+
+                    for new_text in streamer:
                         if not new_text:
                             continue
                         response_body = {
@@ -234,15 +252,12 @@ class PredictorServer:
                         yield f"data: {json.dumps(response_body, ensure_ascii=False)}\n\n"
                     yield "data: [DONE]\n\n"
 
-                # 流式响应需要保证只在 rank 0 输出有效数据，其它 rank 返回占位
-                if self.predictor.tensor_parallel_rank == 0:
-                    return app.response_class(stream_with_context(streaming(data)), mimetype="text/event-stream")
-                else:
-                    return "done"
+                return app.response_class(stream_with_context(streaming(data)), mimetype="text/event-stream")
+
             else:
                 # 非流式：一次性返回完整结果
+                result = self.predict(query)
                 if self.predictor.tensor_parallel_rank == 0:
-                    result = self.predict(query)
                     if type(result) is list and len(result) == 1:
                         result = result[0]
                     response_body = {
@@ -258,11 +273,10 @@ class PredictorServer:
                             }
                         ],
                     }
-                    # data = f"data: {json.dumps(response_body, ensure_ascii=False)}\n\n"
                     data = f"{json.dumps(response_body, ensure_ascii=False)}"
                     return app.response_class(data, mimetype="application/json")
                 else:
-                    return "done"
+                    return app.response_class("done")
 
         # 启动 Flask 服务（单线程预测）
         app.run(host="0.0.0.0", port=self.port, threaded=False)
