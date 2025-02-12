@@ -281,7 +281,15 @@ class QWenAttention(nn.Layer):
             # [bz, sql, nh, hid] ==> [bz, nh, sql hdim]
             value = value.transpose([0, 2, 1, 3])
 
-            attn_weights = paddle.matmul(query / math.sqrt(head_dim), key.transpose([0, 1, 3, 2]))
+            # Add pre divided factor to fix nan under float16.
+            if paddle.in_dynamic_mode() and query.dtype == paddle.float16:
+                pre_divided_factor = 32
+            else:
+                pre_divided_factor = 1
+
+            attn_weights = paddle.matmul(
+                query / (math.sqrt(head_dim) * pre_divided_factor), key.transpose([0, 1, 3, 2])
+            )
 
             if attn_weights.shape != [bsz, num_heads, q_len, kv_seq_len]:
                 raise ValueError(
@@ -292,7 +300,7 @@ class QWenAttention(nn.Layer):
             if attention_mask is None:
                 attention_mask = get_triangle_upper_mask(attn_weights)
             attn_weights = attn_weights + attention_mask
-            attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(value.dtype)
+            attn_weights = F.softmax(attn_weights.astype("float32") * pre_divided_factor, axis=-1).astype(value.dtype)
 
             attn_weights = self.attn_dropout(attn_weights)
             attn_output = paddle.matmul(attn_weights, value)

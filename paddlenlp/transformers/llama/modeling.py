@@ -259,17 +259,20 @@ def scaled_dot_product_attention(
         key_states = paddle.transpose(key_states, [0, 2, 1, 3])
         value_states = paddle.transpose(value_states, [0, 2, 1, 3])
 
-        # matmul and devide by sqrt(head_dim)
-        if get_env_device() == "intel_hpu":
-            # optimize div(const) to mul(const) for better performance
-            attn_weights = paddle.matmul(query_states * (1 / math.sqrt(head_dim)), key_states.transpose([0, 1, 3, 2]))
+        # Add pre divided factor to fix nan under float16.
+        if paddle.in_dynamic_mode() and query_states.dtype == paddle.float16:
+            pre_divided_factor = 32
         else:
-            attn_weights = paddle.matmul(query_states / math.sqrt(head_dim), key_states.transpose([0, 1, 3, 2]))
+            pre_divided_factor = 1
+
+        attn_weights = paddle.matmul(
+            query_states * (1 / (math.sqrt(head_dim) * pre_divided_factor)), key_states.transpose([0, 1, 3, 2])
+        )
 
         # then add alibi bias
         if alibi is not None:
             alibi = alibi.reshape([bsz, num_heads, 1, -1])
-            attn_weights = attn_weights + alibi
+            attn_weights = attn_weights + alibi / pre_divided_factor
 
         if paddle.in_dynamic_mode() and attn_weights.shape != [bsz, num_heads, q_len, kv_seq_len]:
             raise ValueError(
@@ -297,7 +300,9 @@ def scaled_dot_product_attention(
             attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
         else:
             with paddle.amp.auto_cast(False):
-                attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
+                attn_weights = F.softmax(attn_weights.astype("float32") * pre_divided_factor, axis=-1).astype(
+                    query_states.dtype
+                )
 
         attn_output = paddle.matmul(attn_weights, value_states)
         attn_output = attn_output.transpose([0, 2, 1, 3])

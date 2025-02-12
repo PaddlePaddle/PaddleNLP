@@ -229,7 +229,7 @@ tar -zxvf ultrafeedback_binarized.tar.gz
 # DPO 启动命令参考, 8卡训练， 需要大概40G显存
 python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" ./alignment/dpo/run_dpo.py ./config/llama/dpo_argument.json
 
-# 单卡训练，大概需要54G显存
+# 单卡训练，大概需要26G显存左右
 python -u  ./alignment/dpo/run_dpo.py ./config/qwen/dpo_argument_0p5b.json
 ```
 

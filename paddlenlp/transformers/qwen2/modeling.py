@@ -202,8 +202,15 @@ def scaled_dot_product_attention(
         key_states = paddle.transpose(key_states, [0, 2, 1, 3])
         value_states = paddle.transpose(value_states, [0, 2, 1, 3])
 
-        # matmul and divide by sqrt(head_dim)
-        attn_weights = paddle.matmul(query_states / math.sqrt(head_dim), key_states.transpose([0, 1, 3, 2]))
+        # Add pre divided factor to fix nan under float16.
+        if paddle.in_dynamic_mode() and query_states.dtype == paddle.float16:
+            pre_divided_factor = 32
+        else:
+            pre_divided_factor = 1
+
+        attn_weights = paddle.matmul(
+            query_states / (math.sqrt(head_dim) * pre_divided_factor), key_states.transpose([0, 1, 3, 2])
+        )
 
         if attn_weights.shape != [bsz, num_heads, q_len, kv_seq_len]:
             raise ValueError(
@@ -213,6 +220,7 @@ def scaled_dot_product_attention(
 
         if attention_mask is None:
             attention_mask = get_triangle_upper_mask(attn_weights)
+
         attention_mask = attention_mask.reshape([bsz, 1, q_len, kv_seq_len])
         if attention_mask.shape != [bsz, 1, q_len, kv_seq_len]:
             raise ValueError(
@@ -220,11 +228,16 @@ def scaled_dot_product_attention(
             )
 
         attn_weights = attn_weights + attention_mask
+
         if not paddle.in_dynamic_mode():
-            attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
+            attn_weights = F.softmax(attn_weights * pre_divided_factor, axis=-1, dtype="float32").astype(
+                query_states.dtype
+            )
         else:
             with paddle.amp.auto_cast(False):
-                attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
+                attn_weights = F.softmax(
+                    attn_weights.astype("float32") * pre_divided_factor, axis=-1, dtype="float32"
+                ).astype(query_states.dtype)
 
         attn_weights = F.dropout(attn_weights, p=config.attention_dropout, training=training)
 
