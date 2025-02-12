@@ -136,7 +136,7 @@ class MoEGateMixin:
         Returns:
             paddle.Tensor: The z loss value.
         """
-        l_zloss = logits.exp().sum(1).log().square().mean()
+        l_zloss = paddle.logsumexp(logits, axis=1).square().mean()
         return l_zloss
 
     def _cal_orthogonal_loss(self) -> paddle.Tensor:
