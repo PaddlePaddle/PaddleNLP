@@ -580,9 +580,9 @@ class InferencePredictorMixin(BasePredictor):
             if inputs["attention_mask"] is not None:
                 bsz, src_len = inputs["attention_mask"].shape
                 causal_4d_mask = paddle.tril(
-                    paddle.ones(shape=(bsz, 1, self.config.total_max_length, self.config.total_max_length), dtype='int64').cpu()
+                    paddle.ones(shape=(bsz, 1, self.config.total_max_length, self.config.total_max_length), dtype=self.config.dtype)
                 )
-                attention_mask_2d = paddle.ones(shape=(bsz, self.config.total_max_length), dtype='int64').cpu()
+                attention_mask_2d = paddle.ones(shape=(bsz, self.config.total_max_length), dtype='int64')
                 attention_mask_2d[:,0:src_len] = inputs["attention_mask"]
                 bool_mask = attention_mask_2d != 1
                 expanded_attn_mask = bool_mask[:, None, None, :].expand([bsz, 1, self.config.total_max_length, self.config.total_max_length])
@@ -1466,8 +1466,8 @@ def benchmark(predictor, predictor_args, model_args):
     batch_benchmark_texts = batchfy_text(benchmark_texts, predictor_args.batch_size)
     print("***********Start Benchmark**********")
 
-    warmup_time = 5
-    test_time = 20
+    warmup_time = 1
+    test_time = 5
 
     print("***********Start Warmup**********")
     for _ in range(warmup_time):
