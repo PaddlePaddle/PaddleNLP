@@ -362,13 +362,20 @@ PaddleNLP 提供高性能推理，内置动态插入和全环节算子融合策�
      </font>
 </div>
 
+安装高性能推理算子教程（可选）
+```shell
+cd ../csrc/
+python setup_cuda.py install
+cd -
+```
+
 ```shell
 # 动态图模型推理命令参考
-python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16
+python ./predict/predictor.py --model_name_or_path Qwen/Qwen2.5-0.5B-Instruct --inference_model --dtype float16
 
 # 静态图模型推理命令参考
 # step1 : 静态图导出
-python ./predict/export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16
+python ./predict/export_model.py --model_name_or_path Qwen/Qwen2.5-0.5B-Instruct --inference_model --output_path ./inference --dtype float16
 # step2: 静态图推理
 python ./predict/predictor.py --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static"
 ```
@@ -395,19 +402,31 @@ python ./predict/predictor.py --model_name_or_path ./inference --inference_model
 
 服务化部署脚本
 
-```shell
-python -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" ./predict/flask_server.py \
-    --model_name_or_path meta-llama/Llama-2-7b-chat \
+```shell 
+# 单卡，可以使用 paddle.distributed.launch 启动多卡推理
+python  ./predict/flask_server.py \
+    --model_name_or_path Qwen/Qwen2.5-0.5B-Instruct \
     --port 8010 \
     --flask_port 8011 \
     --dtype "float16"
 ```
 
-- `port`: Gradio UI 服务端口号，默认8011。
-- `flask_port`: Flask 服务端口号，默认8010。
+- `port`: Gradio UI 服务端口号，默认8010。
+- `flask_port`: Flask 服务端口号，默认8011。
 - 其他参数请参见[推理文档](./docs/predict/inference.md)中推理参数配置。
 
-此外，如果想通过 API 脚本的方式跑推理，可参考：`./predict/request_flask_server.py` 文件。
+打开 `http://127.0.0.1:8010` 即可使用 gradio 图形化界面，即可开启对话。
+您也可用通过 flask 服务化 API 的形式，访问 API，可参考：`./predict/request_flask_server.py` 文件。
+```shell
+python predict/request_flask_server.py
+```
+或者直接使用 curl,调用开始对话
+```
+curl 127.0.0.1:8011/v1/chat/completions \
+-H 'Content-Type: application/json' \
+-d '{"message": [{"role": "user", "content": "你好"}]}'
+```
+
 
 
 #### 7.2 大模型服务化部署工具
