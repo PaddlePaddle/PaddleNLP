@@ -13,8 +13,6 @@
 # limitations under the License.
 from __future__ import annotations
 
-from typing import Tuple, Union
-
 import paddle
 from paddle import Tensor, nn
 from paddle.distributed import fleet
@@ -23,18 +21,14 @@ from paddle.nn.quant import weight_quantize
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedBlockMultiTransformer,
     FusedBlockMultiTransformerWeightOnly,
-    FusedMultiTransformerBase,
     FusedMultiTransformerConfig,
-    FusedMultiTransformerWeightOnly,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationBlockInferenceModel,
-    GenerationInferenceModel,
 )
 from paddlenlp.transformers.bloom.modeling import BloomPreTrainedModel
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
-    CausalLMOutputWithCrossAttentions,
 )
 from paddlenlp.transformers.model_utils import (
     dy2st_nocheck_guard_context,
@@ -42,8 +36,6 @@ from paddlenlp.transformers.model_utils import (
 )
 
 __all__ = [
-    "BloomModelInferenceModel",
-    "BloomForCausalLMInferenceModel",
     "BloomBlockInferenceModel",
     "BloomForCausalLMBlockInferenceModel",
 ]
@@ -73,9 +65,11 @@ def parallel_matmul(x: Tensor, y: Tensor, parallel_output=True):
 
 
 @register_base_model
-class BloomModelInferenceModel(BloomPreTrainedModel):
+class BloomBlockInferenceModel(BloomPreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
+        self.max_seq_len = config.max_seq_len
+        self.block_size = config.block_size
         self.padding_idx = 0
 
         self.embed_dim = config.hidden_size
@@ -195,6 +189,7 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
             ffn2_weight_attrs=ffn2_weight_attrs,
             ffn2_weight_scale_attrs=ffn2_weight_scale_attrs,
             ffn2_bias_attrs=ffn2_bias_attrs,
+            append_attn=config.append_attn,
         )
 
         self.set_transformer_block(transformer_config)
@@ -206,90 +201,11 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
 
         self.gradient_checkpointing = False
 
-    def set_transformer_block(self, transformer_config):
-        if self.use_weight_only:
-            self.transformer_block = FusedMultiTransformerWeightOnly(transformer_config)
-        else:
-            self.transformer_block = FusedMultiTransformerBase(transformer_config)
-
     def get_input_embeddings(self):
         return self.word_embeddings
 
     def set_input_embeddings(self, new_embeddings: Tensor):
         self.word_embeddings = new_embeddings
-
-    def remove_padding(self, input_ids, seq_lens_this_time):
-        cum_offsets_now = paddle.cumsum(paddle.max(seq_lens_this_time) - seq_lens_this_time)
-        token_num = paddle.sum(seq_lens_this_time)
-        from paddlenlp_ops import get_padding_offset
-
-        ids_remove_padding, cum_offsets, padding_offset = get_padding_offset(
-            input_ids, cum_offsets_now, token_num, seq_lens_this_time
-        )
-        return ids_remove_padding, padding_offset, cum_offsets
-
-    def forward(
-        self,
-        input_ids=None,
-        attention_mask=None,
-        position_ids=None,
-        inputs_embeds=None,
-        cache=None,
-        cache_kvs=None,
-        pre_caches=None,
-        seq_len_encoder=None,
-        seq_len_decoder=None,
-        return_dict=None,
-        **kwargs,
-    ) -> Union[Tuple[Tensor], BaseModelOutputWithPastAndCrossAttentions]:
-        # past_key_values = kwargs.get("cache", past_key_values)
-        # is_decoder = past_key_values is not None
-        is_decoder = cache is not None
-        seq_len = seq_len_decoder if is_decoder else seq_len_encoder
-        if not is_decoder:
-            ids_remove_padding, padding_offset, cum_offsets = self.remove_padding(input_ids, seq_len)
-        else:
-            ids_remove_padding = input_ids
-            padding_offset = None
-            cum_offsets = None
-
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-
-        if input_ids is not None and inputs_embeds is not None:
-            raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
-        elif input_ids is not None:
-            batch_size, seq_length = input_ids.shape
-        elif inputs_embeds is not None:
-            batch_size, seq_length, _ = inputs_embeds.shape
-        else:
-            raise ValueError("You have to specify either input_ids or inputs_embeds")
-
-        if inputs_embeds is None:
-            inputs_embeds = self.word_embeddings(ids_remove_padding)
-
-        hidden_states = self.word_embeddings_layernorm(inputs_embeds)
-        position_offset = 0
-        if not is_decoder and pre_caches is not None:
-            position_offset = 128
-
-        with dy2st_nocheck_guard_context():
-            hidden_states, _ = self.transformer_block(
-                src=hidden_states,
-                input_ids=input_ids,
-                cum_offsets=cum_offsets,
-                padding_offset=padding_offset,
-                attn_mask=paddle.cast(attention_mask, dtype=hidden_states.dtype),
-                caches=cache_kvs,
-                pre_caches=pre_caches,
-                pre_caches_length=position_offset,
-                seq_lens=seq_len,
-                time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
-            )
-
-        # Add last hidden state
-        hidden_states = self.ln_f(hidden_states)
-
-        return BaseModelOutputWithPastAndCrossAttentions(last_hidden_state=hidden_states)
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict, use_structured_name=True):
@@ -394,200 +310,6 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
                 else:
                     raise ValueError("Unknow weight {}".format(k))
 
-
-class BloomLMHead(nn.Layer):
-    def __init__(self, config, embedding_weights=None):
-        super(BloomLMHead, self).__init__()
-        self.decoder_weight = (
-            self.create_parameter(
-                shape=[config.vocab_size, config.hidden_size],
-                dtype=paddle.get_default_dtype(),
-                is_bias=True,
-            )
-            if embedding_weights is None
-            else embedding_weights
-        )
-        self.config = config
-
-    def forward(self, hidden_states):
-        logits = parallel_matmul(hidden_states, self.decoder_weight, parallel_output=False)
-        return logits
-
-
-class BloomPretrainingCriterion(paddle.nn.Layer):
-    """
-    Criterion for GPT.
-    It calculates the final loss.
-    """
-
-    def __init__(self, pad_token_id=None, tensor_parallel_degree=1, tensor_parallel_output=False):
-        super(BloomPretrainingCriterion, self).__init__()
-        if tensor_parallel_degree > 1 and tensor_parallel_output:
-            self.loss_func = fleet.meta_parallel.ParallelCrossEntropy()
-        else:
-            self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
-        self.pad_token_id = pad_token_id
-
-    def forward(self, prediction_scores, masked_lm_labels, loss_mask=None):
-        masked_lm_loss = self.loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
-        with paddle.amp.auto_cast(False):
-            masked_lm_loss = masked_lm_loss.astype("float32")
-            if loss_mask is not None:
-                loss_mask = loss_mask.reshape([-1])
-                masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
-                loss = masked_lm_loss / loss_mask.sum()
-            else:
-                assert self.pad_token_id is not None
-                masked_lm_loss = masked_lm_loss[masked_lm_labels != self.pad_token_id]
-                loss = paddle.mean(masked_lm_loss)
-
-        return loss
-
-
-class BloomForCausalLMInferenceModel(GenerationInferenceModel, BloomPreTrainedModel):
-    _keys_to_ignore_on_load_missing = [
-        r"h.*.self_attention.scale_mask_softmax.causal_mask",
-        r"lm_head.weight",
-    ]
-
-    def __init__(self, config):
-        super().__init__(config)
-        self.bloom = BloomModelInferenceModel(config)
-        self.lm_head = BloomLMHead(config, self.bloom.word_embeddings.weight)
-        self.criterion = BloomPretrainingCriterion(
-            pad_token_id=config.pad_token_id,
-            tensor_parallel_degree=config.tensor_parallel_degree,
-            tensor_parallel_output=True,
-        )
-
-    @classmethod
-    def get_cache_kvs_shape(cls, config, max_batch_size=None, max_length=None) -> list[list[int]]:
-        """get cache_kvs tensor for llama model
-
-        Args:
-            max_batch_size (int): the max batch size
-            max_length (int | None, optional): the max_length of cache_kvs. Defaults to None.
-
-        Returns:
-            list[paddle.Tensor]: the list tensor shape for cache
-        """
-        if max_length is None:
-            max_length = 2048
-
-        cache_kvs = []
-        for _ in range(config.n_layer):
-            cache_kvs.append(
-                [
-                    2,
-                    max_batch_size,
-                    config.num_attention_heads // max(config.tensor_parallel_degree, 1),
-                    max_length,
-                    config.hidden_size // config.num_attention_heads,
-                ]
-            )
-        return cache_kvs
-
-    def get_output_embeddings(self):
-        return self.lm_head
-
-    def set_output_embeddings(self, new_embeddings):
-        self.lm_head = new_embeddings
-
-    def prepare_inputs_for_generation(self, input_ids, cache_kvs, tgt_ids, tgt_generation_mask, **kwargs):
-        # only last token for inputs_ids if cache is defined in kwargs
-        attention_mask = kwargs.get("attention_mask", None)
-        position_ids = kwargs.get("position_ids", None)
-        pre_caches = kwargs.get("pre_caches", None)
-        seq_len_encoder = kwargs.get("seq_len_encoder", None)
-        seq_len_decoder = kwargs.get("seq_len_decoder", None)
-        cache = kwargs.get("cache", None)
-        if cache is not None:
-            input_ids = tgt_ids
-            attention_mask = tgt_generation_mask
-        return {
-            "input_ids": input_ids,
-            "attention_mask": attention_mask,
-            "position_ids": position_ids,
-            "cache_kvs": cache_kvs,
-            "cache": cache,
-            "pre_caches": pre_caches,
-            "use_cache": True,
-            "seq_len_encoder": seq_len_encoder,
-            "seq_len_decoder": seq_len_decoder,
-        }
-
-    def forward(
-        self,
-        input_ids=None,
-        cache=None,
-        attention_mask=None,
-        position_ids=None,
-        head_mask=None,
-        inputs_embeds=None,
-        labels=None,
-        use_cache=None,
-        cache_kvs=None,
-        pre_caches=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        seq_len_encoder=None,
-        seq_len_decoder=None,
-        return_dict=None,
-    ) -> Union[Tuple[Tensor], CausalLMOutputWithCrossAttentions]:
-        r"""
-        labels (`paddle.Tensor` of shape `(batch_size, sequence_length)`, *optional*):
-            Labels for language modeling. Note that the labels **are shifted** inside the model, i.e. you can set
-            `labels = input_ids` Indices are selected in `[-100, 0, ..., config.vocab_size]` All labels set to `-100`
-            are ignored (masked), the loss is only computed for labels in `[0, ..., config.vocab_size]`
-        """
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-        transformer_outputs = self.bloom(
-            input_ids,
-            cache=cache,
-            attention_mask=attention_mask,
-            position_ids=position_ids,
-            inputs_embeds=inputs_embeds,
-            use_cache=use_cache,
-            cache_kvs=cache_kvs,
-            pre_caches=pre_caches,
-            seq_len_encoder=seq_len_encoder,
-            seq_len_decoder=seq_len_decoder,
-            return_dict=return_dict,
-        )
-        hidden_states = transformer_outputs[0]
-        lm_logits = self.lm_head(hidden_states)
-
-        if not return_dict:
-            output = (lm_logits,) + transformer_outputs[1:]
-            return output
-
-        return CausalLMOutputWithCrossAttentions(logits=lm_logits)
-
-    @paddle.no_grad()
-    def set_state_dict(self, state_dict, use_structured_name=True):
-        self.lm_head.set_state_dict(
-            {k: state_dict[k] for k in state_dict.keys() if "lm_head" in k},
-            use_structured_name,
-        )
-        self.bloom.set_state_dict({k: state_dict[k] for k in state_dict.keys() if "bloom" in k})
-
-    @staticmethod
-    def _reorder_cache(past: Tuple[Tuple[Tensor]], beam_idx: Tensor) -> Tuple[Tuple[Tensor]]:
-        """
-        This function is used to re-order the `past_key_values` cache if [`~PreTrainedModel.beam_search`] or
-        [`~PreTrainedModel.beam_sample`] is called. This is required to match `past_key_values` with the correct
-        beam_idx at every generation step.
-        """
-        return tuple(tuple(past_state.index_select(0, beam_idx) for past_state in layer_past) for layer_past in past)
-
-
-@register_base_model
-class BloomBlockInferenceModel(BloomModelInferenceModel):
-    def __init__(self, config):
-        super().__init__(config)
-        self.max_seq_len = config.max_seq_len
-        self.block_size = config.block_size
-
     def set_transformer_block(self, transformer_config):
         if self.use_weight_only:
             self.transformer_block = FusedBlockMultiTransformerWeightOnly(transformer_config)
@@ -651,6 +373,25 @@ class BloomBlockInferenceModel(BloomModelInferenceModel):
             hidden_states=None,
             attentions=None,
         )
+
+
+class BloomLMHead(nn.Layer):
+    def __init__(self, config, embedding_weights=None):
+        super(BloomLMHead, self).__init__()
+        self.decoder_weight = (
+            self.create_parameter(
+                shape=[config.vocab_size, config.hidden_size],
+                dtype=paddle.get_default_dtype(),
+                is_bias=True,
+            )
+            if embedding_weights is None
+            else embedding_weights
+        )
+        self.config = config
+
+    def forward(self, hidden_states):
+        logits = parallel_matmul(hidden_states, self.decoder_weight, parallel_output=False)
+        return logits
 
 
 class BloomForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, BloomPreTrainedModel):

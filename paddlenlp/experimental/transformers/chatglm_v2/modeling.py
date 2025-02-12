@@ -13,8 +13,6 @@
 # limitations under the License.
 
 
-from typing import Optional
-
 import paddle
 import paddle.distributed.fleet as fleet
 import paddle.nn as nn
@@ -23,13 +21,10 @@ from paddle.nn.quant import weight_quantize
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedBlockMultiTransformer,
     FusedBlockMultiTransformerWeightOnly,
-    FusedMultiTransformerBase,
     FusedMultiTransformerConfig,
-    FusedMultiTransformerWeightOnly,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationBlockInferenceModel,
-    GenerationInferenceModel,
 )
 from paddlenlp.experimental.transformers.utils import infererence_model_from_pretrained
 from paddlenlp.transformers import ChatGLMv2Config, ChatGLMv2PretrainedModel
@@ -44,13 +39,15 @@ from paddlenlp.transformers.model_utils import (
     register_base_model,
 )
 
-__all__ = ["ChatGLMv2ForCausalLMInferenceModel", "ChatGLMv2ForCausalLMBlockInferenceModel"]
+__all__ = ["ChatGLMv2ForCausalLMBlockInferenceModel"]
 
 
 @register_base_model
-class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
+class ChatGLMv2BlockInferenceModel(ChatGLMv2PretrainedModel):
     def __init__(self, config: ChatGLMv2Config, empty_init=True):
         super().__init__(config)
+        self.max_seq_len = config.max_sequence_length
+        self.block_size = config.block_size
         self.embedding = Embedding(config)
 
         # Rotary positional embeddings
@@ -177,6 +174,7 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
             epsilon=config.layernorm_epsilon,
             norm_type="rmsnorm",
             kv_num_heads=config.multi_query_group_num,
+            append_attn=config.append_attn,
         )
 
         self.set_transformer_block(transformer_config)
@@ -187,112 +185,11 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
             # Final layer norm before output.
             self.final_layernorm = LayerNormFunc(config)
 
-    def set_transformer_block(self, transformer_config):
-        if self.use_weight_only:
-            self.transformer_block = FusedMultiTransformerWeightOnly(transformer_config)
-        else:
-            self.transformer_block = FusedMultiTransformerBase(transformer_config)
-
     def get_input_embeddings(self):
         return self.embedding.word_embeddings
 
     def set_input_embeddings(self, value):
         self.embedding.word_embeddings = value
-
-    def remove_padding(self, input_ids, seq_lens_this_time):
-        cum_offsets_now = paddle.cumsum(paddle.max(seq_lens_this_time) - seq_lens_this_time)
-        token_num = paddle.sum(seq_lens_this_time)
-        from paddlenlp_ops import get_padding_offset
-
-        ids_remove_padding, cum_offsets, padding_offset = get_padding_offset(
-            input_ids, cum_offsets_now, token_num, seq_lens_this_time
-        )
-        return ids_remove_padding, padding_offset, cum_offsets
-
-    def forward(
-        self,
-        input_ids=None,
-        position_ids: Optional[paddle.Tensor] = None,
-        attention_mask: Optional[paddle.Tensor] = None,
-        inputs_embeds=None,
-        use_cache=None,
-        cache_kvs=None,
-        seq_len_encoder=None,
-        seq_len_decoder=None,
-        past_key_values=None,
-        output_attentions=False,
-        output_hidden_states=None,
-        return_dict=False,
-        **kwargs,
-    ):
-
-        # kwargs["cache"] is used used to distinguish between encoder and decoder phase.
-        past_key_values = kwargs.get("cache", None)
-        is_decoder = past_key_values is not None
-
-        output_hidden_states = (
-            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
-        )
-        use_cache = use_cache if use_cache is not None else self.config.use_cache
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-
-        if not is_decoder:
-            ids_remove_padding, padding_offset, cum_offsets = self.remove_padding(input_ids, seq_len_encoder)
-        else:
-            ids_remove_padding = input_ids
-            padding_offset = None
-            cum_offsets = None
-
-        batch_size, seq_length = input_ids.shape
-
-        if inputs_embeds is None:
-            inputs_embeds = self.embedding.word_embeddings(ids_remove_padding)
-        hidden_states = inputs_embeds
-
-        # Rotary positional embeddings
-        rotary_pos_emb = self.rotary_pos_emb(self.max_sequence_length)
-
-        if position_ids is not None:
-            rotary_pos_emb = rotary_pos_emb[position_ids]
-            rotary_pos_emb = rotary_pos_emb[:, :seq_length, :, :]
-        else:
-            rotary_pos_emb = rotary_pos_emb[None, :seq_length]
-
-        ones = paddle.ones([batch_size, seq_length, self.head_size // 4], dtype=paddle.get_default_dtype())
-        zeros = paddle.zeros([batch_size, seq_length, self.head_size // 4], dtype=paddle.get_default_dtype())
-        # make it to be [2, batch, seq_len, rotary_dim]
-        rotary_pos_emb = rotary_pos_emb.transpose([3, 0, 1, 2])
-        # The following code is for consistency with PaddleNLP/csrc/generation/encode_rotary_qk.cu, so boring.
-        cos = rotary_pos_emb[0]
-        sin = rotary_pos_emb[1]
-        cos = paddle.concat([cos, ones], axis=-1)
-        sin = paddle.concat([sin, zeros], axis=-1)
-        rotary_pos_emb = paddle.stack([cos, sin], axis=0)
-        rotary_pos_emb = (
-            rotary_pos_emb.unsqueeze(-1).tile([1, 1, 1, 1, 2]).reshape([2, batch_size, seq_length, self.head_size])
-        )
-
-        # Run encoder.
-        seq_lens = seq_len_decoder if is_decoder else seq_len_encoder
-        with dy2st_nocheck_guard_context():
-            hidden_states, _ = self.transformer_block(
-                input_ids,
-                hidden_states,
-                cum_offsets=cum_offsets,
-                padding_offset=padding_offset,
-                attn_mask=paddle.cast(attention_mask, dtype=hidden_states.dtype),
-                caches=cache_kvs,
-                pre_caches=None,
-                pre_caches_length=0,
-                seq_lens=seq_lens,
-                rotary_embs=paddle.cast(rotary_pos_emb, "float32"),
-                rotary_emb_dims=1,
-                time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
-            )
-
-        hidden_states = self.final_layernorm(hidden_states)
-
-        return tuple(v for v in [hidden_states, None, None, None] if v is not None)
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
@@ -374,14 +271,6 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
             else:
                 self.transformer_block.ffn2_weights[i].set_value(ffn2_weight)
 
-
-@register_base_model
-class ChatGLMv2BlockInferenceModel(ChatGLMv2InferenceModel):
-    def __init__(self, config: ChatGLMv2Config):
-        super().__init__(config)
-        self.max_seq_len = config.max_sequence_length
-        self.block_size = config.block_size
-
     def set_transformer_block(self, transformer_config):
         if self.use_weight_only:
             self.transformer_block = FusedBlockMultiTransformerWeightOnly(transformer_config)
@@ -436,130 +325,6 @@ class ChatGLMv2BlockInferenceModel(ChatGLMv2InferenceModel):
         hidden_states = self.final_layernorm(hidden_states)
 
         return tuple(v for v in [hidden_states, None, None, None] if v is not None)
-
-
-class ChatGLMv2ForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMv2PretrainedModel):
-    def __init__(self, config: ChatGLMv2Config):
-        super().__init__(config)
-        self.max_sequence_length = config.max_sequence_length
-        self.chatglm_v2 = ChatGLMv2InferenceModel(config)
-
-    @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
-        return infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs)
-
-    @classmethod
-    def get_cache_kvs_shape(cls, config: ChatGLMv2Config, max_batch_size: int = None, max_length: int = None):
-        """get cache_kvs tensor for opt model
-
-        Args:
-            max_batch_size (int): the max batch size
-            max_length (int | None, optional): the max_length of cache_kvs. Defaults to None.
-
-        Returns:
-            list[paddle.Tensor]: the list tensor shape for cache
-        """
-
-        if max_length is None:
-            max_length = config.max_sequence_length
-
-        cache_kvs = []
-        for _ in range(config.num_hidden_layers):
-            cache_kvs.append(
-                [
-                    2,
-                    max_batch_size,
-                    config.multi_query_group_num,
-                    max_length,
-                    config.hidden_size // config.num_attention_heads,
-                ]
-            )
-        return cache_kvs
-
-    def prepare_inputs_for_generation(
-        self,
-        input_ids,
-        cache_kvs,
-        seq_len_encoder,
-        seq_len_decoder,
-        tgt_ids,
-        tgt_pos,
-        tgt_generation_mask,
-        **kwargs,
-    ):
-        position_ids = kwargs.get("position_ids", None)
-        attention_mask = kwargs.get("attention_mask", None)
-        cache = kwargs.get("cache", None)
-        pre_caches = kwargs.get("pre_caches", None)
-        inputs_embeds = kwargs.get("inputs_embeds", None)
-        if cache is not None:
-            input_ids = tgt_ids
-            position_ids = tgt_pos
-            attention_mask = (tgt_generation_mask - 1) * 1e4
-            # make inputs_embeds be none in decoder phase.
-            # in forward function, it will be assigned according to input_ids.
-            inputs_embeds = None
-        else:
-            attention_mask = (attention_mask - 1) * 1e4
-        model_inputs = {
-            "input_ids": input_ids,
-            "inputs_embeds": inputs_embeds,
-            "position_ids": position_ids,
-            "attention_mask": attention_mask,
-            "cache_kvs": cache_kvs,
-            "seq_len_encoder": seq_len_encoder,
-            "seq_len_decoder": seq_len_decoder,
-            "cache": cache,
-            "pre_caches": pre_caches,
-        }
-        return model_inputs
-
-    def forward(
-        self,
-        input_ids: Optional[paddle.Tensor] = None,
-        position_ids: Optional[paddle.Tensor] = None,
-        attention_mask=None,
-        inputs_embeds=None,
-        labels=None,
-        use_cache=False,
-        cache=None,
-        cache_kvs=None,
-        pre_caches=None,
-        seq_len_encoder=None,
-        seq_len_decoder=None,
-        past_key_values=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
-    ):
-        use_cache = use_cache if use_cache is not None else self.config.use_cache
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-
-        transformer_outputs = self.chatglm_v2(
-            input_ids,
-            position_ids=position_ids,
-            attention_mask=attention_mask,
-            inputs_embeds=inputs_embeds,
-            use_cache=use_cache,
-            cache=cache,
-            cache_kvs=cache_kvs,
-            seq_len_encoder=seq_len_encoder,
-            seq_len_decoder=seq_len_decoder,
-            past_key_values=past_key_values,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
-        )
-
-        hidden_states = transformer_outputs[0]
-
-        lm_logits = self.chatglm_v2.output_layer(hidden_states)
-        output = (lm_logits,) + transformer_outputs[1:]
-        return output
-
-    @paddle.no_grad()
-    def set_state_dict(self, state_dict):
-        self.chatglm_v2.set_state_dict(state_dict)
 
 
 class ChatGLMv2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, ChatGLMv2PretrainedModel):

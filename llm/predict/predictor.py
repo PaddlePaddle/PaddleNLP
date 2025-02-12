@@ -118,7 +118,7 @@ class PredictorArgument:
         },
     )
     use_fake_parameter: bool = field(default=False, metadata={"help": "use fake parameter, for ptq scales now."})
-    block_attn: bool = field(default=False, metadata={"help": "whether use block attention"})
+    block_attn: bool = field(default=True, metadata={"help": "whether use block attention"})
     block_size: int = field(default=64, metadata={"help": "the block size for cache_kvs."})
     cachekv_int8_type: str = field(
         default=None,
