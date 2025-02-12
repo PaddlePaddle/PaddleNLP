@@ -354,9 +354,7 @@ def merge_tensor_parallel_with_shard(state_dict, tp_actions, all_filter_keys):
     """
     hcg = fleet.get_hybrid_communicate_group()
     tp_group = hcg.get_model_parallel_group()
-    dp_group = hcg.get_data_parallel_group()
     tp_rank = tp_group.rank
-    dp_rank = dp_group.rank if dp_group.nranks > 1 else 0
 
     # filter actions for pipeline mode
     if hcg.get_pipe_parallel_group().nranks > 1:
@@ -373,10 +371,9 @@ def merge_tensor_parallel_with_shard(state_dict, tp_actions, all_filter_keys):
             if i > len(filter_keys) - 1:
                 continue
             key = filter_keys[i]
-            tensor = state_dict[key]
-            # When using expert parallel, there's no need to save tensors with `no_sync=False` when dp_rank > 0.
-            if dp_rank > 0 and not getattr(tensor, "no_sync", False):
+            if key not in state_dict:
                 continue
+            tensor = state_dict[key]
             if key in tp_actions:
                 # Get tensor size
                 tensor_bytes = tensor.numel().item() * dtype_byte_size(tensor.dtype) * tp_group.nranks
@@ -405,21 +402,13 @@ def merge_tensor_parallel_with_shard(state_dict, tp_actions, all_filter_keys):
     return state_dict_to_save
 
 
-def merge_tensor_parallel_for_optimizer(state_dict, tp_actions, all_filter_keys, model_state_dict=None):
+def merge_tensor_parallel_for_optimizer(state_dict, tp_actions, all_filter_keys):
     """
     Merge tensor parallel according to tp_actions, used for master_weight and optimizer weight.
     """
     hcg = fleet.get_hybrid_communicate_group()
     tp_group = hcg.get_model_parallel_group()
-    dp_group = hcg.get_data_parallel_group()
     tp_rank = tp_group.rank
-    dp_rank = dp_group.rank if dp_group.nranks > 1 else 0
-
-    no_sync_kname = []
-    if model_state_dict is not None:
-        for k, v in model_state_dict.items():
-            if getattr(v, "no_sync", False):
-                no_sync_kname.append(k)
 
     state_dict_to_save = {}
     max_key_len = max([len(_) for _ in all_filter_keys])
@@ -430,10 +419,9 @@ def merge_tensor_parallel_for_optimizer(state_dict, tp_actions, all_filter_keys,
                 continue
             # get base model key
             model_key = filter_keys[i].split("/")[0]
-            tensor = state_dict[filter_keys[i]]
-            # When using expert parallel, there's no need to save tensors with `no_sync=False` when dp_rank > 0.
-            if dp_rank > 0 and model_key not in no_sync_kname:
+            if filter_keys[i] not in state_dict:
                 continue
+            tensor = state_dict[filter_keys[i]]
             if model_key in tp_actions:
                 # for example: beta1, beta2
                 if tensor.numel().item() == 1:
@@ -770,3 +758,31 @@ def save_model_config(model_to_save, save_directory):
     # save generation config
     if model_to_save.can_generate():
         model_to_save.generation_config.save_pretrained(save_directory)
+
+
+def filter_sync_parameters(model_state_dict, optim_state_dict=None, master_weights=None, is_model_weight=True):
+    """Filter sync parameters under expert parallel mode."""
+
+    hcg = fleet.get_hybrid_communicate_group()
+    dp_group = hcg.get_data_parallel_group()
+    dp_rank = dp_group.rank if dp_group.nranks > 1 else 0
+
+    if is_model_weight:
+        for key in list(model_state_dict.keys()):
+            if dp_rank > 0 and not getattr(model_state_dict[key], "no_sync", False):
+                model_state_dict.pop(key)
+    else:
+        no_sync_kname = []
+        for k, v in model_state_dict.items():
+            if getattr(v, "no_sync", False):
+                no_sync_kname.append(k)
+
+        for key in list(optim_state_dict.keys()):
+            model_key = key.split("/")[0]
+            if dp_rank > 0 and model_key not in no_sync_kname:
+                optim_state_dict.pop(key)
+
+        if master_weights is not None:
+            for key in list(master_weights.keys()):
+                if dp_rank > 0 and key not in no_sync_kname:
+                    master_weights.pop(key)
