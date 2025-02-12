@@ -147,6 +147,41 @@ class LlamaEmbeddingPipe(nn.Layer):
             _type_: _description_
         """
         input_ids, attention_mask, attn_mask_startend_row_indices, position_ids, alibi = parse_args(args)
+
+        # we can't distinguish
+        if self.config.alibi and alibi is None and position_ids is None and attn_mask_startend_row_indices is not None:
+            # input_ids, attention_mask, alibi
+            alibi = attn_mask_startend_row_indices
+            position_ids = None
+            attn_mask_startend_row_indices = None
+        elif (
+            self.config.alibi
+            and alibi is None
+            and position_ids is not None
+            and attn_mask_startend_row_indices is not None
+        ):
+            # input_ids, attention_mask, position_ids, alibi
+            alibi = position_ids
+            position_ids = attn_mask_startend_row_indices
+            attn_mask_startend_row_indices = None
+        elif not self.config.alibi:
+            if get_env_device() in ["gpu"]:
+                if attention_mask is not None and attention_mask.dtype == paddle.int32:
+                    attention_mask, attn_mask_startend_row_indices, position_ids = (
+                        None,
+                        attention_mask,
+                        attn_mask_startend_row_indices,
+                    )
+                elif attention_mask is not None and attention_mask.dtype == paddle.int64:
+                    attention_mask, attn_mask_startend_row_indices, position_ids = None, None, attention_mask
+                elif (
+                    attn_mask_startend_row_indices is not None and attn_mask_startend_row_indices.dtype == paddle.int64
+                ):
+                    attn_mask_startend_row_indices, position_ids = None, attn_mask_startend_row_indices
+            elif position_ids is None and attn_mask_startend_row_indices is not None:
+                position_ids = attn_mask_startend_row_indices
+                attn_mask_startend_row_indices = None
+
         input_embeds = self.embed_tokens(input_ids)
         if self.sequence_parallel:
             from paddlenlp.transformers import ScatterOp
