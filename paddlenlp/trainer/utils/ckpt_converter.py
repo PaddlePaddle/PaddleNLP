@@ -16,6 +16,7 @@ import json
 import os
 import re
 from functools import reduce
+from typing import List, Union
 
 import paddle
 from paddle.distributed.checkpoint.load_state_dict import (
@@ -29,7 +30,7 @@ from paddle.distributed.checkpoint.metadata import (
 )
 from paddle.distributed.checkpoint.utils import flatten_state_dict
 from paddle.distributed.fleet.utils.log_util import logger
-from typing import Union, List
+
 MODEL_WEIGHT_SUFFIX = ".pdparams"
 OPTIMIZER_WEIGHT_SUFFIX = ".pdopt"
 SCHEDULER_NAME = "scheduler.pdparams"
@@ -47,7 +48,7 @@ class CheckpointConverter:
         parameter_to_structured_name,
         trainging_args=None,
         patch_dict=None,
-        local_view_pattern: Union[ List, bool] = None
+        local_view_pattern: Union[List, bool] = None,
     ):
         self.use_dist = True if paddle.distributed.get_world_size() > 1 else False
         self.path = hybrid_parallel_ckpt_path
