@@ -316,6 +316,8 @@ class ShardingIO:
             one_shard_opt_state_dict = None
 
         logger.info("reshard optimizer state")
+        if self.args.flash_save_ema_coef is not None:
+            raise ValueError("flash save EMA do not support reshard")  # TODO: suport FC-ema reshard
 
         def load_model_slices():
             model_state = reshard_util.NodeModelState()
@@ -586,7 +588,8 @@ class ShardingIO:
         for k, v in model.state_dict().items():
             structure_name_mapping[k] = v.name
             is_distributed = getattr(v, "is_distributed", False)
-            param_meta[k] = (v.shape, int(v.dtype), is_distributed)
+            no_sync = getattr(v, "no_sync", False)
+            param_meta[k] = (v.shape, int(v.dtype), is_distributed, no_sync)
 
         sharding_metas = {}
         sharding_meta = {}
