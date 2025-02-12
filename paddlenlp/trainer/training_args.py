@@ -31,8 +31,10 @@ import paddle
 import paddle.distributed as dist
 from paddle.distributed import fleet
 
+from ..utils.env import PREFIX_CHECKPOINT_DIR
 from ..utils.fault_tolerance import is_ft_env
 from ..utils.log import logger
+from ..utils.pdc_sdk import FLASH_DEVICE
 from .trainer_utils import (
     IntervalStrategy,
     OptimizerNames,
@@ -970,6 +972,30 @@ class TrainingArguments:
     save_sharding_stage1_model_include_freeze_params: Optional[bool] = field(
         default=False, metadata={"help": "Save Sharding Stage1 Model Exclude Freeze Params"}
     )
+    enable_flash_save_mode: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Enable Flash Save Mode"},
+    )
+    flash_workers_num: Optional[int] = field(
+        default=3,
+        metadata={
+            "help": "The worker num for flash save mode. Increase to gain performance but cost more memory and cpu usage."
+        },
+    )
+    flash_pipeline_hooks_capacity_usage: Optional[float] = field(
+        default=0.6,
+        metadata={
+            "help": "Set pipeline hook capacity usage ratio. Lower value brings faster save speed but may effect calculation speed."
+        },
+    )
+    save_tokenizer: Optional[bool] = field(
+        default=True,
+        metadata={"help": "Save tokenizer to output_dir."},
+    )
+    save_rng_states: Optional[bool] = field(
+        default=True,
+        metadata={"help": "Save rng states to output_dir."},
+    )
     pdc_download_ckpt: Optional[bool] = field(
         default=False,
         metadata={"help": "Download checkpoint in paddlecloud longjob environment"},
@@ -977,6 +1003,10 @@ class TrainingArguments:
     pdc_download_timeout: Optional[int] = field(
         default=300,
         metadata={"help": "Timeout seconds for downloading checkpoint from remote cluster."},
+    )
+    flash_save_steps: Optional[int] = field(
+        default=0,
+        metadata={"help": "Save checkpoints on flash device every this many steps. Default is 0 which disables it"},
     )
 
     def __post_init__(self):
@@ -1855,12 +1885,30 @@ class TrainingArguments:
             self.refined_recompute = refined_recompute_dict
 
         # process fault tolerance settings
-        if not is_ft_env():
+        if is_ft_env():
+            pdc_flash_checkpoint_init_step = os.getenv("PDC_FC_INIT_STEP")
+            if pdc_flash_checkpoint_init_step is not None and int(pdc_flash_checkpoint_init_step) > 0:
+                self.resume_from_checkpoint = os.path.join(
+                    FLASH_DEVICE, f"{PREFIX_CHECKPOINT_DIR}-{pdc_flash_checkpoint_init_step}"
+                )
+                logger.warning(
+                    f"PDC_FC_INIT_STEP {pdc_flash_checkpoint_init_step} has been specified, automatically resume from FLASH_DEVICE: {self.resume_from_checkpoint}"
+                )
+            if self.flash_save_steps > 0:
+                assert (
+                    self.enable_flash_save_mode
+                ), "flash_save_steps should only be set in flash save mode with flash device mounted."
+        else:
             if self.pdc_download_ckpt:
                 logger.warning(
                     "pdc_download_ckpt can only be set as true inside FT environment. Automatically disable it now."
                 )
                 self.pdc_download_ckpt = False
+            if self.flash_save_steps > 0:
+                logger.warning(
+                    "flash_save_steps is only recommended to be set inside FT environment. Automatically disable it now."
+                )
+                self.flash_save_steps = 0
 
     def __str__(self):
         self_as_dict = asdict(self)
