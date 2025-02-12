@@ -136,6 +136,7 @@ nvcc_compile_args += [
 
 cc = get_sm_version()
 cuda_version = float(paddle.version.cuda())
+cuda_version = 12.4
 
 if cc >= 80:
     sources += ["gpu/int8_gemm_with_cutlass/gemm_dequant.cu"]
