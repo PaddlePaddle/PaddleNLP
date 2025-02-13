@@ -1291,18 +1291,16 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         return mem
 
     def get_model_flops(self, *args, **kwargs):
-        base_model = getattr(self, self.base_model_prefix, self)
-        if base_model is not self:
-            return base_model.get_model_flops()
+        if hasattr(self, "_get_model_flops"):
+            return self._get_model_flops()
 
-        raise NotImplementedError(f"model of {type(base_model)} has not implemented the `get_model_flops`")
+        raise NotImplementedError(f"model of {type(self)} has not implemented the `_get_model_flops`")
 
     def get_hardware_flops(self, *args, **kwargs):
-        base_model = getattr(self, self.base_model_prefix, self)
-        if base_model is not self:
-            return base_model.get_hardware_flops()
+        if hasattr(self, "_get_hardware_flops"):
+            return self._get_hardware_flops()
 
-        raise NotImplementedError(f"model of {type(base_model)} has not implemented the `get_hardware_flops`")
+        raise NotImplementedError(f"model of {type(self)} has not implemented the `_get_hardware_flops`")
 
     def get_input_embeddings(self) -> nn.Embedding:
         """get input embedding of model

@@ -898,6 +898,39 @@ class GemmaPretrainedModel(PretrainedModel):
     _keys_to_ignore_on_load_unexpected = []
     _keep_in_fp32_modules = ["inv_freq", "rotary_emb", "cos_cached", "sin_cached"]
 
+    def _get_model_flops(self, batch_size=1, seq_length=None, **kwargs):
+        if seq_length is None:
+            if hasattr(self.config, "seq_length"):
+                seq_length = self.config.seq_length
+            else:
+                seq_length = 2048
+
+        return caculate_llm_flops(
+            hidden_size=self.config.hidden_size,
+            intermediate_size=self.config.intermediate_size,
+            layer_num=self.config.num_hidden_layers,
+            vocab_size=self.config.vocab_size,
+            seq_length=seq_length,
+            recompute=False,
+        )
+
+    def _get_hardware_flops(self, batch_size=1, seq_length=None, recompute=False, **kwargs):
+        if seq_length is None:
+            if hasattr(self.config, "seq_length"):
+                seq_length = self.config.seq_length
+            else:
+                seq_length = 2048
+
+        return caculate_llm_flops(
+            hidden_size=self.config.hidden_size,
+            intermediate_size=self.config.intermediate_size,
+            layer_num=self.config.num_hidden_layers,
+            vocab_size=self.config.vocab_size,
+            seq_length=seq_length,
+            recompute=recompute,
+            recompute_granularity=self.config.recompute_granularity,
+        )
+
     @classmethod
     def _get_name_mappings(cls, config: GemmaConfig) -> List[StateDictNameMapping]:
         mappings: list[StateDictNameMapping] = []
@@ -1074,39 +1107,6 @@ class GemmaModel(GemmaPretrainedModel):
         self.norm = GemmaRMSNorm(config)
 
         self.gradient_checkpointing = False
-
-    def get_model_flops(self, batch_size=1, seq_length=None, **kwargs):
-        if seq_length is None:
-            if hasattr(self.config, "seq_length"):
-                seq_length = self.config.seq_length
-            else:
-                seq_length = 2048
-
-        return caculate_llm_flops(
-            hidden_size=self.config.hidden_size,
-            intermediate_size=self.config.intermediate_size,
-            layer_num=self.config.num_hidden_layers,
-            vocab_size=self.config.vocab_size,
-            seq_length=seq_length,
-            recompute=False,
-        )
-
-    def get_hardware_flops(self, batch_size=1, seq_length=None, recompute=False, **kwargs):
-        if seq_length is None:
-            if hasattr(self.config, "seq_length"):
-                seq_length = self.config.seq_length
-            else:
-                seq_length = 2048
-
-        return caculate_llm_flops(
-            hidden_size=self.config.hidden_size,
-            intermediate_size=self.config.intermediate_size,
-            layer_num=self.config.num_hidden_layers,
-            vocab_size=self.config.vocab_size,
-            seq_length=seq_length,
-            recompute=recompute,
-            recompute_granularity=self.config.recompute_granularity,
-        )
 
     def get_input_embeddings(self):
         return self.embed_tokens

@@ -805,6 +805,39 @@ class GPTPretrainedModel(PretrainedModel):
     pretrained_init_configuration = GPT_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = GPT_PRETRAINED_RESOURCE_FILES_MAP
 
+    def _get_hardware_flops(self, batch_size=1, seq_length=None, recompute=False, **kwargs):
+        if seq_length is None:
+            if hasattr(self.config, "seq_length"):
+                seq_length = self.config.seq_length
+            else:
+                seq_length = 2048
+
+        return caculate_llm_flops(
+            hidden_size=self.config.hidden_size,
+            intermediate_size=self.config.intermediate_size,
+            layer_num=self.config.num_hidden_layers,
+            vocab_size=self.config.vocab_size,
+            seq_length=seq_length,
+            recompute=recompute,
+            recompute_granularity=self.config.recompute_granularity,
+        )
+
+    def _get_model_flops(self, batch_size=1, seq_length=None, **kwargs):
+        if seq_length is None:
+            if hasattr(self.config, "seq_length"):
+                seq_length = self.config.seq_length
+            else:
+                seq_length = 2048
+
+        return caculate_llm_flops(
+            hidden_size=self.config.hidden_size,
+            intermediate_size=self.config.intermediate_size,
+            layer_num=self.config.num_hidden_layers,
+            vocab_size=self.config.vocab_size,
+            seq_length=seq_length,
+            recompute=False,
+        )
+
     @classmethod
     def _get_tensor_parallel_mappings(cls, config, is_split=True):
 
@@ -1104,39 +1137,6 @@ class GPTModel(GPTPretrainedModel):
         self.decoder = TransformerDecoder(
             config,
             decoder_layers,
-        )
-
-    def get_model_flops(self, batch_size=1, seq_length=None, **kwargs):
-        if seq_length is None:
-            if hasattr(self.config, "seq_length"):
-                seq_length = self.config.seq_length
-            else:
-                seq_length = 2048
-
-        return caculate_llm_flops(
-            hidden_size=self.config.hidden_size,
-            intermediate_size=self.config.intermediate_size,
-            layer_num=self.config.num_hidden_layers,
-            vocab_size=self.config.vocab_size,
-            seq_length=seq_length,
-            recompute=False,
-        )
-
-    def get_hardware_flops(self, batch_size=1, seq_length=None, recompute=False, **kwargs):
-        if seq_length is None:
-            if hasattr(self.config, "seq_length"):
-                seq_length = self.config.seq_length
-            else:
-                seq_length = 2048
-
-        return caculate_llm_flops(
-            hidden_size=self.config.hidden_size,
-            intermediate_size=self.config.intermediate_size,
-            layer_num=self.config.num_hidden_layers,
-            vocab_size=self.config.vocab_size,
-            seq_length=seq_length,
-            recompute=recompute,
-            recompute_granularity=self.config.recompute_granularity,
         )
 
     def get_input_embeddings(self):
