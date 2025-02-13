@@ -12,29 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# just for debug
-
 #!/bin/bash
-
-mpi_rank=${OMPI_COMM_WORLD_RANK:-0}
-node_rank=$((mpi_rank+offset))
-mpi_node=${OMPI_COMM_WORLD_SIZE:-1}
-echo "MPI status:${mpi_rank}/${mpi_node}"
-nnode_train=${nnode_set:-${mpi_node}}
-master_train=${master:-localhost}
-#
-echo "Distributed Training ${node_rank}/${nnode_train} master=${master_train}"
-set -x
-
-# 屏蔽平台预设的环境变量，因为框架采用兼容升级，检测到这些配置会使用原方式启动
-unset PADDLE_ELASTIC_JOB_ID
-unset PADDLE_TRAINER_ENDPOINTS
-unset DISTRIBUTED_TRAINER_ENDPOINTS
-unset FLAGS_START_PORT
-unset PADDLE_ELASTIC_TIMEOUT
-nnodes=$PADDLE_TRAINERS_NUM
-rank=$PADDLE_TRAINER_ID
-
 set -x
 unset CUDA_VISIBLE_DEVICES
 
