@@ -60,13 +60,7 @@ def tensors_to_device(device, *tensors):
 def ref_set_value_by_flags_and_idx(pre_ids_all, pre_ids, step_idx, stop_flags, use_cpu=True):
     if use_cpu:
         import paddlenlp_ops
-
-        device = pre_ids_all.place
-        pre_ids_all, pre_ids, step_idx, stop_flags = tensors_to_cpu(pre_ids_all, pre_ids, step_idx, stop_flags)
         stop_flags = paddlenlp_ops.set_value_by_flags_and_idx(pre_ids_all, pre_ids, step_idx, stop_flags)
-        stop_flags, pre_ids_all, pre_ids, step_idx, stop_flags = tensors_to_device(
-            device, stop_flags, pre_ids_all, pre_ids, step_idx, stop_flags
-        )
         return stop_flags
     else:
         condition = step_idx >= paddle.to_tensor([0])
@@ -209,13 +203,7 @@ def ref_top_p_sampling(probs, top_p, use_cpu=True):
 
 def ref_set_stop_value_multi_ends(topk_ids, stop_flags, end_ids):
     import paddlenlp_ops
-
-    place = topk_ids.place
-    topk_ids, stop_flags, end_ids = tensors_to_cpu(topk_ids, stop_flags, end_ids)
     result_topk_ids, result_stop_flags = paddlenlp_ops.set_stop_value_multi_ends(topk_ids, stop_flags, end_ids)
-    result_topk_ids, result_stop_flags, topk_ids, stop_flags, end_ids = tensors_to_device(
-        place, result_topk_ids, result_stop_flags, topk_ids, stop_flags, end_ids
-    )
     return result_topk_ids, result_stop_flags
 
 
