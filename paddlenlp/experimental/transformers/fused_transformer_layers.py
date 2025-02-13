@@ -1160,7 +1160,7 @@ class FusedMultiTransformerBase(Layer):
         def get_moe_scores(
             gating_output: paddle.Tensor,
             config: MoeConfig,
-        ) -> (paddle.Tensor, paddle.Tensor):
+        ) -> tuple[paddle.Tensor, paddle.Tensor]:
 
             num_token = gating_output.shape[0]
             num_expert_group = config.num_expert_group
