@@ -1592,7 +1592,8 @@ class Trainer:
                     paddle.distributed.all_gather(output_tensors, tensors, group=self.hcg._dp_comm_group)
                     tensors = paddle.concat(output_tensors).sum().reshape([1])
                 token_list.append(tensors.item())
-            logger.info(f"Update to now, trained_effective_tokens: {token_list[0]}, trained_tokens: {token_list[1]}.")
+            if self.is_local_process_zero():
+                logger.info(f"Update to now, trained_effective_tokens: {token_list[0]}, trained_tokens: {token_list[1]}.")
 
     def _get_learning_rate(self):
         return self.optimizer.get_lr()
