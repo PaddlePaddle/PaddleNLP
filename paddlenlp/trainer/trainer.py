@@ -1016,6 +1016,8 @@ class Trainer:
             from .plugins.npu_plugin import npu_accelerate_plugin
 
             npu_accelerate_plugin(self.optimizer)
+        # ensure that the seeds here are consistent with those at the time of save_checkpoint
+        self._load_rng_state(resume_from_checkpoint)
 
         if self.args.ignore_data_skip:
             self.timers and self.timers("read-data").start()
@@ -1051,14 +1053,11 @@ class Trainer:
                             steps_trained_progress_bar.update(steps_trained_in_current_epoch)
                             steps_trained_progress_bar.close()
                             steps_trained_progress_bar = None
-                        self._load_rng_state(resume_from_checkpoint)
                     step += steps_trained_in_current_epoch
                 elif steps_trained_in_current_epoch > 0:
                     steps_trained_in_current_epoch -= 1
                     if steps_trained_progress_bar is not None:
                         steps_trained_progress_bar.update(1)
-                    if steps_trained_in_current_epoch == 0:
-                        self._load_rng_state(resume_from_checkpoint)
                     self.timers and self.timers("read-data").start()
                     continue
                 elif steps_trained_progress_bar is not None:
