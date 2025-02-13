@@ -24,7 +24,7 @@
 
 ## 2. 项目创建
 
-LLM-UIE 支持抽取与分类两种类型的任务，根据实际需要创建一个新的项目：
+LLM-UIE 支持抽取类型的任务，根据实际需要创建一个新的项目：
 
 #### 2.1 抽取式任务项目创建
 
@@ -32,14 +32,6 @@ LLM-UIE 支持抽取与分类两种类型的任务，根据实际需要创建一
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/167249142-44885510-51dc-4359-8054-9c89c9633700.png height=230 hspace='15'/>
-</div>
-
-#### 2.2 分类式任务项目创建
-
-创建项目时选择**文本分类**任务。适配**文本分类、句子级情感倾向分类**等任务。
-
-<div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/167249258-48fb4f0c-f68c-4c9a-ab84-5c555ddcf427.png height=230 hspace='15'/>
 </div>
 
 <a name="数据上传"></a>
@@ -59,7 +51,7 @@ LLM-UIE 支持抽取与分类两种类型的任务，根据实际需要创建一
     <img src=https://user-images.githubusercontent.com/40840292/167247061-d5795c26-7a6f-4cdb-88ad-107a3cae5446.png height=300 hspace='15'/>
 </div>
 
-**NOTE**：doccano 支持`TextFile`、`TextLine`、`JSONL`和`CoNLL`四种数据上传格式，UIE 定制训练中**统一使用 TextLine**这一文件格式，即上传的文件需要为 txt 格式，且在数据标注时，该文件的每一行待标注文本显示为一页内容。
+**NOTE**：doccano 支持`TextFile`、`TextLine`、`JSONL`和`CoNLL`四种数据上传格式，LLM-UIE 定制训练中**统一使用 TextLine**这一文件格式，即上传的文件需要为 txt 格式，且在数据标注时，该文件的每一行待标注文本显示为一页内容。
 
 <a name="标签构建"></a>
 
@@ -81,15 +73,6 @@ Relation 类型标签构建示例：
     <img src=https://user-images.githubusercontent.com/40840292/167248307-916c77f6-bf80-4d6b-aa71-30c719f68257.png height=260 hspace='16'/>
 </div>
 
-#### 4.2 构建分类式任务标签
-
-添加分类类别标签：
-
-<div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/167249484-2b5f6338-8a91-48f3-8d56-edc2b26b41d7.png height=160 hspace='15'/>
-</div>
-
-<a name="任务标注"></a>
 
 ## 5. 任务标注
 
@@ -166,7 +149,7 @@ schema = {
 
 ## 6. 数据导出
 
-#### 6.1 导出抽取式和实体/评价维度级分类任务数据
+#### 6.1 导出抽取式任务数据
 
 选择导出的文件类型为``JSONL(relation)``，导出数据示例：
 
@@ -237,24 +220,6 @@ schema = {
     - ``to_id``: Span2对应的标识 ID。
     - ``type``: Relation 类型。
 
-#### 6.2 导出句子级分类任务数据
-
-选择导出的文件类型为``JSONL``，导出数据示例：
-
-```text
-{
-    "id": 41,
-    "data": "大年初一就把车前保险杠给碰坏了，保险杠和保险公司 真够倒霉的，我决定步行反省。",
-    "label": [
-        "负向"
-    ]
-}
-```
-
-标注数据保存在同一个文本文件中，每条样例占一行且存储为``json``格式，其包含以下字段
-- ``id``: 样本在数据集中的唯一标识 ID。
-- ``data``: 原始文本数据。
-- ``label``: 文本对应类别标签。
 
 <a name="数据转换"></a>
 

@@ -1,4 +1,4 @@
-# 大模型信息抽取 LLM-IE(Large Language Model Information Extraction)
+# 通用信息抽取大模型 LLM-UIE
 
  **目录**
 
@@ -19,7 +19,7 @@
 
 ## 1. 模型简介
 
-信息抽取大模型（LLM-UIE）是 PaddleNLP 团队基于开源模型和高质量数据集构建的信息抽取大模型， PaddleNLP基于百度 UIE 的建模思路，通过大模型的能力来训练并开源了一款面向中文通用信息抽取的大模型。 支持统一训练信息抽取任务包括命名实体识别（NER），关系抽取（RE）和事件抽取（EE）。模型共包含0.5B、1.5B、7B 和14B 共4个版本，以适配不同场景下信息抽取任务使用。在多个数据集（包含 Boson、CLUENER、CCIR2021等常见数据）相比 UIE 模型在 ACC 和F1指标上有大幅度提升。
+通用信息抽取大模型（LLM-UIE）是 PaddleNLP 团队基于开源模型和高质量数据集构建的通用信息抽取大模型， PaddleNLP 基于百度 UIE 的建模思路，通过大模型的能力来训练并开源了一款面向中、英文通用信息抽取的大模型。 支持统一训练信息抽取任务包括命名实体识别（NER），关系抽取（RE）和事件抽取（EE）。模型共包含0.5B、1.5B、7B 和14B 共4个版本，以适配不同场景下信息抽取任务使用。在多个数据集（包含 Boson、CLUENER、CCIR2021等常见数据）相比其他通用信息抽取大模型在 ACC 和 F1 指标上有大幅度提升。
 
 
 
@@ -27,7 +27,7 @@
 
 ## 2. 开箱即用
 
-```paddlenlp.Taskflow```提供通用信息抽取、评价观点抽取等能力，可抽取多种类型的信息，包括但不限于命名实体识别（如人名、地名、机构名等）、关系（如电影的导演、歌曲的发行时间等）、事件（如某路口发生车祸、某地发生地震等）、以及评价维度、观点词、情感倾向等信息。用户可以使用自然语言自定义抽取目标，无需训练即可统一抽取输入文本中的对应信息。**实现开箱即用，并满足各类信息抽取需求**
+```paddlenlp.Taskflow```提供通用信息抽取等能力，可抽取多种类型的信息，包括但不限于命名实体识别（如人名、地名、机构名等）、关系（如电影的导演、歌曲的发行时间等）、事件（如某路口发生车祸、某地发生地震等）等信息。用户可以使用自然语言自定义抽取目标，无需训练即可统一抽取输入文本中的对应信息。**实现开箱即用，并满足各类信息抽取需求**
 
 <a name="实体抽取"></a>
 
@@ -67,14 +67,14 @@
 
   关系抽取（Relation Extraction，简称 RE），是指从文本中识别实体并抽取实体之间的语义关系，进而获取三元组信息，即<主体，谓语，客体>。
 
-  - 例如以"竞赛名称"作为抽取主体，抽取关系类型为"主办方"、"承办方"和"已举办次数", schema 构造如下：
+  - 例如以"竞赛名称"作为抽取主体，抽取关系类型为"主办方"、"承办方"和"时间", schema 构造如下：
 
     ```text
     {
       '竞赛名称': [
         '主办方',
         '承办方',
-        '已举办次数'
+        '时间'
       ]
     }
     ```
@@ -82,14 +82,14 @@
     调用示例：
 
     ```python
-    schema = {'竞赛名称': ['主办方', '承办方', '已举办次数']} # Define the schema for relation extraction
+    schema = {'竞赛名称': ['主办方', '承办方', '时间']} # Define the schema for relation extraction
     ie.set_schema(schema) # Reset schema
-    pprint(ie('2022语言与智能技术竞赛由中国中文信息学会和中国计算机学会联合主办，百度公司、中国中文信息学会评测工作委员会和中国计算机学会自然语言处理专委会承办，已连续举办4届，成为全球最热门的中文NLP赛事之一。'))
+    pprint(ie('2022年语言与智能技术竞赛由中国中文信息学会和中国计算机学会联合主办，百度公司、中国中文信息学会评测工作委员会和中国计算机学会自然语言处理专委会承办，已连续举办4届，成为全球最热门的中文NLP赛事之一。'))
     # 输出
     [{'竞赛名称': [{'relations': {'主办方': [{'text': '中国中文信息学会,中国计算机学会'}],
-                          '已举办次数': [{'text': '4'}],
+                          '时间': [{'text': '2022年'}],
                           '承办方': [{'text': '百度公司,中国中文信息学会评测工作委员会,中国计算机学会自然语言处理专委会'}]},
-            'text': '2022语言与智能技术竞赛'}]}]
+            'text': '语言与智能技术竞赛'}]}]
     ```
 
 <a name="模型选择"></a>
@@ -100,7 +100,7 @@
 
   | 模型 |  结构  | 语言 |
   | :---: | :--------: | :--------: |
-  | `paddlenlp/PP-UIE-0.5B` (默认)| 24-layers, 896-hidden, 14-heads | 中、英文 |
+  | `paddlenlp/PP-UIE-0.5B` | 24-layers, 896-hidden, 14-heads | 中、英文 |
   | `paddlenlp/PP-UIE-1.5B` | 28-layers, 1536-hidden, 12-heads | 中、英文 |
   | `paddlenlp/PP-UIE-7B` | 28-layers, 3584-hidden, 28-heads | 中、英文 |
   | `paddlenlp/PP-UIE-14B` | 48-layers, 5120-hidden, 40-heads | 中、英文 |
@@ -113,7 +113,7 @@
 >>> from paddlenlp import Taskflow
 
 >>> ie = Taskflow('information_extraction',
-                  schema = {'竞赛名称': ['主办方', '承办方', '已举办次数']},
+                  schema = {'竞赛名称': ['主办方', '承办方', '时间']},
                   schema_lang="zh",
                   batch_size=1,
                   model='paddlenlp/PP-UIE-0.5B',
@@ -194,7 +194,7 @@ outputs = model.generate(
 
 
 def get_clean_entity(text):
-    ind1 = text.find("\n **回答结束**\n\n")
+    ind1 = text.find("\n**回答结束**\n\n")
     if ind1 != -1:
         pred = text[:ind1]
     else:
@@ -216,7 +216,7 @@ for sentence, prompt, result in zip(sentences, prompts, results):
 
 ## 3. 训练定制
 
-对于简单的抽取目标可以直接使用 ```paddlenlp.Taskflow```实现零样本（zero-shot）抽取，对于细分场景我们推荐使用轻定制功能（标注少量数据进行模型微调）以进一步提升效果。下面通过`报销工单信息抽取`的例子展示如何通过5条训练数据进行 UIE 模型微调。
+对于简单的抽取目标可以直接使用 ```paddlenlp.Taskflow```实现零样本（zero-shot）抽取，对于细分场景我们推荐使用轻定制功能（标注少量数据进行模型微调）以进一步提升效果。下面通过`报销工单信息抽取`的例子展示如何通过几十条训练数据进行 PP-UIE 模型微调。
 
 <a name="代码结构"></a>
 
@@ -275,10 +275,10 @@ python doccano.py \
 
 - ``doccano_file``: 从 doccano 导出的数据标注文件。
 - ``save_dir``: 训练数据的保存目录，默认存储在``data``目录下。
-- ``negative_ratio``: 最大负例比例，该参数只对抽取类型任务有效，适当构造负例可提升模型效果。负例数量和实际的标签数量有关，最大负例数量 = negative_ratio * 正例数量。该参数只对训练集有效，默认为5。
+- ``negative_ratio``: 最大负例比例，该参数只对抽取类型任务有效，适当构造负例可提升模型效果。负例数量和实际的标签数量有关，最大负例数量 = negative_ratio * 正例数量。
 - ``splits``: 划分数据集时训练集、验证集所占的比例。默认为[0.8, 0.1, 0.1]表示按照``8:1:1``的比例将数据划分为训练集、验证集和测试集。
 - ``task_type``: 选择任务类型，目前只有信息抽取这一种任务。
-- ``is_shuffle``: 是否对数据集进行随机打散，默认为 True。
+- ``is_shuffle``: 是否对数据集进行随机打散，默认为 False。
 - ``seed``: 随机种子，默认为1000.
 - ``schema_lang``: 选择 schema 的语言，可选有`ch`和`en`。默认为`ch`，英文数据集请选择`en`。
 
@@ -295,7 +295,7 @@ python doccano.py \
 
 推荐使用 [大模型精调](../../docs/finetune.md) 对模型进行微调。只需输入模型、数据集等就可以高效快速地进行微调和模型压缩等任务，可以一键启动多卡训练、混合精度训练、梯度累积、断点重启、日志显示等功能，并且针对训练过程的通用训练配置做了封装，比如：优化器、学习率调度等。
 
-使用下面的命令，使用 `Qwen2.5-0.5B-Instruct` 作为预训练模型进行模型微调，将微调后的模型保存至`$finetuned_model`：
+使用下面的命令，使用 `paddlenlp/LLM-UIE-0.5B` 作为预训练模型进行模型微调，将微调后的模型保存至指定路径中。
 
 如果在 GPU 环境中使用，可以指定 gpus 参数进行多卡训练：
 
@@ -305,10 +305,10 @@ cd ../../
 python -u  -m paddle.distributed.launch --gpus "0,1" run_finetune.py ./config/qwen/sft_argument.json
 ```
 
-sft_argument.json 的参考配置如下：
+`sft_argument.json` 的参考配置如下：
 ```shell
 {
-    "model_name_or_path": "paddlenlp/LLM-UIE-0114",
+    "model_name_or_path": "paddlenlp/LLM-UIE-0.5B",
     "dataset_name_or_path": "./application/information_extraction/data",
     "output_dir": "./checkpoints/ie_ckpts",
     "per_device_train_batch_size": 1,
@@ -363,9 +363,8 @@ python predict/predictor.py \
     --src_length  512 \
     --max_length  20 \
     --batch_size  4 \
-
 ```
-更多关于 predictor.py 的配置参数说明，请参考[大模型推理教程](../../docs/predict/inference.md)
+更多关于 `predictor.py` 的配置参数说明，请参考[大模型推理教程](../../docs/predict/inference.md)
 
 2. 使用 taskflow进行快速推理
 `paddlenlp.Taskflow`支持装载定制模型，通过`task_path`指定模型权重文件的路径，路径下需要包含训练好的模型权重文件
@@ -404,4 +403,4 @@ python predict/predictor.py \
 <tr><td>uie-m-base (12L768H)<td>38.46<td>74.31<td>63.37<td>87.32<td>76.27<td>80.13
 </table>
 
-0-shot 表示无训练数据直接通过模型进行预测，5-shot 表示预测时使用五个数据样例作为提示。**实验表明 UIE 在垂类场景可以通过少量数据（few-shot）进一步提升效果**。
+0-shot 表示无训练数据直接通过模型进行预测，5-shot 表示预测时使用五个数据样例作为提示。**实验表明 PP-UIE 在垂类场景可以通过少量数据（few-shot）进一步提升效果**。
