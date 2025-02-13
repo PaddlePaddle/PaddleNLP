@@ -144,10 +144,10 @@ if cc >= 80:
 
     sources += [
         "./gpu/append_attention.cu",
-        "./gpu/append_attn/get_block_shape_and_split_kv_block.cu",
-        "./gpu/append_attn/decoder_write_cache_with_rope_kernel.cu",
-        "./gpu/append_attn/speculate_write_cache_with_rope_kernel.cu",
+        "./gpu/multi_head_latent_attention.cu"
     ]
+
+    sources += find_end_files("./gpu/append_attn", ".cu")
     sources += find_end_files("./gpu/append_attn/template_instantiation", ".cu")
 
 

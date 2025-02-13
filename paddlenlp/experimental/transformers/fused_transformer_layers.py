@@ -48,12 +48,17 @@ if not is_paddlenlp_ops_available():
 if (
     paddle.device.get_all_custom_device_type() is not None and len(paddle.device.get_all_custom_device_type()) > 0
 ) or paddle.is_compiled_with_cuda():
-    from paddlenlp_ops import rebuild_padding_v2
-
+    from paddlenlp_ops import (
+        rebuild_padding_v2,
+        prefill_mla_write_cache,
+        decode_mla_write_cache,
+        multi_head_latent_attention,
+        append_attention
+    )
+USE_ABSORB = True
 
 def use_cutlass_fp8_gemm():
     return os.getenv("FLAGS_CUTLASS_FP8_GEMM", "False") in ["True", "1", "true"]
-
 
 if paddle.is_compiled_with_cuda():
     if use_cutlass_fp8_gemm():
@@ -86,6 +91,7 @@ __all__ = [
     "FusedMultiTransformerWeightOnly",
     "FusedMultiTransformerWeightOnlyPostLayernorm",
     "FusedBlockMultiTransformer",
+    "FusedMLAMultiTransformer",
     "FusedBlockMultiTransformerWeightOnly",
     "FusedBlockMultiTransformerA8W8",
     "FusedBlockMultiTransformerFP8",
@@ -183,9 +189,13 @@ class MLAConfig:
     kv_a_layernorm_weight_attrs: List[paddle.ParamAttr] = None
     kv_b_proj_weight_attrs: List[paddle.ParamAttr] = None
     kv_b_proj_weight_scale_attrs: Optional[List[paddle.ParamAttr]] = None
+    # use_absorb = False
 
     def use_mla(self) -> bool:
         return self.kv_lora_rank is not None
+
+    # def use_absorb(self) -> bool:
+    #     return self.use_absorb
 
     @property
     def qk_head_dim(self) -> int:
@@ -978,6 +988,7 @@ class FusedMultiTransformerBase(Layer):
                 [self.config.mla_config.qk_nope_head_dim, self.config.mla_config.qk_rope_head_dim], axis=-1
             )
 
+            # import pdb;pdb.set_trace()
             compressed_kv = paddle.matmul(ln_out, self.kv_a_proj_with_mqa_weights[i])
             compressed_kv, key_pe = compressed_kv.split(
                 [self.config.mla_config.kv_lora_rank, self.config.mla_config.qk_rope_head_dim], axis=-1
@@ -990,6 +1001,10 @@ class FusedMultiTransformerBase(Layer):
                 epsilon=self._epsilon,
                 begin_norm_axis=1,
             )[0]
+            query_pe, key_pe = self.config.rotary_emb(self.position_ids, query_pe, key_pe)
+
+            if USE_ABSORB:
+                return (query, query_nope, query_pe, compressed_kv, key_pe)
             key_value = paddle.matmul(compressed_kv, self.kv_b_proj_weights[i])
             key_value = key_value.reshape(
                 [-1, self.num_heads, self.config.mla_config.qk_nope_head_dim + self.config.mla_config.v_head_dim]
@@ -997,8 +1012,6 @@ class FusedMultiTransformerBase(Layer):
             key_nope, value = key_value.split(
                 [self.config.mla_config.qk_nope_head_dim, self.config.mla_config.v_head_dim], axis=-1
             )
-
-            query_pe, key_pe = self.config.rotary_emb(self.position_ids, query_pe, key_pe)
 
             query[..., self.config.mla_config.qk_nope_head_dim :] = query_pe
             key = paddle.empty_like(query)
@@ -1316,6 +1329,8 @@ class FusedMultiTransformerBase(Layer):
 
             # In-place operations that compute the position_ids.
             get_position_ids(seq_lens_encoder, seq_lens_decoder, self.position_ids)
+
+
 
     def post_process(self, **kwargs):
         time_step = kwargs.get("time_step", None)
@@ -2694,8 +2709,6 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
         **kwargs,
     ):
         if self.config.append_attn:
-            from paddlenlp_ops import append_attention
-
             fmha_out = append_attention(
                 qkv_out,
                 caches[2 * i],
@@ -2895,7 +2908,6 @@ class FusedBlockMultiTransformerA8W8(FusedBlockMultiTransformer, FusedMultiTrans
             cache_quant_type_str = "cache_int8"
 
         if self.config.append_attn:
-            from paddlenlp_ops import append_attention
 
             fmha_out = append_attention(
                 qkv_out,
@@ -3255,8 +3267,6 @@ class FusedBlockMultiTransformerFP8(FusedBlockMultiTransformer):
             cache_quant_type_str = "cache_int8"
 
         if self.config.append_attn:
-            from paddlenlp_ops import append_attention
-
             fmha_out = append_attention(
                 qkv_out,
                 caches[2 * i],
@@ -3465,3 +3475,289 @@ class FusedBlockMultiTransformerFP8(FusedBlockMultiTransformer):
                 residual=residual_input,
             )[0]
         return tmp_out, residual_input
+
+
+class FusedMLAMultiTransformer(FusedMultiTransformerBase):
+    def __init__(self, config: FusedMultiTransformerConfig):
+        super().__init__(config)
+        if paddle.is_compiled_with_xpu():
+            self.cache_k_per_batch_maxs = paddle.full(shape=[10, 6], fill_value=0, dtype="float32")
+            self.cache_v_per_batch_maxs = paddle.full(shape=[10, 6], fill_value=0, dtype="float32")
+
+    def compute_attn(
+        self,
+        time_step,
+        qkv_out,
+        padding_offset,
+        seq_lens,
+        input_ids,
+        rotary_embs,
+        rotary_emb_dims,
+        caches,
+        pre_caches,
+        pre_caches_length,
+        attn_mask,
+        i,
+        **kwargs,
+    ):
+        # import pdb; pdb.set_trace()
+        if USE_ABSORB:
+            query, query_nope, query_pe, compressed_kv, key_pe = qkv_out
+            latent_cache = caches[i]
+            # if time_step is None:
+            if query.shape[0] > 1:
+                k_cache = caches[self.config.num_layers]
+                v_cache = caches[self.config.num_layers + 1]
+                prefill_mla_write_cache(
+                    compressed_kv,
+                    key_pe,
+                    latent_cache,
+                    kwargs.get("seq_lens_encoder", None),
+                    kwargs.get("seq_lens_decoder", None),
+                    kwargs.get("padding_offsets", None),
+                    kwargs.get("cum_offsets", None),
+                    kwargs.get("block_tables", None),
+                    "none",
+                    kwargs.get("max_input_length", -1))
+
+                key_value = paddle.matmul(compressed_kv, self.kv_b_proj_weights[i])
+                key_value = key_value.reshape(
+                    [-1, self.num_heads, self.config.mla_config.qk_nope_head_dim + self.config.mla_config.v_head_dim]
+                )
+                key_nope, value = key_value.split(
+                    [self.config.mla_config.qk_nope_head_dim, self.config.mla_config.v_head_dim], axis=-1
+                )
+                key = paddle.empty_like(query)
+                key[..., : self.config.mla_config.qk_nope_head_dim] = key_nope
+                key[..., self.config.mla_config.qk_nope_head_dim :] = key_pe
+
+                query[..., self.config.mla_config.qk_nope_head_dim :] = query_pe
+
+                qkv_out = paddle.concat(
+                    [
+                        query.reshape([-1, self.num_heads * self.config.mla_config.qk_head_dim]),
+                        key.reshape([-1, self.num_heads * self.config.mla_config.qk_head_dim]),
+                        value.reshape([-1, self.num_heads * self.config.mla_config.v_head_dim]),
+                    ],
+                    axis=-1,
+                )
+                # print("qkv_out:", qkv_out.shape)
+                # print("k_cache:", k_cache.shape)
+                # print("v_cache:", v_cache.shape)
+                fmha_out = append_attention(
+                    qkv_out,
+                    k_cache,
+                    v_cache,
+                    kwargs.get("seq_lens_encoder", None),
+                    kwargs.get("seq_lens_decoder", None),
+                    kwargs.get("seq_lens_this_time", None),
+                    kwargs.get("padding_offsets", None),
+                    kwargs.get("cum_offsets", None),
+                    kwargs.get("block_tables", None),
+                    kwargs.get("encoder_batch_ids", None),
+                    kwargs.get("encoder_tile_ids_per_batch", None),
+                    kwargs.get("encoder_num_blocks", None),
+                    kwargs.get("kv_batch_ids", None),
+                    kwargs.get("kv_tile_ids_per_batch", None),
+                    kwargs.get("kv_num_blocks", None),
+                    kwargs.get("decoder_batch_ids", None),
+                    kwargs.get("decoder_tile_ids_per_batch", None),
+                    kwargs.get("decoder_num_blocks", None),
+                    kwargs.get("max_enc_len_this_time", None),
+                    kwargs.get("max_dec_len_this_time", None),
+                    kwargs.get("max_len_kv", None),
+                    None,
+                    None,  # attn_mask
+                    None,  # qkv_bias
+                    None,  # qkv_out_scales
+                    None,  # cache_k_quant_scales
+                    None,  # cache_v_quant_scales
+                    None,  # cache_k_dequant_scales
+                    None,  # cache_v_dequant_scales
+                    None,  # cache_k_zp
+                    None,  # cache_v_zp
+                    None,  # out_shifts
+                    None,  # out_smooths
+                    self._fuse_kernel_compute_dtype,
+                    "none",  # cache_quant_type
+                    self.use_neox_rotary_style,
+                    kwargs.get("max_input_length", -1),
+                    self.softmax_scale,  # softmax_scale
+                    0.0,  # quant_max_bound
+                    0.0,  # quant_min_bound
+                    0.0,  # out_linear_in_scale
+                    self.config.speculate_config.speculate_max_draft_token_num,
+                    True,  # causal
+                    self.config.speculate_config.speculate_method is not None,  # speculate_decoder
+                )[0]
+            else:
+                decode_mla_write_cache(
+                    compressed_kv,
+                    key_pe,
+                    latent_cache,
+                    kwargs.get("seq_lens_decoder", None),
+                    kwargs.get("seq_lens_encoder", None),
+                    kwargs.get("padding_offsets", None),
+                    kwargs.get("cum_offsets", None),
+                    kwargs.get("block_tables", None),
+                    "none",
+                    kwargs.get("max_input_length", -1))
+                q_input = paddle.empty(
+                    shape=[
+                        query.shape[0],
+                        self.num_heads,
+                        self.config.mla_config.kv_lora_rank + self.config.mla_config.qk_rope_head_dim
+                    ],
+                    dtype=query.dtype
+                )
+                # kv_b_proj_weights: [kv_lora_rank, (qk_nope_head_dim + v_head_dim) * num_heads]
+                wk_b, wv_b = self.kv_b_proj_weights[i].reshape([self.config.mla_config.kv_lora_rank,self.num_heads, -1]).split([self.config.mla_config.qk_nope_head_dim, self.config.mla_config.v_head_dim], axis=-1)
+                # import pdb; pdb.set_trace()
+                # wk_b: [kv_lora_rank, num_heads, qk_nope_head_dim] -> [num_heads, qk_nope_head_dim, kv_lora_rank]
+                # wv_b: [kv_lora_rank, num_heads, v_head_dim] -> [num_heads, kv_lora_rank, v_head_dim]
+                wk_b = wk_b.transpose([1, 2, 0])
+                wv_b = wv_b.transpose([1, 0])
+                # print("query_nope 128:", query_nope.shape) # [n, num_heads, qk_nope_head_dim]
+                # 
+                q_nope_out = paddle.bmm(
+                    query_nope.transpose([1, 0]), # [num_head, n, qk_nope_head_dim]
+                    wk_b).transpose([1, 0])
+                # print("query_nope 512:", q_nope_out.shape)
+                # print("query_pe:", query_pe.shape)
+                q_input[..., :self.config.mla_config.kv_lora_rank] = q_nope_out
+                q_input[..., self.config.mla_config.kv_lora_rank:] = query_pe
+                q_input = q_input.reshape([-1, self.num_heads * (self.config.mla_config.kv_lora_rank + self.config.mla_config.qk_rope_head_dim)])
+                # print("q_input:", q_input.shape)
+                # print("k_cache:", latent_cache.shape)
+                # print("v_cache:", latent_cache.shape)
+                fmha_out = multi_head_latent_attention(
+                    q_input,
+                    latent_cache,
+                    latent_cache,
+                    kwargs.get("seq_lens_encoder", None),
+                    kwargs.get("seq_lens_decoder", None),
+                    kwargs.get("seq_lens_this_time", None),
+                    kwargs.get("padding_offsets", None),
+                    kwargs.get("cum_offsets", None),
+                    kwargs.get("block_tables", None),
+                    kwargs.get("encoder_batch_ids", None),
+                    kwargs.get("encoder_tile_ids_per_batch", None),
+                    kwargs.get("encoder_num_blocks", None),
+                    kwargs.get("kv_batch_ids", None),
+                    kwargs.get("kv_tile_ids_per_batch", None),
+                    kwargs.get("kv_num_blocks", None),
+                    kwargs.get("decoder_batch_ids", None),
+                    kwargs.get("decoder_tile_ids_per_batch", None),
+                    kwargs.get("decoder_num_blocks", None),
+                    kwargs.get("max_enc_len_this_time", None),
+                    kwargs.get("max_dec_len_this_time", None),
+                    kwargs.get("max_len_kv", None),
+                    None,  # attn_mask
+                    None,  # qkv_bias
+                    None,  # qkv_out_scales
+                    None,  # cache_k_quant_scales
+                    None,  # cache_v_quant_scales
+                    None,  # cache_k_dequant_scales
+                    None,  # cache_v_dequant_scales
+                    None,  # cache_k_zp
+                    None,  # cache_v_zp
+                    None,  # out_shifts
+                    None,  # out_smooths
+                    self._fuse_kernel_compute_dtype,
+                    "none",  # cache_quant_type
+                    self.config.mla_config.kv_lora_rank,
+                    kwargs.get("max_input_length", -1),
+                    self.softmax_scale,  # softmax_scale
+                    0.0,  # quant_max_bound
+                    0.0,  # quant_min_bound
+                    0.0,  # out_linear_in_scale
+                    self.config.speculate_config.speculate_max_draft_token_num,
+                    True,  # causal
+                    self.config.speculate_config.speculate_method is not None,  # speculate_decoder
+                )[0]
+                paddle.device.synchronize()
+                fmha_out = fmha_out.reshape([-1, self.num_heads, self.config.mla_config.kv_lora_rank]).transpose([1,0])
+                # print("fmha_out up:", fmha_out.shape)
+                fmha_out = paddle.bmm(fmha_out, wv_b).transpose([1,0]).reshape([-1, self.num_heads * self.config.mla_config.v_head_dim])
+                # print("fmha_out down:", fmha_out.shape)
+            # print("layer_id:", i,"fmha_out:", fmha_out.shape)
+            
+            out_linear_out = self.compute_out_linear(fmha_out, i)
+            return out_linear_out
+        else:
+            # print("qkv_out:", qkv_out.shape)
+            # print("k_cache:", caches[2 * i].shape)
+            # print("v_cache:", caches[2 * i + 1].shape)
+            # print("rotary_embs:", rotary_embs)
+            fmha_out = append_attention(
+                qkv_out,
+                caches[2 * i],
+                caches[2 * i + 1],
+                kwargs.get("seq_lens_encoder", None),
+                kwargs.get("seq_lens_decoder", None),
+                kwargs.get("seq_lens_this_time", None),
+                kwargs.get("padding_offsets", None),
+                kwargs.get("cum_offsets", None),
+                kwargs.get("block_tables", None),
+                kwargs.get("encoder_batch_ids", None),
+                kwargs.get("encoder_tile_ids_per_batch", None),
+                kwargs.get("encoder_num_blocks", None),
+                kwargs.get("kv_batch_ids", None),
+                kwargs.get("kv_tile_ids_per_batch", None),
+                kwargs.get("kv_num_blocks", None),
+                kwargs.get("decoder_batch_ids", None),
+                kwargs.get("decoder_tile_ids_per_batch", None),
+                kwargs.get("decoder_num_blocks", None),
+                kwargs.get("max_enc_len_this_time", None),
+                kwargs.get("max_dec_len_this_time", None),
+                kwargs.get("max_len_kv", None),
+                rotary_embs,
+                None,  # attn_mask
+                None,  # qkv_bias
+                None,  # qkv_out_scales
+                None,  # cache_k_quant_scales
+                None,  # cache_v_quant_scales
+                None,  # cache_k_dequant_scales
+                None,  # cache_v_dequant_scales
+                None,  # cache_k_zp
+                None,  # cache_v_zp
+                None,  # out_shifts
+                None,  # out_smooths
+                self._fuse_kernel_compute_dtype,
+                "none",  # cache_quant_type
+                self.use_neox_rotary_style,
+                kwargs.get("max_input_length", -1),
+                self.softmax_scale,  # softmax_scale
+                0.0,  # quant_max_bound
+                0.0,  # quant_min_bound
+                0.0,  # out_linear_in_scale
+                self.config.speculate_config.speculate_max_draft_token_num,
+                True,  # causal
+                self.config.speculate_config.speculate_method is not None,  # speculate_decoder
+            )[0]
+
+            # print("layer_id:", i,"fmha_out:", fmha_out.shape)
+            out_linear_out = self.compute_out_linear(fmha_out, i)
+
+            return out_linear_out
+
+    def post_process(self, **kwargs):
+        multi_block_output = kwargs.get("multi_block_output", None)
+        cum_offsets = kwargs.get("cum_offsets", None)
+        seq_lens_encoder = kwargs.get("seq_lens_encoder", None)
+        seq_lens_decoder = kwargs.get("seq_lens_decoder", None)
+        max_input_length = kwargs.get("max_input_length", -1)
+        output_padding_offset = kwargs.get("output_padding_offset", None)  # only used in speculative decoding
+
+        if self.config.speculate_config.return_full_hidden_states:
+            return multi_block_output
+        else:
+            out = rebuild_padding_v2(
+                multi_block_output,
+                cum_offsets,
+                seq_lens_decoder,
+                seq_lens_encoder,
+                output_padding_offset,
+                max_input_length,
+            )
+            return out
