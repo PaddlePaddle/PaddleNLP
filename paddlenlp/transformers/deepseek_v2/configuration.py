@@ -116,6 +116,8 @@ class DeepseekV2Config(PretrainedConfig):
             Whether to use a bias in the query, key, value and output projection layers during self-attention.
         attention_dropout (`float`, *optional*, defaults to 0.0):
             The dropout ratio for the attention probabilities.
+        speculate_model_type (`str`, defaults to `None`, *optional*, defaults to `False`):
+            The model type for speculate. Support ['eagle', 'mtp'] Now.
 
     ```python
     >>> from paddlenlp.transformers import DeepseekV2Model, DeepseekV2Config
@@ -174,6 +176,7 @@ class DeepseekV2Config(PretrainedConfig):
         rope_scaling=None,
         attention_bias=False,
         attention_dropout=0.0,
+        speculate_model_type=False,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -218,6 +221,7 @@ class DeepseekV2Config(PretrainedConfig):
         self.rope_scaling = rope_scaling
         self.attention_bias = attention_bias
         self.attention_dropout = attention_dropout
+        self.speculate_model_type = speculate_model_type
 
         super().__init__(
             pad_token_id=pad_token_id,
