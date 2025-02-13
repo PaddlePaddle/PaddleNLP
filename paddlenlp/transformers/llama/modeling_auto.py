@@ -195,6 +195,10 @@ def scaled_dot_product_attention(
         return (attn_output, attn_weights) if output_attentions else attn_output
 
 
+colwise_placements = [dist.Replicate(), dist.Shard(1)]
+rowise_placement = [dist.Replicate(), dist.Shard(0)]
+
+
 class LlamaRMSNormAuto(nn.Layer):
     def __init__(self, config, ipp):
         super().__init__()
@@ -237,16 +241,6 @@ class LlamaMLPAuto(nn.Layer):
         self.fuse_attention_ffn = config.fuse_attention_ffn
         self.ipp = ipp
         self.config = config
-        colwise_placements = (
-            [dist.Replicate(), dist.Shard(1)]
-            if self.config.tensor_parallel_degree > 1
-            else [dist.Replicate(), dist.Replicate()]
-        )
-        rowise_placement = (
-            [dist.Replicate(), dist.Shard(0)]
-            if self.config.tensor_parallel_degree > 1
-            else [dist.Replicate(), dist.Replicate()]
-        )
 
         if config.fuse_attention_ffn and not enable_fuse_ffn_qkv_pass():
             self.gate_up_fused_proj = nn.Linear(self.hidden_size, self.intermediate_size * 2, bias_attr=False)
@@ -315,17 +309,6 @@ class LlamaAttentionAuto(nn.Layer):
         self.layerwise_recompute = layerwise_recompute
         self.recompute_granularity = config.recompute_granularity
         self.ipp = ipp
-
-        colwise_placements = (
-            [dist.Replicate(), dist.Shard(1)]
-            if self.config.tensor_parallel_degree > 1
-            else [dist.Replicate(), dist.Replicate()]
-        )
-        rowise_placement = (
-            [dist.Replicate(), dist.Shard(0)]
-            if self.config.tensor_parallel_degree > 1
-            else [dist.Replicate(), dist.Replicate()]
-        )
 
         self.use_fused_rope = config.use_fused_rope
         if self.use_fused_rope and get_env_device() not in ["npu", "mlu", "xpu", "gcu", "intel_hpu"]:
@@ -1201,10 +1184,23 @@ class LlamaPretrainingCriterion3DAuto(paddle.nn.Layer):
                     masked_lm_labels.unsqueeze(2),
                 )
 
-            # Hack for XPU that doesn't support Allgather yet.
+            # XPU dose not support allgather mask with bool dtype, so we use LocalLayer here.
             if get_env_device() == "xpu":
-                # masked_lm_loss = paddle.masked_select(masked_lm_loss, masked_lm_loss > 0).astype("float32")
-                loss = paddle.mean(masked_lm_loss, axis=-1)
+
+                class LocalLossLayer(paddle.distributed.LocalLayer):
+                    def __init__(self, out_dist_attrs):
+                        super().__init__(out_dist_attrs)
+
+                    def forward(self, x, mask):
+                        masked_lm_loss = paddle.masked_select(x, mask).astype("float32")
+                        loss = paddle.mean(masked_lm_loss)
+                        return loss
+
+                out_dist_attrs = [
+                    (masked_lm_loss.process_mesh, [dist.Partial(dist.ReduceType.kRedSum), dist.Replicate()]),
+                ]
+                loss_func = LocalLossLayer(out_dist_attrs)
+                loss = loss_func(masked_lm_loss, masked_lm_loss > 0)
             else:
                 masked_lm_loss = paddle.masked_select(masked_lm_loss, masked_lm_loss > 0).astype("float32")
                 loss = paddle.mean(masked_lm_loss)
@@ -1216,11 +1212,7 @@ class LlamaLMHeadAuto(nn.Layer):
     def __init__(self, config: LlamaConfig):
         super(LlamaLMHeadAuto, self).__init__()
         self.config = config
-        colwise_placements = (
-            [dist.Replicate(), dist.Shard(1)]
-            if self.config.tensor_parallel_degree > 1
-            else [dist.Replicate(), dist.Replicate()]
-        )
+
         vocab_size = config.vocab_size
         self.weight = self.create_parameter(
             shape=[config.hidden_size, vocab_size],

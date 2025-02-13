@@ -43,6 +43,7 @@ unset PADDLE_TRAINERS_NUM
 #export BKCL_RDMA_NICS=xgbe1,xgbe1,xgbe2,xgbe2,xgbe3,xgbe3,xgbe4,xgbe4
 #export BKCL_SOCKET_IFNAME=xgbe0
 #export BKCL_FORCE_L3_RDMA=0
+export LD_LIBRARY_PATH=/usr/local/lib:/usr/lib64
 echo "bkcl version:"
 strings ${bkcl_location}/libbkcl.so | grep COM
 
@@ -52,8 +53,8 @@ export CUDA_DEVICE_MAX_CONNECTIONS=8
 export PYTHONPATH=../../../:$PYTHONPATH
 
 # for debug
-#export GLOG_v=6
-#export FLAGS_call_stack_level=2
+#export GLOG_v=10
+export FLAGS_call_stack_level=2
 
 rm -rf output/$task_name_or_path
 PYTHONPATH=../:$PYTHONPATH  \
@@ -92,7 +93,7 @@ python -u  -m paddle.distributed.launch \
     --dataloader_num_workers 4 \
     --pipeline_parallel_degree 1 \
     --tensor_parallel_degree 1 \
-    --gradient_accumulation_steps 32 \
+    --gradient_accumulation_steps 1 \
     --eval_steps 1000 \
     --report_to "visualdl" \
     --disable_tqdm true \
@@ -101,4 +102,5 @@ python -u  -m paddle.distributed.launch \
     --do_train \
     --seed 1026 \
     --device "xpu" \
-    --enable_auto_parallel 1
+    --enable_auto_parallel 1 \
+    --to_static 1

@@ -26,7 +26,6 @@ from paddle.distributed import fleet
 from tqdm.auto import tqdm
 
 from paddlenlp.trainer import Trainer
-from paddlenlp.utils.tools import get_env_device
 
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.log import logger
@@ -522,10 +521,6 @@ class AutoTrainer(Trainer):
             delattr(self, "_past")
 
         logger.info("\nTraining completed. \n")
-
-        # Hack for XPU that doesn't support Allgather yet. See LlamaPretrainingCriterion3DAuto in modeling_auto.py for details.
-        if get_env_device() == "xpu":
-            tr_loss = tr_loss.mean()
 
         self._total_loss_scalar += self._get_item_from_loss(tr_loss)
         train_loss = self._total_loss_scalar / self.state.global_step
