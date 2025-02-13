@@ -110,7 +110,7 @@ class GenerationInferenceModel(GenerationMixin):
             input_spec[16] = paddle.static.InputSpec(shape=[None, 2, 1], dtype="int64", name="tgt_pos")  # tgt_pos
         elif self.config["model_type"] and "gpt" in self.config.model_type:
             input_spec[2] = paddle.static.InputSpec(shape=[None], dtype="int64", name="position_ids")  # position_ids
-        model = paddle.jit.to_static(self.generate, input_spec=input_spec)
+        model = paddle.jit.to_static(self.generate, input_spec=input_spec, full_graph=True)
         paddle.jit.save(
             model, output_path, skip_prune_program=True
         )  # Note(Zhengzekang): If we prune program it may cause some inference error.
@@ -539,7 +539,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
             ]
             input_spec.extend(speculate_spec)
 
-        model = paddle.jit.to_static(self.generate, input_spec=input_spec)
+        model = paddle.jit.to_static(self.generate, input_spec=input_spec, full_graph=True)
         paddle.jit.save(
             model, output_path, skip_prune_program=True
         )  # Note(Zhengzekang): If we prune program it may cause some inference error.
@@ -735,23 +735,24 @@ class GenerationBlockInferenceModel(GenerationMixin):
             if self.config.tensor_parallel_degree > 1:
                 paddle.distributed.broadcast(next_tokens, 0)
 
-            from paddlenlp_ops import update_inputs_v2
+            with paddle.base.framework._stride_in_no_check_dy2st_diff():
+                from paddlenlp_ops import update_inputs_v2
 
-            update_inputs_v2(
-                model_kwargs["stop_flags"],
-                model_kwargs["step_idx"],
-                model_kwargs["not_need_stop"],
-                model_kwargs["seq_lens_this_time"],
-                model_kwargs["seq_lens_encoder"],
-                model_kwargs["seq_lens_decoder"],
-                model_kwargs["max_dec_len"],
-                model_kwargs["input_ids"],
-                model_kwargs["stop_nums"],
-                next_tokens,
-                model_kwargs["is_block_step"],
-                eos_token_id,
-                model_kwargs["next_tokens"],
-            )
+                update_inputs_v2(
+                    model_kwargs["stop_flags"],
+                    model_kwargs["step_idx"],
+                    model_kwargs["not_need_stop"],
+                    model_kwargs["seq_lens_this_time"],
+                    model_kwargs["seq_lens_encoder"],
+                    model_kwargs["seq_lens_decoder"],
+                    model_kwargs["max_dec_len"],
+                    model_kwargs["input_ids"],
+                    model_kwargs["stop_nums"],
+                    next_tokens,
+                    model_kwargs["is_block_step"],
+                    eos_token_id,
+                    model_kwargs["next_tokens"],
+                )
 
             from paddlenlp_ops import save_output
 
@@ -1016,7 +1017,7 @@ class GenerationAvxInferenceModel(GenerationMixin):
             config.get("logits_processors", None),
             None,
         ]
-        model = paddle.jit.to_static(self.generate, input_spec=input_spec)
+        model = paddle.jit.to_static(self.generate, input_spec=input_spec, full_graph=True)
         paddle.jit.save(
             model, output_path, skip_prune_program=True
         )  # Note(Zhengzekang): If we prune program it may cause some inference error.

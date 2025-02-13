@@ -146,3 +146,5 @@ if pir_enabled:
 else:
     PADDLE_INFERENCE_MODEL_SUFFIX = ".pdmodel"
     PADDLE_INFERENCE_WEIGHTS_SUFFIX = ".pdiparams"
+
+USE_FAST_TOKENIZER: bool = _get_bool_env("USE_FAST_TOKENIZER", "false")

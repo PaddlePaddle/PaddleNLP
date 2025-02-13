@@ -25,6 +25,7 @@ struct AppendAttnMetaData {
   int kv_num_heads;
   int token_nums;
   int head_dims;
+  int head_dims_v;
   int max_blocks_per_seq;
 };
 
@@ -274,6 +275,16 @@ __forceinline__ __host__ __device__ void vec_cast<nv_bfloat16, float>(
   switch (head_dim) {                              \
     case 128: {                                    \
       constexpr size_t HEAD_DIM = 128;             \
+      __VA_ARGS__                                  \
+      break;                                       \
+    }                                              \
+    case 192: {                                    \
+      constexpr size_t HEAD_DIM = 192;             \
+      __VA_ARGS__                                  \
+      break;                                       \
+    }                                              \
+    case 256: {                                    \
+      constexpr size_t HEAD_DIM = 256;             \
       __VA_ARGS__                                  \
       break;                                       \
     }                                              \
