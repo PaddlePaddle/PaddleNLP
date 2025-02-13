@@ -1,4 +1,4 @@
-# Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2023 DeepSeek-AI and The HuggingFace Inc. team. All rights reserved.
 #
 # This code is based on EleutherAI's GPT-NeoX library and the GPT-NeoX
@@ -69,10 +69,10 @@ from .modeling import (
 )
 
 __all__ = [
-    "DeepseekV2LMHeadNet",
-    "DeepseekV2ForCausalLMNet",
-    "DeepseekV2ModelNet",
-    "DeepseekV2PretrainedModelNet",
+    "DeepseekV2LMHeadAuto",
+    "DeepseekV2ForCausalLMAuto",
+    "DeepseekV2ModelAuto",
+    "DeepseekV2PretrainedModelAuto",
 ]
 
 
@@ -169,7 +169,7 @@ def scaled_dot_product_attention(
         return (attn_output, attn_weights) if output_attentions else attn_output
 
 
-class DeepseekV2MLPNet(nn.Layer):
+class DeepseekV2MLPAuto(nn.Layer):
     def __init__(self, config: DeepseekV2Config, hidden_size=None, intermediate_size=None, is_moe=False):
         super().__init__()
         self.config = config
@@ -187,7 +187,7 @@ class DeepseekV2MLPNet(nn.Layer):
         return down_proj
 
 
-class DeepseekV2MoENet(MoELayer):
+class DeepseekV2MoEAuto(MoELayer):
     """
     A mixed expert module containing shared experts.
     """
@@ -209,7 +209,7 @@ class DeepseekV2MoENet(MoELayer):
         super().__init__(
             config=config,
             moe_num_experts=config.n_routed_experts,
-            expert_class=DeepseekV2MLPNet,
+            expert_class=DeepseekV2MLPAuto,
             expert_kwargs={"config": config, "intermediate_size": config.moe_intermediate_size},
             gate=gate,
             capacity=2.0,
@@ -217,7 +217,7 @@ class DeepseekV2MoENet(MoELayer):
         self.alpha = config.aux_loss_alpha
         if config.n_shared_experts is not None:
             intermediate_size = config.moe_intermediate_size * config.n_shared_experts
-            self.shared_experts = DeepseekV2MLPNet(config=config, intermediate_size=intermediate_size, is_moe=True)
+            self.shared_experts = DeepseekV2MLPAuto(config=config, intermediate_size=intermediate_size, is_moe=True)
 
     def forward(self, hidden_states):
         final_hidden_states, l_aux, l_zloss = super().forward(hidden_states)
@@ -231,7 +231,7 @@ class DeepseekV2MoENet(MoELayer):
 
 
 # Copied from transformers.models.llama.modeling_llama.LlamaAttention with Llama->DeepseekV2
-class DeepseekV2AttentionNet(nn.Layer):
+class DeepseekV2AttentionAuto(nn.Layer):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
 
     def __init__(self, config: DeepseekV2Config, layerwise_recompute: bool = False):
@@ -393,9 +393,7 @@ class DeepseekV2AttentionNet(nn.Layer):
         # query_states[:, :, :, : self.qk_nope_head_dim] = q_nope
         # query_states[:, :, :, self.qk_nope_head_dim :] = q_pe
 
-        print("k_nope.shape", k_nope.shape, "k_pe.shape", k_pe.shape)
         key_states = paddle.empty([bsz, q_len, self.num_heads, self.q_head_dim], dtype=self.config.dtype)
-        print("key_states.shape:", key_states.shape)
         # input[0]'s shape = [1, 2048, 16, 128], input[1]'s shape = [1, 2048, 1, 64].
         key_states = paddle.concat([k_nope, k_pe.expand([bsz, q_len, self.num_heads, k_pe.shape[-1]])], axis=3)
 
@@ -456,7 +454,7 @@ class DeepseekV2AttentionNet(nn.Layer):
         return attn_output, attn_weights, past_key_value
 
 
-class DeepseekV2DecoderLayerNet(nn.Layer):
+class DeepseekV2DecoderLayerAuto(nn.Layer):
     def __init__(self, config: DeepseekV2Config, layer_idx: int, layerwise_recompute: bool = False):
         super().__init__()
         self.config = config
@@ -467,16 +465,16 @@ class DeepseekV2DecoderLayerNet(nn.Layer):
 
         self.hidden_size = config.hidden_size
 
-        self.self_attn = DeepseekV2AttentionNet(config=config, layerwise_recompute=layerwise_recompute)
+        self.self_attn = DeepseekV2AttentionAuto(config=config, layerwise_recompute=layerwise_recompute)
 
         self.mlp = (
-            DeepseekV2MoENet(config)
+            DeepseekV2MoEAuto(config)
             if (
                 config.n_routed_experts is not None
                 and layer_idx >= config.first_k_dense_replace
                 and layer_idx % config.moe_layer_freq == 0
             )
-            else DeepseekV2MLPNet(config)
+            else DeepseekV2MLPAuto(config)
         )
         self.input_layernorm = DeepseekV2RMSNorm(config)
         self.post_attention_layernorm = DeepseekV2RMSNorm(config)
@@ -566,16 +564,16 @@ class DeepseekV2DecoderLayerNet(nn.Layer):
         return outputs
 
 
-class DeepseekV2PretrainedModelNet(PretrainedModel):
+class DeepseekV2PretrainedModelAuto(PretrainedModel):
     config_class = DeepseekV2Config
     base_model_prefix = "deepseek_v2"
-    _no_split_modules = ["DeepseekV2DecoderLayerNet"]
+    _no_split_modules = ["DeepseekV2DecoderLayerAuto"]
 
 
 @register_base_model
-class DeepseekV2ModelNet(DeepseekV2PretrainedModelNet):
+class DeepseekV2ModelAuto(DeepseekV2PretrainedModelAuto):
     """
-    Transformer decoder consisting of *config.num_hidden_layers* layers. Each layer is a [`DeepseekV2DecoderLayerNet`]
+    Transformer decoder consisting of *config.num_hidden_layers* layers. Each layer is a [`DeepseekV2DecoderLayerAuto`]
 
     Args:
         config: DeepseekV2Config
@@ -597,7 +595,7 @@ class DeepseekV2ModelNet(DeepseekV2PretrainedModelNet):
 
         self.layers = nn.LayerList(
             [
-                DeepseekV2DecoderLayerNet(config, layer_idx, layer_idx not in self.no_recompute_layers)
+                DeepseekV2DecoderLayerAuto(config, layer_idx, layer_idx not in self.no_recompute_layers)
                 for layer_idx in range(config.num_hidden_layers)
             ]
         )
@@ -777,9 +775,9 @@ class DeepseekV2ModelNet(DeepseekV2PretrainedModelNet):
         )
 
 
-class DeepseekV2LMHeadNet(nn.Layer):
+class DeepseekV2LMHeadAuto(nn.Layer):
     def __init__(self, config: DeepseekV2Config):
-        super(DeepseekV2LMHeadNet, self).__init__()
+        super(DeepseekV2LMHeadAuto, self).__init__()
 
         self.config = config
 
@@ -796,15 +794,15 @@ class DeepseekV2LMHeadNet(nn.Layer):
         return logits
 
 
-class DeepseekV2ForCausalLMNet(DeepseekV2PretrainedModelNet):
+class DeepseekV2ForCausalLMAuto(DeepseekV2PretrainedModelAuto):
     _tied_weights_keys = ["lm_head.weight"]
 
     def __init__(self, config: DeepseekV2Config):
         super().__init__(config)
         self.config = config
-        self.deepseek_v2 = DeepseekV2ModelNet(config)
+        self.deepseek_v2 = DeepseekV2ModelAuto(config)
         self.vocab_size = config.vocab_size
-        self.lm_head = DeepseekV2LMHeadNet(config)
+        self.lm_head = DeepseekV2LMHeadAuto(config)
         self.criterion = DeepseekV2PretrainingCriterion(config)
 
     def get_input_embeddings(self):
@@ -851,9 +849,9 @@ class DeepseekV2ForCausalLMNet(DeepseekV2PretrainedModelNet):
         Example:
 
         ```python
-        >>> from transformers import AutoTokenizer, DeepseekV2ForCausalLMNet
+        >>> from transformers import AutoTokenizer, DeepseekV2ForCausalLMAuto
 
-        >>> model = DeepseekV2ForCausalLMNet.from_pretrained(PATH_TO_CONVERTED_WEIGHTS)
+        >>> model = DeepseekV2ForCausalLMAuto.from_pretrained(PATH_TO_CONVERTED_WEIGHTS)
         >>> tokenizer = AutoTokenizer.from_pretrained(PATH_TO_CONVERTED_TOKENIZER)
 
         >>> prompt = "Hey, are you conscious? Can you talk to me?"
