@@ -32,7 +32,7 @@ template <typename T,
           typename OutT = T,
           bool ENABLE_PREFILL = true>
 __global__ void multi_query_append_attention_c8_kernel(
-    T *__restrict__ q,             // [token_num, (num_heads + 2* kv_num_head) * head_dim]
+    T *__restrict__ q,  // [token_num, (num_heads + 2* kv_num_head) * head_dim]
     CacheT *__restrict__ cache_k,  // [max_block_num, num_heads, block_size,
                                    // head_dim]
     CacheT *__restrict__ cache_v,
@@ -49,7 +49,7 @@ __global__ void multi_query_append_attention_c8_kernel(
     const int max_seq_len,
     const int max_dec_len,
     const int max_block_num_per_seq,
-    const float scale,
+    const float softmax_scale,
     const float quant_max_bound,
     const float quant_min_bound,
     const float in_scale,
@@ -172,7 +172,7 @@ __global__ void multi_query_append_attention_c8_kernel(
   __syncthreads();
 
   q_smem_inplace_multiply_sm_scale<num_frags_x, num_frags_y, T>(&qo_smem,
-                                                                scale);
+                                                                softmax_scale);
   smem_t k_smem(smem + NUM_WARPS * num_frags_x * 16 * HEAD_DIM * sizeof(T)),
       v_smem(smem + NUM_WARPS * num_frags_x * 16 * HEAD_DIM * sizeof(T) +
              num_frags_z * 16 * HEAD_DIM * sizeof(CacheT));
@@ -206,8 +206,7 @@ __global__ void multi_query_append_attention_c8_kernel(
 
   uint32_t k_smem_offset_w =
       smem_t::get_permuted_offset<num_vecs_per_head_k, inv_k_stride>(
-          wid * 4 + tid / 8,
-          tid % 8);  
+          wid * 4 + tid / 8, tid % 8);
   uint32_t v_smem_offset_w =
       smem_t::get_permuted_offset<num_vecs_per_blocksize, inv_v_stride>(
           wid * 8 + tid / 4, tid % 4);  // 4 * 128 / 8 = 64
@@ -338,7 +337,6 @@ __global__ void multi_query_append_attention_c8_kernel(
                                        chunk_end,
                                        const_v_offset);
     commit_group();
-
   }
   wait_group<0>();
   __syncthreads();
@@ -434,7 +432,7 @@ template <typename T,
           typename OutT = T,
           bool ENABLE_PREFILL = true>
 __global__ void multi_query_append_attention_c8_warp1_4_kernel(
-    T *__restrict__ q,             // [token_num, (num_heads + 2* kv_num_head) * head_dim]
+    T *__restrict__ q,  // [token_num, (num_heads + 2* kv_num_head) * head_dim]
     CacheT *__restrict__ cache_k,  // [max_block_num, num_heads, block_size,
                                    // head_dim]
     CacheT *__restrict__ cache_v,
@@ -451,7 +449,7 @@ __global__ void multi_query_append_attention_c8_warp1_4_kernel(
     const int max_seq_len,
     const int max_dec_len,
     const int max_block_num_per_seq,
-    const float scale,
+    const float softmax_scale,
     const float quant_max_bound,
     const float quant_min_bound,
     const float in_scale,
@@ -575,7 +573,7 @@ __global__ void multi_query_append_attention_c8_warp1_4_kernel(
   __syncthreads();
 
   q_smem_inplace_multiply_sm_scale_multi_warps<num_frags_x, num_frags_y, T>(
-      &qo_smem, scale);
+      &qo_smem, softmax_scale);
 
   smem_t k_smem(smem + num_frags_x * 16 * HEAD_DIM * sizeof(T)),
       v_smem(smem + num_frags_x * 16 * HEAD_DIM * sizeof(T) +
@@ -610,12 +608,10 @@ __global__ void multi_query_append_attention_c8_warp1_4_kernel(
 
   uint32_t k_smem_offset_w =
       smem_t::get_permuted_offset<num_vecs_per_head_k, inv_k_stride>(
-          wid * 4 + tid / 8,
-          tid %
-              8);  
+          wid * 4 + tid / 8, tid % 8);
   uint32_t v_smem_offset_w =
       smem_t::get_permuted_offset<num_vecs_per_blocksize, inv_v_stride>(
-          wid * 8 + tid / 4, tid % 4);  
+          wid * 8 + tid / 4, tid % 4);
 
   uint32_t kv_idx_base = chunk_start;
   const uint32_t const_k_offset = kv_head_idx * kv_h_stride +
@@ -805,7 +801,6 @@ __global__ void multi_query_append_attention_c8_warp1_4_kernel(
           const uint32_t qo_head_idx = q_head_idx + qo_idx_now % GROUP_SIZE;
           const uint32_t qo_idx = q_start_seq_id + qo_idx_now / GROUP_SIZE;
           if (qo_idx - q_start_seq_id < q_len) {
-
             uint32_t offset;
             if (ENABLE_PREFILL) {
               offset = (batch_id * num_chunks + chunk_idx) * q_num_heads +
@@ -857,6 +852,7 @@ void MultiQueryAppendC8Attention(
     const int num_blocks_x_cpu,
     const int max_seq_len,
     const int max_dec_len,
+    const float softmax_scale,
     const float quant_max_bound,
     const float quant_min_bound,
     const float in_scale,
@@ -880,8 +876,6 @@ void MultiQueryAppendC8Attention(
   constexpr uint32_t num_qrow_per_block = NUM_WARP_Q * num_frags_x * 16;
 
   auto *allocator = paddle::GetAllocator(qkv.place());
-
-  const float scale = 1.f / sqrt(HEAD_DIM);
 
   if constexpr (NUM_WARP_Q == 4) {
     constexpr uint32_t num_frags_z = BLOCK_SIZE / 16;
@@ -963,7 +957,7 @@ void MultiQueryAppendC8Attention(
           max_seq_len,
           max_dec_len,
           max_block_num_per_seq,
-          scale,
+          softmax_scale,
           quant_max_bound,
           quant_min_bound,
           in_scale,
@@ -1020,7 +1014,7 @@ void MultiQueryAppendC8Attention(
           max_seq_len,
           max_dec_len,
           max_block_num_per_seq,
-          scale,
+          softmax_scale,
           quant_max_bound,
           quant_min_bound,
           in_scale,
@@ -1069,8 +1063,7 @@ void MultiQueryAppendC8Attention(
       } else {
         constexpr int blockx = HEAD_DIM / vec_size;
         constexpr int blocky = (128 + blockx - 1) / blockx;
-        dim3 grids_merge(min(sm_count * 4, token_num),
-                         num_heads);
+        dim3 grids_merge(min(sm_count * 4, token_num), num_heads);
         dim3 blocks_merge(blockx, blocky);
         merge_multi_chunks_v2_kernel<NV_TYPE,
                                      vec_size,
@@ -1186,7 +1179,7 @@ void MultiQueryAppendC8Attention(
           max_seq_len,
           max_dec_len,
           max_block_num_per_seq,
-          scale,
+          softmax_scale,
           quant_max_bound,
           quant_min_bound,
           in_scale,
@@ -1256,7 +1249,7 @@ void MultiQueryAppendC8Attention(
           max_seq_len,
           max_dec_len,
           max_block_num_per_seq,
-          scale,
+          softmax_scale,
           quant_max_bound,
           quant_min_bound,
           in_scale,
@@ -1300,8 +1293,7 @@ void MultiQueryAppendC8Attention(
       } else {
         constexpr int blockx = HEAD_DIM / vec_size;
         constexpr int blocky = (128 + blockx - 1) / blockx;
-        dim3 grids_merge(min(sm_count * 4, token_num),
-                         num_heads);
+        dim3 grids_merge(min(sm_count * 4, token_num), num_heads);
         dim3 blocks_merge(blockx, blocky);
         merge_multi_chunks_v2_kernel<NV_TYPE,
                                      vec_size,
@@ -1341,37 +1333,39 @@ void MultiQueryAppendC8Attention(
 
 template <typename T, typename OutT>
 void CascadeAppendAttentionC8Kernel(
-    const AppendAttnMetaData& meta_data,
-    const paddle::Tensor& qkv,  // [token_num, (num_heads + 2* kv_num_head) * head_dim]
-    const paddle::Tensor&
-        cache_k,  // [max_block_num, num_heads, block_size, head_dim]
-    const paddle::Tensor&
-        cache_v,  // [max_block_num, num_heads, head_dim, block_size]
-    const paddle::optional<paddle::Tensor>& attn_mask,
-    const paddle::optional<paddle::Tensor>&
-        cache_k_scale,  // [num_kv_heads, head_dim]
-    const paddle::optional<paddle::Tensor>&
-        cache_v_scale,  // [num_kv_heads, head_dim]
-    const paddle::optional<paddle::Tensor>&
-        cache_k_zp,  // [num_kv_heads, head_dim]
-    const paddle::optional<paddle::Tensor>&
-        cache_v_zp,  // [num_kv_heads, head_dim]
-    const paddle::optional<paddle::Tensor>&
-        shift_bias,  // [num_kv_heads, head_dim]
-    const paddle::optional<paddle::Tensor>&
-        smooth_weight,  // [num_kv_heads, head_dim]
-    const paddle::Tensor& seq_lens_q,
-    const paddle::Tensor& seq_lens_kv,
-    const paddle::Tensor& seq_lens_encoder,
-    const paddle::Tensor& padding_offsets,
-    const paddle::Tensor& cum_offsets,
-    const paddle::Tensor& block_table,
-    const paddle::Tensor& batch_ids,
-    const paddle::Tensor& tile_ids_per_batch,
+    const AppendAttnMetaData &meta_data,
+    const paddle::Tensor
+        &qkv,  // [token_num, (num_heads + 2* kv_num_head) * head_dim]
+    const paddle::Tensor
+        &cache_k,  // [max_block_num, num_heads, block_size, head_dim]
+    const paddle::Tensor
+        &cache_v,  // [max_block_num, num_heads, head_dim, block_size]
+    const paddle::optional<paddle::Tensor> &attn_mask,
+    const paddle::optional<paddle::Tensor>
+        &cache_k_scale,  // [num_kv_heads, head_dim]
+    const paddle::optional<paddle::Tensor>
+        &cache_v_scale,  // [num_kv_heads, head_dim]
+    const paddle::optional<paddle::Tensor>
+        &cache_k_zp,  // [num_kv_heads, head_dim]
+    const paddle::optional<paddle::Tensor>
+        &cache_v_zp,  // [num_kv_heads, head_dim]
+    const paddle::optional<paddle::Tensor>
+        &shift_bias,  // [num_kv_heads, head_dim]
+    const paddle::optional<paddle::Tensor>
+        &smooth_weight,  // [num_kv_heads, head_dim]
+    const paddle::Tensor &seq_lens_q,
+    const paddle::Tensor &seq_lens_kv,
+    const paddle::Tensor &seq_lens_encoder,
+    const paddle::Tensor &padding_offsets,
+    const paddle::Tensor &cum_offsets,
+    const paddle::Tensor &block_table,
+    const paddle::Tensor &batch_ids,
+    const paddle::Tensor &tile_ids_per_batch,
     const int num_blocks,
     const int block_shape_q,
     const int max_seq_len,
     const int max_dec_len,
+    const float softmax_scale,
     const float quant_max_bound,
     const float quant_min_bound,
     const float in_scale,
@@ -1379,8 +1373,8 @@ void CascadeAppendAttentionC8Kernel(
     const bool causal,
     const bool is_decoder,
     const bool enable_prefill,
-    cudaStream_t& stream,
-    paddle::Tensor* out) {
+    cudaStream_t &stream,
+    paddle::Tensor *out) {
   const auto token_num = meta_data.token_nums;
   const auto block_size = meta_data.block_size;
   const auto bsz = meta_data.batch_size;
@@ -1434,6 +1428,7 @@ void CascadeAppendAttentionC8Kernel(
                                 num_blocks,
                                 max_seq_len,
                                 max_dec_len,
+                                softmax_scale,
                                 quant_max_bound,
                                 quant_min_bound,
                                 in_scale,

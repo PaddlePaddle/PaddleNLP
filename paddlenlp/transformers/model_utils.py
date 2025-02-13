@@ -424,7 +424,7 @@ def load_state_dict(
         with safe_open(checkpoint_file, framework="np") as f:
             metadata = f.metadata()
         if metadata is None:
-            metadata = {"format", "np"}
+            metadata = {"format": "np"}
 
         if metadata.get("format", "np") not in ["pd", "np"]:
             raise OSError(
