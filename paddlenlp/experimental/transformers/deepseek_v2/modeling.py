@@ -25,6 +25,7 @@ from paddle.nn.quant import weight_quantize
 
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedBlockMultiTransformer,
+    FusedMLAMultiTransformer,
     FusedBlockMultiTransformerWeightOnly,
     FusedMultiTransformerConfig,
     MLAConfig,
@@ -51,7 +52,7 @@ from paddlenlp.transformers.model_utils import (
 from paddlenlp.utils.log import logger
 
 __all__ = ["DeepseekV2ForCausalLMBlockInferenceModel"]
-
+USE_ABSORB = True
 
 class DeepseekScalingRotaryEmbedding(nn.Layer):
     """RotaryEmbedding extended with YaRN method.
@@ -726,7 +727,9 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
         if self.use_weight_only:
             self.transformer_block = FusedBlockMultiTransformerWeightOnly(transformer_config)
         else:
-            self.transformer_block = FusedBlockMultiTransformer(transformer_config)
+            # self.transformer_block = FusedBlockMultiTransformer(transformer_config)
+            self.transformer_block = FusedMLAMultiTransformer(transformer_config)
+            
 
     def remove_padding(self, input_ids, seq_lens_this_time, draft_tokens=None, seq_lens_encoder=None):
         cum_offsets_now = paddle.cumsum(self.max_seq_len - seq_lens_this_time)
@@ -890,7 +893,15 @@ class DeepseekV2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, De
             max_block_nums = max_batch_size * max_block_per_seq
 
         cache_kvs = []
-        for _ in range(config.num_hidden_layers):
+        if USE_ABSORB:
+            for _ in range(config.num_hidden_layers):
+                cache_latent_shape = [
+                    max_block_nums,
+                    1,
+                    config.block_size,
+                    config.kv_lora_rank + config.qk_rope_head_dim,
+                ]
+                cache_kvs.append(cache_latent_shape)
             cache_k_shape = [
                 max_block_nums,
                 config.num_key_value_heads // max(config.tensor_parallel_degree, 1),
@@ -905,7 +916,24 @@ class DeepseekV2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, De
             ]
             cache_kvs.append(cache_k_shape)
             cache_kvs.append(cache_v_shape)
-        return cache_kvs
+            return cache_kvs
+        else:
+            for _ in range(config.num_hidden_layers):
+                cache_k_shape = [
+                    max_block_nums,
+                    config.num_key_value_heads // max(config.tensor_parallel_degree, 1),
+                    config.block_size,
+                    config.qk_nope_head_dim + config.qk_rope_head_dim,
+                ]
+                cache_v_shape = [
+                    max_block_nums,
+                    config.num_key_value_heads // max(config.tensor_parallel_degree, 1),
+                    config.block_size,
+                    config.v_head_dim,
+                ]
+                cache_kvs.append(cache_k_shape)
+                cache_kvs.append(cache_v_shape)
+            return cache_kvs
 
     def prepare_inputs_for_generation(self, **kwargs):
         # only last token for inputs_ids if cache is defined in kwargs
