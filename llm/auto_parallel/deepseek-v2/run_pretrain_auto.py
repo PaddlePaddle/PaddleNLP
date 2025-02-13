@@ -1,4 +1,4 @@
-# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -39,14 +39,14 @@ from paddlenlp.transformers import (
     AutoTokenizer,
     CosineAnnealingWithWarmupDecay,
     DeepseekV2Config,
-    DeepseekV2ForCausalLMNet,
+    DeepseekV2ForCausalLMAuto,
     DeepseekV2PretrainingCriterion,
     LinearAnnealingWithWarmupDecay,
 )
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
-    "deepseekv2_network": (DeepseekV2Config, DeepseekV2ForCausalLMNet, DeepseekV2PretrainingCriterion),
+    "deepseekv2_auto": (DeepseekV2Config, DeepseekV2ForCausalLMAuto, DeepseekV2PretrainingCriterion),
 }
 
 
@@ -90,7 +90,7 @@ class PreTrainingArguments(AutoTrainingArguments):
     )
     sr: Optional[int] = field(default=0, metadata={"help": "The count of chunks without recompute."})
     virtual_pipeline_seg_method: str = field(
-        default="DeepseekV2DecoderLayerNet",
+        default="DeepseekV2DecoderLayerAuto",
         metadata={"help": "The seg method of spliting pp layer for virtual pipeline."},
     )
     # NOTE(gongenlei): new add autotuner_benchmark

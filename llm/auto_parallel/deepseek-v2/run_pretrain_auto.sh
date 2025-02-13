@@ -1,4 +1,4 @@
-# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -41,12 +41,12 @@ unset CUDA_VISIBLE_DEVICES
 task_name="deepseekv2"
 rm -rf output/$task_name/
 rm -rf "output/$task_name""_log"
-rm -rf /root/paddlejob/workspace/env_run/xuxinyi/PaddleNLP/llm/auto_parallel/deepseek-v2/deepseek_single_card
+rm -rf /root/paddlejob/workspace/env_run/xuxinyi/PaddleNLP/llm/auto_parallel/deepseek-v2/log
 
 export SOT_LOG_LEVEL=4
 export PYTHONPATH=/root/paddlejob/workspace/env_run/xuxinyi/PaddleNLP:$PYTHONPATH
 #ulimit -c unlimited
-export GLOG_v=7
+# export GLOG_v=3
 
 # export FLAGS_call_stack_level=3
 # export FLAGS_use_cuda_managed_memory=true
@@ -59,9 +59,9 @@ to_static=0  # 是否开启动转静训练
 
 python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3" \
-    --log_dir "deepseek_single_card" \
+    --log_dir "log" \
     run_pretrain_auto.py \
-    --model_type "deepseekv2_network" \
+    --model_type "deepseekv2_auto" \
     --model_name_or_path "deepseek-ai/DeepSeek-V2-Lite" \
     --tokenizer_name_or_path "deepseek-ai/DeepSeek-V2-Lite" \
     --input_dir "./data" \
