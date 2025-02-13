@@ -1858,8 +1858,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         # Add tokenizer class to the tokenizer config to be able to reload it with from_pretrained
         tokenizer_class = self.__class__.__name__
         # Remove the Fast at the end unless we have a special `PreTrainedTokenizerFast`
-        if tokenizer_class.endswith("Fast") and tokenizer_class != "PreTrainedTokenizerFast":
-            tokenizer_class = tokenizer_class[:-4]
+        # if tokenizer_class.endswith("Fast") and tokenizer_class != "PreTrainedTokenizerFast":
+        #     tokenizer_class = tokenizer_class[:-4]
         tokenizer_config["tokenizer_class"] = tokenizer_class
 
         with io.open(tokenizer_config_file, "w", encoding="utf-8") as f:

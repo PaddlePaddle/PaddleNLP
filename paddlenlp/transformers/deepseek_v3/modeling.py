@@ -27,10 +27,10 @@ import paddle
 
 from ..deepseek_v2.modeling import (
     DeepseekV2ForSequenceClassification,
-    DeepSeekV2LMHead,
+    DeepseekV2LMHead,
     DeepseekV2Model,
     DeepseekV2PretrainedModel,
-    DeepSeekV2PretrainingCriterion,
+    DeepseekV2PretrainingCriterion,
 )
 from ..model_outputs import CausalLMOutputWithPast
 from ..model_utils import register_base_model
@@ -63,8 +63,8 @@ class DeepseekV3ForCausalLM(DeepseekV3PretrainedModel):
         super().__init__(config)
         self.deepseek_v3 = DeepseekV3Model(config)
         self.vocab_size = config.vocab_size
-        self.lm_head = DeepSeekV2LMHead(config)
-        self.criterion = DeepSeekV2PretrainingCriterion(config)
+        self.lm_head = DeepseekV2LMHead(config)
+        self.criterion = DeepseekV2PretrainingCriterion(config)
 
     def get_input_embeddings(self):
         return self.deepseek_v3.embed_tokens

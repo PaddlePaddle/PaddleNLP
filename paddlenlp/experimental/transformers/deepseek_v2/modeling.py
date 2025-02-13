@@ -37,7 +37,7 @@ from paddlenlp.experimental.transformers.generation_utils import (
 from paddlenlp.experimental.transformers.utils import infererence_model_from_pretrained
 from paddlenlp.transformers import DeepseekV2Config, DeepseekV2PretrainedModel
 from paddlenlp.transformers.deepseek_v2.modeling import (
-    DeepSeekV2LMHead,
+    DeepseekV2LMHead,
     yarn_find_correction_range,
     yarn_get_mscale,
     yarn_linear_ramp_mask,
@@ -804,12 +804,12 @@ class DeepseekV2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, De
 
         self.deepseek_v2 = DeepseekV2BlockInferenceModel(config, base_model_prefix)
         if config.tie_word_embeddings:
-            self.lm_head = DeepSeekV2LMHead(
+            self.lm_head = DeepseekV2LMHead(
                 config, embedding_weights=self.deepseek_v2.embed_tokens.weight, transpose_y=True
             )
             self.tie_weights()
         else:
-            self.lm_head = DeepSeekV2LMHead(config)
+            self.lm_head = DeepseekV2LMHead(config)
 
     @classmethod
     def _get_tensor_parallel_mappings(cls, config: DeepseekV2Config, is_split=True):
