@@ -71,6 +71,7 @@ from ..model_outputs import (
 from ..model_utils import PretrainedModel, register_base_model
 from ..moe_gate import PretrainedMoEGate
 from ..moe_layer import MoELayer
+from ..utils import device_guard
 from .configuration import DeepseekV2Config
 
 __all__ = [
@@ -196,13 +197,13 @@ def scaled_dot_product_attention(
         )
 
         if isinstance(outputs, tuple):
-            outputs[0] = outputs[0].reshape([bsz, kv_seq_len, v_num_heads, head_dim])
+            outputs[0] = outputs[0].reshape([bsz, q_len, v_num_heads, head_dim])
             outputs[0] = outputs[0][..., :v_head_dim]
-            outputs[0] = outputs[0].reshape([bsz, kv_seq_len, -1])
+            outputs[0] = outputs[0].reshape([bsz, q_len, -1])
         else:
-            outputs = outputs.reshape([bsz, kv_seq_len, v_num_heads, head_dim])
+            outputs = outputs.reshape([bsz, q_len, v_num_heads, head_dim])
             outputs = outputs[..., :v_head_dim]
-            outputs = outputs.reshape([bsz, kv_seq_len, -1])
+            outputs = outputs.reshape([bsz, q_len, -1])
         return outputs
 
     else:
@@ -345,8 +346,11 @@ class DeepseekV2RotaryEmbedding(nn.Layer):
         self.max_position_embeddings = max_position_embeddings
         self.base = base
         # [dim / 2]
-        self.inv_freq = 1.0 / (self.base ** (paddle.cast(paddle.arange(0, self.dim, 2), dtype="float32") / self.dim))
-        self._set_cos_sin_cache(seq_len=max_position_embeddings)
+        with device_guard("cpu"):
+            self.inv_freq = 1.0 / (
+                self.base ** (paddle.cast(paddle.arange(0, self.dim, 2), dtype="float32") / self.dim)
+            )
+            self._set_cos_sin_cache(seq_len=max_position_embeddings)
 
         self.max_seq_len_cached = None
 
@@ -718,14 +722,14 @@ class DeepseekV2MoE(MoELayer):
             config=config,
             moe_num_experts=config.n_routed_experts,
             expert_class=DeepseekV2MLP,
-            expert_kwargs={"config": config, "intermediate_size": config.moe_intermediate_size},
+            expert_kwargs={"config": config, "intermediate_size": config.moe_intermediate_size, "is_moe": True},
             gate=gate,
             capacity=2.0,
         )
         self.alpha = config.aux_loss_alpha
         if config.n_shared_experts is not None:
             intermediate_size = config.moe_intermediate_size * config.n_shared_experts
-            self.shared_experts = DeepseekV2MLP(config=config, intermediate_size=intermediate_size, is_moe=True)
+            self.shared_experts = DeepseekV2MLP(config=config, intermediate_size=intermediate_size, is_moe=False)
 
     def forward(self, hidden_states):
         final_hidden_states, l_aux, l_zloss = super().forward(hidden_states)
@@ -1220,6 +1224,10 @@ class DeepseekV2PretrainedModel(PretrainedModel):
             base_actions["layers.0.mlp.up_proj.weight"] = partial(fn, is_column=True)
             base_actions["layers.0.mlp.gate_proj.weight"] = partial(fn, is_column=True)
             base_actions["layers.0.mlp.down_proj.weight"] = partial(fn, is_column=False)
+
+            base_actions["layers.0.mlp.shared_experts.gate_proj.weight"] = partial(fn, is_column=True)
+            base_actions["layers.0.mlp.shared_experts.up_proj.weight"] = partial(fn, is_column=True)
+            base_actions["layers.0.mlp.shared_experts.down_proj.weight"] = partial(fn, is_column=False)
 
             for key, action in base_actions.items():
                 if "layers.0." in key:
