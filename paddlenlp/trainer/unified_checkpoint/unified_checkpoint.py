@@ -29,7 +29,7 @@ from paddlenlp.transformers.model_utils import (
     unwrap_model,
 )
 from paddlenlp.transformers.utils import dtype_byte_size
-from paddlenlp.utils import infohub
+from paddlenlp.utils import empty_device_cache, infohub
 from paddlenlp.utils.env import (
     LORA_WEIGHTS_NAME,
     MAX_QUANTIZATION_TIMES,
@@ -67,6 +67,7 @@ from .utils import (
     FP32_MASTER,
     UnifiedCheckpointOption,
     filter_params,
+    filter_sync_parameters,
     gather_sharded_object,
     generate_base_static_name,
     get_expected_state_dict,
@@ -158,7 +159,7 @@ class UnifiedCheckpointHandler:
         if self.args.should_save:
             save_model_config(model_to_save, save_directory)
 
-        paddle.device.cuda.empty_cache()
+        empty_device_cache()
 
         if strtobool(os.getenv("FLAG_LLM_PDC", "False")) and self.args.should_save:
             world_size = paddle.distributed.get_world_size()
@@ -195,7 +196,7 @@ class UnifiedCheckpointHandler:
             load_unified_checkpoint_locally(self.args, model, resume_from_checkpoint, safe_serialization=True)
 
     def save_non_merge_optimizer(self, model, optim_state_dict, master_weights, output_dir, signal_dir):
-        paddle.device.cuda.empty_cache()
+        empty_device_cache()
 
         # gather global master_weights status.
         global_master_weights = reduce_master_weights_status(master_weights is not None)
@@ -218,25 +219,9 @@ class UnifiedCheckpointHandler:
             for key in list(master_weights.keys()):
                 master_weights[static2struct_name_mappings[key]] = master_weights.pop(key)
 
-        no_sync_kname = []
-        model_state_dict = get_expected_state_dict(model)
-        for k, v in model_state_dict.items():
-            if getattr(v, "no_sync", False):
-                no_sync_kname.append(k)
-
-        hcg = fleet.get_hybrid_communicate_group()
-        dp_group = hcg.get_data_parallel_group()
-        dp_rank = dp_group.rank if dp_group.nranks > 1 else 0
         if self.args.use_expert_parallel:
-            for k in list(optim_state_dict.keys()):
-                model_k = k.split("/")[0]
-                if dp_rank > 0 and model_k not in no_sync_kname:
-                    optim_state_dict.pop(k)
-            if master_weights is not None:
-                for k in list(master_weights.keys()):
-                    model_k = k.split("/")[0]
-                    if dp_rank > 0 and model_k not in no_sync_kname:
-                        master_weights.pop(k)
+            model_state_dict = get_expected_state_dict(model)
+            filter_sync_parameters(model_state_dict, optim_state_dict, master_weights, is_model_weight=False)
 
         optimizer_name = _add_variant(SAFE_OPTIMIZER_NAME, self.args.optimizer_name_suffix)
         master_weights_name = _add_variant(SAFE_MASTER_WEIGHTS_NAME, self.args.optimizer_name_suffix)
@@ -344,7 +329,9 @@ class UnifiedCheckpointHandler:
             return
 
         if is_sharding_split_param_mode(self.args):
-            optim_state_dict, master_weights = gather_splited_param_for_optimizer(optimizer)
+            optim_state_dict, master_weights = gather_splited_param_for_optimizer(
+                optimizer, self.args.ckpt_quant_stage if "quant_reach_limit" not in infohub else "O0"
+            )
         else:
             optim_state_dict = nested_copy(optimizer.state_dict())
             master_weights = None
@@ -373,7 +360,7 @@ class UnifiedCheckpointHandler:
             optim_state_dict, shard_optim_file, sharded_optim_index = results[0]
             master_weight_state_dict, shard_master_weight_file, sharded_master_weight_index = results[1]
 
-        paddle.device.cuda.empty_cache()
+        empty_device_cache()
         save_directory = output_dir
         os.makedirs(save_directory, exist_ok=True)
         if signal_dir is not None:
@@ -506,13 +493,17 @@ def unified_checkpoint_into_shards(
     Returns:
         tuple: state_dict, config, shard_file: file name, sharded_index: map for weight to file name.
     """
-    paddle.device.cuda.empty_cache()
+    empty_device_cache()
     assert hasattr(model_to_save, "config")
 
     state_dict = get_expected_state_dict(model_to_save, concat_additional_adapter=True)
     all_filter_keys = filter_params(model_to_save, state_dict, args)
 
     config_to_save = copy.deepcopy(model_to_save.config)
+
+    if args.use_expert_parallel:
+        # ignore saving `no_sync=False` tensors when using expert_parallel under dp_rank > 0.
+        filter_sync_parameters(state_dict, is_model_weight=True)
 
     if config_to_save.tensor_parallel_degree > 1:
         if isinstance(model_to_save, LoRAModel) or isinstance(model_to_save, PrefixModelForCausalLM):
@@ -558,7 +549,7 @@ def unified_checkpoint_into_shards(
         elif isinstance(model_to_save, PrefixModelForCausalLM):
             sharded_index["type"] = "ptuning"
 
-    paddle.device.cuda.empty_cache()
+    empty_device_cache()
 
     return state_dict, shard_file, sharded_index
 
@@ -576,7 +567,7 @@ def unified_optimizer_into_shards(
         optimizer (Optimizer): optimizer to save.
         safe_serialization (bool, optional): safe serialization using safetensors. Defaults to False.
     """
-    paddle.device.cuda.empty_cache()
+    empty_device_cache()
 
     # gather global master_weights status.
     global_master_weights = reduce_master_weights_status(master_weights is not None)
@@ -623,6 +614,9 @@ def unified_optimizer_into_shards(
     tp_group = fleet.get_hybrid_communicate_group().get_model_parallel_group()
     tp_size = tp_group.nranks
 
+    if args.use_expert_parallel:
+        filter_sync_parameters(state_dict, optim_state_dict, master_weights, is_model_weight=False)
+
     if tp_size > 1:
         # get tp_actions
         model_keys = []
@@ -641,9 +635,8 @@ def unified_optimizer_into_shards(
             optim_state_dict,
             tp_actions,
             filter_optim_keys,
-            state_dict if args.use_expert_parallel else None,
         )
-        paddle.device.cuda.empty_cache()
+        empty_device_cache()
 
         if master_weights is not None:
             logger.info("Unified master weight tensor parallel in shards")
@@ -651,9 +644,8 @@ def unified_optimizer_into_shards(
                 master_weights,
                 tp_actions,
                 filter_master_keys,
-                state_dict if args.use_expert_parallel else None,
             )
-            paddle.device.cuda.empty_cache()
+            empty_device_cache()
 
     # build index json file
     index_optimizer_file, index_master_weight_file = {}, {}
@@ -704,7 +696,7 @@ def unified_optimizer_into_shards(
         else:
             sharded_optim_index["master_weights"] = False
 
-    paddle.device.cuda.empty_cache()
+    empty_device_cache()
     if master_weights is None:
         return [(optim_state_dict, shard_optimizer_file, sharded_optim_index)]
     else:

@@ -713,8 +713,13 @@ class AutoTrainer(Trainer):
                         for key, value in model.state_dict("opt").items()
                         if not any(keyword in key for keyword in FREE_SVAE_LOAD_KEY_PATTERNS)
                     }
+                    model_state_dict = model.state_dict("param")
+                    if self.args.should_save_model_with_tensor_fusion:
+                        model_state_dict = self._convert_state_dict_for_saving_tensor_fusion_ckpt(model_state_dict)
+                        opt_state_dict = self._convert_state_dict_for_saving_tensor_fusion_ckpt(opt_state_dict)
+
                     state_dict = {
-                        MODEL_NAME: model.state_dict("param"),
+                        MODEL_NAME: model_state_dict,
                         OPTIMIZER_NAME: opt_state_dict,
                     }
                 else:
@@ -854,6 +859,9 @@ class AutoTrainer(Trainer):
                     for key, value in self.model_wrapped.state_dict("opt").items()
                     if not any(keyword in key for keyword in FREE_SVAE_LOAD_KEY_PATTERNS)
                 }
+                if self.args.should_load_model_with_tensor_fusion:
+                    model_state_dict = self._convert_state_dict_for_loading_tensor_fusion_ckpt(model_state_dict)
+                    optim_state_dict = self._convert_state_dict_for_loading_tensor_fusion_ckpt(optim_state_dict)
             else:
                 model_state_dict = self.model_wrapped.state_dict()
                 optim_state_dict = self.optimizer.state_dict()
@@ -888,7 +896,36 @@ class AutoTrainer(Trainer):
                 self._load_ckpt_func(state_dict, ckpt_path)
 
             if self.args.to_static:
+                if self.args.should_load_model_with_tensor_fusion:
+                    model_state_dict = self._convert_state_dict_for_loading_model_with_tensor_fusion(model_state_dict)
+                    optim_state_dict = self._convert_state_dict_for_loading_model_with_tensor_fusion(optim_state_dict)
+
                 self.model_wrapped.set_state_dict(model_state_dict)
                 self.model_wrapped.set_state_dict(optim_state_dict)
             # release memory
             del state_dict
+
+    def _convert_state_dict_for_loading_tensor_fusion_ckpt(self, state_dict):
+        if self.args.load_model_with_sharding_tensor_fusion:
+            logger.info("load sharding tensor fusion unbalanced model")
+            state_dict = self.model_wrapped._convert_state_dict_with_rank_unique_name(state_dict)
+        else:
+            logger.info("load sharding tensor fusion balanced model")
+            state_dict = self.model_wrapped._convert_state_dict_without_tensor_fusion_param(state_dict)
+        return state_dict
+
+    def _convert_state_dict_for_loading_model_with_tensor_fusion(self, state_dict):
+        if self.args.load_model_with_sharding_tensor_fusion:
+            state_dict = self.model_wrapped._convert_state_dict_with_origin_name(state_dict)
+        else:
+            state_dict = self.model_wrapped._convert_state_dict_with_tensor_fusion_param(state_dict)
+        return state_dict
+
+    def _convert_state_dict_for_saving_tensor_fusion_ckpt(self, state_dict):
+        if self.args.save_model_with_sharding_tensor_fusion:
+            logger.info("save sharding tensor fusion unbalanced model")
+            state_dict = self.model_wrapped._convert_state_dict_with_rank_unique_name(state_dict)
+        else:
+            logger.info("save sharding tensor fusion balanced model")
+            state_dict = self.model_wrapped._convert_state_dict_without_tensor_fusion_param(state_dict)
+        return state_dict
