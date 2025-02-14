@@ -48,43 +48,45 @@ void EncoderWriteCacheWithRopeKernel(
   auto num_heads = meta_data.q_num_heads;
   auto kv_num_heads = meta_data.kv_num_heads;
   auto head_dim = meta_data.head_dims;
-
-  if (num_heads == kv_num_heads) {
-    rotary_qk_variable(
-        qkv_out->data<T>(),
-        qkv.data<QKV_TYPE>(),
-        qkv_out_scales ? qkv_out_scales.get().data<float>() : nullptr,
-        qkv_biases ? qkv_biases.get().data<T>() : nullptr,
-        rotary_embs.get().data<float>(),
-        padding_offsets.data<int>(),
-        seq_lens_encoder.data<int>(),
-        seq_lens_decoder.data<int>(),
-        token_num,
-        num_heads,
-        max_seq_len,
-        rotary_embs.get().dims()[2],
-        head_dim,
-        stream,
-        use_neox_style);
-  } else {
-    gqa_rotary_qk_variable(
-        qkv_out->data<T>(),
-        qkv.data<QKV_TYPE>(),
-        qkv_out_scales ? qkv_out_scales.get().data<float>() : nullptr,
-        qkv_biases ? qkv_biases.get().data<T>() : nullptr,
-        rotary_embs.get().data<float>(),
-        padding_offsets.data<int>(),
-        seq_lens_encoder.data<int>(),
-        seq_lens_decoder.data<int>(),
-        token_num,
-        num_heads,
-        kv_num_heads,
-        max_seq_len,
-        rotary_embs.get().dims()[2],
-        head_dim,
-        stream,
-        use_neox_style);
+  if (rotary_embs) {
+    if (num_heads == kv_num_heads) {
+      rotary_qk_variable(
+          qkv_out->data<T>(),
+          qkv.data<QKV_TYPE>(),
+          qkv_out_scales ? qkv_out_scales.get().data<float>() : nullptr,
+          qkv_biases ? qkv_biases.get().data<T>() : nullptr,
+          rotary_embs.get().data<float>(),
+          padding_offsets.data<int>(),
+          seq_lens_encoder.data<int>(),
+          seq_lens_decoder.data<int>(),
+          token_num,
+          num_heads,
+          max_seq_len,
+          rotary_embs.get().dims()[2],
+          head_dim,
+          stream,
+          use_neox_style);
+    } else {
+      gqa_rotary_qk_variable(
+          qkv_out->data<T>(),
+          qkv.data<QKV_TYPE>(),
+          qkv_out_scales ? qkv_out_scales.get().data<float>() : nullptr,
+          qkv_biases ? qkv_biases.get().data<T>() : nullptr,
+          rotary_embs.get().data<float>(),
+          padding_offsets.data<int>(),
+          seq_lens_encoder.data<int>(),
+          seq_lens_decoder.data<int>(),
+          token_num,
+          num_heads,
+          kv_num_heads,
+          max_seq_len,
+          rotary_embs.get().dims()[2],
+          head_dim,
+          stream,
+          use_neox_style);
+    }
   }
+  
   const uint32_t block_size = meta_data.block_size;
   if (cache_quant_type_str == "none") {
     CascadeAppendWriteCacheKVQKV<T>(meta_data,

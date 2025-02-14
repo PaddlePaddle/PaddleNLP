@@ -33,24 +33,20 @@ class SparsifyMethod:
 
     def dare(self, tensor):
         if self.merge_config.tensor_type == "np":
-            mask = np.random.binomial(1, self.merge_config.reserve_p, size=tensor.shape).astype(tensor.dtype)
-            tensor *= mask
+            tensor *= (np.random.rand(*tensor.shape) < self.merge_config.reserve_p).astype(tensor.dtype)
             if self.merge_config.rescale:
                 tensor /= self.merge_config.reserve_p
             return tensor
         elif self.merge_config.tensor_type == "pd":
-            mask = paddle.bernoulli(paddle.full(tensor.shape, self.merge_config.reserve_p, dtype=tensor.dtype))
-
-            tensor *= mask
-            if self.merge_config.rescale:
-                tensor /= self.merge_config.reserve_p
+            mode = "upscale_in_train" if self.merge_config.rescale else "downscale_in_infer"
+            tensor = paddle.nn.functional.dropout(tensor, p=1 - self.merge_config.reserve_p, mode=mode, training=True)
             return tensor
         else:
             raise ValueError(f"Unkonwn tensor type {self.merge_config.tensor_type}")
 
     def magprune(self, tensor):
         if self.merge_config.tensor_type == "np":
-            if np.all(tensor == 0):
+            if not np.any(tensor != 0):
                 return tensor
             drop_p = 1 - self.merge_config.reserve_p
             # 1: ranking(descending)
@@ -72,7 +68,7 @@ class SparsifyMethod:
                 tensor /= 1 - probs
             return tensor
         elif self.merge_config.tensor_type == "pd":
-            if paddle.all(tensor == 0):
+            if not paddle.any(tensor != 0):
                 return tensor
             drop_p = 1 - self.merge_config.reserve_p
             abs_tensor = paddle.abs(tensor)
@@ -84,8 +80,7 @@ class SparsifyMethod:
             probs = probs * self.merge_config.epsilon / tensor.numel()
             p_min = drop_p - self.merge_config.epsilon / 2
             probs += p_min
-
-            mask = paddle.cast(paddle.bernoulli(1 - probs), tensor.dtype)
+            mask = paddle.bernoulli(1 - probs).astype(tensor.dtype)
             tensor *= mask
             if self.merge_config.rescale:
                 tensor /= 1 - probs
@@ -96,7 +91,6 @@ class SparsifyMethod:
     def trim(self, tensor):
         if self.merge_config.tensor_type == "np":
             shape = tensor.shape
-            org_sum = np.sum(np.abs(tensor))
             tensor = tensor.flatten()
             abs_tensor = np.abs(tensor)
             threshold = np.quantile(abs_tensor, 1 - self.merge_config.reserve_p)
@@ -111,14 +105,11 @@ class SparsifyMethod:
                 tensor[abs_tensor < threshold] = 0
             return tensor.reshape(shape)
         elif self.merge_config.tensor_type == "pd":
-            shape = tensor.shape
-            org_sum = paddle.sum(paddle.abs(tensor))
             abs_tensor = paddle.abs(tensor)
             threshold = paddle.quantile(abs_tensor, 1 - self.merge_config.reserve_p)
-            mask = paddle.cast(abs_tensor >= threshold, tensor.dtype)
-            tensor = tensor * mask
-
+            tensor = paddle.where(abs_tensor < threshold, paddle.zeros_like(tensor), tensor)
             if self.merge_config.rescale:
+                org_sum = paddle.sum(abs_tensor)
                 new_sum = paddle.sum(paddle.abs(tensor))
                 if org_sum >= 1e-8 and new_sum >= 1e-8:
                     tensor *= org_sum / new_sum
