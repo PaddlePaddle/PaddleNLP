@@ -1311,6 +1311,7 @@ class ConversionMixin:
     def _resolve_prefix_keys(state_keys_base, state_keys_real, ignore_error=False):
         # state_keys_map base to real
         state_keys_map = {}
+
         # sorted by length，match from long to short for A.key B.key ...
         state_keys_base = sorted(state_keys_base, key=lambda x: len(x), reverse=True)
         state_keys_real = set(state_keys_real)
