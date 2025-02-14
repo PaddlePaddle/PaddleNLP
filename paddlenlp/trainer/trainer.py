@@ -1820,6 +1820,9 @@ class Trainer:
             if hasattr(optimizer_cls, "_create_master_weight") and self.args.fp16_opt_level == "O2":
                 optimizer_kwargs["multi_precision"] = True
 
+            if isinstance(self.model, LoRAModel) and self.args.use_lorapro:
+                optimizer_kwargs["scaling_factor"] = self.model.lora_config.scaling
+
             self.optimizer = optimizer_cls(
                 learning_rate=self.lr_scheduler if lr_scheduler is None else lr_scheduler,
                 apply_decay_param_fun=apply_decay_param_fun,
@@ -1955,7 +1958,14 @@ class Trainer:
             "beta2": args.adam_beta2,
             "epsilon": args.adam_epsilon,
         }
-        if args.optim == OptimizerNames.ADAMW:
+        if args.use_lorapro:
+            # from ..utils import AdamWMini
+            # optimizer_cls = AdamWMini
+            from ..utils import LoRAPro
+
+            optimizer_cls = LoRAPro
+            optimizer_kwargs.update(adam_kwargs)
+        elif args.optim == OptimizerNames.ADAMW:
             from paddle.optimizer import AdamW
 
             optimizer_cls = AdamW

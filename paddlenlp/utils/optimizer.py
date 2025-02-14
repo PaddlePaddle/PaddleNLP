@@ -12,7 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from collections import defaultdict
+
 import paddle
+import paddle.autograd as imperative_base
 from paddle import pir
 from paddle.base import core, framework
 from paddle.base.framework import Variable, in_dynamic_or_pir_mode, in_pir_mode
@@ -149,3 +152,127 @@ class AdamWMini(AdamW):
         beta1_pow[:], beta2_pow[:] = beta1 * beta1_pow[:], beta2 * beta2_pow[:]
         # 看看怎么更新
         return
+
+
+class LoRAPro(AdamW):
+    def __init__(
+        self,
+        learning_rate: float = 0.001,
+        beta1: float = 0.9,
+        beta2: float = 0.999,
+        epsilon: float = 1e-8,
+        parameters=None,
+        weight_decay: float = 0.01,
+        lr_ratio=None,
+        apply_decay_param_fun=None,
+        grad_clip=None,
+        lazy_mode: bool = False,
+        multi_precision: bool = False,
+        amsgrad: bool = False,
+        name=None,
+        scaling_factor: float = 1.0,
+    ) -> None:
+        super().__init__(
+            learning_rate,
+            beta1,
+            beta2,
+            epsilon,
+            parameters,
+            weight_decay,
+            lr_ratio,
+            apply_decay_param_fun,
+            grad_clip,
+            lazy_mode,
+            multi_precision,
+            amsgrad,
+            name,
+        )
+        self.scaling_factor = scaling_factor
+
+    @imperative_base.no_grad()
+    @framework.non_static_only
+    def step(self) -> None:
+        """
+        Execute the optimizer and update parameters once.
+
+        Returns:
+            None
+
+        Examples:
+            .. code-block:: python
+
+                >>> import paddle
+
+                >>> a = paddle.arange(26, dtype="float32").reshape([2, 13])
+                >>> linear = paddle.nn.Linear(13, 5)
+                >>> # This can be any optimizer supported by dygraph.
+                >>> adam = paddle.optimizer.Adam(learning_rate = 0.01,
+                ...                         parameters = linear.parameters())
+                >>> out = linear(a)
+                >>> out.backward()
+                >>> adam.step()
+                >>> adam.clear_grad()
+        """
+        if paddle.base.dygraph.base.in_to_static_mode():
+            self._declarative_step()
+            return
+        scaling_factor = self.scaling_factor
+        if not isinstance(self._param_groups[0], dict):
+            params_grads = []
+            lora_num = len(self._param_groups) // 2
+            for i in range(lora_num):
+                # 先转置
+                A = self._param_groups[2 * i].detach().T
+                B = self._param_groups[2 * i + 1].detach().T
+                grad_A_orin = self._param_groups[2 * i]._grad_ivar().T
+                grad_B_orin = self._param_groups[2 * i + 1]._grad_ivar().T
+
+                # 中间与torch保持一致
+                delta = 1e-8
+                AA_T = A @ A.T
+                B_TB = B.T @ B
+                AA_T_inv = paddle.linalg.pinv(AA_T + delta * paddle.eye(A.shape[0]))
+                B_TB_inv = paddle.linalg.pinv(B_TB + delta * paddle.eye(A.shape[0]))
+
+                X = paddle.zeros((B_TB_inv.shape[0], B_TB_inv.shape[0])).cast(B.dtype)
+
+                grad_A = (1 / scaling_factor**2) * B_TB_inv @ grad_A_orin + X @ A
+                grad_B = (1 / scaling_factor**2) * (
+                    (paddle.eye(B.shape[0]) - B @ B_TB_inv @ B.T) @ grad_B_orin @ AA_T_inv
+                ) - B @ X
+
+                # 最后转置回来
+                self._param_groups[2 * i]._grad_ivar()[:] = grad_A.T
+                self._param_groups[2 * i + 1]._grad_ivar()[:] = grad_B.T
+
+            for param in self._param_groups:
+                if param.stop_gradient:
+                    continue
+                if param._grad_ivar() is not None:
+                    grad_var = param._grad_ivar()
+                    params_grads.append((param, grad_var))
+
+            self._apply_optimize(
+                loss=None,
+                startup_program=None,
+                params_grads=params_grads,
+                param_group_idx=0,
+            )
+
+        else:
+            # optimize parameters in groups
+            for idx, param_group in enumerate(self._param_groups):
+                params_grads = defaultdict(lambda: [])
+                for param in param_group["params"]:
+                    if param.stop_gradient:
+                        continue
+                    if param._grad_ivar() is not None:
+                        grad_var = param._grad_ivar()
+                        params_grads["params"].append((param, grad_var))
+                params_grads.update({k: v for k, v in param_group.items() if k != "params"})
+                self._apply_optimize(
+                    loss=None,
+                    startup_program=None,
+                    params_grads=params_grads,
+                    param_group_idx=idx,
+                )
