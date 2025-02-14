@@ -1593,7 +1593,10 @@ class Trainer:
                     tensors = paddle.concat(output_tensors).sum().reshape([1])
                 token_list.append(tensors.item())
             if self.is_local_process_zero():
-                logger.info(f"Update to now, trained_effective_tokens: {token_list[0]}, trained_tokens: {token_list[1]}.")
+
+                logger.info(
+                    f"Update to now, trained_effective_tokens: {token_list[0]}, trained_tokens: {token_list[1]}."
+                )
 
     def _get_learning_rate(self):
         return self.optimizer.get_lr()
