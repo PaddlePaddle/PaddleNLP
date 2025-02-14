@@ -25,8 +25,8 @@ function _set_params(){
     MODEL_TYPE=${model_type:-"llama2_7b"}
 
     # for intermediate api
-    use_intermediate_api=${use_intermediate_api:-""}
-    intermediate_api_model_type=${intermediate_api_model_type:-""}
+    intermediate_api=${intermediate_api:-""}
+
 
     ip_lists=($(echo $TRAINER_INSTANCES | tr ',' ' '))
     master_ip=${ip_lists[0]}
@@ -178,20 +178,17 @@ function _train(){
         train_cmd="python -u -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
             --nnodes 1 --nproc_per_node 8 \
             --log_dir mylog run_pretrain_auto.py \
-            ./pretrain_config_${MODEL_TYPE}/pretrain-${MODEL_TYPE}.json \
-            ${use_intermediate_api} ${intermediate_api_model_type}"
+            ./pretrain_config_${MODEL_TYPE}/${intermediate_api}pretrain-${MODEL_TYPE}.json"
         ;;
     N4C32) echo "Run with: device_num=${device_num} run_mode=${run_mode}"
         train_cmd="python -u -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
             --log_dir mylog run_pretrain_auto.py \
-            ./pretrain_config_${MODEL_TYPE}/pretrain-${MODEL_TYPE}.json \
-            ${use_intermediate_api} ${intermediate_api_model_type}"
+            ./pretrain_config_${MODEL_TYPE}/${intermediate_api}pretrain-${MODEL_TYPE}.json"
         ;;
     *) echo "Run with: device_num=${device_num}, run_mode=${run_mode}"
         train_cmd="python -u -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
             --log_dir mylog run_pretrain_auto.py \
-            ./pretrain_config_${MODEL_TYPE}/pretrain-${MODEL_TYPE}.json \
-            ${use_intermediate_api} ${intermediate_api_model_type}"
+            ./pretrain_config_${MODEL_TYPE}/${intermediate_api}pretrain-${MODEL_TYPE}.json"
         ;;
     esac
     cd ../llm/auto_parallel/llama
@@ -256,5 +253,5 @@ export PARALLEL_CROSS_ENTROPY=true
 
 source ${BENCHMARK_ROOT}/scripts/run_model.sh   # 在该脚本中会对符合benchmark规范的log使用analysis.py 脚本进行性能数据解析;如果不联调只想要产出训练log可以注掉本行,提交时需打开
 _set_params $@
-# _train       # 如果只产出训练log,不解析,可取消注释
+#_train       # 如果只产出训练log,不解析,可取消注释
 _run     # 该函数在run_model.sh中,执行时会调用_train; 如果不联调只产出训练log可以注掉本行,提交时需打开

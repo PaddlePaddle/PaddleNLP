@@ -18,8 +18,8 @@ param+="device_num=N4C32 "
 param+="global_batch_size=32 "
 param+="nnodes=4 "
 param+="model_type=llama2_13b "
-param+='use_intermediate_api=--use_intermediate_api=true '
-param+='intermediate_api_model_type=--model_type="llama_network" '
+param+='intermediate_api=intermediate_api_ '
+
 
 cd ./tests
 bash ./test_tipc/static/auto_parallel/llama2/benchmark_common/prepare.sh
