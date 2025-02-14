@@ -973,6 +973,7 @@ class DeepseekV2ForCausalLMAuto(DeepseekV2PretrainedModelAuto):
         if prefix != "":
             assert prefix.endswith(".")
         config = {
+            "dp_config": {"sharding_level": 1, "offload": False, "exclude_layer": None},
             "mp_config": {
                 "parallelize_plan": {
                     f"{prefix}deepseek_v2.embed_tokens": dist.ColWiseParallel(gather_output=True),

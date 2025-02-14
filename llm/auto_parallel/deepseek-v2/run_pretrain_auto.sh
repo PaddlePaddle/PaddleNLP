@@ -55,7 +55,7 @@ python -u  -m paddle.distributed.launch \
     --scale_loss 1024 \
     --pipeline_parallel_degree 1 \
     --tensor_parallel_degree 2 \
-    --sharding_parallel_degree 1 \
+    --sharding_parallel_degree 2 \
     --learning_rate 0.0001 \
     --min_learning_rate 0.00001 \
     --max_steps 2 \
@@ -64,7 +64,7 @@ python -u  -m paddle.distributed.launch \
     --warmup_ratio 0.01 \
     --logging_steps 1\
     --dataloader_num_workers 1 \
-    --sharding "" \
+    --sharding "stage1" \
     --eval_steps 1000000 \
     --disable_tqdm true \
     --continue_training 0\
