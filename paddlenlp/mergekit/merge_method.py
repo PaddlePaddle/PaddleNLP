@@ -48,11 +48,10 @@ class MergeMethod:
             tensor_output = sum(weight * tensor for weight, tensor in zip(weight_list, tensor_list))
             return tensor_output
         elif self.merge_config.tensor_type == "pd":
-            stacked_tensors = paddle.stack(tensor_list, axis=0)
-            weights = paddle.to_tensor(weight_list, dtype=stacked_tensors.dtype)
-            weights = weights.reshape([-1] + [1] * (len(stacked_tensors.shape) - 1))
-            weighted_sum = paddle.sum(stacked_tensors * weights, axis=0)
-            return weighted_sum
+            tensor_output = paddle.zeros_like(tensor_list[0])
+            for i, tensor in enumerate(tensor_list):
+                tensor_output += tensor * weight_list[i]
+            return tensor_output
         else:
             raise ValueError(f"Unkonwn tensor type {self.merge_config.tensor_type}")
 
@@ -155,28 +154,34 @@ class MergeMethod:
 
         elif self.merge_config.tensor_type == "pd":
             mask_dtype = tensor_list[0].dtype
-            weight_list = self.merge_config.weight_list
-            stacked_tensors = paddle.stack(tensor_list, axis=0)
-            weights = paddle.to_tensor(weight_list, dtype=stacked_tensors.dtype)
-            weights = weights.reshape([-1] + [1] * (len(stacked_tensors.shape) - 1))
-            weighted_tensors = stacked_tensors * weights
+
             # Elect majority sign
-            if self.merge_config.ties_elect_type == "sum":
-                majority_sign = (paddle.sum(weighted_tensors, axis=0) >= 0).astype(mask_dtype) * 2 - 1
-            elif self.merge_config.ties_elect_type == "count":
-                stacked_signs = paddle.sign(stacked_tensors).astype(mask_dtype)
-                majority_sign = (paddle.sum(stacked_signs, axis=0) >= 0).astype(mask_dtype) * 2 - 1
-            else:
-                raise NotImplementedError(f"ties_elect_type: {self.merge_config.ties_elect_type} is unknown.")
+            majority_sign = paddle.zeros_like(tensor_list[0])
+            for i, tensor in enumerate(tensor_list):
+                if self.merge_config.ties_elect_type == "sum":
+                    majority_sign += tensor * self.merge_config.weight_list[i]
+                elif self.merge_config.ties_elect_type == "count":
+                    majority_sign += tensor.sign()
+                else:
+                    raise NotImplementedError(f"ties_elect_type: {self.merge_config.ties_elect_type} is unknown.")
+            majority_sign = (majority_sign >= 0).astype(mask_dtype) * 2 - 1
 
             # Merge
-            stacked_masks = (paddle.sign(weighted_tensors) == majority_sign).astype(mask_dtype)
-            masked_tensors = stacked_masks * weighted_tensors
-            merge_tensor = paddle.sum(masked_tensors, axis=0)
+            merge_tensor = paddle.zeros_like(tensor_list[0])
+            if self.merge_config.normalize:
+                divisor = paddle.zeros_like(tensor_list[0])
+            for i, tensor in enumerate(tensor_list):
+                if self.merge_config.normalize:
+                    mask = (tensor.sign() == majority_sign).astype(mask_dtype) * self.merge_config.weight_list[i]
+                    divisor += mask
+                    merge_tensor += mask * tensor
+                else:
+                    merge_tensor += (
+                        (tensor.sign() == majority_sign).astype(mask_dtype) * tensor * self.merge_config.weight_list[i]
+                    )
+
             # Normalize
             if self.merge_config.normalize:
-                weight_masks = stacked_masks * weights
-                divisor = paddle.sum(weight_masks, axis=0)
                 divisor = paddle.where(paddle.abs(divisor) < 1e-8, paddle.ones_like(divisor), divisor)
                 merge_tensor /= divisor
 

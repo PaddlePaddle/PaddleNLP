@@ -177,7 +177,7 @@ class MoELayer(nn.Layer):
         self.experts = nn.LayerList([])
         for i in range(self.moe_num_experts):
             if i // self.moe_num_experts_per_device == self.moe_rank:
-                self.experts.append(expert_class(expert_kwargs))
+                self.experts.append(expert_class(**expert_kwargs))
             else:
                 self.experts.append(None)
 
