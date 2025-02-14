@@ -227,7 +227,6 @@ class Task(metaclass=abc.ABCMeta):
             self._config.switch_ir_optim(False)
         if self.model == "uie-data-distill-gp":
             self._config.enable_memory_optim(False)
-
         self.predictor = paddle.inference.create_predictor(self._config)
         self.input_names = [name for name in self.predictor.get_input_names()]
         self.input_handles = [self.predictor.get_input_handle(name) for name in self.predictor.get_input_names()]
@@ -391,8 +390,7 @@ class Task(metaclass=abc.ABCMeta):
             self._input_spec is not None
         ), "The input spec must be created before converting the dygraph model to static model."
         logger.info("Converting to the inference model cost a little time.")
-        static_model = paddle.jit.to_static(self._model, input_spec=self._input_spec)
-
+        static_model = paddle.jit.to_static(self._model, input_spec=self._input_spec, full_graph=True)
         paddle.jit.save(static_model, self.inference_model_path)
         logger.info("The inference model save in the path:{}".format(self.inference_model_path))
 
@@ -519,7 +517,7 @@ class Task(metaclass=abc.ABCMeta):
         program = model.program()
         for block in program.blocks:
             for op in block.ops:
-                if op.type.count("quantize"):
+                if "quantize" in op.name():
                     return True
         return False
 
