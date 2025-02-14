@@ -211,6 +211,8 @@ def main():
 
     logger.info(f"Final model config: {model_config}")
 
+    logger.info("Creating model")
+
     model_class = AutoModelForCausalLM
     if training_args.pipeline_parallel_degree > 1:
         if data_args.eval_with_do_generation and training_args.do_eval:
@@ -278,7 +280,6 @@ def main():
         tokenizer.pad_token_id = tokenizer.eos_token_id
 
     train_ds, dev_ds, test_ds = create_dataset(data_args, training_args)
-
     # TODO(ZHUI & sijunhe): Temporary implementation. Generalize this logic and move to Trainer later.
     if training_args.resume_from_checkpoint is not None and data_args.lazy:
         logger.info(
@@ -322,6 +323,7 @@ def main():
         )
         eval_zero_padding = False
 
+    logger.info("Trans the dataset text into token ids, please wait for a moment.")
     train_ds, dev_ds, test_ds = trans_dataset_to_ids(
         train_ds, dev_ds, test_ds, model_args, data_args, trans_func, eval_zero_padding
     )
@@ -638,18 +640,21 @@ def create_dataset(data_args, training_args):
     if os.path.exists(os.path.join(data_args.dataset_name_or_path, "train.json")) or os.path.exists(
         os.path.join(data_args.dataset_name_or_path, "dev.json")
     ):
+        logger.info("load train")
         if training_args.do_train:
             train_ds = load_dataset(
                 "json",
                 data_files=os.path.join(data_args.dataset_name_or_path, "train.json"),
                 lazy=data_args.lazy,
             )[0]
+        logger.info("load eval")
         if training_args.do_eval:
             dev_ds = load_dataset(
                 "json",
                 data_files=os.path.join(data_args.dataset_name_or_path, "dev.json"),
                 lazy=data_args.lazy,
             )[0]
+        logger.info("load test")
         if training_args.do_predict:
             test_ds = load_dataset(
                 "json",

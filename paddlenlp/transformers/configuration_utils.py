@@ -235,6 +235,7 @@ class LlmMetaConfig:
         ("use_fused_rope", bool, False, "Enable rope fusion or not."),
         ("use_fused_linear", bool, False, "GPT3 model, use fused linear layer"),
         ("use_fused_dropout_add", bool, False, "GPT3 model, use fused `dropout + residual add` op."),
+        ("use_fused_linear_cross_entropy", bool, False, "use fused `linear + cross_entropy` fuse op."),
     ]
 
     hybrid_parallel_attributes = [
