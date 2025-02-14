@@ -15,3 +15,4 @@
 from ..qwen2.tokenizer import *
 from .configuration import *
 from .modeling import *
+from .modeling_pp import *

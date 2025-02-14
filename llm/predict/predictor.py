@@ -217,21 +217,25 @@ class BasePredictor:
             self.generation_config = None
 
     def _preprocess(self, source):
+
         if self.tokenizer.chat_template is not None:
-            source = [source] if isinstance(source, str) else source
+            # for str -> List[str] eg. "hello"
+            # for List[str] -> List[str]  eg. ["hello", "hello new"]
+            # for List[List[str]] -> List[List[List[str]]]  eg. 历史对话形式,一轮
+            #             [ [ "Hello, how are you?", "I'm doing great. How can I help you today?"],
+            #                ["I'd like to show off how chat templating works!"], ]
+            # for List[Dict] -> List[List[Dict]]  [{'role': 'user', 'content': 'hello'}, {'role': 'assistant', 'content': 'nice'}]
+            #                                 ->  [[{'role': 'user', 'content': 'hello'}, {'role': 'assistant', 'content': 'nice'}]]
+            if not isinstance(source, list) or not isinstance(source[0], str):
+                source = [source]
             source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
 
-        return_position_ids = False
-        return_attention_mask = False
-        if len(source) > 1:
-            return_position_ids = True
-            return_attention_mask = True
         tokenized_source = self.tokenizer(
             source,
             max_length=self.config.src_length,
             truncation=True,
-            return_position_ids=True if not isinstance(self.tokenizer, ChatGLMTokenizer) else return_position_ids,
-            return_attention_mask=return_attention_mask,
+            return_position_ids=True if not isinstance(self.tokenizer, ChatGLMTokenizer) else False,
+            return_attention_mask=True,
             truncation_side="left",
             return_tensors=self.return_tensors,
             padding=True,
@@ -486,7 +490,8 @@ class InferencePredictorMixin(BasePredictor):
         pre_caches_length = 0 if not self.config.export_precache else self.pre_caches[0].shape[-2]
 
         if self.tokenizer.chat_template is not None:
-            source = [source] if isinstance(source, str) else source
+            if not isinstance(source, list) or not isinstance(source[0], str):
+                source = [source]
             source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
 
         inputs = llm_utils.dybatch_preprocess(
@@ -929,7 +934,8 @@ class BlockInferencePredictorMixin(BasePredictor):
             assert len(input_text) == self.batch_size
 
         if self.tokenizer.chat_template is not None:
-            input_text = [input_text] if isinstance(input_text, str) else input_text
+            if not isinstance(input_text, list) or not isinstance(input_text[0], str):
+                input_text = [input_text]
             input_text = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in input_text]
 
         input_ids = []
@@ -1341,7 +1347,16 @@ def create_predictor(
     predictor_args: PredictorArgument,
     model_args: ModelArgument,
 ):
-    tokenizer = AutoTokenizer.from_pretrained(predictor_args.model_name_or_path, padding_side="left")
+
+    paddle.set_device(predictor_args.device)
+    paddle.set_default_dtype(predictor_args.dtype)
+
+    from paddlenlp.utils.env import USE_FAST_TOKENIZER
+
+    tokenizer = AutoTokenizer.from_pretrained(
+        predictor_args.model_name_or_path, padding_side="left", use_fast=USE_FAST_TOKENIZER
+    )
+
     # init chat_template for tokenizer
     llm_utils.init_chat_template(tokenizer, predictor_args.model_name_or_path, predictor_args.chat_template)
 
@@ -1431,9 +1446,6 @@ def predict():
     parser = PdArgumentParser((PredictorArgument, ModelArgument))
     predictor_args, model_args = parser.parse_args_into_dataclasses()
 
-    paddle.set_device(predictor_args.device)
-    paddle.set_default_dtype(predictor_args.dtype)
-
     tensor_parallel_degree = paddle.distributed.get_world_size()
     if tensor_parallel_degree > 1:
         strategy = fleet.DistributedStrategy()
@@ -1466,7 +1478,9 @@ def predict():
                     target_texts.append("")
 
     else:
-        source_texts = ["解释一下温故而知新"] * predictor_args.batch_size
+        source_texts = [
+            "2014年3月，大范围雾霾天气长时间影响我国东部地区，严重危害人体健康。造成雾霾天气的人为原因有____\r\n①工业生产中使用矿物作为燃料，大量排放污染物     ②汽车尾气的大量排放     \r\n③风力小，空气流动不畅     ④冬季取暖排放粉尘\nA. ①②③\nB. ②③④\nC. ①③④\nD. ①②④"
+        ] * predictor_args.batch_size
         target_texts = [""] * predictor_args.batch_size
 
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)

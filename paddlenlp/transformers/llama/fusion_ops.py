@@ -177,8 +177,10 @@ def fusion_flash_attention(
     npu_is_casual=False,
     skip_recompute=False,
 ):
-    bsz, q_len, num_heads, head_dim = query_states.shape
-    _, kv_seq_len, _, _ = value_states.shape
+    # Note:
+    # 1. The head_dim of query_states and key_states should be the same. And the head_dim of value_states should be used for reshape.
+    bsz, q_len, num_heads, _ = query_states.shape
+    _, kv_seq_len, _, head_dim = value_states.shape
     version = paddle.version.full_version
     if version != "0.0.0" and version <= "2.5.2":
         if alibi is not None:
