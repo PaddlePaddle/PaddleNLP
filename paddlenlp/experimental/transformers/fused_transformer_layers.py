@@ -27,9 +27,6 @@ from paddle.incubate.nn.functional import (
     fused_moe,
     fused_rms_norm,
     masked_multihead_attention,
-    moe_dispatch,
-    moe_ffn,
-    moe_reduce,
     variable_length_memory_efficient_attention,
 )
 from paddle.nn import Layer
@@ -1160,7 +1157,7 @@ class FusedMultiTransformerBase(Layer):
         def get_moe_scores(
             gating_output: paddle.Tensor,
             config: MoeConfig,
-        ) -> (paddle.Tensor, paddle.Tensor):
+        ) -> tuple[paddle.Tensor, paddle.Tensor]:
 
             num_token = gating_output.shape[0]
             num_expert_group = config.num_expert_group
@@ -1210,6 +1207,8 @@ class FusedMultiTransformerBase(Layer):
             return scores, scores_no_bias
 
         if self.config.moe_config.topk_method is not None:
+            from paddle.incubate.nn.functional import moe_dispatch, moe_ffn, moe_reduce
+
             gate_out = paddle.matmul(tmp_out.cast("float32"), self.gate_weights[i])
             # 应用各种策略后重塑的 scores
             scores, scores_no_bias = get_moe_scores(gate_out, self.config.moe_config)

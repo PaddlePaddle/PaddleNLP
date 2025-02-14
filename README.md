@@ -166,7 +166,7 @@
 ### 环境依赖
 
 * python >= 3.8
-* paddlepaddle >= 3.0.0b0
+* paddlepaddle >= 3.0.0rc0
 
 如果您尚未安装 PaddlePaddle，请参考 [飞桨官网](https://www.paddlepaddle.org.cn/) 进行安装。
 
@@ -211,7 +211,7 @@ wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwe
 wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.idx
 cd .. # change folder to PaddleNLP/llm
 # 如需使用use_fused_rms_norm=true，需要前往slm/model_zoo/gpt-3/external_ops安装fused_ln
-python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py ./config/llama/pretrain_argument.json --use_fused_rms_norm false
+python -u run_pretrain.py ./config/qwen/pretrain_argument_0p5b.json
 ```
 
 ### 大模型 SFT 精调
@@ -221,7 +221,7 @@ git clone https://github.com/PaddlePaddle/PaddleNLP.git && cd PaddleNLP # 如已
 mkdir -p llm/data && cd llm/data
 wget https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz && tar -zxvf AdvertiseGen.tar.gz
 cd .. # change folder to PaddleNLP/llm
-python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_finetune.py ./config/llama/sft_argument.json
+python -u run_finetune.py ./config/qwen/sft_argument_0p5b.json
 ```
 
 更多大模型全流程步骤，请参考[飞桨大模型套件](./llm)介绍。
@@ -236,7 +236,7 @@ dataset = load_dataset("ZHUI/alpaca_demo", split="train")
 training_args = SFTConfig(output_dir="Qwen/Qwen2.5-0.5B-SFT", device="gpu")
 trainer = SFTTrainer(
     args=training_args,
-    model="Qwen/Qwen2.5-0.5B",
+    model="Qwen/Qwen2.5-0.5B-Instruct",
     train_dataset=dataset,
 )
 trainer.train()

@@ -235,15 +235,12 @@ class BasePredictor:
                 source = [source]
             source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
 
-        return_attention_mask = False
-        if len(source) > 1:
-            return_attention_mask = True
         tokenized_source = self.tokenizer(
             source,
             max_length=self.config.src_length,
             truncation=True,
             return_position_ids=True if not isinstance(self.tokenizer, ChatGLMTokenizer) else False,
-            return_attention_mask=return_attention_mask,
+            return_attention_mask=True,
             truncation_side="left",
             return_tensors=self.return_tensors,
             padding=True,
@@ -1487,7 +1484,9 @@ def predict():
                     target_texts.append("")
 
     else:
-        source_texts = ["解释一下温故而知新"] * predictor_args.batch_size
+        source_texts = [
+            "2014年3月，大范围雾霾天气长时间影响我国东部地区，严重危害人体健康。造成雾霾天气的人为原因有____\r\n①工业生产中使用矿物作为燃料，大量排放污染物     ②汽车尾气的大量排放     \r\n③风力小，空气流动不畅     ④冬季取暖排放粉尘\nA. ①②③\nB. ②③④\nC. ①③④\nD. ①②④"
+        ] * predictor_args.batch_size
         target_texts = [""] * predictor_args.batch_size
 
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)

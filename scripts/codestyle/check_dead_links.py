@@ -35,6 +35,8 @@ def find_dead_links(directory):
     dead_links = []
 
     for root, dirs, files in os.walk(directory):
+        if "third_party" in root:
+            continue
         for file in files:
             if file.endswith((".md", ".rst")):
                 file_path = os.path.join(root, file)
