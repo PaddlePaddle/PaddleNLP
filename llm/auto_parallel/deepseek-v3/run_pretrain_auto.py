@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-deepseek-v2 auto parallel pretraining scripts.
+deepseek-v3 auto parallel pretraining scripts.
 """
 import os
 import random
@@ -162,7 +162,7 @@ class ModelArguments:
         default="deepseekv3", metadata={"help": "Only support for llama pre-training for now."}
     )
     model_name_or_path: str = field(
-        default="deepseek-ai/DeepSeek-V2-Lite",
+        default="deepseek-ai/DeepSeek-V3",
         metadata={
             "help": "Path to pretrained model or model identifier from https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers.html"
         },
