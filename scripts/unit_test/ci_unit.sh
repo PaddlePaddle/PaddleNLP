@@ -54,7 +54,7 @@ set_env() {
 
 install_requirements
 set_env
-pytest -v -n 8 \
+pytest -v -n 1 \
   --dist loadgroup \
   --retries 1 --retry-delay 1 \
   --timeout 200 --durations 20 \
