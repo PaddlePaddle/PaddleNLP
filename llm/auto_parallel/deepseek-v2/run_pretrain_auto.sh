@@ -19,10 +19,9 @@ unset CUDA_VISIBLE_DEVICES
 task_name="deepseekv2"
 rm -rf output/$task_name/
 rm -rf "output/$task_name""_log"
-rm -rf /root/paddlejob/workspace/env_run/xuxinyi/PaddleNLP/llm/auto_parallel/deepseek-v2/log
 
 export SOT_LOG_LEVEL=4
-export PYTHONPATH=/root/paddlejob/workspace/env_run/xuxinyi/PaddleNLP:$PYTHONPATH
+export PYTHONPATH=../../../:$PYTHONPATH
 #ulimit -c unlimited
 # export GLOG_v=3
 
@@ -37,7 +36,7 @@ to_static=0  # 是否开启动转静训练
 
 python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3" \
-    --log_dir "log" \
+    --log_dir  "output/$task_name""_log" \
     run_pretrain_auto.py \
     --model_type "deepseekv2_auto" \
     --model_name_or_path "deepseek-ai/DeepSeek-V2-Lite" \
