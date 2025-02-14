@@ -55,8 +55,11 @@ class ModelRunner:
         self.args.num_layers = self.get_value(self.model_cfg, ["num_hidden_layers", "num_layers"])
         self.args.num_attention_heads = self.get_value(self.model_cfg, ["num_attention_heads", "n_head"])
         self.args.hidden_size = self.model_cfg["hidden_size"]
+        if "deepseek" in self.model_cfg["model_type"]:
+            self.qk_nope_head_dim = int(self.model_cfg["qk_nope_head_dim"])
+            self.qk_rope_head_dim = int(self.model_cfg["qk_rope_head_dim"])
+            self.v_head_dim = int(self.model_cfg["v_head_dim"])
 
-        self.reduce_dialogue_repetition = int(os.environ.get("REDUCE_DIALOGUE_REPETITION", 0))
 
         self.max_stop_seqs_num = int(os.getenv("MAX_STOP_SEQS_NUM", 5))
         self.stop_seqs_max_len = int(os.getenv("STOP_SEQS_MAX_LEN", 8))
@@ -181,15 +184,26 @@ class ModelRunner:
                 cache_type = self.args.dtype
             else:
                 cache_type = "uint8"
-
-            self.cache_kvs["key_caches_{}".format(i)] = paddle.full(shape=[
-                self.args.max_block_num, kv_num_head,
-                self.args.block_size, self.args.hidden_size // self.args.num_attention_heads
-            ], fill_value=0, dtype=cache_type)
-            self.cache_kvs["value_caches_{}".format(i)] = paddle.full(shape=[
-                self.args.max_block_num, kv_num_head,
-                self.args.block_size, self.args.hidden_size // self.args.num_attention_heads
-            ], fill_value=0, dtype=cache_type)
+            
+            if "deepseek" in self.model_cfg["model_type"]:
+                self.cache_kvs["key_caches_{}".format(i)] = paddle.full(shape=[
+                    self.args.max_block_num, kv_num_head,
+                    self.args.block_size,
+                    self.qk_nope_head_dim + self.qk_rope_head_dim
+                ], fill_value=0, dtype=cache_type)
+                self.cache_kvs["value_caches_{}".format(i)] = paddle.full(shape=[
+                    self.args.max_block_num, kv_num_head,
+                    self.args.block_size, self.v_head_dim
+                ], fill_value=0, dtype=cache_type)
+            else:
+                self.cache_kvs["key_caches_{}".format(i)] = paddle.full(shape=[
+                    self.args.max_block_num, kv_num_head,
+                    self.args.block_size, self.args.hidden_size // self.args.num_attention_heads
+                ], fill_value=0, dtype=cache_type)
+                self.cache_kvs["value_caches_{}".format(i)] = paddle.full(shape=[
+                    self.args.max_block_num, kv_num_head,
+                    self.args.block_size, self.args.hidden_size // self.args.num_attention_heads
+                ], fill_value=0, dtype=cache_type)
 
         pre_max_block_num = (self.args.max_seq_len + self.args.block_size - 1) // self.args.block_size + self.args.enc_dec_block_num
         self.share_inputs["block_tables"] = paddle.full(
@@ -273,11 +287,11 @@ class ModelRunner:
                                                 fill_value=-1,
                                                 dtype="int64")
 
-        if self.reduce_dialogue_repetition:
-            self.share_inputs["first_token_ids"] = paddle.full(
-                shape=[self.args.max_batch_size, 1], fill_value=-1, dtype="int64")
-            self.share_inputs["ori_seq_lens_encoder"] = paddle.full(
-                shape=[self.args.max_batch_size, 1], fill_value=0, dtype="int32")
+
+        self.share_inputs["first_token_ids"] = paddle.full(
+            shape=[self.args.max_batch_size, 1], fill_value=-1, dtype="int64")
+        self.share_inputs["ori_seq_lens_encoder"] = paddle.full(
+            shape=[self.args.max_batch_size, 1], fill_value=0, dtype="int32")
         # speculate decoding input
         if self.is_speculate_decoding:
             self.share_inputs["accept_tokens"] = paddle.full(
@@ -324,9 +338,9 @@ class ModelRunner:
             self.share_inputs['max_length'][idx:idx + 1] = max_dec_len
             self.share_inputs['stop_flags'][idx:idx + 1] = False
 
-            if self.reduce_dialogue_repetition:
-                self.share_inputs['first_token_ids'][idx:idx + 1] =  self.share_inputs['input_ids'][idx:idx + 1, :1]
-                self.share_inputs["ori_seq_lens_encoder"][idx:idx + 1] = length
+
+            self.share_inputs['first_token_ids'][idx:idx + 1] =  self.share_inputs['input_ids'][idx:idx + 1, :1]
+            self.share_inputs["ori_seq_lens_encoder"][idx:idx + 1] = length
 
             if "infer_seed" in task:
                 self.share_inputs['infer_seed'][idx:idx + 1] = task['infer_seed']
@@ -371,9 +385,8 @@ class ModelRunner:
                     self.share_inputs['need_block_len'], self.share_inputs['used_list_len'],
                     self.share_inputs['free_list'], self.share_inputs['free_list_len'],
                     self.share_inputs['input_ids'], self.share_inputs['pre_ids'],
-                    self.share_inputs['step_idx'], self.share_inputs['next_tokens'],
-                    self.args.block_size, self.args.enc_dec_block_num, self.args.first_token_id,
-                    speculate_step_token_num)
+                    self.share_inputs['step_idx'], self.share_inputs['next_tokens'], self.share_inputs['first_token_ids'],
+                    self.args.block_size, self.args.enc_dec_block_num, 0)
 
     def initialize_engine_ready_check_flag(self):
         """
@@ -460,14 +473,17 @@ class ModelRunner:
             if use_custom_health_checker:
                 engine_healthy_recorded_time_array[0] = time.time()
 
-            if self.rank == 0:
+            if self.rank % self.config.mp_num_per_node == 0:
                 if not self.infer_queue.empty():
-                    flag_broadcast_array[0] = 1
+                    if self.config.nnode > 1:
+                        self.infer_queue.read_finish_flag.set(1)
+                    else:
+                        flag_broadcast_array[0] = 1
 
             if self.nranks > 1:
                 paddle.distributed.barrier()
 
-            if flag_broadcast_array[0] == 1:
+            if flag_broadcast_array[0] == 1 or self.infer_queue.read_finish_flag.get() == 1:
                 logger.info(f'rank: {self.rank} start to get')
                 if seq_lens_this_time is not None:
                     self.share_inputs["seq_lens_this_time"][:real_bsz] = seq_lens_this_time
@@ -475,6 +491,7 @@ class ModelRunner:
                 tasks, read_finish = self.infer_queue.get()
                 if read_finish:
                     flag_broadcast_array[0] = 0
+                    self.infer_queue.read_finish_flag.set(0)
 
                 req_dicts = []
                 for req_dict, bsz in tasks:
@@ -542,7 +559,7 @@ class InferenceEngine(object):
         """
         predictor init
         """
-        device_id = self.rank % 8
+        device_id = self.rank % self.config.mp_num_per_node
         if use_pir_api():
             self.model_file = os.path.join(self.model_dir, f"model.json")
             self.param_file = os.path.join(self.model_dir, f"model.pdiparams")
@@ -553,30 +570,10 @@ class InferenceEngine(object):
 
         config.enable_use_gpu(100, device_id)
 
-        pir_flag = int(os.environ.get("FLAGS_enable_pir_api", 0))
-        if pir_flag == 1:
+        if use_pir_api():
             config.enable_new_executor()
             config.enable_new_ir()
 
-        # distributed config
-        if self.mp_degree > 1:
-            trainer_endpoints = fleet.worker_endpoints()
-            current_endpoint = trainer_endpoints[self.rank]
-            dist_config = config.dist_config()
-            dist_config.set_ranks(self.nranks, self.rank)
-            dist_config.set_endpoints(trainer_endpoints, current_endpoint)
-            dist_config.enable_dist_model(True)
-            if self.config.distributed_config_path:
-                 dist_config.set_comm_init_config(self.config.distributed_config_path)
-            else:
-                raise Exception("Please set DISTRIBUTED_CONFIG env variable.")
-                logger.warning(
-                    f"Use default distributed config, please set env DISTRIBUTED_CONFIG"
-                )
-                dist_config.set_comm_init_config(
-                    os.path.join(Dir_Path + "/config", "rank_mapping_mp{}.csv".format(self.nranks)))
-
-            config.set_dist_config(dist_config)
         self.predictor = paddle.inference.create_predictor(config)
         self.input_names = self.predictor.get_input_names()
         self.seq_lens_handle = self.predictor.get_input_handle('seq_lens_this_time')
@@ -595,17 +592,6 @@ class InferenceEngine(object):
             input_tensor = self.predictor.get_input_handle(name)
             input_tensor.share_external_data(self.share_inputs[name])
 
-    def predict(self, real_bsz):
-        """
-        predict
-        """
-        seq_lens_this_time = copy.deepcopy(
-            self.share_inputs['seq_lens_this_time'][:real_bsz])
-        self.seq_lens_handle.share_external_data(seq_lens_this_time)
-        self.share_inputs['not_need_stop'][0] = True
-        while self.share_inputs['not_need_stop']:
-            self.predictor.run()
-        self.share_inputs["seq_lens_this_time"][:real_bsz] = seq_lens_this_time
 
 
 def parse_args():
