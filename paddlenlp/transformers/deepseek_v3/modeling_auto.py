@@ -35,10 +35,10 @@ try:
 except:
     flash_attention = None
 
+import paddle.distributed as dist
 
 from ...utils.log import logger
 from ..deepseek_v2.modeling_auto import (
-    DeepseekV2ForCausalLMAuto,
     DeepseekV2LMHeadAuto,
     DeepseekV2ModelAuto,
     DeepseekV2PretrainedModelAuto,
@@ -73,7 +73,7 @@ class DeepseekV3LMHeadAuto(DeepseekV2LMHeadAuto):
         super().__init__(config)
 
 
-class DeepseekV3ForCausalLMAuto(DeepseekV2ForCausalLMAuto):
+class DeepseekV3ForCausalLMAuto(DeepseekV3PretrainedModelAuto):
     _tied_weights_keys = ["lm_head.weight"]
 
     def __init__(self, config: DeepseekV2Config):
@@ -178,3 +178,27 @@ class DeepseekV3ForCausalLMAuto(DeepseekV2ForCausalLMAuto):
         logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
 
         return logits
+
+    def auto_dist_config(self, prefix=""):
+        if prefix != "":
+            assert prefix.endswith(".")
+        config = {
+            "dp_config": {"sharding_level": 1, "offload": False, "exclude_layer": None},
+            "mp_config": {
+                "parallelize_plan": {
+                    f"{prefix}deepseek_v3.embed_tokens": dist.ColWiseParallel(gather_output=True),
+                    f"{prefix}deepseek_v3.layers.*.self_attn.q_b_proj": dist.ColWiseParallel(),
+                    f"{prefix}deepseek_v3.layers.*.self_attn.q_proj": dist.ColWiseParallel(),
+                    f"{prefix}deepseek_v3.layers.*.self_attn.kv_b_proj": dist.ColWiseParallel(),
+                    f"{prefix}deepseek_v3.layers.*.self_attn.o_proj": dist.RowWiseParallel(),
+                    f"{prefix}deepseek_v3.layers.*.mlp.gate_proj": dist.ColWiseParallel(),
+                    f"{prefix}deepseek_v3.layers.*.mlp.up_proj": dist.ColWiseParallel(),
+                    f"{prefix}deepseek_v3.layers.*.mlp.down_proj": dist.RowWiseParallel(),
+                    f"{prefix}deepseek_v3.layers.*.mlp.shared_experts.gate_proj": dist.ColWiseParallel(),
+                    f"{prefix}deepseek_v3.layers.*.mlp.shared_experts.up_proj": dist.ColWiseParallel(),
+                    f"{prefix}deepseek_v3.layers.*.mlp.shared_experts.down_proj": dist.RowWiseParallel(),
+                    f"{prefix}lm_head.weight": dist.ColWiseParallel(),
+                }
+            },
+        }
+        return config
