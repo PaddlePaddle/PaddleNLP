@@ -16,6 +16,7 @@ import json
 import os
 import re
 from functools import reduce
+from typing import List, Union
 
 import paddle
 from paddle.distributed.checkpoint.load_state_dict import (
@@ -47,7 +48,7 @@ class CheckpointConverter:
         parameter_to_structured_name,
         trainging_args=None,
         patch_dict=None,
-        local_view_pattern: list | bool = None,
+        local_view_pattern: Union[List, bool] = None,
     ):
         self.use_dist = True if paddle.distributed.get_world_size() > 1 else False
         self.path = hybrid_parallel_ckpt_path

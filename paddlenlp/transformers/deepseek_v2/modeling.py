@@ -323,6 +323,18 @@ class DeepseekV2RMSNorm(nn.Layer):
             mark_as_sequence_parallel_parameter(self.weight)
 
     def forward(self, hidden_states):
+        if self.config.use_fused_rms_norm and get_env_device() == "xpu":
+            if self.weight.dtype != hidden_states.dtype:
+                hidden_states = paddle.cast(hidden_states, self.weight.dtype)
+            try:
+                import paddle_xpu_nn  # noqa: F821
+
+                return paddle_xpu_nn.xpu_rms_norm(hidden_states, self.weight, self.variance_epsilon)[0]
+            except ImportError:
+                raise NotImplementedError(
+                    f"Implementation of fused_rms_norm is not available on {get_env_device()}. Please install paddle_xpu to use this feature"
+                )
+
         if paddle.in_dynamic_mode():
             with paddle.amp.auto_cast(False):
                 hidden_states = hidden_states.astype("float32")
@@ -550,7 +562,7 @@ def rotate_half(x):
     return paddle.concat([-x2, x1], axis=-1)  # shape is the same as x
 
 
-def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
+def apply_rotary_pos_emb(q, k, cos, sin, position_ids, fuse_rope=False):
     """Applies Rotary Position Embedding to the query and key tensors.
 
     Args:
@@ -571,6 +583,24 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
     Returns:
         `tuple(torch.Tensor)` comprising of the query and key tensors rotated using the Rotary Position Embedding.
     """
+    b, s, h, d = q.shape
+    q = q.reshape([b, s, h, d // 2, 2]).transpose([0, 1, 2, 4, 3]).reshape([b, s, h, d])
+
+    b, s, h, d = k.shape
+    k = k.reshape([b, s, h, d // 2, 2]).transpose([0, 1, 2, 4, 3]).reshape([b, s, h, d])
+
+    if get_env_device() == "xpu" and fuse_rope:
+        q_embed, k_embed, _ = fused_rotary_position_embedding(
+            q,
+            k,
+            None,
+            sin=sin,
+            cos=cos,
+            position_ids=position_ids,
+            use_neox_rotary_style=False,
+        )
+        return q_embed, k_embed
+
     if position_ids is None:
         # Note: Only for MixtralForCausalLMPipe model pretraining
         cos = cos[:, : q.shape[1], :, :]  # [bs, seq_len, 1, axis]
@@ -580,12 +610,6 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
         sin = sin.squeeze(axis=[0, 2])  # [seq_len, axis]
         cos = cos[position_ids].unsqueeze(2)  # [bs, seq_len, 1, axis]
         sin = sin[position_ids].unsqueeze(2)  # [bs, seq_len, 1, axis]
-
-    b, s, h, d = q.shape
-    q = q.reshape([b, s, h, d // 2, 2]).transpose([0, 1, 2, 4, 3]).reshape([b, s, h, d])
-
-    b, s, h, d = k.shape
-    k = k.reshape([b, s, h, d // 2, 2]).transpose([0, 1, 2, 4, 3]).reshape([b, s, h, d])
 
     q_embed = (q * cos) + (rotate_half(q) * sin)
     k_embed = (k * cos) + (rotate_half(k) * sin)
@@ -777,6 +801,7 @@ class DeepseekV2Attention(nn.Layer):
         self.q_head_dim = config.qk_nope_head_dim + config.qk_rope_head_dim
 
         self.is_causal = True
+        self.fuse_rope = config.use_fused_rope
 
         self.seq_length = config.seq_length
         self.sequence_parallel = config.sequence_parallel
@@ -939,7 +964,7 @@ class DeepseekV2Attention(nn.Layer):
         cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
         cos = cos[None, :, None, :]
         sin = sin[None, :, None, :]
-        q_pe, k_pe = apply_rotary_pos_emb(q_pe, k_pe, cos, sin, position_ids)
+        q_pe, k_pe = apply_rotary_pos_emb(q_pe, k_pe, cos, sin, position_ids, self.fuse_rope)
 
         query_states = paddle.empty([bsz, q_len, self.num_heads, self.q_head_dim], dtype=self.config.dtype)
         query_states[:, :, :, : self.qk_nope_head_dim] = q_nope
@@ -1747,15 +1772,34 @@ class DeepseekV2ForCausalLM(DeepseekV2PretrainedModel):
 
         hidden_states = outputs[0]
 
-        # if labels is None，means we need full output, instead of tensor_parallel_output
-        # tensor_parallel_output is together with ParallelCrossEntropy
-        tensor_parallel_output = self.config.tensor_parallel_output and self.config.tensor_parallel_degree > 1
+        if labels is not None and self.config.use_fused_linear_cross_entropy:
+            from paddlenlp_kernel.triton.cut_cross_entropy import linear_cross_entropy
 
-        logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
+            assert (
+                self.config.tensor_parallel_degree <= 1
+            ), "The argument `use_fused_linear_cross_entropy` is imcompatiable with tensor parallel "
 
-        loss = None
-        if labels is not None:
-            loss = self.criterion(logits, labels)
+            masked_lm_loss = linear_cross_entropy(hidden_states, self.lm_head.weight, targets=labels)
+
+            binary_sequence = paddle.where(
+                masked_lm_loss > 0, paddle.ones_like(masked_lm_loss), paddle.zeros_like(masked_lm_loss)
+            )
+            count = paddle.sum(binary_sequence)
+            if count == 0:
+                loss = paddle.sum(masked_lm_loss * binary_sequence)
+            else:
+                loss = paddle.sum(masked_lm_loss * binary_sequence) / count
+            logits = None
+        else:
+            # if labels is None，means we need full output, instead of tensor_parallel_output
+            # tensor_parallel_output is together with ParallelCrossEntropy
+            tensor_parallel_output = self.config.tensor_parallel_output and self.config.tensor_parallel_degree > 1
+
+            logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
+
+            loss = None
+            if labels is not None:
+                loss = self.criterion(logits, labels)
 
         if not return_dict:
             output = (logits,) + outputs[1:]
