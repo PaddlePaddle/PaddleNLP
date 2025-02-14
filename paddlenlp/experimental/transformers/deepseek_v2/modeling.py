@@ -93,10 +93,12 @@ class DeepseekScalingRotaryEmbedding(nn.Layer):
             * attn_factor
         )
 
-        cache = self._compute_cos_sin_cache()
+        cos_cache, sin_cache = self._compute_cos_sin_cache()
 
-        self.cos_sin_cache: paddle.Tensor
-        self.register_buffer("cos_sin_cache", cache, persistable=True)
+        self.cos_cache: paddle.Tensor
+        self.register_buffer("cos_cache", cos_cache, persistable=True)
+        self.sin_cache: paddle.Tensor
+        self.register_buffer("sin_cache", sin_cache, persistable=True)
 
     def _compute_inv_freq(self, scaling_factor: float) -> paddle.Tensor:
         pos_freqs = self.base ** (paddle.arange(0, self.rotary_dim, 2, dtype=paddle.float32) / self.rotary_dim)
@@ -115,11 +117,13 @@ class DeepseekScalingRotaryEmbedding(nn.Layer):
     def _compute_cos_sin_cache(self) -> paddle.Tensor:
         inv_freq = self._compute_inv_freq(self.scaling_factor)
         t = paddle.arange(self.max_position_embeddings * self.scaling_factor, dtype=paddle.float32)
-        freqs = paddle.einsum("i,j->ij", t, inv_freq)
-        cos = freqs.cos() * self.mscale
-        sin = freqs.sin() * self.mscale
-        cache = paddle.concat((cos, sin), axis=-1)
-        return cache.cast(self._dtype)
+
+        freqs = paddle.outer(t, inv_freq)
+        emb = paddle.concat((freqs, freqs), axis=-1)
+        cos = emb.cos() * self.mscale
+        sin = emb.sin() * self.mscale
+
+        return cos.cast(self._dtype), sin.cast(self._dtype)
 
     def forward(
         self,
@@ -127,11 +131,23 @@ class DeepseekScalingRotaryEmbedding(nn.Layer):
         query: paddle.Tensor,
         key: paddle.Tensor,
     ) -> Tuple[paddle.Tensor, paddle.Tensor]:
-        from paddlenlp_ops import fused_rotary_position_encoding
+        cos = self.cos_cache[position_ids].unsqueeze(1)
+        sin = self.sin_cache[position_ids].unsqueeze(1)
 
-        # In-place operations that update the query and key tensors.
-        os.environ["stride_in_no_check_dy2st_diff"] = "1"
-        fused_rotary_position_encoding(query, key, position_ids, self.cos_sin_cache, self.rotary_dim, False)
+        def rotate_half(x):
+            """Rotates half the hidden axiss of the input."""
+            x1 = x[..., : x.shape[-1] // 2]
+            x2 = x[..., x.shape[-1] // 2 :]
+            return paddle.concat([-x2, x1], axis=-1)  # shape is the same as x
+
+        s, h, d = query.shape
+        query = query.reshape([s, h, d // 2, 2]).transpose([0, 1, 3, 2]).reshape([s, h, d])
+
+        s, h, d = key.shape
+        key = key.reshape([s, h, d // 2, 2]).transpose([0, 1, 3, 2]).reshape([s, h, d])
+
+        query = (query * cos) + (rotate_half(query) * sin)
+        key = (key * cos) + (rotate_half(key) * sin)
 
         return query, key
 

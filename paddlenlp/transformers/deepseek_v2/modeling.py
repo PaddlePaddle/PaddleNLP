@@ -1739,15 +1739,34 @@ class DeepseekV2ForCausalLM(DeepseekV2PretrainedModel):
 
         hidden_states = outputs[0]
 
-        # if labels is None，means we need full output, instead of tensor_parallel_output
-        # tensor_parallel_output is together with ParallelCrossEntropy
-        tensor_parallel_output = self.config.tensor_parallel_output and self.config.tensor_parallel_degree > 1
+        if labels is not None and self.config.use_fused_linear_cross_entropy:
+            from paddlenlp_kernel.triton.cut_cross_entropy import linear_cross_entropy
 
-        logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
+            assert (
+                self.config.tensor_parallel_degree <= 1
+            ), "The argument `use_fused_linear_cross_entropy` is imcompatiable with tensor parallel "
 
-        loss = None
-        if labels is not None:
-            loss = self.criterion(logits, labels)
+            masked_lm_loss = linear_cross_entropy(hidden_states, self.lm_head.weight, targets=labels)
+
+            binary_sequence = paddle.where(
+                masked_lm_loss > 0, paddle.ones_like(masked_lm_loss), paddle.zeros_like(masked_lm_loss)
+            )
+            count = paddle.sum(binary_sequence)
+            if count == 0:
+                loss = paddle.sum(masked_lm_loss * binary_sequence)
+            else:
+                loss = paddle.sum(masked_lm_loss * binary_sequence) / count
+            logits = None
+        else:
+            # if labels is None，means we need full output, instead of tensor_parallel_output
+            # tensor_parallel_output is together with ParallelCrossEntropy
+            tensor_parallel_output = self.config.tensor_parallel_output and self.config.tensor_parallel_degree > 1
+
+            logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
+
+            loss = None
+            if labels is not None:
+                loss = self.criterion(logits, labels)
 
         if not return_dict:
             output = (logits,) + outputs[1:]
