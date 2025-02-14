@@ -16,7 +16,7 @@
 set -x
 unset CUDA_VISIBLE_DEVICES
 
-task_name="deepseekv2"
+task_name="deepseekv3"
 rm -rf output/$task_name/
 rm -rf "output/$task_name""_log"
 
@@ -38,9 +38,9 @@ python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3" \
     --log_dir  "output/$task_name""_log" \
     run_pretrain_auto.py \
-    --model_type "deepseekv2_auto" \
-    --model_name_or_path "deepseek-ai/DeepSeek-V2-Lite" \
-    --tokenizer_name_or_path "deepseek-ai/DeepSeek-V2-Lite" \
+    --model_type "deepseekv3_auto" \
+    --model_name_or_path "deepseek-ai/DeepSeek-V3" \
+    --tokenizer_name_or_path "deepseek-ai/DeepSeek-V3" \
     --input_dir "./data" \
     --output_dir "output/$task_name" \
     --split 949,50,1 \

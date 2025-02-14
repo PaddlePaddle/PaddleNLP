@@ -39,14 +39,14 @@ from paddlenlp.transformers import (
     AutoTokenizer,
     CosineAnnealingWithWarmupDecay,
     DeepseekV2Config,
-    DeepseekV2ForCausalLMAuto,
     DeepseekV2PretrainingCriterion,
+    DeepseekV3ForCausalLMAuto,
     LinearAnnealingWithWarmupDecay,
 )
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
-    "deepseekv2_auto": (DeepseekV2Config, DeepseekV2ForCausalLMAuto, DeepseekV2PretrainingCriterion),
+    "deepseekv3_auto": (DeepseekV2Config, DeepseekV3ForCausalLMAuto, DeepseekV2PretrainingCriterion),
 }
 
 
@@ -159,7 +159,7 @@ class ModelArguments:
     """
 
     model_type: Optional[str] = field(
-        default="deepseekv2", metadata={"help": "Only support for llama pre-training for now."}
+        default="deepseekv3", metadata={"help": "Only support for llama pre-training for now."}
     )
     model_name_or_path: str = field(
         default="deepseek-ai/DeepSeek-V2-Lite",
@@ -195,7 +195,7 @@ class ModelArguments:
     )
     use_fused_rms_norm: bool = field(
         default=False,
-        metadata={"help": "deepseekv2, use_fused_rms_norm"},
+        metadata={"help": "deepseekv3, use_fused_rms_norm"},
     )
     fuse_attention_qkv: bool = field(
         default=False,

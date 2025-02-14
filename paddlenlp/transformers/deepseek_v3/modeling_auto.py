@@ -37,7 +37,7 @@ except:
 
 
 from ...utils.log import logger
-from ..deepseek_v2.modeling import (
+from ..deepseek_v2.modeling_auto import (
     DeepseekV2ForCausalLMAuto,
     DeepseekV2LMHeadAuto,
     DeepseekV2ModelAuto,
