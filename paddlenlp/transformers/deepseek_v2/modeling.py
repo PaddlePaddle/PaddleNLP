@@ -1140,6 +1140,56 @@ class DeepseekV2DecoderLayer(nn.Layer):
         return outputs
 
 
+class DeepseekV2MTPLayer(DeepseekV2DecoderLayer):
+    def __init__(
+        self,
+        config: DeepseekV2Config,
+        layer_idx: int,
+        layerwise_recompute: bool = False,
+    ):
+        super(DeepseekV2MTPLayer, self).__init__(config, layer_idx, layerwise_recompute)
+
+        self.enorm = DeepseekV2RMSNorm(config)
+        self.hnorm = DeepseekV2RMSNorm(config)
+        self.eh_proj = nn.Linear(2 * config.hidden_size, config.hidden_size)
+
+    def forward(
+        self,
+        hidden_states: paddle.Tensor,
+        nextn_hidden_state: paddle.Tensor,
+        position_ids: Optional[paddle.Tensor] = None,
+        attention_mask: Optional[paddle.Tensor] = None,
+        output_attentions: Optional[bool] = False,
+        past_key_value: Optional[Tuple[paddle.Tensor]] = None,
+        use_cache: Optional[bool] = False,
+        attn_mask_startend_row_indices: Optional[paddle.Tensor] = None,
+        **kwargs,
+    ) -> Tuple[paddle.Tensor, Optional[Tuple[paddle.Tensor, paddle.Tensor]]]:
+
+        hidden_states = self.hnorm(hidden_states)
+        nextn_hidden_state = self.enorm(nextn_hidden_state)
+
+        hidden_states = self.eh_proj(paddle.concat([hidden_states, nextn_hidden_state], axis=-1))
+
+        layer_outputs = super(DeepseekV2MTPLayer, self).forward(
+            hidden_states,
+            position_ids,
+            attention_mask,
+            output_attentions,
+            past_key_value,
+            use_cache,
+            attn_mask_startend_row_indices,
+            **kwargs,
+        )
+
+        if type(layer_outputs) is tuple:
+            hidden_states = layer_outputs[0]
+        else:
+            hidden_states = layer_outputs
+
+        return hidden_states
+
+
 class DeepseekV2PretrainedModel(PretrainedModel):
     config_class = DeepseekV2Config
     base_model_prefix = "deepseek_v2"
@@ -1354,13 +1404,10 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
         self.enable_recompute = False
         self.recompute_granularity = config.recompute_granularity
         self.no_recompute_layers = config.no_recompute_layers if config.no_recompute_layers is not None else []
-
-        self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
-
         if config.tensor_parallel_degree > 1 and config.vocab_size % config.tensor_parallel_degree == 0:
             self.embed_tokens = mpu.VocabParallelEmbedding(config.vocab_size, config.hidden_size)
         else:
-            self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size)
+            self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
 
         self.layers = nn.LayerList(
             [
@@ -1368,6 +1415,9 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
                 for layer_idx in range(config.num_hidden_layers)
             ]
         )
+        for layer_idx in range(config.num_hidden_layers, config.num_hidden_layers + config.num_nextn_predict_layers):
+            self.layers.append(DeepseekV2MTPLayer(config, layer_idx, layer_idx not in self.no_recompute_layers))
+
         self.norm = DeepseekV2RMSNorm(config)
 
         self.enable_recompute = False
@@ -1476,6 +1526,7 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
             batch_size, seq_length = inputs_embeds.shape[:2]
         else:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
+        seq_length -= self.config.num_nextn_predict_layers
 
         if self.enable_recompute and self.training:
             if use_cache:
@@ -1521,6 +1572,11 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
             if self.config.use_flash_attention:
                 attention_mask = None if is_casual_mask(attention_mask) else attention_mask
 
+        if self.config.num_nextn_predict_layers > 0:
+            inputs_embeds_extra = inputs_embeds[:, -self.config.num_nextn_predict_layers :, :]  # [B, S, D]
+            inputs_embeds = inputs_embeds[:, : -self.config.num_nextn_predict_layers, :]
+            inputs_embeds_ori = inputs_embeds
+
         if self.config.sequence_parallel:
             # [bs, seq_len, num_head * head_dim] -> [bs * seq_len, num_head * head_dim]
             bs, seq_len, hidden_size = inputs_embeds.shape
@@ -1535,8 +1591,11 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
         next_decoder_cache = () if use_cache else None
+        mtp_outputs = []
 
-        for idx, (decoder_layer) in enumerate(self.layers):
+        for idx in range(self.config.num_hidden_layers):
+            decoder_layer = self.layers[idx]
+
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
 
@@ -1583,7 +1642,40 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
             if output_attentions:
                 all_self_attns += (layer_outputs[1],)
 
-        hidden_states = self.norm(hidden_states)
+        if self.config.num_nextn_predict_layers > 0:
+            mtp_outputs.append(hidden_states)
+
+            for nextn in range(self.config.num_nextn_predict_layers):
+                decoder_layer = self.layers[nextn + self.config.num_hidden_layers]
+
+                # 构建输入向量
+                inputs_embeds_cur_depth = paddle.concat(
+                    [inputs_embeds_ori[:, (nextn + 1) :, :], inputs_embeds_extra[:, : (nextn + 1), :]], axis=1
+                )
+
+                # 通过该层的decoder_layer进行预测
+                past_key_value = None
+                layer_outputs = decoder_layer(
+                    hidden_states,
+                    inputs_embeds_cur_depth,
+                    position_ids=position_ids,
+                    attention_mask=attention_mask,
+                    output_attentions=output_attentions,
+                    past_key_value=past_key_value,
+                    use_cache=use_cache,
+                    attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+                )
+
+                if isinstance(layer_outputs, (tuple, list)):
+                    hidden_states = layer_outputs[0]
+                else:
+                    hidden_states = layer_outputs
+
+                mtp_outputs.append(hidden_states)
+            mtp_outputs = [self.norm(hidden_states) for hidden_states in mtp_outputs]
+            hidden_states, mtp_outputs = mtp_outputs[0], mtp_outputs[1:]
+        else:
+            hidden_states = self.norm(hidden_states)
 
         # add hidden states from the last decoder layer
         if output_hidden_states:
@@ -1592,7 +1684,9 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
         next_cache = next_decoder_cache if use_cache else None
 
         if not return_dict:
-            return tuple(v for v in [hidden_states, next_cache, all_hidden_states, all_self_attns] if v is not None)
+            return tuple(
+                v for v in [hidden_states, next_cache, all_hidden_states, all_self_attns, mtp_outputs] if v is not None
+            )
         return BaseModelOutputWithPast(
             last_hidden_state=hidden_states,
             past_key_values=next_cache,
@@ -1618,7 +1712,7 @@ class DeepseekV2PretrainingCriterion(nn.Layer):
         else:
             self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
 
-    def forward(self, prediction_scores, masked_lm_labels):
+    def forward(self, prediction_scores, masked_lm_labels, router_loss=None, mtp_logits=None):
         if self.enable_parallel_cross_entropy:
             if prediction_scores.shape[-1] == self.config.vocab_size:
                 warnings.warn(
@@ -1626,20 +1720,43 @@ class DeepseekV2PretrainingCriterion(nn.Layer):
                 )
                 self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
 
-        with paddle.amp.auto_cast(False):
-            masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
+        def compute_loss(preds, labels):
+            with paddle.amp.auto_cast(False):
+                masked_lm_loss = self.loss_func(preds.astype("float32"), labels.unsqueeze(2))
+                binary_sequence = paddle.where(
+                    masked_lm_loss > 0, paddle.ones_like(masked_lm_loss), paddle.zeros_like(masked_lm_loss)
+                )
+                count = paddle.sum(binary_sequence)
+                if count == 0:
+                    loss = paddle.sum(masked_lm_loss * binary_sequence)
+                else:
+                    loss = paddle.sum(masked_lm_loss * binary_sequence) / count
+                return loss
 
-            # skip ignore_index which loss == 0
-            # masked_lm_loss = masked_lm_loss[masked_lm_loss > 0]
-            # loss = paddle.mean(masked_lm_loss)
-            binary_sequence = paddle.where(
-                masked_lm_loss > 0, paddle.ones_like(masked_lm_loss), paddle.zeros_like(masked_lm_loss)
-            )
-            count = paddle.sum(binary_sequence)
-            if count == 0:
-                loss = paddle.sum(masked_lm_loss * binary_sequence)
-            else:
-                loss = paddle.sum(masked_lm_loss * binary_sequence) / count
+        def add_loss(main_loss, loss):
+            return main_loss + loss - loss.detach()
+
+        if mtp_logits is not None and self.config.num_nextn_predict_layers > 0:
+            assert len(mtp_logits) == self.config.num_nextn_predict_layers
+            masked_lm_labels_ori = masked_lm_labels
+            masked_lm_labels = masked_lm_labels[:, : -self.config.num_nextn_predict_layers]
+            seq_length = masked_lm_labels.shape[1]
+            loss = compute_loss(prediction_scores, masked_lm_labels)
+
+            mtp_loss_res = []
+            for depth in range(self.config.num_nextn_predict_layers):
+                prediction_scores_cur_depth = mtp_logits[depth]
+                masked_lm_labels_cur_depth = masked_lm_labels_ori[:, (depth + 1) : (depth + 1 + seq_length)]
+                res_cur_depth = compute_loss(prediction_scores_cur_depth, masked_lm_labels_cur_depth)
+                mtp_loss_res.append(res_cur_depth)
+            loss = add_loss(loss, self.config.num_nextn_predict_lambda * sum([x for x in mtp_loss_res]) / len(mtp_loss_res))  # fmt: skip
+
+        else:
+            masked_lm_labels = masked_lm_labels[:, : -self.config.num_nextn_predict_layers]
+            loss = compute_loss(prediction_scores, masked_lm_labels)
+
+        if router_loss is not None and isinstance(router_loss, paddle.Tensor):
+            loss = add_loss(loss, router_loss)
 
         return loss
 
@@ -1771,6 +1888,7 @@ class DeepseekV2ForCausalLM(DeepseekV2PretrainedModel):
         )
 
         hidden_states = outputs[0]
+        mtp_outputs = outputs[-1]
 
         if labels is not None and self.config.use_fused_linear_cross_entropy:
             from paddlenlp_kernel.triton.cut_cross_entropy import linear_cross_entropy
@@ -1796,10 +1914,13 @@ class DeepseekV2ForCausalLM(DeepseekV2PretrainedModel):
             tensor_parallel_output = self.config.tensor_parallel_output and self.config.tensor_parallel_degree > 1
 
             logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
+            mtp_logits = (
+                [self.lm_head(_hidden_states) for _hidden_states in mtp_outputs] if len(mtp_outputs) > 0 else []
+            )
 
             loss = None
             if labels is not None:
-                loss = self.criterion(logits, labels)
+                loss = self.criterion(logits, labels, mtp_logits=mtp_logits)
 
         if not return_dict:
             output = (logits,) + outputs[1:]

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-from typing import OrderedDict
+from typing import OrderedDict, Tuple, Union
 
 import paddle
 import paddle.distributed.fleet as fleet
@@ -24,6 +24,7 @@ from paddle.distributed.fleet.meta_parallel import (
     SharedLayerDesc,
 )
 from paddle.distributed.fleet.recompute.recompute import recompute
+from paddle.distributed.fleet.utils.sequence_parallel_utils import ScatterOp
 
 from ...utils.tools import get_env_device
 from ..model_utils import PipelinePretrainedModel
@@ -32,6 +33,7 @@ from .modeling import (
     DeepseekV2DecoderLayer,
     DeepseekV2LMHead,
     DeepseekV2Model,
+    DeepseekV2MTPLayer,
     DeepseekV2PretrainedModel,
     DeepseekV2PretrainingCriterion,
     DeepseekV2RMSNorm,
@@ -44,17 +46,20 @@ __all__ = [
 
 def parse_args(args):
     if isinstance(args, tuple):
+        if len(args) == 5:
+            hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids, mtp_hidden_state = args
         if len(args) == 4:
             hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids = args
+            mtp_hidden_state = None
         elif len(args) == 3:
             hidden_states, attention_mask, attn_mask_startend_row_indices = args
-            position_ids = None
+            position_ids, mtp_hidden_state = None, None
         elif len(args) == 2:
             hidden_states, attention_mask = args
-            attn_mask_startend_row_indices, position_ids = None, None
+            attn_mask_startend_row_indices, position_ids, mtp_hidden_state = None, None, None
     else:
         hidden_states = args
-        attention_mask, attn_mask_startend_row_indices, position_ids = None, None, None
+        attention_mask, attn_mask_startend_row_indices, position_ids, mtp_hidden_state = None, None, None, None
 
     if position_ids is not None:
         position_ids.stop_gradient = True
@@ -65,10 +70,12 @@ def parse_args(args):
     if attn_mask_startend_row_indices is not None:
         attn_mask_startend_row_indices.stop_gradient = True
 
-    return hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids
+    return hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids, mtp_hidden_state
 
 
-def return_args(hidden_states, attention_mask=None, attn_mask_startend_row_indices=None, position_ids=None):
+def return_args(
+    hidden_states, attention_mask=None, attn_mask_startend_row_indices=None, position_ids=None, mtp_hidden_state=None
+):
     ret = (hidden_states,)
 
     if attention_mask is not None:
@@ -77,6 +84,8 @@ def return_args(hidden_states, attention_mask=None, attn_mask_startend_row_indic
         ret += (attn_mask_startend_row_indices.clone(),)
     if position_ids is not None:
         ret += (position_ids.clone(),)
+    if mtp_hidden_state is not None:
+        ret += (mtp_hidden_state.clone(),)
     if len(ret) == 1:
         ret = ret[0]
 
@@ -118,18 +127,12 @@ class DeepseekV2EmbeddingPipe(nn.Layer):
         Returns:
             _type_: _description_
         """
-        input_ids, attention_mask, attn_mask_startend_row_indices, position_ids = parse_args(args)
+        input_ids, attention_mask, attn_mask_startend_row_indices, position_ids, mtp_hidden_state = parse_args(args)
         input_embeds = self.embed_tokens(input_ids)
-        if self.config.sequence_parallel:
-            from paddlenlp.transformers import ScatterOp
-
-            # [bs, seq_len, num_head * head_dim] -> [bs * seq_len, num_head * head_dim]
-            bs, seq_len, hidden_size = input_embeds.shape
-            input_embeds = paddle.reshape_(input_embeds, [bs * seq_len, hidden_size])
-            # [seq_len * bs / n, num_head * head_dim] (n is mp parallelism)
-            input_embeds = ScatterOp.apply(input_embeds)
 
         batch_size, seq_length = input_ids.shape
+        if self.config.num_nextn_predict_layers > 0:
+            seq_length -= self.config.num_nextn_predict_layers
 
         if attention_mask is not None:
             assert (
@@ -146,12 +149,48 @@ class DeepseekV2EmbeddingPipe(nn.Layer):
             attention_mask = paddle.tril(paddle.ones((seq_length, seq_length), dtype="bool"))
             attention_mask.stop_gradient = True
 
-        return return_args(input_embeds, attention_mask, attn_mask_startend_row_indices, position_ids)
+        if self.config.num_nextn_predict_layers > 0:
+            inputs_embeds_extra = input_embeds[:, -self.config.num_nextn_predict_layers :, :]  # [B, S, D]
+            inputs_embeds = input_embeds[:, : -self.config.num_nextn_predict_layers, :]
+            inputs_embeds_ori = inputs_embeds
+            batch_size, seq_length, _ = inputs_embeds.shape
+
+            if self.sequence_parallel:
+                # [bs, seq_len, num_head * head_dim] -> [bs * seq_len, num_head * head_dim]
+                input_embeds = paddle.reshape_(input_embeds, [-1, input_embeds.shape[-1]])
+                # [seq_len * bs / n, num_head * head_dim] (n is mp parallelism)
+                input_embeds = ScatterOp.apply(input_embeds)
+            mtp_emb_res = []
+            for depth in range(self.config.num_nextn_predict_layers):
+                inputs_embeds_mtp = paddle.concat(
+                    [
+                        inputs_embeds_ori[:, (depth + 1) :, :],
+                        inputs_embeds_extra[:, : (depth + 1), :],
+                    ],
+                    axis=1,
+                )
+                if self.sequence_parallel:
+                    inputs_embeds_mtp = inputs_embeds_mtp.reshape([-1, inputs_embeds_mtp.shape[-1]])
+                    inputs_embeds_mtp = ScatterOp.apply(inputs_embeds_mtp)
+                mtp_emb_res.append(inputs_embeds_mtp)
+            # if not self.sequence_parallel
+            # mtp_embeds: [B*num_nextn_predict_layers, seq_len, hidden_size]
+            # else:
+            # mtp_embeds: [B*seq_len*num_nextn_predict_layers, hidden_size]
+            mtp_embeds = paddle.concat(mtp_emb_res, axis=0)
+            return return_args(input_embeds, attention_mask, attn_mask_startend_row_indices, position_ids, mtp_embeds)
+        else:
+            if self.sequence_parallel:
+                input_embeds = input_embeds.reshape([-1, input_embeds.shape[-1]])
+                input_embeds = ScatterOp.apply(input_embeds)
+            return return_args(input_embeds, attention_mask, attn_mask_startend_row_indices, position_ids)
 
 
 class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
     def forward(self, args):
-        hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids = parse_args(args)
+        hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids, mtp_hidden_state = parse_args(
+            args
+        )
 
         has_gradient = not hidden_states.stop_gradient
 
@@ -196,14 +235,80 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
         return return_args(hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids)
 
 
+class DeepseekV2MTPLayerPipe(DeepseekV2MTPLayer):
+    def forward(self, args):
+        hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids, mtp_hidden_state = parse_args(
+            args
+        )
+
+        tensor_list = paddle.split(mtp_hidden_state, self.config.num_nextn_predict_layers)
+        inputs_embeds_cur_depth_list = tensor_list[1:]
+        has_gradient = not hidden_states.stop_gradient
+
+        if attention_mask is not None and attention_mask.dtype == paddle.int32:
+            attention_mask, attn_mask_startend_row_indices, position_ids = (
+                None,
+                attention_mask,
+                attn_mask_startend_row_indices,
+            )
+        elif attention_mask is not None and attention_mask.dtype == paddle.int64:
+            attention_mask, attn_mask_startend_row_indices, position_ids = None, None, attention_mask
+        elif attn_mask_startend_row_indices is not None and attn_mask_startend_row_indices.dtype == paddle.int64:
+            attn_mask_startend_row_indices, position_ids = None, attn_mask_startend_row_indices
+
+        output_list = []
+        for depth in range(self.config.num_nextn_predict_layers):
+            inputs_embeds_cur_depth = inputs_embeds_cur_depth_list[depth]
+            if self.enable_recompute and self.config.recompute_granularity == "full" and has_gradient:
+                if attention_mask is not None or attn_mask_startend_row_indices is not None:
+                    hidden_states = recompute(
+                        super().forward,
+                        hidden_states,
+                        inputs_embeds_cur_depth,
+                        position_ids=position_ids,
+                        attention_mask=attention_mask,
+                        attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+                        use_reentrant=False,
+                    )
+                else:
+                    # for pretrain
+                    hidden_states = recompute(
+                        super().forward,
+                        hidden_states,
+                        inputs_embeds_cur_depth,
+                        position_ids=position_ids,
+                        attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+                        use_reentrant=self.config.recompute_use_reentrant,
+                    )
+            else:
+                hidden_states = super().forward(
+                    hidden_states,
+                    inputs_embeds_cur_depth,
+                    position_ids=position_ids,
+                    attention_mask=attention_mask,
+                    attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+                )
+            output_list.append(hidden_states)
+
+        mtp_hidden_state = paddle.concat(output_list)
+        return return_args(
+            hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids, mtp_hidden_state
+        )
+
+
 class DeepseekV2RMSNormPipe(nn.Layer):
     def __init__(self, config):
         super().__init__()
         self.norm = DeepseekV2RMSNorm(config)
 
     def forward(self, args):
-        hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids = parse_args(args)
-        return self.norm(hidden_states)
+        hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids, mtp_hidden_state = parse_args(
+            args
+        )
+        if self.config.num_nextn_predict_layers > 0:
+            return self.norm(hidden_states), self.norm(mtp_hidden_state)
+        else:
+            return self.norm(hidden_states)
 
 
 class DeepseekV2LMHeadPipe(DeepseekV2LMHead):
@@ -213,6 +318,17 @@ class DeepseekV2LMHeadPipe(DeepseekV2LMHead):
     @property
     def embedding_weight(self):
         return get_attr(self, "weight")
+
+    def forward(self, args: [Tuple, paddle.Tensor]):
+        if self.config.num_nextn_predict_layers > 0:
+            assert isinstance(args, tuple), "args should be a tuple of hidden states and MTP logits"
+            logits = list()
+            for _hidden_states in args:
+                logits.append(super().forward(_hidden_states))
+            return logits
+        hidden_states = args
+        logits = super().forward(hidden_states)
+        return logits
 
 
 class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
@@ -305,6 +421,12 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
                 ),
                 f"{self._base_model.base_model_prefix}.layers.{i}",
             )
+        for i in range(config.num_nextn_predict_layers):
+            self.add_sequential_layer(
+                LayerDesc(Deep, config=config, layer_idx=i),
+                f"{self._base_model.base_model_prefix}.nextn_predictors.{i}",
+            )
+
         self.add_sequential_layer(LayerDesc(DeepseekV2RMSNormPipe, config=config), self._base_model.base_model_prefix)
 
         if config.tie_word_embeddings:
@@ -328,7 +450,7 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
             ), "pp recompute interval should smaller than num layers of each pp chunk"
             recompute_interval = self.config.pp_recompute_interval
 
-        seg_method = "layer:DeepseekV2DecoderLayer"
+        seg_method = "layer:DeepseekV2DecoderLayer|MTPLayer"
         if config.num_hidden_layers % get_hcg().topology().get_dim_size("pipe") != 0:
             seg_method = "uniform"
 
