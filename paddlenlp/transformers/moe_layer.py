@@ -247,7 +247,7 @@ class MoELayer(nn.Layer):
         # group_size = kwargs['group_size'] if 'group_size' in kwargs.keys() else 1
         reshaped_input = hidden_state.reshape([-1, d_model])
 
-        capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss = self.gate(reshaped_input)
+        capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss = self.gate(hidden_state)
 
         # self.l_aux       :
         # combine_weights  : sec
