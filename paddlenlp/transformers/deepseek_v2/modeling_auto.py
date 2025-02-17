@@ -64,7 +64,6 @@ from .modeling import (
     _make_causal_mask,
     apply_rotary_pos_emb,
     get_triangle_upper_mask,
-    is_casual_mask,
     yarn_get_mscale,
 )
 
@@ -705,7 +704,7 @@ class DeepseekV2ModelAuto(DeepseekV2PretrainedModelAuto):
             inputs_embeds = self.embed_tokens(input_ids)
 
         # embed positions
-        if attn_mask_startend_row_indices is not None or get_use_casual_mask():
+        if attn_mask_startend_row_indices is not None or get_use_casual_mask() or self.config.use_flash_attention:
             attention_mask = None
         else:
             # [bs, seq_len]
@@ -731,28 +730,15 @@ class DeepseekV2ModelAuto(DeepseekV2PretrainedModelAuto):
 
             past_key_value = past_key_values[idx] if past_key_values is not None else None
 
-            if (attn_mask_startend_row_indices is not None or get_use_casual_mask()) or (
-                self.config.use_flash_attention and is_casual_mask(attention_mask)
-            ):
-                layer_outputs = decoder_layer(
-                    hidden_states=hidden_states,
-                    position_ids=position_ids,
-                    attention_mask=None,
-                    output_attentions=output_attentions,
-                    past_key_value=past_key_value,
-                    use_cache=use_cache,
-                    attn_mask_startend_row_indices=attn_mask_startend_row_indices,
-                )
-            else:
-                layer_outputs = decoder_layer(
-                    hidden_states=hidden_states,
-                    position_ids=position_ids,
-                    attention_mask=attention_mask,
-                    output_attentions=output_attentions,
-                    past_key_value=past_key_value,
-                    use_cache=use_cache,
-                    attn_mask_startend_row_indices=attn_mask_startend_row_indices,
-                )
+            layer_outputs = decoder_layer(
+                hidden_states=hidden_states,
+                position_ids=position_ids,
+                attention_mask=attention_mask,
+                output_attentions=output_attentions,
+                past_key_value=past_key_value,
+                use_cache=use_cache,
+                attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+            )
 
             # NOTE: clear outdate cache after it has been used for memory saving
             past_key_value = past_key_values[idx] = None
