@@ -113,45 +113,10 @@ def ref_get_token_penalty_multi_scores(
     pre_ids, logits, penalty_scores, frequency_scores, presence_scores, cur_len, min_len, eos_token_id, use_cpu=True
 ):
     if use_cpu:
-        device = pre_ids.place
-        (
-            pre_ids,
-            logits,
-            penalty_scores,
-            frequency_scores,
-            presence_scores,
-            cur_len,
-            min_len,
-            eos_token_id,
-        ) = tensors_to_cpu(
-            pre_ids, logits, penalty_scores, frequency_scores, presence_scores, cur_len, min_len, eos_token_id
-        )
         import paddlenlp_ops
 
         logits_out = paddlenlp_ops.get_token_penalty_multi_scores(
             pre_ids, logits, penalty_scores, frequency_scores, presence_scores, cur_len, min_len, eos_token_id
-        )
-        (
-            logits_out,
-            pre_ids,
-            logits,
-            penalty_scores,
-            frequency_scores,
-            presence_scores,
-            cur_len,
-            min_len,
-            eos_token_id,
-        ) = tensors_to_device(
-            device,
-            logits_out,
-            pre_ids,
-            logits,
-            penalty_scores,
-            frequency_scores,
-            presence_scores,
-            cur_len,
-            min_len,
-            eos_token_id,
         )
         return logits_out
     else:

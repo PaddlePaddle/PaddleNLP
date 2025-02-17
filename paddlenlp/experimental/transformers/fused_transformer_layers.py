@@ -2983,7 +2983,8 @@ class FusedMultiTransformerHPU(FusedMultiTransformerBase):
         position = paddle.max(seq_lens, axis=0)
 
         if len(src.shape) == 2:
-            src = src.unsqueeze(axis=1)
+            # src = src.unsqueeze(axis=1)
+            src = src.reshape((src.shape[0], 1, src.shape[1]))
 
         import paddlenlp_ops
 
