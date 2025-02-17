@@ -189,7 +189,7 @@ python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --
 更多压缩、服务化推理体验：
 
 - [大模型量化教程](../quantization.md)
-- [服务化部署教程](https://github.com/PaddlePaddle/FastDeploy/blob/develop/README_CN.md)
+- [服务化部署教程](../../server/docs/deploy_usage_tutorial.md)
 
 更多硬件大模型推理教程：
 
