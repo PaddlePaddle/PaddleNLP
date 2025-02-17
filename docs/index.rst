@@ -54,8 +54,7 @@
    大模型-精调文档 <llm/docs/finetune.md>
    大模型-DPO文档 <llm/docs/dpo.md>
    大模型-RLHF文档 <llm/docs/rlhf.md>
-   大模型-推理教程 <llm/docs/predict/index.rst>
-   大模型-服务化部署教程 <llm/server/index.rst>
+   大模型-推理部署教程 <llm/docs/predict/index.rst>
    大模型-量化教程 <llm/docs/quantization.md>
    大模型-高级技术文档 <llm/docs/advanced.rst>
    

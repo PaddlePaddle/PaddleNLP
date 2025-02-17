@@ -7,6 +7,8 @@
 
    installation.md
    inference.md
+   ../../server/README.md
+   ../../server/docs/deploy_usage_tutorial.md
    best_practices.md
    speculative_decoding.md
    llama.md
