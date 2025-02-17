@@ -13,7 +13,7 @@
   - [服务状态查询](#服务状态查询)
 - [服务测试](#服务测试)
   - [Python 客户端](#Python-客户端)
-  - [HTTP 调用](#HTTP 调用)
+  - [HTTP 调用](#HTTP-调用)
   - [OpenAI 客户端](#OpenAI-客户端)
   - [返回示例](#返回示例)
 - [基于 dockerfile 创建自己的镜像](#基于 dockerfile 创建自己的镜像)
