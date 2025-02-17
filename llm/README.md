@@ -362,7 +362,9 @@ PaddleNLP 提供高性能推理，内置动态插入和全环节算子融合策�
      </font>
 </div>
 
-安装高性能推理算子教程（可选）
+
+<a id="paddlenlpops"></a>
+paddlenlp_ops 安装高性能推理算子教程（可选）
 ```shell
 cd ../csrc/
 python setup_cuda.py install
@@ -393,11 +395,16 @@ python ./predict/predictor.py --model_name_or_path ./inference --inference_model
 
 我们提供了一套基于动态图推理的简单易用 UI 服务化部署方法，用户可以快速部署服务化推理。
 
+请确保，在部署前请确保已正确安装 NLP，clone 本 repo 下位置代码。以及自定义算子库。本部署的服务是兼容 OpenAI API 接口
+
+
+
 环境准备
 
 - python >= 3.8
 - gradio
 - flask
+- paddlenlp_ops (可选，高性能自定义加速算子， 安装参考[这里](#paddlenlpops))
 
 
 服务化部署脚本
@@ -415,18 +422,21 @@ python  ./predict/flask_server.py \
 - `flask_port`: Flask 服务端口号，默认8011。
 - 其他参数请参见[推理文档](./docs/predict/inference.md)中推理参数配置。
 
-打开 `http://127.0.0.1:8010` 即可使用 gradio 图形化界面，即可开启对话。
-您也可用通过 flask 服务化 API 的形式，访问 API，可参考：`./predict/request_flask_server.py` 文件。
+图形化界面: 打开 `http://127.0.0.1:8010` 即可使用 gradio 图形化界面，即可开启对话。
+API 访问: 您也可用通过 flask 服务化 API 的形式
+
+1. 可参考：`./predict/request_flask_server.py` 文件访问。
 ```shell
 python predict/request_flask_server.py
 ```
-或者直接使用 curl,调用开始对话
-```
+
+2. 或者直接使用 curl,调用开始对话
+```shell
 curl 127.0.0.1:8011/v1/chat/completions \
 -H 'Content-Type: application/json' \
 -d '{"message": [{"role": "user", "content": "你好"}]}'
 ```
-使用 OpenAI 客户端调用：
+3. 使用 OpenAI 客户端调用：
 ```python
 from openai import OpenAI
 
@@ -452,7 +462,6 @@ if stream:
 else:
     print(completion.choices[0].message.content)
 ```
-
 
 
 #### 7.2 大模型服务化部署工具
