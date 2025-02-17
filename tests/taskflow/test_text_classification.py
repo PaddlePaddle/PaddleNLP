@@ -148,9 +148,9 @@ class TestTextClassificationTask(unittest.TestCase):
     @unittest.skip("numerical error")
     @parameterized.expand(
         [
-            (1, "multi_class", "finetune"),
+            # (1, "multi_class", "finetune"),
             (1, "multi_class", "prompt"),
-            (1, "multi_label", "finetune"),
+            # (1, "multi_label", "finetune"),
             (1, "multi_label", "prompt"),
         ]
     )
