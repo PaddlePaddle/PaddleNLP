@@ -299,6 +299,7 @@ class DeepseekV2MTPLayerPipe(DeepseekV2MTPLayer):
 class DeepseekV2RMSNormPipe(nn.Layer):
     def __init__(self, config):
         super().__init__()
+        self.config = config
         self.norm = DeepseekV2RMSNorm(config)
 
     def forward(self, args):
@@ -319,7 +320,7 @@ class DeepseekV2LMHeadPipe(DeepseekV2LMHead):
     def embedding_weight(self):
         return get_attr(self, "weight")
 
-    def forward(self, args: [Tuple, paddle.Tensor]):
+    def forward(self, args: Union[Tuple, paddle.Tensor]):
         if self.config.num_nextn_predict_layers > 0:
             assert isinstance(args, tuple), "args should be a tuple of hidden states and MTP logits"
             logits = list()
@@ -329,6 +330,17 @@ class DeepseekV2LMHeadPipe(DeepseekV2LMHead):
         hidden_states = args
         logits = super().forward(hidden_states)
         return logits
+
+
+class DeepseekV2PretrainingCriterionPipe(DeepseekV2PretrainingCriterion):
+    def forward(self, logits, labels):
+        if self.config.num_nextn_predict_layers > 0:
+            mtp_logits = logits[1:]
+            logits = logits[0]
+            loss = super().forward(logits, labels, mtp_logits=mtp_logits)
+        else:
+            loss = super().forward(logits, labels)
+        return loss
 
 
 class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
@@ -423,8 +435,8 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
             )
         for i in range(config.num_nextn_predict_layers):
             self.add_sequential_layer(
-                LayerDesc(Deep, config=config, layer_idx=i),
-                f"{self._base_model.base_model_prefix}.nextn_predictors.{i}",
+                LayerDesc(DeepseekV2MTPLayerPipe, config=config, layer_idx=i),
+                f"{self._base_model.base_model_prefix}.layers.{i}",
             )
 
         self.add_sequential_layer(LayerDesc(DeepseekV2RMSNormPipe, config=config), self._base_model.base_model_prefix)
@@ -474,4 +486,4 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         # PipelinePretrainedModel.__init__(self.super(), config=config)
 
     def get_loss_fn(self, config):
-        return DeepseekV2PretrainingCriterion(config)
+        return DeepseekV2PretrainingCriterionPipe(config)
