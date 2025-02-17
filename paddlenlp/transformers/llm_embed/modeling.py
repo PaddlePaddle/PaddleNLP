@@ -252,8 +252,11 @@ class BiEncoderModel(PretrainedModel):
                 else:
                     raise NotImplementedError(f"Padding side {self.tokenizer.padding_side} not supported.")
             elif self.sentence_pooling_method == "cls":
-                embeddings = last_hidden_state[:, 1]
+                embeddings = last_hidden_state[:, 0]
             elif self.sentence_pooling_method == "mean":
+                inputs.attention_mask = paddle.cast(
+                    inputs.attention_mask, dtype="float32"
+                )  # float cannot * int64, maybe paddle's bug
                 s = paddle.sum(last_hidden_state * inputs.attention_mask.unsqueeze(-1), axis=1)
                 d = inputs.attention_mask.sum(axis=1, keepdim=True)
                 embeddings = s / d
