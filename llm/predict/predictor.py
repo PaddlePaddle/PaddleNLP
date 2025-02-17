@@ -34,6 +34,7 @@ try:
     )
 except:
     pass
+import paddlenlp
 from paddlenlp.generation import GenerationConfig, TextIteratorStreamer
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.taskflow.utils import static_mode_guard
@@ -1382,6 +1383,13 @@ def create_predictor(
         tokenizer.pad_token = tokenizer.eos_token
 
     config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
+
+    if predictor_args.inference_model:
+        if not hasattr(paddlenlp.experimental.transformers, f"{config.model_type}"):
+            predictor_args.inference_model = False
+            logger.warning(
+                f"paddlenlp_ops not support for current model_type: {config.model_type}, set inference_model to false."
+            )
 
     max_position_embeddings = llm_utils.get_model_max_position_embeddings(config)
     if max_position_embeddings is None:
