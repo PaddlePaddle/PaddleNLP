@@ -7,10 +7,10 @@
 
    installation.md
    inference.md
-   ../../server/README.md
    ../../server/docs/deploy_usage_tutorial.md
    best_practices.md
    speculative_decoding.md
+   大模型异构设备推理 <devices.rst>
    llama.md
    qwen.md
    mixtral.md
