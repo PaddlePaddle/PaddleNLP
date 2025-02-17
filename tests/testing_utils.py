@@ -511,7 +511,7 @@ def require_paddle_up_to_2_gpus(test_case):
 def require_gpu(min_gpus: int = 1):
     def actual_decorator(func):
         gpu_count = paddle.device.cuda.device_count()
-
+        print("gpu count: ", gpu_count)
         if gpu_count < min_gpus:
             return unittest.skip(f"test requires {min_gpus} GPUs")(func)
 

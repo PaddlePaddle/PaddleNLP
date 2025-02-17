@@ -51,7 +51,7 @@ __global__ void multi_query_append_attention_c4_kernel(
     const int max_seq_len,
     const int max_dec_len,
     const int max_block_num_per_seq,
-    const float scale,
+    const float softmax_scale,
     const float quant_max_bound,
     const float quant_min_bound,
     const float in_scale,
@@ -189,7 +189,7 @@ __global__ void multi_query_append_attention_c4_kernel(
   __syncthreads();
 
   q_smem_inplace_multiply_sm_scale<num_frags_x, num_frags_y, T>(&qo_smem,
-                                                                scale);
+                                                                softmax_scale);
 
   T cache_k_scale_frag[num_frags_y][4];
   T cache_k_zp_frag[num_frags_y][4];
@@ -509,7 +509,7 @@ __global__ void multi_query_append_attention_c4_warp1_4_kernel(
     const int max_seq_len,
     const int max_dec_len,
     const int max_block_num_per_seq,
-    const float scale,
+    const float softmax_scale,
     const float quant_max_bound,
     const float quant_min_bound,
     const float in_scale,
@@ -649,7 +649,7 @@ __global__ void multi_query_append_attention_c4_warp1_4_kernel(
   __syncthreads();
 
   q_smem_inplace_multiply_sm_scale_multi_warps<num_frags_x, num_frags_y, T>(
-      &qo_smem, scale);
+      &qo_smem, softmax_scale);
 
   T cache_k_scale_frag[num_frags_y][4];
   T cache_k_zp_frag[num_frags_y][4];
@@ -970,6 +970,7 @@ void MultiQueryAppendC4Attention(
     const int num_blocks_x_cpu,
     const int max_seq_len,
     const int max_dec_len,
+    const float softmax_scale,
     const float quant_max_bound,
     const float quant_min_bound,
     const float in_scale,
@@ -993,8 +994,6 @@ void MultiQueryAppendC4Attention(
   constexpr uint32_t num_qrow_per_block = NUM_WARP_Q * num_frags_x * 16;
 
   auto *allocator = paddle::GetAllocator(qkv.place());
-
-  const float scale = 1.f / sqrt(HEAD_DIM);
 
   if constexpr (NUM_WARP_Q == 4) {
     constexpr uint32_t num_frags_z = BLOCK_SIZE / 16;
@@ -1091,7 +1090,7 @@ void MultiQueryAppendC4Attention(
           max_seq_len,
           max_dec_len,
           max_block_num_per_seq,
-          scale,
+          softmax_scale,
           quant_max_bound,
           quant_min_bound,
           in_scale,
@@ -1154,7 +1153,7 @@ void MultiQueryAppendC4Attention(
           max_seq_len,
           max_dec_len,
           max_block_num_per_seq,
-          scale,
+          softmax_scale,
           quant_max_bound,
           quant_min_bound,
           in_scale,
@@ -1336,7 +1335,7 @@ void MultiQueryAppendC4Attention(
           max_seq_len,
           max_dec_len,
           max_block_num_per_seq,
-          scale,
+          softmax_scale,
           quant_max_bound,
           quant_min_bound,
           in_scale,
@@ -1412,7 +1411,7 @@ void MultiQueryAppendC4Attention(
           max_seq_len,
           max_dec_len,
           max_block_num_per_seq,
-          scale,
+          softmax_scale,
           quant_max_bound,
           quant_min_bound,
           in_scale,
@@ -1533,6 +1532,7 @@ void CascadeAppendAttentionC4Kernel(
     const int block_shape_q,
     const int max_seq_len,
     const int max_dec_len,
+    const float softmax_scale,
     const float quant_max_bound,
     const float quant_min_bound,
     const float in_scale,
@@ -1597,6 +1597,7 @@ void CascadeAppendAttentionC4Kernel(
                                 num_blocks,
                                 max_seq_len,
                                 max_dec_len,
+                                softmax_scale,
                                 quant_max_bound,
                                 quant_min_bound,
                                 in_scale,

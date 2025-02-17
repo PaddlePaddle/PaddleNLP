@@ -17,21 +17,41 @@ import unittest
 
 import paddle
 
-from paddlenlp.transformers import NVEncodeModel
+from paddlenlp.transformers import NVEncodeModel, PretrainedConfig
+
+from ...testing_utils import require_gpu
 
 
 class NVEncodeModelIntegrationTest(unittest.TestCase):
+    @require_gpu(1)
     def test_model_tiny_logits(self):
         input_texts = [
             "This is a test",
             "This is another test",
         ]
 
-        model_name_or_path = "NV-Embed-v1-paddle"
-        model = NVEncodeModel.from_pretrained(
-            model_name_or_path,
-            tokenizer_path=model_name_or_path,
+        config = PretrainedConfig(
+            attention_dropout=0.0,
+            bos_token_id=1,
             dtype="float16",
+            eos_token_id=2,
+            hidden_act="silu",
+            hidden_size=4096,
+            initializer_range=0.02,
+            intermediate_size=14336,
+            max_position_embeddings=32768,
+            num_attention_heads=32,
+            num_hidden_layers=32,
+            num_key_value_heads=8,
+            rms_norm_eps=1e-05,
+            rope_theta=10000.0,
+            sliding_window=4096,
+            tie_word_embeddings=False,
+            vocab_size=32000,
+        )
+        model = NVEncodeModel(
+            config=config,
+            tokenizer_path="BAAI/bge-large-en-v1.5",
             query_instruction="",
             document_instruction="",
         )

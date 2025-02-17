@@ -1329,6 +1329,7 @@ batch_size=32 和 1，预测精度为 FP16 时，GPU 下的效果-时延图：
 - paddlepaddle >= 2.3
 - paddlenlp >= 2.4
 - paddleslim >= 2.4
+- evaluate
 
 ### 数据准备
 此次微调数据主要是以 CLUE benchmark 数据集为主, CLUE benchmark 包括了文本分类、实体抽取、问答三大类数据集，而 CLUE benchmark 数据目前已经集成在 PaddleNLP 的 datasets 里面，可以通过下面的方式来使用数据集

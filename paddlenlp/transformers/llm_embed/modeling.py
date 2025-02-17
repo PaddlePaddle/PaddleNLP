@@ -34,10 +34,14 @@ class EncoderOutput(ModelOutput):
     scores: Optional[paddle.Tensor] = None
 
 
+__all__ = ["BiEncoderModel"]
+
+
 class BiEncoderModel(PretrainedModel):
     def __init__(
         self,
         model_name_or_path: str = None,
+        dtype: str = "float16",
         normalized: bool = False,
         sentence_pooling_method: str = "cls",
         negatives_cross_device: bool = False,
@@ -52,10 +56,9 @@ class BiEncoderModel(PretrainedModel):
         tokenizer=None,
         max_seq_length: int = 4096,
         model_flag: str = None,
-        dtype: str = "float16",
     ):
         super().__init__()
-        self.model = AutoModel.from_pretrained(model_name_or_path, convert_from_torch=True, dtype=dtype)
+        self.model = AutoModel.from_pretrained(model_name_or_path, dtype=dtype, convert_from_torch=True)
         self.model_config = AutoConfig.from_pretrained(model_name_or_path)
         self.cross_entropy = nn.CrossEntropyLoss(reduction="mean")
 

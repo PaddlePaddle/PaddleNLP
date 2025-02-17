@@ -19,15 +19,18 @@ import paddle
 
 from paddlenlp.transformers import AutoTokenizer, BiEncoderModel
 
+from ...testing_utils import require_gpu
+
 
 class BiEncoderModelIntegrationTest(unittest.TestCase):
+    @require_gpu(1)
     def test_model_tiny_logits(self):
         input_texts = [
             "This is a test",
             "This is another test",
         ]
 
-        model_name_or_path = "bge-large-en-v1.5"
+        model_name_or_path = "BAAI/bge-large-en-v1.5"
         tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
         model = BiEncoderModel(model_name_or_path=model_name_or_path, dtype="float16", tokenizer=tokenizer)
         with paddle.no_grad():

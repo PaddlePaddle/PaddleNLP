@@ -26,6 +26,8 @@ from ...utils.log import logger
 from .. import AutoTokenizer, MistralModel, PretrainedConfig, PretrainedModel
 from ..model_outputs import BaseModelOutputWithPast, ModelOutput
 
+__all__ = ["NVEncodeModel"]
+
 
 @dataclass
 class EncoderOutput(ModelOutput):
@@ -121,7 +123,7 @@ class LatentModel(PretrainedModel):
         one = paddle.eye(
             num_rows=self.config.hidden_size,
             num_columns=self.config.hidden_size,
-            dtype=str(self.latents.weight.dtype).split(".")[-1],
+            dtype=self.latents.weight.dtype,
         )
         self_latents_weight_T = self.latents(one).T
         # latents = repeat(self_latents_weight_T, "d h -> b d h", b=last_hidden_states.shape[0]) # from einops import repeat
@@ -206,7 +208,8 @@ class NVEncodeModel(MistralModel):
         self.latent_model = LatentModel(config=config)  # get latent model structure
 
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path, padding_side="right")
-        self.tokenizer.pad_token = self.tokenizer.eos_token
+        if self.tokenizer.pad_token is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
 
         self.query_instruction = query_instruction
         self.document_instruction = document_instruction
@@ -495,6 +498,7 @@ class NVEncodeModel(MistralModel):
                 sentences_batch,
                 max_length=4096,
                 padding=True,
+                return_attention_mask=True,
                 return_token_type_ids=False,
                 return_tensors="pd",
                 truncation=True,

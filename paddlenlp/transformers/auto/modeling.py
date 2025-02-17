@@ -822,27 +822,38 @@ class AutoInferenceModelForCausalLM(_BaseAutoModelClass):
         tensor_parallel_degree = kwargs.pop("tensor_parallel_degree", 1)
         tensor_parallel_rank = kwargs.pop("tensor_parallel_rank", 0)
         model_arg = kwargs.pop("model_args", None)
+        spec_model_type = kwargs.pop("spec_model_type", "None")
+        spec_flag = ""
 
         # Check whether the model_type is img2txt in inference mode
-        if model_arg.model_type is not None and predictor_args.mode == "dynamic":
-            model_name = MODEL_FOR_CAUSAL_LM_INFERENCE_MAPPING_NAMES[model_arg.model_type]
-            predictor_args.block_attn = 0
-            if model_name is None:
-                raise ValueError(
-                    f"Model type {model_arg.model_type} is not supported for {config.architectures[0]} inference."
-                )
-        else:
-            # Check whether the model use block attention
-            if predictor_args.block_attn or predictor_args.speculate_method is not None:
-                attn_type = "Block"
-            else:
-                attn_type = ""
+        if spec_model_type == "eagle":
+            spec_flag = "Eagle"
+            attn_type = "Block"
             model_name = f"{config.architectures[0]}{attn_type}"
+        elif spec_model_type == "mtp":
+            spec_flag = "MTP"
+            attn_type = "Block"
+            model_name = f"{config.architectures[0]}{attn_type}"
+        else:
+            if model_arg.model_type is not None and predictor_args.mode == "dynamic":
+                model_name = MODEL_FOR_CAUSAL_LM_INFERENCE_MAPPING_NAMES[model_arg.model_type]
+                predictor_args.block_attn = 0
+                if model_name is None:
+                    raise ValueError(
+                        f"Model type {model_arg.model_type} is not supported for {config.architectures[0]} inference."
+                    )
+            else:
+                # Check whether the model use block attention
+                if predictor_args.block_attn or predictor_args.speculate_method is not None:
+                    attn_type = "Block"
+                else:
+                    attn_type = ""
+                model_name = f"{config.architectures[0]}{attn_type}"
 
         # Import the InferenceModel
         import_class = importlib.import_module(f"paddlenlp.experimental.transformers.{config.model_type}.modeling")
 
-        model_class_name = f"{model_name}InferenceModel"
+        model_class_name = f"{spec_flag}{model_name}InferenceModel"
         model_class = getattr(import_class, model_class_name)
 
         # It may return a new model class, like LlamaForCausalLMAvxInferenceModel

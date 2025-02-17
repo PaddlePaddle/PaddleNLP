@@ -17,7 +17,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Paddle DeepSeek model."""
+"""Paddle DeepSeek model."""
+
 from __future__ import annotations
 
 import math
@@ -60,15 +61,22 @@ from .. import linear_utils
 from ..activations import ACT2FN
 from ..conversion_utils import StateDictNameMapping, init_name_mappings
 from ..linear_utils import Linear
+from ..llama import fusion_ops
+from ..llama.modeling import get_use_casual_mask
 from ..model_outputs import (
     BaseModelOutputWithPast,
     CausalLMOutputWithPast,
     SequenceClassifierOutputWithPast,
 )
 from ..model_utils import PretrainedModel, register_base_model
+from ..moe_gate import PretrainedMoEGate
+from ..moe_layer import MoELayer
+from ..utils import device_guard
 from .configuration import DeepseekV2Config
 
 __all__ = [
+    "DeepseekV2LMHead",
+    "DeepseekV2PretrainingCriterion",
     "DeepseekV2ForCausalLM",
     "DeepseekV2ForSequenceClassification",
     "DeepseekV2Model",
@@ -155,34 +163,49 @@ def scaled_dot_product_attention(
     value_states,
     attention_mask,
     output_attentions,
+    attn_mask_startend_row_indices=None,
     softmax_scale=1.0,
     training=True,
     sequence_parallel=False,
 ):
     bsz, q_len, num_heads, head_dim = query_states.shape
-    _, kv_seq_len, _, v_head_dim = value_states.shape
+    _, kv_seq_len, v_num_heads, v_head_dim = value_states.shape
 
     if config.use_flash_attention and flash_attention:
         # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
 
-        attn_output = F.scaled_dot_product_attention(
+        # Note: Flash Attention does not support softmax_scale, so we need to scale the query_states
+        q_head_dim = query_states.shape[-1]
+        softmax_scale = softmax_scale * (q_head_dim**0.5)
+        query_states = query_states * softmax_scale
+        value_padding = paddle.zeros(
+            [bsz, kv_seq_len, v_num_heads, head_dim - v_head_dim],
+            dtype=value_states.dtype,
+        )
+        value_states = paddle.concat([value_states, value_padding], axis=-1)
+
+        outputs = fusion_ops.fusion_flash_attention(
             query_states,
+            config,
             key_states,
             value_states,
-            attn_mask=attention_mask,
-            is_causal=attention_mask is None,
-            dropout_p=config.attention_dropout if training else 0.0,
-            training=training,
+            attention_mask,
+            output_attentions,
+            attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+            sequence_parallel=sequence_parallel,
         )
-        attn_output *= (head_dim ** (0.5)) * softmax_scale
-        attn_weights = None
 
-        if sequence_parallel:
-            attn_output = attn_output.reshape([bsz * q_len, v_head_dim * num_heads])
+        if isinstance(outputs, tuple):
+            outputs[0] = outputs[0].reshape([bsz, q_len, v_num_heads, head_dim])
+            outputs[0] = outputs[0][..., :v_head_dim]
+            outputs[0] = outputs[0].reshape([bsz, q_len, -1])
         else:
-            attn_output = attn_output.reshape([bsz, q_len, v_head_dim * num_heads])
-        return (attn_output, attn_weights) if output_attentions else attn_output
+            outputs = outputs.reshape([bsz, q_len, v_num_heads, head_dim])
+            outputs = outputs[..., :v_head_dim]
+            outputs = outputs.reshape([bsz, q_len, -1])
+        return outputs
+
     else:
         #  [ bz, seqlen, nhead, head_dim] -> [bs, nhead, seq_len, head_dim]
         query_states = paddle.transpose(query_states, [0, 2, 1, 3])
@@ -228,7 +251,7 @@ def scaled_dot_product_attention(
 
 def masked_fill(x, mask, value):
     y = paddle.full(x.shape, value, x.dtype)
-    return paddle.where(mask, y, x)
+    return paddle.where(mask.to("bool"), y, x)
 
 
 def is_casual_mask(attention_mask):
@@ -300,6 +323,18 @@ class DeepseekV2RMSNorm(nn.Layer):
             mark_as_sequence_parallel_parameter(self.weight)
 
     def forward(self, hidden_states):
+        if self.config.use_fused_rms_norm and get_env_device() == "xpu":
+            if self.weight.dtype != hidden_states.dtype:
+                hidden_states = paddle.cast(hidden_states, self.weight.dtype)
+            try:
+                import paddle_xpu_nn  # noqa: F821
+
+                return paddle_xpu_nn.xpu_rms_norm(hidden_states, self.weight, self.variance_epsilon)[0]
+            except ImportError:
+                raise NotImplementedError(
+                    f"Implementation of fused_rms_norm is not available on {get_env_device()}. Please install paddle_xpu to use this feature"
+                )
+
         if paddle.in_dynamic_mode():
             with paddle.amp.auto_cast(False):
                 hidden_states = hidden_states.astype("float32")
@@ -323,8 +358,11 @@ class DeepseekV2RotaryEmbedding(nn.Layer):
         self.max_position_embeddings = max_position_embeddings
         self.base = base
         # [dim / 2]
-        self.inv_freq = 1.0 / (self.base ** (paddle.cast(paddle.arange(0, self.dim, 2), dtype="float32") / self.dim))
-        self._set_cos_sin_cache(seq_len=max_position_embeddings)
+        with device_guard("cpu"):
+            self.inv_freq = 1.0 / (
+                self.base ** (paddle.cast(paddle.arange(0, self.dim, 2), dtype="float32") / self.dim)
+            )
+            self._set_cos_sin_cache(seq_len=max_position_embeddings)
 
         self.max_seq_len_cached = None
 
@@ -524,7 +562,7 @@ def rotate_half(x):
     return paddle.concat([-x2, x1], axis=-1)  # shape is the same as x
 
 
-def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
+def apply_rotary_pos_emb(q, k, cos, sin, position_ids, fuse_rope=False):
     """Applies Rotary Position Embedding to the query and key tensors.
 
     Args:
@@ -545,6 +583,24 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
     Returns:
         `tuple(torch.Tensor)` comprising of the query and key tensors rotated using the Rotary Position Embedding.
     """
+    b, s, h, d = q.shape
+    q = q.reshape([b, s, h, d // 2, 2]).transpose([0, 1, 2, 4, 3]).reshape([b, s, h, d])
+
+    b, s, h, d = k.shape
+    k = k.reshape([b, s, h, d // 2, 2]).transpose([0, 1, 2, 4, 3]).reshape([b, s, h, d])
+
+    if get_env_device() == "xpu" and fuse_rope:
+        q_embed, k_embed, _ = fused_rotary_position_embedding(
+            q,
+            k,
+            None,
+            sin=sin,
+            cos=cos,
+            position_ids=position_ids,
+            use_neox_rotary_style=False,
+        )
+        return q_embed, k_embed
+
     if position_ids is None:
         # Note: Only for MixtralForCausalLMPipe model pretraining
         cos = cos[:, : q.shape[1], :, :]  # [bs, seq_len, 1, axis]
@@ -555,19 +611,13 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
         cos = cos[position_ids].unsqueeze(2)  # [bs, seq_len, 1, axis]
         sin = sin[position_ids].unsqueeze(2)  # [bs, seq_len, 1, axis]
 
-    b, s, h, d = q.shape
-    q = q.reshape([b, s, h, d // 2, 2]).transpose([0, 1, 2, 4, 3]).reshape([b, s, h, d])
-
-    b, s, h, d = k.shape
-    k = k.reshape([b, s, h, d // 2, 2]).transpose([0, 1, 2, 4, 3]).reshape([b, s, h, d])
-
     q_embed = (q * cos) + (rotate_half(q) * sin)
     k_embed = (k * cos) + (rotate_half(k) * sin)
     return q_embed, k_embed
 
 
 class DeepseekV2MLP(nn.Layer):
-    def __init__(self, config: DeepseekV2Config, hidden_size=None, intermediate_size=None):
+    def __init__(self, config: DeepseekV2Config, hidden_size=None, intermediate_size=None, is_moe=False):
         super().__init__()
         self.config = config
         self.hidden_size = config.hidden_size if hidden_size is None else hidden_size
@@ -580,7 +630,7 @@ class DeepseekV2MLP(nn.Layer):
             ColumnParallelLinear = linear_utils.ColumnParallelLinear
             RowParallelLinear = linear_utils.RowParallelLinear
 
-        if config.tensor_parallel_degree > 1:
+        if config.tensor_parallel_degree > 1 and not is_moe:
             self.gate_proj = ColumnParallelLinear(
                 self.hidden_size,
                 self.intermediate_size,
@@ -611,110 +661,44 @@ class DeepseekV2MLP(nn.Layer):
         return down_proj
 
 
-class MoEGate(nn.Layer):
-    def __init__(self, config: DeepseekV2Config):
-        super().__init__()
-        self.config = config
-        self.top_k = config.num_experts_per_tok
-        self.n_routed_experts = config.n_routed_experts
-        self.routed_scaling_factor = config.routed_scaling_factor
-        self.scoring_func = config.scoring_func
-        self.alpha = config.aux_loss_alpha
-        self.seq_aux = config.seq_aux
-        self.topk_method = config.topk_method
-        self.n_group = config.n_group
-        self.topk_group = config.topk_group
+class MoEGate(PretrainedMoEGate):
+    def __init__(self, config, num_experts, expert_hidden_size, **kwargs):
+        super().__init__(config, num_experts, expert_hidden_size, **kwargs)
+        # [hidden_size, n_expert]
 
-        # topk selection algorithm
-        self.norm_topk_prob = config.norm_topk_prob
-        self.gating_dim = config.hidden_size
+        self.scoring_func = config.scoring_func
+        self.topk_method = config.topk_method
+
         self.weight = paddle.create_parameter(
-            shape=[self.gating_dim, self.n_routed_experts],
+            shape=[expert_hidden_size, num_experts],
             dtype=paddle.get_default_dtype(),
+            is_bias=False,
             default_initializer=nn.initializer.Constant(1.0),
         )
 
-        if self.topk_method == "noaux_tc":
+        if config.topk_method == "noaux_tc":
             self.e_score_correction_bias = paddle.create_parameter(
-                shape=[self.n_routed_experts],
+                shape=[num_experts],
                 dtype=paddle.get_default_dtype(),
                 default_initializer=nn.initializer.Constant(0.0),
             )
 
     def forward(self, hidden_states):
-        bsz, seq_len, h = hidden_states.shape
+        """
+        Args:
+            hidden_states (_type_): [batch_size * seq_len, hidden_size]
+        """
+        _, h_dim = hidden_states.shape
+
         # compute gating score
-        hidden_states = hidden_states.reshape([-1, h])
+        logits = F.linear(hidden_states, self.weight, None)
+
         with paddle.amp.auto_cast(False):
-            logits = F.linear(
-                paddle.cast(hidden_states, paddle.float32), paddle.cast(self.weight, paddle.float32), None
-            )
+            scores = self.gate_score_func(logits=logits)
+            scores = scores.cast(paddle.get_default_dtype())
 
-        if self.scoring_func == "softmax":
-            with paddle.amp.auto_cast(False):
-                scores = F.softmax(logits.astype("float32"), axis=-1)
-        elif self.scoring_func == "sigmoid":
-            with paddle.amp.auto_cast(False):
-                scores = F.sigmoid(logits.astype("float32"))
-        else:
-            raise NotImplementedError(f"insupportable scoring function for MoE gating: {self.scoring_func}")
-
-        # select top-k experts
-        if self.topk_method == "greedy":
-            topk_weight, topk_idx = paddle.topk(scores, k=self.top_k, axis=-1, sorted=False)
-        elif self.topk_method in ["group_limited_greedy", "noaux_tc"]:
-            if self.topk_method == "group_limited_greedy":
-                group_scores = scores.reshape([bsz * seq_len, self.n_group, -1]).max(axis=-1).values  # [n, n_group]
-            elif self.topk_method == "noaux_tc":
-                assert not self.training
-                scores = scores.reshape([bsz * seq_len, -1]) + self.e_score_correction_bias.unsqueeze(0)
-                group_scores = (
-                    scores.reshape([bsz * seq_len, self.n_group, -1]).topk(2, axis=-1)[0].sum(axis=-1)
-                )  # [n, n_group]
-            group_idx = paddle.topk(group_scores, k=self.topk_group, axis=-1, sorted=False)[1]  # [n, top_k_group]
-            group_mask = paddle.zeros_like(group_scores)  # [n, n_group]
-            group_mask.scatter_(1, group_idx, 1)  # [n, n_group]
-            score_mask = (
-                group_mask.unsqueeze(-1)
-                .expand(bsz * seq_len, self.n_group, self.n_routed_experts // self.n_group)
-                .reshape(bsz * seq_len, -1)
-            )  # [n, e]
-            tmp_scores = scores.masked_fill(~score_mask.bool(), 0.0)  # [n, e]
-            topk_weight, topk_idx = paddle.topk(tmp_scores, k=self.top_k, axis=-1, sorted=False)
-            topk_weight = scores.gather(topk_idx, axis=1) if self.topk_method == "noaux_tc" else topk_weight
-
-        # norm gate to sum 1
-        if self.top_k > 1 and self.norm_topk_prob:
-            denominator = topk_weight.sum(axis=-1, keepdim=True) + 1e-20
-            topk_weight = topk_weight / denominator
-        else:
-            topk_weight = topk_weight * self.routed_scaling_factor
-        # expert-level computation auxiliary loss
-        if self.training and self.alpha > 0.0:
-            scores_for_aux = scores
-            aux_topk = self.top_k
-            # always compute aux loss based on the naive greedy topk method
-            topk_idx_for_aux_loss = topk_idx.reshape([bsz, -1])  # [bsz, top_k*seq_len]
-            if self.seq_aux:
-                scores_for_seq_aux = scores_for_aux.reshape([bsz, seq_len, -1])
-                ce = paddle.zeros([bsz, self.n_routed_experts])
-                ce.put_along_axis_(
-                    axis=1,
-                    indices=topk_idx_for_aux_loss,
-                    values=paddle.ones([bsz, seq_len * aux_topk]),
-                    reduce="add",
-                )
-                ce /= seq_len * aux_topk / self.n_routed_experts
-                aux_loss = (ce * scores_for_seq_aux.mean(axis=1)).sum(axis=1).mean() * self.alpha
-            else:
-                mask_ce = F.one_hot(topk_idx_for_aux_loss.reshape([-1]), num_classes=self.n_routed_experts)
-                ce = mask_ce.float().mean(0)
-                Pi = scores_for_aux.mean(0)
-                fi = ce * self.n_routed_experts
-                aux_loss = (Pi * fi).sum() * self.alpha
-        else:
-            aux_loss = None
-        return topk_idx, topk_weight, aux_loss
+        capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss = self.topkgating(scores)
+        return capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss
 
 
 class AddAuxiliaryLoss(paddle.autograd.PyLayer):
@@ -738,49 +722,47 @@ class AddAuxiliaryLoss(paddle.autograd.PyLayer):
         return grad_output, grad_loss
 
 
-class DeepseekV2MoE(nn.Layer):
+class DeepseekV2MoE(MoELayer):
     """
     A mixed expert module containing shared experts.
     """
 
-    def __init__(self, config):
-        super().__init__()
-        self.config = config
-        self.num_experts_per_tok = config.num_experts_per_tok
-
-        self.ep_size = 1
-        self.experts_per_rank = config.n_routed_experts
-        self.ep_rank = 0
-        self.experts = nn.LayerList(
-            [
-                DeepseekV2MLP(config, intermediate_size=config.moe_intermediate_size)
-                for i in range(config.n_routed_experts)
-            ]
+    def __init__(self, config: DeepseekV2Config):
+        gate = MoEGate(
+            config=config,
+            num_experts=config.n_routed_experts,
+            expert_hidden_size=config.hidden_size,
+            top_k=config.num_experts_per_tok,
+            topk_method=config.topk_method,
+            n_group=config.n_group,
+            topk_group=config.topk_group,
+            norm_topk_prob=config.norm_topk_prob,
+            routed_scaling_factor=config.routed_scaling_factor,
+            drop_tokens=False,
         )
-        self.gate = MoEGate(config)
+
+        super().__init__(
+            config=config,
+            moe_num_experts=config.n_routed_experts,
+            expert_class=DeepseekV2MLP,
+            expert_kwargs={"config": config, "intermediate_size": config.moe_intermediate_size, "is_moe": True},
+            gate=gate,
+            capacity=2.0,
+        )
+        self.alpha = config.aux_loss_alpha
         if config.n_shared_experts is not None:
             intermediate_size = config.moe_intermediate_size * config.n_shared_experts
-            self.shared_experts = DeepseekV2MLP(config=config, intermediate_size=intermediate_size)
+            self.shared_experts = DeepseekV2MLP(config=config, intermediate_size=intermediate_size, is_moe=False)
 
     def forward(self, hidden_states):
-        identity = hidden_states
-        orig_shape = hidden_states.shape
-        topk_idx, topk_weight, aux_loss = self.gate(hidden_states)
-        hidden_states = hidden_states.reshape([-1, hidden_states.shape[-1]])
-        flat_topk_idx = topk_idx.reshape([-1])
-        # remove the infer method
-        hidden_states = hidden_states.repeat_interleave(self.num_experts_per_tok, axis=0)
-        y = paddle.empty_like(hidden_states)
-        for i, expert in enumerate(self.experts):
-            if paddle.any(flat_topk_idx == i):
-                y[flat_topk_idx == i] = expert(hidden_states[flat_topk_idx == i])
-        y = (y.reshape([*topk_weight.shape, -1]) * topk_weight.unsqueeze(-1)).sum(axis=1)
-        y = paddle.cast(y, hidden_states.dtype).reshape([*orig_shape])
-        if self.training and self.gate.alpha > 0.0:
-            y = AddAuxiliaryLoss.apply(y, aux_loss)
+        final_hidden_states, l_aux, l_zloss = super().forward(hidden_states)
+        if self.training and self.alpha > 0.0:
+            final_hidden_states = AddAuxiliaryLoss.apply(final_hidden_states, l_aux)
+
         if self.config.n_shared_experts is not None:
-            y = y + self.shared_experts(identity)
-        return y
+            shared_expert_output = self.shared_experts(hidden_states)
+            final_hidden_states = final_hidden_states + shared_expert_output
+        return final_hidden_states
 
 
 def repeat_kv(hidden_states: paddle.Tensor, n_rep: int) -> paddle.Tensor:
@@ -818,6 +800,7 @@ class DeepseekV2Attention(nn.Layer):
         self.q_head_dim = config.qk_nope_head_dim + config.qk_rope_head_dim
 
         self.is_causal = True
+        self.fuse_rope = config.use_fused_rope
 
         self.seq_length = config.seq_length
         self.sequence_parallel = config.sequence_parallel
@@ -939,11 +922,12 @@ class DeepseekV2Attention(nn.Layer):
     def forward(
         self,
         hidden_states: paddle.Tensor,
-        attention_mask: Optional[paddle.Tensor] = None,
-        position_ids: Optional[paddle.Tensor] = None,
+        position_ids: Optional[Tuple[paddle.Tensor]] = None,
         past_key_value: Optional[Tuple[paddle.Tensor]] = None,
+        attention_mask: Optional[paddle.Tensor] = None,
         output_attentions: bool = False,
         use_cache: bool = False,
+        attn_mask_startend_row_indices: Optional[paddle.Tensor] = None,
         **kwargs,
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         if "padding_mask" in kwargs:
@@ -979,7 +963,7 @@ class DeepseekV2Attention(nn.Layer):
         cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
         cos = cos[None, :, None, :]
         sin = sin[None, :, None, :]
-        q_pe, k_pe = apply_rotary_pos_emb(q_pe, k_pe, cos, sin, position_ids)
+        q_pe, k_pe = apply_rotary_pos_emb(q_pe, k_pe, cos, sin, position_ids, self.fuse_rope)
 
         query_states = paddle.empty([bsz, q_len, self.num_heads, self.q_head_dim], dtype=self.config.dtype)
         query_states[:, :, :, : self.qk_nope_head_dim] = q_nope
@@ -1011,6 +995,7 @@ class DeepseekV2Attention(nn.Layer):
                 value_states,
                 attention_mask,
                 output_attentions,
+                attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                 softmax_scale=self.softmax_scale,
                 training=self.training,
                 sequence_parallel=self.sequence_parallel,
@@ -1024,6 +1009,7 @@ class DeepseekV2Attention(nn.Layer):
                 value_states,
                 attention_mask,
                 output_attentions,
+                attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                 softmax_scale=self.softmax_scale,
                 training=self.training,
                 sequence_parallel=self.sequence_parallel,
@@ -1046,6 +1032,7 @@ class DeepseekV2Attention(nn.Layer):
 class DeepseekV2DecoderLayer(nn.Layer):
     def __init__(self, config: DeepseekV2Config, layer_idx: int, layerwise_recompute: bool = False):
         super().__init__()
+        self.config = config
 
         self.enable_recompute = False
         self.layerwise_recompute = layerwise_recompute
@@ -1070,11 +1057,12 @@ class DeepseekV2DecoderLayer(nn.Layer):
     def forward(
         self,
         hidden_states: paddle.Tensor,
-        attention_mask: Optional[paddle.Tensor] = None,
         position_ids: Optional[paddle.Tensor] = None,
-        past_key_value: Optional[Tuple[paddle.Tensor]] = None,
+        attention_mask: Optional[paddle.Tensor] = None,
         output_attentions: Optional[bool] = False,
+        past_key_value: Optional[Tuple[paddle.Tensor]] = None,
         use_cache: Optional[bool] = False,
+        attn_mask_startend_row_indices: Optional[paddle.Tensor] = None,
         **kwargs,
     ) -> Tuple[paddle.Tensor, Optional[Tuple[paddle.Tensor, paddle.Tensor]]]:
         """
@@ -1107,24 +1095,26 @@ class DeepseekV2DecoderLayer(nn.Layer):
             and has_gradient
             and self.recompute_granularity == "full_attn"
         ):
-            recompute()
-            hidden_states, self_attn_weights, present_key_value = self.self_attn(
+            hidden_states, self_attn_weights, present_key_value = recompute(
+                self.self_attn,
                 hidden_states=hidden_states,
-                attention_mask=attention_mask,
                 position_ids=position_ids,
-                past_key_value=past_key_value,
+                attention_mask=attention_mask,
                 output_attentions=output_attentions,
+                past_key_value=past_key_value,
                 use_cache=use_cache,
+                attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                 **kwargs,
             )
         else:
             hidden_states, self_attn_weights, present_key_value = self.self_attn(
                 hidden_states=hidden_states,
-                attention_mask=attention_mask,
                 position_ids=position_ids,
-                past_key_value=past_key_value,
+                attention_mask=attention_mask,
                 output_attentions=output_attentions,
+                past_key_value=past_key_value,
                 use_cache=use_cache,
+                attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                 **kwargs,
             )
         hidden_states = residual + hidden_states
@@ -1143,6 +1133,9 @@ class DeepseekV2DecoderLayer(nn.Layer):
         if use_cache:
             outputs += (present_key_value,)
 
+        if type(outputs) is tuple and len(outputs) == 1:
+            outputs = outputs[0]
+
         return outputs
 
 
@@ -1151,6 +1144,22 @@ class DeepseekV2PretrainedModel(PretrainedModel):
     base_model_prefix = "deepseek_v2"
     _no_split_modules = ["DeepseekV2DecoderLayer"]
 
+    def _get_model_flops(self, batch_size=1, seq_length=None, **kwargs):
+        from .mfu_utils import DeepSeekProjection
+
+        # self._
+        mfu_cal_proj = DeepSeekProjection(self.config)
+        if seq_length is None:
+            if hasattr(self.config, "seq_length"):
+                seq_length = self.config.seq_length
+            else:
+                seq_length = 2048
+
+        return mfu_cal_proj.get_num_flop_per_token()
+
+    def _get_hardware_flops(self, *args, **kwargs):
+        return self._get_model_flops(*args, **kwargs)
+
     @classmethod
     def _get_name_mappings(cls, config: DeepseekV2Config) -> list[StateDictNameMapping]:
         mappings: list[StateDictNameMapping] = []
@@ -1158,7 +1167,8 @@ class DeepseekV2PretrainedModel(PretrainedModel):
             ["embed_tokens.weight"],
             ["norm.weight"],
         ]
-        for layer_index in range(config.num_hidden_layers):
+        # last one layer contains MTP (eagle) parameters for inference
+        for layer_index in range(config.num_hidden_layers + config.num_nextn_predict_layers):
             layer_mappings = [
                 [f"layers.{layer_index}.self_attn.q_proj.weight", None, "transpose"],
                 [f"layers.{layer_index}.self_attn.q_a_proj.weight", None, "transpose"],
@@ -1178,6 +1188,7 @@ class DeepseekV2PretrainedModel(PretrainedModel):
 
             # MoE parameters
             model_mappings.append([f"layers.{layer_index}.mlp.gate.weight", None, "transpose"])
+            model_mappings.append([f"layers.{layer_index}.mlp.gate.e_score_correction_bias"])
             for expert_idx in range(config.n_routed_experts):
                 expert_mappings = [
                     [f"layers.{layer_index}.mlp.experts.{expert_idx}.gate_proj.weight", None, "transpose"],
@@ -1188,6 +1199,15 @@ class DeepseekV2PretrainedModel(PretrainedModel):
             model_mappings.append([f"layers.{layer_index}.mlp.shared_experts.gate_proj.weight", None, "transpose"])
             model_mappings.append([f"layers.{layer_index}.mlp.shared_experts.up_proj.weight", None, "transpose"])
             model_mappings.append([f"layers.{layer_index}.mlp.shared_experts.down_proj.weight", None, "transpose"])
+
+            # MTP (eagle) parameters for inference
+            if layer_index >= config.num_hidden_layers:
+                model_mappings.append([f"layers.{layer_index}.embed_tokens.weight"])
+                model_mappings.append([f"layers.{layer_index}.enorm.weight"])
+                model_mappings.append([f"layers.{layer_index}.hnorm.weight"])
+                model_mappings.append([f"layers.{layer_index}.eh_proj.weight", None, "transpose"])
+                model_mappings.append([f"layers.{layer_index}.shared_head.norm.weight"])
+                model_mappings.append([f"layers.{layer_index}.shared_head.head.weight", None, "transpose"])
 
         init_name_mappings(mappings=model_mappings)
         if cls.base_model_class.__name__ not in config.architectures:
@@ -1245,11 +1265,30 @@ class DeepseekV2PretrainedModel(PretrainedModel):
             base_actions["layers.0.mlp.gate_proj.weight"] = partial(fn, is_column=True)
             base_actions["layers.0.mlp.down_proj.weight"] = partial(fn, is_column=False)
 
+            base_actions["layers.0.mlp.shared_experts.gate_proj.weight"] = partial(fn, is_column=True)
+            base_actions["layers.0.mlp.shared_experts.up_proj.weight"] = partial(fn, is_column=True)
+            base_actions["layers.0.mlp.shared_experts.down_proj.weight"] = partial(fn, is_column=False)
+
             for key, action in base_actions.items():
                 if "layers.0." in key:
                     for i in range(num_layers):
                         final_actions[key.replace("layers.0.", f"layers.{i}.")] = action
                 final_actions[key] = action
+
+            # for MTP (eagle) parameters for inference
+            base_actions.pop("embed_tokens.weight")
+            base_actions.pop("lm_head.weight")
+            base_actions["layers.0.embed_tokens.weight"] = partial(fn, is_column=False)
+            base_actions["layers.0.eh_proj.weight"] = partial(fn, is_column=True)
+            base_actions["layers.0.shared_head.head.weight"] = partial(fn, is_column=True)
+            for key, action in base_actions.items():
+                if "layers.0." in key:
+                    for i in range(
+                        config.num_hidden_layers, config.num_hidden_layers + config.num_nextn_predict_layers
+                    ):
+                        final_actions[key.replace("layers.0.", f"layers.{i}.")] = action
+                else:
+                    final_actions[key] = action
 
             return final_actions
 
@@ -1273,7 +1312,6 @@ class DeepseekV2PretrainedModel(PretrainedModel):
                 linear_utils.ColumnSequenceParallelLinear,
             ),
         ):
-
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
             # and reset the `state_dict` to update parameter in static mode.
             if isinstance(layer.weight, paddle.Tensor):
@@ -1395,11 +1433,12 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
         self,
         layer_module: nn.Layer,
         hidden_states: Tensor,
-        attention_mask: Tensor,
         position_ids: Optional[Tensor],
-        past_key_value: Tensor,
+        attention_mask: Tensor,
         output_attentions: bool,
+        past_key_value: Tensor,
         use_cache: bool,
+        attn_mask_startend_row_indices: Optional[Tensor] = None,
     ):
         def create_custom_forward(module):
             def custom_forward(*inputs):
@@ -1410,11 +1449,12 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
         hidden_states = recompute(
             create_custom_forward(layer_module),
             hidden_states,
-            attention_mask,
             position_ids,
-            past_key_value,
+            attention_mask,
             output_attentions,
+            past_key_value,
             use_cache,
+            attn_mask_startend_row_indices,
             use_reentrant=self.config.recompute_use_reentrant,
         )
 
@@ -1423,14 +1463,16 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
     def forward(
         self,
         input_ids: paddle.Tensor = None,
-        attention_mask: Optional[paddle.Tensor] = None,
         position_ids: Optional[paddle.Tensor] = None,
-        past_key_values: Optional[List[paddle.Tensor]] = None,
+        attention_mask: Optional[paddle.Tensor] = None,
         inputs_embeds: Optional[paddle.Tensor] = None,
         use_cache: Optional[bool] = None,
+        past_key_values: Optional[List[paddle.Tensor]] = None,
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
+        attn_mask_startend_row_indices: Optional[Tensor] = None,
+        **kwargs,
     ) -> Union[Tuple, BaseModelOutputWithPast]:
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
@@ -1479,17 +1521,20 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
             inputs_embeds = self.embed_tokens(input_ids)
 
         # embed positions
-        if attention_mask is None:
+        if attn_mask_startend_row_indices is not None or get_use_casual_mask():
+            attention_mask = None
+        else:
             # [bs, seq_len]
-            attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
-
-        # 4d mask is passed through the layers
-        attention_mask = self._prepare_decoder_attention_mask(
-            attention_mask,
-            (batch_size, seq_length),
-            past_key_values_length,
-            inputs_embeds.dtype,
-        )
+            attention_mask = (
+                paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
+                if attention_mask is None
+                else attention_mask
+            )
+            attention_mask = self._prepare_decoder_attention_mask(
+                attention_mask, (batch_size, seq_length), past_key_values_length, inputs_embeds.dtype
+            )  # [bs, 1, seq_len, seq_len]
+            if self.config.use_flash_attention:
+                attention_mask = None if is_casual_mask(attention_mask) else attention_mask
 
         if self.config.sequence_parallel:
             # [bs, seq_len, num_head * head_dim] -> [bs * seq_len, num_head * head_dim]
@@ -1521,21 +1566,23 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
             ):
                 layer_outputs = self.recompute_training_full(
                     decoder_layer,
-                    hidden_states,
-                    attention_mask,
-                    position_ids,
-                    past_key_value,
-                    output_attentions,
-                    use_cache,
+                    hidden_states=hidden_states,
+                    position_ids=position_ids,
+                    attention_mask=attention_mask,
+                    output_attentions=output_attentions,
+                    past_key_value=past_key_value,
+                    use_cache=use_cache,
+                    attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                 )
             else:
                 layer_outputs = decoder_layer(
-                    hidden_states,
-                    attention_mask=attention_mask,
+                    hidden_states=hidden_states,
                     position_ids=position_ids,
-                    past_key_value=past_key_value,
+                    attention_mask=attention_mask,
                     output_attentions=output_attentions,
+                    past_key_value=past_key_value,
                     use_cache=use_cache,
+                    attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                 )
 
             # NOTE: clear outdate cache after it has been used for memory saving
@@ -1569,14 +1616,14 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
         )
 
 
-class DeepSeekV2PretrainingCriterion(nn.Layer):
+class DeepseekV2PretrainingCriterion(nn.Layer):
     """
     Criterion for Mixtral.
     It calculates the final loss.
     """
 
     def __init__(self, config: DeepseekV2Config):
-        super(DeepSeekV2PretrainingCriterion, self).__init__()
+        super(DeepseekV2PretrainingCriterion, self).__init__()
         self.ignore_index = getattr(config, "ignore_index", -100)
         self.config = config
         self.enable_parallel_cross_entropy = config.tensor_parallel_degree > 1 and config.tensor_parallel_output
@@ -1598,15 +1645,23 @@ class DeepSeekV2PretrainingCriterion(nn.Layer):
             masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
 
             # skip ignore_index which loss == 0
-            masked_lm_loss = masked_lm_loss[masked_lm_loss > 0]
-            loss = paddle.mean(masked_lm_loss)
+            # masked_lm_loss = masked_lm_loss[masked_lm_loss > 0]
+            # loss = paddle.mean(masked_lm_loss)
+            binary_sequence = paddle.where(
+                masked_lm_loss > 0, paddle.ones_like(masked_lm_loss), paddle.zeros_like(masked_lm_loss)
+            )
+            count = paddle.sum(binary_sequence)
+            if count == 0:
+                loss = paddle.sum(masked_lm_loss * binary_sequence)
+            else:
+                loss = paddle.sum(masked_lm_loss * binary_sequence) / count
 
         return loss
 
 
-class DeepSeekV2LMHead(nn.Layer):
+class DeepseekV2LMHead(nn.Layer):
     def __init__(self, config: DeepseekV2Config):
-        super().__init__()
+        super(DeepseekV2LMHead, self).__init__()
 
         self.config = config
         if config.tensor_parallel_degree > 1 and config.vocab_size % config.tensor_parallel_degree == 0:
@@ -1643,8 +1698,8 @@ class DeepseekV2ForCausalLM(DeepseekV2PretrainedModel):
         self.config = config
         self.deepseek_v2 = DeepseekV2Model(config)
         self.vocab_size = config.vocab_size
-        self.lm_head = DeepSeekV2LMHead(config)
-        self.criterion = DeepSeekV2PretrainingCriterion(config)
+        self.lm_head = DeepseekV2LMHead(config)
+        self.criterion = DeepseekV2PretrainingCriterion(config)
 
     def get_input_embeddings(self):
         return self.deepseek_v2.embed_tokens
@@ -1667,15 +1722,16 @@ class DeepseekV2ForCausalLM(DeepseekV2PretrainedModel):
     def forward(
         self,
         input_ids: paddle.Tensor = None,
-        attention_mask: Optional[paddle.Tensor] = None,
         position_ids: Optional[paddle.Tensor] = None,
-        past_key_values: Optional[List[paddle.Tensor]] = None,
+        attention_mask: Optional[paddle.Tensor] = None,
         inputs_embeds: Optional[paddle.Tensor] = None,
         labels: Optional[paddle.Tensor] = None,
         use_cache: Optional[bool] = None,
+        past_key_values: Optional[List[paddle.Tensor]] = None,
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
+        attn_mask_startend_row_indices=None,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
         r"""
         Args:
@@ -1708,26 +1764,57 @@ class DeepseekV2ForCausalLM(DeepseekV2PretrainedModel):
         )
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
+        if attn_mask_startend_row_indices is not None and attention_mask is not None:
+            logger.warning(
+                "You have provided both attn_mask_startend_row_indices and attention_mask. "
+                "The attn_mask_startend_row_indices will be used."
+            )
+            attention_mask = None
+
         # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
         outputs = self.deepseek_v2(
             input_ids=input_ids,
-            attention_mask=attention_mask,
             position_ids=position_ids,
-            past_key_values=past_key_values,
+            attention_mask=attention_mask,
             inputs_embeds=inputs_embeds,
             use_cache=use_cache,
+            past_key_values=past_key_values,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
+            attn_mask_startend_row_indices=attn_mask_startend_row_indices,
         )
 
         hidden_states = outputs[0]
-        logits = self.lm_head(hidden_states)
 
-        loss = None
-        # TODO@DrownFish19: shift labels
-        if labels is not None:
-            loss = self.criterion(logits, labels)
+        if labels is not None and self.config.use_fused_linear_cross_entropy:
+            from paddlenlp_kernel.triton.cut_cross_entropy import linear_cross_entropy
+
+            assert (
+                self.config.tensor_parallel_degree <= 1
+            ), "The argument `use_fused_linear_cross_entropy` is imcompatiable with tensor parallel "
+
+            masked_lm_loss = linear_cross_entropy(hidden_states, self.lm_head.weight, targets=labels)
+
+            binary_sequence = paddle.where(
+                masked_lm_loss > 0, paddle.ones_like(masked_lm_loss), paddle.zeros_like(masked_lm_loss)
+            )
+            count = paddle.sum(binary_sequence)
+            if count == 0:
+                loss = paddle.sum(masked_lm_loss * binary_sequence)
+            else:
+                loss = paddle.sum(masked_lm_loss * binary_sequence) / count
+            logits = None
+        else:
+            # if labels is None，means we need full output, instead of tensor_parallel_output
+            # tensor_parallel_output is together with ParallelCrossEntropy
+            tensor_parallel_output = self.config.tensor_parallel_output and self.config.tensor_parallel_degree > 1
+
+            logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
+
+            loss = None
+            if labels is not None:
+                loss = self.criterion(logits, labels)
 
         if not return_dict:
             output = (logits,) + outputs[1:]
@@ -1746,7 +1833,6 @@ class DeepseekV2ForCausalLM(DeepseekV2PretrainedModel):
     ):
         batch_size, seq_length = input_ids.shape
         position_ids = kwargs.get("position_ids", paddle.arange(seq_length).expand((batch_size, seq_length)))
-        attention_mask = kwargs.get("attention_mask", None)
         if past_key_values:
             input_ids = input_ids[:, -1].unsqueeze(axis=-1)
             position_ids = position_ids[:, -1].unsqueeze(-1)
