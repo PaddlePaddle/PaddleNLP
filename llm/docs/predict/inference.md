@@ -25,6 +25,7 @@ PaddleNLP 大模型推理提供压缩、推理、服务全流程体验 ：
 ## 1. 模型支持
 
 PaddleNLP 中已经添加高性能推理模型相关实现，已验证过的模型如下：
+
 | Models | Example Models |
 |--------|----------------|
 |Llama 3.x, Llama 2|`meta-llama/Llama-3.2-3B-Instruct`, `meta-llama/Meta-Llama-3.1-8B`, `meta-llama/Meta-Llama-3.1-8B-Instruct`, `meta-llama/Meta-Llama-3.1-405B`, `meta-llama/Meta-Llama-3.1-405B-Instruct`,`meta-llama/Meta-Llama-3-8B`, `meta-llama/Meta-Llama-3-8B-Instruct`, `meta-llama/Meta-Llama-3-70B`, `meta-llama/Meta-Llama-3-70B-Instruct`, `meta-llama/Llama-Guard-3-8B`, `Llama-2-7b, meta-llama/Llama-2-7b-chat`, `meta-llama/Llama-2-13b`, `meta-llama/Llama-2-13b-chat`, `meta-llama/Llama-2-70b`, `meta-llama/Llama-2-70b-chat`|

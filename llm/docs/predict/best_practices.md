@@ -1,4 +1,4 @@
-# 最佳实践
+# 高性能推理最佳实践
 
 PaddleNLP 提供了多种环境变量，用于优化推理性能和资源使用。下面提供一些调整 PaddleNLP 推理性能的最佳实践。
 
@@ -29,6 +29,6 @@ PaddleNLP 提供了多种环境变量，用于优化推理性能和资源使用�
 
 **Append Attention 优化**
 
-- `FLAGS_cascade_attention_max_partition_size`：Append Attention decoder计算时对cache_kv进行分chunk的chunk大小，默认值根据batchsize设置，batchsize=1时设置为128，batchsize>1时设置为512。显式设置时不再区分batchsize。
-- `FLAGS_dec_block_shape_q`：Append Attention decoder计算时对q进行分块的分块大小，默认值为16。
-- `FLAGS_enc_block_shape_q`：Append Attention encoder计算时对q进行分块的分块大小，默认值为64。
+- `FLAGS_cascade_attention_max_partition_size`：Append Attention decoder 计算时对 cache_kv 进行分 chunk 的 chunk 大小，默认值根据 batchsize 设置，batchsize=1时设置为128，batchsize>1时设置为512。显式设置时不再区分 batchsize。
+- `FLAGS_dec_block_shape_q`：Append Attention decoder 计算时对 q 进行分块的分块大小，默认值为16。
+- `FLAGS_enc_block_shape_q`：Append Attention encoder 计算时对 q 进行分块的分块大小，默认值为64。

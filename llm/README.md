@@ -402,7 +402,7 @@ python ./predict/predictor.py --model_name_or_path ./inference --inference_model
 
 服务化部署脚本
 
-```shell 
+```shell
 # 单卡，可以使用 paddle.distributed.launch 启动多卡推理
 python  ./predict/flask_server.py \
     --model_name_or_path Qwen/Qwen2.5-0.5B-Instruct \
@@ -426,6 +426,32 @@ curl 127.0.0.1:8011/v1/chat/completions \
 -H 'Content-Type: application/json' \
 -d '{"message": [{"role": "user", "content": "你好"}]}'
 ```
+使用 OpenAI 客户端调用：
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    api_key="EMPTY",
+    base_url="http://localhost:8011/v1/",
+)
+
+# Completion API
+stream = True
+completion = client.chat.completions.create(
+    model="paddlenlp",
+    messages=[
+        {"role": "user", "content": "PaddleNLP好厉害！这句话的感情色彩是？"}
+    ],
+    max_tokens=1024,
+    stream=stream,
+)
+
+if stream:
+    for c in completion:
+        print(c.choices[0].delta.content, end="")
+else:
+    print(completion.choices[0].message.content)
+```
 
 
 
@@ -433,7 +459,7 @@ curl 127.0.0.1:8011/v1/chat/completions \
 
 该部署工具是基于英伟达 Triton 框架专为服务器场景的大模型服务化部署而设计。它提供了支持 gRPC、HTTP 协议的服务接口，以及流式 Token 输出能力。底层推理引擎支持连续批处理、weight only int8、后训练量化（PTQ）等加速优化策略，为用户带来易用且高性能的部署体验。
 
-基于预编译镜像部署，本节以 Meta-Llama-3-8B-Instruct-A8W8C8 为例，更多模型请参考[LLaMA](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/llama.md)、[Qwen](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/qwen.md)、[Mixtral](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/mixtral.md), 更细致的模型推理、量化教程可以参考[大模型推理教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/inference.md)：
+基于预编译镜像部署，本节以 Meta-Llama-3-8B-Instruct-A8W8C8 为例，更细致的模型推理、量化教程可以参考[大模型推理教程](./docs/predict/inference.md)：
 
 ```shell
 # 下载模型
@@ -460,7 +486,8 @@ curl 127.0.0.1:9965/v1/chat/completions \
 Note:
 1. 请保证 shm-size >= 5，不然可能会导致服务启动失败
 
-更多关于该部署工具的使用方法，请查看[服务化部署流程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/deploy_usage_tutorial.md)
+更多模型请参考[LLaMA](./docs/predict/llama.md)、[Qwen](./docs/predict/qwen.md)、[Mixtral](./docs/predict/mixtral.md)。
+更多关于该部署工具的使用方法，请查看[服务化部署流程](./server/docs/deploy_usage_tutorial.md)
 
 ### 8. PyTorch 模型权重转换
 

@@ -59,13 +59,6 @@
    大模型-量化教程 <llm/docs/quantization.md>
    大模型-高级技术文档 <llm/docs/advanced.rst>
    
-   .. 大模型FlashMask算法 <llm/docs/flashmask.md>
-   .. 大模型常用算法文档 <llm/docs/algorithm_overview.md>
-   .. 大模型统一存储文档 <llm/docs/unified_checkpoint.md>
-   .. 混合并行训练教程 <llm/docs/llm_trainer.rst>
-   .. 模型权重转换教程 <llm/docs/torch2paddle.md>
-
-
 .. toctree::
    :maxdepth: 1
    :caption: 模型库
