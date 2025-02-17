@@ -13,6 +13,10 @@
 # limitations under the License.
 from __future__ import annotations
 
+<<<<<<< HEAD
+=======
+import traceback
+>>>>>>> add auto parallel moe layer
 from typing import Tuple
 
 import paddle
@@ -21,7 +25,10 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 
 from ..utils.log import logger
+<<<<<<< HEAD
 from .auto_utils import einsum
+=======
+>>>>>>> add auto parallel moe layer
 
 
 class MoEGateMixin:
@@ -91,6 +98,10 @@ class MoEGateMixin:
         # gates has shape of SE
         num_tokens = gates.shape[0]
         num_experts = gates.shape[1]
+<<<<<<< HEAD
+=======
+        print(f"==== num_tokens:{num_tokens}, num_experts:{num_experts} ====")
+>>>>>>> add auto parallel moe layer
         capacity = int((num_tokens // num_experts) * capacity_factor)
         if capacity < min_capacity:
             capacity = min_capacity
