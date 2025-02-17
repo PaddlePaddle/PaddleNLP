@@ -994,7 +994,6 @@ class FusedMultiTransformerBase(Layer):
             key_nope, value = key_value.split(
                 [self.config.mla_config.qk_nope_head_dim, self.config.mla_config.v_head_dim], axis=-1
             )
-
             query_pe, key_pe = self.config.rotary_emb(self.position_ids, query_pe, key_pe)
 
             query[..., self.config.mla_config.qk_nope_head_dim :] = query_pe
@@ -1308,13 +1307,14 @@ class FusedMultiTransformerBase(Layer):
         if self.config.mla_config.use_mla():
             seq_lens_encoder = kwargs.get("seq_lens_encoder", None)
             seq_lens_decoder = kwargs.get("seq_lens_decoder", None)
-            position_ids_shape = paddle.sum(seq_lens_encoder) + paddle.sum(seq_lens_decoder > 0)
+            seq_lens_this_time = kwargs.get("seq_lens_this_time", None)
+            position_ids_shape = paddle.sum(seq_lens_this_time)
             self.position_ids = paddle.zeros(shape=position_ids_shape, dtype=seq_lens_encoder.dtype)
 
             from paddlenlp_ops import get_position_ids
 
             # In-place operations that compute the position_ids.
-            get_position_ids(seq_lens_encoder, seq_lens_decoder, self.position_ids)
+            get_position_ids(seq_lens_encoder, seq_lens_decoder, seq_lens_this_time, self.position_ids)
 
     def post_process(self, **kwargs):
         time_step = kwargs.get("time_step", None)

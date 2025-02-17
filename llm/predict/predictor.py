@@ -145,7 +145,9 @@ class PredictorArgument:
     )
     speculate_method: str = field(
         default=None,
-        metadata={"help": "speculate method, it should be one of ['None', 'inference_with_reference', 'eagle']"},
+        metadata={
+            "help": "speculate method, it should be one of ['None', 'inference_with_reference', 'eagle', 'mtp']"
+        },
     )
     speculate_max_draft_token_num: int = field(
         default=1,
@@ -230,15 +232,12 @@ class BasePredictor:
                 source = [source]
             source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
 
-        return_attention_mask = False
-        if len(source) > 1:
-            return_attention_mask = True
         tokenized_source = self.tokenizer(
             source,
             max_length=self.config.src_length,
             truncation=True,
             return_position_ids=True if not isinstance(self.tokenizer, ChatGLMTokenizer) else False,
-            return_attention_mask=return_attention_mask,
+            return_attention_mask=True,
             truncation_side="left",
             return_tensors=self.return_tensors,
             padding=True,
@@ -1019,6 +1018,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
     def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None, **kwargs):
         model = kwargs.get("model", None)
         self.return_full_hidden_states = config.return_full_hidden_states
+        self.full_hidden_states = None
         if model is None:
             raise ValueError("model should be provided for DygraphBlockInferencePredictor")
         self.cache_kvs_shape = model.get_cache_kvs_shape(model.config, config.batch_size)
@@ -1048,7 +1048,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                 config.batch_size,
                 config.max_length,
             )
-        elif config.speculate_method == "eagle":
+        elif config.speculate_method in ["eagle", "mtp"]:
             self.proposer = EagleProposer(args=config)
         else:
             self.proposer = None
@@ -1062,7 +1062,10 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
     @paddle.no_grad()
     def predict(self, input_texts: list[str], return_tokens=False):
         self._preprocess(input_texts)
-
+        if self.proposer is not None:
+            self.proposer.insert_query(
+                base_model_inputs=self.model_inputs, real_bs=len(input_texts), seq_lens=self.seq_lens
+            )
         result_queue = mp.Queue()
         tensor_queue = mp.Queue()
         done_event = mp.Event()
@@ -1094,12 +1097,16 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                     self.model_inputs,
                     real_batch_size=self.batch_size,
                     seq_lens_this_time=self.model_inputs["seq_lens_this_time"],
+                    base_model_full_hidden_states=self.full_hidden_states,
                 )
             if self.return_full_hidden_states:
                 self.full_hidden_states = self._infer(self.model_inputs)
             else:
                 self._infer(self.model_inputs)
         logger.info(f"running spend {time.time()  -  s_time}")
+
+        if self.proposer is not None:
+            self.proposer.postprocess(base_model_inputs=self.model_inputs)
 
         if self.tensor_parallel_rank == 0:
             outputs = []
@@ -1164,7 +1171,7 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
                 config.batch_size,
                 config.max_length,
             )
-        elif config.speculate_method == "eagle":
+        elif config.speculate_method in ["eagle", "mtp"]:
             self.proposer = EagleProposer(
                 args=config,
                 model_args=self.model_args,

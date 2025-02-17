@@ -362,7 +362,9 @@ PaddleNLP 提供高性能推理，内置动态插入和全环节算子融合策�
      </font>
 </div>
 
-安装高性能推理算子教程（可选）
+
+<a id="paddlenlpops"></a>
+paddlenlp_ops 安装高性能推理算子教程（可选）
 ```shell
 cd ../csrc/
 python setup_cuda.py install
@@ -393,16 +395,21 @@ python ./predict/predictor.py --model_name_or_path ./inference --inference_model
 
 我们提供了一套基于动态图推理的简单易用 UI 服务化部署方法，用户可以快速部署服务化推理。
 
+请确保，在部署前请确保已正确安装 NLP，clone 本 repo 下位置代码。以及自定义算子库。本部署的服务是兼容 OpenAI API 接口
+
+
+
 环境准备
 
 - python >= 3.8
 - gradio
 - flask
+- paddlenlp_ops (可选，高性能自定义加速算子， 安装参考[这里](#paddlenlpops))
 
 
 服务化部署脚本
 
-```shell 
+```shell
 # 单卡，可以使用 paddle.distributed.launch 启动多卡推理
 python  ./predict/flask_server.py \
     --model_name_or_path Qwen/Qwen2.5-0.5B-Instruct \
@@ -415,25 +422,53 @@ python  ./predict/flask_server.py \
 - `flask_port`: Flask 服务端口号，默认8011。
 - 其他参数请参见[推理文档](./docs/predict/inference.md)中推理参数配置。
 
-打开 `http://127.0.0.1:8010` 即可使用 gradio 图形化界面，即可开启对话。
-您也可用通过 flask 服务化 API 的形式，访问 API，可参考：`./predict/request_flask_server.py` 文件。
+图形化界面: 打开 `http://127.0.0.1:8010` 即可使用 gradio 图形化界面，即可开启对话。
+API 访问: 您也可用通过 flask 服务化 API 的形式
+
+1. 可参考：`./predict/request_flask_server.py` 文件访问。
 ```shell
 python predict/request_flask_server.py
 ```
-或者直接使用 curl,调用开始对话
-```
+
+2. 或者直接使用 curl,调用开始对话
+```shell
 curl 127.0.0.1:8011/v1/chat/completions \
 -H 'Content-Type: application/json' \
 -d '{"message": [{"role": "user", "content": "你好"}]}'
 ```
+3. 使用 OpenAI 客户端调用：
+```python
+from openai import OpenAI
 
+client = OpenAI(
+    api_key="EMPTY",
+    base_url="http://localhost:8011/v1/",
+)
+
+# Completion API
+stream = True
+completion = client.chat.completions.create(
+    model="paddlenlp",
+    messages=[
+        {"role": "user", "content": "PaddleNLP好厉害！这句话的感情色彩是？"}
+    ],
+    max_tokens=1024,
+    stream=stream,
+)
+
+if stream:
+    for c in completion:
+        print(c.choices[0].delta.content, end="")
+else:
+    print(completion.choices[0].message.content)
+```
 
 
 #### 7.2 大模型服务化部署工具
 
 该部署工具是基于英伟达 Triton 框架专为服务器场景的大模型服务化部署而设计。它提供了支持 gRPC、HTTP 协议的服务接口，以及流式 Token 输出能力。底层推理引擎支持连续批处理、weight only int8、后训练量化（PTQ）等加速优化策略，为用户带来易用且高性能的部署体验。
 
-基于预编译镜像部署，本节以 Meta-Llama-3-8B-Instruct-A8W8C8 为例，更多模型请参考[LLaMA](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/llama.md)、[Qwen](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/qwen.md)、[Mixtral](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/mixtral.md), 更细致的模型推理、量化教程可以参考[大模型推理教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/inference.md)：
+基于预编译镜像部署，本节以 Meta-Llama-3-8B-Instruct-A8W8C8 为例，更细致的模型推理、量化教程可以参考[大模型推理教程](./docs/predict/inference.md)：
 
 ```shell
 # 下载模型
@@ -460,7 +495,8 @@ curl 127.0.0.1:9965/v1/chat/completions \
 Note:
 1. 请保证 shm-size >= 5，不然可能会导致服务启动失败
 
-更多关于该部署工具的使用方法，请查看[服务化部署流程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/deploy_usage_tutorial.md)
+更多模型请参考[LLaMA](./docs/predict/llama.md)、[Qwen](./docs/predict/qwen.md)、[Mixtral](./docs/predict/mixtral.md)。
+更多关于该部署工具的使用方法，请查看[服务化部署流程](./server/docs/deploy_usage_tutorial.md)
 
 ### 8. PyTorch 模型权重转换
 

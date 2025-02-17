@@ -143,6 +143,8 @@ class QWenForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     _get_tensor_parallel_mappings = QWenPretrainedModel._get_tensor_parallel_mappings
     _init_weights = QWenPretrainedModel._init_weights
     _keys_to_ignore_on_load_unexpected = QWenPretrainedModel._keys_to_ignore_on_load_unexpected
+    _get_model_flops = QWenPretrainedModel._get_model_flops
+    _get_hardware_flops = QWenPretrainedModel._get_hardware_flops
 
     # DONOT Add base_model_prefix !!!!
 
