@@ -13,7 +13,6 @@
 # limitations under the License.
 from __future__ import annotations
 
-import os
 from functools import partial
 from typing import Tuple
 
@@ -29,6 +28,7 @@ from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedMultiTransformerConfig,
     MLAConfig,
     MoeConfig,
+    SpeculateConfig,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationBlockInferenceModel,
@@ -184,6 +184,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
         self.rms_norm_eps = config.rms_norm_eps
         self.quant_type = config.quant_type
         self.rope_theta = config.rope_theta
+        self.return_full_hidden_states = config.get("return_full_hidden_states", False)
 
         self.use_weight_only = False
         if config.quant_type == "weight_only_int8":
@@ -340,7 +341,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
         ]
 
         e_score_correction_bias_attrs = None
-        if self.base_model_prefix == "deepseek_v3":
+        if self.base_model_prefix.startswith("deepseek_v3"):
             e_score_correction_bias_attrs = [
                 paddle.ParamAttr(
                     name=f"fuse{self.base_model_prefix}.{idx}.e_score_correction_bias",
@@ -473,6 +474,12 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
             shared_expert_ffn2_weight_scale_attrs=shared_expert_ffn2_weight_scale_attrs,
         )
 
+        speculate_config = SpeculateConfig(
+            speculate_method=config.get("speculate_method", None),
+            speculate_max_draft_token_num=config.get("speculate_max_draft_token_num", 5),
+            return_full_hidden_states=config.get("return_full_hidden_states", False),
+        )
+
         transformer_config = FusedMultiTransformerConfig(
             embed_dim=self.hidden_size,
             num_heads=self.num_attention_heads,
@@ -501,6 +508,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
             moe_config=moe_config,
             mla_config=mla_config,
             append_attn=config.append_attn,
+            speculate_config=speculate_config,
         )
 
         self.set_transformer_block(transformer_config)
@@ -692,7 +700,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                     state_dict[f"{self.base_model_prefix}.layers.{idx}.mlp.gate.weight"]
                 ).cast("float32")
 
-                if self.base_model_prefix == "deepseek_v3":
+                if self.base_model_prefix.startswith("deepseek_v3"):
                     e_score_correction_bias = paddle.to_tensor(
                         state_dict[f"{self.base_model_prefix}.layers.{idx}.mlp.gate.e_score_correction_bias"]
                     ).cast("float32")
@@ -797,6 +805,76 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
             past_key_values=None,
             hidden_states=None,
             attentions=None,
+            cum_offsets=cum_offsets,
+        )
+
+
+@register_base_model
+class MTPDeepseekV2BlockInferenceModel(DeepseekV2BlockInferenceModel):
+    def __init__(self, config: DeepseekV2Config, base_model_prefix: str):
+        super().__init__(config, base_model_prefix)
+        from paddle.distributed.fleet.layers.mpu.mp_layers import ColumnParallelLinear
+
+        self.enorm = DeepseekV2RMSNorm(config)
+        self.hnorm = DeepseekV2RMSNorm(config)
+        self.norm = DeepseekV2RMSNorm(config)
+
+        if config.tensor_parallel_degree > 1:
+            self.eh_proj = ColumnParallelLinear(
+                self.hidden_size * 2, self.hidden_size, has_bias=True, gather_output=True, fuse_matmul_bias=True
+            )
+        else:
+            self.eh_proj = nn.Linear(self.hidden_size * 2, self.hidden_size, bias_attr=True)
+
+    def forward(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        inputs_embeds=None,
+        caches=None,
+        pre_caches=None,
+        output_attentions=False,
+        output_hidden_states=None,
+        return_dict=False,
+        **kwargs,
+    ):
+        seq_lens_this_time = kwargs.get("seq_lens_this_time", None)
+        rope_emb = kwargs.get("rope_emb", None)
+        draft_tokens = kwargs.get("draft_tokens", None)
+        seq_lens_encoder = kwargs.get("seq_lens_encoder", None)
+        pre_hidden_states = kwargs.get("pre_hidden_states", None)
+        ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k = self.remove_padding(
+            input_ids, seq_lens_this_time, draft_tokens, seq_lens_encoder
+        )
+
+        kwargs["cu_seqlens_q"] = cu_seqlens_q
+        kwargs["cu_seqlens_k"] = cu_seqlens_k
+        kwargs["padding_offsets"] = padding_offset
+        kwargs["max_input_length"] = self.max_seq_len
+
+        inputs_embeds = self.embed_tokens(ids_remove_padding)
+        inputs_embeds = paddle.concat([self.enorm(inputs_embeds), self.hnorm(pre_hidden_states)], axis=-1)
+        inputs_embeds = self.eh_proj(inputs_embeds)
+
+        with dy2st_nocheck_guard_context():
+            hidden_states, _ = self.transformer_block(
+                input_ids=input_ids,
+                src=inputs_embeds,
+                cum_offsets=cum_offsets,
+                attn_mask=attention_mask,
+                caches=caches,
+                pre_caches=pre_caches,
+                rotary_embs=rope_emb,
+                post_rebuild_padding=True,
+                **kwargs,
+            )
+        hidden_states = self.norm(hidden_states)
+
+        return BaseModelOutputWithPastAndCrossAttentions(
+            last_hidden_state=hidden_states,
+            past_key_values=None,
+            hidden_states=None,
+            attentions=None,
         )
 
 
@@ -814,6 +892,7 @@ class DeepseekV2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, De
         self.max_candidate_len = config.get("speculate_max_candidate_len", 5)
         self.verify_window = config.get("speculate_verify_window", 2)
         self.max_seq_len = config.max_seq_len
+        self.return_full_hidden_states = config.get("return_full_hidden_states", False)
 
         self.deepseek_v2 = DeepseekV2BlockInferenceModel(config, base_model_prefix)
         if config.tie_word_embeddings:
@@ -843,6 +922,7 @@ class DeepseekV2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, De
 
             base_actions = {
                 "lm_head.weight": partial(fn, is_column=True),
+                "eh_proj.weight": partial(fn, is_column=True),
                 # Row Linear
                 "embed_tokens.weight": partial(fn, is_column=False),
                 "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
@@ -998,12 +1078,29 @@ class DeepseekV2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, De
             draft_tokens=draft_tokens,
             output_padding_offset=output_padding_offset,
         )
+        if self.return_full_hidden_states:
+            from paddlenlp_ops import rebuild_padding_v2
 
-        hidden_states = outputs[0]
+            full_hidden_states = outputs[0]
+            cum_offsets = outputs[1]
+            hidden_states = rebuild_padding_v2(
+                full_hidden_states,
+                cum_offsets,
+                seq_lens_decoder,
+                seq_lens_encoder,
+                output_padding_offset,
+                self.max_seq_len,
+            )
+        else:
+            hidden_states = outputs[0]
         logits = self.lm_head(
             hidden_states,
             tensor_parallel_output=False,
         )
+        if self.return_full_hidden_states:
+            return logits, full_hidden_states
+        else:
+            return logits
 
         return logits
 
@@ -1014,3 +1111,131 @@ class DeepseekV2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, De
                 paddle.to_tensor(state_dict["lm_head.weight"]).cast(self.lm_head.weight.dtype)
             )
         self.deepseek_v2.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
+
+
+class MTPDeepseekV2ForCausalLMBlockInferenceModel(DeepseekV2ForCausalLMBlockInferenceModel):
+    def __init__(self, config, base_model_prefix):
+        super(DeepseekV2ForCausalLMBlockInferenceModel, self).__init__(config, base_model_prefix="deepseek_v3_mtp")
+        self.max_candidate_len = config.get("speculate_max_candidate_len", 5)
+        self.verify_window = config.get("speculate_verify_window", 2)
+        self.max_seq_len = config.max_seq_len
+
+        self.mtp = MTPDeepseekV2BlockInferenceModel(config, base_model_prefix="deepseek_v3_mtp")
+        self.tensor_parallel_rank = config.tensor_parallel_rank
+        if config.tie_word_embeddings:
+            self.lm_head = DeepseekV2LMHead(config, embedding_weights=self.llama.embed_tokens.weight, transpose_y=True)
+            self.tie_weights()
+        else:
+            self.lm_head = DeepseekV2LMHead(config)
+
+    def prepare_inputs_for_generation(self, **kwargs):
+        # only last token for inputs_ids if cache is defined in kwargs
+        input_ids = kwargs["input_ids"]
+        src_mask = kwargs.get("src_mask", None)
+        block_tables = kwargs.get("block_tables", None)
+
+        pre_caches = kwargs.get("pre_caches", None)
+        caches = kwargs.get("caches", None)
+
+        rope_emb = kwargs["rope_emb"]
+        seq_lens_this_time = kwargs["seq_lens_this_time"]
+        seq_lens_encoder = kwargs["seq_lens_encoder"]
+        seq_lens_decoder = kwargs["seq_lens_decoder"]
+        k_quant_scales = kwargs.get("k_quant_scales", None)
+        v_quant_scales = kwargs.get("v_quant_scales", None)
+        k_dequant_scales = kwargs.get("k_dequant_scales", None)
+        v_dequant_scales = kwargs.get("v_dequant_scales", None)
+
+        # speculative decoding related parameters
+        draft_tokens = kwargs.get("draft_tokens", None)
+        output_padding_offset = kwargs.get("output_padding_offset", None)
+        hidden_states = kwargs.get("hidden_states", None)
+
+        model_inputs = {
+            "input_ids": input_ids,
+            "src_mask": src_mask,
+            "rope_emb": rope_emb,
+            "pre_caches": pre_caches,
+            "caches": caches,
+            "seq_lens_this_time": seq_lens_this_time,
+            "seq_lens_encoder": seq_lens_encoder,
+            "seq_lens_decoder": seq_lens_decoder,
+            "block_tables": block_tables,
+            "k_quant_scales": k_quant_scales,
+            "v_quant_scales": v_quant_scales,
+            "k_dequant_scales": k_dequant_scales,
+            "v_dequant_scales": v_dequant_scales,
+            "draft_tokens": draft_tokens,
+            "output_padding_offset": output_padding_offset,
+            "pre_hidden_states": hidden_states,
+        }
+        return model_inputs
+
+    @paddle.no_grad()
+    def set_state_dict(self, state_dict):
+        if "lm_head.weight" in state_dict:
+            self.lm_head.weight.set_value(
+                paddle.to_tensor(state_dict["lm_head.weight"]).cast(self.lm_head.weight.dtype)
+            )
+
+        self.mtp.enorm.weight.set_value(
+            paddle.to_tensor(state_dict["deepseek_v3_mtp.enorm.weight"]).cast(self.lm_head.weight.dtype)
+        )
+        self.mtp.hnorm.weight.set_value(
+            paddle.to_tensor(state_dict["deepseek_v3_mtp.hnorm.weight"]).cast(self.lm_head.weight.dtype)
+        )
+        self.mtp.norm.weight.set_value(
+            paddle.to_tensor(state_dict["deepseek_v3_mtp.norm.weight"]).cast(self.lm_head.weight.dtype)
+        )
+        self.mtp.eh_proj.weight.set_value(
+            paddle.to_tensor(state_dict["deepseek_v3_mtp.eh_proj.weight"]).cast(self.lm_head.weight.dtype)
+        )
+
+        self.mtp.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
+
+    def forward(
+        self,
+        input_ids,
+        src_mask=None,
+        pre_caches=None,
+        caches=None,
+        seq_lens_this_time=None,
+        seq_lens_encoder=None,
+        seq_lens_decoder=None,
+        rope_emb=None,
+        block_tables=None,
+        k_quant_scales=None,
+        v_quant_scales=None,
+        k_dequant_scales=None,
+        v_dequant_scales=None,
+        draft_tokens=None,
+        output_padding_offset=None,
+        pre_hidden_states=None,
+    ):
+        outputs = self.mtp(
+            input_ids,
+            src_mask=src_mask,
+            caches=caches,
+            rope_emb=rope_emb,
+            block_tables=block_tables,
+            pre_caches=pre_caches,
+            seq_lens_this_time=seq_lens_this_time,
+            seq_lens_encoder=seq_lens_encoder,
+            seq_lens_decoder=seq_lens_decoder,
+            k_quant_scales=k_quant_scales,
+            v_quant_scales=v_quant_scales,
+            k_dequant_scales=k_dequant_scales,
+            v_dequant_scales=v_dequant_scales,
+            draft_tokens=draft_tokens,
+            output_padding_offset=output_padding_offset,
+            pre_hidden_states=pre_hidden_states,
+        )
+
+        hidden_states = outputs[0]
+
+        logits = self.lm_head(
+            hidden_states,
+            tensor_parallel_output=False,
+        )
+
+        return logits, hidden_states

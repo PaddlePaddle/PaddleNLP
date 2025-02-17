@@ -1,4 +1,4 @@
-# 安装
+# 高性能推理算子安装
 
 git clone 代码到本地：
 
@@ -7,17 +7,17 @@ git clone https://github.com/PaddlePaddle/PaddleNLP.git
 export PYTHONPATH=/path/to/PaddleNLP:$PYTHONPATH
 ```
 
-PaddleNLP 针对于Transformer 系列编写了高性能自定义算子，提升模型在推理和解码过程中的性能，使用之前需要预先安装自定义算子库：
+PaddleNLP 针对于 Transformer 系列编写了高性能自定义算子，提升模型在推理和解码过程中的性能，使用之前需要预先安装自定义算子库：
 
 ```shell
 #GPU设备安装自定义算子
 cd PaddleNLP/csrc && python setup_cuda.py install
 #XPU设备安装自定义算子
-cd PaddleNLP/csrc/xpu/src && sh cmake_build.sh
+# cd PaddleNLP/csrc/xpu/src && sh cmake_build.sh
 #DCU设备安装自定义算子
-cd PaddleNLP/csrc && python setup_hip.py install
+# cd PaddleNLP/csrc && python setup_hip.py install
 #SDAA设备安装自定义算子
-cd PaddleNLP/csrc/sdaa && python setup_sdaa.py install
+# cd PaddleNLP/csrc/sdaa && python setup_sdaa.py install
 ```
 
 到达运行目录，即可开始：

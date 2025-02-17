@@ -237,6 +237,8 @@ class GemmaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     _get_tensor_parallel_mappings = GemmaPretrainedModel._get_tensor_parallel_mappings
     _init_weights = GemmaPretrainedModel._init_weights
     _keys_to_ignore_on_load_unexpected = GemmaPretrainedModel._keys_to_ignore_on_load_unexpected
+    _get_model_flops = GemmaPretrainedModel._get_model_flops
+    _get_hardware_flops = GemmaPretrainedModel._get_hardware_flops
 
     # DONOT Add base_model_prefix !!!!
 
