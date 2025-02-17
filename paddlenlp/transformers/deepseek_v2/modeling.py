@@ -698,7 +698,6 @@ class MoEGate(PretrainedMoEGate):
             scores = scores.cast(paddle.get_default_dtype())
 
         capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss = self.topkgating(scores)
-
         return capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss
 
 
@@ -1144,6 +1143,22 @@ class DeepseekV2PretrainedModel(PretrainedModel):
     config_class = DeepseekV2Config
     base_model_prefix = "deepseek_v2"
     _no_split_modules = ["DeepseekV2DecoderLayer"]
+
+    def _get_model_flops(self, batch_size=1, seq_length=None, **kwargs):
+        from .mfu_utils import DeepSeekProjection
+
+        # self._
+        mfu_cal_proj = DeepSeekProjection(self.config)
+        if seq_length is None:
+            if hasattr(self.config, "seq_length"):
+                seq_length = self.config.seq_length
+            else:
+                seq_length = 2048
+
+        return mfu_cal_proj.get_num_flop_per_token()
+
+    def _get_hardware_flops(self, *args, **kwargs):
+        return self._get_model_flops(*args, **kwargs)
 
     @classmethod
     def _get_name_mappings(cls, config: DeepseekV2Config) -> list[StateDictNameMapping]:
