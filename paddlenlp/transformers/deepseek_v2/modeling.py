@@ -830,11 +830,11 @@ class DeepseekV2Attention(nn.Layer):
             if self.q_lora_rank is None:
                 self.q_proj = ColumnParallelLinear(self.hidden_size, self.num_heads * self.q_head_dim, has_bias=False, gather_output=False)
             else:
-                self.q_a_proj = nn.Linear(self.hidden_size, config.q_lora_rank, bias_attr=config.attention_bias)
+                self.q_a_proj = linear_utils.Linear(self.hidden_size, config.q_lora_rank, bias_attr=config.attention_bias)
                 self.q_a_layernorm = DeepseekV2RMSNorm(config=config, hidden_size=config.q_lora_rank, use_sequence_parallel=False)
                 self.q_b_proj = ColumnParallelLinear(config.q_lora_rank, self.num_heads * self.q_head_dim, has_bias=False, gather_output=False)
 
-            self.kv_a_proj_with_mqa = nn.Linear(self.hidden_size, config.kv_lora_rank + config.qk_rope_head_dim, bias_attr=config.attention_bias)
+            self.kv_a_proj_with_mqa = linear_utils.Linear(self.hidden_size, config.kv_lora_rank + config.qk_rope_head_dim, bias_attr=config.attention_bias)
             self.kv_a_layernorm = DeepseekV2RMSNorm(config=config, hidden_size=config.kv_lora_rank, use_sequence_parallel=False)
             self.kv_b_proj = ColumnParallelLinear(config.kv_lora_rank, self.num_heads * (self.q_head_dim - self.qk_rope_head_dim + self.v_head_dim), has_bias=False, gather_output=False)
 
@@ -846,17 +846,17 @@ class DeepseekV2Attention(nn.Layer):
         else:
             # for without tensor parallel
             if self.q_lora_rank is None:
-                self.q_proj = nn.Linear(self.hidden_size, self.num_heads * self.q_head_dim, bias_attr=False)
+                self.q_proj = linear_utils.Linear(self.hidden_size, self.num_heads * self.q_head_dim, bias_attr=False)
             else:
-                self.q_a_proj = nn.Linear(self.hidden_size, config.q_lora_rank, bias_attr=config.attention_bias)
+                self.q_a_proj = linear_utils.Linear(self.hidden_size, config.q_lora_rank, bias_attr=config.attention_bias)
                 self.q_a_layernorm = DeepseekV2RMSNorm(config=config, hidden_size=config.q_lora_rank)
-                self.q_b_proj = nn.Linear(config.q_lora_rank, self.num_heads * self.q_head_dim, bias_attr=False)
+                self.q_b_proj = linear_utils.Linear(config.q_lora_rank, self.num_heads * self.q_head_dim, bias_attr=False)
 
-            self.kv_a_proj_with_mqa = nn.Linear(self.hidden_size, config.kv_lora_rank + config.qk_rope_head_dim, bias_attr=config.attention_bias)
+            self.kv_a_proj_with_mqa = linear_utils.Linear(self.hidden_size, config.kv_lora_rank + config.qk_rope_head_dim, bias_attr=config.attention_bias)
             self.kv_a_layernorm = DeepseekV2RMSNorm(config=config, hidden_size=config.kv_lora_rank)
-            self.kv_b_proj = nn.Linear(config.kv_lora_rank, self.num_heads * (self.q_head_dim - self.qk_rope_head_dim + self.v_head_dim), bias_attr=False)
+            self.kv_b_proj = linear_utils.Linear(config.kv_lora_rank, self.num_heads * (self.q_head_dim - self.qk_rope_head_dim + self.v_head_dim), bias_attr=False)
 
-            self.o_proj = nn.Linear(self.num_heads * self.v_head_dim, self.hidden_size, bias_attr=config.attention_bias)
+            self.o_proj = linear_utils.Linear(self.num_heads * self.v_head_dim, self.hidden_size, bias_attr=config.attention_bias)
         # fmt: on
 
         self._init_rope()
@@ -1293,6 +1293,7 @@ class DeepseekV2PretrainedModel(PretrainedModel):
                 mpu.VocabParallelEmbedding,
                 mpu.RowParallelLinear,
                 mpu.ColumnParallelLinear,
+                linear_utils.Linear,
                 linear_utils.RowSequenceParallelLinear,
                 linear_utils.ColumnSequenceParallelLinear,
             ),
@@ -1888,7 +1889,7 @@ class DeepseekV2ForSequenceClassification(DeepseekV2PretrainedModel):
         super().__init__(config)
         self.num_labels = config.num_labels
         self.model = DeepseekV2Model(config)
-        self.score = nn.Linear(config.hidden_size, self.num_labels, bias_attr=False)
+        self.score = linear_utils.Linear(config.hidden_size, self.num_labels, bias_attr=False)
 
         # Initialize weights and apply final processing
         self.post_init()
