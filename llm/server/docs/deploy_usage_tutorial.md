@@ -1,4 +1,4 @@
-# 大模型服务化部署-全流程
+# 大模型服务化部署-静态图高性能部署全流程
 
 ## 目录
 
@@ -44,6 +44,13 @@ docker pull registry.baidubce.com/paddlepaddle/fastdeploy:llm-serving-cuda123-cu
 
 该部署工具为 PaddleNLP 静态图模型提供了高效的部署方案，模型静态图导出方案请参考：[LLaMA](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/llama.md)、[Qwen](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/qwen.md)、[Mixtral](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/mixtral.md) ...
 
+或者下载样例模型:
+```shell
+# 下载模型
+wget https://paddle-qa.bj.bcebos.com/inference_model/Meta-Llama-3-8B-Instruct-A8W8C8.tar
+mkdir Llama-3-8B-A8W8C8 && tar -xf Meta-Llama-3-8B-Instruct-A8W8C8.tar -C Llama-3-8B-A8W8C8
+```
+
 导出后的模型放在任意文件夹下，以 `/home/workspace/models_dir` 为例
 
 ```
@@ -88,7 +95,7 @@ ls /models/
 
 根据需求和硬件信息，配置以下环境变量
 
-```
+```shell
 # 单/多卡推理配置。自行修改。
 ## 如果是单卡推理，使用0卡，设置如下环境变量。
 export MP_NUM=1
@@ -129,7 +136,7 @@ export PUSH_MODE_HTTP_WORKERS="1" # HTTP服务进程数，在 PUSH_MODE_HTTP_POR
 
 ### 启动服务
 
-```
+```shell
 cd /opt/output/Serving
 bash start_server.sh
 
@@ -154,7 +161,7 @@ health接口：（模型是否准备好推理）
 
 提示：HTTP 调用接口使用变量 PUSH_MODE_HTTP_PORT 配置！HTTP_PORT 仅用于探活接口使用！
 
-```
+```python
 import uuid
 import json
 import requests
@@ -194,7 +201,7 @@ for line in res.iter_lines():
 
 ### 返回示例
 
-```
+```python
 如果stream为True，流式返回
     如果正常，返回{'token': xxx, 'is_end': xxx, 'send_idx': xxx, ..., 'error_msg': '', 'error_code': 0}
     如果异常，返回{'error_msg': xxx, 'error_code': xxx}，error_msg字段不为空，error_code字段不为0
@@ -210,7 +217,7 @@ for line in res.iter_lines():
 
 提示：使用 OpenAI 客户端需要配置 `PUSH_MODE_HTTP_PORT`！
 
-```
+```python
 import openai
 
 push_mode_http_port = "9965"    # 服务配置的PUSH_MODE_HTTP_PORT
@@ -279,7 +286,7 @@ print("\n")
 ## 基于 dockerfile 创建自己的镜像
 
 为了方便用户构建自定义服务，我们提供了基于 dockerfile 创建自己的镜像的脚本。
-```
+```shell
 git clone https://github.com/PaddlePaddle/PaddleNLP.git
 cd PaddleNLP/llm/server
 
