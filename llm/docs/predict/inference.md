@@ -171,6 +171,75 @@ python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --
 2. `a8w8`与`a8w8_fp8`需要额外的 act 和 weight 的 scale 校准表，推理传入的 `model_name_or_path` 为 PTQ 校准产出的量化模型。量化模型导出参考[大模型量化教程](../quantization.md)。
 3. `cachekv_int8_type`可选`dynamic`（已不再维护，不建议使用）和`static`两种，`static`需要额外的 cache kv 的 scale 校准表，传入的 `model_name_or_path` 为 PTQ 校准产出的量化模型。量化模型导出参考[大模型量化教程](../quantization.md)。
 
+# 服务化部署
+
+高性能服务化部署请参考：[静态图服务化部署教程](../../server/docs/deploy_usage_tutorial.md)。
+
+如果您想简单体验模型，我们提供了简易的 Flash Server 动态图部署方式，我们提供了一套基于动态图推理的简单易用 UI 服务化部署方法，用户可以快速部署服务化推理。
+
+环境准备
+
+- python >= 3.9
+- gradio
+- flask
+
+
+服务化部署脚本
+
+```shell
+# 单卡，可以使用 paddle.distributed.launch 启动多卡推理
+python  ./predict/flask_server.py \
+    --model_name_or_path Qwen/Qwen2.5-0.5B-Instruct \
+    --port 8010 \
+    --flask_port 8011 \
+    --dtype "float16"
+```
+
+- `port`: Gradio UI 服务端口号，默认8010。
+- `flask_port`: Flask 服务端口号，默认8011。
+
+打开 `http://127.0.0.1:8010` 即可使用 gradio 图形化界面，即可开启对话。
+
+您也可用通过 flask 服务化 API 的形式，访问 API，可参考：`./predict/request_flask_server.py` 文件。
+```shell
+python predict/request_flask_server.py
+```
+或者直接使用 curl,调用开始对话
+```shell
+curl 127.0.0.1:8011/v1/chat/completions \
+-H 'Content-Type: application/json' \
+-d '{"message": [{"role": "user", "content": "你好"}]}'
+```
+使用 OpenAI 客户端调用：
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    api_key="EMPTY",
+    base_url="http://localhost:8011/v1/",
+)
+
+# Completion API
+stream = True
+completion = client.chat.completions.create(
+    model="paddlenlp",
+    messages=[
+        {"role": "user", "content": "PaddleNLP好厉害！这句话的感情色彩是？"}
+    ],
+    max_tokens=1024,
+    stream=stream,
+)
+
+if stream:
+    for c in completion:
+        print(c.choices[0].delta.content, end="")
+else:
+    print(completion.choices[0].message.content)
+```
+该方式部署，性能一般，高性能服务化部署请参考：[静态图服务化部署教程](../../server/docs/deploy_usage_tutorial.md)。
+
+
+
 更多大模型推理教程：
 
 -  [llama](./llama.md)
@@ -189,7 +258,7 @@ python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --
 更多压缩、服务化推理体验：
 
 - [大模型量化教程](../quantization.md)
-- [服务化部署教程](../../server/docs/deploy_usage_tutorial.md)
+- [静态图服务化部署教程](../../server/docs/deploy_usage_tutorial.md)
 
 更多硬件大模型推理教程：
 
