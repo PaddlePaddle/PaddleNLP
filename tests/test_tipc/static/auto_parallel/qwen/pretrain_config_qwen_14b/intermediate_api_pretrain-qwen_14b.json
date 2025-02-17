@@ -25,7 +25,7 @@
     "scale_loss": 1024,
     "warmup_steps": 30,
     "logging_steps": 1,
-    "max_steps": 100,
+    "max_steps": 500,
     "save_steps": 1000,
     "eval_steps": 10000,
     "weight_decay": 0.01,

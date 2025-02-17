@@ -14,7 +14,7 @@
     "max_grad_norm": 0.0,
     "learning_rate": 0.00003,
     "min_learning_rate": 0.000003,
-    "max_steps": 100,
+    "max_steps": 500,
     "logging_steps": 1,
     "eval_steps": 10000,
     "save_steps": 1000,
