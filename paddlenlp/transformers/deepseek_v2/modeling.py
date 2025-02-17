@@ -675,6 +675,8 @@ class MoEGate(PretrainedMoEGate):
             is_bias=False,
             default_initializer=nn.initializer.Constant(1.0),
         )
+        print("==== weight after init ====")
+        print(self.weight)
 
         if config.topk_method == "noaux_tc":
             self.e_score_correction_bias = paddle.create_parameter(
@@ -691,6 +693,10 @@ class MoEGate(PretrainedMoEGate):
         _, h_dim = hidden_states.shape
 
         # compute gating score
+        print("==== weight ====")
+        print(self.weight)
+        print("==== hidden_states ====")
+        print(hidden_states)
         logits = F.linear(hidden_states, self.weight, None)
 
         with paddle.amp.auto_cast(False):
