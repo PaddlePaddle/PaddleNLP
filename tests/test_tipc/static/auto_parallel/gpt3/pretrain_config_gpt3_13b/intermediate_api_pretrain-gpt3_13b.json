@@ -12,7 +12,7 @@
     "scale_loss": 1024,
     "learning_rate": 0.00001,
     "min_learning_rate": 0.000001,
-    "max_steps": 100,
+    "max_steps": 500,
     "save_steps": 50000,
     "weight_decay": 0.01,
     "warmup_ratio": 0.01,
