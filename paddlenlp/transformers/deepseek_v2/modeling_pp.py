@@ -46,20 +46,18 @@ __all__ = [
 
 def parse_args(args):
     if isinstance(args, tuple):
-        if len(args) == 5:
-            hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids, mtp_hidden_state = args
         if len(args) == 4:
             hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids = args
-            mtp_hidden_state = None
+
         elif len(args) == 3:
             hidden_states, attention_mask, attn_mask_startend_row_indices = args
-            position_ids, mtp_hidden_state = None, None
+            position_ids = None
         elif len(args) == 2:
             hidden_states, attention_mask = args
-            attn_mask_startend_row_indices, position_ids, mtp_hidden_state = None, None, None
+            attn_mask_startend_row_indices, position_ids = None, None
     else:
         hidden_states = args
-        attention_mask, attn_mask_startend_row_indices, position_ids, mtp_hidden_state = None, None, None, None
+        attention_mask, attn_mask_startend_row_indices, position_ids = None, None, None
 
     if position_ids is not None:
         position_ids.stop_gradient = True
@@ -70,12 +68,10 @@ def parse_args(args):
     if attn_mask_startend_row_indices is not None:
         attn_mask_startend_row_indices.stop_gradient = True
 
-    return hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids, mtp_hidden_state
+    return hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids
 
 
-def return_args(
-    hidden_states, attention_mask=None, attn_mask_startend_row_indices=None, position_ids=None, mtp_hidden_state=None
-):
+def return_args(hidden_states, attention_mask=None, attn_mask_startend_row_indices=None, position_ids=None):
     ret = (hidden_states,)
 
     if attention_mask is not None:
@@ -84,8 +80,6 @@ def return_args(
         ret += (attn_mask_startend_row_indices.clone(),)
     if position_ids is not None:
         ret += (position_ids.clone(),)
-    if mtp_hidden_state is not None:
-        ret += (mtp_hidden_state.clone(),)
     if len(ret) == 1:
         ret = ret[0]
 
@@ -127,12 +121,15 @@ class DeepseekV2EmbeddingPipe(nn.Layer):
         Returns:
             _type_: _description_
         """
-        input_ids, attention_mask, attn_mask_startend_row_indices, position_ids, mtp_hidden_state = parse_args(args)
-        input_embeds = self.embed_tokens(input_ids)
+        input_ids, attention_mask, attn_mask_startend_row_indices, position_ids = parse_args(args)
+        inputs_embeds = self.embed_tokens(input_ids)
 
         batch_size, seq_length = input_ids.shape
         if self.config.num_nextn_predict_layers > 0:
             seq_length -= self.config.num_nextn_predict_layers
+
+            if attention_mask is not None:
+                attention_mask = attention_mask[:, : -self.config.num_nextn_predict_layers]
 
         if attention_mask is not None:
             assert (
@@ -140,7 +137,7 @@ class DeepseekV2EmbeddingPipe(nn.Layer):
             ), "attention_mask and attn_mask_startend_row_indices can not be set at same time"
 
             attention_mask = DeepseekV2Model._prepare_decoder_attention_mask(
-                attention_mask, (batch_size, seq_length), 0, input_embeds.dtype
+                attention_mask, (batch_size, seq_length), 0, inputs_embeds.dtype
             )
             attention_mask.stop_gradient = True
             if get_env_device() == "npu":
@@ -150,17 +147,17 @@ class DeepseekV2EmbeddingPipe(nn.Layer):
             attention_mask.stop_gradient = True
 
         if self.config.num_nextn_predict_layers > 0:
-            inputs_embeds_extra = input_embeds[:, -self.config.num_nextn_predict_layers :, :]  # [B, S, D]
-            inputs_embeds = input_embeds[:, : -self.config.num_nextn_predict_layers, :]
+            inputs_embeds_extra = inputs_embeds[:, -self.config.num_nextn_predict_layers :, :]  # [B, S, D]
+            inputs_embeds = inputs_embeds[:, : -self.config.num_nextn_predict_layers, :]
             inputs_embeds_ori = inputs_embeds
             batch_size, seq_length, _ = inputs_embeds.shape
 
             if self.sequence_parallel:
                 # [bs, seq_len, num_head * head_dim] -> [bs * seq_len, num_head * head_dim]
-                input_embeds = paddle.reshape_(input_embeds, [-1, input_embeds.shape[-1]])
+                inputs_embeds = paddle.reshape(inputs_embeds, [-1, inputs_embeds.shape[-1]])
                 # [seq_len * bs / n, num_head * head_dim] (n is mp parallelism)
-                input_embeds = ScatterOp.apply(input_embeds)
-            mtp_emb_res = []
+                inputs_embeds = ScatterOp.apply(inputs_embeds)
+            embeds_res = [inputs_embeds]
             for depth in range(self.config.num_nextn_predict_layers):
                 inputs_embeds_mtp = paddle.concat(
                     [
@@ -172,25 +169,28 @@ class DeepseekV2EmbeddingPipe(nn.Layer):
                 if self.sequence_parallel:
                     inputs_embeds_mtp = inputs_embeds_mtp.reshape([-1, inputs_embeds_mtp.shape[-1]])
                     inputs_embeds_mtp = ScatterOp.apply(inputs_embeds_mtp)
-                mtp_emb_res.append(inputs_embeds_mtp)
+                embeds_res.append(inputs_embeds_mtp)
             # if not self.sequence_parallel
             # mtp_embeds: [B*num_nextn_predict_layers, seq_len, hidden_size]
             # else:
             # mtp_embeds: [B*seq_len*num_nextn_predict_layers, hidden_size]
-            mtp_embeds = paddle.concat(mtp_emb_res, axis=0)
-            return return_args(input_embeds, attention_mask, attn_mask_startend_row_indices, position_ids, mtp_embeds)
+            inputs_embeds = paddle.concat(embeds_res, axis=0)
+            return return_args(inputs_embeds, attention_mask, attn_mask_startend_row_indices, position_ids)
         else:
             if self.sequence_parallel:
-                input_embeds = input_embeds.reshape([-1, input_embeds.shape[-1]])
-                input_embeds = ScatterOp.apply(input_embeds)
-            return return_args(input_embeds, attention_mask, attn_mask_startend_row_indices, position_ids)
+                inputs_embeds = inputs_embeds.reshape([-1, inputs_embeds.shape[-1]])
+                inputs_embeds = ScatterOp.apply(inputs_embeds)
+            return return_args(inputs_embeds, attention_mask, attn_mask_startend_row_indices, position_ids)
 
 
 class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
     def forward(self, args):
-        hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids, mtp_hidden_state = parse_args(
-            args
-        )
+        hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids = parse_args(args)
+
+        if self.config.num_nextn_predict_layers > 0:
+            hidden_states_list = paddle.split(hidden_states, self.config.num_nextn_predict_layers + 1)
+            inputs_embeds_mtp = hidden_states_list[-self.config.num_nextn_predict_layers :]
+            hidden_states = hidden_states_list[0]
 
         has_gradient = not hidden_states.stop_gradient
 
@@ -232,18 +232,20 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
                 attn_mask_startend_row_indices=attn_mask_startend_row_indices,
             )
 
+        if self.config.num_nextn_predict_layers > 0:
+            hidden_states = paddle.concat([hidden_states, *inputs_embeds_mtp])
+
         return return_args(hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids)
 
 
 class DeepseekV2MTPLayerPipe(DeepseekV2MTPLayer):
     def forward(self, args):
-        hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids, mtp_hidden_state = parse_args(
-            args
-        )
+        hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids = parse_args(args)
 
-        tensor_list = paddle.split(mtp_hidden_state, self.config.num_nextn_predict_layers)
-        inputs_embeds_cur_depth_list = tensor_list[1:]
-        has_gradient = not hidden_states.stop_gradient
+        hidden_states_list = paddle.split(hidden_states, self.config.num_nextn_predict_layers + 1)
+        hidden_states_main_model = hidden_states_list[0]
+        inputs_embeds_cur_depth_list = hidden_states_list[1:]
+        has_gradient = not hidden_states_main_model.stop_gradient
 
         if attention_mask is not None and attention_mask.dtype == paddle.int32:
             attention_mask, attn_mask_startend_row_indices, position_ids = (
@@ -256,7 +258,8 @@ class DeepseekV2MTPLayerPipe(DeepseekV2MTPLayer):
         elif attn_mask_startend_row_indices is not None and attn_mask_startend_row_indices.dtype == paddle.int64:
             attn_mask_startend_row_indices, position_ids = None, attn_mask_startend_row_indices
 
-        output_list = []
+        output_list = [hidden_states_main_model]
+        hidden_states = hidden_states_main_model
         for depth in range(self.config.num_nextn_predict_layers):
             inputs_embeds_cur_depth = inputs_embeds_cur_depth_list[depth]
             if self.enable_recompute and self.config.recompute_granularity == "full" and has_gradient:
@@ -290,10 +293,8 @@ class DeepseekV2MTPLayerPipe(DeepseekV2MTPLayer):
                 )
             output_list.append(hidden_states)
 
-        mtp_hidden_state = paddle.concat(output_list)
-        return return_args(
-            hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids, mtp_hidden_state
-        )
+        hidden_states = paddle.concat(output_list)
+        return return_args(hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids)
 
 
 class DeepseekV2RMSNormPipe(nn.Layer):
@@ -303,11 +304,17 @@ class DeepseekV2RMSNormPipe(nn.Layer):
         self.norm = DeepseekV2RMSNorm(config)
 
     def forward(self, args):
-        hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids, mtp_hidden_state = parse_args(
-            args
-        )
+        hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids = parse_args(args)
+
         if self.config.num_nextn_predict_layers > 0:
-            return self.norm(hidden_states), self.norm(mtp_hidden_state)
+            hidden_states_list = paddle.split(hidden_states, self.config.num_nextn_predict_layers + 1)
+            hidden_states = hidden_states_list[0]
+            hidden_states_mtp = hidden_states_list[-self.config.num_nextn_predict_layers :]
+
+            output_list = [self.norm(hidden_states)]
+            for hidden_states in hidden_states_mtp:
+                output_list.append(self.norm(hidden_states))
+            return output_list
         else:
             return self.norm(hidden_states)
 
@@ -322,8 +329,7 @@ class DeepseekV2LMHeadPipe(DeepseekV2LMHead):
 
     def forward(self, args: Union[Tuple, paddle.Tensor]):
         if self.config.num_nextn_predict_layers > 0:
-            assert isinstance(args, tuple), "args should be a tuple of hidden states and MTP logits"
-            logits = list()
+            logits = []
             for _hidden_states in args:
                 logits.append(super().forward(_hidden_states))
             return logits
