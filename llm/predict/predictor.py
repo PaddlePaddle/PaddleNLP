@@ -88,7 +88,7 @@ class PredictorArgument:
     mode: str = field(
         default="dynamic", metadata={"help": "the type of predictor, it should be one of [dynamic, static]"}
     )
-    inference_model: bool = field(default=False, metadata={"help": "whether use InferenceModel to do generation"})
+    inference_model: bool = field(default=True, metadata={"help": "whether use InferenceModel to do generation"})
     quant_type: str = field(
         default="",
         metadata={
@@ -1360,6 +1360,13 @@ def create_predictor(
 
     paddle.set_device(predictor_args.device)
     paddle.set_default_dtype(predictor_args.dtype)
+
+    if not is_paddlenlp_ops_available():
+        if predictor_args.inference_model:
+            logger.warning(
+                "The paddlenlp_ops accelerate ops is not installed, disable accelerate mode. you can install it in https://github.com/PaddlePaddle/PaddleNLP/tree/develop/csrc "
+            )
+        predictor_args.inference_model = False
 
     from paddlenlp.utils.env import USE_FAST_TOKENIZER
 
