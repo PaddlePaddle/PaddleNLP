@@ -56,8 +56,12 @@ set_env() {
 
 print_info() {
     if [ $1 -ne 0 ]; then
-        mv ${nlp_dir}/unittest_logs/unittest.log ${nlp_dir}/unittest_logs/unittest_FAIL.log
-        echo -e "\033[31m ${nlp_dir}/unittest_logs/unittest_FAIL \033[0m"
+        mv ${log_path}/unittest.log ${log_path}/unittest_FAIL.log
+        echo -e "\033[31m ${log_path}/unittest_FAIL \033[0m"
+        tail -n 10 ${log_path}/unittest_FAIL.log
+        cp ${log_path}/unittest_FAIL.log ${PPNLP_HOME}/upload/unittest_FAIL.log.${AGILE_PIPELINE_BUILD_ID}.${AGILE_JOB_BUILD_ID}
+        cd ${PPNLP_HOME} && python upload.py ${PPNLP_HOME}/upload 'paddlenlp/PaddleNLP_CI/PaddleNLP-CI-Unittest-GPU'
+        rm -rf upload/*
     else
         echo -e "\033[32m ${log_path}/unittest_SUCCESS \033[0m"
     fi
