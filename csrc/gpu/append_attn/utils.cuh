@@ -16,8 +16,9 @@
 #include <cuda_bf16.h>
 #include <cuda_fp8.h>
 #include <cuda_runtime.h>
+
 #include "mem_util.cuh"
-    
+
 struct AppendAttnMetaData {
   int batch_size;
   int block_size;
@@ -271,31 +272,31 @@ __forceinline__ __host__ __device__ void vec_cast<nv_bfloat16, float>(
     }                                                                   \
   }
 
-#define DISPATCH_HEAD_DIM(head_dim, HEAD_DIM, ...) \
-  switch (head_dim) {                              \
-    case 128: {                                    \
-      constexpr size_t HEAD_DIM = 128;             \
-      __VA_ARGS__                                  \
-      break;                                       \
-    }                                              \
-    case 192: {                                    \
-      constexpr size_t HEAD_DIM = 192;             \
-      __VA_ARGS__                                  \
-      break;                                       \
-    }                                              \
-    case 512: {                                    \
-      constexpr size_t HEAD_DIM = 512;             \
-      __VA_ARGS__                                  \
-      break;                                       \
-    }                                              \
-    case 576: {                                    \
-      constexpr size_t HEAD_DIM = 576;             \
-      __VA_ARGS__                                  \
-      break;                                       \
-    }                                              \
-    default: {                                     \
-      PD_THROW("not support the head_dim: ", head_dim);        \
-    }                                              \
+#define DISPATCH_HEAD_DIM(head_dim, HEAD_DIM, ...)      \
+  switch (head_dim) {                                   \
+    case 128: {                                         \
+      constexpr size_t HEAD_DIM = 128;                  \
+      __VA_ARGS__                                       \
+      break;                                            \
+    }                                                   \
+    case 192: {                                         \
+      constexpr size_t HEAD_DIM = 192;                  \
+      __VA_ARGS__                                       \
+      break;                                            \
+    }                                                   \
+    case 512: {                                         \
+      constexpr size_t HEAD_DIM = 512;                  \
+      __VA_ARGS__                                       \
+      break;                                            \
+    }                                                   \
+    case 576: {                                         \
+      constexpr size_t HEAD_DIM = 576;                  \
+      __VA_ARGS__                                       \
+      break;                                            \
+    }                                                   \
+    default: {                                          \
+      PD_THROW("not support the head_dim: ", head_dim); \
+    }                                                   \
   }
 
 #define DISPATCH_NUM_STAGE(num_stage, NUM_STAGE, ...) \
@@ -317,6 +318,8 @@ __forceinline__ __host__ __device__ void vec_cast<nv_bfloat16, float>(
     constexpr CacheType cache_type_now = CacheType::CacheInt4CwZp;        \
     constexpr size_t cache_bytes = 4;                                     \
     __VA_ARGS__                                                           \
+  } else {                                                                \
+    PD_THROW("not support the cache_type: ", cache_type);                 \
   }
 
 #define DISPATCH_DEAL_EACH_TIME(deal_each_time, DEAL_EACH_TIME, ...) \
@@ -368,6 +371,8 @@ __forceinline__ __host__ __device__ void vec_cast<nv_bfloat16, float>(
   } else if (group_size == 16) {                             \
     constexpr size_t GROUP_SIZE = 16;                        \
     __VA_ARGS__                                              \
+  } else {                                                   \
+    PD_THROW("not support the group_size: ", group_size);    \
   }
 
 #define DISPATCH_BLOCKSHAPE_Q(block_shape_q, BLOCK_SHAPE_Q, NUM_WARP_Q, ...) \
