@@ -60,7 +60,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" train.py --do_train \
 
 当模型架构为 decoder-only 时，以[RepLLaMA](https://huggingface.co/castorini/repllama-v1-7b-lora-passage) 和 [NV-Embed-v1](https://huggingface.co/nvidia/NV-Embed-v1) 为例，采用多卡训练：
 ```
-model_name=castorini/repllama-v1-7b-lora-passage 或 NV-Embed-v1
+model_name=castorini/repllama-v1-7b-lora-passage 或 nvidia/NV-Embed-v1
 output_dir=repllama-v1-7b-duretrieval 或 NV-Embed-v1-duretrieval
 
 python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" train.py --do_train \
@@ -190,7 +190,7 @@ python -u evaluation/eval_mteb.py \
 ```
 export CUDA_VISIBLE_DEVICES=0
 python evaluation/eval_mteb.py \
-       --base_model_name_or_path LLARA-passage \
+       --base_model_name_or_path BAAI/LLARA-passage \
        --output_folder en_results/llara-passage \
        --task_name 'SciFact' \
        --eval_batch_size 8 \
@@ -217,7 +217,7 @@ git lfs install
 git clone https://hf-mirror.com/datasets/Tevatron/msmarco-passage-corpus
 export CUDA_VISIBLE_DEVICES=0
 python evaluation/eval_mteb.py \
-       --base_model_name_or_path LLARA-passage \
+       --base_model_name_or_path BAAI/LLARA-passage \
        --output_folder en_results/llara-passage \
        --task_name 'MSMARCOTITLE' \
        --eval_batch_size 8 \
@@ -242,7 +242,7 @@ python evaluation/eval_mteb.py \
 ```
 export CUDA_VISIBLE_DEVICES=0
 python evaluation/eval_mteb.py \
-       --base_model_name_or_path NV-Embed-v1 \
+       --base_model_name_or_path nvidia/NV-Embed-v1 \
        --output_folder en_results/nv-embed-v1 \
        --query_instruction "Given a claim, find documents that refute the claim" \
        --task_name 'SciFact' \
