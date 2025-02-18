@@ -331,15 +331,6 @@ __forceinline__ __host__ __device__ void vec_cast<nv_bfloat16, float>(
     __VA_ARGS__                                                      \
   }
 
-#define DISPATCH_NUM_THREADS(num_threads, NUM_THREADS, ...) \
-  if (num_threads == 128) {                                 \
-    constexpr size_t NUM_THREADS = 128;                     \
-    __VA_ARGS__                                             \
-  } else if (num_threads == 256) {                          \
-    constexpr size_t NUM_THREADS = 256;                     \
-    __VA_ARGS__                                             \
-  }
-
 #define DISPATCH_GQA_GROUP_SIZE(group_size, GROUP_SIZE, ...) \
   if (group_size == 1) {                                     \
     constexpr size_t GROUP_SIZE = 1;                         \
@@ -367,6 +358,9 @@ __forceinline__ __host__ __device__ void vec_cast<nv_bfloat16, float>(
     __VA_ARGS__                                              \
   } else if (group_size == 16) {                             \
     constexpr size_t GROUP_SIZE = 16;                        \
+    __VA_ARGS__                                              \
+  } else if (group_size == 128) {                             \
+    constexpr size_t GROUP_SIZE = 128;                        \
     __VA_ARGS__                                              \
   }
 
