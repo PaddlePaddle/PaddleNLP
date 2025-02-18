@@ -739,7 +739,7 @@ class DygraphInferencePredictor(InferencePredictorMixin):
         model = kwargs.get("model", None)
         if model is None:
             raise ValueError("model should be provided for DygraphInferencePredictor")
-        self.cache_kvs_shape = model.get_cache_kvs_shape(model.config, config.max_batch_size, config.total_max_length)
+        self.cache_kvs_shape = model.get_cache_kvs_shape(model.config, config.batch_size, config.total_max_length)
         InferencePredictorMixin.__init__(self, config, tokenizer)
         self.model = model
 
@@ -1028,7 +1028,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         self.full_hidden_states = None
         if model is None:
             raise ValueError("model should be provided for DygraphBlockInferencePredictor")
-        self.cache_k_shapes, self.cache_v_shapes = model.get_cache_kvs_shape(model.config, config.max_batch_size)
+        self.cache_k_shapes, self.cache_v_shapes = model.get_cache_kvs_shape(model.config, config.batch_size)
         BlockInferencePredictorMixin.__init__(self, config, tokenizer)
 
         cachekv_dtype = self.dtype if config.cachekv_int8_type is None else "uint8"
@@ -1357,7 +1357,7 @@ class AutoPredictor:
 
             if predictor_args.mode == "static":
                 cache_k_shapes, cache_v_shapes = model.get_cache_kvs_shape(
-                    config, predictor_args.max_batch_size, predictor_args.total_max_length
+                    config, predictor_args.batch_size, predictor_args.total_max_length
                 )
         else:
             inference_mode = ""
