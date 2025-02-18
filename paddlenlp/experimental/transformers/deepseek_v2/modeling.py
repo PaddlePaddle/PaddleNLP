@@ -126,6 +126,8 @@ class DeepseekScalingRotaryEmbedding(nn.Layer):
         query: paddle.Tensor,
         key: paddle.Tensor,
     ) -> Tuple[paddle.Tensor, paddle.Tensor]:
+        import os
+
         from paddlenlp_ops import fused_rotary_position_encoding
 
         # In-place operations that update the query and key tensors.
