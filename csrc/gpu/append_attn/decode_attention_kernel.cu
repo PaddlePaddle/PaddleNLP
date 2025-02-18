@@ -344,10 +344,10 @@ __global__ void multi_query_decode_attention_kernel(T * __restrict__ q, // [toke
     }
     __syncthreads();
 #endif
-#pragma unroll
-  for(int local_id = vid; local_id < HEAD_DIM_QK; local_id += num_vec_per_head_qk) {
-    q_smem[local_id] = q_now[local_id];
-  }
+// #pragma unroll
+  // for(int local_id = vid; local_id < HEAD_DIM_QK; local_id += num_vec_per_head_qk) {
+  ((float4*)q_smem)[vid] = ((float4*)q_now)[vid];
+  // }
   __syncthreads();
 
   CacheT *kv_smem = reinterpret_cast<CacheT*>(smem + HEAD_DIM_QK * sizeof(T)); // [NUM_STAGES * DEAL_EACH_TIME * HEAD_DIM_QK]
@@ -362,7 +362,7 @@ __global__ void multi_query_decode_attention_kernel(T * __restrict__ q, // [toke
   // T *md_smem = reinterpret_cast<T*>(smem + HEAD_DIM_QK * sizeof(T) + NUM_STAGES * DEAL_EACH_TIME * sizeof(CacheT));
 
   uint32_t stage_idx = 0;  
-  constexpr int loop_times = DEAL_EACH_TIME ;
+  constexpr int loop_times = DEAL_EACH_TIME;
 #ifdef DEBUG_DEC_ATTN
   __syncthreads();
   if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0 && blockIdx.x == 0 && blockIdx.y == 0 && blockIdx.z == 0) {
@@ -854,9 +854,7 @@ void DecodeMLAAttentionKernel(
   const uint32_t deal_each_time = get_cascade_attention_deal_each_time();
   const uint32_t num_stage = get_cascade_attention_num_stages();
   const uint32_t num_threads = get_cascade_attention_num_threads();
-  // const uint32_t deal_each_time = 1;
-  // const uint32_t num_stage = 2;
-  // const uint32_t num_threads = 1;
+
   uint32_t cache_type = 0;
   // if (cache_k_scale) {
   //   if (cache_k_zp) {
@@ -873,7 +871,7 @@ void DecodeMLAAttentionKernel(
         {DISPATCH_HEAD_DIM(head_dim_v, HEAD_DIM_V, 
           {DISPATCH_BLOCK_SIZE(block_size, BLOCK_SIZE, 
               {DISPATCH_DEAL_EACH_TIME(deal_each_time, DEAL_EACH_TIME,
-                  {MultiQueryDecoderAttention<T, 128, HEAD_DIM_QK, HEAD_DIM_V, BLOCK_SIZE, CAUSAL, 2, CacheType::CacheT, 16, DEAL_EACH_TIME>(
+                  {MultiQueryDecoderAttention<T, GROUP_SIZE, HEAD_DIM_QK, HEAD_DIM_V, BLOCK_SIZE, CAUSAL, 2, CacheType::CacheT, 16, DEAL_EACH_TIME>(
                   meta_data, stream, q, cache_k, cache_v, attn_mask, shift_bias, smooth_weight, seq_lens_q, seq_lens_kv, padding_offsets, cum_offsets, 
                   block_table, max_seq_len, max_dec_len, rope_scale, rope_theta, softmax_scale, in_scale, out);})})})})})});
 }

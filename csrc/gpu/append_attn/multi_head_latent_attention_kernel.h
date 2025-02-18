@@ -49,7 +49,7 @@ inline uint32_t get_cascade_attention_deal_each_time() {
     static const char* cascade_attention_deal_each_time_env = std::getenv("FLAGS_cascade_attention_deal_each_time");
     static const uint32_t cascade_attention_deal_each_time =
             cascade_attention_deal_each_time_env == nullptr ? 0 : std::stoul(std::string(cascade_attention_deal_each_time_env));
-    return (cascade_attention_deal_each_time != 0 ? cascade_attention_deal_each_time : 64);
+    return (cascade_attention_deal_each_time != 0 ? cascade_attention_deal_each_time : 32);
 }
 
 inline uint32_t get_cascade_attention_num_stages() {
