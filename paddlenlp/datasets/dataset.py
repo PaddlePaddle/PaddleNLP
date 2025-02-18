@@ -20,6 +20,9 @@ import warnings
 from collections import namedtuple
 from itertools import islice
 
+# Add this for extremely slow conection to hf sever even for local dataset.
+os.environ["HF_UPDATE_DOWNLOAD_COUNTS"] = "False"
+
 import datasets
 from multiprocess import Pool, RLock
 
@@ -117,6 +120,7 @@ def load_from_hf(path, name=None, splits=None, **kwargs):
             hf_datasets = load_hf_dataset(path, name=name, **kwargs)
         else:
             hf_datasets = load_hf_dataset(path, name=name, split=splits, **kwargs)
+
     except FileNotFoundError:
         raise FileNotFoundError("Couldn't find the dataset script for '" + path + "' on PaddleNLP or HuggingFace")
     else:

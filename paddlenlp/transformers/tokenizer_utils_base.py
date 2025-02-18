@@ -967,6 +967,11 @@ class SpecialTokensMixin:
 
         return self._add_tokens(new_tokens, special_tokens=special_tokens)
 
+    @classmethod
+    def _add_extra_special_tokens(cls, extra_sp_token: Union[str, AddedToken]):
+        if extra_sp_token not in cls.SPECIAL_TOKENS_ATTRIBUTES:
+            cls.SPECIAL_TOKENS_ATTRIBUTES.append(extra_sp_token)
+
     def _add_tokens(self, new_tokens: Union[List[str], List[AddedToken]], special_tokens: bool = False) -> int:
         raise NotImplementedError
 
@@ -1213,7 +1218,13 @@ class SpecialTokensMixin:
         """
         set_attr = {}
         for attr in self.SPECIAL_TOKENS_ATTRIBUTES:
-            attr_value = getattr(self, "_" + attr)
+            try:
+                attr_value = getattr(self, "_" + attr)
+            except:
+                try:
+                    attr_value = getattr(self, attr)
+                except:
+                    continue
             if attr_value:
                 set_attr[attr] = (
                     type(attr_value)(str(attr_value_sub) for attr_value_sub in attr_value)
@@ -1233,7 +1244,13 @@ class SpecialTokensMixin:
         """
         set_attr = {}
         for attr in self.SPECIAL_TOKENS_ATTRIBUTES:
-            attr_value = getattr(self, "_" + attr)
+            try:
+                attr_value = getattr(self, "_" + attr)
+            except:
+                try:
+                    attr_value = getattr(self, attr)
+                except:
+                    continue
             if attr_value:
                 set_attr[attr] = attr_value
         return set_attr
@@ -1744,6 +1761,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 elif isinstance(value, list):
                     value = [AddedToken(**token) if isinstance(token, dict) else token for token in value]
                 setattr(tokenizer, key, value)
+                cls._add_extra_special_tokens(key)
 
         # Add supplementary tokens.
         special_tokens = tokenizer.all_special_tokens
