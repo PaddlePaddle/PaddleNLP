@@ -259,6 +259,34 @@ python evaluation/eval_mteb.py \
 'ndcg_at_1000': 0.80444
 ```
 
+评估 BGE-EN-ICL 向量检索模型（[BGE-EN-ICL](https://huggingface.co/BAAI/bge-en-icl)）：
+```
+export CUDA_VISIBLE_DEVICES=0
+python evaluation/eval_mteb.py \
+       --base_model_name_or_path BAAI/bge-en-icl \
+       --output_folder en_results/bge-en-icl \
+       --task_name SciFact \
+       --task_split "test" \
+       --query_instruction $'<instruct> Given a scientific claim, retrieve documents that support or refute the claim.\n<query>' \
+       --max_seq_length 512 \
+       --eval_batch_size 32 \
+       --dtype "float32" \
+       --pad_token unk_token \
+       --padding_side left \
+       --add_bos_token 1 \
+       --add_eos_token 1
+```
+结果文件保存在`en_results/nv-embed-v1/SciFact/last/no_model_name_available/no_revision_available/SciFact.json`，包含以下类似的评估结果：
+```
+'ndcg_at_1': 0.65667,
+'ndcg_at_3': 0.72839,
+'ndcg_at_5': 0.76257,
+'ndcg_at_10': 0.77912,
+'ndcg_at_20': 0.78618,
+'ndcg_at_100': 0.79211,
+'ndcg_at_1000': 0.79459,
+```
+
 评估 RepLLaMA 向量检索模型（[repllama-v1-7b-lora-passage](https://huggingface.co/castorini/repllama-v1-7b-lora-passage)）：
 ```
 export CUDA_VISIBLE_DEVICES=0
