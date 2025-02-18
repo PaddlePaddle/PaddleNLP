@@ -276,7 +276,7 @@ python evaluation/eval_mteb.py \
        --add_bos_token 1 \
        --add_eos_token 1
 ```
-结果文件保存在`en_results/nv-embed-v1/SciFact/last/no_model_name_available/no_revision_available/SciFact.json`，包含以下类似的评估结果：
+结果文件保存在`en_results/bge-en-icl/SciFact/last/no_model_name_available/no_revision_available/SciFact.json`，包含以下类似的评估结果：
 ```
 'ndcg_at_1': 0.65667,
 'ndcg_at_3': 0.72839,
