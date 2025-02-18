@@ -187,6 +187,7 @@ class FlashEMAProcessor:
                 _, cpu_buf = self.param_fusion_storage_helper.inited_buffers[index]
                 updated_ema = self.ema_coef * ema_buf + (1 - self.ema_coef) * cpu_buf
                 self.ema_buffer_model_params[index] = updated_ema
+        logger.info(f"[FC EMA] accmulating, buffer type:{self.ema_buffer.place} {self.ema_buffer.dtype}, done")
 
     @imperative_base.no_grad()
     def ema_state_dict(self):
@@ -678,7 +679,7 @@ class FlashCheckpointManager:
         assert self.current_worker is not None, "[FC manager] current_worker must not be None"
         while True:
             if (
-                self.current_worker.status.value != FCWorkerStatus.IDLE.value
+                self.current_worker.status.value == FCWorkerStatus.OFFLOADING.value
                 or self.current_worker.global_step.value != self.global_step
             ):
                 logger.info(
@@ -839,6 +840,9 @@ class FlashCheckpointWorker:
         self.lr_scheduler, self.trainer_state = non_cached_objects
 
     def process_offload_task(self, dump, global_step):
+        """
+        call multipule times during model forward, return True if done dumpping
+        """
         actual_offload_size = (
             min(self.offloaded_numels + self.chunk_size_in_numel, self.all_numel) - self.offloaded_numels
         )
@@ -866,9 +870,11 @@ class FlashCheckpointWorker:
         if self.offloaded_numels == self.all_numel:
             self.optimizer_fusion_storage_helper.wait_all()
             self.param_fusion_storage_helper.wait_all()
+            self.status.value = FCWorkerStatus.DUMPING.value
+            self.global_step.value = global_step
+
             if self.ema_coef is not None:
                 self.flash_ema_processor.ema_accumulate()
-            self.status.value = FCWorkerStatus.DUMPING.value
 
         # continue to process dumping task at the last chunk
         if self.offloaded_numels == self.all_numel:
@@ -878,7 +884,8 @@ class FlashCheckpointWorker:
                 need_report_error = False
             self.offloaded_numels = 0
             self.status.value = FCWorkerStatus.ERROR.value if need_report_error else FCWorkerStatus.IDLE.value
-            self.global_step.value = global_step
+            return True
+        return False
 
     def process_dump_task(self):
         """
@@ -938,6 +945,7 @@ class FlashCheckpointWorker:
 
     def process_dump_task_impl(self, output_dir):
         os.makedirs(output_dir, exist_ok=True)
+        start = time.time()
         # Step1: save static objects
         if self.device_id == 0:
             # Step1.1: save model config
@@ -968,10 +976,14 @@ class FlashCheckpointWorker:
             # Step2.2: save optimizer states
             optimizer_state_name_path = os.path.join(output_dir, self.optimizer_states_name_path)
             opt_state_dict = self.optimizer_fusion_storage_helper.state_dict()
-        logger.info(showmem(f"[FCworker{self.worker_id}] after build state-dict"))
+        # logger.info(showmem(f"[FCworker{self.worker_id}] after build state-dict"))
+        logger.info(f"[FC worker{self.worker_id}] get-state-dict: {time.time() - start:.3f} sec")
+        start = time.time()
         if self.ema_coef is not None:
             ema_name_path = os.path.join(output_dir, self.optimizer_states_name_path).replace("optimizer", "ema")
             ema_state_dict = self.flash_ema_processor.ema_state_dict()
+        logger.info(f"[FC worker{self.worker_id}] get-ema-state-dict: {time.time() - start:.3f} sec")
+        start = time.time()
 
         if self.dp_rank <= 0 or self.use_expert_parallel:
             if self.dp_rank > 0:  # ep
@@ -981,8 +993,12 @@ class FlashCheckpointWorker:
                     ema_state_dict = self._filter_moe_no_sync_optimizer_params(self.model_meta_content, ema_state_dict)
             paddle.save(state_dict, model_states_name_path)
             paddle.save(opt_state_dict, optimizer_state_name_path)
+            logger.info(f"[FC worker{self.worker_id}] save-state-dict: {time.time() - start:.3f} sec")
+            start = time.time()
             if self.ema_coef is not None:
                 paddle.save(ema_state_dict, ema_name_path)
+            logger.info(f"[FC worker{self.worker_id}] save-ema-state-dict: {time.time() - start:.3f} sec")
+            start = time.time()
 
         # Step2.3: save LR Scheduler (To be removed)
         lr_state_name_path = os.path.join(output_dir, SCHEDULER_NAME)
@@ -998,6 +1014,8 @@ class FlashCheckpointWorker:
         saved_signal_path = os.path.join(output_dir, f"saved_signal_{self.global_rank}")
         with open(saved_signal_path, mode="w+") as f:
             f.write("1")
+        logger.info(f"[FC worker{self.worker_id}] remain: {time.time() - start:.3f} sec")
+        start = time.time()
 
     def run(self):
         core.set_cuda_current_device_id(self.device_id)
@@ -1005,14 +1023,13 @@ class FlashCheckpointWorker:
         logger.info(f"[FC worker{self.worker_id}] Worker{self.worker_id} started.")
         ema_ckpt_path = None
         save_info_tuple = None  # save dir...
+        start_time = None
         try:
             while True:
                 logger.info(f"[FC worker{self.worker_id}] Wait for command")
                 task = self.task_queue.get()
                 task_type, task_body = task
-                logger.info(
-                    f"[FC worker{self.worker_id}] Received a new task of type {task_type}., ema:{self.flash_ema_processor.status() if self.flash_ema_processor is not None else None}"
-                )
+                logger.info(f"[FC worker{self.worker_id}] Received a new task of type {task_type}")
                 if task_type == FCTaskType.FINISH:
                     logger.info(f"[FC worker{self.worker_id}] Flash checkpoint worker{self.worker_id} exit")
                     break
@@ -1026,10 +1043,14 @@ class FlashCheckpointWorker:
                             self.flash_ema_processor.load_ema_state_dict(ema_ckpt_path)
                         ema_ckpt_path = None
                 elif task_type == FCTaskType.PREPARE:
+                    start_time = time.time()
                     save_info_tuple = task_body
                     self.process_prepare_task(task_body)
                 elif task_type == FCTaskType.OFFLOAD:
-                    self.process_offload_task(dump=save_info_tuple is not None, global_step=task_body)
+                    dumped = self.process_offload_task(dump=save_info_tuple is not None, global_step=task_body)
+                    if dumped:
+                        used_time = time.time() - start_time
+                        logger.info(f"[FC worker{self.worker_id}] used time {used_time:.3f} sec")
                 elif task_type == FCTaskType.SET_EMA_STATE_DICT:
                     ema_ckpt_path = task_body  # mark ema state dict path
                 else:
