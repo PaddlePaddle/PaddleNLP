@@ -64,6 +64,7 @@ from .modeling import (
     _make_causal_mask,
     apply_rotary_pos_emb,
     get_triangle_upper_mask,
+    is_casual_mask,
     yarn_get_mscale,
 )
 
@@ -704,7 +705,11 @@ class DeepseekV2ModelAuto(DeepseekV2PretrainedModelAuto):
             inputs_embeds = self.embed_tokens(input_ids)
 
         # embed positions
-        if attn_mask_startend_row_indices is not None or get_use_casual_mask() or self.config.use_flash_attention:
+        if (
+            attn_mask_startend_row_indices is not None
+            or get_use_casual_mask()
+            or (self.config.use_flash_attention and self.training)
+        ):
             attention_mask = None
         else:
             # [bs, seq_len]
@@ -716,6 +721,8 @@ class DeepseekV2ModelAuto(DeepseekV2PretrainedModelAuto):
             attention_mask = self._prepare_decoder_attention_mask(
                 attention_mask, (batch_size, seq_length), past_key_values_length, inputs_embeds.dtype
             )  # [bs, 1, seq_len, seq_len]
+            if self.config.use_flash_attention:
+                attention_mask = None if is_casual_mask(attention_mask) else attention_mask
         # embed positions
         hidden_states = inputs_embeds
 
