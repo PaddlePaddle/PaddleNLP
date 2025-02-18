@@ -1,12 +1,10 @@
 # 向量检索模型训练
 
-## 安装 (TODO: 我之后会改成 paddle3的安装命令)
-
 推荐安装 gpu 版本的[PaddlePaddle](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/conda/linux-conda.html)，以 cuda11.7的 paddle 为例，安装命令如下：
 
 ```
 conda install nccl -c conda-forge
-conda install paddlepaddle-gpu==2.6.1 -c https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/Paddle/ -c conda-forge
+conda install paddlepaddle-gpu==3.0.0rc1 -i https://www.paddlepaddle.org.cn/packages/stable/cu123/ -c conda-forge
 ```
 安装其他依赖：
 ```
@@ -215,6 +213,8 @@ python evaluation/eval_mteb.py \
 
 评估其在 MSMARCOTITLE 数据集上的性能:
 ```
+git lfs install
+git clone https://hf-mirror.com/datasets/Tevatron/msmarco-passage-corpus
 export CUDA_VISIBLE_DEVICES=0
 python evaluation/eval_mteb.py \
        --base_model_name_or_path LLARA-passage \
@@ -344,6 +344,6 @@ python evaluation/eval_mteb.py \
 
 [5] Chankyu Lee, Rajarshi Roy, Mengyao Xu, Jonathan Raiman, Mohammad Shoeybi, Bryan Catanzaro, Wei Ping: NV-Embed: Improved Techniques for Training LLMs as Generalist Embedding Models. arXiv 2024.
 
-[6] # TODO: 之后我会把参考文献加上来
+[6] Zheng Liu, Chaofan Li, Shitao Xiao, Yingxia Shao, Defu Lian: Llama2Vec: Unsupervised Adaptation of Large Language Models for Dense Retrieval. ACL 2024
 
-[7]
+[7] Chaofan Li, MingHao Qin, Shitao Xiao, Jianlyu Chen, Kun Luo, Yingxia Shao, Defu Lian, Zheng Liu: Making Text Embedders Few-Shot Learners. arXiv 2024

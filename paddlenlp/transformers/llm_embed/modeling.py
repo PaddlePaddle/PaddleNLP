@@ -287,6 +287,8 @@ class BiEncoderModel(PretrainedModel):
 
         if self.model_flag == "llara":
             input_texts = self.preprocess_sentences_for_llara(input_texts, query_or_doc="query")
+        if self.model_flag == "bge-en-icl":
+            input_texts = self.preprocess_sentences_for_bge_en_icl(input_texts, query_or_doc="query")
 
         return self.encode_sentences(input_texts)
 
@@ -313,6 +315,39 @@ class BiEncoderModel(PretrainedModel):
             input_texts = self.preprocess_sentences_for_llara(input_texts, query_or_doc="doc")
 
         return self.encode_sentences(input_texts)
+
+    def preprocess_sentences_for_bge_en_icl(self, sentences: List[str], query_or_doc: str, **kwargs) -> List[str]:
+        if query_or_doc == "query":
+            query_suffix = "\n<response> "
+        else:
+            raise ValueError(f"Invalid query_or_doc: {query_or_doc}")
+
+        input_texts = []
+        for query in sentences:
+            new_query = f"{query}{query_suffix}"
+            input_length = len(self.tokenizer(new_query)["input_ids"])
+            if input_length > self.max_seq_length:
+                # print(f"Truncate query!\nquery=\n{query}\n")
+                cur_len = 0
+                add_len = 1
+                while add_len < len(query):
+                    add_len *= 2
+                while add_len > 1:
+                    add_len //= 2
+                    assert isinstance(cur_len, int) and isinstance(
+                        add_len, int
+                    ), f"cur_len={cur_len} add_len={add_len}"
+                    new_query = f"{query[:cur_len+add_len]}{query_suffix}"
+                    input_length = len(self.tokenizer(new_query)["input_ids"])
+                    if input_length <= self.max_seq_length:
+                        cur_len += add_len
+                new_query = f"{query[:cur_len]}{query_suffix}"
+                # print(f"new_query=\n{new_query}\n")
+            input_texts.append(new_query)
+        print(f"example(input_texts) =\n{input_texts[0]}")
+        print(f"len(input_queries) = {len(input_texts)}")
+
+        return input_texts
 
     def preprocess_sentences_for_llara(self, sentences: List[str], query_or_doc: str, **kwargs) -> List[str]:
 

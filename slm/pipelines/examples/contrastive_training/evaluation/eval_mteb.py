@@ -30,11 +30,13 @@ from mteb.abstasks.TaskMetadata import TaskMetadata
 from paddlenlp.peft import LoRAConfig, LoRAModel
 from paddlenlp.transformers import AutoTokenizer, BiEncoderModel, NVEncodeModel
 
+MSMARCOTITLE_PATH = "./msmarco-passage-title"
+
 
 class MSMARCOTITLE(AbsTaskRetrieval):
     metadata = TaskMetadata(
         dataset={
-            "path": "/141nfs/lizhuoqun/PaddleNLP/slm/pipelines/examples/contrastive_training/msmarco-passage-title",  # TODO: 这个地方需要确认一下，这里的path和下面evaluation.run里面的path到底哪一个是没有用的
+            "path": MSMARCOTITLE_PATH,
             "revision": "c5a29a104738b98a9e76336939199e264163d4a0",
             "hf_hub_name": "mteb/msmarco",
         },
@@ -199,6 +201,7 @@ if __name__ == "__main__":
             model_name_or_path=args.base_model_name_or_path,
             normalized=True,
             sentence_pooling_method=args.pooling_method,
+            query_instruction=args.query_instruction,
             tokenizer=tokenizer,
             eval_batch_size=args.eval_batch_size,
             max_seq_length=args.max_seq_length,
@@ -222,12 +225,11 @@ if __name__ == "__main__":
 
     logger.info("Ready to eval")
     if args.task_name == "MSMARCOTITLE":
-        # TODO: 回头想个办法，怎么样下载这个带title的数据集，以及如何将path传进来
         evaluation = MTEB(tasks=[MSMARCOTITLE()])
         evaluation.run(
             encode_model,
             output_folder=f"{args.output_folder}/{args.task_name}/{args.pooling_method}",
-            data_folder="/141nfs/lizhuoqun/PaddleNLP/slm/pipelines/examples/contrastive_training/msmarco-passage-title",
+            data_folder=MSMARCOTITLE_PATH,
             score_function="dot",
             eval_splits=["dev"],
         )
