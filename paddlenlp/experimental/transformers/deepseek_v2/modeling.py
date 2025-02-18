@@ -309,11 +309,19 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
             )
             for idx in range(self.num_layers)
         ]
-        kv_b_proj_weight_original_attrs = None
-        if self.use_weight_only:
-            kv_b_proj_weight_original_attrs = [
+        k_b_proj_weight_attrs = None
+        v_b_proj_weight_attrs = None
+        if config.mla_use_matrix_absorption:
+            k_b_proj_weight_attrs = [
                 paddle.ParamAttr(
-                    name=f"fuse{self.base_model_prefix}.{idx}.kv_b_proj_weight_original",
+                    name=f"fuse{self.base_model_prefix}.{idx}.k_b_proj_weight",
+                    initializer=paddle.nn.initializer.Constant(value=0),
+                )
+                for idx in range(self.num_layers)
+            ]
+            v_b_proj_weight_attrs = [
+                paddle.ParamAttr(
+                    name=f"fuse{self.base_model_prefix}.{idx}.v_b_proj_weight",
                     initializer=paddle.nn.initializer.Constant(value=0),
                 )
                 for idx in range(self.num_layers)
@@ -449,8 +457,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
         self.prefill_cache_k_buffer: paddle.Tensor = None
         self.prefill_cache_v_buffer: paddle.Tensor = None
         if self.config.mla_use_matrix_absorption:
-            max_batch_size = 32
-            max_block_nums = max_batch_size * (self.max_seq_len + config.block_size - 1) // config.block_size
+            max_block_nums = config.max_batch_size * (self.max_seq_len + config.block_size - 1) // config.block_size
             cache_k_shape = [
                 max_block_nums,
                 config.num_key_value_heads // max(config.tensor_parallel_degree, 1),
@@ -489,8 +496,9 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
             kv_a_proj_with_mqa_weight_scale_attrs=kv_a_proj_with_mqa_weight_scale_attrs,
             kv_a_layernorm_weight_attrs=kv_a_layernorm_weight_attrs,
             kv_b_proj_weight_attrs=kv_b_proj_weight_attrs,
-            kv_b_proj_weight_original_attrs=kv_b_proj_weight_original_attrs,
             kv_b_proj_weight_scale_attrs=kv_b_proj_weight_scale_attrs,
+            k_b_proj_weight_attrs=k_b_proj_weight_attrs,
+            v_b_proj_weight_attrs=v_b_proj_weight_attrs,
         )
 
         moe_config = MoeConfig(
@@ -641,13 +649,28 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                     kv_b_proj_weight, algo=self.quant_algo
                 )
                 self.transformer_block.kv_b_proj_weights[idx].set_value(kv_b_proj_quanted_weight)
-                self.transformer_block.kv_b_proj_weights_original[idx].set_value(kv_b_proj_weight)
                 self.transformer_block.kv_a_layernorm_weights[idx].set_value(kv_a_layernorm_weight)
                 self.transformer_block.kv_b_proj_weights_scale[idx].set_value(kv_b_proj_weight_scale)
             else:
                 self.transformer_block.kv_a_proj_with_mqa_weights[idx].set_value(kv_a_proj_with_mqa_weight)
                 self.transformer_block.kv_a_layernorm_weights[idx].set_value(kv_a_layernorm_weight)
                 self.transformer_block.kv_b_proj_weights[idx].set_value(kv_b_proj_weight)
+
+            if self.config.mla_use_matrix_absorption:
+                # kv_b_proj_weights: [kv_lora_rank, (qk_nope_head_dim + v_head_dim) * num_heads]
+                wk_b, wv_b = kv_b_proj_weight.reshape(
+                    shape=[
+                        self.config.kv_lora_rank,
+                        self.num_attention_heads // self.config.tensor_parallel_degree,
+                        -1,
+                    ]
+                ).split([self.config.qk_nope_head_dim, self.config.v_head_dim], axis=-1)
+                # wk_b: [kv_lora_rank, num_heads, qk_nope_head_dim] -> [num_heads, qk_nope_head_dim, kv_lora_rank]
+                # wv_b: [kv_lora_rank, num_heads, v_head_dim] -> [num_heads, kv_lora_rank, v_head_dim]
+                wk_b = wk_b.transpose(perm=[1, 2, 0])
+                wv_b = wv_b.transpose(perm=[1, 0, 2])
+                self.transformer_block.k_b_proj_weights[idx].set_value(wk_b)
+                self.transformer_block.v_b_proj_weights[idx].set_value(wv_b)
 
             linear_weight = paddle.to_tensor(
                 state_dict[f"{self.base_model_prefix}.layers.{idx}.self_attn.o_proj.weight"]
