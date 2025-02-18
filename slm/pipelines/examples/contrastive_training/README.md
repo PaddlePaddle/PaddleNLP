@@ -227,15 +227,15 @@ python evaluation/eval_mteb.py \
        --add_eos_token 0 \
        --max_seq_length 532
 ```
-结果文件保存在`en_results/llara-passage/MSMARCOTITLE/last_8/no_model_name_available/no_revision_available/MSMARCOTITLE.json`，包含以下类似的评估结果：（TODO: 这个地方弄错了，下面的结果是不带 title 的，我之后会把带 title 的结果放上来）
+结果文件保存在`en_results/llara-passage/MSMARCOTITLE/last_8/no_model_name_available/no_revision_available/MSMARCOTITLE.json`，包含以下类似的评估结果：
 ```
-'mrr_at_1': 0.27320916905444126,
-'mrr_at_3': 0.36984240687679154,
-'mrr_at_5': 0.39247134670487116,
-'mrr_at_10': 0.408858359485151,
-'mrr_at_20': 0.41549618393398596,
-'mrr_at_100': 0.41905386335354294,
-'mrr_at_1000': 0.41933821737968063,
+"mrr_at_1": 0.29369627507163326,
+"mrr_at_3": 0.3915234001910231,
+"mrr_at_5": 0.41467526265520616,
+"mrr_at_10": 0.43047454177468664,
+"mrr_at_20": 0.4369588035569348,
+"mrr_at_100": 0.4403890327706938,
+"mrr_at_1000": 0.44061882383373324
 ```
 
 评估 NV-Embed 向量检索模型（[NV-Embed-v1](https://huggingface.co/nvidia/NV-Embed-v1)）：

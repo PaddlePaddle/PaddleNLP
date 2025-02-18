@@ -12,12 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# import os
-# os.environ["CUDA_VISIBLE_DEVICES"] = "2"
-import sys  # TODO: 这个地方我回头会删掉，现在加这个东西的原因是：我们并没有通过pip安装paddlenlp，而是使用正在开发的这个paddlenlp
-
-sys.path = ["/141nfs/lizhuoqun/PaddleNLP"] + sys.path
-print(sys.path)
 
 import argparse
 import logging
