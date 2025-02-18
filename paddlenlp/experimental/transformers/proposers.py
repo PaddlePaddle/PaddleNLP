@@ -108,7 +108,7 @@ class InferenceWithReferenceProposer(Proposer):
             seq_lens_this_time,
             seq_lens_encoder,
             seq_lens_decoder,
-            model_inputs["max_dec_len"].cpu(),
+            model_inputs["max_length"].cpu(),
             kargs["real_batch_size"],
             self.max_ngram_size,
             self.max_draft_token_num,
