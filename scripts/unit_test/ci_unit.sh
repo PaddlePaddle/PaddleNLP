@@ -16,6 +16,7 @@
 
 export paddle=$1
 export nlp_dir=/workspace/PaddleNLP
+export log_path=/workspace/PaddleNLP/unittest_logs
 cd $nlp_dir
 
 if [ ! -d "unittest_logs" ];then
@@ -54,8 +55,10 @@ set_env() {
 
 install_requirements
 set_env
+export FLAGS_trace_api="${log_path}/api.yaml,${log_path}/api_config.txt"
+echo ' Testing all unittest cases '
 pytest -v -n 8 \
   --dist loadgroup \
   --retries 1 --retry-delay 1 \
   --timeout 200 --durations 20 \
-  --cov paddlenlp --cov-report xml:coverage.xml
+  --cov paddlenlp --cov-report xml:coverage.xml > ${log_path}/unittest.log 2>&1

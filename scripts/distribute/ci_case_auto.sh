@@ -3110,6 +3110,7 @@ function before_hook_for_gpt() {
     export FLAGS_new_executor_micro_batching=True  # True：打开新执行器
     export FLAGS_embedding_deterministic=1         # 1：关闭随机性
     export FLAGS_cudnn_deterministic=1             # 1：关闭随机性
+    export FLAGS_trace_api="${log_path}/api.yaml,${log_path}/api_config.txt"
     unset CUDA_MODULE_LOADING
     env | grep FLAGS
     export http_proxy=${proxy}
@@ -3152,6 +3153,7 @@ function export_env() {
     export FLAGS_embedding_deterministic=1         # 1：关闭随机性
     export FLAGS_cudnn_deterministic=1             # 1：关闭随机性
     export FLAGS_program_topo_reorder=1            # 1: 反向对齐动手拓扑排序
+    export FLAGS_trace_api="${log_path}/api.yaml,${log_path}/api_config.txt"
     unset CUDA_MODULE_LOADING
     env | grep FLAGS
     export http_proxy=${proxy}
@@ -3166,6 +3168,7 @@ function before_hook_for_llama() {
     export FLAGS_embedding_deterministic=1         # 1：关闭随机性
     export FLAGS_cudnn_deterministic=1             # 1：关闭随机性
     export FLAGS_program_topo_reorder=1            # 1: 反向对齐动手拓扑排序
+    export FLAGS_trace_api="${log_path}/api.yaml,${log_path}/api_config.txt"
     unset CUDA_MODULE_LOADING
     env | grep FLAGS
     export http_proxy=${proxy}

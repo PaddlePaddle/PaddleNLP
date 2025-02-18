@@ -593,6 +593,7 @@ function check_result() {
 function before_hook_for_gpt() {
     echo -e "\033[31m ---- Set FLAGS for GPT dygraph cases  \033[0m"
     cd ${gpt_case_path}
+    export FLAGS_trace_api="${log_path}/api.yaml,${log_path}/api_config.txt"
     env | grep FLAGS
     export http_proxy=${proxy}
     export https_proxy=${proxy}
@@ -704,6 +705,7 @@ function before_hook_for_llm_gpt() {
     cd ${llm_gpt_case_path}
     export FLAGS_cudnn_deterministic=1
     export FLAGS_embedding_deterministic=1
+    export FLAGS_trace_api="${log_path}/api.yaml,${log_path}/api_config.txt"
     env | grep FLAGS
     export http_proxy=${proxy}
     export https_proxy=${proxy}

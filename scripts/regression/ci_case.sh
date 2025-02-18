@@ -548,6 +548,7 @@ llm(){
     
     echo ' Testing all LLMs '
     cd ${nlp_dir}
+    export FLAGS_trace_api=${log_path}/api.yaml,${log_path}/api_config.txt
     python -m pytest tests/llm/test_*.py -vv --timeout=300 --alluredir=result >${log_path}/llm >>${log_path}/llm 2>&1
     print_info $? llm
 }
