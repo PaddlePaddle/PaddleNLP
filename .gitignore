@@ -135,3 +135,17 @@ autogen/
 
 # cutlass kernel
 !csrc/gpu/cutlass_kernels/gemm/collective/builders
+slm/pipelines/examples/contrastive_training/evaluation/results
+slm/pipelines/examples/contrastive_training/log
+slm/pipelines/examples/contrastive_training/evaluation/msmarco-passage-title
+tests/transformers/llm_embed/tmp.py
+tests/transformers/nv_embed/tmp.py
+slm/pipelines/examples/contrastive_training/train.sh
+slm/pipelines/examples/contrastive_training/evaluation/config.yaml
+slm/pipelines/examples/contrastive_training/evaluation/eval_mteb0.sh
+slm/pipelines/examples/contrastive_training/evaluation/eval_mteb1.sh
+slm/pipelines/examples/contrastive_training/evaluation/eval_mteb2.sh
+paddlenlp/transformers/llm_embed/modeling_.py
+slm/pipelines/examples/contrastive_training/evaluation/eval_mteb_.py
+slm/pipelines/examples/contrastive_training/evaluation/eval_mteb998.sh
+slm/pipelines/examples/contrastive_training/evaluation/eval_mteb999.sh

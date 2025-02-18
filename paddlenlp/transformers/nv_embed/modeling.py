@@ -202,6 +202,7 @@ class NVEncodeModel(MistralModel):
         use_inbatch_neg=True,
         matryoshka_dims=None,
         matryoshka_loss_weights=None,
+        max_seq_length=4096,
     ):
         super().__init__(config)  # get mistral model structure
 
@@ -228,6 +229,8 @@ class NVEncodeModel(MistralModel):
         self.use_inbatch_neg = use_inbatch_neg
         self.matryoshka_dims = matryoshka_dims
         self.matryoshka_loss_weights = matryoshka_loss_weights
+
+        self.max_seq_length = max_seq_length
 
         self.cross_entropy = nn.CrossEntropyLoss(reduction="mean")
 
@@ -496,7 +499,7 @@ class NVEncodeModel(MistralModel):
             sentences_batch = sentences[start_index : start_index + self.eval_batch_size]
             inputs = self.tokenizer(
                 sentences_batch,
-                max_length=4096,
+                max_length=self.max_seq_length,
                 padding=True,
                 return_attention_mask=True,
                 return_token_type_ids=False,
