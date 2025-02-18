@@ -607,7 +607,7 @@ __global__ void multi_query_decode_attention_kernel(T * __restrict__ q, // [toke
 }
 
 
-template <typename T, uint32_t GROUP_SIZE, uint32_t HEAD_DIM_QK, uint32_t HEAD_DIM_V, uint32_t BLOCK_SIZE, bool CAUSAL, uint32_t NUM_STAGE, CacheType cache_type, uint32_t cache_bytes, uint32_t DEAL_EACH_TIME, uint32_t NUM_THREADS, PosEncMode pos_enc_mode = PosEncMode::kNonePos>
+template <typename T, uint32_t GROUP_SIZE, uint32_t HEAD_DIM_QK, uint32_t HEAD_DIM_V, uint32_t BLOCK_SIZE, bool CAUSAL, uint32_t NUM_STAGE, CacheType cache_type, uint32_t cache_bytes, uint32_t DEAL_EACH_TIME, PosEncMode pos_enc_mode = PosEncMode::kNonePos>
 void MultiQueryDecoderAttention(
   const AppendAttnMetaData& meta_data,
   cudaStream_t &stream,
@@ -872,12 +872,10 @@ void DecodeMLAAttentionKernel(
       {DISPATCH_HEAD_DIM(head_dim_qk, HEAD_DIM_QK,  
         {DISPATCH_HEAD_DIM(head_dim_v, HEAD_DIM_V, 
           {DISPATCH_BLOCK_SIZE(block_size, BLOCK_SIZE, 
-            {DISPATCH_NUM_STAGE(num_stage, NUM_STAGE,
               {DISPATCH_DEAL_EACH_TIME(deal_each_time, DEAL_EACH_TIME,
-                {DISPATCH_NUM_THREADS(num_threads, NUM_THREADS, 
-                  {MultiQueryDecoderAttention<T, GROUP_SIZE, HEAD_DIM_QK, HEAD_DIM_V, BLOCK_SIZE, CAUSAL, NUM_STAGE, CacheType::CacheT, 16, DEAL_EACH_TIME, NUM_THREADS>(
+                  {MultiQueryDecoderAttention<T, 128, HEAD_DIM_QK, HEAD_DIM_V, BLOCK_SIZE, CAUSAL, 2, CacheType::CacheT, 16, DEAL_EACH_TIME>(
                   meta_data, stream, q, cache_k, cache_v, attn_mask, shift_bias, smooth_weight, seq_lens_q, seq_lens_kv, padding_offsets, cum_offsets, 
-                  block_table, max_seq_len, max_dec_len, rope_scale, rope_theta, softmax_scale, in_scale, out);})})})})})})})});
+                  block_table, max_seq_len, max_dec_len, rope_scale, rope_theta, softmax_scale, in_scale, out);})})})})})});
 }
 
 template void DecodeMLAAttentionKernel<paddle::bfloat16>(

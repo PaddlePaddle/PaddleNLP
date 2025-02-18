@@ -85,6 +85,7 @@ std::vector<paddle::Tensor> PrefillMLAWriteCacheKernel(
   const auto& kv_cache_dims = kv_cache.dims();
   meta_data.kv_num_heads = kv_cache_dims[1];
   const auto nope_size = kv_nope_dims[kv_nope_dims.size() - 1];
+  meta_data.token_nums = kv_nope_dims[0];
   meta_data.head_dims = kv_cache_dims[3];
   meta_data.head_dims_v = nope_size;
 
@@ -191,6 +192,7 @@ std::vector<paddle::Tensor> DecodeMLAWriteCacheKernel(
   const auto& kv_cache_dims = kv_cache.dims();
   meta_data.kv_num_heads = kv_cache_dims[1];
   const auto nope_size = kv_nope_dims[kv_nope_dims.size() - 1];
+  meta_data.token_nums = kv_nope_dims[0];
   meta_data.head_dims = kv_cache_dims[3];
   meta_data.head_dims_v = nope_size;
 
