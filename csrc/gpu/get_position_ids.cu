@@ -18,6 +18,7 @@
 __global__ void GetPositionIdsKernel(
     const int* seq_lens_encoder,  // [bsz] 每个批次的 encoder 长度
     const int* seq_lens_decoder,  // [bsz] 每个批次的 decoder 长度
+    const int* seq_lens_this_time,
     int* position_ids,            // 输出的一维 position_ids
     const int bsz) {              // 批次大小
   // 当前线程索引（每个线程对应一个批次）
@@ -29,13 +30,14 @@ __global__ void GetPositionIdsKernel(
   for (int i = 0; i < tid; i++) {
     offset += seq_lens_encoder[i];
     if (seq_lens_decoder[i] > 0) {
-      offset += 1;
+      offset += seq_lens_this_time[i];
     }
   }
 
   // 当前批次的 encoder 和 decoder 长度
   int encoder_len = seq_lens_encoder[tid];
   int decoder_len = seq_lens_decoder[tid];
+  int seq_len_this_time = seq_lens_this_time[tid];
 
   // 写入 encoder 的 position_ids
   for (int i = 0; i < encoder_len; i++) {
@@ -45,25 +47,29 @@ __global__ void GetPositionIdsKernel(
 
   // 写入 decoder 的 position_ids
   if (decoder_len > 0) {
-    position_ids[offset] = decoder_len;  // 使用 decoder 长度本身
+    for (int i = 0; i < seq_len_this_time; i++) {
+      position_ids[offset + i] = decoder_len + i;  // 使用 decoder 长度本身
+    }
   }
 }
 
 
 void GetPositionIds(const paddle::Tensor& seq_lens_encoder,
                     const paddle::Tensor& seq_lens_decoder,
+                    const paddle::Tensor& seq_lens_this_time,
                     const paddle::Tensor& position_ids) {
   const int bsz = seq_lens_encoder.shape()[0];
 
   GetPositionIdsKernel<<<1, bsz, 0, position_ids.stream()>>>(
       seq_lens_encoder.data<int>(),
       seq_lens_decoder.data<int>(),
+      seq_lens_this_time.data<int>(),
       const_cast<int*>(position_ids.data<int>()),
       bsz);
 }
 
 PD_BUILD_OP(get_position_ids)
-    .Inputs({"seq_lens_encoder", "seq_lens_decoder", "position_ids"})
+    .Inputs({"seq_lens_encoder", "seq_lens_decoder", "seq_lens_this_time", "position_ids"})
     .Outputs({"position_ids_out"})
     .SetInplaceMap({{"position_ids", "position_ids_out"}})
     .SetKernelFn(PD_KERNEL(GetPositionIds));

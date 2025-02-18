@@ -335,7 +335,7 @@ __global__ void multi_query_append_attention_kernel(
     produce_kv_blockwise<SharedMemFillMode::kNoFill,
                          NUM_WARPS,
                          BLOCK_SIZE,
-                         num_frags_y_v,
+                         num_frags_y_qk,
                          num_frags_z,
                          NUM_WARP_Q>(k_smem,
                                      &k_smem_offset_w,

@@ -34,6 +34,8 @@ class DeepseekV3ForCausalLMPipe(DeepseekV2ForCausalLMPipe):
     _get_tensor_parallel_mappings = DeepseekV3PretrainedModel._get_tensor_parallel_mappings
     _init_weights = DeepseekV3PretrainedModel._init_weights
     _keys_to_ignore_on_load_unexpected = DeepseekV3PretrainedModel._keys_to_ignore_on_load_unexpected
+    _get_model_flops = DeepseekV3PretrainedModel._get_model_flops
+    _get_hardware_flops = DeepseekV3PretrainedModel._get_hardware_flops
     _tied_weights_keys = ["lm_head.weight"]
 
     # DONOT Add base_model_prefix !!!!

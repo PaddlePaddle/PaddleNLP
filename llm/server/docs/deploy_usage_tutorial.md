@@ -1,6 +1,8 @@
+# 静态图高性能部署全流程
 
 ## 目录
 
+- [快速开始](#快速开始)
 - [部署环境准备](#部署环境准备)
   - [基础环境](#基础环境)
   - [准备部署镜像](#准备部署镜像)
@@ -12,12 +14,45 @@
   - [服务状态查询](#服务状态查询)
 - [服务测试](#服务测试)
   - [Python 客户端](#Python-客户端)
-  - [HTTP 调用](#HTTP 调用)
+  - [HTTP 调用](#HTTP-调用)
   - [OpenAI 客户端](#OpenAI-客户端)
   - [返回示例](#返回示例)
 - [基于 dockerfile 创建自己的镜像](#基于 dockerfile 创建自己的镜像)
 - [模型配置参数介绍](#模型配置参数介绍)
 - [请求参数介绍](#请求参数介绍)
+
+
+
+*该部署工具是基于英伟达 Triton 框架专为服务器场景的大模型服务化部署而设计。它提供了支持 gRPC、HTTP 协议的服务接口，以及流式 Token 输出能力。底层推理引擎支持连续批处理、weight only int8、后训练量化（PTQ）等加速优化策略，为用户带来易用且高性能的部署体验。*
+
+## 快速开始
+
+基于预编译镜像部署，**使用飞桨静态图模型部署**。本节以 Meta-Llama-3-8B-Instruct-A8W8C8 为例。其他模型需按照要求导出为**静态图模型格式**。
+具体流程如下，仅供示例参考，用户需要根据自己的需求导出所需**静态图模型**，然后开始部署流程。
+
+```shell
+  # 下载模型
+  wget https://paddle-qa.bj.bcebos.com/inference_model/Meta-Llama-3-8B-Instruct-A8W8C8.tar
+  mkdir Llama-3-8B-A8W8C8 && tar -xf Meta-Llama-3-8B-Instruct-A8W8C8.tar -C Llama-3-8B-A8W8C8
+
+  # 挂载模型文件
+  export MODEL_PATH=${PWD}/Llama-3-8B-A8W8C8
+
+  docker run --gpus all --shm-size 5G --network=host --privileged --cap-add=SYS_PTRACE \
+  -v ${MODEL_PATH}:/models/ \
+  -dit registry.baidubce.com/paddlepaddle/fastdeploy:llm-serving-cuda123-cudnn9-v1.2 \
+  bash -c 'export USE_CACHE_KV_INT8=1 && cd /opt/output/Serving && bash start_server.sh; exec bash'
+```
+等待服务启动成功（服务初次启动大概需要40s），可以通过以下命令测试：
+
+```shell
+  curl 127.0.0.1:9965/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{"text": "hello, llm"}'
+```
+
+Note:
+1. 请保证 shm-size >= 5，不然可能会导致服务启动失败
 
 ## 部署环境准备
 
@@ -42,6 +77,13 @@ docker pull registry.baidubce.com/paddlepaddle/fastdeploy:llm-serving-cuda123-cu
 ### 准备模型
 
 该部署工具为 PaddleNLP 静态图模型提供了高效的部署方案，模型静态图导出方案请参考：[LLaMA](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/llama.md)、[Qwen](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/qwen.md)、[Mixtral](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/mixtral.md) ...
+
+或者下载样例模型:
+```shell
+# 下载模型
+wget https://paddle-qa.bj.bcebos.com/inference_model/Meta-Llama-3-8B-Instruct-A8W8C8.tar
+mkdir Llama-3-8B-A8W8C8 && tar -xf Meta-Llama-3-8B-Instruct-A8W8C8.tar -C Llama-3-8B-A8W8C8
+```
 
 导出后的模型放在任意文件夹下，以 `/home/workspace/models_dir` 为例
 
@@ -87,7 +129,7 @@ ls /models/
 
 根据需求和硬件信息，配置以下环境变量
 
-```
+```shell
 # 单/多卡推理配置。自行修改。
 ## 如果是单卡推理，使用0卡，设置如下环境变量。
 export MP_NUM=1
@@ -128,7 +170,7 @@ export PUSH_MODE_HTTP_WORKERS="1" # HTTP服务进程数，在 PUSH_MODE_HTTP_POR
 
 ### 启动服务
 
-```
+```shell
 cd /opt/output/Serving
 bash start_server.sh
 
@@ -153,7 +195,7 @@ health接口：（模型是否准备好推理）
 
 提示：HTTP 调用接口使用变量 PUSH_MODE_HTTP_PORT 配置！HTTP_PORT 仅用于探活接口使用！
 
-```
+```python
 import uuid
 import json
 import requests
@@ -193,7 +235,7 @@ for line in res.iter_lines():
 
 ### 返回示例
 
-```
+```python
 如果stream为True，流式返回
     如果正常，返回{'token': xxx, 'is_end': xxx, 'send_idx': xxx, ..., 'error_msg': '', 'error_code': 0}
     如果异常，返回{'error_msg': xxx, 'error_code': xxx}，error_msg字段不为空，error_code字段不为0
@@ -209,7 +251,7 @@ for line in res.iter_lines():
 
 提示：使用 OpenAI 客户端需要配置 `PUSH_MODE_HTTP_PORT`！
 
-```
+```python
 import openai
 
 push_mode_http_port = "9965"    # 服务配置的PUSH_MODE_HTTP_PORT
@@ -278,7 +320,8 @@ print("\n")
 ## 基于 dockerfile 创建自己的镜像
 
 为了方便用户构建自定义服务，我们提供了基于 dockerfile 创建自己的镜像的脚本。
-```
+
+```shell
 git clone https://github.com/PaddlePaddle/PaddleNLP.git
 cd PaddleNLP/llm/server
 
