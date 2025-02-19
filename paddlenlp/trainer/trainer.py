@@ -87,6 +87,7 @@ try:
     from ..quantization.quantization_linear import QuantizationLinear
 except:
     QuantizationLinear = None
+
 from ..transformers.context_parallel_utils import split_inputs_sequence_dim_load_balance
 from ..transformers.model_utils import (
     PretrainedModel,
@@ -696,7 +697,7 @@ class Trainer:
         """
         assert isinstance(self.model, PretrainedModel), "model should be a PretrainedModel when using flash"
         logger.info("Create flash checkpoint manager...")
-        if isinstance(unwrapped_model, PipelineLayer):
+        if isinstance(self.model, PipelineLayer):
             pipeline_hooks_capacity = (
                 unwrapped_model.forward_pipeline_parallel_hook_capacity
                 + unwrapped_model.backward_pipeline_parallel_hook_capacity
@@ -729,11 +730,16 @@ class Trainer:
             self.args, self.flash_checkpoint_manager, self.runtime_timer, self.sharding_io
         )
         self.add_callback(_callback)
+
         if resume_from_checkpoint is not None:
             path = _add_variant(PADDLE_OPTIMIZER_NAME, self.args.optimizer_name_suffix)
             path = os.path.join(resume_from_checkpoint, path).replace("optimizer", "ema")
-            logger.info(f"FC EMA load from {path}")
-            self.flash_checkpoint_manager.set_ema_state_dict(path)
+            if os.path.exists(path):
+                logger.info(f"FC EMA load from {path}")
+                self.flash_checkpoint_manager.set_ema_state_dict(path)
+            else:
+                logger.info(f"FC EMA state dict not found, in: {path}")
+
         logger.info("Create flash checkpoint manager done.")
 
     def train(
@@ -1769,14 +1775,12 @@ class Trainer:
         if "gpu" not in paddle.device.get_device():
             logger.warning("offload/reload optimizer's states is only supported on GPU devices.")
             return
-
         attributes = [
             ("_accumulators", "_moment1_acc_str"),
             ("_accumulators", "_moment2_acc_str"),
             ("_master_weights",),
             ("_accumulators_holder",),
         ]
-
         for attr in attributes:
             if all(hasattr(self.optimizer, a) for a in attr):
                 target_attr = getattr(self.optimizer, attr[0])
@@ -2404,6 +2408,9 @@ class Trainer:
 
     def _save_checkpoint(self, model, metrics=None):
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
+        if self.args.enable_flash_save_mode:
+            return
+
         self.runtime_timer.start("checkpoint saving time")
 
         # Save model checkpoint
