@@ -285,8 +285,15 @@ class QWenMLPNet(nn.Layer):
         super().__init__()
         ff_dim_in = config.intermediate_size // 2
         self.fuse_attention_ffn = config.fuse_attention_ffn
-        self.w1 = nn.Linear(config.hidden_size, ff_dim_in, bias_attr=False)
-        self.w2 = nn.Linear(config.hidden_size, ff_dim_in, bias_attr=False)
+        if self.fuse_attention_ffn:
+            self.gate_up_fused_proj = nn.Linear(
+                config.hidden_size, 
+                ff_dim_in * 2, 
+                bias_attr=False
+            )
+        else:
+            self.w1 = nn.Linear(config.hidden_size, ff_dim_in, bias_attr=False)
+            self.w2 = nn.Linear(config.hidden_size, ff_dim_in, bias_attr=False)
         self.c_proj = nn.Linear(ff_dim_in, config.hidden_size, bias_attr=False)
 
     def forward(self, hidden_states):
