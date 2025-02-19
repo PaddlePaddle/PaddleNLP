@@ -438,23 +438,6 @@ def main():
     config.num_hidden_layers = (
         model_args.num_hidden_layers if model_args.num_hidden_layers is not None else config.num_hidden_layers
     )
-    config.num_hidden_layers = (
-        model_args.num_hidden_layers if model_args.num_hidden_layers is not None else config.num_hidden_layers
-    )
-    config.first_k_dense_replace = (
-        model_args.first_k_dense_replace
-        if model_args.first_k_dense_replace is not None
-        else config.first_k_dense_replace
-    )
-    config.n_routed_experts = (
-        model_args.n_routed_experts if model_args.n_routed_experts is not None else config.n_routed_experts
-    )
-    config.num_experts_per_tok = (
-        model_args.num_experts_per_tok if model_args.num_experts_per_tok is not None else config.num_experts_per_tok
-    )
-    config.hidden_size = model_args.hidden_size if model_args.hidden_size is not None else config.hidden_size
-    config.topk_group = model_args.topk_group if model_args.topk_group is not None else config.topk_group
-
     # Config for model using dropout, such as GPT.
     if hasattr(config, "hidden_dropout_prob"):
         config.hidden_dropout_prob = model_args.hidden_dropout_prob
