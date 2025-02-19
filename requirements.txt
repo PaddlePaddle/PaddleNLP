@@ -27,4 +27,5 @@ regex
 numpy<=1.26.4
 tiktoken
 tokenizers>=0.21,<0.22
+ml_dtypes
 omegaconf
