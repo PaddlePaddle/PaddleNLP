@@ -213,8 +213,6 @@ python evaluation/eval_mteb.py \
 
 评估其在 MSMARCOTITLE 数据集上的性能:
 ```
-git lfs install
-git clone https://hf-mirror.com/datasets/Tevatron/msmarco-passage-corpus
 export CUDA_VISIBLE_DEVICES=0
 python evaluation/eval_mteb.py \
        --base_model_name_or_path BAAI/LLARA-passage \

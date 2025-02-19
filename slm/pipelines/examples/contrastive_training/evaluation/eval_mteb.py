@@ -17,6 +17,7 @@ import argparse
 import logging
 
 import mteb
+from datasets import load_dataset
 from mteb import MTEB
 from mteb.abstasks.AbsTaskRetrieval import AbsTaskRetrieval, HFDataLoader
 from mteb.abstasks.TaskMetadata import TaskMetadata
@@ -24,15 +25,13 @@ from mteb.abstasks.TaskMetadata import TaskMetadata
 from paddlenlp.peft import LoRAConfig, LoRAModel
 from paddlenlp.transformers import AutoTokenizer, BiEncoderModel, NVEncodeModel
 
-MSMARCOTITLE_PATH = "./msmarco-passage-title"
-
 
 class MSMARCOTITLE(AbsTaskRetrieval):
     metadata = TaskMetadata(
         dataset={
-            "path": MSMARCOTITLE_PATH,
+            "corpus_path": "Tevatron/msmarco-passage-corpus",
+            "path": "mteb/msmarco",
             "revision": "c5a29a104738b98a9e76336939199e264163d4a0",
-            "hf_hub_name": "mteb/msmarco",
         },
         name="MSMARCOTITLE",
         description="MS MARCO is a collection of datasets focused on deep learning in search",
@@ -60,31 +59,20 @@ class MSMARCOTITLE(AbsTaskRetrieval):
         if self.data_loaded:
             return
         self.corpus, self.queries, self.relevant_docs = {}, {}, {}
-        hf_repo_qrels = (
-            self.metadata_dict["dataset"]["hf_hub_name"] + "-qrels"
-            if "clarin-knext" in self.metadata_dict["dataset"]["hf_hub_name"]
-            else None
-        )
+        dataset_path = self.metadata_dict["dataset"]["path"]
+        hf_repo_qrels = dataset_path + "-qrels" if "clarin-knext" in dataset_path else None
         for split in kwargs.get("eval_splits", self.metadata_dict["eval_splits"]):
-            if kwargs.get("data_folder", None) is not None:
-                data_folder = kwargs.get("data_folder", None)
-                print(f"Loading data from local folder: {data_folder}")
-                logger.info("Loading data from local folder: {}".format(data_folder))
-                corpus, queries, qrels = HFDataLoader(
-                    data_folder=data_folder,
-                    streaming=False,
-                    keep_in_memory=False,
-                ).load(split=split)
-            else:
-                corpus, queries, qrels = HFDataLoader(
-                    hf_repo=self.metadata_dict["dataset"]["hf_hub_name"],
-                    hf_repo_qrels=hf_repo_qrels,
-                    streaming=False,
-                    keep_in_memory=False,
-                ).load(split=split)
+            _, queries, qrels = HFDataLoader(
+                hf_repo=dataset_path,
+                hf_repo_qrels=hf_repo_qrels,
+                streaming=False,
+                keep_in_memory=False,
+            ).load(split=split)
+            corpus = load_dataset(self.metadata_dict["dataset"]["corpus_path"], trust_remote_code=True)["train"]
+            print(f"corpus[0] {corpus[0]}")
             # Conversion from DataSet
             queries = {query["id"]: query["text"] for query in queries}
-            corpus = {doc["id"]: {"title": doc["title"], "text": doc["text"]} for doc in corpus}
+            corpus = {doc["docid"]: {"title": doc["title"], "text": doc["text"]} for doc in corpus}
             self.corpus[split], self.queries[split], self.relevant_docs[split] = (
                 corpus,
                 queries,
@@ -223,7 +211,6 @@ if __name__ == "__main__":
         evaluation.run(
             encode_model,
             output_folder=f"{args.output_folder}/{args.task_name}/{args.pooling_method}",
-            data_folder=MSMARCOTITLE_PATH,
             score_function="dot",
             eval_splits=["dev"],
         )
