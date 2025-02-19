@@ -78,7 +78,6 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
         self.num_key_value_heads = config.num_key_value_heads
         self.num_layers = config.num_hidden_layers
         self.rms_norm_eps = config.rms_norm_eps
-        self.max_position_embeddings = config.max_position_embeddings
         self.quant_type = config.quant_type
         self.rope_theta = config.rope_theta
 
@@ -217,7 +216,7 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
             num_experts=self.num_experts,
             top_k=self.moe_topk,
             norm_topk_prob=self.norm_topk_prob,
-            moe_every2=False,
+            moe_intermediate_size=self.moe_intermediate_size,
             shared_expert_intermediate_size=self.shared_expert_intermediate_size,
             shared_expert_ffn1_weight_attrs=shared_expert_ffn1_weight_attrs,
             shared_expert_ffn1_weight_scale_attrs=shared_expert_ffn1_weight_scale_attrs,
@@ -230,7 +229,7 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
             embed_dim=self.hidden_size,
             num_heads=self.num_attention_heads,
             kv_num_heads=self.num_key_value_heads,
-            dim_feedforward=self.moe_intermediate_size,
+            intermediate_size=self.moe_intermediate_size,
             quant_type=self.quant_type,
             activation="swiglu",
             num_layers=config.num_hidden_layers,

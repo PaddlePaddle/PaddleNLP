@@ -88,7 +88,7 @@ monitor_log_file() {
             # 文件大小未变化，增加无更新时长计数
             no_update_duration=$((no_update_duration + 5))
             echo "$(date '+%Y-%m-%d %H:%M:%S') 文件未写入..."
-            if [ "$no_update_duration" -ge 180 ]; then
+            if [ "$no_update_duration" -ge 900 ]; then
                 echo "$(date '+%Y-%m-%d %H:%M:%S') 文件在过去的 3 分钟内没有继续写入，准备杀掉进程 $training_pid."
                 # 创建标志文件
                 touch "$kill_flag_file"

@@ -87,8 +87,10 @@ class FusedQwen2RMSNorm(nn.Layer):
 
 @register_base_model
 class Qwen2InferenceModel(Qwen2PretrainedModel):
-    def __init__(self, config: Qwen2Config):
+    def __init__(self, config: Qwen2Config, base_model_prefix: str):
         super(Qwen2PretrainedModel, self).__init__(config)
+        self.base_model_prefix = base_model_prefix
+
         self.vocab_size = config.vocab_size
         self.hidden_size = config.hidden_size
         self.num_attention_heads = config.num_attention_heads
@@ -306,7 +308,7 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
             embed_dim=self.hidden_size,
             num_heads=self.num_attention_heads,
             kv_num_heads=self.num_key_value_heads,
-            dim_feedforward=self.intermediate_size,
+            intermediate_size=self.intermediate_size,
             quant_type=self.quant_type,
             activation="swiglu",
             num_layers=config.num_hidden_layers,
@@ -771,7 +773,9 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
                     ffn1_weight.cast(self.transformer_block.ffn1_weights[idx].dtype)
                 )
 
-            ffn2_weight = paddle.to_tensor(state_dict[f"{model_prefix}.mlp.down_proj.weight"])
+            ffn2_weight = paddle.to_tensor(state_dict[f"{model_prefix}.mlp.down_proj.weight"]).cast(
+                paddle.get_default_dtype()
+            )
             if self.use_weight_only:
                 ffn2_quanted_weight, ffn2_weight_scale = weight_quantize(ffn2_weight, algo=self.quant_algo)
                 self.transformer_block.ffn2_weights[idx].set_value(ffn2_quanted_weight)
@@ -1051,9 +1055,11 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
 
 
 class Qwen2ForCausalLMInferenceModel(GenerationInferenceModel, Qwen2PretrainedModel):
-    def __init__(self, config: Qwen2Config, **kwargs):
-        super(Qwen2ForCausalLMInferenceModel, self).__init__(config)
-        self.qwen2 = Qwen2InferenceModel(config)
+    def __init__(self, config: Qwen2Config, base_model_prefix: str = "qwen2"):
+        super().__init__(config)
+        self.base_model_prefix = base_model_prefix
+
+        self.qwen2 = Qwen2InferenceModel(config, base_model_prefix)
         if config.tie_word_embeddings:
             self.lm_head = Qwen2LMHead(config, embedding_weights=self.qwen2.embed_tokens.weight, transpose_y=True)
             self.tie_weights()
@@ -1214,9 +1220,9 @@ class Qwen2ForCausalLMInferenceModel(GenerationInferenceModel, Qwen2PretrainedMo
 
 @register_base_model
 class Qwen2BlockInferenceModel(Qwen2InferenceModel):
-    def __init__(self, config: Qwen2Config):
+    def __init__(self, config: Qwen2Config, base_model_prefix: str):
         self.append_attn = config.append_attn
-        super().__init__(config)
+        super().__init__(config, base_model_prefix)
         self.max_seq_len = config.max_seq_len
         self.block_size = config.block_size
 
@@ -1309,13 +1315,15 @@ class Qwen2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen2Pr
 
     _keys_to_ignore_on_load_missing = [r"lm_head.weight"]
 
-    def __init__(self, config):
+    def __init__(self, config: Qwen2Config, base_model_prefix: str = "qwen2"):
         super().__init__(config)
+        self.base_model_prefix = base_model_prefix
+
         self.max_candidate_len = config.get("speculate_max_candidate_len", 5)
         self.verify_window = config.get("speculate_verify_window", 2)
         self.max_seq_len = config.max_seq_len
 
-        self.qwen2 = Qwen2BlockInferenceModel(config)
+        self.qwen2 = Qwen2BlockInferenceModel(config, base_model_prefix)
         if config.tie_word_embeddings:
             self.lm_head = Qwen2LMHead(config, embedding_weights=self.qwen2.embed_tokens.weight, transpose_y=True)
             self.tie_weights()
@@ -1346,6 +1354,31 @@ class Qwen2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen2Pr
                 "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
                 "layers.0.mlp.down_proj.weight": partial(fn, is_column=False),
             }
+
+            if "a8w8" in config.quant_type:
+                if config.quantization_config.shift_smooth_all_linears:
+                    base_actions["layers.0.self_attn.o_proj.shift_bias"] = partial(fn, is_column=True)
+                    base_actions["layers.0.self_attn.o_proj.smooth_weight"] = partial(fn, is_column=True)
+                    base_actions["layers.0.mlp.down_proj.shift_bias"] = partial(fn, is_column=True)
+                    base_actions["layers.0.mlp.down_proj.smooth_weight"] = partial(fn, is_column=True)
+
+                if config.quantization_config.shift:
+                    if config.fuse_attention_qkv:
+                        base_actions["layers.0.self_attn.qkv_proj.bias"] = partial(fn, is_column=True)
+                    else:
+                        base_actions["layers.0.self_attn.q_proj.bias"] = partial(fn, is_column=True)
+                        # if we have enough num_key_value_heads to split, then split it.
+                        if config.num_key_value_heads % config.tensor_parallel_degree == 0:
+                            base_actions["layers.0.self_attn.k_proj.bias"] = partial(fn, is_column=True)
+                            base_actions["layers.0.self_attn.v_proj.bias"] = partial(fn, is_column=True)
+
+                    if config.fuse_attention_ffn:
+                        base_actions["layers.0.mlp.gate_up_fused_proj.bias"] = partial(
+                            fn, is_column=True, is_naive_2fuse=True
+                        )
+                    else:
+                        base_actions["layers.0.mlp.gate_proj.bias"] = partial(fn, is_column=True)
+                        base_actions["layers.0.mlp.up_proj.bias"] = partial(fn, is_column=True)
 
             # Column Linear
             if config.fuse_attention_qkv:
@@ -1520,6 +1553,5 @@ class Qwen2VLForConditionalGenerationBlockInferenceModel(Qwen2ForCausalLMBlockIn
     """
 
     # NOTE: (changwenbin) This function corresponds to QWen2-VL's second part, only used for QWen2-VL.
-    def __init__(self, config):
-        super().__init__(config)
-        self.qwen2.base_model_prefix = "model"
+    def __init__(self, config: Qwen2Config):
+        super().__init__(config, base_model_prefix="model")

@@ -49,18 +49,15 @@
    :maxdepth: 1
    :caption: 飞桨大模型
 
-   大模型预训练文档 <llm/docs/pretrain.rst>
-   大模型精调文档 <llm/docs/finetune.md>
-   大模型FlashMask算法 <llm/docs/flashmask.md>
-   大模型常用算法文档 <llm/docs/algorithm_overview.md>
-   大模型RLHF文档 <llm/docs/rlhf.md>
-   大模型量化教程 <llm/docs/quantization.md>
-   大模型推理教程 <llm/docs/inference.md>
-   大模型统一存储文档 <llm/docs/unified_checkpoint.md>
-   混合并行训练教程 <llm/docs/llm_trainer.rst>
-   模型权重转换教程 <llm/docs/torch2paddle.md>
-   大模型DPO文档 <llm/docs/dpo.md>
-
+   飞桨大模型主文档 <llm/README.md>
+   大模型-预训练文档 <llm/docs/pretrain.rst>
+   大模型-精调文档 <llm/docs/finetune.md>
+   大模型-DPO文档 <llm/docs/dpo.md>
+   大模型-RLHF文档 <llm/docs/rlhf.md>
+   大模型-推理部署教程 <llm/docs/predict/index.rst>
+   大模型-量化教程 <llm/docs/quantization.md>
+   大模型-高级技术文档 <llm/docs/advanced.rst>
+   
 .. toctree::
    :maxdepth: 1
    :caption: 模型库

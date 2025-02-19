@@ -478,6 +478,13 @@ def main():
             except:
                 print("Not register llama pp reshard information.")
 
+    architectures_to_check = {"Qwen2Moe", "DeepseekV2", "DeepseekV3"}
+    if (
+        any(architecture in str(config.architectures) for architecture in architectures_to_check)
+        and training_args.data_parallel_degree > 1
+    ):
+        training_args.use_expert_parallel = True
+
     if model_args.continue_training:
         # NOTE(gongenlei): new add
         if training_args.autotuner_benchmark:

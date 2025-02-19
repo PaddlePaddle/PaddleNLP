@@ -28,7 +28,10 @@ from paddle.base.framework import in_cinn_mode, in_pir_executor_mode, use_pir_ap
 from paddle.distributed import fleet
 
 try:
-    from paddlenlp.experimental.transformers import InferenceWithReferenceProposer
+    from paddlenlp.experimental.transformers import (
+        EagleProposer,
+        InferenceWithReferenceProposer,
+    )
 except:
     pass
 from paddlenlp.generation import GenerationConfig, TextIteratorStreamer
@@ -142,7 +145,9 @@ class PredictorArgument:
     )
     speculate_method: str = field(
         default=None,
-        metadata={"help": "speculate method, it should be one of ['None', 'inference_with_reference']"},
+        metadata={
+            "help": "speculate method, it should be one of ['None', 'inference_with_reference', 'eagle', 'mtp']"
+        },
     )
     speculate_max_draft_token_num: int = field(
         default=1,
@@ -153,6 +158,12 @@ class PredictorArgument:
         default=2, metadata={"help": "the max length of verify window for speculate method."}
     )
     speculate_max_candidate_len: int = field(default=5, metadata={"help": "the max length of candidate tokens."})
+    draft_model_name_or_path: str = field(default=None, metadata={"help": "The directory of eagle or draft model"})
+    draft_model_quant_type: str = field(
+        default="",
+        metadata={"help": "Draft model quantization type. Reserved for future"},
+    )
+    return_full_hidden_states: int = field(default=False, metadata={"help": "whether return full hidden_states"})
 
     def __post_init__(self):
         if self.speculate_method is not None:
@@ -208,8 +219,17 @@ class BasePredictor:
             self.generation_config = None
 
     def _preprocess(self, source):
+
         if self.tokenizer.chat_template is not None:
-            source = [source] if isinstance(source, str) else source
+            # for str -> List[str] eg. "hello"
+            # for List[str] -> List[str]  eg. ["hello", "hello new"]
+            # for List[List[str]] -> List[List[List[str]]]  eg. 历史对话形式,一轮
+            #             [ [ "Hello, how are you?", "I'm doing great. How can I help you today?"],
+            #                ["I'd like to show off how chat templating works!"], ]
+            # for List[Dict] -> List[List[Dict]]  [{'role': 'user', 'content': 'hello'}, {'role': 'assistant', 'content': 'nice'}]
+            #                                 ->  [[{'role': 'user', 'content': 'hello'}, {'role': 'assistant', 'content': 'nice'}]]
+            if not isinstance(source, list) or not isinstance(source[0], str):
+                source = [source]
             source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
 
         tokenized_source = self.tokenizer(
@@ -217,6 +237,7 @@ class BasePredictor:
             max_length=self.config.src_length,
             truncation=True,
             return_position_ids=True if not isinstance(self.tokenizer, ChatGLMTokenizer) else False,
+            return_attention_mask=True,
             truncation_side="left",
             return_tensors=self.return_tensors,
             padding=True,
@@ -471,7 +492,8 @@ class InferencePredictorMixin(BasePredictor):
         pre_caches_length = 0 if not self.config.export_precache else self.pre_caches[0].shape[-2]
 
         if self.tokenizer.chat_template is not None:
-            source = [source] if isinstance(source, str) else source
+            if not isinstance(source, list) or not isinstance(source[0], str):
+                source = [source]
             source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
 
         inputs = llm_utils.dybatch_preprocess(
@@ -914,7 +936,8 @@ class BlockInferencePredictorMixin(BasePredictor):
             assert len(input_text) == self.batch_size
 
         if self.tokenizer.chat_template is not None:
-            input_text = [input_text] if isinstance(input_text, str) else input_text
+            if not isinstance(input_text, list) or not isinstance(input_text[0], str):
+                input_text = [input_text]
             input_text = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in input_text]
 
         input_ids = []
@@ -931,20 +954,24 @@ class BlockInferencePredictorMixin(BasePredictor):
             )
             input_ids.append(tokens["input_ids"][0])
 
-        seq_lens = self.pad_batch_data(input_ids)
+        self.seq_lens = self.pad_batch_data(input_ids)
         self.model_inputs["input_ids"] = self.input_ids
 
         self.model_inputs["block_tables"][:][:] = -1
         free_list = list(range(self.max_block_nums))
         for i in range(self.config.batch_size):
             for j in range(
-                (seq_lens[i] + self.config.max_length + self.config.block_size - 1) // self.config.block_size
+                (self.seq_lens[i] + self.config.max_length + self.config.block_size - 1) // self.config.block_size
             ):
                 used_block_id = free_list.pop()
                 self.model_inputs["block_tables"][i, j] = used_block_id
 
-        self.model_inputs["seq_lens_this_time"] = paddle.to_tensor(np.array(seq_lens).astype("int32").reshape(-1, 1))
-        self.model_inputs["seq_lens_encoder"] = paddle.to_tensor(np.array(seq_lens).astype("int32").reshape(-1, 1))
+        self.model_inputs["seq_lens_this_time"] = paddle.to_tensor(
+            np.array(self.seq_lens).astype("int32").reshape(-1, 1)
+        )
+        self.model_inputs["seq_lens_encoder"] = paddle.to_tensor(
+            np.array(self.seq_lens).astype("int32").reshape(-1, 1)
+        )
         self.model_inputs["seq_lens_decoder"] = paddle.full(
             shape=[self.config.batch_size, 1], fill_value=0, dtype="int32"
         )
@@ -979,7 +1006,7 @@ class BlockInferencePredictorMixin(BasePredictor):
             self.proposer.input_ids_cpu = self.model_inputs["input_ids"].to("cpu", blocking=False)
             for bid in range(self.config.batch_size):
                 self.model_inputs["pre_ids"][bid, 0] = self.model_inputs["input_ids"][bid][
-                    seq_lens[bid] - 1
+                    self.seq_lens[bid] - 1
                 ]  # get the last token before padding of this batch
 
         if self.config.mode == "static":
@@ -990,6 +1017,8 @@ class BlockInferencePredictorMixin(BasePredictor):
 class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
     def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None, **kwargs):
         model = kwargs.get("model", None)
+        self.return_full_hidden_states = config.return_full_hidden_states
+        self.full_hidden_states = None
         if model is None:
             raise ValueError("model should be provided for DygraphBlockInferencePredictor")
         self.cache_kvs_shape = model.get_cache_kvs_shape(model.config, config.batch_size)
@@ -1019,19 +1048,24 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                 config.batch_size,
                 config.max_length,
             )
+        elif config.speculate_method in ["eagle", "mtp"]:
+            self.proposer = EagleProposer(args=config)
         else:
             self.proposer = None
 
     @paddle.no_grad()
     def _infer(self, inputs: dict[str, paddle.Tensor]):
-        self.model.generate(
+        return self.model.generate(
             **inputs,
         )
 
     @paddle.no_grad()
     def predict(self, input_texts: list[str], return_tokens=False):
         self._preprocess(input_texts)
-
+        if self.proposer is not None:
+            self.proposer.insert_query(
+                base_model_inputs=self.model_inputs, real_bs=len(input_texts), seq_lens=self.seq_lens
+            )
         result_queue = mp.Queue()
         tensor_queue = mp.Queue()
         done_event = mp.Event()
@@ -1063,9 +1097,16 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                     self.model_inputs,
                     real_batch_size=self.batch_size,
                     seq_lens_this_time=self.model_inputs["seq_lens_this_time"],
+                    base_model_full_hidden_states=self.full_hidden_states,
                 )
-            self._infer(self.model_inputs)
+            if self.return_full_hidden_states:
+                self.full_hidden_states = self._infer(self.model_inputs)
+            else:
+                self._infer(self.model_inputs)
         logger.info(f"running spend {time.time()  -  s_time}")
+
+        if self.proposer is not None:
+            self.proposer.postprocess(base_model_inputs=self.model_inputs)
 
         if self.tensor_parallel_rank == 0:
             outputs = []
@@ -1091,6 +1132,9 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
         **kwargs,
     ):
         self.cache_kvs_shape = kwargs.get("cache_kvs_shape", None)
+        self.model_args = kwargs.get("model_args", None)
+        self.return_full_hidden_states = config.return_full_hidden_states
+        self.full_hidden_states = None
         if self.cache_kvs_shape is None:
             raise ValueError("cache_kvs_shape should be provided for StaticGraphBlockInferencePredictor")
         BlockInferencePredictorMixin.__init__(self, config, tokenizer)
@@ -1126,6 +1170,11 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
                 config.speculate_max_ngram_size,
                 config.batch_size,
                 config.max_length,
+            )
+        elif config.speculate_method in ["eagle", "mtp"]:
+            self.proposer = EagleProposer(
+                args=config,
+                model_args=self.model_args,
             )
         else:
             self.proposer = None
@@ -1177,6 +1226,10 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
     def predict(self, input_texts: list[str], return_tokens=False):
         s_time = time.time()
         self._preprocess(input_texts)
+        if self.proposer is not None:
+            self.proposer.insert_query(
+                base_model_inputs=self.model_inputs, real_bs=len(input_texts), seq_lens=self.seq_lens
+            )
         logger.info(f"preprocess spend {time.time()  -  s_time}")
 
         result_queue = mp.Queue()
@@ -1210,10 +1263,16 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
                     self.model_inputs,
                     real_batch_size=self.batch_size,
                     seq_lens_this_time=self.model_inputs["seq_lens_this_time"],
+                    base_model_full_hidden_states=self.full_hidden_states,
                 )
-            self.predictor.run(list(self.model_inputs.values()))
+            if self.return_full_hidden_states:
+                self.full_hidden_states = self.predictor.run(list(self.model_inputs.values()))[0]
+            else:
+                self.predictor.run(list(self.model_inputs.values()))
         logger.info(f"running spend {time.time()  -  s_time}")
 
+        if self.proposer is not None:
+            self.proposer.postprocess(base_model_inputs=self.model_inputs)
         if self.tensor_parallel_rank == 0:
             outputs = []
             output_tokens = []
@@ -1288,7 +1347,9 @@ class AutoPredictor:
         predictor_class = getattr(import_class, predictor_class_name)
 
         # instance
-        predictor = predictor_class(predictor_args, tokenizer=tokenizer, model=model, cache_kvs_shape=cache_kvs_shape)
+        predictor = predictor_class(
+            predictor_args, tokenizer=tokenizer, model=model, cache_kvs_shape=cache_kvs_shape, model_args=model_args
+        )
         return predictor
 
 
@@ -1296,7 +1357,16 @@ def create_predictor(
     predictor_args: PredictorArgument,
     model_args: ModelArgument,
 ):
-    tokenizer = AutoTokenizer.from_pretrained(predictor_args.model_name_or_path, padding_side="left")
+
+    paddle.set_device(predictor_args.device)
+    paddle.set_default_dtype(predictor_args.dtype)
+
+    from paddlenlp.utils.env import USE_FAST_TOKENIZER
+
+    tokenizer = AutoTokenizer.from_pretrained(
+        predictor_args.model_name_or_path, padding_side="left", use_fast=USE_FAST_TOKENIZER
+    )
+
     # init chat_template for tokenizer
     llm_utils.init_chat_template(tokenizer, predictor_args.model_name_or_path, predictor_args.chat_template)
 
@@ -1386,9 +1456,6 @@ def predict():
     parser = PdArgumentParser((PredictorArgument, ModelArgument))
     predictor_args, model_args = parser.parse_args_into_dataclasses()
 
-    paddle.set_device(predictor_args.device)
-    paddle.set_default_dtype(predictor_args.dtype)
-
     tensor_parallel_degree = paddle.distributed.get_world_size()
     if tensor_parallel_degree > 1:
         strategy = fleet.DistributedStrategy()
@@ -1421,7 +1488,9 @@ def predict():
                     target_texts.append("")
 
     else:
-        source_texts = ["解释一下温故而知新"] * predictor_args.batch_size
+        source_texts = [
+            "2014年3月，大范围雾霾天气长时间影响我国东部地区，严重危害人体健康。造成雾霾天气的人为原因有____\r\n①工业生产中使用矿物作为燃料，大量排放污染物     ②汽车尾气的大量排放     \r\n③风力小，空气流动不畅     ④冬季取暖排放粉尘\nA. ①②③\nB. ②③④\nC. ①③④\nD. ①②④"
+        ] * predictor_args.batch_size
         target_texts = [""] * predictor_args.batch_size
 
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
