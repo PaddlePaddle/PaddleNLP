@@ -35,7 +35,7 @@ install_requirements() {
     python -m pip install pillow -y
     python -m pip install allure-pytest -y
     python -m pip install --no-cache-dir ${paddle}
-    python -c "import paddle;print('paddle')print(paddle.__version__);print(paddle.version.show())" >> ${log_path}/commit_info.txt
+    python -c "import paddle;print('paddle');print(paddle.__version__);print(paddle.version.show())" >> ${log_path}/commit_info.txt
 
     python setup.py bdist_wheel > /dev/null
     python -m pip install  dist/p****.whl
@@ -60,6 +60,7 @@ print_info() {
         echo -e "\033[31m ${log_path}/unittest_FAIL \033[0m"
         tail -n 10 ${log_path}/unittest_FAIL.log
         cp ${log_path}/unittest_FAIL.log ${PPNLP_HOME}/upload/unittest_FAIL.log.${AGILE_PIPELINE_BUILD_ID}.${AGILE_JOB_BUILD_ID}
+        unset http_proxy && unset https_proxy
         cd ${PPNLP_HOME} && python upload.py ${PPNLP_HOME}/upload 'paddlenlp/PaddleNLP_CI/PaddleNLP-CI-Unittest-GPU'
         rm -rf upload/*
     else
@@ -75,10 +76,14 @@ pytest -v -n 8 \
   --retries 1 --retry-delay 1 \
   --timeout 200 --durations 20 --alluredir=result \
   --cov paddlenlp --cov-report xml:coverage.xml > ${log_path}/unittest.log 2>&1
-print_info $? unittest
+exit_code=$?
+print_info $exit_code unittest
+
 cd ${nlp_dir}
 echo -e "\033[35m ---- Genrate Allure Report  \033[0m"
 unset http_proxy && unset https_proxy
 cp scripts/regression/gen_allure_report.py ./
 python gen_allure_report.py
 echo -e "\033[35m ---- Report: https://xly.bce.baidu.com/ipipe/ipipe-report/report/${AGILE_JOB_BUILD_ID}/report/  \033[0m"
+
+exit $exit_code
