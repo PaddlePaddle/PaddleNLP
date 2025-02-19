@@ -423,7 +423,7 @@ class GenerationInferenceModel(GenerationMixin):
         # because the code below directly use the model_kwargs as a parameter without using inputs_embeds.
         if inputs_embeds is not None:
             model_kwargs["inputs_embeds"] = inputs_embeds
-        model_kwargs["all_input_ids"] = input_ids
+        model_kwargs["all_input_ids"] = input_ids.cpu()
         logits_processors = model_kwargs.pop("logits_processors")
 
         def _forward_(**args):
@@ -490,9 +490,9 @@ class GenerationInferenceModel(GenerationMixin):
             next_tokens = model_kwargs["next_tokens"]
 
             if model_kwargs["all_input_ids"] is None:
-                model_kwargs["all_input_ids"] = next_tokens
+                model_kwargs["all_input_ids"] = next_tokens.cpu()
             else:
-                model_kwargs["all_input_ids"] = paddle.concat([model_kwargs["all_input_ids"], next_tokens], axis=1)
+                model_kwargs["all_input_ids"] = paddle.concat([model_kwargs["all_input_ids"], next_tokens.cpu()], axis=1)
 
             from paddlenlp_ops import save_with_output
 
