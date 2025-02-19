@@ -13,9 +13,9 @@
 # limitations under the License.
 
 param="model_item=intermediate_api_qwen-14b_pretrain_dy2st "
-param+="run_mode=DP1_MP2_PP4_1F1B_Sharding4_Stage1 "
+param+="run_mode=DP1_MP2_Sharding16_Stage1 "
 param+="device_num=N4C32 "
-param+="global_batch_size=128 "
+param+="global_batch_size=32 "
 param+="nnodes=4 "
 param+="model_type=qwen_14b "
 param+="intermediate_api=intermediate_api_ "
