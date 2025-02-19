@@ -295,7 +295,6 @@ class QWenMLPNet(nn.Layer):
         super().__init__()
         ff_dim_in = config.intermediate_size // 2
         self.fuse_attention_ffn = config.fuse_attention_ffn
-        print("[sfj] enable_fuse_ffn_qkv_pass: ", enable_fuse_ffn_qkv_pass())
         if self.fuse_attention_ffn and not enable_fuse_ffn_qkv_pass():
             self.gate_up_fused_proj = nn.Linear(
                 config.hidden_size, 
@@ -314,7 +313,6 @@ class QWenMLPNet(nn.Layer):
         # a2 = self.w2(hidden_states)
         # intermediate_parallel = a1 * F.silu(a2)
         # down
-        print("[sfj] enable_fuse_ffn_qkv_pass: ", enable_fuse_ffn_qkv_pass())
         if self.fuse_attention_ffn and not enable_fuse_ffn_qkv_pass():
             intermediate_parallel = swiglu(self.gate_up_fused_proj(hidden_states))
         else:
