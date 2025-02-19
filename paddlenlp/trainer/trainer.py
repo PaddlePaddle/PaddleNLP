@@ -460,12 +460,16 @@ class Trainer:
             else ["labels"]
         )
         self.label_names = default_label_names if self.args.label_names is None else self.args.label_names
+        self.context_parallel_spliter = None
 
         self.control = self.callback_handler.on_init_end(self.args, self.state, self.control)
         self.print_config()
 
         # very last
         self._memory_tracker.stop_and_update_metrics()
+
+    def set_context_parallel_spliter(self, context_parallel_spliter):
+        self.context_parallel_spliter = context_parallel_spliter
 
     def _wrap_amp_model(self, args, model):
         logger.info("Using half precision")
@@ -1020,7 +1024,12 @@ class Trainer:
                 if self.args.use_hybrid_parallel and self.args.sep_parallel_degree > 1:
                     inputs = split_inputs_sequence_dim(inputs)
                 if self.args.use_hybrid_parallel and self.args.context_parallel_degree > 1:
-                    inputs = split_inputs_sequence_dim_load_balance(inputs)
+                    context_parallel_spliter = (
+                        split_inputs_sequence_dim_load_balance
+                        if self.context_parallel_spliter is None
+                        else self.context_parallel_spliter
+                    )
+                    inputs = context_parallel_spliter(inputs)
                 if self.args.ignore_data_skip:
                     self.timers and self.timers("read-data").stop()
 
