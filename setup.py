@@ -20,6 +20,8 @@ from datetime import datetime
 
 import setuptools
 
+from setup_cuda_tools import get_ext_and_cmd
+
 PADDLENLP_STABLE_VERSION = "PADDLENLP_STABLE_VERSION"
 
 
@@ -173,6 +175,8 @@ def get_package_data_files(package, data, package_dir=None):
 if commit != "unknown":
     write_version_py(filename="paddlenlp/version/__init__.py")
 
+ext_modules, cmdclass = get_ext_and_cmd()
+
 try:
     setuptools.setup(
         name="paddlenlp",
@@ -184,6 +188,9 @@ try:
         long_description_content_type="text/markdown",
         url="https://github.com/PaddlePaddle/PaddleNLP",
         license_files=("LICENSE",),
+        ext_modules=ext_modules,
+        zip_safe=False,
+        cmdclass=cmdclass,
         packages=setuptools.find_packages(
             where=".",
             exclude=("examples*", "tests*", "applications*", "fast_generation*", "model_zoo*"),
