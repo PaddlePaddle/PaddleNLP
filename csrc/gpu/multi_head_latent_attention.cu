@@ -71,55 +71,12 @@ std::vector<paddle::Tensor> MultiHeadLatentAttentionKernel(
   const int encoder_block_shape_q = get_encoder_block_shape_q();
   const int decoder_block_shape_q = get_decoder_block_shape_q();
   auto main_stream = query.stream();
-  static cudaEvent_t main_event;
-  static cudaEvent_t decoder_event;       
-  static cudaStream_t decoder_stream;
-  static bool init_flag = false;
-  if (max_enc_len_this_time_data > 0 && max_dec_len_this_time_data > 0 &&
-      !init_flag) {
-    cudaEventCreateWithFlags(&main_event, cudaEventDisableTiming);
-    cudaEventCreateWithFlags(&decoder_event, cudaEventDisableTiming);
-    cudaStreamCreateWithFlags(&decoder_stream, cudaStreamNonBlocking);
-    init_flag = true;
-  }
-
-  paddle::Tensor fmha_out;
-  if (out_linear_in_scale > 0.0) {
-    if (fabs(quant_max_bound - 127.0f) < 0.000001) {
-      fmha_out = GetEmptyTensor(
-        {meta_data.token_nums, meta_data.q_num_heads * meta_data.head_dims_v},
-        paddle::DataType::INT8,
-        query.place());
-    } 
-    else if (fabs(quant_max_bound - 448.0f) < 0.000001) {
-      fmha_out = GetEmptyTensor(
-        {meta_data.token_nums, meta_data.q_num_heads * meta_data.head_dims_v},
-        paddle::DataType::FLOAT8_E4M3FN,
-        query.place());
-    }else{
-      PD_THROW("Only supported attr of quant_max_bound in ['127.0', '448.0'].");
-    }
-  } else {
-    fmha_out = GetEmptyTensor(
-        {meta_data.token_nums, meta_data.q_num_heads * meta_data.head_dims_v},
-        D,
-        query.place());
-  }
-
-  if (max_enc_len_this_time_data > 0) {
-    if (max_dec_len_this_time_data > 0) {
-      cudaEventRecord(main_event, main_stream);
-    }
-  }
+  paddle::Tensor fmha_out = GetEmptyTensor(
+    {meta_data.token_nums, meta_data.q_num_heads * meta_data.head_dims_v},
+    D,
+    query.place());
 
   if (max_dec_len_this_time_data > 0) {
-    cudaStream_t exec_stream;
-    if (max_enc_len_this_time_data > 0) {
-      cudaStreamWaitEvent(decoder_stream, main_event);
-      exec_stream = decoder_stream;
-    } else {
-      exec_stream = main_stream;
-    }
     // std::cout << "dec_mla" << std::endl;
     DecodeMLAAttentionKernel<data_t>(
         meta_data,
@@ -139,12 +96,8 @@ std::vector<paddle::Tensor> MultiHeadLatentAttentionKernel(
         softmax_scale,
         out_linear_in_scale,
         causal,
-        exec_stream,
+        main_stream,
         &fmha_out);
-    if (max_enc_len_this_time_data > 0) {
-      cudaEventRecord(decoder_event, exec_stream);
-      cudaStreamWaitEvent(main_stream, decoder_event);
-    }
   }
   return {fmha_out};
 }
@@ -254,8 +207,13 @@ std::vector<paddle::Tensor> MultiHeadLatentAttention(
           causal,
           speculate_decoder);
     }
+    default: {
+      PD_THROW(
+          "NOT supported data type. "
+          "Only float16 and bfloat16 are supported. ");
+      break;
+    }
   }
-  return {paddle::Tensor{}};
 }
 
 std::vector<std::vector<int64_t>> MultiHeadLatentAttentionInferShape(
@@ -356,29 +314,9 @@ std::vector<paddle::DataType> MultiHeadLatentAttentionInferDtype(
     const bool causal,
     const bool speculate_decoder) {
   if (compute_dtype == "bf16") {
-    if (out_linear_in_scale > 0.0) {
-      if (fabs(quant_max_bound - 127.0f) < 0.000001) {
-        return {paddle::DataType::INT8, paddle::DataType::BFLOAT16};
-      } else if (fabs(quant_max_bound - 448.0f) < 0.000001) {
-        return {paddle::DataType::FLOAT8_E4M3FN, paddle::DataType::BFLOAT16};
-      }else{
-        PD_THROW("Only supported attr of quant_max_bound in ['127.0', '448.0'].");
-      }
-    } else {
-      return {paddle::DataType::BFLOAT16, paddle::DataType::BFLOAT16};
-    }
+    return {paddle::DataType::BFLOAT16};
   } else if (compute_dtype == "fp16") {
-    if (out_linear_in_scale > 0.0) {
-      if (fabs(quant_max_bound - 127.0f) < 0.000001) {
-        return {paddle::DataType::INT8, paddle::DataType::FLOAT16};
-      } else if (fabs(quant_max_bound - 448.0f) < 0.000001) {
-        return {paddle::DataType::FLOAT8_E4M3FN, paddle::DataType::FLOAT16};
-      }else{
-        PD_THROW("Only supported attr of quant_max_bound in ['127.0', '448.0'].");
-      }
-    } else {
-      return {paddle::DataType::FLOAT16, paddle::DataType::FLOAT16};
-    }
+    return {paddle::DataType::FLOAT16};
   } else {
     PD_THROW("Only supported attr of compute_dtype in ['fp16', 'bf16'].");
   }
@@ -417,9 +355,7 @@ PD_BUILD_OP(multi_head_latent_attention)
              paddle::Optional("cache_v_zp"),
              paddle::Optional("out_linear_shifts"),
              paddle::Optional("out_linear_smooths")})
-    .Outputs({"fmha_out", "key_cache_out", "value_cache_out"})
-    .SetInplaceMap({{"key_cache", "key_cache_out"},
-                    {"value_cache", "value_cache_out"}})
+    .Outputs({"fmha_out"})
     .Attrs({"compute_type: std::string",
             "cache_quant_type: std::string",
             "nope_size: int",
