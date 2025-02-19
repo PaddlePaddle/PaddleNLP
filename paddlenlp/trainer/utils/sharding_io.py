@@ -321,8 +321,6 @@ class ShardingIO:
             one_shard_opt_state_dict = None
 
         logger.info("reshard optimizer state")
-        if self.args.flash_save_ema_coef is not None:
-            raise ValueError("flash save EMA do not support reshard")  # TODO: suport FC-ema reshard
 
         def load_model_slices():
             model_state = reshard_util.NodeModelState()

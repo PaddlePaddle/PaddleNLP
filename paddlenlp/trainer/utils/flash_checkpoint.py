@@ -81,6 +81,15 @@ class FCWorkerStatus(Enum):
     ERROR = 3
 
 
+def showmem(msg):
+    return (
+        f"{msg} mem_alloc: {paddle.device.cuda.memory_allocated():.3e}"
+        f" Bytes/{paddle.device.cuda.max_memory_allocated():.3e} Bytes"
+        f"mem_reserv: {paddle.device.cuda.memory_reserved():.3e} "
+        f"Bytes/{paddle.device.cuda.max_memory_reserved():.3e} Bytes"
+    )
+
+
 def get_fused_param_mappings(optimizer, manipulated_state_dict):
     param_mappings = {}
     ipc_meta_mappings = {}
@@ -152,7 +161,7 @@ class FlashEMAProcessor:
                 for k, (cuda_buf, cpu_buf) in self.param_fusion_storage_helper.inited_buffers.items()
                 if cuda_buf.dtype == paddle.float32
             }
-        logger.info(f"[FC] build buffer done:{ema_buffer.dtype} {ema_buffer.place}")
+        logger.info(f"[FCworker] build buffer done:{ema_buffer.dtype} {ema_buffer.place}")
         return ema_buffer, ema_buffer_model_params, master_min_offset, master_max_offset
 
     def ema_reset(self):
@@ -179,6 +188,8 @@ class FlashEMAProcessor:
                 updated_ema = self.ema_coef * ema_buf + (1 - self.ema_coef) * cpu_buf
                 self.ema_buffer_model_params[index] = updated_ema
 
+        logger.info(f"[FC EMA] accmulating, buffer type:{self.ema_buffer.place} {self.ema_buffer.dtype}, done")
+
     @imperative_base.no_grad()
     def ema_state_dict(self):
         assert self.optimizer_fusion_storage_helper is not None
@@ -193,7 +204,7 @@ class FlashEMAProcessor:
                 if tensor_meta["buffer_index"] not in self.ema_buffer_model_params:
                     continue  # non fp32 has no `self.ema_buffer_model_params`
                 cpu_buffer = self.ema_buffer_model_params[tensor_meta["buffer_index"]]
-                tensor = cpu_buffer._slice(start, end)
+                tensor = cpu_buffer._slice(start, end).clone()  # slice 出来的 tensor 在执行`paddle.save`会异常慢，此处必须clone
                 tensor.get_tensor()._set_dims(shape)
                 tensor.name = name
                 ema_state_dict[k] = tensor
@@ -201,7 +212,7 @@ class FlashEMAProcessor:
             for k, meta in self.optimizer_fusion_storage_helper.master_weights_meta.items():
                 t = self.ema_buffer._slice(
                     meta["start"] - self.master_min_offset, meta["end"] - self.master_min_offset
-                )
+                ).clone()
                 t.get_tensor()._set_dims(meta["shape"])
                 t.name = meta["name"]
                 ema_state_dict_master_weights[k] = t
@@ -229,6 +240,68 @@ class FlashEMAProcessor:
                 e = meta["end"] - self.master_min_offset
                 self.ema_buffer[s:e] = ema_master[k]
             logger.info("[FC EMA] done loading")
+
+
+class FusionStorageCPUHelper(FusionStorageHelper):
+    def __init__(
+        self,
+        accumulators_meta,
+        master_weights_meta,
+        merged_model_params_meta,
+    ):
+        self.async_loader = create_async_load()
+        self.accumulators_meta = None
+        self.master_weights_meta = None
+        self.merged_model_params_meta = None
+        self.buffer = None
+        self.cpu_buffer = None
+        self.buffer_length = None
+        self.tasks = []
+        self.reset_meta(
+            accumulators_meta,
+            master_weights_meta,
+            merged_model_params_meta,
+        )
+
+    @imperative_base.no_grad()
+    def reset_meta(
+        self,
+        accumulators_meta,
+        master_weights_meta,
+        merged_model_params_meta,
+    ):
+        assert isinstance(accumulators_meta, dict), "accumulators_meta must be a dict"
+        self.accumulators_meta = accumulators_meta
+        assert isinstance(master_weights_meta, dict), "master_weights_meta must be a dict"
+        self.master_weights_meta = master_weights_meta
+        assert (
+            isinstance(merged_model_params_meta, dict) or merged_model_params_meta is None
+        ), "merged_model_params_meta must be a dict or None"
+        self.merged_model_params_meta = merged_model_params_meta
+        self.buffer = None
+        self.cpu_buffer = None
+        self.buffer_length = 0
+
+    def sync_param(self):
+        pass
+
+    def sync_partial_param(self, start, end):  #
+        pass
+
+    def wait_all(self):
+        pass
+
+    @imperative_base.no_grad()
+    def restore_tensor_from_meta(self, tensor_meta):
+        shape = tensor_meta["shape"]
+        name = tensor_meta["name"]
+        start = tensor_meta["start"]
+        end = tensor_meta["end"]
+        tensor = self.cpu_buffer._slice(start, end).clone()  # IMPORT to clone, if not clone paddle.save is very slow
+        # print(f'restoring opt <cpuhelper> : {self.cpu_buffer.place} -> {tensor.place}')
+        tensor.get_tensor()._set_dims(shape)
+        tensor.name = name
+        return tensor
 
 
 class ParamFusionStorageHelper:
@@ -334,6 +407,7 @@ class ParamFusionStorageHelper:
     def state_dict(self):
         state_dict = {}
         for k, v in self.model_weights_metas.items():
+            # print(f'restoring {k}')
             state_dict[k] = self.restore_tensor_from_meta(v)
         return state_dict
 
@@ -345,6 +419,7 @@ class ParamFusionStorageHelper:
         end = tensor_meta["end"]
         cpu_buffer = self.inited_buffers[tensor_meta["buffer_index"]][1]
         tensor = cpu_buffer._slice(start, end)
+        # print(f'restoring param: {cpu_buffer.place} -> {tensor.place}')
         tensor.get_tensor()._set_dims(shape)
         tensor.name = name
         return tensor
@@ -361,6 +436,8 @@ class FlashCheckpointCallback(TrainerCallback):
     * on_substep_end(call `gradient_accumulate` times): call flash_checkpoint_pipeline_hook (in non-pp model)
     * (when offload done, dump model)
     on_optimizer_begin: call sync_offload_status, unset set manager.current_worker
+        maybe optimizer reload
+        maybe optimizer offload
     """
 
     def __init__(self, args, flash_checkpoint_manager, timer, sharding_io):
@@ -388,27 +465,28 @@ class FlashCheckpointCallback(TrainerCallback):
     def on_optimizer_begin(self, args, state, control, **kwargs):
         if args.enable_flash_save_mode and self.manager.current_worker is not None:
             logger.info("Start syncing flash checkpoints")
+            assert self.manager.global_step != 0, "global_step should set, when calling `on_optimizer_begin`"
             self.manager.sync_offload_status()
             logger.info("Synced flash checkpoints.")
 
     def on_step_end(self, args, state, control, model, lr_scheduler, optimizer, **kwargs):
         self.manager.flash_checkpoint_pipeline_hook(0)
+        self.manager.global_step = state.global_step
         logger.info(
             f"check coef: {args.flash_save_ema_coef} {control.should_save}, {state.global_step}, {self.flash_ema_interval}"
         )
         if not control.should_save:
             if args.flash_save_ema_coef is not None and state.global_step % self.flash_ema_interval == 0:
-                self.maybe_update_flash_checkpoint_worker(args, model, optimizer)
+                self.maybe_update_flash_checkpoint_worker(args, model, optimizer, state.global_step)
                 self.manager.get_idle_worker_for_saving()  # prepare for dumping
         else:
             self.runtime_timer.start("checkpoint saving time")
-            self.maybe_update_flash_checkpoint_worker(args, model, optimizer)
+            self.maybe_update_flash_checkpoint_worker(args, model, optimizer, state.global_step)
             checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{state.global_step}"
             save_infos = self._get_save_infos_based_on_steps(state, args, checkpoint_folder)
-            non_cached_objects = (lr_scheduler.state_dict(), state)
+            non_cached_objects = (lr_scheduler.state_dict(), copy.deepcopy(state))
             self.manager.get_idle_worker_for_saving((save_infos, non_cached_objects))
             self.runtime_timer.stop()
-            control.should_save = False  # avoid regular saving
 
     def _get_save_infos_based_on_steps(self, state, args, checkpoint_folder):
         flash_checkpoint_dir = None
@@ -419,11 +497,14 @@ class FlashCheckpointCallback(TrainerCallback):
             persistent_checkpoint_dir = os.path.join(args.output_dir, checkpoint_folder)
         return (flash_checkpoint_dir, persistent_checkpoint_dir)
 
-    def maybe_update_flash_checkpoint_worker(self, args, model, optimizer):
-        # logger.info(f'check should update :{optimizer.fused_buffer_version} vs {self.manager.cache_version}')
+    def maybe_update_flash_checkpoint_worker(self, args, model, optimizer, global_step):
+        logger.info(f"check should update :{optimizer.fused_buffer_version} vs {self.manager.cache_version}")
         if optimizer.fused_buffer_version == self.manager.cache_version:
+            if not args.offload_optim:
+                return
+            self.manager.update_flash_workers_pinned_optimizer_state(optimizer.fusion_storage.buffer, global_step)
             return
-
+        logger.info(f"optimizer-place: {optimizer.fusion_storage.buffer.place}")
         logger.info("Flash checkpoint workers need upgrade.")
         self._cache_meta_for_sharded_save(model)
         param_mappings, ipc_meta_mappings = get_fused_param_mappings(optimizer, self.manipulated_state_dict)
@@ -449,7 +530,10 @@ class FlashCheckpointCallback(TrainerCallback):
         static_objects["model_meta"] = self.model_meta
         static_objects["user_file"] = self.user_file_list
 
-        self.manager.update_flash_workers(optimizer.fused_buffer_version, dynamic_objecs, static_objects)
+        self.manager.update_flash_workers(optimizer.fused_buffer_version, dynamic_objecs, static_objects, global_step)
+        logger.info(f"[FC Callback] after first update:{optimizer.fused_states_buffer_ipc_meta}")
+        if optimizer.fused_states_buffer_ipc_meta is None:  # storage has been offloaded
+            self.manager.update_flash_workers_pinned_optimizer_state(optimizer.fusion_storage.buffer, global_step)
 
     def _cache_meta_for_sharded_save(self, model):
         logger.info("Start caching metas for sharded save...")
@@ -480,6 +564,7 @@ class FlashCheckpointManager:
         self.workers = []
         self.processes = []
         self.current_worker = None
+        self.global_step = 0  # set `on-step-end`
         self.device_id = int(os.getenv("FLAGS_selected_gpus"))
         self.pipeline_hooks_steps = max(int(pipeline_hooks_capacity * capacity_usage), 1)
         logger.info(
@@ -494,6 +579,7 @@ class FlashCheckpointManager:
             worker_task_queue = ctx.Queue()
             worker_status = ctx.Value("i", FCWorkerStatus.IDLE.value)
             worker_version = ctx.Value("i", 0)
+            worker_step = ctx.Value("i", 0)
             worker = FlashCheckpointWorker(
                 i,
                 self.device_id,
@@ -501,6 +587,7 @@ class FlashCheckpointManager:
                 self.pipeline_hooks_steps,
                 worker_task_queue,
                 worker_status,
+                worker_step,
                 worker_version,
                 use_expert_parallel,
                 fleet.get_hybrid_communicate_group().get_data_parallel_rank(),
@@ -523,11 +610,11 @@ class FlashCheckpointManager:
             worker.task_queue.put((FCTaskType.SET_EMA_STATE_DICT, path))
         logger.info("[FC manager] done setting EMA state dict")
 
-    def update_flash_workers(self, new_version, dynamic_objecs, static_objects):
+    def update_flash_workers(self, new_version, dynamic_objecs, static_object, global_step):
         self.report_error_worker()
         self.cache_version = new_version
         assert self.current_worker is None, "[FC manager] current_worker must be None"
-        task = (FCTaskType.UPDATE, [self.cache_version, dynamic_objecs, static_objects])
+        task = (FCTaskType.UPDATE, [self.cache_version, dynamic_objecs, static_object, global_step])
         logger.info(f"[FC manager] updating flash workers, verison: {self.cache_version}")
         for worker in self.workers:
             worker.task_queue.put(task)
@@ -535,13 +622,30 @@ class FlashCheckpointManager:
         for worker in self.workers:
             while worker.version.value != self.cache_version:
                 logger.info(
-                    f"[FC manager] waiting worker{worker.worker_id} update. worker version: {worker.version.value}, expected version: {self.cache_version}"
+                    f"[FC manager] waiting worker{worker.worker_id} update. worker version: "
+                    f"{worker.version.value}, expected version: {self.cache_version} "
+                    f"step:{worker.global_step.value}"
                 )
                 time.sleep(1)
             logger.info(
-                f"[FC manager] worker{worker.worker_id} updated. worker version: {worker.version.value}, expected version: {self.cache_version}"
+                f"[FC manager] worker{worker.worker_id} updated. worker version: {worker.version.value}, "
+                f"expected version: {self.cache_version} "
+                f"global_step={global_step} "
             )
         logger.info("[FC manager] update all flash workers done")
+        self.ready_to_save = True
+
+    def update_flash_workers_pinned_optimizer_state(self, pinned_fused_optimizer_state, global_step):
+        """
+        开启 `pinned memory`的时候，需要不断地 fused optimizer buffer
+        """
+        self.report_error_worker()
+        assert self.current_worker is None, "[FC manager] current_worker must be None"
+        task = (FCTaskType.UPDATE, [pinned_fused_optimizer_state, global_step])
+        logger.info("[FC manager] updating flash workers with new pinned optimizer states")
+        for worker in self.workers:
+            worker.task_queue.put(task)
+        logger.info("[FC manager] update pinned optimizer done")
         self.ready_to_save = True
 
     def get_idle_worker_for_saving(self, save_infos_and_non_cached_objects=None):
@@ -574,11 +678,21 @@ class FlashCheckpointManager:
         self.report_error_worker()
         assert self.current_worker is not None, "[FC manager] current_worker must not be None"
         while True:
-            logger.info("[FC manager] Waiting current worker offloading done.")
-            if self.current_worker.status.value == FCWorkerStatus.OFFLOADING.value:
+            if (
+                self.current_worker.status.value == FCWorkerStatus.OFFLOADING.value
+                or self.current_worker.global_step.value != self.global_step
+            ):
+                logger.info(
+                    f"[FC manager] Waiting current worker offloading done., "
+                    f"worker_state:{self.current_worker.status.value}, "
+                    f"worker_step:{self.current_worker.global_step.value}, manager_step:{self.global_step}"
+                )
                 time.sleep(1)
             else:
-                logger.info("[FC manager] Current worker offloading done")
+                logger.info(
+                    f"[FC manager] Current worker offloading done "
+                    f"worker_step:{self.current_worker.global_step.value}, manager_step:{self.global_step} "
+                )
                 break
         self.current_pipeline_hook_step = 0
         self.current_worker = None
@@ -596,7 +710,7 @@ class FlashCheckpointManager:
             return
         if not self.ready_to_save:
             return
-        task = (FCTaskType.OFFLOAD, None)
+        task = (FCTaskType.OFFLOAD, self.global_step)
         self.current_worker.task_queue.put(task)
         self.current_pipeline_hook_step += 1
 
@@ -632,6 +746,7 @@ class FlashCheckpointWorker:
         offload_chunks,
         task_queue,
         status,
+        global_step,
         version,
         use_expert_parallel,
         dp_rank,
@@ -647,6 +762,7 @@ class FlashCheckpointWorker:
         self.offload_chunks = offload_chunks
         self.task_queue = task_queue
         self.status = status
+        self.global_step = global_step  # state value
         self.version = version
         self.ema_coef = ema_coef
         self.use_expert_parallel = use_expert_parallel
@@ -684,7 +800,22 @@ class FlashCheckpointWorker:
         """
         sync operation, main process should wait
         """
-        version, dynamic_objecs, static_objects = updates
+
+        if len(updates) == 2:
+            optimizer_states_buffer, global_step = updates
+            logger.info(f"[FC worker{self.worker_id}] got cpu buffer: {optimizer_states_buffer.place}")
+            buffer_place = str(optimizer_states_buffer.place)
+            assert "gpu_pinned" in buffer_place or "cpu" in buffer_place, optimizer_states_buffer
+            assert isinstance(
+                self.optimizer_fusion_storage_helper, FusionStorageCPUHelper
+            ), self.optimizer_fusion_storage_helper
+            self.optimizer_fusion_storage_helper.cpu_buffer = optimizer_states_buffer
+            self.optimizer_fusion_storage_helper.buffer = None
+            self.global_step.value = global_step
+            return
+
+        version, dynamic_objecs, static_objects, global_step = updates
+
         optimizer_states_meta = dynamic_objecs["optimizer_states_meta"]
         model_states_meta = dynamic_objecs["model_states_meta"]
         self.optimizer_states_name_path = dynamic_objecs["optimizer_states_name_path"]
@@ -697,7 +828,6 @@ class FlashCheckpointWorker:
         self.user_file_list = static_objects["user_file"]
 
         self.manage_offload_chunk()
-
         self.version.value = version
 
     def process_prepare_task(self, prepares):
@@ -709,7 +839,10 @@ class FlashCheckpointWorker:
         self.flash_save_dir, self.persistent_save_dir = save_infos
         self.lr_scheduler, self.trainer_state = non_cached_objects
 
-    def process_offload_task(self, dump):
+    def process_offload_task(self, dump, global_step):
+        """
+        call multipule times during model forward, return True if done dumpping
+        """
         actual_offload_size = (
             min(self.offloaded_numels + self.chunk_size_in_numel, self.all_numel) - self.offloaded_numels
         )
@@ -737,9 +870,11 @@ class FlashCheckpointWorker:
         if self.offloaded_numels == self.all_numel:
             self.optimizer_fusion_storage_helper.wait_all()
             self.param_fusion_storage_helper.wait_all()
+            self.status.value = FCWorkerStatus.DUMPING.value
+            self.global_step.value = global_step
+
             if self.ema_coef is not None:
                 self.flash_ema_processor.ema_accumulate()
-            self.status.value = FCWorkerStatus.DUMPING.value
 
         # continue to process dumping task at the last chunk
         if self.offloaded_numels == self.all_numel:
@@ -749,6 +884,8 @@ class FlashCheckpointWorker:
                 need_report_error = False
             self.offloaded_numels = 0
             self.status.value = FCWorkerStatus.ERROR.value if need_report_error else FCWorkerStatus.IDLE.value
+            return True
+        return False
 
     def process_dump_task(self):
         """
@@ -758,6 +895,7 @@ class FlashCheckpointWorker:
         2. If dumping to persistent device failed, the process will change status to fail, and the main process will raise Error.
         """
         need_report_error = False
+        logger.info(f"[FC worker{self.worker_id}] processing dump task")
         if self.flash_save_dir:
             try:
                 self.process_dump_task_impl(self.flash_save_dir)
@@ -773,6 +911,7 @@ class FlashCheckpointWorker:
             except Exception as e:
                 logger.error(f"[FC worker{self.worker_id}] Failed to dump to persistent device: {e}")
                 need_report_error = True
+        logger.info(f"[FC worker{self.worker_id}] processing dump task, done")
         return need_report_error
 
     def _filter_moe_no_sync_optimizer_params(self, model_meta, optimzier_state_dict):
@@ -806,6 +945,7 @@ class FlashCheckpointWorker:
 
     def process_dump_task_impl(self, output_dir):
         os.makedirs(output_dir, exist_ok=True)
+        start = time.time()
         # Step1: save static objects
         if self.device_id == 0:
             # Step1.1: save model config
@@ -830,16 +970,20 @@ class FlashCheckpointWorker:
 
         # Step2: save dynamic objects
         # Step2.1: save model states
-        model_states_name_path = os.path.join(output_dir, self.model_states_name_path)
-        state_dict = self.param_fusion_storage_helper.state_dict()
-
-        # Step2.2: save optimizer states
-        optimizer_state_name_path = os.path.join(output_dir, self.optimizer_states_name_path)
-        opt_state_dict = self.optimizer_fusion_storage_helper.state_dict()
-
+        with device_guard("cpu"):
+            model_states_name_path = os.path.join(output_dir, self.model_states_name_path)
+            state_dict = self.param_fusion_storage_helper.state_dict()
+            # Step2.2: save optimizer states
+            optimizer_state_name_path = os.path.join(output_dir, self.optimizer_states_name_path)
+            opt_state_dict = self.optimizer_fusion_storage_helper.state_dict()
+        # logger.info(showmem(f"[FCworker{self.worker_id}] after build state-dict"))
+        logger.info(f"[FC worker{self.worker_id}] get-state-dict: {time.time() - start:.3f} sec")
+        start = time.time()
         if self.ema_coef is not None:
             ema_name_path = os.path.join(output_dir, self.optimizer_states_name_path).replace("optimizer", "ema")
             ema_state_dict = self.flash_ema_processor.ema_state_dict()
+        logger.info(f"[FC worker{self.worker_id}] get-ema-state-dict: {time.time() - start:.3f} sec")
+        start = time.time()
 
         if self.dp_rank <= 0 or self.use_expert_parallel:
             if self.dp_rank > 0:  # ep
@@ -847,11 +991,14 @@ class FlashCheckpointWorker:
                 if self.ema_coef is not None:
                     # non master-weights in `ema-state-dict` when dp >1 will be filterd, which is acceptable
                     ema_state_dict = self._filter_moe_no_sync_optimizer_params(self.model_meta_content, ema_state_dict)
-
             paddle.save(state_dict, model_states_name_path)
             paddle.save(opt_state_dict, optimizer_state_name_path)
+            logger.info(f"[FC worker{self.worker_id}] save-state-dict: {time.time() - start:.3f} sec")
+            start = time.time()
             if self.ema_coef is not None:
                 paddle.save(ema_state_dict, ema_name_path)
+            logger.info(f"[FC worker{self.worker_id}] save-ema-state-dict: {time.time() - start:.3f} sec")
+            start = time.time()
 
         # Step2.3: save LR Scheduler (To be removed)
         lr_state_name_path = os.path.join(output_dir, SCHEDULER_NAME)
@@ -867,6 +1014,8 @@ class FlashCheckpointWorker:
         saved_signal_path = os.path.join(output_dir, f"saved_signal_{self.global_rank}")
         with open(saved_signal_path, mode="w+") as f:
             f.write("1")
+        logger.info(f"[FC worker{self.worker_id}] remain: {time.time() - start:.3f} sec")
+        start = time.time()
 
     def run(self):
         core.set_cuda_current_device_id(self.device_id)
@@ -874,27 +1023,34 @@ class FlashCheckpointWorker:
         logger.info(f"[FC worker{self.worker_id}] Worker{self.worker_id} started.")
         ema_ckpt_path = None
         save_info_tuple = None  # save dir...
+        start_time = None
         try:
             while True:
+                # logger.info(f"[FC worker{self.worker_id}] Wait for command")
                 task = self.task_queue.get()
                 task_type, task_body = task
-                # logger.info(f'[FC worker{self.worker_id}] Received a new task of type {task_type}., ema:{self.flash_ema_processor.status() if self.flash_ema_processor is not None else None}')
+                # logger.info(f"[FC worker{self.worker_id}] Received a new task of type {task_type}")
                 if task_type == FCTaskType.FINISH:
                     logger.info(f"[FC worker{self.worker_id}] Flash checkpoint worker{self.worker_id} exit")
                     break
                 elif task_type == FCTaskType.UPDATE:
                     self.process_update_task(task_body)
-                    self.flash_ema_processor = FlashEMAProcessor(  # 在 updte task 后刷新 EMA buffer
-                        self.optimizer_fusion_storage_helper, self.param_fusion_storage_helper, self.ema_coef
-                    )
-                    if ema_ckpt_path is not None:  # update ema if needed
-                        self.flash_ema_processor.load_ema_state_dict(ema_ckpt_path)
-                    ema_ckpt_path = None
+                    if self.ema_coef is not None:
+                        self.flash_ema_processor = FlashEMAProcessor(  # 在 updte task 后刷新 EMA buffer
+                            self.optimizer_fusion_storage_helper, self.param_fusion_storage_helper, self.ema_coef
+                        )
+                        if ema_ckpt_path is not None:  # update ema if needed
+                            self.flash_ema_processor.load_ema_state_dict(ema_ckpt_path)
+                        ema_ckpt_path = None
                 elif task_type == FCTaskType.PREPARE:
+                    start_time = time.time()
                     save_info_tuple = task_body
                     self.process_prepare_task(task_body)
                 elif task_type == FCTaskType.OFFLOAD:
-                    self.process_offload_task(dump=save_info_tuple is not None)
+                    dumped = self.process_offload_task(dump=save_info_tuple is not None, global_step=task_body)
+                    if dumped:
+                        used_time = time.time() - start_time
+                        logger.info(f"[FC worker{self.worker_id}] used time {used_time:.3f} sec")
                 elif task_type == FCTaskType.SET_EMA_STATE_DICT:
                     ema_ckpt_path = task_body  # mark ema state dict path
                 else:
@@ -913,12 +1069,20 @@ class FlashCheckpointWorker:
             buffer_ipc_meta,
         ) = optimizer_states_meta
         if self.optimizer_fusion_storage_helper is None:
-            self.optimizer_fusion_storage_helper = FusionStorageHelper(
-                accumulators_meta,
-                master_weights_meta,
-                merged_model_params_meta,
-                buffer_ipc_meta,
-            )
+            if buffer_ipc_meta is None:  # this means optimzier_buffer has been offloaded
+                logger.info(f"[FC worker{self.worker_id}]: using: CPU Buffer")
+                self.optimizer_fusion_storage_helper = FusionStorageCPUHelper(
+                    accumulators_meta,
+                    master_weights_meta,
+                    merged_model_params_meta,
+                )
+            else:
+                self.optimizer_fusion_storage_helper = FusionStorageHelper(
+                    accumulators_meta,
+                    master_weights_meta,
+                    merged_model_params_meta,
+                    buffer_ipc_meta,
+                )
         else:
             self.optimizer_fusion_storage_helper.reset_meta(
                 accumulators_meta,
