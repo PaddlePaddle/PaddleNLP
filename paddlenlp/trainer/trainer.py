@@ -1959,11 +1959,6 @@ class Trainer:
 
             optimizer_cls = AdamWBF16
             optimizer_kwargs.update(adam_kwargs)
-        elif args.optim == OptimizerNames.ADAMW_BF16R:
-            from ..utils import AdamWBF16REAL
-
-            optimizer_cls = AdamWBF16REAL
-            optimizer_kwargs.update(adam_kwargs)
         else:
             raise ValueError(f"Trainer cannot instantiate unsupported optimizer: {args.optim}")
         return optimizer_cls, optimizer_kwargs
