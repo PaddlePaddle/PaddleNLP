@@ -179,26 +179,6 @@ class ModelArguments:
         default=None,
         metadata={"help": "num_hidden_layers."},
     )
-    first_k_dense_replace: Optional[int] = field(
-        default=None,
-        metadata={"help": "first_k_dense_replace."},
-    )
-    n_routed_experts: Optional[int] = field(
-        default=None,
-        metadata={"help": "n_routed_experts."},
-    )
-    num_experts_per_tok: Optional[int] = field(
-        default=None,
-        metadata={"help": "num_experts_per_tok."},
-    )
-    hidden_size: Optional[int] = field(
-        default=None,
-        metadata={"help": "hidden_size."},
-    )
-    topk_group: Optional[int] = field(
-        default=None,
-        metadata={"help": "topk_group."},
-    )
 
 
 def create_pretrained_dataset(
