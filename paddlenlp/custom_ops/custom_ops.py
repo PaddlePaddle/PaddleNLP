@@ -57,6 +57,7 @@ def append_attention(
     cache_quant_type: str,
     use_neox_rotary_style: bool,
     max_input_length: int,
+    softmax_scale: float,
     quant_max_bound: float,
     quant_min_bound: float,
     out_linear_in_scale: float,
@@ -103,6 +104,7 @@ def append_attention(
         cache_quant_type,
         use_neox_rotary_style,
         max_input_length,
+        softmax_scale,
         quant_max_bound,
         quant_min_bound,
         out_linear_in_scale,
@@ -120,6 +122,142 @@ def avx_weight_only(x: paddle.Tensor, weight: paddle.Tensor, alog: str, trans: b
 def dequant_int8(intput: paddle.Tensor, out_scale: paddle.Tensor, dtype: str) -> List[paddle.Tensor]:
 
     return _C.dequant_int8(intput, out_scale, dtype)
+
+
+def draft_model_postprocess(
+    base_model_draft_tokens: paddle.Tensor,
+    base_model_seq_lens_this_time: paddle.Tensor,
+    base_model_seq_lens_encoder: paddle.Tensor,
+    base_model_stop_flags: paddle.Tensor,
+) -> List[paddle.Tensor]:
+    return _C.draft_model_postprocess(
+        base_model_draft_tokens, base_model_seq_lens_this_time, base_model_seq_lens_encoder, base_model_stop_flags
+    )
+
+
+def draft_model_preprocess(
+    draft_tokens: paddle.Tensor,
+    input_ids: paddle.Tensor,
+    stop_flags: paddle.Tensor,
+    seq_lens_this_time: paddle.Tensor,
+    seq_lens_encoder: paddle.Tensor,
+    seq_lens_decoder: paddle.Tensor,
+    step_idx: paddle.Tensor,
+    first_token_record: paddle.Tensor,
+    not_need_stop: paddle.Tensor,
+    accept_tokens: paddle.Tensor,
+    accept_num: paddle.Tensor,
+    base_model_seq_lens_encoder: paddle.Tensor,
+    base_model_seq_lens_decoder: paddle.Tensor,
+    base_model_step_idx: paddle.Tensor,
+    base_model_stop_flags: paddle.Tensor,
+    base_model_draft_tokens: paddle.Tensor,
+    max_draft_token: int,
+    truncate_first_token: bool,
+) -> List[paddle.Tensor]:
+    return _C.draft_model_preprocess(
+        draft_tokens,
+        input_ids,
+        stop_flags,
+        seq_lens_this_time,
+        seq_lens_encoder,
+        seq_lens_decoder,
+        step_idx,
+        first_token_record,
+        not_need_stop,
+        accept_tokens,
+        accept_num,
+        base_model_seq_lens_encoder,
+        base_model_seq_lens_decoder,
+        base_model_step_idx,
+        base_model_stop_flags,
+        base_model_draft_tokens,
+        max_draft_token,
+        truncate_first_token,
+    )
+
+
+def draft_model_set_value_by_flags(
+    draft_tokens: paddle.Tensor,
+    pre_ids_all: paddle.Tensor,
+    stop_flags: paddle.Tensor,
+    seq_lens_this_time: paddle.Tensor,
+    seq_lens_encoder: paddle.Tensor,
+    seq_lens_decoder: paddle.Tensor,
+    step_idx: paddle.Tensor,
+) -> paddle.Tensor:
+    return _C.draft_model_set_value_by_flags(
+        draft_tokens, pre_ids_all, stop_flags, seq_lens_this_time, seq_lens_encoder, seq_lens_decoder, step_idx
+    )
+
+
+def draft_model_update(
+    inter_next_tokens: paddle.Tensor,
+    draft_tokens: paddle.Tensor,
+    pre_ids: paddle.Tensor,
+    seq_lens_this_time: paddle.Tensor,
+    seq_lens_encoder: paddle.Tensor,
+    seq_lens_decoder: paddle.Tensor,
+    step_idx: paddle.Tensor,
+    output_cum_offsets: paddle.Tensor,
+    stop_flags: paddle.Tensor,
+    not_need_stop: paddle.Tensor,
+    max_dec_len: paddle.Tensor,
+    end_ids: paddle.Tensor,
+    base_model_draft_tokens: paddle.Tensor,
+    max_seq_len: int,
+    substep: int,
+) -> List[paddle.Tensor]:
+    return _C.draft_model_update(
+        inter_next_tokens,
+        draft_tokens,
+        pre_ids,
+        seq_lens_this_time,
+        seq_lens_encoder,
+        seq_lens_decoder,
+        step_idx,
+        output_cum_offsets,
+        stop_flags,
+        not_need_stop,
+        max_dec_len,
+        end_ids,
+        base_model_draft_tokens,
+        max_seq_len,
+        substep,
+    )
+
+
+def eagle_get_base_model_hidden_states(
+    input: paddle.Tensor,
+    seq_lens_this_time: paddle.Tensor,
+    seq_lens_encoder: paddle.Tensor,
+    seq_lens_decoder: paddle.Tensor,
+    stop_flags: paddle.Tensor,
+    accept_nums: paddle.Tensor,
+    base_model_seq_lens_this_time: paddle.Tensor,
+    base_model_seq_lens_encoder: paddle.Tensor,
+    actual_draft_token_num: int,
+) -> List[paddle.Tensor]:
+    return _C.eagle_get_base_model_hidden_states(
+        input,
+        seq_lens_this_time,
+        seq_lens_encoder,
+        seq_lens_decoder,
+        stop_flags,
+        accept_nums,
+        base_model_seq_lens_this_time,
+        base_model_seq_lens_encoder,
+        actual_draft_token_num,
+    )
+
+
+def eagle_get_self_hidden_states(
+    input: paddle.Tensor,
+    last_seq_lens_this_time: paddle.Tensor,
+    seq_lens_this_time: paddle.Tensor,
+    step_idx: paddle.Tensor,
+) -> List[paddle.Tensor]:
+    return _C.eagle_get_self_hidden_states(input, last_seq_lens_this_time, seq_lens_this_time, step_idx)
 
 
 def encode_rotary_qk(
@@ -195,6 +333,17 @@ def fused_get_rotary_embedding(
     return _C.fused_get_rotary_embedding(input_ids, position_ids, head_dim_shape_tensor, prompt_num, theta, use_neox)
 
 
+def fused_rotary_position_encoding(
+    query: paddle.Tensor,
+    key: paddle.Tensor,
+    position_ids: paddle.Tensor,
+    cos_sin_cache: paddle.Tensor,
+    head_size: int,
+    is_neox: bool,
+) -> List[paddle.Tensor]:
+    return _C.fused_rotary_position_encoding(query, key, position_ids, cos_sin_cache, head_size, is_neox)
+
+
 def gemm_dequant(x: paddle.Tensor, y: paddle.Tensor, scale: paddle.Tensor, out_dtype: str) -> List[paddle.Tensor]:
 
     return _C.gemm_dequant(x, y, scale, out_dtype)
@@ -247,6 +396,15 @@ def get_padding_offset_v2(
 ) -> List[paddle.Tensor]:
 
     return _C.get_padding_offset_v2(input_ids, cum_offsets, token_num, seq_len, draft_tokens, seq_lens_encoder)
+
+
+def get_position_ids(
+    seq_lens_encoder: paddle.Tensor,
+    seq_lens_decoder: paddle.Tensor,
+    seq_lens_this_time: paddle.Tensor,
+    position_ids: paddle.Tensor,
+) -> List[paddle.Tensor]:
+    return _C.get_position_ids(seq_lens_encoder, seq_lens_decoder, seq_lens_this_time, position_ids)
 
 
 def get_token_penalty_multi_scores(
@@ -563,9 +721,9 @@ def step_paddle(
     pre_ids: paddle.Tensor,
     step_idx: paddle.Tensor,
     next_tokens: paddle.Tensor,
+    first_token_ids: paddle.Tensor,
     block_size: int,
     encoder_decoder_block_num: int,
-    first_token_id: int,
     speculate_step_token_num: int,
 ) -> List[paddle.Tensor]:
 
@@ -591,9 +749,9 @@ def step_paddle(
         pre_ids,
         step_idx,
         next_tokens,
+        first_token_ids,
         block_size,
         encoder_decoder_block_num,
-        first_token_id,
         speculate_step_token_num,
     )
 

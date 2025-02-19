@@ -2005,7 +2005,7 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
         )
         # hidden_states = outputs[0]
         if self.return_full_hidden_states:
-            from paddlenlp_ops import rebuild_padding_v2
+            from paddlenlp.custom_ops import rebuild_padding_v2
 
             # full_hidden_states = outputs[1]
             full_hidden_states = outputs[0]

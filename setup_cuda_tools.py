@@ -58,8 +58,7 @@ def get_ext_and_cmd():
                 # Avoid the conflict between the .so file and the .py file
                 # when import this package
                 new_so_path = file_path + "_pd_" + ext_suffix
-                if not os.path.exists(new_so_path):
-                    os.rename(rf"{so_path}", rf"{new_so_path}")
+                os.rename(rf"{so_path}", rf"{new_so_path}")
                 assert os.path.exists(new_so_path)
 
         def update_git_submodule():
@@ -138,6 +137,8 @@ def get_ext_and_cmd():
             f"{custom_ops_path}/gpu/step.cu",
             f"{custom_ops_path}/gpu/quant_int8.cu",
             f"{custom_ops_path}/gpu/dequant_int8.cu",
+            f"{custom_ops_path}/gpu/get_position_ids.cu",
+            f"{custom_ops_path}/gpu/fused_rotary_position_encoding.cu",
             f"{custom_ops_path}/gpu/flash_attn_bwd.cc",
             f"{custom_ops_path}/gpu/tune_cublaslt_gemm.cu",
             f"{custom_ops_path}/gpu/sample_kernels/top_p_sampling_reject.cu",

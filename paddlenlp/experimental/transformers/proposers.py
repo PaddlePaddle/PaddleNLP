@@ -17,13 +17,13 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 import paddle
-from paddlenlp_ops import (
+
+from paddlenlp.custom_ops import (
     draft_model_postprocess,
     draft_model_preprocess,
     eagle_get_base_model_hidden_states,
     eagle_get_self_hidden_states,
 )
-
 from paddlenlp.transformers import AutoConfig, AutoInferenceModelForCausalLM
 from paddlenlp.trl import llm_utils
 
