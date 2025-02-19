@@ -171,7 +171,6 @@ __device__ __forceinline__ void produce_kv(CacheT *smem,
 template <uint32_t vec_size, uint32_t half_vec_size, uint32_t bdx, uint32_t bdy, uint32_t HEAD_DIM, uint32_t HALF_HEAD_DIM, uint32_t DEAL_EACH_TIME, PosEncMode pos_enc_mode, CacheType cache_type, typename T, typename CacheT>
 __device__ __forceinline__ void compute_qk(const CacheT* base_smem,
                                            const AlignedVector<T, vec_size>& q_vec,
-                                           const AlignedVector<T, vec_size>& freq_vec,
                                            const uint32_t kv_idx_base,
                                            const uint32_t stage_idx,
                                            const uint32_t iter_base, 
@@ -189,6 +188,22 @@ __device__ __forceinline__ void compute_qk(const CacheT* base_smem,
 #pragma unroll
   for (uint32_t j = 0; j < DEAL_EACH_TIME; ++j) {
     Load<CacheT, vec_size>(smem + j * HEAD_DIM + vid * vec_size, &k_vec);
+#ifdef DEBUG_DEC_PRE
+    __syncthreads();
+    if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0 && blockIdx.x == 0 && blockIdx.y == 0 && blockIdx.z == 0) {
+      printf("q_vec:\n");
+      for (uint32_t i = 0; i < vec_size; ++i) {
+        printf("%f ", static_cast<float>(q_vec[i]));
+      }
+      printf("\n");
+      printf("k_vec:\n");
+      for (uint32_t i = 0; i < vec_size; ++i) {
+        printf("%f ", static_cast<float>(k_vec[i]));
+      }
+      printf("\n");
+    }
+    __syncthreads();
+#endif
     if constexpr (std::is_same<T, half>::value) {
       s[j] = __float2half(0.f);
     } else if constexpr (std::is_same<T, __nv_bfloat16>::value) {
@@ -198,11 +213,38 @@ __device__ __forceinline__ void compute_qk(const CacheT* base_smem,
     for (uint32_t i = 0; i < vec_size; ++i) {
       s[j] += q_vec[i] * k_vec[i];
     }
+#ifdef DEBUG_DEC_PRE
+    __syncthreads();
+    if (threadIdx.y == 0 && threadIdx.z == 0 && blockIdx.x == 0 && blockIdx.y == 0 && blockIdx.z == 0) {
+        printf("be t%d-s[2]:%f \n", threadIdx.x, static_cast<float>(s[j]));
+    }
+    __syncthreads();
+#endif
 #pragma unroll
     for (uint32_t offset = bdx / 2; offset > 0; offset /= 2) {
       s[j] += __shfl_xor_sync(-1, s[j], offset, 32);
     }
+    
+    __syncthreads();
+#ifdef DEBUG_DEC_PRE
+    __syncthreads();
+    if (threadIdx.y == 0 && threadIdx.z == 0 && blockIdx.x == 0 && blockIdx.y == 0 && blockIdx.z == 0) {
+        printf("af t%d-s[2]:%f \n", threadIdx.x, static_cast<float>(s[j]));
+    }
+    __syncthreads();
+#endif
     tmp_smem[bidy] = s[j];
+#ifdef DEBUG_DEC_PRE
+    __syncthreads();
+    if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0 && blockIdx.x == 0 && blockIdx.y == 0 && blockIdx.z == 0) {
+      printf("tmp_smem:\n");
+      for (uint32_t i = 0; i < bdy; ++i) {
+        printf("%f ", static_cast<float>(tmp_smem[i]));
+      }
+      printf("\n");
+    }
+    __syncthreads();
+#endif
     __syncthreads();
     if constexpr (std::is_same<T, half>::value) {
       s[j] = __float2half(0.f);
@@ -212,6 +254,13 @@ __device__ __forceinline__ void compute_qk(const CacheT* base_smem,
     for(uint32_t i = 0; i < bdy; ++i) {
       s[j] += tmp_smem[i];
     }
+#ifdef DEBUG_DEC_PRE
+    __syncthreads();
+    if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0 && blockIdx.x == 0 && blockIdx.y == 0 && blockIdx.z == 0) {
+      printf("s[%d]: %f\n", j, static_cast<float>(s[j]));
+    }
+    __syncthreads();
+#endif
     if constexpr (std::is_same<T, half>::value) {
       s[j] = (iter_base + j < iter_bound) ? s[j] : __float2half(-5e4f);
     } else if constexpr (std::is_same<T, __nv_bfloat16>::value) {
@@ -248,8 +297,9 @@ template<uint32_t vec_size, uint32_t half_vec_size, uint32_t DEAL_EACH_TIME, uin
 __device__ __forceinline__ void compute_sv(const T *s,
                                            const CacheT *base_v_smem,
                                            const uint32_t stage_idx,
+                                           const uint32_t vid,
                                            softmax_state_t<vec_size, T>& st) {
-  uint32_t vid = threadIdx.x, zid = threadIdx.z;
+  uint32_t zid = threadIdx.z;
   const CacheT* v_smem;
   AlignedVector<T, vec_size> v_vec;
   // v_smem = base_v_smem + (stage_idx * DEAL_EACH_TIME + zid * tile_size) * HEAD_DIM;
@@ -258,6 +308,17 @@ __device__ __forceinline__ void compute_sv(const T *s,
   for (int j = 0; j < DEAL_EACH_TIME; ++j) {
     // Load<T, vec_size>(v_smem + j * HEAD_DIM + vid * vec_size, &v_vec);
     Load<T, vec_size>(v_smem + j * HEAD_DIM_QK + vid * vec_size, &v_vec);
+#ifdef DEBUG_DEC_PRE
+    __syncthreads();
+    if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0 && blockIdx.x == 0 && blockIdx.y == 0 && blockIdx.z == 0) {
+      printf("v_vec:\n");
+      for (uint32_t i = 0; i < vec_size; ++i) {
+        printf("%f ", static_cast<float>(v_vec[i]));
+      }
+      printf("\n");
+    }
+    __syncthreads();
+#endif
 #pragma unroll
     for (int reg_id = 0; reg_id < vec_size; ++reg_id) {
       st.o[reg_id] += s[j] * v_vec[reg_id];
@@ -270,7 +331,22 @@ __device__ __forceinline__ void compute_sv(const T *s,
 #endif
     }
   }
-  
+#ifdef DEBUG_DEC_PRE
+  __syncthreads();
+  if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0 && blockIdx.x == 0 && blockIdx.y == 0 && blockIdx.z == 0) {
+    printf("st.o:\n");
+    for (uint32_t i = 0; i < vec_size; ++i) {
+      printf("%f ", static_cast<float>(st.o[i]));
+    }
+    printf("\n");
+    printf("st.d:\n");
+    for (uint32_t i = 0; i < vec_size; ++i) {
+      printf("%f ", static_cast<float>(st.d));
+    }
+    printf("\n");
+  }
+  __syncthreads();
+#endif
 }
 
 // template<uint32_t vec_size, uint32_t HEAD_DIM, uint32_t bdy, uint32_t bdz, typename T>

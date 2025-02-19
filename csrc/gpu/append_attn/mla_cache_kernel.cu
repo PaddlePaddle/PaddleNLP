@@ -39,7 +39,7 @@ std::vector<paddle::Tensor> PrefillMLAWriteCache(
   auto all_size = meta_data.head_dims;
   int pe_size = all_size - nope_size;
   auto kv_num_heads = meta_data.kv_num_heads;
-  const uint32_t elem_nums = num_tokens * kv_num_heads * (nope_size + pe_size);
+  const uint32_t elem_nums = num_tokens * kv_num_heads * all_size;
 
   constexpr int PackSize = 16 / sizeof(DataType_);
   const int pack_num = elem_nums / PackSize;
@@ -84,7 +84,7 @@ std::vector<paddle::Tensor> PrefillMLAWriteCacheKernel(
   const auto& kv_pe_dims = kv_pe.dims();
   const auto& kv_cache_dims = kv_cache.dims();
   meta_data.kv_num_heads = kv_cache_dims[1];
-  const auto nope_size = kv_nope_dims[kv_nope_dims.size() - 1];
+  const auto nope_size = kv_nope_dims[kv_nope_dims.size() - 1] / meta_data.kv_num_heads;
   meta_data.token_nums = kv_nope_dims[0];
   meta_data.head_dims = kv_cache_dims[3];
   meta_data.head_dims_v = nope_size;
@@ -147,7 +147,7 @@ std::vector<paddle::Tensor> DecodeMLAWriteCache(
   auto all_size = meta_data.head_dims;
   int pe_size = all_size - nope_size;
   auto kv_num_heads = meta_data.kv_num_heads;
-  const uint32_t elem_nums = bsz * kv_num_heads * (nope_size + pe_size);
+  const uint32_t elem_nums = bsz * kv_num_heads * all_size;
 
   constexpr int PackSize = 16 / sizeof(DataType_);
   const int pack_num = elem_nums / PackSize;
@@ -191,7 +191,7 @@ std::vector<paddle::Tensor> DecodeMLAWriteCacheKernel(
   const auto& kv_pe_dims = kv_pe.dims();
   const auto& kv_cache_dims = kv_cache.dims();
   meta_data.kv_num_heads = kv_cache_dims[1];
-  const auto nope_size = kv_nope_dims[kv_nope_dims.size() - 1];
+  const auto nope_size = kv_nope_dims[kv_nope_dims.size() - 1] / meta_data.kv_num_heads;
   meta_data.token_nums = kv_nope_dims[0];
   meta_data.head_dims = kv_cache_dims[3];
   meta_data.head_dims_v = nope_size;
