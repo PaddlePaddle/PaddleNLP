@@ -19,7 +19,7 @@ export nlp_dir=/workspace/PaddleNLP
 mkdir -p /workspace/case_logs
 export log_path=/workspace/case_logs
 export case_list=()
-
+mv /workspace/PaddleNLP/case_logs/api.yaml ${log_path}/
 galobal_total_count=0
 galobal_success_count=0
 galobal_exit_250_arr=()
@@ -250,6 +250,7 @@ if [[ ${#case_list[*]} -ne 0 ]];then
     case_num=1
     export FLAGS_install_deps=0
     export FLAGS_download_data=""
+    export FLAGS_trace_api="${log_path}/api.yaml,${log_path}/api_config.txt"
     if [[ $(contain_case llama_auto ${case_list[@]}; echo $?) -eq 1 ]];then
         echo -e "\033[31m ---- running case $case_num/${#case_list[*]}: llama_auto \033"
         cmd=/workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh
