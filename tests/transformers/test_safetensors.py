@@ -41,7 +41,6 @@ def enhanced_to_tensor(tensor):
         new_t.get_tensor()._share_data_with(t.get_tensor())
         return new_t
         # return paddle.to_tensor(tensor.view(np.int8), dtype=paddle.float8_e4m3fn)
-    raise ValueError()
     return paddle.to_tensor(tensor)
 
 
