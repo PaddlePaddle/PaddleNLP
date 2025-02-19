@@ -1,5 +1,5 @@
 {
-    "model_name_or_path": "meta-llama/Meta-Llama-3-8B",
+    "model_name_or_path": "meta-llama/Meta-Llama-3-8B-Instruct",
     "train_dataset_path": "./data/train.jsonl",
     "dev_dataset_path": "./data/dev.jsonl",
     "output_dir": "./checkpoints/dpo_ckpts",

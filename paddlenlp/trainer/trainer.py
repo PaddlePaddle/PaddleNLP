@@ -87,6 +87,12 @@ try:
     from ..quantization.quantization_linear import QuantizationLinear
 except:
     QuantizationLinear = None
+try:
+    from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+        register_sequence_parallel_allreduce_hooks,
+    )
+except:
+    pass
 from ..transformers.context_parallel_utils import split_inputs_sequence_dim_load_balance
 from ..transformers.model_utils import (
     PretrainedModel,
@@ -110,8 +116,9 @@ from ..utils.env import (
     SAFE_WEIGHTS_INDEX_NAME,
     VERA_WEIGHTS_NAME,
 )
+from ..utils.fault_tolerance import LOSS_INF_ERROR, LOSS_NAN_ERROR
 from ..utils.import_utils import is_datasets_available, is_paddle_cuda_available
-from ..utils.log import logger
+from ..utils.log import MetricsDumper, logger
 from ..utils.tools import get_env_device
 from .argparser import strtobool
 from .integrations import get_reporting_integration_callbacks
@@ -137,6 +144,7 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
     ShardingOption,
     TrainerMemoryTracker,
     TrainOutput,
+    download_recovery_ckpt_from_pdc,
     find_batch_size,
     get_last_checkpoint,
     get_scheduler,
@@ -199,17 +207,6 @@ except:
         hack for paddlenlp develop branch.
         """
         return False
-
-
-try:
-    from paddle.framework.recall_error import LOSS_NAN_ERROR
-except ImportError:
-    LOSS_NAN_ERROR = "PaddleRecall error(102): LossNan"
-
-try:
-    from paddle.framework.recall_error import LOSS_INF_ERROR
-except ImportError:
-    LOSS_INF_ERROR = "PaddleRecall error(104): LossInf"
 
 
 __all__ = ["Trainer"]
@@ -397,6 +394,14 @@ class Trainer:
             if signal_path is not None:
                 with open(signal_path, mode="w+") as f:
                     f.write("1")
+
+        self.metrics_dumper = None
+        if self.args.metrics_output_path is not None:
+            if not os.path.exists(self.args.metrics_output_path):
+                os.makedirs(self.args.metrics_output_path, exist_ok=True)
+            metrics_output_file = os.path.join(self.args.metrics_output_path, f"metrics_rank{dist.get_rank()}.json")
+            logger.info(f"create/append metrics dumper at {metrics_output_file}")
+            self.metrics_dumper = MetricsDumper(metrics_output_file)
 
         self._save_ckpt_func = _save_ckpt_func
         self._load_ckpt_func = dist.load_state_dict if self.args.enable_auto_parallel else paddle.load
@@ -747,6 +752,14 @@ class Trainer:
                         shutil.rmtree(resume_from_checkpoint)
                     os.makedirs(resume_from_checkpoint, exist_ok=True)
                     logger.info(f"Reset resume_from_checkpoint to temp directory : {resume_from_checkpoint}")
+
+        if resume_from_checkpoint is not None and self.args.pdc_download_ckpt:
+            if self.is_local_process_zero():
+                download_recovery_ckpt_from_pdc(resume_from_checkpoint, self.args.pdc_download_timeout)
+            if self.args.world_size > 1:
+                logger.info("Wait all processes finish downloading...")
+                paddle.distributed.barrier()
+            logger.info("All processes finished downloading from pdc")
 
         train_dataloader = self.get_train_dataloader()
 
@@ -1340,7 +1353,10 @@ class Trainer:
 
         self.log(metrics)
 
-        self.control = self.callback_handler.on_train_end(args, self.state, self.control)
+        kwargs = {
+            "metrics_dumper": self.metrics_dumper,
+        }
+        self.control = self.callback_handler.on_train_end(args, self.state, self.control, **kwargs)
 
         return TrainOutput(self.state.global_step, train_loss, metrics)
 
@@ -1489,13 +1505,13 @@ class Trainer:
             )
 
             seq_length = None
-            model_flops = None
+            model_flops_per_token = None
             if getattr(self, "is_pretraining", False) and hasattr(self.model, "config"):
                 seq_length = getattr(self.model.config, "seq_length", None)
                 try:
-                    model_flops = self.model.get_hardware_flops(seq_length=seq_length, recompute=self.args.recompute)
+                    model_flops_per_token = self.model.get_hardware_flops()
                 except NotImplementedError:
-                    model_flops = None
+                    model_flops_per_token = None
 
             # Do not log speed metrics if all steps are skipped since last log.
             if num_steps > 0:
@@ -1506,7 +1522,7 @@ class Trainer:
                         num_samples=total_train_batch_size * num_steps,
                         num_steps=num_steps,
                         seq_length=seq_length,
-                        model_flops=model_flops,
+                        model_flops_per_token=model_flops_per_token,
                     )
                 )
 
@@ -2043,6 +2059,11 @@ class Trainer:
             else:
                 model, self.optimizer = decorated
 
+        if self.args.tensor_parallel_degree > 1 and self.args.sequence_parallel:
+            register_sequence_parallel_allreduce_hooks(
+                model, self.args.gradient_accumulation_steps, self.args.fuse_sequence_parallel_allreduce
+            )
+
         if self.args.world_size == 1:
             if self.args.amp_master_grad:
                 mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)
@@ -2535,7 +2556,49 @@ class Trainer:
         else:
             self.save_model(output_dir)
 
-        # only save model state dict, ignore optimizer and scheduler
+        # Determine the new best metric / best model checkpoint
+        if metrics is not None and self.args.metric_for_best_model is not None:
+            metric_to_check = self.args.metric_for_best_model
+            if not metric_to_check.startswith("eval_"):
+                metric_to_check = f"eval_{metric_to_check}"
+            metric_value = metrics[metric_to_check]
+
+            operator = np.greater if self.args.greater_is_better else np.less
+            if (
+                self.state.best_metric is None
+                or self.state.best_model_checkpoint is None
+                or operator(metric_value, self.state.best_metric)
+            ):
+                self.state.best_metric = metric_value
+                self.state.best_model_checkpoint = output_dir
+
+        # Save the Trainer state
+        if self.args.should_save:
+            self.state.save_to_json(os.path.join(output_dir, TRAINER_STATE_NAME))
+
+        # Save RNG state in non-distributed training
+        rng_states = {
+            "python": random.getstate(),
+            "numpy": np.random.get_state(),
+            "cuda": paddle.get_rng_state(),
+            "cpu": paddle.framework.core.default_cpu_generator().get_state(),
+        }
+        if self.args.use_hybrid_parallel:
+            rng_states[
+                "hybrid_parallel_rng_state_tracker"
+            ] = fleet.meta_parallel.get_rng_state_tracker().get_states_tracker()
+
+        if self.args.world_size > 1:
+            rng_states_list = []
+            paddle.distributed.all_gather_object(rng_states_list, rng_states)
+            if self.args.should_save:
+                os.makedirs(output_dir, exist_ok=True)
+                paddle.save(rng_states_list, os.path.join(output_dir, f"rng_state_{self.args.world_size}.pth"))
+        else:
+            os.makedirs(output_dir, exist_ok=True)
+            paddle.save(rng_states, os.path.join(output_dir, "rng_state.pth"))
+
+            # only save model state dict, ignore optimizer and scheduler
         if not self.args.ignore_save_lr_and_optim:
             optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
             saved_signal_path = os.path.join(output_dir, f"saved_signal_{dist.get_rank()}")
@@ -2621,47 +2684,6 @@ class Trainer:
                             paddle.save(global_rank, os.path.join(signal_dir, f".master_weight.done.{global_rank}"))
 
         self.runtime_timer.stop()
-        # Determine the new best metric / best model checkpoint
-        if metrics is not None and self.args.metric_for_best_model is not None:
-            metric_to_check = self.args.metric_for_best_model
-            if not metric_to_check.startswith("eval_"):
-                metric_to_check = f"eval_{metric_to_check}"
-            metric_value = metrics[metric_to_check]
-
-            operator = np.greater if self.args.greater_is_better else np.less
-            if (
-                self.state.best_metric is None
-                or self.state.best_model_checkpoint is None
-                or operator(metric_value, self.state.best_metric)
-            ):
-                self.state.best_metric = metric_value
-                self.state.best_model_checkpoint = output_dir
-
-        # Save the Trainer state
-        if self.args.should_save:
-            self.state.save_to_json(os.path.join(output_dir, TRAINER_STATE_NAME))
-
-        # Save RNG state in non-distributed training
-        rng_states = {
-            "python": random.getstate(),
-            "numpy": np.random.get_state(),
-            "cuda": paddle.get_rng_state(),
-            "cpu": paddle.framework.core.default_cpu_generator().get_state(),
-        }
-        if self.args.use_hybrid_parallel:
-            rng_states[
-                "hybrid_parallel_rng_state_tracker"
-            ] = fleet.meta_parallel.get_rng_state_tracker().get_states_tracker()
-
-        if self.args.world_size > 1:
-            rng_states_list = []
-            paddle.distributed.all_gather_object(rng_states_list, rng_states)
-            if self.args.should_save:
-                os.makedirs(output_dir, exist_ok=True)
-                paddle.save(rng_states_list, os.path.join(output_dir, f"rng_state_{self.args.world_size}.pth"))
-        else:
-            os.makedirs(output_dir, exist_ok=True)
-            paddle.save(rng_states, os.path.join(output_dir, "rng_state.pth"))
 
         # Maybe delete some older checkpoints.
         # For hybrid parallel training, the checkpoint files maybe on different node.
@@ -3013,7 +3035,9 @@ class Trainer:
             paddle_pipeline_timers = None
         except AssertionError:
             paddle_pipeline_timers = None
-        kwargs.update(timer=self.timers, paddle_pipeline_timers=paddle_pipeline_timers)
+        kwargs.update(
+            timer=self.timers, paddle_pipeline_timers=paddle_pipeline_timers, metrics_dumper=self.metrics_dumper
+        )
 
         if self.state.epoch is not None:
             logs["progress_or_epoch"] = round(self.state.epoch, 4)
@@ -3110,6 +3134,9 @@ class Trainer:
             if self.model is self.model_wrapped and isinstance(self.model_wrapped, PipelineLayer):
                 # NOTE(gongenlei): when do_train=False, do_eval=True, we need to wrap model for pipeline
                 self.model_wrapped = fleet.distributed_model(self.model_wrapped)
+            if isinstance(self.model_wrapped, LoRAModel) and isinstance(self.model_wrapped.model, PipelineLayer):
+                # NOTE(liuting): when do_train=False, do_eval=True, lora=True, we need to wrap model for pipeline
+                self.model_wrapped = fleet.distributed_model(self.model_wrapped.model)
             model = self.model_wrapped
         else:
             model = self.model

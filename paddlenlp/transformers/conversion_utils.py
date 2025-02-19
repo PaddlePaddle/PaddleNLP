@@ -1312,7 +1312,8 @@ class ConversionMixin:
         # state_keys_map base to real
         state_keys_map = {}
 
-        state_keys_base = set(state_keys_base)
+        # sorted by length，match from long to short for A.key B.key ...
+        state_keys_base = sorted(state_keys_base, key=lambda x: len(x), reverse=True)
         state_keys_real = set(state_keys_real)
 
         for key in state_keys_base:

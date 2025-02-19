@@ -31,10 +31,12 @@ __global__ void free_and_dispatch_block(bool *stop_flags,
                                         int *used_list_len,
                                         int *free_list,
                                         int *free_list_len,
+                                        int64_t *first_token_ids,
                                         const int bsz,
                                         const int block_size,
                                         const int block_num_per_seq,
-                                        const int max_decoder_block_num) {
+                                        const int max_decoder_block_num,
+                                        const int speculate_step_token_num) {
     typedef cub::BlockReduce<cub::KeyValuePair<int, int>, 512> BlockReduce;
     __shared__ typename BlockReduce::TempStorage temp_storage;
     const int tid = threadIdx.x;
@@ -42,6 +44,7 @@ __global__ void free_and_dispatch_block(bool *stop_flags,
         int *block_table_now = block_tables + tid * block_num_per_seq;
         if (stop_flags[tid] && !is_block_step[tid]) {
             // 回收block块
+            first_token_ids[tid] = -1;
             const int encoder_block_len = encoder_block_lens[tid];
             const int decoder_used_len = used_list_len[tid];
             if (decoder_used_len > 0) {
@@ -57,7 +60,7 @@ __global__ void free_and_dispatch_block(bool *stop_flags,
                 encoder_block_lens[tid] = 0;
                 used_list_len[tid] = 0;
             }
-        } else if (seq_lens_decoder[tid] != 0 && block_table_now[seq_lens_decoder[tid] / block_size] == -1) {
+        } else if (seq_lens_decoder[tid] != 0 && block_table_now[(seq_lens_decoder[tid] + speculate_step_token_num) / block_size] == -1) {
             // 统计需要分配block的位置和总数
             const int ori_need_block_len = atomicAdd(need_block_len, 1);
             need_block_list[ori_need_block_len] = tid;
@@ -110,7 +113,7 @@ __global__ void free_and_dispatch_block(bool *stop_flags,
             used_list_len[need_block_id] += 1;
             const int ori_free_list_len = atomicSub(free_list_len, 1);
             int *block_table_now = block_tables + need_block_id * block_num_per_seq;
-            block_table_now[seq_lens_decoder[need_block_id] / block_size] = free_list[ori_free_list_len - 1];
+            block_table_now[(seq_lens_decoder[need_block_id] + speculate_step_token_num) / block_size] = free_list[ori_free_list_len - 1];
         }
         need_block_list[tid] = -1;
     }
@@ -165,11 +168,11 @@ __global__ void recover_block(int *recover_block_list, // [bsz]
                               int *encoder_block_lens,
                               int *used_list_len,
                               const int64_t *next_tokens,
+                              const int64_t *first_token_ids,
                               const int bsz,
                               const int block_num_per_seq,
                               const int length,
-                              const int pre_id_length,
-                              const int first_token_id) {
+                              const int pre_id_length) {
     const int bid = blockIdx.x;
     const int tid = threadIdx.x;
     __shared__ int ori_free_list_len;
@@ -188,7 +191,8 @@ __global__ void recover_block(int *recover_block_list, // [bsz]
             seq_lens_encoder[recover_id] = seq_len;
             stop_flags[recover_id] = false;
             input_ids_now[ori_seq_len_encoder + step_idx_now - 1] = next_tokens[recover_id]; // next tokens
-            input_ids_now[0] = first_token_id; // set first prompt token
+            input_ids_now[0] =
+                first_token_ids[recover_id];  // set first prompt token
             const int ori_free_list_len_tid0 = atomicSub(free_list_len, decoder_used_len);
             ori_free_list_len = ori_free_list_len_tid0;
 #ifdef DEBUG_STEP
@@ -233,9 +237,10 @@ void StepPaddle(const paddle::Tensor& stop_flags,
                 const paddle::Tensor& pre_ids,
                 const paddle::Tensor& step_idx,
                 const paddle::Tensor& next_tokens,
+                const paddle::Tensor &first_token_ids,
                 const int block_size,
                 const int encoder_decoder_block_num,
-                const int64_t first_token_id) {
+                const int speculate_step_token_num) {
     auto cu_stream = seq_lens_this_time.stream();
     const int bsz = seq_lens_this_time.shape()[0];
     const int block_num_per_seq = block_tables.shape()[1];
@@ -262,10 +267,12 @@ void StepPaddle(const paddle::Tensor& stop_flags,
         const_cast<int*>(used_list_len.data<int>()),
         const_cast<int*>(free_list.data<int>()),
         const_cast<int*>(free_list_len.data<int>()),
+        const_cast<int64_t *>(first_token_ids.data<int64_t>()),
         bsz,
         block_size,
         block_num_per_seq,
-        max_decoder_block_num
+        max_decoder_block_num,
+        speculate_step_token_num
     );
 #ifdef DEBUG_STEP
 #ifdef PADDLE_WITH_HIP
@@ -297,11 +304,11 @@ void StepPaddle(const paddle::Tensor& stop_flags,
             const_cast<int*>(encoder_block_lens.data<int>()),
             const_cast<int*>(used_list_len.data<int>()),
             next_tokens.data<int64_t>(),
+            first_token_ids.data<int64_t>(),
             bsz,
             block_num_per_seq,
             length,
-            pre_id_length,
-            first_token_id
+            pre_id_length
         );
 #ifdef DEBUG_STEP
 #ifdef PADDLE_WITH_HIP
@@ -334,10 +341,11 @@ PD_BUILD_OP(step_paddle)
              "input_ids",
              "pre_ids",
              "step_idx",
-             "next_tokens"})
+             "next_tokens",
+             "first_token_ids",})
     .Attrs({"block_size: int",
             "encoder_decoder_block_num: int",
-            "first_token_id: int64_t"})
+            "speculate_step_token_num: int"})
     .Outputs({"stop_flags_out",
               "seq_lens_this_time_out",
               "seq_lens_encoder_out",
@@ -354,7 +362,8 @@ PD_BUILD_OP(step_paddle)
               "used_list_len_out",
               "free_list_out",
               "free_list_len_out",
-              "input_ids_out"})
+              "input_ids_out",
+              "first_token_ids_out",})
     .SetInplaceMap({{"stop_flags", "stop_flags_out"},
                     {"seq_lens_this_time", "seq_lens_this_time_out"},
                     {"seq_lens_encoder", "seq_lens_encoder_out"},
@@ -371,5 +380,6 @@ PD_BUILD_OP(step_paddle)
                     {"used_list_len", "used_list_len_out"},
                     {"free_list", "free_list_out"},
                     {"free_list_len", "free_list_len_out"},
-                    {"input_ids", "input_ids_out"}})
+                    {"input_ids", "input_ids_out"},
+                    {"first_token_ids", "first_token_ids_out"}})
     .SetKernelFn(PD_KERNEL(StepPaddle));

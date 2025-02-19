@@ -69,7 +69,11 @@ class MoEGateMixin:
 
     @paddle.no_grad()
     def _capacity(
-        self, gates: paddle.Tensor, capacity_factor: float, max_capacity: int, min_capacity: int
+        self,
+        gates: paddle.Tensor,
+        capacity_factor: float,
+        max_capacity: int,
+        min_capacity: int,
     ) -> paddle.Tensor:
         """Calculate the capacity for each expert based on the gates and capacity factor.
 
@@ -107,6 +111,7 @@ class MoEGateMixin:
             paddle.Tensor: The value of auxiliary loss.
 
         """
+        # TODO: @DrownFish19 update aux_loss for Qwen2MoE and DeepSeekV2&V3
         me = paddle.mean(gates, axis=0)
         ce = paddle.mean(mask.cast("float32"), axis=0)
         if self.global_aux_loss:
@@ -131,7 +136,7 @@ class MoEGateMixin:
         Returns:
             paddle.Tensor: The z loss value.
         """
-        l_zloss = logits.exp().sum(1).log().square().mean()
+        l_zloss = paddle.logsumexp(logits, axis=1).square().mean()
         return l_zloss
 
     def _cal_orthogonal_loss(self) -> paddle.Tensor:
@@ -175,8 +180,14 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         self.top2_2nd_expert_sampling = kwargs.pop("top2_2nd_expert_sampling", True)
 
         self.drop_policy = kwargs.pop("drop_policy", "probs")
+        # Qwen2MoE: greedy
+        # DeepSeekV2&V3: group_limited_greedy for training, and noaux_tc for inference
+        self.topk_method = kwargs.pop("topk_method", "greedy")
         self.top_k = kwargs.pop("top_k", 2)
+        self.n_group = kwargs.pop("n_group", 1)  # for group_limited_greedy
+        self.topk_group = kwargs.pop("topk_group", 1)  # for group_limited_greedy
         self.norm_topk_prob = kwargs.pop("norm_topk_prob", False)
+        self.routed_scaling_factor = kwargs.pop("routed_scaling_factor", 1.0)
 
     def _priority(self, topk_idx: paddle.Tensor, capacity: int) -> paddle.Tensor:
         """_summary_
@@ -228,7 +239,7 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
 
         return dispatch_mask
 
-    def topk_naive(self, scores: paddle.Tensor, k: int) -> Tuple[paddle.Tensor, paddle.Tensor]:
+    def _topk_greedy(self, scores: paddle.Tensor, k: int) -> Tuple[paddle.Tensor, paddle.Tensor]:
         """_summary_
 
         Args:
@@ -240,10 +251,10 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
             topk_weight: [bsz*seq_len, k]
             topk_idx: [bsz*seq_len, k]
         """
-        topk_weight, topk_idx = paddle.topk(scores, k=k, axis=-1, sorted=False)
+        topk_weight, topk_idx = paddle.topk(scores, k=k, axis=-1, sorted=True)
         return topk_weight, topk_idx
 
-    def topk_group(
+    def _topk_group_limited_greedy(
         self, scores: paddle.Tensor, k: int, n_group: int, topk_group: int
     ) -> Tuple[paddle.Tensor, paddle.Tensor]:
         """_summary_
@@ -272,6 +283,43 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         )  # [n, e]
         tmp_scores = scores * score_mask  # [n, e]
         topk_weight, topk_idx = paddle.topk(tmp_scores, k=k, axis=-1, sorted=False)
+
+        return topk_weight, topk_idx
+
+    def _topk_noaux_tc(
+        self, scores: paddle.Tensor, k: int, n_group: int, topk_group: int
+    ) -> Tuple[paddle.Tensor, paddle.Tensor]:
+        """_summary_
+
+        Args:
+            scores (paddle.Tensor): [bsz*seq_len, n_experts]
+            k (int): select the top k experts in each group
+            n_groups (int): the number of groups for all experts
+            topk_group (int): the number of groups selected
+
+        Returns:
+            Tuple[paddle.Tensor, paddle.Tensor]: topk_weight, topk_idx
+            topk_weight: [bsz*seq_len, k]
+            topk_idx: [bsz*seq_len, k]
+
+        Note: the group size is normal greater than the number of k
+        """
+        bsz_seq_len, n_experts = scores.shape
+        assert n_experts % n_group == 0, "n_experts must be divisible by n_groups"
+
+        assert self.e_score_correction_bias is not None, "e_score_correction_bias is None"
+        scores_for_choice = scores.reshape([bsz_seq_len, -1]) + self.e_score_correction_bias.unsqueeze(0)
+        group_scores = (
+            scores_for_choice.reshape([bsz_seq_len, self.n_group, -1]).topk(2, axis=-1)[0].sum(axis=-1)
+        )  # fmt:skip [n, n_group]
+        group_idx = paddle.topk(group_scores, k=topk_group, axis=-1, sorted=False)[1]  # [n, top_k_group]
+        group_mask = paddle.zeros_like(group_scores).put_along_axis(group_idx, paddle.to_tensor(1.0), axis=-1)  # fmt:skip
+        score_mask = (
+            group_mask.unsqueeze(-1).expand([bsz_seq_len, n_group, n_experts // n_group]).reshape([bsz_seq_len, -1])
+        )  # [n, e]
+        tmp_scores = scores_for_choice * score_mask  # [n, e]
+        topk_weight, topk_idx = paddle.topk(tmp_scores, k=k, axis=-1, sorted=False)
+        topk_weight = scores.take_along_axis(topk_idx, axis=1) if not self.training else topk_weight
 
         return topk_weight, topk_idx
 
@@ -432,7 +480,22 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         l_zloss = self._cal_z_loss(gates)
 
         # get topk gates
-        top_gate, top_idx = paddle.topk(gates, k=self.top_k, axis=1)
+        if self.topk_method == "greedy":
+            top_gate, top_idx = self._topk_greedy(gates, k=self.top_k)
+        elif self.topk_method == "group_limited_greedy":
+            top_gate, top_idx = self._topk_group_limited_greedy(
+                gates, k=self.top_k, n_group=self.n_group, topk_group=self.topk_group
+            )
+        elif self.topk_method == "noaux_tc":
+            top_gate, top_idx = self._topk_noaux_tc(
+                gates, k=self.top_k, n_group=self.n_group, topk_group=self.topk_group
+            )
+            # norm gate to sum 1
+        if self.top_k > 1 and self.norm_topk_prob:
+            denominator = top_gate.sum(axis=-1, keepdim=True) + 1e-20
+            top_gate = top_gate / denominator
+        top_gate = top_gate * self.routed_scaling_factor
+
         # get topk mask
         mask = paddle.zeros_like(gates).put_along_axis(top_idx, paddle.to_tensor(1.0), axis=1)
         l_aux = self._cal_aux_loss(gates, mask)
@@ -441,7 +504,12 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
 
         if self.drop_tokens:
             # Calculate configured capacity and remove locations outside capacity from mask
-            capacity = self._capacity(gates, self.capacity_factor * self.top_k, self.max_capacity, self.min_capacity)
+            capacity = self._capacity(
+                gates,
+                self.capacity_factor * self.top_k,
+                self.max_capacity,
+                self.min_capacity,
+            )
 
             # update mask and locations by capacity
             if self.drop_policy == "probs":
@@ -462,13 +530,21 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
             token_priority = self._priority(top_idx, capacity)
 
         # normalize gates
-        gates_masked = gates * mask
-        gates_s = paddle.sum(gates_masked, axis=-1, keepdim=True)
-        denom_s = paddle.clip(gates_s, min=paddle.finfo(gates_masked.dtype).eps)
-        if self.norm_topk_prob:
-            gates_masked = gates_masked / denom_s
+        if self.training:
+            gates_masked = gates * mask
+            gates_s = paddle.sum(gates_masked, axis=-1, keepdim=True)
+            denom_s = paddle.clip(gates_s, min=paddle.finfo(gates_masked.dtype).eps)
+            if self.norm_topk_prob:
+                gates_masked = gates_masked / denom_s
+            combine_weights = paddle.einsum(
+                "se,sec->sec", gates_masked, token_priority.cast(paddle.get_default_dtype())
+            )
+        else:
+            topk_masked_gates = paddle.zeros_like(gates).put_along_axis(top_idx, top_gate, axis=1)
+            combine_weights = paddle.einsum(
+                "se,sec->sec", topk_masked_gates, token_priority.cast(paddle.get_default_dtype())
+            )
 
-        combine_weights = paddle.einsum("se,sec->sec", gates_masked, token_priority.cast(paddle.get_default_dtype()))
         dispatch_mask = combine_weights.cast(paddle.bool)
 
         return capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss

@@ -15,6 +15,7 @@
 import unittest
 
 import numpy as np
+import paddle
 
 from paddlenlp.mergekit import MergeConfig, SparsifyMethod
 
@@ -81,3 +82,57 @@ class TestSparsifyMethod(unittest.TestCase):
             dtype="float32",
         )
         self.assertTrue(np.array_equal(sparsify_tensor, expected_result))
+
+    @classmethod
+    def to_paddle_tensor(cls, numpy_tensor):
+        """Convert a numpy array to a paddle tensor."""
+        return paddle.to_tensor(numpy_tensor, dtype="float32")
+
+    def test_none_paddle(self):
+        paddle_tensor = self.to_paddle_tensor(self.tensor)
+        merge_config = MergeConfig(sparsify_type=None, tensor_type="pd")
+        sparsify_method = SparsifyMethod(merge_config=merge_config)
+        sparsify_tensor = sparsify_method.sparsify(paddle_tensor)
+        self.assertEqual(sparsify_tensor.shape, paddle_tensor.shape)
+        self.assertTrue(
+            paddle.allclose(sparsify_tensor, paddle_tensor, atol=1e-6),
+            "Paddle tensor sparsify (none) failed to match input tensor.",
+        )
+
+    def test_dare_paddle(self):
+        paddle.seed(42)  # Fix random seed for reproducibility
+        paddle_tensor = self.to_paddle_tensor(self.tensor)
+        merge_config = MergeConfig(sparsify_type="dare", rescale=True, reserve_p=0.7, tensor_type="pd")
+        sparsify_method = SparsifyMethod(merge_config=merge_config)
+        sparsify_tensor = sparsify_method.sparsify(paddle_tensor)
+        self.assertEqual(sparsify_tensor.shape, paddle_tensor.shape)
+
+    def test_magprune_paddle(self):
+        paddle.seed(42)  # Fix random seed for reproducibility
+        paddle_tensor = self.to_paddle_tensor(self.tensor)
+        merge_config = MergeConfig(sparsify_type="magprune", rescale=True, reserve_p=0.7, tensor_type="pd")
+        sparsify_method = SparsifyMethod(merge_config=merge_config)
+        sparsify_tensor = sparsify_method.sparsify(paddle_tensor)
+        self.assertEqual(sparsify_tensor.shape, paddle_tensor.shape)
+
+    def test_trim_paddle(self):
+        paddle.seed(42)  # Fix random seed for reproducibility
+        paddle_tensor = self.to_paddle_tensor(self.tensor)
+        merge_config = MergeConfig(sparsify_type="trim", rescale=True, reserve_p=0.7, tensor_type="pd")
+        sparsify_method = SparsifyMethod(merge_config=merge_config)
+        sparsify_tensor = sparsify_method.sparsify(paddle_tensor)
+        self.assertEqual(sparsify_tensor.shape, paddle_tensor.shape)
+
+        expected_result = paddle.to_tensor(
+            [
+                [-0.9439255595207214, 0.867495596408844, -1.1095106601715088, 0.9312260150909424, 0.0],
+                [0.8381496071815491, 0.0, 1.0790561437606812, 0.0, 0.6300279498100281],
+                [1.0320085287094116, 0.0, 0.956987738609314, 0.0, -0.958286702632904],
+                [0.6767225861549377, 1.0694657564163208, 0.0, 0.6147512197494507, 0.7808632254600525],
+            ],
+            dtype="float32",
+        )
+        self.assertTrue(
+            paddle.allclose(sparsify_tensor, expected_result, atol=1e-6),
+            "Paddle tensor sparsify (trim) result does not match expected result.",
+        )

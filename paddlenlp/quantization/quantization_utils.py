@@ -23,6 +23,7 @@ from paddle.distributed.fleet.meta_parallel import (
 from paddle.nn.quant import weight_quantize
 
 from ..utils.log import logger
+from ..utils.memory_utils import empty_device_cache
 from .quantization_linear import (
     ColumnParallelQuantizationLinear,
     QuantizationLinear,
@@ -150,7 +151,7 @@ def convert_to_quantize_state_dict_without_check(state_dict, quantization_linear
             state_dict.update(qlora_state_dict)
             del target_weight
             gc.collect()
-            paddle.device.cuda.empty_cache()
+            empty_device_cache()
     return state_dict
 
 

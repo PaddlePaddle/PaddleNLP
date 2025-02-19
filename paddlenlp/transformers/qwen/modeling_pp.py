@@ -18,9 +18,7 @@ import paddle.nn as nn
 from paddle.distributed.fleet.meta_parallel import LayerDesc, PipelineLayer
 
 from paddlenlp.transformers.model_utils import PipelinePretrainedModel
-from paddlenlp.transformers.refined_recompute import (
-    create_skip_config_for_refined_recompute,
-)
+from paddlenlp.transformers.refined_recompute import get_skip_recompute_ops
 
 from ..dpo_criterion import DPOCriterion
 from .modeling import (
@@ -145,6 +143,8 @@ class QWenForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     _get_tensor_parallel_mappings = QWenPretrainedModel._get_tensor_parallel_mappings
     _init_weights = QWenPretrainedModel._init_weights
     _keys_to_ignore_on_load_unexpected = QWenPretrainedModel._keys_to_ignore_on_load_unexpected
+    _get_model_flops = QWenPretrainedModel._get_model_flops
+    _get_hardware_flops = QWenPretrainedModel._get_hardware_flops
 
     # DONOT Add base_model_prefix !!!!
 
@@ -174,7 +174,11 @@ class QWenForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         self.add_sequential_layer(LayerDesc(QWenEmbeddingPipe, config=config), "qwen")
         for i in range(config.num_hidden_layers):
             self.add_sequential_layer(
-                LayerDesc(QWenBlockPipe, config=create_skip_config_for_refined_recompute(i, config)),
+                LayerDesc(
+                    QWenBlockPipe,
+                    config=config,
+                    skip_recompute_ops=get_skip_recompute_ops(config, i),
+                ),
                 f"qwen.h.{i}",
             )
         self.add_sequential_layer(LayerDesc(QWenRMSNormPipe, config=config), "qwen.ln_f")

@@ -424,7 +424,7 @@ def load_state_dict(
         with safe_open(checkpoint_file, framework="np") as f:
             metadata = f.metadata()
         if metadata is None:
-            metadata = {"format", "np"}
+            metadata = {"format": "np"}
 
         if metadata.get("format", "np") not in ["pd", "np"]:
             raise OSError(
@@ -1161,7 +1161,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         tensor_parallel_degree = kwargs.pop("tensor_parallel_degree", 1)
         tensor_parallel_rank = kwargs.pop("tensor_parallel_rank", 0)
 
-        if predictor_args.mode == "dynamic":
+        if predictor_args.mode == "dynamic" or predictor_args.speculate_method in ["eagle", "mtp"]:
             config.tensor_parallel_degree = tensor_parallel_degree
             config.tensor_parallel_rank = tensor_parallel_rank
             config.model_name_or_path = predictor_args.model_name_or_path
@@ -1203,7 +1203,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             config.speculate_max_ngram_size = predictor_args.speculate_max_ngram_size
             config.speculate_verify_window = predictor_args.speculate_verify_window
             config.speculate_max_candidate_len = predictor_args.speculate_max_candidate_len
-            config.decode_strategy = "speculate_decoding"
+            if predictor_args.speculate_method is not None:
+                if config.get("speculate_model_type", "None") in ["eagle", "mtp"]:
+                    config.decode_strategy = "draft_model_sample"
+                else:
+                    config.decode_strategy = "speculate_decoding"
+        config.return_full_hidden_states = predictor_args.return_full_hidden_states
 
     @classmethod
     def confirm_inference_model(cls, predictor_args, **kwargs):
@@ -1287,18 +1292,16 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         return mem
 
     def get_model_flops(self, *args, **kwargs):
-        base_model = getattr(self, self.base_model_prefix, self)
-        if base_model is not self:
-            return base_model.get_model_flops()
+        if hasattr(self, "_get_model_flops"):
+            return self._get_model_flops()
 
-        raise NotImplementedError(f"model of {type(base_model)} has not implemented the `get_model_flops`")
+        raise NotImplementedError(f"model of {type(self)} has not implemented the `_get_model_flops`")
 
     def get_hardware_flops(self, *args, **kwargs):
-        base_model = getattr(self, self.base_model_prefix, self)
-        if base_model is not self:
-            return base_model.get_hardware_flops()
+        if hasattr(self, "_get_hardware_flops"):
+            return self._get_hardware_flops()
 
-        raise NotImplementedError(f"model of {type(base_model)} has not implemented the `get_hardware_flops`")
+        raise NotImplementedError(f"model of {type(self)} has not implemented the `_get_hardware_flops`")
 
     def get_input_embeddings(self) -> nn.Embedding:
         """get input embedding of model
@@ -2741,6 +2744,132 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 f"split in {len(shards)} checkpoint shards. You can find where each parameters has been saved in the "
                 f"index located at {save_index_file}."
             )
+
+    def merge_auto_dist_configs(self, configs):
+        """
+        Merged all auto dist configs into one config.
+        configs is a list of config,every config is a dict,which means a model auto_dist_config.
+        [
+            {
+                mp_config (dict): {
+                    "parallelize_plan": dict, the plan to shard the layer.
+                }
+                pp_config (dict): {
+                    "split_spec": OrderedDict|dict|str|list(str), The pipeline parallel split point.
+                    "global_spec": str|list(str), make the output tensor of specific layers on global mesh.
+                }
+            },{
+                mp_config (dict): {
+                    "parallelize_plan": dict, the plan to shard the layer.
+                }
+                pp_config (dict): {
+                    "split_spec": OrderedDict|dict|str|list(str), The pipeline parallel split point.
+                    "global_spec": str|list(str), make the output tensor of specific layers on global mesh.
+                }
+            },....
+        ]
+        """
+        assert isinstance(configs, (dict, list))
+        if isinstance(configs, dict):
+            return configs
+        final_config = {
+            "mp_config": None,
+            "sp_config": None,
+            "pp_config": None,
+        }
+        for config in configs:
+            if "mp_config" in config and config["mp_config"] is not None:
+                if final_config["mp_config"] is None:
+                    final_config["mp_config"] = config["mp_config"]
+                else:
+                    for k, v in config["mp_config"]["parallelize_plan"].items():
+                        assert (
+                            k not in final_config["mp_config"]["parallelize_plan"].keys()
+                        ), f"sublayer mp_config shuld be a subset of model but got sublayer config {config['mp_config']} and model config {final_config['mp_config']}."
+                        final_config["mp_config"]["parallelize_plan"][k] = v
+            if "sp_config" in config and config["sp_config"] is not None:
+                if final_config["sp_config"] is None:
+                    final_config["sp_config"] = config["sp_config"]
+                else:
+                    for k, v in config["sp_config"]["parallelize_plan"].items():
+                        assert (
+                            k not in final_config["sp_config"]["parallelize_plan"].keys()
+                        ), f"sublayer sp_config shuld be a subset of model but got sublayer config {config['sp_config']} and model config {final_config['sp_config']}."
+                        final_config["sp_config"]["parallelize_plan"][k] = v
+            if "pp_config" in config and config["pp_config"] is not None:
+                if isinstance(config["pp_config"]["split_spec"], str):
+                    config["pp_config"]["split_spec"] = [config["pp_config"]["split_spec"]]
+                    if final_config["pp_config"] is None:
+                        final_config["pp_config"] = config["pp_config"]
+                    else:
+                        final_config["pp_config"]["split_spec"] += config["pp_config"]["split_spec"]
+                elif isinstance(config["pp_config"]["split_spec"], (tuple, list)):
+                    if final_config["pp_config"] is None:
+                        final_config["pp_config"] = config["pp_config"]
+                    else:
+                        final_config["pp_config"]["split_spec"] += config["pp_config"]["split_spec"]
+
+        if final_config["pp_config"] is not None and len(final_config["pp_config"]["split_spec"]) == 1:
+            final_config["pp_config"]["split_spec"] = final_config["pp_config"]["split_spec"][0]
+
+        return final_config
+
+    def _generate_auto_dist_config(self, auto_dist_degree):
+        merged_config = {
+            "sp_config": None,
+            "mp_config": None,
+            "pp_config": None,
+        }
+        for name, layer in self.named_sublayers(include_self=True):
+            if hasattr(layer, "auto_dist_config"):
+                if name != "":
+                    prefix = name + "."
+                else:
+                    prefix = ""
+                layer_config = layer.auto_dist_config(prefix)
+                merged_config = self.merge_auto_dist_configs([merged_config, layer_config])
+                for _, deeper_layer in layer.named_sublayers():
+                    if hasattr(deeper_layer, "auto_dist_config"):
+                        # mask all `auto_dist_config` methods in deeper layer
+                        deeper_layer.auto_dist_config = lambda x: {}
+
+        final_config = {
+            "dp_config": None,
+            "mp_config": None,
+            "pp_config": None,
+        }
+
+        if "tensor_parallel" in auto_dist_degree and auto_dist_degree["tensor_parallel"]:
+            merged_config["mp_config"] is not None
+            final_config["mp_config"] = merged_config["mp_config"]
+
+        if "sequence_parallel" in auto_dist_degree and auto_dist_degree["sequence_parallel"]:
+            merged_config["sp_config"] is not None
+            final_config["mp_config"] = merged_config["sp_config"]
+
+        if "pipeline_parallel" in auto_dist_degree and auto_dist_degree["pipeline_parallel"]:
+            merged_config["pp_config"] is not None
+            final_config["pp_config"] = merged_config["pp_config"]
+
+        if "data_sharding_parallel" in auto_dist_degree and auto_dist_degree["data_sharding_parallel"]:
+            # to avoid a circular import
+            from paddlenlp.trainer.trainer_utils import ShardingOption
+
+            level = 0
+            if "sharding" in auto_dist_degree and auto_dist_degree["sharding"] is not None:
+                sharding = auto_dist_degree["sharding"]
+                if ShardingOption.SHARD_OP in sharding:
+                    level = 1
+                if ShardingOption.SHARD_GRAD_OP in sharding:
+                    level = 2
+                if ShardingOption.FULL_SHARD in sharding:
+                    level = 3
+            final_config["dp_config"] = {
+                "sharding_level": level,
+                "sharding_mesh_dim": auto_dist_degree.get("sharding_mesh_dim", None),
+            }
+
+        return final_config
 
 
 class PipelinePretrainedModel(PretrainedModel):

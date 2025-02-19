@@ -88,7 +88,7 @@ monitor_log_file() {
             # 文件大小未变化，增加无更新时长计数
             no_update_duration=$((no_update_duration + 5))
             echo "$(date '+%Y-%m-%d %H:%M:%S') 文件未写入..."
-            if [ "$no_update_duration" -ge 180 ]; then
+            if [ "$no_update_duration" -ge 900 ]; then
                 echo "$(date '+%Y-%m-%d %H:%M:%S') 文件在过去的 3 分钟内没有继续写入，准备杀掉进程 $training_pid."
                 # 创建标志文件
                 touch "$kill_flag_file"
@@ -246,6 +246,8 @@ export FLAGS_enable_sharding_stage1_tensor_fusion=1
 # 只有13b的任务需要打开CUDA_DEVICE_MAX_CONNECTIONS,7b与13b关闭
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export PARALLEL_CROSS_ENTROPY=true
+# benchmark框架中会默认设置CUDA_MODULE_LOADING=LAZY,影响case执行，修复框架问题后再移除该变量
+unset CUDA_MODULE_LOADING
 
 source ${BENCHMARK_ROOT}/scripts/run_model.sh   # 在该脚本中会对符合benchmark规范的log使用analysis.py 脚本进行性能数据解析;如果不联调只想要产出训练log可以注掉本行,提交时需打开
 _set_params $@

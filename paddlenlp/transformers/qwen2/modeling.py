@@ -32,6 +32,7 @@ import paddle.nn.functional as F
 from paddle import Tensor, nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
+from paddle.distributed.fleet.recompute.recompute import recompute
 
 from paddlenlp.transformers.contrastive_loss import SimpleContrastiveLoss
 from paddlenlp.transformers.refined_recompute import (
@@ -39,9 +40,9 @@ from paddlenlp.transformers.refined_recompute import (
     RRColumnSequenceParallelLinear,
     RRRowParallelLinear,
     RRRowSequenceParallelLinear,
-    create_skip_config_for_refined_recompute,
-    recompute,
+    get_skip_recompute_ops,
 )
+from paddlenlp.transformers.refined_recompute import recompute as rr_recompute
 from paddlenlp.utils.tools import get_env_device
 
 from .. import linear_utils
@@ -58,7 +59,7 @@ from ..model_outputs import (
     TokenClassifierOutput,
 )
 from ..model_utils import PretrainedModel, register_base_model
-from ..utils import caculate_llm_flops, logger
+from ..utils import caculate_llm_per_token_flops, logger
 from .configuration import Qwen2Config
 
 try:
@@ -201,8 +202,15 @@ def scaled_dot_product_attention(
         key_states = paddle.transpose(key_states, [0, 2, 1, 3])
         value_states = paddle.transpose(value_states, [0, 2, 1, 3])
 
-        # matmul and divide by sqrt(head_dim)
-        attn_weights = paddle.matmul(query_states / math.sqrt(head_dim), key_states.transpose([0, 1, 3, 2]))
+        # Add pre divided factor to fix nan under float16.
+        if paddle.in_dynamic_mode() and query_states.dtype == paddle.float16:
+            pre_divided_factor = 32
+        else:
+            pre_divided_factor = 1
+
+        attn_weights = paddle.matmul(
+            query_states / (math.sqrt(head_dim) * pre_divided_factor), key_states.transpose([0, 1, 3, 2])
+        )
 
         if attn_weights.shape != [bsz, num_heads, q_len, kv_seq_len]:
             raise ValueError(
@@ -212,6 +220,7 @@ def scaled_dot_product_attention(
 
         if attention_mask is None:
             attention_mask = get_triangle_upper_mask(attn_weights)
+
         attention_mask = attention_mask.reshape([bsz, 1, q_len, kv_seq_len])
         if attention_mask.shape != [bsz, 1, q_len, kv_seq_len]:
             raise ValueError(
@@ -219,11 +228,16 @@ def scaled_dot_product_attention(
             )
 
         attn_weights = attn_weights + attention_mask
+
         if not paddle.in_dynamic_mode():
-            attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
+            attn_weights = F.softmax(attn_weights * pre_divided_factor, axis=-1, dtype="float32").astype(
+                query_states.dtype
+            )
         else:
             with paddle.amp.auto_cast(False):
-                attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
+                attn_weights = F.softmax(
+                    attn_weights.astype("float32") * pre_divided_factor, axis=-1, dtype="float32"
+                ).astype(query_states.dtype)
 
         attn_weights = F.dropout(attn_weights, p=config.attention_dropout, training=training)
 
@@ -372,8 +386,11 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
 
 
 class Qwen2MLP(nn.Layer):
-    def __init__(self, config: Qwen2Config, is_shared=False):
+    def __init__(self, config: Qwen2Config, is_shared=False, skip_recompute_ops=None):
         super().__init__()
+        if skip_recompute_ops is None:
+            skip_recompute_ops = {}
+        self.skip_recompute_ops = skip_recompute_ops
         self.hidden_size = config.hidden_size
         self.intermediate_size = config.intermediate_size
         self.fuse_attention_ffn = config.fuse_attention_ffn
@@ -386,9 +403,9 @@ class Qwen2MLP(nn.Layer):
 
             # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
             if config.recompute and not config.recompute_use_reentrant:
-                if config.skip_recompute_ops.get("mlp_column_ln", False):
+                if skip_recompute_ops.get("mlp_column_ln", False):
                     ColumnParallelLinear = RRColumnSequenceParallelLinear
-                if config.skip_recompute_ops.get("mlp_row_ln", False):
+                if skip_recompute_ops.get("mlp_row_ln", False):
                     RowParallelLinear = RRRowSequenceParallelLinear
         else:
             ColumnParallelLinear = linear_utils.ColumnParallelLinear
@@ -396,9 +413,9 @@ class Qwen2MLP(nn.Layer):
 
             # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
             if config.recompute and not config.recompute_use_reentrant:
-                if config.skip_recompute_ops.get("mlp_column_ln", False):
+                if skip_recompute_ops.get("mlp_column_ln", False):
                     ColumnParallelLinear = RRColumnParallelLinear
-                if config.skip_recompute_ops.get("mlp_row_ln", False):
+                if skip_recompute_ops.get("mlp_row_ln", False):
                     RowParallelLinear = RRRowParallelLinear
 
         if config.tensor_parallel_degree > 1:
@@ -480,10 +497,12 @@ class Qwen2Attention(nn.Layer):
     and "Generating Long Sequences with Sparse Transformers".
     """
 
-    def __init__(self, config: Qwen2Config, layerwise_recompute: bool = True):
+    def __init__(self, config: Qwen2Config, layerwise_recompute: bool = True, skip_recompute_ops=None):
         super().__init__()
-
+        if skip_recompute_ops is None:
+            skip_recompute_ops = {}
         self.config = config
+        self.skip_recompute_ops = skip_recompute_ops
         self.hidden_size = config.hidden_size
         self.num_heads = config.num_attention_heads
 
@@ -534,9 +553,9 @@ class Qwen2Attention(nn.Layer):
 
             # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
             if config.recompute and not config.recompute_use_reentrant:
-                if config.skip_recompute_ops.get("attention_column_ln", False):
+                if skip_recompute_ops.get("attention_column_ln", False):
                     ColumnParallelLinear = RRColumnSequenceParallelLinear
-                if config.skip_recompute_ops.get("attention_row_ln", False):
+                if skip_recompute_ops.get("attention_row_ln", False):
                     RowParallelLinear = RRRowSequenceParallelLinear
         else:
             ColumnParallelLinear = linear_utils.ColumnParallelLinear
@@ -544,9 +563,9 @@ class Qwen2Attention(nn.Layer):
 
             # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
             if config.recompute and not config.recompute_use_reentrant:
-                if config.skip_recompute_ops.get("attention_column_ln", False):
+                if skip_recompute_ops.get("attention_column_ln", False):
                     ColumnParallelLinear = RRColumnParallelLinear
-                if config.skip_recompute_ops.get("attention_row_ln", False):
+                if skip_recompute_ops.get("attention_row_ln", False):
                     RowParallelLinear = RRRowParallelLinear
 
         if config.tensor_parallel_degree > 1:
@@ -584,11 +603,7 @@ class Qwen2Attention(nn.Layer):
         self.attn_func = scaled_dot_product_attention
 
         # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
-        if (
-            config.recompute
-            and not config.recompute_use_reentrant
-            and config.skip_recompute_ops.get("flash_attn", False)
-        ):
+        if config.recompute and not config.recompute_use_reentrant and skip_recompute_ops.get("flash_attn", False):
             self.attn_func = partial(scaled_dot_product_attention, skip_recompute=True)
 
     def forward(
@@ -678,7 +693,8 @@ class Qwen2Attention(nn.Layer):
             and has_gradient
             and self.recompute_granularity == "core_attn"
         ):
-            outputs = recompute(
+            recompute_fn = rr_recompute if any(self.skip_recompute_ops.values()) else recompute
+            outputs = recompute_fn(
                 self.attn_func,
                 query_states,
                 self.config,
@@ -730,13 +746,16 @@ class Qwen2Attention(nn.Layer):
 
 
 class Qwen2DecoderLayer(nn.Layer):
-    def __init__(self, config: Qwen2Config, layerwise_recompute: bool = False):
+    def __init__(self, config: Qwen2Config, layerwise_recompute: bool = False, skip_recompute_ops=None):
         super().__init__()
+        if skip_recompute_ops is None:
+            skip_recompute_ops = {}
         self.config = config
+        self.skip_recompute_ops = skip_recompute_ops
         self.hidden_size = config.hidden_size
-        self.self_attn = Qwen2Attention(config, layerwise_recompute)
+        self.self_attn = Qwen2Attention(config, layerwise_recompute, skip_recompute_ops=skip_recompute_ops)
 
-        self.mlp = Qwen2MLP(config)
+        self.mlp = Qwen2MLP(config, skip_recompute_ops=skip_recompute_ops)
         self.input_layernorm = Qwen2RMSNorm(config)
         self.post_attention_layernorm = Qwen2RMSNorm(config)
 
@@ -784,7 +803,8 @@ class Qwen2DecoderLayer(nn.Layer):
             and has_gradient
             and self.recompute_granularity == "full_attn"
         ):
-            outputs = recompute(
+            recompute_fn = rr_recompute if any(self.skip_recompute_ops.values()) else recompute
+            outputs = recompute_fn(
                 self.self_attn,
                 hidden_states,
                 position_ids,
@@ -1006,6 +1026,37 @@ class Qwen2PretrainedModel(PretrainedModel):
                     final_actions[keys] = partial(fn, split_nums=2)
         return final_actions
 
+    def _get_model_flops(self):
+        if hasattr(self.config, "seq_length"):
+            seq_length = self.config.seq_length
+        else:
+            seq_length = 2048
+
+        return caculate_llm_per_token_flops(
+            hidden_size=self.config.hidden_size,
+            intermediate_size=self.config.intermediate_size,
+            layer_num=self.config.num_hidden_layers,
+            vocab_size=self.config.vocab_size,
+            seq_length=seq_length,
+            recompute=False,
+        )
+
+    def _get_hardware_flops(self):
+        if hasattr(self.config, "seq_length"):
+            seq_length = self.config.seq_length
+        else:
+            seq_length = 2048
+
+        return caculate_llm_per_token_flops(
+            hidden_size=self.config.hidden_size,
+            intermediate_size=self.config.intermediate_size,
+            layer_num=self.config.num_hidden_layers,
+            vocab_size=self.config.vocab_size,
+            seq_length=seq_length,
+            recompute=self.config.recompute,
+            recompute_granularity=self.config.recompute_granularity,
+        )
+
     def _init_weights(self, layer):
         """Initialization hook"""
         if self.config.tensor_parallel_degree > 1:
@@ -1097,46 +1148,14 @@ class Qwen2Model(Qwen2PretrainedModel):
         self.layers = nn.LayerList(
             [
                 Qwen2DecoderLayer(
-                    create_skip_config_for_refined_recompute(layer_idx, config),
+                    config=config,
                     layerwise_recompute=layer_idx not in self.no_recompute_layers,
+                    skip_recompute_ops=get_skip_recompute_ops(config, layer_idx),
                 )
                 for layer_idx in range(config.num_hidden_layers)
             ]
         )
         self.norm = Qwen2RMSNorm(config)
-
-    def get_model_flops(self, batch_size=1, seq_length=None, **kwargs):
-        if seq_length is None:
-            if hasattr(self.config, "seq_length"):
-                seq_length = self.config.seq_length
-            else:
-                seq_length = 2048
-
-        return caculate_llm_flops(
-            hidden_size=self.config.hidden_size,
-            intermediate_size=self.config.intermediate_size,
-            layer_num=self.config.num_hidden_layers,
-            vocab_size=self.config.vocab_size,
-            seq_length=seq_length,
-            recompute=False,
-        )
-
-    def get_hardware_flops(self, batch_size=1, seq_length=None, recompute=False, **kwargs):
-        if seq_length is None:
-            if hasattr(self.config, "seq_length"):
-                seq_length = self.config.seq_length
-            else:
-                seq_length = 2048
-
-        return caculate_llm_flops(
-            hidden_size=self.config.hidden_size,
-            intermediate_size=self.config.intermediate_size,
-            layer_num=self.config.num_hidden_layers,
-            vocab_size=self.config.vocab_size,
-            seq_length=seq_length,
-            recompute=recompute,
-            recompute_granularity=self.config.recompute_granularity,
-        )
 
     def get_input_embeddings(self):
         return self.embed_tokens
@@ -1197,7 +1216,8 @@ class Qwen2Model(Qwen2PretrainedModel):
 
             return custom_forward
 
-        hidden_states = recompute(
+        recompute_fn = rr_recompute if any(layer_module.skip_recompute_ops.values()) else recompute
+        hidden_states = recompute_fn(
             create_custom_forward(layer_module),
             hidden_states,
             position_ids,
@@ -1484,7 +1504,6 @@ class Qwen2ForCausalLM(Qwen2PretrainedModel):
     ):
         batch_size, seq_length = input_ids.shape
         position_ids = kwargs.get("position_ids", paddle.arange(seq_length).expand((batch_size, seq_length)))
-        attention_mask = kwargs.get("attention_mask", None)
         if past_key_values:
             input_ids = input_ids[:, -1].unsqueeze(axis=-1)
             position_ids = position_ids[:, -1].unsqueeze(-1)
@@ -1615,11 +1634,30 @@ class Qwen2ForCausalLM(Qwen2PretrainedModel):
         # tensor_parallel_output is together with ParallelCrossEntropy
         tensor_parallel_output = self.config.tensor_parallel_output and self.config.tensor_parallel_degree > 1
 
-        logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
+        if labels is not None and self.config.use_fused_linear_cross_entropy:
+            from paddlenlp_kernel.triton.cut_cross_entropy import linear_cross_entropy
 
-        loss = None
-        if labels is not None:
-            loss = self.criterion(logits, labels)
+            assert (
+                self.config.tensor_parallel_degree <= 1
+            ), "The argument `use_fused_linear_cross_entropy` is imcompatiable with tensor parallel "
+
+            masked_lm_loss = linear_cross_entropy(hidden_states, self.lm_head.weight, targets=labels)
+
+            binary_sequence = paddle.where(
+                masked_lm_loss > 0, paddle.ones_like(masked_lm_loss), paddle.zeros_like(masked_lm_loss)
+            )
+            count = paddle.sum(binary_sequence)
+            if count == 0:
+                loss = paddle.sum(masked_lm_loss * binary_sequence)
+            else:
+                loss = paddle.sum(masked_lm_loss * binary_sequence) / count
+            logits = None
+        else:
+            logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
+
+            loss = None
+            if labels is not None:
+                loss = self.criterion(logits, labels)
 
         if not return_dict:
             output = (logits,) + outputs[1:]

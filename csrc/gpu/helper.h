@@ -221,3 +221,17 @@ __device__ inline bool is_in_end(const int64_t id, const int64_t *end_ids, int l
     }
     return flag;
 }
+
+inline uint32_t get_decoder_block_shape_q() {
+    static const char* decoder_block_shape_q_env = std::getenv("FLAGS_dec_block_shape_q");
+    static const uint32_t decoder_block_shape_q =
+            decoder_block_shape_q_env == nullptr ? 16 : std::stoi(std::string(decoder_block_shape_q_env));
+    return decoder_block_shape_q;
+}
+
+inline uint32_t get_encoder_block_shape_q() {
+    static const char* encoder_block_shape_q_env = std::getenv("FLAGS_enc_block_shape_q");
+    static const uint32_t encoder_block_shape_q =
+            encoder_block_shape_q_env == nullptr ? 64 : std::stoi(std::string(encoder_block_shape_q_env));
+    return encoder_block_shape_q;
+}

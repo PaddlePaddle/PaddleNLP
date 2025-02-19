@@ -22,12 +22,11 @@ from paddle.distributed.fleet.meta_parallel import (
     PipelineLayer,
     SharedLayerDesc,
 )
+from paddle.distributed.fleet.recompute.recompute import recompute
 
 from paddlenlp.transformers.model_utils import PipelinePretrainedModel
-from paddlenlp.transformers.refined_recompute import (
-    create_skip_config_for_refined_recompute,
-    recompute,
-)
+from paddlenlp.transformers.refined_recompute import get_skip_recompute_ops
+from paddlenlp.transformers.refined_recompute import recompute as rr_recompute
 from paddlenlp.utils.tools import get_env_device
 
 from ..dpo_criterion import DPOCriterion
@@ -148,6 +147,41 @@ class LlamaEmbeddingPipe(nn.Layer):
             _type_: _description_
         """
         input_ids, attention_mask, attn_mask_startend_row_indices, position_ids, alibi = parse_args(args)
+
+        # we can't distinguish
+        if self.config.alibi and alibi is None and position_ids is None and attn_mask_startend_row_indices is not None:
+            # input_ids, attention_mask, alibi
+            alibi = attn_mask_startend_row_indices
+            position_ids = None
+            attn_mask_startend_row_indices = None
+        elif (
+            self.config.alibi
+            and alibi is None
+            and position_ids is not None
+            and attn_mask_startend_row_indices is not None
+        ):
+            # input_ids, attention_mask, position_ids, alibi
+            alibi = position_ids
+            position_ids = attn_mask_startend_row_indices
+            attn_mask_startend_row_indices = None
+        elif not self.config.alibi:
+            if get_env_device() in ["gpu"]:
+                if attention_mask is not None and attention_mask.dtype == paddle.int32:
+                    attention_mask, attn_mask_startend_row_indices, position_ids = (
+                        None,
+                        attention_mask,
+                        attn_mask_startend_row_indices,
+                    )
+                elif attention_mask is not None and attention_mask.dtype == paddle.int64:
+                    attention_mask, attn_mask_startend_row_indices, position_ids = None, None, attention_mask
+                elif (
+                    attn_mask_startend_row_indices is not None and attn_mask_startend_row_indices.dtype == paddle.int64
+                ):
+                    attn_mask_startend_row_indices, position_ids = None, attn_mask_startend_row_indices
+            elif position_ids is None and attn_mask_startend_row_indices is not None:
+                position_ids = attn_mask_startend_row_indices
+                attn_mask_startend_row_indices = None
+
         input_embeds = self.embed_tokens(input_ids)
         if self.sequence_parallel:
             from paddlenlp.transformers import ScatterOp
@@ -252,8 +286,9 @@ class LlamaDecoderLayerPipe(LlamaDecoderLayer):
             and self.config.recompute_granularity == "full"
             and has_gradient
         ):
+            recompute_fn = rr_recompute if any(self.skip_recompute_ops.values()) else recompute
             if attention_mask is not None or alibi is not None or attn_mask_startend_row_indices is not None:
-                hidden_states = recompute(
+                hidden_states = recompute_fn(
                     super().forward,
                     hidden_states,
                     position_ids=position_ids,
@@ -264,7 +299,7 @@ class LlamaDecoderLayerPipe(LlamaDecoderLayer):
                 )
             else:
                 # for pretrain
-                hidden_states = recompute(
+                hidden_states = recompute_fn(
                     super().forward,
                     hidden_states,
                     position_ids=position_ids,
@@ -315,6 +350,9 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     _get_fuse_or_split_param_mappings = LlamaPretrainedModel._get_fuse_or_split_param_mappings
     _init_weights = LlamaPretrainedModel._init_weights
     _keys_to_ignore_on_load_unexpected = LlamaPretrainedModel._keys_to_ignore_on_load_unexpected
+    _get_model_flops = LlamaPretrainedModel._get_model_flops
+    _get_hardware_flops = LlamaPretrainedModel._get_hardware_flops
+
     _tied_weights_keys = ["lm_head.weight"]
 
     # DONOT Add base_model_prefix !!!!
@@ -378,8 +416,9 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
             self.add_sequential_layer(
                 LayerDesc(
                     LlamaDecoderLayerPipe,
-                    config=create_skip_config_for_refined_recompute(i, config),
+                    config=config,
                     layerwise_recompute=i not in self.no_recompute_layers,
+                    skip_recompute_ops=get_skip_recompute_ops(config, i),
                 ),
                 f"llama.layers.{i}",
             )
