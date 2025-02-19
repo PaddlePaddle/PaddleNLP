@@ -227,6 +227,9 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     _get_tensor_parallel_mappings = DeepseekV2PretrainedModel._get_tensor_parallel_mappings
     _init_weights = DeepseekV2PretrainedModel._init_weights
     _keys_to_ignore_on_load_unexpected = DeepseekV2PretrainedModel._keys_to_ignore_on_load_unexpected
+    _get_model_flops = DeepseekV2PretrainedModel._get_model_flops
+    _get_hardware_flops = DeepseekV2PretrainedModel._get_hardware_flops
+
     _tied_weights_keys = ["lm_head.weight"]
 
     # DONOT Add base_model_prefix !!!!

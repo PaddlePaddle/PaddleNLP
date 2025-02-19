@@ -59,7 +59,7 @@ from ..model_outputs import (
     TokenClassifierOutput,
 )
 from ..model_utils import PretrainedModel, register_base_model
-from ..utils import caculate_llm_flops, logger
+from ..utils import caculate_llm_per_token_flops, logger
 from .configuration import Qwen2Config
 
 try:
@@ -202,8 +202,15 @@ def scaled_dot_product_attention(
         key_states = paddle.transpose(key_states, [0, 2, 1, 3])
         value_states = paddle.transpose(value_states, [0, 2, 1, 3])
 
-        # matmul and divide by sqrt(head_dim)
-        attn_weights = paddle.matmul(query_states / math.sqrt(head_dim), key_states.transpose([0, 1, 3, 2]))
+        # Add pre divided factor to fix nan under float16.
+        if paddle.in_dynamic_mode() and query_states.dtype == paddle.float16:
+            pre_divided_factor = 32
+        else:
+            pre_divided_factor = 1
+
+        attn_weights = paddle.matmul(
+            query_states / (math.sqrt(head_dim) * pre_divided_factor), key_states.transpose([0, 1, 3, 2])
+        )
 
         if attn_weights.shape != [bsz, num_heads, q_len, kv_seq_len]:
             raise ValueError(
@@ -213,6 +220,7 @@ def scaled_dot_product_attention(
 
         if attention_mask is None:
             attention_mask = get_triangle_upper_mask(attn_weights)
+
         attention_mask = attention_mask.reshape([bsz, 1, q_len, kv_seq_len])
         if attention_mask.shape != [bsz, 1, q_len, kv_seq_len]:
             raise ValueError(
@@ -220,11 +228,16 @@ def scaled_dot_product_attention(
             )
 
         attn_weights = attn_weights + attention_mask
+
         if not paddle.in_dynamic_mode():
-            attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
+            attn_weights = F.softmax(attn_weights * pre_divided_factor, axis=-1, dtype="float32").astype(
+                query_states.dtype
+            )
         else:
             with paddle.amp.auto_cast(False):
-                attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
+                attn_weights = F.softmax(
+                    attn_weights.astype("float32") * pre_divided_factor, axis=-1, dtype="float32"
+                ).astype(query_states.dtype)
 
         attn_weights = F.dropout(attn_weights, p=config.attention_dropout, training=training)
 
@@ -1013,6 +1026,37 @@ class Qwen2PretrainedModel(PretrainedModel):
                     final_actions[keys] = partial(fn, split_nums=2)
         return final_actions
 
+    def _get_model_flops(self):
+        if hasattr(self.config, "seq_length"):
+            seq_length = self.config.seq_length
+        else:
+            seq_length = 2048
+
+        return caculate_llm_per_token_flops(
+            hidden_size=self.config.hidden_size,
+            intermediate_size=self.config.intermediate_size,
+            layer_num=self.config.num_hidden_layers,
+            vocab_size=self.config.vocab_size,
+            seq_length=seq_length,
+            recompute=False,
+        )
+
+    def _get_hardware_flops(self):
+        if hasattr(self.config, "seq_length"):
+            seq_length = self.config.seq_length
+        else:
+            seq_length = 2048
+
+        return caculate_llm_per_token_flops(
+            hidden_size=self.config.hidden_size,
+            intermediate_size=self.config.intermediate_size,
+            layer_num=self.config.num_hidden_layers,
+            vocab_size=self.config.vocab_size,
+            seq_length=seq_length,
+            recompute=self.config.recompute,
+            recompute_granularity=self.config.recompute_granularity,
+        )
+
     def _init_weights(self, layer):
         """Initialization hook"""
         if self.config.tensor_parallel_degree > 1:
@@ -1112,39 +1156,6 @@ class Qwen2Model(Qwen2PretrainedModel):
             ]
         )
         self.norm = Qwen2RMSNorm(config)
-
-    def get_model_flops(self, batch_size=1, seq_length=None, **kwargs):
-        if seq_length is None:
-            if hasattr(self.config, "seq_length"):
-                seq_length = self.config.seq_length
-            else:
-                seq_length = 2048
-
-        return caculate_llm_flops(
-            hidden_size=self.config.hidden_size,
-            intermediate_size=self.config.intermediate_size,
-            layer_num=self.config.num_hidden_layers,
-            vocab_size=self.config.vocab_size,
-            seq_length=seq_length,
-            recompute=False,
-        )
-
-    def get_hardware_flops(self, batch_size=1, seq_length=None, recompute=False, **kwargs):
-        if seq_length is None:
-            if hasattr(self.config, "seq_length"):
-                seq_length = self.config.seq_length
-            else:
-                seq_length = 2048
-
-        return caculate_llm_flops(
-            hidden_size=self.config.hidden_size,
-            intermediate_size=self.config.intermediate_size,
-            layer_num=self.config.num_hidden_layers,
-            vocab_size=self.config.vocab_size,
-            seq_length=seq_length,
-            recompute=recompute,
-            recompute_granularity=self.config.recompute_granularity,
-        )
 
     def get_input_embeddings(self):
         return self.embed_tokens
@@ -1623,11 +1634,30 @@ class Qwen2ForCausalLM(Qwen2PretrainedModel):
         # tensor_parallel_output is together with ParallelCrossEntropy
         tensor_parallel_output = self.config.tensor_parallel_output and self.config.tensor_parallel_degree > 1
 
-        logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
+        if labels is not None and self.config.use_fused_linear_cross_entropy:
+            from paddlenlp_kernel.triton.cut_cross_entropy import linear_cross_entropy
 
-        loss = None
-        if labels is not None:
-            loss = self.criterion(logits, labels)
+            assert (
+                self.config.tensor_parallel_degree <= 1
+            ), "The argument `use_fused_linear_cross_entropy` is imcompatiable with tensor parallel "
+
+            masked_lm_loss = linear_cross_entropy(hidden_states, self.lm_head.weight, targets=labels)
+
+            binary_sequence = paddle.where(
+                masked_lm_loss > 0, paddle.ones_like(masked_lm_loss), paddle.zeros_like(masked_lm_loss)
+            )
+            count = paddle.sum(binary_sequence)
+            if count == 0:
+                loss = paddle.sum(masked_lm_loss * binary_sequence)
+            else:
+                loss = paddle.sum(masked_lm_loss * binary_sequence) / count
+            logits = None
+        else:
+            logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
+
+            loss = None
+            if labels is not None:
+                loss = self.criterion(logits, labels)
 
         if not return_dict:
             output = (logits,) + outputs[1:]

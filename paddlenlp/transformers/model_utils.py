@@ -424,7 +424,7 @@ def load_state_dict(
         with safe_open(checkpoint_file, framework="np") as f:
             metadata = f.metadata()
         if metadata is None:
-            metadata = {"format", "np"}
+            metadata = {"format": "np"}
 
         if metadata.get("format", "np") not in ["pd", "np"]:
             raise OSError(
@@ -1161,7 +1161,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         tensor_parallel_degree = kwargs.pop("tensor_parallel_degree", 1)
         tensor_parallel_rank = kwargs.pop("tensor_parallel_rank", 0)
 
-        if predictor_args.mode == "dynamic" or predictor_args.speculate_method in ["eagle"]:
+        if predictor_args.mode == "dynamic" or predictor_args.speculate_method in ["eagle", "mtp"]:
             config.tensor_parallel_degree = tensor_parallel_degree
             config.tensor_parallel_rank = tensor_parallel_rank
             config.model_name_or_path = predictor_args.model_name_or_path
@@ -1203,11 +1203,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             config.speculate_max_ngram_size = predictor_args.speculate_max_ngram_size
             config.speculate_verify_window = predictor_args.speculate_verify_window
             config.speculate_max_candidate_len = predictor_args.speculate_max_candidate_len
-            if predictor_args.speculate_method == "eagle":
-                config.decode_strategy = "draft_model_sample"
-            else:
-                config.decode_strategy = "speculate_decoding"
-            config.return_full_hidden_states = predictor_args.return_full_hidden_states
+            if predictor_args.speculate_method is not None:
+                if config.get("speculate_model_type", "None") in ["eagle", "mtp"]:
+                    config.decode_strategy = "draft_model_sample"
+                else:
+                    config.decode_strategy = "speculate_decoding"
+        config.return_full_hidden_states = predictor_args.return_full_hidden_states
 
     @classmethod
     def confirm_inference_model(cls, predictor_args, **kwargs):
@@ -1291,18 +1292,16 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         return mem
 
     def get_model_flops(self, *args, **kwargs):
-        base_model = getattr(self, self.base_model_prefix, self)
-        if base_model is not self:
-            return base_model.get_model_flops()
+        if hasattr(self, "_get_model_flops"):
+            return self._get_model_flops()
 
-        raise NotImplementedError(f"model of {type(base_model)} has not implemented the `get_model_flops`")
+        raise NotImplementedError(f"model of {type(self)} has not implemented the `_get_model_flops`")
 
     def get_hardware_flops(self, *args, **kwargs):
-        base_model = getattr(self, self.base_model_prefix, self)
-        if base_model is not self:
-            return base_model.get_hardware_flops()
+        if hasattr(self, "_get_hardware_flops"):
+            return self._get_hardware_flops()
 
-        raise NotImplementedError(f"model of {type(base_model)} has not implemented the `get_hardware_flops`")
+        raise NotImplementedError(f"model of {type(self)} has not implemented the `_get_hardware_flops`")
 
     def get_input_embeddings(self) -> nn.Embedding:
         """get input embedding of model

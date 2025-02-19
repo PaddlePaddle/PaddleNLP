@@ -55,7 +55,7 @@ from paddlenlp.transformers.model_utils import PretrainedModel, register_base_mo
 from .. import linear_utils
 from ..linear_utils import Linear
 from ..segment_parallel_utils import ReshardLayer
-from ..utils import caculate_llm_flops
+from ..utils import caculate_llm_per_token_flops
 from .configuration import (
     GEMMA_PRETRAINED_INIT_CONFIGURATION,
     GEMMA_PRETRAINED_RESOURCE_FILES_MAP,
@@ -898,6 +898,37 @@ class GemmaPretrainedModel(PretrainedModel):
     _keys_to_ignore_on_load_unexpected = []
     _keep_in_fp32_modules = ["inv_freq", "rotary_emb", "cos_cached", "sin_cached"]
 
+    def _get_model_flops(self):
+        if hasattr(self.config, "seq_length"):
+            seq_length = self.config.seq_length
+        else:
+            seq_length = 2048
+
+        return caculate_llm_per_token_flops(
+            hidden_size=self.config.hidden_size,
+            intermediate_size=self.config.intermediate_size,
+            layer_num=self.config.num_hidden_layers,
+            vocab_size=self.config.vocab_size,
+            seq_length=seq_length,
+            recompute=False,
+        )
+
+    def _get_hardware_flops(self):
+        if hasattr(self.config, "seq_length"):
+            seq_length = self.config.seq_length
+        else:
+            seq_length = 2048
+
+        return caculate_llm_per_token_flops(
+            hidden_size=self.config.hidden_size,
+            intermediate_size=self.config.intermediate_size,
+            layer_num=self.config.num_hidden_layers,
+            vocab_size=self.config.vocab_size,
+            seq_length=seq_length,
+            recompute=self.config.recompute,
+            recompute_granularity=self.config.recompute_granularity,
+        )
+
     @classmethod
     def _get_name_mappings(cls, config: GemmaConfig) -> List[StateDictNameMapping]:
         mappings: list[StateDictNameMapping] = []
@@ -1074,39 +1105,6 @@ class GemmaModel(GemmaPretrainedModel):
         self.norm = GemmaRMSNorm(config)
 
         self.gradient_checkpointing = False
-
-    def get_model_flops(self, batch_size=1, seq_length=None, **kwargs):
-        if seq_length is None:
-            if hasattr(self.config, "seq_length"):
-                seq_length = self.config.seq_length
-            else:
-                seq_length = 2048
-
-        return caculate_llm_flops(
-            hidden_size=self.config.hidden_size,
-            intermediate_size=self.config.intermediate_size,
-            layer_num=self.config.num_hidden_layers,
-            vocab_size=self.config.vocab_size,
-            seq_length=seq_length,
-            recompute=False,
-        )
-
-    def get_hardware_flops(self, batch_size=1, seq_length=None, recompute=False, **kwargs):
-        if seq_length is None:
-            if hasattr(self.config, "seq_length"):
-                seq_length = self.config.seq_length
-            else:
-                seq_length = 2048
-
-        return caculate_llm_flops(
-            hidden_size=self.config.hidden_size,
-            intermediate_size=self.config.intermediate_size,
-            layer_num=self.config.num_hidden_layers,
-            vocab_size=self.config.vocab_size,
-            seq_length=seq_length,
-            recompute=recompute,
-            recompute_granularity=self.config.recompute_granularity,
-        )
 
     def get_input_embeddings(self):
         return self.embed_tokens
@@ -1560,11 +1558,30 @@ class GemmaForCausalLM(GemmaPretrainedModel):
         # tensor_parallel_output is togather with ParallelCrossEntropy
         tensor_parallel_output = self.config.tensor_parallel_output and self.config.tensor_parallel_degree > 1
 
-        logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
+        if labels is not None and self.config.use_fused_linear_cross_entropy:
+            from paddlenlp_kernel.triton.cut_cross_entropy import linear_cross_entropy
 
-        loss = None
-        if labels is not None:
-            loss = self.criterion(logits, labels)
+            assert (
+                self.config.tensor_parallel_degree <= 1
+            ), "The argument `use_fused_linear_cross_entropy` is imcompatiable with tensor parallel "
+
+            masked_lm_loss = linear_cross_entropy(hidden_states, self.lm_head.weight, targets=labels)
+
+            binary_sequence = paddle.where(
+                masked_lm_loss > 0, paddle.ones_like(masked_lm_loss), paddle.zeros_like(masked_lm_loss)
+            )
+            count = paddle.sum(binary_sequence)
+            if count == 0:
+                loss = paddle.sum(masked_lm_loss * binary_sequence)
+            else:
+                loss = paddle.sum(masked_lm_loss * binary_sequence) / count
+            logits = None
+        else:
+            logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
+
+            loss = None
+            if labels is not None:
+                loss = self.criterion(logits, labels)
 
         if not return_dict:
             output = (logits,) + outputs[1:]
