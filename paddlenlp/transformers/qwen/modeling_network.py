@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import math
+import os
 import warnings
 
 import paddle
@@ -59,6 +60,15 @@ except ImportError:
             x, y = paddle.chunk(x, chunks=2, axis=-1)
         return F.silu(x) * y
 
+def enable_fuse_ffn_qkv_pass():
+    if os.getenv("FLAGS_enable_fused_ffn_qkv_pass") in [
+        "True",
+        "true",
+        "1",
+    ]:
+        return True
+    else:
+        return False
 
 def get_triangle_upper_mask(x, mask=None):
     if mask is not None:
@@ -285,7 +295,8 @@ class QWenMLPNet(nn.Layer):
         super().__init__()
         ff_dim_in = config.intermediate_size // 2
         self.fuse_attention_ffn = config.fuse_attention_ffn
-        if self.fuse_attention_ffn:
+        print("[sfj] enable_fuse_ffn_qkv_pass: ", enable_fuse_ffn_qkv_pass())
+        if self.fuse_attention_ffn and not enable_fuse_ffn_qkv_pass():
             self.gate_up_fused_proj = nn.Linear(
                 config.hidden_size, 
                 ff_dim_in * 2, 
@@ -303,7 +314,8 @@ class QWenMLPNet(nn.Layer):
         # a2 = self.w2(hidden_states)
         # intermediate_parallel = a1 * F.silu(a2)
         # down
-        if self.fuse_attention_ffn:
+        print("[sfj] enable_fuse_ffn_qkv_pass: ", enable_fuse_ffn_qkv_pass())
+        if self.fuse_attention_ffn and not enable_fuse_ffn_qkv_pass():
             intermediate_parallel = swiglu(self.gate_up_fused_proj(hidden_states))
         else:
             intermediate_parallel = swiglu(self.w2(hidden_states), self.w1(hidden_states))
