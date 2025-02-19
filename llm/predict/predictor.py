@@ -169,6 +169,7 @@ class PredictorArgument:
     return_full_hidden_states: bool = field(default=False, metadata={"help": "whether return full hidden_states"})
 
     mla_use_matrix_absorption: bool = field(default=False, metadata={"help": "implement mla with matrix-absorption."})
+    weightonly_group_size: int = field(default=-1, metadata={"help": "the max length of candidate tokens."})
 
     def __post_init__(self):
         if self.speculate_method is not None:

@@ -1173,6 +1173,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         config.decode_strategy = predictor_args.decode_strategy
         config.mla_use_matrix_absorption = predictor_args.mla_use_matrix_absorption
         config.max_batch_size = predictor_args.max_batch_size
+        config.weightonly_group_size = predictor_args.weightonly_group_size
 
         if config.quantization_config.quant_type is not None:
             if predictor_args.mode == "dynamic":

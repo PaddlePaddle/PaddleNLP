@@ -205,6 +205,7 @@ class FusedMultiTransformerConfig:
         num_heads,
         intermediate_size,
         quant_type="",
+        weightonly_group_size=-1,
         dropout_rate=0.0,
         activation="gelu",
         norm_type="layernorm",
@@ -327,6 +328,7 @@ class FusedMultiTransformerConfig:
         self.cache_v_out_scale_attrs = cache_v_out_scale_attrs
 
         self.quant_type = quant_type
+        self.weightonly_group_size = weightonly_group_size
         self.quant_round_type = quant_round_type
         self.quant_max_bound = quant_max_bound
         self.quant_min_bound = quant_min_bound
@@ -1573,6 +1575,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
     def __init__(self, config: FusedMultiTransformerConfig):
         super().__init__(config)
         self.quant_type = config.quant_type
+        self.weightonly_group_size = config.weightonly_group_size
         if self.quant_type == "weight_only_int8":
             self.weight_dtype = "int8"
         elif self.quant_type == "weight_only_int4":
@@ -1618,7 +1621,13 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
                 if self.config.mla_config.q_lora_rank is None:
                     q_proj_weight_scale_attr = self.get_attr(self.config.mla_config.q_proj_weight_scale_attrs, i)
                     q_proj_weight_scale = self.create_parameter(
-                        shape=[self.num_heads * (self.config.mla_config.qk_head_dim)],
+                        shape=[self.num_heads * (self.config.mla_config.qk_head_dim)]
+                        if self.weightonly_group_size < 0
+                        else [
+                            (self.q_proj_weight_shape[1] + self.weightonly_group_size - 1)
+                            // self.weightonly_group_size,
+                            self.num_heads * (self.config.mla_config.qk_head_dim),
+                        ],
                         attr=q_proj_weight_scale_attr,
                         dtype=self.weight_scale_dtype,
                         is_bias=False,
@@ -1627,13 +1636,25 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
                     q_a_proj_weight_scale_attr = self.get_attr(self.config.mla_config.q_a_proj_weight_scale_attrs, i)
                     q_b_proj_weight_scale_attr = self.get_attr(self.config.mla_config.q_b_proj_weight_scale_attrs, i)
                     q_a_proj_weight_scale = self.create_parameter(
-                        shape=[self.config.mla_config.q_lora_rank],
+                        shape=[self.config.mla_config.q_lora_rank]
+                        if self.weightonly_group_size < 0
+                        else [
+                            (self.q_a_proj_weight_shape[1] + self.weightonly_group_size - 1)
+                            // self.weightonly_group_size,
+                            self.config.mla_config.q_lora_rank,
+                        ],
                         attr=q_a_proj_weight_scale_attr,
                         dtype=self.weight_scale_dtype,
                         is_bias=False,
                     )
                     q_b_proj_weight_scale = self.create_parameter(
-                        shape=[self.num_heads * (self.config.mla_config.qk_head_dim)],
+                        shape=[self.num_heads * (self.config.mla_config.qk_head_dim)]
+                        if self.weightonly_group_size < 0
+                        else [
+                            (self.q_b_proj_weight_shape[1] + self.weightonly_group_size - 1)
+                            // self.weightonly_group_size,
+                            self.num_heads * (self.config.mla_config.qk_head_dim),
+                        ],
                         attr=q_b_proj_weight_scale_attr,
                         dtype=self.weight_scale_dtype,
                         is_bias=False,
@@ -1645,7 +1666,13 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
                 kv_b_proj_weight_scale_attr = self.get_attr(self.config.mla_config.kv_b_proj_weight_scale_attrs, i)
 
                 kv_a_proj_with_mqa_weight_scale = self.create_parameter(
-                    shape=[self.config.mla_config.kv_lora_rank + self.config.mla_config.qk_rope_head_dim],
+                    shape=[self.config.mla_config.kv_lora_rank + self.config.mla_config.qk_rope_head_dim]
+                    if self.weightonly_group_size < 0
+                    else [
+                        (self.kv_a_proj_with_mqa_weight_shape[1] + self.weightonly_group_size - 1)
+                        // self.weightonly_group_size,
+                        self.config.mla_config.kv_lora_rank + self.config.mla_config.qk_rope_head_dim,
+                    ],
                     attr=kv_a_proj_with_mqa_weight_scale_attr,
                     dtype=self.weight_scale_dtype,
                     is_bias=False,
@@ -1653,6 +1680,12 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
                 kv_b_proj_weight_scale = self.create_parameter(
                     shape=[
                         self.num_heads * (self.config.mla_config.qk_nope_head_dim + self.config.mla_config.v_head_dim)
+                    ]
+                    if self.weightonly_group_size < 0
+                    else [
+                        (self.kv_b_proj_weight_shape[1] + self.weightonly_group_size - 1)
+                        // self.weightonly_group_size,
+                        self.num_heads * (self.config.mla_config.qk_nope_head_dim + self.config.mla_config.v_head_dim),
                     ],
                     attr=kv_b_proj_weight_scale_attr,
                     dtype=self.weight_scale_dtype,
@@ -1661,14 +1694,24 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             else:
                 qkv_weight_scale_attr = self.get_attr(config.qkv_weight_scale_attrs, i)
                 qkv_weight_scale = self.create_parameter(
-                    shape=[(self.num_heads + 2 * self.kv_num_heads) * self.head_dim],
+                    shape=[(self.num_heads + 2 * self.kv_num_heads) * self.head_dim]
+                    if self.weightonly_group_size < 0
+                    else [
+                        (self.qkv_weight_shape[1] + self.weightonly_group_size - 1) // self.weightonly_group_size,
+                        (self.num_heads + 2 * self.kv_num_heads) * self.head_dim,
+                    ],
                     attr=qkv_weight_scale_attr,
                     dtype=self.weight_scale_dtype,
                     is_bias=False,
                 )
 
             linear_weight_scale = self.create_parameter(
-                shape=[self.embed_dim],
+                shape=[self.embed_dim]
+                if self.weightonly_group_size < 0
+                else [
+                    (self.linear_weight_shape[1] + self.weightonly_group_size - 1) // self.weightonly_group_size,
+                    self.embed_dim,
+                ],
                 attr=linear_weight_scale_attr,
                 dtype=self.weight_scale_dtype,
                 is_bias=False,
@@ -1684,10 +1727,16 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
                     is_bias=False,
                 )
             else:
+                base_shape = (
+                    [self.intermediate_size * 2] if config.activation.endswith("glu") else [self.intermediate_size]
+                )
                 ffn1_weight_scale = self.create_parameter(
-                    shape=[self.intermediate_size * 2]
-                    if config.activation.endswith("glu")
-                    else [self.intermediate_size],
+                    shape=base_shape
+                    if self.weightonly_group_size < 0
+                    else [
+                        (self.ffn1_weight_shape[1] + self.weightonly_group_size - 1) // self.weightonly_group_size,
+                        base_shape[0],
+                    ],
                     attr=ffn1_weight_scale_attr,
                     dtype=self.weight_scale_dtype,
                     is_bias=False,
@@ -1702,7 +1751,12 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
                 )
             else:
                 ffn2_weight_scale = self.create_parameter(
-                    shape=[self.embed_dim],
+                    shape=[self.embed_dim]
+                    if self.weightonly_group_size < 0
+                    else [
+                        (self.ffn2_weight_shape[1] + self.weightonly_group_size - 1) // self.weightonly_group_size,
+                        self.embed_dim,
+                    ],
                     attr=ffn2_weight_scale_attr,
                     dtype=self.weight_scale_dtype,
                     is_bias=False,
@@ -1712,13 +1766,25 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             shared_expert_ffn2_weight_scale = None
             if self.config.moe_config.use_shared_expert(i):
                 shared_expert_ffn1_weight_scale = self.create_parameter(
-                    shape=[self.config.moe_config.shared_expert_intermediate_size * 2],
+                    shape=[self.config.moe_config.shared_expert_intermediate_size * 2]
+                    if self.weightonly_group_size < 0
+                    else [
+                        (self.shared_expert_ffn1_weight_shape[1] + self.weightonly_group_size - 1)
+                        // self.weightonly_group_size,
+                        self.config.moe_config.shared_expert_intermediate_size * 2,
+                    ],
                     attr=shared_expert_ffn1_weight_scale_attr,
                     dtype=self.weight_scale_dtype,
                     is_bias=False,
                 )
                 shared_expert_ffn2_weight_scale = self.create_parameter(
-                    shape=[self.embed_dim],
+                    shape=[self.embed_dim]
+                    if self.weightonly_group_size < 0
+                    else [
+                        (self.shared_expert_ffn2_weight_shape[1] + self.weightonly_group_size - 1)
+                        // self.weightonly_group_size,
+                        self.embed_dim,
+                    ],
                     attr=shared_expert_ffn2_weight_scale_attr,
                     dtype=self.weight_scale_dtype,
                     is_bias=False,
@@ -1864,6 +1930,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
                     weight=self.q_a_proj_weights[i],
                     weight_scale=self.q_a_proj_weights_scale[i],
                     weight_dtype=self.weight_dtype,
+                    group_size=self.weightonly_group_size,
                 )
                 query = self.norm_func(
                     x=query,
@@ -1877,6 +1944,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
                     weight=self.q_b_proj_weights[i],
                     weight_scale=self.q_b_proj_weights_scale[i],
                     weight_dtype=self.weight_dtype,
+                    group_size=self.weightonly_group_size,
                 )
             else:
                 query = weight_only_linear(
@@ -1884,6 +1952,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
                     weight=self.q_proj_weights[i],
                     weight_scale=self.q_proj_weights_scale[i],
                     weight_dtype=self.weight_dtype,
+                    group_size=self.weightonly_group_size,
                 )
 
             query = query.reshape([-1, self.num_heads, self.config.mla_config.qk_head_dim])
@@ -1896,6 +1965,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
                 weight=self.kv_a_proj_with_mqa_weights[i],
                 weight_scale=self.kv_a_proj_with_mqa_weights_scale[i],
                 weight_dtype=self.weight_dtype,
+                group_size=self.weightonly_group_size,
             )
             compressed_kv, key_pe = compressed_kv.split(
                 [self.config.mla_config.kv_lora_rank, self.config.mla_config.qk_rope_head_dim], axis=-1
@@ -1918,6 +1988,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
                 weight=self.kv_b_proj_weights[i],
                 weight_scale=self.kv_b_proj_weights_scale[i],
                 weight_dtype=self.weight_dtype,
+                group_size=self.weightonly_group_size,
             )
             key_value = key_value.reshape(
                 [-1, self.num_heads, self.config.mla_config.qk_nope_head_dim + self.config.mla_config.v_head_dim]
@@ -1946,6 +2017,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
                 bias=self.qkv_biases[i],
                 weight_scale=self.qkv_weights_scale[i],
                 weight_dtype=self.weight_dtype,
+                group_size=self.weightonly_group_size,
             )
 
         return qkv_out
@@ -1956,6 +2028,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             weight=self.linear_weights[i],
             weight_scale=self.linear_weights_scale[i],
             weight_dtype=self.weight_dtype,
+            group_size=self.weightonly_group_size,
         )
 
     def compute_ffn1(self, tmp_out, i):
@@ -1964,6 +2037,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             weight=self.ffn1_weights[i],
             weight_scale=self.ffn1_weights_scale[i],
             weight_dtype=self.weight_dtype,
+            group_size=self.weightonly_group_size,
         )
 
     def compute_ffn2(self, ffn1_out, i):
@@ -1972,6 +2046,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             weight=self.ffn2_weights[i],
             weight_scale=self.ffn2_weights_scale[i],
             weight_dtype=self.weight_dtype,
+            group_size=self.weightonly_group_size,
         )
 
     def compute_shared_expert(self, tmp_out, i):
@@ -1980,6 +2055,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             weight=self.shared_expert_ffn1_weights[i],
             weight_scale=self.shared_expert_ffn1_weights_scale[i],
             weight_dtype=self.weight_dtype,
+            group_size=self.weightonly_group_size,
         )
         ffn1_out = fused_bias_act(ffn1_out, None, act_method=self.activation)
         ffn2_out = weight_only_linear(
@@ -1987,6 +2063,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             weight=self.shared_expert_ffn2_weights[i],
             weight_scale=self.shared_expert_ffn2_weights_scale[i],
             weight_dtype=self.weight_dtype,
+            group_size=self.weightonly_group_size,
         )
         if self.config.moe_config.shared_expert_with_gate:
             gate_out = paddle.matmul(tmp_out, self.shared_expert_gate_weights[i])
@@ -3152,6 +3229,7 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
                 weight=self.kv_b_proj_weights[i],
                 weight_scale=self.kv_b_proj_weights_scale[i],
                 weight_dtype=self.weight_dtype,
+                group_size=self.weightonly_group_size,
             )
             key_value = key_value.reshape(
                 [-1, self.num_heads, self.config.mla_config.qk_nope_head_dim + self.config.mla_config.v_head_dim]

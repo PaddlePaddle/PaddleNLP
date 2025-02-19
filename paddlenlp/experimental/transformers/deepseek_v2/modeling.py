@@ -187,12 +187,15 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
         self.return_full_hidden_states = config.get("return_full_hidden_states", False)
 
         self.use_weight_only = False
-        if config.quant_type == "weight_only_int8":
+        self.weightonly_group_size = -1
+        if self.quant_type == "weight_only_int8":
             self.use_weight_only = True
             self.quant_algo = "weight_only_int8"
-        elif config.quant_type == "weight_only_int4":
+            self.weightonly_group_size = config.weightonly_group_size
+        elif self.quant_type == "weight_only_int4":
             self.use_weight_only = True
             self.quant_algo = "weight_only_int4"
+            self.weightonly_group_size = config.weightonly_group_size
 
         if self.use_weight_only:
             assert (
@@ -531,6 +534,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
             kv_num_heads=self.num_key_value_heads,
             intermediate_size=self.intermediate_size,
             quant_type=self.quant_type,
+            weightonly_group_size=self.weightonly_group_size,
             activation="swiglu",
             num_layers=config.num_hidden_layers,
             nranks=config.tensor_parallel_degree,
@@ -601,17 +605,17 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
 
                 if self.use_weight_only:
                     q_a_proj_quanted_weight, q_a_proj_weight_scale = weight_quantize(
-                        q_a_proj_weight, algo=self.quant_algo
+                        q_a_proj_weight.cpu(), algo=self.quant_algo, group_size=self.weightonly_group_size
                     )
-                    self.transformer_block.q_a_proj_weights[idx].set_value(q_a_proj_quanted_weight)
-                    self.transformer_block.q_a_proj_weights_scale[idx].set_value(q_a_proj_weight_scale)
+                    self.transformer_block.q_a_proj_weights[idx].set_value(q_a_proj_quanted_weight.cuda())
+                    self.transformer_block.q_a_proj_weights_scale[idx].set_value(q_a_proj_weight_scale.cuda())
 
                     q_b_proj_quanted_weight, q_b_proj_weight_scale = weight_quantize(
-                        q_b_proj_weight, algo=self.quant_algo
+                        q_b_proj_weight.cpu(), algo=self.quant_algo, group_size=self.weightonly_group_size
                     )
-                    self.transformer_block.q_b_proj_weights[idx].set_value(q_b_proj_quanted_weight)
+                    self.transformer_block.q_b_proj_weights[idx].set_value(q_b_proj_quanted_weight.cuda())
                     self.transformer_block.q_a_layernorm_weights[idx].set_value(q_a_layernorm_weight)
-                    self.transformer_block.q_b_proj_weights_scale[idx].set_value(q_b_proj_weight_scale)
+                    self.transformer_block.q_b_proj_weights_scale[idx].set_value(q_b_proj_weight_scale.cuda())
                 else:
                     self.transformer_block.q_a_proj_weights[idx].set_value(q_a_proj_weight)
                     self.transformer_block.q_a_layernorm_weights[idx].set_value(q_a_layernorm_weight)
@@ -622,9 +626,11 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                 ).cast(dtype)
 
                 if self.use_weight_only:
-                    q_proj_quanted_weight, q_proj_weight_scale = weight_quantize(q_proj_weight, algo=self.quant_algo)
-                    self.transformer_block.q_proj_weights[idx].set_value(q_proj_quanted_weight)
-                    self.transformer_block.q_proj_weights_scale[idx].set_value(q_proj_weight_scale)
+                    q_proj_quanted_weight, q_proj_weight_scale = weight_quantize(
+                        q_proj_weight.cpu(), algo=self.quant_algo, group_size=self.weightonly_group_size
+                    )
+                    self.transformer_block.q_proj_weights[idx].set_value(q_proj_quanted_weight.cuda())
+                    self.transformer_block.q_proj_weights_scale[idx].set_value(q_proj_weight_scale.cuda())
                 else:
                     self.transformer_block.q_proj_weights[idx].set_value(q_proj_weight)
 
@@ -640,17 +646,21 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
 
             if self.use_weight_only:
                 kv_a_proj_with_mqa_quanted_weight, kv_a_proj_with_mqa_weight_scale = weight_quantize(
-                    kv_a_proj_with_mqa_weight, algo=self.quant_algo
+                    kv_a_proj_with_mqa_weight.cpu(), algo=self.quant_algo, group_size=self.weightonly_group_size
                 )
-                self.transformer_block.kv_a_proj_with_mqa_weights[idx].set_value(kv_a_proj_with_mqa_quanted_weight)
-                self.transformer_block.kv_a_proj_with_mqa_weights_scale[idx].set_value(kv_a_proj_with_mqa_weight_scale)
+                self.transformer_block.kv_a_proj_with_mqa_weights[idx].set_value(
+                    kv_a_proj_with_mqa_quanted_weight.cuda()
+                )
+                self.transformer_block.kv_a_proj_with_mqa_weights_scale[idx].set_value(
+                    kv_a_proj_with_mqa_weight_scale.cuda()
+                )
 
                 kv_b_proj_quanted_weight, kv_b_proj_weight_scale = weight_quantize(
-                    kv_b_proj_weight, algo=self.quant_algo
+                    kv_b_proj_weight.cpu(), algo=self.quant_algo, group_size=self.weightonly_group_size
                 )
-                self.transformer_block.kv_b_proj_weights[idx].set_value(kv_b_proj_quanted_weight)
+                self.transformer_block.kv_b_proj_weights[idx].set_value(kv_b_proj_quanted_weight.cuda())
                 self.transformer_block.kv_a_layernorm_weights[idx].set_value(kv_a_layernorm_weight)
-                self.transformer_block.kv_b_proj_weights_scale[idx].set_value(kv_b_proj_weight_scale)
+                self.transformer_block.kv_b_proj_weights_scale[idx].set_value(kv_b_proj_weight_scale.cuda())
             else:
                 self.transformer_block.kv_a_proj_with_mqa_weights[idx].set_value(kv_a_proj_with_mqa_weight)
                 self.transformer_block.kv_a_layernorm_weights[idx].set_value(kv_a_layernorm_weight)
@@ -677,9 +687,11 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
             ).cast(dtype)
 
             if self.use_weight_only:
-                linear_quanted_weight, linear_weight_scale = weight_quantize(linear_weight, algo=self.quant_algo)
-                self.transformer_block.linear_weights[idx].set_value(linear_quanted_weight)
-                self.transformer_block.linear_weights_scale[idx].set_value(linear_weight_scale)
+                linear_quanted_weight, linear_weight_scale = weight_quantize(
+                    linear_weight.cpu(), algo=self.quant_algo, group_size=self.weightonly_group_size
+                )
+                self.transformer_block.linear_weights[idx].set_value(linear_quanted_weight.cuda())
+                self.transformer_block.linear_weights_scale[idx].set_value(linear_weight_scale.cuda())
             else:
                 self.transformer_block.linear_weights[idx].set_value(linear_weight)
 
@@ -701,10 +713,10 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
 
                 if self.use_weight_only:
                     ffn1_quanted_weight_tensor, ffn1_weight_scale_tensor = weight_quantize(
-                        ffn1_weight_tensor, algo=self.quant_algo
+                        ffn1_weight_tensor.cpu(), algo=self.quant_algo, group_size=self.weightonly_group_size
                     )
-                    self.transformer_block.ffn1_weights[idx].set_value(ffn1_quanted_weight_tensor)
-                    self.transformer_block.ffn1_weights_scale[idx].set_value(ffn1_weight_scale_tensor)
+                    self.transformer_block.ffn1_weights[idx].set_value(ffn1_quanted_weight_tensor.cuda())
+                    self.transformer_block.ffn1_weights_scale[idx].set_value(ffn1_weight_scale_tensor.cuda())
                 else:
                     self.transformer_block.ffn1_weights[idx].set_value(ffn1_weight_tensor)
 
@@ -713,10 +725,10 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                 ).cast(paddle.get_default_dtype())
                 if self.use_weight_only:
                     ffn2_quanted_weight_tensor, ffn2_weight_scale_tensor = weight_quantize(
-                        ffn2_weight_tensor, algo=self.quant_algo
+                        ffn2_weight_tensor.cpu(), algo=self.quant_algo, group_size=self.weightonly_group_size
                     )
-                    self.transformer_block.ffn2_weights[idx].set_value(ffn2_quanted_weight_tensor)
-                    self.transformer_block.ffn2_weights_scale[idx].set_value(ffn2_weight_scale_tensor)
+                    self.transformer_block.ffn2_weights[idx].set_value(ffn2_quanted_weight_tensor.cuda())
+                    self.transformer_block.ffn2_weights_scale[idx].set_value(ffn2_weight_scale_tensor.cuda())
                 else:
                     self.transformer_block.ffn2_weights[idx].set_value(ffn2_weight_tensor)
             else:
@@ -743,8 +755,12 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                     ).cast(dtype)
 
                     if self.use_weight_only:
-                        ffn1_quanted_weight, ffn1_weight_scale = weight_quantize(ffn1_weight, algo=self.quant_algo)
-                        ffn2_quanted_weight, ffn2_weight_scale = weight_quantize(ffn2_weight, algo=self.quant_algo)
+                        ffn1_quanted_weight, ffn1_weight_scale = weight_quantize(
+                            ffn1_weight, algo=self.quant_algo, group_size=-1
+                        )
+                        ffn2_quanted_weight, ffn2_weight_scale = weight_quantize(
+                            ffn2_weight, algo=self.quant_algo, group_size=-1
+                        )
                         ffn1_weights.append(ffn1_quanted_weight.reshape([self.transformer_block.config.embed_dim, -1]))
                         ffn2_weights.append(ffn2_quanted_weight.reshape([-1, self.transformer_block.config.embed_dim]))
                         ffn1_scales.append(ffn1_weight_scale)
@@ -789,7 +805,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
 
                 if self.use_weight_only:
                     shared_expert_ffn1_quanted_weight, shared_expert_ffn1_weight_scale = weight_quantize(
-                        shared_expert_ffn1_weight, algo=self.quant_algo
+                        shared_expert_ffn1_weight.cpu(), algo=self.quant_algo, group_size=self.weightonly_group_size
                     )
                     self.transformer_block.shared_expert_ffn1_weights[idx].set_value(shared_expert_ffn1_quanted_weight)
                     self.transformer_block.shared_expert_ffn1_weights_scale[idx].set_value(
@@ -797,11 +813,13 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                     )
 
                     shared_expert_ffn2_quanted_weight, shared_expert_ffn2_weight_scale = weight_quantize(
-                        shared_expert_ffn2_weight, algo=self.quant_algo
+                        shared_expert_ffn2_weight.cpu(), algo=self.quant_algo, group_size=self.weightonly_group_size
                     )
-                    self.transformer_block.shared_expert_ffn2_weights[idx].set_value(shared_expert_ffn2_quanted_weight)
+                    self.transformer_block.shared_expert_ffn2_weights[idx].set_value(
+                        shared_expert_ffn2_quanted_weight.cuda()
+                    )
                     self.transformer_block.shared_expert_ffn2_weights_scale[idx].set_value(
-                        shared_expert_ffn2_weight_scale
+                        shared_expert_ffn2_weight_scale.cuda()
                     )
                 else:
                     self.transformer_block.shared_expert_ffn1_weights[idx].set_value(shared_expert_ffn1_weight)
