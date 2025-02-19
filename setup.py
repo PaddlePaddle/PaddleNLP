@@ -19,6 +19,8 @@ import subprocess
 from datetime import datetime
 
 import setuptools
+from setuptools import Extension
+from setuptools.command.build_ext import build_ext
 
 PADDLENLP_STABLE_VERSION = "PADDLENLP_STABLE_VERSION"
 
@@ -169,6 +171,13 @@ def get_package_data_files(package, data, package_dir=None):
                     all_files.append(file)
     return all_files
 
+class CustomBuildExt(build_ext):
+    def run(self):
+        import pybind11
+
+        self.include_dirs.append(pybind11.get_include())
+
+        build_ext.run(self)
 
 if commit != "unknown":
     write_version_py(filename="paddlenlp/version/__init__.py")
@@ -197,7 +206,7 @@ try:
             ),
             "paddlenlp.experimental": get_package_data_files("paddlenlp.experimental", ["transformers"]),
         },
-        setup_requires=["cython", "numpy"],
+        setup_requires=["cython", "numpy", "pybind11"],
         install_requires=REQUIRED_PACKAGES,
         entry_points={"console_scripts": ["paddlenlp = paddlenlp.cli:main"]},
         extras_require=extras,
@@ -211,6 +220,16 @@ try:
             "Operating System :: OS Independent",
         ],
         license="Apache 2.0",
+        ext_modules=[
+            Extension(
+                "paddlenlp.experimental.galvatron.core.search_engine.galvatron_dp_core",
+                sources=["csrc/galvatron/dp_core.cpp"],
+                include_dirs=["csrc/galvatron"],
+                extra_compile_args=['-O3', '-Wall', '-shared', '-std=c++11', '-fPIC'],
+                language="c++",
+            )
+        ],
+        cmdclass={"build_ext": CustomBuildExt},
     )
 except Exception as e:
     git_checkout(paddlenlp_dir, "paddlenlp/version/__init__.py") if commit != "unknown" else None
