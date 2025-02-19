@@ -2917,7 +2917,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 self.config.speculate_config.speculate_max_draft_token_num,
                 True,  # causal
                 self.config.speculate_config.speculate_method is not None,  # speculate_decoder
-            )[0]
+            )
             fmha_out_decode = fmha_out_decode.reshape(
                 [-1, self.num_heads, self.config.mla_config.kv_lora_rank]
             ).transpose([1, 0, 2])
@@ -3305,7 +3305,7 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
                 self.config.speculate_config.speculate_max_draft_token_num,
                 True,  # causal
                 self.config.speculate_config.speculate_method is not None,  # speculate_decoder
-            )[0]
+            )
             fmha_out_decode = fmha_out_decode.reshape(
                 [-1, self.num_heads, self.config.mla_config.kv_lora_rank]
             ).transpose([1, 0, 2])
