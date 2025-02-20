@@ -18,7 +18,7 @@ param+="device_num=N4C32 "
 param+="global_batch_size=32 "
 param+="nnodes=4 "
 param+="model_type=baichuan2_13b "
-param+="intermediate_api=intermediate_api_ ""
+param+="intermediate_api=intermediate_api_ "
 
 cd ./tests
 bash ./test_tipc/static/auto_parallel/baichuan2/benchmark_common/prepare.sh
