@@ -25,6 +25,21 @@ def is_cuda():
         return False
 
 
+def get_package_name():
+    if is_cuda():
+        return "paddlenlp-gpu"
+    else:
+        return "paddlenlp"
+
+
+def get_nvcc_cuda_version():
+    nvcc_output = subprocess.check_output(["nvcc", "-V"], universal_newlines=True)
+    output = nvcc_output.split()
+    release_idx = output.index("release") + 1
+    nvcc_cuda_version = output[release_idx].split(",")[0].replace(".", "")
+    return nvcc_cuda_version
+
+
 def get_ext_and_cmd():
     ext_modules = []
     cmdclass = {}
