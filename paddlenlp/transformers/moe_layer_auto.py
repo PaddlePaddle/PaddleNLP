@@ -15,21 +15,13 @@
 # limitations under the License.
 from __future__ import annotations
 
-from typing import Any, Tuple
-
 import paddle
 import paddle.distributed as dist
 import paddle.nn.functional as F
-from paddle import Tensor, nn
-from paddle.distributed.communication import stream
-from paddle.distributed.communication.group import Group
+from paddle import nn
 
+from .auto_utils import get_mesh
 from .moe_gate_auto import PretrainedMoEGate
-
-
-def print_grad(g, name):
-    print(f"==== {name} ====")
-    print(g)
 
 
 def dispatching(x, dispatch_mask, scatter_index, num_experts, capacity):
@@ -96,115 +88,64 @@ def combining(x, combine_weights, scatter_index):
     return paddle.matmul(combine_weights, x).squeeze(1)  # [seq,1,2] @ [seq,2,dim] -> [seq,1,dim]
 
 
-class _AllToAll(paddle.autograd.PyLayer):
-    @staticmethod
-    def forward(
-        ctx: Any,
-        input: Tensor,
-        group: Group,
-    ) -> Tensor:  # type: ignore
-        """
-        All-to-all communication in the group.
-
-        Args:
-            ctx (Any): Context object.
-            input (Tensor): Input tensor.
-            group (Group): The group object.
-
-        Returns:
-            Tensor: Output tensor.
-        """
-
-        ctx.group = group
-        # return input
-        if dist.get_world_size(group) <= 1:
-            return input
-        output = paddle.empty_like(input)
-        stream.alltoall_single(output, input, None, None, group, True, True)
-        return output
-
-    @staticmethod
-    def backward(ctx: Any, *grad_output: Tensor) -> Tuple[Tensor]:
-        """
-        Aggregates gradient information from all input tensors into a single tensor.
-
-        Args:
-            ctx (Any): The context object used to store information that needs to be passed.
-            *grad_output (Tensor): A list of input tensors whose gradients are to be aggregated.
-
-        Returns:
-            Tuple[Tensor]: A tuple containing a tensor that holds the gradients of all input tensors.
-
-        """
-        # return grad_output
-        return _AllToAll.apply(*grad_output, ctx.group)
-
-
-class LocalPart(dist.LocalLayer):
-    def __init__(self, out_dist_attrs, config, gate: PretrainedMoEGate):
-        print("==== out_dist_attrs ====")
-        print(out_dist_attrs)
+class LocalGatePart1(dist.LocalLayer):
+    def __init__(self, config, gate: PretrainedMoEGate, ipp=0):
+        mesh = get_mesh(ipp)
+        out_dist_attrs = [
+            (mesh, [dist.Shard(0), dist.Replicate()]),  # reshaped_input [b*s, h]
+            (mesh, [dist.Shard(0), dist.Replicate()]),  # scores [b*s, e]
+            (mesh, [dist.Partial(dist.ReduceType.kRedMax)]),  # expert_counts [e]
+            (mesh, [dist.Partial(dist.ReduceType.kRedAvg)]),  # l_aux, scalar
+            (mesh, [dist.Partial(dist.ReduceType.kRedAvg)]),  # l_zloss, scalar
+        ]
         super().__init__(out_dist_attrs)
         self.config = config
         self.gate = gate
 
-    def forward(self, hidden_state, gate_weight, used_token=None):
+    def forward(self, hidden_state, gate_weight, e_score_correction_bias, used_token=None):
         # Implement Algorithm 2 from GShard paper.
         batch_size, seq_len, d_model = hidden_state.shape
-
-        # Initial implementation -> Reshape into S tokens by dropping sequence dimension.
-        # Reshape into G groups so that each group can distribute tokens equally
-        # group_size = kwargs['group_size'] if 'group_size' in kwargs.keys() else 1
         reshaped_input = hidden_state.reshape([-1, d_model])
-        print("==== reshaped_input ===")
-        print(reshaped_input)
-
         _, h_dim = reshaped_input.shape
 
         # compute gating score
         logits = F.linear(reshaped_input, gate_weight, None)
-        print("==== logits ====")
-
         with paddle.amp.auto_cast(False):
             scores = self.gate.gate_score_func(logits=logits)
             scores = scores.cast(paddle.get_default_dtype())
 
-        print("==== scores ====")
-        print(scores)
-        # capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss = self.topkgating(scores)
-        capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss = self.gate.topkgating(scores)
-        print("==== combine_weights ====")
-        print(combine_weights)
-        print("==== dispatch_mask ====")
-        print(dispatch_mask)
+        exp_counts, l_aux, l_zloss = self.gate.topkgating_part1(scores, e_score_correction_bias)
 
-        # self.l_aux       :
-        # combine_weights  : sec
-        # dispatch_mask    : sec
-        # self.exp_counts  :
-        dispatched_input = paddle.einsum("sec,sm->ecm", paddle.cast(dispatch_mask, hidden_state.dtype), reshaped_input)
+        return reshaped_input, scores, exp_counts, l_aux, l_zloss
 
-        return dispatched_input, combine_weights, l_aux, l_zloss
+
+class LocalGateAndDispatch(dist.LocalLayer):
+    def __init__(self, gate: PretrainedMoEGate, ipp=0):
+        mesh = get_mesh(ipp)
+        out_dist_attrs = [
+            (mesh, [dist.Shard(1), dist.Replicate()]),  # dispatched_input [e,c,h]
+            (mesh, [dist.Shard(0), dist.Replicate()]),  # combine_weights [s,e,c]
+        ]
+        super().__init__(out_dist_attrs)
+        self.gate = gate
+
+    def forward(self, reshaped_input, scores):
+        combine_weights, dispatch_mask = self.gate.topkgating_part2(scores)
+        dispatched_input = paddle.einsum(
+            "sec,sm->ecm", paddle.cast(dispatch_mask, reshaped_input.dtype), reshaped_input
+        )
+        return dispatched_input, combine_weights
 
 
 class LocalCombine(dist.LocalLayer):
-    def __init__(self, out_dist_attrs):
+    def __init__(self, ipp=0):
+        mesh = get_mesh(ipp)
+        out_dist_attrs = [(mesh, [dist.Shard(0)])]
         super().__init__(out_dist_attrs)
 
     def forward(self, combine_weights, expert_output, dtype="float32"):
         combined_output = paddle.einsum("sec,ecm->sm", combine_weights.cast(dtype), expert_output)
-        combined_output.register_hook(lambda grad: print(grad, "combined_output_in_local_combine.grad"))
         return combined_output
-
-
-def get_mesh(pp_idx=0):
-    """
-    获得pp_idx的mesh
-    """
-    mesh = dist.fleet.auto.get_mesh()
-    if "pp" in mesh.dim_names:
-        mesh = mesh.get_mesh_with_dim("pp", pp_idx)
-    return mesh
 
 
 class MoELayer(nn.Layer):
@@ -218,12 +159,12 @@ class MoELayer(nn.Layer):
         capacity: int = 1.0,
         moe_group: str = "data",
         all_to_all_dropout=0.0,
+        ipp: int = 0,
     ):
         super().__init__()
 
         self.config = config
 
-        print(f"moe_num_experts:{moe_num_experts}")
         self.moe_num_experts = moe_num_experts
         self.capacity = capacity
         self.expert_parallel_degree = 1
@@ -244,17 +185,9 @@ class MoELayer(nn.Layer):
         self.is_dummy_moe = True
         self._post_init()
 
-        mesh = get_mesh()
-        local_out_dist_attrs = [
-            (mesh, [dist.Shard(1)]),  # dispatched_input [e,c,h]
-            (mesh, [dist.Shard(0)]),  # combine_weights [s,e,c]
-            (mesh, [dist.Partial()]),  # l_aux, scalar
-            (mesh, [dist.Partial()]),  # l_zloss, scalar
-        ]
-        self.local_computes = LocalPart(local_out_dist_attrs, config, gate)
-
-        local_combine_dist_attrs = [(mesh, [dist.Shard(0)])]
-        self.local_combine = LocalCombine(local_combine_dist_attrs)
+        self.local_gate_part1 = LocalGatePart1(config, gate, ipp)
+        self.local_gate_and_dispatch = LocalGateAndDispatch(gate, ipp)
+        self.local_combine = LocalCombine(ipp)
 
     def _parse_moe_expert_parallel(self, moe_num_experts, expert_parallel_degree):
         assert (
@@ -303,66 +236,25 @@ class MoELayer(nn.Layer):
         # Implement Algorithm 2 from GShard paper.
         batch_size, seq_len, d_model = hidden_state.shape
 
-        # Initial implementation -> Reshape into S tokens by dropping sequence dimension.
-        # Reshape into G groups so that each group can distribute tokens equally
-        # group_size = kwargs['group_size'] if 'group_size' in kwargs.keys() else 1
-        # reshaped_input = hidden_state.reshape([-1, d_model])
-        # reshaped_input = dist.reshard(reshaped_input, reshaped_input.process_mesh, [dist.Replicate(), dist.Replicate()])
-        # print("==== reshaped_input ====")
-        # print(reshaped_input)
-
-        # capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss = self.gate(reshaped_input)
-        # print("==== combine_weights ====")
-        # print(combine_weights)
-
-        # # self.l_aux       :
-        # # combine_weights  : sec
-        # # dispatch_mask    : sec
-        # # self.exp_counts  :
-        # dispatched_input = paddle.einsum("sec,sm->ecm", paddle.cast(dispatch_mask, hidden_state.dtype), reshaped_input)
-        # print("==== dispatched_input ====")
-        # print(dispatched_input)
-
-        hidden_state.register_hook(lambda grad: print_grad(grad, "hidden_state.grad"))
-        dispatched_input, combine_weights, l_aux, l_zloss = self.local_computes(
-            hidden_state, self.gate.weight, used_token=used_token
+        reshaped_input, gate_scores, exp_counts, l_aux, l_zloss = self.local_gate_part1(
+            hidden_state, self.gate.weight, self.gate.e_score_correction_bias, used_token=used_token
         )
+        if self.gate.drop_tokens is False:
+            self.gate.capacity = int(paddle.max(exp_counts))
+        dispatched_input, combine_weights = self.local_gate_and_dispatch(reshaped_input, gate_scores)
 
-        # dispatched_input = dist.reshard(dispatched_input, get_mesh(), [dist.Shard(0)])
-        # if self.expert_parallel_degree > 1:
-        #     dispatched_input = _AllToAll.apply(dispatched_input, self.moe_group)
-
-        dispatched_input.register_hook(lambda grad: print_grad(grad, "dispatched_input.grad"))
         # Re-shape after all-to-all: ecm -> gecm
         dispatched_input = dispatched_input.reshape(
             [self.expert_parallel_degree, self.moe_num_experts_per_device, -1, d_model]
         )
-        dispatched_input.register_hook(lambda grad: print_grad(grad, "dispatched_input_after_reshape.grad"))
         expert_output = self.expert_forward(dispatched_input)
-        expert_output.register_hook(lambda grad: print_grad(grad, "expert_output.grad"))
         # Re-shape before drop_tokens: gecm -> ecm
         expert_output = expert_output.reshape(
             [self.expert_parallel_degree * self.moe_num_experts_per_device, -1, d_model]
         )
 
-        # expert_output = dist.reshard(expert_output, get_mesh(), [dist.Shard(1)])
-        # if self.expert_parallel_degree > 1:
-        #     expert_output = _AllToAll.apply(expert_output, self.moe_group)
-
-        # combine withe expert weights
-        # Einsum infermeta has not supported auto parallel dist tensor,
-        # so use local layer here.
-        # combined_output = paddle.einsum("sec,ecm->sm", combine_weights.cast(hidden_state[0].dtype), expert_output)
-        combine_weights.register_hook(lambda grad: print_grad(grad, "combine_weights.grad"))
-        expert_output.register_hook(lambda grad: print_grad(grad, "expert_output.grad"))
         combined_output = self.local_combine(combine_weights, expert_output, dtype=hidden_state[0].dtype)
-        print("==== combined_output ====")
-        print(combined_output)
 
-        combined_output.register_hook(lambda grad: print_grad(grad, "combined_output.grad"))
         a = combined_output.reshape(hidden_state.shape)
-        print("==== a ====")
-        print(a)
-        a.register_hook(lambda grad: print_grad(grad, "a.grad"))
 
         return a, l_aux, l_zloss

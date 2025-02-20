@@ -25,10 +25,13 @@ import warnings
 from typing import List, Optional, Tuple, Union
 
 import paddle
+import paddle.distributed as dist
 import paddle.nn.functional as F
 from paddle import Tensor, nn
 from paddle.distributed.fleet.utils import recompute
 from paddle.nn import Linear
+
+from .auto_utils import get_mesh
 
 try:
     from paddle.incubate.nn.functional import fused_rotary_position_embedding
@@ -224,7 +227,9 @@ class AddAuxiliaryLoss(paddle.autograd.PyLayer):
     def backward(ctx, grad_output):
         grad_loss = None
         if ctx.required_aux_loss:
-            grad_loss = paddle.ones(1, dtype=ctx.dtype)
+            # grad_loss = paddle.ones(1, dtype=ctx.dtype)
+            grad_loss = paddle.to_tensor(1, dtype=ctx.dtype)
+            grad_loss = dist.shard_tensor(grad_loss, get_mesh(), [dist.Partial(dist.ReduceType.kRedAvg)])
         return grad_output, grad_loss
 
 
