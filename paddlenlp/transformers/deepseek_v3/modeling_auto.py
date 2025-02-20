@@ -178,10 +178,8 @@ class DeepseekV3ForCausalLMAuto(DeepseekV3PretrainedModelAuto):
 
         logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
         mtp_logits = [self.lm_head(_hidden_states) for _hidden_states in mtp_outputs] if len(mtp_outputs) > 0 else []
-        loss = None
-        if labels is not None:
-            loss = self.criterion(logits, labels, mtp_logits=mtp_logits)
-        return loss
+
+        return self.criterion(logits, labels, mtp_logits=mtp_logits)
 
     def auto_dist_config(self, prefix=""):
         if prefix != "":
@@ -203,6 +201,10 @@ class DeepseekV3ForCausalLMAuto(DeepseekV3PretrainedModelAuto):
                     f"{prefix}deepseek_v3.layers.*.mlp.shared_experts.down_proj": dist.RowWiseParallel(),
                     f"{prefix}lm_head.weight": dist.ColWiseParallel(),
                 }
+            },
+            "pp_config": {
+                "split_spec": [f"{prefix}deepseek_v3.layers", f"{prefix}lm_head"],
+                "global_spec": "deepseek_v3.global_layer",
             },
         }
         return config

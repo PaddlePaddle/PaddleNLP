@@ -1644,23 +1644,23 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
             ):
                 layer_outputs = self.recompute_training_full(
                     decoder_layer,
-                    hidden_states=hidden_states,
-                    position_ids=position_ids,
-                    attention_mask=attention_mask,
-                    output_attentions=output_attentions,
-                    past_key_value=past_key_value,
-                    use_cache=use_cache,
-                    attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+                    hidden_states,
+                    position_ids,
+                    attention_mask,
+                    output_attentions,
+                    past_key_value,
+                    use_cache,
+                    attn_mask_startend_row_indices,
                 )
             else:
                 layer_outputs = decoder_layer(
-                    hidden_states=hidden_states,
-                    position_ids=position_ids,
-                    attention_mask=attention_mask,
-                    output_attentions=output_attentions,
-                    past_key_value=past_key_value,
-                    use_cache=use_cache,
-                    attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+                    hidden_states,
+                    position_ids,
+                    attention_mask,
+                    output_attentions,
+                    past_key_value,
+                    use_cache,
+                    attn_mask_startend_row_indices,
                 )
 
             # NOTE: clear outdate cache after it has been used for memory saving
@@ -1694,12 +1694,12 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
                 layer_outputs = decoder_layer(
                     hidden_states,
                     inputs_embeds_cur_depth,
-                    position_ids=position_ids,
-                    attention_mask=attention_mask,
-                    output_attentions=output_attentions,
-                    past_key_value=past_key_value,
-                    use_cache=use_cache,
-                    attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+                    position_ids,
+                    attention_mask,
+                    output_attentions,
+                    past_key_value,
+                    use_cache,
+                    attn_mask_startend_row_indices,
                 )
 
                 if isinstance(layer_outputs, (tuple, list)):
