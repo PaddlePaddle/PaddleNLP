@@ -39,14 +39,13 @@ from paddlenlp.transformers import (
     AutoTokenizer,
     CosineAnnealingWithWarmupDecay,
     DeepseekV2Config,
-    DeepseekV2PretrainingCriterion,
     DeepseekV3ForCausalLMAuto,
     LinearAnnealingWithWarmupDecay,
 )
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
-    "deepseekv3_auto": (DeepseekV2Config, DeepseekV3ForCausalLMAuto, DeepseekV2PretrainingCriterion),
+    "deepseekv3_auto": (DeepseekV2Config, DeepseekV3ForCausalLMAuto, None),
 }
 
 
@@ -555,7 +554,9 @@ def main():
 
     with paddle.LazyGuard():
         model = model_class.from_config(config, dtype="float32")
-        criterion = criterion_class(config)
+        criterion = None
+        if criterion_class is not None:
+            criterion = criterion_class(config)
 
     if training_args.recompute:
 
