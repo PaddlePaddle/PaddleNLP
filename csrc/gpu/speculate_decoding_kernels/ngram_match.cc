@@ -37,6 +37,7 @@ void find_candidate_pred_tokens(const int64_t *input_ids,
         int32_t *seq_lens_this_time,
         int32_t *seq_lens_encoder,
         int32_t *seq_lens_decoder,
+        int64_t *max_dec_len,
         int64_t input_ids_stride,
         int64_t pre_ids_stride,
         int64_t draft_tokens_stride,
@@ -55,8 +56,8 @@ void find_candidate_pred_tokens(const int64_t *input_ids,
         }
     }
     for (int batch_idx = 0; batch_idx < real_batch_size; batch_idx++) {
-        max_draft_tokens = draft_token_num[batch_idx];
-        // int local_draft_tokens = max_draft_tokens;
+        max_draft_tokens = std::min(static_cast<int64_t>(
+            draft_token_num[batch_idx]), max_dec_len[batch_idx] - step_idx[batch_idx] - 1);
         if (seq_lens_encoder[batch_idx] > 0) {
             continue;
         } else if (seq_lens_decoder[batch_idx] == 0) {
@@ -90,14 +91,7 @@ void find_candidate_pred_tokens(const int64_t *input_ids,
                 continue;
             }
             const int64_t *ngram = cur_pre_ids + (cur_step_idx + 1 - ngram_size);
-#ifdef _DEBUG
-            if (batch_idx == 0) {
-                for (int mm = 0; mm < ngram_size; mm++) {
-                    printf("idx %d: %lld\n", mm, ngram[mm]);
-                }
-            }
-            printf("cur_input_ids_len %d\n", cur_input_ids_len);
-#endif
+
             // Iterate through sliding windows of size ngram_size
             bool match_input = false;
             for (int64_t i = 0; i <= cur_input_ids_len - ngram_size; ++i) {
@@ -114,13 +108,7 @@ void find_candidate_pred_tokens(const int64_t *input_ids,
                     int64_t end_idx = std::min(start_idx + max_draft_tokens, cur_input_ids_len);
                     if (start_idx >= end_idx)
                         continue;
-#ifdef _DEBUG
-                    printf("batch_idx:%d. ngram_size:%d. idx:%lld. \n", batch_idx, ngram_size, i);
-                    printf("start:%d. end:%d.\n", start_idx, end_idx);
-#endif
-                    // Ensure we don't go beyond the length of input_ids and avoid self-match
-                    // if (end_idx <= cur_input_ids_len && start_idx < cur_input_ids_len - ngram_size) {
-                    // Return a pointer to the next num_pred_tokens
+
                     int64_t cur_draft_token_num = end_idx - start_idx;
 
                     seq_lens_this_time[batch_idx] = cur_draft_token_num + 1;
@@ -133,15 +121,10 @@ void find_candidate_pred_tokens(const int64_t *input_ids,
                 }
             }
             if (!match_input) {
-#ifdef _DEBUG
-                printf("match_input is false so match output\n");
-#endif
                 for (int64_t i = 0; i <= cur_step_idx - ngram_size; ++i) {
                     // Check if the current window matches the ngram
                     bool match = true;
-#ifdef _DEBUG
-                    printf("search %d token in pre_ids\n", i);
-#endif
+
                     for (int j = 0; j < ngram_size; j++) {
                         if (ngram[j] != cur_pre_ids[i + j]) {
                             match = false;
@@ -150,26 +133,14 @@ void find_candidate_pred_tokens(const int64_t *input_ids,
                     }
 
                     if (match) {
-#ifdef _DEBUG
-                        printf("%d token in pre_ids matched\n", i);
-#endif
                         int64_t start_idx = i + ngram_size;
                         int64_t end_idx = std::min(start_idx + max_draft_tokens, cur_step_idx);
                         int64_t cur_draft_token_num = end_idx - start_idx;
                         if (start_idx >= end_idx)
                             continue;
 
-#ifdef _DEBUG
-                        printf("cur_step_idx %d, start_idx %lld, end_idx %lld, cur_draft_token_num is %lld\n",
-                                cur_step_idx,
-                                start_idx,
-                                end_idx,
-                                cur_draft_token_num);
-#endif
-
                         seq_lens_this_time[batch_idx] = cur_draft_token_num + 1;
                         memcpy(cur_draft_tokens + 1, cur_pre_ids + start_idx, sizeof(int64_t) * cur_draft_token_num);
-                        // To break the current batch_idx for-loop
                         ngram_size = 0;
                         break;
                     }
@@ -188,6 +159,7 @@ void NgramMatch(const paddle::Tensor &input_ids,
         const paddle::Tensor &seq_lens_this_time,
         const paddle::Tensor &seq_lens_encoder,
         const paddle::Tensor &seq_lens_decoder,
+        const paddle::Tensor &max_dec_len,
         const int real_batch_size,
         const int max_ngram_size,
         const int max_draft_tokens) {
@@ -210,6 +182,7 @@ void NgramMatch(const paddle::Tensor &input_ids,
             const_cast<int32_t *>(seq_lens_this_time.data<int32_t>()),
             const_cast<int32_t *>(seq_lens_encoder.data<int32_t>()),
             const_cast<int32_t *>(seq_lens_decoder.data<int32_t>()),
+            const_cast<int64_t *>(max_dec_len.data<int64_t>()),
             input_ids_stride,
             pre_ids_stride,
             draft_tokens_stride,
@@ -227,7 +200,8 @@ PD_BUILD_OP(ngram_match)
                 "draft_tokens",
                 "seq_lens_this_time",
                 "seq_lens_encoder",
-                "seq_lens_decoder"})
+                "seq_lens_decoder",
+                "max_dec_len"})
         .Attrs({"real_batch_size: int", "max_ngram_size: int", "max_draft_tokens: int"})
         .Outputs({"draft_tokens_out", "seq_lens_this_time_out"})
         .SetKernelFn(PD_KERNEL(NgramMatch))

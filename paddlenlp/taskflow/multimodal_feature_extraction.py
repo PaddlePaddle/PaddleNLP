@@ -19,6 +19,7 @@ import paddle
 from PIL import Image
 
 from ..transformers import AutoModel, AutoProcessor
+from ..utils.env import PADDLE_INFERENCE_MODEL_SUFFIX, PADDLE_INFERENCE_WEIGHTS_SUFFIX
 from ..utils.log import logger
 from .task import Task
 from .utils import dygraph_mode_guard, static_mode_guard
@@ -411,9 +412,9 @@ class MultimodalFeatureExtractionTask(Task):
         self.inference_image_model_path = os.path.join(_base_path, "static", "get_image_features")
         self.inference_text_model_path = os.path.join(_base_path, "static", "get_text_features")
         if (
-            not os.path.exists(self.inference_image_model_path + ".pdiparams")
+            not os.path.exists(self.inference_image_model_path + PADDLE_INFERENCE_WEIGHTS_SUFFIX)
             or self._param_updated
-            or not os.path.exists(self.inference_text_model_path + ".pdiparams")
+            or not os.path.exists(self.inference_text_model_path + PADDLE_INFERENCE_WEIGHTS_SUFFIX)
         ):
             with dygraph_mode_guard():
                 self._construct_model(self.model)
@@ -422,8 +423,8 @@ class MultimodalFeatureExtractionTask(Task):
         if self._predictor_type == "paddle-inference":
             # Get text inference model
             self.inference_model_path = self.inference_text_model_path
-            self._static_model_file = self.inference_model_path + ".pdmodel"
-            self._static_params_file = self.inference_model_path + ".pdiparams"
+            self._static_model_file = self.inference_model_path + PADDLE_INFERENCE_MODEL_SUFFIX
+            self._static_params_file = self.inference_model_path + PADDLE_INFERENCE_WEIGHTS_SUFFIX
             self._config = paddle.inference.Config(self._static_model_file, self._static_params_file)
             self._prepare_static_mode()
 
@@ -435,8 +436,8 @@ class MultimodalFeatureExtractionTask(Task):
 
             # Get image inference model
             self.inference_model_path = self.inference_image_model_path
-            self._static_model_file = self.inference_model_path + ".pdmodel"
-            self._static_params_file = self.inference_model_path + ".pdiparams"
+            self._static_model_file = self.inference_model_path + PADDLE_INFERENCE_MODEL_SUFFIX
+            self._static_params_file = self.inference_model_path + PADDLE_INFERENCE_WEIGHTS_SUFFIX
             self._config = paddle.inference.Config(self._static_model_file, self._static_params_file)
             self._prepare_static_mode()
 
@@ -449,15 +450,15 @@ class MultimodalFeatureExtractionTask(Task):
             # Get text onnx model
             self.export_type = "text"
             self.inference_model_path = self.inference_text_model_path
-            self._static_model_file = self.inference_model_path + ".pdmodel"
-            self._static_params_file = self.inference_model_path + ".pdiparams"
+            self._static_model_file = self.inference_model_path + PADDLE_INFERENCE_MODEL_SUFFIX
+            self._static_params_file = self.inference_model_path + PADDLE_INFERENCE_WEIGHTS_SUFFIX
             self._prepare_onnx_mode()
             self.predictor_map["text"] = self.predictor
 
             # Get image onnx model
             self.export_type = "image"
             self.inference_model_path = self.inference_image_model_path
-            self._static_model_file = self.inference_model_path + ".pdmodel"
-            self._static_params_file = self.inference_model_path + ".pdiparams"
+            self._static_model_file = self.inference_model_path + PADDLE_INFERENCE_MODEL_SUFFIX
+            self._static_params_file = self.inference_model_path + PADDLE_INFERENCE_WEIGHTS_SUFFIX
             self._prepare_onnx_mode()
             self.predictor_map["image"] = self.predictor

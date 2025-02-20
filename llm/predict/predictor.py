@@ -24,7 +24,7 @@ from threading import Thread
 import numpy as np
 import paddle
 import paddle.incubate.multiprocessing as mp
-from paddle.base.framework import in_cinn_mode, in_pir_executor_mode, use_pir_api
+from paddle.base.framework import in_cinn_mode, in_pir_executor_mode
 from paddle.distributed import fleet
 
 try:
@@ -51,7 +51,12 @@ from paddlenlp.transformers import (
     PretrainedTokenizer,
 )
 from paddlenlp.trl import llm_utils
-from paddlenlp.utils.env import MAX_BSZ, MAX_DRAFT_TOKENS
+from paddlenlp.utils.env import (
+    MAX_BSZ,
+    MAX_DRAFT_TOKENS,
+    PADDLE_INFERENCE_MODEL_SUFFIX,
+    PADDLE_INFERENCE_WEIGHTS_SUFFIX,
+)
 from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
 
@@ -670,10 +675,11 @@ class StaticGraphInferencePredictor(InferencePredictorMixin):
         infer_model_path = llm_utils.get_infer_model_path(
             predictor_args.model_name_or_path, predictor_args.model_prefix
         )
-        if use_pir_api():
-            config = paddle.inference.Config(infer_model_path + ".json", infer_model_path + ".pdiparams")
-        else:
-            config = paddle.inference.Config(infer_model_path + ".pdmodel", infer_model_path + ".pdiparams")
+
+        config = paddle.inference.Config(
+            infer_model_path + PADDLE_INFERENCE_MODEL_SUFFIX,
+            infer_model_path + PADDLE_INFERENCE_WEIGHTS_SUFFIX,
+        )
 
         config.switch_ir_optim(True)
         # remove `gpu_cpu_map_matmul_v2_to_matmul_pass` to avoid mapping matmul_v2 -> matmul op
@@ -1008,6 +1014,8 @@ class BlockInferencePredictorMixin(BasePredictor):
                 self.model_inputs["pre_ids"][bid, 0] = self.model_inputs["input_ids"][bid][
                     self.seq_lens[bid] - 1
                 ]  # get the last token before padding of this batch
+                if self.config.speculate_method == "inference_with_reference":
+                    self.proposer.input_ids_len[bid, 0] = self.seq_lens[bid]
 
         if self.config.mode == "static":
             for k, v in self.model_inputs.items():
@@ -1103,7 +1111,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                 self.full_hidden_states = self._infer(self.model_inputs)
             else:
                 self._infer(self.model_inputs)
-        logger.info(f"running spend {time.time()  -  s_time}")
+        logger.info(f"running spend {time.time() - s_time}")
 
         if self.proposer is not None:
             self.proposer.postprocess(base_model_inputs=self.model_inputs)
@@ -1190,10 +1198,10 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
             predictor_args.model_name_or_path, predictor_args.model_prefix
         )
 
-        if use_pir_api():
-            config = paddle.inference.Config(infer_model_path + ".json", infer_model_path + ".pdiparams")
-        else:
-            config = paddle.inference.Config(infer_model_path + ".pdmodel", infer_model_path + ".pdiparams")
+        config = paddle.inference.Config(
+            infer_model_path + PADDLE_INFERENCE_MODEL_SUFFIX,
+            infer_model_path + PADDLE_INFERENCE_WEIGHTS_SUFFIX,
+        )
 
         config.switch_ir_optim(False)
         if predictor_args.device in paddle.device.get_all_custom_device_type():
@@ -1230,7 +1238,7 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
             self.proposer.insert_query(
                 base_model_inputs=self.model_inputs, real_bs=len(input_texts), seq_lens=self.seq_lens
             )
-        logger.info(f"preprocess spend {time.time()  -  s_time}")
+        logger.info(f"preprocess spend {time.time() - s_time}")
 
         result_queue = mp.Queue()
         tensor_queue = mp.Queue()
@@ -1269,7 +1277,7 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
                 self.full_hidden_states = self.predictor.run(list(self.model_inputs.values()))[0]
             else:
                 self.predictor.run(list(self.model_inputs.values()))
-        logger.info(f"running spend {time.time()  -  s_time}")
+        logger.info(f"running spend {time.time() - s_time}")
 
         if self.proposer is not None:
             self.proposer.postprocess(base_model_inputs=self.model_inputs)
@@ -1303,7 +1311,7 @@ class AutoPredictor:
         config: PretrainedConfig,
         model_args: ModelArgument,
         tokenizer: PretrainedTokenizer = None,
-        **kwargs
+        **kwargs,
     ):
         """
         Create a predictor
