@@ -389,9 +389,9 @@ python predict/predictor.py \
 
 #### 3.5 实验指标
 
-我们在互联网、医疗、金融三大垂类自建测试集上进行了实验：
+我们在通用测试集和医疗、新闻、对话与金融等垂类测试集上进行了实验：
 
-<table>
+<!-- <table>
 <tr><th row_span='2'><th colspan='2'>金融<th colspan='2'>医疗<th colspan='2'>互联网
 <tr><td><th>0-shot<th>5-shot<th>0-shot<th>5-shot<th>0-shot<th>5-shot
 <tr><td>uie-base (12L768H)<td>46.43<td>70.92<td><b>71.83</b><td>85.72<td>78.33<td>81.86
@@ -401,6 +401,19 @@ python predict/predictor.py \
 <tr><td>uie-nano (4L312H)<td>38.94<td>66.83<td>48.29<td>76.74<td>62.86<td>72.35
 <tr><td>uie-m-large (24L1024H)<td><b>49.35</b><td><b>74.55</b><td>70.50<td><b>92.66</b><td><b>78.49</b><td><b>83.02</b>
 <tr><td>uie-m-base (12L768H)<td>38.46<td>74.31<td>63.37<td>87.32<td>76.27<td>80.13
+</table> -->
+
+<table>
+<tr><td>模型名称</td><td>数据集名称</td><td>CMeEE-V2</td><td>Boson</td><td>CLUENER</td><td>CCIR2021-NER</td><td>任务对话2018-NER</td><td>银行借贷2021-NER</td><td>SKE2019</td><td>Avg</td></tr>
+<tr><td></td><td>数据集领域</td><td>医疗领域</td><td>通用领域</td><td>通用领域</td><td>新闻领域</td><td>对话领域</td><td>金融领域</td><td>金融领域</td><td></td></tr>
+<tr><td>PP-UIE-0.5B</td><td>F1(0-shot)</td><td>0.479</td><td>0.638</td><td>0.593</td><td>0.773</td><td>0.723</td><td>0.361</td><td>0.782</td><td>0.621</td></tr>
+<tr><td>PP-UIE-1.5B</td><td>F1(0-shot)</td><td>0.485</td><td>0.688</td><td>0.61</td><td>0.799</td><td>0.768</td><td>0.444</td><td>0.803</td><td>0.657</td></tr>
+<tr><td></td><td>F1(5-shot)</td><td>0.52</td><td>0.694</td><td>0.625</td><td>0.812</td><td>0.812</td><td>0.466</td><td>0.801</td><td>0.676</td></tr>
+<tr><td>PP-UIE-7B</td><td>F1(0-shot)</td><td>0.521</td><td>0.696</td><td>0.615</td><td>0.826</td><td>0.807</td><td>0.434</td><td>0.812</td><td>0.673</td></tr>
+<tr><td></td><td>F1(5-shot)</td><td>0.527</td><td>0.705</td><td>0.626</td><td>0.826</td><td>0.861</td><td>0.483</td><td>0.801</td><td>0.69</td></tr>
+<tr><td>PP-UIE-14B</td><td>F1(0-shot)</td><td>0.556</td><td>0.712</td><td>0.637</td><td>0.841</td><td>0.843</td><td>0.488</td><td>0.832</td><td>0.701</td></tr>
+<tr><td></td><td>F1(5-shot)</td><td>0.588</td><td>0.729</td><td>0.67</td><td>0.837</td><td>0.865</td><td>0.576</td><td>0.832</td><td>0.728</td></tr>
 </table>
+
 
 0-shot 表示无训练数据直接通过模型进行预测，5-shot 表示预测时使用五个数据样例作为提示。**实验表明 PP-UIE 在垂类场景可以通过少量数据（few-shot）进一步提升效果**。
