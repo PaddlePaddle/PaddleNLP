@@ -1,6 +1,6 @@
 # 向量检索模型训练
 
-推荐安装 gpu 版本的[PaddlePaddle](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/conda/linux-conda.html)，以 cuda11.7的 paddle 为例，安装命令如下：
+推荐安装 gpu 版本的[PaddlePaddle](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/conda/linux-conda.html)，以 cuda12.3的 paddle 为例，安装命令如下：
 
 ```
 conda install nccl -c conda-forge
