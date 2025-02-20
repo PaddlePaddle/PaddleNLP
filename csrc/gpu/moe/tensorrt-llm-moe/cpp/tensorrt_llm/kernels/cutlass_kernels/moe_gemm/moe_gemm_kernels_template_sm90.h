@@ -65,6 +65,8 @@
 #include <math.h>
 #include <sstream>
 
+#include "paddle/phi/core/enforce.h"
+
 namespace tensorrt_llm
 {
 using EpilogueFusion = HopperGroupedGemmInput::EpilogueFusion;
@@ -77,16 +79,16 @@ void dispatchMoeGemmSelectBiasSM90(HopperGroupedGemmInput hopper_input, int num_
     static_assert(kernels::cutlass_kernels::isValidHopperMOESpecialisation<T, WeightType, EpilogueTag>(),
         "Invalid hopper configuration invoked, fallback to Sm80");
 
-    TLLM_CHECK_WITH_INFO(
+    PADDLE_ENFORCE(
         workspace_size || hopper_input.isValid(), "Hopper specialisation is missing additional input information");
 
-    //            auto func = hopper_input.ptr_c ?
-    //            kernels::cutlass_kernels::genericMoeGemmKernelLauncherHopper<T, WeightType,
-    //                            cutlass::arch::Sm90, EpilogueTag, true>
-    //                                           :
-    //                                           kernels::cutlass_kernels::genericMoeGemmKernelLauncherHopper<T,
-    //                                           WeightType,
-    //                                               cutlass::arch::Sm90, EpilogueTag, false>;
+            //    auto func = hopper_input.ptr_c ?
+            //    kernels::cutlass_kernels::genericMoeGemmKernelLauncherHopper<T, WeightType,
+            //                    cutlass::arch::Sm90, EpilogueTag, true>
+            //                                   :
+            //                                   kernels::cutlass_kernels::genericMoeGemmKernelLauncherHopper<T,
+            //                                   WeightType,
+            //                                       cutlass::arch::Sm90, EpilogueTag, false>;
     // TODO(dastokes) Re-enable bias when CUTLASS supports it
     auto func = kernels::cutlass_kernels::sm90_generic_moe_gemm_kernelLauncher<T, WeightType, OutputType, EpilogueTag,
         FUSION, TileShape, ClusterShape, false>;

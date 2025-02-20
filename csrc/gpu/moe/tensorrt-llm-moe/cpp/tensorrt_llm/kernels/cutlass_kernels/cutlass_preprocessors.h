@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "tensorrt_llm/common/cudaUtils.h"
+#include "paddle/extension.h"
 
 namespace tensorrt_llm
 {
@@ -43,7 +44,7 @@ constexpr int get_weight_quant_bits(QuantType quant_type)
     case QuantType::W8_A16: return 8;
     case QuantType::W4_A16: return 4;
     case QuantType::W4_AFP8: return 4;
-    default: TLLM_CHECK_WITH_INFO(false, "Invalid quant_type"); return -1;
+    default: PADDLE_THROW("Invalid quant_type"); return -1;
     }
 }
 

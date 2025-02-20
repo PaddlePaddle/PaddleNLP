@@ -211,9 +211,9 @@ Tensor trt_llm_fused_moe_helper(Tensor input_activations,
         using BlockScaleGemmImplPtr = std::shared_ptr<tensorrt_llm::kernels::small_m_gemm::CutlassFp8BlockScaleGemmRunnerInterface>;
         BlockScaleGemmImplPtr mBlockScaleGemmImplPtr;
 
-        if (data_w == paddle::DataType::BFLOAT16) {
+        if (std::is_same_v<T, __nv_bfloat16>) {
             mBlockScaleGemmImplPtr
-                    = std::make_shared<kernels::small_m_gemm::CutlassFp8BlockScaleGemmRunner<__nv_bfloat16,
+                    = std::make_shared<tensorrt_llm::kernels::small_m_gemm::CutlassFp8BlockScaleGemmRunner<__nv_bfloat16,
                         __nv_bfloat16, __nv_bfloat16>>();
         } else {
             mBlockScaleGemmImplPtr = std::make_shared<tensorrt_llm::kernels::small_m_gemm::CutlassFp8BlockScaleGemmRunner<__nv_bfloat16,
@@ -236,7 +236,6 @@ Tensor trt_llm_fused_moe_helper(Tensor input_activations,
         // print_gpu_data<float>(scale1_ptr, 256 * 2 * 56, 15);
         auto fc1_scales_ptr = static_cast<float const*>(scale1_ptr);
         auto fc2_scales_ptr = static_cast<float const*>(scale2_ptr);
-
 
         deepseek_params = tensorrt_llm::kernels::BlockScaleParams(
             fc1_scales_ptr, fc2_scales_ptr, mBlockScaleGemmImplPtr, reinterpret_cast<char*>(deepseek_ws), &mMemcpyEvent);

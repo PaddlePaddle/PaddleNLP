@@ -51,7 +51,6 @@
 #pragma GCC diagnostic pop
 #endif
 
-#include "tensorrt_llm/common/assert.h"
 #include "tensorrt_llm/common/cudaUtils.h"
 #include "tensorrt_llm/common/logger.h"
 
@@ -68,6 +67,7 @@
 #include <cuda_fp16.h>
 #include <math.h>
 #include <sstream>
+#include "paddle/phi/core/enforce.h"
 
 namespace tensorrt_llm
 {
@@ -139,7 +139,7 @@ struct genericMoeGemmKernelLauncher
                               || std::is_same_v<T, __nv_fp8_e5m2>) &&std::is_same_v<EpilogueTag,
                               cutlass_extensions::EpilogueOpDefault>)
             {
-                TLLM_CHECK_WITH_INFO(weight_scales == nullptr && biases == nullptr && alpha_scale_ptr_array,
+                PADDLE_ENFORCE(weight_scales == nullptr && biases == nullptr && alpha_scale_ptr_array,
                     "weight_scales and biases should be nullptr and alpha_scale_ptr_array shouldn't be nullptr for FP8 "
                     "Ada");
                 epilogue_op.alpha_ptr_array = alpha_scale_ptr_array;
@@ -170,7 +170,7 @@ struct genericMoeGemmKernelLauncher
                 return;
             }
             int occupancy = std::min(2, GemmGrouped::maximum_active_blocks());
-            TLLM_CHECK_WITH_INFO(occupancy > 0, "GPU lacks the shared memory resources to run GroupedGEMM kernel");
+            PADDLE_ENFORCE(occupancy > 0, "GPU lacks the shared memory resources to run GroupedGEMM kernel");
             int const threadblock_count = multi_processor_count * occupancy;
 
             int const group_size = gemm_k;
@@ -183,17 +183,16 @@ struct genericMoeGemmKernelLauncher
             GemmGrouped gemm;
 
             auto can_implement = gemm.can_implement(args);
-            TLLM_CHECK_WITH_INFO(can_implement == cutlass::Status::kSuccess,
-                "MoE FC kernel will fail for params. Error: " + std::string(cutlassGetStatusString(can_implement)));
+            PADDLE_ENFORCE(can_implement == cutlass::Status::kSuccess,
+                "MoE FC kernel will fail for params.");
 
             auto init_status = gemm.initialize(args);
-            TLLM_CHECK_WITH_INFO(init_status == cutlass::Status::kSuccess,
-                "Failed to initialize cutlass grouped gemm. Error: "
-                    + std::string(cutlassGetStatusString(init_status)));
+            PADDLE_ENFORCE(init_status == cutlass::Status::kSuccess,
+                "Failed to initialize cutlass grouped gemm. Error");
 
             auto run_status = gemm.run(stream);
-            TLLM_CHECK_WITH_INFO(run_status == cutlass::Status::kSuccess,
-                "Failed to run cutlass grouped gemm. Error: " + std::string(cutlassGetStatusString(run_status)));
+            PADDLE_ENFORCE(run_status == cutlass::Status::kSuccess,
+                "Failed to run cutlass grouped gemm. Error");
         }
         else if constexpr (sizeof(ElementType) == 2 && sizeof(CutlassWeightType) == 2
             && (std::is_same_v<EpilogueTag, cutlass_extensions::EpilogueOpDefaultSilu>
@@ -252,7 +251,7 @@ static void dispatch(T const* A, WeightType const* B, GemmOutputType const* weig
     }
     else
     {
-        TLLM_THROW(
+        PADDLE_THROW(
             "Cutlass gemm. Not instantiated for arch %d with stages set to %d", Arch::kMinComputeCapability, Stages);
     }
 }
@@ -282,7 +281,7 @@ void dispatchGemmConfig(T const* A, WeightType const* B, GemmOutputType const* w
             biases, bias_is_broadcast, C, total_tokens_including_expert, num_rows, gemm_n, gemm_k, num_experts,
             gemm_config, multi_processor_count, use_fused_moe, alpha_scale_ptr_array, stream, occupancy);
         break;
-    default: TLLM_THROW("dispatchGemmConfig does not support stages %d", gemm_config.stages); break;
+    default: PADDLE_THROW("dispatchGemmConfig does not support stages %d", gemm_config.stages); break;
     }
 }
 
@@ -303,7 +302,7 @@ void dispatchMoeGemmToCutlass(T const* A, WeightType const* B, GemmOutputType co
     switch (gemm_config.tile_config)
     {
     case cutlass_extensions::CutlassTileConfig::CtaShape16x128x64_WarpShape16x32x64:
-        TLLM_CHECK_WITH_INFO(arch::kMinComputeCapability >= 75, "Invalid config on Volta");
+        PADDLE_ENFORCE(arch::kMinComputeCapability >= 75, "Invalid config on Volta");
         if constexpr (arch::kMinComputeCapability >= 75)
         {
             dispatchGemmConfig<T, WeightType, GemmOutputType, arch, EpilogueTag, cutlass::gemm::GemmShape<16, 128, 64>,
@@ -313,7 +312,7 @@ void dispatchMoeGemmToCutlass(T const* A, WeightType const* B, GemmOutputType co
         }
         break;
     case cutlass_extensions::CutlassTileConfig::CtaShape16x256x64_WarpShape16x64x64:
-        TLLM_CHECK_WITH_INFO(arch::kMinComputeCapability >= 75, "Invalid config on Volta");
+        PADDLE_ENFORCE(arch::kMinComputeCapability >= 75, "Invalid config on Volta");
         if constexpr (arch::kMinComputeCapability >= 75)
         {
             dispatchGemmConfig<T, WeightType, GemmOutputType, arch, EpilogueTag, cutlass::gemm::GemmShape<16, 256, 64>,
@@ -340,11 +339,11 @@ void dispatchMoeGemmToCutlass(T const* A, WeightType const* B, GemmOutputType co
             total_tokens_including_expert, total_rows, gemm_n, gemm_k, num_experts, gemm_config, multi_processor_count,
             use_fused_moe, alpha_scale_ptr_array, stream, occupancy);
         break;
-    case cutlass_extensions::CutlassTileConfig::Undefined: TLLM_THROW("GEMM config undefined."); break;
+    case cutlass_extensions::CutlassTileConfig::Undefined: PADDLE_THROW("GEMM config undefined."); break;
     case cutlass_extensions::CutlassTileConfig::ChooseWithHeuristic:
-        TLLM_THROW("GEMM config should have already been set by heuristic.");
+        PADDLE_THROW("GEMM config should have already been set by heuristic.");
         break;
-    default: TLLM_THROW("Config is invalid for same type tensorop GEMM."); break;
+    default: PADDLE_THROW("Config is invalid for same type tensorop GEMM."); break;
     }
 }
 
@@ -362,7 +361,7 @@ void dispatchMoeGemmToCutlass(T const* A, WeightType const* B, GemmOutputType co
     switch (gemm_config.tile_config)
     {
     case cutlass_extensions::CutlassTileConfig::CtaShape16x128x64_WarpShape16x32x64:
-        TLLM_CHECK_WITH_INFO(arch::kMinComputeCapability >= 75, "Invalid config on Volta");
+        PADDLE_ENFORCE(arch::kMinComputeCapability >= 75, "Invalid config on Volta");
         if constexpr (arch::kMinComputeCapability >= 75)
         {
             dispatchGemmConfig<T, WeightType, GemmOutputType, arch, EpilogueTag, cutlass::gemm::GemmShape<16, 128, 64>,
@@ -372,7 +371,7 @@ void dispatchMoeGemmToCutlass(T const* A, WeightType const* B, GemmOutputType co
         }
         break;
     case cutlass_extensions::CutlassTileConfig::CtaShape16x256x64_WarpShape16x64x64:
-        TLLM_CHECK_WITH_INFO(arch::kMinComputeCapability >= 75, "Invalid config on Volta");
+        PADDLE_ENFORCE(arch::kMinComputeCapability >= 75, "Invalid config on Volta");
         if constexpr (arch::kMinComputeCapability >= 75)
         {
             dispatchGemmConfig<T, WeightType, GemmOutputType, arch, EpilogueTag, cutlass::gemm::GemmShape<16, 256, 64>,
@@ -399,11 +398,11 @@ void dispatchMoeGemmToCutlass(T const* A, WeightType const* B, GemmOutputType co
             total_tokens_including_expert, total_rows, gemm_n, gemm_k, num_experts, gemm_config, multi_processor_count,
             use_fused_moe, alpha_scale_ptr_array, stream, occupancy);
         break;
-    case cutlass_extensions::CutlassTileConfig::Undefined: TLLM_THROW("GEMM config undefined."); break;
+    case cutlass_extensions::CutlassTileConfig::Undefined: PADDLE_THROW("GEMM config undefined."); break;
     case cutlass_extensions::CutlassTileConfig::ChooseWithHeuristic:
-        TLLM_THROW("GEMM config should have already been set by heuristic.");
+        PADDLE_THROW("GEMM config should have already been set by heuristic.");
         break;
-    default: TLLM_THROW("Config is invalid for mixed type tensorop GEMM."); break;
+    default: PADDLE_THROW("Config is invalid for mixed type tensorop GEMM."); break;
     }
 }
 
@@ -463,11 +462,11 @@ void dispatchMoeGemmToCutlass(T const* A, WeightType const* B, GemmOutputType co
             total_tokens_including_expert, total_rows, gemm_n, gemm_k, num_experts, gemm_config, multi_processor_count,
             use_fused_moe, alpha_scale_ptr_array, stream, occupancy);
         break;
-    case cutlass_extensions::CutlassTileConfig::Undefined: TLLM_THROW("GEMM config undefined."); break;
+    case cutlass_extensions::CutlassTileConfig::Undefined: PADDLE_THROW("GEMM config undefined."); break;
     case cutlass_extensions::CutlassTileConfig::ChooseWithHeuristic:
-        TLLM_THROW("GEMM config should have already been set by heuristic.");
+        PADDLE_THROW("GEMM config should have already been set by heuristic.");
         break;
-    default: TLLM_THROW("Config is invalid for same type tensorop GEMM."); break;
+    default: PADDLE_THROW("Config is invalid for same type tensorop GEMM."); break;
     }
 }
 #endif
@@ -489,11 +488,11 @@ void dispatchMoeGemmToCutlass(T const* A, WeightType const* B, GemmOutputType co
             total_tokens_including_expert, total_rows, gemm_n, gemm_k, num_experts, gemm_config, multi_processor_count,
             use_fused_moe, alpha_scale_ptr_array, stream, occupancy);
         break;
-    case cutlass_extensions::CutlassTileConfig::Undefined: TLLM_THROW("GEMM config undefined."); break;
+    case cutlass_extensions::CutlassTileConfig::Undefined: PADDLE_THROW("GEMM config undefined."); break;
     case cutlass_extensions::CutlassTileConfig::ChooseWithHeuristic:
-        TLLM_THROW("GEMM config should have already been set by heuristic.");
+        PADDLE_THROW("GEMM config should have already been set by heuristic.");
         break;
-    default: TLLM_THROW("Unsupported config for float MoE gemm."); break;
+    default: PADDLE_THROW("Unsupported config for float MoE gemm."); break;
     }
 }
 
@@ -630,9 +629,9 @@ void MoeGemmRunner<T, WeightType, OutputType, ScaleBiasType>::dispatchToArch<Epi
     // In the future this will vary based on what fusions are applied for FP8
     auto* C = reinterpret_cast<OutputType*>(C_void);
 
-    TLLM_CHECK_WITH_INFO(
+    PADDLE_ENFORCE(
         sm_ >= 89 || !hopper_input.isValid(), "Hopper input information is set for non specialised implementation");
-    TLLM_CHECK_WITH_INFO(
+    PADDLE_ENFORCE(
         sm_ == 90 || !gemm_config.is_sm90, "Hopper configuration provided for non-Hopper architecture");
 
     if (sm_ >= 75 && sm_ < 80)
@@ -650,7 +649,7 @@ void MoeGemmRunner<T, WeightType, OutputType, ScaleBiasType>::dispatchToArch<Epi
                 "FP8 GEMM Output not supported");
 #endif
 
-            TLLM_CHECK_WITH_INFO(sm_ == 89, "For sm >= 80 and < 90, fp8 is only supported with sm == 89");
+            PADDLE_ENFORCE(sm_ == 89, "For sm >= 80 and < 90, fp8 is only supported with sm == 89");
             dispatchMoeGemmToCutlass<T, WeightType, ScaleBiasType, cutlass::arch::Sm89, EpilogueTag>(A, B,
                 weight_scales, biases, bias_is_broadcast, C, total_tokens_including_expert, total_rows, gemm_n, gemm_k,
                 num_experts, gemm_config, multi_processor_count_, use_fused_moe, alpha_scale_ptr_array, stream,
@@ -673,9 +672,9 @@ void MoeGemmRunner<T, WeightType, OutputType, ScaleBiasType>::dispatchToArch<Epi
             // SM80 is faster. We check here to see which is selected
             if (gemm_config.is_sm90)
             {
-                TLLM_CHECK_WITH_INFO(biases != nullptr || hopper_input.ptr_c == nullptr,
+                PADDLE_ENFORCE(biases != nullptr || hopper_input.ptr_c == nullptr,
                     "Input biases and hopper input disagree if bias is enabled");
-                TLLM_CHECK_WITH_INFO(hopper_input.isValid(), "Calling SM90 configuration with invalid hopper config");
+                PADDLE_ENFORCE(hopper_input.isValid(), "Calling SM90 configuration with invalid hopper config");
 
                 // Select the appropriate fusion function
                 auto select_function = [&]()
@@ -690,7 +689,7 @@ void MoeGemmRunner<T, WeightType, OutputType, ScaleBiasType>::dispatchToArch<Epi
                             HopperGroupedGemmInput::EpilogueFusion::NONE>;
                     case HopperGroupedGemmInput::EpilogueFusion::ACTIVATION:
                     case HopperGroupedGemmInput::EpilogueFusion::GATED_ACTIVATION:
-                    default: TLLM_THROW("Unimplemented fusion %d requested", (int) hopper_input.fusion);
+                    default: PADDLE_THROW("Unimplemented fusion %d requested", (int) hopper_input.fusion);
                     };
                 };
                 auto selected_func = select_function();
@@ -705,10 +704,10 @@ void MoeGemmRunner<T, WeightType, OutputType, ScaleBiasType>::dispatchToArch<Epi
         // Do Ampere case instead
         if constexpr (kernels::cutlass_kernels::isValidAmpereMOESpecialisation<T, WeightType, EpilogueTag>())
         {
-            TLLM_CHECK_WITH_INFO(!hopper_input.isValid(),
+            PADDLE_ENFORCE(!hopper_input.isValid(),
                 "Non-specialised Hopper implementation is being rerouted to fallback implementation so input "
                 "information is not required");
-            TLLM_CHECK_WITH_INFO(!gemm_config.is_sm90,
+            PADDLE_ENFORCE(!gemm_config.is_sm90,
                 "GEMM config is for SM90 configuration, but this configuration is not valid for Hppper");
             dispatchMoeGemmToCutlass<T, WeightType, ScaleBiasType, cutlass::arch::Sm80, EpilogueTag>(A, B,
                 weight_scales, biases, bias_is_broadcast, C, total_tokens_including_expert, total_rows, gemm_n, gemm_k,
@@ -717,12 +716,12 @@ void MoeGemmRunner<T, WeightType, OutputType, ScaleBiasType>::dispatchToArch<Epi
         }
         else
         {
-            TLLM_THROW("Configuration expects SM80 but configuration is not supported by SM80 kernels");
+            PADDLE_THROW("Configuration expects SM80 but configuration is not supported by SM80 kernels");
         }
     }
     else
     {
-        TLLM_THROW("Arch unsupported for MoE GEMM");
+        PADDLE_THROW("Arch unsupported for MoE GEMM");
     }
 }
 
@@ -731,7 +730,6 @@ size_t MoeGemmRunner<T, WeightType, OutputType, ScaleBiasType>::getMaxWorkspaceS
 {
     if (num_experts != num_experts_)
     {
-        TLLM_LOG_TRACE("Calling getMaxWorkspaceSize() with a new expert count %d vs %d", num_experts, num_experts_);
         num_experts_ = num_experts;
         gemm_workspace_size_ = calcMaxWorkspaceSize(num_experts);
     }
@@ -764,19 +762,19 @@ size_t MoeGemmRunner<T, WeightType, OutputType, ScaleBiasType>::calcMaxWorkspace
         }                                                                                                              \
         catch (tensorrt_llm::common::TllmException const& e)                                                           \
         {                                                                                                              \
-            TLLM_LOG_TRACE("Unsupported config skipped when calculating MOE workspace size");                          \
+            std::cout << "Unsupported config skipped when calculating MOE workspace size" << std::endl;                          \
         }                                                                                                              \
     } while (0)
 
             CALC_SIZE_FUSION(HopperGroupedGemmInput::EpilogueFusion::NONE);
             CALC_SIZE_FUSION(HopperGroupedGemmInput::EpilogueFusion::FINALIZE);
         }
-        TLLM_CHECK_WITH_INFO(has_config, "Could not find valid config when calculating workspace size");
+        PADDLE_ENFORCE(has_config, "Could not find valid config when calculating workspace size");
         return max_size;
     }
     else
     {
-        TLLM_THROW("Attempting to calculate Hopper GEMM workspace size with unsupported weight combination");
+        PADDLE_THROW("Attempting to calculate Hopper GEMM workspace size with unsupported weight combination");
         return 0;
     }
 }
@@ -833,8 +831,8 @@ void MoeGemmRunner<T, WeightType, OutputType, ScaleBiasType>::moeGemmBiasAct(T c
             total_tokens_including_expert, hopper_input, total_rows, gemm_n, gemm_k, num_experts, use_fused_moe,
             alpha_scale_ptr_array, stream, chosen_conf);
         break;
-    case ActivationType::InvalidType: TLLM_THROW("Activation type for fpA_intB must be valid."); break;
-    default: TLLM_THROW("Invalid activation type."); break;
+    case ActivationType::InvalidType: PADDLE_THROW("Activation type for fpA_intB must be valid."); break;
+    default: PADDLE_THROW("Invalid activation type."); break;
     }
 }
 

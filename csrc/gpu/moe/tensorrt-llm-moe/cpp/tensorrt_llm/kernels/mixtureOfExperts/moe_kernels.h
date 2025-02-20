@@ -17,7 +17,6 @@
 
 #pragma once
 #include "cutlass/gemm/gemm.h"
-#include "tensorrt_llm/common/assert.h"
 #include "tensorrt_llm/common/quantization.h"
 #include "tensorrt_llm/common/cudaUtils.h"
 #include "tensorrt_llm/kernels/cutlass_kernels/moe_gemm/moe_gemm_kernels.h"

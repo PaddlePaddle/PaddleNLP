@@ -228,6 +228,7 @@ out1 = trt_llm_fused_moe(
             top_k,
             3,
             quant_method,
+            "Swiglu"
         )
 print(out1)
 if paddle.isnan(out1).sum().item() > 0:
@@ -248,6 +249,7 @@ out = trt_llm_fused_moe(
             top_k,
             3,
             quant_method,
+            "Swiglu"
         )
 print(out)
 

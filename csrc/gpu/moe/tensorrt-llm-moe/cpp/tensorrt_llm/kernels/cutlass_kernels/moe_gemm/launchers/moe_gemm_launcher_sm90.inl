@@ -42,7 +42,6 @@
 #include "cutlass_extensions/gemm/kernel/moe_cutlass_kernel.h"
 #include "cutlass_extensions/gemm/threadblock/default_mma.h"
 
-#include "tensorrt_llm/common/assert.h"
 #include "tensorrt_llm/common/cudaUtils.h"
 #include "tensorrt_llm/kernels/cutlass_kernels/cutlass_heuristic.h"
 #include "tensorrt_llm/kernels/cutlass_kernels/cutlass_type_conversion.h"
@@ -55,6 +54,7 @@
 #include <cuda_fp16.h>
 #include <math.h>
 #include <sstream>
+#include "paddle/phi/core/enforce.h"
 
 namespace tensorrt_llm
 {
@@ -316,30 +316,29 @@ void sm90_generic_moe_gemm_kernelLauncher(HopperGroupedGemmInput hopper_input, i
             mainloop_params, epilogue_params, hw_info, scheduler_args};
 
         size_t calculated_ws_size = gemm.get_workspace_size(args);
-        TLLM_CHECK_WITH_INFO(calculated_ws_size <= hopper_input.gemm_workspace_size,
+        PADDLE_ENFORCE(calculated_ws_size <= hopper_input.gemm_workspace_size,
             "Workspace is size %zu but only %zu were allocated", calculated_ws_size, hopper_input.gemm_workspace_size);
 
         auto can_implement = gemm.can_implement(args);
-        TLLM_CHECK_WITH_INFO(can_implement == cutlass::Status::kSuccess,
-            "Grouped GEMM kernel will fail for params. Error: " + std::string(cutlassGetStatusString(can_implement)));
+        PADDLE_ENFORCE(can_implement == cutlass::Status::kSuccess,
+            "Grouped GEMM kernel will fail for params.");
 
         auto init_status = gemm.initialize(args, hopper_input.gemm_workspace);
-        TLLM_CHECK_WITH_INFO(init_status == cutlass::Status::kSuccess,
-            "Failed to initialize cutlass SM90 grouped gemm. Error: "
-                + std::string(cutlassGetStatusString(init_status)));
+        PADDLE_ENFORCE(init_status == cutlass::Status::kSuccess,
+            "Failed to initialize cutlass SM90 grouped gemm. ");
 
         auto run_status = gemm.run(stream);
-        TLLM_CHECK_WITH_INFO(run_status == cutlass::Status::kSuccess,
-            "Failed to run cutlass SM90 grouped gemm. Error: " + std::string(cutlassGetStatusString(run_status)));
+        PADDLE_ENFORCE(run_status == cutlass::Status::kSuccess,
+            "Failed to run cutlass SM90 grouped gemm. Error ");
         sync_check_cuda_error();
     }
     else
     {
-        TLLM_THROW("Configuration was disabled by FAST_BUILD");
+        PADDLE_THROW("Configuration was disabled by FAST_BUILD");
     }
 
 #else  // COMPILE_HOPPER_TMA_GEMMS
-    TLLM_THROW("Please recompile with support for hopper by passing 90-real as an arch to build_wheel.py.");
+    PADDLE_THROW("Please recompile with support for hopper by passing 90-real as an arch to build_wheel.py.");
 #endif // COMPILE_HOPPER_TMA_GEMMS
 }
 

@@ -17,7 +17,7 @@
 #pragma once
 
 #include "tensorrt_llm/common/cudaBf16Fallbacks.cuh"
-#include "tensorrt_llm/common/cudaBf16Wrapper.h"
+#include <cuda_bf16.h>
 #include "tensorrt_llm/common/cudaFp8Utils.h"
 #include <assert.h>
 #include <cuda.h>

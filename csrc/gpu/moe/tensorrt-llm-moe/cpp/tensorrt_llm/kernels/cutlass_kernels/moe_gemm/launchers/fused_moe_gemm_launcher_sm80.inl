@@ -26,6 +26,7 @@
 #include <cutlass_extensions/epilogue_helpers.h>
 #include <cutlass_extensions/gemm/kernel/fused_moe_kernel.cuh>
 #include <tensorrt_llm/common/cudaUtils.h>
+#include "paddle/phi/core/enforce.h"
 
 namespace tensorrt_llm::kernels::cutlass_kernels
 {
@@ -73,7 +74,7 @@ void sm80_generic_fused_moe_gemm_kernelLauncher(ElementType_ const* A, CutlassWe
     }
     int occupancy = std::min(2, fused_moe::fused_gemm_maximum_active_blocks<GemmType>());
     int const threadblock_count = multi_processor_count * occupancy;
-    TLLM_CHECK_WITH_INFO(occupancy > 0, "GPU lacks the shared memory resources to run fused_moe kernel");
+    PADDLE_ENFORCE(occupancy > 0, "GPU lacks the shared memory resources to run fused_moe kernel");
     using Arguments = typename GemmType::Arguments;
     Arguments args{{const_cast<ElementType_*>(A), const_cast<CutlassWeightType_*>(B), const_cast<ElementType_*>(biases),
                        reinterpret_cast<ElementType_*>(C), total_tokens_including_expert, static_cast<int>(gemm_n),
@@ -84,13 +85,13 @@ void sm80_generic_fused_moe_gemm_kernelLauncher(ElementType_ const* A, CutlassWe
     {
         cudaError_t result = cudaFuncSetAttribute(
             fused_moe::run_global<GemmType>, cudaFuncAttributeMaxDynamicSharedMemorySize, GemmType::kSmemSize);
-        TLLM_CHECK_WITH_INFO(result == cudaSuccess,
-            "Fail to set the max smem size to " + std::to_string(GemmType::kSmemSize) + " for fused moe kernel");
+        PADDLE_ENFORCE(result == cudaSuccess,
+            "Fail to set the max smem size for fused moe kernel");
     }
     dim3 grid(params.threadblock_count, 1, 1);
     dim3 block(GemmType::kThreadCount);
     fused_moe::run_global<GemmType><<<grid, block, GemmType::kSmemSize, stream>>>(params);
     auto result = cudaGetLastError();
-    TLLM_CHECK_WITH_INFO(result == cudaSuccess, "Fail to execute fused moe kernel, cuda error %d\n", (int) (result));
+    PADDLE_ENFORCE(result == cudaSuccess, "Fail to execute fused moe kernel, cuda error %d\n", (int) (result));
 }
 } // namespace tensorrt_llm::kernels::cutlass_kernels

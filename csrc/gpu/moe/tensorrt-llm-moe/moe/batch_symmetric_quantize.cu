@@ -1,7 +1,7 @@
 
 #pragma once
 
-#include "tensorrt_llm/common/cudaBf16Wrapper.h"
+#include <cuda_bf16.h>
 #include "tensorrt_llm/kernels/mixtureOfExperts/moe_kernels.h"
 #include "tensorrt_llm/kernels/cutlass_kernels/cutlass_preprocessors.h"
 #include <cuda_bf16.h>
