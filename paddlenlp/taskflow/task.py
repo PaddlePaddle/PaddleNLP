@@ -20,6 +20,7 @@ from abc import abstractmethod
 from multiprocessing import cpu_count
 
 import paddle
+from paddle.base.framework import use_pir_api
 from paddle.dataset.common import md5file
 
 from ..utils.env import (
@@ -58,7 +59,15 @@ class Task(metaclass=abc.ABCMeta):
         self._param_updated = False
 
         self._num_threads = self.kwargs["num_threads"] if "num_threads" in self.kwargs else math.ceil(cpu_count() / 2)
-        self._infer_precision = self.kwargs["precision"] if "precision" in self.kwargs else "fp32"
+        if (
+            self.task == "paddlenlp/PP-UIE-0.5B"
+            or self.task == "paddlenlp/PP-UIE-1.5B"
+            or self.task == "paddlenlp/PP-UIE-7B"
+            or self.task == "paddlenlp/PP-UIE-14B"
+        ):
+            self._infer_precision = self.kwargs["precision"] if "precision" in self.kwargs else "float16"
+        else:
+            self._infer_precision = self.kwargs["precision"] if "precision" in self.kwargs else "fp32"
         # Default to use Paddle Inference
         self._predictor_type = "paddle-inference"
         # The root directory for storing Taskflow related files, default to ~/.paddlenlp.
@@ -216,14 +225,22 @@ class Task(metaclass=abc.ABCMeta):
             # TODO(linjieccc): enable after fixed
             self._config.delete_pass("embedding_eltwise_layernorm_fuse_pass")
             self._config.delete_pass("fused_multi_transformer_encoder_pass")
+            self._config.delete_pass("fused_rotary_position_embedding_pass")
+
+        self._config.switch_ir_optim(True)
+        self._config.enable_new_executor()
+
         self._config.set_cpu_math_library_num_threads(self._num_threads)
         self._config.switch_use_feed_fetch_ops(False)
         self._config.disable_glog_info()
         self._config.enable_memory_optim()
-
         # TODO(linjieccc): some temporary settings and will be remove in future
         # after fixed
-        if self.task in ["document_intelligence", "knowledge_mining", "zero_shot_text_classification"]:
+        if self.task in [
+            "document_intelligence",
+            "knowledge_mining",
+            "zero_shot_text_classification",
+        ]:
             self._config.switch_ir_optim(False)
         if self.model == "uie-data-distill-gp":
             self._config.enable_memory_optim(False)
@@ -284,7 +301,6 @@ class Task(metaclass=abc.ABCMeta):
         """
         if self._custom_model:
             param_path = os.path.join(self._task_path, "model_state.pdparams")
-
             if os.path.exists(param_path):
                 cache_info_path = os.path.join(self._task_path, ".cache_info")
                 md5 = md5file(param_path)
@@ -302,13 +318,20 @@ class Task(metaclass=abc.ABCMeta):
                     fp.write(md5 + "taskflow")
                     fp.close()
                     model_state = paddle.load(param_path)
-                    prefix_map = {"UIE": "ernie", "UIEM": "ernie_m", "UIEX": "ernie_layout"}
+                    prefix_map = {
+                        "UIE": "ernie",
+                        "UIEM": "ernie_m",
+                        "UIEX": "ernie_layout",
+                    }
                     new_state_dict = {}
                     for name, param in model_state.items():
                         if "ernie" in name:
                             new_state_dict[name] = param
                         elif "encoder.encoder" in name:
-                            trans_name = name.replace("encoder.encoder", prefix_map[self._init_class] + ".encoder")
+                            trans_name = name.replace(
+                                "encoder.encoder",
+                                prefix_map[self._init_class] + ".encoder",
+                            )
                             new_state_dict[trans_name] = param
                         elif "encoder" in name:
                             trans_name = name.replace("encoder", prefix_map[self._init_class])
@@ -348,6 +371,7 @@ class Task(metaclass=abc.ABCMeta):
                     self._construct_input_spec()
                     self._convert_dygraph_to_static()
 
+
         self._static_model_file = self.inference_model_path + PADDLE_INFERENCE_MODEL_SUFFIX
         self._static_params_file = self.inference_model_path + PADDLE_INFERENCE_WEIGHTS_SUFFIX
 
@@ -374,7 +398,10 @@ class Task(metaclass=abc.ABCMeta):
             self._static_model_file = self._static_fp16_model_file
             self._static_params_file = self._static_fp16_params_file
         if self._predictor_type == "paddle-inference":
-            self._config = paddle.inference.Config(self._static_model_file, self._static_params_file)
+            if use_pir_api():
+                self._config = paddle.inference.Config(self._static_json_file, self._static_params_file)
+            else:
+                self._config = paddle.inference.Config(self._static_model_file, self._static_params_file)
             self._prepare_static_mode()
         else:
             self._prepare_onnx_mode()
@@ -390,7 +417,9 @@ class Task(metaclass=abc.ABCMeta):
             self._input_spec is not None
         ), "The input spec must be created before converting the dygraph model to static model."
         logger.info("Converting to the inference model cost a little time.")
+
         static_model = paddle.jit.to_static(self._model, input_spec=self._input_spec, full_graph=True)
+
         paddle.jit.save(static_model, self.inference_model_path)
         logger.info("The inference model save in the path:{}".format(self.inference_model_path))
 
