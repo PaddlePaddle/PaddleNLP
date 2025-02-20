@@ -115,7 +115,7 @@ sources = [
     "./gpu/speculate_decoding_kernels/speculate_get_output.cc",
 ]
 sources += find_end_files("./gpu/speculate_decoding_kernels", ".cu")
-# sources = []
+sources = []
 # moe
 sources += [
         "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/cutlass_heuristic.cpp",
@@ -190,16 +190,16 @@ nvcc_compile_args += ["-DENABLE_BF16"]
 cc = get_sm_version()
 cuda_version = float(paddle.version.cuda())
 
-if cc >= 80:
-    sources += ["gpu/int8_gemm_with_cutlass/gemm_dequant.cu"]
+# if cc >= 80:
+#     sources += ["gpu/int8_gemm_with_cutlass/gemm_dequant.cu"]
 
-    sources += [
-        "./gpu/append_attention.cu",
-        "./gpu/append_attn/get_block_shape_and_split_kv_block.cu",
-        "./gpu/append_attn/decoder_write_cache_with_rope_kernel.cu",
-        "./gpu/append_attn/speculate_write_cache_with_rope_kernel.cu",
-    ]
-    sources += find_end_files("./gpu/append_attn/template_instantiation", ".cu")
+#     sources += [
+#         "./gpu/append_attention.cu",
+#         "./gpu/append_attn/get_block_shape_and_split_kv_block.cu",
+#         "./gpu/append_attn/decoder_write_cache_with_rope_kernel.cu",
+#         "./gpu/append_attn/speculate_write_cache_with_rope_kernel.cu",
+#     ]
+#     sources += find_end_files("./gpu/append_attn/template_instantiation", ".cu")
 
 
 fp8_auto_gen_directory = "gpu/cutlass_kernels/fp8_gemm_fused/autogen"

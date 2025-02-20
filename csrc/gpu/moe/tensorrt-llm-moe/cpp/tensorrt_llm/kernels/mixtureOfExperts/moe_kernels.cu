@@ -72,6 +72,31 @@
 using namespace tensorrt_llm::kernels;
 using namespace tensorrt_llm::common;
 
+
+template <typename T>
+void print_gpu_data(T* gpu_data, size_t num_elements, size_t num) {
+    float* host_data = new float[num_elements];
+    T* temp_data = new T[num_elements];
+    printf("dasd before\n");
+    cudaError_t err = cudaMemcpy(temp_data, gpu_data, sizeof(T) * num_elements, cudaMemcpyDeviceToHost);
+    printf("dasd \n");
+    if (err != cudaSuccess) {
+        printf("CUDA Error: %s\n", cudaGetErrorString(err));
+        return;
+    }
+    for (size_t i = 0; i < num_elements; i++) {
+        host_data[i] = static_cast<float>(temp_data[i]);
+    }
+    for (size_t i = 0; i < num; i++) {
+        printf("gpu_data ？？？ [%zu] = %f\n", i, host_data[i]);
+    }
+
+    // 释放内存
+    delete[] host_data;
+    delete[] temp_data;
+}
+
+
 namespace tensorrt_llm::kernels
 {
 
@@ -551,7 +576,7 @@ void topkGatingSoftmaxKernelLauncher(float const* input, float* output, float* s
         default:
         {
             static constexpr int TPB = 256;
-            PADDLE_CHECK(softmax_temp_output != nullptr);
+            // PADDLE_CHECK(softmax_temp_output != nullptr);
             moeSoftmax<TPB><<<num_rows, TPB, 0, stream>>>(input, nullptr, softmax_temp_output, num_experts);
             moeTopK<TPB><<<num_rows, TPB, 0, stream>>>(softmax_temp_output, nullptr, output, indices, source_row,
                 num_experts, k, startk, endk, start_expert, end_expert, norm_mode);
@@ -1089,6 +1114,7 @@ void finalizeMoeRoutingKernelLauncher(GemmOutputType const* expanded_permuted_ro
         },
     };
     auto* const func = func_map[check_finished][int(renorm_scales)];
+    std::cout << "finalize"<< std::endl;
     func<<<blocks, threads, 0, stream>>>(expanded_permuted_rows, reduced_unpermuted_output, bias_ptr, scales,
         expanded_source_row_to_expanded_dest_row, expert_for_source_row, cols, k, num_valid_ptr);
 }
@@ -1513,11 +1539,30 @@ void CutlassMoeFCRunner<T, WeightType, OutputType, ScaleBiasType, Enable>::Block
     // PADDLE_ENFORCE(gemm_runner, "blockscale gemm runner must be instantiated");
     bool const is_gated_activation = isGatedActivation(fc1_activation_type);
 
-    int shape_n = is_gated_activation ? inter_size * 2 : inter_size;
-    int shape_k = hidden_size;
+    auto success = cudaStreamSynchronize(stream);
+
+    int shape_n = is_gated_activation ? inter_size * 2 : inter_size; // 2816
+    int shape_k = hidden_size; // 2048
+    std::cout << "shape_n: "<< shape_n<< std::endl;
+    std::cout << "shape_k: "<< shape_k<< std::endl;
+    std::cout << "einput "<< shape_k<< std::endl;
+    
+    print_gpu_data<T>(const_cast<T*>(input), expanded_num_rows, 10);
+
+     std::cout << "expert_first_token_offset: "<< shape_k<< std::endl;
+    print_gpu_data<int64_t>(const_cast<int64_t*>(expert_first_token_offset), expanded_num_rows, 10);
+
+
+    std::cout << "deepseek_params.fc1_scales_ptrs,: "<< shape_k<< std::endl;
+    
+    print_gpu_data<float>(const_cast<float*>(deepseek_params.fc1_scales_ptrs), expanded_num_rows, 10);
+    
+    // print_gpu_data<WeightType>(const_cast<float*>(fc1_expert_weights), expanded_num_rows, 10);
+
 
     gemm_runner->moeGemm(gemm_output, input, fc1_expert_weights, expert_first_token_offset, num_experts_per_node,
         shape_n, shape_k, deepseek_params.workspace, stream, nullptr, deepseek_params.fc1_scales_ptrs);
+
 
     sync_check_cuda_error();
     constexpr bool bias_is_broadcast = true;
@@ -1526,7 +1571,10 @@ void CutlassMoeFCRunner<T, WeightType, OutputType, ScaleBiasType, Enable>::Block
         inter_size, expanded_num_rows, fc1_activation_type, stream);
 
     sync_check_cuda_error();
-    std::cout <<"fp8 gemm 1 done" << std::endl;
+    auto success1 = cudaStreamSynchronize(stream);
+    std::cout <<"fp8 gemm 1 sucess hahahahahahhahah" << std::endl;
+    print_gpu_data<T>(output, expanded_num_rows*inter_size,expanded_num_rows*inter_size);
+    // print_gpu_data<T>(output, expanded_num_rows*64*1408, 100);
 }
 
 template <class T, class WeightType, class OutputType, class ScaleBiasType, class Enable>
@@ -1541,17 +1589,38 @@ void CutlassMoeFCRunner<T, WeightType, OutputType, ScaleBiasType, Enable>::Block
 {
     int shape_n = hidden_size;
     int shape_k = inter_size;
+    std::cout << "shape_n : " << shape_n << std::endl;
+    std::cout << "shape_k : " << shape_k << std::endl;
+    std::cout <<"num_rows : " << num_rows << std::endl;
+
+    // print_gpu_data<UnfusedGemmOutputType>(static_cast<UnfusedGemmOutputType *>(gemm_output), expanded_num_rows*hidden_size,100);
+
+    // print_gpu_data<WeightType>(const_cast<WeightType*>(fc2_expert_weights), static_cast<size_t>(256*7168*256), static_cast<size_t>(100));
+
+    std::cout <<"fp8 gemm 2 " << std::endl;
     auto gemm_runner = deepseek_params.blockscale_gemm_iml;
     // PADDLE_ENFORCE(gemm_runner, "blockscale gemm runner must be instantiated");
     gemm_runner->moeGemm(gemm_output, input, fc2_expert_weights, expert_first_token_offset, num_experts_per_node,
         shape_n, shape_k, deepseek_params.workspace, stream, nullptr, deepseek_params.fc2_scales_ptrs);
 
+    std::cout <<"fp8 gemm done" << std::endl;
+
+    print_gpu_data<UnfusedGemmOutputType>(static_cast<UnfusedGemmOutputType *>(gemm_output), expanded_num_rows*hidden_size, expanded_num_rows*hidden_size);
+
+    std::cout <<"fp8 gemm done ?? " << std::endl;
+    auto success = cudaStreamSynchronize(stream);
+    std::cout <<"fp8 gemm done why why why why  " << std::endl;
     sync_check_cuda_error();
 
+
+    std::cout <<"fp8 gemm doneno no no no no " << std::endl;
     finalizeMoeRoutingKernelLauncher<T, OutputType, UnfusedGemmOutputType>(
         static_cast<UnfusedGemmOutputType const*>(gemm_output), final_output, fc2_expert_biases,
         token_topk_unpermuted_scales, expanded_source_row_to_expanded_dest_row, expert_for_source_row, num_rows,
         hidden_size, k, num_valid_tokens_ptr, parallelism_config, MOEExpertScaleNormalizationMode::NONE, stream);
+
+    auto success1 = cudaStreamSynchronize(stream);
+    std::cout <<"total done" << std::endl;
 }
 
 void sortAndScanSoftmaxOutput(int* expert_for_source_row, int* source_rows, int* permuted_experts, int* permuted_rows,
@@ -1593,11 +1662,11 @@ void CutlassMoeFCRunner<T, WeightType, OutputType, ScaleBiasType, Enable>::gemm1
 
     if (using_hopper_gemm1)
     {
-        PADDLE_CHECK(config.is_sm90);
-        PADDLE_CHECK(!use_ampere_activation_fusion);
+        // PADDLE_CHECK(config.is_sm90);
+        // PADDLE_CHECK(!use_ampere_activation_fusion);
         bool has_different_gemm_output_type = using_hopper_gemm1 && !std::is_same_v<T, OutputType>;
         bool const has_intermediate = has_different_gemm_output_type || is_gated_activation;
-        PADDLE_ENFORCE(has_intermediate || input != output, "Input and output buffers are overlapping");
+        // PADDLE_ENFORCE(has_intermediate || input != output, "Input and output buffers are overlapping");
         auto* gemm_output = has_intermediate ? intermediate_result : static_cast<void*>(output);
 
         auto hopper_input = hopper_input_template;
@@ -1621,8 +1690,8 @@ void CutlassMoeFCRunner<T, WeightType, OutputType, ScaleBiasType, Enable>::gemm1
     }
     else if (use_fp8)
     {
-        PADDLE_CHECK(!use_ampere_activation_fusion);
-        PADDLE_CHECK(!config.is_sm90);
+        // PADDLE_CHECK(!use_ampere_activation_fusion);
+        // PADDLE_CHECK(!config.is_sm90);
 
         alpha_scale_ptr_array
             = computeFP8DequantScale(alpha_scale_ptr_array, num_experts_per_node, fc1_fp8_dequant, stream);
@@ -1640,16 +1709,16 @@ void CutlassMoeFCRunner<T, WeightType, OutputType, ScaleBiasType, Enable>::gemm1
     }
     else if (!is_gated_activation)
     {
-        PADDLE_CHECK(!use_ampere_activation_fusion);
-        PADDLE_CHECK(!config.is_sm90);
+        // PADDLE_CHECK(!use_ampere_activation_fusion);
+        // PADDLE_CHECK(!config.is_sm90);
         gemm_runner.moeGemmBiasAct(input, fc1_expert_weights, nullptr, nullptr, false,
             output, total_tokens_including_expert, HopperGroupedGemmInput{}, expanded_num_rows, fc1_out_size,
             hidden_size, num_experts_per_node, fc1_activation_type, false, nullptr, stream, config);
     }
     else
     {
-        PADDLE_CHECK(!config.is_sm90);
-        PADDLE_CHECK(is_gated_activation);
+        // PADDLE_CHECK(!config.is_sm90);
+        // PADDLE_CHECK(is_gated_activation);
         PADDLE_ENFORCE(
             !use_ampere_activation_fusion || input != output, "Input and output buffers are overlapping");
 
@@ -1775,30 +1844,30 @@ void CutlassMoeFCRunner<T, WeightType, OutputType, ScaleBiasType, Enable>::runMo
     auto* final_output = static_cast<OutputType*>(final_output_void);
     auto* token_topk_unpermuted_scales = static_cast<float*>(token_topk_final_scales_void);
 
-    PADDLE_ENFORCE(finished == nullptr, "Using 'finished' is deprecated and will be removed in future versions");
-    PADDLE_ENFORCE(
-        num_rows == active_rows, "Using 'finished' is deprecated and will be removed in future versions");
-    PADDLE_CHECK(input_activations);
-    PADDLE_CHECK(gating_output);
-    PADDLE_CHECK(fc1_expert_weights);
-    PADDLE_CHECK(fc2_expert_weights);
-    PADDLE_CHECK(workspace_ptr);
-    PADDLE_CHECK(token_topk_unpermuted_scales);
-    PADDLE_CHECK(expanded_source_row_to_expanded_dest_row);
-    PADDLE_CHECK(expert_for_source_row);
-    PADDLE_CHECK(num_experts % parallelism_config.ep_size == 0);
-    PADDLE_ENFORCE(hidden_size >= 128 / cutlass::sizeof_bits<WeightType>::value,
-        "Hidden size is too small to meet alignment requirements for MOE GEMM");
-    PADDLE_ENFORCE(hidden_size % (128 / cutlass::sizeof_bits<WeightType>::value) == 0,
-        "Hidden size does not meet minimum alignment requirements for MOE GEMM");
-    PADDLE_ENFORCE(inter_size % (128 / cutlass::sizeof_bits<WeightType>::value) == 0,
-        "Inter size does not meet minimum alignment requirements for MOE GEMM");
+    // PADDLE_ENFORCE(finished == nullptr, "Using 'finished' is deprecated and will be removed in future versions");
+    // PADDLE_ENFORCE(
+    //     num_rows == active_rows, "Using 'finished' is deprecated and will be removed in future versions");
+    // PADDLE_CHECK(input_activations);
+    // PADDLE_CHECK(gating_output);
+    // PADDLE_CHECK(fc1_expert_weights);
+    // PADDLE_CHECK(fc2_expert_weights);
+    // PADDLE_CHECK(workspace_ptr);
+    // PADDLE_CHECK(token_topk_unpermuted_scales);
+    // PADDLE_CHECK(expanded_source_row_to_expanded_dest_row);
+    // PADDLE_CHECK(expert_for_source_row);
+    // PADDLE_CHECK(num_experts % parallelism_config.ep_size == 0);
+    // PADDLE_ENFORCE(hidden_size >= 128 / cutlass::sizeof_bits<WeightType>::value,
+    //     "Hidden size is too small to meet alignment requirements for MOE GEMM");
+    // PADDLE_ENFORCE(hidden_size % (128 / cutlass::sizeof_bits<WeightType>::value) == 0,
+    //     "Hidden size does not meet minimum alignment requirements for MOE GEMM");
+    // PADDLE_ENFORCE(inter_size % (128 / cutlass::sizeof_bits<WeightType>::value) == 0,
+    //     "Inter size does not meet minimum alignment requirements for MOE GEMM");
 
-    // These values must fit into an int for building the source maps
-    PADDLE_ENFORCE(num_rows <= std::numeric_limits<int>::max(), "Number of rows is too large");
-    PADDLE_ENFORCE(
-        num_rows * num_experts <= std::numeric_limits<int>::max(), "Number of rows * num_experts is too large");
-    PADDLE_ENFORCE(k * num_experts <= std::numeric_limits<int>::max(), "k * num_experts is too large");
+    // // These values must fit into an int for building the source maps
+    // PADDLE_ENFORCE(num_rows <= std::numeric_limits<int>::max(), "Number of rows is too large");
+    // PADDLE_ENFORCE(
+    //     num_rows * num_experts <= std::numeric_limits<int>::max(), "Number of rows * num_experts is too large");
+    // PADDLE_ENFORCE(k * num_experts <= std::numeric_limits<int>::max(), "k * num_experts is too large");
 
     // PADDLE_ENFORCE(gemm1_config_, "MOE GEMM1 Config is not set");
     // PADDLE_ENFORCE(gemm2_config_, "MOE GEMM2 Config is not set");

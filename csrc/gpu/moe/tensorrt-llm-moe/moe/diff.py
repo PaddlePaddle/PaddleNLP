@@ -66,21 +66,24 @@ def GetQuantizedWeights(quant_method, w1, w2, arch=80):
     else:
         return bmm_w0, bmm_w1, None, None
 
-path = "/root/paddlejob/workspace/env_run/gaoziyuan/PaddleNLP/moe_input"
+path = "/root/paddlejob/workspace/env_run/output/gaoziyuan/PaddleNLP/csrc/gpu/moe/tensorrt-llm-moe/moe/moe_input"
 input_down = paddle.load(path)
 
 # 64, 1408, 1024]
-from paddlenlp_ops import trt_llm_fused_moe, batch_symmetric_quantize
+from paddlenlp_ops import trt_llm_fused_moe
 
 gate_weight = input_down["gate_weights[i]"]
-# print(gate_weight.shape) [2048, 64]
 tmp_out = input_down["tmp_out"]
 ffn1_weights = input_down["ffn1_weights[i]"]
 ffn2_weights = input_down["ffn2_weights[i]"]
-
 # tmp_out = paddle.ones([110, 2048]).cast("bfloat16")
-
-quant_method = "weight_only_int4"
+gate_out = paddle.matmul(tmp_out.cast("float32"), gate_weight)
+print(tmp_out.shape)
+print(gate_out.shape)
+print(ffn1_weights.shape)
+print(ffn2_weights.shape)
+# exit(0)÷
+quant_method = "weight_only_int8"
 
 def permute(x):
     shape_x = x.shape
@@ -115,18 +118,20 @@ np.set_printoptions(threshold=np.inf)
 # ffn1_weights = c
 
 
+a, b = paddle.chunk(ffn1_weights, 2, axis=-1)
+trt_weight_1 = paddle.concat([b,a], axis=-1)
+print("拼接后的shape", trt_weight_1.shape)
+
 
 bmm_w0_quantized, bmm_w1_quantized, scale0, scale1 = GetQuantizedWeights(quant_method, contiguous(ffn1_weights), contiguous(ffn2_weights))
 
 
 
 
-a, b = paddle.chunk(ffn1_weights, 2, axis=-1)
-trt_weight_1 = paddle.concat([b,a], axis=-1)
-print("拼接后的shape", trt_weight_1.shape)
 
 
-bmm_w0_quantized_trt, bmm_w1_quantized_trt,scale0_trt, scale1_trt = GetQuantizedWeights(quant_method, trt_weight_1, contiguous(ffn2_weights))
+
+bmm_w0_quantized_trt, bmm_w1_quantized_trt,scale0_trt, scale1_trt = GetQuantizedWeights(quant_method, contiguous(ffn1_weights), contiguous(ffn2_weights))
 # bmm_w1
 # [64, 2048, 1408]#
 # print(bmm_w0_quantized_trt.shape) # [64, 1408, 1024]
@@ -136,7 +141,27 @@ bmm_w0_quantized_trt, bmm_w1_quantized_trt,scale0_trt, scale1_trt = GetQuantized
 # _, bmm_w1_quantized_trt, scale1_trt = symmetric_quantize(ffn2_weights.cpu(), quant_method)
 
 
-gate_out = paddle.matmul(tmp_out.cast("float32"), gate_weight)
+print(tmp_out.shape)
+print(gate_out.shape)
+print(ffn1_weights.shape)
+print(ffn2_weights.shape)
+
+out = trt_llm_fused_moe(
+    tmp_out,
+    gate_out,
+    ffn1_weights,
+    ffn2_weights,
+    None,
+    None,
+    None,
+    6,
+    0,
+    "none",
+    "Swiglu"
+)
+print(out)
+exit(0)
+
 fused_moe_out_1 = trt_llm_fused_moe(
             tmp_out,
             gate_out,

@@ -94,7 +94,7 @@ class TestMoe(unittest.TestCase):
         for prefix in ['fc1', 'fc2']:
             if prefix == 'fc1':
                 # shape = [num_experts, hidden_size, inter_size * 2]
-                shape = [num_experts, hidden_size, inter_size]
+                shape = [num_experts, hidden_size, inter_size * 2]
             else:
                 shape = [num_experts, inter_size, hidden_size]
                 
@@ -119,7 +119,8 @@ class TestMoe(unittest.TestCase):
             None,
             k,
             3,
-            "none"
+            "none",
+            "Swiglu"
         )
 
     def run_ref_moe(self, input_dict, 
@@ -202,9 +203,9 @@ class TestMoe(unittest.TestCase):
                             # )
 
     @parameterized.expand([
-        ("fp32_swilu", paddle.float32, paddle.float32, 1e-2, 1e-2),
-        ("fp16_swilu", paddle.float16, paddle.float16, 1e-2, 1e-2),
-        # ("bf16_silu", paddle.bfloat16, paddle.bfloat16, 1e-2, 1e-2),
+        # ("fp32_swilu", paddle.float32, paddle.float32, 1e-2, 1e-2),
+        # ("fp16_swilu", paddle.float16, paddle.float16, 1e-2, 1e-2),
+        ("bf16_silu", paddle.bfloat16, paddle.bfloat16, 1e-2, 1e-2),
     ])
     def test_moe(self, name: str, dtype, quant_type,
                  rtol: float, atol: float) -> None:

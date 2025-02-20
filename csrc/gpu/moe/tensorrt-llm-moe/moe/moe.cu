@@ -162,6 +162,8 @@ Tensor trt_llm_fused_moe_helper(Tensor input_activations,
     const int num_rows = input_activations.shape()[0];//(num_tokens, hidden_size)
     const int hidden_size = input_activations.shape()[1];
     const int inter_size = fc2_expert_weights.shape()[1]; //(num_experts, inter_size, hidden_size)
+    // std::cout << "我修改了iner_size "<< std::endl;
+    // const int inter_size = fc2_expert_weights.shape()[2];
     const int fc1_inter_size = fc1_expert_weights.shape()[2];
 
     PD_CHECK(inter_size == fc1_inter_size || inter_size * 2 == fc1_inter_size);
@@ -184,8 +186,8 @@ Tensor trt_llm_fused_moe_helper(Tensor input_activations,
     void* scale1_ptr = nullptr;
     void* scale2_ptr = nullptr;
 
-    WeightType* fc1_weights_ptr = reinterpret_cast<WeightType*>(fc1_expert_weights.data<data_w>());
-    WeightType* fc2_weights_ptr = reinterpret_cast<WeightType*>(fc2_expert_weights.data<data_w>());
+    const void* fc1_weights_ptr = nullptr;
+    const void* fc2_weights_ptr = nullptr;
 
 
     bool use_deepseek = false;
@@ -197,21 +199,27 @@ Tensor trt_llm_fused_moe_helper(Tensor input_activations,
         scale1_ptr = get_ptr<data_t>(scale1);
         scale2_ptr = get_ptr<data_t>(scale2);
         quant_params = tensorrt_llm::kernels::QuantParams::Int(scale1_ptr, scale2_ptr);
+        fc1_weights_ptr = reinterpret_cast<WeightType*>(fc1_expert_weights.data<data_w>());
+        fc2_weights_ptr = reinterpret_cast<WeightType*>(fc2_expert_weights.data<data_w>());
     } else if (quant_method == "fp8_block_wise") {
         // fp8 scale是float
         scale1_ptr = get_ptr<float>(scale1);
         scale2_ptr = get_ptr<float>(scale2);
+        std::cout <<"trt nmsl " << std::endl;
+        fc1_weights_ptr = reinterpret_cast<const void*>(fc1_expert_weights.data<phi::dtype::float8_e4m3fn>());
+        fc2_weights_ptr = reinterpret_cast<const void*>(fc2_expert_weights.data<phi::dtype::float8_e4m3fn>());
+    } else {
+        fc1_weights_ptr = reinterpret_cast<WeightType*>(fc1_expert_weights.data<data_w>());
+        fc2_weights_ptr = reinterpret_cast<WeightType*>(fc2_expert_weights.data<data_w>());
     }
 
     tensorrt_llm::kernels::BlockScaleParams deepseek_params;
     if (use_deepseek)
     {    
-         std::cout <<"in 2" << std::endl;
-
         using BlockScaleGemmImplPtr = std::shared_ptr<tensorrt_llm::kernels::small_m_gemm::CutlassFp8BlockScaleGemmRunnerInterface>;
         BlockScaleGemmImplPtr mBlockScaleGemmImplPtr;
 
-        if (std::is_same_v<T, __nv_bfloat16>) {
+        if (std::is_same_v<WeightType, __nv_bfloat16>) {
             mBlockScaleGemmImplPtr
                     = std::make_shared<tensorrt_llm::kernels::small_m_gemm::CutlassFp8BlockScaleGemmRunner<__nv_bfloat16,
                         __nv_bfloat16, __nv_bfloat16>>();
@@ -224,7 +232,6 @@ Tensor trt_llm_fused_moe_helper(Tensor input_activations,
         cudaEvent_t mMemcpyEvent;
         bool is_gated_activation = isGatedActivation(fc1_activation_type);
         int factor = is_gated_activation ? 2 : 1;
-        std::cout <<"factor hahahha:" << factor << std::endl;
         size_t deepseek_fc1_size = mBlockScaleGemmImplPtr->getWorkspaceSize(
             num_rows * k, factor * inter_size, hidden_size, num_experts);
         size_t deepseek_fc2_size = mBlockScaleGemmImplPtr->getWorkspaceSize(
@@ -244,7 +251,7 @@ Tensor trt_llm_fused_moe_helper(Tensor input_activations,
     // deepseek相关参数
     int sm = getSMVersion();
     tensorrt_llm::kernels::CutlassMoeFCRunner<T, WeightType> moe_runner;
-    std::cout <<"in 5" << std::endl;
+    // std::cout <<"in 5" << std::endl;
 
     auto [tactic1, tactic2] = selectTacticsForArch(moe_runner, sm);
     moe_runner.setTactic(std::make_optional(tactic1), std::make_optional(tactic2));
@@ -424,11 +431,11 @@ std::vector<paddle::Tensor> TrtLLMFusedMoe(const paddle::Tensor&     input_activ
     const auto weight_type = fc1_expert_weights.dtype();
     int     active_rows;
     const int num_rows    = input_activations.shape()[0];
-    const int hidden_size = input_activations.shape()[1];
-    const int num_experts = gating_output.shape()[1];
+    // const int hidden_size = input_activations.shape()[1];
+    // const int num_experts = gating_output.shape()[1];
 
     const auto quant_type = fc2_expert_weights.dtype();
-    const int inter_size = fc2_expert_weights.shape()[1];
+    // const int inter_size = fc2_expert_weights.shape()[1];
 
     Tensor output_tensor;
 
@@ -542,6 +549,7 @@ std::vector<paddle::Tensor> TrtLLMFusedMoe(const paddle::Tensor&     input_activ
                                                                                 normalization_mode,
                                                                                 quant_method);
                     } else {
+                        std::cout << "i want" << std::endl;
                         output_tensor = trt_llm_fused_moe_helper<__nv_bfloat16, __nv_fp8_e4m3>(input_activations,
                                                                                 gating_output,
                                                                                 fc1_expert_weights,

@@ -156,14 +156,25 @@ gate_out = paddle.matmul(tmp_out.cast("float32"), gate_weight)
 #         )
 # print(fused_moe_out_1)
 
+print(ffn1_fp8.shape)
+print(ffn2_fp8.shape)
+print(scale_1.shape)
+print(scale_2.shape)
 
+# [64, 2048, 2816]
 
+# [64, 1408, 2048]
+# [64, 16, 22]
+# [64, 11, 16]
+
+# exit(0)
 quant_method = "fp8_block_wise"
+tmp_out = tmp_out[:64]
 fused_moe_out_1 = trt_llm_fused_moe(
             tmp_out,
             gate_out,
-            ffn1_fp8,
-            ffn2_fp8,
+            ffn1_fp8.reshape([64, -1, 2048]),
+            ffn2_fp8.reshape([64, 2048, -1]),
             scale_1,
             scale_2,
             # scale0,
@@ -193,22 +204,22 @@ print(fused_moe_out_1)
 
 
 
-fused_moe_out = fused_moe(
-            tmp_out,
-            gate_weight,
-            # bmm_w0_quantized,
-            # bmm_w1_quantized,
-            ffn1_weights, 
-            ffn2_weights,
-            None,
-            # original_scale0,
-            # scale0,
-            None,
-            None,
-            None,
-            # scale1,
-            quant_method,
-            # "none",
-            6,
-            False,
-        )
+# fused_moe_out = fused_moe(
+#             tmp_out,
+#             gate_weight,
+#             # bmm_w0_quantized,
+#             # bmm_w1_quantized,
+#             ffn1_weights, 
+#             ffn2_weights,
+#             None,
+#             # original_scale0,
+#             # scale0,
+#             None,
+#             None,
+#             None,
+#             # scale1,
+#             quant_method,
+#             # "none",
+#             6,
+#             False,
+#         )
