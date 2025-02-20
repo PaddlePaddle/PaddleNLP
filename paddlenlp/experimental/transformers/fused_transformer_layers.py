@@ -1208,13 +1208,14 @@ class FusedMultiTransformerBase(Layer):
         from paddlenlp_ops import trt_llm_fused_moe
         gate_out = paddle.matmul(tmp_out.cast("float32"), self.gate_weights[i])
 
-        # input_dict = {}
-        # input_dict["tmp_out"] = tmp_out
-        # input_dict["gate_weights[i]"] = self.gate_weights[i]
-        # input_dict["ffn1_weights[i]"] = self.ffn1_weights[i]
-        # input_dict["ffn2_weights[i]"] = self.ffn2_weights[i]
-        # path = "/root/paddlejob/workspace/env_run/output/gaoziyuan/PaddleNLP/csrc/gpu/moe/tensorrt-llm-moe/moe/moe_input"
-        # paddle.save(input_dict, path)
+        input_dict = {}
+        input_dict["tmp_out"] = tmp_out
+        input_dict["gate_weights[i]"] = self.gate_weights[i]
+        input_dict["ffn1_weights[i]"] = self.ffn1_weights[i]
+        input_dict["ffn2_weights[i]"] = self.ffn2_weights[i]
+        path = "/root/paddlejob/workspace/env_run/output/gaoziyuan/PaddleNLP/csrc/gpu/moe/tensorrt-llm-moe/moe/moe_input"
+        paddle.save(input_dict, path)
+        exit(0)
 
         flag = False
         if hasattr(self, "quant_type"):

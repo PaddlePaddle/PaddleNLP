@@ -6,7 +6,6 @@ Use TensorRT LLM MoE as a library
 ### Build
 
 ```shell
-apt-get install tensorrt
 python3 setup_cuda.py install
 ```
 
