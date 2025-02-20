@@ -16,6 +16,7 @@
 
 PYTHON_VERSION=python
 PYTHON_VERSION=${1:-$PYTHON_VERSION}
+SM_VERSION=${2:-$SM_VERSION}
 export python=$PYTHON_VERSION
 
 # directory config
@@ -65,7 +66,9 @@ function init() {
 function generate_sm_versions_and_build_ops() {
    cuda_version=`${python} -c "import paddle; print(float(paddle.version.cuda()))"`
    echo "CUDA version is: $cuda_version"
-   if echo "$cuda_version >= 12.4" | awk '{if ($0) exit 0; exit 1}'; then
+   if [ ! -z "$SM_VERSION" ]; then
+      sm_versions=($SM_VERSION )
+   elif echo "$cuda_version >= 12.4" | awk '{if ($0) exit 0; exit 1}'; then
        sm_versions=(70 80 80 86 89 90 )
    else
        sm_versions=(70 75 80 86 89 ) 

@@ -556,9 +556,19 @@ taskflow (){
     print_info $? taskflow
 }
 llm(){
-    cd ${nlp_dir}/csrc
-    echo "build paddlenlp_op"
-    python setup_cuda.py install
+    if git diff --numstat "$AGILE_COMPILE_BRANCH" | awk '{print $NF}' | grep -q '^csrc/'; then
+        echo "Found modifications in csrc, running setup_cuda.py install and uploading it to bos."
+        cd ${nlp_dir}/csrc
+        # python setup_cuda.py install
+        bash tools/build_wheel.sh python3.10 80
+        cp ./dist/p****.whl ${PPNLP_HOME}/upload/
+        cd ${PPNLP_HOME}
+        python upload.py ${PPNLP_HOME}/upload 'paddlenlp/wheels'
+        rm -rf upload/*
+    else
+        echo "No modifications in csrc, installing paddlenlp_ops wheel file..."
+        python -m pip install https://paddlenlp.bj.bcebos.com/wheels/paddlenlp_ops-0.0.0-py3-none-any.whl
+    fi
 
     sleep 5
     
