@@ -191,7 +191,7 @@ class MLAConfig:
         return self.kv_lora_rank is not None
 
     def use_absorb(self) -> bool:
-        return self.use_mla and self.use_matrix_absorption
+        return self.use_mla() and self.use_matrix_absorption
 
     @property
     def qk_head_dim(self) -> int:
