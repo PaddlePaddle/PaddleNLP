@@ -687,13 +687,14 @@ class MoEGate(PretrainedMoEGate):
                 dtype=paddle.get_default_dtype(),
                 default_initializer=nn.initializer.Constant(0.0),
             )
+            self.e_score_correction_bias.is_distributed = True
 
     def forward(self, hidden_states):
         """
         Args:
             hidden_states (_type_): [batch_size * seq_len, hidden_size]
         """
-        _, h_dim = hidden_states.shape
+        _, _, h_dim = hidden_states.shape
 
         # compute gating score
         logits = F.linear(hidden_states, self.weight, None)
@@ -762,6 +763,7 @@ class DeepseekV2MoE(MoELayer):
     def forward(self, hidden_states):
         final_hidden_states, l_aux, l_zloss = super().forward(hidden_states)
         if self.training and self.alpha > 0.0:
+            l_aux = l_aux * self.alpha
             final_hidden_states = AddAuxiliaryLoss.apply(final_hidden_states, l_aux)
 
         if self.config.n_shared_experts is not None:
