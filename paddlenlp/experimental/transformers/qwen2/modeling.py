@@ -1523,3 +1523,15 @@ class Qwen2VLForConditionalGenerationBlockInferenceModel(Qwen2ForCausalLMBlockIn
     def __init__(self, config):
         super().__init__(config)
         self.qwen2.base_model_prefix = "model"
+        
+        
+        
+class Qwen2VLForConditionalGenerationBlockInferenceModel1:
+        """
+    NOTE: (changwenbin) This class inherits from Qwen2ForCausalLMBlockInferenceModel.
+    Used only for QWen2-VL's second part.
+    """
+
+    # NOTE: (changwenbin) This function corresponds to QWen2-VL's second part, only used for QWen2-VL.
+    def __init__(self, config):
+        super().__init__(config)
