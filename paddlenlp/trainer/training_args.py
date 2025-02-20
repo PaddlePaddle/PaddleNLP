@@ -889,6 +889,14 @@ class TrainingArguments:
         default=False,
         metadata={"help": "Offload optimizer after optimizer.step()"},
     )
+    count_trained_tokens: bool = field(
+        default=False,
+        metadata={"help": "Whether to count trained tokens."},
+    )
+    pad_token_id: int = field(
+        default=0,
+        metadata={"help": "The id of the padding token."},
+    )
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
