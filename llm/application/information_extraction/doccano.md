@@ -24,7 +24,7 @@
 
 ## 2. 项目创建
 
-LLM-UIE 支持抽取类型的任务，根据实际需要创建一个新的项目：
+PP-UIE 支持抽取类型的任务，根据实际需要创建一个新的项目：
 
 #### 2.1 抽取式任务项目创建
 
@@ -51,7 +51,7 @@ LLM-UIE 支持抽取类型的任务，根据实际需要创建一个新的项目
     <img src=https://user-images.githubusercontent.com/40840292/167247061-d5795c26-7a6f-4cdb-88ad-107a3cae5446.png height=300 hspace='15'/>
 </div>
 
-**NOTE**：doccano 支持`TextFile`、`TextLine`、`JSONL`和`CoNLL`四种数据上传格式，LLM-UIE 定制训练中**统一使用 TextLine**这一文件格式，即上传的文件需要为 txt 格式，且在数据标注时，该文件的每一行待标注文本显示为一页内容。
+**NOTE**：doccano 支持`TextFile`、`TextLine`、`JSONL`和`CoNLL`四种数据上传格式，PP-UIE 定制训练中**统一使用 TextLine**这一文件格式，即上传的文件需要为 txt 格式，且在数据标注时，该文件的每一行待标注文本显示为一页内容。
 
 <a name="标签构建"></a>
 
