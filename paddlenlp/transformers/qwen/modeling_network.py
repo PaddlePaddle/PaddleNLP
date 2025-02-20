@@ -314,7 +314,7 @@ class QWenMLPNet(nn.Layer):
         # a2 = self.w2(hidden_states)
         # intermediate_parallel = a1 * F.silu(a2)
         # down
-        if self.fuse_attention_ffn and not enable_fuse_ffn_qkv_pass()::
+        if self.fuse_attention_ffn and not enable_fuse_ffn_qkv_pass():
             intermediate_parallel = swiglu(self.gate_up_fused_proj(hidden_states))
         else:
             intermediate_parallel = swiglu(self.w2(hidden_states), self.w1(hidden_states))
