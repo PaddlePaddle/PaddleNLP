@@ -1205,60 +1205,94 @@ class FusedMultiTransformerBase(Layer):
             # renormalize 和 refactor 在后面做
             return scores, scores_no_bias
 
-        if self.config.moe_config.topk_method is not None:
-            from paddle.incubate.nn.functional import moe_dispatch, moe_ffn, moe_reduce
+        from paddlenlp_ops import trt_llm_fused_moe
+        gate_out = paddle.matmul(tmp_out.cast("float32"), self.gate_weights[i])
 
-            gate_out = paddle.matmul(tmp_out.cast("float32"), self.gate_weights[i])
-            # 应用各种策略后重塑的 scores
-            scores, scores_no_bias = get_moe_scores(gate_out, self.config.moe_config)
-            # topk 在 moe_dispatch 中
-            (
-                permute_input,
-                token_nums_per_expert,
-                permute_indices_per_token,
-                top_k_weights,
-                top_k_indices,
-            ) = moe_dispatch(tmp_out, scores, self.config.moe_config.top_k, False, topk_only_mode=True)
+        # input_dict = {}
+        # input_dict["tmp_out"] = tmp_out
+        # input_dict["gate_weights[i]"] = self.gate_weights[i]
+        # input_dict["ffn1_weights[i]"] = self.ffn1_weights[i]
+        # input_dict["ffn2_weights[i]"] = self.ffn2_weights[i]
+        # path = "/root/paddlejob/workspace/env_run/output/gaoziyuan/PaddleNLP/csrc/gpu/moe/tensorrt-llm-moe/moe/moe_input"
+        # paddle.save(input_dict, path)
 
-            ffn_out = moe_ffn(
-                permute_input,
-                token_nums_per_expert,
-                self.ffn1_weights[i],
-                self.ffn2_weights[i],
-                self.ffn1_biases[i],
-                self.ffn1_weights_scale[i] if hasattr(self, "ffn1_weights_scale") else None,
-                self.ffn2_weights_scale[i] if hasattr(self, "ffn2_weights_scale") else None,
-                self.quant_type if hasattr(self, "quant_type") else "None",
-            )
+        flag = False
+        if hasattr(self, "quant_type"):
+            if self.quant_type == "weight_only_int4":
+                flag = True
 
-            if e_score_correction_bias is not None:
-                top_k_weights = scores_no_bias.take_along_axis(top_k_indices, axis=1)
-
-            # reduce 中会做 topk 个 weight 的 norm 和 routed_scaling_factor
-            fused_moe_out = moe_reduce(
-                ffn_out,
-                top_k_weights,
-                permute_indices_per_token,
-                top_k_indices,
-                self.ffn2_biases[i],
-                norm_topk_prob=self.config.moe_config.norm_topk_prob,
-                routed_scaling_factor=self.config.moe_config.routed_scaling_factor,
-            )
-        else:
-            fused_moe_out = fused_moe(
-                tmp_out,
-                self.gate_weights[i],
-                self.ffn1_weights[i],
-                self.ffn2_weights[i],
-                self.ffn1_biases[i],
-                self.ffn1_weights_scale[i] if hasattr(self, "ffn1_weights_scale") else None,
-                self.ffn2_biases[i],
-                self.ffn2_weights_scale[i] if hasattr(self, "ffn2_weights_scale") else None,
-                self.quant_type if hasattr(self, "quant_type") else "None",
-                self.config.moe_config.top_k,
-                self.config.moe_config.norm_topk_prob,
-            )
+        fused_moe_out = trt_llm_fused_moe(
+            tmp_out,
+            gate_out,
+            self.ffn1_weights[i].reshape([64, 2048, -1]) if flag else self.ffn1_weights[i],
+            # 注意self.ffn2_weights[i]在被wint4被前面给reshape了
+            self.ffn2_weights[i].reshape([64, -1, 1024]) if flag else self.ffn2_weights[i],
+            # self.ffn1_weights[i],
+            # self.ffn2_weights[i],
+            self.ffn1_weights_scale[i] if hasattr(self, "ffn1_weights_scale") else None,
+            self.ffn2_weights_scale[i] if hasattr(self, "ffn2_weights_scale") else None,
+            None,
+            self.config.moe_config.top_k,
+            0,
+            self.quant_type if hasattr(self, "quant_type") else "None",
+            "Swiglu"
+        )
         return fused_moe_out
+
+        # if self.config.moe_config.topk_method is not None:
+        #     from paddle.incubate.nn.functional import moe_dispatch, moe_ffn, moe_reduce
+
+        #     gate_out = paddle.matmul(tmp_out.cast("float32"), self.gate_weights[i])
+        #     # 应用各种策略后重塑的 scores
+        #     scores, scores_no_bias = get_moe_scores(gate_out, self.config.moe_config)
+        #     # topk 在 moe_dispatch 中
+        #     (
+        #         permute_input,
+        #         token_nums_per_expert,
+        #         permute_indices_per_token,
+        #         top_k_weights,
+        #         top_k_indices,
+        #     ) = moe_dispatch(tmp_out, scores, self.config.moe_config.top_k, False, topk_only_mode=True)
+
+        #     ffn_out = moe_ffn(
+        #         permute_input,
+        #         token_nums_per_expert,
+        #         self.ffn1_weights[i],
+        #         self.ffn2_weights[i],
+        #         self.ffn1_biases[i],
+        #         self.ffn1_weights_scale[i] if hasattr(self, "ffn1_weights_scale") else None,
+        #         self.ffn2_weights_scale[i] if hasattr(self, "ffn2_weights_scale") else None,
+        #         self.quant_type if hasattr(self, "quant_type") else "None",
+        #     )
+
+        #     if e_score_correction_bias is not None:
+        #         top_k_weights = scores_no_bias.take_along_axis(top_k_indices, axis=1)
+
+        #     # reduce 中会做 topk 个 weight 的 norm 和 routed_scaling_factor
+        #     fused_moe_out = moe_reduce(
+        #         ffn_out,
+        #         top_k_weights,
+        #         permute_indices_per_token,
+        #         top_k_indices,
+        #         self.ffn2_biases[i],
+        #         norm_topk_prob=self.config.moe_config.norm_topk_prob,
+        #         routed_scaling_factor=self.config.moe_config.routed_scaling_factor,
+        #     )
+        # else:
+        #     fused_moe_out = fused_moe(
+        #         tmp_out,
+        #         self.gate_weights[i],
+        #         self.ffn1_weights[i],
+        #         self.ffn2_weights[i],
+        #         self.ffn1_biases[i],
+        #         self.ffn1_weights_scale[i] if hasattr(self, "ffn1_weights_scale") else None,
+        #         self.ffn2_biases[i],
+        #         self.ffn2_weights_scale[i] if hasattr(self, "ffn2_weights_scale") else None,
+        #         self.quant_type if hasattr(self, "quant_type") else "None",
+        #         self.config.moe_config.top_k,
+        #         self.config.moe_config.norm_topk_prob,
+        #     )
+        # return fused_moe_out
 
     def compute_activation(self, ffn1_out, i):
         return fused_bias_act(ffn1_out, self.ffn1_biases[i], act_method=self.activation)

@@ -148,6 +148,7 @@ include_path = ["/usr/include/x86_64-linux-gnu/",
                 "third_party/cutlass/include",
                 "third_party/cutlass/tools/util/include",
                 "gpu/moe/tensorrt-llm-moe/cpp/",
+                "gpu/moe/tensorrt-llm-moe/",
                 "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/cutlass_extensions/include/",
                 ]
 
@@ -182,8 +183,8 @@ nvcc_compile_args += [
 ]
 
 # 多线程编译
-num_threads = min(os.cpu_count(), 8)
-nvcc_compile_args += ["--threads", str(num_threads)]
+# num_threads = min(os.cpu_count(), 8)
+# nvcc_compile_args += ["--threads", str(num_threads)]
 nvcc_compile_args += ["-DENABLE_BF16"]
 
 cc = get_sm_version()
