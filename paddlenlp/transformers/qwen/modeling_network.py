@@ -306,6 +306,7 @@ class QWenMLPNet(nn.Layer):
         else:
             self.w1 = nn.Linear(config.hidden_size, ff_dim_in, bias_attr=False)
             self.w2 = nn.Linear(config.hidden_size, ff_dim_in, bias_attr=False)
+        self.c_proj = nn.Linear(ff_dim_in, config.hidden_size, bias_attr=False)
 
     def forward(self, hidden_states):
         # # up
