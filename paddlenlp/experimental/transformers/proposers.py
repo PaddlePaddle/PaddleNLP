@@ -108,6 +108,7 @@ class InferenceWithReferenceProposer(Proposer):
             seq_lens_this_time,
             seq_lens_encoder,
             seq_lens_decoder,
+            model_inputs["max_length"].cpu(),
             kargs["real_batch_size"],
             self.max_ngram_size,
             self.max_draft_token_num,
@@ -144,6 +145,7 @@ class ModelProposer(Proposer):
         assert self.draft_type in (
             "draft_model",
             "eagle",
+            "mtp",
         ), f"draft_type support [draft_model, eagle], but get {self.draft_type}"
 
         self.max_draft_tokens = self.args.speculate_max_draft_token_num
@@ -170,7 +172,6 @@ class ModelProposer(Proposer):
         tensor_parallel_rank, tensor_parallel_degree = llm_utils.init_dist_env()
 
         self.config = AutoConfig.from_pretrained(self.args.draft_model_name_or_path)
-        self.config["decode_strategy"] = "draft_model_sample"
         self.model = AutoInferenceModelForCausalLM.from_pretrained(
             self.args.model_name_or_path,
             config=self.config,
@@ -179,7 +180,7 @@ class ModelProposer(Proposer):
             dtype=self.args.dtype,
             tensor_parallel_degree=tensor_parallel_degree,
             tensor_parallel_rank=tensor_parallel_rank,
-            is_eagle=True if self.draft_type == "eagle" else False,
+            spec_model_type=self.draft_type,
         )
 
         # prepare model_inputs
@@ -282,7 +283,7 @@ max_dec_len({self.args.max_length}) > max_seq_len({max_sec_len})"
             share_inputs["stop_flags"],
             share_inputs["draft_tokens"],
             self.max_draft_tokens,
-            self.draft_type,
+            self.draft_type in ["eagle", "mtp"],
         )
 
     def run_infer(self, share_inputs, **kwargs):
@@ -371,7 +372,6 @@ class EagleProposer(ModelProposer):
             while self.model_inputs["not_need_stop"] and self.model_inputs["substep"] < self.max_draft_tokens:
                 self.last_seq_lens_this_time[:] = self.model_inputs["seq_lens_this_time"][:]
                 output_hidden_states = self.model.generate(**self.model_inputs)
-
                 self.model_inputs["substep"] += 1
                 if self.model_inputs["not_need_stop"] and self.model_inputs["substep"] < self.actual_draft_token_num:
                     self.model_inputs["hidden_states"] = eagle_get_self_hidden_states(

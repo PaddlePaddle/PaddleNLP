@@ -359,7 +359,7 @@ def total_processes_number(local_rank):
     return 1
 
 
-def speed_metrics(split, start_time, num_samples=None, num_steps=None, seq_length=None, model_flops=None):
+def speed_metrics(split, start_time, num_samples=None, num_steps=None, seq_length=None, model_flops_per_token=None):
     """
     Measure and return speed performance metrics.
 
@@ -380,9 +380,9 @@ def speed_metrics(split, start_time, num_samples=None, num_steps=None, seq_lengt
         if seq_length is not None:
             tokens_per_second_per_device = samples_per_second * seq_length / paddle.distributed.get_world_size()
             result[f"{split}_tokens_per_second_per_device"] = round(tokens_per_second_per_device, 4)
-        if model_flops is not None:
+        if model_flops_per_token is not None:
             result[f"{split}_hardware_tflops_per_device"] = round(
-                tokens_per_second_per_device * model_flops / seq_length / 2**40, 2
+                tokens_per_second_per_device * model_flops_per_token / 2**40, 2
             )
 
     if num_steps is not None:

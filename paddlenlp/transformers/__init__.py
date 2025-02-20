@@ -212,6 +212,7 @@ from .layoutxlm.configuration import *
 from .layoutxlm.modeling import *
 from .layoutxlm.tokenizer import *
 from .llama import *
+from .llm_embed.modeling import *
 from .luke.configuration import *
 from .luke.modeling import *
 from .luke.tokenizer import *
@@ -243,6 +244,7 @@ from .mt5.modeling import *
 from .nezha.configuration import *
 from .nezha.modeling import *
 from .nezha.tokenizer import *
+from .nv_embed.modeling import *
 from .nystromformer.configuration import *
 from .nystromformer.modeling import *
 from .nystromformer.tokenizer import *

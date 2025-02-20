@@ -52,7 +52,9 @@ from paddlenlp.transformers.model_outputs import (
     CausalLMOutputWithCrossAttentions,
 )
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
+from paddlenlp.utils.tools import get_env_device
 
+from . import fusion_ops
 from .configuration import (
     LLAMA_PRETRAINED_INIT_CONFIGURATION,
     LLAMA_PRETRAINED_RESOURCE_FILES_MAP,
@@ -69,7 +71,6 @@ from .modeling import (
     build_alibi_tensor,
     get_triangle_upper_mask,
     repeat_kv,
-    rms_norm_fused,
 )
 
 try:
@@ -218,7 +219,9 @@ class LlamaRMSNormAuto(nn.Layer):
 
     def forward(self, hidden_states):
         if self.config.use_fused_rms_norm:
-            return rms_norm_fused(hidden_states, self.weight, self.variance_epsilon)
+            return fusion_ops.fusion_rms_norm(
+                hidden_states, self.weight, self.variance_epsilon, self.config.use_fast_layer_norm
+            )
 
         with paddle.amp.auto_cast(False):
             variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
@@ -308,7 +311,7 @@ class LlamaAttentionAuto(nn.Layer):
         self.ipp = ipp
 
         self.use_fused_rope = config.use_fused_rope
-        if self.use_fused_rope:
+        if self.use_fused_rope and get_env_device() not in ["npu", "mlu", "xpu", "gcu", "intel_hpu"]:
             if "gpu" not in paddle.device.get_device() or fused_rotary_position_embedding is None:
                 warnings.warn(
                     "Enable fuse rope in the config, but fuse rope is not available. "
@@ -935,7 +938,22 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
         else:
             expanded_attn_mask = _make_causal_mask(input_shape, past_key_values_length=past_key_values_length)
         # Convert bool attention_mask to float attention mask, which will be added to attention_scores later
-        expanded_attn_mask = paddle.where(expanded_attn_mask, 0.0, paddle.finfo(dtype).min).astype(dtype)
+        if get_env_device() in ["npu", "mlu", "intel_hpu"]:
+            x = paddle.to_tensor(0.0, dtype="float32")
+            y = paddle.to_tensor(paddle.finfo(dtype).min, dtype="float32")
+            expanded_attn_mask = paddle.where(expanded_attn_mask.cast("bool"), x, y).astype(dtype)
+        elif get_env_device() == "xpu":
+            x = paddle.to_tensor(0.0, dtype="float32")
+            y = paddle.to_tensor(-1.7005809656952787e38, dtype="float32")
+            expanded_attn_mask = paddle.where(expanded_attn_mask.cast("bool"), x, y)
+        elif get_env_device() == "gcu":
+            min_val = paddle.finfo(dtype).min
+            x = paddle.to_tensor(0.0, dtype=dtype)
+            y = paddle.to_tensor(min_val, dtype=dtype)
+            expanded_attn_mask = paddle.where(expanded_attn_mask.cast("bool"), x, y).astype(dtype)
+        else:
+            expanded_attn_mask = paddle.where(expanded_attn_mask, 0.0, paddle.finfo(dtype).min)
+            expanded_attn_mask = expanded_attn_mask.astype(dtype)
         return expanded_attn_mask
 
     def forward(
@@ -1166,8 +1184,27 @@ class LlamaPretrainingCriterion3DAuto(paddle.nn.Layer):
                     masked_lm_labels.unsqueeze(2),
                 )
 
-            masked_lm_loss = paddle.masked_select(masked_lm_loss, masked_lm_loss > 0).astype("float32")
-            loss = paddle.mean(masked_lm_loss)
+            # XPU dose not support allgather mask with bool dtype, so we use LocalLayer here.
+            if get_env_device() == "xpu":
+
+                class LocalLossLayer(paddle.distributed.LocalLayer):
+                    def __init__(self, out_dist_attrs):
+                        super().__init__(out_dist_attrs)
+
+                    def forward(self, x, mask):
+                        masked_lm_loss = paddle.masked_select(x, mask).astype("float32")
+                        loss = paddle.mean(masked_lm_loss)
+                        return loss
+
+                out_dist_attrs = [
+                    (masked_lm_loss.process_mesh, [dist.Partial(dist.ReduceType.kRedSum), dist.Replicate()]),
+                ]
+                loss_func = LocalLossLayer(out_dist_attrs)
+                loss = loss_func(masked_lm_loss, masked_lm_loss > 0)
+            else:
+                masked_lm_loss = paddle.masked_select(masked_lm_loss, masked_lm_loss > 0).astype("float32")
+                loss = paddle.mean(masked_lm_loss)
+
         return loss
 
 
@@ -1175,6 +1212,7 @@ class LlamaLMHeadAuto(nn.Layer):
     def __init__(self, config: LlamaConfig):
         super(LlamaLMHeadAuto, self).__init__()
         self.config = config
+
         vocab_size = config.vocab_size
         self.weight = self.create_parameter(
             shape=[config.hidden_size, vocab_size],

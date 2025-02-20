@@ -20,6 +20,13 @@ PPNLP_HOME              -->  the root directory for storing PaddleNLP related da
 """
 import os
 
+try:
+    from paddle.base.framework import use_pir_api
+
+    pir_enabled = use_pir_api()
+except ImportError:
+    pir_enabled = False
+
 
 def _get_user_home():
     return os.path.expanduser("~")
@@ -132,3 +139,12 @@ MAX_QUANTIZATION_TIMES = 1
 MAX_BSZ = 512
 SPECULATE_MAX_BSZ = 256
 MAX_DRAFT_TOKENS = 6
+
+if pir_enabled:
+    PADDLE_INFERENCE_MODEL_SUFFIX = ".json"
+    PADDLE_INFERENCE_WEIGHTS_SUFFIX = ".pdiparams"
+else:
+    PADDLE_INFERENCE_MODEL_SUFFIX = ".pdmodel"
+    PADDLE_INFERENCE_WEIGHTS_SUFFIX = ".pdiparams"
+
+USE_FAST_TOKENIZER: bool = _get_bool_env("USE_FAST_TOKENIZER", "false")

@@ -615,7 +615,9 @@ def get_model_max_position_embeddings(config: PretrainedConfig) -> Optional[int]
 
 
 def read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Queue, done_event: mp.Event):
-    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
+    from paddlenlp.utils.env import USE_FAST_TOKENIZER
+
+    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, padding_side="left", use_fast=USE_FAST_TOKENIZER)
 
     paddle.device.set_device("cpu")
     paddle.disable_static()
@@ -646,7 +648,9 @@ def read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Q
 
 
 def speculate_read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Queue, done_event: mp.Event):
-    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
+    from paddlenlp.utils.env import USE_FAST_TOKENIZER
+
+    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, use_fast=USE_FAST_TOKENIZER)
     paddle.device.set_device("cpu")
     paddle.disable_static()
     outputs = []
