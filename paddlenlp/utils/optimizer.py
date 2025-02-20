@@ -13,115 +13,13 @@
 # limitations under the License.
 
 import paddle
-import triton
-import triton.language as tl
 from paddle import pir
 from paddle.base import core, framework
 from paddle.base.framework import Variable, in_dynamic_or_pir_mode, in_pir_mode
 from paddle.base.libpaddle import DataType
 from paddle.optimizer.adamw import AdamW
 from paddle.pir import Value
-
-
-@triton.jit
-def adamw_kernel(
-    param_ptr,
-    grad_ptr,
-    moment1_ptr,
-    moment2_ptr,
-    lr_ptr,
-    beta1,
-    beta2,
-    epsilon,
-    coeff,
-    beta1_pow_ptr,
-    beta2_pow_ptr,
-    master_weight_ptr,
-    N,
-    BLOCK_SIZE: tl.constexpr,
-):
-    pid = tl.program_id(0)
-    offsets = pid * BLOCK_SIZE + tl.arange(0, BLOCK_SIZE)
-    mask = offsets < N
-
-    if master_weight_ptr:
-        param = tl.load(master_weight_ptr + offsets, mask=mask)
-    else:
-        param = tl.load(param_ptr + offsets, mask=mask).to(tl.float32)
-    grad = tl.load(grad_ptr + offsets, mask=mask)
-    moment1 = tl.load(moment1_ptr + offsets, mask=mask).to(tl.float32)
-    moment2 = tl.load(moment2_ptr + offsets, mask=mask).to(tl.float32)
-    lr = tl.load(lr_ptr)
-    beta1_pow = tl.load(beta1_pow_ptr)
-    beta2_pow = tl.load(beta2_pow_ptr)
-
-    # Weight Decay
-    param *= 1.0 - lr * coeff
-
-    # AdamW
-    moment1 = beta1 * moment1 + (1.0 - beta1) * grad
-    moment2 = beta2 * moment2 + (1.0 - beta2) * grad * grad
-    denom = tl.sqrt(moment2) / tl.sqrt(1.0 - beta2_pow) + epsilon
-    param += (moment1 / denom) * (-lr / (1 - beta1_pow))
-
-    # Update param
-    if master_weight_ptr:
-        tl.store(master_weight_ptr + offsets, param, mask=mask)
-        tl.store(param_ptr + offsets, param.to(tl.bfloat16), mask=mask)
-    else:
-        tl.store(param_ptr + offsets, param.to(tl.bfloat16), mask=mask)
-    tl.store(moment1_ptr + offsets, moment1.to(tl.bfloat16), mask=mask)
-    tl.store(moment2_ptr + offsets, moment2.to(tl.bfloat16), mask=mask)
-    tl.store(beta1_pow_ptr + offsets, beta1 * beta1_pow, mask=mask)
-    tl.store(beta2_pow_ptr + offsets, beta2 * beta2_pow, mask=mask)
-
-
-def adamw_bf16(
-    param,
-    grad,
-    learning_rate,
-    moment1,
-    moment2,
-    beta1_pow,
-    beta2_pow,
-    master_weight,
-    skip_update,
-    beta1,
-    beta2,
-    epsilon,
-    lr_ratio,
-    coeff,
-    with_decay,
-    multi_precision,
-):
-    if skip_update:
-        return
-    if not with_decay:
-        coeff = 0.0
-    if not multi_precision:
-        master_weight = None
-    lr = learning_rate * lr_ratio
-
-    N = param.numel().item()
-    BLOCK_SIZE = 512
-    grid = lambda meta: (triton.cdiv(N, BLOCK_SIZE),)
-
-    adamw_kernel[grid](
-        param,
-        grad.astype("float32"),
-        moment1,
-        moment2,
-        lr,
-        beta1,
-        beta2,
-        epsilon,
-        coeff,
-        beta1_pow,
-        beta2_pow,
-        master_weight,
-        N,
-        BLOCK_SIZE,
-    )
+from paddlenlp_kernel.triton.optimizer import adamw_bf16
 
 
 class AdamWMini(AdamW):
@@ -406,43 +304,6 @@ class AdamWBF16(AdamW):
             _beta2 = self._beta2 if not isinstance(self._beta2, Variable) else self._beta2.item(0)
 
             found_inf = self._get_auxiliary_var("found_inf") if in_pir_mode() else None
-            print("beta1_pow_acc", beta1_pow_acc)
-            raise NotImplementedError
-            self.adamw_python(
-                param_and_grad[0],
-                param_and_grad[1],
-                lr,
-                moment1,
-                moment2,
-                beta1_pow_acc,
-                beta2_pow_acc,
-                master_weight,
-                found_inf,
-                _beta1,
-                _beta2,
-                self._epsilon,
-                lr_ratio_,
-                self._weight_decay,
-                with_decay,
-                find_master,
-            )
-            # print(
-            #     param_and_grad[0],
-            #     param_and_grad[1],
-            #     lr,
-            #     moment1,
-            #     moment2,
-            #     beta1_pow_acc, # cuda
-            #     beta2_pow_acc,
-            #     master_weight,
-            #     found_inf,
-            #     _beta1,
-            #     _beta2,
-            #     self._epsilon,
-            #     lr_ratio_,
-            #     self._weight_decay,
-            #     with_decay,
-            #     find_master,)
             adamw_bf16(
                 param_and_grad[0],
                 param_and_grad[1],
@@ -461,55 +322,6 @@ class AdamWBF16(AdamW):
                 with_decay,
                 find_master,
             )
-
             return None
         else:
             raise NotImplementedError("Not implemented yet.")
-
-    def adamw_python(
-        self,
-        param,
-        grad,
-        learning_rate,
-        moment1,
-        moment2,
-        beta1_pow,
-        beta2_pow,
-        master_weight,
-        skip_update,
-        beta1,
-        beta2,
-        epsilon,
-        lr_ratio,
-        coeff,
-        with_decay,
-        multi_precision,
-    ):
-        if skip_update:
-            return
-        if not with_decay:
-            coeff = 0.0
-        if not multi_precision:
-            master_weight = None
-        lr = learning_rate * lr_ratio
-        if master_weight is not None:
-            p = master_weight
-        else:
-            p = param
-        p *= 1.0 - lr * coeff
-        mom1 = moment1.astype("float32")
-        mom2 = moment2.astype("float32")
-
-        mom1 = beta1 * mom1 + (1.0 - beta1) * grad
-        mom2 = beta2 * mom2 + (1.0 - beta2) * grad * grad
-        denom = mom2.sqrt() / (1.0 - beta2_pow).sqrt() + epsilon
-        p += (mom1 / denom) * (-(lr / (1.0 - beta1_pow)))
-        if master_weight is not None:
-            master_weight[:] = p
-            param[:] = p.astype(param.dtype)
-        else:
-            param[:] = p
-        moment1[:] = mom1.astype(moment1.dtype)
-        moment2[:] = mom2.astype(moment2.dtype)
-        beta1_pow[:], beta2_pow[:] = beta1 * beta1_pow[:], beta2 * beta2_pow[:]
-        return

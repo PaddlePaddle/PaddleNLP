@@ -37,42 +37,34 @@ def adamw_kernel(
     offsets = pid * BLOCK_SIZE + tl.arange(0, BLOCK_SIZE)
     mask = offsets < N
 
-    param = tl.load(param_ptr + offsets, mask=mask)
-    grad = tl.load(grad_ptr + offsets, mask=mask)
+    if master_weight_ptr is not None:
+        param = tl.load(master_weight_ptr + offsets, mask=mask)
+    else:
+        param = tl.load(param_ptr + offsets, mask=mask).to(tl.float32)
+    grad = tl.load(grad_ptr + offsets, mask=mask).to(tl.float32)
     moment1 = tl.load(moment1_ptr + offsets, mask=mask).to(tl.float32)
     moment2 = tl.load(moment2_ptr + offsets, mask=mask).to(tl.float32)
     lr = tl.load(lr_ptr)
     beta1_pow = tl.load(beta1_pow_ptr)
     beta2_pow = tl.load(beta2_pow_ptr)
 
-    if master_weight_ptr:
-        master_weight = tl.load(master_weight_ptr + offsets, mask=mask)
-        param = master_weight
-    else:
-        param = param.to(tl.float32)
-
     # Weight Decay
     param *= 1.0 - lr * coeff
 
     # AdamW
-    moment1 = beta1 * moment1 + (1 - beta1) * grad
-    moment2 = beta2 * moment2 + (1 - beta2) * grad * grad
-
-    denom = tl.sqrt(moment2 / (1 - beta2_pow)) + epsilon
-
-    update = (moment1 / denom) * (-lr / (1 - beta1_pow))
-    param += update
+    moment1 = beta1 * moment1 + (1.0 - beta1) * grad
+    moment2 = beta2 * moment2 + (1.0 - beta2) * grad * grad
+    denom = tl.sqrt(moment2) / tl.sqrt(1.0 - beta2_pow) + epsilon
+    param += (moment1 / denom) * (-lr / (1 - beta1_pow))
 
     # Update param
-    tl.store(moment1_ptr + offsets, moment1, mask=mask)
-    tl.store(moment2_ptr + offsets, moment2, mask=mask)
-    tl.store(beta1_pow_ptr + offsets, beta1 * beta1_pow, mask=mask)
-    tl.store(beta2_pow_ptr + offsets, beta2 * beta2_pow, mask=mask)
-    if master_weight_ptr:
+    if master_weight_ptr is not None:
         tl.store(master_weight_ptr + offsets, param, mask=mask)
         tl.store(param_ptr + offsets, param.to(tl.bfloat16), mask=mask)
     else:
         tl.store(param_ptr + offsets, param.to(tl.bfloat16), mask=mask)
+    tl.store(moment1_ptr + offsets, moment1.to(tl.bfloat16), mask=mask)
+    tl.store(moment2_ptr + offsets, moment2.to(tl.bfloat16), mask=mask)
 
 
 def adamw_bf16(
@@ -101,7 +93,7 @@ def adamw_bf16(
         master_weight = None
     lr = learning_rate * lr_ratio
 
-    N = param.numel()
+    N = param.numel().item()
     BLOCK_SIZE = 512
     grid = lambda meta: (triton.cdiv(N, BLOCK_SIZE),)
 
@@ -121,3 +113,4 @@ def adamw_bf16(
         N,
         BLOCK_SIZE,
     )
+    beta1_pow[:], beta2_pow[:] = beta1 * beta1_pow[:], beta2 * beta2_pow[:]
