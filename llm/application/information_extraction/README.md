@@ -1,4 +1,4 @@
-# 通用信息抽取大模型 LLM-UIE
+# 通用信息抽取大模型 PP-UIE
 
  **目录**
 
@@ -19,7 +19,7 @@
 
 ## 1. 模型简介
 
-通用信息抽取大模型（LLM-UIE）是 PaddleNLP 团队基于开源模型和高质量数据集构建的通用信息抽取大模型， PaddleNLP 基于百度 UIE 的建模思路，通过大模型的能力来训练并开源了一款面向中、英文通用信息抽取的大模型。 支持统一训练信息抽取任务包括命名实体识别（NER），关系抽取（RE）和事件抽取（EE）。模型共包含0.5B、1.5B、7B 和14B 共4个版本，以适配不同场景下信息抽取任务使用。在多个数据集（包含 Boson、CLUENER、CCIR2021等常见数据）相比其他通用信息抽取大模型在 ACC 和 F1 指标上有大幅度提升。
+通用信息抽取大模型（PP-UIE）是 PaddleNLP 团队基于开源模型和高质量数据集构建的通用信息抽取大模型， PaddleNLP 基于百度 UIE 的建模思路，通过大模型的能力来训练并开源了一款面向中、英文通用信息抽取的大模型。 支持统一训练信息抽取任务包括命名实体识别（NER），关系抽取（RE）和事件抽取（EE）。模型共包含0.5B、1.5B、7B 和14B 共4个版本，以适配不同场景下信息抽取任务使用。在多个数据集（包含 Boson、CLUENER、CCIR2021等常见数据）相比其他通用信息抽取大模型在 ACC 和 F1 指标上有大幅度提升。
 
 
 
@@ -295,7 +295,7 @@ python doccano.py \
 
 推荐使用 [大模型精调](../../docs/finetune.md) 对模型进行微调。只需输入模型、数据集等就可以高效快速地进行微调和模型压缩等任务，可以一键启动多卡训练、混合精度训练、梯度累积、断点重启、日志显示等功能，并且针对训练过程的通用训练配置做了封装，比如：优化器、学习率调度等。
 
-使用下面的命令，使用 `paddlenlp/LLM-UIE-0.5B` 作为预训练模型进行模型微调，将微调后的模型保存至指定路径中。
+使用下面的命令，使用 `paddlenlp/PP-UIE-0.5B` 作为预训练模型进行模型微调，将微调后的模型保存至指定路径中。
 
 如果在 GPU 环境中使用，可以指定 gpus 参数进行多卡训练：
 
@@ -308,7 +308,7 @@ python -u  -m paddle.distributed.launch --gpus "0,1" run_finetune.py ./config/qw
 `sft_argument.json` 的参考配置如下：
 ```shell
 {
-    "model_name_or_path": "paddlenlp/LLM-UIE-0.5B",
+    "model_name_or_path": "paddlenlp/PP-UIE-0.5B",
     "dataset_name_or_path": "./application/information_extraction/data",
     "output_dir": "./checkpoints/ie_ckpts",
     "per_device_train_batch_size": 1,
