@@ -31,6 +31,7 @@ try:
     from paddlenlp.experimental.transformers import (
         EagleProposer,
         InferenceWithReferenceProposer,
+        SpeculateModelArgument,
     )
 except:
     pass
@@ -1057,7 +1058,8 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                 config.max_length,
             )
         elif config.speculate_method in ["eagle", "mtp"]:
-            self.proposer = EagleProposer(args=config)
+            speculate_model_args = SpeculateModelArgument.build_from_predictor(config)
+            self.proposer = EagleProposer(args=speculate_model_args)
         else:
             self.proposer = None
 
@@ -1180,10 +1182,8 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
                 config.max_length,
             )
         elif config.speculate_method in ["eagle", "mtp"]:
-            self.proposer = EagleProposer(
-                args=config,
-                model_args=self.model_args,
-            )
+            speculate_model_args = SpeculateModelArgument.build_from_predictor(config)
+            self.proposer = EagleProposer(args=speculate_model_args)
         else:
             self.proposer = None
 

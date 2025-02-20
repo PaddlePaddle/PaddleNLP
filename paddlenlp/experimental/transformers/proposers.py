@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 
 import numpy as np
 import paddle
@@ -130,17 +131,92 @@ class InferenceWithReferenceProposer(Proposer):
         """
 
 
+@dataclass
+class SpeculateModelArgument:
+    model_name_or_path: str = field(default=None, metadata={"help": "The directory of model."})
+    quant_type: str = field(
+        default="",
+        metadata={
+            "help": "Quantization type. Supported values: a8w8, a8w8c8, a8w8_fp8, a8w8c8_fp8, weight_only_int4, weight_only_int8"
+        },
+    )
+    cachekv_int8_type: str = field(
+        default=None,
+        metadata={
+            "help": "If cachekv_int8_type set as `dynamic`, cache kv would be quantized to int8 dynamically. If cachekv_int8_type set as `static`, cache kv would be quantized to int8 Statically."
+        },
+    )
+    use_fake_parameter: bool = field(default=False, metadata={"help": "use fake parameter, for ptq scales now."})
+    dtype: str = field(default=None, metadata={"help": "Model dtype"})
+    max_batch_size: int = field(default=1, metadata={"help": "The max batch size of data."})
+    total_max_length: int = field(default=8192, metadata={"help": "the max length for encoding and decoding"})
+    min_dec_len: int = field(default=1, metadata={"help": "the min length for decoding."})
+    max_dec_len: int = field(default=1024, metadata={"help": "the max length for decoding."})
+    temperature: float = field(default=1.0, metadata={"help": "top_p parameter for generation"})
+    decode_strategy: str = field(
+        default="draft_model_sample",
+        metadata={"help": "the decoding strategy of generation, it only supports [draft_model_sample] now"},
+    )
+    mode: str = field(default="dynamic", metadata={"help": "the type of predictor, it only supports [dynamic] now"})
+    inference_model: bool = field(default=True, metadata={"help": "whether use InferenceModel to do generation"})
+    block_attn: bool = field(default=True, metadata={"help": "whether use block attention"})
+    append_attn: bool = field(default=True, metadata={"help": "whether use append attention"})
+    block_size: int = field(default=64, metadata={"help": "the block size for cache_kvs."})
+    speculate_method: str = field(
+        default=None,
+        metadata={"help": "speculate method, it should be one of ['eagle', 'mtp']"},
+    )
+    speculate_max_draft_token_num: int = field(
+        default=1,
+        metadata={"help": "the max length of draft tokens for speculate method."},
+    )
+    speculate_max_candidate_len: int = field(default=5, metadata={"help": "the max length of candidate tokens."})
+    speculate_verify_window: int = field(
+        default=2, metadata={"help": "the max length of verify window for speculate method."}
+    )
+    return_full_hidden_states: int = field(default=False, metadata={"help": "whether return full hidden_states"})
+
+    @classmethod
+    def build_from_predictor(cls, predictor_args):
+        args = {}
+        args["model_name_or_path"] = predictor_args.draft_model_name_or_path
+        args["dtype"] = predictor_args.dtype
+        args["quant_type"] = predictor_args.draft_model_quant_type
+        args["use_fake_parameter"] = predictor_args.use_fake_parameter
+
+        args["max_batch_size"] = predictor_args.batch_size
+        args["total_max_length"] = predictor_args.total_max_length
+        args["min_dec_len"] = predictor_args.min_length
+        args["max_dec_len"] = predictor_args.max_length
+        # temperature=1.0 is the best choice in most of cases
+        args["temperature"] = 1.0
+
+        args["speculate_method"] = predictor_args.speculate_method
+        args["speculate_max_draft_token_num"] = predictor_args.speculate_max_draft_token_num
+        args["speculate_max_candidate_len"] = predictor_args.speculate_max_candidate_len
+
+        assert args["speculate_method"] in [
+            "eagle",
+            "mtp",
+        ], f"Speculate model only support [eagle, mtp]. But get {args['speculate_method']}"
+
+        return cls(**args)
+
+    @classmethod
+    def build_from_serving():
+        pass
+
+
 class ModelProposer(Proposer):
     """
     用于类 Model 的 Proposer 基类
     在输入输出中匹配符合的tokens作为 draft tokens
     """
 
-    def __init__(self, args, **kwargs):
+    def __init__(self, args: SpeculateModelArgument):
         super().__init__()
-        self.args = self.build_args(args)
-        self.model_args = kwargs.get("model_args", None)
-        self.draft_type = args.speculate_method
+        self.args = args
+        self.draft_type = self.args.speculate_method
         self.dtype = self.args.dtype
         assert self.draft_type in (
             "draft_model",
@@ -150,7 +226,9 @@ class ModelProposer(Proposer):
 
         self.max_draft_tokens = self.args.speculate_max_draft_token_num
         self.actual_draft_token_num = self.max_draft_tokens
-        self.batch_size = self.args.batch_size
+        self.max_batch_size = self.args.max_batch_size
+        self.total_max_length = self.args.total_max_length
+        self.max_dec_len = self.args.max_dec_len
         self.init_predictor()
 
     def build_args(self, args):
@@ -171,12 +249,14 @@ class ModelProposer(Proposer):
 
         tensor_parallel_rank, tensor_parallel_degree = llm_utils.init_dist_env()
 
-        self.config = AutoConfig.from_pretrained(self.args.draft_model_name_or_path)
+        self.config = AutoConfig.from_pretrained(self.args.model_name_or_path)
+        print(f"config: {self.config}")
+        print(f"args: {self.args}")
+        # exit(0)
         self.model = AutoInferenceModelForCausalLM.from_pretrained(
             self.args.model_name_or_path,
             config=self.config,
             predictor_args=self.args,
-            model_args=self.model_args,
             dtype=self.args.dtype,
             tensor_parallel_degree=tensor_parallel_degree,
             tensor_parallel_rank=tensor_parallel_rank,
@@ -186,23 +266,26 @@ class ModelProposer(Proposer):
         # prepare model_inputs
         self.model_inputs = {}
 
-        self.cache_kvs_shape = self.model.get_cache_kvs_shape(self.model.config, self.args.batch_size)
+        self.cache_kvs_shape = self.model.get_cache_kvs_shape(self.model.config, self.max_batch_size)
         cachekv_dtype = self.dtype if self.config.cachekv_int8_type is None else "uint8"
         self.cache_kvs = [paddle.zeros(shape, dtype=cachekv_dtype) for shape in self.cache_kvs_shape]
 
         self.max_block_nums = self.cache_kvs_shape[0][0]
         self.free_list = list(range(self.max_block_nums))
-        self.pre_ids = paddle.to_tensor(np.zeros((self.batch_size, self.args.total_max_length)).astype("int64") - 1)
+        self.pre_ids = paddle.to_tensor(np.zeros((self.max_batch_size, self.total_max_length)).astype("int64") - 1)
         self.rope_theta = self.config.get("rope_theta", 10000.0)
         self.rope_scaling = self.config.get("rope_scaling", None)
 
         self.head_dim = self.cache_kvs_shape[0][-1]
-        self.rope_emb = llm_utils.get_rotary_position_embedding(
-            paddle.arange(self.args.total_max_length).reshape((1, -1)),
-            self.head_dim,
-            self.rope_theta,
-            self.rope_scaling,
-        )
+        if self.draft_type == "mtp":
+            self.rope_emb = None
+        else:
+            self.rope_emb = llm_utils.get_rotary_position_embedding(
+                paddle.arange(self.total_max_length).reshape((1, -1)),
+                self.head_dim,
+                self.rope_theta,
+                self.rope_scaling,
+            )
 
     def run(self, share_inputs, **kwargs):
         self.run_preprocess(share_inputs)
@@ -214,18 +297,17 @@ class ModelProposer(Proposer):
         seq_lens = kwargs.get("seq_lens")
         base_model_inputs = kwargs.get("base_model_inputs")
 
-        max_sec_len = self.args.total_max_length
         self.model_inputs["block_tables"] = paddle.full_like(
             base_model_inputs["block_tables"], fill_value=-1, dtype="int32"
         )
         for i in range(real_bs):
-            real_len = seq_lens[i] + self.args.max_length
-            if real_len > max_sec_len:
+            real_len = seq_lens[i] + self.max_dec_len
+            if real_len > self.total_max_length:
                 self.free_list = list(range(self.max_block_nums))
                 # self.used_list = [[] for _ in range(self.beam_batch_size)]
                 raise ValueError(
                     f"input_len({seq_lens[i]}) + \
-max_dec_len({self.args.max_length}) > max_seq_len({max_sec_len})"
+max_dec_len({self.max_dec_len}) > max_seq_len({self.total_max_length})"
                 )
             for j in range((real_len + self.args.block_size - 1) // self.args.block_size):
                 used_block_id = self.free_list.pop()
@@ -251,11 +333,11 @@ max_dec_len({self.args.max_length}) > max_seq_len({max_sec_len})"
         self.model_inputs["max_length"] = base_model_inputs["max_length"]
         self.model_inputs["min_length"] = base_model_inputs["min_length"]
         self.model_inputs["bad_tokens"] = base_model_inputs["bad_tokens"]
-        self.model_inputs["next_tokens"] = paddle.full(shape=[self.batch_size, 1], fill_value=-1, dtype="int64")
+        self.model_inputs["next_tokens"] = paddle.full(shape=[self.max_batch_size, 1], fill_value=-1, dtype="int64")
         self.model_inputs["base_model_draft_tokens"] = base_model_inputs["draft_tokens"]
-        self.model_inputs["draft_tokens"] = paddle.full(shape=[self.batch_size, 2], fill_value=-1, dtype="int64")
+        self.model_inputs["draft_tokens"] = paddle.full(shape=[self.max_batch_size, 2], fill_value=-1, dtype="int64")
 
-        self.first_token_record = paddle.full(shape=[self.batch_size, 1], fill_value=-1, dtype="int32")
+        self.first_token_record = paddle.full(shape=[self.max_batch_size, 1], fill_value=-1, dtype="int32")
         self.model_inputs["substep"] = 0
         for i in range(real_bs):
             self.model_inputs["pre_ids"][i, 0] = self.model_inputs["input_ids"][i, -1]
@@ -304,7 +386,7 @@ max_dec_len({self.args.max_length}) > max_seq_len({max_sec_len})"
         )
 
     def postprocess(self, base_model_inputs):
-        for i in range(self.batch_size):
+        for i in range(self.max_batch_size):
             if not base_model_inputs["stop_flags"][i]:
                 break
         self.pre_ids[:] = -1
@@ -369,7 +451,7 @@ class EagleProposer(ModelProposer):
 
         with paddle.no_grad():
             self.model_inputs["substep"] = 0
-            while self.model_inputs["not_need_stop"] and self.model_inputs["substep"] < self.max_draft_tokens:
+            while self.model_inputs["not_need_stop"] and self.model_inputs["substep"] < self.actual_draft_token_num:
                 self.last_seq_lens_this_time[:] = self.model_inputs["seq_lens_this_time"][:]
                 output_hidden_states = self.model.generate(**self.model_inputs)
                 self.model_inputs["substep"] += 1
