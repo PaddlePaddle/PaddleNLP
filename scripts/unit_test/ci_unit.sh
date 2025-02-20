@@ -47,10 +47,10 @@ install_requirements() {
         cd ${nlp_dir}/csrc
         # python setup_cuda.py install
         bash tools/build_wheel.sh python3.10 80
-        cp ./dist/p****.whl ${PPNLP_HOME}/upload/
-        cd ${PPNLP_HOME}
-        python upload.py ${PPNLP_HOME}/upload 'paddlenlp/wheels'
-        rm -rf upload/*
+        # cp ./dist/p****.whl ${PPNLP_HOME}/upload/
+        # cd ${PPNLP_HOME}
+        # python upload.py ${PPNLP_HOME}/upload 'paddlenlp/wheels'
+        # rm -rf upload/*
     else
         echo "No modifications in csrc, installing paddlenlp_ops wheel file..."
         python -m pip install https://paddlenlp.bj.bcebos.com/wheels/paddlenlp_ops-0.0.0-py3-none-any.whl
