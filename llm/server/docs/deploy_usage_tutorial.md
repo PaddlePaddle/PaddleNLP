@@ -57,7 +57,7 @@ cd /home/workspace/models_dir
 # ├── rank_mapping.csv           # 多卡模型会有此文件，如为单卡模型，则无此文件（可选，仅在多卡部署模式下需要）
 # └── rank_0                     # 保存模型结构和权重文件的目录
 #     ├── model.pdiparams
-#     └── model.pdmodel
+#     └── model.pdmodel 或者 model.json # Paddle 3.0 版本模型为model.json，Paddle 2.x 版本模型为model.pdmodel
 ```
 
 ### 创建容器

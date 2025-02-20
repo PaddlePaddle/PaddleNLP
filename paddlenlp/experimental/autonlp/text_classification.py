@@ -47,6 +47,7 @@ from ...transformers import (
 from ...utils.log import logger
 from .auto_trainer_base import AutoTrainerBase
 from .utils import UTCLoss
+from .utils.env import PADDLE_INFERENCE_MODEL_SUFFIX, PADDLE_INFERENCE_WEIGHTS_SUFFIX
 
 
 class AutoTrainerForTextClassification(AutoTrainerBase):
@@ -560,16 +561,16 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         if os.path.exists(default_export_path):
             if "utc" in model_config["model_name_or_path"]:
                 files = [
-                    "model.pdiparams",
-                    "model.pdmodel",
+                    f"model{PADDLE_INFERENCE_WEIGHTS_SUFFIX}",
+                    f"model{PADDLE_INFERENCE_MODEL_SUFFIX}",
                     "tokenizer_config.json",
                     "vocab.txt",
                     "taskflow_config.json",
                 ]
             else:
                 files = [
-                    "model.pdiparams",
-                    "model.pdmodel",
+                    f"model{PADDLE_INFERENCE_WEIGHTS_SUFFIX}",
+                    f"model{PADDLE_INFERENCE_MODEL_SUFFIX}",
                     "tokenizer_config.json",
                     "vocab.txt",
                     "taskflow_config.json",
@@ -735,8 +736,8 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             executor=exe,
             batch_generator=_batch_generator_func,
             model_dir=export_path,
-            model_filename="model.pdmodel",
-            params_filename="model.pdiparams",
+            model_filename=f"model{PADDLE_INFERENCE_MODEL_SUFFIX}",
+            params_filename=f"model{PADDLE_INFERENCE_WEIGHTS_SUFFIX}",
             batch_size=batch_size,
             batch_nums=batch_nums,
             scope=None,
@@ -757,8 +758,8 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         post_training_quantization.quantize()
         post_training_quantization.save_quantized_model(
             save_model_path=compress_path,
-            model_filename="model.pdmodel",
-            params_filename="model.pdiparams",
+            model_filename=f"model{PADDLE_INFERENCE_MODEL_SUFFIX}",
+            params_filename=f"model{PADDLE_INFERENCE_WEIGHTS_SUFFIX}",
         )
 
         paddle.disable_static()
