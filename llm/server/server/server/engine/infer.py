@@ -18,7 +18,8 @@ import json
 import os
 import sys
 import time
-from concurrent.futures import ThreadPoolExecutor
+
+# from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import shared_memory
 
 import numpy as np
@@ -32,12 +33,20 @@ from server.engine.config import Config
 from server.utils import get_logger
 from task_queue_manager import TaskQueueManager
 
+<<<<<<< HEAD
 from paddlenlp.experimental.transformers import InferenceWithReferenceProposer
 from paddlenlp.trl.llm_utils import get_rotary_position_embedding
 from paddlenlp.utils.env import (
     PADDLE_INFERENCE_MODEL_SUFFIX,
     PADDLE_INFERENCE_WEIGHTS_SUFFIX,
 )
+=======
+from paddlenlp.experimental.transformers import (
+    EagleProposer,
+    InferenceWithReferenceProposer,
+)
+from paddlenlp.trl.llm_utils import get_rotary_position_embedding
+>>>>>>> 1.support speculate complicated args. 2.format serving code
 
 File_Path = os.path.realpath(sys.argv[0])
 Dir_Path = os.path.dirname(File_Path)
@@ -65,7 +74,6 @@ class ModelRunner:
             self.qk_rope_head_dim = int(self.model_cfg["qk_rope_head_dim"])
             self.v_head_dim = int(self.model_cfg["v_head_dim"])
 
-
         self.max_stop_seqs_num = int(os.getenv("MAX_STOP_SEQS_NUM", 5))
         self.stop_seqs_max_len = int(os.getenv("STOP_SEQS_MAX_LEN", 8))
 
@@ -76,6 +84,7 @@ class ModelRunner:
         self.load_model_init_val()
 
         self.share_inputs = {}
+        self.helper_tensors = {}
         self.cache_kvs = {}
         self.init_inputs()
 
@@ -88,6 +97,11 @@ class ModelRunner:
                     self.args.max_batch_size,
                     self.args.max_seq_len,
                 )
+<<<<<<< HEAD
+=======
+            elif self.speculate_config.speculate_method == "mtp" or self.speculate_config.speculate_method == "eagle":
+                self.proposer = EagleProposer(self.speculate_config)
+>>>>>>> 1.support speculate complicated args. 2.format serving code
         else:
             self.proposer = None
 
@@ -191,18 +205,25 @@ class ModelRunner:
                 cache_type = self.args.dtype
             else:
                 cache_type = "uint8"
-            
+
             if "deepseek" in self.model_cfg["model_type"]:
-                self.cache_kvs["key_caches_{}".format(i)] = paddle.full(shape=[
-                    self.args.max_block_num, kv_num_head,
-                    self.args.block_size,
-                    self.qk_nope_head_dim + self.qk_rope_head_dim
-                ], fill_value=0, dtype=cache_type)
-                self.cache_kvs["value_caches_{}".format(i)] = paddle.full(shape=[
-                    self.args.max_block_num, kv_num_head,
-                    self.args.block_size, self.v_head_dim
-                ], fill_value=0, dtype=cache_type)
+                self.cache_kvs["key_caches_{}".format(i)] = paddle.full(
+                    shape=[
+                        self.args.max_block_num,
+                        kv_num_head,
+                        self.args.block_size,
+                        self.qk_nope_head_dim + self.qk_rope_head_dim,
+                    ],
+                    fill_value=0,
+                    dtype=cache_type,
+                )
+                self.cache_kvs["value_caches_{}".format(i)] = paddle.full(
+                    shape=[self.args.max_block_num, kv_num_head, self.args.block_size, self.v_head_dim],
+                    fill_value=0,
+                    dtype=cache_type,
+                )
             else:
+<<<<<<< HEAD
                 self.cache_kvs["key_caches_{}".format(i)] = paddle.full(shape=[
                     self.args.max_block_num, kv_num_head,
                     self.args.block_size, self.args.hidden_size // self.args.num_attention_heads
@@ -211,6 +232,28 @@ class ModelRunner:
                     self.args.max_block_num, kv_num_head,
                     self.args.block_size, self.args.hidden_size // self.args.num_attention_heads
                 ], fill_value=0, dtype=cache_type)
+=======
+                self.cache_kvs["key_caches_{}".format(i)] = paddle.full(
+                    shape=[
+                        self.args.max_block_num,
+                        kv_num_head,
+                        self.args.block_size,
+                        self.args.hidden_size // self.args.num_attention_heads,
+                    ],
+                    fill_value=0,
+                    dtype=cache_type,
+                )
+                self.cache_kvs["value_caches_{}".format(i)] = paddle.full(
+                    shape=[
+                        self.args.max_block_num,
+                        kv_num_head,
+                        self.args.block_size,
+                        self.args.hidden_size // self.args.num_attention_heads,
+                    ],
+                    fill_value=0,
+                    dtype=cache_type,
+                )
+>>>>>>> 1.support speculate complicated args. 2.format serving code
 
         pre_max_block_num = (
             self.args.max_seq_len + self.args.block_size - 1
@@ -251,9 +294,16 @@ class ModelRunner:
         self.share_inputs["presence_score"] = paddle.full(
             shape=[self.args.max_batch_size, 1], fill_value=self.presence_score, dtype="float32"
         )
+<<<<<<< HEAD
         self.share_inputs["seq_lens_this_time"] = paddle.full(
             shape=[self.args.max_batch_size, 1], fill_value=0, dtype="int32"
         )
+=======
+        self.helper_tensors["seq_lens_this_time"] = paddle.full(
+            shape=[self.args.max_batch_size, 1], fill_value=0, dtype="int32"
+        )
+        self.share_inputs["seq_lens_this_time"] = None
+>>>>>>> 1.support speculate complicated args. 2.format serving code
         self.share_inputs["seq_lens_encoder"] = paddle.full(
             shape=[self.args.max_batch_size, 1], fill_value=0, dtype="int32"
         )
@@ -314,12 +364,17 @@ class ModelRunner:
         self.share_inputs["stop_seqs"] = paddle.full(
             shape=[self.max_stop_seqs_num, self.stop_seqs_max_len], fill_value=-1, dtype="int64"
         )
+<<<<<<< HEAD
 
+=======
+>>>>>>> 1.support speculate complicated args. 2.format serving code
 
         self.share_inputs["first_token_ids"] = paddle.full(
-            shape=[self.args.max_batch_size, 1], fill_value=-1, dtype="int64")
+            shape=[self.args.max_batch_size, 1], fill_value=-1, dtype="int64"
+        )
         self.share_inputs["ori_seq_lens_encoder"] = paddle.full(
-            shape=[self.args.max_batch_size, 1], fill_value=0, dtype="int32")
+            shape=[self.args.max_batch_size, 1], fill_value=0, dtype="int32"
+        )
         # speculate decoding input
         if self.is_speculate_decoding:
             self.share_inputs["accept_tokens"] = paddle.full(
@@ -341,6 +396,11 @@ class ModelRunner:
                 dtype="int32",
             )
 
+        if self.config.return_full_hidden_states:
+            for i in range(self.args.num_layers):
+                self.share_inputs["value_caches_{}".format(i)] = self.cache_kvs["value_caches_{}".format(i)]
+                self.share_inputs["key_caches_{}".format(i)] = self.cache_kvs["key_caches_{}".format(i)]
+
     def dy_input_preprocess(self, tasks):
         """
         dynamic insertion
@@ -359,7 +419,11 @@ class ModelRunner:
             self.share_inputs["penalty_score"][idx : idx + 1] = task.get("penalty_score", 1.0)
             self.share_inputs["frequency_score"][idx : idx + 1] = task.get("frequency_score", 0.0)
             self.share_inputs["presence_score"][idx : idx + 1] = task.get("presence_score", 0.0)
+<<<<<<< HEAD
             self.share_inputs["seq_lens_this_time"][idx : idx + 1] = length
+=======
+            self.helper_tensors["seq_lens_this_time"][idx : idx + 1] = length
+>>>>>>> 1.support speculate complicated args. 2.format serving code
             self.share_inputs["step_seq_lens_encoder"][idx : idx + 1] = length
             self.share_inputs["seq_lens_encoder"][idx : idx + 1] = length
             self.share_inputs["seq_lens_decoder"][idx : idx + 1] = 0
@@ -374,9 +438,8 @@ class ModelRunner:
             self.share_inputs["max_length"][idx : idx + 1] = max_dec_len
             self.share_inputs["stop_flags"][idx : idx + 1] = False
 
-
-            self.share_inputs['first_token_ids'][idx:idx + 1] =  self.share_inputs['input_ids'][idx:idx + 1, :1]
-            self.share_inputs["ori_seq_lens_encoder"][idx:idx + 1] = length
+            self.share_inputs["first_token_ids"][idx : idx + 1] = self.share_inputs["input_ids"][idx : idx + 1, :1]
+            self.share_inputs["ori_seq_lens_encoder"][idx : idx + 1] = length
 
             if "infer_seed" in task:
                 self.share_inputs["infer_seed"][idx : idx + 1] = task["infer_seed"]
@@ -405,29 +468,43 @@ class ModelRunner:
                     [self.speculate_config.speculate_max_draft_token_num]
                 )
 
-    def step_cuda(self, seq_lens_this_time):
+    def step_cuda(self):
         """
         step cuda
         """
         # whether speculate decoding
-        if self.is_speculate_decoding:
-            speculate_step_token_num = self.speculate_config.speculate_max_draft_token_num + 1
-        else:
-            speculate_step_token_num = 0
+        # if self.is_speculate_decoding:
+        #     speculate_step_token_num = self.speculate_config.speculate_max_draft_token_num + 1
+        # else:
+        #     speculate_step_token_num = 0
 
-        step_paddle(self.share_inputs['stop_flags'], seq_lens_this_time,
-                    self.share_inputs['step_seq_lens_encoder'],
-                    self.share_inputs['seq_lens_encoder'],
-                    self.share_inputs['seq_lens_decoder'], self.share_inputs["block_tables"],
-                    self.share_inputs['encoder_block_lens'],
-                    self.share_inputs["is_block_step"], self.share_inputs['step_block_list'],
-                    self.share_inputs['step_lens'], self.share_inputs['recover_block_list'],
-                    self.share_inputs['recover_lens'], self.share_inputs['need_block_list'],
-                    self.share_inputs['need_block_len'], self.share_inputs['used_list_len'],
-                    self.share_inputs['free_list'], self.share_inputs['free_list_len'],
-                    self.share_inputs['input_ids'], self.share_inputs['pre_ids'],
-                    self.share_inputs['step_idx'], self.share_inputs['next_tokens'], self.share_inputs['first_token_ids'],
-                    self.args.block_size, self.args.enc_dec_block_num, 0)
+        step_paddle(
+            self.share_inputs["stop_flags"],
+            self.share_inputs["seq_lens_this_time"],
+            self.share_inputs["step_seq_lens_encoder"],
+            self.share_inputs["seq_lens_encoder"],
+            self.share_inputs["seq_lens_decoder"],
+            self.share_inputs["block_tables"],
+            self.share_inputs["encoder_block_lens"],
+            self.share_inputs["is_block_step"],
+            self.share_inputs["step_block_list"],
+            self.share_inputs["step_lens"],
+            self.share_inputs["recover_block_list"],
+            self.share_inputs["recover_lens"],
+            self.share_inputs["need_block_list"],
+            self.share_inputs["need_block_len"],
+            self.share_inputs["used_list_len"],
+            self.share_inputs["free_list"],
+            self.share_inputs["free_list_len"],
+            self.share_inputs["input_ids"],
+            self.share_inputs["pre_ids"],
+            self.share_inputs["step_idx"],
+            self.share_inputs["next_tokens"],
+            self.share_inputs["first_token_ids"],
+            self.args.block_size,
+            self.args.enc_dec_block_num,
+            0,
+        )
 
     def initialize_engine_ready_check_flag(self):
         """
@@ -492,12 +569,21 @@ class ModelRunner:
         flag_ready_array[self.rank] = 1
 
         flag_array = np.zeros([1], dtype=np.int32)
+<<<<<<< HEAD
         shm_flag_has_block_step = shared_memory.SharedMemory(
             name=self.config.get_unique_name("shm_flag_has_block_step")
         )
         flag_has_block_step_array = np.ndarray(  # noqa: F841
             flag_array.shape, dtype=flag_array.dtype, buffer=shm_flag_has_block_step.buf
         )
+=======
+        # shm_flag_has_block_step = shared_memory.SharedMemory(
+        #     name=self.config.get_unique_name("shm_flag_has_block_step")
+        # )
+        # flag_has_block_step_array = np.ndarray(
+        #     flag_array.shape, dtype=flag_array.dtype, buffer=shm_flag_has_block_step.buf
+        # )
+>>>>>>> 1.support speculate complicated args. 2.format serving code
 
         use_custom_health_checker = self.config.use_custom_health_checker
         if use_custom_health_checker:
@@ -511,10 +597,17 @@ class ModelRunner:
                 engine_healthy_recorded_time_array,
             ) = self.initialize_engine_healthy_recorded_time_flag()
             engine_healthy_recorded_time_array[0] = time.time()
+<<<<<<< HEAD
             infer_live_flag_shm = self.initialize_engine_live_flag()  # noqa: F841
         infer_seed_increment = paddle.full(shape=[self.args.max_batch_size, 1], fill_value=4, dtype="int64")
         thread_executor = ThreadPoolExecutor(max_workers=1)  # noqa: F841
         seq_lens_this_time = None
+=======
+            # infer_live_flag_shm = self.initialize_engine_live_flag()
+        infer_seed_increment = paddle.full(shape=[self.args.max_batch_size, 1], fill_value=4, dtype="int64")
+        # thread_executor = ThreadPoolExecutor(max_workers=1)
+        # seq_lens_this_time = None
+>>>>>>> 1.support speculate complicated args. 2.format serving code
         real_bsz = None
 
         while True:
@@ -532,9 +625,9 @@ class ModelRunner:
                 paddle.distributed.barrier()
 
             if flag_broadcast_array[0] == 1 or self.infer_queue.read_finish_flag.get() == 1:
-                logger.info(f'rank: {self.rank} start to get')
-                if seq_lens_this_time is not None:
-                    self.share_inputs["seq_lens_this_time"][:real_bsz] = seq_lens_this_time
+                logger.info(f"rank: {self.rank} start to get")
+                if self.share_inputs["seq_lens_this_time"] is not None:
+                    self.helper_tensors["seq_lens_this_time"][:real_bsz] = self.share_inputs["seq_lens_this_time"]
 
                 tasks, read_finish = self.infer_queue.get()
                 if read_finish:
@@ -548,8 +641,11 @@ class ModelRunner:
                     logger.info(f"rank: {self.rank}, real_bsz: {real_bsz}, query_num: {len(req_dicts)}")
 
                 self.dy_input_preprocess(req_dicts)
-                seq_lens_this_time = copy.deepcopy(self.share_inputs["seq_lens_this_time"][:real_bsz])
-                self.infer_engine.seq_lens_handle.share_external_data(seq_lens_this_time)
+                self.share_inputs["seq_lens_this_time"] = copy.deepcopy(
+                    self.helper_tensors["seq_lens_this_time"][:real_bsz]
+                )
+                if not self.config.return_full_hidden_states:
+                    self.infer_engine.seq_lens_handle.share_external_data(self.share_inputs["seq_lens_this_time"])
                 self.share_inputs["not_need_stop"][0] = True
 
             if not self.share_inputs["not_need_stop"]:
@@ -562,15 +658,34 @@ class ModelRunner:
             if self.proposer is not None:
                 self.proposer.run(
                     self.share_inputs,
-                    real_batch_size=seq_lens_this_time.shape[0],
-                    seq_lens_this_time=seq_lens_this_time,
+                    real_batch_size=self.share_inputs["seq_lens_this_time"].shape[0],
+                    seq_lens_this_time=self.share_inputs["seq_lens_this_time"],
                 )
+            logger.info(f"infer_run input: {self.share_inputs}")
+            if self.config.return_full_hidden_states:
+                input_tensors = []
+                share_inputs_keys = self.share_inputs.keys()
 
+                for k in self.infer_engine.input_names:
+                    assert k in share_inputs_keys, f"Input {k} must be created."
+                    v = self.share_inputs[k]
+                    v.name = k
+                    input_tensors.append(v)
+
+                outputs = self.infer_engine.predictor.run(input_tensors)
+                self.share_inputs["all_hidden_states"] = outputs[0]
+            else:
+                self.infer_engine.predictor.run()
+            logger.info(f'accept_num: {self.share_inputs["accept_num"]}')
+
+<<<<<<< HEAD
             self.infer_engine.predictor.run()
+=======
+>>>>>>> 1.support speculate complicated args. 2.format serving code
             self.share_inputs["infer_seed"].add_(infer_seed_increment)
             self.share_inputs["infer_seed"][:] %= self.MAX_INFER_SEED
             if self.free_list_len > 0:
-                self.step_cuda(seq_lens_this_time)
+                self.step_cuda()
 
 
 class InferenceEngine(object):
@@ -598,7 +713,8 @@ class InferenceEngine(object):
             self.rank = fleet.worker_index()
 
         self._init_predictor()
-        self.share_data()
+        if not self.config.return_full_hidden_states:
+            self.share_data()
 
     def _init_predictor(self):
         """
@@ -606,11 +722,11 @@ class InferenceEngine(object):
         """
         device_id = self.rank % self.config.mp_num_per_node
         if use_pir_api():
-            self.model_file = os.path.join(self.model_dir, f"model.json")
-            self.param_file = os.path.join(self.model_dir, f"model.pdiparams")
+            self.model_file = os.path.join(self.model_dir, "model.json")
+            self.param_file = os.path.join(self.model_dir, "model.pdiparams")
         else:
-            self.model_file = os.path.join(self.model_dir, f"model.pdmodel")
-            self.param_file = os.path.join(self.model_dir, f"model.pdiparams")
+            self.model_file = os.path.join(self.model_dir, "model.pdmodel")
+            self.param_file = os.path.join(self.model_dir, "model.pdiparams")
         config = paddle.inference.Config(self.model_file, self.param_file)
 
         config.enable_use_gpu(100, device_id)
@@ -636,7 +752,6 @@ class InferenceEngine(object):
                 continue
             input_tensor = self.predictor.get_input_handle(name)
             input_tensor.share_external_data(self.share_inputs[name])
-
 
 
 def parse_args():
