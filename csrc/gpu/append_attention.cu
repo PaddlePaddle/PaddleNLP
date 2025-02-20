@@ -298,7 +298,7 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
     }
   }
 
-  if (max_dec_len_this_time_data > 0) {
+  if (rotary_embs && max_dec_len_this_time_data > 0) {
     cudaStream_t exec_stream;
     if (max_enc_len_this_time_data > 0) {
       cudaStreamWaitEvent(decoder_stream, main_event);
