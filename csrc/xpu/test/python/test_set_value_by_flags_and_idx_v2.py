@@ -12,24 +12,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import unittest
+
 import numpy as np
 import paddle
-import unittest
-from paddlenlp_ops import set_value_by_flags_and_idx_v2
+
+from paddlenlp.custom_ops import set_value_by_flags_and_idx_v2
 
 paddle.seed(2023)
 
+
 class GetStopValueMultiEndsV2Test(unittest.TestCase):
     def test_set_stop_value_multi_ends_v2(self):
-        pre_ids_all = paddle.to_tensor([[1, 9, 3, 4, 5, 6, 7, -1, -1, -1], [1, 9, 7, 6, 5, 4, -1, -1, -1, -1]], "int64")
-        input_ids = paddle.to_tensor([[1, 9, 3, 4, 5, 6, 7, -1, -1, -1, -1, -1, -1], [1, 9, 7, 6, 5, 4, -1, -1, -1, -1, -1, -1, -1]], "int64")
+        pre_ids_all = paddle.to_tensor(
+            [[1, 9, 3, 4, 5, 6, 7, -1, -1, -1], [1, 9, 7, 6, 5, 4, -1, -1, -1, -1]], "int64"
+        )
+        input_ids = paddle.to_tensor(
+            [[1, 9, 3, 4, 5, 6, 7, -1, -1, -1, -1, -1, -1], [1, 9, 7, 6, 5, 4, -1, -1, -1, -1, -1, -1, -1]], "int64"
+        )
         seq_lens_this_time = paddle.to_tensor([1, 1], "int32")
         seq_lens_encoder = paddle.to_tensor([1, 1], "int32")
         seq_lens_decoder = paddle.to_tensor([1, 1], "int32")
         step_idx = paddle.to_tensor([1, 1], "int64")
         stop_flags = paddle.to_tensor([0, 1], "bool")
         print("pre_ids_all\n", pre_ids_all)
-        set_value_by_flags_and_idx_v2(pre_ids_all, input_ids, seq_lens_this_time, seq_lens_encoder, seq_lens_decoder, step_idx, stop_flags)
+        set_value_by_flags_and_idx_v2(
+            pre_ids_all, input_ids, seq_lens_this_time, seq_lens_encoder, seq_lens_decoder, step_idx, stop_flags
+        )
         print("pre_ids_all\n", pre_ids_all)
         print("input_ids\n", input_ids)
         print("seq_lens_this_time\n", seq_lens_this_time)
@@ -69,7 +78,8 @@ class GetStopValueMultiEndsV2Test(unittest.TestCase):
         )
         diff_pre_ids_all = np.sum(np.abs(ref_pre_ids_all - pre_ids_all.numpy()))
         print("diff_pre_ids_all\n", diff_pre_ids_all)
-        assert diff_pre_ids_all == 0, 'Check failed.'
+        assert diff_pre_ids_all == 0, "Check failed."
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

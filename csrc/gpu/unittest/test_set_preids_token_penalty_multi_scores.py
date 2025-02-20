@@ -16,7 +16,8 @@ import unittest
 
 import numpy as np
 import paddle
-from paddlenlp_ops import (
+
+from paddlenlp.custom_ops import (
     get_token_penalty_multi_scores_v2,
     set_preids_token_penalty_multi_scores,
     set_value_by_flags_and_idx_v2,

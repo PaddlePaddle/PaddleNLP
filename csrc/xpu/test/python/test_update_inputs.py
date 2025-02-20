@@ -12,12 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import unittest
+
 import numpy as np
 import paddle
-import unittest
-from paddlenlp_ops import update_inputs
+
+from paddlenlp.custom_ops import update_inputs
 
 np.random.seed(2023)
+
+
 class GetUpdateInputsTest(unittest.TestCase):
     def test_update_inputs(self):
         bs = 48
@@ -70,7 +74,7 @@ class GetUpdateInputsTest(unittest.TestCase):
             input_ids,
             stop_nums,
             next_tokens,
-            is_block_step
+            is_block_step,
         )
 
         print("-" * 50)
@@ -84,27 +88,273 @@ class GetUpdateInputsTest(unittest.TestCase):
         print("next_tokens:\n", next_tokens)
 
         ref_not_need_stop_out = np.array([True])
-        ref_seq_lens_this_time_out = np.array([0, 0, 1, 0, 0, 1, 0, 1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 1,
-                                            1, 0, 1, 1, 0, 0, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 1, 1], "int32")
-        ref_seq_lens_encoder_out = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "int32")
-        ref_seq_lens_decoder_out = np.array([0, 0, 2, 0, 0, 6, 0, 8, 8, 10, 0, 12, 12, 0, 0, 0, 0, 0, 0, 0, 20, 22, 0, 24,
-                                            24, 0, 26, 28, 0, 0, 0, 32, 32, 0, 34, 0, 0, 38, 0, 40, 0, 0, 42, 0, 0, 46, 46, 48,
-                                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "int32")
-        input_ids_np[:, 0] = np.array([6, 5, 9, 8, 6, 2, 8, 1, 3, 1, 3, 6, 9, 8, 1, 9, 1, 8, 8, 6, 7, 6, 5, 3,
-                                    5, 9, 3, 6, 3, 9, 8, 8, 8, 8, 4, 8, 7, 4, 2, 3, 5, 8, 4, 2, 5, 6, 8, 9,
-                                    6, 7, 4, 2, 4, 6, 2, 3, 4, 9, 7, 2, 1, 8, 7, 8], "int64")
+        ref_seq_lens_this_time_out = np.array(
+            [
+                0,
+                0,
+                1,
+                0,
+                0,
+                1,
+                0,
+                1,
+                1,
+                1,
+                0,
+                1,
+                1,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                1,
+                0,
+                1,
+                1,
+                0,
+                1,
+                1,
+                0,
+                0,
+                0,
+                1,
+                1,
+                0,
+                1,
+                0,
+                0,
+                1,
+                0,
+                1,
+                0,
+                0,
+                1,
+                0,
+                0,
+                1,
+                1,
+                1,
+            ],
+            "int32",
+        )
+        ref_seq_lens_encoder_out = np.array(
+            [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+            ],
+            "int32",
+        )
+        ref_seq_lens_decoder_out = np.array(
+            [
+                0,
+                0,
+                2,
+                0,
+                0,
+                6,
+                0,
+                8,
+                8,
+                10,
+                0,
+                12,
+                12,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                20,
+                22,
+                0,
+                24,
+                24,
+                0,
+                26,
+                28,
+                0,
+                0,
+                0,
+                32,
+                32,
+                0,
+                34,
+                0,
+                0,
+                38,
+                0,
+                40,
+                0,
+                0,
+                42,
+                0,
+                0,
+                46,
+                46,
+                48,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+            ],
+            "int32",
+        )
+        input_ids_np[:, 0] = np.array(
+            [
+                6,
+                5,
+                9,
+                8,
+                6,
+                2,
+                8,
+                1,
+                3,
+                1,
+                3,
+                6,
+                9,
+                8,
+                1,
+                9,
+                1,
+                8,
+                8,
+                6,
+                7,
+                6,
+                5,
+                3,
+                5,
+                9,
+                3,
+                6,
+                3,
+                9,
+                8,
+                8,
+                8,
+                8,
+                4,
+                8,
+                7,
+                4,
+                2,
+                3,
+                5,
+                8,
+                4,
+                2,
+                5,
+                6,
+                8,
+                9,
+                6,
+                7,
+                4,
+                2,
+                4,
+                6,
+                2,
+                3,
+                4,
+                9,
+                7,
+                2,
+                1,
+                8,
+                7,
+                8,
+            ],
+            "int64",
+        )
 
-        assert not_need_stop.numpy() == ref_not_need_stop_out, 'Check not_need_stop failed.'
-        assert np.all(seq_lens_this_time.numpy()
-                    == ref_seq_lens_this_time_out), 'Check seq_lens_this_time failed.'
-        assert np.all(seq_lens_encoder.numpy()
-                    == ref_seq_lens_encoder_out), 'Check seq_lens_encoder failed.'
-        assert np.all(seq_lens_decoder.numpy()
-                    == ref_seq_lens_decoder_out), 'Check seq_lens_decoder failed.'
-        assert np.all(input_ids.numpy()
-                    == input_ids_np), 'Check input_ids failed.'
+        assert not_need_stop.numpy() == ref_not_need_stop_out, "Check not_need_stop failed."
+        assert np.all(seq_lens_this_time.numpy() == ref_seq_lens_this_time_out), "Check seq_lens_this_time failed."
+        assert np.all(seq_lens_encoder.numpy() == ref_seq_lens_encoder_out), "Check seq_lens_encoder failed."
+        assert np.all(seq_lens_decoder.numpy() == ref_seq_lens_decoder_out), "Check seq_lens_decoder failed."
+        assert np.all(input_ids.numpy() == input_ids_np), "Check input_ids failed."
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

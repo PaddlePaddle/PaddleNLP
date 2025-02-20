@@ -114,12 +114,12 @@ def append_attention(
     )
 
 
-def avx_weight_only(x: paddle.Tensor, weight: paddle.Tensor, alog: str, trans: bool) -> List[paddle.Tensor]:
+def avx_weight_only(x: paddle.Tensor, weight: paddle.Tensor, alog: str, trans: bool) -> paddle.Tensor:
 
     return _C.avx_weight_only(x, weight, alog, trans)
 
 
-def dequant_int8(intput: paddle.Tensor, out_scale: paddle.Tensor, dtype: str) -> List[paddle.Tensor]:
+def dequant_int8(intput: paddle.Tensor, out_scale: paddle.Tensor, dtype: str) -> paddle.Tensor:
 
     return _C.dequant_int8(intput, out_scale, dtype)
 
@@ -237,7 +237,7 @@ def eagle_get_base_model_hidden_states(
     base_model_seq_lens_this_time: paddle.Tensor,
     base_model_seq_lens_encoder: paddle.Tensor,
     actual_draft_token_num: int,
-) -> List[paddle.Tensor]:
+) -> paddle.Tensor:
     return _C.eagle_get_base_model_hidden_states(
         input,
         seq_lens_this_time,
@@ -256,7 +256,7 @@ def eagle_get_self_hidden_states(
     last_seq_lens_this_time: paddle.Tensor,
     seq_lens_this_time: paddle.Tensor,
     step_idx: paddle.Tensor,
-) -> List[paddle.Tensor]:
+) -> paddle.Tensor:
     return _C.eagle_get_self_hidden_states(input, last_seq_lens_this_time, seq_lens_this_time, step_idx)
 
 
@@ -267,9 +267,9 @@ def encode_rotary_qk(
     seq_lens: paddle.Tensor,
     rotary_emb_dims: int,
     use_neox: bool,
-) -> None:
+) -> List[paddle.Tensor]:
 
-    _C.encode_rotary_qk(q, kv, rotary_emb, seq_lens, rotary_emb_dims, use_neox)
+    return _C.encode_rotary_qk(q, kv, rotary_emb, seq_lens, rotary_emb_dims, use_neox)
 
 
 def flash_attn_bwd(
@@ -300,7 +300,7 @@ def cutlass_fp8_fp8_fp8_dual_gemm_fused(
     scale1: float,
     scale_out: float,
     act: str,
-) -> List[paddle.Tensor]:
+) -> paddle.Tensor:
 
     return _C.cutlass_fp8_fp8_fp8_dual_gemm_fused(
         x, y0, y1, bias0, bias1, transpose_x, transpose_y, scale0, scale1, scale_out, act
@@ -316,7 +316,7 @@ def cutlass_fp8_fp8_half_gemm_fused(
     scale: float,
     output_type: str,
     act: str,
-) -> List[paddle.Tensor]:
+) -> paddle.Tensor:
 
     return _C.cutlass_fp8_fp8_half_gemm_fused(x, y, bias, transpose_x, transpose_y, scale, output_type, act)
 
@@ -328,7 +328,7 @@ def fused_get_rotary_embedding(
     prompt_num: int,
     theta: float,
     use_neox: bool,
-) -> List[paddle.Tensor]:
+) -> paddle.Tensor:
 
     return _C.fused_get_rotary_embedding(input_ids, position_ids, head_dim_shape_tensor, prompt_num, theta, use_neox)
 
@@ -344,7 +344,7 @@ def fused_rotary_position_encoding(
     return _C.fused_rotary_position_encoding(query, key, position_ids, cos_sin_cache, head_size, is_neox)
 
 
-def gemm_dequant(x: paddle.Tensor, y: paddle.Tensor, scale: paddle.Tensor, out_dtype: str) -> List[paddle.Tensor]:
+def gemm_dequant(x: paddle.Tensor, y: paddle.Tensor, scale: paddle.Tensor, out_dtype: str) -> paddle.Tensor:
 
     return _C.gemm_dequant(x, y, scale, out_dtype)
 
@@ -374,9 +374,9 @@ def get_block_shape_and_split_kv_block(
     )
 
 
-def get_output(x: paddle.Tensor, rank_id: int, wait_flag: float) -> None:
+def get_output(x: paddle.Tensor, rank_id: int, wait_flag: float) -> List[paddle.Tensor]:
 
-    _C.get_output(x, rank_id, wait_flag)
+    return _C.get_output(x, rank_id, wait_flag)
 
 
 def get_padding_offset(
@@ -403,7 +403,7 @@ def get_position_ids(
     seq_lens_decoder: paddle.Tensor,
     seq_lens_this_time: paddle.Tensor,
     position_ids: paddle.Tensor,
-) -> List[paddle.Tensor]:
+) -> paddle.Tensor:
     return _C.get_position_ids(seq_lens_encoder, seq_lens_decoder, seq_lens_this_time, position_ids)
 
 
@@ -416,10 +416,36 @@ def get_token_penalty_multi_scores(
     cur_len: paddle.Tensor,
     min_len: paddle.Tensor,
     eos_token_id: paddle.Tensor,
-) -> List[paddle.Tensor]:
+) -> paddle.Tensor:
 
     return _C.get_token_penalty_multi_scores(
         pre_ids, logits, penalty_scores, frequency_scores, presence_scores, cur_len, min_len, eos_token_id
+    )
+
+
+def get_token_penalty_multi_scores_v2(
+    pre_ids: paddle.Tensor,
+    logits: paddle.Tensor,
+    penalty_scores: paddle.Tensor,
+    frequency_scores: paddle.Tensor,
+    presence_scores: paddle.Tensor,
+    temperatures: paddle.Tensor,
+    bad_tokens: paddle.Tensor,
+    cur_len: paddle.Tensor,
+    min_len: paddle.Tensor,
+    eos_token_id: paddle.Tensor,
+) -> paddle.Tensor:
+    return _C.get_token_penalty_multi_scores_v2(
+        pre_ids,
+        logits,
+        penalty_scores,
+        frequency_scores,
+        presence_scores,
+        temperatures,
+        bad_tokens,
+        cur_len,
+        min_len,
+        eos_token_id,
     )
 
 
@@ -437,9 +463,9 @@ def ngram_match(
     real_batch_size: int,
     max_ngram_size: int,
     max_draft_tokens: int,
-) -> None:
+) -> List[paddle.Tensor]:
 
-    _C.ngram_match(
+    return _C.ngram_match(
         input_ids,
         input_ids_len,
         pre_ids,
@@ -476,14 +502,14 @@ def quant_int8(
     round_type: int,
     max_bound: float,
     min_bound: float,
-) -> List[paddle.Tensor]:
+) -> paddle.Tensor:
 
     return _C.quant_int8(intput, shift, smooth, scale, round_type, max_bound, min_bound)
 
 
 def rebuild_padding(
     tmp_out: paddle.Tensor, padding_offset: paddle.Tensor, seq_lens: paddle.Tensor, input_ids: paddle.Tensor
-) -> List[paddle.Tensor]:
+) -> paddle.Tensor:
 
     return _C.rebuild_padding(tmp_out, padding_offset, seq_lens, input_ids)
 
@@ -495,21 +521,21 @@ def rebuild_padding_v2(
     seq_lens_encoder: paddle.Tensor,
     output_padding_offset: paddle.Tensor,
     max_input_length: int,
-) -> List[paddle.Tensor]:
+) -> paddle.Tensor:
 
     return _C.rebuild_padding_v2(
         tmp_out, cum_offsets, seq_lens_decoder, seq_lens_encoder, output_padding_offset, max_input_length
     )
 
 
-def save_output(x: paddle.Tensor, not_need_stop: paddle.Tensor, rank_id: int) -> None:
+def save_output(x: paddle.Tensor, not_need_stop: paddle.Tensor, rank_id: int) -> paddle.Tensor:
 
-    _C.save_output(x, not_need_stop, rank_id)
+    return _C.save_output(x, not_need_stop, rank_id)
 
 
 def save_with_output(
     x: paddle.Tensor, batch_idx: paddle.Tensor, step_idx: paddle.Tensor, file_path: str, rank_id: int
-) -> List[paddle.Tensor]:
+) -> paddle.Tensor:
 
     return _C.save_with_output(x, batch_idx, step_idx, file_path, rank_id)
 
@@ -530,9 +556,9 @@ def set_preids_token_penalty_multi_scores(
     cur_len: paddle.Tensor,
     min_len: paddle.Tensor,
     eos_token_id: paddle.Tensor,
-) -> None:
+) -> List[paddle.Tensor]:
 
-    _C.set_preids_token_penalty_multi_scores(
+    return _C.set_preids_token_penalty_multi_scores(
         pre_ids,
         input_ids,
         seq_lens_encoder,
@@ -558,20 +584,44 @@ def set_stop_value_multi_ends(
     return _C.set_stop_value_multi_ends(topk_ids, stop_flags, end_ids, mode)
 
 
+def set_stop_value_multi_ends_v2(
+    topk_ids: paddle.Tensor,
+    stop_flags: paddle.Tensor,
+    seq_lens: paddle.Tensor,
+    end_ids: paddle.Tensor,
+    next_tokens: paddle.Tensor,
+) -> List[paddle.Tensor]:
+    return _C.set_stop_value_multi_ends_v2(topk_ids, stop_flags, seq_lens, end_ids, next_tokens)
+
+
 def set_value_by_flags_and_idx(
     pre_ids_all: paddle.Tensor, pre_ids_now: paddle.Tensor, step_idx: paddle.Tensor, stop_flags: paddle.Tensor
-) -> List[paddle.Tensor]:
+) -> paddle.Tensor:
 
     return _C.set_value_by_flags_and_idx(pre_ids_all, pre_ids_now, step_idx, stop_flags)
 
 
-def speculate_clear_accept_nums(accept_num: paddle.Tensor, seq_lens_decoder: paddle.Tensor) -> List[paddle.Tensor]:
+def set_value_by_flags_and_idx_v2(
+    pre_ids_all: paddle.Tensor,
+    input_ids: paddle.Tensor,
+    seq_lens_this_time: paddle.Tensor,
+    seq_lens_encoder: paddle.Tensor,
+    seq_lens_decoder: paddle.Tensor,
+    step_idx: paddle.Tensor,
+    stop_flags: paddle.Tensor,
+) -> paddle.Tensor:
+    return _C.set_value_by_flags_and_idx_v2(
+        pre_ids_all, input_ids, seq_lens_this_time, seq_lens_encoder, seq_lens_decoder, step_idx, stop_flags
+    )
+
+
+def speculate_clear_accept_nums(accept_num: paddle.Tensor, seq_lens_decoder: paddle.Tensor) -> paddle.Tensor:
     return _C.speculate_clear_accept_nums(accept_num, seq_lens_decoder)
 
 
-def speculate_get_output(x: paddle.Tensor, rank_id: int, wait_flag: bool) -> None:
+def speculate_get_output(x: paddle.Tensor, rank_id: int, wait_flag: bool) -> paddle.Tensor:
 
-    _C.speculate_get_output(x, rank_id, wait_flag)
+    return _C.speculate_get_output(x, rank_id, wait_flag)
 
 
 def speculate_get_output_padding_offset(
@@ -586,7 +636,7 @@ def speculate_get_output_padding_offset(
 
 def speculate_get_seq_lens_output(
     seq_lens_this_time: paddle.Tensor, seq_lens_encoder: paddle.Tensor, seq_lens_decoder: paddle.Tensor
-) -> List[paddle.Tensor]:
+) -> paddle.Tensor:
 
     return _C.speculate_get_seq_lens_output(seq_lens_this_time, seq_lens_encoder, seq_lens_decoder)
 
@@ -606,9 +656,9 @@ def speculate_get_token_penalty_multi_scores(
     output_padding_offset: paddle.Tensor,
     output_cum_offsets: paddle.Tensor,
     max_seq_len: int,
-) -> None:
+) -> paddle.Tensor:
 
-    _C.speculate_get_token_penalty_multi_scores(
+    return _C.speculate_get_token_penalty_multi_scores(
         pre_ids,
         logits,
         penalty_scores,
@@ -628,9 +678,9 @@ def speculate_get_token_penalty_multi_scores(
 
 def speculate_save_output(
     accept_tokens: paddle.Tensor, accept_num: paddle.Tensor, not_need_stop: paddle.Tensor, rank_id: int
-) -> None:
+) -> paddle.Tensor:
 
-    _C.speculate_save_output(accept_tokens, accept_num, not_need_stop, rank_id)
+    return _C.speculate_save_output(accept_tokens, accept_num, not_need_stop, rank_id)
 
 
 def speculate_set_value_by_flags_and_idx(
@@ -642,9 +692,9 @@ def speculate_set_value_by_flags_and_idx(
     seq_lens_encoder: paddle.Tensor,
     seq_lens_decoder: paddle.Tensor,
     step_idx: paddle.Tensor,
-) -> None:
+) -> paddle.Tensor:
 
-    _C.speculate_set_value_by_flags_and_idx(
+    return _C.speculate_set_value_by_flags_and_idx(
         pre_ids_all,
         accept_tokens,
         accept_num,
@@ -796,16 +846,53 @@ def top_p_candidates(
     return _C.top_p_candidates(probs, top_p, output_padding_offset, candidates_len, max_seq_len)
 
 
-def top_p_sampling_reject(probs: paddle.Tensor, top_p: paddle.Tensor, seed: int) -> List[paddle.Tensor]:
+def top_p_sampling_reject(probs: paddle.Tensor, top_p: paddle.Tensor, seed: int) -> paddle.Tensor:
 
     return _C.top_p_sampling_reject(probs, top_p, seed)
 
 
 def transpose_remove_padding(
     input: paddle.Tensor, seq_lens: paddle.Tensor, padding_offset: paddle.Tensor
-) -> List[paddle.Tensor]:
+) -> paddle.Tensor:
 
     return _C.transpose_remove_padding(input, seq_lens, padding_offset)
+
+
+def tune_cublaslt_gemm(
+    k: paddle.Tensor,
+    n: paddle.Tensor,
+    m_start: int,
+    m_end: int,
+    dtype: str,
+    is_test: bool,
+    is_read_from_file: bool,
+    path: str,
+) -> None:
+    _C.tune_cublaslt_gemm(k, n, m_start, m_end, dtype, is_test, is_read_from_file, path)
+
+
+def update_inputs(
+    stop_flags: paddle.Tensor,
+    not_need_stop: paddle.Tensor,
+    seq_lens_this_time: paddle.Tensor,
+    seq_lens_encoder: paddle.Tensor,
+    seq_lens_decoder: paddle.Tensor,
+    input_ids: paddle.Tensor,
+    stop_nums: paddle.Tensor,
+    next_tokens: paddle.Tensor,
+    is_block_step: paddle.Tensor,
+) -> List[paddle.Tensor]:
+    return _C.update_inputs(
+        stop_flags,
+        not_need_stop,
+        seq_lens_this_time,
+        seq_lens_encoder,
+        seq_lens_decoder,
+        input_ids,
+        stop_nums,
+        next_tokens,
+        is_block_step,
+    )
 
 
 def update_inputs_v2(
@@ -843,12 +930,12 @@ def update_inputs_v2(
 
 def write_cache_kv(
     input_k: paddle.Tensor, input_v: paddle.Tensor, cache_kv: paddle.Tensor, sequence_lengths: paddle.Tensor
-) -> None:
+) -> paddle.Tensor:
 
-    _C.write_cache_kv(input_k, input_v, cache_kv, sequence_lengths)
+    return _C.write_cache_kv(input_k, input_v, cache_kv, sequence_lengths)
 
 
-def xft_greedy_search(probs: paddle.Tensor) -> List[paddle.Tensor]:
+def xft_greedy_search(probs: paddle.Tensor) -> paddle.Tensor:
 
     return _C.xft_greedy_search(probs)
 
@@ -877,7 +964,7 @@ def xft_transformer(
     maxPositions: int,
     maxPosEmbed: int,
     intermediateSize: int,
-) -> List[paddle.Tensor]:
+) -> paddle.Tensor:
 
     return _C.xft_transformer(
         input,

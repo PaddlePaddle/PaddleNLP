@@ -16,13 +16,15 @@ import unittest
 
 import numpy as np
 import paddle
-from paddlenlp_ops import top_p_sampling_reject
+
+from paddlenlp.custom_ops import top_p_sampling_reject
 
 paddle.seed(2023)
 
 batch_size = 3
 vocab_size = 40080
 max_rounds = 32
+
 
 class SetPreidsTokenPenaltyMultiScores(unittest.TestCase):
     def test_top_p_sampling_reject_case1(self):
@@ -55,9 +57,10 @@ class SetPreidsTokenPenaltyMultiScores(unittest.TestCase):
 
         paddle_pre_norm_prob = paddle.to_tensor(pre_norm_prob_np)
         paddle_norm_prob = paddle_pre_norm_prob / paddle_pre_norm_prob.sum(axis=-1, keepdim=True)
-        top_p_paddle = paddle.uniform(shape=[batch_size,1], min=0, max=1)
+        top_p_paddle = paddle.uniform(shape=[batch_size, 1], min=0, max=1)
         samples = top_p_sampling_reject(paddle_norm_prob, top_p_paddle, 0)
         print(samples)
+
 
 if __name__ == "__main__":
     unittest.main()

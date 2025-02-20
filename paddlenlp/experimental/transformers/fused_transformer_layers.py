@@ -1313,7 +1313,7 @@ class FusedMultiTransformerBase(Layer):
             position_ids_shape = paddle.sum(seq_lens_this_time)
             self.position_ids = paddle.zeros(shape=position_ids_shape, dtype=seq_lens_encoder.dtype)
 
-            from paddlenlp_ops import get_position_ids
+            from paddlenlp.custom_ops import get_position_ids
 
             # In-place operations that compute the position_ids.
             get_position_ids(seq_lens_encoder, seq_lens_decoder, seq_lens_this_time, self.position_ids)
