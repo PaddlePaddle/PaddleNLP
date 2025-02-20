@@ -433,6 +433,7 @@ def ngram_match(
     seq_lens_this_time: paddle.Tensor,
     seq_lens_encoder: paddle.Tensor,
     seq_lens_decoder: paddle.Tensor,
+    max_dec_len: paddle.Tensor,
     real_batch_size: int,
     max_ngram_size: int,
     max_draft_tokens: int,
@@ -448,6 +449,7 @@ def ngram_match(
         seq_lens_this_time,
         seq_lens_encoder,
         seq_lens_decoder,
+        max_dec_len,
         real_batch_size,
         max_ngram_size,
         max_draft_tokens,
@@ -563,6 +565,10 @@ def set_value_by_flags_and_idx(
     return _C.set_value_by_flags_and_idx(pre_ids_all, pre_ids_now, step_idx, stop_flags)
 
 
+def speculate_clear_accept_nums(accept_num: paddle.Tensor, seq_lens_decoder: paddle.Tensor) -> List[paddle.Tensor]:
+    return _C.speculate_clear_accept_nums(accept_num, seq_lens_decoder)
+
+
 def speculate_get_output(x: paddle.Tensor, rank_id: int, wait_flag: bool) -> None:
 
     _C.speculate_get_output(x, rank_id, wait_flag)
@@ -650,14 +656,39 @@ def speculate_set_value_by_flags_and_idx(
     )
 
 
-def speculate_verify_and_update(
+def speculate_update(
+    seq_lens_encoder: paddle.Tensor,
+    seq_lens_decoder: paddle.Tensor,
+    not_need_stop: paddle.Tensor,
+    draft_tokens: paddle.Tensor,
+    actual_draft_token_nums: paddle.Tensor,
+    accept_tokens: paddle.Tensor,
+    accept_num: paddle.Tensor,
+    stop_flags: paddle.Tensor,
+    seq_lens_this_time: paddle.Tensor,
+    is_block_step: paddle.Tensor,
+) -> List[paddle.Tensor]:
+    return _C.speculate_update(
+        seq_lens_encoder,
+        seq_lens_decoder,
+        not_need_stop,
+        draft_tokens,
+        actual_draft_token_nums,
+        accept_tokens,
+        accept_num,
+        stop_flags,
+        seq_lens_this_time,
+        is_block_step,
+    )
+
+
+def speculate_verify(
     accept_tokens: paddle.Tensor,
     accept_num: paddle.Tensor,
     step_idx: paddle.Tensor,
     seq_lens_encoder: paddle.Tensor,
     seq_lens_decoder: paddle.Tensor,
     stop_flags: paddle.Tensor,
-    not_need_stop: paddle.Tensor,
     draft_tokens: paddle.Tensor,
     seq_lens_this_time: paddle.Tensor,
     verify_tokens: paddle.Tensor,
@@ -672,16 +703,14 @@ def speculate_verify_and_update(
     max_seq_len: int,
     verify_window: int,
     enable_topp: bool,
-) -> None:
-
-    _C.speculate_verify_and_update(
+) -> List[paddle.Tensor]:
+    return _C.speculate_verify(
         accept_tokens,
         accept_num,
         step_idx,
         seq_lens_encoder,
         seq_lens_decoder,
         stop_flags,
-        not_need_stop,
         draft_tokens,
         seq_lens_this_time,
         verify_tokens,

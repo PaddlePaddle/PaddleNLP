@@ -1137,7 +1137,6 @@ class MTPDeepseekV2ForCausalLMBlockInferenceModel(DeepseekV2ForCausalLMBlockInfe
         pre_caches = kwargs.get("pre_caches", None)
         caches = kwargs.get("caches", None)
 
-        rope_emb = kwargs["rope_emb"]
         seq_lens_this_time = kwargs["seq_lens_this_time"]
         seq_lens_encoder = kwargs["seq_lens_encoder"]
         seq_lens_decoder = kwargs["seq_lens_decoder"]
@@ -1154,7 +1153,7 @@ class MTPDeepseekV2ForCausalLMBlockInferenceModel(DeepseekV2ForCausalLMBlockInfe
         model_inputs = {
             "input_ids": input_ids,
             "src_mask": src_mask,
-            "rope_emb": rope_emb,
+            "rope_emb": None,
             "pre_caches": pre_caches,
             "caches": caches,
             "seq_lens_this_time": seq_lens_this_time,

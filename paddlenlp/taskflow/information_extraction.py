@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import base64
 import json
 import os
@@ -25,7 +24,14 @@ from huggingface_hub import hf_hub_download
 
 from ..datasets import load_dataset
 from ..layers import GlobalPointerForEntityExtraction, GPLinkerForRelationExtraction
-from ..transformers import UIE, UIEM, UIEX, AutoModel, AutoTokenizer
+from ..transformers import (
+    UIE,
+    UIEM,
+    UIEX,
+    AutoModel,
+    AutoModelForCausalLM,
+    AutoTokenizer,
+)
 from ..utils.doc_parser import DocParser
 from ..utils.env import CONFIG_NAME, LEGACY_CONFIG_NAME
 from ..utils.ie_utils import map_offset, pad_image_data
@@ -113,6 +119,300 @@ def get_dynamic_max_length(examples, default_max_length: int, dynamic_max_length
             max_length = max_length_option
             break
     return max_length
+
+
+LLM_IE_PROMPT = """你是一个阅读理解专家，请提取所给句子与问题，提取实体。请注意，如果存在实体，则一定在原句中逐字出现，请输出对应实体的原文，不要进行额外修改；如果无法提取，请输出“无相应实体”。
+**句子开始**
+{sentence}
+**句子结束**
+**问题开始**
+{prompt}
+**问题结束**
+**回答开始**
+"""
+
+
+class UIELLMTask(Task):
+    def __init__(self, task, model, schema, **kwargs):
+        super().__init__(task=task, model=model, **kwargs)
+        self._dtype = kwargs.get("dtype", "float16")
+        self.kwargs["generation_task"] = task
+        self._tgt_length = kwargs.get("tgt_length", 50)
+        # Token max length
+        self._max_seq_length = kwargs.get("max_seq_length", 512)
+        self._top_k = kwargs.get("top_k", 1)
+        self._top_p = kwargs.get("top_p", 1.0)
+        self._temperature = kwargs.get("temperature", 1.0)
+        self._decode_strategy = kwargs.get("decode_strategy", "greedy_search")
+        self._num_return_sequences = kwargs.get("num_return_sequences", 1)
+        self._prompt = LLM_IE_PROMPT
+
+        self._construct_tokenizer(model)
+        self.set_schema(schema)
+        self._construct_model(model)
+        self._construct_input_spec()
+
+        if not schema:
+            logger.warning(
+                "The schema has not been set yet, please set a schema via set_schema(). "
+                "More details about the setting of schema please refer to https://github.com/PaddlePaddle/PaddleNLP/blob/develop/applications/information_extraction/taskflow_text.md"
+            )
+            self._schema_tree = None
+        else:
+            self.set_schema(schema)
+
+        self._is_en = False
+
+    def _construct_model(self, model):
+        """
+        Construct the inference model for the predictor.
+        """
+        model_instance = AutoModelForCausalLM.from_pretrained(model, dtype=self._infer_precision)
+        self._model = model_instance
+        self._model.eval()
+
+    def _construct_tokenizer(self, model):
+        """
+        Construct the tokenizer for the predictor.
+        """
+        self._tokenizer = AutoTokenizer.from_pretrained(model)
+
+    def _batchify(self, data, batch_size):
+        """
+        Generate input batches.
+        """
+        # Separates data into some batches.
+        one_batch = []
+        for example in data:
+            one_batch.append(example)
+            if len(one_batch) == batch_size:
+                yield one_batch
+                one_batch = []
+        if one_batch:
+            yield one_batch
+
+    def _preprocess(self, inputs, padding=True, add_special_tokens=True):
+        """
+        Transform the raw text to the model inputs, two steps involved:
+           1) Transform the raw text to token ids.
+           2) Generate the other model inputs from the raw text and token ids.
+        """
+        inputs = self._check_input_text(inputs)
+        return inputs
+
+    def _run_model(self, inputs):
+        """
+        Run the task model from the outputs of the `_tokenize` function.
+        """
+        results = self._multi_stage_predict(inputs)
+        return results
+
+    def _postprocess(self, inputs):
+        """
+        The model output is tag ids, this function will convert the model output to raw text.
+        """
+        return inputs
+
+    def _construct_input_spec(self):
+        """
+        Construct the input spec for the convert dygraph model to static model.
+        """
+        if paddle.get_device().split(":", 1)[0] == "npu":
+            input_spec_dtype = "int32"
+        else:
+            input_spec_dtype = "int64"
+        self._input_spec = [
+            paddle.static.InputSpec(shape=[None, None], dtype=input_spec_dtype, name="input_ids"),
+            paddle.static.InputSpec(shape=[None, None], dtype=input_spec_dtype, name="position_ids"),
+            paddle.static.InputSpec(shape=[None, None], dtype=input_spec_dtype, name="attention_mask"),
+        ]
+
+    def _single_stage_predict(self, inputs):
+        inputs = [self._prompt.format(sentence=dic["text"], prompt=dic["prompt"]) for dic in inputs]
+        batch_size = self.kwargs["batch_size"] if "batch_size" in self.kwargs else 1
+        batches = self._batchify(inputs, batch_size)
+        examples = []
+        for input_text in batches:
+            if self._tokenizer.chat_template is not None:
+                input_text = [input_text] if isinstance(input_text, str) else input_text
+                input_text = [self._tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in input_text]
+            tokenized_output = self._tokenizer(
+                input_text,
+                return_tensors="pd",
+                return_position_ids=True,
+                padding_side="left",
+                padding=True,
+                max_new_tokens=self._max_seq_length,
+                truncation=True,
+                truncation_side="left",
+                add_special_tokens=self._tokenizer.chat_template is None,
+            )
+            examples.append(tokenized_output)
+
+        outputs = {}
+        outputs["text"] = inputs
+        outputs["data_loader"] = examples
+
+        batch_size = self.kwargs["batch_size"] if "batch_size" in self.kwargs else 1
+        results = []
+        for batch_inputs in outputs["data_loader"]:
+            result = self._model.generate(
+                **batch_inputs,
+                decode_strategy=self._decode_strategy,
+                top_k=self._top_k,
+                top_p=self._top_p,
+                temperature=self._temperature,
+                max_new_tokens=self._tgt_length,
+                bos_token_id=self._tokenizer.bos_token_id,
+                eos_token_id=self._tokenizer.eos_token_id,
+                pad_token_id=self._tokenizer.pad_token_id,
+                num_return_sequences=self._num_return_sequences,
+                use_cache=True,
+            )
+            results.extend(result[0])
+        out_list = []
+        for x in results:
+            res = self._tokenizer.decode(x.numpy().tolist(), skip_special_tokens=True)
+            res = res.strip("\n")
+            end_idx = res.find("\n**回答结束**")
+            if end_idx != -1:
+                res = res[:end_idx]
+            out_list.append([{"text": res}])
+
+        return out_list
+
+    def _multi_stage_predict(self, data):
+        """
+        Traversal the schema tree and do multi-stage prediction.
+
+        Args:
+            data (list): a list of strings
+
+        Returns:
+            list: a list of predictions, where the list's length
+                equals to the length of `data`
+        """
+        results = [{} for _ in range(len(data))]
+        # Input check to early return
+        if len(data) < 1 or self._schema_tree is None:
+            return results
+
+        # Copy to stay `self._schema_tree` unchanged
+        schema_list = self._schema_tree.children[:]
+        while len(schema_list) > 0:
+            node = schema_list.pop(0)
+            examples = []
+            input_map = {}
+            cnt = 0
+            idx = 0
+            if not node.prefix:
+                for one_data in data:
+                    examples.append(
+                        {
+                            "text": one_data,
+                            "prompt": dbc2sbc(node.name),
+                        }
+                    )
+                    input_map[cnt] = [idx]
+                    idx += 1
+                    cnt += 1
+            else:
+                for pre, one_data in zip(node.prefix, data):
+                    if len(pre) == 0:
+                        input_map[cnt] = []
+                    else:
+                        for p in pre:
+                            prompt = p + node.name
+                            examples.append(
+                                {
+                                    "text": one_data,
+                                    "prompt": dbc2sbc(prompt),
+                                }
+                            )
+                        input_map[cnt] = [i + idx for i in range(len(pre))]
+                        idx += len(pre)
+                    cnt += 1
+            if len(examples) == 0:
+                result_list = []
+            else:
+                result_list = self._single_stage_predict(examples)
+
+            if not node.parent_relations:
+                relations = [[] for i in range(len(data))]
+                for k, v in input_map.items():
+                    for idx in v:
+                        if len(result_list[idx]) == 0:
+                            continue
+                        if node.name not in results[k].keys():
+                            results[k][node.name] = result_list[idx]
+                        else:
+                            results[k][node.name].extend(result_list[idx])
+                    if node.name in results[k].keys():
+                        relations[k].extend(results[k][node.name])
+            else:
+                relations = node.parent_relations
+                for k, v in input_map.items():
+                    for i in range(len(v)):
+                        if len(result_list[v[i]]) == 0:
+                            continue
+                        if "relations" not in relations[k][i].keys():
+                            relations[k][i]["relations"] = {node.name: result_list[v[i]]}
+                        elif node.name not in relations[k][i]["relations"].keys():
+                            relations[k][i]["relations"][node.name] = result_list[v[i]]
+                        else:
+                            relations[k][i]["relations"][node.name].extend(result_list[v[i]])
+                new_relations = [[] for i in range(len(data))]
+                for i in range(len(relations)):
+                    for j in range(len(relations[i])):
+                        if "relations" in relations[i][j].keys() and node.name in relations[i][j]["relations"].keys():
+                            for k in range(len(relations[i][j]["relations"][node.name])):
+                                new_relations[i].append(relations[i][j]["relations"][node.name][k])
+                relations = new_relations
+
+            prefix = [[] for _ in range(len(data))]
+            for k, v in input_map.items():
+                for idx in v:
+                    for i in range(len(result_list[idx])):
+                        if self._is_en:
+                            prefix[k].append(" of " + result_list[idx][i]["text"])
+                        else:
+                            prefix[k].append(result_list[idx][i]["text"] + "的")
+
+            for child in node.children:
+                child.prefix = prefix
+                child.parent_relations = relations
+                schema_list.append(child)
+        return results
+
+    def set_schema(self, schema):
+        if isinstance(schema, dict) or isinstance(schema, str):
+            schema = [schema]
+        self._schema_tree = self._build_tree(schema)
+
+    @classmethod
+    def _build_tree(cls, schema, name="root"):
+        """
+        Build the schema tree.
+        """
+        schema_tree = SchemaTree(name)
+        for s in schema:
+            if isinstance(s, str):
+                schema_tree.add_child(SchemaTree(s))
+            elif isinstance(s, dict):
+                for k, v in s.items():
+                    if isinstance(v, str):
+                        child = [v]
+                    elif isinstance(v, list):
+                        child = v
+                    else:
+                        raise TypeError(
+                            "Invalid schema, value for each key:value pairs should be list or string"
+                            "but {} received".format(type(v))
+                        )
+                    schema_tree.add_child(cls._build_tree(child, name=k))
+            else:
+                raise TypeError("Invalid schema, element should be string or dict, " "but {} received".format(type(s)))
+        return schema_tree
 
 
 class UIETask(Task):
@@ -510,7 +810,6 @@ class UIETask(Task):
                 self._check_task_files()
                 with open(os.path.join(self._task_path, CONFIG_NAME)) as f:
                     self._init_class = json.load(f)["architectures"].pop()
-
         self._is_en = True if model in ["uie-base-en"] or self._schema_lang == "en" else False
 
         if self._init_class in ["UIEX"]:
@@ -583,7 +882,9 @@ class UIETask(Task):
         Construct the inference model for the predictor.
         """
         model_instance = MODEL_MAP[self._init_class].from_pretrained(
-            self._task_path, from_hf_hub=self.from_hf_hub, convert_from_torch=self._convert_from_torch
+            self._task_path,
+            from_hf_hub=self.from_hf_hub,
+            convert_from_torch=self._convert_from_torch,
         )
         self._model = model_instance
         self._model.eval()
@@ -621,16 +922,20 @@ class UIETask(Task):
                     if "doc" in example.keys():
                         if not self._parser_map[self._ocr_lang_choice]:
                             self._parser_map[self._ocr_lang_choice] = DocParser(
-                                ocr_lang=self._ocr_lang, layout_analysis=self._layout_analysis
+                                ocr_lang=self._ocr_lang,
+                                layout_analysis=self._layout_analysis,
                             )
                         if "layout" in example.keys():
                             data = self._parser_map[self._ocr_lang_choice].parse(
-                                {"doc": example["doc"]}, do_ocr=False, expand_to_a4_size=self._expand_to_a4_size
+                                {"doc": example["doc"]},
+                                do_ocr=False,
+                                expand_to_a4_size=self._expand_to_a4_size,
                             )
                             data["layout"] = example["layout"]
                         else:
                             data = self._parser_map[self._ocr_lang_choice].parse(
-                                {"doc": example["doc"]}, expand_to_a4_size=self._expand_to_a4_size
+                                {"doc": example["doc"]},
+                                expand_to_a4_size=self._expand_to_a4_size,
                             )
                     elif "text" in example.keys():
                         if not isinstance(example["text"], str):
@@ -658,14 +963,16 @@ class UIETask(Task):
     def _single_stage_predict(self, inputs):
         input_texts = [d["text"] for d in inputs]
         prompts = [d["prompt"] for d in inputs]
-
         # max predict length should exclude the length of prompt and summary tokens
         max_predict_len = self._max_seq_len - len(max(prompts)) - self._summary_token_num
 
         if self._init_class in ["UIEX"]:
             bbox_list = [d["bbox"] for d in inputs]
             short_input_texts, short_bbox_list, input_mapping = self._auto_splitter(
-                input_texts, max_predict_len, bbox_list=bbox_list, split_sentence=self._split_sentence
+                input_texts,
+                max_predict_len,
+                bbox_list=bbox_list,
+                split_sentence=self._split_sentence,
             )
         else:
             short_input_texts, input_mapping = self._auto_splitter(
@@ -761,7 +1068,14 @@ class UIETask(Task):
                 return bbox_list
 
             def _encode_doc(
-                tokenizer, offset_mapping, last_offset, prompt, this_text_line, inputs_ids, q_sep_index, max_seq_len
+                tokenizer,
+                offset_mapping,
+                last_offset,
+                prompt,
+                this_text_line,
+                inputs_ids,
+                q_sep_index,
+                max_seq_len,
             ):
                 if len(offset_mapping) == 0:
                     content_encoded_inputs = tokenizer(
@@ -795,7 +1109,10 @@ class UIETask(Task):
                     last_offset = offset_mapping[-1][-1]
                 else:
                     content_encoded_inputs = tokenizer(
-                        text=this_text_line, max_seq_len=max_seq_len, return_dict=False, return_offsets_mapping=True
+                        text=this_text_line,
+                        max_seq_len=max_seq_len,
+                        return_dict=False,
+                        return_offsets_mapping=True,
                     )
                     inputs_ids += content_encoded_inputs["input_ids"][1:-1]
                     sub_offset_mapping = [list(x) for x in content_encoded_inputs["offset_mapping"]]
@@ -842,7 +1159,7 @@ class UIETask(Task):
 
                     bbox_list = [[0, 0, 0, 0] for x in range(len(inputs_ids))]
                     token_type_ids = [
-                        1 if token_index <= q_sep_index or token_index > c_sep_index else 0
+                        (1 if token_index <= q_sep_index or token_index > c_sep_index else 0)
                         for token_index in range(self._max_seq_len)
                     ]
                     padded_image = np.zeros([3, 224, 224])
@@ -930,7 +1247,13 @@ class UIETask(Task):
                     padded_image,
                     offset_mapping,
                 ]
-                input_list = [inputs_ids, token_type_ids, position_ids, attention_mask, bbox_list]
+                input_list = [
+                    inputs_ids,
+                    token_type_ids,
+                    position_ids,
+                    attention_mask,
+                    bbox_list,
+                ]
                 return_list = [np.array(x, dtype="int64") for x in input_list]
                 return_list.append(np.array(padded_image, dtype="float32"))
                 return_list.append(np.array(offset_mapping, dtype="int64"))
@@ -946,14 +1269,25 @@ class UIETask(Task):
         batch_sampler = paddle.io.BatchSampler(dataset=infer_ds, batch_size=self._batch_size, shuffle=False)
 
         infer_data_loader = paddle.io.DataLoader(
-            dataset=infer_ds, batch_sampler=batch_sampler, num_workers=self._num_workers, return_list=True
+            dataset=infer_ds,
+            batch_sampler=batch_sampler,
+            num_workers=self._num_workers,
+            return_list=True,
         )
 
         sentence_ids = []
         probs = []
         for batch in infer_data_loader:
             if self._init_class in ["UIEX"]:
-                input_ids, token_type_ids, pos_ids, att_mask, bbox, image, offset_maps = batch
+                (
+                    input_ids,
+                    token_type_ids,
+                    pos_ids,
+                    att_mask,
+                    bbox,
+                    image,
+                    offset_maps,
+                ) = batch
             elif self._init_class in ["UIEM"]:
                 input_ids, pos_ids, offset_maps = batch
             else:
@@ -1033,7 +1367,10 @@ class UIETask(Task):
                     if len(short_results[v]) == 0:
                         continue
                     if short_results[v][0]["text"] not in cls_options.keys():
-                        cls_options[short_results[v][0]["text"]] = [1, short_results[v][0]["probability"]]
+                        cls_options[short_results[v][0]["text"]] = [
+                            1,
+                            short_results[v][0]["probability"],
+                        ]
                     else:
                         cls_options[short_results[v][0]["text"]][0] += 1
                         cls_options[short_results[v][0]["text"]][1] += short_results[v][0]["probability"]
@@ -1087,7 +1424,14 @@ class UIETask(Task):
                         box = self._parser_map[self._ocr_lang_choice]._normalize_box(box, [img_w, img_h], [1000, 1000])
                         text += segment[1]
                         bbox.extend([box] * len(segment[1]))
-                    _inputs.append({"text": text, "bbox": bbox, "image": d["image"], "layout": d["layout"]})
+                    _inputs.append(
+                        {
+                            "text": text,
+                            "bbox": bbox,
+                            "image": d["image"],
+                            "layout": d["layout"],
+                        }
+                    )
                 else:
                     _inputs.append({"text": d["text"], "bbox": None, "image": None})
             else:
@@ -1162,7 +1506,6 @@ class UIETask(Task):
                 result_list = []
             else:
                 result_list = self._single_stage_predict(examples)
-
             if not node.parent_relations:
                 relations = [[] for i in range(len(data))]
                 for k, v in input_map.items():
@@ -1249,7 +1592,12 @@ class UIETask(Task):
                     if len(segment) == 2 or (len(segment) == 3 and segment[2] != "table"):
                         char_w = (sbox[2] - sbox[0]) * 1.0 / text_len
                         for i in range(text_len):
-                            cbox = [sbox[0] + i * char_w, sbox[1], sbox[0] + (i + 1) * char_w, sbox[3]]
+                            cbox = [
+                                sbox[0] + i * char_w,
+                                sbox[1],
+                                sbox[0] + (i + 1) * char_w,
+                                sbox[3],
+                            ]
                             char_boxes.append((segment[1][i], cbox))
                     else:
                         cell_bbox = [(segment[1][i], sbox) for i in range(text_len)]
@@ -1281,7 +1629,12 @@ class UIETask(Task):
                     result = {"text": prompt[start:end], "probability": prob[i]}
                     result_list.append(result)
                 else:
-                    result = {"text": text[start:end], "start": start, "end": end, "probability": prob[i]}
+                    result = {
+                        "text": text[start:end],
+                        "start": start,
+                        "end": end,
+                        "probability": prob[i],
+                    }
                     result_list.append(result)
             results.append(result_list)
         return results
@@ -1507,7 +1860,10 @@ class GPTask(Task):
             for rel in all_rel_preds[i]:
                 r = aspect_maps[(rel["aspect"], rel["aspect_start_index"])]
                 r["relations"] = {}
-                sentiment = {"probability": rel["probability"], "text": rel["sentiment"]}
+                sentiment = {
+                    "probability": rel["probability"],
+                    "text": rel["sentiment"],
+                }
                 opinion = {
                     "text": rel["opinion"],
                     "start": rel["opinion_start_index"],
