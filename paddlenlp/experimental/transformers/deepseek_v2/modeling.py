@@ -668,17 +668,17 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
 
             if self.config.mla_use_matrix_absorption:
                 # kv_b_proj_weights: [kv_lora_rank, (qk_nope_head_dim + v_head_dim) * num_heads]
-                wk_b, wv_b = kv_b_proj_weight.reshape(
+                kv_b_proj_weight = kv_b_proj_weight.reshape(
                     shape=[
                         self.config.kv_lora_rank,
                         self.num_attention_heads // self.config.tensor_parallel_degree,
                         -1,
                     ]
-                ).split([self.config.qk_nope_head_dim, self.config.v_head_dim], axis=-1)
-                # wk_b: [kv_lora_rank, num_heads, qk_nope_head_dim] -> [num_heads, qk_nope_head_dim, kv_lora_rank]
-                # wv_b: [kv_lora_rank, num_heads, v_head_dim] -> [num_heads, kv_lora_rank, v_head_dim]
-                wk_b = wk_b.transpose(perm=[1, 2, 0])
-                wv_b = wv_b.transpose(perm=[1, 0, 2])
+                ).transpose(perm=[1, 2, 0])
+                # wk_b: [num_heads, qk_nope_head_dim, kv_lora_rank]
+                # wv_b: [num_heads, kv_lora_rank, v_head_dim]
+                wk_b = kv_b_proj_weight[:, : self.config.qk_nope_head_dim, :]
+                wv_b = kv_b_proj_weight[:, -self.config.v_head_dim :, :].transpose(perm=[0, 2, 1])
                 self.transformer_block.k_b_proj_weights[idx].set_value(wk_b)
                 self.transformer_block.v_b_proj_weights[idx].set_value(wv_b)
 
