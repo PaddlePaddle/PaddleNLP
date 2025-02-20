@@ -19,7 +19,11 @@ from paddle.base.framework import Variable, in_dynamic_or_pir_mode, in_pir_mode
 from paddle.base.libpaddle import DataType
 from paddle.optimizer.adamw import AdamW
 from paddle.pir import Value
-from paddlenlp_kernel.triton.optimizer import adamw_bf16
+
+try:
+    from paddlenlp_kernel.triton.optimizer import adamw_bf16
+except:
+    adamw_bf16 = None
 
 
 class AdamWMini(AdamW):
@@ -304,7 +308,8 @@ class AdamWBF16(AdamW):
             _beta2 = self._beta2 if not isinstance(self._beta2, Variable) else self._beta2.item(0)
 
             found_inf = self._get_auxiliary_var("found_inf") if in_pir_mode() else None
-            adamw_bf16(
+            apply_adamw = self.adamw_python if adamw_bf16 is None else adamw_bf16
+            apply_adamw(
                 param_and_grad[0],
                 param_and_grad[1],
                 lr,
@@ -325,3 +330,51 @@ class AdamWBF16(AdamW):
             return None
         else:
             raise NotImplementedError("Not implemented yet.")
+
+    def adamw_python(
+        self,
+        param,
+        grad,
+        learning_rate,
+        moment1,
+        moment2,
+        beta1_pow,
+        beta2_pow,
+        master_weight,
+        skip_update,
+        beta1,
+        beta2,
+        epsilon,
+        lr_ratio,
+        coeff,
+        with_decay,
+        multi_precision,
+    ):
+        if skip_update:
+            return
+        if not with_decay:
+            coeff = 0.0
+        if not multi_precision:
+            master_weight = None
+        lr = learning_rate * lr_ratio
+        if master_weight is not None:
+            p = master_weight
+        else:
+            p = param
+        p *= 1.0 - lr * coeff
+        mom1 = moment1
+        mom2 = moment2
+
+        mom1 = beta1 * mom1 + (1.0 - beta1) * grad
+        mom2 = beta2 * mom2 + (1.0 - beta2) * grad * grad
+        denom = mom2.sqrt() / (1.0 - beta2_pow).sqrt() + epsilon
+        p += (mom1 / denom) * (-(lr / (1.0 - beta1_pow))).astype("float32")
+        if master_weight is not None:
+            master_weight[:] = p
+            param[:] = p.astype(param.dtype)
+        else:
+            param[:] = p
+        moment1[:] = mom1
+        moment2[:] = mom2
+        beta1_pow[:], beta2_pow[:] = beta1 * beta1_pow[:], beta2 * beta2_pow[:]
+        return
