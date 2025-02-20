@@ -323,7 +323,6 @@ class OptimizerNames(ExplicitEnum):
     ADAMW_MINI = "adamw_mini"
     ADAMW_PYTHON = "adamw_python"
     ADAMW_BF16 = "adamw_bf16"
-    ADAMW_BF16R = "adamw_bf16r"
 
 
 class ShardingOption(ExplicitEnum):
