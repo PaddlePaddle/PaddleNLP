@@ -236,6 +236,10 @@ class ModelArguments:
         default=False,
         metadata={"help": "recompute_use_reentrant"},
     )
+    first_k_dense_replace: int = field(
+        default=3,
+        metadata={"help": "first_k_dense_replace"},
+    )
 
 
 def create_pretrained_dataset(
@@ -531,6 +535,7 @@ def main():
     config.no_recompute_layers = model_args.no_recompute_layers
     config.pp_recompute_interval = model_args.pp_recompute_interval
     config.recompute_use_reentrant = model_args.recompute_use_reentrant
+    config.first_k_dense_replace = model_args.first_k_dense_replace
 
     config.use_recompute = training_args.recompute
     config.tensor_parallel_degree = training_args.tensor_parallel_degree

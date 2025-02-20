@@ -16,12 +16,32 @@
 set -x
 unset CUDA_VISIBLE_DEVICES
 
+mpi_rank=${OMPI_COMM_WORLD_RANK:-0}
+node_rank=$((mpi_rank+offset))
+mpi_node=${OMPI_COMM_WORLD_SIZE:-1}
+echo "MPI status:${mpi_rank}/${mpi_node}"
+nnode_train=${nnode_set:-${mpi_node}}
+master_train=${master:-localhost}
+#
+echo "Distributed Training ${node_rank}/${nnode_train} master=${master_train}"
+set -x
+
+# 屏蔽平台预设的环境变量，因为框架采用兼容升级，检测到这些配置会使用原方式启动
+unset PADDLE_ELASTIC_JOB_ID
+unset PADDLE_TRAINER_ENDPOINTS
+unset DISTRIBUTED_TRAINER_ENDPOINTS
+unset FLAGS_START_PORT
+unset PADDLE_ELASTIC_TIMEOUT
+nnodes=$PADDLE_TRAINERS_NUM
+rank=$PADDLE_TRAINER_ID
+
 task_name="deepseekv3"
 rm -rf output/$task_name/
 rm -rf "output/$task_name""_log"
 
 export SOT_LOG_LEVEL=4
 export PYTHONPATH=../../../:$PYTHONPATH
+export PYTHONPATH=/root/paddlejob/workspace/env_run/xuxinyi/Paddle/build/python:$PYTHONPATH
 #ulimit -c unlimited
 # export GLOG_v=3
 
@@ -35,7 +55,7 @@ export PYTHONPATH=../../../:$PYTHONPATH
 to_static=0  # 是否开启动转静训练
 
 python -u  -m paddle.distributed.launch \
-    --gpus "0,1,2,3" \
+    --gpus "0,1,2,3,4,5,6,7" \
     --log_dir  "output/$task_name""_log" \
     run_pretrain_auto.py \
     --model_type "deepseekv3_auto" \
@@ -44,7 +64,7 @@ python -u  -m paddle.distributed.launch \
     --input_dir "./data" \
     --output_dir "output/$task_name" \
     --split 949,50,1 \
-    --max_seq_length 2048 \
+    --max_seq_length 512 \
     --per_device_train_batch_size 1 \
     --per_device_eval_batch_size 2 \
     --gradient_accumulation_steps 2 \
@@ -53,9 +73,9 @@ python -u  -m paddle.distributed.launch \
     --fp16 0 \
     --fp16_opt_level "O2"  \
     --scale_loss 1024 \
-    --pipeline_parallel_degree 1 \
+    --pipeline_parallel_degree 4 \
     --tensor_parallel_degree 2 \
-    --sharding_parallel_degree 2 \
+    --sharding_parallel_degree 1 \
     --learning_rate 0.0001 \
     --min_learning_rate 0.00001 \
     --max_steps 2 \
@@ -75,6 +95,8 @@ python -u  -m paddle.distributed.launch \
     --data_impl "mmap" \
     --enable_auto_parallel 1 \
     --max_grad_norm 1.0 \
-    --num_hidden_layers 1 \
+    --num_hidden_layers 5 \
     --use_intermediate_api true \
     --to_static $to_static \
+    --first_k_dense_replace 6 \
+    --hidden_size 1792 \

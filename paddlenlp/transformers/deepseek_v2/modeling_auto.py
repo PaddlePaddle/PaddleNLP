@@ -388,13 +388,7 @@ class DeepseekV2AttentionAuto(nn.Layer):
         sin = sin[None, :, None, :]
         q_pe, k_pe = apply_rotary_pos_emb(q_pe, k_pe, cos, sin, position_ids)
 
-        query_states = paddle.empty([bsz, q_len, self.num_heads, self.q_head_dim], dtype=self.config.dtype)
         query_states = paddle.concat([q_nope, q_pe], axis=-1)
-        # query_states[:, :, :, : self.qk_nope_head_dim] = q_nope
-        # query_states[:, :, :, self.qk_nope_head_dim :] = q_pe
-
-        key_states = paddle.empty([bsz, q_len, self.num_heads, self.q_head_dim], dtype=self.config.dtype)
-        # input[0]'s shape = [1, 2048, 16, 128], input[1]'s shape = [1, 2048, 1, 64].
         key_states = paddle.concat([k_nope, k_pe.expand([bsz, q_len, self.num_heads, k_pe.shape[-1]])], axis=-1)
 
         # key_states[:, :, :, : self.qk_nope_head_dim] = k_nope
@@ -620,48 +614,10 @@ class DeepseekV2PretrainedModelAuto(PretrainedModel):
     _no_split_modules = ["DeepseekV2DecoderLayerAuto"]
 
 
-@register_base_model
-class DeepseekV2ModelAuto(DeepseekV2PretrainedModelAuto):
-    """
-    Transformer decoder consisting of *config.num_hidden_layers* layers. Each layer is a [`DeepseekV2DecoderLayerAuto`]
-
-    Args:
-        config: DeepseekV2Config
-    """
-
-    def __init__(self, config: DeepseekV2Config):
-        super().__init__(config)
-
+class GlobalOutputNet(nn.Layer):
+    def __init__(self, config) -> None:
+        super().__init__()
         self.config = config
-        self.padding_idx = config.pad_token_id
-        self.vocab_size = config.vocab_size
-
-        # Recompute defaults to False and is controlled by Trainer
-        self.enable_recompute = False
-        self.recompute_granularity = config.recompute_granularity
-        self.no_recompute_layers = config.no_recompute_layers if config.no_recompute_layers is not None else []
-
-        self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
-
-        self.layers = nn.LayerList(
-            [
-                DeepseekV2DecoderLayerAuto(config, layer_idx, layer_idx not in self.no_recompute_layers)
-                for layer_idx in range(config.num_hidden_layers)
-            ]
-        )
-
-        for layer_idx in range(config.num_hidden_layers, config.num_hidden_layers + config.num_nextn_predict_layers):
-            self.layers.append(DeepseekV2MTPLayerAuto(config, layer_idx, layer_idx not in self.no_recompute_layers))
-
-        self.norm = DeepseekV2RMSNorm(config)
-
-        self.enable_recompute = False
-
-    def get_input_embeddings(self):
-        return self.embed_tokens
-
-    def set_input_embeddings(self, value):
-        self.embed_tokens = value
 
     @staticmethod
     def _prepare_decoder_attention_mask(attention_mask, input_shape, past_key_values_length, dtype):
@@ -697,6 +653,83 @@ class DeepseekV2ModelAuto(DeepseekV2PretrainedModelAuto):
                 dtype
             )
         return expanded_attn_mask
+
+    def forward(
+        self,
+        position_ids,
+        attention_mask,
+        seq_length,
+        batch_size,
+        seq_length_with_past,
+        cache_length,
+        emb_dtype,
+        attn_mask_startend_row_indices,
+    ):
+        if position_ids is None:
+            position_ids = paddle.arange(cache_length, seq_length + cache_length, dtype=paddle.int64)
+            position_ids = position_ids.unsqueeze(0)
+
+        if attn_mask_startend_row_indices is not None or get_use_casual_mask():
+            attention_mask = None
+        else:
+            # [bs, seq_len]
+            attention_mask = (
+                paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
+                if attention_mask is None
+                else attention_mask
+            )
+            attention_mask = self._prepare_decoder_attention_mask(
+                attention_mask, (batch_size, seq_length), cache_length, emb_dtype
+            )  # [bs, 1, seq_len, seq_len]
+            if self.config.use_flash_attention:
+                attention_mask = None if is_casual_mask(attention_mask) else attention_mask
+
+        return position_ids, attention_mask
+
+
+@register_base_model
+class DeepseekV2ModelAuto(DeepseekV2PretrainedModelAuto):
+    """
+    Transformer decoder consisting of *config.num_hidden_layers* layers. Each layer is a [`DeepseekV2DecoderLayerAuto`]
+
+    Args:
+        config: DeepseekV2Config
+    """
+
+    def __init__(self, config: DeepseekV2Config):
+        super().__init__(config)
+
+        self.config = config
+        self.padding_idx = config.pad_token_id
+        self.vocab_size = config.vocab_size
+
+        # Recompute defaults to False and is controlled by Trainer
+        self.enable_recompute = False
+        self.recompute_granularity = config.recompute_granularity
+        self.no_recompute_layers = config.no_recompute_layers if config.no_recompute_layers is not None else []
+
+        self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
+        self.global_layer = GlobalOutputNet(config=config)
+
+        self.layers = nn.LayerList(
+            [
+                DeepseekV2DecoderLayerAuto(config, layer_idx, layer_idx not in self.no_recompute_layers)
+                for layer_idx in range(config.num_hidden_layers)
+            ]
+        )
+
+        for layer_idx in range(config.num_hidden_layers, config.num_hidden_layers + config.num_nextn_predict_layers):
+            self.layers.append(DeepseekV2MTPLayerAuto(config, layer_idx, layer_idx not in self.no_recompute_layers))
+
+        self.norm = DeepseekV2RMSNorm(config)
+
+        self.enable_recompute = False
+
+    def get_input_embeddings(self):
+        return self.embed_tokens
+
+    def set_input_embeddings(self, value):
+        self.embed_tokens = value
 
     def forward(
         self,
@@ -744,36 +777,25 @@ class DeepseekV2ModelAuto(DeepseekV2PretrainedModelAuto):
         past_key_values = list(past_key_values)
 
         seq_length_with_past = seq_length
-        past_key_values_length = 0
+        cache_length = 0
         if past_key_values[0] is not None:
-            past_key_values_length = past_key_values[0][0].shape[1]
-            seq_length_with_past += past_key_values_length
-
-        if position_ids is None:
-            position_ids = paddle.arange(
-                past_key_values_length, seq_length + past_key_values_length, dtype=paddle.int64
-            )
-            position_ids = position_ids.unsqueeze(0)
+            cache_length = past_key_values[0][0].shape[1]
+            seq_length_with_past += cache_length
 
         if inputs_embeds is None:
             # [bs, seq_len, dim]
             inputs_embeds = self.embed_tokens(input_ids)
 
-        # embed positions
-        if attn_mask_startend_row_indices is not None or get_use_casual_mask():
-            attention_mask = None
-        else:
-            # [bs, seq_len]
-            attention_mask = (
-                paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
-                if attention_mask is None
-                else attention_mask
-            )
-            attention_mask = self._prepare_decoder_attention_mask(
-                attention_mask, (batch_size, seq_length), past_key_values_length, inputs_embeds.dtype
-            )  # [bs, 1, seq_len, seq_len]
-            if self.config.use_flash_attention:
-                attention_mask = None if is_casual_mask(attention_mask) else attention_mask
+        position_ids, attention_mask = self.global_layer(
+            position_ids,
+            attention_mask,
+            seq_length,
+            batch_size,
+            seq_length_with_past,
+            cache_length,
+            inputs_embeds.dtype,
+            attn_mask_startend_row_indices,
+        )
 
         if self.config.num_nextn_predict_layers > 0:
             inputs_embeds_extra = inputs_embeds[:, -self.config.num_nextn_predict_layers :, :]  # [B, S, D]
@@ -806,23 +828,23 @@ class DeepseekV2ModelAuto(DeepseekV2PretrainedModelAuto):
             ):
                 layer_outputs = self.recompute_training_full(
                     decoder_layer,
-                    hidden_states=hidden_states,
-                    position_ids=position_ids,
-                    attention_mask=attention_mask,
-                    output_attentions=output_attentions,
-                    past_key_value=past_key_value,
-                    use_cache=use_cache,
-                    attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+                    hidden_states,
+                    position_ids,
+                    attention_mask,
+                    output_attentions,
+                    past_key_value,
+                    use_cache,
+                    attn_mask_startend_row_indices,
                 )
             else:
                 layer_outputs = decoder_layer(
-                    hidden_states=hidden_states,
-                    position_ids=position_ids,
-                    attention_mask=attention_mask,
-                    output_attentions=output_attentions,
-                    past_key_value=past_key_value,
-                    use_cache=use_cache,
-                    attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+                    hidden_states,
+                    position_ids,
+                    attention_mask,
+                    output_attentions,
+                    past_key_value,
+                    use_cache,
+                    attn_mask_startend_row_indices,
                 )
 
             # NOTE: clear outdate cache after it has been used for memory saving
@@ -849,17 +871,23 @@ class DeepseekV2ModelAuto(DeepseekV2PretrainedModelAuto):
                     [inputs_embeds_ori[:, (nextn + 1) :, :], inputs_embeds_extra[:, : (nextn + 1), :]], axis=1
                 )
 
+                if inputs_embeds_cur_depth.process_mesh != hidden_states.process_mesh:
+                    inputs_embeds_cur_depth = paddle.distributed.reshard(
+                        inputs_embeds_cur_depth,
+                        hidden_states.process_mesh,
+                        inputs_embeds_cur_depth.placements,
+                    )
                 # 通过该层的decoder_layer进行预测
                 past_key_value = None
                 layer_outputs = decoder_layer(
                     hidden_states,
                     inputs_embeds_cur_depth,
-                    position_ids=position_ids,
-                    attention_mask=attention_mask,
-                    output_attentions=output_attentions,
-                    past_key_value=past_key_value,
-                    use_cache=use_cache,
-                    attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+                    position_ids,
+                    attention_mask,
+                    output_attentions,
+                    past_key_value,
+                    use_cache,
+                    attn_mask_startend_row_indices,
                 )
 
                 if isinstance(layer_outputs, (tuple, list)):
@@ -1016,10 +1044,11 @@ class DeepseekV2ForCausalLMAuto(DeepseekV2PretrainedModelAuto):
         logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
 
         mtp_logits = [self.lm_head(_hidden_states) for _hidden_states in mtp_outputs] if len(mtp_outputs) > 0 else []
-        loss = None
+
         if labels is not None:
-            loss = self.criterion(logits, labels, mtp_logits=mtp_logits)
-        return loss
+            return self.criterion(logits, labels, mtp_logits=mtp_logits)
+        else:
+            return mtp_logits
 
     def prepare_inputs_for_generation(
         self, input_ids, use_cache=False, past_key_values=None, attention_mask=None, inputs_embeds=None, **kwargs
