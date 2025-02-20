@@ -24,6 +24,7 @@ from paddle.distributed.communication import stream
 from paddle.distributed.communication.group import Group
 
 from paddlenlp.utils.tools import get_env_device
+
 from .moe_gate import PretrainedMoEGate
 
 
@@ -177,6 +178,7 @@ class MoELayer(nn.Layer):
 
         if get_env_device() == "xpu":
             from paddle_xpu.layers.nn import xpu_matmul
+
             self.xpu_matmul1 = xpu_matmul()
             self.xpu_matmul2 = xpu_matmul()
 
@@ -225,12 +227,7 @@ class MoELayer(nn.Layer):
         expert_output = paddle.stack(expert_outputs, axis=1)  # [ecm]
         return expert_output
 
-    def forward(
-        self,
-        hidden_state: paddle.Tensor,
-        used_token: paddle.Tensor = None,
-        is_train=False
-    ):
+    def forward(self, hidden_state: paddle.Tensor, used_token: paddle.Tensor = None, is_train=False):
         """_summary_
 
         Args:
@@ -254,13 +251,19 @@ class MoELayer(nn.Layer):
         # combine_weights  : sec
         # dispatch_mask    : sec
         # self.exp_counts  :
-      
+
         if get_env_device() == "xpu":
             dispatch_mask = paddle.cast(dispatch_mask, hidden_state.dtype)
-            dispatched_input = self.xpu_matmul1(dispatch_mask.reshape([dispatch_mask.shape[0], -1]), reshaped_input, transpose_x=True,
-                training=is_train)
+            dispatched_input = self.xpu_matmul1(
+                dispatch_mask.reshape([dispatch_mask.shape[0], -1]),
+                reshaped_input,
+                transpose_x=True,
+                training=is_train,
+            )
         else:
-            dispatched_input = paddle.einsum("sec,sm->ecm", paddle.cast(dispatch_mask, hidden_state.dtype), reshaped_input)
+            dispatched_input = paddle.einsum(
+                "sec,sm->ecm", paddle.cast(dispatch_mask, hidden_state.dtype), reshaped_input
+            )
 
         if self.expert_parallel_degree > 1:
             dispatched_input = _AllToAll.apply(dispatched_input, self.moe_group)
@@ -280,7 +283,11 @@ class MoELayer(nn.Layer):
 
         # combine withe expert weights
         if get_env_device() == "xpu":
-            combined_output = self.xpu_matmul2(combine_weights.reshape([combine_weights.shape[0], -1]).cast(hidden_state[0].dtype), expert_output.reshape([-1, expert_output.shape[-1]]), training=is_train)
+            combined_output = self.xpu_matmul2(
+                combine_weights.reshape([combine_weights.shape[0], -1]).cast(hidden_state[0].dtype),
+                expert_output.reshape([-1, expert_output.shape[-1]]),
+                training=is_train,
+            )
         else:
             combined_output = paddle.einsum("sec,ecm->sm", combine_weights.cast(hidden_state[0].dtype), expert_output)
 
