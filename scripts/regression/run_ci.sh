@@ -141,11 +141,11 @@ for file_name in `git diff --numstat ${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`
         done
         if [[ ${dir2} =~ "__init__" ]];then # 针对发版mini test
             P0case_list[${#P0case_list[*]}]=bert
-        elif [[ ${!all_P0case_dic[*]} =~ ${dir2} ]];then
+        elif [[ ${!all_P0case_dic[*]} == ${dir2} ]];then
             P0case_list[${#P0case_list[*]}]=${dir2}
         elif [[ ${dir2} =~ "transformers" ]];then
             P0case_list[${#P0case_list[*]}]=llm
-            if [[ ${!all_P0case_dic[*]} =~ ${dir3} ]];then
+            if [[ ${!all_P0case_dic[*]} == ${dir3} ]];then
                 P0case_list[${#P0case_list[*]}]=${dir3}
             fi
         elif [[ ${dir2} =~ "taskflow" ]];then
@@ -308,7 +308,7 @@ if [[ ${#P0case_list[*]} -ne 0 ]] || [[ ${#APIcase_list[*]} -ne 0 ]];then
     echo -e "\033[35m ---- Genrate Allure Report  \033[0m"
     unset http_proxy && unset https_proxy
     cp scripts/regression/gen_allure_report.py ./
-    python gen_allure_report.py
+    python gen_allure_report.py > ${nlp_dir}/coverage_logs/gen_allure_report.log 2>&1
     echo -e "\033[35m ---- Report: https://xly.bce.baidu.com/ipipe/ipipe-report/report/${AGILE_JOB_BUILD_ID}/report/  \033[0m"
     ####################################
     # run coverage

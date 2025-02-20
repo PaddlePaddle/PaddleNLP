@@ -17,6 +17,7 @@
 export paddle=$1
 export nlp_dir=/workspace/PaddleNLP
 export log_path=/workspace/PaddleNLP/unittest_logs
+mkdir -p /workspace/PaddleNLP/coverage_report
 cd $nlp_dir
 
 if [ ! -d "unittest_logs" ];then
@@ -56,14 +57,15 @@ set_env() {
 
 print_info() {
     if [ $1 -ne 0 ]; then
-        mv ${log_path}/unittest.log ${log_path}/unittest_FAIL.log
+        cat ${log_path}/unittest.log | grep -v "Fail to fscanf: Success" \
+            | grep -v "SKIPPED" | grep -v "warning" > ${log_path}/unittest_FAIL.log
         echo -e "\033[31m ${log_path}/unittest_FAIL \033[0m"
-        tail -n 10 ${log_path}/unittest_FAIL.log
+        cat ${log_path}/unittest_FAIL.log
         cp ${log_path}/unittest_FAIL.log ${PPNLP_HOME}/upload/unittest_FAIL.log.${AGILE_PIPELINE_BUILD_ID}.${AGILE_JOB_BUILD_ID}
-        unset http_proxy && unset https_proxy
         cd ${PPNLP_HOME} && python upload.py ${PPNLP_HOME}/upload 'paddlenlp/PaddleNLP_CI/PaddleNLP-CI-Unittest-GPU'
         rm -rf upload/*
     else
+        tail -n 1 ${log_path}/unittest.log
         echo -e "\033[32m ${log_path}/unittest_SUCCESS \033[0m"
     fi
 }
@@ -83,7 +85,7 @@ cd ${nlp_dir}
 echo -e "\033[35m ---- Genrate Allure Report  \033[0m"
 unset http_proxy && unset https_proxy
 cp scripts/regression/gen_allure_report.py ./
-python gen_allure_report.py
+python gen_allure_report.py > ${nlp_dir}/coverage_report/gen_allure_report.log 2>&1
 echo -e "\033[35m ---- Report: https://xly.bce.baidu.com/ipipe/ipipe-report/report/${AGILE_JOB_BUILD_ID}/report/  \033[0m"
 
 exit $exit_code

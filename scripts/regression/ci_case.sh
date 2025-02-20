@@ -32,20 +32,22 @@ fi
 print_info() {
     if [ $1 -ne 0 ]; then
         if [[ $2 =~ 'tests' ]]; then
-            mv ${nlp_dir}/unittest_logs/$3.log ${nlp_dir}/unittest_logs/$3_FAIL.log
+            cp ${nlp_dir}/unittest_logs/$3.log ${nlp_dir}/unittest_logs/$3_FAIL.log
             echo -e "\033[31m ${nlp_dir}/unittest_logs/$3_FAIL \033[0m"
-            tail -n 10 ${nlp_dir}/unittest_logs/$3_FAIL.log
+            cat ${nlp_dir}/unittest_logs/$3_FAIL.log
         else
-            mv ${log_path}/$2 ${log_path}/$2_FAIL.log
+            cat ${log_path}/$2 | grep -v "SKIPPED" | grep -v "PASSED" > ${log_path}/$2_FAIL.log
             echo -e "\033[31m ${log_path}/$2_FAIL \033[0m"
-            tail -n 10 ${log_path}/$2_FAIL.log
+            cat ${log_path}/$2_FAIL.log
         fi
         cp ${log_path}/$2_FAIL.log ${PPNLP_HOME}/upload/$2_FAIL.log.${AGILE_PIPELINE_BUILD_ID}.${AGILE_JOB_BUILD_ID}
         cd ${PPNLP_HOME} && python upload.py ${PPNLP_HOME}/upload 'paddlenlp/PaddleNLP_CI/PaddleNLP_CI'
         rm -rf upload/*
     elif [[ $2 =~ 'tests' ]]; then
+        tail -n 1 ${log_path}/$3.log
         echo -e "\033[32m ${log_path}/$3_SUCCESS \033[0m"
     else
+        tail -n 1 ${log_path}/$2.log
         echo -e "\033[32m ${log_path}/$2_SUCCESS \033[0m"
     fi
 }

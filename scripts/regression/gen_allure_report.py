@@ -71,11 +71,11 @@ def gen_allure_report():
         job_build_id = os.getenv("AGILE_JOB_BUILD_ID")
         REPORT_SERVER = os.getenv("REPORT_SERVER")
 
-        cmd = "curl -v {}/report/upload.sh | bash -s ./report {} report".format(REPORT_SERVER, job_build_id)
+        cmd = "curl -s {}/report/upload.sh | bash -s ./report {} report".format(REPORT_SERVER, job_build_id)
 
         if job_build_id:
             # upload allure report
-            cmd = "curl -v {}/report/upload.sh | bash -s ./report {} report".format(REPORT_SERVER, job_build_id)
+            cmd = "curl -s {}/report/upload.sh | bash -s ./report {} report".format(REPORT_SERVER, job_build_id)
             print("upload cmd is {}".format(cmd))
             ret = os.system(cmd)
         else:
