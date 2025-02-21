@@ -176,12 +176,6 @@ class MoELayer(nn.Layer):
         self.all_to_all_dropout = all_to_all_dropout
         self.enable_recompute = False
 
-        if get_env_device() == "xpu":
-            from paddle_xpu.layers.nn import xpu_matmul
-
-            self.xpu_matmul1 = xpu_matmul()
-            self.xpu_matmul2 = xpu_matmul()
-
         self.experts = nn.LayerList([])
         for i in range(self.moe_num_experts):
             if i // self.moe_num_experts_per_device == self.moe_rank:
@@ -254,7 +248,9 @@ class MoELayer(nn.Layer):
 
         if get_env_device() == "xpu":
             dispatch_mask = paddle.cast(dispatch_mask, hidden_state.dtype)
-            dispatched_input = self.xpu_matmul1(
+            from paddle_xpu.layers.nn import xpu_matmul
+
+            dispatched_input = xpu_matmul()(
                 dispatch_mask.reshape([dispatch_mask.shape[0], -1]),
                 reshaped_input,
                 transpose_x=True,
@@ -283,7 +279,9 @@ class MoELayer(nn.Layer):
 
         # combine withe expert weights
         if get_env_device() == "xpu":
-            combined_output = self.xpu_matmul2(
+            from paddle_xpu.layers.nn import xpu_matmul
+
+            combined_output = xpu_matmul()(
                 combine_weights.reshape([combine_weights.shape[0], -1]).cast(hidden_state[0].dtype),
                 expert_output.reshape([-1, expert_output.shape[-1]]),
                 training=is_train,
