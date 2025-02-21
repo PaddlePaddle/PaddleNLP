@@ -245,7 +245,7 @@ class Config:
             speculate_model_name_or_path = os.getenv("SPECULATE_MODEL_PATH", None)
             speculate_model_quant_type = os.getenv("SPECULATE_MODEL_QUANT_TYPE", "weight_only_int8")
             speculate_max_ngram_size = int(
-                os.getenv("SPECULATE_MAX_NGRAM_SIZE"), model_cfg["speculate_max_ngram_size"]
+                os.getenv("SPECULATE_MAX_NGRAM_SIZE", model_cfg["speculate_max_ngram_size"])
             )
 
             if speculate_method in ["eagle", "mtp"]:
@@ -261,7 +261,8 @@ class Config:
                 quant_type=speculate_model_quant_type,
                 max_batch_size=self.max_batch_size,
                 total_max_length=self.max_seq_len,
-                max_dec_len=self.max_dec_len,
+                max_length=self.max_dec_len,
+                dtype=self.dtype,
             )
 
             logger = get_logger("model_server", "infer_config.log")

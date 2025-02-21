@@ -98,10 +98,15 @@ class ModelRunner:
                     self.args.max_seq_len,
                 )
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
             elif self.speculate_config.speculate_method == "mtp" or self.speculate_config.speculate_method == "eagle":
                 self.proposer = EagleProposer(self.speculate_config)
 >>>>>>> 1.support speculate complicated args. 2.format serving code
+=======
+            elif self.speculate_config.speculate_method in ["eagle", "mtp"]:
+                self.proposer = EagleProposer(self.speculate_config, base_model_inputs=self.share_inputs)
+>>>>>>> 1. support mtp serving.  2. Unify Spec argument
         else:
             self.proposer = None
 
@@ -118,6 +123,9 @@ class ModelRunner:
             config=self.config,
             mp_degree=self.nranks,
         )
+
+        if self.config.return_full_hidden_states:
+            self.set_inputs()
 
     def read_model_config(self):
         """
@@ -395,11 +403,23 @@ class ModelRunner:
                 fill_value=self.speculate_config.speculate_max_draft_token_num,
                 dtype="int32",
             )
+            self.helper_tensors["full_hidden_states"] = None
 
-        if self.config.return_full_hidden_states:
-            for i in range(self.args.num_layers):
-                self.share_inputs["value_caches_{}".format(i)] = self.cache_kvs["value_caches_{}".format(i)]
-                self.share_inputs["key_caches_{}".format(i)] = self.cache_kvs["key_caches_{}".format(i)]
+    def set_inputs(self):
+        for i in range(self.args.num_layers):
+            self.share_inputs["value_caches_{}".format(i)] = self.cache_kvs["value_caches_{}".format(i)]
+            self.share_inputs["key_caches_{}".format(i)] = self.cache_kvs["key_caches_{}".format(i)]
+
+        self.input_tensors = []
+        share_inputs_keys = self.share_inputs.keys()
+        for k in self.infer_engine.input_names:
+            assert k in share_inputs_keys, f"Input {k} must be created."
+            if k != "seq_lens_this_time":
+                v = self.share_inputs[k]
+                v.name = k
+                self.input_tensors.append(v)
+        # seq_lens_this_time need to be replaced in insert step
+        self.input_tensors.append("None")
 
     def dy_input_preprocess(self, tasks):
         """
@@ -461,12 +481,15 @@ class ModelRunner:
                 )
 
             if self.is_speculate_decoding:
-                self.share_inputs["draft_tokens"][idx : idx + 1] = np.zeros(
-                    [self.speculate_config.speculate_max_draft_token_num + 1]
-                )
-                self.share_inputs["actual_draft_token_num"][idx : idx + 1] = np.array(
-                    [self.speculate_config.speculate_max_draft_token_num]
-                )
+                if self.speculate_config.speculate_method == "inference_with_reference":
+                    self.share_inputs["draft_tokens"][idx : idx + 1] = np.zeros(
+                        [self.speculate_config.speculate_max_draft_token_num + 1]
+                    )
+                    self.share_inputs["actual_draft_token_num"][idx : idx + 1] = np.array(
+                        [self.speculate_config.speculate_max_draft_token_num]
+                    )
+                elif self.speculate_config.speculate_method in ["eagle", "mtp"]:
+                    self.proposer.insert_query(idx=idx, task=task)
 
     def step_cuda(self):
         """
@@ -611,6 +634,7 @@ class ModelRunner:
         real_bsz = None
 
         while True:
+            self.insert_step = False
             if use_custom_health_checker:
                 engine_healthy_recorded_time_array[0] = time.time()
 
@@ -626,6 +650,7 @@ class ModelRunner:
 
             if flag_broadcast_array[0] == 1 or self.infer_queue.read_finish_flag.get() == 1:
                 logger.info(f"rank: {self.rank} start to get")
+                self.insert_step = True
                 if self.share_inputs["seq_lens_this_time"] is not None:
                     self.helper_tensors["seq_lens_this_time"][:real_bsz] = self.share_inputs["seq_lens_this_time"]
 
@@ -644,6 +669,9 @@ class ModelRunner:
                 self.share_inputs["seq_lens_this_time"] = copy.deepcopy(
                     self.helper_tensors["seq_lens_this_time"][:real_bsz]
                 )
+                if self.config.return_full_hidden_states:
+                    self.share_inputs["seq_lens_this_time"].name = "seq_lens_this_time"
+                    self.input_tensors[-1] = self.share_inputs["seq_lens_this_time"]
                 if not self.config.return_full_hidden_states:
                     self.infer_engine.seq_lens_handle.share_external_data(self.share_inputs["seq_lens_this_time"])
                 self.share_inputs["not_need_stop"][0] = True
@@ -660,23 +688,15 @@ class ModelRunner:
                     self.share_inputs,
                     real_batch_size=self.share_inputs["seq_lens_this_time"].shape[0],
                     seq_lens_this_time=self.share_inputs["seq_lens_this_time"],
+                    base_model_full_hidden_states=self.helper_tensors["full_hidden_states"],
+                    insert_step=self.insert_step,
                 )
-            logger.info(f"infer_run input: {self.share_inputs}")
+
             if self.config.return_full_hidden_states:
-                input_tensors = []
-                share_inputs_keys = self.share_inputs.keys()
-
-                for k in self.infer_engine.input_names:
-                    assert k in share_inputs_keys, f"Input {k} must be created."
-                    v = self.share_inputs[k]
-                    v.name = k
-                    input_tensors.append(v)
-
-                outputs = self.infer_engine.predictor.run(input_tensors)
-                self.share_inputs["all_hidden_states"] = outputs[0]
+                outputs = self.infer_engine.predictor.run(self.input_tensors)
+                self.helper_tensors["full_hidden_states"] = outputs[0]
             else:
                 self.infer_engine.predictor.run()
-            logger.info(f'accept_num: {self.share_inputs["accept_num"]}')
 
 <<<<<<< HEAD
             self.infer_engine.predictor.run()
@@ -686,6 +706,9 @@ class ModelRunner:
             self.share_inputs["infer_seed"][:] %= self.MAX_INFER_SEED
             if self.free_list_len > 0:
                 self.step_cuda()
+
+            if self.proposer is not None:
+                self.proposer.postprocess()
 
 
 class InferenceEngine(object):
