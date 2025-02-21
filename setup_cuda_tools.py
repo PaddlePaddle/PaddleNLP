@@ -76,6 +76,14 @@ def get_ext_and_cmd():
                 os.rename(rf"{so_path}", rf"{new_so_path}")
                 assert os.path.exists(new_so_path)
 
+                # Copy the .so and .py file to source code
+                source_name = self.get_ext_fullname(self.extensions[0]._full_name).replace(".", "/")
+                source_code_path = source_name + ".py"
+                source_so_path = source_name + "_pd_" + ext_suffix
+                shutil.copyfile(python_api_path, source_code_path)
+                shutil.copyfile(new_so_path, source_so_path)
+                assert os.path.exists(source_so_path)
+
         def update_git_submodule():
             try:
                 subprocess.run(["git", "submodule", "update", "--init"], check=True, cwd=custom_ops_path)

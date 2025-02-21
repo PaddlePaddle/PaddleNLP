@@ -135,3 +135,6 @@ autogen/
 
 # cutlass kernel
 !csrc/gpu/cutlass_kernels/gemm/collective/builders
+
+# custom_ops python api file
+paddlenlp/custom_ops/_C.py
