@@ -1444,6 +1444,8 @@ class FusedMultiTransformerBase(Layer):
         )
         kwargs["max_enc_len_this_time"] = max_enc_len_this_time
         kwargs["max_dec_len_this_time"] = max_dec_len_this_time
+        self.prefill_phase = max_enc_len_this_time[0] > 0
+        self.decode_phase = max_dec_len_this_time[0] > 0
 
         if self.config.append_attn:
 
@@ -2827,7 +2829,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
             shape=[query.shape[0], self.num_heads * self.config.mla_config.v_head_dim], dtype=query.dtype
         )
 
-        if kwargs["max_enc_len_this_time"][0] > 0:  # prefill phase
+        if self.prefill_phase:  # prefill phase
             prefill_mla_write_cache(
                 compressed_kv,
                 key_pe,
@@ -2913,7 +2915,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
             )[0]
             fmha_out = fmha_out + fmha_out_prefill
 
-        if kwargs["max_dec_len_this_time"][0] > 0:  # decode phase
+        if self.decode_phase:  # decode phase
             decode_mla_write_cache(
                 compressed_kv,
                 key_pe,
@@ -3210,7 +3212,7 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
             shape=[query.shape[0], self.num_heads * self.config.mla_config.v_head_dim], dtype=query.dtype
         )
 
-        if kwargs["max_enc_len_this_time"][0] > 0:  # prefill phase
+        if self.prefill_phase:  # prefill phase
             prefill_mla_write_cache(
                 compressed_kv,
                 key_pe,
@@ -3302,7 +3304,7 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
             )[0]
             fmha_out = fmha_out + fmha_out_prefill
 
-        if kwargs["max_dec_len_this_time"][0] > 0:  # decode phase
+        if self.decode_phase:  # decode phase
             decode_mla_write_cache(
                 compressed_kv,
                 key_pe,
