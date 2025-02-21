@@ -10,7 +10,7 @@
     "tensor_parallel_degree": 2,
     "pipeline_parallel_degree": 1,
     "sharding_parallel_degree": 16,
-    "sequence_parallel": 1,
+    "sequence_parallel": 0,
     "virtual_pp_degree": 1,
     "virtual_pipeline_seg_method": "QWenBlockAuto",
     "use_flash_attention": true,
