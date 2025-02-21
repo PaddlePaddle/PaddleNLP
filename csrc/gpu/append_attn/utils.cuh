@@ -365,6 +365,12 @@ __forceinline__ __host__ __device__ void vec_cast<nv_bfloat16, float>(
   } else if (group_size == 16) {                             \
     constexpr size_t GROUP_SIZE = 16;                        \
     __VA_ARGS__                                              \
+  } else if (group_size == 32) {                             \
+    constexpr size_t GROUP_SIZE = 32;                        \
+    __VA_ARGS__                                              \
+  } else if (group_size == 64) {                             \
+    constexpr size_t GROUP_SIZE = 64;                        \
+    __VA_ARGS__                                              \
   } else if (group_size == 128) {                            \
     constexpr size_t GROUP_SIZE = 128;                       \
     __VA_ARGS__                                              \

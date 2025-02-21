@@ -414,7 +414,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
 
         if self.use_weight_only:
             if self.config.q_lora_rank is not None:
-                q_proj_weight_scale_attrs = [
+                q_a_proj_weight_scale_attrs = [
                     paddle.ParamAttr(
                         name=f"fuse{self.base_model_prefix}.{idx}.q_a_proj_weight_scale",
                     )

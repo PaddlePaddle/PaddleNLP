@@ -721,11 +721,6 @@ class FusedMultiTransformerBase(Layer):
                 )
                 kv_a_layernorm_weight_attr = self.get_attr(self.config.mla_config.kv_a_layernorm_weight_attrs, i)
                 kv_b_proj_weight_attr = self.get_attr(self.config.mla_config.kv_b_proj_weight_attrs, i)
-
-                q_nope_k_b_proj_weight_attr = self.get_attr(self.config.mla_config.q_nope_k_b_proj_weight_attrs, i)
-                q_rope_proj_weight_attr = self.get_attr(self.config.mla_config.q_rope_proj_weight_attrs, i)
-                v_b_o_proj_weight_attr = self.get_attr(self.config.mla_config.v_b_o_proj_weight_attrs, i)
-
                 if kv_a_proj_with_mqa_weight_attr:
                     kv_a_proj_with_mqa_weight = self.create_parameter(
                         shape=self.kv_a_proj_with_mqa_weight_shape,
@@ -747,6 +742,10 @@ class FusedMultiTransformerBase(Layer):
                         dtype=self.create_params_type,
                         is_bias=False,
                     )
+
+                q_nope_k_b_proj_weight_attr = self.get_attr(self.config.mla_config.q_nope_k_b_proj_weight_attrs, i)
+                q_rope_proj_weight_attr = self.get_attr(self.config.mla_config.q_rope_proj_weight_attrs, i)
+                v_b_o_proj_weight_attr = self.get_attr(self.config.mla_config.v_b_o_proj_weight_attrs, i)
                 if q_nope_k_b_proj_weight_attr:
                     q_nope_k_b_proj_weight = self.create_parameter(
                         shape=self.q_nope_k_b_proj_weight_shape,
@@ -1664,84 +1663,90 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
 
         for i in range(self.num_layers):
 
-            q_proj_weight_scale = None
-            q_proj_weight_scale_attr = self.get_attr(self.config.mla_config.q_proj_weight_scale_attrs, i)
-            if q_proj_weight_scale_attr:
-                q_proj_weight_scale = self.create_parameter(
-                    shape=[self.num_heads * (self.config.mla_config.qk_head_dim)]
-                    if self.weightonly_group_size < 0
-                    else [
-                        (self.q_proj_weight_shape[1] + self.weightonly_group_size - 1) // self.weightonly_group_size,
-                        self.num_heads * (self.config.mla_config.qk_head_dim),
-                    ],
-                    attr=q_proj_weight_scale_attr,
-                    dtype=self.weight_scale_dtype,
-                    is_bias=False,
-                )
-
             q_a_proj_weight_scale = None
             q_b_proj_weight_scale = None
-            q_a_proj_weight_scale_attr = self.get_attr(self.config.mla_config.q_a_proj_weight_scale_attrs, i)
-            q_b_proj_weight_scale_attr = self.get_attr(self.config.mla_config.q_b_proj_weight_scale_attrs, i)
-            if q_a_proj_weight_scale_attr:
-                q_a_proj_weight_scale = self.create_parameter(
-                    shape=[self.config.mla_config.q_lora_rank]
-                    if self.weightonly_group_size < 0
-                    else [
-                        (self.q_a_proj_weight_shape[1] + self.weightonly_group_size - 1) // self.weightonly_group_size,
-                        self.config.mla_config.q_lora_rank,
-                    ],
-                    attr=q_a_proj_weight_scale_attr,
-                    dtype=self.weight_scale_dtype,
-                    is_bias=False,
-                )
-            if q_b_proj_weight_scale_attr:
-                q_b_proj_weight_scale = self.create_parameter(
-                    shape=[self.num_heads * (self.config.mla_config.qk_head_dim)]
-                    if self.weightonly_group_size < 0
-                    else [
-                        (self.q_b_proj_weight_shape[1] + self.weightonly_group_size - 1) // self.weightonly_group_size,
-                        self.num_heads * (self.config.mla_config.qk_head_dim),
-                    ],
-                    attr=q_b_proj_weight_scale_attr,
-                    dtype=self.weight_scale_dtype,
-                    is_bias=False,
-                )
-
             kv_a_proj_with_mqa_weight_scale = None
             kv_b_proj_weight_scale = None
-            kv_a_proj_with_mqa_weight_scale_attr = self.get_attr(
-                self.config.mla_config.kv_a_proj_with_mqa_weight_scale_attrs, i
-            )
-            kv_b_proj_weight_scale_attr = self.get_attr(self.config.mla_config.kv_b_proj_weight_scale_attrs, i)
-            if kv_a_proj_with_mqa_weight_scale_attr:
-                kv_a_proj_with_mqa_weight_scale = self.create_parameter(
-                    shape=[self.config.mla_config.kv_lora_rank + self.config.mla_config.qk_rope_head_dim]
-                    if self.weightonly_group_size < 0
-                    else [
-                        (self.kv_a_proj_with_mqa_weight_shape[1] + self.weightonly_group_size - 1)
-                        // self.weightonly_group_size,
-                        self.config.mla_config.kv_lora_rank + self.config.mla_config.qk_rope_head_dim,
-                    ],
-                    attr=kv_a_proj_with_mqa_weight_scale_attr,
-                    dtype=self.weight_scale_dtype,
-                    is_bias=False,
+            if self.config.mla_config.use_mla():
+                q_proj_weight_scale = None
+                q_proj_weight_scale_attr = self.get_attr(self.config.mla_config.q_proj_weight_scale_attrs, i)
+                if q_proj_weight_scale_attr:
+                    q_proj_weight_scale = self.create_parameter(
+                        shape=[self.num_heads * (self.config.mla_config.qk_head_dim)]
+                        if self.weightonly_group_size < 0
+                        else [
+                            (self.q_proj_weight_shape[1] + self.weightonly_group_size - 1)
+                            // self.weightonly_group_size,
+                            self.num_heads * (self.config.mla_config.qk_head_dim),
+                        ],
+                        attr=q_proj_weight_scale_attr,
+                        dtype=self.weight_scale_dtype,
+                        is_bias=False,
+                    )
+
+                q_a_proj_weight_scale_attr = self.get_attr(self.config.mla_config.q_a_proj_weight_scale_attrs, i)
+                q_b_proj_weight_scale_attr = self.get_attr(self.config.mla_config.q_b_proj_weight_scale_attrs, i)
+                if q_a_proj_weight_scale_attr:
+                    q_a_proj_weight_scale = self.create_parameter(
+                        shape=[self.config.mla_config.q_lora_rank]
+                        if self.weightonly_group_size < 0
+                        else [
+                            (self.q_a_proj_weight_shape[1] + self.weightonly_group_size - 1)
+                            // self.weightonly_group_size,
+                            self.config.mla_config.q_lora_rank,
+                        ],
+                        attr=q_a_proj_weight_scale_attr,
+                        dtype=self.weight_scale_dtype,
+                        is_bias=False,
+                    )
+                if q_b_proj_weight_scale_attr:
+                    q_b_proj_weight_scale = self.create_parameter(
+                        shape=[self.num_heads * (self.config.mla_config.qk_head_dim)]
+                        if self.weightonly_group_size < 0
+                        else [
+                            (self.q_b_proj_weight_shape[1] + self.weightonly_group_size - 1)
+                            // self.weightonly_group_size,
+                            self.num_heads * (self.config.mla_config.qk_head_dim),
+                        ],
+                        attr=q_b_proj_weight_scale_attr,
+                        dtype=self.weight_scale_dtype,
+                        is_bias=False,
+                    )
+
+                kv_a_proj_with_mqa_weight_scale_attr = self.get_attr(
+                    self.config.mla_config.kv_a_proj_with_mqa_weight_scale_attrs, i
                 )
-            if kv_b_proj_weight_scale_attr:
-                kv_b_proj_weight_scale = self.create_parameter(
-                    shape=[
-                        self.num_heads * (self.config.mla_config.qk_nope_head_dim + self.config.mla_config.v_head_dim)
-                    ]
-                    if self.weightonly_group_size < 0
-                    else [
-                        (self.kv_b_proj_weight_shape[1] + self.weightonly_group_size - 1)
-                        // self.weightonly_group_size,
-                        self.num_heads * (self.config.mla_config.qk_nope_head_dim + self.config.mla_config.v_head_dim),
-                    ],
-                    attr=kv_b_proj_weight_scale_attr,
-                    dtype=self.weight_scale_dtype,
-                    is_bias=False,
-                )
+                kv_b_proj_weight_scale_attr = self.get_attr(self.config.mla_config.kv_b_proj_weight_scale_attrs, i)
+                if kv_a_proj_with_mqa_weight_scale_attr:
+                    kv_a_proj_with_mqa_weight_scale = self.create_parameter(
+                        shape=[self.config.mla_config.kv_lora_rank + self.config.mla_config.qk_rope_head_dim]
+                        if self.weightonly_group_size < 0
+                        else [
+                            (self.kv_a_proj_with_mqa_weight_shape[1] + self.weightonly_group_size - 1)
+                            // self.weightonly_group_size,
+                            self.config.mla_config.kv_lora_rank + self.config.mla_config.qk_rope_head_dim,
+                        ],
+                        attr=kv_a_proj_with_mqa_weight_scale_attr,
+                        dtype=self.weight_scale_dtype,
+                        is_bias=False,
+                    )
+                if kv_b_proj_weight_scale_attr:
+                    kv_b_proj_weight_scale = self.create_parameter(
+                        shape=[
+                            self.num_heads
+                            * (self.config.mla_config.qk_nope_head_dim + self.config.mla_config.v_head_dim)
+                        ]
+                        if self.weightonly_group_size < 0
+                        else [
+                            (self.kv_b_proj_weight_shape[1] + self.weightonly_group_size - 1)
+                            // self.weightonly_group_size,
+                            self.num_heads
+                            * (self.config.mla_config.qk_nope_head_dim + self.config.mla_config.v_head_dim),
+                        ],
+                        attr=kv_b_proj_weight_scale_attr,
+                        dtype=self.weight_scale_dtype,
+                        is_bias=False,
+                    )
 
             qkv_weight_scale = None
             qkv_weight_scale_attr = self.get_attr(config.qkv_weight_scale_attrs, i)
@@ -1776,50 +1781,51 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             q_nope_k_b_proj_weight_scale = None
             q_rope_proj_weight_scale = None
             v_b_o_proj_weight_scale = None
-            q_nope_k_b_proj_weight_scale_attr = self.get_attr(
-                self.config.mla_config.q_nope_k_b_proj_weight_scale_attrs, i
-            )
-            q_rope_proj_weight_scale_attr = self.get_attr(self.config.mla_config.q_rope_proj_weight_scale_attrs, i)
-            v_b_o_proj_weight_scale_attr = self.get_attr(self.config.mla_config.v_b_o_proj_weight_scale_attrs, i)
-            if q_nope_k_b_proj_weight_scale_attr:
-                q_nope_k_b_proj_weight_scale = self.create_parameter(
-                    shape=[self.num_heads * self.config.mla_config.kv_lora_rank]
-                    if self.weightonly_group_size < 0
-                    else [
-                        (self.q_nope_k_b_proj_weight_shape[1] + self.weightonly_group_size - 1)
-                        // self.weightonly_group_size,
-                        self.num_heads * self.config.mla_config.kv_lora_rank,
-                    ],
-                    attr=q_nope_k_b_proj_weight_scale_attr,
-                    dtype=self.weight_scale_dtype,
-                    is_bias=False,
+            if self.config.mla_config.use_absorb():
+                q_nope_k_b_proj_weight_scale_attr = self.get_attr(
+                    self.config.mla_config.q_nope_k_b_proj_weight_scale_attrs, i
                 )
-            if q_rope_proj_weight_scale_attr:
-                q_rope_proj_weight_scale = self.create_parameter(
-                    shape=[self.num_heads * self.config.mla_config.qk_rope_head_dim]
-                    if self.weightonly_group_size < 0
-                    else [
-                        (self.q_rope_proj_weight_shape[1] + self.weightonly_group_size - 1)
-                        // self.weightonly_group_size,
-                        self.num_heads * self.config.mla_config.qk_rope_head_dim,
-                    ],
-                    attr=q_rope_proj_weight_scale_attr,
-                    dtype=self.weight_scale_dtype,
-                    is_bias=False,
-                )
-            if v_b_o_proj_weight_scale_attr:
-                v_b_o_proj_weight_scale = self.create_parameter(
-                    shape=[self.embed_dim]
-                    if self.weightonly_group_size < 0
-                    else [
-                        (self.v_b_o_proj_weight_shape[1] + self.weightonly_group_size - 1)
-                        // self.weightonly_group_size,
-                        self.embed_dim,
-                    ],
-                    attr=v_b_o_proj_weight_scale_attr,
-                    dtype=self.weight_scale_dtype,
-                    is_bias=False,
-                )
+                q_rope_proj_weight_scale_attr = self.get_attr(self.config.mla_config.q_rope_proj_weight_scale_attrs, i)
+                v_b_o_proj_weight_scale_attr = self.get_attr(self.config.mla_config.v_b_o_proj_weight_scale_attrs, i)
+                if q_nope_k_b_proj_weight_scale_attr:
+                    q_nope_k_b_proj_weight_scale = self.create_parameter(
+                        shape=[self.num_heads * self.config.mla_config.kv_lora_rank]
+                        if self.weightonly_group_size < 0
+                        else [
+                            (self.q_nope_k_b_proj_weight_shape[1] + self.weightonly_group_size - 1)
+                            // self.weightonly_group_size,
+                            self.num_heads * self.config.mla_config.kv_lora_rank,
+                        ],
+                        attr=q_nope_k_b_proj_weight_scale_attr,
+                        dtype=self.weight_scale_dtype,
+                        is_bias=False,
+                    )
+                if q_rope_proj_weight_scale_attr:
+                    q_rope_proj_weight_scale = self.create_parameter(
+                        shape=[self.num_heads * self.config.mla_config.qk_rope_head_dim]
+                        if self.weightonly_group_size < 0
+                        else [
+                            (self.q_rope_proj_weight_shape[1] + self.weightonly_group_size - 1)
+                            // self.weightonly_group_size,
+                            self.num_heads * self.config.mla_config.qk_rope_head_dim,
+                        ],
+                        attr=q_rope_proj_weight_scale_attr,
+                        dtype=self.weight_scale_dtype,
+                        is_bias=False,
+                    )
+                if v_b_o_proj_weight_scale_attr:
+                    v_b_o_proj_weight_scale = self.create_parameter(
+                        shape=[self.embed_dim]
+                        if self.weightonly_group_size < 0
+                        else [
+                            (self.v_b_o_proj_weight_shape[1] + self.weightonly_group_size - 1)
+                            // self.weightonly_group_size,
+                            self.embed_dim,
+                        ],
+                        attr=v_b_o_proj_weight_scale_attr,
+                        dtype=self.weight_scale_dtype,
+                        is_bias=False,
+                    )
 
             ffn1_weight_scale = None
             ffn2_weight_scale = None
