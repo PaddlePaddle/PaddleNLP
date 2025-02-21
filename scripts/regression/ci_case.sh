@@ -47,7 +47,7 @@ print_info() {
             echo -e "\033[31m ${nlp_dir}/unittest_logs/$3_FAIL \033[0m"
             cat ${nlp_dir}/unittest_logs/$3_FAIL.log
         else
-            cat ${log_path}/$2 | grep -v "SKIPPED" | grep -v "PASSED" > ${log_path}/$2_FAIL.log
+            cat ${log_path}/$2.log | grep -v "SKIPPED" | grep -v "PASSED" > ${log_path}/$2_FAIL.log
             echo -e "\033[31m ${log_path}/$2_FAIL \033[0m"
             cat ${log_path}/$2_FAIL.log
         fi
@@ -574,7 +574,7 @@ llm(){
     
     echo ' Testing all LLMs '
     cd ${nlp_dir}
-    python -m pytest tests/llm/test_*.py -vv --timeout=300 --alluredir=result >${log_path}/llm >>${log_path}/llm 2>&1
+    python -m pytest tests/llm/test_*.py -vv --timeout=300 --alluredir=result >${log_path}/llm.log >>${log_path}/llm.log 2>&1
     print_info $? llm
 }
 
