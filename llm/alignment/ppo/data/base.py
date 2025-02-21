@@ -263,6 +263,7 @@ class RawDataset(Dataset):
         """Load a raw dataset by name."""
         normalized_name = RawDataset.__ALIAS_NAME_MAPPING.get(name, name)
         try:
+            # 这里的cls就是SafeRLHFTrainDataset,cls.NAME:'PKU-SafeRLHF/train'
             cls = RawDataset.__REGISTRY[normalized_name]
         except KeyError as ex:
             raise ValueError(
@@ -326,6 +327,7 @@ class TokenizedDataset(Dataset):
         dataset_names_and_attributes: dict[str, float | dict[str, Any]] | Iterable[tuple[str, float | dict[str, Any]]],
         tokenizer: PretrainedTokenizerBase,
         lazy_tokenization: bool = True,
+        use_rm_server: bool = False,
         seed: int = 42,
     ) -> None:
         if not isinstance(dataset_names_and_attributes, dict):
@@ -368,6 +370,7 @@ class TokenizedDataset(Dataset):
 
         self.tokenizer = tokenizer
         self.seed = seed
+        self.use_rm_server = use_rm_server
 
         merged_rawdata = self._merge_raw_datasets(seed=seed)
         self.rawdata = [merged_rawdata[i] for i in range(len(merged_rawdata))]
@@ -510,9 +513,10 @@ class TokenizedDataset(Dataset):
 class CollatorBase(metaclass=abc.ABCMeta):
     pad_token_id: int  # The id of the padding token for the tokenizer.
 
-    def __init__(self, pad_token_id: int) -> None:
+    def __init__(self, pad_token_id: int, use_rm_server: bool) -> None:
         """Initialize a collator."""
         self.pad_token_id = pad_token_id
+        self.use_rm_server = use_rm_server
 
     @abc.abstractmethod
     def __call__(self, samples: list[dict[str, paddle.Tensor]]) -> dict[str, paddle.Tensor]:
