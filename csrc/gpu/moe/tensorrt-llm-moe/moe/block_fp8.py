@@ -55,8 +55,8 @@ score = paddle.randn((M, E), dtype=paddle.float32)
 
 # Bfloat16 input
 a = paddle.randn((M, K), dtype=paddle.bfloat16) / 10
-w1 = paddle.rand((E, 2 * N,K), dtype=paddle.bfloat16) 
-w2 = paddle.rand((E , K, N), dtype=paddle.bfloat16)
+w1 = paddle.rand((E,K,2 * N), dtype=paddle.bfloat16) 
+w2 = paddle.rand((E , N,K), dtype=paddle.bfloat16)
 
 # FP8 scaling
 factor_for_scale = 1e-2
@@ -98,8 +98,8 @@ w2_s = paddle.rand((E, n_tiles_w2, k_tiles_w2), dtype=paddle.float32) * factor_f
 
 print(w1_fp8)
 
-w1_fp8 = paddle.zeros([32, 512, 1024]).to(paddle.float8_e4m3fn) * 2
-w2_fp8 = (paddle.zeros([32, 1024, 256])+1).to(paddle.float8_e4m3fn) * 2
+# w1_fp8 = paddle.zeros([32, 512, 1024]).to(paddle.float8_e4m3fn) * 2
+# w2_fp8 = (paddle.zeros([32, 1024, 256])+1).to(paddle.float8_e4m3fn) * 2
 
 
 def moe_fp8(i):

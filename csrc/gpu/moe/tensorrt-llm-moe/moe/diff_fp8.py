@@ -173,8 +173,8 @@ tmp_out = tmp_out[:64]
 fused_moe_out_1 = trt_llm_fused_moe(
             tmp_out,
             gate_out,
-            ffn1_fp8.reshape([64, -1, 2048]),
-            ffn2_fp8.reshape([64, 2048, -1]),
+            ffn1_fp8.reshape([64, 2048,-1]),
+            ffn2_fp8.reshape([64, -1,2048]),
             scale_1,
             scale_2,
             # scale0,

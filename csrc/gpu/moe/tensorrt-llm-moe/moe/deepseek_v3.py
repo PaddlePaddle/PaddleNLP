@@ -36,9 +36,9 @@ DTYPES = paddle.bfloat16
 M = 32 # Batch size, token_num
 
 TP = 8
-N = 2048  # Intermediate size
+N = 2048 // TP # Intermediate size 256
 K = 7168  # Hidden size
-E = 256 // TP  # Number of experts
+E = 256  # Number of experts
 TOP_KS = 8
 BLOCK_SIZE = [128, 128]  # Block-wise
 SEEDS = 0
@@ -74,11 +74,15 @@ k_tiles_w1 = (K + block_k - 1) // block_k
 k_tiles_w2 = (N + block_k - 1) // block_k
 
 # Scale for w1 and w2
-w1_s = paddle.rand((E, n_tiles_w1, k_tiles_w1), dtype=paddle.float32) * factor_for_scale
-w2_s = paddle.rand((E, n_tiles_w2, k_tiles_w2), dtype=paddle.float32) * factor_for_scale
+# w1_s = paddle.rand((E, n_tiles_w1, k_tiles_w1), dtype=paddle.float32) * factor_for_scale
+# w2_s = paddle.rand((E, n_tiles_w2, k_tiles_w2), dtype=paddle.float32) * factor_for_scale
+w1_s = paddle.rand((E, k_tiles_w1, n_tiles_w1), dtype=paddle.float32) * factor_for_scale
 
-w1_s = paddle.ones(w1_s.shape).to(paddle.float32)
-w2_s = paddle.ones(w2_s.shape).to(paddle.float32)
+w2_s = paddle.rand((E, k_tiles_w2, n_tiles_w2), dtype=paddle.float32) * factor_for_scale
+
+
+# w1_s = paddle.ones([E,2 * N]).to(paddle.float32)
+# w2_s = paddle.ones([E, K]).to(paddle.float32)
 
 
 # [32, 512, 1024]
@@ -89,12 +93,22 @@ w2_s = paddle.ones(w2_s.shape).to(paddle.float32)
 # exit(0)
 # print(w1_fp8)
 
-# w1_fp8 = paddle.ones([256, 7168, 2048 * 2]).to(paddle.float8_e4m3fn)
+w1_fp8 = paddle.rand([E, 2 * N, K]).to(paddle.float8_e4m3fn) / 10
+w2_fp8 = paddle.rand([E, K, N]).to(paddle.float8_e4m3fn) / 10
 
-# w2_fp8 = paddle.ones([256, 2048, 7168]).to(paddle.float8_e4m3fn)
+# w1_s = paddle.rand((E, n_tiles_w1, k_tiles_w1), dtype=paddle.float32)* factor_for_scale
+# w2_s = paddle.rand((E, k_tiles_w2, n_tiles_w2), dtype=paddle.float32)* factor_for_scale
 
+w1_s = paddle.rand((E, n_tiles_w1, k_tiles_w1), dtype=paddle.float32)* factor_for_scale
 
+w2_s = paddle.rand((E, n_tiles_w2, k_tiles_w2), dtype=paddle.float32)* factor_for_scale
 
+# print(w1_s.shape)
+# print(w2_s.shape)
+# [256, 4, 56]
+# [256, 56, 2]
+# w1_s = paddle.ones([E,2 * N]).to(paddle.float32)
+# w2_s = paddle.ones([E, K]).to(paddle.float32)
 
 paddle.device.synchronize()
 start = time.time()
@@ -102,31 +116,38 @@ start = time.time()
 activation_str = "Swiglu"
 quant_method = "fp8_block_wise"
 
-out = trt_llm_fused_moe(
-        a,
-        score,
-        w1_fp8,
-        w2_fp8,
-        # w1_s.reshape([E, k_tiles_w1, -1]),
-        # w2_s.reshape([E, k_tiles_w2, -1]),
-        w1_s,
-        w2_s,
-        None,
-        topk,
-        0,
-        quant_method,
-        # "Swiglu"
-        "Swiglu"
-        # "silu"
-    )
+print(w1_fp8)
 
-paddle.device.synchronize()
-end = time.time()
-print(out)
-if paddle.isnan(out).sum().item() > 0:
-    print("fuck !")
-print(f"fp8 : {((end - start) * 1000)} ms")
+for i in range(10):
+    out = trt_llm_fused_moe(
+            a,
+            score,
+            w1_fp8,
+            w2_fp8,
+            # w1_s.reshape([E, k_tiles_w1, -1]),
+            # w2_s.reshape([E, k_tiles_w2, -1]),
+            w1_s,
+            w2_s,
+            None,
+            topk,
+            0,
+            quant_method,
+            # "Swiglu"
+            "Swiglu"
+            # "silu"
+        )
 
+    paddle.device.synchronize()
+    end = time.time()
+    print(out)
+    if paddle.isnan(out).sum().item() > 0:
+        print("fuck !")
+    print(f"fp8 : {((end - start) * 1000)} ms")
+
+
+
+# /root/paddlejob/workspace/env_run/output/gaoziyuan/2023.1.1/bin/nsys profile -t cuda,osrt,nvtx -o paddle.bs1_0829 -w true --force-overwrite true python /root/paddlejob/workspace/env_run/output/gaoziyuan/PaddleNLP/csrc/gpu/moe/tensorrt-llm-moe/moe/deepseek_v3.py 2>&1 |tee run_deep.log
+# /root/paddlejob/workspace/env_run/output/gaoziyuan/2023.1.1/bin/nsys profile -t cuda,osrt,nvtx -o paddle.bs1_0829 -w true --force-overwrite true python /root/paddlejob/workspace/env_run/output/gaoziyuan/PaddleNLP/csrc/gpu/moe/tensorrt-llm-moe/moe/speed.py
 
 # def moe_fp8_no_block(i):
 #     """Function to test FP8 per-tensor fused MoE."""

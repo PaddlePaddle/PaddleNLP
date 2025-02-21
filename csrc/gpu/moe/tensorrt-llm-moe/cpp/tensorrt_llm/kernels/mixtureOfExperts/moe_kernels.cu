@@ -74,12 +74,10 @@ using namespace tensorrt_llm::common;
 
 
 template <typename T>
-void print_gpu_data(T* gpu_data, size_t num_elements, size_t num) {
+void print_gpu_data_inter(T* gpu_data, size_t num_elements, size_t num) {
     float* host_data = new float[num_elements];
     T* temp_data = new T[num_elements];
-    printf("dasd before\n");
     cudaError_t err = cudaMemcpy(temp_data, gpu_data, sizeof(T) * num_elements, cudaMemcpyDeviceToHost);
-    printf("dasd \n");
     if (err != cudaSuccess) {
         printf("CUDA Error: %s\n", cudaGetErrorString(err));
         return;
@@ -88,7 +86,7 @@ void print_gpu_data(T* gpu_data, size_t num_elements, size_t num) {
         host_data[i] = static_cast<float>(temp_data[i]);
     }
     for (size_t i = 0; i < num; i++) {
-        printf("gpu_data ？？？ [%zu] = %f\n", i, host_data[i]);
+        printf("gpu_data inner [%zu] = %f\n", i, host_data[i]);
     }
 
     // 释放内存
@@ -1408,7 +1406,8 @@ std::vector<size_t> CutlassMoeFCRunner<T, WeightType, OutputType, ScaleBiasType,
             = std::max(std::max(glu_inter_size, fc2_result_size), overlapped_gemm1_gemm2_outputs);
     }
     if (use_deepseek)
-    {
+    {   
+        std::cout <<"use_deepseek get workspace" << std::endl;
         int factor = is_gated_activation ? 2 : 1;
         int blockscale_fc1_output_size = factor * interbuf_elems * gemm_output_dtype;
         int blockscale_fc2_output_size = permuted_elems * gemm_output_dtype;
@@ -1445,7 +1444,6 @@ size_t CutlassMoeFCRunner<T, WeightType, OutputType, ScaleBiasType, Enable>::get
     auto workspace = getWorkspaceDeviceBufferSizes(num_rows, hidden_size, inter_size, num_experts,
         num_experts / ep_size, k, activation_type, norm_mode, use_deepseek);
     auto ws_size = tensorrt_llm::common::calculateTotalWorkspaceSize(workspace.data(), workspace.size());
-    TLLM_LOG_DEBUG("Mixture Of Experts Plugin requires workspace of %2f MiB", ws_size / 1024.f / 1024.f);
     return ws_size;
 }
 
@@ -1519,7 +1517,8 @@ void CutlassMoeFCRunner<T, WeightType, OutputType, ScaleBiasType, Enable>::confi
     }
 
     if (use_deepseek)
-    {
+    {   
+        std::cout <<"use_deepseek configureWsPtrs" << std::endl;
         permuted_data_ = (T*) ws_sliced[8];
         fc1_result_ = (T*) ws_sliced[8];
         glu_inter_result_ = (T*) ws_sliced[9];
@@ -1541,28 +1540,32 @@ void CutlassMoeFCRunner<T, WeightType, OutputType, ScaleBiasType, Enable>::Block
 
     auto success = cudaStreamSynchronize(stream);
 
-    int shape_n = is_gated_activation ? inter_size * 2 : inter_size; // 2816
-    int shape_k = hidden_size; // 2048
-    std::cout << "shape_n: "<< shape_n<< std::endl;
-    std::cout << "shape_k: "<< shape_k<< std::endl;
-    std::cout << "einput "<< shape_k<< std::endl;
+    int shape_n = is_gated_activation ? inter_size * 2 : inter_size; //512 = 256 * 2
+    int shape_k = hidden_size; // 7168
+
+    #ifdef MYDEBUG
+        std::cout << "shape_n: "<< shape_n<< std::endl;
+        std::cout << "shape_k: "<< shape_k<< std::endl;
+        std::cout << " expanded_num_rows " << std::endl;
+
+        print_gpu_data_inter<T>(const_cast<T*>(input), expanded_num_rows * hidden_size, expanded_num_rows * hidden_size);
+        std::cout << "expert_first_token_offset: "<< shape_k<< std::endl;
+        print_gpu_data_inter<int64_t>(const_cast<int64_t*>(expert_first_token_offset), expanded_num_rows, expanded_num_rows);
+
+        std::cout << "fc1_scales_ptrs waht wrtong 256 * 2 * 256 256 * 2 * 256 256 * 2 * 256: "<< shape_k<< std::endl;
+        
+        print_gpu_data_inter<float>(const_cast<float*>(deepseek_params.fc1_scales_ptrs), 256 * 2 * 256, 256 * 2 * 256);
     
-    print_gpu_data<T>(const_cast<T*>(input), expanded_num_rows, 10);
-
-     std::cout << "expert_first_token_offset: "<< shape_k<< std::endl;
-    print_gpu_data<int64_t>(const_cast<int64_t*>(expert_first_token_offset), expanded_num_rows, 10);
-
-
-    std::cout << "deepseek_params.fc1_scales_ptrs,: "<< shape_k<< std::endl;
-    
-    print_gpu_data<float>(const_cast<float*>(deepseek_params.fc1_scales_ptrs), expanded_num_rows, 10);
-    
-    // print_gpu_data<WeightType>(const_cast<float*>(fc1_expert_weights), expanded_num_rows, 10);
-
+    #endif
 
     gemm_runner->moeGemm(gemm_output, input, fc1_expert_weights, expert_first_token_offset, num_experts_per_node,
         shape_n, shape_k, deepseek_params.workspace, stream, nullptr, deepseek_params.fc1_scales_ptrs);
 
+
+    #ifdef MYDEBUG
+    std::cout << "gemm 1 "<< std::endl;
+    print_gpu_data_inter<UnfusedGemmOutputType>(static_cast<UnfusedGemmOutputType *>(gemm_output), expanded_num_rows*inter_size*2, expanded_num_rows*inter_size*2);
+    #endif
 
     sync_check_cuda_error();
     constexpr bool bias_is_broadcast = true;
@@ -1573,8 +1576,8 @@ void CutlassMoeFCRunner<T, WeightType, OutputType, ScaleBiasType, Enable>::Block
     sync_check_cuda_error();
     auto success1 = cudaStreamSynchronize(stream);
     std::cout <<"fp8 gemm 1 sucess hahahahahahhahah" << std::endl;
-    print_gpu_data<T>(output, expanded_num_rows*inter_size,expanded_num_rows*inter_size);
-    // print_gpu_data<T>(output, expanded_num_rows*64*1408, 100);
+    // print_gpu_data_inter<T>(output, expanded_num_rows*inter_size,expanded_num_rows*inter_size);
+    // print_gpu_data_inter<T>(output, expanded_num_rows*64*1408, 100);
 }
 
 template <class T, class WeightType, class OutputType, class ScaleBiasType, class Enable>
@@ -1593,9 +1596,9 @@ void CutlassMoeFCRunner<T, WeightType, OutputType, ScaleBiasType, Enable>::Block
     std::cout << "shape_k : " << shape_k << std::endl;
     std::cout <<"num_rows : " << num_rows << std::endl;
 
-    // print_gpu_data<UnfusedGemmOutputType>(static_cast<UnfusedGemmOutputType *>(gemm_output), expanded_num_rows*hidden_size,100);
+    // print_gpu_data_inter<UnfusedGemmOutputType>(static_cast<UnfusedGemmOutputType *>(gemm_output), expanded_num_rows*hidden_size,100);
 
-    // print_gpu_data<WeightType>(const_cast<WeightType*>(fc2_expert_weights), static_cast<size_t>(256*7168*256), static_cast<size_t>(100));
+    // print_gpu_data_inter<WeightType>(const_cast<WeightType*>(fc2_expert_weights), static_cast<size_t>(256*7168*256), static_cast<size_t>(100));
 
     std::cout <<"fp8 gemm 2 " << std::endl;
     auto gemm_runner = deepseek_params.blockscale_gemm_iml;
@@ -1605,7 +1608,7 @@ void CutlassMoeFCRunner<T, WeightType, OutputType, ScaleBiasType, Enable>::Block
 
     std::cout <<"fp8 gemm done" << std::endl;
 
-    print_gpu_data<UnfusedGemmOutputType>(static_cast<UnfusedGemmOutputType *>(gemm_output), expanded_num_rows*hidden_size, expanded_num_rows*hidden_size);
+    // print_gpu_data_inter<UnfusedGemmOutputType>(static_cast<UnfusedGemmOutputType *>(gemm_output), expanded_num_rows*hidden_size, expanded_num_rows*hidden_size);
 
     std::cout <<"fp8 gemm done ?? " << std::endl;
     auto success = cudaStreamSynchronize(stream);

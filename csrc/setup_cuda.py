@@ -236,6 +236,8 @@ if cc >= 90 and cuda_version >= 12.0:
     library_dirs += ["gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/fp8_blockscale_gemm/"]
     extra_link_args += ["gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/fp8_blockscale_gemm/libfp8_blockscale_gemm.a"]
     libraries += ["fp8_blockscale_gemm"]
+    # nvcc_compile_args += ["-DENABLE_FP8", "-DMYDEBUG"]
+    # CXX_FLAGS += ["-DENABLE_FP8", "-DMYDEBUG"]
     nvcc_compile_args += ["-DENABLE_FP8"]
     CXX_FLAGS += ["-DENABLE_FP8"]
 

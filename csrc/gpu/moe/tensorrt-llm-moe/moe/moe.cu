@@ -25,8 +25,8 @@ void print_gpu_data(T* gpu_data, size_t num_elements, size_t num) {
     for (size_t i = 0; i < num_elements; i++) {
         host_data[i] = static_cast<float>(temp_data[i]);
     }
-    for (size_t i = num; i < num + 1000; i++) {
-        printf("gpu_data ？？？ [%zu] = %f\n", i, host_data[i]);
+    for (size_t i = 0; i < num; i++) {
+        printf("gpu_data from 0 [%zu] = %f\n", i, host_data[i]);
     }
 
     // 释放内存
@@ -161,12 +161,15 @@ Tensor trt_llm_fused_moe_helper(Tensor input_activations,
 
     const int num_rows = input_activations.shape()[0];//(num_tokens, hidden_size)
     const int hidden_size = input_activations.shape()[1];
-    const int inter_size = fc2_expert_weights.shape()[1]; //(num_experts, inter_size, hidden_size)
-    // std::cout << "我修改了iner_size "<< std::endl;
-    // const int inter_size = fc2_expert_weights.shape()[2];
-    const int fc1_inter_size = fc1_expert_weights.shape()[2];
+    int inter_size = fc2_expert_weights.shape()[1]; //(num_experts, inter_size, hidden_size)
 
-    PD_CHECK(inter_size == fc1_inter_size || inter_size * 2 == fc1_inter_size);
+    if (quant_method == "fp8_block_wise") {
+        std::cout << "我改了inter_size"<< std::endl;
+       inter_size = fc2_expert_weights.shape()[2];
+    }
+    // const int fc1_inter_size = fc1_expert_weights.shape()[2];
+
+    // PD_CHECK(inter_size == fc1_inter_size || inter_size * 2 == fc1_inter_size);
     const int num_experts = gating_output.shape()[1]; //(num_tokens, num_experts)
     
     auto stream = input_activations.stream();
@@ -186,14 +189,21 @@ Tensor trt_llm_fused_moe_helper(Tensor input_activations,
     void* scale1_ptr = nullptr;
     void* scale2_ptr = nullptr;
 
-    const void* fc1_weights_ptr = nullptr;
-    const void* fc2_weights_ptr = nullptr;
+    // const void* fc1_weights_ptr = nullptr;
+    // const void* fc2_weights_ptr = nullptr;
 
 
     bool use_deepseek = false;
     if (quant_method == "fp8_block_wise") {
         use_deepseek = true;
     }
+
+    void* fc1_weights_ptr = nullptr;
+    void* fc2_weights_ptr = nullptr;
+   
+
+
+
     tensorrt_llm::kernels::QuantParams quant_params;
     if (quant_method == "weight_only_int8" || quant_method == "weight_only_int4") {
         scale1_ptr = get_ptr<data_t>(scale1);
@@ -205,9 +215,16 @@ Tensor trt_llm_fused_moe_helper(Tensor input_activations,
         // fp8 scale是float
         scale1_ptr = get_ptr<float>(scale1);
         scale2_ptr = get_ptr<float>(scale2);
-        std::cout <<"trt nmsl " << std::endl;
-        fc1_weights_ptr = reinterpret_cast<const void*>(fc1_expert_weights.data<phi::dtype::float8_e4m3fn>());
-        fc2_weights_ptr = reinterpret_cast<const void*>(fc2_expert_weights.data<phi::dtype::float8_e4m3fn>());
+        std::cout <<"trt nmsl ffffff" << std::endl;
+
+        fc1_weights_ptr = reinterpret_cast<__nv_fp8_e4m3*>(fc1_expert_weights.data<phi::dtype::float8_e4m3fn>());
+        fc2_weights_ptr = reinterpret_cast<__nv_fp8_e4m3*>(fc2_expert_weights.data<phi::dtype::float8_e4m3fn>());
+         
+        #ifdef MYDEBUG
+        std::cout <<"打印一下weight 1000个" << std::endl;
+        print_gpu_data<__nv_fp8_e4m3>(reinterpret_cast<__nv_fp8_e4m3*>(fc1_expert_weights.data<phi::dtype::float8_e4m3fn>()), num_experts * 2 * inter_size * hidden_size, 10000);
+        #endif
+
     } else {
         fc1_weights_ptr = reinterpret_cast<WeightType*>(fc1_expert_weights.data<data_w>());
         fc2_weights_ptr = reinterpret_cast<WeightType*>(fc2_expert_weights.data<data_w>());
@@ -219,14 +236,8 @@ Tensor trt_llm_fused_moe_helper(Tensor input_activations,
         using BlockScaleGemmImplPtr = std::shared_ptr<tensorrt_llm::kernels::small_m_gemm::CutlassFp8BlockScaleGemmRunnerInterface>;
         BlockScaleGemmImplPtr mBlockScaleGemmImplPtr;
 
-        if (std::is_same_v<WeightType, __nv_bfloat16>) {
-            mBlockScaleGemmImplPtr
-                    = std::make_shared<tensorrt_llm::kernels::small_m_gemm::CutlassFp8BlockScaleGemmRunner<__nv_bfloat16,
-                        __nv_bfloat16, __nv_bfloat16>>();
-        } else {
-            mBlockScaleGemmImplPtr = std::make_shared<tensorrt_llm::kernels::small_m_gemm::CutlassFp8BlockScaleGemmRunner<__nv_bfloat16,
-                        __nv_fp8_e4m3, __nv_bfloat16>>();;
-        }
+        mBlockScaleGemmImplPtr = std::make_shared<tensorrt_llm::kernels::small_m_gemm::CutlassFp8BlockScaleGemmRunner<__nv_bfloat16,
+                    __nv_fp8_e4m3, __nv_bfloat16>>();;
         
         size_t deepseek_workspace_size = 0;
         cudaEvent_t mMemcpyEvent;
@@ -239,13 +250,14 @@ Tensor trt_llm_fused_moe_helper(Tensor input_activations,
         deepseek_workspace_size = std::max(deepseek_fc1_size, deepseek_fc2_size);
 
         auto deepseek_ws = allocator->Allocate(deepseek_workspace_size)->ptr();
-        std::cout <<"in 3" << std::endl;
-        // print_gpu_data<float>(scale1_ptr, 256 * 2 * 56, 15);
-        auto fc1_scales_ptr = static_cast<float const*>(scale1_ptr);
-        auto fc2_scales_ptr = static_cast<float const*>(scale2_ptr);
+        
+        #ifdef MYDEBUG
+        std::cout <<"我改了scale 哈哈哈哈哈哈哈哈哈！" << std::endl;
+        print_gpu_data<float>( static_cast<float*>(scale1_ptr), num_experts * 2 * inter_size, num_experts * 2 * inter_size);
+        #endif
 
         deepseek_params = tensorrt_llm::kernels::BlockScaleParams(
-            fc1_scales_ptr, fc2_scales_ptr, mBlockScaleGemmImplPtr, reinterpret_cast<char*>(deepseek_ws), &mMemcpyEvent);
+            static_cast<float *>(scale1_ptr), static_cast<float *>(scale2_ptr), mBlockScaleGemmImplPtr, reinterpret_cast<char*>(deepseek_ws), &mMemcpyEvent);
     }
 
     // deepseek相关参数
