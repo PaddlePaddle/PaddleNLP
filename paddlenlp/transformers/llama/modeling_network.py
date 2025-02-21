@@ -671,7 +671,7 @@ class LlamaPretrainedModelNet(PretrainedModel):
     pretrained_resource_files_map = LLAMA_PRETRAINED_RESOURCE_FILES_MAP
     _keys_to_ignore_on_load_unexpected = [r"self_attn.rotary_emb.inv_freq"]
 
-    # TODO():
+    # TODO(): wa that loading weight first, then parallelize.
     @classmethod
     def _get_tensor_parallel_mappings(cls, config, is_split):
         return {}
