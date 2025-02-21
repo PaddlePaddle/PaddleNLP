@@ -251,10 +251,10 @@ Tensor trt_llm_fused_moe_helper(Tensor input_activations,
 
         auto deepseek_ws = allocator->Allocate(deepseek_workspace_size)->ptr();
         
-        #ifdef MYDEBUG
-        std::cout <<"我改了scale 哈哈哈哈哈哈哈哈哈！" << std::endl;
-        print_gpu_data<float>( static_cast<float*>(scale1_ptr), num_experts * 2 * inter_size, num_experts * 2 * inter_size);
-        #endif
+        // #ifdef MYDEBUG
+        // std::cout <<"我改了scale 哈哈哈哈哈哈哈哈哈！" << std::endl;
+        // print_gpu_data<float>( static_cast<float*>(scale1_ptr), num_experts * 2 * inter_size, num_experts * 2 * inter_size);
+        // #endif
 
         deepseek_params = tensorrt_llm::kernels::BlockScaleParams(
             static_cast<float *>(scale1_ptr), static_cast<float *>(scale2_ptr), mBlockScaleGemmImplPtr, reinterpret_cast<char*>(deepseek_ws), &mMemcpyEvent);
