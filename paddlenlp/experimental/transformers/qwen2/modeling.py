@@ -554,6 +554,7 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
         self.set_quant_scale()
+        self.base_model_prefix = "model"
         self.transformer_block.init_weight()
         split_fn = split_param_func()
         self.embed_tokens.weight.set_value(
@@ -1554,4 +1555,17 @@ class Qwen2VLForConditionalGenerationBlockInferenceModel(Qwen2ForCausalLMBlockIn
 
     # NOTE: (changwenbin) This function corresponds to QWen2-VL's second part, only used for QWen2-VL.
     def __init__(self, config: Qwen2Config):
-        super().__init__(config, base_model_prefix="model")
+        super().__init__(config)
+        self.base_model_prefix = "model"
+
+
+class Qwen2_5_VLForConditionalGenerationBlockInferenceModel(Qwen2ForCausalLMBlockInferenceModel):
+    """
+    NOTE: (changwenbin) This class inherits from Qwen2ForCausalLMBlockInferenceModel.
+    Used only for QWen2-5-VL's second part.
+    """
+
+    # NOTE: (changwenbin) This function corresponds to QWen2-5-VL's second part, only used for QWen2-5-VL.
+    def __init__(self, config: Qwen2Config):
+        super().__init__(config)
+        self.base_model_prefix = "model"

@@ -238,7 +238,7 @@ class _LazyConfigMapping(OrderedDict):
 
     def __getitem__(self, key):
         # NOTE: (changwenbin) This is to enable the qwen2_vl language model to use qwen2 reasoning optimization
-        if key == "qwen2_vl":
+        if key == "qwen2_vl" or key == "qwen2_5_vl":
             key = "qwen2"
         if key in self._extra_content:
             return self._extra_content[key]
