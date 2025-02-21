@@ -50,10 +50,10 @@ python -u  -m paddle.distributed.launch \
     --dataset_name_or_path "../../finetune_data/data" \
     --output_dir "output/$task_name/" \
     --enable_auto_parallel true \
-    --lora true \
+    --lora false \
     --use_mora false \
-    --model_type "llama_network" \
-    --use_intermediate_api true \
+    --model_type "llama" \
+    --use_intermediate_api false \
     --to_static $to_static \
     --per_device_train_batch_size 2 \
     --gradient_accumulation_steps 2 \
