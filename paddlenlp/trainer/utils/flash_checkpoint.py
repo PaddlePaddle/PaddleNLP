@@ -27,6 +27,7 @@ import paddle.autograd as imperative_base
 import paddle.distributed as dist
 from paddle.base import core
 from paddle.distributed.fleet import fleet
+from paddle.distributed.fleet.meta_parallel import PipelineLayer
 from paddle.incubate.tensor.manipulation import (
     async_offload_with_offset,
     create_async_load,
@@ -396,7 +397,7 @@ class FlashCheckpointCallback(TrainerCallback):
             assert args.flash_workers_num == 1, "[FC EMA] not support #worker > 1"
 
     def on_substep_end(self, args, state, control, **kwargs):
-        self.manager.flash_checkpoint_pipeline_hook(0)
+        self.manager.flash_checkpoint_pipeline_hook(0)  # only works in non-pp model
 
     def on_optimizer_begin(self, args, state, control, **kwargs):
         if args.enable_flash_save_mode and self.manager.current_worker is not None:
@@ -406,8 +407,8 @@ class FlashCheckpointCallback(TrainerCallback):
             logger.info("Synced flash checkpoints.")
 
     def on_step_end(self, args, state, control, model, lr_scheduler, optimizer, **kwargs):
-        self.manager.flash_checkpoint_pipeline_hook(0)
-        self.manager.global_step = state.global_step
+        if not isinstance(model, PipelineLayer):
+            self.manager.flash_checkpoint_pipeline_hook(0)
         # logger.info(
         #     f"check coef: {args.flash_save_ema_coef} {control.should_save}, {state.global_step}, {self.flash_ema_interval}"
         # )
@@ -462,7 +463,7 @@ class FlashCheckpointCallback(TrainerCallback):
         static_objects["model_meta"] = self.model_meta
         static_objects["user_file"] = self.user_file_list
 
-        self.manager.update_flash_workers(optimizer.fused_buffer_version, dynamic_objecs, static_objects)
+        self.manager.update_flash_workers(optimizer.fused_buffer_version, dynamic_objecs, static_objects, global_step)
         logger.info(f"[FC Callback] after first update:{optimizer.fused_states_buffer_ipc_meta}")
 
     def _cache_meta_for_sharded_save(self, model):
@@ -540,9 +541,10 @@ class FlashCheckpointManager:
             worker.task_queue.put((FCTaskType.SET_EMA_STATE_DICT, path))
         logger.info("[FC manager] done setting EMA state dict")
 
-    def update_flash_workers(self, new_version, dynamic_objecs, static_object):
+    def update_flash_workers(self, new_version, dynamic_objecs, static_object, global_step):
         self.report_error_worker()
         self.cache_version = new_version
+        self.global_step = global_step
         assert self.current_worker is None, "[FC manager] current_worker must be None"
         task = (FCTaskType.UPDATE, [self.cache_version, dynamic_objecs, static_object])
         logger.info(f"[FC manager] updating flash workers, verison: {self.cache_version}")
@@ -595,10 +597,7 @@ class FlashCheckpointManager:
         self.report_error_worker()
         assert self.current_worker is not None, "[FC manager] current_worker must not be None"
         while True:
-            if (
-                self.current_worker.status.value == FCWorkerStatus.OFFLOADING.value
-                or self.current_worker.global_step.value != self.global_step
-            ):
+            if self.current_worker.global_step.value != self.global_step:
                 logger.info(
                     f"[FC manager] Waiting current worker offloading done., "
                     f"worker_state:{self.current_worker.status.value}, "
@@ -846,7 +845,6 @@ class FlashCheckpointWorker:
 
     def process_dump_task_impl(self, output_dir):
         os.makedirs(output_dir, exist_ok=True)
-        start = time.time()
         # Step1: save static objects
         if self.device_id == 0:
             # Step1.1: save model config
@@ -878,13 +876,9 @@ class FlashCheckpointWorker:
             optimizer_state_name_path = os.path.join(output_dir, self.optimizer_states_name_path)
             opt_state_dict = self.optimizer_fusion_storage_helper.state_dict()
         # logger.info(showmem(f"[FCworker{self.worker_id}] after build state-dict"))
-        logger.info(f"[FC worker{self.worker_id}] get-state-dict: {time.time() - start:.3f} sec")
-        start = time.time()
         if self.ema_coef is not None:
             ema_name_path = os.path.join(output_dir, self.optimizer_states_name_path).replace("optimizer", "ema")
             ema_state_dict = self.flash_ema_processor.ema_state_dict()
-        logger.info(f"[FC worker{self.worker_id}] get-ema-state-dict: {time.time() - start:.3f} sec")
-        start = time.time()
 
         if self.dp_rank <= 0 or self.use_expert_parallel:
             if self.dp_rank > 0:  # ep
@@ -894,12 +888,9 @@ class FlashCheckpointWorker:
                     ema_state_dict = self._filter_moe_no_sync_optimizer_params(self.model_meta_content, ema_state_dict)
             paddle.save(state_dict, model_states_name_path)
             paddle.save(opt_state_dict, optimizer_state_name_path)
-            logger.info(f"[FC worker{self.worker_id}] save-state-dict: {time.time() - start:.3f} sec")
-            start = time.time()
+
             if self.ema_coef is not None:
                 paddle.save(ema_state_dict, ema_name_path)
-            logger.info(f"[FC worker{self.worker_id}] save-ema-state-dict: {time.time() - start:.3f} sec")
-            start = time.time()
 
         # Step2.3: save LR Scheduler (To be removed)
         lr_state_name_path = os.path.join(output_dir, SCHEDULER_NAME)
@@ -915,8 +906,6 @@ class FlashCheckpointWorker:
         saved_signal_path = os.path.join(output_dir, f"saved_signal_{self.global_rank}")
         with open(saved_signal_path, mode="w+") as f:
             f.write("1")
-        logger.info(f"[FC worker{self.worker_id}] remain: {time.time() - start:.3f} sec")
-        start = time.time()
 
     def run(self):
         core.set_cuda_current_device_id(self.device_id)
