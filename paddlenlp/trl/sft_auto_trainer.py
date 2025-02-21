@@ -27,7 +27,7 @@ from paddle.distributed.auto_parallel.intermediate.parallelize import (
     parallelize_optimizer,
 )
 
-from paddlenlp.trl import SFTTrainer
+from .sft_trainer import SFTTrainer
 
 from ..data import DataCollatorForSeq2Seq
 from ..trainer.argparser import strtobool

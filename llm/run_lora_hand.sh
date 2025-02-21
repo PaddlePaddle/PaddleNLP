@@ -46,8 +46,8 @@ python -u  -m paddle.distributed.launch \
     --log_dir  "log/$task_name""_log" \
     run_finetune.py \
     --model_name_or_path "meta-llama/Meta-Llama-3.1-8B-Instruct" \
-    --dataset_name_or_path "fintune_data/data" \
-    --output_dir "./checkpoints/llama_sft_ckpts" \
+    --dataset_name_or_path "finetune_data/data" \
+    --output_dir "./checkpoints/llama_lora_ckpts" \
     --lora true \
     --use_mora false \
     --per_device_train_batch_size 1 \
@@ -71,12 +71,11 @@ python -u  -m paddle.distributed.launch \
     --disable_tqdm true \
     --load_best_model_at_end true \
     --eval_with_do_generation false \
-    --metric_for_best_model "accuracy" \
+    --metric_for_best_model "loss" \
     --recompute false \
     --save_total_limit 1 \
     --tensor_parallel_degree 2 \
     --pipeline_parallel_degree 2 \
-    --sharding "stage1" \
     --zero_padding false \
     --unified_checkpoint false \
     --use_flash_attention true \
@@ -85,4 +84,3 @@ python -u  -m paddle.distributed.launch \
     --sharding_parallel_config "enable_stage1_tensor_fusion" \
     --tensor_parallel_config "enable_mp_async_allreduce" \
     --pipeline_parallel_config "enable_sharding_comm_overlap enable_dp_comm_overlap enable_overlap_p2p_comm disable_p2p_cache_shape" \
-    # --num_hidden_layers 4 \

@@ -46,7 +46,7 @@ from ...utils.distributed import distributed_allgather, distributed_gather
 from ...utils.env import LORA_WEIGHTS_NAME, SAFE_PEFT_WEIGHTS_INDEX_NAME
 from ...utils.log import logger
 from ...utils.tools import get_env_device
-from .lora_config import LoRAConfig
+from .lora_config import LoRAConfig, LoRAAutoConfig
 
 
 def get_lora_layers():
@@ -443,7 +443,10 @@ class LoRAModel(nn.Layer):
         ), f"Saving directory ({save_directory}) should be a directory, not a file"
         os.makedirs(save_directory, exist_ok=True)
 
-        lora_config_to_save = LoRAConfig(**self.lora_config.to_dict())
+        if isinstance(self.lora_config, LoRAConfig):
+            lora_config_to_save = LoRAConfig(**self.lora_config.to_dict())
+        else:
+            lora_config_to_save = LoRAAutoConfig(**self.lora_config.to_dict())
 
         trainable_state_dict = self.get_trainable_state_dict(concat_init_lora=lora_config_to_save.loraga)
 

@@ -267,15 +267,13 @@ def main():
     if (
         model_args.continue_training
         and not training_args.autotuner_benchmark
-        and not training_args.use_intermediate_api
     ):
-        with paddle.LazyGuard():
-            criterion = criterion_class(model_config)
-            model = model_class.from_pretrained(
-                model_args.model_name_or_path,
-                config=model_config,
-                from_aistudio=model_args.from_aistudio,
-            )
+        criterion = criterion_class(model_config)
+        model = model_class.from_pretrained(
+            model_args.model_name_or_path,
+            config=model_config,
+            from_aistudio=model_args.from_aistudio,
+        )
     else:
         with paddle.LazyGuard():
             criterion = criterion_class(model_config)
@@ -489,7 +487,6 @@ def main():
     #     layer.register_forward_pre_hook(forward_pre_hook)
     #     layer.register_forward_post_hook(forward_post_hook)
     # Train
-    print(trainer.model)
     if training_args.do_train:
         checkpoint = None
         if training_args.resume_from_checkpoint is not None:
