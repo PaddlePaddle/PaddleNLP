@@ -19,11 +19,12 @@ PPNLP_HOME              -->  the root directory for storing PaddleNLP related da
 └─ DATA_HOME         -->  Store automatically downloaded datasets.
 """
 import os
-import paddle
 
 try:
-    pir_enabled = paddle.base.framework.use_pir_api()
-except AttributeError:
+    from paddle.base.framework import use_pir_api
+
+    pir_enabled = use_pir_api()
+except ImportError:
     pir_enabled = False
 
 

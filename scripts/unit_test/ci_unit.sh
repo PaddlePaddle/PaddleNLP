@@ -70,6 +70,7 @@ print_info() {
     if [ $1 -ne 0 ]; then
         cat ${log_path}/unittest.log | grep -v "Fail to fscanf: Success" \
             | grep -v "SKIPPED" | grep -v "warning" > ${log_path}/unittest_FAIL.log
+        tail -n 1 ${log_path}/unittest.log >> ${log_path}/unittest_FAIL.log
         echo -e "\033[31m ${log_path}/unittest_FAIL \033[0m"
         cat ${log_path}/unittest_FAIL.log
         cp ${log_path}/unittest_FAIL.log ${PPNLP_HOME}/upload/unittest_FAIL.log.${AGILE_PIPELINE_BUILD_ID}.${AGILE_JOB_BUILD_ID}
