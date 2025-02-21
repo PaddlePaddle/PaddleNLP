@@ -252,6 +252,8 @@ def main():
         padding_side="left",
         tokenizer_alpha=model_args.actor_tokenizer_alpha,
     )
+    actor_tokenizer.chat_template = None
+    
     training_args.autotuner_benchmark = True
     if not training_args.use_rm_server and model_args.reward_model_name_or_path is not None:
         runtime_timer.start("Reward model loading time")
