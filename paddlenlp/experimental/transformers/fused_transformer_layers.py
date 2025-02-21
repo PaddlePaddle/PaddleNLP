@@ -184,8 +184,10 @@ class MLAConfig:
     kv_a_layernorm_weight_attrs: Optional[List[paddle.ParamAttr]] = None
     kv_b_proj_weight_attrs: Optional[List[paddle.ParamAttr]] = None
     kv_b_proj_weight_scale_attrs: Optional[List[paddle.ParamAttr]] = None
-    k_b_proj_weight_attrs: Optional[List[paddle.ParamAttr]] = None
-    v_b_proj_weight_attrs: Optional[List[paddle.ParamAttr]] = None
+
+    q_nope_k_b_proj_weight_attrs: Optional[List[paddle.ParamAttr]] = None
+    q_rope_proj_weight_attrs: Optional[List[paddle.ParamAttr]] = None
+    v_b_o_proj_weight_attrs: Optional[List[paddle.ParamAttr]] = None
 
     def use_mla(self) -> bool:
         return self.kv_lora_rank is not None
@@ -661,8 +663,9 @@ class FusedMultiTransformerBase(Layer):
         self.kv_a_proj_with_mqa_weights = []
         self.kv_a_layernorm_weights = []
         self.kv_b_proj_weights = []
-        self.k_b_proj_weights = []
-        self.v_b_proj_weights = []
+        self.q_nope_k_b_proj_weights = []
+        self.q_rope_proj_weights = []
+        self.v_b_o_proj_weights = []
 
         for i in range(self.num_layers):
             q_proj_weight = None
@@ -672,8 +675,10 @@ class FusedMultiTransformerBase(Layer):
             kv_a_proj_with_mqa_weight = None
             kv_a_layernorm_weight = None
             kv_b_proj_weight = None
-            k_b_proj_weight = None
-            v_b_proj_weight = None
+
+            q_nope_k_b_proj_weight = None
+            q_rope_proj_weight = None
+            v_b_o_proj_weight = None
             if self.config.mla_config.use_mla():
                 q_proj_weight_attr = self.get_attr(self.config.mla_config.q_proj_weight_attrs, i)
                 q_a_proj_weight_attr = self.get_attr(self.config.mla_config.q_a_proj_weight_attrs, i)
@@ -713,8 +718,10 @@ class FusedMultiTransformerBase(Layer):
                 )
                 kv_a_layernorm_weight_attr = self.get_attr(self.config.mla_config.kv_a_layernorm_weight_attrs, i)
                 kv_b_proj_weight_attr = self.get_attr(self.config.mla_config.kv_b_proj_weight_attrs, i)
-                k_b_proj_weight_attr = self.get_attr(self.config.mla_config.k_b_proj_weight_attrs, i)
-                v_b_proj_weight_attr = self.get_attr(self.config.mla_config.v_b_proj_weight_attrs, i)
+
+                q_nope_k_b_proj_weight_attr = self.get_attr(self.config.mla_config.q_nope_k_b_proj_weight_attrs, i)
+                q_rope_proj_weight_attr = self.get_attr(self.config.mla_config.q_rope_proj_weight_attrs, i)
+                v_b_o_proj_weight_attr = self.get_attr(self.config.mla_config.v_b_o_proj_weight_attrs, i)
 
                 if kv_a_proj_with_mqa_weight_attr:
                     kv_a_proj_with_mqa_weight = self.create_parameter(
@@ -737,26 +744,38 @@ class FusedMultiTransformerBase(Layer):
                         dtype=self.create_params_type,
                         is_bias=False,
                     )
-                if k_b_proj_weight_attr:
-                    k_b_proj_weight = self.create_parameter(
+                if q_nope_k_b_proj_weight_attr:
+                    q_nope_k_b_proj_weight = self.create_parameter(
                         shape=[
-                            self.num_heads,
-                            self.config.mla_config.qk_nope_head_dim,
-                            self.config.mla_config.kv_lora_rank,
+                            self.embed_dim
+                            if self.config.mla_config.q_lora_rank is None
+                            else self.config.mla_config.q_lora_rank,
+                            self.num_heads * self.config.mla_config.kv_lora_rank,
                         ],
-                        attr=k_b_proj_weight_attr,
-                        dtype=self._dtype,
+                        attr=q_nope_k_b_proj_weight_attr,
+                        dtype=self.create_params_type,
                         is_bias=False,
                     )
-                if v_b_proj_weight_attr:
-                    v_b_proj_weight = self.create_parameter(
+                if q_rope_proj_weight_attr:
+                    q_rope_proj_weight = self.create_parameter(
                         shape=[
-                            self.num_heads,
-                            self.config.mla_config.kv_lora_rank,
-                            self.config.mla_config.v_head_dim,
+                            self.embed_dim
+                            if self.config.mla_config.q_lora_rank is None
+                            else self.config.mla_config.q_lora_rank,
+                            self.num_heads * self.config.mla_config.qk_rope_head_dim,
                         ],
-                        attr=v_b_proj_weight_attr,
-                        dtype=self._dtype,
+                        attr=q_rope_proj_weight_attr,
+                        dtype=self.create_params_type,
+                        is_bias=False,
+                    )
+                if v_b_o_proj_weight_attr:
+                    v_b_o_proj_weight = self.create_parameter(
+                        shape=[
+                            self.num_heads * self.config.mla_config.kv_lora_rank,
+                            self.embed_dim,
+                        ],
+                        attr=v_b_o_proj_weight_attr,
+                        dtype=self.create_params_type,
                         is_bias=False,
                     )
 
@@ -873,9 +892,11 @@ class FusedMultiTransformerBase(Layer):
             self.kv_a_proj_with_mqa_weights.append(kv_a_proj_with_mqa_weight)
             self.kv_a_layernorm_weights.append(kv_a_layernorm_weight)
             self.kv_b_proj_weights.append(kv_b_proj_weight)
-            self.k_b_proj_weights.append(k_b_proj_weight)
-            self.v_b_proj_weights.append(v_b_proj_weight)
             self.qkv_weights.append(qkv_weight)
+
+            self.q_nope_k_b_proj_weights.append(q_nope_k_b_proj_weight)
+            self.q_rope_proj_weights.append(q_rope_proj_weight)
+            self.v_b_o_proj_weights.append(v_b_o_proj_weight)
 
             self.linear_weights.append(linear_weight)
 
@@ -895,8 +916,9 @@ class FusedMultiTransformerBase(Layer):
             self._add_parameter(kv_a_layernorm_weight)
             self._add_parameter(kv_b_proj_weight)
 
-            self._add_parameter(k_b_proj_weight)
-            self._add_parameter(v_b_proj_weight)
+            self._add_parameter(q_nope_k_b_proj_weight)
+            self._add_parameter(q_rope_proj_weight)
+            self._add_parameter(v_b_o_proj_weight)
             self._add_parameter(qkv_weight)
 
             self._add_parameter(shared_expert_ffn1_weight)
@@ -1003,7 +1025,7 @@ class FusedMultiTransformerBase(Layer):
 
         return ln_out
 
-    def compute_qkv_linear(self, ln_out, i):
+    def compute_qkv_linear(self, ln_out, i, latent_cache=None, **kwargs):
         if self.config.mla_config.use_mla():
             if self.config.mla_config.q_lora_rank is not None:
                 query = paddle.matmul(ln_out, self.q_a_proj_weights[i])
@@ -1038,7 +1060,20 @@ class FusedMultiTransformerBase(Layer):
             query_pe, key_pe = self.config.rotary_emb(self.position_ids, query_pe, key_pe)
 
             if self.config.mla_config.use_absorb():
-                return (query, query_nope, query_pe, compressed_kv, key_pe)
+                from paddlenlp_ops import prefill_mla_write_cache
+
+                prefill_mla_write_cache(
+                    compressed_kv,
+                    key_pe,
+                    latent_cache,
+                    kwargs.get("seq_lens_encoder", None),
+                    kwargs.get("seq_lens_decoder", None),
+                    kwargs.get("padding_offsets", None),
+                    kwargs.get("cum_offsets", None),
+                    kwargs.get("block_tables", None),
+                    "none",
+                    kwargs.get("max_input_length", -1),
+                )
 
             key_value = paddle.matmul(compressed_kv, self.kv_b_proj_weights[i])
             key_value = key_value.reshape(
@@ -1070,7 +1105,12 @@ class FusedMultiTransformerBase(Layer):
 
     def compute_qkv(self, src, residual_input, i):
         ln_out = self.compute_layernorm_before_qkv(src, i)
-        qkv_out = self.compute_qkv_linear(ln_out, i)
+
+        if self.config.mla_config.use_absorb():
+            qkv_out = ln_out
+        else:
+            qkv_out = self.compute_qkv_linear(ln_out, i)
+
         return qkv_out, residual_input
 
     def compute_max_len(self, seq_lens_encoder, seq_lens_decoder, cum_offsets):
@@ -1492,8 +1532,12 @@ class FusedMultiTransformerBase(Layer):
                 i,
                 **kwargs,
             )
+            if self.config.mla_config.use_absorb():
+                out_linear_out = fmha_out
+            else:
+                out_linear_out = self.compute_out_linear(fmha_out, i)
 
-            out_linear_out = self.compute_out_linear(fmha_out, i)
+            print(f"{i}: out_linear_out: {out_linear_out}")
 
             # all_reduce
             if self.nranks > 1:
@@ -2809,61 +2853,22 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
             self.cache_k_per_batch_maxs = paddle.full(shape=[10, 6], fill_value=0, dtype="float32")
             self.cache_v_per_batch_maxs = paddle.full(shape=[10, 6], fill_value=0, dtype="float32")
 
-    def compute_mla(
+    def compute_mla_absorb(
         self,
         qkv_out,
         caches,
         i,
         **kwargs,
     ):
-        from paddlenlp_ops import (
-            decode_mla_write_cache,
-            multi_head_latent_attention,
-            prefill_mla_write_cache,
-        )
+        from paddlenlp_ops import decode_mla_write_cache, multi_head_latent_attention
 
-        query, query_nope, query_pe, compressed_kv, key_pe = qkv_out
+        ln_out = qkv_out
         latent_cache = caches[i]
 
-        fmha_out = paddle.zeros(
-            shape=[query.shape[0], self.num_heads * self.config.mla_config.v_head_dim], dtype=query.dtype
-        )
+        out_linear_out = paddle.zeros(shape=[ln_out.shape[0], self.embed_dim], dtype=ln_out.dtype)
 
         if self.prefill_phase:  # prefill phase
-            prefill_mla_write_cache(
-                compressed_kv,
-                key_pe,
-                latent_cache,
-                kwargs.get("seq_lens_encoder", None),
-                kwargs.get("seq_lens_decoder", None),
-                kwargs.get("padding_offsets", None),
-                kwargs.get("cum_offsets", None),
-                kwargs.get("block_tables", None),
-                "none",
-                kwargs.get("max_input_length", -1),
-            )
-
-            key_value = paddle.matmul(compressed_kv, self.kv_b_proj_weights[i])
-            key_value = key_value.reshape(
-                [-1, self.num_heads, self.config.mla_config.qk_nope_head_dim + self.config.mla_config.v_head_dim]
-            )
-            key_nope, value = key_value.split(
-                [self.config.mla_config.qk_nope_head_dim, self.config.mla_config.v_head_dim], axis=-1
-            )
-
-            query[..., self.config.mla_config.qk_nope_head_dim :] = query_pe
-            key = paddle.empty_like(query)
-            key[..., : self.config.mla_config.qk_nope_head_dim] = key_nope
-            key[..., self.config.mla_config.qk_nope_head_dim :] = key_pe
-
-            qkv_out_inner = paddle.concat(
-                [
-                    query.reshape([-1, self.num_heads * self.config.mla_config.qk_head_dim]),
-                    key.reshape([-1, self.num_heads * self.config.mla_config.qk_head_dim]),
-                    value.reshape([-1, self.num_heads * self.config.mla_config.v_head_dim]),
-                ],
-                axis=-1,
-            )
+            qkv_out_inner = self.compute_qkv_linear(ln_out, i, latent_cache=latent_cache, **kwargs)
 
             from paddlenlp_ops import append_attention
 
@@ -2912,10 +2917,46 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 self.config.speculate_config.speculate_max_draft_token_num,
                 True,  # causal
                 self.config.speculate_config.speculate_method is not None,  # speculate_decoder
+                True,  # mla_use_absorb
             )[0]
-            fmha_out = fmha_out + fmha_out_prefill
+            out_linear_out_prefill = self.compute_out_linear(fmha_out_prefill, i)
+            out_linear_out = out_linear_out + out_linear_out_prefill
+
+            print(f"prefill {i}: out_linear_out: {out_linear_out}")
 
         if self.decode_phase:  # decode phase
+            if self.config.mla_config.q_lora_rank is not None:
+                query = paddle.matmul(ln_out, self.q_a_proj_weights[i])
+                query = self.norm_func(
+                    x=query,
+                    norm_weight=self.q_a_layernorm_weights[i],
+                    norm_bias=None,
+                    epsilon=self._epsilon,
+                    begin_norm_axis=1,
+                )[0]
+                ln_out_or_q_c = query
+            else:
+                ln_out_or_q_c = ln_out
+
+            compressed_kv = paddle.matmul(ln_out, self.kv_a_proj_with_mqa_weights[i])
+            compressed_kv, key_pe = compressed_kv.split(
+                [self.config.mla_config.kv_lora_rank, self.config.mla_config.qk_rope_head_dim], axis=-1
+            )
+            key_pe = key_pe.reshape([-1, 1, self.config.mla_config.qk_rope_head_dim])
+            compressed_kv = self.norm_func(
+                x=compressed_kv,
+                norm_weight=self.kv_a_layernorm_weights[i],
+                norm_bias=None,
+                epsilon=self._epsilon,
+                begin_norm_axis=1,
+            )[0]
+
+            query_nope = paddle.matmul(ln_out_or_q_c, self.q_nope_k_b_proj_weights[i])
+            query_nope = query_nope.reshape(shape=[-1, self.num_heads, self.config.mla_config.kv_lora_rank])
+            query_pe = paddle.matmul(ln_out_or_q_c, self.q_rope_proj_weights[i])
+            query_pe = query_pe.reshape(shape=[-1, self.num_heads, self.config.mla_config.qk_rope_head_dim])
+            query_pe, key_pe = self.config.rotary_emb(self.position_ids, query_pe, key_pe)
+
             decode_mla_write_cache(
                 compressed_kv,
                 key_pe,
@@ -2928,23 +2969,8 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 "none",
                 kwargs.get("max_input_length", -1),
             )
-            q_input = paddle.empty(
-                shape=[
-                    query.shape[0],
-                    self.num_heads,
-                    self.config.mla_config.kv_lora_rank + self.config.mla_config.qk_rope_head_dim,
-                ],
-                dtype=query.dtype,
-            )
-            # k_b_proj_weights [num_heads, qk_nope_head_dim, kv_lora_rank]
-            q_nope_out = paddle.bmm(
-                query_nope.transpose([1, 0, 2]), self.k_b_proj_weights[i]
-            ).transpose(  # [num_head, n, qk_nope_head_dim]
-                [1, 0, 2]
-            )
 
-            q_input[..., : self.config.mla_config.kv_lora_rank] = q_nope_out
-            q_input[..., self.config.mla_config.kv_lora_rank :] = query_pe
+            q_input = paddle.concat([query_nope, query_pe], axis=-1)
             q_input = q_input.reshape(
                 [
                     -1,
@@ -2997,18 +3023,13 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 True,  # causal
                 self.config.speculate_config.speculate_method is not None,  # speculate_decoder
             )
-            fmha_out_decode = fmha_out_decode.reshape(
-                [-1, self.num_heads, self.config.mla_config.kv_lora_rank]
-            ).transpose([1, 0, 2])
-            # v_b_proj_weights [num_heads, kv_lora_rank, v_head_dim]
-            fmha_out_decode = (
-                paddle.bmm(fmha_out_decode, self.v_b_proj_weights[i])
-                .transpose([1, 0, 2])
-                .reshape([-1, self.num_heads * self.config.mla_config.v_head_dim])
-            )
-            fmha_out = fmha_out + fmha_out_decode
 
-        return fmha_out
+            out_linear_out_decode = paddle.matmul(fmha_out_decode, self.v_b_o_proj_weights[i])
+            out_linear_out = out_linear_out + out_linear_out_decode
+
+            print(f"decode {i}: out_linear_out: {out_linear_out}")
+
+        return out_linear_out
 
     def compute_attn(
         self,
@@ -3027,7 +3048,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
         **kwargs,
     ):
         if self.config.mla_config.use_absorb():
-            return self.compute_mla(qkv_out, caches, i, **kwargs)
+            return self.compute_mla_absorb(qkv_out, caches, i, **kwargs)
 
         if self.config.append_attn:
             from paddlenlp_ops import append_attention
@@ -3077,6 +3098,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 self.config.speculate_config.speculate_max_draft_token_num,
                 True,  # causal
                 self.config.speculate_config.speculate_method is not None,  # speculate_decoder
+                False,  # mla_use_absorb
             )[0]
         else:
             if paddle.is_compiled_with_xpu():
@@ -3192,7 +3214,7 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
     def __init__(self, config: FusedMultiTransformerConfig):
         super().__init__(config)
 
-    def compute_mla(
+    def compute_mla_absorb(
         self,
         qkv_out,
         caches,
@@ -3301,6 +3323,7 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
                 self.config.speculate_config.speculate_max_draft_token_num,
                 True,  # causal
                 self.config.speculate_config.speculate_method is not None,  # speculate_decoder
+                True,  # mla_use_absorb
             )[0]
             fmha_out = fmha_out + fmha_out_prefill
 
@@ -3483,6 +3506,7 @@ class FusedBlockMultiTransformerA8W8(FusedBlockMultiTransformer, FusedMultiTrans
                 self.config.speculate_config.speculate_max_draft_token_num,
                 True,  # causal
                 self.config.speculate_config.speculate_method is not None,  # speculate_decoder
+                False,  # mla_use_absorb
             )[0]
         else:
             fmha_out = paddle.incubate.nn.functional.block_multihead_attention(
@@ -3841,6 +3865,7 @@ class FusedBlockMultiTransformerFP8(FusedBlockMultiTransformer):
                 self.config.speculate_config.speculate_max_draft_token_num,
                 True,  # causal
                 False,  # speculate_decoder
+                False,  # mla_use_absorb
             )[0]
         else:
             fmha_out = paddle.incubate.nn.functional.block_multihead_attention(

@@ -62,7 +62,8 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
     const float out_linear_in_scale,
     const int speculate_max_draft_token_num,
     const bool causal,
-    const bool speculate_decoder) {
+    const bool speculate_decoder,
+    const bool mla_use_absorb) {
   typedef PDTraits<D> traits_;
   typedef typename traits_::DataType DataType_;
   typedef typename traits_::data_t data_t;
@@ -298,7 +299,7 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
     }
   }
 
-  if (rotary_embs && max_dec_len_this_time_data > 0) {
+  if (!mla_use_absorb && max_dec_len_this_time_data > 0) {
     cudaStream_t exec_stream;
     if (max_enc_len_this_time_data > 0) {
       cudaStreamWaitEvent(decoder_stream, main_event);
@@ -578,7 +579,8 @@ std::vector<paddle::Tensor> AppendAttention(
     const float out_linear_in_scale,
     const int speculate_max_draft_token_num,
     const bool causal,
-    const bool speculate_decoder) {
+    const bool speculate_decoder,
+    const bool mla_use_absorb) {
   AppendAttnMetaData meta_data;
 
   const auto& qkv_dims = qkv.dims();
@@ -641,7 +643,8 @@ std::vector<paddle::Tensor> AppendAttention(
           out_linear_in_scale,
           speculate_max_draft_token_num,
           causal,
-          speculate_decoder);
+          speculate_decoder,
+          mla_use_absorb);
     }
     case paddle::DataType::BFLOAT16: {
       return AppendAttentionKernel<paddle::DataType::BFLOAT16>(
@@ -688,7 +691,8 @@ std::vector<paddle::Tensor> AppendAttention(
           out_linear_in_scale,
           speculate_max_draft_token_num,
           causal,
-          speculate_decoder);
+          speculate_decoder,
+          mla_use_absorb);
     }
     case paddle::DataType::INT32: {
       if (compute_dtype == "bf16") {
@@ -736,7 +740,8 @@ std::vector<paddle::Tensor> AppendAttention(
             out_linear_in_scale,
             speculate_max_draft_token_num,
             causal,
-            speculate_decoder);
+            speculate_decoder,
+            mla_use_absorb);
       } else if (compute_dtype == "fp16") {
         return AppendAttentionKernel<paddle::DataType::FLOAT16>(
             meta_data,
@@ -782,7 +787,8 @@ std::vector<paddle::Tensor> AppendAttention(
             out_linear_in_scale,
             speculate_max_draft_token_num,
             causal,
-            speculate_decoder);
+            speculate_decoder,
+            mla_use_absorb);
       } else {
         PD_THROW("Only supported attr of compute_dtype in ['fp16', 'bf16'].");
         break;
@@ -886,7 +892,8 @@ std::vector<paddle::DataType> AppendAttentionInferDtype(
     const float out_linear_in_scale,
     const int speculate_max_draft_token_num,
     const bool causal,
-    const bool speculate_decoder) {
+    const bool speculate_decoder,
+    const bool mla_use_absorb) {
   if (compute_dtype == "bf16") {
     if (out_linear_in_scale > 0.0) {
       if (fabs(quant_max_bound - 127.0f) < 0.000001) {
@@ -963,7 +970,8 @@ PD_BUILD_OP(append_attention)
             "out_linear_in_scale: float",
             "speculate_max_draft_token_num: int",
             "causal: bool",
-            "speculate_decoder: bool"})
+            "speculate_decoder: bool",
+            "mla_use_absorb: bool"})
     .SetKernelFn(PD_KERNEL(AppendAttention))
     .SetInferShapeFn(PD_INFER_SHAPE(AppendAttentionInferShape))
     .SetInferDtypeFn(PD_INFER_DTYPE(AppendAttentionInferDtype));
