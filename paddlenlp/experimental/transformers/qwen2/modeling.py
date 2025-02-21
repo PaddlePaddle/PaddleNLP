@@ -554,7 +554,6 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
         self.set_quant_scale()
-        self.base_model_prefix = "model"
         self.transformer_block.init_weight()
         split_fn = split_param_func()
         self.embed_tokens.weight.set_value(
