@@ -40,6 +40,7 @@ void EncoderWriteCacheWithRopeKernel(
     const int num_blocks,
     const int max_seq_len,
     const bool use_neox_style,
+    const bool mla_use_absorb,
     cudaStream_t& stream,
     paddle::Tensor* qkv_out,
     paddle::Tensor* key_cache_out,
@@ -96,6 +97,7 @@ void EncoderWriteCacheWithRopeKernel(
                                     seq_lens_encoder,
                                     seq_lens_decoder,
                                     max_seq_len,
+                                    mla_use_absorb,
                                     stream,
                                     key_cache_out,
                                     value_cache_out);

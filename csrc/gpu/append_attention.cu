@@ -145,6 +145,7 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
           kv_num_blocks_data,
           max_input_length,
           use_neox_rotary_style,
+          mla_use_absorb,
           main_stream,
           &qkv_out,
           const_cast<paddle::Tensor*>(&key_cache),
@@ -172,6 +173,7 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
           kv_num_blocks_data,
           max_input_length,
           use_neox_rotary_style,
+          mla_use_absorb,
           main_stream,
           &qkv_out,
           const_cast<paddle::Tensor*>(&key_cache),
@@ -213,6 +215,7 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
             causal,
             false,
             true,
+            mla_use_absorb,
             main_stream,
             &fmha_out);
           break;
@@ -251,6 +254,7 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
             causal,
             false,
             true,
+            mla_use_absorb,
             main_stream,
             &fmha_out);
           break;
@@ -294,6 +298,7 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
           causal,
           false,
           true,
+          mla_use_absorb,
           main_stream,
           &fmha_out);
     }
@@ -441,6 +446,7 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
             causal,
             !speculate_decoder,
             !speculate_decoder,
+            mla_use_absorb,
             exec_stream,
             &fmha_out);
           break;
@@ -479,6 +485,7 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
             causal,
             !speculate_decoder,
             !speculate_decoder,
+            mla_use_absorb,
             exec_stream,
             &fmha_out);
           break;
@@ -523,6 +530,7 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
           causal,
           !speculate_decoder,
           !speculate_decoder,
+          mla_use_absorb,
           exec_stream,
           &fmha_out);
     }
