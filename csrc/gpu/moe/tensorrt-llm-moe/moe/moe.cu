@@ -200,8 +200,6 @@ Tensor trt_llm_fused_moe_helper(Tensor input_activations,
 
     void* fc1_weights_ptr = nullptr;
     void* fc2_weights_ptr = nullptr;
-   
-
 
 
     tensorrt_llm::kernels::QuantParams quant_params;

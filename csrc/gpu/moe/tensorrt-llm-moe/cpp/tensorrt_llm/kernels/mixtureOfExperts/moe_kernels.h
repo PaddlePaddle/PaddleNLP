@@ -25,6 +25,7 @@
 #include <NvInferRuntime.h>
 #include <optional>
 #include <random>
+#include "moe/utils.h"
 
 namespace tensorrt_llm::kernels
 {
@@ -422,8 +423,8 @@ private:
     HostDeepSeekWorkspace host_deepseek_workspace_;
 };
 
-// void makeLoadBalancedRoutingConfiguration(
-//     void* data_void, int num_experts, int num_tokens, int k, nvinfer1::DataType type, cudaStream_t stream);
+void makeLoadBalancedRoutingConfiguration(
+    void* data_void, int num_experts, int num_tokens, int k, paddle::DataType type, cudaStream_t stream);
 
 struct GemmProfilerBackend
 {
@@ -436,16 +437,17 @@ public:
         GEMM_2
     };
 
-    void init(CutlassMoeFCRunnerInterface& runner, GemmToProfile gemm_to_profile, nvinfer1::DataType dtype,
-        nvinfer1::DataType wtype, nvinfer1::DataType otype, int num_experts, int k, int64_t hidden_size,
+    void init(CutlassMoeFCRunnerInterface& runner, GemmToProfile gemm_to_profile, paddle::DataType dtype,
+        paddle::DataType wtype, paddle::DataType otype, int num_experts, int k, int64_t hidden_size,
         int64_t inter_size, ActivationType activation_type, bool bias,
-        MOEParallelismConfig parallelism_config)
+        MOEParallelismConfig parallelism_config, bool is_weight_only_in4)
     {
         mInterface = &runner;
         mGemmToProfile = gemm_to_profile;
         mDType = dtype;
         mWType = wtype;
         mOType = otype;
+        is_weight_only_in4 = is_weight_only_in4; // paddle没有int4类型
         mNumExperts = num_experts;
         mNumExpertsPerNode = num_experts / parallelism_config.ep_size;
         mK = k;
@@ -482,9 +484,14 @@ public:
 
     int mSampleIndex = 0;
 
-    nvinfer1::DataType mDType{};
-    nvinfer1::DataType mWType{};
-    nvinfer1::DataType mOType{};
+    // nvinfer1::DataType mDType{};
+    // nvinfer1::DataType mWType{};
+    // nvinfer1::DataType mOType{};
+
+    paddle::DataType mDType{};
+    paddle::DataType mWType{};
+    paddle::DataType mOType{};
+    bool is_weight_only_in4 = false;
 
     constexpr static int64_t NUM_ROUTING_SAMPLES = 16;
 
