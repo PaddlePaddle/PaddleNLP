@@ -199,11 +199,11 @@ std::vector<std::vector<int64_t>> CutlassFp8Fp8HalfBlockGemmFusedInferShape(
   int rank = x_shape.size();
   int M = 0;
   int N = 0;
-  if (x_shape[rank - 1] != x_scale_shape[rank - 1] * 128){
+  if ((x_shape[rank - 1] + 127) / 128 != x_scale_shape[rank - 2]){
     PADDLE_THROW(phi::errors::Fatal(
-        "cutlass_fp8_fp8_half_block_gemm_fused only support x_scale's dim[-1] * 128 = x's dim[-1]."));
+        "cutlass_fp8_fp8_half_block_gemm_fused only support x_scale's dim[-2] * 128 = x's dim[-1]."));
   }
-  if ((y_shape[rank - 1] != y_scale_shape[rank - 1] * 128) || (y_shape[rank - 2] != y_scale_shape[rank - 2] * 128)){
+  if (((y_shape[rank - 1] + 127) / 128 != y_scale_shape[rank - 1]) || ((y_shape[rank - 2] + 127) / 128 != y_scale_shape[rank - 2])){
     PADDLE_THROW(phi::errors::Fatal(
         "cutlass_fp8_fp8_half_block_gemm_fused only support input y_scale's dim[-2:] * 128 = y's dim[-2:]."));
   }
