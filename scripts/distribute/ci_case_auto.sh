@@ -114,6 +114,7 @@ function llama_case_list_auto() {
         llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2
         llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2_intermediate
         llama_dy2st_auto_bs2_bf16_DP2-MP1-PP1-CINN
+        llama_lora_static_graph_auto_bs_2_bf16_DP2-TP2-PP1
     )
     if [ $1 = "prepare_case" ]; then
         restore_func $fun_list  
@@ -3033,6 +3034,83 @@ function llm_qwen_pir_auto_bs1_bf16_TP2_PP2(){
     echo "=========== $FUNCNAME run  end ==========="
 }
 
+function llama_lora_static_graph_auto_bs_2_bf16_DP2-TP2-PP1() {
+    echo "=========== $FUNCNAME run begin ===========" 
+    set -x
+    unset CUDA_VISIBLE_DEVICES 
+
+    export PYTHONPATH=$root_path/:$PYTHONPATH
+    export FLAGS_call_stack_level=3
+    export NVIDIA_TF32_OVERRIDE=0
+    task_name="llama_3.1_lora_auto_dp2_tp2"
+
+    case_out_dir="output/$task_name"
+    case_log_dir="output/$task_name""_log"
+    
+    rm -rf output/$task_name/
+    rm -rf "log/$task_name""_log"
+
+    python -u  -m paddle.distributed.launch \
+    --gpus "0,1,2,3" \
+    --log_dir  "$case_log_dir" \
+    ../run_finetune_auto.py \
+    --model_name_or_path "meta-llama/Meta-Llama-3.1-8B-Instruct" \
+    --dataset_name_or_path "./data" \
+    --output_dir "$case_out_dir" \
+    --enable_auto_parallel true \
+    --lora true \
+    --use_mora false \
+    --model_type "llama_network" \
+    --use_intermediate_api true \
+    --to_static true \
+    --per_device_train_batch_size 2 \
+    --gradient_accumulation_steps 2 \
+    --per_device_eval_batch_size 8 \
+    --eval_accumulation_steps 16 \
+    --num_train_epochs 1 \
+    --learning_rate 3e-05 \
+    --max_steps 10 \
+    --warmup_steps 30 \
+    --logging_steps 1 \
+    --evaluation_strategy "epoch" \
+    --save_strategy "epoch" \
+    --src_length 1024 \
+    --max_length 2048 \
+    --bf16 true \
+    --fp16_opt_level "O2" \
+    --amp_master_grad true \
+    --do_train true \
+    --do_eval false \
+    --disable_tqdm true \
+    --load_best_model_at_end true \
+    --eval_with_do_generation false \
+    --metric_for_best_model "accuracy" \
+    --recompute false \
+    --save_total_limit 1 \
+    --tensor_parallel_degree 2 \
+    --pipeline_parallel_degree 1 \
+    --zero_padding false \
+    --unified_checkpoint false \
+    --flash_mask false \
+    --use_flash_attention true \
+    --fuse_attention_qkv true \
+    --sharding "stage1" \
+    --auto_parallel_resume_form_hybrid_parallel true \
+    --num_hidden_layers 16 \
+    >>${log_path}/$FUNCNAME 2>&1
+    ips=-1
+    loss=-1
+    mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'current_memory_allocated: ' '{print $2}' | awk -F ',' '{print $1}'`
+
+    loss_base=-1
+    ips_base=-1
+    mem_base=6.5
+    echo "result: loss=$loss ips=$ips mem=$mem"
+    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
+
+    echo "=========== $FUNCNAME run  end ==========="
+}
+
 
 ############ case end ############
 
@@ -3184,6 +3262,9 @@ function before_hook_for_llama() {
             mkdir ${llama_data_path}/data;
             wget -O ${llama_data_path}/data/llama_openwebtext_100k_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy;
             wget -O ${llama_data_path}/data/llama_openwebtext_100k_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz;
+            # download data for llama finetune
+            wget -O ${llama_data_path}/AdvertiseGen.tar.gz https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz
+            tar -xvf ${llama_data_path}/AdvertiseGen.tar.gz -C ${llama_data_path}
         fi
         cp -r ${llama_data_path}/data ${llama_case_path}/
     else
