@@ -58,7 +58,7 @@ from .modeling import (
     LlamaLinearScalingRotaryEmbedding,
     LlamaNTKScalingRotaryEmbedding,
     Llama3RotaryEmbedding,
-    _expand_2d_mask,
+    LlamaRotaryEmbedding,
     _make_causal_mask,
     apply_rotary_pos_emb,
     build_alibi_tensor,
