@@ -111,9 +111,6 @@ class PredictorArgument:
         metadata={"help": "avx cachekv type. Supported values: fp16,int8"},
     )
     batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
-    max_batch_size: int = field(
-        default=1, metadata={"help": "The max batch size of data used for export static model."}
-    )
     benchmark: bool = field(
         default=False,
         metadata={
@@ -179,8 +176,6 @@ class PredictorArgument:
         assert (
             self.src_length + self.max_length <= self.total_max_length
         ), "src_length + max_length should smaller than total_max_length."
-        if self.max_batch_size < self.batch_size:
-            self.max_batch_size = self.batch_size
 
 
 @dataclass

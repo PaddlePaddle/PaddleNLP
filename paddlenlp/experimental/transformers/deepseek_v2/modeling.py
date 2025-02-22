@@ -486,7 +486,8 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
         self.prefill_cache_k_buffer: paddle.Tensor = None
         self.prefill_cache_v_buffer: paddle.Tensor = None
         if self.config.mla_use_matrix_absorption:
-            max_block_nums = config.max_batch_size * (self.max_seq_len + config.block_size - 1) // config.block_size
+            max_batch_size = 1
+            max_block_nums = max_batch_size * (self.max_seq_len + config.block_size - 1) // config.block_size
             cache_k_shape = [
                 max_block_nums,
                 config.num_key_value_heads // max(config.tensor_parallel_degree, 1),
