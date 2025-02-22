@@ -3029,13 +3029,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
 
         if self.decode_phase:  # decode phase
             if self.config.mla_config.q_lora_rank is not None:
-                query = weight_only_linear(
-                    ln_out,
-                    weight=self.q_a_proj_weights[i],
-                    weight_scale=self.q_a_proj_weights_scale[i],
-                    weight_dtype=self.weight_dtype,
-                    group_size=self.weightonly_group_size,
-                )
+                query = paddle.matmul(ln_out, self.q_a_proj_weights[i])
                 query = self.norm_func(
                     x=query,
                     norm_weight=self.q_a_layernorm_weights[i],
@@ -3047,13 +3041,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
             else:
                 ln_out_or_q_c = ln_out
 
-            compressed_kv = weight_only_linear(
-                ln_out,
-                weight=self.kv_a_proj_with_mqa_weights[i],
-                weight_scale=self.kv_a_proj_with_mqa_weights_scale[i],
-                weight_dtype=self.weight_dtype,
-                group_size=self.weightonly_group_size,
-            )
+            compressed_kv = paddle.matmul(ln_out, self.kv_a_proj_with_mqa_weights[i])
             compressed_kv, key_pe = compressed_kv.split(
                 [self.config.mla_config.kv_lora_rank, self.config.mla_config.qk_rope_head_dim], axis=-1
             )
@@ -3066,21 +3054,9 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 begin_norm_axis=1,
             )[0]
 
-            query_nope = weight_only_linear(
-                ln_out_or_q_c,
-                weight=self.q_nope_k_b_proj_weights[i],
-                weight_scale=self.q_nope_k_b_proj_weights_scale[i],
-                weight_dtype=self.weight_dtype,
-                group_size=self.weightonly_group_size,
-            )
+            query_nope = paddle.matmul(ln_out_or_q_c, self.q_nope_k_b_proj_weights[i])
             query_nope = query_nope.reshape(shape=[-1, self.num_heads, self.config.mla_config.kv_lora_rank])
-            query_pe = weight_only_linear(
-                ln_out_or_q_c,
-                weight=self.q_rope_proj_weights[i],
-                weight_scale=self.q_rope_proj_weights_scale[i],
-                weight_dtype=self.weight_dtype,
-                group_size=self.weightonly_group_size,
-            )
+            query_pe = paddle.matmul(ln_out_or_q_c, self.q_rope_proj_weights[i])
             query_pe = query_pe.reshape(shape=[-1, self.num_heads, self.config.mla_config.qk_rope_head_dim])
             query_pe, key_pe = self.config.rotary_emb(self.position_ids, query_pe, key_pe)
 
@@ -3151,13 +3127,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 self.config.speculate_config.speculate_method is not None,  # speculate_decoder
             )
 
-            out_linear_out_decode = weight_only_linear(
-                fmha_out_decode,
-                weight=self.v_b_o_proj_weights[i],
-                weight_scale=self.v_b_o_proj_weights_scale[i],
-                weight_dtype=self.weight_dtype,
-                group_size=self.weightonly_group_size,
-            )
+            out_linear_out_decode = paddle.matmul(fmha_out_decode, self.v_b_o_proj_weights[i])
             out_linear_out = out_linear_out + out_linear_out_decode
 
             # print(f"decode {i}: out_linear_out: {out_linear_out}")
