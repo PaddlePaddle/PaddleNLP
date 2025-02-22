@@ -58,7 +58,8 @@ __global__ void multi_query_append_attention_kernel(
     float *__restrict__ tmp_m,      // [token_num, num_chunks, num_heads]
     float *__restrict__ tmp_d,      // [token_num, num_chunks, num_heads]
     OutT *__restrict__ out,
-    const int speculate_max_draft_token_num = 5) {
+    const int speculate_max_draft_token_num = 5,
+    const bool mla_use_absorb = false) {
   constexpr uint32_t num_vecs_per_head_qk =
       HEAD_DIM_QK / num_elems_per_128b<T>();
   constexpr uint32_t num_vecs_per_head_v = HEAD_DIM_V / num_elems_per_128b<T>();
@@ -221,7 +222,7 @@ __global__ void multi_query_append_attention_kernel(
       wid * 4 + tid / 8, tid % 8);
 
   uint32_t kv_idx_base = chunk_start;
-  int block_id = __ldg(&block_table_now[kv_idx_base / BLOCK_SIZE]);
+  int block_id = mla_use_absorb ? kv_idx_base / BLOCK_SIZE : __ldg(&block_table_now[kv_idx_base / BLOCK_SIZE]);
   const uint32_t const_offset_k = kv_head_idx * k_h_stride +
                                   (wid * 4 + tid / 8) * k_b_stride +
                                   tid % 8 * num_elems_per_128b<T>();
@@ -327,7 +328,7 @@ __global__ void multi_query_append_attention_kernel(
     __syncthreads();
 
     kv_idx_base += num_frags_z * 16;
-    block_id = __ldg(&block_table_now[kv_idx_base / BLOCK_SIZE]);
+    block_id = mla_use_absorb ? kv_idx_base / BLOCK_SIZE : __ldg(&block_table_now[kv_idx_base / BLOCK_SIZE]);
     if (block_id < 0) {
       block_id = 0;
     }
@@ -1023,6 +1024,7 @@ void MultiQueryAppendAttention(
     const float in_scale,
     const int speculate_max_draft_token_num,
     const bool is_decoder,
+    const bool mla_use_absorb,
     cudaStream_t &stream,
     paddle::Tensor *out) {
   using NV_TYPE = typename cascade_attn_type_traits<T>::type;
@@ -1133,7 +1135,8 @@ void MultiQueryAppendAttention(
           nullptr,
           nullptr,
           reinterpret_cast<OUT_NV_TYPE *>(out->data<OutT>()),
-          speculate_max_draft_token_num);
+          speculate_max_draft_token_num,
+          mla_use_absorb);
 
     } else {
       phi::Allocator::AllocationPtr tmp_workspace, tmp_m, tmp_d;
@@ -1191,7 +1194,8 @@ void MultiQueryAppendAttention(
           static_cast<float *>(tmp_m->ptr()),
           static_cast<float *>(tmp_d->ptr()),
           reinterpret_cast<OUT_NV_TYPE *>(out->data<OutT>()),
-          speculate_max_draft_token_num);
+          speculate_max_draft_token_num,
+          mla_use_absorb);
       // merge
       constexpr int vec_size = num_elems_per_128b<NV_TYPE>();
       if (is_decoder) {
@@ -1549,6 +1553,7 @@ void CascadeAppendAttentionC16Kernel(
     const bool causal,
     const bool is_decoder,
     const bool enable_prefill,
+    const bool mla_use_absorb,
     cudaStream_t &stream,
     paddle::Tensor *out) {
   const auto token_num = meta_data.token_nums;
@@ -1613,6 +1618,7 @@ void CascadeAppendAttentionC16Kernel(
                                     in_scale,
                                     speculate_max_draft_token_num,
                                     is_decoder,
+                                    mla_use_absorb,
                                     stream,
                                     out);
                               })})})})})})})
