@@ -439,7 +439,7 @@ public:
 
     void init(CutlassMoeFCRunnerInterface& runner, GemmToProfile gemm_to_profile, paddle::DataType dtype,
         paddle::DataType wtype, paddle::DataType otype, int num_experts, int k, int64_t hidden_size,
-        int64_t inter_size, ActivationType activation_type, bool bias,
+        int64_t inter_size, bool bias,
         MOEParallelismConfig parallelism_config, bool is_weight_only_in4)
     {
         mInterface = &runner;
@@ -453,7 +453,7 @@ public:
         mK = k;
         mExpertHiddenSize = hidden_size;
         mExpertInterSize = inter_size;
-        mActivationType = activation_type;
+        // mActivationType = activation_type;
         mBias = bias;
         mParallelismConfig = parallelism_config;
         mSM = common::getSMVersion();

@@ -87,7 +87,6 @@ def trt_bf16():
 def paddle_bf16():
     paddle.device.synchronize()
     start = time.time()
-
     fused_moe_out = fused_moe(
                 a,
                 score,
@@ -106,11 +105,17 @@ def paddle_bf16():
     end = time.time()
     print(f"paddle bf16 : {((end - start) * 1000)} ms")
 
+
 for i in range(10):
-    trt_bf16()
+    paddle_bf16()
+
 
 # for i in range(10):
-#     paddle_bf16()
+#     trt_bf16()
+
+
+
+
 
 
 #  def moe_fp8_no_block(i):

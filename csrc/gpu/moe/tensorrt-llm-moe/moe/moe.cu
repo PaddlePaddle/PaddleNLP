@@ -1,4 +1,4 @@
-// #include <torch/extension.h>
+
 // #include <ATen/cuda/CUDAContext.h>
 // #include <c10/cuda/CUDACachingAllocator.h>
 
@@ -11,6 +11,7 @@
 #include "tensorrt_llm/kernels/cutlass_kernels/cutlass_preprocessors.h"
 #include "utils.h"
 #include <cstdio>
+#include "tensorrt_llm/common/cudaUtils.h"
 
 
 template <typename T>
@@ -35,8 +36,6 @@ void print_gpu_data(T* gpu_data, size_t num_elements, size_t num) {
 }
 
 
-using paddle::Tensor;
-
 int getSMVersion() {
     int device = -1;
     cudaGetDevice(&device);
@@ -46,53 +45,448 @@ int getSMVersion() {
 }
 
 
-template<typename T, typename WeightType, typename OutputType = T>
-std::vector<tensorrt_llm::cutlass_extensions::CutlassGemmConfig> getFilteredConfigs(
-    tensorrt_llm::kernels::CutlassMoeFCRunner<T, WeightType, OutputType>& moe_runner, int sm) {
-    auto tactics = moe_runner.getTactics();
-    if (sm == 89) {
-        // Filter some unsupported configs for L40S
-        auto it = std::remove_if(tactics.begin(), tactics.end(),
-            [&](auto conf) {
-                using tensorrt_llm::cutlass_extensions::CutlassTileConfig;
-                auto checks = std::vector{
-                    // Fail for BF16/FP16
-                    conf.tile_config == CutlassTileConfig::CtaShape128x128x64_WarpShape64x32x64,
-                    conf.tile_config == CutlassTileConfig::CtaShape64x128x64_WarpShape32x64x64 && conf.stages == 4,
-                    // Fail for FP8
-                    false && conf.tile_config == CutlassTileConfig::CtaShape16x256x128_WarpShape16x64x128
-                        && conf.stages >= 3,
-                };
+// profile部分 ***************************************
+namespace kernels = tensorrt_llm::kernels;
+namespace cutlass_extensions = tensorrt_llm::cutlass_extensions;
+using paddle::Tensor;
+using profiler_backend = kernels::GemmProfilerBackend;
+using Profile = cutlass_extensions::CutlassGemmConfig;
 
-                return std::any_of(checks.begin(), checks.end(), [](auto v) { return v; });
-            });
-        tactics.erase(it, tactics.end());
+
+struct GemmIDMoe
+{
+    profiler_backend::GemmToProfile gemm_idx;
+    int64_t hidden_size;
+    int64_t inter_size;
+    int num_experts;
+    int top_k;
+
+    bool operator==(GemmIDMoe const& id) const
+    {
+        return id.gemm_idx == gemm_idx && id.hidden_size == hidden_size && id.inter_size == inter_size
+            && id.num_experts == num_experts && id.top_k == top_k;
     }
 
-    if (tactics.empty()) {
-        throw std::runtime_error("No valid GEMM tactics found");
+    friend std::ostream& operator<<(std::ostream& out, GemmIDMoe const& id)
+    {
+        out << "gemm_idx, hidden_size, inter_size, num_experts, top_k=" << static_cast<int>(id.gemm_idx) << ","
+            << id.hidden_size << "," << id.inter_size << "," << id.num_experts << "," << id.top_k;
+        return out;
+    }
+};
+
+struct GemmIDMoeHash
+{
+    std::size_t operator()(GemmIDMoe const& id) const
+    {
+        size_t hash = std::hash<int>{}(static_cast<int>(id.gemm_idx));
+        hash ^= std::hash<int64_t>{}(id.hidden_size);
+        hash ^= std::hash<int64_t>{}(id.inter_size);
+        hash ^= std::hash<int>{}(id.num_experts);
+        hash ^= std::hash<int>{}(id.top_k);
+        return hash;
+    }
+};
+
+using ProfileId = int;
+using MProfileMap = std::unordered_map<int, ProfileId>;
+using MProfileMapPtr = std::shared_ptr<MProfileMap>;
+
+
+struct MNKProfileMap
+{
+    std::unordered_map<GemmIDMoe, MProfileMapPtr, GemmIDMoeHash> profile_map;
+
+    bool existsMProfileMap(GemmIDMoe const& id)
+    {
+        auto const iter = profile_map.find(id);
+        return iter != profile_map.end();
     }
 
-    return tactics;
-}
+    void createMProfileMap(GemmIDMoe const& id)
+    {
+        profile_map[id] = std::make_shared<MProfileMap>();
+    }
+
+    MProfileMapPtr getMProfileMap(GemmIDMoe const& id)
+    {
+        auto const iter = profile_map.find(id);
+        if (iter == profile_map.end())
+        {
+            PADDLE_THROW("Cannot find ID  in the profile map. Abort.");
+        }
+        return iter->second;
+    }
+};
+
+
+class FusedMoeRunnerPofiler {
+
+public:
+    FusedMoeRunnerPofiler(paddle::DataType activation_dtype, paddle::DataType weight_dtype, paddle::DataType output_dtype,
+        std::shared_ptr<kernels::CutlassMoeFCRunnerInterface> moe_runner, const std::string& quant_method) {
+            mActivationDtype = activation_dtype;
+            mWeightDtype = weight_dtype;
+            mOutputDtype = output_dtype;
+            if (quant_method == "fp8_block_wise") {
+                mUseFp8BlockScaling = true;
+            } else if (quant_method == "weight_only_in4") {
+                mIsWeightOnlyIn4 = true;
+            }
+            mKernelRunner = moe_runner;
+            mProfiler = std::make_shared<kernels::GemmProfilerBackend>();
+            mMNKProfileMap = std::make_shared<MNKProfileMap>();
+            mAllProfiles = getFilteredConfigs(mKernelRunner->getTactics(), getSMVersion());
+            mMinDimM = -1;
+            mMaxDimM = -1;
+        }
+
+    void runProfileGemmIdx(int64_t const hidden_size, int64_t const inter_size, int const num_experts, int const top_k,
+        int const tp_size, int const tp_rank, int const ep_size, int const ep_rank,
+        std::vector<int64_t> const& num_token_buckets, profiler_backend::GemmToProfile const gemm_idx,
+        cudaStream_t stream)
+    {
+        auto gemm_id_moe = GemmIDMoe{gemm_idx, hidden_size, inter_size, num_experts, top_k};
+
+        if (mMNKProfileMap->existsMProfileMap(gemm_id_moe))
+        {
+            return;
+        }
+
+        mMNKProfileMap->createMProfileMap(gemm_id_moe);
+
+        mProfiler->mGemmToProfile = gemm_idx;
+        // TODO: support more dtypes and expert parallelism
+        auto parallelism_config = kernels::MOEParallelismConfig(tp_size, tp_rank, ep_size, ep_rank);
+        mProfiler->init(*mKernelRunner, mProfiler->mGemmToProfile,
+            mActivationDtype,
+            mWeightDtype,
+            mOutputDtype, num_experts, top_k, hidden_size, inter_size,
+            /* bias */ false, parallelism_config, mIsWeightOnlyIn4);
+
+        char* profile_workspace = nullptr;
+        size_t tmp_workspace_size = mProfiler->getWorkspaceSize(mMaxDimM);
+        auto const cu_malloc_status = cudaMalloc(&profile_workspace, tmp_workspace_size);
+        
+        
+        if (cu_malloc_status != cudaSuccess) {
+            std::cout << "Can't allocate tmp workspace for MOE GEMM tactics profiling." << std::endl;
+        }
+
+        for (auto const& m : num_token_buckets)
+        {
+            ProfileId best_profile_id = runProfileM(m, profile_workspace, stream);
+            std::cout << "mMNKProfileMap insert :" << m << "best_profile_id :"<< best_profile_id <<std::endl;
+            mMNKProfileMap->getMProfileMap(gemm_id_moe)->insert({m, best_profile_id});
+        }
+
+        auto const cu_free = cudaFree(profile_workspace);
+        // TORCH_CHECK(cu_free == cudaSuccess, "Can't free tmp workspace for MOE GEMM profiling.");
+    }
+
+    std::vector<Profile> getFilteredConfigs(std::vector<Profile> tactics, int sm) {
+        if (sm == 89) {
+            // Filter some unsupported configs for L40S
+            auto it = std::remove_if(tactics.begin(), tactics.end(),
+                [&](auto conf) {
+                    using cutlass_extensions::CutlassTileConfig;
+                    auto checks = std::vector{
+                        // Fail for BF16/FP16
+                        conf.tile_config == CutlassTileConfig::CtaShape128x128x64_WarpShape64x32x64,
+                        conf.tile_config == CutlassTileConfig::CtaShape64x128x64_WarpShape32x64x64 && conf.stages == 4,
+                        // Fail for FP8
+                        false && conf.tile_config == CutlassTileConfig::CtaShape16x256x128_WarpShape16x64x128
+                            && conf.stages >= 3,
+                    };
+
+                    return std::any_of(checks.begin(), checks.end(), [](auto v) { return v; });
+                });
+            tactics.erase(it, tactics.end());
+        }
+
+        // if (tactics.empty()) {
+        //     throw std::runtime_error("No valid GEMM tactics found");
+        // }
+        // // 筛选符合sm >= 90的所有配置
+        bool is_sm90 = sm >= 90;
+        printf("sm is {%d}\n", sm);
+        auto it = std::remove_if(tactics.begin(), tactics.end(), [is_sm90](auto& c) { 
+            return c.is_sm90 != is_sm90; // 移除所有不符合sm >= 90的配置
+        });
+        tactics.erase(it, tactics.end()); // 保留符合sm >= 90的配置
+        return tactics;
+    }
+
+    float runSingleProfile(int64_t const m, Profile const& profile, char* profile_workspace, cudaStream_t stream)
+    {
+        constexpr int warmup = 3;
+        constexpr int runs = 5;
+
+        // warmup
+        for (int i = 0; i < warmup; ++i)
+        {
+            mProfiler->runProfiler(m, profile, profile_workspace, stream);
+        }
+
+        cudaEvent_t start;
+        cudaEvent_t stop;
+        cudaEventCreate(&start);
+        cudaEventCreate(&stop);
+        cudaStreamSynchronize(stream);
+        cudaEventRecord(start, stream);
+
+        // profile
+        for (int i = 0; i < runs; ++i)
+        {
+            mProfiler->runProfiler(m, profile, profile_workspace, stream);
+        }
+
+        cudaEventRecord(stop, stream);
+        cudaEventSynchronize(stop);
+        float elapsed;
+
+        cudaEventElapsedTime(&elapsed, start, stop);
+        cudaEventDestroy(start);
+        cudaEventDestroy(stop);
+        return elapsed / runs;
+    }
+
+    ProfileId runProfileM(int64_t const m, char* profile_workspace, cudaStream_t stream)
+    {
+        mProfiler->prepare(m, profile_workspace, stream);
+        float best_time = std::numeric_limits<float>::max();
+        ProfileId best_profile_id;
+        for (int i = 0; i < static_cast<int>(mAllProfiles.size()); ++i)
+        {
+            auto const& profile = mAllProfiles[i];
+            float candidate_time = std::numeric_limits<float>::max();
+            try
+            {
+                candidate_time = runSingleProfile(m, profile, profile_workspace, stream);
+                std::cout << "candidate_time : " << candidate_time << std::endl;
+            }
+            catch (std::exception const& e)
+            {
+                std::ostringstream msg;
+                msg << "Cannot profile configuration " << i << ": " << profile.toString() << "\n (for"
+                    << " m=" << m << ")"
+                    << ", reason: \"" << e.what() << "\". Skipped";
+                cudaGetLastError(); // Reset the last cudaError to cudaSuccess.
+
+                std::cout << "Error: " << msg.str() << std::endl;
+                continue;
+            }
+
+            if (candidate_time < best_time)
+            {
+                best_time = candidate_time;
+                best_profile_id = i;
+            }
+        }
+        std::cout << "best_profile_id : " << best_profile_id << std::endl;
+        return best_profile_id;
+    }
+
+    void runProfile(Tensor const& fc2_expert_weights, int64_t const top_k, int64_t const tp_size,
+        int64_t const tp_rank, int64_t const ep_size, int64_t const ep_rank, std::vector<int64_t> num_token_buckets)
+    {
+        std::lock_guard<std::mutex> lock(mMutex);
+
+        if (mUseFp8BlockScaling)
+        {
+            return; // TODO
+        }
+
+        std::cout << "注意这里 " << std::endl;
+        int64_t hidden_size = fc2_expert_weights.shape()[2];
+        int64_t inter_size = fc2_expert_weights.shape()[1];
+
+        int num_experts = static_cast<int>(fc2_expert_weights.shape()[0] * ep_size);
+
+        std::sort(num_token_buckets.begin(), num_token_buckets.end());
+        mMinDimM = num_token_buckets.front();
+        mMaxDimM = num_token_buckets.back();
+
+        cudaStream_t stream;
+        cudaStreamCreate(&stream);
+        // common::check_cuda_error(cudaStreamCreate(&stream));
+
+        profiler_backend::GemmToProfile gemm_idxes[]
+            = {profiler_backend::GemmToProfile::GEMM_1, profiler_backend::GemmToProfile::GEMM_2};
+
+        for (auto const& gemm_idx : gemm_idxes)
+        {
+            runProfileGemmIdx(hidden_size, inter_size, num_experts, static_cast<int>(top_k), static_cast<int>(tp_size),
+                static_cast<int>(tp_rank), static_cast<int>(ep_size), static_cast<int>(ep_rank), num_token_buckets,
+                gemm_idx, stream);
+        }
+        cudaStreamDestroy(stream);
+        // common::check_cuda_error(cudaStreamDestroy(stream));
+    }
+
+
+    std::vector<int64_t> getProfileIds(int64_t const num_tokens, Tensor const& fc2_expert_weights,
+        int64_t const top_k, int64_t const num_experts)
+    {
+        std::lock_guard<std::mutex> lock(mMutex);
+        std::cout <<"start getProfileIds " << std::endl;
+        int64_t hidden_size = fc2_expert_weights.shape()[2];
+        int64_t inter_size = fc2_expert_weights.shape()[1];
+        auto gemm_id_moe1 = GemmIDMoe{profiler_backend::GemmToProfile::GEMM_1, hidden_size, inter_size,
+            static_cast<int>(num_experts), static_cast<int>(top_k)};
+        auto gemm_id_moe2 = GemmIDMoe{profiler_backend::GemmToProfile::GEMM_2, hidden_size, inter_size,
+            static_cast<int>(num_experts), static_cast<int>(top_k)};
+
+        if (!mMNKProfileMap->existsMProfileMap(gemm_id_moe1) || !mMNKProfileMap->existsMProfileMap(gemm_id_moe2))
+        {   
+            printf("Not find configs from tuned configs...\n");
+            return {};
+        }
+
+        int64_t capped_num_tokens = num_tokens;
+        if (num_tokens < mMinDimM)
+        {
+            capped_num_tokens = mMinDimM;
+        }
+        else if (num_tokens > mMaxDimM)
+        {
+            capped_num_tokens = mMaxDimM;
+        }
+
+        int gemm1_profile_id = mMNKProfileMap->getMProfileMap(gemm_id_moe1)->at(capped_num_tokens);
+        int gemm2_profile_id = mMNKProfileMap->getMProfileMap(gemm_id_moe2)->at(capped_num_tokens);
+        std::cout << "gemm1_profile_id *********"  << gemm1_profile_id << std::endl;
+        std::vector<int64_t> profile_ids = {gemm1_profile_id, gemm2_profile_id};
+        return profile_ids;
+    }
+
+private:
+    std::shared_ptr<kernels::CutlassMoeFCRunnerInterface> mKernelRunner;
+    std::shared_ptr<kernels::GemmProfilerBackend> mProfiler;
+    std::shared_ptr<MNKProfileMap> mMNKProfileMap;
+    int64_t mMinDimM;
+    int64_t mMaxDimM;
+    paddle::DataType mActivationDtype;
+    paddle::DataType mWeightDtype;
+    paddle::DataType mOutputDtype;
+    bool mUseFp8BlockScaling = false;
+    bool mIsWeightOnlyIn4 = false;
+
+    std::mutex mMutex;
+
+    using Profile = cutlass_extensions::CutlassGemmConfig;
+    std::vector<Profile> mAllProfiles;
+
+};
+
+// template<typename T, typename WeightType, typename OutputType = T>
+// std::vector<cutlass_extensions::CutlassGemmConfig> getFilteredConfigs(
+//     tensorrt_llm::kernels::CutlassMoeFCRunner<T, WeightType, OutputType>& moe_runner, int sm) {
+//     auto tactics = moe_runner.getTactics();
+//     if (sm == 89) {
+//         // Filter some unsupported configs for L40S
+//         auto it = std::remove_if(tactics.begin(), tactics.end(),
+//             [&](auto conf) {
+//                 using cutlass_extensions::CutlassTileConfig;
+//                 auto checks = std::vector{
+//                     // Fail for BF16/FP16
+//                     conf.tile_config == CutlassTileConfig::CtaShape128x128x64_WarpShape64x32x64,
+//                     conf.tile_config == CutlassTileConfig::CtaShape64x128x64_WarpShape32x64x64 && conf.stages == 4,
+//                     // Fail for FP8
+//                     false && conf.tile_config == CutlassTileConfig::CtaShape16x256x128_WarpShape16x64x128
+//                         && conf.stages >= 3,
+//                 };
+
+//                 return std::any_of(checks.begin(), checks.end(), [](auto v) { return v; });
+//             });
+//         tactics.erase(it, tactics.end());
+//     }
+
+//     if (tactics.empty()) {
+//         throw std::runtime_error("No valid GEMM tactics found");
+//     }
+
+//     return tactics;
+// }
+
+// using Profile = cutlass_extensions::CutlassGemmConfig;
+
+void setRunnerProfiles(std::shared_ptr<kernels::CutlassMoeFCRunnerInterface> moe_runner, std::vector<int64_t> profile_ids, const std::string& quant_method)
+    {
+        if (quant_method == "fp8_block_wise")
+        {
+            auto config = cutlass_extensions::CutlassGemmConfig(
+                cutlass_extensions::CutlassTileConfigSM90::CtaShape128x16x128B,
+                cutlass_extensions::MainloopScheduleType::AUTO,
+                cutlass_extensions::EpilogueScheduleType::AUTO,
+                cutlass_extensions::ClusterShape::ClusterShape_1x1x1);
+            moe_runner->setTactic(config, config);
+            return;
+        }
+
+        std::vector<Profile> mAllProfiles = moe_runner->getTactics();
+        auto best_gemm1_profile = mAllProfiles.front();
+        auto best_gemm2_profile = mAllProfiles.front();
+        if (!profile_ids.empty())
+        {   
+            std::cout << "选择tune好的config"<< std::endl;
+            best_gemm1_profile = mAllProfiles.at(profile_ids[0]);
+            best_gemm2_profile = mAllProfiles.at(profile_ids[1]);
+        }
+        moe_runner->setTactic(best_gemm1_profile, best_gemm2_profile);
+    }
+
+
+// template<typename T, typename WeightType, typename OutputType = T>
+// std::vector<cutlass_extensions::CutlassGemmConfig> getFilteredConfigs(
+//     kernels::CutlassMoeFCRunner<T, WeightType, OutputType>& moe_runner, int sm) {
+//     using Profile = cutlass_extensions::CutlassGemmConfig;
+//     std::vector<Profile> mAllProfiles = moe_runner.getTactics();
+
+//     if (sm == 89) {
+//         // Filter some unsupported configs for L40S
+//         auto it = std::remove_if(tactics.begin(), tactics.end(),
+//             [&](auto conf) {
+//                 using cutlass_extensions::CutlassTileConfig;
+//                 auto checks = std::vector{
+//                     // Fail for BF16/FP16
+//                     conf.tile_config == CutlassTileConfig::CtaShape128x128x64_WarpShape64x32x64,
+//                     conf.tile_config == CutlassTileConfig::CtaShape64x128x64_WarpShape32x64x64 && conf.stages == 4,
+//                     // Fail for FP8
+//                     false && conf.tile_config == CutlassTileConfig::CtaShape16x256x128_WarpShape16x64x128
+//                         && conf.stages >= 3,
+//                 };
+
+//                 return std::any_of(checks.begin(), checks.end(), [](auto v) { return v; });
+//             });
+//         tactics.erase(it, tactics.end());
+//     }
+
+//     if (tactics.empty()) {
+//         throw std::runtime_error("No valid GEMM tactics found");
+//     }
+
+//     return tactics;
+// }
+
+
 
 
 // 第三个模版参数默认是T
-template<typename T, typename WeightType, typename OutputType = T>
-std::pair<tensorrt_llm::cutlass_extensions::CutlassGemmConfig, tensorrt_llm::cutlass_extensions::CutlassGemmConfig> 
-selectTacticsForArch(tensorrt_llm::kernels::CutlassMoeFCRunner<T, WeightType, OutputType>& moe_runner, int sm) {
-    bool is_sm90 = sm >= 90;
-    auto tactics = getFilteredConfigs(moe_runner, sm);
-    auto it = std::find_if(tactics.begin(), tactics.end(), [is_sm90](auto& c) { return c.is_sm90 == is_sm90; });
-    if (it == tactics.end()) {
-        // Fall back to any tactic
-        std::cout << "WARNING: Could not find config for sm version " << sm << std::endl;
-        return std::make_pair(tactics[0], tactics[0]);
-    }
+// template<typename T, typename WeightType, typename OutputType = T>
+// std::pair<cutlass_extensions::CutlassGemmConfig, cutlass_extensions::CutlassGemmConfig> 
+// selectTacticsForArch(kernels::CutlassMoeFCRunner<T, WeightType, OutputType>& moe_runner, int sm) {
+//     bool is_sm90 = sm >= 90;
+//     auto tactics = getFilteredConfigs(moe_runner, sm);
+//     auto it = std::find_if(tactics.begin(), tactics.end(), [is_sm90](auto& c) { return c.is_sm90 == is_sm90; });
+//     if (it == tactics.end()) {
+//         // Fall back to any tactic
+//         std::cout << "WARNING: Could not find config for sm version " << sm << std::endl;
+//         return std::make_pair(tactics[0], tactics[0]);
+//     }
 
-    return std::make_pair(*it, *it);
-}
-
+//     return std::make_pair(*it, *it);
+// }
 
 
 tensorrt_llm::ActivationType getActivationType(std::string activation_type_str)
@@ -118,22 +512,22 @@ tensorrt_llm::ActivationType getActivationType(std::string activation_type_str)
     return tensorrt_llm::ActivationType::InvalidType;
 }
 
-tensorrt_llm::kernels::MOEExpertScaleNormalizationMode getNormalizationMode(int normalization_mode) {
+kernels::MOEExpertScaleNormalizationMode getNormalizationMode(int normalization_mode) {
     switch (normalization_mode) {
         case 0:
-            return tensorrt_llm::kernels::MOEExpertScaleNormalizationMode::NONE;
+            return kernels::MOEExpertScaleNormalizationMode::NONE;
         case 1:
-            return tensorrt_llm::kernels::MOEExpertScaleNormalizationMode::RENORMALIZE;
+            return kernels::MOEExpertScaleNormalizationMode::RENORMALIZE;
         case 2:
-            return tensorrt_llm::kernels::MOEExpertScaleNormalizationMode::SPARSE_MIXER;
+            return kernels::MOEExpertScaleNormalizationMode::SPARSE_MIXER;
         case 3:
-            return tensorrt_llm::kernels::MOEExpertScaleNormalizationMode::DEVICE_LIMITED;
+            return kernels::MOEExpertScaleNormalizationMode::DEVICE_LIMITED;
         case 4:
-            return tensorrt_llm::kernels::MOEExpertScaleNormalizationMode::DEVICE_LIMITED_RENORM;
+            return kernels::MOEExpertScaleNormalizationMode::DEVICE_LIMITED_RENORM;
         default:
             std::cerr << "Unknown normalization_mode value: " << normalization_mode << std::endl;
             // Return a default value if an invalid mode is passed
-            return tensorrt_llm::kernels::MOEExpertScaleNormalizationMode::NONE;
+            return kernels::MOEExpertScaleNormalizationMode::NONE;
     }
 }
 
@@ -184,14 +578,10 @@ Tensor trt_llm_fused_moe_helper(Tensor input_activations,
 
     bool* finished_ptr = nullptr;
 
-    tensorrt_llm::kernels::MOEParallelismConfig moe_parallel_config = tensorrt_llm::kernels::MOEParallelismConfig(1, 0, 1, 0);
+    kernels::MOEParallelismConfig moe_parallel_config = kernels::MOEParallelismConfig(1, 0, 1, 0);
 
     void* scale1_ptr = nullptr;
     void* scale2_ptr = nullptr;
-
-    // const void* fc1_weights_ptr = nullptr;
-    // const void* fc2_weights_ptr = nullptr;
-
 
     bool use_deepseek = false;
     if (quant_method == "fp8_block_wise") {
@@ -202,11 +592,11 @@ Tensor trt_llm_fused_moe_helper(Tensor input_activations,
     void* fc2_weights_ptr = nullptr;
 
 
-    tensorrt_llm::kernels::QuantParams quant_params;
+    kernels::QuantParams quant_params;
     if (quant_method == "weight_only_int8" || quant_method == "weight_only_int4") {
         scale1_ptr = get_ptr<data_t>(scale1);
         scale2_ptr = get_ptr<data_t>(scale2);
-        quant_params = tensorrt_llm::kernels::QuantParams::Int(scale1_ptr, scale2_ptr);
+        quant_params = kernels::QuantParams::Int(scale1_ptr, scale2_ptr);
         fc1_weights_ptr = reinterpret_cast<WeightType*>(fc1_expert_weights.data<data_w>());
         fc2_weights_ptr = reinterpret_cast<WeightType*>(fc2_expert_weights.data<data_w>());
     } else if (quant_method == "fp8_block_wise") {
@@ -228,13 +618,13 @@ Tensor trt_llm_fused_moe_helper(Tensor input_activations,
         fc2_weights_ptr = reinterpret_cast<WeightType*>(fc2_expert_weights.data<data_w>());
     }
 
-    tensorrt_llm::kernels::BlockScaleParams deepseek_params;
+    kernels::BlockScaleParams deepseek_params;
     if (use_deepseek)
     {    
-        using BlockScaleGemmImplPtr = std::shared_ptr<tensorrt_llm::kernels::small_m_gemm::CutlassFp8BlockScaleGemmRunnerInterface>;
+        using BlockScaleGemmImplPtr = std::shared_ptr<kernels::small_m_gemm::CutlassFp8BlockScaleGemmRunnerInterface>;
         BlockScaleGemmImplPtr mBlockScaleGemmImplPtr;
 
-        mBlockScaleGemmImplPtr = std::make_shared<tensorrt_llm::kernels::small_m_gemm::CutlassFp8BlockScaleGemmRunner<__nv_bfloat16,
+        mBlockScaleGemmImplPtr = std::make_shared<kernels::small_m_gemm::CutlassFp8BlockScaleGemmRunner<__nv_bfloat16,
                     __nv_fp8_e4m3, __nv_bfloat16>>();;
         
         size_t deepseek_workspace_size = 0;
@@ -254,21 +644,48 @@ Tensor trt_llm_fused_moe_helper(Tensor input_activations,
         // print_gpu_data<float>( static_cast<float*>(scale1_ptr), num_experts * 2 * inter_size, num_experts * 2 * inter_size);
         // #endif
 
-        deepseek_params = tensorrt_llm::kernels::BlockScaleParams(
+        deepseek_params = kernels::BlockScaleParams(
             static_cast<float *>(scale1_ptr), static_cast<float *>(scale2_ptr), mBlockScaleGemmImplPtr, reinterpret_cast<char*>(deepseek_ws), &mMemcpyEvent);
     }
 
     // deepseek相关参数
-    int sm = getSMVersion();
-    tensorrt_llm::kernels::CutlassMoeFCRunner<T, WeightType> moe_runner;
+    // int sm = getSMVersion();
+    // kernels::CutlassMoeFCRunner<T, WeightType> moe_runner;
+    std::shared_ptr<kernels::CutlassMoeFCRunnerInterface> moe_runner_ptr = std::make_shared<kernels::CutlassMoeFCRunner<T, WeightType>>();
+
+    
+    FusedMoeRunnerPofiler profiler(/* activation_dtype= */ input_activations.dtype(), 
+                                    /* weight_dtype= */ fc1_expert_weights.dtype(), 
+                                    /* output_dtype= */ input_activations.dtype(), 
+                                    /* moe_runner= */ moe_runner_ptr, 
+                                    /* quant_method= */ quant_method);
+
+    std::vector<int64_t> num_token_buckets = {num_rows};
+    profiler.runProfile(fc2_expert_weights, k, 1, 0, 1, 0, num_token_buckets);
+
+    std::vector<int64_t> profile_ids = profiler.getProfileIds(num_rows, fc2_expert_weights, k, num_experts);
+    
+    std::cout << "profile_ids : " << profile_ids.size() << std::endl;
+
+    for (int i = 0; i < profile_ids.size(); ++i){
+        std::cout <<  "profile_ids : "<< profile_ids[i] << std::endl;
+    }
+
+    // std::vector<int64_t> profile_ids = {20, 19};
+    setRunnerProfiles(moe_runner_ptr, profile_ids, quant_method);
+
     // std::cout <<"in 5" << std::endl;
 
-    auto [tactic1, tactic2] = selectTacticsForArch(moe_runner, sm);
-    moe_runner.setTactic(std::make_optional(tactic1), std::make_optional(tactic2));
+    // auto [tactic1, tactic2] = selectTacticsForArch(moe_runner, sm);
+    // moe_runner.setTactic(std::make_optional(tactic1), std::make_optional(tactic2));
 
-    tensorrt_llm::kernels::MOEExpertScaleNormalizationMode normalization_mode_enum = getNormalizationMode(normalization_mode);
+    // std::vector<int64_t> profile_ids;
+    // setRunnerProfiles(moe_runner, profile_ids, quant_method);
+    // std::cout <<"我设置了tatic" << std::endl;
 
-    auto bytes = moe_runner.getWorkspaceSize(num_rows, hidden_size, inter_size, num_experts, k, fc1_activation_type, 
+    kernels::MOEExpertScaleNormalizationMode normalization_mode_enum = getNormalizationMode(normalization_mode);
+
+    auto bytes = moe_runner_ptr->getWorkspaceSize(num_rows, hidden_size, inter_size, num_experts, k, fc1_activation_type, 
                                              normalization_mode_enum, moe_parallel_config, use_deepseek);
 
     auto workspace_ptr = allocator->Allocate(bytes)->ptr();
@@ -286,7 +703,7 @@ Tensor trt_llm_fused_moe_helper(Tensor input_activations,
     auto output_tensor = paddle::empty({num_rows, hidden_size}, input_activations.dtype(), place);
     T* output_tensor_ptr = reinterpret_cast<T*>(output_tensor.data<data_t>());
 
-    moe_runner.runMoe(input_act_ptr,
+    moe_runner_ptr->runMoe(input_act_ptr,
                     gating_output_ptr,
                     fc1_weights_ptr,
                     fc1_expert_biases_ptr, // nullptr
@@ -358,22 +775,22 @@ Tensor trt_llm_fused_moe_helper_fp8_per_tensor(Tensor input_activations,
 
     bool* finished_ptr = nullptr;
 
-    tensorrt_llm::kernels::MOEParallelismConfig moe_parallel_config = tensorrt_llm::kernels::MOEParallelismConfig(1, 0, 1, 0);
+    kernels::MOEParallelismConfig moe_parallel_config = kernels::MOEParallelismConfig(1, 0, 1, 0);
 
     // 根据启用的量化方法设置量化参数
-    tensorrt_llm::kernels::QuantParams quant_params;
-    quant_params = tensorrt_llm::kernels::QuantParams::FP8(scale1_ptr, scale2_ptr, scale3_ptr);
+    kernels::QuantParams quant_params;
+    quant_params = kernels::QuantParams::FP8(scale1_ptr, scale2_ptr, scale3_ptr);
 
     int sm = getSMVersion();
-    tensorrt_llm::kernels::CutlassMoeFCRunner<T, WeightType, __nv_bfloat16> moe_runner;
-    tensorrt_llm::kernels::BlockScaleParams deepseek_params;
+    kernels::CutlassMoeFCRunner<T, WeightType, __nv_bfloat16> moe_runner;
+    kernels::BlockScaleParams deepseek_params;
     bool use_deepseek = false;
 
     auto [tactic1, tactic2] = selectTacticsForArch(moe_runner, sm);
     moe_runner.setTactic(std::make_optional(tactic1), std::make_optional(tactic2));
 
     auto bytes = moe_runner.getWorkspaceSize(num_rows, hidden_size, inter_size, num_experts, k, fc1_activation_type, 
-                                             tensorrt_llm::kernels::MOEExpertScaleNormalizationMode::RENORMALIZE, moe_parallel_config, false);
+                                             kernels::MOEExpertScaleNormalizationMode::RENORMALIZE, moe_parallel_config, false);
 
     auto workspace_tensor = paddle::empty({static_cast<int>(bytes)}, paddle::DataType::UINT8, place);
     uint8_t* uint8_ptr = get_ptr<uint8_t>(workspace_tensor);
@@ -414,7 +831,7 @@ Tensor trt_llm_fused_moe_helper_fp8_per_tensor(Tensor input_activations,
                       expert_for_source_row_ptr,
                       0.2f,  // sparse_mixer_epsilon
                       moe_parallel_config,
-                      tensorrt_llm::kernels::MOEExpertScaleNormalizationMode::RENORMALIZE,
+                      kernels::MOEExpertScaleNormalizationMode::RENORMALIZE,
                       use_deepseek,
                       deepseek_params,
                       stream);

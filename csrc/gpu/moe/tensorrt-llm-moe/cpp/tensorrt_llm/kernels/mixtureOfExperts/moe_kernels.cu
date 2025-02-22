@@ -2187,10 +2187,12 @@ std::vector<size_t> GemmProfilerBackend::getProfilerWorkspaces(int maxM, bool is
     size_t num_experts_per_node = mNumExpertsPerNode;
 
     size_t fc1_out_size = inter_size;
-    if (isGatedActivation(mActivationType))
-    {
-        fc1_out_size = inter_size * 2;
-    }
+
+    // 默认为Swiglu
+    // if (isGatedActivation(mActivationType))
+    // {
+    fc1_out_size = inter_size * 2;
+    // }
 
     // TODO Needs updated when gather/finalize fusion is integrated
     size_t input_size1 = hidden_size * num_expanded_tokens * dtype_bytes;
