@@ -78,7 +78,8 @@ def trt_bf16():
             topk,
             0,
             "none",
-            "Swiglu"
+            "Swiglu",
+            8192,
         )
     paddle.device.synchronize()
     end = time.time()
@@ -106,12 +107,12 @@ def paddle_bf16():
     print(f"paddle bf16 : {((end - start) * 1000)} ms")
 
 
-for i in range(10):
-    paddle_bf16()
-
-
 # for i in range(10):
-#     trt_bf16()
+#     paddle_bf16()
+
+
+for i in range(10):
+    trt_bf16()
 
 
 

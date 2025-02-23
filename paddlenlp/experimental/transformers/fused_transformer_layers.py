@@ -1189,7 +1189,9 @@ class FusedMultiTransformerBase(Layer):
             group_idx = paddle.topk(group_scores, k=topk_group, axis=-1, sorted=False)[1]  # [n, topk_group]
 
             group_mask = paddle.zeros_like(group_scores, dtype="int64")  # [n, num_expert_group]
-            group_mask = paddle.put_along_axis(group_mask, group_idx, 1, axis=1)
+            #group_mask = paddle.put_along_axis(group_mask, group_idx, 1, axis=1)
+
+            group_mask = paddle.put_along_axis(group_mask, group_idx, paddle.to_tensor(1), axis=1)
 
             # Apply group mask to the scores
             score_mask = (
