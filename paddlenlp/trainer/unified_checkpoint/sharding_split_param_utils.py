@@ -205,6 +205,7 @@ def get_params_info(comm_buffer_list):
 
 
 def reshape_params(state_dict, struct2static_name_mappings, param_shape_info, param_slice_info):
+    """Reshape params to 1-D tensors"""
     for key in list(state_dict.keys()):
         key_name = key.split("/")[0]
         static_name = struct2static_name_mappings.get(key_name, None)
@@ -320,25 +321,10 @@ def load_unified_optimizer_split_param(args, model, optimizer, resume_from_check
     )
 
     # need to split param for different sharding rank, maybe need to deal with oom issue.
+    reshape_params(state_dict_optim, struct2static_name_mappings, param_shape_info, param_slice_info)
     for key in list(state_dict_optim.keys()):
         key_name = key.split("/")
         static_name = struct2static_name_mappings.get(key_name[0], None)
-
-        if int(state_dict_optim[key].numel()) > 1:
-            begin, end = param_slice_info[static_name]
-            _, numel, index, padded_size = param_shape_info[static_name]
-            state_dict_optim[key] = state_dict_optim[key].reshape([-1])
-            state_dict_optim[key] = state_dict_optim[key][begin - index : end - index]
-
-            padding_start = max(begin, index + numel)
-            padding_end = min(end, index + padded_size)
-            if padding_start < padding_end:
-                state_dict_optim[key] = paddle.concat(
-                    (
-                        state_dict_optim[key],
-                        paddle.zeros([padding_end - padding_start], dtype=state_dict_optim[key].dtype),
-                    )
-                )
         if has_master_weights:
             if model_state_dict[key_name[0]].dtype != paddle.float32:
                 key_name = "_".join([static_name, FP32_MASTER, key_name[1]])
@@ -360,24 +346,10 @@ def load_unified_optimizer_split_param(args, model, optimizer, resume_from_check
             expected_keys,
             is_master_weights=True,
         )
+        reshape_params(state_dict_master_weight, struct2static_name_mappings, param_shape_info, param_slice_info)
 
         for key in list(state_dict_master_weight.keys()):
             static_name = struct2static_name_mappings.get(key, None)
-            if int(state_dict_master_weight[key].numel()) > 1:
-                begin, end = param_slice_info[static_name]
-                _, numel, index, padded_size = param_shape_info[static_name]
-                state_dict_master_weight[key] = state_dict_master_weight[key].reshape([-1])
-                state_dict_master_weight[key] = state_dict_master_weight[key][begin - index : end - index]
-
-                padding_start = max(begin, index + numel)
-                padding_end = min(end, index + padded_size)
-                if padding_start < padding_end:
-                    state_dict_master_weight[key] = paddle.concat(
-                        (
-                            state_dict_master_weight[key],
-                            paddle.zeros([padding_end - padding_start], dtype=state_dict_master_weight[key].dtype),
-                        )
-                    )
             state_dict_master_weight[key] = state_dict_master_weight[key]._copy_to(
                 paddle.framework._current_expected_place(), False
             )
