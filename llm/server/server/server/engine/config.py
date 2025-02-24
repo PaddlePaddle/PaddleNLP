@@ -14,7 +14,6 @@
 
 import json
 import os
-from dataclasses import dataclass
 from datetime import datetime
 
 from server.utils import model_server_logger
@@ -231,7 +230,7 @@ class Config:
         get speculate_decoding related config
 
         Returns:
-            SpeculateConfig: the speculate related config
+            SpeculateArgument: the speculate related arguments
         """
         from server.utils import get_logger
 
@@ -308,10 +307,3 @@ class Config:
 
     def __str__(self) -> str:
         return json.dumps(self.__dict__, indent=4)
-
-
-@dataclass
-class SpeculateConfig:
-    speculate_method: str = "None"
-    speculate_max_draft_token_num: int = 1
-    speculate_max_ngram_size: int = 1

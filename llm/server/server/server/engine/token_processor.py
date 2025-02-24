@@ -19,9 +19,9 @@ import traceback
 from collections import Counter
 from datetime import datetime
 
-import numpy as np
 from paddlenlp_ops import get_output, speculate_get_output
 from server.utils import datetime_diff, model_server_logger, monitor_logger
+
 from paddlenlp.utils.env import MAX_DRAFT_TOKENS, SPECULATE_MAX_BSZ
 
 
@@ -29,8 +29,10 @@ class TokenProcessor(object):
     """
     get Token/Score from Paddle inference engine
     """
+
     def __init__(self, cfg):
         import paddle
+
         paddle.device.set_device("cpu")
         self.cfg = cfg
         self.resource_manager = None
@@ -41,7 +43,9 @@ class TokenProcessor(object):
 
         self.is_speculate_decoding = self.cfg.get_speculate_config().speculate_method != "None"
         if self.is_speculate_decoding:
-            self.output_tokens = paddle.full(shape=[SPECULATE_MAX_BSZ * MAX_DRAFT_TOKENS + SPECULATE_MAX_BSZ + 2, 1], fill_value=2, dtype="int64")
+            self.output_tokens = paddle.full(
+                shape=[SPECULATE_MAX_BSZ * MAX_DRAFT_TOKENS + SPECULATE_MAX_BSZ + 2, 1], fill_value=2, dtype="int64"
+            )
         else:
             self.output_tokens = paddle.full(shape=[self.cfg.max_batch_size + 2, 1], fill_value=2, dtype="int64")
         self.worker = None
@@ -52,6 +56,7 @@ class TokenProcessor(object):
         self.number_of_tasks = 0
         self.number_of_input_tokens = 0
         self.number_of_output_tokens = 0
+        self.total_step = 0
 
     def set_resource_manager(self, resource_manager):
         """
@@ -90,7 +95,7 @@ class TokenProcessor(object):
 
                 if self.output_tokens[0, 0] == -2:
                     continue
-                
+
                 self._process_batch_output()
             except Exception as e:
                 model_server_logger.info("while get input_data error: {0} {1}".format(e, str(traceback.format_exc())))
@@ -140,8 +145,13 @@ class TokenProcessor(object):
 
         # get benchmark msg
         if task.get("benchmark"):
-            keys = ["preprocess_start_time", "preprocess_end_time", "schedule_start_time",
-                    "inference_start_time", "inference_current_step_time"]
+            keys = [
+                "preprocess_start_time",
+                "preprocess_end_time",
+                "schedule_start_time",
+                "inference_start_time",
+                "inference_current_step_time",
+            ]
             for key in keys:
                 if key in task:
                     result[key] = str(task[key])
@@ -160,11 +170,13 @@ class TokenProcessor(object):
                 info_dict["input_token_num"] = len(task["input_ids"])
                 info_dict["output_token_num"] = len(self.all_tokens[i])
                 if hasattr(task, "preprocess_start_time") and hasattr(task, "preprocess_end_time"):
-                    info_dict["preprocess_cost_time"] = datetime_diff(task["preprocess_start_time"],
-                                                                    task["preprocess_end_time"])
+                    info_dict["preprocess_cost_time"] = datetime_diff(
+                        task["preprocess_start_time"], task["preprocess_end_time"]
+                    )
                 if hasattr(task, "preprocess_end_time") and hasattr(task, "schedule_start_time"):
-                    info_dict["cache_waiting_cost_time"] = datetime_diff(task["preprocess_end_time"],
-                                                                        task["schedule_start_time"])
+                    info_dict["cache_waiting_cost_time"] = datetime_diff(
+                        task["preprocess_end_time"], task["schedule_start_time"]
+                    )
                 info_dict["inference_time_cost"] = task["inference_time_cost"]
                 info_dict["version"] = "OpenSource"
                 info_dict["timestamp"] = time.time()
@@ -193,9 +205,9 @@ class TokenProcessor(object):
         tokens = self.output_tokens.numpy()
         batch = self.output_tokens[1, 0]
         if not self.is_speculate_decoding:
-            tokens = tokens[2:batch + 2]
+            tokens = tokens[2 : batch + 2]
         else:
-            accept_num = tokens[2:batch + 2]
+            accept_num = tokens[2 : batch + 2]
 
         batch_result = list()
         exist_finished_task = False
@@ -206,8 +218,16 @@ class TokenProcessor(object):
             if not self.is_speculate_decoding:
                 token_ids = [int(tokens[i, 0])]
             else:
-                token_ids = tokens[2 + SPECULATE_MAX_BSZ + i * MAX_DRAFT_TOKENS: 2 + SPECULATE_MAX_BSZ + i * MAX_DRAFT_TOKENS + accept_num[i, 0], 0].tolist()
-            
+                token_ids = tokens[
+                    2
+                    + SPECULATE_MAX_BSZ
+                    + i * MAX_DRAFT_TOKENS : 2
+                    + SPECULATE_MAX_BSZ
+                    + i * MAX_DRAFT_TOKENS
+                    + accept_num[i, 0],
+                    0,
+                ].tolist()
+
             if any(token_id < 0 for token_id in token_ids):
                 continue
 
@@ -215,6 +235,7 @@ class TokenProcessor(object):
 
             task_id = task["req_id"]
             result = self._get_single_result(i, task_id, token_ids, task)
+            self.total_step += 1
 
             for token_id in token_ids:
                 self.tokens_counter[task_id] += 1
@@ -226,6 +247,10 @@ class TokenProcessor(object):
                     self._recycle_resources(task_id, i, task)
                     model_server_logger.info("req_id: {0} finished".format(task_id))
                     model_server_logger.info(f"{self.resource_manager.info()}")
+                    model_server_logger.info(
+                        f"Speculate accept ratio: {1 - self.total_step * 1.0 / self.number_of_output_tokens}"
+                        f" total step: {self.total_step}. total_output_token_num: {self.number_of_output_tokens}"
+                    )
                     exist_finished_task = True
                     break
             batch_result.append(result)
@@ -237,6 +262,7 @@ class WarmUpTokenProcessor(TokenProcessor):
     """
     Warmup Processor
     """
+
     def __init__(self, cfg):
         super().__init__(cfg)
         self._is_running = True
