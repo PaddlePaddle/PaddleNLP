@@ -60,6 +60,7 @@ from .modeling import (
     Llama3RotaryEmbedding,
     LlamaRotaryEmbedding,
     _make_causal_mask,
+    _expand_2d_mask,
     apply_rotary_pos_emb,
     build_alibi_tensor,
     get_triangle_upper_mask,
