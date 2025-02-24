@@ -264,9 +264,6 @@ class ModelProposer(Proposer):
         tensor_parallel_rank, tensor_parallel_degree = llm_utils.init_dist_env()
 
         self.config = AutoConfig.from_pretrained(self.args.model_name_or_path)
-        print(f"config: {self.config}")
-        print(f"args: {self.args}")
-        # exit(0)
         paddle.set_default_dtype(self.dtype)
         self.model = AutoInferenceModelForCausalLM.from_pretrained(
             self.args.model_name_or_path,
