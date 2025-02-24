@@ -3050,6 +3050,7 @@ function llama_lora_static_graph_auto_bs_2_bf16_DP2-TP2-PP1() {
     rm -rf output/$task_name/
 
     ls -la ./
+    ls -la ./data
 
     python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3" \
