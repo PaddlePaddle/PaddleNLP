@@ -374,6 +374,7 @@ class Task(metaclass=abc.ABCMeta):
 
         self._static_model_file = self.inference_model_path + PADDLE_INFERENCE_MODEL_SUFFIX
         self._static_params_file = self.inference_model_path + PADDLE_INFERENCE_WEIGHTS_SUFFIX
+        self._static_json_file = self.inference_model_path + ".json"
 
         if paddle.get_device().split(":", 1)[0] == "npu" and self._infer_precision == "fp16":
             # transform fp32 model tp fp16 model
