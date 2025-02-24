@@ -946,17 +946,11 @@ class DeepseekV2Attention(nn.Layer):
             print("qa input: ", hidden_states._md5sum())
             print("qa weight: ", self.q_a_proj.weight._md5sum())
             q = self.q_b_proj(self.q_a_layernorm(self.q_a_proj(hidden_states)))
-        print("qb weight shape: ", self.q_b_proj.weight.shape)
-        print("qb weight reshape: ", [bsz, q_len, self.num_heads, self.q_head_dim])
-        print("q output shape: ", q.shape)
-        print(self.q_a_proj, self.q_b_proj)
         q = q.reshape([bsz, q_len, self.num_heads, self.q_head_dim])
         q_nope, q_pe = paddle.split(q, [self.qk_nope_head_dim, self.qk_rope_head_dim], axis=-1)
 
         # DeepSeekV2 kv_lora_rank+qk_rope_head_dim=512+64
-        print("kva weight: ", self.kv_a_proj_with_mqa.weight._md5sum())
         compressed_kv = self.kv_a_proj_with_mqa(hidden_states)
-        print(self.kv_a_proj_with_mqa, self.kv_b_proj)
         compressed_kv, k_pe = paddle.split(compressed_kv, [self.kv_lora_rank, self.qk_rope_head_dim], axis=-1)
         k_pe = k_pe.reshape([bsz, q_len, 1, self.qk_rope_head_dim])
 

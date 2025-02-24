@@ -253,10 +253,8 @@ class MoELayer(nn.Layer):
         # dispatched_input = paddle.masked_fill_(reshaped_input, dispatch_mask)
 
         if self.expert_parallel_degree > 1:
-            print(dispatched_input, self.moe_group)
             dispatched_input = _AllToAll.apply(dispatched_input, self.moe_group)
         # Re-shape after all-to-all: ecm -> gecm
-        print(dispatched_input.shape)
         dispatched_input = dispatched_input.reshape(
             [self.expert_parallel_degree, self.moe_num_experts_per_device, -1, d_model]
         )

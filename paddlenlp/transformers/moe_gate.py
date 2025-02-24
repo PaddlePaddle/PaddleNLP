@@ -235,17 +235,7 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         token_priority = paddle.masked_fill(token_priority, ~valid_mask, 0)
         dispatch_mask = F.one_hot(token_priority, capacity).cast(paddle.bool)
         valid_mask = valid_mask.unsqueeze(-1).expand(valid_mask.shape + [capacity])
-        # p = paddle.topk(tmp_scores, k=k, axis=-1, sorted=Truirint('1', valid_mask)
-        # print('2', ~valid_mask)
-        # print('3', dispatch_mask)
-        # dispatch_mask = paddle.masked_fill(dispatch_mask, ~valid_mask, 0)
         dispatch_mask = dispatch_mask * (~valid_mask)
-
-        # valid_mask = paddle.logical_and(token_priority >= 0, token_priority < capacity)
-        # token_priority = paddle.masked_fill(token_priority, ~valid_mask, 0)
-        # dispatch_mask = F.one_hot(token_priority, capacity).cast(paddle.int32)
-        # valid_mask = valid_mask.unsqueeze(-1).expand(valid_mask.shape + [capacity])
-        # dispatch_mask = paddle.masked_fill(dispatch_mask, ~valid_mask, 0)
 
         return dispatch_mask
 
@@ -555,11 +545,7 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
                 "se,sec->sec", topk_masked_gates, token_priority.cast(paddle.get_default_dtype())
             )
 
-        # print(gates_masked)
-        # gates_masked = gates_masked.astype("bool").unsqueeze(-1).expand(gates_masked.shape + token_priority.shape[-1:])
-        # print(gates_masked)
         combine_weights = paddle.einsum("se,sec->sec", gates_masked, token_priority.cast(paddle.get_default_dtype()))
-        # combine_weights = gates_masked * token_priority
         dispatch_mask = combine_weights.astype(paddle.bool)
 
         return capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss
