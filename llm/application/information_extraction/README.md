@@ -123,7 +123,7 @@
 * `schema`：定义任务抽取目标，可参考开箱即用中不同任务的调用示例进行配置。
 * `schema_lang`：设置 schema 的语言，默认为`zh`, 可选有`zh`和`en`。因为中英 schema 的构造有所不同，因此需要指定 schema 的语言。
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
-* `model`：选择任务使用的模型，默认为`paddlenlp/PP-UIE-0.5B`，可选有`paddlenlp/PP-UIE-0.5B`, `paddlenlp/PP-UIE-1.5B`, `paddlenlp/PP-UIE-7B`, `paddlenlp/PP-UIE-14B`。
+* `model`：选择任务使用的模型，可选有`paddlenlp/PP-UIE-0.5B`, `paddlenlp/PP-UIE-1.5B`, `paddlenlp/PP-UIE-7B`, `paddlenlp/PP-UIE-14B`。
 * `precision`：选择模型精度，默认为`float16`，可选有`float16`、`bfloat16`和`float32`和。如果选择`float16`，在 GPU 硬件环境下，请先确保机器正确安装 NVIDIA 相关驱动和基础软件，**确保 CUDA>=11.2，cuDNN>=8.1.1**，初次使用需按照提示安装相关依赖。其次，需要确保 GPU 设备的 CUDA 计算能力（CUDA Compute Capability）大于7.0，典型的设备包括 V100、T4、A10、A100、GTX 20系列和30系列显卡等。如果选择`bfloat16`，能有效加速处理大模型和批量数据，尤其与混合精度结合使用时性能表现更优。但需确保硬件和软件环境支持该精度。支持 `bfloat16`的硬件包括 NVIDIA A100 和 H100 GPU，同时需要确保使用 CUDA>=11.2、cuDNN>=8.1.1 等软件环境。更多关于 CUDA Compute Capability 和精度支持情况请参考 NVIDIA 文档：[GPU 硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)。
 
 
@@ -266,7 +266,7 @@ schema = ['出发地', '目的地', '费用', '时间']
 python doccano.py \
     --doccano_file ./data/doccano_ext.json \
     --save_dir ./data \
-    --splits 0.8 0.2 0 \
+    --splits 0.8 0.1 0.1 \
     --schema_lang ch
 ```
 
@@ -277,7 +277,7 @@ python doccano.py \
 - ``save_dir``: 训练数据的保存目录，默认存储在``data``目录下。
 - ``negative_ratio``: 最大负例比例，该参数只对抽取类型任务有效，适当构造负例可提升模型效果。负例数量和实际的标签数量有关，最大负例数量 = negative_ratio * 正例数量。
 - ``splits``: 划分数据集时训练集、验证集所占的比例。默认为[0.8, 0.1, 0.1]表示按照``8:1:1``的比例将数据划分为训练集、验证集和测试集。
-- ``task_type``: 选择任务类型，目前只有信息抽取这一种任务。
+- ``task_type``: 选择任务类型，目前只有信息抽取`ie`这一种任务。
 - ``is_shuffle``: 是否对数据集进行随机打散，默认为 False。
 - ``seed``: 随机种子，默认为1000.
 - ``schema_lang``: 选择 schema 的语言，可选有`ch`和`en`。默认为`ch`，英文数据集请选择`en`。
@@ -341,7 +341,7 @@ python -u  -m paddle.distributed.launch --gpus "0,1" run_finetune.py ./config/qw
     "use_flash_attention": false
   }
 ```
-更多 sft_argument.json 配置文件说明，请参考[大模型精调](../../docs/finetune.md)
+更多 `sft_argument.json` 配置文件说明，请参考[大模型精调](../../docs/finetune.md)
 
 
 <a name="定制模型一键预测"></a>
@@ -362,7 +362,7 @@ python predict/predictor.py \
     --output_file ./output.json \
     --src_length  512 \
     --max_length  20 \
-    --batch_size  4 \
+    --batch_size  4 
 ```
 更多关于 `predictor.py` 的配置参数说明，请参考[大模型推理教程](../../docs/predict/inference.md)
 
