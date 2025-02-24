@@ -72,7 +72,7 @@ def check_infer_engine_process():
     return:
         status: bool, True if process is alive else False
     """
-    mp_num = int(env_config.mp_num)
+    mp_num = int(env_config.mp_num_per_node)
     for i in range(mp_num):
         try:
             infer_live_flag_shm = shared_memory.SharedMemory(name=env_config.get_unique_name("shm_flag_infer_{}_live".format(i)))
