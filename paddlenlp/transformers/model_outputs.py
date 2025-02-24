@@ -718,6 +718,7 @@ class BaseModelOutputWithPastAndMTP(ModelOutput):
     attentions: Optional[Tuple[paddle.Tensor]] = None
     mtp_outputs: Optional[Tuple[paddle.Tensor]] = None
 
+
 @dataclass
 class BaseModelOutputWithPoolingAndCrossAttentions(ModelOutput):
     """
