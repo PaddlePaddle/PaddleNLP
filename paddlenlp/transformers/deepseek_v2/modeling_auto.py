@@ -723,6 +723,7 @@ class DeepseekV2ModelAuto(DeepseekV2PretrainedModelAuto):
             )  # [bs, 1, seq_len, seq_len]
             if self.config.use_flash_attention:
                 attention_mask = None if is_casual_mask(attention_mask) else attention_mask
+
         # embed positions
         hidden_states = inputs_embeds
 
