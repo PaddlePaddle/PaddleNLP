@@ -4,7 +4,7 @@
     "ptx_datasets": "alpaca",
     "actor_model_name_or_path": "PKU-Alignment/alpaca-7b-reproduced",
     "reward_model_name_or_path": "PKU-Alignment/beaver-7b-v1.0-reward",
-    "output_dir": "checkpoints/llama-ppo",
+    "output_dir": "checkpoints/llama-grpo",
     "logging_dir": "log",
     "max_length": 2048,
     "use_fusemt": 1,
@@ -75,5 +75,8 @@
     "use_fused_head_and_loss_fn": 0,
     "fused_linear":1,
     "autotuner_benchmark": 0,
-    "skip_profile_timer": 1
+    "skip_profile_timer": 1,
+    "use_rm_server": true,
+    "reward_server": "http://10.174.146.80:8048",
+    "rl_algorithm": "grpo"
 }

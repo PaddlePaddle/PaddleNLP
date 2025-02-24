@@ -70,17 +70,11 @@ class Predictor:
             )
             config = copy.deepcopy(model.config)
             config.tensor_parallel_rank, config.tensor_parallel_degree = init_dist_env()
-
-            print("tensor parallel degree in create_infer_model", config.tensor_parallel_degree)
-            # ppo为啥加这一行？注释掉会报错
-            # config.quant_type = None
-            # ################### ppohacking
             config.quant_type = []
             config.cachekv_int8_type = None
             config.append_attn = False
-            # breakpoint()
-            # ################### ppohacking
             config.single_card_ptq = True
+
             infer_model_cls = getattr(paddlenlp.experimental.transformers, model.__class__.__name__ + "InferenceModel")
             # ori_init_weights = infer_model_cls.init_weights
             # infer_model_cls.init_weights = lambda self: None
@@ -130,7 +124,7 @@ class Predictor:
                 "repetition_penalty": trainer.args.repetition_penalty,
             }
         )[0]
-        print("trainer amp_dtype", trainer.amp_dtype)
+
         policy_predictor = Predictor(predictor_args, model=infer_model, tokenizer=trainer.tokenizer)
         return policy_predictor
 
@@ -174,8 +168,6 @@ class Predictor:
         self.is_available = False
 
     def enable(self, model, offload_model=True):
-        print("tensor parallel degree in enable")
-        print(model.config.tensor_parallel_degree)
         if self.is_available:
             return
         # set params
@@ -185,8 +177,6 @@ class Predictor:
     @paddle.no_grad()
     def set_state_dict(self, model, offload_model=True):
         key = list(model.state_dict().keys())[3]
-        print("model state dict dtype", model.state_dict()[key].dtype)
-        print(paddle.get_default_dtype())
         self.model.set_state_dict(model.state_dict())
         if offload_model:
             offload_place = paddle.CUDAPinnedPlace()
