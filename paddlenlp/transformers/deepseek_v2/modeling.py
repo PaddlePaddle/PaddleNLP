@@ -64,7 +64,7 @@ from ..linear_utils import Linear
 from ..llama import fusion_ops
 from ..llama.modeling import get_use_casual_mask
 from ..model_outputs import (
-    BaseModelOutputWithPast,
+    BaseModelOutputWithPastAndMTP,
     CausalLMOutputWithPast,
     SequenceClassifierOutputWithPast,
 )
@@ -133,7 +133,7 @@ def parallel_matmul(x: Tensor, y: Tensor, tensor_parallel_output=True):
         hcg = fleet.get_hybrid_communicate_group()
         model_parallel_group = hcg.get_model_parallel_group()
         tensor_parallel_degree = hcg.get_model_parallel_world_size()
-    except:
+    except AttributeError:
         is_fleet_init = False
 
     if paddle.in_dynamic_mode():
@@ -1537,7 +1537,7 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
         return_dict: Optional[bool] = None,
         attn_mask_startend_row_indices: Optional[Tensor] = None,
         **kwargs,
-    ) -> Union[Tuple, BaseModelOutputWithPast]:
+    ) -> Union[Tuple, BaseModelOutputWithPastAndMTP]:
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -1723,11 +1723,12 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
             return tuple(
                 v for v in [hidden_states, next_cache, all_hidden_states, all_self_attns, mtp_outputs] if v is not None
             )
-        return BaseModelOutputWithPast(
+        return BaseModelOutputWithPastAndMTP(
             last_hidden_state=hidden_states,
             past_key_values=next_cache,
             hidden_states=all_hidden_states,
             attentions=all_self_attns,
+            mtp_outputs=mtp_outputs,
         )
 
 
@@ -1922,12 +1923,15 @@ class DeepseekV2ForCausalLM(DeepseekV2PretrainedModel):
             past_key_values=past_key_values,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
+            return_dict=True,
             attn_mask_startend_row_indices=attn_mask_startend_row_indices,
         )
-
-        hidden_states = outputs[0]
-        mtp_outputs = outputs[-1]
+        if return_dict:
+            hidden_states = outputs.hidden_states
+            mtp_outputs = outputs.mtp_outputs
+        else:
+            hidden_states = outputs[0]
+            mtp_outputs = outputs[-1]
 
         if labels is not None and self.config.use_fused_linear_cross_entropy:
             from paddlenlp_kernel.triton.cut_cross_entropy import linear_cross_entropy

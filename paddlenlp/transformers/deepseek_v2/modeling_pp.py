@@ -188,9 +188,10 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
         hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids = parse_args(args)
 
         if self.config.num_nextn_predict_layers > 0:
-            hidden_states_list = paddle.split(hidden_states, self.config.num_nextn_predict_layers + 1)
-            inputs_embeds_mtp = hidden_states_list[-self.config.num_nextn_predict_layers :]
-            hidden_states = hidden_states_list[0]
+            _, _, hidden_size = hidden_states.shape
+            hidden_size_mtp = hidden_size // (self.config.num_nextn_predict_layers + 1)
+            inputs_embeds_mtp = hidden_states[:, :, -hidden_size_mtp:]
+            hidden_states = hidden_states[:, :, :-hidden_size_mtp]
 
         has_gradient = not hidden_states.stop_gradient
 
