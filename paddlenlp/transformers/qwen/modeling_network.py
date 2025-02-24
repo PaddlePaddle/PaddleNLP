@@ -298,11 +298,7 @@ class QWenMLPNet(nn.Layer):
         ff_dim_in = config.intermediate_size // 2
         self.fuse_attention_ffn = config.fuse_attention_ffn
         if self.fuse_attention_ffn and not enable_fuse_ffn_qkv_pass():
-            self.gate_up_fused_proj = nn.Linear(
-                config.hidden_size, 
-                ff_dim_in * 2, 
-                bias_attr=False
-            )
+            self.gate_up_fused_proj = nn.Linear(config.hidden_size, ff_dim_in * 2, bias_attr=False)
         else:
             self.w1 = nn.Linear(config.hidden_size, ff_dim_in, bias_attr=False)
             self.w2 = nn.Linear(config.hidden_size, ff_dim_in, bias_attr=False)
