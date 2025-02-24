@@ -470,7 +470,6 @@ def main():
     if training_args.do_predict:
         eval_result = trainer.predict(test_ds).metrics
         trainer.log_metrics("test", eval_result)
-    training_args.do_eval = False
     # Evaluation dev set
     if training_args.do_eval:
         logger.info("*** Evaluate result after train ***")
