@@ -54,6 +54,8 @@ try:
 except:
     flash_attention = None
 
+import numpy as np
+
 from paddlenlp.transformers.model_utils import dtype_guard
 
 from ...utils.initializer import kaiming_uniform_
@@ -93,6 +95,49 @@ def new_repr(self):
 
 
 nn.Embedding.extra_repr = new_repr
+
+
+paddle_numpy_mapping = {
+    paddle.float8_e5m2: (paddle.int8, np.float8_e5m2),
+    paddle.float8_e4m3fn: (paddle.int8, np.float8_e4m3fn),
+    paddle.bfloat16: (paddle.int16, np.bfloat16),
+}
+numpy_paddle_mapping = {
+    np.float8_e5m2: (np.int8, paddle.float8_e5m2),
+    np.float8_e4m3fn: (np.int8, paddle.float8_e4m3fn),
+    np.bfloat16: (np.int16, paddle.bfloat16),
+}
+
+
+origin_tensort_init = paddle.Tensor.__call__
+origin_to_tensor = paddle.to_tensor
+
+
+def enhance_init(*args, **kwargs):
+    print(args, kwargs)
+    if isinstance(args[0], np.ndarray) and args[0].dtype in (np.float8_e4m3fn, np.float8_e5m2):
+        raise ValueError()
+        inter_dtype, tgt_dtype = numpy_paddle_mapping[args[0].dtype]
+        tensor = np.view(inter_dtype)
+        new_args = (tensor, *args[1:])
+        tensor = origin_tensort_init(*new_args, **kwargs)
+        return tensor.view(tgt_dtype)
+
+    return origin_tensort_init(*args, **kwargs)
+
+
+def enhance_to_tensor(*args, **kwargs):
+    if isinstance(args[0], np.ndarray) and args[0].dtype in (np.float8_e4m3fn, np.float8_e5m2):
+        inter_dtype, tgt_dtype = numpy_paddle_mapping[args[0].dtype]
+        tensor = np.view(inter_dtype)
+        new_args = (tensor, *args[1:])
+        tensor = origin_to_tensor(*new_args, **kwargs)
+        return tensor.view(tgt_dtype)
+    return origin_to_tensor(*args, **kwargs)
+
+
+paddle.Tensor.__call__ = enhance_init
+paddle.to_tensor = enhance_to_tensor
 
 
 def get_triangle_upper_mask(x, mask=None):

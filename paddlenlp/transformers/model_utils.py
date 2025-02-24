@@ -471,7 +471,7 @@ def load_state_dict(
             if device == "cpu":
                 for k in list(state_dict.keys()):
                     with device_guard():
-                        state_dict[k] = paddle.Tensor(state_dict.pop(k), zero_copy=True)
+                        state_dict[k] = paddle.Tensor.__call__(state_dict.pop(k), zero_copy=True)
 
             if len(scale_dict) != 0:
                 if ckpt_quant_stage == "O0":
