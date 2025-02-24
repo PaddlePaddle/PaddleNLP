@@ -27,26 +27,17 @@ import paddle
 import paddle.distributed as dist
 import paddle.distributed.fleet as fleet
 from paddle.base.framework import use_pir_api
-from paddlenlp_ops import step_paddle
+from paddlenlp_ops import speculate_step_paddle, step_paddle
 from server.data.processor import DataProcessor
 from server.engine.config import Config
 from server.utils import get_logger
 from task_queue_manager import TaskQueueManager
 
-<<<<<<< HEAD
-from paddlenlp.experimental.transformers import InferenceWithReferenceProposer
-from paddlenlp.trl.llm_utils import get_rotary_position_embedding
-from paddlenlp.utils.env import (
-    PADDLE_INFERENCE_MODEL_SUFFIX,
-    PADDLE_INFERENCE_WEIGHTS_SUFFIX,
-)
-=======
 from paddlenlp.experimental.transformers import (
     EagleProposer,
     InferenceWithReferenceProposer,
 )
 from paddlenlp.trl.llm_utils import get_rotary_position_embedding
->>>>>>> 1.support speculate complicated args. 2.format serving code
 
 File_Path = os.path.realpath(sys.argv[0])
 Dir_Path = os.path.dirname(File_Path)
@@ -97,16 +88,8 @@ class ModelRunner:
                     self.args.max_batch_size,
                     self.args.max_seq_len,
                 )
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-            elif self.speculate_config.speculate_method == "mtp" or self.speculate_config.speculate_method == "eagle":
-                self.proposer = EagleProposer(self.speculate_config)
->>>>>>> 1.support speculate complicated args. 2.format serving code
-=======
             elif self.speculate_config.speculate_method in ["eagle", "mtp"]:
                 self.proposer = EagleProposer(self.speculate_config, base_model_inputs=self.share_inputs)
->>>>>>> 1. support mtp serving.  2. Unify Spec argument
         else:
             self.proposer = None
 
@@ -231,16 +214,6 @@ class ModelRunner:
                     dtype=cache_type,
                 )
             else:
-<<<<<<< HEAD
-                self.cache_kvs["key_caches_{}".format(i)] = paddle.full(shape=[
-                    self.args.max_block_num, kv_num_head,
-                    self.args.block_size, self.args.hidden_size // self.args.num_attention_heads
-                ], fill_value=0, dtype=cache_type)
-                self.cache_kvs["value_caches_{}".format(i)] = paddle.full(shape=[
-                    self.args.max_block_num, kv_num_head,
-                    self.args.block_size, self.args.hidden_size // self.args.num_attention_heads
-                ], fill_value=0, dtype=cache_type)
-=======
                 self.cache_kvs["key_caches_{}".format(i)] = paddle.full(
                     shape=[
                         self.args.max_block_num,
@@ -261,7 +234,6 @@ class ModelRunner:
                     fill_value=0,
                     dtype=cache_type,
                 )
->>>>>>> 1.support speculate complicated args. 2.format serving code
 
         pre_max_block_num = (
             self.args.max_seq_len + self.args.block_size - 1
@@ -302,16 +274,10 @@ class ModelRunner:
         self.share_inputs["presence_score"] = paddle.full(
             shape=[self.args.max_batch_size, 1], fill_value=self.presence_score, dtype="float32"
         )
-<<<<<<< HEAD
-        self.share_inputs["seq_lens_this_time"] = paddle.full(
-            shape=[self.args.max_batch_size, 1], fill_value=0, dtype="int32"
-        )
-=======
         self.helper_tensors["seq_lens_this_time"] = paddle.full(
             shape=[self.args.max_batch_size, 1], fill_value=0, dtype="int32"
         )
         self.share_inputs["seq_lens_this_time"] = None
->>>>>>> 1.support speculate complicated args. 2.format serving code
         self.share_inputs["seq_lens_encoder"] = paddle.full(
             shape=[self.args.max_batch_size, 1], fill_value=0, dtype="int32"
         )
@@ -372,11 +338,6 @@ class ModelRunner:
         self.share_inputs["stop_seqs"] = paddle.full(
             shape=[self.max_stop_seqs_num, self.stop_seqs_max_len], fill_value=-1, dtype="int64"
         )
-<<<<<<< HEAD
-
-=======
->>>>>>> 1.support speculate complicated args. 2.format serving code
-
         self.share_inputs["first_token_ids"] = paddle.full(
             shape=[self.args.max_batch_size, 1], fill_value=-1, dtype="int64"
         )
@@ -439,11 +400,7 @@ class ModelRunner:
             self.share_inputs["penalty_score"][idx : idx + 1] = task.get("penalty_score", 1.0)
             self.share_inputs["frequency_score"][idx : idx + 1] = task.get("frequency_score", 0.0)
             self.share_inputs["presence_score"][idx : idx + 1] = task.get("presence_score", 0.0)
-<<<<<<< HEAD
-            self.share_inputs["seq_lens_this_time"][idx : idx + 1] = length
-=======
             self.helper_tensors["seq_lens_this_time"][idx : idx + 1] = length
->>>>>>> 1.support speculate complicated args. 2.format serving code
             self.share_inputs["step_seq_lens_encoder"][idx : idx + 1] = length
             self.share_inputs["seq_lens_encoder"][idx : idx + 1] = length
             self.share_inputs["seq_lens_decoder"][idx : idx + 1] = 0
@@ -495,39 +452,64 @@ class ModelRunner:
         """
         step cuda
         """
-        # whether speculate decoding
-        # if self.is_speculate_decoding:
-        #     speculate_step_token_num = self.speculate_config.speculate_max_draft_token_num + 1
-        # else:
-        #     speculate_step_token_num = 0
 
-        step_paddle(
-            self.share_inputs["stop_flags"],
-            self.share_inputs["seq_lens_this_time"],
-            self.share_inputs["step_seq_lens_encoder"],
-            self.share_inputs["seq_lens_encoder"],
-            self.share_inputs["seq_lens_decoder"],
-            self.share_inputs["block_tables"],
-            self.share_inputs["encoder_block_lens"],
-            self.share_inputs["is_block_step"],
-            self.share_inputs["step_block_list"],
-            self.share_inputs["step_lens"],
-            self.share_inputs["recover_block_list"],
-            self.share_inputs["recover_lens"],
-            self.share_inputs["need_block_list"],
-            self.share_inputs["need_block_len"],
-            self.share_inputs["used_list_len"],
-            self.share_inputs["free_list"],
-            self.share_inputs["free_list_len"],
-            self.share_inputs["input_ids"],
-            self.share_inputs["pre_ids"],
-            self.share_inputs["step_idx"],
-            self.share_inputs["next_tokens"],
-            self.share_inputs["first_token_ids"],
-            self.args.block_size,
-            self.args.enc_dec_block_num,
-            0,
-        )
+        if self.is_speculate_decoding:
+            speculate_step_paddle(
+                self.share_inputs["stop_flags"],
+                self.share_inputs["seq_lens_this_time"],
+                self.share_inputs["step_seq_lens_encoder"],
+                self.share_inputs["seq_lens_encoder"],
+                self.share_inputs["seq_lens_decoder"],
+                self.share_inputs["block_tables"],
+                self.share_inputs["encoder_block_lens"],
+                self.share_inputs["is_block_step"],
+                self.share_inputs["step_block_list"],
+                self.share_inputs["step_lens"],
+                self.share_inputs["recover_block_list"],
+                self.share_inputs["recover_lens"],
+                self.share_inputs["need_block_list"],
+                self.share_inputs["need_block_len"],
+                self.share_inputs["used_list_len"],
+                self.share_inputs["free_list"],
+                self.share_inputs["free_list_len"],
+                self.share_inputs["input_ids"],
+                self.share_inputs["pre_ids"],
+                self.share_inputs["step_idx"],
+                self.share_inputs["next_tokens"],
+                self.share_inputs["first_token_ids"],
+                self.share_inputs["accept_num"],
+                self.args.block_size,
+                self.args.enc_dec_block_num,
+                self.speculate_config.speculate_max_draft_token_num,
+            )
+        else:
+            step_paddle(
+                self.share_inputs["stop_flags"],
+                self.share_inputs["seq_lens_this_time"],
+                self.share_inputs["step_seq_lens_encoder"],
+                self.share_inputs["seq_lens_encoder"],
+                self.share_inputs["seq_lens_decoder"],
+                self.share_inputs["block_tables"],
+                self.share_inputs["encoder_block_lens"],
+                self.share_inputs["is_block_step"],
+                self.share_inputs["step_block_list"],
+                self.share_inputs["step_lens"],
+                self.share_inputs["recover_block_list"],
+                self.share_inputs["recover_lens"],
+                self.share_inputs["need_block_list"],
+                self.share_inputs["need_block_len"],
+                self.share_inputs["used_list_len"],
+                self.share_inputs["free_list"],
+                self.share_inputs["free_list_len"],
+                self.share_inputs["input_ids"],
+                self.share_inputs["pre_ids"],
+                self.share_inputs["step_idx"],
+                self.share_inputs["next_tokens"],
+                self.share_inputs["first_token_ids"],
+                self.args.block_size,
+                self.args.enc_dec_block_num,
+                0,
+            )
 
     def initialize_engine_ready_check_flag(self):
         """
@@ -592,21 +574,12 @@ class ModelRunner:
         flag_ready_array[self.rank] = 1
 
         flag_array = np.zeros([1], dtype=np.int32)
-<<<<<<< HEAD
-        shm_flag_has_block_step = shared_memory.SharedMemory(
-            name=self.config.get_unique_name("shm_flag_has_block_step")
-        )
-        flag_has_block_step_array = np.ndarray(  # noqa: F841
-            flag_array.shape, dtype=flag_array.dtype, buffer=shm_flag_has_block_step.buf
-        )
-=======
         # shm_flag_has_block_step = shared_memory.SharedMemory(
         #     name=self.config.get_unique_name("shm_flag_has_block_step")
         # )
         # flag_has_block_step_array = np.ndarray(
         #     flag_array.shape, dtype=flag_array.dtype, buffer=shm_flag_has_block_step.buf
         # )
->>>>>>> 1.support speculate complicated args. 2.format serving code
 
         use_custom_health_checker = self.config.use_custom_health_checker
         if use_custom_health_checker:
@@ -620,17 +593,9 @@ class ModelRunner:
                 engine_healthy_recorded_time_array,
             ) = self.initialize_engine_healthy_recorded_time_flag()
             engine_healthy_recorded_time_array[0] = time.time()
-<<<<<<< HEAD
-            infer_live_flag_shm = self.initialize_engine_live_flag()  # noqa: F841
-        infer_seed_increment = paddle.full(shape=[self.args.max_batch_size, 1], fill_value=4, dtype="int64")
-        thread_executor = ThreadPoolExecutor(max_workers=1)  # noqa: F841
-        seq_lens_this_time = None
-=======
             # infer_live_flag_shm = self.initialize_engine_live_flag()
         infer_seed_increment = paddle.full(shape=[self.args.max_batch_size, 1], fill_value=4, dtype="int64")
         # thread_executor = ThreadPoolExecutor(max_workers=1)
-        # seq_lens_this_time = None
->>>>>>> 1.support speculate complicated args. 2.format serving code
         real_bsz = None
 
         while True:
@@ -698,10 +663,6 @@ class ModelRunner:
             else:
                 self.infer_engine.predictor.run()
 
-<<<<<<< HEAD
-            self.infer_engine.predictor.run()
-=======
->>>>>>> 1.support speculate complicated args. 2.format serving code
             self.share_inputs["infer_seed"].add_(infer_seed_increment)
             self.share_inputs["infer_seed"][:] %= self.MAX_INFER_SEED
             if self.free_list_len > 0:
