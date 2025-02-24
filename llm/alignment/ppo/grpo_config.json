@@ -4,7 +4,7 @@
     "ptx_datasets": "alpaca",
     "actor_model_name_or_path": "PKU-Alignment/alpaca-7b-reproduced",
     "reward_model_name_or_path": "PKU-Alignment/alpaca-7b-reproduced",
-    "output_dir": "checkpoints/ernie-bot-ppo",
+    "output_dir": "checkpoints/ppo",
     "use_fusemt": 1,
     "use_flash_attention": 1,
     "max_dec_len": 1024,

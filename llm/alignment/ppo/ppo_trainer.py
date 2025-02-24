@@ -1273,7 +1273,6 @@ class PPOTrainer(Trainer):
                 src = self.tokenizer.batch_decode(inputs["input_ids"], skip_special_tokens=True)
                 tgt = self.tokenizer.batch_decode(inputs["label_ids"], skip_special_tokens=True)
                 response = self.tokenizer.batch_decode(generated_seq[:, prompt_len:], skip_special_tokens=True)
-                # pdb
                 reward_score = self.request_reward_server(src, tgt, response)
 
             reward_score = reward_score.squeeze(axis=-1).cast(paddle.float32)
@@ -2611,7 +2610,6 @@ class PPOTrainer(Trainer):
             reward_score = self.request_reward_server(src, tgt, response)
 
         reward_score = reward_score.squeeze(axis=-1)
-        # reward_score的shape是[1],reward_score的shape是[]
 
         if self.args.rl_algorithm == "grpo":
             return {"rewards": reward_score}
@@ -2660,11 +2658,8 @@ class PPOTrainer(Trainer):
                 reward_score = paddle.empty(shape=[len(response)], dtype=self._model_config.dtype)
             paddle.distributed.barrier(tp_group)
             paddle.distributed.broadcast(reward_score, src=tp_group.ranks[0], group=tp_group)
-            # reward_score =
-            # Tensor(shape=[1], dtype=bfloat16, place=Place(gpu:7), stop_gradient=True,
-            # [0.00000000])
 
-        return reward_score
+        return reward_score.unsqueeze(-1)
 
     @paddle.no_grad()
     def normalize_batch_data(
@@ -2741,10 +2736,6 @@ class PPOTrainer(Trainer):
             sequence_mask = attention_mask[:, 1:].clone()  # length: src + tgt -1
             sequence_mask[:, :start] = False
             if use_tgt_len_value:
-                # pdb
-                print("print log_probs!!!")
-                print(ref_log_probs.shape)
-                print(start)
                 ref_log_probs = ref_log_probs[:, start:].contiguous()
                 old_log_probs = old_log_probs[:, start:].contiguous()
                 if self.args.rl_algorithm == "ppo":
@@ -2858,7 +2849,6 @@ def compute_grpo_advantages(
     id2mean = {}
     id2std = {}
     batch_size = rewards.shape[0]
-    # if rewards.ndim > 0 else 1
 
     for i in range(batch_size):
         id2score[index[i]].append(rewards[i])

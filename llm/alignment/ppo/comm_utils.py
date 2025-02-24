@@ -192,10 +192,6 @@ def reload_tensor_to_gpu(tensors):
         return
 
     # optimizer
-    # print("hello1!!!")
-    # print(type(tensors))
-    # print(len(tensors))
-    # print(tensors[0])
     if "optimizer" in tensors[1]:
         optimizer = tensors[0]
         # offload moment1
@@ -617,7 +613,6 @@ def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
                         ret = distributed_gather(tensor, dst=0, group=tp_group, offload=False)
                         action = tp_actions.pop(key)
                         tensor = action(ret) if is_dst else None
-                        # if is_dst: print("="*20, "gather", key, [t.shape for t in ret], tensor.shape)
                     else:
                         tensor = tensor._copy_to(paddle.CPUPlace(), False) if is_dst else None
 

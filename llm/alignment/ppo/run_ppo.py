@@ -164,7 +164,6 @@ def main():
     runtime_timer.start("Actor model loading time")
 
     # actor model
-    # pdb
     actor_model_config = AutoConfig.from_pretrained(
         model_args.actor_model_name_or_path,
         tensor_parallel_output=training_args.tensor_parallel_output,
