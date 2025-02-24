@@ -1,4 +1,4 @@
-# Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
+# = paddle.topk(tmp_scores, k=k, axis=-1, sorted=Trui Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -231,11 +231,21 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         # less than the expert capacity. One-hot matrix will ignore indices outside
         # the range [0, expert_capacity).
         # Shape: [tokens_per_group, num_experts, expert_capacity].
-        valid_mask = paddle.logical_and(token_priority >= 0, token_priority < capacity)
+        valid_mask = paddle.logical_and(token_priority >= 0, token_priority < capacity).astype(paddle.bool)
         token_priority = paddle.masked_fill(token_priority, ~valid_mask, 0)
-        dispatch_mask = F.one_hot(token_priority, capacity).cast(paddle.int32)
+        dispatch_mask = F.one_hot(token_priority, capacity).cast(paddle.bool)
         valid_mask = valid_mask.unsqueeze(-1).expand(valid_mask.shape + [capacity])
-        dispatch_mask = paddle.masked_fill(dispatch_mask, ~valid_mask, 0)
+        # p = paddle.topk(tmp_scores, k=k, axis=-1, sorted=Truirint('1', valid_mask)
+        # print('2', ~valid_mask)
+        # print('3', dispatch_mask)
+        # dispatch_mask = paddle.masked_fill(dispatch_mask, ~valid_mask, 0)
+        dispatch_mask = dispatch_mask * (~valid_mask)
+
+        # valid_mask = paddle.logical_and(token_priority >= 0, token_priority < capacity)
+        # token_priority = paddle.masked_fill(token_priority, ~valid_mask, 0)
+        # dispatch_mask = F.one_hot(token_priority, capacity).cast(paddle.int32)
+        # valid_mask = valid_mask.unsqueeze(-1).expand(valid_mask.shape + [capacity])
+        # dispatch_mask = paddle.masked_fill(dispatch_mask, ~valid_mask, 0)
 
         return dispatch_mask
 
@@ -276,13 +286,13 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         assert n_experts % n_group == 0, "n_experts must be divisible by n_groups"
 
         group_scores = scores.reshape([0, n_group, -1]).max(axis=-1)  # [n, n_group]
-        group_idx = paddle.topk(group_scores, k=topk_group, axis=-1, sorted=False)[1]  # [n, top_k_group]
+        group_idx = paddle.topk(group_scores, k=topk_group, axis=-1, sorted=True)[1]  # [n, top_k_group]
         group_mask = paddle.zeros_like(group_scores).put_along_axis(group_idx, paddle.to_tensor(1.0), axis=-1)  # fmt:skip
         score_mask = (
             group_mask.unsqueeze(-1).expand([bsz_seq_len, n_group, n_experts // n_group]).reshape([bsz_seq_len, -1])
         )  # [n, e]
         tmp_scores = scores * score_mask  # [n, e]
-        topk_weight, topk_idx = paddle.topk(tmp_scores, k=k, axis=-1, sorted=False)
+        topk_weight, topk_idx = paddle.topk(tmp_scores, k=k, axis=-1, sorted=True)
 
         return topk_weight, topk_idx
 
@@ -312,13 +322,13 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         group_scores = (
             scores_for_choice.reshape([bsz_seq_len, self.n_group, -1]).topk(2, axis=-1)[0].sum(axis=-1)
         )  # fmt:skip [n, n_group]
-        group_idx = paddle.topk(group_scores, k=topk_group, axis=-1, sorted=False)[1]  # [n, top_k_group]
+        group_idx = paddle.topk(group_scores, k=topk_group, axis=-1, sorted=True)[1]  # [n, top_k_group]
         group_mask = paddle.zeros_like(group_scores).put_along_axis(group_idx, paddle.to_tensor(1.0), axis=-1)  # fmt:skip
         score_mask = (
             group_mask.unsqueeze(-1).expand([bsz_seq_len, n_group, n_experts // n_group]).reshape([bsz_seq_len, -1])
         )  # [n, e]
         tmp_scores = scores_for_choice * score_mask  # [n, e]
-        topk_weight, topk_idx = paddle.topk(tmp_scores, k=k, axis=-1, sorted=False)
+        topk_weight, topk_idx = paddle.topk(tmp_scores, k=k, axis=-1, sorted=True)
         topk_weight = scores.take_along_axis(topk_idx, axis=1) if not self.training else topk_weight
 
         return topk_weight, topk_idx
@@ -545,6 +555,11 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
                 "se,sec->sec", topk_masked_gates, token_priority.cast(paddle.get_default_dtype())
             )
 
-        dispatch_mask = combine_weights.cast(paddle.bool)
+        # print(gates_masked)
+        # gates_masked = gates_masked.astype("bool").unsqueeze(-1).expand(gates_masked.shape + token_priority.shape[-1:])
+        # print(gates_masked)
+        combine_weights = paddle.einsum("se,sec->sec", gates_masked, token_priority.cast(paddle.get_default_dtype()))
+        # combine_weights = gates_masked * token_priority
+        dispatch_mask = combine_weights.astype(paddle.bool)
 
         return capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss

@@ -215,8 +215,10 @@ class MoELayer(nn.Layer):
         assert len(chunks) == len(true_experts), (len(chunks), len(true_experts))
         for chunk, expert in zip(chunks, true_experts):
             chunk = chunk.contiguous()
+            print("11", chunk.shape)  # [ecm]
             expert_outputs += [expert(chunk)]
         expert_output = paddle.stack(expert_outputs, axis=1)  # [ecm]
+        print("22", expert_output.shape)  # [ecm]
         return expert_output
 
     def forward(
@@ -248,11 +250,13 @@ class MoELayer(nn.Layer):
         # dispatch_mask    : sec
         # self.exp_counts  :
         dispatched_input = paddle.einsum("sec,sm->ecm", paddle.cast(dispatch_mask, hidden_state.dtype), reshaped_input)
+        # dispatched_input = paddle.masked_fill_(reshaped_input, dispatch_mask)
 
         if self.expert_parallel_degree > 1:
+            print(dispatched_input, self.moe_group)
             dispatched_input = _AllToAll.apply(dispatched_input, self.moe_group)
-
         # Re-shape after all-to-all: ecm -> gecm
+        print(dispatched_input.shape)
         dispatched_input = dispatched_input.reshape(
             [self.expert_parallel_degree, self.moe_num_experts_per_device, -1, d_model]
         )

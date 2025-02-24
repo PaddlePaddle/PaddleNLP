@@ -32,7 +32,7 @@ import paddle.nn.functional as F
 from paddle import Tensor, nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
-from paddle.distributed.fleet.utils import recompute
+from paddle.distributed.fleet.recompute.recompute import recompute
 from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 
 try:
@@ -691,7 +691,9 @@ class MoEGate(PretrainedMoEGate):
         _, h_dim = hidden_states.shape
 
         # compute gating score
+        print("linear input: ", hidden_states._md5sum())
         logits = F.linear(hidden_states, self.weight, None)
+        print("linear output: ", logits._md5sum())
 
         with paddle.amp.auto_cast(False):
             scores = self.gate_score_func(logits=logits)
@@ -831,16 +833,16 @@ class DeepseekV2Attention(nn.Layer):
             else:
                 self.q_a_proj = nn.Linear(self.hidden_size, config.q_lora_rank, bias_attr=config.attention_bias)
                 self.q_a_layernorm = DeepseekV2RMSNorm(config=config, hidden_size=config.q_lora_rank, use_sequence_parallel=False)
-                self.q_b_proj = ColumnParallelLinear(config.q_lora_rank, self.num_heads * self.q_head_dim, has_bias=False, gather_output=False)
+                self.q_b_proj = ColumnParallelLinear(config.q_lora_rank, self.num_heads * self.q_head_dim, has_bias=False, gather_output=True)
 
             self.kv_a_proj_with_mqa = nn.Linear(self.hidden_size, config.kv_lora_rank + config.qk_rope_head_dim, bias_attr=config.attention_bias)
             self.kv_a_layernorm = DeepseekV2RMSNorm(config=config, hidden_size=config.kv_lora_rank, use_sequence_parallel=False)
-            self.kv_b_proj = ColumnParallelLinear(config.kv_lora_rank, self.num_heads * (self.q_head_dim - self.qk_rope_head_dim + self.v_head_dim), has_bias=False, gather_output=False)
+            self.kv_b_proj = ColumnParallelLinear(config.kv_lora_rank, self.num_heads * (self.q_head_dim - self.qk_rope_head_dim + self.v_head_dim), has_bias=False, gather_output=True)
 
-            self.o_proj = RowParallelLinear(self.num_heads * self.v_head_dim, self.hidden_size, has_bias=config.attention_bias, input_is_parallel=True)
+            self.o_proj = RowParallelLinear(self.num_heads * self.v_head_dim, self.hidden_size, has_bias=config.attention_bias, input_is_parallel=False)
 
             assert self.num_heads % config.tensor_parallel_degree == 0, f"num_heads: {self.num_heads}, tensor_parallel_degree: {config.tensor_parallel_degree}"
-            self.num_heads = self.num_heads // config.tensor_parallel_degree
+            # self.num_heads = self.num_heads // config.tensor_parallel_degree
 
         else:
             # for without tensor parallel
@@ -941,12 +943,20 @@ class DeepseekV2Attention(nn.Layer):
         if self.q_lora_rank is None:
             q = self.q_proj(hidden_states)
         else:
+            print("qa input: ", hidden_states._md5sum())
+            print("qa weight: ", self.q_a_proj.weight._md5sum())
             q = self.q_b_proj(self.q_a_layernorm(self.q_a_proj(hidden_states)))
+        print("qb weight shape: ", self.q_b_proj.weight.shape)
+        print("qb weight reshape: ", [bsz, q_len, self.num_heads, self.q_head_dim])
+        print("q output shape: ", q.shape)
+        print(self.q_a_proj, self.q_b_proj)
         q = q.reshape([bsz, q_len, self.num_heads, self.q_head_dim])
         q_nope, q_pe = paddle.split(q, [self.qk_nope_head_dim, self.qk_rope_head_dim], axis=-1)
 
         # DeepSeekV2 kv_lora_rank+qk_rope_head_dim=512+64
+        print("kva weight: ", self.kv_a_proj_with_mqa.weight._md5sum())
         compressed_kv = self.kv_a_proj_with_mqa(hidden_states)
+        print(self.kv_a_proj_with_mqa, self.kv_b_proj)
         compressed_kv, k_pe = paddle.split(compressed_kv, [self.kv_lora_rank, self.qk_rope_head_dim], axis=-1)
         k_pe = k_pe.reshape([bsz, q_len, 1, self.qk_rope_head_dim])
 
@@ -1022,11 +1032,23 @@ class DeepseekV2Attention(nn.Layer):
         # if sequence_parallel is true, out shape are [q_len / n, bs, num_head * head_dim]
         # else their shape are [bs, q_len, num_head * head_dim], n is mp parallelism.
         attn_output = self.o_proj(attn_output)
+        print("o ouput: ", attn_output._md5sum())
 
         if not output_attentions:
             attn_weights = None
 
-        return attn_output, attn_weights, past_key_value
+        outputs = (attn_output,)
+
+        if output_attentions:
+            outputs += (attn_weights,)
+
+        if use_cache:
+            outputs += (past_key_value,)
+
+        if type(outputs) is tuple and len(outputs) == 1:
+            outputs = outputs[0]
+
+        return outputs
 
 
 class DeepseekV2DecoderLayer(nn.Layer):
@@ -1095,7 +1117,7 @@ class DeepseekV2DecoderLayer(nn.Layer):
             and has_gradient
             and self.recompute_granularity == "full_attn"
         ):
-            hidden_states, self_attn_weights, present_key_value = recompute(
+            outputs = recompute(
                 self.self_attn,
                 hidden_states=hidden_states,
                 position_ids=position_ids,
@@ -1107,7 +1129,7 @@ class DeepseekV2DecoderLayer(nn.Layer):
                 **kwargs,
             )
         else:
-            hidden_states, self_attn_weights, present_key_value = self.self_attn(
+            outputs = self.self_attn(
                 hidden_states=hidden_states,
                 position_ids=position_ids,
                 attention_mask=attention_mask,
@@ -1117,6 +1139,18 @@ class DeepseekV2DecoderLayer(nn.Layer):
                 attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                 **kwargs,
             )
+
+        if type(outputs) is tuple:
+            hidden_states = outputs[0]
+        else:
+            hidden_states = outputs
+
+        if output_attentions:
+            self_attn_weights = outputs[1]
+
+        if use_cache:
+            present_key_value = outputs[2 if output_attentions else 1]
+
         hidden_states = residual + hidden_states
 
         # Fully Connected
@@ -1676,6 +1710,15 @@ class DeepseekV2LMHead(nn.Layer):
         )
         # Must set distributed attr for Tensor Parallel !
         self.weight.is_distributed = True if (vocab_size != config.vocab_size) else False
+        if get_env_device() == "xpu":
+            try:
+                from paddle_xpu.layers.nn import (  # noqa: F401
+                    parallel_matmul as xpu_parallel_matmul,
+                )
+
+                self.xpu_parallel_matmul = xpu_parallel_matmul()
+            except ImportError:
+                self.xpu_parallel_matmul = None
 
     def forward(self, hidden_states, tensor_parallel_output=None):
         if self.config.sequence_parallel:
@@ -1686,7 +1729,16 @@ class DeepseekV2LMHead(nn.Layer):
         if tensor_parallel_output is None:
             tensor_parallel_output = self.config.tensor_parallel_output
 
-        logits = parallel_matmul(hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output)
+        if get_env_device() == "xpu" and self.xpu_parallel_matmul is not None:
+            logits = self.xpu_parallel_matmul(
+                hidden_states,
+                self.weight,
+                transpose_y=False,
+                tensor_parallel_output=tensor_parallel_output,
+                training=self.training,
+            )
+        else:
+            logits = parallel_matmul(hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output)
         return logits
 
 
