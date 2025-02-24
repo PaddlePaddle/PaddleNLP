@@ -22,7 +22,6 @@ from typing import List, Optional
 import numpy as np
 import paddle
 import paddle.distributed as dist
-import paddle.distributed.fleet.base.topology as tp
 import paddle.incubate.multiprocessing as mp
 from paddle.distributed import fleet
 from sklearn.metrics import accuracy_score
@@ -746,7 +745,7 @@ def get_rotary_position_embedding(position_ids, head_dim, rope_theta=10000.0, ro
 def init_dist_env():
     """
     Initialize the distributed environment and obtain tensor parallel degree and rank.
-    
+
     Returns:
         tuple: A tuple containing tensor parallel rank and degree.
     """

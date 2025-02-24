@@ -672,7 +672,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
 
         self.gradient_checkpointing = False
 
-        self._weights_initialized = False 
+        self._weights_initialized = False
 
     def set_transformer_block(self, transformer_config):
         if self.use_weight_only:
