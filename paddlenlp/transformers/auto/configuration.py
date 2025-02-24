@@ -213,6 +213,14 @@ MODEL_NAMES_MAPPING = OrderedDict(
     ]
 )
 
+MULTI_MODELS_MAPPING = OrderedDict(
+    # multi models mapping
+    [
+        ("qwen2_vl", "qwen2"),
+        ("qwen2_5_vl", "qwen2"),
+    ]
+)
+
 
 def config_class_to_model_type(config):
     """Converts a config class name to the corresponding model type"""
@@ -238,8 +246,9 @@ class _LazyConfigMapping(OrderedDict):
 
     def __getitem__(self, key):
         # NOTE: (changwenbin) This is to enable the qwen2_vl language model to use qwen2 reasoning optimization
-        if key == "qwen2_vl":
-            key = "qwen2"
+        for model_type, model_key in MULTI_MODELS_MAPPING.items():
+            if key == model_type:
+                key = model_key
         if key in self._extra_content:
             return self._extra_content[key]
         if key not in self._mapping:

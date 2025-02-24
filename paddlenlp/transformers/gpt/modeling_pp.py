@@ -167,6 +167,9 @@ class GPTForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     pretrained_init_configuration = GPTPretrainedModel.pretrained_init_configuration
     pretrained_resource_files_map = GPTPretrainedModel.pretrained_resource_files_map
 
+    _get_model_flops = GPTPretrainedModel._get_model_flops
+    _get_hardware_flops = GPTPretrainedModel._get_hardware_flops
+
     # NO base_model_prefix !!!!
 
     def __init__(

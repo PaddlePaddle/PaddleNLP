@@ -143,11 +143,8 @@ from .deberta.tokenizer import *
 from .deberta_v2.configuration import *
 from .deberta_v2.modeling import *
 from .deberta_v2.tokenizer import *
-from .deepseek_v2.configuration import *
-from .deepseek_v2.modeling import *
-from .deepseek_v2.tokenizer_fast import *
-from .deepseek_v3.configuration import *
-from .deepseek_v3.modeling import *
+from .deepseek_v2 import *
+from .deepseek_v3 import *
 from .distilbert.configuration import *
 from .distilbert.modeling import *
 from .distilbert.tokenizer import *
@@ -215,6 +212,7 @@ from .layoutxlm.configuration import *
 from .layoutxlm.modeling import *
 from .layoutxlm.tokenizer import *
 from .llama import *
+from .llm_embed.modeling import *
 from .luke.configuration import *
 from .luke.modeling import *
 from .luke.tokenizer import *
@@ -246,6 +244,7 @@ from .mt5.modeling import *
 from .nezha.configuration import *
 from .nezha.modeling import *
 from .nezha.tokenizer import *
+from .nv_embed.modeling import *
 from .nystromformer.configuration import *
 from .nystromformer.modeling import *
 from .nystromformer.tokenizer import *

@@ -822,12 +822,16 @@ class AutoInferenceModelForCausalLM(_BaseAutoModelClass):
         tensor_parallel_degree = kwargs.pop("tensor_parallel_degree", 1)
         tensor_parallel_rank = kwargs.pop("tensor_parallel_rank", 0)
         model_arg = kwargs.pop("model_args", None)
-        is_eagle = kwargs.pop("is_eagle", False)
-        eagle_flag = ""
+        spec_model_type = kwargs.pop("spec_model_type", "None")
+        spec_flag = ""
 
         # Check whether the model_type is img2txt in inference mode
-        if is_eagle:
-            eagle_flag = "Eagle"
+        if spec_model_type == "eagle":
+            spec_flag = "Eagle"
+            attn_type = "Block"
+            model_name = f"{config.architectures[0]}{attn_type}"
+        elif spec_model_type == "mtp":
+            spec_flag = "MTP"
             attn_type = "Block"
             model_name = f"{config.architectures[0]}{attn_type}"
         else:
@@ -849,7 +853,7 @@ class AutoInferenceModelForCausalLM(_BaseAutoModelClass):
         # Import the InferenceModel
         import_class = importlib.import_module(f"paddlenlp.experimental.transformers.{config.model_type}.modeling")
 
-        model_class_name = f"{eagle_flag}{model_name}InferenceModel"
+        model_class_name = f"{spec_flag}{model_name}InferenceModel"
         model_class = getattr(import_class, model_class_name)
 
         # It may return a new model class, like LlamaForCausalLMAvxInferenceModel

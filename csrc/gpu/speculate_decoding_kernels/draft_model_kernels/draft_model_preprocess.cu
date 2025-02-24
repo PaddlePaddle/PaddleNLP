@@ -128,7 +128,7 @@ void DraftModelPreprocess(const paddle::Tensor& draft_tokens,
                           const paddle::Tensor& base_model_stop_flags,
                           const paddle::Tensor& base_model_draft_tokens,
                           const int max_draft_token,
-                          const std::string& draft_type) {
+                          const bool truncate_first_token) {
   int real_bsz = seq_lens_this_time.shape()[0];
   int accept_tokens_len = accept_tokens.shape()[1];
   int input_ids_len = input_ids.shape()[1];
@@ -140,7 +140,7 @@ void DraftModelPreprocess(const paddle::Tensor& draft_tokens,
       not_need_stop.copy_to(seq_lens_this_time.place(), false);
 
 
-  if (draft_type == "eagle") {
+  if (truncate_first_token) {
     draft_model_preprocess_kernel<BlockSize, true>
         <<<1, BlockSize, 0, cu_stream>>>(
             const_cast<int64_t*>(draft_tokens.data<int64_t>()),
@@ -226,7 +226,7 @@ PD_BUILD_OP(draft_model_preprocess)
               "step_idx_out",
               "not_need_stop_out",
               "first_token_record_out"})
-    .Attrs({"max_draft_token: int", "draft_type: std::string"})
+    .Attrs({"max_draft_token: int", "truncate_first_token: bool"})
     .SetInplaceMap({{"draft_tokens", "draft_tokens_out"},
                     {"input_ids", "input_ids_out"},
                     {"stop_flags", "stop_flags_out"},

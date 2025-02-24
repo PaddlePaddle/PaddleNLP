@@ -188,7 +188,7 @@ class LlamaAvxInferenceModel(LlamaPretrainedModel):
             embed_dim=self.hidden_size,
             num_heads=self.num_attention_heads,
             kv_num_heads=self.num_layers,
-            dim_feedforward=self.intermediate_size,
+            intermediate_size=self.intermediate_size,
             activation="silu",
             num_layers=self.num_layers,
             ln_scale_attrs=ln_scale_attrs,
@@ -616,7 +616,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             embed_dim=self.hidden_size,
             num_heads=self.num_attention_heads,
             kv_num_heads=self.num_key_value_heads,
-            dim_feedforward=self.intermediate_size,
+            intermediate_size=self.intermediate_size,
             quant_type=self.quant_type,
             activation="swiglu",
             num_layers=config.num_hidden_layers,
@@ -1431,6 +1431,7 @@ class LlamaBlockInferenceModel(LlamaInferenceModel):
         kwargs["cu_seqlens_k"] = cu_seqlens_k
         kwargs["padding_offsets"] = padding_offset
         kwargs["max_input_length"] = self.max_seq_len
+        kwargs["block_size"] = self.block_size
 
         inputs_embeds = self.embed_tokens(ids_remove_padding)
 

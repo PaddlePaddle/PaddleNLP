@@ -19,6 +19,8 @@ import subprocess
 import paddle
 from paddle.utils.cpp_extension import CUDAExtension, setup
 
+sm_version = int(os.getenv("CUDA_SM_VERSION", "0"))
+
 
 def update_git_submodule():
     try:
@@ -38,9 +40,12 @@ def find_end_files(directory, end_str):
 
 
 def get_sm_version():
-    prop = paddle.device.cuda.get_device_properties()
-    cc = prop.major * 10 + prop.minor
-    return cc
+    if sm_version > 0:
+        return sm_version
+    else:
+        prop = paddle.device.cuda.get_device_properties()
+        cc = prop.major * 10 + prop.minor
+        return cc
 
 
 def strtobool(v):
@@ -77,8 +82,6 @@ def get_gencode_flags():
 gencode_flags = get_gencode_flags()
 library_path = os.environ.get("LD_LIBRARY_PATH", "/usr/local/cuda/lib64")
 
-sm_version = get_sm_version()
-
 sources = [
     "./gpu/save_with_output.cc",
     "./gpu/set_value_by_flags.cu",
@@ -103,6 +106,8 @@ sources = [
     "./gpu/step.cu",
     "./gpu/quant_int8.cu",
     "./gpu/dequant_int8.cu",
+    "./gpu/get_position_ids.cu",
+    "./gpu/fused_rotary_position_encoding.cu",
     "./gpu/flash_attn_bwd.cc",
     "./gpu/tune_cublaslt_gemm.cu",
     "./gpu/sample_kernels/top_p_sampling_reject.cu",
@@ -174,8 +179,9 @@ if cc >= 90 and cuda_version >= 12.0:
         "gpu/fp8_gemm_with_cutlass/fp8_fp8_fp8_dual_gemm.cu",
     ]
 
+ops_name = f"paddlenlp_ops_{sm_version}" if sm_version != 0 else "paddlenlp_ops"
 setup(
-    name="paddlenlp_ops",
+    name=ops_name,
     ext_modules=CUDAExtension(
         sources=sources,
         extra_compile_args={"cxx": ["-O3"], "nvcc": nvcc_compile_args},

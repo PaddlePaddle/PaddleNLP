@@ -110,7 +110,7 @@ class GenerationInferenceModel(GenerationMixin):
             input_spec[16] = paddle.static.InputSpec(shape=[None, 2, 1], dtype="int64", name="tgt_pos")  # tgt_pos
         elif self.config["model_type"] and "gpt" in self.config.model_type:
             input_spec[2] = paddle.static.InputSpec(shape=[None], dtype="int64", name="position_ids")  # position_ids
-        model = paddle.jit.to_static(self.generate, input_spec=input_spec)
+        model = paddle.jit.to_static(self.generate, input_spec=input_spec, full_graph=True)
         paddle.jit.save(
             model, output_path, skip_prune_program=True
         )  # Note(Zhengzekang): If we prune program it may cause some inference error.
@@ -539,7 +539,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
             ]
             input_spec.extend(speculate_spec)
 
-        model = paddle.jit.to_static(self.generate, input_spec=input_spec)
+        model = paddle.jit.to_static(self.generate, input_spec=input_spec, full_graph=True)
         paddle.jit.save(
             model, output_path, skip_prune_program=True
         )  # Note(Zhengzekang): If we prune program it may cause some inference error.
@@ -735,23 +735,24 @@ class GenerationBlockInferenceModel(GenerationMixin):
             if self.config.tensor_parallel_degree > 1:
                 paddle.distributed.broadcast(next_tokens, 0)
 
-            from paddlenlp_ops import update_inputs_v2
+            with paddle.base.framework._stride_in_no_check_dy2st_diff():
+                from paddlenlp_ops import update_inputs_v2
 
-            update_inputs_v2(
-                model_kwargs["stop_flags"],
-                model_kwargs["step_idx"],
-                model_kwargs["not_need_stop"],
-                model_kwargs["seq_lens_this_time"],
-                model_kwargs["seq_lens_encoder"],
-                model_kwargs["seq_lens_decoder"],
-                model_kwargs["max_dec_len"],
-                model_kwargs["input_ids"],
-                model_kwargs["stop_nums"],
-                next_tokens,
-                model_kwargs["is_block_step"],
-                eos_token_id,
-                model_kwargs["next_tokens"],
-            )
+                update_inputs_v2(
+                    model_kwargs["stop_flags"],
+                    model_kwargs["step_idx"],
+                    model_kwargs["not_need_stop"],
+                    model_kwargs["seq_lens_this_time"],
+                    model_kwargs["seq_lens_encoder"],
+                    model_kwargs["seq_lens_decoder"],
+                    model_kwargs["max_dec_len"],
+                    model_kwargs["input_ids"],
+                    model_kwargs["stop_nums"],
+                    next_tokens,
+                    model_kwargs["is_block_step"],
+                    eos_token_id,
+                    model_kwargs["next_tokens"],
+                )
 
             from paddlenlp_ops import save_output
 
@@ -830,28 +831,26 @@ class GenerationBlockInferenceModel(GenerationMixin):
             probs = F.softmax(logits)
 
             from paddlenlp_ops import (
+                speculate_clear_accept_nums,
                 speculate_save_output,
                 speculate_set_value_by_flags_and_idx,
-                speculate_verify_and_update,
+                speculate_update,
+                speculate_verify,
                 top_p_candidates,
             )
 
             verify_scores, verify_tokens, actual_candidate_len = top_p_candidates(
                 probs, top_p, model_kwargs["output_padding_offset"], self.max_candidate_len, self.max_seq_len
-            )  # [token_num, max_candidate_len]
+            )
 
-            # Speculate Verify And Update
-            speculate_verify_and_update(
+            speculate_verify(
                 model_kwargs["accept_tokens"],
                 model_kwargs["accept_num"],
                 model_kwargs["step_idx"],
+                model_kwargs["stop_flags"],
                 model_kwargs["seq_lens_encoder"],
                 model_kwargs["seq_lens_decoder"],
-                model_kwargs["stop_flags"],
-                model_kwargs["not_need_stop"],
-                model_kwargs[
-                    "draft_tokens"
-                ],  # Both input and output, need to write the last 1 token accepted to position 0.
+                model_kwargs["draft_tokens"],  # 既是输入又是输出，需要把接收的最后1个token写入到第0个位置
                 model_kwargs["seq_lens_this_time"],
                 verify_tokens,
                 verify_scores,
@@ -867,6 +866,25 @@ class GenerationBlockInferenceModel(GenerationMixin):
                 True,  # enable_topp
             )
 
+            if self.config.tensor_parallel_degree > 1:
+                paddle.distributed.broadcast(model_kwargs["accept_tokens"], 0)
+                paddle.distributed.broadcast(model_kwargs["accept_num"], 0)
+                paddle.distributed.broadcast(model_kwargs["step_idx"], 0)
+                paddle.distributed.broadcast(model_kwargs["stop_flags"], 0)
+
+            speculate_update(
+                model_kwargs["seq_lens_encoder"],
+                model_kwargs["seq_lens_decoder"],
+                model_kwargs["not_need_stop"],
+                model_kwargs["draft_tokens"],
+                model_kwargs["actual_draft_token_num"],
+                model_kwargs["accept_tokens"],
+                model_kwargs["accept_num"],
+                model_kwargs["stop_flags"],
+                model_kwargs["seq_lens_this_time"],
+                model_kwargs["is_block_step"],
+            )
+
             speculate_save_output(
                 model_kwargs["accept_tokens"],
                 model_kwargs["accept_num"],
@@ -875,7 +893,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
             )
 
             # If seq_lens_decoder is 0 (means stop), accept_num should be set to 0
-            model_kwargs["accept_num"][model_kwargs["seq_lens_decoder"] == 0] = 0
+            speculate_clear_accept_nums(model_kwargs["accept_num"], model_kwargs["seq_lens_decoder"])
 
             # Update pre_ids through accept tokens
             speculate_set_value_by_flags_and_idx(
@@ -1016,7 +1034,7 @@ class GenerationAvxInferenceModel(GenerationMixin):
             config.get("logits_processors", None),
             None,
         ]
-        model = paddle.jit.to_static(self.generate, input_spec=input_spec)
+        model = paddle.jit.to_static(self.generate, input_spec=input_spec, full_graph=True)
         paddle.jit.save(
             model, output_path, skip_prune_program=True
         )  # Note(Zhengzekang): If we prune program it may cause some inference error.

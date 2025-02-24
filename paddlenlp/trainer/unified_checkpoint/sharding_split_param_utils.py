@@ -305,7 +305,11 @@ def load_unified_optimizer_split_param(args, model, optimizer, resume_from_check
                     )
                 )
         if has_master_weights:
-            key_name = "_".join([static_name, FP32_MASTER, key_name[1]])
+            if model_state_dict[key_name[0]].dtype != paddle.float32:
+                key_name = "_".join([static_name, FP32_MASTER, key_name[1]])
+            else:
+                # for parameters with float32 dtype, no need to have fp32 master weights.
+                key_name = "_".join([static_name, key_name[1]])
         else:
             key_name = "_".join([static_name, key_name[1]])
 
