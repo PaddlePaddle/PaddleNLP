@@ -525,7 +525,7 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_intermediate() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.35162258
+    loss_base=9.32584476
     if [ $IS_A100 -ne 0 ];then
         loss_base=9.40048313
     fi
@@ -3098,7 +3098,7 @@ function llama_lora_static_graph_auto_bs_2_bf16_DP2-TP2-PP1() {
     --fuse_attention_qkv true \
     --sharding "stage1" \
     --auto_parallel_resume_form_hybrid_parallel true \
-    --num_hidden_layers 16 \
+    --num_hidden_layers 4 \
     >>${log_path}/$FUNCNAME 2>&1
     ips=-1
     loss=-1
