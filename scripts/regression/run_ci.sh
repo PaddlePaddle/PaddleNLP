@@ -217,9 +217,9 @@ if [[ ${#Build_list[*]} -ne 0 ]];then
     cd PaddleNLP_dev && git submodule update --init --recursive
     cd /workspace && tar -zcf PaddleNLP.tar.gz PaddleNLP_dev/
     mv PaddleNLP.tar.gz ${PPNLP_HOME}/upload
-    cd ${PPNLP_HOME}
-    python upload.py ${PPNLP_HOME}/upload 'paddlenlp/wheels'
-    rm -rf upload/*
+    # cd ${PPNLP_HOME}
+    # python upload.py ${PPNLP_HOME}/upload 'paddlenlp/wheels'
+    # rm -rf upload/*
 else
    echo -e "\033[32m Don't need build whl  \033[0m"
 fi
@@ -234,7 +234,7 @@ if [[ ${#P0case_list[*]} -ne 0 ]] || [[ ${#APIcase_list[*]} -ne 0 ]];then
         install_paddle
         echo "install_nlp_develop"
         wget https://paddlenlp.bj.bcebos.com/wheels/paddlenlp-ci-py3-none-any.whl
-        python -m pip install --user paddlenlp-ci-py3-none-any.whl
+        python -m pip install --user paddlenlp-ci-py3-none-any.whl --no-cache-dir
     else
         echo "instal_nlp_pr"
         python -m pip install  dist/p****.whl

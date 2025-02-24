@@ -60,6 +60,12 @@ print_info() {
     else
         tail -n 1 ${log_path}/$2.log
         echo -e "\033[32m ${log_path}/$2_SUCCESS \033[0m"
+        if [ -e "${PPNLP_HOME}/upload" ] && [ "$(ls -A "${PPNLP_HOME}/upload")" ]; then
+            cd ${PPNLP_HOME} && ls -A "${PPNLP_HOME}/upload"
+            python upload.py ${PPNLP_HOME}/upload 'paddlenlp/wheels'
+            rm -rf upload/*
+            echo -e "\033[32m upload wheels SUCCESS \033[0m"
+        fi
     fi
 }
 # case list
@@ -561,13 +567,10 @@ llm(){
         cd ${nlp_dir}/csrc
         # python setup_cuda.py install
         bash tools/build_wheel.sh python3.10 80
-        cp ./dist/p****.whl ${PPNLP_HOME}/upload/
-        cd ${PPNLP_HOME}
-        python upload.py ${PPNLP_HOME}/upload 'paddlenlp/wheels'
-        rm -rf upload/*
+        cp ${nlp_dir}/csrc/dist/p****.whl ${PPNLP_HOME}/upload/
     else
         echo "No modifications in csrc, installing paddlenlp_ops wheel file..."
-        python -m pip install https://paddlenlp.bj.bcebos.com/wheels/paddlenlp_ops-0.0.0-py3-none-any.whl
+        python -m pip install --pre --upgrade paddlenlp_ops -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html --no-cache-dir
     fi
 
     sleep 5

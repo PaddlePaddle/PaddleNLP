@@ -37,6 +37,13 @@ def read_version():
     """
     read version and return content
     """
+    VERSION = "3.0.0b3.post"
+    if os.getenv(PADDLENLP_STABLE_VERSION):
+        VERSION = VERSION.replace(".post", "")
+    else:
+        formatted_date = datetime.now().date().strftime("%Y%m%d")
+        VERSION = VERSION.replace(".post", ".post{}".format(formatted_date))
+
     return VERSION
 
 
@@ -50,7 +57,7 @@ def read_readme():
 setup(
     name="paddlenlp_ops",
     packages=find_packages(),
-    version="0.0.0",
+    version=read_version(),
     author="Paddle Infernce Team",
     author_email="paddle-inference@baidu.com",
     description=description,
