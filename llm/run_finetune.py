@@ -440,7 +440,6 @@ def main():
     trainer.set_optimizer_grouped_parameters(trainable_parameters)
 
     # Train
-    print(trainer.model)
     if training_args.do_train:
         checkpoint = None
         if training_args.resume_from_checkpoint is not None:

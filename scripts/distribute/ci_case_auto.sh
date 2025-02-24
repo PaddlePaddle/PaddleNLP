@@ -3048,7 +3048,9 @@ function llama_lora_static_graph_auto_bs_2_bf16_DP2-TP2-PP1() {
     case_log_dir="output/$task_name""_log"
     
     rm -rf output/$task_name/
-    rm -rf "log/$task_name""_log"
+
+    ls -la ./
+    ehco $PWD
 
     python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3" \
