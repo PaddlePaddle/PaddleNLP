@@ -21,6 +21,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 
 from ..utils.log import logger
+from .auto_utils import einsum
 
 
 class MoEGateMixin:
@@ -90,7 +91,6 @@ class MoEGateMixin:
         # gates has shape of SE
         num_tokens = gates.shape[0]
         num_experts = gates.shape[1]
-        print(f"==== num_tokens:{num_tokens}, num_experts:{num_experts} ====")
         capacity = int((num_tokens // num_experts) * capacity_factor)
         if capacity < min_capacity:
             capacity = min_capacity
@@ -125,6 +125,22 @@ class MoEGateMixin:
             me = paddle.stack(me_list).mean(0)
             ce = paddle.stack(ce_list).mean(0)
         aux_loss = paddle.sum(me * ce) * float(self.num_experts)
+        return aux_loss
+
+    def _cal_seq_aux_loss(self, gates, top_k, topk_idx) -> paddle.Tensor:
+        """
+        Calculate sequence auxiliary loss.
+        Args:
+            logits (paddle.Tensor): Model output.
+        Returns:
+            paddle.Tensor: The value of sequence auxiliary loss.
+        """
+        batch_size, seq_len, _ = gates.shape
+        ce = paddle.zeros([batch_size, self.num_experts])
+        topk_idx = topk_idx.reshape([batch_size, -1])
+        ce.put_along_axis_(indices=topk_idx, values=paddle.ones([batch_size, seq_len * top_k]), axis=1)
+        ce = ce / (seq_len * top_k / self.num_experts)
+        aux_loss = (ce * paddle.mean(gates, axis=1)).sum(axis=1).mean()
         return aux_loss
 
     def _cal_z_loss(self, logits) -> paddle.Tensor:
@@ -478,6 +494,10 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         gates: paddle.Tensor,
     ) -> Tuple[int, paddle.Tensor, paddle.Tensor, paddle.Tensor, paddle.Tensor, paddle.Tensor]:
         """Implements TopKGating on logits."""
+        batch_size, seq_len, d_model = gates.shape
+        gates_ori = gates
+        gates = gates.reshape([-1, d_model])
+
         l_zloss = self._cal_z_loss(gates)
 
         # get topk gates
@@ -500,7 +520,10 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
 
         # get topk mask
         mask = paddle.zeros_like(gates).put_along_axis(top_idx, paddle.to_tensor(1.0), axis=1)
-        l_aux = self._cal_aux_loss(gates, mask)
+        if self.config.seq_aux:
+            l_aux = self._cal_seq_aux_loss(gates_ori, self.top_k, top_idx)
+        else:
+            l_aux = self._cal_aux_loss(gates, mask)
 
         exp_counts = paddle.sum(mask.cast(paddle.int64), axis=0)
 
@@ -548,6 +571,9 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
 
     def topkgating_part1(self, gates, e_score_correction_bias):
         l_zloss = self._cal_z_loss(gates)
+        batch_size, seq_len, d_model = gates.shape
+        gates_ori = gates
+        gates = gates.reshape([-1, d_model])
 
         # get topk gates
         if self.topk_method == "greedy":
@@ -569,7 +595,10 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
 
         # get topk mask
         mask = paddle.zeros_like(gates).put_along_axis(top_idx, paddle.to_tensor(1.0), axis=1)
-        l_aux = self._cal_aux_loss(gates, mask)
+        if self.config.seq_aux:
+            l_aux = self._cal_seq_aux_loss(gates_ori, self.top_k, top_idx)
+        else:
+            l_aux = self._cal_aux_loss(gates, mask)
 
         exp_counts = paddle.sum(mask.cast(paddle.int64), axis=0)
 
@@ -618,9 +647,7 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
             locations = paddle.cumsum(self.mask, axis=0) - 1
             self.token_priority = self._one_hot_to_float(locations * self.mask, self.capacity)
 
-        combine_weights = paddle.einsum(
-            "se,sec->sec", gates_masked, self.token_priority.cast(paddle.get_default_dtype())
-        )
+        combine_weights = einsum("se,sec->sec", gates_masked, self.token_priority.cast(paddle.get_default_dtype()))
         dispatch_mask = combine_weights.cast(paddle.bool)
 
         return combine_weights, dispatch_mask

@@ -31,7 +31,7 @@ from paddle import Tensor, nn
 from paddle.distributed.fleet.utils import recompute
 from paddle.nn import Linear
 
-from .auto_utils import get_mesh
+from ..auto_utils import get_mesh
 
 try:
     from paddle.incubate.nn.functional import fused_rotary_position_embedding
@@ -245,6 +245,22 @@ class DeepseekV2MLPAuto(nn.Layer):
         self.down_proj = Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
 
         self.act_fn = ACT2FN[config.hidden_act]
+
+    def redistribute_expert(self, mesh, placements):
+        """
+        Place the experts on different devices.
+        """
+        self.gate_proj.weight = dist.shard_tensor(self.gate_proj.weight, mesh, placements)
+        if self.gate_proj.bias is not None:
+            self.gate_proj.bias = dist.shard_tensor(self.gate_proj.bias, mesh, placements)
+
+        self.up_proj.weight = dist.shard_tensor(self.up_proj.weight, mesh, placements)
+        if self.up_proj.bias is not None:
+            self.up_proj.bias = dist.shard_tensor(self.up_proj.bias, mesh, placements)
+
+        self.down_proj.weight = dist.shard_tensor(self.down_proj.weight, mesh, placements)
+        if self.down_proj.bias is not None:
+            self.down_proj.bias = dist.shard_tensor(self.down_proj.bias, mesh, placements)
 
     def forward(self, x):
         down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
