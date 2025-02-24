@@ -20,7 +20,7 @@ int getSMVersion() {
 std::vector<cutlass_extensions::CutlassGemmConfig> getFilteredConfigs(
     std::shared_ptr<kernels::CutlassMoeFCRunnerInterface> moe_runner, int sm) {
     std::vector<Profile> tactics = moe_runner->getTactics();
-
+    std::cout <<"f性能差啊" << std::endl;
     if (sm == 89) {
         // Filter some unsupported configs for L40S
         auto it = std::remove_if(tactics.begin(), tactics.end(),

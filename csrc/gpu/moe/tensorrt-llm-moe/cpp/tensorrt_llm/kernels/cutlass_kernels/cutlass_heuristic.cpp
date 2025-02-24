@@ -152,12 +152,17 @@ std::vector<CutlassTileConfig> get_candidate_tiles(
     case CutlassGemmType::Simt: return {CutlassTileConfig::CtaShape128x128x8_WarpShape64x64x8};
     case CutlassGemmType::WeightOnly:
         if (sm >= 75)
-        {
-            return {CutlassTileConfig::CtaShape16x128x64_WarpShape16x32x64,
-                CutlassTileConfig::CtaShape16x256x64_WarpShape16x64x64,
+        {   
+            std::cout << "我增加了一些配置"<< std::endl;
+            return {
+                // CutlassTileConfig::CtaShape16x128x64_WarpShape16x32x64,这两个配置比较慢
+                // CutlassTileConfig::CtaShape16x256x64_WarpShape16x64x64,
                 CutlassTileConfig::CtaShape32x128x64_WarpShape32x32x64,
                 CutlassTileConfig::CtaShape64x128x64_WarpShape64x32x64,
-                CutlassTileConfig::CtaShape128x128x64_WarpShape128x32x64};
+                CutlassTileConfig::CtaShape64x128x64_WarpShape64x64x64,
+                CutlassTileConfig::CtaShape128x128x64_WarpShape128x32x64,
+                CutlassTileConfig::CtaShape128x128x64_WarpShape64x64x64,
+                };
         }
         else
         {
@@ -225,7 +230,8 @@ std::vector<CutlassTileConfigSM90> get_candidate_tiles_sm90(
 #else
     if (config & CutlassGemmConfig::GROUPED_GEMM)
     {
-        return {CutlassTileConfigSM90::CtaShape128x16x128B, CutlassTileConfigSM90::CtaShape128x32x128B,
+        return {
+            // CutlassTileConfigSM90::CtaShape128x16x128B, CutlassTileConfigSM90::CtaShape128x32x128B,
             CutlassTileConfigSM90::CtaShape128x64x128B, CutlassTileConfigSM90::CtaShape128x128x128B,
             CutlassTileConfigSM90::CtaShape128x256x128B, CutlassTileConfigSM90::CtaShape256x128x128B};
     }
@@ -313,7 +319,7 @@ std::vector<CutlassGemmConfig> get_candidate_configs(
     std::vector<CutlassGemmConfig> candidate_configs;
     bool const int8_configs_only = config_type_param & CutlassGemmConfig::INT8_ONLY;
     int const min_stages = int8_configs_only ? 3 : 2;
-    int const max_stages = int8_configs_only ? 6 : (sm >= 80 ? 4 : 2);
+    int const max_stages = int8_configs_only ? 6 : (sm >= 80 ? 5 : 2);
     for (auto const& tile_config : tiles)
     {
         for (int stages = min_stages; stages <= max_stages; ++stages)

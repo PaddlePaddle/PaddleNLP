@@ -5,15 +5,11 @@
 #include <algorithm>
 #include "tensorrt_llm/kernels/mixtureOfExperts/moe_kernels.h"
 #include "tensorrt_llm/kernels/cutlass_kernels/cutlass_preprocessors.h"
+#include "cutlass_helper.h"
 #include "utils.h"
 #include "profile.h"
 
-
-
-
-
 // profile部分 ***************************************
-// #include <fstream>
 
 
 
@@ -88,7 +84,7 @@ class FusedMoeRunnerPofiler {
 
 public:
     FusedMoeRunnerPofiler(paddle::DataType activation_dtype, paddle::DataType weight_dtype, paddle::DataType output_dtype,
-        std::shared_ptr<kernels::CutlassMoeFCRunnerInterface> moe_runner, const std::string& quant_method) {
+        std::shared_ptr<kernels::CutlassMoeFCRunnerInterface> moe_runner, std::string quant_method) {
             mActivationDtype = activation_dtype;
             mWeightDtype = weight_dtype;
             mOutputDtype = output_dtype;
@@ -103,6 +99,7 @@ public:
             mAllProfiles = getFilteredConfigs(mKernelRunner->getTactics(), getSMVersion());
             mMinDimM = -1;
             mMaxDimM = -1;
+            QuantMethod = quant_method;
         }
 
     void runProfileGemmIdx(int64_t const hidden_size, int64_t const inter_size, int const num_experts, int const top_k,
@@ -126,7 +123,7 @@ public:
             mActivationDtype,
             mWeightDtype,
             mOutputDtype, num_experts, top_k, hidden_size, inter_size,
-            /* bias */ false, parallelism_config, mIsWeightOnlyIn4);
+            /* bias */ false, parallelism_config, mIsWeightOnlyIn4, QuantMethod);
 
         char* profile_workspace = nullptr;
         size_t tmp_workspace_size = mProfiler->getWorkspaceSize(mMaxDimM);
@@ -140,7 +137,6 @@ public:
         for (auto const& m : num_token_buckets)
         {
             ProfileId best_profile_id = runProfileM(m, profile_workspace, stream);
-            std::cout << "mMNKProfileMap insert :" << m << "best_profile_id :"<< best_profile_id <<std::endl;
             mMNKProfileMap->getMProfileMap(gemm_id_moe)->insert({m, best_profile_id});
         }
 
@@ -168,16 +164,16 @@ public:
             tactics.erase(it, tactics.end());
         }
 
-        // if (tactics.empty()) {
-        //     throw std::runtime_error("No valid GEMM tactics found");
-        // }
+        if (tactics.empty()) {
+            throw std::runtime_error("No valid GEMM tactics found");
+        }
         // // 筛选符合sm >= 90的所有配置
-        bool is_sm90 = sm >= 90;
-        printf("sm is {%d}\n", sm);
-        auto it = std::remove_if(tactics.begin(), tactics.end(), [is_sm90](auto& c) { 
-            return c.is_sm90 != is_sm90; // 移除所有不符合sm >= 90的配置
-        });
-        tactics.erase(it, tactics.end()); // 保留符合sm >= 90的配置
+        // bool is_sm90 = sm >= 90;
+        // printf("sm is {%d}\n", sm);
+        // auto it = std::remove_if(tactics.begin(), tactics.end(), [is_sm90](auto& c) { 
+        //     return c.is_sm90 != is_sm90; // 移除所有不符合sm >= 90的配置
+        // });
+        // tactics.erase(it, tactics.end()); // 保留符合sm >= 90的配置
         return tactics;
     }
 
@@ -185,7 +181,6 @@ public:
     {
         constexpr int warmup = 5;
         constexpr int runs = 15;
-        std::cout <<"我改了warmup"<< std::endl;
 
         // warmup
         for (int i = 0; i < warmup; ++i)
@@ -221,6 +216,7 @@ public:
         mProfiler->prepare(m, profile_workspace, stream);
         float best_time = std::numeric_limits<float>::max();
         ProfileId best_profile_id;
+        // std::cout <<< "**********" << m << "************************"<<std::endl; 
         for (int i = 0; i < static_cast<int>(mAllProfiles.size()); ++i)
         {
             auto const& profile = mAllProfiles[i];
@@ -228,7 +224,9 @@ public:
             try
             {
                 candidate_time = runSingleProfile(m, profile, profile_workspace, stream);
-                std::cout << "candidate_time : " << candidate_time << std::endl;
+                std::cout <<"candidate_time : " << candidate_time << std::endl;
+                std::cout <<"tile_config : " << static_cast<int>(profile.tile_config) << std::endl;
+                std::cout <<"stages : " << static_cast<int>(profile.stages) << std::endl;
             }
             catch (std::exception const& e)
             {
@@ -249,6 +247,7 @@ public:
             }
         }
         std::cout << "best_profile_id : " << best_profile_id << std::endl;
+        std::cout << "best_time : " << best_time << std::endl;
         return best_profile_id;
     }
 
@@ -339,15 +338,22 @@ public:
 
             json profile_ids;
             for (const auto& entry : *profile_map) {
-                profile_ids.push_back({
-                    {"token_num", entry.first},  // Save token_num
-                    {"profile_id", entry.second} // Save corresponding profile_id
-                });
+                json profile_entry;
+                profile_entry["token_num"] = entry.first;  // Save token_num
+                profile_entry["profile_id"] = entry.second; // Save corresponding profile_id
+                auto config = mAllProfiles[entry.second];
+                profile_entry["tile_config"] = config.tile_config;
+                profile_entry["split_k_style"] = config.split_k_style;
+                profile_entry["split_k_factor"] = config.split_k_factor;
+                profile_entry["stages"] = config.stages;
+                // Now push the profile_entry directly
+                profile_ids.push_back(profile_entry);
             }
 
             gemm_entry["profile_ids"] = profile_ids;
             root.push_back(gemm_entry);
         }
+
         std::ofstream file(file_path);
         if (file.is_open()) {
             file << root;
@@ -369,6 +375,7 @@ private:
     paddle::DataType mOutputDtype;
     bool mUseFp8BlockScaling = false;
     bool mIsWeightOnlyIn4 = false;
+    std::string QuantMethod;
 
     std::mutex mMutex;
 
@@ -377,48 +384,53 @@ private:
 
 };
 
-std::vector<int64_t> loadProfileResultsFromFile(const std::string& file_path, 
+std::vector<int64_t> loadProfileResultsFromFile(const nlohmann::json& root, 
                                                 int64_t num_tokens, 
                                                 const GemmIDMoe& gemm_id_moe1,
                                                 const GemmIDMoe& gemm_id_moe2)
 {
-    // std::vector<int64_t> profile_ids;
-    std::ifstream file(file_path);
-    int profile_id_gemm1;
-    int profile_id_gemm2;
-    if (file.is_open()) {
-        json root;
-        file >> root;
-        file.close();
+    std::vector<int64_t> profile_ids;
 
-        for (const auto& gemm_entry : root) {
-            int gemm_idx = gemm_entry["gemm_idx"];
-            
-            // Check if gemm_id_moe1 or gemm_id_moe2 match
-            if (gemm_idx == static_cast<int>(gemm_id_moe1.gemm_idx)) {
-                const auto& profile_ids_json = gemm_entry["profile_ids"];
-                for (const auto& entry : profile_ids_json) {
-                    int64_t token_num = entry.value("token_num", -1);  // Default to -1 if not found
-                    if (token_num == num_tokens) {
-                        profile_id_gemm1 = entry["profile_id"];
-                    }
-                }
-            }
-            else if (gemm_idx == static_cast<int>(gemm_id_moe2.gemm_idx)) {
-                const auto& profile_ids_json = gemm_entry["profile_ids"];
-                for (const auto& entry : profile_ids_json) {
-                    int64_t token_num = entry.value("token_num", -1);  // Default to -1 if not found
-                    if (token_num == num_tokens) {
-                        profile_id_gemm2 = entry["profile_id"];
-                    }
-                }
+    // 使用哈希表存储 token_num -> profile_id 映射
+    std::unordered_map<int64_t, int> gemm1_profile_map;
+    std::unordered_map<int64_t, int> gemm2_profile_map;
+
+    for (const auto& gemm_entry : root) {
+        int gemm_idx = gemm_entry["gemm_idx"];
+        
+        // Check if gemm_id_moe1 or gemm_id_moe2 match
+        if (gemm_idx == static_cast<int>(gemm_id_moe1.gemm_idx)) {
+            const auto& profile_ids_json = gemm_entry["profile_ids"];
+            for (const auto& entry : profile_ids_json) {
+                int64_t token_num = entry.value("token_num", -1);  // Default to -1 if not found
+                int profile_id = entry["profile_id"];
+                gemm1_profile_map[token_num] = profile_id;
             }
         }
-    } else {
-        std::cerr << "Failed to load profile results from " << file_path << std::endl;
+        else if (gemm_idx == static_cast<int>(gemm_id_moe2.gemm_idx)) {
+            const auto& profile_ids_json = gemm_entry["profile_ids"];
+            for (const auto& entry : profile_ids_json) {
+                int64_t token_num = entry.value("token_num", -1);  // Default to -1 if not found
+                int profile_id = entry["profile_id"];
+                gemm2_profile_map[token_num] = profile_id;
+            }
+        }
     }
-    std::cout << "fuck " << std::endl;
-    return {profile_id_gemm1, profile_id_gemm2};
+
+    // 查找 gemm1 和 gemm2 的 profile_id，确保它们的顺序
+    if (gemm1_profile_map.find(num_tokens) != gemm1_profile_map.end()) {
+        profile_ids.push_back(gemm1_profile_map[num_tokens]);
+    } else {
+        std::cerr << "No profile_id found for gemm1 with token_num " << num_tokens << std::endl;
+    }
+
+    if (gemm2_profile_map.find(num_tokens) != gemm2_profile_map.end()) {
+        profile_ids.push_back(gemm2_profile_map[num_tokens]);
+    } else {
+        std::cerr << "No profile_id found for gemm2 with token_num " << num_tokens << std::endl;
+    }
+    std::cout <<"我又修改了stage 5" << std::endl;
+    return profile_ids;
 }
 
 
@@ -440,7 +452,6 @@ void setRunnerProfiles(std::shared_ptr<kernels::CutlassMoeFCRunnerInterface> moe
         auto best_gemm2_profile = mAllProfiles.front();
         if (!profile_ids.empty())
         {   
-            std::cout << "选择tune好的config"<< std::endl;
             best_gemm1_profile = mAllProfiles.at(profile_ids[0]);
             best_gemm2_profile = mAllProfiles.at(profile_ids[1]);
         }
@@ -448,8 +459,6 @@ void setRunnerProfiles(std::shared_ptr<kernels::CutlassMoeFCRunnerInterface> moe
     }
 
 // profile部分 ***************************************
-
-
 tensorrt_llm::ActivationType getActivationType(std::string activation_type_str)
 {
     if (activation_type_str == "Gelu" || activation_type_str == "gelu") {
@@ -524,9 +533,6 @@ Tensor trt_llm_fused_moe_helper(Tensor input_activations,
         std::cout << "我改了inter_size"<< std::endl;
        inter_size = fc2_expert_weights.shape()[2];
     }
-    // const int fc1_inter_size = fc1_expert_weights.shape()[2];
-
-    // PD_CHECK(inter_size == fc1_inter_size || inter_size * 2 == fc1_inter_size);
     const int num_experts = gating_output.shape()[1]; //(num_tokens, num_experts)
     
     auto stream = input_activations.stream();
@@ -565,9 +571,7 @@ Tensor trt_llm_fused_moe_helper(Tensor input_activations,
     } else if (quant_method == "fp8_block_wise") {
         // fp8 scale是float
         scale1_ptr = get_ptr<float>(scale1);
-        scale2_ptr = get_ptr<float>(scale2);
-        std::cout <<"trt nmsl ffffff" << std::endl;
-
+        scale2_ptr = get_ptr<float>(scale2);;
         fc1_weights_ptr = reinterpret_cast<__nv_fp8_e4m3*>(fc1_expert_weights.data<phi::dtype::float8_e4m3fn>());
         fc2_weights_ptr = reinterpret_cast<__nv_fp8_e4m3*>(fc2_expert_weights.data<phi::dtype::float8_e4m3fn>());
          
@@ -611,10 +615,8 @@ Tensor trt_llm_fused_moe_helper(Tensor input_activations,
     }
 
     std::shared_ptr<kernels::CutlassMoeFCRunnerInterface> moe_runner_ptr = std::make_shared<kernels::CutlassMoeFCRunner<T, WeightType>>();
-
-    std::cout <<"1 : " <<   tune_max_num_tokens << std::endl;
-
-     std::string profile_file = "./trt_moe_profile_results.json";
+    std::string profile_file = "./trt_moe_profile_results.json";
+    CutlassGemmConfigMannager& best_config_mannager = CutlassGemmConfigMannager::getInstance();
 
     if (getenv("FLAGS_efficientllm_op_configs")) {
         std::string efficientllm_op_configs = getenv("FLAGS_efficientllm_op_configs");
@@ -626,14 +628,16 @@ Tensor trt_llm_fused_moe_helper(Tensor input_activations,
                                     /* moe_runner= */ moe_runner_ptr, 
                                     /* quant_method= */ quant_method);
 
-            std::vector<int64_t> num_token_buckets = get_power_of_2_num_tokens_buckets(tune_max_num_tokens);
-            std::cout <<"num_token_buckets : " <<   tune_max_num_tokens << std::endl;
+            // std::vector<int64_t> num_token_buckets = get_power_of_2_num_tokens_buckets(tune_max_num_tokens);
+            // std::cout <<"num_token_buckets : " <<   tune_max_num_tokens << std::endl;
 
+            std::vector<int64_t> num_token_buckets = {1024};
+            std::cout << "我只tune 1024"<< std::endl;
             profiler.runProfile(fc2_expert_weights, k, 1, 0, 1, 0, num_token_buckets);
             // 需要将profile的结果，即num_tokens和对应的profile_ids落在本地efficientllm_op_configs路径下，这里需要补充代码
             profiler.saveProfileResultsToFile(profile_file);
 
-            std::vector<int64_t> profile_ids = profiler.getProfileIds(num_rows, fc2_expert_weights, k, num_experts);
+            std::vector<int64_t> profile_ids = profiler.getProfileIds(next_positive_power_of_2(num_rows), fc2_expert_weights, k, num_experts);
 
             std::cout << "profile_ids : " << profile_ids.size() << std::endl;
 
@@ -646,16 +650,14 @@ Tensor trt_llm_fused_moe_helper(Tensor input_activations,
             if (!std::filesystem::exists(efficientllm_op_configs)) {
                 PADDLE_THROW(phi::errors::Fatal("Warning: The file \"" + efficientllm_op_configs + "\" does not exist in the specified path." ));
             } else {
-                std::cout <<"3 : " <<   tune_max_num_tokens << std::endl;
                 // 从config文件路径读取到适合当前num_tokens的配置，这里需要重写一个方法，可以根据num_rows读取到对应配置
                 auto gemm_id_moe1 = GemmIDMoe{profiler_backend::GemmToProfile::GEMM_1, hidden_size, inter_size,
                     static_cast<int>(num_experts), static_cast<int>(k)};
                 auto gemm_id_moe2 = GemmIDMoe{profiler_backend::GemmToProfile::GEMM_2, hidden_size, inter_size,
                     static_cast<int>(num_experts), static_cast<int>(k)};
-                std::vector<int64_t> profile_ids = loadProfileResultsFromFile(profile_file, num_rows, gemm_id_moe1, gemm_id_moe2);
-                for (int i = 0; i < profile_ids.size(); ++i){
-                    std::cout <<  "我使用了tune好的profile_ids : "<< profile_ids[i] << std::endl;
-                }
+                auto* configs_json = best_config_mannager.get_gemm_best_configs(profile_file);
+
+                std::vector<int64_t> profile_ids = loadProfileResultsFromFile(*configs_json, next_positive_power_of_2(num_rows), gemm_id_moe1, gemm_id_moe2);
                 setRunnerProfiles(moe_runner_ptr, profile_ids, quant_method);
             }
         }
@@ -666,9 +668,9 @@ Tensor trt_llm_fused_moe_helper(Tensor input_activations,
     }
     
     
-    // std::vector<int64_t> profile_ids = {8, 15};
+    // std::vector<int64_t> profile_ids = {20, 19};
     // setRunnerProfiles(moe_runner_ptr, profile_ids, quant_method);
-    // std::cout <<"我设置了tatic 8 15" << std::endl;
+    // std::cout <<"我设置了tatic 20 19" << std::endl;
 
 
     kernels::MOEExpertScaleNormalizationMode normalization_mode_enum = getNormalizationMode(normalization_mode);
@@ -685,7 +687,6 @@ Tensor trt_llm_fused_moe_helper(Tensor input_activations,
 
     // topk的结果
     auto expert_for_source_row = paddle::empty({num_rows, k}, paddle::DataType::INT32, place);
-
     int* expert_for_source_row_ptr = reinterpret_cast<int*>(expert_for_source_row.data<int>());
 
     auto output_tensor = paddle::empty({num_rows, hidden_size}, input_activations.dtype(), place);
@@ -844,25 +845,11 @@ std::vector<paddle::Tensor> TrtLLMFusedMoe(const paddle::Tensor&     input_activ
 
     const auto _st = input_activations.dtype();
     const auto weight_type = fc1_expert_weights.dtype();
-    int     active_rows;
     const int num_rows    = input_activations.shape()[0];
-    // const int hidden_size = input_activations.shape()[1];
-    // const int num_experts = gating_output.shape()[1];
-
     const auto quant_type = fc2_expert_weights.dtype();
-    // const int inter_size = fc2_expert_weights.shape()[1];
 
     Tensor output_tensor;
-
     tensorrt_llm::ActivationType fc1_activation_type = tensorrt_llm::ActivationType::Swiglu;;
-    active_rows = num_rows;
-    if (fc1_activation_type_str == "identity") {
-        fc1_activation_type = tensorrt_llm::ActivationType::Identity;
-    }
-    else {
-        fc1_activation_type = getActivationType(fc1_activation_type_str);
-    }
-
     std::cout << "start ! "<< std::endl;
     std::cout<< quant_method  << std::endl;
     switch (_st) {
@@ -873,7 +860,7 @@ std::vector<paddle::Tensor> TrtLLMFusedMoe(const paddle::Tensor&     input_activ
                                                                     fc1_expert_weights,
                                                                     fc1_activation_type,
                                                                     fc2_expert_weights,
-                                                                    active_rows,
+                                                                    num_rows,
                                                                     k,
                                                                     nullptr,
                                                                     nullptr,
@@ -894,7 +881,7 @@ std::vector<paddle::Tensor> TrtLLMFusedMoe(const paddle::Tensor&     input_activ
                                                                                 fc1_expert_weights,
                                                                                 fc1_activation_type,
                                                                                 fc2_expert_weights,
-                                                                                active_rows,
+                                                                                num_rows,
                                                                                 k,
                                                                                 nullptr,
                                                                                 nullptr,
@@ -909,7 +896,7 @@ std::vector<paddle::Tensor> TrtLLMFusedMoe(const paddle::Tensor&     input_activ
                                                                                 fc1_expert_weights,
                                                                                 fc1_activation_type,
                                                                                 fc2_expert_weights,
-                                                                                active_rows,
+                                                                                num_rows,
                                                                                 k,
                                                                                 scale1,
                                                                                 scale2,
@@ -917,13 +904,13 @@ std::vector<paddle::Tensor> TrtLLMFusedMoe(const paddle::Tensor&     input_activ
                                                                                 normalization_mode,
                                                                                 quant_method,
                                                                                 tune_max_num_tokens);
-            } else if (quant_method == "weight_only_int4") {
+                } else if (quant_method == "weight_only_int4") {
                 output_tensor = trt_llm_fused_moe_helper<__nv_bfloat16, cutlass::uint4b_t>(input_activations,
                                                                             gating_output,
                                                                             fc1_expert_weights,
                                                                             fc1_activation_type,
                                                                             fc2_expert_weights,
-                                                                            active_rows,
+                                                                            num_rows,
                                                                             k,
                                                                             scale1,
                                                                             scale2,
@@ -937,7 +924,7 @@ std::vector<paddle::Tensor> TrtLLMFusedMoe(const paddle::Tensor&     input_activ
                                                                             fc1_expert_weights,
                                                                             fc1_activation_type,
                                                                             fc2_expert_weights,
-                                                                            active_rows,
+                                                                            num_rows,
                                                                             k,
                                                                             scale1,
                                                                             scale2,
@@ -960,7 +947,7 @@ std::vector<paddle::Tensor> TrtLLMFusedMoe(const paddle::Tensor&     input_activ
             //                                                                     fc1_expert_weights,
             //                                                                     fc1_activation_type,
             //                                                                     fc2_expert_weights,
-            //                                                                     active_rows,
+            //                                                                     num_rows,
             //                                                                     k,
             //                                                                     scale1,
             //                                                                     scale2,

@@ -173,6 +173,9 @@ struct genericMoeGemmKernelLauncher
             PADDLE_ENFORCE(occupancy > 0, "GPU lacks the shared memory resources to run GroupedGEMM kernel");
             int const threadblock_count = multi_processor_count * occupancy;
 
+            if (weight_scales == nullptr) {
+                std::cout << "why fuck wo bu dong le !!!!!!!!!"<< std::endl;
+            }
             int const group_size = gemm_k;
             typename GemmGrouped::Arguments args(num_experts, threadblock_count, group_size, epilogue_op,
                 reinterpret_cast<ElementType const*>(A), reinterpret_cast<CutlassWeightType const*>(B),
@@ -182,6 +185,7 @@ struct genericMoeGemmKernelLauncher
 
             GemmGrouped gemm;
 
+            std::cout << "gemm can_imple"<< std::endl;
             auto can_implement = gemm.can_implement(args);
             PADDLE_ENFORCE(can_implement == cutlass::Status::kSuccess,
                 "MoE FC kernel will fail for params.");
@@ -243,7 +247,7 @@ static void dispatch(T const* A, WeightType const* B, GemmOutputType const* weig
 
     if constexpr ((Stages == 2 || Arch::kMinComputeCapability >= 80)
         && (!isFp8 || std::is_same_v<Arch, cutlass::arch::Sm89>) )
-    {
+    {   
         kernels::cutlass_kernels::genericMoeGemmKernelLauncher<T, WeightType, GemmOutputType, Arch, EpilogueTag,
             ThreadblockShape, WarpShape, Stages>::call(A, B, weight_scales, biases, bias_is_broadcast, C,
             total_tokens_including_expert, num_rows, gemm_n, gemm_k, num_experts, gemm_config, multi_processor_count,
@@ -263,7 +267,8 @@ void dispatchGemmConfig(T const* A, WeightType const* B, GemmOutputType const* w
     int64_t const* total_tokens_including_expert, int64_t num_rows, int64_t gemm_n, int64_t gemm_k, int num_experts,
     cutlass_extensions::CutlassGemmConfig gemm_config, int multi_processor_count, bool use_fused_moe,
     float const** alpha_scale_ptr_array, cudaStream_t stream, int* occupancy = nullptr)
-{
+{   
+    // std::cout << "我又修改为了3，3，3，3"<< std::endl;
     switch (gemm_config.stages)
     {
     case 2:
@@ -278,6 +283,11 @@ void dispatchGemmConfig(T const* A, WeightType const* B, GemmOutputType const* w
         break;
     case 4:
         dispatch<T, WeightType, GemmOutputType, arch, EpilogueTag, ThreadblockShape, WarpShape, 4>(A, B, weight_scales,
+            biases, bias_is_broadcast, C, total_tokens_including_expert, num_rows, gemm_n, gemm_k, num_experts,
+            gemm_config, multi_processor_count, use_fused_moe, alpha_scale_ptr_array, stream, occupancy);
+        break;
+    case 5:
+        dispatch<T, WeightType, GemmOutputType, arch, EpilogueTag, ThreadblockShape, WarpShape, 5>(A, B, weight_scales,
             biases, bias_is_broadcast, C, total_tokens_including_expert, num_rows, gemm_n, gemm_k, num_experts,
             gemm_config, multi_processor_count, use_fused_moe, alpha_scale_ptr_array, stream, occupancy);
         break;
@@ -383,6 +393,13 @@ void dispatchMoeGemmToCutlass(T const* A, WeightType const* B, GemmOutputType co
     case cutlass_extensions::CutlassTileConfig::CtaShape32x128x64_WarpShape32x32x64:
         dispatchGemmConfig<T, WeightType, GemmOutputType, arch, EpilogueTag, cutlass::gemm::GemmShape<32, 128, 64>,
             cutlass::gemm::GemmShape<32, 32, 64>>(A, B, weight_scales, biases, bias_is_broadcast, C,
+            total_tokens_including_expert, total_rows, gemm_n, gemm_k, num_experts, gemm_config, multi_processor_count,
+            use_fused_moe, alpha_scale_ptr_array, stream, occupancy);
+        break;
+    // 新加的
+    case cutlass_extensions::CutlassTileConfig::CtaShape64x128x64_WarpShape32x64x64:
+        dispatchGemmConfig<T, WeightType, GemmOutputType, arch, EpilogueTag, cutlass::gemm::GemmShape<64, 128, 64>,
+            cutlass::gemm::GemmShape<32, 64, 64>>(A, B, weight_scales, biases, bias_is_broadcast, C,
             total_tokens_including_expert, total_rows, gemm_n, gemm_k, num_experts, gemm_config, multi_processor_count,
             use_fused_moe, alpha_scale_ptr_array, stream, occupancy);
         break;
@@ -786,7 +803,8 @@ void MoeGemmRunner<T, WeightType, OutputType, ScaleBiasType>::runGemm(T const* A
     int64_t const* total_tokens_including_expert, HopperGroupedGemmInput hopper_input, int64_t total_rows,
     int64_t gemm_n, int64_t gemm_k, int num_experts, bool use_fused_moe, float const** alpha_scale_ptr_array,
     cudaStream_t stream, cutlass_extensions::CutlassGemmConfig chosen_conf)
-{
+{   
+    // 这里可以增加tune的配置
     dispatchToArch<EpilogueTag>(A, B, weight_scales, biases, bias_is_broadcast, C, total_tokens_including_expert,
         hopper_input, total_rows, gemm_n, gemm_k, num_experts, chosen_conf, use_fused_moe, alpha_scale_ptr_array,
         stream, nullptr);

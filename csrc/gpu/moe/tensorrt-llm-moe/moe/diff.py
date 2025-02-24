@@ -157,7 +157,8 @@ out = trt_llm_fused_moe(
     6,
     0,
     "none",
-    "Swiglu"
+    "Swiglu",
+    0
 )
 print(out)
 exit(0)
@@ -197,7 +198,8 @@ fused_moe_out_1 = trt_llm_fused_moe(
             0,
             quant_method,
             # "none",
-            "Swiglu"
+            "Swiglu",
+            0
         )
 print(fused_moe_out_1)
 

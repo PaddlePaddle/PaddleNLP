@@ -1111,7 +1111,6 @@ void finalizeMoeRoutingKernelLauncher(GemmOutputType const* expanded_permuted_ro
         },
     };
     auto* const func = func_map[check_finished][int(renorm_scales)];
-    std::cout << "finalize"<< std::endl;
     func<<<blocks, threads, 0, stream>>>(expanded_permuted_rows, reduced_unpermuted_output, bias_ptr, scales,
         expanded_source_row_to_expanded_dest_row, expert_for_source_row, cols, k, num_valid_ptr);
 }
@@ -2219,9 +2218,13 @@ std::vector<size_t> GemmProfilerBackend::getProfilerWorkspaces(int maxM, bool is
     size_t bias = mGemmToProfile == GemmToProfile::GEMM_1 ? bias_1 : bias_2;
 
     // TODO Make quant 2 & 4 bigger for FP8 if we ever change to scaling per expert
-    bool is_int_w_quant = mWType == paddle::DataType::INT8;
-    bool is_fp8_w_quant = mWType == paddle::DataType::FLOAT8_E4M3FN;
-
+    bool is_int_w_quant = false;
+    bool is_fp8_w_quant = false;
+    if(QuantMode == "weight_only_int8") {
+        is_int_w_quant = true;
+    } else if (QuantMode == "fp8_block_wise") {
+        is_fp8_w_quant = true;
+    }
     // Int sizes
     size_t quant_1 = is_int_w_quant ? fc1_out_size * num_experts_per_node * dtype_bytes : 0;
     size_t quant_2 = is_int_w_quant ? hidden_size * num_experts_per_node * dtype_bytes : 0;
@@ -2327,6 +2330,9 @@ void GemmProfilerBackend::runProfiler(
     {
         hopper_input_template.configureWorkspace(
             static_cast<int8_t*>(hopper_workspace), num_experts_per_node, gemm_workspace, workspaces.back());
+    }
+    if (scale_1 == nullptr) {
+        std::cout << "我不懂了 "<< std::endl;
     }
 
     QuantParams quant_params;

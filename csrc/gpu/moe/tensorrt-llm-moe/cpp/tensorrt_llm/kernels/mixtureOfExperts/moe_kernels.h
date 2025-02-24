@@ -440,7 +440,7 @@ public:
     void init(CutlassMoeFCRunnerInterface& runner, GemmToProfile gemm_to_profile, paddle::DataType dtype,
         paddle::DataType wtype, paddle::DataType otype, int num_experts, int k, int64_t hidden_size,
         int64_t inter_size, bool bias,
-        MOEParallelismConfig parallelism_config, bool is_weight_only_in4)
+        MOEParallelismConfig parallelism_config, bool is_weight_only_in4, const std::string quant_mode)
     {
         mInterface = &runner;
         mGemmToProfile = gemm_to_profile;
@@ -456,6 +456,7 @@ public:
         // mActivationType = activation_type;
         mBias = bias;
         mParallelismConfig = parallelism_config;
+        QuantMode = quant_mode;
         mSM = common::getSMVersion();
         mSorter.updateNumExperts(mNumExperts);
     }
@@ -491,6 +492,7 @@ public:
     paddle::DataType mDType{};
     paddle::DataType mWType{};
     paddle::DataType mOType{};
+    std::string QuantMode;
     bool is_weight_only_in4 = false;
 
     constexpr static int64_t NUM_ROUTING_SAMPLES = 16;

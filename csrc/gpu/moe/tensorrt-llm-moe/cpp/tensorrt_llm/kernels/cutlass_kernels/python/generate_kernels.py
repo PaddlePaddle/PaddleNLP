@@ -444,7 +444,7 @@ def generate_sm80_fused_grouped_gemm_operations():
     cta_shapes_mnk = [(16, 128, 64), (16, 256, 64), (32, 128, 64),
                       (64, 128, 64), (128, 128, 64)]
 
-    stages = [2, 3, 4]
+    stages = [2, 3, 4, 5]
 
     partial_args = product(supported_dtypes, epi_tags, cta_shapes_mnk, stages)
 
@@ -477,14 +477,14 @@ if __name__ == "__main__":
     # Get the absolute path of the provided directory
     output_dir = os.path.abspath(args.output_dir)
 
-    # fpA_intB_inl = "tensorrt_llm/kernels/cutlass_kernels/fpA_intB_gemm/launchers/fpA_intB_launcher_sm90.inl"
+    fpA_intB_inl = "tensorrt_llm/kernels/cutlass_kernels/fpA_intB_gemm/launchers/fpA_intB_launcher_sm90.inl"
     moe_gemm_inl = "tensorrt_llm/kernels/cutlass_kernels/moe_gemm/launchers/moe_gemm_launcher_sm90.inl"
-    # sm80_moe_gemm_inl = "tensorrt_llm/kernels/cutlass_kernels/moe_gemm/launchers/fused_moe_gemm_launcher_sm80.inl"
+    sm80_moe_gemm_inl = "tensorrt_llm/kernels/cutlass_kernels/moe_gemm/launchers/fused_moe_gemm_launcher_sm80.inl"
 
     inl_map = {
         (GemmKind.Gemm, 90): [fpA_intB_inl],
         (GemmKind.Grouped, 90): [moe_gemm_inl],
-        # (GemmKind.Grouped, 80): [sm80_moe_gemm_inl]
+        (GemmKind.Grouped, 80): [sm80_moe_gemm_inl]
     }
 
     # The goal here is to group kernels with common instantiations together in order to reduce template instantiation overheads.
