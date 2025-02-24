@@ -388,12 +388,18 @@ def load_non_merge_optimizer_with_split_param(args, model, optimizer, resume_fro
     expected_keys, param_slice_info, param_shape_info = get_params_info(comm_buffer_list)
     expected_keys = set([static2struct_name_mappings.get(name, None) for name in expected_keys])
     expected_keys_optim = []
-    typename_set = set()
+    sharding_typename_set, typename_set = [], []
     with safe_open(optimizer_path, framework="numpy") as f:
         optim_keys = f.keys()
     for key in optim_keys:
         _, typename = key.split("/")
-        typename_set.add(typename)
+        typename_set.append(typename)
+
+    # To avoid incomplete typename in some shard files, communication is performed.
+    hcg = fleet.get_hybrid_communicate_group()
+    sharding_group = hcg.get_sharding_parallel_group()
+    dist.all_gather_object(sharding_typename_set, typename_set, sharding_group)
+    typename_set = set(chain(*sharding_typename_set))
     for key in expected_keys:
         for typename in typename_set:
             expected_keys_optim.append(f"{key}/{typename}")
