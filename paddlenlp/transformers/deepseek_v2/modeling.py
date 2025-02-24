@@ -54,13 +54,13 @@ try:
 except:
     flash_attention = None
 
+from paddlenlp.transformers.model_utils import dtype_guard
+
 from ...utils.initializer import kaiming_uniform_
 from ...utils.log import logger
 from ...utils.tools import get_env_device
-from .. import linear_utils
 from ..activations import ACT2FN
 from ..conversion_utils import StateDictNameMapping, init_name_mappings
-from ..linear_utils import Linear
 from ..llama import fusion_ops
 from ..llama.modeling import get_use_casual_mask
 from ..model_outputs import (
@@ -72,7 +72,9 @@ from ..model_utils import PretrainedModel, register_base_model
 from ..moe_gate import PretrainedMoEGate
 from ..moe_layer import MoELayer
 from ..utils import device_guard
+from . import fp8_linear as linear_utils
 from .configuration import DeepseekV2Config
+from .fp8_linear import Linear
 
 __all__ = [
     "DeepseekV2LMHead",
@@ -82,6 +84,15 @@ __all__ = [
     "DeepseekV2Model",
     "DeepseekV2PretrainedModel",
 ]
+
+origin_repr = nn.Embedding.extra_repr
+
+
+def new_repr(self):
+    return origin_repr(self) + f", dtype={self._dtype}"
+
+
+nn.Embedding.extra_repr = new_repr
 
 
 def get_triangle_upper_mask(x, mask=None):
@@ -315,7 +326,7 @@ class DeepseekV2RMSNorm(nn.Layer):
 
         self.weight = paddle.create_parameter(
             shape=[self.hidden_size],
-            dtype=paddle.get_default_dtype(),
+            dtype=paddle.float32,
             default_initializer=nn.initializer.Constant(1.0),
         )
 
@@ -348,6 +359,9 @@ class DeepseekV2RMSNorm(nn.Layer):
         if self.weight.dtype in [paddle.float16, paddle.bfloat16]:
             hidden_states = paddle.cast(hidden_states, self.weight.dtype)
         return hidden_states * self.weight
+
+    def extra_repr(self):
+        return f"hidden_size={self.hidden_size}, dtype={self._dtype}"
 
 
 class DeepseekV2RotaryEmbedding(nn.Layer):
@@ -671,7 +685,7 @@ class MoEGate(PretrainedMoEGate):
 
         self.weight = paddle.create_parameter(
             shape=[expert_hidden_size, num_experts],
-            dtype=paddle.get_default_dtype(),
+            dtype=paddle.float32,
             is_bias=False,
             default_initializer=nn.initializer.Constant(1.0),
         )
@@ -679,7 +693,7 @@ class MoEGate(PretrainedMoEGate):
         if config.topk_method == "noaux_tc":
             self.e_score_correction_bias = paddle.create_parameter(
                 shape=[num_experts],
-                dtype=paddle.get_default_dtype(),
+                dtype=paddle.float32,
                 default_initializer=nn.initializer.Constant(0.0),
             )
 
@@ -695,7 +709,7 @@ class MoEGate(PretrainedMoEGate):
 
         with paddle.amp.auto_cast(False):
             scores = self.gate_score_func(logits=logits)
-            scores = scores.cast(paddle.get_default_dtype())
+            scores = scores.cast(paddle.float32)
 
         capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss = self.topkgating(scores)
         return capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss
@@ -1297,6 +1311,7 @@ class DeepseekV2PretrainedModel(PretrainedModel):
         return mappings
 
     def _init_weights(self, layer):
+        return
         if self.config.tensor_parallel_degree > 1:
             rng_tracker = get_rng_state_tracker().rng_state
 
@@ -1370,12 +1385,11 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
         self.recompute_granularity = config.recompute_granularity
         self.no_recompute_layers = config.no_recompute_layers if config.no_recompute_layers is not None else []
 
-        self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
-
-        if config.tensor_parallel_degree > 1 and config.vocab_size % config.tensor_parallel_degree == 0:
-            self.embed_tokens = mpu.VocabParallelEmbedding(config.vocab_size, config.hidden_size)
-        else:
-            self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size)
+        with dtype_guard("float32"):
+            if config.tensor_parallel_degree > 1 and config.vocab_size % config.tensor_parallel_degree == 0:
+                self.embed_tokens = mpu.VocabParallelEmbedding(config.vocab_size, config.hidden_size)
+            else:
+                self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
 
         self.layers = nn.LayerList(
             [
@@ -1671,7 +1685,7 @@ class DeepseekV2LMHead(nn.Layer):
 
         self.weight = self.create_parameter(
             shape=[config.hidden_size, vocab_size],
-            dtype=paddle.get_default_dtype(),
+            dtype=paddle.float32,
             default_initializer=nn.initializer.XavierNormal(1.0),
         )
         # Must set distributed attr for Tensor Parallel !
@@ -1688,6 +1702,9 @@ class DeepseekV2LMHead(nn.Layer):
 
         logits = parallel_matmul(hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output)
         return logits
+
+    def extra_repr(self):
+        return f"hidden_size={self.weight.shape[0]}, vocab_size={self.weight.shape[1]}, dtype={self._dtype}"
 
 
 class DeepseekV2ForCausalLM(DeepseekV2PretrainedModel):
