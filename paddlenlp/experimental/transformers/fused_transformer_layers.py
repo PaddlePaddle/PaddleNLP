@@ -1494,8 +1494,6 @@ class FusedMultiTransformerBase(Layer):
         )
         kwargs["max_enc_len_this_time"] = max_enc_len_this_time
         kwargs["max_dec_len_this_time"] = max_dec_len_this_time
-        self.prefill_phase = max_enc_len_this_time[0] > 0
-        self.decode_phase = max_dec_len_this_time[0] > 0
 
         if self.config.append_attn:
 
@@ -2970,7 +2968,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
 
         out_linear_out = paddle.zeros(shape=[ln_out.shape[0], self.embed_dim], dtype=ln_out.dtype)
 
-        if self.prefill_phase:  # prefill phase
+        if kwargs["max_enc_len_this_time"]:  # prefill phase
             qkv_out_inner = self.compute_qkv_linear(ln_out, i, latent_cache=latent_cache, **kwargs)
 
             from paddlenlp_ops import append_attention
@@ -3027,7 +3025,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
 
             # print(f"prefill {i}: out_linear_out: {out_linear_out}")
 
-        if self.decode_phase:  # decode phase
+        if kwargs["max_dec_len_this_time"]:  # decode phase
             if self.config.mla_config.q_lora_rank is not None:
                 query = paddle.matmul(ln_out, self.q_a_proj_weights[i])
                 query = self.norm_func(
@@ -3331,7 +3329,7 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
 
         out_linear_out = paddle.zeros(shape=[ln_out.shape[0], self.embed_dim], dtype=ln_out.dtype)
 
-        if self.prefill_phase:  # prefill phase
+        if kwargs["max_enc_len_this_time"]:  # prefill phase
             qkv_out_inner = self.compute_qkv_linear(ln_out, i, latent_cache=latent_cache, **kwargs)
 
             from paddlenlp_ops import append_attention
@@ -3388,7 +3386,7 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
 
             # print(f"prefill {i}: out_linear_out: {out_linear_out}")
 
-        if self.decode_phase:  # decode phase
+        if kwargs["max_dec_len_this_time"]:  # decode phase
             if self.config.mla_config.q_lora_rank is not None:
                 query = weight_only_linear(
                     ln_out,
