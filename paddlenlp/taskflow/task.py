@@ -370,7 +370,6 @@ class Task(metaclass=abc.ABCMeta):
                     self._construct_input_spec()
                     self._convert_dygraph_to_static()
 
-
         self._static_model_file = self.inference_model_path + PADDLE_INFERENCE_MODEL_SUFFIX
         self._static_params_file = self.inference_model_path + PADDLE_INFERENCE_WEIGHTS_SUFFIX
 
