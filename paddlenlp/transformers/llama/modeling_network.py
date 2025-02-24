@@ -54,13 +54,13 @@ from .configuration import (
     LlamaConfig,
 )
 from .modeling import (
+    Llama3RotaryEmbedding,
     LlamaDynamicNTKScalingRotaryEmbedding,
     LlamaLinearScalingRotaryEmbedding,
     LlamaNTKScalingRotaryEmbedding,
-    Llama3RotaryEmbedding,
     LlamaRotaryEmbedding,
-    _make_causal_mask,
     _expand_2d_mask,
+    _make_causal_mask,
     apply_rotary_pos_emb,
     build_alibi_tensor,
     get_triangle_upper_mask,
@@ -676,6 +676,7 @@ class LlamaPretrainedModelNet(PretrainedModel):
     @classmethod
     def _get_tensor_parallel_mappings(cls, config, is_split):
         return {}
+
 
 @register_base_model
 class LlamaModelNet(LlamaPretrainedModelNet):

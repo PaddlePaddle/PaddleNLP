@@ -46,7 +46,7 @@ from ...utils.distributed import distributed_allgather, distributed_gather
 from ...utils.env import LORA_WEIGHTS_NAME, SAFE_PEFT_WEIGHTS_INDEX_NAME
 from ...utils.log import logger
 from ...utils.tools import get_env_device
-from .lora_config import LoRAConfig, LoRAAutoConfig
+from .lora_config import LoRAAutoConfig, LoRAConfig
 
 
 def get_lora_layers():
