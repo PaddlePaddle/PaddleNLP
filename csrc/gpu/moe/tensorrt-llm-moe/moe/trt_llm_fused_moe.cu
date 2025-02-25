@@ -458,40 +458,38 @@ std::vector<paddle::Tensor> TrtLLMFusedMoe(const paddle::Tensor&     input_activ
     return {output_tensor};
 }
 
-std::vector<paddle::DataType> TrtLLMFusedMoeInferDtype(
-        const paddle::DataType&     input_activations, //(num_tokens, hidden_size)
-        const paddle::DataType&      gating_output, //(num_tokens, num_experts)
-        const paddle::DataType&      fc1_expert_weights, //(num_experts, hidden_size, inter_size * 2)
-        const paddle::DataType&     fc2_expert_weights, //(num_experts, inter_size, hidden_size)
-        const paddle::optional<paddle::DataType>& scale1,
-        const paddle::optional<paddle::DataType>& scale2,
-        const paddle::optional<paddle::DataType>& scale3, 
-        int     k,
-        int normalization_mode,
-        const std::string& quant_method,
-        int     tune_max_num_tokens){
+// std::vector<paddle::DataType> TrtLLMFusedMoeInferDtype(
+//         const paddle::DataType&     input_activations_dtype, //(num_tokens, hidden_size)
+//         const paddle::DataType&      gating_output_dtype, //(num_tokens, num_experts)
+//         const paddle::DataType&      fc1_expert_weights_dtype, //(num_experts, hidden_size, inter_size * 2)
+//         const paddle::DataType&     fc2_expert_weight_dtypes, //(num_experts, inter_size, hidden_size)
+//         const paddle::optional<paddle::DataType>& scale1_dtype,
+//         const paddle::optional<paddle::DataType>& scale2_dtype,
+//         const paddle::optional<paddle::DataType>& scale3_dtype, 
+//         int     k,
+//         int normalization_mode,
+//         const std::string& quant_method,
+//         int     tune_max_num_tokens){
+        
+//         return {input_activations_dtype};
+// }
 
-        const int num_rows = input_activations.shape()[0];//(num_tokens, hidden_size)
-        const int hidden_size = input_activations.shape()[1];
-        return {input_activations};
+// std::vector<std::vector<int64_t>> TrtLLMFusedMoeInferShape(
+//         const std::vector<int64_t>&     input_activations_shape, //(num_tokens, hidden_size)
+//         const std::vector<int64_t>&      gating_output_shape, //(num_tokens, num_experts)
+//         const std::vector<int64_t>&      fc1_expert_weights_shape, //(num_experts, hidden_size, inter_size * 2)
+//         const std::vector<int64_t>&      fc2_expert_weights_shape, //(num_experts, inter_size, hidden_size)
+//         const paddle::optional<std::vector<int64_t>&>& scale1_shape,
+//         const paddle::optional<std::vector<int64_t>&>& scale2_shape,
+//         const paddle::optional<std::vector<int64_t>&>& scale3_shape){
     
-}
-
-std::vector<std::vector<int64_t>> TrtLLMFusedMoeInferShape(
-        const std::vector<int64_t>&     input_activations_shape, //(num_tokens, hidden_size)
-        const std::vector<int64_t>&      gating_output_shape, //(num_tokens, num_experts)
-        const std::vector<int64_t>&      fc1_expert_weights_shape, //(num_experts, hidden_size, inter_size * 2)
-        const std::vector<int64_t>&      fc2_expert_weights_shape, //(num_experts, inter_size, hidden_size)
-        const paddle::optional<std::vector<int64_t>&>& scale1_shape,
-        const paddle::optional<std::vector<int64_t>&>& scale2_shape,
-        const paddle::optional<std::vector<int64_t>&>& scale3_shape){
-    return {input_activations>shape};
-}
+//     return {input_activations_shape};
+// }
 
 PD_BUILD_OP(trt_llm_fused_moe)
     .Inputs({"input_activations", "gating_output", "fc1_expert_weights", "fc2_expert_weights", paddle::Optional("scale1"), paddle::Optional("scale2"), paddle::Optional("scale3"),})
     .Outputs({"output_tensor"})
     .Attrs({"k: int", "normalization_mode: int", "quant_method:std::string", "tune_max_num_tokens: int"})
-    .SetKernelFn(PD_KERNEL(TrtLLMFusedMoe))
-    .SetInferShapeFn(PD_INFER_SHAPE(TrtLLMFusedMoeInferShape))
-    .SetInferDtypeFn(PD_INFER_DTYPE(TrtLLMFusedMoeInferDtype));
+    .SetKernelFn(PD_KERNEL(TrtLLMFusedMoe));
+    // .SetInferShapeFn(PD_INFER_SHAPE(TrtLLMFusedMoeInferShape))
+    // .SetInferDtypeFn(PD_INFER_DTYPE(TrtLLMFusedMoeInferDtype));

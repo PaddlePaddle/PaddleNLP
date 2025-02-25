@@ -52,7 +52,6 @@
 #endif
 
 #include "tensorrt_llm/common/cudaUtils.h"
-#include "tensorrt_llm/common/logger.h"
 
 #include "tensorrt_llm/kernels/cutlass_kernels/cutlass_heuristic.h"
 #include "tensorrt_llm/kernels/cutlass_kernels/cutlass_type_conversion.h"
@@ -778,7 +777,7 @@ size_t MoeGemmRunner<T, WeightType, OutputType, ScaleBiasType>::calcMaxWorkspace
             max_size = std::max(max_size, size);                                                                       \
             has_config = true;                                                                                         \
         }                                                                                                              \
-        catch (tensorrt_llm::common::TllmException const& e)                                                           \
+        catch (std::runtime_error const& e)                                                           \
         {                                                                                                              \
             std::cout << "Unsupported config skipped when calculating MOE workspace size" << std::endl;                          \
         }                                                                                                              \

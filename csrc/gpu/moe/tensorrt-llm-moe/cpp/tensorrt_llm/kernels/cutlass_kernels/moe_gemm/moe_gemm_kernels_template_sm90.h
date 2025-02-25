@@ -50,7 +50,6 @@
 #pragma GCC diagnostic pop
 #endif          // __GNUC__
 
-#include "tensorrt_llm/common/assert.h"
 #include "tensorrt_llm/common/cudaUtils.h"
 #include "tensorrt_llm/kernels/cutlass_kernels/cutlass_heuristic.h"
 
@@ -159,7 +158,7 @@ void dispatchMoeGemmSelectClusterShapeSM90(HopperGroupedGemmInput hopper_input, 
         }                                                                                                              \
         else                                                                                                           \
         {                                                                                                              \
-            TLLM_THROW("Unsupported tile and cluster shape combination");                                              \
+            PADDLE_THROW("Unsupported tile and cluster shape combination");                                              \
         }                                                                                                              \
     }
 
@@ -170,7 +169,7 @@ void dispatchMoeGemmSelectClusterShapeSM90(HopperGroupedGemmInput hopper_input, 
         SHAPE_CASE(2, 2, 1)
 
 #undef SHAPE_CASE
-    default: TLLM_THROW("Unsupported config for MoE gemm.");
+    default: PADDLE_THROW("Unsupported config for MoE gemm.");
     }
 } // namespace tensorrt_llm
 
@@ -202,11 +201,11 @@ void dispatchMoeGemmSelectTileShapeSM90(HopperGroupedGemmInput hopper_input, int
         SHAPE_CASE(256, 128, 128)
 
 #undef SHAPE_CASE
-    case cutlass_extensions::CutlassTileConfigSM90::Undefined: TLLM_THROW("GEMM config undefined."); break;
+    case cutlass_extensions::CutlassTileConfigSM90::Undefined: PADDLE_THROW("GEMM config undefined."); break;
     case cutlass_extensions::CutlassTileConfigSM90::ChooseWithHeuristic:
-        TLLM_THROW("GEMM config should have already been set by heuristic.");
+        PADDLE_THROW("GEMM config should have already been set by heuristic.");
         break;
-    default: TLLM_THROW("Unsupported config for MoE gemm."); break;
+    default: PADDLE_THROW("Unsupported config for MoE gemm."); break;
     }
 }
 

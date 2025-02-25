@@ -17,7 +17,6 @@
 
 #pragma once
 #include "cutlass/gemm/gemm.h"
-#include "tensorrt_llm/common/quantization.h"
 #include "tensorrt_llm/common/cudaUtils.h"
 #include "tensorrt_llm/kernels/cutlass_kernels/moe_gemm/moe_gemm_kernels.h"
 #include "tensorrt_llm/kernels/cutlass_kernels/fp8_blockscale_gemm/fp8_blockscale_gemm.h"
@@ -117,13 +116,6 @@ struct MOEParallelismConfig
         , ep_size(ep_size)
         , ep_rank(ep_rank)
     {
-        // Do some basic sanity checks
-        TLLM_CHECK(tp_rank < tp_size);
-        TLLM_CHECK(tp_rank >= 0);
-        TLLM_CHECK(tp_size >= 1);
-        TLLM_CHECK(ep_rank < ep_size);
-        TLLM_CHECK(ep_rank >= 0);
-        TLLM_CHECK(ep_size >= 1);
     }
 
     bool operator==(MOEParallelismConfig const& other) const

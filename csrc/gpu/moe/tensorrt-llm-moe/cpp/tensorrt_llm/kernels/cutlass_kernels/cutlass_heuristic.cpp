@@ -32,7 +32,7 @@
 #include <cuda_runtime_api.h>
 #include <set>
 #include <vector>
-
+#include "paddle/phi/core/enforce.h"
 using namespace tensorrt_llm::cutlass_extensions;
 
 namespace tensorrt_llm
@@ -66,7 +66,7 @@ TileShape get_cta_shape_for_config(CutlassTileConfig tile_config)
     case CutlassTileConfig::CtaShape128x256x64_WarpShape64x64x64: return TileShape{128, 256};
     case CutlassTileConfig::CtaShape256x128x64_WarpShape64x64x64: return TileShape{256, 128};
     case CutlassTileConfig::CtaShape16x256x128_WarpShape16x64x128: return TileShape{16, 256};
-    default: TLLM_THROW("[get_grid_shape_for_config] Invalid config");
+    default: PADDLE_THROW("[get_grid_shape_for_config] Invalid config");
     }
 }
 
@@ -346,7 +346,7 @@ CutlassGemmConfig estimate_best_config_from_occupancies(std::vector<CutlassGemmC
 
     if (occupancies.size() != candidate_configs.size())
     {
-        TLLM_THROW(
+        PADDLE_THROW(
             "[estimate_best_config_from_occupancies] occpancies and "
             "candidate configs vectors must have equal length.");
     }
@@ -421,7 +421,7 @@ CutlassGemmConfig estimate_best_config_from_occupancies(std::vector<CutlassGemmC
 
     if (best_config.tile_config == CutlassTileConfig::ChooseWithHeuristic)
     {
-        TLLM_THROW("Heurisitc failed to find a valid config.");
+        PADDLE_THROW("Heurisitc failed to find a valid config.");
     }
 
     return best_config;

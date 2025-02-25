@@ -263,10 +263,6 @@ void sm90_generic_moe_gemm_kernelLauncher(HopperGroupedGemmInput hopper_input, i
         }
 
         using MainloopArguments = typename CollectiveMainloop::Arguments;
-        TLLM_CHECK(hopper_input.stride_a);
-        TLLM_CHECK(hopper_input.stride_b);
-        TLLM_CHECK(hopper_input.ptr_a);
-        TLLM_CHECK(hopper_input.ptr_b);
 
         MainloopArguments const mainloop_params = {reinterpret_cast<ElementB const**>(hopper_input.ptr_b),
             hopper_input.stride_b, reinterpret_cast<ElementA const**>(hopper_input.ptr_a), hopper_input.stride_a};

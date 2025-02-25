@@ -133,10 +133,6 @@ sources += [
         "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/generated_kernels/gemm_grouped/cutlass_kernel_file_4.generated.cu",
         "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/generated_kernels/gemm_grouped/cutlass_kernel_file_5.generated.cu",
         "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/generated_kernels/gemm_grouped/cutlass_kernel_file_6.generated.cu",
-        
-        "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/common/stringUtils.cpp",
-        "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/common/logger.cpp", 
-        "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/common/tllmException.cpp",
         "gpu/moe/tensorrt-llm-moe/moe/trt_llm_fused_moe.cu",
         ]
 

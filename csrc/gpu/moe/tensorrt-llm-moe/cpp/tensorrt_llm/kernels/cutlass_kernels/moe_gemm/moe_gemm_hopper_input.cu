@@ -23,8 +23,7 @@
 #include "cutlass/conv/convolution.h"
 // Order matters here, packed_stride.hpp is missing cute and convolution includes
 #include "cutlass/util/packed_stride.hpp"
-
-#include "tensorrt_llm/common/logger.h"
+#include "paddle/phi/core/enforce.h"
 
 namespace tensorrt_llm
 {
@@ -54,7 +53,7 @@ void HopperGroupedGemmInput::configureWorkspace(
 {
     auto buffers = workspaceBuffers(num_experts);
     std::array<int8_t*, 10> pointers{};
-    TLLM_CHECK_WITH_INFO(pointers.size() == buffers.size(), "Mismatching workspace size and number of buffers");
+    PADDLE_ENFORCE(pointers.size() == buffers.size(), "Mismatching workspace size and number of buffers");
     for (int i = 0; i < buffers.size(); i++)
     {
         pointers[i] = start_ptr;
