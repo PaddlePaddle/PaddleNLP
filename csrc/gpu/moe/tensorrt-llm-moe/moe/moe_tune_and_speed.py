@@ -129,7 +129,7 @@ def trt_win8(quant_method):
             topk,
             0,
             quant_method,
-            8192 * 8,
+            8192 * 64,
         )
     paddle.device.synchronize()
     end = time.time()
@@ -179,11 +179,11 @@ def paddle_win8(quant_method):
     print(f"paddle win8 : {((end - start) * 1000 * 1000)} us")
 
 
-for i in range(20):
+for i in range(1):
     trt_win8(quant_method)
 
-for i in range(20):
-    paddle_win8(quant_method)
+# for i in range(20):
+#     paddle_win8(quant_method)
 
 
 

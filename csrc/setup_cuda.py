@@ -115,45 +115,28 @@ sources = [
     "./gpu/speculate_decoding_kernels/speculate_get_output.cc",
 ]
 sources += find_end_files("./gpu/speculate_decoding_kernels", ".cu")
+# moe
 sources = []
-# moe
+sources += find_end_files("./gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/generated_kernels/gemm_grouped/", ".cu")
+sources += find_end_files("./gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/moe_gemm/", ".cu")
 sources += [
-        "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/cutlass_heuristic.cpp",
-        "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/mixtureOfExperts/moe_kernels.cu",
-        "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/moe_gemm/moe_gemm_hopper_input.cu",
-        "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/moe_gemm/moe_gemm_kernels_bf16_bf16.cu",
-        "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/moe_gemm/moe_gemm_kernels_bf16_uint4.cu",
-        "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/moe_gemm/moe_gemm_kernels_bf16_uint8.cu",
-        "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/moe_gemm/moe_gemm_kernels_fp16_fp16.cu",
-        "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/moe_gemm/moe_gemm_kernels_fp8_fp8.cu",
-        "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/moe_gemm/moe_gemm_kernels_bf16_fp8.cu",
-        "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/generated_kernels/gemm_grouped/cutlass_kernel_file_1.generated.cu",
-        "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/generated_kernels/gemm_grouped/cutlass_kernel_file_2.generated.cu",
-        "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/generated_kernels/gemm_grouped/cutlass_kernel_file_3.generated.cu",
-        "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/generated_kernels/gemm_grouped/cutlass_kernel_file_4.generated.cu",
-        "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/generated_kernels/gemm_grouped/cutlass_kernel_file_5.generated.cu",
-        "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/generated_kernels/gemm_grouped/cutlass_kernel_file_6.generated.cu",
-        "gpu/moe/tensorrt-llm-moe/moe/trt_llm_fused_moe.cu",
-        ]
-
-
-include_path = ["/usr/include/x86_64-linux-gnu/", 
-                "third_party/cutlass/include",
-                "third_party/cutlass/tools/util/include",
-                "gpu/moe/tensorrt-llm-moe/cpp/",
-                "gpu/moe/tensorrt-llm-moe/",
-                "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/cutlass_extensions/include/",
-                ]
-
-
-
-# extra_link_args = ["-L/usr/lib/x86_64-linux-gnu/", "-lnvinfer"]
+    "./gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/cutlass_heuristic.cpp",
+    "./gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/mixtureOfExperts/moe_kernels.cu",
+    "./gpu/moe/tensorrt-llm-moe/moe/trt_llm_fused_moe.cu",
+]
+include_path = [
+    "/usr/include/x86_64-linux-gnu/", 
+    "./third_party/cutlass/include",
+    "./third_party/cutlass/tools/util/include",
+    "./gpu/moe/tensorrt-llm-moe/cpp/",
+    "./gpu/moe/tensorrt-llm-moe/",
+    "./gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/cutlass_extensions/include/",
+]
 extra_link_args = ["-L/usr/lib/x86_64-linux-gnu/"]
-# moe
-CXX_FLAGS = ["-g"]
-CXX_FLAGS += ["-DENABLE_BF16"]
+CXX_FLAGS = ["-g" ,"-DENABLE_BF16"]
 library_dirs = [library_path]
 libraries=["cublasLt"]
+
 
 nvcc_compile_args = gencode_flags
 update_git_submodule()
