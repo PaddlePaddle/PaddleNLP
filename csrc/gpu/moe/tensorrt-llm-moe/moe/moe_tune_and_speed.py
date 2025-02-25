@@ -1,31 +1,41 @@
 
 
 import paddle
-
-import functools
-import json
-import logging
-import os
 import time
-from typing import Any, Callable, Dict, List, Optional, Tuple
-from paddle.incubate.nn.functional import (
-    fused_moe)
-
+import argparse
+from paddle.incubate.nn.functional import fused_moe
 from paddle.nn.quant import weight_quantize
-
-# import triton
-
 from paddlenlp_ops import trt_llm_fused_moe
+
 paddle.seed(2)
 
-
-import argparse  # 导入argparse库
-
-# 使用 argparse 获取命令行参数
 parser = argparse.ArgumentParser(description='Run MoE model with specified M')
 parser.add_argument('--M', type=int, default=256, help='Batch size, token_num (M)')
 args = parser.parse_args()
 
+# Constants
+DTYPES = paddle.bfloat16
+# deepseek v3 parameters
+M = args.M # (Batch size * token_num)
+TP = 16
+N = 2048 // TP  # Intermediate size
+K = 7168  # Hidden size
+E = 256  # Number of experts
+topk = 8
+block_size = [128, 128]
+SEEDS = 0
+
+def create_random_cuda_tensor(shape, dtype, mean: float = 0, std: float = 1):    
+    return paddle.empty(shape, dtype=dtype).normal_(mean, std)
+
+# Gate logits (score after gate)
+score = create_random_cuda_tensor([M, E], paddle.float32).cast("float32")
+
+# Bfloat16 input
+a = paddle.randn((M, K), dtype=paddle.bfloat16) / 100
+w1 = paddle.rand((E, K, 2 * N), dtype=paddle.bfloat16) / 100
+w2 = paddle.rand((E , N, K), dtype=paddle.bfloat16)/ 100
+gate_weight = paddle.rand((K, E), dtype=paddle.float32) / 100
 
 def GetQuantizedWeights(quant_method, w1, w2, arch=80):
     """
@@ -33,11 +43,11 @@ def GetQuantizedWeights(quant_method, w1, w2, arch=80):
     :param quant_method: The quantization method to use.
     :return: Quantized bmm_w0, bmm_w1, scale0, scale1
     """
-    num_expert = 256
+    num_expert = E
     bmm_w0 = w1
     bmm_w1 = w2
-    d_model = 7168
-    d_feedforward = 128
+    d_model = K
+    d_feedforward = N
     
     if quant_method != "None":
         fc0_expert_weights_for_ref_list = []
@@ -76,60 +86,7 @@ def GetQuantizedWeights(quant_method, w1, w2, arch=80):
         return bmm_w0_quantized, bmm_w1_quantized, scale0, scale1
     else:
         return bmm_w0, bmm_w1, None, None
-
-# Constants
-DTYPES = paddle.bfloat16
-M = args.M # Batch size, token_num
-
-TP = 16
-N = 2048 // TP  # Intermediate size
-K = 7168  # Hidden size
-E = 256  # Number of experts
-TOP_KS = 8
-BLOCK_SIZE = [128, 128]  # Block-wise
-SEEDS = 0
-
-# Define parameters
-topk = TOP_KS
-block_size = BLOCK_SIZE
-
-def create_random_cuda_tensor(shape, dtype, mean: float = 0, std: float = 1):
-        # return paddle.randn(shape, dtype=dtype) / 10
-        
-    return paddle.empty(shape, dtype=dtype).normal_(mean, std)
-
-# Gate logits (score after gate)
-score = create_random_cuda_tensor([M, E], paddle.float32).cast("float32")
-
-# Bfloat16 input
-a = paddle.randn((M, K), dtype=paddle.bfloat16) / 100
-
-# a = create_random_cuda_tensor([M, K], paddle.bfloat16, mean=0, std=0.01)
-
-w1 = paddle.rand((E, K, 2 * N), dtype=paddle.bfloat16) / 100
-w2 = paddle.rand((E , N, K), dtype=paddle.bfloat16)/ 100
-
-gate_weight = paddle.rand((K,E), dtype=paddle.float32) / 100
-# w1 = create_random_cuda_tensor([E, K, 2 * N], paddle.bfloat16, mean=0, std=0.01)
-# w2 = create_random_cuda_tensor([E ,N, K], paddle.bfloat16, mean=0, std=0.01)
-
-# print(w1)
-print("((((((((((((((((((((((((((()))))))))))))))))))))))))))")
-
-print(a.shape)
-print(score.shape)
-print(w1.shape)
-print(w2.shape)
-
-# [110, 2048]
-# [110, 64]
-# [64, 2048, 2816]
-# [64, 1408, 2048]
-
-
-
-
-
+    
 
 def trt_bf16():
     paddle.device.synchronize()
@@ -178,26 +135,26 @@ def trt_win8(quant_method):
     end = time.time()
     print(f"trt wint8 : {((end - start) * 1000 * 1000)} us")
 
-# def paddle_bf16():
-#     paddle.device.synchronize()
-#     start = time.time()
-#     fused_moe_out = fused_moe(
-#                 a,
-#                 score,
-#                 w1,
-#                 w2,
-#                 None,
-#                 None,
-#                 None,
-#                 None,
-#                 # quant_method,
-#                 quant_method,
-#                 topk,
-#                 False,
-#             )
-#     paddle.device.synchronize()
-#     end = time.time()
-#     print(f"paddle bf16 : {((end - start) * 1000)} ms")
+def paddle_bf16():
+    paddle.device.synchronize()
+    start = time.time()
+    fused_moe_out = fused_moe(
+                a,
+                score,
+                w1,
+                w2,
+                None,
+                None,
+                None,
+                None,
+                # quant_method,
+                quant_method,
+                topk,
+                False,
+            )
+    paddle.device.synchronize()
+    end = time.time()
+    print(f"paddle bf16 : {((end - start) * 1000)} ms")
 
 
 
@@ -222,50 +179,11 @@ def paddle_win8(quant_method):
     print(f"paddle win8 : {((end - start) * 1000 * 1000)} us")
 
 
-# for i in range(20):
-#     paddle_bf16()
-
-
-# for i in range(20):
-#     trt_bf16()
-
-
-for i in range(10):
+for i in range(20):
     trt_win8(quant_method)
 
 for i in range(20):
     paddle_win8(quant_method)
 
 
-
-#  def moe_fp8_no_block(i):
-#     """Function to test FP8 per-tensor fused MoE."""
-#     paddle.device.synchronize()
-#     start = time.time()
-
-#     out = fused_moe(
-#         a, # bf16
-#         w1_fp8,
-#         w2_fp8,
-#         score,
-#         topk,
-#         renormalize=True,
-#         use_fp8_w8a8=True,
-#         w1_scale=w1_s,
-#         w2_scale=w2_s,
-#     )
-#     paddle.device.synchronize()
-#     end = time.time()
-#     print(f"fp8 no block {i} : {((end - start) * 1000)} ms")
-
-
-# Run tests
-# for i in range(10):
-#     moe(i)
-
-# for i in range(1):
-#     moe_fp8(i)
-
-# for i in range(10):
-#     moe_fp8_no_block(i)
 

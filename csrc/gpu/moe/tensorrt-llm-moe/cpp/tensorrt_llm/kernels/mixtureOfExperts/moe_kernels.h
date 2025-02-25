@@ -25,7 +25,7 @@
 #include <NvInferRuntime.h>
 #include <optional>
 #include <random>
-#include "moe/utils.h"
+#include "utils.h"
 
 namespace tensorrt_llm::kernels
 {

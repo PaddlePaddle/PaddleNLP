@@ -66,7 +66,7 @@
 
 
 #include "paddle/phi/core/enforce.h"
-#include "moe/utils.h"
+#include "utils.h"
 
 using namespace tensorrt_llm::kernels;
 using namespace tensorrt_llm::common;

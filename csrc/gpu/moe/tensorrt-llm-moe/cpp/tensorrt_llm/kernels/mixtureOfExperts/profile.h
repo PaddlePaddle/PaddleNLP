@@ -2,7 +2,6 @@
 
 #pragma once
 #include "utils.h"
-#include "tensorrt_llm/kernels/cutlass_kernels/cutlass_preprocessors.h"
 #include "tensorrt_llm/kernels/mixtureOfExperts/moe_kernels.h"
 
 using profiler_backend = kernels::GemmProfilerBackend;
@@ -62,7 +61,7 @@ selectTacticsForArch(std::shared_ptr<kernels::CutlassMoeFCRunnerInterface> moe_r
 }
 
 
-// profile部分 ***************************************
+// ***************************************profile部分 ***************************************
 struct GemmIDMoe
 {
     profiler_backend::GemmToProfile gemm_idx;

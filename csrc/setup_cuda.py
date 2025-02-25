@@ -119,16 +119,12 @@ sources = []
 # moe
 sources += [
         "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/cutlass_heuristic.cpp",
-        "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/cutlass_preprocessors.cpp", 
         "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/mixtureOfExperts/moe_kernels.cu",
         "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/moe_gemm/moe_gemm_hopper_input.cu",
         "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/moe_gemm/moe_gemm_kernels_bf16_bf16.cu",
         "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/moe_gemm/moe_gemm_kernels_bf16_uint4.cu",
         "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/moe_gemm/moe_gemm_kernels_bf16_uint8.cu",
         "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/moe_gemm/moe_gemm_kernels_fp16_fp16.cu",
-        "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/moe_gemm/moe_gemm_kernels_fp16_uint4.cu",
-        "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/moe_gemm/moe_gemm_kernels_fp16_uint8.cu",
-        "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/moe_gemm/moe_gemm_kernels_fp32_fp32.cu",
         "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/moe_gemm/moe_gemm_kernels_fp8_fp8.cu",
         "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/moe_gemm/moe_gemm_kernels_bf16_fp8.cu",
         "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/generated_kernels/gemm_grouped/cutlass_kernel_file_1.generated.cu",
@@ -137,10 +133,11 @@ sources += [
         "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/generated_kernels/gemm_grouped/cutlass_kernel_file_4.generated.cu",
         "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/generated_kernels/gemm_grouped/cutlass_kernel_file_5.generated.cu",
         "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/generated_kernels/gemm_grouped/cutlass_kernel_file_6.generated.cu",
+        
         "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/common/stringUtils.cpp",
         "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/common/logger.cpp", 
         "gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/common/tllmException.cpp",
-        "gpu/moe/tensorrt-llm-moe/moe/moe.cu",
+        "gpu/moe/tensorrt-llm-moe/moe/trt_llm_fused_moe.cu",
         ]
 
 
@@ -182,9 +179,6 @@ nvcc_compile_args += [
     "-Igpu/sample_kernels",
 ]
 
-# 多线程编译
-# num_threads = min(os.cpu_count(), 8)
-# nvcc_compile_args += ["--threads", str(num_threads)]
 nvcc_compile_args += ["-DENABLE_BF16"]
 
 cc = get_sm_version()
@@ -236,8 +230,6 @@ if cc >= 90 and cuda_version >= 12.0:
     library_dirs += ["gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/fp8_blockscale_gemm/"]
     extra_link_args += ["gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/fp8_blockscale_gemm/libfp8_blockscale_gemm.a"]
     libraries += ["fp8_blockscale_gemm"]
-    # nvcc_compile_args += ["-DENABLE_FP8", "-DMYDEBUG"]
-    # CXX_FLAGS += ["-DENABLE_FP8", "-DMYDEBUG"]
     nvcc_compile_args += ["-DENABLE_FP8"]
     CXX_FLAGS += ["-DENABLE_FP8"]
 

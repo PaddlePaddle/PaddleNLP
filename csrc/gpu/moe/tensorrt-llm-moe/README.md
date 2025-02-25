@@ -1,7 +1,7 @@
 # NOTE
 
 # tensorrt-llm-moe
-Use TensorRT LLM MoE as a library
+Use TensorRT LLM MoE OP
 
 ### Build
 
@@ -9,11 +9,9 @@ Use TensorRT LLM MoE as a library
 python3 setup_cuda.py install
 ```
 
-### Test
-
-#### end2end MoE test
+### Tune and Test
 ```shell
-python3 test_trtllm_moe.py
+python3 moe_tune_and_speed.py
 ```
 
 

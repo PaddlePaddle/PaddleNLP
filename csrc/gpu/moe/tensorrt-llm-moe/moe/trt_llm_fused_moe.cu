@@ -1,13 +1,26 @@
+// Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 #pragma once
 
 #include <optional>
 #include <algorithm>
-#include "tensorrt_llm/kernels/mixtureOfExperts/moe_kernels.h"
-#include "tensorrt_llm/kernels/cutlass_kernels/cutlass_preprocessors.h"
 #include "cutlass_helper.h"
-#include "moe/utils.h"
-#include "profile.h"
+#include "tensorrt_llm/kernels/mixtureOfExperts/utils.h"
+#include "tensorrt_llm/kernels/mixtureOfExperts/profile.h"
+#include "tensorrt_llm/kernels/mixtureOfExperts/moe_kernels.h"
+
 
 kernels::MOEExpertScaleNormalizationMode getNormalizationMode(int normalization_mode) {
     switch (normalization_mode) {
@@ -445,9 +458,40 @@ std::vector<paddle::Tensor> TrtLLMFusedMoe(const paddle::Tensor&     input_activ
     return {output_tensor};
 }
 
+std::vector<paddle::DataType> TrtLLMFusedMoeInferDtype(
+        const paddle::DataType&     input_activations, //(num_tokens, hidden_size)
+        const paddle::DataType&      gating_output, //(num_tokens, num_experts)
+        const paddle::DataType&      fc1_expert_weights, //(num_experts, hidden_size, inter_size * 2)
+        const paddle::DataType&     fc2_expert_weights, //(num_experts, inter_size, hidden_size)
+        const paddle::optional<paddle::DataType>& scale1,
+        const paddle::optional<paddle::DataType>& scale2,
+        const paddle::optional<paddle::DataType>& scale3, 
+        int     k,
+        int normalization_mode,
+        const std::string& quant_method,
+        int     tune_max_num_tokens){
+
+        const int num_rows = input_activations.shape()[0];//(num_tokens, hidden_size)
+        const int hidden_size = input_activations.shape()[1];
+        return {input_activations};
+    
+}
+
+std::vector<std::vector<int64_t>> TrtLLMFusedMoeInferShape(
+        const std::vector<int64_t>&     input_activations_shape, //(num_tokens, hidden_size)
+        const std::vector<int64_t>&      gating_output_shape, //(num_tokens, num_experts)
+        const std::vector<int64_t>&      fc1_expert_weights_shape, //(num_experts, hidden_size, inter_size * 2)
+        const std::vector<int64_t>&      fc2_expert_weights_shape, //(num_experts, inter_size, hidden_size)
+        const paddle::optional<std::vector<int64_t>&>& scale1_shape,
+        const paddle::optional<std::vector<int64_t>&>& scale2_shape,
+        const paddle::optional<std::vector<int64_t>&>& scale3_shape){
+    return {input_activations>shape};
+}
 
 PD_BUILD_OP(trt_llm_fused_moe)
     .Inputs({"input_activations", "gating_output", "fc1_expert_weights", "fc2_expert_weights", paddle::Optional("scale1"), paddle::Optional("scale2"), paddle::Optional("scale3"),})
     .Outputs({"output_tensor"})
     .Attrs({"k: int", "normalization_mode: int", "quant_method:std::string", "tune_max_num_tokens: int"})
-    .SetKernelFn(PD_KERNEL(TrtLLMFusedMoe));
+    .SetKernelFn(PD_KERNEL(TrtLLMFusedMoe))
+    .SetInferShapeFn(PD_INFER_SHAPE(TrtLLMFusedMoeInferShape))
+    .SetInferDtypeFn(PD_INFER_DTYPE(TrtLLMFusedMoeInferDtype));
