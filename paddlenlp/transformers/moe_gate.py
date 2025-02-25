@@ -1,4 +1,4 @@
-# = paddle.topk(tmp_scores, k=k, axis=-1, sorted=Trui Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -231,11 +231,11 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         # less than the expert capacity. One-hot matrix will ignore indices outside
         # the range [0, expert_capacity).
         # Shape: [tokens_per_group, num_experts, expert_capacity].
-        valid_mask = paddle.logical_and(token_priority >= 0, token_priority < capacity).astype(paddle.bool)
+        valid_mask = paddle.logical_and(token_priority >= 0, token_priority < capacity)
         token_priority = paddle.masked_fill(token_priority, ~valid_mask, 0)
-        dispatch_mask = F.one_hot(token_priority, capacity).cast(paddle.bool)
+        dispatch_mask = F.one_hot(token_priority, capacity).cast(paddle.int32)
         valid_mask = valid_mask.unsqueeze(-1).expand(valid_mask.shape + [capacity])
-        dispatch_mask = dispatch_mask * (~valid_mask)
+        dispatch_mask = paddle.masked_fill(dispatch_mask, ~valid_mask, 0)
 
         return dispatch_mask
 
@@ -530,20 +530,13 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
             token_priority = self._priority(top_idx, capacity)
 
         # normalize gates
+        gates_masked = gates * mask
         if self.training:
-            gates_masked = gates * mask
             gates_s = paddle.sum(gates_masked, axis=-1, keepdim=True)
             denom_s = paddle.clip(gates_s, min=paddle.finfo(gates_masked.dtype).eps)
             if self.norm_topk_prob:
                 gates_masked = gates_masked / denom_s
-            combine_weights = paddle.einsum(
-                "se,sec->sec", gates_masked, token_priority.cast(paddle.get_default_dtype())
-            )
-        else:
-            topk_masked_gates = paddle.zeros_like(gates).put_along_axis(top_idx, top_gate, axis=1)
-            combine_weights = paddle.einsum(
-                "se,sec->sec", topk_masked_gates, token_priority.cast(paddle.get_default_dtype())
-            )
+        combine_weights = paddle.einsum("se,sec->sec", gates_masked, token_priority.cast(paddle.get_default_dtype()))
 
         combine_weights = paddle.einsum("se,sec->sec", gates_masked, token_priority.cast(paddle.get_default_dtype()))
         dispatch_mask = combine_weights.astype(paddle.bool)
