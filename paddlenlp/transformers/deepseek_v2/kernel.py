@@ -17,7 +17,8 @@ from typing import Tuple
 import paddle
 import triton
 import triton.language as tl
-from triton import Config
+
+# from triton import Config
 
 
 @triton.jit
@@ -59,11 +60,11 @@ def act_quant(x: paddle.Tensor, block_size: int = 128) -> Tuple[paddle.Tensor, p
     """
     assert x.is_contiguous(), "Input tensor must be contiguous"
     assert (
-        x.size(-1) % block_size == 0
+        x.shape[-1] % block_size == 0
     ), f"Last dimension size must be divisible by block_size (block_size={block_size})"
     y = paddle.empty_like(x, dtype=paddle.float8_e4m3fn)
-    s = x.new_empty(*x.size()[:-1], x.size(-1) // block_size, dtype=paddle.float32)
-    grid = lambda meta: (triton.cdiv(x.numel(), meta["BLOCK_SIZE"]),)
+    s = paddle.empty((*x.shape[:-1], x.shape[-1] // block_size), dtype=paddle.float32)
+    grid = lambda meta: (triton.cdiv(x.numel().item(), meta["BLOCK_SIZE"]),)
     act_quant_kernel[grid](x, y, s, BLOCK_SIZE=block_size)
     return y, s
 
@@ -114,22 +115,21 @@ def weight_dequant(x: paddle.Tensor, s: paddle.Tensor, block_size: int = 128) ->
     """
     assert x.is_contiguous() and s.is_contiguous(), "Input tensors must be contiguous"
     assert x.dim() == 2 and s.dim() == 2, "Input tensors must have 2 dimensions"
-    M, N = x.size()
+    M, N = x.shape
     y = paddle.empty_like(x, dtype=paddle.get_default_dtype())
     grid = lambda meta: (triton.cdiv(M, meta["BLOCK_SIZE"]), triton.cdiv(N, meta["BLOCK_SIZE"]))
     weight_dequant_kernel[grid](x, s, y, M, N, BLOCK_SIZE=block_size)
     return y
 
 
-fp8_gemm_configs = [
-    Config({"BLOCK_SIZE_M": block_m, "BLOCK_SIZE_N": block_n, "BLOCK_SIZE_K": 128}, num_stages=num_stages, num_warps=8)
-    for block_m in [16, 32, 64]
-    for block_n in [32, 64, 128]
-    for num_stages in [3, 4, 5, 6]
-]
-
-
-@triton.autotune(configs=fp8_gemm_configs, key=["N", "K"])
+# fp8_gemm_configs = [
+#     Config({"BLOCK_SIZE_M": block_m, "BLOCK_SIZE_N": block_n, "BLOCK_SIZE_K": 128}, num_stages=num_stages, num_warps=8)
+#     for block_m in [16, 32, 64]
+#     for block_n in [32, 64, 128]
+#     for num_stages in [3, 4, 5, 6]
+# ]
+# FIXME @ZHUI, paddle not support triton autotune temporarily.
+# # @triton.autotune(configs=fp8_gemm_configs, key=["N", "K"])
 @triton.jit
 def fp8_gemm_kernel(
     a_ptr,
@@ -195,23 +195,32 @@ def fp8_gemm_kernel(
 
 def fp8_gemm(a: paddle.Tensor, a_s: paddle.Tensor, b: paddle.Tensor, b_s: paddle.Tensor):
     """
-    Perform a matrix multiplication using FP8 precision.
-
-    Args:
-        a (paddle.Tensor): The first input matrix, must be contiguous.
-        a_s (paddle.Tensor): The scaling factor for the first input matrix, must be contiguous.
-        b (paddle.Tensor): The second input matrix, must be contiguous.
-        b_s (paddle.Tensor): The scaling factor for the second input matrix, must be contiguous.
-
-    Returns:
-        paddle.Tensor: The result of the matrix multiplication.
+    Modified for B matrix with shape [K, N]
     """
+    # FIXME @ZHUI, transposed
+    b = b.T.contiguous()
+    b_s = b_s.T.contiguous()
     assert a.is_contiguous() and b.is_contiguous(), "Input tensors must be contiguous"
     assert a_s.is_contiguous() and b_s.is_contiguous(), "Scaling factor tensors must be contiguous"
-    K = a.size(-1)
-    M = a.numel() // K
-    N = b.size(0)
-    c = a.new_empty(*a.size()[:-1], N, dtype=paddle.get_default_dtype())
+
+    K = a.shape[-1]
+    M = a.numel().item() // K
+    # N = b.shape[-1]  # Get N from the second dimension of B
+    N = b.shape[0]  # Get N from the second dimension of B
+
+    c = paddle.empty((*a.shape[:-1], N), dtype=paddle.get_default_dtype())
     grid = lambda META: (triton.cdiv(M, META["BLOCK_SIZE_M"]), triton.cdiv(N, META["BLOCK_SIZE_N"]))
-    fp8_gemm_kernel[grid](a, b, c, a_s, b_s, M, N, K)
+    fp8_gemm_kernel[grid](
+        a,
+        b,
+        c,
+        a_s,
+        b_s,
+        M,
+        N,
+        K,
+        BLOCK_SIZE_M=32,
+        BLOCK_SIZE_N=64,
+        BLOCK_SIZE_K=128,
+    )
     return c

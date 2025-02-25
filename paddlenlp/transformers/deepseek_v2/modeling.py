@@ -96,48 +96,95 @@ def new_repr(self):
 
 nn.Embedding.extra_repr = new_repr
 
+origin_tensort_init = paddle.Tensor.__call__
+origin_to_tensor = paddle.to_tensor
+origin_numpy = paddle.Tensor.numpy
+origin_numel = paddle.Tensor.numel
+origin_set_value = paddle.core.eager.Tensor.set_value
+
 
 paddle_numpy_mapping = {
     paddle.float8_e5m2: (paddle.int8, np.float8_e5m2),
     paddle.float8_e4m3fn: (paddle.int8, np.float8_e4m3fn),
     paddle.bfloat16: (paddle.int16, np.bfloat16),
 }
+
 numpy_paddle_mapping = {
-    np.float8_e5m2: (np.int8, paddle.float8_e5m2),
-    np.float8_e4m3fn: (np.int8, paddle.float8_e4m3fn),
-    np.bfloat16: (np.int16, paddle.bfloat16),
+    np.dtype(np.float8_e5m2): (np.int8, paddle.float8_e5m2),
+    np.dtype(np.float8_e4m3fn): (np.int8, paddle.float8_e4m3fn),
+    np.dtype(np.bfloat16): (np.uint16, paddle.bfloat16),
 }
 
 
-origin_tensort_init = paddle.Tensor.__call__
-origin_to_tensor = paddle.to_tensor
+paddle_set_value_mapping = {
+    paddle.float8_e5m2: (paddle.int8, None),
+    paddle.float8_e4m3fn: (paddle.int8, None),
+    paddle.bfloat16: (paddle.int16, None),
+    # paddle.bfloat16: (paddle.int16, np.bfloat16),
+    np.dtype(np.float8_e5m2): (np.int8, paddle.float8_e5m2),
+    np.dtype(np.float8_e4m3fn): (np.int8, paddle.float8_e4m3fn),
+}
 
 
 def enhance_init(*args, **kwargs):
-    print(args, kwargs)
-    if isinstance(args[0], np.ndarray) and args[0].dtype in (np.float8_e4m3fn, np.float8_e5m2):
-        raise ValueError()
+    if isinstance(args[0], np.ndarray) and args[0].dtype in numpy_paddle_mapping:
         inter_dtype, tgt_dtype = numpy_paddle_mapping[args[0].dtype]
-        tensor = np.view(inter_dtype)
+        tensor = args[0].view(inter_dtype)
         new_args = (tensor, *args[1:])
         tensor = origin_tensort_init(*new_args, **kwargs)
         return tensor.view(tgt_dtype)
-
     return origin_tensort_init(*args, **kwargs)
 
 
 def enhance_to_tensor(*args, **kwargs):
-    if isinstance(args[0], np.ndarray) and args[0].dtype in (np.float8_e4m3fn, np.float8_e5m2):
+    if isinstance(args[0], np.ndarray) and args[0].dtype in numpy_paddle_mapping:
         inter_dtype, tgt_dtype = numpy_paddle_mapping[args[0].dtype]
-        tensor = np.view(inter_dtype)
+        tensor = args[0].view(inter_dtype)
         new_args = (tensor, *args[1:])
         tensor = origin_to_tensor(*new_args, **kwargs)
         return tensor.view(tgt_dtype)
     return origin_to_tensor(*args, **kwargs)
 
 
+def enhance_set_value(self, *args, **kwargs):
+    # print(args, kwargs)
+    if isinstance(args[0], np.ndarray) and args[0].dtype in paddle_set_value_mapping:
+        inter_dtype, tgt_dtype = paddle_set_value_mapping[args[0].dtype]
+        tensor = args[0].view(inter_dtype)
+        new_args = (tensor, *args[1:])
+        return origin_set_value(self, *new_args, **kwargs)
+
+    if isinstance(args[0], paddle.Tensor) and args[0].dtype in paddle_set_value_mapping:
+        inter_dtype, _ = paddle_set_value_mapping[args[0].dtype]
+        tensor = args[0].view(inter_dtype)
+        new_args = (tensor, *args[1:])
+        new_self = self.view(inter_dtype)
+        return origin_set_value(new_self, *new_args, **kwargs)
+
+    return origin_set_value(self, *args, **kwargs)
+
+
+def _numpy(self, *args, **kwargs):
+    if self.dtype in paddle_numpy_mapping:
+        inter_pd_dtype, np_dtype = paddle_numpy_mapping[self.dtype]
+        tensor = origin_numpy(self.view(inter_pd_dtype), *args, **kwargs)
+        return tensor.view(np_dtype)
+    return origin_numpy(self, *args, **kwargs)
+
+
+def _numel(self, *args, **kwargs):
+    if self.dtype in paddle_numpy_mapping:
+        inter_pd_dtype, _ = paddle_numpy_mapping[self.dtype]
+        ret = origin_numel(self.view(inter_pd_dtype), *args, **kwargs)
+        return ret
+    return origin_numel(self, *args, **kwargs)
+
+
+paddle.Tensor.numpy = _numpy
 paddle.Tensor.__call__ = enhance_init
 paddle.to_tensor = enhance_to_tensor
+paddle.core.eager.Tensor.set_value = enhance_set_value
+paddle.Tensor.numel = _numel
 
 
 def get_triangle_upper_mask(x, mask=None):
@@ -371,7 +418,7 @@ class DeepseekV2RMSNorm(nn.Layer):
 
         self.weight = paddle.create_parameter(
             shape=[self.hidden_size],
-            dtype=paddle.float32,
+            dtype=paddle.get_default_dtype(),
             default_initializer=nn.initializer.Constant(1.0),
         )
 
@@ -406,7 +453,7 @@ class DeepseekV2RMSNorm(nn.Layer):
         return hidden_states * self.weight
 
     def extra_repr(self):
-        return f"hidden_size={self.hidden_size}, dtype={self._dtype}"
+        return f"hidden_size={self.hidden_size}, dtype={self.weight.dtype}"
 
 
 class DeepseekV2RotaryEmbedding(nn.Layer):
@@ -682,6 +729,14 @@ class DeepseekV2MLP(nn.Layer):
         self.hidden_size = config.hidden_size if hidden_size is None else hidden_size
         self.intermediate_size = config.intermediate_size if intermediate_size is None else intermediate_size
 
+        def linear_dtye_gaurd():
+            if config.use_fp8:
+                return dtype_guard("float8_e4m3fn")
+            else:
+                import contextlib
+
+                return contextlib.nullcontext()
+
         if config.sequence_parallel:
             ColumnParallelLinear = linear_utils.ColumnSequenceParallelLinear
             RowParallelLinear = linear_utils.RowSequenceParallelLinear
@@ -689,29 +744,30 @@ class DeepseekV2MLP(nn.Layer):
             ColumnParallelLinear = linear_utils.ColumnParallelLinear
             RowParallelLinear = linear_utils.RowParallelLinear
 
-        if config.tensor_parallel_degree > 1 and not is_moe:
-            self.gate_proj = ColumnParallelLinear(
-                self.hidden_size,
-                self.intermediate_size,
-                gather_output=False,
-                has_bias=False,
-            )
-            self.up_proj = ColumnParallelLinear(
-                self.hidden_size,
-                self.intermediate_size,
-                gather_output=False,
-                has_bias=False,
-            )
-            self.down_proj = RowParallelLinear(
-                self.intermediate_size,
-                self.hidden_size,
-                input_is_parallel=True,
-                has_bias=False,
-            )
-        else:
-            self.gate_proj = Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
-            self.up_proj = Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
-            self.down_proj = Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
+        with linear_dtye_gaurd():
+            if config.tensor_parallel_degree > 1 and not is_moe:
+                self.gate_proj = ColumnParallelLinear(
+                    self.hidden_size,
+                    self.intermediate_size,
+                    gather_output=False,
+                    has_bias=False,
+                )
+                self.up_proj = ColumnParallelLinear(
+                    self.hidden_size,
+                    self.intermediate_size,
+                    gather_output=False,
+                    has_bias=False,
+                )
+                self.down_proj = RowParallelLinear(
+                    self.intermediate_size,
+                    self.hidden_size,
+                    input_is_parallel=True,
+                    has_bias=False,
+                )
+            else:
+                self.gate_proj = Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
+                self.up_proj = Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
+                self.down_proj = Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
 
         self.act_fn = ACT2FN[config.hidden_act]
 
@@ -730,7 +786,7 @@ class MoEGate(PretrainedMoEGate):
 
         self.weight = paddle.create_parameter(
             shape=[expert_hidden_size, num_experts],
-            dtype=paddle.float32,
+            dtype=paddle.get_default_dtype(),
             is_bias=False,
             default_initializer=nn.initializer.Constant(1.0),
         )
@@ -870,6 +926,14 @@ class DeepseekV2Attention(nn.Layer):
         self.layerwise_recompute = layerwise_recompute
         self.recompute_granularity = config.recompute_granularity
 
+        def linear_dtye_gaurd():
+            if config.use_fp8:
+                return dtype_guard("float8_e4m3fn")
+            else:
+                import contextlib
+
+                return contextlib.nullcontext()
+
         # Note (@DrownFish19): For tensor parallel we consider that q_a_proj and kv_a_proj_with_mqa
         # are the small weight and cannot achieve performance gain. So we use the original
         # linear layers. We use the tensor parallel linear layers for q_proj，q_b_proj and kv_b_proj
@@ -886,35 +950,39 @@ class DeepseekV2Attention(nn.Layer):
                 RowParallelLinear = linear_utils.RowParallelLinear
 
             if self.q_lora_rank is None:
-                self.q_proj = ColumnParallelLinear(self.hidden_size, self.num_heads * self.q_head_dim, has_bias=False, gather_output=False)
+                with linear_dtye_gaurd():
+                    self.q_proj = ColumnParallelLinear(self.hidden_size, self.num_heads * self.q_head_dim, has_bias=False, gather_output=False)
             else:
-                self.q_a_proj = nn.Linear(self.hidden_size, config.q_lora_rank, bias_attr=config.attention_bias)
+                with linear_dtye_gaurd():
+                    self.q_a_proj = Linear(self.hidden_size, config.q_lora_rank, bias_attr=config.attention_bias)
+                    self.q_b_proj = ColumnParallelLinear(config.q_lora_rank, self.num_heads * self.q_head_dim, has_bias=False, gather_output=False)
                 self.q_a_layernorm = DeepseekV2RMSNorm(config=config, hidden_size=config.q_lora_rank, use_sequence_parallel=False)
-                self.q_b_proj = ColumnParallelLinear(config.q_lora_rank, self.num_heads * self.q_head_dim, has_bias=False, gather_output=False)
 
-            self.kv_a_proj_with_mqa = nn.Linear(self.hidden_size, config.kv_lora_rank + config.qk_rope_head_dim, bias_attr=config.attention_bias)
+            with linear_dtye_gaurd():
+                self.kv_a_proj_with_mqa = Linear(self.hidden_size, config.kv_lora_rank + config.qk_rope_head_dim, bias_attr=config.attention_bias)
+                self.kv_b_proj = ColumnParallelLinear(config.kv_lora_rank, self.num_heads * (self.q_head_dim - self.qk_rope_head_dim + self.v_head_dim), has_bias=False, gather_output=False)
+                self.o_proj = RowParallelLinear(self.num_heads * self.v_head_dim, self.hidden_size, has_bias=config.attention_bias, input_is_parallel=True)
             self.kv_a_layernorm = DeepseekV2RMSNorm(config=config, hidden_size=config.kv_lora_rank, use_sequence_parallel=False)
-            self.kv_b_proj = ColumnParallelLinear(config.kv_lora_rank, self.num_heads * (self.q_head_dim - self.qk_rope_head_dim + self.v_head_dim), has_bias=False, gather_output=False)
-
-            self.o_proj = RowParallelLinear(self.num_heads * self.v_head_dim, self.hidden_size, has_bias=config.attention_bias, input_is_parallel=True)
 
             assert self.num_heads % config.tensor_parallel_degree == 0, f"num_heads: {self.num_heads}, tensor_parallel_degree: {config.tensor_parallel_degree}"
             self.num_heads = self.num_heads // config.tensor_parallel_degree
-
         else:
             # for without tensor parallel
             if self.q_lora_rank is None:
-                self.q_proj = nn.Linear(self.hidden_size, self.num_heads * self.q_head_dim, bias_attr=False)
+                with linear_dtye_gaurd():
+                    self.q_proj = Linear(self.hidden_size, self.num_heads * self.q_head_dim, bias_attr=False)
             else:
-                self.q_a_proj = nn.Linear(self.hidden_size, config.q_lora_rank, bias_attr=config.attention_bias)
+                with linear_dtye_gaurd():
+                    self.q_a_proj = Linear(self.hidden_size, config.q_lora_rank, bias_attr=config.attention_bias)
+                    self.q_b_proj = Linear(config.q_lora_rank, self.num_heads * self.q_head_dim, bias_attr=False)
                 self.q_a_layernorm = DeepseekV2RMSNorm(config=config, hidden_size=config.q_lora_rank)
-                self.q_b_proj = nn.Linear(config.q_lora_rank, self.num_heads * self.q_head_dim, bias_attr=False)
 
-            self.kv_a_proj_with_mqa = nn.Linear(self.hidden_size, config.kv_lora_rank + config.qk_rope_head_dim, bias_attr=config.attention_bias)
+            with linear_dtye_gaurd():
+                self.kv_a_proj_with_mqa = Linear(self.hidden_size, config.kv_lora_rank + config.qk_rope_head_dim, bias_attr=config.attention_bias)
+                self.kv_b_proj = Linear(config.kv_lora_rank, self.num_heads * (self.q_head_dim - self.qk_rope_head_dim + self.v_head_dim), bias_attr=False)
+                self.o_proj = Linear(self.num_heads * self.v_head_dim, self.hidden_size, bias_attr=config.attention_bias)
             self.kv_a_layernorm = DeepseekV2RMSNorm(config=config, hidden_size=config.kv_lora_rank)
-            self.kv_b_proj = nn.Linear(config.kv_lora_rank, self.num_heads * (self.q_head_dim - self.qk_rope_head_dim + self.v_head_dim), bias_attr=False)
 
-            self.o_proj = nn.Linear(self.num_heads * self.v_head_dim, self.hidden_size, bias_attr=config.attention_bias)
         # fmt: on
 
         self._init_rope()
@@ -1430,11 +1498,10 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
         self.recompute_granularity = config.recompute_granularity
         self.no_recompute_layers = config.no_recompute_layers if config.no_recompute_layers is not None else []
 
-        with dtype_guard("float32"):
-            if config.tensor_parallel_degree > 1 and config.vocab_size % config.tensor_parallel_degree == 0:
-                self.embed_tokens = mpu.VocabParallelEmbedding(config.vocab_size, config.hidden_size)
-            else:
-                self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
+        if config.tensor_parallel_degree > 1 and config.vocab_size % config.tensor_parallel_degree == 0:
+            self.embed_tokens = mpu.VocabParallelEmbedding(config.vocab_size, config.hidden_size)
+        else:
+            self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
 
         self.layers = nn.LayerList(
             [
@@ -1730,7 +1797,7 @@ class DeepseekV2LMHead(nn.Layer):
 
         self.weight = self.create_parameter(
             shape=[config.hidden_size, vocab_size],
-            dtype=paddle.float32,
+            dtype=paddle.get_default_dtype(),
             default_initializer=nn.initializer.XavierNormal(1.0),
         )
         # Must set distributed attr for Tensor Parallel !
@@ -1749,7 +1816,7 @@ class DeepseekV2LMHead(nn.Layer):
         return logits
 
     def extra_repr(self):
-        return f"hidden_size={self.weight.shape[0]}, vocab_size={self.weight.shape[1]}, dtype={self._dtype}"
+        return f"hidden_size={self.weight.shape[0]}, vocab_size={self.weight.shape[1]}, dtype={self.weight.dtype}"
 
 
 class DeepseekV2ForCausalLM(DeepseekV2PretrainedModel):
@@ -1965,7 +2032,7 @@ class DeepseekV2ForSequenceClassification(DeepseekV2PretrainedModel):
         super().__init__(config)
         self.num_labels = config.num_labels
         self.model = DeepseekV2Model(config)
-        self.score = nn.Linear(config.hidden_size, self.num_labels, bias_attr=False)
+        self.score = Linear(config.hidden_size, self.num_labels, bias_attr=False)
 
         # Initialize weights and apply final processing
         self.post_init()

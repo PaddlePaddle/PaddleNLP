@@ -49,15 +49,17 @@ block_size = 128
 def register_scale(self):
     if self.weight.element_size() == 1:
         in_features, out_features = self.weight.shape
-        assert in_features % self.block_size == 0
-        assert out_features % self.block_size == 0
+        # assert in_features % self.block_size == 0, f"in_features {in_features}, should be devide by {self.block_size}"
+        # assert out_features % self.block_size == 0, f"out_features {out_features}, should be devide by {self.block_size}"
+        scale_out_features = (out_features + self.block_size - 1) // self.block_size
+        scale_in_features = (in_features + self.block_size - 1) // self.block_size
         self.weight_scale_inv = self.create_parameter(
-            shape=[in_features // self.block_size, out_features // self.block_size],
+            shape=[scale_in_features, scale_out_features],
             attr=self._weight_attr,
             dtype="float32",
             is_bias=False,
         )
-        self.weight.scale = self.weight_scale_inv
+        self.weight._scale = self.weight_scale_inv
 
 
 class Linear(PD_Linear):
@@ -95,7 +97,9 @@ class RowSequenceParallelLinear(PD_RowSequenceParallelLinear):
         register_scale(self)
 
 
-def fp8_linear(x: paddle.Tensor, weight: paddle.Tensor, bias: Optional[paddle.Tensor] = None) -> paddle.Tensor:
+def fp8_linear(
+    x: paddle.Tensor, weight: paddle.Tensor, bias: Optional[paddle.Tensor] = None, name=None
+) -> paddle.Tensor:
     """
     Applies a linear transformation to the incoming data: y = xA^T + b.
     This function supports specialized implementations based on quantization
@@ -120,11 +124,13 @@ def fp8_linear(x: paddle.Tensor, weight: paddle.Tensor, bias: Optional[paddle.Te
     if weight.element_size() > 1:
         return original_linear(x, weight, bias)
     elif gemm_impl == "bf16":
-        weight = weight_dequant(weight, weight.scale)
+        # print(weight, type(weight), weight._scale, type(weight._scale))
+        weight = weight_dequant(weight, weight._scale)
+        # print("original_linear: ", x.dtype, weight.dtype)
         return original_linear(x, weight, bias)
     else:
         x, scale = act_quant(x, block_size)
-        y = fp8_gemm(x, scale, weight, weight.scale)
+        y = fp8_gemm(x, scale, weight, weight._scale)
         if bias is not None:
             y += bias
         return y
