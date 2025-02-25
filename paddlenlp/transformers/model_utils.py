@@ -2789,7 +2789,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             },....
         ]
         """
-        # import pdb;pdb.set_trace()
         assert isinstance(configs, (dict, list))
         if isinstance(configs, dict):
             return configs

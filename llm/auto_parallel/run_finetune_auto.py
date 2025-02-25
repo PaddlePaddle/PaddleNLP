@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# import inspect
+
 import json
 import logging
 import os
@@ -264,28 +264,13 @@ def main():
 
     logger.info(f"Final model config: {model_config}")
 
-    if (
-        model_args.continue_training
-        and not training_args.autotuner_benchmark
-<<<<<<< HEAD
-    ):
+    if model_args.continue_training and not training_args.autotuner_benchmark:
         criterion = criterion_class(model_config)
         model = model_class.from_pretrained(
             model_args.model_name_or_path,
             config=model_config,
             from_aistudio=model_args.from_aistudio,
         )
-=======
-        and not training_args.use_intermediate_api
-    ):
-        with paddle.LazyGuard():
-            criterion = criterion_class(model_config)
-            model = model_class.from_pretrained(
-                model_args.model_name_or_path,
-                config=model_config,
-                from_aistudio=model_args.from_aistudio,
-            )
->>>>>>> [AutoParallel]:auto_sft rebase develop
     else:
         with paddle.LazyGuard():
             criterion = criterion_class(model_config)
@@ -485,24 +470,7 @@ def main():
         gen_args=gen_args,
         data_args=data_args,
     )
-    # #NOTE(zhangwl):this may move to wrap
-    # trainable_parameters = [p for p in model.parameters() if not p.stop_gradient]
-    # trainer.set_optimizer_grouped_parameters(trainable_parameters)
 
-    # def forward_pre_hook(layer, input):
-    #     print(f"{layer} forward start")
-
-    # def forward_post_hook(layer, input, output):
-    #     print(f"{layer} forward done")
-
-    # for layer in trainer.model.sublayers():
-    #     layer.register_forward_pre_hook(forward_pre_hook)
-    #     layer.register_forward_post_hook(forward_post_hook)
-    # Train
-<<<<<<< HEAD
-=======
-    print(trainer.model)
->>>>>>> [AutoParallel]:auto_sft rebase develop
     if training_args.do_train:
         checkpoint = None
         if training_args.resume_from_checkpoint is not None:
