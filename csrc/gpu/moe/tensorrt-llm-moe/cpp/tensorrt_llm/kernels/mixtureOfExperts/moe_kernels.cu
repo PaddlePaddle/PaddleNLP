@@ -1593,7 +1593,6 @@ void CutlassMoeFCRunner<T, WeightType, OutputType, ScaleBiasType, Enable>::Block
     std::cout << "shape_n : " << shape_n << std::endl;
     std::cout << "shape_k : " << shape_k << std::endl;
     std::cout <<"num_rows : " << num_rows << std::endl;
-
     // print_gpu_data_inter<UnfusedGemmOutputType>(static_cast<UnfusedGemmOutputType *>(gemm_output), expanded_num_rows*hidden_size,100);
 
     // print_gpu_data_inter<WeightType>(const_cast<WeightType*>(fc2_expert_weights), static_cast<size_t>(256*7168*256), static_cast<size_t>(100));
@@ -1846,34 +1845,6 @@ void CutlassMoeFCRunner<T, WeightType, OutputType, ScaleBiasType, Enable>::runMo
     auto const* fc2_expert_biases = reinterpret_cast<ScaleBiasType const*>(fc2_expert_biases_void);
     auto* final_output = static_cast<OutputType*>(final_output_void);
     auto* token_topk_unpermuted_scales = static_cast<float*>(token_topk_final_scales_void);
-
-    // PADDLE_ENFORCE(finished == nullptr, "Using 'finished' is deprecated and will be removed in future versions");
-    // PADDLE_ENFORCE(
-    //     num_rows == active_rows, "Using 'finished' is deprecated and will be removed in future versions");
-    // PADDLE_CHECK(input_activations);
-    // PADDLE_CHECK(gating_output);
-    // PADDLE_CHECK(fc1_expert_weights);
-    // PADDLE_CHECK(fc2_expert_weights);
-    // PADDLE_CHECK(workspace_ptr);
-    // PADDLE_CHECK(token_topk_unpermuted_scales);
-    // PADDLE_CHECK(expanded_source_row_to_expanded_dest_row);
-    // PADDLE_CHECK(expert_for_source_row);
-    // PADDLE_CHECK(num_experts % parallelism_config.ep_size == 0);
-    // PADDLE_ENFORCE(hidden_size >= 128 / cutlass::sizeof_bits<WeightType>::value,
-    //     "Hidden size is too small to meet alignment requirements for MOE GEMM");
-    // PADDLE_ENFORCE(hidden_size % (128 / cutlass::sizeof_bits<WeightType>::value) == 0,
-    //     "Hidden size does not meet minimum alignment requirements for MOE GEMM");
-    // PADDLE_ENFORCE(inter_size % (128 / cutlass::sizeof_bits<WeightType>::value) == 0,
-    //     "Inter size does not meet minimum alignment requirements for MOE GEMM");
-
-    // // These values must fit into an int for building the source maps
-    // PADDLE_ENFORCE(num_rows <= std::numeric_limits<int>::max(), "Number of rows is too large");
-    // PADDLE_ENFORCE(
-    //     num_rows * num_experts <= std::numeric_limits<int>::max(), "Number of rows * num_experts is too large");
-    // PADDLE_ENFORCE(k * num_experts <= std::numeric_limits<int>::max(), "k * num_experts is too large");
-
-    // PADDLE_ENFORCE(gemm1_config_, "MOE GEMM1 Config is not set");
-    // PADDLE_ENFORCE(gemm2_config_, "MOE GEMM2 Config is not set");
 
     if (int_scales_required)
     {

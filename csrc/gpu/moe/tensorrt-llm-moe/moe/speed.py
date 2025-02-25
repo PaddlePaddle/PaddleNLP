@@ -9,8 +9,6 @@ import os
 import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from paddle.incubate.nn.functional import (
-    fused_bias_act,
-    fused_layer_norm,
     fused_moe)
 
 from paddle.nn.quant import weight_quantize
@@ -19,6 +17,14 @@ from paddle.nn.quant import weight_quantize
 
 from paddlenlp_ops import trt_llm_fused_moe
 paddle.seed(2)
+
+
+import argparse  # 导入argparse库
+
+# 使用 argparse 获取命令行参数
+parser = argparse.ArgumentParser(description='Run MoE model with specified M')
+parser.add_argument('--M', type=int, default=256, help='Batch size, token_num (M)')
+args = parser.parse_args()
 
 
 def GetQuantizedWeights(quant_method, w1, w2, arch=80):
@@ -73,7 +79,7 @@ def GetQuantizedWeights(quant_method, w1, w2, arch=80):
 
 # Constants
 DTYPES = paddle.bfloat16
-M = 1 # Batch size, token_num
+M = args.M # Batch size, token_num
 
 TP = 16
 N = 2048 // TP  # Intermediate size
@@ -166,7 +172,6 @@ def trt_win8(quant_method):
             topk,
             0,
             quant_method,
-            "Swiglu",
             8192 * 8,
         )
     paddle.device.synchronize()
@@ -214,7 +219,7 @@ def paddle_win8(quant_method):
             )
     paddle.device.synchronize()
     end = time.time()
-    print(f"paddle bf16 : {((end - start) * 1000 * 1000)} us")
+    print(f"paddle win8 : {((end - start) * 1000 * 1000)} us")
 
 
 # for i in range(20):
@@ -228,7 +233,7 @@ def paddle_win8(quant_method):
 for i in range(10):
     trt_win8(quant_method)
 
-for i in range(10):
+for i in range(20):
     paddle_win8(quant_method)
 
 

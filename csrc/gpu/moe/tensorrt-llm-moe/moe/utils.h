@@ -126,3 +126,26 @@ void print_gpu_data(T* gpu_data, size_t num_elements, size_t num) {
     delete[] temp_data;
 }
 
+
+// tensorrt_llm::ActivationType getTRTActivationType(std::string activation_type_str)
+// {
+//     if (activation_type_str == "Gelu" || activation_type_str == "gelu") {
+//         return tensorrt_llm::ActivationType::Gelu;
+//     }
+//     else if (activation_type_str == "Relu" || activation_type_str == "relu") {
+//         return tensorrt_llm::ActivationType::Relu;
+//     }
+//     else if (activation_type_str == "Silu" || activation_type_str == "silu") {
+//         return tensorrt_llm::ActivationType::Silu;
+//     }
+//     else if (activation_type_str == "GeGLU" || activation_type_str == "geglu" || activation_type_str == "gated-gelu") {
+//         return tensorrt_llm::ActivationType::Geglu;
+//     }
+//     else if (activation_type_str == "Swiglu") {
+//         return tensorrt_llm::ActivationType::Swiglu;
+//     }
+//     else {
+//         std::cout << "Activation Type: " <<  activation_type_str << " not supported !";
+//     }
+//     return tensorrt_llm::ActivationType::InvalidType;
+// }

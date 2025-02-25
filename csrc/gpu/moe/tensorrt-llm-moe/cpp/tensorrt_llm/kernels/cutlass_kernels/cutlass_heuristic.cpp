@@ -153,7 +153,6 @@ std::vector<CutlassTileConfig> get_candidate_tiles(
     case CutlassGemmType::WeightOnly:
         if (sm >= 75)
         {   
-            std::cout << "全部配置"<< std::endl;
             return {
                 CutlassTileConfig::CtaShape16x128x64_WarpShape16x32x64, //这两个配置比较慢
                 CutlassTileConfig::CtaShape16x256x64_WarpShape16x64x64,
