@@ -54,7 +54,6 @@ try:
 except:
     flash_attention = None
 
-import numpy as np
 
 from paddlenlp.transformers.model_utils import dtype_guard
 
@@ -86,105 +85,6 @@ __all__ = [
     "DeepseekV2Model",
     "DeepseekV2PretrainedModel",
 ]
-
-origin_repr = nn.Embedding.extra_repr
-
-
-def new_repr(self):
-    return origin_repr(self) + f", dtype={self._dtype}"
-
-
-nn.Embedding.extra_repr = new_repr
-
-origin_tensort_init = paddle.Tensor.__call__
-origin_to_tensor = paddle.to_tensor
-origin_numpy = paddle.Tensor.numpy
-origin_numel = paddle.Tensor.numel
-origin_set_value = paddle.core.eager.Tensor.set_value
-
-
-paddle_numpy_mapping = {
-    paddle.float8_e5m2: (paddle.int8, np.float8_e5m2),
-    paddle.float8_e4m3fn: (paddle.int8, np.float8_e4m3fn),
-    paddle.bfloat16: (paddle.int16, np.bfloat16),
-}
-
-numpy_paddle_mapping = {
-    np.dtype(np.float8_e5m2): (np.int8, paddle.float8_e5m2),
-    np.dtype(np.float8_e4m3fn): (np.int8, paddle.float8_e4m3fn),
-    np.dtype(np.bfloat16): (np.uint16, paddle.bfloat16),
-}
-
-
-paddle_set_value_mapping = {
-    paddle.float8_e5m2: (paddle.int8, None),
-    paddle.float8_e4m3fn: (paddle.int8, None),
-    paddle.bfloat16: (paddle.int16, None),
-    # paddle.bfloat16: (paddle.int16, np.bfloat16),
-    np.dtype(np.float8_e5m2): (np.int8, paddle.float8_e5m2),
-    np.dtype(np.float8_e4m3fn): (np.int8, paddle.float8_e4m3fn),
-}
-
-
-def enhance_init(*args, **kwargs):
-    if isinstance(args[0], np.ndarray) and args[0].dtype in numpy_paddle_mapping:
-        inter_dtype, tgt_dtype = numpy_paddle_mapping[args[0].dtype]
-        tensor = args[0].view(inter_dtype)
-        new_args = (tensor, *args[1:])
-        tensor = origin_tensort_init(*new_args, **kwargs)
-        return tensor.view(tgt_dtype)
-    return origin_tensort_init(*args, **kwargs)
-
-
-def enhance_to_tensor(*args, **kwargs):
-    if isinstance(args[0], np.ndarray) and args[0].dtype in numpy_paddle_mapping:
-        inter_dtype, tgt_dtype = numpy_paddle_mapping[args[0].dtype]
-        tensor = args[0].view(inter_dtype)
-        new_args = (tensor, *args[1:])
-        tensor = origin_to_tensor(*new_args, **kwargs)
-        return tensor.view(tgt_dtype)
-    return origin_to_tensor(*args, **kwargs)
-
-
-def enhance_set_value(self, *args, **kwargs):
-    # print(args, kwargs)
-    if isinstance(args[0], np.ndarray) and args[0].dtype in paddle_set_value_mapping:
-        inter_dtype, tgt_dtype = paddle_set_value_mapping[args[0].dtype]
-        tensor = args[0].view(inter_dtype)
-        new_args = (tensor, *args[1:])
-        return origin_set_value(self, *new_args, **kwargs)
-
-    if isinstance(args[0], paddle.Tensor) and args[0].dtype in paddle_set_value_mapping:
-        inter_dtype, _ = paddle_set_value_mapping[args[0].dtype]
-        tensor = args[0].view(inter_dtype)
-        new_args = (tensor, *args[1:])
-        new_self = self.view(inter_dtype)
-        return origin_set_value(new_self, *new_args, **kwargs)
-
-    return origin_set_value(self, *args, **kwargs)
-
-
-def _numpy(self, *args, **kwargs):
-    if self.dtype in paddle_numpy_mapping:
-        inter_pd_dtype, np_dtype = paddle_numpy_mapping[self.dtype]
-        tensor = origin_numpy(self.view(inter_pd_dtype), *args, **kwargs)
-        return tensor.view(np_dtype)
-    return origin_numpy(self, *args, **kwargs)
-
-
-def _numel(self, *args, **kwargs):
-    if self.dtype in paddle_numpy_mapping:
-        inter_pd_dtype, _ = paddle_numpy_mapping[self.dtype]
-        ret = origin_numel(self.view(inter_pd_dtype), *args, **kwargs)
-        return ret
-    return origin_numel(self, *args, **kwargs)
-
-
-paddle.Tensor.numpy = _numpy
-paddle.Tensor.__call__ = enhance_init
-paddle.to_tensor = enhance_to_tensor
-paddle.core.eager.Tensor.set_value = enhance_set_value
-paddle.Tensor.numel = _numel
 
 
 def get_triangle_upper_mask(x, mask=None):
