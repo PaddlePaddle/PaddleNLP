@@ -26,12 +26,11 @@ from ..linear_utils import (
 from ..linear_utils import Linear as PD_Linear
 from ..linear_utils import RowParallelLinear as PD_RowParallelLinear
 from ..linear_utils import RowSequenceParallelLinear as PD_RowSequenceParallelLinear
-from .kernel import act_quant, fp8_gemm, weight_dequant
 
-# try:
-#     from .kernel import act_quant, fp8_gemm, weight_dequant
-# except:
-#     pass
+try:
+    from .kernel import act_quant, fp8_gemm, weight_dequant
+except:
+    pass
 
 
 __all__ = [
@@ -46,11 +45,49 @@ gemm_impl: Literal["bf16", "fp8"] = "bf16"
 block_size = 128
 
 
+def fp8_linear(
+    x: paddle.Tensor, weight: paddle.Tensor, bias: Optional[paddle.Tensor] = None, name=None
+) -> paddle.Tensor:
+    """
+    Applies a linear transformation to the incoming data: y = xA^T + b.
+    This function supports specialized implementations based on quantization
+    and tensor formats.
+
+    Args:
+        x (paddle.Tensor): The input tensor.
+        weight (paddle.Tensor): The weight tensor. It may be quantized and
+            requires dequantization for certain cases.
+        bias (Optional[paddle.Tensor]): The bias tensor to be added. Default is None.
+
+    Returns:
+        paddle.Tensor: The result of the linear transformation, which may involve
+        quantization-aware computations depending on the input parameters.
+
+    Notes:
+        - If `weight` is quantized (e.g., `element_size() == 1`), a dequantized version
+          is used for computation.
+        - If `gemm_impl == "bf16"`, dequantization and a `bf16` GEMM operation are applied.
+        - For other cases, the function applies quantization to `x` and uses `fp8_gemm` for computation.
+    """
+    if weight.element_size() > 1:
+        return original_linear(x, weight, bias)
+    elif gemm_impl == "bf16":
+        weight = weight_dequant(weight, weight._scale)
+        return original_linear(x, weight, bias)
+    else:
+        x, scale = act_quant(x, block_size)
+        y = fp8_gemm(x, scale, weight, weight._scale)
+        if bias is not None:
+            y += bias
+        return y
+
+
+paddle.nn.functional.linear = fp8_linear
+
+
 def register_scale(self):
     if self.weight.element_size() == 1:
         in_features, out_features = self.weight.shape
-        # assert in_features % self.block_size == 0, f"in_features {in_features}, should be devide by {self.block_size}"
-        # assert out_features % self.block_size == 0, f"out_features {out_features}, should be devide by {self.block_size}"
         scale_out_features = (out_features + self.block_size - 1) // self.block_size
         scale_in_features = (in_features + self.block_size - 1) // self.block_size
         self.weight_scale_inv = self.create_parameter(
@@ -95,45 +132,3 @@ class RowSequenceParallelLinear(PD_RowSequenceParallelLinear):
         super().__init__(*args, **kwargs)
         self.block_size = kwargs.get("block_size", 128)
         register_scale(self)
-
-
-def fp8_linear(
-    x: paddle.Tensor, weight: paddle.Tensor, bias: Optional[paddle.Tensor] = None, name=None
-) -> paddle.Tensor:
-    """
-    Applies a linear transformation to the incoming data: y = xA^T + b.
-    This function supports specialized implementations based on quantization
-    and tensor formats.
-
-    Args:
-        x (paddle.Tensor): The input tensor.
-        weight (paddle.Tensor): The weight tensor. It may be quantized and
-            requires dequantization for certain cases.
-        bias (Optional[paddle.Tensor]): The bias tensor to be added. Default is None.
-
-    Returns:
-        paddle.Tensor: The result of the linear transformation, which may involve
-        quantization-aware computations depending on the input parameters.
-
-    Notes:
-        - If `weight` is quantized (e.g., `element_size() == 1`), a dequantized version
-          is used for computation.
-        - If `gemm_impl == "bf16"`, dequantization and a `bf16` GEMM operation are applied.
-        - For other cases, the function applies quantization to `x` and uses `fp8_gemm` for computation.
-    """
-    if weight.element_size() > 1:
-        return original_linear(x, weight, bias)
-    elif gemm_impl == "bf16":
-        # print(weight, type(weight), weight._scale, type(weight._scale))
-        weight = weight_dequant(weight, weight._scale)
-        # print("original_linear: ", x.dtype, weight.dtype)
-        return original_linear(x, weight, bias)
-    else:
-        x, scale = act_quant(x, block_size)
-        y = fp8_gemm(x, scale, weight, weight._scale)
-        if bias is not None:
-            y += bias
-        return y
-
-
-paddle.nn.functional.linear = fp8_linear

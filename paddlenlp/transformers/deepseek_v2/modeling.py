@@ -21,6 +21,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import math
 import warnings
 from functools import partial
@@ -629,12 +630,10 @@ class DeepseekV2MLP(nn.Layer):
         self.hidden_size = config.hidden_size if hidden_size is None else hidden_size
         self.intermediate_size = config.intermediate_size if intermediate_size is None else intermediate_size
 
-        def linear_dtye_gaurd():
+        def linear_dtype_gaurd():
             if config.use_fp8:
                 return dtype_guard("float8_e4m3fn")
             else:
-                import contextlib
-
                 return contextlib.nullcontext()
 
         if config.sequence_parallel:
@@ -644,7 +643,7 @@ class DeepseekV2MLP(nn.Layer):
             ColumnParallelLinear = linear_utils.ColumnParallelLinear
             RowParallelLinear = linear_utils.RowParallelLinear
 
-        with linear_dtye_gaurd():
+        with linear_dtype_gaurd():
             if config.tensor_parallel_degree > 1 and not is_moe:
                 self.gate_proj = ColumnParallelLinear(
                     self.hidden_size,
@@ -826,12 +825,10 @@ class DeepseekV2Attention(nn.Layer):
         self.layerwise_recompute = layerwise_recompute
         self.recompute_granularity = config.recompute_granularity
 
-        def linear_dtye_gaurd():
+        def linear_dtype_gaurd():
             if config.use_fp8:
                 return dtype_guard("float8_e4m3fn")
             else:
-                import contextlib
-
                 return contextlib.nullcontext()
 
         # Note (@DrownFish19): For tensor parallel we consider that q_a_proj and kv_a_proj_with_mqa
@@ -850,15 +847,15 @@ class DeepseekV2Attention(nn.Layer):
                 RowParallelLinear = linear_utils.RowParallelLinear
 
             if self.q_lora_rank is None:
-                with linear_dtye_gaurd():
+                with linear_dtype_gaurd():
                     self.q_proj = ColumnParallelLinear(self.hidden_size, self.num_heads * self.q_head_dim, has_bias=False, gather_output=False)
             else:
-                with linear_dtye_gaurd():
+                with linear_dtype_gaurd():
                     self.q_a_proj = Linear(self.hidden_size, config.q_lora_rank, bias_attr=config.attention_bias)
                     self.q_b_proj = ColumnParallelLinear(config.q_lora_rank, self.num_heads * self.q_head_dim, has_bias=False, gather_output=False)
                 self.q_a_layernorm = DeepseekV2RMSNorm(config=config, hidden_size=config.q_lora_rank, use_sequence_parallel=False)
 
-            with linear_dtye_gaurd():
+            with linear_dtype_gaurd():
                 self.kv_a_proj_with_mqa = Linear(self.hidden_size, config.kv_lora_rank + config.qk_rope_head_dim, bias_attr=config.attention_bias)
                 self.kv_b_proj = ColumnParallelLinear(config.kv_lora_rank, self.num_heads * (self.q_head_dim - self.qk_rope_head_dim + self.v_head_dim), has_bias=False, gather_output=False)
                 self.o_proj = RowParallelLinear(self.num_heads * self.v_head_dim, self.hidden_size, has_bias=config.attention_bias, input_is_parallel=True)
@@ -869,15 +866,15 @@ class DeepseekV2Attention(nn.Layer):
         else:
             # for without tensor parallel
             if self.q_lora_rank is None:
-                with linear_dtye_gaurd():
+                with linear_dtype_gaurd():
                     self.q_proj = Linear(self.hidden_size, self.num_heads * self.q_head_dim, bias_attr=False)
             else:
-                with linear_dtye_gaurd():
+                with linear_dtype_gaurd():
                     self.q_a_proj = Linear(self.hidden_size, config.q_lora_rank, bias_attr=config.attention_bias)
                     self.q_b_proj = Linear(config.q_lora_rank, self.num_heads * self.q_head_dim, bias_attr=False)
                 self.q_a_layernorm = DeepseekV2RMSNorm(config=config, hidden_size=config.q_lora_rank)
 
-            with linear_dtye_gaurd():
+            with linear_dtype_gaurd():
                 self.kv_a_proj_with_mqa = Linear(self.hidden_size, config.kv_lora_rank + config.qk_rope_head_dim, bias_attr=config.attention_bias)
                 self.kv_b_proj = Linear(config.kv_lora_rank, self.num_heads * (self.q_head_dim - self.qk_rope_head_dim + self.v_head_dim), bias_attr=False)
                 self.o_proj = Linear(self.num_heads * self.v_head_dim, self.hidden_size, bias_attr=config.attention_bias)
@@ -1266,6 +1263,9 @@ class DeepseekV2PretrainedModel(PretrainedModel):
                 "embed_tokens.weight": partial(fn, is_column=False),
                 "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
             }
+            if config.use_fp8:
+                base_actions["layers.0.self_attn.o_proj.weight.weight_scale_inv"] = partial(fn, is_column=False)
+
             if config.tie_word_embeddings:
                 base_actions["lm_head.weight"] = partial(fn, is_column=False)
             else:
@@ -1281,20 +1281,33 @@ class DeepseekV2PretrainedModel(PretrainedModel):
             base_actions["layers.0.self_attn.q_b_proj.weight"] = partial(fn, is_column=True)
 
             # if we have enough num_key_value_heads to split, then split it.
+            # ???
             if config.num_key_value_heads % config.tensor_parallel_degree == 0:
-                base_actions["layers.0.self_attn.k_proj.weight"] = partial(fn, is_column=True)
-                base_actions["layers.0.self_attn.v_proj.weight"] = partial(fn, is_column=True)
-                base_actions["layers.0.self_attn.k_proj.bias"] = partial(fn, is_column=True)
-                base_actions["layers.0.self_attn.v_proj.bias"] = partial(fn, is_column=True)
                 base_actions["layers.0.self_attn.kv_b_proj.weight"] = partial(fn, is_column=True)
+                if config.use_fp8:
+                    base_actions["layers.0.self_attn.kv_b_proj.weight.weight_scale_inv"] = partial(fn, is_column=True)
 
             base_actions["layers.0.mlp.up_proj.weight"] = partial(fn, is_column=True)
             base_actions["layers.0.mlp.gate_proj.weight"] = partial(fn, is_column=True)
             base_actions["layers.0.mlp.down_proj.weight"] = partial(fn, is_column=False)
+            if config.use_fp8:
+                base_actions["layers.0.mlp.up_proj.weight.weight_scale_inv"] = partial(fn, is_column=True)
+                base_actions["layers.0.mlp.gate_proj.weight.weight_scale_inv"] = partial(fn, is_column=True)
+                base_actions["layers.0.mlp.down_proj.weight.weight_scale_inv"] = partial(fn, is_column=False)
 
             base_actions["layers.0.mlp.shared_experts.gate_proj.weight"] = partial(fn, is_column=True)
             base_actions["layers.0.mlp.shared_experts.up_proj.weight"] = partial(fn, is_column=True)
             base_actions["layers.0.mlp.shared_experts.down_proj.weight"] = partial(fn, is_column=False)
+            if config.use_fp8:
+                base_actions["layers.0.mlp.shared_experts.gate_proj.weight.weight_scale_inv"] = partial(
+                    fn, is_column=True
+                )
+                base_actions["layers.0.mlp.shared_experts.up_proj.weight.weight_scale_inv"] = partial(
+                    fn, is_column=True
+                )
+                base_actions["layers.0.mlp.shared_experts.down_proj.weight.weight_scale_inv"] = partial(
+                    fn, is_column=False
+                )
 
             for key, action in base_actions.items():
                 if "layers.0." in key:

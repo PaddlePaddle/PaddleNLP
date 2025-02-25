@@ -27,7 +27,7 @@ from ..testing_utils import skip_platform
 paddle.set_device("cpu")
 
 
-class EextendDtypeNumpySafe(unittest.TestCase):
+class ExtendDtypeNumpySafe(unittest.TestCase):
     def setUp(self):
         super().setUp()
         self.weight_map = {}
