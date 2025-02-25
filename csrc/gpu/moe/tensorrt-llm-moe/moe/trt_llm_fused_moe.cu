@@ -67,7 +67,7 @@ Tensor trt_llm_fused_moe_helper(Tensor input_activations,
     // 初始化一些参数，获得data_ptr
     const int num_rows = input_activations.shape()[0];//(num_tokens, hidden_size)
     const int hidden_size = input_activations.shape()[1];
-    int inter_size = fc2_expert_weights.shape()[1]; //(num_experts, inter_size, hidden_size)
+    int inter_size = fc1_expert_weights.shape()[2] / 2; //(num_experts, inter_size, hidden_size)
     if (quant_method == "fp8_block_wise") {
        inter_size = fc2_expert_weights.shape()[2];
     }

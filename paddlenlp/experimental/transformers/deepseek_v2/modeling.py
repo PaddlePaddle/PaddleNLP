@@ -686,7 +686,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                     ffn1_weight = paddle.to_tensor(concated_gate_up_weight).cast(dtype)
 
                     if use_trt_fused_moe:
-                        print("这里修改为了w3/w1")
+                        # print("这里修改为了w3/w1")
                         gate, up = paddle.chunk(ffn1_weight, 2, axis=-1)
                         ffn1_weight = paddle.concat([up, gate], axis=-1)
 
@@ -697,12 +697,15 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                     if self.use_weight_only:
                         ffn1_quanted_weight, ffn1_weight_scale = weight_quantize(ffn1_weight, algo=self.quant_algo)
                         ffn2_quanted_weight, ffn2_weight_scale = weight_quantize(ffn2_weight, algo=self.quant_algo)
+                        print(ffn1_quanted_weight.shape)
+                        print(self.transformer_block.config.embed_dim)
+                        exit(0)
                         ffn1_weights.append(ffn1_quanted_weight.reshape([self.transformer_block.config.embed_dim, -1]))
                         ffn2_weights.append(ffn2_quanted_weight.reshape([-1, self.transformer_block.config.embed_dim]))
                         ffn1_scales.append(ffn1_weight_scale)
                         ffn2_scales.append(ffn2_weight_scale)
                     elif use_trt_fused_moe and not self.use_weight_only:
-                        print("trt bf16的时候transpose 需要变为col major")
+                        # print("trt bf16的时候transpose 需要变为col major")
                         ffn1_weights_trt = ffn1_weight.transpose([1, 0]).reshape(ffn1_weight.shape)
                         ffn1_weights.append(ffn1_weights_trt)
                         ffn2_weights_trt = ffn2_weight.transpose([1, 0]).reshape(ffn2_weight.shape)
@@ -715,16 +718,6 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                 fused_moe_ffn2_weight = paddle.to_tensor(ffn2_weights)
                 fused_moe_ffn1_weight_scale = paddle.to_tensor(ffn1_scales)
                 fused_moe_ffn2_weight_scale = paddle.to_tensor(ffn2_scales)
-
-                # if use_trt_fused_moe and self.use_weight_only:
-                #     from paddlenlp_ops import batch_symmetric_quantize
-                #     # trt量化算子,支持三维量化,在wint4的时候排布paddle的不同
-                #     ffn1_quanted_weight, ffn1_weight_scale = batch_symmetric_quantize(fused_moe_ffn1_weight.cpu(), self.quant_algo)
-                #     ffn2_quanted_weight, ffn2_weight_scale = batch_symmetric_quantize(fused_moe_ffn2_weight.cpu(), self.quant_algo)
-                #     fused_moe_ffn1_weight = ffn1_quanted_weight.cuda()
-                #     fused_moe_ffn2_weight = ffn2_quanted_weight.cuda().reshape([self.num_layers,-1,self.transformer_block.config.embed_dim])
-                #     fused_moe_ffn1_weight_scale = ffn1_weight_scale.cuda()
-                #     fused_moe_ffn2_weight_scale = ffn2_weight_scale.cuda()
 
                 gate_weight = paddle.to_tensor(
                     state_dict[f"{self.base_model_prefix}.layers.{idx}.mlp.gate.weight"]

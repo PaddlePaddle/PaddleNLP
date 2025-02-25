@@ -17,7 +17,7 @@ args = parser.parse_args()
 DTYPES = paddle.bfloat16
 # deepseek v3 parameters
 M = args.M # (Batch size * token_num)
-TP = 16
+TP = 1
 N = 2048 // TP  # Intermediate size
 K = 7168  # Hidden size
 E = 256  # Number of experts
@@ -54,8 +54,10 @@ def GetQuantizedWeights(quant_method, w1, w2, arch=80):
         scale0 = []
         for i in range(num_expert):
             fc0_expert_weights_for_ref_i, fc0_expert_weights_scale_for_ref_i = weight_quantize(bmm_w0[i], algo=quant_method)
-            # print(fc0_expert_weights_for_ref_i.shape)
-            # exit(0) [256, 7168]
+            print(fc0_expert_weights_for_ref_i.shape)
+            print(bmm_w0[i].shape)
+            # wint 8[7168, 2048]
+            # wint 4[1024, 7168]
             fc0_expert_weights_for_ref_list.append(
                 fc0_expert_weights_for_ref_i.reshape(
                     [d_model, d_feedforward * 2]
@@ -69,6 +71,13 @@ def GetQuantizedWeights(quant_method, w1, w2, arch=80):
         scale1 = []
         for i in range(num_expert):
             fc1_expert_weights_for_ref_i, fc1_expert_weights_scale_for_ref_i = weight_quantize(bmm_w1[i], algo=quant_method)
+            #  后[3584, 1024]
+            # 原来[1024, 7168]
+            print(fc1_expert_weights_for_ref_i.shape)
+            print(bmm_w1[i].shape)
+            exit(0)
+            # [3584, 128]
+            #     [128, 7168]
             fc1_expert_weights_for_ref_list.append(
                 fc1_expert_weights_for_ref_i.reshape(
                     [d_feedforward, d_model]
@@ -110,7 +119,7 @@ def trt_bf16():
     print(f"trt bf16 : {((end - start) * 1000)} ms")
 
 
-quant_method = "weight_only_int8"
+quant_method = "weight_only_int4"
 bmm_w0_quantized, bmm_w1_quantized, scale0, scale1 = GetQuantizedWeights(quant_method, w1, w2)
 
 
