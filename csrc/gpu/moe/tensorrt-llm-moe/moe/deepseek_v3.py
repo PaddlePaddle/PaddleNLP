@@ -93,6 +93,7 @@ batch_input = paddle.to_tensor(my_input)
 for i in range(10):
     paddle.device.synchronize()
     start = time.time()
+    
     out = trt_llm_fused_moe(
             tmp_out, # input
             # batch_input,

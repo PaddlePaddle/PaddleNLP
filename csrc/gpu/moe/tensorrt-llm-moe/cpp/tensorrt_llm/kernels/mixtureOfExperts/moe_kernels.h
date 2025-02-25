@@ -453,7 +453,7 @@ public:
         mK = k;
         mExpertHiddenSize = hidden_size;
         mExpertInterSize = inter_size;
-        // mActivationType = activation_type;
+        mActivationType = tensorrt_llm::ActivationType::Swiglu; // 固定为Swiglu
         mBias = bias;
         mParallelismConfig = parallelism_config;
         QuantMode = quant_mode;

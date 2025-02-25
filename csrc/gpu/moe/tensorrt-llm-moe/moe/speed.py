@@ -73,7 +73,7 @@ def GetQuantizedWeights(quant_method, w1, w2, arch=80):
 
 # Constants
 DTYPES = paddle.bfloat16
-M = 1024 # Batch size, token_num
+M = 1 # Batch size, token_num
 
 TP = 16
 N = 2048 // TP  # Intermediate size
@@ -102,6 +102,8 @@ a = paddle.randn((M, K), dtype=paddle.bfloat16) / 100
 
 w1 = paddle.rand((E, K, 2 * N), dtype=paddle.bfloat16) / 100
 w2 = paddle.rand((E , N, K), dtype=paddle.bfloat16)/ 100
+
+gate_weight = paddle.rand((K,E), dtype=paddle.float32) / 100
 # w1 = create_random_cuda_tensor([E, K, 2 * N], paddle.bfloat16, mean=0, std=0.01)
 # w2 = create_random_cuda_tensor([E ,N, K], paddle.bfloat16, mean=0, std=0.01)
 
@@ -145,17 +147,14 @@ def trt_bf16():
     print(f"trt bf16 : {((end - start) * 1000)} ms")
 
 
+quant_method = "weight_only_int8"
+bmm_w0_quantized, bmm_w1_quantized, scale0, scale1 = GetQuantizedWeights(quant_method, w1, w2)
 
 
-def trt_win8(quant_method):
-    bmm_w0_quantized, bmm_w1_quantized, scale0, scale1 = GetQuantizedWeights(quant_method, w1, w2)
-    # print(bmm_w0_quantized.shape)
-    # print(bmm_w1_quantized.shape)
-    # [256, 7168, 256]
-    # [256, 128, 7168]
-    
+def trt_win8(quant_method):    
     paddle.device.synchronize()
     start = time.time()
+    gate_out = paddle.matmul(a.cast("float32"), gate_weight)
     out = trt_llm_fused_moe(
             a,
             score,
@@ -168,11 +167,11 @@ def trt_win8(quant_method):
             0,
             quant_method,
             "Swiglu",
-            1024,
+            8192 * 8,
         )
     paddle.device.synchronize()
     end = time.time()
-    print(f"trt wint8 : {((end - start) * 1000)} ms")
+    print(f"trt wint8 : {((end - start) * 1000 * 1000)} us")
 
 # def paddle_bf16():
 #     paddle.device.synchronize()
@@ -196,10 +195,8 @@ def trt_win8(quant_method):
 #     print(f"paddle bf16 : {((end - start) * 1000)} ms")
 
 
+
 def paddle_win8(quant_method):
-    # a, b = paddle.chunk(w1, 2, axis=-1)
-    # trt_weight_1 = paddle.concat([b,a], axis=-1)
-    bmm_w0_quantized, bmm_w1_quantized, scale0, scale1 = GetQuantizedWeights(quant_method, w1, w2)
     paddle.device.synchronize()
     start = time.time()
     fused_moe_out = fused_moe(
@@ -217,7 +214,7 @@ def paddle_win8(quant_method):
             )
     paddle.device.synchronize()
     end = time.time()
-    print(f"paddle bf16 : {((end - start) * 1000)} ms")
+    print(f"paddle bf16 : {((end - start) * 1000 * 1000)} us")
 
 
 # for i in range(20):
@@ -228,13 +225,11 @@ def paddle_win8(quant_method):
 #     trt_bf16()
 
 
-for i in range(1):
-    quant_method = "weight_only_int8"
+for i in range(10):
     trt_win8(quant_method)
 
-# for i in range(10):
-#     quant_method = "weight_only_int8"
-#     paddle_win8(quant_method)
+for i in range(10):
+    paddle_win8(quant_method)
 
 
 

@@ -6,7 +6,7 @@
 #include "tensorrt_llm/kernels/mixtureOfExperts/moe_kernels.h"
 #include "tensorrt_llm/kernels/cutlass_kernels/cutlass_preprocessors.h"
 #include "cutlass_helper.h"
-#include "utils.h"
+#include "moe/utils.h"
 #include "profile.h"
 
 // profile部分 ***************************************
@@ -118,8 +118,8 @@ public:
 
         mProfiler->mGemmToProfile = gemm_idx;
         // TODO: support more dtypes and expert parallelism
-        auto parallelism_config = kernels::MOEParallelismConfig(tp_size, tp_rank, ep_size, ep_rank);
-        mProfiler->init(*mKernelRunner, mProfiler->mGemmToProfile,
+        auto parallelism_config = kernels::MOEParallelismConfig(1, 0, 1, 0);
+        mProfiler->init(*mKernelRunner.get(), mProfiler->mGemmToProfile,
             mActivationDtype,
             mWeightDtype,
             mOutputDtype, num_experts, top_k, hidden_size, inter_size,
@@ -129,6 +129,7 @@ public:
         size_t tmp_workspace_size = mProfiler->getWorkspaceSize(mMaxDimM);
         auto const cu_malloc_status = cudaMalloc(&profile_workspace, tmp_workspace_size);
         
+        PADDLE_ENFORCE(cu_malloc_status == cudaSuccess, "Can't allocate tmp workspace for MOE GEMM tactics profiling.");
         
         if (cu_malloc_status != cudaSuccess) {
             std::cout << "Can't allocate tmp workspace for MOE GEMM tactics profiling." << std::endl;
@@ -141,7 +142,7 @@ public:
         }
 
         auto const cu_free = cudaFree(profile_workspace);
-        // TORCH_CHECK(cu_free == cudaSuccess, "Can't free tmp workspace for MOE GEMM profiling.");
+        PADDLE_ENFORCE(cu_free == cudaSuccess, "Can't free tmp workspace for MOE GEMM profiling.");
     }
 
     std::vector<Profile> getFilteredConfigs(std::vector<Profile> tactics, int sm) {
@@ -180,8 +181,7 @@ public:
     float runSingleProfile(int64_t const m, Profile const& profile, char* profile_workspace, cudaStream_t stream)
     {
         constexpr int warmup = 5;
-        constexpr int runs = 15;
-
+        constexpr int runs = 20;
         // warmup
         for (int i = 0; i < warmup; ++i)
         {
@@ -224,6 +224,7 @@ public:
             try
             {
                 candidate_time = runSingleProfile(m, profile, profile_workspace, stream);
+                std::cout <<"i : " << i << std::endl;
                 std::cout <<"candidate_time : " << candidate_time << std::endl;
                 std::cout <<"tile_config : " << static_cast<int>(profile.tile_config) << std::endl;
                 std::cout <<"stages : " << static_cast<int>(profile.stages) << std::endl;
@@ -266,6 +267,7 @@ public:
         int64_t inter_size = fc2_expert_weights.shape()[1];
 
         int num_experts = static_cast<int>(fc2_expert_weights.shape()[0] * ep_size);
+        std::cout << "num_experts : " << num_experts << std::endl;
 
         std::sort(num_token_buckets.begin(), num_token_buckets.end());
         mMinDimM = num_token_buckets.front();
@@ -279,7 +281,8 @@ public:
             = {profiler_backend::GemmToProfile::GEMM_1, profiler_backend::GemmToProfile::GEMM_2};
 
         for (auto const& gemm_idx : gemm_idxes)
-        {
+        {   
+            std::cout << "********************* start gemm profile*****************"<< std::endl;
             runProfileGemmIdx(hidden_size, inter_size, num_experts, static_cast<int>(top_k), static_cast<int>(tp_size),
                 static_cast<int>(tp_rank), static_cast<int>(ep_size), static_cast<int>(ep_rank), num_token_buckets,
                 gemm_idx, stream);
@@ -298,6 +301,7 @@ public:
         int64_t inter_size = fc2_expert_weights.shape()[1];
         auto gemm_id_moe1 = GemmIDMoe{profiler_backend::GemmToProfile::GEMM_1, hidden_size, inter_size,
             static_cast<int>(num_experts), static_cast<int>(top_k)};
+        
         auto gemm_id_moe2 = GemmIDMoe{profiler_backend::GemmToProfile::GEMM_2, hidden_size, inter_size,
             static_cast<int>(num_experts), static_cast<int>(top_k)};
 
@@ -628,11 +632,8 @@ Tensor trt_llm_fused_moe_helper(Tensor input_activations,
                                     /* moe_runner= */ moe_runner_ptr, 
                                     /* quant_method= */ quant_method);
 
-            // std::vector<int64_t> num_token_buckets = get_power_of_2_num_tokens_buckets(tune_max_num_tokens);
-            // std::cout <<"num_token_buckets : " <<   tune_max_num_tokens << std::endl;
-
-            std::vector<int64_t> num_token_buckets = {1024};
-            std::cout << "我只tune 1024"<< std::endl;
+            std::vector<int64_t> num_token_buckets = get_power_of_2_num_tokens_buckets(tune_max_num_tokens);
+            std::cout <<"num_token_buckets : " <<   tune_max_num_tokens << std::endl;
             profiler.runProfile(fc2_expert_weights, k, 1, 0, 1, 0, num_token_buckets);
             // 需要将profile的结果，即num_tokens和对应的profile_ids落在本地efficientllm_op_configs路径下，这里需要补充代码
             profiler.saveProfileResultsToFile(profile_file);
@@ -666,11 +667,6 @@ Tensor trt_llm_fused_moe_helper(Tensor input_activations,
         auto [tactic1, tactic2] = selectTacticsForArch(moe_runner_ptr);
         moe_runner_ptr->setTactic(std::make_optional(tactic1), std::make_optional(tactic2));
     }
-    
-    
-    // std::vector<int64_t> profile_ids = {20, 19};
-    // setRunnerProfiles(moe_runner_ptr, profile_ids, quant_method);
-    // std::cout <<"我设置了tatic 20 19" << std::endl;
 
 
     kernels::MOEExpertScaleNormalizationMode normalization_mode_enum = getNormalizationMode(normalization_mode);

@@ -296,16 +296,15 @@ public:
 
     static Status can_implement(Arguments const& args)
     {   
-        std::cout << "我改了can_implement"<< std::endl;
         if (platform::is_same<uint8_t, ElementB>::value || platform::is_same<uint4b_t, ElementB>::value)
         {
             if (args.weight_scales == nullptr)
             {
                 // CUTLASS_TRACE_HOST("MoeFCGemm::can_implement() - weight scales are required for uint8_t and uint4b_t");
                 printf("MoeFCGemm::can_implement() - weight scales are required for uint8_t and uint4b_t \n");
-                printf("暂时改为sucess \n");
-                return Status::kSuccess;
-                // return Status::kInvalid;
+                // printf("暂时改为sucess \n");
+                // return Status::kSuccess;
+                return Status::kInvalid;
             }
         }
         else if (args.weight_scales != nullptr)

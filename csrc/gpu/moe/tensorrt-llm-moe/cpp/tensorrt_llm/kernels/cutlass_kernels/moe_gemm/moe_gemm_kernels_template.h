@@ -173,9 +173,6 @@ struct genericMoeGemmKernelLauncher
             PADDLE_ENFORCE(occupancy > 0, "GPU lacks the shared memory resources to run GroupedGEMM kernel");
             int const threadblock_count = multi_processor_count * occupancy;
 
-            if (weight_scales == nullptr) {
-                std::cout << "why fuck wo bu dong le !!!!!!!!!"<< std::endl;
-            }
             int const group_size = gemm_k;
             typename GemmGrouped::Arguments args(num_experts, threadblock_count, group_size, epilogue_op,
                 reinterpret_cast<ElementType const*>(A), reinterpret_cast<CutlassWeightType const*>(B),
@@ -185,7 +182,6 @@ struct genericMoeGemmKernelLauncher
 
             GemmGrouped gemm;
 
-            std::cout << "gemm can_imple"<< std::endl;
             auto can_implement = gemm.can_implement(args);
             PADDLE_ENFORCE(can_implement == cutlass::Status::kSuccess,
                 "MoE FC kernel will fail for params.");
@@ -268,7 +264,6 @@ void dispatchGemmConfig(T const* A, WeightType const* B, GemmOutputType const* w
     cutlass_extensions::CutlassGemmConfig gemm_config, int multi_processor_count, bool use_fused_moe,
     float const** alpha_scale_ptr_array, cudaStream_t stream, int* occupancy = nullptr)
 {   
-    // std::cout << "我又修改为了3，3，3，3"<< std::endl;
     switch (gemm_config.stages)
     {
     case 2:
@@ -397,6 +392,12 @@ void dispatchMoeGemmToCutlass(T const* A, WeightType const* B, GemmOutputType co
             use_fused_moe, alpha_scale_ptr_array, stream, occupancy);
         break;
     // 新加的
+    case cutlass_extensions::CutlassTileConfig::CtaShape64x128x64_WarpShape64x64x64:
+        dispatchGemmConfig<T, WeightType, GemmOutputType, arch, EpilogueTag, cutlass::gemm::GemmShape<64, 128, 64>,
+            cutlass::gemm::GemmShape<64, 64, 64>>(A, B, weight_scales, biases, bias_is_broadcast, C,
+            total_tokens_including_expert, total_rows, gemm_n, gemm_k, num_experts, gemm_config, multi_processor_count,
+            use_fused_moe, alpha_scale_ptr_array, stream, occupancy);
+        break;
     case cutlass_extensions::CutlassTileConfig::CtaShape64x128x64_WarpShape32x64x64:
         dispatchGemmConfig<T, WeightType, GemmOutputType, arch, EpilogueTag, cutlass::gemm::GemmShape<64, 128, 64>,
             cutlass::gemm::GemmShape<32, 64, 64>>(A, B, weight_scales, biases, bias_is_broadcast, C,
@@ -844,11 +845,11 @@ void MoeGemmRunner<T, WeightType, OutputType, ScaleBiasType>::moeGemmBiasAct(T c
             total_tokens_including_expert, hopper_input, total_rows, gemm_n, gemm_k, num_experts, use_fused_moe,
             alpha_scale_ptr_array, stream, chosen_conf);
         break;
-    case ActivationType::Geglu:
-        runGemm<cutlass_extensions::EpilogueOpDefaultFtGelu>(A, B, weight_scales, biases, bias_is_broadcast, C,
-            total_tokens_including_expert, hopper_input, total_rows, gemm_n, gemm_k, num_experts, use_fused_moe,
-            alpha_scale_ptr_array, stream, chosen_conf);
-        break;
+    // case ActivationType::Geglu:
+    //     runGemm<cutlass_extensions::EpilogueOpDefaultFtGelu>(A, B, weight_scales, biases, bias_is_broadcast, C,
+    //         total_tokens_including_expert, hopper_input, total_rows, gemm_n, gemm_k, num_experts, use_fused_moe,
+    //         alpha_scale_ptr_array, stream, chosen_conf);
+    //     break;
     case ActivationType::InvalidType: PADDLE_THROW("Activation type for fpA_intB must be valid."); break;
     default: PADDLE_THROW("Invalid activation type."); break;
     }

@@ -66,7 +66,7 @@
 
 
 #include "paddle/phi/core/enforce.h"
-
+#include "moe/utils.h"
 
 using namespace tensorrt_llm::kernels;
 using namespace tensorrt_llm::common;
@@ -573,7 +573,7 @@ void topkGatingSoftmaxKernelLauncher(float const* input, float* output, float* s
         default:
         {
             static constexpr int TPB = 256;
-            // PADDLE_CHECK(softmax_temp_output != nullptr);
+            PADDLE_CHECK(softmax_temp_output != nullptr);
             moeSoftmax<TPB><<<num_rows, TPB, 0, stream>>>(input, nullptr, softmax_temp_output, num_experts);
             moeTopK<TPB><<<num_rows, TPB, 0, stream>>>(softmax_temp_output, nullptr, output, indices, source_row,
                 num_experts, k, startk, endk, start_expert, end_expert, norm_mode);
@@ -1662,9 +1662,10 @@ void CutlassMoeFCRunner<T, WeightType, OutputType, ScaleBiasType, Enable>::gemm1
     int64_t const* total_tokens_including_expert = expert_first_token_offset + 1;
 
     if (using_hopper_gemm1)
-    {
-        // PADDLE_CHECK(config.is_sm90);
-        // PADDLE_CHECK(!use_ampere_activation_fusion);
+    {   
+        std::cout << "sm 90 swiglu走的这里"<< std::endl;
+        PADDLE_CHECK(config.is_sm90);
+        PADDLE_CHECK(!use_ampere_activation_fusion);
         bool has_different_gemm_output_type = using_hopper_gemm1 && !std::is_same_v<T, OutputType>;
         bool const has_intermediate = has_different_gemm_output_type || is_gated_activation;
         // PADDLE_ENFORCE(has_intermediate || input != output, "Input and output buffers are overlapping");
@@ -1691,8 +1692,8 @@ void CutlassMoeFCRunner<T, WeightType, OutputType, ScaleBiasType, Enable>::gemm1
     }
     else if (use_fp8)
     {
-        // PADDLE_CHECK(!use_ampere_activation_fusion);
-        // PADDLE_CHECK(!config.is_sm90);
+        PADDLE_CHECK(!use_ampere_activation_fusion);
+        PADDLE_CHECK(!config.is_sm90);
 
         alpha_scale_ptr_array
             = computeFP8DequantScale(alpha_scale_ptr_array, num_experts_per_node, fc1_fp8_dequant, stream);
@@ -1710,16 +1711,17 @@ void CutlassMoeFCRunner<T, WeightType, OutputType, ScaleBiasType, Enable>::gemm1
     }
     else if (!is_gated_activation)
     {
-        // PADDLE_CHECK(!use_ampere_activation_fusion);
-        // PADDLE_CHECK(!config.is_sm90);
+        PADDLE_CHECK(!use_ampere_activation_fusion);
+        PADDLE_CHECK(!config.is_sm90);
+        std::cout << "sm 80 swiglu走的这里 is_gated_activation"<< std::endl;
         gemm_runner.moeGemmBiasAct(input, fc1_expert_weights, nullptr, nullptr, false,
             output, total_tokens_including_expert, HopperGroupedGemmInput{}, expanded_num_rows, fc1_out_size,
             hidden_size, num_experts_per_node, fc1_activation_type, false, nullptr, stream, config);
     }
     else
     {
-        // PADDLE_CHECK(!config.is_sm90);
-        // PADDLE_CHECK(is_gated_activation);
+        PADDLE_CHECK(!config.is_sm90);
+        PADDLE_CHECK(is_gated_activation);
         PADDLE_ENFORCE(
             !use_ampere_activation_fusion || input != output, "Input and output buffers are overlapping");
 
@@ -2331,15 +2333,13 @@ void GemmProfilerBackend::runProfiler(
         hopper_input_template.configureWorkspace(
             static_cast<int8_t*>(hopper_workspace), num_experts_per_node, gemm_workspace, workspaces.back());
     }
-    if (scale_1 == nullptr) {
-        std::cout << "我不懂了 "<< std::endl;
-    }
 
     QuantParams quant_params;
-    if (mWType == paddle::DataType::INT8)
-    {
+    if (QuantMode == "weight_only_int8" || QuantMode == "weight_only_int4")
+    {   
         PADDLE_CHECK(scale_1 && scale_2);
         quant_params = QuantParams::Int(scale_1, scale_2);
+        
     }
     else if (mWType == paddle::DataType::FLOAT8_E4M3FN)
     {
@@ -2350,7 +2350,7 @@ void GemmProfilerBackend::runProfiler(
 
     mInterface->is_profiler = true;
     if (mGemmToProfile == GemmToProfile::GEMM_1)
-    {
+    {   
         mInterface->gemm1(inputs,                             //
             outputs,                                          //
             intermediate,                                     //
@@ -2373,7 +2373,7 @@ void GemmProfilerBackend::runProfiler(
             tactic);
     }
     else
-    {
+    {   
         PADDLE_CHECK(mGemmToProfile == GemmToProfile::GEMM_2);
         mInterface->gemm2(inputs,                           //
             intermediate,                                   //
