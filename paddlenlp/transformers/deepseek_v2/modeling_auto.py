@@ -669,11 +669,11 @@ class GlobalOutputNet(nn.Layer):
             position_ids = paddle.arange(cache_length, seq_length + cache_length, dtype=paddle.int64)
             position_ids = position_ids.unsqueeze(0)
 
-        if(
+        if (
             attn_mask_startend_row_indices is not None
             or get_use_casual_mask()
             or (self.config.use_flash_attention and self.training)
-            ):
+        ):
             attention_mask = None
         else:
             # [bs, seq_len]
@@ -1049,10 +1049,7 @@ class DeepseekV2ForCausalLMAuto(DeepseekV2PretrainedModelAuto):
 
         mtp_logits = [self.lm_head(_hidden_states) for _hidden_states in mtp_outputs] if len(mtp_outputs) > 0 else []
 
-        if labels is not None:
-            return self.criterion(logits, labels, mtp_logits=mtp_logits)
-        else:
-            return mtp_logits
+        return self.criterion(logits, labels, mtp_logits=mtp_logits)
 
     def prepare_inputs_for_generation(
         self, input_ids, use_cache=False, past_key_values=None, attention_mask=None, inputs_embeds=None, **kwargs
