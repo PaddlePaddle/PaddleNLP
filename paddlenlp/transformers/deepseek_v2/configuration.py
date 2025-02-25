@@ -139,7 +139,8 @@ class DeepseekV2Config(PretrainedConfig):
         intermediate_size=11008,
         moe_intermediate_size=1407,
         num_hidden_layers=30,
-        num_nextn_predict_layers=1,
+        num_nextn_predict_layers=0,
+        num_nextn_predict_lambda=1.0,
         num_attention_heads=32,
         num_key_value_heads=32,
         n_shared_experts=None,
@@ -187,6 +188,7 @@ class DeepseekV2Config(PretrainedConfig):
         self.moe_intermediate_size = moe_intermediate_size
         self.num_hidden_layers = num_hidden_layers
         self.num_nextn_predict_layers = num_nextn_predict_layers
+        self.num_nextn_predict_lambda = num_nextn_predict_lambda
         self.num_attention_heads = num_attention_heads
         self.n_shared_experts = n_shared_experts
         self.n_routed_experts = n_routed_experts

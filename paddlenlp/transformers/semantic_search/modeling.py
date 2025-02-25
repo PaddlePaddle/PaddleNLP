@@ -282,8 +282,9 @@ class ErnieCrossEncoder(nn.Layer):
             input_ids, token_type_ids=token_type_ids, position_ids=position_ids, attention_mask=attention_mask
         )
         pooled_output = self.ernie.dropout(sequence_output[:, 0])
-        probs = self.ernie.classifier(pooled_output)
-        return probs
+        cls_embedding = self.ernie.classifier(pooled_output)
+        probs = F.softmax(cls_embedding, axis=1)
+        return probs[:, 1]
 
     def matching_v3(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
         """Use the pooled_output as the feature for listwise prediction, eg. ERNIE-Search"""
