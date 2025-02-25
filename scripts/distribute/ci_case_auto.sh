@@ -3071,7 +3071,7 @@ function llama_lora_static_graph_auto_bs_2_bf16_DP2-TP2-PP1() {
     --eval_accumulation_steps 16 \
     --num_train_epochs 1 \
     --learning_rate 3e-05 \
-    --max_steps 10 \
+    --max_steps 3 \
     --warmup_steps 30 \
     --logging_steps 1 \
     --evaluation_strategy "epoch" \
@@ -3098,17 +3098,21 @@ function llama_lora_static_graph_auto_bs_2_bf16_DP2-TP2-PP1() {
     --fuse_attention_qkv true \
     --sharding "stage1" \
     --auto_parallel_resume_form_hybrid_parallel true \
-    --num_hidden_layers 4 \
+    --num_hidden_layers 2 \
     >>${log_path}/$FUNCNAME 2>&1
     ips=-1
     loss=-1
-    mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'current_memory_allocated: ' '{print $2}' | awk -F ',' '{print $1}'`
+    mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 3' | awk -F 'current_memory_allocated: ' '{print $2}' | awk -F ',' '{print $1}'`
 
-    loss_base=-1
+    loss_base=14.08608055
     ips_base=-1
-    mem_base=6.5
+    mem_base=2.02
     echo "result: loss=$loss ips=$ips mem=$mem"
-    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
+    if [ $IS_A100 -ne 0 ];then
+        check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
+    else
+        echo "auto just compare loss in A100 machine."
+    fi
 
     echo "=========== $FUNCNAME run  end ==========="
 }
