@@ -236,11 +236,8 @@ def scaled_dot_product_attention(
             )
 
         attn_weights = attn_weights + attention_mask
-        if not paddle.in_dynamic_mode():
+        with paddle.amp.auto_cast(False):
             attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
-        else:
-            with paddle.amp.auto_cast(False):
-                attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
 
         attn_weights = F.dropout(attn_weights, p=config.attention_dropout, training=training)
 
@@ -340,12 +337,7 @@ class DeepseekV2RMSNorm(nn.Layer):
                     f"Implementation of fused_rms_norm is not available on {get_env_device()}. Please install paddle_xpu to use this feature"
                 )
 
-        if paddle.in_dynamic_mode():
-            with paddle.amp.auto_cast(False):
-                hidden_states = hidden_states.astype("float32")
-                variance = hidden_states.pow(2).mean(-1, keepdim=True)
-                hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
-        else:
+        with paddle.amp.auto_cast(False):
             hidden_states = hidden_states.astype("float32")
             variance = hidden_states.pow(2).mean(-1, keepdim=True)
             hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
@@ -548,7 +540,7 @@ class DeepseekV2YarnRotaryEmbedding(DeepseekV2RotaryEmbedding):
 
         t = paddle.arange(seq_len, dtype=paddle.float32)
 
-        freqs = paddle.outer(t, self.inv_freq)
+        freqs = paddle.outer(t, paddle.cast(self.inv_freq, dtype="float32"))
 
         _mscale = float(
             yarn_get_mscale(self.scaling_factor, self.mscale)

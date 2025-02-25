@@ -669,7 +669,11 @@ class GlobalOutputNet(nn.Layer):
             position_ids = paddle.arange(cache_length, seq_length + cache_length, dtype=paddle.int64)
             position_ids = position_ids.unsqueeze(0)
 
-        if attn_mask_startend_row_indices is not None or get_use_casual_mask():
+        if(
+            attn_mask_startend_row_indices is not None
+            or get_use_casual_mask()
+            or (self.config.use_flash_attention and self.training)
+            ):
             attention_mask = None
         else:
             # [bs, seq_len]
