@@ -520,7 +520,7 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
 
         # get topk mask
         mask = paddle.zeros_like(gates).put_along_axis(top_idx, paddle.to_tensor(1.0), axis=1)
-        if self.config.seq_aux:
+        if hasattr(self.config, "seq_aux") and self.config.seq_aux:
             l_aux = self._cal_seq_aux_loss(gates_ori, self.top_k, top_idx)
         else:
             l_aux = self._cal_aux_loss(gates, mask)
