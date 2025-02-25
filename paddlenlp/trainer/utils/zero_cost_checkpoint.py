@@ -401,11 +401,6 @@ class ZeroCostCheckpointCallback(TrainerCallback):
             logger.info("[ZCC manager] Synced checkpoints.")
 
     def on_step_end(self, args, state, control, model, lr_scheduler, optimizer, **kwargs):
-        if not isinstance(model, PipelineLayer):
-            self.manager.zcc_pipeline_hook(0)
-        # logger.info(
-        #     f"check coef: {args.zcc_save_ema_coef} {control.should_save}, {state.global_step}, {self.zcc_ema_interval}"
-        # )
         if not control.should_save:
             if args.zcc_save_ema_coef is not None and state.global_step % self.zcc_ema_interval == 0:
                 self.maybe_update_zcc_worker(args, model, optimizer, state.global_step)
@@ -418,6 +413,8 @@ class ZeroCostCheckpointCallback(TrainerCallback):
             non_cached_objects = (lr_scheduler.state_dict(), copy.deepcopy(state), self.get_rng_states(args))
             self.manager.get_idle_worker_for_saving((save_infos, non_cached_objects))
             self.runtime_timer.stop()
+        if not isinstance(model, PipelineLayer):
+            self.manager.zcc_pipeline_hook(0)
 
     def get_rng_states(self, args):
         if not args.save_rng_states:
