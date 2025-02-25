@@ -414,9 +414,6 @@ class DataCollatorForSeq2Seq:
         ):
             decoder_input_ids = self.model.prepare_decoder_input_ids_from_labels(labels=batch["labels"])
             batch["decoder_input_ids"] = decoder_input_ids
-        if "labels" in batch.keys():
-            value = batch.pop("labels")
-            batch["labels"] = value
         return batch
 
 
