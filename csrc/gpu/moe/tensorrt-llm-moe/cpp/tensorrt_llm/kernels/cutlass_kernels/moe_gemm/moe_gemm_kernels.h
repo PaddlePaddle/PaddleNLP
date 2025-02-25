@@ -16,7 +16,7 @@
  */
 
 #pragma once
-#include "tensorrt_llm/common/workspace.h"
+#include "tensorrt_llm/common/cudaUtils.h"
 #include "tensorrt_llm/cutlass_extensions/include/cutlass_extensions/gemm_configs.h"
 #include <array>
 #include <cuda_runtime_api.h>

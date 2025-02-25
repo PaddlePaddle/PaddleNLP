@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-#include "tensorrt_llm/common/workspace.h"
+#include "tensorrt_llm/common/cudaUtils.h"
 #include <algorithm>
 #include <cuda.h>
 #include <cuda_fp16.h>
