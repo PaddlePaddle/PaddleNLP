@@ -71,33 +71,33 @@ std::vector<paddle::Tensor> MultiHeadLatentAttentionKernel(
   const int encoder_block_shape_q = get_encoder_block_shape_q();
   const int decoder_block_shape_q = get_decoder_block_shape_q();
   auto main_stream = query.stream();
-  paddle::Tensor fmha_out = GetEmptyTensor(
-    {meta_data.token_nums, meta_data.q_num_heads * meta_data.head_dims_v},
-    D,
-    query.place());
+
+  paddle::Tensor fmha_out = paddle::full(
+      {meta_data.token_nums, meta_data.q_num_heads * meta_data.head_dims_v},
+      0,
+      D,
+      query.place());
 
   if (max_dec_len_this_time_data > 0) {
-    // std::cout << "dec_mla" << std::endl;
-    DecodeMLAAttentionKernel<data_t>(
-        meta_data,
-        query, // [token_num, num_heads, head_dim]
-        key_cache,
-        value_cache,
-        attn_mask,
-        out_linear_shifts,
-        out_linear_smooths,
-        seq_lens_this_time, // q_seq_len is 1
-        seq_lens_decoder,
-        padding_offsets,
-        cum_offsets,
-        block_tables,
-        max_input_length,
-        max_len_kv_data,
-        softmax_scale,
-        out_linear_in_scale,
-        causal,
-        main_stream,
-        &fmha_out);
+    DecodeMLAAttentionKernel<data_t>(meta_data,
+                                     query,  // [token_num, num_heads, head_dim]
+                                     key_cache,
+                                     value_cache,
+                                     attn_mask,
+                                     out_linear_shifts,
+                                     out_linear_smooths,
+                                     seq_lens_this_time,  // q_seq_len is 1
+                                     seq_lens_decoder,
+                                     padding_offsets,
+                                     cum_offsets,
+                                     block_tables,
+                                     max_input_length,
+                                     max_len_kv_data,
+                                     softmax_scale,
+                                     out_linear_in_scale,
+                                     causal,
+                                     main_stream,
+                                     &fmha_out);
   }
   return {fmha_out};
 }
