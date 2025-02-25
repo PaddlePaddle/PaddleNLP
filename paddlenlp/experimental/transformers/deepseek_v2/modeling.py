@@ -174,6 +174,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
         self.config = config
 
         self.max_seq_len = config.max_seq_len
+        self.block_size = config.block_size
 
         self.vocab_size = config.vocab_size
         self.hidden_size = config.hidden_size
@@ -483,32 +484,8 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                 for idx in range(self.num_layers)
             ]
 
-        self.prefill_cache_k_buffer: paddle.Tensor = None
-        self.prefill_cache_v_buffer: paddle.Tensor = None
-        if self.config.mla_use_matrix_absorption:
-            max_batch_size = 1
-            max_block_nums = max_batch_size * (self.max_seq_len + config.block_size - 1) // config.block_size
-            cache_k_shape = [
-                max_block_nums,
-                config.num_key_value_heads // max(config.tensor_parallel_degree, 1),
-                config.block_size,
-                config.qk_nope_head_dim + config.qk_rope_head_dim,
-            ]
-            cache_v_shape = [
-                max_block_nums,
-                config.num_key_value_heads // max(config.tensor_parallel_degree, 1),
-                config.block_size,
-                config.v_head_dim,
-            ]
-            self.prefill_cache_k_buffer = paddle.empty(shape=cache_k_shape, dtype=paddle.get_default_dtype())
-            self.prefill_cache_v_buffer = paddle.empty(shape=cache_v_shape, dtype=paddle.get_default_dtype())
-            self.register_buffer("prefill_cache_k_buffer", self.prefill_cache_k_buffer, persistable=False)
-            self.register_buffer("prefill_cache_v_buffer", self.prefill_cache_v_buffer, persistable=False)
-
         mla_config = MLAConfig(
             use_matrix_absorption=self.config.mla_use_matrix_absorption,
-            prefill_cache_k_buffer=self.prefill_cache_k_buffer,
-            prefill_cache_v_buffer=self.prefill_cache_v_buffer,
             q_lora_rank=self.config.q_lora_rank,
             kv_lora_rank=self.config.kv_lora_rank,
             qk_nope_head_dim=self.config.qk_nope_head_dim,
@@ -943,6 +920,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
         kwargs["cu_seqlens_k"] = cu_seqlens_k
         kwargs["padding_offsets"] = padding_offset
         kwargs["max_input_length"] = self.max_seq_len
+        kwargs["block_size"] = self.block_size
 
         inputs_embeds = self.embed_tokens(ids_remove_padding)
 
@@ -1010,6 +988,7 @@ class MTPDeepseekV2BlockInferenceModel(DeepseekV2BlockInferenceModel):
         kwargs["cu_seqlens_k"] = cu_seqlens_k
         kwargs["padding_offsets"] = padding_offset
         kwargs["max_input_length"] = self.max_seq_len
+        kwargs["block_size"] = self.block_size
 
         inputs_embeds = self.embed_tokens(ids_remove_padding)
         inputs_embeds = paddle.concat([self.enorm(inputs_embeds), self.hnorm(pre_hidden_states)], axis=-1)

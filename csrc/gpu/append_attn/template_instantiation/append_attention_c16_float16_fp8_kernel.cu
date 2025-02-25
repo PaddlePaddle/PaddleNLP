@@ -53,6 +53,5 @@ template void CascadeAppendAttentionC16Kernel<paddle::float16, paddle::float8_e4
     const bool causal,
     const bool is_decoder,
     const bool enable_prefill,
-    const bool mla_use_absorb,
     cudaStream_t& stream,
     paddle::Tensor* out);

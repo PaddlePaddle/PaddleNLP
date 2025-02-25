@@ -636,8 +636,7 @@ __global__ void cache_kernel(
     const int head_size_v,
     const int block_size,
     const uint32_t elem_cnt,
-    const int kv_num_heads,
-    const bool mla_use_absorb = false) {
+    const int kv_num_heads) {
   using LoadT = AlignedVector<T, VecSize>;
   LoadT src_vec;
 
@@ -661,7 +660,7 @@ __global__ void cache_kernel(
 
     block_table_now = block_tables + ori_bi * max_blocks_per_seq;
 
-    const uint32_t block_idx = mla_use_absorb ? ori_seq_id / block_size : block_table_now[ori_seq_id / block_size];
+    const uint32_t block_idx = block_table_now[ori_seq_id / block_size];
     const uint32_t block_offset = ori_seq_id % block_size;
 
     if (bias < hidden_size_k) {
@@ -1467,7 +1466,6 @@ void CascadeAppendWriteCacheKVQKV(
     const paddle::Tensor &seq_lens_encoder,
     const paddle::Tensor &seq_lens_decoder,
     const int max_seq_len,
-    const bool mla_use_absorb,
     cudaStream_t &stream,
     paddle::Tensor *key_cache_out,
     paddle::Tensor *value_cache_out) {
@@ -1501,8 +1499,7 @@ void CascadeAppendWriteCacheKVQKV(
       head_dim_v,
       block_size,
       elem_nums,
-      kv_num_heads,
-      mla_use_absorb);
+      kv_num_heads);
 }
 
 template <typename T, uint32_t HEAD_DIM, uint32_t BLOCK_SIZE>

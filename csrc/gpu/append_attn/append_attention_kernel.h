@@ -57,7 +57,6 @@ void CascadeAppendAttentionC16Kernel(
     const bool causal,
     const bool is_decoder,
     const bool enable_prefill,
-    const bool mla_use_absorb,
     cudaStream_t& stream,
     paddle::Tensor* out);
 
@@ -191,7 +190,6 @@ void CascadeAppendAttentionKernel(
     const bool causal,
     const bool is_decoder,
     const bool enable_prefill,
-    const bool mla_use_absorb,
     cudaStream_t& stream,
     paddle::Tensor* out) {
   if (cache_quant_type_str == "none") {
@@ -226,7 +224,6 @@ void CascadeAppendAttentionKernel(
                                              causal,
                                              is_decoder,
                                              enable_prefill,
-                                             mla_use_absorb,
                                              stream,
                                              out);
   } else if (cache_quant_type_str == "cache_int8") {

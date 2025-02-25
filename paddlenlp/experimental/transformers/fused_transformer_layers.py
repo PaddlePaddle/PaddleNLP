@@ -160,8 +160,6 @@ class SpeculateConfig:
 @dataclass
 class MLAConfig:
     use_matrix_absorption: bool = False
-    prefill_cache_k_buffer: paddle.Tensor = None
-    prefill_cache_v_buffer: paddle.Tensor = None
 
     q_lora_rank: int = None
     kv_lora_rank: int = None
@@ -1098,20 +1096,26 @@ class FusedMultiTransformerBase(Layer):
             key[..., : self.config.mla_config.qk_nope_head_dim] = key_nope
             key[..., self.config.mla_config.qk_nope_head_dim :] = key_pe
 
-            qkv_out = paddle.concat(
-                [
-                    query.reshape([-1, self.num_heads * self.config.mla_config.qk_head_dim]),
-                    key.reshape([-1, self.num_heads * self.config.mla_config.qk_head_dim]),
-                    value.reshape([-1, self.num_heads * self.config.mla_config.v_head_dim]),
-                ],
-                axis=-1,
-            )
+            if self.config.mla_config.use_absorb():
+                value = paddle.nn.functional.pad(
+                    value, [0, self.config.mla_config.qk_head_dim - self.config.mla_config.v_head_dim], value=0
+                )
+                return query, key, value
+            else:
+                qkv_out = paddle.concat(
+                    [
+                        query.reshape([-1, self.num_heads * self.config.mla_config.qk_head_dim]),
+                        key.reshape([-1, self.num_heads * self.config.mla_config.qk_head_dim]),
+                        value.reshape([-1, self.num_heads * self.config.mla_config.v_head_dim]),
+                    ],
+                    axis=-1,
+                )
+                return qkv_out
         else:
             qkv_out = paddle.matmul(ln_out, self.qkv_weights[i], False, True)
             if self.qkv_biases[i] is not None:
                 qkv_out = paddle.add(qkv_out, self.qkv_biases[i])
-
-        return qkv_out
+            return qkv_out
 
     def compute_qkv(self, src, residual_input, i):
         ln_out = self.compute_layernorm_before_qkv(src, i)
@@ -2149,14 +2153,21 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             key[..., : self.config.mla_config.qk_nope_head_dim] = key_nope
             key[..., self.config.mla_config.qk_nope_head_dim :] = key_pe
 
-            qkv_out = paddle.concat(
-                [
-                    query.reshape([-1, self.num_heads * self.config.mla_config.qk_head_dim]),
-                    key.reshape([-1, self.num_heads * self.config.mla_config.qk_head_dim]),
-                    value.reshape([-1, self.num_heads * self.config.mla_config.v_head_dim]),
-                ],
-                axis=-1,
-            )
+            if self.config.mla_config.use_absorb():
+                value = paddle.nn.functional.pad(
+                    value, [0, self.config.mla_config.qk_head_dim - self.config.mla_config.v_head_dim], value=0
+                )
+                return query, key, value
+            else:
+                qkv_out = paddle.concat(
+                    [
+                        query.reshape([-1, self.num_heads * self.config.mla_config.qk_head_dim]),
+                        key.reshape([-1, self.num_heads * self.config.mla_config.qk_head_dim]),
+                        value.reshape([-1, self.num_heads * self.config.mla_config.v_head_dim]),
+                    ],
+                    axis=-1,
+                )
+                return qkv_out
         else:
             qkv_out = weight_only_linear(
                 ln_out,
@@ -2166,8 +2177,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
                 weight_dtype=self.weight_dtype,
                 group_size=self.weightonly_group_size,
             )
-
-        return qkv_out
+            return qkv_out
 
     def compute_out_linear(self, fmha_out, i):
         return weight_only_linear(
@@ -2969,57 +2979,25 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
         out_linear_out = paddle.zeros(shape=[ln_out.shape[0], self.embed_dim], dtype=ln_out.dtype)
 
         if kwargs["max_enc_len_this_time"]:  # prefill phase
-            qkv_out_inner = self.compute_qkv_linear(ln_out, i, latent_cache=latent_cache, **kwargs)
+            query, key, value = self.compute_qkv_linear(ln_out, i, latent_cache=latent_cache, **kwargs)
 
-            from paddlenlp_ops import append_attention
-
-            fmha_out_prefill = append_attention(
-                qkv_out_inner,
-                self.config.mla_config.prefill_cache_k_buffer,
-                self.config.mla_config.prefill_cache_v_buffer,
-                kwargs.get("seq_lens_encoder", None),
-                kwargs.get("seq_lens_decoder", None),
-                kwargs.get("seq_lens_this_time", None),
-                kwargs.get("padding_offsets", None),
-                kwargs.get("cum_offsets", None),
-                kwargs.get("block_tables", None),
-                kwargs.get("encoder_batch_ids", None),
-                kwargs.get("encoder_tile_ids_per_batch", None),
-                kwargs.get("encoder_num_blocks", None),
-                kwargs.get("kv_batch_ids", None),
-                kwargs.get("kv_tile_ids_per_batch", None),
-                kwargs.get("kv_num_blocks", None),
-                kwargs.get("decoder_batch_ids", None),
-                kwargs.get("decoder_tile_ids_per_batch", None),
-                kwargs.get("decoder_num_blocks", None),
-                kwargs.get("max_enc_len_this_time", None),
-                kwargs.get("max_dec_len_this_time", None),
-                kwargs.get("max_len_kv", None),
-                None,
-                None,  # attn_mask
-                None,  # qkv_bias
-                None,  # qkv_out_scales
-                None,  # cache_k_quant_scales
-                None,  # cache_v_quant_scales
-                None,  # cache_k_dequant_scales
-                None,  # cache_v_dequant_scales
-                None,  # cache_k_zp
-                None,  # cache_v_zp
-                None,  # out_shifts
-                None,  # out_smooths
-                self._fuse_kernel_compute_dtype,
-                "none",  # cache_quant_type
-                self.use_neox_rotary_style,
-                kwargs.get("max_input_length", -1),
-                self.softmax_scale,  # softmax_scale
-                0.0,  # quant_max_bound
-                0.0,  # quant_min_bound
-                0.0,  # out_linear_in_scale
-                self.config.speculate_config.speculate_max_draft_token_num,
-                True,  # causal
-                self.config.speculate_config.speculate_method is not None,  # speculate_decoder
-                True,  # mla_use_absorb
+            fmha_out_prefill = paddle.nn.functional.flash_attention.flash_attn_unpadded(
+                query,
+                key,
+                value,
+                kwargs.get("cu_seqlens_q", None),
+                kwargs.get("cu_seqlens_k", None),
+                kwargs.get("max_enc_len_this_time", -1),
+                kwargs.get("max_enc_len_this_time", -1),
+                self.softmax_scale,
+                causal=True,
+                training=False,
             )[0]
+
+            fmha_out_prefill = fmha_out_prefill.reshape([-1, self.num_heads, self.config.mla_config.qk_head_dim])
+            fmha_out_prefill = fmha_out_prefill[:, :, : self.config.mla_config.v_head_dim]
+            fmha_out_prefill = fmha_out_prefill.reshape([-1, self.num_heads * self.config.mla_config.v_head_dim])
+
             out_linear_out_prefill = self.compute_out_linear(fmha_out_prefill, i)
             out_linear_out = out_linear_out + out_linear_out_prefill
 
@@ -3330,57 +3308,25 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
         out_linear_out = paddle.zeros(shape=[ln_out.shape[0], self.embed_dim], dtype=ln_out.dtype)
 
         if kwargs["max_enc_len_this_time"]:  # prefill phase
-            qkv_out_inner = self.compute_qkv_linear(ln_out, i, latent_cache=latent_cache, **kwargs)
+            query, key, value = self.compute_qkv_linear(ln_out, i, latent_cache=latent_cache, **kwargs)
 
-            from paddlenlp_ops import append_attention
-
-            fmha_out_prefill = append_attention(
-                qkv_out_inner,
-                self.config.mla_config.prefill_cache_k_buffer,
-                self.config.mla_config.prefill_cache_v_buffer,
-                kwargs.get("seq_lens_encoder", None),
-                kwargs.get("seq_lens_decoder", None),
-                kwargs.get("seq_lens_this_time", None),
-                kwargs.get("padding_offsets", None),
-                kwargs.get("cum_offsets", None),
-                kwargs.get("block_tables", None),
-                kwargs.get("encoder_batch_ids", None),
-                kwargs.get("encoder_tile_ids_per_batch", None),
-                kwargs.get("encoder_num_blocks", None),
-                kwargs.get("kv_batch_ids", None),
-                kwargs.get("kv_tile_ids_per_batch", None),
-                kwargs.get("kv_num_blocks", None),
-                kwargs.get("decoder_batch_ids", None),
-                kwargs.get("decoder_tile_ids_per_batch", None),
-                kwargs.get("decoder_num_blocks", None),
-                kwargs.get("max_enc_len_this_time", None),
-                kwargs.get("max_dec_len_this_time", None),
-                kwargs.get("max_len_kv", None),
-                None,
-                None,  # attn_mask
-                None,  # qkv_bias
-                None,  # qkv_out_scales
-                None,  # cache_k_quant_scales
-                None,  # cache_v_quant_scales
-                None,  # cache_k_dequant_scales
-                None,  # cache_v_dequant_scales
-                None,  # cache_k_zp
-                None,  # cache_v_zp
-                None,  # out_shifts
-                None,  # out_smooths
-                self._fuse_kernel_compute_dtype,
-                "none",  # cache_quant_type
-                self.use_neox_rotary_style,
-                kwargs.get("max_input_length", -1),
-                self.softmax_scale,  # softmax_scale
-                0.0,  # quant_max_bound
-                0.0,  # quant_min_bound
-                0.0,  # out_linear_in_scale
-                self.config.speculate_config.speculate_max_draft_token_num,
-                True,  # causal
-                self.config.speculate_config.speculate_method is not None,  # speculate_decoder
-                True,  # mla_use_absorb
+            fmha_out_prefill = paddle.nn.functional.flash_attention.flash_attn_unpadded(
+                query,
+                key,
+                value,
+                kwargs.get("cu_seqlens_q", None),
+                kwargs.get("cu_seqlens_k", None),
+                kwargs.get("max_enc_len_this_time", -1),
+                kwargs.get("max_enc_len_this_time", -1),
+                self.softmax_scale,
+                causal=True,
+                training=False,
             )[0]
+
+            fmha_out_prefill = fmha_out_prefill.reshape([-1, self.num_heads, self.config.mla_config.qk_head_dim])
+            fmha_out_prefill = fmha_out_prefill[:, :, : self.config.mla_config.v_head_dim]
+            fmha_out_prefill = fmha_out_prefill.reshape([-1, self.num_heads * self.config.mla_config.v_head_dim])
+
             out_linear_out_prefill = self.compute_out_linear(fmha_out_prefill, i)
             out_linear_out = out_linear_out + out_linear_out_prefill
 
