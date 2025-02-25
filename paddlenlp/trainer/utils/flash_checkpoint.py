@@ -407,10 +407,8 @@ class FlashCheckpointCallback(TrainerCallback):
             logger.info("Synced flash checkpoints.")
 
     def on_step_end(self, args, state, control, model, lr_scheduler, optimizer, **kwargs):
-        if not isinstance(model, PipelineLayer):
-            self.manager.flash_checkpoint_pipeline_hook(0)
         # logger.info(
-        #     f"check coef: {args.flash_save_ema_coef} {control.should_save}, {state.global_step}, {self.flash_ema_interval}"
+        #     f"check coef: {args.flash_save_ema_coef} {control.should_save}, {state.global_step}, {self.flash_ema_interval}, type={type(model)}"
         # )
         if not control.should_save:
             if args.flash_save_ema_coef is not None and state.global_step % self.flash_ema_interval == 0:
@@ -424,6 +422,8 @@ class FlashCheckpointCallback(TrainerCallback):
             non_cached_objects = (lr_scheduler.state_dict(), copy.deepcopy(state))
             self.manager.get_idle_worker_for_saving((save_infos, non_cached_objects))
             self.runtime_timer.stop()
+        if not isinstance(model, PipelineLayer):
+            self.manager.flash_checkpoint_pipeline_hook(0)
 
     def _get_save_infos_based_on_steps(self, state, args, checkpoint_folder):
         flash_checkpoint_dir = None
