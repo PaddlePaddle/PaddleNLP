@@ -27,23 +27,6 @@ from ..testing_utils import skip_platform
 paddle.set_device("cpu")
 
 
-def enhanced_to_tensor(tensor):
-    if tensor.dtype == np.bfloat16:
-        return paddle.to_tensor(tensor.view(np.uint16))
-    if tensor.dtype == np.float8_e5m2:
-        t = paddle.to_tensor(tensor.view(np.int8))
-        new_t = paddle.empty(t.shape, dtype=paddle.float8_e5m2)
-        new_t.get_tensor()._share_data_with(t.get_tensor())
-        return new_t
-    if tensor.dtype == np.float8_e4m3fn:
-        t = paddle.to_tensor(tensor.view(np.int8))
-        new_t = paddle.empty(t.shape, dtype=paddle.float8_e4m3fn)
-        new_t.get_tensor()._share_data_with(t.get_tensor())
-        return new_t
-        # return paddle.to_tensor(tensor.view(np.int8), dtype=paddle.float8_e4m3fn)
-    return paddle.to_tensor(tensor)
-
-
 class EextendDtypeNumpySafe(unittest.TestCase):
     def setUp(self):
         super().setUp()
@@ -68,7 +51,7 @@ class EextendDtypeNumpySafe(unittest.TestCase):
     def get_paddle_target_dtype(self, dtype="float32"):
         weight_map = self.get_target_dtype(dtype)
         for k, v in list(weight_map.items()):
-            weight_map[k] = enhanced_to_tensor(v)
+            weight_map[k] = paddle.to_tensor(v)
         return weight_map
 
     @skip_platform("win32", "cygwin")
@@ -89,8 +72,8 @@ class EextendDtypeNumpySafe(unittest.TestCase):
                 fs_sf_load = fast_load_file(path)
 
                 for k, v in self.weight_map.items():
-                    paddle.allclose(v, enhanced_to_tensor(sf_load[k]))
-                    paddle.allclose(v, enhanced_to_tensor(fs_sf_load[k]))
+                    paddle.allclose(v, paddle.to_tensor(sf_load[k]))
+                    paddle.allclose(v, paddle.to_tensor(fs_sf_load[k]))
 
     @skip_platform("win32", "cygwin")
     def test_save_load_file(self):
