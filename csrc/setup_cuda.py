@@ -136,7 +136,6 @@ nvcc_compile_args += [
 
 cc = get_sm_version()
 cuda_version = float(paddle.version.cuda())
-cuda_version = 12.4
 
 if cc >= 80:
     sources += ["gpu/int8_gemm_with_cutlass/gemm_dequant.cu"]
@@ -164,15 +163,26 @@ if cc == 89 and cuda_version >= 12.4:
         "gpu/fp8_gemm_with_cutlass/fp8_fp8_fp8_dual_gemm.cu",
     ]
 
-if cc >= 89 and cuda_version >= 12.4:
+if cc >= 80 and cuda_version >= 12.4:
     nvcc_compile_args += [
         "-std=c++17",
         "--use_fast_math",
         "--threads=8",
         "-D_GLIBCXX_USE_CXX11_ABI=1",
     ]
-    sources += find_end_files("./gpu/sage_attn_kernels", ".cu")
-    sources += ["./gpu/sage_attn_kernels/sageattn.cc"]
+    if cc >= 80:
+        sources += [
+            "./gpu/sage_attn_kernels/sageattn_fused.cu",
+            "./gpu/sage_attn_kernels/sageattn_qk_int_sv_f16_kernel_sm80.cu"
+        ]
+    if cc >= 89:
+        sources += [
+            "./gpu/sage_attn_kernels/sageattn_qk_int_sv_f8_kernel_sm89.cu"
+        ]
+    if cc >= 90:
+        sources += [
+            "./gpu/sage_attn_kernels/sageattn_qk_int_sv_f8_kernel_sm90.cu"
+        ]
 
 if cc >= 90 and cuda_version >= 12.0:
     nvcc_compile_args += ["-DNDEBUG"]

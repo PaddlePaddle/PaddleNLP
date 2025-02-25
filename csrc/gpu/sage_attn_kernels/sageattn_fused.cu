@@ -83,13 +83,7 @@ __global__ void QuantInt8Kernel(T *__restrict__ input, T *__restrict__ mean, int
 
   if constexpr (sub_mean)
   {
-    // *(float4*)(&mean_val[0]) = *(float4*)(mean_ptr_base);
-    // for unable-align reasons, we unroll it manually.
-#pragma unroll
-    for (int ii = 0; ii < 8; ii++) {
-      mean_val[ii] = mean_ptr_base[ii];
-    }
-
+    *(float4*)(&mean_val[0]) = *(float4*)(mean_ptr_base); // 8 elements
 #pragma unroll
     for (uint32_t j = 0; j < 8; j++)
     {
@@ -104,12 +98,7 @@ __global__ void QuantInt8Kernel(T *__restrict__ input, T *__restrict__ mean, int
   {
     if (thread_base_token + i * iter_stride < num_tokens)
     {
-      // *(float4*)(&x_val[i][0]) = *(float4*)(input_ptr_base + i * iter_stride * stride_seq_input);
-      // for unable-align reasons, we unroll it manually.
-#pragma unroll
-      for (int ii = 0; ii < 8; ii++) {
-        x_val[i][ii] = *(input_ptr_base + i * iter_stride * stride_seq_input + ii);
-      }
+      *(float4*)(&x_val[i][0]) = *(float4*)(input_ptr_base + i * iter_stride * stride_seq_input);
 #pragma unroll
       for (uint32_t j = 0; j < 8; j++)
       {
@@ -247,12 +236,12 @@ __global__ void TransposePadPermuteKernel(T *__restrict__ input, T *__restrict__
 
   __syncthreads();
 
-  // *(float4*)(output_ptr_base) = *(float4*)(&shared_store[thread_id / num_threads_per_cta][thread_id % num_threads_per_cta * pack_size]);
+  *(float4*)(output_ptr_base) = *(float4*)(&shared_store[thread_id / num_threads_per_cta][thread_id % num_threads_per_cta * pack_size]);
   // for unable-align reasons, we unroll it manually.
-#pragma unroll
-  for (int i = 0; i < 8; i++) {
-    *(output_ptr_base + i) = shared_store[thread_id / num_threads_per_cta][thread_id % num_threads_per_cta * pack_size + i];  // TODO: not debugged, maybe some problem
-  }
+// #pragma unroll
+//   for (int i = 0; i < 8; i++) {
+//     *(output_ptr_base + i) = shared_store[thread_id / num_threads_per_cta][thread_id % num_threads_per_cta * pack_size + i];  // TODO: not debugged, maybe some problem
+//   }
 }
 
 template<uint32_t pad_size, bool sub_mean = false, typename T>
@@ -290,11 +279,11 @@ __global__ void MeanScaleKernel(T *__restrict__ input, int8_t *__restrict__ outp
 
   for (int i = 0; i < num_iters; i++)
   {
-    // *(float4*)(&x_val[0]) = *(float4*)(input_ptr_base + i * gmem_stride);
-#pragma unroll
-    for (int ii = 0; ii < 8; ii++) {
-      x_val[ii] = *(input_ptr_base + i * gmem_stride + ii); // TODO: not debugged
-    }
+    *(float4*)(&x_val[0]) = *(float4*)(input_ptr_base + i * gmem_stride);
+// #pragma unroll
+//     for (int ii = 0; ii < 8; ii++) {
+//       x_val[ii] = *(input_ptr_base + i * gmem_stride + ii); // TODO: not debugged
+//     }
 #pragma unroll
     for (uint32_t j = 0; j < 8; j++)
     {
@@ -350,11 +339,11 @@ __global__ void MeanScaleKernel(T *__restrict__ input, int8_t *__restrict__ outp
 
   for (int i = 0; i < num_iters; i++)
   {
-    // *(float4*)(&x_val[0]) = *(float4*)(input_ptr_base + i * gmem_stride);
-#pragma unroll
-    for (int ii = 0; ii < 8; ii++) {
-      x_val[ii] = *(input_ptr_base + i * gmem_stride + ii); // TODO: not debugged
-    }
+    *(float4*)(&x_val[0]) = *(float4*)(input_ptr_base + i * gmem_stride);
+// #pragma unroll
+//     for (int ii = 0; ii < 8; ii++) {
+//       x_val[ii] = *(input_ptr_base + i * gmem_stride + ii); // TODO: not debugged
+//     }
 #pragma unroll
     for (uint32_t j = 0; j < 8; j++)
     {
@@ -438,10 +427,9 @@ void quant_per_block_int8_fuse_sub_mean_cuda_fwd(
   auto mean_dtype = mean.dtype();
 
   PD_CHECK(input_dtype == mean_dtype, "Input and mean must have the same data type");
-
   DISPATCH_PADDLE_DTYPE_TO_CTYPE_FP16(input_dtype, c_type, {
     DISPATCH_BLOCK_SIZE(block_size, BLOCK_SIZE, {
-      DISPATCH_HEAD_DIM(head_dim, HEAD_DIM, {
+      DISPATCH_HEAD_DIM_QK(head_dim, HEAD_DIM, {
         CHECK_SHAPE(mean, batch_size, num_heads, head_dim);
         CHECK_SHAPE(output, input.shape()[0], input.shape()[1], input.shape()[2], input.shape()[3]);
         CHECK_SHAPE(scale, batch_size, num_heads, (num_tokens + BLOCK_SIZE - 1) / BLOCK_SIZE);
@@ -451,9 +439,6 @@ void quant_per_block_int8_fuse_sub_mean_cuda_fwd(
         constexpr int num_pack_per_thread = (BLOCK_SIZE * (HEAD_DIM / 8) + 1023) / 1024;
 
         dim3 block(BLOCK_SIZE * (HEAD_DIM / 8) / num_pack_per_thread);
-        std::cout << "resources: " << (num_tokens + BLOCK_SIZE - 1) / BLOCK_SIZE << " " << num_heads << " " <<batch_size << std::endl;
-        std::cout << "block: " << BLOCK_SIZE * (HEAD_DIM / 8) / num_pack_per_thread << std::endl;
-
         QuantInt8Kernel<HEAD_DIM, BLOCK_SIZE, num_pack_per_thread, false, true, c_type><<<grid, block>>>(
           reinterpret_cast<c_type*>(input.data()),
           reinterpret_cast<c_type*>(mean.data()),
@@ -470,6 +455,13 @@ void quant_per_block_int8_fuse_sub_mean_cuda_fwd(
     });
   });
 }
+
+PD_BUILD_OP(quant_per_block_int8_fuse_sub_mean_cuda)
+    .Inputs({"input", "mean", "output", "scale"})
+    .Outputs({"out1", "out2", "out3", "out4"})
+    .SetInplaceMap({{"input", "out1"}, {"mean", "out2"}, {"output", "out3"}, {"scale", "out4"}}) // Inplace
+    .Attrs({"block_size: int", "tensor_layout: int"})
+    .SetKernelFn(PD_KERNEL(quant_per_block_int8_fuse_sub_mean_cuda_fwd));
 
 void quant_per_warp_int8_cuda_fwd(
                 paddle::Tensor& input,
@@ -527,7 +519,7 @@ void quant_per_warp_int8_cuda_fwd(
   DISPATCH_PADDLE_DTYPE_TO_CTYPE_FP16(input_dtype, c_type, {
     DISPATCH_WARP_BLOCK_SIZE(warp_block_size, WARP_BLOCK_SIZE, {
       DISPATCH_BLOCK_SIZE(block_size, BLOCK_SIZE, {
-        DISPATCH_HEAD_DIM(head_dim, HEAD_DIM, {
+        DISPATCH_HEAD_DIM_QK(head_dim, HEAD_DIM, {
           CHECK_SHAPE(output, input.shape()[0], input.shape()[1], input.shape()[2], input.shape()[3]);
           CHECK_SHAPE(scale, batch_size, num_heads, (num_tokens + BLOCK_SIZE - 1) / BLOCK_SIZE * (BLOCK_SIZE / WARP_BLOCK_SIZE));
           dim3 grid((num_tokens + BLOCK_SIZE - 1) / BLOCK_SIZE * (BLOCK_SIZE / WARP_BLOCK_SIZE), num_heads, batch_size);
@@ -551,6 +543,13 @@ void quant_per_warp_int8_cuda_fwd(
     });
   });
 }
+
+PD_BUILD_OP(quant_per_warp_int8_cuda)
+    .Inputs({"input", "output", "scale"})
+    .Outputs({"out1", "out2", "out3"})
+    .SetInplaceMap({{"input", "out1"}, {"output", "out2"}, {"scale", "out3"}}) // Inplace
+    .Attrs({"block_size: int", "warp_block_size: int", "tensor_layout: int"})
+    .SetKernelFn(PD_KERNEL(quant_per_warp_int8_cuda_fwd));
 
 void quant_per_block_int8_cuda_scale_fwd(
                 paddle::Tensor& input,
@@ -635,6 +634,13 @@ void quant_per_block_int8_cuda_scale_fwd(
   });
 }
 
+PD_BUILD_OP(quant_per_block_int8_cuda_scale)
+    .Inputs({"input", "output", "scale"})
+    .Outputs({"out1", "out2", "out3"})
+    .SetInplaceMap({{"input", "out1"}, {"output", "out2"}, {"scale", "out3"}}) // Inplace
+    .Attrs({"sm_scale: float", "block_size: int", "tensor_layout: int"})
+    .SetKernelFn(PD_KERNEL(quant_per_block_int8_cuda_scale_fwd));
+
 void quant_per_block_int8_cuda_fwd(
                 paddle::Tensor& input,
                 paddle::Tensor& output,
@@ -717,6 +723,14 @@ void quant_per_block_int8_cuda_fwd(
   });
 }
 
+PD_BUILD_OP(quant_per_block_int8_cuda)
+    .Inputs({"input", "output", "scale"})
+    .Outputs({"out1", "out2", "out3"})
+    .SetInplaceMap({{"input", "out1"}, {"output", "out2"}, {"scale", "out3"}}) // Inplace
+    .Attrs({"sm_scale: float", "block_size: int", "tensor_layout: int"})
+    .SetKernelFn(PD_KERNEL(quant_per_block_int8_cuda_fwd));
+
+// quant v用，但是v不是192，所以可以沿用原来的DISPATCH_HEAD_DIM
 void transpose_pad_permute_cuda_fwd(
                 paddle::Tensor& input,
                 paddle::Tensor& output,
@@ -791,6 +805,13 @@ void transpose_pad_permute_cuda_fwd(
     });
   });
 }
+
+PD_BUILD_OP(transpose_pad_permute_cuda)
+    .Inputs({"input", "output"})
+    .Outputs({"out1", "out2"})
+    .SetInplaceMap({{"input", "out1"}, {"output", "out2"}}) // Inplace
+    .Attrs({"tensor_layout: int"})
+    .SetKernelFn(PD_KERNEL(transpose_pad_permute_cuda_fwd));
 
 void scale_fuse_quant_cuda_fwd(
                 paddle::Tensor& input,
@@ -869,6 +890,14 @@ void scale_fuse_quant_cuda_fwd(
   });
 }
 
+PD_BUILD_OP(scale_fuse_quant_cuda)
+    .Inputs({"input", "output", "scale"})
+    .Outputs({"out1", "out2", "out3"})
+    .SetInplaceMap({{"input", "out1"}, {"output", "out2"}, {"scale", "out3"}}) // Inplace
+    .Attrs({"num_tokens: int", "scale_max: float", "tensor_layout: int"})
+    .SetKernelFn(PD_KERNEL(scale_fuse_quant_cuda_fwd));
+
+// smooth v
 void mean_scale_fuse_quant_cuda_fwd(
                 paddle::Tensor& input,
                 paddle::Tensor& output,
@@ -951,3 +980,10 @@ void mean_scale_fuse_quant_cuda_fwd(
     );
   });
 }
+
+PD_BUILD_OP(mean_scale_fuse_quant_cuda)
+    .Inputs({"input", "output", "mean", "scale"})
+    .Outputs({"out1", "out2", "out3", "out4"})
+    .SetInplaceMap({{"input", "out1"}, {"output", "out2"}, {"mean", "out3"}, {"scale", "out4"}}) // Inplace
+    .Attrs({"num_tokens: int", "scale_max: float", "tensor_layout: int"})
+    .SetKernelFn(PD_KERNEL(mean_scale_fuse_quant_cuda_fwd));

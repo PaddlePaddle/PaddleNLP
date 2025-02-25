@@ -1,4 +1,5 @@
 #pragma once
+#include <cuda.h>
 #include <cuda_bf16.h>
 #include <cuda_fp16.h>
 #include <cuda_fp8.h>
@@ -22,6 +23,8 @@
 #define S_FP8_OFFSET_EXP 6680.8477f
 #define S_FP8_OFFSET_EXP_INV 0.0022326917f
 
+#define div_ceil(M, N) (((M) + (N)-1) / (N))
+
 #if (__CUDACC_VER_MAJOR__ * 10000 + __CUDACC_VER_MINOR__ * 100 >= 120400)
 #if (!defined(__CUDA_ARCH__) || (__CUDA_ARCH__ >= 890))
 #define FP8_CAST_ENABLED
@@ -42,6 +45,26 @@
     __VA_ARGS__                                                 \
   } else if (head_dim == 128) {                                 \
     constexpr int HEAD_DIM = 128;                               \
+    __VA_ARGS__                                                 \
+  } else {                                                      \
+    std::ostringstream err_msg;                                 \
+    err_msg << "Unsupported head dim: " << int(head_dim);       \
+    throw std::invalid_argument(err_msg.str());                 \
+  }
+
+// add new support to HEAD_DIM = 192 for deepseek
+#define DISPATCH_HEAD_DIM_QK(head_dim, HEAD_DIM, ...)              \
+  if (head_dim == 64) {                                         \
+    constexpr int HEAD_DIM = 64;                                \
+    __VA_ARGS__                                                 \
+  } else if (head_dim == 128) {                                 \
+    constexpr int HEAD_DIM = 128;                               \
+    __VA_ARGS__                                                 \
+  } else if (head_dim == 192) {                                 \
+    constexpr int HEAD_DIM = 192;                               \
+    __VA_ARGS__                                                 \
+  } else if (head_dim == 256) {                                 \
+    constexpr int HEAD_DIM = 256;                               \
     __VA_ARGS__                                                 \
   } else {                                                      \
     std::ostringstream err_msg;                                 \
@@ -1079,6 +1102,10 @@ __device__ __forceinline__ void pred_load_128b(T* smem_ptr, const T* gmem_ptr, b
 
 } // namespace cp_async
 
+#ifndef USHORT_TYPE
+#define USHORT_TYPE
+typedef unsigned short ushort;
+#endif
 
 // namespace math
 // math operations using ptx
@@ -1516,10 +1543,6 @@ enum class ComputeUnit {
   kCudaCore,
 };
 
-inline __device__ __host__ size_t div_ceil(size_t a, size_t b) {
-    return (a % b != 0) ? (a / b + 1) : (a / b);
-}
-
 __device__ __forceinline__ uint32_t get_warp_id()
 {
   return threadIdx.y;
@@ -1833,11 +1856,24 @@ __device__ __forceinline__ void update_mdo(float RS[][num_tiles_k][8], DTypeSVAc
                                 max(RS[fq][fk][k * 2 + 4], RS[fq][fk][k * 2 + 5]));
         m_temp = max(m_temp, m_local);
       }
-      // exchange element with the 4 threads in the row
+
       if constexpr (!fuse_scale)
       {
-        m_temp *= sm_scale;
+        if constexpr (exp_offset)
+        {
+          m_temp = fmaf(m_temp, sm_scale, -S_FP8_OFFSET);
+        }
+        else
+        {
+          m_temp *= sm_scale;
+        }
       }
+      else if constexpr (exp_offset)
+      {        
+        m_temp += (-S_FP8_OFFSET);        
+      }
+
+      // exchange element with the 4 threads in the row
       m_temp = max(m_temp, __shfl_xor_sync(0xffffffff, m_temp, 0x1)); // 0 exchange with 1, 2 exchange with 3
       m_temp = max(m_temp, __shfl_xor_sync(0xffffffff, m_temp, 0x2)); // 0 exchange with 2, 1 exchange with 3
 
@@ -1848,7 +1884,11 @@ __device__ __forceinline__ void update_mdo(float RS[][num_tiles_k][8], DTypeSVAc
       // update denominator
       d[fq][k] *= o_scale;
 
-      half2 o_scale2 = __floats2half2_rn(o_scale, o_scale);
+      half2 o_scale2;
+      if constexpr (use_half_o_scale)
+      {  
+        o_scale2 = __floats2half2_rn(o_scale, o_scale);
+      }
 
       // update RO
 #pragma unroll
@@ -1880,10 +1920,6 @@ __device__ __forceinline__ void update_mdo(float RS[][num_tiles_k][8], DTypeSVAc
 
       // raise RS to exponent
       float negative_m = -m[fq][k];
-      if constexpr (exp_offset)
-      {
-        negative_m += S_FP8_OFFSET; // times 400 to achieve smaller quantization error of fp8 S
-      }
 #pragma unroll
       for (uint32_t fk = 0; fk < num_tiles_k; fk++)
       {
