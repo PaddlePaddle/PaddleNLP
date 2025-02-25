@@ -175,14 +175,17 @@ if cc >= 80 and cuda_version >= 12.4:
             "./gpu/sage_attn_kernels/sageattn_fused.cu",
             "./gpu/sage_attn_kernels/sageattn_qk_int_sv_f16_kernel_sm80.cu"
         ]
+        nvcc_compile_args += ["-gencode", f"arch=compute_80,code=compute_80"]
     if cc >= 89:
         sources += [
             "./gpu/sage_attn_kernels/sageattn_qk_int_sv_f8_kernel_sm89.cu"
         ]
+        nvcc_compile_args += ["-gencode", f"arch=compute_89,code=compute_89"]
     if cc >= 90:
         sources += [
             "./gpu/sage_attn_kernels/sageattn_qk_int_sv_f8_kernel_sm90.cu"
         ]
+        nvcc_compile_args += ["-gencode", f"arch=compute_90a,code=compute_90a"]
 
 if cc >= 90 and cuda_version >= 12.0:
     nvcc_compile_args += ["-DNDEBUG"]
