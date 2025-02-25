@@ -3101,7 +3101,7 @@ function llama_lora_static_graph_auto_bs_2_bf16_DP2-TP2-PP1() {
     --num_hidden_layers 2 \
     >>${log_path}/$FUNCNAME 2>&1
     ips=-1
-    loss=-1
+    loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 3' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
     mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 3' | awk -F 'current_memory_allocated: ' '{print $2}' | awk -F ',' '{print $1}'`
 
     loss_base=14.08608055
