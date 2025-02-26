@@ -779,6 +779,11 @@ class MiniMaxText01PreTrainedModel(PretrainedModel):
 
         init_name_mappings(mappings=model_mappings)
 
+        for mapping in model_mappings:
+            mapping[0] = "model." + mapping[0]
+            mapping[1] = "model." + mapping[1]
+        model_mappings.append(["lm_head.weight", "lm_head.weight", "transpose"])
+
         # if "MiniMaxText01Model" not in config.architectures:
         #     for mapping in model_mappings:
         #         mapping[0] = "model." + mapping[0]
