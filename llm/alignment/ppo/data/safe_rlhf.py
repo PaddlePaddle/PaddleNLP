@@ -35,9 +35,7 @@ class SafeRLHFDataset(RawDataset):
     PATH: ClassVar[str]
 
     def __init__(self, path: str | None = None) -> None:
-        # self.data = load_dataset(path or self.PATH, split=self.SPLIT)
-        self.data = load_dataset('json', data_files="5ppl_train.jsonl", split="train")
-        
+        self.data = load_dataset(path or self.PATH, split=self.SPLIT)
 
     def __getitem__(self, index: int) -> RawSample:
         data = self.data[index]

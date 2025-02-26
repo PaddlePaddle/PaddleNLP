@@ -390,7 +390,6 @@ def main():
             tokenizer.pad_token_id = tokenizer.eos_token_id
 
     if training_args.should_load_dataset:
-        # [('PKU-SafeRLHF/train', {'proportion': 1.0})]
         train_ds = PromptOnlyDataset(
             data_args.parsed_train_datasets, tokenizer=actor_tokenizer, use_rm_server=training_args.use_rm_server
         )
@@ -450,8 +449,6 @@ def main():
         ),
         data_collator=train_ds.get_collator(),
     )
-    # if token_audit:
-    #     trainer.add_callback(token_callback)
 
     # TODO(gongenlei) resume_from_checkpoint is not ready
     checkpoint = None

@@ -5,7 +5,6 @@
     "actor_model_name_or_path": "PKU-Alignment/alpaca-7b-reproduced",
     "reward_model_name_or_path": "PKU-Alignment/beaver-7b-v1.0-reward",
     "output_dir": "checkpoints/llama-ppo",
-    "logging_dir": "log",
     "max_length": 2048,
     "use_fusemt": 1,
     "use_flash_attention": 1,

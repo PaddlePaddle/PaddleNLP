@@ -263,7 +263,6 @@ class RawDataset(Dataset):
         """Load a raw dataset by name."""
         normalized_name = RawDataset.__ALIAS_NAME_MAPPING.get(name, name)
         try:
-            # 这里的cls就是SafeRLHFTrainDataset,cls.NAME:'PKU-SafeRLHF/train'
             cls = RawDataset.__REGISTRY[normalized_name]
         except KeyError as ex:
             raise ValueError(
