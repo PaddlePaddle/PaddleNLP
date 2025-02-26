@@ -1038,9 +1038,17 @@ class Trainer:
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
             for step, inputs in enumerate(epoch_iterator):
-                if self.args.use_hybrid_parallel and self.args.sep_parallel_degree > 1:
+                if (
+                    self.args.use_hybrid_parallel
+                    and self.args.sep_parallel_degree > 1
+                    and self.args.split_inputs_sequence_dim
+                ):
                     inputs = split_inputs_sequence_dim(inputs)
-                if self.args.use_hybrid_parallel and self.args.context_parallel_degree > 1:
+                if (
+                    self.args.use_hybrid_parallel
+                    and self.args.context_parallel_degree > 1
+                    and self.args.split_inputs_sequence_dim
+                ):
                     inputs = split_inputs_sequence_dim_load_balance(inputs)
                 if self.args.ignore_data_skip:
                     self.timers and self.timers("read-data").stop()
