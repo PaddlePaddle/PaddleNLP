@@ -1468,7 +1468,7 @@ class EagleForLlamaInferenceModel(LlamaBlockInferenceModel):
 
         if config.tensor_parallel_degree > 1:
             self.fc = ColumnParallelLinear(
-                self.hidden_size * 2, self.hidden_size, has_bias=True, gather_output=False, fuse_matmul_bias=True
+                self.hidden_size * 2, self.hidden_size, has_bias=True, gather_output=True, fuse_matmul_bias=True
             )
         else:
             self.fc = nn.Linear(self.hidden_size * 2, self.hidden_size, bias_attr=True)
@@ -1832,6 +1832,8 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
 
             base_actions = {
                 "lm_head.weight": partial(fn, is_column=True),
+                "fc.weight": partial(fn, is_column=True),
+                "fc.bias": partial(fn, is_column=True),
                 # Row Linear
                 "embed_tokens.weight": partial(fn, is_column=False),
                 "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
