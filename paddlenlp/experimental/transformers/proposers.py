@@ -279,7 +279,7 @@ class ModelProposer(Proposer):
         self.model_inputs = {}
 
         self.cache_k_shapes, self.cache_v_shapes = self.model.get_cache_kvs_shape(
-            self.model.config, self.args.batch_size
+            self.model.config, self.max_batch_size
         )
         cachekv_dtype = self.dtype if self.config.cachekv_int8_type is None else "uint8"
         self.cache_kvs = []
