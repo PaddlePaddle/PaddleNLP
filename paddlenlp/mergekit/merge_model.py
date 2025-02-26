@@ -151,7 +151,7 @@ class MergeModel:
                 )
         for key in local_keys:
             # Tensor preprocess
-            is_bf16 = str(state_dict_list[0][key].dtype) == "uint16"
+            is_bf16 = str(state_dict_list[0][key].dtype) in ["uint16", "bfloat16"]
             tensor_list = [state_dict_list[i].pop(key) for i in range(model_num)]
             tensor_mem = int(np.prod(tensor_list[0].shape) * self.numpy_dtype_map[str(tensor_list[0].dtype)]) / (
                 1024**3
@@ -436,7 +436,7 @@ class MergeModel:
                     framework="np",
                 ) as w:
                     tensor_list.append(w.get_tensor(k))
-            is_bf16 = str(tensor_list[0].dtype) == "uint16"
+            is_bf16 = str(tensor_list[0].dtype) in ["uint16", "bfloat16"]
             tensor_mem = int(np.prod(tensor_list[0].shape) * self.numpy_dtype_map[str(tensor_list[0].dtype)]) / (
                 1024**3
             )
@@ -562,7 +562,7 @@ class MergeModel:
                 lora_A_tensor = None
                 if lora_state_dict is not None and lora_A_key in lora_state_dict.keys():
                     lora_A_tensor, lora_B_tensor = lora_state_dict.pop(lora_A_key), lora_state_dict.pop(lora_B_key)
-                    is_bf16 = tensor.dtype == np.uint16
+                    is_bf16 = str(tensor.dtype) in ["uint16", "bfloat16"]
                     tensor = paddle.Tensor.__call__(tensor, zero_copy=True)
                     lora_A_tensor = paddle.Tensor.__call__(lora_A_tensor, zero_copy=True)
                     lora_B_tensor = paddle.Tensor.__call__(lora_B_tensor, zero_copy=True)
@@ -693,7 +693,8 @@ class MergeModel:
                 if lora_A_key in lora_state_dict.keys():
                     lora_A_tensor = lora_state_dict[lora_A_key]
                     lora_B_tensor = lora_state_dict[lora_B_key]
-                    is_bf16 = tensor.dtype == np.uint16
+                    is_bf16 = str(tensor.dtype) in ["uint16", "bfloat16"]
+
                     tensor = paddle.Tensor.__call__(tensor, zero_copy=True)
                     lora_A_tensor = paddle.Tensor.__call__(lora_A_tensor, zero_copy=True)
                     lora_B_tensor = paddle.Tensor.__call__(lora_B_tensor, zero_copy=True)
