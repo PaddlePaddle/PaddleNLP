@@ -1665,12 +1665,12 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
 
         for i in range(self.num_layers):
 
+            q_proj_weight_scale = None
             q_a_proj_weight_scale = None
             q_b_proj_weight_scale = None
             kv_a_proj_with_mqa_weight_scale = None
             kv_b_proj_weight_scale = None
             if self.config.mla_config.use_mla():
-                q_proj_weight_scale = None
                 q_proj_weight_scale_attr = self.get_attr(self.config.mla_config.q_proj_weight_scale_attrs, i)
                 if q_proj_weight_scale_attr:
                     q_proj_weight_scale = self.create_parameter(
