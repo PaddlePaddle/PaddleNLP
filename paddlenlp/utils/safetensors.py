@@ -243,12 +243,11 @@ class PySafeSlice:
         return tensor.reshape(target_shape)
 
     def get(self, *args, **kwargs):
-        # tensor = np.empty(shape=self.shape, dtype=self.dtype)
-        # self.bufferfile.seek(self.start_offset)
-        # self.bufferfile.readinto(memoryview(tensor))
         # int fix for empty shape []
         nbytes = int(np.prod(self.shape)) * np.dtype(self.dtype).itemsize
-        buffer = self.bufferfile.read(nbytes)
+        buffer = bytearray(nbytes)
+        self.bufferfile.seek(self.start_offset)
+        self.bufferfile.readinto(buffer)
         tensor = np.frombuffer(buffer, dtype=self.dtype).reshape(self.shape)
         return tensor
 
