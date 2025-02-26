@@ -400,13 +400,10 @@ def main():
         # NOTE(gongenlei): new add autotuner_benchmark
         max_length = data_args.max_length
         padding = "max_length"
-    elif max(training_args.sharding_parallel_degree, training_args.data_parallel_degree) == 1:
-        # NOTE(zhangwl):in auto_parallel , ever peer input shape should be same when sharding_parallel_degree > 1
+    else:
         max_length = None
         padding = True
-    else:
-        max_length = data_args.max_length
-        padding = "max_length"
+
     if training_args.pipeline_parallel_degree > 1:
         metrics = None
     elif data_args.eval_with_do_generation:
