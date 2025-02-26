@@ -272,7 +272,19 @@ __forceinline__ __host__ __device__ void vec_cast<nv_bfloat16, float>(
     }                                                                   \
   }
 
-#define DISPATCH_HEAD_DIM(head_dim, HEAD_DIM, ...)      \
+#define DISPATCH_GQA_HEAD_DIM(head_dim, HEAD_DIM, ...)  \
+  switch (head_dim) {                                   \
+    case 128: {                                         \
+      constexpr size_t HEAD_DIM = 128;                  \
+      __VA_ARGS__                                       \
+      break;                                            \
+    }                                                   \
+    default: {                                          \
+      PD_THROW("not support the head_dim: ", head_dim); \
+    }                                                   \
+  }
+
+#define DISPATCH_MLA_HEAD_DIM(head_dim, HEAD_DIM, ...)  \
   switch (head_dim) {                                   \
     case 128: {                                         \
       constexpr size_t HEAD_DIM = 128;                  \
@@ -299,10 +311,12 @@ __forceinline__ __host__ __device__ void vec_cast<nv_bfloat16, float>(
     }                                                   \
   }
 
-#define DISPATCH_NUM_STAGE(num_stage, NUM_STAGE, ...) \
-  if (num_stage == 2) {                               \
-    constexpr size_t NUM_STAGE = 2;                   \
-    __VA_ARGS__                                       \
+#define DISPATCH_NUM_STAGE(num_stage, NUM_STAGE, ...)   \
+  if (num_stage == 2) {                                 \
+    constexpr size_t NUM_STAGE = 2;                     \
+    __VA_ARGS__                                         \
+  } else {                                              \
+    PD_THROW("not support the num_stage: ", num_stage); \
   }
 
 #define DISPATCH_CACHE_TYPE(cache_type, cache_type_now, cache_bytes, ...) \
@@ -329,9 +343,8 @@ __forceinline__ __host__ __device__ void vec_cast<nv_bfloat16, float>(
   } else if (deal_each_time == 32) {                                 \
     constexpr size_t DEAL_EACH_TIME = 32;                            \
     __VA_ARGS__                                                      \
-  } else if (deal_each_time == 64) {                                 \
-    constexpr size_t DEAL_EACH_TIME = 64;                            \
-    __VA_ARGS__                                                      \
+  } else {                                                           \
+    PD_THROW("not support the deal_each_time: ", deal_each_time);    \
   }
 
 #define DISPATCH_GQA_GROUP_SIZE(group_size, GROUP_SIZE, ...) \
@@ -359,17 +372,28 @@ __forceinline__ __host__ __device__ void vec_cast<nv_bfloat16, float>(
   } else if (group_size == 8) {                              \
     constexpr size_t GROUP_SIZE = 8;                         \
     __VA_ARGS__                                              \
-  } else if (group_size == 12) {                             \
-    constexpr size_t GROUP_SIZE = 12;                        \
-    __VA_ARGS__                                              \
   } else if (group_size == 16) {                             \
     constexpr size_t GROUP_SIZE = 16;                        \
     __VA_ARGS__                                              \
-  } else if (group_size == 32) {                             \
-    constexpr size_t GROUP_SIZE = 32;                        \
+  } else {                                                   \
+    PD_THROW("not support the group_size: ", group_size);    \
+  }
+
+#define DISPATCH_MLA_GROUP_SIZE(group_size, GROUP_SIZE, ...) \
+  if (group_size == 1) {                                     \
+    constexpr size_t GROUP_SIZE = 1;                         \
     __VA_ARGS__                                              \
-  } else if (group_size == 64) {                             \
-    constexpr size_t GROUP_SIZE = 64;                        \
+  } else if (group_size == 2) {                              \
+    constexpr size_t GROUP_SIZE = 2;                         \
+    __VA_ARGS__                                              \
+  } else if (group_size == 4) {                              \
+    constexpr size_t GROUP_SIZE = 4;                         \
+    __VA_ARGS__                                              \
+  } else if (group_size == 8) {                              \
+    constexpr size_t GROUP_SIZE = 8;                         \
+    __VA_ARGS__                                              \
+  } else if (group_size == 16) {                             \
+    constexpr size_t GROUP_SIZE = 16;                        \
     __VA_ARGS__                                              \
   } else if (group_size == 128) {                            \
     constexpr size_t GROUP_SIZE = 128;                       \
@@ -383,24 +407,20 @@ __forceinline__ __host__ __device__ void vec_cast<nv_bfloat16, float>(
     constexpr size_t BLOCK_SHAPE_Q = 16;                                     \
     constexpr size_t NUM_WARP_Q = 1;                                         \
     __VA_ARGS__                                                              \
-  } else if (block_shape_q <= 32) {                                          \
-    constexpr size_t BLOCK_SHAPE_Q = 32;                                     \
-    constexpr size_t NUM_WARP_Q = 1;                                         \
-    __VA_ARGS__                                                              \
   } else if (block_shape_q <= 64) {                                          \
     constexpr size_t BLOCK_SHAPE_Q = 64;                                     \
     constexpr size_t NUM_WARP_Q = 4;                                         \
     __VA_ARGS__                                                              \
   } else {                                                                   \
-    constexpr size_t BLOCK_SHAPE_Q = 128;                                    \
-    constexpr size_t NUM_WARP_Q = 4;                                         \
-    __VA_ARGS__                                                              \
+    PD_THROW("not support the block_shape_q: ", block_shape_q);              \
   }
 
-#define DISPATCH_CAUSAL(causal, CAUSAL, ...) \
-  if (causal) {                              \
-    constexpr bool CAUSAL = true;            \
-    __VA_ARGS__                              \
+#define DISPATCH_CAUSAL(causal, CAUSAL, ...)      \
+  if (causal) {                                   \
+    constexpr bool CAUSAL = true;                 \
+    __VA_ARGS__                                   \
+  } else {                                        \
+    PD_THROW("not support the causal: ", causal); \
   }
 
 #define DISPATCH_ENABLE_PREFILL(enable_prefill, ENABLE_PREFILL, ...) \
@@ -412,22 +432,26 @@ __forceinline__ __host__ __device__ void vec_cast<nv_bfloat16, float>(
     __VA_ARGS__                                                      \
   }
 
-#define DISPATCH_BLOCK_SIZE(block_size, BLOCK_SIZE, ...) \
-  if (block_size == 64) {                                \
-    constexpr size_t BLOCK_SIZE = 64;                    \
-    __VA_ARGS__                                          \
+#define DISPATCH_BLOCK_SIZE(block_size, BLOCK_SIZE, ...)  \
+  if (block_size == 64) {                                 \
+    constexpr size_t BLOCK_SIZE = 64;                     \
+    __VA_ARGS__                                           \
+  } else {                                                \
+    PD_THROW("not support the block_size: ", block_size); \
   }
 
-#define DISPATCH_BLOCKSHAPE_Q_SYSTEM(              \
-    block_shape_q, BLOCK_SHAPE_Q, NUM_WARP_Q, ...) \
-  if (block_shape_q <= 16) {                       \
-    constexpr size_t BLOCK_SHAPE_Q = 16;           \
-    constexpr size_t NUM_WARP_Q = 1;               \
-    __VA_ARGS__                                    \
-  } else if (block_shape_q <= 32) {                \
-    constexpr size_t BLOCK_SHAPE_Q = 32;           \
-    constexpr size_t NUM_WARP_Q = 1;               \
-    __VA_ARGS__                                    \
+#define DISPATCH_BLOCKSHAPE_Q_SYSTEM(                           \
+    block_shape_q, BLOCK_SHAPE_Q, NUM_WARP_Q, ...)              \
+  if (block_shape_q <= 16) {                                    \
+    constexpr size_t BLOCK_SHAPE_Q = 16;                        \
+    constexpr size_t NUM_WARP_Q = 1;                            \
+    __VA_ARGS__                                                 \
+  } else if (block_shape_q <= 32) {                             \
+    constexpr size_t BLOCK_SHAPE_Q = 32;                        \
+    constexpr size_t NUM_WARP_Q = 1;                            \
+    __VA_ARGS__                                                 \
+  } else {                                                      \
+    PD_THROW("not support the block_shape_q: ", block_shape_q); \
   }
 
 template <typename T>

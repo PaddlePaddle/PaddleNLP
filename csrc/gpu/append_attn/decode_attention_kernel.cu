@@ -526,8 +526,8 @@ void MultiQueryDecoderAttention(
       reinterpret_cast<NV_TYPE*>(const_cast<T*>(out->data<T>()))
     );
 
-    CHECK(cudaGetLastError());  // 捕捉同步前的最后一个错误。
-    CHECK(cudaDeviceSynchronize());
+    // CHECK(cudaGetLastError());  // 捕捉同步前的最后一个错误。
+    // CHECK(cudaDeviceSynchronize());
   } else {
     // std::cout << "split kv";
     auto *allocator = paddle::GetAllocator(q.place());
@@ -664,9 +664,9 @@ void DecodeMLAAttentionKernel(
   // std::cout << "cache_type: " << cache_type << ", group_size: " << group_size << std::endl;
   // std::cout << "cache_type: " << cache_type << ", group_size: " << group_size << ", deal_each_time: " << deal_each_time << ", num_stage: " << num_stage;
   DISPATCH_CAUSAL(causal, CAUSAL,
-    {DISPATCH_GQA_GROUP_SIZE(group_size, GROUP_SIZE,
-      {DISPATCH_HEAD_DIM(head_dim_qk, HEAD_DIM_QK,  
-        {DISPATCH_HEAD_DIM(head_dim_v, HEAD_DIM_V, 
+    {DISPATCH_MLA_GROUP_SIZE(group_size, GROUP_SIZE,
+      {DISPATCH_MLA_HEAD_DIM(head_dim_qk, HEAD_DIM_QK,  
+        {DISPATCH_MLA_HEAD_DIM(head_dim_v, HEAD_DIM_V, 
           {DISPATCH_BLOCK_SIZE(block_size, BLOCK_SIZE, 
               {DISPATCH_DEAL_EACH_TIME(deal_each_time, DEAL_EACH_TIME,
                   {MultiQueryDecoderAttention<T, GROUP_SIZE, HEAD_DIM_QK, HEAD_DIM_V, BLOCK_SIZE, CAUSAL, 2, 16, DEAL_EACH_TIME>(
