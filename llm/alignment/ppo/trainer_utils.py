@@ -376,6 +376,7 @@ class DataArgument:
             "help": "The maximum length that model input tokens can have. When intokens is set to True, it's also the maximum length for InTokens data stream"
         },
     )
+    max_prompt_len: int = field(default=4096, metadata={"help": "Maximum prompt length."})
 
     @property
     def parsed_train_datasets(self) -> Tuple[str, Dict[str, Any]]:
@@ -395,62 +396,6 @@ class DataArgument:
         if self.ptx_datasets is None:
             return None
         return [parse_dataset(string) for string in self.ptx_datasets.split(",")]
-
-    # train_task_config: str = field(
-    #     default="./config/task_sft.json",
-    #     metadata={"help": "Path to the training task config."},
-    # )
-    # eval_task_config: str = field(default=None, metadata={"help": "Path to the evaluation task config."})
-    # ptx_task_config: str = field(default=None, metadata={"help": "Path to the sft task config."})
-    # max_seq_len: int = field(default=4096, metadata={"help": "Maximum sequence length."})
-    # max_prompt_len: int = field(default=4096, metadata={"help": "Maximum prompt length."})
-    # num_samples_each_epoch: int = field(
-    #     default=100000,
-    #     metadata={"help": "Number of samples per epoch. Used for SFT."},
-    # )
-    # example_from_same_task_prob: float = field(
-    #     default=0.1,
-    #     metadata={"help": "Probability of sampling pseudo multi-turn examples from the same task."},
-    # )
-    # pseudo_sampling_prob: float = field(
-    #     default=0.5,
-    #     metadata={"help": "Probability of pseudo multi-turn sampling."},
-    # )
-    # trigger_data_prob: float = field(
-    #     default=0.5,
-    #     metadata={"help": "Probability of utilizing trigger data strategy."},
-    # )
-    # num_comparisons: int = field(default=6, metadata={"help": "Number of candidate responses."})
-    # use_cls: bool = field(
-    #     default=True,
-    #     metadata={"help": "Whether to use cls to predict RM score."},
-    # )
-    # random_shuffle: bool = field(
-    #     default=True,
-    #     metadata={"help": "Whether to enable authorize code for privatization. Defaults to False."},
-    # )
-    # greedy_intokens: bool = field(
-    #     default=True,
-    #     metadata={"help": "Whether to use greedy_intokens packing method."},
-    # )
-    # append_bos_token: bool = field(
-    #     default=True,
-    #     metadata={"help": "Whether to add bos."},
-    # )
-    # append_eos_token: bool = field(
-    #     default=False,
-    #     metadata={"help": "Whether to add eos."},
-    # )
-
-    # @property
-    # def max_length(self):
-    #     """
-    #         返回最大序列长度，包括特征和标签。
-
-    #     Returns:
-    #         int (int): 最大序列长度，包括特征和标签。
-    #     """
-    #     return self.max_seq_len
 
 
 # ########## patches for Trianer ##########

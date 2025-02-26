@@ -34,7 +34,7 @@ import paddlenlp
 from paddlenlp.trainer.trainer import Trainer, logger
 from paddlenlp.transformers import PretrainedModel, PretrainedTokenizer
 from paddlenlp.transformers.model_utils import dtype_guard
-from paddlenlp.trl.llm_utils import get_model_max_position_embeddings, init_dist_env
+from paddlenlp.trl.llm_utils import init_dist_env
 
 
 class Predictor:
@@ -111,12 +111,12 @@ class Predictor:
         parser = PdArgumentParser((PredictorArgument,))
         predictor_args = parser.parse_dict(
             {
-                "src_length": get_model_max_position_embeddings(  # can be changed dynamically by predictor.input_length
-                    trainer.model.config if eval_model is None else eval_model.config
-                ),
-                "max_length": trainer.args.max_length,
+                "model_name_or_path": trainer.args.actor_model_name_or_path,
+                "src_length": trainer.args.max_src_len,
+                "max_length": trainer.args.max_dec_len,
+                "total_max_length": trainer.args.max_src_len + trainer.args.max_dec_len,
                 "dtype": trainer.amp_dtype,
-                "batch_size": trainer.args.per_device_train_batch_size,
+                "batch_size": trainer.args.per_device_prompt_batch_size * trainer.args.num_return_sequences,
                 # infer model do not support top_k, and differ with non-infer model
                 # generation which gets default top_K=50 using generation_config.top_k
                 "top_p": trainer.args.top_p,
@@ -176,7 +176,6 @@ class Predictor:
 
     @paddle.no_grad()
     def set_state_dict(self, model, offload_model=True):
-        key = list(model.state_dict().keys())[3]
         self.model.set_state_dict(model.state_dict())
         if offload_model:
             offload_place = paddle.CUDAPinnedPlace()

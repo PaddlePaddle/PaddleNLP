@@ -51,9 +51,9 @@ __all__ = [
 ]
 
 IGNORE_INDEX: int = -100
-PROMPT_BEGIN: str = "BEGINNING OF CONVERSATION: "
-PROMPT_USER: str = "USER: {input} "
-PROMPT_ASSISTANT: str = "ASSISTANT:"  # should not have a space at the end
+PROMPT_BEGIN: str = ""
+PROMPT_USER: str = "{input}"
+PROMPT_ASSISTANT: str = ""  # should not have a space at the end
 PROMPT_INPUT: str = PROMPT_BEGIN + PROMPT_USER + PROMPT_ASSISTANT
 
 

@@ -74,7 +74,7 @@ def merge_fwd_labels(loss_cls):
     return loss_cls
 
 
-def create_loss(loss_cls, config, extra_args, merge_labels=None):
+def create_loss(loss_cls, config, extra_args, info_buffer, merge_labels=None):
     """
     loss_cls(paddle.nn.Layer): loss class
     config(PratrainedConfig): model config, to be consistent with loss defined
@@ -97,6 +97,8 @@ def create_loss(loss_cls, config, extra_args, merge_labels=None):
     else:
         # create from TrainingArguments
         loss_kwargs = {name: getattr(extra_args, name) for name in loss_arg_names if hasattr(extra_args, name)}
+    if "info_buffer" in loss_arg_names:
+        loss_kwargs["info_buffer"] = info_buffer
     loss = loss_cls(config, **loss_kwargs)
     return loss
 
@@ -283,7 +285,9 @@ class RLHFPPOLoss(nn.Layer):
 class RLHFPPOMixedLoss(nn.Layer):
     """provide two losses, one for PPO loss, the other for SFT loss."""
 
-    def __init__(self, config, ptx_coeff=16, clip_range_ratio=0.2, kl_loss_coeff=0.001, clip_range_score=10):
+    def __init__(
+        self, config, ptx_coeff=16, clip_range_ratio=0.2, kl_loss_coeff=0.001, clip_range_score=10, info_buffer=None
+    ):
         """
         Args:
         config (Config): configuration object containing hyperparameters and options for the agent.
@@ -301,6 +305,7 @@ class RLHFPPOMixedLoss(nn.Layer):
         self.sft_criterion = PretrainingCriterion(config)
         self.kl_loss_coeff = kl_loss_coeff
         self.clip_range_score = clip_range_score
+        self.info_buffer = info_buffer
 
     def forward(
         self,
@@ -329,8 +334,8 @@ class RLHFPPOMixedLoss(nn.Layer):
             paddle.Tensor: 返回损失函数，如果labels不为None，则为soft target loss；否则为PPO loss。
         """
 
-        # if not self.config.use_fused_head_and_loss_fn:
-        #     logits = logits if isinstance(logits, paddle.Tensor) else logits[0]
+        if not self.config.use_fused_head_and_loss_fn:
+            logits = logits if isinstance(logits, paddle.Tensor) else logits[0]
         logits = logits if isinstance(logits, paddle.Tensor) else logits[0]
         loss = None
         # sft, pt loss
@@ -365,31 +370,7 @@ class RLHFPPOMixedLoss(nn.Layer):
             else:
                 # labels (old_log_probs, reward_advantages, sequence_mask) has tgt length
                 log_probs = log_probs[:, -old_log_probs.shape[1] :]
-            # if self.config.use_fused_head_and_loss_fn:
-            #     hidden_states, weight, bias, transpose_y = logits
 
-            #     if self.config.tensor_parallel_degree > 1 and self.config.sequence_parallel:
-            #         hidden_states = GatherOp.apply(hidden_states)
-            #         hidden_states = hidden_states.reshape(
-            #             [
-            #                 -1,
-            #                 self.config.max_sequence_length,
-            #                 hidden_states.shape[-1],
-            #             ]
-            #         )
-
-            #     loss = self.ppo_criterion(
-            #         hidden_states,
-            #         weight,
-            #         bias,
-            #         input_ids,
-            #         old_log_probs,
-            #         reward_advantages,
-            #         sequence_mask,
-            #         transpose_y,
-            #     )
-            # else:
-            #     loss = self.ppo_criterion(logits, input_ids, old_log_probs, reward_advantages, sequence_mask)
             # TODO:support fused head and loss fn
             loss = self.ppo_criterion(log_probs, old_log_probs, reward_advantages, sequence_mask)
 
@@ -399,8 +380,10 @@ class RLHFPPOMixedLoss(nn.Layer):
                 min=-self.clip_range_score,
                 max=self.clip_range_score,
             )
-            kl_loss = paddle.sum(self.kl_loss_coeff * kl_divergence_estimate * sequence_mask) / sequence_mask.sum()
-            loss += kl_loss
+            kl_loss = paddle.sum(kl_divergence_estimate * sequence_mask) / sequence_mask.sum()
+            self.info_buffer["kl_loss"] = kl_loss.detach()
+            self.info_buffer["pure_policy_loss"] = loss.detach()
+            loss += self.kl_loss_coeff * kl_loss
 
         return loss
 
@@ -745,65 +728,65 @@ class ActorFusedLoss(paddle.autograd.PyLayer):
         return grad_hidden_states, grad_lm_head_weight, grad_lm_head_bias, None, None
 
 
-# class FusedPPOLoss(nn.Layer):
-#     """Fused PPOLoss"""
+class FusedPPOLoss(nn.Layer):
+    """Fused PPOLoss"""
 
-#     def __init__(self, config, clip_range_ratio=0.2):
-#         """Initialize FusedPPOLoss class."""
-#         super().__init__()
-#         self.clip_range_ratio = clip_range_ratio
-#         self.config = config
+    def __init__(self, config, clip_range_ratio=0.2):
+        """Initialize FusedPPOLoss class."""
+        super().__init__()
+        self.clip_range_ratio = clip_range_ratio
+        self.config = config
 
-#     def forward(
-#         self,
-#         hidden_states: paddle.Tensor,
-#         lm_head_weight: paddle.Tensor,
-#         lm_head_bias: paddle.Tensor,
-#         input_ids: paddle.Tensor,
-#         old_log_probs: paddle.Tensor,
-#         reward_advantages: paddle.Tensor,
-#         sequence_mask: paddle.Tensor,
-#         transpose_y: bool,
-#     ):
-#         """
-#         forward function of FusedPPOLoss
+    def forward(
+        self,
+        hidden_states: paddle.Tensor,
+        lm_head_weight: paddle.Tensor,
+        lm_head_bias: paddle.Tensor,
+        input_ids: paddle.Tensor,
+        old_log_probs: paddle.Tensor,
+        reward_advantages: paddle.Tensor,
+        sequence_mask: paddle.Tensor,
+        transpose_y: bool,
+    ):
+        """
+        forward function of FusedPPOLoss
 
-#         Args:
-#             hidden_states (paddle.Tensor): hidden_states, [batch_size, seq_len, hidden_size].
-#             lm_head_weight (paddle.Tensor): lm_head_weight, [hidden_size, vocab_size / tensor_parallel_degree].
-#             lm_head_bias (paddle.Tensor, optional): lm_head_bias, [vocab_size / tensor_parallel_degree].
-#             input_ids (paddle.Tensor): input_ids, [batch_size, seq_len].
-#             old_log_probs (paddle.Tensor): old_log_probs, [batch_size, seq_len-1].
-#             reward_advantages (paddle.Tensor): advantages, [batch_size, seq_len-1].
-#             sequence_mask (paddle.Tensor): mask, [batch_size, seq_len-1].
-#             transpose_y (bool): whether to transpose lm_head_weight.
+        Args:
+            hidden_states (paddle.Tensor): hidden_states, [batch_size, seq_len, hidden_size].
+            lm_head_weight (paddle.Tensor): lm_head_weight, [hidden_size, vocab_size / tensor_parallel_degree].
+            lm_head_bias (paddle.Tensor, optional): lm_head_bias, [vocab_size / tensor_parallel_degree].
+            input_ids (paddle.Tensor): input_ids, [batch_size, seq_len].
+            old_log_probs (paddle.Tensor): old_log_probs, [batch_size, seq_len-1].
+            reward_advantages (paddle.Tensor): advantages, [batch_size, seq_len-1].
+            sequence_mask (paddle.Tensor): mask, [batch_size, seq_len-1].
+            transpose_y (bool): whether to transpose lm_head_weight.
 
-#         Returns:
-#             paddle.Tensor: loss
+        Returns:
+            paddle.Tensor: loss
 
-#         """
-#         logits_next = hidden_states[:, :-1, :]
-#         labels_next = input_ids[:, 1:]
+        """
+        logits_next = hidden_states[:, :-1, :]
+        labels_next = input_ids[:, 1:]
 
-#         if old_log_probs.shape[1] != labels_next.shape[1]:
-#             # labels（old_log_probs，reward_advantages，sequence_mask）的长度为 src + tgt - 1，实际长度由 sequence_mask 确定
-#             raise ValueError("old_log_probs and reward_advantages should have the same length")
+        if old_log_probs.shape[1] != labels_next.shape[1]:
+            # labels（old_log_probs，reward_advantages，sequence_mask）的长度为 src + tgt - 1，实际长度由 sequence_mask 确定
+            raise ValueError("old_log_probs and reward_advantages should have the same length")
 
-#         actor_loss = ActorFusedLoss.apply(
-#             hidden_states=logits_next,
-#             lm_head_weight=lm_head_weight,
-#             lm_head_bias=lm_head_bias,
-#             labels=labels_next,
-#             mask=sequence_mask,
-#             transpose_y=transpose_y,
-#             num_embeddings=self.config.vocab_size,
-#             tensor_parallel_degree=self.config.tensor_parallel_degree,
-#             tensor_parallel_output=self.config.tensor_parallel_output,
-#             fused_linear=False,
-#             loop_chunk_size=1024,  # 128,
-#             ignore_index=0,
-#             old_log_probs=old_log_probs,
-#             advantages=reward_advantages,
-#             clip_range_ratio=self.clip_range_ratio,
-#         )
-#         return actor_loss
+        actor_loss = ActorFusedLoss.apply(
+            hidden_states=logits_next,
+            lm_head_weight=lm_head_weight,
+            lm_head_bias=lm_head_bias,
+            labels=labels_next,
+            mask=sequence_mask,
+            transpose_y=transpose_y,
+            num_embeddings=self.config.vocab_size,
+            tensor_parallel_degree=self.config.tensor_parallel_degree,
+            tensor_parallel_output=self.config.tensor_parallel_output,
+            fused_linear=False,
+            loop_chunk_size=1024,  # 128,
+            ignore_index=0,
+            old_log_probs=old_log_probs,
+            advantages=reward_advantages,
+            clip_range_ratio=self.clip_range_ratio,
+        )
+        return actor_loss

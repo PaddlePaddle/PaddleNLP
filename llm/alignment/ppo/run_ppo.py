@@ -26,10 +26,10 @@ from models.score_model import LlamaModelForScore  # noqa
 from ppo_trainer import PPOTrainer
 from trainer_utils import DataArgument, ModelArgument, TrainingArguments
 
-from llm.alignment.ppo.ppo_trainer import PPOTrainer
 from paddlenlp.trainer import PdArgumentParser, RuntimeTimer, get_last_checkpoint
 from paddlenlp.trainer.trainer_utils import ShardingOption
 from paddlenlp.transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
+from paddlenlp.trl import llm_utils
 from paddlenlp.utils.log import logger
 
 
@@ -54,7 +54,8 @@ def main():
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
-    # training_args.max_src_len = data_args.max_prompt_len
+    training_args.max_src_len = data_args.max_prompt_len
+    training_args.actor_model_name_or_path = model_args.actor_model_name_or_path
 
     if training_args.sequence_parallel:
         if training_args.tensor_parallel_degree <= 1:
@@ -132,12 +133,19 @@ def main():
     if training_args.use_rm_server:
         if model_args.reward_server is None:
             raise ValueError("Please specify reward_server when use_rm_server is true.")
-        logger.info(f"Use reward server{model_args.reward_server} for training.")
+        logger.info(f"Use reward server: {model_args.reward_server} for training.")
         if training_args.rl_algorithm == "ppo" and model_args.reward_critic_model_name_or_path is None:
             raise ValueError("Please specify reward_critic_model_name_or_path when use_rm_server is true.")
     else:
         if model_args.reward_model_name_or_path is None:
             raise ValueError("Please specify reward_model_name_or_path when use_rm_server is false.")
+
+    if training_args.rl_algorithm != "ppo" and training_args.use_fused_head_and_loss_fn:
+        logger.warning(
+            f"Fused_head_and_loss_fn currently does not support {training_args.rl_algorithm}. "
+            "Reset `use_fused_head_and_loss_fn` to False."
+        )
+        training_args.use_fused_head_and_loss_fn = False
 
     model_class_lm, model_class_score = AutoModelForCausalLM, LlamaModelForScore
     if training_args.pipeline_parallel_degree > 1:
@@ -251,8 +259,8 @@ def main():
         padding_side="left",
         tokenizer_alpha=model_args.actor_tokenizer_alpha,
     )
-    actor_tokenizer.chat_template = None
-    
+    llm_utils.init_chat_template(actor_tokenizer, model_args.actor_model_name_or_path, model_args.chat_template)
+
     training_args.autotuner_benchmark = True
     if not training_args.use_rm_server and model_args.reward_model_name_or_path is not None:
         runtime_timer.start("Reward model loading time")
@@ -314,6 +322,7 @@ def main():
             padding_side="right",
             tokenizer_alpha=model_args.reward_tokenizer_alpha,
         )
+        llm_utils.init_chat_template(reward_tokenizer, model_args.reward_model_name_or_path, model_args.chat_template)
     else:
         reward_tokenizer = actor_tokenizer
         reward_model = model_args.reward_server
@@ -353,6 +362,9 @@ def main():
             model_max_length=data_args.max_length,
             padding_side="left",
             tokenizer_alpha=model_args.reward_critic_tokenizer_alpha,
+        )
+        llm_utils.init_chat_template(
+            reward_critic_tokenizer, model_args.reward_critic_model_name_or_path, model_args.chat_template
         )
         if training_args.eval_mode is not None:
             config = copy.deepcopy(reward_critic_model.config)

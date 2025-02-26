@@ -722,20 +722,26 @@ class PPOMetric:
                     "kl_divergence",
                     "mean_generated_length",
                     "max_generated_length",
+                    "min_generated_length",
                 ]
                 if self.args.rl_algorithm == "ppo"
                 else [
                     "policy_loss",
                     "ptx_loss",
+                    "pure_policy_loss",
+                    "kl_loss",
                     "reward",
                     "kl_divergence",
                     "mean_generated_length",
                     "max_generated_length",
+                    "min_generated_length",
                 ]
             )
         ]
 
-        self.metric_ops = ["mean"] * 10 + ["max"] if self.args.rl_algorithm == "ppo" else ["mean"] * 5 + ["max"]
+        self.metric_ops = (
+            ["mean"] * 10 + ["max", "min"] if self.args.rl_algorithm == "ppo" else ["mean"] * 7 + ["max", "min"]
+        )
         if not use_ptx:
             self.metric_names.pop(1)
             self.metric_ops.pop(1)
@@ -789,9 +795,12 @@ class PPOMetric:
             if self.use_stack:
                 mean_metric = metrics.mean(0)
                 max_metric = metrics.max(0)
+                min_metric = metrics.min(0)
             for i, (name, op) in enumerate(zip(self.metric_names, self.metric_ops)):
                 if op == "max":
                     out_metrics[name] = max_metric[i].item() if self.use_stack else metrics[i].max().item()
+                elif op == "min":
+                    out_metrics[name] = min_metric[i].item() if self.use_stack else metrics[i].min().item()
                 else:
                     out_metrics[name] = mean_metric[i].item() if self.use_stack else metrics[i].mean().item()
 
@@ -1190,7 +1199,7 @@ class PPOTrainer(Trainer):
         inputs: Dict[str, Union[paddle.Tensor, Any]],
         prediction_loss_only: bool,
         ignore_keys: Optional[List[str]] = None,
-    ) -> Tuple[Optional[paddle.Tensor], Optional[paddle.Tensor], Optional[paddle.Tensor],]:
+    ) -> Tuple[Optional[paddle.Tensor], Optional[paddle.Tensor], Optional[paddle.Tensor]]:
         """
         预测步骤，用于生成下一个输入序列。
 
@@ -2093,8 +2102,6 @@ class PPOTrainer(Trainer):
         # inputs used by policy trainer
         old_log_probs = rl_batch["log_probs"]  # length: src+tgt(-1)
         reward_advantages = rl_batch["reward_advantages"]  # length: src+tgt(-1)
-        if self.args.rl_algorithm == "ppo":
-            reward_returns = rl_batch["reward_returns"]  # length: src+tgt(-1)
 
         policy_trainer_inputs = {
             "input_ids": input_ids,
@@ -2125,12 +2132,21 @@ class PPOTrainer(Trainer):
             kl_divergence = ((old_log_probs - ref_log_probs) * mask_cast).sum() / mask_cast.sum()
             mean_generated_length = mask_cast.sum(axis=-1).mean()
             max_generated_length = mask_cast.sum(axis=-1).max()
+            min_generated_length = mask_cast.sum(axis=-1).min()
 
         return {
             # when using PipelienParallel, the loss returned is 0 when not reach
             # accumulated step and the loss returned at accumulated step is a
             # mixed loss.
             "train_policy_loss": actor_loss,
+            **(
+                {
+                    "train_pure_policy_loss": self.policy_trainer.info_buffer.get("pure_policy_loss"),
+                    "train_kl_loss": self.policy_trainer.info_buffer.get("kl_loss"),
+                }
+                if self.args.rl_algorithm == "grpo"
+                else {}
+            ),
             "train_reward": ori_rewards,  # use original reward to log
             **(
                 {
@@ -2146,6 +2162,7 @@ class PPOTrainer(Trainer):
             "train_kl_divergence": kl_divergence,
             "train_mean_generated_length": mean_generated_length,
             "train_max_generated_length": max_generated_length,
+            "train_min_generated_length": min_generated_length,
         }
 
     def rl_critic_step(self, rl_batch: Dict[str, paddle.Tensor]) -> Dict[str, Any]:
@@ -2432,23 +2449,38 @@ class PPOTrainer(Trainer):
         if do_eval:
             train_num_return_sequences = self.args.num_return_sequences
             self.args.num_return_sequences = 1
+
+        position_ids = (
+            prompt_only_batch["position_ids"]
+            if "position_ids" in prompt_only_batch
+            else make_position_ids(attention_mask)
+        )
+
+        if self.args.num_return_sequences > 1:
+            input_ids = input_ids.repeat_interleave(self.args.num_return_sequences, axis=0)
+            raw_dtype = attention_mask.dtype
+            attention_mask = (
+                attention_mask.cast("int32").repeat_interleave(self.args.num_return_sequences, axis=0).cast(raw_dtype)
+            )
+            position_ids = position_ids.repeat_interleave(self.args.num_return_sequences, axis=0)
+
         sequences = self.actor_model.generate(
             input_ids=input_ids,
             attention_mask=attention_mask,
-            position_ids=(
-                prompt_only_batch["position_ids"]
-                if "position_ids" in prompt_only_batch
-                else make_position_ids(attention_mask)
-            ),
+            position_ids=position_ids,
             generation_config=self.generation_config,
             synced_gpus=ShardingOption.FULL_SHARD in self.policy_trainer.args.sharding,
         )[0]
 
         if self.args.use_rm_server:
             label_ids = prompt_only_batch["label_ids"]
-            label_ids = label_ids.repeat_interleave(self.args.num_return_sequences, axis=0)
+            if self.args.num_return_sequences > 1:
+                label_ids = label_ids.repeat_interleave(self.args.num_return_sequences, axis=0)
 
-        sequences = sequences.reshape([input_ids.shape[0], self.args.num_return_sequences, -1])
+        if self.args.num_return_sequences > 1:
+            sequences = sequences.reshape(
+                [input_ids.shape[0] // self.args.num_return_sequences, self.args.num_return_sequences, -1]
+            )
         if do_eval:
             self.args.num_return_sequences = train_num_return_sequences
             sequences = sequences.transpose([1, 0, 2])
@@ -2742,8 +2774,11 @@ class PPOTrainer(Trainer):
                     old_reward_values = old_reward_values[:, start:].contiguous()
                 sequence_mask = sequence_mask[:, start:].contiguous()
             if self.args.rl_algorithm == "grpo":
+                eos_mask = (rl_batch["input_ids"] != self.tokenizer.pad_token_id)[:, 1:].to(old_log_probs.dtype)
+                if use_tgt_len_value:
+                    eos_mask = eos_mask[:, start:].contiguous()
                 reward_advantages = compute_grpo_advantages(
-                    rewards, rl_batch["index"], sequence_mask, old_log_probs.shape[-1]
+                    rewards, rl_batch["index"], eos_mask, old_log_probs.shape[-1]
                 )
             elif self.args.rl_algorithm == "ppo":
                 rewards_with_kl, kl_rewards = self.add_kl_divergence_regularization(

@@ -20,7 +20,8 @@ import logging
 import re
 import threading
 import traceback
-from typing import Dict, Tuple, Optional, List
+from typing import Dict, List, Optional, Tuple
+
 import uvicorn
 from fastapi import FastAPI
 from pydantic import BaseModel
@@ -199,7 +200,8 @@ def compute_score(
     print("\n" + "=" * 80)
     print(" Processing New Sample ".center(80, "="))
 
-    solution_str = "\n<|im_start|>assistant\n<think>" + solution_str
+    if "\n<|im_start|>assistant\n<think>" not in solution_str:
+        solution_str = "\n<|im_start|>assistant\n<think>" + solution_str
 
     # Parse ground truth data
     solution_text = ground_truth
@@ -222,7 +224,7 @@ def compute_score(
     if format_correct and answer_text:
         pred_status = parse_model_answer(answer_text, expected_names)
         if pred_status:
-            print(f"\n[Content Validation]")
+            print("\n[Content Validation]")
             print(f"  Expected: {gt_status}")
             print(f"  Predicted: {pred_status}")
 
@@ -241,7 +243,7 @@ def compute_score(
 
     total_score = format_score + answer_score
     print("\n" + "-" * 80)
-    print(f" Final Score ".center(80, "-"))
+    print(" Final Score ".center(80, "-"))
     print(f"  Format: {format_score}")
     print(f"  Answer: {answer_score}")
     print(f"  Total: {total_score}")
