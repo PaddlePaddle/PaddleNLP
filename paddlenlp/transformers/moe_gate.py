@@ -126,6 +126,24 @@ class MoEGateMixin:
         aux_loss = paddle.sum(me * ce) * float(self.num_experts)
         return aux_loss
 
+    def _cal_seq_aux_loss(self, gates, top_k, topk_idx) -> paddle.Tensor:
+        """
+        Calculate sequence auxiliary loss.
+
+        Args:
+            logits (paddle.Tensor): Model output.
+
+        Returns:
+            paddle.Tensor: The value of sequence auxiliary loss.
+        """
+        batch_size, seq_len, _ = gates.shape
+        ce = paddle.zeros([batch_size, self.num_experts])
+        topk_idx = topk_idx.reshape([batch_size, -1])
+        ce.put_along_axis_(indices=topk_idx, values=paddle.ones([batch_size, seq_len * top_k]), axis=1)
+        ce = ce / (seq_len * top_k / self.num_experts)
+        aux_loss = (ce * paddle.mean(gates, axis=1)).sum(axis=1).mean()
+        return aux_loss
+
     def _cal_z_loss(self, logits) -> paddle.Tensor:
         """
         Calculate the z loss.
@@ -477,6 +495,10 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         gates: paddle.Tensor,
     ) -> Tuple[int, paddle.Tensor, paddle.Tensor, paddle.Tensor, paddle.Tensor, paddle.Tensor]:
         """Implements TopKGating on logits."""
+        batch_size, seq_len, d_model = gates.shape
+        gates_ori = gates
+        gates = gates.reshape([-1, d_model])
+
         l_zloss = self._cal_z_loss(gates)
 
         # get topk gates
@@ -498,7 +520,10 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
 
         # get topk mask
         mask = paddle.zeros_like(gates).put_along_axis(top_idx, paddle.to_tensor(1.0), axis=1)
-        l_aux = self._cal_aux_loss(gates, mask)
+        if hasattr(self.config, "seq_aux") and self.config.seq_aux:
+            l_aux = self._cal_seq_aux_loss(gates_ori, self.top_k, top_idx)
+        else:
+            l_aux = self._cal_aux_loss(gates, mask)
 
         exp_counts = paddle.sum(mask.cast(paddle.int64), axis=0)
 
