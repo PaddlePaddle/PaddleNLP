@@ -38,11 +38,8 @@ def read_version():
     read version and return content
     """
     VERSION = "3.0.0b3.post"
-    if os.getenv(PADDLENLP_STABLE_VERSION):
-        VERSION = VERSION.replace(".post", "")
-    else:
-        formatted_date = datetime.now().date().strftime("%Y%m%d")
-        VERSION = VERSION.replace(".post", ".post{}".format(formatted_date))
+    formatted_date = datetime.now().date().strftime("%Y%m%d")
+    VERSION = VERSION.replace(".post", ".post{}".format(formatted_date))
 
     return VERSION
 
