@@ -3177,7 +3177,6 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 self.config.speculate_config.speculate_max_draft_token_num,
                 True,  # causal
                 self.config.speculate_config.speculate_method is not None,  # speculate_decoder
-                False,  # mla_use_absorb
             )[0]
         else:
             if paddle.is_compiled_with_xpu():
@@ -3553,7 +3552,6 @@ class FusedBlockMultiTransformerA8W8(FusedBlockMultiTransformer, FusedMultiTrans
                 self.config.speculate_config.speculate_max_draft_token_num,
                 True,  # causal
                 self.config.speculate_config.speculate_method is not None,  # speculate_decoder
-                False,  # mla_use_absorb
             )[0]
         else:
             fmha_out = paddle.incubate.nn.functional.block_multihead_attention(
@@ -3912,7 +3910,6 @@ class FusedBlockMultiTransformerFP8(FusedBlockMultiTransformer):
                 self.config.speculate_config.speculate_max_draft_token_num,
                 True,  # causal
                 False,  # speculate_decoder
-                False,  # mla_use_absorb
             )[0]
         else:
             fmha_out = paddle.incubate.nn.functional.block_multihead_attention(
