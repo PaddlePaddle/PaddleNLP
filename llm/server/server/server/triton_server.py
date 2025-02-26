@@ -201,7 +201,9 @@ class TritonServer(object):
         self.engine.start()
         model_server_logger.info("Create engine success")
 
-        self._initialize_push_mode()
+        # Master node only
+        if self.cfg.nnode == 1 or os.getenv('POD_0_IP',"127.0.0.1") == self.cfg.host_ip:
+            self._initialize_push_mode()
         model_server_logger.info("Init triton server success")
 
 

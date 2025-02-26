@@ -765,7 +765,7 @@ class Qwen2MoeGate(PretrainedMoEGate):
         Args:
             hidden_states (_type_): [batch_size * seq_len, hidden_size]
         """
-        _, h_dim = hidden_states.shape
+        _, _, h_dim = hidden_states.shape
 
         # compute gating score
         logits = F.linear(hidden_states, self.weight, None)

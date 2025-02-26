@@ -466,6 +466,9 @@ class Trainer:
 
         # very last
         self._memory_tracker.stop_and_update_metrics()
+        if self.args.count_trained_tokens:
+            self.trained_effective_tokens = 0
+            self.trained_tokens = 0
 
     def _wrap_amp_model(self, args, model):
         logger.info("Using half precision")
@@ -1122,6 +1125,9 @@ class Trainer:
                     is_no_sync = True
 
                 sync_context = model.no_sync() if is_no_sync else contextlib.nullcontext()
+                if self.args.count_trained_tokens:
+                    self.trained_effective_tokens += (inputs["input_ids"] != self.args.pad_token_id).sum()
+                    self.trained_tokens += inputs["input_ids"].numel()
                 with sync_context:
                     if "step_control" in inspect.signature(self.training_step).parameters:
                         tr_loss_step = self.training_step(model, inputs, step_control=step_control)
@@ -1570,6 +1576,27 @@ class Trainer:
             self._save_checkpoint(model, metrics=metrics)
             logger.info(f"{self.runtime_timer.log()}")
             self.control = self.callback_handler.on_save(self.args, self.state, self.control)
+            self.log_trained_tokens()
+
+    def log_trained_tokens(self):
+        if self.args.count_trained_tokens:
+            token_list = []
+            for token_num in [self.trained_effective_tokens, self.trained_tokens]:
+                tensors = token_num.reshape([1])
+                if self.hcg._sharding_degree > 1:
+                    output_tensors = []
+                    paddle.distributed.all_gather(output_tensors, tensors, group=self.hcg._sharding_comm_group)
+                    tensors = paddle.concat(output_tensors).sum().reshape([1])
+                if self.hcg._dp_degree > 1:
+                    output_tensors = []
+                    paddle.distributed.all_gather(output_tensors, tensors, group=self.hcg._dp_comm_group)
+                    tensors = paddle.concat(output_tensors).sum().reshape([1])
+                token_list.append(tensors.item())
+            if self.is_local_process_zero():
+
+                logger.info(
+                    f"Update to now, trained_effective_tokens: {token_list[0]}, trained_tokens: {token_list[1]}."
+                )
 
     def _get_learning_rate(self):
         return self.optimizer.get_lr()
