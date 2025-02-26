@@ -69,17 +69,21 @@ def fp8_linear(
         - If `gemm_impl == "bf16"`, dequantization and a `bf16` GEMM operation are applied.
         - For other cases, the function applies quantization to `x` and uses `fp8_gemm` for computation.
     """
-    if weight.element_size() > 1:
-        return original_linear(x, weight, bias)
-    elif gemm_impl == "bf16":
-        weight = weight_dequant(weight, weight._scale)
-        return original_linear(x, weight, bias)
+
+    if paddle.in_dynamic_mode():
+        if weight.element_size() > 1:
+            return original_linear(x, weight, bias)
+        elif gemm_impl == "bf16":
+            weight = weight_dequant(weight, weight._scale)
+            return original_linear(x, weight, bias)
+        else:
+            x, scale = act_quant(x, block_size)
+            y = fp8_gemm(x, scale, weight, weight._scale)
+            if bias is not None:
+                y += bias
+            return y
     else:
-        x, scale = act_quant(x, block_size)
-        y = fp8_gemm(x, scale, weight, weight._scale)
-        if bias is not None:
-            y += bias
-        return y
+        return original_linear(x, weight, bias)
 
 
 paddle.nn.functional.linear = fp8_linear
