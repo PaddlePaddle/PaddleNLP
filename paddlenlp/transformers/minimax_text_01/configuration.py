@@ -14,6 +14,8 @@
 
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
+__all__ = ["MiniMaxText01Config"]
+
 
 class MiniMaxText01Config(PretrainedConfig):
     """
@@ -129,6 +131,8 @@ class MiniMaxText01Config(PretrainedConfig):
         self.output_router_logits = output_router_logits
         self.router_aux_loss_coef = router_aux_loss_coef
         self.router_jitter_noise = router_jitter_noise
+
+        self._attn_implementation = ""  # question
 
         # Call to the parent class constructor
         super().__init__(
