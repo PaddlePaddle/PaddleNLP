@@ -1342,8 +1342,9 @@ class AutoPredictor:
             Predictor: The predictor.
         """
         model = kwargs.pop("model", None)
-        cache_k_shapes = None
-        cache_v_shapes = None
+        cache_kvs_shape = None  # used for not block_attn/append_attn
+        cache_k_shapes = None  # used for block_attn/append_attn
+        cache_v_shapes = None  # used for block_attn/append_attn
 
         # static or dynamic
         execute_mode = "Dygraph" if predictor_args.mode == "dynamic" else "StaticGraph"
@@ -1353,14 +1354,17 @@ class AutoPredictor:
             # block/no block
             if predictor_args.block_attn:
                 attn_type = "Block"
+                if predictor_args.mode == "static":
+                    cache_k_shapes, cache_v_shapes = model.get_cache_kvs_shape(
+                        config, predictor_args.batch_size, predictor_args.total_max_length
+                    )
             else:
                 attn_type = ""
+                if predictor_args.mode == "static":
+                    cache_kvs_shape = model.get_cache_kvs_shape(
+                        config, predictor_args.batch_size, predictor_args.total_max_length
+                    )
             inference_mode = f"{attn_type}Inference"
-
-            if predictor_args.mode == "static":
-                cache_k_shapes, cache_v_shapes = model.get_cache_kvs_shape(
-                    config, predictor_args.batch_size, predictor_args.total_max_length
-                )
         else:
             inference_mode = ""
 
@@ -1378,6 +1382,7 @@ class AutoPredictor:
             model=model,
             cache_k_shapes=cache_k_shapes,
             cache_v_shapes=cache_v_shapes,
+            cache_kvs_shape=cache_kvs_shape,
             model_args=model_args,
         )
         return predictor

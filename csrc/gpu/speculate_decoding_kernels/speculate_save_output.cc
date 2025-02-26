@@ -29,7 +29,7 @@ struct msgdata {
 
 void SpeculateSaveWithOutputMsg(const paddle::Tensor& accept_tokens,
                  const paddle::Tensor& accept_num,
-                 const paddle::Tensor& not_need_stop,
+                 const paddle::Tensor& not_need_stop, // cpu
                  int64_t rank_id) {            
     if (rank_id > 0) return;
 
@@ -37,11 +37,10 @@ void SpeculateSaveWithOutputMsg(const paddle::Tensor& accept_tokens,
 
     auto accept_tokens_cpu = accept_tokens.copy_to(paddle::CPUPlace(), false);
     auto accept_num_cpu = accept_num.copy_to(paddle::CPUPlace(), false);
-    auto not_need_stop_cpu = not_need_stop.copy_to(paddle::CPUPlace(), false);
 
     int64_t *accept_tokens_data = accept_tokens_cpu.data<int64_t>();
     int *accept_num_data = accept_num_cpu.data<int>();
-    bool not_need_stop_data = not_need_stop_cpu.data<bool>()[0];
+    bool not_need_stop_data = not_need_stop.data<bool>()[0];
 
     static struct msgdata msg_sed;
     static key_t key = ftok("./", 1);
