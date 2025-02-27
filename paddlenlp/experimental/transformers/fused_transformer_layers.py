@@ -1299,6 +1299,7 @@ class FusedMultiTransformerBase(Layer):
 
         if self.config.moe_config.topk_method != None:
             gate_out = paddle.matmul(tmp_out.cast("float32"), self.gate_weights[i])
+            # scores在这里获得
             scores = get_moe_scores(gate_out, self.config.moe_config)
 
             if use_trt_fused_moe:
@@ -1321,9 +1322,6 @@ class FusedMultiTransformerBase(Layer):
                     moe_ffn,
                     moe_reduce,
                 )
-
-                # 应用各种策略后重塑的 scores
-                scores = get_moe_scores(gate_out, self.config.moe_config)
                 # topk 在 moe_dispatch 中
                 (
                     permute_input,
