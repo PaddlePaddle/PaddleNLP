@@ -62,11 +62,15 @@ from .load_save_single_card import (
     save_single_card_checkpoint,
     save_single_card_optimizer,
 )
-from .sharding_split_param_utils import gather_splited_param_for_optimizer
+from .sharding_split_param_utils import (
+    gather_splited_param_for_optimizer,
+    load_non_merge_optimizer_with_split_param,
+)
 from .utils import (
     FP32_MASTER,
     UnifiedCheckpointOption,
     filter_params,
+    filter_sync_parameters,
     gather_sharded_object,
     generate_base_static_name,
     get_expected_state_dict,
@@ -218,25 +222,9 @@ class UnifiedCheckpointHandler:
             for key in list(master_weights.keys()):
                 master_weights[static2struct_name_mappings[key]] = master_weights.pop(key)
 
-        no_sync_kname = []
-        model_state_dict = get_expected_state_dict(model)
-        for k, v in model_state_dict.items():
-            if getattr(v, "no_sync", False):
-                no_sync_kname.append(k)
-
-        hcg = fleet.get_hybrid_communicate_group()
-        dp_group = hcg.get_data_parallel_group()
-        dp_rank = dp_group.rank if dp_group.nranks > 1 else 0
         if self.args.use_expert_parallel:
-            for k in list(optim_state_dict.keys()):
-                model_k = k.split("/")[0]
-                if dp_rank > 0 and model_k not in no_sync_kname:
-                    optim_state_dict.pop(k)
-            if master_weights is not None:
-                for k in list(master_weights.keys()):
-                    model_k = k.split("/")[0]
-                    if dp_rank > 0 and model_k not in no_sync_kname:
-                        master_weights.pop(k)
+            model_state_dict = get_expected_state_dict(model)
+            filter_sync_parameters(model_state_dict, optim_state_dict, master_weights, is_model_weight=False)
 
         optimizer_name = _add_variant(SAFE_OPTIMIZER_NAME, self.args.optimizer_name_suffix)
         master_weights_name = _add_variant(SAFE_MASTER_WEIGHTS_NAME, self.args.optimizer_name_suffix)
@@ -278,6 +266,23 @@ class UnifiedCheckpointHandler:
             )
 
     def load_non_merge_optimizer(self, model, optimizer, resume_from_checkpoint, ckpt_quant_stage="O0"):
+        """load non merge optimizer
+
+        Args:
+            model (PretrainedModel): model used to get key mapping.
+            optimizer (Optimizer): optimizer to load
+            resume_from_checkpoint (str): path of the checkpoint to load
+            ckpt_quant_stage (str): ckpt quant stage
+
+        Returns:
+            dict: optimizer state dict
+        """
+
+        if is_sharding_split_param_mode(self.args):
+            return load_non_merge_optimizer_with_split_param(
+                self.args, model, optimizer, resume_from_checkpoint, ckpt_quant_stage
+            )
+
         # init and get optimizer LR_Scheduler
         returned_optim_state_dict = nested_copy(optimizer.state_dict())
 
@@ -516,6 +521,10 @@ def unified_checkpoint_into_shards(
 
     config_to_save = copy.deepcopy(model_to_save.config)
 
+    if args.use_expert_parallel:
+        # ignore saving `no_sync=False` tensors when using expert_parallel under dp_rank > 0.
+        filter_sync_parameters(state_dict, is_model_weight=True)
+
     if config_to_save.tensor_parallel_degree > 1:
         if isinstance(model_to_save, LoRAModel) or isinstance(model_to_save, PrefixModelForCausalLM):
             tp_actions = model_to_save._get_tensor_parallel_convert_actions(
@@ -625,6 +634,9 @@ def unified_optimizer_into_shards(
     tp_group = fleet.get_hybrid_communicate_group().get_model_parallel_group()
     tp_size = tp_group.nranks
 
+    if args.use_expert_parallel:
+        filter_sync_parameters(state_dict, optim_state_dict, master_weights, is_model_weight=False)
+
     if tp_size > 1:
         # get tp_actions
         model_keys = []
@@ -643,7 +655,6 @@ def unified_optimizer_into_shards(
             optim_state_dict,
             tp_actions,
             filter_optim_keys,
-            state_dict if args.use_expert_parallel else None,
         )
         empty_device_cache()
 
@@ -653,7 +664,6 @@ def unified_optimizer_into_shards(
                 master_weights,
                 tp_actions,
                 filter_master_keys,
-                state_dict if args.use_expert_parallel else None,
             )
             empty_device_cache()
 

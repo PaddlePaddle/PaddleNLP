@@ -22,6 +22,17 @@ export CXX_COMPILER_PATH=$(which g++)
 export CC=$(which gcc)
 export CXX=$(which g++)
 
+export PADDLE_INFERENCE_MODEL_SUFFIX=$(python -c "
+import paddle
+try:
+    from paddle.base.framework import use_pir_api
+    pir_enabled = use_pir_api()
+except ImportError:
+    pir_enabled = False
+model_suffix = '.json' if pir_enabled else '.pdmodel'
+print(model_suffix)
+")
+
 if [ ! -d "model_logs" ]; then
     mkdir model_logs
 fi
@@ -32,17 +43,22 @@ fi
 print_info() {
     if [ $1 -ne 0 ]; then
         if [[ $2 =~ 'tests' ]]; then
-            mv ${nlp_dir}/unittest_logs/$3.log ${nlp_dir}/unittest_logs/$3_FAIL.log
+            cp ${nlp_dir}/unittest_logs/$3.log ${nlp_dir}/unittest_logs/$3_FAIL.log
             echo -e "\033[31m ${nlp_dir}/unittest_logs/$3_FAIL \033[0m"
             cat ${nlp_dir}/unittest_logs/$3_FAIL.log
         else
-            mv ${log_path}/$2 ${log_path}/$2_FAIL.log
+            cat ${log_path}/$2.log | grep -v "SKIPPED" | grep -v "PASSED" > ${log_path}/$2_FAIL.log
             echo -e "\033[31m ${log_path}/$2_FAIL \033[0m"
             cat ${log_path}/$2_FAIL.log
         fi
+        cp ${log_path}/$2_FAIL.log ${PPNLP_HOME}/upload/$2_FAIL.log.${AGILE_PIPELINE_BUILD_ID}.${AGILE_JOB_BUILD_ID}
+        cd ${PPNLP_HOME} && python upload.py ${PPNLP_HOME}/upload 'paddlenlp/PaddleNLP_CI/PaddleNLP_CI'
+        rm -rf upload/*
     elif [[ $2 =~ 'tests' ]]; then
+        tail -n 1 ${log_path}/$3.log
         echo -e "\033[32m ${log_path}/$3_SUCCESS \033[0m"
     else
+        tail -n 1 ${log_path}/$2.log
         echo -e "\033[32m ${log_path}/$2_SUCCESS \033[0m"
     fi
 }
@@ -363,7 +379,7 @@ lexical_analysis(){
     print_info $? lexical_analysis_predict
     # deploy
     time (python deploy/predict.py \
-        --model_file=infer_model/static_graph_params.pdmodel \
+        --model_file=infer_model/static_graph_params${PADDLE_INFERENCE_MODEL_SUFFIX} \
         --params_file=infer_model/static_graph_params.pdiparams \
         --data_dir lexical_analysis_dataset_tiny >${log_path}/lexical_analysis_deploy) >>${log_path}/lexical_analysis_deploy 2>&1
     print_info $? lexical_analysis_deploy
@@ -467,7 +483,7 @@ ernie-csc() {
     python export_model.py --params_path ./checkpoints/best_model.pdparams --output_path ./infer_model/static_graph_params >${log_path}/ernie-csc_export >>${log_path}/ernie-csc_export 2>&1
     print_info $? ernie-csc_export
     #python deploy
-    python predict.py --model_file infer_model/static_graph_params.pdmodel --params_file infer_model/static_graph_params.pdiparams >${log_path}/ernie-csc_deploy >>${log_path}/ernie-csc_deploy 2>&1
+    python predict.py --model_file infer_model/static_graph_params${PADDLE_INFERENCE_MODEL_SUFFIX} --params_file infer_model/static_graph_params.pdiparams >${log_path}/ernie-csc_deploy >>${log_path}/ernie-csc_deploy 2>&1
     print_info $? ernie-csc_deploy
 }
 
@@ -540,15 +556,25 @@ taskflow (){
     print_info $? taskflow
 }
 llm(){
-    cd ${nlp_dir}/csrc
-    echo "build paddlenlp_op"
-    python setup_cuda.py install
+    if git diff --numstat "$AGILE_COMPILE_BRANCH" | awk '{print $NF}' | grep -q '^csrc/'; then
+        echo "Found modifications in csrc, running setup_cuda.py install and uploading it to bos."
+        cd ${nlp_dir}/csrc
+        # python setup_cuda.py install
+        bash tools/build_wheel.sh python3.10 80
+        cp ./dist/p****.whl ${PPNLP_HOME}/upload/
+        cd ${PPNLP_HOME}
+        python upload.py ${PPNLP_HOME}/upload 'paddlenlp/wheels'
+        rm -rf upload/*
+    else
+        echo "No modifications in csrc, installing paddlenlp_ops wheel file..."
+        python -m pip install https://paddlenlp.bj.bcebos.com/wheels/paddlenlp_ops-0.0.0-py3-none-any.whl
+    fi
 
     sleep 5
     
     echo ' Testing all LLMs '
     cd ${nlp_dir}
-    python -m pytest tests/llm/test_*.py -vv --timeout=300 --alluredir=result >${log_path}/llm >>${log_path}/llm 2>&1
+    python -m pytest tests/llm/test_*.py -vv --timeout=300 --alluredir=result >${log_path}/llm.log >>${log_path}/llm.log 2>&1
     print_info $? llm
 }
 

@@ -126,6 +126,24 @@ class MoEGateMixin:
         aux_loss = paddle.sum(me * ce) * float(self.num_experts)
         return aux_loss
 
+    def _cal_seq_aux_loss(self, gates, top_k, topk_idx) -> paddle.Tensor:
+        """
+        Calculate sequence auxiliary loss.
+
+        Args:
+            logits (paddle.Tensor): Model output.
+
+        Returns:
+            paddle.Tensor: The value of sequence auxiliary loss.
+        """
+        batch_size, seq_len, _ = gates.shape
+        ce = paddle.zeros([batch_size, self.num_experts])
+        topk_idx = topk_idx.reshape([batch_size, -1])
+        ce.put_along_axis_(indices=topk_idx, values=paddle.ones([batch_size, seq_len * top_k]), axis=1)
+        ce = ce / (seq_len * top_k / self.num_experts)
+        aux_loss = (ce * paddle.mean(gates, axis=1)).sum(axis=1).mean()
+        return aux_loss
+
     def _cal_z_loss(self, logits) -> paddle.Tensor:
         """
         Calculate the z loss.
@@ -136,7 +154,7 @@ class MoEGateMixin:
         Returns:
             paddle.Tensor: The z loss value.
         """
-        l_zloss = logits.exp().sum(1).log().square().mean()
+        l_zloss = paddle.logsumexp(logits, axis=1).square().mean()
         return l_zloss
 
     def _cal_orthogonal_loss(self) -> paddle.Tensor:
@@ -308,16 +326,18 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         assert n_experts % n_group == 0, "n_experts must be divisible by n_groups"
 
         assert self.e_score_correction_bias is not None, "e_score_correction_bias is None"
-        scores = scores.reshape([bsz_seq_len, -1]) + self.e_score_correction_bias.unsqueeze(0)
-        group_scores = scores.reshape([bsz_seq_len, self.n_group, -1]).topk(2, axis=-1)[0].sum(axis=-1)  # [n, n_group]
+        scores_for_choice = scores.reshape([bsz_seq_len, -1]) + self.e_score_correction_bias.unsqueeze(0)
+        group_scores = (
+            scores_for_choice.reshape([bsz_seq_len, self.n_group, -1]).topk(2, axis=-1)[0].sum(axis=-1)
+        )  # fmt:skip [n, n_group]
         group_idx = paddle.topk(group_scores, k=topk_group, axis=-1, sorted=False)[1]  # [n, top_k_group]
         group_mask = paddle.zeros_like(group_scores).put_along_axis(group_idx, paddle.to_tensor(1.0), axis=-1)  # fmt:skip
         score_mask = (
             group_mask.unsqueeze(-1).expand([bsz_seq_len, n_group, n_experts // n_group]).reshape([bsz_seq_len, -1])
         )  # [n, e]
-        tmp_scores = scores * score_mask  # [n, e]
+        tmp_scores = scores_for_choice * score_mask  # [n, e]
         topk_weight, topk_idx = paddle.topk(tmp_scores, k=k, axis=-1, sorted=False)
-        topk_weight = scores.gather(topk_idx, axis=1) if not self.training else topk_weight
+        topk_weight = scores.take_along_axis(topk_idx, axis=1) if not self.training else topk_weight
 
         return topk_weight, topk_idx
 
@@ -475,6 +495,10 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         gates: paddle.Tensor,
     ) -> Tuple[int, paddle.Tensor, paddle.Tensor, paddle.Tensor, paddle.Tensor, paddle.Tensor]:
         """Implements TopKGating on logits."""
+        batch_size, seq_len, d_model = gates.shape
+        gates_ori = gates
+        gates = gates.reshape([-1, d_model])
+
         l_zloss = self._cal_z_loss(gates)
 
         # get topk gates
@@ -492,12 +516,14 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         if self.top_k > 1 and self.norm_topk_prob:
             denominator = top_gate.sum(axis=-1, keepdim=True) + 1e-20
             top_gate = top_gate / denominator
-        else:
-            top_gate = top_gate * self.routed_scaling_factor
+        top_gate = top_gate * self.routed_scaling_factor
 
         # get topk mask
         mask = paddle.zeros_like(gates).put_along_axis(top_idx, paddle.to_tensor(1.0), axis=1)
-        l_aux = self._cal_aux_loss(gates, mask)
+        if hasattr(self.config, "seq_aux") and self.config.seq_aux:
+            l_aux = self._cal_seq_aux_loss(gates_ori, self.top_k, top_idx)
+        else:
+            l_aux = self._cal_aux_loss(gates, mask)
 
         exp_counts = paddle.sum(mask.cast(paddle.int64), axis=0)
 
@@ -529,13 +555,21 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
             token_priority = self._priority(top_idx, capacity)
 
         # normalize gates
-        gates_masked = gates * mask
-        gates_s = paddle.sum(gates_masked, axis=-1, keepdim=True)
-        denom_s = paddle.clip(gates_s, min=paddle.finfo(gates_masked.dtype).eps)
-        if self.norm_topk_prob:
-            gates_masked = gates_masked / denom_s
+        if self.training:
+            gates_masked = gates * mask
+            gates_s = paddle.sum(gates_masked, axis=-1, keepdim=True)
+            denom_s = paddle.clip(gates_s, min=paddle.finfo(gates_masked.dtype).eps)
+            if self.norm_topk_prob:
+                gates_masked = gates_masked / denom_s
+            combine_weights = paddle.einsum(
+                "se,sec->sec", gates_masked, token_priority.cast(paddle.get_default_dtype())
+            )
+        else:
+            topk_masked_gates = paddle.zeros_like(gates).put_along_axis(top_idx, top_gate, axis=1)
+            combine_weights = paddle.einsum(
+                "se,sec->sec", topk_masked_gates, token_priority.cast(paddle.get_default_dtype())
+            )
 
-        combine_weights = paddle.einsum("se,sec->sec", gates_masked, token_priority.cast(paddle.get_default_dtype()))
         dispatch_mask = combine_weights.cast(paddle.bool)
 
         return capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss

@@ -188,7 +188,7 @@ class LlamaAvxInferenceModel(LlamaPretrainedModel):
             embed_dim=self.hidden_size,
             num_heads=self.num_attention_heads,
             kv_num_heads=self.num_layers,
-            dim_feedforward=self.intermediate_size,
+            intermediate_size=self.intermediate_size,
             activation="silu",
             num_layers=self.num_layers,
             ln_scale_attrs=ln_scale_attrs,
@@ -616,7 +616,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             embed_dim=self.hidden_size,
             num_heads=self.num_attention_heads,
             kv_num_heads=self.num_key_value_heads,
-            dim_feedforward=self.intermediate_size,
+            intermediate_size=self.intermediate_size,
             quant_type=self.quant_type,
             activation="swiglu",
             num_layers=config.num_hidden_layers,
@@ -1431,6 +1431,7 @@ class LlamaBlockInferenceModel(LlamaInferenceModel):
         kwargs["cu_seqlens_k"] = cu_seqlens_k
         kwargs["padding_offsets"] = padding_offset
         kwargs["max_input_length"] = self.max_seq_len
+        kwargs["block_size"] = self.block_size
 
         inputs_embeds = self.embed_tokens(ids_remove_padding)
 
@@ -1915,7 +1916,8 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
         else:
             max_block_nums = max_batch_size * max_block_per_seq
 
-        cache_kvs = []
+        cache_k_shapes = []
+        cache_v_shapes = []
         for _ in range(config.num_hidden_layers):
             cache_kv_shape = [
                 max_block_nums,
@@ -1923,9 +1925,9 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
                 config.block_size,
                 config.hidden_size // config.num_attention_heads,
             ]
-            cache_kvs.append(cache_kv_shape)
-            cache_kvs.append(cache_kv_shape)
-        return cache_kvs
+            cache_k_shapes.append(cache_kv_shape)
+            cache_v_shapes.append(cache_kv_shape)
+        return cache_k_shapes, cache_v_shapes
 
     def prepare_inputs_for_generation(self, **kwargs):
         # only last token for inputs_ids if cache is defined in kwargs
@@ -2223,7 +2225,9 @@ class LlamaForMiniGPT4InferenceModel(LlamaForCausalLMInferenceModel):
     # rewrite to_static function in generation_utils.py
     def to_static(self, output_path: str, config: dict):
         dtype = config.get("dtype", paddle.get_default_dtype())
-        cache_kvs_shapes = self.get_cache_kvs_shape(self.config, max_length=config.get("max_length", None))
+        cache_k_shapes, cache_v_shapes = self.get_cache_kvs_shape(
+            self.config, max_length=config.get("max_length", None)
+        )
         input_spec = [
             paddle.static.InputSpec(
                 shape=[None, None, None], dtype="float32", name="image_features"
@@ -2257,7 +2261,7 @@ class LlamaForMiniGPT4InferenceModel(LlamaForCausalLMInferenceModel):
                     dtype=dtype,
                     name="cache_kvs_{}".format(i),
                 )
-                for i, shape in enumerate(cache_kvs_shapes)
+                for i, shape in enumerate(cache_k_shapes + cache_v_shapes)
             ],  # cache_kvs
         ]
 

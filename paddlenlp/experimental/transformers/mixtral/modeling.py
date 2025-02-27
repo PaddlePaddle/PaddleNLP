@@ -289,13 +289,14 @@ class MixtralInferenceModel(MixtralPretrainedModel):
             top_k=self.moe_topk,
             norm_topk_prob=True,
             moe_every2=self.moe_every2,
+            moe_intermediate_size=self.intermediate_size,
         )
 
         transformer_config = FusedMultiTransformerConfig(
             embed_dim=self.hidden_size,
             num_heads=self.num_attention_heads,
             kv_num_heads=self.num_key_value_heads,
-            dim_feedforward=self.intermediate_size,
+            intermediate_size=self.intermediate_size,
             quant_type=self.quant_type,
             activation="swiglu",
             num_layers=config.num_hidden_layers,
@@ -643,9 +644,9 @@ class MixtralInferenceModel(MixtralPretrainedModel):
                     )
                     ffn1_quanted_weight_list.append(
                         ffn1_quanted_weight_list_i.reshape(
-                            [self.transformer_block.embed_dim, self.transformer_block.dim_feedforward * 2]
+                            [self.transformer_block.embed_dim, self.transformer_block.intermediate_size * 2]
                             if self.quant_type == "weight_only_int8"
-                            else [self.transformer_block.embed_dim, self.transformer_block.dim_feedforward]
+                            else [self.transformer_block.embed_dim, self.transformer_block.intermediate_size]
                         )
                     )
                     ffn1_quanted_weight_scale.append(ffn1_quanted_weight_scale_i)
@@ -682,9 +683,9 @@ class MixtralInferenceModel(MixtralPretrainedModel):
                     )
                     ffn2_quanted_weight_list.append(
                         ffn2_quanted_weight_list_i.reshape(
-                            [self.transformer_block.dim_feedforward, self.transformer_block.embed_dim]
+                            [self.transformer_block.intermediate_size, self.transformer_block.embed_dim]
                             if self.quant_type == "weight_only_int8"
-                            else [self.transformer_block.dim_feedforward, self.transformer_block.embed_dim // 2]
+                            else [self.transformer_block.intermediate_size, self.transformer_block.embed_dim // 2]
                         )
                     )
                     ffn2_quanted_weight_scale.append(ffn2_quanted_weight_scale_i)
@@ -1270,7 +1271,8 @@ class MixtralForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Mixtr
         else:
             max_block_nums = max_batch_size * max_block_per_seq
 
-        cache_kvs = []
+        cache_k_shapes = []
+        cache_v_shapes = []
         for _ in range(config.num_hidden_layers):
             cache_kv_shape = [
                 max_block_nums,
@@ -1278,9 +1280,9 @@ class MixtralForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Mixtr
                 config.block_size,
                 config.hidden_size // config.num_attention_heads,
             ]
-            cache_kvs.append(cache_kv_shape)
-            cache_kvs.append(cache_kv_shape)
-        return cache_kvs
+            cache_k_shapes.append(cache_kv_shape)
+            cache_v_shapes.append(cache_kv_shape)
+        return cache_k_shapes, cache_v_shapes
 
     def prepare_inputs_for_generation(self, **kwargs):
         # only last token for inputs_ids if cache is defined in kwargs

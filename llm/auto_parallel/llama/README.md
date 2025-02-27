@@ -45,19 +45,30 @@ import paddle.distributed as dist
 
 ckpt_path='/path/for/dist_ckpt'
 # offload=1, 参数 offload 到 CPU，减少显存占用
-merged_state_dict = dist.checkpoint.load_state_dict.load_merged_state_dict(ckpt_path, offload=1)
+# prefix="model" 参数可用于过滤掉非模型参数，例如 optimizer 状态等
+merged_state_dict = dist.checkpoint.load_state_dict.load_merged_state_dict(ckpt_path, offload=1, prefix="model")
 paddle.save(merged_state_dict, 'model_state.pdparams')
 
-# 上述合并的模型参数格式为Paddle原生格式，如需转换为unified_param格式(safetensors)，可继续执行如下代码：
-python PaddleNLP/llm/auto_parallel/utils/convert_to_safetensors.py --input_path input_path  [--output_path output_path] [--split_num split_num] [--offload offload]
+# 上述合并的模型参数格式为Paddle原生格式，如需转换为unified checkpoint格式(safetensors)，或需获取模型参数的index文件，继续执行如下代码：
+python PaddleNLP/llm/auto_parallel/utils/convert_to_safetensors.py --input_path input_path  [--output_path output_path] [--split_num split_num] [--offload] [--as_safetensors]
 
 # 参数介绍
 --input_path: 输入的单卡模型参数路径
 --output_path: 可选，输出模型参数路径，默认为'./temp'
 --split_num: 可选，输出的模型参数分片数，默认为 1
---offload: 可选，是否将参数 offload 到 CPU，默认为 false
+--offload: 可选，选项用于控制是否将参数 offload 到 CPU
+--as_safetensors: 可选，选项用于控制是否将模型参数转换为 safetensors 格式
 ```
 
 - 动态图推理
 
     [大模型推理教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/inference.md)
+
+## 5.PPO 训练
+自动并行当前尚未支持 PPO 训练，后续会持续支持。但您可以将自动并行训练得到的模型参数转换后用于 PPO 训练。自动并行 ckpt 转手动并行 ckpt 流程参考**推理**部分。
+
+- PPO 训练
+
+    [PPO 训练教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/rlhf.md)
+
+- 注：PPO 训练教程中 PKU-Alignment/alpaca-7b-reproduced 模型是一个类 llama 模型，但与原生 llama 模型结构存在一定差异，具体为 embedding 层和 lm_head 层 shape 不同，原生 llama 的 shape 为 [4096, 32000]，但 PKU-Alignment/alpaca-7b-reproduced 的 shape 为 [4096, 32001]。

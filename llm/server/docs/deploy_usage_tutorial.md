@@ -1,6 +1,8 @@
+# 静态图高性能部署全流程
 
 ## 目录
 
+- [快速开始](#快速开始)
 - [部署环境准备](#部署环境准备)
   - [基础环境](#基础环境)
   - [准备部署镜像](#准备部署镜像)
@@ -12,12 +14,45 @@
   - [服务状态查询](#服务状态查询)
 - [服务测试](#服务测试)
   - [Python 客户端](#Python-客户端)
-  - [HTTP调用](#HTTP调用)
+  - [HTTP 调用](#HTTP-调用)
   - [OpenAI 客户端](#OpenAI-客户端)
   - [返回示例](#返回示例)
-- [基于dockerfile创建自己的镜像](#基于dockerfile创建自己的镜像)
+- [基于 dockerfile 创建自己的镜像](#基于 dockerfile 创建自己的镜像)
 - [模型配置参数介绍](#模型配置参数介绍)
 - [请求参数介绍](#请求参数介绍)
+
+
+
+*该部署工具是基于英伟达 Triton 框架专为服务器场景的大模型服务化部署而设计。它提供了支持 gRPC、HTTP 协议的服务接口，以及流式 Token 输出能力。底层推理引擎支持连续批处理、weight only int8、后训练量化（PTQ）等加速优化策略，为用户带来易用且高性能的部署体验。*
+
+## 快速开始
+
+基于预编译镜像部署，**使用飞桨静态图模型部署**。本节以 Meta-Llama-3-8B-Instruct-A8W8C8 为例。其他模型需按照要求导出为**静态图模型格式**。
+具体流程如下，仅供示例参考，用户需要根据自己的需求导出所需**静态图模型**，然后开始部署流程。
+
+```shell
+  # 下载模型
+  wget https://paddle-qa.bj.bcebos.com/inference_model/Meta-Llama-3-8B-Instruct-A8W8C8.tar
+  mkdir Llama-3-8B-A8W8C8 && tar -xf Meta-Llama-3-8B-Instruct-A8W8C8.tar -C Llama-3-8B-A8W8C8
+
+  # 挂载模型文件
+  export MODEL_PATH=${PWD}/Llama-3-8B-A8W8C8
+
+  docker run --gpus all --shm-size 5G --network=host --privileged --cap-add=SYS_PTRACE \
+  -v ${MODEL_PATH}:/models/ \
+  -dit registry.baidubce.com/paddlepaddle/fastdeploy:llm-serving-cuda123-cudnn9-v1.2 \
+  bash -c 'export USE_CACHE_KV_INT8=1 && cd /opt/output/Serving && bash start_server.sh; exec bash'
+```
+等待服务启动成功（服务初次启动大概需要40s），可以通过以下命令测试：
+
+```shell
+  curl 127.0.0.1:9965/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{"text": "hello, llm"}'
+```
+
+Note:
+1. 请保证 shm-size >= 5，不然可能会导致服务启动失败
 
 ## 部署环境准备
 
@@ -34,7 +69,7 @@
 
 ### 准备部署镜像
 
-为了方便部署，我们提供了 cuda12.3 的镜像，可以直接拉取镜像，或者使用我们提供的 `Dockerfile` [构建自定义镜像](#基于dockerfile创建自己的镜像)
+为了方便部署，我们提供了 cuda12.3 的镜像，可以直接拉取镜像，或者使用我们提供的 `Dockerfile` [构建自定义镜像](#基于 dockerfile 创建自己的镜像)
 ```
 docker pull registry.baidubce.com/paddlepaddle/fastdeploy:llm-serving-cuda123-cudnn9-v1.2
 ```
@@ -42,6 +77,13 @@ docker pull registry.baidubce.com/paddlepaddle/fastdeploy:llm-serving-cuda123-cu
 ### 准备模型
 
 该部署工具为 PaddleNLP 静态图模型提供了高效的部署方案，模型静态图导出方案请参考：[LLaMA](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/llama.md)、[Qwen](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/qwen.md)、[Mixtral](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/mixtral.md) ...
+
+或者下载样例模型:
+```shell
+# 下载模型
+wget https://paddle-qa.bj.bcebos.com/inference_model/Meta-Llama-3-8B-Instruct-A8W8C8.tar
+mkdir Llama-3-8B-A8W8C8 && tar -xf Meta-Llama-3-8B-Instruct-A8W8C8.tar -C Llama-3-8B-A8W8C8
+```
 
 导出后的模型放在任意文件夹下，以 `/home/workspace/models_dir` 为例
 
@@ -57,7 +99,7 @@ cd /home/workspace/models_dir
 # ├── rank_mapping.csv           # 多卡模型会有此文件，如为单卡模型，则无此文件（可选，仅在多卡部署模式下需要）
 # └── rank_0                     # 保存模型结构和权重文件的目录
 #     ├── model.pdiparams
-#     └── model.pdmodel
+#     └── model.pdmodel 或者 model.json # Paddle 3.0 版本模型为model.json，Paddle 2.x 版本模型为model.pdmodel
 ```
 
 ### 创建容器
@@ -87,7 +129,7 @@ ls /models/
 
 根据需求和硬件信息，配置以下环境变量
 
-```
+```shell
 # 单/多卡推理配置。自行修改。
 ## 如果是单卡推理，使用0卡，设置如下环境变量。
 export MP_NUM=1
@@ -128,7 +170,7 @@ export PUSH_MODE_HTTP_WORKERS="1" # HTTP服务进程数，在 PUSH_MODE_HTTP_POR
 
 ### 启动服务
 
-```
+```shell
 cd /opt/output/Serving
 bash start_server.sh
 
@@ -149,11 +191,11 @@ health接口：（模型是否准备好推理）
 
 ## 服务测试
 
-### HTTP调用
+### HTTP 调用
 
-提示：HTTP调用接口使用变量 PUSH_MODE_HTTP_PORT 配置！HTTP_PORT 仅用于探活接口使用！
+提示：HTTP 调用接口使用变量 PUSH_MODE_HTTP_PORT 配置！HTTP_PORT 仅用于探活接口使用！
 
-```
+```python
 import uuid
 import json
 import requests
@@ -193,7 +235,7 @@ for line in res.iter_lines():
 
 ### 返回示例
 
-```
+```python
 如果stream为True，流式返回
     如果正常，返回{'token': xxx, 'is_end': xxx, 'send_idx': xxx, ..., 'error_msg': '', 'error_code': 0}
     如果异常，返回{'error_msg': xxx, 'error_code': xxx}，error_msg字段不为空，error_code字段不为0
@@ -209,7 +251,7 @@ for line in res.iter_lines():
 
 提示：使用 OpenAI 客户端需要配置 `PUSH_MODE_HTTP_PORT`！
 
-```
+```python
 import openai
 
 push_mode_http_port = "9965"    # 服务配置的PUSH_MODE_HTTP_PORT
@@ -217,8 +259,8 @@ client = openai.Client(base_url=f"http://127.0.0.1:{push_mode_http_port}/v1/chat
 
 # 非流式返回
 response = client.completions.create(
-	model="default",
-	prompt="Hello, how are you?",
+    model="default",
+    prompt="Hello, how are you?",
   max_tokens=50,
   stream=False,
 )
@@ -228,8 +270,8 @@ print("\n")
 
 # 流式返回
 response = client.completions.create(
-	model="default",
-	prompt="Hello, how are you?",
+    model="default",
+    prompt="Hello, how are you?",
   max_tokens=100,
   stream=True,
 )
@@ -275,10 +317,10 @@ for chunk in response:
 print("\n")
 ```
 
-## 基于dockerfile创建自己的镜像
+## 基于 dockerfile 创建自己的镜像
 
-为了方便用户构建自定义服务，我们提供了基于dockerfile创建自己的镜像的脚本。
-```
+为了方便用户构建自定义服务，我们提供了基于 dockerfile 创建自己的镜像的脚本。
+```shell
 git clone https://github.com/PaddlePaddle/PaddleNLP.git
 cd PaddleNLP/llm/server
 
@@ -292,35 +334,35 @@ docker build --network=host -f ./dockerfiles/Dockerfile_serving_cuda123_cudnn9 -
 | :---: | :-----: | :---: | :---: | :-----: | :----: |
 | MP_NUM |  int  | 模型并行度 | 否 | 8 | CUDA_VISIBLE_DEVICES 需配置对应卡数 |
 | CUDA_VISIBLE_DEVICES | str | 使用 GPU 编号 | 否 | 0,1,2,3,4,5,6,7 |  |
-| HTTP_PORT | int | 探活服务的http端口 | 是 | 无 | 当前仅用于健康检查、探活 |
-| GRPC_PORT | int | 模型推服务的grpc端口 | 是 | 无 |   |
+| HTTP_PORT | int | 探活服务的 http 端口 | 是 | 无 | 当前仅用于健康检查、探活 |
+| GRPC_PORT | int | 模型推服务的 grpc 端口 | 是 | 无 |   |
 | METRICS_PORT | int | 模型服务中监督指标的端口 | 是 | 无 |   |
 | INFER_QUEUE_PORT | int | 模型服务内部使用的端口 | 否 | 56666 |   |
-| PUSH_MODE_HTTP_PORT | int | 服务请求HTTP端口号 | 否 | -1 | 如不配置，服务只支持GRPC协议 |
+| PUSH_MODE_HTTP_PORT | int | 服务请求 HTTP 端口号 | 否 | -1 | 如不配置，服务只支持 GRPC 协议 |
 | DISABLE_STREAMING | int | 是否使用流式返回 | 否 | 0 |  |
-| MAX_SEQ_LEN | int | 最大输入序列长度 | 否 | 8192 | 服务会拒绝input token数量超过MAX_SEQ_LEN的请求，并返回错误提示 |
-| MAX_DEC_LEN | int | 最大decoer序列长度 | 否 | 1024 | 服务会拒绝请求中max_dec_len/min_dec_len超过此参数的请求，并返回错误提示 |
-| BATCH_SIZE | int | 最大Batch Size | 否 | 50 | 模型可同时并发处理的最大输入数量，不能高于128 |
-| BLOCK_BS | int | 缓存Block支持的最大Query Batch Size | 否 | 50 | 如果出现out of memeory 错误，尝试减少该数值 |
-| BLOCK_RATIO | float |  | 否 | 0.75 | 建议配置 输入平均Token数/（输入+输出平均Token数) |
+| MAX_SEQ_LEN | int | 最大输入序列长度 | 否 | 8192 | 服务会拒绝 input token 数量超过 MAX_SEQ_LEN 的请求，并返回错误提示 |
+| MAX_DEC_LEN | int | 最大 decoer 序列长度 | 否 | 1024 | 服务会拒绝请求中 max_dec_len/min_dec_len 超过此参数的请求，并返回错误提示 |
+| BATCH_SIZE | int | 最大 Batch Size | 否 | 50 | 模型可同时并发处理的最大输入数量，不能高于128 |
+| BLOCK_BS | int | 缓存 Block 支持的最大 Query Batch Size | 否 | 50 | 如果出现 out of memeory 错误，尝试减少该数值 |
+| BLOCK_RATIO | float |  | 否 | 0.75 | 建议配置 输入平均 Token 数/（输入+输出平均 Token 数) |
 | MAX_CACHED_TASK_NUM | int | 服务缓存队列最大长度 | 否 | 128 | 队列达到上限后，会拒绝新的请求 |
-| PUSH_MODE_HTTP_WORKERS | int | HTTP服务进程数 | 否 | 1 | 在 PUSH_MODE_HTTP_PORT 配置的情况下有效，高并发下提高该数值，建议最高配置为8 |
+| PUSH_MODE_HTTP_WORKERS | int | HTTP 服务进程数 | 否 | 1 | 在 PUSH_MODE_HTTP_PORT 配置的情况下有效，高并发下提高该数值，建议最高配置为8 |
 | USE_WARMUP | int | 是否进行 warmup | 否 | 0 |  |
-| USE_HF_TOKENIZER | int | 是否进行使用huggingface的词表 | 否 | 0 |   |
-| USE_CACHE_KV_INT8 | int | 是否将INT8配置为KV Cache的类型 | 否 | 0 | c8量化模型需要配置为1 |
+| USE_HF_TOKENIZER | int | 是否进行使用 huggingface 的词表 | 否 | 0 |   |
+| USE_CACHE_KV_INT8 | int | 是否将 INT8配置为 KV Cache 的类型 | 否 | 0 | c8量化模型需要配置为1 |
 | MODEL_DIR | str | 模型文件路径 | 否 | /models/ |  |
-| FD_MODEL_CONFIG_PATH | str | 模型config文件路径 | 否 | ${model_dir}/config.json |  |
+| FD_MODEL_CONFIG_PATH | str | 模型 config 文件路径 | 否 | ${model_dir}/config.json |  |
 | DISTRIBUTED_CONFIG | str | 模型分布式配置文件路径 | 否 | ${model_dir}/rank_mapping.csv |  |
 
 ## 请求参数介绍
 
 | 字段名 | 字段类型 | 说明 | 是否必填 | 默认值 | 备注 |
 | :---: | :-----: | :---: | :---: | :-----: | :----: |
-| req_id |  str  | 请求ID，用于标识一个请求。建议设置req_id，保证其唯一性   | 否 | 随机id | 如果推理服务中同时有两个相同req_id的请求，会返回req_id重复的错误信息 |
+| req_id |  str  | 请求 ID，用于标识一个请求。建议设置 req_id，保证其唯一性   | 否 | 随机 id | 如果推理服务中同时有两个相同 req_id 的请求，会返回 req_id 重复的错误信息 |
 | text   | str  | 请求的文本 | 否 | 无 | text 和 messages 必须有一个 |
-| messages | str | 多轮对话文本 | 否 | 无 | 多轮对话以list方式存储 |
-| max_dec_len | int  | 最大生成token的长度，如果请求的文本token长度加上max_dec_len大于模型的max_seq_len，会返回长度超限的错误信息 | 否 | max_seq_len减去文本token长度 |  |
-| min_dec_len | int | 最小生成token的长度，最小是1 | 否 | 1 |  |
+| messages | str | 多轮对话文本 | 否 | 无 | 多轮对话以 list 方式存储 |
+| max_dec_len | int  | 最大生成 token 的长度，如果请求的文本 token 长度加上 max_dec_len 大于模型的 max_seq_len，会返回长度超限的错误信息 | 否 | max_seq_len 减去文本 token 长度 |  |
+| min_dec_len | int | 最小生成 token 的长度，最小是1 | 否 | 1 |  |
 | topp | float | 控制随机性参数，数值越大则随机性越大，范围是0~1 | 否 | 0.7 |  |
 | temperature | float | 控制随机性参数，数值越小随机性越大，需要大于 0 | 否 | 0.95 |  |
 | frequency_score | float | 频率分数 | 否 | 0 |  |
@@ -330,5 +372,5 @@ docker build --network=host -f ./dockerfiles/Dockerfile_serving_cuda123_cudnn9 -
 | timeout | int | 请求等待的超时时间，单位是秒 | 否 | 300 |  |
 | return_usage | bool | 是否返回输入、输出 token 数量 | 否 | False |  |
 
-* 在正确配置PUSH_MODE_HTTP_PORT字段下，服务支持 GRPC 和 HTTP 两种请求服务
+* 在正确配置 PUSH_MODE_HTTP_PORT 字段下，服务支持 GRPC 和 HTTP 两种请求服务
   * stream 参数仅对 HTTP 请求生效

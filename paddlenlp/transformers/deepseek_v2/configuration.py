@@ -116,6 +116,8 @@ class DeepseekV2Config(PretrainedConfig):
             Whether to use a bias in the query, key, value and output projection layers during self-attention.
         attention_dropout (`float`, *optional*, defaults to 0.0):
             The dropout ratio for the attention probabilities.
+        speculate_model_type (`str`, defaults to `None`, *optional*, defaults to `False`):
+            The model type for speculate. Support ['eagle', 'mtp'] Now.
 
     ```python
     >>> from paddlenlp.transformers import DeepseekV2Model, DeepseekV2Config
@@ -137,7 +139,8 @@ class DeepseekV2Config(PretrainedConfig):
         intermediate_size=11008,
         moe_intermediate_size=1407,
         num_hidden_layers=30,
-        num_nextn_predict_layers=1,
+        num_nextn_predict_layers=0,
+        num_nextn_predict_lambda=1.0,
         num_attention_heads=32,
         num_key_value_heads=32,
         n_shared_experts=None,
@@ -174,6 +177,7 @@ class DeepseekV2Config(PretrainedConfig):
         rope_scaling=None,
         attention_bias=False,
         attention_dropout=0.0,
+        speculate_model_type=False,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -184,6 +188,7 @@ class DeepseekV2Config(PretrainedConfig):
         self.moe_intermediate_size = moe_intermediate_size
         self.num_hidden_layers = num_hidden_layers
         self.num_nextn_predict_layers = num_nextn_predict_layers
+        self.num_nextn_predict_lambda = num_nextn_predict_lambda
         self.num_attention_heads = num_attention_heads
         self.n_shared_experts = n_shared_experts
         self.n_routed_experts = n_routed_experts
@@ -218,6 +223,7 @@ class DeepseekV2Config(PretrainedConfig):
         self.rope_scaling = rope_scaling
         self.attention_bias = attention_bias
         self.attention_dropout = attention_dropout
+        self.speculate_model_type = speculate_model_type
 
         super().__init__(
             pad_token_id=pad_token_id,
