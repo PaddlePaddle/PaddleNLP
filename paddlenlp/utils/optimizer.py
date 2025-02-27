@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import warnings
 
 import paddle
 from paddle import pir
@@ -21,9 +22,9 @@ from paddle.optimizer.adamw import AdamW
 from paddle.pir import Value
 
 try:
-    from paddlenlp_kernel.triton.optimizer import adamw_bf16
+    from paddlenlp_kernel.triton.optimizer import adamw_16bit_moment
 except:
-    adamw_bf16 = None
+    adamw_16bit_moment = None
 
 
 class AdamWMini(AdamW):
@@ -156,7 +157,7 @@ class AdamWMini(AdamW):
         return
 
 
-class AdamWPython(AdamW):
+class AdamWCustom(AdamW):
     def _append_optimize_op(self, block, param_and_grad):
         assert isinstance(block, (framework.Block, pir.Block))
         if isinstance(param_and_grad, dict):
@@ -183,7 +184,7 @@ class AdamWPython(AdamW):
             _beta2 = self._beta2 if not isinstance(self._beta2, Variable) else self._beta2.item(0)
 
             found_inf = self._get_auxiliary_var("found_inf") if in_pir_mode() else None
-            self.adamw_python(
+            self.adamw_custom(
                 param_and_grad[0],
                 param_and_grad[1],
                 lr,
@@ -205,7 +206,7 @@ class AdamWPython(AdamW):
         else:
             raise NotImplementedError("Not implemented yet.")
 
-    def adamw_python(
+    def adamw_custom(
         self,
         param,
         grad,
@@ -254,13 +255,14 @@ class AdamWPython(AdamW):
         return
 
 
-class AdamWBF16(AdamW):
-    def _add_moments_pows(self, p):
+class AdamW_16Bit(AdamW):
+    def _add_moments_pows(self, p, moment_dtype=core.VarDesc.VarType.FP32):
         acc_dtype = p.dtype
         if self._is_dtype_fp16_or_bf16(acc_dtype):
             acc_dtype = DataType.FLOAT32 if in_pir_mode() else core.VarDesc.VarType.FP32
-        self._add_accumulator(self._moment1_acc_str, p, dtype=core.VarDesc.VarType.BF16)
-        self._add_accumulator(self._moment2_acc_str, p, dtype=core.VarDesc.VarType.BF16)
+
+        self._add_accumulator(self._moment1_acc_str, p, dtype=moment_dtype)
+        self._add_accumulator(self._moment2_acc_str, p, dtype=moment_dtype)
         try:
             type = core.VarDesc.VarType.DENSE_TENSOR
         except:
@@ -281,6 +283,33 @@ class AdamWBF16(AdamW):
             shape=[1],
             type=type,
         )
+
+    def _create_accumulators(self, block, parameters):
+        assert isinstance(block, (framework.Block, pir.Block))
+        if isinstance(parameters, dict):
+            parameters = self._update_param_group(parameters)
+
+        # Create accumulator tensors for first and second moments
+        for p in parameters:
+            if p.name in self._already_create_accumulator:
+                continue
+            if self._multi_precision and self._is_dtype_fp16_or_bf16(p.dtype):
+                master_p = self._create_master_weight(p)
+                if str(p.dtype) == "paddle.float16":
+                    moment_dtype = core.VarDesc.VarType.FP16
+                elif str(p.dtype) == "paddle.bfloat16":
+                    moment_dtype = core.VarDesc.VarType.BF16
+
+                self._add_moments_pows(master_p, moment_dtype)
+                self._already_create_accumulator.add(p.name)
+                continue
+            if self._is_dtype_fp16_or_bf16(p.dtype) and not self._multi_precision:
+                warnings.warn(
+                    "Accumulating with FP16 or BF16 in optimizer can lead to poor accuracy or slow convergence."
+                    "Consider using multi_precision=True option of the Adam optimizer."
+                )
+            self._add_moments_pows(p)
+            self._already_create_accumulator.add(p.name)
 
     def _append_optimize_op(self, block, param_and_grad):
         assert isinstance(block, (framework.Block, pir.Block))
@@ -308,7 +337,7 @@ class AdamWBF16(AdamW):
             _beta2 = self._beta2 if not isinstance(self._beta2, Variable) else self._beta2.item(0)
 
             found_inf = self._get_auxiliary_var("found_inf") if in_pir_mode() else None
-            apply_adamw = self.adamw_python if adamw_bf16 is None else adamw_bf16
+            apply_adamw = self.adamw_16bit_moment if adamw_16bit_moment is None else adamw_16bit_moment
             apply_adamw(
                 param_and_grad[0],
                 param_and_grad[1],
@@ -331,7 +360,7 @@ class AdamWBF16(AdamW):
         else:
             raise NotImplementedError("Not implemented yet.")
 
-    def adamw_python(
+    def adamw_16bit_moment(
         self,
         param,
         grad,
@@ -362,6 +391,7 @@ class AdamWBF16(AdamW):
         else:
             p = param
         p *= 1.0 - lr * coeff
+        moment_dtype = moment1.dtype
         mom1 = moment1
         mom2 = moment2
 
@@ -374,7 +404,7 @@ class AdamWBF16(AdamW):
             param[:] = p.astype(param.dtype)
         else:
             param[:] = p
-        moment1[:] = mom1
-        moment2[:] = mom2
+        moment1[:] = mom1.astype(moment_dtype)
+        moment2[:] = mom2.astype(moment_dtype)
         beta1_pow[:], beta2_pow[:] = beta1 * beta1_pow[:], beta2 * beta2_pow[:]
         return

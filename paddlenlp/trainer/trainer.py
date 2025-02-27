@@ -1965,15 +1965,15 @@ class Trainer:
 
             optimizer_cls = AdamWMini
             optimizer_kwargs.update(adam_kwargs)
-        elif args.optim == OptimizerNames.ADAMW_PYTHON:
-            from ..utils import AdamWPython
+        elif args.optim == OptimizerNames.ADAMW_CUSTOM:
+            from ..utils import AdamWCustom
 
-            optimizer_cls = AdamWPython
+            optimizer_cls = AdamWCustom
             optimizer_kwargs.update(adam_kwargs)
-        elif args.optim == OptimizerNames.ADAMW_BF16:
-            from ..utils import AdamWBF16
+        elif args.optim == OptimizerNames.ADAMW_16BIT_MOMENT:
+            from ..utils import AdamW_16Bit
 
-            optimizer_cls = AdamWBF16
+            optimizer_cls = AdamW_16Bit
             optimizer_kwargs.update(adam_kwargs)
         else:
             raise ValueError(f"Trainer cannot instantiate unsupported optimizer: {args.optim}")

@@ -321,8 +321,8 @@ class OptimizerNames(ExplicitEnum):
     ADAMW = "adamw"
     ADAFACTOR = "adafactor"
     ADAMW_MINI = "adamw_mini"
-    ADAMW_PYTHON = "adamw_python"
-    ADAMW_BF16 = "adamw_bf16"
+    ADAMW_CUSTOM = "adamw_custom"
+    ADAMW_16BIT_MOMENT = "adamw_16bit_moment"
 
 
 class ShardingOption(ExplicitEnum):

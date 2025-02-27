@@ -30,6 +30,7 @@ def adamw_kernel(
     beta1_pow_ptr,
     beta2_pow_ptr,
     master_weight_ptr,
+    dtype,
     N,
     BLOCK_SIZE: tl.constexpr,
 ):
@@ -56,18 +57,25 @@ def adamw_kernel(
     moment2 = beta2 * moment2 + (1.0 - beta2) * grad * grad
     denom = tl.sqrt(moment2) / tl.sqrt(1.0 - beta2_pow) + epsilon
     param += (moment1 / denom) * (-lr / (1 - beta1_pow))
+    if dtype == 0:
+        target_dtype = tl.float16
+    elif dtype == 1:
+        target_dtype = tl.bfloat16
+    else:
+        target_dtype = tl.float32
+    target_dtype = tl.bfloat16
 
     # Update param
     if master_weight_ptr is not None:
         tl.store(master_weight_ptr + offsets, param, mask=mask)
-        tl.store(param_ptr + offsets, param.to(tl.bfloat16), mask=mask)
+        tl.store(param_ptr + offsets, param.to(target_dtype), mask=mask)
     else:
-        tl.store(param_ptr + offsets, param.to(tl.bfloat16), mask=mask)
-    tl.store(moment1_ptr + offsets, moment1.to(tl.bfloat16), mask=mask)
-    tl.store(moment2_ptr + offsets, moment2.to(tl.bfloat16), mask=mask)
+        tl.store(param_ptr + offsets, param.to(target_dtype), mask=mask)
+    tl.store(moment1_ptr + offsets, moment1.to(target_dtype), mask=mask)
+    tl.store(moment2_ptr + offsets, moment2.to(target_dtype), mask=mask)
 
 
-def adamw_bf16(
+def adamw_16bit_moment(
     param,
     grad,
     learning_rate,
@@ -96,7 +104,12 @@ def adamw_bf16(
     N = param.numel().item()
     BLOCK_SIZE = 512
     grid = lambda meta: (triton.cdiv(N, BLOCK_SIZE),)
-
+    if str(param.dtype) == "paddle.float16":
+        dtype = 0
+    elif str(param.dtype) == "paddle.bfloat16":
+        dtype = 1
+    else:
+        dtype = 2
     adamw_kernel[grid](
         param,
         grad,
@@ -110,6 +123,7 @@ def adamw_bf16(
         beta1_pow,
         beta2_pow,
         master_weight,
+        dtype,
         N,
         BLOCK_SIZE,
     )
