@@ -100,7 +100,7 @@ void EncoderWriteCacheWithRopeKernel(
                                     key_cache_out,
                                     value_cache_out);
   } else if (cache_quant_type_str == "cache_int8") {
-    DISPATCH_HEAD_DIM(
+    DISPATCH_GQA_HEAD_DIM(
         head_dim, HEAD_DIM, {DISPATCH_BLOCK_SIZE(block_size, BLOCK_SIZE, {
           CascadeAppendWriteCacheKVC8QKV<T, HEAD_DIM, BLOCK_SIZE>(
               meta_data,
@@ -123,7 +123,7 @@ void EncoderWriteCacheWithRopeKernel(
               value_cache_out);
         })})
   } else if (cache_quant_type_str == "cache_int4_zp") {
-    DISPATCH_HEAD_DIM(
+    DISPATCH_GQA_HEAD_DIM(
         head_dim, HEAD_DIM, {DISPATCH_BLOCK_SIZE(block_size, BLOCK_SIZE, {
           CascadeAppendWriteCacheKVC4QKV<T, HEAD_DIM, BLOCK_SIZE>(
               meta_data,
