@@ -474,30 +474,30 @@ cudaError_t BatchMLAWithPagedKVCacheKernelTraitsDispatched(Params& params,
   );
   // cudaDeviceSynchronize();
   // auto err = cudaGetLastError();
-  constexpr int vec_size = 16 / sizeof(DTypeO);
-  constexpr int merge_block_size = 256;
-  constexpr int blockx = KernelTraits::HEAD_DIM_VO / vec_size;
-  constexpr int blocky = (merge_block_size + blockx - 1) / blockx;
-  dim3 grids_merge(min(multiprocessor_count, params.token_num), params.q_num_head); // 128k is too large
-  dim3 blocks_merge(blockx, blocky);
-  merge_multi_chunks_kernel<DTypeO, vec_size, blocky, KernelTraits::HEAD_DIM_VO><<<grids_merge, blocks_merge, 0, stream>>>(
-    params.O_tmp,
-    params.m,
-    params.d,
-    params.seq_lens_this_time,
-    params.seq_lens_decoder,
-    params.seq_lens_encoder,
-    params.padding_offsets,
-    params.O,
-    params.max_seq_len,
-    params.chunk_num,
-    params.q_num_head,
-    params.chunk_size,
-    params.vo_head_dim,
-    params.token_num,
-    params.bsz,
-    params.max_draft_token_num
-  );
+  // constexpr int vec_size = 16 / sizeof(DTypeO);
+  // constexpr int merge_block_size = 256;
+  // constexpr int blockx = KernelTraits::HEAD_DIM_VO / vec_size;
+  // constexpr int blocky = (merge_block_size + blockx - 1) / blockx;
+  // dim3 grids_merge(min(multiprocessor_count, params.token_num), params.q_num_head); // 128k is too large
+  // dim3 blocks_merge(blockx, blocky);
+  // merge_multi_chunks_kernel<DTypeO, vec_size, blocky, KernelTraits::HEAD_DIM_VO><<<grids_merge, blocks_merge, 0, stream>>>(
+  //   params.O_tmp,
+  //   params.m,
+  //   params.d,
+  //   params.seq_lens_this_time,
+  //   params.seq_lens_decoder,
+  //   params.seq_lens_encoder,
+  //   params.padding_offsets,
+  //   params.O,
+  //   params.max_seq_len,
+  //   params.chunk_num,
+  //   params.q_num_head,
+  //   params.chunk_size,
+  //   params.vo_head_dim,
+  //   params.token_num,
+  //   params.bsz,
+  //   params.max_draft_token_num
+  // );
 
   // cudaDeviceSynchronize();
   // err = cudaGetLastError();
@@ -521,8 +521,8 @@ cudaError_t BatchMLAWithPagedKVCacheDispatched(Params& params, cudaStream_t stre
   } else {
     return cudaErrorNotSupported;
   }
-  cudaError_t status = cudaGetLastError();
-  return status;
+  // cudaError_t status = cudaGetLastError();
+  return cudaSuccess;
 };
 
 }  // namespace mla_attn

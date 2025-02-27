@@ -75,7 +75,7 @@ std::vector<paddle::Tensor> MultiHeadLatentAttentionKernel(
   const int decoder_block_shape_q = get_decoder_block_shape_q();
 
   const bool mla_use_tensorcore = get_mla_use_tensorcore();
-  auto sm_version = getSMVersion();
+  auto sm_version = GetSMVersion();
   if (mla_use_tensorcore && sm_version < 90) {
     PD_THROW("Please export FLAGS_mla_use_tensorcore=0 when sm < 90.");
   }
