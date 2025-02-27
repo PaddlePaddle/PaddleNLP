@@ -78,6 +78,7 @@ from paddlenlp.trainer.trainer import (
     speed_metrics,
 )
 from paddlenlp.trainer.trainer_utils import TrainOutput
+from paddlenlp.trainer.utils import distributed_concat
 from paddlenlp.transformers import (
     CosineAnnealingWithWarmupDecay,
     LinearAnnealingWithWarmupDecay,
@@ -86,7 +87,7 @@ from paddlenlp.transformers import (
 )
 from paddlenlp.transformers.model_utils import _add_variant
 from paddlenlp.utils.env import PADDLE_WEIGHTS_NAME
-from paddlenlp.trainer.utils import distributed_concat
+
 
 class StepTrainer(Trainer):
     """
@@ -1235,12 +1236,13 @@ class PPOTrainer(Trainer):
                 generated_seq = self.generate(prompt_only_batch, do_eval=True)[0]["input_ids"]
 
             if self._model_config.sequence_parallel:
+                # pad to max_sequence_length
                 seq = self.tokenizer.pad(
                     {"input_ids": [s for s in generated_seq]},
                     padding="max_length",
                     max_length=self._model_config.max_sequence_length,
                     return_attention_mask=False,
-                )["input_ids"]  # pad to max_sequence_length
+                )["input_ids"]
             else:
                 seq = generated_seq
 
@@ -1265,12 +1267,13 @@ class PPOTrainer(Trainer):
                     )
                     reward_position_ids = make_position_ids(reward_attention_mask)
 
+                # .end_scores
                 reward_score = self.reward_model(
                     reward_input_ids,
                     attention_mask=reward_attention_mask,
                     position_ids=reward_position_ids,
                     # return_dict=True,
-                )[1]  # .end_scores
+                )[1]
             else:
                 prompt_len = inputs["input_ids"].shape[-1]
                 if "label_ids" not in inputs:
@@ -1770,11 +1773,7 @@ class PPOTrainer(Trainer):
         # ##### set training state and resume #####
         # consumed_samples used to set train_dataloader.batch_sampler may not be
         # correct. Thus, data cannot be resumed perfectly when not breaking at epoch end.
-        (
-            epochs_trained,
-            steps_trained_in_current_epoch,
-            steps_trained_progress_bar,
-        ) = self.init_train_state(
+        (epochs_trained, steps_trained_in_current_epoch, steps_trained_progress_bar,) = self.init_train_state(
             resume_from_checkpoint,
             train_dataloader,
             max_steps,
@@ -2478,15 +2477,12 @@ class PPOTrainer(Trainer):
             if self.args.num_return_sequences > 1:
                 label_ids = label_ids.repeat_interleave(self.args.num_return_sequences, axis=0)
 
-        if self.args.num_return_sequences > 1:
-            sequences = sequences.reshape(
-                [input_ids.shape[0] // self.args.num_return_sequences, self.args.num_return_sequences, -1]
-            )
+        sequences = sequences.reshape(
+            [input_ids.shape[0] // self.args.num_return_sequences, self.args.num_return_sequences, -1]
+        )
         if do_eval:
             self.args.num_return_sequences = train_num_return_sequences
             sequences = sequences.transpose([1, 0, 2])
-        if not isinstance(sequences, list):
-            sequences = [sequences]
         # prompt, sequence, attention_mask
         return [
             {
@@ -2626,12 +2622,13 @@ class PPOTrainer(Trainer):
                 reward_attention_mask = attention_mask
                 reward_position_ids = position_ids
 
+            # .end_scores
             reward_score = self.reward_model(
                 reward_input_ids,
                 attention_mask=reward_attention_mask,
                 position_ids=reward_position_ids,
                 # return_dict=True,
-            )[1]  # .end_scores
+            )[1]
         else:
             prompt_len = kwargs["prompt"].shape[-1]
             if "label_ids" not in kwargs:
@@ -2646,12 +2643,13 @@ class PPOTrainer(Trainer):
         if self.args.rl_algorithm == "grpo":
             return {"rewards": reward_score}
 
+        # .scores
         reward_value = self.reward_critic_model(
             input_ids,
             attention_mask=attention_mask,
             position_ids=position_ids,
             # return_dict=True,
-        )[0]  # .scores
+        )[0]
         reward_value = reward_value.squeeze(axis=-1)
         reward_value = reward_value[:, :-1]
 
