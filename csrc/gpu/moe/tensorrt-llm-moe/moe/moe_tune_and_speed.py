@@ -1,16 +1,9 @@
-# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
-# 
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-# 
-#     http://www.apache.org/licenses/LICENSE-2.0
-# 
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+'''
+
+使用trt-fused-moe算子需要先tune一下，在运行路径下
+export FLAGS_efficientllm_op_configs=tune
+执行运行代码即可，第一次tune时间比较长会在当前路径下产生trt_moe_profile_results.json文件
+'''
 
 import argparse
 import time
@@ -114,7 +107,7 @@ def trt_bf16():
         0,
         "none",
         "Swiglu",
-        8192,
+        8192 * 16,
     )
     paddle.device.synchronize()
     end = time.time()
@@ -139,7 +132,7 @@ def trt_win8(quant_method):
         topk,
         0,
         quant_method,
-        8192 * 64,
+        8192 * 6,
     )
     paddle.device.synchronize()
     end = time.time()
