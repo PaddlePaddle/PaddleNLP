@@ -132,6 +132,7 @@ class StepTrainer(Trainer):
         )
         # criterion is only used for non-PipelineParallel models. criterion is
         # included in model for PipelineParallel.
+        self.info_buffer = {}
         if getattr(self, "loss_cls", None) and self.criterion is None:
             self.criterion = self.create_criterion()
 
@@ -150,7 +151,7 @@ class StepTrainer(Trainer):
         whose label arguments are merged into one argument, this is useful to
         PipelineParallel and trainer.criterion which limit loss format.
         """
-        criterion = create_loss(self.loss_cls, self.model.config, self.args, merge_labels=True)
+        criterion = create_loss(self.loss_cls, self.model.config, self.args, self.info_buffer, merge_labels=True)
         return criterion
 
     def loss_identifier(self, inputs: Dict) -> str:
@@ -1004,7 +1005,6 @@ class PPOTrainer(Trainer):
                 ),  # workaround for pipeline parallel model check
             },
         ):
-
             self.reference_trainer = StepTrainer(
                 reference_model,
                 criterion,
@@ -1240,9 +1240,7 @@ class PPOTrainer(Trainer):
                     padding="max_length",
                     max_length=self._model_config.max_sequence_length,
                     return_attention_mask=False,
-                )[
-                    "input_ids"
-                ]  # pad to max_sequence_length
+                )["input_ids"]  # pad to max_sequence_length
             else:
                 seq = generated_seq
 
@@ -1272,9 +1270,7 @@ class PPOTrainer(Trainer):
                     attention_mask=reward_attention_mask,
                     position_ids=reward_position_ids,
                     # return_dict=True,
-                )[
-                    1
-                ]  # .end_scores
+                )[1]  # .end_scores
             else:
                 prompt_len = inputs["input_ids"].shape[-1]
                 if "label_ids" not in inputs:
@@ -1552,12 +1548,12 @@ class PPOTrainer(Trainer):
                 self.prompt_only_dataloader,
                 itertools.cycle(self.ptx_dataloader),
             ):
-
                 # generate batches
                 self.set_eval()
 
-                with ema(self.policy_trainer), (
-                    ema(self.value_trainer) if self.args.rl_algorithm == "ppo" else contextlib.nullcontext()
+                with (
+                    ema(self.policy_trainer),
+                    ema(self.value_trainer) if self.args.rl_algorithm == "ppo" else contextlib.nullcontext(),
                 ):
                     with guard_set_args(self._model_config, {"use_fused_head_and_loss_fn": False}):
                         rl_batches = self.split_rl_micro_batches(prompt_only_batch)
@@ -1708,34 +1704,40 @@ class PPOTrainer(Trainer):
 
         # ##### trainging data and related num setting #####
         # TODO(guosheng): remove the binding method get_collator of dataset
-        with guard_set_args(
-            args,
-            {"per_device_train_batch_size": self.args.per_device_prompt_batch_size},
-        ), guard_set_args(
-            self,
-            {
-                "train_dataset": self.train_dataset,
-                "data_collator": self.train_dataset.get_collator(),
-            },
+        with (
+            guard_set_args(
+                args,
+                {"per_device_train_batch_size": self.args.per_device_prompt_batch_size},
+            ),
+            guard_set_args(
+                self,
+                {
+                    "train_dataset": self.train_dataset,
+                    "data_collator": self.train_dataset.get_collator(),
+                },
+            ),
         ):
             train_dataloader = self.prompt_only_dataloader = self.get_train_dataloader()
 
         if self.use_ptx:
-            with guard_set_args(
-                args,
-                {
-                    "per_device_train_batch_size": (
-                        1
-                        if getattr(self.ptx_dataset, "is_intokens", False)
-                        else self.args.per_device_prompt_batch_size * self.args.num_return_sequences
-                    )
-                },
-            ), guard_set_args(
-                self,
-                {
-                    "train_dataset": self.ptx_dataset,
-                    "data_collator": self.ptx_dataset.get_collator(),
-                },
+            with (
+                guard_set_args(
+                    args,
+                    {
+                        "per_device_train_batch_size": (
+                            1
+                            if getattr(self.ptx_dataset, "is_intokens", False)
+                            else self.args.per_device_prompt_batch_size * self.args.num_return_sequences
+                        )
+                    },
+                ),
+                guard_set_args(
+                    self,
+                    {
+                        "train_dataset": self.ptx_dataset,
+                        "data_collator": self.ptx_dataset.get_collator(),
+                    },
+                ),
             ):
                 self.ptx_dataloader = self.get_train_dataloader()
         else:
@@ -1768,7 +1770,11 @@ class PPOTrainer(Trainer):
         # ##### set training state and resume #####
         # consumed_samples used to set train_dataloader.batch_sampler may not be
         # correct. Thus, data cannot be resumed perfectly when not breaking at epoch end.
-        (epochs_trained, steps_trained_in_current_epoch, steps_trained_progress_bar,) = self.init_train_state(
+        (
+            epochs_trained,
+            steps_trained_in_current_epoch,
+            steps_trained_progress_bar,
+        ) = self.init_train_state(
             resume_from_checkpoint,
             train_dataloader,
             max_steps,
@@ -1883,14 +1889,10 @@ class PPOTrainer(Trainer):
 
             best_model_checkpoint = json.loads(self.state.best_model_checkpoint)
 
-            logger.info(
-                f"Loading best model from {best_model_checkpoint['value']}" f"(score: {self.state.best_metric})."
-            )
+            logger.info(f"Loading best model from {best_model_checkpoint['value']}(score: {self.state.best_metric}).")
             self.load_best_ckpt(best_model_checkpoint["value"], self.value_trainer)
 
-            logger.info(
-                f"Loading best model from {best_model_checkpoint['policy']}" f"(score: {self.state.best_metric})."
-            )
+            logger.info(f"Loading best model from {best_model_checkpoint['policy']}(score: {self.state.best_metric}).")
             self.load_best_ckpt(best_model_checkpoint["policy"], self.policy_trainer)
 
         metrics = speed_metrics(
@@ -1967,7 +1969,6 @@ class PPOTrainer(Trainer):
                 None.
         """
         if self.control.should_log and tr_loss is not None:
-
             logs: Dict[str, float] = {}
             # use_ptx would double the gradient_accumulation_steps which causes
             # policy_loss and ptx_loss reduced by half. Moreover, ptx_loss should
@@ -2484,7 +2485,8 @@ class PPOTrainer(Trainer):
         if do_eval:
             self.args.num_return_sequences = train_num_return_sequences
             sequences = sequences.transpose([1, 0, 2])
-
+        if not isinstance(sequences, list):
+            sequences = [sequences]
         # prompt, sequence, attention_mask
         return [
             {
@@ -2629,9 +2631,7 @@ class PPOTrainer(Trainer):
                 attention_mask=reward_attention_mask,
                 position_ids=reward_position_ids,
                 # return_dict=True,
-            )[
-                1
-            ]  # .end_scores
+            )[1]  # .end_scores
         else:
             prompt_len = kwargs["prompt"].shape[-1]
             if "label_ids" not in kwargs:
@@ -2651,9 +2651,7 @@ class PPOTrainer(Trainer):
             attention_mask=attention_mask,
             position_ids=position_ids,
             # return_dict=True,
-        )[
-            0
-        ]  # .scores
+        )[0]  # .scores
         reward_value = reward_value.squeeze(axis=-1)
         reward_value = reward_value[:, :-1]
 

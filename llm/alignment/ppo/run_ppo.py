@@ -386,7 +386,7 @@ def main():
         reward_tokenizer,
         reward_critic_tokenizer if training_args.rl_algorithm == "ppo" else None,
     ]:
-        if isinstance(tokenizer, AutoTokenizer) and tokenizer.pad_token_id is None:
+        if tokenizer.pad_token_id is None:
             tokenizer.pad_token_id = tokenizer.eos_token_id
 
     if training_args.should_load_dataset:

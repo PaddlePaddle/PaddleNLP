@@ -362,6 +362,16 @@ class ModelArgument:
             "can be selected as `full` or `full_attn` or `core_attn`. "
         },
     )
+    chat_template: str = field(
+        default="none",
+        metadata={
+            "help": "the path of `chat_template.json` file to handle multi-rounds conversation. "
+            "If is None(do not set --chat_template argument), it will use the default `chat_template.json`;"
+            "If is equal with `model_name_or_path`, it will use the default loading; "
+            "If is directory, it will find the `chat_template.json` under the directory; If is file, it will load it."
+            "If is none string, it will not use chat_template.json."
+        },
+    )
 
 
 @dataclass

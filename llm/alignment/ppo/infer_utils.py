@@ -24,7 +24,7 @@ import paddle.distributed as dist
 from comm_utils import offload_tensor_to_cpu, reload_tensor_to_gpu
 from paddle.utils import try_import
 from predict.predictor import (
-    InferencePredictorMixin,
+    DygraphInferencePredictor,
     PdArgumentParser,
     PredictorArgument,
 )
@@ -53,8 +53,8 @@ class Predictor:
         # multi time prediction. define caches and extra inputs creation method
         # instead of using predictor.__init__
 
-        self._buffer_maker = types.MethodType(InferencePredictorMixin.__init__, self)
-        self._inputs_processer = types.MethodType(InferencePredictorMixin._preprocess, self)
+        self._buffer_maker = types.MethodType(DygraphInferencePredictor.__init__, self)
+        self._inputs_processer = types.MethodType(DygraphInferencePredictor._preprocess, self)
 
     @staticmethod
     def create_predictor(trainer):
