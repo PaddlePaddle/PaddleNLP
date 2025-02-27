@@ -1,29 +1,25 @@
-/*
- * Copyright (c) 2019-2024, NVIDIA CORPORATION.  All rights reserved.
- * Copyright (c) 2021, NAVER Corp.  Authored by CLOVA.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+// Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
-#include "tensorrt_llm/common/cudaTypeUtils.cuh"
-#include "tensorrt_llm/kernels/noAuxTcKernels.h"
+// This code is partially inspired by and references the implementation found
+// in NVIDIA TRTLLM.
+
 #include <cooperative_groups.h>
 #include <cooperative_groups/reduce.h>
 namespace cg = cooperative_groups;
-using namespace tensorrt_llm::common;
 
-namespace tensorrt_llm::kernels
-{
+
 constexpr unsigned FULL_WARP_MASK = 0xffffffff;
 constexpr int32_t WARP_SIZE = 32;
 constexpr int32_t BLOCK_SIZE = 512;
@@ -513,12 +509,12 @@ __global__ void group_idx_and_topk_idx_kernel(T* scores, T const* group_scores, 
     {
         for (int i = lane_id; i < warp_topk::round_up_to_multiple_of<WARP_SIZE>(topk); i += WARP_SIZE)
         {
-            T value = i < topk ? scores[s_topk_idx[i]] : cuda_cast<T, float>(0.0f); // Load the valid value of expert
+            T value = i < topk ? scores[s_topk_idx[i]] : 0.0f; // Load the valid value of expert
             if (i < topk)
             {
                 s_topk_value[i] = value;
             }
-            topk_sum += reduce(tile, cuda_cast<float, T>(value), cg::plus<float>());
+            topk_sum += reduce(tile, value, cg::plus<float>());
         }
     }
 
@@ -537,8 +533,8 @@ __global__ void group_idx_and_topk_idx_kernel(T* scores, T const* group_scores, 
     {
         for (int i = lane_id; i < topk; i += WARP_SIZE)
         {
-            float value = cuda_cast<float, T>(s_topk_value[i]) / topk_sum * routed_scaling_factor;
-            scores[s_topk_idx[i]] = cuda_cast<T, float>(value);
+            float value = s_topk_value[i] / topk_sum * routed_scaling_factor;
+            scores[s_topk_idx[i]] = value;
         }
     }
 }
@@ -567,8 +563,4 @@ void invokeNoAuxTc(T* scores, T* group_scores, T* scores_with_bias, int64_t cons
         double const routed_scaling_factor, cudaStream_t const stream);
 
 INSTANTIATE_NOAUX_TC(float);
-INSTANTIATE_NOAUX_TC(half);
-#ifdef ENABLE_BF16
-INSTANTIATE_NOAUX_TC(__nv_bfloat16);
-#endif
-} // namespace tensorrt_llm::kernels
+

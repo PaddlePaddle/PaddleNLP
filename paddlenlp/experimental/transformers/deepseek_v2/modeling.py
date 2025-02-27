@@ -13,6 +13,7 @@
 # limitations under the License.
 from __future__ import annotations
 
+import os
 from functools import partial
 from typing import Tuple
 
@@ -49,13 +50,14 @@ from paddlenlp.transformers.model_utils import (
     register_base_model,
 )
 from paddlenlp.utils.log import logger
-import os
 
 __all__ = ["DeepseekV2ForCausalLMBlockInferenceModel"]
+
 
 def use_trt_llm_fused_moe():
     """Get the value of the 'USE_TRT_LLM_FUSED_MOE' environment variable."""
     return os.getenv("USE_TRT_LLM_FUSED_MOE", "False") in ["True", "1", "true"]
+
 
 use_trt_fused_moe = use_trt_llm_fused_moe()
 
@@ -686,7 +688,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                     ffn1_weight = paddle.to_tensor(concated_gate_up_weight).cast(dtype)
 
                     if use_trt_fused_moe:
-                        # print("这里修改为了w3/w1")
+                        # 这里修改为了w3/w1
                         gate, up = paddle.chunk(ffn1_weight, 2, axis=-1)
                         ffn1_weight = paddle.concat([up, gate], axis=-1)
 
@@ -697,15 +699,12 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                     if self.use_weight_only:
                         ffn1_quanted_weight, ffn1_weight_scale = weight_quantize(ffn1_weight, algo=self.quant_algo)
                         ffn2_quanted_weight, ffn2_weight_scale = weight_quantize(ffn2_weight, algo=self.quant_algo)
-                        print(ffn1_quanted_weight.shape)
-                        print(self.transformer_block.config.embed_dim)
-                        exit(0)
                         ffn1_weights.append(ffn1_quanted_weight.reshape([self.transformer_block.config.embed_dim, -1]))
                         ffn2_weights.append(ffn2_quanted_weight.reshape([-1, self.transformer_block.config.embed_dim]))
                         ffn1_scales.append(ffn1_weight_scale)
                         ffn2_scales.append(ffn2_weight_scale)
                     elif use_trt_fused_moe and not self.use_weight_only:
-                        # print("trt bf16的时候transpose 需要变为col major")
+                        # trt bf16的时候transpose 需要变为col major
                         ffn1_weights_trt = ffn1_weight.transpose([1, 0]).reshape(ffn1_weight.shape)
                         ffn1_weights.append(ffn1_weights_trt)
                         ffn2_weights_trt = ffn2_weight.transpose([1, 0]).reshape(ffn2_weight.shape)

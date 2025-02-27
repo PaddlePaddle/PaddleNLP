@@ -302,8 +302,6 @@ public:
             {
                 // CUTLASS_TRACE_HOST("MoeFCGemm::can_implement() - weight scales are required for uint8_t and uint4b_t");
                 printf("MoeFCGemm::can_implement() - weight scales are required for uint8_t and uint4b_t \n");
-                // printf("暂时改为sucess \n");
-                // return Status::kSuccess;
                 return Status::kInvalid;
             }
         }

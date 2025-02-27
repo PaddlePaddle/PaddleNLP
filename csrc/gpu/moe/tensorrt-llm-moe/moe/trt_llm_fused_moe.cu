@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// This code is partially inspired by and references the implementation found
+// in NVIDIA TRTLLM.
+
 #pragma once
 
 #include <optional>
@@ -70,6 +73,8 @@ Tensor trt_llm_fused_moe_helper(Tensor input_activations,
     int inter_size = fc1_expert_weights.shape()[2] / 2; //(num_experts, inter_size, hidden_size)
     if (quant_method == "fp8_block_wise") {
        inter_size = fc2_expert_weights.shape()[2];
+    } else if (quant_method == "weight_only_int4") {
+        inter_size = fc1_expert_weights.shape()[2];
     }
     const int num_experts = gating_output.shape()[1]; //(num_tokens, num_experts)
     
@@ -340,8 +345,6 @@ std::vector<paddle::Tensor> TrtLLMFusedMoe(const paddle::Tensor&     input_activ
 
     Tensor output_tensor;
     tensorrt_llm::ActivationType fc1_activation_type = tensorrt_llm::ActivationType::Swiglu;;
-    std::cout << "start ! "<< std::endl;
-    std::cout<< quant_method  << std::endl;
     switch (_st) {
         case paddle::DataType::FLOAT16: {
             if (quant_type == _st) {
@@ -458,38 +461,33 @@ std::vector<paddle::Tensor> TrtLLMFusedMoe(const paddle::Tensor&     input_activ
     return {output_tensor};
 }
 
-// std::vector<paddle::DataType> TrtLLMFusedMoeInferDtype(
-//         const paddle::DataType&     input_activations_dtype, //(num_tokens, hidden_size)
-//         const paddle::DataType&      gating_output_dtype, //(num_tokens, num_experts)
-//         const paddle::DataType&      fc1_expert_weights_dtype, //(num_experts, hidden_size, inter_size * 2)
-//         const paddle::DataType&     fc2_expert_weight_dtypes, //(num_experts, inter_size, hidden_size)
-//         const paddle::optional<paddle::DataType>& scale1_dtype,
-//         const paddle::optional<paddle::DataType>& scale2_dtype,
-//         const paddle::optional<paddle::DataType>& scale3_dtype, 
-//         int     k,
-//         int normalization_mode,
-//         const std::string& quant_method,
-//         int     tune_max_num_tokens){
+std::vector<paddle::DataType> TrtLLMFusedMoeInferDtype(
+        const paddle::DataType&     input_activations_dtype, //(num_tokens, hidden_size)
+        const paddle::DataType&      gating_output_dtype, //(num_tokens, num_experts)
+        const paddle::DataType&      fc1_expert_weights_dtype, //(num_experts, hidden_size, inter_size * 2)
+        const paddle::DataType&     fc2_expert_weight_dtypes, //(num_experts, inter_size, hidden_size)
+        const paddle::optional<paddle::DataType>& scale1_dtype,
+        const paddle::optional<paddle::DataType>& scale2_dtype,
+        const paddle::optional<paddle::DataType>& scale3_dtype){
         
-//         return {input_activations_dtype};
-// }
+        return {input_activations_dtype};
+}
 
-// std::vector<std::vector<int64_t>> TrtLLMFusedMoeInferShape(
-//         const std::vector<int64_t>&     input_activations_shape, //(num_tokens, hidden_size)
-//         const std::vector<int64_t>&      gating_output_shape, //(num_tokens, num_experts)
-//         const std::vector<int64_t>&      fc1_expert_weights_shape, //(num_experts, hidden_size, inter_size * 2)
-//         const std::vector<int64_t>&      fc2_expert_weights_shape, //(num_experts, inter_size, hidden_size)
-//         const paddle::optional<std::vector<int64_t>&>& scale1_shape,
-//         const paddle::optional<std::vector<int64_t>&>& scale2_shape,
-//         const paddle::optional<std::vector<int64_t>&>& scale3_shape){
-    
-//     return {input_activations_shape};
-// }
+std::vector<std::vector<int64_t>> TrtLLMFusedMoeInferShape(
+        const std::vector<int64_t>&     input_activations_shape, //(num_tokens, hidden_size)
+        const std::vector<int64_t>&      gating_output_shape, //(num_tokens, num_experts)
+        const std::vector<int64_t>&      fc1_expert_weights_shape, //(num_experts, hidden_size, inter_size * 2)
+        const std::vector<int64_t>&      fc2_expert_weights_shape, //(num_experts, inter_size, hidden_size)
+        const paddle::optional<std::vector<int64_t>>& scale1_shape,
+        const paddle::optional<std::vector<int64_t>>& scale2_shape,
+        const paddle::optional<std::vector<int64_t>>& scale3_shape){
+    return {input_activations_shape};
+}
 
 PD_BUILD_OP(trt_llm_fused_moe)
     .Inputs({"input_activations", "gating_output", "fc1_expert_weights", "fc2_expert_weights", paddle::Optional("scale1"), paddle::Optional("scale2"), paddle::Optional("scale3"),})
     .Outputs({"output_tensor"})
     .Attrs({"k: int", "normalization_mode: int", "quant_method:std::string", "tune_max_num_tokens: int"})
-    .SetKernelFn(PD_KERNEL(TrtLLMFusedMoe));
-    // .SetInferShapeFn(PD_INFER_SHAPE(TrtLLMFusedMoeInferShape))
-    // .SetInferDtypeFn(PD_INFER_DTYPE(TrtLLMFusedMoeInferDtype));
+    .SetKernelFn(PD_KERNEL(TrtLLMFusedMoe))
+    .SetInferShapeFn(PD_INFER_SHAPE(TrtLLMFusedMoeInferShape))
+    .SetInferDtypeFn(PD_INFER_DTYPE(TrtLLMFusedMoeInferDtype));

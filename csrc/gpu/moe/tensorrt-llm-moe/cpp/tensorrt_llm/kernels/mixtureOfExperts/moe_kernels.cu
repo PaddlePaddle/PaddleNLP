@@ -629,7 +629,7 @@ void sparseMixerTopkSoftmax(float const* input, float* output, float* mixer_temp
 {
     // TODO we need to update the sparseMixerMask() function to mask all previous experts instead of just the most
     //  recent one.
-    PADDLE_ENFORCE(k <= 2, "Current sparse mixer only supports k <= 2");
+    // PADDLE_ENFORCE(k <= 2, "Current sparse mixer only supports k <= 2");
 
     // Each thread handles one token
     constexpr int threads_per_block = 256;
@@ -651,7 +651,7 @@ void selectExpertsForTokens(float const* input, float* output, float* mixer_temp
 {
     if (norm_mode == MOEExpertScaleNormalizationMode::SPARSE_MIXER)
     {
-        PADDLE_ENFORCE(mixer_temp_output, "Sparse mixer output is null when running sparse mixer");
+        // PADDLE_ENFORCE(mixer_temp_output, "Sparse mixer output is null when running sparse mixer");
         sparseMixerTopkSoftmax(input, output, mixer_temp_output, softmax_temp_output, indices, source_row, num_rows,
             num_experts, k, start_expert, end_expert, mixer_epsilon, stream);
     }
@@ -712,8 +712,8 @@ void CubKeyValueSorter::run(void* workspace, size_t const workspace_size, int co
     size_t expected_ws_size = getWorkspaceSize(num_key_value_pairs, num_experts_);
     size_t actual_ws_size = workspace_size;
 
-    PADDLE_ENFORCE(expected_ws_size <= workspace_size,
-        "[CubKeyValueSorter::run] The allocated workspace is too small to run this problem.");
+    // PADDLE_ENFORCE(expected_ws_size <= workspace_size,
+    //     "[CubKeyValueSorter::run] The allocated workspace is too small to run this problem.");
     cub::DeviceRadixSort::SortPairs(
         workspace, actual_ws_size, keys_in, keys_out, values_in, values_out, num_key_value_pairs, 0, num_bits_, stream);
 }
@@ -1438,7 +1438,7 @@ size_t CutlassMoeFCRunner<T, WeightType, OutputType, ScaleBiasType, Enable>::get
     ) const
 {
     int const ep_size = parallelism_config.ep_size;
-    PADDLE_ENFORCE(num_experts % ep_size == 0, "Number of experts must be a multiple of ep size");
+    // PADDLE_ENFORCE(num_experts % ep_size == 0, "Number of experts must be a multiple of ep size");
     auto workspace = getWorkspaceDeviceBufferSizes(num_rows, hidden_size, inter_size, num_experts,
         num_experts / ep_size, k, activation_type, norm_mode, use_deepseek);
     auto ws_size = tensorrt_llm::common::calculateTotalWorkspaceSize(workspace.data(), workspace.size());
@@ -1662,9 +1662,8 @@ void CutlassMoeFCRunner<T, WeightType, OutputType, ScaleBiasType, Enable>::gemm1
 
     if (using_hopper_gemm1)
     {   
-        std::cout << "sm 90 swiglu走的这里"<< std::endl;
-        PADDLE_CHECK(config.is_sm90);
-        PADDLE_CHECK(!use_ampere_activation_fusion);
+        // PADDLE_CHECK(config.is_sm90);
+        // PADDLE_CHECK(!use_ampere_activation_fusion);
         bool has_different_gemm_output_type = using_hopper_gemm1 && !std::is_same_v<T, OutputType>;
         bool const has_intermediate = has_different_gemm_output_type || is_gated_activation;
         // PADDLE_ENFORCE(has_intermediate || input != output, "Input and output buffers are overlapping");
@@ -1712,18 +1711,12 @@ void CutlassMoeFCRunner<T, WeightType, OutputType, ScaleBiasType, Enable>::gemm1
     {
         PADDLE_CHECK(!use_ampere_activation_fusion);
         PADDLE_CHECK(!config.is_sm90);
-        std::cout << "sm 80 swiglu走的这里 is_gated_activation"<< std::endl;
         gemm_runner.moeGemmBiasAct(input, fc1_expert_weights, nullptr, nullptr, false,
             output, total_tokens_including_expert, HopperGroupedGemmInput{}, expanded_num_rows, fc1_out_size,
             hidden_size, num_experts_per_node, fc1_activation_type, false, nullptr, stream, config);
     }
     else
     {
-        PADDLE_CHECK(!config.is_sm90);
-        PADDLE_CHECK(is_gated_activation);
-        PADDLE_ENFORCE(
-            !use_ampere_activation_fusion || input != output, "Input and output buffers are overlapping");
-
         // Run the GEMM with activation function overridden with `Identity`, we do the activation separately
         ActivationType activation_type = use_ampere_activation_fusion ? fc1_activation_type : ActivationType::Identity;
         void* gemm_result = use_ampere_activation_fusion ? static_cast<void*>(output) : intermediate_result;
@@ -1846,43 +1839,43 @@ void CutlassMoeFCRunner<T, WeightType, OutputType, ScaleBiasType, Enable>::runMo
     auto* final_output = static_cast<OutputType*>(final_output_void);
     auto* token_topk_unpermuted_scales = static_cast<float*>(token_topk_final_scales_void);
 
-    if (int_scales_required)
-    {
-        PADDLE_ENFORCE(
-            fc1_int_scales != nullptr, "Weight scales expected but scale for first matmul is a null pointer");
-        PADDLE_ENFORCE(
-            fc2_int_scales != nullptr, "Weight scales expected but scale for second matmul is a null pointer");
+    // if (int_scales_required)
+    // {
+    //     PADDLE_ENFORCE(
+    //         fc1_int_scales != nullptr, "Weight scales expected but scale for first matmul is a null pointer");
+    //     PADDLE_ENFORCE(
+    //         fc2_int_scales != nullptr, "Weight scales expected but scale for second matmul is a null pointer");
 
-        PADDLE_ENFORCE(fc1_fp8_dequant == nullptr && fc2_fp8_quant == nullptr && fc2_fp8_dequant == nullptr,
-            "FP8 scales are provided for integer quantization");
-    }
-    else if (fp8_scales_required && (!use_deepseek))
-    {
-        PADDLE_ENFORCE(fc1_expert_biases == nullptr, "Bias is not supported with FP8");
-        PADDLE_ENFORCE(fc2_expert_biases == nullptr, "Bias is not supported with FP8");
+    //     PADDLE_ENFORCE(fc1_fp8_dequant == nullptr && fc2_fp8_quant == nullptr && fc2_fp8_dequant == nullptr,
+    //         "FP8 scales are provided for integer quantization");
+    // }
+    // else if (fp8_scales_required && (!use_deepseek))
+    // {
+    //     PADDLE_ENFORCE(fc1_expert_biases == nullptr, "Bias is not supported with FP8");
+    //     PADDLE_ENFORCE(fc2_expert_biases == nullptr, "Bias is not supported with FP8");
 
-        PADDLE_ENFORCE(
-            fc1_fp8_dequant != nullptr, "FP8 scales expected but dequant scale for FC1 is a null pointer");
-        PADDLE_ENFORCE(fc2_fp8_quant != nullptr, "FP8 scales expected but quant scale for FC2 is a null pointer");
-        PADDLE_ENFORCE(
-            fc2_fp8_dequant != nullptr, "FP8 scales expected but quant scale for FC2 is a null pointer");
+    //     PADDLE_ENFORCE(
+    //         fc1_fp8_dequant != nullptr, "FP8 scales expected but dequant scale for FC1 is a null pointer");
+    //     PADDLE_ENFORCE(fc2_fp8_quant != nullptr, "FP8 scales expected but quant scale for FC2 is a null pointer");
+    //     PADDLE_ENFORCE(
+    //         fc2_fp8_dequant != nullptr, "FP8 scales expected but quant scale for FC2 is a null pointer");
 
-        PADDLE_ENFORCE(
-            fc1_int_scales == nullptr && fc2_int_scales == nullptr, "Integer scales are provided for FP8 quantization");
-    }
-    else
-    {
-        PADDLE_ENFORCE(
-            fc1_int_scales == nullptr, "Scales are ignored for fp32/fp16/bf16 but received weight scale for FC1");
-        PADDLE_ENFORCE(
-            fc2_int_scales == nullptr, "Scales are ignored for fp32/fp16/bf16 but received weight scale for FC2");
-        PADDLE_ENFORCE(
-            fc1_fp8_dequant == nullptr, "Scales are ignored for fp32/fp16/bf16 but received dequant scale for FC1");
-        PADDLE_ENFORCE(
-            fc2_fp8_quant == nullptr, "Scales are ignored for fp32/fp16/bf16 but received quant scale for FC2");
-        PADDLE_ENFORCE(
-            fc2_fp8_dequant == nullptr, "Scales are ignored for fp32/fp16/bf16 but received quant scale for FC2");
-    }
+    //     PADDLE_ENFORCE(
+    //         fc1_int_scales == nullptr && fc2_int_scales == nullptr, "Integer scales are provided for FP8 quantization");
+    // }
+    // else
+    // {
+    //     PADDLE_ENFORCE(
+    //         fc1_int_scales == nullptr, "Scales are ignored for fp32/fp16/bf16 but received weight scale for FC1");
+    //     PADDLE_ENFORCE(
+    //         fc2_int_scales == nullptr, "Scales are ignored for fp32/fp16/bf16 but received weight scale for FC2");
+    //     PADDLE_ENFORCE(
+    //         fc1_fp8_dequant == nullptr, "Scales are ignored for fp32/fp16/bf16 but received dequant scale for FC1");
+    //     PADDLE_ENFORCE(
+    //         fc2_fp8_quant == nullptr, "Scales are ignored for fp32/fp16/bf16 but received quant scale for FC2");
+    //     PADDLE_ENFORCE(
+    //         fc2_fp8_dequant == nullptr, "Scales are ignored for fp32/fp16/bf16 but received quant scale for FC2");
+    // }
 
     int const num_experts_per_node = num_experts / parallelism_config.ep_size;
 
@@ -2000,7 +1993,7 @@ __global__ void initRoutingKernelDiagonal(void* data_void, int num_experts, int 
 void makeLoadBalancedRoutingConfiguration(
     void* data_void, int num_experts, int num_tokens, int k, paddle::DataType type, cudaStream_t stream)
 {
-    PADDLE_ENFORCE(type == paddle::DataType::FLOAT32, "Routing configuration must be float");
+    // PADDLE_ENFORCE(type == paddle::DataType::FLOAT32, "Routing configuration must be float");
     check_cuda_error(
         cudaMemsetAsync(data_void, 0x0, int64_t{num_experts} * int64_t{num_tokens} * sizeof(float), stream));
 
@@ -2247,7 +2240,7 @@ std::function<void*()> GemmProfilerBackend::getWorkspacePointerGenerator(char* w
     auto index = 0;
     auto getNext = [=]() mutable -> void*
     {
-        PADDLE_ENFORCE(index < workspaces.size(), "Mismatching scratch space allocation");
+        // PADDLE_ENFORCE(index < workspaces.size(), "Mismatching scratch space allocation");
         auto res = workspace_ptr;
         size_t element_size_bytes = workspaces[index];
         workspace_ptr = nextWorkspacePtr(workspace_ptr, element_size_bytes);
