@@ -1901,6 +1901,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         dtype=None,
         keep_in_fp32_modules=None,
         quantization_linear_list=None,
+        sharded_metadata=None,
     ) -> Tuple[List[str]]:
         """load the state_dict into model, and do the following things:
 
@@ -1921,6 +1922,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         model_state_dict = model.state_dict()
 
         expected_keys = list(model_state_dict.keys())
+        print("cakdsjf: ", model.base_model_prefix)
+        print("cakdsjf: ", cls.base_model_prefix)
         prefix = model.base_model_prefix
 
         if len(prefix) > 0:
@@ -1982,6 +1985,23 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         missing_keys = list(set(expected_keys) - set(loaded_keys))
         unexpected_keys = list(set(loaded_keys) - set(expected_keys))
+
+        # Optimize for skip unused shard files for supper large model
+        if sharded_metadata is not None:
+            assert isinstance(resolved_archive_file, list)
+            new_archive_file = []
+            skip_archive_file = []
+            expected_keys_set = set(expected_keys)
+            for file in resolved_archive_file:
+                filename = os.path.split(file)[-1]
+                if not expected_keys_set.isdisjoint(set(sharded_metadata["file_map"][filename])):
+                    new_archive_file.append(file)
+                else:
+                    skip_archive_file.append(filename)
+
+            resolved_archive_file = new_archive_file
+            if len(skip_archive_file) > 0:
+                logger.info(f"Skip load files for not contrains expected key, {skip_archive_file}")
 
         # Some models may have keys that are not in the state by design, removing them before needlessly warning
         # the user.
@@ -2057,7 +2077,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
             before_fuse_keys = list(state_dict.keys())
             if pre_tensor_parallel_split:
-                tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys, ignore_error=True)
+                print("xxxxxsdf: ", prefix)
+                tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys, ignore_error=True, base_model_prefix="deepseek_v3")
             else:
                 tp_actions = None
             state_dict, resume_state_dict = cls.convert_fuse_and_split(config, state_dict, tp_actions)
@@ -2123,7 +2144,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 ):
                     pre_tensor_parallel_split = True
                     assert loaded_keys is not None, "loaded_keys is not None."
-                    tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys, ignore_error=True)
+                    print("xxxxxsdf: ", prefix)
+                    tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys, ignore_error=True, base_model_prefix="deepseek_v3")
                 # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
                 filter_dict_keys = set(expected_keys)
                 fuse_actions, _ = cls.get_fuse_or_split_param_convert_actions(config, loaded_keys, is_fuse=True)
@@ -2547,6 +2569,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             dtype=dtype,
             keep_in_fp32_modules=keep_in_fp32_modules,
             quantization_linear_list=quantization_linear_list,
+            sharded_metadata=sharded_metadata if is_sharded else None,
         )
 
         # load generation_config.json

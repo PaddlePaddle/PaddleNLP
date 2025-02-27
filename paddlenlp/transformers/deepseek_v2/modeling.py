@@ -25,6 +25,7 @@ import math
 import warnings
 from functools import partial
 from typing import List, Optional, Tuple, Union
+import paddle.distributed as dist
 
 import paddle
 import paddle.distributed.fleet.meta_parallel as mpu
@@ -749,11 +750,16 @@ class DeepseekV2MoE(MoELayer):
             drop_tokens=False,
         )
 
+        # (LiuTing) only support either tp or ep.
+        moe_group = dist.fleet.get_hybrid_communicate_group().get_data_parallel_group()
+        expert_parallel_degree = dist.get_world_size(moe_group)
+        expert_parallel_degree = 1 if expert_parallel_degree < 0 else expert_parallel_degree
+        act_tp_shard = config.tensor_parallel_degree > 1 and expert_parallel_degree <= 1
         super().__init__(
             config=config,
             moe_num_experts=config.n_routed_experts,
             expert_class=DeepseekV2MLP,
-            expert_kwargs={"config": config, "intermediate_size": config.moe_intermediate_size, "is_moe": True},
+            expert_kwargs={"config": config, "intermediate_size": config.moe_intermediate_size, "is_moe": not act_tp_shard},
             gate=gate,
             capacity=2.0,
         )
@@ -1349,10 +1355,18 @@ class DeepseekV2PretrainedModel(PretrainedModel):
                 base_actions["layers.0.self_attn.v_proj.bias"] = partial(fn, is_column=True)
                 base_actions["layers.0.self_attn.kv_b_proj.weight"] = partial(fn, is_column=True)
 
+            # dense mlp
             base_actions["layers.0.mlp.up_proj.weight"] = partial(fn, is_column=True)
             base_actions["layers.0.mlp.gate_proj.weight"] = partial(fn, is_column=True)
             base_actions["layers.0.mlp.down_proj.weight"] = partial(fn, is_column=False)
 
+            # moe unit routed experts
+            for e_i in range(config.n_routed_experts):
+                base_actions[f"layers.0.mlp.experts.{e_i}.up_proj.weight"] = partial(fn, is_column=True)
+                base_actions[f"layers.0.mlp.experts.{e_i}.gate_proj.weight"] = partial(fn, is_column=True)
+                base_actions[f"layers.0.mlp.experts.{e_i}.down_proj.weight"] = partial(fn, is_column=False)
+
+            # moe unit shared experts
             base_actions["layers.0.mlp.shared_experts.gate_proj.weight"] = partial(fn, is_column=True)
             base_actions["layers.0.mlp.shared_experts.up_proj.weight"] = partial(fn, is_column=True)
             base_actions["layers.0.mlp.shared_experts.down_proj.weight"] = partial(fn, is_column=False)
@@ -1385,6 +1399,7 @@ class DeepseekV2PretrainedModel(PretrainedModel):
         return mappings
 
     def _init_weights(self, layer):
+        return
         if self.config.tensor_parallel_degree > 1:
             rng_tracker = get_rng_state_tracker().rng_state
 

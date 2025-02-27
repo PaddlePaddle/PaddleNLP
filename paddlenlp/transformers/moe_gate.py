@@ -139,7 +139,7 @@ class MoEGateMixin:
         batch_size, seq_len, _ = gates.shape
         ce = paddle.zeros([batch_size, self.num_experts])
         topk_idx = topk_idx.reshape([batch_size, -1])
-        ce.put_along_axis_(indices=topk_idx, values=paddle.ones([batch_size, seq_len * top_k]), axis=1)
+        ce.put_along_axis_(indices=topk_idx, values=paddle.ones([batch_size, seq_len * top_k]), axis=1, reduce="add")
         ce = ce / (seq_len * top_k / self.num_experts)
         aux_loss = (ce * paddle.mean(gates, axis=1)).sum(axis=1).mean()
         return aux_loss
@@ -561,7 +561,6 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
             denom_s = paddle.clip(gates_s, min=paddle.finfo(gates_masked.dtype).eps)
             if self.norm_topk_prob:
                 gates_masked = gates_masked / denom_s
-        combine_weights = paddle.einsum("se,sec->sec", gates_masked, token_priority.cast(paddle.get_default_dtype()))
 
         combine_weights = paddle.einsum("se,sec->sec", gates_masked, token_priority.cast(paddle.get_default_dtype()))
         dispatch_mask = combine_weights.astype(paddle.bool)
