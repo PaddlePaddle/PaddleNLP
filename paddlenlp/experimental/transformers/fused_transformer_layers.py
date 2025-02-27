@@ -35,6 +35,7 @@ from paddle.nn.quant import weight_only_linear
 
 from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
+from paddle_sageattn import sageattn_qk_int8_pv_fp8_cuda_dsk_sm90 as sageattn_qk_int8_pv_fp8_cuda_sm90a_paddle
 
 if not is_paddlenlp_ops_available():
     logger.warning(
@@ -2973,26 +2974,60 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
     ):
         from paddlenlp_ops import decode_mla_write_cache, multi_head_latent_attention
 
+        default_path = False
+
         ln_out = qkv_out
         latent_cache = caches[i]
-
         out_linear_out = paddle.zeros(shape=[ln_out.shape[0], self.embed_dim], dtype=ln_out.dtype)
 
         if kwargs["max_enc_len_this_time"]:  # prefill phase
             query, key, value = self.compute_qkv_linear(ln_out, i, latent_cache=latent_cache, **kwargs)
 
-            fmha_out_prefill = paddle.nn.functional.flash_attention.flash_attn_unpadded(
-                query,
-                key,
-                value,
-                kwargs.get("cu_seqlens_q", None),
-                kwargs.get("cu_seqlens_k", None),
-                kwargs.get("max_enc_len_this_time", -1),
-                kwargs.get("max_enc_len_this_time", -1),
-                self.softmax_scale,
-                causal=True,
-                training=False,
-            )[0]
+            # qkv shape: [110, 16, 192]
+            # o shape: [110, 16, 192]
+            # Notice: the last 64 dims of v is 0, and the last 64 dim of o is 0.
+
+            if default_path:
+                fmha_out_prefill = paddle.nn.functional.flash_attention.flash_attn_unpadded(
+                    query,
+                    key,
+                    value,
+                    kwargs.get("cu_seqlens_q", None),
+                    kwargs.get("cu_seqlens_k", None),
+                    kwargs.get("max_enc_len_this_time", -1),
+                    kwargs.get("max_enc_len_this_time", -1),
+                    self.softmax_scale,
+                    causal=True,
+                    training=False,
+                )[0]
+            else:
+                query_192 = paddle.unsqueeze(query, axis=0)
+                key_192 = paddle.unsqueeze(key, axis=0)
+
+                value_128, _ = paddle.split(value, [128, 64], axis=-1)
+                value_128 = paddle.unsqueeze(value_128, axis=0)
+
+                tensor_layout = "NHD"
+                fmha_out_prefill2 = sageattn_qk_int8_pv_fp8_cuda_sm90a_paddle(
+                    query_192,
+                    key_192,
+                    value_128,
+                    is_causal=True,
+                    sm_scale=self.softmax_scale,
+                    tensor_layout=tensor_layout,
+                )
+                fmha_out_prefill2 = paddle.nn.functional.pad(fmha_out_prefill2, (0, 192 - 128))
+                fmha_out_prefill = paddle.squeeze(fmha_out_prefill2, axis=0)
+
+                # print(paddle.max(fmha_out_prefill2 - fmha_out_prefill))
+            # print("The value shape", value.shape)
+            # print("value last several: ", value[35, 15, :127])
+            # print("value last several: ", value[35, 15, 128:])
+            # print("The output shape", fmha_out_prefill.shape)
+            # print("output last several: ", fmha_out_prefill[35, 15, :127])
+            # print("output last several: ", fmha_out_prefill[35, 15, 128:])
+
+            # print("The v head dim: ", self.config.mla_config.v_head_dim)
 
             fmha_out_prefill = fmha_out_prefill.reshape([-1, self.num_heads, self.config.mla_config.qk_head_dim])
             fmha_out_prefill = fmha_out_prefill[:, :, : self.config.mla_config.v_head_dim]
@@ -3131,7 +3166,6 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
 
         if self.config.append_attn:
             from paddlenlp_ops import append_attention
-
             fmha_out = append_attention(
                 qkv_out,
                 caches[2 * i],
