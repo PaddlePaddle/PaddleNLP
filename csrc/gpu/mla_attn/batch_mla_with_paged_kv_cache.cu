@@ -30,6 +30,8 @@
 #include <sstream>
 
 #include "batch_mla_with_paged_kv_cache.h"
+#include "env.h"
+
 using namespace cute;
 using namespace mla_attn;
 using namespace std;
