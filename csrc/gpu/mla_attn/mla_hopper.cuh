@@ -220,7 +220,7 @@ MLAWithKVCacheKernel(CUTE_GRID_CONSTANT
       const int tile_id = mainloop_params.tile_ids_per_batch[i];
       const int seq_len_now = mainloop_params.seq_lens_this_time[bid];
       const int seq_len_encoder_now = mainloop_params.seq_lens_encoder[bid];
-      const int seq_len_decoder_now = mainloop_params.seq_lens_decoder[bid];
+      const int seq_len_decoder_now = mainloop_params.seq_lens_decoder[bid] + seq_len_now;
       const int start_token_idx = mainloop_params.cumsum_q_seqlens[bid];
 
       // load Q
@@ -297,7 +297,7 @@ MLAWithKVCacheKernel(CUTE_GRID_CONSTANT
       const int tile_id = mainloop_params.tile_ids_per_batch[i];
       const int seq_len_now = mainloop_params.seq_lens_this_time[bid];
       const int seq_len_encoder_now = mainloop_params.seq_lens_encoder[bid];
-      const int seq_len_decoder_now = mainloop_params.seq_lens_decoder[bid];
+      const int seq_len_decoder_now = mainloop_params.seq_lens_decoder[bid] + seq_len_now;
       const int start_token_idx = mainloop_params.cumsum_q_seqlens[bid];
 
       mma_f16<Ktraits, CAUSAL>(
@@ -359,7 +359,7 @@ __global__ void split_q_block(const int * __restrict__ seq_lens_q,
     for (uint32_t bid = 0; bid < bsz; bid++) {
       int seq_len = seq_lens_q[bid];
       int seq_len_encoder = seq_lens_encoder[bid];
-      int seq_len_decoder = seq_lens_decoder[bid];
+      int seq_len_decoder = seq_lens_decoder[bid] + seq_len;
 
       if (seq_len == 0) continue;
 
@@ -397,19 +397,19 @@ cudaError_t BatchMLAWithPagedKVCacheKernelTraitsDispatched(Params& params,
       SparseCollectiveMainloop<KernelTraits, CAUSAL>;
   using CollectiveEpilogue = CollectiveEpilogue<KernelTraits>;
 
-  // split_q_block<<<1, 32, 0, stream>>>(
-  //   params.seq_lens_this_time,
-  //   params.seq_lens_encoder,
-  //   params.seq_lens_decoder,
-  //   params.batch_ids,
-  //   params.tile_ids_per_batch,
-  //   params.num_blocks_x,
-  //   params.bsz,
-  //   KernelTraits::CTA_Q,
-  //   params.chunk_size,
-  //   KernelTraits::GROUP_SIZE,
-  //   false // is_encoder
-  // );
+  split_q_block<<<1, 32, 0, stream>>>(
+    params.seq_lens_this_time,
+    params.seq_lens_encoder,
+    params.seq_lens_decoder,
+    params.batch_ids,
+    params.tile_ids_per_batch,
+    params.num_blocks_x,
+    params.bsz,
+    KernelTraits::CTA_Q,
+    params.chunk_size,
+    KernelTraits::GROUP_SIZE,
+    false // is_encoder
+  );
 
   typename CollectiveMainloop::Params mainloop_params = CollectiveMainloop::to_underlying_arguments({
       make_layout(make_shape(KernelTraits::CTA_Q, params.qk_head_dim), make_stride(params.qk_head_dim, _1{})), // layout q

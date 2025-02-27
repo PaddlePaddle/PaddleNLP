@@ -254,7 +254,6 @@ def test_append_c16_attention(cache_length, bsz):
     print("latent_cache0: ", latent_cache.shape)
     # print("latent_cache_v0: ", latent_cache[132][:, :, :512])
     # print("latent_cache1: ", latent_cache[1])
-    seq_lens_decoder += 1
     inputs = [
         query,
         seq_lens_encoder,
@@ -379,6 +378,6 @@ def test_append_c16_attention(cache_length, bsz):
 if __name__ == "__main__":
     # for cache_length in [1024, 2048]:
     #   for bsz in [1, 8, 32, 96, 128, 256]:
-    for cache_length in [108]:
+    for cache_length in [1984]:
         for bsz in [1]:
             test_append_c16_attention(cache_length, bsz)
