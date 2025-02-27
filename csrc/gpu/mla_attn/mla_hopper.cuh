@@ -342,48 +342,48 @@ MLAWithKVCacheKernel(CUTE_GRID_CONSTANT
   }
 }
 
-__global__ void split_q_block(const int * __restrict__ seq_lens_q,
-                              const int * __restrict__ seq_lens_encoder,
-                              const int * __restrict__ seq_lens_decoder,
-                              int * __restrict__ batch_ids,
-                              int * __restrict__ tile_ids_per_batch,
-                              int * __restrict__ num_blocks_x,
-                              const int bsz,
-                              const int num_rows_per_block,
-                              const int chunk_size,
-                              const int GROUP_SIZE,
-                              const bool is_encoder) {
-  if (threadIdx.x == 0) {
-    int gridx = 0;
-    int index = 0;
-    for (uint32_t bid = 0; bid < bsz; bid++) {
-      int seq_len = seq_lens_q[bid];
-      int seq_len_encoder = seq_lens_encoder[bid];
-      int seq_len_decoder = seq_lens_decoder[bid] + seq_len;
+// __global__ void split_q_block(const int * __restrict__ seq_lens_q,
+//                               const int * __restrict__ seq_lens_encoder,
+//                               const int * __restrict__ seq_lens_decoder,
+//                               int * __restrict__ batch_ids,
+//                               int * __restrict__ tile_ids_per_batch,
+//                               int * __restrict__ num_blocks_x,
+//                               const int bsz,
+//                               const int num_rows_per_block,
+//                               const int chunk_size,
+//                               const int GROUP_SIZE,
+//                               const bool is_encoder) {
+//   if (threadIdx.x == 0) {
+//     int gridx = 0;
+//     int index = 0;
+//     for (uint32_t bid = 0; bid < bsz; bid++) {
+//       int seq_len = seq_lens_q[bid];
+//       int seq_len_encoder = seq_lens_encoder[bid];
+//       int seq_len_decoder = seq_lens_decoder[bid] + seq_len;
 
-      if (seq_len == 0) continue;
+//       if (seq_len == 0) continue;
 
-      int loop_times;
-      if (is_encoder) {
-        loop_times = cute::ceil_div(seq_len * GROUP_SIZE, num_rows_per_block);
-        if (seq_len_decoder > 0) {
-          loop_times = 0;
-        }
-      } else {
-        loop_times = cute::ceil_div(seq_len_decoder, chunk_size);
-        if (seq_len_encoder > 0) {
-          loop_times = 0;
-        }
-      }
-      for (uint32_t tile_id = 0; tile_id < loop_times; tile_id++) {
-        batch_ids[index] = bid;
-        tile_ids_per_batch[index++] = tile_id;
-      }
-      gridx += loop_times;
-    }
-    *num_blocks_x = gridx;
-  }
-}
+//       int loop_times;
+//       if (is_encoder) {
+//         loop_times = cute::ceil_div(seq_len * GROUP_SIZE, num_rows_per_block);
+//         if (seq_len_decoder > 0) {
+//           loop_times = 0;
+//         }
+//       } else {
+//         loop_times = cute::ceil_div(seq_len_decoder, chunk_size);
+//         if (seq_len_encoder > 0) {
+//           loop_times = 0;
+//         }
+//       }
+//       for (uint32_t tile_id = 0; tile_id < loop_times; tile_id++) {
+//         batch_ids[index] = bid;
+//         tile_ids_per_batch[index++] = tile_id;
+//       }
+//       gridx += loop_times;
+//     }
+//     *num_blocks_x = gridx;
+//   }
+// }
 
 template <typename KernelTraits, bool CAUSAL, typename Params>
 cudaError_t BatchMLAWithPagedKVCacheKernelTraitsDispatched(Params& params,
@@ -397,19 +397,19 @@ cudaError_t BatchMLAWithPagedKVCacheKernelTraitsDispatched(Params& params,
       SparseCollectiveMainloop<KernelTraits, CAUSAL>;
   using CollectiveEpilogue = CollectiveEpilogue<KernelTraits>;
 
-  split_q_block<<<1, 32, 0, stream>>>(
-    params.seq_lens_this_time,
-    params.seq_lens_encoder,
-    params.seq_lens_decoder,
-    params.batch_ids,
-    params.tile_ids_per_batch,
-    params.num_blocks_x,
-    params.bsz,
-    KernelTraits::CTA_Q,
-    params.chunk_size,
-    KernelTraits::GROUP_SIZE,
-    false // is_encoder
-  );
+  // split_q_block<<<1, 32, 0, stream>>>(
+  //   params.seq_lens_this_time,
+  //   params.seq_lens_encoder,
+  //   params.seq_lens_decoder,
+  //   params.batch_ids,
+  //   params.tile_ids_per_batch,
+  //   params.num_blocks_x,
+  //   params.bsz,
+  //   KernelTraits::CTA_Q,
+  //   params.chunk_size,
+  //   KernelTraits::GROUP_SIZE,
+  //   false // is_encoder
+  // );
 
   typename CollectiveMainloop::Params mainloop_params = CollectiveMainloop::to_underlying_arguments({
       make_layout(make_shape(KernelTraits::CTA_Q, params.qk_head_dim), make_stride(params.qk_head_dim, _1{})), // layout q
@@ -460,12 +460,12 @@ cudaError_t BatchMLAWithPagedKVCacheKernelTraitsDispatched(Params& params,
   int multiprocessor_count;
   MLA_CUDA_CALL(
       cudaDeviceGetAttribute(&multiprocessor_count, cudaDevAttrMultiProcessorCount, device));
-  int act_blocks_per_sm;
-  cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-      &act_blocks_per_sm, kernel, KernelTraits::NUM_WARPS * 32, smem_size);
+  // int act_blocks_per_sm;
+  // cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+  //     &act_blocks_per_sm, kernel, KernelTraits::NUM_WARPS * 32, smem_size);
   // cudaDeviceProp devProp;
   // cudaGetDeviceProperties(&devProp, device);
-  
+
   dim3 grid_dims = {multiprocessor_count, 1, 1}; // todo: split kv
   static constexpr int ctaSize = KernelTraits::NUM_WARPS * 32;
   dim3 block_dims(ctaSize);
@@ -474,31 +474,32 @@ cudaError_t BatchMLAWithPagedKVCacheKernelTraitsDispatched(Params& params,
   );
   // cudaDeviceSynchronize();
   // auto err = cudaGetLastError();
-  // constexpr int vec_size = 16 / sizeof(DTypeO);
-  // constexpr int merge_block_size = 256;
-  // constexpr int blockx = KernelTraits::HEAD_DIM_VO / vec_size;
-  // constexpr int blocky = (merge_block_size + blockx - 1) / blockx;
-  // dim3 grids_merge(min(multiprocessor_count, params.token_num), params.q_num_head); // 128k is too large
-  // dim3 blocks_merge(blockx, blocky);
-  // merge_multi_chunks_kernel<DTypeO, vec_size, blocky, KernelTraits::HEAD_DIM_VO><<<grids_merge, blocks_merge, 0, stream>>>(
-  //   params.O_tmp,
-  //   params.m,
-  //   params.d,
-  //   params.seq_lens_this_time,
-  //   params.seq_lens_decoder,
-  //   params.seq_lens_encoder,
-  //   params.padding_offsets,
-  //   params.O,
-  //   params.max_seq_len,
-  //   params.chunk_num,
-  //   params.q_num_head,
-  //   params.chunk_size,
-  //   params.vo_head_dim,
-  //   params.token_num,
-  //   params.bsz,
-  //   params.max_draft_token_num
-  // );
-
+  if (params.chunk_num > 1) {
+    constexpr int vec_size = 16 / sizeof(DTypeO);
+    constexpr int merge_block_size = 256;
+    constexpr int blockx = KernelTraits::HEAD_DIM_VO / vec_size;
+    constexpr int blocky = (merge_block_size + blockx - 1) / blockx;
+    dim3 grids_merge(min(multiprocessor_count, params.token_num), params.q_num_head); // 128k is too large
+    dim3 blocks_merge(blockx, blocky);
+    merge_multi_chunks_kernel<DTypeO, vec_size, blocky, KernelTraits::HEAD_DIM_VO><<<grids_merge, blocks_merge, 0, stream>>>(
+      params.O_tmp,
+      params.m,
+      params.d,
+      params.seq_lens_this_time,
+      params.seq_lens_decoder,
+      params.seq_lens_encoder,
+      params.padding_offsets,
+      params.O,
+      params.max_seq_len,
+      params.chunk_num,
+      params.q_num_head,
+      params.chunk_size,
+      params.vo_head_dim,
+      params.token_num,
+      params.bsz,
+      params.max_draft_token_num
+    );
+  }
   // cudaDeviceSynchronize();
   // err = cudaGetLastError();
   //   printf("err = %d, str = %s\n", err, cudaGetErrorString(err));
