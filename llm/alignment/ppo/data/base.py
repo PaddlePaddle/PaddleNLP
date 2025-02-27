@@ -349,6 +349,8 @@ class TokenizedDataset(Dataset):
                 raise TypeError(
                     f"Dataset `{name}` attributes should be a float or a dict, " f"got {type(attributes).__name__}.",
                 )
+            kwargs["use_rm_server"] = use_rm_server
+
             proportion = kwargs.pop("proportion", 1.0)
             if isinstance(proportion, Fraction):
                 if not (proportion < 0 and proportion.denominator == 1):

@@ -22,12 +22,16 @@ __all__ = ["JsonDataset"]
 class JsonDataset(RawDataset):
     NAME: str = "Jsonfile"
 
-    def __init__(self, path: str | None = None) -> None:
+    def __init__(self, path: str | None = None, *args, **kwargs) -> None:
         self.data = load_dataset("json", data_files=path, split="train")
+        self.use_rm_server = kwargs.pop("use_rm_server", False)
+        assert "src" in self.data.column_names, "'src' should be included in jsonfile"
+        if self.use_rm_server:
+            assert "tgt" in self.data.column_names, "'tgt' should be included in jsonfile when using rm server"
 
     def __getitem__(self, index: int) -> RawSample:
         data = self.data[index]
-        if "tgt" in data:
+        if self.use_rm_server:
             rawdata = RawSample(
                 input=data["src"],
                 answer=data["tgt"],
