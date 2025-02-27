@@ -332,7 +332,9 @@ class MergeModel:
                         file_map[index["weight_map"][key]] = [key]
                     else:
                         file_map[index["weight_map"][key]].append(key)
+                logger.info(f"Merging file list: {file_list[positions[rank] : positions[rank + 1]]}")
                 for shard_file in file_list[positions[rank] : positions[rank + 1]]:
+                    logger.info(f"Start merging tensor in {shard_file}")
                     if self.merge_config.tensor_type == "np":
                         self.shard_merge_np(file_map[shard_file], index_list, shard_file)
                     else:
@@ -545,18 +547,19 @@ class MergeModel:
 
     def shard_lora_merge(self, base_index, shard_file, lora_config, file_type_list, key_list=None, file=None):
         merge_state_dict = {}
+        lora_state_dict = self.get_model_state_dict(self.merge_config.lora_model_path, file_type_list[0])
+        logger.info("Load LoRA weight successfully.")
         base_state_dict = self.get_model_state_dict(
             self.merge_config.base_model_path, file_type_list[1], key_list=key_list, file=file
         )
-        lora_state_dict = self.get_model_state_dict(self.merge_config.lora_model_path, file_type_list[0])
+        logger.info("Load model weight successfully.")
         if not lora_config.rslora:
             scaling = lora_config.lora_alpha / lora_config.r
         else:
             scaling = lora_config.lora_alpha / math.sqrt(lora_config.r)
 
         model_key_list = list(base_state_dict.keys())
-        desc = "Merging tensor" if file is None else "Merging tensor in {file}"
-        for k in tqdm(model_key_list, desc=desc):
+        for k in tqdm(model_key_list, desc="Merging tensor"):
             if lora_state_dict is not None and k in lora_state_dict.keys():
                 tensor = lora_state_dict.pop(k)
             else:
@@ -580,6 +583,7 @@ class MergeModel:
                         tensor += lora_A_tensor @ lora_B_tensor * scaling
                         tensor = tensor.numpy()
             merge_state_dict[k] = tensor
+
         logger.info("Merge tensors successfully.")
         save_file_name = os.path.join(self.merge_config.output_path, shard_file)
         save_file(
@@ -607,7 +611,9 @@ class MergeModel:
             file_list = sorted(list(set(base_index["weight_map"].values())))
             if file_type_list[-1] == "safetensors" and len(file_list) >= dist.get_world_size():
                 positions = divide_positions(len(file_list), dist.get_world_size())
+                logger.info(f"Merging file list: {file_list[positions[rank] : positions[rank + 1]]}")
                 for shard_file in file_list[positions[rank] : positions[rank + 1]]:
+                    logger.info(f"Start merging tensor in {shard_file}")
                     self.shard_lora_merge(base_index, shard_file, lora_config, file_type_list, file=shard_file)
                 index["weight_map"] = base_index["weight_map"]
             else:
@@ -660,7 +666,9 @@ class MergeModel:
     def merge_pdparams_lora_model(self, file_type_list):
         # Load & check state dict
         lora_state_dict = self.get_model_state_dict(self.merge_config.lora_model_path, file_type_list[0])
+        logger.info("Load LoRA weight successfully.")
         base_state_dict = self.get_model_state_dict(self.merge_config.base_model_path, file_type_list[1])
+        logger.info("Load model weight successfully.")
         for key in lora_state_dict.keys():
             if "lora_A" in key:
                 if key.replace("lora_A", "lora_B") not in lora_state_dict.keys():
