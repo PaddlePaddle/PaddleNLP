@@ -44,7 +44,6 @@ inline uint32_t get_max_partition_size(int bsz) {
     return (max_partition_size != 0 ? max_partition_size : (bsz == 1 ? 128 : 512));
 }
 
-
 inline uint32_t get_cascade_attention_deal_each_time() {
     static const char* cascade_attention_deal_each_time_env = std::getenv("FLAGS_cascade_attention_deal_each_time");
     static const uint32_t cascade_attention_deal_each_time =
@@ -64,4 +63,11 @@ inline uint32_t get_cascade_attention_num_threads() {
     static const uint32_t cascade_attention_num_threads =
             cascade_attention_num_threads_env == nullptr ? 0 : std::stoul(std::string(cascade_attention_num_threads_env));
     return cascade_attention_num_threads != 0 ? cascade_attention_num_threads : 128;
+}
+
+inline bool get_mla_use_tensorcore() {
+    static const char* mla_use_tensorcore_env = std::getenv("FLAGS_mla_use_tensorcore");
+    static const uint32_t mla_use_tensorcore =
+            mla_use_tensorcore_env == nullptr ? 1 : std::stoul(std::string(mla_use_tensorcore_env));
+    return mla_use_tensorcore != 0 ? true : false;
 }
