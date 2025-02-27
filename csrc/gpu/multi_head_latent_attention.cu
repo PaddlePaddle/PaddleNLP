@@ -73,7 +73,13 @@ std::vector<paddle::Tensor> MultiHeadLatentAttentionKernel(
   int max_len_kv_data = max_len_kv.data<int>()[0];
   const int encoder_block_shape_q = get_encoder_block_shape_q();
   const int decoder_block_shape_q = get_decoder_block_shape_q();
+
   const bool mla_use_tensorcore = get_mla_use_tensorcore();
+  auto sm_version = getSMVersion();
+  if (mla_use_tensorcore && sm_version < 90) {
+    PD_THROW("Please export FLAGS_mla_use_tensorcore=0 when sm < 90.");
+  }
+
   auto main_stream = query.stream();
 
   paddle::Tensor fmha_out = paddle::full(
@@ -84,61 +90,60 @@ std::vector<paddle::Tensor> MultiHeadLatentAttentionKernel(
 
   if (max_dec_len_this_time_data > 0) {
     if (mla_use_tensorcore) {
-      BatchMLAWithPagedKVCacheKernel<data_t>(
-        meta_data,
-        query,
-        key_cache,
-        attn_mask,
-        cache_k_dequant_scales,
-        cache_v_dequant_scales,
-        cache_k_zp,
-        cache_v_zp,
-        out_linear_shifts,
-        out_linear_smooths,
-        seq_lens_this_time,
-        seq_lens_decoder,
-        seq_lens_encoder,
-        cu_seqlens_q,
-        padding_offsets,
-        cum_offsets,
-        block_tables,
-        decoder_batch_ids,
-        decoder_tile_ids_per_batch,
-        decoder_num_blocks,
-        cache_quant_type_str,
-        decoder_num_blocks_data,
-        decoder_block_shape_q,
-        max_input_length,
-        max_len_kv_data,
-        softmax_scale,
-        quant_max_bound,
-        quant_min_bound,
-        out_linear_in_scale,
-        speculate_max_draft_token_num,
-        causal,
-        main_stream,
-        &fmha_out);
+      BatchMLAWithPagedKVCacheKernel<data_t>(meta_data,
+                                             query,
+                                             key_cache,
+                                             attn_mask,
+                                             cache_k_dequant_scales,
+                                             cache_v_dequant_scales,
+                                             cache_k_zp,
+                                             cache_v_zp,
+                                             out_linear_shifts,
+                                             out_linear_smooths,
+                                             seq_lens_this_time,
+                                             seq_lens_decoder,
+                                             seq_lens_encoder,
+                                             cu_seqlens_q,
+                                             padding_offsets,
+                                             cum_offsets,
+                                             block_tables,
+                                             decoder_batch_ids,
+                                             decoder_tile_ids_per_batch,
+                                             decoder_num_blocks,
+                                             cache_quant_type_str,
+                                             decoder_num_blocks_data,
+                                             decoder_block_shape_q,
+                                             max_input_length,
+                                             max_len_kv_data,
+                                             softmax_scale,
+                                             quant_max_bound,
+                                             quant_min_bound,
+                                             out_linear_in_scale,
+                                             speculate_max_draft_token_num,
+                                             causal,
+                                             main_stream,
+                                             &fmha_out);
     } else {
       DecodeMLAAttentionKernel<data_t>(
-        meta_data,
-        query,  // [token_num, num_heads, head_dim]
-        key_cache,
-        value_cache,
-        attn_mask,
-        out_linear_shifts,
-        out_linear_smooths,
-        seq_lens_this_time,  // q_seq_len is 1
-        seq_lens_decoder,
-        padding_offsets,
-        cum_offsets,
-        block_tables,
-        max_input_length,
-        max_len_kv_data,
-        softmax_scale,
-        out_linear_in_scale,
-        causal,
-        main_stream,
-        &fmha_out);
+          meta_data,
+          query,  // [token_num, num_heads, head_dim]
+          key_cache,
+          value_cache,
+          attn_mask,
+          out_linear_shifts,
+          out_linear_smooths,
+          seq_lens_this_time,  // q_seq_len is 1
+          seq_lens_decoder,
+          padding_offsets,
+          cum_offsets,
+          block_tables,
+          max_input_length,
+          max_len_kv_data,
+          softmax_scale,
+          out_linear_in_scale,
+          causal,
+          main_stream,
+          &fmha_out);
     }
   }
   return {fmha_out};

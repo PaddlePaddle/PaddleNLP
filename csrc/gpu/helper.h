@@ -222,6 +222,13 @@ __device__ inline bool is_in_end(const int64_t id, const int64_t *end_ids, int l
     return flag;
 }
 
+inline int getSMVersion() {
+  static int sm_version = sm_version =
+      paddle::platform::GetGPUComputeCapability(
+          paddle::platform::GetCurrentDeviceId());
+  return sm_version;
+}
+
 inline uint32_t get_decoder_block_shape_q() {
     static const char* decoder_block_shape_q_env = std::getenv("FLAGS_dec_block_shape_q");
     static const uint32_t decoder_block_shape_q =
