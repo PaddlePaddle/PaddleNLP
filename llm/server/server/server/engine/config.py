@@ -14,12 +14,12 @@
 
 import json
 import os
-import sys
 from datetime import datetime
 
-from paddlenlp.generation import GenerationConfig
 from server.utils import model_server_logger
-from dataclasses import dataclass
+
+from paddlenlp.experimental.transformers import SpeculateArgument
+from paddlenlp.generation import GenerationConfig
 
 
 class Config:
@@ -35,8 +35,7 @@ class Config:
         get the configuration from environment
         """
         env = os.environ
-        self.model_dir = env.get(
-            "MODEL_DIR", "/opt/output/Serving/models")
+        self.model_dir = env.get("MODEL_DIR", "/opt/output/Serving/models")
         if not self.model_dir:
             raise Exception("The parameter MODEL_DIR is None.")
         self.mp_num = int(env.get("MP_NUM", 8))
@@ -54,17 +53,16 @@ class Config:
         self.device = env.get("DEVICE", "GPU")
         self.device_ids = ",".join([str(i) for i in range(self.mp_num)])
         if self.device == "GPU":
-            self.device_ids = os.getenv("CUDA_VISIBLE_DEVICES",
-                                        self.device_ids)
+            self.device_ids = os.getenv("CUDA_VISIBLE_DEVICES", self.device_ids)
         else:
             raise Exception(f"unsupported device type: {self.device}")
 
         # multi-node config
         self.nnode = int(env.get("MP_NNODE", "1"))
-        assert self.mp_num % self.nnode == 0 ,f"mp_num: {self.mp_num} should be divisible by nnode: {self.nnode}"
+        assert self.mp_num % self.nnode == 0, f"mp_num: {self.mp_num} should be divisible by nnode: {self.nnode}"
         self.mp_num_per_node = self.mp_num // self.nnode
         self.host_ip = os.getenv("HOST_IP", "127.0.0.1")
-        
+
         # Triton config
         self.max_prefill_batch = int(os.getenv("MAX_PREFILL_BATCH", 1))
         if self.max_prefill_batch <= 0:
@@ -88,6 +86,7 @@ class Config:
 
         # Padlle commit id
         import paddle
+
         self.paddle_commit_id = paddle.version.commit
 
         # time interval for detecting whether the engine loop is normal during probing
@@ -99,7 +98,6 @@ class Config:
         self.use_cache_kv_int8 = int(os.getenv("USE_CACHE_KV_INT8", 0))
         self.use_cache_kv_int4 = int(os.getenv("USE_CACHE_KV_INT4", 0))
 
-
         # infer config
         self.max_batch_size = int(env.get("BATCH_SIZE", 50))
         self.max_seq_len = int(env.get("MAX_SEQ_LEN", 8192))
@@ -109,6 +107,7 @@ class Config:
         self.block_ratio = float(os.getenv("BLOCK_RATIO", 0.75))
         self.bad_tokens = str(env.get("BAD_TOKENS", "-1"))
         self.first_token_id = int(os.getenv("FIRST_TOKEN_ID", 1))
+        self.return_full_hidden_states = int(os.getenv("RETURN_FULL_HIDDEN_STATES", 0))
 
         # infer queue port
         self.infer_port = int(os.getenv("INFER_QUEUE_PORT", 56666))
@@ -124,7 +123,7 @@ class Config:
         self.use_warmup = int(os.getenv("USE_WARMUP", 0)) == 1
 
         # uuid
-        self.shm_uuid = os.getenv("SHM_UUID", '')
+        self.shm_uuid = os.getenv("SHM_UUID", "")
 
         # use huggingface tokenizer
         self.use_hf_tokenizer = int(os.getenv("USE_HF_TOKENIZER", 0)) == 1
@@ -148,10 +147,8 @@ class Config:
         """
         if self.block_ratio >= 1.0:
             self.enc_dec_block_num = (self.max_dec_len + self.block_size - 1) // self.block_size
-        self.max_query_block_num = (max(self.max_dec_len, self.max_seq_len) +
-                               self.block_size - 1) // self.block_size
-        self.max_query_block_num = (self.max_dec_len + self.max_seq_len +
-                                self.block_size - 1) // self.block_size
+        self.max_query_block_num = (max(self.max_dec_len, self.max_seq_len) + self.block_size - 1) // self.block_size
+        self.max_query_block_num = (self.max_dec_len + self.max_seq_len + self.block_size - 1) // self.block_size
         self.dec_token_num = self.enc_dec_block_num * self.block_size
         self.total_block_num = int(self.block_bs * self.max_query_block_num)
         self.max_block_num = int(self.total_block_num * self.block_ratio)
@@ -161,9 +158,12 @@ class Config:
         """
         check the legality of config
         """
-        assert self.max_batch_size <= 256, (
-            "The parameter `max_batch_size` is not allowed to exceed 256, "
-            "but now it's {}.".format(self.max_batch_size)
+        import math
+
+        assert (
+            self.max_batch_size <= 256
+        ), "The parameter `max_batch_size` is not allowed to exceed 256, " "but now it's {}.".format(
+            self.max_batch_size
         )
         assert self.seq_len_limit <= self.max_seq_len, (
             f"The seq_len_limit shouldn't greater than max_seq_len in model, "
@@ -177,12 +177,14 @@ class Config:
         )
         if os.getenv("DISABLE_CAPACITY_CHECKER", "0") == 1:
             # max_output_token_num
-            max_output_token_num = (self.total_block_num - self.max_block_num) * self.block_size + self.enc_dec_block_num * self.block_size
+            max_output_token_num = (
+                self.total_block_num - self.max_block_num
+            ) * self.block_size + self.enc_dec_block_num * self.block_size
             assert max_output_token_num >= self.dec_len_limit, (
                 f"The available output token number of the service is {max_output_token_num}, "
                 f"which is less than the setting MAX_DEC_LEN:{self.dec_len_limit}. "
             )
-    
+
             # Maximum input length of a single query that the service can handle
             max_input_token_num = int(math.floor(self.max_block_num * self.block_size - self.dec_token_num))
             assert max_input_token_num >= self.seq_len_limit, (
@@ -197,16 +199,14 @@ class Config:
         Args:
             file (str): the path of file to save config
         """
-        model_server_logger.info(
-            "=================== Configuration Information ===============")
+        model_server_logger.info("=================== Configuration Information ===============")
         for k, v in self.__dict__.items():
             if k == "generation_config" and v is not None:
                 for gck, gcv in v.to_dict().items():
                     model_server_logger.info("{:<20}:{:<6}{}".format(gck, "", gcv))
             else:
                 model_server_logger.info("{:<20}:{:<6}{}".format(k, "", v))
-        model_server_logger.info(
-            "=============================================================")
+        model_server_logger.info("=============================================================")
         if file is not None:
             f = open(file, "a")
             now_time = datetime.now()
@@ -222,7 +222,7 @@ class Config:
         Returns:
             dict: the config file
         """
-        model_config_json = json.load(open(self.model_config_path, 'r', encoding='utf-8'))
+        model_config_json = json.load(open(self.model_config_path, "r", encoding="utf-8"))
         return model_config_json
 
     def get_speculate_config(self):
@@ -230,27 +230,52 @@ class Config:
         get speculate_decoding related config
 
         Returns:
-            SpeculateConfig: the speculate related config
+            SpeculateArgument: the speculate related arguments
         """
-        speculate_config = SpeculateConfig()
+        from server.utils import get_logger
+
         model_cfg = self.get_model_config()
+
         if model_cfg.get("speculate_method", "None") != "None":
-            speculate_config.speculate_method = str(model_cfg["speculate_method"])
-            speculate_config.speculate_max_draft_token_num = model_cfg[
-                "speculate_max_draft_token_num"]
-            speculate_config.speculate_max_ngram_size = model_cfg[
-                "speculate_max_ngram_size"]
+            speculate_method = os.getenv("SPECULATE_METHOD", model_cfg["speculate_method"])
+            speculate_max_draft_token_num = int(
+                os.getenv("SPECULATE_MAX_DRAFT_TOKEN_NUM", model_cfg["speculate_max_draft_token_num"])
+            )
+            speculate_model_name_or_path = os.getenv("SPECULATE_MODEL_PATH", None)
+            speculate_model_quant_type = os.getenv("SPECULATE_MODEL_QUANT_TYPE", "weight_only_int8")
+            speculate_max_ngram_size = int(
+                os.getenv("SPECULATE_MAX_NGRAM_SIZE", model_cfg["speculate_max_ngram_size"])
+            )
 
-        if speculate_config.speculate_method not in ["None", "inference_with_reference"]:
-            model_server_logger.error(f"Unsupport speculate method: {speculate_config.speculate_method}")
+            if speculate_method in ["eagle", "mtp"]:
+                assert (
+                    speculate_model_name_or_path is not None
+                ), "[eagle, mtp] method must be set by env SPECULATE_MODEL_PATH"
 
-        return speculate_config
+            speculate_args = SpeculateArgument.build_from_serving(
+                speculate_method=speculate_method,
+                speculate_max_draft_token_num=speculate_max_draft_token_num,
+                speculate_max_ngram_size=speculate_max_ngram_size,
+                model_name_or_path=speculate_model_name_or_path,
+                quant_type=speculate_model_quant_type,
+                max_batch_size=self.max_batch_size,
+                total_max_length=self.max_seq_len,
+                max_length=self.max_dec_len,
+                dtype=self.dtype,
+            )
+
+            logger = get_logger("model_server", "infer_config.log")
+            logger.info(f"Speculate info: {speculate_args}")
+            return speculate_args
+        else:
+            return SpeculateArgument.build_from_serving(speculate_method="None")
 
     def read_from_config(self):
         """
         reset model config from json file
         """
         from server.utils import get_logger
+
         logger = get_logger("model_server", "infer_config.log")
         config = self.get_model_config()
 
@@ -262,9 +287,14 @@ class Config:
 
         reset_value(self, "block_size", "infer_model_block_size", config)
         reset_value(self, "max_seq_len", "infer_model_max_seq_len", config)
+        reset_value(self, "return_full_hidden_states", "return_full_hidden_states", config)
 
-        assert self.seq_len_limit <= self.max_seq_len, f"The loading model requires len(input_ids) <= {self.max_seq_len}, but now the setting MAX_SEQ_LEN={self.seq_len_limit}."
-        assert self.dec_len_limit <= self.max_seq_len, f"The loading model requires MAX_DEC_LEN <= {self.max_seq_len}, but now the setting MAX_DEC_LEN={self.dec_len_limit}."
+        assert (
+            self.seq_len_limit <= self.max_seq_len
+        ), f"The loading model requires len(input_ids) <= {self.max_seq_len}, but now the setting MAX_SEQ_LEN={self.seq_len_limit}."
+        assert (
+            self.dec_len_limit <= self.max_seq_len
+        ), f"The loading model requires MAX_DEC_LEN <= {self.max_seq_len}, but now the setting MAX_DEC_LEN={self.dec_len_limit}."
 
     def get_unique_name(self, name):
         """
@@ -277,10 +307,3 @@ class Config:
 
     def __str__(self) -> str:
         return json.dumps(self.__dict__, indent=4)
-
-
-@dataclass
-class SpeculateConfig:
-    speculate_method: str = "None"
-    speculate_max_draft_token_num: int = 1
-    speculate_max_ngram_size: int = 1

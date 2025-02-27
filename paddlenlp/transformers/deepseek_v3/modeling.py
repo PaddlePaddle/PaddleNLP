@@ -142,12 +142,15 @@ class DeepseekV3ForCausalLM(DeepseekV3PretrainedModel):
         )
 
         hidden_states = outputs[0]
+        mtp_outputs = outputs[-1]
+
         logits = self.lm_head(hidden_states)
+        mtp_logits = [self.lm_head(_hidden_states) for _hidden_states in mtp_outputs] if len(mtp_outputs) > 0 else []
 
         loss = None
         # TODO@DrownFish19: shift labels
         if labels is not None:
-            loss = self.criterion(logits, labels)
+            loss = self.criterion(logits, labels, mtp_logits=mtp_logits)
 
         if not return_dict:
             output = (logits,) + outputs[1:]
