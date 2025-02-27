@@ -25,7 +25,7 @@ export ENC_DEC_BLOCK_NUM=${ENC_DEC_BLOCK_NUM:-"4"}
 export FIRST_TOKEN_ID=${FIRST_TOKEN_ID:-"1"}
 export MAX_PREFILL_BATCH=${MAX_PREFILL_BATCH:-"4"}
 export STOP_THRESHOLD=${STOP_THRESHOLD:-"0"}
-export MODEL_DIR=${MODEL_DIR:-"/models"}
+export MODEL_DIR=${MODEL_DIR:-"/root/paddlejob/workspace/env_run/minghaipeng/DeepSeek-V2-Lite-Chat/export_a8w8_fp8"}
 export DISTRIBUTED_CONFIG=${DISTRIBUTED_CONFIG:-"${MODEL_DIR}/rank_mapping.csv"}
 export CONFIG_JSON_FILE=${CONFIG_JSON_FILE:-"config.json"}
 export PUSH_MODE_HTTP_WORKERS=${PUSH_MODE_HTTP_WORKERS:-"4"}
@@ -35,7 +35,7 @@ export HTTP_PORT=${HTTP_PORT:-"8110"}
 export GRPC_PORT=${GRPC_PORT:-"8811"}
 export METRICS_PORT=${METRICS_PORT:-"8722"}
 export INFER_QUEUE_PORT=${INFER_QUEUE_PORT:-"8813"}
-export PUSH_MODE_HTTP_PORT=${PUSH_MODE_HTTP_PORT:-"9965"}
+export PUSH_MODE_HTTP_PORT=${PUSH_MODE_HTTP_PORT:-"9967"}
 
 mkdir -p log
 rm -rf console.log log/*
