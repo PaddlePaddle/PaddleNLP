@@ -463,8 +463,8 @@ cudaError_t BatchMLAWithPagedKVCacheKernelTraitsDispatched(Params& params,
   int act_blocks_per_sm;
   cudaOccupancyMaxActiveBlocksPerMultiprocessor(
       &act_blocks_per_sm, kernel, KernelTraits::NUM_WARPS * 32, smem_size);
-  cudaDeviceProp devProp;
-  cudaGetDeviceProperties(&devProp, device);
+  // cudaDeviceProp devProp;
+  // cudaGetDeviceProperties(&devProp, device);
   
   dim3 grid_dims = {multiprocessor_count, 1, 1}; // todo: split kv
   static constexpr int ctaSize = KernelTraits::NUM_WARPS * 32;
