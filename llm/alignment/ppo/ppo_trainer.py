@@ -1301,7 +1301,7 @@ class PPOTrainer(Trainer):
             # prompts.extend(prompt)
             # generateds.extend(generated)
             self._eval_seq = (prompt, generated, reward_score_list)
-        return reward_score.mean(), None, None
+        return reward_score.mean(), reward_score, reward_score
 
     def evaluation_loop(
         self,
@@ -2559,7 +2559,8 @@ class PPOTrainer(Trainer):
 
         if not isinstance(ref_logits, paddle.Tensor):
             ref_logits = ref_logits[0]  # [2, 355, 12544]
-
+        logits = logits / self.args.temperature if self.args.temperature > 0.0 else logits
+        ref_logits = ref_logits / self.args.temperature if self.args.temperature > 0.0 else ref_logits
         if self.actor_model.config.tensor_parallel_degree > 1 and self.actor_model.config.tensor_parallel_output:
             log_probs = (
                 -ParallelCrossEntropy()(logits[:, :-1].astype("float32"), input_ids[:, 1:])
