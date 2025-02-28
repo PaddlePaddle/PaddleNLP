@@ -260,6 +260,7 @@ def test_append_c16_attention(cache_length, bsz):
         block_tables,
         "none",
         max_length,
+        False,
     )
     print("latent_cache0: ", latent_cache.shape)
     # print("latent_cache_v0: ", latent_cache[132][:, :, :512])
