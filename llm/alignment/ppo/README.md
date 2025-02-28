@@ -10,7 +10,14 @@ GRPO（Group Relative Policy Optimization，组相对策略优化）是 PPO（Pr
 * 训练环境：
 1. 参考 Paddle 官网安装 PaddlePaddle-GPU
 2. clone 并安装 PaddleNLP
+```shell
+git clone https://github.com/PaddlePaddle/PaddleNLP.git
+```
 3. 安装 paddlenlp_ops，参考 PaddleNLP/csrc 进行安装（必需）
+```shell
+cd your_PaddleNLP_path/csrc
+python setup_cuda.py install
+```
 
 ## 支持模型
 
