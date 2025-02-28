@@ -110,8 +110,8 @@ python reward_server.py
 ```shell
 export PYTHONPATH=your_PaddleNLP_path/:$PYTHONPATH
 export PYTHONPATH=your_PaddleNLP_path/llm:$PYTHONPATH
-python -u -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" run_grpo.py ../../config/qwen/grpo_argument.json
-# python -u -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" run_grpo.py ../../config/llama/grpo_argument.json
+python -u -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" run_ppo.py ../../config/qwen/grpo_argument.json
+# python -u -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" run_ppo.py ../../config/llama/grpo_argument.json
 ```
 
 ### 在线监控
