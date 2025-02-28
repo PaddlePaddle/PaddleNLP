@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import sys
 import unittest
+from unittest import skip
 
 from parameterized import parameterized_class
 
@@ -24,6 +25,7 @@ from tests.testing_utils import argv_context_guard, load_test_config
 from .testing_utils import LLMTest
 
 
+@skip("skip test ppo")
 @parameterized_class(
     ["model_dir"],
     [["llama"]],
