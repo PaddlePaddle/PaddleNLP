@@ -158,7 +158,7 @@ void BatchMLAWithPagedKVCacheKernel(
   params.chunk_num = num_chunks;
 
   if (q_head_dim == 576) {
-      BatchMLAWithPagedKVCacheDispatched<576, 512, MaskMode::kCausal>(
+      BatchMLAWithPagedKVCacheDispatched<576, 512, MaskMode::kCausal, NV_TYPE>(
           params, stream
       );
   } else {

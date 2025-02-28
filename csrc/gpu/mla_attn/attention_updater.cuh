@@ -128,7 +128,7 @@ __forceinline__ __device__ void apply_exp2(Tensor<Engine0, Layout0>& tensor,
     auto row_max = max(mi);
 #pragma unroll
     for (int ni = 0; ni < size<1>(tensor); ++ni) {
-      tensor(mi, ni) = exp2f(tensor(mi, ni) - row_max);
+      tensor(mi, ni) = __expf(tensor(mi, ni) - row_max);
     }
   }
 }
@@ -146,7 +146,7 @@ __forceinline__ __device__ void scale_apply_exp2(Tensor<Engine0, Layout0>& tenso
 #pragma unroll
     for (int ni = 0; ni < size<1>(tensor); ++ni) {
       // row_max * scale is a constant for each row, so we can use fma here
-      tensor(mi, ni) = exp2f(tensor(mi, ni) * scale - row_max * scale);
+      tensor(mi, ni) = __expf(tensor(mi, ni) * scale - row_max * scale);
     }
   }
 }
@@ -209,9 +209,9 @@ struct OnlineSoftmax {
       for (int mi = 0; mi < size(row_max); ++mi) {
         float scores_max_cur = row_max(mi);
         if constexpr (WITH_SCALE) {
-          scores_scale(mi) = exp2f((scores_max_prev(mi) - scores_max_cur) * sm_scale_log2);
+          scores_scale(mi) = __expf((scores_max_prev(mi) - scores_max_cur) * sm_scale_log2);
         } else {
-          scores_scale(mi) = exp2f(scores_max_prev(mi) - scores_max_cur);
+          scores_scale(mi) = __expf(scores_max_prev(mi) - scores_max_cur);
         }
         row_sum(mi) *= scores_scale(mi);
       }
@@ -239,11 +239,7 @@ struct OnlineSoftmax {
       float sum = row_sum(mi);
       float inv_sum = 1.f / sum;
       scores_scale(mi) = inv_sum;
-      if constexpr (WITH_SCALE) {
-        row_sum(mi) = row_max(mi) * sm_scale_log2 + math::ptx_log2(sum); // m + logsum(exp(x - m)) = logsum((exp(x - m)exp(m)))
-      } else {
-        row_sum(mi) = row_max(mi) + math::ptx_log2(sum);
-      }
+      row_max(mi) *= sm_scale_log2;
     }
     return scores_scale;
   };
