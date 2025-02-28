@@ -1171,6 +1171,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             config.single_card_ptq = not predictor_args.use_fake_parameter
         config.append_attn = predictor_args.append_attn
         config.decode_strategy = predictor_args.decode_strategy
+        config.mla_use_matrix_absorption = predictor_args.mla_use_matrix_absorption
+        config.weightonly_group_size = predictor_args.weightonly_group_size
 
         if config.quantization_config.quant_type is not None:
             if predictor_args.mode == "dynamic":
@@ -1200,13 +1202,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if predictor_args.speculate_method is not None:
             config.speculate_method = predictor_args.speculate_method
             config.speculate_max_draft_token_num = predictor_args.speculate_max_draft_token_num
-            config.speculate_max_ngram_size = predictor_args.speculate_max_ngram_size
             config.speculate_verify_window = predictor_args.speculate_verify_window
             config.speculate_max_candidate_len = predictor_args.speculate_max_candidate_len
+            if predictor_args.speculate_method == "inference_with_reference":
+                config.speculate_max_ngram_size = predictor_args.speculate_max_ngram_size
             if predictor_args.speculate_method is not None:
-                if config.get("speculate_model_type", "None") in ["eagle", "mtp"]:
-                    config.decode_strategy = "draft_model_sample"
-                else:
+                if not config.get("speculate_model_type", "None") in ["eagle", "mtp"]:
                     config.decode_strategy = "speculate_decoding"
         config.return_full_hidden_states = predictor_args.return_full_hidden_states
 

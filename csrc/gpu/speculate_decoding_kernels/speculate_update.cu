@@ -88,7 +88,7 @@ __global__ void speculate_update(int *seq_lens_encoder,
 
 void SpeculateUpdate(const paddle::Tensor &seq_lens_encoder,
                        const paddle::Tensor &seq_lens_decoder,
-                       const paddle::Tensor &not_need_stop,
+                       const paddle::Tensor &not_need_stop, // cpu
                        const paddle::Tensor &draft_tokens,
                        const paddle::Tensor &actual_draft_token_nums,
                        const paddle::Tensor &accept_tokens,
@@ -98,13 +98,14 @@ void SpeculateUpdate(const paddle::Tensor &seq_lens_encoder,
                        const paddle::Tensor &is_block_step) {
     int real_bsz = seq_lens_this_time.shape()[0];
     auto max_draft_tokens = draft_tokens.shape()[1];
+    auto not_need_stop_gpu = not_need_stop.copy_to(draft_tokens.place(), false);
 
     constexpr int BlockSize = 512;
 
     speculate_update<BlockSize><<<1, BlockSize, 0, accept_tokens.stream()>>>(
         const_cast<int *>(seq_lens_encoder.data<int>()),
         const_cast<int *>(seq_lens_decoder.data<int>()),
-        const_cast<bool *>(not_need_stop.data<bool>()),
+        const_cast<bool *>(not_need_stop_gpu.data<bool>()),
         const_cast<int64_t *>(draft_tokens.data<int64_t>()),
         const_cast<int *>(actual_draft_token_nums.data<int>()),
         accept_tokens.data<int64_t>(),
@@ -114,6 +115,10 @@ void SpeculateUpdate(const paddle::Tensor &seq_lens_encoder,
         is_block_step.data<bool>(),
         real_bsz,
         max_draft_tokens);
+
+    auto not_need_stop_cpu = not_need_stop_gpu.copy_to(not_need_stop.place(), false);
+    bool *not_need_stop_data = const_cast<bool*>(not_need_stop.data<bool>());
+    not_need_stop_data[0] = not_need_stop_cpu.data<bool>()[0];
 }
 
 PD_BUILD_OP(speculate_update)

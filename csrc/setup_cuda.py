@@ -99,7 +99,6 @@ sources = [
     "./gpu/rebuild_padding_v2.cu",
     "./gpu/set_value_by_flags_v2.cu",
     "./gpu/stop_generation_multi_ends_v2.cu",
-    "./gpu/update_inputs.cu",
     "./gpu/get_output.cc",
     "./gpu/save_with_output_msg.cc",
     "./gpu/write_int8_cache_kv.cu",
@@ -145,12 +144,9 @@ cuda_version = float(paddle.version.cuda())
 if cc >= 80:
     sources += ["gpu/int8_gemm_with_cutlass/gemm_dequant.cu"]
 
-    sources += [
-        "./gpu/append_attention.cu",
-        "./gpu/append_attn/get_block_shape_and_split_kv_block.cu",
-        "./gpu/append_attn/decoder_write_cache_with_rope_kernel.cu",
-        "./gpu/append_attn/speculate_write_cache_with_rope_kernel.cu",
-    ]
+    sources += ["./gpu/append_attention.cu", "./gpu/multi_head_latent_attention.cu"]
+
+    sources += find_end_files("./gpu/append_attn", ".cu")
     sources += find_end_files("./gpu/append_attn/template_instantiation", ".cu")
 
 
