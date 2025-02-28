@@ -40,8 +40,6 @@ GRPO（Group Relative Policy Optimization，组相对策略优化）是 PPO（Pr
 wget https://paddlenlp.bj.bcebos.com/datasets/examples/ppo-kk.tgz && tar zxf ppo-kk.tgz
 ```
 
-
-
 ## 训练
 
 ### 训练配置
@@ -93,13 +91,25 @@ max_dec_len + max_prompt_len 应当小于 max_seq_len。
 - `fp16_opt_level`: float16 精度训练模式，`O2`表示纯 float16 训练
 
 
-### PPO 训练命令
+<!-- ### PPO 训练命令
 
 ```shell
 python -u -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7"  run_ppo.py llm/config/llama/ppo_argument.json
-```
+``` -->
 
 ### GRPO 训练命令
 ```shell
-python -u -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7"  run_grpo.py llm/config/llama/grpo_argument.json
+# 启动 reward server
+python reward_server.py
+```
+
+```shell
+python -u -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" run_grpo.py llm/config/llama/grpo_argument.json
+```
+
+
+### 在线监控
+在`grpo_argument.json`中设置的输出目录为`"logging_dir": "vdl_log"`, 可以通过以下命令查看训练过程
+```shell
+visualdl --logdir vdl_log --host 0.0.0.0
 ```
