@@ -453,7 +453,7 @@ def main():
             reward_critic_tokenizer if training_args.rl_algorithm == "ppo" else None,
         ),
         data_collator=train_ds.get_collator(),
-        compute_metrics=compute_metrics, # TODO: only used for grpo (kk datasets)
+        compute_metrics=compute_metrics,  # TODO: only used for grpo (kk datasets)
     )
 
     # TODO(gongenlei) resume_from_checkpoint is not ready
