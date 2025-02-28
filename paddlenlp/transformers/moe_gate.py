@@ -218,6 +218,8 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         Returns:
             paddle.Tensor: cumsum locations
         """
+        # (LiuTing) this func can further code refine.
+
         # Make num_selected_experts the leading axis to ensure that top-1 choices
         # have priority over top-2 choices, which have priority over top-3 choices,
         # etc.
@@ -245,17 +247,7 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         # Shape: [tokens_per_group, num_experts].
         token_priority = paddle.max(token_priority, axis=1)
 
-        # Token T can only be routed to expert E if its priority is positive and
-        # less than the expert capacity. One-hot matrix will ignore indices outside
-        # the range [0, expert_capacity).
-        # Shape: [tokens_per_group, num_experts, expert_capacity].
-        valid_mask = paddle.logical_and(token_priority >= 0, token_priority < capacity)
-        token_priority = paddle.masked_fill(token_priority, ~valid_mask, 0)
-        dispatch_mask = F.one_hot(token_priority, capacity).cast(paddle.int32)
-        valid_mask = valid_mask.unsqueeze(-1).expand(valid_mask.shape + [capacity])
-        dispatch_mask = paddle.masked_fill(dispatch_mask, ~valid_mask, 0)
-
-        return dispatch_mask
+        return token_priority
 
     def _topk_greedy(self, scores: paddle.Tensor, k: int) -> Tuple[paddle.Tensor, paddle.Tensor]:
         """_summary_
@@ -562,7 +554,4 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
             if self.norm_topk_prob:
                 gates_masked = gates_masked / denom_s
 
-        combine_weights = paddle.einsum("se,sec->sec", gates_masked, token_priority.cast(paddle.get_default_dtype()))
-        dispatch_mask = combine_weights.astype(paddle.bool)
-
-        return capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss
+        return capacity, gates_masked, token_priority, exp_counts, l_aux, l_zloss

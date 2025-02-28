@@ -25,9 +25,9 @@ import math
 import warnings
 from functools import partial
 from typing import List, Optional, Tuple, Union
-import paddle.distributed as dist
 
 import paddle
+import paddle.distributed as dist
 import paddle.distributed.fleet.meta_parallel as mpu
 import paddle.nn.functional as F
 from paddle import Tensor, nn
@@ -759,7 +759,11 @@ class DeepseekV2MoE(MoELayer):
             config=config,
             moe_num_experts=config.n_routed_experts,
             expert_class=DeepseekV2MLP,
-            expert_kwargs={"config": config, "intermediate_size": config.moe_intermediate_size, "is_moe": not act_tp_shard},
+            expert_kwargs={
+                "config": config,
+                "intermediate_size": config.moe_intermediate_size,
+                "is_moe": not act_tp_shard,
+            },
             gate=gate,
             capacity=2.0,
         )

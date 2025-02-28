@@ -15,13 +15,9 @@
 # limitations under the License.
 from __future__ import annotations
 
-from typing import Any, Tuple
-
 import paddle
 import paddle.distributed as dist
-from paddle import Tensor, nn
-from paddle.distributed.communication import stream
-from paddle.distributed.communication.group import Group
+from paddle import nn
 
 from .moe_gate import PretrainedMoEGate
 
@@ -88,50 +84,6 @@ def combining(x, combine_weights, scatter_index):
     if isinstance(combine_weights, (list, tuple)):
         combine_weights = paddle.concat(combine_weights, -1).unsqueeze([1])
     return paddle.matmul(combine_weights, x).squeeze(1)  # [seq,1,2] @ [seq,2,dim] -> [seq,1,dim]
-
-
-class _AllToAll(paddle.autograd.PyLayer):
-    @staticmethod
-    def forward(
-        ctx: Any,
-        input: Tensor,
-        group: Group,
-    ) -> Tensor:  # type: ignore
-        """
-        All-to-all communication in the group.
-
-        Args:
-            ctx (Any): Context object.
-            input (Tensor): Input tensor.
-            group (Group): The group object.
-
-        Returns:
-            Tensor: Output tensor.
-        """
-
-        ctx.group = group
-        # return input
-        if dist.get_world_size(group) <= 1:
-            return input
-        output = paddle.empty_like(input)
-        stream.alltoall_single(output, input, None, None, group, True, True)
-        return output
-
-    @staticmethod
-    def backward(ctx: Any, *grad_output: Tensor) -> Tuple[Tensor]:
-        """
-        Aggregates gradient information from all input tensors into a single tensor.
-
-        Args:
-            ctx (Any): The context object used to store information that needs to be passed.
-            *grad_output (Tensor): A list of input tensors whose gradients are to be aggregated.
-
-        Returns:
-            Tuple[Tensor]: A tuple containing a tensor that holds the gradients of all input tensors.
-
-        """
-        # return grad_output
-        return _AllToAll.apply(*grad_output, ctx.group)
 
 
 class MoELayer(nn.Layer):
@@ -212,20 +164,23 @@ class MoELayer(nn.Layer):
                     p.no_sync = not self.is_dummy_moe
                     # logger.info(f"expert param={p.name}, no-sync={p.no_sync}")
 
-    def expert_forward(self, dispatched_input):
+    def expert_forward(self, dispatched_input, exp_token_idx):
         true_experts = self.experts[
             self.moe_rank * self.moe_num_experts_per_device : (self.moe_rank + 1) * self.moe_num_experts_per_device
         ]
         expert_outputs = []
-        chunks = dispatched_input.unbind(1)
-        assert len(chunks) == len(true_experts), (len(chunks), len(true_experts))
-        for chunk, expert in zip(chunks, true_experts):
-            chunk = chunk.contiguous()
-            print("11", chunk.shape)  # [ecm]
-            expert_outputs += [expert(chunk)]
-        expert_output = paddle.stack(expert_outputs, axis=1)  # [ecm]
-        print("22", expert_output.shape)  # [ecm]
-        return expert_output
+
+        for idx in range(len(dispatched_input)):
+            # print(dispatched_input[idx])
+            # print(exp_token_idx[idx])
+            # (LiuTing) can use paddle.stack here.
+            expert_outputs.append(
+                true_experts[idx % self.moe_num_experts_per_device](dispatched_input[idx])
+                if exp_token_idx[idx] is not None
+                else dispatched_input[idx]
+            )
+
+        return expert_outputs
 
     def forward(
         self,
@@ -249,32 +204,52 @@ class MoELayer(nn.Layer):
         # group_size = kwargs['group_size'] if 'group_size' in kwargs.keys() else 1
         reshaped_input = hidden_state.reshape([-1, d_model])
 
-        capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss = self.gate(hidden_state)
-
         # self.l_aux       :
-        # combine_weights  : sec
-        # dispatch_mask    : sec
+        # gates_masked  : se
+        # token_priority    : se
         # self.exp_counts  :
-        dispatched_input = paddle.einsum("sec,sm->ecm", paddle.cast(dispatch_mask, hidden_state.dtype), reshaped_input)
+        capacity, gates_masked, token_priority, exp_counts, l_aux, l_zloss = self.gate(hidden_state)
+
+        dispatched_input = []
+        # print("token p: ", token_priority)
+        # print("token pick exp num: ", (token_priority>=0).astype('bfloat16').sum(axis=1))
+        # print("less pick exp: ", (token_priority>=0).astype('bfloat16').sum(axis=0).min())
+        # print("gates masked: ", gates_masked)
+        exp_token_idx = []
+        for e_i in range(self.moe_num_experts):
+            expert_tokens_idx = (token_priority[:, e_i] >= 0).nonzero().squeeze(-1)
+            # (LiuTing) this expert not deal with any token.
+            if expert_tokens_idx.shape[0] == 0:
+                exp_token_idx.append(None)
+                dispatched_input.append(None)
+            else:
+                exp_token_idx.append(expert_tokens_idx)
+                dispatched_input.append(paddle.gather(reshaped_input, exp_token_idx[e_i], axis=0))
 
         if self.expert_parallel_degree > 1:
-            dispatched_input = _AllToAll.apply(dispatched_input, self.moe_group)
-        # Re-shape after all-to-all: ecm -> gecm
-        dispatched_input = dispatched_input.reshape(
-            [self.expert_parallel_degree, self.moe_num_experts_per_device, -1, d_model]
-        )
-        expert_output = self.expert_forward(dispatched_input)
-        # Re-shape before drop_tokens: gecm -> ecm
-        expert_output = expert_output.reshape(
-            [self.expert_parallel_degree * self.moe_num_experts_per_device, -1, d_model]
-        )
+            output = []
+            dist.alltoall(output, dispatched_input, self.moe_group)
+            dispatched_input = output
 
+        expert_output = self.expert_forward(dispatched_input, exp_token_idx)
         if self.expert_parallel_degree > 1:
-            expert_output = _AllToAll.apply(expert_output, self.moe_group)
+            output = []
+            dist.alltoall(output, expert_output, self.moe_group)
+            expert_output = output
 
-        # combine withe expert weights
-        combined_output = paddle.einsum("sec,ecm->sm", combine_weights.cast(hidden_state[0].dtype), expert_output)
+        # reformat output
+        a = paddle.zeros_like(reshaped_input)
 
-        a = combined_output.reshape(hidden_state.shape)
+        for e_i in range(self.moe_num_experts):
+            if exp_token_idx[e_i] is not None:
+                updated = expert_output[e_i] * gates_masked[exp_token_idx[e_i].unsqueeze(-1), e_i]
+                # print("e_i: ", e_i)
+                # print("act: ", token_priority[:, e_i])
+                # print("expert_output: ", expert_output[e_i])
+                # print("exp token idxx: ", exp_token_idx[e_i])
+                # print("gate weight: ", gates_masked[exp_token_idx[e_i].unsqueeze(-1), e_i])
+                # print("gates value: ", updated)
+                a[exp_token_idx[e_i]] += updated.astype(a.dtype)
 
+        # print("moe output: ", a, a.mean(), a.max(), a._md5sum())
         return a, l_aux, l_zloss

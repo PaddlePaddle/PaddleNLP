@@ -2078,7 +2078,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             before_fuse_keys = list(state_dict.keys())
             if pre_tensor_parallel_split:
                 print("xxxxxsdf: ", prefix)
-                tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys, ignore_error=True, base_model_prefix="deepseek_v3")
+                tp_actions = cls.get_tensor_parallel_convert_actions(
+                    config, loaded_keys, ignore_error=True, base_model_prefix="deepseek_v3"
+                )
             else:
                 tp_actions = None
             state_dict, resume_state_dict = cls.convert_fuse_and_split(config, state_dict, tp_actions)
@@ -2145,7 +2147,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     pre_tensor_parallel_split = True
                     assert loaded_keys is not None, "loaded_keys is not None."
                     print("xxxxxsdf: ", prefix)
-                    tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys, ignore_error=True, base_model_prefix="deepseek_v3")
+                    tp_actions = cls.get_tensor_parallel_convert_actions(
+                        config, loaded_keys, ignore_error=True, base_model_prefix="deepseek_v3"
+                    )
                 # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
                 filter_dict_keys = set(expected_keys)
                 fuse_actions, _ = cls.get_fuse_or_split_param_convert_actions(config, loaded_keys, is_fuse=True)
