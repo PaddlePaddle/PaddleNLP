@@ -109,7 +109,7 @@ DeepSeek R1系列蒸馏模型以 deepseek-ai/DeepSeek-R1-Distill-Qwen-14B 的单
 python ./predict/predictor.py --model_name_or_path deepseek-ai/DeepSeek-R1-Distill-Qwen-14B --dtype bfloat16 --mode dynamic --inference_model 1 --append_attn 1 --quant_type weight_only_int8
 
 # 动转静导出模型
-python predict/export_model.py --model_name_or_path meta-llama/Meta-Llama-3-8B-Instruct --output_path /path/to/exported_model --dtype bfloat16 --inference_model 1 --append_attn 1 --quant_type weight_only_int8
+python predict/export_model.py --model_name_or_path deepseek-ai/DeepSeek-R1-Distill-Qwen-14B --output_path /path/to/exported_model --dtype bfloat16 --inference_model 1 --append_attn 1 --quant_type weight_only_int8
 
 # 静态图推理
 python predict/predictor.py --model_name_or_path /path/to/exported_model --dtype bfloat16 --mode static --inference_model 1 --append_attn 1 --quant_type weight_only_int8
