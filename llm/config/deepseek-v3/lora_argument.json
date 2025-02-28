@@ -36,6 +36,6 @@
     "zero_padding": true,
     "flash_mask": false,
     "unified_checkpoint": true,
-    "use_flash_attention": true,
+    "use_flash_attention": false,
     "lora": true
 }
