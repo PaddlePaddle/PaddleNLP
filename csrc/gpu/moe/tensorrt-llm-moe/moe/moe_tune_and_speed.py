@@ -182,8 +182,8 @@ def paddle_win8(quant_method):
     print(f"paddle win8 : {((end - start) * 1000 * 1000)} us")
 
 
-for i in range(1):
+for i in range(5):
     trt_win8(quant_method)
 
-# for i in range(5):
-#     paddle_win8(quant_method)
+for i in range(5):
+    paddle_win8(quant_method)
