@@ -1,19 +1,18 @@
-# PPO
+# PPO && GRPO
 
 PPO（Proximal Policy Optimization，近端策略优化）是一种强化学习算法，旨在通过优化策略来最大化累积奖励。PPO 算法结合了 Policy Gradient 和‌TRPO 的优点，通过使用随机梯度上升优化一个“替代”目标函数，实现小批量更新，而不是每个数据样本只进行一次梯度更新。
+GRPO（Group Relative Policy Optimization，组相对策略优化）是 PPO（Proximal Policy Optimization，近端策略优化）算法的一种变体。与 PPO 不同，GRPO 省略了价值函数估计器。在 GRPO 中，对于每个状态 \(s\)，算法会从当前策略 \(\pi_{\theta_{t}}\) 中采样多个动作 \(a_{1}, \dots, a_{G}\)。然后，GRPO 计算这些动作相对于组内其他动作的“组相对优势”（group-relative advantage），以此作为优化策略的依据。
 
 以下是详细的使用文档和示例：
 
 ## 环境依赖
 
-* 训练环境：在 python3.9的环境下安装, 可以使用如下脚本安装
-```bash
-bash -x scripts/install_train_env.sh gpu
-```
+* 训练环境：
+1. 参考 Paddle 官网安装 PaddlePaddle-GPU
+2. clone 并安装 PaddleNLP
+3. 安装 paddlenlp_ops，参考 PaddleNLP/csrc 进行安装（必需）
 
 ## 数据协议
-
-数据格式以`data/rlhf_train_data_test.jsonl`为例。
 
 ### 字段说明
 
@@ -34,13 +33,20 @@ bash -x scripts/install_train_env.sh gpu
 }
 ```
 
-## 训练
 
-```shell
-bash scripts/ppo.sh
+### PPO & GRPO 数据准备
+
+```
+wget https://paddlenlp.bj.bcebos.com/datasets/examples/ppo-kk.tgz && tar zxf ppo-kk.tgz
 ```
 
-其中参数释义如下：
+
+
+## 训练
+
+### 训练配置
+
+我们采用的配置文件在放置在`llm/config/llama/ppo_argument.json`和`llm/config/llama/grpo_argument.json`中，同时我们提供了详细参数释义如下：
 
 - `train_task_config`: 训练数据 config, 请以`config/task_ppo.json`为例
 - `eval_task_config`: 评估数据 config, 请以`config/task_ppo.json`为例
@@ -85,3 +91,15 @@ max_dec_len + max_prompt_len 应当小于 max_seq_len。
 - `fp16`: 使用 float16 精度进行模型训练和推理。
 - `bf16`: 使用 bfloat16 精度进行模型训练和推理。
 - `fp16_opt_level`: float16 精度训练模式，`O2`表示纯 float16 训练
+
+
+### PPO 训练命令
+
+```shell
+python -u -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7"  run_ppo.py llm/config/llama/ppo_argument.json
+```
+
+### GRPO 训练命令
+```shell
+python -u -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7"  run_grpo.py llm/config/llama/grpo_argument.json
+```

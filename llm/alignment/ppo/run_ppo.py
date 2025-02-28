@@ -48,7 +48,6 @@ def main():
     """
     # Arguments
     parser = PdArgumentParser((ModelArgument, DataArgument, TrainingArguments))
-    # 参数解析是不是改错了
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
         model_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
     else:
