@@ -117,14 +117,19 @@ def scaled_dot_product_attention(
         )
 
         if isinstance(outputs, tuple):
-            outputs[0] = outputs[0].reshape([bsz, kv_seq_len, v_num_heads, head_dim])
+            outputs[0] = outputs[0].reshape([bsz, q_len, v_num_heads, head_dim])
             outputs[0] = outputs[0][..., :v_head_dim]
-            outputs[0] = outputs[0].reshape([bsz, kv_seq_len, -1])
+            outputs[0] = outputs[0].reshape([bsz, q_len, -1])
         else:
-            outputs = outputs.reshape([bsz, kv_seq_len, v_num_heads, head_dim])
+            outputs = outputs.reshape([bsz, q_len, v_num_heads, head_dim])
             outputs = outputs[..., :v_head_dim]
-            outputs = outputs.reshape([bsz, kv_seq_len, -1])
-        return outputs
+            outputs = outputs.reshape([bsz, q_len, -1])
+
+        if sequence_parallel:
+            attn_output = outputs.reshape([bsz * q_len, v_head_dim * num_heads])
+        else:
+            attn_output = outputs.reshape([bsz, q_len, v_head_dim * num_heads])
+        return attn_output
 
     else:
         #  [ bz, seqlen, nhead, head_dim] -> [bs, nhead, seq_len, head_dim]
@@ -229,7 +234,9 @@ class AddAuxiliaryLoss(paddle.autograd.PyLayer):
         if ctx.required_aux_loss:
             # grad_loss = paddle.ones(1, dtype=ctx.dtype)
             grad_loss = paddle.to_tensor(1, dtype=ctx.dtype)
-            grad_loss = dist.shard_tensor(grad_loss, get_mesh(), [dist.Partial(dist.ReduceType.kRedAvg)])
+            grad_loss = dist.auto_parallel.api.dtensor_from_local(grad_loss, get_mesh(), [dist.Replicate()])
+            # if paddle.in_dynamic_mode():
+            #     grad_loss = dist.shard_tensor(grad_loss, get_mesh(), [dist.Partial(dist.ReduceType.kRedAvg)])
         return grad_output, grad_loss
 
 
@@ -607,7 +614,7 @@ class DeepseekV2DecoderLayerAuto(nn.Layer):
             )
         else:
             hidden_states, self_attn_weights, present_key_value = self.self_attn(
-                hidden_states=hidden_states,
+                hidden_states,
                 position_ids=position_ids,
                 attention_mask=attention_mask,
                 output_attentions=output_attentions,
@@ -1203,19 +1210,18 @@ class DeepseekV2ForCausalLMAuto(DeepseekV2PretrainedModelAuto):
     def auto_dist_config(self, prefix=""):
         if prefix != "":
             assert prefix.endswith(".")
-        config = {}
-        # config = {
-        #     "mp_config": {
-        #         "parallelize_plan": {
-        #             f"{prefix}deepseek_v2.embed_tokens": dist.ColWiseParallel(gather_output=True),
-        #             f"{prefix}deepseek_v2.layers.*.self_attn.q_proj": dist.ColWiseParallel(),
-        #             f"{prefix}deepseek_v2.layers.*.self_attn.kv_b_proj": dist.ColWiseParallel(),
-        #             f"{prefix}deepseek_v2.layers.*.self_attn.o_proj": dist.RowWiseParallel(),
-        #             f"{prefix}deepseek_v2.layers.*.mlp.gate_proj": dist.ColWiseParallel(),
-        #             f"{prefix}deepseek_v2.layers.*.mlp.up_proj": dist.ColWiseParallel(),
-        #             f"{prefix}deepseek_v2.layers.*.mlp.down_proj": dist.RowWiseParallel(),
-        #             f"{prefix}lm_head.weight": dist.ColWiseParallel(),
-        #         }
-        #     },
-        # }
+        config = {
+            "mp_config": {
+                "parallelize_plan": {
+                    f"{prefix}deepseek_v2.embed_tokens": dist.ColWiseParallel(gather_output=True),
+                    f"{prefix}deepseek_v2.layers.*.self_attn.q_proj": dist.ColWiseParallel(),
+                    f"{prefix}deepseek_v2.layers.*.self_attn.kv_b_proj": dist.ColWiseParallel(),
+                    f"{prefix}deepseek_v2.layers.*.self_attn.o_proj": dist.RowWiseParallel(),
+                    f"{prefix}deepseek_v2.layers.*.mlp.gate_proj": dist.ColWiseParallel(),
+                    f"{prefix}deepseek_v2.layers.*.mlp.up_proj": dist.ColWiseParallel(),
+                    f"{prefix}deepseek_v2.layers.*.mlp.down_proj": dist.RowWiseParallel(),
+                    f"{prefix}lm_head.weight": dist.ColWiseParallel(),
+                }
+            },
+        }
         return config
