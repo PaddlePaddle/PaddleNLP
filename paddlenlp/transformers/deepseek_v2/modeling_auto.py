@@ -117,11 +117,11 @@ def scaled_dot_product_attention(
         )
 
         if isinstance(outputs, tuple):
-            outputs[0] = outputs[0].reshape([bsz, kv_seq_len, v_num_heads, head_dim])
+            outputs[0] = outputs[0].reshape([bsz, q_len, v_num_heads, head_dim])
             outputs[0] = outputs[0][..., :v_head_dim]
-            outputs[0] = outputs[0].reshape([bsz, kv_seq_len, -1])
+            outputs[0] = outputs[0].reshape([bsz, q_len, -1])
         else:
-            outputs = outputs.reshape([bsz, kv_seq_len, v_num_heads, head_dim])
+            outputs = outputs.reshape([bsz, q_len, v_num_heads, head_dim])
             outputs = outputs[..., :v_head_dim]
             outputs = outputs.reshape([bsz, q_len, -1])
 
