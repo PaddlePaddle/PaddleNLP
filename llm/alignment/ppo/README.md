@@ -99,14 +99,20 @@ python -u -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7"  run_ppo.py l
 
 ### GRPO 训练命令
 ```shell
+cd your_PaddleNLP_path/llm/alignment/ppo
+```
+
+```shell
 # 启动 reward server
 python reward_server.py
 ```
 
 ```shell
-python -u -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" run_grpo.py llm/config/llama/grpo_argument.json
+export PYTHONPATH=your_PaddleNLP_path/:$PYTHONPATH
+export PYTHONPATH=your_PaddleNLP_path/llm:$PYTHONPATH
+python -u -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" run_grpo.py ../../config/qwen/grpo_argument.json
+# python -u -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" run_grpo.py ../../config/llama/grpo_argument.json
 ```
-
 
 ### 在线监控
 在`grpo_argument.json`中设置的输出目录为`"logging_dir": "vdl_log"`, 可以通过以下命令查看训练过程
