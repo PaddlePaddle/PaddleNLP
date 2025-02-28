@@ -21,13 +21,13 @@ namespace tensorrt_llm
 template class MoeGemmRunner<half, half, half>;
 #ifdef ENABLE_BF16
 template class MoeGemmRunner<__nv_bfloat16, __nv_bfloat16, __nv_bfloat16>;
-template class MoeGemmRunner<__nv_bfloat16, __nv_fp8_e4m3, __nv_bfloat16>;
+// template class MoeGemmRunner<__nv_bfloat16, __nv_fp8_e4m3, __nv_bfloat16>;
 template class MoeGemmRunner<__nv_bfloat16, cutlass::uint4b_t, __nv_bfloat16>;
 template class MoeGemmRunner<__nv_bfloat16, uint8_t, __nv_bfloat16>;
-template class MoeGemmRunner<__nv_fp8_e4m3, __nv_fp8_e4m3, __nv_bfloat16>;
+// template class MoeGemmRunner<__nv_fp8_e4m3, __nv_fp8_e4m3, __nv_bfloat16>;
 #endif
-#ifdef ENABLE_FP8
-template class MoeGemmRunner<__nv_fp8_e4m3, __nv_fp8_e4m3, half>;
-#endif
+// #ifdef ENABLE_FP8
+// template class MoeGemmRunner<__nv_fp8_e4m3, __nv_fp8_e4m3, half>;
+// #endif
 
 } // namespace tensorrt_llm
