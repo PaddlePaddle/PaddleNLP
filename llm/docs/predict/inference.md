@@ -246,6 +246,7 @@ else:
 
 -  [llama](./llama.md)
 -  [qwen](./qwen.md)
+-  [deepseek](./deepseek.md)
 -  [mixtral](./mixtral.md)
 -  [投机解码](./speculative_decoding.md)
 
