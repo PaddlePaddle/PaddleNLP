@@ -2976,7 +2976,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
     ):
         from paddlenlp_ops import decode_mla_write_cache, multi_head_latent_attention
 
-        use_sageattn = False if os.getenv("USE_SAGEATTN", "0") == "1" else True
+        use_sageattn = False if os.getenv("USE_SAGEATTN", 0) == 1 else True
 
         ln_out = qkv_out
         latent_cache = caches[i]
