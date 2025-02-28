@@ -379,6 +379,8 @@ class TrainingArguments:
             `paddle.DataParallel`. Will default to `False` if recompute is used, `True` otherwise.
         wandb_api_key (`str`, *optional*):
             Weights & Biases (WandB) API key(s) for authentication with the WandB service.
+        wandb_http_proxy (`str`, *optional*):
+            Weights & Biases (WandB) http proxy for connecting with the WandB service.
         resume_from_checkpoint (`str`, *optional*):
             The path to a folder with a valid checkpoint for your model. This argument is not directly used by
             [`Trainer`], it's intended to be used by your training/evaluation scripts instead. See the [example
@@ -866,6 +868,10 @@ class TrainingArguments:
     wandb_api_key: Optional[str] = field(
         default=None,
         metadata={"help": "Weights & Biases (WandB) API key(s) for authentication with the WandB service."},
+    )
+    wandb_http_proxy: Optional[str] = field(
+        default=None,
+        metadata={"help": "Weights & Biases (WandB) http proxy for connecting with the WandB service."},
     )
     resume_from_checkpoint: Optional[str] = field(
         default=None,
