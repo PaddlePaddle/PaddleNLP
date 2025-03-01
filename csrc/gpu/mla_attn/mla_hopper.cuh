@@ -222,6 +222,8 @@ MLAWithKVCacheKernel(CUTE_GRID_CONSTANT
       const int seq_len_encoder_now = mainloop_params.seq_lens_encoder[bid];
       const int seq_len_decoder_now = mainloop_params.seq_lens_decoder[bid] + seq_len_now;
       const int start_token_idx = mainloop_params.cumsum_q_seqlens[bid];
+      cutlass::arch::NamedBarrier::sync(Ktraits::NUM_THREADS,
+                                        /*id=*/static_cast<int>(NamedBarriers::kWG0WG1WG2Sync));
 
       // load Q
       collective_mainloop.load_q(
@@ -257,8 +259,6 @@ MLAWithKVCacheKernel(CUTE_GRID_CONSTANT
           );
         }
       }
-      cutlass::arch::NamedBarrier::sync(Ktraits::NUM_THREADS,
-                                        /*id=*/static_cast<int>(NamedBarriers::kWG0WG1WG2Sync));
     }
 
     collective_mainloop.load_tail(pipeline_q, smem_pipe_write_q, pipeline_kv, smem_pipe_write_kv);
@@ -299,6 +299,8 @@ MLAWithKVCacheKernel(CUTE_GRID_CONSTANT
       const int seq_len_encoder_now = mainloop_params.seq_lens_encoder[bid];
       const int seq_len_decoder_now = mainloop_params.seq_lens_decoder[bid] + seq_len_now;
       const int start_token_idx = mainloop_params.cumsum_q_seqlens[bid];
+      cutlass::arch::NamedBarrier::sync(Ktraits::NUM_THREADS,
+                                        /*id=*/static_cast<int>(NamedBarriers::kWG0WG1WG2Sync));
 
       mma_f16<Ktraits, CAUSAL>(
           mainloop_params, 
@@ -331,9 +333,6 @@ MLAWithKVCacheKernel(CUTE_GRID_CONSTANT
           seq_len_decoder_now,
           mainloop_params.chunk_size,
           mainloop_params.o_stride_bsz);
-
-      cutlass::arch::NamedBarrier::sync(Ktraits::NUM_THREADS,
-                                        /*id=*/static_cast<int>(NamedBarriers::kWG0WG1WG2Sync));
     }
 
     // collective_mainloop.load_tail(pipeline_q, smem_pipe_write_q);
@@ -342,48 +341,6 @@ MLAWithKVCacheKernel(CUTE_GRID_CONSTANT
   }
 }
 
-// __global__ void split_q_block(const int * __restrict__ seq_lens_q,
-//                               const int * __restrict__ seq_lens_encoder,
-//                               const int * __restrict__ seq_lens_decoder,
-//                               int * __restrict__ batch_ids,
-//                               int * __restrict__ tile_ids_per_batch,
-//                               int * __restrict__ num_blocks_x,
-//                               const int bsz,
-//                               const int num_rows_per_block,
-//                               const int chunk_size,
-//                               const int GROUP_SIZE,
-//                               const bool is_encoder) {
-//   if (threadIdx.x == 0) {
-//     int gridx = 0;
-//     int index = 0;
-//     for (uint32_t bid = 0; bid < bsz; bid++) {
-//       int seq_len = seq_lens_q[bid];
-//       int seq_len_encoder = seq_lens_encoder[bid];
-//       int seq_len_decoder = seq_lens_decoder[bid] + seq_len;
-
-//       if (seq_len == 0) continue;
-
-//       int loop_times;
-//       if (is_encoder) {
-//         loop_times = cute::ceil_div(seq_len * GROUP_SIZE, num_rows_per_block);
-//         if (seq_len_decoder > 0) {
-//           loop_times = 0;
-//         }
-//       } else {
-//         loop_times = cute::ceil_div(seq_len_decoder, chunk_size);
-//         if (seq_len_encoder > 0) {
-//           loop_times = 0;
-//         }
-//       }
-//       for (uint32_t tile_id = 0; tile_id < loop_times; tile_id++) {
-//         batch_ids[index] = bid;
-//         tile_ids_per_batch[index++] = tile_id;
-//       }
-//       gridx += loop_times;
-//     }
-//     *num_blocks_x = gridx;
-//   }
-// }
 
 template <typename KernelTraits, bool CAUSAL, typename Params>
 cudaError_t BatchMLAWithPagedKVCacheKernelTraitsDispatched(Params& params,
@@ -392,6 +349,7 @@ cudaError_t BatchMLAWithPagedKVCacheKernelTraitsDispatched(Params& params,
   using DTypeKV = typename KernelTraits::DTypeKV;
   using DTypeO = typename KernelTraits::DTypeO;
   using IdType = typename KernelTraits::IdType;
+  using NV_TYPE = typename KernelTraits::NV_TYPE;
 
   using CollectiveMainloop =
       SparseCollectiveMainloop<KernelTraits, CAUSAL>;
@@ -439,6 +397,7 @@ cudaError_t BatchMLAWithPagedKVCacheKernelTraitsDispatched(Params& params,
       params.o_stride_bsz,
       params.o_stride_head_num,
       params.chunk_size,
+      params.chunk_num,
       params.max_draft_token_num
   });
   typename CollectiveEpilogue::Params epilogue_params = CollectiveEpilogue::to_underlying_arguments_ntma({
@@ -450,7 +409,7 @@ cudaError_t BatchMLAWithPagedKVCacheKernelTraitsDispatched(Params& params,
 
   // Get the ptr to kernel function.
   auto kernel =
-      (void*)MLAWithKVCacheKernel<CollectiveMainloop, CollectiveEpilogue, KernelTraits, CAUSAL, 132>;
+      MLAWithKVCacheKernel<CollectiveMainloop, CollectiveEpilogue, KernelTraits, CAUSAL, 132>;
   int smem_size = sizeof(typename KernelTraits::SharedStorage);
   MLA_CUDA_CALL(
       cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size));
@@ -460,16 +419,13 @@ cudaError_t BatchMLAWithPagedKVCacheKernelTraitsDispatched(Params& params,
   int multiprocessor_count;
   MLA_CUDA_CALL(
       cudaDeviceGetAttribute(&multiprocessor_count, cudaDevAttrMultiProcessorCount, device));
-  // int act_blocks_per_sm;
-  // cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-  //     &act_blocks_per_sm, kernel, KernelTraits::NUM_WARPS * 32, smem_size);
-  // cudaDeviceProp devProp;
-  // cudaGetDeviceProperties(&devProp, device);
-
+  int act_blocks_per_sm;
+  cudaOccupancyMaxActiveBlocksPerMultiprocessor(
+      &act_blocks_per_sm, kernel, KernelTraits::NUM_WARPS * 32, smem_size);
   dim3 grid_dims = {multiprocessor_count, 1, 1}; // todo: split kv
   static constexpr int ctaSize = KernelTraits::NUM_WARPS * 32;
-  dim3 block_dims(ctaSize);
-  MLAWithKVCacheKernel<CollectiveMainloop, CollectiveEpilogue, KernelTraits, CAUSAL, 132><<<grid_dims, block_dims, smem_size, stream>>>(
+  dim3 block_dims(ctaSize, 1, 1);
+  kernel<<<grid_dims, block_dims, smem_size, stream>>>(
     mainloop_params, epilogue_params
   );
   // cudaDeviceSynchronize();
@@ -481,15 +437,15 @@ cudaError_t BatchMLAWithPagedKVCacheKernelTraitsDispatched(Params& params,
     constexpr int blocky = (merge_block_size + blockx - 1) / blockx;
     dim3 grids_merge(min(multiprocessor_count, params.token_num), params.q_num_head); // 128k is too large
     dim3 blocks_merge(blockx, blocky);
-    merge_multi_chunks_kernel<DTypeO, vec_size, blocky, KernelTraits::HEAD_DIM_VO><<<grids_merge, blocks_merge, 0, stream>>>(
-      params.O_tmp,
+    merge_multi_chunks_kernel<NV_TYPE, vec_size, blocky, KernelTraits::HEAD_DIM_VO><<<grids_merge, blocks_merge, 0, stream>>>(
+      reinterpret_cast<NV_TYPE*>(params.O_tmp),
       params.m,
       params.d,
       params.seq_lens_this_time,
       params.seq_lens_decoder,
       params.seq_lens_encoder,
       params.padding_offsets,
-      params.O,
+      reinterpret_cast<NV_TYPE*>(params.O),
       params.max_seq_len,
       params.chunk_num,
       params.q_num_head,
@@ -499,14 +455,14 @@ cudaError_t BatchMLAWithPagedKVCacheKernelTraitsDispatched(Params& params,
       params.bsz,
       params.max_draft_token_num
     );
+    // cudaDeviceSynchronize();
+    // err = cudaGetLastError();
+    // printf("err = %d, str = %s\n", err, cudaGetErrorString(err));
   }
-  // cudaDeviceSynchronize();
-  // err = cudaGetLastError();
-  //   printf("err = %d, str = %s\n", err, cudaGetErrorString(err));
   return cudaSuccess;
 }
 
-template <uint32_t HEAD_DIM_QK, uint32_t HEAD_DIM_VO, MaskMode MASK_MODE, typename Params>
+template <uint32_t HEAD_DIM_QK, uint32_t HEAD_DIM_VO, MaskMode MASK_MODE, typename NV_TYPE, typename Params>
 cudaError_t BatchMLAWithPagedKVCacheDispatched(Params& params, cudaStream_t stream) {
   constexpr bool CAUSAL = MASK_MODE == MaskMode::kCausal;
   if constexpr (HEAD_DIM_QK == 576) {
@@ -517,7 +473,7 @@ cudaError_t BatchMLAWithPagedKVCacheDispatched(Params& params, cudaStream_t stre
                                 /*CTA_KV_=*/64,
                                 /*NUM_STAGES_=*/2, typename Params::DTypeQ,
                                 typename Params::DTypeKV, typename Params::DTypeO,
-                                typename Params::IdType>,
+                                typename Params::IdType, NV_TYPE>,
           CAUSAL>(params, stream);)
   } else {
     return cudaErrorNotSupported;

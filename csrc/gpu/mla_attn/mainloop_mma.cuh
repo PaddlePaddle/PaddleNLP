@@ -67,6 +67,8 @@ CUTLASS_DEVICE void mma_f16(const Params& mainloop_params,
   // using RealSmemLayoutV = decltype(make_layout(get<0>(SmemLayoutVtTest{}), get<1>(SmemLayoutVtTest{}), get<2>(SmemLayoutVt{})));
   static_assert(is_rmem<FrgTensorO>::value, "O tensor must be rmem resident.");
 
+  const int chunk_num_this_seq = cute::ceil_div(kv_len, mainloop_params.chunk_size);
+
   static constexpr int CTA_Q = get<0>(TileShape_QKD{});
   static constexpr int CTA_KV = get<1>(TileShape_QKD{});
 
@@ -172,13 +174,10 @@ CUTLASS_DEVICE void mma_f16(const Params& mainloop_params,
       // gather qk gemm res
       cute::copy(smem_tiled_copy_P, tPrP, tPsP);
       cute::copy(scale_o, tScalesScale);
-
-
-      cutlass::arch::NamedBarrier::arrive(Ktraits::NUM_MMA_THREADS, static_cast<int>(NamedBarriers::kWarpSchedulerWG1));
+      // make sure r2s all done
+      cutlass::arch::NamedBarrier::sync(Ktraits::NUM_MMA_THREADS, static_cast<int>(NamedBarriers::kWarpSchedulerWG1));
 
       attention_updater.rescale_o(tOrO, scale_o);
-      // Tensor tOrP = make_tensor(convert_tSrS.data(),
-      //                           convert_layout_acc_Aregs<typename Ktraits::TiledMmaPV>(tSrS.layout()));
 
       // pv gemm
       if (count % 2 == 0) {
@@ -201,14 +200,17 @@ CUTLASS_DEVICE void mma_f16(const Params& mainloop_params,
     ++smem_pipe_read_q;
 
     // normalize
-    Tensor scale_o = attention_updater.finalize(tSrS);
-    cute::copy(scale_o, tScalesScale);
+    Tensor scale_o = attention_updater.finalize(tSrS); // warp reduce row sum
+    if (chunk_num_this_seq == 1) {
+      // norm
+      cute::copy(scale_o, tScalesScale);
 
-    cutlass::arch::NamedBarrier::arrive(Ktraits::NUM_MMA_THREADS, static_cast<int>(NamedBarriers::kWarpSchedulerWG2));
-    attention_updater.rescale_o(tOrO, scale_o);
+      cutlass::arch::NamedBarrier::arrive(Ktraits::NUM_MMA_THREADS, static_cast<int>(NamedBarriers::kWarpSchedulerWG2));
+      attention_updater.rescale_o(tOrO, scale_o);
+    }
 
     // WG1 write m,d back to gmem
-    if (thread_idx % 4 == 0) { // 16 rows per warp, eg. t0->row0 row8，t4->row1 row9
+    if (chunk_num_this_seq > 1 && thread_idx % 4 == 0) { // 16 rows per warp, eg. t0->row0 row8，t4->row1 row9
       const int warp_idx = thread_idx / 32;
 #pragma unroll
       for (int w_i = 0; w_i < 2; ++w_i) {
@@ -251,11 +253,14 @@ CUTLASS_DEVICE void mma_f16(const Params& mainloop_params,
       // sync WG1 WG2
       cutlass::arch::NamedBarrier::sync(Ktraits::NUM_MMA_THREADS, static_cast<int>(NamedBarriers::kWG1WG2Sync));
     }
-    cutlass::arch::NamedBarrier::sync(Ktraits::NUM_MMA_THREADS, static_cast<int>(NamedBarriers::kWarpSchedulerWG2));
-    // norm
-    cute::copy(tScalesScale, scale_o);
+    if (chunk_num_this_seq == 1) {
+      // norm
+      cutlass::arch::NamedBarrier::sync(Ktraits::NUM_MMA_THREADS, static_cast<int>(NamedBarriers::kWarpSchedulerWG2));
+      // norm
+      cute::copy(tScalesScale, scale_o);
 
-    attention_updater.rescale_o(tOrO, scale_o);
+      attention_updater.rescale_o(tOrO, scale_o);
+    }
   }
   return;
 }

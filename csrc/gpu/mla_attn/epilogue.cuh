@@ -196,11 +196,11 @@ struct CollectiveEpilogue {
     Tensor tOrO_out = convert_type<DTypeO>(tOrO);
     Tensor taccOrO = smem_thr_copy_O.retile_S(tOrO_out);  // ((Atom,AtomNum), MMA_M, MMA_N)
     Tensor taccOsO = smem_thr_copy_O.partition_D(sO);     // ((Atom,AtomNum),PIPE_M,PIPE_N)
-    // Make sure all WGs have finished reading KV
+    // r2s
+    cute::copy(smem_tiled_copy_O, taccOrO, taccOsO);
+    // make sure r2s done
     cutlass::arch::NamedBarrier::sync(NUM_MMA_THREADS,
                                       /*id=*/static_cast<int>(NamedBarriers::kValueEmpty));
-    // r2g
-    cute::copy(smem_tiled_copy_O, taccOrO, taccOsO);
     // cutlass::arch::fence_view_async_shared();  // ensure smem writes are visible to TMA
     // cutlass::arch::NamedBarrier::arrive(NUM_MMA_THREADS + Ktraits::NUM_PRODUCER_THREADS,
     //                                     cutlass::arch::ReservedNamedBarriers::EpilogueBarrier);

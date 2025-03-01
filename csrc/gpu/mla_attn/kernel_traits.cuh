@@ -56,7 +56,7 @@ struct alignas(16) SharedStorageQKVO {
 };
 
 template <bool USE_TMA_LOAD_KV_, int HEAD_DIM_QK_, int HEAD_DIM_VO_, int GROUP_SIZE_, int CTA_Q_, int CTA_KV_,
-          int NUM_STAGES_, typename DTypeQ_, typename DTypeKV_, typename DTypeO_, typename IdType_>
+          int NUM_STAGES_, typename DTypeQ_, typename DTypeKV_, typename DTypeO_, typename IdType_, typename NV_TYPE_>
 struct AttentionKernelTraits {
 
   using DTypeQ = DTypeQ_;
@@ -67,6 +67,7 @@ struct AttentionKernelTraits {
   using DTypePVAccum = float;
   // using DTypeQKAccum = DTypeQ;
   // using DTypePVAccum = DTypeO;
+  using NV_TYPE = NV_TYPE_;
   
   
   static constexpr bool USE_TMA_LOAD_KV = USE_TMA_LOAD_KV_;

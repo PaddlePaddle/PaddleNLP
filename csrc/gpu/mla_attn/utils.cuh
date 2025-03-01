@@ -203,7 +203,6 @@ template <size_t vec_size, typename T>
 struct prefill_softmax_state_t {
   AlignedVector<T, vec_size> o;
   float m;
-  int m_i;
   float d;
   
   __device__ __forceinline__ void init() {
@@ -224,27 +223,6 @@ struct prefill_softmax_state_t {
     } else if constexpr (std::is_same<T, nv_bfloat16>::value) {
       m = -3.38953e38f;
     }
-  }
-
-  __device__ __forceinline__ void init(const int mask_value) {
-    if constexpr (std::is_same<T, half>::value) {
-#pragma unroll
-      for (int i = 0; i < vec_size / 2; ++i) {
-        *((half2*)(&o) + i) = make_half2(0, 0);
-      }
-    } else if constexpr (std::is_same<T, __nv_bfloat16>::value) {
-#pragma unroll
-      for (int i = 0; i < vec_size / 2; ++i) {
-        *((nv_bfloat162*)(&o) + i) = make_bfloat162(0, 0);
-      }
-    }
-    d = 1.f;
-    if constexpr (std::is_same<T, half>::value) {
-      m = -5e4f;
-    } else if constexpr (std::is_same<T, nv_bfloat16>::value) {
-      m = -3.38953e38f;
-    }
-    m_i = mask_value;
   }
 
   __device__ __forceinline__ void merge(const AlignedVector<T, vec_size>& other_o, 
@@ -301,10 +279,10 @@ __global__ void merge_multi_chunks_kernel(const T * __restrict__ multi_out, // [
     if (seq_len_kv == 0) continue;
     seq_len_kv += seq_len_q;
     const int num_chunks_this_seq = cute::ceil_div(seq_len_kv, chunk_size);
-    if (num_chunks_this_seq <= 1) {
-      // not need merge
-      continue;
-    }
+    // if (num_chunks_this_seq <= 1) {
+    //   // not need merge
+    //   continue;
+    // }
 
     using LoadT = AlignedVector<T, vec_size>;
     LoadT load_vec;
@@ -327,7 +305,7 @@ __global__ void merge_multi_chunks_kernel(const T * __restrict__ multi_out, // [
     } else if constexpr (std::is_same<T, __nv_bfloat16>::value) {
       m = -3.0e+30f;
     }
-#pragma unroll 2
+
     for (int i = ty; i < num_chunks_this_seq; i += bdy) {
       uint32_t offset;
       offset = ((i * bsz + bid) * max_draft_token_num + local_seq_id) * num_heads + hid;
