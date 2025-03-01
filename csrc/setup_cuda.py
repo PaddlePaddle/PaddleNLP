@@ -111,6 +111,7 @@ sources = [
     "./gpu/tune_cublaslt_gemm.cu",
     "./gpu/sample_kernels/top_p_sampling_reject.cu",
     "./gpu/update_inputs_v2.cu",
+    "./gpu/noaux_tc.cu",
     "./gpu/set_preids_token_penalty_multi_scores.cu",
     "./gpu/speculate_decoding_kernels/ngram_match.cc",
     "./gpu/speculate_decoding_kernels/speculate_save_output.cc",
