@@ -109,10 +109,10 @@ def per_channel_fp8(
     vm = paddle.empty((b, h_kv, head_dim), dtype=paddle.float32)
 
     if smooth_v:
-        paddlenlp_ops.mean_scale_fuse_quant_cuda(v_transposed_permutted, v_fp8, vm, v_scale, kv_len, scale_max, _tensor_layout)
+        paddlenlp_ops.mean_scale_fuse_quant_cuda(v_transposed_permutted, v_fp8, vm, v_scale, v, scale_max, _tensor_layout) # modified: use `v` instead of kv_len for static mode
         return v_fp8, v_scale, vm
     else:
-        paddlenlp_ops.scale_fuse_quant_cuda(v_transposed_permutted, v_fp8, v_scale, kv_len, scale_max, _tensor_layout)
+        paddlenlp_ops.scale_fuse_quant_cuda(v_transposed_permutted, v_fp8, v_scale, v, scale_max, _tensor_layout) # modified: use `v` instead of kv_len for static mode
         return v_fp8, v_scale, None
     
 
@@ -413,7 +413,7 @@ def sageattn_qk_int8_pv_fp8_cuda_dsk_sm90(
     elif head_dim_og > pad_dim_tgt:
         raise ValueError(f"Unsupported head_dim: {head_dim_og}")
     
-    assert q.strides[-1] == 1 and k.strides[-1] == 1 and v.strides[-1] == 1, "Last dim of qkv must be contiguous."
+    # assert q.strides[-1] == 1 and k.strides[-1] == 1 and v.strides[-1] == 1, "Last dim of qkv must be contiguous."
 
     if sm_scale is None:
         sm_scale = head_dim_og**-0.5

@@ -817,7 +817,7 @@ void scale_fuse_quant_cuda_fwd(
                 paddle::Tensor& input,
                 paddle::Tensor& output,
                 paddle::Tensor& scale,
-                int num_tokens,
+                paddle::Tensor& v,             // for static graph mode
                 float scale_max,
                 int tensor_layout)
 {
@@ -842,13 +842,14 @@ void scale_fuse_quant_cuda_fwd(
   int stride_bz_input = input.strides()[0];
   int stride_bz_output = output.strides()[0];
 
-  int num_heads, head_dim;
+  int num_heads, head_dim, num_tokens;
   int stride_d_input, stride_h_input, stride_d_output, stride_h_output;
 
   if (tensor_layout == 0)
   {
     num_heads = input.shape()[2];
     head_dim = input.shape()[1];
+    num_tokens = v.shape()[1];
     stride_d_input = input.strides()[1];
     stride_h_input = input.strides()[2];
     stride_d_output = output.strides()[1];
@@ -858,6 +859,7 @@ void scale_fuse_quant_cuda_fwd(
   {
     num_heads = input.shape()[1];
     head_dim = input.shape()[2];
+    num_tokens = v.shape()[2];
     stride_d_input = input.strides()[2];
     stride_h_input = input.strides()[1];
     stride_d_output = output.strides()[2];
@@ -891,10 +893,10 @@ void scale_fuse_quant_cuda_fwd(
 }
 
 PD_BUILD_OP(scale_fuse_quant_cuda)
-    .Inputs({"input", "output", "scale"})
-    .Outputs({"out1", "out2", "out3"})
-    .SetInplaceMap({{"input", "out1"}, {"output", "out2"}, {"scale", "out3"}}) // Inplace
-    .Attrs({"num_tokens: int", "scale_max: float", "tensor_layout: int"})
+    .Inputs({"input", "output", "scale", "v"})
+    .Outputs({"out1", "out2", "out3", "out4"})
+    .SetInplaceMap({{"input", "out1"}, {"output", "out2"}, {"scale", "out3"}, {"v", "out4"}}) // Inplace
+    .Attrs({"scale_max: float", "tensor_layout: int"})
     .SetKernelFn(PD_KERNEL(scale_fuse_quant_cuda_fwd));
 
 // smooth v
@@ -903,7 +905,7 @@ void mean_scale_fuse_quant_cuda_fwd(
                 paddle::Tensor& output,
                 paddle::Tensor& mean,
                 paddle::Tensor& scale,
-                int num_tokens,
+                paddle::Tensor& v,             // for static graph mode
                 float scale_max,
                 int tensor_layout)
 {
@@ -932,13 +934,14 @@ void mean_scale_fuse_quant_cuda_fwd(
   int stride_bz_input = input.strides()[0];
   int stride_bz_output = output.strides()[0];
 
-  int num_heads, head_dim;
+  int num_heads, head_dim, num_tokens;
   int stride_d_input, stride_h_input, stride_d_output, stride_h_output;
 
   if (tensor_layout == 0)
   {
     num_heads = input.shape()[2];
     head_dim = input.shape()[1];
+    num_tokens = v.shape()[1];
     stride_d_input = input.strides()[1];
     stride_h_input = input.strides()[2];
     stride_d_output = output.strides()[1];
@@ -948,6 +951,7 @@ void mean_scale_fuse_quant_cuda_fwd(
   {
     num_heads = input.shape()[1];
     head_dim = input.shape()[2];
+    num_tokens = v.shape()[2];
     stride_d_input = input.strides()[2];
     stride_h_input = input.strides()[1];
     stride_d_output = output.strides()[2];
@@ -982,8 +986,8 @@ void mean_scale_fuse_quant_cuda_fwd(
 }
 
 PD_BUILD_OP(mean_scale_fuse_quant_cuda)
-    .Inputs({"input", "output", "mean", "scale"})
-    .Outputs({"out1", "out2", "out3", "out4"})
-    .SetInplaceMap({{"input", "out1"}, {"output", "out2"}, {"mean", "out3"}, {"scale", "out4"}}) // Inplace
-    .Attrs({"num_tokens: int", "scale_max: float", "tensor_layout: int"})
+    .Inputs({"input", "output", "mean", "scale", "v"})
+    .Outputs({"out1", "out2", "out3", "out4", "out5"})
+    .SetInplaceMap({{"input", "out1"}, {"output", "out2"}, {"mean", "out3"}, {"scale", "out4"}, {"v", "out5"}}) // Inplace
+    .Attrs({"scale_max: float", "tensor_layout: int"})
     .SetKernelFn(PD_KERNEL(mean_scale_fuse_quant_cuda_fwd));
