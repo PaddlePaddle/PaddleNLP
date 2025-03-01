@@ -1260,61 +1260,42 @@ class FusedMultiTransformerBase(Layer):
         def get_moe_scores(
             gating_output: paddle.Tensor,
             config: MoeConfig,
-        ) -> tuple[paddle.Tensor, paddle.Tensor]:
-
-            num_token = gating_output.shape[0]
-            num_expert_group = config.num_expert_group
-            topk_group = config.topk_group
-
+        ) -> paddle.Tensor:
             # Compute softmax or sigmoid scores based on the topk_method
             if config.topk_method == "greedy":
                 scores = paddle.nn.functional.softmax(gating_output, axis=-1)
-                return scores, scores
+                return scores
             elif config.topk_method == "group_limited_greedy":
                 scores = paddle.nn.functional.softmax(gating_output, axis=-1)
-                scores_no_bias = scores
-                group_scores = scores.reshape([num_token, num_expert_group, -1]).max(axis=-1)  # [n, num_expert_group]
+                scores_with_bias = scores
             elif config.topk_method == "noaux_tc":
                 if e_score_correction_bias is None:
                     raise ValueError("e_score_correction_bias must be provided for 'noaux_tc' method.")
                 scores = paddle.nn.functional.sigmoid(gating_output)
-                # 原始 scores
-                scores_no_bias = scores
-                scores = scores + e_score_correction_bias.unsqueeze(0)
-                group_scores = (
-                    scores.reshape([num_token, num_expert_group, -1]).topk(2, axis=-1)[0].sum(axis=-1)
-                )  # [n, num_expert_group]
+                scores_with_bias = scores + e_score_correction_bias.unsqueeze(0)
             else:
                 raise ValueError(
                     f"Unsupported topk_method: {config.topk_method}. Please choose 'group_limited_greedy' or 'noaux_tc'."
                 )
+            from paddlenlp_ops import noaux_tc
 
-            # Identify top-k groups
-            group_idx = paddle.topk(group_scores, k=topk_group, axis=-1, sorted=False)[1]  # [n, topk_group]
-
-            group_mask = paddle.zeros_like(group_scores, dtype="int64")  # [n, num_expert_group]
-            group_mask = paddle.put_along_axis(group_mask, group_idx, 1, axis=1)
-
-            # Apply group mask to the scores
-            score_mask = (
-                group_mask.unsqueeze(-1)
-                .expand([num_token, num_expert_group, scores.shape[-1] // num_expert_group])
-                .reshape([num_token, -1])
-                .astype("float32")
-            )  # [n, e]
-
-            # Scale the scores with the mask and scaling factor
-            scores = scores * score_mask
-
-            # renormalize 和 refactor 在后面做
-            return scores, scores_no_bias
+            scores = noaux_tc(
+                scores,
+                scores_with_bias,
+                config.num_expert_group,
+                config.topk_group,
+                config.top_k,
+                config.routed_scaling_factor,
+            )
+            return scores
 
         if self.config.moe_config.topk_method is not None:
             from paddle.incubate.nn.functional import moe_dispatch, moe_ffn, moe_reduce
 
             gate_out = paddle.matmul(tmp_out.cast("float32"), self.gate_weights[i])
             # 应用各种策略后重塑的 scores
-            scores, scores_no_bias = get_moe_scores(gate_out, self.config.moe_config)
+            scores = get_moe_scores(gate_out, self.config.moe_config)
+
             # topk 在 moe_dispatch 中
             (
                 permute_input,
@@ -1335,18 +1316,14 @@ class FusedMultiTransformerBase(Layer):
                 self.quant_type if hasattr(self, "quant_type") else "None",
             )
 
-            if e_score_correction_bias is not None:
-                top_k_weights = scores_no_bias.take_along_axis(top_k_indices, axis=1)
-
-            # reduce 中会做 topk 个 weight 的 norm 和 routed_scaling_factor
             fused_moe_out = moe_reduce(
                 ffn_out,
                 top_k_weights,
                 permute_indices_per_token,
                 top_k_indices,
                 self.ffn2_biases[i],
-                norm_topk_prob=self.config.moe_config.norm_topk_prob,
-                routed_scaling_factor=self.config.moe_config.routed_scaling_factor,
+                norm_topk_prob=False,  # 在noaux_tc中做了
+                routed_scaling_factor=1.0,  # 在noaux_tc中做了
             )
         else:
             fused_moe_out = fused_moe(
