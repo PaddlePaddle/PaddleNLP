@@ -76,6 +76,11 @@ __all__ = [
 ]
 
 
+def is_pp_enable():
+    global_mesh = dist.auto_parallel.get_mesh()
+    return "pp" in global_mesh.dim_names
+
+
 def scaled_dot_product_attention(
     query_states,
     config,
@@ -279,7 +284,7 @@ class DeepseekV2MoEAuto(MoELayer):
     A mixed expert module containing shared experts.
     """
 
-    def __init__(self, config: DeepseekV2Config):
+    def __init__(self, config: DeepseekV2Config, ipp=None):
         gate = MoEGate(
             config=config,
             num_experts=config.n_routed_experts,
@@ -291,6 +296,7 @@ class DeepseekV2MoEAuto(MoELayer):
             norm_topk_prob=config.norm_topk_prob,
             routed_scaling_factor=config.routed_scaling_factor,
             drop_tokens=False,
+            ipp=ipp,
         )
 
         super().__init__(
@@ -300,6 +306,7 @@ class DeepseekV2MoEAuto(MoELayer):
             expert_kwargs={"config": config, "intermediate_size": config.moe_intermediate_size},
             gate=gate,
             capacity=2.0,
+            ipp=ipp,
         )
         self.alpha = config.aux_loss_alpha
         if config.n_shared_experts is not None:
@@ -536,7 +543,7 @@ class DeepseekV2AttentionAuto(nn.Layer):
 
 
 class DeepseekV2DecoderLayerAuto(nn.Layer):
-    def __init__(self, config: DeepseekV2Config, layer_idx: int, layerwise_recompute: bool = False):
+    def __init__(self, config: DeepseekV2Config, layer_idx: int, layerwise_recompute: bool = False, ipp=None):
         super().__init__()
         self.config = config
 
@@ -547,9 +554,10 @@ class DeepseekV2DecoderLayerAuto(nn.Layer):
         self.hidden_size = config.hidden_size
 
         self.self_attn = DeepseekV2AttentionAuto(config=config, layerwise_recompute=layerwise_recompute)
+        self.ipp = ipp
 
         self.mlp = (
-            DeepseekV2MoEAuto(config)
+            DeepseekV2MoEAuto(config, ipp=self.ipp)
             if (
                 config.n_routed_experts is not None
                 and layer_idx >= config.first_k_dense_replace
@@ -646,13 +654,8 @@ class DeepseekV2DecoderLayerAuto(nn.Layer):
 
 
 class DeepseekV2MTPLayerAuto(DeepseekV2DecoderLayerAuto):
-    def __init__(
-        self,
-        config: DeepseekV2Config,
-        layer_idx: int,
-        layerwise_recompute: bool = False,
-    ):
-        super(DeepseekV2MTPLayerAuto, self).__init__(config, layer_idx, layerwise_recompute)
+    def __init__(self, config: DeepseekV2Config, layer_idx: int, layerwise_recompute: bool = False, ipp=None):
+        super(DeepseekV2MTPLayerAuto, self).__init__(config, layer_idx, layerwise_recompute, ipp)
 
         self.enorm = DeepseekV2RMSNorm(config)
         self.hnorm = DeepseekV2RMSNorm(config)
@@ -802,15 +805,51 @@ class DeepseekV2ModelAuto(DeepseekV2PretrainedModelAuto):
         self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
         self.global_layer = GlobalOutputNet(config=config)
 
-        self.layers = nn.LayerList(
-            [
-                DeepseekV2DecoderLayerAuto(config, layer_idx, layer_idx not in self.no_recompute_layers)
-                for layer_idx in range(config.num_hidden_layers)
-            ]
-        )
+        def divide_list_indices(n, k):
+            n = n + 1
+            base_size = n // k
+            extra = n % k
 
-        for layer_idx in range(config.num_hidden_layers, config.num_hidden_layers + config.num_nextn_predict_layers):
-            self.layers.append(DeepseekV2MTPLayerAuto(config, layer_idx, layer_idx not in self.no_recompute_layers))
+            indices = []
+            current_index = -1
+
+            for i in range(k):
+                current_index += base_size
+                if i < extra:
+                    current_index += 1
+                indices.append(current_index)
+            return indices
+
+        if is_pp_enable():
+            mesh = dist.auto_parallel.get_mesh()
+            self.pp_indices = divide_list_indices(
+                config.num_hidden_layers + config.num_nextn_predict_layers, mesh.get_dim_size("pp")
+            )
+
+        def get_pp_stage_id(layer_idx):
+            if not is_pp_enable():
+                return None
+            else:
+                for idx, end_idx in enumerate(self.pp_indices):
+                    if layer_idx <= end_idx:
+                        return idx
+
+        decoder_layers = []
+        for layer_idx in range(config.num_hidden_layers + config.num_nextn_predict_layers):
+            pp_stage_id = get_pp_stage_id(layer_idx)
+            logger.info(f"layer_idx:{layer_idx}, pp_stage_id:{pp_stage_id}")
+            if layer_idx < config.num_hidden_layers:
+                decoder_layers.append(
+                    DeepseekV2DecoderLayerAuto(
+                        config, layer_idx, layer_idx not in self.no_recompute_layers, pp_stage_id
+                    )
+                )
+            else:
+                decoder_layers.append(
+                    DeepseekV2MTPLayerAuto(config, layer_idx, layer_idx not in self.no_recompute_layers, pp_stage_id)
+                )
+
+        self.layers = nn.LayerList(decoder_layers)
 
         self.norm = DeepseekV2RMSNorm(config)
 
