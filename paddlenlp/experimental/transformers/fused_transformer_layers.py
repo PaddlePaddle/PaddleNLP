@@ -1390,12 +1390,15 @@ class FusedMultiTransformerBase(Layer):
             seq_lens_decoder = kwargs.get("seq_lens_decoder", None)
             seq_lens_this_time = kwargs.get("seq_lens_this_time", None)
             position_ids_shape = paddle.sum(seq_lens_this_time)
-            self.position_ids = paddle.zeros(shape=position_ids_shape, dtype=seq_lens_encoder.dtype)
+            self.position_ids = paddle.empty(shape=position_ids_shape, dtype=seq_lens_encoder.dtype)
+            self.mask_encoder_batch = paddle.empty(shape=position_ids_shape, dtype=seq_lens_encoder.dtype).unsqueeze(1)
 
-            from paddlenlp_ops import get_position_ids
+            from paddlenlp_ops import get_position_ids_and_mask_encoder_batch
 
             # In-place operations that compute the position_ids.
-            get_position_ids(seq_lens_encoder, seq_lens_decoder, seq_lens_this_time, self.position_ids)
+            get_position_ids_and_mask_encoder_batch(
+                seq_lens_encoder, seq_lens_decoder, seq_lens_this_time, self.position_ids, self.mask_encoder_batch
+            )
 
     def post_process(self, **kwargs):
         time_step = kwargs.get("time_step", None)
@@ -2976,6 +2979,8 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
             fmha_out_prefill = fmha_out_prefill[:, :, : self.config.mla_config.v_head_dim]
             fmha_out_prefill = fmha_out_prefill.reshape([-1, self.num_heads * self.config.mla_config.v_head_dim])
 
+            fmha_out_prefill = fmha_out_prefill * self.mask_encoder_batch.cast(fmha_out_prefill.dtype)
+
             out_linear_out_prefill = self.compute_out_linear(fmha_out_prefill, i)
             out_linear_out = out_linear_out + out_linear_out_prefill
 
@@ -3306,6 +3311,8 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
             fmha_out_prefill = fmha_out_prefill.reshape([-1, self.num_heads, self.config.mla_config.qk_head_dim])
             fmha_out_prefill = fmha_out_prefill[:, :, : self.config.mla_config.v_head_dim]
             fmha_out_prefill = fmha_out_prefill.reshape([-1, self.num_heads * self.config.mla_config.v_head_dim])
+
+            fmha_out_prefill = fmha_out_prefill * self.mask_encoder_batch.cast(fmha_out_prefill.dtype)
 
             out_linear_out_prefill = self.compute_out_linear(fmha_out_prefill, i)
             out_linear_out = out_linear_out + out_linear_out_prefill
