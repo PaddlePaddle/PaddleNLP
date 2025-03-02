@@ -1070,7 +1070,7 @@ class FusedMultiTransformerBase(Layer):
             query_pe, key_pe = self.config.rotary_emb(self.position_ids, query_pe, key_pe)
 
             if self.config.mla_config.use_absorb():
-                from paddlenlp_ops import prefill_mla_write_cache
+                from paddlenlp.custom_ops import prefill_mla_write_cache
 
                 prefill_mla_write_cache(
                     compressed_kv,
@@ -2121,7 +2121,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             query_pe, key_pe = self.config.rotary_emb(self.position_ids, query_pe, key_pe)
 
             if self.config.mla_config.use_absorb():
-                from paddlenlp_ops import prefill_mla_write_cache
+                from paddlenlp.custom_ops import prefill_mla_write_cache
 
                 prefill_mla_write_cache(
                     compressed_kv,
@@ -2973,7 +2973,10 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
         i,
         **kwargs,
     ):
-        from paddlenlp_ops import decode_mla_write_cache, multi_head_latent_attention
+        from paddlenlp.custom_ops import (
+            decode_mla_write_cache,
+            multi_head_latent_attention,
+        )
 
         ln_out = qkv_out
         latent_cache = caches[i]
@@ -3301,7 +3304,10 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
         i,
         **kwargs,
     ):
-        from paddlenlp_ops import decode_mla_write_cache, multi_head_latent_attention
+        from paddlenlp.custom_ops import (
+            decode_mla_write_cache,
+            multi_head_latent_attention,
+        )
 
         ln_out = qkv_out
         latent_cache = caches[i]

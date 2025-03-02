@@ -128,7 +128,7 @@ class DeepseekScalingRotaryEmbedding(nn.Layer):
     ) -> Tuple[paddle.Tensor, paddle.Tensor]:
         import os
 
-        from paddlenlp_ops import fused_rotary_position_encoding
+        from paddlenlp.custom_ops import fused_rotary_position_encoding
 
         # In-place operations that update the query and key tensors.
         os.environ["stride_in_no_check_dy2st_diff"] = "1"
