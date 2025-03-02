@@ -1271,7 +1271,8 @@ class MixtralForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Mixtr
         else:
             max_block_nums = max_batch_size * max_block_per_seq
 
-        cache_kvs = []
+        cache_k_shapes = []
+        cache_v_shapes = []
         for _ in range(config.num_hidden_layers):
             cache_kv_shape = [
                 max_block_nums,
@@ -1279,9 +1280,9 @@ class MixtralForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Mixtr
                 config.block_size,
                 config.hidden_size // config.num_attention_heads,
             ]
-            cache_kvs.append(cache_kv_shape)
-            cache_kvs.append(cache_kv_shape)
-        return cache_kvs
+            cache_k_shapes.append(cache_kv_shape)
+            cache_v_shapes.append(cache_kv_shape)
+        return cache_k_shapes, cache_v_shapes
 
     def prepare_inputs_for_generation(self, **kwargs):
         # only last token for inputs_ids if cache is defined in kwargs

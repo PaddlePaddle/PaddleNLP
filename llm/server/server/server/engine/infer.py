@@ -18,7 +18,8 @@ import json
 import os
 import sys
 import time
-from concurrent.futures import ThreadPoolExecutor
+
+# from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import shared_memory
 
 import numpy as np
@@ -31,15 +32,12 @@ from server.engine.config import Config
 from server.utils import get_logger
 from task_queue_manager import TaskQueueManager
 
-from paddlenlp.custom_ops import step_paddle
-from paddlenlp.experimental.transformers import InferenceWithReferenceProposer
+from paddlenlp.custom_ops import speculate_step_paddle, step_paddle
+from paddlenlp.experimental.transformers import (
+    EagleProposer,
+    InferenceWithReferenceProposer,
+)
 from paddlenlp.trl.llm_utils import get_rotary_position_embedding
-
-# Assigned to but never used
-# from paddlenlp.utils.env import (
-#     PADDLE_INFERENCE_MODEL_SUFFIX,
-#     PADDLE_INFERENCE_WEIGHTS_SUFFIX,
-# )
 
 File_Path = os.path.realpath(sys.argv[0])
 Dir_Path = os.path.dirname(File_Path)
@@ -77,6 +75,7 @@ class ModelRunner:
         self.load_model_init_val()
 
         self.share_inputs = {}
+        self.helper_tensors = {}
         self.cache_kvs = {}
         self.init_inputs()
 
@@ -89,6 +88,8 @@ class ModelRunner:
                     self.args.max_batch_size,
                     self.args.max_seq_len,
                 )
+            elif self.speculate_config.speculate_method in ["eagle", "mtp"]:
+                self.proposer = EagleProposer(self.speculate_config, base_model_inputs=self.share_inputs)
         else:
             self.proposer = None
 
@@ -105,6 +106,9 @@ class ModelRunner:
             config=self.config,
             mp_degree=self.nranks,
         )
+
+        if self.config.return_full_hidden_states:
+            self.set_inputs()
 
     def read_model_config(self):
         """
@@ -270,9 +274,10 @@ class ModelRunner:
         self.share_inputs["presence_score"] = paddle.full(
             shape=[self.args.max_batch_size, 1], fill_value=self.presence_score, dtype="float32"
         )
-        self.share_inputs["seq_lens_this_time"] = paddle.full(
+        self.helper_tensors["seq_lens_this_time"] = paddle.full(
             shape=[self.args.max_batch_size, 1], fill_value=0, dtype="int32"
         )
+        self.share_inputs["seq_lens_this_time"] = None
         self.share_inputs["seq_lens_encoder"] = paddle.full(
             shape=[self.args.max_batch_size, 1], fill_value=0, dtype="int32"
         )
@@ -333,7 +338,6 @@ class ModelRunner:
         self.share_inputs["stop_seqs"] = paddle.full(
             shape=[self.max_stop_seqs_num, self.stop_seqs_max_len], fill_value=-1, dtype="int64"
         )
-
         self.share_inputs["first_token_ids"] = paddle.full(
             shape=[self.args.max_batch_size, 1], fill_value=-1, dtype="int64"
         )
@@ -360,6 +364,23 @@ class ModelRunner:
                 fill_value=self.speculate_config.speculate_max_draft_token_num,
                 dtype="int32",
             )
+            self.helper_tensors["full_hidden_states"] = None
+
+    def set_inputs(self):
+        for i in range(self.args.num_layers):
+            self.share_inputs["value_caches_{}".format(i)] = self.cache_kvs["value_caches_{}".format(i)]
+            self.share_inputs["key_caches_{}".format(i)] = self.cache_kvs["key_caches_{}".format(i)]
+
+        self.input_tensors = []
+        share_inputs_keys = self.share_inputs.keys()
+        for k in self.infer_engine.input_names:
+            assert k in share_inputs_keys, f"Input {k} must be created."
+            if k != "seq_lens_this_time":
+                v = self.share_inputs[k]
+                v.name = k
+                self.input_tensors.append(v)
+        # seq_lens_this_time need to be replaced in insert step
+        self.input_tensors.append("None")
 
     def dy_input_preprocess(self, tasks):
         """
@@ -379,7 +400,7 @@ class ModelRunner:
             self.share_inputs["penalty_score"][idx : idx + 1] = task.get("penalty_score", 1.0)
             self.share_inputs["frequency_score"][idx : idx + 1] = task.get("frequency_score", 0.0)
             self.share_inputs["presence_score"][idx : idx + 1] = task.get("presence_score", 0.0)
-            self.share_inputs["seq_lens_this_time"][idx : idx + 1] = length
+            self.helper_tensors["seq_lens_this_time"][idx : idx + 1] = length
             self.share_inputs["step_seq_lens_encoder"][idx : idx + 1] = length
             self.share_inputs["seq_lens_encoder"][idx : idx + 1] = length
             self.share_inputs["seq_lens_decoder"][idx : idx + 1] = 0
@@ -417,51 +438,77 @@ class ModelRunner:
                 )
 
             if self.is_speculate_decoding:
-                self.share_inputs["draft_tokens"][idx : idx + 1] = np.zeros(
-                    [self.speculate_config.speculate_max_draft_token_num + 1]
-                )
-                self.share_inputs["actual_draft_token_num"][idx : idx + 1] = np.array(
-                    [self.speculate_config.speculate_max_draft_token_num]
-                )
+                if self.speculate_config.speculate_method == "inference_with_reference":
+                    self.share_inputs["draft_tokens"][idx : idx + 1] = np.zeros(
+                        [self.speculate_config.speculate_max_draft_token_num + 1]
+                    )
+                    self.share_inputs["actual_draft_token_num"][idx : idx + 1] = np.array(
+                        [self.speculate_config.speculate_max_draft_token_num]
+                    )
+                elif self.speculate_config.speculate_method in ["eagle", "mtp"]:
+                    self.proposer.insert_query(idx=idx, task=task)
 
-    def step_cuda(self, seq_lens_this_time):
+    def step_cuda(self):
         """
         step cuda
         """
-        # Assigned but never used
-        # whether speculate decoding
-        # if self.is_speculate_decoding:
-        #     speculate_step_token_num = self.speculate_config.speculate_max_draft_token_num + 1
-        # else:
-        #     speculate_step_token_num = 0
-
-        step_paddle(
-            self.share_inputs["stop_flags"],
-            seq_lens_this_time,
-            self.share_inputs["step_seq_lens_encoder"],
-            self.share_inputs["seq_lens_encoder"],
-            self.share_inputs["seq_lens_decoder"],
-            self.share_inputs["block_tables"],
-            self.share_inputs["encoder_block_lens"],
-            self.share_inputs["is_block_step"],
-            self.share_inputs["step_block_list"],
-            self.share_inputs["step_lens"],
-            self.share_inputs["recover_block_list"],
-            self.share_inputs["recover_lens"],
-            self.share_inputs["need_block_list"],
-            self.share_inputs["need_block_len"],
-            self.share_inputs["used_list_len"],
-            self.share_inputs["free_list"],
-            self.share_inputs["free_list_len"],
-            self.share_inputs["input_ids"],
-            self.share_inputs["pre_ids"],
-            self.share_inputs["step_idx"],
-            self.share_inputs["next_tokens"],
-            self.share_inputs["first_token_ids"],
-            self.args.block_size,
-            self.args.enc_dec_block_num,
-            0,
-        )
+        if self.is_speculate_decoding:
+            speculate_step_paddle(
+                self.share_inputs["stop_flags"],
+                self.share_inputs["seq_lens_this_time"],
+                self.share_inputs["step_seq_lens_encoder"],
+                self.share_inputs["seq_lens_encoder"],
+                self.share_inputs["seq_lens_decoder"],
+                self.share_inputs["block_tables"],
+                self.share_inputs["encoder_block_lens"],
+                self.share_inputs["is_block_step"],
+                self.share_inputs["step_block_list"],
+                self.share_inputs["step_lens"],
+                self.share_inputs["recover_block_list"],
+                self.share_inputs["recover_lens"],
+                self.share_inputs["need_block_list"],
+                self.share_inputs["need_block_len"],
+                self.share_inputs["used_list_len"],
+                self.share_inputs["free_list"],
+                self.share_inputs["free_list_len"],
+                self.share_inputs["input_ids"],
+                self.share_inputs["pre_ids"],
+                self.share_inputs["step_idx"],
+                self.share_inputs["next_tokens"],
+                self.share_inputs["first_token_ids"],
+                self.share_inputs["accept_num"],
+                self.args.block_size,
+                self.args.enc_dec_block_num,
+                self.speculate_config.speculate_max_draft_token_num,
+            )
+        else:
+            step_paddle(
+                self.share_inputs["stop_flags"],
+                self.share_inputs["seq_lens_this_time"],
+                self.share_inputs["step_seq_lens_encoder"],
+                self.share_inputs["seq_lens_encoder"],
+                self.share_inputs["seq_lens_decoder"],
+                self.share_inputs["block_tables"],
+                self.share_inputs["encoder_block_lens"],
+                self.share_inputs["is_block_step"],
+                self.share_inputs["step_block_list"],
+                self.share_inputs["step_lens"],
+                self.share_inputs["recover_block_list"],
+                self.share_inputs["recover_lens"],
+                self.share_inputs["need_block_list"],
+                self.share_inputs["need_block_len"],
+                self.share_inputs["used_list_len"],
+                self.share_inputs["free_list"],
+                self.share_inputs["free_list_len"],
+                self.share_inputs["input_ids"],
+                self.share_inputs["pre_ids"],
+                self.share_inputs["step_idx"],
+                self.share_inputs["next_tokens"],
+                self.share_inputs["first_token_ids"],
+                self.args.block_size,
+                self.args.enc_dec_block_num,
+                0,
+            )
 
     def initialize_engine_ready_check_flag(self):
         """
@@ -526,12 +573,12 @@ class ModelRunner:
         flag_ready_array[self.rank] = 1
 
         flag_array = np.zeros([1], dtype=np.int32)
-        shm_flag_has_block_step = shared_memory.SharedMemory(
-            name=self.config.get_unique_name("shm_flag_has_block_step")
-        )
-        flag_has_block_step_array = np.ndarray(  # noqa: F841
-            flag_array.shape, dtype=flag_array.dtype, buffer=shm_flag_has_block_step.buf
-        )
+        # shm_flag_has_block_step = shared_memory.SharedMemory(
+        #     name=self.config.get_unique_name("shm_flag_has_block_step")
+        # )
+        # flag_has_block_step_array = np.ndarray(
+        #     flag_array.shape, dtype=flag_array.dtype, buffer=shm_flag_has_block_step.buf
+        # )
 
         use_custom_health_checker = self.config.use_custom_health_checker
         if use_custom_health_checker:
@@ -545,13 +592,13 @@ class ModelRunner:
                 engine_healthy_recorded_time_array,
             ) = self.initialize_engine_healthy_recorded_time_flag()
             engine_healthy_recorded_time_array[0] = time.time()
-            infer_live_flag_shm = self.initialize_engine_live_flag()  # noqa: F841
+            # infer_live_flag_shm = self.initialize_engine_live_flag()
         infer_seed_increment = paddle.full(shape=[self.args.max_batch_size, 1], fill_value=4, dtype="int64")
-        thread_executor = ThreadPoolExecutor(max_workers=1)  # noqa: F841
-        seq_lens_this_time = None
+        # thread_executor = ThreadPoolExecutor(max_workers=1)
         real_bsz = None
 
         while True:
+            self.insert_step = False
             if use_custom_health_checker:
                 engine_healthy_recorded_time_array[0] = time.time()
 
@@ -567,8 +614,10 @@ class ModelRunner:
 
             if flag_broadcast_array[0] == 1 or self.infer_queue.read_finish_flag.get() == 1:
                 logger.info(f"rank: {self.rank} start to get")
-                if seq_lens_this_time is not None:
-                    self.share_inputs["seq_lens_this_time"][:real_bsz] = seq_lens_this_time
+
+                self.insert_step = True
+                if self.share_inputs["seq_lens_this_time"] is not None:
+                    self.helper_tensors["seq_lens_this_time"][:real_bsz] = self.share_inputs["seq_lens_this_time"]
 
                 tasks, read_finish = self.infer_queue.get()
                 if read_finish:
@@ -582,8 +631,14 @@ class ModelRunner:
                     logger.info(f"rank: {self.rank}, real_bsz: {real_bsz}, query_num: {len(req_dicts)}")
 
                 self.dy_input_preprocess(req_dicts)
-                seq_lens_this_time = copy.deepcopy(self.share_inputs["seq_lens_this_time"][:real_bsz])
-                self.infer_engine.seq_lens_handle.share_external_data(seq_lens_this_time)
+                self.share_inputs["seq_lens_this_time"] = copy.deepcopy(
+                    self.helper_tensors["seq_lens_this_time"][:real_bsz]
+                )
+                if self.config.return_full_hidden_states:
+                    self.share_inputs["seq_lens_this_time"].name = "seq_lens_this_time"
+                    self.input_tensors[-1] = self.share_inputs["seq_lens_this_time"]
+                if not self.config.return_full_hidden_states:
+                    self.infer_engine.seq_lens_handle.share_external_data(self.share_inputs["seq_lens_this_time"])
                 self.share_inputs["not_need_stop"][0] = True
 
             if not self.share_inputs["not_need_stop"]:
@@ -596,15 +651,25 @@ class ModelRunner:
             if self.proposer is not None:
                 self.proposer.run(
                     self.share_inputs,
-                    real_batch_size=seq_lens_this_time.shape[0],
-                    seq_lens_this_time=seq_lens_this_time,
+                    real_batch_size=self.share_inputs["seq_lens_this_time"].shape[0],
+                    seq_lens_this_time=self.share_inputs["seq_lens_this_time"],
+                    base_model_full_hidden_states=self.helper_tensors["full_hidden_states"],
+                    insert_step=self.insert_step,
                 )
 
-            self.infer_engine.predictor.run()
+            if self.config.return_full_hidden_states:
+                outputs = self.infer_engine.predictor.run(self.input_tensors)
+                self.helper_tensors["full_hidden_states"] = outputs[0]
+            else:
+                self.infer_engine.predictor.run()
+
             self.share_inputs["infer_seed"].add_(infer_seed_increment)
             self.share_inputs["infer_seed"][:] %= self.MAX_INFER_SEED
             if self.free_list_len > 0:
-                self.step_cuda(seq_lens_this_time)
+                self.step_cuda()
+
+            if self.proposer is not None:
+                self.proposer.postprocess()
 
 
 class InferenceEngine(object):
@@ -632,7 +697,8 @@ class InferenceEngine(object):
             self.rank = fleet.worker_index()
 
         self._init_predictor()
-        self.share_data()
+        if not self.config.return_full_hidden_states:
+            self.share_data()
 
     def _init_predictor(self):
         """

@@ -653,6 +653,14 @@ class TrainingArguments:
             )
         },
     )
+    split_inputs_sequence_dim: bool = field(
+        default=True,
+        metadata={
+            "help": (
+                "The paddle sequence parallel strategy can reduce the GPU memory of activation to 1/sep .If it is true, trainer will cut input in sequence dim "
+            )
+        },
+    )
     context_parallel_degree: int = field(
         default=-1,
         metadata={
@@ -977,6 +985,14 @@ class TrainingArguments:
     pdc_download_timeout: Optional[int] = field(
         default=300,
         metadata={"help": "Timeout seconds for downloading checkpoint from remote cluster."},
+    )
+    count_trained_tokens: bool = field(
+        default=False,
+        metadata={"help": "Whether to count trained tokens."},
+    )
+    pad_token_id: int = field(
+        default=0,
+        metadata={"help": "The id of the padding token."},
     )
 
     def __post_init__(self):

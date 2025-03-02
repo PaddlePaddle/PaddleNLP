@@ -153,7 +153,13 @@ class MoELayer(nn.Layer):
         self.moe_num_experts = moe_num_experts
         self.capacity = capacity
 
-        if dist.get_world_size() > 1 and moe_group == "data":
+        try:
+            dist.fleet.get_hybrid_communicate_group()
+            is_fleet_init = True
+        except AttributeError:
+            is_fleet_init = False
+
+        if is_fleet_init and dist.get_world_size() > 1 and moe_group == "data":
             self.moe_group = dist.fleet.get_hybrid_communicate_group().get_data_parallel_group()
             self.moe_rank = dist.get_rank(self.moe_group)
             self.moe_rank = 0 if self.moe_rank < 0 else self.moe_rank
@@ -241,7 +247,7 @@ class MoELayer(nn.Layer):
         # group_size = kwargs['group_size'] if 'group_size' in kwargs.keys() else 1
         reshaped_input = hidden_state.reshape([-1, d_model])
 
-        capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss = self.gate(reshaped_input)
+        capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss = self.gate(hidden_state)
 
         # self.l_aux       :
         # combine_weights  : sec

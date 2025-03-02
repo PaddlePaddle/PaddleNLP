@@ -415,14 +415,14 @@ class GenerationBlockInferenceModel(GenerationMixin):
         dtype = config.get("dtype", paddle.get_default_dtype())
         cachekv_dtype = dtype
 
-        cache_kvs_shapes = self.get_cache_kvs_shape(
+        cache_k_shapes, cache_v_shapes = self.get_cache_kvs_shape(
             self.config, max_batch_size=config.get("max_batch_size", -1), max_length=config.get("max_length", None)
         )
         export_precache = config.get("export_precache", False)
         if export_precache:
             precache_kv_spec = [
                 paddle.static.InputSpec(shape=[None, None, None, None], dtype=dtype, name=f"pre_caches_{i}")
-                for i in range(len(cache_kvs_shapes))
+                for i in range(len(cache_k_shapes + cache_v_shapes))
             ]
         else:
             precache_kv_spec = None
@@ -438,7 +438,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
                     dtype="float32",
                     name="k_quant_scales_{}".format(i),
                 )
-                for i in range(int(len(cache_kvs_shapes) / 2))
+                for i in range(int(len(cache_k_shapes)))
             ]
 
             cache_v_quant_scales = [
@@ -447,7 +447,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
                     dtype="float32",
                     name="v_quant_scales_{}".format(i),
                 )
-                for i in range(int(len(cache_kvs_shapes) / 2))
+                for i in range(int(len(cache_v_shapes)))
             ]
 
             cache_k_dequant_scales = [
@@ -456,7 +456,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
                     dtype="float32",
                     name="k_dequant_scales_{}".format(i),
                 )
-                for i in range(int(len(cache_kvs_shapes) / 2))
+                for i in range(int(len(cache_k_shapes)))
             ]
             cache_v_dequant_scales = [
                 paddle.static.InputSpec(
@@ -464,7 +464,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
                     dtype="float32",
                     name="v_dequant_scales_{}".format(i),
                 )
-                for i in range(int(len(cache_kvs_shapes) / 2))
+                for i in range(int(len(cache_v_shapes)))
             ]
         else:
             cache_k_quant_scales = None
@@ -473,17 +473,19 @@ class GenerationBlockInferenceModel(GenerationMixin):
             cache_v_dequant_scales = None
 
         caches = []
-        for i in range(len(cache_kvs_shapes) // 2):
-            caches.append(
-                paddle.static.InputSpec(
-                    shape=cache_kvs_shapes[2 * i], dtype=cachekv_dtype, name="key_caches_{}".format(i)
+        for i in range(len(cache_k_shapes)):
+            if cache_k_shapes is not None:
+                caches.append(
+                    paddle.static.InputSpec(
+                        shape=cache_k_shapes[i], dtype=cachekv_dtype, name="key_caches_{}".format(i)
+                    )
                 )
-            )
-            caches.append(
-                paddle.static.InputSpec(
-                    shape=cache_kvs_shapes[2 * i + 1], dtype=cachekv_dtype, name="value_caches_{}".format(i)
+            if cache_v_shapes is not None:
+                caches.append(
+                    paddle.static.InputSpec(
+                        shape=cache_v_shapes[i], dtype=cachekv_dtype, name="value_caches_{}".format(i)
+                    )
                 )
-            )
         if export_precache:
             src_mask_spec = paddle.static.InputSpec(shape=[None, 1, None, None], dtype=dtype, name="src_mask")
         else:
