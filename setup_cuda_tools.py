@@ -51,6 +51,8 @@ def get_ext_and_cmd():
         from paddle.utils.cpp_extension.cpp_extension import BuildCommand
         from paddle.utils.cpp_extension.extension_utils import custom_write_stub
 
+        sm_version = int(os.getenv("CUDA_SM_VERSION", "0"))
+
         custom_ops_path = "./csrc"
         name = "paddlenlp.custom_ops._C"
 
@@ -100,9 +102,12 @@ def get_ext_and_cmd():
             return gen_files
 
         def get_sm_version():
-            prop = paddle.device.cuda.get_device_properties()
-            cc = prop.major * 10 + prop.minor
-            return cc
+            if sm_version > 0:
+                return sm_version
+            else:
+                prop = paddle.device.cuda.get_device_properties()
+                cc = prop.major * 10 + prop.minor
+                return cc
 
         def strtobool(v):
             if isinstance(v, bool):
@@ -153,7 +158,6 @@ def get_ext_and_cmd():
             f"{custom_ops_path}/gpu/rebuild_padding_v2.cu",
             f"{custom_ops_path}/gpu/set_value_by_flags_v2.cu",
             f"{custom_ops_path}/gpu/stop_generation_multi_ends_v2.cu",
-            f"{custom_ops_path}/gpu/update_inputs.cu",
             f"{custom_ops_path}/gpu/get_output.cc",
             f"{custom_ops_path}/gpu/save_with_output_msg.cc",
             f"{custom_ops_path}/gpu/write_int8_cache_kv.cu",
@@ -201,10 +205,10 @@ def get_ext_and_cmd():
 
             sources += [
                 f"{custom_ops_path}/gpu/append_attention.cu",
-                f"{custom_ops_path}/gpu/append_attn/get_block_shape_and_split_kv_block.cu",
-                f"{custom_ops_path}/gpu/append_attn/decoder_write_cache_with_rope_kernel.cu",
-                f"{custom_ops_path}/gpu/append_attn/speculate_write_cache_with_rope_kernel.cu",
+                f"{custom_ops_path}/gpu/multi_head_latent_attention.cu",
             ]
+
+            sources += find_end_files(f"{custom_ops_path}/gpu/append_attn", ".cu")
             sources += find_end_files(f"{custom_ops_path}/gpu/append_attn/template_instantiation", ".cu")
 
         fp8_auto_gen_directory = f"{custom_ops_path}/gpu/cutlass_kernels/fp8_gemm_fused/autogen"
