@@ -16,8 +16,9 @@ export MP_NUM=${MP_NUM:-"1"}                                 # Model parallelism
 
 # Deployment Configuration
 # ------------------------
-docker_image=${docker_image:-" registry.baidubce.com/paddlepaddle/fastdeploy:llm-serving-cuda124-cudnn9-v1.2"}
-model_path=${model_path:-"DeepSeek-R1/DeepSeek-R1-Distill-Llama-8B"}       # Local model path (will be mounted to container)
+docker_image=${docker_image:-"registry.baidubce.com/paddlepaddle/fastdeploy:llm-serving-cuda124-cudnn9-v1.2"}
+model_path=${model_path:-~/llm_models/}  # Local model path (will be mounted to container)
+model_name=${model_name:-"DeepSeek-R1/DeepSeek-R1-Distill-Llama-8B/weight_only_int8"}      # need to download model name，
 tag="3.0-beta4"
 
 # Model Preparation
@@ -26,8 +27,8 @@ tag="3.0-beta4"
 if [ -d "${model_path}" ]; then
     echo "Model directory exists at ${model_path}, skipping download."
 else
-    echo "Downloading model to ${model_path}..."
-    python download_model.py --url f"https://paddlenlp.bj.bcebos.com/models/static/${model_path}/${tag}" --dir ${model_path}
+    echo "Downloading model: ${model_name}..."
+    python download_model.py --url https://paddlenlp.bj.bcebos.com/models/static/${model_name}/${tag} --dir ${model_path} --model_name ${model_name}
 fi
 
 # Container Deployment

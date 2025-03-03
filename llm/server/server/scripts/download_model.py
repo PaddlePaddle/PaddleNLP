@@ -8,10 +8,13 @@ def parse_arguments():
                         help="downloadfiles")
     parser.add_argument('-d', '--dir', default='downloads',
                        help="save dir")
+    parser.add_argument('-m', '--model_name', default='DeepSeek-R1/DeepSeek-R1-Distill-Llama-8B/weight_only_int8',
+                       help="model_name")
+
     return parser.parse_args()
 
 
-def download_from_txt(base_url, save_dir):
+def download_from_txt(base_url, save_dir, model_name):
     txt_url = base_url + "/file_list.txt"
     try:
         response = requests.get(txt_url)
@@ -34,8 +37,7 @@ def download_from_txt(base_url, save_dir):
                 print(f"[×] Failed: {cur_url}")
 
     except Exception as e:
-        print(f"Failed: {str(e)}")
-
+        print(f"Failed to get model {model_name}, please recheck the model name from https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/inference.md")
 def download_file(url, save_path):
     try:
         with requests.get(url, stream=True) as response:
@@ -77,7 +79,7 @@ def main():
     os.makedirs(args.dir, exist_ok=True)
 
     # download from file_list.txt
-    download_from_txt(args.url, args.dir)
+    download_from_txt(args.url, args.dir, args.model_name)
 
 if __name__ == "__main__":
     main()
