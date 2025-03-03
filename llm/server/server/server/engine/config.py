@@ -261,6 +261,7 @@ class Config:
                 total_max_length=self.max_seq_len,
                 max_length=self.max_dec_len,
                 dtype=self.dtype,
+                mla_use_matrix_absorption=model_cfg.get("mla_use_matrix_absorption", False),
             )
 
             logger = get_logger("model_server", "infer_config.log")
