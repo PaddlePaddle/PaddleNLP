@@ -96,6 +96,7 @@ def put_along_axis_triton_api(A, index):
         )
         return useless
 
+
 @paddle_use_triton(
     key=["1"],
 )
@@ -113,20 +114,19 @@ def _per_token_group_quant_fp8_kernel(
     BLOCK_N: tl.constexpr,
 ):
     start_block = tl.program_id(0) * BLOCK_M
-    
+
     blocks = tl.arange(0, BLOCK_M) + start_block
     groups = tl.arange(0, BLOCK_N)
-    y_ptrs = y_ptr + blocks[:, None] * BLOCK_N + groups[None,:]
-    mask = blocks[:,None] < flatten_num_blocks
+    y_ptrs = y_ptr + blocks[:, None] * BLOCK_N + groups[None, :]
+    mask = blocks[:, None] < flatten_num_blocks
 
     y = tl.load(y_ptrs, mask=mask, other=0.0).to(tl.float32)
     # Quant
     _absmax = tl.maximum(tl.max(tl.abs(y), axis=1), eps)
     y_s = _absmax / fp8_max
-    y_q = tl.clamp(y / y_s[:,None], fp8_min, fp8_max).to(y_q_ptr.dtype.element_ty)
+    y_q = tl.clamp(y / y_s[:, None], fp8_min, fp8_max).to(y_q_ptr.dtype.element_ty)
 
-
-    y_q_ptrs = y_q_ptr + blocks[:, None] * BLOCK_N + groups[None,:]
+    y_q_ptrs = y_q_ptr + blocks[:, None] * BLOCK_N + groups[None, :]
     tl.store(y_q_ptrs, y_q, mask=mask)
     if TRANSPOSE_SCALE:
         col_blocks = flatten_num_blocks // num_rows
@@ -137,6 +137,7 @@ def _per_token_group_quant_fp8_kernel(
     else:
         y_s_ptrs = y_s_ptr + blocks
         tl.store(y_s_ptrs, y_s)
+
 
 d2s_infer_code = """
 std::vector<std::vector<int64_t>> ${op_name}_InferShape(const std::vector<int64_t>& x,
@@ -234,9 +235,9 @@ def per_token_group_quant_fp8_api(
             eps,
             fp8_min=fp8_min,
             fp8_max=fp8_max,
-            TRANSPOSE_SCALE = (int)(transpose_scale),
+            TRANSPOSE_SCALE=(int)(transpose_scale),
             BLOCK_M=BLOCK_M,
-            BLOCK_N=BLOCK_N
+            BLOCK_N=BLOCK_N,
         )
     if in_dynamic_or_pir_mode():
         outs = _C_ops._run_custom_op(op_name, x, group_size, transpose_scale, eps)
@@ -261,6 +262,7 @@ def per_token_group_quant_fp8_api(
             attrs=attrs,
         )
         return x_q, x_s
+
 
 @paddle_use_triton(
     key=["1"],
@@ -454,6 +456,7 @@ def fused_moe_kernel_paddle(
 def ceil_div(a, b):
     return (a + b - 1) // b
 
+
 # 初步实现，后期可以换成cuda kernel，实现动态or静态
 def per_tensor_quant_fp8(x, scale=None):
     x_fp32 = x.cast("float32")
@@ -491,9 +494,9 @@ def invoke_fused_moe_kernel(
             block_k = block_shape[1]
             A, A_scale = per_token_group_quant_fp8_api(A, block_k)
 
-    grid = lambda META: (
-        triton.cdiv(sorted_token_ids.shape[0], META["BLOCK_SIZE_M"]) * triton.cdiv(B.shape[1], META["BLOCK_SIZE_N"]),
-    )
+    # grid = lambda META: (
+    #     triton.cdiv(sorted_token_ids.shape[0], META["BLOCK_SIZE_M"]) * triton.cdiv(B.shape[1], META["BLOCK_SIZE_N"]),
+    # )
 
     K = B.shape[2] - padded_size
     if K % config["BLOCK_SIZE_K"] == 0:
@@ -521,6 +524,7 @@ def invoke_fused_moe_kernel(
     )
 
     assert compute_type == tl.bfloat16
+
 
 def invoke_fused_moe_kernel_api(
     A,
@@ -608,7 +612,6 @@ def invoke_fused_moe_kernel_api(
             get_tensor_ptr(sorted_token_ids),
             get_tensor_ptr(expert_ids),
             get_tensor_ptr(num_tokens_post_padded),
-            
         };
         """
         template_used = rendering_common_template(

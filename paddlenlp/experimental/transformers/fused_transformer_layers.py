@@ -65,7 +65,6 @@ if paddle.is_compiled_with_cuda():
         from paddlenlp_ops import (
             dequant_int8,
             encode_rotary_qk,
-            group_quant,
             qkv_transpose_split,
             quant_int8,
             rebuild_padding,
@@ -4696,7 +4695,10 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
         if self.weight_block_size[0] == 0 and self.weight_block_size[1] == 0:
             x_q, x_s = self.per_tensor_quant_fp8(x)
         else:
-            from paddlenlp.ops.moe.fused_moe_triton.fused_moe import per_token_group_quant_fp8_api
+            from paddlenlp.ops.moe.fused_moe_triton.fused_moe import (
+                per_token_group_quant_fp8_api,
+            )
+
             x_q, x_s = per_token_group_quant_fp8_api(x, 128, True)
             # x_q, x_s = group_quant(
             #     x, group_size=128, transpose_scale=True, quant_max_bound=448.0, quant_min_bound=-448.0
