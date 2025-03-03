@@ -50,6 +50,10 @@ numpy_paddle_mapping = {
     np.dtype(np.bfloat16): (np.uint16, paddle.bfloat16),
 }
 
+paddle_numel_mapping = {
+    paddle.float8_e5m2: (paddle.int8, None),
+    paddle.float8_e4m3fn: (paddle.int8, None),
+}
 
 paddle_set_value_mapping = {
     paddle.float8_e5m2: (paddle.int8, None),
@@ -131,8 +135,8 @@ def _numpy(self, *args, **kwargs):
 
 
 def _numel(self, *args, **kwargs):
-    if self.dtype in paddle_numpy_mapping:
-        inter_pd_dtype, _ = paddle_numpy_mapping[self.dtype]
+    if self.dtype in paddle_numel_mapping:
+        inter_pd_dtype, _ = paddle_numel_mapping[self.dtype]
         ret = origin_numel(self.view(inter_pd_dtype), *args, **kwargs)
         return ret
     return origin_numel(self, *args, **kwargs)
