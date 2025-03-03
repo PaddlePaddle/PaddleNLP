@@ -185,71 +185,62 @@ class MoELayer(nn.Layer):
     def forward(
         self,
         hidden_state: paddle.Tensor,
-        used_token: paddle.Tensor = None,
     ):
-        """_summary_
+        """MoE Layer forward function
+            1. Gate Forward.
+            2. Dispatch export.
+            3. Experts Forward.
 
         Args:
-            input (_type_): _description_
-            used_token
+            hidden_state: MoE Layer input
 
         Returns:
-            _type_: _description_
+            final_out: MoE Layer main output.
+            l_aux: MoE auxiliary loss.
+            l_zloss: MoE z loss.
         """
-        # Implement Algorithm 2 from GShard paper.
         batch_size, seq_len, d_model = hidden_state.shape
 
-        # Initial implementation -> Reshape into S tokens by dropping sequence dimension.
-        # Reshape into G groups so that each group can distribute tokens equally
-        # group_size = kwargs['group_size'] if 'group_size' in kwargs.keys() else 1
         reshaped_input = hidden_state.reshape([-1, d_model])
 
         # self.l_aux       :
         # gates_masked  : se
         # token_priority    : se
         # self.exp_counts  :
-        capacity, gates_masked, token_priority, exp_counts, l_aux, l_zloss = self.gate(hidden_state)
+        capacity, topk_weight, topk_ids, exp_counts, l_aux, l_zloss = self.gate(hidden_state)
 
-        dispatched_input = []
-        # print("token p: ", token_priority)
-        # print("token pick exp num: ", (token_priority>=0).astype('bfloat16').sum(axis=1))
-        # print("less pick exp: ", (token_priority>=0).astype('bfloat16').sum(axis=0).min())
-        # print("gates masked: ", gates_masked)
-        exp_token_idx = []
-        for e_i in range(self.moe_num_experts):
-            expert_tokens_idx = (token_priority[:, e_i] >= 0).nonzero().squeeze(-1)
-            # (LiuTing) this expert not deal with any token.
-            if expert_tokens_idx.shape[0] == 0:
-                exp_token_idx.append(None)
-                dispatched_input.append(None)
-            else:
-                exp_token_idx.append(expert_tokens_idx)
-                dispatched_input.append(paddle.gather(reshaped_input, exp_token_idx[e_i], axis=0))
+        cnts = paddle.zeros([topk_ids.shape[0], len(self.experts)], dtype=topk_ids.dtype)
+        cnts = cnts.put_along_axis(topk_ids, 1, axis=1)
 
-        if self.expert_parallel_degree > 1:
-            output = []
-            dist.alltoall(output, dispatched_input, self.moe_group)
-            dispatched_input = output
+        tokens_per_expert = cnts.sum(axis=0)
+        idxs = topk_ids.reshape([topk_ids.shape[0] * topk_ids.shape[1]]).argsort()
+        sorted_tokens = reshaped_input[idxs // topk_ids.shape[1]]
+        tokens_per_expert = tokens_per_expert.cpu().numpy()
+        # TODO: AlltoALL
 
-        expert_output = self.expert_forward(dispatched_input, exp_token_idx)
-        if self.expert_parallel_degree > 1:
-            output = []
-            dist.alltoall(output, expert_output, self.moe_group)
-            expert_output = output
+        outputs = []
+        start_idx = 0
+        for i, num_tokens in enumerate(tokens_per_expert):
+            end_idx = start_idx + num_tokens
+            if num_tokens == 0:
+                continue
+            expert = self.experts[i + self.moe_rank * self.moe_num_experts_per_device]
+            tokens_for_this_expert = sorted_tokens[start_idx:end_idx]
+            expert_out = expert(tokens_for_this_expert)
+            outputs.append(expert_out)
+            start_idx = end_idx
 
-        # reformat output
-        a = paddle.zeros_like(reshaped_input)
+        # TODO: AlltoALL
+        outs = paddle.concat(outputs, axis=0) if len(outputs) else paddle.to_tensor(0, dtype=sorted_tokens)
 
-        for e_i in range(self.moe_num_experts):
-            if exp_token_idx[e_i] is not None:
-                updated = expert_output[e_i] * gates_masked[exp_token_idx[e_i].unsqueeze(-1), e_i]
-                # print("e_i: ", e_i)
-                # print("act: ", token_priority[:, e_i])
-                # print("expert_output: ", expert_output[e_i])
-                # print("exp token idxx: ", exp_token_idx[e_i])
-                # print("gate weight: ", gates_masked[exp_token_idx[e_i].unsqueeze(-1), e_i])
-                # print("gates value: ", updated)
-                a[exp_token_idx[e_i]] += updated.astype(a.dtype)
+        new_x = paddle.empty_like(outs)
+        new_x[idxs] = outs
+        final_out = (
+            new_x.reshape(topk_ids.shape + [-1])
+            .astype(topk_weight.dtype)
+            .multiply_(topk_weight.unsqueeze(-1))
+            .sum(axis=1)
+            .astype(new_x.dtype)
+        )
 
-        # print("moe output: ", a, a.mean(), a.max(), a._md5sum())
-        return a, l_aux, l_zloss
+        return final_out, l_aux, l_zloss

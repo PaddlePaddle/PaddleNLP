@@ -544,7 +544,8 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
             if self.group is not None:
                 dist.all_reduce(local_capacity, op=dist.ReduceOp.MAX, group=self.group)
             capacity = int(local_capacity)
-            token_priority = self._priority(top_idx, capacity)
+            # token_priority = self._priority(top_idx, capacity)
+            token_priority = top_idx
 
         # normalize gates
         gates_masked = gates * mask
@@ -554,4 +555,4 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
             if self.norm_topk_prob:
                 gates_masked = gates_masked / denom_s
 
-        return capacity, gates_masked, token_priority, exp_counts, l_aux, l_zloss
+        return capacity, gates_masked.take_along_axis(top_idx, axis=-1), token_priority, exp_counts, l_aux, l_zloss
