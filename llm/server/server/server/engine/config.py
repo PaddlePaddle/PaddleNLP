@@ -148,7 +148,6 @@ class Config:
         if self.block_ratio >= 1.0:
             self.enc_dec_block_num = (self.max_dec_len + self.block_size - 1) // self.block_size
         self.max_query_block_num = (max(self.max_dec_len, self.max_seq_len) + self.block_size - 1) // self.block_size
-        self.max_query_block_num = (self.max_dec_len + self.max_seq_len + self.block_size - 1) // self.block_size
         self.dec_token_num = self.enc_dec_block_num * self.block_size
         self.total_block_num = int(self.block_bs * self.max_query_block_num)
         self.max_block_num = int(self.total_block_num * self.block_ratio)
