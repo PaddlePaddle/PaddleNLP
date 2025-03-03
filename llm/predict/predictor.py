@@ -177,7 +177,11 @@ class PredictorArgument:
     weightonly_group_size: int = field(default=-1, metadata={"help": "the max length of candidate tokens."})
     weight_block_size: List[int] = field(
         default_factory=lambda: [128, 128],
-        metadata={"help": "Quantitative granularity of weights. Supported values: [0, 0], [128, 128]"},
+        metadata={"help": "Quantitative granularity of weights. Supported values: [128 128]"},
+    )
+    moe_quant_type: str = field(
+        default="",
+        metadata={"help": "Quantization type of moe. Supported values: weight_only_int4"},
     )
 
     def __post_init__(self):
@@ -1512,15 +1516,13 @@ def register_triton_custom_ops(model_dir):
         for file in files:
             if file.endswith("_package.so"):
                 so_full_path = os.path.join(root, file)
-                paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
-                    so_full_path
-                )
+                paddle.utils.cpp_extension.load_op_meta_info_and_register_op(so_full_path)
+
 
 def predict():
     parser = PdArgumentParser((PredictorArgument, ModelArgument))
     predictor_args, model_args = parser.parse_args_into_dataclasses()
-    
-    
+
     # Added by zkk.
     mp_id = paddle.distributed.get_rank()
     triton_dir = f"triton_ops_rank_{mp_id}"
@@ -1528,7 +1530,7 @@ def predict():
     if predictor_args.mode == "static":
         register_triton_custom_ops(triton_kernel_cache_dir)
     else:
-        os.environ["TRITON_KERNEL_CACHE_DIR"] = f"/root/.paddlenlp/{triton_dir}"
+        os.environ["TRITON_KERNEL_CACHE_DIR"] = f"/tmp/{triton_dir}"
 
     tensor_parallel_degree = paddle.distributed.get_world_size()
     if tensor_parallel_degree > 1:

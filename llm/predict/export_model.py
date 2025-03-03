@@ -43,11 +43,11 @@ def add_inference_args_to_config(model_config, args):
 def main():
     parser = PdArgumentParser((PredictorArgument, ModelArgument, ExportArgument))
     predictor_args, model_args, export_args = parser.parse_args_into_dataclasses()
-    
+
     # add triton custom ops dir, added by zkk.
     mp_id = paddle.distributed.get_rank()
     triton_dir = f"triton_ops_rank_{mp_id}"
-    triton_kernel_cache_dir = f"{export_args}/{triton_dir}"
+    triton_kernel_cache_dir = f"{export_args.output_path}/{triton_dir}"
     os.environ["TRITON_KERNEL_CACHE_DIR"] = triton_kernel_cache_dir
     if os.path.exists(triton_kernel_cache_dir):
         # del old triton_ops

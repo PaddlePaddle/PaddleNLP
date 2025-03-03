@@ -210,6 +210,7 @@ class FusedMultiTransformerConfig:
         intermediate_size,
         quant_type="",
         weight_block_size=[0, 0],
+        moe_quant_type="",
         weightonly_group_size=-1,
         dropout_rate=0.0,
         activation="gelu",
@@ -334,6 +335,7 @@ class FusedMultiTransformerConfig:
 
         self.quant_type = quant_type
         self.weight_block_size = weight_block_size
+        self.moe_quant_type = moe_quant_type
         self.weightonly_group_size = weightonly_group_size
         self.quant_round_type = quant_round_type
         self.quant_max_bound = quant_max_bound
@@ -365,6 +367,7 @@ class FusedMultiTransformerBase(Layer):
         super().__init__()
 
         self.config = config
+        self.moe_quant_type = config.moe_quant_type
 
         assert config.embed_dim > 0, "Expected embed_dim to be greater than 0, " "but received {}".format(
             config.embed_dim
@@ -4071,7 +4074,6 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
     def __init__(self, config: FusedMultiTransformerConfig):
         super().__init__(config)
         self.quant_type = config.quant_type
-        self.moe_quant_type = config.moe_quant_type
         self.fp8_type = "float8_e4m3fn"
         self.weight_scale_dtype = "float32"
         self.weight_block_size = self.config.weight_block_size
@@ -4596,13 +4598,13 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                     ffn1_weight = self.create_parameter(
                         shape=self.moe_ffn1_weight_shape,
                         attr=ffn1_weight_attr,
-                        dtype="float32",
+                        dtype=self.fp8_type,
                         is_bias=False,
                     )
                     ffn2_weight = self.create_parameter(
                         shape=self.moe_ffn2_weight_shape,
                         attr=ffn2_weight_attr,
-                        dtype="float32",
+                        dtype=self.fp8_type,
                         is_bias=False,
                     )
             else:
@@ -4997,10 +4999,10 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
             fmha_out_prefill = fmha_out_prefill[:, :, : self.config.mla_config.v_head_dim]
             fmha_out_prefill = fmha_out_prefill.reshape([-1, self.num_heads * self.config.mla_config.v_head_dim])
 
+            fmha_out_prefill = fmha_out_prefill * self.mask_encoder_batch.cast(fmha_out_prefill.dtype)
+
             out_linear_out_prefill = self.compute_out_linear(fmha_out_prefill, i)
             out_linear_out = out_linear_out + out_linear_out_prefill
-
-            # print(f"prefill {i}: out_linear_out: {out_linear_out}")
 
         if kwargs["max_dec_len_this_time"]:  # decode phase
             if self.config.mla_config.q_lora_rank is not None:
@@ -5079,6 +5081,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                 kwargs.get("block_tables", None),
                 "none",
                 kwargs.get("max_input_length", -1),
+                self.config.speculate_config.speculate_method is not None,  # speculate_decoder
             )
 
             q_input = paddle.concat([query_nope, query_pe], axis=-1)
@@ -5096,6 +5099,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                 kwargs.get("seq_lens_encoder", None),
                 kwargs.get("seq_lens_decoder", None),
                 kwargs.get("seq_lens_this_time", None),
+                kwargs.get("cu_seqlens_q", None),
                 kwargs.get("padding_offsets", None),
                 kwargs.get("cum_offsets", None),
                 kwargs.get("block_tables", None),
@@ -5108,6 +5112,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                 kwargs.get("decoder_batch_ids", None),
                 kwargs.get("decoder_tile_ids_per_batch", None),
                 kwargs.get("decoder_num_blocks", None),
+                kwargs.get("decoder_num_blocks_cpu", None),
                 kwargs.get("max_enc_len_this_time", None),
                 kwargs.get("max_dec_len_this_time", None),
                 kwargs.get("max_len_kv", None),
@@ -5146,7 +5151,6 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
             )
             out_linear_out = out_linear_out + out_linear_out_decode
 
-            # print(f"decode {i}: out_linear_out: {out_linear_out}")
         return out_linear_out
 
     def compute_ffn1(self, tmp_out, i):
@@ -5178,63 +5182,39 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
         def get_moe_scores(
             gating_output: paddle.Tensor,
             config: MoeConfig,
-        ) -> (paddle.Tensor, paddle.Tensor):
-
-            num_token = gating_output.shape[0]
-            num_expert_group = config.num_expert_group
-            topk_group = config.topk_group
-
+        ) -> paddle.Tensor:
             # Compute softmax or sigmoid scores based on the topk_method
             if config.topk_method == "greedy":
                 scores = paddle.nn.functional.softmax(gating_output, axis=-1)
-                return scores, scores
+                return scores
             elif config.topk_method == "group_limited_greedy":
                 scores = paddle.nn.functional.softmax(gating_output, axis=-1)
-                scores_no_bias = scores
-                group_scores = scores.reshape([num_token, num_expert_group, -1]).max(axis=-1)  # [n, num_expert_group]
+                scores_with_bias = scores
             elif config.topk_method == "noaux_tc":
                 if e_score_correction_bias is None:
                     raise ValueError("e_score_correction_bias must be provided for 'noaux_tc' method.")
                 scores = paddle.nn.functional.sigmoid(gating_output)
-                scores_no_bias = scores
-                scores = scores + e_score_correction_bias.unsqueeze(0)
-                group_scores = (
-                    scores.reshape([num_token, num_expert_group, -1]).topk(2, axis=-1)[0].sum(axis=-1)
-                )  # [n, num_expert_group]
+                scores_with_bias = scores + e_score_correction_bias.unsqueeze(0)
             else:
                 raise ValueError(
                     f"Unsupported topk_method: {config.topk_method}. Please choose 'group_limited_greedy' or 'noaux_tc'."
                 )
+            from paddlenlp_ops import noaux_tc
 
-            # Identify top-k groups
-            group_idx = paddle.topk(group_scores, k=topk_group, axis=-1, sorted=False)[1]  # [n, topk_group]
-
-            group_mask = paddle.zeros_like(group_scores, dtype="int64")  # [n, num_expert_group]
-            # group_mask = paddle.put_along_axis(group_mask, group_idx, paddle.to_tensor(1), axis=1)
-            from paddlenlp.ops.moe.fused_moe_triton.fused_moe import (
-                put_along_axis_triton_api,
+            scores = noaux_tc(
+                scores,
+                scores_with_bias,
+                config.num_expert_group,
+                config.topk_group,
+                config.top_k,
+                config.routed_scaling_factor,
             )
-
-            put_along_axis_triton_api(group_mask, group_idx)
-
-            # Apply group mask to the scores
-            score_mask = (
-                group_mask.unsqueeze(-1)
-                .expand([num_token, num_expert_group, scores.shape[-1] // num_expert_group])
-                .reshape([num_token, -1])
-                .astype("float32")
-            )  # [n, e]
-
-            # Scale the scores with the mask and scaling factor
-            scores = scores * score_mask
-
-            # renormalize 和 refactor 在后面做
-            return scores, scores_no_bias
+            return scores
 
         if self.config.moe_config.topk_method is not None:
             gate_out = paddle.matmul(tmp_out.cast("float32"), self.gate_weights[i])
             # 应用各种策略后重塑的 scores
-            scores, scores_no_bias = get_moe_scores(gate_out, self.config.moe_config)
+            scores = get_moe_scores(gate_out, self.config.moe_config)
 
             if self.moe_quant_type == "weight_only_int4":
                 from paddle.incubate.nn.functional import (
@@ -5257,24 +5237,20 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                     token_nums_per_expert,
                     self.ffn1_weights[i],
                     self.ffn2_weights[i],
-                    None,
+                    self.ffn1_biases[i],
                     self.ffn1_weights_scale[i] if hasattr(self, "ffn1_weights_scale") else None,
                     self.ffn2_weights_scale[i] if hasattr(self, "ffn2_weights_scale") else None,
                     "weight_only_int4",
                 )
 
-                if e_score_correction_bias is not None:
-                    top_k_weights = scores_no_bias.take_along_axis(top_k_indices, axis=1)
-
-                # reduce 中会做 topk 个 weight 的 norm 和 routed_scaling_factor
                 fused_moe_out = moe_reduce(
                     ffn_out,
                     top_k_weights,
                     permute_indices_per_token,
                     top_k_indices,
                     self.ffn2_biases[i],
-                    norm_topk_prob=self.config.moe_config.norm_topk_prob,
-                    routed_scaling_factor=self.config.moe_config.routed_scaling_factor,
+                    norm_topk_prob=False,  # 在noaux_tc中做了
+                    routed_scaling_factor=1.0,  # 在noaux_tc中做了
                 )
             else:
                 from paddlenlp.ops.moe.fused_moe_triton.fused_moe import fused_moe
@@ -5284,17 +5260,13 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                     self.ffn1_weights[i],
                     self.ffn2_weights[i],
                     scores,
-                    scores_no_bias,
                     self.config.moe_config.top_k,
-                    renormalize=self.config.moe_config.norm_topk_prob,
                     use_fp8_w8a8=True,
                     w1_scale=self.ffn1_weights_scale[i] if hasattr(self, "ffn1_weights_scale") else None,
                     w2_scale=self.ffn2_weights_scale[i] if hasattr(self, "ffn2_weights_scale") else None,
                     block_shape=self.weight_block_size
                     if sum(self.weight_block_size) != 0
                     else None,  # default block-wise, per-tensor is None
-                    refactor=self.config.moe_config.routed_scaling_factor,
-                    e_score_correction_bias=e_score_correction_bias,
                 )
         else:
             assert False, "Not implemented yet"

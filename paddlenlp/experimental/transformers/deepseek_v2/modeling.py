@@ -173,6 +173,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
         self.rms_norm_eps = config.rms_norm_eps
         self.quant_type = config.quant_type
         self.weight_block_size = config.weight_block_size
+        self.moe_quant_type = config.moe_quant_type
         self.rope_theta = config.rope_theta
         self.return_full_hidden_states = config.get("return_full_hidden_states", False)
 
@@ -195,7 +196,6 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
         self.dynamic_quant = False
         if "fp8" in self.quant_type:
             self.dynamic_quant = True
-            self.moe_quant_type = self.config.get("moe_quant_type", "fp8")
 
         assert config.append_attn is True
 
@@ -537,6 +537,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
             intermediate_size=self.intermediate_size,
             quant_type=self.quant_type,
             weight_block_size=self.weight_block_size,
+            moe_quant_type=self.moe_quant_type,
             weightonly_group_size=self.weightonly_group_size,
             activation="swiglu",
             num_layers=config.num_hidden_layers,

@@ -76,11 +76,11 @@ def infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, 
         state_dict = load_tp_checkpoint(model_path, cls, config, return_numpy=return_numpy)
         model.set_state_dict(state_dict)
 
-        paddle.distributed.barrier()
-        rank = paddle.distributed.get_rank()
-        file_name = f"/root/paddlejob/workspace/env_run/output/model/split/deepseekv3-fp8/{rank}.pdparams"
-        state_dict = model.state_dict()
-        paddle.save(state_dict, file_name)
+        # paddle.distributed.barrier()
+        # rank = paddle.distributed.get_rank()
+        # file_name = f"/root/paddlejob/workspace/env_run/output/model/split/deepseek_r1_fp8/{rank}.pdparams"
+        # state_dict = model.state_dict()
+        # paddle.save(state_dict, file_name)
         # exit(0)
     else:
         model.deepseek_v2.transformer_block.init_weight()
@@ -90,7 +90,7 @@ def infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, 
 
         paddle.distributed.barrier()
         rank = paddle.distributed.get_rank()
-        file_name = f"/root/paddlejob/workspace/env_run/output/model/split/deepseekv3-fp8/{rank}.pdparams"
+        file_name = f"/root/paddlejob/workspace/env_run/output/model/split/deepseek_r1_fp8/{rank}.pdparams"
         state_dict = paddle.load(file_name, return_numpy=False)
 
         for key, value in model.state_dict().items():

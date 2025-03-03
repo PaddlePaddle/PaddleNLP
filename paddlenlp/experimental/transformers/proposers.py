@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from typing import List
 
 import numpy as np
 import paddle
@@ -75,6 +76,18 @@ class SpeculateArgument:
     )
     return_full_hidden_states: int = field(default=False, metadata={"help": "whether return full hidden_states"})
     serving_mode: str = field(default=False, metadata={"help": "whether in serving_mode"})
+    mla_use_matrix_absorption: bool = field(default=False, metadata={"help": "implement mla with matrix-absorption."})
+    weightonly_group_size: int = field(
+        default=-1, metadata={"help": "the maxgroup lengthsize offor candidateweight-only tokensquantization."}
+    )
+    weight_block_size: List[int] = field(
+        default_factory=lambda: [128, 128],
+        metadata={"help": "Quantitative granularity of weights. Supported values: [128 128]"},
+    )
+    moe_quant_type: str = field(
+        default="",
+        metadata={"help": "Quantization type of moe. Supported values: weight_only_int4"},
+    )
 
     @classmethod
     def build_from_predictor(cls, predictor_args):
@@ -94,6 +107,11 @@ class SpeculateArgument:
         args["speculate_method"] = predictor_args.speculate_method
         args["speculate_max_draft_token_num"] = predictor_args.speculate_max_draft_token_num
         args["speculate_max_candidate_len"] = predictor_args.speculate_max_candidate_len
+
+        args["mla_use_matrix_absorption"] = predictor_args.mla_use_matrix_absorption
+        args["weightonly_group_size"] = predictor_args.weightonly_group_size
+        args["weight_block_size"] = predictor_args.weight_block_size
+        args["moe_quant_type"] = predictor_args.moe_quant_type
 
         assert args["speculate_method"] in [
             "eagle",
@@ -293,14 +311,14 @@ class ModelProposer(Proposer):
             assert self.cache_v_shapes is None
             self.cache_kvs = [paddle.zeros(shape, dtype=cachekv_dtype) for shape in self.cache_k_shapes]
 
-        self.max_block_nums = self.cache_kvs_shape[0][0]
+        self.max_block_nums = self.cache_k_shapes[0][0]
         self.free_list = list(range(self.max_block_nums))
         self.used_list = [[] for _ in range(self.max_batch_size)]
         self.pre_ids = paddle.to_tensor(np.zeros((self.max_batch_size, self.total_max_length)).astype("int64") - 1)
         self.rope_theta = self.config.get("rope_theta", 10000.0)
         self.rope_scaling = self.config.get("rope_scaling", None)
 
-        self.head_dim = self.cache_kvs_shape[0][-1]
+        self.head_dim = self.cache_k_shapes[0][-1]
         if self.draft_type == "mtp":
             self.rope_emb = None
         else:

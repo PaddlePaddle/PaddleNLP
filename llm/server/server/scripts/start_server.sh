@@ -19,6 +19,20 @@ export GLOG_logtostderr=1
 export PYTHONIOENCODING=utf8
 export LC_ALL=C.UTF-8
 
+export MP_NUM=16
+export BLOCK_BS=40
+export BATCH_SIZE=128
+export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+export PUSH_MODE_HTTP_WORKERS=4
+export SERVER_WAITTING_TIME=30
+export REDUCE_DIALOGUE_REPETITION=1
+export DTYPE=bfloat16
+export MP_NNODES=2
+
+export PATH=/opt/tritonserver/bin/:$PATH
+rm -rf models
+ln -s /root/paddlejob/workspace/env_run/output/model/static/deepseek_r1_fp8 models
+
 # PaddlePaddle environment variables
 export FLAGS_gemm_use_half_precision_compute_type=0
 export FLAGS_cascade_attention_max_partition_size=32768
