@@ -156,6 +156,10 @@ class LocalCombine(dist.LocalLayer):
     def forward(self, combine_weights, expert_output, dtype="float32", out_shape=None):
         combined_output = einsum("sec,ecm->sm", combine_weights.cast(dtype), expert_output)
         if out_shape is not None:
+            if combined_output._is_initialized():
+                out_shape = dist.auto_parallel.moe_utils._cal_local_shape(
+                    out_shape, self.out_dist_attrs[0][0], self.out_dist_attrs[0][1]
+                )
             combined_output = combined_output.reshape(out_shape)
         return combined_output
 
@@ -282,7 +286,9 @@ class MoELayer(nn.Layer):
             hidden_state, self.gate.weight, self.gate.e_score_correction_bias, used_token=used_token
         )
         if self.gate.drop_tokens is False:
-            self.gate.capacity = int(paddle.max(exp_counts))
+            capacity = paddle.max(exp_counts)
+            capacity = dist.reshard(capacity, get_mesh(), [dist.Replicate()])
+            self.gate.capacity = int(capacity)
         dispatched_input, combine_weights = self.local_gate_and_dispatch(reshaped_input, gate_scores)
         ori_dispatched_placements = copy.deepcopy(dispatched_input.placements)
 
@@ -302,7 +308,7 @@ class MoELayer(nn.Layer):
         expert_output = dist.reshard(expert_output, get_mesh(self.ipp), ori_dispatched_placements)
 
         combined_output = self.local_combine(
-            combine_weights, expert_output, dtype=hidden_state[0].dtype, out_shape=hidden_state._local_shape
+            combine_weights, expert_output, dtype=hidden_state[0].dtype, out_shape=hidden_state.shape
         )
 
         return combined_output, l_aux, l_zloss
