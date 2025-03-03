@@ -164,24 +164,6 @@ class MoELayer(nn.Layer):
                     p.no_sync = not self.is_dummy_moe
                     # logger.info(f"expert param={p.name}, no-sync={p.no_sync}")
 
-    def expert_forward(self, dispatched_input, exp_token_idx):
-        true_experts = self.experts[
-            self.moe_rank * self.moe_num_experts_per_device : (self.moe_rank + 1) * self.moe_num_experts_per_device
-        ]
-        expert_outputs = []
-
-        for idx in range(len(dispatched_input)):
-            # print(dispatched_input[idx])
-            # print(exp_token_idx[idx])
-            # (LiuTing) can use paddle.stack here.
-            expert_outputs.append(
-                true_experts[idx % self.moe_num_experts_per_device](dispatched_input[idx])
-                if exp_token_idx[idx] is not None
-                else dispatched_input[idx]
-            )
-
-        return expert_outputs
-
     def forward(
         self,
         hidden_state: paddle.Tensor,
