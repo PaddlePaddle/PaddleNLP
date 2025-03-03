@@ -31,8 +31,6 @@ from paddle import Tensor, nn
 from paddle.distributed.fleet.utils import recompute
 from paddle.nn import Linear
 
-from ..auto_utils import get_mesh
-
 try:
     from paddle.incubate.nn.functional import fused_rotary_position_embedding
 except ImportError:
@@ -228,7 +226,7 @@ class AddAuxiliaryLoss(paddle.autograd.PyLayer):
 
     @staticmethod
     def forward(ctx, x, loss):
-        assert paddle.numel(loss) == 1
+        # assert paddle.numel(loss) == 1
         ctx.dtype = loss.dtype
         ctx.required_aux_loss = not loss.stop_gradient
         return x
@@ -239,9 +237,8 @@ class AddAuxiliaryLoss(paddle.autograd.PyLayer):
         if ctx.required_aux_loss:
             # grad_loss = paddle.ones(1, dtype=ctx.dtype)
             grad_loss = paddle.to_tensor(1, dtype=ctx.dtype)
-            grad_loss = dist.auto_parallel.api.dtensor_from_local(grad_loss, get_mesh(), [dist.Replicate()])
-            # if paddle.in_dynamic_mode():
-            #     grad_loss = dist.shard_tensor(grad_loss, get_mesh(), [dist.Partial(dist.ReduceType.kRedAvg)])
+            mesh = grad_output.process_mesh
+            grad_loss = dist.auto_parallel.api.dtensor_from_local(grad_loss, mesh, [dist.Replicate()])
         return grad_output, grad_loss
 
 
