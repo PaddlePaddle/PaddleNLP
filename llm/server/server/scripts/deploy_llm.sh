@@ -21,6 +21,46 @@ model_path=${model_path:-~/llm_models/}  # Local model path (will be mounted to 
 model_name=${model_name:-"DeepSeek-R1/DeepSeek-R1-Distill-Llama-8B/weight_only_int8"}      # need to download model name，
 tag="3.0-beta4"
 
+
+# Download files from file_list.txt
+download_files() {
+    # Get file list
+    FILE_LIST_URL="${base_url}/file_list.txt"
+    if ! wget -q "$FILE_LIST_URL" -O /tmp/file_list.txt; then
+        echo "Failed to download file list: $FILE_LIST_URL,  please check your model_name $model_name."
+        exit 1
+    fi
+
+    # Read and clean file list
+    mapfile -t FILES < <(grep -v '^[[:space:]]*$' /tmp/file_list.txt | sed 's/^[ \t]*//;s/[ \t]*$//')
+    if [[ ${#FILES[@]} -eq 0 ]]; then
+        echo "No files found in file list"
+        exit 1
+    fi
+
+    echo "Found ${#FILES[@]} files to download"
+
+    # Create save directory
+    mkdir -p "$model_path"
+
+    # Download each file
+    for FILE in "${FILES[@]}"; do
+        FILE_URL="${base_url}/${FILE}"
+        if ! wget -q --show-progress -P "$model_path" "$FILE_URL"; then
+            echo "Failed to download: $FILE, please check your model_name $model_name."
+            # Remove potentially corrupted file
+            rm -f "${model_path}/${FILE}"
+            exit 1
+        fi
+        echo "Save path: $model_path/$FILE"
+    done
+
+    # Cleanup temporary file
+    rm /tmp/file_list.txt
+}
+
+
+
 # Model Preparation
 # -----------------
 # Verify model existence or download from remote
@@ -28,7 +68,8 @@ if [ -d "${model_path}" ]; then
     echo "Model directory exists at ${model_path}, skipping download."
 else
     echo "Downloading model: ${model_name}..."
-    python download_model.py --url https://paddlenlp.bj.bcebos.com/models/static/${model_name}/${tag} --dir ${model_path} --model_name ${model_name}
+    base_url=https://paddlenlp.bj.bcebos.com/models/static/${model_name}/${tag}
+    download_files
 fi
 
 # Container Deployment
