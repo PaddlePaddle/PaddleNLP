@@ -15,8 +15,8 @@
 # limitations under the License.
 
 PYTHON_VERSION=python
-PYTHON_VERSION=${2:-$PYTHON_VERSION}
-SM_VERSION=${3:-$SM_VERSION}
+SM_VERSION=${2:-$SM_VERSION}
+PYTHON_VERSION=${3:-$PYTHON_VERSION}
 export python=$PYTHON_VERSION
 ARCHITECTURE=${1:-$(${python} -c "import paddle;prop = paddle.device.cuda.get_device_properties();cc = prop.major * 10 + prop.minor;print(cc)")}
 
