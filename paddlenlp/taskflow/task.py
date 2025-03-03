@@ -20,7 +20,6 @@ from abc import abstractmethod
 from multiprocessing import cpu_count
 
 import paddle
-from paddle.base.framework import use_pir_api
 from paddle.dataset.common import md5file
 
 from ..utils.env import (
@@ -371,7 +370,6 @@ class Task(metaclass=abc.ABCMeta):
                     self._construct_input_spec()
                     self._convert_dygraph_to_static()
 
-
         self._static_model_file = self.inference_model_path + PADDLE_INFERENCE_MODEL_SUFFIX
         self._static_params_file = self.inference_model_path + PADDLE_INFERENCE_WEIGHTS_SUFFIX
 
@@ -398,10 +396,7 @@ class Task(metaclass=abc.ABCMeta):
             self._static_model_file = self._static_fp16_model_file
             self._static_params_file = self._static_fp16_params_file
         if self._predictor_type == "paddle-inference":
-            if use_pir_api():
-                self._config = paddle.inference.Config(self._static_json_file, self._static_params_file)
-            else:
-                self._config = paddle.inference.Config(self._static_model_file, self._static_params_file)
+            self._config = paddle.inference.Config(self._static_model_file, self._static_params_file)
             self._prepare_static_mode()
         else:
             self._prepare_onnx_mode()

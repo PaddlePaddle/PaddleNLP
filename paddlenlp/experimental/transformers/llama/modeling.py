@@ -411,7 +411,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         elif config.quant_type == "weight_only_int4":
             self.use_weight_only = True
             self.quant_algo = "weight_only_int4"
-        elif "a8w8" in config.quant_type:
+        elif config.quant_type and "a8w8" in config.quant_type:
             self.quant_model_path = config.model_name_or_path
             self.shift = config.quantization_config.shift
             self.smooth = config.quantization_config.smooth
@@ -671,6 +671,8 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         self.head_dim_shape_tensor = paddle.ones((self.hidden_size // self.num_attention_heads), dtype="int8")
 
         self.gradient_checkpointing = False
+
+        self._weights_initialized = False
 
     def set_transformer_block(self, transformer_config):
         if self.use_weight_only:
@@ -989,7 +991,9 @@ class LlamaInferenceModel(LlamaPretrainedModel):
     @paddle.no_grad()
     def set_state_dict(self, state_dict, is_eagle=False):
         self.set_quant_scale()
-        self.transformer_block.init_weight()
+        if not self._weights_initialized:
+            self.transformer_block.init_weight()
+            self._weights_initialized = True
         split_fn = split_param_func()
         self.embed_tokens.weight.set_value(
             paddle.to_tensor(state_dict["llama.embed_tokens.weight"]).cast(self.embed_tokens.weight.dtype)
@@ -1468,7 +1472,7 @@ class EagleForLlamaInferenceModel(LlamaBlockInferenceModel):
 
         if config.tensor_parallel_degree > 1:
             self.fc = ColumnParallelLinear(
-                self.hidden_size * 2, self.hidden_size, has_bias=True, gather_output=False, fuse_matmul_bias=True
+                self.hidden_size * 2, self.hidden_size, has_bias=True, gather_output=True, fuse_matmul_bias=True
             )
         else:
             self.fc = nn.Linear(self.hidden_size * 2, self.hidden_size, bias_attr=True)
@@ -1832,6 +1836,8 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
 
             base_actions = {
                 "lm_head.weight": partial(fn, is_column=True),
+                "fc.weight": partial(fn, is_column=True),
+                "fc.bias": partial(fn, is_column=True),
                 # Row Linear
                 "embed_tokens.weight": partial(fn, is_column=False),
                 "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
@@ -1916,7 +1922,8 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
         else:
             max_block_nums = max_batch_size * max_block_per_seq
 
-        cache_kvs = []
+        cache_k_shapes = []
+        cache_v_shapes = []
         for _ in range(config.num_hidden_layers):
             cache_kv_shape = [
                 max_block_nums,
@@ -1924,9 +1931,9 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
                 config.block_size,
                 config.hidden_size // config.num_attention_heads,
             ]
-            cache_kvs.append(cache_kv_shape)
-            cache_kvs.append(cache_kv_shape)
-        return cache_kvs
+            cache_k_shapes.append(cache_kv_shape)
+            cache_v_shapes.append(cache_kv_shape)
+        return cache_k_shapes, cache_v_shapes
 
     def prepare_inputs_for_generation(self, **kwargs):
         # only last token for inputs_ids if cache is defined in kwargs
@@ -2224,7 +2231,9 @@ class LlamaForMiniGPT4InferenceModel(LlamaForCausalLMInferenceModel):
     # rewrite to_static function in generation_utils.py
     def to_static(self, output_path: str, config: dict):
         dtype = config.get("dtype", paddle.get_default_dtype())
-        cache_kvs_shapes = self.get_cache_kvs_shape(self.config, max_length=config.get("max_length", None))
+        cache_k_shapes, cache_v_shapes = self.get_cache_kvs_shape(
+            self.config, max_length=config.get("max_length", None)
+        )
         input_spec = [
             paddle.static.InputSpec(
                 shape=[None, None, None], dtype="float32", name="image_features"
@@ -2258,7 +2267,7 @@ class LlamaForMiniGPT4InferenceModel(LlamaForCausalLMInferenceModel):
                     dtype=dtype,
                     name="cache_kvs_{}".format(i),
                 )
-                for i, shape in enumerate(cache_kvs_shapes)
+                for i, shape in enumerate(cache_k_shapes + cache_v_shapes)
             ],  # cache_kvs
         ]
 
