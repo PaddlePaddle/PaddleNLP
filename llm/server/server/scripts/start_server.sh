@@ -24,15 +24,18 @@ export BLOCK_RATIO=${BLOCK_RATIO:-"0.75"}
 export ENC_DEC_BLOCK_NUM=${ENC_DEC_BLOCK_NUM:-"4"}
 export MAX_PREFILL_BATCH=${MAX_PREFILL_BATCH:-"4"}
 export STOP_THRESHOLD=${STOP_THRESHOLD:-"0"}
+
+export tag="3.0-beta4"
+export model_name=$1
 export MODEL_DIR=${MODEL_DIR:-"/models"}
+export model_path=$MODEL_DIR
+if [ ! "$model_name" == "" ]]; then
+    export MODEL_DIR=${MODEL_DIR}/${model_name}
+fi
 export CONFIG_JSON_FILE=${CONFIG_JSON_FILE:-"config.json"}
 export PUSH_MODE_HTTP_WORKERS=${PUSH_MODE_HTTP_WORKERS:-"4"}
 
 # serving port
-
-
-
-
 export HEALTH_HTTP_PORT=${HTTP_PORT:-${HEALTH_HTTP_PORT:-"8110"}}
 export METRICS_HTTP_PORT=${METRICS_PORT:-${METRICS_HTTP_PORT:-"8722"}}
 export SERVICE_GRPC_PORT=${GRPC_PORT:-${SERVICE_GRPC_PORT:-"8811"}}

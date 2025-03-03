@@ -20,6 +20,7 @@ from server.utils import model_server_logger
 
 from paddlenlp.experimental.transformers import SpeculateArgument
 from paddlenlp.generation import GenerationConfig
+from server.engine.download_model import download_from_txt
 
 
 class Config:
@@ -38,6 +39,16 @@ class Config:
         self.model_dir = env.get("MODEL_DIR", "/opt/output/Serving/models")
         if not self.model_dir:
             raise Exception("The parameter MODEL_DIR is None.")
+        if 
+            try:
+                model_path=env.get("model_path")
+                model_name=env.get("model_name")
+                tag=env.get("tag")
+                base_url=f"https://paddlenlp.bj.bcebos.com/models/static/{model_name}/{tag}"
+                download_from_txt(base_url, model_path, model_name)
+            except Exception as e:
+                model_server_logger.error("No models in the dir")
+                raise
         self.mp_num = int(env.get("MP_NUM", 8))
         self.config_json_file = env.get("CONFIG_JSON_FILE", "config.json")
         self.model_config_path = os.path.join(self.model_dir, self.config_json_file)
@@ -222,7 +233,20 @@ class Config:
         Returns:
             dict: the config file
         """
-        model_config_json = json.load(open(self.model_config_path, "r", encoding="utf-8"))
+        model_config_json = None
+        try:
+            model_config_json = json.load(open(self.model_config_path, "r", encoding="utf-8"))
+        except:
+            try:
+                env = os.environ
+                model_path=env.get("model_path")
+                model_name=env.get("model_name")
+                tag=env.get("tag")
+                base_url=f"https://paddlenlp.bj.bcebos.com/models/static/{model_name}/{tag}"
+                download_from_txt(base_url, model_path, model_name)
+            except Exception as e:
+                model_server_logger.error("No models in the dir")
+                raise
         return model_config_json
 
     def get_speculate_config(self):
