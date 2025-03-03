@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 from dataclasses import dataclass, field
 
 import paddle
@@ -41,6 +42,15 @@ def add_inference_args_to_config(model_config, args):
 def main():
     parser = PdArgumentParser((PredictorArgument, ModelArgument, ExportArgument))
     predictor_args, model_args, export_args = parser.parse_args_into_dataclasses()
+    
+    # add triton custom ops dir, added by zkk.
+    mp_id = paddle.distributed.get_rank()
+    triton_dir = f"triton_ops_rank_{mp_id}"
+    triton_kernel_cache_dir = f"{export_args}/{triton_dir}"
+    os.environ["TRITON_KERNEL_CACHE_DIR"] = triton_kernel_cache_dir
+    if os.path.exists(triton_kernel_cache_dir):
+        # del old triton_ops
+        shutil.rmtree(triton_kernel_cache_dir)
 
     paddle.set_default_dtype(predictor_args.dtype)
     tensor_parallel_degree = paddle.distributed.get_world_size()

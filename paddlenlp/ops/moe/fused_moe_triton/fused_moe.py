@@ -96,56 +96,10 @@ def put_along_axis_triton_api(A, index):
         )
         return useless
 
-
-# 可以使用凯伦算子代替
-@triton.jit
-def _per_token_group_quant_fp8(
-    # Pointers to inputs and output
-    y_ptr,
-    y_q_ptr,
-    y_s_ptr,
-    # Stride of input
-    y_stride,
-    # Collums of input
-    N,
-    # Avoid to divide zero
-    M,
-    eps,
-    # Information for float8
-    fp8_min,
-    fp8_max,
-    # Meta-parameters
-    BLOCK: tl.constexpr,
-):
-    """A Triton-accelerated function to perform per-token-group quantization on a
-    tensor.
-
-    This function converts the tensor values into float8 values.
-    """
-    # Map the program id to the row of X and Y it should compute.
-    g_id = tl.program_id(0)
-    y_ptr += g_id * y_stride
-    y_q_ptr += g_id * y_stride
-    y_s_ptr += g_id
-
-    cols = tl.arange(0, BLOCK)  # N <= BLOCK
-    mask = cols < N
-
-    y = tl.load(y_ptr + cols, mask=mask, other=0.0).to(tl.float32)
-    # Quant
-    _absmax = tl.maximum(tl.max(tl.abs(y)), eps)
-    y_s = _absmax / fp8_max
-    y_q = tl.clamp(y / y_s, fp8_min, fp8_max).to(y_q_ptr.dtype.element_ty)
-
-    tl.store(y_q_ptr + cols, y_q, mask=mask)
-    tl.store(y_s_ptr, y_s)
-
-
-# 可以使用凯伦算子代替
 @paddle_use_triton(
     key=["1"],
 )
-def _per_token_group_quant_fp8_zkk(
+def _per_token_group_quant_fp8_kernel(
     y_ptr,
     y_q_ptr,
     y_s_ptr,
@@ -183,42 +137,6 @@ def _per_token_group_quant_fp8_zkk(
     else:
         y_s_ptrs = y_s_ptr + blocks
         tl.store(y_s_ptrs, y_s)
-
-def per_token_group_quant_fp8(
-    x,
-    group_size: int,
-    eps: float = 1e-10,
-):
-    fp8_max, fp8_min = 448.0, -448.0
-    x_q = paddle.empty(x.shape, dtype=paddle.float8_e4m3fn)
-    M = x.numel() // group_size
-    N = group_size
-    x_s = paddle.empty(
-        [x.shape[0], x.shape[-1] // group_size],
-        dtype=paddle.float32,
-    )
-
-    BLOCK = triton.next_power_of_2(N)
-    # heuristics for number of warps
-    num_warps = min(max(BLOCK // 256, 1), 8)
-    num_stages = 1
-    _per_token_group_quant_fp8[(M,)](
-        x,
-        x_q,
-        x_s,
-        group_size,
-        N,
-        -1,
-        eps,
-        fp8_min=fp8_min,
-        fp8_max=fp8_max,
-        BLOCK=BLOCK,
-        num_warps=num_warps,
-        num_stages=num_stages,
-    )
-
-    return x_q, x_s
-
 
 d2s_infer_code = """
 std::vector<std::vector<int64_t>> ${op_name}_InferShape(const std::vector<int64_t>& x,
@@ -307,7 +225,7 @@ def per_token_group_quant_fp8_api(
         grid = ("(flatten_num_blocks + BLOCK_M - 1)/BLOCK_M",)
         BLOCK_M = 8
 
-        _per_token_group_quant_fp8_zkk[(op_name, template_used, grid, [config])](
+        _per_token_group_quant_fp8_kernel[(op_name, template_used, grid, [config])](
             x,
             x_q,
             x_s,
@@ -344,197 +262,10 @@ def per_token_group_quant_fp8_api(
         )
         return x_q, x_s
 
-
-@triton.jit
-def fused_moe_kernel(
-    # Pointers to matrices
-    a_ptr,
-    b_ptr,
-    c_ptr,
-    a_scale_ptr,
-    b_scale_ptr,
-    topk_weights_ptr,
-    sorted_token_ids_ptr,
-    expert_ids_ptr,
-    num_tokens_post_padded_ptr,
-    # Matrix dimensions
-    N,
-    K,
-    EM,
-    num_valid_tokens,
-    # The stride variables represent how much to increase the ptr by when
-    # moving by 1 element in a particular dimension. E.g. `stride_am` is
-    # how much to increase `a_ptr` by to get the element one row down
-    # (A has M rows).
-    stride_am,
-    stride_ak,
-    stride_be,
-    stride_bk,
-    stride_bn,
-    stride_cm,
-    stride_cn,
-    stride_asm,
-    stride_ask,
-    stride_bse,
-    stride_bsk,
-    stride_bsn,
-    # Block size for block-wise quantization
-    group_n: tl.constexpr,
-    group_k: tl.constexpr,
-    # Meta-parameters
-    BLOCK_SIZE_M: tl.constexpr,
-    BLOCK_SIZE_N: tl.constexpr,
-    BLOCK_SIZE_K: tl.constexpr,
-    GROUP_SIZE_M: tl.constexpr,
-    MUL_ROUTED_WEIGHT: tl.constexpr,
-    top_k: tl.constexpr,
-    compute_type_enum: tl.constexpr,
-    use_fp8_w8a8: tl.constexpr,
-    use_int8_w8a16: tl.constexpr,
-    even_Ks: tl.constexpr,
-):
-    """
-    Implements the fused computation for a Mixture of Experts (MOE) using
-    token and expert matrices.
-
-    Key Parameters:
-    - A: The input tensor representing tokens with shape (*, K), where '*' can
-        be any shape representing batches and K is the feature dimension of
-        each token.
-    - B: The stacked MOE weight tensor with shape (E, N, K), where E is
-        the number of experts, K is the input feature dimension, and N is
-        the output feature dimension.
-    - C: The output cache tensor with shape (M, topk, N), where M is the
-        total number of tokens post padding, topk is the number of times
-        each token is repeated, and N is the output feature dimension.
-    - sorted_token_ids: A tensor containing the sorted indices of tokens,
-        repeated topk times and arranged by the expert index they are
-        assigned to.
-    - expert_ids: A tensor containing the indices of the expert for each
-        block. It determines which expert matrix from B should be used for
-        each block in A.
-    This kernel performs the multiplication of a token by its corresponding
-    expert matrix as determined by `expert_ids`. The sorting of
-    `sorted_token_ids` by expert index and padding ensures divisibility by
-    BLOCK_SIZE_M, which is necessary to maintain consistency in block matrix
-    multiplication across different blocks processed by the same expert.
-    """
-    # -----------------------------------------------------------
-    # Map program ids `pid` to the block of C it should compute.
-    # This is done in a grouped ordering to promote L2 data reuse.
-    pid = tl.program_id(axis=0)
-    num_pid_m = tl.cdiv(EM, BLOCK_SIZE_M)
-    num_pid_n = tl.cdiv(N, BLOCK_SIZE_N)
-    num_pid_in_group = GROUP_SIZE_M * num_pid_n
-    group_id = pid // num_pid_in_group
-    first_pid_m = group_id * GROUP_SIZE_M
-    group_size_m = min(num_pid_m - first_pid_m, GROUP_SIZE_M)
-    pid_m = first_pid_m + ((pid % num_pid_in_group) % group_size_m)
-    pid_n = (pid % num_pid_in_group) // group_size_m
-
-    assert compute_type_enum == 1
-    compute_type = tl.bfloat16
-
-    # ----------------------------------------------------------
-    # Create pointers for the first blocks of A and B.
-    # We will advance this pointer as we move in the K direction
-    # and accumulate
-    # `a_ptrs` is a block of [BLOCK_SIZE_M, BLOCK_SIZE_K] pointers
-    # `b_ptrs` is a block of [BLOCK_SIZE_K, BLOCK_SIZE_N] pointers
-    num_tokens_post_padded = tl.load(num_tokens_post_padded_ptr)
-    if pid_m * BLOCK_SIZE_M >= num_tokens_post_padded:
-        return
-    offs_token_id = pid_m * BLOCK_SIZE_M + tl.arange(0, BLOCK_SIZE_M)
-    offs_token = tl.load(sorted_token_ids_ptr + offs_token_id)
-    token_mask = offs_token < num_valid_tokens
-
-    offs_bn = (pid_n * BLOCK_SIZE_N + tl.arange(0, BLOCK_SIZE_N)) % N
-    offs_k = tl.arange(0, BLOCK_SIZE_K)
-    a_ptrs = a_ptr + (offs_token[:, None] // top_k * stride_am + offs_k[None, :] * stride_ak)
-
-    off_experts = tl.load(expert_ids_ptr + pid_m)
-    b_ptrs = b_ptr + off_experts * stride_be + (offs_k[:, None] * stride_bk + offs_bn[None, :] * stride_bn)
-    if use_int8_w8a16:
-        b_scale_ptrs = b_scale_ptr + off_experts * stride_bse + offs_bn[None, :] * stride_bsn
-        b_scale = tl.load(b_scale_ptrs)
-
-    if use_fp8_w8a8:
-        if group_k > 0 and group_n > 0:
-            a_scale_ptrs = a_scale_ptr + (offs_token // top_k) * stride_asm
-            offs_bsn = offs_bn // group_n
-            b_scale_ptrs = b_scale_ptr + off_experts * stride_bse + offs_bsn * stride_bsn
-        else:
-            a_scale = tl.load(a_scale_ptr)
-            b_scale = tl.load(b_scale_ptr + off_experts)
-
-    # -----------------------------------------------------------
-    # Iterate to compute a block of the C matrix.
-    # We accumulate into a `[BLOCK_SIZE_M, BLOCK_SIZE_N]` block
-    # of fp32 values for higher accuracy.
-    # `accumulator` will be converted back to fp16 after the loop.
-    accumulator = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_N), dtype=tl.float32)
-
-    for k in range(0, tl.cdiv(K, BLOCK_SIZE_K)):
-        # Load the next block of A and B, generate a mask by checking the
-        # K dimension.
-        if even_Ks:
-            a = tl.load(
-                a_ptrs,
-                mask=token_mask[:, None],
-                other=0.0,
-            )
-            b = tl.load(b_ptrs)
-        else:
-            a = tl.load(
-                a_ptrs,
-                mask=token_mask[:, None] & (offs_k[None, :] < K - k * BLOCK_SIZE_K),
-                other=0.0,
-            )
-            b = tl.load(b_ptrs, mask=offs_k[:, None] < K - k * BLOCK_SIZE_K, other=0.0)
-
-        # We accumulate along the K dimension.
-        if use_int8_w8a16:
-            accumulator = tl.dot(a, b.to(compute_type), acc=accumulator)
-        elif use_fp8_w8a8:
-            if group_k > 0 and group_n > 0:
-                k_start = k * BLOCK_SIZE_K
-                offs_ks = k_start // group_k
-                a_scale = tl.load(a_scale_ptrs + offs_ks * stride_ask, mask=token_mask, other=0.0)
-                b_scale = tl.load(b_scale_ptrs + offs_ks * stride_bsk)
-
-                accumulator += tl.dot(a, b) * a_scale[:, None] * b_scale[None, :]
-            else:
-                accumulator = tl.dot(a, b, acc=accumulator)
-        else:
-            accumulator += tl.dot(a, b)
-        # Advance the ptrs to the next K block.
-        a_ptrs += BLOCK_SIZE_K * stride_ak
-        b_ptrs += BLOCK_SIZE_K * stride_bk
-
-    if MUL_ROUTED_WEIGHT:
-        moe_weight = tl.load(topk_weights_ptr + offs_token, mask=token_mask, other=0)
-        accumulator = accumulator * moe_weight[:, None]
-    if use_int8_w8a16:
-        accumulator = (accumulator * b_scale).to(compute_type)
-    elif use_fp8_w8a8:
-        if group_k > 0 and group_n > 0:
-            accumulator = accumulator.to(compute_type)
-        else:
-            accumulator = (accumulator * a_scale * b_scale).to(compute_type)
-    else:
-        accumulator = accumulator.to(compute_type)
-    # -----------------------------------------------------------
-    # Write back the block of the output
-    offs_cn = pid_n * BLOCK_SIZE_N + tl.arange(0, BLOCK_SIZE_N)
-    c_ptrs = c_ptr + stride_cm * offs_token[:, None] + stride_cn * offs_cn[None, :]
-    c_mask = token_mask[:, None] & (offs_cn[None, :] < N)
-    tl.store(c_ptrs, accumulator, mask=c_mask)
-
-
 @paddle_use_triton(
     key=["1"],
 )
-def fused_moe_kernel_zkk(
+def fused_moe_kernel_paddle(
     # Pointers to matrices
     a_ptr,
     b_ptr,
@@ -723,179 +454,6 @@ def fused_moe_kernel_zkk(
 def ceil_div(a, b):
     return (a + b - 1) // b
 
-
-@triton.jit
-def moe_align_block_size_stage1(
-    topk_ids_ptr,
-    tokens_cnts_ptr,
-    num_experts: tl.constexpr,
-    numel: tl.constexpr,
-    tokens_per_thread: tl.constexpr,
-):
-    pid = tl.program_id(0)
-
-    start_idx = pid * tokens_per_thread
-
-    off_c = (pid + 1) * num_experts
-
-    for i in range(tokens_per_thread):
-        if start_idx + i < numel:
-            idx = tl.load(topk_ids_ptr + start_idx + i)
-            token_cnt = tl.load(tokens_cnts_ptr + off_c + idx)
-            tl.store(tokens_cnts_ptr + off_c + idx, token_cnt + 1)
-
-
-@triton.jit
-def moe_align_block_size_stage2(
-    tokens_cnts_ptr,
-    num_experts: tl.constexpr,
-):
-    pid = tl.program_id(0)
-
-    last_cnt = 0
-    for i in range(1, num_experts + 1):
-        token_cnt = tl.load(tokens_cnts_ptr + i * num_experts + pid)
-        last_cnt = last_cnt + token_cnt
-        tl.store(tokens_cnts_ptr + i * num_experts + pid, last_cnt)
-
-
-@triton.jit
-def moe_align_block_size_stage3(
-    total_tokens_post_pad_ptr,
-    tokens_cnts_ptr,
-    cumsum_ptr,
-    num_experts: tl.constexpr,
-    block_size: tl.constexpr,
-):
-    last_cumsum = 0
-    off_cnt = num_experts * num_experts
-    for i in range(1, num_experts + 1):
-        token_cnt = tl.load(tokens_cnts_ptr + off_cnt + i - 1)
-        last_cumsum = last_cumsum + tl.cdiv(token_cnt, block_size) * block_size
-        tl.store(cumsum_ptr + i, last_cumsum)
-    tl.store(total_tokens_post_pad_ptr, last_cumsum)
-
-
-@triton.jit
-def moe_align_block_size_stage4(
-    topk_ids_ptr,
-    sorted_token_ids_ptr,
-    expert_ids_ptr,
-    tokens_cnts_ptr,
-    cumsum_ptr,
-    num_experts: tl.constexpr,
-    block_size: tl.constexpr,
-    numel: tl.constexpr,
-    tokens_per_thread: tl.constexpr,
-):
-    pid = tl.program_id(0)
-    start_idx = tl.load(cumsum_ptr + pid)
-    end_idx = tl.load(cumsum_ptr + pid + 1)
-
-    for i in range(start_idx, end_idx, block_size):
-        tl.store(expert_ids_ptr + i // block_size, pid)
-
-    start_idx = pid * tokens_per_thread
-    off_t = pid * num_experts
-
-    for i in range(start_idx, tl.minimum(start_idx + tokens_per_thread, numel)):
-        expert_id = tl.load(topk_ids_ptr + i)
-        token_cnt = tl.load(tokens_cnts_ptr + off_t + expert_id)
-        rank_post_pad = token_cnt + tl.load(cumsum_ptr + expert_id)
-        tl.store(sorted_token_ids_ptr + rank_post_pad, i)
-        tl.store(tokens_cnts_ptr + off_t + expert_id, token_cnt + 1)
-
-
-@paddle_use_triton(
-    key=["1"],
-)
-def moe_align_block_size_stage1_zkk(
-    topk_ids_ptr,
-    tokens_cnts_ptr,
-    numel,
-    tokens_per_thread,
-    num_experts: tl.constexpr,
-):
-    pid = tl.program_id(0)
-
-    start_idx = pid * tokens_per_thread
-
-    off_c = (pid + 1) * num_experts
-
-    for i in range(tokens_per_thread):
-        if start_idx + i < numel:
-            idx = tl.load(topk_ids_ptr + start_idx + i)
-            token_cnt = tl.load(tokens_cnts_ptr + off_c + idx)
-            tl.store(tokens_cnts_ptr + off_c + idx, token_cnt + 1)
-
-
-@paddle_use_triton(
-    key=["1"],
-)
-def moe_align_block_size_stage2_zkk(
-    tokens_cnts_ptr,
-    num_experts: tl.constexpr,
-):
-    pid = tl.program_id(0)
-
-    last_cnt = 0
-    for i in range(1, num_experts + 1):
-        token_cnt = tl.load(tokens_cnts_ptr + i * num_experts + pid)
-        last_cnt = last_cnt + token_cnt
-        tl.store(tokens_cnts_ptr + i * num_experts + pid, last_cnt)
-
-
-@paddle_use_triton(
-    key=["1"],
-)
-def moe_align_block_size_stage3_zkk(
-    total_tokens_post_pad_ptr,
-    tokens_cnts_ptr,
-    cumsum_ptr,
-    num_experts: tl.constexpr,
-    block_size: tl.constexpr,
-):
-    last_cumsum = 0
-    off_cnt = num_experts * num_experts
-    for i in range(1, num_experts + 1):
-        token_cnt = tl.load(tokens_cnts_ptr + off_cnt + i - 1)
-        last_cumsum = last_cumsum + tl.cdiv(token_cnt, block_size) * block_size
-        tl.store(cumsum_ptr + i, last_cumsum)
-    tl.store(total_tokens_post_pad_ptr, last_cumsum)
-
-
-@paddle_use_triton(
-    key=["1"],
-)
-def moe_align_block_size_stage4_zkk(
-    topk_ids_ptr,
-    sorted_token_ids_ptr,
-    expert_ids_ptr,
-    tokens_cnts_ptr,
-    cumsum_ptr,
-    numel,
-    tokens_per_thread,
-    num_experts: tl.constexpr,
-    block_size: tl.constexpr,
-):
-    pid = tl.program_id(0)
-    start_idx = tl.load(cumsum_ptr + pid)
-    end_idx = tl.load(cumsum_ptr + pid + 1)
-
-    for i in range(start_idx, end_idx, block_size):
-        tl.store(expert_ids_ptr + i // block_size, pid)
-
-    start_idx = pid * tokens_per_thread
-    off_t = pid * num_experts
-
-    for i in range(start_idx, tl.minimum(start_idx + tokens_per_thread, numel)):
-        expert_id = tl.load(topk_ids_ptr + i)
-        token_cnt = tl.load(tokens_cnts_ptr + off_t + expert_id)
-        rank_post_pad = token_cnt + tl.load(cumsum_ptr + expert_id)
-        tl.store(sorted_token_ids_ptr + rank_post_pad, i)
-        tl.store(tokens_cnts_ptr + off_t + expert_id, token_cnt + 1)
-
-
 # 初步实现，后期可以换成cuda kernel，实现动态or静态
 def per_tensor_quant_fp8(x, scale=None):
     x_fp32 = x.cast("float32")
@@ -933,17 +491,6 @@ def invoke_fused_moe_kernel(
             block_k = block_shape[1]
             A, A_scale = per_token_group_quant_fp8_api(A, block_k)
 
-            # from paddlenlp_ops import group_quant
-            # A, A_scale = group_quant(
-            #     A, group_size=128, transpose_scale=False, quant_max_bound=448.0, quant_min_bound=-448.0
-            # )
-            # assert 128 == block_k
-
-            # A, A_scale = per_token_group_quant_fp8(A, block_k)
-
-            # print((my_scale-A_scale).max().abs())
-            # print(my_A.cast("float32") - A.cast("float32"))
-
     grid = lambda META: (
         triton.cdiv(sorted_token_ids.shape[0], META["BLOCK_SIZE_M"]) * triton.cdiv(B.shape[1], META["BLOCK_SIZE_N"]),
     )
@@ -953,7 +500,6 @@ def invoke_fused_moe_kernel(
         even_Ks = True
     else:
         even_Ks = False
-    # C1 = paddle.assign(C)
 
     invoke_fused_moe_kernel_api(
         A,
@@ -975,47 +521,6 @@ def invoke_fused_moe_kernel(
     )
 
     assert compute_type == tl.bfloat16
-    """
-    fused_moe_kernel[grid](
-        A,
-        B,
-        C,
-        A_scale,
-        B_scale,
-        topk_weights,
-        sorted_token_ids,
-        expert_ids,
-        num_tokens_post_padded,
-        B.shape[1],
-        B.shape[2] - padded_size,
-        sorted_token_ids.shape[0],
-        topk_ids.numel().item(),
-        A.strides[0],
-        A.strides[1],
-        B.strides[0],
-        B.strides[2],
-        B.strides[1],
-        C.strides[1],
-        C.strides[2],
-        A_scale.strides[0],
-        A_scale.strides[1],
-        B_scale.strides[0],
-        B_scale.strides[2],
-        B_scale.strides[1],
-        128,
-        128,
-        MUL_ROUTED_WEIGHT=(int)(mul_routed_weight),
-        top_k=top_k,
-        compute_type_enum=1,
-        use_fp8_w8a8=(int)(use_fp8_w8a8),
-        use_int8_w8a16=(int)(use_int8_w8a16),
-        even_Ks=(int)(even_Ks),
-        **config,
-    )
-    """
-
-    # assert ((C-C1).abs().max() * 100).cast("int32").item() == 0
-
 
 def invoke_fused_moe_kernel_api(
     A,
@@ -1081,7 +586,7 @@ def invoke_fused_moe_kernel_api(
 
     configs.append(dict(config))
 
-    op_name = "fused_moe_zkk"
+    op_name = "fused_moe_paddle"
     op_name += f"{get_dtype_str(A.dtype)}"
     op_name += f"{B.shape[0]}"
     op_name += f"{B.shape[1]}"
@@ -1119,7 +624,7 @@ def invoke_fused_moe_kernel_api(
         if in_dynamic_or_pir_mode():
             assert C.shape[2] == B.shape[1]
 
-        fused_moe_kernel_zkk[(op_name, template_used, grid, configs)](
+        fused_moe_kernel_paddle[(op_name, template_used, grid, configs)](
             A,
             B,
             C,

@@ -1492,9 +1492,28 @@ def create_predictor(
     return predictor
 
 
+def register_triton_custom_ops(model_dir):
+    for root, dirs, files in os.walk(model_dir):
+        for file in files:
+            if file.endswith("_package.so"):
+                so_full_path = os.path.join(root, file)
+                paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
+                    so_full_path
+                )
+
 def predict():
     parser = PdArgumentParser((PredictorArgument, ModelArgument))
     predictor_args, model_args = parser.parse_args_into_dataclasses()
+    
+    
+    # Added by zkk.
+    mp_id = paddle.distributed.get_rank()
+    triton_dir = f"triton_ops_rank_{mp_id}"
+    triton_kernel_cache_dir = f"{predictor_args.model_name_or_path}/{triton_dir}"
+    if predictor_args.mode == "static":
+        register_triton_custom_ops(triton_kernel_cache_dir)
+    else:
+        os.environ["TRITON_KERNEL_CACHE_DIR"] = f"/root/.paddlenlp/{triton_dir}"
 
     tensor_parallel_degree = paddle.distributed.get_world_size()
     if tensor_parallel_degree > 1:
