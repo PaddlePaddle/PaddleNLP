@@ -1127,9 +1127,6 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                 self._infer(self.model_inputs)
         logger.info(f"running spend {time.time() - s_time}")
 
-        if self.proposer is not None:
-            self.proposer.postprocess(base_model_inputs=self.model_inputs)
-
         if self.tensor_parallel_rank == 0:
             outputs = []
             output_tokens = []
