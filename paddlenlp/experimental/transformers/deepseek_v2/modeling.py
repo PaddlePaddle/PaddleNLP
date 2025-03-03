@@ -195,6 +195,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
         self.dynamic_quant = False
         if "fp8" in self.quant_type:
             self.dynamic_quant = True
+            self.moe_quant_type = self.config.get("moe_quant_type", "fp8")
 
         assert config.append_attn is True
 
@@ -1031,51 +1032,67 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                         ffn1_scales.append(ffn1_weight_scale)
                         ffn2_scales.append(ffn2_weight_scale)
                     elif "fp8" in self.quant_type:
-                        concated_gate_up_weight = np.concatenate(
-                            [
-                                state_dict[
-                                    f"{self.base_model_prefix}.layers.{idx}.mlp.experts.{expert_idx}.gate_proj.weight"
-                                ],
-                                state_dict[
-                                    f"{self.base_model_prefix}.layers.{idx}.mlp.experts.{expert_idx}.up_proj.weight"
-                                ],
-                            ],
-                            axis=-1,
-                        )
-                        ffn1_quanted_weight = paddle.to_tensor(concated_gate_up_weight).transpose((1, 0))
-                        ffn2_quanted_weight = paddle.to_tensor(
-                            state_dict[
-                                f"{self.base_model_prefix}.layers.{idx}.mlp.experts.{expert_idx}.down_proj.weight"
-                            ]
-                        ).transpose((1, 0))
-
-                        concated_gate_up_weight_scale = np.concatenate(
-                            [
-                                state_dict[
-                                    f"{self.base_model_prefix}.layers.{idx}.mlp.experts.{expert_idx}.gate_proj.weight_scale_inv"
-                                ],
-                                state_dict[
-                                    f"{self.base_model_prefix}.layers.{idx}.mlp.experts.{expert_idx}.up_proj.weight_scale_inv"
-                                ],
-                            ],
-                            axis=-1,
-                        )
-                        ffn1_weight_scale = (
-                            paddle.to_tensor(concated_gate_up_weight_scale).transpose((1, 0)).cast(paddle.float32)
-                        )
-                        ffn2_weight_scale = (
-                            paddle.to_tensor(
-                                state_dict[
-                                    f"{self.base_model_prefix}.layers.{idx}.mlp.experts.{expert_idx}.down_proj.weight_scale_inv"
-                                ]
+                        if self.moe_quant_type == "weight_only_int4":
+                            ffn1_quanted_weight, ffn1_weight_scale = weight_quantize(
+                                ffn1_weight, algo=self.moe_quant_type, group_size=-1
                             )
-                            .transpose((1, 0))
-                            .cast(paddle.float32)
-                        )
-                        ffn1_weights.append(ffn1_quanted_weight.view(paddle.uint8))
-                        ffn2_weights.append(ffn2_quanted_weight.view(paddle.uint8))
-                        ffn1_scales.append(ffn1_weight_scale)
-                        ffn2_scales.append(ffn2_weight_scale)
+                            ffn2_quanted_weight, ffn2_weight_scale = weight_quantize(
+                                ffn2_weight, algo=self.moe_quant_type, group_size=-1
+                            )
+                            ffn1_weights.append(
+                                ffn1_quanted_weight.reshape([self.transformer_block.config.embed_dim, -1])
+                            )
+                            ffn2_weights.append(
+                                ffn2_quanted_weight.reshape([-1, self.transformer_block.config.embed_dim])
+                            )
+                            ffn1_scales.append(ffn1_weight_scale)
+                            ffn2_scales.append(ffn2_weight_scale)
+                        else:
+                            concated_gate_up_weight = np.concatenate(
+                                [
+                                    state_dict[
+                                        f"{self.base_model_prefix}.layers.{idx}.mlp.experts.{expert_idx}.gate_proj.weight"
+                                    ],
+                                    state_dict[
+                                        f"{self.base_model_prefix}.layers.{idx}.mlp.experts.{expert_idx}.up_proj.weight"
+                                    ],
+                                ],
+                                axis=-1,
+                            )
+                            ffn1_quanted_weight = paddle.to_tensor(concated_gate_up_weight).transpose((1, 0))
+                            ffn2_quanted_weight = paddle.to_tensor(
+                                state_dict[
+                                    f"{self.base_model_prefix}.layers.{idx}.mlp.experts.{expert_idx}.down_proj.weight"
+                                ]
+                            ).transpose((1, 0))
+
+                            concated_gate_up_weight_scale = np.concatenate(
+                                [
+                                    state_dict[
+                                        f"{self.base_model_prefix}.layers.{idx}.mlp.experts.{expert_idx}.gate_proj.weight_scale_inv"
+                                    ],
+                                    state_dict[
+                                        f"{self.base_model_prefix}.layers.{idx}.mlp.experts.{expert_idx}.up_proj.weight_scale_inv"
+                                    ],
+                                ],
+                                axis=-1,
+                            )
+                            ffn1_weight_scale = (
+                                paddle.to_tensor(concated_gate_up_weight_scale).transpose((1, 0)).cast(paddle.float32)
+                            )
+                            ffn2_weight_scale = (
+                                paddle.to_tensor(
+                                    state_dict[
+                                        f"{self.base_model_prefix}.layers.{idx}.mlp.experts.{expert_idx}.down_proj.weight_scale_inv"
+                                    ]
+                                )
+                                .transpose((1, 0))
+                                .cast(paddle.float32)
+                            )
+                            ffn1_weights.append(ffn1_quanted_weight.view(paddle.uint8))
+                            ffn2_weights.append(ffn2_quanted_weight.view(paddle.uint8))
+                            ffn1_scales.append(ffn1_weight_scale)
+                            ffn2_scales.append(ffn2_weight_scale)
                     else:
                         ffn1_weights.append(ffn1_weight)
                         ffn2_weights.append(ffn2_weight)
@@ -1098,10 +1115,14 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                     self.transformer_block.ffn1_weights[idx].set_value(fused_moe_ffn1_weight)
                     self.transformer_block.ffn2_weights[idx].set_value(fused_moe_ffn2_weight)
                 elif "fp8" in self.quant_type:
-                    fused_moe_ffn1_weight_quant = paddle.to_tensor(ffn1_weights).view(paddle.float8_e4m3fn)
-                    fused_moe_ffn2_weight_quant = paddle.to_tensor(ffn2_weights).view(paddle.float8_e4m3fn)
-                    self.transformer_block.ffn1_weights[idx].copy_(fused_moe_ffn1_weight_quant, False)
-                    self.transformer_block.ffn2_weights[idx].copy_(fused_moe_ffn2_weight_quant, False)
+                    if self.moe_quant_type == "weight_only_int4":
+                        self.transformer_block.ffn1_weights[idx].set_value(fused_moe_ffn1_weight)
+                        self.transformer_block.ffn2_weights[idx].set_value(fused_moe_ffn2_weight)
+                    else:
+                        fused_moe_ffn1_weight_quant = paddle.to_tensor(ffn1_weights).view(paddle.float8_e4m3fn)
+                        fused_moe_ffn2_weight_quant = paddle.to_tensor(ffn2_weights).view(paddle.float8_e4m3fn)
+                        self.transformer_block.ffn1_weights[idx].copy_(fused_moe_ffn1_weight_quant, False)
+                        self.transformer_block.ffn2_weights[idx].copy_(fused_moe_ffn2_weight_quant, False)
                 else:
                     self.transformer_block.ffn1_weights[idx].set_value(fused_moe_ffn1_weight)
                     self.transformer_block.ffn2_weights[idx].set_value(fused_moe_ffn2_weight)
@@ -1111,12 +1132,16 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                     self.transformer_block.ffn1_weights_scale[idx].set_value(fused_moe_ffn1_weight_scale)
                     self.transformer_block.ffn2_weights_scale[idx].set_value(fused_moe_ffn2_weight_scale)
                 elif "fp8" in self.quant_type:
-                    self.transformer_block.ffn1_weights_scale[idx].set_value(
-                        fused_moe_ffn1_weight_scale.cast(paddle.float32)
-                    )
-                    self.transformer_block.ffn2_weights_scale[idx].set_value(
-                        fused_moe_ffn2_weight_scale.cast(paddle.float32)
-                    )
+                    if self.moe_quant_type == "weight_only_int4":
+                        self.transformer_block.ffn1_weights_scale[idx].set_value(fused_moe_ffn1_weight_scale)
+                        self.transformer_block.ffn2_weights_scale[idx].set_value(fused_moe_ffn2_weight_scale)
+                    else:
+                        self.transformer_block.ffn1_weights_scale[idx].set_value(
+                            fused_moe_ffn1_weight_scale.cast(paddle.float32)
+                        )
+                        self.transformer_block.ffn2_weights_scale[idx].set_value(
+                            fused_moe_ffn2_weight_scale.cast(paddle.float32)
+                        )
 
                 concated_gate_up_weight = np.concatenate(
                     [
