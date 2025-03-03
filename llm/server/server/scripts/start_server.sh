@@ -35,8 +35,6 @@ ln -s /root/paddlejob/workspace/env_run/output/model/static/deepseek_r1_fp8 mode
 
 # PaddlePaddle environment variables
 export FLAGS_gemm_use_half_precision_compute_type=0
-export FLAGS_cascade_attention_max_partition_size=32768
-export FLAGS_mla_use_tensorcore=1
 export NVIDIA_TF32_OVERRIDE=0
 
 # Model hyperparameters
@@ -56,7 +54,6 @@ export FIRST_TOKEN_ID=${FIRST_TOKEN_ID:-"1"}
 export MAX_PREFILL_BATCH=${MAX_PREFILL_BATCH:-"4"}
 export STOP_THRESHOLD=${STOP_THRESHOLD:-"0"}
 export MODEL_DIR=${MODEL_DIR:-"/models"}
-export DISTRIBUTED_CONFIG=${DISTRIBUTED_CONFIG:-"${MODEL_DIR}/rank_mapping.csv"}
 export CONFIG_JSON_FILE=${CONFIG_JSON_FILE:-"config.json"}
 export PUSH_MODE_HTTP_WORKERS=${PUSH_MODE_HTTP_WORKERS:-"4"}
 

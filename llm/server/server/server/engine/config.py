@@ -41,13 +41,6 @@ class Config:
         self.mp_num = int(env.get("MP_NUM", 8))
         self.config_json_file = env.get("CONFIG_JSON_FILE", "config.json")
         self.model_config_path = os.path.join(self.model_dir, self.config_json_file)
-        if env.get("FD_MODEL_CONFIG_PATH", None):
-            self.model_config_path = env.get("FD_MODEL_CONFIG_PATH")
-
-        # distributed config
-        self.distributed_config_path = os.path.join(self.model_dir, "rank_mapping.csv")
-        if os.getenv("DISTRIBUTED_CONFIG", None):
-            self.distributed_config_path = os.getenv("DISTRIBUTED_CONFIG")
 
         # device config
         self.device = env.get("DEVICE", "GPU")
@@ -261,6 +254,7 @@ class Config:
                 total_max_length=self.max_seq_len,
                 max_length=self.max_dec_len,
                 dtype=self.dtype,
+                mla_use_matrix_absorption=model_cfg.get("mla_use_matrix_absorption", False),
             )
 
             logger = get_logger("model_server", "infer_config.log")

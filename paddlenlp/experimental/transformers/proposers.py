@@ -89,6 +89,9 @@ class SpeculateArgument:
         metadata={"help": "Quantization type of moe. Supported values: weight_only_int4"},
     )
 
+    mla_use_matrix_absorption: bool = field(default=False, metadata={"help": "implement mla with matrix-absorption."})
+    weightonly_group_size: int = field(default=-1, metadata={"help": "the max length of candidate tokens."})
+
     @classmethod
     def build_from_predictor(cls, predictor_args):
         args = {}
