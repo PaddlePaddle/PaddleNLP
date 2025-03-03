@@ -249,7 +249,6 @@ class MiniMaxText01LightningAttention(nn.Layer):
             self.offset += 1
 
         ratio = paddle.exp(-slope_rate)
-
         if past_key_value is None:
             slope_rate = paddle.cast(slope_rate, dtype="float32")
             if attn_mask is not None:
@@ -306,7 +305,6 @@ class MiniMaxText01LightningAttention(nn.Layer):
             output = paddle.concat(output, axis=-2)
 
         output = output.reshape([b, n, h * d])
-        print(output.shape, output[0][0])
 
         output = self.norm(output)
 
@@ -478,7 +476,6 @@ class MiniMaxText01Attention(nn.Layer):
         )
 
         kv_seq_len = key_states.shape[-2]
-        print("kv_seq_len", kv_seq_len)
         if past_key_value is not None:
             if self.layer_idx is None:
                 raise ValueError(
@@ -525,7 +522,7 @@ class MiniMaxText01Attention(nn.Layer):
                 f" {attn_output.shape}"
             )
 
-        attn_output = attn_output.transpose([0, 2, 1, 3]).reshape([bsz, q_len, self.hidden_size])
+        attn_output = attn_output.transpose([0, 2, 1, 3]).reshape([bsz, q_len, -1])
 
         attn_output = self.o_proj(attn_output)
 
@@ -592,6 +589,7 @@ class MiniMaxText01SparseMoeBlock(nn.Layer):
 
     def forward(self, hidden_states):
         batch_size, sequence_length, hidden_dim = hidden_states.shape
+
         if self.training and self.jitter_noise > 0:
             hidden_states *= (
                 paddle.rand_like(hidden_states, dtype=hidden_states.dtype) * (1.0 + self.jitter_noise)
@@ -607,20 +605,30 @@ class MiniMaxText01SparseMoeBlock(nn.Layer):
         routing_weights /= paddle.sum(routing_weights, axis=-1, keepdim=True)
         routing_weights = routing_weights.astype(hidden_states.dtype)
 
-        final_hidden_states = paddle.zeros(
-            (batch_size * sequence_length, hidden_dim), dtype=hidden_states.dtype, place=hidden_states.place
+        final_hidden_states = paddle.zeros((batch_size * sequence_length, hidden_dim), dtype=hidden_states.dtype).to(
+            hidden_states.place
         )
 
         expert_mask = paddle.nn.functional.one_hot(selected_experts, num_classes=self.num_experts).transpose([2, 1, 0])
 
         for expert_idx in range(self.num_experts):
             expert_layer = self.experts[expert_idx]
-            idx, top_x = paddle.nonzero(expert_mask[expert_idx], as_tuple=True)
+            indices = paddle.nonzero(expert_mask[expert_idx])
+            idx = indices[:, 0]
+            top_x = indices[:, 1]
 
-            current_state = hidden_states[top_x].reshape((-1, hidden_dim))
+            if top_x.shape[0] == 0:
+                continue
+            else:
+                current_state = hidden_states[top_x].reshape((-1, hidden_dim))
             current_hidden_states = expert_layer(current_state) * routing_weights[top_x, idx, None]
 
-            paddle.index_add(final_hidden_states, 0, top_x, current_hidden_states.astype(final_hidden_states.dtype))
+            final_hidden_states = paddle.index_add(
+                x=final_hidden_states,
+                index=top_x,
+                value=current_hidden_states.astype(final_hidden_states.dtype),
+                axis=0,
+            )
 
         final_hidden_states = final_hidden_states.reshape((batch_size, sequence_length, hidden_dim))
         return final_hidden_states, router_logits
@@ -885,10 +893,10 @@ class MiniMaxText01Model(MiniMaxText01PreTrainedModel):
             raise ValueError("You cannot specify both decoder_input_ids and decoder_inputs_embeds at the same time")
         elif input_ids is not None:
             batch_size, seq_length = input_ids.shape
-            default_device = input_ids.device
+            default_device = input_ids.place
         elif inputs_embeds is not None:
             batch_size, seq_length, _ = inputs_embeds.shape
-            default_device = inputs_embeds.device
+            default_device = inputs_embeds.place
         else:
             raise ValueError("You have to specify either decoder_input_ids or decoder_inputs_embeds")
 
@@ -903,13 +911,12 @@ class MiniMaxText01Model(MiniMaxText01PreTrainedModel):
                     break
 
         if position_ids is None:
-            device = input_ids.device if input_ids is not None else inputs_embeds.device
             position_ids = paddle.arange(
-                past_key_values_length, seq_length + past_key_values_length, dtype=paddle.int64, device=device
-            )
-            position_ids = position_ids.unsqueeze(0).view(-1, seq_length)
+                past_key_values_length, seq_length + past_key_values_length, dtype=paddle.int64
+            ).to(input_ids.place)
+            position_ids = position_ids.unsqueeze(0).reshape([-1, seq_length])
         else:
-            position_ids = position_ids.view(-1, seq_length).long()
+            position_ids = position_ids.reshape([-1, seq_length]).astype("int64")
 
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
