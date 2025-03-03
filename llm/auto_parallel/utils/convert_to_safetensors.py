@@ -19,10 +19,12 @@ import paddle
 from safetensors.numpy import save_file as safe_save_file
 
 from paddlenlp.transformers.utils import dtype_byte_size
-from paddlenlp.utils.env import SAFE_WEIGHTS_INDEX_NAME
+from paddlenlp.utils.env import PADDLE_WEIGHTS_INDEX_NAME, SAFE_WEIGHTS_INDEX_NAME
 
 
-def convert_to_unified_ckpt(path: str, output_dir: str = "./tmp", split_num: int = 1, offload: bool = False):
+def convert_to_unified_ckpt(
+    path: str, output_dir: str = "./tmp", split_num: int = 1, offload: bool = False, as_safetensors: bool = False
+):
     """
     Convert a single card checkpoint to the unified format.
 
@@ -31,9 +33,10 @@ def convert_to_unified_ckpt(path: str, output_dir: str = "./tmp", split_num: int
         output_dir (str, optional): The directory where the converted files will be saved. Defaults to ".".
         split_num (int, optional): The number of shards to split the weights into output_dir. Defaults to 1.
         offload (bool, optional): Whether to offload the weights to CPU memory before saving them. Defaults to False.
+        as_safetensors (bool, optional): Whether to save the weights as safetensors. Defaults to False.
     """
 
-    def get_sub_state_dict(sub_keys, state_dict, weight_filename, index_weight_file, total_size):
+    def get_sub_state_dict(sub_keys, state_dict, weight_filename, index_weight_file, total_size, as_safetensors):
         """
         Get the sub-state dict and update the index weight file and total size.
         Args:
@@ -42,8 +45,12 @@ def convert_to_unified_ckpt(path: str, output_dir: str = "./tmp", split_num: int
             weight_filename (str): The filename of the corresponding weight file.
             index_weight_file (dict): The dictionary containing the mapping from keys to their corresponding weight filenames.
             total_size (int): The total size of the model so far.
+            as_safetensors (bool): Whether to save the weights as safetensors.
         """
-        sub_state_dict = {key: state_dict[key].numpy() for key in sub_keys}
+        if as_safetensors:
+            sub_state_dict = {key: state_dict[key].numpy() for key in sub_keys}
+        else:
+            sub_state_dict = {key: state_dict[key] for key in sub_keys}
         for key in sub_keys:
             index_weight_file[key] = weight_filename
             total_size += state_dict[key].numel().item() * dtype_byte_size(state_dict[key].dtype)
@@ -65,12 +72,21 @@ def convert_to_unified_ckpt(path: str, output_dir: str = "./tmp", split_num: int
         current_size = split_size + (1 if rank < extra_keys else 0)
         sub_keys = all_keys[index : index + current_size]
         index += current_size
-        weight_filename = f"model-{rank+1:04d}-of-{split_num:04d}.safetensors"
+        if as_safetensors:
+            weight_filename = f"model-{rank+1:04d}-of-{split_num:04d}.safetensors"
+        else:
+            weight_filename = f"model_state-{rank+1:04d}-of-{split_num:04d}.pdparams"
         sub_state_dict, total_size = get_sub_state_dict(
-            sub_keys, state_dict, weight_filename, index_weight_file, total_size
+            sub_keys, state_dict, weight_filename, index_weight_file, total_size, as_safetensors
         )
-        safe_save_file(sub_state_dict, os.path.join(output_dir, weight_filename))
-    with open(os.path.join(output_dir, SAFE_WEIGHTS_INDEX_NAME), "w") as f:
+        if as_safetensors:
+            safe_save_file(sub_state_dict, os.path.join(output_dir, weight_filename), metadata={"format": "np"})
+            index_file_name = SAFE_WEIGHTS_INDEX_NAME
+        else:
+            paddle.save(sub_state_dict, os.path.join(output_dir, weight_filename))
+            index_file_name = PADDLE_WEIGHTS_INDEX_NAME
+
+    with open(os.path.join(output_dir, index_file_name), "w") as f:
         json.dump({"metadata": {"total_size": total_size}, "weight_map": index_weight_file}, f, indent=4)
 
 
@@ -86,7 +102,10 @@ if __name__ == "__main__":
         "--split_num", type=int, default=1, help="The number of shards to split the weights into output_dir."
     )
     parser.add_argument(
-        "--offload", type=bool, help="Whether to offload the weights to CPU memory before saving them."
+        "--offload", action="store_true", help="Whether to offload the weights to CPU memory before saving them."
+    )
+    parser.add_argument(
+        "--as_safetensors", action="store_true", help="Save the weights as safetensors instead of pdparams."
     )
     args = parser.parse_args()
-    convert_to_unified_ckpt(args.input_path, args.output_dir, args.split_num, args.offload)
+    convert_to_unified_ckpt(args.input_path, args.output_dir, args.split_num, args.offload, args.as_safetensors)

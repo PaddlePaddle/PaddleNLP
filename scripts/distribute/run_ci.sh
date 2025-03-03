@@ -176,7 +176,7 @@ function execute_func_list(){
                 echo -e "\033[31m verification failed!"
                 let verification_fail_count++
                 galobal_verification_fail_arr+=("$func_name")
-            elif [ $result -eq 250 ]; then
+            elif [ $result -eq 250 ] || [ $result -eq 1 ]; then
                 if [ $execute_num -eq 1 ]; then
                     echo -e "\033[31m fist time execute failed, try again!"
                     let execute_num++

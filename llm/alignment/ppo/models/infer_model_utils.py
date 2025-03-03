@@ -19,6 +19,17 @@ import paddle
 
 
 def patch_paddlenlp_ops(eos_token_id, pad_token_id):
+    """
+    修补 PaddleNLP Ops，用于处理 EOS 标记和填充。
+
+    Args:
+        eos_token_id (int): EOS 标记的 ID，用于推断模型中的 padding。
+        当非推断模型使用该标记进行 padding 时，需要将其更改为 pad_token_id。
+        pad_token_id (int, optional): 填充标记的 ID，默认为 None。当非推断模型使用该标记进行 padding 时，需要将其更改为 eos_token_id。
+
+    Returns:
+        None. 直接在 PaddleNLP Ops 上修改函数实现。
+    """
     import paddlenlp_ops
 
     paddlenlp_ops.save_with_output = lambda *args, **kwargs: None
@@ -69,6 +80,16 @@ _model_weights_mapping_dict = {}
 
 
 def register_model(model_cls_name):
+    """
+    注册模型类名，并将其映射到对应的函数上。
+
+    Args:
+        model_cls_name (str): 模型类名，用于在映射表中进行存储。
+
+    Returns:
+        function: 返回一个装饰器，该装饰器接收一个函数作为参数，并将函数映射到传入的模型类名上。
+    """
+
     def mark_cls_name(func):
         # Do not register here although we can, otherwise infer model would import
         # before paddlenlp_ops.
@@ -79,6 +100,15 @@ def register_model(model_cls_name):
 
 
 def patch_infer_model():
+    """
+    修补 InferModel 类的 get_weights_mapping 方法，使其能够正确获取权重映射。
+
+    Args:
+        无参数，不需要传入任何参数。
+
+    Returns:
+        None, 该函数没有返回值。
+    """
     import paddlenlp.experimental.transformers as infer_transformers
 
     for model_cls_name, get_weights_mapping in _model_weights_mapping_dict.items():

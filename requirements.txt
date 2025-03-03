@@ -26,5 +26,6 @@ jinja2
 regex
 numpy<=1.26.4
 tiktoken
-tokenizers>=0.21,<0.22
+tokenizers<=0.20.3; python_version<="3.8"
+tokenizers>=0.21,<0.22; python_version>"3.8"
 omegaconf

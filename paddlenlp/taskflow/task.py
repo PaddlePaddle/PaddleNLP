@@ -22,7 +22,11 @@ from multiprocessing import cpu_count
 import paddle
 from paddle.dataset.common import md5file
 
-from ..utils.env import PPNLP_HOME
+from ..utils.env import (
+    PADDLE_INFERENCE_MODEL_SUFFIX,
+    PADDLE_INFERENCE_WEIGHTS_SUFFIX,
+    PPNLP_HOME,
+)
 from ..utils.log import logger
 from .utils import cut_chinese_sent, download_check, download_file, dygraph_mode_guard
 
@@ -54,7 +58,15 @@ class Task(metaclass=abc.ABCMeta):
         self._param_updated = False
 
         self._num_threads = self.kwargs["num_threads"] if "num_threads" in self.kwargs else math.ceil(cpu_count() / 2)
-        self._infer_precision = self.kwargs["precision"] if "precision" in self.kwargs else "fp32"
+        if (
+            self.task == "paddlenlp/PP-UIE-0.5B"
+            or self.task == "paddlenlp/PP-UIE-1.5B"
+            or self.task == "paddlenlp/PP-UIE-7B"
+            or self.task == "paddlenlp/PP-UIE-14B"
+        ):
+            self._infer_precision = self.kwargs["precision"] if "precision" in self.kwargs else "float16"
+        else:
+            self._infer_precision = self.kwargs["precision"] if "precision" in self.kwargs else "fp32"
         # Default to use Paddle Inference
         self._predictor_type = "paddle-inference"
         # The root directory for storing Taskflow related files, default to ~/.paddlenlp.
@@ -118,12 +130,12 @@ class Task(metaclass=abc.ABCMeta):
     def _get_static_model_name(self):
         names = []
         for file_name in os.listdir(self._task_path):
-            if ".pdmodel" in file_name:
-                names.append(file_name[:-8])
+            if PADDLE_INFERENCE_MODEL_SUFFIX in file_name:
+                names.append(file_name[: -len(PADDLE_INFERENCE_MODEL_SUFFIX)])
         if len(names) == 0:
-            raise IOError(f"{self._task_path} should include '.pdmodel' file.")
+            raise IOError(f"{self._task_path} should include '{PADDLE_INFERENCE_MODEL_SUFFIX}' file.")
         if len(names) > 1:
-            logger.warning(f"{self._task_path} includes more than one '.pdmodel' file.")
+            logger.warning(f"{self._task_path} includes more than one '{PADDLE_INFERENCE_MODEL_SUFFIX}' file.")
         return names[0]
 
     def _check_task_files(self):
@@ -212,18 +224,25 @@ class Task(metaclass=abc.ABCMeta):
             # TODO(linjieccc): enable after fixed
             self._config.delete_pass("embedding_eltwise_layernorm_fuse_pass")
             self._config.delete_pass("fused_multi_transformer_encoder_pass")
+            self._config.delete_pass("fused_rotary_position_embedding_pass")
+
+        self._config.switch_ir_optim(True)
+        self._config.enable_new_executor()
+
         self._config.set_cpu_math_library_num_threads(self._num_threads)
         self._config.switch_use_feed_fetch_ops(False)
         self._config.disable_glog_info()
         self._config.enable_memory_optim()
-
         # TODO(linjieccc): some temporary settings and will be remove in future
         # after fixed
-        if self.task in ["document_intelligence", "knowledge_mining", "zero_shot_text_classification"]:
+        if self.task in [
+            "document_intelligence",
+            "knowledge_mining",
+            "zero_shot_text_classification",
+        ]:
             self._config.switch_ir_optim(False)
         if self.model == "uie-data-distill-gp":
             self._config.enable_memory_optim(False)
-
         self.predictor = paddle.inference.create_predictor(self._config)
         self.input_names = [name for name in self.predictor.get_input_names()]
         self.input_handles = [self.predictor.get_input_handle(name) for name in self.predictor.get_input_names()]
@@ -281,12 +300,14 @@ class Task(metaclass=abc.ABCMeta):
         """
         if self._custom_model:
             param_path = os.path.join(self._task_path, "model_state.pdparams")
-
             if os.path.exists(param_path):
                 cache_info_path = os.path.join(self._task_path, ".cache_info")
                 md5 = md5file(param_path)
                 self._param_updated = True
-                if os.path.exists(cache_info_path) and open(cache_info_path).read()[:-8] == md5:
+                if (
+                    os.path.exists(cache_info_path)
+                    and open(cache_info_path).read()[: -len(PADDLE_INFERENCE_MODEL_SUFFIX)] == md5
+                ):
                     self._param_updated = False
                 elif self.task == "information_extraction" and self.model != "uie-data-distill-gp":
                     # UIE related models are moved to paddlenlp.transformers after v2.4.5
@@ -296,13 +317,20 @@ class Task(metaclass=abc.ABCMeta):
                     fp.write(md5 + "taskflow")
                     fp.close()
                     model_state = paddle.load(param_path)
-                    prefix_map = {"UIE": "ernie", "UIEM": "ernie_m", "UIEX": "ernie_layout"}
+                    prefix_map = {
+                        "UIE": "ernie",
+                        "UIEM": "ernie_m",
+                        "UIEX": "ernie_layout",
+                    }
                     new_state_dict = {}
                     for name, param in model_state.items():
                         if "ernie" in name:
                             new_state_dict[name] = param
                         elif "encoder.encoder" in name:
-                            trans_name = name.replace("encoder.encoder", prefix_map[self._init_class] + ".encoder")
+                            trans_name = name.replace(
+                                "encoder.encoder",
+                                prefix_map[self._init_class] + ".encoder",
+                            )
                             new_state_dict[trans_name] = param
                         elif "encoder" in name:
                             trans_name = name.replace("encoder", prefix_map[self._init_class])
@@ -318,11 +346,11 @@ class Task(metaclass=abc.ABCMeta):
         # When the user-provided model path is already a static model, skip to_static conversion
         if self.is_static_model:
             self.inference_model_path = os.path.join(self._task_path, self._static_model_name)
-            if not os.path.exists(self.inference_model_path + ".pdmodel") or not os.path.exists(
-                self.inference_model_path + ".pdiparams"
+            if not os.path.exists(self.inference_model_path + PADDLE_INFERENCE_MODEL_SUFFIX) or not os.path.exists(
+                self.inference_model_path + PADDLE_INFERENCE_WEIGHTS_SUFFIX
             ):
                 raise IOError(
-                    f"{self._task_path} should include {self._static_model_name + '.pdmodel'} and {self._static_model_name + '.pdiparams'} while is_static_model is True"
+                    f"{self._task_path} should include {self._static_model_name + PADDLE_INFERENCE_MODEL_SUFFIX} and {self._static_model_name + PADDLE_INFERENCE_WEIGHTS_SUFFIX} while is_static_model is True"
                 )
             if self.paddle_quantize_model(self.inference_model_path):
                 self._infer_precision = "int8"
@@ -336,19 +364,19 @@ class Task(metaclass=abc.ABCMeta):
                 else os.path.join(self._home_path, "taskflow", self.task, self._task_path)
             )
             self.inference_model_path = os.path.join(_base_path, "static", "inference")
-            if not os.path.exists(self.inference_model_path + ".pdiparams") or self._param_updated:
+            if not os.path.exists(self.inference_model_path + PADDLE_INFERENCE_WEIGHTS_SUFFIX) or self._param_updated:
                 with dygraph_mode_guard():
                     self._construct_model(self.model)
                     self._construct_input_spec()
                     self._convert_dygraph_to_static()
 
-        self._static_model_file = self.inference_model_path + ".pdmodel"
-        self._static_params_file = self.inference_model_path + ".pdiparams"
+        self._static_model_file = self.inference_model_path + PADDLE_INFERENCE_MODEL_SUFFIX
+        self._static_params_file = self.inference_model_path + PADDLE_INFERENCE_WEIGHTS_SUFFIX
 
         if paddle.get_device().split(":", 1)[0] == "npu" and self._infer_precision == "fp16":
             # transform fp32 model tp fp16 model
-            self._static_fp16_model_file = self.inference_model_path + "-fp16.pdmodel"
-            self._static_fp16_params_file = self.inference_model_path + "-fp16.pdiparams"
+            self._static_fp16_model_file = self.inference_model_path + f"-fp16{PADDLE_INFERENCE_MODEL_SUFFIX}"
+            self._static_fp16_params_file = self.inference_model_path + f"-fp16{PADDLE_INFERENCE_WEIGHTS_SUFFIX}"
             if not os.path.exists(self._static_fp16_model_file) and not os.path.exists(self._static_fp16_params_file):
                 logger.info("Converting to the inference model from fp32 to fp16.")
                 paddle.inference.convert_to_mixed_precision(
@@ -384,7 +412,8 @@ class Task(metaclass=abc.ABCMeta):
             self._input_spec is not None
         ), "The input spec must be created before converting the dygraph model to static model."
         logger.info("Converting to the inference model cost a little time.")
-        static_model = paddle.jit.to_static(self._model, input_spec=self._input_spec)
+
+        static_model = paddle.jit.to_static(self._model, input_spec=self._input_spec, full_graph=True)
 
         paddle.jit.save(static_model, self.inference_model_path)
         logger.info("The inference model save in the path:{}".format(self.inference_model_path))
@@ -512,7 +541,7 @@ class Task(metaclass=abc.ABCMeta):
         program = model.program()
         for block in program.blocks:
             for op in block.ops:
-                if op.type.count("quantize"):
+                if "quantize" in op.name():
                     return True
         return False
 

@@ -37,6 +37,11 @@
 
 ## 🚀 快速开始 🚀
 
+开始之前，您可以安装先 PaddleNLP 最新 develop 版本:
+```shell
+pip install --pre --upgrade paddlenlp -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
+```
+
 ### 1. 预训练
 
 PaddleNLP 将飞桨4D 并行策略加入到 Trainer API 中， 用户只需修改 Trainer 配置即可使用不同的分布式策略。目前大模型套件提供[LLaMA/LLaMA2/LLaMA3](./config/llama)、[GPT-3](./config/gpt-3)、[Qwen](./config/qwen)、[Baichuan/Baichuan2](./config/baichuan)、[Mixtral](./config/mixtral) 等模型预训练功能，更多模型支持持续更新中。
@@ -73,19 +78,30 @@ mkdir data
 mv llama_openwebtext_100k.bin ./data
 mv llama_openwebtext_100k.idx ./data
 ```
+单卡训练:
+```shell
+# 16G 显存可训练
+python -u run_pretrain.py ./config/qwen/pretrain_argument_0p5b.json
+```
+- 该配置16G 显存可训练，可以开启 use_flash_attention,use_fused_rms_norm,recompute 进一步省显存
+- 如果上述配置无法开启，或显存依然不够，可以开启`offload_optim`,此时显存约为11G  `python -u run_pretrain.py ./config/qwen/pretrain_argument_0p5b.json  --offload_optim  1`
 
+高性能、多卡、多机训练:
 ```shell
 # 编译自定义算子，可选
 cd ../slm/model_zoo/gpt-3/external_ops/ && python3 setup.py install && cd -
 
-# 模型预训练参考
-python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py ./config/llama/pretrain_argument.json
+# 多卡模型预训练参考:
+python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" run_pretrain.py ./config/llama/pretrain_argument.json
+# 多机训练参考: 占用45G显存左右
+python -u -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7"  --master=192.168.1.1:8090 --nnodes=2  run_pretrain.py ./config/llama/pretrain_argument.json
 ```
+- 更详细的分布式启动命令请参考[这里](https://www.paddlepaddle.org.cn/documentation/docs/zh/2.6/api/paddle/distributed/launch_cn.html#launch)。
 
 注意：
 
 1. 建议使用 paddle develop 版本训练，需要安装`pip install fast_dataindex visualdl==2.5.3`等相关缺失 whl 包
-2. `use_flash_attention` 需要在 A100机器开启，建议使用 cuda11.8环境。
+2. `use_flash_attention` 需要在 A100 以上机器开启，建议使用 cuda11.8以上环境。
 3. `use_fused_rms_norm` 需要安装自定义算子。如果安装后仍然找不到算子，需要额外设置 PYTHONPATH
 4. `continue_training` 表示从现有的预训练模型加载训练。7b 模型初始 loss 大概为2.xx, 随机初始化模型 loss 从11.x 左右下降。
 5. 多机训练时，若各机器使用的训练数据文件位置相同（例如挂载共享硬盘情况），请指定`--share_folder true`使全局0号卡制作缓存数据。否则默认各台机器的0号卡独立制作缓存数据，
@@ -125,29 +141,45 @@ PaddleNLP 支持多个主流大模型的 SFT、PEFT 等精调策略，提供统�
 为了方便测试，我们也提供了[tatsu-lab/alpaca](https://huggingface.co/datasets/tatsu-lab/alpaca)demo 数据集可以直接使用：
 
 ```shell
+# 在 PaddleNLP/llm 目录执行
 wget https://bj.bcebos.com/paddlenlp/datasets/examples/alpaca_demo.gz
 tar -xvf alpaca_demo.gz
 ```
 
 #### 2.2 全参精调：SFT
 
+单卡
 ```bash
-# SFT 启动命令参考
-python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_finetune.py ./config/llama/sft_argument.json
+# 需要12G显存左右
+python -u run_finetune.py ./config/qwen/sft_argument_0p5b.json
+# 单卡性能最佳实践，16G显存，可以参考打开开关。
+# ./config/qwen/sft_argument_0p5b_best.json
+```
+
+多卡
+```bash
+# SFT 启动命令参考，需要45G显存左右
+python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" run_finetune.py ./config/qwen/sft_argument.json
 ```
 
 #### 2.3 LoRA
 
+LoRA 启动命令参考
 ```bash
-# LoRA 启动命令参考
-python  run_finetune.py ./config/llama/lora_argument.json
+# 需要9G左右显存
+python run_finetune.py ./config/qwen/lora_argument_0p5b.json
+# 需要29G左右显存
+python run_finetune.py ./config/qwen/lora_argument.json
 ```
 
 #### 2.4 Prefix Tuning
 
+Prefix Tuning 启动命令参考
 ```bash
-# Prefix Tuning 启动命令参考
-python  run_finetune.py ./config/llama/pt_argument.json
+# 需要10G左右显存
+python run_finetune.py ./config/qwen/pt_argument_0p5b.json
+# 需要30G左右显存
+python run_finetune.py ./config/qwen/pt_argument.json
 ```
 
 除了 LoRA、Prefix Tuning 外，还支持 LoKr、VeRA、MoRA、ReFT、rsLoRA、LoRA+、PiSSA、MoSLoRA 等多种精调算法，更多大模型精调使用文档、训练细节和效果请参见[大模型精调教程](./docs/finetune.md)。
@@ -192,18 +224,26 @@ tar -zxvf ultrafeedback_binarized.tar.gz
 
 ##### 全参 DPO
 
+
 ```bash
-# DPO 启动命令参考
-python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/dpo/run_dpo.py ./config/llama/dpo_argument.json
+# DPO 启动命令参考, 8卡训练， 需要大概40G显存
+python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" ./alignment/dpo/run_dpo.py ./config/llama/dpo_argument.json
+
+# 单卡训练，大概需要26G显存左右
+python -u  ./alignment/dpo/run_dpo.py ./config/qwen/dpo_argument_0p5b.json
 ```
 
 ##### LoRA DPO
 
 ```bash
 # DPO 启动命令参考
-python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/dpo/run_dpo.py ./config/llama/dpo_lora_argument.json
+python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" ./alignment/dpo/run_dpo.py ./config/llama/dpo_lora_argument.json
 ```
 更多 DPO 技术细节和使用说明详见[DPO 文档](./docs/dpo.md)。
+```bash
+# 需要52G左右显存
+python -u  ./alignment/dpo/run_dpo.py ./config/llama/dpo_lora_argument.json
+```
 
 #### 3.2 KTO
 
@@ -240,13 +280,13 @@ tar -zxvf ultrafeedback_binarized.tar.gz
 
 ```bash
 # KTO 启动命令参考
-python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/kto/run_kto.py ./config/llama/kto_argument.json
+python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" ./alignment/kto/run_kto.py ./config/llama/kto_argument.json
 ```
 ##### LoRA KTO
 
 ```bash
 # KTO 启动命令参考
-python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/kto/run_kto.py ./config/llama/kto_lora_argument.json
+python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" ./alignment/kto/run_kto.py ./config/llama/kto_lora_argument.json
 ```
 
 #### 3.3 RLHF
@@ -322,13 +362,22 @@ PaddleNLP 提供高性能推理，内置动态插入和全环节算子融合策�
      </font>
 </div>
 
+
+<a id="paddlenlpops"></a>
+paddlenlp_ops 安装高性能推理算子教程（可选）
+```shell
+cd ../csrc/
+python setup_cuda.py install
+cd -
+```
+
 ```shell
 # 动态图模型推理命令参考
-python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16
+python ./predict/predictor.py --model_name_or_path Qwen/Qwen2.5-0.5B-Instruct --inference_model --dtype float16
 
 # 静态图模型推理命令参考
 # step1 : 静态图导出
-python ./predict/export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16
+python ./predict/export_model.py --model_name_or_path Qwen/Qwen2.5-0.5B-Instruct --inference_model --output_path ./inference --dtype float16
 # step2: 静态图推理
 python ./predict/predictor.py --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static"
 ```
@@ -346,35 +395,80 @@ python ./predict/predictor.py --model_name_or_path ./inference --inference_model
 
 我们提供了一套基于动态图推理的简单易用 UI 服务化部署方法，用户可以快速部署服务化推理。
 
+请确保，在部署前请确保已正确安装 NLP，clone 本 repo 下位置代码。以及自定义算子库。本部署的服务是兼容 OpenAI API 接口
+
+
+
 环境准备
 
 - python >= 3.8
 - gradio
 - flask
+- paddlenlp_ops (可选，高性能自定义加速算子， 安装参考[这里](#paddlenlpops))
 
 
 服务化部署脚本
 
 ```shell
-python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./predict/flask_server.py \
-    --model_name_or_path meta-llama/Llama-2-7b-chat \
+# 单卡，可以使用 paddle.distributed.launch 启动多卡推理
+python  ./predict/flask_server.py \
+    --model_name_or_path Qwen/Qwen2.5-0.5B-Instruct \
     --port 8010 \
     --flask_port 8011 \
     --dtype "float16"
 ```
 
-- `port`: Gradio UI 服务端口号，默认8011。
-- `flask_port`: Flask 服务端口号，默认8010。
+- `port`: Gradio UI 服务端口号，默认8010。
+- `flask_port`: Flask 服务端口号，默认8011。
 - 其他参数请参见[推理文档](./docs/predict/inference.md)中推理参数配置。
 
-此外，如果想通过 API 脚本的方式跑推理，可参考：`./predict/request_flask_server.py` 文件。
+图形化界面: 打开 `http://127.0.0.1:8010` 即可使用 gradio 图形化界面，即可开启对话。
+API 访问: 您也可用通过 flask 服务化 API 的形式
+
+1. 可参考：`./predict/request_flask_server.py` 文件访问。
+```shell
+python predict/request_flask_server.py
+```
+
+2. 或者直接使用 curl,调用开始对话
+```shell
+curl 127.0.0.1:8011/v1/chat/completions \
+-H 'Content-Type: application/json' \
+-d '{"message": [{"role": "user", "content": "你好"}]}'
+```
+3. 使用 OpenAI 客户端调用：
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    api_key="EMPTY",
+    base_url="http://localhost:8011/v1/",
+)
+
+# Completion API
+stream = True
+completion = client.chat.completions.create(
+    model="paddlenlp",
+    messages=[
+        {"role": "user", "content": "PaddleNLP好厉害！这句话的感情色彩是？"}
+    ],
+    max_tokens=1024,
+    stream=stream,
+)
+
+if stream:
+    for c in completion:
+        print(c.choices[0].delta.content, end="")
+else:
+    print(completion.choices[0].message.content)
+```
 
 
 #### 7.2 大模型服务化部署工具
 
 该部署工具是基于英伟达 Triton 框架专为服务器场景的大模型服务化部署而设计。它提供了支持 gRPC、HTTP 协议的服务接口，以及流式 Token 输出能力。底层推理引擎支持连续批处理、weight only int8、后训练量化（PTQ）等加速优化策略，为用户带来易用且高性能的部署体验。
 
-基于预编译镜像部署，本节以 Meta-Llama-3-8B-Instruct-A8W8C8 为例，更多模型请参考[LLaMA](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/llama.md)、[Qwen](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/qwen.md)、[Mixtral](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/mixtral.md), 更细致的模型推理、量化教程可以参考[大模型推理教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/inference.md)：
+基于预编译镜像部署，本节以 Meta-Llama-3-8B-Instruct-A8W8C8 为例，更细致的模型推理、量化教程可以参考[大模型推理教程](./docs/predict/inference.md)：
 
 ```shell
 # 下载模型
@@ -401,7 +495,8 @@ curl 127.0.0.1:9965/v1/chat/completions \
 Note:
 1. 请保证 shm-size >= 5，不然可能会导致服务启动失败
 
-更多关于该部署工具的使用方法，请查看[服务化部署流程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/deploy_usage_tutorial.md)
+更多模型请参考[LLaMA](./docs/predict/llama.md)、[Qwen](./docs/predict/qwen.md)、[Mixtral](./docs/predict/mixtral.md)。
+更多关于该部署工具的使用方法，请查看[服务化部署流程](./server/docs/deploy_usage_tutorial.md)
 
 ### 8. PyTorch 模型权重转换
 

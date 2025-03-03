@@ -19,6 +19,8 @@ import subprocess
 import paddle
 from paddle.utils.cpp_extension import CUDAExtension, setup
 
+sm_version = int(os.getenv("CUDA_SM_VERSION", "0"))
+
 
 def update_git_submodule():
     try:
@@ -38,9 +40,12 @@ def find_end_files(directory, end_str):
 
 
 def get_sm_version():
-    prop = paddle.device.cuda.get_device_properties()
-    cc = prop.major * 10 + prop.minor
-    return cc
+    if sm_version > 0:
+        return sm_version
+    else:
+        prop = paddle.device.cuda.get_device_properties()
+        cc = prop.major * 10 + prop.minor
+        return cc
 
 
 def strtobool(v):
@@ -77,8 +82,6 @@ def get_gencode_flags():
 gencode_flags = get_gencode_flags()
 library_path = os.environ.get("LD_LIBRARY_PATH", "/usr/local/cuda/lib64")
 
-sm_version = get_sm_version()
-
 sources = [
     "./gpu/save_with_output.cc",
     "./gpu/set_value_by_flags.cu",
@@ -96,13 +99,14 @@ sources = [
     "./gpu/rebuild_padding_v2.cu",
     "./gpu/set_value_by_flags_v2.cu",
     "./gpu/stop_generation_multi_ends_v2.cu",
-    "./gpu/update_inputs.cu",
     "./gpu/get_output.cc",
     "./gpu/save_with_output_msg.cc",
     "./gpu/write_int8_cache_kv.cu",
     "./gpu/step.cu",
     "./gpu/quant_int8.cu",
     "./gpu/dequant_int8.cu",
+    "./gpu/get_position_ids.cu",
+    "./gpu/fused_rotary_position_encoding.cu",
     "./gpu/flash_attn_bwd.cc",
     "./gpu/tune_cublaslt_gemm.cu",
     "./gpu/sample_kernels/top_p_sampling_reject.cu",
@@ -140,12 +144,9 @@ cuda_version = float(paddle.version.cuda())
 if cc >= 80:
     sources += ["gpu/int8_gemm_with_cutlass/gemm_dequant.cu"]
 
-    sources += [
-        "./gpu/append_attention.cu",
-        "./gpu/append_attn/get_block_shape_and_split_kv_block.cu",
-        "./gpu/append_attn/decoder_write_cache_with_rope_kernel.cu",
-        "./gpu/append_attn/speculate_write_cache_with_rope_kernel.cu",
-    ]
+    sources += ["./gpu/append_attention.cu", "./gpu/multi_head_latent_attention.cu"]
+
+    sources += find_end_files("./gpu/append_attn", ".cu")
     sources += find_end_files("./gpu/append_attn/template_instantiation", ".cu")
 
 
@@ -174,8 +175,9 @@ if cc >= 90 and cuda_version >= 12.0:
         "gpu/fp8_gemm_with_cutlass/fp8_fp8_fp8_dual_gemm.cu",
     ]
 
+ops_name = f"paddlenlp_ops_{sm_version}" if sm_version != 0 else "paddlenlp_ops"
 setup(
-    name="paddlenlp_ops",
+    name=ops_name,
     ext_modules=CUDAExtension(
         sources=sources,
         extra_compile_args={"cxx": ["-O3"], "nvcc": nvcc_compile_args},

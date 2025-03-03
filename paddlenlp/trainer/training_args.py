@@ -653,6 +653,14 @@ class TrainingArguments:
             )
         },
     )
+    split_inputs_sequence_dim: bool = field(
+        default=True,
+        metadata={
+            "help": (
+                "The paddle sequence parallel strategy can reduce the GPU memory of activation to 1/sep .If it is true, trainer will cut input in sequence dim "
+            )
+        },
+    )
     context_parallel_degree: int = field(
         default=-1,
         metadata={
@@ -977,6 +985,14 @@ class TrainingArguments:
     pdc_download_timeout: Optional[int] = field(
         default=300,
         metadata={"help": "Timeout seconds for downloading checkpoint from remote cluster."},
+    )
+    count_trained_tokens: bool = field(
+        default=False,
+        metadata={"help": "Whether to count trained tokens."},
+    )
+    pad_token_id: int = field(
+        default=0,
+        metadata={"help": "The id of the padding token."},
     )
 
     def __post_init__(self):
@@ -1632,13 +1648,12 @@ class TrainingArguments:
                             "enable_mp_async_allreduce",  # allreduce_matmul_grad_overlapping in auto_parallel
                             "enable_delay_scale_loss",
                             "replace_with_c_embedding",
-                            # "enable_mp_skip_c_identity",
                             # "enable_mp_fused_linear_param_grad_add",
                             "replace_with_parallel_cross_entropy",
                         ]:
                             raise ValueError(
                                 f"Found unknown tensor parallell config {x}, "
-                                f"accept config is enable_mp_async_allreduce, replace_with_c_embedding, enable_mp_skip_c_identity and enable_mp_fused_linear_param_grad_add"
+                                f"accept config is enable_mp_async_allreduce, replace_with_c_embedding, and enable_mp_fused_linear_param_grad_add"
                             )
                 try:
                     if "enable_mp_async_allreduce" in mp_config:

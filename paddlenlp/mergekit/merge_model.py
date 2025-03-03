@@ -39,11 +39,7 @@ from paddlenlp.utils.log import logger
 from paddlenlp.utils.safetensors import fast_safe_open
 
 from .merge_method import MergeMethod
-from .merge_utils import (
-    divide_lora_key_list,
-    divide_positions,
-    divide_safetensor_key_list,
-)
+from .merge_utils import divide_lora_key_list, divide_positions
 from .sparsify_method import SparsifyMethod
 
 SPARSIFY_MERGE_MAPPING = {
@@ -228,12 +224,16 @@ class MergeModel:
                 f.write(json.dumps(index, indent=2) + "\n")
             self.merge_config.save_pretrained(self.merge_config.output_path)
 
-    def get_model_state_dict(self, model_path, file_type, key_list=None):
+    def get_model_state_dict(self, model_path, file_type, key_list=None, file=None):
         if file_type == "safetensors":
             state_dict = {}
             with open(os.path.join(model_path, self.safe_index_name()), "r", encoding="utf-8") as f:
                 index = json.load(f)
-            if key_list is None:
+            if file is not None:
+                with fast_safe_open(os.path.join(model_path, file), framework="np") as f:
+                    for k in f.keys():
+                        state_dict[k] = f.get_tensor(k)
+            elif key_list is None:
                 files = set(index["weight_map"].values())
                 for file in files:
                     with fast_safe_open(os.path.join(model_path, file), framework="np") as f:
@@ -311,24 +311,41 @@ class MergeModel:
         index["metadata"]["total_size"] = int(index["metadata"]["total_size"])
         index["weight_map"] = {}
         num = self.merge_config.n_process if self.is_cpu else dist.get_world_size()
-        if file_type_list[0] == "safetensors" and len(set(index_list[0]["weight_map"].values())) >= num:
-            key_list, positions = divide_safetensor_key_list(index_list[0]["weight_map"], num)
-        else:
-            key_list = list(index_list[0]["weight_map"].keys())
-            positions = divide_positions(len(key_list), num)
+        key_list = list(index_list[0]["weight_map"].keys())
+        positions = divide_positions(len(key_list), num)
         if not self.is_cpu:
-            i = dist.get_rank()
-            local_keys = key_list[positions[i] : positions[i + 1]]
-            shard_file = f"{self.merge_config.merge_prefix}-{i+1:05d}-of-{dist.get_world_size():05d}.safetensors"
-            if self.merge_config.tensor_type == "np":
-                self.shard_merge_np(local_keys, index_list, shard_file)
+            rank = dist.get_rank()
+            file_list = sorted(list(set(index_list[0]["weight_map"].values())))
+            if file_type_list[0] == "safetensors" and len(file_list) >= num:
+                positions = divide_positions(len(file_list), num)
+                index["weight_map"] = index_list[0]["weight_map"]
+                file_map = {}
+                for key in key_list:
+                    if index["weight_map"][key] not in file_map:
+                        file_map[index["weight_map"][key]] = [key]
+                    else:
+                        file_map[index["weight_map"][key]].append(key)
+                for shard_file in file_list[positions[rank] : positions[rank + 1]]:
+                    if self.merge_config.tensor_type == "np":
+                        self.shard_merge_np(file_map[shard_file], index_list, shard_file)
+                    else:
+                        self.shard_merge_pd(file_map[shard_file], index_list, shard_file)
             else:
-                self.shard_merge_pd(local_keys, index_list, shard_file)
+                local_keys = key_list[positions[rank] : positions[rank + 1]]
+                shard_file = (
+                    f"{self.merge_config.merge_prefix}-{rank+1:05d}-of-{dist.get_world_size():05d}.safetensors"
+                )
+                if self.merge_config.tensor_type == "np":
+                    self.shard_merge_np(local_keys, index_list, shard_file)
+                else:
+                    self.shard_merge_pd(local_keys, index_list, shard_file)
 
-            for i in range(len(positions) - 1):
-                shard_file = f"{self.merge_config.merge_prefix}-{i+1:05d}-of-{dist.get_world_size():05d}.safetensors"
-                for k in key_list[positions[i] : positions[i + 1]]:
-                    index["weight_map"][k] = shard_file
+                for i in range(len(positions) - 1):
+                    shard_file = (
+                        f"{self.merge_config.merge_prefix}-{i+1:05d}-of-{dist.get_world_size():05d}.safetensors"
+                    )
+                    for k in key_list[positions[i] : positions[i + 1]]:
+                        index["weight_map"][k] = shard_file
         else:
             threads = []
             for i in range(len(positions) - 1):
@@ -515,25 +532,28 @@ class MergeModel:
         else:
             self.merge_pdparams_lora_model(file_type_list)
 
-    def shard_lora_merge(self, key_list, base_index, shard_file, lora_config, file_type_list):
+    def shard_lora_merge(self, base_index, shard_file, lora_config, file_type_list, key_list=None, file=None):
         merge_state_dict = {}
-        base_state_dict = self.get_model_state_dict(self.merge_config.base_model_path, file_type_list[1], key_list)
-        lora_state_dict = self.get_model_state_dict(self.merge_config.lora_model_path, file_type_list[0], key_list)
+        base_state_dict = self.get_model_state_dict(
+            self.merge_config.base_model_path, file_type_list[1], key_list=key_list, file=file
+        )
+        lora_state_dict = self.get_model_state_dict(self.merge_config.lora_model_path, file_type_list[0])
         if not lora_config.rslora:
             scaling = lora_config.lora_alpha / lora_config.r
         else:
             scaling = lora_config.lora_alpha / math.sqrt(lora_config.r)
 
-        for k in key_list:
+        model_key_list = list(base_state_dict.keys())
+        for k in model_key_list:
             if lora_state_dict is not None and k in lora_state_dict.keys():
-                tensor = lora_state_dict[k]
+                tensor = lora_state_dict.pop(k)
             else:
-                tensor = base_state_dict[k]
+                tensor = base_state_dict.pop(k)
             if "weight" in k:
                 lora_A_key, lora_B_key = k.replace("weight", "lora_A"), k.replace("weight", "lora_B")
                 lora_A_tensor = None
                 if lora_state_dict is not None and lora_A_key in lora_state_dict.keys():
-                    lora_A_tensor, lora_B_tensor = lora_state_dict[lora_A_key], lora_state_dict[lora_B_key]
+                    lora_A_tensor, lora_B_tensor = lora_state_dict.pop(lora_A_key), lora_state_dict.pop(lora_B_key)
                     is_bf16 = tensor.dtype == np.uint16
                     tensor = paddle.Tensor(tensor, zero_copy=True)
                     lora_A_tensor = paddle.Tensor(lora_A_tensor, zero_copy=True)
@@ -569,15 +589,25 @@ class MergeModel:
         key_list = list(base_index["weight_map"].keys())
         if not self.is_cpu:
             rank = dist.get_rank()
-            divided_key_list = divide_lora_key_list(key_list, dist.get_world_size(), lora_config)
-            local_keys = divided_key_list[rank]
-            shard_file = f"{self.merge_config.merge_prefix}-{rank+1:05d}-of-{dist.get_world_size():05d}.safetensors"
-            self.shard_lora_merge(local_keys, base_index, shard_file, lora_config, file_type_list)
-
-            for i in range(len(divided_key_list)):
-                shard_file = f"{self.merge_config.merge_prefix}-{i+1:05d}-of-{dist.get_world_size():05d}.safetensors"
-                for k in divided_key_list[i]:
-                    index["weight_map"][k] = shard_file
+            file_list = sorted(list(set(base_index["weight_map"].values())))
+            if file_type_list[-1] == "safetensors" and len(file_list) >= dist.get_world_size():
+                positions = divide_positions(len(file_list), dist.get_world_size())
+                for shard_file in file_list[positions[rank] : positions[rank + 1]]:
+                    self.shard_lora_merge(base_index, shard_file, lora_config, file_type_list, file=shard_file)
+                index["weight_map"] = base_index["weight_map"]
+            else:
+                divided_key_list = divide_lora_key_list(key_list, dist.get_world_size(), lora_config)
+                local_keys = divided_key_list[rank]
+                shard_file = (
+                    f"{self.merge_config.merge_prefix}-{rank+1:05d}-of-{dist.get_world_size():05d}.safetensors"
+                )
+                self.shard_lora_merge(base_index, shard_file, lora_config, file_type_list, key_list=local_keys)
+                for i in range(len(divided_key_list)):
+                    shard_file = (
+                        f"{self.merge_config.merge_prefix}-{i+1:05d}-of-{dist.get_world_size():05d}.safetensors"
+                    )
+                    for k in divided_key_list[i]:
+                        index["weight_map"][k] = shard_file
         else:
             divided_key_list = divide_lora_key_list(key_list, self.merge_config.n_process, lora_config)
             threads = []
@@ -588,11 +618,11 @@ class MergeModel:
                 t = Process(
                     target=self.shard_lora_merge,
                     args=(
-                        divided_key_list[i],  # key_list
                         base_index,  # base index
                         shard_file,  # shard_file name
                         lora_config,
                         file_type_list,
+                        divided_key_list[i],  # key_list
                     ),
                 )
                 threads.append(t)
