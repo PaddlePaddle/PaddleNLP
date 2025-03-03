@@ -382,7 +382,8 @@ class ModelRunner:
 
     def set_inputs(self):
         for i in range(self.args.num_layers):
-            self.share_inputs["value_caches_{}".format(i)] = self.cache_kvs["value_caches_{}".format(i)]
+            if not self.mla_use_absorb:
+                self.share_inputs["value_caches_{}".format(i)] = self.cache_kvs["value_caches_{}".format(i)]
             self.share_inputs["key_caches_{}".format(i)] = self.cache_kvs["key_caches_{}".format(i)]
 
         self.input_tensors = []
