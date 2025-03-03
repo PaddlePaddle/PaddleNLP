@@ -71,12 +71,12 @@ class Config:
 
         # max cached task num
         self.max_cached_task_num = int(os.getenv("MAX_CACHED_TASK_NUM", "128"))
-        # if PUSH_MODE_HTTP_PORT is not configured, only GRPC service is enabled
-        self.push_mode_http_port = int(os.getenv("PUSH_MODE_HTTP_PORT", "-1"))
+        # if SERVICE_HTTP_PORT is not configured, only GRPC service is enabled
+        self.push_mode_http_port = int(os.getenv("SERVICE_HTTP_PORT", "-1"))
         if self.push_mode_http_port > 0:
-            grpc_port = os.getenv("GRPC_PORT", None)
+            grpc_port = os.getenv("SERVICE_GRPC_PORT", None)
             if grpc_port is None:
-                raise Exception("GRPC_PORT cannot be None, while PUSH_MODE_HTTP_PORT>0")
+                raise Exception("SERVICE_GRPC_PORT cannot be None, while SERVICE_HTTP_PORT>0")
             self.grpc_port = int(grpc_port)
 
         # http worker num
@@ -110,7 +110,7 @@ class Config:
         self.return_full_hidden_states = int(os.getenv("RETURN_FULL_HIDDEN_STATES", 0))
 
         # infer queue port
-        self.infer_port = int(os.getenv("INFER_QUEUE_PORT", 56666))
+        self.infer_port = int(os.getenv("INTER_PROC_PORT", 56666))
 
         # whether to use custom health checker
         self.use_custom_health_checker = int(os.getenv("USE_CUSTOM_HEALTH_CHECKER", 1))
