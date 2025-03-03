@@ -16,7 +16,7 @@ export MP_NUM=${MP_NUM:-"1"}                                 # Model parallelism
 
 # Deployment Configuration
 # ------------------------
-docker_image=${docker_image:-"registry.baidubce.com/paddlepaddle/fastdeploy:llm-serving-cuda124-cudnn9-v1.2"}
+docker_image=${docker_image:-"ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v1.0"}
 model_path=${model_path:-~/llm_models/}  # Local model path (will be mounted to container)
 model_name=${model_name:-"DeepSeek-R1/DeepSeek-R1-Distill-Llama-8B/weight_only_int8"}      # need to download model name，
 tag="3.0-beta4"
