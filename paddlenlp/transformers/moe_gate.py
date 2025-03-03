@@ -331,7 +331,7 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
             scores_for_choice.reshape([bsz_seq_len, self.n_group, -1]).topk(2, axis=-1)[0].sum(axis=-1)
         )  # fmt:skip [n, n_group]
         group_idx = paddle.topk(group_scores, k=topk_group, axis=-1, sorted=False)[1]  # [n, top_k_group]
-        group_mask = paddle.zeros_like(group_scores).put_along_axis(group_idx, paddle.to_tensor(1.0), axis=-1)  # fmt:skip
+        group_mask = paddle.zeros_like(group_scores).put_along_axis(group_idx, paddle.to_tensor(1.0, dtype="float32"), axis=-1)  # fmt:skip
         score_mask = (
             group_mask.unsqueeze(-1).expand([bsz_seq_len, n_group, n_experts // n_group]).reshape([bsz_seq_len, -1])
         )  # [n, e]
@@ -395,7 +395,9 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
 
         _, top_idx = paddle.topk(mask1_rand, k=capacity, axis=0)  # Select top_capacity tokens
 
-        new_mask1 = mask1 * paddle.zeros_like(mask1).put_along_axis(top_idx, paddle.to_tensor(1.0), axis=0)
+        new_mask1 = mask1 * paddle.zeros_like(mask1).put_along_axis(
+            top_idx, paddle.to_tensor(1.0, dtype="float32"), axis=0
+        )
         mask1 = new_mask1
 
         # Compute locations in capacity buffer
@@ -519,7 +521,7 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         top_gate = top_gate * self.routed_scaling_factor
 
         # get topk mask
-        mask = paddle.zeros_like(gates).put_along_axis(top_idx, paddle.to_tensor(1.0), axis=1)
+        mask = paddle.zeros_like(gates).put_along_axis(top_idx, paddle.to_tensor(1.0, dtype="float32"), axis=1)
         if hasattr(self.config, "seq_aux") and self.config.seq_aux:
             l_aux = self._cal_seq_aux_loss(gates_ori, self.top_k, top_idx)
         else:
@@ -561,14 +563,10 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
             denom_s = paddle.clip(gates_s, min=paddle.finfo(gates_masked.dtype).eps)
             if self.norm_topk_prob:
                 gates_masked = gates_masked / denom_s
-            combine_weights = paddle.einsum(
-                "se,sec->sec", gates_masked, token_priority.cast(paddle.get_default_dtype())
-            )
+            combine_weights = paddle.einsum("se,sec->sec", gates_masked, token_priority.cast(paddle.float32))
         else:
             topk_masked_gates = paddle.zeros_like(gates).put_along_axis(top_idx, top_gate, axis=1)
-            combine_weights = paddle.einsum(
-                "se,sec->sec", topk_masked_gates, token_priority.cast(paddle.get_default_dtype())
-            )
+            combine_weights = paddle.einsum("se,sec->sec", topk_masked_gates, token_priority.cast(paddle.float32))
 
         dispatch_mask = combine_weights.cast(paddle.bool)
 
