@@ -32,6 +32,7 @@ from server.data.processor import DataProcessor
 from server.engine.config import Config
 from server.utils import get_logger
 from task_queue_manager import TaskQueueManager
+from paddlenlp.trl import llm_utils
 
 from paddlenlp.experimental.transformers import (
     EagleProposer,
@@ -764,6 +765,7 @@ def main():
     start model runner
     """
     args = parse_args()
+    llm_utils.set_triton_cache(args.model_dir, "static")
     model_runner = ModelRunner(args)
     model_runner.run()
 
