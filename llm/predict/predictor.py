@@ -179,6 +179,10 @@ class PredictorArgument:
         default_factory=lambda: [128, 128],
         metadata={"help": "Quantitative granularity of weights. Supported values: [128 128]"},
     )
+    moe_quant_type: str = field(
+        default="",
+        metadata={"help": "Quantization type of moe. Supported values: weight_only_int4"},
+    )
 
     def __post_init__(self):
         if self.speculate_method is not None:

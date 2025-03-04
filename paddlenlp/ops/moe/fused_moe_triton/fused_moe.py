@@ -987,7 +987,6 @@ def fused_moe(
     w2,
     scores,
     topk: int,
-    renormalize: bool,
     use_fp8_w8a8: bool = False,
     use_int8_w8a16: bool = False,
     w1_scale=None,
