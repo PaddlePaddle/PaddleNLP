@@ -37,6 +37,7 @@
 #include "cute/tensor.hpp"
 #include "cutlass/pipeline/pipeline.hpp"
 #include "epilogue.cuh"
+#include "helper.h"
 #include "kernel_traits.cuh"
 #include "mainloop_mma.cuh"
 #include "mainloop_load.cuh"
@@ -106,23 +107,14 @@ struct Params {
   if (group_size == 8) {                                     \
     constexpr size_t GROUP_SIZE = 8;                         \
     __VA_ARGS__                                              \
+  } else if (group_size == 16) {                             \
+    constexpr size_t GROUP_SIZE = 16;                        \
+    __VA_ARGS__                                              \
   } else if (group_size == 64) {                             \
     constexpr size_t GROUP_SIZE = 64;                        \
     __VA_ARGS__                                              \
   } else {                                                   \
-    printf("Unsupported block_size: %d\n", group_size);      \
-    return cudaErrorNotSupported;                            \
-  }
-
-#define DISPATCH_BLOCK_SIZE(block_size, BLOCK_SIZE, ...)     \
-  if (block_size == 32) {                                    \
-    constexpr size_t BLOCK_SIZE = 8;                         \
-    __VA_ARGS__                                              \
-  } else if (block_size == 64) {                             \
-    constexpr size_t BLOCK_SIZE = 64;                        \
-    __VA_ARGS__                                              \
-  } else {                                                   \
-    printf("Unsupported block_size: %d\n", block_size);      \
+    PD_THROW("not support the group_size: ", group_size);    \
     return cudaErrorNotSupported;                            \
   }
 
