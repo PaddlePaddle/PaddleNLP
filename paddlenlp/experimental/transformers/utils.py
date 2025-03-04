@@ -59,7 +59,7 @@ def infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, 
     with ContextManagers(init_contexts):
         model = cls(config)
 
-    if True:
+    if False:
         resolved_archive_file, _, _, _ = cls._resolve_model_file_path(
             pretrained_model_name_or_path,
             cache_dir=cache_dir,

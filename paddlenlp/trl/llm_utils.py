@@ -16,6 +16,7 @@ from __future__ import annotations
 import glob
 import math
 import os
+import shutil
 import struct
 from typing import List, Optional
 
@@ -806,3 +807,14 @@ def get_eos_token_id(
 
     eos_token_ids_dict = {str(item): item for item in eos_token_ids}
     return list(eos_token_ids_dict.values())
+
+
+def register_triton_kernel(output_path):
+    # add triton custom ops dir, added by zkk.
+    mp_id = paddle.distributed.get_rank()
+    triton_dir = f"triton_ops_rank_{mp_id}"
+    triton_kernel_cache_dir = f"{output_path}/{triton_dir}"
+    os.environ["TRITON_KERNEL_CACHE_DIR"] = triton_kernel_cache_dir
+    if os.path.exists(triton_kernel_cache_dir):
+        # del old triton_ops
+        shutil.rmtree(triton_kernel_cache_dir)
