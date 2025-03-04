@@ -35,6 +35,7 @@ from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
 from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
+from paddle.utils import try_import
 
 try:
     from paddle.incubate.nn.functional import fused_rotary_position_embedding
@@ -301,6 +302,38 @@ def _expand_2d_mask(mask, dtype, tgt_length):
     expanded_mask = mask.expand([batch_size, 1, tgt_length, src_length])
 
     return expanded_mask
+
+
+def rms_norm_fused(x_in, w, eps, use_fast_ln=False):
+    if use_fast_ln:
+        fast_ln = try_import("fast_ln")
+        return fast_ln.fast_rms_norm(x_in, w, eps)[0]
+    else:
+        fused_ln = try_import("fused_ln")
+        return fused_ln.fused_rms_norm(x_in, w, eps)[0]
+
+
+def fusion_rms_norm(hidden_states, weight, variance_epsilon, use_fast_ln=False):
+    if get_env_device() == "npu":
+        return paddle.base.core.eager._run_custom_op("rms_norm_npu", hidden_states, weight, variance_epsilon)[0]
+    if get_env_device() == "mlu":
+        return paddle.base.core.eager._run_custom_op("rms_norm_mlu", hidden_states, weight, variance_epsilon)[0]
+    elif get_env_device() == "gcu":
+        return paddle.base.core.eager._run_custom_op("rms_norm_gcu", hidden_states, weight, variance_epsilon)[0]
+    elif get_env_device() == "intel_hpu":
+        return paddle.incubate.nn.functional.fused_rms_norm(
+            hidden_states, weight, None, variance_epsilon, hidden_states.dim() - 1
+        )[0]
+    elif get_env_device() == "xpu":
+        try:
+            import paddle_xpu_nn  # noqa: F821
+
+            return paddle_xpu_nn.xpu_rms_norm(hidden_states, weight, variance_epsilon)[0]
+        except ImportError:
+            raise NotImplementedError(
+                f"Implementation of fused_rms_norm is not available on {get_env_device()}. Please install paddle_xpu to use this feature"
+            )
+    return rms_norm_fused(hidden_states, weight, variance_epsilon, use_fast_ln)
 
 
 class DeepseekV2RMSNorm(nn.Layer):
@@ -593,7 +626,7 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids, fuse_rope=False):
     b, s, h, d = k.shape
     k = k.reshape([b, s, h, d // 2, 2]).transpose([0, 1, 2, 4, 3]).reshape([b, s, h, d])
 
-    if get_env_device() == "xpu" and fuse_rope:
+    if get_env_device() == "gpu" and fuse_rope:
         q_embed, k_embed, _ = fused_rotary_position_embedding(
             q,
             k,
@@ -1073,15 +1106,21 @@ class DeepseekV2DecoderLayer(nn.Layer):
 
         self.self_attn = DeepseekV2Attention(config=config, layerwise_recompute=layerwise_recompute)
 
-        self.mlp = (
-            DeepseekV2MoE(config)
-            if (
-                config.n_routed_experts is not None
-                and layer_idx >= config.first_k_dense_replace
-                and layer_idx % config.moe_layer_freq == 0
-            )
-            else DeepseekV2MLP(config)
-        )
+        # self.mlp = (
+        #     DeepseekV2MoE(config)
+        #     if (
+        #         config.n_routed_experts is not None
+        #         and layer_idx >= config.first_k_dense_replace
+        #         and layer_idx % config.moe_layer_freq == 0
+        #     )
+        #     else DeepseekV2MLP(config)
+        # )
+        self.mlp1 = DeepseekV2MLP(config)
+        self.mlp2 = DeepseekV2MLP(config)
+        self.mlp3 = DeepseekV2MLP(config)
+        self.mlp4 = DeepseekV2MLP(config)
+        self.mlp5 = DeepseekV2MLP(config)
+
         self.input_layernorm = DeepseekV2RMSNorm(config)
         self.post_attention_layernorm = DeepseekV2RMSNorm(config)
 
@@ -1153,8 +1192,16 @@ class DeepseekV2DecoderLayer(nn.Layer):
         # Fully Connected
         residual = hidden_states
         hidden_states = self.post_attention_layernorm(hidden_states)
-        hidden_states = self.mlp(hidden_states)
-        hidden_states = residual + hidden_states
+        # hidden_states = self.mlp(hidden_states)
+        # hidden_states = residual + hidden_states
+        hidden_states = paddle.concat([hidden_states, hidden_states], axis=0)
+        hidden_states = self.mlp1(hidden_states)
+        hidden_states = self.mlp2(hidden_states)
+        hidden_states = self.mlp3(hidden_states)
+        hidden_states = self.mlp4(hidden_states)
+        hidden_states = self.mlp5(hidden_states)
+        hidden_states = hidden_states[0]
+        hidden_states = residual + hidden_states[0]
 
         outputs = (hidden_states,)
 
