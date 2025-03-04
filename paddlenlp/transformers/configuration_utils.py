@@ -14,7 +14,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Configuration base class and utilities."""
+"""Configuration base class and utilities."""
+
 from __future__ import annotations
 
 import copy
@@ -228,6 +229,41 @@ def llmmetaclass(cls):
 
 
 class LlmMetaConfig:
+    model_attributes = [
+        # name, type, default_value, comment
+        ("num_hidden_layers", int, None, "num_hidden_layers"),
+        ("num_nextn_predict_layers", int, None, "num_nextn_predict_layers"),
+        ("num_nextn_predict_lambda", int, None, "num_nextn_predict_lambda"),
+        ("hidden_size", int, None, "hidden_size"),
+        ("moe_intermediate_size", int, None, "moe_intermediate_size"),
+        ("intermediate_size", int, None, "intermediate_size"),
+        ("num_attention_heads", int, None, "num_attention_heads"),
+        ("num_key_value_heads", int, None, "num_key_value_heads"),
+        ("n_shared_experts", int, None, "n_shared_experts"),
+        ("n_routed_experts", int, None, "n_routed_experts"),
+        ("hidden_act", str, None, "hidden_act"),
+        ("tie_word_embeddings", bool, None, "tie_word_embeddings"),
+    ]
+    moe_attributes = [
+        ("moe_capacity_factor", bool, None, "moe_capacity_factor"),
+        ("moe_eval_capacity_factor", bool, None, "moe_eval_capacity_factor"),
+        ("moe_min_capacity", bool, None, "moe_min_capacity"),
+        ("moe_max_capacity", bool, None, "moe_max_capacity"),
+        ("moe_global_aux_loss", bool, None, "moe_global_aux_loss"),
+        ("moe_expert_drop", bool, None, "moe_expert_drop"),
+        ("moe_noisy_gate_policy", bool, None, "moe_noisy_gate_policy"),
+        ("moe_drop_tokens", bool, None, "moe_drop_tokens"),
+        ("moe_use_rts", bool, None, "moe_use_rts"),
+        ("moe_top2_2nd_expert_sampling", bool, None, "moe_top2_2nd_expert_sampling"),
+        ("moe_drop_policy", bool, None, "moe_drop_policy"),
+        ("moe_topk_method", bool, None, "moe_topk_method"),
+        ("moe_top_k", bool, None, "moe_top_k"),
+        ("moe_n_group", bool, None, "moe_n_group"),
+        ("moe_topk_group", bool, None, "moe_topk_group"),
+        ("moe_norm_topk_prob", bool, None, "moe_norm_topk_prob"),
+        ("moe_routed_scaling_factor", bool, None, "moe_routed_scaling_factor"),
+    ]
+
     op_fusion_attributes = [
         # name, type, default_value, comment
         ("use_flash_attention", bool, False, "Whether to use flash attention to accelerate training."),
@@ -286,6 +322,8 @@ class LlmMetaConfig:
             cls.op_fusion_attributes,
             cls.hybrid_parallel_attributes,
             cls.recompute_attributes,
+            cls.model_attributes,
+            cls.moe_attributes,
         ]:
             for attr in attrs:
                 # return dict of key and default values
@@ -299,6 +337,8 @@ class LlmMetaConfig:
             cls.op_fusion_attributes,
             cls.hybrid_parallel_attributes,
             cls.recompute_attributes,
+            cls.model_attributes,
+            cls.moe_attributes,
         ]:
             for attr in attrs:
                 # return dict of key and default values
@@ -320,6 +360,8 @@ class LlmMetaConfig:
     @classmethod
     def set_llm_config(cls, config, args):
         for key, value in cls._get_defaults().items():
+            if getattr(args, key, value) is None:
+                continue
             setattr(config, key, getattr(args, key, value))
 
 
@@ -499,6 +541,7 @@ class PretrainedConfig:
             This attribute is currently not being used during model loading time, but this may change in the future
             versions. But we can already start preparing for the future by saving the dtype with save_pretrained.
     """
+
     model_type: str = ""
     is_composition: bool = False
 
@@ -935,7 +978,7 @@ class PretrainedConfig:
             id2label = kwargs["id2label"] if kwargs["id2label"] is not None else []
             if len(id2label) != num_labels:
                 raise ValueError(
-                    f"You passed along `num_labels={num_labels }` with an incompatible id to label map: "
+                    f"You passed along `num_labels={num_labels}` with an incompatible id to label map: "
                     f"{kwargs['id2label']}. Since those arguments are inconsistent with each other, you should remove "
                     "one of them."
                 )

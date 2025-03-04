@@ -135,7 +135,7 @@ class ModelConfig:
     num_key_value_heads: int = field(default=None, metadata={"help": "num_key_value_heads."})
     n_shared_experts: int = field(default=None, metadata={"help": "n_shared_experts."})
     n_routed_experts: int = field(default=None, metadata={"help": "n_routed_experts."})
-    hidden_act: int = field(default=None, metadata={"help": "hidden_act."})
+    hidden_act: str = field(default=None, metadata={"help": "hidden_act."})
     tie_word_embeddings: bool = field(default=None, metadata={"help": "tie_word_embeddings."})
 
     # moe related parameters
