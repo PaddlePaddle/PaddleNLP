@@ -1083,7 +1083,7 @@ class MiniMaxText01ForCausalLM(MiniMaxText01PreTrainedModel):
                 output = (aux_loss,) + output
             return (loss,) + output if loss is not None else output
 
-        paddle.cuda.empty_cache()  # Clearing the cache on GPU
+        paddle.device.cuda.empty_cache()  # Clearing the cache on GPU
         return MoECausalLMOutputWithPast(
             loss=loss,
             aux_loss=aux_loss,
@@ -1196,13 +1196,15 @@ class MiniMaxText01ForSequenceClassification(MiniMaxText01PreTrainedModel):
         else:
             if input_ids is not None:
                 # If no pad token found, use modulo instead of reverse indexing for ONNX compatibility
-                sequence_lengths = paddle.eq(input_ids, self.config.pad_token_id).astype(paddle.int32).argmax(-1) - 1
+                sequence_lengths = (
+                    paddle.equal(input_ids, self.config.pad_token_id).astype(paddle.int32).argmax(-1) - 1
+                )
                 sequence_lengths = sequence_lengths % input_ids.shape[-1]
-                sequence_lengths = sequence_lengths.astype(paddle.int64).to(logits.device)
+                sequence_lengths = sequence_lengths.astype(paddle.int64).to(logits.place)
             else:
                 sequence_lengths = -1
 
-        pooled_logits = logits[paddle.arange(batch_size, device=logits.device), sequence_lengths]
+        pooled_logits = logits[paddle.arange(batch_size), sequence_lengths]
 
         loss = None
         if labels is not None:
