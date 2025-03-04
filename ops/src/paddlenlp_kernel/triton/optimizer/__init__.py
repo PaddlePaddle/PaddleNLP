@@ -12,9 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from paddlenlp.utils.log import logger
-
-try:
-    from .paddlenlp_ops_89 import *
-except ImportError:
-    logger.WARNING("No paddlenlp_ops_89 ops")
+from .adamw_16bit_moment import adamw_16bit_moment
