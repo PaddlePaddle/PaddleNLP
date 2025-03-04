@@ -33,6 +33,7 @@ namespace cub = hipcub;
 #else
 #include <cub/cub.cuh>
 #include <curand_kernel.h>
+#include <cuda_fp8.h>
 #endif
 #include <iostream>
 #include <fstream>
