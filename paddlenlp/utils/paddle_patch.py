@@ -41,7 +41,7 @@ origin_set_value = paddle.core.eager.Tensor.set_value
 paddle_numpy_mapping = {
     paddle.float8_e5m2: (paddle.int8, np.float8_e5m2),
     paddle.float8_e4m3fn: (paddle.int8, np.float8_e4m3fn),
-    paddle.bfloat16: (paddle.int16, np.bfloat16),
+    # paddle.bfloat16: (paddle.int16, np.bfloat16),
 }
 
 numpy_paddle_mapping = {
