@@ -30,6 +30,7 @@ cd PaddleNLP/llm
 
 -  [llama](./llama.md)
 -  [qwen](./qwen.md)
+-  [deepseek](./deepseek.md)
 -  [mixtral](./mixtral.md)
 
 获取最佳推理性能：

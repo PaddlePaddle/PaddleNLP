@@ -29,6 +29,10 @@ PaddleNLP 提供了多种环境变量，用于优化推理性能和资源使用�
 
 **Append Attention 优化**
 
-- `FLAGS_cascade_attention_max_partition_size`：Append Attention decoder 计算时对 cache_kv 进行分 chunk 的 chunk 大小，默认值根据 batchsize 设置，batchsize=1时设置为128，batchsize>1时设置为512。显式设置时不再区分 batchsize。
+- `FLAGS_cascade_attention_max_partition_size`：Attention decoder 计算时对 cache_kv 进行分 chunk 的 chunk 大小，默认值根据 batch_size 设置，batch_size = 1 时设置为 128，batchsize > 1 时设置为 512。显式设置时不再区分 batch_size。
 - `FLAGS_dec_block_shape_q`：Append Attention decoder 计算时对 q 进行分块的分块大小，默认值为16。
 - `FLAGS_enc_block_shape_q`：Append Attention encoder 计算时对 q 进行分块的分块大小，默认值为64。
+
+**MLA 相关优化**
+- `FLAGS_mla_use_tensorcore`：MLA 计算时是否使用 tensor core 实现，默认为 True，仅支持 Hoppers 架构显卡。为 False 时则采用 cuda core 实现，同时支持 Ampper 和
+ Hopper 架构。
