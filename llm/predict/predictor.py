@@ -1319,6 +1319,7 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
                 self.full_hidden_states = self.predictor.run(list(self.model_inputs.values()))[0]
             else:
                 self.predictor.run(list(self.model_inputs.values()))
+            print("accept_num", self.model_inputs["accept_num"])
         logger.info(f"running spend {time.time() - s_time}")
 
         if self.tensor_parallel_rank == 0:

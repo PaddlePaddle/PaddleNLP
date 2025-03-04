@@ -1095,9 +1095,8 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                             ffn1_scales.append(ffn1_weight_scale)
                             ffn2_scales.append(ffn2_weight_scale)
                     else:
-                        ffn1_weights.append(ffn1_weight)
-                        ffn2_weights.append(ffn2_weight)
-
+                        ffn1_weights.append(ffn1_weight.view(paddle.float16))
+                        ffn2_weights.append(ffn2_weight.view(paddle.float16))
                 fused_moe_ffn1_weight = paddle.to_tensor(ffn1_weights)
                 fused_moe_ffn2_weight = paddle.to_tensor(ffn2_weights)
                 fused_moe_ffn1_weight_scale = paddle.to_tensor(ffn1_scales)
@@ -1125,8 +1124,8 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                         self.transformer_block.ffn1_weights[idx].copy_(fused_moe_ffn1_weight_quant, False)
                         self.transformer_block.ffn2_weights[idx].copy_(fused_moe_ffn2_weight_quant, False)
                 else:
-                    self.transformer_block.ffn1_weights[idx].set_value(fused_moe_ffn1_weight)
-                    self.transformer_block.ffn2_weights[idx].set_value(fused_moe_ffn2_weight)
+                    self.transformer_block.ffn1_weights[idx].set_value(fused_moe_ffn1_weight.view(dtype))
+                    self.transformer_block.ffn2_weights[idx].set_value(fused_moe_ffn2_weight.view(dtype))
                 self.transformer_block.gate_weights[idx].set_value(gate_weight)
 
                 if self.use_weight_only:
@@ -1410,43 +1409,46 @@ class DeepseekV2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, De
                 # Row Linear
                 "embed_tokens.weight": partial(fn, is_column=False),
                 "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
-                "layers.0.self_attn.o_proj.weight_scale_inv": partial(fn, is_column=False),
             }
+            if "fp8" in config.quant_type:
+                base_actions["layers.0.self_attn.o_proj.weight_scale_inv"] = partial(fn, is_column=False)
+                base_actions["layers.0.self_attn.q_proj.weight_scale_inv"] = partial(fn, is_column=True)
+                base_actions["layers.0.self_attn.kv_b_proj.weight_scale_inv"] = partial(fn, is_column=True)
+                base_actions["layers.0.self_attn.q_b_proj.weight_scale_inv"] = partial(fn, is_column=True)
+                base_actions["layers.0.mlp.gate_proj.weight_scale_inv"] = partial(fn, is_column=True)
+                base_actions["layers.0.mlp.up_proj.weight_scale_inv"] = partial(fn, is_column=True)
+                base_actions["layers.0.mlp.down_proj.weight_scale_inv"] = partial(fn, is_column=False)
 
             # Column Linear
             base_actions["layers.0.self_attn.q_proj.weight"] = partial(fn, is_column=True)
             base_actions["layers.0.self_attn.q_b_proj.weight"] = partial(fn, is_column=True)
             base_actions["layers.0.self_attn.kv_b_proj.weight"] = partial(fn, is_column=True)
-            base_actions["layers.0.self_attn.q_proj.weight_scale_inv"] = partial(fn, is_column=True)
-            base_actions["layers.0.self_attn.kv_b_proj.weight_scale_inv"] = partial(fn, is_column=True)
-            base_actions["layers.0.self_attn.q_b_proj.weight_scale_inv"] = partial(fn, is_column=True)
 
             base_actions["layers.0.mlp.gate_proj.weight"] = partial(fn, is_column=True)
             base_actions["layers.0.mlp.up_proj.weight"] = partial(fn, is_column=True)
             base_actions["layers.0.mlp.down_proj.weight"] = partial(fn, is_column=False)
-            base_actions["layers.0.mlp.gate_proj.weight_scale_inv"] = partial(fn, is_column=True)
-            base_actions["layers.0.mlp.up_proj.weight_scale_inv"] = partial(fn, is_column=True)
-            base_actions["layers.0.mlp.down_proj.weight_scale_inv"] = partial(fn, is_column=False)
 
             for expert_idx in range(config.n_routed_experts):
                 base_actions[f"layers.0.mlp.experts.{expert_idx}.up_proj.weight"] = partial(fn, is_column=True)
                 base_actions[f"layers.0.mlp.experts.{expert_idx}.gate_proj.weight"] = partial(fn, is_column=True)
                 base_actions[f"layers.0.mlp.experts.{expert_idx}.down_proj.weight"] = partial(fn, is_column=False)
-                base_actions[f"layers.0.mlp.experts.{expert_idx}.up_proj.weight_scale_inv"] = partial(
-                    fn, is_column=True
-                )
-                base_actions[f"layers.0.mlp.experts.{expert_idx}.gate_proj.weight_scale_inv"] = partial(
-                    fn, is_column=True
-                )
-                base_actions[f"layers.0.mlp.experts.{expert_idx}.down_proj.weight_scale_inv"] = partial(
-                    fn, is_column=False
-                )
+                if "fp8" in config.quant_type:
+                    base_actions[f"layers.0.mlp.experts.{expert_idx}.up_proj.weight_scale_inv"] = partial(
+                        fn, is_column=True
+                    )
+                    base_actions[f"layers.0.mlp.experts.{expert_idx}.gate_proj.weight_scale_inv"] = partial(
+                        fn, is_column=True
+                    )
+                    base_actions[f"layers.0.mlp.experts.{expert_idx}.down_proj.weight_scale_inv"] = partial(
+                        fn, is_column=False
+                    )
             base_actions["layers.0.mlp.shared_experts.up_proj.weight"] = partial(fn, is_column=True)
             base_actions["layers.0.mlp.shared_experts.gate_proj.weight"] = partial(fn, is_column=True)
             base_actions["layers.0.mlp.shared_experts.down_proj.weight"] = partial(fn, is_column=False)
-            base_actions["layers.0.mlp.shared_experts.up_proj.weight_scale_inv"] = partial(fn, is_column=True)
-            base_actions["layers.0.mlp.shared_experts.gate_proj.weight_scale_inv"] = partial(fn, is_column=True)
-            base_actions["layers.0.mlp.shared_experts.down_proj.weight_scale_inv"] = partial(fn, is_column=False)
+            if "fp8" in config.quant_type:
+                base_actions["layers.0.mlp.shared_experts.up_proj.weight_scale_inv"] = partial(fn, is_column=True)
+                base_actions["layers.0.mlp.shared_experts.gate_proj.weight_scale_inv"] = partial(fn, is_column=True)
+                base_actions["layers.0.mlp.shared_experts.down_proj.weight_scale_inv"] = partial(fn, is_column=False)
 
             # MTP parts
             base_actions["layers.61.embed_tokens.weight"] = partial(fn, is_column=False)
