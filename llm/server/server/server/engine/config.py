@@ -61,6 +61,8 @@ class Config:
         assert self.mp_num % self.nnode == 0, f"mp_num: {self.mp_num} should be divisible by nnode: {self.nnode}"
         self.mp_num_per_node = self.mp_num // self.nnode
         self.host_ip = os.getenv("HOST_IP", "127.0.0.1")
+        if self.nnode > 1:
+            self.ips = os.getenv("POD_IPS")
 
         # Triton config
         self.max_prefill_batch = int(os.getenv("MAX_PREFILL_BATCH", 1))

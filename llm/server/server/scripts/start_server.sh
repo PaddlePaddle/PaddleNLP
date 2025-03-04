@@ -50,7 +50,7 @@ rm -rf /dev/shm/*
 FED_POD_IP=$(hostname -i)
 if [ "$MP_NNODE" -gt 1 ]; then
     POD_0_IP=$POD_0_IP
-    HOST_IP=$FED_POD_IP
+    export HOST_IP=$FED_POD_IP
 else
     POD_0_IP="127.0.0.1"
     HOST_IP="127.0.0.1"
