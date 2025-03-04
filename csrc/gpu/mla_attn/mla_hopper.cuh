@@ -198,7 +198,7 @@ MLAWithKVCacheKernel(CUTE_GRID_CONSTANT
   
   if (warp_group_idx == 0) {
     // producer
-    cutlass::arch::warpgroup_reg_dealloc<56>();
+    cutlass::arch::warpgroup_reg_dealloc<72>();
     const uint32_t warp_idx_in_warpgroup = __shfl_sync(0xffffffff, warp_idx % 4, 0);
     
     PipelineStateQ smem_pipe_write_q = cutlass::make_producer_start_state<MainloopPipelineQ>();
@@ -250,7 +250,7 @@ MLAWithKVCacheKernel(CUTE_GRID_CONSTANT
     }
   } else {
     // consumer
-    cutlass::arch::warpgroup_reg_alloc<224>(); 
+    cutlass::arch::warpgroup_reg_alloc<216>(); 
     PipelineStateQ smem_pipe_read_q;
     PipelineState smem_pipe_read_kv;
 
