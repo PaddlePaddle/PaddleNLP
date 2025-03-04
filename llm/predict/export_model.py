@@ -36,6 +36,7 @@ def add_inference_args_to_config(model_config, args):
     model_config.infer_model_cachekv_int8_type = args.cachekv_int8_type
     model_config.infer_model_dtype = args.dtype
     model_config.infer_model_paddle_commit = paddle.version.commit
+    model_config.mla_use_matrix_absorption = args.mla_use_matrix_absorption
 
 
 def main():
