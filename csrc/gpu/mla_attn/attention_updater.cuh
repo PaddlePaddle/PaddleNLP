@@ -151,30 +151,9 @@ __forceinline__ __device__ void scale_apply_exp2(Tensor<Engine0, Layout0>& tenso
   }
 }
 
-template <int NUM_ROWS_PER_THREAD>
-struct DefaultUpdater {
-  using TensorT = decltype(make_tensor<float>(Shape<Int<NUM_ROWS_PER_THREAD>>{}));
-  constexpr static float fill_value = 0.f;
-  CUTLASS_DEVICE DefaultUpdater() {};
-
-  __forceinline__ __device__ TensorT get_lse() { return TensorT(); }
-
-  template <bool init, typename Tensor0>
-  __forceinline__ __device__ void update(Tensor0& acc_s) {
-  };
-
-  template <typename Tensor1>
-  __forceinline__ __device__ void finalize(Tensor1& acc_s) {
-  };
-
-  template <typename Tensor1>
-  __forceinline__ __device__ void rescale_o(Tensor1& acc_o) {
-  };
-};
-
 template <int NUM_ROWS_PER_THREAD, bool WITH_SCALE>
 struct OnlineSoftmax {
-  constexpr static float fill_value = -math::inf;
+  constexpr static float fill_value = -5e4;
   using TensorT = decltype(make_tensor<float>(Shape<Int<NUM_ROWS_PER_THREAD>>{}));
   TensorT row_max, row_sum, scores_scale;
   float sm_scale_log2;
@@ -254,7 +233,6 @@ struct OnlineSoftmax {
 #pragma unroll
       for (int ni = 0; ni < size<1>(acc_o_rowcol); ++ni) {
         acc_o_rowcol(mi, ni) *= scores_scale(mi);
-        // acc_o_rowcol(mi, ni) = acc_o_rowcol(mi, ni) * scores_scale(mi);
       }
     }
   };
@@ -269,7 +247,6 @@ struct OnlineSoftmax {
 #pragma unroll
       for (int ni = 0; ni < size<1>(acc_o_rowcol); ++ni) {
         acc_o_rowcol(mi, ni) *= scores_scale_input(mi);
-        // acc_o_rowcol(mi, ni) = acc_o_rowcol(mi, ni) * scores_scale_input(mi);
       }
     }
   };

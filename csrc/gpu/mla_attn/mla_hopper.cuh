@@ -33,15 +33,13 @@
 #include <type_traits>
 #include <vector>
 
-#include "cutlass_utils.cuh"
 #include "attention_updater.cuh"
-#include "mask.cuh"
 #include "cute/tensor.hpp"
 #include "cutlass/pipeline/pipeline.hpp"
 #include "epilogue.cuh"
 #include "kernel_traits.cuh"
 #include "mainloop_mma.cuh"
-#include "sparse_mainloop.cuh"
+#include "mainloop_load.cuh"
 #include "utils.cuh"
 
 #ifdef DEBUG_MLA
@@ -98,31 +96,34 @@ struct Params {
     int vo_head_dim;
     int block_size;
     int max_draft_token_num;
-    int chunk_size; // todo: find better chunk_size(can't control diff)
+    int chunk_size;
     int chunk_num;
 
     float sm_scale;
 };
 
-// #define DISPATCH_GQA_GROUP_SIZE(group_size, GROUP_SIZE, ...) \
-//   if (group_size == 8) {                                     \
-//     constexpr size_t GROUP_SIZE = 8;                         \
-//     __VA_ARGS__                                              \
-//   } else if (group_size == 16) {                             \
-//     constexpr size_t GROUP_SIZE = 16;                        \
-//     __VA_ARGS__                                              \
-//   } else if (group_size == 64) {                             \
-//     constexpr size_t GROUP_SIZE = 64;                        \
-//     __VA_ARGS__                                              \
-//   }
-
-#define DISPATCH_GQA_GROUP_SIZE(group_size, GROUP_SIZE, ...) \
+#define DISPATCH_GROUP_SIZE(group_size, GROUP_SIZE, ...)     \
   if (group_size == 8) {                                     \
     constexpr size_t GROUP_SIZE = 8;                         \
     __VA_ARGS__                                              \
-  } else if (group_size == 64) {                              \
-    constexpr size_t GROUP_SIZE = 64;                         \
+  } else if (group_size == 64) {                             \
+    constexpr size_t GROUP_SIZE = 64;                        \
     __VA_ARGS__                                              \
+  } else {                                                   \
+    printf("Unsupported block_size: %d\n", group_size);      \
+    return cudaErrorNotSupported;                            \
+  }
+
+#define DISPATCH_BLOCK_SIZE(block_size, BLOCK_SIZE, ...)     \
+  if (block_size == 32) {                                    \
+    constexpr size_t BLOCK_SIZE = 8;                         \
+    __VA_ARGS__                                              \
+  } else if (block_size == 64) {                             \
+    constexpr size_t BLOCK_SIZE = 64;                        \
+    __VA_ARGS__                                              \
+  } else {                                                   \
+    printf("Unsupported block_size: %d\n", block_size);      \
+    return cudaErrorNotSupported;                            \
   }
 
 template <typename CollectiveMainloop, typename CollectiveEpilogue, typename Ktraits, bool CAUSAL, int SM_COUNT = 132>
@@ -141,12 +142,11 @@ MLAWithKVCacheKernel(CUTE_GRID_CONSTANT
 
   static constexpr int NUM_MMA_THREADS = Ktraits::NUM_MMA_THREADS;
   static constexpr int NUM_COPY_THREADS = Ktraits::NUM_PRODUCER_THREADS;
-  static constexpr int CTA_Q = Ktraits::CTA_Q;
-  static constexpr int CTA_KV = Ktraits::CTA_KV;
+  static constexpr int BLOCK_SHAPE_Q = Ktraits::BLOCK_SHAPE_Q;
+  static constexpr int BLOCK_SHAPE_KV = Ktraits::BLOCK_SHAPE_KV;
   const int num_blocks_x = mainloop_params.num_blocks_x[0];
 
   static constexpr bool use_tma_load_kv = CollectiveMainloop::USE_TMA_LOAD_KV;
-
 
   using MainloopPipeline = typename CollectiveMainloop::MainloopPipeline;
   using PipelineParams = typename MainloopPipeline::Params;
@@ -206,11 +206,7 @@ MLAWithKVCacheKernel(CUTE_GRID_CONSTANT
   
   if (warp_group_idx == 0) {
     // producer
-    if constexpr (use_tma_load_kv) {
-      cutlass::arch::warpgroup_reg_dealloc<72>();
-    } else {
-      cutlass::arch::warpgroup_reg_dealloc<56>();
-    }
+    cutlass::arch::warpgroup_reg_dealloc<56>();
     const uint32_t warp_idx_in_warpgroup = __shfl_sync(0xffffffff, warp_idx % 4, 0);
     
     PipelineStateQ smem_pipe_write_q = cutlass::make_producer_start_state<MainloopPipelineQ>();
@@ -234,7 +230,7 @@ MLAWithKVCacheKernel(CUTE_GRID_CONSTANT
           threadIdx.x,
           bid);
 
-      if constexpr (!use_tma_load_kv) {  // Load Q, K, V
+      if constexpr (!use_tma_load_kv) {
         // load kv
         collective_mainloop.load_kv(
             mainloop_params,
@@ -260,38 +256,18 @@ MLAWithKVCacheKernel(CUTE_GRID_CONSTANT
         }
       }
     }
-
-    collective_mainloop.load_tail(pipeline_q, smem_pipe_write_q, pipeline_kv, smem_pipe_write_kv);
-    // collective_mainloop.load_tail(pipeline_kv, smem_pipe_write_kv);
-
   } else {
     // consumer
-    if constexpr (use_tma_load_kv) {
-      if (warp_group_idx == 1) {
-        // need 64 168 + 64 = 232
-        cutlass::arch::warpgroup_reg_alloc<224>(); // 384 threads max_reg_num = 168(170), 80 * 128 / 256 + 168 = 208
-        // cutlass::arch::warpgroup_reg_alloc<232>(); // 384 threads max_reg_num = 168(170), 80 * 128 / 256 + 168 = 208
-      } else {
-        // need 40 168 + 40 = 208
-        cutlass::arch::warpgroup_reg_alloc<208>(); // 384 threads max_reg_num = 168(170), 80 * 128 / 256 + 168 = 208
-      }
-    } else {
-      cutlass::arch::warpgroup_reg_alloc<208>(); 
-    }
+    cutlass::arch::warpgroup_reg_alloc<224>(); 
     PipelineStateQ smem_pipe_read_q;
     PipelineState smem_pipe_read_kv;
 
     typename Ktraits::TiledMmaPVSS tiled_mma_pv;
     Tensor tOrO = partition_fragment_C(tiled_mma_pv, select<0, 1>(TileShape_PDV{}));
 
-    // PipelineStateQ smem_pipe_write_q = cutlass::make_producer_start_state<MainloopPipelineQ>();
     auto attention_updater = OnlineSoftmax<2 * size<1>(tOrO), /*WITH_SCALE=*/true>(mainloop_params.sm_scale);
-
-    int count = 0;
     for (int i = blockIdx.x; i < num_blocks_x; i += SM_COUNT) {
-      // Tensor tOrO = partition_fragment_C(tiled_mma_pv, select<0, 1>(TileShape_PDV{}));
       clear(tOrO);
-      // auto attention_updater = OnlineSoftmax<2 * size<1>(tOrO), /*WITH_SCALE=*/true>(mainloop_params.sm_scale);
       clear(attention_updater.scores_scale);
       const int bid = mainloop_params.batch_ids[i];
       const int tile_id = mainloop_params.tile_ids_per_batch[i];
@@ -302,7 +278,8 @@ MLAWithKVCacheKernel(CUTE_GRID_CONSTANT
       cutlass::arch::NamedBarrier::sync(Ktraits::NUM_THREADS,
                                         /*id=*/static_cast<int>(NamedBarriers::kWG0WG1WG2Sync));
 
-      mma_f16<Ktraits, CAUSAL>(
+      if constexpr (BLOCK_SHAPE_KV == 64) {
+        mma_f16<Ktraits, CAUSAL>(
           mainloop_params, 
           pipeline_q, 
           smem_pipe_read_q,
@@ -310,13 +287,28 @@ MLAWithKVCacheKernel(CUTE_GRID_CONSTANT
           smem_pipe_read_kv,
           tOrO, 
           attention_updater,
-          count,
           threadIdx.x - NUM_COPY_THREADS,
           bid,
           seq_len_decoder_now,
           seq_len_now,
           tile_id,
           shared_storage);
+      } else if (BLOCK_SHAPE_KV == 32) {
+        mma_f16_two_stages<Ktraits, CAUSAL>(
+          mainloop_params, 
+          pipeline_q, 
+          smem_pipe_read_q,
+          pipeline_kv, 
+          smem_pipe_read_kv,
+          tOrO, 
+          attention_updater,
+          threadIdx.x - NUM_COPY_THREADS,
+          bid,
+          seq_len_decoder_now,
+          seq_len_now,
+          tile_id,
+          shared_storage);
+      }
 
       collective_epilogue.store(
           epilogue_params, 
@@ -334,10 +326,6 @@ MLAWithKVCacheKernel(CUTE_GRID_CONSTANT
           mainloop_params.chunk_size,
           mainloop_params.o_stride_bsz);
     }
-
-    // collective_mainloop.load_tail(pipeline_q, smem_pipe_write_q);
-    collective_epilogue.store_tail();
-
   }
 }
 
@@ -352,28 +340,13 @@ cudaError_t BatchMLAWithPagedKVCacheKernelTraitsDispatched(Params& params,
   using NV_TYPE = typename KernelTraits::NV_TYPE;
 
   using CollectiveMainloop =
-      SparseCollectiveMainloop<KernelTraits, CAUSAL>;
+      CollectiveMainloop<KernelTraits, CAUSAL>;
   using CollectiveEpilogue = CollectiveEpilogue<KernelTraits>;
 
-  // split_q_block<<<1, 32, 0, stream>>>(
-  //   params.seq_lens_this_time,
-  //   params.seq_lens_encoder,
-  //   params.seq_lens_decoder,
-  //   params.batch_ids,
-  //   params.tile_ids_per_batch,
-  //   params.num_blocks_x,
-  //   params.bsz,
-  //   KernelTraits::CTA_Q,
-  //   params.chunk_size,
-  //   KernelTraits::GROUP_SIZE,
-  //   false // is_encoder
-  // );
-
   typename CollectiveMainloop::Params mainloop_params = CollectiveMainloop::to_underlying_arguments({
-      make_layout(make_shape(KernelTraits::CTA_Q, params.qk_head_dim), make_stride(params.qk_head_dim, _1{})), // layout q
+      make_layout(make_shape(KernelTraits::BLOCK_SHAPE_Q, params.qk_head_dim), make_stride(params.qk_head_dim, _1{})), // layout q
       make_layout(make_shape(params.block_size, params.qk_head_dim, params.max_block_num), make_stride(params.qk_head_dim, _1{}, params.block_size * params.qk_head_dim)),
       make_layout(make_shape(params.chunk_num, params.bsz * params.max_draft_token_num * params.q_num_head), make_stride(params.bsz * params.max_draft_token_num * params.q_num_head, _1{})),
-    //   make_layout(make_shape(KernelTraits::CTA_KV, params.qk_head_dim), make_stride(params.qk_head_dim, _1{})), // layout q
       params.Q,
       params.KV,
       params.m,
@@ -402,23 +375,20 @@ cudaError_t BatchMLAWithPagedKVCacheKernelTraitsDispatched(Params& params,
   });
   typename CollectiveEpilogue::Params epilogue_params = CollectiveEpilogue::to_underlying_arguments_ntma({
       params.O,
-      make_layout(make_shape(KernelTraits::CTA_Q, params.vo_head_dim), make_stride(params.vo_head_dim, _1{})), // layout O
+      make_layout(make_shape(KernelTraits::BLOCK_SHAPE_Q, params.vo_head_dim), make_stride(params.vo_head_dim, _1{})), // layout O
       params.O_tmp,
-      make_layout(make_shape(KernelTraits::CTA_Q, params.vo_head_dim), make_stride(params.vo_head_dim, _1{})) // layout O_tmp
+      make_layout(make_shape(KernelTraits::BLOCK_SHAPE_Q, params.vo_head_dim), make_stride(params.vo_head_dim, _1{})) // layout O_tmp
   });
 
   // Get the ptr to kernel function.
   auto kernel =
       MLAWithKVCacheKernel<CollectiveMainloop, CollectiveEpilogue, KernelTraits, CAUSAL, 132>;
   int smem_size = sizeof(typename KernelTraits::SharedStorage);
-  MLA_CUDA_CALL(
-      cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size));
-
+  cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
   int device;
   cudaGetDevice(&device);
   int multiprocessor_count;
-  MLA_CUDA_CALL(
-      cudaDeviceGetAttribute(&multiprocessor_count, cudaDevAttrMultiProcessorCount, device));
+  cudaDeviceGetAttribute(&multiprocessor_count, cudaDevAttrMultiProcessorCount, device);
   int act_blocks_per_sm;
   cudaOccupancyMaxActiveBlocksPerMultiprocessor(
       &act_blocks_per_sm, kernel, KernelTraits::NUM_WARPS * 32, smem_size);
@@ -428,8 +398,6 @@ cudaError_t BatchMLAWithPagedKVCacheKernelTraitsDispatched(Params& params,
   kernel<<<grid_dims, block_dims, smem_size, stream>>>(
     mainloop_params, epilogue_params
   );
-  // cudaDeviceSynchronize();
-  // auto err = cudaGetLastError();
   if (params.chunk_num > 1) {
     constexpr int vec_size = 16 / sizeof(DTypeO);
     constexpr int merge_block_size = 256;
@@ -455,30 +423,32 @@ cudaError_t BatchMLAWithPagedKVCacheKernelTraitsDispatched(Params& params,
       params.bsz,
       params.max_draft_token_num
     );
-    // cudaDeviceSynchronize();
-    // err = cudaGetLastError();
-    // printf("err = %d, str = %s\n", err, cudaGetErrorString(err));
   }
   return cudaSuccess;
 }
 
-template <uint32_t HEAD_DIM_QK, uint32_t HEAD_DIM_VO, MaskMode MASK_MODE, typename NV_TYPE, typename Params>
+template <uint32_t HEAD_DIM_QK, uint32_t HEAD_DIM_VO, typename NV_TYPE, typename Params>
 cudaError_t BatchMLAWithPagedKVCacheDispatched(Params& params, cudaStream_t stream) {
-  constexpr bool CAUSAL = MASK_MODE == MaskMode::kCausal;
+  constexpr bool CAUSAL = true;
   if constexpr (HEAD_DIM_QK == 576) {
-    DISPATCH_GQA_GROUP_SIZE(params.q_num_head, GROUP_SIZE,
+    DISPATCH_GROUP_SIZE(params.q_num_head, GROUP_SIZE,
       BatchMLAWithPagedKVCacheKernelTraitsDispatched<
-          AttentionKernelTraits</*USE_TMA_LOAD_KV=*/false, HEAD_DIM_QK, HEAD_DIM_VO, GROUP_SIZE,
-                                /*CTA_Q_=*/64,
-                                /*CTA_KV_=*/64,
-                                /*NUM_STAGES_=*/2, typename Params::DTypeQ,
-                                typename Params::DTypeKV, typename Params::DTypeO,
-                                typename Params::IdType, NV_TYPE>,
+          AttentionKernelTraits</*USE_TMA_LOAD_KV=*/false, 
+                                HEAD_DIM_QK, 
+                                HEAD_DIM_VO, 
+                                GROUP_SIZE,
+                                /*BLOCK_SHAPE_Q_=*/64,
+                                /*BLOCK_SHAPE_KV_=*/64,
+                                /*NUM_STAGES_=*/2, 
+                                typename Params::DTypeQ,
+                                typename Params::DTypeKV, 
+                                typename Params::DTypeO,
+                                typename Params::IdType, 
+                                NV_TYPE>,
           CAUSAL>(params, stream);)
   } else {
     return cudaErrorNotSupported;
   }
-  // cudaError_t status = cudaGetLastError();
   return cudaSuccess;
 };
 

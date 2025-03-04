@@ -25,7 +25,6 @@
 
 #include <cutlass/cutlass.h>
 
-#include "math.cuh"
 #include "cute/tensor.hpp"
 #include "cutlass/gemm/collective/collective_builder.hpp"
 #include "named_barrier.cuh"
@@ -38,16 +37,15 @@
 
 namespace mla_attn {
 
-
 using namespace cute;
 
 template <typename Ktraits>
 struct CollectiveEpilogue {
   using DTypeO = typename Ktraits::DTypeO;
-  static constexpr int CTA_Q = Ktraits::CTA_Q;
-  static constexpr int CTA_KV = Ktraits::CTA_KV;
+  static constexpr int BLOCK_SHAPE_Q = Ktraits::BLOCK_SHAPE_Q;
+  static constexpr int BLOCK_SHAPE_KV = Ktraits::BLOCK_SHAPE_KV;
   static constexpr int HEAD_DIM_VO = Ktraits::HEAD_DIM_VO;
-  using TileShape_PDV = Shape<Int<CTA_Q>, Int<HEAD_DIM_VO>, Int<CTA_KV>>;
+  using TileShape_PDV = Shape<Int<BLOCK_SHAPE_Q>, Int<HEAD_DIM_VO>, Int<BLOCK_SHAPE_KV>>;
 
   static constexpr int NUM_WARPS = Ktraits::NUM_WARPS;
   static constexpr int NUM_THREADS = NUM_WARPS * cutlass::NumThreadsPerWarp;
@@ -75,14 +73,6 @@ struct CollectiveEpilogue {
   using StrideNTMAT = cute::Shape<int32_t, _1>;
   using LayoutNTMAT = cute::Layout<ShapeNTMAT, StrideNTMAT>;
 
-  // using ShapeT = cute::Shape<int32_t, int32_t, int32_t>;
-  // using StrideT = cute::Shape<int32_t, int32_t, _1>;
-  // using LayoutT = cute::Layout<ShapeT, StrideT>;
-
-  using ShapeLseT = cute::Shape<int32_t, int32_t>;
-  using StrideLseT = cute::Shape<_1, int64_t>;
-  using LayoutLseT = cute::Layout<ShapeLseT, StrideLseT>;
-
   using GmemTiledCopyOTMA = cute::SM90_TMA_STORE;
   using TMA_O = decltype(make_tma_copy(
       GmemTiledCopyOTMA{},
@@ -108,8 +98,6 @@ struct CollectiveEpilogue {
     LayoutNTMAT const layout_O;
     DTypeO* O_ptr_tmp;
     LayoutNTMAT const layout_O_tmp;
-    // float* lse_ptr;
-    // LayoutLseT const layout_LSE;
   };
 
   // Device side kernel params
@@ -118,8 +106,6 @@ struct CollectiveEpilogue {
     LayoutNTMAT const layout_O;
     DTypeO* O_ptr_tmp;
     LayoutNTMAT const layout_O_tmp;
-    // float* lse_ptr;
-    // LayoutLseT const layout_LSE;
   };
 
   static Params to_underlying_arguments_ntma(Arguments const& args) {
@@ -128,49 +114,6 @@ struct CollectiveEpilogue {
 
   CUTLASS_DEVICE
   static void prefetch_tma_descriptors(Params const& epilogue_params) {}
-
-  template <typename SharedStorage, typename FrgTensorO, typename FrgTensorLSE,
-            typename TiledMma>
-  CUTLASS_DEVICE void store_tma(Params const& epilogue_params, // padding to 64
-                            FrgTensorO const& tOrO,
-                            FrgTensorLSE const& lse, 
-                            SharedStorage& shared_storage,
-                            TiledMma tiled_mma, 
-                            int thread_idx) {
-    Tensor sO = make_tensor(make_smem_ptr(shared_storage.smem_o.data()), SmemLayoutO{});
-    auto smem_tiled_copy_O = make_tiled_copy_C(SmemCopyAtomO{}, tiled_mma);
-    auto smem_thr_copy_O = smem_tiled_copy_O.get_thread_slice(thread_idx);
-
-    Tensor tOrO_out = convert_type<DTypeO>(tOrO);
-    Tensor taccOrO = smem_thr_copy_O.retile_S(tOrO_out);  // ((Atom,AtomNum), MMA_M, MMA_N)
-    Tensor taccOsO = smem_thr_copy_O.partition_D(sO);     // ((Atom,AtomNum),PIPE_M,PIPE_N)
-    // Make sure all WGs have finished reading V
-    cutlass::arch::NamedBarrier::sync(NUM_MMA_THREADS,
-                                      /*id=*/static_cast<int>(NamedBarriers::kValueEmpty));
-    // r2g
-    cute::copy(smem_tiled_copy_O, taccOrO, taccOsO);
-    cutlass::arch::fence_view_async_shared();  // ensure smem writes are visible to TMA
-    cutlass::arch::NamedBarrier::arrive(NUM_MMA_THREADS + Ktraits::NUM_PRODUCER_THREADS,
-                                        cutlass::arch::ReservedNamedBarriers::EpilogueBarrier);
-    
-    const int bid = blockIdx.x;
-    Tensor mO = epilogue_params.tma_store_O.get_tma_tensor(epilogue_params.layout_O.shape());
-    Tensor gO = local_tile(mO(_, _, bid), select<0, 1>(TileShape_PDV{}), make_coord(_, _0{}))(_, _, _0{});
-    auto block_tma_O = epilogue_params.tma_store_O.get_slice(_0{});
-    Tensor tOgO = block_tma_O.partition_D(gO);  // (TMA, TMA_M, TMA_K)
-    Tensor tOsO = block_tma_O.partition_S(sO); // (TMA, TMA_M, TMA_K)
-
-    int write_warp_idx = NUM_COPY_THREADS / 32;
-    if (cutlass::canonical_warp_idx_sync() == write_warp_idx) {
-      cutlass::arch::NamedBarrier::sync(NUM_MMA_THREADS + Ktraits::NUM_PRODUCER_THREADS,
-                                        cutlass::arch::ReservedNamedBarriers::EpilogueBarrier);
-      if (cute::elect_one_sync()) {
-        cute::copy(epilogue_params.tma_store_O, tOsO, tOgO);
-        tma_store_arrive();
-        tma_store_wait<0>();
-      }
-    }
-  }
 
   template <typename SharedStorage, typename FrgTensorO, typename FrgTensorLSE,
             typename TiledMma>
@@ -196,15 +139,14 @@ struct CollectiveEpilogue {
     Tensor tOrO_out = convert_type<DTypeO>(tOrO);
     Tensor taccOrO = smem_thr_copy_O.retile_S(tOrO_out);  // ((Atom,AtomNum), MMA_M, MMA_N)
     Tensor taccOsO = smem_thr_copy_O.partition_D(sO);     // ((Atom,AtomNum),PIPE_M,PIPE_N)
+    // make sure gemm done
+    cutlass::arch::NamedBarrier::sync(NUM_MMA_THREADS,
+                                      /*id=*/static_cast<int>(NamedBarriers::kValueEmpty));
     // r2s
     cute::copy(smem_tiled_copy_O, taccOrO, taccOsO);
     // make sure r2s done
     cutlass::arch::NamedBarrier::sync(NUM_MMA_THREADS,
                                       /*id=*/static_cast<int>(NamedBarriers::kValueEmpty));
-    // cutlass::arch::fence_view_async_shared();  // ensure smem writes are visible to TMA
-    // cutlass::arch::NamedBarrier::arrive(NUM_MMA_THREADS + Ktraits::NUM_PRODUCER_THREADS,
-    //                                     cutlass::arch::ReservedNamedBarriers::EpilogueBarrier);
-
     TiledCopyO gmem_tiled_copy_O;
     auto O_ptr = num_chunks == 1 ? epilogue_params.O_ptr + start_token_idx * o_stride_bsz : epilogue_params.O_ptr_tmp + (tile_idx * bsz + bid) * o_stride_bsz;
     Tensor mO = make_tensor(make_gmem_ptr(O_ptr), epilogue_params.layout_O);
@@ -224,10 +166,6 @@ struct CollectiveEpilogue {
       return elem_less(get<0>(s_coords) / Ktraits::GROUP_SIZE, seq_len_now);
     };
     copy_if(gmem_tiled_copy_O, predicate_fn, tOsOGroup, tOgOGroup);
-  }
-
-  CUTLASS_DEVICE void store_tail() {
-    // tma_store_wait<0>();
   }
 };
 

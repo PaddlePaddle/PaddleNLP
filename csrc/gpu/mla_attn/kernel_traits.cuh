@@ -24,7 +24,6 @@
 
 #include <type_traits>
 
-#include "cutlass_utils.cuh"
 #include "cute/algorithm/copy.hpp"
 #include "cute/atom/mma_atom.hpp"
 #include "cutlass/cutlass.h"
@@ -38,7 +37,7 @@ namespace mla_attn {
 using namespace cute;
 
 template <typename MainloopPipeline, typename MainloopPipelineQ, class DTypeQ, class DTypeKV, class DTypeQKAccum, class DTypeOut, class IdType,
-          int CTA_KV, int NUM_STAGES, class SmemLayoutQ, class SmemLayoutK, class SmemLayoutP, class SmemLayoutRow, class SmemLayoutO>
+          int BLOCK_SHAPE_KV, class SmemLayoutQ, class SmemLayoutK, class SmemLayoutP, class SmemLayoutRow, class SmemLayoutO>
 struct alignas(16) SharedStorageQKVO {
   alignas(16) cute::array_aligned<DTypeQ, cute::cosize_v<SmemLayoutQ>> smem_q;
   alignas(16) cute::array_aligned<DTypeQ, cute::cosize_v<SmemLayoutP>> smem_p;
@@ -46,16 +45,14 @@ struct alignas(16) SharedStorageQKVO {
   union {
     alignas(16) cute::array_aligned<DTypeKV, cute::cosize_v<SmemLayoutK>> smem_kv;
     alignas(16) cute::array_aligned<DTypeOut, cute::cosize_v<SmemLayoutO>> smem_o;
-  }; // kv_o_smem[NUM_STAGES];
+  };
   struct {
-    // cutlass::arch::ClusterTransactionBarrier barrier_Q;
-    // cutlass::arch::ClusterBarrier barrier_O;
     alignas(16) typename MainloopPipelineQ::SharedStorage pipeline_q;
     alignas(16) typename MainloopPipeline::SharedStorage pipeline_kv;
   };
 };
 
-template <bool USE_TMA_LOAD_KV_, int HEAD_DIM_QK_, int HEAD_DIM_VO_, int GROUP_SIZE_, int CTA_Q_, int CTA_KV_,
+template <bool USE_TMA_LOAD_KV_, int HEAD_DIM_QK_, int HEAD_DIM_VO_, int GROUP_SIZE_, int BLOCK_SHAPE_Q_, int BLOCK_SHAPE_KV_,
           int NUM_STAGES_, typename DTypeQ_, typename DTypeKV_, typename DTypeO_, typename IdType_, typename NV_TYPE_>
 struct AttentionKernelTraits {
 
@@ -65,34 +62,31 @@ struct AttentionKernelTraits {
   using IdType = IdType_;
   using DTypeQKAccum = float;
   using DTypePVAccum = float;
-  // using DTypeQKAccum = DTypeQ;
-  // using DTypePVAccum = DTypeO;
   using NV_TYPE = NV_TYPE_;
   
   
   static constexpr bool USE_TMA_LOAD_KV = USE_TMA_LOAD_KV_;
   static constexpr int GROUP_SIZE = GROUP_SIZE_;
-  static constexpr int CTA_Q = CTA_Q_;
-  static_assert(CTA_Q % 64 == 0);
-  static constexpr int CTA_KV = CTA_KV_;
+  static constexpr int BLOCK_SHAPE_Q = BLOCK_SHAPE_Q_;
+  static_assert(BLOCK_SHAPE_Q % 64 == 0);
+  static constexpr int BLOCK_SHAPE_KV = BLOCK_SHAPE_KV_;
   static constexpr int HEAD_DIM_QK = HEAD_DIM_QK_;
   static constexpr int HEAD_DIM_VO = HEAD_DIM_VO_;
-  static constexpr int NUM_PER_STAGE = CTA_KV * HEAD_DIM_QK;
+  static constexpr int NUM_PER_STAGE = BLOCK_SHAPE_KV * HEAD_DIM_QK;
   static_assert(HEAD_DIM_QK % 32 == 0);
   static_assert(HEAD_DIM_VO % 32 == 0);
 
-  static constexpr int NUM_WARPS = 12; // 4 + 8
+  static constexpr int NUM_WARPS = 12;
   static constexpr int NUM_THREADS = 384;
-  // static constexpr int NUM_THREADS = 128;
   static constexpr int NUM_PRODUCER_THREADS = 128;
 
-  using TileShape_QKD = Shape<Int<CTA_Q>, Int<CTA_KV>, Int<HEAD_DIM_QK>>;
-  using TileShape_PDV = Shape<Int<CTA_Q>, Int<HEAD_DIM_VO>, Int<CTA_KV>>;
+  using TileShape_QKD = Shape<Int<BLOCK_SHAPE_Q>, Int<BLOCK_SHAPE_KV>, Int<HEAD_DIM_QK>>;
+  using TileShape_PDV = Shape<Int<BLOCK_SHAPE_Q>, Int<HEAD_DIM_VO>, Int<BLOCK_SHAPE_KV>>;
 
   static constexpr int NUM_STAGES = NUM_STAGES_;
 
-  using AtomLayoutQKD = Layout<Shape<Int<CTA_Q / 64>, _1, _1>>;
-  using AtomLayoutPV = Layout<Shape<Int<CTA_Q / 64>, _2, _1>>;
+  using AtomLayoutQKD = Layout<Shape<Int<BLOCK_SHAPE_Q / 64>, _1, _1>>;
+  using AtomLayoutPV = Layout<Shape<Int<BLOCK_SHAPE_Q / 64>, _2, _1>>;
   using TiledMmaQK = decltype(cute::make_tiled_mma(
       cute::GMMA::ss_op_selector<DTypeQ, DTypeKV, DTypeQKAccum, TileShape_QKD>(), AtomLayoutQKD{}));
   using TiledMmaPV = decltype(cute::make_tiled_mma(
@@ -110,10 +104,6 @@ struct AttentionKernelTraits {
                                    GMMA::Major::K, DTypeQ, decltype(cute::get<0>(TileShape_QKD{})),
                                    decltype(cute::get<2>(TileShape_QKD{}))>());
   using SmemLayoutQ = decltype(tile_to_shape(SmemLayoutAtomQ{}, select<0, 2>(TileShape_QKD{})));
-  using SmemLayoutAtomQCopy = decltype(cutlass::gemm::collective::detail::ss_smem_selector<
-                                   GMMA::Major::K, DTypeQ, Int<GROUP_SIZE>,
-                                   decltype(cute::get<2>(TileShape_QKD{}))>());
-  using SmemLayoutQCopy = decltype(tile_to_shape(SmemLayoutAtomQCopy{}, select<0, 2>(TileShape_QKD{})));
 
   using SmemLayoutAtomK = decltype(cutlass::gemm::collective::detail::ss_smem_selector<
                                    GMMA::Major::K, DTypeKV, decltype(cute::get<1>(TileShape_QKD{})),
@@ -121,14 +111,10 @@ struct AttentionKernelTraits {
   using SmemLayoutK = decltype(tile_to_shape(
       SmemLayoutAtomK{},
       make_shape(shape<1>(TileShape_QKD{}), shape<2>(TileShape_QKD{}), Int<NUM_STAGES>{})));
-  using SmemLayoutKCopy = decltype(make_layout(make_shape(Int<CTA_KV>(), Int<HEAD_DIM_QK>(), Int<NUM_STAGES>()), make_stride(Int<HEAD_DIM_QK>(), Int<1>(), Int<HEAD_DIM_QK * CTA_KV>())));
   using SmemLayoutVt = decltype(composition(
       SmemLayoutK{}, make_ordered_layout(make_shape(get<2>(TileShape_QKD{}),
                                                     get<1>(TileShape_QKD{}), Int<NUM_STAGES>{}),
                                          Step<_2, _1, _3>{})));
-  using SmemLayoutKTest = decltype(tile_to_shape(
-      SmemLayoutAtomK{},
-      make_shape(shape<1>(TileShape_QKD{}), shape<2>(TileShape_QKD{}))));
   using SmemLayoutAtomV = decltype(cutlass::gemm::collective::detail::ss_smem_selector<
                                    GMMA::Major::K, DTypeKV, decltype(cute::get<2>(TileShape_PDV{})),
                                    decltype(cute::get<1>(TileShape_PDV{}))>());
@@ -148,14 +134,18 @@ struct AttentionKernelTraits {
   using SmemLayoutO = decltype(tile_to_shape(SmemLayoutAtomO{}, select<0, 1>(TileShape_PDV{})));
 
   using SmemCopyAtom = Copy_Atom<cute::SM90_U32x4_STSM_N, DTypeQ>;
-  // permute layout
-  using SmemLayoutP = Layout<Shape<Int<CTA_Q>, Int<CTA_KV>>, Stride<Int<CTA_KV>, _1>>;
-  using SmemLayoutRow = Layout<Shape<_2, Int<128>>, Stride<_1, _2>>;
+  
+  static constexpr bool IS_CTA_32 = (BLOCK_SHAPE_KV == 32);
+  using SmemLayoutRowOneStage = Layout<Shape<_2, Int<128>>, Stride<_1, _2>>;
+  using SmemLayoutRowTwoStage = Layout<Shape<_2, Int<128>, _2>, Stride<_1, _2, _256>>;
+  using SmemLayoutRow = std::conditional_t<IS_CTA_32, SmemLayoutRowTwoStage, SmemLayoutRowOneStage>;
 
   using SmemLayoutAtomP = decltype(cutlass::gemm::collective::detail::ss_smem_selector<
                                    GMMA::Major::K, DTypeQ, decltype(cute::get<0>(TileShape_QKD{})),
                                    decltype(cute::get<1>(TileShape_QKD{}))>());
-  using SmemLayoutPSS = decltype(tile_to_shape(SmemLayoutAtomP{}, select<0, 1>(TileShape_QKD{})));
+  using SmemLayoutPSSOneStage = decltype(tile_to_shape(SmemLayoutAtomP{}, select<0, 1>(TileShape_QKD{})));
+  using SmemLayoutPSSTwoStage = decltype(tile_to_shape(SmemLayoutAtomP{}, make_shape(Int<BLOCK_SHAPE_Q>{}, Int<BLOCK_SHAPE_KV>{}, Int<2>{})));
+  using SmemLayoutP = std::conditional_t<IS_CTA_32, SmemLayoutPSSTwoStage, SmemLayoutPSSOneStage>;
 
   using MainloopPipelineQ = typename cutlass::PipelineAsync<1>;
   using PipelineStateQ = typename cutlass::PipelineState<1>;
@@ -164,7 +154,7 @@ struct AttentionKernelTraits {
                          typename cutlass::PipelineAsync<NUM_STAGES>>;
   using PipelineState = typename cutlass::PipelineState<NUM_STAGES>;
 
-  using SharedStorage = SharedStorageQKVO<MainloopPipeline, MainloopPipelineQ, DTypeQ, DTypeKV, DTypeQKAccum, DTypeO, IdType, CTA_KV, NUM_STAGES,
+  using SharedStorage = SharedStorageQKVO<MainloopPipeline, MainloopPipelineQ, DTypeQ, DTypeKV, DTypeQKAccum, DTypeO, IdType, BLOCK_SHAPE_KV,
                                           SmemLayoutQ, SmemLayoutK, SmemLayoutP, SmemLayoutRow, SmemLayoutO>;
 };
 
