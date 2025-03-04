@@ -12,16 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/*
- * Copyright (c) 2024, Jay Shah, Ganesh Bikshandi, Ying Zhang, Vijay Thakkar, Pradeep Ramani, Tri
- * Dao. Licensed under the BSD 3-Clause.
- *
- * Modified by the FlashInfer team.
- */
-
 #ifndef ATTENTION_HOPPER_UTILS_CUH_
 #define ATTENTION_HOPPER_UTILS_CUH_
 
+#include "cute/tensor.hpp"
+#include "cutlass/cutlass.h"
+#include "cutlass/epilogue/collective/collective_builder.hpp"
+#include "cutlass/epilogue/collective/default_epilogue.hpp"
+#include "cutlass/epilogue/thread/linear_combination.h"
+#include "cutlass/gemm/collective/collective_builder.hpp"
+#include "cutlass/gemm/device/gemm_grouped.h"
+#include "cutlass/gemm/device/gemm_universal_adapter.h"
+#include "cutlass/gemm/dispatch_policy.hpp"
+#include "cutlass/gemm/group_array_problem_shape.hpp"
+#include "cutlass/gemm/kernel/default_gemm_grouped.h"
+#include "cutlass/gemm/kernel/gemm_universal.hpp"
+#include "cutlass/layout/matrix.h"
+#include "cutlass/numeric_types.h"
+#include "cutlass/tensor_ref.h"
+#include "cutlass/util/command_line.h"
+#include "cutlass/util/distribution.h"
+#include "cutlass/util/host_tensor.h"
+#include "cutlass/util/packed_stride.hpp"
+#include "cutlass/util/reference/device/gemm.h"
+#include "cutlass/util/reference/device/tensor_compare.h"
+#include "cutlass/util/reference/device/tensor_fill.h"
+#include "cutlass/util/tensor_view_io.h"
 #include <assert.h>
 #include <cuda_fp16.h>
 #include <stdint.h>
@@ -40,26 +56,11 @@
 #include <cmath>
 #include <cute/arch/cluster_sm90.hpp>
 #include <cute/tensor.hpp>
-
-#include "math.cuh"
-#include "utils_call.cuh"
 #include "cutlass/fast_math.h"
 
 namespace mla_attn {
 
 using namespace cute;
-
-template <int CTA_Q, int CTA_KV>
-CUTLASS_DEVICE int get_swa_begin_kv_tile_idx(int window_left, int q_tile_idx, const int qo_len,
-                                             const int kv_len) {
-  return std::max((q_tile_idx * CTA_Q + kv_len - qo_len - window_left) / CTA_KV - 1, 0);
-}
-
-template <int CTA_Q, int CTA_KV>
-CUTLASS_DEVICE int get_swa_end_kv_tile_idx(int window_left, int q_tile_idx, const int qo_len,
-                                           const int kv_len) {
-  return std::max(((q_tile_idx + 1) * CTA_Q + kv_len - qo_len - window_left) / CTA_KV, -1);
-}
 
 template <typename TensorT>
 CUTLASS_HOST_DEVICE auto flatten_1(TensorT tensor) {
@@ -131,7 +132,6 @@ __forceinline__ __device__ auto convert_type(Tensor<Engine, Layout> const& tenso
   using From_type = typename Engine::value_type;
   constexpr int numel = decltype(size(tensor))::value;
   cutlass::NumericArrayConverter<To_type, From_type, numel> convert_op;
-  // HACK: this requires tensor to be "contiguous"
   auto frag = convert_op(*reinterpret_cast<const cutlass::Array<From_type, numel>*>(tensor.data()));
   return make_tensor(make_rmem_ptr<To_type>(&frag), tensor.layout());
 }
