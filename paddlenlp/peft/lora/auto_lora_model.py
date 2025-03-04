@@ -564,7 +564,6 @@ class LoRAAutoModel(nn.Layer):
             },....
         ]
         """
-        # import pdb;pdb.set_trace()
         assert isinstance(configs, (dict, list))
         if isinstance(configs, dict):
             return configs
@@ -617,8 +616,6 @@ class LoRAAutoModel(nn.Layer):
                 final_config["pp_config"]["split_spec"] = list(set(final_config["pp_config"]["split_spec"]))
             if len(final_config["pp_config"]["global_spec"]) > 1:
                 final_config["pp_config"]["global_spec"] = list(set(final_config["pp_config"]["global_spec"]))
-            # final_config["pp_config"]["split_spec"] = final_config["pp_config"]["split_spec"][0]
-            # final_config["pp_config"]["global_spec"] = final_config["pp_config"]["global_spec"][0]
         return final_config
 
     def _generate_auto_dist_config(self, auto_dist_degree):
@@ -658,7 +655,6 @@ class LoRAAutoModel(nn.Layer):
             merged_config["pp_config"] is not None
             final_config["pp_config"] = merged_config["pp_config"]
             if final_config["pp_config"]["global_spec"] is not None:
-                # final_config["pp_config"]["global_spec"] = [spec_name for spec_name in final_config["pp_config"]["global_spec"] if spec_name in layer_name ]
                 temp_specs_name = final_config["pp_config"]["global_spec"]
                 for spec_name_i in temp_specs_name:
                     for spec_name_j in temp_specs_name:
@@ -667,7 +663,6 @@ class LoRAAutoModel(nn.Layer):
                             break
 
             if final_config["pp_config"]["split_spec"] is not None:
-                # final_config["pp_config"]["split_spec"] = [spec_name for spec_name in final_config["pp_config"]["split_spec"] if spec_name in layer_name ]
                 temp_specs_name = final_config["pp_config"]["split_spec"]
                 for spec_name_i in temp_specs_name:
                     for spec_name_j in temp_specs_name:
