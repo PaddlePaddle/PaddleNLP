@@ -1,5 +1,8 @@
 # Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
 #
+# This file is inspired by the SageAttention project (https://github.com/thu-ml/SageAttention),
+# but has been re-implemented by PaddlePaddle.
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
