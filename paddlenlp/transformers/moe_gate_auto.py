@@ -21,6 +21,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 
 from ..utils.log import logger
+from .auto_utils import einsum
 
 
 class MoEGateMixin:
@@ -116,8 +117,8 @@ class MoEGateMixin:
         ce = paddle.mean(mask.cast("float32"), axis=0)
         if self.global_aux_loss:
             me_list, ce_list = [], []
-            dist.all_gather(me_list, me, group=self.group)
-            dist.all_gather(ce_list, ce, group=self.group)
+            # dist.all_gather(me_list, me, group=self.group)
+            # dist.all_gather(ce_list, ce, group=self.group)
 
             me_list[self.rank] = me
             ce_list[self.rank] = ce
@@ -129,10 +130,8 @@ class MoEGateMixin:
     def _cal_seq_aux_loss(self, gates, top_k, topk_idx) -> paddle.Tensor:
         """
         Calculate sequence auxiliary loss.
-
         Args:
             logits (paddle.Tensor): Model output.
-
         Returns:
             paddle.Tensor: The value of sequence auxiliary loss.
         """
@@ -154,7 +153,7 @@ class MoEGateMixin:
         Returns:
             paddle.Tensor: The z loss value.
         """
-        l_zloss = paddle.logsumexp(logits, axis=1).square().mean()
+        l_zloss = logits.exp().sum(1).log().square().mean()
         return l_zloss
 
     def _cal_orthogonal_loss(self) -> paddle.Tensor:
@@ -176,6 +175,7 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
 
         self.num_experts = num_experts
         self.expert_hidden_size = expert_hidden_size
+        self.expert_parallel_degree = kwargs.pop("expert_parallel_degree", 1)
 
         # force keep in float32 when using amp
         self._cast_to_low_precision = False
@@ -305,7 +305,7 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         return topk_weight, topk_idx
 
     def _topk_noaux_tc(
-        self, scores: paddle.Tensor, k: int, n_group: int, topk_group: int
+        self, scores: paddle.Tensor, e_score_correction_bias, k: int, n_group: int, topk_group: int
     ) -> Tuple[paddle.Tensor, paddle.Tensor]:
         """_summary_
 
@@ -325,19 +325,18 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         bsz_seq_len, n_experts = scores.shape
         assert n_experts % n_group == 0, "n_experts must be divisible by n_groups"
 
-        assert self.e_score_correction_bias is not None, "e_score_correction_bias is None"
-        scores_for_choice = scores.reshape([bsz_seq_len, -1]) + self.e_score_correction_bias.unsqueeze(0)
-        group_scores = (
-            scores_for_choice.reshape([bsz_seq_len, self.n_group, -1]).topk(2, axis=-1)[0].sum(axis=-1)
-        )  # fmt:skip [n, n_group]
+        assert e_score_correction_bias is not None, "e_score_correction_bias is None"
+        # scores = scores.reshape([bsz_seq_len, -1]) + self.e_score_correction_bias.unsqueeze(0)
+        scores = scores.reshape([bsz_seq_len, -1]) + e_score_correction_bias.unsqueeze(0)
+        group_scores = scores.reshape([bsz_seq_len, self.n_group, -1]).topk(2, axis=-1)[0].sum(axis=-1)  # [n, n_group]
         group_idx = paddle.topk(group_scores, k=topk_group, axis=-1, sorted=False)[1]  # [n, top_k_group]
-        group_mask = paddle.zeros_like(group_scores).put_along_axis(group_idx, paddle.to_tensor(1.0, dtype="float32"), axis=-1)  # fmt:skip
+        group_mask = paddle.zeros_like(group_scores).put_along_axis(group_idx, paddle.to_tensor(1.0), axis=-1)  # fmt:skip
         score_mask = (
             group_mask.unsqueeze(-1).expand([bsz_seq_len, n_group, n_experts // n_group]).reshape([bsz_seq_len, -1])
         )  # [n, e]
-        tmp_scores = scores_for_choice * score_mask  # [n, e]
+        tmp_scores = scores * score_mask  # [n, e]
         topk_weight, topk_idx = paddle.topk(tmp_scores, k=k, axis=-1, sorted=False)
-        topk_weight = scores.take_along_axis(topk_idx, axis=1) if not self.training else topk_weight
+        topk_weight = scores.gather(topk_idx, axis=1) if not self.training else topk_weight
 
         return topk_weight, topk_idx
 
@@ -395,9 +394,7 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
 
         _, top_idx = paddle.topk(mask1_rand, k=capacity, axis=0)  # Select top_capacity tokens
 
-        new_mask1 = mask1 * paddle.zeros_like(mask1).put_along_axis(
-            top_idx, paddle.to_tensor(1.0, dtype="float32"), axis=0
-        )
+        new_mask1 = mask1 * paddle.zeros_like(mask1).put_along_axis(top_idx, paddle.to_tensor(1.0), axis=0)
         mask1 = new_mask1
 
         # Compute locations in capacity buffer
@@ -512,17 +509,18 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
             )
         elif self.topk_method == "noaux_tc":
             top_gate, top_idx = self._topk_noaux_tc(
-                gates, k=self.top_k, n_group=self.n_group, topk_group=self.topk_group
+                gates, self.e_score_correction_bias, k=self.top_k, n_group=self.n_group, topk_group=self.topk_group
             )
             # norm gate to sum 1
         if self.top_k > 1 and self.norm_topk_prob:
             denominator = top_gate.sum(axis=-1, keepdim=True) + 1e-20
             top_gate = top_gate / denominator
-        top_gate = top_gate * self.routed_scaling_factor
+        else:
+            top_gate = top_gate * self.routed_scaling_factor
 
         # get topk mask
-        mask = paddle.zeros_like(gates).put_along_axis(top_idx, paddle.to_tensor(1.0, dtype="float32"), axis=1)
-        if hasattr(self.config, "seq_aux") and self.config.seq_aux:
+        mask = paddle.zeros_like(gates).put_along_axis(top_idx, paddle.to_tensor(1.0), axis=1)
+        if self.config.seq_aux:
             l_aux = self._cal_seq_aux_loss(gates_ori, self.top_k, top_idx)
         else:
             l_aux = self._cal_aux_loss(gates, mask)
@@ -554,20 +552,102 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
             if self.group is not None:
                 dist.all_reduce(local_capacity, op=dist.ReduceOp.MAX, group=self.group)
             capacity = int(local_capacity)
-            token_priority = self._priority(top_idx, capacity)
 
         # normalize gates
-        if self.training:
-            gates_masked = gates * mask
-            gates_s = paddle.sum(gates_masked, axis=-1, keepdim=True)
-            denom_s = paddle.clip(gates_s, min=paddle.finfo(gates_masked.dtype).eps)
-            if self.norm_topk_prob:
-                gates_masked = gates_masked / denom_s
-            combine_weights = paddle.einsum("se,sec->sec", gates_masked, token_priority.cast(paddle.float32))
-        else:
-            topk_masked_gates = paddle.zeros_like(gates).put_along_axis(top_idx, top_gate, axis=1)
-            combine_weights = paddle.einsum("se,sec->sec", topk_masked_gates, token_priority.cast(paddle.float32))
+        gates_masked = gates * mask
+        gates_s = paddle.sum(gates_masked, axis=-1, keepdim=True)
+        denom_s = paddle.clip(gates_s, min=paddle.finfo(gates_masked.dtype).eps)
+        if self.norm_topk_prob:
+            gates_masked = gates_masked / denom_s
 
+        if not self.drop_tokens:
+            locations = paddle.cumsum(mask, axis=0) - 1
+            token_priority = self._one_hot_to_float(locations * mask, capacity)
+
+        combine_weights = paddle.einsum("se,sec->sec", gates_masked, token_priority.cast(paddle.get_default_dtype()))
         dispatch_mask = combine_weights.cast(paddle.bool)
 
         return capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss
+
+    def topkgating_part1(self, gates, e_score_correction_bias):
+        l_zloss = self._cal_z_loss(gates)
+        batch_size, seq_len, d_model = gates.shape
+        gates_ori = gates
+        gates = gates.reshape([-1, d_model])
+
+        # get topk gates
+        if self.topk_method == "greedy":
+            top_gate, top_idx = self._topk_greedy(gates, k=self.top_k)
+        elif self.topk_method == "group_limited_greedy":
+            top_gate, top_idx = self._topk_group_limited_greedy(
+                gates, k=self.top_k, n_group=self.n_group, topk_group=self.topk_group
+            )
+        elif self.topk_method == "noaux_tc":
+            top_gate, top_idx = self._topk_noaux_tc(
+                gates, e_score_correction_bias, k=self.top_k, n_group=self.n_group, topk_group=self.topk_group
+            )
+            # norm gate to sum 1
+        if self.top_k > 1 and self.norm_topk_prob:
+            denominator = top_gate.sum(axis=-1, keepdim=True) + 1e-20
+            top_gate = top_gate / denominator
+        else:
+            top_gate = top_gate * self.routed_scaling_factor
+
+        # get topk mask
+        mask = paddle.zeros_like(gates).put_along_axis(top_idx, paddle.to_tensor(1.0), axis=1)
+        if self.config.seq_aux:
+            l_aux = self._cal_seq_aux_loss(gates_ori, self.top_k, top_idx)
+        else:
+            l_aux = self._cal_aux_loss(gates, mask)
+
+        exp_counts = paddle.sum(mask.cast(paddle.int64), axis=0)
+
+        if self.drop_tokens:
+            # Calculate configured capacity and remove locations outside capacity from mask
+            capacity = self._capacity(
+                gates,
+                self.capacity_factor * self.top_k,
+                self.max_capacity,
+                self.min_capacity,
+            )
+
+            # update mask and locations by capacity
+            if self.drop_policy == "probs":
+                topk_masked_gates = paddle.zeros_like(gates).put_along_axis(top_idx, top_gate, axis=1)
+                capacity_probs, capacity_indices = paddle.topk(topk_masked_gates, k=capacity, axis=0, sorted=False)
+                token_priority = self._priority(capacity_indices, capacity)
+
+            elif self.drop_policy == "position":
+                token_priority = self._priority(top_idx, capacity)
+            else:
+                raise ValueError(f"Invalid drop_policy: {self.drop_policy}")
+        else:
+            # Do not drop tokens - set capacity according to current expert assignments
+            # local_capacity = paddle.max(exp_counts)
+            # capacity = int(local_capacity)
+            capacity = None
+            token_priority = None
+
+        # keep these tensor for using in topkgating_part2
+        self.mask = mask
+        self.capacity = capacity
+        self.token_priority = token_priority
+
+        return exp_counts, l_aux, l_zloss
+
+    def topkgating_part2(self, gates):
+
+        gates_masked = gates * self.mask
+        gates_s = paddle.sum(gates_masked, axis=-1, keepdim=True)
+        denom_s = paddle.clip(gates_s, min=paddle.finfo(gates_masked.dtype).eps)
+        if self.norm_topk_prob:
+            gates_masked = gates_masked / denom_s
+
+        if not self.drop_tokens:
+            locations = paddle.cumsum(self.mask, axis=0) - 1
+            self.token_priority = self._one_hot_to_float(locations * self.mask, self.capacity)
+
+        combine_weights = einsum("se,sec->sec", gates_masked, self.token_priority.cast(paddle.get_default_dtype()))
+        dispatch_mask = combine_weights.cast(paddle.bool)
+
+        return combine_weights, dispatch_mask

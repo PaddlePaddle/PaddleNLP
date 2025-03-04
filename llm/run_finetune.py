@@ -66,6 +66,7 @@ from paddlenlp.transformers import (
     Qwen2MoeForCausalLMPipe,
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig
+from paddlenlp.transformers.longlora import replace_llama_attn, set_group_size
 from paddlenlp.trl import DataConfig, ModelConfig, SFTConfig, SFTTrainer
 from paddlenlp.trl.llm_utils import (
     ZeroPaddingIterDatasetCallback,
@@ -168,6 +169,13 @@ def main():
         quantization_config=quantization_config,
     )
 
+    if training_args.use_ssa:
+        assert (
+            training_args.ssa_group_size_ratio is not None
+        ), "ssa_group_size_ratio must be specified when use_ssa is True"
+        set_group_size(training_args.ssa_group_size_ratio)
+        replace_llama_attn()
+
     architectures_to_check = {"Qwen2Moe", "DeepseekV2", "DeepseekV3"}
     if (
         any(architecture in str(model_config.architectures) for architecture in architectures_to_check)
@@ -192,6 +200,8 @@ def main():
         model_config.fuse_attention_ffn = model_args.fuse_attention_ffn
 
     model_config.seq_length = data_args.max_length
+    orig_ctx_len = getattr(model_config, "max_position_embeddings", None)
+    model_args.rope_scaling_factor = data_args.max_length // orig_ctx_len
 
     # Config for model useing long sequence strategy
     if model_args.use_long_sequence_strategies:
