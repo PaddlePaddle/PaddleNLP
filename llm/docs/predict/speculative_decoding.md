@@ -21,7 +21,7 @@ python predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_
 ## Multi-Token Prediction(MTP)
 
 Paper：https://github.com/deepseek-ai/DeepSeek-V3/blob/main/DeepSeek_V3.pdf
-![Alt text](images/mtp.png)
+![MTP](https://github.com/user-attachments/assets/6cdc3d94-7bab-4c0f-991c-875ae24816a6)
 
 支持 DeepSeek-V3/R1 & MTP 的推理功能，具体原理请查阅论文。
 
