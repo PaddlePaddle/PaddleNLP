@@ -23,8 +23,8 @@ config.first_k_dense_replace = 6
 config.intermediate_size = 2048
 config.use_flash_attention = 1
 config.use_fused_rope = 1
-config.use_fused_rms_norm = 0
-config.use_fast_layer_norm = 1
+config.use_fused_rms_norm = 1
+config.use_fast_layer_norm = 0
 seq_len = 4096
 print("Final pre-training config:", config.to_dict())
 
