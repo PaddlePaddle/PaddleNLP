@@ -25,7 +25,7 @@ export ENC_DEC_BLOCK_NUM=${ENC_DEC_BLOCK_NUM:-"4"}
 export MAX_PREFILL_BATCH=${MAX_PREFILL_BATCH:-"4"}
 export STOP_THRESHOLD=${STOP_THRESHOLD:-"0"}
 
-export tag="3.0-beta4"
+export tag="3.0.0.b"
 export model_name=$1
 export MODEL_DIR=${MODEL_DIR:-"/models"}
 if [ ! "$model_name" == "" ]]; then
