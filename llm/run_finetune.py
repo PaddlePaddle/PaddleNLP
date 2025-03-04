@@ -176,6 +176,7 @@ def main():
         training_args.use_expert_parallel = True
 
     LlmMetaConfig.set_llm_config(model_config, training_args)
+    LlmMetaConfig.set_llm_config(model_config, model_args)
     model_config.use_fast_layer_norm = model_args.use_fast_layer_norm
 
     # Config for model using dropout, such as GPT.

@@ -43,6 +43,7 @@ from paddlenlp.transformers import (
     LinearAnnealingWithWarmupDecay,
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig, llmmetaclass
+from paddlenlp.trl import ModelConfig
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.tools import get_env_device
@@ -136,51 +137,6 @@ class DataArguments:
     data_cache: str = field(default=None, metadata={"help": "The path of the cached dataset."})
 
 
-@dataclass
-class ModelArguments:
-    """
-    Arguments pertaining to which model/config/tokenizer we are going to pre-train from.
-    """
-
-    model_name_or_path: str = field(
-        default="__internal_testing__/tiny-random-llama",
-        metadata={
-            "help": "Path to pretrained model or model identifier from https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers.html"
-        },
-    )
-    tokenizer_name_or_path: Optional[str] = field(
-        default=None, metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}
-    )
-
-    use_fast_layer_norm: bool = field(
-        default=False,
-        metadata={"help": "GPT3 model, use fast layernorm"},
-    )
-
-    hidden_dropout_prob: float = field(default=0.1, metadata={"help": "The hidden dropout prob."})
-    attention_probs_dropout_prob: float = field(default=0.1, metadata={"help": "The attention hidden dropout prob."})
-
-    fuse_attention_qkv: bool = field(
-        default=None,
-        metadata={"help": "whether to fuse attention qkv"},
-    )
-    fuse_attention_ffn: bool = field(
-        default=None,
-        metadata={"help": "whether to fuse first up and gate proj in mlp block"},
-    )
-
-    continue_training: bool = field(
-        default=False,
-        metadata={
-            "help": "Pre-training from existing paddlenlp model weights. Default False and model will train from scratch. If set True, the model_name_or_path argument must exist in the paddlenlp models."
-        },
-    )
-    num_hidden_layers: Optional[int] = field(
-        default=None,
-        metadata={"help": "num_hidden_layers."},
-    )
-
-
 def create_pretrained_dataset(
     data_args,
     training_args,
@@ -188,7 +144,6 @@ def create_pretrained_dataset(
     tokenizer,
     need_data=True,
 ):
-
     check_data_split(data_args.split, training_args.do_train, training_args.do_eval, training_args.do_predict)
 
     train_val_test_num_samples = [
@@ -347,7 +302,7 @@ class PretrainingTrainer(Trainer):
 
 
 def main():
-    parser = PdArgumentParser((ModelArguments, DataArguments, PreTrainingArguments))
+    parser = PdArgumentParser((ModelConfig, DataArguments, PreTrainingArguments))
     # Support format as "args.json --arg1 value1 --arg2 value2.”
     # In case of conflict, command line arguments take precedence.
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
@@ -404,6 +359,7 @@ def main():
     config = AutoConfig.from_pretrained(model_args.model_name_or_path)
     # set all llm config
     LlmMetaConfig.set_llm_config(config, training_args)
+    LlmMetaConfig.set_llm_config(config, model_args)
     config.use_fast_layer_norm = model_args.use_fast_layer_norm
 
     config.seq_length = data_args.max_seq_length
