@@ -112,6 +112,7 @@ class RotaryEmbedding(nn.Layer):
         self.register_buffer("inv_freq", inv_freq)
         self.dim = dim
         self.original_impl = original_impl
+        self.rope_ratio=rope_ratio
 
     def forward_impl(self, seq_len: int, n_elem: int, base: int = 10000):
         """Enhanced Transformer with Rotary Position Embedding.
