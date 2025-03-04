@@ -16,11 +16,9 @@ import json
 import os
 from datetime import datetime
 
-from server.utils import model_server_logger
-
+from server.utils import model_server_logger, download_model
 from paddlenlp.experimental.transformers import SpeculateArgument
 from paddlenlp.generation import GenerationConfig
-from server.engine.download_model import download_from_txt
 
 
 class Config:
@@ -39,16 +37,6 @@ class Config:
         self.model_dir = env.get("MODEL_DIR", "/opt/output/Serving/models")
         if not self.model_dir:
             raise Exception("The parameter MODEL_DIR is None.")
-        if 
-            try:
-                model_path=env.get("model_path")
-                model_name=env.get("model_name")
-                tag=env.get("tag")
-                base_url=f"https://paddlenlp.bj.bcebos.com/models/static/{model_name}/{tag}"
-                download_from_txt(base_url, model_path, model_name)
-            except Exception as e:
-                model_server_logger.error("No models in the dir")
-                raise
         self.mp_num = int(env.get("MP_NUM", 8))
         self.config_json_file = env.get("CONFIG_JSON_FILE", "config.json")
         self.model_config_path = os.path.join(self.model_dir, self.config_json_file)
@@ -239,13 +227,22 @@ class Config:
         except:
             try:
                 env = os.environ
-                model_path=env.get("model_path")
                 model_name=env.get("model_name")
+                model_server_logger.info(f"Start downloading model: {model_name}")
                 tag=env.get("tag")
-                base_url=f"https://paddlenlp.bj.bcebos.com/models/static/{model_name}/{tag}"
-                download_from_txt(base_url, model_path, model_name)
+                base_url=f"https://paddlenlp.bj.bcebos.com/models/static/{tag}/{model_name}"
+                if self.nnode == 1:
+                    # single node model
+                    temp_tar = "model.tar"
+                elif env.get("POD_0_IP", "127.0.0.1") == self.host_ip:
+                    # Master node model
+                    temp_tar = "node1.tar"
+                else:
+                    temp_tar = "node2.tar"
+                base_url = base_url+f"/{temp_tar}"
+                download_model(base_url, self.model_dir, temp_tar)
             except Exception as e:
-                model_server_logger.error("No models in the dir")
+                model_server_logger.error(f"{e}")
                 raise
         return model_config_json
 

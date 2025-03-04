@@ -28,9 +28,9 @@ export STOP_THRESHOLD=${STOP_THRESHOLD:-"0"}
 export tag="3.0-beta4"
 export model_name=$1
 export MODEL_DIR=${MODEL_DIR:-"/models"}
-export model_path=$MODEL_DIR
 if [ ! "$model_name" == "" ]]; then
     export MODEL_DIR=${MODEL_DIR}/${model_name}
+    mkdir -p $MODEL_DIR
 fi
 export CONFIG_JSON_FILE=${CONFIG_JSON_FILE:-"config.json"}
 export PUSH_MODE_HTTP_WORKERS=${PUSH_MODE_HTTP_WORKERS:-"4"}
