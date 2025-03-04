@@ -241,6 +241,7 @@ class Config:
                     temp_tar = "node2.tar"
                 base_url = base_url+f"/{temp_tar}"
                 download_model(base_url, self.model_dir, temp_tar)
+                model_config_json = json.load(open(self.model_config_path, "r", encoding="utf-8"))
             except Exception as e:
                 model_server_logger.error(f"{e}")
                 raise
