@@ -60,7 +60,7 @@ function generate_sm_version(){
     if [ ! -z "$SM_VERSION" ]; then
         sm_versions=($SM_VERSION )
     elif [ "$ARCHITECTURE" = "all" ]; then
-        if echo "$cuda_version >= 12.4" | awk '{if ($0) exit 0; exit 1}'; then
+        if echo "$cuda_version >= 12.0" | awk '{if ($0) exit 0; exit 1}'; then
           sm_versions=(70 80 80 86 89 90 )
         else
           sm_versions=(70 75 80 86 89 ) 
@@ -160,7 +160,7 @@ import paddle
 from paddlenlp.utils.log import logger
 
 cuda_version = float(paddle.version.cuda())
-SUPPORTED_SM_VERSIONS = {70, 75, 80, 86, 89, 90} if cuda_version >= 12.4 else {70, 75, 80, 86, 89}
+SUPPORTED_SM_VERSIONS = {70, 75, 80, 86, 89, 90} if cuda_version >= 12.0 else {70, 75, 80, 86, 89}
 
 
 def get_sm_version():
