@@ -986,7 +986,6 @@ def fused_moe(
     w1,
     w2,
     scores,
-    scores_no_bias,
     topk: int,
     renormalize: bool,
     use_fp8_w8a8: bool = False,
@@ -996,23 +995,12 @@ def fused_moe(
     a1_scale=None,
     a2_scale=None,
     block_shape: Optional[List[int]] = None,
-    refactor: float = 1.0,
-    e_score_correction_bias=None,
 ):
     # Check constraints.
     assert scores.shape[1] == w1.shape[0], "Number of experts mismatch"
 
     # 经过分组策略后的scores计算topk
     topk_weights, topk_ids = paddle.topk(scores, k=topk, axis=-1, sorted=False)
-
-    if e_score_correction_bias is not None:
-        topk_weights = scores_no_bias.take_along_axis(topk_ids, axis=1)
-
-    # renormalize和refactor
-    if renormalize:
-        topk_weights = topk_weights / topk_weights.sum(axis=-1, keepdim=True)
-
-    topk_weights = topk_weights * refactor
 
     return fused_experts_impl(
         hidden_states,
