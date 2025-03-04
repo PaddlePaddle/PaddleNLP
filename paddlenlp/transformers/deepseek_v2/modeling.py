@@ -79,6 +79,16 @@ from . import fp8_linear as linear_utils
 from .configuration import DeepseekV2Config
 from .fp8_linear import Linear
 
+try:
+    from paddle.incubate.nn.functional import swiglu
+except ImportError:
+
+    def swiglu(x, y=None):
+        if y is None:
+            x, y = paddle.chunk(x, chunks=2, axis=-1)
+        return F.silu(x) * y
+
+
 __all__ = [
     "DeepseekV2LMHead",
     "DeepseekV2PretrainingCriterion",
@@ -694,15 +704,27 @@ class DeepseekV2MLP(nn.Layer):
                     has_bias=False,
                 )
             else:
-                self.gate_proj = Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
-                self.up_proj = Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
+                # self.gate_proj = Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
+                # self.up_proj = Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
+                if config.fuse_attention_ffn:
+                    self.gate_up_fused_proj = Linear(self.hidden_size, self.intermediate_size * 2, bias_attr=False)
+                else:
+                    self.gate_proj = Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
+                    self.up_proj = Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
                 self.down_proj = Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
 
         self.act_fn = ACT2FN[config.hidden_act]
 
+    # def forward(self, x):
+    #     down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
+    #     return down_proj
     def forward(self, x):
-        down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
-        return down_proj
+        if self.fuse_attention_ffn:
+            x = swiglu(self.gate_up_fused_proj(x))
+        else:
+            x = swiglu(self.gate_proj(x), self.up_proj(x))
+        out = self.down_proj(x)
+        return out
 
 
 class MoEGate(PretrainedMoEGate):

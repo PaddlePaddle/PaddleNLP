@@ -25,6 +25,7 @@ config.use_flash_attention = 1
 config.use_fused_rope = 1
 config.use_fused_rms_norm = 1
 config.use_fast_layer_norm = 0
+config.fuse_attention_ffn = 1
 seq_len = 4096
 print("Final pre-training config:", config.to_dict())
 
