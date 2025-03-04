@@ -51,7 +51,15 @@ from ..llama.modeling import get_use_casual_mask
 from ..model_outputs import BaseModelOutputWithPast, CausalLMOutputWithPast
 from ..model_utils import PretrainedModel, register_base_model
 from ..moe_gate_auto import PretrainedMoEGate
-from ..moe_layer_auto import MoELayer
+
+try:
+    from ..moe_layer_auto import MoELayer
+except:
+
+    class MoELayer:
+        pass
+
+
 from .configuration import DeepseekV2Config
 from .modeling import (
     DeepseekV2DynamicNTKScalingRotaryEmbedding,

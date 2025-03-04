@@ -257,6 +257,7 @@ def main():
         model_max_length=data_args.max_length,
         padding_side="left",
         tokenizer_alpha=model_args.actor_tokenizer_alpha,
+        use_fast=True,
     )
     llm_utils.init_chat_template(actor_tokenizer, model_args.actor_model_name_or_path, model_args.chat_template)
 
@@ -320,6 +321,7 @@ def main():
             model_max_length=data_args.max_length,
             padding_side="right",
             tokenizer_alpha=model_args.reward_tokenizer_alpha,
+            use_fast=True,
         )
         llm_utils.init_chat_template(reward_tokenizer, model_args.reward_model_name_or_path, model_args.chat_template)
     else:
@@ -361,6 +363,7 @@ def main():
             model_max_length=data_args.max_length,
             padding_side="left",
             tokenizer_alpha=model_args.reward_critic_tokenizer_alpha,
+            use_fast=True,
         )
         llm_utils.init_chat_template(
             reward_critic_tokenizer, model_args.reward_critic_model_name_or_path, model_args.chat_template

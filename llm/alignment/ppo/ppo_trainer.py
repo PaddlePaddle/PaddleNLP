@@ -2470,6 +2470,7 @@ class PPOTrainer(Trainer):
             position_ids=position_ids,
             generation_config=self.generation_config,
             synced_gpus=ShardingOption.FULL_SHARD in self.policy_trainer.args.sharding,
+            do_eval=do_eval,
         )[0]
 
         if self.args.use_rm_server:

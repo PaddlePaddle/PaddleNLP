@@ -867,6 +867,10 @@ class TrainingArguments:
         default=None,
         metadata={"help": "Weights & Biases (WandB) API key(s) for authentication with the WandB service."},
     )
+    wandb_http_proxy: Optional[str] = field(
+        default=None,
+        metadata={"help": "Weights & Biases (WandB) http proxy for connecting with the WandB service."},
+    )
     resume_from_checkpoint: Optional[str] = field(
         default=None,
         metadata={"help": "The path to a folder with a valid checkpoint for your model."},
