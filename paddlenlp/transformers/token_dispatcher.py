@@ -113,14 +113,16 @@ class _DeepepManager(_DispatchManager):
             self.token_indices = self.token_indices.masked_fill(mask, -1)
 
     def dispatch(self, hidden_states: paddle.Tensor) -> paddle.Tensor:
-        hidden_states, dispatched_indices, dispatched_probs, num_tokens_per_expert, handle = (
+        # hidden_states, dispatched_indices, dispatched_probs, num_tokens_per_expert, handle = (
+        states = dict()
+        hidden_states, dispatched_probs = (
             fused_dispatch(
-                hidden_states, self.token_indices, self.token_probs, self.num_experts, self.group
+                hidden_states, self.token_indices, self.token_probs, self.num_experts, states, self.group
             )
         )
-        self.handle = handle
-        self.tokens_per_expert = num_tokens_per_expert
-        self.dispatched_indices = dispatched_indices
+        self.handle = states['handle']
+        self.tokens_per_expert = states['tokens_per_expert']
+        self.dispatched_indices = states['dispatched_indices']
         self.dispatched_probs = dispatched_probs
 
         return hidden_states

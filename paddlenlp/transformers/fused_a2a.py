@@ -4,7 +4,7 @@
 # Licensed under the MIT License - https://github.com/deepseek-ai/DeepEP/blob/main/LICENSE
 
 try:
-    from paddle.distributed import deep_ep
+    import paddle.distributed.communication.deep_ep as deep_ep
 
     HAVE_DEEP_EP = True
 except ImportError:
@@ -41,19 +41,18 @@ def get_buffer(group: Group, hidden_bytes: int):
     """
     global _buffer
     num_nvl_bytes, num_rdma_bytes = 0, 0
-    num_nvl_bytes = int(1e9)
     # TODO: hongqing
-    # for config in (
-    #     deep_ep.Buffer.get_dispatch_config(group.world_size),
-    #     deep_ep.Buffer.get_combine_config(group.world_size),
-    # ):
-    #     # Split long line for PEP8 compliance
-    #     num_nvl_bytes = max(
-    #         config.get_nvl_buffer_size_hint(hidden_bytes, group.world_size), num_nvl_bytes
-    #     )
-    #     num_rdma_bytes = max(
-    #         config.get_rdma_buffer_size_hint(hidden_bytes, group.world_size), num_rdma_bytes
-    #     )
+    for config in (
+        deep_ep.Buffer.get_dispatch_config(group.world_size),
+        deep_ep.Buffer.get_combine_config(group.world_size),
+    ):
+        # Split long line for PEP8 compliance
+        num_nvl_bytes = max(
+            config.get_nvl_buffer_size_hint(hidden_bytes, group.world_size), num_nvl_bytes
+        )
+        # num_rdma_bytes = max(
+        #     config.get_rdma_buffer_size_hint(hidden_bytes, group.world_size), num_rdma_bytes
+        # )
 
     # Allocate buffer if not existed or not enough buffer
     # NOTES: the adaptive routing configuration of the network **must be off**
@@ -71,7 +70,7 @@ class FusedDispatch(PyLayer):
     """Fused dispatch operation for MoE routing combining computation and communication."""
 
     @staticmethod
-    def forward(ctx, x, token_indices, token_probs, num_experts, group, previous_event=None):
+    def forward(ctx, x, token_indices, token_probs, num_experts, states, group, previous_event=None):
         """Forward pass of fused dispatch."""
         # Calculate layout before actual dispatch
         buffer = get_buffer(group, get_hidden_bytes(x))
@@ -117,11 +116,16 @@ class FusedDispatch(PyLayer):
         ctx.event = event
         tokens_per_expert = paddle.to_tensor(num_recv_tokens_per_expert_list)
 
-        return (recv_x, recv_token_indices, recv_token_probs, tokens_per_expert, handle)
+        # states = dict()
+        states['dispatched_indices'] = recv_token_indices
+        states['tokens_per_expert'] = tokens_per_expert
+        states['handle'] = handle
+
+        return recv_x, recv_token_probs
 
     @staticmethod
     def backward(
-        ctx, grad_output, grad_token_indices, grad_token_probs, grad_tokens_per_expert, grad_handle
+        ctx, grad_output, grad_token_probs
     ):
         """Backward pass of fused dispatch."""
         buffer = get_buffer(ctx.group, get_hidden_bytes(grad_output))
@@ -135,7 +139,7 @@ class FusedDispatch(PyLayer):
             async_finish=False,
             allocate_on_comm_stream=False,
         )
-        return grad_x, None, grad_token_probs, None, None, None
+        return grad_x, None, grad_token_probs
 
 
 class FusedCombine(PyLayer):
