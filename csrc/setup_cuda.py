@@ -115,8 +115,30 @@ sources = [
     "./gpu/speculate_decoding_kernels/ngram_match.cc",
     "./gpu/speculate_decoding_kernels/speculate_save_output.cc",
     "./gpu/speculate_decoding_kernels/speculate_get_output.cc",
+    "./gpu/noauxtc/noaux_tc.cu"
 ]
 sources += find_end_files("./gpu/speculate_decoding_kernels", ".cu")
+# moe
+sources += find_end_files("./gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/generated_kernels/gemm_grouped/", ".cu")
+sources += find_end_files("./gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/moe_gemm/", ".cu")
+sources += [
+    "./gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/cutlass_heuristic.cpp",
+    "./gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/mixtureOfExperts/moe_kernels.cu",
+    "./gpu/moe/tensorrt-llm-moe/moe/trt_llm_fused_moe.cu",
+]
+include_path = [
+    "/usr/include/x86_64-linux-gnu/", 
+    "./third_party/cutlass/include",
+    "./third_party/cutlass/tools/util/include",
+    "./gpu/moe/tensorrt-llm-moe/cpp/",
+    "./gpu/moe/tensorrt-llm-moe/",
+    "./gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/cutlass_extensions/include/",
+]
+extra_link_args = ["-L/usr/lib/x86_64-linux-gnu/"]
+CXX_FLAGS = ["-g" ,"-DENABLE_BF16"]
+library_dirs = [library_path]
+libraries=["cublasLt"]
+
 
 nvcc_compile_args = gencode_flags
 update_git_submodule()
@@ -137,6 +159,8 @@ nvcc_compile_args += [
     "-Ithird_party/nlohmann_json/single_include",
     "-Igpu/sample_kernels",
 ]
+
+nvcc_compile_args += ["-DENABLE_BF16"]
 
 cc = get_sm_version()
 cuda_version = float(paddle.version.cuda())
@@ -174,14 +198,28 @@ if cc >= 90 and cuda_version >= 12.0:
         "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_cuda_core_gemm.cu",
         "gpu/fp8_gemm_with_cutlass/fp8_fp8_fp8_dual_gemm.cu",
     ]
+    # moe
+    nvcc_compile_args +=  [
+            "-DCOMPILE_HOPPER_TMA_GEMMS",
+            "-DCUTLASS_ARCH_MMA_SM90_SUPPORTED=1",
+            "-DCUDA_12_0_SM90_FEATURES_SUPPORTED",
+            "-D__CUDA_ARCH_FEAT_SM90_ALL"
+        ]
+    library_dirs += ["gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/fp8_blockscale_gemm/"]
+    extra_link_args += ["gpu/moe/tensorrt-llm-moe/cpp/tensorrt_llm/kernels/cutlass_kernels/fp8_blockscale_gemm/libfp8_blockscale_gemm.a"]
+    libraries += ["fp8_blockscale_gemm"]
+    nvcc_compile_args += ["-DENABLE_FP8"]
+    CXX_FLAGS += ["-DENABLE_FP8"]
 
 ops_name = f"paddlenlp_ops_{sm_version}" if sm_version != 0 else "paddlenlp_ops"
 setup(
     name=ops_name,
     ext_modules=CUDAExtension(
         sources=sources,
-        extra_compile_args={"cxx": ["-O3"], "nvcc": nvcc_compile_args},
-        libraries=["cublasLt"],
-        library_dirs=[library_path],
+        extra_compile_args={"cxx": CXX_FLAGS, "nvcc": nvcc_compile_args},
+        libraries=libraries,
+        library_dirs=library_dirs,
+        extra_link_args=extra_link_args,
+        include_dirs=include_path,
     ),
 )
