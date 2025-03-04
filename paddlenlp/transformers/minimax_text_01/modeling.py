@@ -304,12 +304,12 @@ class MiniMaxText01LightningAttention(nn.Layer):
                 output.append(qkv)
             output = paddle.concat(output, axis=-2)
 
-        output = output.reshape([b, n, h * d])
+        output = paddle.transpose(output, perm=[0, 2, 1, 3])
+        output = output.reshape([b, n, -1])
 
         output = self.norm(output)
 
         output = F.sigmoid(self.output_gate(x)) * output
-
         output = self.out_proj(output)
 
         attn_weights = None
@@ -457,7 +457,7 @@ class MiniMaxText01Attention(nn.Layer):
         hidden_states: paddle.Tensor,
         attention_mask: Optional[paddle.Tensor] = None,
         position_ids: Optional[paddle.Tensor] = None,
-        past_key_value: Optional[paddle.Tensor] = None,
+        past_key_value: Optional[Tuple[paddle.Tensor]] = None,
         output_attentions: bool = False,
         use_cache: bool = False,
         **kwargs,
@@ -483,13 +483,15 @@ class MiniMaxText01Attention(nn.Layer):
                     "for auto-regressive decoding with k/v caching, please make sure to initialize the attention class "
                     "with a layer index."
                 )
-            kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
+            kv_seq_len += past_key_value[0].shape[-3]
         cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
         query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
 
         if past_key_value is not None:
-            cache_kwargs = {"sin": sin, "cos": cos}  # Specific to RoPE models
-            key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
+            key_states = paddle.concat([past_key_value[0], key_states], axis=-2)
+            value_states = paddle.concat([past_key_value[1], value_states], axis=-2)
+
+        past_key_value = (key_states, value_states) if use_cache else None
 
         # repeat k/v heads if n_kv_heads < n_heads
         key_states = repeat_kv(key_states, self.num_key_value_groups)
@@ -497,17 +499,7 @@ class MiniMaxText01Attention(nn.Layer):
 
         attn_weights = paddle.matmul(query_states, key_states.transpose([0, 1, 3, 2])) / math.sqrt(self.head_dim)
 
-        if attn_weights.shape != [bsz, self.num_heads, q_len, kv_seq_len]:
-            raise ValueError(
-                f"Attention weights should be of size {(bsz, self.num_heads, q_len, kv_seq_len)}, but is"
-                f" {attn_weights.shape}"
-            )
-
         if attention_mask is not None:
-            if attention_mask.shape != [bsz, 1, q_len, kv_seq_len]:
-                raise ValueError(
-                    f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.shape}"
-                )
 
             attn_weights = attn_weights + attention_mask
 
