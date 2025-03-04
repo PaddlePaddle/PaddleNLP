@@ -21,7 +21,7 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import Tensor
-from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
+from paddle.nn import CrossEntropyLoss
 
 from ..activations import ACT2FN
 from ..conversion_utils import StateDictNameMapping, init_name_mappings
@@ -1190,25 +1190,22 @@ class MiniMaxText01ForSequenceClassification(MiniMaxText01PreTrainedModel):
 
         if self.config.pad_token_id is None and batch_size != 1:
             raise ValueError("Cannot handle batch sizes > 1 if no padding token is defined.")
-
         if self.config.pad_token_id is None:
             sequence_lengths = -1
         else:
             if input_ids is not None:
-                # If no pad token found, use modulo instead of reverse indexing for ONNX compatibility
-                sequence_lengths = (
-                    paddle.equal(input_ids, self.config.pad_token_id).astype(paddle.int32).argmax(-1) - 1
-                )
+                # if no pad token found, use modulo instead of reverse indexing for ONNX compatibility
+                sequence_lengths = paddle.equal(input_ids, self.config.pad_token_id).astype("int32").argmax(-1) - 1
                 sequence_lengths = sequence_lengths % input_ids.shape[-1]
-                sequence_lengths = sequence_lengths.astype(paddle.int64).to(logits.place)
+                sequence_lengths = sequence_lengths
             else:
                 sequence_lengths = -1
 
-        pooled_logits = logits[paddle.arange(batch_size), sequence_lengths]
+        # pooled_logits = logits[paddle.arange(batch_size), sequence_lengths]
+        pooled_logits = logits.gather_nd(paddle.stack([paddle.arange(logits.shape[0]), sequence_lengths], axis=-1))
 
         loss = None
         if labels is not None:
-            labels = labels.astype(pooled_logits.dtype)
             if self.config.problem_type is None:
                 if self.num_labels == 1:
                     self.config.problem_type = "regression"
@@ -1218,18 +1215,17 @@ class MiniMaxText01ForSequenceClassification(MiniMaxText01PreTrainedModel):
                     self.config.problem_type = "multi_label_classification"
 
             if self.config.problem_type == "regression":
-                loss_fct = MSELoss()
+                loss_fct = nn.MSELoss()
                 if self.num_labels == 1:
                     loss = loss_fct(pooled_logits.squeeze(), labels.squeeze())
                 else:
                     loss = loss_fct(pooled_logits, labels)
             elif self.config.problem_type == "single_label_classification":
-                loss_fct = CrossEntropyLoss()
-                loss = loss_fct(pooled_logits.reshape((-1, self.num_labels)), labels.reshape((-1)))
+                loss_fct = nn.CrossEntropyLoss()
+                loss = loss_fct(pooled_logits.reshape([-1, self.num_labels]), labels.reshape([-1]))
             elif self.config.problem_type == "multi_label_classification":
-                loss_fct = BCEWithLogitsLoss()
+                loss_fct = nn.BCEWithLogitsLoss()
                 loss = loss_fct(pooled_logits, labels)
-
         if not return_dict:
             output = (pooled_logits,) + transformer_outputs[1:]
             return ((loss,) + output) if loss is not None else output
