@@ -1077,8 +1077,8 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                         ffn1_scales.append(ffn1_weight_scale)
                         ffn2_scales.append(ffn2_weight_scale)
                     else:
-                        ffn1_weights.append(ffn1_weight)
-                        ffn2_weights.append(ffn2_weight)
+                        ffn1_weights.append(ffn1_weight.view(paddle.float16))
+                        ffn2_weights.append(ffn2_weight.view(paddle.float16))
 
                 fused_moe_ffn1_weight = paddle.to_tensor(ffn1_weights)
                 fused_moe_ffn2_weight = paddle.to_tensor(ffn2_weights)
@@ -1103,8 +1103,8 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                     self.transformer_block.ffn1_weights[idx].copy_(fused_moe_ffn1_weight_quant, False)
                     self.transformer_block.ffn2_weights[idx].copy_(fused_moe_ffn2_weight_quant, False)
                 else:
-                    self.transformer_block.ffn1_weights[idx].set_value(fused_moe_ffn1_weight)
-                    self.transformer_block.ffn2_weights[idx].set_value(fused_moe_ffn2_weight)
+                    self.transformer_block.ffn1_weights[idx].set_value(fused_moe_ffn1_weight.view(dtype))
+                    self.transformer_block.ffn2_weights[idx].set_value(fused_moe_ffn2_weight.view(dtype))
                 self.transformer_block.gate_weights[idx].set_value(gate_weight)
 
                 if self.use_weight_only:
