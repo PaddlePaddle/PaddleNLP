@@ -372,17 +372,8 @@ class DeepseekV2RMSNorm(nn.Layer):
             mark_as_sequence_parallel_parameter(self.weight)
 
     def forward(self, hidden_states):
-        if self.config.use_fused_rms_norm and get_env_device() == "xpu":
-            if self.weight.dtype != hidden_states.dtype:
-                hidden_states = paddle.cast(hidden_states, self.weight.dtype)
-            try:
-                import paddle_xpu_nn  # noqa: F821
-
-                return paddle_xpu_nn.xpu_rms_norm(hidden_states, self.weight, self.variance_epsilon)[0]
-            except ImportError:
-                raise NotImplementedError(
-                    f"Implementation of fused_rms_norm is not available on {get_env_device()}. Please install paddle_xpu to use this feature"
-                )
+        if self.config.use_fused_rms_norm:
+            return fusion_rms_norm(hidden_states, self.weight, self.variance_epsilon, self.config.use_fast_layer_norm)
 
         with paddle.amp.auto_cast(False):
             hidden_states = hidden_states.astype("float32")
