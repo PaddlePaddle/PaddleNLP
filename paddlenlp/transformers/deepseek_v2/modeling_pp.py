@@ -445,8 +445,8 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
             )
         for i in range(config.num_nextn_predict_layers):
             self.add_sequential_layer(
-                LayerDesc(DeepseekV2MTPLayerPipe, config=config, layer_idx=i),
-                f"{self._base_model.base_model_prefix}.layers.{i}",
+                LayerDesc(DeepseekV2MTPLayerPipe, config=config, layer_idx=config.num_hidden_layers + i),
+                f"{self._base_model.base_model_prefix}.layers.{config.num_hidden_layers + i}",
             )
 
         self.add_sequential_layer(LayerDesc(DeepseekV2RMSNormPipe, config=config), self._base_model.base_model_prefix)
