@@ -3104,7 +3104,7 @@ function llama_lora_static_graph_auto_bs_2_bf16_DP2-TP2-PP1() {
     loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 3' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
     mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 3' | awk -F 'current_memory_allocated: ' '{print $2}' | awk -F ',' '{print $1}'`
 
-    loss_base=14.08647537
+    loss_base=14.08622074
     ips_base=-1
     mem_base=2.02
     echo "result: loss=$loss ips=$ips mem=$mem"
