@@ -5038,6 +5038,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                 kwargs.get("block_tables", None),
                 "none",
                 kwargs.get("max_input_length", -1),
+                self.config.speculate_config.speculate_method is not None,  # speculate_decoder
             )
 
             q_input = paddle.concat([query_nope, query_pe], axis=-1)
