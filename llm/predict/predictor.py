@@ -49,6 +49,7 @@ from paddlenlp.transformers import (
     Llama3Tokenizer,
     LlamaTokenizer,
     PretrainedConfig,
+    PretrainedModel,
     PretrainedTokenizer,
 )
 from paddlenlp.trl import llm_utils
@@ -204,8 +205,14 @@ def batchfy_text(texts, batch_size):
 
 
 class BasePredictor:
-    def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None):
-        self.model_config = AutoConfig.from_pretrained(config.model_name_or_path)
+    def __init__(
+        self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None, model: PretrainedModel = None
+    ):
+        if model is not None and hasattr(model, "config"):
+            self.model_config = model.config
+        else:
+            self.model_config = AutoConfig.from_pretrained(config.model_name_or_path)
+
         self.config: PredictorArgument = config
         if tokenizer is None:
             tokenizer = AutoTokenizer.from_pretrained(config.model_name_or_path, padding_side="left")
@@ -278,9 +285,11 @@ class BasePredictor:
 
 
 class DygraphPredictor(BasePredictor):
-    def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None, **kwargs):
-        super().__init__(config, tokenizer)
-        self.model = kwargs.get("model", None)
+    def __init__(
+        self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None, model: PretrainedModel = None, **kwargs
+    ):
+        super().__init__(config, tokenizer, model)
+        self.model = model
         if config.lora_path is not None:
             lora_config = LoRAConfig.from_pretrained(config.lora_path)
             dtype = lora_config.dtype
@@ -357,8 +366,10 @@ class DygraphPredictor(BasePredictor):
 
 
 class StaticGraphPredictor(BasePredictor):
-    def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None, **kwargs):
-        super().__init__(config, tokenizer)
+    def __init__(
+        self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None, model: PretrainedModel = None, **kwargs
+    ):
+        super().__init__(config, tokenizer, model)
 
         inference_config = paddle.inference.Config(self.config.model_name_or_path, self.config.model_prefix)
 
@@ -409,9 +420,8 @@ class StaticGraphPredictor(BasePredictor):
 
 
 class InferencePredictorMixin(BasePredictor):
-    def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer):
-        BasePredictor.__init__(self, config, tokenizer)
-
+    def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer, model: PretrainedModel = None):
+        BasePredictor.__init__(self, config, tokenizer, model)
         self.architectures = self.model_config.architectures[0].lower()
 
         self.dtype = config.dtype or self.model_config.dtype
@@ -660,12 +670,13 @@ class StaticGraphInferencePredictor(InferencePredictorMixin):
         self,
         config: PredictorArgument,
         tokenizer: PretrainedTokenizer = None,
+        model: PretrainedModel = None,
         **kwargs,
     ):
         self.cache_kvs_shape = kwargs.get("cache_kvs_shape", None)
         if self.cache_kvs_shape is None:
             raise ValueError("cache_kvs_shape should be provided for StaticGraphInferencePredictor")
-        InferencePredictorMixin.__init__(self, config, tokenizer)
+        InferencePredictorMixin.__init__(self, config, tokenizer, model)
 
         self.predictor = self._create_predictor(config)
 
@@ -737,13 +748,13 @@ class DygraphInferencePredictor(InferencePredictorMixin):
         self,
         config: PredictorArgument,
         tokenizer: PretrainedTokenizer = None,
+        model: PretrainedModel = None,
         **kwargs,
     ):
-        model = kwargs.get("model", None)
         if model is None:
             raise ValueError("model should be provided for DygraphInferencePredictor")
         self.cache_kvs_shape = model.get_cache_kvs_shape(model.config, config.batch_size, config.total_max_length)
-        InferencePredictorMixin.__init__(self, config, tokenizer)
+        InferencePredictorMixin.__init__(self, config, tokenizer, model)
         self.model = model
 
     @paddle.no_grad()
@@ -765,8 +776,13 @@ class DygraphInferencePredictor(InferencePredictorMixin):
 
 
 class BlockInferencePredictorMixin(BasePredictor):
-    def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer):
-        BasePredictor.__init__(self, config, tokenizer)
+    def __init__(
+        self,
+        config: PredictorArgument,
+        tokenizer: PretrainedTokenizer = None,
+        model: PretrainedModel = None,
+    ):
+        BasePredictor.__init__(self, config, tokenizer, model)
 
         self.num_layers = len(self.cache_k_shapes)
         self.num_key_value_heads = self.cache_k_shapes[0][-3]
@@ -1027,14 +1043,15 @@ class BlockInferencePredictorMixin(BasePredictor):
 
 
 class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
-    def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None, **kwargs):
-        model = kwargs.get("model", None)
+    def __init__(
+        self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None, model: PretrainedModel = None, **kwargs
+    ):
         self.return_full_hidden_states = config.return_full_hidden_states
         self.full_hidden_states = None
         if model is None:
             raise ValueError("model should be provided for DygraphBlockInferencePredictor")
         self.cache_k_shapes, self.cache_v_shapes = model.get_cache_kvs_shape(model.config, config.batch_size)
-        BlockInferencePredictorMixin.__init__(self, config, tokenizer)
+        BlockInferencePredictorMixin.__init__(self, config, tokenizer, model)
 
         cachekv_dtype = self.dtype if config.cachekv_int8_type is None else "uint8"
 
@@ -1148,6 +1165,7 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
         self,
         config: PredictorArgument,
         tokenizer: PretrainedTokenizer = None,
+        model: PretrainedModel = None,
         **kwargs,
     ):
         self.cache_k_shapes = kwargs.get("cache_k_shapes", None)
@@ -1324,6 +1342,7 @@ class AutoPredictor:
         config: PretrainedConfig,
         model_args: ModelArgument,
         tokenizer: PretrainedTokenizer = None,
+        model: PretrainedModel = None,
         **kwargs,
     ):
         """
@@ -1338,7 +1357,6 @@ class AutoPredictor:
         Returns:
             Predictor: The predictor.
         """
-        model = kwargs.pop("model", None)
         cache_kvs_shape = None  # used for not block_attn/append_attn
         cache_k_shapes = None  # used for block_attn/append_attn
         cache_v_shapes = None  # used for block_attn/append_attn

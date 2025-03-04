@@ -224,6 +224,7 @@ class DeepseekV2Config(PretrainedConfig):
         self.attention_bias = attention_bias
         self.attention_dropout = attention_dropout
         self.speculate_model_type = speculate_model_type
+        self.use_fp8 = False
 
         super().__init__(
             pad_token_id=pad_token_id,

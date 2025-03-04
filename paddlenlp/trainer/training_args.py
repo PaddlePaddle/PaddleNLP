@@ -653,6 +653,14 @@ class TrainingArguments:
             )
         },
     )
+    split_inputs_sequence_dim: bool = field(
+        default=True,
+        metadata={
+            "help": (
+                "The paddle sequence parallel strategy can reduce the GPU memory of activation to 1/sep .If it is true, trainer will cut input in sequence dim "
+            )
+        },
+    )
     context_parallel_degree: int = field(
         default=-1,
         metadata={
