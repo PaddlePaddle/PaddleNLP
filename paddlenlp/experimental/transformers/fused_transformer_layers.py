@@ -71,9 +71,8 @@ if paddle.is_compiled_with_cuda():
             transpose_remove_padding,
             write_cache_kv,
         )
-        from .sageattention import (
-            sageattn_qk_int8_pv_fp8_cuda_dsk_sm90
-        )
+
+        from .sageattention import sageattn_qk_int8_pv_fp8_cuda_dsk_sm90
     except:
         pass
 
@@ -2984,38 +2983,42 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
 
         if kwargs["max_enc_len_this_time"]:  # prefill phase
             query, key, value = self.compute_qkv_linear(ln_out, i, latent_cache=latent_cache, **kwargs)
+            seq_len_q_slices = kwargs.get("cu_seqlens_q", None)
+            seq_len_k_slices = kwargs.get("cu_seqlens_k", None)
+            bsz = 1
+            if seq_len_q_slices is not None:
+                bsz = seq_len_q_slices.shape[0] - 1
 
-            if not use_sageattn:
-                fmha_out_prefill = paddle.nn.functional.flash_attention.flash_attn_unpadded(
-                    query,
-                    key,
-                    value,
-                    kwargs.get("cu_seqlens_q", None),
-                    kwargs.get("cu_seqlens_k", None),
-                    kwargs.get("max_enc_len_this_time", -1),
-                    kwargs.get("max_enc_len_this_time", -1),
-                    self.softmax_scale,
-                    causal=True,
-                    training=False,
-                )[0]
-            else:
+            if use_sageattn and bsz == 1:  # batch size == 1
                 query_192 = paddle.unsqueeze(query, axis=0)
                 key_192 = paddle.unsqueeze(key, axis=0)
 
                 value_128, _ = paddle.split(value, [128, 64], axis=-1)
                 value_128 = paddle.unsqueeze(value_128, axis=0)
 
-                tensor_layout = "NHD"
                 fmha_out_prefill = sageattn_qk_int8_pv_fp8_cuda_dsk_sm90(
                     query_192,
                     key_192,
                     value_128,
                     is_causal=True,
                     sm_scale=self.softmax_scale,
-                    tensor_layout=tensor_layout,
+                    tensor_layout="NHD",
                 )
                 fmha_out_prefill = paddle.nn.functional.pad(fmha_out_prefill, (0, 192 - 128))
                 fmha_out_prefill = paddle.squeeze(fmha_out_prefill, axis=0)
+            else:
+                fmha_out_prefill = paddle.nn.functional.flash_attention.flash_attn_unpadded(
+                    query,
+                    key,
+                    value,
+                    seq_len_q_slices,
+                    seq_len_k_slices,
+                    kwargs.get("max_enc_len_this_time", -1),
+                    kwargs.get("max_enc_len_this_time", -1),
+                    self.softmax_scale,
+                    causal=True,
+                    training=False,
+                )[0]
 
             fmha_out_prefill = fmha_out_prefill.reshape([-1, self.num_heads, self.config.mla_config.qk_head_dim])
             fmha_out_prefill = fmha_out_prefill[:, :, : self.config.mla_config.v_head_dim]
