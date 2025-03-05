@@ -44,10 +44,14 @@ from huggingface_hub import (
 from huggingface_hub.utils import EntryNotFoundError
 from paddle import Tensor
 from paddle.distributed.fleet.meta_parallel.parallel_layers import (
-    LocalSharedLayerDesc,
     PipelineLayer,
     SharedLayerDesc,
 )
+
+try:
+    from paddle.distributed.fleet.meta_parallel import LocalSharedLayerDesc
+except:
+    LocalSharedLayerDesc = None
 from paddle.nn import Embedding, Layer
 
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
