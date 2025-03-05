@@ -87,6 +87,7 @@ class LoraTest(LLMTest, unittest.TestCase):
         paddle.set_default_dtype("float32")
 
         lora_config = load_test_config(self.config_path, "rslora_plus", self.model_dir)
+        lora_config["deivce"] = "cpu"
         lora_config["output_dir"] = self.output_dir
         lora_config["dataset_name_or_path"] = self.data_dir
 

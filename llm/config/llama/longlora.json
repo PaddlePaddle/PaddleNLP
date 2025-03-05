@@ -33,6 +33,7 @@
     "unified_checkpoint": true,
     "pissa": false,
     "use_mora": false,
+    "autoregressive": true,
     "use_ssa": true,
     "ssa_group_size_ratio": 0.25,
     "use_long_sequence_strategies": true,
