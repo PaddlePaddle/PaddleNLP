@@ -124,7 +124,6 @@ def main(
     donw_and_filter_dataset(tokenizer_name, num_prompts, backend, dataset_path)
 
 if __name__ == "__main__":
-    # 使用 argparse 解析命令行参数
     parser = argparse.ArgumentParser(description="Download and filter ShareGPT dataset.")
     parser.add_argument(
         "--tokenizer_name",
