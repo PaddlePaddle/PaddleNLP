@@ -200,6 +200,8 @@ def main():
         model_config.fuse_attention_ffn = model_args.fuse_attention_ffn
 
     model_config.seq_length = data_args.max_length
+    orig_ctx_len = getattr(model_config, "max_position_embeddings", None)
+    model_args.rope_scaling_factor = data_args.max_length // orig_ctx_len
 
     # Config for model useing long sequence strategy
     if model_args.use_long_sequence_strategies:
