@@ -75,6 +75,14 @@ class AutoTrainingArguments(TrainingArguments):
             )
         },
     )
+    job_schedule_profiler_start: int = field(
+        default=-1,
+        metadata={"help": "The step to start job_schedule_profiler."},
+    )
+    job_schedule_profiler_end: int = field(
+        default=-1,
+        metadata={"help": "The step to end job_schedule_profiler."},
+    )
 
     def __post_init__(self):
         super().__post_init__()

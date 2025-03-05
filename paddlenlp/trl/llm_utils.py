@@ -16,6 +16,7 @@ from __future__ import annotations
 import glob
 import math
 import os
+import shutil
 import struct
 from typing import List, Optional
 
@@ -806,3 +807,28 @@ def get_eos_token_id(
 
     eos_token_ids_dict = {str(item): item for item in eos_token_ids}
     return list(eos_token_ids_dict.values())
+
+
+def set_triton_cache(model_name_or_path, mode):
+    """
+    Set triton cache.
+    """
+    valid_modes = {"export", "static", "dynamic"}
+    if mode not in valid_modes:
+        raise ValueError(f"Invalid mode: {mode}. Valid modes are: {valid_modes}")
+    mp_id = paddle.distributed.get_rank()
+    triton_dir = f"triton_ops_rank_{mp_id}"
+    triton_kernel_cache_dir = f"{model_name_or_path}/{triton_dir}"
+    if mode == "export":
+        os.environ["TRITON_KERNEL_CACHE_DIR"] = triton_kernel_cache_dir
+        if os.path.exists(triton_kernel_cache_dir):
+            # del old triton_ops
+            shutil.rmtree(triton_kernel_cache_dir)
+    elif mode == "static":
+        for root, dirs, files in os.walk(triton_kernel_cache_dir):
+            for file in files:
+                if file.endswith("_package.so"):
+                    so_full_path = os.path.join(root, file)
+                    paddle.utils.cpp_extension.load_op_meta_info_and_register_op(so_full_path)
+    else:
+        os.environ["TRITON_KERNEL_CACHE_DIR"] = f"/root/.paddlenlp/{triton_dir}"
