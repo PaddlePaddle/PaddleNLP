@@ -42,8 +42,12 @@ from paddlenlp.transformers import (
     CosineAnnealingWithWarmupDecay,
     LinearAnnealingWithWarmupDecay,
 )
-from paddlenlp.transformers.configuration_utils import LlmMetaConfig, llmmetaclass
-from paddlenlp.trl import ModelConfig
+from paddlenlp.transformers.configuration_utils import (
+    LlmMetaConfig,
+    llmmetaclass,
+    set_not_none_keys,
+)
+from paddlenlp.trl import ModelConfig, StructConfig
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.tools import get_env_device
@@ -302,13 +306,13 @@ class PretrainingTrainer(Trainer):
 
 
 def main():
-    parser = PdArgumentParser((ModelConfig, DataArguments, PreTrainingArguments))
+    parser = PdArgumentParser((ModelConfig, StructConfig, DataArguments, PreTrainingArguments))
     # Support format as "args.json --arg1 value1 --arg2 value2.”
     # In case of conflict, command line arguments take precedence.
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
-        model_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
+        model_args, struct_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
     else:
-        model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+        model_args, truct_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     if training_args.no_recompute_layers is not None:
         training_args.no_recompute_layers.sort()
@@ -359,8 +363,10 @@ def main():
     config = AutoConfig.from_pretrained(model_args.model_name_or_path)
     # set all llm config
     LlmMetaConfig.set_llm_config(config, training_args)
-    LlmMetaConfig.set_llm_config(config, model_args)
     config.use_fast_layer_norm = model_args.use_fast_layer_norm
+
+    if struct_args.restruct_model:
+        set_not_none_keys(config, struct_args)
 
     config.seq_length = data_args.max_seq_length
     # There are some technique extend RotaryEmbedding context. so don't change max_position_embeddings
