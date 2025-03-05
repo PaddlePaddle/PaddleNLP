@@ -22,7 +22,7 @@ from datetime import datetime
 from paddlenlp_ops import get_output, speculate_get_output
 from server.utils import datetime_diff, model_server_logger, monitor_logger
 
-from paddlenlp.utils.env import MAX_DRAFT_TOKENS, SPECULATE_MAX_BSZ
+from paddlenlp.utils.env import MAX_BSZ, MAX_DRAFT_TOKENS, SPECULATE_MAX_BSZ
 
 
 class TokenProcessor(object):
@@ -47,7 +47,7 @@ class TokenProcessor(object):
                 shape=[SPECULATE_MAX_BSZ * MAX_DRAFT_TOKENS + SPECULATE_MAX_BSZ + 2, 1], fill_value=2, dtype="int64"
             )
         else:
-            self.output_tokens = paddle.full(shape=[self.cfg.max_batch_size + 2, 1], fill_value=2, dtype="int64")
+            self.output_tokens = paddle.full(shape=[MAX_BSZ + 2, 1], fill_value=2, dtype="int64")
         self.worker = None
 
         self.record_time_interval = int(os.getenv("RECORD_TIME_INTERVAL", "600"))
