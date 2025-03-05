@@ -246,7 +246,7 @@ def download_model(url, output_dir, temp_tar):
         # Cleanup on failure
         if os.path.exists(temp_tar):
             os.remove(temp_tar)
-        raise Exception(f"Failed to get model from {url}, please recheck the model name from https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/static_models.md"")
+        raise Exception(f"Failed to get model from {url}, please recheck the model name from https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/static_models.md")
         exit(1)
     finally:
         # Cleanup temp file
