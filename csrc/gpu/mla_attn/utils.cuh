@@ -279,10 +279,10 @@ __global__ void merge_multi_chunks_kernel(const T * __restrict__ multi_out, // [
     if (seq_len_kv == 0) continue;
     seq_len_kv += seq_len_q;
     const int num_chunks_this_seq = cute::ceil_div(seq_len_kv, chunk_size);
-    // if (num_chunks_this_seq <= 1) {
-    //   // not need merge
-    //   continue;
-    // }
+    if (num_chunks_this_seq <= 1) {
+      // not need merge
+      continue;
+    }
 
     using LoadT = AlignedVector<T, vec_size>;
     LoadT load_vec;
