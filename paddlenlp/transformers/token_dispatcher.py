@@ -1,3 +1,19 @@
+# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2025, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2025 DeepSeek
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from abc import ABC, abstractmethod
 import paddle
 from paddle.distributed.communication.group import Group
@@ -278,4 +294,5 @@ class MoEFlexTokenDispatcher(MoETokenDispatcher):
         hidden_states = self._comm_manager.get_restored_hidden_states_by_experts(hidden_states)
         hidden_states = self._comm_manager.combine(hidden_states)
 
-        return hidden_states.view(self.hidden_shape), None
+        hidden_states = hidden_states.reshape(self.hidden_shape)
+        return hidden_states, None
