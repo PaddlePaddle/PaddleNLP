@@ -15,6 +15,7 @@
 import json
 import os
 from datetime import datetime
+import re
 
 from server.utils import model_server_logger, download_model
 from paddlenlp.experimental.transformers import SpeculateArgument
