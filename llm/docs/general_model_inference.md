@@ -9,7 +9,7 @@
 
 该方法仅支持[可一键跑通的模型列表](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/static_models.md)中的模型进行一键启动推理服务
 
-本节已 meta-llama/Meta-Llama-3-8B-Instruct bf16 推理为例子
+本节以 meta-llama/Meta-Llama-3-8B-Instruct bf16 推理为例子
 
 ```shell
 export MAX_SEQ_LEN=4096  # 以上模型支持MAX_SEQ_LEN=4096 其他模型可能会不同,可查看config.json 进行修改
