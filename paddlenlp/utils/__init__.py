@@ -22,6 +22,7 @@ from .import_utils import install_package, uninstall_package
 from .infohub import infohub
 from .initializer import to
 from .memory_utils import empty_device_cache
+from .optimizer import *
 from .serialization import load_torch
 
 # hack impl for EagerParamBase to function
