@@ -172,7 +172,6 @@ def main():
         assert (
             model_args.ssa_group_size_ratio is not None
         ), "ssa_group_size_ratio must be specified when use_ssa is True"
-        # set_group_size(training_args.ssa_group_size_ratio)
         replace_llama_attn(model_args.ssa_group_size_ratio)
 
     architectures_to_check = {"Qwen2Moe", "DeepseekV2", "DeepseekV3"}
