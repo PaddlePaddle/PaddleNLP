@@ -1033,7 +1033,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                         ffn1_scales.append(ffn1_weight_scale)
                         ffn2_scales.append(ffn2_weight_scale)
                     elif "fp8" in self.quant_type:
-                        if self.moe_quant_type == "weight_only_int4":
+                        if self.moe_quant_type in ["weight_only_int4", "weight_only_int8"]:
                             gate_proj_weight_quant = paddle.to_tensor(
                                 state_dict[
                                     f"{self.base_model_prefix}.layers.{idx}.mlp.experts.{expert_idx}.gate_proj.weight"
@@ -1164,7 +1164,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                     self.transformer_block.ffn1_weights[idx].set_value(fused_moe_ffn1_weight)
                     self.transformer_block.ffn2_weights[idx].set_value(fused_moe_ffn2_weight)
                 elif "fp8" in self.quant_type:
-                    if self.moe_quant_type == "weight_only_int4":
+                    if self.moe_quant_type in ["weight_only_int4", "weight_only_int8"]:
                         self.transformer_block.ffn1_weights[idx].set_value(fused_moe_ffn1_weight)
                         self.transformer_block.ffn2_weights[idx].set_value(fused_moe_ffn2_weight)
                     else:
@@ -1181,7 +1181,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                     self.transformer_block.ffn1_weights_scale[idx].set_value(fused_moe_ffn1_weight_scale)
                     self.transformer_block.ffn2_weights_scale[idx].set_value(fused_moe_ffn2_weight_scale)
                 elif "fp8" in self.quant_type:
-                    if self.moe_quant_type == "weight_only_int4":
+                    if self.moe_quant_type in ["weight_only_int4", "weight_only_int8"]:
                         self.transformer_block.ffn1_weights_scale[idx].set_value(fused_moe_ffn1_weight_scale)
                         self.transformer_block.ffn2_weights_scale[idx].set_value(fused_moe_ffn2_weight_scale)
                     else:

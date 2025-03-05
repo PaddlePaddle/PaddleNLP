@@ -4078,9 +4078,6 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
         self.weight_scale_dtype = "float32"
         self.weight_block_size = self.config.weight_block_size
 
-        if self.moe_quant_type == "weight_only_int4":
-            self.weight_dtype = "int4"
-
         self.qkv_weights_scale = []
         self.linear_weights_scale = []
         self.ffn1_weights_scale = []
@@ -4219,7 +4216,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
             ffn1_weight_scale_attr = self.get_attr(config.ffn1_weight_scale_attrs, i)
             ffn2_weight_scale_attr = self.get_attr(config.ffn2_weight_scale_attrs, i)
             if self.config.moe_config.use_moe(i):
-                if self.moe_quant_type == "weight_only_int4":
+                if self.moe_quant_type in ["weight_only_int4", "weight_only_int8"]:
                     ffn1_weight_scale = self.create_parameter(
                         shape=[self.config.moe_config.num_experts, self.config.moe_config.moe_intermediate_size * 2]
                         if config.activation.endswith("glu")
@@ -4244,7 +4241,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                 )
 
             if self.config.moe_config.use_moe(i):
-                if self.moe_quant_type == "weight_only_int4":
+                if self.moe_quant_type in ["weight_only_int4", "weight_only_int8"]:
                     ffn2_weight_scale = self.create_parameter(
                         shape=[self.config.moe_config.num_experts, self.embed_dim],
                         attr=ffn2_weight_scale_attr,
@@ -4407,7 +4404,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                 self.embed_dim,
                 self.config.moe_config.moe_intermediate_size,
             ]
-            if self.moe_quant_type == "weight_only_int4":
+            if self.moe_quant_type in ["weight_only_int4", "weight_only_int8"]:
                 self.moe_ffn1_weight_shape = (
                     [
                         self.config.moe_config.num_experts,
@@ -4426,12 +4423,13 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                     self.config.moe_config.moe_intermediate_size,
                     self.embed_dim,
                 ]
-                if config.moe_config.has_shared_expert():
-                    self.moe_ffn1_weight_shape[2] //= 2
-                    self.moe_ffn2_weight_shape[1] //= 2
-                else:
-                    self.moe_ffn1_weight_shape[2] //= 2
-                    self.moe_ffn2_weight_shape[2] //= 2
+                if config.moe_quant_type == "weight_only_int4":
+                    if config.moe_config.has_shared_expert():
+                        self.moe_ffn1_weight_shape[2] //= 2
+                        self.moe_ffn2_weight_shape[1] //= 2
+                    else:
+                        self.moe_ffn1_weight_shape[2] //= 2
+                        self.moe_ffn2_weight_shape[2] //= 2
 
         if self.config.moe_config.has_shared_expert():
             self.shared_expert_ffn1_weight_shape = [
@@ -4599,7 +4597,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
             ffn1_weight_attr = self.get_attr(self.config.ffn1_weight_attrs, i)
             ffn2_weight_attr = self.get_attr(self.config.ffn2_weight_attrs, i)
             if self.config.moe_config.use_moe(i):
-                if self.moe_quant_type == "weight_only_int4":
+                if self.moe_quant_type in ["weight_only_int4", "weight_only_int8"]:
                     ffn1_weight = self.create_parameter(
                         shape=self.moe_ffn1_weight_shape,
                         attr=ffn1_weight_attr,
@@ -5234,7 +5232,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
             # 应用各种策略后重塑的 scores
             scores = get_moe_scores(gate_out, self.config.moe_config)
 
-            if self.moe_quant_type == "weight_only_int4":
+            if self.moe_quant_type in ["weight_only_int4", "weight_only_int8"]:
                 from paddle.incubate.nn.functional import (
                     moe_dispatch,
                     moe_ffn,
@@ -5258,7 +5256,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                     self.ffn1_biases[i],
                     self.ffn1_weights_scale[i] if hasattr(self, "ffn1_weights_scale") else None,
                     self.ffn2_weights_scale[i] if hasattr(self, "ffn2_weights_scale") else None,
-                    "weight_only_int4",
+                    self.moe_quant_type,
                 )
 
                 fused_moe_out = moe_reduce(
