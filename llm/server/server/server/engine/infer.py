@@ -64,6 +64,8 @@ class ModelRunner:
             self.qk_nope_head_dim = int(self.model_cfg["qk_nope_head_dim"])
             self.qk_rope_head_dim = int(self.model_cfg["qk_rope_head_dim"])
             self.v_head_dim = int(self.model_cfg["v_head_dim"])
+            self.kv_lora_rank = int(self.model_cfg["kv_lora_rank"])
+            self.mla_use_absorb = bool(self.model_cfg["mla_use_matrix_absorption"])
 
         self.max_stop_seqs_num = int(os.getenv("MAX_STOP_SEQS_NUM", 5))
         self.stop_seqs_max_len = int(os.getenv("STOP_SEQS_MAX_LEN", 8))
@@ -198,21 +200,33 @@ class ModelRunner:
                 cache_type = "uint8"
 
             if "deepseek" in self.model_cfg["model_type"]:
-                self.cache_kvs["key_caches_{}".format(i)] = paddle.full(
-                    shape=[
-                        self.args.max_block_num,
-                        kv_num_head,
-                        self.args.block_size,
-                        self.qk_nope_head_dim + self.qk_rope_head_dim,
-                    ],
-                    fill_value=0,
-                    dtype=cache_type,
-                )
-                self.cache_kvs["value_caches_{}".format(i)] = paddle.full(
-                    shape=[self.args.max_block_num, kv_num_head, self.args.block_size, self.v_head_dim],
-                    fill_value=0,
-                    dtype=cache_type,
-                )
+                if self.mla_use_absorb:
+                    self.cache_kvs["key_caches_{}".format(i)] = paddle.full(
+                        shape=[
+                            self.args.max_block_num,
+                            1,
+                            self.args.block_size,
+                            self.kv_lora_rank + self.qk_rope_head_dim,
+                        ],
+                        fill_value=0,
+                        dtype=cache_type,
+                    )
+                else:
+                    self.cache_kvs["key_caches_{}".format(i)] = paddle.full(
+                        shape=[
+                            self.args.max_block_num,
+                            kv_num_head,
+                            self.args.block_size,
+                            self.qk_nope_head_dim + self.qk_rope_head_dim,
+                        ],
+                        fill_value=0,
+                        dtype=cache_type,
+                    )
+                    self.cache_kvs["value_caches_{}".format(i)] = paddle.full(
+                        shape=[self.args.max_block_num, kv_num_head, self.args.block_size, self.v_head_dim],
+                        fill_value=0,
+                        dtype=cache_type,
+                    )
             else:
                 self.cache_kvs["key_caches_{}".format(i)] = paddle.full(
                     shape=[
@@ -294,7 +308,7 @@ class ModelRunner:
         self.share_inputs["max_length"] = paddle.full(
             shape=[self.args.max_batch_size, 1], fill_value=self.max_length, dtype="int64"
         )
-        self.share_inputs["not_need_stop"] = paddle.full(shape=[1], fill_value=False, dtype="bool")
+        self.share_inputs["not_need_stop"] = paddle.full(shape=[1], fill_value=False, dtype="bool").cpu()
         self.share_inputs["stop_flags"] = paddle.full(
             shape=[self.args.max_batch_size, 1], fill_value=True, dtype="bool"
         )
@@ -368,7 +382,8 @@ class ModelRunner:
 
     def set_inputs(self):
         for i in range(self.args.num_layers):
-            self.share_inputs["value_caches_{}".format(i)] = self.cache_kvs["value_caches_{}".format(i)]
+            if not self.mla_use_absorb:
+                self.share_inputs["value_caches_{}".format(i)] = self.cache_kvs["value_caches_{}".format(i)]
             self.share_inputs["key_caches_{}".format(i)] = self.cache_kvs["key_caches_{}".format(i)]
 
         self.input_tensors = []

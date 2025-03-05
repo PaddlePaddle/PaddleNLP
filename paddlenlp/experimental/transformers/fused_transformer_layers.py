@@ -1260,61 +1260,42 @@ class FusedMultiTransformerBase(Layer):
         def get_moe_scores(
             gating_output: paddle.Tensor,
             config: MoeConfig,
-        ) -> tuple[paddle.Tensor, paddle.Tensor]:
-
-            num_token = gating_output.shape[0]
-            num_expert_group = config.num_expert_group
-            topk_group = config.topk_group
-
+        ) -> paddle.Tensor:
             # Compute softmax or sigmoid scores based on the topk_method
             if config.topk_method == "greedy":
                 scores = paddle.nn.functional.softmax(gating_output, axis=-1)
-                return scores, scores
+                return scores
             elif config.topk_method == "group_limited_greedy":
                 scores = paddle.nn.functional.softmax(gating_output, axis=-1)
-                scores_no_bias = scores
-                group_scores = scores.reshape([num_token, num_expert_group, -1]).max(axis=-1)  # [n, num_expert_group]
+                scores_with_bias = scores
             elif config.topk_method == "noaux_tc":
                 if e_score_correction_bias is None:
                     raise ValueError("e_score_correction_bias must be provided for 'noaux_tc' method.")
                 scores = paddle.nn.functional.sigmoid(gating_output)
-                # 原始 scores
-                scores_no_bias = scores
-                scores = scores + e_score_correction_bias.unsqueeze(0)
-                group_scores = (
-                    scores.reshape([num_token, num_expert_group, -1]).topk(2, axis=-1)[0].sum(axis=-1)
-                )  # [n, num_expert_group]
+                scores_with_bias = scores + e_score_correction_bias.unsqueeze(0)
             else:
                 raise ValueError(
                     f"Unsupported topk_method: {config.topk_method}. Please choose 'group_limited_greedy' or 'noaux_tc'."
                 )
+            from paddlenlp_ops import noaux_tc
 
-            # Identify top-k groups
-            group_idx = paddle.topk(group_scores, k=topk_group, axis=-1, sorted=False)[1]  # [n, topk_group]
-
-            group_mask = paddle.zeros_like(group_scores, dtype="int64")  # [n, num_expert_group]
-            group_mask = paddle.put_along_axis(group_mask, group_idx, 1, axis=1)
-
-            # Apply group mask to the scores
-            score_mask = (
-                group_mask.unsqueeze(-1)
-                .expand([num_token, num_expert_group, scores.shape[-1] // num_expert_group])
-                .reshape([num_token, -1])
-                .astype("float32")
-            )  # [n, e]
-
-            # Scale the scores with the mask and scaling factor
-            scores = scores * score_mask
-
-            # renormalize 和 refactor 在后面做
-            return scores, scores_no_bias
+            scores = noaux_tc(
+                scores,
+                scores_with_bias,
+                config.num_expert_group,
+                config.topk_group,
+                config.top_k,
+                config.routed_scaling_factor,
+            )
+            return scores
 
         if self.config.moe_config.topk_method is not None:
             from paddle.incubate.nn.functional import moe_dispatch, moe_ffn, moe_reduce
 
             gate_out = paddle.matmul(tmp_out.cast("float32"), self.gate_weights[i])
             # 应用各种策略后重塑的 scores
-            scores, scores_no_bias = get_moe_scores(gate_out, self.config.moe_config)
+            scores = get_moe_scores(gate_out, self.config.moe_config)
+
             # topk 在 moe_dispatch 中
             (
                 permute_input,
@@ -1335,18 +1316,14 @@ class FusedMultiTransformerBase(Layer):
                 self.quant_type if hasattr(self, "quant_type") else "None",
             )
 
-            if e_score_correction_bias is not None:
-                top_k_weights = scores_no_bias.take_along_axis(top_k_indices, axis=1)
-
-            # reduce 中会做 topk 个 weight 的 norm 和 routed_scaling_factor
             fused_moe_out = moe_reduce(
                 ffn_out,
                 top_k_weights,
                 permute_indices_per_token,
                 top_k_indices,
                 self.ffn2_biases[i],
-                norm_topk_prob=self.config.moe_config.norm_topk_prob,
-                routed_scaling_factor=self.config.moe_config.routed_scaling_factor,
+                norm_topk_prob=False,  # 在noaux_tc中做了
+                routed_scaling_factor=1.0,  # 在noaux_tc中做了
             )
         else:
             fused_moe_out = fused_moe(
@@ -1413,12 +1390,15 @@ class FusedMultiTransformerBase(Layer):
             seq_lens_decoder = kwargs.get("seq_lens_decoder", None)
             seq_lens_this_time = kwargs.get("seq_lens_this_time", None)
             position_ids_shape = paddle.sum(seq_lens_this_time)
-            self.position_ids = paddle.zeros(shape=position_ids_shape, dtype=seq_lens_encoder.dtype)
+            self.position_ids = paddle.empty(shape=position_ids_shape, dtype=seq_lens_encoder.dtype)
+            self.mask_encoder_batch = paddle.empty(shape=position_ids_shape, dtype=seq_lens_encoder.dtype).unsqueeze(1)
 
-            from paddlenlp_ops import get_position_ids
+            from paddlenlp_ops import get_position_ids_and_mask_encoder_batch
 
             # In-place operations that compute the position_ids.
-            get_position_ids(seq_lens_encoder, seq_lens_decoder, seq_lens_this_time, self.position_ids)
+            get_position_ids_and_mask_encoder_batch(
+                seq_lens_encoder, seq_lens_decoder, seq_lens_this_time, self.position_ids, self.mask_encoder_batch
+            )
 
     def post_process(self, **kwargs):
         time_step = kwargs.get("time_step", None)
@@ -1513,6 +1493,7 @@ class FusedMultiTransformerBase(Layer):
                 kwargs["decoder_batch_ids"],
                 kwargs["decoder_tile_ids_per_batch"],
                 kwargs["decoder_num_blocks"],
+                kwargs["decoder_num_blocks_cpu"],
                 kwargs["max_len_kv"],
             ) = get_block_shape_and_split_kv_block(
                 kwargs.get("seq_lens_encoder", None),
@@ -2998,6 +2979,8 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
             fmha_out_prefill = fmha_out_prefill[:, :, : self.config.mla_config.v_head_dim]
             fmha_out_prefill = fmha_out_prefill.reshape([-1, self.num_heads * self.config.mla_config.v_head_dim])
 
+            fmha_out_prefill = fmha_out_prefill * self.mask_encoder_batch.cast(fmha_out_prefill.dtype)
+
             out_linear_out_prefill = self.compute_out_linear(fmha_out_prefill, i)
             out_linear_out = out_linear_out + out_linear_out_prefill
 
@@ -3047,6 +3030,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 kwargs.get("block_tables", None),
                 "none",
                 kwargs.get("max_input_length", -1),
+                self.config.speculate_config.speculate_method is not None,  # speculate_decoder
             )
 
             q_input = paddle.concat([query_nope, query_pe], axis=-1)
@@ -3064,6 +3048,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 kwargs.get("seq_lens_encoder", None),
                 kwargs.get("seq_lens_decoder", None),
                 kwargs.get("seq_lens_this_time", None),
+                kwargs.get("cu_seqlens_q", None),
                 kwargs.get("padding_offsets", None),
                 kwargs.get("cum_offsets", None),
                 kwargs.get("block_tables", None),
@@ -3076,6 +3061,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 kwargs.get("decoder_batch_ids", None),
                 kwargs.get("decoder_tile_ids_per_batch", None),
                 kwargs.get("decoder_num_blocks", None),
+                kwargs.get("decoder_num_blocks_cpu", None),
                 kwargs.get("max_enc_len_this_time", None),
                 kwargs.get("max_dec_len_this_time", None),
                 kwargs.get("max_len_kv", None),
@@ -3150,7 +3136,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 kwargs.get("kv_num_blocks", None),
                 kwargs.get("decoder_batch_ids", None),
                 kwargs.get("decoder_tile_ids_per_batch", None),
-                kwargs.get("decoder_num_blocks", None),
+                kwargs.get("decoder_num_blocks_cpu", None),
                 kwargs.get("max_enc_len_this_time", None),
                 kwargs.get("max_dec_len_this_time", None),
                 kwargs.get("max_len_kv", None),
@@ -3326,6 +3312,8 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
             fmha_out_prefill = fmha_out_prefill[:, :, : self.config.mla_config.v_head_dim]
             fmha_out_prefill = fmha_out_prefill.reshape([-1, self.num_heads * self.config.mla_config.v_head_dim])
 
+            fmha_out_prefill = fmha_out_prefill * self.mask_encoder_batch.cast(fmha_out_prefill.dtype)
+
             out_linear_out_prefill = self.compute_out_linear(fmha_out_prefill, i)
             out_linear_out = out_linear_out + out_linear_out_prefill
 
@@ -3399,6 +3387,7 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
                 kwargs.get("block_tables", None),
                 "none",
                 kwargs.get("max_input_length", -1),
+                self.config.speculate_config.speculate_method is not None,  # speculate_decoder
             )
 
             q_input = paddle.concat([query_nope, query_pe], axis=-1)
@@ -3416,6 +3405,7 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
                 kwargs.get("seq_lens_encoder", None),
                 kwargs.get("seq_lens_decoder", None),
                 kwargs.get("seq_lens_this_time", None),
+                kwargs.get("cu_seqlens_q", None),
                 kwargs.get("padding_offsets", None),
                 kwargs.get("cum_offsets", None),
                 kwargs.get("block_tables", None),
@@ -3428,6 +3418,7 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
                 kwargs.get("decoder_batch_ids", None),
                 kwargs.get("decoder_tile_ids_per_batch", None),
                 kwargs.get("decoder_num_blocks", None),
+                kwargs.get("decoder_num_blocks_cpu", None),
                 kwargs.get("max_enc_len_this_time", None),
                 kwargs.get("max_dec_len_this_time", None),
                 kwargs.get("max_len_kv", None),
@@ -3525,7 +3516,7 @@ class FusedBlockMultiTransformerA8W8(FusedBlockMultiTransformer, FusedMultiTrans
                 kwargs.get("kv_num_blocks", None),
                 kwargs.get("decoder_batch_ids", None),
                 kwargs.get("decoder_tile_ids_per_batch", None),
-                kwargs.get("decoder_num_blocks", None),
+                kwargs.get("decoder_num_blocks_cpu", None),
                 kwargs.get("max_enc_len_this_time", None),
                 kwargs.get("max_dec_len_this_time", None),
                 kwargs.get("max_len_kv", None),
@@ -3883,7 +3874,7 @@ class FusedBlockMultiTransformerFP8(FusedBlockMultiTransformer):
                 kwargs.get("kv_num_blocks", None),
                 kwargs.get("decoder_batch_ids", None),
                 kwargs.get("decoder_tile_ids_per_batch", None),
-                kwargs.get("decoder_num_blocks", None),
+                kwargs.get("decoder_num_blocks_cpu", None),
                 kwargs.get("max_enc_len_this_time", None),
                 kwargs.get("max_dec_len_this_time", None),
                 kwargs.get("max_len_kv", None),

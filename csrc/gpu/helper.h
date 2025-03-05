@@ -37,9 +37,11 @@ namespace cub = hipcub;
 #include <iostream>
 #include <fstream>
 
+#include "env.h"
 #include "paddle/extension.h"
 #include "paddle/phi/core/dense_tensor.h"
 #include "paddle/phi/core/allocator.h"
+#include "paddle/phi/backends/gpu/gpu_info.h"
 #include "nlohmann/json.hpp"
 
 using json = nlohmann::json;
@@ -222,16 +224,8 @@ __device__ inline bool is_in_end(const int64_t id, const int64_t *end_ids, int l
     return flag;
 }
 
-inline uint32_t get_decoder_block_shape_q() {
-    static const char* decoder_block_shape_q_env = std::getenv("FLAGS_dec_block_shape_q");
-    static const uint32_t decoder_block_shape_q =
-            decoder_block_shape_q_env == nullptr ? 16 : std::stoi(std::string(decoder_block_shape_q_env));
-    return decoder_block_shape_q;
-}
-
-inline uint32_t get_encoder_block_shape_q() {
-    static const char* encoder_block_shape_q_env = std::getenv("FLAGS_enc_block_shape_q");
-    static const uint32_t encoder_block_shape_q =
-            encoder_block_shape_q_env == nullptr ? 64 : std::stoi(std::string(encoder_block_shape_q_env));
-    return encoder_block_shape_q;
+inline int GetSMVersion() {
+  static int sm_version = phi::backends::gpu::GetGPUComputeCapability(
+      phi::backends::gpu::GetCurrentDeviceId());
+  return sm_version;
 }
