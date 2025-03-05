@@ -4747,9 +4747,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
         if self.weight_block_size[0] == 0 and self.weight_block_size[1] == 0:
             x_q, x_s = self.per_tensor_quant_fp8(x)
         else:
-            from paddlenlp.ops.moe.fused_moe_triton.fused_moe import (
-                per_token_group_quant_fp8_api,
-            )
+            from paddlenlp.ops.triton_ops.fused_moe import per_token_group_quant_fp8_api
 
             x_q, x_s = per_token_group_quant_fp8_api(x, 128, True)
             # x_q, x_s = group_quant(
@@ -5269,7 +5267,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                     routed_scaling_factor=1.0,  # 在noaux_tc中做了
                 )
             else:
-                from paddlenlp.ops.moe.fused_moe_triton.fused_moe import fused_moe
+                from paddlenlp.ops.triton_ops.fused_moe import fused_moe
 
                 fused_moe_out = fused_moe(
                     tmp_out,
