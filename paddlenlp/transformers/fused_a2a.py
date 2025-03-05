@@ -50,6 +50,7 @@ def get_buffer(group: Group, hidden_bytes: int):
         num_nvl_bytes = max(
             config.get_nvl_buffer_size_hint(hidden_bytes, group.world_size), num_nvl_bytes
         )
+        # TODO(umiswing): support internode
         # num_rdma_bytes = max(
         #     config.get_rdma_buffer_size_hint(hidden_bytes, group.world_size), num_rdma_bytes
         # )
@@ -70,7 +71,7 @@ class FusedDispatch(PyLayer):
     """Fused dispatch operation for MoE routing combining computation and communication."""
 
     @staticmethod
-    def forward(ctx, x, token_indices, token_probs, num_experts, states, group, previous_event=None):
+    def forward(ctx, x, token_indices, token_probs, num_experts, group, previous_event=None):
         """Forward pass of fused dispatch."""
         # Calculate layout before actual dispatch
         buffer = get_buffer(group, get_hidden_bytes(x))
@@ -116,12 +117,12 @@ class FusedDispatch(PyLayer):
         ctx.event = event
         tokens_per_expert = paddle.to_tensor(num_recv_tokens_per_expert_list)
 
-        # states = dict()
+        states = dict()
         states['dispatched_indices'] = recv_token_indices
         states['tokens_per_expert'] = tokens_per_expert
         states['handle'] = handle
 
-        return recv_x, recv_token_probs
+        return recv_x, recv_token_probs, states
 
     @staticmethod
     def backward(
@@ -146,8 +147,9 @@ class FusedCombine(PyLayer):
     """Fused combine operation for MoE output combining computation and communication."""
 
     @staticmethod
-    def forward(ctx, x, group, handle, previous_event=None):
+    def forward(ctx, x, group, states, previous_event=None):
         """Forward pass of fused combine."""
+        handle = states['handle']
         buffer = get_buffer(group, get_hidden_bytes(x))
         combined_x, _, event = buffer.combine(
             x, handle=handle, async_finish=False, previous_event=None, allocate_on_comm_stream=False
@@ -156,7 +158,6 @@ class FusedCombine(PyLayer):
         ctx.group = group
         ctx.previous_event=previous_event
 
-        # return combined_x, event
         return combined_x
 
     @staticmethod
@@ -170,12 +171,12 @@ class FusedCombine(PyLayer):
             async_finish=False,
             allocate_on_comm_stream=False,
         )
-        return grad_x, (None, None, None, None, None, None)
+        return grad_x
 
 
 if HAVE_DEEP_EP:
 
-    def fused_dispatch(x, token_indices, token_probs, num_experts, group, previous_event=None):
+    def fused_dispatch(x, token_indices, token_probs, num_experts, group: Group, previous_event=None):
         """Perform fused dispatch operation if deep_ep is available.
 
         Args:
@@ -205,7 +206,9 @@ if HAVE_DEEP_EP:
         Returns:
             Result of FusedCombine
         """
-        return FusedCombine.apply(x, group, handle, previous_event)
+        states = dict()
+        states['handle'] = handle
+        return FusedCombine.apply(x, group, states, previous_event)
 
 else:
     fused_dispatch = None
