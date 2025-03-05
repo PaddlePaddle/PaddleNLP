@@ -143,6 +143,8 @@ CUTLASS_DEVICE void mma_f16(const Params& mainloop_params,
       // gather qk gemm res
       cute::copy(smem_tiled_copy_P, tPrP, tPsP);
       cute::copy(scale_o, tScalesScale);
+      // r2s fence wgmma
+      cutlass::arch::fence_view_async_shared();
       // make sure r2s all done
       cutlass::arch::NamedBarrier::sync(Ktraits::NUM_MMA_THREADS, static_cast<int>(NamedBarriers::kWarpSchedulerWG1));
 
@@ -342,6 +344,8 @@ CUTLASS_DEVICE void mma_f16_two_stages(const Params& mainloop_params,
     // gather qk gemm res
     cute::copy(smem_tiled_copy_P, tPrP, tPsP(_, _, _, smem_pipe_read_kv.index() % 2));
     cute::copy(scale_o, tScalesScale(_, smem_pipe_read_kv.index() % 2));
+    // r2s fence wgmma
+    cutlass::arch::fence_view_async_shared();
     cutlass::arch::NamedBarrier::sync(Ktraits::NUM_MMA_THREADS, static_cast<int>(NamedBarriers::kWarpSchedulerWG1));
 
     constexpr int n_masking_steps = CAUSAL ? cute::ceil_div(BLOCK_SHAPE_Q, BLOCK_SHAPE_KV) : 0;
@@ -399,6 +403,8 @@ CUTLASS_DEVICE void mma_f16_two_stages(const Params& mainloop_params,
       // gather qk gemm res
       cute::copy(smem_tiled_copy_P, tPrP, tPsP(_, _, _, smem_pipe_read_kv.index() % 2));
       cute::copy(scale_o, tScalesScale(_, smem_pipe_read_kv.index() % 2));
+      // r2s fence wgmma
+      cutlass::arch::fence_view_async_shared();
       // make sure tSrS r2s done
       cutlass::arch::NamedBarrier::sync(Ktraits::NUM_MMA_THREADS, static_cast<int>(NamedBarriers::kWarpSchedulerWG1));
       // wait last pv gemm

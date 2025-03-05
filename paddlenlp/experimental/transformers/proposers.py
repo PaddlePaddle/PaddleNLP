@@ -460,8 +460,8 @@ max_length({self.max_length}) > total_max_length({self.total_max_length})"
         """
         update draft model parameteds
         """
-        if kwargs.get("insert_step", 0):
-            self.actual_draft_token_num = 1
+        # if kwargs.get("insert_step", 0):
+        #     self.actual_draft_token_num = 1
 
         draft_model_preprocess(
             self.model_inputs["draft_tokens"],
@@ -500,8 +500,8 @@ max_length({self.max_length}) > total_max_length({self.total_max_length})"
             share_inputs["seq_lens_encoder"],
             share_inputs["stop_flags"],
         )
-        if kwargs.get("insert_step", 0):
-            self.actual_draft_token_num = 1
+        # if kwargs.get("insert_step", 0):
+        #     self.actual_draft_token_num = 1
 
     def postprocess(self):
         for i in range(self.max_batch_size):

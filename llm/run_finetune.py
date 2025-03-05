@@ -206,6 +206,7 @@ def main():
             if data_args.use_pose_convert
             else data_args.max_length
         )
+        data_args.scaled_max_length = int(data_args.max_length * model_args.rope_scaling_factor)
         model_config.use_long_sequence_strategies = True
         model_config.long_sequence_strategy_type = model_args.strategy_type
         model_config.long_sequence_strategy_name = model_args.strategy_name
