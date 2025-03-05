@@ -91,6 +91,6 @@ tritonserver --exit-timeout-secs 100 --cuda-memory-pool-byte-size 0:0 --cuda-mem
                  --allow-http false \
                  --grpc-port=${SERVICE_GRPC_PORT} \
                  --metrics-port=${METRICS_HTTP_PORT} \
-                 --log-file log/server.log --log-info true
+                 --log-file log/server.log --log-info true &
 
 echo "The logs for the model service, please check" ${PWD}"/log/server.log and "${PWD}"/log/workerlog.0"
