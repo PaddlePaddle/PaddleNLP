@@ -181,7 +181,7 @@ class PredictorArgument:
     )
     moe_quant_type: str = field(
         default="",
-        metadata={"help": "Quantization type of moe. Supported values: weight_only_int4"},
+        metadata={"help": "Quantization type of moe. Supported values: weight_only_int4, weight_only_int8"},
     )
 
     def __post_init__(self):
