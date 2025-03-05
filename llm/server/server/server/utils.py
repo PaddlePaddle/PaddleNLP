@@ -20,6 +20,10 @@ import pickle
 import re
 import subprocess
 import time
+import requests
+import tarfile
+import shutil
+from tqdm import tqdm
 from datetime import datetime
 from enum import Enum
 from logging.handlers import BaseRotatingHandler
@@ -232,7 +236,7 @@ def download_model(url, output_dir, temp_tar):
     try:
         temp_tar = os.path.join(output_dir, temp_tar)
         # Download the file
-        print(f"\nStarting download from: {url}")
+        model_server_logger.info(f"\nStarting download from: {url} {temp_tar}")
         download_file(url, temp_tar)
         # Extract the archive
         print("\nExtracting files...")
@@ -242,7 +246,7 @@ def download_model(url, output_dir, temp_tar):
         # Cleanup on failure
         if os.path.exists(temp_tar):
             os.remove(temp_tar)
-        raise Exception(f"Failed to get model from {url}, please recheck the model name from https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/inference.md")
+        raise Exception(f"Failed to get model from {url}, please recheck the model name from https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/static_models.md"")
         exit(1)
     finally:
         # Cleanup temp file

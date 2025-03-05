@@ -226,7 +226,7 @@ class Config:
         # Check if model_name matches any supported pattern
         if not any(re.match(pattern, model_name) for pattern in supported_patterns):
             raise ValueError(
-                f"{model_name} is not in the supported list. Currently supported models: Qwen, Llama, Mixtral, DeepSeek."
+                f"{model_name} is not in the supported list. Currently supported models: Qwen, Llama, Mixtral, DeepSeek. Please check the model name from this document https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/static_models.md"
             )
         model_server_logger.info(f"Start downloading model: {model_name}")
         tag=env.get("tag")
