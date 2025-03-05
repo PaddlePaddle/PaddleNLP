@@ -107,9 +107,7 @@ class _DeepepManager(_DispatchManager):
         self.handle = None
 
         if fused_dispatch is None:
-            raise ImportError(
-                "DeepEP is not installed. Please install DeepEP package from " "https://github.com/deepseek-ai/deepep."
-            )
+            raise ImportError("DeepEP is not supported in your paddlepaddle whl package.")
 
     def setup_metadata(self, routing_map: paddle.Tensor, probs: paddle.Tensor):
         num_tokens = routing_map.shape[0]
@@ -253,7 +251,7 @@ class MoEFlexTokenDispatcher(MoETokenDispatcher):
         super().__init__(ep_group)
 
         self.num_local_experts = num_local_experts
-        assert self.ep_size > 1, "Flex token dispatcher requires TPxEP > 1"
+        assert self.ep_size > 1, "Flex token dispatcher requires EP > 1"
         self._comm_manager = _DeepepManager(
             group=self.ep_group,
             router_topk=moe_router_topk,
