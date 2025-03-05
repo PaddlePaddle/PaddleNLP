@@ -118,3 +118,90 @@ mpirun python -m paddle.distributed.launch \
   --return_full_hidden_states 1 \
   --mla_use_matrix_absorption 1
 ```
+
+3.R1-FP8 Model 动态图 + MTP 动态图
+
+```shell
+export MODEL_TAG=deepseek-ai/DeepSeek-R1-FP8
+export DRAFT_MODEL_TAG=deepseek-ai/DeepSeek-R1-MTP-FP8
+export QUANT_MODE=a8w8_fp8
+export TOTAL_MAX_LENGTH=8192
+export MAX_DEC_LEN=2048
+# 算子加速策略
+export FLAGS_mla_use_tensorcore=1
+export FLAGS_cascade_attention_max_partition_size=${TOTAL_MAX_LENGTH}
+export CUDA_VISIBLE_DEVICES="0,1,2,3,4,5,6,7"
+mpirun python -m paddle.distributed.launch \
+  --gpus ${CUDA_VISIBLE_DEVICES} \
+  predictor.py \
+  --model_name_or_path ${MODEL_TAG} \
+  --dtype bfloat16 \
+  --mode dynamic \
+  --inference_model 1 \
+  --append_attn 1 \
+  --total_max_length ${TOTAL_MAX_LENGTH} \
+  --quant_type ${QUANT_MODE} \
+  --max_length ${MAX_DEC_LEN} \
+  --speculate_method mtp \
+  --draft_model_name_or_path ${DRAFT_MODEL_TAG} \
+  --speculate_max_draft_token_num 1 \
+  --speculate_max_ngram_size 3 \
+  --return_full_hidden_states 1 \
+  --mla_use_matrix_absorption 1
+```
+
+2.【**推荐**】R1 Model 静态图 + MTP 动态图
+
+R1 Model 静态图导出
+
+> 注：投机解码导出支持所有方法，因此这里 speculate_method 设为默认的 inference_with_reference 即可
+
+```shell
+export MODEL_TAG=deepseek-ai/DeepSeek-R1-FP8
+export OUTPUT_PATH=/path/to/exported_model
+export QUANT_MODE=a8w8_fp8
+export TOTAL_MAX_LENGTH=8192
+export CUDA_VISIBLE_DEVICES="0,1,2,3,4,5,6,7"
+mpirun python -m paddle.distributed.launch \
+  --gpus ${CUDA_VISIBLE_DEVICES} \
+  export_model.py \
+  --model_name_or_path ${MODEL_TAG} \
+  --output_path ${OUTPUT_PATH} \
+  --dtype bfloat16 \
+  --inference_model 1 \
+  --append_attn 1 \
+  --total_max_length ${TOTAL_MAX_LENGTH} \
+  --quant_type ${QUANT_MODE} \
+  --speculate_method inference_with_reference \
+  --return_full_hidden_states 1 \
+  --mla_use_matrix_absorption 1
+```
+
+推理脚本
+
+```shell
+export OUTPUT_PATH=/path/to/exported_model
+export DRAFT_MODEL_TAG=deepseek-ai/DeepSeek-R1-MTP-FP8
+export TOTAL_MAX_LENGTH=8192
+export MAX_DEC_LEN=2048
+export QUANT_MODE=a8w8_fp8
+export CUDA_VISIBLE_DEVICES="0,1,2,3,4,5,6,7"
+mpirun python -m paddle.distributed.launch \
+  --gpus ${CUDA_VISIBLE_DEVICES} \
+  predictor.py \
+  --model_name_or_path ${OUTPUT_PATH} \
+  --dtype bfloat16 \
+  --mode static \
+  --inference_model 1 \
+  --append_attn 1 \
+  --total_max_length ${TOTAL_MAX_LENGTH} \
+  --quant_type ${QUANT_MODE} \
+  --max_length 1024 \
+  --speculate_method mtp \
+  --draft_model_name_or_path ${DRAFT_MODEL_TAG} \
+  --draft_model_quant_type ${QUANT_MODE} \
+  --speculate_max_draft_token_num 1 \
+  --speculate_max_ngram_size 3 \
+  --return_full_hidden_states 1 \
+  --mla_use_matrix_absorption 1
+```
