@@ -114,7 +114,7 @@ PaddleNLP 提供了多种量化策略，支持 Weight Only INT8及 INT4推理，
 
 - `weightonly_group_size`: `weight_only`模式下，使用`group wise`量化方式，`group size`目前支持 为 `64` 和 `128`，默认值为`-1`表示`channel wise`模式。
 
-- `weight_block_size`: 权重量化粒度， 支持 DeepSeek-V3/R1 模型， 默认为[128 128]。
+- `weight_block_size`: FP8 权重量化粒度， 当前支持 DeepSeek-V3/R1 模型， 默认为[128 128]。
 
 - `moe_quant_type`: MoE 量化类型， 支持 DeepSeek-V3/R1-FP8 模型的 MoE 量化推理， 默认为空， 可选值`weight_only_int4`、`weight_only_int8`。
 
