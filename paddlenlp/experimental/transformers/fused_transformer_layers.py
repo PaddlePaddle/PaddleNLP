@@ -4078,11 +4078,6 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
         self.weight_scale_dtype = "float32"
         self.weight_block_size = self.config.weight_block_size
 
-        if self.moe_quant_type == "weight_only_int8":
-            self.weight_dtype = "int8"
-        elif self.moe_quant_type == "weight_only_int4":
-            self.weight_dtype = "int4"
-
         self.qkv_weights_scale = []
         self.linear_weights_scale = []
         self.ffn1_weights_scale = []
