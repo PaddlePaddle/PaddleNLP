@@ -77,13 +77,11 @@ class _DeepepManager(_DispatchManager):
         group: Group,
         router_topk: int,
         permute_fusion: bool = False,
-        capacity_factor: float = None,
         num_experts: int = None,
         num_local_experts: int = None,
     ):
         self.group = group
         self.router_topk = router_topk
-        self.capacity_factor = capacity_factor
         self.permute_fusion = permute_fusion
         self.num_experts = num_experts
         self.num_local_experts = num_local_experts
@@ -107,10 +105,6 @@ class _DeepepManager(_DispatchManager):
         probs = probs.reshape([num_tokens, self.num_experts])
         # Convert the format of routing map from multihot to indices.
         self.token_probs, self.token_indices = paddle.topk(probs, self.router_topk, axis=-1)
-        # Mask the indices of dropped tokens with -1
-        if self.capacity_factor is not None:
-            mask = self.token_probs == 0
-            self.token_indices = self.token_indices.masked_fill(mask, -1)
 
     def dispatch(self, hidden_states: paddle.Tensor) -> paddle.Tensor:
         # hidden_states, dispatched_indices, dispatched_probs, num_tokens_per_expert, handle = (
@@ -284,18 +278,16 @@ class MoEFlexTokenDispatcher(MoETokenDispatcher):
     """
 
     def __init__(
-        self, num_local_experts: int, local_expert_indices: List[int], moe_router_topk, moe_expert_capacity_factor, num_moe_experts
+        self, num_local_experts: int, moe_router_topk, num_moe_experts
     ):
         super().__init__()
 
         self.num_local_experts = num_local_experts
-        self.local_expert_indices = local_expert_indices
         assert self.tp_size * self.ep_size > 1, "Flex token dispatcher requires TPxEP > 1"
         self._comm_manager = _DeepepManager(
             group=self.tp_ep_group,
             router_topk=self.tp_size * moe_router_topk,
             permute_fusion=False,
-            capacity_factor=moe_expert_capacity_factor,
             num_experts=self.tp_size * num_moe_experts,
             num_local_experts=self.num_local_experts,
         )
