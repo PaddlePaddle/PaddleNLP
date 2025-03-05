@@ -14,8 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import paddle
 from typing import Optional
+
+import paddle
+
 
 def permute(
     tokens,
@@ -36,7 +38,7 @@ def permute(
         drop_and_pad (bool, optional): Whether or not the token dispatcher uses token-drop
                                        and pads the number of tokens to the expert capacity.
     """
-    assert drop_and_pad == False, "token-drop and pads is not supported"
+    assert not drop_and_pad, "token-drop and pads is not supported"
     num_tokens, hidden = tokens.shape
     num_experts = routing_map.shape[1]
 
@@ -44,9 +46,7 @@ def permute(
     routing_map = routing_map.cast(paddle.bool).T.contiguous()
 
     # Create a dense expert-to-token mapping from the sparse token-to-expert mapping
-    token_indices = (
-        paddle.arange(num_tokens).unsqueeze(0).expand([num_experts, -1])
-    )
+    token_indices = paddle.arange(num_tokens).unsqueeze(0).expand([num_experts, -1])
     sorted_indices = token_indices.masked_select(routing_map)
 
     # use the mapping to permute the tokens
@@ -80,7 +80,7 @@ def unpermute(
     Returns:
         paddle.Tensor: The tokens restored to their original order.
     """
-    assert drop_and_pad == False, "token-drop and pads is not supported"
+    assert not drop_and_pad, "token-drop and pads is not supported"
     _, hidden = restore_shape
 
     if probs is not None:
@@ -89,9 +89,13 @@ def unpermute(
         permuted_tokens = permuted_tokens * permuted_probs.unsqueeze(-1)
 
     # Create an output tensor filled with zeros
-    output_tokens = paddle.zeros(
-        restore_shape, dtype=permuted_tokens.dtype
-    )
+    output_tokens = paddle.zeros(restore_shape, dtype=permuted_tokens.dtype)
     # Scatter add the permuted_input back to the original positions
-    output_tokens.put_along_axis_(axis=0, indices=sorted_indices.unsqueeze(1).expand([-1, hidden]), values=permuted_tokens, reduce='add', include_self=True)
+    output_tokens.put_along_axis_(
+        axis=0,
+        indices=sorted_indices.unsqueeze(1).expand([-1, hidden]),
+        values=permuted_tokens,
+        reduce="add",
+        include_self=True,
+    )
     return output_tokens

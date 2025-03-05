@@ -22,8 +22,8 @@ except ImportError:
     HAVE_DEEP_EP = False
 
 import paddle
-from paddle.distributed.communication.group import Group
 from paddle.autograd import PyLayer
+from paddle.distributed.communication.group import Group
 
 _buffer = None
 
@@ -52,15 +52,12 @@ def get_buffer(group: Group, hidden_bytes: int):
     """
     global _buffer
     num_nvl_bytes, num_rdma_bytes = 0, 0
-    # TODO: hongqing
     for config in (
         deep_ep.Buffer.get_dispatch_config(group.world_size),
         deep_ep.Buffer.get_combine_config(group.world_size),
     ):
         # Split long line for PEP8 compliance
-        num_nvl_bytes = max(
-            config.get_nvl_buffer_size_hint(hidden_bytes, group.world_size), num_nvl_bytes
-        )
+        num_nvl_bytes = max(config.get_nvl_buffer_size_hint(hidden_bytes, group.world_size), num_nvl_bytes)
         # TODO(umiswing): support internode
         # num_rdma_bytes = max(
         #     config.get_rdma_buffer_size_hint(hidden_bytes, group.world_size), num_rdma_bytes
@@ -129,16 +126,14 @@ class FusedDispatch(PyLayer):
         tokens_per_expert = paddle.to_tensor(num_recv_tokens_per_expert_list)
 
         states = dict()
-        states['dispatched_indices'] = recv_token_indices
-        states['tokens_per_expert'] = tokens_per_expert
-        states['handle'] = handle
+        states["dispatched_indices"] = recv_token_indices
+        states["tokens_per_expert"] = tokens_per_expert
+        states["handle"] = handle
 
         return recv_x, recv_token_probs, states
 
     @staticmethod
-    def backward(
-        ctx, grad_output, grad_token_probs
-    ):
+    def backward(ctx, grad_output, grad_token_probs):
         """Backward pass of fused dispatch."""
         buffer = get_buffer(ctx.group, get_hidden_bytes(grad_output))
         handle = ctx.handle
@@ -160,14 +155,14 @@ class FusedCombine(PyLayer):
     @staticmethod
     def forward(ctx, x, group, states, previous_event=None):
         """Forward pass of fused combine."""
-        handle = states['handle']
+        handle = states["handle"]
         buffer = get_buffer(group, get_hidden_bytes(x))
         combined_x, _, event = buffer.combine(
             x, handle=handle, async_finish=False, previous_event=None, allocate_on_comm_stream=False
         )
         ctx.handle = handle
         ctx.group = group
-        ctx.previous_event=previous_event
+        ctx.previous_event = previous_event
 
         return combined_x
 
@@ -201,9 +196,7 @@ if HAVE_DEEP_EP:
         Returns:
             Result of FusedDispatch
         """
-        return FusedDispatch.apply(
-            x.contiguous(), token_indices, token_probs, num_experts, group, previous_event
-        )
+        return FusedDispatch.apply(x.contiguous(), token_indices, token_probs, num_experts, group, previous_event)
 
     def fused_combine(x, group, handle, previous_event=None):
         """Perform fused combine operation if deep_ep is available.
@@ -218,7 +211,7 @@ if HAVE_DEEP_EP:
             Result of FusedCombine
         """
         states = dict()
-        states['handle'] = handle
+        states["handle"] = handle
         return FusedCombine.apply(x, group, states, previous_event)
 
 else:

@@ -15,13 +15,13 @@
 # limitations under the License.
 
 from abc import ABC, abstractmethod
-import paddle
-from paddle.distributed.communication.group import Group
-import paddle.distributed.fleet as fleet
 from typing import Optional, Tuple
-import paddle.distributed as dist
-from fused_a2a import fused_dispatch, fused_combine
+
+import paddle
+from fused_a2a import fused_combine, fused_dispatch
 from moe_utils import permute, unpermute
+from paddle.distributed.communication.group import Group
+
 
 class _DispatchManager(ABC):
     """
@@ -108,8 +108,7 @@ class _DeepepManager(_DispatchManager):
 
         if fused_dispatch is None:
             raise ImportError(
-                "DeepEP is not installed. Please install DeepEP package from "
-                "https://github.com/deepseek-ai/deepep."
+                "DeepEP is not installed. Please install DeepEP package from " "https://github.com/deepseek-ai/deepep."
             )
 
     def setup_metadata(self, routing_map: paddle.Tensor, probs: paddle.Tensor):
@@ -121,14 +120,12 @@ class _DeepepManager(_DispatchManager):
         self.token_probs, self.token_indices = paddle.topk(probs, self.router_topk, axis=-1)
 
     def dispatch(self, hidden_states: paddle.Tensor) -> paddle.Tensor:
-        hidden_states, dispatched_probs, states = (
-            fused_dispatch(
-                hidden_states, self.token_indices, self.token_probs, self.num_experts, self.group
-            )
+        hidden_states, dispatched_probs, states = fused_dispatch(
+            hidden_states, self.token_indices, self.token_probs, self.num_experts, self.group
         )
-        self.handle = states['handle']
-        self.tokens_per_expert = states['tokens_per_expert']
-        self.dispatched_indices = states['dispatched_indices']
+        self.handle = states["handle"]
+        self.tokens_per_expert = states["tokens_per_expert"]
+        self.dispatched_indices = states["dispatched_indices"]
         self.dispatched_probs = dispatched_probs
 
         return hidden_states
@@ -147,19 +144,13 @@ class _DeepepManager(_DispatchManager):
                 - probs: Multihot probabilities.
         """
         batch_size = indices.shape[0]
-        multihot_routing_map = paddle.zeros(
-            (batch_size, self.num_local_experts), dtype=paddle.int64
-        )
+        multihot_routing_map = paddle.zeros((batch_size, self.num_local_experts), dtype=paddle.int64)
 
-        multihot_probs = paddle.zeros(
-            (batch_size, self.num_local_experts), dtype=paddle.float32
-        )
+        multihot_probs = paddle.zeros((batch_size, self.num_local_experts), dtype=paddle.float32)
 
         mask = indices != -1
         valid_indices = indices[mask]
-        row_indices = paddle.arange(batch_size).repeat_interleave(
-            mask.sum(axis=1)
-        )
+        row_indices = paddle.arange(batch_size).repeat_interleave(mask.sum(axis=1))
         multihot_routing_map[row_indices, valid_indices] = 1
         multihot_probs[row_indices, valid_indices] = probs[mask]
         return multihot_routing_map.cast(paddle.bool), multihot_probs
@@ -203,6 +194,7 @@ class _DeepepManager(_DispatchManager):
         )
         return hidden_states.to(input_dtype)
 
+
 class MoETokenDispatcher:
     """
     MoE Token Dispatcher
@@ -225,9 +217,7 @@ class MoETokenDispatcher:
         return self.ep_group.world_size
 
     @abstractmethod
-    def token_permutation(
-        self, tokens: paddle.Tensor, probs: paddle.Tensor, routing_map: paddle.Tensor
-    ):
+    def token_permutation(self, tokens: paddle.Tensor, probs: paddle.Tensor, routing_map: paddle.Tensor):
         """Dispatch tokens to experts.
 
         Args:
@@ -253,14 +243,13 @@ class MoETokenDispatcher:
         """
         raise NotImplementedError("Restore function not implemented.")
 
+
 class MoEFlexTokenDispatcher(MoETokenDispatcher):
     """
     Flexible token dispatcher for MoE models with Efficient-A2A communication kernels.
     """
 
-    def __init__(
-        self, num_local_experts: int, moe_router_topk: int, num_moe_experts: int, ep_group: Group
-    ):
+    def __init__(self, num_local_experts: int, moe_router_topk: int, num_moe_experts: int, ep_group: Group):
         super().__init__(ep_group)
 
         self.num_local_experts = num_local_experts
@@ -280,9 +269,7 @@ class MoEFlexTokenDispatcher(MoETokenDispatcher):
 
         self._comm_manager.setup_metadata(routing_map, probs)
         hidden_states = self._comm_manager.dispatch(hidden_states)
-        global_input_tokens = self._comm_manager.get_permuted_hidden_states_by_experts(
-            hidden_states
-        )
+        global_input_tokens = self._comm_manager.get_permuted_hidden_states_by_experts(hidden_states)
         tokens_per_expert = self._comm_manager.get_number_of_tokens_per_expert()
 
         return global_input_tokens, tokens_per_expert
