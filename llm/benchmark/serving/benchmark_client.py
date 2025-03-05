@@ -249,6 +249,42 @@ def sample_requests_inner(dataset_path: str, num_requests: int):
     print(f"Elapsed time for filtering: {round(time.perf_counter() - start_time, 2)} seconds")
     return que
 
+def save_results_to_file(stats: np.ndarray, output_file: str):
+    """Save the benchmark results to a file."""
+    results = {
+        "first_token_latency": {
+            "min": stats[:, 0].min(),
+            "max": stats[:, 0].max(),
+            "avg": stats[:, 0].mean(),
+        },
+        "total_token_latency": {
+            "min": stats[:, 1].min(),
+            "max": stats[:, 1].max(),
+            "avg": stats[:, 1].mean(),
+        },
+        "input_sequence_length": {
+            "min": stats[:, 2].min(),
+            "max": stats[:, 2].max(),
+            "avg": stats[:, 2].mean(),
+        },
+        "output_sequence_length": {
+            "min": stats[:, 3].min(),
+            "max": stats[:, 3].max(),
+            "avg": stats[:, 3].mean(),
+        },
+        "real_output_sequence_length": {
+            "min": stats[:, 4].min(),
+            "max": stats[:, 4].max(),
+            "avg": stats[:, 4].mean(),
+        },
+        "qps": len(stats) / (stats[:, 1].sum() / len(stats)),
+        "real_output_tokens_per_second": len(stats) / (stats[:, 1].sum() / len(stats)) * stats[:, 4].mean(),
+    }
+
+    with open(output_file, "w") as f:
+        json.dump(results, f, indent=4)
+    print(f"Results saved to {output_file}")
+
 
 def main(
     dataset_path: str = "./filtered_sharedgpt_short_3000.json",
@@ -263,6 +299,7 @@ def main(
     mode: str = "not_mtp",
     min_dec_len: int = 1,
     max_dec_len: int = 2048,
+    output_file: Optional[str] = None,
 ):
     api_url = f"http://{host}:{port}/generate_stream"
     if backend in ["vllm", "trtllm", "paddle"]:
@@ -333,6 +370,10 @@ def main(
     print(f"QPS: {len(all_stat) / elapsed_time:.2f}")
     print(f"Real Output Tokens/s: {len(all_stat) / elapsed_time * all_stat[:, 4].mean():.2f}")
 
+    # Save results to file if output_file is provided
+    if output_file:
+        save_results_to_file(all_stat, output_file)
+
     for p in procs:
         p.join()
 
@@ -351,6 +392,7 @@ if __name__ == "__main__":
     parser.add_argument("--mode", type=str, default="not_mtp", help="Mode of operation.")
     parser.add_argument("--min_dec_len", type=int, default=1, help="Minimum decoding length.")
     parser.add_argument("--max_dec_len", type=int, default=2048, help="Maximum decoding length.")
+    parser.add_argument("--output_file", type=str, default=None, help="Path to save the results file.")
 
     args = parser.parse_args()
     main(
@@ -366,4 +408,5 @@ if __name__ == "__main__":
         mode=args.mode,
         min_dec_len=args.min_dec_len,
         max_dec_len=args.max_dec_len,
+        output_file=args.output_file,
     )
