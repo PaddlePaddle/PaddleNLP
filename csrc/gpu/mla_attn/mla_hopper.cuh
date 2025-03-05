@@ -316,6 +316,7 @@ MLAWithKVCacheKernel(CUTE_GRID_CONSTANT
           tile_id,
           seq_len_decoder_now,
           mainloop_params.chunk_size,
+          mainloop_params.max_draft_token_num,
           mainloop_params.o_stride_bsz);
     }
   }
@@ -338,7 +339,7 @@ cudaError_t BatchMLAWithPagedKVCacheKernelTraitsDispatched(Params& params,
   typename CollectiveMainloop::Params mainloop_params = CollectiveMainloop::to_underlying_arguments({
       make_layout(make_shape(KernelTraits::BLOCK_SHAPE_Q, params.qk_head_dim), make_stride(params.qk_head_dim, _1{})), // layout q
       make_layout(make_shape(params.block_size, params.qk_head_dim, params.max_block_num), make_stride(params.qk_head_dim, _1{}, params.block_size * params.qk_head_dim)),
-      make_layout(make_shape(params.chunk_num, params.bsz * params.max_draft_token_num * params.q_num_head), make_stride(params.bsz * params.max_draft_token_num * params.q_num_head, _1{})),
+      make_layout(make_shape(params.chunk_num, params.bsz * params.q_num_head), make_stride(params.bsz * params.max_draft_token_num * params.q_num_head, _1{})),
       params.Q,
       params.KV,
       params.m,

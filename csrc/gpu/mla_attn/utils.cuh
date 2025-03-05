@@ -264,7 +264,7 @@ __global__ void merge_multi_chunks_kernel(const T * __restrict__ multi_out, // [
                                           const int head_dim,
                                           const int token_num,
                                           const int bsz,
-                                          const int max_draft_token_num=5) {
+                                          const int max_draft_token_num) {
   const int vid = threadIdx.x, ty = threadIdx.y;
   const int hid = blockIdx.y;
   __shared__ T smem[bdy * HEAD_DIM];
