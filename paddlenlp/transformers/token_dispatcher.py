@@ -192,18 +192,16 @@ class MoETokenDispatcher:
     MoE Token Dispatcher
     """
 
-    def __init__(self) -> None:
+    def __init__(self, ep_group) -> None:
         """
         Initialize the MoE Token Dispatcher.
         """
-        # self._ep_group = ep_group
+        self._ep_group = ep_group
 
     @property
     def ep_group(self):
         """Get expert model parallel group."""
-        hcg = fleet.get_hybrid_communicate_group()
-        ep_group = hcg.get_model_parallel_group()
-        return ep_group
+        return self._ep_group
 
     @property
     def ep_size(self):
@@ -245,9 +243,9 @@ class MoEFlexTokenDispatcher(MoETokenDispatcher):
     """
 
     def __init__(
-        self, num_local_experts: int, moe_router_topk: int, num_moe_experts: int
+        self, num_local_experts: int, moe_router_topk: int, num_moe_experts: int, ep_group: Group
     ):
-        super().__init__()
+        super().__init__(ep_group)
 
         self.num_local_experts = num_local_experts
         assert self.ep_size > 1, "Flex token dispatcher requires TPxEP > 1"
