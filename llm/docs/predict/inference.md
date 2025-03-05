@@ -114,6 +114,10 @@ PaddleNLP 提供了多种量化策略，支持 Weight Only INT8及 INT4推理，
 
 - `weightonly_group_size`: `weight_only`模式下，使用`group wise`量化方式，`group size`目前支持 为 `64` 和 `128`，默认值为`-1`表示`channel wise`模式。
 
+- `weight_block_size`: 权重量化粒度， 支持 DeepSeek-V3/R1 模型， 默认为[128 128]。
+
+- `moe_quant_type`: MoE 量化类型， 支持 DeepSeek-V3/R1-FP8 模型的 MoE 量化推理， 默认为空， 可选值`weight_only_int4`、`weight_only_int8`。
+
 ### 3.4 投机解码参数
 
 - `speculate_method`: 推理解码算法，默认值为`None`，可选的数值有`None`、`inference_with_reference`。为`None`时为正常自回归解码，为`inference_with_reference`时为基于上下文的投机解码[论文地址](https://arxiv.org/pdf/2304.04487)。
