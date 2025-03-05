@@ -35,8 +35,6 @@ try:
 except:
     flash_attention = None
 
-import paddle.distributed as dist
-
 from ...utils.log import logger
 from ..deepseek_v2.modeling_auto import (
     DeepseekV2LMHeadAuto,
@@ -185,26 +183,43 @@ class DeepseekV3ForCausalLMAuto(DeepseekV3PretrainedModelAuto):
         if prefix != "":
             assert prefix.endswith(".")
         config = {
-            "dp_config": {"sharding_level": 1, "offload": False, "exclude_layer": None},
-            "mp_config": {
-                "parallelize_plan": {
-                    f"{prefix}deepseek_v3.embed_tokens": dist.ColWiseParallel(gather_output=True),
-                    f"{prefix}deepseek_v3.layers.*.self_attn.q_b_proj": dist.ColWiseParallel(),
-                    f"{prefix}deepseek_v3.layers.*.self_attn.q_proj": dist.ColWiseParallel(),
-                    f"{prefix}deepseek_v3.layers.*.self_attn.kv_b_proj": dist.ColWiseParallel(),
-                    f"{prefix}deepseek_v3.layers.*.self_attn.o_proj": dist.RowWiseParallel(),
-                    f"{prefix}deepseek_v3.layers.*.mlp.gate_proj": dist.ColWiseParallel(),
-                    f"{prefix}deepseek_v3.layers.*.mlp.up_proj": dist.ColWiseParallel(),
-                    f"{prefix}deepseek_v3.layers.*.mlp.down_proj": dist.RowWiseParallel(),
-                    f"{prefix}deepseek_v3.layers.*.mlp.shared_experts.gate_proj": dist.ColWiseParallel(),
-                    f"{prefix}deepseek_v3.layers.*.mlp.shared_experts.up_proj": dist.ColWiseParallel(),
-                    f"{prefix}deepseek_v3.layers.*.mlp.shared_experts.down_proj": dist.RowWiseParallel(),
-                    f"{prefix}lm_head.weight": dist.ColWiseParallel(),
-                }
-            },
-            "pp_config": {
-                "split_spec": [f"{prefix}deepseek_v3.layers", f"{prefix}lm_head"],
-                "global_spec": "deepseek_v3.global_layer",
-            },
+            "dp_config": {"sharding_level": 0, "offload": False, "exclude_layer": None},
+            # "sp_config": {
+            #     "parallelize_plan": {
+            #         f"{prefix}deepseek_v3.embed_tokens": [
+            #             dist.ColWiseParallel(),
+            #             dist.SequenceParallelBegin(),
+            #         ],
+            #         f"{prefix}deepseek_v3.layers.*.self_attn.q_b_proj": dist.ColWiseParallel(),
+            #         f"{prefix}deepseek_v3.layers.*.self_attn.q_proj": dist.ColWiseParallel(),
+            #         f"{prefix}deepseek_v3.layers.*.self_attn.kv_b_proj": dist.ColWiseParallel(),
+            #         f"{prefix}deepseek_v3.layers.*.self_attn.o_proj": dist.RowWiseParallel(),
+            #         f"{prefix}deepseek_v3.layers.*.self_attn": dist.SequenceParallelDisable(),
+            #         f"{prefix}deepseek_v3.layers.*.mlp.gate_proj": dist.ColWiseParallel(),
+            #         f"{prefix}deepseek_v3.layers.*.mlp.up_proj": dist.ColWiseParallel(),
+            #         f"{prefix}deepseek_v3.layers.*.mlp.down_proj": dist.RowWiseParallel(),
+            #         f"{prefix}deepseek_v3.layers.*.mlp.shared_experts.gate_proj": dist.ColWiseParallel(),
+            #         f"{prefix}deepseek_v3.layers.*.mlp.shared_experts.up_proj": dist.ColWiseParallel(),
+            #         f"{prefix}deepseek_v3.layers.*.mlp.shared_experts.down_proj": dist.RowWiseParallel(),
+            #         f"{prefix}lm_head.weight": dist.ColWiseParallel(),
+            #         f"{prefix}lm_head": dist.SequenceParallelEnd(),
+            #     }
+            # },
+            # "mp_config": {
+            #     "parallelize_plan": {
+            #         f"{prefix}deepseek_v3.embed_tokens": dist.ColWiseParallel(gather_output=True),
+            #         f"{prefix}deepseek_v3.layers.*.self_attn.q_b_proj": dist.ColWiseParallel(),
+            #         f"{prefix}deepseek_v3.layers.*.self_attn.q_proj": dist.ColWiseParallel(),
+            #         f"{prefix}deepseek_v3.layers.*.self_attn.kv_b_proj": dist.ColWiseParallel(),
+            #         f"{prefix}deepseek_v3.layers.*.self_attn.o_proj": dist.RowWiseParallel(),
+            #         f"{prefix}deepseek_v3.layers.*.mlp.gate_proj": dist.ColWiseParallel(),
+            #         f"{prefix}deepseek_v3.layers.*.mlp.up_proj": dist.ColWiseParallel(),
+            #         f"{prefix}deepseek_v3.layers.*.mlp.down_proj": dist.RowWiseParallel(),
+            #         f"{prefix}deepseek_v3.layers.*.mlp.shared_experts.gate_proj": dist.ColWiseParallel(),
+            #         f"{prefix}deepseek_v3.layers.*.mlp.shared_experts.up_proj": dist.ColWiseParallel(),
+            #         f"{prefix}deepseek_v3.layers.*.mlp.shared_experts.down_proj": dist.RowWiseParallel(),
+            #         f"{prefix}lm_head.weight": dist.ColWiseParallel(),
+            #     }
+            # },
         }
         return config

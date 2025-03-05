@@ -33,6 +33,15 @@ from paddlenlp.utils.tools import get_env_device
 Linear = nn.Linear
 ColumnParallelLinear = mpu.ColumnParallelLinear
 RowParallelLinear = mpu.RowParallelLinear
+
+__all__ = [
+    "Linear",
+    "ColumnParallelLinear",
+    "RowParallelLinear",
+    "ColumnSequenceParallelLinear",
+    "RowSequenceParallelLinear",
+]
+
 try:
     ColumnSequenceParallelLinear = sequence_parallel_utils.ColumnSequenceParallelLinear
     RowSequenceParallelLinear = sequence_parallel_utils.RowSequenceParallelLinear

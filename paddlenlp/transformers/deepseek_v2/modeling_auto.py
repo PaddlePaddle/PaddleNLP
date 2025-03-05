@@ -25,10 +25,13 @@ import warnings
 from typing import List, Optional, Tuple, Union
 
 import paddle
+import paddle.distributed as dist
 import paddle.nn.functional as F
 from paddle import Tensor, nn
 from paddle.distributed.fleet.utils import recompute
 from paddle.nn import Linear
+
+from ..auto_utils import get_mesh
 
 try:
     from paddle.incubate.nn.functional import fused_rotary_position_embedding
@@ -40,8 +43,6 @@ try:
 except:
     flash_attention = None
 
-import paddle.distributed as dist
-
 from ...utils.log import logger
 from ...utils.tools import get_env_device
 from ..activations import ACT2FN
@@ -49,17 +50,16 @@ from ..llama import fusion_ops
 from ..llama.modeling import get_use_casual_mask
 from ..model_outputs import BaseModelOutputWithPast, CausalLMOutputWithPast
 from ..model_utils import PretrainedModel, register_base_model
-from ..moe_layer import MoELayer
+from ..moe_gate_auto import PretrainedMoEGate
+from ..moe_layer_auto import MoELayer
 from .configuration import DeepseekV2Config
 from .modeling import (
-    AddAuxiliaryLoss,
     DeepseekV2DynamicNTKScalingRotaryEmbedding,
     DeepseekV2LinearScalingRotaryEmbedding,
     DeepseekV2PretrainingCriterion,
     DeepseekV2RMSNorm,
     DeepseekV2RotaryEmbedding,
     DeepseekV2YarnRotaryEmbedding,
-    MoEGate,
     _expand_2d_mask,
     _make_causal_mask,
     apply_rotary_pos_emb,
@@ -124,7 +124,12 @@ def scaled_dot_product_attention(
             outputs = outputs.reshape([bsz, q_len, v_num_heads, head_dim])
             outputs = outputs[..., :v_head_dim]
             outputs = outputs.reshape([bsz, q_len, -1])
-        return outputs
+
+        if sequence_parallel:
+            attn_output = outputs.reshape([bsz * q_len, v_head_dim * num_heads])
+        else:
+            attn_output = outputs.reshape([bsz, q_len, v_head_dim * num_heads])
+        return attn_output
 
     else:
         #  [ bz, seqlen, nhead, head_dim] -> [bs, nhead, seq_len, head_dim]
@@ -169,8 +174,74 @@ def scaled_dot_product_attention(
         return (attn_output, attn_weights) if output_attentions else attn_output
 
 
+class MoEGate(PretrainedMoEGate):
+    def __init__(self, config, num_experts, expert_hidden_size, **kwargs):
+        super().__init__(config, num_experts, expert_hidden_size, **kwargs)
+        # [hidden_size, n_expert]
+
+        self.scoring_func = config.scoring_func
+        self.topk_method = config.topk_method
+
+        self.weight = paddle.create_parameter(
+            shape=[expert_hidden_size, num_experts],
+            dtype=paddle.get_default_dtype(),
+            is_bias=False,
+            default_initializer=nn.initializer.Constant(1.0),
+        )
+
+        if config.topk_method == "noaux_tc":
+            self.e_score_correction_bias = paddle.create_parameter(
+                shape=[num_experts],
+                dtype=paddle.get_default_dtype(),
+                default_initializer=nn.initializer.Constant(0.0),
+            )
+
+    def forward(self, hidden_states):
+        """
+        Args:
+            hidden_states (_type_): [batch_size * seq_len, hidden_size]
+        """
+        _, h_dim = hidden_states.shape
+
+        # compute gating score
+        logits = F.linear(hidden_states, self.weight, None)
+
+        with paddle.amp.auto_cast(False):
+            scores = self.gate_score_func(logits=logits)
+            scores = scores.cast(paddle.get_default_dtype())
+
+        capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss = self.topkgating(scores)
+
+        return capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss
+
+
+class AddAuxiliaryLoss(paddle.autograd.PyLayer):
+    """
+    The trick function of adding auxiliary (aux) loss,
+    which includes the gradient of the aux loss during backpropagation.
+    """
+
+    @staticmethod
+    def forward(ctx, x, loss):
+        assert paddle.numel(loss) == 1
+        ctx.dtype = loss.dtype
+        ctx.required_aux_loss = not loss.stop_gradient
+        return x
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        grad_loss = None
+        if ctx.required_aux_loss:
+            # grad_loss = paddle.ones(1, dtype=ctx.dtype)
+            grad_loss = paddle.to_tensor(1, dtype=ctx.dtype)
+            grad_loss = dist.auto_parallel.api.dtensor_from_local(grad_loss, get_mesh(), [dist.Replicate()])
+            # if paddle.in_dynamic_mode():
+            #     grad_loss = dist.shard_tensor(grad_loss, get_mesh(), [dist.Partial(dist.ReduceType.kRedAvg)])
+        return grad_output, grad_loss
+
+
 class DeepseekV2MLPAuto(nn.Layer):
-    def __init__(self, config: DeepseekV2Config, hidden_size=None, intermediate_size=None):
+    def __init__(self, config: DeepseekV2Config, hidden_size=None, intermediate_size=None, is_moe=False):
         super().__init__()
         self.config = config
         self.hidden_size = config.hidden_size if hidden_size is None else hidden_size
@@ -181,6 +252,22 @@ class DeepseekV2MLPAuto(nn.Layer):
         self.down_proj = Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
 
         self.act_fn = ACT2FN[config.hidden_act]
+
+    def redistribute_expert(self, mesh, placements):
+        """
+        Place the experts on different devices.
+        """
+        self.gate_proj.weight = dist.shard_tensor(self.gate_proj.weight, mesh, placements)
+        if self.gate_proj.bias is not None:
+            self.gate_proj.bias = dist.shard_tensor(self.gate_proj.bias, mesh, placements)
+
+        self.up_proj.weight = dist.shard_tensor(self.up_proj.weight, mesh, placements)
+        if self.up_proj.bias is not None:
+            self.up_proj.bias = dist.shard_tensor(self.up_proj.bias, mesh, placements)
+
+        self.down_proj.weight = dist.shard_tensor(self.down_proj.weight, mesh, placements)
+        if self.down_proj.bias is not None:
+            self.down_proj.bias = dist.shard_tensor(self.down_proj.bias, mesh, placements)
 
     def forward(self, x):
         down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
@@ -217,7 +304,7 @@ class DeepseekV2MoEAuto(MoELayer):
         self.alpha = config.aux_loss_alpha
         if config.n_shared_experts is not None:
             intermediate_size = config.moe_intermediate_size * config.n_shared_experts
-            self.shared_experts = DeepseekV2MLPAuto(config=config, intermediate_size=intermediate_size)
+            self.shared_experts = DeepseekV2MLPAuto(config=config, intermediate_size=intermediate_size, is_moe=True)
 
     def forward(self, hidden_states):
         final_hidden_states, l_aux, l_zloss = super().forward(hidden_states)
@@ -527,7 +614,7 @@ class DeepseekV2DecoderLayerAuto(nn.Layer):
             )
         else:
             hidden_states, self_attn_weights, present_key_value = self.self_attn(
-                hidden_states=hidden_states,
+                hidden_states,
                 position_ids=position_ids,
                 attention_mask=attention_mask,
                 output_attentions=output_attentions,
@@ -1124,20 +1211,15 @@ class DeepseekV2ForCausalLMAuto(DeepseekV2PretrainedModelAuto):
         if prefix != "":
             assert prefix.endswith(".")
         config = {
-            "dp_config": {"sharding_level": 1, "offload": False, "exclude_layer": None},
             "mp_config": {
                 "parallelize_plan": {
                     f"{prefix}deepseek_v2.embed_tokens": dist.ColWiseParallel(gather_output=True),
-                    f"{prefix}deepseek_v2.layers.*.self_attn.q_b_proj": dist.ColWiseParallel(),
                     f"{prefix}deepseek_v2.layers.*.self_attn.q_proj": dist.ColWiseParallel(),
                     f"{prefix}deepseek_v2.layers.*.self_attn.kv_b_proj": dist.ColWiseParallel(),
                     f"{prefix}deepseek_v2.layers.*.self_attn.o_proj": dist.RowWiseParallel(),
                     f"{prefix}deepseek_v2.layers.*.mlp.gate_proj": dist.ColWiseParallel(),
                     f"{prefix}deepseek_v2.layers.*.mlp.up_proj": dist.ColWiseParallel(),
                     f"{prefix}deepseek_v2.layers.*.mlp.down_proj": dist.RowWiseParallel(),
-                    f"{prefix}deepseek_v2.layers.*.mlp.shared_experts.gate_proj": dist.ColWiseParallel(),
-                    f"{prefix}deepseek_v2.layers.*.mlp.shared_experts.up_proj": dist.ColWiseParallel(),
-                    f"{prefix}deepseek_v2.layers.*.mlp.shared_experts.down_proj": dist.RowWiseParallel(),
                     f"{prefix}lm_head.weight": dist.ColWiseParallel(),
                 }
             },

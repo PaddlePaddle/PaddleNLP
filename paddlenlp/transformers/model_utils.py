@@ -388,7 +388,7 @@ def _load_part_state_dict(
                 weight = py_safe_slice_[:]
             if device == "expected":
                 with device_guard():
-                    weight = paddle.Tensor(weight, zero_copy=True)
+                    weight = paddle.Tensor.__call__(weight, zero_copy=True)
                 weight = weight._copy_to(paddle.framework._current_expected_place(), False)
             part_state_dict[key] = weight
         for key in keys:
@@ -399,7 +399,7 @@ def _load_part_state_dict(
             ):
                 scale = f.get_tensor(key)
                 with device_guard():
-                    scale = paddle.Tensor(scale, zero_copy=True)
+                    scale = paddle.Tensor.__call__(scale, zero_copy=True)
                 scale = scale._copy_to(paddle.framework._current_expected_place(), False)
                 scale_dict[key] = scale
     return part_state_dict, scale_dict
@@ -471,7 +471,7 @@ def load_state_dict(
             if device == "cpu":
                 for k in list(state_dict.keys()):
                     with device_guard():
-                        state_dict[k] = paddle.Tensor(state_dict.pop(k), zero_copy=True)
+                        state_dict[k] = paddle.Tensor.__call__(state_dict.pop(k), zero_copy=True)
 
             if len(scale_dict) != 0:
                 if ckpt_quant_stage == "O0":
@@ -1902,6 +1902,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         dtype=None,
         keep_in_fp32_modules=None,
         quantization_linear_list=None,
+        sharded_metadata=None,
     ) -> Tuple[List[str]]:
         """load the state_dict into model, and do the following things:
 
@@ -1983,6 +1984,23 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         missing_keys = list(set(expected_keys) - set(loaded_keys))
         unexpected_keys = list(set(loaded_keys) - set(expected_keys))
+
+        # Optimize for skip unused shard files for supper large model
+        if sharded_metadata is not None:
+            assert isinstance(resolved_archive_file, list)
+            new_archive_file = []
+            skip_archive_file = []
+            expected_keys_set = set(expected_keys)
+            for file in resolved_archive_file:
+                filename = os.path.split(file)[-1]
+                if not expected_keys_set.isdisjoint(set(sharded_metadata["file_map"][filename])):
+                    new_archive_file.append(file)
+                else:
+                    skip_archive_file.append(filename)
+
+            resolved_archive_file = new_archive_file
+            if len(skip_archive_file) > 0:
+                logger.info(f"Skip load files for not contrains expected key, {skip_archive_file}")
 
         # Some models may have keys that are not in the state by design, removing them before needlessly warning
         # the user.
@@ -2496,7 +2514,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             for k in list(state_dict.keys()):
                 if not isinstance(state_dict[k], paddle.Tensor):
                     with device_guard():
-                        state_dict[k] = paddle.Tensor(state_dict.pop(k), zero_copy=True)
+                        state_dict[k] = paddle.Tensor.__call__(state_dict.pop(k), zero_copy=True)
         else:
             if is_sharded:
                 loaded_state_dict_keys = sharded_metadata["all_checkpoint_keys"]
@@ -2511,7 +2529,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             for k in list(state_dict.keys()):
                 if not isinstance(state_dict[k], paddle.Tensor):
                     with device_guard():
-                        state_dict[k] = paddle.Tensor(state_dict.pop(k), zero_copy=True)
+                        state_dict[k] = paddle.Tensor.__call__(state_dict.pop(k), zero_copy=True)
         # 3. init the model
         init_args = config["init_args"] or ()
         with ContextManagers(init_contexts):
@@ -2548,6 +2566,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             dtype=dtype,
             keep_in_fp32_modules=keep_in_fp32_modules,
             quantization_linear_list=quantization_linear_list,
+            sharded_metadata=sharded_metadata if is_sharded else None,
         )
 
         # load generation_config.json
@@ -3036,7 +3055,7 @@ def load_sharded_checkpoint_as_one(folder, variant=None, return_numpy=False):
         if not return_numpy:
             for key in list(state_dict.keys()):
                 if isinstance(state_dict[key], np.ndarray):
-                    state_dict[key] = paddle.Tensor(state_dict.pop(key), zero_copy=True)
+                    state_dict[key] = paddle.Tensor.__call__(state_dict.pop(key), zero_copy=True)
         return state_dict
 
     index_file = os.path.join(folder, _add_variant(PADDLE_WEIGHTS_INDEX_NAME, variant))
@@ -3079,7 +3098,7 @@ def load_sharded_checkpoint_as_one(folder, variant=None, return_numpy=False):
     if not return_numpy:
         for key in list(ret.keys()):
             if isinstance(ret[key], np.ndarray):
-                ret[key] = paddle.Tensor(ret.pop(key), zero_copy=True)
+                ret[key] = paddle.Tensor.__call__(ret.pop(key), zero_copy=True)
 
     return ret
 
