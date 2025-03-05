@@ -208,6 +208,48 @@ class Config:
                 f.write("{:<20}:{:<6}{}\n".format(k, "", v))
             f.close()
 
+
+    def _get_download_model(self):
+        env = os.environ
+        model_name=env.get("model_name")
+        if not model_name:
+            raise Exception(f"Model Dir is empty")
+        # Define supported model patterns
+        supported_patterns = [
+            r".+Qwen.+", 
+            r".+Llama.+",
+            r".+Mixtral.+", 
+            r".+DeepSeek.+",
+        ]
+        
+        # Check if model_name matches any supported pattern
+        if not any(re.match(pattern, model_name) for pattern in supported_patterns):
+            raise ValueError(
+                f"{model_name} is not in the supported list. Currently supported models: Qwen, Llama, Mixtral, DeepSeek."
+            )
+        model_server_logger.info(f"Start downloading model: {model_name}")
+        tag=env.get("tag")
+        base_url=f"https://paddlenlp.bj.bcebos.com/models/static/{tag}/{model_name}"
+        if self.nnode == 1:
+            # single node model
+            temp_tar = "model.tar"
+        elif env.get("POD_0_IP", "127.0.0.1") == self.host_ip:
+            # Master node model
+            temp_tar = "node1.tar"
+        else:
+            temp_tar = "node2.tar"
+        model_url = base_url+f"/{temp_tar}"
+        download_model(model_url, self.model_dir, temp_tar)
+
+        speculate_path = env.get("SPECULATE_MODEL_PATH")
+        if speculate_path:
+            speculate_url = base_url+"/mtp.tar"
+            os.makedirs(speculate_path, exists=True)
+            model_server_logger.info(f"Start Downloading MTP model, save path : {speculate_path}")
+            download_model(model_url, speculate_path, "mtp.tar")
+
+
+
     def get_model_config(self):
         """
         load config file
@@ -220,24 +262,9 @@ class Config:
             model_config_json = json.load(open(self.model_config_path, "r", encoding="utf-8"))
         except:
             try:
-                env = os.environ
-                model_name=env.get("model_name")
-                model_server_logger.info(f"Start downloading model: {model_name}")
-                tag=env.get("tag")
-                base_url=f"https://paddlenlp.bj.bcebos.com/models/static/{tag}/{model_name}"
-                if self.nnode == 1:
-                    # single node model
-                    temp_tar = "model.tar"
-                elif env.get("POD_0_IP", "127.0.0.1") == self.host_ip:
-                    # Master node model
-                    temp_tar = "node1.tar"
-                else:
-                    temp_tar = "node2.tar"
-                base_url = base_url+f"/{temp_tar}"
-                download_model(base_url, self.model_dir, temp_tar)
+                self._get_download_model()
                 model_config_json = json.load(open(self.model_config_path, "r", encoding="utf-8"))
-            except Exception as e:
-                model_server_logger.error(f"{e}")
+            except:
                 raise
         return model_config_json
 
