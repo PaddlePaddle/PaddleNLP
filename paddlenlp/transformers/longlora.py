@@ -126,13 +126,7 @@ def ssa_scaled_dot_product_attention(
     return (attn_output, attn_weights) if output_attentions else attn_output
 
 
-# def set_group_size(group_size_ratio):
-#     global ssa_group_size_ratio
-#     ssa_group_size_ratio = group_size_ratio
-
-
 def replace_llama_attn(ssa_group_size_ratio):
-    # paddlenlp.transformers.llama.modeling.scaled_dot_product_attention = ssa_scaled_dot_product_attention
     paddlenlp.transformers.llama.modeling.scaled_dot_product_attention = functools.partial(
         ssa_scaled_dot_product_attention, ssa_group_size_ratio=ssa_group_size_ratio
     )
