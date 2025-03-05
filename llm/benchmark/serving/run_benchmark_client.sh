@@ -1,7 +1,6 @@
 #!/bin/bash
 # get filter shared_gpt dataset
 if [ ! -f ./filtered_sharedgpt_short_3000.json ]; then
-  export MODEL_NAME=/gaoziyuan_ssd1n1/paddlenllp/Qwen2-7B-Instruct
   python get_filter_shared_gpt.py --tokenizer_name $MODEL_NAME
 fi
 
