@@ -1,0 +1,18 @@
+#!/bin/bash
+# get filter shared_gpt dataset
+if [ ! -f ./filtered_sharedgpt_short_3000.json ]; then
+  export MODEL_NAME=/gaoziyuan_ssd1n1/paddlenllp/Qwen2-7B-Instruct
+  python get_filter_shared_gpt.py --tokenizer_name $MODEL_NAME
+fi
+
+python benchmark_client.py \
+  --dataset_path ./filtered_sharedgpt_short_3000.json \
+  --backend paddle \
+  --num_prompts 3000 \
+  --warmup_round 1 \
+  --concurrency 256 \
+  --host localhost \
+  --port 8110 \
+  --dataset_name sharegpt \
+  --max_dec_len 2048 \
+  --mode not_mtp 
