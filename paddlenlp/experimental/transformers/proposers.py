@@ -109,6 +109,8 @@ class SpeculateArgument:
 
         args["mla_use_matrix_absorption"] = predictor_args.mla_use_matrix_absorption
         args["weightonly_group_size"] = predictor_args.weightonly_group_size
+        args["weight_block_size"] = predictor_args.weight_block_size
+        args["moe_quant_type"] = predictor_args.moe_quant_type
 
         assert args["speculate_method"] in [
             "eagle",
