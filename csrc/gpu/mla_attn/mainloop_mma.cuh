@@ -183,7 +183,7 @@ CUTLASS_DEVICE void mma_f16(const Params& mainloop_params,
       const int warp_idx = thread_idx / 32;
 #pragma unroll
       for (int w_i = 0; w_i < 2; ++w_i) {
-        const int token_group_idx = warp_idx * 16 + thread_idx / 4 + 8 * w_i;
+        const int token_group_idx = warp_idx * 16 + (thread_idx % 32) / 4 + 8 * w_i;
         const int token_idx = token_group_idx / Ktraits::GROUP_SIZE;
 
         if (token_idx < qo_len) {
@@ -447,7 +447,7 @@ CUTLASS_DEVICE void mma_f16_two_stages(const Params& mainloop_params,
       const int warp_idx = thread_idx / 32;
 #pragma unroll
       for (int w_i = 0; w_i < 2; ++w_i) {
-        const int token_group_idx = warp_idx * 16 + thread_idx / 4 + 8 * w_i;
+        const int token_group_idx = warp_idx * 16 + (thread_idx % 32) / 4 + 8 * w_i;
         const int token_idx = token_group_idx / Ktraits::GROUP_SIZE;
 
         if (token_idx < qo_len) {
