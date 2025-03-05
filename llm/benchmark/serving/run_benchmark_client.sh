@@ -14,5 +14,4 @@ python benchmark_client.py \
   --port 8110 \
   --dataset_name sharegpt \
   --max_dec_len 2048 \
-  --mode not_mtp \
   --output_file output.log

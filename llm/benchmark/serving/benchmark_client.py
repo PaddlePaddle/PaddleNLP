@@ -21,8 +21,7 @@ def infer(
     api_url: str = "http://localhost:8010/generate_stream",
     model_name: str = "openlm-research/open_llama_13b",
     min_dec_len: int = 1,
-    max_dec_len: int = 2048,
-    mode: str = "no_mtp",
+    max_dec_len: int = 2048
 ):
     stats = []
     while not req_que.empty():
@@ -34,9 +33,9 @@ def infer(
         start = time.time()
         is_first = True
         first_token_latency = float("inf")
-        if output_seqlen > 1024:
-            print("Request exceeds 1024 tokens. Truncating to 1024.", output_seqlen)
-            output_seqlen = 1024
+        # if output_seqlen > 1024:
+        #     print("Request exceeds 1024 tokens. Truncating to 1024.", output_seqlen)
+        #     output_seqlen = 1024
 
         headers = {"User-Agent": "Benchmark Client"}
         if backend == "vllm":
@@ -99,7 +98,7 @@ def infer(
                 )
             except:
                 token_num = len(chunks)
-        elif backend == "paddle" and mode == "mtp":
+        elif backend == "paddle":
             token_num = 0
             for chunk in chunks:
                 chunk_dict = json.loads(chunk.decode("utf-8").strip())
@@ -296,7 +295,6 @@ def main(
     port: str = "8100",
     warmup_round: int = 1,
     dataset_name: str = "sharegpt",
-    mode: str = "not_mtp",
     min_dec_len: int = 1,
     max_dec_len: int = 2048,
     output_file: Optional[str] = None,
@@ -327,7 +325,7 @@ def main(
     for i in range(concurrency):
         proc = mp.Process(
             target=infer,
-            args=(i + 1, req_que, res_que, end_flags, backend, api_url, model_name, min_dec_len, max_dec_len, mode),
+            args=(i + 1, req_que, res_que, end_flags, backend, api_url, model_name, min_dec_len, max_dec_len),
         )
         procs.append(proc)
         proc.start()
@@ -389,7 +387,6 @@ if __name__ == "__main__":
     parser.add_argument("--port", type=str, default="8100", help="Port of the inference server.")
     parser.add_argument("--warmup_round", type=int, default=1, help="Number of warmup rounds.")
     parser.add_argument("--dataset_name", type=str, default="sharegpt", choices=["sharegpt", "paddle_inner"], help="Name of the dataset to use.")
-    parser.add_argument("--mode", type=str, default="not_mtp", help="Mode of operation.")
     parser.add_argument("--min_dec_len", type=int, default=1, help="Minimum decoding length.")
     parser.add_argument("--max_dec_len", type=int, default=2048, help="Maximum decoding length.")
     parser.add_argument("--output_file", type=str, default=None, help="Path to save the results file.")
@@ -405,7 +402,6 @@ if __name__ == "__main__":
         port=args.port,
         warmup_round=args.warmup_round,
         dataset_name=args.dataset_name,
-        mode=args.mode,
         min_dec_len=args.min_dec_len,
         max_dec_len=args.max_dec_len,
         output_file=args.output_file,
