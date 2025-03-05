@@ -46,7 +46,7 @@ PATH_TO_MODEL  # 静态图模型存放路径
 
 a100
 ```shell
-docker run  -i --rm  --gpus all --shm-size 5G --network=host --privileged --cap-add=SYS_PTRACE \
+docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
 -v /PATH_TO_MODEL/:/models -dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v1.0 /bin/bash \
 -c -ex 'cd /opt/source/PaddleNLP &&export PYTHONPATH=$PWD:$PYTHONPATH && cd llm && python3 predict/export_model.py --model_name_or_path meta-llama/Meta-Llama-3-8B-Instruct --output_path /models --dtype bfloat16 --inference_model 1 --append_attn 1'\
 && docker logs -f $(docker ps -lq)
@@ -54,7 +54,7 @@ docker run  -i --rm  --gpus all --shm-size 5G --network=host --privileged --cap-
 
 v100
 ```shell
-docker run  -i --rm  --gpus all --shm-size 5G --network=host --privileged --cap-add=SYS_PTRACE \
+docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
 -v /PATH_TO_MODEL/:/models -dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda118-cudnn8-v1.0 /bin/bash \
 -c -ex 'cd /opt/source/PaddleNLP/llm &&export PYTHONPATH=$PWD:$PYTHONPATH&& python3 predict/export_model.py --model_name_or_path meta-llama/Meta-Llama-3-8B-Instruct --output_path /models --dtype float16 --inference_model 1 --block_attn'\
 && docker logs -f $(docker ps -lq)
@@ -63,7 +63,7 @@ docker run  -i --rm  --gpus all --shm-size 5G --network=host --privileged --cap-
 ###服务化推理
 a100
 ```shell
-docker run --gpus all --shm-size 5G --network=host --privileged --cap-add=SYS_PTRACE \
+docker run --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
 -v /PATH_TO_MODEL/:/models -dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v1.0 /bin/bash \
 -c -ex 'cd /opt/output/Serving && export MAX_SEQ_LEN=4096 &&bash start_server.sh && tail -f /dev/null'\
 && docker exec -it $(docker ps -lq) sh -c "while [ ! -f /opt/output/Serving/log/workerlog.0 ]; do sleep 1; done; tail -f /opt/output/Serving/log/workerlog.0"
@@ -71,7 +71,7 @@ docker run --gpus all --shm-size 5G --network=host --privileged --cap-add=SYS_PT
 
 v100
 ```shell
-docker run --gpus all --shm-size 5G --network=host --privileged --cap-add=SYS_PTRACE \
+docker run --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
 -v /PATH_TO_MODEL/:/models -dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda118-cudnn8-v1.0 /bin/bash \
 -c -ex 'cd /opt/output/Serving && export MAX_SEQ_LEN=4096 &&export DTYPE="float16" && bash start_server.sh && tail -f /dev/null'\
 && docker exec -it $(docker ps -lq) sh -c "while [ ! -f /opt/output/Serving/log/workerlog.0 ]; do sleep 1; done; tail -f /opt/output/Serving/log/workerlog.0"

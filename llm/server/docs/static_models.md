@@ -5,7 +5,6 @@
 ### DeepSeekV2
 |模型名称|静态图下载 model_name|
 |:------|:-:|
-|DeepSeekV2|
 | deepseek-ai/DeepSeek-V2-Chat              | 🚧 |
 | deepseek-ai/DeepSeek-V2-Lite-Chat         | 🚧 |
 
