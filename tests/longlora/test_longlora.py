@@ -20,10 +20,7 @@ import unittest
 import paddle
 from parameterized import parameterized_class
 
-from paddlenlp.transformers.longlora import (
-    set_group_size,
-    ssa_scaled_dot_product_attention,
-)
+from paddlenlp.transformers.longlora import ssa_scaled_dot_product_attention
 
 from .testing_utils import LLMTest
 
@@ -44,7 +41,6 @@ class TestSSA(LLMTest, unittest.TestCase):
 
         # 设置 group size ratio
         self.ssa_group_size_ratio = 1 / 4
-        set_group_size(self.ssa_group_size_ratio)
 
         # 创建输入张量的配置
         self.bsz = 2
@@ -72,6 +68,7 @@ class TestSSA(LLMTest, unittest.TestCase):
             self.value_states,
             self.attention_mask,
             output_attentions=False,
+            ssa_group_size_ratio=self.ssa_group_size_ratio,
         )
         print(attn_output.shape)
         # 验证输出形状是否符合预期
@@ -85,6 +82,7 @@ class TestSSA(LLMTest, unittest.TestCase):
             self.value_states,
             self.attention_mask,
             output_attentions=False,
+            ssa_group_size_ratio=self.ssa_group_size_ratio,
         )
         print(attn_output.shape)
 

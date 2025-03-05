@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import functools
 import math
 
 import paddle
@@ -19,8 +20,6 @@ import paddle.nn.functional as F
 
 import paddlenlp
 from paddlenlp.transformers.llama.modeling import get_triangle_upper_mask
-
-ssa_group_size_ratio = 1 / 4
 
 
 def shift(qkv, bsz, q_len, group_size, num_heads, head_dim):
@@ -45,6 +44,7 @@ def ssa_scaled_dot_product_attention(
     alibi=None,
     sequence_parallel=False,
     reshard_layer=None,
+    ssa_group_size_ratio=None,
     **kwargs
 ):
     bsz, q_len, num_heads, head_dim = query_states.shape
@@ -126,10 +126,13 @@ def ssa_scaled_dot_product_attention(
     return (attn_output, attn_weights) if output_attentions else attn_output
 
 
-def set_group_size(group_size_ratio):
-    global ssa_group_size_ratio
-    ssa_group_size_ratio = group_size_ratio
+# def set_group_size(group_size_ratio):
+#     global ssa_group_size_ratio
+#     ssa_group_size_ratio = group_size_ratio
 
 
-def replace_llama_attn():
-    paddlenlp.transformers.llama.modeling.scaled_dot_product_attention = ssa_scaled_dot_product_attention
+def replace_llama_attn(ssa_group_size_ratio):
+    # paddlenlp.transformers.llama.modeling.scaled_dot_product_attention = ssa_scaled_dot_product_attention
+    paddlenlp.transformers.llama.modeling.scaled_dot_product_attention = functools.partial(
+        ssa_scaled_dot_product_attention, ssa_group_size_ratio=ssa_group_size_ratio
+    )

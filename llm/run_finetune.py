@@ -66,7 +66,7 @@ from paddlenlp.transformers import (
     Qwen2MoeForCausalLMPipe,
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig
-from paddlenlp.transformers.longlora import replace_llama_attn, set_group_size
+from paddlenlp.transformers.longlora import replace_llama_attn
 from paddlenlp.trl import DataConfig, ModelConfig, SFTConfig, SFTTrainer
 from paddlenlp.trl.llm_utils import (
     ZeroPaddingIterDatasetCallback,
@@ -116,7 +116,6 @@ def main():
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
     training_args.print_config(gen_args, "Generation")
-
     # Setup GPU & distributed training
     paddle.set_device(training_args.device)
     set_seed(seed=training_args.seed)
@@ -169,12 +168,12 @@ def main():
         quantization_config=quantization_config,
     )
 
-    if training_args.use_ssa:
+    if model_args.use_ssa:
         assert (
-            training_args.ssa_group_size_ratio is not None
+            model_args.ssa_group_size_ratio is not None
         ), "ssa_group_size_ratio must be specified when use_ssa is True"
-        set_group_size(training_args.ssa_group_size_ratio)
-        replace_llama_attn()
+        # set_group_size(training_args.ssa_group_size_ratio)
+        replace_llama_attn(model_args.ssa_group_size_ratio)
 
     architectures_to_check = {"Qwen2Moe", "DeepseekV2", "DeepseekV3"}
     if (
@@ -200,19 +199,21 @@ def main():
         model_config.fuse_attention_ffn = model_args.fuse_attention_ffn
 
     model_config.seq_length = data_args.max_length
-    orig_ctx_len = getattr(model_config, "max_position_embeddings", None)
-    model_args.rope_scaling_factor = data_args.max_length // orig_ctx_len
 
     # Config for model useing long sequence strategy
     if model_args.use_long_sequence_strategies:
-        data_args.scaled_max_length = int(data_args.max_length * model_args.rope_scaling_factor)
+        scaled_max_length = (
+            int(data_args.max_length * model_args.rope_scaling_factor)
+            if data_args.use_pose_convert
+            else data_args.max_length
+        )
         model_config.use_long_sequence_strategies = True
         model_config.long_sequence_strategy_type = model_args.strategy_type
         model_config.long_sequence_strategy_name = model_args.strategy_name
         model_config.rope_scaling_factor = model_args.rope_scaling_factor
         model_config.long_sequence_init_args = {
             "dim": int(model_config.hidden_size / model_config.num_attention_heads),
-            "max_position_embeddings": data_args.scaled_max_length,  # extended context window
+            "max_position_embeddings": scaled_max_length,  # extended context window
             "base": model_config.rope_theta,
             "scaling_factor": model_args.rope_scaling_factor,
         }
