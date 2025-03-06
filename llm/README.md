@@ -495,7 +495,7 @@ curl 127.0.0.1:9965/v1/chat/completions \
 Note:
 1. 请保证 shm-size >= 5，不然可能会导致服务启动失败
 
-更多模型请参考[LLaMA](./docs/predict/llama.md)、[Qwen](./docs/predict/qwen.md)、[Mixtral](./docs/predict/mixtral.md)。
+更多模型请参考[LLaMA](./docs/predict/llama.md)、[Qwen](./docs/predict/qwen.md)、[DeepSeek](./docs/predict/deepseek.md)、[Mixtral](./docs/predict/mixtral.md)。
 更多关于该部署工具的使用方法，请查看[服务化部署流程](./server/docs/deploy_usage_tutorial.md)
 
 ### 8. PyTorch 模型权重转换

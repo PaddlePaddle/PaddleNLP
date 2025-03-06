@@ -2,24 +2,25 @@
 
 ## 目录
 
-- [快速开始](#快速开始)
-- [部署环境准备](#部署环境准备)
-  - [基础环境](#基础环境)
-  - [准备部署镜像](#准备部署镜像)
-  - [准备模型](#准备模型)
-  - [创建容器](#创建容器)
-- [启动服务](#启动服务)
-  - [配置参数](#配置参数)
+- [静态图高性能部署全流程](#静态图高性能部署全流程)
+  - [目录](#目录)
+  - [快速开始](#快速开始)
+  - [部署环境准备](#部署环境准备)
+    - [基础环境](#基础环境)
+    - [准备部署镜像](#准备部署镜像)
+    - [准备模型](#准备模型)
+    - [创建容器](#创建容器)
   - [启动服务](#启动服务)
-  - [服务状态查询](#服务状态查询)
-- [服务测试](#服务测试)
-  - [Python 客户端](#Python-客户端)
-  - [HTTP 调用](#HTTP-调用)
-  - [OpenAI 客户端](#OpenAI-客户端)
-  - [返回示例](#返回示例)
-- [基于 dockerfile 创建自己的镜像](#基于 dockerfile 创建自己的镜像)
-- [模型配置参数介绍](#模型配置参数介绍)
-- [请求参数介绍](#请求参数介绍)
+    - [配置参数](#配置参数)
+    - [启动服务](#启动服务-1)
+    - [服务状态查询](#服务状态查询)
+  - [服务测试](#服务测试)
+    - [HTTP 调用](#http-调用)
+    - [返回示例](#返回示例)
+    - [OpenAI 客户端](#openai-客户端)
+  - [基于 dockerfile 创建自己的镜像](#基于-dockerfile-创建自己的镜像)
+  - [模型配置参数介绍](#模型配置参数介绍)
+  - [请求参数介绍](#请求参数介绍)
 
 
 
@@ -76,7 +77,7 @@ docker pull registry.baidubce.com/paddlepaddle/fastdeploy:llm-serving-cuda123-cu
 
 ### 准备模型
 
-该部署工具为 PaddleNLP 静态图模型提供了高效的部署方案，模型静态图导出方案请参考：[LLaMA](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/llama.md)、[Qwen](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/qwen.md)、[Mixtral](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/mixtral.md) ...
+该部署工具为 PaddleNLP 静态图模型提供了高效的部署方案，模型静态图导出方案请参考：[LLaMA](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/llama.md)、[Qwen](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/qwen.md)、[DeepSeek](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/deepseek.md)、[Mixtral](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/mixtral.md) ...
 
 或者下载样例模型:
 ```shell
@@ -351,7 +352,6 @@ docker build --network=host -f ./dockerfiles/Dockerfile_serving_cuda123_cudnn9 -
 | USE_HF_TOKENIZER | int | 是否进行使用 huggingface 的词表 | 否 | 0 |   |
 | USE_CACHE_KV_INT8 | int | 是否将 INT8配置为 KV Cache 的类型 | 否 | 0 | c8量化模型需要配置为1 |
 | MODEL_DIR | str | 模型文件路径 | 否 | /models/ |  |
-| FD_MODEL_CONFIG_PATH | str | 模型 config 文件路径 | 否 | ${model_dir}/config.json |  |
 | DISTRIBUTED_CONFIG | str | 模型分布式配置文件路径 | 否 | ${model_dir}/rank_mapping.csv |  |
 
 ## 请求参数介绍

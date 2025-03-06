@@ -239,7 +239,7 @@ for sentence, prompt, result in zip(sentences, prompts, results):
 
 #### 3.2 数据标注
 
-我们推荐使用数据标注平台[doccano](https://github.com/doccano/doccano) 进行数据标注，本示例也打通了从标注到训练的通道，即 doccano 导出数据后可通过[doccano.py](./doccano.py)脚本轻松将数据转换为输入模型时需要的形式，实现无缝衔接。标注方法的详细介绍请参考[doccano 数据标注指南](doccano.md)。
+我们推荐使用数据标注平台[doccano](https://github.com/doccano/doccano) 进行数据标注，本示例也打通了从标注到训练的通道，即 doccano 导出数据后可通过[doccano.py](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/application/information_extraction/doccano.py)脚本轻松将数据转换为输入模型时需要的形式，实现无缝衔接。标注方法的详细介绍请参考[doccano 数据标注指南](doccano.md)。
 
 原始数据示例：
 
@@ -288,8 +288,8 @@ python doccano.py \
 - ``schema_lang``: 选择 schema 的语言，可选有`ch`和`en`。默认为`ch`，英文数据集请选择`en`。
 
 备注：
-- 默认情况下 [doccano.py](./doccano.py) 脚本会按照比例将数据划分为 train/dev/test 数据集
-- 每次执行 [doccano.py](./doccano.py) 脚本，将会覆盖已有的同名数据文件
+- 默认情况下 doccano.py 脚本会按照比例将数据划分为 train/dev/test 数据集
+- 每次执行 doccano.py 脚本，将会覆盖已有的同名数据文件
 - 在模型训练阶段我们推荐构造一些负例以提升模型效果，在数据转换阶段我们内置了这一功能。可通过`negative_ratio`控制自动构造的负样本比例；负样本数量 = negative_ratio * 正样本数量。
 - 对于从 doccano 导出的文件，默认文件中的每条数据都是经过人工正确标注的。
 
@@ -357,7 +357,7 @@ python -u  -m paddle.distributed.launch --gpus "0,1" run_finetune.py ./config/qw
 - 支持 Weight Only INT8及 INT4推理，支持权重、激活、Cache KV 进行 INT8、FP8量化的推理
 - 支持动态图推理和静态图推理两种方式
 
-在推理之前，推荐编译安装 PaddleNLP 大模型高性能自定义推理算子。使用这些高性能算子，可以大幅提升大模型推理速度。详细的安装教程请参考[大模型高性能推理算子安装教程](../../../csrc/README.md)
+在推理之前，推荐编译安装 PaddleNLP 大模型高性能自定义推理算子。使用这些高性能算子，可以大幅提升大模型推理速度。详细的安装教程请参考[大模型高性能推理算子安装教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/csrc/README.md)
 
 安装完之后，可按照下列指令，进行高性能推理。
 
