@@ -42,10 +42,10 @@ docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap
 
 ### 模型导出
 ```shell
-PATH_TO_MODEL  # 静态图模型存放路径
---dtype 可选择导出精度
---append_attn 仅sm>=80的机器支持
---block_attn 支持sm<80的机器导出 如果append_attn无法推理可直接替换成 block_attn
+MODEL_PATH #静态图模型存放地址
+--dtype #可选择导出精度
+--append_attn #仅sm>=80的机器支持
+--block_attn #支持sm<80的机器导出 如果append_attn无法推理可直接替换成 block_attn
 ```
 高性能部署需要先将动态图模型，导出为静态图推理格式，针对A100，V100机器的导出命令如下：
 
