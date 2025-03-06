@@ -96,5 +96,4 @@ curl 127.0.0.1:9965/v1/chat/completions \
 |cuda版本| 支持硬件架构|镜像地址|支持的典型设备|
 |:------|:-:|:-:|:-:|
 | cuda11.8 | 70 75 80 86 |ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda118-cudnn8-v1.0 |V100，T4，A100，A30，A10 |
-| cuda12.4 | 80 86 89 90 |ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v1.0 |A100，A30，A10
-L20，H20，H100 |
+| cuda12.4 | 80 86 89 90 |ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v1.0 |A100，A30，A10,L20，H20，H100 |
