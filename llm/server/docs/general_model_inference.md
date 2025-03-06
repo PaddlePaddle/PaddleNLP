@@ -12,22 +12,26 @@
 本节以 meta-llama/Meta-Llama-3-8B-Instruct bf16 推理为例子
 
 ```shell
-export MAX_SEQ_LEN=4096  # 以上模型支持MAX_SEQ_LEN=4096 其他模型可能会不同,可查看config.json 进行修改
-export DTYPE="bfloat16"  # 默认是bfloat16 v100 需要替换成   export DTYPE="float16"
-PATH_TO_MODEL  # 静态图模型存放路径
+MODEL_PATH  # 静态图模型存放路径
 ```
 a100
 ```shell
+export MODEL_PATH=${MODEL_PATH:-$PWD}
+export model_name=${model_name:-"meta-llama/Meta-Llama-3-8B-Instruct"}
 docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
--v /PATH_TO_MODEL/:/models -dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v1.0 /bin/bash \
--c -ex 'model_name=${model_name:-"meta-llama/Meta-Llama-3-8B-Instruct-Append-Attn/bfloat16"} && cd /opt/output/Serving && export MAX_SEQ_LEN=4096 && bash start_server.sh && tail -f /dev/null'\
+-v $MODEL_PATH:/models -e "model_name=${model_name}" \
+-dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v1.0 /bin/bash \
+-c -ex 'start_server $model_name && tail -f /dev/null'\
 && docker exec -it $(docker ps -lq) sh -c "while [ ! -f /opt/output/Serving/log/workerlog.0 ]; do sleep 1; done; tail -f /opt/output/Serving/log/workerlog.0"
 ```
 v100
 ```shell
+export MODEL_PATH=${MODEL_PATH:-$PWD}
+export model_name=${model_name:-"meta-llama/Meta-Llama-3-8B-Instruct"}
 docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
--v /PATH_TO_MODEL/:/models -dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda118-cudnn8-v1.0 /bin/bash \
--c -ex 'model_name=${model_name:-"meta-llama/Meta-Llama-3-8B-Instruct-Append-Attn/bfloat16"} && cd /opt/output/Serving && export MAX_SEQ_LEN=4096 && export DTYPE="float16" && bash start_server.sh && tail -f /dev/null'\
+-v $MODEL_PATH:/models -e "model_name=${model_name}" \ 
+-dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda118-cudnn8-v1.0 /bin/bash \
+-c -ex 'start_server $model_name && tail -f /dev/null'\
 && docker exec -it $(docker ps -lq) sh -c "while [ ! -f /opt/output/Serving/log/workerlog.0 ]; do sleep 1; done; tail -f /opt/output/Serving/log/workerlog.0"
 ```
 
@@ -47,16 +51,18 @@ PATH_TO_MODEL  # 静态图模型存放路径
 
 a100
 ```shell
+export MODEL_PATH=${MODEL_PATH:-$PWD}
 docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
--v /PATH_TO_MODEL/:/models -dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v1.0 /bin/bash \
+-v $MODEL_PATH/:/models -dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v1.0 /bin/bash \
 -c -ex 'cd /opt/source/PaddleNLP &&export PYTHONPATH=$PWD:$PYTHONPATH && cd llm && python3 predict/export_model.py --model_name_or_path meta-llama/Meta-Llama-3-8B-Instruct --output_path /models --dtype bfloat16 --inference_model 1 --append_attn 1'\
 && docker logs -f $(docker ps -lq)
 ```
 
 v100
 ```shell
+export MODEL_PATH=${MODEL_PATH:-$PWD}
 docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
--v /PATH_TO_MODEL/:/models -dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda118-cudnn8-v1.0 /bin/bash \
+-v $MODEL_PATH/:/models -dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda118-cudnn8-v1.0 /bin/bash \
 -c -ex 'cd /opt/source/PaddleNLP &&export PYTHONPATH=$PWD:$PYTHONPATH&& cd llm && python3 predict/export_model.py --model_name_or_path meta-llama/Meta-Llama-3-8B-Instruct --output_path /models --dtype float16 --inference_model 1 --block_attn'\
 && docker logs -f $(docker ps -lq)
 ```
@@ -64,17 +70,19 @@ docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap
 ### 服务化推理
 a100
 ```shell
+export MODEL_PATH=${MODEL_PATH:-$PWD}
 docker run --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
--v /PATH_TO_MODEL/:/models -dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v1.0 /bin/bash \
--c -ex 'cd /opt/output/Serving && export MAX_SEQ_LEN=4096 &&bash start_server.sh && tail -f /dev/null'\
+-v $MODEL_PATH/:/models -dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v1.0 /bin/bash \
+-c -ex 'start_server && tail -f /dev/null'\
 && docker exec -it $(docker ps -lq) sh -c "while [ ! -f /opt/output/Serving/log/workerlog.0 ]; do sleep 1; done; tail -f /opt/output/Serving/log/workerlog.0"
 ```
 
 v100
 ```shell
+export MODEL_PATH=${MODEL_PATH:-$PWD}
 docker run --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
--v /PATH_TO_MODEL/:/models -dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda118-cudnn8-v1.0 /bin/bash \
--c -ex 'cd /opt/output/Serving && export MAX_SEQ_LEN=4096 &&export DTYPE="float16" && bash start_server.sh && tail -f /dev/null'\
+-v $MODEL_PATH/:/models -dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda118-cudnn8-v1.0 /bin/bash \
+-c -ex 'start_server && tail -f /dev/null'\
 && docker exec -it $(docker ps -lq) sh -c "while [ ! -f /opt/output/Serving/log/workerlog.0 ]; do sleep 1; done; tail -f /opt/output/Serving/log/workerlog.0"
 ```
 
