@@ -492,8 +492,8 @@ void quant_per_block_int8_fuse_sub_mean_cuda_fwd(
 
 PD_BUILD_OP(quant_per_block_int8_fuse_sub_mean_cuda)
     .Inputs({"input", "mean", "output", "scale"})
-    .Outputs({"out1", "out2", "out3", "out4"})
-    .SetInplaceMap({{"input", "out1"}, {"mean", "out2"}, {"output", "out3"}, {"scale", "out4"}}) // Inplace
+    .Outputs({"out_mean", "out", "out_scale"})
+    .SetInplaceMap({{"mean", "out_mean"}, {"output", "out"}, {"scale", "out_scale"}}) // Inplace
     .Attrs({"block_size: int", "tensor_layout: int"})
     .SetKernelFn(PD_KERNEL(quant_per_block_int8_fuse_sub_mean_cuda_fwd));
 
@@ -580,8 +580,8 @@ void quant_per_warp_int8_cuda_fwd(
 
 PD_BUILD_OP(quant_per_warp_int8_cuda)
     .Inputs({"input", "output", "scale"})
-    .Outputs({"out1", "out2", "out3"})
-    .SetInplaceMap({{"input", "out1"}, {"output", "out2"}, {"scale", "out3"}}) // Inplace
+    .Outputs({"out", "out_scale"})
+    .SetInplaceMap({{"output", "out"}, {"scale", "out_scale"}}) // Inplace
     .Attrs({"block_size: int", "warp_block_size: int", "tensor_layout: int"})
     .SetKernelFn(PD_KERNEL(quant_per_warp_int8_cuda_fwd));
 
@@ -670,8 +670,8 @@ void quant_per_block_int8_cuda_scale_fwd(
 
 PD_BUILD_OP(quant_per_block_int8_cuda_scale)
     .Inputs({"input", "output", "scale"})
-    .Outputs({"out1", "out2", "out3"})
-    .SetInplaceMap({{"input", "out1"}, {"output", "out2"}, {"scale", "out3"}}) // Inplace
+    .Outputs({"out", "out_scale"})
+    .SetInplaceMap({{"output", "out"}, {"scale", "out_scale"}}) // Inplace
     .Attrs({"sm_scale: float", "block_size: int", "tensor_layout: int"})
     .SetKernelFn(PD_KERNEL(quant_per_block_int8_cuda_scale_fwd));
 
@@ -759,8 +759,8 @@ void quant_per_block_int8_cuda_fwd(
 
 PD_BUILD_OP(quant_per_block_int8_cuda)
     .Inputs({"input", "output", "scale"})
-    .Outputs({"out1", "out2", "out3"})
-    .SetInplaceMap({{"input", "out1"}, {"output", "out2"}, {"scale", "out3"}}) // Inplace
+    .Outputs({"out", "out_scale"})
+    .SetInplaceMap({{"output", "out"}, {"scale", "out_scale"}}) // Inplace
     .Attrs({"sm_scale: float", "block_size: int", "tensor_layout: int"})
     .SetKernelFn(PD_KERNEL(quant_per_block_int8_cuda_fwd));
 
@@ -842,8 +842,8 @@ void transpose_pad_permute_cuda_fwd(
 
 PD_BUILD_OP(transpose_pad_permute_cuda)
     .Inputs({"input", "output"})
-    .Outputs({"out1", "out2"})
-    .SetInplaceMap({{"input", "out1"}, {"output", "out2"}}) // Inplace
+    .Outputs({"out"})
+    .SetInplaceMap({{"output", "out"}}) // Inplace
     .Attrs({"tensor_layout: int"})
     .SetKernelFn(PD_KERNEL(transpose_pad_permute_cuda_fwd));
 
@@ -928,8 +928,8 @@ void scale_fuse_quant_cuda_fwd(
 
 PD_BUILD_OP(scale_fuse_quant_cuda)
     .Inputs({"input", "output", "scale", "v"})
-    .Outputs({"out1", "out2", "out3", "out4"})
-    .SetInplaceMap({{"input", "out1"}, {"output", "out2"}, {"scale", "out3"}, {"v", "out4"}}) // Inplace
+    .Outputs({"out", "out_scale"})
+    .SetInplaceMap({{"output", "out"}, {"scale", "out_scale"}}) // Inplace
     .Attrs({"scale_max: float", "tensor_layout: int"})
     .SetKernelFn(PD_KERNEL(scale_fuse_quant_cuda_fwd));
 
@@ -1021,7 +1021,7 @@ void mean_scale_fuse_quant_cuda_fwd(
 
 PD_BUILD_OP(mean_scale_fuse_quant_cuda)
     .Inputs({"input", "output", "mean", "scale", "v"})
-    .Outputs({"out1", "out2", "out3", "out4", "out5"})
-    .SetInplaceMap({{"input", "out1"}, {"output", "out2"}, {"mean", "out3"}, {"scale", "out4"}, {"v", "out5"}}) // Inplace
+    .Outputs({"out", "out_mean", "out_scale"})
+    .SetInplaceMap({{"output", "out"}, {"mean", "out_mean"}, {"scale", "out_scale"}}) // Inplace
     .Attrs({"scale_max: float", "tensor_layout: int"})
     .SetKernelFn(PD_KERNEL(mean_scale_fuse_quant_cuda_fwd));

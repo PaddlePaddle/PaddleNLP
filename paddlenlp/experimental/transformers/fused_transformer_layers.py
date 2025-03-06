@@ -2975,7 +2975,6 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
     ):
         from paddlenlp_ops import decode_mla_write_cache, multi_head_latent_attention
 
-        use_sageattn = False if os.getenv("USE_SAGEATTN", "0") == "0" else True
         ln_out = qkv_out
         latent_cache = caches[i]
 
@@ -2984,7 +2983,9 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
         if kwargs["max_enc_len_this_time"]:  # prefill phase
             query, key, value = self.compute_qkv_linear(ln_out, i, latent_cache=latent_cache, **kwargs)
 
-            if use_sageattn:
+            from paddlenlp.utils.env import PREFILL_USE_SAGE_ATTN
+
+            if PREFILL_USE_SAGE_ATTN:
 
                 query_192 = paddle.unsqueeze(query, axis=0)
                 key_192 = paddle.unsqueeze(key, axis=0)
