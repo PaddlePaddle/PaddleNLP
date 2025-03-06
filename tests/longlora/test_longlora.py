@@ -44,7 +44,7 @@ class TestSSA(LLMTest, unittest.TestCase):
 
         # 设置 group size ratio
         self.ssa_group_size_ratio = 1 / 4
-        replace_llama_attn(self.group_size, use_ssa=True)
+        replace_llama_attn(self.ssa_group_size_ratio, use_ssa=True)
         # 创建输入张量的配置
         self.bsz = 2
         self.q_len = 16
