@@ -15,12 +15,74 @@
 # limitations under the License.
 from __future__ import annotations
 
+from typing import Any, List, Tuple
+
 import numpy as np
 import paddle
 import paddle.distributed as dist
-from paddle import nn
+from paddle import Tensor, nn
+from paddle.distributed.communication.group import Group
 
 from .moe_gate import PretrainedMoEGate
+
+
+class _AllToAll(paddle.autograd.PyLayer):
+    @staticmethod
+    def forward(
+        ctx: Any,
+        output_shape: List,
+        input: Tensor,
+        out_split_sizes: List = None,
+        in_split_sizes: List = None,
+        group: Group = None,
+    ) -> Tensor:  # type: ignore
+        """
+        All-to-all communication in the group.
+        Args:
+            ctx (Any): Context object.
+            output_shape (List): Output shape.
+            input (Tensor): Input tensor.
+            out_split_sizes (List): Output split sizes.
+            in_split_sizes (List): Input split sizes.
+            group (Group): The group object.
+        Returns:
+            Tensor: Output tensor.
+        """
+
+        ctx.group = group
+        ctx.output_shape = output_shape
+        ctx.out_split_sizes = out_split_sizes
+        ctx.in_split_sizes = in_split_sizes
+
+        # return input
+        if dist.get_world_size(group) <= 1:
+            return input
+
+        output = paddle.empty(output_shape, dtype=input.dtype)
+        task = dist.alltoall_single(
+            output,
+            input,
+            out_split_sizes=out_split_sizes,
+            in_split_sizes=in_split_sizes,
+            sync_op=False,
+            group=group,
+        )
+        task.wait()
+
+        return output
+
+    @staticmethod
+    def backward(ctx: Any, *grad_output: Tensor) -> Tuple[Tensor]:
+        """
+        Aggregates gradient information from all input tensors into a single tensor.
+        Args:
+            ctx (Any): The context object used to store information that needs to be passed.
+            *grad_output (Tensor): A list of input tensors whose gradients are to be aggregated.
+        Returns:
+            Tuple[Tensor]: A tuple containing a tensor that holds the gradients of all input tensors.
+        """
+        # return grad_output
+        return _AllToAll.apply(ctx.output_shape, *grad_output, ctx.out_split_sizes, ctx.in_split_sizes, ctx.group)
 
 
 def dispatching(x, dispatch_mask, scatter_index, num_experts, capacity):
@@ -201,25 +263,21 @@ class MoELayer(nn.Layer):
 
         if self.expert_parallel_degree > 1:
             tokens_per_ep_rank = tokens_per_expert.reshape([self.expert_parallel_degree, -1]).sum(axis=1)
-            tokens_per_expert_group = paddle.empty([tokens_per_expert.shape[0]], dtype=tokens_per_expert.dtype)
-            dist.alltoall_single(tokens_per_expert_group, tokens_per_expert)
+            tokens_per_expert_group = _AllToAll.apply(
+                [tokens_per_expert.shape[0]], tokens_per_expert, group=self.moe_group
+            )
             output_splits = (
                 tokens_per_expert_group.reshape([self.expert_parallel_degree, -1]).sum(axis=1).cpu().tolist()
             )
-            gathered_tokens = paddle.empty(
-                [tokens_per_expert_group.sum(axis=0).cpu().item(), sorted_tokens.shape[1]], dtype=sorted_tokens.dtype
-            )
-
             input_split_sizes = tokens_per_ep_rank.cpu().tolist()
-            task = dist.alltoall_single(
-                gathered_tokens,
+            gathered_tokens = _AllToAll.apply(
+                [tokens_per_expert_group.sum(axis=0).cpu().item(), sorted_tokens.shape[1]],
                 sorted_tokens,
                 out_split_sizes=output_splits,
                 in_split_sizes=input_split_sizes,
-                sync_op=False,
                 group=self.moe_group,
             )
-            task.wait()
+
             tokens_per_expert_post_gather = tokens_per_expert_group.reshape(
                 [self.expert_parallel_degree, self.moe_num_experts_per_device]
             ).sum(axis=0)
@@ -247,16 +305,13 @@ class MoELayer(nn.Layer):
         if self.expert_parallel_degree > 1:
             new_x = paddle.empty_like(outs)
             new_x[gatherd_idxs] = outs
-            gathered_tokens = paddle.empty(sorted_tokens_shape, dtype=new_x.dtype)
-            task = dist.alltoall_single(
-                gathered_tokens,
+            gathered_tokens = _AllToAll.apply(
+                sorted_tokens_shape,
                 new_x,
                 out_split_sizes=input_split_sizes,
                 in_split_sizes=output_splits,
-                sync_op=False,
                 group=self.moe_group,
             )
-            task.wait()
             outs = gathered_tokens
 
         new_x = paddle.empty_like(outs)
