@@ -23,7 +23,7 @@ cd PaddleNLP/csrc/sdaa && python setup_sdaa.py install
 安装triton依赖
 
 ```shell
-pip install triton
+pip install triton # 推荐 3.2.0
 
 python -m pip install git+https://github.com/zhoutianzi666/UseTritonInPaddle.git
 
