@@ -14,24 +14,28 @@
 | deepseek-ai/DeepSeek-V3                   | 🚧 |
 
 ### DeepSeekR1
-|模型名称|静态图下载 model_name|
-|:------|:-:|
-| deepseek-ai/DeepSeek-R1                   | deepseek-ai/DeepSeek-R1/weight_only_int4,deepseek-ai/DeepSeek-R1-2nodes/weight_only_int4, deepseek-ai/DeepSeek-R1/weight_only_int8, deepseek-ai/DeepSeek-R1-2nodes/weight_only_int8,deepseek-ai/DeepSeek-R1/a8w8_fp8,deepseek-ai/DeepSeek-R1-2nodes/a8w8_fp8,deepseek-ai/DeepSeek-R1-MTP-2nodes/weight-only-int8,deepseek-ai/DeepSeek-R1-MTP/weight-only-int8,deepseek-ai/DeepSeek-R1-MTP/weight-only-int4,deepseek-ai/DeepSeek-R1-MTP-2nodes/weight-only-int4 |
-| deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B | deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B/weight_only_int8 |
-| deepseek-ai/DeepSeek-R1-Distill-Qwen-7B   | deepseek-ai/DeepSeek-R1-Distill-Qwen-7B/weight_only_int8 |
-| deepseek-ai/DeepSeek-R1-Distill-Qwen-14B  | deepseek-ai/DeepSeek-R1-Distill-Qwen-14B/weight_only_int8 |
-| deepseek-ai/DeepSeek-R1-Distill-Qwen-32B  | deepseek-ai/DeepSeek-R1-Distill-Qwen-32B/weight_only_int8 |
-| deepseek-ai/DeepSeek-R1-Distill-Llama-8B  | deepseek-ai/DeepSeek-R1-Distill-Llama-8B/weight_only_int8 |
-| deepseek-ai/DeepSeek-R1-Distill-Llama-70B | deepseek-ai/DeepSeek-R1-Distill-Llama-70B/weight_only_int8 |
+|模型名称|精度|MTP|节点数|静态图下载 model_name|
+|:------|:-:|:-:|:-:|:-:|
+| deepseek-ai/DeepSeek-R1                   |weight_only_int4|否|1| deepseek-ai/DeepSeek-R1/weight_only_int4 |
+|                  |weight_only_int4|是|1| deepseek-ai/DeepSeek-R1-MTP/weight-only-int4 |
+|                  |weight_only_int4|否|2| deepseek-ai/DeepSeek-R1-2nodes/weight_only_int4 |
+|                  |weight_only_int4|是|2| deepseek-ai/DeepSeek-R1-MTP-2nodes/weight-only-int4  |
+|                  |weight_only_int8|否|1|  deepseek-ai/DeepSeek-R1/weight-only-int8|
+|                  |weight_only_int8|是|1|  deepseek-ai/DeepSeek-R1-MTP/weight-only-int8|
+|                  |weight_only_int8|否|2| deepseek-ai/DeepSeek-R1-2nodes/weight_only_int8 |
+|                  |weight_only_int8|是|2| deepseek-ai/DeepSeek-R1-MTP-2nodes/weight-only-int8 |
+|                  |a8w8_fp8|否|1| deepseek-ai/DeepSeek-R1/a8w8_fp8 |
+|                  |a8w8_fp8|是|1| deepseek-ai/DeepSeek-R1-MTP/a8w8_fp8|
+|                  |a8w8_fp8|否|2| deepseek-ai/DeepSeek-R1-2nodes/a8w8_fp8|
+|                  |a8w8_fp8|是|2| deepseek-ai/DeepSeek-R1-MTP-2nodes/a8w8_fp8|
+| deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B |weight_only_int8|-|-｜ deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B/weight_only_int8 |
+| deepseek-ai/DeepSeek-R1-Distill-Qwen-7B   |weight_only_int8|-|- deepseek-ai/DeepSeek-R1-Distill-Qwen-7B/weight_only_int8 |
+| deepseek-ai/DeepSeek-R1-Distill-Qwen-14B  |weight_only_int8|-|- deepseek-ai/DeepSeek-R1-Distill-Qwen-14B/weight_only_int8 |
+| deepseek-ai/DeepSeek-R1-Distill-Qwen-32B  |weight_only_int8|-|- deepseek-ai/DeepSeek-R1-Distill-Qwen-32B/weight_only_int8 |
+| deepseek-ai/DeepSeek-R1-Distill-Llama-8B  |weight_only_int8|-|- deepseek-ai/DeepSeek-R1-Distill-Llama-8B/weight_only_int8 |
+| deepseek-ai/DeepSeek-R1-Distill-Llama-70B |weight_only_int8|-|- deepseek-ai/DeepSeek-R1-Distill-Llama-70B/weight_only_int8 |
 
 
-### PP-UIE
-| 模型名称 | 静态图下载 model_name |
-|:------|:-:|
-| paddlenlp/PP-UIE-0.5B | 🚧 |
-| paddlenlp/PP-UIE-1.5B | 🚧 |
-| paddlenlp/PP-UIE-7B | 🚧 |
-| paddlenlp/PP-UIE-14B | 🚧 |
 
 ### LLaMA
 | 模型名称 | 静态图下载 model_name |
@@ -84,86 +88,11 @@
 |:------|:-:|
 | meta-llama/Llama-3.3-70B-Instruct | 🚧 |
 
-### Baichuan
-| 模型名称 | 静态图下载 model_name |
-|:------|:-:|
-| baichuan-inc/Baichuan-7B | 🚧 |
-| baichuan-inc/Baichuan-13B-Base | 🚧 |
-| baichuan-inc/Baichuan-13B-Chat | 🚧 |
-
-### Baichuan2
-| 模型名称 | 静态图下载 model_name |
-|:------|:-:|
-| baichuan-inc/Baichuan2-7B-Base | 🚧 |
-| baichuan-inc/Baichuan2-7B-Chat | 🚧 |
-| baichuan-inc/Baichuan2-13B-Base | 🚧 |
-| baichuan-inc/Baichuan2-13B-Chat | 🚧 |
-
-### Bloom
-| 模型名称 | 静态图下载 model_name |
-|:------|:-:|
-| bigscience/bloom-560m | 🚧 |
-| bigscience/bloom-560m-bf16 | 🚧 |
-| bigscience/bloom-1b1 | 🚧 |
-| bigscience/bloom-3b | 🚧 |
-| bigscience/bloom-7b1 | 🚧 |
-| bigscience/bloomz-560m | 🚧 |
-| bigscience/bloomz-1b1 | 🚧 |
-| bigscience/bloomz-3b | 🚧 |
-| bigscience/bloomz-7b1-mt | 🚧 |
-| bigscience/bloomz-7b1-p3 | 🚧 |
-| bigscience/bloomz-7b1 | 🚧 |
-| bellegroup/belle-7b-2m | 🚧 |
-
-### ChatGLM
-| 模型名称 | 静态图下载 model_name |
-|:------|:-:|
-| THUDM/chatglm-6b | 🚧 |
-| THUDM/chatglm-6b-v1.1 | 🚧 |
-
-### ChatGLM2
-| 模型名称 | 静态图下载 model_name |
-|:------|:-:|
-| THUDM/chatglm2-6b | 🚧 |
-
-### ChatGLM3
-| 模型名称 | 静态图下载 model_name |
-|:------|:-:|
-| THUDM/chatglm3-6b | 🚧 |
-
-
-### Gemma
-| 模型名称 | 静态图下载 model_name |
-|:------|:-:|
-| google/gemma-7b | 🚧 |
-| google/gemma-7b-it | 🚧 |
-| google/gemma-2b | 🚧 |
-| google/gemma-2b-it | 🚧 |
-
-### Mistral
-| 模型名称 | 静态图下载 model_name |
-|:------|:-:|
-| mistralai/Mistral-7B-Instruct-v0.3 | 🚧 |
-| mistralai/Mistral-7B-v0.1 | 🚧 |
 
 ### Mixtral
 | 模型名称 | 静态图下载 model_name |
 |:------|:-:|
 | mistralai/Mixtral-8x7B-Instruct-v0.1 | 🚧 |
-
-### OPT
-| 模型名称 | 静态图下载 model_name |
-|:------|:-:|
-| facebook/opt-125m | 🚧 |
-| facebook/opt-350m | 🚧 |
-| facebook/opt-1.3b | 🚧 |
-| facebook/opt-2.7b | 🚧 |
-| facebook/opt-6.7b | 🚧 |
-| facebook/opt-13b | 🚧 |
-| facebook/opt-30b | 🚧 |
-| facebook/opt-66b | 🚧 |
-| facebook/opt-iml-1.3b | 🚧 |
-| opt-iml-max-1.3b | 🚧 |
 
 ### Qwen
 | 模型名称 | 静态图下载 model_name |
@@ -258,10 +187,3 @@
 | Qwen/Qwen2.5-Coder-1.5B-Instruct | 🚧 |
 | Qwen/Qwen2.5-Coder-7B | 🚧 |
 | Qwen/Qwen2.5-Coder-7B-Instruct | 🚧 |
-
-### Yuan2
-| 模型名称 | 静态图下载 model_name |
-|:------|:-:|
-| IEITYuan/Yuan2-2B | 🚧 |
-| IEITYuan/Yuan2-51B | 🚧 |
-| IEITYuan/Yuan2-102B | 🚧 |
