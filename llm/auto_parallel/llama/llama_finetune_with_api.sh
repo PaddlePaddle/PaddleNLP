@@ -88,4 +88,4 @@ python -u  -m paddle.distributed.launch \
     --fuse_attention_qkv true \
     --sharding "stage1" \
     --auto_parallel_resume_form_hybrid_parallel true \
-    --num_hidden_layers 2 \
+    --num_hidden_layers 2 
