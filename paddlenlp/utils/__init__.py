@@ -24,7 +24,8 @@ from .initializer import to
 from .memory_utils import empty_device_cache
 from .optimizer import *
 from .serialization import load_torch
-
+from .modeling_outputs import *
+from .doc import add_start_docstrings
 # hack impl for EagerParamBase to function
 # https://github.com/PaddlePaddle/Paddle/blob/fa44ea5cf2988cd28605aedfb5f2002a63018df7/python/paddle/nn/layer/layers.py#L2077
 paddle.framework.io.EagerParamBase.to = to
