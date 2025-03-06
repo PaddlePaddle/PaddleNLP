@@ -72,7 +72,6 @@ if paddle.is_compiled_with_cuda():
             write_cache_kv,
         )
 
-        from .sageattention import sageattn_qk_int8_pv_fp8_cuda_dsk_sm90
     except:
         pass
 
@@ -2986,6 +2985,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
             from paddlenlp.utils.env import PREFILL_USE_SAGE_ATTN
 
             if PREFILL_USE_SAGE_ATTN:
+                from .sageattention import sageattn_qk_int8_pv_fp8_cuda_dsk_sm90
 
                 query_192 = paddle.unsqueeze(query, axis=0)
                 key_192 = paddle.unsqueeze(key, axis=0)
