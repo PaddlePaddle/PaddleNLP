@@ -10,6 +10,6 @@
    ../../server/docs/deploy_usage_tutorial.md
    best_practices.md
    speculative_decoding.md
-   ../../../llm/server/docs/general_model_inference.md
+   ../../../../llm/server/docs/general_model_inference.md
    各个模型推理量化教程 <models.rst>
    大模型异构设备推理 <devices.rst>
