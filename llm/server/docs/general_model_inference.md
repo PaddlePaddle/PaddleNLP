@@ -1,6 +1,6 @@
 # 一键部署推理服务
 
-本文档展示了如何使用docker 在 PaddleNLP 中一键跑通大模型推理。[可一键跑通的模型列表](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/static_models.md)
+本文档展示了如何使用docker一键跑通大模型推理。支持的模型可参考[可一键跑通的模型列表](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/static_models.md)
 
 # 快速开始
 基于预编译镜像部署，使用飞桨静态图模型部署。本节以a100/v100机器跑Llama 3推理为例。其他模型需按照要求导出为静态图模型格式。 更细致的模型推理、量化教程可以参考[大模型推理教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/inference.md)：
