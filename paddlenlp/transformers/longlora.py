@@ -19,7 +19,10 @@ import paddle
 import paddle.nn.functional as F
 
 import paddlenlp
-from paddlenlp.transformers.llama.modeling import get_triangle_upper_mask
+from paddlenlp.transformers.llama.modeling import (
+    get_triangle_upper_mask,
+    scaled_dot_product_attention,
+)
 
 
 def shift(qkv, bsz, q_len, group_size, num_heads, head_dim):
@@ -126,7 +129,10 @@ def ssa_scaled_dot_product_attention(
     return (attn_output, attn_weights) if output_attentions else attn_output
 
 
-def replace_llama_attn(ssa_group_size_ratio):
-    paddlenlp.transformers.llama.modeling.scaled_dot_product_attention = functools.partial(
-        ssa_scaled_dot_product_attention, ssa_group_size_ratio=ssa_group_size_ratio
-    )
+def replace_llama_attn(ssa_group_size_ratio, use_ssa):
+    if use_ssa:
+        paddlenlp.transformers.llama.modeling.scaled_dot_product_attention = functools.partial(
+            ssa_scaled_dot_product_attention, ssa_group_size_ratio=ssa_group_size_ratio
+        )
+    else:
+        paddlenlp.transformers.llama.modeling.scaled_dot_product_attention = scaled_dot_product_attention
