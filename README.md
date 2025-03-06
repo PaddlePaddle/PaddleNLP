@@ -156,17 +156,18 @@
 | [OPT](./llm/config/opt)                    |    ✅     |  ✅  |  ✅   |    🚧     |      🚧       |         🚧         |  🚧  |    ✅     |      🚧      |
 | [Gemma](./llm/config/gemma)                |    ✅     |  ✅  |  ✅   |    🚧     |      🚧       |         ✅          |  🚧  |    ✅     |      🚧      |
 | [Yuan](./llm/config/yuan)                  |    ✅     |  ✅  |  ✅   |    🚧     |      🚧       |         ✅          |  🚧  |    ✅     |      🚧      |
-* [大模型推理](./llm/docs/predict/inference.md)已支持 LLaMA 系列、Qwen 系列、Mistral 系列、ChatGLM 系列、Bloom 系列和 Baichuan 系列，支持 Weight Only INT8及 INT4推理，支持 WAC（权重、激活、Cache KV）进行 INT8、FP8量化的推理，【LLM】模型推理支持列表如下：
+* [大模型推理](./llm/docs/predict/inference.md)已支持 LLaMA 系列、Qwen 系列、DeepSeek 系列、Mistral 系列、ChatGLM 系列、Bloom 系列和 Baichuan 系列，支持 Weight Only INT8及 INT4推理，支持 WAC（权重、激活、Cache KV）进行 INT8、FP8量化的推理，【LLM】模型推理支持列表如下：
 
-|          模型名称/量化类型支持           | FP16/BF16 | WINT8 | WINT4 | INT8-A8W8 | FP8-A8W8 | INT8-A8W8C8 |
+|          模型名称/量化类型支持              | FP16/BF16 | WINT8 | WINT4 | INT8-A8W8 | FP8-A8W8 | INT8-A8W8C8 |
 |:----------------------------------------:|:---------:|:-----:|:-----:|:---------:|:--------:|:-----------:|
 |   [LLaMA](./llm/docs/predict/llama.md)   |     ✅     |   ✅   |   ✅   |     ✅     |    ✅     |      ✅      |
 |    [Qwen](./llm/docs/predict/qwen.md)    |     ✅     |   ✅   |   ✅   |     ✅     |    ✅     |      ✅      |
-|  [Qwen-Moe](./llm/docs/predict/qwen.md)  |     ✅     |   ✅   |   ✅   |    🚧     |    🚧    |     🚧      |
-| [Mixtral](./llm/docs/predict/mixtral.md) |     ✅     |   ✅   |   ✅   |    🚧     |    🚧    |     🚧      |
-|                 ChatGLM                  |     ✅     |   ✅   |   ✅   |    🚧     |    🚧    |     🚧      |
-|                  Bloom                   |     ✅     |   ✅   |   ✅   |    🚧     |    🚧    |     🚧      |
-|                 BaiChuan                 |     ✅     |   ✅   |   ✅   |     ✅     |    ✅     |     🚧      |
+|[DeepSeek](./llm/docs/predict/deepseek.md)|     ✅     |   ✅   |   ✅   |     🚧     |    ✅     |      🚧      |
+|  [Qwen-Moe](./llm/docs/predict/qwen.md)  |     ✅     |   ✅   |   ✅   |     🚧     |    🚧     |      🚧      |
+| [Mixtral](./llm/docs/predict/mixtral.md) |     ✅     |   ✅   |   ✅   |     🚧     |    🚧     |      🚧      |
+|                 ChatGLM                  |     ✅     |   ✅   |   ✅   |     🚧     |    🚧     |      🚧      |
+|                  Bloom                   |     ✅     |   ✅   |   ✅   |     🚧     |    🚧     |      🚧      |
+|                 BaiChuan                 |     ✅     |   ✅   |   ✅   |     ✅     |    ✅     |      🚧      |
 
 ## 安装
 
