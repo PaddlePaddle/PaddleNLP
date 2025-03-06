@@ -49,23 +49,27 @@ export SERVICE_HTTP_PORT=${PUSH_MODE_HTTP_PORT:-${SERVICE_HTTP_PORT:-"9965"}}
 # 开启 MTP
 export SPECULATE_METHOD="mtp"
 # /PATH_TO_MODEL # 模型挂载路径
-# /PATH_TO_MODELMTP # MTP 模型挂载路径
+# /PATH_TO_MTP # MTP 挂载路径
 ```
 
 ```shell
 # node1
+export model_name=${model_name:-"deepseek-ai/DeepSeek-R1-2nodes/a8w8_fp8"}
+export MODEL_PATH=${MODEL_PATH:-/PATH_TO_MODEL/}
+export MODEL_MTP_PATH=${MODEL_PATH:-/PATH_TO_MTP/}
 docker run --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
--v /PATH_TO_MODEL/:/models -v /PATH_TO_MODEL/:/models-mtp \
+-v $MODEL_PATH:/models -v $MODEL_MTP_PATH:/models-mtp -e "model_name=${model_name}" \
 -dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v1.0 /bin/bash \
--c -ex 'export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 && export MP_NUM=16 && export MP_NNODE=2 && export POD_0_IP=192.168.0.1 && export POD_IPS=192.168.0.1,192.168.0.2 && export SPECULATE_MODEL_QUANT_TYPE="weight_only_int8" && export SPECULATE_METHOD="mtp" && export SPECULATE_MODEL_PATH="/models-mtp" && export SPECULATE_MAX_DRAFT_TOKEN_NUM=1 && model_name=${model_name:-"deepseek-ai/DeepSeek-R1-MTP-2nodes/weight_only_int8"}&& cd /opt/output/Serving && bash start_server.sh $model_name && tail -f /dev/null'\
-&& docker exec -it $(docker ps -lq) sh -c "while [ ! -f /opt/output/Serving/log/workerlog.0 ]; do sleep 1; done; tail -f /opt/output/Serving/log/workerlog.0"
+-c -ex 'export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 && export MP_NUM=16 && export MP_NNODE=2 && export POD_0_IP=192.168.0.1 && export POD_IPS=192.168.0.1,192.168.0.2 && export SPECULATE_MODEL_QUANT_TYPE="weight_only_int8" && export SPECULATE_METHOD="mtp" && export SPECULATE_MODEL_PATH="/models-mtp" && export SPECULATE_MAX_DRAFT_TOKEN_NUM=1 && start_server $model_name && tail -f /dev/null'
 
 # node2
+export model_name=${model_name:-"deepseek-ai/DeepSeek-R1-2nodes/a8w8_fp8"}
+export MODEL_PATH=${MODEL_PATH:-/PATH_TO_MODEL/}
+export MODEL_MTP_PATH=${MODEL_PATH:-/PATH_TO_MTP/}
 docker run --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
--v /PATH_TO_MODEL/:/models -v /PATH_TO_MODEL/:/models-mtp \
+-v $MODEL_PATH:/models -v $MODEL_MTP_PATH:/models-mtp -e "model_name=${model_name}" \
 -dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v1.0 /bin/bash \
--c -ex 'export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 && export MP_NUM=16 && export MP_NNODE=2 && export POD_0_IP=192.168.0.1 && export POD_IPS=192.168.0.1,192.168.0.2 &&export SPECULATE_MODEL_QUANT_TYPE="weight_only_int8"&& export SPECULATE_METHOD="mtp" && export SPECULATE_MODEL_PATH="/models-mtp" && export SPECULATE_MAX_DRAFT_TOKEN_NUM=1 && model_name=${model_name:-"deepseek-ai/DeepSeek-R1-MTP-2nodes/weight_only_int8"} && cd /opt/output/Serving && bash start_server.sh $model_name && tail -f /dev/null'\
-&& docker exec -it $(docker ps -lq) sh -c "while [ ! -f /opt/output/Serving/log/workerlog.0 ]; do sleep 1; done; tail -f /opt/output/Serving/log/workerlog.0"
+-c -ex 'export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 && export MP_NUM=16 && export MP_NNODE=2 && export POD_0_IP=192.168.0.1 && export POD_IPS=192.168.0.1,192.168.0.2 &&export SPECULATE_MODEL_QUANT_TYPE="weight_only_int8" && export SPECULATE_METHOD="mtp" && export SPECULATE_MODEL_PATH="/models-mtp" && export SPECULATE_MAX_DRAFT_TOKEN_NUM=1 && start_server $model_name  && tail -f /dev/null'
 ```
 
 ### 请求服务化

@@ -21,8 +21,7 @@ export model_name=${model_name:-"meta-llama/Meta-Llama-3-8B-Instruct-Append-Attn
 docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
 -v $MODEL_PATH:/models -e "model_name=${model_name}" \
 -dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v1.0 /bin/bash \
--c -ex 'start_server $model_name && tail -f /dev/null'\
-&& docker exec -it $(docker ps -lq) sh -c "while [ ! -f /opt/output/Serving/log/workerlog.0 ]; do sleep 1; done; tail -f /opt/output/Serving/log/workerlog.0"
+-c -ex 'start_server $model_name && tail -f /dev/null'
 ```
 v100
 ```shell
@@ -31,8 +30,7 @@ export model_name=${model_name:-"meta-llama/Meta-Llama-3-8B-Instruct-Block-Attn/
 docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
 -v $MODEL_PATH:/models -e "model_name=${model_name}" \ 
 -dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda118-cudnn8-v1.0 /bin/bash \
--c -ex 'start_server $model_name && tail -f /dev/null'\
-&& docker exec -it $(docker ps -lq) sh -c "while [ ! -f /opt/output/Serving/log/workerlog.0 ]; do sleep 1; done; tail -f /opt/output/Serving/log/workerlog.0"
+-c -ex 'start_server $model_name && tail -f /dev/null'
 ```
 
 
@@ -73,8 +71,7 @@ a100
 export MODEL_PATH=${MODEL_PATH:-$PWD}
 docker run --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
 -v $MODEL_PATH/:/models -dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v1.0 /bin/bash \
--c -ex 'start_server && tail -f /dev/null'\
-&& docker exec -it $(docker ps -lq) sh -c "while [ ! -f /opt/output/Serving/log/workerlog.0 ]; do sleep 1; done; tail -f /opt/output/Serving/log/workerlog.0"
+-c -ex 'start_server && tail -f /dev/null'
 ```
 
 v100
@@ -82,8 +79,7 @@ v100
 export MODEL_PATH=${MODEL_PATH:-$PWD}
 docker run --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
 -v $MODEL_PATH/:/models -dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda118-cudnn8-v1.0 /bin/bash \
--c -ex 'start_server && tail -f /dev/null'\
-&& docker exec -it $(docker ps -lq) sh -c "while [ ! -f /opt/output/Serving/log/workerlog.0 ]; do sleep 1; done; tail -f /opt/output/Serving/log/workerlog.0"
+-c -ex 'start_server && tail -f /dev/null'
 ```
 
 ## 服务化测试
