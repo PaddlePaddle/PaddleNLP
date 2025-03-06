@@ -11,9 +11,8 @@
 
 本节以 meta-llama/Meta-Llama-3-8B-Instruct bf16 推理为例子
 
-```shell
-MODEL_PATH  # 静态图模型存放路径
-```
+>MODEL_PATH # 静态图模型存放路径
+
 a100
 ```shell
 export MODEL_PATH=${MODEL_PATH:-$PWD}
@@ -41,13 +40,12 @@ docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap
 不支持一键导出的模型暂时仅支持用户自行导出进行服务化推理,可参考以下内容进行推理服务化部署
 
 ### 模型导出
-```shell
-MODEL_PATH #静态图模型存放地址
---dtype #可选择导出精度
---append_attn #仅sm>=80的机器支持
---block_attn #支持sm<80的机器导出 如果append_attn无法推理可直接替换成 block_attn
-```
-高性能部署需要先将动态图模型，导出为静态图推理格式，针对A100，V100机器的导出命令如下：
+
+> MODEL_PATH #静态图模型存放地址
+> --dtype #可选择导出精度
+> --append_attn #仅sm>=80的机器支持
+> --block_attn #支持sm<80的机器导出，如果append_attn无法推理可直接替换成block_attn
+> 高性能部署需要先将动态图模型，导出为静态图推理格式，针对A100/V100机器的导出命令如下：
 
 a100
 ```shell
@@ -88,11 +86,10 @@ docker run --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_P
 
 ## 服务化测试
 
-```shell
-观察到如下日志后可以
-analysis_predictor.cc:1158] ======= pir optimization completed =======
-可以ctrl+c 进行服务化测试
-```
+> 观察到如下日志后可以
+> analysis_predictor.cc:1158] ======= pir optimization completed =======
+> 可以ctrl+c 进行服务化测试
+ 
 
 ```shell
 curl 127.0.0.1:9965/v1/chat/completions \
