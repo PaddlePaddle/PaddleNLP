@@ -2983,13 +2983,9 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
 
         if kwargs["max_enc_len_this_time"]:  # prefill phase
             query, key, value = self.compute_qkv_linear(ln_out, i, latent_cache=latent_cache, **kwargs)
-            seq_len_q_slices = kwargs.get("cu_seqlens_q", None)
-            seq_len_k_slices = kwargs.get("cu_seqlens_k", None)
-            bsz = 1
-            if seq_len_q_slices is not None:
-                bsz = seq_len_q_slices.shape[0] - 1
 
-            if use_sageattn and bsz == 1:  # batch size == 1
+            if use_sageattn:
+
                 query_192 = paddle.unsqueeze(query, axis=0)
                 key_192 = paddle.unsqueeze(key, axis=0)
 
@@ -2999,6 +2995,8 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 fmha_out_prefill = sageattn_qk_int8_pv_fp8_cuda_dsk_sm90(
                     query_192,
                     key_192,
+                    kwargs.get("cu_seqlens_q", None),
+                    kwargs.get("cu_seqlens_k", None),
                     value_128,
                     is_causal=True,
                     sm_scale=self.softmax_scale,
@@ -3011,8 +3009,8 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                     query,
                     key,
                     value,
-                    seq_len_q_slices,
-                    seq_len_k_slices,
+                    kwargs.get("cu_seqlens_q", None),
+                    kwargs.get("cu_seqlens_k", None),
                     kwargs.get("max_enc_len_this_time", -1),
                     kwargs.get("max_enc_len_this_time", -1),
                     self.softmax_scale,

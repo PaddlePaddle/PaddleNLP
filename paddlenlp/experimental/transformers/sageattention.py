@@ -516,6 +516,8 @@ def sageattn_qk_int8_pv_fp8_cuda_sm90(
 def sageattn_qk_int8_pv_fp8_cuda_dsk_sm90(
     q: paddle.Tensor,
     k: paddle.Tensor,
+    q_seq_indices: paddle.Tensor,
+    k_seq_indices: paddle.Tensor,
     v: paddle.Tensor,
     tensor_layout: str = "HND",
     is_causal: bool = False,
@@ -607,6 +609,8 @@ def sageattn_qk_int8_pv_fp8_cuda_dsk_sm90(
         k_int8_nope,
         q_int8_pe,
         k_int8_pe,
+        q_seq_indices,
+        k_seq_indices,
         v_fp8,
         o,
         q_scale,

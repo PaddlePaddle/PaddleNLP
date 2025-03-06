@@ -855,6 +855,8 @@ std::vector<paddle::Tensor> qk_int8_sv_f8_accum_f32_fuse_v_scale_attn_inst_buf_d
                     paddle::Tensor& key,
                     paddle::Tensor& query_pe,
                     paddle::Tensor& key_pe,
+                    paddle::Tensor& q_seq_indices,
+                    paddle::Tensor& k_seq_indices,
                     paddle::Tensor& value,
                     paddle::Tensor& output,
                     paddle::Tensor& query_scale,
@@ -905,7 +907,9 @@ std::vector<paddle::Tensor> qk_int8_sv_f8_accum_f32_fuse_v_scale_attn_inst_buf_d
   CHECK_DIMS(key_scale, 3);
   CHECK_DIMS(value_scale, 3);
 
-  const int batch_size = query.shape()[0];
+  const int batch_size = q_seq_indices.shape()[0] - 1;
+  PD_CHECK(batch_size == 1, "Sage Attention only support batch_size == 1");
+  
   const int head_dim = query.shape()[3];
 
   int stride_bz_q = query.strides()[0];
@@ -1058,6 +1062,8 @@ std::vector<std::vector<int64_t>> qk_int8_sv_f8_accum_f32_fuse_v_scale_attn_inst
   std::vector<int64_t> key_shape, 
   std::vector<int64_t> query_pe_shape, 
   std::vector<int64_t> key_pe_shape, 
+  std::vector<int64_t> q_seq_indices_shape,
+  std::vector<int64_t> k_seq_indices_shape,
   std::vector<int64_t> value_shape, 
   std::vector<int64_t> output_shape, 
   std::vector<int64_t> query_scale_shape, 
@@ -1082,12 +1088,14 @@ std::vector<paddle::DataType> qk_int8_sv_f8_accum_f32_fuse_v_scale_attn_inst_buf
   paddle::DataType F_dtype,
   paddle::DataType G_dtype,
   paddle::DataType H_dtype,
-  paddle::DataType I_dtype) {
+  paddle::DataType I_dtype,
+  paddle::DataType J_dtype,
+  paddle::DataType K_dtype) {
   return {paddle::DataType::FLOAT32};
 }
 
 PD_BUILD_OP(qk_int8_sv_f8_accum_f32_fuse_v_scale_attn_inst_buf_dsk_sm90)
-    .Inputs({"query", "key", "query_pe", "key_pe", "value", "output", "query_scale", "key_scale", "value_scale"})
+    .Inputs({"query", "key", "query_pe", "key_pe", "q_seq_indices", "k_seq_indices", "value", "output", "query_scale", "key_scale", "value_scale"})
     .Outputs({"out", "lse"})
     .SetInplaceMap({{"output", "out"}}) // Inplace
     .Attrs({"tensor_layout: int",
