@@ -172,7 +172,7 @@ def main():
         assert (
             model_args.ssa_group_size_ratio is not None
         ), "ssa_group_size_ratio must be specified when use_ssa is True"
-        replace_llama_attn(model_args.ssa_group_size_ratio, use_ssa=True)
+        replace_llama_attn(model_args.ssa_group_size_ratio, model_args.use_ssa)
 
     architectures_to_check = {"Qwen2Moe", "DeepseekV2", "DeepseekV3"}
     if (
@@ -463,7 +463,6 @@ def main():
                 trainer.log_metrics("train", train_result.metrics)
                 trainer.save_metrics("train", train_result.metrics)
                 trainer.save_state()
-
     # Evaluation test set
     if training_args.do_predict:
         eval_result = trainer.predict(test_ds).metrics
@@ -474,10 +473,6 @@ def main():
         logger.info("*** Evaluate result after train ***")
         eval_result = trainer.evaluate(dev_ds)
         trainer.log_metrics("eval", eval_result)
-
-    # longlora: dense attention is needed after training
-    if model_args.use_ssa:
-        replace_llama_attn(model_args.ssa_group_size_ratio, use_ssa=False)
 
 
 def save_to_aistudio(model_args, training_args, trainer):

@@ -20,6 +20,7 @@ import unittest
 import paddle
 from parameterized import parameterized_class
 
+from paddlenlp.transformers.longlora import replace_llama_attn
 from tests.testing_utils import argv_context_guard, load_test_config
 
 from .testing_utils import LLMTest
@@ -62,7 +63,7 @@ class LoraTest(LLMTest, unittest.TestCase):
             from run_finetune import main
 
             main()
-
+        replace_llama_attn(use_ssa=False)
         # merge weights
         merge_lora_weights_config = {
             "lora_path": lora_config["output_dir"],
@@ -73,7 +74,6 @@ class LoraTest(LLMTest, unittest.TestCase):
             from tools.merge_lora_params import merge
 
             merge()
-
         # TODO(wj-Mcat): disable chatglm2 test temporarily
         if self.model_dir not in ["qwen", "baichuan", "chatglm2"]:
             self.run_predictor({"inference_model": True})
