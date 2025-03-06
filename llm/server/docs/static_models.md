@@ -1,6 +1,6 @@
 ## 静态图模型下载支持
 
-* 静态图模型已支持 Deepseek 系列、Qwen 系列、llama 系列等模型 详细列表👉【LLM】模型支持列表如下：
+* 静态图模型已支持 Deepseek 系列、Qwen 系列、llama 系列等模型 详细支持列表如下：
 
 ### DeepSeekV2
 |模型名称|静态图下载 model_name|
