@@ -16,24 +16,24 @@
 ### DeepSeekR1
 |模型名称|精度|MTP|节点数|静态图下载 model_name|
 |:------|:-:|:-:|:-:|:-:|
-| deepseek-ai/DeepSeek-R1                   |weight_only_int4|否|1| deepseek-ai/DeepSeek-R1/weight_only_int4 |
-|                  |weight_only_int4|是|1| deepseek-ai/DeepSeek-R1-MTP/weight-only-int4 |
-|                  |weight_only_int4|否|2| deepseek-ai/DeepSeek-R1-2nodes/weight_only_int4 |
-|                  |weight_only_int4|是|2| deepseek-ai/DeepSeek-R1-MTP-2nodes/weight-only-int4  |
-|                  |weight_only_int8|否|1|  deepseek-ai/DeepSeek-R1/weight-only-int8|
-|                  |weight_only_int8|是|1|  deepseek-ai/DeepSeek-R1-MTP/weight-only-int8|
-|                  |weight_only_int8|否|2| deepseek-ai/DeepSeek-R1-2nodes/weight_only_int8 |
-|                  |weight_only_int8|是|2| deepseek-ai/DeepSeek-R1-MTP-2nodes/weight-only-int8 |
-|                  |a8w8_fp8|否|1| deepseek-ai/DeepSeek-R1/a8w8_fp8 |
-|                  |a8w8_fp8|是|1| deepseek-ai/DeepSeek-R1-MTP/a8w8_fp8|
-|                  |a8w8_fp8|否|2| deepseek-ai/DeepSeek-R1-2nodes/a8w8_fp8|
-|                  |a8w8_fp8|是|2| deepseek-ai/DeepSeek-R1-MTP-2nodes/a8w8_fp8|
-| deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B |weight_only_int8|-|-｜ deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B/weight_only_int8 |
-| deepseek-ai/DeepSeek-R1-Distill-Qwen-7B   |weight_only_int8|-|- deepseek-ai/DeepSeek-R1-Distill-Qwen-7B/weight_only_int8 |
-| deepseek-ai/DeepSeek-R1-Distill-Qwen-14B  |weight_only_int8|-|- deepseek-ai/DeepSeek-R1-Distill-Qwen-14B/weight_only_int8 |
-| deepseek-ai/DeepSeek-R1-Distill-Qwen-32B  |weight_only_int8|-|- deepseek-ai/DeepSeek-R1-Distill-Qwen-32B/weight_only_int8 |
-| deepseek-ai/DeepSeek-R1-Distill-Llama-8B  |weight_only_int8|-|- deepseek-ai/DeepSeek-R1-Distill-Llama-8B/weight_only_int8 |
-| deepseek-ai/DeepSeek-R1-Distill-Llama-70B |weight_only_int8|-|- deepseek-ai/DeepSeek-R1-Distill-Llama-70B/weight_only_int8 |
+| deepseek-ai/DeepSeek-R1  |weight_only_int4|否|1| deepseek-ai/DeepSeek-R1/weight_only_int4 |
+| deepseek-ai/DeepSeek-R1  |weight_only_int4|是|1| deepseek-ai/DeepSeek-R1-MTP/weight-only-int4 |
+| deepseek-ai/DeepSeek-R1  |weight_only_int4|否|2| deepseek-ai/DeepSeek-R1-2nodes/weight_only_int4 |
+| deepseek-ai/DeepSeek-R1  |weight_only_int4|是|2| deepseek-ai/DeepSeek-R1-MTP-2nodes/weight-only-int4  |
+| deepseek-ai/DeepSeek-R1  |weight_only_int8|否|1|  deepseek-ai/DeepSeek-R1/weight-only-int8|
+| deepseek-ai/DeepSeek-R1  |weight_only_int8|是|1|  deepseek-ai/DeepSeek-R1-MTP/weight-only-int8|
+| deepseek-ai/DeepSeek-R1  |weight_only_int8|否|2| deepseek-ai/DeepSeek-R1-2nodes/weight_only_int8 |
+| deepseek-ai/DeepSeek-R1  |weight_only_int8|是|2| deepseek-ai/DeepSeek-R1-MTP-2nodes/weight-only-int8 |
+| deepseek-ai/DeepSeek-R1  |a8w8_fp8|否|1| deepseek-ai/DeepSeek-R1/a8w8_fp8 |
+| deepseek-ai/DeepSeek-R1  |a8w8_fp8|是|1| deepseek-ai/DeepSeek-R1-MTP/a8w8_fp8|
+| deepseek-ai/DeepSeek-R1  |a8w8_fp8|否|2| deepseek-ai/DeepSeek-R1-2nodes/a8w8_fp8|
+| deepseek-ai/DeepSeek-R1  |a8w8_fp8|是|2| deepseek-ai/DeepSeek-R1-MTP-2nodes/a8w8_fp8|
+| deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B |weight_only_int8|-|-| deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B/weight_only_int8 |
+| deepseek-ai/DeepSeek-R1-Distill-Qwen-7B   |weight_only_int8|-|-|deepseek-ai/DeepSeek-R1-Distill-Qwen-7B/weight_only_int8 |
+| deepseek-ai/DeepSeek-R1-Distill-Qwen-14B  |weight_only_int8|-|-|deepseek-ai/DeepSeek-R1-Distill-Qwen-14B/weight_only_int8 |
+| deepseek-ai/DeepSeek-R1-Distill-Qwen-32B  |weight_only_int8|-|-|deepseek-ai/DeepSeek-R1-Distill-Qwen-32B/weight_only_int8 |
+| deepseek-ai/DeepSeek-R1-Distill-Llama-8B  |weight_only_int8|-|-|deepseek-ai/DeepSeek-R1-Distill-Llama-8B/weight_only_int8 |
+| deepseek-ai/DeepSeek-R1-Distill-Llama-70B |weight_only_int8|-|-|deepseek-ai/DeepSeek-R1-Distill-Llama-70B/weight_only_int8 |
 
 
 
