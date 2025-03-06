@@ -2985,7 +2985,7 @@ class PipelinePretrainedModel(PretrainedModel):
 
         return self._single_to_pp_mapping
 
-    def get_shardlayer_prefix(self, name_splited, shared_layer_class):
+    def get_shardlayer_prefix(self, name_splited, shared_layer_class=SharedLayerDesc):
         """_summary_
             This function retrieves the prefix of a shared layer. The process involves:
             1. Identifying all key names of shared layers, like 'shared_weight01', 'shared_weight02', etc.
