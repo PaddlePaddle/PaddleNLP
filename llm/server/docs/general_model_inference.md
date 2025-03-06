@@ -12,11 +12,12 @@
 本节以 meta-llama/Meta-Llama-3-8B-Instruct bf16 推理为例子
 
 >MODEL_PATH # 静态图模型存放路径。  
+>model_name # 参考文档可一键跑通的模型列表
 
 a100
 ```shell
 export MODEL_PATH=${MODEL_PATH:-$PWD}
-export model_name=${model_name:-"meta-llama/Meta-Llama-3-8B-Instruct"}
+export model_name=${model_name:-"meta-llama/Meta-Llama-3-8B-Instruct-Append-Attn/bfloat16"}
 docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
 -v $MODEL_PATH:/models -e "model_name=${model_name}" \
 -dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v1.0 /bin/bash \
@@ -26,7 +27,7 @@ docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap
 v100
 ```shell
 export MODEL_PATH=${MODEL_PATH:-$PWD}
-export model_name=${model_name:-"meta-llama/Meta-Llama-3-8B-Instruct"}
+export model_name=${model_name:-"meta-llama/Meta-Llama-3-8B-Instruct-Block-Attn/float16"}
 docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
 -v $MODEL_PATH:/models -e "model_name=${model_name}" \ 
 -dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda118-cudnn8-v1.0 /bin/bash \
