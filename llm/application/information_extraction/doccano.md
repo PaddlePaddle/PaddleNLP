@@ -28,7 +28,7 @@ PP-UIE 支持抽取类型的任务，根据实际需要创建一个新的项目�
 
 #### 2.1 抽取式任务项目创建
 
-创建项目时选择**序列标注**任务，并勾选**Allow overlapping entity**及**Use relation Labeling**。适配**命名实体识别、关系抽取、事件抽取、评价观点抽取**等任务。
+创建项目时选择**序列标注**任务，并勾选**Allow overlapping entity**及**Use relation Labeling**。适配**命名实体识别、关系抽取、事件抽取**等任务。
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/167249142-44885510-51dc-4359-8054-9c89c9633700.png height=230 hspace='15'/>
@@ -236,14 +236,14 @@ schema = {
 python doccano.py \
     --doccano_file ./data/doccano_ext.json \
     --save_dir ./data \
-    --negative_ratio 5
+    --negative_ratio 1
 ```
 
 可配置参数说明：
 
 - ``doccano_file``: 从 doccano 导出的数据标注文件。
 - ``save_dir``: 训练数据的保存目录，默认存储在``data``目录下。
-- ``negative_ratio``: 最大负例比例，该参数只对抽取类型任务有效，适当构造负例可提升模型效果。负例数量和实际的标签数量有关，最大负例数量 = negative_ratio * 正例数量。该参数只对训练集有效，默认为5。为了保证评估指标的准确性，验证集和测试集默认构造全正例。
+- ``negative_ratio``: 最大负例比例，该参数只对抽取类型任务有效，适当构造负例可提升模型效果。负例数量和实际的标签数量有关，最大负例数量 = negative_ratio * 正例数量。
 - ``splits``: 划分数据集时训练集、验证集所占的比例。默认为[0.8, 0.1, 0.1]表示按照``8:1:1``的比例将数据划分为训练集、验证集和测试集。
 - ``task_type``: 选择任务类型，目前只有信息抽取这一种任务。
 - ``is_shuffle``: 是否对数据集进行随机打散，默认为 True。

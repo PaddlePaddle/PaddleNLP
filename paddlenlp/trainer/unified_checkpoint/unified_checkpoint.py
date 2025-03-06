@@ -62,7 +62,10 @@ from .load_save_single_card import (
     save_single_card_checkpoint,
     save_single_card_optimizer,
 )
-from .sharding_split_param_utils import gather_splited_param_for_optimizer
+from .sharding_split_param_utils import (
+    gather_splited_param_for_optimizer,
+    load_non_merge_optimizer_with_split_param,
+)
 from .utils import (
     FP32_MASTER,
     UnifiedCheckpointOption,
@@ -263,6 +266,23 @@ class UnifiedCheckpointHandler:
             )
 
     def load_non_merge_optimizer(self, model, optimizer, resume_from_checkpoint, ckpt_quant_stage="O0"):
+        """load non merge optimizer
+
+        Args:
+            model (PretrainedModel): model used to get key mapping.
+            optimizer (Optimizer): optimizer to load
+            resume_from_checkpoint (str): path of the checkpoint to load
+            ckpt_quant_stage (str): ckpt quant stage
+
+        Returns:
+            dict: optimizer state dict
+        """
+
+        if is_sharding_split_param_mode(self.args):
+            return load_non_merge_optimizer_with_split_param(
+                self.args, model, optimizer, resume_from_checkpoint, ckpt_quant_stage
+            )
+
         # init and get optimizer LR_Scheduler
         returned_optim_state_dict = nested_copy(optimizer.state_dict())
 
