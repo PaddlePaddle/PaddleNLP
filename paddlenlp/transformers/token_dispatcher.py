@@ -18,9 +18,10 @@ from abc import ABC, abstractmethod
 from typing import Optional, Tuple
 
 import paddle
-from fused_a2a import fused_combine, fused_dispatch
-from moe_utils import permute, unpermute
 from paddle.distributed.communication.group import Group
+
+from .fused_a2a import fused_combine, fused_dispatch
+from .moe_utils import permute, unpermute
 
 
 class _DispatchManager(ABC):
