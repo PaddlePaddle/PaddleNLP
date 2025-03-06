@@ -17,8 +17,12 @@ RUN mkdir -p /opt/source/ && cd /opt/source/ \
     && python3 -m pip install --no-cache-dir -r PaddleNLP/requirements.txt \
     && python3 -m pip install --no-cache-dir -r PaddleNLP/llm/server/server/requirements.txt
 
-RUN cp /opt/source/PaddleNLP/llm/server/server/scripts/start_server.sh /opt/output/Serving/ \
-    && cp /opt/source/PaddleNLP/llm/server/server/scripts/stop_server.sh /opt/output/Serving/
+RUN cp /opt/source/PaddleNLP/llm/server/server/scripts/start_server.sh start_server \
+    && chmod +x start_server \
+    && mv start_server /usr/local/bin/ \
+    && cp /opt/source/PaddleNLP/llm/server/server/scripts/stop_server.sh start_server \
+    && chmod +x stop_server \
+    && mv stop_server /usr/local/bin/ 
 
 ENV PYTHONPATH="/opt/source/PaddleNLP/llm/server/server:/opt/source/PaddleNLP"
 
