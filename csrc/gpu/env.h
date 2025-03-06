@@ -31,8 +31,8 @@ inline uint32_t get_encoder_block_shape_q() {
 inline uint32_t get_max_partition_size(int bsz) {
     static const char* max_partition_size_env = std::getenv("FLAGS_cascade_attention_max_partition_size");
     static const uint32_t max_partition_size =
-            max_partition_size_env == nullptr ? 0 : std::stoul(std::string(max_partition_size_env));
-    return (max_partition_size != 0 ? max_partition_size : (bsz == 1 ? 128 : 512));
+            max_partition_size_env == nullptr ? 32768 : std::stoul(std::string(max_partition_size_env));
+    return max_partition_size;
 }
 
 inline uint32_t get_cascade_attention_deal_each_time() {
