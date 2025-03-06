@@ -68,6 +68,9 @@ docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap
 ```
 
 ### 服务化推理
+具体的部署细节以及参数说明可以查看[文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/deploy_usage_tutorial.md)
+
+
 a100
 ```shell
 export MODEL_PATH=${MODEL_PATH:-$PWD}
@@ -87,8 +90,8 @@ docker run --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_P
 ## 服务化测试
 
 > 观察到如下日志后可以  
-> analysis_predictor.cc:1158] ======= pir optimization completed =======  
-> 可以ctrl+c 进行服务化测试  
+> Init triton server success  
+> 模型加载完成可以进行服务化测试  
  
 
 ```shell
