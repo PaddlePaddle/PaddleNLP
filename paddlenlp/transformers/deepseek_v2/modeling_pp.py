@@ -149,7 +149,6 @@ class DeepseekV2EmbeddingPipe(nn.Layer):
             attention_mask.stop_gradient = True
 
         if self.config.num_nextn_predict_layers > 0:
-            print("pipe out 0.5:", inputs_embeds)
             inputs_embeds_extra = inputs_embeds[:, -self.config.num_nextn_predict_layers :, :]  # [B, S, D]
             inputs_embeds = inputs_embeds[:, : -self.config.num_nextn_predict_layers, :]
             inputs_embeds_ori = inputs_embeds
@@ -178,8 +177,6 @@ class DeepseekV2EmbeddingPipe(nn.Layer):
             # else:
             # mtp_embeds: [B*seq_len*num_nextn_predict_layers, hidden_size]
             inputs_embeds = paddle.concat(embeds_res, axis=-1)
-            print("pipe out:", inputs_embeds)
-            print("pipe out atm:", attention_mask)
             return return_args(inputs_embeds, attention_mask, attn_mask_startend_row_indices, position_ids)
         else:
             if self.sequence_parallel:

@@ -179,9 +179,7 @@ class MoELayer(nn.Layer):
 
         Returns:
             final_out: MoE Layer main output.
-            l_aux: MoE auxiliary loss.
-            l_zloss: MoE z loss.
-        """
+            l_aux: MoE auxiliary loss.  l_zloss: MoE z loss."""
         batch_size, seq_len, d_model = hidden_state.shape
 
         reshaped_input = hidden_state.reshape([-1, d_model])
@@ -204,9 +202,6 @@ class MoELayer(nn.Layer):
         if self.expert_parallel_degree > 1:
             tokens_per_ep_rank = tokens_per_expert.reshape([self.expert_parallel_degree, -1]).sum(axis=1)
             tokens_per_expert_group = paddle.empty([tokens_per_expert.shape[0]], dtype=tokens_per_expert.dtype)
-            print("tokens_per_expert", tokens_per_expert.shape)
-            print("tokens_per_expert_group", tokens_per_expert_group.shape)
-            dist.barrier()
             dist.alltoall_single(tokens_per_expert_group, tokens_per_expert)
             output_splits = (
                 tokens_per_expert_group.reshape([self.expert_parallel_degree, -1]).sum(axis=1).cpu().tolist()
@@ -216,11 +211,6 @@ class MoELayer(nn.Layer):
             )
 
             input_split_sizes = tokens_per_ep_rank.cpu().tolist()
-            print("gathered_tokens", gathered_tokens.shape)
-            print("sorted_tokens", sorted_tokens.shape)
-            print("input_split_sizes", input_split_sizes)
-            print("output_splits", output_splits)
-            dist.barrier()
             task = dist.alltoall_single(
                 gathered_tokens,
                 sorted_tokens,
@@ -257,12 +247,7 @@ class MoELayer(nn.Layer):
         if self.expert_parallel_degree > 1:
             new_x = paddle.empty_like(outs)
             new_x[gatherd_idxs] = outs
-            # gathered_tokens = new_x.new_empty(*sorted_tokens_shape)
             gathered_tokens = paddle.empty(sorted_tokens_shape, dtype=new_x.dtype)
-            print("gathered_tokens", gathered_tokens.shape)
-            print("sorted_tokens", sorted_tokens.shape)
-            print("input_split_sizes", input_split_sizes)
-            print("output_splits", output_splits)
             task = dist.alltoall_single(
                 gathered_tokens,
                 new_x,

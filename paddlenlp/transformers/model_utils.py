@@ -1922,8 +1922,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         model_state_dict = model.state_dict()
 
         expected_keys = list(model_state_dict.keys())
-        print("cakdsjf: ", model.base_model_prefix)
-        print("cakdsjf: ", cls.base_model_prefix)
         prefix = model.base_model_prefix
 
         if len(prefix) > 0:
@@ -2077,7 +2075,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
             before_fuse_keys = list(state_dict.keys())
             if pre_tensor_parallel_split:
-                print("xxxxxsdf: ", prefix)
                 tp_actions = cls.get_tensor_parallel_convert_actions(
                     config, loaded_keys, ignore_error=True, base_model_prefix="deepseek_v3"
                 )
@@ -2146,7 +2143,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 ):
                     pre_tensor_parallel_split = True
                     assert loaded_keys is not None, "loaded_keys is not None."
-                    print("xxxxxsdf: ", prefix)
                     tp_actions = cls.get_tensor_parallel_convert_actions(
                         config, loaded_keys, ignore_error=True, base_model_prefix="deepseek_v3"
                     )
