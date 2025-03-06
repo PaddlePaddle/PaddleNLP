@@ -46,6 +46,7 @@ docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap
 > --dtype #可选择导出精度  
 > --append_attn #仅sm>=80的机器支持  
 > --block_attn #支持sm<80的机器导出，如果append_attn无法推理可直接替换成block_attn  
+>[sm对应GPU型号查询](https://developer.nvidia.com/cuda-gpus)  
 
 a100
 ```shell
@@ -55,6 +56,7 @@ docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap
 -c -ex 'cd /opt/source/PaddleNLP &&export PYTHONPATH=$PWD:$PYTHONPATH && cd llm && python3 predict/export_model.py --model_name_or_path meta-llama/Meta-Llama-3-8B-Instruct --output_path /models --dtype bfloat16 --inference_model 1 --append_attn 1'\
 && docker logs -f $(docker ps -lq)
 ```
+> ⚠️ v100由于硬件指令限制，仅支持float16  
 
 v100
 ```shell
