@@ -15,9 +15,9 @@
 import json
 import os
 from datetime import datetime
+import re
 
-from server.utils import model_server_logger
-
+from server.utils import model_server_logger, download_model
 from paddlenlp.experimental.transformers import SpeculateArgument
 from paddlenlp.generation import GenerationConfig
 
@@ -55,6 +55,8 @@ class Config:
         assert self.mp_num % self.nnode == 0, f"mp_num: {self.mp_num} should be divisible by nnode: {self.nnode}"
         self.mp_num_per_node = self.mp_num // self.nnode
         self.host_ip = os.getenv("HOST_IP", "127.0.0.1")
+        if self.nnode > 1:
+            self.ips = os.getenv("POD_IPS")
 
         # Triton config
         self.max_prefill_batch = int(os.getenv("MAX_PREFILL_BATCH", 1))
@@ -64,12 +66,12 @@ class Config:
 
         # max cached task num
         self.max_cached_task_num = int(os.getenv("MAX_CACHED_TASK_NUM", "128"))
-        # if PUSH_MODE_HTTP_PORT is not configured, only GRPC service is enabled
-        self.push_mode_http_port = int(os.getenv("PUSH_MODE_HTTP_PORT", "-1"))
+        # if SERVICE_HTTP_PORT is not configured, only GRPC service is enabled
+        self.push_mode_http_port = int(os.getenv("SERVICE_HTTP_PORT", "-1"))
         if self.push_mode_http_port > 0:
-            grpc_port = os.getenv("GRPC_PORT", None)
+            grpc_port = os.getenv("SERVICE_GRPC_PORT", None)
             if grpc_port is None:
-                raise Exception("GRPC_PORT cannot be None, while PUSH_MODE_HTTP_PORT>0")
+                raise Exception("SERVICE_GRPC_PORT cannot be None, while SERVICE_HTTP_PORT>0")
             self.grpc_port = int(grpc_port)
 
         # http worker num
@@ -103,7 +105,7 @@ class Config:
         self.return_full_hidden_states = int(os.getenv("RETURN_FULL_HIDDEN_STATES", 0))
 
         # infer queue port
-        self.infer_port = int(os.getenv("INFER_QUEUE_PORT", 56666))
+        self.infer_port = int(os.getenv("INTER_PROC_PORT", 56666))
 
         # whether to use custom health checker
         self.use_custom_health_checker = int(os.getenv("USE_CUSTOM_HEALTH_CHECKER", 1))
@@ -207,6 +209,48 @@ class Config:
                 f.write("{:<20}:{:<6}{}\n".format(k, "", v))
             f.close()
 
+
+    def _get_download_model(self):
+        env = os.environ
+        model_name=env.get("model_name")
+        if not model_name:
+            raise Exception(f"Model Dir is empty")
+        # Define supported model patterns
+        supported_patterns = [
+            r".+Qwen.+", 
+            r".+Llama.+",
+            r".+Mixtral.+", 
+            r".+DeepSeek.+",
+        ]
+        
+        # Check if model_name matches any supported pattern
+        if not any(re.match(pattern, model_name) for pattern in supported_patterns):
+            raise ValueError(
+                f"{model_name} is not in the supported list. Currently supported models: Qwen, Llama, Mixtral, DeepSeek. Please check the model name from this document https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/static_models.md"
+            )
+        model_server_logger.info(f"Start downloading model: {model_name}")
+        tag=env.get("tag")
+        base_url=f"https://paddlenlp.bj.bcebos.com/models/static/{tag}/{model_name}"
+        if self.nnode == 1:
+            # single node model
+            temp_tar = "model.tar"
+        elif env.get("POD_0_IP", "127.0.0.1") == self.host_ip:
+            # Master node model
+            temp_tar = "node1.tar"
+        else:
+            temp_tar = "node2.tar"
+        model_url = base_url+f"/{temp_tar}"
+        download_model(model_url, self.model_dir, temp_tar)
+
+        speculate_path = env.get("SPECULATE_MODEL_PATH")
+        if speculate_path:
+            speculate_url = base_url+"/mtp.tar"
+            os.makedirs(speculate_path, exists=True)
+            model_server_logger.info(f"Start Downloading MTP model, save path : {speculate_path}")
+            download_model(model_url, speculate_path, "mtp.tar")
+
+
+
     def get_model_config(self):
         """
         load config file
@@ -214,7 +258,15 @@ class Config:
         Returns:
             dict: the config file
         """
-        model_config_json = json.load(open(self.model_config_path, "r", encoding="utf-8"))
+        model_config_json = None
+        try:
+            model_config_json = json.load(open(self.model_config_path, "r", encoding="utf-8"))
+        except:
+            try:
+                self._get_download_model()
+                model_config_json = json.load(open(self.model_config_path, "r", encoding="utf-8"))
+            except:
+                raise
         return model_config_json
 
     def get_speculate_config(self):
@@ -271,6 +323,11 @@ class Config:
 
         logger = get_logger("model_server", "infer_config.log")
         config = self.get_model_config()
+
+        # check paddle nlp version
+        tag = os.getenv("tag")
+        if tag not in config["paddlenlp_version"]:
+            raise Exception(f"Current image paddlenlp version {tag} doesn't match the model paddlenlp version {config['paddlenlp_version']} ")
 
         def reset_value(self, value_name, key, config):
             if key in config:

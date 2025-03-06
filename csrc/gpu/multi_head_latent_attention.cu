@@ -62,22 +62,16 @@ std::vector<paddle::Tensor> MultiHeadLatentAttentionKernel(
     const bool causal,
     const bool speculate_decoder) {
   typedef PDTraits<D> traits_;
-  typedef typename traits_::DataType DataType_;
   typedef typename traits_::data_t data_t;
 
-  int encoder_num_blocks_data = encoder_num_blocks.data<int>()[0];
-  int kv_num_blocks_data = kv_num_blocks.data<int>()[0];
   int decoder_num_blocks_data = decoder_num_blocks_cpu.data<int>()[0];
-  int max_enc_len_this_time_data = max_enc_len_this_time.data<int>()[0];
   int max_dec_len_this_time_data = max_dec_len_this_time.data<int>()[0];
   int max_len_kv_data = max_len_kv.data<int>()[0];
-  const int encoder_block_shape_q = get_encoder_block_shape_q();
-  const int decoder_block_shape_q = get_decoder_block_shape_q();
 
   const bool mla_use_tensorcore = get_mla_use_tensorcore();
   auto sm_version = GetSMVersion();
-  if (mla_use_tensorcore && sm_version < 90) {
-    PD_THROW("Please export FLAGS_mla_use_tensorcore=0 when sm < 90.");
+  if ((speculate_decoder || mla_use_tensorcore) && sm_version < 90) {
+    PD_THROW("Please use speculate_decoder=0 and FLAGS_mla_use_tensorcore=0 when sm < 90.");
   }
 
   auto main_stream = query.stream();
@@ -112,7 +106,6 @@ std::vector<paddle::Tensor> MultiHeadLatentAttentionKernel(
                                              decoder_num_blocks,
                                              cache_quant_type_str,
                                              decoder_num_blocks_data,
-                                             decoder_block_shape_q,
                                              max_input_length,
                                              max_len_kv_data,
                                              softmax_scale,

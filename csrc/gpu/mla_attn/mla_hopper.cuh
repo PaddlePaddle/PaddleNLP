@@ -316,6 +316,7 @@ MLAWithKVCacheKernel(CUTE_GRID_CONSTANT
           tile_id,
           seq_len_decoder_now,
           mainloop_params.chunk_size,
+          mainloop_params.max_draft_token_num,
           mainloop_params.o_stride_bsz);
     }
   }
