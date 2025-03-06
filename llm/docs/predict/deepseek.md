@@ -42,16 +42,6 @@
 | deepseek-ai/DeepSeek-R1-Distill-Llama-8B  |weight_only_int8|-|-|deepseek-ai/DeepSeek-R1-Distill-Llama-8B/weight_only_int8 |
 | deepseek-ai/DeepSeek-R1-Distill-Llama-70B |weight_only_int8|-|-|deepseek-ai/DeepSeek-R1-Distill-Llama-70B/weight_only_int8 |
 
-|模型名称|静态图下载 model_name|
-|:------|:-:|
-| deepseek-ai/DeepSeek-V3                   | 🚧 |
-
-|模型名称|静态图下载 model_name|
-|:------|:-:|
-| deepseek-ai/DeepSeek-V2-Chat              | 🚧 |
-| deepseek-ai/DeepSeek-V2-Lite-Chat         | 🚧 |
-
-
 ## 模型推理
 
 ### deepseek-ai/DeepSeek-R1
