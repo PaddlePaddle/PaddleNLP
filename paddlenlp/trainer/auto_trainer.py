@@ -162,11 +162,13 @@ class AutoTrainer(Trainer):
             meshes.append(_get_mesh(self.args.pipeline_parallel_degree - 1))
         return meshes
 
-    def _wrap_for_dist_loader(self, train_dataloader):
+    def _wrap_for_dist_loader(self, train_dataloader, dtensor_idx=None):
+        self.dtensor_idx = dtensor_idx
         dist_loader = dist.shard_dataloader(
             dataloader=train_dataloader,
             meshes=self._get_meshes_for_loader(),
             shard_dims="dp",
+            dtensor_idx=dtensor_idx,
         )
         return dist_loader
 
@@ -294,15 +296,25 @@ class AutoTrainer(Trainer):
                     for i in range(self.args.gradient_accumulation_steps):
                         global_micro_batchs[i].update({key: []})
                 else:
-                    for dtensor in dtensors:
+                    for j, dtensor in enumerate(dtensors):
                         if isinstance(dtensor, paddle.Tensor):
                             mesh, placements = dtensor.process_mesh, dtensor.placements
-                            global_datas = split_dtensor_by_axis(dtensor, 0)
-                            for index, data in enumerate(global_datas):
-                                if key in global_micro_batchs[index].keys():
-                                    global_micro_batchs[index][key].append(dist.reshard(data, mesh, placements))
-                                else:
-                                    global_micro_batchs[index].update({key: [dist.reshard(data, mesh, placements)]})
+                            if self.dtensor_idx is not None and j in self.dtensor_idx:
+                                global_datas = dtensor.split(self.args.gradient_accumulation_steps, axis=0)
+                                for index, data in enumerate(global_datas):
+                                    if key in global_micro_batchs[index].keys():
+                                        global_micro_batchs[index][key].append(data)
+                                    else:
+                                        global_micro_batchs[index].update({key: [data]})
+                            else:
+                                global_datas = split_dtensor_by_axis(dtensor, 0)
+                                for index, data in enumerate(global_datas):
+                                    if key in global_micro_batchs[index].keys():
+                                        global_micro_batchs[index][key].append(dist.reshard(data, mesh, placements))
+                                    else:
+                                        global_micro_batchs[index].update(
+                                            {key: [dist.reshard(data, mesh, placements)]}
+                                        )
                         else:
                             raise ValueError(f"unsupported type: {type(dtensor)}")
             else:
