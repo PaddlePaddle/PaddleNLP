@@ -340,11 +340,11 @@ class Config:
         reset_value(self, "return_full_hidden_states", "return_full_hidden_states", config)
         if self.seq_len_limit > self.max_seq_len:
             self.seq_len_limit = self.max_seq_len
-            logger.warning(f"The loading model requires len(input_ids) <= {self.max_seq_len}, now reset MAX_SEQ_LEN."
+            logger.warning(f"The loading model requires len(input_ids) <= {self.max_seq_len}, now reset MAX_SEQ_LEN.")
 
         if self.dec_len_limit > self.max_seq_len:
             self.dec_len_limit = self.max_seq_len
-            logger.warning(f"The loading model requires MAX_DEC_LEN <= {self.max_seq_len}, now reset MAX_DEC_LEN."
+            logger.warning(f"The loading model requires MAX_DEC_LEN <= {self.max_seq_len}, now reset MAX_DEC_LEN.")
 
     def get_unique_name(self, name):
         """
