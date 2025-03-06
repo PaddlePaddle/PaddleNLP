@@ -20,14 +20,14 @@ a100
 ```shell
 docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
 -v /PATH_TO_MODEL/:/models -dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v1.0 /bin/bash \
--c -ex 'cd /models && wget  https://paddlenlp.bj.bcebos.com/models/static/3.0.0.b4/meta-llama/Meta-Llama-3-8B-Instruct-Append-Attn/bfloat16/model.tar && tar -xvf model.tar && cd /opt/output/Serving && export MAX_SEQ_LEN=4096 && bash start_server.sh && tail -f /dev/null'\
+-c -ex 'model_name=${model_name:-"meta-llama/Meta-Llama-3-8B-Instruct-Append-Attn/bfloat16"} && cd /opt/output/Serving && export MAX_SEQ_LEN=4096 && bash start_server.sh && tail -f /dev/null'\
 && docker exec -it $(docker ps -lq) sh -c "while [ ! -f /opt/output/Serving/log/workerlog.0 ]; do sleep 1; done; tail -f /opt/output/Serving/log/workerlog.0"
 ```
 v100
 ```shell
 docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
--v /PATH_TO_MODEL/:/models -dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v1.0 /bin/bash \
--c -ex 'cd /models && wget  https://paddlenlp.bj.bcebos.com/models/static/3.0.0.b4/meta-llama/Meta-Llama-3-8B-Instruct-Block-Attn/float16/model.tar && tar -xvf model.tar && cd /opt/output/Serving && export MAX_SEQ_LEN=4096 && export DTYPE="float16" && bash start_server.sh && tail -f /dev/null'\
+-v /PATH_TO_MODEL/:/models -dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda118-cudnn8-v1.0 /bin/bash \
+-c -ex 'model_name=${model_name:-"meta-llama/Meta-Llama-3-8B-Instruct-Append-Attn/bfloat16"} && cd /opt/output/Serving && export MAX_SEQ_LEN=4096 && export DTYPE="float16" && bash start_server.sh && tail -f /dev/null'\
 && docker exec -it $(docker ps -lq) sh -c "while [ ! -f /opt/output/Serving/log/workerlog.0 ]; do sleep 1; done; tail -f /opt/output/Serving/log/workerlog.0"
 ```
 
@@ -91,3 +91,10 @@ curl 127.0.0.1:9965/v1/chat/completions \
   -H'Content-Type: application/json' \
   -d'{"text": "hello, llm"}'
 ```
+## 镜像
+
+|cuda版本| 支持硬件架构|镜像地址|支持的典型设备|
+|:------|:-:|:-:|:-:|
+| cuda11.8 | 70 75 80 86 |ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda118-cudnn8-v1.0 |V100，T4，A100，A30，A10 |
+| cuda12.4 | 80 86 89 90 |ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v1.0 |A100，A30，A10
+L20，H20，H100 |
