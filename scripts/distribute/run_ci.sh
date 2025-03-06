@@ -183,6 +183,9 @@ function execute_func_list(){
                     continue
                 else
                     echo -e "\033[31m second time execute failed, exit!"
+                    mv ${log_path}/$func_name ${log_path}/${func_name}_FAIL.log
+                    echo -e "\033[31m ${log_path}/$func_name_FAIL \033"
+                    tail -15 ${log_path}/${func_name}_FAIL.log
                     let exit_250_count++
                     galobal_exit_250_arr+=("$func_name")
                 fi
