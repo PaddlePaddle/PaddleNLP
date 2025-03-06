@@ -150,7 +150,7 @@ mpirun python -m paddle.distributed.launch \
   --mla_use_matrix_absorption 1
 ```
 
-2.【**推荐**】R1 Model 静态图 + MTP 动态图
+4.【**推荐**】R1 Model 静态图 + MTP 动态图
 
 R1 Model 静态图导出
 
@@ -204,4 +204,79 @@ mpirun python -m paddle.distributed.launch \
   --speculate_max_ngram_size 3 \
   --return_full_hidden_states 1 \
   --mla_use_matrix_absorption 1
+```
+
+5. 一键容器启动 Base Model 静态图 + MTP 动态图
+
+```shell
+需要保证2机器节点可以互相ping通
+# 第一个节点(master)
+ping 192.168.0.1
+# 第二个节点(slave)
+ping 192.168.0.2
+model_name=${model_name:-"deepseek-ai/DeepSeek-R1-2nodes/weight_only_int8"}
+export POD_0_IP=master_ip
+export POD_IPS=master_ip,slave_ip # 该环境变量在2机上都需保持一致
+# 服务化默认启动端口，如果冲突可以通过export进行修改
+export SERVICE_HTTP_PORT=${PUSH_MODE_HTTP_PORT:-${SERVICE_HTTP_PORT:-"9965"}}
+# 开启 MTP
+export SPECULATE_METHOD="mtp"
+# /PATH_TO_MODEL # 模型挂载路径
+# /PATH_TO_MODELMTP # MTP 模型挂载路径
+```
+
+```shell
+# node1
+docker run --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
+-v /PATH_TO_MODEL/:/models -v /PATH_TO_MODEL/:/models-mtp \
+-dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v1.0 /bin/bash \
+-c -ex 'export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 && export MP_NUM=16 && export MP_NNODE=2 && export POD_0_IP=192.168.0.1 && export POD_IPS=192.168.0.1,192.168.0.2 && export SPECULATE_MODEL_QUANT_TYPE="weight_only_int8" && export SPECULATE_METHOD="mtp" && export SPECULATE_MODEL_PATH="/models-mtp" && export SPECULATE_MAX_DRAFT_TOKEN_NUM=1 && model_name=${model_name:-"deepseek-ai/DeepSeek-R1-MTP-2nodes/weight_only_int8"}&& cd /opt/output/Serving && bash start_server.sh $model_name && tail -f /dev/null'\
+&& docker exec -it $(docker ps -lq) sh -c "while [ ! -f /opt/output/Serving/log/workerlog.0 ]; do sleep 1; done; tail -f /opt/output/Serving/log/workerlog.0"
+
+# node2
+docker run --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
+-v /PATH_TO_MODEL/:/models -v /PATH_TO_MODEL/:/models-mtp \
+-dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v1.0 /bin/bash \
+-c -ex 'export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 && export MP_NUM=16 && export MP_NNODE=2 && export POD_0_IP=192.168.0.1 && export POD_IPS=192.168.0.1,192.168.0.2 &&export SPECULATE_MODEL_QUANT_TYPE="weight_only_int8"&& export SPECULATE_METHOD="mtp" && export SPECULATE_MODEL_PATH="/models-mtp" && export SPECULATE_MAX_DRAFT_TOKEN_NUM=1 && model_name=${model_name:-"deepseek-ai/DeepSeek-R1-MTP-2nodes/weight_only_int8"} && cd /opt/output/Serving && bash start_server.sh $model_name && tail -f /dev/null'\
+&& docker exec -it $(docker ps -lq) sh -c "while [ ! -f /opt/output/Serving/log/workerlog.0 ]; do sleep 1; done; tail -f /opt/output/Serving/log/workerlog.0"
+```
+
+### 请求服务化
+
+curl 请求
+```shell
+curl ${ip}:9965/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{
+      "model":"default",
+      "text":"Hello, how are you?"
+  }'
+```
+OpenAI 请求
+```python
+import openai
+client = openai.Client(base_url=f"http://127.0.0.1:9965/v1/chat/completions", api_key="EMPTY_API_KEY")
+# 非流式返回
+response = client.completions.create(
+    model="default",
+    prompt="Hello, how are you?",
+  max_tokens=50,
+  stream=False,
+)
+
+print(response)
+print("\n")
+
+# 流式返回
+response = client.completions.create(
+    model="default",
+    prompt="Hello, how are you?",
+  max_tokens=100,
+  stream=True,
+)
+
+for chunk in response:
+  if chunk.choices[0] is not None:
+    print(chunk.choices[0].text, end='')
+print("\n")
 ```
