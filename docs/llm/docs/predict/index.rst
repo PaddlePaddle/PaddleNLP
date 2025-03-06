@@ -11,5 +11,6 @@
    best_practices.md
    speculative_decoding.md
    ../../server/docs/general_model_inference.md
+   ../../server/docs/static_models.md
    各个模型推理量化教程 <models.rst>
    大模型异构设备推理 <devices.rst>
