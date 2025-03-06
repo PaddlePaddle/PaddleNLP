@@ -17,13 +17,11 @@ RUN mkdir -p /opt/source/ && cd /opt/source/ \
     && python3 -m pip install --no-cache-dir -r PaddleNLP/requirements.txt \
     && python3 -m pip install --no-cache-dir -r PaddleNLP/llm/server/server/requirements.txt
 
-RUN mkdir -p /opt/output/Serving/llm_model/model/1 \
-    && cp /opt/source/PaddleNLP/llm/server/server/config/config.pbtxt /opt/output/Serving/llm_model/model/ \
-    && cp /opt/source/PaddleNLP/llm/server/server/scripts/start_server.sh /opt/output/Serving/ \
+RUN cp /opt/source/PaddleNLP/llm/server/server/scripts/start_server.sh /opt/output/Serving/ \
     && cp /opt/source/PaddleNLP/llm/server/server/scripts/stop_server.sh /opt/output/Serving/
 
 ENV PYTHONPATH="/opt/source/PaddleNLP/llm/server/server:/opt/source/PaddleNLP"
-RUN echo "from server.triton_server import TritonPythonModel" >>/opt/output/Serving/llm_model/model/1/model.py
+
 
 ENV http_proxy=""
 ENV https_proxy=""

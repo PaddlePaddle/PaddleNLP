@@ -59,6 +59,7 @@ from paddlenlp.utils.env import (
     MAX_DRAFT_TOKENS,
     PADDLE_INFERENCE_MODEL_SUFFIX,
     PADDLE_INFERENCE_WEIGHTS_SUFFIX,
+    SPECULATE_MAX_BSZ,
 )
 from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
@@ -1124,7 +1125,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
             output_tensor_shape = [MAX_BSZ + 2, 1]
         else:
             read_res_func = llm_utils.speculate_read_res
-            output_tensor_shape = [MAX_BSZ * MAX_DRAFT_TOKENS + MAX_BSZ + 2, 1]
+            output_tensor_shape = [SPECULATE_MAX_BSZ * MAX_DRAFT_TOKENS + SPECULATE_MAX_BSZ + 2, 1]
 
         read_res_process = mp.Process(
             target=read_res_func, args=[self.model_name_or_path, tensor_queue, result_queue, done_event]
@@ -1292,7 +1293,7 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
             output_tensor_shape = [MAX_BSZ + 2, 1]
         else:
             read_res_func = llm_utils.speculate_read_res
-            output_tensor_shape = [MAX_BSZ * MAX_DRAFT_TOKENS + MAX_BSZ + 2, 1]
+            output_tensor_shape = [SPECULATE_MAX_BSZ * MAX_DRAFT_TOKENS + SPECULATE_MAX_BSZ + 2, 1]
 
         read_res_process = mp.Process(
             target=read_res_func, args=[self.model_name_or_path, tensor_queue, result_queue, done_event]

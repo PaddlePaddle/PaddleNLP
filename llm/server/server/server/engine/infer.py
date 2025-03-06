@@ -524,7 +524,6 @@ class ModelRunner:
                 self.share_inputs["first_token_ids"],
                 self.args.block_size,
                 self.args.enc_dec_block_num,
-                0,
             )
 
     def initialize_engine_ready_check_flag(self):

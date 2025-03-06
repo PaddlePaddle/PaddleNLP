@@ -1402,6 +1402,7 @@ class FusedMultiTransformerBase(Layer):
             from paddlenlp_ops import get_position_ids_and_mask_encoder_batch
 
             # In-place operations that compute the position_ids.
+            os.environ["stride_in_no_check_dy2st_diff"] = "1"
             get_position_ids_and_mask_encoder_batch(
                 seq_lens_encoder, seq_lens_decoder, seq_lens_this_time, self.position_ids, self.mask_encoder_batch
             )

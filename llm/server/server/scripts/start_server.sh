@@ -25,7 +25,7 @@ export NVIDIA_TF32_OVERRIDE=0
 
 # Model hyperparameters
 export MP_NUM=${MP_NUM:-"1"}                                # number of model parallelism
-export MP_NNODES=${MP_NNODES:-"1"}                            # number of nodes
+export MP_NNODE=${MP_NNODE:-"1"}                            # number of nodes
 export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-"0"}    # GPU ids
 export MAX_SEQ_LEN=${MAX_SEQ_LEN:-"8192"}
 export MAX_DEC_LEN=${MAX_DEC_LEN:-"8192"}
@@ -36,19 +36,28 @@ export DTYPE=${DTYPE:-"bfloat16"}
 export USE_CACHE_KV_INT8=${USE_CACHE_KV_INT8:-"0"}  # c8 model requires configuration 1
 export BLOCK_RATIO=${BLOCK_RATIO:-"0.75"}
 export ENC_DEC_BLOCK_NUM=${ENC_DEC_BLOCK_NUM:-"4"}
-export FIRST_TOKEN_ID=${FIRST_TOKEN_ID:-"1"}
 export MAX_PREFILL_BATCH=${MAX_PREFILL_BATCH:-"4"}
 export STOP_THRESHOLD=${STOP_THRESHOLD:-"0"}
+
+export tag=${tag:-"3.0.0.b4"}
+export model_name=$1
 export MODEL_DIR=${MODEL_DIR:-"/models"}
+
+if [ ! "$model_name" == "" ]; then
+    export MODEL_DIR=${MODEL_DIR}/${model_name}
+    mkdir -p $MODEL_DIR
+fi
+
 export CONFIG_JSON_FILE=${CONFIG_JSON_FILE:-"config.json"}
 export PUSH_MODE_HTTP_WORKERS=${PUSH_MODE_HTTP_WORKERS:-"4"}
 
 # serving port
-export HTTP_PORT=${HTTP_PORT:-"8110"}
-export GRPC_PORT=${GRPC_PORT:-"8811"}
-export METRICS_PORT=${METRICS_PORT:-"8722"}
-export INFER_QUEUE_PORT=${INFER_QUEUE_PORT:-"8813"}
-export PUSH_MODE_HTTP_PORT=${PUSH_MODE_HTTP_PORT:-"9965"}
+export HEALTH_HTTP_PORT=${HTTP_PORT:-${HEALTH_HTTP_PORT:-"8110"}}
+export METRICS_HTTP_PORT=${METRICS_PORT:-${METRICS_HTTP_PORT:-"8722"}}
+export SERVICE_GRPC_PORT=${GRPC_PORT:-${SERVICE_GRPC_PORT:-"8811"}}
+export INTER_PROC_PORT=${INTER_QUEUE_PORT:-${INTER_PROC_PORT:-"8813"}}
+export SERVICE_HTTP_PORT=${PUSH_MODE_HTTP_PORT:-${SERVICE_HTTP_PORT:-"9965"}}
+
 
 mkdir -p log
 rm -rf console.log log/*
@@ -57,7 +66,7 @@ rm -rf /dev/shm/*
 FED_POD_IP=$(hostname -i)
 if [ "$MP_NNODE" -gt 1 ]; then
     POD_0_IP=$POD_0_IP
-    HOST_IP=$FED_POD_IP
+    export HOST_IP=$FED_POD_IP
 else
     POD_0_IP="127.0.0.1"
     HOST_IP="127.0.0.1"
@@ -80,8 +89,8 @@ tritonserver --exit-timeout-secs 100 --cuda-memory-pool-byte-size 0:0 --cuda-mem
                  --cuda-memory-pool-byte-size 5:0 --cuda-memory-pool-byte-size 6:0 --cuda-memory-pool-byte-size 7:0 \
                  --pinned-memory-pool-byte-size 0 --model-repository llm_model/ \
                  --allow-http false \
-                 --grpc-port=${GRPC_PORT} \
-                 --metrics-port=${METRICS_PORT} \
-                 --log-file log/server.log --log-info true  > log/console.log 2>&1 &
+                 --grpc-port=${SERVICE_GRPC_PORT} \
+                 --metrics-port=${METRICS_HTTP_PORT} \
+                 --log-file log/server.log --log-info true &
 
 echo "The logs for the model service, please check" ${PWD}"/log/server.log and "${PWD}"/log/workerlog.0"

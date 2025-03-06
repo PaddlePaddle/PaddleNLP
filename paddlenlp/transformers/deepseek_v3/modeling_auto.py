@@ -184,6 +184,10 @@ class DeepseekV3ForCausalLMAuto(DeepseekV3PretrainedModelAuto):
             assert prefix.endswith(".")
         config = {
             "dp_config": {"sharding_level": 0, "offload": False, "exclude_layer": None},
+            "pp_config": {
+                "split_spec": [f"{prefix}deepseek_v3.layers", f"{prefix}lm_head"],
+                "global_spec": "deepseek_v3.global_layer",
+            },
             # "sp_config": {
             #     "parallelize_plan": {
             #         f"{prefix}deepseek_v3.embed_tokens": [
