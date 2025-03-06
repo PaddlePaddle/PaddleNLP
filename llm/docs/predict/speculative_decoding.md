@@ -206,7 +206,7 @@ mpirun python -m paddle.distributed.launch \
   --mla_use_matrix_absorption 1
 ```
 
-5. 一键容器启动 Base Model 静态图 + MTP 动态图
+5. 一键容器启动 Base Model 静态图 + MTP 动态图推理服务
 
 ```shell
 需要保证2机器节点可以互相ping通

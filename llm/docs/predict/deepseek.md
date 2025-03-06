@@ -322,7 +322,7 @@ python export_model.py --model_name_or_path deepseek-ai/DeepSeek-R1-Distill-Qwen
 python predictor.py --model_name_or_path /path/to/exported_model --dtype bfloat16 --mode static --inference_model 1 --append_attn 1
 ```
 
-一键启动 单机单卡 WINT8 推理服务
+**一键启动 单机单卡 WINT8 推理服务**
 
 ```shell
 docker run --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
