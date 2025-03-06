@@ -39,7 +39,7 @@ def read_version():
     read version and return content
     """
     VERSION = "3.0.0b3.post"
-    formatted_date = datetime.now().date().strftime("%Y%m%d")
+    formatted_date = datetime.now().date().strftime("%Y%m%d%H%M%S")
     VERSION = VERSION.replace(".post", ".post{}".format(formatted_date))
 
     return VERSION
