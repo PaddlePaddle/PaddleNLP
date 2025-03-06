@@ -18,6 +18,7 @@ from dataclasses import asdict, dataclass, field
 from typing import List, Optional
 
 from paddlenlp.utils.env import MERGE_CONFIG_NAME
+from paddlenlp.utils.log import logger
 
 
 @dataclass
@@ -140,6 +141,7 @@ class MergeConfig:
         # save it
         with open(output_path, "w") as writer:
             writer.write(json.dumps(output_dict, indent=2, sort_keys=True))
+        logger.info(f"Merge config file saved in {output_path}.")
 
     @classmethod
     def from_pretrained(cls, pretrained_model_path, **kwargs):

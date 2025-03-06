@@ -388,6 +388,8 @@ class Engine(object):
                     f" --use_cache_kv_int8 {self.cfg.use_cache_kv_int8}"
                     f" --enc_dec_block_num {self.cfg.enc_dec_block_num}"
                     f" --block_ratio {self.cfg.block_ratio} --dtype {self.cfg.dtype}")
+        if self.cfg.nnode > 1:
+            pd_cmd = pd_cmd + f" --ips {self.cfg.ips}"
         pd_cmd = pd_cmd + arguments + " >log/launch_infer.log 2>&1"
         model_server_logger.info("Launch infer service command: {}".format(pd_cmd))
         p = subprocess.Popen(

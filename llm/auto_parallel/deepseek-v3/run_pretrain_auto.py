@@ -76,14 +76,6 @@ class PreTrainingArguments(AutoTrainingArguments):
             "help": "Enable fused linear grad add strategy, which will reduce elementwise add for grad accumulation in the backward of nn.Linear ."
         },
     )
-    job_schedule_profiler_start: int = field(
-        default=-1,
-        metadata={"help": "The step to start job_schedule_profiler."},
-    )
-    job_schedule_profiler_end: int = field(
-        default=-1,
-        metadata={"help": "The step to end job_schedule_profiler."},
-    )
     pipeline_schedule_mode: str = field(
         default="1F1B", metadata={"help": "The pipeline schedule mode, support FThenB, 1F1B, VPP and Eager-1F1B."}
     )
@@ -158,7 +150,7 @@ class ModelArguments:
     """
 
     model_type: Optional[str] = field(
-        default="deepseekv3", metadata={"help": "Only support for llama pre-training for now."}
+        default="deepseekv3_auto", metadata={"help": "Only support for llama pre-training for now."}
     )
     model_name_or_path: str = field(
         default="deepseek-ai/DeepSeek-V3",
@@ -237,8 +229,12 @@ class ModelArguments:
         metadata={"help": "recompute_use_reentrant"},
     )
     first_k_dense_replace: int = field(
-        default=3,
+        default=None,
         metadata={"help": "first_k_dense_replace"},
+    )
+    moe_group: str = field(
+        default="None",
+        metadata={"help": "The mesh dimension for expert parallel, must in ['dp', 'mp', 'None']"},
     )
 
 
@@ -536,6 +532,7 @@ def main():
     config.pp_recompute_interval = model_args.pp_recompute_interval
     config.recompute_use_reentrant = model_args.recompute_use_reentrant
     config.first_k_dense_replace = model_args.first_k_dense_replace
+    config.moe_group = model_args.moe_group
 
     config.use_recompute = training_args.recompute
     config.tensor_parallel_degree = training_args.tensor_parallel_degree

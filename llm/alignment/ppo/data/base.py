@@ -51,9 +51,9 @@ __all__ = [
 ]
 
 IGNORE_INDEX: int = -100
-PROMPT_BEGIN: str = "BEGINNING OF CONVERSATION: "
-PROMPT_USER: str = "USER: {input} "
-PROMPT_ASSISTANT: str = "ASSISTANT:"  # should not have a space at the end
+PROMPT_BEGIN: str = ""
+PROMPT_USER: str = "{input}"
+PROMPT_ASSISTANT: str = ""  # should not have a space at the end
 PROMPT_INPUT: str = PROMPT_BEGIN + PROMPT_USER + PROMPT_ASSISTANT
 
 
@@ -326,6 +326,7 @@ class TokenizedDataset(Dataset):
         dataset_names_and_attributes: dict[str, float | dict[str, Any]] | Iterable[tuple[str, float | dict[str, Any]]],
         tokenizer: PretrainedTokenizerBase,
         lazy_tokenization: bool = True,
+        use_rm_server: bool = False,
         seed: int = 42,
     ) -> None:
         if not isinstance(dataset_names_and_attributes, dict):
@@ -348,6 +349,8 @@ class TokenizedDataset(Dataset):
                 raise TypeError(
                     f"Dataset `{name}` attributes should be a float or a dict, " f"got {type(attributes).__name__}.",
                 )
+            kwargs["use_rm_server"] = use_rm_server
+
             proportion = kwargs.pop("proportion", 1.0)
             if isinstance(proportion, Fraction):
                 if not (proportion < 0 and proportion.denominator == 1):
@@ -368,6 +371,7 @@ class TokenizedDataset(Dataset):
 
         self.tokenizer = tokenizer
         self.seed = seed
+        self.use_rm_server = use_rm_server
 
         merged_rawdata = self._merge_raw_datasets(seed=seed)
         self.rawdata = [merged_rawdata[i] for i in range(len(merged_rawdata))]
@@ -510,9 +514,10 @@ class TokenizedDataset(Dataset):
 class CollatorBase(metaclass=abc.ABCMeta):
     pad_token_id: int  # The id of the padding token for the tokenizer.
 
-    def __init__(self, pad_token_id: int) -> None:
+    def __init__(self, pad_token_id: int, use_rm_server: bool) -> None:
         """Initialize a collator."""
         self.pad_token_id = pad_token_id
+        self.use_rm_server = use_rm_server
 
     @abc.abstractmethod
     def __call__(self, samples: list[dict[str, paddle.Tensor]]) -> dict[str, paddle.Tensor]:

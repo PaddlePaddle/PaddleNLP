@@ -17,6 +17,7 @@ import io
 import json
 import os
 from collections import OrderedDict
+from copy import deepcopy
 
 from ...utils.download import resolve_file_path
 from ...utils.log import logger
@@ -224,7 +225,7 @@ class _BaseAutoModelClass:
 
         # Get class name corresponds to this configuration
         if is_standard_config(config):
-            architectures = config["architectures"]
+            architectures = deepcopy(config["architectures"])
             init_class = architectures.pop() if len(architectures) > 0 else None
         else:
             init_class = config.pop("init_class", None)

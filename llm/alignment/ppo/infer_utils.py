@@ -21,14 +21,20 @@ from contextlib import contextmanager
 
 import paddle
 import paddle.distributed as dist
-from comm_utils import cleanup_tensor_space, offload_tensor_to_cpu, reload_tensor_to_gpu
+from comm_utils import offload_tensor_to_cpu, reload_tensor_to_gpu
 from paddle.utils import try_import
+from predict.predictor import (
+    DygraphInferencePredictor,
+    PdArgumentParser,
+    PredictorArgument,
+)
 from trainer_utils import guard_set_args
 
 import paddlenlp
 from paddlenlp.trainer.trainer import Trainer, logger
 from paddlenlp.transformers import PretrainedModel, PretrainedTokenizer
 from paddlenlp.transformers.model_utils import dtype_guard
+from paddlenlp.trl.llm_utils import init_dist_env
 
 
 class Predictor:
@@ -46,17 +52,12 @@ class Predictor:
         # 2. inputs_processer creates caches and other inputs can be shared among
         # multi time prediction. define caches and extra inputs creation method
         # instead of using predictor.__init__
-        from predictor import InferencePredictorMixin
 
-        self._buffer_maker = types.MethodType(InferencePredictorMixin.__init__, self)
-        self._inputs_processer = types.MethodType(InferencePredictorMixin._preprocess, self)
+        self._buffer_maker = types.MethodType(DygraphInferencePredictor.__init__, self)
+        self._inputs_processer = types.MethodType(DygraphInferencePredictor._preprocess, self)
 
     @staticmethod
     def create_predictor(trainer):
-        from predictor import PdArgumentParser, PredictorArgument
-
-        from paddlenlp.trl.llm_utils import get_model_max_position_embeddings
-
         # create infer model
         # NOTE: infer model use static name param_attr to create and cannot be
         # created multiple times.
@@ -68,11 +69,12 @@ class Predictor:
                 eos_token_id=trainer.tokenizer.eos_token_id, pad_token_id=trainer.tokenizer.pad_token_id
             )
             config = copy.deepcopy(model.config)
-            hcg = dist.fleet.get_hybrid_communicate_group()  # may differ with training
-            config.tensor_parallel_degree = hcg.get_model_parallel_world_size()
-            config.tensor_parallel_rank = hcg.get_model_parallel_rank()
-            config.quant_type = None
+            config.tensor_parallel_rank, config.tensor_parallel_degree = init_dist_env()
+            config.quant_type = []
+            config.cachekv_int8_type = None
+            config.append_attn = False
             config.single_card_ptq = True
+
             infer_model_cls = getattr(paddlenlp.experimental.transformers, model.__class__.__name__ + "InferenceModel")
             # ori_init_weights = infer_model_cls.init_weights
             # infer_model_cls.init_weights = lambda self: None
@@ -109,12 +111,12 @@ class Predictor:
         parser = PdArgumentParser((PredictorArgument,))
         predictor_args = parser.parse_dict(
             {
-                "src_length": get_model_max_position_embeddings(  # can be changed dynamically by predictor.input_length
-                    trainer.model.config if eval_model is None else eval_model.config
-                ),
-                "max_length": trainer.args.max_length,
+                "model_name_or_path": trainer.args.actor_model_name_or_path,
+                "src_length": trainer.args.max_src_len,
+                "max_length": trainer.args.max_dec_len,
+                "total_max_length": trainer.args.max_src_len + trainer.args.max_dec_len,
                 "dtype": trainer.amp_dtype,
-                "batch_size": trainer.args.per_device_train_batch_size,
+                "batch_size": trainer.args.per_device_prompt_batch_size * trainer.args.num_return_sequences,
                 # infer model do not support top_k, and differ with non-infer model
                 # generation which gets default top_K=50 using generation_config.top_k
                 "top_p": trainer.args.top_p,
@@ -122,6 +124,7 @@ class Predictor:
                 "repetition_penalty": trainer.args.repetition_penalty,
             }
         )[0]
+
         policy_predictor = Predictor(predictor_args, model=infer_model, tokenizer=trainer.tokenizer)
         return policy_predictor
 
@@ -138,10 +141,13 @@ class Predictor:
         self.config.src_length = getattr(self, "input_length", self.config.src_length)
         if not hasattr(self, "_buffer_attrs"):
             pre_attrs = set(self.__dict__.keys())
-        self.cache_k_shapes, self.cache_v_shapes = self.model.get_cache_kvs_shape(
+        self.cache_kvs_shapes = self.model.get_cache_kvs_shape(
             self.model_config, self.config.batch_size, self.config.total_max_length
         )
-        self._buffer_maker(self.config, self.tokenizer)
+
+        self.config.model_config = copy.deepcopy(self.model_config)
+
+        self._buffer_maker(self.config, self.tokenizer, self.model)
         if not hasattr(self, "_buffer_attrs"):
             self._buffer_attrs = set(self.__dict__.keys()) - pre_attrs
 
@@ -170,37 +176,15 @@ class Predictor:
 
     @paddle.no_grad()
     def set_state_dict(self, model, offload_model=True):
-        offload_place = paddle.CUDAPinnedPlace()
-        state_dict = {}
-        for k, v in model.state_dict().items():
-            state_dict[k] = v
-
-        if getattr(self, "_weights_mapping", None) is None:
-            self._weights_mapping = self.model.get_weights_mapping()
-
-        # non_share_params = []
-        for k, v in self._weights_mapping.items():
-            param, (convert_fun, args) = k, v
-            args = [state_dict[name] for name in args]
-            value = convert_fun(*args)
-            if offload_model:
-                for arg in args:
-                    # shared params no need to offload
-                    if value is not arg:
-                        cpu_arg = arg._copy_to(offload_place, blocking=False)
-                        cpu_arg._share_buffer_to(arg)
-            if not isinstance(value, paddle.Tensor):
-                param.set_value(value)
-            # elif isinstance(value.place, paddle.CUDAPlace):
-            elif value.place.is_gpu_place():
-                # NOTE: _share_buffer_to seems do not work
-                # value._share_buffer_to(param)
-                # value._share_underline_tensor_to(param)
-                param.get_tensor()._share_data_with(value.get_tensor())
-            else:
-                param.copy_(value, True)
-
-        paddle.device.cuda.synchronize()
+        self.model.set_state_dict(model.state_dict())
+        if offload_model:
+            offload_place = paddle.CUDAPinnedPlace()
+            state_dict = model.state_dict()
+            for k, v in state_dict.items():
+                cpu_arg = v._copy_to(offload_place, blocking=False)
+                cpu_arg._share_buffer_to(v)
+                # v.value().get_tensor()._share_data_with(cpu_arg.value().get_tensor())
+        paddle.device.synchronize()
 
     def _preprocess(self, source):
         # make cache when infer happens to get actual shape to save memory
@@ -257,7 +241,7 @@ def infer_guard(trainer, offload_model=True):
 
     try:
         try_import("paddlenlp_ops")
-    except:
+    except ImportError:
         logger.warning("paddlenlp_ops does not exist, please install paddlenlp_ops for generation speedup.")
         yield
         return
@@ -265,21 +249,30 @@ def infer_guard(trainer, offload_model=True):
     global policy_predictor
     if policy_predictor is None:
         policy_predictor = Predictor.create_predictor(trainer)
-    if not policy_predictor.is_available:
-        policy_predictor.enable(model, offload_model=offload_model)
+    with dtype_guard(trainer.amp_dtype):
+        if not policy_predictor.is_available:
+            policy_predictor.enable(model, offload_model=offload_model)
 
     # TODO(guosheng): patch for dist.all_recude to use tp group, fix it later
-    ori_all_reduce = dist.all_reduce
-    ori_broadcast = dist.broadcast
-    hcg = dist.fleet.get_hybrid_communicate_group()
-    dist.all_reduce = lambda x: ori_all_reduce(x, group=hcg.get_model_parallel_group())
-    dist.broadcast = lambda x, rank: ori_broadcast(
-        x, src=hcg.get_model_parallel_group_src_rank(), group=hcg.get_model_parallel_group()
-    )
-    yield
-    dist.all_reduce = ori_all_reduce
-    dist.broadcast = ori_broadcast
+    is_distributed = True
+    try:
+        hcg = dist.fleet.get_hybrid_communicate_group()
+    except Exception:
+        is_distributed = False
 
+    if is_distributed:
+        ori_all_reduce = dist.all_reduce
+        ori_broadcast = dist.broadcast
+
+        dist.all_reduce = lambda x: ori_all_reduce(x, group=hcg.get_model_parallel_group())
+        dist.broadcast = lambda x, rank: ori_broadcast(
+            x, src=hcg.get_model_parallel_group_src_rank(), group=hcg.get_model_parallel_group()
+        )
+        yield
+        dist.all_reduce = ori_all_reduce
+        dist.broadcast = ori_broadcast
+    else:
+        yield
     policy_predictor.disable(model, onload_model=offload_model)
 
 
@@ -296,20 +289,23 @@ class InferEvalModel:
     def enable(self):
         trainer = self.trainer
         if trainer.model is not self.model:
+            reload_tensor_to_gpu((trainer.model, "train_model"))
+            reload_tensor_to_gpu((self.model, "freeze_model"))
             trainer.export_evaluate_model(
                 trainer.model,
                 self.model,
                 with_offload="train_model" in trainer.args.offload_level,
             )
         else:
-            reload_tensor_to_gpu(self.model.state_dict())
+            reload_tensor_to_gpu((self.model, "train_model"))
 
     def disable(self):
         trainer = self.trainer
         if trainer.model is not self.model:
-            cleanup_tensor_space(self.model.state_dict())
+            offload_tensor_to_cpu((trainer.model, "train_model"))
+            offload_tensor_to_cpu((self.model, "freeze_model"))
         else:
-            offload_tensor_to_cpu(self.model.state_dict())
+            offload_tensor_to_cpu((self.model, "train_model"))
 
     def __getattr__(self, name):
         try:
