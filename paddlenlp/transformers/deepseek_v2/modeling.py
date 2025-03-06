@@ -698,9 +698,7 @@ class MoEGate(PretrainedMoEGate):
         _, _, h_dim = hidden_states.shape
 
         # compute gating score
-        print("linear input: ", hidden_states._md5sum())
         logits = F.linear(hidden_states, self.weight, None)
-        print("linear output: ", logits._md5sum())
 
         with paddle.amp.auto_cast(False):
             scores = self.gate_score_func(logits=logits)
@@ -959,8 +957,6 @@ class DeepseekV2Attention(nn.Layer):
         if self.q_lora_rank is None:
             q = self.q_proj(hidden_states)
         else:
-            print("qa input: ", hidden_states._md5sum())
-            print("qa weight: ", self.q_a_proj.weight._md5sum())
             q = self.q_b_proj(self.q_a_layernorm(self.q_a_proj(hidden_states)))
 
         if self.sequence_parallel:
@@ -1047,7 +1043,6 @@ class DeepseekV2Attention(nn.Layer):
         # if sequence_parallel is true, out shape are [q_len / n, bs, num_head * head_dim]
         # else their shape are [bs, q_len, num_head * head_dim], n is mp parallelism.
         attn_output = self.o_proj(attn_output)
-        print("o ouput: ", attn_output._md5sum())
 
         if not output_attentions:
             attn_weights = None
@@ -1385,7 +1380,7 @@ class DeepseekV2PretrainedModel(PretrainedModel):
             base_actions.pop("embed_tokens.weight")
             base_actions.pop("lm_head.weight")
             base_actions["layers.0.embed_tokens.weight"] = partial(fn, is_column=False)
-            base_actions["layers.0.eh_proj.weight"] = partial(fn, is_column=True)
+            # base_actions["layers.0.eh_proj.weight"] = partial(fn, is_column=True)
             base_actions["layers.0.shared_head.head.weight"] = partial(fn, is_column=True)
             for key, action in base_actions.items():
                 if "layers.0." in key:
@@ -1403,7 +1398,7 @@ class DeepseekV2PretrainedModel(PretrainedModel):
         return mappings
 
     def _init_weights(self, layer):
-        return
+        # return
         if self.config.tensor_parallel_degree > 1:
             rng_tracker = get_rng_state_tracker().rng_state
 
@@ -1603,7 +1598,9 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
             seq_length -= self.config.num_nextn_predict_layers
 
             if attention_mask is not None:
-                attention_mask = attention_mask[:, : -self.config.num_nextn_predict_layers]
+                attention_mask = attention_mask[
+                    :, :, : -self.config.num_nextn_predict_layers, : -self.config.num_nextn_predict_layers
+                ]
 
         if self.enable_recompute and self.training:
             if use_cache:

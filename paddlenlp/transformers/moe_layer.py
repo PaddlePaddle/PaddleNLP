@@ -15,6 +15,7 @@
 # limitations under the License.
 from __future__ import annotations
 
+import numpy as np
 import paddle
 import paddle.distributed as dist
 from paddle import nn
@@ -197,8 +198,49 @@ class MoELayer(nn.Layer):
         tokens_per_expert = cnts.sum(axis=0)
         idxs = topk_ids.reshape([topk_ids.shape[0] * topk_ids.shape[1]]).argsort()
         sorted_tokens = reshaped_input[idxs // topk_ids.shape[1]]
-        tokens_per_expert = tokens_per_expert.cpu().numpy()
-        # TODO: AlltoALL
+        tokens_per_expert = tokens_per_expert.detach()
+        sorted_tokens_shape = sorted_tokens.shape
+
+        if self.expert_parallel_degree > 1:
+            tokens_per_ep_rank = tokens_per_expert.reshape([self.expert_parallel_degree, -1]).sum(axis=1)
+            tokens_per_expert_group = paddle.empty([tokens_per_expert.shape[0]], dtype=tokens_per_expert.dtype)
+            print("tokens_per_expert", tokens_per_expert.shape)
+            print("tokens_per_expert_group", tokens_per_expert_group.shape)
+            dist.barrier()
+            dist.alltoall_single(tokens_per_expert_group, tokens_per_expert)
+            output_splits = (
+                tokens_per_expert_group.reshape([self.expert_parallel_degree, -1]).sum(axis=1).cpu().tolist()
+            )
+            gathered_tokens = paddle.empty(
+                [tokens_per_expert_group.sum(axis=0).cpu().item(), sorted_tokens.shape[1]], dtype=sorted_tokens.dtype
+            )
+
+            input_split_sizes = tokens_per_ep_rank.cpu().tolist()
+            print("gathered_tokens", gathered_tokens.shape)
+            print("sorted_tokens", sorted_tokens.shape)
+            print("input_split_sizes", input_split_sizes)
+            print("output_splits", output_splits)
+            dist.barrier()
+            task = dist.alltoall_single(
+                gathered_tokens,
+                sorted_tokens,
+                out_split_sizes=output_splits,
+                in_split_sizes=input_split_sizes,
+                sync_op=False,
+                group=self.moe_group,
+            )
+            task.wait()
+            tokens_per_expert_post_gather = tokens_per_expert_group.reshape(
+                [self.expert_parallel_degree, self.moe_num_experts_per_device]
+            ).sum(axis=0)
+            gatherd_idxs = np.zeros(shape=(gathered_tokens.shape[0],), dtype=np.int32)
+            s = 0
+            for i, k in enumerate(tokens_per_expert_group.cpu().numpy()):
+                gatherd_idxs[s : s + k] = i % self.moe_num_experts_per_device
+                s += k
+            gatherd_idxs = gatherd_idxs.argsort()
+            sorted_tokens = gathered_tokens[gatherd_idxs]
+            tokens_per_expert = tokens_per_expert_post_gather
 
         outputs = []
         start_idx = 0
@@ -211,9 +253,26 @@ class MoELayer(nn.Layer):
             expert_out = expert(tokens_for_this_expert)
             outputs.append(expert_out)
             start_idx = end_idx
-
-        # TODO: AlltoALL
-        outs = paddle.concat(outputs, axis=0) if len(outputs) else paddle.to_tensor(0, dtype=sorted_tokens)
+        outs = paddle.concat(outputs, axis=0) if len(outputs) > 0 else paddle.to_tensor(0, dtype=sorted_tokens.dtype)
+        if self.expert_parallel_degree > 1:
+            new_x = paddle.empty_like(outs)
+            new_x[gatherd_idxs] = outs
+            # gathered_tokens = new_x.new_empty(*sorted_tokens_shape)
+            gathered_tokens = paddle.empty(sorted_tokens_shape, dtype=new_x.dtype)
+            print("gathered_tokens", gathered_tokens.shape)
+            print("sorted_tokens", sorted_tokens.shape)
+            print("input_split_sizes", input_split_sizes)
+            print("output_splits", output_splits)
+            task = dist.alltoall_single(
+                gathered_tokens,
+                new_x,
+                out_split_sizes=input_split_sizes,
+                in_split_sizes=output_splits,
+                sync_op=False,
+                group=self.moe_group,
+            )
+            task.wait()
+            outs = gathered_tokens
 
         new_x = paddle.empty_like(outs)
         new_x[idxs] = outs
