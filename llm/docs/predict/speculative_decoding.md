@@ -1,11 +1,14 @@
 # 投机解码教程
 
 投机解码是一个通过投机性地一次性猜测多个 token 然后进行验证和接收的算法，通过投机解码可以极大地减小推理时延。PaddleNLP 提供了简单、高效的投机解码推理流程。下面提供 PaddleNLP 中各种投机解码算法的使用说明。
-
+## 高效投机解码框架
+传统的 Draft Token 验证以及 MTP(Eagle/Draft Model) 推理方法，batch_size 一般会膨胀 Draft Token 数量的倍数，我们高效的注意力机制则可以保持原始批次大小，减少计算量，如下图所示：
+![框架图](https://github.com/user-attachments/assets/fd938c8c-fcd5-4ead-ae6e-f455af415e52)
+参考 [Vllm batch_extension](https://docs.google.com/document/d/1T-JaS2T1NRfdP51qzqpyakoCXxSXTtORppiwaj5asxA/edit?tab=t.0#heading=h.kk7dq05lc6q8)
 ## 参数说明
 - `speculate_method`: 推理解码算法，默认值为`None`，可选的数值有`None`、`inference_with_reference`、 `mtp`、 `eagle`。为`None`时为正常自回归解码，为`inference_with_reference`时为基于上下文的投机解码[论文地址](https://arxiv.org/pdf/2304.04487)。
 
-- `speculate_max_draft_token_num`: 投机解码算法中每轮产生的最大 draft tokens 数目，默认值为 1。
+- `speculate_max_draft_token_num`: 投机解码算法中每轮产生的最大 draft tokens 数目，默认值为 1，最大支持 5。
 
 - `speculate_max_ngram_size`: n-gram 匹配 draft tokens 时的最大窗口大小，默认值为`1`。inference_with_reference 算法中会先从 prompt 中使用 ngram 窗口滑动匹配 draft tokens，窗口大小和输入输出重叠程度共同决定了产生 draft tokens 的开销从而影响 inference_with_reference 算法的加速效果。
 
@@ -19,6 +22,8 @@
 
 - `return_full_hidden_states`: 在`MTP`或者`EAGLE`模式下，是否返回全部的隐藏层状态，默认为`False`。
 
+Others：
+1. 投机解码目前支持的最大 batch_size 为 128
 ## Inference with reference
 
 该算法通过 n-gram 窗口从 prompt 中匹配 draft tokens，适合输入和输出有很大 overlap 的场景如代码编辑、文档查询等，更多信息查看查看[论文地址](https://arxiv.org/pdf/2304.04487)。
