@@ -29,8 +29,8 @@ def get_candidate_tiles():
         ("<_2, _1, _1>"),
         ("<_1, _2, _1>"),
         ("<_2, _2, _1>"),
-        ("<_1, _8, _1>"),
-        ("<_8, _1, _1>"),
+        # ("<_1, _8, _1>"),
+        # ("<_8, _1, _1>"),
     ]
     base_configs = [(x, y) for x in cta_shape for y in cluster_shape]
 
