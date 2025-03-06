@@ -1,59 +1,32 @@
 # 静态图高性能部署全流程
 
-## 目录
-
-- [静态图高性能部署全流程](#静态图高性能部署全流程)
-  - [目录](#目录)
-  - [快速开始](#快速开始)
-  - [部署环境准备](#部署环境准备)
-    - [基础环境](#基础环境)
-    - [准备部署镜像](#准备部署镜像)
-    - [准备模型](#准备模型)
-    - [创建容器](#创建容器)
-  - [启动服务](#启动服务)
-    - [配置参数](#配置参数)
-    - [启动服务](#启动服务-1)
-    - [服务状态查询](#服务状态查询)
-  - [服务测试](#服务测试)
-    - [HTTP 调用](#http-调用)
-    - [返回示例](#返回示例)
-    - [OpenAI 客户端](#openai-客户端)
-  - [基于 dockerfile 创建自己的镜像](#基于-dockerfile-创建自己的镜像)
-  - [模型配置参数介绍](#模型配置参数介绍)
-  - [请求参数介绍](#请求参数介绍)
-
-
 
 *该部署工具是基于英伟达 Triton 框架专为服务器场景的大模型服务化部署而设计。它提供了支持 gRPC、HTTP 协议的服务接口，以及流式 Token 输出能力。底层推理引擎支持连续批处理、weight only int8、后训练量化（PTQ）等加速优化策略，为用户带来易用且高性能的部署体验。*
 
-## 快速开始
+## 静态图快速部署
 
-基于预编译镜像部署，**使用飞桨静态图模型部署**。本节以 Meta-Llama-3-8B-Instruct-A8W8C8 为例。其他模型需按照要求导出为**静态图模型格式**。
-具体流程如下，仅供示例参考，用户需要根据自己的需求导出所需**静态图模型**，然后开始部署流程。
+该方法仅支持[可一键跑通的模型列表](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/static_models.md)中的模型进行一键启动推理服务
 
-```shell
-  # 下载模型
-  wget https://paddle-qa.bj.bcebos.com/inference_model/Meta-Llama-3-8B-Instruct-A8W8C8.tar
-  mkdir Llama-3-8B-A8W8C8 && tar -xf Meta-Llama-3-8B-Instruct-A8W8C8.tar -C Llama-3-8B-A8W8C8
+`MODEL_PATH` 为指定模型下载的存储路径，可自行指定
+`model_name` 为指定下载模型名称，具体支持模型可查看[文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/static_models.md)
 
-  # 挂载模型文件
-  export MODEL_PATH=${PWD}/Llama-3-8B-A8W8C8
 
-  docker run --gpus all --shm-size 5G --network=host --privileged --cap-add=SYS_PTRACE \
-  -v ${MODEL_PATH}:/models/ \
-  -dit registry.baidubce.com/paddlepaddle/fastdeploy:llm-serving-cuda123-cudnn9-v1.2 \
-  bash -c 'export USE_CACHE_KV_INT8=1 && cd /opt/output/Serving && bash start_server.sh; exec bash'
 ```
-等待服务启动成功（服务初次启动大概需要40s），可以通过以下命令测试：
-
-```shell
-  curl 127.0.0.1:9965/v1/chat/completions \
-  -H 'Content-Type: application/json' \
-  -d '{"text": "hello, llm"}'
+export MODEL_PATH=${MODEL_PATH:-$PWD}
+export model_name=${model_name:-"meta-llama/Meta-Llama-3-8B-Instruct-Block-Attn/float16"}
+docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
+-v $MODEL_PATH:/models -e "model_name=${model_name}" \ 
+-dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda118-cudnn8-v1.0 /bin/bash \
+-c -ex 'start_server $model_name && tail -f /dev/null'
 ```
 
-Note:
-1. 请保证 shm-size >= 5，不然可能会导致服务启动失败
+### 服务测试
+```
+curl 127.0.0.1:9965/v1/chat/completions \
+  -H'Content-Type: application/json' \
+  -d'{"text": "hello, llm"}'
+```
+
 
 ## 部署环境准备
 
@@ -70,23 +43,15 @@ Note:
 
 ### 准备部署镜像
 
-为了方便部署，我们提供了 cuda12.3 的镜像，可以直接拉取镜像，或者使用我们提供的 `Dockerfile` [构建自定义镜像](#基于 dockerfile 创建自己的镜像)
+为了方便部署，我们提供了 cuda12.4 与 cuda 11.8 的镜像，可以直接拉取镜像，或者使用我们提供的 `Dockerfile` [构建自定义镜像](#基于 dockerfile 创建自己的镜像)
 ```
-docker pull registry.baidubce.com/paddlepaddle/fastdeploy:llm-serving-cuda123-cudnn9-v1.2
+docker pull ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v1.0
 ```
 
 ### 准备模型
 
-该部署工具为 PaddleNLP 静态图模型提供了高效的部署方案，模型静态图导出方案请参考：[LLaMA](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/llama.md)、[Qwen](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/qwen.md)、[DeepSeek](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/deepseek.md)、[Mixtral](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/mixtral.md) ...
-
-或者下载样例模型:
-```shell
-# 下载模型
-wget https://paddle-qa.bj.bcebos.com/inference_model/Meta-Llama-3-8B-Instruct-A8W8C8.tar
-mkdir Llama-3-8B-A8W8C8 && tar -xf Meta-Llama-3-8B-Instruct-A8W8C8.tar -C Llama-3-8B-A8W8C8
-```
-
 导出后的模型放在任意文件夹下，以 `/home/workspace/models_dir` 为例
+该部署工具为 PaddleNLP 静态图模型提供了高效的部署方案，模型静态图导出方案请参考：[DeepSeek](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/deepseek.md)、[LLaMA](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/llama.md)、[Qwen](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/qwen.md)、[Mixtral](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/mixtral.md) ...
 
 ```
 cd /home/workspace/models_dir
@@ -116,7 +81,7 @@ docker run --gpus all \
     --network=host \
     --shm-size=5G \
     -v /home/workspace/models_dir:/models/ \
-    -dit registry.baidubce.com/paddlepaddle/fastdeploy:llm-serving-cuda123-cudnn9-v1.2 bash
+    -dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v1.0 bash
 
 # 进入容器，检查GPU环境和模型挂载是否正常
 docker exec -it paddlenlp_serving /bin/bash
@@ -147,11 +112,11 @@ export CUDA_VISIBLE_DEVICES=0
 # export DISABLE_STREAMING=1
 
 # 配置数据服务。需要自行修改HTTP_PORT、GRPC_PORT、METRICS_PORT和INFER_QUEUE_PORT。(请事先检查端口可用)
-export HTTP_PORT="8110"                         # 探活服务的http端口（当前仅用于健康检查、探活）
-export GRPC_PORT="8811"                         # 模型推服务的grpc端口
-export METRICS_PORT="8722"                      # 模型服务中监督指标的端口
-export INFER_QUEUE_PORT="8813"                  # 模型服务内部使用的端口
-export PUSH_MODE_HTTP_PORT="9965"               # 服务请求HTTP端口号，如不配置，默认为-1，即服务只支持GRPC协议
+export HEALTH_HTTP_PORT="8110"                         # 探活服务的http端口（当前仅用于健康检查、探活）
+export SERVICE_GRPC_PORT="8811"                         # 模型推服务的grpc端口
+export METRICS_HTTP_PORT="8722"                      # 模型服务中监督指标的端口
+export INFER_PROC_PORT="8813"                  # 模型服务内部使用的端口
+export SERVICE_HTTP_PORT="9965"               # 服务请求HTTP端口号，如不配置，默认为-1，即服务只支持GRPC协议
 
 # MAX_SEQ_LEN: 服务会拒绝input token数量超过MAX_SEQ_LEN的请求，并返回错误提示
 # MAX_DEC_LEN: 服务会拒绝请求中max_dec_len/min_dec_len超过此参数的请求，并返回错误提示
@@ -167,21 +132,58 @@ export MAX_CACHED_TASK_NUM="128"  # 服务缓存队列最大长度，队列达�
 export PUSH_MODE_HTTP_WORKERS="1" # HTTP服务进程数，在 PUSH_MODE_HTTP_PORT 配置的情况下有效，最高设置到8即可，默认为1
 ```
 
+
+#### 多机参数配置
+相比单机部署新增服务参数
+
+```
+export POD_IPS=10.0.0.1,10.0.0.2
+export POD_0_IP=10.0.0.1
+export MP_NNODE=2 # 节点数为2表明为2机服务
+export MP_NUM=16 # 模型分片为16
+export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+```
 更多请求参数请参考[模型配置参数介绍](#模型配置参数介绍)
 
 ### 启动服务
+#### 单机启动
 
 ```shell
-cd /opt/output/Serving
-bash start_server.sh
+start_server
 
-# 重新启动服务前，需要停止服务，在/opt/output/Serving目录下执行 bash stop_server.sh
+# 重新启动服务前，需要停止服务，执行 stop_server
 ```
+启动脚本位置： /opt/output/Serving
+#### 多机启动
+##### 依次启动服务
+1. 启动 master node 主节点服务
+2. 依次启动其他节点的服务
+
+**启动命令**
+
+```
+start_server
+
+# 重新启动服务前，需要停止服务
+
+stop_server
+```
+
+##### mpi启动
+若使用mpi 进行启动需提前配置各机器的ssh 可以正常访问
+
+```
+mpirun start_server
+
+# 停止服务
+mpirun stop_server
+```
+
 
 ### 服务状态查询
 
 ```
-# port为上面启动服务时候指定的HTTP_PORT
+# port为上面启动服务时候指定的HEALTH_HTTP_PORT
   > 测试前请确保服务IP和端口正确
 
 live接口： (服务是否能正常接收请求）
@@ -191,18 +193,18 @@ health接口：（模型是否准备好推理）
 ```
 
 ## 服务测试
+多机测试时需在主节点执行或者将ip 修改为主节点ip
 
 ### HTTP 调用
 
-提示：HTTP 调用接口使用变量 PUSH_MODE_HTTP_PORT 配置！HTTP_PORT 仅用于探活接口使用！
 
 ```python
 import uuid
 import json
 import requests
-
-push_mode_http_port = "9965"    # 服务配置的PUSH_MODE_HTTP_PORT
-url = f"http://127.0.0.1:{push_mode_http_port}/v1/chat/completions"
+ip = 127.0.0.1
+service_http_port = "9965"    # 服务配置的
+url = f"http://{ip}:{service_http_port}/v1/chat/completions"
 req_id = str(uuid.uuid1())
 data_single = {
     "text": "Hello, how are you?",
@@ -250,13 +252,14 @@ for line in res.iter_lines():
 
 我们提供了 OpenAI 客户端的支持，使用方法如下：
 
-提示：使用 OpenAI 客户端需要配置 `PUSH_MODE_HTTP_PORT`！
 
 ```python
 import openai
 
-push_mode_http_port = "9965"    # 服务配置的PUSH_MODE_HTTP_PORT
-client = openai.Client(base_url=f"http://127.0.0.1:{push_mode_http_port}/v1/chat/completions", api_key="EMPTY_API_KEY")
+ip = 127.0.0.1
+service_http_port = "9965"    # 服务配置的
+
+client = openai.Client(base_url=f"http://{ip}:{service_http_port}/v1/chat/completions", api_key="EMPTY_API_KEY")
 
 # 非流式返回
 response = client.completions.create(
@@ -325,7 +328,7 @@ print("\n")
 git clone https://github.com/PaddlePaddle/PaddleNLP.git
 cd PaddleNLP/llm/server
 
-docker build --network=host -f ./dockerfiles/Dockerfile_serving_cuda123_cudnn9 -t llm-serving-cu123-self .
+docker build --network=host -f ./dockerfiles/Dockerfile_serving_cuda124_cudnn9 -t llm-serving-cu124-self .
 ```
 创建自己的镜像后，可以基于该镜像[创建容器](#创建容器)
 
@@ -333,13 +336,16 @@ docker build --network=host -f ./dockerfiles/Dockerfile_serving_cuda123_cudnn9 -
 
 | 字段名 | 字段类型 | 说明 | 是否必填 | 默认值 | 备注 |
 | :---: | :-----: | :---: | :---: | :-----: | :----: |
+| MP_NNODE |  int  | 节点个数 | 否 | 1 | 与机器个数相同| 
 | MP_NUM |  int  | 模型并行度 | 否 | 8 | CUDA_VISIBLE_DEVICES 需配置对应卡数 |
 | CUDA_VISIBLE_DEVICES | str | 使用 GPU 编号 | 否 | 0,1,2,3,4,5,6,7 |  |
-| HTTP_PORT | int | 探活服务的 http 端口 | 是 | 无 | 当前仅用于健康检查、探活 |
-| GRPC_PORT | int | 模型推服务的 grpc 端口 | 是 | 无 |   |
-| METRICS_PORT | int | 模型服务中监督指标的端口 | 是 | 无 |   |
-| INFER_QUEUE_PORT | int | 模型服务内部使用的端口 | 否 | 56666 |   |
-| PUSH_MODE_HTTP_PORT | int | 服务请求 HTTP 端口号 | 否 | -1 | 如不配置，服务只支持 GRPC 协议 |
+| POD_IPS | str | 多机每个结点的ip | 否 | 无 | 多机时必填，示例: "10.0.0.1,10.0.0.2" |
+| POD_0_IP | str | 多机中主节点IP | 否 | 无 | 多机时必填，示例: "10.0.0.1" 该IP 必须存在在POD_IPS 中|
+| HEALTH_HTTP_PORT | int | 探活服务的 http 端口 | 是 | 无 | 当前仅用于健康检查、探活 (3.0.0版本前镜像使用HTTP_PORT)|
+| SERVICE_GRPC_PORT | int | 模型推服务的 grpc 端口 | 是 | 无 |   (3.0.0版本前镜像使用GRPC_PORT)| |
+| METRICS_HTTP_PORT | int | 模型服务中监督指标的端口 | 是 | 无 |  (3.0.0版本前镜像使用METRICS_PORT) |
+| INTER_PROC_PORT | int | 模型服务内部使用的端口 | 否 | 56666 |  (3.0.0版本前镜像使用INTER_QUEUE_PORT)  |
+| SERVICE_HTTP_PORT | int | 服务请求 HTTP 端口号 | 否 | 9965 | (3.0.0版本前镜像使用PUSH_MODE_HTTP_PORT)  |
 | DISABLE_STREAMING | int | 是否使用流式返回 | 否 | 0 |  |
 | MAX_SEQ_LEN | int | 最大输入序列长度 | 否 | 8192 | 服务会拒绝 input token 数量超过 MAX_SEQ_LEN 的请求，并返回错误提示 |
 | MAX_DEC_LEN | int | 最大 decoer 序列长度 | 否 | 1024 | 服务会拒绝请求中 max_dec_len/min_dec_len 超过此参数的请求，并返回错误提示 |
@@ -347,12 +353,12 @@ docker build --network=host -f ./dockerfiles/Dockerfile_serving_cuda123_cudnn9 -
 | BLOCK_BS | int | 缓存 Block 支持的最大 Query Batch Size | 否 | 50 | 如果出现 out of memeory 错误，尝试减少该数值 |
 | BLOCK_RATIO | float |  | 否 | 0.75 | 建议配置 输入平均 Token 数/（输入+输出平均 Token 数) |
 | MAX_CACHED_TASK_NUM | int | 服务缓存队列最大长度 | 否 | 128 | 队列达到上限后，会拒绝新的请求 |
-| PUSH_MODE_HTTP_WORKERS | int | HTTP 服务进程数 | 否 | 1 | 在 PUSH_MODE_HTTP_PORT 配置的情况下有效，高并发下提高该数值，建议最高配置为8 |
+| PUSH_MODE_HTTP_WORKERS | int | HTTP 服务进程数 | 否 | 1 | 在  配置的情况下有效，高并发下提高该数值，建议最高配置为8 |
 | USE_WARMUP | int | 是否进行 warmup | 否 | 0 |  |
 | USE_HF_TOKENIZER | int | 是否进行使用 huggingface 的词表 | 否 | 0 |   |
 | USE_CACHE_KV_INT8 | int | 是否将 INT8配置为 KV Cache 的类型 | 否 | 0 | c8量化模型需要配置为1 |
 | MODEL_DIR | str | 模型文件路径 | 否 | /models/ |  |
-| DISTRIBUTED_CONFIG | str | 模型分布式配置文件路径 | 否 | ${model_dir}/rank_mapping.csv |  |
+| model_name | str | 模型名称 | 否 | 无 |  用于支持模型静态图下载，具体名称参考文档(#./static_models.md)|
 
 ## 请求参数介绍
 
@@ -372,5 +378,5 @@ docker build --network=host -f ./dockerfiles/Dockerfile_serving_cuda123_cudnn9 -
 | timeout | int | 请求等待的超时时间，单位是秒 | 否 | 300 |  |
 | return_usage | bool | 是否返回输入、输出 token 数量 | 否 | False |  |
 
-* 在正确配置 PUSH_MODE_HTTP_PORT 字段下，服务支持 GRPC 和 HTTP 两种请求服务
+* 服务支持 GRPC 和 HTTP 两种请求服务
   * stream 参数仅对 HTTP 请求生效
