@@ -118,6 +118,8 @@ sources = [
     "./gpu/speculate_decoding_kernels/ngram_match.cc",
     "./gpu/speculate_decoding_kernels/speculate_save_output.cc",
     "./gpu/speculate_decoding_kernels/speculate_get_output.cc",
+    "./gpu/communication/trt_reduce_internal.cu",
+    "./gpu/communication/trt_reduce_kernel.cu",
 ]
 sources += find_end_files("./gpu/speculate_decoding_kernels", ".cu")
 
@@ -140,6 +142,7 @@ nvcc_compile_args += [
     "-Ithird_party/cutlass/tools/util/include",
     "-Ithird_party/nlohmann_json/single_include",
     "-Igpu/sample_kernels",
+    "-Igpu/communication/",
 ]
 
 cc = get_sm_version()
@@ -188,7 +191,7 @@ setup(
     name=ops_name,
     ext_modules=CUDAExtension(
         sources=sources,
-        extra_compile_args={"cxx": ["-O3"], "nvcc": nvcc_compile_args},
+        extra_compile_args={"cxx": ["-O3", "-fpermissive", "-g"], "nvcc": nvcc_compile_args},
         libraries=["cublasLt"],
         library_dirs=[library_path],
     ),
