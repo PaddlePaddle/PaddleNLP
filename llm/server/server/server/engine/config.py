@@ -338,13 +338,13 @@ class Config:
         reset_value(self, "block_size", "infer_model_block_size", config)
         reset_value(self, "max_seq_len", "infer_model_max_seq_len", config)
         reset_value(self, "return_full_hidden_states", "return_full_hidden_states", config)
+        if self.seq_len_limit > self.max_seq_len:
+            self.seq_len_limit = self.max_seq_len
+            logger.warning(f"The loading model requires len(input_ids) <= {self.max_seq_len}, now reset MAX_SEQ_LEN."
 
-        assert (
-            self.seq_len_limit <= self.max_seq_len
-        ), f"The loading model requires len(input_ids) <= {self.max_seq_len}, but now the setting MAX_SEQ_LEN={self.seq_len_limit}."
-        assert (
-            self.dec_len_limit <= self.max_seq_len
-        ), f"The loading model requires MAX_DEC_LEN <= {self.max_seq_len}, but now the setting MAX_DEC_LEN={self.dec_len_limit}."
+        if self.dec_len_limit > self.max_seq_len:
+            self.dec_len_limit = self.max_seq_len
+            logger.warning(f"The loading model requires MAX_DEC_LEN <= {self.max_seq_len}, now reset MAX_DEC_LEN."
 
     def get_unique_name(self, name):
         """
