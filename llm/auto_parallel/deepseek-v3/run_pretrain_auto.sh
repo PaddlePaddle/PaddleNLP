@@ -36,7 +36,7 @@ export PYTHONPATH=../../../:$PYTHONPATH
 
 export FLAGS_enable_moe_utils=true
 export FLAGS_call_stack_level=3
-# export GLOG_v=0
+
 to_static=0  # 是否开启动转静训练
 
 python -u  -m paddle.distributed.launch \
@@ -44,15 +44,15 @@ python -u  -m paddle.distributed.launch \
     --log_dir  "output/$task_name""_log" \
     run_pretrain_auto.py \
     --model_type "deepseekv3_auto" \
-    --model_name_or_path "./model_config" \
+    --model_name_or_path "deepseek-ai/DeepSeek-V3" \
     --tokenizer_name_or_path "deepseek-ai/DeepSeek-V3" \
     --input_dir "./data" \
     --output_dir "output/$task_name" \
     --split 949,50,1 \
-    --max_seq_length 2048 \
+    --max_seq_length 4096 \
     --per_device_train_batch_size 1 \
     --per_device_eval_batch_size 2 \
-    --gradient_accumulation_steps 1 \
+    --gradient_accumulation_steps 16 \
     --fuse_attention_ffn true \
     --fuse_attention_qkv true \
     --fuse_sequence_parallel_allreduce true \
@@ -65,16 +65,16 @@ python -u  -m paddle.distributed.launch \
     --pipeline_parallel_degree 1 \
     --tensor_parallel_degree 1 \
     --sharding_parallel_degree 8 \
+    --sharding "stage1" \
     --learning_rate 0.0001 \
     --min_learning_rate 0.00001 \
-    --max_steps 2 \
+    --max_steps 2000 \
     --moe_group "dp" \
     --save_steps 100000 \
     --weight_decay 0.01 \
     --warmup_ratio 0.01 \
     --logging_steps 1\
     --dataloader_num_workers 1 \
-    --sharding "stage1" \
     --eval_steps 1000000 \
     --disable_tqdm true \
     --continue_training 0\
