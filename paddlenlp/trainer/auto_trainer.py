@@ -162,13 +162,13 @@ class AutoTrainer(Trainer):
             meshes.append(_get_mesh(self.args.pipeline_parallel_degree - 1))
         return meshes
 
-    def _wrap_for_dist_loader(self, train_dataloader, dtensor_idx=None):
-        self.dtensor_idx = dtensor_idx
+    def _wrap_for_dist_loader(self, train_dataloader, dense_tensor_idx=None):
+        self.dense_tensor_idx = dense_tensor_idx
         dist_loader = dist.shard_dataloader(
             dataloader=train_dataloader,
             meshes=self._get_meshes_for_loader(),
             shard_dims="dp",
-            dtensor_idx=dtensor_idx,
+            dense_tensor_idx=dense_tensor_idx,
         )
         return dist_loader
 
@@ -299,7 +299,7 @@ class AutoTrainer(Trainer):
                     for j, dtensor in enumerate(dtensors):
                         if isinstance(dtensor, paddle.Tensor):
                             mesh, placements = dtensor.process_mesh, dtensor.placements
-                            if self.dtensor_idx is not None and j in self.dtensor_idx:
+                            if self.dense_tensor_idx is not None and j in self.dense_tensor_idx:
                                 global_datas = dtensor.split(self.args.gradient_accumulation_steps, axis=0)
                                 for index, data in enumerate(global_datas):
                                     if key in global_micro_batchs[index].keys():
