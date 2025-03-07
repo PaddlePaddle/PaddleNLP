@@ -340,6 +340,12 @@ class Config:
         reset_value(self, "block_size", "infer_model_block_size", config)
         reset_value(self, "max_seq_len", "infer_model_max_seq_len", config)
         reset_value(self, "return_full_hidden_states", "return_full_hidden_states", config)
+        reset_value(self, "dtype", "infer_model_dtype", config)
+        reset_value(self, "use_cache_kv_int8", "infer_model_cachekv_int8_type", config)
+        if self.use_cache_kv_int8 == "null":
+            self.use_cache_kv_int8 = 0
+        else:
+            self.use_cache_kv_int8 = 1
         if self.seq_len_limit > self.max_seq_len:
             self.seq_len_limit = self.max_seq_len
             logger.warning(f"The loading model requires len(input_ids) <= {self.max_seq_len}, now reset MAX_SEQ_LEN.")
