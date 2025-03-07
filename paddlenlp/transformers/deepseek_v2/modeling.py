@@ -72,7 +72,7 @@ from ..model_outputs import (
 )
 from ..model_utils import PretrainedModel, register_base_model
 from ..moe_gate import PretrainedMoEGate
-from ..moe_layer import MoELayer
+from ..moe_layer import MoEFlexTokenLayer, MoELayer
 from ..utils import device_guard
 from . import fp8_linear as linear_utils
 from .configuration import DeepseekV2Config
@@ -682,9 +682,9 @@ class MoEGate(PretrainedMoEGate):
 
         self.weight = paddle.create_parameter(
             shape=[expert_hidden_size, num_experts],
-            dtype=paddle.get_default_dtype(),
+            dtype=paddle.float32,
             is_bias=False,
-            default_initializer=nn.initializer.Constant(1.0),
+            # default_initializer=nn.initializer.Constant(1.0),
         )
 
         if config.topk_method == "noaux_tc":
@@ -695,6 +695,8 @@ class MoEGate(PretrainedMoEGate):
             )
             self.e_score_correction_bias.is_distributed = True
 
+        self.using_flex_token = config.using_flex_token
+
     def forward(self, hidden_states):
         """
         Args:
@@ -703,11 +705,15 @@ class MoEGate(PretrainedMoEGate):
         _, _, h_dim = hidden_states.shape
 
         # compute gating score
-        logits = F.linear(hidden_states, self.weight, None)
-
         with paddle.amp.auto_cast(False):
+            hidden_states = hidden_states.cast(self.weight.dtype)
+            logits = F.linear(hidden_states, self.weight, None)
             scores = self.gate_score_func(logits=logits)
             scores = scores.cast(paddle.float32)
+
+        if self.using_flex_token:
+            scores, routing_map, exp_counts, l_aux, l_zloss = self.topkgating_nodrop(scores)
+            return scores, routing_map, l_aux, l_zloss
 
         capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss = self.topkgating(scores)
         return capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss
@@ -761,6 +767,58 @@ class DeepseekV2MoE(MoELayer):
             gate=gate,
             capacity=2.0,
         )
+        self.alpha = config.aux_loss_alpha
+        if config.n_shared_experts is not None:
+            intermediate_size = config.moe_intermediate_size * config.n_shared_experts
+            self.shared_experts = DeepseekV2MLP(config=config, intermediate_size=intermediate_size, is_moe=False)
+
+    def forward(self, hidden_states):
+        final_hidden_states, l_aux, l_zloss = super().forward(hidden_states)
+        if self.training and self.alpha > 0.0:
+            l_aux = l_aux * self.alpha
+            final_hidden_states = AddAuxiliaryLoss.apply(final_hidden_states, l_aux)
+
+        if self.config.n_shared_experts is not None:
+            shared_expert_output = self.shared_experts(hidden_states)
+            final_hidden_states = final_hidden_states + shared_expert_output
+        return final_hidden_states
+
+
+class DeepseekV2MoEFlexToken(MoEFlexTokenLayer):
+    """
+    A mixed expert module containing shared experts.
+    """
+
+    def __init__(self, config: DeepseekV2Config):
+        gate = MoEGate(
+            config=config,
+            num_experts=config.n_routed_experts,
+            expert_hidden_size=config.hidden_size,
+            top_k=config.num_experts_per_tok,
+            topk_method=config.topk_method,
+            n_group=config.n_group,
+            topk_group=config.topk_group,
+            norm_topk_prob=config.norm_topk_prob,
+            routed_scaling_factor=config.routed_scaling_factor,
+            drop_tokens=False,
+        )
+
+        hcg = fleet.get_hybrid_communicate_group()
+        moe_group = hcg.expert_parallel_group
+        moe_grad_group = hcg.expert_grad_comm_group
+
+        super().__init__(
+            config=config,
+            moe_num_experts=config.n_routed_experts,
+            expert_class=DeepseekV2MLP,
+            expert_kwargs={"config": config, "intermediate_size": config.moe_intermediate_size, "is_moe": True},
+            gate=gate,
+            moe_group=moe_group,
+        )
+
+        for p in self.experts.parameters():
+            setattr(p, "color", {"color": "moe_expert", "group": moe_grad_group})
+
         self.alpha = config.aux_loss_alpha
         if config.n_shared_experts is not None:
             intermediate_size = config.moe_intermediate_size * config.n_shared_experts
@@ -1073,8 +1131,10 @@ class DeepseekV2DecoderLayer(nn.Layer):
 
         self.self_attn = DeepseekV2Attention(config=config, layerwise_recompute=layerwise_recompute)
 
+        MoELayerClass = DeepseekV2MoEFlexToken if config.using_flex_token else DeepseekV2MoE
+
         self.mlp = (
-            DeepseekV2MoE(config)
+            MoELayerClass(config)
             if (
                 config.n_routed_experts is not None
                 and layer_idx >= config.first_k_dense_replace

@@ -178,6 +178,7 @@ class DeepseekV2Config(PretrainedConfig):
         attention_bias=False,
         attention_dropout=0.0,
         speculate_model_type=False,
+        using_flex_token=False,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -225,6 +226,7 @@ class DeepseekV2Config(PretrainedConfig):
         self.attention_dropout = attention_dropout
         self.speculate_model_type = speculate_model_type
         self.use_fp8 = False
+        self.using_flex_token = using_flex_token
 
         super().__init__(
             pad_token_id=pad_token_id,
