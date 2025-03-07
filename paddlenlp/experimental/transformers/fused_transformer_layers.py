@@ -2973,23 +2973,33 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
             from paddlenlp.utils.env import PREFILL_USE_SAGE_ATTN
 
             if PREFILL_USE_SAGE_ATTN:
-                from .sageattention import sageattn_qk_int8_pv_fp8_cuda_dsk_sm90
+                from paddlenlp_ops import sage_attention_dsk
 
-                query_192 = paddle.unsqueeze(query, axis=0)
-                key_192 = paddle.unsqueeze(key, axis=0)
+                query_256 = paddle.nn.functional.pad(paddle.unsqueeze(query, axis=0), (0, 256 - 192))
+                key_256 = paddle.nn.functional.pad(paddle.unsqueeze(key, axis=0), (0, 256 - 192))
 
                 value_128, _ = paddle.split(value, [128, 64], axis=-1)
                 value_128 = paddle.unsqueeze(value_128, axis=0)
 
-                fmha_out_prefill = sageattn_qk_int8_pv_fp8_cuda_dsk_sm90(
-                    query_192,
-                    key_192,
+                km = paddle.mean(key_256, axis=1, keepdim=True)
+                km = km.squeeze(1)
+
+                fmha_out_prefill = sage_attention_dsk(
+                    query_256,
+                    key_256,
                     kwargs.get("cu_seqlens_q", None),
                     kwargs.get("cu_seqlens_k", None),
                     value_128,
-                    is_causal=True,
-                    sm_scale=self.softmax_scale,
-                    tensor_layout="NHD",
+                    km,
+                    None,  # vm
+                    self.softmax_scale,
+                    "per_warp",  # qk_quant_gran
+                    "fp16",  # pv_accum_dtype
+                    0,  # tensor layout, 0 -> NHD
+                    True,  # is_causal
+                    True,  # smooth k
+                    False,  # smooth v
+                    False,  # return lse
                 )
                 fmha_out_prefill = paddle.nn.functional.pad(fmha_out_prefill, (0, 192 - 128))
                 fmha_out_prefill = paddle.squeeze(fmha_out_prefill, axis=0)
@@ -3330,23 +3340,33 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
             from paddlenlp.utils.env import PREFILL_USE_SAGE_ATTN
 
             if PREFILL_USE_SAGE_ATTN:
-                from .sageattention import sageattn_qk_int8_pv_fp8_cuda_dsk_sm90
+                from paddlenlp_ops import sage_attention_dsk
 
-                query_192 = paddle.unsqueeze(query, axis=0)
-                key_192 = paddle.unsqueeze(key, axis=0)
+                query_256 = paddle.nn.functional.pad(paddle.unsqueeze(query, axis=0), (0, 256 - 192))
+                key_256 = paddle.nn.functional.pad(paddle.unsqueeze(key, axis=0), (0, 256 - 192))
 
                 value_128, _ = paddle.split(value, [128, 64], axis=-1)
                 value_128 = paddle.unsqueeze(value_128, axis=0)
 
-                fmha_out_prefill = sageattn_qk_int8_pv_fp8_cuda_dsk_sm90(
-                    query_192,
-                    key_192,
+                km = paddle.mean(key_256, axis=1, keepdim=True)
+                km = km.squeeze(1)
+
+                fmha_out_prefill = sage_attention_dsk(
+                    query_256,
+                    key_256,
                     kwargs.get("cu_seqlens_q", None),
                     kwargs.get("cu_seqlens_k", None),
                     value_128,
-                    is_causal=True,
-                    sm_scale=self.softmax_scale,
-                    tensor_layout="NHD",
+                    km,
+                    None,  # vm
+                    self.softmax_scale,
+                    "per_warp",  # qk_quant_gran
+                    "fp16",  # pv_accum_dtype
+                    0,  # tensor layout, 0 -> NHD
+                    True,  # is_causal
+                    True,  # smooth k
+                    False,  # smooth v
+                    False,  # return lse
                 )
                 fmha_out_prefill = paddle.nn.functional.pad(fmha_out_prefill, (0, 192 - 128))
                 fmha_out_prefill = paddle.squeeze(fmha_out_prefill, axis=0)
@@ -5049,23 +5069,33 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
             from paddlenlp.utils.env import PREFILL_USE_SAGE_ATTN
 
             if PREFILL_USE_SAGE_ATTN:
-                from .sageattention import sageattn_qk_int8_pv_fp8_cuda_dsk_sm90
+                from paddlenlp_ops import sage_attention_dsk
 
-                query_192 = paddle.unsqueeze(query, axis=0)
-                key_192 = paddle.unsqueeze(key, axis=0)
+                query_256 = paddle.nn.functional.pad(paddle.unsqueeze(query, axis=0), (0, 256 - 192))
+                key_256 = paddle.nn.functional.pad(paddle.unsqueeze(key, axis=0), (0, 256 - 192))
 
                 value_128, _ = paddle.split(value, [128, 64], axis=-1)
                 value_128 = paddle.unsqueeze(value_128, axis=0)
 
-                fmha_out_prefill = sageattn_qk_int8_pv_fp8_cuda_dsk_sm90(
-                    query_192,
-                    key_192,
+                km = paddle.mean(key_256, axis=1, keepdim=True)
+                km = km.squeeze(1)
+
+                fmha_out_prefill = sage_attention_dsk(
+                    query_256,
+                    key_256,
                     kwargs.get("cu_seqlens_q", None),
                     kwargs.get("cu_seqlens_k", None),
                     value_128,
-                    is_causal=True,
-                    sm_scale=self.softmax_scale,
-                    tensor_layout="NHD",
+                    km,
+                    None,  # vm
+                    self.softmax_scale,
+                    "per_warp",  # qk_quant_gran
+                    "fp16",  # pv_accum_dtype
+                    0,  # tensor layout, 0 -> NHD
+                    True,  # is_causal
+                    True,  # smooth k
+                    False,  # smooth v
+                    False,  # return lse
                 )
                 fmha_out_prefill = paddle.nn.functional.pad(fmha_out_prefill, (0, 192 - 128))
                 fmha_out_prefill = paddle.squeeze(fmha_out_prefill, axis=0)
