@@ -92,7 +92,7 @@ def combining(x, combine_weights, scatter_index):
 
 
 class LocalGatePart1(dist.LocalLayer):
-    def __init__(self, config, gate: PretrainedMoEGate, ipp=0):
+    def __init__(self, config, gate: PretrainedMoEGate, ipp=None):
         mesh = get_mesh(ipp)
         out_dist_attrs = [
             (mesh, [dist.Shard(0)]),  # reshaped_input [b*s, h]
@@ -128,7 +128,7 @@ class LocalGatePart1(dist.LocalLayer):
 
 
 class LocalGateAndDispatch(dist.LocalLayer):
-    def __init__(self, gate: PretrainedMoEGate, ipp=0):
+    def __init__(self, gate: PretrainedMoEGate, ipp=None):
         mesh = get_mesh(ipp)
         out_dist_attrs = [
             (mesh, [dist.Shard(1)]),  # dispatched_input [e,c,h]
@@ -148,16 +148,16 @@ class LocalGateAndDispatch(dist.LocalLayer):
 
 
 class LocalCombine(dist.LocalLayer):
-    def __init__(self, ipp=0):
-        mesh = get_mesh(ipp)
-        out_dist_attrs = [(mesh, [dist.Shard(0)])]
+    def __init__(self, ipp=None):
+        self.mesh = get_mesh(ipp)
+        out_dist_attrs = [(self.mesh, [dist.Shard(0)])]
         grad_dist_attrs = [None, None]
         super().__init__(out_dist_attrs, grad_dist_attrs)
 
     def forward(self, combine_weights, expert_output, dtype="float32", out_shape=None):
         combined_output = einsum("sec,ecm->sm", combine_weights.cast(dtype), expert_output)
         if out_shape is not None:
-            if combined_output._is_initialized():
+            if dist.get_rank() in self.mesh.process_ids:
                 out_shape = dist.auto_parallel.moe_utils._cal_local_shape(
                     out_shape, self.out_dist_attrs[0][0], self.out_dist_attrs[0][1]
                 )
@@ -176,7 +176,7 @@ class MoELayer(nn.Layer):
         capacity: int = 1.0,
         moe_group: str = "data",
         all_to_all_dropout=0.0,
-        ipp: int = 0,
+        ipp: int = None,
     ):
         super().__init__()
 

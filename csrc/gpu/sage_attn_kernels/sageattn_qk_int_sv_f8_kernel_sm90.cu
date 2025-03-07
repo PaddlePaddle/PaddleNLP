@@ -38,6 +38,7 @@
 
 #include "sageattn_utils.cuh"
 #include "sageattn_fused.cuh"
+#include "sageattn_fused.cuh"
 
 template <int BlockMajorSize, int BlockMinorSize, bool swizzle=true, CUtensorMapL2promotion_enum promotion_mode=CU_TENSOR_MAP_L2_PROMOTION_NONE, typename T>
 CUtensorMap create_tensor_map_4D(T* gmem_ptr, int d1, int d2, int d3, int d4, int stride1, int stride2, int stride3) {

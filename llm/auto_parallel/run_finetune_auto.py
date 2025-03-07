@@ -11,17 +11,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# import inspect
+
 import json
 import logging
 import os
 import sys
+from dataclasses import dataclass, field
 from functools import partial
+from typing import List, Optional
 
 import paddle
-from utils.argument import GenerateArgument, ReftArgument
-from utils.data import convert_example_for_reft, get_convert_example
 
+from llm.utils.argument import GenerateArgument, ReftArgument
+from llm.utils.data import convert_example_for_reft, get_convert_example
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import (
     ZeroPaddingIterableDataset,
@@ -32,8 +34,8 @@ from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
 from paddlenlp.peft import (
     LoKrConfig,
     LoKrModel,
-    LoRAConfig,
-    LoRAModel,
+    LoRAAutoConfig,
+    LoRAAutoModel,
     PrefixConfig,
     PrefixModelForCausalLM,
     VeRAConfig,
@@ -47,27 +49,24 @@ from paddlenlp.peft.reft import (
 )
 from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint, set_seed
 from paddlenlp.trainer.trainer_callback import TrainerState
+from paddlenlp.trainer.utils.doc import add_start_docstrings
 from paddlenlp.transformers import (
-    AutoConfig,
-    AutoModelForCausalLM,
-    AutoModelForCausalLMPipe,
     AutoTokenizer,
-    DeepseekV2ForCausalLM,
-    DeepseekV2ForCausalLMPipe,
-    DeepseekV3ForCausalLM,
-    DeepseekV3ForCausalLMPipe,
     Llama3Tokenizer,
-    LlamaForCausalLM,
-    LlamaForCausalLMPipe,
+    LlamaConfig,
+    LlamaForCausalLM3DAuto,
+    LlamaForCausalLMNet,
+    LlamaPretrainingCriterion3DAuto,
+    LlamaPretrainingCriterionNet,
     LlamaTokenizer,
-    Qwen2ForCausalLM,
-    Qwen2ForCausalLMPipe,
-    Qwen2MoeForCausalLM,
-    Qwen2MoeForCausalLMPipe,
 )
-from paddlenlp.transformers.configuration_utils import LlmMetaConfig
-from paddlenlp.transformers.longlora import replace_llama_attn, set_group_size
-from paddlenlp.trl import DataConfig, ModelConfig, SFTConfig, SFTTrainer
+
+MODEL_CLASSES = {
+    "llama": (LlamaConfig, LlamaForCausalLM3DAuto, LlamaPretrainingCriterion3DAuto),
+    "llama_network": (LlamaConfig, LlamaForCausalLMNet, LlamaPretrainingCriterionNet),
+}
+
+from paddlenlp.trl import DataConfig, ModelConfig, SFTAutoTrainer, SFTConfig
 from paddlenlp.trl.llm_utils import (
     ZeroPaddingIterDatasetCallback,
     compute_metrics,
@@ -81,18 +80,7 @@ from paddlenlp.utils.tools import get_env_device
 # Fine-tune Environment Variables to support sharding stage1 overlap optimization.
 os.environ["USE_CASUAL_MASK"] = "False"
 
-flash_mask_support_list = [
-    DeepseekV2ForCausalLM,
-    DeepseekV2ForCausalLMPipe,
-    DeepseekV3ForCausalLM,
-    DeepseekV3ForCausalLMPipe,
-    LlamaForCausalLM,
-    LlamaForCausalLMPipe,
-    Qwen2ForCausalLM,
-    Qwen2ForCausalLMPipe,
-    Qwen2MoeForCausalLM,
-    Qwen2MoeForCausalLMPipe,
-]
+flash_mask_support_list = [LlamaForCausalLM3DAuto, LlamaForCausalLMNet]
 
 
 def paddlenlp_verison_check():
@@ -105,14 +93,82 @@ def paddlenlp_verison_check():
         )
 
 
+@dataclass
+@add_start_docstrings(SFTConfig.__doc__)
+class SFTAutoConfig(SFTConfig):
+    enable_linear_fused_grad_add: bool = field(
+        default=False,
+        metadata={
+            "help": "Enable fused linear grad add strategy, which will reduce elementwise add for grad accumulation in the backward of nn.Linear ."
+        },
+    )
+    job_schedule_profiler_start: int = field(
+        default=-1,
+        metadata={"help": "The step to start job_schedule_profiler."},
+    )
+    job_schedule_profiler_end: int = field(
+        default=-1,
+        metadata={"help": "The step to end job_schedule_profiler."},
+    )
+    pipeline_schedule_mode: str = field(
+        default="1F1B", metadata={"help": "The pipeline schedule mode, support FThenB, 1F1B, VPP and Eager-1F1B."}
+    )
+    sr: Optional[int] = field(default=0, metadata={"help": "The count of chunks without recompute."})
+    refined_ops_patterns: Optional[List[str]] = field(
+        default=None, metadata={"help": "The pattern of refined recompute."}
+    )
+    virtual_pipeline_seg_method: str = field(
+        default="LlamaDecoderLayerAuto", metadata={"help": "The seg method of spliting pp layer for virtual pipeline."}
+    )
+    # NOTE(gongenlei): new add autotuner_benchmark
+    autotuner_benchmark: bool = field(
+        default=False,
+        metadata={"help": "Weather to run benchmark by autotuner. True for from_scratch and pad_max_length."},
+    )
+    use_intermediate_api: bool = field(
+        default=False,
+        metadata={"help": "Weather to use auto_parallel intermediate api"},
+    )
+
+    def __post_init__(self):
+        super().__post_init__()
+        assert self.enable_auto_parallel
+
+        # NOTE(gongenlei): new add autotuner_benchmark
+        if self.autotuner_benchmark:
+            self.max_steps = 5
+            self.do_train = True
+            self.do_export = False
+            self.do_predict = False
+            self.do_eval = False
+            self.overwrite_output_dir = True
+            self.load_best_model_at_end = False
+            self.report_to = []
+
+        logger.info(self.strategy)
+
+
+@dataclass
+class ModelAutoConfig(ModelConfig):
+    """
+    Arguments pertaining to which model/config/tokenizer we are going to pre-train from.
+    """
+
+    model_type: Optional[str] = field(
+        default="llama", metadata={"help": "Only support for llama pre-training for now."}
+    )
+    num_hidden_layers: Optional[int] = field(
+        default=None, metadata={"help": "Number of hidden layers in the Transformer encoder."}
+    )
+
+
 def main():
     paddlenlp_verison_check()
-    parser = PdArgumentParser((GenerateArgument, ModelConfig, ReftArgument, DataConfig, SFTConfig))
+    parser = PdArgumentParser((GenerateArgument, ModelAutoConfig, ReftArgument, DataConfig, SFTAutoConfig))
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
         gen_args, model_args, reft_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
     else:
         gen_args, model_args, reft_args, data_args, training_args = parser.parse_args_into_dataclasses()
-
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
     training_args.print_config(gen_args, "Generation")
@@ -161,31 +217,18 @@ def main():
         weight_double_quant=model_args.weight_double_quant,
         weight_double_quant_block_size=model_args.weight_double_quant_block_size,
     )
-
-    model_config = AutoConfig.from_pretrained(
+    config_class, model_class, criterion_class = MODEL_CLASSES[model_args.model_type]
+    model_config = config_class.from_pretrained(
         model_args.model_name_or_path,
         dtype=dtype,
         from_aistudio=model_args.from_aistudio,
         quantization_config=quantization_config,
     )
-
-    if training_args.use_ssa:
-        assert (
-            training_args.ssa_group_size_ratio is not None
-        ), "ssa_group_size_ratio must be specified when use_ssa is True"
-        set_group_size(training_args.ssa_group_size_ratio)
-        replace_llama_attn()
-
-    architectures_to_check = {"Qwen2Moe", "DeepseekV2", "DeepseekV3"}
-    if (
-        any(architecture in str(model_config.architectures) for architecture in architectures_to_check)
-        and training_args.data_parallel_degree > 1
-    ):
-        training_args.use_expert_parallel = True
-
-    LlmMetaConfig.set_llm_config(model_config, training_args)
+    model_config.use_flash_attention = training_args.use_flash_attention
     model_config.use_fast_layer_norm = model_args.use_fast_layer_norm
-
+    model_config.num_hidden_layers = (
+        model_args.num_hidden_layers if model_args.num_hidden_layers is not None else model_config.num_hidden_layers
+    )
     # Config for model using dropout, such as GPT.
     if hasattr(model_config, "hidden_dropout_prob"):
         model_config.hidden_dropout_prob = model_args.hidden_dropout_prob
@@ -198,16 +241,10 @@ def main():
         model_config.fuse_attention_qkv = model_args.fuse_attention_qkv
     if model_args.fuse_attention_ffn is not None:
         model_config.fuse_attention_ffn = model_args.fuse_attention_ffn
-
     model_config.seq_length = data_args.max_length
 
     # Config for model useing long sequence strategy
     if model_args.use_long_sequence_strategies:
-        scaled_max_length = (
-            int(data_args.max_length * model_args.rope_scaling_factor)
-            if data_args.use_pose_convert
-            else data_args.max_length
-        )
         data_args.scaled_max_length = int(data_args.max_length * model_args.rope_scaling_factor)
         model_config.use_long_sequence_strategies = True
         model_config.long_sequence_strategy_type = model_args.strategy_type
@@ -215,33 +252,30 @@ def main():
         model_config.rope_scaling_factor = model_args.rope_scaling_factor
         model_config.long_sequence_init_args = {
             "dim": int(model_config.hidden_size / model_config.num_attention_heads),
-            "max_position_embeddings": scaled_max_length,  # extended context window
+            "max_position_embeddings": data_args.scaled_max_length,  # extended context window
             "base": model_config.rope_theta,
             "scaling_factor": model_args.rope_scaling_factor,
         }
         if model_args.strategy_name == "YaRNScalingRotaryEmbedding":
             model_config.long_sequence_init_args["original_max_position_embeddings"] = data_args.max_length
+    model_config.sequence_parallel = training_args.sequence_parallel
+    model_config.pipeline_parallel_degree = training_args.pipeline_parallel_degree
+    model_config.tensor_parallel_degree = training_args.tensor_parallel_degree
 
     logger.info(f"Final model config: {model_config}")
 
-    logger.info("Creating model")
-
-    model_class = AutoModelForCausalLM
-    if training_args.pipeline_parallel_degree > 1:
-        if data_args.eval_with_do_generation and training_args.do_eval:
-            raise ValueError("Plese set eval_with_do_generation to false in pipeline parallel mode.")
-
-        model_class = AutoModelForCausalLMPipe
-
     if model_args.continue_training and not training_args.autotuner_benchmark:
+        criterion = criterion_class(model_config)
         model = model_class.from_pretrained(
             model_args.model_name_or_path,
             config=model_config,
             from_aistudio=model_args.from_aistudio,
         )
     else:
-        # NOTE(gongenlei): new add autotuner_benchmark
-        model = model_class.from_config(model_config, dtype=dtype)
+        with paddle.LazyGuard():
+            criterion = criterion_class(model_config)
+            # NOTE(gongenlei): new add autotuner_benchmark
+            model = model_class.from_config(model_config, dtype=dtype)
 
     if model_args.flash_mask and (not data_args.zero_padding or not model.config.use_flash_attention):
         logger.warning("`flash_mask` must use with zero padding and flash attention.")
@@ -293,6 +327,7 @@ def main():
         tokenizer.pad_token_id = tokenizer.eos_token_id
 
     train_ds, dev_ds, test_ds = create_dataset(data_args, training_args)
+
     # TODO(ZHUI & sijunhe): Temporary implementation. Generalize this logic and move to Trainer later.
     if training_args.resume_from_checkpoint is not None and data_args.lazy:
         logger.info(
@@ -314,10 +349,6 @@ def main():
         )
         train_ds = train_ds.skip(consumed_samples)
 
-    if training_args.pipeline_parallel_degree > 1:
-        from utils.data import convert_example_common
-
-        trans_func = partial(convert_example_common, tokenizer=tokenizer, data_args=data_args)
     elif model_args.reft:
         trans_func = partial(
             convert_example_for_reft,
@@ -336,7 +367,6 @@ def main():
         )
         eval_zero_padding = False
 
-    logger.info("Trans the dataset text into token ids, please wait for a moment.")
     train_ds, dev_ds, test_ds = trans_dataset_to_ids(
         train_ds, dev_ds, test_ds, model_args, data_args, trans_func, eval_zero_padding
     )
@@ -403,10 +433,13 @@ def main():
         # NOTE(gongenlei): new add autotuner_benchmark
         max_length = data_args.max_length
         padding = "max_length"
-    else:
+    elif max(training_args.sharding_parallel_degree, training_args.data_parallel_degree) == 1:
+        # NOTE(zhangwl):in auto_parallel , ever peer input shape should be same when sharding_parallel_degree > 1
         max_length = None
         padding = True
-
+    else:
+        max_length = data_args.max_length
+        padding = "max_length"
     if training_args.pipeline_parallel_degree > 1:
         metrics = None
     elif data_args.eval_with_do_generation:
@@ -423,8 +456,9 @@ def main():
         return_attention_mask=not model_args.flash_mask,
         pad_to_multiple_of=data_args.pad_to_multiple_of,
     )
-    trainer = SFTTrainer(
+    trainer = SFTAutoTrainer(
         model=model,
+        criterion=criterion,
         args=training_args,
         train_dataset=train_ds,
         eval_dataset=dev_ds,
@@ -436,10 +470,7 @@ def main():
         gen_args=gen_args,
         data_args=data_args,
     )
-    trainable_parameters = [p for p in model.parameters() if not p.stop_gradient]
-    trainer.set_optimizer_grouped_parameters(trainable_parameters)
 
-    # Train
     if training_args.do_train:
         checkpoint = None
         if training_args.resume_from_checkpoint is not None:
@@ -470,6 +501,7 @@ def main():
     if training_args.do_predict:
         eval_result = trainer.predict(test_ds).metrics
         trainer.log_metrics("test", eval_result)
+    training_args.do_eval = False
     # Evaluation dev set
     if training_args.do_eval:
         logger.info("*** Evaluate result after train ***")
@@ -537,7 +569,7 @@ def create_peft_model(model_args, reft_args, training_args, dtype, model_config,
             ), "Currently not support enabling sharding_stage1_overlap in lora mode."
         if model_args.lora_path is None:
             target_modules = get_lora_target_modules(model)
-            lora_config = LoRAConfig(
+            lora_config = LoRAAutoConfig(
                 target_modules=target_modules,
                 r=model_args.lora_rank,
                 lora_alpha=2 * model_args.lora_rank if not model_args.rslora else 4,
@@ -551,10 +583,12 @@ def create_peft_model(model_args, reft_args, training_args, dtype, model_config,
                 use_quick_lora=model_args.use_quick_lora,
                 lora_use_mixer=model_args.lora_use_mixer,
                 use_mora=model_args.use_mora,
+                use_intermediate_api=training_args.use_intermediate_api,
+                pipeline_parallel_degree=training_args.pipeline_parallel_degree,
             )
-            model = LoRAModel(model, lora_config)
+            model = LoRAAutoModel(model, lora_config)
         else:
-            model = LoRAModel.from_pretrained(model=model, lora_path=model_args.lora_path)
+            model = LoRAAutoModel.from_pretrained(model=model, lora_path=model_args.lora_path)
 
         model.print_trainable_parameters()
 
@@ -620,12 +654,7 @@ def create_peft_model(model_args, reft_args, training_args, dtype, model_config,
 def trans_dataset_to_ids(train_ds, dev_ds, test_ds, model_args, data_args, trans_func, eval_zero_padding):
     if train_ds is not None:
         train_ds = train_ds.map(
-            partial(
-                trans_func,
-                is_test=False,
-                zero_padding=data_args.zero_padding,
-                flash_mask=model_args.flash_mask,
-            )
+            partial(trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.flash_mask)
         )
     if dev_ds is not None:
         dev_ds = dev_ds.map(
@@ -652,21 +681,18 @@ def create_dataset(data_args, training_args):
     if os.path.exists(os.path.join(data_args.dataset_name_or_path, "train.json")) or os.path.exists(
         os.path.join(data_args.dataset_name_or_path, "dev.json")
     ):
-        logger.info("load train")
         if training_args.do_train:
             train_ds = load_dataset(
                 "json",
                 data_files=os.path.join(data_args.dataset_name_or_path, "train.json"),
                 lazy=data_args.lazy,
             )[0]
-        logger.info("load eval")
         if training_args.do_eval:
             dev_ds = load_dataset(
                 "json",
                 data_files=os.path.join(data_args.dataset_name_or_path, "dev.json"),
                 lazy=data_args.lazy,
             )[0]
-        logger.info("load test")
         if training_args.do_predict:
             test_ds = load_dataset(
                 "json",

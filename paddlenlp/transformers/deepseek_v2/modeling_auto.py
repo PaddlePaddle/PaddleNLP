@@ -167,7 +167,7 @@ def scaled_dot_product_attention(
 
         attn_weights = F.dropout(attn_weights, p=config.attention_dropout, training=training)
 
-        attn_output = paddle.matmul(attn_weights.astype("float32"), value_states.astype("float32"))
+        attn_output = paddle.matmul(attn_weights, value_states)
         attn_output = attn_output.transpose([0, 2, 1, 3])
 
         if sequence_parallel:
@@ -803,7 +803,7 @@ class DeepseekV2ModelAuto(DeepseekV2PretrainedModelAuto):
         self.global_layer = GlobalOutputNet(config=config)
 
         def divide_list_indices(n, k):
-            n = n + 1
+            n = n + self.config.pp_extra_layer_num
             base_size = n // k
             extra = n % k
 
