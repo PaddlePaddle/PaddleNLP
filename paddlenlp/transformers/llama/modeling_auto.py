@@ -1205,20 +1205,8 @@ class LlamaPretrainingCriterion3DAuto(paddle.nn.Layer):
                 ]
                 loss_func = LocalLossLayer(out_dist_attrs, grad_dist_attrs)
 
-                def is_initialized(loss):
-                    if isinstance(loss, paddle.Tensor):
-                        return loss._is_initialized()
-                    elif isinstance(loss, paddle.pir.Value):
-                        return loss.initialized()
-                    else:
-                        return False
-
-                # LocalLayer does not support uninitialized tensor as input
-                if is_initialized(masked_lm_loss):
-                    loss = loss_func(masked_lm_loss, masked_lm_loss > 0)
-                    loss = loss.mean()
-                else:
-                    loss = paddle.mean(masked_lm_loss)
+                loss = loss_func(masked_lm_loss, masked_lm_loss > 0)
+                loss = loss.mean()
             else:
                 masked_lm_loss = paddle.masked_select(masked_lm_loss, masked_lm_loss > 0).astype("float32")
                 loss = paddle.mean(masked_lm_loss)
