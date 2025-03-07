@@ -85,7 +85,7 @@ python -u  -m paddle.distributed.launch \
     --data_impl "mmap" \
     --enable_auto_parallel 1 \
     --max_grad_norm 1.0 \
-    --num_hidden_layers 1 \
+    --num_hidden_layers 2 \
     --first_k_dense_replace 0 \
     --n_routed_experts 16 \
     --use_intermediate_api true \
