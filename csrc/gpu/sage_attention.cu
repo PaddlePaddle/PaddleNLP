@@ -129,10 +129,12 @@ std::vector<paddle::Tensor> SageAttentionKernel(
         const_cast<paddle::Tensor*>(&value_cache));
     
     // TODO: Sage Attention
+    printf("%d %d %d\n", qkv_out.shape()[0], qkv_out.shape()[1], qkv_out.shape()[2]);
+    q, rope_k, rope_v;;;;;;;; // [token_num, (q_num_head + 2 x kv_num_head) x head_dim]
     CascadeAppendAttentionKernel<data_t, data_t>(
         meta_data,
         qkv_out,
-        key_cache,
+        key_cache,  // [bsz x (token + block_size - 1// block_size), kv_num_head, head_dim]
         value_cache,
         attn_mask,
         cache_k_dequant_scales,
