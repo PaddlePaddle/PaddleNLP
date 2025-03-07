@@ -268,6 +268,9 @@ CUTLASS_DEVICE void mma_f16_two_stages(const Params& mainloop_params,
   static constexpr int BLOCK_SHAPE_Q = get<0>(TileShape_QKD{});
   static constexpr int BLOCK_SHAPE_KV = get<1>(TileShape_QKD{});
 
+  cutlass::FastDivmod stage_div(2);
+  int quotient, remainder;
+
   Tensor sQ = make_tensor(make_smem_ptr(shared_storage.smem_q.data()), SmemLayoutQ{});
   Tensor sK = make_tensor(make_smem_ptr(shared_storage.smem_kv.data()), SmemLayoutK{});
   Tensor sVt_s1 = make_tensor(make_smem_ptr(shared_storage.smem_kv.data()), SmemLayoutVtOneStage{});
@@ -342,8 +345,9 @@ CUTLASS_DEVICE void mma_f16_two_stages(const Params& mainloop_params,
     Tensor scale_o = attention_updater.update</*init=*/true>(tSrS);
     Tensor tPrP = smem_thr_copy_P.retile_S(convert_type<DTypeKV>(tSrS));
     // gather qk gemm res
-    cute::copy(smem_tiled_copy_P, tPrP, tPsP(_, _, _, smem_pipe_read_kv.index() % 2));
-    cute::copy(scale_o, tScalesScale(_, smem_pipe_read_kv.index() % 2));
+    stage_div.fast_divmod(quotient, remainder, smem_pipe_read_kv.index());
+    cute::copy(smem_tiled_copy_P, tPrP, tPsP(_, _, _, remainder));
+    cute::copy(scale_o, tScalesScale(_, remainder));
     // r2s fence wgmma
     cutlass::arch::fence_view_async_shared();
     cutlass::arch::NamedBarrier::sync(Ktraits::NUM_MMA_THREADS, static_cast<int>(NamedBarriers::kWarpSchedulerWG1));
@@ -361,18 +365,19 @@ CUTLASS_DEVICE void mma_f16_two_stages(const Params& mainloop_params,
       gemm</*init=*/true, /*wg_wait=*/-1>(tiled_mma_qk, tSrQ, tSrK(_, _, _, smem_pipe_read_kv.index()),
                                           tSrS);
       attention_updater.rescale_o(tOrO);
+      stage_div.fast_divmod(quotient, remainder, smem_pipe_read_kv_cur.index());
       // last pv gemm
       if (smem_pipe_read_kv_cur.index() == 0) {
-        gemm</*init=*/false, /*wg_wait=*/-1>(tiled_mma_pv_ss, tOrP_CS2(_, _, _, smem_pipe_read_kv_cur.index() % 2),
+        gemm</*init=*/false, /*wg_wait=*/-1>(tiled_mma_pv_ss, tOrP_CS2(_, _, _, remainder),
                                              tOrV1(_, _, _, _0{}), tOrO);
       } else if (smem_pipe_read_kv_cur.index() == 1) {
-        gemm</*init=*/false, /*wg_wait=*/-1>(tiled_mma_pv_ss, tOrP_CS2(_, _, _, smem_pipe_read_kv_cur.index() % 2),
+        gemm</*init=*/false, /*wg_wait=*/-1>(tiled_mma_pv_ss, tOrP_CS2(_, _, _, remainder),
                                              tOrV2(_, _, _, _0{}), tOrO);
       } else if (smem_pipe_read_kv_cur.index() == 2) {
-        gemm</*init=*/false, /*wg_wait=*/-1>(tiled_mma_pv_ss, tOrP_CS2(_, _, _, smem_pipe_read_kv_cur.index() % 2),
+        gemm</*init=*/false, /*wg_wait=*/-1>(tiled_mma_pv_ss, tOrP_CS2(_, _, _, remainder),
                                              tOrV3(_, _, _, _0{}), tOrO);
       } else {
-        gemm</*init=*/false, /*wg_wait=*/-1>(tiled_mma_pv_ss, tOrP_CS2(_, _, _, smem_pipe_read_kv_cur.index() % 2),
+        gemm</*init=*/false, /*wg_wait=*/-1>(tiled_mma_pv_ss, tOrP_CS2(_, _, _, remainder),
                                              tOrV4(_, _, _, _0{}), tOrO);
       }
       // wait cur qk gemm
@@ -399,10 +404,10 @@ CUTLASS_DEVICE void mma_f16_two_stages(const Params& mainloop_params,
       // update s (exp(s - m))
       Tensor scale_o = attention_updater.update</*init=*/false>(tSrS);
       Tensor tPrP = smem_thr_copy_P.retile_S(convert_type<DTypeKV>(tSrS));
-
       // gather qk gemm res
-      cute::copy(smem_tiled_copy_P, tPrP, tPsP(_, _, _, smem_pipe_read_kv.index() % 2));
-      cute::copy(scale_o, tScalesScale(_, smem_pipe_read_kv.index() % 2));
+      stage_div.fast_divmod(quotient, remainder, smem_pipe_read_kv.index());
+      cute::copy(smem_tiled_copy_P, tPrP, tPsP(_, _, _, remainder));
+      cute::copy(scale_o, tScalesScale(_, remainder));
       // r2s fence wgmma
       cutlass::arch::fence_view_async_shared();
       // make sure tSrS r2s done
@@ -417,17 +422,18 @@ CUTLASS_DEVICE void mma_f16_two_stages(const Params& mainloop_params,
     ++smem_pipe_read_q;
     // compute last pv
     attention_updater.rescale_o(tOrO);
+    stage_div.fast_divmod(quotient, remainder, smem_pipe_read_kv.index());
     if (smem_pipe_read_kv.index() == 0) {
-      gemm</*init=*/false, /*wg_wait=*/-1>(tiled_mma_pv_ss, tOrP_CS2(_, _, _, smem_pipe_read_kv.index() % 2),
+      gemm</*init=*/false, /*wg_wait=*/-1>(tiled_mma_pv_ss, tOrP_CS2(_, _, _, remainder),
                                            tOrV1(_, _, _, _0{}), tOrO);
     } else if (smem_pipe_read_kv.index() == 1) {
-      gemm</*init=*/false, /*wg_wait=*/-1>(tiled_mma_pv_ss, tOrP_CS2(_, _, _, smem_pipe_read_kv.index() % 2),
+      gemm</*init=*/false, /*wg_wait=*/-1>(tiled_mma_pv_ss, tOrP_CS2(_, _, _, remainder),
                                            tOrV2(_, _, _, _0{}), tOrO);
     } else if (smem_pipe_read_kv.index() == 2) {
-      gemm</*init=*/false, /*wg_wait=*/-1>(tiled_mma_pv_ss, tOrP_CS2(_, _, _, smem_pipe_read_kv.index() % 2),
+      gemm</*init=*/false, /*wg_wait=*/-1>(tiled_mma_pv_ss, tOrP_CS2(_, _, _, remainder),
                                            tOrV3(_, _, _, _0{}), tOrO);
     } else {
-      gemm</*init=*/false, /*wg_wait=*/-1>(tiled_mma_pv_ss, tOrP_CS2(_, _, _, smem_pipe_read_kv.index() % 2),
+      gemm</*init=*/false, /*wg_wait=*/-1>(tiled_mma_pv_ss, tOrP_CS2(_, _, _, remainder),
                                            tOrV4(_, _, _, _0{}), tOrO);
     }
     scale_o = attention_updater.finalize(tSrS);
@@ -437,8 +443,8 @@ CUTLASS_DEVICE void mma_f16_two_stages(const Params& mainloop_params,
     ++smem_pipe_read_kv;
     if (chunk_num_this_seq == 1) {
       // norm
-      cute::copy(scale_o, tScalesScale(_, smem_pipe_read_kv.index() % 2));
-
+      stage_div.fast_divmod(quotient, remainder, smem_pipe_read_kv.index());
+      cute::copy(scale_o, tScalesScale(_, remainder));
       cutlass::arch::NamedBarrier::arrive(Ktraits::NUM_MMA_THREADS, static_cast<int>(NamedBarriers::kWG1WG2LastSync));
       attention_updater.rescale_o(tOrO);
     }
@@ -466,20 +472,21 @@ CUTLASS_DEVICE void mma_f16_two_stages(const Params& mainloop_params,
       consumer_wait(pipeline_kv, smem_pipe_read_kv);
       cutlass::arch::NamedBarrier::sync(Ktraits::NUM_MMA_THREADS, static_cast<int>(NamedBarriers::kWarpSchedulerWG1));
       // A: tPsP
-      cute::copy(tScalesScale(_, smem_pipe_read_kv.index() % 2), scale_o);
+      stage_div.fast_divmod(quotient, remainder, smem_pipe_read_kv.index());
+      cute::copy(tScalesScale(_, remainder), scale_o);
       // rescale
       attention_updater.rescale_o(tOrO, scale_o);
       if (smem_pipe_read_kv.index() == 0) {
-        gemm</*init=*/false, /*wg_wait=*/0>(tiled_mma_pv_ss, tOrP_CS2(_, _, _, smem_pipe_read_kv.index() % 2),
+        gemm</*init=*/false, /*wg_wait=*/0>(tiled_mma_pv_ss, tOrP_CS2(_, _, _, remainder),
                                             tOrV1(_, _, _, _0{}), tOrO);
       } else if (smem_pipe_read_kv.index() == 1) {
-        gemm</*init=*/false, /*wg_wait=*/0>(tiled_mma_pv_ss, tOrP_CS2(_, _, _, smem_pipe_read_kv.index() % 2),
+        gemm</*init=*/false, /*wg_wait=*/0>(tiled_mma_pv_ss, tOrP_CS2(_, _, _, remainder),
                                             tOrV2(_, _, _, _0{}), tOrO);
       } else if (smem_pipe_read_kv.index() == 2) {
-        gemm</*init=*/false, /*wg_wait=*/0>(tiled_mma_pv_ss, tOrP_CS2(_, _, _, smem_pipe_read_kv.index() % 2),
+        gemm</*init=*/false, /*wg_wait=*/0>(tiled_mma_pv_ss, tOrP_CS2(_, _, _, remainder),
                                             tOrV3(_, _, _, _0{}), tOrO);
       } else {
-        gemm</*init=*/false, /*wg_wait=*/0>(tiled_mma_pv_ss, tOrP_CS2(_, _, _, smem_pipe_read_kv.index() % 2),
+        gemm</*init=*/false, /*wg_wait=*/0>(tiled_mma_pv_ss, tOrP_CS2(_, _, _, remainder),
                                             tOrV4(_, _, _, _0{}), tOrO);
       }
       pipeline_kv.consumer_release(smem_pipe_read_kv);
@@ -487,8 +494,9 @@ CUTLASS_DEVICE void mma_f16_two_stages(const Params& mainloop_params,
     }
     if (chunk_num_this_seq == 1) {
       // norm
+      stage_div.fast_divmod(quotient, remainder, smem_pipe_read_kv.index());
       cutlass::arch::NamedBarrier::sync(Ktraits::NUM_MMA_THREADS, static_cast<int>(NamedBarriers::kWG1WG2LastSync));
-      cute::copy(tScalesScale(_, smem_pipe_read_kv.index() % 2), scale_o);
+      cute::copy(tScalesScale(_, remainder), scale_o);
       attention_updater.rescale_o(tOrO, scale_o);
     }
   }

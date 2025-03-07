@@ -424,21 +424,39 @@ template <uint32_t HEAD_DIM_QK, uint32_t HEAD_DIM_VO, typename NV_TYPE, typename
 cudaError_t BatchMLAWithPagedKVCacheDispatched(Params& params, cudaStream_t stream) {
   constexpr bool CAUSAL = true;
   if constexpr (HEAD_DIM_QK == 576) {
-    DISPATCH_GROUP_SIZE(params.q_num_head, GROUP_SIZE,
-      BatchMLAWithPagedKVCacheKernelTraitsDispatched<
-          AttentionKernelTraits</*USE_TMA_LOAD_KV=*/false, 
-                                HEAD_DIM_QK, 
-                                HEAD_DIM_VO, 
-                                GROUP_SIZE,
-                                /*BLOCK_SHAPE_Q_=*/64,
-                                /*BLOCK_SHAPE_KV_=*/64,
-                                /*NUM_STAGES_=*/2, 
-                                typename Params::DTypeQ,
-                                typename Params::DTypeKV, 
-                                typename Params::DTypeO,
-                                typename Params::IdType, 
-                                NV_TYPE>,
-          CAUSAL>(params, stream);)
+    if (params.block_size == 32) {
+      DISPATCH_GROUP_SIZE(params.q_num_head, GROUP_SIZE,
+        BatchMLAWithPagedKVCacheKernelTraitsDispatched<
+            AttentionKernelTraits</*USE_TMA_LOAD_KV=*/true, 
+                                  HEAD_DIM_QK, 
+                                  HEAD_DIM_VO, 
+                                  GROUP_SIZE,
+                                  /*BLOCK_SHAPE_Q_=*/64,
+                                  /*BLOCK_SHAPE_KV_=*/32,
+                                  /*NUM_STAGES_=*/4, 
+                                  typename Params::DTypeQ,
+                                  typename Params::DTypeKV, 
+                                  typename Params::DTypeO,
+                                  typename Params::IdType,
+                                  NV_TYPE>,
+            CAUSAL>(params, stream);)
+    } else if (params.block_size == 64) {
+      DISPATCH_GROUP_SIZE(params.q_num_head, GROUP_SIZE,
+        BatchMLAWithPagedKVCacheKernelTraitsDispatched<
+            AttentionKernelTraits</*USE_TMA_LOAD_KV=*/false, 
+                                  HEAD_DIM_QK, 
+                                  HEAD_DIM_VO, 
+                                  GROUP_SIZE,
+                                  /*BLOCK_SHAPE_Q_=*/64,
+                                  /*BLOCK_SHAPE_KV_=*/64,
+                                  /*NUM_STAGES_=*/2, 
+                                  typename Params::DTypeQ,
+                                  typename Params::DTypeKV, 
+                                  typename Params::DTypeO,
+                                  typename Params::IdType,
+                                  NV_TYPE>,
+            CAUSAL>(params, stream);)
+    }
   } else {
     return cudaErrorNotSupported;
   }
