@@ -726,7 +726,7 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids, fuse_rope=False):
     b, s, h, d = k.shape
     k = k.reshape([b, s, h, d // 2, 2]).transpose([0, 1, 2, 4, 3]).reshape([b, s, h, d])
 
-    if get_env_device() == "gpu" and fuse_rope:
+    if (get_env_device() == "xpu" or get_env_device() == "gpu") and fuse_rope:
         q_embed, k_embed, _ = fused_rotary_position_embedding(
             q,
             k,
