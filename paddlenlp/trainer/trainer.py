@@ -1422,7 +1422,7 @@ class Trainer:
                 dataset=self.train_dataset,
                 shuffle=False,
                 batch_size=self.args.per_device_train_batch_size,
-                drop_last=self.args.dataloader_drop_last,
+                drop_last=True,
             )
 
         return DistributedBatchSampler(
@@ -1431,7 +1431,7 @@ class Trainer:
             shuffle=False,
             num_replicas=self.args.dataset_world_size,
             rank=self.args.dataset_rank,
-            drop_last=self.args.dataloader_drop_last,
+            drop_last=True,
         )
 
     def _set_state_dict_in_model(self, state_dict):
