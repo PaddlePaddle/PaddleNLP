@@ -17,7 +17,8 @@ import os
 from datetime import datetime
 import re
 
-from server.utils import model_server_logger, download_model
+from server.utils import model_server_logger
+from server.download_model import download_from_txt
 from paddlenlp.experimental.transformers import SpeculateArgument
 from paddlenlp.generation import GenerationConfig
 
@@ -210,14 +211,14 @@ class Config:
             f.close()
 
 
-    def _get_download_model(self):
+    def _get_download_model(self, model_type="default"):
         env = os.environ
         model_name=env.get("model_name")
         if not model_name:
             raise Exception(f"Model Dir is empty")
         # Define supported model patterns
         supported_patterns = [
-            r".+Qwen.+", 
+            r".*Qwen.*", 
             r".+Llama.+",
             r".+Mixtral.+", 
             r".+DeepSeek.+",
@@ -233,21 +234,19 @@ class Config:
         base_url=f"https://paddlenlp.bj.bcebos.com/models/static/{tag}/{model_name}"
         if self.nnode == 1:
             # single node model
-            temp_tar = "model.tar"
+            temp_file = "model"
         elif env.get("POD_0_IP", "127.0.0.1") == self.host_ip:
             # Master node model
-            temp_tar = "node1.tar"
+            temp_file = "node1"
         else:
-            temp_tar = "node2.tar"
-        model_url = base_url+f"/{temp_tar}"
-        download_model(model_url, self.model_dir, temp_tar)
-
-        speculate_path = env.get("SPECULATE_MODEL_PATH")
-        if speculate_path:
-            speculate_url = base_url+"/mtp.tar"
-            os.makedirs(speculate_path, exists=True)
-            model_server_logger.info(f"Start Downloading MTP model, save path : {speculate_path}")
-            download_model(model_url, speculate_path, "mtp.tar")
+            temp_file = "node2"
+        if model_type == "default":
+            path = self.model_dir 
+        elif model_type == "speculate":
+            path = os.getenv("SPECULATE_MODEL_PATH")
+            temp_file="mtp"
+        model_url = base_url+f"/{temp_file}"
+        download_from_txt(model_url, path)
 
 
 
@@ -296,6 +295,9 @@ class Config:
                     speculate_model_name_or_path is not None
                 ), "[eagle, mtp] method must be set by env SPECULATE_MODEL_PATH"
 
+            if not os.path.exists(speculate_model_name_or_path):
+                self._get_download_model(model_type="speculate")
+            
             speculate_args = SpeculateArgument.build_from_serving(
                 speculate_method=speculate_method,
                 speculate_max_draft_token_num=speculate_max_draft_token_num,
@@ -338,6 +340,12 @@ class Config:
         reset_value(self, "block_size", "infer_model_block_size", config)
         reset_value(self, "max_seq_len", "infer_model_max_seq_len", config)
         reset_value(self, "return_full_hidden_states", "return_full_hidden_states", config)
+        reset_value(self, "dtype", "infer_model_dtype", config)
+        reset_value(self, "use_cache_kv_int8", "infer_model_cachekv_int8_type", config)
+        if self.use_cache_kv_int8 == "null":
+            self.use_cache_kv_int8 = 0
+        else:
+            self.use_cache_kv_int8 = 1
         if self.seq_len_limit > self.max_seq_len:
             self.seq_len_limit = self.max_seq_len
             logger.warning(f"The loading model requires len(input_ids) <= {self.max_seq_len}, now reset MAX_SEQ_LEN.")
