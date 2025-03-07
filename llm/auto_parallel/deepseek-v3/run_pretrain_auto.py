@@ -237,12 +237,16 @@ class ModelArguments:
         metadata={"help": "The mesh dimension for expert parallel, must in ['dp', 'mp', 'None']"},
     )
     n_routed_experts: int = field(
-        default=None,
-        metadata={"help": "n_routed_experts"},
+        default=256,
+        metadata={
+            "help": "The number of routed experts in moe group. DeepSeekV3 default value is 256, and you can change it according to your own situation."
+        },
     )
     pp_extra_layer_num: int = field(
         default=1,
-        metadata={"help": "pp_extra_layer_num, only used calulate pp stage id"},
+        metadata={
+            "help": "When use pipeline parallel intermediate api, if the matched layer contains a non attention layer, the number of additional matching layers needs to be passed in for ipp calculation. For example, the layer of lm_head is not attention layer, so need to add 1 for ipp calculation."
+        },
     )
 
 
