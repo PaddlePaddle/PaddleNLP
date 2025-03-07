@@ -50,7 +50,7 @@ class _AllToAll(paddle.autograd.PyLayer):
         """
 
         ctx.group = group
-        ctx.output_shape = output_shape
+        ctx.input_shape = input.shape
         ctx.out_split_sizes = out_split_sizes
         ctx.in_split_sizes = in_split_sizes
 
@@ -82,7 +82,7 @@ class _AllToAll(paddle.autograd.PyLayer):
             Tuple[Tensor]: A tuple containing a tensor that holds the gradients of all input tensors.
         """
         # return grad_output
-        return _AllToAll.apply(ctx.output_shape, *grad_output, ctx.out_split_sizes, ctx.in_split_sizes, ctx.group)
+        return _AllToAll.apply(ctx.input_shape, *grad_output, ctx.in_split_sizes, ctx.out_split_sizes, ctx.group)
 
 
 def dispatching(x, dispatch_mask, scatter_index, num_experts, capacity):
