@@ -566,7 +566,7 @@ llm(){
         echo "Found modifications in csrc, running setup_cuda.py install and uploading it to bos."
         cd ${nlp_dir}/csrc
         # python setup_cuda.py install
-        bash tools/build_wheel.sh python3.10 80
+        bash tools/build_wheel.sh
         cp ${nlp_dir}/csrc/gpu_dist/p****.whl ${PPNLP_HOME}/upload/
     else
         echo "No modifications in csrc, installing paddlenlp_ops wheel file..."

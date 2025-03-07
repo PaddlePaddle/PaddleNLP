@@ -116,7 +116,7 @@ __version__ = "3.0.0b3.post"
 if os.getenv(PADDLENLP_STABLE_VERSION):
     __version__ = __version__.replace(".post", "")
 else:
-    formatted_date = datetime.now().date().strftime("%Y%m%d%H%M%S")
+    formatted_date = datetime.now().strftime("%Y%m%d%H%M")
     __version__ = __version__.replace(".post", ".post{}".format(formatted_date))
 
 
