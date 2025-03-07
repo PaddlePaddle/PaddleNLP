@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-task_name_or_path="llama2-13b-auto"
+task_name_or_path="llama2-7b-auto"
 
 #export XPUAPI_DEBUG=0x1
 #export XPURT_DISPATCH_MODE=PROFILING
@@ -55,7 +55,6 @@ export PYTHONPATH=../../../:$PYTHONPATH
 # for debug
 #export GLOG_v=10
 export FLAGS_call_stack_level=2
-export GLOG_minloglevel=2
 
 rm -rf output/$task_name_or_path
 PYTHONPATH=../:$PYTHONPATH  \
@@ -63,19 +62,20 @@ python -u  -m paddle.distributed.launch \
     --xpus "0,1,2,3,4,5,6,7" \
     --log_dir "output/$task_name_or_path/" \
     ./run_pretrain_auto.py \
-    --model_name_or_path "meta-llama/Llama-2-13b" \
-    --tokenizer_name_or_path "meta-llama/Llama-2-13b" \
+    --model_name_or_path "meta-llama/Llama-2-7b" \
+    --tokenizer_name_or_path "meta-llama/Llama-2-7b" \
     --input_dir "./data" \
     --output_dir "output/$task_name_or_path" \
     --per_device_train_batch_size 1 \
-    --gradient_accumulation_steps 4 \
-    --per_device_eval_batch_size 4 \
+    --gradient_accumulation_steps 1 \
+    --per_device_eval_batch_size 1 \
     --tensor_parallel_degree 1 \
-    --pipeline_parallel_degree 4 \
+    --pipeline_parallel_degree 1 \
     --sharding "stage1" \
     --sharding_parallel_config "enable_overlap" \
-    --tensor_parallel_config "enable_mp_async_allreduce enable_mp_skip_c_identity enable_mp_fused_linear_param_grad_add" \
-    --pipeline_parallel_config "enable_send_recv_overlap" \
+    --tensor_parallel_config "enable_delay_scale_loss enable_mp_async_allreduce" \
+    --pipeline_parallel_config "enable_delay_scale_loss enable_release_grads disable_partial_send_recv" \
+    --virtual_pp_degree 1 \
     --sequence_parallel 0 \
     --use_flash_attention 1 \
     --use_fused_rms_norm 0 \
@@ -88,7 +88,7 @@ python -u  -m paddle.distributed.launch \
     --learning_rate 3e-05 \
     --min_learning_rate 3e-06 \
     --warmup_steps 30 \
-    --logging_steps 2 \
+    --logging_steps 1 \
     --max_steps 1000 \
     --save_steps 100000 \
     --eval_steps 10000 \
@@ -99,7 +99,7 @@ python -u  -m paddle.distributed.launch \
     --fp16_opt_level "O2"  \
     --amp_master_grad true \
     --warmup_ratio 0.01 \
-    --max_grad_norm 1.0 \
+    --max_grad_norm 0.0 \
     --dataloader_num_workers 1 \
     --continue_training 0 \
     --do_predict 0 \
@@ -112,5 +112,4 @@ python -u  -m paddle.distributed.launch \
     --save_total_limit 2 \
     --device "xpu" \
     --enable_auto_parallel 1 \
-    --to_static 0 \
-    --hybrid_parallel_topo_order "sharding_first" \
+    --to_static 1 \
