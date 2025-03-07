@@ -27,6 +27,7 @@ from predict.predictor import (
     ModelArgument,
     PredictorArgument,
 )
+from trainer_utils import process_row
 
 from paddlenlp.trainer.trainer import Trainer, logger
 from paddlenlp.transformers import (
@@ -80,10 +81,15 @@ class PolicyPredictor(DygraphBlockInferencePredictor):
         self.model_inputs[key] = paddle.full(shape=old_value.shape, fill_value=value, dtype=old_value.dtype)
 
     @paddle.no_grad()
-    def predict(self, input_texts: str | list[str], **kwargs):
-        bs = len(input_texts)
+    def predict(self, input_ids: paddle.Tensor = None, **kwargs):
+        bs = input_ids.shape[0]
+        input_ids_list = []
+        for row in input_ids:
+            row_ids = process_row(row, remove_value=self.tokenizer.pad_token_id, remove_side="left").tolist()
+            input_ids_list.append(row_ids)
+
         with self.update_predictor_params(**kwargs):
-            self._preprocess(input_texts)
+            self._preprocess(input_text=None, input_ids=input_ids_list)
             all_tokens = []
             while self.model_inputs["not_need_stop"]:
                 next_tokens = self._infer(self.model_inputs)[:bs]
@@ -256,7 +262,6 @@ class InferEvalModel:
 
         arg_dict = inspect.signature(self.model.generate).bind(*args, **kwargs).arguments
         input_ids = arg_dict["input_ids"]
-        prompts = self.tokenizer.batch_decode(input_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)
         kwargs = {}
         if do_eval:
             # for greedy search
@@ -266,6 +271,6 @@ class InferEvalModel:
                     "temperature": 1.0,
                 }
             )
-        outputs = policy_predictor.predict(prompts, **kwargs)
+        outputs = policy_predictor.predict(input_ids=input_ids, **kwargs)
         outputs = paddle.concat([input_ids, outputs], axis=-1)
         return (outputs,)

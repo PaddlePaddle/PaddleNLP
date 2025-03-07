@@ -170,6 +170,8 @@ def make_attention_mask(
     Returns:
         Tensor: 注意力掩码，形状为（batch_size, 1, seq_len, seq_len + past_len）。
     """
+    unk_id = None
+
     attention_mask = input_ids != pad_id
     if unk_id is not None and pad_id != unk_id:
         attention_mask = paddle.logical_and(attention_mask, input_ids != unk_id)
