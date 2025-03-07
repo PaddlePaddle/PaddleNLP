@@ -920,6 +920,7 @@ std::vector<paddle::Tensor> sage_attention_fwd(paddle::Tensor& q,
                                                paddle::Tensor& k,
                                                paddle::Tensor& v,
                                                paddle::Tensor& km,
+                                               paddle::Tensor& seq_len_this_time,
                                                paddle::optional<paddle::Tensor>& vm,
                                                float sm_scale,
                                                std::string qk_quant_gran,
@@ -945,10 +946,18 @@ std::vector<paddle::Tensor> sage_attention_fwd(paddle::Tensor& q,
   constexpr int BLKK = 128;
   std::vector<paddle::Tensor>&& quant_qk_results = per_warp_int8_cuda(q, k, km, BLKQ, WARPQ, BLKK, tensor_layout); // q_int8, q_scale, k_int8, k_scale
 
-  int v_seq_len = (tensor_layout == 0) ? v.shape()[1] : v.shape()[2];
-  PD_CHECK(v_seq_len % 128 == 0, "v_seq_len must be multiple of 128, do padding before calling this op.");
-
   paddle::Tensor o = paddle::empty(v.shape(), v.dtype(), paddle::GPUPlace());
+
+  int v_seq_len = (tensor_layout == 0) ? v.shape()[1] : v.shape()[2];
+  int v_pad_len = (v_seq_len % 128 != 0) ? (128 - v_seq_len % 128) : 0;
+
+  if (v_pad_len > 0) {
+    if (tensor_layout == 0) { // NHD
+      v = paddle::concat({v, paddle::zeros({v.shape()[0], v_pad_len, v.shape()[2], v.shape()[3]}, v.dtype(), v.place())}, 1);
+    } else {
+      v = paddle::concat({v, paddle::zeros({v.shape()[0], v.shape()[1], v_pad_len, v.shape()[3]}, v.dtype(), v.place())}, 2);
+    }
+  }
 
   std::vector<paddle::Tensor>&& quant_vfp8_results = per_channel_fp8(v, tensor_layout, 448.0, false);
 
@@ -962,6 +971,7 @@ std::vector<std::vector<int64_t>> sage_attention_InferShape(
   const std::vector<int64_t> key_shape, 
   const std::vector<int64_t> value_shape,
   const std::vector<int64_t> km_shape,
+  const std::vector<int64_t> seq_len_this_time_shape,
   const paddle::optional<std::vector<int64_t>>& vm_shape) {
     return {value_shape};
 }
@@ -971,12 +981,13 @@ std::vector<paddle::DataType> sage_attention_InferDtype(
   const paddle::DataType B_dtype,
   const paddle::DataType C_dtype,
   const paddle::DataType D_dtype,
-  const paddle::optional<paddle::DataType>& E_dtype) {
+  const paddle::DataType E_dtype,
+  const paddle::optional<paddle::DataType>& F_dtype) {
   return {C_dtype};
 }
 
 PD_BUILD_OP(sage_attention)
-    .Inputs({"q", "k", "v", "km", paddle::Optional("vm")})
+    .Inputs({"q", "k", "v", "km", "seq_len_this_time", paddle::Optional("vm")})
     .Outputs({"o"})
     .Attrs({"sm_scale: float",
             "qk_quant_gran: std::string",

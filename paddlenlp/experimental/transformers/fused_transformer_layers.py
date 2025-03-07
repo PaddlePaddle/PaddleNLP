@@ -2987,10 +2987,9 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 fmha_out_prefill = sage_attention_dsk(
                     query_256,
                     key_256,
-                    kwargs.get("cu_seqlens_q", None),
-                    kwargs.get("cu_seqlens_k", None),
                     value_128,
                     km,
+                    kwargs.get("cu_seqlens_q", None),
                     None,  # vm
                     self.softmax_scale,
                     "per_warp",  # qk_quant_gran
@@ -3354,10 +3353,9 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
                 fmha_out_prefill = sage_attention_dsk(
                     query_256,
                     key_256,
-                    kwargs.get("cu_seqlens_q", None),
-                    kwargs.get("cu_seqlens_k", None),
                     value_128,
                     km,
+                    kwargs.get("cu_seqlens_q", None),
                     None,  # vm
                     self.softmax_scale,
                     "per_warp",  # qk_quant_gran
@@ -5083,10 +5081,9 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                 fmha_out_prefill = sage_attention_dsk(
                     query_256,
                     key_256,
-                    kwargs.get("cu_seqlens_q", None),
-                    kwargs.get("cu_seqlens_k", None),
                     value_128,
                     km,
+                    kwargs.get("cu_seqlens_q", None),
                     None,  # vm
                     self.softmax_scale,
                     "per_warp",  # qk_quant_gran
