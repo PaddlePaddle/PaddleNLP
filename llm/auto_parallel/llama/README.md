@@ -1,42 +1,156 @@
-# LLaMA 自动并行训练
+# LLaMA 自动并行中层API使用说明
+本README详细介绍了如何使用LLaMA自动并行中层API进行大模型的预训练、SFT（监督微调）、LoRA（低秩适应）、DPO（直接偏好优化）以及推理。
 
-## 1. 模型组网介绍
+## 目录
+- [LLaMA 自动并行中层API使用说明](#llama-自动并行中层api使用说明)
+  - [目录](#目录)
+  - [环境准备](#环境准备)
+  - [模型组网介绍](#模型组网介绍)
+  - [自动并行策略配置](#自动并行策略配置)
+  - [预训练](#预训练)
+    - [数据准备](#数据准备)
+    - [启动预训练](#启动预训练)
+  - [监督微调(SFT)](#监督微调sft)
+    - [数据准备](#数据准备-1)
+    - [启动微调](#启动微调)
+  - [低秩适应（LoRA）](#低秩适应lora)
+  - [推理](#推理)
+  - [DPO](#dpo)
+  - [FAQ](#faq)
 
-- 动静统一自动并行组网[modeling_auto.py](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/transformers/llama/modeling_auto.py)，当前主要支持预训练，包括动态图和动转静训练，未来会扩展支持 SFT 等流程。
 
-## 2. 预训练准备
+## 环境准备
+1.安装PaddlePaddle最新版本
 
-安装最新的 Paddle，建议使用 nightly 版本，请前往 [Paddle 官网](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/develop/install/pip/linux-pip.html) 进行安装。
+首先，您需要安装最新的 Paddle 推荐使用 nightly 版本。访问 [Paddle官网]() 获取安装指导
 
-下载预先处理好的数据，并解压到 `./data` 目录下：
+2.验证安装
+
+```python
+import paddle
+print(paddle.utils.run_check())
+```
+3.安装PaddleNLP
+
+请访问[PaddleNLP安装教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/get_started/installation.rst)获取安装指导
+
+## 模型组网介绍
+
+动静统一自动并行组网代码位于文件[modeling_network.py](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/transformers/llama/modeling_network.py) TODO(更新链接)，通过少量并行策略配置即可实现以下特性：
+* 代码侵入性低（<5%单卡代码修改量）
+* 支持混合并行策略（DP+MP+PP）
+* 兼容动静统一训练模式
+
+## 自动并行策略配置
+
+自动并行中层API支持多种并行策略，包括数据并行（DP）、模型并行（MP）、流水线并行（PP）以及混合ND并行策略。以下是配置示例：
+``` python
+#自动并行策略配置 example
+import paddle.distributed as dist
+def auto_dist_config(self, prefix=""):
+    config = {
+        "sp_config": {
+            "parallelize_plan": {
+                "llama.layers.*.self_attn.qkv_proj": dist.ColWiseParallel(),
+            },
+        },
+        "mp_config": {
+            "parallelize_plan": {
+                "llama.embed_tokens": dist.RowWiseParallel(),
+            },
+        },
+        "pp_config": {"split_spec": "llama.layers", "global_spec": "llama.global_layer"},
+    }
+
+    return config
+```
+>详细的配置说明可以参考[Paddle文档中层API](https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/api/paddle/distributed/Overview_cn.html)
+
+
+## 预训练
+### 数据准备
+项目提供了预先处理好的数据方便用户测试模型，下载到 `data` 目录下：
 ```shell
 # llama 模型数据下载
-wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.bin
-wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.idx
+mkdir -p data && cd data
+wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.{bin,idx}
+```
+### 启动预训练
 
-mkdir data
-mv llama_openwebtext_100k.bin ./data
-mv llama_openwebtext_100k.idx ./data
+<br>预训练脚本[run_pretrain_auto.py](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/auto_parallel/llama/run_pretrain_auto.py)，可以通过`ModelArguments`, `DataArguments`, `AutoTrainingArguments`配置训练任务
+
+- 动态图模式(8卡A100示例)
+<br> 通过`model_type=llama_network`选择通信API侵入的模型实例，配置`use_intermediate_api=true`选项，表示使用中层API进行自动并行训练
+```python
+    python -u -m paddle.distributed.launch \
+          --device "0,1,2,3,4,5,6,7"   \
+          run_pretrain_auto.py         \
+          --enable_auto_parallel true \
+          --model_name_or_path "facebook/llama-7b" \
+          --tokenizer_name_or_path "facebook/llama-7b" \
+          --input_dir "./data" \
+          --model_type "llama_network" \
+          --output_dir "log"           \
+          --max_steps 1                \
+          --eval_steps 1               \
+          --use_intermediate_api true  \
+          --tensor_parallel_degree 2   \
+          --pipeline_parallel_degree 2 \
+          --sharding_parallel_degree 2
 ```
 
-安装自定义算子:
-```shell
-# 编译自定义算子，可选
-cd ../../../slm/model_zoo/gpt-3/external_ops/ && python3 setup.py install && cd -
+- 动转静模式
+<br>追加 `--to_static`参数
 
+启动shell脚本**llama_with_api.sh**可以默认进行8卡，DP2-MP2-PP2的并行策略的预训练任务。更多可配置参数，请参考`ModelArguments`, `DataArguments`, `PreTrainingArguments`
+
+## 监督微调(SFT)
+### 数据准备
+项目提供预处理好的精调数据方便用户测试模型，下载并解压到`data`目录下：
+```shell 
+wget -O AdvertiseGen.tar.gz https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz
+tar -xvf AdvertiseGen.tar.gz
 ```
-## 3. 预训练
-- 动态图训练
-参考训练脚本 **run_pretrain_auto.sh**，运行8卡 dp2mp2pp2的并行策略。
-- 动转静训练
-参考训练脚本 **run_pretrain_auto.sh**，并开启 `to_static=1`，运行8卡 dp2mp2pp2的并行策略。
 
-您可以参考 **run_pretrain_auto.sh**，按需求修改相关参数进行训练。
+### 启动微调
+SFT训练脚本[run_finetune_auto.py]()，同样可以通过模型配置，数据配置和训练相关配置完成自定义训练过程
 
-## 4.推理
+- 动态图模式
+<br> 同样需要配置`model_type=llama_network`, 开启`use_intermediate_api=true`
+```python
+    python -u -m paddle.distributed.launch                             \
+          --device "0,1,2,3,4,5,6,7"                                   \
+          ${FILE_PATH}/run_finetune_auto.py                            \
+          --enable_auto_parallel true                                  \
+          --model_name_or_path "meta-llama/Meta-Llama-3.1-8B-Instruct" \
+          --dataset_name_or_path "./data"                              \
+          --model_type "llama_network"                                 \
+          --output_dir "log"                                           \
+          --max_steps 1                                                \
+          --use_intermediate_api true                                  \
+          --tensor_parallel_degree 2                                   \
+          --pipeline_parallel_degree 2                                 \
+          --sharding_parallel_degree 2
+```
+
+- 动转静模式
+<br>追加`--to_static`参数
+
+启动shell脚本**llama_finetune_with_api.sh**可以默认进行8卡，DP2-MP2-PP2的并行策略的预训练任务。更多可配置参数，请参考`GenerateArgument`, `ModelAutoConfig`, `ReftArgument`, `DataConfig`, `SFTAutoConfig` 
+
+## 低秩适应（LoRA）
+在SFT基础上启用LoRA参数：
+```bash
+# 追加以下参数
+--lora true \
+--lora_rank 8 
+```
+更多的参数以及说明，可以参考[model_config.py]()
+
+## 推理
 推理流程包括：动态图推理 -> 动转静导出模型 -> 静态图推理。当前自动并行预训练保存的模型参数已支持用于动态图推理；动转静导出模型、静态图推理步骤请参考 [LLaMA 系列大模型运行文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/llama.md)。
 
-以动态图自动并行训练（dp2mp2pp2）为例。
+以动态图自动并行训练（DP2-MP2-PP2）为例。
 - 分布式 ckpt 合并为单卡模型参数：
 
 ```python
@@ -64,11 +178,11 @@ python PaddleNLP/llm/auto_parallel/utils/convert_to_safetensors.py --input_path 
 
     [大模型推理教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/inference.md)
 
-## 5.PPO 训练
-自动并行当前尚未支持 PPO 训练，后续会持续支持。但您可以将自动并行训练得到的模型参数转换后用于 PPO 训练。自动并行 ckpt 转手动并行 ckpt 流程参考**推理**部分。
+## DPO
+TODO
 
-- PPO 训练
+## FAQ
 
-    [PPO 训练教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/rlhf.md)
-
-- 注：PPO 训练教程中 PKU-Alignment/alpaca-7b-reproduced 模型是一个类 llama 模型，但与原生 llama 模型结构存在一定差异，具体为 embedding 层和 lm_head 层 shape 不同，原生 llama 的 shape 为 [4096, 32000]，但 PKU-Alignment/alpaca-7b-reproduced 的 shape 为 [4096, 32001]。
+Q1: 出现OOM如何调整?
+- 减少 batch_size
+- 开启 fuse_attention_ffn, fuse_flash_qkv
