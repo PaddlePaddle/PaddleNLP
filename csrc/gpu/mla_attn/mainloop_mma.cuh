@@ -39,6 +39,7 @@ CUTLASS_DEVICE void mma_f16(const Params& mainloop_params,
                             const int kv_len,
                             const int qo_len,
                             const int tile_idx,
+                            const int q_tile_idx,
                             SharedStorage& shared_storage) {
   using DTypeQ = typename Ktraits::DTypeQ;
   using DTypeKV = typename Ktraits::DTypeKV;
@@ -61,6 +62,8 @@ CUTLASS_DEVICE void mma_f16(const Params& mainloop_params,
 
   static constexpr int BLOCK_SHAPE_Q = get<0>(TileShape_QKD{});
   static constexpr int BLOCK_SHAPE_KV = get<1>(TileShape_QKD{});
+
+  const int q_group_offset = q_tile_idx * BLOCK_SHAPE_Q;
 
   Tensor sQ = make_tensor(make_smem_ptr(shared_storage.smem_q.data()), SmemLayoutQ{});
   Tensor sK = make_tensor(make_smem_ptr(shared_storage.smem_kv.data()), SmemLayoutK{});
@@ -119,7 +122,7 @@ CUTLASS_DEVICE void mma_f16(const Params& mainloop_params,
         Tensor tScS = threadMmaQK.partition_C(cS);
 #pragma unroll
         for (int i = 0; i < size(tSrS); ++i) {
-          int qo_idx = get<0>(tScS(i)) / Ktraits::GROUP_SIZE;
+          int qo_idx = (get<0>(tScS(i)) + q_group_offset) / Ktraits::GROUP_SIZE;
           int kv_idx = get<1>(tScS(i)) + kv_tile_idx * BLOCK_SHAPE_KV;
           if constexpr (!CAUSAL) {  // Just masking based on col
             if (kv_idx >= kv_len) {
@@ -183,13 +186,13 @@ CUTLASS_DEVICE void mma_f16(const Params& mainloop_params,
       const int warp_idx = thread_idx / 32;
 #pragma unroll
       for (int w_i = 0; w_i < 2; ++w_i) {
-        const int token_group_idx = warp_idx * 16 + (thread_idx % 32) / 4 + 8 * w_i;
+        const int token_group_idx = warp_idx * 16 + (thread_idx % 32) / 4 + 8 * w_i + q_group_offset;
         const int token_idx = token_group_idx / Ktraits::GROUP_SIZE;
 
         if (token_idx < qo_len) {
-          const int head_idx = token_group_idx % Ktraits::GROUP_SIZE;
+          // const int head_idx = token_group_idx % Ktraits::GROUP_SIZE;
           const int bid_offset = mainloop_params.max_draft_token_num * Ktraits::GROUP_SIZE;
-          const int write_idx = bid * bid_offset + token_idx * Ktraits::GROUP_SIZE + head_idx;
+          const int write_idx = bid * bid_offset + token_group_idx;
           mM(write_idx) = static_cast<DTypeMD>(attention_updater.row_max(w_i));
           mD(write_idx) = static_cast<DTypeMD>(attention_updater.row_sum(w_i));
         }
@@ -245,6 +248,7 @@ CUTLASS_DEVICE void mma_f16_two_stages(const Params& mainloop_params,
                                        const int kv_len,
                                        const int qo_len,
                                        const int tile_idx,
+                                       const int q_tile_idx,
                                        SharedStorage& shared_storage) {
   using DTypeQ = typename Ktraits::DTypeQ;
   using DTypeKV = typename Ktraits::DTypeKV;
@@ -267,6 +271,8 @@ CUTLASS_DEVICE void mma_f16_two_stages(const Params& mainloop_params,
 
   static constexpr int BLOCK_SHAPE_Q = get<0>(TileShape_QKD{});
   static constexpr int BLOCK_SHAPE_KV = get<1>(TileShape_QKD{});
+
+  const int q_group_offset = q_tile_idx * BLOCK_SHAPE_Q;
 
   cutlass::FastDivmod stage_div(2);
   int quotient, remainder;
@@ -328,7 +334,7 @@ CUTLASS_DEVICE void mma_f16_two_stages(const Params& mainloop_params,
       Tensor tScS = threadMmaQK.partition_C(cS);
 #pragma unroll
       for (int i = 0; i < size(tSrS); ++i) {
-        int qo_idx = get<0>(tScS(i)) / Ktraits::GROUP_SIZE;
+        int qo_idx = (get<0>(tScS(i)) + q_group_offset) / Ktraits::GROUP_SIZE;
         int kv_idx = get<1>(tScS(i)) + kv_tile_idx * BLOCK_SHAPE_KV;
         if constexpr (!CAUSAL) {  // Just masking based on col
           if (kv_idx >= kv_len) {
@@ -388,7 +394,7 @@ CUTLASS_DEVICE void mma_f16_two_stages(const Params& mainloop_params,
         Tensor tScS = threadMmaQK.partition_C(cS);
 #pragma unroll
         for (int i = 0; i < size(tSrS); ++i) {
-          int qo_idx = get<0>(tScS(i)) / Ktraits::GROUP_SIZE;
+          int qo_idx = (get<0>(tScS(i)) + q_group_offset) / Ktraits::GROUP_SIZE;
           int kv_idx = get<1>(tScS(i)) + kv_tile_idx * BLOCK_SHAPE_KV;
           if constexpr (!CAUSAL) {  // Just masking based on col
             if (kv_idx >= kv_len) {
@@ -453,13 +459,13 @@ CUTLASS_DEVICE void mma_f16_two_stages(const Params& mainloop_params,
       const int warp_idx = thread_idx / 32;
 #pragma unroll
       for (int w_i = 0; w_i < 2; ++w_i) {
-        const int token_group_idx = warp_idx * 16 + (thread_idx % 32) / 4 + 8 * w_i;
+        const int token_group_idx = warp_idx * 16 + (thread_idx % 32) / 4 + 8 * w_i + q_group_offset;
         const int token_idx = token_group_idx / Ktraits::GROUP_SIZE;
 
         if (token_idx < qo_len) {
-          const int head_idx = token_group_idx % Ktraits::GROUP_SIZE;
+          // const int head_idx = token_group_idx % Ktraits::GROUP_SIZE;
           const int bid_offset = mainloop_params.max_draft_token_num * Ktraits::GROUP_SIZE;
-          const int write_idx = bid * bid_offset + token_idx * Ktraits::GROUP_SIZE + head_idx;
+          const int write_idx = bid * bid_offset + token_group_idx;
           mM(write_idx) = static_cast<DTypeMD>(attention_updater.row_max(w_i));
           mD(write_idx) = static_cast<DTypeMD>(attention_updater.row_sum(w_i));
         }
