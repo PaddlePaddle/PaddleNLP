@@ -25,6 +25,7 @@ from paddle.distributed.communication import stream
 from paddle.distributed.communication.group import Group
 
 from .moe_gate import PretrainedMoEGate
+from .token_dispatcher import MoEFlexTokenDispatcher
 
 
 def dispatching(x, dispatch_mask, scatter_index, num_experts, capacity):
@@ -278,3 +279,44 @@ class MoELayer(nn.Layer):
         a = combined_output.reshape(hidden_state.shape)
 
         return a, l_aux, l_zloss
+
+
+class MoEFlexTokenLayer(nn.Layer):
+    def __init__(self, config, moe_num_experts, expert_class, expert_kwargs, gate, moe_group):
+
+        super().__init__()
+        self.config = config
+        self.moe_group = moe_group
+        self.ep_size = dist.get_world_size(self.moe_group)
+        self.moe_router_topk = gate.top_k
+        self.moe_num_experts = moe_num_experts
+        self.num_local_experts = moe_num_experts // self.ep_size
+        self.token_dispatcher = MoEFlexTokenDispatcher(
+            self.num_local_experts, self.moe_router_topk, self.moe_num_experts, moe_group
+        )
+
+        self.experts = nn.LayerList([expert_class(**expert_kwargs)] * self.num_local_experts)
+        self.router = gate
+
+    def expert_forward(self, dispatched_input, tokens_per_expert):
+        outputs = []
+        tokens_per_expert = tokens_per_expert.tolist()
+        # print(f"all tokens: {sum(tokens_per_expert)}, detail: {tokens_per_expert}")
+        chunks = paddle.split(dispatched_input, num_or_sections=tokens_per_expert, axis=0)
+        for chunk, expert in zip(chunks, self.experts):
+            chunk = chunk.contiguous()
+            assert chunk.shape[0] != 0, "Cannot dispatch empty input"
+            outputs += [expert(chunk)]
+
+        return paddle.concat(outputs, axis=0)
+
+    def forward(self, hidden_states: paddle.Tensor):
+        _, _, d_model = hidden_states.shape
+        # reshaped_input = hidden_states.reshape([-1, d_model])
+        probs, routing_map, l_aux, l_zloss = self.router(hidden_states)
+        (dispatched_input, tokens_per_expert) = self.token_dispatcher.token_permutation(
+            hidden_states, probs, routing_map
+        )
+        expert_output = self.expert_forward(dispatched_input, tokens_per_expert)
+        output, _ = self.token_dispatcher.token_unpermutation(expert_output, None)
+        return output, l_aux, l_zloss

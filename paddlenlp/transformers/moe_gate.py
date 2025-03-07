@@ -574,3 +574,40 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         dispatch_mask = combine_weights.cast(paddle.bool)
 
         return capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss
+
+    def topkgating_nodrop(self, gates: paddle.Tensor):
+        """Implements TopKGating on logits."""
+        batch_size, seq_len, d_model = gates.shape
+        gates_ori = gates
+        gates = gates.reshape([-1, d_model])
+
+        l_zloss = self._cal_z_loss(gates)
+
+        # get topk gates
+        if self.topk_method == "greedy":
+            top_gate, top_idx = self._topk_greedy(gates, k=self.top_k)
+        elif self.topk_method == "group_limited_greedy":
+            top_gate, top_idx = self._topk_group_limited_greedy(
+                gates, k=self.top_k, n_group=self.n_group, topk_group=self.topk_group
+            )
+        elif self.topk_method == "noaux_tc":
+            top_gate, top_idx = self._topk_noaux_tc(
+                gates, k=self.top_k, n_group=self.n_group, topk_group=self.topk_group
+            )
+            # norm gate to sum 1
+        if self.top_k > 1 and self.norm_topk_prob:
+            denominator = top_gate.sum(axis=-1, keepdim=True) + 1e-20
+            top_gate = top_gate / denominator
+        top_gate = top_gate * self.routed_scaling_factor
+
+        # get topk mask
+        mask = paddle.zeros_like(gates).put_along_axis(top_idx, paddle.to_tensor(1.0), axis=1)
+
+        if hasattr(self.config, "seq_aux") and self.config.seq_aux:
+            l_aux = self._cal_seq_aux_loss(gates_ori, self.top_k, top_idx)
+        else:
+            l_aux = self._cal_aux_loss(gates, mask)
+
+        exp_counts = paddle.sum(mask.cast(paddle.int64), axis=0)
+        topk_masked_gates = paddle.zeros_like(gates).put_along_axis(top_idx, top_gate, axis=1)
+        return topk_masked_gates, mask, exp_counts, l_aux, l_zloss
