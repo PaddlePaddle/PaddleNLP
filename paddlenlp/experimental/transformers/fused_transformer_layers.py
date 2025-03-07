@@ -3162,8 +3162,9 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
             if PREFILL_USE_SAGE_ATTN:
                 from paddlenlp_ops import sage_attention as attention_prefill
             else:
-                print(1)
                 from paddlenlp_ops import append_attention as attention_prefill
+
+            breakpoint()
 
             fmha_out = attention_prefill(
                 qkv_out,

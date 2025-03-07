@@ -129,8 +129,21 @@ std::vector<paddle::Tensor> SageAttentionKernel(
         const_cast<paddle::Tensor*>(&value_cache));
     
     // TODO: Sage Attention
-    printf("%d %d %d\n", qkv_out.shape()[0], qkv_out.shape()[1], qkv_out.shape()[2]);
-    q, rope_k, rope_v;;;;;;;; // [token_num, (q_num_head + 2 x kv_num_head) x head_dim]
+    // printf("%d %d %d\n", qkv_out.shape()[0], qkv_out.shape()[1], qkv_out.shape()[2]);
+    // q, rope_k, rope_v;;;;;;;; // [token_num, (q_num_head + 2 x kv_num_head) x head_dim]
+    int batch_size = seq_lens_this_time.shape()[0];
+    PD_CHECK(batch_size == 1, "Sage Attention Only support batch_size = 1");
+    const int num_q_head = meta_data.q_num_heads;
+    const int num_kv_head = meta_data.kv_num_heads;
+    const int head_dim_qk = meta_data.head_dims;
+    const int head_dim_v = meta_data.head_dims_v;
+    std::vector<paddle::Tensor>&& qkv_with_rope = paddle::split(qkv_out, {num_q_head * head_dim_qk, num_kv_head * head_dim_qk, num_kv_head * head_dim_v}, 1);
+    paddle::Tensor q = paddle::unsqueeze(paddle::reshape(qkv_with_rope[0], {-1, num_q_head, head_dim_qk}), 0);
+    paddle::Tensor k = paddle::unsqueeze(paddle::reshape(qkv_with_rope[1], {-1, num_kv_head, head_dim_qk}), 0);
+    paddle::Tensor v = paddle::unsqueeze(paddle::reshape(qkv_with_rope[2], {-1, num_kv_head, head_dim_v}), 0);
+
+    // fmha_out = sage_attention_fwd(q, k, v, )
+
     CascadeAppendAttentionKernel<data_t, data_t>(
         meta_data,
         qkv_out,
