@@ -285,21 +285,25 @@ class AutoTrainer(Trainer):
                 paddle.assign(local_micro_batch, global_micro_batch._local_value())
             return global_micro_batchs
 
-        for key, dtensors in inputs.items():
+        for i, (key, dtensors) in enumerate(inputs.items()):
             if isinstance(dtensors, paddle.Tensor):
-                mesh, placements = dtensors.process_mesh, dtensors.placements
-                global_datas = split_dtensor_by_axis(dtensors, 0)
-                for index, data in enumerate(global_datas):
-                    global_micro_batchs[index].update({key: dist.reshard(data, mesh, placements)})
+                if self.dense_tensor_idx is not None and self.dense_tensor_idx[i] != []:
+                    global_datas = dtensors.split(self.args.gradient_accumulation_steps, axis=0)
+                    for index, data in enumerate(global_datas):
+                        global_micro_batchs[index].update({key: data})
+                else:
+                    mesh, placements = dtensors.process_mesh, dtensors.placements
+                    global_datas = split_dtensor_by_axis(dtensors, 0)
+                    for index, data in enumerate(global_datas):
+                        global_micro_batchs[index].update({key: dist.reshard(data, mesh, placements)})
             elif isinstance(dtensors, (list, tuple)):
                 if len(dtensors) == 0:
-                    for i in range(self.args.gradient_accumulation_steps):
-                        global_micro_batchs[i].update({key: []})
+                    for j in range(self.args.gradient_accumulation_steps):
+                        global_micro_batchs[j].update({key: []})
                 else:
                     for j, dtensor in enumerate(dtensors):
                         if isinstance(dtensor, paddle.Tensor):
-                            mesh, placements = dtensor.process_mesh, dtensor.placements
-                            if self.dense_tensor_idx is not None and j in self.dense_tensor_idx:
+                            if self.dense_tensor_idx is not None and j in self.dense_tensor_idx[i]:
                                 global_datas = dtensor.split(self.args.gradient_accumulation_steps, axis=0)
                                 for index, data in enumerate(global_datas):
                                     if key in global_micro_batchs[index].keys():
@@ -307,6 +311,7 @@ class AutoTrainer(Trainer):
                                     else:
                                         global_micro_batchs[index].update({key: [data]})
                             else:
+                                mesh, placements = dtensor.process_mesh, dtensor.placements
                                 global_datas = split_dtensor_by_axis(dtensor, 0)
                                 for index, data in enumerate(global_datas):
                                     if key in global_micro_batchs[index].keys():
