@@ -1501,7 +1501,7 @@ std::vector<paddle::DataType> sage_attention_InferDtype(
   return {C_dtype};
 }
 
-PD_BUILD_OP(sage_attention)
+PD_BUILD_OP(sage_attention_forward)
     .Inputs({"q", "k", "v", "km", "seq_len_this_time", paddle::Optional("vm")})
     .Outputs({"o"})
     .Attrs({"sm_scale: float",
