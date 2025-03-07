@@ -56,6 +56,10 @@ try:
 except:
     flash_attention = None
 
+import deep_gemm
+import kitchen
+import kitchen.quantization_subchannel_block_hybrid
+from kitchen.quantization import QParams, ScalingType
 
 from paddlenlp.transformers.model_utils import dtype_guard
 
@@ -77,7 +81,6 @@ from ..moe_layer import MoELayer
 from ..utils import device_guard
 from . import fp8_linear as linear_utils
 from .configuration import DeepseekV2Config
-from .fp8_linear import Linear
 
 try:
     from paddle.incubate.nn.functional import swiglu
@@ -344,6 +347,102 @@ def fusion_rms_norm(hidden_states, weight, variance_epsilon, use_fast_ln=False):
                 f"Implementation of fused_rms_norm is not available on {get_env_device()}. Please install paddle_xpu to use this feature"
             )
     return rms_norm_fused(hidden_states, weight, variance_epsilon, use_fast_ln)
+
+
+def kitchen_act_quant(x: Tensor, backend: kitchen.ops.Backend = kitchen.ops.Backend.CUBLAS) -> Tuple[Tensor, Tensor]:
+    x_qparams = QParams(
+        quant_dtype=paddle.float8_e4m3fn,
+        scaling_type=ScalingType.VECTOR_TILED_X_AND_G_BLOCK_TILED_W,
+        eps=0,
+        pow_2_scales=False,
+        quant_tile_shape=(1, 128),
+    )
+    quantize_op = kitchen.quantization_subchannel_block_hybrid.HybridBlockAndVectorTiledQuantizeOp(backend)
+    qresult_ref = quantize_op.quantize(x, x_qparams, False)
+    return (qresult_ref.data, qresult_ref.scale)
+
+
+def kitchen_weight_quant(x: Tensor, return_transpose=False) -> Tuple[Tensor, Tensor]:
+    x_qparams = QParams(
+        quant_dtype=paddle.float8_e4m3fn,
+        scaling_type=ScalingType.VECTOR_TILED_X_AND_G_BLOCK_TILED_W,
+        eps=0,
+        pow_2_scales=False,
+        quant_tile_shape=(128, 128),
+    )
+    quantize_op = kitchen.quantization_subchannel_block_hybrid.HybridBlockAndVectorTiledQuantizeOp(
+        kitchen.ops.Backend.CUBLAS
+    )
+    qresult_ref = quantize_op.quantize(x, x_qparams, return_transpose)
+
+    return (
+        qresult_ref.data,
+        qresult_ref.scale,
+        qresult_ref.data_t,
+        qresult_ref.scale_t,
+    )
+
+
+class LinearFP8Func(paddle.autograd.PyLayer):
+    @staticmethod
+    def forward(ctx, x, weight):
+        x_orig_shape = x.shape
+        # deep_gemm only support 2D
+        x = x.reshape([-1, x_orig_shape[-1]])
+        # quant
+        x_quant, x_scale = kitchen_act_quant(x, kitchen.ops.Backend.CUTLASS)
+        w_quant, w_sacle, w_t_quant, w_t_scale = kitchen_weight_quant(weight, True)
+        # compute
+        out = paddle.empty([x.shape[0], weight.shape[-1]], dtype=x.dtype)
+        deep_gemm.gemm_fp8_fp8_bf16_nt((x_quant, x_scale), (w_t_quant, w_t_scale), out)
+        out = out.reshape([x_orig_shape[0], -1, weight.shape[-1]])
+        # save for bwd
+        x_t = x.T
+        # padding
+        x_t_shape = x_t.shape
+        if x_t.shape[1] % 128 != 0:
+            x_t = paddle.concat(
+                [x_t, paddle.zeros([x_t.shape[0], 128 - (x_t.shape[1] % 128)], dtype=x_t.dtype)], axis=1
+            )
+        x_t_quant, x_t_scale = kitchen_act_quant(x_t.contiguous(), kitchen.ops.Backend.CUTLASS)
+        ctx.save_for_backward(x_t_quant, x_t_scale, w_quant, w_sacle, x_t_shape)
+        return out
+
+    @staticmethod
+    def backward(ctx, dout):
+        x_t_quant, x_t_scale, w_quant, w_sacle, x_t_shape = ctx.saved_tensor()
+        # compute dx = mm(dout, w_T)
+        dx = paddle.empty([x_t_shape[1], x_t_shape[0]], dout.dtype)
+        dx_orig_shape = dout.shape[:-1]
+        dx_orig_shape.append(x_t_shape[0])
+        dout_quant, dout_scale = kitchen_act_quant(dout.reshape([-1, dout.shape[-1]]), kitchen.ops.Backend.CUTLASS)
+        deep_gemm.gemm_fp8_fp8_bf16_nt((dout_quant, dout_scale), (w_quant, w_sacle), dx)
+        dx = dx.reshape(dx_orig_shape)
+        # compute dw = mm(x_T, dout)
+        dout_t = dout.reshape([-1, dout.shape[-1]]).T.contiguous()
+        # padding
+        if dout_t.shape[1] % 128 != 0:
+            pad_size = 128 - (dout_t.shape[1] % 128)
+            dout_t = paddle.concat([dout_t, paddle.zeros([dout_t.shape[0], pad_size], dtype=dout_t.dtype)], axis=1)
+        dout_t_fp8 = kitchen_weight_quant(dout_t)
+        dweight = paddle.empty(w_quant.shape, dout.dtype)
+        deep_gemm.gemm_fp8_fp8_bf16_nt((x_t_quant, x_t_scale), (dout_t_fp8[0], dout_t_fp8[1]), dweight)
+        return dx, dweight
+
+
+class Linear(paddle.nn.Layer):
+    def __init__(self, in_features: int, out_features: int, bias_attr: bool = False) -> None:
+        super().__init__()
+        self._dtype = self._helper.get_default_dtype()
+
+        self.weight = self.create_parameter(
+            shape=[in_features, out_features],
+            dtype="bfloat16",
+            is_bias=False,
+        )
+
+    def forward(self, x):
+        return LinearFP8Func.apply(x, self.weight)
 
 
 class DeepseekV2RMSNorm(nn.Layer):
@@ -695,8 +794,6 @@ class DeepseekV2MLP(nn.Layer):
                     has_bias=False,
                 )
             else:
-                # self.gate_proj = Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
-                # self.up_proj = Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
                 if config.fuse_attention_ffn:
                     self.gate_up_fused_proj = Linear(self.hidden_size, self.intermediate_size * 2, bias_attr=False)
                 else:
@@ -706,9 +803,6 @@ class DeepseekV2MLP(nn.Layer):
 
         self.act_fn = ACT2FN[config.hidden_act]
 
-    # def forward(self, x):
-    #     down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
-    #     return down_proj
     def forward(self, x):
         if self.fuse_attention_ffn:
             x = swiglu(self.gate_up_fused_proj(x))
@@ -904,7 +998,7 @@ class DeepseekV2Attention(nn.Layer):
                 self.q_a_layernorm = DeepseekV2RMSNorm(config=config, hidden_size=config.q_lora_rank, use_sequence_parallel=False)
 
             with linear_dtype_gaurd():
-                self.kv_a_proj_with_mqa = Linear(self.hidden_size, config.kv_lora_rank + config.qk_rope_head_dim, bias_attr=config.attention_bias)
+                self.kv_a_proj_with_mqa = paddle.nn.Linear(self.hidden_size, config.kv_lora_rank + config.qk_rope_head_dim, bias_attr=config.attention_bias)
                 self.kv_b_proj = ColumnParallelLinear(config.kv_lora_rank, self.num_heads * (self.q_head_dim - self.qk_rope_head_dim + self.v_head_dim), has_bias=False, gather_output=False)
                 self.o_proj = RowParallelLinear(self.num_heads * self.v_head_dim, self.hidden_size, has_bias=config.attention_bias, input_is_parallel=True)
             self.kv_a_layernorm = DeepseekV2RMSNorm(config=config, hidden_size=config.kv_lora_rank, use_sequence_parallel=False)
@@ -1467,6 +1561,7 @@ class DeepseekV2PretrainedModel(PretrainedModel):
                 mpu.ColumnParallelLinear,
                 linear_utils.RowSequenceParallelLinear,
                 linear_utils.ColumnSequenceParallelLinear,
+                Linear,
             ),
         ):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
