@@ -1481,14 +1481,6 @@ std::vector<paddle::Tensor> sage_attention_fwd(paddle::Tensor& q,
   return {o};
 }
 
-std::vector<std::vector<int64_t>> sage_attention_InferShape(
-  const std::vector<int64_t> query_shape, 
-  const std::vector<int64_t> key_shape, 
-  const std::vector<int64_t> value_shape,
-  const std::vector<int64_t> km_shape,
-  const std::vector<int64_t> seq_len_this_time_shape,
-  const paddle::optional<std::vector<int64_t>>& vm_shape) {
-    return {value_shape};
 //
 //  =========== Exposed to Outside API - ARCH: SM80 ===========
 //
