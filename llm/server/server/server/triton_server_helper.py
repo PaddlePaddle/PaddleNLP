@@ -89,7 +89,7 @@ def check():
         status: bool, True if process is alive else False
     """
     error_info = {}
-    grpc_port = os.getenv("GRPC_PORT")
+    grpc_port = os.getenv("SERVICE_GRPC_PORT")
 
     # 1. check server is ready
     if grpc_port is not None:

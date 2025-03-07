@@ -1020,9 +1020,17 @@ class Trainer:
 
             step = -1
             for step, inputs in enumerate(epoch_iterator):
-                if self.args.use_hybrid_parallel and self.args.sep_parallel_degree > 1:
+                if (
+                    self.args.use_hybrid_parallel
+                    and self.args.sep_parallel_degree > 1
+                    and self.args.split_inputs_sequence_dim
+                ):
                     inputs = split_inputs_sequence_dim(inputs)
-                if self.args.use_hybrid_parallel and self.args.context_parallel_degree > 1:
+                if (
+                    self.args.use_hybrid_parallel
+                    and self.args.context_parallel_degree > 1
+                    and self.args.split_inputs_sequence_dim
+                ):
                     inputs = split_inputs_sequence_dim_load_balance(inputs)
                 if self.args.ignore_data_skip:
                     self.timers and self.timers("read-data").stop()
@@ -1991,6 +1999,16 @@ class Trainer:
             from ..utils import AdamWMini
 
             optimizer_cls = AdamWMini
+            optimizer_kwargs.update(adam_kwargs)
+        elif args.optim == OptimizerNames.ADAMW_CUSTOM:
+            from ..utils import AdamWCustom
+
+            optimizer_cls = AdamWCustom
+            optimizer_kwargs.update(adam_kwargs)
+        elif args.optim == OptimizerNames.ADAMW_16BIT_MOMENT:
+            from ..utils import AdamW_16Bit
+
+            optimizer_cls = AdamW_16Bit
             optimizer_kwargs.update(adam_kwargs)
         else:
             raise ValueError(f"Trainer cannot instantiate unsupported optimizer: {args.optim}")

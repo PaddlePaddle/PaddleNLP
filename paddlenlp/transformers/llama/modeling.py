@@ -102,6 +102,7 @@ rms_norm_fused = fusion_ops.rms_norm_fused
 
 __all__ = [
     "LlamaModel",
+    "LlamaLMHead",
     "LlamaPretrainedModel",
     "LlamaForCausalLM",
     "LlamaPretrainingCriterion",

@@ -1,6 +1,7 @@
 # Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
 # Copyright (c) Microsoft Corporation.
 # Copyright (c) Facebook, Inc. and its affiliates. All rights reserved.
+# Copyright (C) 2024 THL A29 Limited, a Tencent company.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,6 +25,7 @@ from paddle import Tensor, nn
 from paddle.distributed.communication.group import Group
 
 from .moe_gate import PretrainedMoEGate
+from .token_dispatcher import MoEFlexTokenDispatcher
 
 
 class _AllToAll(paddle.autograd.PyLayer):
@@ -327,3 +329,45 @@ class MoELayer(nn.Layer):
         )
 
         return final_out, l_aux, l_zloss
+
+
+class MoEFlexTokenLayer(nn.Layer):
+    def __init__(self, config, moe_num_experts, expert_class, expert_kwargs, gate, moe_group):
+
+        super().__init__()
+        self.config = config
+        self.moe_group = moe_group
+        self.ep_size = dist.get_world_size(self.moe_group)
+        self.moe_router_topk = gate.top_k
+        self.moe_num_experts = moe_num_experts
+        self.num_local_experts = moe_num_experts // self.ep_size
+        self.token_dispatcher = MoEFlexTokenDispatcher(
+            self.num_local_experts, self.moe_router_topk, self.moe_num_experts, moe_group
+        )
+
+        self.experts = nn.LayerList([expert_class(**expert_kwargs)] * self.num_local_experts)
+        self.router = gate
+
+    def expert_forward(self, dispatched_input, tokens_per_expert):
+        outputs = []
+        tokens_per_expert = tokens_per_expert.tolist()
+        # print(f"all tokens: {sum(tokens_per_expert)}, detail: {tokens_per_expert}")
+        chunks = paddle.split(dispatched_input, num_or_sections=tokens_per_expert, axis=0)
+        for chunk, expert in zip(chunks, self.experts):
+            chunk = chunk.contiguous()
+            assert chunk.shape[0] != 0, "Cannot dispatch empty input"
+            outputs += [expert(chunk)]
+
+        return paddle.concat(outputs, axis=0)
+
+    def forward(self, hidden_states: paddle.Tensor):
+        _, _, d_model = hidden_states.shape
+        # reshaped_input = hidden_states.reshape([-1, d_model])
+        probs, routing_map, l_aux, l_zloss = self.router(hidden_states)
+        (dispatched_input, tokens_per_expert) = self.token_dispatcher.token_permutation(
+            hidden_states, probs, routing_map
+        )
+        expert_output = self.expert_forward(dispatched_input, tokens_per_expert)
+        output, _ = self.token_dispatcher.token_unpermutation(expert_output, None)
+        return output, l_aux, l_zloss
+>>>>>>> 1db27cdaf9005cc8714c72c7f04f0f797e06eba8

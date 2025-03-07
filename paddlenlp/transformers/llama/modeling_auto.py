@@ -1188,18 +1188,22 @@ class LlamaPretrainingCriterion3DAuto(paddle.nn.Layer):
             if get_env_device() == "xpu":
 
                 class LocalLossLayer(paddle.distributed.LocalLayer):
-                    def __init__(self, out_dist_attrs):
-                        super().__init__(out_dist_attrs)
+                    def __init__(self, out_dist_attrs, grad_dist_attrs):
+                        super().__init__(out_dist_attrs, grad_dist_attrs)
 
                     def forward(self, x, mask):
                         masked_lm_loss = paddle.masked_select(x, mask).astype("float32")
-                        loss = paddle.mean(masked_lm_loss)
-                        return loss
+                        loss = paddle.mean(masked_lm_loss).unsqueeze(0)
+                        return loss.unsqueeze(0)
 
                 out_dist_attrs = [
-                    (masked_lm_loss.process_mesh, [dist.Partial(dist.ReduceType.kRedSum), dist.Replicate()]),
+                    (masked_lm_loss.process_mesh, [dist.Shard(0), dist.Replicate()]),
                 ]
-                loss_func = LocalLossLayer(out_dist_attrs)
+                grad_dist_attrs = [
+                    (masked_lm_loss.process_mesh, [dist.Shard(0), dist.Replicate()]),
+                    None,
+                ]
+                loss_func = LocalLossLayer(out_dist_attrs, grad_dist_attrs)
                 loss = loss_func(masked_lm_loss, masked_lm_loss > 0)
             else:
                 masked_lm_loss = paddle.masked_select(masked_lm_loss, masked_lm_loss > 0).astype("float32")
