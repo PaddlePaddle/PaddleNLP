@@ -218,36 +218,16 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         Returns:
             paddle.Tensor: cumsum locations
         """
-        # (LiuTing) this func can further code refine.
+        _, k = topk_idx.shape
+        # Shape: [seq_len * k]
+        chosen_expert = topk_idx.reshape([-1])
+        # Shape: [seq_len * k, num_experts].
+        token_priority = F.one_hot(chosen_expert, self.num_experts).cast(paddle.int32)
+        token_priority = paddle.logical_and(token_priority > 0, token_priority.cumsum(axis=0) < capacity)
+        # Shape: [seq_len, num_experts].
+        token_priority = token_priority.reshape([-1, k, self.num_experts]).sum(axis=1)
 
-        # Make num_selected_experts the leading axis to ensure that top-1 choices
-        # have priority over top-2 choices, which have priority over top-3 choices,
-        # etc.
-        expert_index = paddle.transpose(topk_idx, [1, 0])  # [topk, B*S]
-        # Shape: [num_selected_experts * tokens_per_group]
-        expert_index = expert_index.reshape([-1])
-
-        # Create mask out of indices.
-        # Shape: [tokens_per_group * num_selected_experts, num_experts].
-        expert_mask = F.one_hot(expert_index, self.num_experts).cast(paddle.int32)
-
-        # Experts have a fixed capacity that we cannot exceed. A token's priority
-        # within the expert's buffer is given by the masked, cumulative capacity of
-        # its target expert.
-        # Shape: [tokens_per_group * num_selected_experts, num_experts].
-        token_priority = paddle.cumsum(expert_mask, axis=0) * expert_mask - 1
-        # Shape: [num_selected_experts, tokens_per_group, num_experts].
-        token_priority = token_priority.reshape((self.top_k, -1, self.num_experts))
-        # Shape: [tokens_per_group, num_selected_experts, num_experts].
-        token_priority = paddle.transpose(token_priority, [1, 0, 2])
-        # For each token, across all selected experts, select the only non-negative
-        # (unmasked) priority. Now, for group G routing to expert E, token T has
-        # non-negative priority (i.e. token_priority[G,T,E] >= 0) if and only if E
-        # is its targeted expert.
-        # Shape: [tokens_per_group, num_experts].
-        token_priority = paddle.max(token_priority, axis=1)
-
-        return token_priority
+        return (token_priority > 0.0).astype("float32")
 
     def _topk_greedy(self, scores: paddle.Tensor, k: int) -> Tuple[paddle.Tensor, paddle.Tensor]:
         """_summary_
@@ -544,8 +524,7 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
             if self.group is not None:
                 dist.all_reduce(local_capacity, op=dist.ReduceOp.MAX, group=self.group)
             capacity = int(local_capacity)
-            # token_priority = self._priority(top_idx, capacity)
-            token_priority = top_idx
+            token_priority = self._priority(top_idx, capacity)
 
         # normalize gates
         gates_masked = gates * mask
@@ -555,4 +534,11 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
             if self.norm_topk_prob:
                 gates_masked = gates_masked / denom_s
 
-        return capacity, gates_masked.take_along_axis(top_idx, axis=-1), token_priority, exp_counts, l_aux, l_zloss
+        return (
+            capacity,
+            gates_masked.take_along_axis(top_idx, axis=-1),
+            top_idx,
+            token_priority.take_along_axis(top_idx, axis=-1),
+            l_aux,
+            l_zloss,
+        )

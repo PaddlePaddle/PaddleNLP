@@ -247,10 +247,11 @@ class MoELayer(nn.Layer):
         reshaped_input = hidden_state.reshape([-1, d_model])
 
         # self.l_aux       :
-        # gates_masked  : se
+        # topk_weight  : se
+        # topk_ids    : sk
         # token_priority    : se
         # self.exp_counts  :
-        capacity, topk_weight, topk_ids, exp_counts, l_aux, l_zloss = self.gate(hidden_state)
+        capacity, topk_weight, topk_ids, token_priority, l_aux, l_zloss = self.gate(hidden_state)
 
         cnts = paddle.zeros([topk_ids.shape[0], len(self.experts)], dtype=topk_ids.dtype)
         cnts = cnts.put_along_axis(topk_ids, 1, axis=1)
@@ -320,6 +321,7 @@ class MoELayer(nn.Layer):
             new_x.reshape(topk_ids.shape + [-1])
             .astype(topk_weight.dtype)
             .multiply_(topk_weight.unsqueeze(-1))
+            .multiply_(token_priority.unsqueeze(-1))
             .sum(axis=1)
             .astype(new_x.dtype)
         )

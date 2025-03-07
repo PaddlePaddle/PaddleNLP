@@ -174,6 +174,9 @@ def main():
         and training_args.data_parallel_degree > 1
     ):
         training_args.use_expert_parallel = True
+        # (Liuting) Not support acc calculation now due to MTP.
+        if "DeepseekV3" in str(model_config.architectures):
+            training_args.prediction_loss_only = True
 
     LlmMetaConfig.set_llm_config(model_config, training_args)
     model_config.use_fast_layer_norm = model_args.use_fast_layer_norm
