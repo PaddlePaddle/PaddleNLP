@@ -82,20 +82,20 @@ wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwe
 - 动态图模式(8卡A100示例)
 <br> 通过`model_type=llama_network`选择通信API侵入的模型实例，配置`use_intermediate_api=true`选项，表示使用中层API进行自动并行训练
 ```python
-    python -u -m paddle.distributed.launch \
-          --device "0,1,2,3,4,5,6,7"   \
-          run_pretrain_auto.py         \
-          --enable_auto_parallel true \
-          --model_name_or_path "facebook/llama-7b" \
-          --tokenizer_name_or_path "facebook/llama-7b" \
-          --input_dir "./data" \
-          --model_type "llama_network" \
-          --output_dir "log"           \
-          --max_steps 1                \
-          --eval_steps 1               \
-          --use_intermediate_api true  \
-          --tensor_parallel_degree 2   \
-          --pipeline_parallel_degree 2 \
+    python -u -m paddle.distributed.launch            \
+          --device "0,1,2,3,4,5,6,7"                  \
+          ${FILE_PATH}run_pretrain_auto.py            \
+          --enable_auto_parallel true                 \
+          --model_name_or_path "facebook/llama-7b"    \
+          --tokenizer_name_or_path "facebook/llama-7b"\
+          --input_dir "./data"                        \
+          --model_type "llama_network"                \
+          --output_dir "log"                          \
+          --max_steps 1                               \
+          --eval_steps 1                              \
+          --use_intermediate_api true                 \
+          --tensor_parallel_degree 2                  \
+          --pipeline_parallel_degree 2                \
           --sharding_parallel_degree 2
 ```
 
