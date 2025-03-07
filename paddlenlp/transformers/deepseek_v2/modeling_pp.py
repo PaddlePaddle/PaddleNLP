@@ -39,13 +39,18 @@ from .modeling import (
     DeepseekV2RMSNorm,
 )
 
+try:
+    from paddle.distributed.fleet.meta_parallel import LocalSharedLayerDesc
+except:
+    LocalSharedLayerDesc = None
+
 __all__ = [
     "DeepseekV2ForCausalLMPipe",
 ]
 
 
 def parse_args(args):
-    if isinstance(args, tuple):
+    if isinstance(args, (tuple, list)):
         if len(args) == 4:
             hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids = args
 
@@ -55,6 +60,9 @@ def parse_args(args):
         elif len(args) == 2:
             hidden_states, attention_mask = args
             attn_mask_startend_row_indices, position_ids = None, None
+        else:  # len(args) == 1:
+            hidden_states = args[0]
+            attention_mask, attn_mask_startend_row_indices, position_ids = None, None, None
     else:
         hidden_states = args
         attention_mask, attn_mask_startend_row_indices, position_ids = None, None, None
@@ -321,8 +329,8 @@ class DeepseekV2RMSNormPipe(nn.Layer):
 
 
 class DeepseekV2LMHeadPipe(DeepseekV2LMHead):
-    def __init__(self, config):
-        super(DeepseekV2LMHeadPipe, self).__init__(config)
+    def __init__(self, config, embedding_weight=None):
+        super(DeepseekV2LMHeadPipe, self).__init__(config, embedding_weight=embedding_weight)
 
     @property
     def embedding_weight(self):
@@ -406,6 +414,10 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
             assert len(self.no_recompute_layers) == 0, "for pp with full recompute, no_recompute_layers is not support"
 
         virtual_pp_degree = getattr(self.config, "virtual_pp_degree", 1)
+        use_dualpipev = getattr(self.config, "use_dualpipev", False)
+        if use_dualpipev:
+            assert LocalSharedLayerDesc is not None, "LocalSharedLayerDesc is None, please update your paddle."
+        shared_class = LocalSharedLayerDesc if use_dualpipev else SharedLayerDesc
 
         def get_hcg():
             return fleet.get_hybrid_communicate_group()
@@ -420,7 +432,7 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
 
         if config.tie_word_embeddings:
             self.add_sequential_layer(
-                SharedLayerDesc(
+                shared_class(
                     "DeepseekV2_shared_weight",
                     DeepseekV2EmbeddingPipe,
                     shared_weight_attr="embedding_weight",
@@ -453,12 +465,11 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
 
         if config.tie_word_embeddings:
             self.add_sequential_layer(
-                SharedLayerDesc(
+                shared_class(
                     "DeepseekV2_shared_weight",
                     DeepseekV2LMHeadPipe,
                     shared_weight_attr="embedding_weight",
                     config=config,
-                    **{"transpose_y": True},
                 ),
                 "lm_head",
             )
@@ -489,6 +500,7 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
                 "partition": False,
             },
             num_virtual_pipeline_stages=virtual_pp_degree,
+            use_dualpipev=use_dualpipev,
         )
         # You should call init here, since there is a  diamond inheritance problem
         self.apply(self._init_weights)
@@ -497,3 +509,36 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
 
     def get_loss_fn(self, config):
         return DeepseekV2PretrainingCriterionPipe(config)
+
+    def overlapped_forward_backward(
+        self,
+        module0,  # the module of the forward chunk
+        inputs0,
+        criterion0,
+        labels0,
+        module1,  # the module of the backward chunk, maybe not used
+        loss1,
+        outputs1,
+        output_grads1,
+        scaler,
+    ):
+        outputs0 = module0(inputs0)
+        outputs0 = [outputs0] if isinstance(outputs0, paddle.Tensor) else outputs0
+
+        if labels0 is not None:
+            loss0 = criterion0(outputs0, labels0)
+        else:
+            loss0 = None
+
+        if loss1 is not None:
+            if scaler:
+                paddle.autograd.backward(scaler.scale(loss1))
+            else:
+                paddle.autograd.backward(loss1)
+        else:
+            paddle.autograd.backward(
+                tensors=outputs1,
+                grad_tensors=output_grads1,
+            )
+
+        return outputs0, loss0

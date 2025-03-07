@@ -305,7 +305,7 @@ class MoEFlexTokenLayer(nn.Layer):
         chunks = paddle.split(dispatched_input, num_or_sections=tokens_per_expert, axis=0)
         for chunk, expert in zip(chunks, self.experts):
             chunk = chunk.contiguous()
-            assert chunk.shape[0] != 0, "Cannot dispatch empty input"
+            # assert chunk.shape[0] != 0, "Cannot dispatch empty input"
             outputs += [expert(chunk)]
 
         return paddle.concat(outputs, axis=0)

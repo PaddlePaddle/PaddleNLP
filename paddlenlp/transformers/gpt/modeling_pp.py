@@ -60,12 +60,15 @@ def get_attr(layer, name):
 
 
 def parse_args(args):
-    if isinstance(args, tuple):
+    if isinstance(args, (tuple, list)):
         if len(args) == 3:
             hidden_states, attention_mask, position_ids = args
         elif len(args) == 2:
             hidden_states, attention_mask = args
             position_ids = None
+        else:
+            hidden_states = args[0]
+            attention_mask, position_ids = None, None
     else:
         hidden_states = args
         attention_mask, position_ids = None, None

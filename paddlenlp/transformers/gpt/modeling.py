@@ -1350,6 +1350,8 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
             Tensor: The pretraining loss. Its data type should be float32 and its shape is [1].
 
         """
+        if isinstance(prediction_scores, list):
+            prediction_scores = prediction_scores[0]
         with paddle.amp.auto_cast(False):
             masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
             # skip ignore_index which loss == 0
