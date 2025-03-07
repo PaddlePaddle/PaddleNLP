@@ -3157,9 +3157,15 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
             return self.compute_mla_absorb(qkv_out, caches, i, **kwargs)
 
         if self.config.append_attn:
-            from paddlenlp_ops import append_attention
+            from paddlenlp.utils.env import PREFILL_USE_SAGE_ATTN
 
-            fmha_out = append_attention(
+            if PREFILL_USE_SAGE_ATTN:
+                from paddlenlp_ops import sage_attention as attention_prefill
+            else:
+                print(1)
+                from paddlenlp_ops import append_attention as attention_prefill
+
+            fmha_out = attention_prefill(
                 qkv_out,
                 caches[2 * i],
                 caches[2 * i + 1],
