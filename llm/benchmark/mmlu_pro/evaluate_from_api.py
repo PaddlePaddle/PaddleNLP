@@ -230,6 +230,18 @@ def call_generate(prompt, **kwargs):
             "max_tokens": 2048,
             "stream": False
         }
+    elif kwargs['backend'] == 'vllm':
+        data = {
+            "model": "/root/r1/models/",
+            "messages": 
+            [
+                {"role":"user","content": prompt}
+            ],
+            "top_p": 0.95,
+            "temperature": 0.6,
+            "max_tokens": 2048,
+            "stream": False
+        }
 
     response = requests.post(url, headers=headers, data=json.dumps(data))
 
@@ -239,10 +251,9 @@ def call_generate(prompt, **kwargs):
 
     lines = b"".join(chunks).decode("utf-8")
     lines = lines.strip().split('\n')
-    # import pdb;pdb.set_trace()
     if kwargs['backend'] == 'paddle':
         return json.loads(lines[-1])["tokens_all"]
-    elif kwargs['backend'] == 'trtllm':
+    elif kwargs['backend'] == 'trtllm' or kwargs['backend'] == 'vllm':
         return json.loads(lines[-1])["choices"][0]["message"]["content"]
 
 def single_request(client, single_question, cot_examples_dict, exist_result):
@@ -251,6 +262,7 @@ def single_request(client, single_question, cot_examples_dict, exist_result):
     for each in exist_result:
         if q_id == each["question_id"] and single_question["question"] == each["question"]:
             pred = extract_answer(each["model_outputs"])
+            
             return pred, each["model_outputs"], exist
     exist = False
     category = single_question["category"]
@@ -264,10 +276,7 @@ def single_request(client, single_question, cot_examples_dict, exist_result):
         prompt += format_example(each["question"], each["options"], each["cot_content"])
     input_text = format_example(question, options)
     try:
-        
-        # response = call_api(client, prompt, input_text)
-        response = call_generate(prompt, ip=args.ip, port=args.port, backend=args.backend)
-        # import pdb;pdb.set_trace()
+        response = call_generate(prompt+input_text, ip=args.ip, port=args.port, backend=args.backend)
         response = response.replace('**', '')
     except Exception as e:
         print("error", e)
@@ -331,12 +340,13 @@ def evaluate(subjects):
 
         k = 0
         for each in tqdm(test_data):
-            k += 1
-            if k % 10 != 0:
-                continue
+            # k += 1
+            # if k % 10 != 0:
+            #     continue
             
             label = each["answer"]
             category = subject
+            # import pdb;pdb.set_trace()
             pred, response, exist = single_request(None, each, dev_df, res)
             if response is not None:
                 res, category_record = update_result(output_res_path)
@@ -345,6 +355,7 @@ def evaluate(subjects):
                 each["pred"] = pred
                 each["model_outputs"] = response
                 merge_result(res, each)
+                
                 if pred is not None:
                     if pred == label:
                         category_record[category]["corr"] += 1
@@ -352,6 +363,7 @@ def evaluate(subjects):
                         category_record[category]["wrong"] += 1
                 else:
                     category_record[category]["wrong"] += 1
+                # import pdb;pdb.set_trace()
                 save_res(res, output_res_path)
                 save_summary(category_record, output_summary_path)
                 res, category_record = update_result(output_res_path)
