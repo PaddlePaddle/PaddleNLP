@@ -1213,21 +1213,15 @@ class DeepseekV2DecoderLayer(nn.Layer):
 
         self.self_attn = DeepseekV2Attention(config=config, layerwise_recompute=layerwise_recompute)
 
-        # self.mlp = (
-        #     DeepseekV2MoE(config)
-        #     if (
-        #         config.n_routed_experts is not None
-        #         and layer_idx >= config.first_k_dense_replace
-        #         and layer_idx % config.moe_layer_freq == 0
-        #     )
-        #     else DeepseekV2MLP(config)
-        # )
-        self.mlp1 = DeepseekV2MLP(config)
-        self.mlp2 = DeepseekV2MLP(config)
-        self.mlp3 = DeepseekV2MLP(config)
-        self.mlp4 = DeepseekV2MLP(config)
-        self.mlp5 = DeepseekV2MLP(config)
-
+        self.mlp = (
+            DeepseekV2MoE(config)
+            if (
+                config.n_routed_experts is not None
+                and layer_idx >= config.first_k_dense_replace
+                and layer_idx % config.moe_layer_freq == 0
+            )
+            else DeepseekV2MLP(config)
+        )
         self.input_layernorm = DeepseekV2RMSNorm(config)
         self.post_attention_layernorm = DeepseekV2RMSNorm(config)
 
@@ -1299,16 +1293,8 @@ class DeepseekV2DecoderLayer(nn.Layer):
         # Fully Connected
         residual = hidden_states
         hidden_states = self.post_attention_layernorm(hidden_states)
-        # hidden_states = self.mlp(hidden_states)
-        # hidden_states = residual + hidden_states
-        hidden_states = paddle.concat([hidden_states, hidden_states], axis=0)
-        hidden_states = self.mlp1(hidden_states)
-        hidden_states = self.mlp2(hidden_states)
-        hidden_states = self.mlp3(hidden_states)
-        hidden_states = self.mlp4(hidden_states)
-        hidden_states = self.mlp5(hidden_states)
-        hidden_states = hidden_states[0]
-        hidden_states = residual + hidden_states[0]
+        hidden_states = self.mlp(hidden_states)
+        hidden_states = residual + hidden_states
 
         outputs = (hidden_states,)
 
