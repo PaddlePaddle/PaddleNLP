@@ -30,9 +30,9 @@
 |模型名称|精度|MTP|节点数|静态图下载 model_name|
 |:------|:-:|:-:|:-:|:-:|
 | deepseek-ai/DeepSeek-R1  |weight_only_int4|否|1| deepseek-ai/DeepSeek-R1/weight_only_int4 |
-| deepseek-ai/DeepSeek-R1  |weight_only_int4|是|1| deepseek-ai/DeepSeek-R1-MTP/weight-only-int4 |
+| deepseek-ai/DeepSeek-R1  |weight_only_int4|是|1| deepseek-ai/DeepSeek-R1-MTP/weight_only_int4 |
 | deepseek-ai/DeepSeek-R1  |weight_only_int8|否|2| deepseek-ai/DeepSeek-R1-2nodes/weight_only_int8 |
-| deepseek-ai/DeepSeek-R1  |weight_only_int8|是|2| deepseek-ai/DeepSeek-R1-MTP-2nodes/weight-only-int8 |
+| deepseek-ai/DeepSeek-R1  |weight_only_int8|是|2| deepseek-ai/DeepSeek-R1-MTP-2nodes/weight_only_int8 |
 | deepseek-ai/DeepSeek-R1  |a8w8_fp8|否|2| deepseek-ai/DeepSeek-R1-2nodes/a8w8_fp8|
 | deepseek-ai/DeepSeek-R1  |a8w8_fp8|是|2| deepseek-ai/DeepSeek-R1-MTP-2nodes/a8w8_fp8|
 | deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B |weight_only_int8|-|-| deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B/weight_only_int8 |
@@ -54,7 +54,7 @@ export MODEL_PATH=${MODEL_PATH:-$PWD}
 export model_name=${model_name:-"deepseek-ai/DeepSeek-R1/weight_only_int4"}
 docker run --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
 -v $MODEL_PATH:/models -e "model_name=${model_name}" \
--dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v1.0 /bin/bash \
+-dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.1 /bin/bash \
 -c -ex 'export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 && export MP_NUM=8 && start_server $model_name && tail -f /dev/null'
 ```
 
@@ -80,7 +80,7 @@ export MODEL_PATH=${MODEL_PATH:-$PWD}
 export model_name=${model_name:-"deepseek-ai/DeepSeek-R1-2nodes/weight_only_int8"}
 docker run --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
 -v $MODEL_PATH:/models -e "model_name=${model_name}" \
--dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v1.0 /bin/bash \
+-dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.1 /bin/bash \
 -c -ex 'export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 && export MP_NUM=16 && export MP_NNODE=2 && export POD_0_IP=192.168.0.1 && export POD_IPS=192.168.0.1,192.168.0.2 && start_server $model_name && tail -f /dev/null'
 
 # node2
@@ -88,7 +88,7 @@ export MODEL_PATH=${MODEL_PATH:-$PWD}
 export model_name=${model_name:-"deepseek-ai/DeepSeek-R1-2nodes/weight_only_int8"}
 docker run --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
 -v $MODEL_PATH:/models -e "model_name=${model_name}"\
--dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v1.0 /bin/bash \
+-dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.1 /bin/bash \
 -c -ex 'export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 && export MP_NUM=16 && export MP_NNODE=2 && export POD_0_IP=192.168.0.1 && export POD_IPS=192.168.0.1,192.168.0.2 && start_server $model_name && tail -f /dev/null'
 ```
 
@@ -100,7 +100,7 @@ export MODEL_PATH=${MODEL_PATH:-$PWD}
 export model_name=${model_name:-"deepseek-ai/DeepSeek-R1-2nodes/a8w8_fp8"}
 docker run --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
 -v $MODEL_PATH:/models -e "model_name=${model_name}" \
--dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v1.0 /bin/bash \
+-dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.1 /bin/bash \
 -c -ex 'export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 && export MP_NUM=16 && export MP_NNODE=2 && export POD_0_IP=192.168.0.1 && export POD_IPS=192.168.0.1,192.168.0.2 && start_server $model_name  && tail -f /dev/null'
 
 # node2
@@ -108,7 +108,7 @@ export MODEL_PATH=${MODEL_PATH:-$PWD}
 export model_name=${model_name:-"deepseek-ai/DeepSeek-R1-2nodes/a8w8_fp8"}
 docker run --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
 -v $MODEL_PATH:/models -e "model_name=${model_name}" \
--dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v1.0 /bin/bash \
+-dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.1 /bin/bash \
 -c -ex 'export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 && export MP_NUM=16 && export MP_NNODE=2 && export POD_0_IP=192.168.0.1 && export POD_IPS=192.168.0.1,192.168.0.2 && start_server $model_name  && tail -f /dev/null'
 ```
 
@@ -117,11 +117,12 @@ docker run --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_P
 ### deepseek-ai/DeepSeek-R1-Distill-Qwen-14B
 
 ```shell
+export MODEL_PATH=${MODEL_PATH:-$PWD}
+export model_name=${model_name:-"deepseek-ai/DeepSeek-R1-Distill-Qwen-14B/weight_only_int8"}
 docker run --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
--v /PATH_TO_MODEL/:/models \
--dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v1.0 /bin/bash \
--c -ex 'model_name=${model_name:-"deepseek-ai/DeepSeek-R1-Distill-Qwen-14B/weight_only_int8"} && cd /opt/output/Serving && bash start_server.sh $model_name && tail -f /dev/null'\
-&& docker exec -it $(docker ps -lq) sh -c "while [ ! -f /opt/output/Serving/log/workerlog.0 ]; do sleep 1; done; tail -f /opt/output/Serving/log/workerlog.0"
+-v /MODEL_PATH/:/models -e "model_name=${model_name}"\
+-dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.1 /bin/bash \
+-c -ex 'bash start_server.sh $model_name && tail -f /dev/null'
 ```
 
 ### 请求服务化
@@ -235,8 +236,17 @@ python -m paddle.distributed.launch \
 ```
 
 两机 WINT8-TP16 推理
+
 ```shell
-# 动态图推理
+启动2机推理 需要保证2机器节点可以互相ping通
+# 第一个节点(master)
+ping 192.168.0.1
+# 第二个节点(slave)
+ping 192.168.0.2
+```
+
+```shell
+# 动态图推理 node1和node2命令均相同
 export MODEL_TAG=deepseek-ai/DeepSeek-R1
 export QUANT_MODE=weight_only_int8
 export TOTAL_MAX_LENGTH=8192
@@ -244,8 +254,8 @@ export MAX_DEC_LEN=4096
 export FLAGS_mla_use_tensorcore=1 # only support Hopper, Amper shoule be 0
 export FLAGS_cascade_attention_max_partition_size=${TOTAL_MAX_LENGTH}
 export CUDA_VISIBLE_DEVICES="0,1,2,3,4,5,6,7"
-mpirun python -m paddle.distributed.launch \
-  --gpus ${CUDA_VISIBLE_DEVICES} \
+python -m paddle.distributed.launch \
+  --gpus ${CUDA_VISIBLE_DEVICES} --ips "192.168.0.1,192.168.0.2"\
   predictor.py \
   --model_name_or_path ${MODEL_TAG} \
   --dtype bfloat16 \
@@ -258,13 +268,13 @@ mpirun python -m paddle.distributed.launch \
   --mla_use_matrix_absorption 1
 
 
-# 动转静导出模型
+# 动转静导出模型 node1和node2命令均相同
 export MODEL_TAG=deepseek-ai/DeepSeek-R1
 export OUTPUT_PATH=/path/to/exported_model
 export QUANT_MODE=weight_only_int8
 export TOTAL_MAX_LENGTH=8192
 export CUDA_VISIBLE_DEVICES="0,1,2,3,4,5,6,7"
-mpirun python -m paddle.distributed.launch \
+python -m paddle.distributed.launch --ips "192.168.0.1,192.168.0.2"\
   --gpus ${CUDA_VISIBLE_DEVICES} \
   export_model.py \
   --model_name_or_path ${MODEL_TAG} \
@@ -277,7 +287,7 @@ mpirun python -m paddle.distributed.launch \
   --mla_use_matrix_absorption 1
 
 
-# 静态图推理
+# 静态图推理 node1和node2命令均相同
 export OUTPUT_PATH=/path/to/exported_model
 export QUANT_MODE=weight_only_int8
 export TOTAL_MAX_LENGTH=8192
@@ -285,7 +295,7 @@ export MAX_DEC_LEN=4096
 export FLAGS_mla_use_tensorcore=1 # only support Hopper, Amper shoule be 0
 export FLAGS_cascade_attention_max_partition_size=${TOTAL_MAX_LENGTH}
 export CUDA_VISIBLE_DEVICES="0,1,2,3,4,5,6,7"
-mpirun python -m paddle.distributed.launch \
+python -m paddle.distributed.launch --ips "192.168.0.1,192.168.0.2"\
   --gpus ${CUDA_VISIBLE_DEVICES} \
   predictor.py \
   --model_name_or_path ${OUTPUT_PATH} \
@@ -300,8 +310,17 @@ mpirun python -m paddle.distributed.launch \
 ```
 
 两机 FP8-TP16 推理
+
 ```shell
-# 动态图推理
+启动2机推理 需要保证2机器节点可以互相ping通
+# 第一个节点(master)
+ping 192.168.0.1
+# 第二个节点(slave)
+ping 192.168.0.2
+```
+
+```shell
+# 动态图推理 node1和node2命令均相同
 export MODEL_TAG=deepseek-ai/DeepSeek-R1-FP8
 export QUANT_MODE=a8w8_fp8
 export TOTAL_MAX_LENGTH=8192
@@ -309,7 +328,7 @@ export MAX_DEC_LEN=4096
 export FLAGS_mla_use_tensorcore=1 # only support Hopper, Amper shoule be 0
 export FLAGS_cascade_attention_max_partition_size=${TOTAL_MAX_LENGTH}
 export CUDA_VISIBLE_DEVICES="0,1,2,3,4,5,6,7"
-mpirun python -m paddle.distributed.launch \
+python -m paddle.distributed.launch --ips "192.168.0.1,192.168.0.2"\
   --gpus ${CUDA_VISIBLE_DEVICES} \
   predictor.py \
   --model_name_or_path ${MODEL_TAG} \
@@ -324,13 +343,13 @@ mpirun python -m paddle.distributed.launch \
   --weight_block_size 128 128
 
 
-# 动转静导出模型
+# 动转静导出模型 node1和node2命令均相同
 export MODEL_TAG=deepseek-ai/DeepSeek-R1-FP8
 export OUTPUT_PATH=/path/to/exported_model
 export QUANT_MODE=a8w8_fp8
 export TOTAL_MAX_LENGTH=8192
 export CUDA_VISIBLE_DEVICES="0,1,2,3,4,5,6,7"
-mpirun python -m paddle.distributed.launch \
+python -m paddle.distributed.launch --ips "192.168.0.1,192.168.0.2"\
   --gpus ${CUDA_VISIBLE_DEVICES} \
   export_model.py \
   --model_name_or_path ${MODEL_TAG} \
@@ -344,7 +363,7 @@ mpirun python -m paddle.distributed.launch \
   --weight_block_size 128 128
 
 
-# 静态图推理
+# 静态图推理 node1和node2命令均相同
 export OUTPUT_PATH=/path/to/exported_model
 export QUANT_MODE=a8w8_fp8
 export TOTAL_MAX_LENGTH=8192
@@ -352,7 +371,7 @@ export MAX_DEC_LEN=4096
 export FLAGS_mla_use_tensorcore=1 # only support Hopper, Amper shoule be 0
 export FLAGS_cascade_attention_max_partition_size=${TOTAL_MAX_LENGTH}
 export CUDA_VISIBLE_DEVICES="0,1,2,3,4,5,6,7"
-mpirun python -m paddle.distributed.launch \
+python -m paddle.distributed.launch --ips "192.168.0.1,192.168.0.2"\
   --gpus ${CUDA_VISIBLE_DEVICES} \
   predictor.py \
   --model_name_or_path ${OUTPUT_PATH} \
