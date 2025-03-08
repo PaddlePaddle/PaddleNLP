@@ -10,8 +10,11 @@ def parse_arguments():
                         help="downloadfiles")
     parser.add_argument('-d', '--dir', default='downloads',
                        help="save dir")
+<<<<<<< HEAD
     parser.add_argument('-m', '--model_name', default='file_list.txt',
                        help="model_name")
+=======
+>>>>>>> e95308cb6 (fix)
 
     return parser.parse_args()
 
@@ -101,8 +104,7 @@ def main():
     # make dir
     os.makedirs(args.dir, exist_ok=True)
 
-    # download from txt
-    download_from_txt(args.url, args.dir, args.model_name)
+    download_from_txt(args.url, args.dir)
 
 if __name__ == "__main__":
     main()

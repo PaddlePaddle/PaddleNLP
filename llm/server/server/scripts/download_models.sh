@@ -49,13 +49,13 @@ MODEL_URL="$BASE_URL/$TEMP_FILE"
 
 if [ -z "$SPECULATE_MODEL_PATH" ]; then
     echo "Downloading from $MODEL_URL to $MODEL_DIR"
-    download_model -u $MODEL_URL -d $MODEL_DIR 
+    python download_model.py -u $MODEL_URL -d $MODEL_DIR 
 elif [ -n "$SPECULATE_MODEL_PATH" ]; then  
     echo "Downloading from $MODEL_URL to $MODEL_DIR"
-    download_model -u $MODEL_URL -d $MODEL_DIR 
+    python download_model.py -u $MODEL_URL -d $MODEL_DIR 
     MTP_URL="$BASE_URL/mtp"
     echo "Downloading from $MTP_URL to $SPECULATE_MODEL_PATH"
-    download_model -u $MTP_URL -d $SPECULATE_MODEL_PATH 
+    python download_model.py -u $MTP_URL -d $SPECULATE_MODEL_PATH 
 fi
 
 if [ $? -ne 0 ]; then
