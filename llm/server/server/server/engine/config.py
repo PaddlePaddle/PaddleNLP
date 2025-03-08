@@ -329,7 +329,7 @@ class Config:
         # check paddle nlp version
         tag = os.getenv("tag")
         if tag not in config["paddlenlp_version"]:
-            raise Exception(f"Current image paddlenlp version {tag} doesn't match the model paddlenlp version {config['paddlenlp_version']} ")
+            logger.warning(f"Current image paddlenlp version {tag} doesn't match the model paddlenlp version {config['paddlenlp_version']} ")
 
         def reset_value(self, value_name, key, config):
             if key in config:
@@ -342,7 +342,7 @@ class Config:
         reset_value(self, "return_full_hidden_states", "return_full_hidden_states", config)
         reset_value(self, "dtype", "infer_model_dtype", config)
         reset_value(self, "use_cache_kv_int8", "infer_model_cachekv_int8_type", config)
-        if self.use_cache_kv_int8 == "null":
+        if self.use_cache_kv_int8 == None:
             self.use_cache_kv_int8 = 0
         else:
             self.use_cache_kv_int8 = 1
