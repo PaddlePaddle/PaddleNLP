@@ -135,6 +135,7 @@ void BatchMLAWithPagedKVCacheKernel(
   params.batch_ids = const_cast<int*>(batch_ids.data<int>());
   params.tile_ids_per_batch = const_cast<int*>(tile_ids_per_batch.data<int>());
   params.num_blocks_x = const_cast<int*>(num_blocks_x_device.data<int>());
+  params.num_blocks_x_int = num_blocks_x;
   params.q_stride_bsz = q_head_num * q_head_dim;
   params.q_stride_head_num = q_head_dim;
   params.kv_stride_block_num = block_size * k_head_dim;
