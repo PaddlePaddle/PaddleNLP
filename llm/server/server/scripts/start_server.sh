@@ -85,7 +85,7 @@ fi
 
 
 
-tritonserver --exit-timeout-secs 1000 --cuda-memory-pool-byte-size 0:0 --cuda-memory-pool-byte-size 1:0 \
+tritonserver --exit-timeout-secs 100000 --cuda-memory-pool-byte-size 0:0 --cuda-memory-pool-byte-size 1:0 \
                  --cuda-memory-pool-byte-size 2:0 --cuda-memory-pool-byte-size 3:0 --cuda-memory-pool-byte-size 4:0 \
                  --cuda-memory-pool-byte-size 5:0 --cuda-memory-pool-byte-size 6:0 --cuda-memory-pool-byte-size 7:0 \
                  --pinned-memory-pool-byte-size 0 --model-repository llm_model/ \
