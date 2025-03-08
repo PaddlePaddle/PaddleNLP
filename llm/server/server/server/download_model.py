@@ -3,6 +3,7 @@ import os
 from tqdm import tqdm
 import argparse
 import hashlib
+import re
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="download models")
@@ -10,8 +11,10 @@ def parse_arguments():
                         help="downloadfiles")
     parser.add_argument('-d', '--dir', default='downloads',
                        help="save dir")
-    parser.add_argument('-m', '--model_name', default='file_list.txt',
+    parser.add_argument('-m', '--model_name', default='deepseek-ai/DeepSeek-R1/weight_only_int4',
                        help="model_name")
+    parser.add_argument('--mode', default='model',
+                       help="download mode: model, node1, node2, mtp. model: single node. node1: 2 nodes model, master node. node2 :2 nodes model, slave node. mtp: support mtp model")
 
     return parser.parse_args()
 
@@ -64,7 +67,7 @@ def download_file(url, save_path, md5sum):
             os.remove(save_path)
         return None
 
-def download_from_txt(base_url, save_dir, model_name=None):
+def download_from_txt(base_url, save_dir):
     txt_url = base_url + "/file_list.txt"
     print(f"{txt_url}")
     try:
@@ -101,8 +104,29 @@ def main():
     # make dir
     os.makedirs(args.dir, exist_ok=True)
 
-    # download from txt
-    download_from_txt(args.url, args.dir, args.model_name)
+    model_name = args.model_name
+    env = os.environ
+    # Define supported model patterns
+    supported_patterns = [
+        r".*Qwen.*", 
+        r".+Llama.+",
+        r".+Mixtral.+", 
+        r".+DeepSeek.+",
+    ]
+    
+    # Check if model_name matches any supported pattern
+    if not any(re.match(pattern, model_name) for pattern in supported_patterns):
+        raise ValueError(
+            f"{model_name} is not in the supported list. Currently supported models: Qwen, Llama, Mixtral, DeepSeek. Please check the model name from this document https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/static_models.md"
+        )
+    model_server_logger.info(f"Start downloading model: {model_name}")
+    tag=env.get("tag")
+    base_url=f"https://paddlenlp.bj.bcebos.com/models/static/{tag}/{model_name}"
+
+    path = args.dir + f"/{model_name}"
+    os.makedirs(path, exist_ok=True)
+    model_url = base_url+f"/{args.mode}"
+    download_from_txt(model_url, path)
 
 if __name__ == "__main__":
     main()
