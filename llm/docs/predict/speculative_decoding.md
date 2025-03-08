@@ -75,34 +75,34 @@ Paper：https://github.com/deepseek-ai/DeepSeek-V3/blob/main/DeepSeek_V3.pdf
 ping 192.168.0.1
 # 第二个节点(slave)
 ping 192.168.0.2
-model_name=${model_name:-"deepseek-ai/DeepSeek-R1-2nodes/weight_only_int8"}
+model_name=${model_name:-"deepseek-ai/DeepSeek-R1-MTP-2nodes/weight_only_int8"}
 export POD_0_IP=master_ip
 export POD_IPS=master_ip,slave_ip # 该环境变量在2机上都需保持一致
 # 服务化默认启动端口，如果冲突可以通过export进行修改
 export SERVICE_HTTP_PORT=${PUSH_MODE_HTTP_PORT:-${SERVICE_HTTP_PORT:-"9965"}}
-# 开启 MTP
-export SPECULATE_METHOD="mtp"
+#注意 SPECULATE_MODEL_QUANT_TYPE应与MTP支持量化精度表格一致
+export SPECULATE_MODEL_QUANT_TYPE="weight_only_int8"
 # /PATH_TO_MODEL # 模型挂载路径
 # /PATH_TO_MTP # MTP 挂载路径
 ```
 
 ```shell
 # node1
-export model_name=${model_name:-"deepseek-ai/DeepSeek-R1-2nodes/a8w8_fp8"}
+export model_name=${model_name:-"deepseek-ai/DeepSeek-R1-MTP-2nodes/weight_only_int8"}
 export MODEL_PATH=${MODEL_PATH:-/PATH_TO_MODEL/}
 export MODEL_MTP_PATH=${MODEL_PATH:-/PATH_TO_MTP/}
 docker run --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
 -v $MODEL_PATH:/models -v $MODEL_MTP_PATH:/models-mtp -e "model_name=${model_name}" \
--dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v1.0 /bin/bash \
+-dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.1 /bin/bash \
 -c -ex 'export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 && export MP_NUM=16 && export MP_NNODE=2 && export POD_0_IP=192.168.0.1 && export POD_IPS=192.168.0.1,192.168.0.2 && export SPECULATE_MODEL_QUANT_TYPE="weight_only_int8" && export SPECULATE_METHOD="mtp" && export SPECULATE_MODEL_PATH="/models-mtp" && export SPECULATE_MAX_DRAFT_TOKEN_NUM=1 && start_server $model_name && tail -f /dev/null'
 
 # node2
-export model_name=${model_name:-"deepseek-ai/DeepSeek-R1-2nodes/a8w8_fp8"}
+export model_name=${model_name:-"deepseek-ai/DeepSeek-R1-MTP-2nodes/weight_only_int8"}
 export MODEL_PATH=${MODEL_PATH:-/PATH_TO_MODEL/}
 export MODEL_MTP_PATH=${MODEL_PATH:-/PATH_TO_MTP/}
 docker run --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
 -v $MODEL_PATH:/models -v $MODEL_MTP_PATH:/models-mtp -e "model_name=${model_name}" \
--dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v1.0 /bin/bash \
+-dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.1 /bin/bash \
 -c -ex 'export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 && export MP_NUM=16 && export MP_NNODE=2 && export POD_0_IP=192.168.0.1 && export POD_IPS=192.168.0.1,192.168.0.2 &&export SPECULATE_MODEL_QUANT_TYPE="weight_only_int8" && export SPECULATE_METHOD="mtp" && export SPECULATE_MODEL_PATH="/models-mtp" && export SPECULATE_MAX_DRAFT_TOKEN_NUM=1 && start_server $model_name  && tail -f /dev/null'
 ```
 
@@ -149,6 +149,16 @@ print("\n")
 ### 方法二：使用脚本推理测试
 #### DeepSeek_R1 动态图 + MTP 动态图, 双机 TP16
 1. DeepSeek_R1 使用 weight_only_int8, MTP 使用 weight_only_int8
+
+```shell
+启动2机推理 需要保证2机器节点可以互相ping通
+# 第一个节点(master)
+ping 192.168.0.1
+# 第二个节点(slave)
+ping 192.168.0.2
+```
+
+node1 和 node2 脚本相同
 ```shell
 $ cat run_dynamic_mtp.sh
 
@@ -160,7 +170,7 @@ export TOTAL_MAX_LENGTH=8192
 export MAX_DEC_LEN=2048
 # 算子加速策略
 export CUDA_VISIBLE_DEVICES="0,1,2,3,4,5,6,7"
-python -m paddle.distributed.launch \
+python -m paddle.distributed.launch --ips "192.168.0.1,192.168.0.2"\
   --gpus ${CUDA_VISIBLE_DEVICES} \
   predictor.py \
   --model_name_or_path ${MODEL_TAG} \
@@ -178,11 +188,12 @@ python -m paddle.distributed.launch \
   --return_full_hidden_states 1 \
   --mla_use_matrix_absorption 1
 
-$ mpirun bash run_dynamic_mtp.sh
+$ bash run_dynamic_mtp.sh
 ```
 
 2. DeepSeek_R1 使用 FP8, MTP 使用 FP8
 
+node1 和 node2 脚本相同
 ```shell
 $ cat run_dynamic_mtp.sh
 
@@ -194,7 +205,7 @@ export TOTAL_MAX_LENGTH=8192
 export MAX_DEC_LEN=2048
 # 算子加速策略
 export CUDA_VISIBLE_DEVICES="0,1,2,3,4,5,6,7"
-mpirun python -m paddle.distributed.launch \
+python -m paddle.distributed.launch --ips "192.168.0.1,192.168.0.2"\
   --gpus ${CUDA_VISIBLE_DEVICES} \
   predictor.py \
   --model_name_or_path ${MODEL_TAG} \
@@ -212,7 +223,7 @@ mpirun python -m paddle.distributed.launch \
   --return_full_hidden_states 1 \
   --mla_use_matrix_absorption 1
 
-$ mpirun bash run_dynamic_mtp.sh
+$ bash run_dynamic_mtp.sh
 ```
 #### DeepSeek_R1 动态图 + MTP 动态图, 单机 TP8
 1. DeepSeek_R1 使用 weight_only_int8, MTP 使用 weight_only_int8
@@ -253,9 +264,17 @@ $ bash run_dynamic_mtp.sh
 1.投机解码导出的模型支持所有方法，因此这里 speculate_method 设为默认的 inference_with_reference 即可.
 2.静态图模型可从 DeepSeek-R1 导出，或直接下载已上传模型
 
+```shell
+启动2机推理 需要保证2机器节点可以互相ping通
+# 第一个节点(master)
+ping 192.168.0.1
+# 第二个节点(slave)
+ping 192.168.0.2
+```
 
 1. DeepSeek-R1 使用 weight_only_int8，MTP 使用 weight_only_int8
 
+node1 和 node2 脚本相同
 ```shell
 # 导出脚本
 $ cat export.sh
@@ -265,7 +284,7 @@ export OUTPUT_PATH=/path/to/exported_model
 export QUANT_MODE=weight_only_int8
 export TOTAL_MAX_LENGTH=8192
 export CUDA_VISIBLE_DEVICES="0,1,2,3,4,5,6,7"
-python -m paddle.distributed.launch \
+python -m paddle.distributed.launch --ips "192.168.0.1,192.168.0.2"\
   --gpus ${CUDA_VISIBLE_DEVICES} \
   export_model.py \
   --model_name_or_path ${MODEL_TAG} \
@@ -280,8 +299,10 @@ python -m paddle.distributed.launch \
   --return_full_hidden_states 1 \
   --mla_use_matrix_absorption 1
 
-$ mpirun bash export.sh
+$ bash export.sh
 ```
+
+node1 和 node2 脚本相同
 ```shell
 # 推理脚本
 $ cat run_mtp_infer.sh
@@ -293,7 +314,7 @@ export MAX_DEC_LEN=2048
 export QUANT_MODE=weight_only_int8
 export DRAFT_MODEL_QUANT_MODE=weight_only_int8
 export CUDA_VISIBLE_DEVICES="0,1,2,3,4,5,6,7"
-python -m paddle.distributed.launch \
+python -m paddle.distributed.launch --ips "192.168.0.1,192.168.0.2"\
   --gpus ${CUDA_VISIBLE_DEVICES} \
   predictor.py \
   --model_name_or_path ${OUTPUT_PATH} \
@@ -311,10 +332,12 @@ python -m paddle.distributed.launch \
   --return_full_hidden_states 1 \
   --mla_use_matrix_absorption 1
 
-$ mpirun bash run_mtp_infer.sh
+$ bash run_mtp_infer.sh
 ```
 
 2. DeepSeek-R1 使用 FP8, MTP 使用 FP8, 双机 TP16
+
+node1 和 node2 脚本相同
 ```shell
 # 导出脚本
 $ cat export.sh
@@ -324,7 +347,7 @@ export OUTPUT_PATH=/path/to/exported_model
 export QUANT_MODE=a8w8_fp8
 export TOTAL_MAX_LENGTH=8192
 export CUDA_VISIBLE_DEVICES="0,1,2,3,4,5,6,7"
-python -m paddle.distributed.launch \
+python -m paddle.distributed.launch --ips "192.168.0.1,192.168.0.2"\
   --gpus ${CUDA_VISIBLE_DEVICES} \
   export_model.py \
   --model_name_or_path ${MODEL_TAG} \
@@ -338,9 +361,10 @@ python -m paddle.distributed.launch \
   --return_full_hidden_states 1 \
   --mla_use_matrix_absorption 1
 
-$ mpirun bash export.sh
+$ bash export.sh
 ```
 
+node1 和 node2 脚本相同
 ```shell
 # 推理脚本
 $ cat run_mtp_infer.sh
@@ -351,7 +375,7 @@ export TOTAL_MAX_LENGTH=8192
 export MAX_DEC_LEN=2048
 export QUANT_MODE=a8w8_fp8
 export CUDA_VISIBLE_DEVICES="0,1,2,3,4,5,6,7"
-python -m paddle.distributed.launch \
+python -m paddle.distributed.launch --ips "192.168.0.1,192.168.0.2"\
   --gpus ${CUDA_VISIBLE_DEVICES} \
   predictor.py \
   --model_name_or_path ${OUTPUT_PATH} \
@@ -369,5 +393,5 @@ python -m paddle.distributed.launch \
   --return_full_hidden_states 1 \
   --mla_use_matrix_absorption 1
 
-$ mpirun bash run_mtp_infer.sh
+$ bash run_mtp_infer.sh
 ```
