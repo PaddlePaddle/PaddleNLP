@@ -349,38 +349,42 @@ def fusion_rms_norm(hidden_states, weight, variance_epsilon, use_fast_ln=False):
     return rms_norm_fused(hidden_states, weight, variance_epsilon, use_fast_ln)
 
 
-def kitchen_act_quant(x: Tensor, backend: kitchen.ops.Backend = kitchen.ops.Backend.CUBLAS) -> Tuple[Tensor, Tensor]:
+def kitchen_quant(x, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False):
+    quant_tile_shape = (1, 128) if is_1d_scaled else (128, 128)
     x_qparams = QParams(
         quant_dtype=paddle.float8_e4m3fn,
         scaling_type=ScalingType.VECTOR_TILED_X_AND_G_BLOCK_TILED_W,
         eps=0,
         pow_2_scales=False,
-        quant_tile_shape=(1, 128),
+        quant_tile_shape=quant_tile_shape,
     )
     quantize_op = kitchen.quantization_subchannel_block_hybrid.HybridBlockAndVectorTiledQuantizeOp(backend)
-    qresult_ref = quantize_op.quantize(x, x_qparams, False)
-    return (qresult_ref.data, qresult_ref.scale)
-
-
-def kitchen_weight_quant(x: Tensor, return_transpose=False) -> Tuple[Tensor, Tensor]:
-    x_qparams = QParams(
-        quant_dtype=paddle.float8_e4m3fn,
-        scaling_type=ScalingType.VECTOR_TILED_X_AND_G_BLOCK_TILED_W,
-        eps=0,
-        pow_2_scales=False,
-        quant_tile_shape=(128, 128),
-    )
-    quantize_op = kitchen.quantization_subchannel_block_hybrid.HybridBlockAndVectorTiledQuantizeOp(
-        kitchen.ops.Backend.CUBLAS
-    )
     qresult_ref = quantize_op.quantize(x, x_qparams, return_transpose)
+    if return_transpose:
+        return (
+            qresult_ref.data,
+            qresult_ref.scale,
+            qresult_ref.data_t,
+            qresult_ref.scale_t,
+        )
+    else:
+        return (qresult_ref.data, qresult_ref.scale)
 
-    return (
-        qresult_ref.data,
-        qresult_ref.scale,
-        qresult_ref.data_t,
-        qresult_ref.scale_t,
+
+def kitchen_fp8_gemm(x_fp8, x_scale, w_fp8, w_scale, is_a_1d_scaled, is_b_1d_scaled):
+    y = kitchen.ops.fp8_gemm_blockwise(
+        a=x_fp8,
+        a_decode_scale=x_scale,
+        b=w_fp8,
+        b_decode_scale=w_scale,
+        out_dtype=paddle.bfloat16,
+        out=None,
+        accumulate=False,
+        use_split_accumulator=True,
+        is_a_1d_scaled=is_a_1d_scaled,
+        is_b_1d_scaled=is_b_1d_scaled,
     )
+    return y
 
 
 class LinearFP8Func(paddle.autograd.PyLayer):
@@ -390,12 +394,18 @@ class LinearFP8Func(paddle.autograd.PyLayer):
         # deep_gemm only support 2D
         x = x.reshape([-1, x_orig_shape[-1]])
         # quant
-        x_quant, x_scale = kitchen_act_quant(x, kitchen.ops.Backend.CUTLASS)
-        w_quant, w_sacle, w_t_quant, w_t_scale = kitchen_weight_quant(weight, True)
-        # compute
+        x_quant, x_scale = kitchen_quant(
+            x, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+        )
+        w_quant, w_sacle, w_t_quant, w_t_scale = kitchen_quant(
+            weight, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
+        )
+
+        # compute out = mm(x, w_t)
         out = paddle.empty([x.shape[0], weight.shape[-1]], dtype=x.dtype)
         deep_gemm.gemm_fp8_fp8_bf16_nt((x_quant, x_scale), (w_t_quant, w_t_scale), out)
         out = out.reshape([x_orig_shape[0], -1, weight.shape[-1]])
+
         # save for bwd
         x_t = x.T
         # padding
@@ -404,29 +414,44 @@ class LinearFP8Func(paddle.autograd.PyLayer):
             x_t = paddle.concat(
                 [x_t, paddle.zeros([x_t.shape[0], 128 - (x_t.shape[1] % 128)], dtype=x_t.dtype)], axis=1
             )
-        x_t_quant, x_t_scale = kitchen_act_quant(x_t.contiguous(), kitchen.ops.Backend.CUTLASS)
+        x_t_quant, x_t_scale = kitchen_quant(
+            x_t.contiguous(), backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+        )
         ctx.save_for_backward(x_t_quant, x_t_scale, w_quant, w_sacle, x_t_shape)
         return out
 
     @staticmethod
     def backward(ctx, dout):
         x_t_quant, x_t_scale, w_quant, w_sacle, x_t_shape = ctx.saved_tensor()
-        # compute dx = mm(dout, w_T)
+        # compute dx = mm(dout, w)
         dx = paddle.empty([x_t_shape[1], x_t_shape[0]], dout.dtype)
         dx_orig_shape = dout.shape[:-1]
         dx_orig_shape.append(x_t_shape[0])
-        dout_quant, dout_scale = kitchen_act_quant(dout.reshape([-1, dout.shape[-1]]), kitchen.ops.Backend.CUTLASS)
+        dout_quant, dout_scale = kitchen_quant(
+            dout.reshape([-1, dout.shape[-1]]),
+            backend=kitchen.ops.Backend.CUTLASS,
+            is_1d_scaled=True,
+            return_transpose=False,
+        )
         deep_gemm.gemm_fp8_fp8_bf16_nt((dout_quant, dout_scale), (w_quant, w_sacle), dx)
         dx = dx.reshape(dx_orig_shape)
-        # compute dw = mm(x_T, dout)
+
+        # compute dw = mm(x_t, dout_t)
         dout_t = dout.reshape([-1, dout.shape[-1]]).T.contiguous()
         # padding
         if dout_t.shape[1] % 128 != 0:
             pad_size = 128 - (dout_t.shape[1] % 128)
             dout_t = paddle.concat([dout_t, paddle.zeros([dout_t.shape[0], pad_size], dtype=dout_t.dtype)], axis=1)
-        dout_t_fp8 = kitchen_weight_quant(dout_t)
-        dweight = paddle.empty(w_quant.shape, dout.dtype)
-        deep_gemm.gemm_fp8_fp8_bf16_nt((x_t_quant, x_t_scale), (dout_t_fp8[0], dout_t_fp8[1]), dweight)
+        # dout use [1,128] quant
+        dout_t_quant, dout_t_scale = kitchen_quant(
+            dout_t, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+        )
+        dweight = kitchen_fp8_gemm(x_t_quant, x_t_scale, dout_t_quant, dout_t_scale, True, True)
+
+        # dout use [128,128] quant
+        # dout_t_fp8 = kitchen_quant(dout_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True)
+        # dweight = paddle.empty(w_quant.shape, dout.dtype)
+        # deep_gemm.gemm_fp8_fp8_bf16_nt((x_t_quant, x_t_scale), (dout_t_fp8[0], dout_t_fp8[1]), dweight)
         return dx, dweight
 
 
