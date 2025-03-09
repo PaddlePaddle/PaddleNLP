@@ -164,12 +164,15 @@ def get_ext_and_cmd():
             f"{custom_ops_path}/gpu/step.cu",
             f"{custom_ops_path}/gpu/quant_int8.cu",
             f"{custom_ops_path}/gpu/dequant_int8.cu",
-            f"{custom_ops_path}/gpu/get_position_ids.cu",
+            f"{custom_ops_path}/gpu/group_quant.cu",
+            f"{custom_ops_path}/gpu/preprocess_for_moe.cu",
+            f"{custom_ops_path}/gpu/get_position_ids_and_mask_encoder_batch.cu",
             f"{custom_ops_path}/gpu/fused_rotary_position_encoding.cu",
             f"{custom_ops_path}/gpu/flash_attn_bwd.cc",
             f"{custom_ops_path}/gpu/tune_cublaslt_gemm.cu",
             f"{custom_ops_path}/gpu/sample_kernels/top_p_sampling_reject.cu",
             f"{custom_ops_path}/gpu/update_inputs_v2.cu",
+            f"{custom_ops_path}/gpu/noaux_tc.cu",
             f"{custom_ops_path}/gpu/set_preids_token_penalty_multi_scores.cu",
             f"{custom_ops_path}/gpu/speculate_decoding_kernels/ngram_match.cc",
             f"{custom_ops_path}/gpu/speculate_decoding_kernels/speculate_save_output.cc",
@@ -181,6 +184,7 @@ def get_ext_and_cmd():
         update_git_submodule()
         nvcc_compile_args += [
             "-O3",
+            "-DNDEBUG",
             "-U__CUDA_NO_HALF_OPERATORS__",
             "-U__CUDA_NO_HALF_CONVERSIONS__",
             "-U__CUDA_NO_BFLOAT16_OPERATORS__",
@@ -225,20 +229,54 @@ def get_ext_and_cmd():
                 f"{custom_ops_path}/gpu/fp8_gemm_with_cutlass/fp8_fp8_fp8_dual_gemm.cu",
             ]
 
+        if cc >= 80 and cuda_version >= 12.4:
+            nvcc_compile_args += [
+                "-std=c++17",
+                "--use_fast_math",
+                "--threads=8",
+                "-D_GLIBCXX_USE_CXX11_ABI=1",
+            ]
+            sources += [f"{custom_ops_path}/gpu/sage_attn_kernels/sageattn_fused.cu"]
+            if cc >= 80 and cc < 89:
+                sources += [f"{custom_ops_path}/gpu/sage_attn_kernels/sageattn_qk_int_sv_f16_kernel_sm80.cu"]
+                nvcc_compile_args += ["-gencode", "arch=compute_80,code=compute_80"]
+            elif cc >= 89 and cc < 90:
+                sources += [f"{custom_ops_path}/gpu/sage_attn_kernels/sageattn_qk_int_sv_f8_kernel_sm89.cu"]
+                nvcc_compile_args += ["-gencode", "arch=compute_89,code=compute_89"]
+            elif cc >= 90:
+                sources += [
+                    f"{custom_ops_path}/gpu/sage_attn_kernels/sageattn_qk_int_sv_f8_kernel_sm90.cu",
+                    f"{custom_ops_path}/gpu/sage_attn_kernels/sageattn_qk_int_sv_f8_dsk_kernel_sm90.cu",
+                ]
+                nvcc_compile_args += ["-gencode", "arch=compute_90a,code=compute_90a"]
+
         if cc >= 90 and cuda_version >= 12.0:
-            nvcc_compile_args += ["-DNDEBUG"]
-            os.system(f"python {custom_ops_path}utils/auto_gen_fp8_fp8_gemm_fused_kernels_sm90.py --cuda_arch 90")
-            os.system(f"python {custom_ops_path}utils/auto_gen_fp8_fp8_dual_gemm_fused_kernels_sm90.py --cuda_arch 90")
+            os.system(f"python {custom_ops_path}/utils/auto_gen_fp8_fp8_gemm_fused_kernels_sm90.py --cuda_arch 90")
+            os.system(
+                f"python {custom_ops_path}/utils/auto_gen_fp8_fp8_gemm_fused_kernels_ptr_scale_sm90.py --cuda_arch 90"
+            )
+            os.system(
+                f"python {custom_ops_path}/utils/auto_gen_fp8_fp8_dual_gemm_fused_kernels_sm90.py --cuda_arch 90"
+            )
+            os.system(
+                f"python {custom_ops_path}/utils/auto_gen_fp8_fp8_block_gemm_fused_kernels_sm90.py --cuda_arch 90"
+            )
             sources += find_end_files(fp8_auto_gen_directory, ".cu")
             sources += [
                 f"{custom_ops_path}/gpu/fp8_gemm_with_cutlass/fp8_fp8_half_gemm.cu",
                 f"{custom_ops_path}/gpu/fp8_gemm_with_cutlass/fp8_fp8_half_cuda_core_gemm.cu",
                 f"{custom_ops_path}/gpu/fp8_gemm_with_cutlass/fp8_fp8_fp8_dual_gemm.cu",
+                f"{custom_ops_path}/gpu/fp8_gemm_with_cutlass/fp8_fp8_half_block_gemm.cu",
+                f"{custom_ops_path}/gpu/fp8_gemm_with_cutlass/fp8_fp8_half_gemm_ptr_scale.cu",
             ]
+            sources += find_end_files(f"{custom_ops_path}/gpu/mla_attn", ".cu")
 
         cuda_module = CUDAExtension(
             sources=sources,
-            extra_compile_args={"cxx": ["-O3"], "nvcc": nvcc_compile_args},
+            extra_compile_args={
+                "cxx": ["-O3", "-fopenmp", "-lgomp", "-std=c++17", "-DENABLE_BF16"],
+                "nvcc": nvcc_compile_args,
+            },
             libraries=["cublasLt"],
             library_dirs=[library_path],
         )

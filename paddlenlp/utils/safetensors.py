@@ -17,12 +17,17 @@ import json
 import mmap
 from collections import OrderedDict
 
+import ml_dtypes
 import numpy as np
 
 __all__ = [
     "fast_safe_open",
     "fast_load_file",
 ]
+
+np.bfloat16 = ml_dtypes.bfloat16
+np.float8_e5m2 = ml_dtypes.float8_e5m2
+np.float8_e4m3fn = ml_dtypes.float8_e4m3fn
 
 
 MAX_HEADER_SIZE = 100 * 1000 * 1000
@@ -49,8 +54,8 @@ numpy_dtype = {
     "BOOL": np.bool_,
     "U8": np.uint8,
     "I8": np.int8,
-    "F8_E5M2": 1,  # no fp8
-    "F8_E4M3": 1,  # no fp8
+    "F8_E5M2": np.float8_e5m2,  # no fp8
+    "F8_E4M3": np.float8_e4m3fn,  # no fp8
     "I16": np.int16,
     "U16": np.uint16,
     "I32": np.int32,
@@ -58,7 +63,7 @@ numpy_dtype = {
     "I64": np.int64,
     "U64": np.uint64,
     "F16": np.float16,
-    "BF16": 2,  # no bf16
+    "BF16": np.bfloat16,  # no bf16
     "F32": np.float32,
     "F64": np.float64,
 }
@@ -238,9 +243,12 @@ class PySafeSlice:
         return tensor.reshape(target_shape)
 
     def get(self, *args, **kwargs):
-        tensor = np.empty(shape=self.shape, dtype=self.dtype)
+        # int fix for empty shape []
+        nbytes = int(np.prod(self.shape)) * np.dtype(self.dtype).itemsize
+        buffer = bytearray(nbytes)
         self.bufferfile.seek(self.start_offset)
-        self.bufferfile.readinto(memoryview(tensor))
+        self.bufferfile.readinto(buffer)
+        tensor = np.frombuffer(buffer, dtype=self.dtype).reshape(self.shape)
         return tensor
 
     @property

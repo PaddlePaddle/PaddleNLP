@@ -1,19 +1,38 @@
-# PPO
+# PPO && GRPO
 
 PPO（Proximal Policy Optimization，近端策略优化）是一种强化学习算法，旨在通过优化策略来最大化累积奖励。PPO 算法结合了 Policy Gradient 和‌TRPO 的优点，通过使用随机梯度上升优化一个“替代”目标函数，实现小批量更新，而不是每个数据样本只进行一次梯度更新。
+GRPO（Group Relative Policy Optimization，组相对策略优化）是 PPO（Proximal Policy Optimization，近端策略优化）算法的一种变体。与 PPO 不同，GRPO 省略了价值函数估计器。在 GRPO 中，对于每个状态 \(s\)，算法会从当前策略 \(\pi_{\theta_{t}}\) 中采样多个动作 \(a_{1}, \dots, a_{G}\)。然后，GRPO 计算这些动作相对于组内其他动作的“组相对优势”（group-relative advantage），以此作为优化策略的依据。
 
 以下是详细的使用文档和示例：
 
 ## 环境依赖
 
-* 训练环境：在 python3.9的环境下安装, 可以使用如下脚本安装
-```bash
-bash -x scripts/install_train_env.sh gpu
+* 训练环境：
+1. 参考 Paddle 官网安装 PaddlePaddle-GPU
+2. clone 并安装 PaddleNLP
+```shell
+git clone https://github.com/PaddlePaddle/PaddleNLP.git
+```
+3. 安装 paddlenlp_ops，参考 PaddleNLP/csrc 进行安装（必需）
+```shell
+cd your_PaddleNLP_path/csrc
+python setup_cuda.py install
 ```
 
-## 数据协议
+## 支持模型
 
-数据格式以`data/rlhf_train_data_test.jsonl`为例。
+|   模型系列    | 模型名称                                                                                                                                                                                                                                                                      |
+|:-------------:|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+|   Llama3.1    | meta-llama/Meta-Llama-3.1-8B, meta-llama/Meta-Llama-3.1-8B-Instruct, meta-llama/Meta-Llama-3.1-70B, meta-llama/Meta-Llama-3.1-70B-Instruct, meta-llama/Meta-Llama-3.1-405B, meta-llama/Meta-Llama-3.1-405B-Instruct, meta-llama/Llama-Guard-3-8B                              |
+|   Llama3.2    | meta-llama/Llama-3.2-1B, meta-llama/Llama-3.2-1B-Instruct, meta-llama/Llama-3.2-3B, meta-llama/Llama-3.2-3B-Instruct                                                                                                                                                          |
+|    Qwen1.5    | Qwen/Qwen1.5-0.5B, Qwen/Qwen1.5-0.5B-Chat, Qwen/Qwen1.5-1.8B, Qwen/Qwen1.5-1.8B-Chat, Qwen/Qwen1.5-4B, Qwen/Qwen1.5-4B-Chat, Qwen/Qwen1.5-7B, Qwen/Qwen1.5-7B-Chat, Qwen/Qwen1.5-14B, Qwen/Qwen1.5-14B-Chat, Qwen/Qwen1.5-32B, Qwen/Qwen1.5-32B-Chat                          |
+|     Qwen2     | Qwen/Qwen2-0.5B, Qwen/Qwen2-0.5B-Instruct, Qwen/Qwen2-1.5B, Qwen/Qwen2-1.5B-Instruct, Qwen/Qwen2-7B, Qwen/Qwen2-7B-Instruct, Qwen/Qwen2-72B, Qwen/Qwen2-72B-Instruct, Qwen/Qwen2-57B-A14B, Qwen/Qwen2-57B-A14B-Instruct                                                       |
+|  Qwen2-Math   | Qwen/Qwen2-Math-1.5B, Qwen/Qwen2-Math-1.5B-Instruct, Qwen/Qwen2-Math-7B, Qwen/Qwen2-Math-7B-Instruct                                                                                                                                                                          |
+|    Qwen2.5    | Qwen/Qwen2.5-0.5B, Qwen/Qwen2.5-0.5B-Instruct, Qwen/Qwen2.5-1.5B, Qwen/Qwen2.5-1.5B-Instruct, Qwen/Qwen2.5-3B, Qwen/Qwen2.5-3B-Instruct, Qwen/Qwen2.5-7B, Qwen/Qwen2.5-7B-Instruct, Qwen/Qwen2.5-14B, Qwen/Qwen2.5-14B-Instruct, Qwen/Qwen2.5-32B, Qwen/Qwen2.5-32B-Instruct, |
+| Qwen2.5-Math  | Qwen/Qwen2.5-Math-1.5B, Qwen/Qwen2.5-Math-1.5B-Instruct, Qwen/Qwen2.5-Math-7B, Qwen/Qwen2.5-Math-7B-Instruct                                                                                                                                                                  |
+| Qwen2.5-Coder | Qwen/Qwen2.5-Coder-1.5B, Qwen/Qwen2.5-Coder-1.5B-Instruct, Qwen/Qwen2.5-Coder-7B, Qwen/Qwen2.5-Coder-7B-Instruct                                                                                                                                                              |
+
+## 数据协议
 
 ### 字段说明
 
@@ -34,13 +53,18 @@ bash -x scripts/install_train_env.sh gpu
 }
 ```
 
-## 训练
 
-```shell
-bash scripts/ppo.sh
+### PPO & GRPO 数据准备
+
+```
+wget https://paddlenlp.bj.bcebos.com/datasets/examples/ppo-kk.tgz && tar zxf ppo-kk.tgz
 ```
 
-其中参数释义如下：
+## 训练
+
+### 训练配置
+
+我们采用的配置文件在放置在`llm/config/llama/ppo_argument.json`和`llm/config/llama/grpo_argument.json`中，同时我们提供了详细参数释义如下：
 
 - `train_task_config`: 训练数据 config, 请以`config/task_ppo.json`为例
 - `eval_task_config`: 评估数据 config, 请以`config/task_ppo.json`为例
@@ -85,3 +109,33 @@ max_dec_len + max_prompt_len 应当小于 max_seq_len。
 - `fp16`: 使用 float16 精度进行模型训练和推理。
 - `bf16`: 使用 bfloat16 精度进行模型训练和推理。
 - `fp16_opt_level`: float16 精度训练模式，`O2`表示纯 float16 训练
+
+
+<!-- ### PPO 训练命令
+
+```shell
+python -u -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7"  run_ppo.py llm/config/llama/ppo_argument.json
+``` -->
+
+### GRPO 训练命令
+```shell
+cd your_PaddleNLP_path/llm/alignment/ppo
+```
+
+```shell
+# 启动 reward server
+python reward_server.py
+```
+
+```shell
+export PYTHONPATH=your_PaddleNLP_path/:$PYTHONPATH
+export PYTHONPATH=your_PaddleNLP_path/llm:$PYTHONPATH
+python -u -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" run_ppo.py ../../config/qwen/grpo_argument.json
+# python -u -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" run_ppo.py ../../config/llama/grpo_argument.json
+```
+
+### 在线监控
+在`grpo_argument.json`中设置的输出目录为`"logging_dir": "vdl_log"`, 可以通过以下命令查看训练过程
+```shell
+visualdl --logdir vdl_log --host 0.0.0.0
+```

@@ -48,7 +48,6 @@ def main():
     """
     # Arguments
     parser = PdArgumentParser((ModelArgument, DataArgument, TrainingArguments))
-    # 参数解析是不是改错了
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
         model_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
     else:
@@ -422,6 +421,12 @@ def main():
         # NOTE(gongenlei): release memory_reserved_size to equal to memory_allocated_size
         paddle.device.cuda.empty_cache()
 
+    def compute_metrics(eval_preds):
+        accuracy = (eval_preds.predictions == 3).astype("float32").mean().item()
+        return {
+            "accuracy": accuracy,
+        }
+
     trainer = PPOTrainer(
         #  (policy_model, reference_model, reward_model, value_model)
         #   policy_model, sft_model,       reward_model, value_model
@@ -448,6 +453,7 @@ def main():
             reward_critic_tokenizer if training_args.rl_algorithm == "ppo" else None,
         ),
         data_collator=train_ds.get_collator(),
+        compute_metrics=compute_metrics,  # TODO: only used for grpo (kk datasets)
     )
 
     # TODO(gongenlei) resume_from_checkpoint is not ready

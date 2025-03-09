@@ -286,7 +286,14 @@ class RLHFPPOMixedLoss(nn.Layer):
     """provide two losses, one for PPO loss, the other for SFT loss."""
 
     def __init__(
-        self, config, ptx_coeff=16, clip_range_ratio=0.2, kl_loss_coeff=0.001, clip_range_score=10, info_buffer=None
+        self,
+        config,
+        ptx_coeff=16,
+        clip_range_ratio=0.2,
+        kl_loss_coeff=0.001,
+        clip_range_score=10,
+        info_buffer=None,
+        temperature=1.0,
     ):
         """
         Args:
@@ -306,6 +313,7 @@ class RLHFPPOMixedLoss(nn.Layer):
         self.kl_loss_coeff = kl_loss_coeff
         self.clip_range_score = clip_range_score
         self.info_buffer = info_buffer
+        self.temperature = temperature
 
     def forward(
         self,
@@ -336,7 +344,7 @@ class RLHFPPOMixedLoss(nn.Layer):
 
         if not self.config.use_fused_head_and_loss_fn:
             logits = logits if isinstance(logits, paddle.Tensor) else logits[0]
-        logits = logits if isinstance(logits, paddle.Tensor) else logits[0]
+        logits = logits / self.temperature if self.temperature > 0.0 else logits
         loss = None
         # sft, pt loss
         if labels is not None:

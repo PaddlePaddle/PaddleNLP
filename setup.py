@@ -119,7 +119,8 @@ def show():
 
 
 # only use this file to contral the version
-__version__ = "3.0.0b3+post"
+__version__ = "3.0.0b4+post"
+
 if os.getenv(PADDLENLP_STABLE_VERSION):
     __version__ = __version__.replace("+post", "")
 else:
@@ -129,8 +130,9 @@ else:
 if is_cuda:
     __version__ += f".cu{get_nvcc_cuda_version()}"
 
-# write the version information for the develop version
+
 def append_version_py(filename="paddlenlp/__init__.py"):
+    # write the version information for the develop version
     assert os.path.exists(filename), f"{filename} does not exist!"
 
     with open(filename, "r") as file:

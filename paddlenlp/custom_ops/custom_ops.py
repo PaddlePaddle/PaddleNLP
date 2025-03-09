@@ -130,6 +130,7 @@ def decode_mla_write_cache(
     block_tables: paddle.Tensor,
     cache_quant_type_str: str,
     max_seq_len: int,
+    speculate_decoder: bool,
 ) -> paddle.Tensor:
     return _C.decode_mla_write_cache(
         kv_nope,
@@ -142,6 +143,7 @@ def decode_mla_write_cache(
         block_tables,
         cache_quant_type_str,
         max_seq_len,
+        speculate_decoder,
     )
 
 
@@ -347,6 +349,35 @@ def cutlass_fp8_fp8_half_gemm_fused(
     return _C.cutlass_fp8_fp8_half_gemm_fused(x, y, bias, transpose_x, transpose_y, scale, output_type, act)
 
 
+def cutlass_fp8_fp8_half_block_gemm_fused(
+    x: paddle.Tensor,
+    y: paddle.Tensor,
+    x_scale: paddle.Tensor,
+    y_scale: paddle.Tensor,
+    bias: paddle.Tensor,
+    trans_x: bool,
+    trans_y: bool,
+    output_type: str,
+    activation_type: str,
+) -> paddle.Tensor:
+    return _C.cutlass_fp8_fp8_half_block_gemm_fused(
+        x, y, x_scale, y_scale, bias, trans_x, trans_y, output_type, activation_type
+    )
+
+
+def cutlass_fp8_fp8_half_gemm_ptr_scale_fused(
+    x: paddle.Tensor,
+    y: paddle.Tensor,
+    x_scale: paddle.Tensor,
+    y_scale: paddle.Tensor,
+    bias: paddle.Tensor,
+    trans_x: bool,
+    trans_y: bool,
+    output_type: str,
+) -> paddle.Tensor:
+    return _C.cutlass_fp8_fp8_half_gemm_ptr_scale_fused(x, y, x_scale, y_scale, bias, trans_x, trans_y, output_type)
+
+
 def fused_get_rotary_embedding(
     input_ids: paddle.Tensor,
     position_ids: paddle.Tensor,
@@ -433,6 +464,18 @@ def get_position_ids(
     return _C.get_position_ids(seq_lens_encoder, seq_lens_decoder, seq_lens_this_time, position_ids)
 
 
+def get_position_ids_and_mask_encoder_batch(
+    seq_lens_encoder: paddle.Tensor,
+    seq_lens_decoder: paddle.Tensor,
+    seq_lens_this_time: paddle.Tensor,
+    position_ids: paddle.Tensor,
+    mask_encoder_batch: paddle.Tensor,
+) -> List[paddle.Tensor]:
+    return _C.get_position_ids_and_mask_encoder_batch(
+        seq_lens_encoder, seq_lens_decoder, seq_lens_this_time, position_ids, mask_encoder_batch
+    )
+
+
 def get_token_penalty_multi_scores(
     pre_ids: paddle.Tensor,
     logits: paddle.Tensor,
@@ -475,6 +518,12 @@ def get_token_penalty_multi_scores_v2(
     )
 
 
+def group_quant(
+    x: paddle.Tensor, group_size: int, transpose_scale: bool, quant_max_bound: float, quant_min_bound: float
+) -> List[paddle.Tensor]:
+    return _C.group_quant(x, group_size, transpose_scale, quant_max_bound, quant_min_bound)
+
+
 def multi_head_latent_attention(
     query: paddle.Tensor,
     key_cache: paddle.Tensor,
@@ -482,6 +531,7 @@ def multi_head_latent_attention(
     seq_lens_encoder: paddle.Tensor,
     seq_lens_decoder: paddle.Tensor,
     seq_lens_this_time: paddle.Tensor,
+    cu_seqlens_q: paddle.Tensor,
     padding_offsets: paddle.Tensor,
     cum_offsets: paddle.Tensor,
     block_tables: paddle.Tensor,
@@ -494,6 +544,7 @@ def multi_head_latent_attention(
     decoder_batch_ids: paddle.Tensor,
     decoder_tile_ids_per_batch: paddle.Tensor,
     decoder_num_blocks: paddle.Tensor,
+    decoder_num_blocks_cpu: paddle.Tensor,
     max_enc_len_this_time: paddle.Tensor,
     max_dec_len_this_time: paddle.Tensor,
     max_len_kv: paddle.Tensor,
@@ -527,6 +578,7 @@ def multi_head_latent_attention(
         seq_lens_encoder,
         seq_lens_decoder,
         seq_lens_this_time,
+        cu_seqlens_q,
         padding_offsets,
         cum_offsets,
         block_tables,
@@ -539,6 +591,7 @@ def multi_head_latent_attention(
         decoder_batch_ids,
         decoder_tile_ids_per_batch,
         decoder_num_blocks,
+        decoder_num_blocks_cpu,
         max_enc_len_this_time,
         max_dec_len_this_time,
         max_len_kv,
@@ -565,6 +618,17 @@ def multi_head_latent_attention(
         causal,
         speculate_decoder,
     )
+
+
+def noaux_tc(
+    scores: paddle.Tensor,
+    scores_with_bias: paddle.Tensor,
+    n_group: int,
+    topk_group: int,
+    topk: int,
+    routed_scaling_factor: float,
+) -> paddle.Tensor:
+    return _C.noaux_tc(scores, scores_with_bias, n_group, topk_group, topk, routed_scaling_factor)
 
 
 def ngram_match(
@@ -626,6 +690,10 @@ def prefill_mla_write_cache(
     )
 
 
+def preprocess_for_moe(topk_ids: paddle.Tensor, num_experts: int, block_size: int) -> List[paddle.Tensor]:
+    return _C.preprocess_for_moe(topk_ids, num_experts, block_size)
+
+
 def qkv_transpose_split(
     qkv: paddle.Tensor,
     padding_offset: paddle.Tensor,
@@ -669,6 +737,74 @@ def rebuild_padding_v2(
 
     return _C.rebuild_padding_v2(
         tmp_out, cum_offsets, seq_lens_decoder, seq_lens_encoder, output_padding_offset, max_input_length
+    )
+
+
+def sage_attention(
+    q: paddle.Tensor,
+    k: paddle.Tensor,
+    v: paddle.Tensor,
+    km: paddle.Tensor,
+    seq_len_this_time: paddle.Tensor,
+    vm: paddle.Tensor,
+    sm_scale: float,
+    qk_quant_gran: str,
+    pv_accum_dtype: str,
+    tensor_layout: int,
+    is_causal: bool,
+    smooth_k: bool,
+    smooth_v: bool,
+    return_lse: bool,
+) -> paddle.Tensor:
+    return _C.sage_attention(
+        q,
+        k,
+        v,
+        km,
+        seq_len_this_time,
+        vm,
+        sm_scale,
+        qk_quant_gran,
+        pv_accum_dtype,
+        tensor_layout,
+        is_causal,
+        smooth_k,
+        smooth_v,
+        return_lse,
+    )
+
+
+def sage_attention_dsk(
+    q: paddle.Tensor,
+    k: paddle.Tensor,
+    v: paddle.Tensor,
+    km: paddle.Tensor,
+    seq_len_this_time: paddle.Tensor,
+    vm: paddle.Tensor,
+    sm_scale: float,
+    qk_quant_gran: str,
+    pv_accum_dtype: str,
+    tensor_layout: int,
+    is_causal: bool,
+    smooth_k: bool,
+    smooth_v: bool,
+    return_lse: bool,
+) -> paddle.Tensor:
+    return _C.sage_attention_dsk(
+        q,
+        k,
+        v,
+        km,
+        seq_len_this_time,
+        vm,
+        sm_scale,
+        qk_quant_gran,
+        pv_accum_dtype,
+        tensor_layout,
+        is_causal,
+        smooth_k,
+        smooth_v,
+        return_lse,
     )
 
 
@@ -1005,9 +1141,7 @@ def step_paddle(
     first_token_ids: paddle.Tensor,
     block_size: int,
     encoder_decoder_block_num: int,
-    speculate_step_token_num: int,
 ) -> List[paddle.Tensor]:
-
     return _C.step_paddle(
         stop_flags,
         seq_lens_this_time,
@@ -1033,7 +1167,6 @@ def step_paddle(
         first_token_ids,
         block_size,
         encoder_decoder_block_num,
-        speculate_step_token_num,
     )
 
 

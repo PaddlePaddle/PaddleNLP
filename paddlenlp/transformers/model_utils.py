@@ -47,6 +47,11 @@ from paddle.distributed.fleet.meta_parallel.parallel_layers import (
     PipelineLayer,
     SharedLayerDesc,
 )
+
+try:
+    from paddle.distributed.fleet.meta_parallel import LocalSharedLayerDesc
+except:
+    LocalSharedLayerDesc = None
 from paddle.nn import Embedding, Layer
 
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
@@ -388,7 +393,7 @@ def _load_part_state_dict(
                 weight = py_safe_slice_[:]
             if device == "expected":
                 with device_guard():
-                    weight = paddle.Tensor(weight, zero_copy=True)
+                    weight = paddle.Tensor.__call__(weight, zero_copy=True)
                 weight = weight._copy_to(paddle.framework._current_expected_place(), False)
             part_state_dict[key] = weight
         for key in keys:
@@ -399,7 +404,7 @@ def _load_part_state_dict(
             ):
                 scale = f.get_tensor(key)
                 with device_guard():
-                    scale = paddle.Tensor(scale, zero_copy=True)
+                    scale = paddle.Tensor.__call__(scale, zero_copy=True)
                 scale = scale._copy_to(paddle.framework._current_expected_place(), False)
                 scale_dict[key] = scale
     return part_state_dict, scale_dict
@@ -471,7 +476,7 @@ def load_state_dict(
             if device == "cpu":
                 for k in list(state_dict.keys()):
                     with device_guard():
-                        state_dict[k] = paddle.Tensor(state_dict.pop(k), zero_copy=True)
+                        state_dict[k] = paddle.Tensor.__call__(state_dict.pop(k), zero_copy=True)
 
             if len(scale_dict) != 0:
                 if ckpt_quant_stage == "O0":
@@ -1173,6 +1178,11 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         config.decode_strategy = predictor_args.decode_strategy
         config.mla_use_matrix_absorption = predictor_args.mla_use_matrix_absorption
         config.weightonly_group_size = predictor_args.weightonly_group_size
+        config.weight_block_size = predictor_args.weight_block_size
+        config.moe_quant_type = predictor_args.moe_quant_type
+        if config.quantization_config.quant_method is not None:
+            predictor_args.weight_block_size = config.quantization_config.weight_block_size
+            config.weight_block_size = predictor_args.weight_block_size
 
         if config.quantization_config.quant_type is not None:
             if predictor_args.mode == "dynamic":
@@ -1902,6 +1912,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         dtype=None,
         keep_in_fp32_modules=None,
         quantization_linear_list=None,
+        sharded_metadata=None,
     ) -> Tuple[List[str]]:
         """load the state_dict into model, and do the following things:
 
@@ -1983,6 +1994,23 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         missing_keys = list(set(expected_keys) - set(loaded_keys))
         unexpected_keys = list(set(loaded_keys) - set(expected_keys))
+
+        # Optimize for skip unused shard files for supper large model
+        if sharded_metadata is not None:
+            assert isinstance(resolved_archive_file, list)
+            new_archive_file = []
+            skip_archive_file = []
+            expected_keys_set = set(expected_keys)
+            for file in resolved_archive_file:
+                filename = os.path.split(file)[-1]
+                if not expected_keys_set.isdisjoint(set(sharded_metadata["file_map"][filename])):
+                    new_archive_file.append(file)
+                else:
+                    skip_archive_file.append(filename)
+
+            resolved_archive_file = new_archive_file
+            if len(skip_archive_file) > 0:
+                logger.info(f"Skip load files for not contrains expected key, {skip_archive_file}")
 
         # Some models may have keys that are not in the state by design, removing them before needlessly warning
         # the user.
@@ -2496,7 +2524,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             for k in list(state_dict.keys()):
                 if not isinstance(state_dict[k], paddle.Tensor):
                     with device_guard():
-                        state_dict[k] = paddle.Tensor(state_dict.pop(k), zero_copy=True)
+                        state_dict[k] = paddle.Tensor.__call__(state_dict.pop(k), zero_copy=True)
         else:
             if is_sharded:
                 loaded_state_dict_keys = sharded_metadata["all_checkpoint_keys"]
@@ -2511,7 +2539,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             for k in list(state_dict.keys()):
                 if not isinstance(state_dict[k], paddle.Tensor):
                     with device_guard():
-                        state_dict[k] = paddle.Tensor(state_dict.pop(k), zero_copy=True)
+                        state_dict[k] = paddle.Tensor.__call__(state_dict.pop(k), zero_copy=True)
         # 3. init the model
         init_args = config["init_args"] or ()
         with ContextManagers(init_contexts):
@@ -2548,6 +2576,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             dtype=dtype,
             keep_in_fp32_modules=keep_in_fp32_modules,
             quantization_linear_list=quantization_linear_list,
+            sharded_metadata=sharded_metadata if is_sharded else None,
         )
 
         # load generation_config.json
@@ -2829,17 +2858,11 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     prefix = ""
                 layer_config = layer.auto_dist_config(prefix)
                 merged_config = self.merge_auto_dist_configs([merged_config, layer_config])
-                for _, deeper_layer in layer.named_sublayers():
-                    if hasattr(deeper_layer, "auto_dist_config"):
-                        # mask all `auto_dist_config` methods in deeper layer
-                        deeper_layer.auto_dist_config = lambda x: {}
-
         final_config = {
             "dp_config": None,
             "mp_config": None,
             "pp_config": None,
         }
-
         if "tensor_parallel" in auto_dist_degree and auto_dist_degree["tensor_parallel"]:
             merged_config["mp_config"] is not None
             final_config["mp_config"] = merged_config["mp_config"]
@@ -2930,7 +2953,10 @@ class PipelinePretrainedModel(PretrainedModel):
                                 f"Please check! we treat this key as last layer, get {k}, set origin name as {'.'.join(single_name)}"
                             )
                     elif name_splited[0] == "shared_layers":
-                        single_name = [self.get_shardlayer_prefix(name_splited)]
+                        single_name = [self.get_shardlayer_prefix(name_splited, SharedLayerDesc)]
+                        single_name.extend(name_splited[2:])
+                    elif name_splited[0] == "local_shared_layers":
+                        single_name = [self.get_shardlayer_prefix(name_splited, LocalSharedLayerDesc)]
                         single_name.extend(name_splited[2:])
                     else:
                         raise ValueError(f"Unexpected key: {k} for pp layer.")
@@ -2942,7 +2968,10 @@ class PipelinePretrainedModel(PretrainedModel):
                         single_name = [] if prefixes[idx] == "" else [prefixes[idx]]
                         single_name.extend(name_splited[1:])
                     elif idx == "shared_layers":
-                        single_name = [self.get_shardlayer_prefix(name_splited)]
+                        single_name = [self.get_shardlayer_prefix(name_splited, SharedLayerDesc)]
+                        single_name.extend(name_splited[2:])
+                    elif idx == "local_shared_layers":
+                        single_name = [self.get_shardlayer_prefix(name_splited, LocalSharedLayerDesc)]
                         single_name.extend(name_splited[2:])
                     else:
                         raise ValueError(f"Unexpected key: {k} for pp layer.")
@@ -2955,7 +2984,7 @@ class PipelinePretrainedModel(PretrainedModel):
 
         return self._single_to_pp_mapping
 
-    def get_shardlayer_prefix(self, name_splited):
+    def get_shardlayer_prefix(self, name_splited, shared_layer_class=SharedLayerDesc):
         """_summary_
             This function retrieves the prefix of a shared layer. The process involves:
             1. Identifying all key names of shared layers, like 'shared_weight01', 'shared_weight02', etc.
@@ -2972,11 +3001,11 @@ class PipelinePretrainedModel(PretrainedModel):
         Returns:
             _type_: _description_
         """
-        shared_layer_names = {s.layer_name for s in self._layers_desc if isinstance(s, SharedLayerDesc)}
+        shared_layer_names = {s.layer_name for s in self._layers_desc if isinstance(s, shared_layer_class)}
         assert name_splited[1] in shared_layer_names, f"The shared layer name {name_splited[1]} must be in prefixes!"
         shared_layer_key = name_splited[1]
         for idx, layer in enumerate(self._layers_desc):
-            if isinstance(layer, SharedLayerDesc) and layer.layer_name == shared_layer_key:
+            if isinstance(layer, shared_layer_class) and layer.layer_name == shared_layer_key:
                 if self.get_stage_from_index(idx) == self._stage_id:
                     return self.get_sequential_name_prefixes()[str(idx)]
 
@@ -3036,7 +3065,7 @@ def load_sharded_checkpoint_as_one(folder, variant=None, return_numpy=False):
         if not return_numpy:
             for key in list(state_dict.keys()):
                 if isinstance(state_dict[key], np.ndarray):
-                    state_dict[key] = paddle.Tensor(state_dict.pop(key), zero_copy=True)
+                    state_dict[key] = paddle.Tensor.__call__(state_dict.pop(key), zero_copy=True)
         return state_dict
 
     index_file = os.path.join(folder, _add_variant(PADDLE_WEIGHTS_INDEX_NAME, variant))
@@ -3079,7 +3108,7 @@ def load_sharded_checkpoint_as_one(folder, variant=None, return_numpy=False):
     if not return_numpy:
         for key in list(ret.keys()):
             if isinstance(ret[key], np.ndarray):
-                ret[key] = paddle.Tensor(ret.pop(key), zero_copy=True)
+                ret[key] = paddle.Tensor.__call__(ret.pop(key), zero_copy=True)
 
     return ret
 
