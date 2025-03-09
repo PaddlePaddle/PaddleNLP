@@ -233,32 +233,22 @@ class DPOCriterion(nn.Layer):
                 axis=0,
             )
         else:
-            chosen_logps = paddle.stack(
-                [
-                    (
-                        paddle.gather(
-                            paddle.gather(per_token_logps, response_index[0], axis=0),
-                            paddle.arange(response_index[1], response_index[2], dtype=paddle.int32),
-                            axis=0,
-                        ).sum()
-                    )
-                    for response_index in response_indexs
-                ],
-                axis=0,
+            batch_idx = response_indexs[:, 0]
+            start_idx = response_indexs[:, 1]
+            end_idx = response_indexs[:, 2]
+            end2_idx = response_indexs[:, 3]
+            seq_len = per_token_logps.shape[1]
+
+            _range = paddle.arange(seq_len).unsqueeze(0)
+            ranges = _range.expand([batch_idx.shape[0], seq_len])
+
+            chosen_mask = (ranges >= paddle.unsqueeze(start_idx, 1)) & (ranges < paddle.unsqueeze(end_idx, 1))
+            rejected_mask = (ranges >= paddle.unsqueeze(end_idx + offset, 1)) & (
+                ranges < paddle.unsqueeze(end2_idx, 1)
             )
-            rejected_logps = paddle.stack(
-                [
-                    (
-                        paddle.gather(
-                            paddle.gather(per_token_logps, response_index[0], axis=0),
-                            paddle.arange(response_index[2] + offset, response_index[3], dtype=paddle.int32),
-                            axis=0,
-                        ).sum()
-                    )
-                    for response_index in response_indexs
-                ],
-                axis=0,
-            )
+            chosen_logps = paddle.sum(per_token_logps[batch_idx] * chosen_mask.astype("float32"), axis=1)
+            rejected_logps = paddle.sum(per_token_logps[batch_idx] * rejected_mask.astype("float32"), axis=1)
+
         sft_loss = -chosen_logps.sum() / (chosen_labels != 0).sum()
         if average_log_prob:
             chosen_response_length = response_indexs[:, 2] - response_indexs[:, 1] - offset
@@ -304,3 +294,27 @@ class DPOCriterion(nn.Layer):
             return loss
         else:
             return policy_chosen_logps, policy_rejected_logps, sft_loss, dpo_loss, loss
+
+
+class AutoDPOCriterion(DPOCriterion):
+    def __init__(self, config, dpo_config=None, use_infohub=False, ignore_eos_token=False):
+        super(AutoDPOCriterion, self).__init__(config, dpo_config, use_infohub, ignore_eos_token)
+        self.logprobs = nn.CrossEntropyLoss(reduction="none")
+
+    def forward(
+        self,
+        logits,
+        chosen_labels,
+        rejected_labels,
+        response_indexs,
+        reference_chosen_logps,
+        reference_rejected_logps,
+    ):
+        if not paddle.is_grad_enabled():
+            reference_chosen_logps = None
+            reference_rejected_logps = None
+        labels = (chosen_labels, rejected_labels, response_indexs, reference_chosen_logps, reference_rejected_logps)
+        result = super().forward(logits, labels)
+        if len(result) == 5:
+            return result[-1]
+        return result

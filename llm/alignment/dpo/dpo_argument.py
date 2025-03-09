@@ -44,6 +44,13 @@ class DPOTrainingArguments(TrainingArguments):
         default=False,
         metadata={"help": "Whether to run benchmark by autotuner. True for from_scratch."},
     )
+    use_intermediate_api: str = field(
+        default="use_intermediate_api",
+        metadata={"help": "Flag indicating whether to use the intermediate API for model."},
+    )
+    max_seq_length: int = field(default=128, metadata={"help": "The maximum sequence length for model inputs."})
+    global_batch_size: int = field(default=1, metadata={"help": "Total batch size for training."})
+    num_hidden_layers: int = field(default=2, metadata={"help": "The number of hidden layers in the network model."})
 
     def __post_init__(self):
         super().__post_init__()
@@ -137,6 +144,7 @@ class DPOModelArgument:
         default=None,
         metadata={"help": "whether to fuse first up and gate proj in mlp block"},
     )
+    model_type: str = field(default="llama_dpo", metadata={"help": "Specifies the type of model to use."})
     # LoRA
     lora_rank: int = field(default=8, metadata={"help": "Lora rank."})
     lora_path: str = field(default=None, metadata={"help": "Initialize lora state dict."})
