@@ -522,7 +522,10 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         output_grads1,
         scaler,
     ):
-        outputs0 = module0(inputs0)
+        outputs0 = inputs0
+        for layer in module0:
+            outputs0 = layer(outputs0)
+
         outputs0 = [outputs0] if isinstance(outputs0, paddle.Tensor) else outputs0
 
         if labels0 is not None:

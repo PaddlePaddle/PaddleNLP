@@ -826,6 +826,10 @@ class DeepseekV2MoEFlexToken(MoEFlexTokenLayer):
 
     def forward(self, hidden_states):
         final_hidden_states, l_aux, l_zloss = super().forward(hidden_states)
+        final_hidden_states = self.auxilibaryloss_and_shared_expert_compute(hidden_states, final_hidden_states, l_aux)
+        return final_hidden_states
+
+    def auxilibaryloss_and_shared_expert_compute(self, hidden_states, final_hidden_states, l_aux):
         if self.training and self.alpha > 0.0:
             l_aux = l_aux * self.alpha
             final_hidden_states = AddAuxiliaryLoss.apply(final_hidden_states, l_aux)
@@ -1145,6 +1149,48 @@ class DeepseekV2DecoderLayer(nn.Layer):
         self.input_layernorm = DeepseekV2RMSNorm(config)
         self.post_attention_layernorm = DeepseekV2RMSNorm(config)
 
+    def self_attn_and_gate_compute(
+        self,
+        hidden_states: paddle.Tensor,
+        position_ids: Optional[paddle.Tensor] = None,
+        attention_mask: Optional[paddle.Tensor] = None,
+        output_attentions: Optional[bool] = False,
+        past_key_value: Optional[Tuple[paddle.Tensor]] = None,
+        use_cache: Optional[bool] = False,
+        attn_mask_startend_row_indices: Optional[paddle.Tensor] = None,
+        **kwargs,
+    ):
+        hidden_states, residual = self.self_attn_compute(
+            hidden_states,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            output_attentions=output_attentions,
+            past_key_value=past_key_value,
+            use_cache=use_cache,
+            attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+            **kwargs,
+        )
+        probs, routing_map, l_aux, l_zloss = self.mlp.gate_compute(hidden_states)
+        return probs, routing_map, l_aux, l_zloss
+
+    def auxilibaryloss_and_shared_expert_compute(self, residual, hidden_states, expert_output, l_aux):
+        hidden_states = self.mlp.auxilibaryloss_and_shared_expert_compute(hidden_states, expert_output, l_aux)
+        hidden_states = residual + hidden_states
+
+    def post_process_output(self, hidden_states, output_attentions, use_cache, self_attn_weights, present_key_value):
+        outputs = (hidden_states,)
+
+        if output_attentions:
+            outputs += (self_attn_weights,)
+
+        if use_cache:
+            outputs += (present_key_value,)
+
+        if type(outputs) is tuple and len(outputs) == 1:
+            outputs = outputs[0]
+
+        return outputs
+
     def forward(
         self,
         hidden_states: paddle.Tensor,
@@ -1170,10 +1216,6 @@ class DeepseekV2DecoderLayer(nn.Layer):
                 (see `past_key_values`).
             past_key_value (`Tuple(paddle.Tensor)`, *optional*): cached past key and value projection states
         """
-        if "padding_mask" in kwargs:
-            warnings.warn(
-                "Passing `padding_mask` is deprecated and will be removed in v4.37. Please make sure use `attention_mask` instead.`"
-            )
         residual = hidden_states
 
         hidden_states = self.input_layernorm(hidden_states)
@@ -1216,18 +1258,60 @@ class DeepseekV2DecoderLayer(nn.Layer):
         hidden_states = self.mlp(hidden_states)
         hidden_states = residual + hidden_states
 
-        outputs = (hidden_states,)
+        return self.post_process_output(
+            hidden_states, output_attentions, use_cache, self_attn_weights, present_key_value
+        )
 
-        if output_attentions:
-            outputs += (self_attn_weights,)
+    def self_attn_compute(
+        self,
+        hidden_states: paddle.Tensor,
+        position_ids: Optional[paddle.Tensor] = None,
+        attention_mask: Optional[paddle.Tensor] = None,
+        output_attentions: Optional[bool] = False,
+        past_key_value: Optional[Tuple[paddle.Tensor]] = None,
+        use_cache: Optional[bool] = False,
+        attn_mask_startend_row_indices: Optional[paddle.Tensor] = None,
+        **kwargs
+    ):
+        residual = hidden_states
 
-        if use_cache:
-            outputs += (present_key_value,)
+        hidden_states = self.input_layernorm(hidden_states)
 
-        if type(outputs) is tuple and len(outputs) == 1:
-            outputs = outputs[0]
+        # Self Attention
+        has_gradient = not hidden_states.stop_gradient
+        if (
+            self.enable_recompute
+            and self.layerwise_recompute
+            and has_gradient
+            and self.recompute_granularity == "full_attn"
+        ):
+            hidden_states, self_attn_weights, present_key_value = recompute(
+                self.self_attn,
+                hidden_states=hidden_states,
+                position_ids=position_ids,
+                attention_mask=attention_mask,
+                output_attentions=output_attentions,
+                past_key_value=past_key_value,
+                use_cache=use_cache,
+                attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+                **kwargs,
+            )
+        else:
+            hidden_states, self_attn_weights, present_key_value = self.self_attn(
+                hidden_states=hidden_states,
+                position_ids=position_ids,
+                attention_mask=attention_mask,
+                output_attentions=output_attentions,
+                past_key_value=past_key_value,
+                use_cache=use_cache,
+                attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+                **kwargs,
+            )
+        hidden_states = residual + hidden_states
 
-        return outputs
+        residual = hidden_states
+        hidden_states = self.post_attention_layernorm(hidden_states)
+        return hidden_states, residual
 
 
 class DeepseekV2MTPLayer(DeepseekV2DecoderLayer):

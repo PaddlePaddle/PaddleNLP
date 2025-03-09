@@ -311,12 +311,27 @@ class MoEFlexTokenLayer(nn.Layer):
         return paddle.concat(outputs, axis=0)
 
     def forward(self, hidden_states: paddle.Tensor):
+        probs, routing_map, l_aux, l_zloss = self.gate_compute(hidden_states)
+        dispatched_input, tokens_per_expert = self.dispatch_comm(hidden_states, probs, routing_map)
+        expert_output = self.mlp_compute(dispatched_input, tokens_per_expert)
+        output = self.combine_comm(expert_output)
+        return output, l_aux, l_zloss
+
+    def gate_compute(self, hidden_states):
         _, _, d_model = hidden_states.shape
         # reshaped_input = hidden_states.reshape([-1, d_model])
         probs, routing_map, l_aux, l_zloss = self.router(hidden_states)
-        (dispatched_input, tokens_per_expert) = self.token_dispatcher.token_permutation(
+        return probs, routing_map, l_aux, l_zloss
+
+    def dispatch_comm(self, hidden_states, probs, routing_map):
+        dispatched_input, tokens_per_expert = self.token_dispatcher.token_permutation(
             hidden_states, probs, routing_map
         )
-        expert_output = self.expert_forward(dispatched_input, tokens_per_expert)
+        return dispatched_input, tokens_per_expert
+
+    def mlp_compute(self, dispatched_input, tokens_per_expert):
+        return self.expert_forward(dispatched_input, tokens_per_expert)
+
+    def combine_comm(self, expert_output):
         output, _ = self.token_dispatcher.token_unpermutation(expert_output, None)
-        return output, l_aux, l_zloss
+        return output
