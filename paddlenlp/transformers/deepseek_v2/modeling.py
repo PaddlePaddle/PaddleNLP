@@ -472,6 +472,127 @@ class Linear(paddle.nn.Layer):
         return LinearFP8Func.apply(x, self.weight)
 
 
+class Fuse_FFN_FP8_Func(paddle.autograd.PyLayer):
+    @staticmethod
+    def forward(ctx, x, w1, w2):
+        # deep_gemm only support 2D
+        x_orig_shape = x.shape
+        x = x.reshape([-1, x_orig_shape[-1]])
+
+        # ===== o1 = deep_gemm(x_fp8, w1_t_fp8) =====
+        x_fp8, x_scale = kitchen_quant(
+            x, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+        )
+        w1_fp8, w1_sacle, w1_t_fp8, w1_t_scale = kitchen_quant(
+            w1, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
+        )
+        o1 = paddle.empty([x.shape[0], w1.shape[-1]], dtype=x.dtype)
+        deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale), (w1_t_fp8, w1_t_scale), o1)
+
+        # ===== o2 = swiglu(o1) =====
+        o2 = swiglu(o1)
+        # TODO: [Fusion] swiglu + quant
+        o2_fp8, o2_scale = kitchen_quant(
+            o2, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+        )
+
+        # ===== o3 = deep_gemm(o2_fp8, w2_t_fp8) =====
+        w2_fp8, w2_sacle, w2_t_fp8, w2_t_scale = kitchen_quant(
+            w2, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
+        )
+        o3 = paddle.empty([o2.shape[0], w2.shape[-1]], dtype=o2.dtype)
+        deep_gemm.gemm_fp8_fp8_bf16_nt((o2_fp8, o2_scale), (w2_t_fp8, w2_t_scale), o3)
+        if len(x_orig_shape) > 2:
+            o3 = o3.reshape([x_orig_shape[0], -1, o3.shape[-1]])
+
+        # ===== save for backward =====
+        # TODO: [Fusion] transpose + quant
+        x_t = x.T.contiguous()
+        x_t_fp8, x_t_scale = kitchen_quant(
+            x_t, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+        )
+
+        ctx.save_for_backward(x_t_fp8, x_t_scale, w1_fp8, w1_sacle, o1, w2_fp8, w2_sacle, x_orig_shape)
+        return o3
+
+    @staticmethod
+    def backward(ctx, do3):
+        # deep_gemm only support 2D
+        do3_orig_shape = do3.shape
+        do3 = do3.reshape([-1, do3_orig_shape[-1]])
+
+        x_t_fp8, x_t_scale, w1_fp8, w1_sacle, o1, w2_fp8, w2_sacle, x_orig_shape = ctx.saved_tensor()
+
+        # ===== [recompute] o2 = swiglu(o1) =====
+        # TODO: [Fusion] swiglu + transpose + quant
+        o2 = swiglu(o1)
+        o2_t = o2.T.contiguous()
+        o2_t_fp8, o2_t_scale = kitchen_quant(
+            o2_t, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+        )
+
+        # ===== do2 = deep_gemm(do3_fp8, w2_fp8)
+        do3_fp8, do3_scale = kitchen_quant(
+            do3, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+        )
+        do2 = paddle.empty([o2_t_fp8.shape[1], o2_t_fp8.shape[0]], do3.dtype)
+        deep_gemm.gemm_fp8_fp8_bf16_nt((do3_fp8, do3_scale), (w2_fp8, w2_sacle), do2)
+
+        # ===== dw2 = deep_gemm(o2_t_fp8, do3_t_fp8)
+        do3_t = do3.T.contiguous()
+        do3_t_fp8 = kitchen_quant(do3_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True)
+        dw2 = paddle.zeros(w2_fp8.shape, do3.dtype)
+        if o2_t_fp8.numel() != 0 and do3_t_fp8[0].numel() != 0:
+            deep_gemm.gemm_fp8_fp8_bf16_nt((o2_t_fp8, o2_t_scale), (do3_t_fp8[0], do3_t_fp8[1]), dw2)
+
+        # ===== do1 = swiglu_grad(o1, None, do2) =====
+        do1, _ = paddle._C_ops.swiglu_grad(o1, None, do2)
+        # TODO: [Fusion] swiglu_grad + quant
+        do1_fp8, do1_scale = kitchen_quant(
+            do1, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+        )
+
+        # ===== dx = deep_gemm(do1_fp8, w1_fp8)
+        dx = paddle.empty([x_t_fp8.shape[1], x_t_fp8.shape[0]], do1.dtype)
+        deep_gemm.gemm_fp8_fp8_bf16_nt((do1_fp8, do1_scale), (w1_fp8, w1_sacle), dx)
+        if len(x_orig_shape) > 2:
+            dx = dx.reshape([x_orig_shape[0], -1, dx.shape[-1]])
+
+        # ===== dw1 = deep_gemm(x_t_fp8, do1_t_fp8)
+        # TODO: [Fusion] swiglu_grad + transpose + quant
+        do1_t = do1.T.contiguous()
+        do1_t_fp8, do1_t_scale = kitchen_quant(
+            do1_t, is_1d_scaled=True, backend=kitchen.ops.Backend.CUBLAS, return_transpose=False
+        )
+        if o2_t_fp8.numel() != 0 and do3_t_fp8[0].numel() != 0:
+            dw1 = kitchen_fp8_gemm(x_t_fp8, x_t_scale, do1_t_fp8, do1_t_scale, True, True)
+        else:
+            dw1 = paddle.zeros(w1_fp8.shape, do1.dtype)
+        return dx, dw1, dw2
+
+
+class FuseDeepseekV2MLP(paddle.nn.Layer):
+    def __init__(self, config: DeepseekV2Config, hidden_size=None, intermediate_size=None, is_moe=False):
+        super().__init__()
+        self.config = config
+        self.hidden_size = config.hidden_size if hidden_size is None else hidden_size
+        self.intermediate_size = config.intermediate_size if intermediate_size is None else intermediate_size
+
+        self.w1 = self.create_parameter(
+            shape=[self.hidden_size, self.intermediate_size * 2],
+            dtype="bfloat16",
+            is_bias=False,
+        )
+        self.w2 = self.create_parameter(
+            shape=[self.intermediate_size, self.hidden_size],
+            dtype="bfloat16",
+            is_bias=False,
+        )
+
+    def forward(self, x):
+        return Fuse_FFN_FP8_Func.apply(x, self.w1, self.w2)
+
+
 class DeepseekV2RMSNorm(nn.Layer):
     def __init__(self, config: DeepseekV2Config, hidden_size=None, eps=1e-6, use_sequence_parallel=True):
         """DeepseekV2RMSNorm is equivalent to T5LayerNorm
