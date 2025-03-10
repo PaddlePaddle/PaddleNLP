@@ -410,10 +410,8 @@ class LinearFP8Func(paddle.autograd.PyLayer):
         x_t = x.T
         # padding
         x_t_shape = x_t.shape
-        if x_t.shape[1] % 128 != 0:
-            x_t = paddle.concat(
-                [x_t, paddle.zeros([x_t.shape[0], 128 - (x_t.shape[1] % 128)], dtype=x_t.dtype)], axis=1
-            )
+        if x_t.shape[1] % 8 != 0:
+            x_t = paddle.concat([x_t, paddle.zeros([x_t.shape[0], 8 - (x_t.shape[1] % 8)], dtype=x_t.dtype)], axis=1)
         x_t_quant, x_t_scale = kitchen_quant(
             x_t.contiguous(), backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
         )
@@ -439,17 +437,10 @@ class LinearFP8Func(paddle.autograd.PyLayer):
         # compute dw = mm(x_t, dout_t)
         dout_t = dout.reshape([-1, dout.shape[-1]]).T.contiguous()
         # padding
-        if dout_t.shape[1] % 128 != 0:
-            pad_size = 128 - (dout_t.shape[1] % 128)
+        if dout_t.shape[1] % 8 != 0:
+            pad_size = 8 - (dout_t.shape[1] % 8)
             dout_t = paddle.concat([dout_t, paddle.zeros([dout_t.shape[0], pad_size], dtype=dout_t.dtype)], axis=1)
-        # dout use [128,128] quant
-        # dout_t_fp8 = kitchen_quant(
-        #     dout_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
-        # )
-        # dweight = paddle.empty(w_quant.shape, dout.dtype)
-        # deep_gemm.gemm_fp8_fp8_bf16_nt((x_t_quant, x_t_scale), (dout_t_fp8[0], dout_t_fp8[1]), dweight)
 
-        # If dout use [1,128] quant
         dout_t_quant, dout_t_scale = kitchen_quant(
             dout_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
         )
