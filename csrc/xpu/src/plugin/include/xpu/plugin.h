@@ -76,6 +76,14 @@ DLL_EXPORT int get_padding_offset(Context* ctx,
                                   const int max_seq_len,
                                   const int bs);
 
+
+DLL_EXPORT int get_position_ids(Context *ctx,
+                       const int *seq_lens_encoder,
+                       const int *seq_lens_decoder,
+                       const int *seq_lens_this_time,
+                       int *position_ids,
+                       const int bs);
+
 DLL_EXPORT int update_inputs(Context* ctx,
                              bool* not_need_stop,
                              int* seq_lens_this_time,
@@ -101,6 +109,24 @@ DLL_EXPORT int rebuild_padding(Context *ctx,
                     const int dim_embed,
                     const int elem_nums);
 
+DLL_EXPORT int update_inputs_v2(Context* ctx,
+                                bool* not_need_stop,
+                                int64_t* step_idx,
+                                bool* stop_flags,
+                                int* seq_lens_this_time,
+                                int* seq_lens_encoder,
+                                int* seq_lens_decoder,
+                                int64_t* next_tokens,
+                                int64_t* kwargs_next_tokens,
+                                int64_t* input_ids,
+                                const int64_t* end_ids,
+                                const int64_t* stop_nums,
+                                const bool* is_block_step,
+                                const int64_t* max_dec_len,
+                                int now_bsz,
+                                int max_bsz,
+                                int input_ids_stride,
+                                int end_length);
 }  // namespace plugin
 }  // namespace api
 }  // namespace xpu

@@ -1256,11 +1256,11 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
             config.set_xpu_device_id(device_id)
             xpu_config = paddle.inference.XpuConfig()
             xpu_config.device_id = device_id
-            xpu_config.l3_size = 63 * 1024 * 1024
-            xpu_config.l3_autotune_size = 63 * 1024 * 1024
+            xpu_config.l3_size = 0
+            xpu_config.l3_autotune_size = 0
             config.set_xpu_config(xpu_config)
             config.switch_ir_optim(True)
-            config.enable_memory_optim()
+            # config.enable_memory_optim()
         else:
             device_id = int(os.environ.get("FLAGS_selected_gpus", 0))
             config.enable_use_gpu(100, device_id)
@@ -1517,7 +1517,13 @@ def predict():
     predictor_args, model_args = parser.parse_args_into_dataclasses()
 
     llm_utils.set_triton_cache(predictor_args.model_name_or_path, predictor_args.mode)
+    try:
+        from paddle.utils import try_import
 
+        try_import("paddlenlp_ops")
+    except ImportError:
+        logger.warning("paddlenlp_ops does not exist, please install paddlenlp_ops.")
+        return
     tensor_parallel_degree = paddle.distributed.get_world_size()
     if tensor_parallel_degree > 1:
         strategy = fleet.DistributedStrategy()

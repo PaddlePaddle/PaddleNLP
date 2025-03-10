@@ -32,12 +32,12 @@ from server.data.processor import DataProcessor
 from server.engine.config import Config
 from server.utils import get_logger
 from task_queue_manager import TaskQueueManager
-from paddlenlp.trl import llm_utils
 
 from paddlenlp.experimental.transformers import (
     EagleProposer,
     InferenceWithReferenceProposer,
 )
+from paddlenlp.trl import llm_utils
 from paddlenlp.trl.llm_utils import get_rotary_position_embedding
 
 File_Path = os.path.realpath(sys.argv[0])
@@ -780,6 +780,13 @@ def main():
     """
     args = parse_args()
     llm_utils.set_triton_cache(args.model_dir, "static")
+    try:
+        from paddle.utils import try_import
+
+        try_import("paddlenlp_ops")
+    except ImportError:
+        logger.warning("paddlenlp_ops does not exist, please install paddlenlp_ops.")
+        return
     model_runner = ModelRunner(args)
     model_runner.run()
 
