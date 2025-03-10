@@ -37,8 +37,8 @@ limitations under the License. */
 #include "cutlass/gemm/gemm.h"
 #include "cutlass/layout/matrix.h"
 
-#include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/arch/mma.h"
-#include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/gemm/kernel/mixed_gemm_B_layout.h"
+#include "cutlass_extensions/arch/mma.h"
+#include "cutlass_extensions/gemm/kernel/mixed_gemm_B_layout.h"
 
 namespace cutlass {
 namespace gemm {

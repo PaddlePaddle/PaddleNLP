@@ -57,9 +57,9 @@ limitations under the License. */
 #include "cutlass/matrix_shape.h"
 #include "cutlass/numeric_types.h"
 
-#include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/gemm/threadblock/dq_mma_base.h"
-#include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/gemm/warp/mma_tensorop_dequantizer.h"
-#include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/interleaved_numeric_conversion.h"
+#include "cutlass_extensions/gemm/threadblock/dq_mma_base.h"
+#include "cutlass_extensions/gemm/warp/mma_tensorop_dequantizer.h"
+#include "cutlass_extensions/interleaved_numeric_conversion.h"
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -31,15 +31,15 @@ limitations under the License. */
 #pragma once
 
 #include "cutlass/gemm/threadblock/default_mma.h"
-#include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/arch/mma.h"
+#include "cutlass_extensions/arch/mma.h"
 
-#include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/gemm/threadblock/dq_mma_multistage.h"
-#include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/gemm/warp/default_mma_tensor_op.h"
-#include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/gemm/warp/mma_tensorop_compute_B_with_f16.h"
-#include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/tile_interleaved_layout.h"
-#include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/transform/threadblock/fine_grained_scale_zero_iterator.h"
+#include "cutlass_extensions/gemm/threadblock/dq_mma_multistage.h"
+#include "cutlass_extensions/gemm/warp/default_mma_tensor_op.h"
+#include "cutlass_extensions/gemm/warp/mma_tensorop_compute_B_with_f16.h"
+#include "cutlass_extensions/tile_interleaved_layout.h"
+#include "cutlass_extensions/transform/threadblock/fine_grained_scale_zero_iterator.h"
 
-#include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/gemm/threadblock/default_dq_mma.h"
+#include "cutlass_extensions/gemm/threadblock/default_dq_mma.h"
 
 namespace cutlass {
 namespace gemm {

@@ -13,12 +13,7 @@
 // limitations under the License.
 
 #pragma once
-// #include "cutlass/array.h"
-// #include "cutlass/epilogue/thread/linear_combination.h"
-// #include "cutlass/epilogue/thread/linear_combination_relu.h"
-// #include "cutlass/gemm/device/gemm_grouped.h"
-// #include "cutlass/gemm/gemm.h"
-// #include "cutlass/gemm/kernel/default_gemm_grouped.h"
+
 #include "cutlass/numeric_conversion.h"
 #include "moe/fused_moe_helper.h"
 
@@ -45,7 +40,6 @@ void MoeFFNKernel(const paddle::Tensor& permute_input,
   auto input_type = permute_input.dtype();
   auto stream = permute_input.stream();
 
-
   auto fp16_moe_gemm_runner =
       MoeGemmRunner<DataType_,
                     DataType_>();
@@ -65,7 +59,6 @@ void MoeFFNKernel(const paddle::Tensor& permute_input,
   }
 
   const int64_t inter_size = inter_dim;
-
 
   paddle::Tensor fc1_out_tensor = GetEmptyTensor(
                                           {expanded_active_expert_rows, inter_size},
@@ -121,22 +114,8 @@ void MoeFFNKernel(const paddle::Tensor& permute_input,
         stream);
   }
 
-  const int num_rows = expanded_active_expert_rows;
-
-
-
-    // check
-    paddle::Tensor act_out_tensor = GetEmptyTensor(
-            {num_rows, inter_size / 2},
-            input_type,
-            place);
-  
-//   const std::string act_type = "swiglu";
-  paddle::experimental::swiglu(fc1_out_tensor, act_out_tensor);
+  auto act_out_tensor = paddle::experimental::swiglu(fc1_out_tensor, nullptr);
   auto act_out = act_out_tensor.data<data_t>();
-//   paddle::phi::swiglu(&fc1_out_tensor, nullptr, &act_out_tensor);
-//   auto bias_act_helper = BiasActHelper<T>(ctx, act_type, num_rows, inter_size);
-//   bias_act_helper.Compute(&fc1_out_tensor, nullptr, &act_out_tensor);
 
   if (quant_method == "weight_only_int8") {
     int8_moe_gemm_runner.moe_gemm(
@@ -178,8 +157,6 @@ void MoeFFNKernel(const paddle::Tensor& permute_input,
   }
 }
 
-
-
 std::vector<paddle::Tensor>  MoeExpertFFN(
     const paddle::Tensor& permute_input,
     const paddle::Tensor& token_nums_per_expert,
@@ -206,15 +183,56 @@ std::vector<paddle::Tensor>  MoeExpertFFN(
                 quant_method,
                 ffn_out
             );
+            break;
+        case paddle::DataType::FLOAT16:
+          MoeFFNKernel<paddle::DataType::FLOAT16>(
+              permute_input,
+              token_nums_per_expert,
+              ffn1_weight,
+              ffn2_weight,
+              ffn1_bias,
+              ffn1_scale,
+              ffn2_scale,
+              quant_method,
+              ffn_out
+          );
+          break;
+         default:
+            throw std::runtime_error("Unsupported data type for MoeExpertFFN");
+
     }
     return {ffn_out};
+}
 
+std::vector<std::vector<int64_t>> MoeExpertFFNInferShape(
+  const std::vector<int64_t>&     permute_input_shape,
+        const std::vector<int64_t>&      token_nums_per_expert_shape,
+        const std::vector<int64_t>&      ffn1_weight_shape,
+        const std::vector<int64_t>&     ffn2_weight_shape,
+        const paddle::optional<std::vector<int64_t>>& ffn1_bias_shape,
+        const paddle::optional<std::vector<int64_t>>& ffn1_scale_shape,
+        const paddle::optional<std::vector<int64_t>>& ffn2_scale_shape
+) {
+  return {permute_input_shape};
+}
+
+std::vector<paddle::DataType> MoeExpertFFNInferDtype(
+  const paddle::DataType&     permute_input_dtype,
+        const paddle::DataType&      token_nums_per_expert_dtype,
+        const paddle::DataType&      ffn1_weight_dtype,
+        const paddle::DataType&     ffn2_weight_dtype,
+        const paddle::optional<paddle::DataType>& ffn1_bias_dtype,
+        const paddle::optional<paddle::DataType>& ffn1_scale_dtype,
+        const paddle::optional<paddle::DataType>& ffn2_scale_dtype
+) 
+{
+  return  {permute_input_dtype};
 }
 
 PD_BUILD_OP(moe_expert_ffn)
-    .Inputs({"permute_input", "token_nums_per_expert", "ffn1_weight", "ffn2_weight", paddle::Optional("ffn1_bias"), paddle::Optional("ffn1_scale"), paddle::Optional("ffn2_scale"),})
+    .Inputs({"permute_input", "token_nums_per_expert", "ffn1_weight", "ffn2_weight", paddle::Optional("ffn1_bias"), paddle::Optional("ffn1_scale"), paddle::Optional("ffn2_scale")})
     .Outputs({"output_tensor"})
     .Attrs({"quant_method:std::string"})
-    .SetKernelFn(PD_KERNEL(MoeExpertFFN));
-    // .SetInferShapeFn(PD_INFER_SHAPE(TrtLLMFusedMoeInferShape))
-    // .SetInferDtypeFn(PD_INFER_DTYPE(TrtLLMFusedMoeInferDtype));
+    .SetKernelFn(PD_KERNEL(MoeExpertFFN))
+    .SetInferShapeFn(PD_INFER_SHAPE(MoeExpertFFNInferShape))
+    .SetInferDtypeFn(PD_INFER_DTYPE(MoeExpertFFNInferDtype));

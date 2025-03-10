@@ -30,8 +30,8 @@ limitations under the License. */
 
 #pragma once
 
-#include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/arch/mma.h"
-#include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/interleaved_numeric_conversion.h"
+#include "cutlass_extensions/arch/mma.h"
+#include "cutlass_extensions/interleaved_numeric_conversion.h"
 
 namespace cutlass {
 namespace gemm {

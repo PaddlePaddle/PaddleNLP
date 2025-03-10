@@ -39,7 +39,7 @@ static std::vector<CutlassTileConfig> get_candidate_tiles(
     const int sm,
     const int group_size,
     const bool is_moe) {
-  std::cout << "get_candidate_tiles sm: " << sm;
+  // std::cout << "get_candidate_tiles sm: " << sm;
   std::vector<CutlassTileConfig> simt_configs{
       CutlassTileConfig::CtaShape128x128x8_WarpShape64x64x8};
 

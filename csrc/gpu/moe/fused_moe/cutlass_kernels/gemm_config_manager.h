@@ -257,7 +257,7 @@ class GemmConfigManager {
       json j;
       inFile >> j;
       mGemmProfileMap->deserialize(j);
-      std::cout << "Parse gemm profile json file successfully";
+      // std::cout << "Parse gemm profile json file successfully";
       return true;
     } catch (const std::exception& e) {
       PADDLE_FATAL("[GemmConfigManager] Failed to parse gemm profiles json");

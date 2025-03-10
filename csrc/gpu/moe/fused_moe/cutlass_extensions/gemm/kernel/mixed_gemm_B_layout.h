@@ -47,8 +47,8 @@ limitations under the License. */
 #include "cutlass/arch/mma.h"
 #include "cutlass/platform/platform.h"
 
-#include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/arch/mma.h"
-#include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/tile_interleaved_layout.h"
+#include "cutlass_extensions/arch/mma.h"
+#include "cutlass_extensions/tile_interleaved_layout.h"
 
 namespace cutlass {
 namespace gemm {

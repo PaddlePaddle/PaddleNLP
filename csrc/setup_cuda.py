@@ -180,7 +180,9 @@ if cc >= 90 and cuda_version >= 12.0:
 
 sources = []
 sources += [
-        "./gpu/moe/fused_moe/moe_ffn.cu",
+        # "./gpu/moe/fused_moe/moe_ffn.cu",
+        # "./gpu/moe/fused_moe/moe_dispatch.cu",
+        "./gpu/moe/fused_moe/moe_reduce.cu",
     ]
 sources += find_end_files("./gpu/moe/fused_moe/cutlass_kernels/moe_gemm/", ".cu")
 include_path = [

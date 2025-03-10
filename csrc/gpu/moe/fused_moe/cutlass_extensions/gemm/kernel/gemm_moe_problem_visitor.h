@@ -41,7 +41,7 @@
 #include "cutlass/gemm/kernel/gemm_grouped_problem_visitor.h"
 #include "cutlass/matrix_coord.h"
 
-#include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/gemm/kernel/moe_problem_visitor.h"
+#include "cutlass_extensions/gemm/kernel/moe_problem_visitor.h"
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 

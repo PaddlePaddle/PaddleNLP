@@ -39,8 +39,8 @@ limitations under the License. */
 #include "cutlass/gemm/warp/default_mma_tensor_op.h"
 #include "cutlass/gemm/warp/mma_tensor_op.h"
 
-#include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/arch/mma.h"
-#include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/gemm/warp/mma_tensorop_compute_B_with_f16.h"
+#include "cutlass_extensions/arch/mma.h"
+#include "cutlass_extensions/gemm/warp/mma_tensorop_compute_B_with_f16.h"
 
 namespace cutlass {
 namespace gemm {

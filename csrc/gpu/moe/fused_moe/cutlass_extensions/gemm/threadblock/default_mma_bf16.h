@@ -31,8 +31,8 @@ limitations under the License. */
 #pragma once
 
 #include "cutlass/gemm/threadblock/default_mma.h"
-#include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/gemm/threadblock/default_dq_mma_multistage.h"
-#include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/gemm/threadblock/default_dq_mma_pipelined.h"
+#include "cutlass_extensions/gemm/threadblock/default_dq_mma_multistage.h"
+#include "cutlass_extensions/gemm/threadblock/default_dq_mma_pipelined.h"
 
 namespace cutlass {
 namespace gemm {
