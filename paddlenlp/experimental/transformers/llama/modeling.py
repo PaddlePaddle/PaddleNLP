@@ -405,12 +405,15 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         self.use_fake_parameter = config.get("use_fake_parameter", False)
 
         self.use_weight_only = False
+        self.weightonly_group_size = -1
         if config.quant_type == "weight_only_int8":
             self.use_weight_only = True
             self.quant_algo = "weight_only_int8"
+            self.weightonly_group_size = config.weightonly_group_size
         elif config.quant_type == "weight_only_int4":
             self.use_weight_only = True
             self.quant_algo = "weight_only_int4"
+            self.weightonly_group_size = config.weightonly_group_size
         elif config.quant_type and "a8w8" in config.quant_type:
             self.quant_model_path = config.model_name_or_path
             self.shift = config.quantization_config.shift
@@ -618,6 +621,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             kv_num_heads=self.num_key_value_heads,
             intermediate_size=self.intermediate_size,
             quant_type=self.quant_type,
+            weightonly_group_size=self.weightonly_group_size,
             activation="swiglu",
             num_layers=config.num_hidden_layers,
             nranks=config.tensor_parallel_degree,
@@ -1092,7 +1096,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             if self.use_weight_only:
                 qkv_weight_tensor = paddle.transpose(qkv_weight_tensor, perm=[1, 0])
                 qkv_quanted_weight_tensor, qkv_weight_scale_tensor = weight_quantize(
-                    qkv_weight_tensor, algo=self.quant_algo
+                    qkv_weight_tensor.cpu(), algo=self.quant_algo, group_size=self.weightonly_group_size
                 )
                 self.transformer_block.qkv_weights[idx].set_value(qkv_quanted_weight_tensor)
                 self.transformer_block.qkv_weights_scale[idx].set_value(qkv_weight_scale_tensor)
@@ -1110,7 +1114,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             ).cast(paddle.get_default_dtype())
             if self.use_weight_only:
                 linear_quanted_weight_tensor, linear_weight_scale_tensor = weight_quantize(
-                    linear_weight_tensor, algo=self.quant_algo
+                    linear_weight_tensor.cpu(), algo=self.quant_algo, group_size=self.weightonly_group_size
                 )
                 self.transformer_block.linear_weights[idx].set_value(linear_quanted_weight_tensor)
                 self.transformer_block.linear_weights_scale[idx].set_value(linear_weight_scale_tensor)
@@ -1171,7 +1175,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
 
             if self.use_weight_only:
                 ffn1_quanted_weight_tensor, ffn1_weight_scale_tensor = weight_quantize(
-                    ffn1_weight_tensor, algo=self.quant_algo
+                    ffn1_weight_tensor.cpu(), algo=self.quant_algo, group_size=self.weightonly_group_size
                 )
                 self.transformer_block.ffn1_weights[idx].set_value(ffn1_quanted_weight_tensor)
                 self.transformer_block.ffn1_weights_scale[idx].set_value(ffn1_weight_scale_tensor)
@@ -1208,7 +1212,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             )
             if self.use_weight_only:
                 ffn2_quanted_weight_tensor, ffn2_weight_scale_tensor = weight_quantize(
-                    ffn2_weight_tensor, algo=self.quant_algo
+                    ffn2_weight_tensor.cpu(), algo=self.quant_algo, group_size=self.weightonly_group_size
                 )
                 self.transformer_block.ffn2_weights[idx].set_value(ffn2_quanted_weight_tensor)
                 self.transformer_block.ffn2_weights_scale[idx].set_value(ffn2_weight_scale_tensor)
@@ -1382,6 +1386,7 @@ class LlamaBlockInferenceModel(LlamaInferenceModel):
         super().__init__(config)
         self.max_seq_len = config.max_seq_len
         self.block_size = config.block_size
+        self.config = config
 
     def set_transformer_block(self, transformer_config):
         if self.use_weight_only:
