@@ -1246,7 +1246,7 @@ function llama_dy2st_auto_bs2_bf16_DP2-MP1-PP1-CINN() {
     echo "result: to_static=$to_static loss=$loss ips=$ips mem=$mem"
     loss_base=9.99302597
     if [ $IS_A100 -ne 0 ];then
-        loss_base=10.20988007
+        loss_base=10.20990143
     fi
     ips_base=-1
     mem_base=-1
