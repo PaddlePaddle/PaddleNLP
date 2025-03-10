@@ -672,6 +672,24 @@ class DeepseekV2MLP(nn.Layer):
         return down_proj
 
 
+class FakeGate(paddle.autograd.PyLayer):
+    @staticmethod
+    def forward(ctx, hidden_states, weight):
+        expert_num = weight.shape[1]
+        bsz, seq, _ = hidden_states.shape
+
+        ctx.x_shape = hidden_states.shape
+        ctx.x_dtype = hidden_states.dtype
+        ctx.y_shape = weight.shape
+        ctx.y_dtype = weight.dtype
+
+        return paddle.randn([bsz, seq, expert_num]).cast(weight.dtype)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        return paddle.zeros(ctx.x_shape, dtype=ctx.x_dtype), paddle.zeros(ctx.y_shape, dtype=ctx.y_dtype)
+
+
 class MoEGate(PretrainedMoEGate):
     def __init__(self, config, num_experts, expert_hidden_size, **kwargs):
         super().__init__(config, num_experts, expert_hidden_size, **kwargs)
@@ -687,6 +705,7 @@ class MoEGate(PretrainedMoEGate):
             # default_initializer=nn.initializer.Constant(1.0),
         )
 
+        self.config = config
         if config.topk_method == "noaux_tc":
             self.e_score_correction_bias = paddle.create_parameter(
                 shape=[num_experts],
@@ -707,7 +726,12 @@ class MoEGate(PretrainedMoEGate):
         # compute gating score
         with paddle.amp.auto_cast(False):
             hidden_states = hidden_states.cast(self.weight.dtype)
-            logits = F.linear(hidden_states, self.weight, None)
+
+            if hasattr(self.config, "using_fake_gate") and self.config.using_fake_gate:
+                logits = FakeGate.apply(hidden_states, self.weight)
+            else:
+                logits = F.linear(hidden_states, self.weight, None)
+
             scores = self.gate_score_func(logits=logits)
             scores = scores.cast(paddle.float32)
 
