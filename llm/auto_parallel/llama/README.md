@@ -24,7 +24,7 @@
 ## 环境准备
 1.安装 PaddlePaddle 最新版本
 
-首先，您需要安装最新的`Paddle`， 推荐使用`3.0-rc`版本。访问 [Paddle 官网](https://www.paddlepaddle.org.cn/install/quick?docurl=undefined) 获取安装指导。
+首先，您需要安装最新的`Paddle`， 推荐使用`Nightly`版本。访问 [Paddle 官网](https://www.paddlepaddle.org.cn/install/quick?docurl=undefined) 获取安装指导。
 
 2.验证安装
 
