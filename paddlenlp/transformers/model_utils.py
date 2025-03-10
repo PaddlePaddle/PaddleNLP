@@ -71,6 +71,10 @@ from paddlenlp.utils.env import (
 from paddlenlp.utils.log import logger
 
 from ..generation import GenerationConfig, GenerationMixin
+from ..quantization.quantization_utils import (
+    convert_to_quantize_state_dict,
+    replace_with_quantization_linear,
+)
 from ..quantization.unified_checkpoint_quantization import dequant_unified_optimizer
 from ..utils import device_guard
 from ..utils.download import resolve_file_path
@@ -1827,7 +1831,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         low_cpu_mem_usage=False,
         dtype=None,
         keep_in_fp32_modules=None,
-        quantization_linear_list=None,
     ) -> Tuple[List[str]]:
         """load the state_dict into model, and do the following things:
 
@@ -1844,7 +1847,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             Tuple[List[str]]: _description_
         """
         is_safetensors = False
-        is_quantize = hasattr(config, "quantization_config") and config.quantization_config.is_weight_quantize()
         model_state_dict = model.state_dict()
 
         expected_keys = list(model_state_dict.keys())
@@ -1866,38 +1868,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             _prefix = f"{prefix}."
             expected_keys_not_prefixed = [s for s in expected_keys if not s.startswith(_prefix)]
             expected_keys = [s[len(_prefix) :] if s.startswith(_prefix) else s for s in expected_keys]
-            if quantization_linear_list is not None:
-                quantization_linear_list = [
-                    s[len(_prefix) :] if s.startswith(_prefix) else s for s in quantization_linear_list
-                ]
         elif add_prefix_to_model:
             expected_keys = [".".join([prefix, s]) for s in expected_keys]
-            if quantization_linear_list is not None:
-                quantization_linear_list = [".".join([prefix, s]) for s in quantization_linear_list]
-
-        # Weight quantization if not yet quantized & update loaded_keys
-        if is_quantize:
-            try:
-                from ..quantization.quantization_utils import (
-                    convert_to_quantize_state_dict,
-                    update_loaded_state_dict_keys,
-                )
-            except ImportError:
-                raise ImportError("Quantization features require `paddlepaddle >= 2.5.2`")
-            origin_loaded_keys = copy.deepcopy(loaded_keys)
-            loaded_keys = update_loaded_state_dict_keys(
-                loaded_keys, quantization_linear_list, config.quantization_config
-            )
-            if keep_in_fp32_modules is None:
-                keep_in_fp32_modules = (
-                    ["quant_scale"] if config.quantization_config.weight_quantize_algo in ["nf4", "fp4"] else None
-                )
-            else:
-                keep_in_fp32_modules = (
-                    keep_in_fp32_modules + ["quant_scale"]
-                    if config.quantization_config.weight_quantize_algo in ["nf4", "fp4"]
-                    else keep_in_fp32_modules
-                )
 
         missing_keys = list(set(expected_keys) - set(loaded_keys))
         unexpected_keys = list(set(loaded_keys) - set(expected_keys))
@@ -1913,7 +1885,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 unexpected_keys = [k for k in unexpected_keys if re.search(pat, k) is None]
 
         # Set some modules to fp32 if any
-        if keep_in_fp32_modules is not None and not is_quantize:
+        if keep_in_fp32_modules is not None:
             for name, param in model.named_parameters():
                 if any(module_to_keep_in_fp32 in name for module_to_keep_in_fp32 in keep_in_fp32_modules):
                     if param.dtype != paddle.float32:
@@ -1984,27 +1956,26 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
             return state_dict, resume_state_dict, fused_keys, new_keys
 
+        if config.quantization_config.is_weight_quantize():
+            with ContextManagers([no_init_weights(_enable=True), paddle.LazyGuard()]):
+                replace_with_quantization_linear(
+                    model=model_to_load,
+                    quantization_config=config.quantization_config,
+                    llm_int8_threshold=config.quantization_config.llm_int8_threshold,
+                )
+            quantization_linear_list = []
+            for key in model_to_load.state_dict().keys():
+                if "quant_weight" in key:
+                    quantization_linear_list.append(key[:-13])
+
         if state_dict is not None:
             # have loaded all state_dict, no resume state_dict
             state_dict, _, fused_keys, new_keys = _fuse_or_split_keys(
                 state_dict,
                 config,
-                loaded_keys if not is_quantize else origin_loaded_keys,
+                loaded_keys,
                 pre_tensor_parallel_split=True if config is not None and config.tensor_parallel_degree > 1 else False,
             )
-            if is_quantize:
-                state_dict = convert_to_quantize_state_dict(
-                    state_dict,
-                    quantization_linear_list,
-                    config.quantization_config,
-                    dtype,
-                )
-                new_keys = update_loaded_state_dict_keys(
-                    new_keys, quantization_linear_list, config.quantization_config, ignore_warning=True
-                )
-                fused_keys = update_loaded_state_dict_keys(
-                    fused_keys, quantization_linear_list, config.quantization_config, ignore_warning=True
-                )
             missing_keys = list(set(missing_keys) - set(new_keys))
             unexpected_keys = list(set(unexpected_keys) - set(fused_keys))
 
@@ -2017,17 +1988,19 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 ignore_mismatched_sizes,
             )
 
-            if is_quantize:
-                error_msgs = _load_state_dict_into_meta_model(
-                    model_to_load,
+            if config.quantization_config.is_weight_quantize():
+                state_dict = convert_to_quantize_state_dict(
                     state_dict,
-                    loaded_keys,
-                    start_prefix,
-                    expected_keys,
-                    dtype=dtype,
-                    is_safetensors=is_safetensors,
-                    keep_in_fp32_modules=keep_in_fp32_modules,
+                    quantization_linear_list,
+                    config.quantization_config,
+                    dtype,
                 )
+                model_state_dict = model.state_dict()
+                for param_name, param in state_dict.items():
+                    with paddle.no_grad():
+                        model_state_dict[param_name].get_tensor()._share_data_with(param.value().get_tensor())
+                        param.value().get_tensor()._clear()
+                error_msgs = []
             else:
                 error_msgs = _load_state_dict_into_model(model_to_load, state_dict, start_prefix)
         else:
@@ -2051,27 +2024,13 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     and "tp" not in os.path.split(shard_file)[-1]
                 ):
                     pre_tensor_parallel_split = True
-                    if not is_quantize:
-                        assert loaded_keys is not None, "loaded_keys is not None."
-                        tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys, ignore_error=True)
-                    else:
-                        assert origin_loaded_keys is not None, "loaded_keys is not None."
-                        tp_actions = cls.get_tensor_parallel_convert_actions(
-                            config, origin_loaded_keys, ignore_error=True
-                        )
+                    assert loaded_keys is not None, "loaded_keys is not None."
+                    tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys, ignore_error=True)
 
                 # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
                 filter_dict_keys = set(expected_keys)
-                if not is_quantize:
-                    fuse_actions, _ = cls.get_fuse_or_split_param_convert_actions(config, loaded_keys, is_fuse=True)
-                    split_actions, _ = cls.get_fuse_or_split_param_convert_actions(config, loaded_keys, is_fuse=False)
-                else:
-                    fuse_actions, _ = cls.get_fuse_or_split_param_convert_actions(
-                        config, origin_loaded_keys, is_fuse=True
-                    )
-                    split_actions, _ = cls.get_fuse_or_split_param_convert_actions(
-                        config, origin_loaded_keys, is_fuse=False
-                    )
+                fuse_actions, _ = cls.get_fuse_or_split_param_convert_actions(config, loaded_keys, is_fuse=True)
+                split_actions, _ = cls.get_fuse_or_split_param_convert_actions(config, loaded_keys, is_fuse=False)
                 for k in list(fuse_actions.keys()):
                     need_add_except_key = k[-1] in expected_keys
                     if need_add_except_key:
@@ -2095,8 +2054,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         if k[-1] in tp_actions:
                             fuse_actions.pop(k[-1], None)
 
-                if is_quantize:
-                    filter_dict_keys = None
                 state_dict = load_state_dict(
                     shard_file,
                     tp_actions if pre_tensor_parallel_split else None,
@@ -2107,24 +2064,11 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 state_dict, resume_state_dict, fused_keys, new_keys = _fuse_or_split_keys(
                     state_dict,
                     config,
-                    loaded_keys if not is_quantize else origin_loaded_keys,
+                    loaded_keys,
                     pre_tensor_parallel_split=pre_tensor_parallel_split,
                     resume_state_dict=resume_state_dict,
                 )
 
-                if is_quantize:
-                    state_dict = convert_to_quantize_state_dict(
-                        state_dict,
-                        quantization_linear_list,
-                        config.quantization_config,
-                        dtype,
-                    )
-                    new_keys = update_loaded_state_dict_keys(
-                        new_keys, quantization_linear_list, config.quantization_config, ignore_warning=True
-                    )
-                    fused_keys = update_loaded_state_dict_keys(
-                        fused_keys, quantization_linear_list, config.quantization_config, ignore_warning=True
-                    )
                 missing_keys = list(set(missing_keys) - set(new_keys))
                 unexpected_keys = list(set(unexpected_keys) - set(fused_keys))
 
@@ -2147,7 +2091,19 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     )
                     logger.info("Converted state_dict to Tensor Parallel Format")
 
-                if low_cpu_mem_usage or is_quantize:
+                if config.quantization_config.is_weight_quantize():
+                    state_dict = convert_to_quantize_state_dict(
+                        state_dict,
+                        quantization_linear_list,
+                        config.quantization_config,
+                        dtype,
+                    )
+                    model_state_dict = model.state_dict()
+                    for param_name, param in state_dict.items():
+                        with paddle.no_grad():
+                            model_state_dict[param_name].get_tensor()._share_data_with(param.value().get_tensor())
+                            param.value().get_tensor()._clear()
+                elif low_cpu_mem_usage:
                     new_error_msgs = _load_state_dict_into_meta_model(
                         model_to_load,
                         state_dict,
@@ -2293,7 +2249,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         variant = kwargs.pop("variant", None)
         use_safetensors = kwargs.pop("use_safetensors", None if is_safetensors_available() else False)
 
-        low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", False)
+        low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", False) or config.quantization_config.is_weight_quantize()
         convert_from_torch = kwargs.pop("convert_from_torch", None)
         load_state_as_np = kwargs.pop("load_state_as_np", None)
         if load_state_as_np is not None:
@@ -2344,13 +2300,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             dtype = config.dtype
 
         if config.quantization_config.is_weight_quantize():
-            try:
-                from ..quantization.quantization_utils import (
-                    replace_with_quantization_linear,
-                )
-            except ImportError:
-                raise ImportError("You need to install paddlepaddle >= 2.6.0")
-
             if dtype != "float16" and dtype != "bfloat16":
                 dtype = "float16"
                 logger.warning(
@@ -2359,7 +2308,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         config.dtype = dtype
 
         init_contexts = []
-        if low_cpu_mem_usage or config.quantization_config.is_weight_quantize():
+        if low_cpu_mem_usage:
             # Instantiate model.
             init_contexts.append(no_init_weights(_enable=True))
             if is_paddle_support_lazy_init():
@@ -2367,13 +2316,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         if dtype:
             init_contexts.append(dtype_guard(dtype))
-
-        # Quantization method requires empty init to avoid unnecessary GPU allocation
-        if config.quantization_config.is_weight_quantize():
-            quantization_init_contexts = []
-            quantization_init_contexts.append(no_init_weights(_enable=True))
-            if is_paddle_support_lazy_init():
-                quantization_init_contexts.append(paddle.LazyGuard())
 
         # Keep in fp32 modules
         keep_in_fp32_modules = None
@@ -2472,19 +2414,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         else:
             keep_in_fp32_modules = []
 
-        quantization_linear_list = None
-        if config.quantization_config.is_weight_quantize():
-            with ContextManagers(quantization_init_contexts):
-                quantization_linear_list = replace_with_quantization_linear(
-                    model=model,
-                    quantization_config=config.quantization_config,
-                    llm_int8_threshold=config.quantization_config.llm_int8_threshold,
-                )
-                quantization_linear_list = []
-                for key in model.state_dict().keys():
-                    if "quant_weight" in key:
-                        quantization_linear_list.append(key[:-13])
-
         model, missing_keys, unexpected_keys, mismatched_keys = cls._load_pretrained_model(
             model=model,
             state_dict=state_dict,
@@ -2496,7 +2425,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             low_cpu_mem_usage=low_cpu_mem_usage,
             dtype=dtype,
             keep_in_fp32_modules=keep_in_fp32_modules,
-            quantization_linear_list=quantization_linear_list,
         )
 
         # load generation_config.json

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import gc
+import re
 
 import paddle
 import paddle.nn as nn
@@ -35,15 +36,16 @@ try:
 except:
     qlora_weight_quantize = None
 
+LINEAR_CLASSES = [nn.Linear, ColumnParallelLinear, RowParallelLinear]
+
 
 def replace_with_quantization_linear(model, quantization_config, llm_int8_threshold=6.0):
-    quantization_linear_list = []
     for name, child in model.named_sublayers():
-        if "output_linear" in name:
-            continue
-        if any(
-            isinstance(child, linear_class) for linear_class in [nn.Linear, ColumnParallelLinear, RowParallelLinear]
+        if quantization_config.ignore_modules is not None and any(
+            re.fullmatch(ignore_module, name) for ignore_module in quantization_config.ignore_modules
         ):
+            continue
+        if any(isinstance(child, linear_class) for linear_class in LINEAR_CLASSES):
             if child.bias is None:
                 bias_attr = False
             else:
@@ -84,12 +86,8 @@ def replace_with_quantization_linear(model, quantization_config, llm_int8_thresh
                     input_is_parallel=child.input_is_parallel,
                     llm_int8_threshold=llm_int8_threshold,
                 )
-
-            del child
             setattr(parent, last, quant_linear)
-            quantization_linear_list.append(name)
     gc.collect()
-    return quantization_linear_list
 
 
 def convert_to_quantize_state_dict_with_check(state_dict, quantization_linear_list, quant_algo, dtype):

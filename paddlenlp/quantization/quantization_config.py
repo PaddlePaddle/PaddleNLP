@@ -52,6 +52,7 @@ class QuantizationConfig:
         weight_double_quant_block_size=256,
         weight_quant_method="abs_max_channel_wise",
         act_quant_method="abs_max",
+        ignore_modules=None,
     ):
         if weight_quantize_algo is not None and weight_quantize_algo not in [
             "weight_only_int8",
@@ -88,6 +89,7 @@ class QuantizationConfig:
         self.weight_quant_method = weight_quant_method
         self.act_quant_method = quant_inference_mapping[act_quant_method]
         self.weight_double_quant_block_size = weight_double_quant_block_size
+        self.ignore_modules = ignore_modules
 
     def is_weight_quantize(self):
         if self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8", "nf4", "fp4", "a8w8"]:
