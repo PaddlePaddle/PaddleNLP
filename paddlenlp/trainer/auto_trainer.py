@@ -163,6 +163,7 @@ class AutoTrainer(Trainer):
         return meshes
 
     def _wrap_for_dist_loader(self, train_dataloader, dense_tensor_idx=None):
+        # dense_tensor_idx specifies the index of the dense_tensor in the output of dataloader.
         self.dense_tensor_idx = dense_tensor_idx
         dist_loader = dist.shard_dataloader(
             dataloader=train_dataloader,
