@@ -9,10 +9,10 @@
   - [预训练](#预训练)
     - [数据准备](#数据准备)
     - [启动预训练](#启动预训练)
-  - [监督微调(SFT)](#监督微调 sft)
+  - [监督微调(SFT)](#监督微调sft)
     - [数据准备](#数据准备-1)
     - [启动微调](#启动微调)
-  - [低秩适应（LoRA）](#低秩适应 lora)
+  - [低秩适应（LoRA）](#低秩适应lora)
   - [推理](#推理)
     - [动态图推理](#动态图推理)
     - [静态图推理](#静态图推理)
@@ -88,20 +88,20 @@ wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwe
 
 - 动态图模式(8卡 A100代码示例)
 ```python
-    python -u -m paddle.distributed.launch \
-          --device "0,1,2,3,4,5,6,7"   \
-          ${FILE_PATH}/run_pretrain_auto.py         \
-          --enable_auto_parallel true \
-          --model_name_or_path "facebook/llama-7b" \
-          --tokenizer_name_or_path "facebook/llama-7b" \
-          --input_dir "./data" \
-          --model_type "llama_network" \
-          --output_dir "log"           \
-          --max_steps 1                \
-          --eval_steps 1               \
-          --use_intermediate_api true  \
-          --tensor_parallel_degree 2   \
-          --pipeline_parallel_degree 2 \
+    python -u -m paddle.distributed.launch               \
+          --device "0,1,2,3,4,5,6,7"                     \
+          ${FILE_PATH}/run_pretrain_auto.py              \
+          --enable_auto_parallel true                    \
+          --model_name_or_path "facebook/llama-7b"       \
+          --tokenizer_name_or_path "facebook/llama-7b"   \
+          --input_dir "./data"                           \
+          --model_type "llama_network"                   \
+          --output_dir "log"                             \
+          --max_steps 1                                  \
+          --eval_steps 1                                 \
+          --use_intermediate_api true                    \
+          --tensor_parallel_degree 2                     \
+          --pipeline_parallel_degree 2                   \
           --sharding_parallel_degree 2
 ```
 | 参数名称              | 选项          | 描述                                   |
