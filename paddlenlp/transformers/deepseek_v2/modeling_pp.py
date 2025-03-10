@@ -174,7 +174,7 @@ class DeepseekV2EmbeddingPipe(nn.Layer):
             # mtp_embeds: [B*num_nextn_predict_layers, seq_len, hidden_size]
             # else:
             # mtp_embeds: [B*seq_len*num_nextn_predict_layers, hidden_size]
-            inputs_embeds = paddle.concat(embeds_res, axis=0)
+            inputs_embeds = paddle.concat(embeds_res)
             return return_args(inputs_embeds, attention_mask, attn_mask_startend_row_indices, position_ids)
         else:
             if self.sequence_parallel:
@@ -188,10 +188,10 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
         hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids = parse_args(args)
 
         if self.config.num_nextn_predict_layers > 0:
-            _, _, hidden_size = hidden_states.shape
-            hidden_size_mtp = hidden_size // (self.config.num_nextn_predict_layers + 1)
-            inputs_embeds_mtp = hidden_states[:, :, -hidden_size_mtp:]
-            hidden_states = hidden_states[:, :, :-hidden_size_mtp]
+            batch_size, _, hidden_size = hidden_states.shape
+            batch_size_mtp = batch_size // (self.config.num_nextn_predict_layers + 1)
+            inputs_embeds_mtp = hidden_states[-batch_size_mtp:, :, :]
+            hidden_states = hidden_states[:batch_size_mtp, :, :]
 
         has_gradient = not hidden_states.stop_gradient
 
@@ -234,7 +234,7 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
             )
 
         if self.config.num_nextn_predict_layers > 0:
-            hidden_states = paddle.concat([hidden_states, *inputs_embeds_mtp])
+            hidden_states = paddle.concat([hidden_states, inputs_embeds_mtp])
 
         return return_args(hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids)
 
@@ -445,8 +445,8 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
             )
         for i in range(config.num_nextn_predict_layers):
             self.add_sequential_layer(
-                LayerDesc(DeepseekV2MTPLayerPipe, config=config, layer_idx=i),
-                f"{self._base_model.base_model_prefix}.layers.{i}",
+                LayerDesc(DeepseekV2MTPLayerPipe, config=config, layer_idx=config.num_hidden_layers + i),
+                f"{self._base_model.base_model_prefix}.layers.{config.num_hidden_layers + i}",
             )
 
         self.add_sequential_layer(LayerDesc(DeepseekV2RMSNormPipe, config=config), self._base_model.base_model_prefix)

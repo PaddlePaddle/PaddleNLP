@@ -379,6 +379,8 @@ class TrainingArguments:
             `paddle.DataParallel`. Will default to `False` if recompute is used, `True` otherwise.
         wandb_api_key (`str`, *optional*):
             Weights & Biases (WandB) API key(s) for authentication with the WandB service.
+        wandb_http_proxy (`str`, *optional*):
+            Weights & Biases (WandB) http proxy for connecting with the WandB service.
         resume_from_checkpoint (`str`, *optional*):
             The path to a folder with a valid checkpoint for your model. This argument is not directly used by
             [`Trainer`], it's intended to be used by your training/evaluation scripts instead. See the [example
@@ -670,6 +672,14 @@ class TrainingArguments:
             )
         },
     )
+    expert_parallel_degree: int = field(
+        default=-1,
+        metadata={"help": ("The paddle expert data parallel strategy.")},
+    )
+    expert_tensor_parallel_degree: int = field(
+        default=-1,
+        metadata={"help": ("The paddle expert tensor parallel strategy. Currently is not supported. DO NOT SET.")},
+    )
     data_parallel_config: str = field(
         default="",
         metadata={
@@ -866,6 +876,10 @@ class TrainingArguments:
     wandb_api_key: Optional[str] = field(
         default=None,
         metadata={"help": "Weights & Biases (WandB) API key(s) for authentication with the WandB service."},
+    )
+    wandb_http_proxy: Optional[str] = field(
+        default=None,
+        metadata={"help": "Weights & Biases (WandB) http proxy for connecting with the WandB service."},
     )
     resume_from_checkpoint: Optional[str] = field(
         default=None,
@@ -1123,6 +1137,13 @@ class TrainingArguments:
             sep_parallel_degree = max(self.sep_parallel_degree, 1)
             context_parallel_degree = max(self.context_parallel_degree, 1)
             pipeline_parallel_degree = max(self.pipeline_parallel_degree, 1)
+            expert_parallel_degree = max(self.expert_parallel_degree, 1)
+            expert_tensor_parallel_degree = max(self.expert_tensor_parallel_degree, 1)
+
+            # TODO(@gexiao): support expert_tensor_parallel_degree > 1 in the future
+            assert (
+                expert_tensor_parallel_degree == 1
+            ), f"Currently only support expert_tensor_parallel_degree=1, but got expert_tensor_parallel_degree of {expert_tensor_parallel_degree}"
 
             assert (
                 world_size % (self.tensor_parallel_degree * self.pipeline_parallel_degree) == 0
@@ -1146,6 +1167,11 @@ class TrainingArguments:
                 logger.warning("sharding_parallel_degree=1 means no sharding, please set sharding to empty!")
                 self.sharding = []
 
+            if sharding_parallel_degree > 1:
+                assert (
+                    sharding_parallel_degree % expert_parallel_degree == 0
+                ), f"sharding_parallel_degree should be divided by expert_parallel_degree, current sharding_parallel_degree: {sharding_parallel_degree}, expert_parallel_degree: {expert_parallel_degree}."
+
             self.data_parallel_degree = world_size // (
                 sharding_parallel_degree
                 * tensor_parallel_degree
@@ -1154,12 +1180,18 @@ class TrainingArguments:
                 * pipeline_parallel_degree
             )
 
+            assert not (
+                self.data_parallel_degree > 1 and expert_parallel_degree > 1
+            ), f"Currently only support use expert_data_parallel strategy together with sharding_parallel strategy, but not with data_parallel strategy. Currently data_parallel_degree is {self.data_parallel_degree}."
+
             if (
                 sharding_parallel_degree > 1
                 or tensor_parallel_degree > 1
                 or pipeline_parallel_degree > 1
                 or self.sep_parallel_degree > 1
                 or self.context_parallel_degree > 1
+                or expert_parallel_degree > 1
+                or expert_tensor_parallel_degree > 1
             ):
                 self.use_hybrid_parallel = True
                 self.sharding_parallel_degree = sharding_parallel_degree
@@ -1167,6 +1199,8 @@ class TrainingArguments:
                 self.pipeline_parallel_degree = pipeline_parallel_degree
                 self.sep_parallel_degree = sep_parallel_degree
                 self.context_parallel_degree = context_parallel_degree
+                self.expert_parallel_degree = expert_parallel_degree
+                self.expert_tensor_parallel_degree = expert_tensor_parallel_degree
 
             if not self.use_hybrid_parallel:
                 self.sharding = []
@@ -1175,6 +1209,8 @@ class TrainingArguments:
                 self.pipeline_parallel_degree = -1
                 self.sep_parallel_degree = -1
                 self.context_parallel_degree = -1
+                self.expert_parallel_degree = -1
+                self.expert_tensor_parallel_degree = -1
 
         if self.hybrid_parallel_topo_order is None:
             self.hybrid_parallel_topo_order = "pp_first"
@@ -1232,6 +1268,7 @@ class TrainingArguments:
                                 "enable_overlap_p2p_comm",
                                 "disable_batch_p2p_comm",
                                 "best_unbalanced_scheduler",
+                                "use_dualpipev",
                             ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
@@ -1278,6 +1315,7 @@ class TrainingArguments:
                         "clear_every_step_cache": "enable_clear_every_step_cache" in pipeline_parallel_config,
                         "use_batch_p2p_comm": "disable_batch_p2p_comm" not in pipeline_parallel_config,
                         "best_unbalanced_scheduler": "best_unbalanced_scheduler" in pipeline_parallel_config,
+                        "use_dualpipev": "use_dualpipev" in pipeline_parallel_config,
                     }
                     if dygraph_pp_configs["dp_comm_overlap"]:
                         raise ValueError("overlap has accuracy issue")  # TODO: fix `overalap` + `delay_scale` issue
@@ -1530,6 +1568,9 @@ class TrainingArguments:
                 fleet.init(is_collective=True, strategy=strategy)
                 logger.info(strategy)
 
+                if self.expert_parallel_degree > 1:
+                    self.add_moe_comm_group()
+
         elif self.enable_auto_parallel:
             self.tensor_parallel_degree = max(self.tensor_parallel_degree, 1)
             self.sep_parallel_degree = max(self.sep_parallel_degree, 1)
@@ -1738,6 +1779,10 @@ class TrainingArguments:
                 order = ["pp", "dp", "sharding", "sep", "mp"]
             elif self.hybrid_parallel_topo_order == "sharding_first":
                 order = ["dp", "sharding", "pp", "sep", "mp"]
+                if self.expert_parallel_degree > 1:
+                    logger.warning(
+                        "Currently using sharding_first topo order, but pp_first is recommended when using experts parallel for performance."
+                    )
 
             strategy = fleet.DistributedStrategy()
             strategy.hybrid_configs = {
@@ -1876,6 +1921,37 @@ class TrainingArguments:
                     "pdc_download_ckpt can only be set as true inside FT environment. Automatically disable it now."
                 )
                 self.pdc_download_ckpt = False
+
+    def add_moe_comm_group(self):
+        hcg = fleet.get_hybrid_communicate_group()
+        topo = hcg._topo
+        sharding_parallel_groups = topo.get_comm_list("sharding")
+        experts_replicas = self.sharding_parallel_degree // self.expert_parallel_degree
+
+        # init experts groups inside all sharding groups
+        for ranks_in_current_sharding_group in sharding_parallel_groups:
+            # init experts parallel groups (dispatch & combine)
+            for i in range(experts_replicas):
+                rank_indices = list(range(i * self.expert_parallel_degree, (i + 1) * self.expert_parallel_degree))
+                ranks = [ranks_in_current_sharding_group[i] for i in rank_indices]
+                group = dist.new_group(ranks=ranks)
+                if dist.get_rank() in ranks:
+                    assert not hasattr(hcg, "expert_parallel_group"), "expert_parallel_group can not be set repeate"
+                    setattr(hcg, "expert_parallel_group", group)
+
+            # init experts gradients comm groups
+            for i in range(self.expert_parallel_degree):
+                rank_indices = list(range(i, self.sharding_parallel_degree, self.expert_parallel_degree))
+                ranks = [ranks_in_current_sharding_group[i] for i in rank_indices]
+                group = dist.new_group(ranks=ranks)
+                if dist.get_rank() in ranks:
+                    assert not hasattr(hcg, "expert_grad_comm_group"), "expert_grad_comm_group can not be set repeate"
+                    setattr(hcg, "expert_grad_comm_group", group)
+
+        assert hasattr(hcg, "expert_parallel_group") and hasattr(hcg, "expert_grad_comm_group")
+        logger.info(
+            f"experts groups are created, expert_parallel_group: {hcg.expert_parallel_group}, expert_grad_comm_group: {hcg.expert_grad_comm_group}"
+        )
 
     def __str__(self):
         self_as_dict = asdict(self)

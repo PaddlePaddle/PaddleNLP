@@ -1,6 +1,7 @@
 # Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
 # Copyright (c) Microsoft Corporation.
 # Copyright (c) Facebook, Inc. and its affiliates. All rights reserved.
+# Copyright (C) 2024 THL A29 Limited, a Tencent company.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -91,7 +92,7 @@ def combining(x, combine_weights, scatter_index):
 
 
 class LocalGatePart1(dist.LocalLayer):
-    def __init__(self, config, gate: PretrainedMoEGate, ipp=0):
+    def __init__(self, config, gate: PretrainedMoEGate, ipp=None):
         mesh = get_mesh(ipp)
         out_dist_attrs = [
             (mesh, [dist.Shard(0)]),  # reshaped_input [b*s, h]
@@ -127,7 +128,7 @@ class LocalGatePart1(dist.LocalLayer):
 
 
 class LocalGateAndDispatch(dist.LocalLayer):
-    def __init__(self, gate: PretrainedMoEGate, ipp=0):
+    def __init__(self, gate: PretrainedMoEGate, ipp=None):
         mesh = get_mesh(ipp)
         out_dist_attrs = [
             (mesh, [dist.Shard(1)]),  # dispatched_input [e,c,h]
@@ -147,15 +148,19 @@ class LocalGateAndDispatch(dist.LocalLayer):
 
 
 class LocalCombine(dist.LocalLayer):
-    def __init__(self, ipp=0):
-        mesh = get_mesh(ipp)
-        out_dist_attrs = [(mesh, [dist.Shard(0)])]
+    def __init__(self, ipp=None):
+        self.mesh = get_mesh(ipp)
+        out_dist_attrs = [(self.mesh, [dist.Shard(0)])]
         grad_dist_attrs = [None, None]
         super().__init__(out_dist_attrs, grad_dist_attrs)
 
     def forward(self, combine_weights, expert_output, dtype="float32", out_shape=None):
         combined_output = einsum("sec,ecm->sm", combine_weights.cast(dtype), expert_output)
         if out_shape is not None:
+            if dist.get_rank() in self.mesh.process_ids:
+                out_shape = dist.auto_parallel.moe_utils._cal_local_shape(
+                    out_shape, self.out_dist_attrs[0][0], self.out_dist_attrs[0][1]
+                )
             combined_output = combined_output.reshape(out_shape)
         return combined_output
 
@@ -171,7 +176,7 @@ class MoELayer(nn.Layer):
         capacity: int = 1.0,
         moe_group: str = "data",
         all_to_all_dropout=0.0,
-        ipp: int = 0,
+        ipp: int = None,
     ):
         super().__init__()
 
@@ -282,7 +287,9 @@ class MoELayer(nn.Layer):
             hidden_state, self.gate.weight, self.gate.e_score_correction_bias, used_token=used_token
         )
         if self.gate.drop_tokens is False:
-            self.gate.capacity = int(paddle.max(exp_counts))
+            capacity = paddle.max(exp_counts)
+            capacity = dist.reshard(capacity, get_mesh(), [dist.Replicate()])
+            self.gate.capacity = int(capacity)
         dispatched_input, combine_weights = self.local_gate_and_dispatch(reshaped_input, gate_scores)
         ori_dispatched_placements = copy.deepcopy(dispatched_input.placements)
 
@@ -302,7 +309,7 @@ class MoELayer(nn.Layer):
         expert_output = dist.reshard(expert_output, get_mesh(self.ipp), ori_dispatched_placements)
 
         combined_output = self.local_combine(
-            combine_weights, expert_output, dtype=hidden_state[0].dtype, out_shape=hidden_state._local_shape
+            combine_weights, expert_output, dtype=hidden_state[0].dtype, out_shape=hidden_state.shape
         )
 
         return combined_output, l_aux, l_zloss

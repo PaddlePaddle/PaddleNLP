@@ -20,6 +20,7 @@ import time
 from abc import abstractmethod
 from dataclasses import dataclass, field
 from threading import Thread
+from typing import List
 
 import numpy as np
 import paddle
@@ -58,6 +59,7 @@ from paddlenlp.utils.env import (
     MAX_DRAFT_TOKENS,
     PADDLE_INFERENCE_MODEL_SUFFIX,
     PADDLE_INFERENCE_WEIGHTS_SUFFIX,
+    SPECULATE_MAX_BSZ,
 )
 from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
@@ -174,6 +176,14 @@ class PredictorArgument:
 
     mla_use_matrix_absorption: bool = field(default=False, metadata={"help": "implement mla with matrix-absorption."})
     weightonly_group_size: int = field(default=-1, metadata={"help": "the max length of candidate tokens."})
+    weight_block_size: List[int] = field(
+        default_factory=lambda: [128, 128],
+        metadata={"help": "Quantitative granularity of weights. Supported values: [128 128]"},
+    )
+    moe_quant_type: str = field(
+        default="",
+        metadata={"help": "Quantization type of moe. Supported values: weight_only_int4, weight_only_int8"},
+    )
 
     def __post_init__(self):
         if self.speculate_method is not None:
@@ -1115,7 +1125,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
             output_tensor_shape = [MAX_BSZ + 2, 1]
         else:
             read_res_func = llm_utils.speculate_read_res
-            output_tensor_shape = [MAX_BSZ * MAX_DRAFT_TOKENS + MAX_BSZ + 2, 1]
+            output_tensor_shape = [SPECULATE_MAX_BSZ * MAX_DRAFT_TOKENS + SPECULATE_MAX_BSZ + 2, 1]
 
         read_res_process = mp.Process(
             target=read_res_func, args=[self.model_name_or_path, tensor_queue, result_queue, done_event]
@@ -1283,7 +1293,7 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
             output_tensor_shape = [MAX_BSZ + 2, 1]
         else:
             read_res_func = llm_utils.speculate_read_res
-            output_tensor_shape = [MAX_BSZ * MAX_DRAFT_TOKENS + MAX_BSZ + 2, 1]
+            output_tensor_shape = [SPECULATE_MAX_BSZ * MAX_DRAFT_TOKENS + SPECULATE_MAX_BSZ + 2, 1]
 
         read_res_process = mp.Process(
             target=read_res_func, args=[self.model_name_or_path, tensor_queue, result_queue, done_event]
@@ -1505,6 +1515,8 @@ def create_predictor(
 def predict():
     parser = PdArgumentParser((PredictorArgument, ModelArgument))
     predictor_args, model_args = parser.parse_args_into_dataclasses()
+
+    llm_utils.set_triton_cache(predictor_args.model_name_or_path, predictor_args.mode)
 
     tensor_parallel_degree = paddle.distributed.get_world_size()
     if tensor_parallel_degree > 1:
