@@ -825,6 +825,7 @@ def set_triton_cache(model_name_or_path, mode):
             # del old triton_ops
             shutil.rmtree(triton_kernel_cache_dir)
     elif mode == "static":
+        os.environ["TRITON_KERNEL_CACHE_DIR"] = triton_kernel_cache_dir
         for root, dirs, files in os.walk(triton_kernel_cache_dir):
             for file in files:
                 if file.endswith("_package.so"):
