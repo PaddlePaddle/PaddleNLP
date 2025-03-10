@@ -177,6 +177,17 @@ if cc >= 90 and cuda_version >= 12.0:
     ]
     sources += find_end_files("./gpu/mla_attn", ".cu")
 
+
+sources = []
+sources += [
+        "./gpu/moe/fused_moe/moe_ffn.cu",
+    ]
+sources += find_end_files("./gpu/moe/fused_moe/cutlass_kernels/moe_gemm/", ".cu")
+include_path = [
+    "./gpu/moe/fused_moe/",
+]
+
+
 ops_name = f"paddlenlp_ops_{sm_version}" if sm_version != 0 else "paddlenlp_ops"
 setup(
     name=ops_name,
@@ -185,5 +196,6 @@ setup(
         extra_compile_args={"cxx": ["-O3"], "nvcc": nvcc_compile_args},
         libraries=["cublasLt"],
         library_dirs=[library_path],
+        include_dirs=include_path,
     ),
 )
