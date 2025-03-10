@@ -16,15 +16,14 @@
 """Tokenization class for Yuan2.0 model"""
 
 import os
+import re
 from shutil import copyfile
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
-import numpy as np
 import sentencepiece as spm
 
 from ...utils.log import logger
 from .. import PretrainedTokenizer
-from ..tokenizer_utils_base import BatchEncoding, EncodedInput, PaddingStrategy
 
 __all__ = ["YuanTokenizer"]
 
@@ -203,60 +202,81 @@ class YuanTokenizer(PretrainedTokenizer):
             return len(token_ids_0 + eos) * [0]
         return len(token_ids_0 + eos + token_ids_1 + eos) * [0]
 
-    def _pad(
+    def _encode_chat_inputs(
         self,
-        encoded_inputs: Union[Dict[str, EncodedInput], BatchEncoding],
-        max_length: Optional[int] = None,
-        padding_strategy: PaddingStrategy = PaddingStrategy.DO_NOT_PAD,
-        pad_to_multiple_of: Optional[int] = None,
-        return_attention_mask: Optional[bool] = None,
-    ) -> dict:
-        """
-        Pad encoded inputs (on left/right and up to predefined length or max length in the batch)
+        conversations: List[Tuple[str, str]],
+        context_data: Dict[str, Any] = {},
+        system: str = None,
+        add_generation_prompt=True,
+    ):
+        result = {}
 
-        Args:
-            encoded_inputs:
-                Dictionary of tokenized inputs (`List[int]`) or batch of tokenized inputs (`List[List[int]]`).
-            max_length: maximum length of the returned list and optionally padding length (see below).
-                Will truncate by taking into account the special tokens.
-            padding_strategy: PaddingStrategy to use for padding.
+        # Some template do not support system msg, so we need to check it first.
+        if system:
+            try:
+                self.chat_template.render(messages={"role": "system", "content": system})
+            except Exception as e:
+                raise ValueError("System is not supported in this tokenizer.", e)
 
-                - PaddingStrategy.LONGEST Pad to the longest sequence in the batch
-                - PaddingStrategy.MAX_LENGTH: Pad to the max length (default)
-                - PaddingStrategy.DO_NOT_PAD: Do not pad
-                The tokenizer padding sides are defined in self.padding_side:
+        # convert list msg to role dict msg
+        conversation_dict = []
+        origin_msg = []
+        for round in conversations:
+            round_role = [
+                {"role": "user", "content": round[0]},
+                {"role": "assistant", "content": round[1]},
+            ]
+            origin_msg.extend(round_role)
+            conversation_dict.append(round_role)
+        ans = []
 
-                    - 'left': pads on the left of the sequences
-                    - 'right': pads on the right of the sequences
-            pad_to_multiple_of: (optional) Integer if set will pad the sequence to a multiple of the provided value.
-                This is especially useful to enable the use of Tensor Core on NVIDIA hardware with compute capability
-                >= 7.5 (Volta).
-            return_attention_mask:
-                (optional) Set to False to avoid returning attention mask (default: set to model specifics)
-        """
-        # Load from model defaults
+        # get answer in single round, then compile the chat entirely and split by single round ans
+        # attention: answer should include end token!
+        for conv in conversation_dict:
+            roundi = [system] + conv if system else conv
+            roundi_str = self.chat_template.render(
+                messages=roundi, add_generation_prompt=False, **self.special_tokens_map
+            )
+            roundi_no_ans = [system] + [conv[0]] if system else [conv[0]]
+            roundi_no_ans_str = self.chat_template.render(
+                messages=roundi_no_ans, add_generation_prompt=add_generation_prompt, **self.special_tokens_map
+            )
 
-        # attention_mask shape [1,seq_len,seq_len]
-        if "attention_mask" in encoded_inputs and len(np.shape(encoded_inputs["attention_mask"])) > 2:
-            attention_mask = encoded_inputs["attention_mask"]
-            encoded_inputs.pop("attention_mask")
-        else:
-            attention_mask = None
+            ans_roundi = roundi_str[len(roundi_no_ans_str) - len("<sep>") + len("<n>") : -len("<sep>")]
+            ans.append(ans_roundi)
+        for idx, _ in enumerate(ans):
+            ans[idx] += "<n>" if idx != len(ans) - 1 else "<sep>"
 
-        required_input = encoded_inputs[self.model_input_names[0]]
-        encoded_inputs = super()._pad(
-            encoded_inputs, max_length, padding_strategy, pad_to_multiple_of, return_attention_mask
+        non_learnable_parts = self._extract_non_learnable_parts(origin_msg, ans)
+        assert len(non_learnable_parts) == len(ans)
+
+        conversation_ids = []
+        for i in range(len(non_learnable_parts)):
+            conversation_ids.append(
+                self.batch_encode(
+                    [non_learnable_parts[i], ans[i]],
+                    add_special_tokens=False,
+                    padding=False,
+                )["input_ids"]
+            )
+
+        result["conversations"] = conversation_ids
+        return result
+
+    def _extract_non_learnable_parts(self, origin_msg: List[Dict[str, str]], split_s: List[str]):
+        """Split the entire chat by specified words. Extract the non-learnable parts."""
+        # distingish and replace the special words in original string to an uncompiled form: Like | -> \|
+        split_s_with_front_token = split_s.copy()
+        for idx, _ in enumerate(split_s):
+            split_s_with_front_token[idx] = "<n>" + split_s_with_front_token[idx]
+        regex_pattern = "|".join(map(re.escape, split_s_with_front_token))
+        # splited by replaced specified words
+        non_learnable_parts = re.split(
+            r"(?:%s)" % regex_pattern,
+            self.chat_template.render(messages=origin_msg, add_generation_prompt=False, **self.special_tokens_map),
         )
-        if attention_mask is not None and len(np.shape(attention_mask)) > 2:
-            encoded_inputs["attention_mask"] = attention_mask
-            needs_to_be_padded = padding_strategy != PaddingStrategy.DO_NOT_PAD and len(required_input) != max_length
-            if needs_to_be_padded:
-                difference = max_length - len(required_input)
-                if "attention_mask" in encoded_inputs:
-                    encoded_inputs["attention_mask"] = np.pad(
-                        encoded_inputs["attention_mask"],
-                        pad_width=[(0, 0), (difference, 0), (difference, 0)],
-                        mode="constant",
-                        constant_values=0,
-                    )
-        return encoded_inputs
+        if non_learnable_parts[-1] == "":
+            non_learnable_parts.pop()
+        for idx, _ in enumerate(non_learnable_parts):
+            non_learnable_parts[idx] = non_learnable_parts[idx] + "<n>"
+        return non_learnable_parts

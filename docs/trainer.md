@@ -14,7 +14,7 @@ PaddleNLP 提供了 Trainer 训练 API，针对训练过程的通用训练配置
 ## Trainer 基本使用方法介绍
 
 下面是用户使用 Trainer API 进行 finetune 任务的简单示例，这里以中文情感分类数据集`chnsenticorp`为例。
-更详细的使用可以参考[CLUE Trainer](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/legacy/examples/benchmark/clue/classification/run_clue_classifier_trainer.py)版本。
+更详细的使用可以参考[CLUE Trainer](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/slm/examples/benchmark/clue/classification/run_clue_classifier_trainer.py)版本。
 
 1. 导入需要用到的头文件。
     - 主要是模型、Tokenizer
@@ -82,7 +82,7 @@ if training_args.do_train:
     trainer.log_metrics("train", metrics)
     trainer.save_state()
 ```
-预训练的使用方式可以参考[ERNIE-1.0 Trainer](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/legacy/model_zoo/ernie-1.0/run_pretrain_trainer.py)版本。
+预训练的使用方式可以参考[ERNIE-1.0 Trainer](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/slm/model_zoo/ernie-1.0/run_pretrain_trainer.py)版本。
 
 
 ## Trainer 进阶分布式能力使用介绍
@@ -601,6 +601,87 @@ Trainer 是一个简单，但功能完整的 Paddle 训练和评估模块，并�
 
                         Recompute the forward pass to calculate gradients. Used for saving memory (default: False)
 
+  --refined_recompute
+                        精化重新计算参数，用于在GPU显存使用和计算速度之间寻求最佳平衡。
+                        此参数允许用户对重新计算过程进行细致控制，以优化资源利用。具体配置示例如下：
+                        `"attention_column_ln:-1,attention_row_ln:-1,flash_attn:-1,mlp_column_ln:5,mlp_row_ln:-1"`
+
+                        在配置中，支持的参数包括：
+                            `attention_column_ln`
+                            `attention_row_ln`
+                            `mlp_column_ln`
+                            `mlp_row_ln`
+                            `flash_attn`
+
+                        每个参数后的数字，即`skip_num`，决定了对应操作跳过重计算的次数。具体解释如下：
+                            `skip_num` 为 `-1`：表示在所有阶段均不进行重新计算，从而最大化显存使用。
+                            `skip_num` 为 `0`：表示在每个阶段都强制进行重新计算，以最小化显存使用。
+
+                        此外，您还可以将`skip_num`设置为`[1, ..., num_layers]`范围内的任意值。若`skip_num`超出`num_layers`，其行为将等同于设置为`-1`。
+                        若配置中省略了某个参数，则系统默认将其设置为`xxx:0`。
+
+                        (类型: `str`, 可选, 默认为: "")
+
+                        Refined recompute parameter for optimizing the balance between GPU memory usage and computational speed.
+                        This parameter allows fine-grained control over the recomputation process to optimize resource utilization. An example configuration is as follows:
+                        `"attention_column_ln:-1,attention_row_ln:-1,flash_attn:-1,mlp_column_ln:5,mlp_row_ln:-1"`
+
+                        The supported parameters in the configuration include:
+                            `attention_column_ln`
+                            `attention_row_ln`
+                            `mlp_column_ln`
+                            `mlp_row_ln`
+                            `flash_attn`
+
+                        The number following each parameter, `skip_num`, determines the number of times to bypass recomputation for the specified operation. Specifically:
+                            `skip_num of -1`: Indicates no recomputation across all stages, maximizing memory usage.
+                            `skip_num of 0`: Enforces recomputation at every stage, minimizing memory usage.
+
+                        Additionally, you can set skip_num to any value within the range `[1, ..., num_layers]`. If `skip_num` exceeds `num_layers`, it will behave as if set to `-1`.
+                        If a parameter is omitted from the configuration, it defaults to `xxx:0`.
+
+                        (Type: `str`, optional, default: "")
+
+  --refined_ops_patterns
+                        静态图半自动并行精化重新计算参数，用于在GPU显存使用和计算速度之间寻求最佳平衡。
+                        此参数允许用户对重新计算过程进行细致控制，以优化资源利用。具体配置示例如下：
+                        `'[{"main_ops":["matmul"],"num":-1,"pre_ops":["softmax"],"suf_ops":[]},{"main_ops":["flash_attn"],"num":-1,"pre_ops":["matmul"],"suf_ops":[]}]'`
+
+                        在配置中，支持的参数包括：
+                            `main_ops`
+                            `num`
+                            `pre_ops`
+                            `suf_ops`
+
+                        `pattern = pre_ops + main_ops + suf_ops`会在 program 中进行匹配, `main_ops`决定了哪些操作会被重新计算,
+                        `pre_ops`和`suf_ops`只是起到辅助定位的作用。
+                        参数`num`决定了对应操作跳过重计算的次数。具体解释如下：
+                            `num` 为 `-1`：表示在所有阶段均不进行重新计算，从而最大化显存使用。
+                            `num` 为 `0`：表示在每个阶段都强制进行重新计算，以最小化显存使用。
+
+                        此外，您还可以将`num`设置为`[1, ..., num_layers]`范围内的任意值。若`num`超出`num_layers`，其行为将等同于设置为`-1`。
+
+                        (类型: `str`, 可选, 默认为: "")
+
+                        Static semi-automatic parallel refined recompute parameter for optimizing the balance between GPU memory usage and computational speed.
+                        This parameter allows fine-grained control over the recomputation process to optimize resource utilization. An example configuration is as follows:
+                        `'[{"main_ops":["matmul"],"num":-1,"pre_ops":["softmax"],"suf_ops":[]},{"main_ops":["flash_attn"],"num":-1,"pre_ops":["matmul"],"suf_ops":[]}]'`
+
+                        The supported parameters in the configuration include:
+                            `main_ops`
+                            `num`
+                            `pre_ops`
+                            `suf_ops`
+
+                        `Pattern = pre_ops + main_ops + suf_ops' will be matched in the program. `Main_ops' determines which operations will be recomputed, `Pre_ops and suf_ops only serve as auxiliary positioning tools
+                        The number following each parameter, `num`, determines the number of times to bypass recomputation for the specified operation. Specifically:
+                            `num of -1`: Indicates no recomputation across all stages, maximizing memory usage.
+                            `num of 0`: Enforces recomputation at every stage, minimizing memory usage.
+
+                        Additionally, you can set num to any value within the range `[1, ..., num_layers]`. If `num` exceeds `num_layers`, it will behave as if set to `-1`.
+
+                        (Type: `str`, optional, default: "")
+
   --minimum_eval_times
                         最少评估次数，如果当前设置的eval_steps，评估次数少于minimum_eval_times，
                         此选项会覆盖eval_steps参数。
@@ -691,6 +772,9 @@ Trainer 是一个简单，但功能完整的 Paddle 训练和评估模块，并�
   --optim
                         优化器名称，默认为adamw，(`str`, 可选，默认为 `adamw`)
                         The optimizer to use. (default: adamw)
+                        可能的值为：
+                            - `"adamw"`
+                            - `"adamw_mini"`
 
   --report_to
                         日志可视化显示，默认使用visualdl可视化展示。(可选，默认为 None，展示所有)
@@ -714,6 +798,7 @@ Trainer 是一个简单，但功能完整的 Paddle 训练和评估模块，并�
                            skip_save_model_weight: 当master_weights存在时，跳过保存模型权重。
                            master_weight_compatible: 1. 仅当optimizer需要master_weights时，才进行加载;
                                                      2. 如果checkpoint中不存在master_weights，则将model weight作为master_weights进行加载。
+                           remove_master_weight: 是否保存 master weight, 如果checkpoint中不存在master_weights，则将model weight作为master_weights进行加载。
                            async_save: 在保存Checkpoint至磁盘时做异步保存，不影响训练过程，提高训练效率。
                            enable_all_options: 上述参数全部开启。
 
@@ -722,8 +807,12 @@ Trainer 是一个简单，但功能完整的 Paddle 训练和评估模块，并�
                            skip_save_model_weight, no need to save model weights when the master_weights exist.
                            master_weight_compatible, 1. if the master_weights exist, only load when needed.
                                                      2. if master_weights does not exist, convert model weights to master_weights when needed.
+                           remove_master_weight, whether save master weight, if master_weights does not exist, convert model weights to master_weights when needed.
                            async_save, enable asynchronous saving checkpoints to disk.
                            enable_all_options, enable all unified checkpoint optimization configs.
+
+  --ordered_save_group_size
+                       选择同时轮流save checkpoint的进程数量。如果设置为0，则不使用轮流save checkpoint功能。
 
   --skip_memory_metrics
                        是否跳过内存profiler检测。（可选，默认为True，跳过）
@@ -742,5 +831,13 @@ Trainer 是一个简单，但功能完整的 Paddle 训练和评估模块，并�
   --release_grads
                       是否在训练过程每次迭代后对梯度进行释放,减少峰值显存. 可选，默认为False）
                       Whether to reduce peak memory usage by releasing gradients after each iteration. (default: False)
+
+  --ckpt_quant_stage
+                      是否开启 unified Checkpoint 压缩, 可选项["O0", "O1", "O2"], 默认为O0）
+                        O1: 对 Adam 优化器一/二阶动量进行 Int8 压缩.
+                        O2: 对 Adam 优化器一/二阶动量进行 Int4 压缩.
+                      Whether use unified Checkpoint compression, choices=["O0", "O1", "O2"]. (default: O0)
+                        O1: Compress Adam moment1/moment2 to Int8 dtype.
+                        O2: Compress Adam moment1/moment2 to Int4 dtype.
 
 ```

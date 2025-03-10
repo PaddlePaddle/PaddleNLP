@@ -18,9 +18,12 @@ import paddle
 
 from .batch_sampler import *
 from .env import CONFIG_NAME, GENERATION_CONFIG_NAME, LEGACY_CONFIG_NAME
-from .import_utils import install_package, uninstall_package
+from .import_utils import *
 from .infohub import infohub
 from .initializer import to
+from .memory_utils import empty_device_cache
+from .optimizer import *
+from .paddle_patch import *
 from .serialization import load_torch
 
 # hack impl for EagerParamBase to function

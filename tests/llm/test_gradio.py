@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -46,10 +47,9 @@ class UITest(unittest.TestCase):
         self.model_path = "__internal_testing__/micro-random-llama"
         command = (
             "cd ./llm && PYTHONPATH=../:$PYTHONPATH"
-            + ' {python} predict/flask_server.py --model_name_or_path {model_path} --port {port} --flask_port {flask_port} --src_length 1024 --dtype "float16"'.format(
-                flask_port=self.flask_port, port=self.port, model_path=self.model_path, python=sys.executable
-            )
-        )
+            + " {python} predict/flask_server.py --model_name_or_path {model_path} "
+            + '--port {port} --flask_port {flask_port} --src_length 1024 --dtype "float16"'
+        ).format(flask_port=self.flask_port, port=self.port, model_path=self.model_path, python=sys.executable)
         current_env = copy.copy(os.environ.copy())
         current_env.pop("http_proxy", None)
         current_env.pop("https_proxy", None)
@@ -58,7 +58,6 @@ class UITest(unittest.TestCase):
 
         self.ui_process = subprocess.Popen(command, shell=True, stdout=sys.stdout, stderr=sys.stderr, env=current_env)
         self.tokenizer = LlamaTokenizer.from_pretrained(self.model_path)
-
         return super().setUp()
 
     def tearDown(self):
@@ -79,13 +78,11 @@ class UITest(unittest.TestCase):
         while True:
             if is_port_in_use(self.flask_port) and is_port_in_use(self.port):
                 break
-
             print("waiting for server ...")
             time.sleep(1)
 
     def get_gradio_ui_result(self, *args, **kwargs):
         _, _, file = self.client.predict(*args, **kwargs)
-
         with open(file, "r", encoding="utf-8") as f:
             content = json.load(f)
         return content[-1]["utterance"]
@@ -95,64 +92,57 @@ class UITest(unittest.TestCase):
         self.wait_until_server_is_ready()
 
         def get_response(data):
-            res = requests.post(f"http://localhost:{self.flask_port}/api/chat", json=data, stream=True)
+            res = requests.post(f"http://localhost:{self.flask_port}/v1/chat/completions", json=data, stream=True)
             result_ = ""
             for line in res.iter_lines():
-                print(line)
-                result = json.loads(line)
-                bot_response = result["result"]["response"]
-
-                if bot_response["utterance"].endswith("[END]"):
-                    bot_response["utterance"] = bot_response["utterance"][:-5]
-
-                result_ += bot_response["utterance"]
-
+                if not line:
+                    continue
+                decoded_line = line.decode("utf-8").strip()
+                # 如果返回行以 "data:" 开头，则去除该前缀
+                if decoded_line.startswith("data:"):
+                    data_str = decoded_line[len("data:") :].strip()
+                else:
+                    data_str = decoded_line
+                if data_str == "[DONE]":
+                    break
+                chunk = json.loads(data_str)
+                # 根据 OpenAI 的流式返回，每个 chunk 在 choices[0]["delta"] 中包含回复增量
+                delta = chunk["choices"][0]["delta"].get("content", "")
+                result_ += delta
             return result_
 
+        # 测试用例1：greedy search 模式（top_p 为1.0）
         data = {
-            "context": "你好",
-            "top_k": 1,
-            "top_p": 1.0,
+            "messages": [{"role": "user", "content": "你好"}],
             "temperature": 1.0,
-            "repetition_penalty": 1.0,
-            "max_length": 20,
-            "min_length": 1,
+            "max_tokens": 20,
+            "top_p": 1.0,
+            "stream": True,
         }
-        # Case 1: greedy search
-        # result_0 = get_response(data)
         result_1 = get_response(data)
 
-        # TODO(wj-Mcat): enable logit-comparision later
-        # assert result_0 == result_1
-
+        # 测试用例2：采样模式（top_p 为 0.7）
         data = {
-            "context": "你好",
-            "top_k": 0,
-            "top_p": 0.7,
+            "messages": [{"role": "user", "content": "你好"}],
             "temperature": 1.0,
-            "repetition_penalty": 1.0,
-            "max_length": 20,
-            "min_length": 1,
+            "max_tokens": 20,
+            "top_p": 0.7,
+            "stream": True,
         }
-
-        # Case 2: sampling
         result_2 = get_response(data)
-        # assert result_1 != result_2
 
-        # 测试长度应该保持一致
+        # 对生成文本的长度进行简单检测
         assert 10 <= len(self.tokenizer.tokenize(result_1)) <= 50
         assert 10 <= len(self.tokenizer.tokenize(result_2)) <= 50
 
+        # 测试用例3：更长的 max_tokens 参数
         data = {
-            "context": "你好",
-            "top_k": 1,
-            "top_p": 0.7,
+            "messages": [{"role": "user", "content": "你好"}],
             "temperature": 1.0,
-            "repetition_penalty": 1.0,
-            "max_length": 100,
-            "min_length": 1,
+            "max_tokens": 100,
+            "top_p": 0.7,
+            "stream": True,
         }
-        # Case 3: max_length
         result_3 = get_response(data)
         assert result_3 != result_2
         assert 70 <= len(self.tokenizer.tokenize(result_3)) <= 150

@@ -24,7 +24,6 @@ from paddlenlp.prompt import (
     PromptModelForSequenceClassification,
     SoftVerbalizer,
 )
-from paddlenlp.taskflow import Taskflow
 from paddlenlp.taskflow.text_classification import TextClassificationTask
 from paddlenlp.transformers import (
     AutoModelForMaskedLM,
@@ -145,60 +144,60 @@ class TestTextClassificationTask(unittest.TestCase):
                 if model == "multi_label":
                     self.assertGreater(dygraph_pred["score"], dygraph_taskflow.multilabel_threshold)
 
-    @unittest.skip("numerical error")
-    @parameterized.expand(
-        [
-            (1, "multi_class", "finetune"),
-            (1, "multi_class", "prompt"),
-            (1, "multi_label", "finetune"),
-            (1, "multi_label", "prompt"),
-        ]
-    )
-    def test_taskflow_task(self, batch_size, problem_type, mode):
-        input_text = ["百度", "深度学习框架", "飞桨", "PaddleNLP"]
-        id2label = {
-            0: "negative",
-            1: "positive",
-        }
-        if mode == "finetune":
-            dygraph_model_path = self.finetune_dygraph_model_path
-            static_model_path = self.finetune_static_model_path
-        else:
-            dygraph_model_path = self.prompt_dygraph_model_path
-            static_model_path = self.prompt_static_model_path
+    # @unittest.skip("numerical error")
+    # @parameterized.expand(
+    #     [
+    #         (1, "multi_class", "finetune"),
+    #         (1, "multi_class", "prompt"),
+    #         (1, "multi_label", "finetune"),
+    #         (1, "multi_label", "prompt"),
+    #     ]
+    # )
+    # def test_taskflow_task(self, batch_size, problem_type, mode):
+    #     input_text = ["百度", "深度学习框架", "飞桨", "PaddleNLP"]
+    #     id2label = {
+    #         0: "negative",
+    #         1: "positive",
+    #     }
+    #     if mode == "finetune":
+    #         dygraph_model_path = self.finetune_dygraph_model_path
+    #         static_model_path = self.finetune_static_model_path
+    #     else:
+    #         dygraph_model_path = self.prompt_dygraph_model_path
+    #         static_model_path = self.prompt_static_model_path
 
-        dygraph_taskflow = Taskflow(
-            mode=mode,
-            task="text_classification",
-            task_path=dygraph_model_path,
-            id2label=id2label,
-            batch_size=batch_size,
-            device_id=0,
-            problem_type=problem_type,
-        )
+    #     dygraph_taskflow = Taskflow(
+    #         mode=mode,
+    #         task="text_classification",
+    #         task_path=dygraph_model_path,
+    #         id2label=id2label,
+    #         batch_size=batch_size,
+    #         device_id=0,
+    #         problem_type=problem_type,
+    #     )
 
-        dygraph_results = dygraph_taskflow(input_text)
+    #     dygraph_results = dygraph_taskflow(input_text)
 
-        self.assertEqual(len(dygraph_results), len(input_text))
+    #     self.assertEqual(len(dygraph_results), len(input_text))
 
-        static_taskflow = Taskflow(
-            mode=mode,
-            task="text_classification",
-            is_static_model=True,
-            task_path=static_model_path,
-            id2label=id2label,
-            batch_size=batch_size,
-            device_id=0,
-            problem_type=problem_type,
-        )
+    #     static_taskflow = Taskflow(
+    #         mode=mode,
+    #         task="text_classification",
+    #         is_static_model=True,
+    #         task_path=static_model_path,
+    #         id2label=id2label,
+    #         batch_size=batch_size,
+    #         device_id=0,
+    #         problem_type=problem_type,
+    #     )
 
-        static_results = static_taskflow(input_text)
-        self.assertEqual(len(static_results), len(input_text))
+    #     static_results = static_taskflow(input_text)
+    #     self.assertEqual(len(static_results), len(input_text))
 
-        for dygraph_result, static_result in zip(dygraph_results, static_results):
-            for dygraph_pred, static_pred in zip(dygraph_result["predictions"], static_result["predictions"]):
-                self.assertEqual(dygraph_pred["label"], static_pred["label"])
-                self.assertAlmostEqual(dygraph_pred["score"], static_pred["score"], delta=1e-6)
-                # if multi_label, all predictions should be greater than the threshold
-                if mode == "multi_label":
-                    self.assertGreater(dygraph_pred["score"], dygraph_taskflow.task_instance.multilabel_threshold)
+    #     for dygraph_result, static_result in zip(dygraph_results, static_results):
+    #         for dygraph_pred, static_pred in zip(dygraph_result["predictions"], static_result["predictions"]):
+    #             self.assertEqual(dygraph_pred["label"], static_pred["label"])
+    #             self.assertAlmostEqual(dygraph_pred["score"], static_pred["score"], delta=1e-6)
+    #             # if multi_label, all predictions should be greater than the threshold
+    #             if mode == "multi_label":
+    #                 self.assertGreater(dygraph_pred["score"], dygraph_taskflow.task_instance.multilabel_threshold)

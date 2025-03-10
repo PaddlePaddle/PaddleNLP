@@ -86,6 +86,7 @@ GPT_PRETRAINED_INIT_CONFIGURATION = {
         "eol_token_id": 198,
     },
     "gpt3-13B-en": {  # 13B
+        "architectures": ["GPTForCausalLM"],
         "vocab_size": 50304,
         "hidden_size": 5120,
         "num_hidden_layers": 40,
@@ -267,6 +268,7 @@ class GPTConfig(PretrainedConfig):
         fuse_attention_qkv: bool = False,
         fuse_attention_ffn: bool = False,
         fused_softmax_with_triangular: bool = False,
+        use_dualpipev: bool = False,
         **kwargs
     ):
         super().__init__(pad_token_id=pad_token_id, **kwargs)
@@ -301,3 +303,4 @@ class GPTConfig(PretrainedConfig):
 
         self.use_fast_layer_norm = use_fast_layer_norm
         self.fused_softmax_with_triangular = fused_softmax_with_triangular
+        self.use_dualpipev = use_dualpipev

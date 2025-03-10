@@ -28,7 +28,23 @@ export APIcase_list=()
 declare -A Normal_dic
 declare -A all_P0case_dic
 declare -A Build_list
-all_P0case_dic=("msra_ner"]=15 
+target_lists_for_llm=(
+    "paddlenlp/transformers"
+    "paddlenlp/experimental/transformers/"
+    "paddlenlp/data"
+    "paddlenlp/datasets"
+    "paddlenlp/generation"
+    "paddlenlp/peft"
+    "paddlenlp/mergekit"
+    "paddlenlp/quantization"
+    "paddlenlp/trainer"
+    "paddlenlp/trl"
+    "llm"
+    "tests/llm"
+    "csrc"
+    "scripts/regression"
+)
+all_P0case_dic=(["msra_ner"]=15 
     ["glue"]=2 
     ["bert"]=2 
     ["skep"]=10 
@@ -51,8 +67,9 @@ install_paddle(){
     echo -e "\033[35m ---- Install paddlepaddle-gpu  \033[0m"
     python -m pip install --user -r scripts/regression/requirements_ci.txt
     python -m pip uninstall paddlepaddle -y
-    python -m pip install --user ${paddle};
-    python -c "import paddle; print('paddle version:',paddle.__version__,'\npaddle commit:',paddle.version.commit)";
+    python -m pip install pillow -y
+    python -m pip install --user ${paddle} --no-cache-dir;
+    python -c "import paddle;print('paddle');print(paddle.__version__);print(paddle.version.show())" >> ${log_path}/commit_info.txt
     python -c 'from visualdl import LogWriter'
 }
 ####################################
@@ -95,12 +112,13 @@ for line in `cat scripts/regression/model_list.txt`;do
 done
 cd ${nlp_dir}
 get_diff_TO_P0case(){
-for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
+for file_name in `git diff --numstat ${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
     arr_file_name=(${file_name//// })
     dir1=${arr_file_name[0]}
     dir2=${arr_file_name[1]}
     dir3=${arr_file_name[2]}
     dir4=${arr_file_name[3]}
+    file_item=$dir1/$dir2/$dir3/$dir4
     echo "file_name:"${file_name}, "dir1:"${dir1}, "dir2:"${dir2},"dir3:"${dir3},".xx:" ${file_name##*.}
     if [ ! -f ${file_name} ];then # 针对pr删掉文件
         continue
@@ -112,14 +130,22 @@ for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{pri
         if [[ ${dir2} =~ "should_deploy" ]];then # 针对发版mini test
             P0case_list[${#P0case_list[*]}]=transformer
         fi
+        if [[ ${dir2} =~ "regression" ]];then # ci脚本修改
+            P0case_list[${#P0case_list[*]}]=llm
+        fi
     elif [[ ${dir1} =~ "paddlenlp" ]];then # API 升级
+        for ((i=0; i<${#target_lists_for_llm[@]}; i++)); do  # 命中指定路径执行llm
+            if [[ ${file_item} == *${target_lists_for_llm[i]}* ]];then
+                P0case_list[${#P0case_list[*]}]=llm
+            fi
+        done
         if [[ ${dir2} =~ "__init__" ]];then # 针对发版mini test
             P0case_list[${#P0case_list[*]}]=bert
-        elif [[ ${!all_P0case_dic[*]} =~ ${dir2} ]];then
+        elif [[ ${!all_P0case_dic[*]} == ${dir2} ]];then
             P0case_list[${#P0case_list[*]}]=${dir2}
         elif [[ ${dir2} =~ "transformers" ]];then
             P0case_list[${#P0case_list[*]}]=llm
-            if [[ ${!all_P0case_dic[*]} =~ ${dir3} ]];then
+            if [[ ${!all_P0case_dic[*]} == ${dir3} ]];then
                 P0case_list[${#P0case_list[*]}]=${dir3}
             fi
         elif [[ ${dir2} =~ "taskflow" ]];then
@@ -167,6 +193,8 @@ for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{pri
         Build_list[${dir1}]=${dir1}
     elif [[ ${dir1} =~ "ppdiffusers" ]];then # 影响编包
         Build_list[${dir1}]=${dir1}
+    elif [[ ${dir1} =~ "csrc" ]];then # 推理改动
+        P0case_list[${#P0case_list[*]}]=llm
     else
         continue
     fi
@@ -186,7 +214,8 @@ if [[ ${#Build_list[*]} -ne 0 ]];then
     echo -e "\033[32m make PaddleNLP.tar.gz  \033[0m"
     cd /workspace
     rm -rf PaddleNLP_dev/build/*
-    tar -zcvf PaddleNLP.tar.gz PaddleNLP_dev/
+    cd PaddleNLP_dev && git submodule update --init --recursive
+    cd /workspace && tar -zcf PaddleNLP.tar.gz PaddleNLP_dev/
     mv PaddleNLP.tar.gz ${PPNLP_HOME}/upload
     cd ${PPNLP_HOME}
     python upload.py ${PPNLP_HOME}/upload 'paddlenlp/wheels'
@@ -210,6 +239,7 @@ if [[ ${#P0case_list[*]} -ne 0 ]] || [[ ${#APIcase_list[*]} -ne 0 ]];then
         echo "instal_nlp_pr"
         python -m pip install  dist/p****.whl
     fi
+    python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)" >> ${log_path}/commit_info.txt
     python -m pip list
     echo -e "\033[35m =======CI Check P0case========= \033[0m"
     echo -e "\033[35m ---- P0case_list length: ${#P0case_list[*]}, cases: ${P0case_list[*]} \033[0m"
@@ -276,8 +306,9 @@ if [[ ${#P0case_list[*]} -ne 0 ]] || [[ ${#APIcase_list[*]} -ne 0 ]];then
     fi
     cd ${nlp_dir}
     echo -e "\033[35m ---- Genrate Allure Report  \033[0m"
+    unset http_proxy && unset https_proxy
     cp scripts/regression/gen_allure_report.py ./
-    python gen_allure_report.py
+    python gen_allure_report.py > ${nlp_dir}/coverage_logs/gen_allure_report.log 2>&1
     echo -e "\033[35m ---- Report: https://xly.bce.baidu.com/ipipe/ipipe-report/report/${AGILE_JOB_BUILD_ID}/report/  \033[0m"
     ####################################
     # run coverage

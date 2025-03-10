@@ -36,7 +36,7 @@ class CommonTest(unittest.TestCase):
         self.config = {}
         self.places = ["cpu"]
         if paddle.is_compiled_with_cuda():
-            self.places.append("gpu")
+            self.places = ["gpu"]
 
     @classmethod
     def setUpClass(cls):

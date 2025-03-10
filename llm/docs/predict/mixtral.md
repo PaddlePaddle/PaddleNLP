@@ -12,7 +12,7 @@
 
 |Model|
 |:-|
-|mistralai/Mixtral-8x7B-v0.1-Instruct|
+|mistralai/Mixtral-8x7B-Instruct-v0.1|
 
 
 ## 模型推理
@@ -31,7 +31,7 @@ python -m paddle.distributed.launch \
     --dtype bfloat16 \
     --mode "dynamic" \
     --inference_model \
-    --block_attn
+    --append_attn
 
 # 动转静导出模型
 export DEVICES=0,1
@@ -42,11 +42,9 @@ python -m paddle.distributed.launch \
     --output_path ./inference \
     --dtype bfloat16 \
     --inference_model \
-    --block_attn
+    --append_attn
 
 # 静态图推理
-# 需要设置下面的环境变量，否则会导致多卡推理阻塞
-export FLAGS_dynamic_static_unified_comm=false
 export DEVICES=0,1
 python -m paddle.distributed.launch \
     --gpus ${DEVICES} \
@@ -55,7 +53,7 @@ python -m paddle.distributed.launch \
     --dtype bfloat16 \
     --mode "static" \
     --inference_model \
-    --block_attn
+    --append_attn
 
 ```
 
@@ -71,7 +69,7 @@ python -m paddle.distributed.launch \
     --quant_type "weight_only_int8" \
     --mode "dynamic" \
     --inference_model \
-    --block_attn
+    --append_attn
 
 # 动转静导出模型
 export DEVICES=0,1
@@ -83,10 +81,9 @@ python -m paddle.distributed.launch \
     --dtype bfloat16 \
     --quant_type weight_only_int8 \
     --inference_model \
-    --block_attn
+    --append_attn
 
 # 静态图推理
-export FLAGS_dynamic_static_unified_comm=false
 export DEVICES=0,1
 python -m paddle.distributed.launch \
     --gpus ${DEVICES} \
@@ -96,5 +93,5 @@ python -m paddle.distributed.launch \
     --quant_type weight_only_int8 \
     --mode "static" \
     --inference_model \
-    --block_attn
+    --append_attn
 ```

@@ -38,13 +38,16 @@ from paddlenlp.transformers import (
     CosineAnnealingWithWarmupDecay,
     GPTConfig,
     GPTForCausalLMAuto,
+    GPTForCausalLMNet,
     GPTPretrainingCriterionAuto,
+    GPTPretrainingCriterionNet,
     LinearAnnealingWithWarmupDecay,
 )
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
     "gpt": (GPTConfig, GPTForCausalLMAuto, GPTPretrainingCriterionAuto),
+    "gpt_network": (GPTConfig, GPTForCausalLMNet, GPTPretrainingCriterionNet),
 }
 
 from paddlenlp.data.causal_dataset import (
@@ -52,14 +55,7 @@ from paddlenlp.data.causal_dataset import (
     check_data_split,
     print_rank_0,
 )
-
-
-def add_start_docstrings(*docstr):
-    def docstring_decorator(fn):
-        fn.__doc__ = "".join(docstr) + (fn.__doc__ if fn.__doc__ is not None else "")
-        return fn
-
-    return docstring_decorator
+from paddlenlp.trainer.utils.doc import add_start_docstrings
 
 
 @dataclass
@@ -75,12 +71,6 @@ class PreTrainingArguments(AutoTrainingArguments):
             "help": "The steps use to control the learing rate. If the step > decay_steps, will use the min_learning_rate."
         },
     )
-    enable_linear_fused_grad_add: bool = field(
-        default=False,
-        metadata={
-            "help": "Enable fused linear grad add strategy, which will reduce elementwise add for grad accumulation in the backward of nn.Linear ."
-        },
-    )
     job_schedule_profiler_start: int = field(
         default=-1,
         metadata={"help": "The step to start job_schedule_profiler."},
@@ -93,9 +83,6 @@ class PreTrainingArguments(AutoTrainingArguments):
         default="1F1B", metadata={"help": "The pipeline schedule mode, support FThenB, 1F1B, VPP and Eager-1F1B."}
     )
     sr: Optional[int] = field(default=0, metadata={"help": "The count of chunks without recompute."})
-    refined_ops_patterns: Optional[List[str]] = field(
-        default=None, metadata={"help": "The pattern of refined recompute."}
-    )
     virtual_pipeline_seg_method: str = field(
         default="LlamaDecoderLayerAuto", metadata={"help": "The seg method of spliting pp layer for virtual pipeline."}
     )
@@ -211,6 +198,15 @@ class ModelArguments:
         default=False,
         metadata={"help": "whether to fuse first up and gate proj in mlp block"},
     )
+    # this optional can be use in run_pretrain.py
+    use_fast_layer_norm: bool = field(
+        default=False,
+        metadata={"help": "GPT3 model, use fast layernorm"},
+    )
+    use_fused_dropout_add: bool = field(
+        default=False,
+        metadata={"help": "Gpt3 model, use_fused_dropout_add"},
+    )
     recompute_granularity: str = field(
         default="full",
         metadata={"help": "Choose among ['full', 'core_attn', 'full_attn']"},
@@ -228,15 +224,6 @@ class ModelArguments:
 
     hidden_dropout_prob: float = field(default=0.1, metadata={"help": "The hidden dropout prob."})
     attention_probs_dropout_prob: float = field(default=0.1, metadata={"help": "The attention hidden dropout prob."})
-
-    sequence_parallel: bool = field(
-        default=False,
-        metadata={"help": "whether to use sequence parallel"},
-    )
-    fuse_sequence_parallel_allreduce: bool = field(
-        default=False,
-        metadata={"help": "whether to use fuse sequence parallel allreduce"},
-    )
     use_fused_rope: Optional[bool] = field(
         default=False,
         metadata={"help": "Enable rope fusion or not."},
@@ -360,6 +347,7 @@ def get_train_data_file(args):
 class PretrainingTrainer(AutoTrainer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.is_pretraining = True
 
     def _wrap_for_dist_loader(self, train_dataloader):
         dist_loader = super()._wrap_for_dist_loader(train_dataloader)
@@ -398,13 +386,18 @@ def init_seed(seed: int = 1234, args=None):
     else:
         assert not args.use_hybrid_parallel and args.enable_auto_parallel
         if dist.get_world_size() > 1:
+            if args.hybrid_parallel_topo_order is None or args.hybrid_parallel_topo_order == "pp_first":
+                order = ["pp", "dp", "sharding", "mp", "sep"]
+            elif args.hybrid_parallel_topo_order == "sharding_first":
+                order = ["dp", "sharding", "pp", "mp", "sep"]
             topo = Topology(
                 dist.get_rank(),
                 dist.get_world_size(),
-                dp_degree=args.data_parallel_degree,
+                dp_degree=max(args.data_parallel_degree, args.sharding_parallel_degree),
                 pp_degree=args.pipeline_parallel_degree,
                 mp_degree=args.tensor_parallel_degree,
-                sharding_degree=1,  # auto_parallel's sharding is not orthogonal with dp, mp and pp
+                sharding_degree=1,
+                order=order,
             )
 
             global_seed, local_seed, random_seed = _get_distributed_seeds(args.seed, topo)
@@ -429,11 +422,6 @@ def main():
         model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-
-    if training_args.enable_linear_fused_grad_add:
-        from fused_layers import mock_layers
-
-        mock_layers()
 
     if model_args.tokenizer_name_or_path is None:
         model_args.tokenizer_name_or_path = model_args.model_name_or_path
@@ -474,7 +462,7 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
 
     config = config_class.from_pretrained(model_args.model_name_or_path)
-
+    config.use_fast_layer_norm = model_args.use_fast_layer_norm
     config.seq_length = data_args.max_seq_length
     # There are some technique extend RotaryEmbedding context. so don't change max_position_embeddings
     if not model_args.continue_training:
@@ -498,15 +486,15 @@ def main():
     config.num_attention_heads = (
         model_args.num_attention_heads if model_args.num_attention_heads is not None else config.num_attention_heads
     )
-
+    config.use_fused_dropout_add = model_args.use_fused_dropout_add
     config.use_flash_attention = model_args.use_flash_attention
     config.use_fused_rms_norm = model_args.use_fused_rms_norm
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
     config.fuse_attention_ffn = model_args.fuse_attention_ffn
     config.recompute_granularity = model_args.recompute_granularity
     config.virtual_pp_degree = model_args.virtual_pp_degree
-    config.sequence_parallel = model_args.sequence_parallel
-    config.fuse_sequence_parallel_allreduce = model_args.fuse_sequence_parallel_allreduce
+    config.sequence_parallel = training_args.sequence_parallel
+    config.fuse_sequence_parallel_allreduce = training_args.fuse_sequence_parallel_allreduce
     config.use_fused_rope = model_args.use_fused_rope
     config.no_recompute_layers = model_args.no_recompute_layers
     config.pp_recompute_interval = model_args.pp_recompute_interval
@@ -532,14 +520,16 @@ def main():
             dtype = "float16"
         if training_args.bf16:
             dtype = "bfloat16"
-
-    model = model_class.from_config(config, dtype=dtype)
-    criterion = criterion_class(config)
+    with paddle.LazyGuard():
+        model = model_class.from_config(config, dtype=dtype)
+        criterion = criterion_class(config)
     if training_args.recompute:
 
         def fn(layer):
             if hasattr(layer, "enable_recompute") and (layer.enable_recompute is False or layer.enable_recompute == 0):
                 layer.enable_recompute = True
+                if hasattr(layer, "layerwise_recompute"):
+                    layer.layerwise_recompute = True
 
         model.apply(fn)
 
@@ -574,9 +564,6 @@ def main():
         tokenizer,
         need_data=training_args.should_load_dataset,
     )
-
-    # load_model_auto(model)
-    # model = shard_model(model)
 
     trainer = PretrainingTrainer(
         model=model,
