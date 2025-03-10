@@ -39,6 +39,7 @@ from comm_utils import (
     new_timer_log,
     offload_tensor_to_cpu,
     reload_tensor_to_gpu,
+    masked_whiten
 )
 from infer_utils import InferEvalModel, infer_guard
 from models.ppo_model_utils import (
@@ -715,19 +716,19 @@ class PPOMetric:
                 [
                     "policy_loss",
                     "ptx_loss",
-                    "value_loss",
+                    *(["value_loss"] if self.args.rl_algorithm == "ppo" else []),
                     "reward",
                     "norm_reward",
                     "kl_reward",
                     "norm_reward_with_kl",
-                    "values",
+                    *(["values"] if self.args.rl_algorithm == "ppo" else []),
                     "returns",
                     "kl_divergence",
                     "mean_generated_length",
                     "max_generated_length",
                     "min_generated_length",
                 ]
-                if self.args.rl_algorithm == "ppo"
+                if self.args.rl_algorithm in ["ppo", "reinforce_plus_plus"]
                 else [
                     "policy_loss",
                     "ptx_loss",
@@ -742,9 +743,12 @@ class PPOMetric:
             )
         ]
 
-        self.metric_ops = (
-            ["mean"] * 10 + ["max", "min"] if self.args.rl_algorithm == "ppo" else ["mean"] * 7 + ["max", "min"]
-        )
+        if self.args.rl_algorithm == "ppo":
+            self.metric_ops = ["mean"] * 11 + ["max", "min"]
+        elif self.args.rl_algorithm == "reinforce_plus_plus":
+            self.metric_ops = ["mean"] * 9 + ["max", "min"]
+        else:
+            self.metric_ops = ["mean"] * 7 + ["max", "min"]
         if not use_ptx:
             self.metric_names.pop(1)
             self.metric_ops.pop(1)
@@ -2103,17 +2107,22 @@ class PPOTrainer(Trainer):
         old_log_probs = rl_batch["log_probs"]  # length: src+tgt(-1)
         reward_advantages = rl_batch["reward_advantages"]  # length: src+tgt(-1)
 
+        response_start = rl_batch["prompt"].shape[-1] - 1
+
         policy_trainer_inputs = {
             "input_ids": input_ids,
             "attention_mask": attention_mask,
             "position_ids": position_ids,
             "old_log_probs": old_log_probs,
             "reward_advantages": reward_advantages,
-            "sequence_mask": sequence_mask,
+            "sequence_mask": sequence_mask[:, response_start:],
+            "response_start": response_start
         }
 
         if self.args.rl_algorithm == "grpo":
             policy_trainer_inputs.update({"ref_log_probs": rl_batch["ref_log_probs"]})
+        else:
+            policy_trainer_inputs.update({"ref_log_probs": None})
 
         actor_loss = self.policy_trainer.full_training_step(**policy_trainer_inputs)
 
@@ -2121,14 +2130,14 @@ class PPOTrainer(Trainer):
         with paddle.no_grad():
             rewards = rl_batch["rewards"].mean()
             ori_rewards = rl_batch["ori_rewards"].mean()
-            mask_cast = sequence_mask.cast(paddle.float32)
-            if self.args.rl_algorithm == "ppo":
+            mask_cast = sequence_mask[:, response_start:].cast(paddle.float32)
+            if self.args.rl_algorithm in ["ppo", "reinforce_plus_plus"]:
                 kl_rewards = (rl_batch["kl_rewards"] * mask_cast).sum() / mask_cast.sum()
                 rewards_with_kl = (rl_batch["rewards_with_kl"] * mask_cast).sum() / mask_cast.sum()
-                values = (rl_batch["reward_values"] * mask_cast).sum() / mask_cast.sum()
+                if self.args.rl_algorithm == "ppo":
+                    values = (rl_batch["reward_values"] * mask_cast).sum() / mask_cast.sum()
                 returns = (rl_batch["reward_returns"] * mask_cast).sum() / mask_cast.sum()
             ref_log_probs = rl_batch["ref_log_probs"]
-            # kl_divergence = ((old_log_probs - ref_log_probs) * sequence_mask).sum(axis=-1).mean()
             kl_divergence = ((old_log_probs - ref_log_probs) * mask_cast).sum() / mask_cast.sum()
             mean_generated_length = mask_cast.sum(axis=-1).mean()
             max_generated_length = mask_cast.sum(axis=-1).max()
@@ -2153,10 +2162,16 @@ class PPOTrainer(Trainer):
                     "train_norm_reward": rewards,
                     "train_kl_reward": kl_rewards,
                     "train_norm_reward_with_kl": rewards_with_kl,
-                    "train_values": values,
+                    **(
+                        {
+                            "train_values": values,
+                        }
+                        if self.args.rl_algorithm == "ppo"
+                        else {}
+                    ),
                     "train_returns": returns,
                 }
-                if self.args.rl_algorithm == "ppo"
+                if self.args.rl_algorithm in ["ppo", "reinforce_plus_plus"]
                 else {}
             ),
             "train_kl_divergence": kl_divergence,
@@ -2509,7 +2524,6 @@ class PPOTrainer(Trainer):
             for idx, seq in enumerate(sequences)
         ]
 
-    @paddle.no_grad()
     def rollout_logprob(
         self,
         input_ids: paddle.Tensor,
@@ -2542,7 +2556,8 @@ class PPOTrainer(Trainer):
         """
         # pipe model outputs a logits tensor with LMHead, while non-pipe model
         # outputs a tuple with logits tensor as the only one element.
-
+        
+        response_start = kwargs["prompt"].shape[-1] - 1 if "prompt" in kwargs else 0
         logits = self.actor_model(
             input_ids,
             attention_mask=attention_mask,
@@ -2560,28 +2575,30 @@ class PPOTrainer(Trainer):
 
         if not isinstance(ref_logits, paddle.Tensor):
             ref_logits = ref_logits[0]  # [2, 355, 12544]
+            
         logits = logits / self.args.temperature if self.args.temperature > 0.0 else logits
         ref_logits = ref_logits / self.args.temperature if self.args.temperature > 0.0 else ref_logits
+
         if self.actor_model.config.tensor_parallel_degree > 1 and self.actor_model.config.tensor_parallel_output:
             log_probs = (
-                -ParallelCrossEntropy()(logits[:, :-1].astype("float32"), input_ids[:, 1:])
+                -ParallelCrossEntropy()(logits[:, response_start:-1].astype("float32"), input_ids[:, response_start + 1:])
                 .squeeze(axis=-1)
                 .astype(logits.dtype)
             )
         else:
-            log_probs = gather_log_probabilities(logits[:, :-1], input_ids[:, 1:])
+            log_probs = gather_log_probabilities(logits[:, response_start:-1], input_ids[:, response_start + 1:])
 
         if (
             self.reference_model.config.tensor_parallel_degree > 1
             and self.reference_model.config.tensor_parallel_output
         ):
             ref_log_probs = (
-                -ParallelCrossEntropy()(ref_logits[:, :-1].astype("float32"), input_ids[:, 1:])
+                -ParallelCrossEntropy()(ref_logits[:, response_start:-1].astype("float32"), input_ids[:, response_start + 1:])
                 .squeeze(axis=-1)
                 .astype(ref_logits.dtype)
             )
         else:
-            ref_log_probs = gather_log_probabilities(ref_logits[:, :-1], input_ids[:, 1:])
+            ref_log_probs = gather_log_probabilities(ref_logits[:, response_start:-1], input_ids[:, response_start + 1:])
 
         return {"log_probs": log_probs, "ref_log_probs": ref_log_probs}
 
@@ -2642,7 +2659,7 @@ class PPOTrainer(Trainer):
 
         reward_score = reward_score.squeeze(axis=-1)
 
-        if self.args.rl_algorithm == "grpo":
+        if self.args.rl_algorithm in ["grpo", "reinforce_plus_plus"]:
             return {"rewards": reward_score}
 
         # .scores
@@ -2768,18 +2785,17 @@ class PPOTrainer(Trainer):
             # clone to avoid to change attention_mask
             sequence_mask = attention_mask[:, 1:].clone()  # length: src + tgt -1
             sequence_mask[:, :start] = False
+            eos_mask = (rl_batch["input_ids"] != self.tokenizer.pad_token_id)[:, 1:].to(old_log_probs.dtype)
             if use_tgt_len_value:
                 ref_log_probs = ref_log_probs[:, start:].contiguous()
                 old_log_probs = old_log_probs[:, start:].contiguous()
                 if self.args.rl_algorithm == "ppo":
                     old_reward_values = old_reward_values[:, start:].contiguous()
                 sequence_mask = sequence_mask[:, start:].contiguous()
+                eos_mask = eos_mask[:, start:].contiguous()
             if self.args.rl_algorithm == "grpo":
-                eos_mask = (rl_batch["input_ids"] != self.tokenizer.pad_token_id)[:, 1:].to(old_log_probs.dtype)
-                if use_tgt_len_value:
-                    eos_mask = eos_mask[:, start:].contiguous()
                 reward_advantages = compute_grpo_advantages(
-                    rewards, rl_batch["index"], eos_mask, old_log_probs.shape[-1]
+                    rewards, rl_batch["index"], eos_mask[:, start:], old_log_probs.shape[-1]
                 )
             elif self.args.rl_algorithm == "ppo":
                 rewards_with_kl, kl_rewards = self.add_kl_divergence_regularization(
@@ -2796,6 +2812,19 @@ class PPOTrainer(Trainer):
                     start=0 if use_tgt_len_value else start,
                     use_tgt_len_return=use_tgt_len_value,
                 )  # length: tgt if use_tgt_len_value src + tgt -1
+            elif self.args.rl_algorithm == "reinforce_plus_plus":
+                rewards_with_kl, kl_rewards = self.add_kl_divergence_regularization(
+                    None,  # prompt,
+                    old_log_probs,
+                    ref_log_probs,
+                    rewards,
+                    eos_mask[:, start:],
+                )  # length: tgt if use_tgt_len_value src + tgt -1
+                reward_advantages, reward_returns = compute_reinforce_plus_plus_advantages_and_returns(
+                    rewards_with_kl,
+                    eos_mask[:, start:],
+                    self.gamma,
+                )  # length: tgt if use_tgt_len_value src + tgt -1
             else:
                 raise ValueError(f"Unknown rl_algorithm: {self.args.rl_algorithm}")
 
@@ -2808,10 +2837,12 @@ class PPOTrainer(Trainer):
                     "rewards": rewards,
                 }
             )
-            if self.args.rl_algorithm == "ppo":
+            if self.args.rl_algorithm in ["reinforce_plus_plus", "ppo"]:
+                if self.args.rl_algorithm == "ppo":
+                    rl_batch.update({"reward_values": old_reward_values})
+
                 rl_batch.update(
                     {
-                        "reward_values": old_reward_values,
                         "reward_returns": reward_returns,
                         "kl_rewards": kl_rewards,
                         "rewards_with_kl": rewards_with_kl,
@@ -2819,7 +2850,7 @@ class PPOTrainer(Trainer):
                 )
 
             # pop out to reduce data dispatch comm overhead
-            rl_batch.pop("prompt")
+            # rl_batch.pop("prompt")
 
         if use_advantage_normalization:
             all_advantages_list = []
@@ -2904,3 +2935,22 @@ def compute_grpo_advantages(
         rewards[i] = (rewards[i] - id2mean[index[i]]) / (id2std[index[i]] + epsilon)
     rewards = rewards.unsqueeze(-1).tile([1, response_length]) * sequence_mask
     return rewards
+
+@paddle.no_grad()
+def compute_reinforce_plus_plus_advantages_and_returns(
+    rewards: paddle.Tensor,
+    eos_mask: paddle.Tensor,
+    gamma: float,
+) -> Tuple[paddle.Tensor, paddle.Tensor]:
+    """Compute reinforce_plus_plus_advantages_and_returns."""
+    length = rewards.shape[-1]
+    returns = paddle.zeros_like(rewards)
+    running_return = 0
+    for t in reversed(range(length)):
+        running_return = rewards[:, t] + gamma * running_return
+        returns[:, t] = running_return
+        running_return = running_return * eos_mask[:, t]
+
+    advantages = masked_whiten(returns.cast("float32"), eos_mask.cast("float32"))
+    advantages = (advantages * eos_mask).cast(rewards.dtype)
+    return advantages, returns
