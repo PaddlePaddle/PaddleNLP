@@ -370,4 +370,3 @@ class MoEFlexTokenLayer(nn.Layer):
         expert_output = self.expert_forward(dispatched_input, tokens_per_expert)
         output, _ = self.token_dispatcher.token_unpermutation(expert_output, None)
         return output, l_aux, l_zloss
->>>>>>> 1db27cdaf9005cc8714c72c7f04f0f797e06eba8
