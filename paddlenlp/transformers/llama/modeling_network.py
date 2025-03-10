@@ -23,9 +23,6 @@ from typing import Optional, Tuple
 import paddle
 import paddle.nn.functional as F
 from paddle import nn
-from paddle.distributed.auto_parallel.intermediate.tensor_parallel import (
-    PrepareLayerInput,
-)
 from paddle.distributed.fleet.utils import recompute
 
 try:
@@ -612,19 +609,10 @@ class LlamaDecoderLayerNet(nn.Layer):
         return outputs
 
 
-class ReshardLayer(paddle.nn.Layer):
-    def __init__(self):
-        super().__init__()
-
-    def forward(self, input):
-        return input
-
-
 class GlobalOutputNet(nn.Layer):
     def __init__(self, config) -> None:
         super().__init__()
         self.config = config
-        self.reshard_replicate = ReshardLayer()
 
     @staticmethod
     def _prepare_decoder_attention_mask(attention_mask, input_shape, past_key_values_length, dtype):
@@ -659,14 +647,11 @@ class GlobalOutputNet(nn.Layer):
         if not self.config.use_flash_attention and attention_mask is None:
             # [bs, seq_len]
             attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
-            attention_mask = self.reshard_replicate(attention_mask)
+
         if self.config.alibi:
             if attention_mask is None:
                 attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
-                attention_mask = self.reshard_replicate(attention_mask)
-
             alibi = build_alibi_tensor(attention_mask, self.config.num_attention_heads, dtype=emb_dtype)
-            alibi = self.reshard_replicate(alibi)
         else:
             alibi = None
         if self.config.use_flash_attention and not self.config.alibi:
@@ -677,7 +662,6 @@ class GlobalOutputNet(nn.Layer):
             attention_mask = self._prepare_decoder_attention_mask(
                 attention_mask, (batch_size, seq_length), cache_length, emb_dtype
             )  # [bs, 1, seq_len, seq_len]
-            attention_mask = self.reshard_replicate(attention_mask)
         return position_ids, attention_mask, alibi
 
 
@@ -724,9 +708,6 @@ class LlamaModelNet(LlamaPretrainedModelNet):
         self.norm = LlamaRMSNormNet(config)
 
         self.gradient_checkpointing = False
-
-        self.reshard_row = ReshardLayer()
-        self.reshard_row_and_col = ReshardLayer()
 
     def get_input_embeddings(self):
         return self.embed_tokens
@@ -810,8 +791,6 @@ class LlamaModelNet(LlamaPretrainedModelNet):
             cache_length,
             inputs_embeds.dtype,
         )
-        attention_mask = self.reshard_row(attention_mask)
-        alibi = self.reshard_row_and_col(alibi)
         # print(position_ids, attention_mask, alibi)
         hidden_states = inputs_embeds
 
@@ -939,48 +918,6 @@ class LlamaLMHeadNet(nn.Layer):
             tensor_parallel_output = self.config.tensor_parallel_output
         logits = paddle.matmul(hidden_states, self.weight, transpose_y=False)
         return logits
-
-
-def layer_input_parallel_row_hook(process_mesh):
-    def hook(layer, inputs, output=None):
-        res_inputs = []
-        for input in inputs:
-            if not input.is_dist():
-                x = dist.shard_tensor(input, process_mesh, [dist.Shard(0), dist.Replicate()])
-                res_inputs.append(dist.reshard(x, process_mesh, [dist.Shard(0), dist.Replicate()]))
-            else:
-                res_inputs.append(dist.reshard(input, process_mesh, [dist.Shard(0), dist.Replicate()]))
-        return tuple(res_inputs)
-
-    return hook
-
-
-def layer_input_parallel_row_and_col_hook(process_mesh):
-    def hook(layer, inputs, output=None):
-        res_inputs = []
-        for input in inputs:
-            if not input.is_dist():
-                x = dist.shard_tensor(input, process_mesh, [dist.Shard(0), dist.Shard(1)])
-                res_inputs.append(dist.reshard(x, process_mesh, [dist.Shard(0), dist.Shard(1)]))
-            else:
-                res_inputs.append(dist.reshard(input, process_mesh, [dist.Shard(0), dist.Shard(1)]))
-        return tuple(res_inputs)
-
-    return hook
-
-
-def layer_input_replicate_hook(process_mesh):
-    def hook(layer, inputs, output=None):
-        res_inputs = []
-        for input in inputs:
-            if not input.is_dist():
-                x = dist.shard_tensor(input, process_mesh, [dist.Replicate(), dist.Replicate()])
-                res_inputs.append(dist.reshard(x, process_mesh, [dist.Replicate(), dist.Replicate()]))
-            else:
-                res_inputs.append(dist.reshard(input, process_mesh, [dist.Replicate(), dist.Replicate()]))
-        return tuple(res_inputs)
-
-    return hook
 
 
 class LlamaForCausalLMNet(LlamaPretrainedModelNet):
@@ -1120,9 +1057,6 @@ class LlamaForCausalLMNet(LlamaPretrainedModelNet):
                         dist.ColWiseParallel(),
                         dist.SequenceParallelBegin(),
                     ],
-                    f"{prefix}llama.reshard_row": PrepareLayerInput(layer_input_parallel_row_hook),
-                    f"{prefix}llama.reshard_row_and_col": PrepareLayerInput(layer_input_parallel_row_and_col_hook),
-                    f"{prefix}llama.global_layer.reshard_replicate": PrepareLayerInput(layer_input_replicate_hook),
                     f"{prefix}llama.layers.*.self_attn.qkv_proj": dist.ColWiseParallel(),
                     f"{prefix}llama.layers.*.self_attn.q_proj": dist.ColWiseParallel(),
                     f"{prefix}llama.layers.*.self_attn.k_proj": dist.ColWiseParallel(),
@@ -1140,10 +1074,7 @@ class LlamaForCausalLMNet(LlamaPretrainedModelNet):
             },
             "mp_config": {
                 "parallelize_plan": {
-                    f"{prefix}llama.embed_tokens": dist.ColWiseParallel(gather_output=True),
-                    f"{prefix}llama.reshard_row": PrepareLayerInput(layer_input_parallel_row_hook),
-                    f"{prefix}llama.reshard_row_and_col": PrepareLayerInput(layer_input_parallel_row_and_col_hook),
-                    f"{prefix}llama.global_layer.reshard_replicate": PrepareLayerInput(layer_input_replicate_hook),
+                    f"{prefix}llama.embed_tokens": dist.RowWiseParallel(),
                     f"{prefix}llama.layers.*.self_attn.qkv_proj": dist.ColWiseParallel(),
                     f"{prefix}llama.layers.*.self_attn.q_proj": dist.ColWiseParallel(),
                     f"{prefix}llama.layers.*.self_attn.k_proj": dist.ColWiseParallel(),
