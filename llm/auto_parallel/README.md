@@ -1,11 +1,11 @@
-# LLaMA 自动并行使用说明
-本 README 详细介绍了如何使用 LLaMA 自动并行进行大模型的预训练、SFT（监督微调）、LoRA（低秩适应）、DPO（直接偏好优化）、 PPO（近端策略优化）以及推理。
+# 自动并行使用说明
+本 README 详细介绍了如何使用自动并行进行大模型的预训练、SFT（监督微调）、LoRA（低秩适应）、DPO（直接偏好优化）、 PPO（近端策略优化）以及推理。
 
 ## 目录
-- [LLaMA 自动并行使用说明](#llama-自动并行使用说明)
+- [自动并行使用说明](#自动并行使用说明)
   - [目录](#目录)
+  - [当前支持模型](#当前支持模型)
   - [环境准备](#环境准备)
-  - [自动并行策略配置](#自动并行策略配置)
   - [预训练](#预训练)
     - [数据准备](#数据准备)
     - [启动预训练](#启动预训练)
@@ -20,55 +20,31 @@
     - [静态图推理](#静态图推理)
   - [FAQ](#faq)
 
+## 当前支持模型
+| Model | Pretrain | SFT |  LoRA | dpo | ppo |
+|-------|----------|-----|-----|-----|-----|
+| gpt-3 |    ✅    |  🚧   |  🚧  | 🚧   |  🚧   |
+| llama |    ✅    |  ✅   |  ✅  | ✅   |  🚧   |
+| qwen  |    ✅    |  🚧   |  🚧  | 🚧   |  🚧   |
+| deepseekv3| ✅   |  🚧   |  🚧  | 🚧   |  🚧   |
+
+- ✅: Supported
+- 🚧: In Progress
 
 ## 环境准备
 1.安装 PaddlePaddle 最新版本
 
 首先，您需要安装最新的`Paddle`， 推荐使用`Nightly`版本。访问 [Paddle 官网](https://www.paddlepaddle.org.cn/install/quick?docurl=undefined) 获取安装指导。
 
-2.验证安装
+2.Paddle安装验证
 
 ```python
 import paddle
 print(paddle.utils.run_check())
 ```
-3.安装 PaddleNLP
+3.安装 PaddleNLP及自定义算子
 
 请访问[PaddleNLP 安装教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/get_started/installation.rst)获取安装指导。
-
-## 自动并行策略配置
-当前自动并行支持多种并行策略，包括数据并行（DP）、模型并行（MP）、流水线并行（PP）以及混合 ND 并行策略。
-- 自动并行基础API在组网中定义分布式状态:
-```python
-self.gate_proj.weight = dist.shard_tensor(
-    self.gate_proj.weight,
-    get_mesh(self.ipp),
-    [dist.Replicate(), dist.Shard(1)],
-)
-```
-
-- 自动并行中层API通过配置指定并行策略:
-``` python
-import paddle.distributed as dist
-def auto_dist_config(self, prefix=""):
-    config = {
-        "sp_config": {
-            "parallelize_plan": {
-                "llama.layers.*.self_attn.qkv_proj": dist.ColWiseParallel(),
-            },
-        },
-        "mp_config": {
-            "parallelize_plan": {
-                "llama.embed_tokens": dist.RowWiseParallel(),
-            },
-        },
-        "pp_config": {"split_spec": "llama.layers", "global_spec": "llama.global_layer"},
-    }
-
-    return config
-```
-
->详细的配置使用说明可以参考[Paddle自动并行使用指南](https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/guides/paddle_v3_features/auto_parallel_cn.html)和[Paddle分布式API](https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/api/paddle/distributed/Overview_cn.html)。
 
 
 ## 预训练
@@ -81,13 +57,19 @@ wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwe
 ```
 ### 启动预训练
 
-预训练脚本位于[run_pretrain_auto.py](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/auto_parallel/llama/run_pretrain_auto.py)。
-
-- 动态图模式(8卡 A100代码示例)
-<br>启动 shell 脚本**llama_with_api.sh**可以默认进行8卡，DP2-MP2-PP2的并行策略的预训练任务。更多可配置参数，请参考`ModelArguments`, `DataArguments`, `PreTrainingArguments`，详情可见文件[run_pretrain_auto.py](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/auto_parallel/llama/run_pretrain_auto.py)。
+- 动态图模式
+```python
+# llame example
+python -u  -m paddle.distributed.launch \
+    --gpus "0,1,2,3,4,5,6,7"            \
+    --log_dir "llama_auto_3d"           \
+    run_pretrain_auto.py ./pretrain_argument.json
+```
+该配置下运行`llama7B`预训练任务，并行策略为MP2-PP2-DP2，分片策略为Stage1。
+<br>更多可配置参数，请参考`ModelArguments`, `DataArguments`, `PreTrainingArguments`。
 
 - 动转静模式
-<br>追加 `--to_static=true`参数
+<br>追加 `to_static`参数
 
 
 ## 监督微调(SFT)
@@ -99,10 +81,16 @@ tar -xvf AdvertiseGen.tar.gz
 ```
 
 ### 启动微调
-SFT 训练脚本位于[run_finetune_auto.py](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/auto_parallel/run_finetune_auto.py)。
 
-- 动态图模式(8卡 A100代码示例)
-<br>启动 shell 脚本**llama_finetune_with_api.sh**可以默认进行8卡，DP2-MP2-PP2的并行策略的微调任务。更多可配置参数，请参考`GenerateArgument`, `ModelAutoConfig`, `ReftArgument`, `DataConfig`, `SFTAutoConfig`， 详情可见文件[run_finetune_auto.py](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/auto_parallel/run_finetune_auto.py)。
+- 动态图模式
+```python
+# llama finetune example
+python -u -m paddle.distributed.launch \
+  --gpus "0,1,2,3,4,5,6,7" \
+  ../run_finetune_auto.py ./finetune_argument.json
+```
+该配置下运行`llama-3.1-8B`任务，并行策略为MP2-PP2-DP2，分片策略为Stage2.
+<br>更多可配置参数，请参考`GenerateArgument`, `ModelAutoConfig`, `ReftArgument`, `DataConfig`, `SFTAutoConfig`。
 
 - 动转静模式
 <br>追加`--to_static=true`参数
@@ -114,7 +102,7 @@ SFT 训练脚本位于[run_finetune_auto.py](https://github.com/PaddlePaddle/Pad
 --lora true \
 --lora_rank 8
 ```
-更多的参数以及说明，可以参考[model_config.py](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/trl/model_config.py)。
+更多的参数，可以参考[model_config.py](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/trl/model_config.py)。
 
 ## DPO
 TODO

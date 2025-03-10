@@ -51,7 +51,7 @@ python -u -m paddle.distributed.launch \
     --tokenizer_name_or_path gpt3-13B-en \
     --to_static ${to_static} \
     --enable_auto_parallel 1 \
-    --input_dir "../gpt_data" \
+    --input_dir "../llama/data" \
     --output_dir "output/$task_name" \
     --split 949,50,1 \
     --max_seq_length 4096 \
