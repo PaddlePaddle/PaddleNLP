@@ -1098,8 +1098,8 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 qkv_quanted_weight_tensor, qkv_weight_scale_tensor = weight_quantize(
                     qkv_weight_tensor.cpu(), algo=self.quant_algo, group_size=self.weightonly_group_size
                 )
-                self.transformer_block.qkv_weights[idx].set_value(qkv_quanted_weight_tensor)
-                self.transformer_block.qkv_weights_scale[idx].set_value(qkv_weight_scale_tensor)
+                self.transformer_block.qkv_weights[idx].set_value(qkv_quanted_weight_tensor.cuda())
+                self.transformer_block.qkv_weights_scale[idx].set_value(qkv_weight_scale_tensor.cuda())
             elif "fp8" in self.quant_type:
                 self.transformer_block.qkv_weights[idx].copy_(paddle.cast(concated_qkv_weight, "float8_e4m3fn"), False)
             elif "a8w8" in self.quant_type and not self.transformer_block.skip_quant("qkv_weight_scale", idx):
@@ -1116,8 +1116,8 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 linear_quanted_weight_tensor, linear_weight_scale_tensor = weight_quantize(
                     linear_weight_tensor.cpu(), algo=self.quant_algo, group_size=self.weightonly_group_size
                 )
-                self.transformer_block.linear_weights[idx].set_value(linear_quanted_weight_tensor)
-                self.transformer_block.linear_weights_scale[idx].set_value(linear_weight_scale_tensor)
+                self.transformer_block.linear_weights[idx].set_value(linear_quanted_weight_tensor.cuda())
+                self.transformer_block.linear_weights_scale[idx].set_value(linear_weight_scale_tensor.cuda())
             elif "fp8" in self.quant_type:
                 self.transformer_block.linear_weights[idx].copy_(
                     paddle.cast(
@@ -1177,8 +1177,8 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 ffn1_quanted_weight_tensor, ffn1_weight_scale_tensor = weight_quantize(
                     ffn1_weight_tensor.cpu(), algo=self.quant_algo, group_size=self.weightonly_group_size
                 )
-                self.transformer_block.ffn1_weights[idx].set_value(ffn1_quanted_weight_tensor)
-                self.transformer_block.ffn1_weights_scale[idx].set_value(ffn1_weight_scale_tensor)
+                self.transformer_block.ffn1_weights[idx].set_value(ffn1_quanted_weight_tensor.cuda())
+                self.transformer_block.ffn1_weights_scale[idx].set_value(ffn1_weight_scale_tensor.cuda())
             elif "fp8" in self.quant_type:
                 self.transformer_block.ffn1_0_weights[idx].copy_(
                     paddle.to_tensor(unfused_state_dict["mlp.gate_proj.weight"])
@@ -1214,8 +1214,8 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 ffn2_quanted_weight_tensor, ffn2_weight_scale_tensor = weight_quantize(
                     ffn2_weight_tensor.cpu(), algo=self.quant_algo, group_size=self.weightonly_group_size
                 )
-                self.transformer_block.ffn2_weights[idx].set_value(ffn2_quanted_weight_tensor)
-                self.transformer_block.ffn2_weights_scale[idx].set_value(ffn2_weight_scale_tensor)
+                self.transformer_block.ffn2_weights[idx].set_value(ffn2_quanted_weight_tensor.cuda())
+                self.transformer_block.ffn2_weights_scale[idx].set_value(ffn2_weight_scale_tensor.cuda())
             elif "fp8" in self.quant_type:
                 self.transformer_block.ffn2_weights[idx].copy_(
                     paddle.to_tensor(state_dict["llama.layers.{}.mlp.down_proj.weight".format(idx)])
