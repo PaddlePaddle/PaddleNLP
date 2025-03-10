@@ -1271,6 +1271,8 @@ function llama_dpo_dy2st_auto_bs2_bf16_MP8_intermediate() {
     export FLAGS_cudnn_deterministic=1
     export FLAGS_embedding_deterministic=1
     export FLAGS_enable_pir_api=1
+    wget https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized.tar.gz
+    tar -zxvf ultrafeedback_binarized.tar.gz
 
     task_name="llama_dpo_dy2st_auto_bs2_bf16_MP8_intermediate"
     case_out_dir="output/$task_name"
@@ -1284,6 +1286,8 @@ function llama_dpo_dy2st_auto_bs2_bf16_MP8_intermediate() {
         --model_name_or_path "meta-llama/Meta-Llama-3.1-8B-Instruct" \
         --train_dataset_path ../../data/train.jsonl \
         --dev_dataset_path ../../data/dev.jsonl \
+        --train_dataset_path ../../../data/train.jsonl \
+        --dev_dataset_path ../../../data/dev.jsonl \
         --output_dir ./checkpoints/dpo_ckpts \
         --per_device_train_batch_size 1 \
         --gradient_accumulation_steps 1 \
@@ -1330,13 +1334,15 @@ function llama_dpo_dy2st_auto_bs2_bf16_MP8_intermediate() {
     ips=-1
     mem=-1
     echo "result: to_static=$to_static loss=$loss ips=$ips mem=$mem"
-    loss_base=0.59018242
+    loss_base=1.20962083
     if [ $IS_A100 -ne 0 ];then
-        loss_base=0.59018242
+        loss_base=1.20962083
     fi
     ips_base=-1
     mem_base=-1
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
+    rm -rf data
+    rm -rf ultrafeedback_binarized.tar.gz
 
     echo "=========== $FUNCNAME run  end ==========="
 }
