@@ -102,7 +102,7 @@ tar -xvf AdvertiseGen.tar.gz
 SFT 训练脚本位于[run_finetune_auto.py](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/auto_parallel/run_finetune_auto.py)。
 
 - 动态图模式(8卡 A100代码示例)
-<br>启动 shell 脚本**llama_finetune_with_api.sh**可以默认进行8卡，DP2-MP2-PP2的并行策略的预训练任务。更多可配置参数，请参考[PaddleNLP](https://paddlenlp.readthedocs.io/zh/latest/trainer.html)文档。
+<br>启动 shell 脚本**llama_finetune_with_api.sh**可以默认进行8卡，DP2-MP2-PP2的并行策略的微调任务。更多可配置参数，请参考[PaddleNLP](https://paddlenlp.readthedocs.io/zh/latest/trainer.html)文档。
 
 - 动转静模式
 <br>追加`--to_static=true`参数
