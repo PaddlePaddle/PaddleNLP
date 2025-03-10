@@ -43,23 +43,33 @@ fi
 print_info() {
     if [ $1 -ne 0 ]; then
         if [[ $2 =~ 'tests' ]]; then
-            cp ${nlp_dir}/unittest_logs/$3.log ${nlp_dir}/unittest_logs/$3_FAIL.log
+            cp ${nlp_dir}/unittest_logs/$3 ${nlp_dir}/unittest_logs/$3_FAIL.log
             echo -e "\033[31m ${nlp_dir}/unittest_logs/$3_FAIL \033[0m"
-            cat ${nlp_dir}/unittest_logs/$3_FAIL.log
+            cat ${nlp_dir}/unittest_logs/$3_FAIL
+            cp ${log_path}/$3_FAIL.log ${PPNLP_HOME}/upload/$3_FAIL.log.${AGILE_PIPELINE_BUILD_ID}.${AGILE_JOB_BUILD_ID}
         else
             cat ${log_path}/$2.log | grep -v "SKIPPED" | grep -v "PASSED" > ${log_path}/$2_FAIL.log
             echo -e "\033[31m ${log_path}/$2_FAIL \033[0m"
             cat ${log_path}/$2_FAIL.log
+            cp ${log_path}/$2_FAIL.log ${PPNLP_HOME}/upload/$2_FAIL.log.${AGILE_PIPELINE_BUILD_ID}.${AGILE_JOB_BUILD_ID}
         fi
-        cp ${log_path}/$2_FAIL.log ${PPNLP_HOME}/upload/$2_FAIL.log.${AGILE_PIPELINE_BUILD_ID}.${AGILE_JOB_BUILD_ID}
         cd ${PPNLP_HOME} && python upload.py ${PPNLP_HOME}/upload 'paddlenlp/PaddleNLP_CI/PaddleNLP_CI'
         rm -rf upload/*
-    elif [[ $2 =~ 'tests' ]]; then
-        tail -n 1 ${log_path}/$3.log
-        echo -e "\033[32m ${log_path}/$3_SUCCESS \033[0m"
     else
-        tail -n 1 ${log_path}/$2.log
-        echo -e "\033[32m ${log_path}/$2_SUCCESS \033[0m"
+        if [[ $2 =~ 'tests' ]]; then
+            tail -n 1 ${log_path}/$3.log
+            echo -e "\033[32m ${log_path}/$3_SUCCESS \033[0m"
+        else
+            tail -n 1 ${log_path}/$2.log
+            echo -e "\033[32m ${log_path}/$2_SUCCESS \033[0m"
+        fi
+
+        if [ -e "${PPNLP_HOME}/upload" ] && [ "$(ls -A "${PPNLP_HOME}/upload")" ]; then
+            cd ${PPNLP_HOME} && ls -A "${PPNLP_HOME}/upload"
+            python upload.py ${PPNLP_HOME}/upload 'paddlenlp/wheels'
+            rm -rf upload/*
+            echo -e "\033[32m upload wheels SUCCESS \033[0m"
+        fi
     fi
 }
 # case list
@@ -560,14 +570,14 @@ llm(){
         echo "Found modifications in csrc, running setup_cuda.py install and uploading it to bos."
         cd ${nlp_dir}/csrc
         # python setup_cuda.py install
-        bash tools/build_wheel.sh python3.10 80
-        cp ./dist/p****.whl ${PPNLP_HOME}/upload/
+        bash tools/build_wheel.sh
+        cp ${nlp_dir}/csrc/gpu_dist/p****.whl ${PPNLP_HOME}/upload/
         cd ${PPNLP_HOME}
         python upload.py ${PPNLP_HOME}/upload 'paddlenlp/wheels'
         rm -rf upload/*
     else
         echo "No modifications in csrc, installing paddlenlp_ops wheel file..."
-        python -m pip install https://paddlenlp.bj.bcebos.com/wheels/paddlenlp_ops-0.0.0-py3-none-any.whl
+        python -m pip install https://paddlenlp.bj.bcebos.com/wheels/paddlenlp_ops-0.0.0-py3-none-any.whl --no-cache-dir
     fi
 
     sleep 5

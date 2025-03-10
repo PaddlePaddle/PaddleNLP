@@ -217,9 +217,9 @@ if [[ ${#Build_list[*]} -ne 0 ]];then
     cd PaddleNLP_dev && git submodule update --init --recursive
     cd /workspace && tar -zcf PaddleNLP.tar.gz PaddleNLP_dev/
     mv PaddleNLP.tar.gz ${PPNLP_HOME}/upload
-    cd ${PPNLP_HOME}
-    python upload.py ${PPNLP_HOME}/upload 'paddlenlp/wheels'
-    rm -rf upload/*
+    # cd ${PPNLP_HOME}
+    # python upload.py ${PPNLP_HOME}/upload 'paddlenlp/wheels'
+    # rm -rf upload/*
 else
    echo -e "\033[32m Don't need build whl  \033[0m"
 fi
