@@ -28,6 +28,7 @@ from paddlenlp.transformers.contrastive_loss import (
     SimpleContrastiveLoss,
 )
 from paddlenlp.transformers.embedding_utils import dist_gather_tensor_with_gradient
+from paddlenlp.utils import empty_device_cache
 
 __all__ = ["EmbeddingTrainer"]
 
@@ -57,7 +58,7 @@ class EmbeddingTrainer(Trainer):
     def clear_memory(self):
         self.accum_q_features.clear()
         self.accum_p_features.clear()
-        paddle.device.cuda.empty_cache()
+        empty_device_cache()
 
     def clear_state(self):
         self.accum_data.clear()
