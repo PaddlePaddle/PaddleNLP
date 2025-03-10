@@ -54,7 +54,13 @@ from paddlenlp.trl import (
 from paddlenlp.trl.llm_utils import get_lora_target_modules
 from paddlenlp.utils.log import logger
 
-flash_mask_support_list = [Qwen2ForCausalLM, Qwen2ForCausalLMPipe, LlamaForCausalLM, LlamaForCausalLMPipe]
+flash_mask_support_list = [
+    Qwen2ForCausalLM,
+    Qwen2ForCausalLMPipe,
+    LlamaForCausalLMNet,
+    LlamaForCausalLM,
+    LlamaForCausalLMPipe,
+]
 
 
 def main():

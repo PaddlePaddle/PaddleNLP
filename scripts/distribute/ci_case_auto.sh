@@ -1271,8 +1271,6 @@ function llama_dpo_dy2st_auto_bs2_bf16_MP8_intermediate() {
     export FLAGS_cudnn_deterministic=1
     export FLAGS_embedding_deterministic=1
     export FLAGS_enable_pir_api=1
-    wget https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized.tar.gz
-    tar -zxvf ultrafeedback_binarized.tar.gz
 
     task_name="llama_dpo_dy2st_auto_bs2_bf16_MP8_intermediate"
     case_out_dir="output/$task_name"
@@ -1286,8 +1284,8 @@ function llama_dpo_dy2st_auto_bs2_bf16_MP8_intermediate() {
         --model_name_or_path "meta-llama/Meta-Llama-3.1-8B-Instruct" \
         --train_dataset_path ../../data/train.jsonl \
         --dev_dataset_path ../../data/dev.jsonl \
-        --train_dataset_path ../../../data/train.jsonl \
-        --dev_dataset_path ../../../data/dev.jsonl \
+        --train_dataset_path ${llama_data_path}/data_dpo/data/train.jsonl \
+        --dev_dataset_path ${llama_data_path}/data_dpo/data/dev.jsonl \
         --output_dir ./checkpoints/dpo_ckpts \
         --per_device_train_batch_size 1 \
         --gradient_accumulation_steps 1 \
@@ -3361,6 +3359,10 @@ function before_hook_for_llama() {
             # download data for llama finetune
             wget -O ${llama_data_path}/AdvertiseGen.tar.gz https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz
             tar -xvf ${llama_data_path}/AdvertiseGen.tar.gz -C ${llama_data_path}
+            # download data for llama dpo
+            wget -O ${llama_data_path}/ultrafeedback_binarized.tar.gz https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized.tar.gz
+            mkdir ${llama_data_path}/data_dpo;
+            tar -xvf ${llama_data_path}/ultrafeedback_binarized.tar.gz -C ${llama_data_path}/data_dpo
         fi
         cp -r ${llama_data_path}/data ${llama_case_path}/
     else

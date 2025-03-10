@@ -98,6 +98,7 @@ def scaled_dot_product_attention(
     attention_mask,
     output_attentions,
     alibi=None,
+    attn_mask_startend_row_indices=None,
 ):
     bsz, q_len, num_heads, head_dim = query_states.shape
     _, kv_seq_len, _, _ = value_states.shape
@@ -119,13 +120,24 @@ def scaled_dot_product_attention(
         else:
             if alibi is not None:
                 attention_mask = attention_mask.cast(alibi.dtype) + alibi
-            attn_output = F.scaled_dot_product_attention(
-                query_states,
-                key_states,
-                value_states,
-                attn_mask=attention_mask,
-                is_causal=attention_mask is None and query_states.shape[1] != 1,
-            )
+            if attn_mask_startend_row_indices is not None:
+                if len(attn_mask_startend_row_indices.shape) == 2:
+                    attn_mask_startend_row_indices = paddle.unsqueeze(attn_mask_startend_row_indices, axis=1)
+                attn_output = F.flashmask_attention(
+                    query_states,
+                    key_states,
+                    value_states,
+                    startend_row_indices=attn_mask_startend_row_indices.unsqueeze(-1),
+                    causal=True,
+                )
+            else:
+                attn_output = F.scaled_dot_product_attention(
+                    query_states,
+                    key_states,
+                    value_states,
+                    attn_mask=attention_mask,
+                    is_causal=attention_mask is None and query_states.shape[1] != 1,
+                )
             attn_weights = None
 
         attn_output = attn_output.reshape([bsz, q_len, head_dim * query_states.shape[-2]])
@@ -351,6 +363,7 @@ class LlamaAttentionNet(nn.Layer):
         output_attentions: bool = False,
         use_cache: bool = False,
         alibi: Optional[paddle.Tensor] = None,
+        attn_mask_startend_row_indices: Optional[paddle.Tensor] = None,
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
         # [bs, seq_len, num_head * head_dim] or [seq_len / n, bs, num_head * head_dim] (if sequence_parallel)
@@ -458,6 +471,7 @@ class LlamaAttentionNet(nn.Layer):
                 attention_mask,
                 output_attentions,
                 alibi,
+                attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                 use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
@@ -469,6 +483,7 @@ class LlamaAttentionNet(nn.Layer):
                 attention_mask,
                 output_attentions,
                 alibi,
+                attn_mask_startend_row_indices=attn_mask_startend_row_indices,
             )
         if output_attentions:
             attn_output, attn_weights = outputs
@@ -520,6 +535,7 @@ class LlamaDecoderLayerNet(nn.Layer):
         past_key_value: Optional[Tuple[paddle.Tensor]] = None,
         use_cache: Optional[bool] = False,
         alibi: Optional[paddle.Tensor] = None,
+        attn_mask_startend_row_indices: Optional[paddle.Tensor] = None,
     ) -> Tuple[paddle.Tensor, Optional[Tuple[paddle.Tensor, paddle.Tensor]]]:
         """
         Args:
@@ -556,6 +572,7 @@ class LlamaDecoderLayerNet(nn.Layer):
                 output_attentions,
                 use_cache,
                 alibi,
+                attn_mask_startend_row_indices,
                 use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
@@ -567,6 +584,7 @@ class LlamaDecoderLayerNet(nn.Layer):
                 output_attentions,
                 use_cache,
                 alibi,
+                attn_mask_startend_row_indices=attn_mask_startend_row_indices,
             )
 
         if type(outputs) is tuple:
@@ -719,17 +737,14 @@ class LlamaModelNet(LlamaPretrainedModelNet):
         self,
         input_ids=None,
         position_ids=None,
-        response_indexs=None,
         attention_mask=None,
-        chosen_labels=None,
-        rejected_labels=None,
-        labels=None,
         inputs_embeds=None,
         use_cache=None,
         past_key_values=None,
         output_attentions=False,
         output_hidden_states=None,
         return_dict=False,
+        attn_mask_startend_row_indices=None,
         **kwargs,
     ):
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
@@ -824,6 +839,7 @@ class LlamaModelNet(LlamaPretrainedModelNet):
                     past_key_value,
                     use_cache,
                     alibi,
+                    attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                 )
             else:
                 layer_outputs = decoder_layer(
@@ -834,6 +850,7 @@ class LlamaModelNet(LlamaPretrainedModelNet):
                     past_key_value,
                     use_cache,
                     alibi,
+                    attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                 )
 
             if type(layer_outputs) is tuple:
@@ -1011,9 +1028,13 @@ class LlamaForCausalLMNet(LlamaPretrainedModelNet):
     def forward(
         self,
         input_ids=None,
-        labels=None,
         position_ids=None,
+        response_indexs=None,
         attention_mask=None,
+        chosen_labels=None,
+        rejected_labels=None,
+        attn_mask_startend_row_indices=None,
+        labels=None,
         inputs_embeds=None,
         use_cache=False,
         past_key_values=None,
@@ -1037,6 +1058,7 @@ class LlamaForCausalLMNet(LlamaPretrainedModelNet):
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
+            attn_mask_startend_row_indices=attn_mask_startend_row_indices,
         )
 
         hidden_states = outputs[0]  # [bs, seq_len, dim]
