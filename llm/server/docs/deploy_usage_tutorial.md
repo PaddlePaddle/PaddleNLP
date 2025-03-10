@@ -82,6 +82,8 @@ python download_model.py \
 --speculate_model_path $MODEL_PATH 
 ```
 
+**参数说明**
+
 | 字段名 | 字段类型 | 说明 | 是否必填 | 默认值 |
 | :---: | :-----: | :---: | :---: | :-----: |
 | model_name | str | 为指定下载模型名称，具体支持模型可查看[文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/static_models.md) | 否 | deepseek-ai/DeepSeek-R1/weight_only_int4 |
