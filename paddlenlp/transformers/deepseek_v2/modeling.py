@@ -443,17 +443,17 @@ class LinearFP8Func(paddle.autograd.PyLayer):
             pad_size = 128 - (dout_t.shape[1] % 128)
             dout_t = paddle.concat([dout_t, paddle.zeros([dout_t.shape[0], pad_size], dtype=dout_t.dtype)], axis=1)
         # dout use [128,128] quant
-        dout_t_fp8 = kitchen_quant(
-            dout_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
-        )
-        dweight = paddle.empty(w_quant.shape, dout.dtype)
-        deep_gemm.gemm_fp8_fp8_bf16_nt((x_t_quant, x_t_scale), (dout_t_fp8[0], dout_t_fp8[1]), dweight)
+        # dout_t_fp8 = kitchen_quant(
+        #     dout_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
+        # )
+        # dweight = paddle.empty(w_quant.shape, dout.dtype)
+        # deep_gemm.gemm_fp8_fp8_bf16_nt((x_t_quant, x_t_scale), (dout_t_fp8[0], dout_t_fp8[1]), dweight)
 
         # If dout use [1,128] quant
-        # dout_t_quant, dout_t_scale = kitchen_quant(
-        #     dout_t, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
-        # )
-        # dweight = kitchen_fp8_gemm(x_t_quant, x_t_scale, dout_t_quant, dout_t_scale, True, True)
+        dout_t_quant, dout_t_scale = kitchen_quant(
+            dout_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
+        )
+        dweight = kitchen_fp8_gemm(x_t_quant, x_t_scale, dout_t_quant, dout_t_scale, True, True)
         return dx, dweight
 
 
