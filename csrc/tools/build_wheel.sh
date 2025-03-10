@@ -92,11 +92,12 @@ function create_directories(){
 """ setup for PaddlenlpOps """
 
 import os
+from datetime import datetime
 
 from setuptools import find_packages, setup
 
 description = "Paddlenlp_ops : inference framework implemented based on PaddlePaddle"
-VERSION = "0.0.0"
+VERSION = "3.0.0b4.post"
 
 
 def read(file: str):
@@ -114,12 +115,16 @@ def read_version():
     """
     read version and return content
     """
-    return VERSION
+    __version__ = "3.0.0b4.post"
+    formatted_date = datetime.now().strftime("%Y%m%d%H%M")
+    __version__ = __version__.replace(".post", ".post{}".format(formatted_date))
+    
+    return __version__
 
 setup(
     name="paddlenlp_ops",
     packages=find_packages(),
-    version="0.0.0",
+    version=read_version(),
     author="Paddle Infernce Team",
     author_email="paddle-inference@baidu.com",
     description=description,
