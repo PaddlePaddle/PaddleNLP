@@ -97,7 +97,6 @@ from datetime import datetime
 from setuptools import find_packages, setup
 
 description = "Paddlenlp_ops : inference framework implemented based on PaddlePaddle"
-VERSION = "3.0.0b4.post"
 
 
 def read(file: str):
@@ -116,7 +115,7 @@ def read_version():
     read version and return content
     """
     __version__ = "3.0.0b4.post"
-    formatted_date = datetime.now().strftime("%Y%m%d%H%M")
+    formatted_date = datetime.now().date().strftime("%Y%m%d")
     __version__ = __version__.replace(".post", ".post{}".format(formatted_date))
     
     return __version__
