@@ -87,7 +87,7 @@ wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwe
 
 - 动态图模式(8卡 A100代码示例)
 ```python
-python -u -m paddle.distributed.launch               \
+python -u -m paddle.distributed.launch                 \
         --device "0,1,2,3,4,5,6,7"                     \
         ${FILE_PATH}/run_pretrain_auto.py              \
         --enable_auto_parallel true                    \
