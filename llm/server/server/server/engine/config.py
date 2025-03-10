@@ -314,10 +314,10 @@ class Config:
         from server.utils import get_logger
 
         logger = get_logger("model_server", "infer_config.log")
+        env = os.environ
         model_name=env.get("model_name")
         if model_name:
             self._get_download_model()
-            model_config_json = json.load(open(self.model_config_path, "r", encoding="utf-8"))
 
         config = self.get_model_config()
 
