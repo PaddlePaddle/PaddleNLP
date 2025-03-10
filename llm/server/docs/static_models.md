@@ -3,17 +3,20 @@
 * 静态图模型已支持 Deepseek 系列、Qwen 系列、llama 系列等模型 详细支持列表如下：
 
 ### DeepSeekV2
+
 |模型名称|静态图下载 model_name|
 |:------|:-:|
 | deepseek-ai/DeepSeek-V2-Chat              | 🚧 |
 | deepseek-ai/DeepSeek-V2-Lite-Chat         | 🚧 |
 
 ### DeepSeekV3
+
 |模型名称|静态图下载 model_name|
 |:------|:-:|
 | deepseek-ai/DeepSeek-V3                   | 🚧 |
 
 ### DeepSeekR1
+
 |模型名称|精度|MTP|节点数|静态图下载 model_name|
 |:------|:-:|:-:|:-:|:-:|
 | deepseek-ai/DeepSeek-R1  |weight_only_int4|否|1| deepseek-ai/DeepSeek-R1/weight_only_int4 |
@@ -31,6 +34,7 @@
 
 
 ### LLaMA
+
 | 模型名称 | 静态图下载 model_name |
 |:------|:-:|
 | facebook/llama-7b | 🚧 |
@@ -39,6 +43,7 @@
 | facebook/llama-65b | 🚧 |
 
 ### Llama2
+
 | 模型名称 | 静态图下载 model_name |
 |:------|:-:|
 | meta-llama/Llama-2-7b | 🚧 |
@@ -49,6 +54,7 @@
 | meta-llama/Llama-2-70b-chat | 🚧 |
 
 ### Llama3
+
 | 模型名称 | 静态图下载 model_name |
 |:------|:-:|
 | meta-llama/Meta-Llama-3-8B | 🚧 |
@@ -57,6 +63,7 @@
 | meta-llama/Meta-Llama-3-70B-Instruct | 🚧 |
 
 ### Llama3.1
+
 | 模型名称 | 静态图下载 model_name |
 |:------|:-:|
 | meta-llama/Meta-Llama-3.1-8B | 🚧 |
@@ -68,6 +75,7 @@
 | meta-llama/Llama-Guard-3-8B | 🚧 |
 
 ### Llama3.2
+
 | 模型名称 | 静态图下载 model_name |
 |:------|:-:|
 | meta-llama/Llama-3.2-1B | 🚧 |
@@ -77,17 +85,20 @@
 | meta-llama/Llama-Guard-3-1B | 🚧 |
 
 ### Llama3.3
+
 | 模型名称 | 静态图下载 model_name |
 |:------|:-:|
 | meta-llama/Llama-3.3-70B-Instruct | 🚧 |
 
 
 ### Mixtral
+
 | 模型名称 | 静态图下载 model_name |
 |:------|:-:|
 | mistralai/Mixtral-8x7B-Instruct-v0.1 | 🚧 |
 
 ### Qwen
+
 | 模型名称 | 静态图下载 model_name |
 |:------|:-:|
 | qwen/qwen-7b | 🚧 |
@@ -98,6 +109,7 @@
 | qwen/qwen-72b-chat | 🚧 |
 
 ### Qwen1.5
+
 | 模型名称 | 静态图下载 model_name |
 |:------|:-:|
 | Qwen/Qwen1.5-0.5B | Qwen/Qwen1.5-0.5B-Block-Attn/bfloat16,Qwen/Qwen1.5-0.5B-Block-Attn/float16 |
@@ -120,6 +132,7 @@
 | Qwen/Qwen1.5-MoE-A2.7B-Chat | 🚧 |
 
 ### Qwen2
+
 | 模型名称 | 静态图下载 model_name |
 |:------|:-:|
 | Qwen/Qwen2-0.5B | 🚧 |
@@ -134,6 +147,7 @@
 | Qwen/Qwen2-57B-A14B-Instruct | 🚧 |
 
 ### Qwen2-Math
+
 | 模型名称 | 静态图下载 model_name |
 |:------|:-:|
 | Qwen/Qwen2-Math-1.5B | 🚧 |
@@ -145,6 +159,7 @@
 | Qwen/Qwen2-Math-RM-72B | 🚧 |
 
 ### Qwen2.5
+
 | 模型名称 | 静态图下载 model_name |
 |:------|:-:|
 | Qwen/Qwen2.5-0.5B | 🚧 |
@@ -163,6 +178,7 @@
 | Qwen/Qwen2.5-72B-Instruct | 🚧 |
 
 ### Qwen2.5-Math
+
 | 模型名称 | 静态图下载 model_name |
 |:------|:-:|
 | Qwen/Qwen2.5-Math-1.5B | 🚧 |
@@ -174,6 +190,7 @@
 | Qwen/Qwen2.5-Math-RM-72B | 🚧 |
 
 ### Qwen2.5-Coder
+
 | 模型名称 | 静态图下载 model_name |
 |:------|:-:|
 | Qwen/Qwen2.5-Coder-1.5B | 🚧 |
