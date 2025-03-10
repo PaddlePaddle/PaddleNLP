@@ -9,10 +9,10 @@
   - [预训练](#预训练)
     - [数据准备](#数据准备)
     - [启动预训练](#启动预训练)
-  - [监督微调(SFT)](#监督微调 sft)
+  - [监督微调(SFT)](#监督微调sft)
     - [数据准备](#数据准备-1)
     - [启动微调](#启动微调)
-  - [低秩适应（LoRA）](#低秩适应 lora)
+  - [低秩适应（LoRA）](#低秩适应lora)
   - [推理](#推理)
   - [DPO](#dpo)
   - [FAQ](#faq)
@@ -21,7 +21,7 @@
 ## 环境准备
 1.安装 PaddlePaddle 最新版本
 
-首先，您需要安装最新的 Paddle 推荐使用 nightly 版本。访问 [Paddle 官网]() 获取安装指导
+首先，您需要安装最新的 Paddle 推荐使用 nightly 版本。访问 [Paddle 官网](https://www.paddlepaddle.org.cn/install/quick?docurl=undefined) 获取安装指导
 
 2.验证安装
 
@@ -35,8 +35,8 @@ print(paddle.utils.run_check())
 
 ## 自动并行策略配置
 当前自动并行支持多种并行策略，包括数据并行（DP）、模型并行（MP）、流水线并行（PP）以及混合 ND 并行策略。
-- 基础 API
-自动并行基础 API 需要侵入组网定义分布式状态
+- 基础API
+自动并行基础API侵入组网定义分布式状态
 ```python
     self.gate_proj.weight = dist.shard_tensor(
         self.gate_proj.weight,
@@ -44,9 +44,11 @@ print(paddle.utils.run_check())
         [dist.Replicate(), dist.Shard(1)],
     )
 ```
-- 中层 API
-自动并行中层 API 较少的侵入组网，用户指定并行策略配置
-<br>自动并行中层 API 并行策略配置示例：
+
+- 中层API
+自动并行中层API较少的侵入组网，用户通过配置指定并行策略:
+<br>自动并行中层API并行策略配置示例：
+
 ``` python
     #自动并行策略配置 example
     import paddle.distributed as dist
@@ -80,10 +82,10 @@ wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwe
 ```
 ### 启动预训练
 
-<br>预训练脚本[run_pretrain_auto.py](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/auto_parallel/llama/run_pretrain_auto.py)，可以通过`ModelArguments`, `DataArguments`, `AutoTrainingArguments`配置训练任务
+<br>预训练脚本[run_pretrain_auto.py](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/auto_parallel/llama/run_pretrain_auto.py)
 ·
-- 动态图模式(8卡 A100示例)
-<br> 通过`model_type=llama_network`选择通信 API 侵入的模型实例，配置`use_intermediate_api=true`选项，表示使用中层 API 进行自动并行训练
+- 动态图模式(8卡A100示例)
+<br> **代码示例**
 ```python
     python -u -m paddle.distributed.launch \
           --device "0,1,2,3,4,5,6,7"   \
@@ -101,6 +103,13 @@ wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwe
           --pipeline_parallel_degree 2 \
           --sharding_parallel_degree 2
 ```
+| 参数名称              | 选项          | 描述                                   |
+|-----------------------|---------------|----------------------------------------|
+| **use_intermediate_api** | `true`       | 使用自动并行中层API进行分布式训练       |
+|                       | `false`      | 使用基础API进行分布式训练              |
+| **model_type**        | `llama_network` | 使用中层API组网                        |
+|                       | `llama`      | 使用基础API组网                        |
+
 
 - 动转静模式
 <br>追加 `--to_static`参数
@@ -116,10 +125,10 @@ tar -xvf AdvertiseGen.tar.gz
 ```
 
 ### 启动微调
-SFT 训练脚本[run_finetune_auto.py]()，同样可以通过模型配置，数据配置和训练相关配置完成自定义训练过程
+SFT训练脚本[run_finetune_auto.py](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/auto_parallel/run_finetune_auto.py)
 
-- 动态图模式
-<br> 同样需要配置`model_type=llama_network`, 开启`use_intermediate_api=true`
+- 动态图模式(8卡A100示例)
+<br> **代码示例**
 ```python
     python -u -m paddle.distributed.launch                             \
           --device "0,1,2,3,4,5,6,7"                                   \
@@ -135,6 +144,7 @@ SFT 训练脚本[run_finetune_auto.py]()，同样可以通过模型配置，数�
           --pipeline_parallel_degree 2                                 \
           --sharding_parallel_degree 2
 ```
+`use_intermediate_api`, `model_type`同上
 
 - 动转静模式
 <br>追加`--to_static`参数
@@ -148,7 +158,7 @@ SFT 训练脚本[run_finetune_auto.py]()，同样可以通过模型配置，数�
 --lora true \
 --lora_rank 8
 ```
-更多的参数以及说明，可以参考[model_config.py]()
+更多的参数以及说明，可以参考[model_config.py](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/trl/model_config.py)
 
 ## 推理
 推理流程包括：动态图推理 -> 动转静导出模型 -> 静态图推理。当前自动并行预训练保存的模型参数已支持用于动态图推理；动转静导出模型、静态图推理步骤请参考 [LLaMA 系列大模型运行文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/llama.md)。
