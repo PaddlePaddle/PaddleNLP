@@ -21,7 +21,9 @@ from dataclasses import dataclass
 from typing import Optional, Tuple
 
 import paddle
+import paddle.distributed
 import paddle.distributed as dist
+import paddle.incubate.nn.functional as PF
 import paddle.nn.functional as F
 from paddle import nn
 from paddle.distributed import fleet
@@ -327,7 +329,7 @@ class RLHFPPOMixedLoss(nn.Layer):
         reward_advantages,
         sequence_mask,
         ref_log_probs=None,
-        response_start=0
+        response_start=0,
     ):
         """
         计算损失函数，包含两部分：soft target loss和PPO loss。
@@ -357,12 +359,14 @@ class RLHFPPOMixedLoss(nn.Layer):
         if reward_advantages is not None:
             if self.config.tensor_parallel_degree > 1 and self.config.tensor_parallel_output:
                 log_probs = (
-                    -ParallelCrossEntropy()(logits[:, response_start:-1].astype("float32"), input_ids[:, response_start+1:])
+                    -ParallelCrossEntropy()(
+                        logits[:, response_start:-1].astype("float32"), input_ids[:, response_start + 1 :]
+                    )
                     .squeeze(axis=-1)
                     .astype(logits.dtype)
                 )
             else:
-                log_probs = gather_log_probabilities(logits[:, response_start:-1], input_ids[:, response_start+1:])
+                log_probs = gather_log_probabilities(logits[:, response_start:-1], input_ids[:, response_start + 1 :])
             if log_probs.shape[1] == old_log_probs.shape[1]:
                 # labels (old_log_probs, reward_advantages, sequence_mask) has
                 # src+tgt-1 length, valid length is determined by sequence_mask
@@ -801,3 +805,299 @@ class FusedPPOLoss(nn.Layer):
             clip_range_ratio=self.clip_range_ratio,
         )
         return actor_loss
+
+
+class ActorFusedPGEntropyKLLoss(paddle.autograd.PyLayer):
+    """ActorFusedPGEntropyKLLoss"""
+
+    @staticmethod
+    def forward(
+        ctx,
+        hidden_states: paddle.Tensor,
+        weight: paddle.Tensor,
+        bias: paddle.Tensor,
+        sequence_mask: paddle.Tensor,
+        labels: paddle.Tensor,
+        old_log_probs: paddle.Tensor,
+        advantages: paddle.Tensor,
+        ref_log_probs: paddle.Tensor,  # 新增参考策略的log概率
+        transpose_y: bool,
+        vocab_size: int,
+        tensor_parallel_degree: int,
+        tensor_parallel_output: bool,
+        pg_loss_coeff: float,
+        clip_range_ratio: float,  # pg loss
+        entropy_coeff: float,  # entropy loss
+        clip_range_score: float,  # clip loss
+        kl_loss_coeff: float,  # clip loss
+        fused_linear: bool,
+        loop_chunk_size: int,
+    ):
+        if ref_log_probs is None:
+            kl_loss_coeff = 0.0
+        if tensor_parallel_degree > 1:
+            assert tensor_parallel_output, "tensor_parallel_output must be True when tensor_parallel_degree > 1."
+        assert pg_loss_coeff > 0.0, "pg_loss_coeff must be greater than 0."
+
+        dtype = hidden_states.dtype
+
+        if tensor_parallel_degree > 1 and tensor_parallel_output:
+            hcg = fleet.get_hybrid_communicate_group()
+            model_parallel_group = hcg.get_model_parallel_group()
+            tensor_parallel_degree = hcg.get_model_parallel_world_size()
+
+        original_shape = hidden_states.shape
+        hidden_states_stop_gradient = hidden_states.stop_gradient
+        hidden_states = hidden_states.reshape([-1, original_shape[-1]])
+        labels = labels.reshape([-1])
+        old_log_probs = old_log_probs.reshape([-1])
+        advantages = advantages.reshape([-1])
+        if kl_loss_coeff > 0:
+            ref_log_probs = ref_log_probs.reshape([-1])
+        loss_mask = sequence_mask.reshape([-1]).astype("float32")
+        divisor = loss_mask.sum()
+
+        n_tokens = hidden_states.shape[0]
+        n_classes = weight.shape[0] if transpose_y else weight.shape[1]
+
+        lm_head_weight_cast = weight.cast(dtype)
+        lm_head_bias_cast = bias.cast(dtype) if bias is not None else None
+
+        def maybe_transpose(x):
+            if transpose_y:
+                return x.T
+            return x
+
+        # use indices to distinguish the devices.
+        if tensor_parallel_degree > 1 and tensor_parallel_output:
+            rank = hcg.get_model_parallel_rank()
+            per_part_size = vocab_size // tensor_parallel_degree
+            indices = paddle.arange(
+                rank * per_part_size,
+                rank * per_part_size + n_classes,
+                dtype=labels.dtype,
+            ).unsqueeze(0)
+        else:
+            indices = paddle.arange(vocab_size, dtype=labels.dtype).unsqueeze(0)
+
+        total_pg_loss = paddle.zeros([1], dtype=dtype)
+        if entropy_coeff > 0:
+            total_entropy_loss = paddle.zeros([1], dtype=dtype)
+        if kl_loss_coeff > 0:
+            total_kl_loss = paddle.zeros([1], dtype=dtype)
+
+        grad_lm_head_weight = paddle.zeros_like(weight) if not weight.stop_gradient else None
+        grad_lm_head_bias = paddle.zeros_like(bias) if bias is not None and not bias.stop_gradient else None
+        grad_hidden_states = paddle.zeros_like(hidden_states) if not hidden_states_stop_gradient else None
+
+        for i in range(0, n_tokens, loop_chunk_size):
+            chunk_slice = slice(i, min(i + loop_chunk_size, n_tokens))
+            hidden_chunk = hidden_states[chunk_slice]
+            labels_chunk = labels[chunk_slice]
+            old_log_prob_chunk = old_log_probs[chunk_slice]
+            if kl_loss_coeff > 0:
+                ref_log_chunk = ref_log_probs[chunk_slice]
+            advantages_chunk = advantages[chunk_slice]
+            mask_chunk = loss_mask[chunk_slice]
+
+            if fused_linear:
+                logits_chunk = PF.fused_linear(
+                    hidden_chunk, maybe_transpose(lm_head_weight_cast), bias=lm_head_bias_cast
+                )
+            else:
+                logits_chunk = F.linear(hidden_chunk, maybe_transpose(lm_head_weight_cast), bias=lm_head_bias_cast)
+            logits_chunk = logits_chunk.astype("float32")
+
+            # 计算交叉熵和softmax
+            if tensor_parallel_degree > 1 and tensor_parallel_output:
+                ce_loss_chunk, softmax_out_chunk = mp_ops._c_softmax_with_cross_entropy(
+                    logits_chunk, labels_chunk, group=model_parallel_group, return_softmax=True
+                )
+            else:
+                ce_loss_chunk = F.cross_entropy(logits_chunk, labels_chunk, reduction="none")
+                softmax_out_chunk = F.softmax(logits_chunk, axis=-1)
+
+            log_probs_chunk = -ce_loss_chunk.squeeze(axis=-1)
+            labels_one_hot = labels_chunk.unsqueeze(1) == indices
+            grad_logits_chunk = labels_one_hot.astype("float32") - softmax_out_chunk
+
+            # [1] pg loss
+            ratio_chunk = paddle.exp(log_probs_chunk - old_log_prob_chunk)
+            clipped_ratio_chunk = paddle.clip(
+                ratio_chunk,
+                min=1.0 - clip_range_ratio,
+                max=1.0 + clip_range_ratio,
+            )
+
+            pg_loss1_chunk = -advantages_chunk * ratio_chunk
+            pg_loss2_chunk = -advantages_chunk * clipped_ratio_chunk
+
+            pg_loss_chunk = paddle.maximum(pg_loss1_chunk, pg_loss2_chunk) * mask_chunk
+
+            total_pg_loss += pg_loss_chunk.sum() * pg_loss_coeff / divisor
+
+            # gradgradgradgrad pg loss
+            pg_within_clip_chunk = (
+                (ratio_chunk >= 1.0 - clip_range_ratio) & (ratio_chunk <= 1.0 + clip_range_ratio)
+            ).astype(dtype)
+
+            d_pg_log_probs_chunk = (
+                paddle.where(
+                    pg_loss1_chunk >= pg_loss2_chunk,
+                    pg_loss1_chunk,
+                    pg_loss2_chunk * pg_within_clip_chunk,
+                )
+                * mask_chunk
+                * pg_loss_coeff
+                / divisor
+            )
+
+            if entropy_coeff > 0:
+                # [2] entropy loss
+                eps = 1e-12
+                log_prob_chunk = paddle.log(softmax_out_chunk + eps)
+                entropy_loss_chunk = (softmax_out_chunk * log_prob_chunk).sum(axis=-1) * mask_chunk
+                total_entropy_loss += entropy_loss_chunk.sum() * entropy_coeff / divisor
+
+                # gradgradgradgrad entropy loss
+                grad_softmax_out_chunk = (log_prob_chunk + 1) * mask_chunk.unsqueeze(-1) * entropy_coeff / divisor
+                sum_term = (softmax_out_chunk * grad_softmax_out_chunk).sum(axis=-1, keepdim=True)
+                d_entropy_logits_chunk = softmax_out_chunk * (grad_softmax_out_chunk - sum_term)
+
+            if kl_loss_coeff > 0:
+                # [3] kl loss
+                delta_chunk = ref_log_chunk - log_probs_chunk
+                exp_delta_chunk = paddle.exp(delta_chunk)
+                kl_loss_estimate_chunk = exp_delta_chunk - delta_chunk - 1
+                kl_loss_clipped_chunk = (
+                    paddle.clip(
+                        kl_loss_estimate_chunk,
+                        min=-clip_range_score,
+                        max=clip_range_score,
+                    )
+                    * mask_chunk
+                )
+                total_kl_loss += kl_loss_clipped_chunk.sum() * kl_loss_coeff / divisor
+                # gradgradgradgrad kl loss
+                kl_within_clip_chunk = (
+                    (kl_loss_estimate_chunk >= -clip_range_score) & (kl_loss_estimate_chunk <= clip_range_score)
+                ).astype(dtype)
+                d_kl_log_probs_chunk = (
+                    (1 - exp_delta_chunk) * kl_within_clip_chunk * mask_chunk * kl_loss_coeff / divisor
+                )
+
+            d_total_logits_chunk = d_pg_log_probs_chunk.unsqueeze(-1) * grad_logits_chunk
+            if entropy_coeff > 0:
+                d_total_logits_chunk += d_entropy_logits_chunk
+            if kl_loss_coeff > 0:
+                d_total_logits_chunk += d_kl_log_probs_chunk.unsqueeze(-1) * grad_logits_chunk
+
+            d_total_logits_chunk = d_total_logits_chunk.cast(dtype)
+
+            if grad_hidden_states is not None:
+                grad_hidden_states[chunk_slice] = paddle.matmul(
+                    d_total_logits_chunk, lm_head_weight_cast, transpose_y=not transpose_y
+                )
+            if grad_lm_head_weight is not None:
+                if transpose_y:
+                    grad_lm_head_weight += paddle.matmul(d_total_logits_chunk, hidden_chunk, transpose_x=True)
+                else:
+                    grad_lm_head_weight += paddle.matmul(hidden_chunk, d_total_logits_chunk, transpose_x=True)
+            if grad_lm_head_bias is not None:
+                grad_lm_head_bias += d_total_logits_chunk.astype("float32").sum(axis=0).astype(dtype)
+
+        final_loss = total_pg_loss
+        if entropy_coeff > 0:
+            final_loss += total_entropy_loss
+        if kl_loss_coeff > 0:
+            final_loss += total_kl_loss
+
+        ctx.hidden_states_has_grad = grad_hidden_states is not None
+        ctx.lm_head_weight_has_grad = grad_lm_head_weight is not None
+        ctx.lm_head_bias_has_grad = grad_lm_head_bias is not None
+
+        if ctx.hidden_states_has_grad:
+            if tensor_parallel_degree > 1:
+                paddle.distributed.all_reduce(
+                    grad_hidden_states, op=paddle.distributed.ReduceOp.SUM, group=model_parallel_group
+                )
+            grad_hidden_states = grad_hidden_states.reshape(original_shape)
+
+        ctx.save_for_backward(
+            *filter(lambda x: x is not None, [grad_hidden_states, grad_lm_head_weight, grad_lm_head_bias])
+        )
+
+        return final_loss
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        grad_args = ctx.saved_tensor()
+        idx = 0
+        if ctx.hidden_states_has_grad:
+            grad_hidden = grad_args[idx] * grad_output.astype(grad_args[idx].dtype)
+            idx += 1
+        else:
+            grad_hidden = None
+
+        if ctx.lm_head_weight_has_grad:
+            grad_lm_head_weight = grad_args[idx] * grad_output.astype(grad_args[idx].dtype)
+            idx += 1
+        else:
+            grad_lm_head_weight = None
+
+        if ctx.lm_head_bias_has_grad:
+            grad_lm_head_bias = grad_args[idx] * grad_output.astype(grad_args[idx].dtype)
+            idx += 1
+        else:
+            grad_lm_head_bias = None
+
+        return grad_hidden, grad_lm_head_weight, grad_lm_head_bias
+
+
+def actor_fused_pg_entropy_kl_loss(
+    hidden_states: paddle.Tensor,
+    weight: paddle.Tensor,
+    bias: paddle.Tensor,
+    input_ids: paddle.Tensor,
+    old_log_probs: paddle.Tensor,
+    ref_log_probs: paddle.Tensor,
+    advantages: paddle.Tensor,
+    sequence_mask: paddle.Tensor,
+    transpose_y: bool = False,
+    fused_linear: bool = False,
+    vocab_size=1024,
+    tensor_parallel_degree=1,
+    tensor_parallel_output=False,
+    pg_loss_coeff=1.0,
+    clip_range_ratio=0.2,
+    entropy_coeff=0.01,
+    clip_range_score=50,
+    kl_loss_coeff=0.1,
+    loop_chunk_size=1024,
+):
+    logits_next = hidden_states[:, :-1, :]
+    labels_next = input_ids[:, 1:]
+
+    if ref_log_probs is None:
+        kl_loss_coeff = 0.0
+    return ActorFusedPGEntropyKLLoss.apply(
+        hidden_states=logits_next,
+        weight=weight,
+        bias=bias,
+        sequence_mask=sequence_mask,
+        labels=labels_next,
+        old_log_probs=old_log_probs,
+        advantages=advantages,
+        ref_log_probs=ref_log_probs,
+        transpose_y=transpose_y,
+        vocab_size=vocab_size,
+        tensor_parallel_degree=tensor_parallel_degree,
+        tensor_parallel_output=tensor_parallel_output,
+        pg_loss_coeff=pg_loss_coeff,
+        clip_range_ratio=clip_range_ratio,  # pg loss
+        entropy_coeff=entropy_coeff,  # entropy loss
+        clip_range_score=clip_range_score,  # clip loss
+        kl_loss_coeff=kl_loss_coeff,  # clip loss
+        fused_linear=fused_linear,
+        loop_chunk_size=loop_chunk_size,
+    )
