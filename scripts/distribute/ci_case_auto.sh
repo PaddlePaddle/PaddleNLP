@@ -2325,50 +2325,58 @@ function llm_gpt_pir_auto_bs4_TP2_PP2(){
     rm -rf $case_out_dir
     rm -rf $case_log_dir
 
-    python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
-        --log_dir $case_log_dir \
-        run_pretrain_auto.py \
-        --model_name_or_path gpt3-13B-en \
-        --tokenizer_name_or_path gpt3-13B-en \
-        --input_dir "$gpt_data_path/data" \
-        --output_dir "output/$task_name" \
-        --split 949,50,1 \
-        --max_seq_length 1024 \
-        --per_device_train_batch_size 1 \
-        --per_device_eval_batch_size 1 \
-        --sharding "" \
-        --tensor_parallel_degree 2 \
-        --pipeline_parallel_degree 2 \
-        --sequence_parallel 0 \
-        --fuse_attention_qkv 1 \
-        --use_flash_attention 0 \
-        --scale_loss 1024 \
-        --learning_rate 0.00001 \
-        --min_learning_rate 0.000005 \
-        --max_steps 10 \
-        --save_steps 50000 \
-        --weight_decay 0.01 \
-        --warmup_ratio 0.01 \
-        --max_grad_norm 1.0 \
-        --logging_steps 1\
-        --continue_training 0\
-        --dataloader_num_workers 1 \
-        --eval_steps 100000 \
-        --report_to "visualdl" \
-        --disable_tqdm true \
-        --recompute 0 \
-        --gradient_accumulation_steps 4 \
-        --do_train \
-        --do_eval \
-        --device "gpu" \
-        --model_type "gpt" \
-        --enable_auto_parallel 1 \
-        --to_static 1 \
-        --fp16 1 \
-        --fp16_opt_level "O2" \
-        --num_hidden_layers 2 \
-        --intermediate_size 1024 \
-        >>${log_path}/$FUNCNAME 2>&1
+    pipeline_parallel_config=(
+        "--pipeline_parallel_config auto_parallel_sync_shared_params" 
+        " "
+    )
+
+    for pp_config in "${pipeline_parallel_config[@]}"; do
+        python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
+            --log_dir $case_log_dir \
+            run_pretrain_auto.py \
+            --model_name_or_path gpt3-13B-en \
+            --tokenizer_name_or_path gpt3-13B-en \
+            --input_dir "$gpt_data_path/data" \
+            --output_dir "output/$task_name" \
+            --split 949,50,1 \
+            --max_seq_length 1024 \
+            --per_device_train_batch_size 1 \
+            --per_device_eval_batch_size 1 \
+            --sharding "" \
+            --tensor_parallel_degree 2 \
+            --pipeline_parallel_degree 2 \
+            ${pipeline_parallel_config} \
+            --sequence_parallel 0 \
+            --fuse_attention_qkv 1 \
+            --use_flash_attention 0 \
+            --scale_loss 1024 \
+            --learning_rate 0.00001 \
+            --min_learning_rate 0.000005 \
+            --max_steps 10 \
+            --save_steps 50000 \
+            --weight_decay 0.01 \
+            --warmup_ratio 0.01 \
+            --max_grad_norm 1.0 \
+            --logging_steps 1\
+            --continue_training 0\
+            --dataloader_num_workers 1 \
+            --eval_steps 100000 \
+            --report_to "visualdl" \
+            --disable_tqdm true \
+            --recompute 0 \
+            --gradient_accumulation_steps 4 \
+            --do_train \
+            --do_eval \
+            --device "gpu" \
+            --model_type "gpt" \
+            --enable_auto_parallel 1 \
+            --to_static 1 \
+            --fp16 1 \
+            --fp16_opt_level "O2" \
+            --num_hidden_layers 2 \
+            --intermediate_size 1024 \
+            >>${log_path}/$FUNCNAME 2>&1
+    done
     echo "=========== $FUNCNAME run  end ==========="
 }
 
