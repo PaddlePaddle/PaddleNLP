@@ -914,6 +914,7 @@ class DeepseekV2MLP(nn.Layer):
         self.config = config
         self.hidden_size = config.hidden_size if hidden_size is None else hidden_size
         self.intermediate_size = config.intermediate_size if intermediate_size is None else intermediate_size
+        self.fuse_attention_ffn = config.fuse_attention_ffn
 
         def linear_dtype_gaurd():
             if config.use_fp8:
