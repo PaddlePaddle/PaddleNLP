@@ -88,12 +88,9 @@ std::vector<paddle::Tensor> MlaAttn(
 
   xpu::ctx_guard RAII_GUARD(xpu_ctx->x_context());
 
-//   xpu_ctx->x_context()->set_debug_level(0xa1);
-
   using QType = typename XPUTypeTrait<bfloat16>::Type;
   using CacheType = typename XPUTypeTrait<bfloat16>::Type;
   typedef paddle::bfloat16 qdata_t, cache_t;
-  // std::cout << "!!!!! kernel !!!!!!!!!" << std::endl;
   const auto& input_dims = q.dims();
   const auto& key_cache_dims = key_cache.dims();
   const auto& value_cache_dims = value_cache.dims();
@@ -106,10 +103,6 @@ std::vector<paddle::Tensor> MlaAttn(
   const int max_block_per_seq = block_tables.dims()[1];
   const int block_size = key_cache_dims[2];  
   const int max_seq_len = block_size * max_block_per_seq;
-//   std::cout << "bsz: " << bsz << " token_num: " << token_num
-//           << " num_head: " << num_head << " dim_qk: " << dim_qk << " dim_v: " << dim_v
-//           << " block_batch: " << block_batch << " block_size: " << block_size
-//           << " max_block_per_seq: " << max_block_per_seq << std::endl;
   // 初始化输入：q k v
   auto q_xft = baidu::xpu::xft::xftTensor<QType, 2>(
       reinterpret_cast<QType*>(const_cast<paddle::bfloat16*>(q.data<qdata_t>())),
@@ -169,16 +162,6 @@ std::vector<paddle::Tensor> MlaAttn(
                  sizeof(int32_t) * bsz,
                  XPUMemcpyKind::XPU_DEVICE_TO_HOST);
 
-//   std::cout << "seq_lens_encoder: " << std::endl;
-//   for(int ii=0;ii<bsz;ii++){
-//       std::cout << seq_lens_encoder_cpu[ii] << "  ";
-//   }
-//   std::cout << std::endl;
-//   std::cout << "seq_lens_decoder: " << std::endl;
-//   for(int ii=0;ii<bsz;ii++){
-//       std::cout << seq_lens_decoder_cpu[ii] << "  ";
-//   }
-//   std::cout << std::endl;
   int enc_batch = 0, dec_batch = 0;
   int64_t total_enc_len = 0;
   int batch_offset = 0;
@@ -206,7 +189,6 @@ std::vector<paddle::Tensor> MlaAttn(
 
   // encoder
   if(max_enc_len_this_time.data<int>()[0] > 0){
-    // std::cout << "compute encoder " << std::endl;
     // q_lod
     baidu::xpu::api::VectorParam<int32_t> context_len_vp =
         baidu::xpu::api::VectorParam<int32_t>{encoder_seq_lod.data(), enc_batch + 1, nullptr}
@@ -237,26 +219,6 @@ std::vector<paddle::Tensor> MlaAttn(
                                               prefix_lens_vp, // prefix_lens_vp
                                               encoder_kv_lods_vp); // encoder_kv_lods_vp
     
-    // encoder 关键信息打印
-    // std::cout << "===encoder 关键信息打印===" << std::endl;
-    // std::cout << "enc_batch: " << enc_batch << std::endl;
-    // std::cout << "context_len_vp: " << std::endl;
-    // for(int ii=0;ii<enc_batch+1;ii++){
-    //     std::cout << context_len_vp.cpu[ii] << "  ";
-    // }
-    // std::cout << std::endl;
-    // std::cout << "valid_batch_vp: " << std::endl;
-    // for(int ii=0;ii<enc_batch;ii++){
-    //     std::cout << valid_batch_vp.cpu[ii] << "  ";
-    // }
-    // std::cout << std::endl;
-    // std::cout << "prefix_lens_vp: 不需要"  << std::endl;
-    // std::cout << "encoder_kv_lods_vp: " << std::endl;
-    // for(int ii=0;ii<enc_batch+1;ii++){
-    //     std::cout << encoder_kv_lods_vp.cpu[ii] << "  ";
-    // }
-    // std::cout << std::endl;    
-
     // k v cache write
     std::vector<int> start_tokens(enc_batch, 0);
     baidu::xpu::api::VectorParam<int32_t> start_tokens_vp =
@@ -368,7 +330,6 @@ std::vector<paddle::Tensor> MlaAttn(
 
   // decoder
   if(max_dec_len_this_time.data<int>()[0] > 0){
-    // std::cout << "compute decoder " << std::endl;
     // context_len
     baidu::xpu::api::VectorParam<int32_t> context_len_vp =
         baidu::xpu::api::VectorParam<int32_t>{decoder_context_len.data(), dec_batch, nullptr}
@@ -399,23 +360,6 @@ std::vector<paddle::Tensor> MlaAttn(
                                               valid_batch_vp, // valid_batch_vp
                                               prefix_lens_vp, // prefix_lens_vp
                                               encoder_kv_lods_vp); // encoder_kv_lods_vp
-    
-    // decoder 关键信息打印
-    // std::cout << "===decoder 关键信息打印===" << std::endl;
-    // std::cout << "dec_batch: " << dec_batch << std::endl;
-    // std::cout << "context_len_vp: " << std::endl;
-    // for(int ii=0;ii<dec_batch;ii++){
-    //     std::cout << context_len_vp.cpu[ii] << "  ";
-    // }
-    // std::cout << std::endl;
-    // std::cout << "valid_batch_vp: " << std::endl;
-    // for(int ii=0;ii<dec_batch;ii++){
-    //     std::cout << valid_batch_vp.cpu[ii] << "  ";
-    // }
-    // std::cout << std::endl;
-    // std::cout << "prefix_lens_vp: 不需要"  << std::endl;
-    // std::cout << "encoder_kv_lods_vp: 不需要 "<< std::endl;
-    // std::cout << "total_enc_len: " << total_enc_len << std::endl;
     // k v cache write
     std::vector<int> kv_seq_lod(dec_batch + 1);
     std::iota(kv_seq_lod.begin(), kv_seq_lod.end(), 0);
@@ -503,10 +447,7 @@ std::vector<paddle::Tensor> MlaAttn(
             nullptr, // p_v_zeros,
             nullptr, // out_maxptr,
             dim_v); // v_head_dim
-
-    // std::cout << "pa decoder done" << std::endl;
   }
-    // xpu_ctx->x_context()->set_debug_level(0);
     return {fmha_out};   
 }
 

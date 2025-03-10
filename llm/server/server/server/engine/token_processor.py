@@ -19,7 +19,12 @@ import traceback
 from collections import Counter
 from datetime import datetime
 
-from paddlenlp_ops import get_output, speculate_get_output
+import paddle
+from paddlenlp_ops import get_output
+
+if not paddle.is_compiled_with_xpu():
+    from paddlenlp_ops import speculate_get_output
+
 from server.utils import datetime_diff, model_server_logger, monitor_logger
 
 from paddlenlp.utils.env import MAX_BSZ, MAX_DRAFT_TOKENS, SPECULATE_MAX_BSZ

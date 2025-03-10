@@ -71,7 +71,6 @@ std::vector<std::vector<int64_t>> GetPaddingOffsetV2InferShape(const std::vector
                                                              const std::vector<int64_t>& seq_len_shape,
                                                              const std::vector<int64_t>& draft_tokens_shape,
                                                              const std::vector<int64_t>& seq_lens_encoder_shape) {
-    // std::cout << "wht --- GetPaddingOffsetV2InferShape" << std::endl;
     int64_t bsz = seq_len_shape[0];
     int64_t seq_len = input_ids_shape[1];
     return {{-1}, {bsz}, {-1}, {bsz + 1}, {bsz + 1}};
@@ -83,7 +82,6 @@ std::vector<paddle::DataType> GetPaddingOffsetV2InferDtype(const paddle::DataTyp
                                                          const paddle::DataType& seq_len_dtype,
                                                          const paddle::DataType& draft_tokens_dtype,
                                                          const paddle::DataType& seq_lens_encoder_dtype) {
-    // std::cout << "wht --- GetPaddingOffsetV2InferDtype" << std::endl;
     return {input_ids_dtype, seq_len_dtype, seq_len_dtype, seq_len_dtype, seq_len_dtype};
 }
 
