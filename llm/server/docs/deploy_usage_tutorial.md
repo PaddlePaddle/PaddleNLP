@@ -81,12 +81,13 @@ python download_model.py \
 --mode "master" \
 --speculate_model_path $MODEL_PATH 
 ```
+
 | 字段名 | 字段类型 | 说明 | 是否必填 | 默认值 | 
 | :---: | :-----: | :---: | :---: | :-----: | 
 | model_name | str | 为指定下载模型名称，具体支持模型可查看[文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/static_models.md) | 否 | deepseek-ai/DeepSeek-R1/weight_only_int4 | 
 | dir | str | 模型存储地址 | 否 | downloads |
 | nnodes | int | 节点个数 | 否 | 1 |
-| mode | str | 下载模式用于区分多机的不同节点 | 否 | 仅支持 master 和 slave 两个值|
+| mode | str | 下载模式用于区分多机的不同节点 | 否 | 仅支持 master 和 slave 两个值 |
 | speculate_model_path | str | 投机解码模型存储路径 | 否 | None | 
 
 
