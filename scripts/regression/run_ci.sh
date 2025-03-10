@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 ####################################
+set -e
 export python=$1
 export paddle=$2
 export nlp_dir=/workspace/PaddleNLP
@@ -67,7 +68,7 @@ install_paddle(){
     echo -e "\033[35m ---- Install paddlepaddle-gpu  \033[0m"
     python -m pip install --user -r scripts/regression/requirements_ci.txt
     python -m pip uninstall paddlepaddle -y
-    python -m pip install pillow -y
+    python -m pip install pillow
     python -m pip install --user ${paddle} --no-cache-dir;
     python -c "import paddle;print('paddle');print(paddle.__version__);print(paddle.version.show())" >> ${log_path}/commit_info.txt
     python -c 'from visualdl import LogWriter'
@@ -90,7 +91,7 @@ nlp_build (){
 ####################################
 # upload paddlenlp  whl
 upload (){
-    mkdir ${PPNLP_HOME}/upload
+    mkdir -p ${PPNLP_HOME}/upload
     if [ $1 == "paddlenlp" ];then
         echo -e "\033[35m ---- build latest paddlenlp  \033[0m"
         build_dev_path=/workspace/PaddleNLP_dev
@@ -107,9 +108,9 @@ upload (){
 }
 ####################################
 # get diff case
-for line in `cat scripts/regression/model_list.txt`;do
-    all_example_dict[${#all_example_dict[*]}]=$line
-done
+# for line in `cat scripts/regression/model_list.txt`;do
+#     all_example_dict[${#all_example_dict[*]}]=$line
+# done
 cd ${nlp_dir}
 get_diff_TO_P0case(){
 for file_name in `git diff --numstat ${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
@@ -228,13 +229,11 @@ if [[ ${#P0case_list[*]} -ne 0 ]] || [[ ${#APIcase_list[*]} -ne 0 ]];then
     # Install paddlenlp
     cd ${nlp_dir}
     python -m pip uninstall protobuf -y
-    python -m pip uninstall protobuf -y
     python -m pip install protobuf==3.20.2
     if [ ! -f ./dist/p****.whl ];then
         install_paddle
         echo "install_nlp_develop"
-        wget https://paddlenlp.bj.bcebos.com/wheels/paddlenlp-ci-py3-none-any.whl
-        python -m pip install --user paddlenlp-ci-py3-none-any.whl
+        python -m pip install --user https://paddlenlp.bj.bcebos.com/wheels/paddlenlp-ci-py3-none-any.whl --no-cache-dir
     else
         echo "instal_nlp_pr"
         python -m pip install  dist/p****.whl
