@@ -38,7 +38,7 @@ print(paddle.utils.run_check())
 ## 自动并行策略配置
 当前自动并行支持多种并行策略，包括数据并行（DP）、模型并行（MP）、流水线并行（PP）以及混合 ND 并行策略。
 - 基础 API
-自动并行基础 API 侵入组网定义分布式状态
+<br>自动并行基础API在组网中定义分布式状态
 ```python
     self.gate_proj.weight = dist.shard_tensor(
         self.gate_proj.weight,
@@ -48,7 +48,7 @@ print(paddle.utils.run_check())
 ```
 
 - 中层 API
-自动并行中层 API 较少的侵入组网，用户通过配置指定并行策略:
+自动并行中层API通过配置指定并行策略:
 <br>自动并行中层 API 并行策略配置示例：
 
 ``` python
