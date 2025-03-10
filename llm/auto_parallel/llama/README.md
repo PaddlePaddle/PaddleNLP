@@ -13,17 +13,18 @@
     - [数据准备](#数据准备-1)
     - [启动微调](#启动微调)
   - [低秩适应（LoRA）](#低秩适应lora)
+  - [DPO](#dpo)
+  - [PPO](#ppo)
   - [推理](#推理)
     - [动态图推理](#动态图推理)
     - [静态图推理](#静态图推理)
-  - [DPO](#dpo)
   - [FAQ](#faq)
 
 
 ## 环境准备
 1.安装 PaddlePaddle 最新版本
 
-首先，您需要安装最新的 Paddle 推荐使用 nightly 版本。访问 [Paddle 官网](https://www.paddlepaddle.org.cn/install/quick?docurl=undefined) 获取安装指导。
+首先，您需要安装最新的`Paddle`， 推荐使用`3.0`版本。访问 [Paddle 官网](https://www.paddlepaddle.org.cn/install/quick?docurl=undefined) 获取安装指导。
 
 2.验证安装
 
@@ -66,7 +67,8 @@ def auto_dist_config(self, prefix=""):
 
     return config
 ```
->详细的配置说明可以参考[Paddle 文档中层 API](https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/api/paddle/distributed/Overview_cn.html)。
+
+>详细的配置使用说明可以参考[Paddle自动并行使用指南](https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/guides/paddle_v3_features/auto_parallel_cn.html)和[Paddle分布式API](https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/api/paddle/distributed/Overview_cn.html)。
 
 
 ## 预训练
@@ -79,38 +81,14 @@ wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwe
 ```
 ### 启动预训练
 
-<br>预训练脚本[run_pretrain_auto.py](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/auto_parallel/llama/run_pretrain_auto.py)
+预训练脚本位于[run_pretrain_auto.py](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/auto_parallel/llama/run_pretrain_auto.py)。
 
 - 动态图模式(8卡 A100代码示例)
-```python
-python -u -m paddle.distributed.launch                 \
-        --device "0,1,2,3,4,5,6,7"                     \
-        ${FILE_PATH}/run_pretrain_auto.py              \
-        --enable_auto_parallel true                    \
-        --model_name_or_path "facebook/llama-7b"       \
-        --tokenizer_name_or_path "facebook/llama-7b"   \
-        --input_dir "./data"                           \
-        --model_type "llama_network"                   \
-        --output_dir "log"                             \
-        --max_steps 1                                  \
-        --eval_steps 1                                 \
-        --use_intermediate_api true                    \
-        --tensor_parallel_degree 2                     \
-        --pipeline_parallel_degree 2                   \
-        --sharding_parallel_degree 2
-```
-| 参数名称              | 选项          | 描述                                   |
-|-----------------------|---------------|----------------------------------------|
-| **use_intermediate_api** | `true`       | 使用自动并行中层 API 进行分布式训练       |
-|                       | `false`      | 使用基础 API 进行分布式训练              |
-| **model_type**        | `llama_network` | 使用中层 API 组网                        |
-|                       | `llama`      | 使用基础 API 组网                        |
-
+<br>启动 shell 脚本**llama_with_api.sh**可以默认进行8卡，DP2-MP2-PP2的并行策略的预训练任务。更多可配置参数，请参考[PaddleNLP](https://paddlenlp.readthedocs.io/zh/latest/trainer.html)文档。
 
 - 动转静模式
-<br>追加 `--to_static`参数
+<br>追加 `--to_static=true`参数
 
-启动 shell 脚本**llama_with_api.sh**可以默认进行8卡，DP2-MP2-PP2的并行策略的预训练任务。更多可配置参数，请参考`ModelArguments`, `DataArguments`, `PreTrainingArguments`。
 
 ## 监督微调(SFT)
 ### 数据准备
@@ -121,30 +99,13 @@ tar -xvf AdvertiseGen.tar.gz
 ```
 
 ### 启动微调
-SFT 训练脚本[run_finetune_auto.py](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/auto_parallel/run_finetune_auto.py)。
+SFT 训练脚本位于[run_finetune_auto.py](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/auto_parallel/run_finetune_auto.py)。
 
 - 动态图模式(8卡 A100代码示例)
-```python
-python -u -m paddle.distributed.launch                             \
-        --device "0,1,2,3,4,5,6,7"                                   \
-        ${FILE_PATH}/run_finetune_auto.py                            \
-        --enable_auto_parallel true                                  \
-        --model_name_or_path "meta-llama/Meta-Llama-3.1-8B-Instruct" \
-        --dataset_name_or_path "./data"                              \
-        --model_type "llama_network"                                 \
-        --output_dir "log"                                           \
-        --max_steps 1                                                \
-        --use_intermediate_api true                                  \
-        --tensor_parallel_degree 2                                   \
-        --pipeline_parallel_degree 2                                 \
-        --sharding_parallel_degree 2
-```
-`use_intermediate_api`, `model_type`同上
+<br>启动 shell 脚本**llama_finetune_with_api.sh**可以默认进行8卡，DP2-MP2-PP2的并行策略的预训练任务。更多可配置参数，请参考[PaddleNLP](https://paddlenlp.readthedocs.io/zh/latest/trainer.html)文档。
 
 - 动转静模式
-<br>追加`--to_static`参数
-
-启动 shell 脚本**llama_finetune_with_api.sh**可以默认进行8卡，DP2-MP2-PP2的并行策略的预训练任务。更多可配置参数，请参考`GenerateArgument`, `ModelAutoConfig`, `ReftArgument`, `DataConfig`, `SFTAutoConfig`。
+<br>追加`--to_static=true`参数
 
 ## 低秩适应（LoRA）
 在 SFT 基础上启用 LoRA 参数：
@@ -154,6 +115,12 @@ python -u -m paddle.distributed.launch                             \
 --lora_rank 8
 ```
 更多的参数以及说明，可以参考[model_config.py](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/trl/model_config.py)。
+
+## DPO
+TODO
+
+## PPO
+TODO
 
 ## 推理
 推理流程包括：动态图推理 -> 动转静导出模型 -> 静态图推理。
@@ -188,9 +155,6 @@ python PaddleNLP/llm/auto_parallel/utils/convert_to_safetensors.py --input_path 
 
 ### 静态图推理
 动转静导出模型、静态图推理步骤请参考 [LLaMA 系列大模型运行文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/llama.md)。
-
-## DPO
-TODO
 
 ## FAQ
 
