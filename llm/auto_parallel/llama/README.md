@@ -52,7 +52,6 @@ self.gate_proj.weight = dist.shard_tensor(
 <br>自动并行中层 API 并行策略配置示例：
 
 ``` python
-#自动并行策略配置 example
 import paddle.distributed as dist
 def auto_dist_config(self, prefix=""):
     config = {
