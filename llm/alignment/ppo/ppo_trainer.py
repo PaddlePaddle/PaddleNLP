@@ -2524,6 +2524,7 @@ class PPOTrainer(Trainer):
             for idx, seq in enumerate(sequences)
         ]
 
+    @paddle.no_grad()
     def rollout_logprob(
         self,
         input_ids: paddle.Tensor,
