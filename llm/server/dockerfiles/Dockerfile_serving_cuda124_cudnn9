@@ -22,11 +22,11 @@ RUN cp /opt/source/PaddleNLP/llm/server/server/scripts/start_server.sh start_ser
     && mv start_server /usr/local/bin/ \
     && cp /opt/source/PaddleNLP/llm/server/server/scripts/stop_server.sh stop_server \
     && chmod +x stop_server \
-    && mv stop_server /usr/local/bin/ 
-    
+    && mv stop_server /usr/local/bin/
+
 RUN cp /opt/source/PaddleNLP/llm/server/server/server/download_model.py download_model.py
 
 ENV PYTHONPATH="/opt/source/PaddleNLP/llm/server/server:/opt/source/PaddleNLP"
-
+ENV tag="3.0.0.b4"
 ENV http_proxy=""
 ENV https_proxy=""
