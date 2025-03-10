@@ -415,12 +415,15 @@ class LinearFP8Func(paddle.autograd.PyLayer):
         x_t_quant, x_t_scale = kitchen_quant(
             x_t.contiguous(), backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
         )
-        ctx.save_for_backward(x_t_quant, x_t_scale, w_quant, w_sacle, x_t_shape)
+        ctx.save_for_backward(
+            x_t_quant, x_t_scale, w_quant, w_sacle, paddle.to_tensor(x_t_shape, dtype="int64", place=paddle.CPUPlace())
+        )
         return out
 
     @staticmethod
     def backward(ctx, dout):
         x_t_quant, x_t_scale, w_quant, w_sacle, x_t_shape = ctx.saved_tensor()
+        x_t_shape = x_t_shape.numpy()
         # compute dx = mm(dout, w)
         dx = paddle.empty([x_t_shape[1], x_t_shape[0]], dout.dtype)
         dx_orig_shape = dout.shape[:-1]
@@ -505,7 +508,16 @@ class Fuse_FFN_FP8_Func(paddle.autograd.PyLayer):
             x_t, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
         )
 
-        ctx.save_for_backward(x_t_fp8, x_t_scale, w1_fp8, w1_sacle, o1, w2_fp8, w2_sacle, x_orig_shape)
+        ctx.save_for_backward(
+            x_t_fp8,
+            x_t_scale,
+            w1_fp8,
+            w1_sacle,
+            o1,
+            w2_fp8,
+            w2_sacle,
+            paddle.to_tensor(x_orig_shape, dtype="int64", place=paddle.CPUPlace()),
+        )
         return o3
 
     @staticmethod
@@ -515,6 +527,7 @@ class Fuse_FFN_FP8_Func(paddle.autograd.PyLayer):
         do3 = do3.reshape([-1, do3_orig_shape[-1]])
 
         x_t_fp8, x_t_scale, w1_fp8, w1_sacle, o1, w2_fp8, w2_sacle, x_orig_shape = ctx.saved_tensor()
+        x_orig_shape = x_orig_shape.numpy()
 
         # ===== [recompute] o2 = swiglu(o1) =====
         # TODO: [Fusion] swiglu + transpose + quant
