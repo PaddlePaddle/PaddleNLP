@@ -273,7 +273,7 @@ class TrainingArguments(TrainingArguments):
     )
     rl_algorithm: str = field(
         default="ppo",
-        metadata={"help": "RL algorithm (supports PPO and GRPO)."},
+        metadata={"help": "RL algorithm (supports PPO, GRPO and Reinforce++)."},
     )
     use_tgt_len_value: bool = field(
         default=False,
@@ -317,7 +317,7 @@ class TrainingArguments(TrainingArguments):
                 self.logging_strategy = IntervalStrategy.STEPS
         if self.per_device_rollout_batch_size < 0:
             self.per_device_rollout_batch_size = self.per_device_train_batch_size
-        assert self.rl_algorithm in ["ppo", "grpo"], 'self.rl_algorithm should be one of ["ppo", "grpo"]'
+        assert self.rl_algorithm in ["ppo", "grpo", "reinforce_plus_plus"], 'self.rl_algorithm should be one of ["ppo", "grpo", "reinforce_plus_plus"]'
         if self.rl_algorithm == "grpo":
             self.normalize_reward = False
             self.normalize_advantage = False

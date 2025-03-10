@@ -174,7 +174,8 @@ def make_attention_mask(
 
     attention_mask = input_ids != pad_id
     if unk_id is not None and pad_id != unk_id:
-        attention_mask = paddle.logical_and(attention_mask, input_ids != unk_id)
+        if eos_id is not None and unk_id != eos_id:
+            attention_mask = paddle.logical_and(attention_mask, input_ids != unk_id)
     if eos_id is not None and pad_id != eos_id:
         attention_mask = paddle.logical_and(attention_mask, input_ids != eos_id)
     if not causal_mask:
@@ -326,6 +327,7 @@ class RLHFPPOMixedLoss(nn.Layer):
         reward_advantages,
         sequence_mask,
         ref_log_probs=None,
+        response_start=0
     ):
         """
         计算损失函数，包含两部分：soft target loss和PPO loss。
@@ -355,12 +357,12 @@ class RLHFPPOMixedLoss(nn.Layer):
         if reward_advantages is not None:
             if self.config.tensor_parallel_degree > 1 and self.config.tensor_parallel_output:
                 log_probs = (
-                    -ParallelCrossEntropy()(logits[:, :-1].astype("float32"), input_ids[:, 1:])
+                    -ParallelCrossEntropy()(logits[:, response_start:-1].astype("float32"), input_ids[:, response_start+1:])
                     .squeeze(axis=-1)
                     .astype(logits.dtype)
                 )
             else:
-                log_probs = gather_log_probabilities(logits[:, :-1], input_ids[:, 1:])
+                log_probs = gather_log_probabilities(logits[:, response_start:-1], input_ids[:, response_start+1:])
             if log_probs.shape[1] == old_log_probs.shape[1]:
                 # labels (old_log_probs, reward_advantages, sequence_mask) has
                 # src+tgt-1 length, valid length is determined by sequence_mask
@@ -383,7 +385,6 @@ class RLHFPPOMixedLoss(nn.Layer):
 
             # TODO:support fused head and loss fn
             loss = self.ppo_criterion(log_probs, old_log_probs, reward_advantages, sequence_mask)
-
         if ref_log_probs is not None:
             kl_divergence_estimate = paddle.clip(
                 paddle.exp(ref_log_probs - log_probs) - (ref_log_probs - log_probs) - 1,

@@ -139,7 +139,7 @@ def main():
         if model_args.reward_model_name_or_path is None:
             raise ValueError("Please specify reward_model_name_or_path when use_rm_server is false.")
 
-    if training_args.rl_algorithm != "ppo" and training_args.use_fused_head_and_loss_fn:
+    if training_args.rl_algorithm == "grpo" and training_args.use_fused_head_and_loss_fn:
         logger.warning(
             f"Fused_head_and_loss_fn currently does not support {training_args.rl_algorithm}. "
             "Reset `use_fused_head_and_loss_fn` to False."
