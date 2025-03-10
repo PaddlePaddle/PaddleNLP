@@ -1282,8 +1282,6 @@ function llama_dpo_dy2st_auto_bs2_bf16_MP8_intermediate() {
         --log_dir $case_log_dir \
         ../../alignment/dpo/run_dpo_auto.py\
         --model_name_or_path "meta-llama/Meta-Llama-3.1-8B-Instruct" \
-        --train_dataset_path ../../data/train.jsonl \
-        --dev_dataset_path ../../data/dev.jsonl \
         --train_dataset_path ${llama_data_path}/data_dpo/data/train.jsonl \
         --dev_dataset_path ${llama_data_path}/data_dpo/data/dev.jsonl \
         --output_dir ./checkpoints/dpo_ckpts \
