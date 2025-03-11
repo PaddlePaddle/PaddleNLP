@@ -2153,6 +2153,7 @@ class PPOTrainer(Trainer):
                 {
                     "train_pure_policy_loss": self.policy_trainer.info_buffer.get("pure_policy_loss"),
                     "train_kl_loss": self.policy_trainer.info_buffer.get("kl_loss"),
+                    "train_entropy_loss": self.policy_trainer.info_buffer.get("entropy_loss"),
                 }
                 if self.args.rl_algorithm == "grpo"
                 else {}
