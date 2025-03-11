@@ -2424,7 +2424,10 @@ class PPOTrainer(Trainer):
                         else {}
                     ),
                 }
-                micro_batch.update(self.rollout_logprob(**micro_batch))
+                if self.args.rollout_logprob_batch_size != -1:
+                    micro_batch.update(self.rollout_logprob_with_batch_size(**micro_batch))
+                else:
+                    micro_batch.update(self.rollout_logprob(**micro_batch))
                 micro_batches.append(micro_batch)
             self.timers and self.timers(get_timer_label(RolloutStages.ROLLOUT_LOGPROB)).stop()
             self.tokenizer.padding_side = origin_padding_side
@@ -2618,6 +2621,102 @@ class PPOTrainer(Trainer):
         return {"log_probs": log_probs, "ref_log_probs": ref_log_probs}
 
     @paddle.no_grad()
+    def rollout_logprob_with_batch_size(
+        self,
+        input_ids: paddle.Tensor,
+        attention_mask: paddle.Tensor,
+        position_ids: paddle.Tensor = None,
+        **kwargs,
+    ) -> Dict[str, paddle.Tensor]:
+        # Initialize lists to store results
+        rollout_logprob_batch_size = self.args.rollout_logprob_batch_size
+        log_probs_list = []
+        ref_log_probs_list = []
+        batch_size, _ = input_ids.shape
+        num_batches = (batch_size + rollout_logprob_batch_size - 1) // rollout_logprob_batch_size
+        response_start = kwargs["prompt"].shape[-1] - 1 if "prompt" in kwargs else 0
+
+        for i in range(num_batches):
+            # Calculate the start and end indices for the current batch
+            start_index = i * rollout_logprob_batch_size
+            end_index = min(start_index + rollout_logprob_batch_size, batch_size)
+
+            # Extract the current batch
+            current_input_ids = input_ids[start_index:end_index]
+            current_attention_mask = attention_mask[start_index:end_index] if attention_mask is not None else None
+            current_position_ids = position_ids[start_index:end_index] if position_ids is not None else None
+
+            logits = self.actor_model(
+                current_input_ids,
+                attention_mask=current_attention_mask,
+                position_ids=current_position_ids,
+            )
+            if not isinstance(logits, paddle.Tensor):
+                logits = logits[0]  # [2, 355, 12544]
+
+            if self.args.use_fp32_compute and logits.dtype != paddle.float32:
+                logits = logits.cast(paddle.float32)
+            logits = logits / self.args.temperature if self.args.temperature > 0.0 else logits
+
+            if self.actor_model.config.tensor_parallel_degree > 1 and self.actor_model.config.tensor_parallel_output:
+                log_probs = (
+                    -ParallelCrossEntropy()(
+                        logits[:, response_start:-1].astype("float32"), current_input_ids[:, response_start + 1 :]
+                    )
+                    .squeeze(axis=-1)
+                    .astype(logits.dtype)
+                )
+            else:
+                log_probs = gather_log_probabilities(
+                    logits[:, response_start:-1], current_input_ids[:, response_start + 1 :]
+                )
+
+            log_probs_list.append(log_probs)
+            # set logits to none, save memory
+            logits = None
+            paddle.device.cuda.empty_cache()
+
+            ref_logits = self.reference_model(
+                current_input_ids,
+                attention_mask=current_attention_mask,
+                position_ids=current_position_ids,
+            )
+
+            if not isinstance(ref_logits, paddle.Tensor):
+                ref_logits = ref_logits[0]  # [2, 355, 12544]
+
+            if self.args.use_fp32_compute and ref_logits.dtype != paddle.float32:
+                ref_logits = ref_logits.cast(paddle.float32)
+            ref_logits = ref_logits / self.args.temperature if self.args.temperature > 0.0 else ref_logits
+
+            if (
+                self.reference_model.config.tensor_parallel_degree > 1
+                and self.reference_model.config.tensor_parallel_output
+            ):
+                ref_log_probs = (
+                    -ParallelCrossEntropy()(
+                        ref_logits[:, response_start:-1].astype("float32"), current_input_ids[:, response_start + 1 :]
+                    )
+                    .squeeze(axis=-1)
+                    .astype(ref_logits.dtype)
+                )
+            else:
+                ref_log_probs = gather_log_probabilities(
+                    ref_logits[:, response_start:-1], current_input_ids[:, response_start + 1 :]
+                )
+            ref_log_probs_list.append(ref_log_probs)
+            # set logits to none, save memory
+            ref_logits = None
+            paddle.device.cuda.empty_cache()
+
+        if num_batches > 1:
+            return {
+                "log_probs": paddle.concat(log_probs_list, axis=0),
+                "ref_log_probs": paddle.concat(ref_log_probs_list, axis=0),
+            }
+        return {"log_probs": log_probs_list[0], "ref_log_probs": ref_log_probs_list[0]}
+
+    @paddle.no_grad()
     def rollout_reward_value(
         self,
         input_ids: paddle.Tensor,
@@ -2696,10 +2795,14 @@ class PPOTrainer(Trainer):
             try:
                 res = requests.post(self.reward_server, json=data)
                 result = json.loads(res.text)
-                reward_score = paddle.to_tensor(result["score"], dtype=self._model_config.dtype if not self.args.use_fp32_compute else "float32")
+                reward_score = paddle.to_tensor(
+                    result["score"], dtype=self._model_config.dtype if not self.args.use_fp32_compute else "float32"
+                )
             except:
                 logger.warning("Request reward server failed and rewards_score will be set zero.")
-                reward_score = paddle.zeros(len(response), dtype=self._model_config.dtype  if not self.args.use_fp32_compute else "float32")
+                reward_score = paddle.zeros(
+                    len(response), dtype=self._model_config.dtype if not self.args.use_fp32_compute else "float32"
+                )
             return reward_score
 
         try:
@@ -2717,7 +2820,10 @@ class PPOTrainer(Trainer):
             if tp_rank == 0:
                 reward_score = post()
             else:
-                reward_score = paddle.empty(shape=[len(response)], dtype=self._model_config.dtype if not self.args.use_fp32_compute else "float32")
+                reward_score = paddle.empty(
+                    shape=[len(response)],
+                    dtype=self._model_config.dtype if not self.args.use_fp32_compute else "float32",
+                )
             paddle.distributed.barrier(tp_group)
             paddle.distributed.broadcast(reward_score, src=tp_group.ranks[0], group=tp_group)
 

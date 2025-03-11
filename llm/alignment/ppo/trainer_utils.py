@@ -57,6 +57,10 @@ from paddlenlp.transformers.tokenizer_utils_base import PaddingStrategy
 
 @dataclass
 class TrainingArguments(TrainingArguments):
+    rollout_logprob_batch_size: int = field(
+        default=-1,
+        metadata={"help": "The log prob batch size."},
+    )
     kl_coeff: float = field(
         default=0.02,
         metadata={"help": "The coefficient for the KL divergence between the reference and actor policy."},
@@ -288,7 +292,9 @@ class TrainingArguments(TrainingArguments):
         metadata={"help": "Whether to use tgt for KL."},
     )
     use_rm_server: bool = field(default=False, metadata={"help": "Use reward server instead of reward model."})
-    use_fp32_compute: bool = field(default=False, metadata={"help": "Use fp32 to compute xx_log_prob,rewards, advantages and loss."})
+    use_fp32_compute: bool = field(
+        default=False, metadata={"help": "Use fp32 to compute xx_log_prob,rewards, advantages and loss."}
+    )
 
     def __post_init__(self):
         """

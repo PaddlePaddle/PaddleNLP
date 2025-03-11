@@ -204,9 +204,15 @@ def make_attention_mask(
 
 def gather_log_probabilities(logits: paddle.Tensor, labels: paddle.Tensor) -> paddle.Tensor:
     """Gather log probabilities of the given labels from the logits."""
-    log_probs = F.log_softmax(logits, axis=-1)
-    log_probs_labels = paddle.take_along_axis(log_probs, axis=-1, indices=labels.unsqueeze(axis=-1))
-    return log_probs_labels.squeeze(axis=-1)
+    # log_probs = F.log_softmax(logits, axis=-1)
+    # log_probs_labels = paddle.take_along_axis(log_probs, axis=-1, indices=labels.unsqueeze(axis=-1))
+    # return log_probs_labels.squeeze(axis=-1)
+    token_loss = F.cross_entropy(
+        logits.cast("float32"),
+        labels,
+        reduction="none",
+    ).squeeze(axis=-1)
+    return -token_loss.cast(logits.dtype)
 
 
 class RLHFPPOLoss(nn.Layer):
@@ -397,7 +403,7 @@ class RLHFPPOMixedLoss(nn.Layer):
             if self.use_fp32_compute and hidden_states.dtype != paddle.float32:
                 hidden_states = hidden_states.cast(paddle.float32)
                 weight = weight.cast(paddle.float32)
-                 if bias is not None:
+                if bias is not None:
                     bias = bias.cast(paddle.float32)
             hidden_states = hidden_states / self.temperature if self.temperature > 0.0 else hidden_states
             total_loss, pg_loss, entropy_loss, kl_loss = actor_fused_pg_entropy_kl_loss(
