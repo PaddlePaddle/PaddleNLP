@@ -139,12 +139,12 @@ def main():
         if model_args.reward_model_name_or_path is None:
             raise ValueError("Please specify reward_model_name_or_path when use_rm_server is false.")
 
-    if training_args.rl_algorithm == "grpo" and training_args.use_fused_head_and_loss_fn:
-        logger.warning(
-            f"Fused_head_and_loss_fn currently does not support {training_args.rl_algorithm}. "
-            "Reset `use_fused_head_and_loss_fn` to False."
-        )
-        training_args.use_fused_head_and_loss_fn = False
+    # if training_args.rl_algorithm == "grpo" and training_args.use_fused_head_and_loss_fn:
+    #     logger.warning(
+    #         f"Fused_head_and_loss_fn currently does not support {training_args.rl_algorithm}. "
+    #         "Reset `use_fused_head_and_loss_fn` to False."
+    #     )
+    #     training_args.use_fused_head_and_loss_fn = False
 
     model_class_lm, model_class_score = AutoModelForCausalLM, LlamaModelForScore
     if training_args.pipeline_parallel_degree > 1:
