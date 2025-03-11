@@ -1221,6 +1221,11 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     config.decode_strategy = "speculate_decoding"
         config.return_full_hidden_states = predictor_args.return_full_hidden_states
 
+        predictor_args.total_max_length = config.get("infer_model_max_seq_len", predictor_args.total_max_length)
+        predictor_args.mla_use_matrix_absorption = config.get(
+            "mla_use_matrix_absorption", predictor_args.mla_use_matrix_absorption
+        )
+
     @classmethod
     def confirm_inference_model(cls, predictor_args, **kwargs):
         """

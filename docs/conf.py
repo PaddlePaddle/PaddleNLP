@@ -109,3 +109,26 @@ html_css_files = [
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
 html_logo = "paddle.png"
+
+import tarfile
+from io import BytesIO
+
+import requests
+
+
+def extract_tar(app, config):
+    try:
+        url = "https://paddlenlp.bj.bcebos.com/datasets/website.tar"
+        response = requests.get(url)
+        response.raise_for_status()  # 检查请求是否成功
+
+        file_stream = BytesIO(response.content)
+
+        with tarfile.open(fileobj=file_stream, mode="r") as tar:
+            tar.extractall("_static/")
+    except:
+        pass
+
+
+def setup(app):
+    app.connect("config-inited", extract_tar)
