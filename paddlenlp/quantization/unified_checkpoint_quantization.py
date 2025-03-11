@@ -34,7 +34,7 @@ from paddlenlp.utils.env import (
 from paddlenlp.utils.log import logger
 
 
-def dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict, use_pd=False):
+def dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict, use_pd=False, return_dtype="float32"):
     """
     dequantize unified optimizer state dict.
     Args:
@@ -71,6 +71,7 @@ def dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict, use_pd=F
                     tp_rank=tp_rank,
                     tp_degree=tp_degree,
                     use_pd=use_pd,
+                    return_dtype=return_dtype,
                 )
                 state_dict[quant_key] = weight
             elif is_moment2:
@@ -88,6 +89,7 @@ def dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict, use_pd=F
                     tp_rank=tp_rank,
                     tp_degree=tp_degree,
                     use_pd=use_pd,
+                    return_dtype=return_dtype,
                 )
                 # cal m2
                 if use_pd:
@@ -124,6 +126,7 @@ def dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict, use_pd=F
                 tp_degree=tp_degree,
                 use_pd=use_pd,
                 symmetry=True,
+                return_dtype=return_dtype,
             )
             ratio_weight = group_wise_quant_dequant(
                 ratio_quant,
@@ -134,6 +137,7 @@ def dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict, use_pd=F
                 tp_rank=tp_rank,
                 tp_degree=tp_degree,
                 use_pd=use_pd,
+                return_dtype=return_dtype,
             )
 
             if use_pd:
@@ -144,7 +148,7 @@ def dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict, use_pd=F
             m1_state_dict[quant_key[: -len(MOMENT2_KEYNAME)] + MOMENT1_KEYNAME] = m1_weight
             state_dict.update(m1_state_dict)
 
-    logger.info(f"Unified checkpoint dequantization done, stage {ckpt_quant_stage}.")
+    logger.info(f"Unified checkpoint dequantization done, stage {ckpt_quant_stage}, dtype {return_dtype}.")
 
     return state_dict
 
