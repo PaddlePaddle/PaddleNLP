@@ -16,6 +16,9 @@
 | deepseek-ai/DeepSeek-V3                   | 🚧 |
 
 ### DeepSeekR1
+部署硬件要求：
+- 支持的最低版本是SM90a (机器：H100 / H800)
+- 要求CUDA 12.4 以上
 
 |模型名称|精度|MTP|节点数|静态图下载 model_name|
 |:------|:-:|:-:|:-:|:-:|
@@ -54,6 +57,15 @@
 | meta-llama/Llama-2-70b-chat | 🚧 |
 
 ### Llama3
+
+部署硬件要求：
+- Append-Attn：
+  - 支持的最低版本是SM80 (机器：A100 / A800)
+  - 要求CUDA 11.8 以上
+- Block-Attn:
+  - 支持的最低版本是SM70 (机器：V100)
+  - 要求CUDA 11.8 以上
+
 
 | 模型名称 | 静态图下载 model_name |
 |:------|:-:|
@@ -109,6 +121,10 @@
 | qwen/qwen-72b-chat | 🚧 |
 
 ### Qwen1.5
+部署硬件要求：
+- Block-Attn:
+  - 支持的最低版本是SM70 (机器：V100)
+  - 要求CUDA 11.8 以上
 
 | 模型名称 | 静态图下载 model_name |
 |:------|:-:|
@@ -132,6 +148,13 @@
 | Qwen/Qwen1.5-MoE-A2.7B-Chat | 🚧 |
 
 ### Qwen2
+部署硬件要求：
+- Append-Attn：
+  - 支持的最低版本是SM80 (机器：A100 / A800)
+  - 要求CUDA 11.8 以上
+- Block-Attn:
+  - 支持的最低版本是SM70 (机器：V100)
+  - 要求CUDA 11.8 以上
 
 | 模型名称 | 静态图下载 model_name |
 |:------|:-:|
