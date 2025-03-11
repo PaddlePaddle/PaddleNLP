@@ -254,7 +254,7 @@ CUTLASS_DEVICE void mma_f16_two_stages(const Params& mainloop_params,
                                        SharedStorage& shared_storage) {
   using DTypeQ = typename Ktraits::DTypeQ;
   using DTypeKV = typename Ktraits::DTypeKV;
-  using DTypeMD = typename Ktraits::DTypeO; // !!! bf16
+  using DTypeMD = typename Ktraits::DTypeO; 
   using DTypeQKAccum = typename Ktraits::DTypeQKAccum;
   using IdType = typename Ktraits::IdType;
   using TileShape_QKD = typename Ktraits::TileShape_QKD;
@@ -530,7 +530,7 @@ CUTLASS_DEVICE void mma_qk_one_stages(const Params& mainloop_params,
                                       SharedStorage& shared_storage) {
   using DTypeQ = typename Ktraits::DTypeQ;
   using DTypeKV = typename Ktraits::DTypeKV;
-  using DTypeMD = typename Ktraits::DTypeO; // !!! bf16
+  using DTypeMD = typename Ktraits::DTypeO; 
   using DTypeQKAccum = typename Ktraits::DTypeQKAccum;
   using IdType = typename Ktraits::IdType;
   using TileShape_QKD = typename Ktraits::TileShape_QKD;
@@ -676,7 +676,7 @@ CUTLASS_DEVICE void mma_qk_two_stages(const Params& mainloop_params,
                                       SharedStorage& shared_storage) {
   using DTypeQ = typename Ktraits::DTypeQ;
   using DTypeKV = typename Ktraits::DTypeKV;
-  using DTypeMD = typename Ktraits::DTypeO; // !!! bf16
+  using DTypeMD = typename Ktraits::DTypeO; 
   using DTypeQKAccum = typename Ktraits::DTypeQKAccum;
   using IdType = typename Ktraits::IdType;
   using TileShape_QKD = typename Ktraits::TileShape_QKD;
@@ -866,7 +866,7 @@ CUTLASS_DEVICE void mma_pv_one_stages(const Params& mainloop_params,
                                       SharedStorage& shared_storage) {
   using DTypeQ = typename Ktraits::DTypeQ;
   using DTypeKV = typename Ktraits::DTypeKV;
-  using DTypeMD = typename Ktraits::DTypeO; // !!! bf16
+  using DTypeMD = typename Ktraits::DTypeO;
   using DTypeQKAccum = typename Ktraits::DTypeQKAccum;
   using IdType = typename Ktraits::IdType;
   using TileShape_QKD = typename Ktraits::TileShape_QKD;
