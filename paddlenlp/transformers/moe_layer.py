@@ -28,65 +28,6 @@ from .moe_gate import PretrainedMoEGate
 from .token_dispatcher import MoEFlexTokenDispatcher
 
 
-class _AllToAll(paddle.autograd.PyLayer):
-    @staticmethod
-    def forward(
-        ctx: Any,
-        output_shape: List,
-        input: Tensor,
-        out_split_sizes: List = None,
-        in_split_sizes: List = None,
-        group: Group = None,
-    ) -> Tensor:  # type: ignore
-        """
-        All-to-all communication in the group.
-        Args:
-            ctx (Any): Context object.
-            output_shape (List): Output shape.
-            input (Tensor): Input tensor.
-            out_split_sizes (List): Output split sizes.
-            in_split_sizes (List): Input split sizes.
-            group (Group): The group object.
-        Returns:
-            Tensor: Output tensor.
-        """
-
-        ctx.group = group
-        ctx.input_shape = input.shape
-        ctx.out_split_sizes = out_split_sizes
-        ctx.in_split_sizes = in_split_sizes
-
-        # return input
-        if dist.get_world_size(group) <= 1:
-            return input
-
-        output = paddle.empty(output_shape, dtype=input.dtype)
-        task = dist.alltoall_single(
-            output,
-            input,
-            out_split_sizes=out_split_sizes,
-            in_split_sizes=in_split_sizes,
-            sync_op=False,
-            group=group,
-        )
-        task.wait()
-
-        return output
-
-    @staticmethod
-    def backward(ctx: Any, *grad_output: Tensor) -> Tuple[Tensor]:
-        """
-        Aggregates gradient information from all input tensors into a single tensor.
-        Args:
-            ctx (Any): The context object used to store information that needs to be passed.
-            *grad_output (Tensor): A list of input tensors whose gradients are to be aggregated.
-        Returns:
-            Tuple[Tensor]: A tuple containing a tensor that holds the gradients of all input tensors.
-        """
-        # return grad_output
-        return _AllToAll.apply(ctx.input_shape, *grad_output, ctx.in_split_sizes, ctx.out_split_sizes, ctx.group)
-
-
 def dispatching(x, dispatch_mask, scatter_index, num_experts, capacity):
     """
     Rearranges the input tensor `x` based on gate results, truncates it according to the specified capacity, and performs padding.
@@ -149,6 +90,65 @@ def combining(x, combine_weights, scatter_index):
     if isinstance(combine_weights, (list, tuple)):
         combine_weights = paddle.concat(combine_weights, -1).unsqueeze([1])
     return paddle.matmul(combine_weights, x).squeeze(1)  # [seq,1,2] @ [seq,2,dim] -> [seq,1,dim]
+
+
+class _AllToAll(paddle.autograd.PyLayer):
+    @staticmethod
+    def forward(
+        ctx: Any,
+        output_shape: List,
+        input: Tensor,
+        out_split_sizes: List = None,
+        in_split_sizes: List = None,
+        group: Group = None,
+    ) -> Tensor:  # type: ignore
+        """
+        All-to-all communication in the group.
+        Args:
+            ctx (Any): Context object.
+            output_shape (List): Output shape.
+            input (Tensor): Input tensor.
+            out_split_sizes (List): Output split sizes.
+            in_split_sizes (List): Input split sizes.
+            group (Group): The group object.
+        Returns:
+            Tensor: Output tensor.
+        """
+
+        ctx.group = group
+        ctx.input_shape = input.shape
+        ctx.out_split_sizes = out_split_sizes
+        ctx.in_split_sizes = in_split_sizes
+
+        # return input
+        if dist.get_world_size(group) <= 1:
+            return input
+
+        output = paddle.empty(output_shape, dtype=input.dtype)
+        task = dist.alltoall_single(
+            output,
+            input,
+            out_split_sizes=out_split_sizes,
+            in_split_sizes=in_split_sizes,
+            sync_op=False,
+            group=group,
+        )
+        task.wait()
+
+        return output
+
+    @staticmethod
+    def backward(ctx: Any, *grad_output: Tensor) -> Tuple[Tensor]:
+        """
+        Aggregates gradient information from all input tensors into a single tensor.
+        Args:
+            ctx (Any): The context object used to store information that needs to be passed.
+            *grad_output (Tensor): A list of input tensors whose gradients are to be aggregated.
+        Returns:
+            Tuple[Tensor]: A tuple containing a tensor that holds the gradients of all input tensors.
+        """
+        # return grad_output
+        return _AllToAll.apply(ctx.input_shape, *grad_output, ctx.in_split_sizes, ctx.out_split_sizes, ctx.group)
 
 
 class MoELayer(nn.Layer):
@@ -255,6 +255,7 @@ class MoELayer(nn.Layer):
         # self.exp_counts  :
         capacity, topk_weight, topk_ids, token_priority, l_aux, l_zloss = self.gate(hidden_state)
 
+        """MoE expert dispatch from: https://huggingface.co/deepseek-ai/DeepSeek-V3/blob/main/modeling_deepseek.py"""
         cnts = paddle.zeros([topk_ids.shape[0], len(self.experts)], dtype=topk_ids.dtype)
         cnts = cnts.put_along_axis(topk_ids, 1, axis=1)
 

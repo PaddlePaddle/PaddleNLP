@@ -1443,10 +1443,13 @@ class DeepseekV2PretrainedModel(PretrainedModel):
                 base_actions["layers.0.mlp.down_proj.weight.weight_scale_inv"] = partial(fn, is_column=False)
 
             # moe unit routed experts
-            for e_i in range(config.n_routed_experts):
-                base_actions[f"layers.0.mlp.experts.{e_i}.up_proj.weight"] = partial(fn, is_column=True)
-                base_actions[f"layers.0.mlp.experts.{e_i}.gate_proj.weight"] = partial(fn, is_column=True)
-                base_actions[f"layers.0.mlp.experts.{e_i}.down_proj.weight"] = partial(fn, is_column=False)
+            moe_group = dist.fleet.get_hybrid_communicate_group().get_data_parallel_group()
+            expert_parallel_degree = dist.get_world_size(moe_group)
+            if expert_parallel_degree <= 1:
+                for e_i in range(config.n_routed_experts):
+                    base_actions[f"layers.0.mlp.experts.{e_i}.up_proj.weight"] = partial(fn, is_column=True)
+                    base_actions[f"layers.0.mlp.experts.{e_i}.gate_proj.weight"] = partial(fn, is_column=True)
+                    base_actions[f"layers.0.mlp.experts.{e_i}.down_proj.weight"] = partial(fn, is_column=False)
 
             # moe unit shared experts
             base_actions["layers.0.mlp.shared_experts.gate_proj.weight"] = partial(fn, is_column=True)
@@ -1473,7 +1476,6 @@ class DeepseekV2PretrainedModel(PretrainedModel):
             base_actions.pop("embed_tokens.weight")
             base_actions.pop("lm_head.weight")
             base_actions["layers.0.embed_tokens.weight"] = partial(fn, is_column=False)
-            # base_actions["layers.0.eh_proj.weight"] = partial(fn, is_column=True)
             base_actions["layers.0.shared_head.head.weight"] = partial(fn, is_column=True)
             for key, action in base_actions.items():
                 if "layers.0." in key:
