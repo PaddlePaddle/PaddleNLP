@@ -13,7 +13,6 @@
 // limitations under the License.
 
 
-
 // Ignore CUTLASS warnings about type punning
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstrict-aliasing"
@@ -27,8 +26,7 @@
 
 
 template <paddle::DataType T>
-void MoeDispatchKernel(
-                       const paddle::Tensor& input,
+void MoeDispatchKernel(const paddle::Tensor& input,
                        const paddle::Tensor& gating_output,
                        const int moe_topk,
                        const bool group_moe,
@@ -41,7 +39,6 @@ void MoeDispatchKernel(
                        paddle::Tensor* permute_indices_per_token,
                        paddle::Tensor* expert_scales_float,
                        paddle::Tensor* top_k_indices) {
-
   typedef PDTraits<T> traits_;
   typedef typename traits_::DataType DataType_;
   typedef typename traits_::data_t data_t;
@@ -61,13 +58,10 @@ void MoeDispatchKernel(
                           moe_topk));
   }
 
-  paddle::Tensor finished_tensor = GetEmptyTensor(
-                                          {num_rows},
-                                          paddle::DataType::BOOL,
-                                          place);
+  paddle::Tensor finished_tensor =
+      GetEmptyTensor({num_rows}, paddle::DataType::BOOL, place);
   paddle::experimental::fill(finished_tensor, false);
   bool* finished = finished_tensor.data<bool>();
-
 
 
   const int num_moe_inputs = AlignTo16(num_rows * moe_topk);
@@ -80,10 +74,10 @@ void MoeDispatchKernel(
       AlignTo16(sorter_.getWorkspaceSize(moe_topk * num_rows));
   const int sort_tmp_in_out_size = num_moe_inputs * 2 * sizeof(int);
 
-  paddle::Tensor ws_ptr_tensor = GetEmptyTensor(
-                                          {bytes + sorter_ws_size_bytes + sort_tmp_in_out_size},
-                                          paddle::DataType::INT8,
-                                          place);
+  paddle::Tensor ws_ptr_tensor =
+      GetEmptyTensor({bytes + sorter_ws_size_bytes + sort_tmp_in_out_size},
+                     paddle::DataType::INT8,
+                     place);
 
   int8_t* ws_ptr = ws_ptr_tensor.data<int8_t>();
   int* source_rows_ = reinterpret_cast<int*>(ws_ptr);
@@ -96,15 +90,10 @@ void MoeDispatchKernel(
 
   float* softmax_max_prob = nullptr;
   if (group_moe) {
-
-
-    paddle::Tensor softmax_max_prob_tensor = GetEmptyTensor(
-                                          {num_rows, moe_topk},
-                                          paddle::DataType::FLOAT32,
-                                          place);
+    paddle::Tensor softmax_max_prob_tensor =
+        GetEmptyTensor({num_rows, moe_topk}, paddle::DataType::FLOAT32, place);
     paddle::experimental::fill(softmax_max_prob_tensor, 0.f);
     softmax_max_prob = softmax_max_prob_tensor.data<float>();
-    
   }
 
   float* softmax_out_;
@@ -115,9 +104,8 @@ void MoeDispatchKernel(
   paddle::Tensor softmax_buffer;
 
   if (!is_pow_2 || expert_num > 256 || group_moe) {
-    softmax_buffer = GetEmptyTensor({num_rows * expert_num},
-                                          paddle::DataType::FLOAT32,
-                                          place);
+    softmax_buffer = GetEmptyTensor(
+        {num_rows * expert_num}, paddle::DataType::FLOAT32, place);
 
 
     softmax_out_ = softmax_buffer.data<float>();
@@ -125,27 +113,26 @@ void MoeDispatchKernel(
     softmax_out_ = nullptr;
   }
 
-//   VLOG(4) << "[MoE Info] "
-//           << "num_rows: " << num_rows << ", "
-//           << "hidden_size: " << hidden_size << ", "
-//           << "num_experts: " << expert_num << ", "
-//           << "k: " << moe_topk << ", "
-//           << "group_moe: " << std::boolalpha << group_moe;
+  //   VLOG(4) << "[MoE Info] "
+  //           << "num_rows: " << num_rows << ", "
+  //           << "hidden_size: " << hidden_size << ", "
+  //           << "num_experts: " << expert_num << ", "
+  //           << "k: " << moe_topk << ", "
+  //           << "group_moe: " << std::boolalpha << group_moe;
 
-  topk_gating_softmax_kernelLauncher<float>(
-      gating_output.data<float>(),
-      finished,
-      expert_scales_float->data<float>(),
-      softmax_out_,
-      expert_for_source_row,
-      source_rows_,
-      softmax_max_prob,
-      num_rows,
-      expert_num,
-      moe_topk,
-      group_moe,
-      stream,
-      topk_only_mode);
+  topk_gating_softmax_kernelLauncher<float>(gating_output.data<float>(),
+                                            finished,
+                                            expert_scales_float->data<float>(),
+                                            softmax_out_,
+                                            expert_for_source_row,
+                                            source_rows_,
+                                            softmax_max_prob,
+                                            num_rows,
+                                            expert_num,
+                                            moe_topk,
+                                            group_moe,
+                                            stream,
+                                            topk_only_mode);
 
   sorter_.run(reinterpret_cast<void*>(sorter_ws_ptr),
               sorter_ws_size_bytes,
@@ -159,8 +146,8 @@ void MoeDispatchKernel(
 
 
   initialize_moe_routing_kernelLauncher(
-      input.data<data_t>(), // check
-      permute_input->data<data_t>(), // check
+      input.data<data_t>(),           // check
+      permute_input->data<data_t>(),  // check
       permuted_rows_,
       permute_indices_per_token->data<int32_t>(),
       num_rows,
@@ -172,7 +159,7 @@ void MoeDispatchKernel(
 
   compute_total_rows_before_expert<data_t>(
       permuted_experts_,
-      input.data<data_t>(), // check
+      input.data<data_t>(),  // check
       moe_topk * num_rows,
       expert_num,
       token_nums_per_expert->data<int64_t>(),
@@ -180,98 +167,125 @@ void MoeDispatchKernel(
 }
 
 
-std::vector<paddle::Tensor>  MoeExpertDispatch(
-                       const paddle::Tensor& input,
-                       const paddle::Tensor& gating_output,
-                       const int moe_topk,
-                       const bool group_moe,
-                       const bool topk_only_mode) {
-    const auto input_type = input.dtype();
-    auto place = input.place();
-    int token_rows = 0;
-    auto input_dims = input.dims();
-    auto gating_dims = gating_output.dims();
-    const int expert_num = gating_dims[gating_dims.size() - 1];
+std::vector<paddle::Tensor> MoeExpertDispatch(
+    const paddle::Tensor& input,
+    const paddle::Tensor& gating_output,
+    const int moe_topk,
+    const bool group_moe,
+    const bool topk_only_mode) {
+  const auto input_type = input.dtype();
+  auto place = input.place();
+  int token_rows = 0;
+  auto input_dims = input.dims();
+  auto gating_dims = gating_output.dims();
+  const int expert_num = gating_dims[gating_dims.size() - 1];
 
-    if (input_dims.size() == 3) {
-        token_rows = input_dims[0] * input_dims[1];
-    } else {
-        token_rows = input_dims[0];
-    }
-    const int num_rows = token_rows;
-    const int hidden_size = input.dims()[input_dims.size() - 1];
+  if (input_dims.size() == 3) {
+    token_rows = input_dims[0] * input_dims[1];
+  } else {
+    token_rows = input_dims[0];
+  }
+  const int num_rows = token_rows;
+  const int hidden_size = input.dims()[input_dims.size() - 1];
 
-    auto permute_input = GetEmptyTensor(
-                                          {moe_topk * num_rows, hidden_size},
-                                          input_type,
-                                          place);
-    // correspond to the weighted coefficients of the results from each expert.
-    auto  expert_scales_float =  GetEmptyTensor(
-                                          {num_rows, moe_topk},
-                                          paddle::DataType::FLOAT32,
-                                          place);
-    auto  top_k_indices =  GetEmptyTensor(
-                                          {num_rows, moe_topk},
-                                          paddle::DataType::INT8,
-                                          place);
+  auto permute_input =
+      GetEmptyTensor({moe_topk * num_rows, hidden_size}, input_type, place);
+  // correspond to the weighted coefficients of the results from each expert.
+  auto expert_scales_float =
+      GetEmptyTensor({num_rows, moe_topk}, paddle::DataType::FLOAT32, place);
+  auto top_k_indices =
+      GetEmptyTensor({num_rows, moe_topk}, paddle::DataType::INT32, place);
 
-    auto  token_nums_per_expert =  GetEmptyTensor(
-                                          {expert_num},
-                                          paddle::DataType::INT64,
-                                          place);
-    auto  permute_indices_per_token = GetEmptyTensor(
-                                          {moe_topk, num_rows},
-                                          paddle::DataType::INT32,
-                                          place);
+  auto token_nums_per_expert =
+      GetEmptyTensor({expert_num}, paddle::DataType::INT64, place);
+  auto permute_indices_per_token =
+      GetEmptyTensor({moe_topk, num_rows}, paddle::DataType::INT32, place);
 
 
-    switch (input_type) {
-        case paddle::DataType::BFLOAT16:
-            MoeDispatchKernel<paddle::DataType::BFLOAT16>(
-                input,
-                gating_output,
-                moe_topk,
-                group_moe,
-                topk_only_mode,
-                num_rows,
-                hidden_size,
-                expert_num,
-                &permute_input,
-                &token_nums_per_expert,
-                &permute_indices_per_token,
-                &expert_scales_float,
-                &top_k_indices
-            );
-            break;
-        case paddle::DataType::FLOAT16:
-            MoeDispatchKernel<paddle::DataType::FLOAT16>(
-                    input,
-                    gating_output,
-                    moe_topk,
-                    group_moe,
-                    topk_only_mode,
-                    num_rows,
-                    hidden_size,
-                    expert_num,
-                    &permute_input,
-                    &token_nums_per_expert,
-                    &permute_indices_per_token,
-                    &expert_scales_float,
-                    &top_k_indices
-                );
-                break;
-         default:
-            throw std::runtime_error("Unsupported data type for MoeDispatchKernel");
+  switch (input_type) {
+    case paddle::DataType::BFLOAT16:
+      MoeDispatchKernel<paddle::DataType::BFLOAT16>(input,
+                                                    gating_output,
+                                                    moe_topk,
+                                                    group_moe,
+                                                    topk_only_mode,
+                                                    num_rows,
+                                                    hidden_size,
+                                                    expert_num,
+                                                    &permute_input,
+                                                    &token_nums_per_expert,
+                                                    &permute_indices_per_token,
+                                                    &expert_scales_float,
+                                                    &top_k_indices);
+      break;
+    case paddle::DataType::FLOAT16:
+      MoeDispatchKernel<paddle::DataType::FLOAT16>(input,
+                                                   gating_output,
+                                                   moe_topk,
+                                                   group_moe,
+                                                   topk_only_mode,
+                                                   num_rows,
+                                                   hidden_size,
+                                                   expert_num,
+                                                   &permute_input,
+                                                   &token_nums_per_expert,
+                                                   &permute_indices_per_token,
+                                                   &expert_scales_float,
+                                                   &top_k_indices);
+      break;
+    default:
+      throw std::runtime_error("Unsupported data type for MoeDispatchKernel");
+  }
+  return {permute_input,
+          token_nums_per_expert,
+          permute_indices_per_token,
+          expert_scales_float,
+          top_k_indices};
+}
 
-    }
-    return {permute_input, token_nums_per_expert, permute_indices_per_token, expert_scales_float, top_k_indices};
+
+std::vector<std::vector<int64_t>> MoeExpertDispatchInferShape(
+    const std::vector<int64_t>& input_shape,
+    const std::vector<int64_t>& gating_output_shape,
+    const int moe_topk) {
+  int token_rows = -1;
+
+  if (input_shape.size() == 3) {
+    token_rows = input_shape[0] * input_shape[1];
+  } else {
+    token_rows = input_shape[0];
+  }
+  const int expert_num = gating_output_shape[gating_output_shape.size() - 1];
+  const int num_rows = token_rows;
+  const int hidden_size = input_shape[input_shape.size() - 1];
+
+  return {{moe_topk * num_rows, hidden_size},
+          {expert_num},
+          {moe_topk, num_rows},
+          {num_rows, moe_topk},
+          {num_rows, moe_topk}};
+}
+
+std::vector<paddle::DataType> MoeExpertDispatchInferDtype(
+    const paddle::DataType& input_dtype,
+    const paddle::DataType& gating_output_dtype,
+    const int moe_topk) {
+  return {input_dtype,
+          paddle::DataType::INT64,
+          paddle::DataType::INT32,
+          paddle::DataType::FLOAT32,
+          paddle::DataType::INT32};
 }
 
 
 PD_BUILD_OP(moe_expert_dispatch)
     .Inputs({"input", "gating_output"})
-    .Outputs({"permute_input", "token_nums_per_expert", "permute_indices_per_token", "expert_scales_float", "top_k_indices"})
+    .Outputs({"permute_input",
+              "token_nums_per_expert",
+              "permute_indices_per_token",
+              "expert_scales_float",
+              "top_k_indices"})
     .Attrs({"moe_topk:int", "group_moe:bool", "topk_only_mode:bool"})
-    .SetKernelFn(PD_KERNEL(MoeExpertDispatch));
-    // .SetInferShapeFn(PD_INFER_SHAPE(MoeExpertDispatchInferShape))
-    // .SetInferDtypeFn(PD_INFER_DTYPE(MoeExpertDispatchInferDtype));
+    .SetKernelFn(PD_KERNEL(MoeExpertDispatch))
+    .SetInferShapeFn(PD_INFER_SHAPE(MoeExpertDispatchInferShape))
+    .SetInferDtypeFn(PD_INFER_DTYPE(MoeExpertDispatchInferDtype));
