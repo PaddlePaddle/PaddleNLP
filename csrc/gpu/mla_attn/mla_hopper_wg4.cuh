@@ -54,7 +54,6 @@ MLAWithKVCacheWG4Kernel(CUTE_GRID_CONSTANT
                         typename CollectiveMainloop::Params const mainloop_params,
                         CUTE_GRID_CONSTANT
                         typename CollectiveEpilogue::Params const epilogue_params) {
-  // Obtain warp index
   int warp_group_idx = cutlass::canonical_warp_group_idx();
   using DTypeQ = typename Ktraits::DTypeQ;
   using DTypeKV = typename Ktraits::DTypeKV;
