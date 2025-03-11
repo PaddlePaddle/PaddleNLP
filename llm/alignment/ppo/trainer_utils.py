@@ -341,6 +341,15 @@ class TrainingArguments(TrainingArguments):
             self.normalize_reward = False
             self.normalize_advantage = False
 
+        if self.per_device_eval_batch_size > self.per_device_rollout_batch_size * self.num_return_sequences:
+            logger.warning(
+                f"per_device_eval_batch_size: {self.per_device_eval_batch_size} is larger than "
+                f"per_device_rollout_batch_size: {self.per_device_rollout_batch_size} * num_return_sequences: "
+                f"{self.num_return_sequences}, which may cause infer error. "
+                f"We will set it to per_device_rollout_batch_size * num_return_sequences!"
+            )
+            self.per_device_eval_batch_size = self.per_device_rollout_batch_size * self.num_return_sequences
+
 
 @dataclass
 class ModelArgument:
