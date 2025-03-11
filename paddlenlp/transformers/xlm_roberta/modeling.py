@@ -17,14 +17,18 @@
 """Paddle XLM-RoBERTa model."""
 
 import math
-from typing import List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import paddle
+import paddle.distributed as dist
+from paddle.distributed.fleet.recompute.recompute import recompute
 from paddle import nn
 from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
+from paddlenlp.transformers.contrastive_loss import SimpleContrastiveLoss
 
 from ...utils import logger
 from ...utils.converter import StateDictNameMapping
+from ..embedding_utils import dist_gather_tensor_with_gradient
 from ..activations import ACT2FN
 from ..model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
@@ -52,6 +56,7 @@ __all__ = [
     "XLMRobertaForMaskedLM",
     "XLMRobertaForMultipleChoice",
     "XLMRobertaForCausalLM",
+    "XLMRobertaSentenceEmbedding",
 ]
 
 
@@ -483,7 +488,7 @@ class XLMRobertaEncoder(nn.Layer):
             past_key_value = past_key_values[i] if past_key_values is not None else None
 
             if self.enable_recompute and not hidden_states.stop_gradient:
-                layer_outputs = self._gradient_checkpointing_func(
+                layer_outputs = recompute(
                     layer_module.__call__,
                     hidden_states,
                     attention_mask,
@@ -563,7 +568,7 @@ class XLMRobertaPretrainedModel(PretrainedModel):
             "hf-internal-testing/tiny-random-onnx-xlm-roberta": "https://bj.bcebos.com/paddlenlp/models/community/hf-internal-testing/tiny-random-onnx-xlm-roberta/model.safetensors",
         }
     }
-    base_model_prefix = "roberta"
+    base_model_prefix = "xlm_roberta"
     supports_gradient_checkpointing = True
     _no_split_modules = ["XLMRobertaEmbeddings", "XLMRobertaSelfAttention"]
 
@@ -796,7 +801,9 @@ class XLMRobertaModel(XLMRobertaPretrainedModel):
 
         # We can provide a self-attention mask of dimensions [batch_size, from_seq_length, to_seq_length]
         # ourselves in which case we just need to make it broadcastable to all heads.
-        if attention_mask.ndim == 3:
+        if attention_mask.ndim == 4:
+            extended_attention_mask=attention_mask
+        elif attention_mask.ndim == 3:
             extended_attention_mask = attention_mask[:, None, :, :]
         elif attention_mask.ndim == 2:
             # Provided a padding mask of dimensions [batch_size, seq_length]
@@ -807,6 +814,7 @@ class XLMRobertaModel(XLMRobertaPretrainedModel):
                     input_shape, attention_mask
                 )
             else:
+                # bs, n_head, seq_length, seq_length
                 extended_attention_mask = attention_mask[:, None, None, :]
         else:
             raise ValueError(
@@ -1616,3 +1624,81 @@ def create_position_ids_from_input_ids(input_ids, padding_idx, past_key_values_l
     mask = (input_ids != padding_idx).cast("int64")
     incremental_indices = (paddle.cumsum(mask, axis=1) + past_key_values_length) * mask
     return incremental_indices.cast("int64") + padding_idx
+
+
+class XLMRobertaSentenceEmbedding(XLMRobertaPretrainedModel):
+    def __init__(
+        self,
+        config: XLMRobertaConfig,
+        embedding_temperature: float = 0.02
+    ):
+        """XLMRobertaSentenceEmbedding
+        For getting larger batch_size, we use tensor parallel to get larger batch_size.
+
+        Args:
+            config (XLMRobertaConfig): _description_
+            model (XLMRobertaModel): _description_
+            embedding_temperature (float, optional): _description_. Defaults to 0.02.
+        """
+        super(XLMRobertaSentenceEmbedding, self).__init__(config)
+        self.config = config
+        self.xlm_roberta = XLMRobertaModel(config)
+        self.in_batch_negative_loss = SimpleContrastiveLoss(embedding_temperature)
+        self.world_size = dist.get_world_size()
+        self.process_rank = dist.get_rank()
+        self.embedding_negatives_cross_device = config.embedding_negatives_cross_device
+        if self.world_size <= 1:
+            self.embedding_negatives_cross_device = False
+
+    def forward(
+        self,
+        query: Optional[Dict[str, paddle.Tensor]] = None,
+        passages: Optional[Dict[str, paddle.Tensor]] = None,
+        return_encode=False,
+    ):
+        """forward"""
+        q_reps = self.encode(**query)
+        p_reps = self.encode(**passages)
+
+        q_reps = nn.functional.normalize(q_reps, axis=-1)
+        p_reps = nn.functional.normalize(p_reps, axis=-1)
+
+        if return_encode:
+            return q_reps, p_reps
+
+        if self.embedding_negatives_cross_device:
+            q_reps = dist_gather_tensor_with_gradient(q_reps)
+            p_reps = dist_gather_tensor_with_gradient(p_reps)
+
+        loss = self.in_batch_negative_loss(q_reps, p_reps)
+        return loss
+
+    def encode(
+        self,
+        input_ids,
+        position_ids=None,
+        embedding_indices=None,
+        attention_mask=None,
+        output_attentions=False,
+        output_hidden_states=False,
+        return_dict=False,
+        **kwargs,
+    ):
+        """encode"""
+        input_type = type(input_ids)
+        outputs = self.xlm_roberta(
+            input_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+            **kwargs,
+        )
+        if isinstance(outputs, input_type):
+            hidden_states = outputs
+        else:
+            hidden_states = outputs[0]
+        #last_hidden_states = hidden_states.gather_nd(embedding_indices)
+        last_hidden_states = hidden_states[:, 0]
+        return last_hidden_states
