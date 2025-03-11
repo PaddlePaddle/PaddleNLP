@@ -326,6 +326,7 @@ class MoELayer(nn.Layer):
             .multiply_(token_priority.unsqueeze(-1))
             .sum(axis=1)
             .astype(new_x.dtype)
+            .reshape([batch_size, seq_len, -1])
         )
 
         return final_out, l_aux, l_zloss
