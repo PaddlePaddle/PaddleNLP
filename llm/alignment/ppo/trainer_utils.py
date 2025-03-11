@@ -800,6 +800,10 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
             scaler=self.scaler if self.do_grad_scaling else None,
         )
         optimizer_was_run = True
+
+        if self.args.offload_optim:
+            self._reload_optimizer()
+
         if self.do_grad_scaling:
             scale_before = paddle.assign(self.scaler._scale)
             self.scaler.step(self.optimizer)
@@ -822,17 +826,20 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
             self.optimizer.step()
 
         # self.timers and self.timers(f"{timer_name}: optimizer-step").stop()
+        if self.args.offload_optim:
+            self._offload_optimizer()
 
         if optimizer_was_run:
             self.lr_scheduler.step()
 
-        if enable_release_grads and args.pipeline_parallel_degree > 1:
+        if args.release_grads or enable_release_grads:
             self.optimizer.clear_grad(set_to_zero=False)
-            for _, buffers in model._chunk_2_comm_buffers.items():
-                for buffer in buffers:
-                    buffer._clear_grad_storage()
+            if args.pipeline_parallel_degree > 1:
+                for _, buffers in model._chunk_2_comm_buffers.items():
+                    for buffer in buffers:
+                        buffer._clear_grad_storage()
         else:
-            self.optimizer.clear_grad(set_to_zero=False)
+            self.optimizer.clear_grad()
 
         self.callback_handler.on_optimizer_end(
             args,
