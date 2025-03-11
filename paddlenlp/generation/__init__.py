@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from .configuration_utils import GenerationConfig
+
 # from ..models import PretrainedModel
 from .logits_process import *
 from .stopping_criteria import (
@@ -23,5 +24,6 @@ from .stopping_criteria import (
     validate_stopping_criteria,
 )
 from .streamers import BaseStreamer, TextIteratorStreamer, TextStreamer
+
 # from .utils import BeamSearchScorer, GenerationMixin, get_unfinished_flag
 from .utils import BeamSearchScorer, GenerationMixin

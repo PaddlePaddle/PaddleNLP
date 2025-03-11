@@ -1,3 +1,17 @@
+# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+#     http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import time
 import warnings
 from abc import ABC
@@ -8,8 +22,11 @@ from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-from ..utils import add_start_docstrings
+
 from paddlenlp.utils.log import logger
+
+from ..utils import add_start_docstrings
+
 # from ..tokenization_utils_base import PreTrainedTokenizerBase
 
 # # We maintain a module-level cache of the embedding vectors for the stop string criterion
@@ -365,14 +382,14 @@ class StopStringCriteria(StoppingCriteria):
             # Since this is lots of very small assignments of lists, we build it with numpy rather
             # than torch for speed + simplicity, then convert to torch at the end
             for token_idx, valid_positions in positions.items():
-                gather_vec[token_idx, max_valid_positions * i : max_valid_positions * i + len(valid_positions)] = (
-                    valid_positions
-                )
+                gather_vec[
+                    token_idx, max_valid_positions * i : max_valid_positions * i + len(valid_positions)
+                ] = valid_positions
             for token_idx, possible_end_lens in end_lens.items():
                 gather_vec[
                     token_idx,
-                    max_valid_positions * len(stop_strings) + max_valid_end_lens * i : max_valid_positions
-                    * len(stop_strings)
+                    max_valid_positions * len(stop_strings)
+                    + max_valid_end_lens * i : max_valid_positions * len(stop_strings)
                     + max_valid_end_lens * i
                     + len(possible_end_lens),
                 ] = possible_end_lens
@@ -449,7 +466,7 @@ class EosTokenCriteria(StoppingCriteria):
     By default, it uses the `model.generation_config.eos_token_id`.
 
     Args:
-        eos_token_id (`Union[int, List[int], torch.Tensor]`):
+        eos_token_id (`Union[int, List[int]], paddle.Tensor]`):
             The id(s) of the *end-of-sequence* token.
     """
 

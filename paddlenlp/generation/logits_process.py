@@ -19,9 +19,10 @@ from typing import Callable, Iterable, List, Optional, Tuple, Union
 
 import numpy as np
 import paddle
-from paddlenlp.utils.log import logger
-from ..utils import add_start_docstrings
 
+from paddlenlp.utils.log import logger
+
+from ..utils import add_start_docstrings
 
 LOGITS_PROCESSOR_INPUTS_DOCSTRING = r"""
     Args:
@@ -35,6 +36,7 @@ LOGITS_PROCESSOR_INPUTS_DOCSTRING = r"""
         `paddle.Tensor` of shape `(batch_size, config.vocab_size)`: The processed prediction scores.
 
 """
+
 
 class LogitsProcessor:
     """Abstract base class for all logit processors that can be applied during generation."""
@@ -463,7 +465,9 @@ class TopPLogitsWarper(LogitsProcessor):
         sorted_indices_to_remove[:, 0] = 0
 
         # Scatter sorted tensors to original indexing
-        sorted_indices = sorted_indices + paddle.arange(scores.shape[0], dtype="int64").unsqueeze(-1) * scores.shape[-1]
+        sorted_indices = (
+            sorted_indices + paddle.arange(scores.shape[0], dtype="int64").unsqueeze(-1) * scores.shape[-1]
+        )
         condition = paddle.scatter(
             sorted_indices_to_remove.flatten(), sorted_indices.flatten(), sorted_indices_to_remove.flatten()
         )
@@ -518,7 +522,6 @@ class TopKLogitsWarper(LogitsProcessor):
 
     @add_start_docstrings(LOGITS_PROCESSOR_INPUTS_DOCSTRING)
     def __call__(self, input_ids: paddle.Tensor, scores: paddle.Tensor) -> paddle.Tensor:
-        # import pdb; pdb.set_trace()
         top_k = min(self.top_k, scores.shape[-1])  # Safety check
         # Remove all tokens with a probability less than the last token of the top-k
         indices_to_remove = scores < paddle.topk(scores, top_k)[0][..., -1, None]
@@ -593,11 +596,17 @@ class MinPLogitsWarper(LogitsProcessor):
         # Create a mask for tokens that have a probability less than the scaled min_p
         tokens_to_remove = probs < scaled_min_p
         sorted_indices = paddle.argsort(scores, descending=True, axis=-1)
-        sorted_indices_to_remove = paddle.take_along_axis(tokens_to_remove.cast("int64"), sorted_indices, axis=-1).cast("bool")
-        sorted_indices_to_remove[..., :self.min_tokens_to_keep] = False
+        sorted_indices_to_remove = paddle.take_along_axis(
+            tokens_to_remove.cast("int64"), sorted_indices, axis=-1
+        ).cast("bool")
+        sorted_indices_to_remove[..., : self.min_tokens_to_keep] = False
 
         sorted_indices = sorted_indices + paddle.arange(probs.shape[0], dtype="int64").unsqueeze(-1) * probs.shape[-1]
-        indices_to_remove = paddle.scatter(sorted_indices_to_remove.flatten().cast("int64"), sorted_indices.flatten(), sorted_indices_to_remove.flatten().cast("int64"))
+        indices_to_remove = paddle.scatter(
+            sorted_indices_to_remove.flatten().cast("int64"),
+            sorted_indices.flatten(),
+            sorted_indices_to_remove.flatten().cast("int64"),
+        )
         indices_to_remove = paddle.cast(indices_to_remove, "bool").reshape(probs.shape)
         # Apply mask to scores
         scores_processed = paddle.where(indices_to_remove, paddle.full_like(scores, self.filter_value), scores)
@@ -671,19 +680,21 @@ class TypicalLogitsWarper(LogitsProcessor):
     @add_start_docstrings(LOGITS_PROCESSOR_INPUTS_DOCSTRING)
     def __call__(self, input_ids: paddle.Tensor, scores: paddle.Tensor) -> paddle.Tensor:
         # calculate entropy
-        
+
         normalized = paddle.nn.functional.log_softmax(scores, axis=-1)
         p = paddle.exp(normalized)
         ent = -(normalized * p).nansum(-1, keepdim=True)
 
         # shift and sort
         shifted_scores = paddle.abs((-normalized) - ent)
-        sorted_scores, sorted_indices = paddle.sort(shifted_scores, descending=False), paddle.argsort(shifted_scores, descending=False)
+        sorted_scores, sorted_indices = paddle.sort(shifted_scores, descending=False), paddle.argsort(
+            shifted_scores, descending=False
+        )
         sorted_logits = paddle.take_along_axis(scores, sorted_indices, axis=-1)
         # sorted_logits = scores.gather(-1, sorted_indices)
         cumulative_probs = paddle.nn.functional.softmax(sorted_logits, axis=-1).cumsum(axis=-1)
         # cumulative_probs = sorted_logits.softmax(axis=-1).cumsum(axis=-1)
-        
+
         # Remove tokens with cumulative mass above the threshold
         last_ind = (cumulative_probs < self.mass).sum(axis=1)
         last_ind.clip_(max=sorted_scores.shape[-1] - 1)
@@ -691,10 +702,15 @@ class TypicalLogitsWarper(LogitsProcessor):
         # sorted_indices_to_remove = sorted_scores > sorted_scores.gather(1, last_ind.view(-1, 1))
         sorted_indices_to_remove[..., : self.min_tokens_to_keep] = False
 
-        sorted_indices = sorted_indices + paddle.arange(scores.shape[0], dtype="int64").unsqueeze(-1) * scores.shape[-1]
-        indices_to_remove = paddle.scatter(sorted_indices_to_remove.flatten().cast("int64"), sorted_indices.flatten(), sorted_indices_to_remove.flatten().cast("int64"))
+        sorted_indices = (
+            sorted_indices + paddle.arange(scores.shape[0], dtype="int64").unsqueeze(-1) * scores.shape[-1]
+        )
+        indices_to_remove = paddle.scatter(
+            sorted_indices_to_remove.flatten().cast("int64"),
+            sorted_indices.flatten(),
+            sorted_indices_to_remove.flatten().cast("int64"),
+        )
         # indices_to_remove = sorted_indices_to_remove.scatter(1, sorted_indices, sorted_indices_to_remove)
-        # import pdb; pdb.set_trace()
         indices_to_remove = paddle.cast(indices_to_remove, "bool").reshape(scores.shape)
         scores_processed = scores.masked_fill(indices_to_remove, self.filter_value)
         return scores_processed
@@ -764,7 +780,7 @@ class EpsilonLogitsWarper(LogitsProcessor):
         # Keep the words with the 'min_tokens_to_keep'-highest probabilities
         top_k = min(self.min_tokens_to_keep, scores.shape[-1])  # Safety check
         indices_to_remove = indices_to_remove & (scores < paddle.topk(scores, top_k)[0][..., -1, None])
-        
+
         scores_processed = scores.masked_fill(indices_to_remove, self.filter_value)
         return scores_processed
 
@@ -844,7 +860,7 @@ class EtaLogitsWarper(LogitsProcessor):
         entropy = paddle.distribution.Categorical(logits=scores).entropy()
         eta = paddle.minimum(self.epsilon, paddle.sqrt(self.epsilon) * paddle.exp(-entropy))[..., None]
         indices_to_remove = probabilities < eta
-        
+
         # Keep the words with the 'min_tokens_to_keep'-highest probabilities
         top_k = min(self.min_tokens_to_keep, scores.shape[-1])  # Safety check
         indices_to_remove = indices_to_remove & (scores < paddle.topk(scores, top_k)[0][..., -1, None])
@@ -973,7 +989,6 @@ class NoRepeatNGramLogitsProcessor(LogitsProcessor):
         cur_len = input_ids.shape[-1]
         scores_processed = scores.clone()
         banned_batch_tokens = _calc_banned_ngram_tokens(self.ngram_size, input_ids, num_batch_hypotheses, cur_len)
-        import pdb; pdb.set_trace()
         for i, banned_tokens in enumerate(banned_batch_tokens):
             if len(banned_tokens) == 0:
                 continue
@@ -1148,10 +1163,14 @@ class SequenceBiasLogitsProcessor(LogitsProcessor):
                 continue
             prefix_length = len(sequence_ids) - 1
             last_token = sequence_ids[-1]
-            matching_rows = paddle.equal(
-                input_ids[:, -prefix_length:],
-                paddle.to_tensor(sequence_ids[:-1], dtype=input_ids.dtype),
-            ).prod(axis=1).astype(paddle.int64)
+            matching_rows = (
+                paddle.equal(
+                    input_ids[:, -prefix_length:],
+                    paddle.to_tensor(sequence_ids[:-1], dtype=input_ids.dtype),
+                )
+                .prod(axis=1)
+                .astype(paddle.int64)
+            )
             bias[:, last_token] += paddle.where(
                 matching_rows.bool(),
                 paddle.to_tensor(sequence_bias),
@@ -2604,7 +2623,9 @@ class SynthIDTextWatermarkLogitsProcessor(LogitsProcessor):
     ):
         self.ngram_len = ngram_len
         self.keys = paddle.to_tensor(keys)
-        generator = paddle.framework.core.default_cuda_generator(int(paddle.device.get_device()[-1])).seed(sampling_table_seed)
+        generator = paddle.framework.core.default_cuda_generator(int(paddle.device.get_device()[-1])).seed(
+            sampling_table_seed
+        )
         # A random sampling table is pre-computed and modulo table size is applied to map from a hash of ngram keys to
         # g values, this is similar to the hashtable implementation used in
         # https://github.com/facebookresearch/three_bricks. We note that the hashing employed in this repository is

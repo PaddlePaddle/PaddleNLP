@@ -17,8 +17,10 @@ from dataclasses import dataclass
 from typing import Optional, Tuple
 
 import paddle
+
 # from .utils import ModelOutput
 from paddlenlp.transformers.model_outputs import ModelOutput
+
 
 @dataclass
 class BaseModelOutput(ModelOutput):

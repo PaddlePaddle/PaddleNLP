@@ -21,7 +21,6 @@ import packaging.version
 from .. import __version__
 from .doc import ExplicitEnum
 
-
 # This is needed in case we deprecate a kwarg of a function/method being compiled
 # if is_torch_available():
 #     import torch  # noqa: F401

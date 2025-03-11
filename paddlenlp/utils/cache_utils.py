@@ -1,24 +1,36 @@
+# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import copy
-import importlib.metadata
+
+# import importlib.metadata
 import json
 import os
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import paddle
-from packaging import version
 
+# from packaging import version
 from paddlenlp.transformers import PretrainedConfig
 from paddlenlp.utils.log import logger
+
 from .deprecation import deprecate_kwarg
 
 
 # if is_hqq_available():
 #     from hqq.core.quantize import Quantizer as HQQQuantizer
-
-
-
-
 class Cache:
     """
     Base, abstract class for all caches. The actual data structure is specific to each subclass.
@@ -1126,8 +1138,8 @@ class StaticCache(Cache):
                 layer_device = layer_device_map[idx]
             else:
                 layer_device = self.device
-            new_layer_key_cache = paddle.zeros(cache_shape, dtype=self.dtype)
-            new_layer_value_cache = paddle.zeros(cache_shape, dtype=self.dtype)
+            new_layer_key_cache = paddle.zeros(cache_shape, dtype=self.dtype, place=layer_device)
+            new_layer_value_cache = paddle.zeros(cache_shape, dtype=self.dtype, place=layer_device)
             # Note: `mark_static_address` is used to tag the cache as a fixed data pointer,
             # preventing compiled graph breaks when updating the cache.
             paddle._dynamo.mark_static_address(new_layer_key_cache)
@@ -1439,9 +1451,7 @@ class EncoderDecoderCache(Cache):
         return legacy_cache
 
     @classmethod
-    def from_legacy_cache(
-        cls, past_key_values: Optional[Tuple[Tuple[paddle.Tensor]]] = None
-    ) -> "EncoderDecoderCache":
+    def from_legacy_cache(cls, past_key_values: Optional[Tuple[Tuple[paddle.Tensor]]] = None) -> "EncoderDecoderCache":
         """Converts a cache in the legacy cache format into an equivalent `EncoderDecoderCache`."""
         cache = cls(
             self_attention_cache=DynamicCache(),
@@ -1523,7 +1533,9 @@ class EncoderDecoderCache(Cache):
             self_attention_cache.update(layer_keys, layer_values, idx)
 
             layer_keys = paddle.concat([current.cross_attention_cache.key_cache[idx] for current in splits], axis=0)
-            layer_values = paddle.concat([current.cross_attention_cache.value_cache[idx] for current in splits], axis=0)
+            layer_values = paddle.concat(
+                [current.cross_attention_cache.value_cache[idx] for current in splits], axis=0
+            )
             cross_attention_cache.update(layer_keys, layer_values, idx)
         return cls(self_attention_cache, cross_attention_cache)
 
@@ -1644,8 +1656,8 @@ class HybridCache(Cache):
             # Note: `mark_static_address` is used to tag the cache as an fixed data pointer, preventing cuda graph
             # breaks when updating the cache.
             cache_shape = global_cache_shape if not self.is_sliding[i] else sliding_cache_shape
-            new_layer_key_cache = paddle.zeros(cache_shape, dtype=self.dtype)
-            new_layer_value_cache = paddle.zeros(cache_shape, dtype=self.dtype)
+            new_layer_key_cache = paddle.zeros(cache_shape, dtype=self.dtype, place=layer_device)
+            new_layer_value_cache = paddle.zeros(cache_shape, dtype=self.dtype, place=layer_device)
             paddle._dynamo.mark_static_address(new_layer_key_cache)
             paddle._dynamo.mark_static_address(new_layer_value_cache)
             self.key_cache.append(new_layer_key_cache)

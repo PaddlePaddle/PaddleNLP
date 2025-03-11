@@ -494,6 +494,65 @@ class Trie:
         return tokens
 
 
+class ExtensionsTrie(Trie):
+    def __init__(self, *args):
+        super().__init__(*args)
+
+    def extensions(self, prefix: str):
+        """
+        Generates all extensions of a given prefix token in the Trie.
+
+        Example:
+
+        ```python
+        >>> trie = Trie()
+        >>> trie.add("apple")
+        >>> trie.add("app")
+        >>> trie.add("application")
+        >>> trie.extensions("app")
+        ['app', 'apple', 'application']
+        ```
+        """
+        prefix_node = self._get_node(prefix)
+        ret = self._collect_tokens(prefix_node)
+        return [prefix + token for token in ret]
+
+    def _get_node(self, token: str) -> dict:
+        """
+        Retrieves the node corresponding to the given token in the Trie.
+
+        Args:
+            token (str): The token for which the corresponding node needs to be retrieved.
+
+        Returns:
+            dict: The node in the Trie corresponding to the given token.
+        """
+        node = self.data
+        for char in token:
+            if char not in node:
+                break
+
+            node = node[char]
+        return node
+
+    def _collect_tokens(self, node: dict) -> list:
+        """
+        Generates all tokens in the Trie starting from a given node.
+
+        Args:
+            node (dict): The node in the Trie from which tokens need to be generated.
+
+        Returns:
+            list: List of tokens generated from the given node.
+        """
+        tokens = [self._termination_char] if self._termination_char in node else []
+        for token, subtrie_head in node.items():
+            if token != self._termination_char:
+                subtokens = self._collect_tokens(subtrie_head)
+                tokens.extend([token + subtoken for subtoken in subtokens])
+        return tokens
+
+
 def tokenize_chinese_chars(text):
     """Adds whitespace around any CJK character."""
     output = []

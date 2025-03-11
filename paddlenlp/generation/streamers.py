@@ -203,9 +203,7 @@ class TextIteratorStreamer(TextStreamer):
         ```
     """
 
-    def __init__(
-        self, tokenizer, skip_prompt: bool = False, timeout: Optional[float] = None, **decode_kwargs
-    ):
+    def __init__(self, tokenizer, skip_prompt: bool = False, timeout: Optional[float] = None, **decode_kwargs):
         super().__init__(tokenizer, skip_prompt, **decode_kwargs)
         self.text_queue = Queue()
         self.stop_signal = None
@@ -281,9 +279,7 @@ class AsyncTextIteratorStreamer(TextStreamer):
         ```
     """
 
-    def __init__(
-        self, tokenizer, skip_prompt: bool = False, timeout: Optional[float] = None, **decode_kwargs
-    ):
+    def __init__(self, tokenizer, skip_prompt: bool = False, timeout: Optional[float] = None, **decode_kwargs):
         super().__init__(tokenizer, skip_prompt, **decode_kwargs)
         self.text_queue = asyncio.Queue()
         self.stop_signal = None

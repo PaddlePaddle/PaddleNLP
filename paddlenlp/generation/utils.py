@@ -15,7 +15,6 @@
 # limitations under the License.
 import copy
 import inspect
-import os
 import warnings
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
@@ -26,33 +25,30 @@ import paddle.distributed as dist
 import paddle.nn as nn
 import paddle.nn.functional as F
 
-# from transformers.generation.candidate_generator import AssistantVocabTranslatorCache
-
-from paddlenlp.utils.cache_utils import (
+from paddlenlp.generation.candidate_generator import AssistantVocabTranslatorCache
+from paddlenlp.transformers import PretrainedConfig
+from paddlenlp.transformers.model_outputs import ModelOutput
+from paddlenlp.transformers.tokenizer_utils import ExtensionsTrie
+from paddlenlp.utils.cache_utils import (  # StaticCache,
     Cache,
     DynamicCache,
     EncoderDecoderCache,
     OffloadedCache,
     QuantizedCacheConfig,
-    StaticCache,
 )
-from paddlenlp.transformers.model_outputs import ModelOutput
-from paddlenlp.transformers.utils import get_scale_by_dtype
 from paddlenlp.utils.log import logger
-from paddlenlp.transformers import PretrainedConfig
+
 # from ..integrations.deepspeed import is_deepspeed_zero3_enabled
 # from ..integrations.fsdp import is_fsdp_managed_module
 from ..utils import CausalLMOutputWithPast, Seq2SeqLMOutput
-# from ..pytorch_utils import isin_mps_friendly
-# from ..tokenization_utils import ExtensionsTrie
 
 # from ..utils import (
-    # ModelOutput,
-    # is_accelerate_available,
-    # is_hqq_available,
-    # is_optimum_quanto_available,
-    # is_torchdynamo_compiling,
-    # logging,
+# ModelOutput,
+# is_accelerate_available,
+# is_hqq_available,
+# is_optimum_quanto_available,
+# is_torchdynamo_compiling,
+# logging,
 # )
 from .beam_constraints import DisjunctiveConstraint, PhrasalConstraint
 from .beam_search import BeamScorer, BeamSearchScorer, ConstrainedBeamSearchScorer
@@ -110,7 +106,6 @@ from .stopping_criteria import (
     StoppingCriteriaList,
     StopStringCriteria,
 )
-
 
 if TYPE_CHECKING:
     from ..modeling_utils import PreTrainedModel
@@ -364,7 +359,7 @@ class GenerationMixin:
     def prepare_inputs_for_generation(
         self,
         input_ids: paddle.Tensor,
-        past_key_values = None,
+        past_key_values=None,
         attention_mask: Optional[paddle.Tensor] = None,
         inputs_embeds: Optional[paddle.Tensor] = None,
         cache_position: Optional[paddle.Tensor] = None,
@@ -402,10 +397,7 @@ class GenerationMixin:
             model_inputs["past_key_values"] = past_key_values
             if inputs_embeds is not None and input_ids.shape[1] == 0:  # Exception 4
                 inputs_embeds = inputs_embeds[:, -cache_position.shape[0] :]
-            elif (
-                inputs_embeds is not None  # Exception 1
-                or cache_position[-1] >= input_ids.shape[1]  # Exception 3
-            ):
+            elif inputs_embeds is not None or cache_position[-1] >= input_ids.shape[1]:  # Exception 1  # Exception 3
                 input_ids = input_ids[:, -cache_position.shape[0] :]
             elif input_ids.shape[1] != cache_position.shape[0]:  # Default case (the "else", a no op, is Exception 2)
                 input_ids = input_ids[:, cache_position]
@@ -704,9 +696,7 @@ class GenerationMixin:
                 )
             decoder_start_token_id = decoder_start_token_id.view(-1, 1)
         else:
-            decoder_start_token_id = (
-                paddle.ones((batch_size, 1), dtype="int64") * decoder_start_token_id
-            )
+            decoder_start_token_id = paddle.ones((batch_size, 1), dtype="int64") * decoder_start_token_id
 
         # 3. Encoder-decoder models expect the `decoder_input_ids` to start with a special token. Let's ensure that.
         # no user input -> use decoder_start_token_id as decoder_input_ids
@@ -791,21 +781,26 @@ class GenerationMixin:
         # update token_type_ids with last value
         if "token_type_ids" in model_kwargs:
             token_type_ids = model_kwargs["token_type_ids"]
-            model_kwargs["token_type_ids"] = paddle.concat([token_type_ids, token_type_ids[:, -1].unsqueeze(-1)], axis=-1)
+            model_kwargs["token_type_ids"] = paddle.concat(
+                [token_type_ids, token_type_ids[:, -1].unsqueeze(-1)], axis=-1
+            )
 
         if not is_encoder_decoder:
             # update attention mask
             if "attention_mask" in model_kwargs:
                 attention_mask = model_kwargs["attention_mask"]
                 model_kwargs["attention_mask"] = paddle.concat(
-                    [attention_mask, paddle.ones((attention_mask.shape[0], 1),dtype=attention_mask.dtype)], axis=-1
+                    [attention_mask, paddle.ones((attention_mask.shape[0], 1), dtype=attention_mask.dtype)], axis=-1
                 )
         else:
             # update decoder attention mask
             if "decoder_attention_mask" in model_kwargs:
                 decoder_attention_mask = model_kwargs["decoder_attention_mask"]
                 model_kwargs["decoder_attention_mask"] = paddle.concat(
-                    [decoder_attention_mask, paddle.ones((decoder_attention_mask.shape[0], 1),dtype=attention_mask.dtype)],
+                    [
+                        decoder_attention_mask,
+                        paddle.ones((decoder_attention_mask.shape[0], 1), dtype=attention_mask.dtype),
+                    ],
                     axis=-1,
                 )
 
@@ -839,7 +834,7 @@ class GenerationMixin:
         """
         Returns the candidate generator to be used in `assisted_generation`
         """
-        # different_tokenizers = all(v is not None for v in (assistant_model, target_tokenizer, assistant_tokenizer))
+        different_tokenizers = all(v is not None for v in (assistant_model, target_tokenizer, assistant_tokenizer))
 
         if generation_config.assistant_early_exit is not None:
             candidate_generator = EarlyExitCandidateGenerator(
@@ -857,37 +852,37 @@ class GenerationMixin:
                 max_matching_ngram_size=generation_config.max_matching_ngram_size,
                 max_length=generation_config.max_length,
             )
-        # elif different_tokenizers:
-        #     if generation_config.do_sample is True:
-        #         atm_translator = AssistantVocabTranslatorCache.get_translator(
-        #             target_tokenizer, assistant_tokenizer, self.config.vocab_size, assistant_model.device
-        #         )
-        #         candidate_generator = UniversalSpeculativeDecodingGenerator(
-        #             input_ids=input_ids,
-        #             assistant_model=assistant_model,
-        #             generation_config=generation_config,
-        #             model_kwargs=model_kwargs,
-        #             inputs_tensor=inputs_tensor,
-        #             logits_processor=logits_processor,
-        #             target_tokenizer=target_tokenizer,
-        #             assistant_tokenizer=assistant_tokenizer,
-        #             atm_translator=atm_translator,
-        #         )
-        #     elif generation_config.do_sample is False:
-        #         candidate_generator = AssistedCandidateGeneratorDifferentTokenizers(
-        #             input_ids=input_ids,
-        #             assistant_model=assistant_model,
-        #             generation_config=generation_config,
-        #             model_kwargs=model_kwargs,
-        #             inputs_tensor=inputs_tensor,
-        #             logits_processor=logits_processor,
-        #             target_tokenizer=target_tokenizer,
-        #             assistant_tokenizer=assistant_tokenizer,
-        #         )
-        #     else:
-        #         raise ValueError(
-        #             f"Invalid value for `do_sample`: expected a boolean, got {type(generation_config.do_sample).__name__}"
-        #         )
+        elif different_tokenizers:
+            if generation_config.do_sample is True:
+                atm_translator = AssistantVocabTranslatorCache.get_translator(
+                    target_tokenizer, assistant_tokenizer, self.config.vocab_size, assistant_model.device
+                )
+                candidate_generator = UniversalSpeculativeDecodingGenerator(
+                    input_ids=input_ids,
+                    assistant_model=assistant_model,
+                    generation_config=generation_config,
+                    model_kwargs=model_kwargs,
+                    inputs_tensor=inputs_tensor,
+                    logits_processor=logits_processor,
+                    target_tokenizer=target_tokenizer,
+                    assistant_tokenizer=assistant_tokenizer,
+                    atm_translator=atm_translator,
+                )
+            elif generation_config.do_sample is False:
+                candidate_generator = AssistedCandidateGeneratorDifferentTokenizers(
+                    input_ids=input_ids,
+                    assistant_model=assistant_model,
+                    generation_config=generation_config,
+                    model_kwargs=model_kwargs,
+                    inputs_tensor=inputs_tensor,
+                    logits_processor=logits_processor,
+                    target_tokenizer=target_tokenizer,
+                    assistant_tokenizer=assistant_tokenizer,
+                )
+            else:
+                raise ValueError(
+                    f"Invalid value for `do_sample`: expected a boolean, got {type(generation_config.do_sample).__name__}"
+                )
         else:
             candidate_generator = AssistedCandidateGenerator(
                 input_ids=input_ids,
@@ -1543,21 +1538,22 @@ class GenerationMixin:
             # 3) there are non-default generation parameters in the model config.
             # 4) the user must have set new generation parameters in the model config.
             # NOTE: `paddle.compile` can't compile `hash`, this legacy support is disabled with compilation.
-            if (
-                self.generation_config._from_model_config  # 1)
-                and self.generation_config._original_object_hash == hash(self.generation_config)  # 2)
-                # and len(self.config._get_non_default_generation_parameters()) > 0  # 3)
-            ):
-                new_generation_config = GenerationConfig.from_model_config(self.config)
-                if new_generation_config != self.generation_config:  # 4)
-                    warnings.warn(
-                        "You have modified the pretrained model configuration to control generation. This is a"
-                        " deprecated strategy to control generation and will be removed in v5."
-                        " Please use and modify the model generation configuration (see"
-                        " https://huggingface.co/docs/transformers/generation_strategies#default-text-generation-configuration )",
-                        UserWarning,
-                    )
-                    self.generation_config = new_generation_config
+            if hasattr(self.generation_config, "_original_object_hash"):
+                if (
+                    self.generation_config._from_model_config  # 1)
+                    and self.generation_config._original_object_hash == hash(self.generation_config)  # 2)
+                    # and len(self.config._get_non_default_generation_parameters()) > 0  # 3)
+                ):
+                    new_generation_config = GenerationConfig.from_model_config(self.config)
+                    if new_generation_config != self.generation_config:  # 4)
+                        warnings.warn(
+                            "You have modified the pretrained model configuration to control generation. This is a"
+                            " deprecated strategy to control generation and will be removed in v5."
+                            " Please use and modify the model generation configuration (see"
+                            " https://huggingface.co/docs/transformers/generation_strategies#default-text-generation-configuration )",
+                            UserWarning,
+                        )
+                        self.generation_config = new_generation_config
 
             generation_config = self.generation_config
             using_model_generation_config = True
@@ -1654,9 +1650,9 @@ class GenerationMixin:
                 # if not is_torchdynamo_compiling():
                 #     cache_dtype = self.dtype
                 # else:
-                    # NOTE: self.dtype is not compatible with paddle.compile, as it calls `self.parameters()`.
-                    # Workaround: trust the lm_head, whose attribute name is somewhat consistent across generative
-                    # models. May cause trobles with non-text modalities.
+                # NOTE: self.dtype is not compatible with paddle.compile, as it calls `self.parameters()`.
+                # Workaround: trust the lm_head, whose attribute name is somewhat consistent across generative
+                # models. May cause trobles with non-text modalities.
                 cache_dtype = self.get_output_embeddings().weight.dtype
 
             cache_kwargs = {
@@ -1683,6 +1679,8 @@ class GenerationMixin:
         order to save memory (because no back and forth `to_legacy_cache` and `from_legacy_cache` will be performed
         for `HybridMambaAttentionDynamicCache`).
         """
+        if not hasattr(self, "_supports_cache_class"):
+            self._supports_cache_class = True
         return (
             self._supports_cache_class
             and "jamba" not in self.__class__.__name__.lower()
@@ -1817,7 +1815,7 @@ class GenerationMixin:
         self,
         generation_config: GenerationConfig,
         kwargs_has_attention_mask: Optional[bool] = None,
-        device = None,
+        device=None,
         # device: Optional[Union[paddle.device, str]] = None,
     ):
         """
@@ -1996,9 +1994,8 @@ class GenerationMixin:
                     - [`~generation.GenerateEncoderDecoderOutput`],
                     - [`~generation.GenerateBeamEncoderDecoderOutput`]
         """
-        
+
         # 1. Handle `generation_config` and kwargs that might update it, and validate the `.generate()` call
-        # import pdb;pdb.set_trace()
         self._validate_model_class()
         tokenizer = kwargs.pop("tokenizer", None)  # Pull this out first, we only use it for stopping criteria
         assistant_tokenizer = kwargs.pop("assistant_tokenizer", None)  # only used for assisted generation
@@ -2086,7 +2083,6 @@ class GenerationMixin:
         input_ids_length = input_ids.shape[-1]
         has_default_max_length = kwargs.get("max_length") is None and generation_config.max_length is not None
         has_default_min_length = kwargs.get("min_length") is None and generation_config.min_length is not None
-        # import pdb; pdb.set_trace()
         generation_config = self._prepare_generated_length(
             generation_config=generation_config,
             has_default_max_length=has_default_max_length,
@@ -2461,11 +2457,10 @@ class GenerationMixin:
 
         # replace bos with pad to not condition healing on it
         input_ids = paddle.where(input_ids == bos_token_id, pad_token_id, input_ids)
-
         """
         the latter code assumes the input_ids is not empty,
         input_id has to be checked if contains elements
-		"""
+        """
         if input_ids.numel() == 0:
             return input_ids
 
@@ -2485,7 +2480,7 @@ class GenerationMixin:
             """
             seq_bias key has to be tuple with int so have to use
             tokenizer function to convert str to int
-			"""
+            """
             seq_bias = {
                 (tokenizer.convert_tokens_to_ids(alt_tok),): 10.0 for alt_tok in vocab_trie.extensions(prefix=tail_tok)
             }
@@ -2498,11 +2493,10 @@ class GenerationMixin:
             generation_config.update(sequence_bias=seq_bias)
 
             trimmed_ids = batch_ids[:-1]
-
             """
             the latter code assumes trimmed_ids is not empty
             so have to check the its element count
-			"""
+            """
             if trimmed_ids.numel() == 0:
                 continue
 
@@ -3213,7 +3207,7 @@ class GenerationMixin:
         this_peer_finished = False
         unfinished_sequences = paddle.ones(batch_size, dtype="int64")
         model_kwargs = self._get_initial_cache_position(input_ids, model_kwargs)
-        
+
         model_forward = self.__call__
 
         # if isinstance(model_kwargs.get("past_key_values"), Cache):
@@ -3230,9 +3224,6 @@ class GenerationMixin:
             this_peer_finished, synced_gpus, device=input_ids.place, cur_len=cur_len, max_length=max_length
         ):
             # prepare model inputs
-            # print("2\model_kwargs:",model_kwargs)
-            # print("input_ids:",input_ids)
-            # import pdb; pdb.set_trace()
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
             # prepare variable output controls (note: some models won't accept all output controls)
             model_inputs.update({"output_attentions": output_attentions} if output_attentions else {})
@@ -3242,7 +3233,6 @@ class GenerationMixin:
                 outputs = self(**model_inputs, return_dict=True)
                 is_prefill = False
             else:
-                # import pdb; pdb.set_trace()
                 outputs = model_forward(**model_inputs, return_dict=True)
 
             # synced_gpus: don't waste resources running the code we don't need; kwargs must be updated before skipping
@@ -3289,7 +3279,6 @@ class GenerationMixin:
                 next_tokens = paddle.multinomial(probs, num_samples=1).squeeze(1)
             else:
                 next_tokens = paddle.argmax(next_token_scores, axis=-1)
-            # import pdb;pdb.set_trace()
             # finished sentences should have their next token be a padding token
             if has_eos_stopping_criteria:
                 next_tokens = next_tokens * unfinished_sequences + pad_token_id * (1 - unfinished_sequences)
@@ -3838,7 +3827,9 @@ class GenerationMixin:
                     )
 
                 input_ids[batch_group_indices] = group_input_ids[beam_idx]
-                group_input_ids = paddle.concat([group_input_ids[beam_idx, :], beam_next_tokens.unsqueeze(-1)], axis=-1)
+                group_input_ids = paddle.concat(
+                    [group_input_ids[beam_idx, :], beam_next_tokens.unsqueeze(-1)], axis=-1
+                )
                 current_tokens[batch_group_indices] = group_input_ids[:, -1]
 
                 # (beam_idx // group_size) -> batch_idx
@@ -4023,7 +4014,7 @@ class GenerationMixin:
 
         decoder_prompt_len = input_ids.shape[-1]  # record the prompt length of decoder
         while self._has_unfinished_sequences(this_peer_finished, synced_gpus, device=input_ids.device):
-            
+
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
 
             # prepare variable output controls (note: some models won't accept all output controls)
@@ -4415,7 +4406,7 @@ class GenerationMixin:
                 candidate_generator.num_assistant_tokens
             )
         if return_dict_in_generate:
-        # if True:
+            # if True:
             if self.config.is_encoder_decoder:
                 return GenerateEncoderDecoderOutput(
                     sequences=input_ids,
@@ -4591,7 +4582,7 @@ def _split(data, full_batch_size: int, split_size: int = None):
 
 
 def _split_model_inputs(
-    model_input: Union[ModelOutput, Dict], split_size: int, full_batch_size: int, config:PretrainedConfig
+    model_input: Union[ModelOutput, Dict], split_size: int, full_batch_size: int, config: PretrainedConfig
 ) -> List[Union[ModelOutput, Dict]]:
     """
     Split a ModelOutput object (or its subclasses) or Dict into a list of same-class objects based on a specified split
@@ -4745,7 +4736,9 @@ def _dola_select_contrast(
         return logits
 
     # 1. Stacking all premature_layers into a new dimension
-    stacked_premature_layers = paddle.stack([candidate_premature_logits[i] for i in candidate_premature_layers], axis=0)
+    stacked_premature_layers = paddle.stack(
+        [candidate_premature_logits[i] for i in candidate_premature_layers], axis=0
+    )
 
     # 2. Calculate the softmax values for mature_layer and all premature_layers
     # shape: (batch_size, vocab_size)

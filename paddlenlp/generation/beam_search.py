@@ -191,9 +191,7 @@ class BeamSearchScorer(BeamScorer):
         ]
         # self._done[i*self.num_beam_groups+j] indicates whether the generation of the beam_hyps of the j-th group
         # in the i-th mini-batch is complete.
-        self._done = paddle.to_tensor(
-            [False for _ in range(batch_size * self.num_beam_groups)], dtype=paddle.bool
-        )
+        self._done = paddle.to_tensor([False for _ in range(batch_size * self.num_beam_groups)], dtype=paddle.bool)
 
         if not isinstance(num_beams, int) or num_beams <= 1:
             raise ValueError(
@@ -574,7 +572,6 @@ class ConstrainedBeamSearchScorer(BeamScorer):
                     f"{self.group_size} is expected by the beam scorer."
                 )
 
-
         next_beam_scores = paddle.zeros((batch_size, self.group_size), dtype=next_scores.dtype)
         next_beam_tokens = paddle.zeros((batch_size, self.group_size), dtype=next_tokens.dtype)
         next_beam_indices = paddle.zeros((batch_size, self.group_size), dtype=next_indices.dtype)
@@ -686,7 +683,7 @@ class ConstrainedBeamSearchScorer(BeamScorer):
         # 2. Selecting best candidates such that we end up with highest probable candidates
         #     that fulfill our constraints.
 
-        orig_len = sent_beam_indices.shape[0]        
+        orig_len = sent_beam_indices.shape[0]
         device = sent_beam_indices.device
 
         # initialize states

@@ -20,13 +20,16 @@ import os
 import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, is_dataclass
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
 from enum import Enum
-from .. import __version__
-from ..utils import GENERATION_CONFIG_NAME
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
+
+from paddlenlp.transformers.configuration_utils import PretrainedConfig
 from paddlenlp.utils.download import resolve_file_path
 from paddlenlp.utils.log import logger
-from paddlenlp.transformers.configuration_utils import PretrainedConfig
+
+from .. import __version__
+from ..utils import GENERATION_CONFIG_NAME
+
 # from ..utils import (
 #     GENERATION_CONFIG_NAME,
 #     ExplicitEnum,
@@ -42,18 +45,20 @@ from paddlenlp.transformers.configuration_utils import PretrainedConfig
 if TYPE_CHECKING:
     from paddlenlp.transformers.model_utils import PretrainedModel
 
-from paddlenlp.utils.cache_utils import (
-    # HQQQuantizedCache,
+from paddlenlp.utils.cache_utils import (  # HQQQuantizedCache,; QuantoQuantizedCache,
     HybridCache,
     MambaCache,
     OffloadedStaticCache,
     QuantizedCacheConfig,
-    QuantoQuantizedCache,
     SlidingWindowCache,
     StaticCache,
     StaticCacheConfig,
 )
-from .logits_process import SynthIDTextWatermarkLogitsProcessor, WatermarkLogitsProcessor
+
+from .logits_process import (
+    SynthIDTextWatermarkLogitsProcessor,
+    WatermarkLogitsProcessor,
+)
 
 # logger = logging.get_logger(__name__)
 METADATA_FIELDS = ("_from_model_config", "_commit_hash", "_original_object_hash", "transformers_version")
@@ -61,7 +66,6 @@ CACHE_CONFIG_MAPPING = {}
 NEED_SETUP_CACHE_CLASSES_MAPPING = {}
 QUANT_BACKEND_CLASSES_MAPPING = {}
 ALL_CACHE_IMPLEMENTATIONS = []
-
 
 
 CACHE_CONFIG_MAPPING["quantized"] = QuantizedCacheConfig
@@ -78,6 +82,7 @@ ALL_CACHE_IMPLEMENTATIONS = (
     list(NEED_SETUP_CACHE_CLASSES_MAPPING.keys()) + list(CACHE_CONFIG_MAPPING.keys()) + ["offloaded"]
 )
 
+
 class ExplicitEnum(str, Enum):
     """
     Enum with more explicit error message for missing values.
@@ -88,6 +93,7 @@ class ExplicitEnum(str, Enum):
         raise ValueError(
             f"{value} is not a valid {cls.__name__}, please select one of {list(cls._value2member_map_.keys())}"
         )
+
 
 class GenerationMode(ExplicitEnum):
     """
@@ -491,7 +497,7 @@ class GenerationConfig:
         self.prompt_lookup_num_tokens = kwargs.pop("prompt_lookup_num_tokens", None)
         self.max_matching_ngram_size = kwargs.pop("max_matching_ngram_size", None)
         self.assistant_early_exit = kwargs.pop("assistant_early_exit", None)
-        ## assistant generation for different tokenizers, the windows size for assistant/target model
+        # assistant generation for different tokenizers, the windows size for assistant/target model
         self.assistant_lookbehind = kwargs.pop("assistant_lookbehind", 10)
         self.target_lookbehind = kwargs.pop("target_lookbehind", 10)
 
@@ -1090,17 +1096,34 @@ class GenerationConfig:
         else:
             return config
 
-    def dict_torch_dtype_to_str(self, d: Dict[str, Any]) -> None:
+    def dict_paddle_dtype_to_str(self, d: dict[str, Any]) -> None:
         """
-        Checks whether the passed dictionary and its nested dicts have a *torch_dtype* key and if it's not None,
-        converts torch.dtype to a string of just the type. For example, `torch.float32` get converted into *"float32"*
+        Checks whether the passed dictionary and its nested dicts have a *paddle_dtype* key and if it's not None,
+        converts PaddlePaddle dtype to a string of just the type. For example, `paddle.float32` gets converted into *"float32"*
         string, which can then be stored in the json format.
         """
-        if d.get("torch_dtype", None) is not None and not isinstance(d["torch_dtype"], str):
-            d["torch_dtype"] = str(d["torch_dtype"]).split(".")[1]
-        for value in d.values():
+        if "paddle_dtype" in d and d["paddle_dtype"] is not None and not isinstance(d["paddle_dtype"], str):
+            d["paddle_dtype"] = (
+                str(d["paddle_dtype"]).split(".")[1]
+                if hasattr(d["paddle_dtype"], "__name__")
+                else str(d["paddle_dtype"])
+            )
+
+        for key, value in d.items():
             if isinstance(value, dict):
-                self.dict_torch_dtype_to_str(value)
+                self.dict_paddle_dtype_to_str(value)
+
+    # def dict_torch_dtype_to_str(self, d: Dict[str, Any]) -> None:
+    #     """
+    #     Checks whether the passed dictionary and its nested dicts have a *torch_dtype* key and if it's not None,
+    #     converts torch.dtype to a string of just the type. For example, `torch.float32` get converted into *"float32"*
+    #     string, which can then be stored in the json format.
+    #     """
+    #     if d.get("torch_dtype", None) is not None and not isinstance(d["torch_dtype"], str):
+    #         d["torch_dtype"] = str(d["torch_dtype"]).split(".")[1]
+    #     for value in d.values():
+    #         if isinstance(value, dict):
+    #             self.dict_torch_dtype_to_str(value)
 
     def to_diff_dict(self) -> Dict[str, Any]:
         """
@@ -1122,7 +1145,7 @@ class GenerationConfig:
             if key not in default_config_dict or key == "transformers_version" or value != default_config_dict[key]:
                 serializable_config_dict[key] = value
 
-        self.dict_torch_dtype_to_str(serializable_config_dict)
+        self.dict_paddle_dtype_to_str(serializable_config_dict)
         return serializable_config_dict
 
     def to_dict(self) -> Dict[str, Any]:
@@ -1145,7 +1168,7 @@ class GenerationConfig:
         # Transformers version when serializing this file
         output["transformers_version"] = __version__
 
-        self.dict_torch_dtype_to_str(output)
+        self.dict_paddle_dtype_to_str(output)
         return output
 
     def to_json_string(self, use_diff: bool = True, ignore_metadata: bool = False) -> str:
@@ -1229,13 +1252,15 @@ class GenerationConfig:
 
         # Special case: some models have generation attributes set in the decoder. Use them if still unset in the
         # generation config (which in turn is defined from the outer attributes of model config).
-        
+
         for decoder_name in ("decoder", "generator", "text_config"):
             if decoder_name in config_dict:
                 default_generation_config = GenerationConfig()
                 decoder_config = config_dict[decoder_name]
                 for attr in generation_config.to_dict().keys():
-                    if attr in decoder_config and getattr(generation_config, attr) == getattr(default_generation_config, attr):
+                    if attr in decoder_config and getattr(generation_config, attr) == getattr(
+                        default_generation_config, attr
+                    ):
                         setattr(generation_config, attr, decoder_config[attr])
 
         # decoder_config = model_config.get_text_config(decoder=True)
@@ -1362,10 +1387,12 @@ class BaseWatermarkingConfig(ABC):
                 setattr(self, key, value)
 
     @abstractmethod
-    def validate(self): ...
+    def validate(self):
+        ...
 
     @abstractmethod
-    def construct_processor(self, vocab_size): ...
+    def construct_processor(self, vocab_size):
+        ...
 
 
 @dataclass
@@ -1539,9 +1566,6 @@ class SynthIDTextWatermarkingConfig(BaseWatermarkingConfig):
 @dataclass
 class CompileConfig:
     """
-    Class that holds arguments relative to `torch.compile` behavior, when using automatic compilation in `generate`.
-    See [`torch.compile`](https://pytorch.org/docs/stable/generated/torch.compile.html) for more details on the arguments.
-
     Args:
         fullgraph (`bool`, *optional*, defaults to `True`):
             If `True`, requires that the whole forward be capturable in a single graph.

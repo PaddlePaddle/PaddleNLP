@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import copy
+import importlib.util
 import weakref
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 
@@ -23,13 +24,17 @@ import paddle
 # from ..utils import is_sklearn_available
 
 
-# if is_sklearn_available():
-#     from sklearn.metrics import roc_curve
+if importlib.util.find_spec("sklearn") is not None:
+    is_sklearn_available = True
+    from sklearn.metrics import roc_curve
 
-# from ..cache_utils import DynamicCache
-# from ..pytorch_utils import isin_mps_friendly
-from .logits_process import LogitsProcessorList, MinLengthLogitsProcessor, SuppressTokensLogitsProcessor
+from paddlenlp.utils.cache_utils import DynamicCache
 
+from .logits_process import (
+    LogitsProcessorList,
+    MinLengthLogitsProcessor,
+    SuppressTokensLogitsProcessor,
+)
 
 if TYPE_CHECKING:
     from ..modeling_utils import PreTrainedModel
@@ -187,7 +192,7 @@ class AssistedCandidateGenerator(CandidateGenerator):
         self.generation_config.cache_implementation = None
 
         if (
-            is_sklearn_available()
+            is_sklearn_available
             and self.assistant_model.generation_config.assistant_confidence_threshold
             and type(self) is AssistedCandidateGenerator
         ):
@@ -248,8 +253,7 @@ class AssistedCandidateGenerator(CandidateGenerator):
         # The assistant's confidence threshold is adjusted throughout the speculative iterations to reduce the number of unnecessary draft and target forward passes. The costs are estimated based on the ROC curve, which considers the probability of the draft token and its match with the target. A cost of 25% is assigned to false positives and 75% to false negatives.
         # This adaptation is not compatible with UAG, as it relies on the number of matched tokens based on the draft vocabulary, which is unavailable in UAG.
         if (
-            is_sklearn_available()
-            and self.assistant_model.generation_config.assistant_confidence_threshold
+            self.assistant_model.generation_config.assistant_confidence_threshold
             and type(self) is AssistedCandidateGenerator
         ):
             # update self.matches
@@ -262,8 +266,8 @@ class AssistedCandidateGenerator(CandidateGenerator):
             if excess_length > 0:
                 del self.probs[-excess_length:]
 
-            if (
-                len(self.probs) > 5 and {0, 1}.issubset(self.matches)
+            if len(self.probs) > 5 and {0, 1}.issubset(
+                self.matches
             ):  # require at least 5 samples to calculate the ROC curve and at least one positive and one negative sample
                 fpr, tpr, thresholds = roc_curve(self.matches, self.probs)
                 fnr = 1 - tpr
@@ -316,7 +320,7 @@ class AssistedCandidateGenerator(CandidateGenerator):
         assistant_output = self.assistant_model.generate(**generation_args, **self.assistant_kwargs)
         self.assistant_kwargs["past_key_values"] = assistant_output.past_key_values
         if (
-            is_sklearn_available()
+            is_sklearn_available
             and self.assistant_model.generation_config.assistant_confidence_threshold
             and type(self) is AssistedCandidateGenerator
         ):
@@ -645,9 +649,10 @@ class AssistantToTargetTranslator:
         self._assistant_tokenizer: "PreTrainedTokenizerBase" = assistant_tokenizer
         self._assistant_model_device: str = assistant_model_device
         self.target_vocab_size: int = target_vocab_size
-        self._assistant_to_target_input_ids, self.target_to_assistant_input_ids = (
-            self._get_assistant_to_target_input_ids()
-        )
+        (
+            self._assistant_to_target_input_ids,
+            self.target_to_assistant_input_ids,
+        ) = self._get_assistant_to_target_input_ids()
         self._suppress_input_ids: list[int] = self._get_suppress_input_ids()
         self.logits_processors: Optional[LogitsProcessorList] = None
         if len(self._suppress_input_ids) > 0:
@@ -972,7 +977,7 @@ class PromptLookupCandidateGenerator(CandidateGenerator):
                     # remove remaining candidate ids if an "eos" token is found, otherwise the target model may
                     # accept eos and the rest as valid, thus not stopping generation after "eos"
                     # NOTE: below code is written based on the fact that assisted decoding supports only bs=1
-                    mask = isin_mps_friendly(chosen_ids, self.eos_token_id)
+                    mask = paddle.isin(chosen_ids, self.eos_token_id)
                     match_indices_eos = paddle.nonzero(mask)
                     if match_indices_eos.numel() > 0:
                         first_eos_index = match_indices_eos[0].item()
@@ -1118,7 +1123,9 @@ def _prepare_attention_mask(model_kwargs: Dict[str, Any], new_length: int, is_en
     if mask_length_diff < 0:
         model_kwargs[mask_key] = mask[:, :mask_length_diff]
     elif mask_length_diff > 0:
-        model_kwargs[mask_key] = paddle.concat([mask, paddle.ones((mask.shape[0], mask_length_diff), dtype=mask.dtype)], axis=-1)
+        model_kwargs[mask_key] = paddle.concat(
+            [mask, paddle.ones((mask.shape[0], mask_length_diff), dtype=mask.dtype)], axis=-1
+        )
 
     # Handle cross attention models
     if "cross_attention_mask" in model_kwargs:
