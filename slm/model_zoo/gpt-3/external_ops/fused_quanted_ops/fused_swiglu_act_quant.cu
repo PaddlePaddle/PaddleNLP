@@ -178,8 +178,7 @@ __device__ __forceinline__ float fast_swiglu(const __nv_bfloat16 x, const __nv_b
 }
 // 对二维坐标进行swizzle变换，提供相对offset,避免bank conflict
 __device__ __forceinline__ int swizzled_2d_idx(const int outer_dim, const int inner_rank, const int inner_dim) {
-    return outer_dim * inner_rank+ outer_dim^inner_dim;
-    //return outer_dim * inner_rank+ inner_dim;
+    return outer_dim * inner_rank + outer_dim ^ inner_dim;
 }
 
 #define BLOCK_SIZE 128
