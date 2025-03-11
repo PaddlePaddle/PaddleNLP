@@ -3,6 +3,29 @@
 
 *该部署工具是基于英伟达 Triton 框架专为服务器场景的大模型服务化部署而设计。它提供了支持 gRPC、HTTP 协议的服务接口，以及流式 Token 输出能力。底层推理引擎支持连续批处理、weight only int8、后训练量化（PTQ）等加速优化策略，为用户带来易用且高性能的部署体验。*
 
+## 静态图快速部署
+
+该方法仅支持[可一键跑通的模型列表](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/static_models.md)中的模型进行一键启动推理服务。
+  
+为了避免模型过大导致的下载时间过长问题，我们直接提供了自动下载的[脚本](#静态图下载)，支持下载后再启动服务进行推理。进入容器后根据单机或多机模型进行静态图下载。
+
+`MODEL_PATH` 为指定模型下载的存储路径，可自行指定
+`model_name` 为指定下载模型名称，具体支持模型可查看[文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/static_models.md)
+
+Note:
+1. 请保证 shm-size >= 5，不然可能会导致服务启动失败
+2. 部署前请确认模型所需要的环境和硬件，请参考[文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/static_models.md)
+
+**A100部署示例**
+```shell
+export MODEL_PATH=${MODEL_PATH:-$PWD}
+export model_name=${model_name:-"deepseek-ai/DeepSeek-R1-Distill-Llama-8B/weight_only_int8"}
+docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
+-v $MODEL_PATH:/models -e "model_name=${model_name}" \
+-dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.1 /bin/bash \
+-c -ex 'start_server $model_name && tail -f /dev/null'
+```
+
 
 ## 部署环境准备
 
@@ -19,10 +42,14 @@
 
 ### 准备部署镜像
 
-为了方便部署，我们提供了 cuda12.4 与 cuda 11.8 的镜像，可以直接拉取镜像，或者使用我们提供的 `Dockerfile` [构建自定义镜像](#基于 dockerfile 创建自己的镜像)
-```
-docker pull ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.1
-```
+为了方便部署，我们提供了 cuda12.4 与 cuda 11.8 的镜像，可以直接拉取镜像，或者使用我们提供的 `Dockerfile` [构建自定义镜像](#基于-dockerfile-创建自己的镜像)
+
+
+|cuda版本| 支持硬件架构|镜像地址|支持的典型设备|
+|:------|:-:|:-:|:-:|
+| cuda11.8 | 70 75 80 86 |ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda118-cudnn8-v2.1 |V100，T4，A100，A30，A10 |
+| cuda12.4 | 80 86 89 90 |ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.1 |A100，A30，A10,L20，H20，H100 |
+
 
 ### 准备模型
 
@@ -45,7 +72,7 @@ cd /home/workspace/models_dir
 
 #### 静态图下载
 
-除了支持通过设置`model_name` 在启动时进行自动下载，服务提供脚本可以进行自行下载
+除了支持通过设置`model_name` 在启动时进行自动下载，服务提供脚本可以进行自行下载。**部署时需指定环境变量`MODEL_DIR` 为模型下载存储路径**
 
 脚本所在路径`/opt/output/download_model.py`
 
@@ -170,28 +197,34 @@ export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 更多请求参数请参考[模型配置参数介绍](#模型配置参数介绍)
 
 ### 启动服务
+针对模型部署我们提供两种方案：
+- 模型已保存在指定路径下进行部署
+- 静态图自动下载部署
+
 #### 单机启动
+模型已保存在指定路径下进行部署
 
 ```shell
+export MODEL_DIR=${MODEL_DIR:-"/models"}
 start_server
 
 # 重新启动服务前，需要停止服务，执行 stop_server
 ```
-启动脚本位置： /opt/output/Serving
+静态图自动下载部署  
+`model_name` 为指定下载模型名称，具体支持模型可查看[文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/static_models.md)
+
+```shell
+model_name="deepseek-ai/DeepSeek-R1-2nodes/weight_only_int8"
+start_server $model_name
+
+# 重新启动服务前，需要停止服务，执行 stop_server
+```
 #### 多机启动
 ##### 依次启动服务
 1. 启动 master node 主节点服务
 2. 依次启动其他节点的服务
 
-**启动命令**
-
-```
-start_server
-
-# 重新启动服务前，需要停止服务
-
-stop_server
-```
+启动命令与单机相同
 
 ##### mpi启动
 若使用mpi 进行启动需提前配置各机器的ssh 可以正常访问
