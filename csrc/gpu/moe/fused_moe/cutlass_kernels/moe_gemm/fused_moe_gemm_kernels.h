@@ -17,8 +17,8 @@
 #pragma once
 #include <cuda_runtime_api.h>
 #include <string>
-#include "cutlass_extensions/ft_gemm_configs.h"
-
+#include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/ft_gemm_configs.h"
+using namespace phi;
 
 template <typename T, /*The type used for activations/scales/compute*/
           typename WeightType /* The type for the MoE weights */>

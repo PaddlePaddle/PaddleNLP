@@ -24,7 +24,7 @@
 #include <unordered_map>
 
 #include <nlohmann/json.hpp>
-#include "cutlass_extensions/ft_gemm_configs.h"
+#include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/ft_gemm_configs.h"
 
 
 using json = nlohmann::json;
@@ -269,12 +269,12 @@ class GemmConfigManager {
  private:
   GemmConfigManager() {
     mGemmProfileMap = std::make_shared<GemmProfileMap>();
-    loadFromJson("gemm_profiles.json");
+    loadFromJson("moe_gemm_profiles.json");
   }
 
   ~GemmConfigManager() {
     json j = mGemmProfileMap->serialize();
-    std::ofstream outFile("gemm_profiles.json");
+    std::ofstream outFile("moe_gemm_profiles.json");
     outFile << j.dump(4);
     outFile.close();
   }

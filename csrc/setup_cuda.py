@@ -118,8 +118,8 @@ sources = [
     "./gpu/speculate_decoding_kernels/speculate_get_output.cc",
 ]
 sources += find_end_files("./gpu/speculate_decoding_kernels", ".cu")
+sources = []
 sources += find_end_files("./gpu/moe/fused_moe/cutlass_kernels/moe_gemm/", ".cu")
-# sources = []
 sources += find_end_files("./gpu/moe/fused_moe/", ".cu")
 
 nvcc_compile_args = gencode_flags
@@ -148,13 +148,13 @@ include_path = [
 cc = get_sm_version()
 cuda_version = float(paddle.version.cuda())
 
-if cc >= 80:
-    sources += ["gpu/int8_gemm_with_cutlass/gemm_dequant.cu"]
+# if cc >= 80:
+#     sources += ["gpu/int8_gemm_with_cutlass/gemm_dequant.cu"]
 
-    sources += ["./gpu/append_attention.cu", "./gpu/multi_head_latent_attention.cu"]
+#     sources += ["./gpu/append_attention.cu", "./gpu/multi_head_latent_attention.cu"]
 
-    sources += find_end_files("./gpu/append_attn", ".cu")
-    sources += find_end_files("./gpu/append_attn/template_instantiation", ".cu")
+#     sources += find_end_files("./gpu/append_attn", ".cu")
+#     sources += find_end_files("./gpu/append_attn/template_instantiation", ".cu")
 
 
 fp8_auto_gen_directory = "gpu/cutlass_kernels/fp8_gemm_fused/autogen"
@@ -181,7 +181,7 @@ if cc >= 90 and cuda_version >= 12.0:
     #     "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_cuda_core_gemm.cu",
     #     "gpu/fp8_gemm_with_cutlass/fp8_fp8_fp8_dual_gemm.cu",
     # ]
-    sources += find_end_files("./gpu/mla_attn", ".cu")
+    # sources += find_end_files("./gpu/mla_attn", ".cu")
 
 
 ops_name = f"paddlenlp_ops_{sm_version}" if sm_version != 0 else "paddlenlp_ops"

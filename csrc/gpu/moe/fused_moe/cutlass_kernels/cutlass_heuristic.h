@@ -30,7 +30,8 @@ limitations under the License. */
 
 #pragma once
 
-#include "cutlass_extensions/ft_gemm_configs.h"
+#include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/ft_gemm_configs.h"
+using namespace phi;
 
 static std::vector<CutlassTileConfig> get_candidate_tiles(
     const bool is_weight_only,

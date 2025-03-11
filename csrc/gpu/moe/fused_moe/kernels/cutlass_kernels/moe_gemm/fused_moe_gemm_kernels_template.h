@@ -35,10 +35,10 @@
 #include "paddle/common/errors.h"
 #include "paddle/phi/core/enforce.h"
 
-#include "cutlass_extensions/compute_occupancy.h"
-#include "cutlass_extensions/epilogue_helpers.h"
-#include "cutlass_extensions/gemm/kernel/default_fpA_intB_traits.h"
-#include "cutlass_extensions/gemm/threadblock/default_mma.h"
+#include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/compute_occupancy.h"
+#include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/epilogue_helpers.h"
+#include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/gemm/kernel/default_fpA_intB_traits.h"
+#include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/gemm/threadblock/default_mma.h"
 #include "cutlass_kernels/moe_gemm/fused_moe_cutlass_kernel.h"
 #include "cutlass_kernels/moe_gemm/fused_moe_gemm_kernels.h"
 
@@ -46,7 +46,7 @@
 
 #include "cutlass_kernels/cutlass_heuristic.h"
 #include "cutlass_kernels/gemm_config_manager.h"
-#include "utils/cuda_utils.h"
+#include "paddle/phi/kernels/fusion/cutlass/utils/cuda_utils.h"
 
 #include "helper.h"
 
