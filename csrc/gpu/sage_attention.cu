@@ -133,52 +133,63 @@ std::vector<paddle::Tensor> SageAttentionKernel(
     // q, rope_k, rope_v;;;;;;;; // [token_num, (q_num_head + 2 x kv_num_head) x head_dim]
     int batch_size = seq_lens_this_time.shape()[0];
     PD_CHECK(batch_size == 1, "Sage Attention Only support batch_size = 1");
+
     const int num_q_head = meta_data.q_num_heads;
     const int num_kv_head = meta_data.kv_num_heads;
     const int head_dim_qk = meta_data.head_dims;
     const int head_dim_v = meta_data.head_dims_v;
     std::vector<paddle::Tensor>&& qkv_with_rope = paddle::split(qkv_out, {num_q_head * head_dim_qk, num_kv_head * head_dim_qk, num_kv_head * head_dim_v}, 1);
-    paddle::Tensor q = paddle::unsqueeze(paddle::reshape(qkv_with_rope[0], {-1, num_q_head, head_dim_qk}), 0);
-    paddle::Tensor k = paddle::unsqueeze(paddle::reshape(qkv_with_rope[1], {-1, num_kv_head, head_dim_qk}), 0);
-    paddle::Tensor v = paddle::unsqueeze(paddle::reshape(qkv_with_rope[2], {-1, num_kv_head, head_dim_v}), 0);
+    paddle::Tensor q = paddle::unsqueeze(paddle::reshape(qkv_with_rope[0], {-1, num_q_head, head_dim_qk}), {0});
+    paddle::Tensor k = paddle::unsqueeze(paddle::reshape(qkv_with_rope[1], {-1, num_kv_head, head_dim_qk}), {0});
+    paddle::Tensor v = paddle::unsqueeze(paddle::reshape(qkv_with_rope[2], {-1, num_kv_head, head_dim_v}), {0});
+    // printf("q shape: %d, %d, %d, %d\n", q.shape()[0],q.shape()[1],q.shape()[2],q.shape()[3]);
 
-    // fmha_out = sage_attention_fwd(q, k, v, )
+    paddle::Tensor km = paddle::experimental::mean(k, {1}, true);
+    km = paddle::experimental::squeeze(km, {1});
+    
+    paddle::optional<paddle::Tensor> vm = paddle::optional<paddle::Tensor>(paddle::empty({1}, paddle::DataType::FLOAT32, paddle::GPUPlace()));
 
-    CascadeAppendAttentionKernel<data_t, data_t>(
-        meta_data,
-        qkv_out,
-        key_cache,  // [bsz x (token + block_size - 1// block_size), kv_num_head, head_dim]
-        value_cache,
-        attn_mask,
-        cache_k_dequant_scales,
-        cache_v_dequant_scales,
-        cache_k_zp,
-        cache_v_zp,
-        out_linear_shifts,
-        out_linear_smooths,
-        seq_lens_this_time,
-        seq_lens_decoder,
-        seq_lens_encoder,
-        padding_offsets,
-        cum_offsets,
-        block_tables,
-        encoder_batch_ids,
-        encoder_tile_ids_per_batch,
-        cache_quant_type_str,
-        encoder_num_blocks_data,
-        encoder_block_shape_q,
-        max_input_length,
-        max_enc_len_this_time_data,
-        softmax_scale,
-        quant_max_bound,
-        quant_min_bound,
-        out_linear_in_scale,
-        speculate_max_draft_token_num,
-        causal,
-        false,
-        true,
-        main_stream,
-        &fmha_out);
+    fmha_out = sage_attention_fwd(q, k, v, km, 
+                                  seq_lens_this_time, vm, 
+                                  softmax_scale, std::string("per_warp"), 
+                                  std::string(""), 
+                                  0, true, true, false, false)[0];
+    fmha_out = paddle::reshape(paddle::experimental::squeeze(fmha_out, {0}), {-1, num_q_head * head_dim_qk});
+    // CascadeAppendAttentionKernel<data_t, data_t>(
+    //     meta_data,
+    //     qkv_out,
+    //     key_cache,  // [bsz x (token + block_size - 1// block_size), kv_num_head, head_dim]
+    //     value_cache,
+    //     attn_mask,
+    //     cache_k_dequant_scales,
+    //     cache_v_dequant_scales,
+    //     cache_k_zp,
+    //     cache_v_zp,
+    //     out_linear_shifts,
+    //     out_linear_smooths,
+    //     seq_lens_this_time,
+    //     seq_lens_decoder,
+    //     seq_lens_encoder,
+    //     padding_offsets,
+    //     cum_offsets,
+    //     block_tables,
+    //     encoder_batch_ids,
+    //     encoder_tile_ids_per_batch,
+    //     cache_quant_type_str,
+    //     encoder_num_blocks_data,
+    //     encoder_block_shape_q,
+    //     max_input_length,
+    //     max_enc_len_this_time_data,
+    //     softmax_scale,
+    //     quant_max_bound,
+    //     quant_min_bound,
+    //     out_linear_in_scale,
+    //     speculate_max_draft_token_num,
+    //     causal,
+    //     false,
+    //     true,
+    //     main_stream,
+    //     &fmha_out);
   }
 
   if (max_dec_len_this_time_data > 0) {

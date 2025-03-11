@@ -3164,8 +3164,6 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
             else:
                 from paddlenlp_ops import append_attention as attention_prefill
 
-            breakpoint()
-
             fmha_out = attention_prefill(
                 qkv_out,
                 caches[2 * i],
