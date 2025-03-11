@@ -7,4 +7,5 @@
 
    llama.md
    qwen.md
+   deepseek.md
    mixtral.md

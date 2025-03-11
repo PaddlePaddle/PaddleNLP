@@ -1,4 +1,4 @@
-## 🚣‍♂️ 使用 PaddleNLP 在 MX C550下跑通 llama2-13b 模型 🚣
+# 使用 PaddleNLP 在 MX C550下跑通 llama2-13b 模型
 
 PaddleNLP 在曦云®C550（[了解沐曦](https://www.metax-tech.com/)）上对 llama2-13B 模型进行了深度适配和优化，该套件实现了曦云 C550和 GPU 的训推入口完全统一，达到了『无缝切换』的效果。
 曦云 C500 系列 GPU 是沐曦基于自主知识产权 GPU IP 打造的旗舰系列产品，具有强大的多精度混合算力，64GB 大容量高带宽内存，以及先进的多卡互联 MetaLink 技术。它搭载 MXMACA®软件栈，全面兼容主流 GPU 生态，应用迁移零成本，

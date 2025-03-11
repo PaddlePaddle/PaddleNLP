@@ -1,4 +1,4 @@
-## 🚣‍♂️ 使用 PaddleNLP 在 Intel HPU 下跑通 llama2-7b 模型 🚣
+# 使用 PaddleNLP 在 Intel HPU 下跑通 llama2-7b 模型
 PaddleNLP 在 Intel® Gaudi®2D([了解 Gaudi](https://docs.habana.ai/en/latest/index.html))上对 llama2-7B 模型进行了深度适配和优化，下面给出详细安装步骤。
 
 ##  🚀 快速开始 🚀

@@ -28,7 +28,6 @@ do                                                                              
         exit(1);                                                                \
     }                                                                           \
 }while(0)
-// #define DEBUG_DEC_ATTN
 
 template <typename T, typename OutT, int vec_size, uint32_t bdy, uint32_t HEAD_DIM>
 __global__ void merge_varlen_multi_chunks_v2_kernel(const T * __restrict__ multi_out, // [bsz, num_chunks, num_heads, head_dim]
@@ -94,7 +93,6 @@ __global__ void merge_varlen_multi_chunks_v2_kernel(const T * __restrict__ multi
     offset = (qid * num_chunks * num_heads + i * num_heads + hid) * head_dim + vid * vec_size;
     Load<T, vec_size>(&multi_out[offset], &load_vec);
     const T scale1 = hexp(m_prev - m), scale2 = hexp(m_now - m);
-    // const T scale1 = __expf(m_prev - m), scale2 = __expf(m_now - m);
     d = d * scale1 + d_now * scale2;
 #pragma once
     for (int j = 0; j < vec_size; j++) {
@@ -126,102 +124,6 @@ __global__ void merge_varlen_multi_chunks_v2_kernel(const T * __restrict__ multi
   }
   Store<OutT, vec_size>(out_vec, &out[(start_token_ids * num_heads + hid) * head_dim + vid * vec_size]);
 }
-
-// template <typename T, typename OutT, int vec_size>
-// __global__ void merge_varlen_multi_chunks_kernel(const T * __restrict__ multi_out, // [bsz, num_chunks, num_heads, head_dim]
-//                                                 const T * __restrict__ multi_m, // [bsz, num_chunks, num_heads]
-//                                                 const T * __restrict__ multi_d, // [bsz, num_chunks, num_heads]
-//                                                 const int * __restrict__ seq_lens_q,
-//                                                 const int * __restrict__ seq_lens_kv,
-//                                                 const int * __restrict__ cum_offsets,
-//                                                 const T * __restrict__ shift_bias, // [q_num_heads * HEAD_DIM]
-//                                                 const T * __restrict__ smooth_weight, // [q_num_heads * HEAD_DIM]
-//                                                 OutT * __restrict__ out, // [token_num, num_heads, head_dim]
-//                                                 const float in_scale,
-//                                                 const int num_chunks,
-//                                                 const int chunk_size,
-//                                                 const int max_seq_len,
-//                                                 const int num_heads,
-//                                                 const int head_dim) {
-//   const int vid = threadIdx.x, hid = threadIdx.y;
-//   const int qid = blockIdx.x;
-//   const int seq_len_q = seq_lens_q[qid];
-//   if (seq_len_q == 0) return;
-//   int seq_len_kv = seq_lens_kv[qid];
-//   if (seq_len_kv == 0) return;
-//   seq_len_kv += seq_len_q;
-//   const int num_chunks_this_seq = div_up(seq_len_kv, chunk_size);
-//   if (num_chunks_this_seq == 1) {
-//     return;
-//   }
-//   const int start_token_ids = qid * max_seq_len - __ldg(&cum_offsets[qid]);
-//   using LoadT = AlignedVector<T, vec_size>;
-//   LoadT load_vec;
-//   LoadT res_vec;
-//   if constexpr (std::is_same<T, half>::value) {
-// #pragma unroll
-//     for (int i = 0; i < vec_size / 2; ++i) {
-//       *((half2*)(&res_vec) + i) = make_half2(0, 0);
-//     }
-//   } else if constexpr (std::is_same<T, nv_bfloat16>::value) {
-// #pragma unroll
-//     for (int i = 0; i < vec_size / 2; ++i) {
-//       *((nv_bfloat162*)(&res_vec) + i) = make_bfloat162(0, 0);
-//     }
-//   }
-//   T m;
-//   T d = 1.f;
-//   if constexpr (std::is_same<T, half>::value) {
-//     m = __float2half(-5e4f);
-//   } else if constexpr (std::is_same<T, nv_bfloat16>::value) {
-//     m = __float2bfloat16(-3.38953e38f);
-//   }
-// #pragma unroll 2
-//   for (int i = 0; i < num_chunks_this_seq; ++i) {
-//     uint32_t offset = (qid * num_chunks + i) * num_heads + hid;
-//     T m_prev = m;
-//     T d_prev = d;
-//     const T m_now = multi_m[offset];
-//     const T d_now = multi_d[offset];
-//     m = m_prev > m_now ? m_prev : m_now;
-//     offset = (qid * num_chunks * num_heads + i * num_heads + hid) * head_dim + vid * vec_size;
-//     Load<T, vec_size>(&multi_out[offset], &load_vec);
-//     const T scale1 = hexp(m_prev - m), scale2 = hexp(m_now - m);
-//     // const T scale1 = __expf(m_prev - m), scale2 = __expf(m_now - m);
-//     d = d * scale1 + d_now * scale2;
-// #pragma unroll
-//     for (int j = 0; j < vec_size; j++) {
-//       res_vec[j] = res_vec[j] * scale1 + load_vec[j] * scale2;
-//     }
-//   }
-// #pragma unroll 
-//   for (int j = 0; j < vec_size; j++) {
-//     res_vec[j] /= d;
-//   }
-
-//   AlignedVector<OutT, vec_size> out_vec;
-//   if (in_scale > 0) {
-//     const uint32_t shift_smooth_offset = hid * head_dim + vid * vec_size;
-//     AlignedVector<T, vec_size> shift_bias_vec;
-//     AlignedVector<T, vec_size> smooth_weight_vec;
-//     Load<T, vec_size>(shift_bias + shift_smooth_offset, &shift_bias_vec);
-//     Load<T, vec_size>(smooth_weight + shift_smooth_offset, &smooth_weight_vec);
-// #pragma unroll
-//     for (int i = 0; i < vec_size; ++i) {
-//       float quant_value  = 127.0f * static_cast<float>((res_vec[i] + shift_bias_vec[i]) * smooth_weight_vec[i]) * in_scale;
-//       quant_value = rintf(quant_value);
-//       quant_value = quant_value > 127.0f ? 127.0f : quant_value;
-//       quant_value = quant_value < -127.0f ? -127.0f : quant_value;
-//       out_vec[i] = static_cast<OutT>(quant_value);
-//     }
-//   } else {
-// #pragma unroll
-//     for (int i = 0; i < vec_size; ++i) {
-//       out_vec[i] = static_cast<OutT>(res_vec[i]);
-//     }
-//   }
-//   Store<OutT, vec_size>(out_vec, &out[(start_token_ids * num_heads + hid) * head_dim + vid * vec_size]);
-// }
 
 template <bool partition_kv, typename T, typename OutT, typename CacheT, uint32_t NUM_STAGES, uint32_t DEAL_EACH_TIME, uint32_t GROUP_SIZE, uint32_t HEAD_DIM_QK, uint32_t HEAD_DIM_V, 
           uint32_t BLOCK_SIZE, uint32_t VEC_SIZE, uint32_t CACHE_VEC_SIZE, uint32_t bdx, uint32_t bdy>
@@ -270,7 +172,6 @@ __global__ void multi_query_decode_attention_kernel(T * __restrict__ q, // [toke
   kv_len += q_len;
   const uint32_t num_chunk_this_seq = div_up(kv_len, chunk_size);
   const uint32_t q_start_idx = bid * max_seq_len - __ldg(&cum_offsets[bid]);
-  // const uint32_t q_start_idx = bid;
   const uint32_t q_write_idx = bid * max_seq_len - __ldg(&cum_offsets[bid]);
   if (chunk_id >= num_chunk_this_seq) {
     return;
@@ -302,7 +203,7 @@ __global__ void multi_query_decode_attention_kernel(T * __restrict__ q, // [toke
   }
 
 
-  CacheT *kv_smem = reinterpret_cast<CacheT*>(smem + GROUP_SIZE * HEAD_DIM_QK * sizeof(CacheT)); // [NUM_STAGES * DEAL_EACH_TIME * HEAD_DIM_QK]
+  CacheT *kv_smem = reinterpret_cast<CacheT*>(smem + GROUP_SIZE * HEAD_DIM_QK * sizeof(CacheT)); 
   uint32_t stage_idx = 0;  
   constexpr int loop_times = DEAL_EACH_TIME / bdy;
 #pragma unroll
@@ -433,10 +334,6 @@ void MultiQueryDecoderAttention(
   auto token_num = meta_data.token_nums;
   auto bsz = meta_data.batch_size;
   auto max_block_num_per_seq = meta_data.max_blocks_per_seq;
-  // const float scale = 1.f / sqrt(HEAD_DIM);
-  // std::cout << "bsz: " << bsz << ", token_num: " << token_num << ", num_heads: " << num_heads << ", kv_num_heads: " << kv_num_heads << ", group_size: " << GROUP_SIZE << std::endl;
-  // dev_ctx.template Alloc<T>(out);
-
   constexpr int num_stages = NUM_STAGE;
 
   constexpr int vec_size = 16 / sizeof(T); // 8 16 32
@@ -444,15 +341,11 @@ void MultiQueryDecoderAttention(
   constexpr int blockxc = HEAD_DIM_QK / cache_vec_size;
   constexpr int num_vec_per_head = HEAD_DIM_QK / vec_size;
   constexpr int blockx = num_vec_per_head < 32 ? num_vec_per_head : 32;
-  // constexpr int blockx = 32;
 
   constexpr int blocky = GROUP_SIZE;
   const int gridx = bsz;
-  // static_assert(blockx <= 32);
   
-  constexpr int num_threads = blockx * blocky;
-  // std::cout << "blockx: " << blockx << ", blocky: " << blocky << ", << ", blockxc: " << blockxc << ", DEAL_EACH_TIME: " << DEAL_EACH_TIME << std::endl;
-  
+  constexpr int num_threads = blockx * blocky;  
 
   auto splitkv_kernel = multi_query_decode_attention_kernel<true, NV_TYPE, NV_TYPE, NV_TYPE, num_stages, DEAL_EACH_TIME, GROUP_SIZE, HEAD_DIM_QK, HEAD_DIM_V,
                                                                         BLOCK_SIZE, vec_size, cache_vec_size, blockx, blocky>;
@@ -464,11 +357,8 @@ void MultiQueryDecoderAttention(
   
   const uint32_t chunk_size = get_max_partition_size(bsz);
   const int num_chunks = div_up(max_dec_len, chunk_size);
-  // size_t smem_size = blocky * sizeof(T) * 2 + div_up(max_block_num_per_seq, 4) * 4 * sizeof(int)
-  //                    + cache_smem_bytes + blocky * HEAD_DIM * sizeof(T);
   size_t smem_size = cache_smem_bytes + GROUP_SIZE * HEAD_DIM_QK * sizeof(T);
-  // size_t smem_size = max(size_t(cache_smem_bytes), HEAD_DIM_QK * sizeof(T)) + blocky * sizeof(T) * 2 + blocky * sizeof(T) * 2 + blocky * sizeof(T) * 2;
-  
+
   if (smem_size >= 48 * 1024) {
     cudaFuncSetAttribute(
       splitkv_kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
@@ -479,25 +369,16 @@ void MultiQueryDecoderAttention(
   cudaDeviceGetAttribute(&sm_count, cudaDevAttrMultiProcessorCount, dev_id);
   cudaOccupancyMaxActiveBlocksPerMultiprocessor(
     &act_blocks_per_sm, splitkv_kernel, num_threads, smem_size);
-  // assert(act_blocks_per_sm > 1);
+  assert(act_blocks_per_sm > 1);
   
   const int num_blocks_per_wave = sm_count * act_blocks_per_sm;
   const int num_blocks_need = gridx * num_chunks * kv_num_heads;
   const int max_num_chunks = div_up(num_blocks_per_wave, num_blocks_need);
   const float ratio = static_cast<float>(num_blocks_need) / static_cast<float>(num_blocks_per_wave);
 
-  
-  // std::cout << "num_blocks_per_wave: " << num_blocks_per_wave << ", num_blocks_need: " << num_blocks_need << ", max_num_chunks: " << max_num_chunks << ", ratio: " << ratio << std::endl;
-  // std::cout << "num_chunks: " << num_chunks;
-  
   dim3 grids(gridx, num_chunks, kv_num_heads);
   dim3 blocks(blockx, blocky);
-  // std::cout << "grids: " << grids.x << ", " << grids.y << ", " << grids.z
-  //   << " blocks: " << blocks.x << ", " << blocks.y
-  //   << " smem_size: " << div_up(smem_size, 1024) << "KB" << " HEAD_DIM_QK:" << HEAD_DIM_QK << " HEAD_DIM_V:" << HEAD_DIM_V
-  //   << " num_blocks_need: " << num_blocks_need << ", num_blocks_per_wave: " << num_blocks_per_wave << std::endl;
   if (num_chunks <= 1) {
-    // std::cout << "not split kv";
     auto no_splitkv_kernel = multi_query_decode_attention_kernel<false, NV_TYPE, NV_TYPE, NV_TYPE, num_stages, DEAL_EACH_TIME, GROUP_SIZE, HEAD_DIM_QK, HEAD_DIM_V, BLOCK_SIZE, vec_size, 
                                                                              cache_vec_size, blockx, blocky>;
     if (smem_size >= 48 * 1024) {
@@ -526,10 +407,9 @@ void MultiQueryDecoderAttention(
       reinterpret_cast<NV_TYPE*>(const_cast<T*>(out->data<T>()))
     );
 
-    // CHECK(cudaGetLastError());  // 捕捉同步前的最后一个错误。
+    // CHECK(cudaGetLastError());
     // CHECK(cudaDeviceSynchronize());
   } else {
-    // std::cout << "split kv";
     auto *allocator = paddle::GetAllocator(q.place());
     phi::Allocator::AllocationPtr tmp_workspace, tmp_m, tmp_d;
     tmp_workspace = allocator->Allocate(
@@ -541,8 +421,6 @@ void MultiQueryDecoderAttention(
     tmp_d = allocator->Allocate(
         phi::SizeOf(q.dtype()) *
         static_cast<size_t>(bsz * num_chunks * num_heads));
-    // std::cout << "grids: " << grids.x << ", " << grids.y << ", " << grids.z
-    //   << " blocks: " << blocks.x << ", " << blocks.y << std::endl;
 
     splitkv_kernel<<<grids, blocks, smem_size, stream>>>(
       reinterpret_cast<NV_TYPE*>(const_cast<T*>(q.data<T>())),
@@ -565,37 +443,13 @@ void MultiQueryDecoderAttention(
       reinterpret_cast<NV_TYPE*>(tmp_d->ptr()),
       reinterpret_cast<NV_TYPE*>(const_cast<T*>(out->data<T>()))
     );
-    // CHECK(cudaGetLastError());  // 捕捉同步前的最后一个错误。
+    // CHECK(cudaGetLastError());
     // CHECK(cudaDeviceSynchronize());
-    // merge
-    // if (num_chunks <= bsz) {
-    //   dim3 grids_merge(bsz);
-    //   dim3 blocks_merge(blockx, num_heads);
-    //   assert(blockx * num_heads <= 1024);
-    //   merge_varlen_multi_chunks_kernel<NV_TYPE, NV_TYPE, vec_size><<<grids_merge, blocks_merge, 0, stream>>>(
-    //     reinterpret_cast<NV_TYPE*>(tmp_workspace->ptr()),
-    //     reinterpret_cast<NV_TYPE*>(tmp_m->ptr()),
-    //     reinterpret_cast<NV_TYPE*>(tmp_d->ptr()),
-    //     seq_lens_q.data<int>(),
-    //     seq_lens_kv.data<int>(),
-    //     cum_offsets.data<int>(),
-    //     reinterpret_cast<NV_TYPE*>(const_cast<T*>(shift_bias_ptr)),
-    //     reinterpret_cast<NV_TYPE*>(const_cast<T*>(smooth_weight_ptr)),
-    //     reinterpret_cast<NV_TYPE*>(const_cast<T*>(out->data<T>())),
-    //     in_scale,
-    //     num_chunks,
-    //     chunk_size,
-    //     max_seq_len,
-    //     num_heads,
-    //     HEAD_DIM_V
-    //   );
-    // } else {
+    
     constexpr int mblockx = HEAD_DIM_V / vec_size;
-    // constexpr int blockx = 32;
     constexpr int bdy = 256 / mblockx;
     dim3 grids_merge(bsz, num_heads);
     dim3 blocks_merge(mblockx, bdy);
-    // std::cout << "work_space size:" << bsz * num_chunks * num_heads * HEAD_DIM_V << std::endl;
     merge_varlen_multi_chunks_v2_kernel<NV_TYPE, NV_TYPE, vec_size, bdy, HEAD_DIM_V><<<grids_merge, blocks_merge, 0, stream>>>(
       reinterpret_cast<NV_TYPE*>(tmp_workspace->ptr()),
       reinterpret_cast<NV_TYPE*>(tmp_m->ptr()),
@@ -614,7 +468,7 @@ void MultiQueryDecoderAttention(
       HEAD_DIM_V
     );
   }
-  // CHECK(cudaGetLastError());  // 捕捉同步前的最后一个错误。
+  // CHECK(cudaGetLastError());
   // CHECK(cudaDeviceSynchronize());
 }
 
@@ -639,7 +493,6 @@ void DecodeMLAAttentionKernel(
   bool causal,
   cudaStream_t &stream,
   paddle::Tensor *out) { 
-  // std::cout << "start: " << std::endl;
   const auto token_num = meta_data.token_nums;
   const auto block_size = meta_data.block_size;
   const auto bsz = meta_data.batch_size;
@@ -653,16 +506,6 @@ void DecodeMLAAttentionKernel(
   const uint32_t num_stage = get_cascade_attention_num_stages();
   const uint32_t num_threads = get_cascade_attention_num_threads();
 
-  // uint32_t cache_type = 0;
-  // if (cache_k_scale) {
-  //   if (cache_k_zp) {
-  //     cache_type = 2;
-  //   } else {
-  //     cache_type = 1;
-  //   }
-  // }
-  // std::cout << "cache_type: " << cache_type << ", group_size: " << group_size << std::endl;
-  // std::cout << "cache_type: " << cache_type << ", group_size: " << group_size << ", deal_each_time: " << deal_each_time << ", num_stage: " << num_stage;
   DISPATCH_CAUSAL(causal, CAUSAL,
     {DISPATCH_MLA_GROUP_SIZE(group_size, GROUP_SIZE,
       {DISPATCH_MLA_HEAD_DIM(head_dim_qk, HEAD_DIM_QK,  
@@ -695,23 +538,23 @@ template void DecodeMLAAttentionKernel<paddle::bfloat16>(
   cudaStream_t &stream,
   paddle::Tensor *out);
 
-// template void DecodeMLAAttentionKernel<paddle::float16>(
-//   const AppendAttnMetaData& meta_data,
-//   const paddle::Tensor &q, // [token_num, num_heads, head_dim]
-//   const paddle::Tensor &cache_k,
-//   const paddle::Tensor &cache_v,
-//   const paddle::optional<paddle::Tensor>& attn_mask,
-//   const paddle::optional<paddle::Tensor>& shift_bias,
-//   const paddle::optional<paddle::Tensor>& smooth_weight,
-//   const paddle::Tensor &seq_lens_q, // q_seq_len is 1
-//   const paddle::Tensor &seq_lens_kv,
-//   const paddle::Tensor &padding_offsets,
-//   const paddle::Tensor &cum_offsets,
-//   const paddle::Tensor &block_table,
-//   int max_seq_len,
-//   int max_dec_len,
-//  float softmax_scale,
-//   float in_scale,
-//   bool causal,
-//   cudaStream_t &stream,
-//   paddle::Tensor *out);
+template void DecodeMLAAttentionKernel<paddle::float16>(
+  const AppendAttnMetaData& meta_data,
+  const paddle::Tensor &q, // [token_num, num_heads, head_dim]
+  const paddle::Tensor &cache_k,
+  const paddle::Tensor &cache_v,
+  const paddle::optional<paddle::Tensor>& attn_mask,
+  const paddle::optional<paddle::Tensor>& shift_bias,
+  const paddle::optional<paddle::Tensor>& smooth_weight,
+  const paddle::Tensor &seq_lens_q, // q_seq_len is 1
+  const paddle::Tensor &seq_lens_kv,
+  const paddle::Tensor &padding_offsets,
+  const paddle::Tensor &cum_offsets,
+  const paddle::Tensor &block_table,
+  int max_seq_len,
+  int max_dec_len,
+ float softmax_scale,
+  float in_scale,
+  bool causal,
+  cudaStream_t &stream,
+  paddle::Tensor *out);
