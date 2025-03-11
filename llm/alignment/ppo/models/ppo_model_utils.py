@@ -1035,7 +1035,7 @@ class ActorFusedPGEntropyKLLoss(paddle.autograd.PyLayer):
 
             if entropy_coeff > 0:
                 # [2] entropy loss
-                log_prob_chunk = paddle.log(paddle.clip(softmax_out_chunk, min=1e-12, out=softmax_out_chunk))
+                log_prob_chunk = paddle.log(paddle.clip(softmax_out_chunk, min=1e-12))
                 entropy_loss_chunk = (softmax_out_chunk * log_prob_chunk).sum(axis=-1) * mask_chunk
                 total_entropy_loss += entropy_loss_chunk.sum() * entropy_coeff / divisor
 
