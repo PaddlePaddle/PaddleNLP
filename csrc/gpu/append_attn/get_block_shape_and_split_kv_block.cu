@@ -176,7 +176,7 @@ std::vector<paddle::Tensor> GetBlockShapeAndSplitKVBlock(
   // decoder
   int max_dec_len_this_time_data = max_dec_len_this_time.data<int>()[0];
   if (max_dec_len_this_time_data > 0) {
-    const bool mla_use_tensorcore = get_mla_use_tensorcore();
+    const bool mla_use_tensorcore = GetMlaUseTensorcore();
     if (mla_use_tensorcore) {
       const int chunk_size = get_max_partition_size(bsz);
       const int decoder_max_tile_size_per_bs = div_up(max_len_kv_cpu.data<int>()[0], chunk_size);

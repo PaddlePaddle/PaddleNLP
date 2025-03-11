@@ -56,7 +56,7 @@ inline uint32_t get_cascade_attention_num_threads() {
     return cascade_attention_num_threads != 0 ? cascade_attention_num_threads : 128;
 }
 
-inline bool get_mla_use_tensorcore() {
+inline bool get_flags_mla_use_tensorcore() {
     static const char* mla_use_tensorcore_env = std::getenv("FLAGS_mla_use_tensorcore");
     static const uint32_t mla_use_tensorcore =
             mla_use_tensorcore_env == nullptr ? 1 : std::stoul(std::string(mla_use_tensorcore_env));
