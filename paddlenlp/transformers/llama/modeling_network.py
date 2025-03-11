@@ -811,7 +811,8 @@ class LlamaModelNet(LlamaPretrainedModelNet):
             inputs_embeds.dtype,
         )
         attention_mask = self.reshard_row(attention_mask)
-        alibi = self.reshard_row_and_col(alibi)
+        if alibi is not None:
+            alibi = self.reshard_row_and_col(alibi)
         # print(position_ids, attention_mask, alibi)
         hidden_states = inputs_embeds
 
