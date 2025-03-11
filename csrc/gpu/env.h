@@ -58,8 +58,13 @@ inline uint32_t get_cascade_attention_num_threads() {
 
 inline bool get_mla_use_tensorcore() {
     static const char* mla_use_tensorcore_env = std::getenv("FLAGS_mla_use_tensorcore");
+    static const uint32_t sm_version = GetSMVersion();
+    static const uint32_t enable_mla_tensorcore = sm_version >= 90 ? 1 : 0;
     static const uint32_t mla_use_tensorcore =
-            mla_use_tensorcore_env == nullptr ? 1 : std::stoul(std::string(mla_use_tensorcore_env));
+            mla_use_tensorcore_env == nullptr ? enable_mla_tensorcore : std::stoul(std::string(mla_use_tensorcore_env));
+    if (mla_use_tensorcore && !enable_mla_tensorcore) {
+        PD_THROW("Don't support FLAGS_mla_use_tensorcore=1 when sm < 90.");
+    }
     return mla_use_tensorcore != 0 ? true : false;
 }
 

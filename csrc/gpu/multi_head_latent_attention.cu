@@ -69,8 +69,7 @@ std::vector<paddle::Tensor> MultiHeadLatentAttentionKernel(
   int max_len_kv_data = max_len_kv.data<int>()[0];
 
   const bool mla_use_tensorcore = get_mla_use_tensorcore();
-  auto sm_version = GetSMVersion();
-  if ((speculate_decoder || mla_use_tensorcore) && sm_version < 90) {
+  if (speculate_decoder && !mla_use_tensorcore) {
     PD_THROW("Please use speculate_decoder=0 and FLAGS_mla_use_tensorcore=0 when sm < 90.");
   }
 
