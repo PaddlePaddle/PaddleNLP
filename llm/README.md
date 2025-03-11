@@ -468,7 +468,7 @@ else:
 
 该部署工具是基于英伟达 Triton 框架专为服务器场景的大模型服务化部署而设计。它提供了支持 gRPC、HTTP 协议的服务接口，以及流式 Token 输出能力。底层推理引擎支持连续批处理、weight only int8、后训练量化（PTQ）等加速优化策略，为用户带来易用且高性能的部署体验。
 
-基于预编译镜像部署，本节以 deepseek-ai/DeepSeek-R1-Distill-Llama-8B/weight_only_int8 为例，基于预编译镜像部署，本节以 DeepSeek-R1-Distill-Llama-8B（weight_only_int8） 为例，自动下载静态图进行部署，具体支持模型可查看[文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/static_models.md)，更细致的模型推理、量化教程可以参考[大模型推理教程](./docs/predict/inference.md)：
+基于预编译镜像部署，本节以 DeepSeek-R1-Distill-Llama-8B（weight_only_int8） 为例，自动下载静态图进行部署，具体支持模型可查看[文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/static_models.md)，更细致的模型推理、量化教程可以参考[大模型推理教程](./docs/predict/inference.md)：
 
 ```shell
 
