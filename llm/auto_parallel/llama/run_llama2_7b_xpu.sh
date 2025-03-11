@@ -99,7 +99,7 @@ python -u  -m paddle.distributed.launch \
     --fp16_opt_level "O2"  \
     --amp_master_grad true \
     --warmup_ratio 0.01 \
-    --max_grad_norm 0.0 \
+    --max_grad_norm 1.0 \
     --dataloader_num_workers 1 \
     --continue_training 0 \
     --do_predict 0 \
