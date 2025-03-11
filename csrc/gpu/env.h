@@ -63,6 +63,13 @@ inline bool get_mla_use_tensorcore() {
     return mla_use_tensorcore != 0 ? true : false;
 }
 
+inline bool get_mla_use_wg4() {
+    static const char* mla_use_wg4_env = std::getenv("FLAGS_mla_use_wg4");
+    static const uint32_t mla_use_wg4 =
+            mla_use_wg4_env == nullptr ? 1 : std::stoul(std::string(mla_use_wg4_env));
+    return mla_use_wg4 != 0 ? true : false;
+}
+
 inline bool enable_cuda_core_fp8_gemm() {
     static const char* enable_cuda_core_fp8_env = std::getenv("FLAGS_cuda_core_fp8_gemm");
     static const bool enable_cuda_core_fp8_gemm =

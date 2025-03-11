@@ -12,20 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/*
- * Copyright (c) 2024, Jay Shah, Ganesh Bikshandi, Ying Zhang, Vijay Thakkar, Pradeep Ramani, Tri
- * Dao. Licensed under the BSD 3-Clause.
- *
- * Modified by the FlashInfer team.
- */
-
 #pragma once
 
-#ifndef ATTENTION_HOPPER_KERNEL_TRAITS_CUH_
-#define ATTENTION_HOPPER_KERNEL_TRAITS_CUH_
+#ifndef ATTENTION_HOPPER_KERNEL_TRAITS_WG4_CUH_
+#define ATTENTION_HOPPER_KERNEL_TRAITS_WG4_CUH_
 
 #include <type_traits>
-
 #include "cute/algorithm/copy.hpp"
 #include "cute/atom/mma_atom.hpp"
 #include "cutlass/cutlass.h"
@@ -38,9 +30,9 @@ namespace mla_attn {
 
 using namespace cute;
 
-template <typename MainloopPipeline, typename MainloopPipelineQ, class DTypeQ, class DTypeKV, class DTypeQKAccum, class DTypeOut, class IdType,
+template <typename MainloopPipeline, typename MainloopPipelineQ, typename MainloopPipelineQK, class DTypeQ, class DTypeKV, class DTypeQKAccum, class DTypeOut, class IdType,
           int BLOCK_SHAPE_KV, class SmemLayoutQ, class SmemLayoutK, class SmemLayoutP, class SmemLayoutRow, class SmemLayoutO>
-struct alignas(16) SharedStorageQKVO {
+struct alignas(16) SharedStorageQKVWG4O {
   alignas(16) cute::array_aligned<DTypeQ, cute::cosize_v<SmemLayoutQ>> smem_q;
   alignas(16) cute::array_aligned<DTypeQ, cute::cosize_v<SmemLayoutP>> smem_p;
   alignas(16) cute::array_aligned<DTypeQKAccum, cute::cosize_v<SmemLayoutRow>> smem_scale;
@@ -50,20 +42,23 @@ struct alignas(16) SharedStorageQKVO {
   };
   struct {
     alignas(16) typename MainloopPipelineQ::SharedStorage pipeline_q;
+    alignas(16) typename MainloopPipelineQK::SharedStorage pipeline_qk;
     alignas(16) typename MainloopPipeline::SharedStorage pipeline_kv;
   };
 };
 
 template <bool USE_TMA_LOAD_KV_, int HEAD_DIM_QK_, int HEAD_DIM_VO_, int GROUP_SIZE_, int BLOCK_SHAPE_Q_, int BLOCK_SHAPE_KV_,
           int NUM_STAGES_, typename DTypeQ_, typename DTypeKV_, typename DTypeO_, typename IdType_, typename NV_TYPE_>
-struct AttentionKernelTraits {
+struct AttentionKernelWG4Traits {
 
   using DTypeQ = DTypeQ_;
   using DTypeKV = DTypeKV_;
   using DTypeO = DTypeO_;
   using IdType = IdType_;
-  using DTypeQKAccum = float;
-  using DTypePVAccum = float;
+//   using DTypeQKAccum = float;
+//   using DTypePVAccum = float;
+  using DTypeQKAccum = DTypeQ;
+  using DTypePVAccum = DTypeO;
   using NV_TYPE = NV_TYPE_;
   
   
@@ -78,9 +73,6 @@ struct AttentionKernelTraits {
   static_assert(HEAD_DIM_QK % 32 == 0);
   static_assert(HEAD_DIM_VO % 32 == 0);
 
-  static constexpr int NUM_WARPS = 12;
-  static constexpr int NUM_THREADS = 384;
-  static constexpr int NUM_PRODUCER_THREADS = 128;
 
   using TileShape_QKD = Shape<Int<BLOCK_SHAPE_Q>, Int<BLOCK_SHAPE_KV>, Int<HEAD_DIM_QK>>;
   using TileShape_PDV = Shape<Int<BLOCK_SHAPE_Q>, Int<HEAD_DIM_VO>, Int<BLOCK_SHAPE_KV>>;
@@ -100,7 +92,12 @@ struct AttentionKernelTraits {
                                  GMMA::Major::K, GMMA::Major::MN>(),
       AtomLayoutPV{}));
 
-  static constexpr int NUM_MMA_THREADS = size(TiledMmaPV{});
+  static constexpr int NUM_MMA_THREADS_QK = size(TiledMmaQK{});
+  static constexpr int NUM_MMA_THREADS_PV = size(TiledMmaPVSS{});
+  static constexpr int NUM_MMA_THREADS = NUM_MMA_THREADS_PV;
+  static constexpr int NUM_PRODUCER_THREADS = cutlass::NumThreadsPerWarpGroup;
+  static constexpr int NUM_THREADS = NUM_MMA_THREADS_QK + NUM_MMA_THREADS_PV + NUM_PRODUCER_THREADS;
+  static constexpr int NUM_WARPS = NUM_THREADS / cutlass::NumThreadsPerWarp;
 
   using SmemLayoutAtomQ = decltype(cutlass::gemm::collective::detail::ss_smem_selector<
                                    GMMA::Major::K, DTypeQ, decltype(cute::get<0>(TileShape_QKD{})),
@@ -136,30 +133,28 @@ struct AttentionKernelTraits {
   using SmemLayoutO = decltype(tile_to_shape(SmemLayoutAtomO{}, select<0, 1>(TileShape_PDV{})));
 
   using SmemCopyAtom = Copy_Atom<cute::SM90_U32x4_STSM_N, DTypeQ>;
-  
-  static constexpr bool IS_CTA_32 = (BLOCK_SHAPE_KV == 32);
-  using SmemLayoutRowOneStage = Layout<Shape<_2, Int<128>>, Stride<_1, _2>>;
-  using SmemLayoutRowTwoStage = Layout<Shape<_2, Int<128>, _2>, Stride<_1, _2, _256>>;
-  using SmemLayoutRow = std::conditional_t<IS_CTA_32, SmemLayoutRowTwoStage, SmemLayoutRowOneStage>;
+  // permute layout
+  using SmemLayoutRow = Layout<Shape<Int<2>, Int<128>, Int<2>>, Stride<Int<1>, Int<2>, Int<256>>>;
 
   using SmemLayoutAtomP = decltype(cutlass::gemm::collective::detail::ss_smem_selector<
                                    GMMA::Major::K, DTypeQ, decltype(cute::get<0>(TileShape_QKD{})),
                                    decltype(cute::get<1>(TileShape_QKD{}))>());
-  using SmemLayoutPSSOneStage = decltype(tile_to_shape(SmemLayoutAtomP{}, select<0, 1>(TileShape_QKD{})));
-  using SmemLayoutPSSTwoStage = decltype(tile_to_shape(SmemLayoutAtomP{}, make_shape(Int<BLOCK_SHAPE_Q>{}, Int<BLOCK_SHAPE_KV>{}, Int<2>{})));
-  using SmemLayoutP = std::conditional_t<IS_CTA_32, SmemLayoutPSSTwoStage, SmemLayoutPSSOneStage>;
+  static constexpr int QK_STAGE = 2;
+  using SmemLayoutPSS = decltype(tile_to_shape(SmemLayoutAtomP{}, make_shape(shape<0>(TileShape_QKD{}), shape<1>(TileShape_QKD{}), Int<QK_STAGE>{})));
 
   using MainloopPipelineQ = typename cutlass::PipelineAsync<1>;
   using PipelineStateQ = typename cutlass::PipelineState<1>;
+  using MainloopPipelineQK = typename cutlass::PipelineAsync<QK_STAGE>;
+  using PipelineStateQK = typename cutlass::PipelineState<QK_STAGE>;
   using MainloopPipeline =
       std::conditional_t<USE_TMA_LOAD_KV, typename cutlass::PipelineTmaAsync<NUM_STAGES>,
                          typename cutlass::PipelineAsync<NUM_STAGES>>;
   using PipelineState = typename cutlass::PipelineState<NUM_STAGES>;
 
-  using SharedStorage = SharedStorageQKVO<MainloopPipeline, MainloopPipelineQ, DTypeQ, DTypeKV, DTypeQKAccum, DTypeO, IdType, BLOCK_SHAPE_KV,
-                                          SmemLayoutQ, SmemLayoutK, SmemLayoutP, SmemLayoutRow, SmemLayoutO>;
+  using SharedStorage = SharedStorageQKVWG4O<MainloopPipeline, MainloopPipelineQ, MainloopPipelineQK, DTypeQ, DTypeKV, DTypeQKAccum, DTypeO, IdType, BLOCK_SHAPE_KV,
+                                             SmemLayoutQ, SmemLayoutK, SmemLayoutPSS, SmemLayoutRow, SmemLayoutO>;
 };
 
 }  // namespace mla_attn
 
-#endif
+#endif // ATTENTION_HOPPER_KERNEL_TRAITS_WG4_CUH_

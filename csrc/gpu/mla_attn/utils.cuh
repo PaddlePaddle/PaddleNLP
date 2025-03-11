@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#pragma once
+
 #ifndef ATTENTION_HOPPER_UTILS_CUH_
 #define ATTENTION_HOPPER_UTILS_CUH_
 

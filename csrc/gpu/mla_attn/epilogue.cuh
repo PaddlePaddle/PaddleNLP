@@ -19,6 +19,7 @@
  * Modified by the FlashInfer team.
  */
 
+#pragma once
 
 #ifndef ATTENTION_HOPPER_EPILOGUE_CUH_
 #define ATTENTION_HOPPER_EPILOGUE_CUH_

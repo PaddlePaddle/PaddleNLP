@@ -24,6 +24,7 @@
 #include <vector>
 #include "cute/tensor.hpp"
 #include "mla_hopper.cuh"
+#include "mla_hopper_wg4.cuh"
 #include <iostream>
 #include <string>
 #include <sstream>
@@ -99,6 +100,7 @@ void BatchMLAWithPagedKVCacheKernel(
   const auto max_block_num_per_seq = meta_data.max_blocks_per_seq;
   const auto max_block_num = bsz * max_block_num_per_seq;
   const uint32_t chunk_size = get_max_partition_size(bsz);
+  const bool mla_use_wg4 = get_mla_use_wg4();
 
 
   int q_head_dim = meta_data.head_dims;
@@ -156,9 +158,15 @@ void BatchMLAWithPagedKVCacheKernel(
   params.chunk_num = num_chunks;
 
   if (q_head_dim == 576) {
-      BatchMLAWithPagedKVCacheDispatched<576, 512, NV_TYPE>(
-          params, stream
-      );
+      if (mla_use_wg4 && params.block_size == 32 && std::is_same<NV_TYPE, half>::value) {
+        BatchMLAWithPagedKVCacheWG4Dispatched<576, 512, NV_TYPE>(
+            params, stream
+        );
+      } else {
+        BatchMLAWithPagedKVCacheDispatched<576, 512, NV_TYPE>(
+            params, stream
+        );
+      }
   } else {
       PD_THROW("error!!! q_head_dim must be 576 !!!\n");
   }
