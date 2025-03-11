@@ -190,9 +190,8 @@ class PredictorArgument:
             self.append_attn = True
         if self.append_attn:
             self.block_attn = True
-        assert (
-            self.src_length + self.max_length <= self.total_max_length
-        ), "src_length + max_length should smaller than total_max_length."
+        assert self.max_length < self.total_max_length, "max_length should smaller than total_max_length."
+        self.src_length = self.total_max_length - self.max_length
 
 
 @dataclass
