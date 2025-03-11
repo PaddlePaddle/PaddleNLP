@@ -158,7 +158,6 @@ def setup_fused_quant_ops():
                     "-U__CUDA_NO_BFLOAT162_OPERATORS__",
                     "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
                     "-DCUTE_ARCH_MMA_SM90A_ENABLE",
-                    f"-I{cutlass_include_dir}",
                     "--expt-relaxed-constexpr",
                     "--expt-extended-lambda",
                     "--use_fast_math",
