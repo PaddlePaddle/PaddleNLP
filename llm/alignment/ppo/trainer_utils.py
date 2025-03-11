@@ -57,8 +57,8 @@ from paddlenlp.transformers.tokenizer_utils_base import PaddingStrategy
 
 @dataclass
 class TrainingArguments(TrainingArguments):
-    rollout_logprob_batch_size: int = field(
-        default=-1,
+    rollout_logprob_batch_size: str = field(
+        default=None,
         metadata={"help": "The log prob batch size."},
     )
     kl_coeff: float = field(

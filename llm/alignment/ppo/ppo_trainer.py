@@ -2424,7 +2424,7 @@ class PPOTrainer(Trainer):
                         else {}
                     ),
                 }
-                if self.args.rollout_logprob_batch_size != -1:
+                if self.args.rollout_logprob_batch_size is not None:
                     micro_batch.update(self.rollout_logprob_with_batch_size(**micro_batch))
                 else:
                     micro_batch.update(self.rollout_logprob(**micro_batch))
@@ -2629,10 +2629,20 @@ class PPOTrainer(Trainer):
         **kwargs,
     ) -> Dict[str, paddle.Tensor]:
         # Initialize lists to store results
-        rollout_logprob_batch_size = self.args.rollout_logprob_batch_size
         log_probs_list = []
         ref_log_probs_list = []
-        batch_size, _ = input_ids.shape
+        batch_size, sequence_length = input_ids.shape
+        if str(self.args.rollout_logprob_batch_size).lower() == "auto":
+            # auto compute
+            if sequence_length > 4096 - 128:
+                rollout_logprob_batch_size = 2
+            elif sequence_length > 2048 - 128:
+                rollout_logprob_batch_size = 4
+            else:
+                rollout_logprob_batch_size = batch_size
+        else:
+            rollout_logprob_batch_size = int(self.args.rollout_logprob_batch_size)
+
         num_batches = (batch_size + rollout_logprob_batch_size - 1) // rollout_logprob_batch_size
         response_start = kwargs["prompt"].shape[-1] - 1 if "prompt" in kwargs else 0
 
