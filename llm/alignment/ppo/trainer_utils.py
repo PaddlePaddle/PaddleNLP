@@ -288,6 +288,7 @@ class TrainingArguments(TrainingArguments):
         metadata={"help": "Whether to use tgt for KL."},
     )
     use_rm_server: bool = field(default=False, metadata={"help": "Use reward server instead of reward model."})
+    use_fp32_compute: bool = field(default=False, metadata={"help": "Use fp32 to compute xx_log_prob,rewards, advantages and loss."})
 
     def __post_init__(self):
         """

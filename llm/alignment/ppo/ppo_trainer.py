@@ -2104,6 +2104,8 @@ class PPOTrainer(Trainer):
         attention_mask = rl_batch["attention_mask"]  # length: src+tgt
         position_ids = rl_batch["position_ids"]  # length: src+tgt
         sequence_mask = rl_batch["sequence_mask"]  # length: src+tgt(-1)
+        if self.args.use_fp32_compute and sequence_mask.dtype != paddle.float32:
+            sequence_mask = sequence_mask.cast(paddle.float32)
         # inputs used by policy trainer
         old_log_probs = rl_batch["log_probs"]  # length: src+tgt(-1)
         reward_advantages = rl_batch["reward_advantages"]  # length: src+tgt(-1)
@@ -2579,7 +2581,11 @@ class PPOTrainer(Trainer):
         if not isinstance(ref_logits, paddle.Tensor):
             ref_logits = ref_logits[0]  # [2, 355, 12544]
 
+        if self.args.use_fp32_compute and logits.dtype != paddle.float32:
+            logits = logits.cast(paddle.float32)
         logits = logits / self.args.temperature if self.args.temperature > 0.0 else logits
+        if self.args.use_fp32_compute and ref_logits.dtype != paddle.float32:
+            ref_logits = ref_logits.cast(paddle.float32)
         ref_logits = ref_logits / self.args.temperature if self.args.temperature > 0.0 else ref_logits
 
         if self.actor_model.config.tensor_parallel_degree > 1 and self.actor_model.config.tensor_parallel_output:
@@ -2690,10 +2696,10 @@ class PPOTrainer(Trainer):
             try:
                 res = requests.post(self.reward_server, json=data)
                 result = json.loads(res.text)
-                reward_score = paddle.to_tensor(result["score"], dtype=self._model_config.dtype)
+                reward_score = paddle.to_tensor(result["score"], dtype=self._model_config.dtype if not self.args.use_fp32_compute else "float32")
             except:
                 logger.warning("Request reward server failed and rewards_score will be set zero.")
-                reward_score = paddle.zeros(len(response), dtype=self._model_config.dtype)
+                reward_score = paddle.zeros(len(response), dtype=self._model_config.dtype  if not self.args.use_fp32_compute else "float32")
             return reward_score
 
         try:
@@ -2711,7 +2717,7 @@ class PPOTrainer(Trainer):
             if tp_rank == 0:
                 reward_score = post()
             else:
-                reward_score = paddle.empty(shape=[len(response)], dtype=self._model_config.dtype)
+                reward_score = paddle.empty(shape=[len(response)], dtype=self._model_config.dtype if not self.args.use_fp32_compute else "float32")
             paddle.distributed.barrier(tp_group)
             paddle.distributed.broadcast(reward_score, src=tp_group.ranks[0], group=tp_group)
 
@@ -2793,6 +2799,8 @@ class PPOTrainer(Trainer):
             # sequence_mask is for label masking, make source be masked out
             # clone to avoid to change attention_mask
             sequence_mask = attention_mask[:, 1:].clone()  # length: src + tgt -1
+            if self.args.use_fp32_compute and sequence_mask.dtype != paddle.float32:
+                sequence_mask = sequence_mask.cast(paddle.float32)
             sequence_mask[:, :start] = False
             eos_mask = (rl_batch["input_ids"] != self.tokenizer.pad_token_id)[:, 1:].to(old_log_probs.dtype)
             if use_tgt_len_value:

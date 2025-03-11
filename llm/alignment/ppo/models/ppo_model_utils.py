@@ -333,6 +333,7 @@ class RLHFPPOMixedLoss(nn.Layer):
         temperature=1.0,
         entropy_coeff=0.001,
         pg_loss_coeff=1.0,
+        use_fp32_compute=False,
     ):
         """
         Args:
@@ -356,6 +357,7 @@ class RLHFPPOMixedLoss(nn.Layer):
         self.clip_range_ratio = clip_range_ratio
         self.entropy_coeff = entropy_coeff
         self.pg_loss_coeff = pg_loss_coeff
+        self.use_fp32_compute = use_fp32_compute
 
     def forward(
         self,
@@ -387,9 +389,16 @@ class RLHFPPOMixedLoss(nn.Layer):
 
         if not self.config.use_fused_head_and_loss_fn:
             logits = logits if isinstance(logits, paddle.Tensor) else logits[0]
+            if self.use_fp32_compute and logits.dtype != paddle.float32:
+                logits = logits.cast(paddle.float32)
             logits = logits / self.temperature if self.temperature > 0.0 else logits
         else:
             hidden_states, weight, bias, transpose_y = logits
+            if self.use_fp32_compute and hidden_states.dtype != paddle.float32:
+                hidden_states = hidden_states.cast(paddle.float32)
+                weight = weight.cast(paddle.float32)
+                 if bias is not None:
+                    bias = bias.cast(paddle.float32)
             hidden_states = hidden_states / self.temperature if self.temperature > 0.0 else hidden_states
             total_loss, pg_loss, entropy_loss, kl_loss = actor_fused_pg_entropy_kl_loss(
                 hidden_states,
