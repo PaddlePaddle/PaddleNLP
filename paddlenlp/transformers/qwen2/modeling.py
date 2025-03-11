@@ -1630,6 +1630,10 @@ class Qwen2ForCausalLM(Qwen2PretrainedModel):
 
         hidden_states = outputs[0]
 
+        # add this for fused_head_and_loss_fn
+        if self.config.use_fused_head_and_loss_fn and self.training:
+            return hidden_states, self.lm_head.weight, None, self.lm_head.transpose_y
+
         # if labels is None，means we need full output, instead of tensor_parallel_output
         # tensor_parallel_output is together with ParallelCrossEntropy
         tensor_parallel_output = self.config.tensor_parallel_output and self.config.tensor_parallel_degree > 1

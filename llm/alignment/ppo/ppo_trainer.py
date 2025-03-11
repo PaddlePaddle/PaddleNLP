@@ -36,10 +36,10 @@ from comm_utils import (
     data_group_merge,
     data_group_split,
     get_timer_label,
+    masked_whiten,
     new_timer_log,
     offload_tensor_to_cpu,
     reload_tensor_to_gpu,
-    masked_whiten
 )
 from infer_utils import InferEvalModel, infer_guard
 from models.ppo_model_utils import (
@@ -734,6 +734,7 @@ class PPOMetric:
                     "ptx_loss",
                     "pure_policy_loss",
                     "kl_loss",
+                    "entropy_loss",
                     "reward",
                     "kl_divergence",
                     "mean_generated_length",
@@ -748,7 +749,7 @@ class PPOMetric:
         elif self.args.rl_algorithm == "reinforce_plus_plus":
             self.metric_ops = ["mean"] * 9 + ["max", "min"]
         else:
-            self.metric_ops = ["mean"] * 7 + ["max", "min"]
+            self.metric_ops = ["mean"] * 8 + ["max", "min"]
         if not use_ptx:
             self.metric_names.pop(1)
             self.metric_ops.pop(1)
@@ -2116,7 +2117,7 @@ class PPOTrainer(Trainer):
             "old_log_probs": old_log_probs,
             "reward_advantages": reward_advantages,
             "sequence_mask": sequence_mask[:, response_start:],
-            "response_start": response_start
+            "response_start": response_start,
         }
 
         if self.args.rl_algorithm == "grpo":
@@ -2557,7 +2558,7 @@ class PPOTrainer(Trainer):
         """
         # pipe model outputs a logits tensor with LMHead, while non-pipe model
         # outputs a tuple with logits tensor as the only one element.
-        
+
         response_start = kwargs["prompt"].shape[-1] - 1 if "prompt" in kwargs else 0
         logits = self.actor_model(
             input_ids,
@@ -2576,30 +2577,36 @@ class PPOTrainer(Trainer):
 
         if not isinstance(ref_logits, paddle.Tensor):
             ref_logits = ref_logits[0]  # [2, 355, 12544]
-            
+
         logits = logits / self.args.temperature if self.args.temperature > 0.0 else logits
         ref_logits = ref_logits / self.args.temperature if self.args.temperature > 0.0 else ref_logits
 
         if self.actor_model.config.tensor_parallel_degree > 1 and self.actor_model.config.tensor_parallel_output:
             log_probs = (
-                -ParallelCrossEntropy()(logits[:, response_start:-1].astype("float32"), input_ids[:, response_start + 1:])
+                -ParallelCrossEntropy()(
+                    logits[:, response_start:-1].astype("float32"), input_ids[:, response_start + 1 :]
+                )
                 .squeeze(axis=-1)
                 .astype(logits.dtype)
             )
         else:
-            log_probs = gather_log_probabilities(logits[:, response_start:-1], input_ids[:, response_start + 1:])
+            log_probs = gather_log_probabilities(logits[:, response_start:-1], input_ids[:, response_start + 1 :])
 
         if (
             self.reference_model.config.tensor_parallel_degree > 1
             and self.reference_model.config.tensor_parallel_output
         ):
             ref_log_probs = (
-                -ParallelCrossEntropy()(ref_logits[:, response_start:-1].astype("float32"), input_ids[:, response_start + 1:])
+                -ParallelCrossEntropy()(
+                    ref_logits[:, response_start:-1].astype("float32"), input_ids[:, response_start + 1 :]
+                )
                 .squeeze(axis=-1)
                 .astype(ref_logits.dtype)
             )
         else:
-            ref_log_probs = gather_log_probabilities(ref_logits[:, response_start:-1], input_ids[:, response_start + 1:])
+            ref_log_probs = gather_log_probabilities(
+                ref_logits[:, response_start:-1], input_ids[:, response_start + 1 :]
+            )
 
         return {"log_probs": log_probs, "ref_log_probs": ref_log_probs}
 
@@ -2936,6 +2943,7 @@ def compute_grpo_advantages(
         rewards[i] = (rewards[i] - id2mean[index[i]]) / (id2std[index[i]] + epsilon)
     rewards = rewards.unsqueeze(-1).tile([1, response_length]) * sequence_mask
     return rewards
+
 
 @paddle.no_grad()
 def compute_reinforce_plus_plus_advantages_and_returns(

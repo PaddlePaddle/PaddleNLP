@@ -65,6 +65,14 @@ class TrainingArguments(TrainingArguments):
         default=0.001,
         metadata={"help": "The coefficient for the KL loss for GRPO."},
     )
+    pg_loss_coeff: float = field(
+        default=1.0,
+        metadata={"help": "The coefficient for the PG loss for GRPO."},
+    )
+    entropy_coeff: float = field(
+        default=0.001,
+        metadata={"help": "The coefficient for the entropy loss for GRPO."},
+    )
     clip_range_ratio: float = field(
         default=0.2,
         metadata={
@@ -73,7 +81,7 @@ class TrainingArguments(TrainingArguments):
         },
     )
     clip_range_score: float = field(
-        default=50.0,
+        default=10.0,
         metadata={
             "help": "The clipping range for the output of the score model. "
             "The reward is clipped into [-clip_range_score, clip_range_score]."
@@ -317,7 +325,11 @@ class TrainingArguments(TrainingArguments):
                 self.logging_strategy = IntervalStrategy.STEPS
         if self.per_device_rollout_batch_size < 0:
             self.per_device_rollout_batch_size = self.per_device_train_batch_size
-        assert self.rl_algorithm in ["ppo", "grpo", "reinforce_plus_plus"], 'self.rl_algorithm should be one of ["ppo", "grpo", "reinforce_plus_plus"]'
+        assert self.rl_algorithm in [
+            "ppo",
+            "grpo",
+            "reinforce_plus_plus",
+        ], 'self.rl_algorithm should be one of ["ppo", "grpo", "reinforce_plus_plus"]'
         if self.rl_algorithm == "grpo":
             self.normalize_reward = False
             self.normalize_advantage = False

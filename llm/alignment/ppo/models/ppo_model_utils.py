@@ -286,6 +286,38 @@ class RLHFPPOLoss(nn.Layer):
         return actor_loss
 
 
+def entropy_from_logits(logits: paddle.Tensor, tensor_parallel_output=False):
+    try:
+        hcg = fleet.get_hybrid_communicate_group()
+        model_parallel_group = hcg.get_model_parallel_group()
+        tensor_parallel_degree = hcg.get_model_parallel_world_size()
+    except:
+        tensor_parallel_degree = 1
+
+    max_logits = paddle.max(logits, axis=-1, keepdim=True)
+    if tensor_parallel_degree > 1 and tensor_parallel_output:
+        dist.all_reduce(max_logits, op=dist.ReduceOp.MAX, group=model_parallel_group)
+    normed_logits = logits - max_logits
+    sum_exp_logits = paddle.exp(normed_logits).sum(axis=-1, keepdim=True)
+    if tensor_parallel_degree > 1 and tensor_parallel_output:
+        dist.all_reduce(
+            sum_exp_logits,
+            op=dist.ReduceOp.SUM,
+            group=model_parallel_group,
+        )
+    log_sum_exp_logits = paddle.log(sum_exp_logits)
+    log_probs = normed_logits - log_sum_exp_logits
+    pd = log_probs.exp()
+    entropy = -(pd * log_probs).sum(axis=-1)
+    if tensor_parallel_degree > 1 and tensor_parallel_output:
+        dist.all_reduce(
+            entropy,
+            op=dist.ReduceOp.SUM,
+            group=model_parallel_group,
+        )
+    return entropy
+
+
 @merge_fwd_labels
 class RLHFPPOMixedLoss(nn.Layer):
     """provide two losses, one for PPO loss, the other for SFT loss."""
@@ -299,6 +331,8 @@ class RLHFPPOMixedLoss(nn.Layer):
         clip_range_score=10,
         info_buffer=None,
         temperature=1.0,
+        entropy_coeff=0.001,
+        pg_loss_coeff=1.0,
     ):
         """
         Args:
@@ -319,6 +353,9 @@ class RLHFPPOMixedLoss(nn.Layer):
         self.clip_range_score = clip_range_score
         self.info_buffer = info_buffer
         self.temperature = temperature
+        self.clip_range_ratio = clip_range_ratio
+        self.entropy_coeff = entropy_coeff
+        self.pg_loss_coeff = pg_loss_coeff
 
     def forward(
         self,
@@ -350,7 +387,43 @@ class RLHFPPOMixedLoss(nn.Layer):
 
         if not self.config.use_fused_head_and_loss_fn:
             logits = logits if isinstance(logits, paddle.Tensor) else logits[0]
-        logits = logits / self.temperature if self.temperature > 0.0 else logits
+            logits = logits / self.temperature if self.temperature > 0.0 else logits
+        else:
+            hidden_states, weight, bias, transpose_y = logits
+            hidden_states = hidden_states / self.temperature if self.temperature > 0.0 else hidden_states
+            total_loss, pg_loss, entropy_loss, kl_loss = actor_fused_pg_entropy_kl_loss(
+                hidden_states,
+                weight,
+                input_ids,
+                old_log_probs,
+                ref_log_probs,
+                reward_advantages,
+                sequence_mask,
+                bias=bias,
+                transpose_y=transpose_y,
+                fused_linear=False,
+                vocab_size=self.config.vocab_size,
+                tensor_parallel_degree=self.config.tensor_parallel_degree,
+                tensor_parallel_output=self.config.tensor_parallel_output,
+                pg_loss_coeff=self.pg_loss_coeff,
+                clip_range_ratio=self.clip_range_ratio,
+                entropy_coeff=self.entropy_coeff,
+                clip_range_score=self.clip_range_score,
+                kl_loss_coeff=self.kl_loss_coeff,
+                loop_chunk_size=1024,
+                response_start=response_start,
+            )
+            with paddle.no_grad():
+                self.info_buffer["kl_loss"] = (
+                    kl_loss.detach() / self.kl_loss_coeff if self.kl_loss_coeff > 0 else paddle.to_tensor([0.0])
+                )
+                self.info_buffer["entropy_loss"] = (
+                    entropy_loss.detach() / self.entropy_coeff if self.entropy_coeff > 0 else paddle.to_tensor([0.0])
+                )
+                self.info_buffer["pure_policy_loss"] = (
+                    pg_loss.detach() / self.pg_loss_coeff if self.pg_loss_coeff > 0 else paddle.to_tensor([0.0])
+                )
+            return total_loss
         loss = None
         # sft, pt loss
         if labels is not None:
@@ -389,6 +462,9 @@ class RLHFPPOMixedLoss(nn.Layer):
 
             # TODO:support fused head and loss fn
             loss = self.ppo_criterion(log_probs, old_log_probs, reward_advantages, sequence_mask)
+            self.info_buffer["pure_policy_loss"] = loss.detach()
+            loss = self.pg_loss_coeff * loss
+
         if ref_log_probs is not None:
             kl_divergence_estimate = paddle.clip(
                 paddle.exp(ref_log_probs - log_probs) - (ref_log_probs - log_probs) - 1,
@@ -397,8 +473,15 @@ class RLHFPPOMixedLoss(nn.Layer):
             )
             kl_loss = paddle.sum(kl_divergence_estimate * sequence_mask) / sequence_mask.sum()
             self.info_buffer["kl_loss"] = kl_loss.detach()
-            self.info_buffer["pure_policy_loss"] = loss.detach()
             loss += self.kl_loss_coeff * kl_loss
+
+        if self.entropy_coeff > 0:
+            entropy_loss_raw = entropy_from_logits(logits[:, response_start:-1], self.config.tensor_parallel_output)
+            entropy_loss = paddle.sum(entropy_loss_raw * sequence_mask) / sequence_mask.sum()
+            self.info_buffer["entropy_loss"] = entropy_loss.detach()
+            loss -= self.entropy_coeff * entropy_loss
+        else:
+            self.info_buffer["entropy_loss"] = paddle.to_tensor([0.0])
 
         return loss
 
@@ -880,11 +963,9 @@ class ActorFusedPGEntropyKLLoss(paddle.autograd.PyLayer):
         else:
             indices = paddle.arange(vocab_size, dtype=labels.dtype).unsqueeze(0)
 
-        total_pg_loss = paddle.zeros([1], dtype=dtype)
-        if entropy_coeff > 0:
-            total_entropy_loss = paddle.zeros([1], dtype=dtype)
-        if kl_loss_coeff > 0:
-            total_kl_loss = paddle.zeros([1], dtype=dtype)
+        total_pg_loss = paddle.zeros([1], dtype="float32")
+        total_entropy_loss = paddle.zeros([1], dtype="float32")
+        total_kl_loss = paddle.zeros([1], dtype="float32")
 
         grad_lm_head_weight = paddle.zeros_like(weight) if not weight.stop_gradient else None
         grad_lm_head_bias = paddle.zeros_like(bias) if bias is not None and not bias.stop_gradient else None
@@ -954,8 +1035,7 @@ class ActorFusedPGEntropyKLLoss(paddle.autograd.PyLayer):
 
             if entropy_coeff > 0:
                 # [2] entropy loss
-                eps = 1e-12
-                log_prob_chunk = paddle.log(softmax_out_chunk + eps)
+                log_prob_chunk = paddle.log(paddle.clip(softmax_out_chunk, min=1e-12, out=softmax_out_chunk))
                 entropy_loss_chunk = (softmax_out_chunk * log_prob_chunk).sum(axis=-1) * mask_chunk
                 total_entropy_loss += entropy_loss_chunk.sum() * entropy_coeff / divisor
 
@@ -1027,10 +1107,10 @@ class ActorFusedPGEntropyKLLoss(paddle.autograd.PyLayer):
             *filter(lambda x: x is not None, [grad_hidden_states, grad_lm_head_weight, grad_lm_head_bias])
         )
 
-        return final_loss
+        return final_loss, total_pg_loss, -total_entropy_loss, total_kl_loss
 
     @staticmethod
-    def backward(ctx, grad_output):
+    def backward(ctx, grad_output, *args):
         grad_args = ctx.saved_tensor()
         idx = 0
         if ctx.hidden_states_has_grad:
@@ -1057,31 +1137,32 @@ class ActorFusedPGEntropyKLLoss(paddle.autograd.PyLayer):
 def actor_fused_pg_entropy_kl_loss(
     hidden_states: paddle.Tensor,
     weight: paddle.Tensor,
-    bias: paddle.Tensor,
     input_ids: paddle.Tensor,
     old_log_probs: paddle.Tensor,
     ref_log_probs: paddle.Tensor,
     advantages: paddle.Tensor,
     sequence_mask: paddle.Tensor,
+    bias: paddle.Tensor = None,
     transpose_y: bool = False,
     fused_linear: bool = False,
-    vocab_size=1024,
-    tensor_parallel_degree=1,
-    tensor_parallel_output=False,
-    pg_loss_coeff=1.0,
-    clip_range_ratio=0.2,
-    entropy_coeff=0.01,
-    clip_range_score=50,
-    kl_loss_coeff=0.1,
-    loop_chunk_size=1024,
+    vocab_size: int = 1024,
+    tensor_parallel_degree: int = 1,
+    tensor_parallel_output: bool = False,
+    pg_loss_coeff: float = 1.0,
+    clip_range_ratio: float = 0.2,
+    entropy_coeff: float = 0.001,
+    clip_range_score: float = 10.0,
+    kl_loss_coeff: float = 0.001,
+    response_start: int = 0,
+    loop_chunk_size: int = 1024,
 ):
-    logits_next = hidden_states[:, :-1, :]
-    labels_next = input_ids[:, 1:]
+    hidden_next = hidden_states[:, response_start:-1, :]
+    labels_next = input_ids[:, response_start + 1 :]
 
     if ref_log_probs is None:
         kl_loss_coeff = 0.0
     return ActorFusedPGEntropyKLLoss.apply(
-        hidden_states=logits_next,
+        hidden_states=hidden_next,
         weight=weight,
         bias=bias,
         sequence_mask=sequence_mask,
