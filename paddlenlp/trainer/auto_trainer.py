@@ -286,12 +286,24 @@ class AutoTrainer(Trainer):
                 paddle.assign(local_micro_batch, global_micro_batch._local_value())
             return global_micro_batchs
 
+        skip_next_i = False
         for i, (key, dtensors) in enumerate(inputs.items()):
+            if skip_next_i:
+                skip_next_i = False
+                continue
             if isinstance(dtensors, paddle.Tensor):
                 if self.dense_tensor_idx is not None and self.dense_tensor_idx[i] != []:
-                    global_datas = dtensors.split(self.args.gradient_accumulation_steps, axis=0)
+                    next_dtensor = dtensors[i + 1]
+                    next_dtensor_list = (
+                        paddle.prod(next_dtensor, axis=-1) if len(next_dtensor.shape) != 1 else next_dtensor
+                    )
+                    global_datas = dtensors.split(next_dtensor_list.cast("int64").tolist(), axis=0)
                     for index, data in enumerate(global_datas):
                         global_micro_batchs[index].update({key: data})
+                    global_datas_next = next_dtensor.split(self.args.gradient_accumulation_steps, axis=0)
+                    for index, data in enumerate(global_datas):
+                        global_micro_batchs[index].update({key: data})
+                    skip_next_i = True
                 else:
                     mesh, placements = dtensors.process_mesh, dtensors.placements
                     global_datas = split_dtensor_by_axis(dtensors, 0)
@@ -302,15 +314,33 @@ class AutoTrainer(Trainer):
                     for j in range(self.args.gradient_accumulation_steps):
                         global_micro_batchs[j].update({key: []})
                 else:
+                    skip_next_j = False
                     for j, dtensor in enumerate(dtensors):
+                        if skip_next_j:
+                            skip_next_j = False
+                            continue
                         if isinstance(dtensor, paddle.Tensor):
                             if self.dense_tensor_idx is not None and j in self.dense_tensor_idx[i]:
-                                global_datas = dtensor.split(self.args.gradient_accumulation_steps, axis=0)
+                                next_dtensor = dtensors[j + 1]
+                                next_dtensor_list = (
+                                    paddle.prod(next_dtensor, axis=-1)
+                                    if len(next_dtensor.shape) != 1
+                                    else next_dtensor
+                                )
+                                global_datas = dtensor.split(next_dtensor_list.cast("int64").tolist(), axis=0)
                                 for index, data in enumerate(global_datas):
                                     if key in global_micro_batchs[index].keys():
                                         global_micro_batchs[index][key].append(data)
                                     else:
                                         global_micro_batchs[index].update({key: [data]})
+
+                                global_datas_next = next_dtensor.split(self.args.gradient_accumulation_steps, axis=0)
+                                for index, data in enumerate(global_datas_next):
+                                    if key in global_micro_batchs[index].keys():
+                                        global_micro_batchs[index][key].append(data)
+                                    else:
+                                        global_micro_batchs[index].update({key: [data]})
+                                skip_next_j = True
                             else:
                                 mesh, placements = dtensor.process_mesh, dtensor.placements
                                 global_datas = split_dtensor_by_axis(dtensor, 0)
