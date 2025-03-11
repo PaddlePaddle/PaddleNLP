@@ -3,30 +3,6 @@
 
 *该部署工具是基于英伟达 Triton 框架专为服务器场景的大模型服务化部署而设计。它提供了支持 gRPC、HTTP 协议的服务接口，以及流式 Token 输出能力。底层推理引擎支持连续批处理、weight only int8、后训练量化（PTQ）等加速优化策略，为用户带来易用且高性能的部署体验。*
 
-## 静态图快速部署
-
-该方法仅支持[可一键跑通的模型列表](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/static_models.md)中的模型进行一键启动推理服务
-
-`MODEL_PATH` 为指定模型下载的存储路径，可自行指定
-`model_name` 为指定下载模型名称，具体支持模型可查看[文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/static_models.md)
-
-
-```
-export MODEL_PATH=${MODEL_PATH:-$PWD}
-export model_name=${model_name:-"meta-llama/Meta-Llama-3-8B-Instruct-Block-Attn/float16"}
-docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
--v $MODEL_PATH:/models -e "model_name=${model_name}" \ 
--dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda118-cudnn8-v2.1 /bin/bash \
--c -ex 'start_server $model_name && tail -f /dev/null'
-```
-
-### 服务测试
-```
-curl 127.0.0.1:9965/v1/chat/completions \
-  -H'Content-Type: application/json' \
-  -d'{"text": "hello, llm"}'
-```
-
 
 ## 部署环境准备
 
@@ -81,6 +57,29 @@ python download_model.py \
 --mode "master" \
 --speculate_model_path $MODEL_PATH 
 ```
+
+**单机模型下载**
+以DeepSeek-R1 weight_only_int4 模型为例
+```
+export MODEL_PATH=${MODEL_PATH:-$PWD}
+export model_name="deepseek-ai/DeepSeek-R1/weight_only_int4"
+python download_model.py --model_name $model_name --dir $MODEL_PATH --nnodes 1
+```
+**多机模型下载**
+以DeepSeek-R1 2机 weight_only_int8 模型为例
+**node1** 主节点
+```
+export MODEL_PATH=${MODEL_PATH:-$PWD}
+export model_name="deepseek-ai/DeepSeek-R1-2nodes/weight_only_int8"
+python download_model.py --model_name $model_name --dir $MODEL_PATH --nnodes 2 --mode "master"
+```
+**node2** 副节点
+```
+export MODEL_PATH=${MODEL_PATH:-$PWD}
+export model_name="deepseek-ai/DeepSeek-R1-2nodes/weight_only_int8"
+python download_model.py --model_name $model_name --dir $MODEL_PATH --nnodes 2 --mode "slave"
+```
+
 
 **参数说明**
 
