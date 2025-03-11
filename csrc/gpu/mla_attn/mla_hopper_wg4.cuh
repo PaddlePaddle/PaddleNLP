@@ -122,7 +122,7 @@ MLAWithKVCacheWG4Kernel(CUTE_GRID_CONSTANT
     pipeline_params_qk.role = MainloopPipelineQK::ThreadCategory::Consumer;
   }
   pipeline_params_qk.producer_arv_count = NUM_MMA_THREADS_QK;
-  pipeline_params_qk.consumer_arv_count = NUM_MMA_THREADS_PV; // just one wg qk
+  pipeline_params_qk.consumer_arv_count = NUM_MMA_THREADS_PV;
   MainloopPipelineQK pipeline_qk(shared_storage.pipeline_qk, pipeline_params_qk);
 
   MainloopPipeline pipeline_kv = [&] {
