@@ -1,3 +1,17 @@
+// Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #include <cuda_fp8.h>
 #include <cuda_bf16.h>
 #include <cuda_runtime.h>
@@ -237,7 +251,8 @@ __global__ void FusedSwigluActQuantKernel(
                 is_output_inner_OOB = (g_block_x_offset + x_offset) >= cols;
             } 
             if(is_output_inner_OOB) break; // 列越界则不取值、不影响max;
-            local_max = fmaxf(local_max, fabsf(smem_tile[swizzled_2d_idx(y_offset, BLOCK_SIZE, x_offset)])); // 正常情况下提供绝对值给其他线程,每个线程的local_max最多为4数最大值
+            // 正常情况下提供绝对值给其他线程,每个线程的local_max最多为4数最大值
+            local_max = fmaxf(local_max, fabsf(smem_tile[swizzled_2d_idx(y_offset, BLOCK_SIZE, x_offset)])); 
         }
         bool is_output_outer_OOB;
         if constexpr (transpose_output) {
