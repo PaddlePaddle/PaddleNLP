@@ -731,8 +731,13 @@ CUTLASS_DEVICE void mma_qk_two_stages(const Params& mainloop_params,
   // wait k
   consumer_wait(pipeline_kv, smem_pipe_read_kv);
   // first qk gemm
-  gemm</*init=*/true, /*wg_wait=*/-1>(tiled_mma_qk, tSrQ, tSrK(_, _, _, smem_pipe_read_kv.index()),
-                                      tSrS1);
+  if (smem_pipe_write_qk.index() == 0) {
+    gemm</*init=*/true, /*wg_wait=*/-1>(tiled_mma_qk, tSrQ, tSrK(_, _, _, smem_pipe_read_kv.index()),
+                                        tSrS1);
+  } else {
+    gemm</*init=*/true, /*wg_wait=*/-1>(tiled_mma_qk, tSrQ, tSrK(_, _, _, smem_pipe_read_kv.index()),
+                                        tSrS2);
+  }
   constexpr int n_masking_steps = CAUSAL ? cute::ceil_div(BLOCK_SHAPE_Q, BLOCK_SHAPE_KV) : 0;
   int masking_step = n_masking_steps;
   --kv_tile_idx;

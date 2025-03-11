@@ -102,6 +102,7 @@ struct Params {
     int max_draft_token_num;
     int chunk_size;
     int chunk_num;
+    int num_blocks_x_int;
 
     float sm_scale;
 };

@@ -133,7 +133,7 @@ struct AttentionKernelWG4Traits {
   using SmemLayoutO = decltype(tile_to_shape(SmemLayoutAtomO{}, select<0, 1>(TileShape_PDV{})));
 
   using SmemCopyAtom = Copy_Atom<cute::SM90_U32x4_STSM_N, DTypeQ>;
-  // permute layout
+  // todo: permute layout
   using SmemLayoutRow = Layout<Shape<Int<2>, Int<128>, Int<2>>, Stride<Int<1>, Int<2>, Int<256>>>;
 
   using SmemLayoutAtomP = decltype(cutlass::gemm::collective::detail::ss_smem_selector<

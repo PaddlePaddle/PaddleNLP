@@ -121,48 +121,88 @@ void BatchMLAWithPagedKVCacheKernel(
       sizeof(float) *
       static_cast<size_t>(num_chunks * bsz * draft_token_num * q_head_num));
 
-  Params<CUTLASS_TYPE, CUTLASS_TYPE, CUTLASS_TYPE, int> params = {};
-  params.Q = reinterpret_cast<CUTLASS_TYPE*>(const_cast<T*>(q.data<T>()));
-  params.KV = reinterpret_cast<CUTLASS_TYPE*>(const_cast<T*>(latent_cache.data<T>()));
-  params.O = reinterpret_cast<CUTLASS_TYPE*>(const_cast<T*>(out->data<T>()));
-  params.O_tmp = reinterpret_cast<CUTLASS_TYPE*>(O_tmp->ptr());
-  params.m = reinterpret_cast<float*>(m_tmp->ptr());
-  params.d = reinterpret_cast<float*>(d_tmp->ptr());
-  params.block_tables = const_cast<int*>(block_tables.data<int>());
-  params.seq_lens_this_time = const_cast<int*>(seq_lens_this_time.data<int>());
-  params.seq_lens_encoder = const_cast<int*>(seq_lens_encoder.data<int>());
-  params.seq_lens_decoder = const_cast<int*>(seq_lens_decoder.data<int>());
-  params.cumsum_q_seqlens = const_cast<int*>(cu_seqlens_q.data<int>());
-  params.padding_offsets = const_cast<int*>(padding_offsets.data<int>());
-  params.batch_ids = const_cast<int*>(batch_ids.data<int>());
-  params.tile_ids_per_batch = const_cast<int*>(tile_ids_per_batch.data<int>());
-  params.num_blocks_x = const_cast<int*>(num_blocks_x_device.data<int>());
-  params.q_stride_bsz = q_head_num * q_head_dim;
-  params.q_stride_head_num = q_head_dim;
-  params.kv_stride_block_num = block_size * k_head_dim;
-  params.kv_stride_block_size = k_head_dim;
-  params.o_stride_bsz = q_head_num * v_head_dim;
-  params.o_stride_head_num = v_head_dim;
-  params.bsz = bsz;
-  params.token_num = token_num;
-  params.max_seq_len = max_seq_len;
-  params.max_block_num = max_block_num;
-  params.max_block_num_per_seq = max_block_num_per_seq;
-  params.q_num_head = q_head_num;
-  params.qk_head_dim = q_head_dim;
-  params.vo_head_dim = v_head_dim;
-  params.block_size = block_size;
-  params.max_draft_token_num = draft_token_num;
-  params.sm_scale = softmax_scale;
-  params.chunk_size = chunk_size;
-  params.chunk_num = num_chunks;
-
   if (q_head_dim == 576) {
-      if (mla_use_wg4 && params.block_size == 32 && std::is_same<NV_TYPE, half>::value) {
-        BatchMLAWithPagedKVCacheWG4Dispatched<576, 512, NV_TYPE>(
-            params, stream
-        );
+      if (mla_use_wg4 && block_size == 32) {
+        if constexpr (!std::is_same<CUTLASS_TYPE, cutlass::half_t>::value) {
+          PD_THROW("error!!! mla_wg4 not supports bf16 now!!!\n");
+        } else {
+          Params<cutlass::half_t, cutlass::half_t, cutlass::half_t, int> params = {};
+          params.Q = reinterpret_cast<cutlass::half_t*>(const_cast<T*>(q.data<T>()));
+          params.KV = reinterpret_cast<cutlass::half_t*>(const_cast<T*>(latent_cache.data<T>()));
+          params.O = reinterpret_cast<cutlass::half_t*>(const_cast<T*>(out->data<T>()));
+          params.O_tmp = reinterpret_cast<cutlass::half_t*>(O_tmp->ptr());
+          params.m = reinterpret_cast<float*>(m_tmp->ptr());
+          params.d = reinterpret_cast<float*>(d_tmp->ptr());
+          params.block_tables = const_cast<int*>(block_tables.data<int>());
+          params.seq_lens_this_time = const_cast<int*>(seq_lens_this_time.data<int>());
+          params.seq_lens_encoder = const_cast<int*>(seq_lens_encoder.data<int>());
+          params.seq_lens_decoder = const_cast<int*>(seq_lens_decoder.data<int>());
+          params.cumsum_q_seqlens = const_cast<int*>(cu_seqlens_q.data<int>());
+          params.padding_offsets = const_cast<int*>(padding_offsets.data<int>());
+          params.batch_ids = const_cast<int*>(batch_ids.data<int>());
+          params.tile_ids_per_batch = const_cast<int*>(tile_ids_per_batch.data<int>());
+          params.num_blocks_x = const_cast<int*>(num_blocks_x_device.data<int>());
+          params.num_blocks_x_int = num_blocks_x;
+          params.q_stride_bsz = q_head_num * q_head_dim;
+          params.q_stride_head_num = q_head_dim;
+          params.kv_stride_block_num = block_size * k_head_dim;
+          params.kv_stride_block_size = k_head_dim;
+          params.o_stride_bsz = q_head_num * v_head_dim;
+          params.o_stride_head_num = v_head_dim;
+          params.bsz = bsz;
+          params.token_num = token_num;
+          params.max_seq_len = max_seq_len;
+          params.max_block_num = max_block_num;
+          params.max_block_num_per_seq = max_block_num_per_seq;
+          params.q_num_head = q_head_num;
+          params.qk_head_dim = q_head_dim;
+          params.vo_head_dim = v_head_dim;
+          params.block_size = block_size;
+          params.max_draft_token_num = draft_token_num;
+          params.sm_scale = softmax_scale;
+          params.chunk_size = chunk_size;
+          params.chunk_num = num_chunks;
+          BatchMLAWithPagedKVCacheWG4Dispatched<576, 512, half, Params<cutlass::half_t, cutlass::half_t, cutlass::half_t, int>>(
+              params, stream
+          );
+        }
       } else {
+        Params<CUTLASS_TYPE, CUTLASS_TYPE, CUTLASS_TYPE, int> params = {};
+        params.Q = reinterpret_cast<CUTLASS_TYPE*>(const_cast<T*>(q.data<T>()));
+        params.KV = reinterpret_cast<CUTLASS_TYPE*>(const_cast<T*>(latent_cache.data<T>()));
+        params.O = reinterpret_cast<CUTLASS_TYPE*>(const_cast<T*>(out->data<T>()));
+        params.O_tmp = reinterpret_cast<CUTLASS_TYPE*>(O_tmp->ptr());
+        params.m = reinterpret_cast<float*>(m_tmp->ptr());
+        params.d = reinterpret_cast<float*>(d_tmp->ptr());
+        params.block_tables = const_cast<int*>(block_tables.data<int>());
+        params.seq_lens_this_time = const_cast<int*>(seq_lens_this_time.data<int>());
+        params.seq_lens_encoder = const_cast<int*>(seq_lens_encoder.data<int>());
+        params.seq_lens_decoder = const_cast<int*>(seq_lens_decoder.data<int>());
+        params.cumsum_q_seqlens = const_cast<int*>(cu_seqlens_q.data<int>());
+        params.padding_offsets = const_cast<int*>(padding_offsets.data<int>());
+        params.batch_ids = const_cast<int*>(batch_ids.data<int>());
+        params.tile_ids_per_batch = const_cast<int*>(tile_ids_per_batch.data<int>());
+        params.num_blocks_x = const_cast<int*>(num_blocks_x_device.data<int>());
+        params.num_blocks_x_int = num_blocks_x;
+        params.q_stride_bsz = q_head_num * q_head_dim;
+        params.q_stride_head_num = q_head_dim;
+        params.kv_stride_block_num = block_size * k_head_dim;
+        params.kv_stride_block_size = k_head_dim;
+        params.o_stride_bsz = q_head_num * v_head_dim;
+        params.o_stride_head_num = v_head_dim;
+        params.bsz = bsz;
+        params.token_num = token_num;
+        params.max_seq_len = max_seq_len;
+        params.max_block_num = max_block_num;
+        params.max_block_num_per_seq = max_block_num_per_seq;
+        params.q_num_head = q_head_num;
+        params.qk_head_dim = q_head_dim;
+        params.vo_head_dim = v_head_dim;
+        params.block_size = block_size;
+        params.max_draft_token_num = draft_token_num;
+        params.sm_scale = softmax_scale;
+        params.chunk_size = chunk_size;
+        params.chunk_num = num_chunks;
         BatchMLAWithPagedKVCacheDispatched<576, 512, NV_TYPE>(
             params, stream
         );

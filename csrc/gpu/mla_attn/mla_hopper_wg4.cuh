@@ -48,7 +48,7 @@ namespace mla_attn {
 
 using namespace cute;
 
-template <typename CollectiveMainloop, typename CollectiveEpilogue, typename Ktraits, bool CAUSAL, int SM_COUNT = 132, bool USE_REG_EALLOC=false, bool USE_QK_TWO_STAGE=true>
+template <typename CollectiveMainloop, typename CollectiveEpilogue, typename Ktraits, bool CAUSAL, int SM_COUNT = 132, bool USE_REG_EALLOC=false, bool USE_FIXED_BLOCK_NUM=false, bool USE_QK_TWO_STAGE=false>
 __global__ void __launch_bounds__(Ktraits::NUM_WARPS * cutlass::NumThreadsPerWarp, 1)
 MLAWithKVCacheWG4Kernel(CUTE_GRID_CONSTANT
                         typename CollectiveMainloop::Params const mainloop_params,
@@ -68,6 +68,10 @@ MLAWithKVCacheWG4Kernel(CUTE_GRID_CONSTANT
   static constexpr int BLOCK_SHAPE_Q = Ktraits::BLOCK_SHAPE_Q;
   static constexpr int BLOCK_SHAPE_KV = Ktraits::BLOCK_SHAPE_KV;
   const int num_blocks_x = mainloop_params.num_blocks_x[0];
+  int block_stride = SM_COUNT;
+  if constexpr (USE_FIXED_BLOCK_NUM) {
+    block_stride = num_blocks_x;
+  }
 
   static constexpr bool use_tma_load_kv = CollectiveMainloop::USE_TMA_LOAD_KV;
 
@@ -140,15 +144,14 @@ MLAWithKVCacheWG4Kernel(CUTE_GRID_CONSTANT
   
   if (warp_group_idx == 0) {
     // producer
-    if constexpr(USE_REG_EALLOC) {
+    if constexpr (USE_REG_EALLOC) {
         cutlass::arch::warpgroup_reg_dealloc<64>();
     }
     int const warp_idx = cutlass::canonical_warp_idx_sync();
     const uint32_t warp_idx_in_warpgroup = __shfl_sync(0xffffffff, warp_idx % 4, 0);
-    
-    for (int i = blockIdx.x; i < num_blocks_x; i += SM_COUNT) {
-      PipelineStateQ smem_pipe_write_q = cutlass::make_producer_start_state<MainloopPipelineQ>();
-      PipelineState smem_pipe_write_kv = cutlass::make_producer_start_state<MainloopPipeline>();
+    PipelineStateQ smem_pipe_write_q = cutlass::make_producer_start_state<MainloopPipelineQ>();
+    PipelineState smem_pipe_write_kv = cutlass::make_producer_start_state<MainloopPipeline>();
+    for (int i = blockIdx.x; i < num_blocks_x; i += block_stride) {
       const int bid = mainloop_params.batch_ids[i];
       const int tile_id = mainloop_params.tile_ids_per_batch[i];
       const int q_tile_id = mainloop_params.q_tile_ids_per_batch ? mainloop_params.q_tile_ids_per_batch[i] : 0;
@@ -195,15 +198,15 @@ MLAWithKVCacheWG4Kernel(CUTE_GRID_CONSTANT
     }
   } else if (warp_group_idx == 1) {
     // mma qk
-    if constexpr(USE_REG_EALLOC) {
+    if constexpr (USE_REG_EALLOC) {
         cutlass::arch::warpgroup_reg_dealloc<64>(); 
     }
 
     auto attention_updater = OnlineSoftmax<2 * BLOCK_SHAPE_Q / 64, /*WITH_SCALE=*/true>(mainloop_params.sm_scale);
-    for (int i = blockIdx.x; i < num_blocks_x; i += SM_COUNT) {
-      PipelineStateQ smem_pipe_read_q;
-      PipelineState smem_pipe_read_kv;
-      PipelineStateQK smem_pipe_write_qk = cutlass::make_producer_start_state<MainloopPipelineQK>();
+    PipelineStateQ smem_pipe_read_q;
+    PipelineState smem_pipe_read_kv;
+    PipelineStateQK smem_pipe_write_qk = cutlass::make_producer_start_state<MainloopPipelineQK>();
+    for (int i = blockIdx.x; i < num_blocks_x; i += block_stride) {
       clear(attention_updater.scores_scale);
       const int bid = mainloop_params.batch_ids[i];
       const int tile_id = mainloop_params.tile_ids_per_batch[i];
@@ -250,15 +253,15 @@ MLAWithKVCacheWG4Kernel(CUTE_GRID_CONSTANT
     }
   } else {
     // mm pv and store 160 reg
-    if constexpr(USE_REG_EALLOC) {
+    if constexpr (USE_REG_EALLOC) {
         cutlass::arch::warpgroup_reg_alloc<184>();
     }
     typename Ktraits::TiledMmaPVSS tiled_mma_pv;
     Tensor tOrO = partition_fragment_C(tiled_mma_pv, select<0, 1>(TileShape_PDV{}));
     auto attention_updater = OnlineSoftmax<2 * BLOCK_SHAPE_Q / 64, /*WITH_SCALE=*/true>(mainloop_params.sm_scale);
-    for (int i = blockIdx.x; i < num_blocks_x; i += SM_COUNT) {
-      PipelineState smem_pipe_read_kv;
-      PipelineStateQK smem_pipe_read_qk;
+    PipelineState smem_pipe_read_kv;
+    PipelineStateQK smem_pipe_read_qk;
+    for (int i = blockIdx.x; i < num_blocks_x; i += block_stride) {
       const int bid = mainloop_params.batch_ids[i];
       const int tile_id = mainloop_params.tile_ids_per_batch[i];
       const int q_tile_id = mainloop_params.q_tile_ids_per_batch ? mainloop_params.q_tile_ids_per_batch[i] : 0;
@@ -304,7 +307,7 @@ MLAWithKVCacheWG4Kernel(CUTE_GRID_CONSTANT
   }
 }
 
-template <typename KernelTraits, bool CAUSAL, typename Params, bool USE_REG_EALLOC=false, bool USE_QK_TWO_STAGE=false>
+template <typename KernelTraits, bool CAUSAL, typename Params, bool USE_REG_EALLOC=false, bool USE_FIXED_BLOCK_NUM=false, bool USE_QK_TWO_STAGE=false>
 cudaError_t BatchMLAWithPagedKVCacheWG4KernelTraitsDispatched(Params& params,
                                                               cudaStream_t stream) {
   using DTypeQ = typename KernelTraits::DTypeQ;
@@ -356,7 +359,7 @@ cudaError_t BatchMLAWithPagedKVCacheWG4KernelTraitsDispatched(Params& params,
 
   // Get the ptr to kernel function.
   auto kernel =
-      MLAWithKVCacheWG4Kernel<CollectiveMainloop, CollectiveEpilogue, KernelTraits, CAUSAL, 132, USE_REG_EALLOC, USE_QK_TWO_STAGE>;
+      MLAWithKVCacheWG4Kernel<CollectiveMainloop, CollectiveEpilogue, KernelTraits, CAUSAL, 132, USE_REG_EALLOC, USE_FIXED_BLOCK_NUM, USE_QK_TWO_STAGE>;
   int smem_size = sizeof(typename KernelTraits::SharedStorage);
   cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
   int device;
@@ -366,7 +369,14 @@ cudaError_t BatchMLAWithPagedKVCacheWG4KernelTraitsDispatched(Params& params,
   int act_blocks_per_sm;
   cudaOccupancyMaxActiveBlocksPerMultiprocessor(
       &act_blocks_per_sm, kernel, KernelTraits::NUM_WARPS * 32, smem_size);
-  dim3 grid_dims = {multiprocessor_count, 1, 1};
+  int gridx;
+  if constexpr (USE_FIXED_BLOCK_NUM) {
+    gridx = multiprocessor_count;
+  } else {
+    gridx = params.num_blocks_x_int;
+  }
+  printf("gridx: %d\n", gridx);
+  dim3 grid_dims = {gridx, 1, 1};
   static constexpr int ctaSize = KernelTraits::NUM_WARPS * 32;
   dim3 block_dims(ctaSize, 1, 1);
   kernel<<<grid_dims, block_dims, smem_size, stream>>>(
@@ -401,7 +411,7 @@ cudaError_t BatchMLAWithPagedKVCacheWG4KernelTraitsDispatched(Params& params,
   return cudaSuccess;
 }
 
-template <uint32_t HEAD_DIM_QK, uint32_t HEAD_DIM_VO, typename NV_TYPE, typename Params, bool USE_REG_EALLOC=false, bool USE_QK_TWO_STAGE=true>
+template <uint32_t HEAD_DIM_QK, uint32_t HEAD_DIM_VO, typename NV_TYPE, typename Params, bool USE_REG_EALLOC=false, bool USE_FIXED_BLOCK_NUM=false, bool USE_QK_TWO_STAGE=false>
 cudaError_t BatchMLAWithPagedKVCacheWG4Dispatched(Params& params, cudaStream_t stream) {
   constexpr bool CAUSAL = true;
   if constexpr (HEAD_DIM_QK == 576) {
@@ -423,6 +433,7 @@ cudaError_t BatchMLAWithPagedKVCacheWG4Dispatched(Params& params, cudaStream_t s
             CAUSAL,
             Params,
             USE_REG_EALLOC,
+            USE_FIXED_BLOCK_NUM,
             USE_QK_TWO_STAGE>(params, stream);)
     }
   } else {
