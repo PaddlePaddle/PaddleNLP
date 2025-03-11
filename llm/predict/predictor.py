@@ -74,7 +74,7 @@ class PredictorArgument:
     max_length: int = field(default=1024, metadata={"help": "the max length for decoding."})
     top_k: int = field(default=0, metadata={"help": "top_k parameter for generation"})
     top_p: float = field(default=0.7, metadata={"help": "top_p parameter for generation"})
-    temperature: float = field(default=0.95, metadata={"help": "top_p parameter for generation"})
+    temperature: float = field(default=0.95, metadata={"help": "temperature parameter for generation"})
     repetition_penalty: float = field(default=1.0, metadata={"help": "repetition penalty parameter for generation"})
     device: str = field(default="gpu", metadata={"help": "Device"})
     dtype: str = field(default=None, metadata={"help": "Model dtype"})
