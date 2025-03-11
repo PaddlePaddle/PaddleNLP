@@ -190,6 +190,8 @@ class PredictorArgument:
             self.append_attn = True
         if self.append_attn:
             self.block_attn = True
+        if self.block_attn:
+            self.inference_model = True
         assert self.max_length < self.total_max_length, "max_length should smaller than total_max_length."
         self.src_length = self.total_max_length - self.max_length
 
