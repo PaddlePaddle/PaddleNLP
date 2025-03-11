@@ -129,6 +129,49 @@ def setup_fused_ln():
             ),
         )
 
+def setup_fused_quant_ops():
+    """setup_fused_fp8_ops"""
+    from paddle.utils.cpp_extension import CUDAExtension, setup
 
+    gencode_flags = get_gencode_flags()
+    change_pwd()
+    setup(
+        name="FusedQuantOps",
+        ext_modules=CUDAExtension(
+            sources=[
+                "fused_quanted_ops/fused_swiglu_act_quant.cu",
+            ],
+            extra_compile_args={
+                "cxx": [
+                    "-O3",
+                    "-w",
+                    "-Wno-abi",
+                    "-fPIC",
+                    "-std=c++17"
+                ],
+                "nvcc": [
+                    "-O3",
+                    "-U__CUDA_NO_HALF_OPERATORS__",
+                    "-U__CUDA_NO_HALF_CONVERSIONS__",
+                    "-U__CUDA_NO_BFLOAT16_OPERATORS__",
+                    "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
+                    "-U__CUDA_NO_BFLOAT162_OPERATORS__",
+                    "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
+                    "-DCUTE_ARCH_MMA_SM90A_ENABLE",
+                    f"-I{cutlass_include_dir}",
+                    "--expt-relaxed-constexpr",
+                    "--expt-extended-lambda",
+                    "--use_fast_math",
+                    "-lineinfo",
+                    "-DCUTLASS_DEBUG_TRACE_LEVEL=0",
+                    "-maxrregcount=50",
+                    "-arch=sm_90a",
+                    "-DNDEBUG"
+                ] + gencode_flags,
+            },
+        ),
+    )
+
+run(setup_fused_quant_ops)
 run(setup_fast_ln)
 run(setup_fused_ln)
