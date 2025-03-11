@@ -58,12 +58,7 @@ void MoeDispatchKernel(const paddle::Tensor& input,
                           moe_topk));
   }
 
-  paddle::Tensor finished_tensor =
-      GetEmptyTensor({num_rows}, paddle::DataType::BOOL, place);
-  paddle::experimental::fill(finished_tensor, false);
-  bool* finished = finished_tensor.data<bool>();
-
-
+  bool* finished = nullptr;
   const int num_moe_inputs = AlignTo16(num_rows * moe_topk);
   const int bytes = num_moe_inputs * sizeof(int);
 
@@ -92,6 +87,7 @@ void MoeDispatchKernel(const paddle::Tensor& input,
   if (group_moe) {
     paddle::Tensor softmax_max_prob_tensor =
         GetEmptyTensor({num_rows, moe_topk}, paddle::DataType::FLOAT32, place);
+    // (TODO: check fill sucess ?)
     paddle::experimental::fill(softmax_max_prob_tensor, 0.f);
     softmax_max_prob = softmax_max_prob_tensor.data<float>();
   }
@@ -106,8 +102,6 @@ void MoeDispatchKernel(const paddle::Tensor& input,
   if (!is_pow_2 || expert_num > 256 || group_moe) {
     softmax_buffer = GetEmptyTensor(
         {num_rows * expert_num}, paddle::DataType::FLOAT32, place);
-
-
     softmax_out_ = softmax_buffer.data<float>();
   } else {
     softmax_out_ = nullptr;
@@ -146,8 +140,8 @@ void MoeDispatchKernel(const paddle::Tensor& input,
 
 
   initialize_moe_routing_kernelLauncher(
-      input.data<data_t>(),           // check
-      permute_input->data<data_t>(),  // check
+      input.data<data_t>(),
+      permute_input->data<data_t>(),
       permuted_rows_,
       permute_indices_per_token->data<int32_t>(),
       num_rows,
@@ -159,7 +153,7 @@ void MoeDispatchKernel(const paddle::Tensor& input,
 
   compute_total_rows_before_expert<data_t>(
       permuted_experts_,
-      input.data<data_t>(),  // check
+      input.data<data_t>(),
       moe_topk * num_rows,
       expert_num,
       token_nums_per_expert->data<int64_t>(),

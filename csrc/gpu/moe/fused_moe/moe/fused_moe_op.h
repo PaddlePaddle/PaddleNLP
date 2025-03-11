@@ -162,7 +162,8 @@ __launch_bounds__(TPB) __global__ void moe_top_k(const T* inputs_after_softmax,
     return;
   }
 
-  const bool should_process_row = finished ? !finished[block_row] : true;
+  // const bool should_process_row = finished ? !finished[block_row] : true;
+  const bool should_process_row = true;
   const int thread_read_offset = block_row * num_experts;
 
   for (int k_idx = 0; k_idx < k; ++k_idx) {
@@ -221,9 +222,9 @@ __launch_bounds__(TPB) __global__ void moe_softmax(const T* input,
   float threadData(-FLT_MAX);
 
   // Don't touch finished rows.
-  if ((finished != nullptr) && finished[globalIdx]) {
-    return;
-  }
+  // if ((finished != nullptr) && finished[globalIdx]) {
+  //   return;
+  // }
 
   for (int ii = threadIdx.x; ii < num_cols; ii += TPB) {
     const int idx = thread_row_offset + ii;
@@ -279,7 +280,8 @@ __launch_bounds__(TPB) __global__ void moe_top_k(const T* inputs_after_softmax,
     return;
   }
 
-  const bool should_process_row = finished ? !finished[block_row] : true;
+  // const bool should_process_row = finished ? !finished[block_row] : true;
+  const bool should_process_row = true;
   const int thread_read_offset = block_row * num_experts;
 
   for (int k_idx = 0; k_idx < k; ++k_idx) {
@@ -397,7 +399,8 @@ __launch_bounds__(WARPS_PER_CTA* WARP_SIZE) __global__
 
   // Threads with indices out of bounds should early exit here.
   if (thread_row >= num_rows) return;
-  const bool should_process_row = finished ? !finished[thread_row] : true;
+  // const bool should_process_row = finished ? !finished[thread_row] : true;
+  const bool should_process_row = true;
 
   // We finally start setting up the read pointers for each thread. First, each
   // thread jumps to the start of the row it will read.

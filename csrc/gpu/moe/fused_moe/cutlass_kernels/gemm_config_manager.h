@@ -244,7 +244,8 @@ class GemmConfigManager {
     return ++v;
   }
 
-  int getMaxProfileM() const { return 1024; }
+  // 设置最大m为8192
+  int getMaxProfileM() const { return 8192; }
 
   bool loadFromJson(const std::string& filename) {
     std::ifstream inFile(filename);

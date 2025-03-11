@@ -116,9 +116,9 @@ static std::vector<CutlassGemmConfig> get_candidate_configs(
                           is_moe);
 
   std::vector<CutlassGemmConfig> candidate_configs;
-  const int min_stages = 3;
+  const int min_stages = 2;
   // Note(yuanlehome): max_stages must smaller than 5!
-  const int max_stages = sm >= 80 ? 4 : 2;
+  const int max_stages = sm >= 80 ? 5 : 2;
 
   for (const auto& tile_config : tiles) {
     for (int stages = min_stages; stages <= max_stages; ++stages) {
