@@ -44,7 +44,6 @@
 
 #include "cutlass_kernels/cutlass_heuristic.h"
 #include "cutlass_kernels/gemm_config_manager.h"
-#include "paddle/phi/kernels/fusion/cutlass/utils/cuda_utils.h"
 
 #include "helper.h"
 
@@ -944,7 +943,7 @@ void MoeGemmRunner<T, WeightType>::run_gemm<EpilogueTag>(
   static constexpr bool is_weight_only = !std::is_same<T, WeightType>::value;
   static constexpr bool only_simt_configs = std::is_same<T, float>::value;
   std::vector<CutlassGemmConfig> candidate_configs = get_candidate_configs(
-      sm_, -1, is_weight_only, false, only_simt_configs, true);
+      sm_, -1, is_weight_only, only_simt_configs, true);
   static constexpr int warm_time = 5;
   static constexpr int test_time = 10;
   auto& gemmConfigManager = GemmConfigManager::Instance();
