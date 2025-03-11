@@ -213,9 +213,6 @@ class Config:
 
     def _get_download_model(self, model_type="default"):
         env = os.environ
-        model_name=env.get("model_name")
-        if not model_name:
-            raise Exception(f"Model Dir is empty")
         # Define supported model patterns
         supported_patterns = [
             r".*Qwen.*", 
@@ -257,15 +254,8 @@ class Config:
         Returns:
             dict: the config file
         """
-        model_config_json = None
-        try:
-            model_config_json = json.load(open(self.model_config_path, "r", encoding="utf-8"))
-        except:
-            try:
-                self._get_download_model()
-                model_config_json = json.load(open(self.model_config_path, "r", encoding="utf-8"))
-            except:
-                raise
+        
+        model_config_json = json.load(open(self.model_config_path, "r", encoding="utf-8"))
         return model_config_json
 
     def get_speculate_config(self):
@@ -324,12 +314,17 @@ class Config:
         from server.utils import get_logger
 
         logger = get_logger("model_server", "infer_config.log")
+        env = os.environ
+        model_name=env.get("model_name")
+        if model_name:
+            self._get_download_model()
+
         config = self.get_model_config()
 
         # check paddle nlp version
         tag = os.getenv("tag")
         if tag not in config["paddlenlp_version"]:
-            raise Exception(f"Current image paddlenlp version {tag} doesn't match the model paddlenlp version {config['paddlenlp_version']} ")
+            logger.warning(f"Current image paddlenlp version {tag} doesn't match the model paddlenlp version {config['paddlenlp_version']} ")
 
         def reset_value(self, value_name, key, config):
             if key in config:
@@ -342,7 +337,7 @@ class Config:
         reset_value(self, "return_full_hidden_states", "return_full_hidden_states", config)
         reset_value(self, "dtype", "infer_model_dtype", config)
         reset_value(self, "use_cache_kv_int8", "infer_model_cachekv_int8_type", config)
-        if self.use_cache_kv_int8 == "null":
+        if self.use_cache_kv_int8 == None:
             self.use_cache_kv_int8 = 0
         else:
             self.use_cache_kv_int8 = 1

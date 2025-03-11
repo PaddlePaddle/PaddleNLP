@@ -16,7 +16,7 @@ export MODEL_PATH=${MODEL_PATH:-$PWD}
 export model_name=${model_name:-"meta-llama/Meta-Llama-3-8B-Instruct-Block-Attn/float16"}
 docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
 -v $MODEL_PATH:/models -e "model_name=${model_name}" \ 
--dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda118-cudnn8-v1.0 /bin/bash \
+-dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda118-cudnn8-v2.1 /bin/bash \
 -c -ex 'start_server $model_name && tail -f /dev/null'
 ```
 
@@ -45,7 +45,7 @@ curl 127.0.0.1:9965/v1/chat/completions \
 
 为了方便部署，我们提供了 cuda12.4 与 cuda 11.8 的镜像，可以直接拉取镜像，或者使用我们提供的 `Dockerfile` [构建自定义镜像](#基于 dockerfile 创建自己的镜像)
 ```
-docker pull ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v1.0
+docker pull ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.1
 ```
 
 ### 准备模型
@@ -62,11 +62,36 @@ cd /home/workspace/models_dir
 # ├── xxxx.model                 # 词表模型文件
 # ├── special_tokens_map.json    # 词表配置文件
 # ├── tokenizer_config.json      # 词表配置文件
-# ├── rank_mapping.csv           # 多卡模型会有此文件，如为单卡模型，则无此文件（可选，仅在多卡部署模式下需要）
 # └── rank_0                     # 保存模型结构和权重文件的目录
 #     ├── model.pdiparams
 #     └── model.pdmodel 或者 model.json # Paddle 3.0 版本模型为model.json，Paddle 2.x 版本模型为model.pdmodel
 ```
+
+#### 静态图下载
+
+除了支持通过设置`model_name` 在启动时进行自动下载，服务提供脚本可以进行自行下载
+
+脚本所在路径`/opt/output/download_model.py`
+
+```
+python download_model.py \
+--model_name $model_name \
+--dir $MODEL_PATH \
+--nnodes 2 \
+--mode "master" \
+--speculate_model_path $MODEL_PATH 
+```
+
+**参数说明**
+
+| 字段名 | 字段类型 | 说明 | 是否必填 | 默认值 |
+| :---: | :-----: | :---: | :---: | :-----: |
+| model_name | str | 为指定下载模型名称，具体支持模型可查看[文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/static_models.md) | 否 | deepseek-ai/DeepSeek-R1/weight_only_int4 |
+| dir | str | 模型存储地址 | 否 | downloads |
+| nnodes | int | 节点个数 | 否 | 1 |
+| mode | str | 下载模式用于区分多机的不同节点 | 否 | 仅支持 master 和 slave 两个值 |
+| speculate_model_path | str | 投机解码模型存储路径 | 否 | None |
+
 
 ### 创建容器
 
@@ -81,7 +106,7 @@ docker run --gpus all \
     --network=host \
     --shm-size=5G \
     -v /home/workspace/models_dir:/models/ \
-    -dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v1.0 bash
+    -dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.1 bash
 
 # 进入容器，检查GPU环境和模型挂载是否正常
 docker exec -it paddlenlp_serving /bin/bash

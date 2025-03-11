@@ -3,18 +3,21 @@ import os
 from tqdm import tqdm
 import argparse
 import hashlib
+import re
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="download models")
-    parser.add_argument('-u', '--url', required=True,
-                        help="downloadfiles")
+    parser.add_argument('-m', '--model_name', default='deepseek-ai/DeepSeek-R1/weight_only_int4',
+                       help="model_name")
     parser.add_argument('-d', '--dir', default='downloads',
                        help="save dir")
-    parser.add_argument('-m', '--model_name', default='file_list.txt',
-                       help="model_name")
-
+    parser.add_argument('-n', '--nnodes', type=int, default=1,
+                       help="the number of node")
+    parser.add_argument('-M', '--mode', default="master", choices=["master", "slave"],
+                       help="only support in 2 nodes model. There are two modes, master or slave.")
+    parser.add_argument('-s', '--speculate_model_path', default=None,
+                       help="speculate model path")
     return parser.parse_args()
-
 
 def calculate_md5(file_path, chunk_size=8192):
     hasher = hashlib.md5()
@@ -25,7 +28,6 @@ def calculate_md5(file_path, chunk_size=8192):
 
 def download_file(url, save_path, md5sum):
     """download file"""
-
     try:
         with requests.get(url, stream=True) as response:
             response.raise_for_status()
@@ -73,8 +75,8 @@ def download_from_txt(base_url, save_dir):
         files_name = response.text.splitlines()
         files_name  = [file.strip() for file in files_name if file.strip()]
 
-        md5sum = [file_name.split(':')[-1] for file_name in files_name]
-        file_name = [file_name.split(':')[0] for file_name in files_name]
+        md5sum = [file_name.rsplit(':', 1)[-1] for file_name in files_name]
+        file_name = [file_name.rsplit(':', 1)[0] for file_name in files_name]
 
         if not files_name:
             print("No valid files found.")
@@ -82,30 +84,66 @@ def download_from_txt(base_url, save_dir):
 
         print(f"Found {len(files_name)} files")
 
-
         for i in range(len(file_name)): 
             cur_url = base_url + f"/{file_name[i]}"
-            path = download_file(cur_url, save_dir+f"/{file_name[i]}", md5sum[i])
+            path = download_file(cur_url, os.path.join(save_dir, file_name[i]), md5sum[i])
             if path:
                 print(f"[✓] Success: {path}")
             else:
                 print(f"[×] Failed: {cur_url}")
-    except Exception as e:
-        raise Exception(f"Failed to get model {file_name} from {base_url}, please recheck the model name from https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/static_models.md")
-
+    except requests.exceptions.RequestException as e:
+        raise Exception(f"Failed to download file list from {txt_url}: {str(e)}")
 
 def main():
     args = parse_arguments()
     print(f"Save Path: {os.path.abspath(args.dir)}")
 
     # make dir
-    os.makedirs(args.dir, exist_ok=True)
+    path = os.path.join(args.dir, args.model_name)
+    os.makedirs(path, exist_ok=True)
 
-    # download from txt
-    download_from_txt(args.url, args.dir, args.model_name)
+    model_name = args.model_name
+    env = os.environ
+    # Define supported model patterns
+    supported_patterns = [
+        r".*Qwen.*", 
+        r".+Llama.+",
+        r".+Mixtral.+", 
+        r".+DeepSeek.+",
+    ]
+    
+    # Check if model_name matches any supported pattern
+    if not any(re.match(pattern, model_name) for pattern in supported_patterns):
+        raise ValueError(
+            f"{model_name} is not in the supported list. Currently supported models: Qwen, Llama, Mixtral, DeepSeek. Please check the model name from this document https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/static_models.md"
+        )
+    print(f"Start downloading model: {model_name}")
+    tag = env.get("tag")
+    base_url = f"https://paddlenlp.bj.bcebos.com/models/static/{tag}/{model_name}"
+    temp_file = None
+    if args.nnodes == 1:
+        temp_file = "model"
+    elif args.nnodes > 1:
+        if args.mode == "master":
+            temp_file = "node1"
+        elif args.mode == "slave":
+            temp_file = "node2"
+        else:
+            raise ValueError(f"Invalid mode: {args.mode}. Mode must be 'master' or 'slave'.")
+    else:
+        raise ValueError(f"Invalid nnodes: {args.nnodes}. nnodes must be >= 1.")
+
+    if temp_file:
+        model_url = base_url + f"/{temp_file}"
+        download_from_txt(model_url, path)
+    else:
+        print(f"Don't support download the {model_name} in mode {args.mode}")
+
+    if args.speculate_model_path:
+        os.makedirs(args.speculate_model_path, exist_ok=True)
+        print(f"Start downloading mtp model: {model_name}")
+        model_url = base_url + "/mtp"
+        download_from_txt(model_url, args.speculate_model_path)
 
 if __name__ == "__main__":
     main()
-
-
-

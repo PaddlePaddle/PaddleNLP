@@ -74,6 +74,7 @@ struct Params {
     alignas(16) IdType *padding_offsets;
 
     alignas(16) IdType *batch_ids;
+    alignas(16) IdType *q_tile_ids_per_batch = nullptr;
     alignas(16) IdType *tile_ids_per_batch;
     alignas(16) IdType *num_blocks_x;
 
@@ -206,6 +207,7 @@ MLAWithKVCacheKernel(CUTE_GRID_CONSTANT
     for (int i = blockIdx.x; i < num_blocks_x; i += SM_COUNT) {
       const int bid = mainloop_params.batch_ids[i];
       const int tile_id = mainloop_params.tile_ids_per_batch[i];
+      const int q_tile_id = mainloop_params.q_tile_ids_per_batch ? mainloop_params.q_tile_ids_per_batch[i] : 0;
       const int seq_len_now = mainloop_params.seq_lens_this_time[bid];
       const int seq_len_encoder_now = mainloop_params.seq_lens_encoder[bid];
       const int seq_len_decoder_now = mainloop_params.seq_lens_decoder[bid] + seq_len_now;
@@ -220,7 +222,8 @@ MLAWithKVCacheKernel(CUTE_GRID_CONSTANT
           smem_pipe_write_q,
           shared_storage,
           threadIdx.x,
-          bid);
+          bid,
+          q_tile_id);
 
       if constexpr (!use_tma_load_kv) {
         // load kv
@@ -263,6 +266,7 @@ MLAWithKVCacheKernel(CUTE_GRID_CONSTANT
       clear(attention_updater.scores_scale);
       const int bid = mainloop_params.batch_ids[i];
       const int tile_id = mainloop_params.tile_ids_per_batch[i];
+      const int q_tile_id = mainloop_params.q_tile_ids_per_batch ? mainloop_params.q_tile_ids_per_batch[i] : 0;
       const int seq_len_now = mainloop_params.seq_lens_this_time[bid];
       const int seq_len_encoder_now = mainloop_params.seq_lens_encoder[bid];
       const int seq_len_decoder_now = mainloop_params.seq_lens_decoder[bid] + seq_len_now;
@@ -284,6 +288,7 @@ MLAWithKVCacheKernel(CUTE_GRID_CONSTANT
           seq_len_decoder_now,
           seq_len_now,
           tile_id,
+          q_tile_id,
           shared_storage);
       } else if (BLOCK_SHAPE_KV == 32) {
         mma_f16_two_stages<Ktraits, CAUSAL>(
@@ -299,6 +304,7 @@ MLAWithKVCacheKernel(CUTE_GRID_CONSTANT
           seq_len_decoder_now,
           seq_len_now,
           tile_id,
+          q_tile_id,
           shared_storage);
       }
 
@@ -314,6 +320,7 @@ MLAWithKVCacheKernel(CUTE_GRID_CONSTANT
           seq_len_now,
           start_token_idx,
           tile_id,
+          q_tile_id,
           seq_len_decoder_now,
           mainloop_params.chunk_size,
           mainloop_params.max_draft_token_num,
@@ -351,6 +358,7 @@ cudaError_t BatchMLAWithPagedKVCacheKernelTraitsDispatched(Params& params,
       params.cumsum_q_seqlens,
       params.batch_ids,
       params.tile_ids_per_batch,
+      params.q_tile_ids_per_batch,
       params.num_blocks_x,
       params.sm_scale,
       params.bsz,
@@ -424,21 +432,39 @@ template <uint32_t HEAD_DIM_QK, uint32_t HEAD_DIM_VO, typename NV_TYPE, typename
 cudaError_t BatchMLAWithPagedKVCacheDispatched(Params& params, cudaStream_t stream) {
   constexpr bool CAUSAL = true;
   if constexpr (HEAD_DIM_QK == 576) {
-    DISPATCH_GROUP_SIZE(params.q_num_head, GROUP_SIZE,
-      BatchMLAWithPagedKVCacheKernelTraitsDispatched<
-          AttentionKernelTraits</*USE_TMA_LOAD_KV=*/false, 
-                                HEAD_DIM_QK, 
-                                HEAD_DIM_VO, 
-                                GROUP_SIZE,
-                                /*BLOCK_SHAPE_Q_=*/64,
-                                /*BLOCK_SHAPE_KV_=*/64,
-                                /*NUM_STAGES_=*/2, 
-                                typename Params::DTypeQ,
-                                typename Params::DTypeKV, 
-                                typename Params::DTypeO,
-                                typename Params::IdType, 
-                                NV_TYPE>,
-          CAUSAL>(params, stream);)
+    if (params.block_size == 32) {
+      DISPATCH_GROUP_SIZE(params.q_num_head, GROUP_SIZE,
+        BatchMLAWithPagedKVCacheKernelTraitsDispatched<
+            AttentionKernelTraits</*USE_TMA_LOAD_KV=*/true, 
+                                  HEAD_DIM_QK, 
+                                  HEAD_DIM_VO, 
+                                  GROUP_SIZE,
+                                  /*BLOCK_SHAPE_Q_=*/64,
+                                  /*BLOCK_SHAPE_KV_=*/32,
+                                  /*NUM_STAGES_=*/4, 
+                                  typename Params::DTypeQ,
+                                  typename Params::DTypeKV, 
+                                  typename Params::DTypeO,
+                                  typename Params::IdType,
+                                  NV_TYPE>,
+            CAUSAL>(params, stream);)
+    } else if (params.block_size == 64) {
+      DISPATCH_GROUP_SIZE(params.q_num_head, GROUP_SIZE,
+        BatchMLAWithPagedKVCacheKernelTraitsDispatched<
+            AttentionKernelTraits</*USE_TMA_LOAD_KV=*/false, 
+                                  HEAD_DIM_QK, 
+                                  HEAD_DIM_VO, 
+                                  GROUP_SIZE,
+                                  /*BLOCK_SHAPE_Q_=*/64,
+                                  /*BLOCK_SHAPE_KV_=*/64,
+                                  /*NUM_STAGES_=*/2, 
+                                  typename Params::DTypeQ,
+                                  typename Params::DTypeKV, 
+                                  typename Params::DTypeO,
+                                  typename Params::IdType,
+                                  NV_TYPE>,
+            CAUSAL>(params, stream);)
+    }
   } else {
     return cudaErrorNotSupported;
   }

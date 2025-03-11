@@ -869,6 +869,7 @@ class GLMForConditionalGeneration(GLMPretrainedModel):
                 loss = (1 - label_smoothing) * loss + label_smoothing * smooth_loss
             if loss_mask is not None:
                 loss_mask = loss_mask.reshape([-1])
+                loss_mask = paddle.cast(loss_mask, dtype="float32")
                 loss = paddle.sum(loss.reshape([-1]) * loss_mask) / paddle.sum(loss_mask)
 
         if not return_dict:

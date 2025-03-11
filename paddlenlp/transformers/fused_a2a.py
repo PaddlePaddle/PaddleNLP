@@ -58,10 +58,7 @@ def get_buffer(group: Group, hidden_bytes: int):
     ):
         # Split long line for PEP8 compliance
         num_nvl_bytes = max(config.get_nvl_buffer_size_hint(hidden_bytes, group.world_size), num_nvl_bytes)
-        # TODO(umiswing): support internode
-        # num_rdma_bytes = max(
-        #     config.get_rdma_buffer_size_hint(hidden_bytes, group.world_size), num_rdma_bytes
-        # )
+        num_rdma_bytes = max(config.get_rdma_buffer_size_hint(hidden_bytes, group.world_size), num_rdma_bytes)
 
     # Allocate buffer if not existed or not enough buffer
     # NOTES: the adaptive routing configuration of the network **must be off**
