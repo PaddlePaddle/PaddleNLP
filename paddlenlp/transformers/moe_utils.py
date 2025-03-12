@@ -14,15 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional
-
 import paddle
 
 
 def permute(
     tokens,
     routing_map,
-    num_out_tokens: Optional[int] = None,
     drop_and_pad: bool = False,
 ):
     """Permute the tokens and probs based on the mask.
@@ -33,8 +30,6 @@ def permute(
     Args:
         tokens (paddle.Tensor): The input token tensor, [num_tokens, hidden].
         routing_map (paddle.Tensor): The sparse token to expert mapping, [num_tokens, num_experts].
-        num_out_tokens (int, optional): The number of output tokens. If None, it's set to
-                                        the number of input tokens.
         drop_and_pad (bool, optional): Whether or not the token dispatcher uses token-drop
                                        and pads the number of tokens to the expert capacity.
     """

@@ -314,9 +314,16 @@ class MoEFlexTokenLayer(nn.Layer):
         _, _, d_model = hidden_states.shape
         # reshaped_input = hidden_states.reshape([-1, d_model])
         probs, routing_map, l_aux, l_zloss = self.router(hidden_states)
-        (dispatched_input, tokens_per_expert) = self.token_dispatcher.token_permutation(
-            hidden_states, probs, routing_map
-        )
+        (
+            dispatched_input,
+            tokens_per_expert,
+            reversed_mapping_for_combine,
+            dispatched_routing_map,
+            dispatched_probs,
+            handle,
+        ) = self.token_dispatcher.token_permutation(hidden_states, probs, routing_map)
         expert_output = self.expert_forward(dispatched_input, tokens_per_expert)
-        output, _ = self.token_dispatcher.token_unpermutation(expert_output, None)
+        output, _ = self.token_dispatcher.token_unpermutation(
+            expert_output, reversed_mapping_for_combine, dispatched_routing_map, dispatched_probs, handle, None
+        )
         return output, l_aux, l_zloss
