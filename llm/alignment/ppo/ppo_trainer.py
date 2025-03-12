@@ -42,13 +42,13 @@ from comm_utils import (
     reload_tensor_to_gpu,
 )
 from infer_utils import InferEvalModel, infer_guard
-from models.ppo_model_utils import (
+from models.ppo_model_utils import (  # make_attention_mask,; make_position_ids,
     RLHFPPOMixedLoss,
     RLHFValueLoss,
     create_loss,
+    create_startend_row_indices,
     gather_log_probabilities,
-    make_attention_mask,
-    make_position_ids,
+    make_position_ids_from_input_ids,
 )
 from paddle import nn
 from paddle.distributed import fleet
@@ -1231,11 +1231,8 @@ class PPOTrainer(Trainer):
         inputs = self._prepare_inputs(inputs)
         with self.enable(self.actor_model, self.reference_model, self.policy_trainer):
             with infer_guard(self.policy_trainer):
-                position_ids = inputs.get("position_ids", make_position_ids(inputs["attention_mask"]))
                 prompt_only_batch = {
                     "input_ids": inputs["input_ids"],
-                    "attention_mask": inputs["attention_mask"],
-                    "position_ids": position_ids,
                     **({"label_ids": inputs["label_ids"]} if self.args.use_rm_server else {}),
                 }
                 generated_seq = self.generate(prompt_only_batch, do_eval=True)[0]["input_ids"]
@@ -1259,18 +1256,14 @@ class PPOTrainer(Trainer):
                         dest_tokenizer=self.reward_tokenizer,
                     )
                     reward_input_ids = reward_tokenize_output["input_ids"]
-                    reward_attention_mask = reward_tokenize_output["attention_mask"]
+                    # reward_attention_mask = reward_tokenize_output["attention_mask"]
                     reward_position_ids = reward_tokenize_output["position_ids"]
                 else:
                     reward_input_ids = seq
-                    reward_attention_mask = make_attention_mask(
-                        seq,
-                        pad_id=self.reward_tokenizer.pad_token_id,
-                        eos_id=self.reward_tokenizer.eos_token_id,
-                        unk_id=self.reward_tokenizer.unk_token_id,
-                        causal_mask=True,
+                    reward_attention_mask = None
+                    reward_position_ids = make_position_ids_from_input_ids(
+                        reward_attention_mask, self.reward_tokenizer.pad_token_id
                     )
-                    reward_position_ids = make_position_ids(reward_attention_mask)
 
                 # .end_scores
                 reward_score = self.reward_model(
@@ -2101,9 +2094,8 @@ class PPOTrainer(Trainer):
     def rl_step(self, rl_batch: Dict[str, paddle.Tensor]) -> Dict[str, Any]:
         # inputs shared by policy and value trainer
         input_ids = rl_batch["input_ids"].contiguous()  # length: src+tgt
-        attention_mask = rl_batch["attention_mask"]  # length: src+tgt
         position_ids = rl_batch["position_ids"]  # length: src+tgt
-        sequence_mask = rl_batch["sequence_mask"]  # length: src+tgt(-1)
+        sequence_mask = rl_batch["eos_mask"]  # length: src+tgt(-1)
         if self.args.use_fp32_compute and sequence_mask.dtype != paddle.float32:
             sequence_mask = sequence_mask.cast(paddle.float32)
         # inputs used by policy trainer
@@ -2112,14 +2104,15 @@ class PPOTrainer(Trainer):
 
         response_start = rl_batch["prompt"].shape[-1] - 1
 
+        attn_mask_startend_row_indices = create_startend_row_indices(input_ids, self.tokenizer.pad_token_id)
         policy_trainer_inputs = {
             "input_ids": input_ids,
-            "attention_mask": attention_mask,
             "position_ids": position_ids,
             "old_log_probs": old_log_probs,
             "reward_advantages": reward_advantages,
             "sequence_mask": sequence_mask[:, response_start:],
             "response_start": response_start,
+            "attn_mask_startend_row_indices": attn_mask_startend_row_indices,
         }
 
         if self.args.rl_algorithm == "grpo":
@@ -2394,28 +2387,12 @@ class PPOTrainer(Trainer):
                     return_attention_mask=False,
                 )["input_ids"]
 
-                sequence_mask = make_attention_mask(
-                    input_ids,
-                    pad_id=self.tokenizer.pad_token_id,
-                    eos_id=None,
-                    unk_id=self.tokenizer.unk_token_id,
-                    causal_mask=False,
-                ).cast(self._model_config.dtype)
-                attention_mask = make_attention_mask(
-                    input_ids,
-                    pad_id=self.tokenizer.pad_token_id,
-                    eos_id=None,
-                    unk_id=self.tokenizer.unk_token_id,
-                    causal_mask=True,
-                ).cast(self._model_config.dtype)
-                position_ids = make_position_ids(attention_mask)
+                position_ids = make_position_ids_from_input_ids(input_ids)
                 prompt = prompt_only_batch["input_ids"][i : i + per_device_train_batch_size]
 
                 micro_batch = {
                     "prompt": prompt,
                     "input_ids": input_ids,
-                    "sequence_mask": sequence_mask,
-                    "attention_mask": attention_mask,
                     "position_ids": position_ids,
                     "index": indices[i : i + per_device_train_batch_size],
                     **(
@@ -2467,29 +2444,29 @@ class PPOTrainer(Trainer):
     def generate(self, prompt_only_batch: Dict, do_eval=False) -> List[Dict[str, Any]]:
         """Rollout a batch of experiences."""
         input_ids = prompt_only_batch["input_ids"]
-        attention_mask = prompt_only_batch["attention_mask"]
+        # attention_mask = prompt_only_batch["attention_mask"]
         if do_eval:
             train_num_return_sequences = self.args.num_return_sequences
             self.args.num_return_sequences = 1
 
-        position_ids = (
-            prompt_only_batch["position_ids"]
-            if "position_ids" in prompt_only_batch
-            else make_position_ids(attention_mask)
-        )
+        # position_ids = (
+        #     prompt_only_batch["position_ids"]
+        #     if "position_ids" in prompt_only_batch
+        #     else make_position_ids(attention_mask)
+        # )
 
         if self.args.num_return_sequences > 1:
             input_ids = input_ids.repeat_interleave(self.args.num_return_sequences, axis=0)
-            raw_dtype = attention_mask.dtype
-            attention_mask = (
-                attention_mask.cast("int32").repeat_interleave(self.args.num_return_sequences, axis=0).cast(raw_dtype)
-            )
-            position_ids = position_ids.repeat_interleave(self.args.num_return_sequences, axis=0)
+            # raw_dtype = attention_mask.dtype
+            # attention_mask = (
+            #     attention_mask.cast("int32").repeat_interleave(self.args.num_return_sequences, axis=0).cast(raw_dtype)
+            # )
+            # position_ids = position_ids.repeat_interleave(self.args.num_return_sequences, axis=0)
 
         sequences = self.actor_model.generate(
             input_ids=input_ids,
-            attention_mask=attention_mask,
-            position_ids=position_ids,
+            attention_mask=None,
+            position_ids=None,
             generation_config=self.generation_config,
             synced_gpus=ShardingOption.FULL_SHARD in self.policy_trainer.args.sharding,
             do_eval=do_eval,
@@ -2513,20 +2490,20 @@ class PPOTrainer(Trainer):
                 "input_ids": seq,
                 **({"label_ids": label_ids[idx * len(seq) : (idx + 1) * len(seq)]} if self.args.use_rm_server else {}),
                 "index": np.array([str(uuid.uuid4())] * len(seq), dtype=object),
-                "attention_mask": make_attention_mask(
-                    seq,
-                    pad_id=self.tokenizer.pad_token_id,
-                    eos_id=None,
-                    unk_id=self.tokenizer.unk_token_id,
-                    causal_mask=True,
-                ).cast(self._model_config.dtype),
-                "sequence_mask": make_attention_mask(
-                    seq,
-                    pad_id=self.tokenizer.pad_token_id,
-                    eos_id=None,
-                    unk_id=self.tokenizer.unk_token_id,
-                    causal_mask=False,
-                ).cast(self._model_config.dtype),
+                # "attention_mask": make_attention_mask(
+                #     seq,
+                #     pad_id=self.tokenizer.pad_token_id,
+                #     eos_id=None,
+                #     unk_id=self.tokenizer.unk_token_id,
+                #     causal_mask=True,
+                # ).cast(self._model_config.dtype),
+                # "sequence_mask": make_attention_mask(
+                #     seq,
+                #     pad_id=self.tokenizer.pad_token_id,
+                #     eos_id=None,
+                #     unk_id=self.tokenizer.unk_token_id,
+                #     causal_mask=False,
+                # ).cast(self._model_config.dtype),
             }
             for idx, seq in enumerate(sequences)
         ]
@@ -2535,7 +2512,6 @@ class PPOTrainer(Trainer):
     def rollout_logprob(
         self,
         input_ids: paddle.Tensor,
-        attention_mask: paddle.Tensor,
         position_ids: paddle.Tensor = None,
         **kwargs,
     ) -> Dict[str, paddle.Tensor]:
@@ -2564,20 +2540,20 @@ class PPOTrainer(Trainer):
         """
         # pipe model outputs a logits tensor with LMHead, while non-pipe model
         # outputs a tuple with logits tensor as the only one element.
-
+        startend_row_indices = create_startend_row_indices(input_ids, self.tokenizer.pad_token_id)
         response_start = kwargs["prompt"].shape[-1] - 1 if "prompt" in kwargs else 0
         logits = self.actor_model(
             input_ids,
-            attention_mask=attention_mask,
             position_ids=position_ids,
+            attn_mask_startend_row_indices=startend_row_indices,
             # return_dict=True,
         )  # .logits
         if not isinstance(logits, paddle.Tensor):
             logits = logits[0]  # [2, 355, 12544]
         ref_logits = self.reference_model(
             input_ids,
-            attention_mask=attention_mask,
             position_ids=position_ids,
+            attn_mask_startend_row_indices=startend_row_indices,
             # return_dict=True,
         )  # .logits
 
@@ -2624,7 +2600,6 @@ class PPOTrainer(Trainer):
     def rollout_logprob_with_batch_size(
         self,
         input_ids: paddle.Tensor,
-        attention_mask: paddle.Tensor,
         position_ids: paddle.Tensor = None,
         **kwargs,
     ) -> Dict[str, paddle.Tensor]:
@@ -2646,6 +2621,8 @@ class PPOTrainer(Trainer):
         num_batches = (batch_size + rollout_logprob_batch_size - 1) // rollout_logprob_batch_size
         response_start = kwargs["prompt"].shape[-1] - 1 if "prompt" in kwargs else 0
 
+        startend_row_indices = create_startend_row_indices(input_ids, self.tokenizer.pad_token_id)
+
         for i in range(num_batches):
             # Calculate the start and end indices for the current batch
             start_index = i * rollout_logprob_batch_size
@@ -2653,12 +2630,15 @@ class PPOTrainer(Trainer):
 
             # Extract the current batch
             current_input_ids = input_ids[start_index:end_index]
-            current_attention_mask = attention_mask[start_index:end_index] if attention_mask is not None else None
+            current_startend_row_indices = (
+                startend_row_indices[start_index:end_index] if startend_row_indices is not None else None
+            )
             current_position_ids = position_ids[start_index:end_index] if position_ids is not None else None
 
             logits = self.actor_model(
                 current_input_ids,
-                attention_mask=current_attention_mask,
+                attention_mask=None,
+                attn_mask_startend_row_indices=current_startend_row_indices,
                 position_ids=current_position_ids,
             )
             if not isinstance(logits, paddle.Tensor):
@@ -2688,7 +2668,8 @@ class PPOTrainer(Trainer):
 
             ref_logits = self.reference_model(
                 current_input_ids,
-                attention_mask=current_attention_mask,
+                attention_mask=None,
+                attn_mask_startend_row_indices=current_startend_row_indices,
                 position_ids=current_position_ids,
             )
 
@@ -2730,7 +2711,6 @@ class PPOTrainer(Trainer):
     def rollout_reward_value(
         self,
         input_ids: paddle.Tensor,
-        attention_mask: paddle.Tensor,
         position_ids: paddle.Tensor = None,
         **kwargs,
     ) -> Dict[str, paddle.Tensor]:
@@ -2758,17 +2738,19 @@ class PPOTrainer(Trainer):
                     dest_tokenizer=self.reward_tokenizer,
                 )
                 reward_input_ids = reward_tokenize_output["input_ids"]
-                reward_attention_mask = reward_tokenize_output["attention_mask"]
                 reward_position_ids = reward_tokenize_output["position_ids"]
             else:
                 reward_input_ids = input_ids
-                reward_attention_mask = attention_mask
                 reward_position_ids = position_ids
 
+            attn_mask_startend_row_indices = create_startend_row_indices(
+                reward_input_ids, self.reward_tokenizer.pad_token_id
+            )
             # .end_scores
             reward_score = self.reward_model(
                 reward_input_ids,
-                attention_mask=reward_attention_mask,
+                attention_mask=None,
+                attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                 position_ids=reward_position_ids,
                 # return_dict=True,
             )[1]
@@ -2786,11 +2768,13 @@ class PPOTrainer(Trainer):
         if self.args.rl_algorithm in ["grpo", "reinforce_plus_plus"]:
             return {"rewards": reward_score}
 
+        attn_mask_startend_row_indices = create_startend_row_indices(input_ids, self.reward_tokenizer.pad_token_id)
         # .scores
         reward_value = self.reward_critic_model(
             input_ids,
-            attention_mask=attention_mask,
+            attention_mask=None,
             position_ids=position_ids,
+            attn_mask_startend_row_indices=attn_mask_startend_row_indices,
             # return_dict=True,
         )[0]
         reward_value = reward_value.squeeze(axis=-1)
@@ -2901,10 +2885,6 @@ class PPOTrainer(Trainer):
 
         for rl_batch in rl_batches:
             prompt = rl_batch["prompt"]  # length: src
-            attention_mask = rl_batch["attention_mask"]  # length: src + tgt
-            if len(attention_mask.shape) == 4:
-                # use padding mask instead of causal mask
-                attention_mask = rl_batch["sequence_mask"]  # length: src + tgt
             old_log_probs = rl_batch["log_probs"]  # length: src + tgt -1
             ref_log_probs = rl_batch["ref_log_probs"]  # length: src + tgt -1
             rewards = rl_batch["rewards"]  # length: 1
@@ -2912,19 +2892,12 @@ class PPOTrainer(Trainer):
                 old_reward_values = rl_batch["reward_values"]  # length: src + tgt -1
 
             start = prompt.shape[-1] - 1
-            # sequence_mask is for label masking, make source be masked out
-            # clone to avoid to change attention_mask
-            sequence_mask = attention_mask[:, 1:].clone()  # length: src + tgt -1
-            if self.args.use_fp32_compute and sequence_mask.dtype != paddle.float32:
-                sequence_mask = sequence_mask.cast(paddle.float32)
-            sequence_mask[:, :start] = False
             eos_mask = (rl_batch["input_ids"] != self.tokenizer.pad_token_id)[:, 1:].to(old_log_probs.dtype)
             if use_tgt_len_value:
                 ref_log_probs = ref_log_probs[:, start:].contiguous()
                 old_log_probs = old_log_probs[:, start:].contiguous()
                 if self.args.rl_algorithm == "ppo":
                     old_reward_values = old_reward_values[:, start:].contiguous()
-                sequence_mask = sequence_mask[:, start:].contiguous()
                 eos_mask = eos_mask[:, start:].contiguous()
             if self.args.rl_algorithm == "grpo":
                 reward_advantages = compute_grpo_advantages(
@@ -2936,12 +2909,12 @@ class PPOTrainer(Trainer):
                     old_log_probs,
                     ref_log_probs,
                     rewards,
-                    sequence_mask,
+                    eos_mask[:, start:],
                 )  # length: tgt if use_tgt_len_value src + tgt -1
                 reward_advantages, reward_returns = self.get_advantages_and_returns(
                     old_reward_values,
                     rewards_with_kl,
-                    sequence_mask,
+                    eos_mask[:, start:],
                     start=0 if use_tgt_len_value else start,
                     use_tgt_len_return=use_tgt_len_value,
                 )  # length: tgt if use_tgt_len_value src + tgt -1
@@ -2965,9 +2938,9 @@ class PPOTrainer(Trainer):
                 {
                     "log_probs": old_log_probs,
                     "reward_advantages": reward_advantages,
-                    "sequence_mask": sequence_mask,
                     "ref_log_probs": ref_log_probs,
                     "rewards": rewards,
+                    "eos_mask": eos_mask,
                 }
             )
             if self.args.rl_algorithm in ["reinforce_plus_plus", "ppo"]:
@@ -2988,9 +2961,8 @@ class PPOTrainer(Trainer):
         if use_advantage_normalization:
             all_advantages_list = []
             for rl_batch in rl_batches:
-                sequence_mask = rl_batch["sequence_mask"].cast(paddle.int64)  # length: src + tgt
                 advantages = rl_batch["reward_advantages"]
-                all_advantages_list.append(advantages[sequence_mask != 0])
+                all_advantages_list.append(advantages[eos_mask[:, start:] != 0])
             all_advantages = paddle.concat(all_advantages_list, axis=0)
             all_advantages = all_advantages.cast(paddle.float32)
 

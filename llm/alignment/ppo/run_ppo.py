@@ -188,6 +188,9 @@ def main():
     actor_model_config.max_position_embeddings = data_args.max_length
     actor_model_config.use_sparse_head_and_loss_fn = False
     actor_model_config.fused_linear = model_args.fused_linear
+    actor_model_config.use_fused_rms_norm = training_args.use_fused_rms_norm
+    actor_model_config.seq_length = data_args.max_length
+    actor_model_config.max_sequence_length = data_args.max_length
     print(f"Loading Actor model with config:\n\t{actor_model_config}\n")
 
     if not training_args.autotuner_benchmark:

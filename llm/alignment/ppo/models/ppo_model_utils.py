@@ -33,6 +33,11 @@ from paddle.distributed.fleet.meta_parallel import ParallelCrossEntropy
 from paddlenlp.transformers import LlamaPretrainingCriterion as PretrainingCriterion
 from paddlenlp.transformers.model_outputs import ModelOutput
 
+try:
+    from paddle.distributed.fleet.utils.sequence_parallel_utils import GatherOp
+except:
+    pass
+
 
 @dataclass
 class PolicyOutput(ModelOutput):
@@ -103,6 +108,11 @@ def create_loss(loss_cls, config, extra_args, info_buffer, merge_labels=None):
         loss_kwargs["info_buffer"] = info_buffer
     loss = loss_cls(config, **loss_kwargs)
     return loss
+
+
+def make_position_ids_from_input_ids(input_ids, pad_token_id=0):
+    position_ids = (input_ids != pad_token_id).cast("int32").cumsum(-1) - 1
+    return position_ids.masked_fill(position_ids < 0, 0)
 
 
 @paddle.no_grad()
@@ -213,6 +223,12 @@ def gather_log_probabilities(logits: paddle.Tensor, labels: paddle.Tensor) -> pa
         reduction="none",
     ).squeeze(axis=-1)
     return -token_loss.cast(logits.dtype)
+
+
+def create_startend_row_indices(input_ids, pad_token_id=0):
+    startend_row_indices = paddle.full(input_ids.shape, input_ids.shape[-1], dtype="int32")
+    mask = (input_ids != pad_token_id).cast("int32").cumsum(-1) == 0
+    return startend_row_indices.masked_fill(mask, 0)
 
 
 class RLHFPPOLoss(nn.Layer):
@@ -405,6 +421,15 @@ class RLHFPPOMixedLoss(nn.Layer):
                 weight = weight.cast(paddle.float32)
                 if bias is not None:
                     bias = bias.cast(paddle.float32)
+            if self.config.tensor_parallel_degree > 1 and self.config.sequence_parallel:
+                hidden_states = GatherOp.apply(hidden_states)
+                hidden_states = hidden_states.reshape(
+                    [
+                        -1,
+                        self.config.seq_length,
+                        hidden_states.shape[-1],
+                    ]
+                )
             hidden_states = hidden_states / self.temperature if self.temperature > 0.0 else hidden_states
             total_loss, pg_loss, entropy_loss, kl_loss = actor_fused_pg_entropy_kl_loss(
                 hidden_states,

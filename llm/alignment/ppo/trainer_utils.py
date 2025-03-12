@@ -61,6 +61,10 @@ class TrainingArguments(TrainingArguments):
         default=None,
         metadata={"help": "The log prob batch size."},
     )
+    use_fused_rms_norm: bool = field(
+        default=False,
+        metadata={"help": "qwen, use_fused_rms_norm"},
+    )
     kl_coeff: float = field(
         default=0.02,
         metadata={"help": "The coefficient for the KL divergence between the reference and actor policy."},
