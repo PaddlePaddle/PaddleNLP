@@ -64,7 +64,7 @@ void BatchMLAWithPagedKVCacheKernel(
     const float quant_max_bound,
     const float quant_min_bound,
     const float in_scale,
-    const int draft_token_num,
+    const int draft_total_token_num,
     const bool causal,
     cudaStream_t& stream,
     paddle::Tensor* out);

@@ -53,7 +53,7 @@ def get_padding_offset(bsz, max_seq_len, seq_lens_this_time):
 
 RUN_TIME = 1
 WARM_UP = 0
-BLOCK_SIZE = 32
+BLOCK_SIZE = 64
 HEAD_DIM_QK = 576
 HEAD_DIM_V = 512
 PE_SIZE = 64
@@ -61,7 +61,7 @@ MAX_LENGTH = 8192
 MAX_DEC_LEN = 1024
 NUM_Q_HEAD = 8
 NUM_KV_HEAD = 1
-dtype = "float16"
+dtype = "bfloat16"
 DRAFT_TOTAL_TOKEN_NUM = 1
 CAUSAL = True
 

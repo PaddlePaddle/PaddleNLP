@@ -258,8 +258,6 @@ MLAWithKVCacheWG4Kernel(CUTE_GRID_CONSTANT
     const int seq_len_now = mainloop_params.seq_lens_this_time[bid];
     const int seq_len_decoder_now = mainloop_params.seq_lens_decoder[bid] + seq_len_now;
     const int start_token_idx = mainloop_params.cumsum_q_seqlens[bid];
-    cutlass::arch::NamedBarrier::sync(Ktraits::NUM_THREADS,
-                                      /*id=*/static_cast<int>(NamedBarriers::kAllWGSync));
     clear(tOrO);
     clear(attention_updater.scores_scale);
     mma_pv_one_stages<Ktraits, CAUSAL>(
