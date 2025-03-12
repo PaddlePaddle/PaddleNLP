@@ -38,4 +38,4 @@ export FLAGS_enable_pir_in_executor=0
 python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
     --log_dir "auto_3d" \
-    run_pretrain_auto.py ./gpt_with_intermediate.json
+    run_pretrain_auto.py ./pretrain_argument.json
