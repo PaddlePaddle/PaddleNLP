@@ -93,15 +93,10 @@ python -u -m paddle.distributed.launch \
 <br>更多可配置参数，请参考`GenerateArgument`, `ModelAutoConfig`, `ReftArgument`, `DataConfig`, `SFTAutoConfig`。
 
 - 动转静模式
-<br>追加`--to_static=true`参数
+<br>追加`to_static`参数
 
 ## 低秩适应（LoRA）
-在 SFT 基础上启用 LoRA 参数：
-```bash
-# 追加以下参数
---lora true \
---lora_rank 8
-```
+在 SFT 基础上启用，开启`lora`, `lora_rank`参数。
 更多的参数，可以参考[model_config.py](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/trl/model_config.py)。
 
 ## DPO
