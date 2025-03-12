@@ -54,19 +54,15 @@ void moe_token_type_ids_kernelLauncher(T *gating_output,
 }
 
 
-
-template <typename T,
-          typename NvType>
+template <typename T, typename NvType>
 class MoeHelper {
- public:
-  MoeHelper(
-            const std::string gemm_method,
+public:
+  MoeHelper(const std::string gemm_method,
             MoeGemmRunner<NvType, NvType> *fp16_moe_gemm_runner,
             MoeGemmRunner<NvType, uint8_t> *int8_moe_gemm_runner,
             MoeGemmRunner<NvType, cutlass::uint4b_t> *int4_moe_gemm_runner,
             int layernum = 0)
-       :
-       gemm_method_(gemm_method),
+      : gemm_method_(gemm_method),
         fp16_moe_gemm_runner_(fp16_moe_gemm_runner),
         int8_moe_gemm_runner_(int8_moe_gemm_runner),
         int4_moe_gemm_runner_(int4_moe_gemm_runner),
@@ -144,7 +140,7 @@ class MoeHelper {
     auto *output_ = output->data<T>();
     auto stream = input->stream();
     auto place = input->place();
-    auto input_type =  input->dtype();
+    auto input_type = input->dtype();
 
     auto input_dims = input->dims();
     auto ffn1_dims = ffn1_weight->dims();
@@ -172,19 +168,19 @@ class MoeHelper {
     const int64_t num_experts = ffn1_dims[0];
     const int64_t k = moe_topk;
 
-    // VLOG(4) << "[MoE Info] "
-    //         << "num_rows: " << num_rows << ", "
-    //         << "hidden_size: " << hidden_size << ", "
-    //         << "inter_size: " << inter_size << ", "
-    //         << "num_experts: " << num_experts << ", "
-    //         << "k: " << k << ", "
-    //         << "group_moe: " << std::boolalpha << group_moe;
+    VLOG(4) << "[MoE Info] "
+            << "num_rows: " << num_rows << ", "
+            << "hidden_size: " << hidden_size << ", "
+            << "inter_size: " << inter_size << ", "
+            << "num_experts: " << num_experts << ", "
+            << "k: " << k << ", "
+            << "group_moe: " << std::boolalpha << group_moe;
 
 
     int64_t bytes =
         getWorkspaceSize<T>(num_rows, hidden_size, inter_size, num_experts, k);
-    
-    // VLOG(4) << "bytes ---- " << bytes;
+
+    VLOG(4) << "bytes ---- " << bytes;
 
     // Pointers
     int *expert_for_source_row;
@@ -198,8 +194,8 @@ class MoeHelper {
     T *fc1_result_;
     float *softmax_out_;
 
-    paddle::Tensor ws_ptr_tensor = 
-         GetEmptyTensor({bytes}, paddle::DataType::INT8, place);
+    paddle::Tensor ws_ptr_tensor =
+        GetEmptyTensor({bytes}, paddle::DataType::INT8, place);
     int8_t *ws_ptr = ws_ptr_tensor.data<int8_t>();
 
     const int64_t buf_size = AlignTo16(k * num_rows * hidden_size);
@@ -230,32 +226,34 @@ class MoeHelper {
 
     bool *finished = nullptr;
 
-    paddle::Tensor expert_scales_float_tensor = 
-      GetEmptyTensor({num_rows, moe_topk}, paddle::DataType::FLOAT32, place);
+    paddle::Tensor expert_scales_float_tensor =
+        GetEmptyTensor({num_rows, moe_topk}, paddle::DataType::FLOAT32, place);
     float *expert_scales_float = expert_scales_float_tensor.data<float>();
 
     float *softmax_max_prob = nullptr;
     if (group_moe) {
-      paddle::Tensor softmax_max_prob_tensor = 
-       GetEmptyTensor({num_rows, moe_topk}, paddle::DataType::FLOAT32, place);
-       // (TODO: check fill sucess ?)
-       paddle::experimental::fill(softmax_max_prob_tensor, 0.f);
-       softmax_max_prob = softmax_max_prob_tensor.data<float>();
+      paddle::Tensor softmax_max_prob_tensor = GetEmptyTensor(
+          {num_rows, moe_topk}, paddle::DataType::FLOAT32, place);
+      // (TODO: check fill sucess ?)
+      paddle::experimental::fill(softmax_max_prob_tensor, 0.f);
+      softmax_max_prob = softmax_max_prob_tensor.data<float>();
     }
 
-    paddle::Tensor fc1_out_tensor = GetEmptyTensor(
-      {num_rows * k, inter_size}, input_type, place);
+    paddle::Tensor fc1_out_tensor =
+        GetEmptyTensor({num_rows * k, inter_size}, input_type, place);
     T *fc1_out = fc1_out_tensor.data<T>();
 
     VLOG(4) << " gemm method is :" << gemm_method_
             << ". group_moe is :" << group_moe;
 
-    auto input_cast_tensor = paddle::experimental::cast(*input, paddle::DataType::FLOAT32);
-    auto gate_tensor = paddle::experimental::matmul(input_cast_tensor, *gate_weight);
+    auto input_cast_tensor =
+        paddle::experimental::cast(*input, paddle::DataType::FLOAT32);
+    auto gate_tensor =
+        paddle::experimental::matmul(input_cast_tensor, *gate_weight);
     float *gating_output = gate_tensor.data<float>();
 
     if (moe_token_type_ids) {
-      // VLOG(4) << "moe_token_type_ids is on";
+      VLOG(4) << "moe_token_type_ids is on";
       auto *moe_token_type_ids_out = moe_token_type_ids->data<int>();
       moe_token_type_ids_kernelLauncher<float>(gating_output,
                                                moe_token_type_ids_out,
@@ -311,7 +309,7 @@ class MoeHelper {
                                         total_rows_before_expert_,
                                         stream);
 
-    // VLOG(4) << " ENTER EXPERT \n";
+    VLOG(4) << " ENTER EXPERT \n";
 
     if (gemm_method_ == "weight_only_int8") {
       int8_moe_gemm_runner_->moe_gemm_bias_act(
@@ -359,12 +357,12 @@ class MoeHelper {
     }
 
     if (moe_type == "ffn") {
-      auto act_out_tensor = paddle::experimental::swiglu(fc1_out_tensor, nullptr);
+      auto act_out_tensor =
+          paddle::experimental::swiglu(fc1_out_tensor, nullptr);
       auto act_out = act_out_tensor.data<T>();
 
       paddle::Tensor fc2_output_tensor =
-        GetEmptyTensor(
-        {k * num_rows, hidden_size}, input_type, place);
+          GetEmptyTensor({k * num_rows, hidden_size}, input_type, place);
       T *fc2_result = fc2_output_tensor.data<T>();
 
       if (gemm_method_ == "weight_only_int8") {
@@ -437,10 +435,10 @@ class MoeHelper {
           routed_scaling_factor,
           stream);
     }
-    // VLOG(4) << " Finished EXPERT \n";
+    VLOG(4) << " Finished EXPERT \n";
   }
 
- private:
+private:
   std::string gemm_method_;
   MoeGemmRunner<NvType, NvType> *fp16_moe_gemm_runner_;
   MoeGemmRunner<NvType, uint8_t> *int8_moe_gemm_runner_;
