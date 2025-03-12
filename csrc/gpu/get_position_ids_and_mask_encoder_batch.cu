@@ -63,7 +63,7 @@ void GetPositionIdsAndMaskEncoderBatch(
     const paddle::Tensor& seq_lens_this_time,
     const paddle::Tensor& position_ids,
     const paddle::Tensor& mask_encoder_batch) {
-  const int bsz = seq_lens_encoder.shape()[0];
+  const int bsz = seq_lens_this_time.shape()[0];
 
   GetPositionIdsAndMaskEncoderBatchKernel<<<1, bsz, 0, position_ids.stream()>>>(
       seq_lens_encoder.data<int>(),
