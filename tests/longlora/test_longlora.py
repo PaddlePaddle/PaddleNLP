@@ -70,7 +70,6 @@ class TestSSA(LLMTest, unittest.TestCase):
             output_attentions=False,
             ssa_group_size_ratio=self.ssa_group_size_ratio,
         )
-        print(attn_output.shape)
         self.assertEqual(attn_output.shape, [self.bsz, self.q_len, self.num_heads * self.head_dim])
 
     def test_ssa_attention_values_reasonable(self):
@@ -83,7 +82,6 @@ class TestSSA(LLMTest, unittest.TestCase):
             output_attentions=False,
             ssa_group_size_ratio=self.ssa_group_size_ratio,
         )
-        print(attn_output.shape)
 
         self.assertFalse(paddle.isnan(attn_output).any().item())  # 无NaN
         self.assertFalse(paddle.isinf(attn_output).any().item())  # 无无穷值
