@@ -497,7 +497,7 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_intermediate() {
         --fp16_opt_level "O2" \
         --amp_master_grad 1 \
         --scale_loss 1024 \
-        --pipeline_parallel_degree 2 \
+        --pipeline_parallel_degree 1 \
         --tensor_parallel_degree 2 \
         --sharding_parallel_degree 1 \
         --learning_rate 0.0001 \
@@ -1837,7 +1837,7 @@ function llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2_intermediate
         --output_dir $case_out_dir \
         --split 949,50,1 \
         --to_static true \
-        --pipeline_parallel_degree 2 \
+        --pipeline_parallel_degree 1 \
         --tensor_parallel_degree 2 \
         --virtual_pp_degree 2\
         --pipeline_schedule_mode "1F1B" \
