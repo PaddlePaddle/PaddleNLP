@@ -159,6 +159,7 @@ class TokenProcessor(object):
         # fill some extra information
         result["token_ids"] = []
         for token_id in token_ids:
+            self.number_of_output_tokens += 1
             if token_id in task["eos_token_ids"]:
                 result["is_end"] = 1
                 result["send_idx"] = self.tokens_counter[task_id]
@@ -185,7 +186,6 @@ class TokenProcessor(object):
             else:
                 self.tokens_counter[task_id] += 1
                 self.all_tokens[i].append(token_id)
-                self.number_of_output_tokens += 1
                 result["token_ids"].append(token_id)
 
         return result
