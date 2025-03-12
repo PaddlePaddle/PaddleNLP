@@ -57,6 +57,7 @@ void BatchMLAWithPagedKVCacheKernel(
     const paddle::Tensor& num_blocks_x_device,
     const std::string& cache_quant_type_str,
     const int num_blocks_x,
+    const int chunk_size,
     const int max_seq_len,
     const int max_dec_len,
     const float softmax_scale,

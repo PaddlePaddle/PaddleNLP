@@ -186,6 +186,7 @@ def test_append_c16_attention(cache_length, bsz):
         decoder_tile_ids_per_batch,
         decoder_num_blocks_device,
         decoder_num_blocks,
+        decoder_chunk_size,
         max_len_kv,
     ) = paddlenlp_ops.get_block_shape_and_split_kv_block(
         seq_lens_encoder,
@@ -229,7 +230,6 @@ def test_append_c16_attention(cache_length, bsz):
 
     ref_out = ref_attention(query, p_compressed_kv, compressed_kv, p_key_pe, key_pe, bsz, cache_length, softmax_scale)
     paddle.device.synchronize()
-
     s_time = 0
     for i in range(RUN_TIME + WARM_UP):
         if i == WARM_UP:
@@ -255,6 +255,7 @@ def test_append_c16_attention(cache_length, bsz):
             decoder_tile_ids_per_batch,
             decoder_num_blocks_device,
             decoder_num_blocks,
+            decoder_chunk_size,
             max_enc_len_this_time,
             max_dec_len_this_time,
             max_len_kv,
@@ -287,8 +288,8 @@ def test_append_c16_attention(cache_length, bsz):
     out = out.reshape([-1, NUM_Q_HEAD, HEAD_DIM_V])
     alloc_diff(ref_out, out)
     print(
-        "dec bsz:{}, num_q_head:{}, cache_length:{}, cost_time:{}ms".format(
-            bsz, NUM_Q_HEAD, cache_length, (e_time - s_time) / RUN_TIME * 1000
+        "dec bsz:{}, num_q_head:{}, cache_length:{}, chunk_size{}, cost_time:{}ms".format(
+            bsz, NUM_Q_HEAD, cache_length, decoder_chunk_size, (e_time - s_time) / RUN_TIME * 1000
         )
     )
 

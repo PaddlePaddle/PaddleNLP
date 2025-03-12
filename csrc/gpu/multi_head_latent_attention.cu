@@ -38,6 +38,7 @@ std::vector<paddle::Tensor> MultiHeadLatentAttentionKernel(
     const paddle::Tensor& decoder_tile_ids_per_batch,
     const paddle::Tensor& decoder_num_blocks,
     const paddle::Tensor& decoder_num_blocks_cpu,
+    const paddle::Tensor& decoder_chunk_size_cpu,
     const paddle::Tensor& max_enc_len_this_time,
     const paddle::Tensor& max_dec_len_this_time,
     const paddle::Tensor& max_len_kv,
@@ -66,6 +67,7 @@ std::vector<paddle::Tensor> MultiHeadLatentAttentionKernel(
 
   int decoder_num_blocks_data = decoder_num_blocks_cpu.data<int>()[0];
   int max_dec_len_this_time_data = max_dec_len_this_time.data<int>()[0];
+  int chunk_size = decoder_chunk_size_cpu.data<int>()[0];
   int max_len_kv_data = max_len_kv.data<int>()[0];
 
 
@@ -107,6 +109,7 @@ std::vector<paddle::Tensor> MultiHeadLatentAttentionKernel(
                                              decoder_num_blocks,
                                              cache_quant_type_str,
                                              decoder_num_blocks_data,
+                                             chunk_size,
                                              max_input_length,
                                              max_len_kv_data,
                                              softmax_scale,
@@ -164,6 +167,7 @@ std::vector<paddle::Tensor> MultiHeadLatentAttention(
     const paddle::Tensor& decoder_tile_ids_per_batch,
     const paddle::Tensor& decoder_num_blocks,
     const paddle::Tensor& decoder_num_blocks_cpu,
+    const paddle::Tensor& decoder_chunk_size_cpu,
     const paddle::Tensor& max_enc_len_this_time,
     const paddle::Tensor& max_dec_len_this_time,
     const paddle::Tensor& max_len_kv,
@@ -228,6 +232,7 @@ std::vector<paddle::Tensor> MultiHeadLatentAttention(
           decoder_tile_ids_per_batch,
           decoder_num_blocks,
           decoder_num_blocks_cpu,
+          decoder_chunk_size_cpu,
           max_enc_len_this_time,
           max_dec_len_this_time,
           max_len_kv,
@@ -275,6 +280,7 @@ std::vector<paddle::Tensor> MultiHeadLatentAttention(
           decoder_tile_ids_per_batch,
           decoder_num_blocks,
           decoder_num_blocks_cpu,
+          decoder_chunk_size_cpu,
           max_enc_len_this_time,
           max_dec_len_this_time,
           max_len_kv,
@@ -329,6 +335,7 @@ std::vector<std::vector<int64_t>> MultiHeadLatentAttentionInferShape(
     const std::vector<int64_t>& decoder_tile_ids_per_batch_shape,
     const std::vector<int64_t>& decoder_num_blocks_shape,
     const std::vector<int64_t>& decoder_num_blocks_cpu_shape,
+    const std::vector<int64_t>& decoder_chunk_size_cpu_shape,
     const std::vector<int64_t>& max_enc_len_this_time_shape,
     const std::vector<int64_t>& max_dec_len_this_time_shape,
     const std::vector<int64_t>& max_len_kv_shape,
@@ -363,6 +370,8 @@ std::vector<std::vector<int64_t>> MultiHeadLatentAttentionInferShape(
   return {{token_num, num_heads * head_dim_v}};
 }
 
+
+
 std::vector<paddle::DataType> MultiHeadLatentAttentionInferDtype(
     const paddle::DataType& query_dtype,
     const paddle::DataType& key_cache_dtype,
@@ -384,6 +393,7 @@ std::vector<paddle::DataType> MultiHeadLatentAttentionInferDtype(
     const paddle::DataType& decoder_tile_ids_per_batch_dtype,
     const paddle::DataType& decoder_num_blocks_dtype,
     const paddle::DataType& decoder_num_blocks_cpu_dtype,
+    const paddle::DataType& decoder_chunk_size_cpu_dtype,
     const paddle::DataType& max_enc_len_this_time_dtype,
     const paddle::DataType& max_dec_len_this_time_dtype,
     const paddle::DataType& max_len_kv_dtype,
@@ -439,6 +449,7 @@ PD_BUILD_OP(multi_head_latent_attention)
              "decoder_tile_ids_per_batch",
              "decoder_num_blocks",
              "decoder_num_blocks_cpu",
+             "decoder_chunk_size_cpu",
              "max_enc_len_this_time",
              "max_dec_len_this_time",
              "max_len_kv",

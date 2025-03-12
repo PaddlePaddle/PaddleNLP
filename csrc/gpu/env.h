@@ -76,3 +76,10 @@ inline bool enable_cuda_core_fp8_gemm() {
             enable_cuda_core_fp8_env != nullptr && std::string(enable_cuda_core_fp8_env) == "1";
     return enable_cuda_core_fp8_gemm;
 }
+
+inline int get_mla_dec_chunk_size(int bsz) {
+    static const char* mla_dec_chunk_size_env = std::getenv("FLAGS_mla_dec_chunk_size");
+    static const int mla_dec_chunk_size =
+            mla_dec_chunk_size_env == nullptr ? -1 : std::stoi(std::string(mla_dec_chunk_size_env));
+    return bsz > 1 ? mla_dec_chunk_size : 64;
+}
