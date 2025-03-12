@@ -17,8 +17,13 @@ from queue import Empty
 from threading import Thread
 
 import paddle
+import pytest
 
-from paddlenlp.generation import TextIteratorStreamer, TextStreamer
+from paddlenlp.generation import (
+    AsyncTextIteratorStreamer,
+    TextIteratorStreamer,
+    TextStreamer,
+)
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
 from paddlenlp.transformers.utils import CaptureStd
 from tests.testing_utils import slow
@@ -109,4 +114,43 @@ class StreamerTester(unittest.TestCase):
         with self.assertRaises(Empty):
             streamer_text = ""
             for new_text in streamer:
+                streamer_text += new_text
+
+
+@pytest.mark.asyncio(loop_scope="class")
+class AsyncStreamerTester(unittest.IsolatedAsyncioTestCase):
+    async def test_async_iterator_streamer_matches_non_streaming(self):
+        tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/tiny-random-llama")
+        model = AutoModelForCausalLM.from_pretrained("__internal_testing__/tiny-random-llama")
+        model.config.eos_token_id = -1
+
+        input_ids = ids_tensor((1, 5), vocab_size=model.config.vocab_size)
+        greedy_ids = model.generate(input_ids, max_new_tokens=10, do_sample=False)
+        greedy_text = tokenizer.decode(greedy_ids[0])
+
+        streamer = AsyncTextIteratorStreamer(tokenizer)
+        generation_kwargs = {"input_ids": input_ids, "max_new_tokens": 10, "do_sample": False, "streamer": streamer}
+        thread = Thread(target=model.generate, kwargs=generation_kwargs)
+        thread.start()
+        streamer_text = ""
+        async for new_text in streamer:
+            streamer_text += new_text
+
+        self.assertEqual(streamer_text, greedy_text)
+
+    async def test_async_iterator_streamer_timeout(self):
+        tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/tiny-random-llama")
+        model = AutoModelForCausalLM.from_pretrained("__internal_testing__/tiny-random-llama")
+        model.config.eos_token_id = -1
+
+        input_ids = ids_tensor((1, 5), vocab_size=model.config.vocab_size)
+        streamer = AsyncTextIteratorStreamer(tokenizer, timeout=0.001)
+        generation_kwargs = {"input_ids": input_ids, "max_new_tokens": 10, "do_sample": False, "streamer": streamer}
+        thread = Thread(target=model.generate, kwargs=generation_kwargs)
+        thread.start()
+
+        # The streamer will timeout after 0.001 seconds, so TimeoutError will be raised
+        with self.assertRaises(TimeoutError):
+            streamer_text = ""
+            async for new_text in streamer:
                 streamer_text += new_text

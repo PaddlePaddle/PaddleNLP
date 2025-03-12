@@ -125,7 +125,7 @@ class MinLengthLogitsProcessor(LogitsProcessor):
     ```
     """
 
-    def __init__(self, min_length: int, eos_token_id: Union[int, List[int], paddle.Tensor], device: str = "cpu"):
+    def __init__(self, min_length: int, eos_token_id: Union[int, List[int], paddle.Tensor]):
         if not isinstance(min_length, int) or min_length < 0:
             raise ValueError(f"`min_length` has to be a non-negative integer, but is {min_length}")
 
@@ -189,7 +189,6 @@ class MinNewTokensLengthLogitsProcessor(LogitsProcessor):
         prompt_length_to_skip: int,
         min_new_tokens: int,
         eos_token_id: Union[int, List[int], paddle.Tensor],
-        device: str = "cpu",
     ):
         for arg_name, arg_value in [
             ("prompt_length_to_skip", prompt_length_to_skip),
@@ -837,9 +836,7 @@ class EtaLogitsWarper(LogitsProcessor):
     ```
     """
 
-    def __init__(
-        self, epsilon: float, filter_value: float = -float("Inf"), min_tokens_to_keep: int = 1, device: str = "cpu"
-    ):
+    def __init__(self, epsilon: float, filter_value: float = -float("Inf"), min_tokens_to_keep: int = 1):
         epsilon = float(epsilon)
         if epsilon <= 0 or epsilon >= 1:
             raise ValueError(f"`eta_cutoff` has to be a float > 0 and < 1, but is {epsilon}")
@@ -850,7 +847,7 @@ class EtaLogitsWarper(LogitsProcessor):
                 f"`min_tokens_to_keep` has to be a strictly positive integer, but is {min_tokens_to_keep}"
             )
 
-        self.epsilon = paddle.to_tensor(epsilon, place=device)
+        self.epsilon = paddle.to_tensor(epsilon)
         self.filter_value = filter_value
         self.min_tokens_to_keep = min_tokens_to_keep
 
@@ -1624,7 +1621,7 @@ class ForcedEOSTokenLogitsProcessor(LogitsProcessor):
     ```
     """
 
-    def __init__(self, max_length: int, eos_token_id: Union[int, List[int], paddle.Tensor], device: str = "cpu"):
+    def __init__(self, max_length: int, eos_token_id: Union[int, List[int], paddle.Tensor]):
         self.max_length = max_length
 
         if not isinstance(eos_token_id, paddle.Tensor):
@@ -1840,7 +1837,7 @@ class SuppressTokensAtBeginLogitsProcessor(LogitsProcessor):
     ```
     """
 
-    def __init__(self, begin_suppress_tokens, begin_index, device: str = "cpu"):
+    def __init__(self, begin_suppress_tokens, begin_index):
         self.begin_suppress_tokens = paddle.to_tensor(list(begin_suppress_tokens))
         self.begin_index = begin_index
 
@@ -1887,7 +1884,7 @@ class SuppressTokensLogitsProcessor(LogitsProcessor):
     ```
     """
 
-    def __init__(self, suppress_tokens, device: str = "cpu"):
+    def __init__(self, suppress_tokens):
         self.suppress_tokens = paddle.to_tensor(list(suppress_tokens))
 
     @add_start_docstrings(LOGITS_PROCESSOR_INPUTS_DOCSTRING)
@@ -2336,7 +2333,7 @@ class BarkEosPrioritizerLogitsProcessor(LogitsProcessor):
             Minimum end of speech threshold.
     """
 
-    def __init__(self, eos_token_id: Union[int, List[int], paddle.Tensor], min_eos_p: float, device: str = "cpu"):
+    def __init__(self, eos_token_id: Union[int, List[int], paddle.Tensor], min_eos_p: float):
         if not isinstance(eos_token_id, paddle.Tensor):
             if isinstance(eos_token_id, int):
                 eos_token_id = [eos_token_id]
@@ -2431,7 +2428,6 @@ class WatermarkLogitsProcessor(LogitsProcessor):
     def __init__(
         self,
         vocab_size,
-        device,
         greenlist_ratio: float = 0.25,
         bias: float = 2.0,
         hashing_key: int = 15485863,
@@ -2517,7 +2513,6 @@ class SynthIDTextWatermarkState:
         batch_size: int,
         ngram_len: int,
         context_history_size: int,
-        device: paddle.device,
     ):
         """Initializes the state.
 
@@ -2617,7 +2612,6 @@ class SynthIDTextWatermarkLogitsProcessor(LogitsProcessor):
         sampling_table_size: int,
         sampling_table_seed: int,
         context_history_size: int,
-        device: paddle.device,
         skip_first_ngram_calls: bool = False,
         debug_mode: bool = False,
     ):
@@ -2638,7 +2632,6 @@ class SynthIDTextWatermarkLogitsProcessor(LogitsProcessor):
             generator=generator,
         )
         self.context_history_size = context_history_size
-        self.device = device
         self.state = None
         self.skip_first_ngram_calls = skip_first_ngram_calls
         self.debug_mode = debug_mode
@@ -2649,7 +2642,6 @@ class SynthIDTextWatermarkLogitsProcessor(LogitsProcessor):
             batch_size=batch_size,
             ngram_len=self.ngram_len,
             context_history_size=self.context_history_size,
-            device=self.device,
         )
 
     def update_scores(self, scores: paddle.Tensor, g_values: paddle.Tensor) -> paddle.Tensor:
@@ -2911,7 +2903,6 @@ class SynthIDTextWatermarkLogitsProcessor(LogitsProcessor):
             batch_size=batch_size,
             ngram_len=self.ngram_len,
             context_history_size=self.context_history_size,
-            device=self.device,
         )
         contexts = input_ids[:, :-1].unfold(
             axis=1,
