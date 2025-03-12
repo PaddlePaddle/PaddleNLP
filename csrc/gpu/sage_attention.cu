@@ -142,7 +142,6 @@ std::vector<paddle::Tensor> SageAttentionKernel(
     paddle::Tensor q = paddle::unsqueeze(paddle::reshape(qkv_with_rope[0], {-1, num_q_head, head_dim_qk}), {0});
     paddle::Tensor k = paddle::unsqueeze(paddle::reshape(qkv_with_rope[1], {-1, num_kv_head, head_dim_qk}), {0});
     paddle::Tensor v = paddle::unsqueeze(paddle::reshape(qkv_with_rope[2], {-1, num_kv_head, head_dim_v}), {0});
-    // printf("q shape: %d, %d, %d, %d\n", q.shape()[0],q.shape()[1],q.shape()[2],q.shape()[3]);
 
     paddle::Tensor km = paddle::experimental::mean(k, {1}, true);
     km = paddle::experimental::squeeze(km, {1});
@@ -152,7 +151,7 @@ std::vector<paddle::Tensor> SageAttentionKernel(
     fmha_out = sage_attention_fwd(q, k, v, km, 
                                   seq_lens_this_time, vm, 
                                   softmax_scale, std::string("per_warp"), 
-                                  std::string(""), 
+                                  std::string("any"), 
                                   0, true, true, false, false)[0];
     fmha_out = paddle::reshape(paddle::experimental::squeeze(fmha_out, {0}), {-1, num_q_head * head_dim_qk});
     // CascadeAppendAttentionKernel<data_t, data_t>(

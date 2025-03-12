@@ -1647,8 +1647,8 @@ std::vector<paddle::Tensor> sage_attention_fwd(paddle::Tensor& q,
   int _qk_quant_gran = (qk_quant_gran == std::string("per_thread")) ? 3 : 2;
   int _return_lse = int(return_lse);
 
-  PD_CHECK(pv_accum_dtype == std::string("fp32+fp32") || pv_accum_dtype == std::string("fp32"), "pv_accum_dtype must be either fp32 or fp32+fp32");
-  auto pv_accum_dtype_const = (pv_accum_dtype == std::string("fp32+fp32")) ? paddle::DataType::UNDEFINED : paddle::DataType::FLOAT32;
+  PD_CHECK(pv_accum_dtype == std::string("fp32+fp32") || pv_accum_dtype == std::string("fp32") || pv_accum_dtype == std::string("any"), "pv_accum_dtype must be either fp32 or fp32+fp32");
+  auto pv_accum_dtype_const = (pv_accum_dtype == std::string("fp32")) ? paddle::DataType::FLOAT32 : paddle::DataType::UNDEFINED;
 
   PD_CHECK(q.shape()[3] == 64 || q.shape()[3] == 128, "head_dim must be either 64 or 128");
   PD_CHECK(q.strides()[3] == 1 && k.strides()[3] == 1 && v.strides()[3] == 1, "Last dim of qkv must be contiguous.");
