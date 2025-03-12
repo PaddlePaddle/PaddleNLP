@@ -253,11 +253,11 @@ def new_paddle_win8(quant_method):
     print(f"paddle new win8 : {((end - start) * 1000 * 1000)} us")
 
 
-for i in range(10):
-    ori_paddle_win8(quant_method)
+# for i in range(10):
+#     ori_paddle_win8(quant_method)
 
 print("____________________________________")
 
 
-for i in range(10):
+for i in range(1):
     new_paddle_win8(quant_method)
