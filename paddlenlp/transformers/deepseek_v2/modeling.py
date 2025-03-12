@@ -502,8 +502,15 @@ class Fuse_FFN_FP8_Func(paddle.autograd.PyLayer):
         # ===== save for backward =====
         # TODO: [Fusion] transpose + padding + quant
         x_t = x.T.contiguous()
-        if x_t.shape[-1] % 8 != 0:
-            x_t = paddle.concat([x_t, paddle.zeros([x_t.shape[0], 8 - (x_t.shape[-1] % 8)], dtype=x_t.dtype)], axis=1)
+        if x_t.shape[-1] % 128 != 0 or x_t.shape[-1] % 512 != 0:
+            if (x_t.shape[-1] + 128 - (x_t.shape[-1] % 128)) % 512 != 0:
+                padding_size = 512
+            else:
+                padding_size = 128
+            x_t = paddle.concat(
+                [x_t, paddle.zeros([x_t.shape[0], padding_size - (x_t.shape[-1] % padding_size)], dtype=x_t.dtype)],
+                axis=1,
+            )
         x_t_fp8, x_t_scale = kitchen_quant(
             x_t, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
         )
@@ -545,18 +552,35 @@ class Fuse_FFN_FP8_Func(paddle.autograd.PyLayer):
         deep_gemm.gemm_fp8_fp8_bf16_nt((do3_fp8, do3_scale), (w2_fp8, w2_sacle), do2)
 
         # ===== dw2 = deep_gemm(o2_t_fp8, do3_t_fp8)
-        if o2_t.shape[-1] % 8 != 0:
+        if o2_t.shape[-1] % 128 != 0 or o2_t.shape[-1] % 512 != 0:
+            if (o2_t.shape[-1] + 128 - (o2_t.shape[-1] % 128)) % 512 != 0:
+                padding_size = 512
+            else:
+                padding_size = 128
             o2_t = paddle.concat(
-                [o2_t, paddle.zeros([o2_t.shape[0], 8 - (o2_t.shape[1] % 8)], dtype=o2_t.dtype)], axis=-1
+                [
+                    o2_t,
+                    paddle.zeros([o2_t.shape[0], padding_size - (o2_t.shape[-1] % padding_size)], dtype=o2_t.dtype),
+                ],
+                axis=-1,
             )
             o2_t_fp8, o2_t_scale = kitchen_quant(
                 o2_t, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
             )
         do3_t = do3.T.contiguous()
-        if do3_t.shape[-1] % 8 != 0:
+        if do3_t.shape[-1] % 128 != 0 or do3_t.shape[-1] % 512 != 0:
+            if (do3_t.shape[-1] + 128 - (do3_t.shape[-1] % 128)) % 512 != 0:
+                padding_size = 512
+            else:
+                padding_size = 128
             do3_t = paddle.concat(
-                [do3_t, paddle.zeros([do3_t.shape[0], 8 - (do3_t.shape[1] % 8)], dtype=do3_t.dtype)], axis=-1
+                [
+                    do3_t,
+                    paddle.zeros([do3_t.shape[0], padding_size - (do3_t.shape[-1] % padding_size)], dtype=do3_t.dtype),
+                ],
+                axis=-1,
             )
+
         do3_t_fp8 = kitchen_quant(do3_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True)
         dw2 = paddle.zeros(w2_fp8.shape, do3.dtype)
         if o2_t_fp8.numel() != 0 and do3_t_fp8[0].numel() != 0:
@@ -578,8 +602,13 @@ class Fuse_FFN_FP8_Func(paddle.autograd.PyLayer):
         # ===== dw1 = deep_gemm(x_t_fp8, do1_t_fp8)
         # TODO: [Fusion] swiglu_grad + transpose + padding + quant
         do1_t = do1.T.contiguous()
-        if do1_t.shape[-1] % 8 != 0:
-            pad_size = 8 - (do1_t.shape[1] % 8)
+        if do1_t.shape[-1] % 128 != 0 or do1_t.shape[-1] % 512 != 0:
+            if (do1_t.shape[-1] + 128 - (do1_t.shape[-1] % 128)) % 512 != 0:
+                padding_size = 512
+            else:
+                padding_size = 128
+
+            pad_size = padding_size - (do1_t.shape[1] % padding_size)
             do1_t = paddle.concat([do1_t, paddle.zeros([do1_t.shape[0], pad_size], dtype=do1_t.dtype)], axis=-1)
         do1_t_fp8, do1_t_scale = kitchen_quant(
             do1_t, is_1d_scaled=True, backend=kitchen.ops.Backend.CUBLAS, return_transpose=False
