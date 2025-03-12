@@ -36,5 +36,6 @@
     "release_grads": true,
     "loss_type": "contrastive",
     "query_template": "{text}",
-    "passage_template": "{text}"
+    "passage_template": "{text}",
+    "return_position_ids": false
 }

@@ -26,8 +26,8 @@ from paddlenlp.transformers import (
     AutoConfig,
     AutoTokenizer,
     Qwen2Config,
-    XLMRobertaConfig,
     Qwen2SentenceEmbedding,
+    XLMRobertaConfig,
     XLMRobertaSentenceEmbedding,
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig
@@ -253,7 +253,7 @@ def main():
         return_tensors="np",
         return_attention_mask=not model_args.flash_mask,
         pad_to_multiple_of=data_args.pad_to_multiple_of,
-        return_position_ids=False
+        return_position_ids=model_args.return_position_ids,
     )
     trainer = EmbeddingTrainer(
         model=model,

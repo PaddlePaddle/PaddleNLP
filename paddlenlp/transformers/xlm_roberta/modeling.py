@@ -21,15 +21,16 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import paddle
 import paddle.distributed as dist
-from paddle.distributed.fleet.recompute.recompute import recompute
 from paddle import nn
+from paddle.distributed.fleet.recompute.recompute import recompute
 from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
+
 from paddlenlp.transformers.contrastive_loss import SimpleContrastiveLoss
 
 from ...utils import logger
 from ...utils.converter import StateDictNameMapping
-from ..embedding_utils import dist_gather_tensor_with_gradient
 from ..activations import ACT2FN
+from ..embedding_utils import dist_gather_tensor_with_gradient
 from ..model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     BaseModelOutputWithPoolingAndCrossAttentions,
@@ -802,7 +803,7 @@ class XLMRobertaModel(XLMRobertaPretrainedModel):
         # We can provide a self-attention mask of dimensions [batch_size, from_seq_length, to_seq_length]
         # ourselves in which case we just need to make it broadcastable to all heads.
         if attention_mask.ndim == 4:
-            extended_attention_mask=attention_mask
+            extended_attention_mask = attention_mask
         elif attention_mask.ndim == 3:
             extended_attention_mask = attention_mask[:, None, :, :]
         elif attention_mask.ndim == 2:
@@ -1627,11 +1628,7 @@ def create_position_ids_from_input_ids(input_ids, padding_idx, past_key_values_l
 
 
 class XLMRobertaSentenceEmbedding(XLMRobertaPretrainedModel):
-    def __init__(
-        self,
-        config: XLMRobertaConfig,
-        embedding_temperature: float = 0.02
-    ):
+    def __init__(self, config: XLMRobertaConfig, embedding_temperature: float = 0.02):
         """XLMRobertaSentenceEmbedding
         For getting larger batch_size, we use tensor parallel to get larger batch_size.
 
@@ -1699,6 +1696,6 @@ class XLMRobertaSentenceEmbedding(XLMRobertaPretrainedModel):
             hidden_states = outputs
         else:
             hidden_states = outputs[0]
-        #last_hidden_states = hidden_states.gather_nd(embedding_indices)
+        # last_hidden_states = hidden_states.gather_nd(embedding_indices)
         last_hidden_states = hidden_states[:, 0]
         return last_hidden_states
