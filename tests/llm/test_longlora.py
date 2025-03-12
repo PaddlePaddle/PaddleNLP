@@ -64,7 +64,6 @@ class LoraTest(LLMTest, unittest.TestCase):
 
             main()
         replace_llama_attn(use_ssa=False)
-
         # merge weights
         merge_lora_weights_config = {
             "lora_path": lora_config["output_dir"],
