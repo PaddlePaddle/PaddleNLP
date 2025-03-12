@@ -1268,6 +1268,8 @@ class TrainingArguments:
                                 "enable_overlap_p2p_comm",
                                 "disable_batch_p2p_comm",
                                 "best_unbalanced_scheduler",
+                                "enable_offload_queue",
+                                "use_dualpipev",
                             ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
@@ -1314,6 +1316,8 @@ class TrainingArguments:
                         "clear_every_step_cache": "enable_clear_every_step_cache" in pipeline_parallel_config,
                         "use_batch_p2p_comm": "disable_batch_p2p_comm" not in pipeline_parallel_config,
                         "best_unbalanced_scheduler": "best_unbalanced_scheduler" in pipeline_parallel_config,
+                        "enable_offload_queue": "enable_offload_queue" in pipeline_parallel_config,
+                        "use_dualpipev": "use_dualpipev" in pipeline_parallel_config,
                     }
                     if dygraph_pp_configs["dp_comm_overlap"]:
                         raise ValueError("overlap has accuracy issue")  # TODO: fix `overalap` + `delay_scale` issue

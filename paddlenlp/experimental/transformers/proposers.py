@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from typing import List
 
 import numpy as np
 import paddle
@@ -78,6 +79,14 @@ class SpeculateArgument:
 
     mla_use_matrix_absorption: bool = field(default=False, metadata={"help": "implement mla with matrix-absorption."})
     weightonly_group_size: int = field(default=-1, metadata={"help": "the max length of candidate tokens."})
+    weight_block_size: List[int] = field(
+        default_factory=lambda: [128, 128],
+        metadata={"help": "Quantitative granularity of weights. Supported values: [128 128]"},
+    )
+    moe_quant_type: str = field(
+        default="",
+        metadata={"help": "Quantization type of moe. Supported values: weight_only_int4, weight_only_int8"},
+    )
 
     @classmethod
     def build_from_predictor(cls, predictor_args):
@@ -100,6 +109,8 @@ class SpeculateArgument:
 
         args["mla_use_matrix_absorption"] = predictor_args.mla_use_matrix_absorption
         args["weightonly_group_size"] = predictor_args.weightonly_group_size
+        args["weight_block_size"] = predictor_args.weight_block_size
+        args["moe_quant_type"] = predictor_args.moe_quant_type
 
         assert args["speculate_method"] in [
             "eagle",

@@ -19,10 +19,6 @@ import sys
 from functools import partial
 
 import paddle
-from reward_argument import DataArgument, ModelArgument, TrainingArguments
-from reward_model import LlamaModelForPRM, LlamaModelForScore, MistralModelForPRM
-from reward_trainer import RewardTrainer
-
 from data import (
     preference_collate_fn,
     preprocess_preference_data,
@@ -30,6 +26,10 @@ from data import (
     process_collate_fn,
     zero_padding_process_collate_fn,
 )
+from reward_argument import DataArgument, ModelArgument, TrainingArguments
+from reward_model import LlamaModelForPRM, LlamaModelForScore, MistralModelForPRM
+from reward_trainer import RewardTrainer
+
 from paddlenlp.datasets import (
     ZeroPaddingIterableDataset,
     ZeroPaddingMapDataset,
@@ -171,11 +171,6 @@ def main():
     if model_args.flash_mask and not model.config.use_flash_attention:
         logger.warning("`flash_mask` must use with zero padding and flash attention.")
         model.config.use_flash_attention = True
-
-    if model_args.tokenizer_name_or_path is not None:
-        tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
-    else:
-        tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
 
     # TODO: support chat template in next pr
     # tokenizer.chat_template = None

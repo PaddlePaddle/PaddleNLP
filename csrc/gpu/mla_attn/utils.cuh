@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#pragma once
+
 #ifndef ATTENTION_HOPPER_UTILS_CUH_
 #define ATTENTION_HOPPER_UTILS_CUH_
 
@@ -264,7 +266,7 @@ __global__ void merge_multi_chunks_kernel(const T * __restrict__ multi_out, // [
                                           const int head_dim,
                                           const int token_num,
                                           const int bsz,
-                                          const int max_draft_token_num=5) {
+                                          const int max_draft_token_num) {
   const int vid = threadIdx.x, ty = threadIdx.y;
   const int hid = blockIdx.y;
   __shared__ T smem[bdy * HEAD_DIM];
@@ -279,10 +281,10 @@ __global__ void merge_multi_chunks_kernel(const T * __restrict__ multi_out, // [
     if (seq_len_kv == 0) continue;
     seq_len_kv += seq_len_q;
     const int num_chunks_this_seq = cute::ceil_div(seq_len_kv, chunk_size);
-    // if (num_chunks_this_seq <= 1) {
-    //   // not need merge
-    //   continue;
-    // }
+    if (num_chunks_this_seq <= 1) {
+      // not need merge
+      continue;
+    }
 
     using LoadT = AlignedVector<T, vec_size>;
     LoadT load_vec;
