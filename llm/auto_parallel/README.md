@@ -14,19 +14,20 @@
     - [启动微调](#启动微调)
   - [低秩适应（LoRA）](#低秩适应lora)
   - [DPO](#dpo)
-  - [PPO](#ppo)
   - [推理](#推理)
     - [动态图推理](#动态图推理)
     - [静态图推理](#静态图推理)
   - [FAQ](#faq)
 
 ## 当前支持模型
-| Model | Pretrain | SFT |  LoRA | dpo | ppo |
-|-------|----------|-----|-----|-----|-----|
-| gpt-3 |    ✅    |  🚧   |  🚧  | 🚧   |  🚧   |
-| llama |    ✅    |  ✅   |  ✅  | ✅   |  🚧   |
-| qwen  |    ✅    |  🚧   |  🚧  | 🚧   |  🚧   |
-| deepseekv3| ✅   |  🚧   |  🚧  | 🚧   |  🚧   |
+| Model | Pretrain | SFT |  LoRA | DPO |
+|-------|----------|-----|-----|-----|
+| GPT-3 |    ✅    |  🚧   |  🚧  | 🚧   |
+| LlaMa |    ✅    |  ✅   |  ✅  | ✅   |
+| Qwen  |    ✅    |  🚧   |  🚧  | 🚧   |
+| DeepSeek-V3| ✅   |  🚧   |  🚧  | 🚧   |
+
+注：当前提供的deepseek-v3模型配置脚本为一个规模较小的示例demo（调小了网络层数），以支持在单机8卡的环境下运行，如果你想运行完整671B规模的deepseek-v3，需要将层数配置为61层，并对应地调整并行策略。当前自动并行提供的deepseek-v3版本中，暂未集成FP8、DeepEP等优化策略。
 
 - ✅: Supported
 - 🚧: In Progress
@@ -59,11 +60,13 @@ wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwe
 
 - 动态图模式
 ```python
-# llame example
+# llama finetune example
+# assume that cur dir is auto_parallel
+# cd ${PaddleNLP_Path}/llm/auto_parallel/
 python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7"            \
     --log_dir "llama_auto_3d"           \
-    run_pretrain_auto.py ./pretrain_argument.json
+    ./llama/run_pretrain_auto.py ./llama/pretrain_argument.json
 ```
 该配置下运行`llama7B`预训练任务，并行策略为MP2-PP2-DP2，分片策略为Stage1。
 更多可配置参数，请参考`ModelArguments`, `DataArguments`, `PreTrainingArguments`。
@@ -85,9 +88,11 @@ tar -xvf AdvertiseGen.tar.gz
 - 动态图模式
 ```python
 # llama finetune example
+# assume that cur dir is auto_parallel
+# cd ${PaddleNLP_Path}/llm/auto_parallel/
 python -u -m paddle.distributed.launch \
   --gpus "0,1,2,3,4,5,6,7" \
-  ../run_finetune_auto.py ./finetune_argument.json
+  ./run_finetune_auto.py ./llama/finetune_argument.json
 ```
 该配置下运行`llama-3.1-8B`任务，并行策略为MP2-PP2-DP2，分片策略为Stage2。
 更多可配置参数，请参考`GenerateArgument`, `ModelAutoConfig`, `ReftArgument`, `DataConfig`, `SFTAutoConfig`。
@@ -102,11 +107,8 @@ python -u -m paddle.distributed.launch \
 ## DPO
 TODO
 
-## PPO
-TODO
-
 ## 推理
-推理流程包括：动态图推理 -> 动转静导出模型 -> 静态图推理。
+推理流程包括：动态图推理，动转静导出模型 -> 静态图推理。
 
 ### 动态图推理
 当前自动并行任务保存的模型参数已支持用于动态图推理。以动态图自动并行训练（DP2-MP2-PP2）为例：
