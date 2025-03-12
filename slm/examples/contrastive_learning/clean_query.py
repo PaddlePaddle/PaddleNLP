@@ -155,8 +155,8 @@ class Clean_Query:
 
         query_list = [single_data["query"] for single_data in data_list]
 
-        data_list = data_list[:10000]
-        query_list = query_list[:10000]
+        # data_list = data_list[:10000]
+        # query_list = query_list[:10000]
 
         world_size = paddle.distributed.get_world_size()
         rank = paddle.distributed.get_rank()
