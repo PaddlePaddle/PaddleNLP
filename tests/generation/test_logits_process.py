@@ -326,9 +326,7 @@ class LogitsProcessorTest(unittest.TestCase):
         self.assertFalse(paddle.all(min_p_warp(input_ids, dist) == dist))
 
         # check edge cases with negative and extreme logits
-        ramp_logits = paddle.arange(vocab_size) - (vocab_size // 2)
-        ramp_logits = ramp_logits.unsqueeze(0).repeat(batch_size, 1)
-
+        ramp_logits = paddle.arange(vocab_size).unsqueeze(0).tile((batch_size, 1)) - (vocab_size // 2)
         # make ramp_logits more extreme
         ramp_logits[1] = ramp_logits[1] * 100.0
 
@@ -369,7 +367,7 @@ class LogitsProcessorTest(unittest.TestCase):
         self.assertListEqual((scores == 0.0).sum(axis=-1).tolist(), [0, 0])
 
         # check edge cases with negative and extreme logits
-        ramp_logits = paddle.arange(vocab_size).unsqueeze(0).repeat(batch_size, 1) - (vocab_size // 2)
+        ramp_logits = paddle.arange(vocab_size).unsqueeze(0).tile((batch_size, 1)) - (vocab_size // 2)
 
         # make ramp_logits more extreme
         ramp_logits[1] = ramp_logits[1] * 100.0
@@ -401,7 +399,7 @@ class LogitsProcessorTest(unittest.TestCase):
         self.assertFalse(paddle.all(epsilon_warp(input_ids, dist) == dist))
 
         # check edge cases with negative and extreme logits
-        ramp_logits = paddle.arange(vocab_size).unsqueeze(0).repeat(batch_size, 1) - (vocab_size // 2)
+        ramp_logits = paddle.arange(vocab_size).unsqueeze(0).tile((batch_size, 1)) - (vocab_size // 2)
 
         # make ramp_logits more extreme
         ramp_logits[1] = ramp_logits[1] * 100.0
@@ -435,7 +433,7 @@ class LogitsProcessorTest(unittest.TestCase):
         self.assertFalse(paddle.all(eta_warp(input_ids, dist) == dist))
 
         # check edge cases with negative and extreme logits
-        ramp_logits = paddle.arange(vocab_size).unsqueeze(0).repeat(batch_size, 1) - (vocab_size // 2)
+        ramp_logits = paddle.arange(vocab_size).unsqueeze(0).tile((batch_size, 1)) - (vocab_size // 2)
 
         # make ramp_logits more extreme
         ramp_logits[1] = ramp_logits[1] * 100.0
@@ -498,7 +496,7 @@ class LogitsProcessorTest(unittest.TestCase):
         )
         # 3-gram would forbid 1st token at 1st beam and no token at 2nd beam
         self.assertListEqual(
-            (filtered_scores_2_gram == paddle.finfo(scores.dtype).min).tolist(),
+            (filtered_scores_3_gram == paddle.finfo(scores.dtype).min).tolist(),
             [[False, True, False], [False, False, False]],
         )
 
@@ -694,7 +692,7 @@ class LogitsProcessorTest(unittest.TestCase):
         current_tokens = paddle.to_tensor([0, 3, 1, 2])
 
         diversity_logits_processor = HammingDiversityLogitsProcessor(
-            diversity_rate=1.0, num_beams=num_beams, num_beam_groups=num_beam_groups
+            diversity_penalty=1.0, num_beams=num_beams, num_beam_groups=num_beam_groups
         )
 
         processed_scores = diversity_logits_processor(None, scores, current_tokens, 1)
@@ -920,7 +918,7 @@ class LogitsProcessorTest(unittest.TestCase):
             return paddle.nn.functional.log_softmax(x, dim=-1)
 
         # explicit unconditional prompt + attention mask
-        input_ids = paddle.LongTensor([[0]])
+        input_ids = paddle.to_tensor([[0]])
         cfg = UnbatchedClassifierFreeGuidanceLogitsProcessor(1.5, dummy_model, input_ids, paddle.ones_like(input_ids))
         out = cfg(input_ids, logits_cond)[0, -1]
 
@@ -931,7 +929,7 @@ class LogitsProcessorTest(unittest.TestCase):
         self.assertAlmostEqual(out[2].item(), res[2].item())
 
         # explicit unconditional prompt
-        input_ids = paddle.Tensor([[0]])
+        input_ids = paddle.to_tensor([[0]])
         cfg = UnbatchedClassifierFreeGuidanceLogitsProcessor(1.5, dummy_model, input_ids)
         out = cfg(input_ids, logits_cond)[0, -1]
 
@@ -942,7 +940,7 @@ class LogitsProcessorTest(unittest.TestCase):
         self.assertAlmostEqual(out[2].item(), res[2].item())
 
         # all implicit
-        input_ids = paddle.Tensor([[0]])
+        input_ids = paddle.to_tensor([[0]])
         cfg = UnbatchedClassifierFreeGuidanceLogitsProcessor(1.5, dummy_model)
         out = cfg(input_ids, logits_cond)[0, -1]
 
@@ -1010,7 +1008,7 @@ class LogitsProcessorTest(unittest.TestCase):
     @parameterized.expand([(5, 3, 10000), (10, 5, 1000)])
     def test_synthidtext_watermarking_processor_bias_uniformity(self, ngram_len, num_layers, vocab_size):
         """Test SynthID watermarked distribution bias uniformity over iterations."""
-        paddle.manual_seed(0)
+        paddle.seed(0)
         np.random.seed(0)
         watermarking_config = {
             "ngram_len": ngram_len,
@@ -1070,7 +1068,7 @@ class LogitsProcessorTest(unittest.TestCase):
 
         updated_softmaxes = 0
         np.random.seed(0)
-        paddle.manual_seed(0)
+        paddle.seed(0)
         if logits_type == "uniform":
             fixed_logits = paddle.ones((batch_size, vocab_size))
         elif logits_type == "random":

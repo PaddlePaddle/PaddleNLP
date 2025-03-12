@@ -27,8 +27,8 @@ from paddlenlp.generation import (
     LogitsProcessorList,
     MinLengthLogitsProcessor,
     RepetitionPenaltyLogitsProcessor,
-    TopKProcess,
-    TopPProcess,
+    TopKLogitsWarper,
+    TopPLogitsWarper,
     get_unfinished_flag,
 )
 from paddlenlp.transformers import (  # import gpt model
@@ -48,11 +48,12 @@ def top_k_top_p_filtering(
     top_p=1.0,
     min_tokens_to_keep=1,
 ):
+    input_ids = None
     if top_k > 0:
-        logits = TopKProcess(logits, top_k, min_tokens_to_keep)
+        logits = TopKLogitsWarper(top_k, min_tokens_to_keep=min_tokens_to_keep)(input_ids, logits)
 
     if 0 <= top_p <= 1.0:
-        logits = TopPProcess(logits, top_p, min_tokens_to_keep)
+        logits = TopPLogitsWarper(top_p, min_tokens_to_keep=min_tokens_to_keep)(input_ids, logits)
 
     return logits
 

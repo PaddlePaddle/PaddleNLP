@@ -159,7 +159,7 @@ class StoppingCriteriaTestCase(unittest.TestCase):
         stop_strings = ["<|im_end|>", "stop", "e nd"]
 
         # Use a tokenizer that won't actually have special tokens for these
-        tokenizer = AutoTokenizer.from_pretrained("openai-community/gpt2")
+        tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/tiny-random-llama")
         tokenizer.pad_token_id = tokenizer.eos_token_id
         tokenizer.padding_side = "left"
         true_input_ids = tokenizer(true_strings, return_tensors="pt", padding="longest", add_special_tokens=False)
@@ -186,7 +186,7 @@ class StoppingCriteriaTestCase(unittest.TestCase):
 
     def test_stop_string_criteria_vocab_size_mismatch(self):
         """Test that StopStringCriteria handles tokens above len(tokenizer) correctly."""
-        tokenizer = AutoTokenizer.from_pretrained("openai-community/gpt2")
+        tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/tiny-random-llama")
 
         # Create input_ids with tokens above len(tokenizer)
         input_ids = paddle.to_tensor([[len(tokenizer) + 1024, 1, 2]])
@@ -234,7 +234,7 @@ class StoppingCriteriaTestCase(unittest.TestCase):
         true_strings = ["a", "baa", "abc"]  # "abc" is a single token
         false_strings = ["abbbbbbb", "b"]  # "abbbbbbb" is split into multiple tokens
         stop_strings = ["a"]
-        tokenizer = AutoTokenizer.from_pretrained("openai-community/gpt2")
+        tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/tiny-random-llama")
         tokenizer.pad_token_id = tokenizer.eos_token_id
         tokenizer.padding_side = "left"
 
@@ -252,7 +252,7 @@ class StoppingCriteriaTestCase(unittest.TestCase):
         text = "They completed the challenging puzzle, revealing the hidden image at the end"
         stop_strings = ["end"]
 
-        tokenizer = AutoTokenizer.from_pretrained("openai-community/gpt2")
+        tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/tiny-random-llama")
         tokenizer.pad_token_id = tokenizer.eos_token_id
         inputs = tokenizer(text, return_tensors="pt", add_special_tokens=False)
 
@@ -278,7 +278,7 @@ class StoppingCriteriaTestCase(unittest.TestCase):
         ]
         stop_strings = ["end"]
 
-        tokenizer = AutoTokenizer.from_pretrained("openai-community/gpt2")
+        tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/tiny-random-llama")
         tokenizer.pad_token_id = tokenizer.eos_token_id
         tokenizer.padding_side = "left"
         inputs = tokenizer(text, return_tensors="pt", padding="longest", add_special_tokens=False)

@@ -2351,7 +2351,7 @@ class BarkEosPrioritizerLogitsProcessor(LogitsProcessor):
     def __call__(self, input_ids: paddle.Tensor, scores: paddle.Tensor) -> paddle.Tensor:
         scores_processed = scores
         if self.min_eos_p:
-            probs = paddle.nn.functional.softmax(scores.float(), axis=-1)
+            probs = paddle.nn.functional.softmax(scores.astype(paddle.float32), axis=-1)
             # create scores full of -inf except for the eos_token_id
             early_stop_scores = paddle.ones_like(scores) * -float("inf")
             early_stop_scores[:, self.eos_token_id] = scores[:, self.eos_token_id]

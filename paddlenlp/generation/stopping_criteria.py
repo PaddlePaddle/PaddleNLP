@@ -1,11 +1,11 @@
 # Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -499,7 +499,7 @@ class ConfidenceCriteria(StoppingCriteria):
         self.assistant_confidence_threshold = assistant_confidence_threshold
 
     def __call__(self, input_ids: paddle.Tensor, scores: paddle.Tensor, **kwargs) -> paddle.Tensor:
-        probs = scores[-1].softmax(-1)
+        probs = paddle.nn.functional.softmax(scores[-1], axis=-1)
         p = probs[0, input_ids[0, -1]].item()
         if p < self.assistant_confidence_threshold:
             return True
