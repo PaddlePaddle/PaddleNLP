@@ -66,7 +66,7 @@ python -u  -m paddle.distributed.launch \
     run_pretrain_auto.py ./pretrain_argument.json
 ```
 该配置下运行`llama7B`预训练任务，并行策略为MP2-PP2-DP2，分片策略为Stage1。
-<br>更多可配置参数，请参考`ModelArguments`, `DataArguments`, `PreTrainingArguments`。
+更多可配置参数，请参考`ModelArguments`, `DataArguments`, `PreTrainingArguments`。
 
 - 动转静模式
 <br>追加 `to_static`参数
@@ -89,8 +89,8 @@ python -u -m paddle.distributed.launch \
   --gpus "0,1,2,3,4,5,6,7" \
   ../run_finetune_auto.py ./finetune_argument.json
 ```
-该配置下运行`llama-3.1-8B`任务，并行策略为MP2-PP2-DP2，分片策略为Stage2.
-<br>更多可配置参数，请参考`GenerateArgument`, `ModelAutoConfig`, `ReftArgument`, `DataConfig`, `SFTAutoConfig`。
+该配置下运行`llama-3.1-8B`任务，并行策略为MP2-PP2-DP2，分片策略为Stage2。
+更多可配置参数，请参考`GenerateArgument`, `ModelAutoConfig`, `ReftArgument`, `DataConfig`, `SFTAutoConfig`。
 
 - 动转静模式
 <br>追加`to_static`参数
