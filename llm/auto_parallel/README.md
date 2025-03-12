@@ -60,7 +60,7 @@ wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwe
 
 - 动态图模式
 ```python
-# Llama finetune example
+# Llama pretrain example
 # assume that cur dir is auto_parallel
 # cd ${PaddleNLP_Path}/llm/auto_parallel/
 python -u  -m paddle.distributed.launch \
