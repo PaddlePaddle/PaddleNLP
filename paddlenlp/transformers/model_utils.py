@@ -47,6 +47,11 @@ from paddle.distributed.fleet.meta_parallel.parallel_layers import (
     PipelineLayer,
     SharedLayerDesc,
 )
+
+try:
+    from paddle.distributed.fleet.meta_parallel import LocalSharedLayerDesc
+except:
+    LocalSharedLayerDesc = None
 from paddle.nn import Embedding, Layer
 
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
@@ -1173,6 +1178,11 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         config.decode_strategy = predictor_args.decode_strategy
         config.mla_use_matrix_absorption = predictor_args.mla_use_matrix_absorption
         config.weightonly_group_size = predictor_args.weightonly_group_size
+        config.weight_block_size = predictor_args.weight_block_size
+        config.moe_quant_type = predictor_args.moe_quant_type
+        if config.quantization_config.quant_method is not None:
+            predictor_args.weight_block_size = config.quantization_config.weight_block_size
+            config.weight_block_size = predictor_args.weight_block_size
 
         if config.quantization_config.quant_type is not None:
             if predictor_args.mode == "dynamic":
@@ -1210,6 +1220,11 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 if not config.get("speculate_model_type", "None") in ["eagle", "mtp"]:
                     config.decode_strategy = "speculate_decoding"
         config.return_full_hidden_states = predictor_args.return_full_hidden_states
+
+        predictor_args.total_max_length = config.get("infer_model_max_seq_len", predictor_args.total_max_length)
+        predictor_args.mla_use_matrix_absorption = config.get(
+            "mla_use_matrix_absorption", predictor_args.mla_use_matrix_absorption
+        )
 
     @classmethod
     def confirm_inference_model(cls, predictor_args, **kwargs):
@@ -2848,17 +2863,11 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     prefix = ""
                 layer_config = layer.auto_dist_config(prefix)
                 merged_config = self.merge_auto_dist_configs([merged_config, layer_config])
-                for _, deeper_layer in layer.named_sublayers():
-                    if hasattr(deeper_layer, "auto_dist_config"):
-                        # mask all `auto_dist_config` methods in deeper layer
-                        deeper_layer.auto_dist_config = lambda x: {}
-
         final_config = {
             "dp_config": None,
             "mp_config": None,
             "pp_config": None,
         }
-
         if "tensor_parallel" in auto_dist_degree and auto_dist_degree["tensor_parallel"]:
             merged_config["mp_config"] is not None
             final_config["mp_config"] = merged_config["mp_config"]
@@ -2949,7 +2958,10 @@ class PipelinePretrainedModel(PretrainedModel):
                                 f"Please check! we treat this key as last layer, get {k}, set origin name as {'.'.join(single_name)}"
                             )
                     elif name_splited[0] == "shared_layers":
-                        single_name = [self.get_shardlayer_prefix(name_splited)]
+                        single_name = [self.get_shardlayer_prefix(name_splited, SharedLayerDesc)]
+                        single_name.extend(name_splited[2:])
+                    elif name_splited[0] == "local_shared_layers":
+                        single_name = [self.get_shardlayer_prefix(name_splited, LocalSharedLayerDesc)]
                         single_name.extend(name_splited[2:])
                     else:
                         raise ValueError(f"Unexpected key: {k} for pp layer.")
@@ -2961,7 +2973,10 @@ class PipelinePretrainedModel(PretrainedModel):
                         single_name = [] if prefixes[idx] == "" else [prefixes[idx]]
                         single_name.extend(name_splited[1:])
                     elif idx == "shared_layers":
-                        single_name = [self.get_shardlayer_prefix(name_splited)]
+                        single_name = [self.get_shardlayer_prefix(name_splited, SharedLayerDesc)]
+                        single_name.extend(name_splited[2:])
+                    elif idx == "local_shared_layers":
+                        single_name = [self.get_shardlayer_prefix(name_splited, LocalSharedLayerDesc)]
                         single_name.extend(name_splited[2:])
                     else:
                         raise ValueError(f"Unexpected key: {k} for pp layer.")
@@ -2974,7 +2989,7 @@ class PipelinePretrainedModel(PretrainedModel):
 
         return self._single_to_pp_mapping
 
-    def get_shardlayer_prefix(self, name_splited):
+    def get_shardlayer_prefix(self, name_splited, shared_layer_class=SharedLayerDesc):
         """_summary_
             This function retrieves the prefix of a shared layer. The process involves:
             1. Identifying all key names of shared layers, like 'shared_weight01', 'shared_weight02', etc.
@@ -2991,11 +3006,11 @@ class PipelinePretrainedModel(PretrainedModel):
         Returns:
             _type_: _description_
         """
-        shared_layer_names = {s.layer_name for s in self._layers_desc if isinstance(s, SharedLayerDesc)}
+        shared_layer_names = {s.layer_name for s in self._layers_desc if isinstance(s, shared_layer_class)}
         assert name_splited[1] in shared_layer_names, f"The shared layer name {name_splited[1]} must be in prefixes!"
         shared_layer_key = name_splited[1]
         for idx, layer in enumerate(self._layers_desc):
-            if isinstance(layer, SharedLayerDesc) and layer.layer_name == shared_layer_key:
+            if isinstance(layer, shared_layer_class) and layer.layer_name == shared_layer_key:
                 if self.get_stage_from_index(idx) == self._stage_id:
                     return self.get_sequential_name_prefixes()[str(idx)]
 

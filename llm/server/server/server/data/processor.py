@@ -121,9 +121,6 @@ class BaseDataProcessor(ABC):
 class DataProcessor(BaseDataProcessor):
     def __init__(self):
         self.config = Config()
-        max_length = self.config.get_model_config().get('max_length', 1024)
-        self.src_length = self.config.seq_len_limit - max_length
-
 
         self.decode_status = dict()
         self.tokenizer = self._load_tokenizer()
@@ -216,7 +213,7 @@ class DataProcessor(BaseDataProcessor):
                 return_tensors="np",
                 padding=True,
                 truncation=True,
-                max_length=self.src_length,
+                max_length=self.config.seq_len_limit,
                 add_special_tokens=self.tokenizer.chat_template is None,
             )
         return tokens["input_ids"][0]
@@ -290,7 +287,7 @@ class DataProcessor(BaseDataProcessor):
             return AutoTokenizer.from_pretrained(self.config.model_dir, use_fast=False)
         else:
             from paddlenlp.transformers import AutoTokenizer
-            return AutoTokenizer.from_pretrained(self.config.model_dir, use_fast=USE_FAST_TOKENIZER)
+            return AutoTokenizer.from_pretrained(self.config.model_dir, padding_side="left", use_fast=USE_FAST_TOKENIZER)
 
     def clear_request_status(self, task_id):
         """

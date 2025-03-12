@@ -1,4 +1,4 @@
-## 🚣‍♂️ 使用 PaddleNLP 在太初 sdaa 下运行 Llama-2-13b-chat 模型 🚣
+# 使用 PaddleNLP 在太初 sdaa 下运行 Llama-2-13b-chat 模型
 
 PaddleNLP 在太初 sdaa 上对 Llama-2-13b-chat 模型进行了深度适配和优化，实现了 sdaa device 推理入口和 GPU 的基本统一，仅需修改 device 即可完成推理任务的迁移。
 
