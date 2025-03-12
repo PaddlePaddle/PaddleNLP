@@ -22,49 +22,50 @@
 template <paddle::DataType D>
 std::vector<paddle::Tensor> SageAttentionKernel(
     const AppendAttnMetaData& meta_data,
-    const paddle::Tensor& qkv,
-    const paddle::Tensor& key_cache,
-    const paddle::Tensor& value_cache,
-    const paddle::Tensor& seq_lens_encoder,
-    const paddle::Tensor& seq_lens_decoder,
-    const paddle::Tensor& seq_lens_this_time,
-    const paddle::Tensor& padding_offsets,
-    const paddle::Tensor& cum_offsets,
-    const paddle::Tensor& block_tables,
-    const paddle::Tensor& encoder_batch_ids,
-    const paddle::Tensor& encoder_tile_ids_per_batch,
-    const paddle::Tensor& encoder_num_blocks,
-    const paddle::Tensor& kv_batch_ids,
-    const paddle::Tensor& kv_tile_ids_per_batch,
-    const paddle::Tensor& kv_num_blocks,
-    const paddle::Tensor& decoder_batch_ids,
-    const paddle::Tensor& decoder_tile_ids_per_batch,
-    const paddle::Tensor& decoder_num_blocks,
-    const paddle::Tensor& max_enc_len_this_time,
-    const paddle::Tensor& max_dec_len_this_time,
-    const paddle::Tensor& max_len_kv,
-    const paddle::optional<paddle::Tensor>& rotary_embs,
-    const paddle::optional<paddle::Tensor>& attn_mask,
-    const paddle::optional<paddle::Tensor>& qkv_bias,
+    const paddle::Tensor& qkv,  // write kv, sage attn
+    const paddle::Tensor& key_cache,          // write kv
+    const paddle::Tensor& value_cache,        // write kv
+    const paddle::Tensor& seq_lens_encoder,   // write kv
+    const paddle::Tensor& seq_lens_decoder,   // write kv
+    const paddle::Tensor& seq_lens_this_time, // write kv
+    const paddle::Tensor& padding_offsets,    // write kv
+    const paddle::Tensor& cum_offsets,        // write kv
+    const paddle::Tensor& block_tables,       // write kv
+    const paddle::Tensor& encoder_batch_ids,  // not used
+    const paddle::Tensor& encoder_tile_ids_per_batch, // not used
+    const paddle::Tensor& encoder_num_blocks, // utils
+    const paddle::Tensor& kv_batch_ids,       // write kv
+    const paddle::Tensor& kv_tile_ids_per_batch,  // write kv
+    const paddle::Tensor& kv_num_blocks,      // write kv
+    const paddle::Tensor& decoder_batch_ids,  // CascadeAppendAttention
+    const paddle::Tensor& decoder_tile_ids_per_batch, // CascadeAppendAttention
+    const paddle::Tensor& decoder_num_blocks, // utils
+    const paddle::Tensor& max_enc_len_this_time,  // utils
+    const paddle::Tensor& max_dec_len_this_time,  // utils
+    const paddle::Tensor& max_len_kv,         // utils
+    const paddle::optional<paddle::Tensor>& rotary_embs,  // write kv
+    const paddle::optional<paddle::Tensor>& attn_mask,    // CascadeAppendAttention
+    const paddle::optional<paddle::Tensor>& qkv_bias,     // write kv
     const paddle::optional<paddle::Tensor>& qkv_out_scales,     // None
-    const paddle::optional<paddle::Tensor>& cache_k_quant_scales,
-    const paddle::optional<paddle::Tensor>& cache_v_quant_scales,
-    const paddle::optional<paddle::Tensor>& cache_k_dequant_scales,
-    const paddle::optional<paddle::Tensor>& cache_v_dequant_scales,
-    const paddle::optional<paddle::Tensor>& cache_k_zp,
-    const paddle::optional<paddle::Tensor>& cache_v_zp,
-    const paddle::optional<paddle::Tensor>& out_linear_shifts,
-    const paddle::optional<paddle::Tensor>& out_linear_smooths,
-    const std::string& cache_quant_type_str,
-    const bool use_neox_rotary_style,
-    const int max_input_length,
-    const float softmax_scale,
-    const float quant_max_bound,
-    const float quant_min_bound,
-    const float out_linear_in_scale,        // 0.0
-    const int speculate_max_draft_token_num,
-    const bool causal,
-    const bool speculate_decoder) {
+    const paddle::optional<paddle::Tensor>& cache_k_quant_scales, // write kv
+    const paddle::optional<paddle::Tensor>& cache_v_quant_scales, // write kv
+    const paddle::optional<paddle::Tensor>& cache_k_dequant_scales, // CascadeAppendAttention
+    const paddle::optional<paddle::Tensor>& cache_v_dequant_scales, // CascadeAppendAttention
+    const paddle::optional<paddle::Tensor>& cache_k_zp,   // write kv
+    const paddle::optional<paddle::Tensor>& cache_v_zp,   // write kv
+    const paddle::optional<paddle::Tensor>& out_linear_shifts,  // CascadeAppendAttention
+    const paddle::optional<paddle::Tensor>& out_linear_smooths, // CascadeAppendAttention
+    const std::string& cache_quant_type_str,  // write kv
+    const bool use_neox_rotary_style, // write kv
+    const int max_input_length, // write kv
+    const float softmax_scale,  // sage attn
+    const float quant_max_bound,  // CascadeAppendAttention
+    const float quant_min_bound,  // CascadeAppendAttention
+    const float out_linear_in_scale,        // 0.0, CascadeAppendAttention
+    const int speculate_max_draft_token_num,  // CascadeAppendAttention
+    const bool causal,  // sage attention, CascadeAppendAttention
+    const bool speculate_decoder  // CascadeAppendAttention
+) {
   typedef PDTraits<D> traits_;
   typedef typename traits_::DataType DataType_;
   typedef typename traits_::data_t data_t;
@@ -127,10 +128,8 @@ std::vector<paddle::Tensor> SageAttentionKernel(
         &qkv_out,
         const_cast<paddle::Tensor*>(&key_cache),
         const_cast<paddle::Tensor*>(&value_cache));
-    
-    // TODO: Sage Attention
-    // printf("%d %d %d\n", qkv_out.shape()[0], qkv_out.shape()[1], qkv_out.shape()[2]);
-    // q, rope_k, rope_v;;;;;;;; // [token_num, (q_num_head + 2 x kv_num_head) x head_dim]
+
+    // qkv_out: [token_num, (q_num_head + 2 x kv_num_head) x head_dim]
     int batch_size = seq_lens_this_time.shape()[0];
     PD_CHECK(batch_size == 1, "Sage Attention Only support batch_size = 1");
 
@@ -152,43 +151,8 @@ std::vector<paddle::Tensor> SageAttentionKernel(
                                   seq_lens_this_time, vm, 
                                   softmax_scale, std::string("per_warp"), 
                                   std::string("any"), 
-                                  0, true, true, false, false)[0];
+                                  0, causal, true, false, false)[0];
     fmha_out = paddle::reshape(paddle::experimental::squeeze(fmha_out, {0}), {-1, num_q_head * head_dim_qk});
-    // CascadeAppendAttentionKernel<data_t, data_t>(
-    //     meta_data,
-    //     qkv_out,
-    //     key_cache,  // [bsz x (token + block_size - 1// block_size), kv_num_head, head_dim]
-    //     value_cache,
-    //     attn_mask,
-    //     cache_k_dequant_scales,
-    //     cache_v_dequant_scales,
-    //     cache_k_zp,
-    //     cache_v_zp,
-    //     out_linear_shifts,
-    //     out_linear_smooths,
-    //     seq_lens_this_time,
-    //     seq_lens_decoder,
-    //     seq_lens_encoder,
-    //     padding_offsets,
-    //     cum_offsets,
-    //     block_tables,
-    //     encoder_batch_ids,
-    //     encoder_tile_ids_per_batch,
-    //     cache_quant_type_str,
-    //     encoder_num_blocks_data,
-    //     encoder_block_shape_q,
-    //     max_input_length,
-    //     max_enc_len_this_time_data,
-    //     softmax_scale,
-    //     quant_max_bound,
-    //     quant_min_bound,
-    //     out_linear_in_scale,
-    //     speculate_max_draft_token_num,
-    //     causal,
-    //     false,
-    //     true,
-    //     main_stream,
-    //     &fmha_out);
   }
 
   if (max_dec_len_this_time_data > 0) {
