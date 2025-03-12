@@ -295,6 +295,7 @@ def test_append_c16_attention(cache_length, bsz):
 
 
 if __name__ == "__main__":
+    print("CUDA_VERSION >=12.8 is required to compile and run mla benchmark")
     for cache_length in [1023, 2047]:
         for bsz in [1, 16, 32, 64, 128, 256]:
             test_append_c16_attention(cache_length, bsz)

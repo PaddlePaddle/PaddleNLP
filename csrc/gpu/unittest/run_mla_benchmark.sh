@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#建议使用cuda-12.8编译和运行以获得最佳性能
+#请使用cuda-12.8编译和运行benchnark
 export FLAGS_mla_use_tensorcore=1
 export FLAGS_mla_use_wg4=0
 export FLAGS_mla_dec_chunk_size=-1
