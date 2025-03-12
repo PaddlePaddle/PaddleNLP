@@ -23,7 +23,7 @@
 | Model | Pretrain | SFT |  LoRA | DPO |
 |-------|----------|-----|-----|-----|
 | GPT-3 |    ✅    |  🚧   |  🚧  | 🚧   |
-| LlaMa |    ✅    |  ✅   |  ✅  | ✅   |
+| Llama |    ✅    |  ✅   |  ✅  | ✅   |
 | Qwen  |    ✅    |  🚧   |  🚧  | 🚧   |
 | DeepSeek-V3| ✅   |  🚧   |  🚧  | 🚧   |
 
@@ -60,7 +60,7 @@ wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwe
 
 - 动态图模式
 ```python
-# llama finetune example
+# Llama finetune example
 # assume that cur dir is auto_parallel
 # cd ${PaddleNLP_Path}/llm/auto_parallel/
 python -u  -m paddle.distributed.launch \
@@ -68,7 +68,7 @@ python -u  -m paddle.distributed.launch \
     --log_dir "llama_auto_3d"           \
     ./llama/run_pretrain_auto.py ./llama/pretrain_argument.json
 ```
-该配置下运行`llama7B`预训练任务，并行策略为MP2-PP2-DP2，分片策略为Stage1。
+该配置下运行`facebook/llama-7b`预训练任务，并行策略为MP2-PP2-DP2，分片策略为Stage1。
 更多可配置参数，请参考`ModelArguments`, `DataArguments`, `PreTrainingArguments`。
 
 - 动转静模式
@@ -87,14 +87,14 @@ tar -xvf AdvertiseGen.tar.gz
 
 - 动态图模式
 ```python
-# llama finetune example
+# Llama finetune example
 # assume that cur dir is auto_parallel
 # cd ${PaddleNLP_Path}/llm/auto_parallel/
 python -u -m paddle.distributed.launch \
   --gpus "0,1,2,3,4,5,6,7" \
   ./run_finetune_auto.py ./llama/finetune_argument.json
 ```
-该配置下运行`llama-3.1-8B`任务，并行策略为MP2-PP2-DP2，分片策略为Stage2。
+该配置下运行`Meta-Llama-3.1-8B-Instruct`任务，并行策略为MP2-PP2-DP2，分片策略为Stage2。
 更多可配置参数，请参考`GenerateArgument`, `ModelAutoConfig`, `ReftArgument`, `DataConfig`, `SFTAutoConfig`。
 
 - 动转静模式
