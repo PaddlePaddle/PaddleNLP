@@ -140,7 +140,6 @@ sources = [
     "./gpu/speculate_decoding_kernels/speculate_get_output.cc",
 ]
 sources += find_end_files("./gpu/speculate_decoding_kernels", ".cu")
-sources = []
 sources += find_end_files("./gpu/moe/fused_moe/cutlass_kernels/moe_gemm/", ".cu")
 sources += find_end_files("./gpu/moe/fused_moe/", ".cu")
 
