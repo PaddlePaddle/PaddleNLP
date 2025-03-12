@@ -52,7 +52,6 @@ print(paddle.utils.run_check())
 ### 数据准备
 项目提供了预先处理好的数据方便用户测试模型，下载到 `data` 目录下：
 ```shell
-# llama 模型数据下载
 mkdir -p data && cd data
 wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.{bin,idx}
 ```
