@@ -29,6 +29,26 @@ def update_git_submodule():
         print(f"Error occurred while updating git submodule: {str(e)}")
         raise
 
+def build_glog():
+    """Automatically build glog if it is not already built."""
+    glog_src_dir = "./third_party/glog"
+    glog_build_dir = os.path.join(glog_src_dir, "build")
+
+    if os.path.exists(os.path.join(glog_build_dir, "libglog.a")) or os.path.exists(
+        os.path.join(glog_build_dir, "libglog.so")
+    ):
+        print("glog is already built.")
+        return
+    # Build glog
+    print("Building glog...")
+    os.makedirs(glog_build_dir, exist_ok=True)
+    subprocess.run(["cmake", ".."], cwd=glog_build_dir, check=True)
+    subprocess.run(["make"], cwd=glog_build_dir, check=True)
+    # Install glog to system paths
+    print("Installing glog...")
+    subprocess.run(["make", "install"], cwd=glog_build_dir, check=True)
+    print("glog build and installation completed.")
+
 
 def find_end_files(directory, end_str):
     gen_files = []
@@ -80,7 +100,7 @@ def get_gencode_flags():
 
 
 gencode_flags = get_gencode_flags()
-library_path = os.environ.get("LD_LIBRARY_PATH", "/usr/local/cuda/lib64")
+library_path = [os.environ.get("LD_LIBRARY_PATH", "/usr/local/cuda/lib64"), "./third_party/glog/build"]
 
 sources = [
     "./gpu/save_with_output.cc",
@@ -124,6 +144,7 @@ sources += find_end_files("./gpu/moe/fused_moe/", ".cu")
 
 nvcc_compile_args = gencode_flags
 update_git_submodule()
+build_glog()
 nvcc_compile_args += [
     "-O3",
     "-U__CUDA_NO_HALF_OPERATORS__",
@@ -132,17 +153,19 @@ nvcc_compile_args += [
     "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
     "-U__CUDA_NO_BFLOAT162_OPERATORS__",
     "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
-    "-Igpu",
-    "-Igpu/cutlass_kernels",
-    "-Igpu/fp8_gemm_with_cutlass",
-    "-Igpu/cutlass_kernels/fp8_gemm_fused/autogen",
-    "-Ithird_party/cutlass/include",
-    "-Ithird_party/cutlass/tools/util/include",
-    "-Ithird_party/nlohmann_json/single_include",
-    "-Igpu/sample_kernels",
-    "-Igpu/moe/fused_moe",
 ]
 
+include_dirs = [
+    "./gpu",
+    "./gpu/cutlass_kernels",
+    "./gpu/fp8_gemm_with_cutlass",
+    "./gpu/cutlass_kernels/fp8_gemm_fused/autogen",
+    "./third_party/cutlass/include",
+    "./third_party/cutlass/tools/util/include",
+    "./third_party/nlohmann_json/single_include",
+    "./gpu/sample_kernels",
+    "./gpu/moe/fused_moe",
+]
 cc = get_sm_version()
 cuda_version = float(paddle.version.cuda())
 
@@ -188,7 +211,9 @@ setup(
     ext_modules=CUDAExtension(
         sources=sources,
         extra_compile_args={"cxx": ["-O3"], "nvcc": nvcc_compile_args},
-        libraries=["cublasLt"],
-        library_dirs=[library_path],
+        libraries=["cublasLt", "glog"],
+        library_dirs=library_path,
+        include_dirs=include_dirs,
+        define_macros=[("GLOG_USE_GLOG_EXPORT", "1")],
     ),
 )

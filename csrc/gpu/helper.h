@@ -33,6 +33,7 @@ namespace cub = hipcub;
 #else
 #include <cub/cub.cuh>
 #include <curand_kernel.h>
+#include <glog/logging.h>
 #endif
 #include <iostream>
 #include <fstream>
@@ -43,6 +44,7 @@ namespace cub = hipcub;
 #include "paddle/phi/core/allocator.h"
 #include "paddle/phi/backends/gpu/gpu_info.h"
 #include "nlohmann/json.hpp"
+
 
 using json = nlohmann::json;
 

@@ -247,8 +247,8 @@ class MoeHelper {
       {num_rows * k, inter_size}, input_type, place);
     T *fc1_out = fc1_out_tensor.data<T>();
 
-    // VLOG(4) << " gemm method is :" << gemm_method_
-    //         << ". group_moe is :" << group_moe;
+    VLOG(4) << " gemm method is :" << gemm_method_
+            << ". group_moe is :" << group_moe;
 
     auto input_cast_tensor = paddle::experimental::cast(*input, paddle::DataType::FLOAT32);
     auto gate_tensor = paddle::experimental::matmul(input_cast_tensor, *gate_weight);
