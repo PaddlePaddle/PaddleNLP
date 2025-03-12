@@ -253,7 +253,7 @@ def main():
         return_tensors="np",
         return_attention_mask=not model_args.flash_mask,
         pad_to_multiple_of=data_args.pad_to_multiple_of,
-        return_position_ids=model_args.return_position_ids,
+        return_position_ids=embedding_args.return_position_ids,
     )
     trainer = EmbeddingTrainer(
         model=model,
