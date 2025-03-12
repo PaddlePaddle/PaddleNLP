@@ -566,6 +566,7 @@ taskflow (){
     print_info $? taskflow
 }
 llm(){
+    export http_proxy=${proxy} && export https_proxy=${proxy}
     if git diff --numstat "$AGILE_COMPILE_BRANCH" | awk '{print $NF}' | grep -q '^csrc/'; then
         echo "Found modifications in csrc, running setup_cuda.py install and uploading it to bos."
         cd ${nlp_dir}/csrc
@@ -584,7 +585,6 @@ llm(){
     
     echo ' Testing all LLMs '
     cd ${nlp_dir}
-    export http_proxy=${proxy} && export https_proxy=${proxy}
     python -m pytest tests/llm/test_*.py -vv --timeout=300 --alluredir=result >${log_path}/llm.log >>${log_path}/llm.log 2>&1
     print_info $? llm
 }
