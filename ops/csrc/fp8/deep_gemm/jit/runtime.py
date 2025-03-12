@@ -20,11 +20,6 @@ import ctypes
 import os
 from typing import Optional
 
-import paddle
-from paddle import Tensor
-
-from .template import map_ctype
-
 
 class Runtime:
     def __init__(self, path: str) -> None:
@@ -46,20 +41,20 @@ class Runtime:
 
     def __call__(self, *args) -> int:
         # Load SO file
-        if self.lib is None or self.args is None:
+        if self.lib is None:
             self.lib = ctypes.CDLL(os.path.join(self.path, "kernel.so"))
-            with open(os.path.join(self.path, "kernel.args"), "r") as f:
-                self.args = eval(f.read())
 
-        # Check args and launch
-        assert len(args) == len(self.args), f"Expected {len(self.args)} arguments, got {len(args)}"
-        cargs = []
-        for arg, (name, dtype) in zip(args, self.args):
-            if isinstance(arg, Tensor):
-                assert arg.dtype == dtype, f"Expected tensor dtype `{dtype}` for `{name}`, got `{arg.dtype}`"
-            else:
-                assert isinstance(arg, dtype), f"Expected built-in type `{dtype}` for `{name}`, got `{type(arg)}`"
-            cargs.append(map_ctype(arg))
+        cargs = [
+            ctypes.c_void_p(args[0].data_ptr()),
+            ctypes.c_void_p(args[1].data_ptr()),
+            ctypes.c_void_p(args[2].data_ptr()),
+            ctypes.c_void_p(args[3].data_ptr()),
+            ctypes.c_void_p(args[4].data_ptr()),
+            ctypes.c_int(args[5]),
+            ctypes.c_void_p(args[6].cuda_stream),
+            ctypes.c_int(args[7]),
+            ctypes.c_int(args[8]),
+        ]
 
         return_code = ctypes.c_int(0)
         self.lib.launch(*cargs, ctypes.byref(return_code))
