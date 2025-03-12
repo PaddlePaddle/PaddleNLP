@@ -86,6 +86,7 @@ install_requirements
 set_env
 cd ${nlp_dir}
 echo ' Testing all unittest cases '
+export http_proxy=${proxy} && export https_proxy=${proxy}
 set +e
 pytest -v -n 8 \
   --dist loadgroup \
