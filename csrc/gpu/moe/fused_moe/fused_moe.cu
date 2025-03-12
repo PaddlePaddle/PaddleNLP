@@ -148,7 +148,7 @@ std::vector<paddle::DataType> FusedExpertMoeInferDtype(
 }
 
 
-PD_BUILD_OP(fused_expet_moe)
+PD_BUILD_OP(fused_expert_moe)
     .Inputs({"input",
              "gate_weight",
              "ffn1_weight",

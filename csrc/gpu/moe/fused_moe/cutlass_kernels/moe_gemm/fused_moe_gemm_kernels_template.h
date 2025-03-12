@@ -42,8 +42,8 @@
 
 #pragma GCC diagnostic pop
 
-#include "cutlass_kernels/cutlass_heuristic.h"
-#include "cutlass_kernels/gemm_config_manager.h"
+#include "paddle/phi/kernels/fusion/cutlass/cutlass_kernels/cutlass_heuristic.h"
+#include "paddle/phi/kernels/fusion/cutlass/cutlass_kernels/gemm_config_manager.h"
 
 #include "helper.h"
 

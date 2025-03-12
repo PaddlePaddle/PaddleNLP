@@ -24,11 +24,16 @@ from paddle.framework import in_dynamic_mode
 from paddle.incubate.nn.functional import (
     fused_bias_act,
     fused_layer_norm,
-    fused_moe,
     fused_rms_norm,
     masked_multihead_attention,
     variable_length_memory_efficient_attention,
 )
+from paddlenlp_ops import (
+                moe_expert_dispatch,
+                moe_expert_ffn,
+                moe_expert_reduce,
+                fused_expert_moe
+            )
 from paddle.nn import Layer
 from paddle.nn.initializer import Constant
 from paddle.nn.quant import weight_only_linear
@@ -1293,11 +1298,6 @@ class FusedMultiTransformerBase(Layer):
             gate_out = paddle.matmul(tmp_out.cast("float32"), self.gate_weights[i])
             # 应用各种策略后重塑的 scores
             scores = get_moe_scores(gate_out, self.config.moe_config)
-            from paddlenlp_ops import (
-                moe_expert_dispatch,
-                moe_expert_ffn,
-                moe_expert_reduce,
-            )
 
             (
                 permute_input,
@@ -1328,7 +1328,7 @@ class FusedMultiTransformerBase(Layer):
                 routed_scaling_factor=1.0,  # 在noaux_tc中做了
             )
         else:
-            fused_moe_out = fused_moe(
+            fused_moe_out = fused_expert_moe(
                 tmp_out,
                 self.gate_weights[i],
                 self.ffn1_weights[i],
