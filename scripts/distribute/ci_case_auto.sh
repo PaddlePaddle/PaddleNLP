@@ -3357,6 +3357,10 @@ function before_hook_for_llama() {
             # download data for llama finetune
             wget -O ${llama_data_path}/AdvertiseGen.tar.gz https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz
             tar -xvf ${llama_data_path}/AdvertiseGen.tar.gz -C ${llama_data_path}
+        fi
+        if [[ -e ${llama_data_path}/data_dpo ]]; then
+            echo "LLaMA DPO data downloaded"
+        else
             # download data for llama dpo
             wget -O ${llama_data_path}/ultrafeedback_binarized.tar.gz https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized.tar.gz
             mkdir ${llama_data_path}/data_dpo;
