@@ -935,7 +935,6 @@ class ActorFusedPGEntropyKLLoss(paddle.autograd.PyLayer):
             kl_loss_coeff = 0.0
         if tensor_parallel_degree > 1:
             assert tensor_parallel_output, "tensor_parallel_output must be True when tensor_parallel_degree > 1."
-        assert pg_loss_coeff > 0.0, "pg_loss_coeff must be greater than 0."
 
         dtype = hidden_states.dtype
 
@@ -978,6 +977,7 @@ class ActorFusedPGEntropyKLLoss(paddle.autograd.PyLayer):
         else:
             indices = paddle.arange(vocab_size, dtype=labels.dtype).unsqueeze(0)
 
+        final_loss = paddle.zeros([1], dtype="float32")
         total_pg_loss = paddle.zeros([1], dtype="float32")
         total_entropy_loss = paddle.zeros([1], dtype="float32")
         total_kl_loss = paddle.zeros([1], dtype="float32")
@@ -1051,13 +1051,17 @@ class ActorFusedPGEntropyKLLoss(paddle.autograd.PyLayer):
             if entropy_coeff > 0:
                 # [2] entropy loss
                 log_prob_chunk = paddle.log(paddle.clip(softmax_out_chunk, min=1e-12))
-                entropy_loss_chunk = (softmax_out_chunk * log_prob_chunk).sum(axis=-1) * mask_chunk
+                entropy_loss_chunk = -(softmax_out_chunk * log_prob_chunk).sum(axis=-1) * mask_chunk
                 total_entropy_loss += entropy_loss_chunk.sum() * entropy_coeff / divisor
 
                 # gradgradgradgrad entropy loss
-                grad_softmax_out_chunk = (log_prob_chunk + 1) * mask_chunk.unsqueeze(-1) * entropy_coeff / divisor
-                sum_term = (softmax_out_chunk * grad_softmax_out_chunk).sum(axis=-1, keepdim=True)
-                d_entropy_logits_chunk = softmax_out_chunk * (grad_softmax_out_chunk - sum_term)
+                # grad_softmax_out_chunk = -(log_prob_chunk + 1) * mask_chunk.unsqueeze(-1) * entropy_coeff / divisor
+                # sum_term = (softmax_out_chunk * grad_softmax_out_chunk).sum(axis=-1, keepdim=True)
+                # d_entropy_logits_chunk = softmax_out_chunk * (grad_softmax_out_chunk - sum_term)
+                H = entropy_loss_chunk.unsqueeze(-1)
+                d_entropy_logits_chunk = (
+                    -softmax_out_chunk * (log_prob_chunk + H) * mask_chunk.unsqueeze(-1) * entropy_coeff / divisor
+                )
 
             if kl_loss_coeff > 0:
                 # [3] kl loss
@@ -1083,7 +1087,7 @@ class ActorFusedPGEntropyKLLoss(paddle.autograd.PyLayer):
 
             d_total_logits_chunk = d_pg_log_probs_chunk.unsqueeze(-1) * grad_logits_chunk
             if entropy_coeff > 0:
-                d_total_logits_chunk += d_entropy_logits_chunk
+                d_total_logits_chunk -= d_entropy_logits_chunk
             if kl_loss_coeff > 0:
                 d_total_logits_chunk += d_kl_log_probs_chunk.unsqueeze(-1) * grad_logits_chunk
 
@@ -1101,14 +1105,14 @@ class ActorFusedPGEntropyKLLoss(paddle.autograd.PyLayer):
             if grad_lm_head_bias is not None:
                 grad_lm_head_bias += d_total_logits_chunk.astype("float32").sum(axis=0).astype(dtype)
 
-        final_loss = total_pg_loss
+        final_loss += total_pg_loss
         if entropy_coeff > 0:
             # softmax_out_chunk shape is [bs, seqlen, vocab_size // tensor_parallel_degree], do all_reduce sum here
             if tensor_parallel_degree > 1 and tensor_parallel_output:
                 paddle.distributed.all_reduce(
                     total_entropy_loss, op=paddle.distributed.ReduceOp.SUM, group=model_parallel_group
                 )
-            final_loss += total_entropy_loss
+            final_loss -= total_entropy_loss
         if kl_loss_coeff > 0:
             final_loss += total_kl_loss
 
@@ -1127,7 +1131,7 @@ class ActorFusedPGEntropyKLLoss(paddle.autograd.PyLayer):
             *filter(lambda x: x is not None, [grad_hidden_states, grad_lm_head_weight, grad_lm_head_bias])
         )
 
-        return final_loss, total_pg_loss, -total_entropy_loss, total_kl_loss
+        return final_loss, total_pg_loss, total_entropy_loss, total_kl_loss
 
     @staticmethod
     def backward(ctx, grad_output, *args):
