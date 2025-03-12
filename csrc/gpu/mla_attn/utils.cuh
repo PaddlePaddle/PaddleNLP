@@ -266,7 +266,7 @@ __global__ void merge_multi_chunks_kernel(const T * __restrict__ multi_out, // [
                                           const int head_dim,
                                           const int token_num,
                                           const int bsz,
-                                          const int max_draft_token_num) {
+                                          const int draft_total_token_num) {
   const int vid = threadIdx.x, ty = threadIdx.y;
   const int hid = blockIdx.y;
   __shared__ T smem[bdy * HEAD_DIM];
@@ -310,13 +310,13 @@ __global__ void merge_multi_chunks_kernel(const T * __restrict__ multi_out, // [
 
     for (int i = ty; i < num_chunks_this_seq; i += bdy) {
       uint32_t offset;
-      offset = ((i * bsz + bid) * max_draft_token_num + local_seq_id) * num_heads + hid;
+      offset = ((i * bsz + bid) * draft_total_token_num + local_seq_id) * num_heads + hid;
       float m_prev = m;
       float d_prev = d;
       const float m_now = multi_m[offset];
       const float d_now = multi_d[offset];
       m = max(m_prev, m_now);
-      offset = (((i * bsz + bid) * max_draft_token_num + local_seq_id) * num_heads + hid) * head_dim + vid * vec_size;
+      offset = (((i * bsz + bid) * draft_total_token_num + local_seq_id) * num_heads + hid) * head_dim + vid * vec_size;
       Load<T, vec_size>(&multi_out[offset], &load_vec);
       const float scale1 = __expf(m_prev - m), scale2 = __expf(m_now - m);
       const T scale1_T = static_cast<T>(scale1), scale2_T = static_cast<T>(scale2);

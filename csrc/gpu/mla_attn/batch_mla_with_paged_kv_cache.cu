@@ -88,7 +88,7 @@ void BatchMLAWithPagedKVCacheKernel(
     const float quant_max_bound,
     const float quant_min_bound,
     const float in_scale,
-    const int draft_token_num,
+    const int draft_total_token_num,
     const bool causal,
     cudaStream_t& stream,
     paddle::Tensor* out) {
@@ -101,34 +101,36 @@ void BatchMLAWithPagedKVCacheKernel(
   const auto max_block_num_per_seq = meta_data.max_blocks_per_seq;
   const auto max_block_num = bsz * max_block_num_per_seq;
   const bool mla_use_wg4 = get_mla_use_wg4();
-
-
+#if CUDA_VERSION >= 12080
+  constexpr bool USE_REG_EALLOC = true;
+#else
+  constexpr bool USE_REG_EALLOC = false;
+#endif
   int q_head_dim = meta_data.head_dims;
   int k_head_dim = meta_data.head_dims;
   int v_head_dim = meta_data.head_dims_v;
   // int num_chunks = max_dec_len / chunk_size;
   int num_chunks = div_up(max_dec_len, chunk_size);
 
-
-
   auto *allocator = paddle::GetAllocator(q.place());
   phi::Allocator::AllocationPtr O_tmp, m_tmp, d_tmp;
   O_tmp = allocator->Allocate(
       phi::SizeOf(q.dtype()) *
-      static_cast<size_t>(num_chunks * bsz * draft_token_num * q_head_num * v_head_dim));
+      static_cast<size_t>(num_chunks * bsz * draft_total_token_num * q_head_num * v_head_dim));
   m_tmp = allocator->Allocate(
       sizeof(float) *
-      static_cast<size_t>(num_chunks * bsz * draft_token_num * q_head_num));
+      static_cast<size_t>(num_chunks * bsz * draft_total_token_num * q_head_num));
   d_tmp = allocator->Allocate(
       sizeof(float) *
-      static_cast<size_t>(num_chunks * bsz * draft_token_num * q_head_num));
+      static_cast<size_t>(num_chunks * bsz * draft_total_token_num * q_head_num));
 
   if (q_head_dim == 576) {
       if (mla_use_wg4 && block_size == 32) {
         if constexpr (!std::is_same<CUTLASS_TYPE, cutlass::half_t>::value) {
           PD_THROW("error!!! mla_wg4 not supports bf16 now!!!\n");
         } else {
-          Params<cutlass::half_t, cutlass::half_t, cutlass::half_t, int> params = {};
+          using ParamsType = Params<cutlass::half_t, cutlass::half_t, cutlass::half_t, int> ;
+          ParamsType params = {};
           params.Q = reinterpret_cast<cutlass::half_t*>(const_cast<T*>(q.data<T>()));
           params.KV = reinterpret_cast<cutlass::half_t*>(const_cast<T*>(latent_cache.data<T>()));
           params.O = reinterpret_cast<cutlass::half_t*>(const_cast<T*>(out->data<T>()));
@@ -160,16 +162,17 @@ void BatchMLAWithPagedKVCacheKernel(
           params.qk_head_dim = q_head_dim;
           params.vo_head_dim = v_head_dim;
           params.block_size = block_size;
-          params.max_draft_token_num = draft_token_num;
+          params.draft_total_token_num = draft_total_token_num;
           params.sm_scale = softmax_scale;
           params.chunk_size = chunk_size;
           params.chunk_num = num_chunks;
-          BatchMLAWithPagedKVCacheWG4Dispatched<576, 512, half, Params<cutlass::half_t, cutlass::half_t, cutlass::half_t, int>>(
+          BatchMLAWithPagedKVCacheWG4Dispatched<576, 512, half, ParamsType, USE_REG_EALLOC>(
               params, stream
           );
         }
       } else {
-        Params<CUTLASS_TYPE, CUTLASS_TYPE, CUTLASS_TYPE, int> params = {};
+        using ParamsType = Params<CUTLASS_TYPE, CUTLASS_TYPE, CUTLASS_TYPE, int>;
+        ParamsType params = {};
         params.Q = reinterpret_cast<CUTLASS_TYPE*>(const_cast<T*>(q.data<T>()));
         params.KV = reinterpret_cast<CUTLASS_TYPE*>(const_cast<T*>(latent_cache.data<T>()));
         params.O = reinterpret_cast<CUTLASS_TYPE*>(const_cast<T*>(out->data<T>()));
@@ -201,11 +204,11 @@ void BatchMLAWithPagedKVCacheKernel(
         params.qk_head_dim = q_head_dim;
         params.vo_head_dim = v_head_dim;
         params.block_size = block_size;
-        params.max_draft_token_num = draft_token_num;
+        params.draft_total_token_num = draft_total_token_num;
         params.sm_scale = softmax_scale;
         params.chunk_size = chunk_size;
         params.chunk_num = num_chunks;
-        BatchMLAWithPagedKVCacheDispatched<576, 512, NV_TYPE>(
+        BatchMLAWithPagedKVCacheDispatched<576, 512, NV_TYPE, ParamsType, USE_REG_EALLOC>(
             params, stream
         );
       }
@@ -244,7 +247,7 @@ template void BatchMLAWithPagedKVCacheKernel<paddle::bfloat16>(
     const float quant_max_bound,
     const float quant_min_bound,
     const float in_scale,
-    const int draft_token_num,
+    const int draft_total_token_num,
     const bool causal,
     cudaStream_t& stream,
     paddle::Tensor* out);
@@ -280,7 +283,7 @@ template void BatchMLAWithPagedKVCacheKernel<paddle::float16>(
     const float quant_max_bound,
     const float quant_min_bound,
     const float in_scale,
-    const int draft_token_num,
+    const int draft_total_token_num,
     const bool causal,
     cudaStream_t& stream,
     paddle::Tensor* out);

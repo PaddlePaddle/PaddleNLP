@@ -149,7 +149,7 @@ struct CollectiveMainloop {
     int o_stride_head_num;
     int chunk_size;
     int chunk_num;
-    int max_draft_token_num;
+    int draft_total_token_num;
   };
 
   // Device side kernel params
@@ -182,7 +182,7 @@ struct CollectiveMainloop {
     int o_stride_head_num;
     int chunk_size;
     int chunk_num;
-    int max_draft_token_num;
+    int draft_total_token_num;
     TMA_KV tma_load_KV;
   };
 
@@ -221,7 +221,7 @@ struct CollectiveMainloop {
             args.o_stride_head_num,
             args.chunk_size,
             args.chunk_num,
-            args.max_draft_token_num,
+            args.draft_total_token_num,
             tma_load_KV
             };
   }

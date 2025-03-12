@@ -235,7 +235,7 @@ std::vector<paddle::Tensor> GetBlockShapeAndSplitKVBlock(
       cudaGetDevice(&device);
       int sm_cout;
       cudaDeviceGetAttribute(&sm_cout, cudaDevAttrMultiProcessorCount, device);
-      constexpr int config_size = 10; // search space for chunk size:[64, 128, 256, ... 32768]
+      constexpr int config_size = 12; // search space for chunk size:[64, 128, 256, ... 131072]
 
       search_chunk_size_for_mla<config_size><<<1, 32, 0, stream>>>(
         seq_lens_this_time.data<int>(),

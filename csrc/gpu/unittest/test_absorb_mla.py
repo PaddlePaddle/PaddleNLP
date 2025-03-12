@@ -53,7 +53,7 @@ def get_padding_offset(bsz, max_seq_len, seq_lens_this_time):
 
 RUN_TIME = 1
 WARM_UP = 0
-BLOCK_SIZE = 64
+BLOCK_SIZE = 32
 HEAD_DIM_QK = 576
 HEAD_DIM_V = 512
 PE_SIZE = 64
@@ -61,29 +61,29 @@ MAX_LENGTH = 8192
 MAX_DEC_LEN = 1024
 NUM_Q_HEAD = 8
 NUM_KV_HEAD = 1
-dtype = "bfloat16"
-MAX_DRAFT_TOKEN_NUM = 1
+dtype = "float16"
+DRAFT_TOTAL_TOKEN_NUM = 1
 CAUSAL = True
 
 SPECULATE_DECODER = False
 
 
 def ref_attention(q_all, p_compressed_kv, compressed_kv, p_key_pe, key_pe, bsz, cache_length, softmax_scale):
-    q = q_all.reshape([bsz, MAX_DRAFT_TOKEN_NUM, NUM_Q_HEAD, HEAD_DIM_QK])
+    q = q_all.reshape([bsz, DRAFT_TOTAL_TOKEN_NUM, NUM_Q_HEAD, HEAD_DIM_QK])
     p_compressed_kv = p_compressed_kv.reshape((bsz, cache_length, HEAD_DIM_V))
-    compressed_kv = compressed_kv.reshape((bsz, MAX_DRAFT_TOKEN_NUM, HEAD_DIM_V))
+    compressed_kv = compressed_kv.reshape((bsz, DRAFT_TOTAL_TOKEN_NUM, HEAD_DIM_V))
     p_key_pe = p_key_pe.reshape((bsz, cache_length, PE_SIZE))
-    key_pe = key_pe.reshape((bsz, MAX_DRAFT_TOKEN_NUM, PE_SIZE))
+    key_pe = key_pe.reshape((bsz, DRAFT_TOTAL_TOKEN_NUM, PE_SIZE))
 
     p_k = paddle.concat([p_compressed_kv, p_key_pe], axis=-1).reshape((bsz, cache_length, HEAD_DIM_QK))
-    k = paddle.concat([compressed_kv, key_pe], axis=-1).reshape((bsz, MAX_DRAFT_TOKEN_NUM, HEAD_DIM_QK))
+    k = paddle.concat([compressed_kv, key_pe], axis=-1).reshape((bsz, DRAFT_TOTAL_TOKEN_NUM, HEAD_DIM_QK))
     k = paddle.concat([p_k, k], axis=1).transpose([0, 2, 1])
     v = paddle.concat([p_compressed_kv, compressed_kv], axis=1).reshape(
-        (bsz, cache_length + MAX_DRAFT_TOKEN_NUM, HEAD_DIM_V)
+        (bsz, cache_length + DRAFT_TOTAL_TOKEN_NUM, HEAD_DIM_V)
     )
 
-    out = paddle.zeros(shape=[bsz, MAX_DRAFT_TOKEN_NUM, NUM_Q_HEAD, HEAD_DIM_V], dtype=dtype)
-    for i in range(MAX_DRAFT_TOKEN_NUM):
+    out = paddle.zeros(shape=[bsz, DRAFT_TOTAL_TOKEN_NUM, NUM_Q_HEAD, HEAD_DIM_V], dtype=dtype)
+    for i in range(DRAFT_TOTAL_TOKEN_NUM):
         for j in range(NUM_Q_HEAD):
 
             query = q[:, i, j, :].reshape([-1, 1, HEAD_DIM_QK])
@@ -147,7 +147,7 @@ def test_append_c16_attention(cache_length, bsz):
         cache_length,
     ] * bsz
     seq_lens_this_time = [
-        MAX_DRAFT_TOKEN_NUM,
+        DRAFT_TOTAL_TOKEN_NUM,
     ] * bsz
     max_enc_len_this_time = max(seq_lens_enc)
     max_dec_len_this_time = max(seq_lens_dec)
@@ -197,7 +197,7 @@ def test_append_c16_attention(cache_length, bsz):
         cum_offsets,
         NUM_Q_HEAD // NUM_KV_HEAD,
         BLOCK_SIZE,
-        MAX_DRAFT_TOKEN_NUM,
+        DRAFT_TOTAL_TOKEN_NUM,
     )
     softmax_scale = HEAD_DIM_QK ** (-0.5)
 
@@ -278,7 +278,7 @@ def test_append_c16_attention(cache_length, bsz):
             0.0,
             0.0,
             0.0,  # out_linear_in_scale
-            MAX_DRAFT_TOKEN_NUM,  # max_draft_token_num
+            DRAFT_TOTAL_TOKEN_NUM,  # DRAFT_TOTAL_TOKEN_NUM
             CAUSAL,
             SPECULATE_DECODER,
         )
@@ -288,8 +288,8 @@ def test_append_c16_attention(cache_length, bsz):
     out = out.reshape([-1, NUM_Q_HEAD, HEAD_DIM_V])
     alloc_diff(ref_out, out)
     print(
-        "dec bsz:{}, num_q_head:{}, cache_length:{}, chunk_size{}, cost_time:{}ms".format(
-            bsz, NUM_Q_HEAD, cache_length, decoder_chunk_size, (e_time - s_time) / RUN_TIME * 1000
+        "dec bsz:{}, num_q_head:{}, cache_length:{}, cost_time:{}ms".format(
+            bsz, NUM_Q_HEAD, cache_length, (e_time - s_time) / RUN_TIME * 1000
         )
     )
 
