@@ -1,17 +1,32 @@
-from paddlenlp.transformers import AutoModel, AutoConfig
-from paddlenlp.transformers import AutoTokenizer
+# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import json
-from tqdm import tqdm
-import paddle
-import paddle.nn as nn
-import paddle.distributed as dist
-import numpy as np
+
 import faiss
+import numpy as np
+import paddle
+import paddle.distributed as dist
+from tqdm import tqdm
+
+from paddlenlp.transformers import AutoConfig, AutoModel, AutoTokenizer
+
 
 class Clean_Query:
     def __init__(
-        self, 
-        model_path, 
+        self,
+        model_path,
         tokenizer_path,
         input_data_path,
         output_data_path,
@@ -20,15 +35,17 @@ class Clean_Query:
         max_src_len=8192,
         normalize=True,
         dtype=None,
-        similarity_threshold=0.75):
+        similarity_threshold=0.75,
+    ):
         # Initialize the tokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(
             tokenizer_path,
             padding_side="right",
-            truncation_side="right",)
+            truncation_side="right",
+        )
 
         self.config = AutoConfig.from_pretrained(model_path)
-        self.config.embedding_negatives_cross_device=False
+        self.config.embedding_negatives_cross_device = False
         self.dtype = dtype if dtype else self.config.dtype
 
         # Initialize the distributed environment
@@ -38,23 +55,21 @@ class Clean_Query:
             print(f"Running in multi-GPU mode with {world_size} GPUs.")
         else:
             print("Running in single-GPU or CPU mode.")
-        
+
         # Initialize the embedding model
-        self.model=AutoModel.from_pretrained(
-            model_path,
-            config=self.config,
-            dtype=self.dtype,
-            low_cpu_mem_usage=False)
+        self.model = AutoModel.from_pretrained(
+            model_path, config=self.config, dtype=self.dtype, low_cpu_mem_usage=False
+        )
         self.model.eval()
 
         self.input_data_path = input_data_path
         self.output_data_path = output_data_path
-        self.template=template
-        self.dimension=dimension
-        self.max_src_len=max_src_len
-        self.normalize=normalize
-        self.similarity_threshold=similarity_threshold
-    
+        self.template = template
+        self.dimension = dimension
+        self.max_src_len = max_src_len
+        self.normalize = normalize
+        self.similarity_threshold = similarity_threshold
+
     def _preprocess(self, texts):
         """Pre-process inputs."""
         template_prefix, template_suffix = self.template.split("{text}")
@@ -128,29 +143,29 @@ class Clean_Query:
         inputs = self._preprocess(texts)
         if self.config.model_type in ["xlm-roberta"]:
             del inputs["embedding_indices"]
-            del inputs['position_ids']
+            del inputs["position_ids"]
         outputs = self._forward(inputs, dimension)
         return outputs
 
     def clean(self):
-        data_list=[]
+        data_list = []
         with open(self.input_data_path, "r") as f:
             for line in tqdm(f):
                 data_list.append(json.loads(line))
-        
-        query_list=[single_data['query'] for single_data in data_list]
 
-        data_list=data_list[:10000]
-        query_list=query_list[:10000]
+        query_list = [single_data["query"] for single_data in data_list]
+
+        data_list = data_list[:10000]
+        query_list = query_list[:10000]
 
         world_size = paddle.distributed.get_world_size()
         rank = paddle.distributed.get_rank()
         chunk_size = len(query_list) // world_size
         if rank == world_size - 1:
             # The last process handles the remaining data
-            query_data_chunk=query_list[rank * chunk_size:]
+            query_data_chunk = query_list[rank * chunk_size :]
         else:
-            query_data_chunk=query_list[rank * chunk_size: (rank + 1) * chunk_size]
+            query_data_chunk = query_list[rank * chunk_size : (rank + 1) * chunk_size]
 
         batch_size = 4  # Adjust batch size according to your hardware and needs
         local_q_vecs = []
@@ -160,11 +175,11 @@ class Clean_Query:
             batch_start = batch
             batch_end = min(batch_start + batch_size, len(query_data_chunk))
             batch_texts = query_data_chunk[batch_start:batch_end]
-            
+
             # Call get_embedding to obtain embeddings for the current batch
             batch_embeddings = self.get_embedding(batch_texts)
             local_q_vecs.extend(batch_embeddings)
-        
+
         local_q_vecs_file = f"local_q_vecs_rank_{rank}.npy"
         np.save(local_q_vecs_file, local_q_vecs)
         dist.barrier()  # Ensure all cards have reached this point before continuing
@@ -192,25 +207,25 @@ class Clean_Query:
                 co.useFloat16 = False
                 index = faiss.index_cpu_to_all_gpus(index, co=co)
 
-            temp_query_embedding=q_vecs[0].reshape(1,-1)
+            temp_query_embedding = q_vecs[0].reshape(1, -1)
             # faiss.normalize_L2(temp_query_embedding)
             # print(q_vecs.shape)
             # print(temp_query_embedding)
             # print(temp_query_embedding.shape)
             index.add(temp_query_embedding)
 
-            clean_data_list=[data_list[0]]
-            temp_query_list=[query_list[0]]
-            for i in tqdm(range(1,len(query_list))):
-                single_query_embedding=q_vecs[i].reshape(1,-1)
+            clean_data_list = [data_list[0]]
+            temp_query_list = [query_list[0]]
+            for i in tqdm(range(1, len(query_list))):
+                single_query_embedding = q_vecs[i].reshape(1, -1)
                 # faiss.normalize_L2(single_query_embedding)
 
-                if i<3:
+                if i < 3:
                     top_values, top_indices = index.search(single_query_embedding, 1)
                 else:
                     top_values, top_indices = index.search(single_query_embedding, 3)
 
-                if top_values[0][0]<self.similarity_threshold:
+                if top_values[0][0] < self.similarity_threshold:
                     clean_data_list.append(data_list[i])
                     index.add(single_query_embedding)
                     temp_query_list.append(query_list[i])
@@ -223,16 +238,22 @@ class Clean_Query:
                 # if i%10000==0:
                 #     print(len(clean_data_list))
 
-            with open(self.output_data_path, 'w', encoding='utf-8') as f:
+            with open(self.output_data_path, "w", encoding="utf-8") as f:
                 for data in clean_data_list:
                     f.write(json.dumps(data, ensure_ascii=False))
                     f.write("\n")
 
+
 if __name__ == "__main__":
-    model_path = 'BAAI/bge-m3'
-    tokenizer_path = 'BAAI/bge-m3'
-    input_data_path = './toy_data/toy_source.json'
-    output_data_path='./toy_data/test_clean.json'
-    test_clean = Clean_Query(model_path, tokenizer_path, input_data_path=input_data_path, output_data_path=output_data_path, similarity_threshold=0.70)
+    model_path = "BAAI/bge-m3"
+    tokenizer_path = "BAAI/bge-m3"
+    input_data_path = "./toy_data/toy_source.json"
+    output_data_path = "./toy_data/test_clean.json"
+    test_clean = Clean_Query(
+        model_path,
+        tokenizer_path,
+        input_data_path=input_data_path,
+        output_data_path=output_data_path,
+        similarity_threshold=0.70,
+    )
     test_clean.clean()
-        
