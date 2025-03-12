@@ -108,5 +108,6 @@ python -u -m paddle.distributed.launch \
     # --fused_linear 1 \
     # --use_fast_layer_norm 1 \
     # --use_fused_dropout_add 1 \
-    # --pipeline_parallel_config "enable_send_recv_overlap enable_split_backward" \
-    
+    # --pipeline_parallel_config "enable_send_recv_overlap enable_split_backward" \ 
+
+
