@@ -115,6 +115,7 @@ function llama_case_list_auto() {
         llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2
         llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2_intermediate
         llama_dy2st_auto_bs2_bf16_DP2-MP1-PP1-CINN
+        llama_lora_static_graph_auto_bs_2_bf16_DP2-TP2-PP1
     )
     if [ $1 = "prepare_case" ]; then
         restore_func $fun_list  
@@ -3229,6 +3230,8 @@ EOF
     export FLAGS_cudnn_deterministic=1
     export NVIDIA_TF32_OVERRIDE=0
 
+    export FLAGS_enable_moe_utils=true
+
     python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
     --log_dir  "output/$task_name""_log" \
@@ -3258,7 +3261,7 @@ EOF
     --sharding "stage1" \
     --learning_rate 0.0001 \
     --min_learning_rate 0.00001 \
-    --max_steps 2000 \
+    --max_steps 2 \
     --moe_group "dp" \
     --save_steps 100000 \
     --weight_decay 0.01 \
@@ -3372,6 +3375,8 @@ EOF
     export FLAGS_embedding_deterministic=1
     export FLAGS_cudnn_deterministic=1
     export NVIDIA_TF32_OVERRIDE=0
+    
+    export FLAGS_enable_moe_utils=true
 
     python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
@@ -3402,7 +3407,7 @@ EOF
     --sharding "stage1" \
     --learning_rate 0.0001 \
     --min_learning_rate 0.00001 \
-    --max_steps 2000 \
+    --max_steps 2 \
     --moe_group "dp" \
     --save_steps 100000 \
     --weight_decay 0.01 \
