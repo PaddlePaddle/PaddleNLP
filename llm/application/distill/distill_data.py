@@ -34,6 +34,11 @@ paddlenlp_dataset = paddlenlp_dataset.rename_column("reasoning_solution", "tgt")
 paddlenlp_dataset.to_json("data/gsm8k_distilled/train.json", force_ascii=False)
 
 
+dataset = load_dataset("meta-math/GSM8K_zh")["train"]
+paddlenlp_dataset = deepcopy(dataset)
+paddlenlp_dataset.to_json("data/gsm8k_zh/train.jsonl", force_ascii=False)
+
+
 dataset = load_dataset("HuggingFaceH4/aime_2024", split="train")
 paddlenlp_dataset = deepcopy(dataset)
 paddlenlp_dataset = paddlenlp_dataset.rename_column("problem", "src")

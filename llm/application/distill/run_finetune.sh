@@ -16,6 +16,6 @@ export PYTHONPATH=../../../:$PYTHONPATH # PaddleNLP dir
 export PYTHONPATH=../../:$PYTHONPATH # PaddleNLP/llm dir
 
 python -u -m paddle.distributed.launch \
-    --devices "0,1,2,3" \
+    --devices "0,1,2,3,4,5,6,7" \
     ../../run_finetune.py \
     sft_argument.json

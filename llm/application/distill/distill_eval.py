@@ -16,9 +16,15 @@ import json
 import os
 import re
 
-test_dataset_path = "./data/gsm8k/dev.json"
-output_dataset_path = "./results-gsm8k/deepseek-ai/DeepSeek-R1-Distill-Qwen-7B/output.json"
-gsm8k_output_path = os.path.join(os.path.dirname(output_dataset_path), "gsm8k.log")
+from grader import math_equal
+
+# dataset_name = "aime2024"
+dataset_name = "gsm8k"
+# dataset_name = "math500"
+
+test_dataset_path = f"./data/{dataset_name}/dev.json"
+output_dataset_path = f"./results-{dataset_name}/Qwen/Qwen2.5-Math-7B/output.json"
+output_result_path = os.path.join(os.path.dirname(output_dataset_path), f"{dataset_name}.log")
 IS_BASE = False
 
 
@@ -38,14 +44,22 @@ def extract_solution(solution_str, base=False):
         pattern = r"-?\d+\.?\d*"
         numbers = [s for s in re.findall(pattern, sentence)]
     else:
-        pattern = r"\\boxed\{([0-9]+(\.[0-9]+)?)"
-        numbers = [s for s in re.findall(pattern, sentence)]
+        if dataset_name in ["aime2024", "gsm8k"]:
+            pattern = r"boxed\{([0-9]+(\.[0-9]+)?)"
+            numbers = [s for s in re.findall(pattern, sentence)]
+        elif dataset_name == "math500":
+            # 提取boxed{}中的任意值
+            pattern = r"boxed\{(.*)\}"
+            numbers = [s for s in re.findall(pattern, sentence)]
 
     if not numbers:
         return None  # Return 'inf' if no number is found
     else:
         # Return the last number found as a float
-        return str(numbers[-1][0]) if not base else str(numbers[-1])
+        if dataset_name == "math500":
+            return str(numbers[-1]) if not base else str(numbers[-1])
+        else:
+            return str(numbers[-1][0]) if not base else str(numbers[-1])
 
 
 ground, solution = [], []
@@ -55,7 +69,10 @@ with open(test_dataset_path, "r") as f:
         if not line:
             continue
         jsline = json.loads(line)
-        ground.append(extract_answer(jsline["tgt"]))
+        if "answer" in jsline.keys():
+            ground.append(str(jsline["answer"]))
+        else:
+            ground.append(extract_answer(jsline["tgt"]))
 
 
 bad_format = 0
@@ -78,9 +95,9 @@ print(f"after line, bad_format= {bad_format}")
 assert len(ground) == len(solution)
 
 cnt = 0
-with open(gsm8k_output_path, "w") as f:
+with open(output_result_path, "w") as f:
     for idx, (i, j) in enumerate(zip(ground, solution)):
-        if i == j:
+        if math_equal(i, j):
             cnt += 1
         else:
             print(f"{idx}: ground: {i}, answer: {j}", flush=True)

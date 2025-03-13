@@ -231,17 +231,11 @@ class OpenAIProcessor:
 
     def _parse_response(self, response) -> Dict[str, str]:
         """Parse API response into structured format"""
-        choice = response.choices[0]
-        response_text = choice.message.content
+        response_text = response.result
         reasoning_text = ""
-
-        completion_tokens = response.usage.completion_tokens
-        prompt_tokens = response.usage.prompt_tokens
 
         if "</think>" in response_text and response_text.count("</think>") == 1:
             reasoning_text, _, response_text = response_text.partition("</think>")
-        elif hasattr(choice.message, "reasoning_content"):
-            reasoning_text = choice.message.reasoning_content
 
         if reasoning_text and not reasoning_text.startswith("<think>"):
             reasoning_text = f"<think>\n{reasoning_text.strip()}"
@@ -249,10 +243,8 @@ class OpenAIProcessor:
             reasoning_text = f"{reasoning_text.strip()}\n</think>"
 
         return {
-            "deepseek_r1_response": response_text,
-            "deepseek_r1_reasoning": reasoning_text,
-            "deepseek_r1_completion_tokens": completion_tokens,
-            "deepseek_r1_prompt_tokens": prompt_tokens,
+            "deepseek_r1_response_zh": response_text,
+            "deepseek_r1_reasoning_zh": reasoning_text,
         }
 
     async def _write_result(self, line_num: int, result: Dict[str, str]):
