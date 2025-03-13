@@ -54,6 +54,7 @@ from .configuration import (
     LlamaConfig,
 )
 from .modeling import (
+    Llama3RotaryEmbedding,
     LlamaDynamicNTKScalingRotaryEmbedding,
     LlamaLinearScalingRotaryEmbedding,
     LlamaNTKScalingRotaryEmbedding,
@@ -296,7 +297,22 @@ class LlamaAttentionNet(nn.Layer):
         self.config = config
 
     def _init_rope(self):
-        if self.config.rope_scaling_type is None:
+        if (
+            hasattr(self.config, "rope_scaling")
+            and self.config.rope_scaling is not None
+            and self.config.rope_scaling.get("rope_type", None) == "llama3"
+        ):
+            self.rotary_emb = Llama3RotaryEmbedding(
+                self.head_dim,
+                max_position_embeddings=self.max_position_embeddings,
+                base=self.config.rope_theta,
+                factor=self.config.rope_scaling["factor"],
+                high_freq_factor=self.config.rope_scaling["high_freq_factor"],
+                low_freq_factor=self.config.rope_scaling["low_freq_factor"],
+                original_max_position_embeddings=self.config.rope_scaling["original_max_position_embeddings"],
+            )
+
+        elif self.config.rope_scaling_type is None:
             self.rotary_emb = LlamaRotaryEmbedding(
                 self.head_dim,
                 max_position_embeddings=self.max_position_embeddings,
@@ -655,6 +671,11 @@ class LlamaPretrainedModelNet(PretrainedModel):
     pretrained_init_configuration = LLAMA_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = LLAMA_PRETRAINED_RESOURCE_FILES_MAP
     _keys_to_ignore_on_load_unexpected = [r"self_attn.rotary_emb.inv_freq"]
+
+    # TODO(): wa that loading weight first, then parallelize.
+    @classmethod
+    def _get_tensor_parallel_mappings(cls, config, is_split):
+        return {}
 
 
 @register_base_model
@@ -1053,7 +1074,7 @@ class LlamaForCausalLMNet(LlamaPretrainedModelNet):
             },
             "mp_config": {
                 "parallelize_plan": {
-                    f"{prefix}llama.embed_tokens": dist.ColWiseParallel(gather_output=True),
+                    f"{prefix}llama.embed_tokens": dist.RowWiseParallel(),
                     f"{prefix}llama.layers.*.self_attn.qkv_proj": dist.ColWiseParallel(),
                     f"{prefix}llama.layers.*.self_attn.q_proj": dist.ColWiseParallel(),
                     f"{prefix}llama.layers.*.self_attn.k_proj": dist.ColWiseParallel(),
@@ -1066,7 +1087,7 @@ class LlamaForCausalLMNet(LlamaPretrainedModelNet):
                     f"{prefix}lm_head.weight": dist.ColWiseParallel(),
                 }
             },
-            "pp_config": {"split_spec": f"{prefix}llama.layers", "global_spec": "llama.global_layer"},
+            "pp_config": {"split_spec": f"{prefix}llama.layers", "global_spec": f"{prefix}llama.global_layer"},
         }
 
         return config

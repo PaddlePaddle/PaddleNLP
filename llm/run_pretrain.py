@@ -419,6 +419,12 @@ def main():
         model_args.num_hidden_layers if model_args.num_hidden_layers is not None else config.num_hidden_layers
     )
     # Config for model using dropout, such as GPT.
+    if hasattr(config, "use_dualpipev"):
+        # NOTE(zhangyuqin): In Paddle, the segmentation and scheduling of pipeline parallel
+        # models are separate. Therefore, first we need to set the flag in the model config
+        # to perform V-shape segmentation. Second, we need to set the flag in the training_args
+        # to configure strategy.hybrid_configs to choose the DualPipeV schedule.
+        config.use_dualpipev = "use_dualpipev" in training_args.pipeline_parallel_config
     if hasattr(config, "hidden_dropout_prob"):
         config.hidden_dropout_prob = model_args.hidden_dropout_prob
     if hasattr(config, "attention_probs_dropout_prob"):

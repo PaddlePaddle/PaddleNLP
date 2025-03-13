@@ -23,6 +23,7 @@ import paddle.distributed as dist
 import paddle.distributed.auto_parallel.intermediate.parallelize as parallelize
 import paddle.nn as nn
 from paddle.distributed import fleet
+from paddle.profiler.utils import switch_job_schedule_profiler
 from tqdm.auto import tqdm
 
 from paddlenlp.trainer import Trainer
@@ -85,6 +86,7 @@ class AutoTrainer(Trainer):
             if not param._is_initialized() and param._init_func is not None:
                 param.initialize()
         kwargs["model"] = model
+
         super().__init__(*args, **kwargs)
         assert self.args.enable_auto_parallel
 
@@ -161,11 +163,13 @@ class AutoTrainer(Trainer):
             meshes.append(_get_mesh(self.args.pipeline_parallel_degree - 1))
         return meshes
 
-    def _wrap_for_dist_loader(self, train_dataloader):
+    def _wrap_for_dist_loader(self, train_dataloader, dense_tensor_idx=None):
+        self.dense_tensor_idx = dense_tensor_idx
         dist_loader = dist.shard_dataloader(
             dataloader=train_dataloader,
             meshes=self._get_meshes_for_loader(),
             shard_dims="dp",
+            dense_tensor_idx=dense_tensor_idx,
         )
         return dist_loader
 
@@ -282,26 +286,97 @@ class AutoTrainer(Trainer):
                 paddle.assign(local_micro_batch, global_micro_batch._local_value())
             return global_micro_batchs
 
-        for key, dtensors in inputs.items():
+        skip_next_i = False
+        for i, (key, dtensors) in enumerate(inputs.items()):
+            if skip_next_i:
+                skip_next_i = False
+                continue
             if isinstance(dtensors, paddle.Tensor):
-                mesh, placements = dtensors.process_mesh, dtensors.placements
-                global_datas = split_dtensor_by_axis(dtensors, 0)
-                for index, data in enumerate(global_datas):
-                    global_micro_batchs[index].update({key: dist.reshard(data, mesh, placements)})
+                if self.dense_tensor_idx is not None and self.dense_tensor_idx[i] != []:
+                    next_dtensor = dtensors[i + 1]
+                    if isinstance(next_dtensor, paddle.Tensor):
+                        next_dtensor_list = (
+                            paddle.prod(next_dtensor, axis=-1) if len(next_dtensor.shape) != 1 else next_dtensor
+                        )
+                        global_datas = dtensors.split(next_dtensor_list.cast("int64").tolist(), axis=0)
+                        for index, data in enumerate(global_datas):
+                            global_micro_batchs[index].update({key: data})
+                        global_datas_next = next_dtensor.split(self.args.gradient_accumulation_steps, axis=0)
+                        for index, data in enumerate(global_datas):
+                            global_micro_batchs[index].update({key: data})
+                    elif isinstance(next_dtensor, int):
+                        global_datas = dtensors.split(next_dtensor, axis=0)
+                        for index, data in enumerate(global_datas):
+                            global_micro_batchs[index].update({key: data})
+                        for index in range(self.args.gradient_accumulation_steps):
+                            global_micro_batchs[index].update({key: next_dtensor})
+                    else:
+                        raise ValueError(f"unsupported split dense_tensor with type: {type(next_dtensor)}")
+                    skip_next_i = True
+                else:
+                    mesh, placements = dtensors.process_mesh, dtensors.placements
+                    global_datas = split_dtensor_by_axis(dtensors, 0)
+                    for index, data in enumerate(global_datas):
+                        global_micro_batchs[index].update({key: dist.reshard(data, mesh, placements)})
             elif isinstance(dtensors, (list, tuple)):
                 if len(dtensors) == 0:
-                    for i in range(self.args.gradient_accumulation_steps):
-                        global_micro_batchs[i].update({key: []})
+                    for j in range(self.args.gradient_accumulation_steps):
+                        global_micro_batchs[j].update({key: []})
                 else:
-                    for dtensor in dtensors:
+                    skip_next_j = False
+                    for j, dtensor in enumerate(dtensors):
+                        if skip_next_j:
+                            skip_next_j = False
+                            continue
                         if isinstance(dtensor, paddle.Tensor):
-                            mesh, placements = dtensor.process_mesh, dtensor.placements
-                            global_datas = split_dtensor_by_axis(dtensor, 0)
-                            for index, data in enumerate(global_datas):
-                                if key in global_micro_batchs[index].keys():
-                                    global_micro_batchs[index][key].append(dist.reshard(data, mesh, placements))
+                            if self.dense_tensor_idx is not None and j in self.dense_tensor_idx[i]:
+                                next_dtensor = dtensors[j + 1]
+                                if isinstance(next_dtensor, paddle.Tensor):
+                                    next_dtensor_list = (
+                                        paddle.prod(next_dtensor, axis=-1)
+                                        if len(next_dtensor.shape) != 1
+                                        else next_dtensor
+                                    )
+                                    global_datas = dtensor.split(next_dtensor_list.cast("int64").tolist(), axis=0)
+                                    for index, data in enumerate(global_datas):
+                                        if key in global_micro_batchs[index].keys():
+                                            global_micro_batchs[index][key].append(data)
+                                        else:
+                                            global_micro_batchs[index].update({key: [data]})
+
+                                    global_datas_next = next_dtensor.split(
+                                        self.args.gradient_accumulation_steps, axis=0
+                                    )
+                                    for index, data in enumerate(global_datas_next):
+                                        if key in global_micro_batchs[index].keys():
+                                            global_micro_batchs[index][key].append(data)
+                                        else:
+                                            global_micro_batchs[index].update({key: [data]})
+                                elif isinstance(next_dtensor, int):
+                                    global_datas = dtensor.split(next_dtensor, axis=0)
+                                    for index, data in enumerate(global_datas):
+                                        if key in global_micro_batchs[index].keys():
+                                            global_micro_batchs[index][key].append(data)
+                                        else:
+                                            global_micro_batchs[index].update({key: [data]})
+                                    for index in range(self.args.gradient_accumulation_steps):
+                                        if key in global_micro_batchs[index].keys():
+                                            global_micro_batchs[index][key].append(next_dtensor)
+                                        else:
+                                            global_micro_batchs[index].update({key: next_dtensor})
                                 else:
-                                    global_micro_batchs[index].update({key: [dist.reshard(data, mesh, placements)]})
+                                    raise ValueError(f"unsupported split dense_tensor with type: {type(next_dtensor)}")
+                                skip_next_j = True
+                            else:
+                                mesh, placements = dtensor.process_mesh, dtensor.placements
+                                global_datas = split_dtensor_by_axis(dtensor, 0)
+                                for index, data in enumerate(global_datas):
+                                    if key in global_micro_batchs[index].keys():
+                                        global_micro_batchs[index][key].append(dist.reshard(data, mesh, placements))
+                                    else:
+                                        global_micro_batchs[index].update(
+                                            {key: [dist.reshard(data, mesh, placements)]}
+                                        )
                         else:
                             raise ValueError(f"unsupported type: {type(dtensor)}")
             else:
@@ -400,7 +475,6 @@ class AutoTrainer(Trainer):
 
         model, dist_loader = self._wrap_for_auto(model, train_dataloader)
         train_dataloader = dist_loader()
-
         if resume_from_checkpoint is not None:
             self._load_from_checkpoint(resume_from_checkpoint)
 
@@ -442,6 +516,10 @@ class AutoTrainer(Trainer):
                     steps_trained_progress_bar = None
 
                 inputs_list = self._split_batches_for_accumulation(inputs)
+                if self.args.to_static:
+                    schedule_start_step = self.args.job_schedule_profiler_start
+                    schedule_end_step = self.args.job_schedule_profiler_end
+                    switch_job_schedule_profiler(model, step, schedule_start_step, schedule_end_step)
 
                 for inputs in inputs_list:
                     if step_control % args.gradient_accumulation_steps == 0:

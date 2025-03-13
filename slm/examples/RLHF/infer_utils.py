@@ -138,7 +138,7 @@ class Predictor:
         self.config.src_length = getattr(self, "input_length", self.config.src_length)
         if not hasattr(self, "_buffer_attrs"):
             pre_attrs = set(self.__dict__.keys())
-        self.cache_kvs_shape = self.model.get_cache_kvs_shape(
+        self.cache_k_shapes, self.cache_v_shapes = self.model.get_cache_kvs_shape(
             self.model_config, self.config.batch_size, self.config.total_max_length
         )
         self._buffer_maker(self.config, self.tokenizer)

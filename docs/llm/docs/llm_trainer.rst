@@ -50,8 +50,8 @@ Trainer进阶分布式能力使用介绍
 
 注：
 
-* 总卡数=sharding_parallel_dergee * tensor_parallel_dergee * pipeline_parallel_degree * data_parallel_degree
-* data_parallel_degree 不需要传入参数设置，由 总卡数/(sharding_parallel_dergee * tensor_parallel_dergee * pipeline_parallel_degree) 计算得来 
+* 总卡数=sharding_parallel_degree * tensor_parallel_degree * pipeline_parallel_degree * data_parallel_degree
+* data_parallel_degree 不需要传入参数设置，由 总卡数/(sharding_parallel_degree * tensor_parallel_degree * pipeline_parallel_degree) 计算得来 
 
 .. code-block:: bash
 
@@ -59,36 +59,36 @@ Trainer进阶分布式能力使用介绍
     python train.py
 
     # 单机(多机)多卡/数据并行
-    paddle.distruted.launch --devices "0,1,2,3,4,5,6,7" train.py
+    paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" train.py
 
     # 单机(多机)多卡/Sharding并行 
-    paddle.distruted.launch --devices "0,1,2,3,4,5,6,7" train.py -sharding "stage2"
+    paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" train.py -sharding "stage2"
 
     # 单机(多机)多卡/Sharding并行 + 数据并行 (sharding4 dp2)
-    paddle.distruted.launch --devices "0,1,2,3,4,5,6,7" train.py --sharding "stage2" --sharding_parallel_degree 4
+    paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" train.py --sharding "stage2" --sharding_parallel_degree 4
 
     # 单机(多机)多卡/ 张量并行 TP8
-    paddle.distruted.launch --devices "0,1,2,3,4,5,6,7" train.py --tensor_parallel_degree 8
+    paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" train.py --tensor_parallel_degree 8
 
     # 单机(多机)多卡/ 张量并行+数据并行 TP4 DP2
-    paddle.distruted.launch --devices "0,1,2,3,4,5,6,7" train.py --tensor_parallel_degree 4
+    paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" train.py --tensor_parallel_degree 4
 
     # 单机(多机)多卡/ 张量并行+sharding并行 TP4 Sharding2
-    paddle.distruted.launch --devices "0,1,2,3,4,5,6,7" train.py --tensor_parallel_degree 4 \
+    paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" train.py --tensor_parallel_degree 4 \
         --sharding "stage1"  --sharding_parallel_degree 2
 
     # 单机(多机)多卡/ 张量并行+流水线并行 TP2 PP4
-    paddle.distruted.launch --devices "0,1,2,3,4,5,6,7" train.py --tensor_parallel_degree 2 \
+    paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" train.py --tensor_parallel_degree 2 \
         --pipeline_parallel_degree 4
 
     # 单机(多机)多卡/ 张量并行+流水线并行+sharding并行  TP2 PP2 Sharding2
-    paddle.distruted.launch --devices "0,1,2,3,4,5,6,7" train.py --tensor_parallel_degree 2 \
+    paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" train.py --tensor_parallel_degree 2 \
         --pipeline_parallel_degree 2 \
         --sharding "stage1"  --sharding_parallel_degree 2
 
     # 4D 并行，需要两机
     # 单机(多机)多卡/ 张量并行+流水线并行+sharding并行  TP2 PP2 Sharding2 DP2
-    paddle.distruted.launch --devices "0,1,2,3,4,5,6,7" train.py --tensor_parallel_degree 2 \
+    paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" train.py --tensor_parallel_degree 2 \
         --pipeline_parallel_degree 2 \
         --sharding "stage1"  --sharding_parallel_degree 2
 
@@ -115,7 +115,7 @@ Trainer 分布式能力
 
 对于通用的分布式能力, PaddleNLP适配了数据并行data_parallel, 分布式参数sharding功能的支持。
 
-用户使用 paddle.distruted.launch --devices "0,1,2,3" train.py即可将运行的程序切换为多卡数据并行. 如果想要使用sharding功能, 减少模型显存占用, 指定参数--sharding "stage2"即可. 更多sharding功能配置见参数介绍部分.
+用户使用 paddle.distributed.launch --devices "0,1,2,3" train.py即可将运行的程序切换为多卡数据并行. 如果想要使用sharding功能, 减少模型显存占用, 指定参数--sharding "stage2"即可. 更多sharding功能配置见参数介绍部分.
 
 DP 或者sharding，这类功能无需用户修改组网, 直接多卡即可运行。目前已经支持PaddleNLP所有模型。
 
@@ -229,7 +229,7 @@ PP接入的本质是把模型写成一个 sequential 的形式，即模型之间
   * Layer的初始化，只接受模型config一个参数
   * add_sequential_layer 最后一个str参数是这一层模型，在原来网络中的前缀名
 
-    i. 比如 embedding 层。原来在模型中是 llama.embeding.weight 这里的前缀是 llama
+    i. 比如 embedding 层。原来在模型中是 llama.embedding.weight 这里的前缀是 llama
     ii. 后面的Decoder层，就是 llama.layers.0  llama.layers.1 之类
     iii. 此处的名字，可以将模型的命名结构映射到单卡
 

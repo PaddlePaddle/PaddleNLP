@@ -22,6 +22,8 @@ rm -rf "output/$task_name""_log"
 
 export SOT_LOG_LEVEL=4
 export PYTHONPATH=../../../:$PYTHONPATH
+
+
 #ulimit -c unlimited
 # export GLOG_v=3
 
@@ -32,10 +34,13 @@ export PYTHONPATH=../../../:$PYTHONPATH
 # export FLAGS_cudnn_deterministic=1
 # export NVIDIA_TF32_OVERRIDE=0
 
+export FLAGS_enable_moe_utils=true
+export FLAGS_call_stack_level=3
+
 to_static=0  # 是否开启动转静训练
 
 python -u  -m paddle.distributed.launch \
-    --gpus "0,1,2,3" \
+    --gpus "0,1,2,3,4,5,6,7" \
     --log_dir  "output/$task_name""_log" \
     run_pretrain_auto.py \
     --model_type "deepseekv3_auto" \
@@ -44,27 +49,32 @@ python -u  -m paddle.distributed.launch \
     --input_dir "./data" \
     --output_dir "output/$task_name" \
     --split 949,50,1 \
-    --max_seq_length 2048 \
+    --max_seq_length 4096 \
     --per_device_train_batch_size 1 \
     --per_device_eval_batch_size 2 \
-    --gradient_accumulation_steps 2 \
-    --use_flash_attention 0 \
-    --use_fused_rms_norm 1 \
-    --fp16 0 \
+    --gradient_accumulation_steps 16 \
+    --fuse_attention_ffn true \
+    --fuse_attention_qkv true \
+    --fuse_sequence_parallel_allreduce true \
+    --use_flash_attention true \
+    --use_fused_rope true \
+    --use_fused_rms_norm true \
+    --bf16 True \
     --fp16_opt_level "O2"  \
     --scale_loss 1024 \
     --pipeline_parallel_degree 1 \
-    --tensor_parallel_degree 2 \
-    --sharding_parallel_degree 2 \
+    --tensor_parallel_degree 1 \
+    --sharding_parallel_degree 8 \
+    --sharding "stage1" \
     --learning_rate 0.0001 \
     --min_learning_rate 0.00001 \
-    --max_steps 2 \
-    --save_steps 5000000 \
+    --max_steps 2000 \
+    --moe_group "dp" \
+    --save_steps 100000 \
     --weight_decay 0.01 \
     --warmup_ratio 0.01 \
     --logging_steps 1\
     --dataloader_num_workers 1 \
-    --sharding "stage1" \
     --eval_steps 1000000 \
     --disable_tqdm true \
     --continue_training 0\
@@ -75,6 +85,8 @@ python -u  -m paddle.distributed.launch \
     --data_impl "mmap" \
     --enable_auto_parallel 1 \
     --max_grad_norm 1.0 \
-    --num_hidden_layers 1 \
+    --num_hidden_layers 2 \
+    --first_k_dense_replace 0 \
+    --n_routed_experts 16 \
     --use_intermediate_api true \
     --to_static $to_static \

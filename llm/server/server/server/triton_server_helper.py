@@ -72,7 +72,7 @@ def check_infer_engine_process():
     return:
         status: bool, True if process is alive else False
     """
-    mp_num = int(env_config.mp_num)
+    mp_num = int(env_config.mp_num_per_node)
     for i in range(mp_num):
         try:
             infer_live_flag_shm = shared_memory.SharedMemory(name=env_config.get_unique_name("shm_flag_infer_{}_live".format(i)))
@@ -89,7 +89,7 @@ def check():
         status: bool, True if process is alive else False
     """
     error_info = {}
-    grpc_port = os.getenv("GRPC_PORT")
+    grpc_port = os.getenv("SERVICE_GRPC_PORT")
 
     # 1. check server is ready
     if grpc_port is not None:

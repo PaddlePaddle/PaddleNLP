@@ -22,6 +22,13 @@ from .score_model import LlamaModelForScore
 # TODO(guosheng): create Mixin and make model classes using metaclass.
 class LlamaPolicyModel(LlamaForCausalLM):
     def __init__(self, config: PretrainedConfig, **kwargs):
+        """
+        Initializes a RLHFPPOMixedLossWrapper instance.
+
+        Args:
+            config (PretrainedConfig): The model configuration used for initialization.
+            kwargs (Dict[str, Any], optional): Additional keyword arguments passed along. Defaults to {}.
+        """
         super().__init__(config)
         self.loss_fn = RLHFPPOMixedLoss(config, **kwargs)
 
@@ -41,6 +48,16 @@ class LlamaPolicyModel(LlamaForCausalLM):
         output_hidden_states=None,
         return_dict=None,
     ):
+        """
+        Returns a tuple containing:
+        1. the loss, calculated as the sum of the cross entropy for each token and the KL divergence between the
+           policy distribution and the uniform distribution. If `advantages` are provided, the loss will be
+           augmented with the additional term -E[log P(a|x)] where x is the input and a is the action.
+        2. the model's output as a tuple of:
+            - the last layer's output of shape `(batch_size, sequence_length, config.vocab_size)`
+            - the cache used in inference for next chunk.
+            - the decoder's attention weights for each layer.
+        """
         outputs = super().forward(
             input_ids=input_ids,
             position_ids=position_ids,
@@ -56,7 +73,10 @@ class LlamaPolicyModel(LlamaForCausalLM):
         logits = outputs[0]
         loss = None
         if labels is not None or advantages is not None:
-            loss = self.loss_fn(logits, (labels, input_ids, log_probs, advantages, sequence_mask))
+            loss = self.loss_fn(
+                logits,
+                (labels, input_ids, log_probs, advantages, sequence_mask),
+            )
         if not return_dict:
             return (loss,) + outputs if loss is not None else outputs
 
@@ -71,6 +91,16 @@ class LlamaPolicyModel(LlamaForCausalLM):
 
 class LlamaValueModel(LlamaModelForScore):
     def __init__(self, config, **kwargs):
+        """
+        Initializes the RLHFValueLossWrapper instance.
+
+        Args:
+            config (DictConfig): Config dict for the model.
+            **kwargs (Any, optional): Keyword arguments to be passed to the parent class. Defaults to None.
+
+        Returns:
+            None.
+        """
         super().__init__(config, **kwargs)
         self.loss_fn = RLHFValueLoss(config, **kwargs)
 
@@ -89,6 +119,24 @@ class LlamaValueModel(LlamaModelForScore):
         output_hidden_states=None,
         return_dict=None,
     ):
+        """
+        Returns:
+        Union[Tuple[torch.Tensor], BaseModelOutputWithPastAndCrossAttentions]:
+            if `return_dict` is False, a tuple of tensors is returned, containing:
+                - the loss, if it is not None;
+                - the reward values;
+                - the rewards;
+                - the past key values;
+                - the hidden states;
+                - the attentions.
+            if `return_dict` is True, a [`ValueOutput`] is returned, containing:
+                - the loss, if it is not None;
+                - the reward values;
+                - the rewards;
+                - the past key values;
+                - the hidden states;
+                - the attentions.
+        """
         outputs = super().forward(
             input_ids=input_ids,
             position_ids=position_ids,

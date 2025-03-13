@@ -11,7 +11,7 @@ PaddleNLP 提供了多种环境变量，用于优化推理性能和资源使用�
 
 - `FLAGS_CUTLASS_FP8_GEMM`: fp8 gemm 是否使用 cutlass 版本，默认值为 False, 表示不开启。设置为 True，则在 A8W8模型上使用 Tensor Core 进行计算，性能会更好。
 
-- `FLAGS_use_cutlass_device_best_config_path`: 在 `FLAGS_CUTLASS_FP8_GEMM` 设为 True 的前提下，使用该环境变量来指定离线调优出的 fp8 gemm 配置文件。配置文件可以通过`PaddleNLP/csrc/utils/tune_cutlass_fp8_*.py`产出，该脚本会自动搜索当前输入大小下提供的最优 gemm 配置并将结果记录下来，默认产出文件为`fp8_fuse_gemm_config.json`。不同 NVIDIA GPU 和 CUDA 版本需要分别调优，SM89架构 GPU 增加 dual_gemm 调优，具体可参考`dual_gemm.py`。可选值：`tune`，开启调优；空值或`default`，使用默认配置；任意值，优先使用配置文件中的参数，若无则使用默认配置。
+- `FLAGS_use_cutlass_device_best_config_path`: 在 `FLAGS_CUTLASS_FP8_GEMM` 设为 True 的前提下，使用该环境变量来指定离线调优出的 fp8 gemm 配置文件。配置文件可以通过`csrc/utils/tune_cutlass_fp8_*.py`产出，该脚本会自动搜索当前输入大小下提供的最优 gemm 配置并将结果记录下来，默认产出文件为`fp8_fuse_gemm_config.json`。不同 NVIDIA GPU 和 CUDA 版本需要分别调优，SM89及 SM90架构 GPU 增加 dual_gemm 调优，具体可参考`dual_gemm.py`。可选值：`tune`，开启调优；空值或`default`，使用默认配置；任意值，优先使用配置文件中的参数，若无则使用默认配置。此外，也支持 DeepSeek 系列模型 Block wise FP8 gemm 调优， 具体参考`csrc/tools/tune_fp8_gemm.sh`。
 
 - `FLAGS_cuda_core_int8_gemm`：是否开启小 Batch Int8 Gemm 优化，默认值不开启。设为1可开启，推理 A8W8模型时，平均性能会加速约40%-55%，适用于 SM>=70的显卡。
 
@@ -29,6 +29,10 @@ PaddleNLP 提供了多种环境变量，用于优化推理性能和资源使用�
 
 **Append Attention 优化**
 
-- `FLAGS_cascade_attention_max_partition_size`：Append Attention decoder 计算时对 cache_kv 进行分 chunk 的 chunk 大小，默认值根据 batchsize 设置，batchsize=1时设置为128，batchsize>1时设置为512。显式设置时不再区分 batchsize。
+- `FLAGS_cascade_attention_max_partition_size`：Attention decoder 计算时对 cache_kv 进行分 chunk 的 chunk 大小，默认值根据 batch_size 设置，batch_size = 1 时设置为 128，batchsize > 1 时设置为 512。显式设置时不再区分 batch_size。
 - `FLAGS_dec_block_shape_q`：Append Attention decoder 计算时对 q 进行分块的分块大小，默认值为16。
 - `FLAGS_enc_block_shape_q`：Append Attention encoder 计算时对 q 进行分块的分块大小，默认值为64。
+
+**MLA 相关优化**
+- `FLAGS_mla_use_tensorcore`：MLA 计算时是否使用 tensor core 实现，默认为 True，仅支持 Hoppers 架构显卡。为 False 时则采用 cuda core 实现，同时支持 Ampper 和
+ Hopper 架构。

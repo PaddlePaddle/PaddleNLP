@@ -110,7 +110,7 @@ __global__ void update_inputs_kernel_v2(
 
 void UpdateInputesV2(const paddle::Tensor& stop_flags,
                const paddle::Tensor& step_idx,
-               const paddle::Tensor& not_need_stop,
+               const paddle::Tensor& not_need_stop, // cpu
                const paddle::Tensor& seq_lens_this_time,
                const paddle::Tensor& seq_lens_encoder,
                const paddle::Tensor& seq_lens_decoder,
@@ -125,8 +125,11 @@ void UpdateInputesV2(const paddle::Tensor& stop_flags,
   const int now_bsz = seq_lens_this_time.shape()[0];
   const int input_ids_stride = input_ids.shape()[1];
   const int end_length = end_ids.shape()[0];
+
+  auto not_need_stop_gpu = not_need_stop.copy_to(stop_flags.place(), false);
+
   update_inputs_kernel_v2<1024><<<1, 1024, 0, input_ids.stream()>>>(
-    const_cast<bool*>(not_need_stop.data<bool>()),
+    const_cast<bool*>(not_need_stop_gpu.data<bool>()),
     const_cast<int64_t*>(step_idx.data<int64_t>()),
     const_cast<bool*>(stop_flags.data<bool>()),
     const_cast<int*>(seq_lens_this_time.data<int>()),
@@ -144,6 +147,10 @@ void UpdateInputesV2(const paddle::Tensor& stop_flags,
     input_ids_stride,
     end_length
   );
+
+  auto not_need_stop_cpu = not_need_stop_gpu.copy_to(not_need_stop.place(), false);
+  bool *not_need_stop_data = const_cast<bool*>(not_need_stop.data<bool>());
+  not_need_stop_data[0] = not_need_stop_cpu.data<bool>()[0];
 }
 
 PD_BUILD_OP(update_inputs_v2)

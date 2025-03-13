@@ -1391,7 +1391,7 @@ void CascadeAppendAttentionC8Kernel(
           {DISPATCH_GQA_GROUP_SIZE(
               group_size,
               GROUP_SIZE,
-              {DISPATCH_HEAD_DIM(
+              {DISPATCH_GQA_HEAD_DIM(
                   head_dim,
                   HEAD_DIM,
                   {DISPATCH_BLOCK_SIZE(
