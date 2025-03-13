@@ -3125,7 +3125,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 0.0,  # quant_max_bound
                 0.0,  # quant_min_bound
                 0.0,  # out_linear_in_scale
-                self.config.speculate_config.speculate_max_draft_token_num,
+                self.config.speculate_config.speculate_max_draft_token_num + 1,
                 True,  # causal
                 self.config.speculate_config.speculate_method is not None,  # speculate_decoder
             )
@@ -3515,7 +3515,7 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
                 0.0,  # quant_max_bound
                 0.0,  # quant_min_bound
                 0.0,  # out_linear_in_scale
-                self.config.speculate_config.speculate_max_draft_token_num,
+                self.config.speculate_config.speculate_max_draft_token_num + 1,
                 True,  # causal
                 self.config.speculate_config.speculate_method is not None,  # speculate_decoder
             )
@@ -5250,7 +5250,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                 0.0,  # quant_max_bound
                 0.0,  # quant_min_bound
                 0.0,  # out_linear_in_scale
-                self.config.speculate_config.speculate_max_draft_token_num,
+                self.config.speculate_config.speculate_max_draft_token_num + 1,
                 True,  # causal
                 self.config.speculate_config.speculate_method is not None,  # speculate_decoder
             )

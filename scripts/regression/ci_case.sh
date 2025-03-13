@@ -566,6 +566,7 @@ taskflow (){
     print_info $? taskflow
 }
 llm(){
+    export http_proxy=${proxy} && export https_proxy=${proxy}
     if git diff --numstat "$AGILE_COMPILE_BRANCH" | awk '{print $NF}' | grep -q '^csrc/'; then
         echo "Found modifications in csrc, running setup_cuda.py install and uploading it to bos."
         cd ${nlp_dir}/csrc

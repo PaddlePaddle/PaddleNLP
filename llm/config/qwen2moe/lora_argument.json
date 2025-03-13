@@ -27,6 +27,7 @@
     "tensor_parallel_degree": 1,
     "pipeline_parallel_degree": 1,
     "lora": true,
+    "use_expert_parallel": true,
     "unified_checkpoint": true,
     "zero_padding": false,
     "use_flash_attention": true,

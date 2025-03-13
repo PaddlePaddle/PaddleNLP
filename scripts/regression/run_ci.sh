@@ -18,11 +18,11 @@ set -e
 export python=$1
 export paddle=$2
 export nlp_dir=/workspace/PaddleNLP
-mkdir /workspace/PaddleNLP/logs
-mkdir /workspace/PaddleNLP/model_logs
-mkdir /workspace/PaddleNLP/unittest_logs
-mkdir /workspace/PaddleNLP/coverage_logs
-mkdir /workspace/PaddleNLP/upload
+mkdir -p /workspace/PaddleNLP/logs
+mkdir -p /workspace/PaddleNLP/model_logs
+mkdir -p /workspace/PaddleNLP/unittest_logs
+mkdir -p /workspace/PaddleNLP/coverage_logs
+mkdir -p /workspace/PaddleNLP/upload
 export log_path=/workspace/PaddleNLP/model_logs
 export P0case_list=()
 export APIcase_list=()
