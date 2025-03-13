@@ -214,6 +214,7 @@ class Config:
     def _get_download_model(self, model_type="default"):
         env = os.environ
         # Define supported model patterns
+        model_name = env.get("model_name")
         supported_patterns = [
             r".*Qwen.*", 
             r".+Llama.+",

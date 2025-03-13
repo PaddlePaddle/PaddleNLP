@@ -3035,88 +3035,88 @@ function llm_qwen_pir_auto_bs1_bf16_TP2_PP2(){
 }
 
 function llama_lora_static_graph_auto_bs_2_bf16_DP2-TP2-PP1() {
-    echo "=========== $FUNCNAME run begin ===========" 
-    set -x
-    unset CUDA_VISIBLE_DEVICES 
+    # Only A100 support this case.
+    echo IS_A100 is $IS_A100
+    if [ $IS_A100 -ne 0 ]; then    
+        echo "=========== $FUNCNAME run begin ===========" 
+        set -x
+        unset CUDA_VISIBLE_DEVICES 
 
-    export PYTHONPATH=$root_path/:$PYTHONPATH
-    export FLAGS_call_stack_level=3
-    export NVIDIA_TF32_OVERRIDE=0
-    export FLAGS_cudnn_deterministic=1
-    export FLAGS_embedding_deterministic=1
-    task_name="llama_3.1_lora_auto_dp2_tp2"
+        export PYTHONPATH=$root_path/:$PYTHONPATH
+        export FLAGS_call_stack_level=3
+        export NVIDIA_TF32_OVERRIDE=0
+        export FLAGS_cudnn_deterministic=1
+        export FLAGS_embedding_deterministic=1
+        task_name="llama_3.1_lora_auto_dp2_tp2"
 
-    case_out_dir="output/$task_name"
-    case_log_dir="output/$task_name""_log"
-    
-    rm -rf output/$task_name/
+        case_out_dir="output/$task_name"
+        case_log_dir="output/$task_name""_log"
+        
+        rm -rf output/$task_name/
 
-    ls -la ./
-    ls -la ./data
+        ls -la ./
+        ls -la ./data
 
-    python -u  -m paddle.distributed.launch \
-    --gpus "0,1,2,3" \
-    --log_dir  "$case_log_dir" \
-    ../run_finetune_auto.py \
-    --model_name_or_path "meta-llama/Meta-Llama-3.1-8B-Instruct" \
-    --dataset_name_or_path "./data" \
-    --output_dir "$case_out_dir" \
-    --enable_auto_parallel true \
-    --lora true \
-    --use_mora false \
-    --model_type "llama_network" \
-    --use_intermediate_api true \
-    --to_static true \
-    --per_device_train_batch_size 2 \
-    --gradient_accumulation_steps 2 \
-    --per_device_eval_batch_size 8 \
-    --eval_accumulation_steps 16 \
-    --num_train_epochs 1 \
-    --learning_rate 3e-05 \
-    --max_steps 3 \
-    --warmup_steps 30 \
-    --logging_steps 1 \
-    --evaluation_strategy "epoch" \
-    --save_strategy "epoch" \
-    --src_length 1024 \
-    --max_length 2048 \
-    --bf16 true \
-    --fp16_opt_level "O2" \
-    --amp_master_grad true \
-    --do_train true \
-    --do_eval false \
-    --disable_tqdm true \
-    --load_best_model_at_end true \
-    --eval_with_do_generation false \
-    --metric_for_best_model "accuracy" \
-    --recompute false \
-    --save_total_limit 1 \
-    --tensor_parallel_degree 2 \
-    --pipeline_parallel_degree 1 \
-    --zero_padding false \
-    --unified_checkpoint false \
-    --flash_mask false \
-    --use_flash_attention true \
-    --fuse_attention_qkv true \
-    --sharding "stage1" \
-    --auto_parallel_resume_form_hybrid_parallel true \
-    --num_hidden_layers 2 \
-    >>${log_path}/$FUNCNAME 2>&1
-    ips=-1
-    loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 3' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 3' | awk -F 'current_memory_allocated: ' '{print $2}' | awk -F ',' '{print $1}'`
+        python -u  -m paddle.distributed.launch \
+        --gpus "0,1,2,3" \
+        --log_dir  "$case_log_dir" \
+        ../run_finetune_auto.py \
+        --model_name_or_path "meta-llama/Meta-Llama-3.1-8B-Instruct" \
+        --dataset_name_or_path "./data" \
+        --output_dir "$case_out_dir" \
+        --enable_auto_parallel true \
+        --lora true \
+        --use_mora false \
+        --model_type "llama_network" \
+        --use_intermediate_api true \
+        --to_static true \
+        --per_device_train_batch_size 2 \
+        --gradient_accumulation_steps 2 \
+        --per_device_eval_batch_size 8 \
+        --eval_accumulation_steps 16 \
+        --num_train_epochs 1 \
+        --learning_rate 3e-05 \
+        --max_steps 3 \
+        --warmup_steps 30 \
+        --logging_steps 1 \
+        --evaluation_strategy "epoch" \
+        --save_strategy "epoch" \
+        --src_length 1024 \
+        --max_length 2048 \
+        --bf16 true \
+        --fp16_opt_level "O2" \
+        --amp_master_grad true \
+        --do_train true \
+        --do_eval false \
+        --disable_tqdm true \
+        --load_best_model_at_end true \
+        --eval_with_do_generation false \
+        --metric_for_best_model "accuracy" \
+        --recompute false \
+        --save_total_limit 1 \
+        --tensor_parallel_degree 2 \
+        --pipeline_parallel_degree 1 \
+        --zero_padding false \
+        --unified_checkpoint false \
+        --flash_mask false \
+        --use_flash_attention true \
+        --fuse_attention_qkv true \
+        --sharding "stage1" \
+        --auto_parallel_resume_form_hybrid_parallel true \
+        --num_hidden_layers 2 \
+        >>${log_path}/$FUNCNAME 2>&1
+        ips=-1
+        loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 3' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+        mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 3' | awk -F 'current_memory_allocated: ' '{print $2}' | awk -F ',' '{print $1}'`
 
-    loss_base=14.08647537 
-    ips_base=-1
-    mem_base=2.02
-    echo "result: loss=$loss ips=$ips mem=$mem"
-    if [ $IS_A100 -ne 0 ];then
+        loss_base=14.08647537 
+        ips_base=-1
+        mem_base=2.02
+        echo "result: loss=$loss ips=$ips mem=$mem"
         check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
-    else
-        echo "auto just compare loss in A100 machine."
-    fi
 
-    echo "=========== $FUNCNAME run  end ==========="
+        echo "=========== $FUNCNAME run  end ==========="
+    fi
 }
 
 
