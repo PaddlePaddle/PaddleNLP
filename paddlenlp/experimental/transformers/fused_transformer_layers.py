@@ -28,12 +28,6 @@ from paddle.incubate.nn.functional import (
     masked_multihead_attention,
     variable_length_memory_efficient_attention,
 )
-from paddlenlp_ops import (
-    moe_expert_dispatch,
-    moe_expert_ffn,
-    moe_expert_reduce,
-    fused_expert_moe
-)
 from paddle.nn import Layer
 from paddle.nn.initializer import Constant
 from paddle.nn.quant import weight_only_linear
@@ -75,8 +69,11 @@ if paddle.is_compiled_with_cuda():
             rebuild_padding,
             transpose_remove_padding,
             write_cache_kv,
-        )
-
+            moe_expert_dispatch,
+            moe_expert_ffn,
+            moe_expert_reduce,
+            fused_expert_moe
+            )
     except:
         pass
 
