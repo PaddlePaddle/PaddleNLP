@@ -2095,12 +2095,12 @@ class PPOTrainer(Trainer):
         # inputs shared by policy and value trainer
         input_ids = rl_batch["input_ids"].contiguous()  # length: src+tgt
         position_ids = rl_batch["position_ids"]  # length: src+tgt
-        sequence_mask = rl_batch["eos_mask"]  # length: src+tgt(-1)
+        sequence_mask = rl_batch["eos_mask"]  # length: tgt(-1)
         if self.args.use_fp32_compute and sequence_mask.dtype != paddle.float32:
             sequence_mask = sequence_mask.cast(paddle.float32)
         # inputs used by policy trainer
-        old_log_probs = rl_batch["log_probs"]  # length: src+tgt(-1)
-        reward_advantages = rl_batch["reward_advantages"]  # length: src+tgt(-1)
+        old_log_probs = rl_batch["log_probs"]  # length: tgt(-1)
+        reward_advantages = rl_batch["reward_advantages"]  # length: tgt(-1)
 
         response_start = rl_batch["prompt"].shape[-1] - 1
 
@@ -2110,7 +2110,7 @@ class PPOTrainer(Trainer):
             "position_ids": position_ids,
             "old_log_probs": old_log_probs,
             "reward_advantages": reward_advantages,
-            "sequence_mask": sequence_mask[:, response_start:],
+            "sequence_mask": sequence_mask,
             "response_start": response_start,
             "attn_mask_startend_row_indices": attn_mask_startend_row_indices,
         }
@@ -2126,7 +2126,7 @@ class PPOTrainer(Trainer):
         with paddle.no_grad():
             rewards = rl_batch["rewards"].mean()
             ori_rewards = rl_batch["ori_rewards"].mean()
-            mask_cast = sequence_mask[:, response_start:].cast(paddle.float32)
+            mask_cast = sequence_mask.cast(paddle.float32)
             if self.args.rl_algorithm in ["ppo", "reinforce_plus_plus"]:
                 kl_rewards = (rl_batch["kl_rewards"] * mask_cast).sum() / mask_cast.sum()
                 rewards_with_kl = (rl_batch["rewards_with_kl"] * mask_cast).sum() / mask_cast.sum()
@@ -2943,7 +2943,7 @@ class PPOTrainer(Trainer):
                     "reward_advantages": reward_advantages,
                     "ref_log_probs": ref_log_probs,
                     "rewards": rewards,
-                    "eos_mask": eos_mask,
+                    "eos_mask": eos_mask[:, start:],
                 }
             )
             if self.args.rl_algorithm in ["reinforce_plus_plus", "ppo"]:

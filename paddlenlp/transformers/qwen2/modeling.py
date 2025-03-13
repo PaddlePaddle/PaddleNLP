@@ -1630,8 +1630,6 @@ class Qwen2ForCausalLM(Qwen2PretrainedModel):
         else:
             raise ValueError("You have to specify either decoder_input_ids or decoder_inputs_embeds")
 
-        print("QWEN input_ids.shape", input_ids.shape, "is training?", self.training)
-
         # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
         outputs = self.qwen2(
             input_ids=input_ids,

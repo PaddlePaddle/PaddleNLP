@@ -78,7 +78,7 @@ class TrainingArguments(TrainingArguments):
         metadata={"help": "The coefficient for the PG loss for GRPO."},
     )
     entropy_coeff: float = field(
-        default=0.001,
+        default=0.0,
         metadata={"help": "The coefficient for the entropy loss for GRPO."},
     )
     clip_range_ratio: float = field(

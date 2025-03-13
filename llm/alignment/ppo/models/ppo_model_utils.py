@@ -106,8 +106,18 @@ def create_loss(loss_cls, config, extra_args, info_buffer, merge_labels=None):
 
 
 def make_position_ids_from_input_ids(input_ids, pad_token_id=0):
-    position_ids = (input_ids != pad_token_id).cast("int32").cumsum(-1) - 1
-    return position_ids.masked_fill(position_ids < 0, 0)
+    assert input_ids.ndim == 2, "input_ids's shape must be 2d"
+    position_ids = paddle.zeros_like(input_ids)
+    for index, row in enumerate(input_ids):
+        non_zero_indices = paddle.nonzero(row != pad_token_id).flatten()
+        start_index = non_zero_indices[0]
+        position_ids[index, start_index + 1 :] = 1
+    return position_ids.cumsum(-1)
+
+
+# def make_position_ids_from_input_ids(input_ids, pad_token_id=0):
+#     position_ids = (input_ids != pad_token_id).cast("int32").cumsum(-1) - 1
+#     return position_ids.masked_fill(position_ids < 0, 0)
 
 
 @paddle.no_grad()
@@ -431,13 +441,14 @@ class RLHFPPOMixedLoss(nn.Layer):
                 vocab_size=self.config.vocab_size,
                 tensor_parallel_degree=self.config.tensor_parallel_degree,
                 tensor_parallel_output=self.config.tensor_parallel_output,
-                pg_loss_coeff=self.pg_loss_coeff,
+                pg_loss_coeff=self.pg_loss_coeff,  # donot use this
                 clip_range_ratio=self.clip_range_ratio,
-                entropy_coeff=self.entropy_coeff,
+                entropy_coeff=self.entropy_coeff,  # donot support this
                 clip_range_score=self.clip_range_score,
                 kl_loss_coeff=self.kl_loss_coeff,
                 loop_chunk_size=1024,
                 response_start=response_start,
+                use_actor_fused_loss=True,  # TODO, currently only support kunbo's fused head loss
             )
             with paddle.no_grad():
                 self.info_buffer["kl_loss"] = (
@@ -621,8 +632,11 @@ class ActorFusedLoss(paddle.autograd.PyLayer):
         loop_chunk_size: int,
         ignore_index: int,
         old_log_probs: paddle.Tensor,
+        ref_log_probs: paddle.Tensor,
         advantages: paddle.Tensor,
         clip_range_ratio: float,
+        clip_range_score: float,
+        kl_loss_coeff: float,  # KL loss coefficient
     ):
         """
         forward function of ActorFusedLoss
@@ -670,6 +684,7 @@ class ActorFusedLoss(paddle.autograd.PyLayer):
         hidden_states = hidden_states.reshape([-1, original_shape[-1]])
         labels = labels.reshape([-1])
         old_log_probs = old_log_probs.reshape([-1])
+        ref_log_probs = ref_log_probs.reshape([-1])
         advantages = advantages.reshape([-1])
         loss_mask = mask.reshape([-1]).astype("float32")  # .astype(dtype)
 
@@ -695,6 +710,8 @@ class ActorFusedLoss(paddle.autograd.PyLayer):
 
         # initialize total_loss and divisor
         total_loss = paddle.zeros([1], dtype=dtype)
+        total_kl_loss = paddle.zeros([1], dtype=dtype)
+        total_entropy_loss = paddle.zeros([1], dtype=dtype)
         divisor = loss_mask.sum()
 
         # initialize grads
@@ -702,7 +719,7 @@ class ActorFusedLoss(paddle.autograd.PyLayer):
             grad_lm_head_weight = paddle.zeros_like(lm_head_weight)
         else:
             grad_lm_head_weight = None
-        if lm_head_weight is not None and not lm_head_weight.stop_gradient:
+        if lm_head_bias is not None and not lm_head_bias.stop_gradient:
             grad_lm_head_bias = paddle.zeros_like(lm_head_bias)
         else:
             grad_lm_head_bias = None
@@ -717,6 +734,8 @@ class ActorFusedLoss(paddle.autograd.PyLayer):
             hidden_states_chunk = hidden_states[token_start_idx:token_end_idx]
             labels_chunk = labels[token_start_idx:token_end_idx]
             old_log_probs_chunk = old_log_probs[token_start_idx:token_end_idx]
+            if kl_loss_coeff > 0:
+                ref_log_chunk = ref_log_probs[token_start_idx:token_end_idx]
             advantages_chunk = advantages[token_start_idx:token_end_idx]
             mask_chunk = loss_mask[token_start_idx:token_end_idx]
 
@@ -786,6 +805,29 @@ class ActorFusedLoss(paddle.autograd.PyLayer):
             # ∂loss/∂logits
             d_loss_d_logits_chunk = d_loss_d_log_probs_chunk.unsqueeze(-1) * d_log_probs_d_logits_chunk
 
+            if kl_loss_coeff > 0:
+                # [3] kl loss
+                delta_chunk = ref_log_chunk - log_probs_chunk
+                exp_delta_chunk = paddle.exp(delta_chunk)
+                kl_loss_estimate_chunk = exp_delta_chunk - delta_chunk - 1
+                kl_loss_clipped_chunk = (
+                    paddle.clip(
+                        kl_loss_estimate_chunk,
+                        min=-clip_range_score,
+                        max=clip_range_score,
+                    )
+                    * mask_chunk
+                )
+                total_kl_loss += kl_loss_clipped_chunk.sum() * kl_loss_coeff
+                # gradgradgradgrad kl loss
+                kl_within_clip_chunk = (
+                    (kl_loss_estimate_chunk >= -clip_range_score) & (kl_loss_estimate_chunk <= clip_range_score)
+                ).astype(dtype)
+                d_kl_log_probs_chunk = (
+                    (1 - exp_delta_chunk) * kl_within_clip_chunk * mask_chunk * kl_loss_coeff / divisor
+                )
+                d_loss_d_logits_chunk += d_kl_log_probs_chunk.unsqueeze(-1) * d_log_probs_d_logits_chunk
+
             # grads
             if grad_hidden_states is not None:
                 grad_hidden_states[token_start_idx:token_end_idx] = paddle.matmul(
@@ -799,7 +841,7 @@ class ActorFusedLoss(paddle.autograd.PyLayer):
             if grad_lm_head_bias is not None:
                 grad_lm_head_bias += d_loss_d_logits_chunk.astype("float32").sum(axis=0).astype(dtype)
 
-        final_loss = total_loss / divisor
+        final_loss = (total_loss + total_kl_loss) / divisor
         ctx.hidden_states_has_grad = grad_hidden_states is not None
         ctx.lm_head_weight_has_grad = grad_lm_head_weight is not None
         ctx.lm_head_bias_has_grad = grad_lm_head_bias is not None
@@ -815,10 +857,15 @@ class ActorFusedLoss(paddle.autograd.PyLayer):
             grad_args.append(grad_lm_head_bias)
 
         ctx.save_for_backward(*grad_args)
-        return final_loss
+        return (
+            final_loss,
+            (total_loss / divisor).detach(),
+            total_entropy_loss.detach(),
+            (total_kl_loss / divisor).detach(),
+        )
 
     @staticmethod
-    def backward(ctx, grad_output):
+    def backward(ctx, grad_output, *args):
         """
         backward function of ActorFusedLoss
 
@@ -1142,7 +1189,7 @@ class ActorFusedPGEntropyKLLoss(paddle.autograd.PyLayer):
             *filter(lambda x: x is not None, [grad_hidden_states, grad_lm_head_weight, grad_lm_head_bias])
         )
 
-        return final_loss, total_pg_loss, total_entropy_loss, total_kl_loss
+        return final_loss, total_pg_loss.detach(), total_entropy_loss.detach(), total_kl_loss.detach()
 
     @staticmethod
     def backward(ctx, grad_output, *args):
@@ -1190,12 +1237,36 @@ def actor_fused_pg_entropy_kl_loss(
     kl_loss_coeff: float = 0.001,
     response_start: int = 0,
     loop_chunk_size: int = 1024,
+    use_actor_fused_loss: bool = True,
 ):
     hidden_next = hidden_states[:, response_start:-1, :]
     labels_next = input_ids[:, response_start + 1 :]
 
     if ref_log_probs is None:
         kl_loss_coeff = 0.0
+
+    if use_actor_fused_loss:
+        return ActorFusedLoss.apply(
+            hidden_states=hidden_next,
+            lm_head_weight=weight,
+            lm_head_bias=bias,
+            labels=labels_next,
+            mask=sequence_mask,
+            transpose_y=transpose_y,
+            num_embeddings=vocab_size,
+            old_log_probs=old_log_probs,
+            ref_log_probs=ref_log_probs,
+            advantages=advantages,
+            tensor_parallel_degree=tensor_parallel_degree,
+            tensor_parallel_output=tensor_parallel_output,
+            fused_linear=fused_linear,
+            loop_chunk_size=loop_chunk_size,
+            clip_range_ratio=clip_range_ratio,
+            clip_range_score=clip_range_score,
+            kl_loss_coeff=kl_loss_coeff,
+            ignore_index=-100,
+        )
+
     return ActorFusedPGEntropyKLLoss.apply(
         hidden_states=hidden_next,
         weight=weight,
