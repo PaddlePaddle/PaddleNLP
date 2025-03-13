@@ -171,6 +171,47 @@ def setup_fused_quant_ops():
         ),
     )
 
+def setup_token_dispatcher_utils():
+    from paddle.utils.cpp_extension import CUDAExtension, setup
+
+    change_pwd()
+    setup(
+        name="TokenDispatherUtils",
+        ext_modules=CUDAExtension(
+            sources=[
+                "token_dispatcher_utils/topk_to_multihot.cu",
+            ],
+            extra_compile_args={
+                "cxx": [
+                    "-O3",
+                    "-w",
+                    "-Wno-abi",
+                    "-fPIC",
+                    "-std=c++17"
+                ],
+                "nvcc": [
+                    "-O3",
+                    "-U__CUDA_NO_HALF_OPERATORS__",
+                    "-U__CUDA_NO_HALF_CONVERSIONS__",
+                    "-U__CUDA_NO_BFLOAT16_OPERATORS__",
+                    "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
+                    "-U__CUDA_NO_BFLOAT162_OPERATORS__",
+                    "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
+                    "-DCUTE_ARCH_MMA_SM90A_ENABLE",
+                    "--expt-relaxed-constexpr",
+                    "--expt-extended-lambda",
+                    "--use_fast_math",
+                    "-lineinfo",
+                    "-DCUTLASS_DEBUG_TRACE_LEVEL=0",
+                    "-maxrregcount=50",
+                    "-arch=sm_90a",
+                    "-DNDEBUG"
+                ],
+            },
+        ),
+    )
+
+run(setup_token_dispatcher_utils)
 run(setup_fused_quant_ops)
 run(setup_fast_ln)
 run(setup_fused_ln)
