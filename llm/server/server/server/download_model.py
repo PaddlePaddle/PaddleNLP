@@ -28,7 +28,7 @@ def calculate_md5(file_path, chunk_size=8192):
 
 def download_file(url, save_path, md5sum):
     """download file"""
-    md5_check= int(os.getenv("MD5_CHECK", 1)) == 1
+    md5_check= int(os.getenv("MD5_CHECK", 0)) == 1
     try:
         with requests.get(url, stream=True) as response:
             response.raise_for_status()
