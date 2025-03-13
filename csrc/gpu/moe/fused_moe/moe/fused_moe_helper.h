@@ -224,8 +224,6 @@ public:
       softmax_out_ = nullptr;
     }
 
-    bool *finished = nullptr;
-
     paddle::Tensor expert_scales_float_tensor =
         GetEmptyTensor({num_rows, moe_topk}, paddle::DataType::FLOAT32, place);
     float *expert_scales_float = expert_scales_float_tensor.data<float>();
@@ -264,7 +262,6 @@ public:
     }
 
     topk_gating_softmax_kernelLauncher<float>(gating_output,
-                                              finished,
                                               expert_scales_float,
                                               softmax_out_,
                                               expert_for_source_row,
@@ -302,12 +299,11 @@ public:
 
     const int64_t expanded_active_expert_rows = k * num_rows;
 
-    compute_total_rows_before_expert<T>(permuted_experts_,
-                                        input_activations,
-                                        expanded_active_expert_rows,
-                                        num_experts,
-                                        total_rows_before_expert_,
-                                        stream);
+    compute_total_rows_before_expert(permuted_experts_,
+                                     expanded_active_expert_rows,
+                                     num_experts,
+                                     total_rows_before_expert_,
+                                     stream);
 
     VLOG(4) << " ENTER EXPERT \n";
 

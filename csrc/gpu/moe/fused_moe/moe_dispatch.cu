@@ -17,6 +17,7 @@
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstrict-aliasing"
 #pragma GCC diagnostic ignored "-Wunused-function"
+#pragma once
 
 #include "moe/fused_moe_helper.h"
 #include "moe/fused_moe_op.h"
@@ -58,7 +59,6 @@ void MoeDispatchKernel(const paddle::Tensor& input,
                           moe_topk));
   }
 
-  bool* finished = nullptr;
   const int num_moe_inputs = AlignTo16(num_rows * moe_topk);
   const int bytes = num_moe_inputs * sizeof(int);
 
@@ -115,7 +115,6 @@ void MoeDispatchKernel(const paddle::Tensor& input,
             << "group_moe: " << std::boolalpha << group_moe;
 
   topk_gating_softmax_kernelLauncher<float>(gating_output.data<float>(),
-                                            finished,
                                             expert_scales_float->data<float>(),
                                             softmax_out_,
                                             expert_for_source_row,
@@ -151,9 +150,8 @@ void MoeDispatchKernel(const paddle::Tensor& input,
       stream);
 
 
-  compute_total_rows_before_expert<data_t>(
+  compute_total_rows_before_expert(
       permuted_experts_,
-      input.data<data_t>(),
       moe_topk * num_rows,
       expert_num,
       token_nums_per_expert->data<int64_t>(),

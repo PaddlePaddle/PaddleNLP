@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #pragma once
-
 #include "cutlass/numeric_conversion.h"
 #include "helper.h"
 #include "moe/fused_moe_helper.h"
