@@ -51,7 +51,6 @@ nnodes=$(($END_RANK-$START_RANK))
 
 master=`cat /root/paddlejob/workspace/hostfile | head -n 1 | awk '{print $1}'`
 port=36679
-# export PYTHONPATH=/root/paddlejob/workspace/env_run/shenliang/PaddleNLP:/root/paddlejob/workspace/env_run/shenliang/PaPerf:$PYTHONPATH
 export PYTHONPATH=../:$PYTHONPATH
 export PATH=/opt/nvidia/nsight-systems/2025.1.1/bin/:$PATH
 
@@ -63,4 +62,3 @@ python3.10 -m paddle.distributed.launch \
     --run_mode=collective \
     ${script:-run_pretrain.py}  \
     $@
-    
