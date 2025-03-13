@@ -29,7 +29,7 @@ import paddle.distributed.fleet as fleet
 from paddle.base.framework import use_pir_api
 from paddlenlp_ops import speculate_step_paddle, step_paddle
 from server.data.processor import DataProcessor
-from server.engine.config import Config
+from server.engine.config import global_config
 from server.utils import get_logger
 from task_queue_manager import TaskQueueManager
 
@@ -52,7 +52,7 @@ class ModelRunner:
         # 2**63 - 1
         self.MAX_INFER_SEED = 9223372036854775806
 
-        self.config = Config()
+        self.config = global_config
         self.model_cfg = self.config.get_model_config()
         self.speculate_config = self.config.get_speculate_config()
         self.is_speculate_decoding = self.speculate_config.speculate_method != "None"
