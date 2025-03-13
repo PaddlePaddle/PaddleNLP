@@ -512,6 +512,9 @@ def main():
         config.using_flex_token = True
         config.num_nextn_predict_layers = 0
         config.using_fake_gate = True
+        config.use_fused_rms_norm = True
+        config.fuse_attention_ffn = True
+        config.use_fused_rope = True
         model = model_class.from_config(config, dtype=dtype)
 
     if training_args.recompute:
