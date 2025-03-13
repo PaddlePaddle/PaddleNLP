@@ -102,7 +102,9 @@ def get_gencode_flags():
 
 
 gencode_flags = get_gencode_flags()
-library_path = [os.environ.get("LD_LIBRARY_PATH", "/usr/local/cuda/lib64"), "./third_party/glog/install/lib"]
+
+glog_lib_path = "./third_party/glog/build/install/lib"
+library_path = [os.environ.get("LD_LIBRARY_PATH", "/usr/local/cuda/lib64"), glog_lib_path]
 
 sources = [
     "./gpu/save_with_output.cc",
@@ -247,6 +249,7 @@ setup(
         libraries=["cublasLt", "glog"],
         library_dirs=library_path,
         include_dirs=include_dirs,
+        extra_link_args=[f"-Wl,-rpath,{glog_lib_path}"],
         define_macros=[("GLOG_USE_GLOG_EXPORT", "1")],
     ),
 )
