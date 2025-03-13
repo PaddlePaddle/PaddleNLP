@@ -12,26 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-nohup python distill_model.py \
+nohup python distill_data.py \
     --input_file "data/gsm8k_zh/train.jsonl" \
     --output_dir "data/gsm8k_zh/meta-math_gsm8k_en_distill" \
     --prompt_key "question" \
+    --response_key "deepseek_r1_response" \
+    --reasoning_key "deepseek_r1_reasoning" \
     --prompt_suffix "\nPlease reason step by step, and put your final answer within \\boxed{}." \
     --base_urls "http://192.168.0.1:9965/v1,http://192.168.0.2:9965/v1" \
     --model deepseek-r1:671b \
     --temperature 0.6 \
     --top_p 0.95 \
     --max_tokens 32768 \
-    --concurrency 160 > ./meta-math_gsm8k_en_distill.log 2>&1 &
+    --concurrency 32 > ./meta-math_gsm8k_en_distill.log 2>&1 &
 
-nohup python distill_model.py \
-    --input_file "data/gsm8k_zh/meta-math_gsm8k_en_distill/openai-train.jsonl" \
+nohup python distill_data.py \
+    --input_file "data/gsm8k_zh/GSM8K_distilled_zh.jsonl" \
     --output_dir "data/gsm8k_zh/meta-math_gsm8k_zh_distill" \
     --prompt_key "question_zh" \
+    --response_key "deepseek_r1_response_zh" \
+    --reasoning_key "deepseek_r1_reasoning_zh" \
     --prompt_suffix "\n请一步一步地推理，并将你的最终答案放在\boxed{}中。" \
     --base_urls "http://192.168.0.1:9965/v1,http://192.168.0.2:9965/v1" \
     --model deepseek-r1:671b \
     --temperature 0.6 \
     --top_p 0.95 \
     --max_tokens 32768 \
-    --concurrency 160 > ./meta-math_gsm8k_zh_distill.log 2>&1 &
+    --concurrency 32 > ./meta-math_gsm8k_zh_distill.log 2>&1 &
