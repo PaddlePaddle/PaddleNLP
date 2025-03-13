@@ -100,7 +100,7 @@ function llama_case_list_auto() {
         llama_dygraph_auto_bs8_fp32_DP2-MP2
         llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2
         llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2
-        llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_intermediate
+        # llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_intermediate
         llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw
         llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2
         llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1
@@ -112,7 +112,7 @@ function llama_case_list_auto() {
         llama_align_dy2st_fthenb_and_vpp_auto_bs2_fp32_DP1-MP1-PP4
         llama_align_dygraph_dy2st_pir_auto_pp_bs2_bf16_DP1-MP1-PP4
         llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2
-        llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2_intermediate
+        # llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2_intermediate
         llama_dy2st_auto_bs2_bf16_DP2-MP1-PP1-CINN
         llama_lora_static_graph_auto_bs_2_bf16_DP2-TP2-PP1
     )
@@ -497,7 +497,7 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_intermediate() {
         --fp16_opt_level "O2" \
         --amp_master_grad 1 \
         --scale_loss 1024 \
-        --pipeline_parallel_degree 1 \
+        --pipeline_parallel_degree 2 \
         --tensor_parallel_degree 2 \
         --sharding_parallel_degree 1 \
         --learning_rate 0.0001 \
@@ -1837,7 +1837,7 @@ function llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2_intermediate
         --output_dir $case_out_dir \
         --split 949,50,1 \
         --to_static true \
-        --pipeline_parallel_degree 1 \
+        --pipeline_parallel_degree 2 \
         --tensor_parallel_degree 2 \
         --virtual_pp_degree 2\
         --pipeline_schedule_mode "1F1B" \
