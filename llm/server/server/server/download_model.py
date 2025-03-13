@@ -70,7 +70,7 @@ def download_file(url, save_path, md5sum):
             os.remove(save_path)
         return None
 
-def download_from_txt(base_url, save_dir, model_name=None):
+def download_from_txt(base_url, save_dir):
     txt_url = base_url + "/file_list.txt"
     print(f"{txt_url}")
     try:
