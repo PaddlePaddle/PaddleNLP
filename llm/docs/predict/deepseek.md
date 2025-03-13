@@ -406,7 +406,16 @@ python predictor.py --model_name_or_path /path/to/exported_model --dtype bfloat1
 ## Benchmark
 
 ### vLLM & sglang 服务部署
-1. 安装[vLLM main branch](https://docs.vllm.ai/en/latest/getting_started/installation.html) & [sglang main branch](https://docs.sglang.ai/start/install.html)
+1. 安装[vLLM main branch](https://docs.vllm.ai/en/latest/getting_started/installation.html) & [sglang v0.4.3.post4](https://docs.sglang.ai/start/install.html)
+
+```shell
+export VLLM_COMMIT=1253b1577408f7981d11495b1fda71cbcbe48dc4
+git clone https://github.com/vllm-project/vllm.git && cd vllm && git checkout $VLLM_COMMIT
+python3 setup.py bdsit_wheel
+```
+```shell
+pip install "sglang[all]>=0.4.3.post4"
+```
 
 2. 部署服务
 ```shell
@@ -423,3 +432,14 @@ cd llm/benchmark/serving
 bash run_benchmark_client.sh vllm
 bash run_benchmark_client.sh sglang
 ```
+
+## Acknowledgement
+在本项目的开发过程中，我们借鉴并受益于多个优秀的开源项目。在此，我们向以下项目及其贡献者表示诚挚的感谢：
+
+- Triton：Trito作为高效的算子开发工具，在我们的系统中得到大量应用。
+- sglang：MoE和Fp8的算子为我们的系统优化带来了重要参考。
+- vLLM：其高效的矩阵吸收方案为我们的系统优化带来了重要参考。
+- TensorRT-LLM：为大模型推理提供了强大的优化工具，使得我们能够充分利用硬件性能。
+- DeepSeek：作为开源大模型的重要贡献者，为社区提供了高质量的模型权重和优化方案。
+  
+开源精神推动了 AI 技术的发展，我们的项目同样受益于这一生态。再次感谢所有开源社区的贡献者！
