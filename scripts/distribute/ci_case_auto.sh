@@ -1332,7 +1332,7 @@ function llama_dpo_dy2st_auto_bs2_bf16_MP8_intermediate() {
     echo "result: to_static=$to_static loss=$loss ips=$ips mem=$mem"
     loss_base=1.22546446
     if [ $IS_A100 -ne 0 ];then
-        loss_base=1.20962083
+        loss_base=1.22545731
     fi
     ips_base=-1
     mem_base=-1

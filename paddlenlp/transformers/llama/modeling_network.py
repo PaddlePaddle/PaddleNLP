@@ -75,6 +75,7 @@ except:
 
 __all__ = [
     "LlamaForCausalLMNet",
+    "LlamaForCausalLMNetDPO",
     "LlamaPretrainingCriterionNet",
 ]
 
@@ -1028,19 +1029,16 @@ class LlamaForCausalLMNet(LlamaPretrainedModelNet):
     def forward(
         self,
         input_ids=None,
-        position_ids=None,
-        response_indexs=None,
-        attention_mask=None,
-        chosen_labels=None,
-        rejected_labels=None,
-        attn_mask_startend_row_indices=None,
         labels=None,
+        position_ids=None,
+        attention_mask=None,
         inputs_embeds=None,
         use_cache=False,
         past_key_values=None,
         output_attentions=None,
         output_hidden_states=None,
         return_dict=None,
+        attn_mask_startend_row_indices=None,
     ):
         input_ids.stop_gradient = True
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
@@ -1117,3 +1115,40 @@ class LlamaForCausalLMNet(LlamaPretrainedModelNet):
         }
 
         return config
+
+
+class LlamaForCausalLMNetDPO(LlamaForCausalLMNet):
+    def __init__(self, config):
+        super().__init__(config)
+
+    def forward(
+        self,
+        input_ids=None,
+        position_ids=None,
+        response_indexs=None,
+        attention_mask=None,
+        chosen_labels=None,
+        rejected_labels=None,
+        attn_mask_startend_row_indices=None,
+        labels=None,
+        inputs_embeds=None,
+        use_cache=False,
+        past_key_values=None,
+        output_attentions=None,
+        output_hidden_states=None,
+        return_dict=None,
+    ):
+        logits = super().forward(
+            input_ids=input_ids,
+            labels=labels,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
+            use_cache=use_cache,
+            past_key_values=past_key_values,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+            attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+        )
+        return logits

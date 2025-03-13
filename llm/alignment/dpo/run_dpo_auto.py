@@ -39,7 +39,7 @@ from paddlenlp.transformers import (
     AutoModelForCausalLMPipe,
     AutoTokenizer,
     LlamaForCausalLM,
-    LlamaForCausalLMNet,
+    LlamaForCausalLMNetDPO,
     LlamaForCausalLMPipe,
     Qwen2ForCausalLM,
     Qwen2ForCausalLMPipe,
@@ -57,7 +57,7 @@ from paddlenlp.utils.log import logger
 flash_mask_support_list = [
     Qwen2ForCausalLM,
     Qwen2ForCausalLMPipe,
-    LlamaForCausalLMNet,
+    LlamaForCausalLMNetDPO,
     LlamaForCausalLM,
     LlamaForCausalLMPipe,
 ]
@@ -139,7 +139,7 @@ def main():
             ref_model_config.dpo_config = dpo_config
         model_config.dpo_config = dpo_config
     else:
-        model_class = LlamaForCausalLMNet
+        model_class = LlamaForCausalLMNetDPO
 
     if not training_args.autotuner_benchmark or model_args.weight_quantize_algo is not None:
         model = model_class.from_pretrained(model_args.model_name_or_path, config=model_config)
