@@ -104,7 +104,7 @@ def get_gencode_flags():
 gencode_flags = get_gencode_flags()
 
 glog_lib_path = "./third_party/glog/build/install/lib"
-library_path = [os.environ.get("LD_LIBRARY_PATH", "/usr/local/cuda/lib64"), glog_lib_path]
+library_path = [glog_lib_path, os.environ.get("LD_LIBRARY_PATH", "/usr/local/cuda/lib64")]
 
 sources = [
     "./gpu/save_with_output.cc",
@@ -144,6 +144,7 @@ sources = [
     "./gpu/speculate_decoding_kernels/speculate_get_output.cc",
 ]
 sources += find_end_files("./gpu/speculate_decoding_kernels", ".cu")
+sources = []
 sources += find_end_files("./gpu/moe/fused_moe/cutlass_kernels/moe_gemm/", ".cu")
 sources += find_end_files("./gpu/moe/fused_moe/", ".cu")
 
@@ -168,7 +169,7 @@ include_dirs = [
     "./gpu/cutlass_kernels/fp8_gemm_fused/autogen",
     "./third_party/cutlass/include",
     "./third_party/cutlass/tools/util/include",
-    "./third_party/glog/install/include",
+    "./third_party/glog/build/install/include",
     "./third_party/nlohmann_json/single_include",
     "./gpu/sample_kernels",
     "./gpu/moe/fused_moe",
