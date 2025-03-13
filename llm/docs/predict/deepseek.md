@@ -402,3 +402,24 @@ python export_model.py --model_name_or_path deepseek-ai/DeepSeek-R1-Distill-Qwen
 # 静态图推理
 python predictor.py --model_name_or_path /path/to/exported_model --dtype bfloat16 --mode static --inference_model 1 --append_attn 1
 ```
+
+## Benchmark
+
+### vLLM & sglang 服务部署
+1. 安装[vLLM main branch](https://docs.vllm.ai/en/latest/getting_started/installation.html) & [sglang main branch](https://docs.sglang.ai/start/install.html)
+
+2. 部署服务
+```shell
+VLLM_USE_FLASHINFER_SAMPLER=1 VLLM_USE_V1=1 VLLM_ATTENTION_BACKEND=FLASHMLA vllm serve deepseek-ai/DeepSeek-R1 --tensor-parallel-size 16 --trust-remote-code   --max-num-seqs 256 --max-model-len 4096 --max-seq-len-to-capture 256 --enforce-eager --disable-log-requests
+```
+
+```shell
+python3 -m sglang.launch_server --model-path deepseek-ai/DeepSeek-R1 --tp 16 --dist-init-addr $IP --nnodes 2 --node-rank 0 --trust-remote-code --host 0.0.0.0 --port 40000 --enable-torch-compile --torch-compile-max-bs 256 --disable-cuda-graph --quantization fp8 --enable-flashinfer-mla
+```
+
+3. 测试Benchmark
+```shell
+cd llm/benchmark/serving
+bash run_benchmark_client.sh vllm
+bash run_benchmark_client.sh sglang
+```
