@@ -29,7 +29,7 @@ def update_git_submodule():
         print(f"Error occurred while updating git submodule: {str(e)}")
         raise
 
-def build_glog():
+def build_glog(install_prefix="./install"):
     """Automatically build glog if it is not already built."""
     glog_src_dir = "./third_party/glog"
     glog_build_dir = os.path.join(glog_src_dir, "build")
@@ -39,13 +39,15 @@ def build_glog():
     ):
         print("glog is already built.")
         return
-    # Build glog
+
     print("Building glog...")
     os.makedirs(glog_build_dir, exist_ok=True)
-    subprocess.run(["cmake", ".."], cwd=glog_build_dir, check=True)
-    subprocess.run(["make"], cwd=glog_build_dir, check=True)
-    # Install glog to system paths
-    print("Installing glog...")
+    subprocess.run(
+        ["cmake", "..", f"-DCMAKE_INSTALL_PREFIX={install_prefix}"],
+        cwd=glog_build_dir,
+        check=True
+    )
+    print(f"Installing glog to {install_prefix}...")
     subprocess.run(["make", "install"], cwd=glog_build_dir, check=True)
     print("glog build and installation completed.")
 
@@ -100,7 +102,7 @@ def get_gencode_flags():
 
 
 gencode_flags = get_gencode_flags()
-library_path = [os.environ.get("LD_LIBRARY_PATH", "/usr/local/cuda/lib64"), "./third_party/glog/build"]
+library_path = [os.environ.get("LD_LIBRARY_PATH", "/usr/local/cuda/lib64"), "./third_party/glog/install/lib"]
 
 sources = [
     "./gpu/save_with_output.cc",
@@ -164,6 +166,7 @@ include_dirs = [
     "./gpu/cutlass_kernels/fp8_gemm_fused/autogen",
     "./third_party/cutlass/include",
     "./third_party/cutlass/tools/util/include",
+    "./third_party/glog/install/include",
     "./third_party/nlohmann_json/single_include",
     "./gpu/sample_kernels",
     "./gpu/moe/fused_moe",
