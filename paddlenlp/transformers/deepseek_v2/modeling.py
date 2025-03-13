@@ -27,15 +27,18 @@ import warnings
 from functools import partial
 from typing import List, Optional, Tuple, Union
 
+import FusedQuantOps as FQO
 import paddle
-import paddle.distributed as dist
 import paddle.distributed.fleet.meta_parallel as mpu
 import paddle.nn.functional as F
 from paddle import Tensor, nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
-from paddle.distributed.fleet.recompute.recompute import recompute
+from paddle.distributed.fleet.utils import recompute
 from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
+from paddle.utils import try_import
+
+# from .fp8_linear import Linear #默认原来的Linear
 
 try:
     from paddle.incubate.nn.functional import fused_rotary_position_embedding
@@ -56,6 +59,10 @@ try:
 except:
     flash_attention = None
 
+import deep_gemm
+import kitchen
+import kitchen.quantization_subchannel_block_hybrid
+from kitchen.quantization import QParams, ScalingType
 
 from paddlenlp.transformers.model_utils import dtype_guard
 
@@ -77,7 +84,16 @@ from ..moe_layer import MoEFlexTokenLayer, MoELayer
 from ..utils import device_guard
 from . import fp8_linear as linear_utils
 from .configuration import DeepseekV2Config
-from .fp8_linear import Linear
+
+try:
+    from paddle.incubate.nn.functional import swiglu
+except ImportError:
+
+    def swiglu(x, y=None):
+        if y is None:
+            x, y = paddle.chunk(x, chunks=2, axis=-1)
+        return F.silu(x) * y
+
 
 __all__ = [
     "DeepseekV2LMHead",
@@ -304,6 +320,480 @@ def _expand_2d_mask(mask, dtype, tgt_length):
     return expanded_mask
 
 
+def rms_norm_fused(x_in, w, eps, use_fast_ln=False):
+    if use_fast_ln:
+        fast_ln = try_import("fast_ln")
+        return fast_ln.fast_rms_norm(x_in, w, eps)[0]
+    else:
+        fused_ln = try_import("fused_ln")
+        return fused_ln.fused_rms_norm(x_in, w, eps)[0]
+
+
+def fusion_rms_norm(hidden_states, weight, variance_epsilon, use_fast_ln=False):
+    if get_env_device() == "npu":
+        return paddle.base.core.eager._run_custom_op("rms_norm_npu", hidden_states, weight, variance_epsilon)[0]
+    if get_env_device() == "mlu":
+        return paddle.base.core.eager._run_custom_op("rms_norm_mlu", hidden_states, weight, variance_epsilon)[0]
+    elif get_env_device() == "gcu":
+        return paddle.base.core.eager._run_custom_op("rms_norm_gcu", hidden_states, weight, variance_epsilon)[0]
+    elif get_env_device() == "intel_hpu":
+        return paddle.incubate.nn.functional.fused_rms_norm(
+            hidden_states, weight, None, variance_epsilon, hidden_states.dim() - 1
+        )[0]
+    elif get_env_device() == "xpu":
+        try:
+            import paddle_xpu_nn  # noqa: F821
+
+            return paddle_xpu_nn.xpu_rms_norm(hidden_states, weight, variance_epsilon)[0]
+        except ImportError:
+            raise NotImplementedError(
+                f"Implementation of fused_rms_norm is not available on {get_env_device()}. Please install paddle_xpu to use this feature"
+            )
+    return rms_norm_fused(hidden_states, weight, variance_epsilon, use_fast_ln)
+
+
+def kitchen_quant(x, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False):
+    quant_tile_shape = (1, 128) if is_1d_scaled else (128, 128)
+    x_qparams = QParams(
+        quant_dtype=paddle.float8_e4m3fn,
+        scaling_type=ScalingType.VECTOR_TILED_X_AND_G_BLOCK_TILED_W,
+        eps=0,
+        pow_2_scales=False,
+        quant_tile_shape=quant_tile_shape,
+    )
+    quantize_op = kitchen.quantization_subchannel_block_hybrid.HybridBlockAndVectorTiledQuantizeOp(backend)
+    qresult_ref = quantize_op.quantize(x, x_qparams, return_transpose)
+    if return_transpose:
+        return (
+            qresult_ref.data,
+            qresult_ref.scale,
+            qresult_ref.data_t,
+            qresult_ref.scale_t,
+        )
+    else:
+        return (qresult_ref.data, qresult_ref.scale)
+
+
+def kitchen_fp8_gemm(x_fp8, x_scale, w_fp8, w_scale, is_a_1d_scaled, is_b_1d_scaled):
+    y = kitchen.ops.fp8_gemm_blockwise(
+        a=x_fp8,
+        a_decode_scale=x_scale,
+        b=w_fp8,
+        b_decode_scale=w_scale,
+        out_dtype=paddle.bfloat16,
+        out=None,
+        accumulate=False,
+        use_split_accumulator=True,
+        is_a_1d_scaled=is_a_1d_scaled,
+        is_b_1d_scaled=is_b_1d_scaled,
+    )
+    return y
+
+
+class LinearFP8Func(paddle.autograd.PyLayer):
+    @staticmethod
+    def forward(ctx, x, weight):
+        x_orig_shape = x.shape
+        # deep_gemm only support 2D
+        x = x.reshape([-1, x_orig_shape[-1]])
+        # quant
+        x_quant, x_scale = kitchen_quant(
+            x, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+        )
+        w_quant, w_sacle, w_t_quant, w_t_scale = kitchen_quant(
+            weight, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
+        )
+
+        # compute out = mm(x, w_t)
+        out = paddle.empty([x.shape[0], weight.shape[-1]], dtype=x.dtype)
+        deep_gemm.gemm_fp8_fp8_bf16_nt((x_quant, x_scale), (w_t_quant, w_t_scale), out)
+        out = out.reshape([x_orig_shape[0], -1, weight.shape[-1]])
+
+        # save for bwd
+        x_t = x.T
+        # padding
+        x_t_shape = x_t.shape
+        if x_t.shape[-1] % 8 != 0:
+            x_t = paddle.concat([x_t, paddle.zeros([x_t.shape[0], 8 - (x_t.shape[-1] % 8)], dtype=x_t.dtype)], axis=-1)
+        x_t_quant, x_t_scale = kitchen_quant(
+            x_t.contiguous(), backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+        )
+        ctx.save_for_backward(
+            x_t_quant, x_t_scale, w_quant, w_sacle, paddle.to_tensor(x_t_shape, dtype="int64", place=paddle.CPUPlace())
+        )
+        return out
+
+    @staticmethod
+    def backward(ctx, dout):
+        x_t_quant, x_t_scale, w_quant, w_sacle, x_t_shape = ctx.saved_tensor()
+        x_t_shape = x_t_shape.numpy()
+        # compute dx = mm(dout, w)
+        dx = paddle.empty([x_t_shape[1], x_t_shape[0]], dout.dtype)
+        dx_orig_shape = dout.shape[:-1]
+        dx_orig_shape.append(x_t_shape[0])
+        dout_quant, dout_scale = kitchen_quant(
+            dout.reshape([-1, dout.shape[-1]]),
+            backend=kitchen.ops.Backend.CUTLASS,
+            is_1d_scaled=True,
+            return_transpose=False,
+        )
+        deep_gemm.gemm_fp8_fp8_bf16_nt((dout_quant, dout_scale), (w_quant, w_sacle), dx)
+        dx = dx.reshape(dx_orig_shape)
+
+        # compute dw = mm(x_t, dout_t)
+        dout_t = dout.reshape([-1, dout.shape[-1]]).T.contiguous()
+        # padding
+        if dout_t.shape[-1] % 8 != 0:
+            pad_size = 8 - (dout_t.shape[-1] % 8)
+            dout_t = paddle.concat([dout_t, paddle.zeros([dout_t.shape[0], pad_size], dtype=dout_t.dtype)], axis=-1)
+
+        dout_t_quant, dout_t_scale = kitchen_quant(
+            dout_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
+        )
+        dweight = kitchen_fp8_gemm(x_t_quant, x_t_scale, dout_t_quant, dout_t_scale, True, True)
+        return dx, dweight
+
+
+class Linear(paddle.nn.Layer):
+    def __init__(self, in_features: int, out_features: int, bias_attr: bool = False) -> None:
+        super().__init__()
+        self._dtype = self._helper.get_default_dtype()
+
+        self.weight = self.create_parameter(
+            shape=[in_features, out_features],
+            dtype="bfloat16",
+            is_bias=False,
+        )
+
+    def forward(self, x):
+        return LinearFP8Func.apply(x, self.weight)
+
+
+class Fuse_FFN_FP8_Func(paddle.autograd.PyLayer):
+    @staticmethod
+    def forward(ctx, x, w1, w2, use_group_gemm=False):
+        if use_group_gemm:
+            assert len(x.shape) == 3 or len(x.shape) == 2
+            assert len(w1.shape) == 3 or len(w1.shape) == 2
+            w1_origin_shape = w1.shape
+            # ===== o1 = deep_grouped_gemm(x_fp8, w1_t_fp8) =====
+            print("w1_origin_shape:", w1_origin_shape)
+            # print('x.shape', x.shape)
+            if len(x.shape) == 2:
+                x = x.reshape([1, -1, x.shape[-1]])
+            x_orig_shape = x.shape
+            num_groups = x_orig_shape[0]
+            print("num_groups: ", num_groups)
+            x_fp8 = paddle.empty_like(x, dtype=paddle.float8_e4m3fn)
+            x_scale = paddle.empty((num_groups, x_orig_shape[1], x_orig_shape[-1] // 128), dtype=paddle.float32)
+            print("x_fp8.shape", x_fp8.shape)
+            print("x_scale.shape", x_scale.shape)
+            if len(w1_origin_shape) == 2:
+                # w1=w1.reshape([num_groups, -1, w1_origin_shape[-1]])
+                w1 = paddle.tile(w1, repeat_times=[num_groups, 1, 1])
+                print("w1.shape", w1.shape)
+            w1_fp8 = paddle.empty_like(w1, dtype=paddle.float8_e4m3fn)
+            w1_scale = paddle.empty(
+                (num_groups, (w1_fp8.shape[1] + 127) // 128, w1_fp8.shape[-1] // 128), dtype=paddle.float32
+            )
+            w1_t_fp8 = w1_fp8.transpose([0, 2, 1]).contiguous()
+            w1_t_scale = w1_scale.transpose([0, 2, 1]).contiguous()
+            print("w1_fp8.shape", w1_fp8.shape)
+            print("w1_sacle.shape", w1_scale.shape)
+            print("w1_t_fp8.shape", w1_t_fp8.shape)
+            print("w1_t_scale.shape", w1_t_scale.shape)
+            for i in range(num_groups):
+                x_fp8_tmp, x_scale_tmp = kitchen_quant(
+                    x[i], backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+                )
+                w1_fp8_tmp, w1_scale_tmp, w1_t_fp8_tmp, w1_t_scale_tmp = kitchen_quant(
+                    w1[i], backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
+                )
+                # x_fp8[i] = x_fp8_tmp
+                paddle.assign(x_fp8_tmp, x_fp8[i])
+                x_scale[i] = x_scale_tmp
+                # w1_fp8[i] = w1_fp8_tmp
+                paddle.assign(w1_fp8_tmp, w1_fp8[i])
+                w1_scale[i] = w1_scale_tmp
+                # w1_t_fp8[i] = w1_t_fp8_tmp
+                paddle.assign(w1_t_fp8_tmp, w1_t_fp8[i])
+                w1_t_scale[i] = w1_t_scale_tmp
+
+            x_fp8 = x_fp8.reshape([-1, x_orig_shape[-1]])
+            x_scale = x_scale.reshape([-1, x_scale.shape[-1]])
+            print("x_fp8.shape", x_fp8.shape)
+            print("x_scale.shape", x_scale.shape)
+            o1 = paddle.empty([x_fp8.shape[0], w1_t_fp8.shape[1]], dtype=x.dtype)
+            m_indices = paddle.arange(0, num_groups, dtype=paddle.int32)
+            m_indices = paddle.flatten(
+                paddle.expand(paddle.unsqueeze(m_indices, -1), shape=[num_groups, x_orig_shape[1]])
+            )
+            print("o1.shape", o1.shape)
+            print("m_indices.shape", m_indices.shape)
+
+            deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
+                (x_fp8, x_scale), (w1_t_fp8, w1_t_scale), o1, m_indices
+            )
+
+            print("use grouped gemm")
+            print("o1:", o1)
+
+            # ===== o2 = swiglu(o1) =====
+            # TODO: [Fusion] swiglu + quant
+            o2 = swiglu(o1)
+            o2_fp8, o2_scale = kitchen_quant(
+                o2, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+            )
+            print("o2.shape", o2.shape)
+            print("o2_fp8.shape", o2_fp8.shape)
+            print("o2_scale.shape", o2_scale.shape)
+            # ===== o3 = deep_grouped_gemm(o2_fp8, w2_t_fp8) =====
+            w2_fp8, w2_sacle, w2_t_fp8, w2_t_scale = kitchen_quant(
+                w2, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
+            )
+            print("w2_fp8.shape", w2_fp8.shape)
+            print("w2_sacle.shape", w2_sacle.shape)
+            print("w2_t_fp8.shape", w2_t_fp8.shape)
+            print("w2_t_scale.shape", w2_t_scale.shape)
+            w2_t_fp8 = w2_t_fp8.unsqueeze(0)
+            w2_t_scale = w2_t_scale.unsqueeze(0)
+            o3 = paddle.empty([o2_fp8.shape[0], w2_t_fp8.shape[1]], dtype=o1.dtype)
+            print("o3.shape", o3.shape)
+            m_indices = paddle.arange(0, 1, dtype=paddle.int32)
+            print("m_indices.shape", m_indices.shape)
+            print("num_groups", num_groups)
+            print("o2_fp8.shape[0]:", o2_fp8.shape[0])
+            m_indices = paddle.flatten(paddle.expand(paddle.unsqueeze(m_indices, -1), shape=[1, o2_fp8.shape[0]]))
+            print("m_indices.shape", m_indices.shape)
+            deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
+                (o2_fp8, o2_scale), (w2_t_fp8, w2_t_scale), o3, m_indices
+            )
+
+            if len(x_orig_shape) > 2:
+                o3 = o3.reshape([x_orig_shape[0], -1, o3.shape[-1]])
+            print("o3.shape", o3.shape)
+
+            # ===== save for backward =====
+            # TODO: [Fusion] transpose + padding + quant
+            x = x.reshape([-1, x_orig_shape[-1]])
+            x_t = x.T.contiguous()
+            print("x.shape:", x.shape)
+            print("x_t.shape:", x_t.shape)
+            if x_t.shape[-1] % 8 != 0:
+                x_t = paddle.concat(
+                    [x_t, paddle.zeros([x_t.shape[0], 8 - (x_t.shape[-1] % 8)], dtype=x_t.dtype)], axis=1
+                )
+            x_t_fp8, x_t_scale = kitchen_quant(
+                x_t, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+            )
+
+            ctx.save_for_backward(
+                x_t_fp8,
+                x_t_scale,
+                w1_fp8,
+                w1_scale,
+                o1,
+                w2_fp8,
+                w2_sacle,
+                paddle.to_tensor(x_orig_shape, dtype="int64", place=paddle.CPUPlace()),
+            )
+            print("x_t_fp8.shape:", x_t_fp8.shape)
+            print("x_t_scale.shape", x_t_scale.shape)
+            print("w1_fp8.shape", w1_fp8.shape)
+            print("w1_scale.shape", w1_scale.shape)
+            print("o1.shape", o1.shape)
+            print("w2_fp8.shape", w2_fp8.shape)
+            print("w2_sacle.shape", w2_sacle.shape)
+            print("o3 result", o3)
+            return o3
+        else:  # use gemm
+            # print("x.shape:", x.shape)
+            # print("w1.shape:", w1.shape)
+            # raise RuntimeError("use_group_gemm must be True")
+            # deep_gemm only support 2D
+            x_orig_shape = x.shape
+            x = x.reshape([-1, x_orig_shape[-1]])
+            # ===== o1 = deep_gemm(x_fp8, w1_t_fp8) =====
+            x_fp8, x_scale = kitchen_quant(
+                x, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+            )
+            # print("x_fp8.shape:", x_fp8.shape)
+            # print("x_scale.shape::", x_scale.shape)
+            w1_fp8, w1_scale, w1_t_fp8, w1_t_scale = kitchen_quant(
+                w1, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
+            )
+            o1 = paddle.empty([x_fp8.shape[0], w1_t_fp8.shape[0]], dtype=x.dtype)
+            deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale), (w1_t_fp8, w1_t_scale), o1)
+            print("o1: ", o1)
+            # ===== o2 = swiglu(o1) =====
+            # TODO: [Fusion] swiglu + quant
+            o2 = swiglu(o1)
+            o2_fp8, o2_scale = kitchen_quant(
+                o2, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+            )
+            print("o2.shape", o2.shape)
+            print("o2_fp8.shape", o2_fp8.shape)
+            print("o2_fp8.shape", o2_fp8.shape)
+            print("o2_scale.shape", o2_scale.shape)
+            # o2_fp8, o2_scale = FQO.fused_swiglu_act_quant(o1, None, transpose_output=False, to_e4m3=True, using_pow2_scaling=False,padding_last_dim_to_8x=False)
+
+            # ===== o3 = deep_gemm(o2_fp8, w2_t_fp8) =====
+            w2_fp8, w2_sacle, w2_t_fp8, w2_t_scale = kitchen_quant(
+                w2, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
+            )
+            print("w2_fp8.shape", w2_fp8.shape)
+            print("w2_sacle.shape", w2_sacle.shape)
+            print("w2_sacle.shape", w2_sacle.shape)
+            print("w2_t_fp8.shape", w2_t_fp8.shape)
+            print("w2_t_scale.shape", w2_t_scale.shape)
+            o3 = paddle.empty([o2_fp8.shape[0], w2_t_fp8.shape[0]], dtype=o1.dtype)
+            deep_gemm.gemm_fp8_fp8_bf16_nt((o2_fp8, o2_scale), (w2_t_fp8, w2_t_scale), o3)
+            if len(x_orig_shape) > 2:
+                o3 = o3.reshape([x_orig_shape[0], -1, o3.shape[-1]])
+            # print('o3.shape:', o3.shape)
+            # ===== save for backward =====
+            # TODO: [Fusion] transpose + padding + quant
+            x_t = x.T.contiguous()
+            # print("x.shape:", x.shape)
+            # print("x_t.shape:", x_t.shape)
+            if x_t.shape[-1] % 8 != 0:
+                x_t = paddle.concat(
+                    [x_t, paddle.zeros([x_t.shape[0], 8 - (x_t.shape[-1] % 8)], dtype=x_t.dtype)], axis=1
+                )
+            x_t_fp8, x_t_scale = kitchen_quant(
+                x_t, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+            )
+
+            ctx.save_for_backward(
+                x_t_fp8,
+                x_t_scale,
+                w1_fp8,
+                w1_scale,
+                o1,
+                w2_fp8,
+                w2_sacle,
+                paddle.to_tensor(x_orig_shape, dtype="int64", place=paddle.CPUPlace()),
+            )
+            # print("o3.shape", o3.shape)
+            print("x_t_fp8.shape:", x_t_fp8.shape)
+            print("x_t_scale.shape", x_t_scale.shape)
+            print("w1_fp8.shape", w1_fp8.shape)
+            print("w1_scale.shape", w1_scale.shape)
+            print("o1.shape", o1.shape)
+            print("w2_fp8.shape", w2_fp8.shape)
+            print("w2_sacle.shape", w2_sacle.shape)
+            print("o3 result", o3)
+            raise RuntimeError("use_group_gemm must be True")
+            return o3
+
+    @staticmethod
+    def backward(ctx, do3):
+        # deep_gemm only support 2D
+        do3_orig_shape = do3.shape
+        do3 = do3.reshape([-1, do3_orig_shape[-1]])
+
+        x_t_fp8, x_t_scale, w1_fp8, w1_scale, o1, w2_fp8, w2_sacle, x_orig_shape = ctx.saved_tensor()
+        x_orig_shape = x_orig_shape.numpy()
+
+        # ===== [recompute] o2 = swiglu(o1) =====
+        # TODO: [Fusion] swiglu + transpose + quant
+        o2 = swiglu(o1)
+        o2_t = o2.T.contiguous()
+        o2_t_fp8, o2_t_scale = kitchen_quant(
+            o2_t, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+        )
+
+        # ===== do2 = deep_gemm(do3_fp8, w2_fp8)
+        do3_fp8, do3_scale = kitchen_quant(
+            do3, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+        )
+        do2 = paddle.empty([do3_fp8.shape[0], w2_fp8.shape[0]], do3.dtype)
+        deep_gemm.gemm_fp8_fp8_bf16_nt((do3_fp8, do3_scale), (w2_fp8, w2_sacle), do2)
+
+        # ===== dw2 = deep_gemm(o2_t_fp8, do3_t_fp8)
+        if o2_t.shape[-1] % 8 != 0:
+            o2_t = paddle.concat(
+                [o2_t, paddle.zeros([o2_t.shape[0], 8 - (o2_t.shape[1] % 8)], dtype=o2_t.dtype)], axis=-1
+            )
+            o2_t_fp8, o2_t_scale = kitchen_quant(
+                o2_t, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+            )
+        do3_t = do3.T.contiguous()
+        if do3_t.shape[-1] % 8 != 0:
+            do3_t = paddle.concat(
+                [do3_t, paddle.zeros([do3_t.shape[0], 8 - (do3_t.shape[1] % 8)], dtype=do3_t.dtype)], axis=-1
+            )
+        do3_t_fp8 = kitchen_quant(do3_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True)
+        dw2 = paddle.zeros(w2_fp8.shape, do3.dtype)
+        if o2_t_fp8.numel() != 0 and do3_t_fp8[0].numel() != 0:
+            deep_gemm.gemm_fp8_fp8_bf16_nt((o2_t_fp8, o2_t_scale), (do3_t_fp8[0], do3_t_fp8[1]), dw2)
+
+        # ===== do1 = swiglu_grad(o1, None, do2) =====
+        # TODO: [Fusion] swiglu_grad + quant
+        do1, _ = paddle._C_ops.swiglu_grad(o1, None, do2)
+        do1_fp8, do1_scale = kitchen_quant(
+            do1, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+        )
+
+        # ===== dx = deep_gemm(do1_fp8, w1_fp8)
+        w1_fp8 = w1_fp8.reshape([-1, w1_fp8.shape[-1]])
+        w1_scale = w1_scale.reshape([-1, w1_scale.shape[-1]])
+        print("do1_fp8.shape:", do1_fp8.shape)
+        print("do1_scale.shape:", do1_scale.shape)
+        print("w1_fp8.shape:", w1_fp8.shape)
+        print("w1_scale.shape:", w1_scale.shape)
+        dx = paddle.empty([do1_fp8.shape[0], w1_fp8.shape[0]], do1.dtype)
+        print("dx.shape:", dx.shape)
+        deep_gemm.gemm_fp8_fp8_bf16_nt((do1_fp8, do1_scale), (w1_fp8, w1_scale), dx)
+        print("----------")
+        if len(x_orig_shape) > 2:
+            dx = dx.reshape([x_orig_shape[0], -1, dx.shape[-1]])
+
+        # ===== dw1 = deep_gemm(x_t_fp8, do1_t_fp8)
+        # TODO: [Fusion] swiglu_grad + transpose + padding + quant
+        print("do1.shape:", do1.shape)
+        do1_t = do1.T.contiguous()
+        print("do1_t.shape:", do1_t.shape)
+        if do1_t.shape[-1] % 8 != 0:
+            pad_size = 8 - (do1_t.shape[1] % 8)
+            do1_t = paddle.concat([do1_t, paddle.zeros([do1_t.shape[0], pad_size], dtype=do1_t.dtype)], axis=-1)
+        do1_t_fp8, do1_t_scale = kitchen_quant(
+            do1_t, is_1d_scaled=True, backend=kitchen.ops.Backend.CUBLAS, return_transpose=False
+        )
+        print("do1_t_fp8.shape:", do1_t_fp8.shape)
+        print("do1_t_scale.shape:", do1_t_scale.shape)
+        print("x_t_fp8.shape:", x_t_fp8.shape)
+        print("x_t_scale.shape:", x_t_scale.shape)
+        if o2_t_fp8.numel() != 0 and do3_t_fp8[0].numel() != 0:
+            dw1 = kitchen_fp8_gemm(x_t_fp8, x_t_scale, do1_t_fp8, do1_t_scale, True, True)
+        else:
+            dw1 = paddle.zeros(w1_fp8.shape, do1.dtype)
+        # print("dw1:",dw1)
+        return dx, dw1, dw2
+
+
+class DeepseekV2MLP(paddle.nn.Layer):
+    def __init__(self, config: DeepseekV2Config, hidden_size=None, intermediate_size=None, is_moe=False):
+        super().__init__()
+        self.config = config
+        self.hidden_size = config.hidden_size if hidden_size is None else hidden_size
+        self.intermediate_size = config.intermediate_size if intermediate_size is None else intermediate_size
+
+        self.w1 = self.create_parameter(
+            shape=[self.hidden_size, self.intermediate_size * 2],
+            dtype="bfloat16",
+            is_bias=False,
+        )
+        self.w2 = self.create_parameter(
+            shape=[self.intermediate_size, self.hidden_size],
+            dtype="bfloat16",
+            is_bias=False,
+        )
+
+    def forward(self, x):
+        return Fuse_FFN_FP8_Func.apply(x, self.w1, self.w2, True)
+
+
 class DeepseekV2RMSNorm(nn.Layer):
     def __init__(self, config: DeepseekV2Config, hidden_size=None, eps=1e-6, use_sequence_parallel=True):
         """DeepseekV2RMSNorm is equivalent to T5LayerNorm
@@ -330,17 +820,8 @@ class DeepseekV2RMSNorm(nn.Layer):
             mark_as_sequence_parallel_parameter(self.weight)
 
     def forward(self, hidden_states):
-        if self.config.use_fused_rms_norm and get_env_device() == "xpu":
-            if self.weight.dtype != hidden_states.dtype:
-                hidden_states = paddle.cast(hidden_states, self.weight.dtype)
-            try:
-                import paddle_xpu_nn  # noqa: F821
-
-                return paddle_xpu_nn.xpu_rms_norm(hidden_states, self.weight, self.variance_epsilon)[0]
-            except ImportError:
-                raise NotImplementedError(
-                    f"Implementation of fused_rms_norm is not available on {get_env_device()}. Please install paddle_xpu to use this feature"
-                )
+        if self.config.use_fused_rms_norm:
+            return fusion_rms_norm(hidden_states, self.weight, self.variance_epsilon, self.config.use_fast_layer_norm)
 
         with paddle.amp.auto_cast(False):
             hidden_states = hidden_states.astype("float32")
@@ -594,7 +1075,7 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids, fuse_rope=False):
     b, s, h, d = k.shape
     k = k.reshape([b, s, h, d // 2, 2]).transpose([0, 1, 2, 4, 3]).reshape([b, s, h, d])
 
-    if get_env_device() == "xpu" and fuse_rope:
+    if (get_env_device() == "xpu" or get_env_device() == "gpu") and fuse_rope:
         q_embed, k_embed, _ = fused_rotary_position_embedding(
             q,
             k,
@@ -621,12 +1102,13 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids, fuse_rope=False):
     return q_embed, k_embed
 
 
-class DeepseekV2MLP(nn.Layer):
+class LJDDeepseekV2MLP(nn.Layer):
     def __init__(self, config: DeepseekV2Config, hidden_size=None, intermediate_size=None, is_moe=False):
         super().__init__()
         self.config = config
         self.hidden_size = config.hidden_size if hidden_size is None else hidden_size
         self.intermediate_size = config.intermediate_size if intermediate_size is None else intermediate_size
+        self.fuse_attention_ffn = config.fuse_attention_ffn
 
         def linear_dtype_gaurd():
             if config.use_fp8:
@@ -662,33 +1144,22 @@ class DeepseekV2MLP(nn.Layer):
                     has_bias=False,
                 )
             else:
-                self.gate_proj = Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
-                self.up_proj = Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
+                if config.fuse_attention_ffn:
+                    self.gate_up_fused_proj = Linear(self.hidden_size, self.intermediate_size * 2, bias_attr=False)
+                else:
+                    self.gate_proj = Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
+                    self.up_proj = Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
                 self.down_proj = Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
 
         self.act_fn = ACT2FN[config.hidden_act]
 
     def forward(self, x):
-        down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
-        return down_proj
-
-
-class FakeGate(paddle.autograd.PyLayer):
-    @staticmethod
-    def forward(ctx, hidden_states, weight):
-        expert_num = weight.shape[1]
-        bsz, seq, _ = hidden_states.shape
-
-        ctx.x_shape = hidden_states.shape
-        ctx.x_dtype = hidden_states.dtype
-        ctx.y_shape = weight.shape
-        ctx.y_dtype = weight.dtype
-
-        return paddle.randn([bsz, seq, expert_num]).cast(weight.dtype)
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        return paddle.zeros(ctx.x_shape, dtype=ctx.x_dtype), paddle.zeros(ctx.y_shape, dtype=ctx.y_dtype)
+        if self.fuse_attention_ffn:
+            x = swiglu(self.gate_up_fused_proj(x))
+        else:
+            x = swiglu(self.gate_proj(x), self.up_proj(x))
+        out = self.down_proj(x)
+        return out
 
 
 class MoEGate(PretrainedMoEGate):
@@ -706,7 +1177,6 @@ class MoEGate(PretrainedMoEGate):
             # default_initializer=nn.initializer.Constant(1.0),
         )
 
-        self.config = config
         if config.topk_method == "noaux_tc":
             self.e_score_correction_bias = paddle.create_parameter(
                 shape=[num_experts],
@@ -727,12 +1197,7 @@ class MoEGate(PretrainedMoEGate):
         # compute gating score
         with paddle.amp.auto_cast(False):
             hidden_states = hidden_states.cast(self.weight.dtype)
-
-            if hasattr(self.config, "using_fake_gate") and self.config.using_fake_gate:
-                logits = FakeGate.apply(hidden_states, self.weight)
-            else:
-                logits = F.linear(hidden_states, self.weight, None)
-
+            logits = F.linear(hidden_states, self.weight, None)
             scores = self.gate_score_func(logits=logits)
             scores = scores.cast(paddle.float32)
 
@@ -784,20 +1249,11 @@ class DeepseekV2MoE(MoELayer):
             drop_tokens=False,
         )
 
-        # (LiuTing) only support either tp or ep.
-        moe_group = dist.fleet.get_hybrid_communicate_group().get_data_parallel_group()
-        expert_parallel_degree = dist.get_world_size(moe_group)
-        expert_parallel_degree = 1 if expert_parallel_degree < 0 else expert_parallel_degree
-        act_tp_shard = config.tensor_parallel_degree > 1 and expert_parallel_degree <= 1
         super().__init__(
             config=config,
             moe_num_experts=config.n_routed_experts,
             expert_class=DeepseekV2MLP,
-            expert_kwargs={
-                "config": config,
-                "intermediate_size": config.moe_intermediate_size,
-                "is_moe": not act_tp_shard,
-            },
+            expert_kwargs={"config": config, "intermediate_size": config.moe_intermediate_size, "is_moe": True},
             gate=gate,
             capacity=2.0,
         )
@@ -942,18 +1398,21 @@ class DeepseekV2Attention(nn.Layer):
 
             if self.q_lora_rank is None:
                 with linear_dtype_gaurd():
-                    self.q_proj = ColumnParallelLinear(self.hidden_size, self.num_heads * self.q_head_dim, has_bias=False, gather_output=True)
+                    self.q_proj = ColumnParallelLinear(self.hidden_size, self.num_heads * self.q_head_dim, has_bias=False, gather_output=False)
             else:
                 with linear_dtype_gaurd():
                     self.q_a_proj = Linear(self.hidden_size, config.q_lora_rank, bias_attr=config.attention_bias)
-                    self.q_b_proj = ColumnParallelLinear(config.q_lora_rank, self.num_heads * self.q_head_dim, has_bias=False, gather_output=True)
+                    self.q_b_proj = ColumnParallelLinear(config.q_lora_rank, self.num_heads * self.q_head_dim, has_bias=False, gather_output=False)
                 self.q_a_layernorm = DeepseekV2RMSNorm(config=config, hidden_size=config.q_lora_rank, use_sequence_parallel=False)
 
             with linear_dtype_gaurd():
-                self.kv_a_proj_with_mqa = Linear(self.hidden_size, config.kv_lora_rank + config.qk_rope_head_dim, bias_attr=config.attention_bias)
-                self.kv_b_proj = ColumnParallelLinear(config.kv_lora_rank, self.num_heads * (self.q_head_dim - self.qk_rope_head_dim + self.v_head_dim), has_bias=False, gather_output=True)
-                self.o_proj = RowParallelLinear(self.num_heads * self.v_head_dim, self.hidden_size, has_bias=config.attention_bias, input_is_parallel=False)
+                self.kv_a_proj_with_mqa = paddle.nn.Linear(self.hidden_size, config.kv_lora_rank + config.qk_rope_head_dim, bias_attr=config.attention_bias)
+                self.kv_b_proj = ColumnParallelLinear(config.kv_lora_rank, self.num_heads * (self.q_head_dim - self.qk_rope_head_dim + self.v_head_dim), has_bias=False, gather_output=False)
+                self.o_proj = RowParallelLinear(self.num_heads * self.v_head_dim, self.hidden_size, has_bias=config.attention_bias, input_is_parallel=True)
             self.kv_a_layernorm = DeepseekV2RMSNorm(config=config, hidden_size=config.kv_lora_rank, use_sequence_parallel=False)
+
+            assert self.num_heads % config.tensor_parallel_degree == 0, f"num_heads: {self.num_heads}, tensor_parallel_degree: {config.tensor_parallel_degree}"
+            self.num_heads = self.num_heads // config.tensor_parallel_degree
         else:
             # for without tensor parallel
             if self.q_lora_rank is None:
@@ -966,7 +1425,7 @@ class DeepseekV2Attention(nn.Layer):
                 self.q_a_layernorm = DeepseekV2RMSNorm(config=config, hidden_size=config.q_lora_rank)
 
             with linear_dtype_gaurd():
-                self.kv_a_proj_with_mqa = Linear(self.hidden_size, config.kv_lora_rank + config.qk_rope_head_dim, bias_attr=config.attention_bias)
+                self.kv_a_proj_with_mqa = paddle.nn.Linear(self.hidden_size, config.kv_lora_rank + config.qk_rope_head_dim, bias_attr=config.attention_bias)
                 self.kv_b_proj = Linear(config.kv_lora_rank, self.num_heads * (self.q_head_dim - self.qk_rope_head_dim + self.v_head_dim), bias_attr=False)
                 self.o_proj = Linear(self.num_heads * self.v_head_dim, self.hidden_size, bias_attr=config.attention_bias)
             self.kv_a_layernorm = DeepseekV2RMSNorm(config=config, hidden_size=config.kv_lora_rank)
@@ -1146,18 +1605,7 @@ class DeepseekV2Attention(nn.Layer):
         if not output_attentions:
             attn_weights = None
 
-        outputs = (attn_output,)
-
-        if output_attentions:
-            outputs += (attn_weights,)
-
-        if use_cache:
-            outputs += (past_key_value,)
-
-        if type(outputs) is tuple and len(outputs) == 1:
-            outputs = outputs[0]
-
-        return outputs
+        return attn_output, attn_weights, past_key_value
 
 
 class DeepseekV2DecoderLayer(nn.Layer):
@@ -1228,7 +1676,7 @@ class DeepseekV2DecoderLayer(nn.Layer):
             and has_gradient
             and self.recompute_granularity == "full_attn"
         ):
-            outputs = recompute(
+            hidden_states, self_attn_weights, present_key_value = recompute(
                 self.self_attn,
                 hidden_states=hidden_states,
                 position_ids=position_ids,
@@ -1240,7 +1688,7 @@ class DeepseekV2DecoderLayer(nn.Layer):
                 **kwargs,
             )
         else:
-            outputs = self.self_attn(
+            hidden_states, self_attn_weights, present_key_value = self.self_attn(
                 hidden_states=hidden_states,
                 position_ids=position_ids,
                 attention_mask=attention_mask,
@@ -1250,18 +1698,6 @@ class DeepseekV2DecoderLayer(nn.Layer):
                 attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                 **kwargs,
             )
-
-        if type(outputs) is tuple:
-            hidden_states = outputs[0]
-        else:
-            hidden_states = outputs
-
-        if output_attentions:
-            self_attn_weights = outputs[1]
-
-        if use_cache:
-            present_key_value = outputs[2 if output_attentions else 1]
-
         hidden_states = residual + hidden_states
 
         # Fully Connected
@@ -1457,7 +1893,6 @@ class DeepseekV2PretrainedModel(PretrainedModel):
                 if config.use_fp8:
                     base_actions["layers.0.self_attn.kv_b_proj.weight.weight_scale_inv"] = partial(fn, is_column=True)
 
-            # dense mlp
             base_actions["layers.0.mlp.up_proj.weight"] = partial(fn, is_column=True)
             base_actions["layers.0.mlp.gate_proj.weight"] = partial(fn, is_column=True)
             base_actions["layers.0.mlp.down_proj.weight"] = partial(fn, is_column=False)
@@ -1466,16 +1901,6 @@ class DeepseekV2PretrainedModel(PretrainedModel):
                 base_actions["layers.0.mlp.gate_proj.weight.weight_scale_inv"] = partial(fn, is_column=True)
                 base_actions["layers.0.mlp.down_proj.weight.weight_scale_inv"] = partial(fn, is_column=False)
 
-            # moe unit routed experts
-            moe_group = dist.fleet.get_hybrid_communicate_group().get_data_parallel_group()
-            expert_parallel_degree = dist.get_world_size(moe_group)
-            if expert_parallel_degree <= 1:
-                for e_i in range(config.n_routed_experts):
-                    base_actions[f"layers.0.mlp.experts.{e_i}.up_proj.weight"] = partial(fn, is_column=True)
-                    base_actions[f"layers.0.mlp.experts.{e_i}.gate_proj.weight"] = partial(fn, is_column=True)
-                    base_actions[f"layers.0.mlp.experts.{e_i}.down_proj.weight"] = partial(fn, is_column=False)
-
-            # moe unit shared experts
             base_actions["layers.0.mlp.shared_experts.gate_proj.weight"] = partial(fn, is_column=True)
             base_actions["layers.0.mlp.shared_experts.up_proj.weight"] = partial(fn, is_column=True)
             base_actions["layers.0.mlp.shared_experts.down_proj.weight"] = partial(fn, is_column=False)
@@ -1500,6 +1925,7 @@ class DeepseekV2PretrainedModel(PretrainedModel):
             base_actions.pop("embed_tokens.weight")
             base_actions.pop("lm_head.weight")
             base_actions["layers.0.embed_tokens.weight"] = partial(fn, is_column=False)
+            base_actions["layers.0.eh_proj.weight"] = partial(fn, is_column=True)
             base_actions["layers.0.shared_head.head.weight"] = partial(fn, is_column=True)
             for key, action in base_actions.items():
                 if "layers.0." in key:
@@ -1531,6 +1957,7 @@ class DeepseekV2PretrainedModel(PretrainedModel):
                 mpu.ColumnParallelLinear,
                 linear_utils.RowSequenceParallelLinear,
                 linear_utils.ColumnSequenceParallelLinear,
+                Linear,
             ),
         ):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -1718,9 +2145,7 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
             seq_length -= self.config.num_nextn_predict_layers
 
             if attention_mask is not None:
-                attention_mask = attention_mask[
-                    :, :, : -self.config.num_nextn_predict_layers, : -self.config.num_nextn_predict_layers
-                ]
+                attention_mask = attention_mask[:, : -self.config.num_nextn_predict_layers]
 
         if self.enable_recompute and self.training:
             if use_cache:
@@ -1979,15 +2404,6 @@ class DeepseekV2LMHead(nn.Layer):
         )
         # Must set distributed attr for Tensor Parallel !
         self.weight.is_distributed = True if (vocab_size != config.vocab_size) else False
-        if get_env_device() == "xpu":
-            try:
-                from paddle_xpu.layers.nn import (  # noqa: F401
-                    parallel_matmul as xpu_parallel_matmul,
-                )
-
-                self.xpu_parallel_matmul = xpu_parallel_matmul()
-            except ImportError:
-                self.xpu_parallel_matmul = None
 
     def forward(self, hidden_states, tensor_parallel_output=None):
         if self.config.sequence_parallel:
@@ -1997,16 +2413,7 @@ class DeepseekV2LMHead(nn.Layer):
         if tensor_parallel_output is None:
             tensor_parallel_output = self.config.tensor_parallel_output
 
-        if get_env_device() == "xpu" and self.xpu_parallel_matmul is not None:
-            logits = self.xpu_parallel_matmul(
-                hidden_states,
-                self.weight,
-                transpose_y=False,
-                tensor_parallel_output=tensor_parallel_output,
-                training=self.training,
-            )
-        else:
-            logits = parallel_matmul(hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output)
+        logits = parallel_matmul(hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output)
         return logits
 
     def extra_repr(self):
