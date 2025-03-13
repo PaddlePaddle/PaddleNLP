@@ -20,6 +20,7 @@ import time
 from abc import abstractmethod
 from dataclasses import dataclass, field
 from threading import Thread
+from typing import List
 
 import numpy as np
 import paddle
@@ -58,6 +59,7 @@ from paddlenlp.utils.env import (
     MAX_DRAFT_TOKENS,
     PADDLE_INFERENCE_MODEL_SUFFIX,
     PADDLE_INFERENCE_WEIGHTS_SUFFIX,
+    SPECULATE_MAX_BSZ,
 )
 from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
@@ -72,7 +74,7 @@ class PredictorArgument:
     max_length: int = field(default=1024, metadata={"help": "the max length for decoding."})
     top_k: int = field(default=0, metadata={"help": "top_k parameter for generation"})
     top_p: float = field(default=0.7, metadata={"help": "top_p parameter for generation"})
-    temperature: float = field(default=0.95, metadata={"help": "top_p parameter for generation"})
+    temperature: float = field(default=0.95, metadata={"help": "temperature parameter for generation"})
     repetition_penalty: float = field(default=1.0, metadata={"help": "repetition penalty parameter for generation"})
     device: str = field(default="gpu", metadata={"help": "Device"})
     dtype: str = field(default=None, metadata={"help": "Model dtype"})
@@ -174,15 +176,24 @@ class PredictorArgument:
 
     mla_use_matrix_absorption: bool = field(default=False, metadata={"help": "implement mla with matrix-absorption."})
     weightonly_group_size: int = field(default=-1, metadata={"help": "the max length of candidate tokens."})
+    weight_block_size: List[int] = field(
+        default_factory=lambda: [128, 128],
+        metadata={"help": "Quantitative granularity of weights. Supported values: [128 128]"},
+    )
+    moe_quant_type: str = field(
+        default="",
+        metadata={"help": "Quantization type of moe. Supported values: weight_only_int4, weight_only_int8"},
+    )
 
     def __post_init__(self):
         if self.speculate_method is not None:
             self.append_attn = True
         if self.append_attn:
             self.block_attn = True
-        assert (
-            self.src_length + self.max_length <= self.total_max_length
-        ), "src_length + max_length should smaller than total_max_length."
+        if self.block_attn:
+            self.inference_model = True
+        assert self.max_length < self.total_max_length, "max_length should smaller than total_max_length."
+        self.src_length = self.total_max_length - self.max_length
 
 
 @dataclass
@@ -1115,7 +1126,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
             output_tensor_shape = [MAX_BSZ + 2, 1]
         else:
             read_res_func = llm_utils.speculate_read_res
-            output_tensor_shape = [MAX_BSZ * MAX_DRAFT_TOKENS + MAX_BSZ + 2, 1]
+            output_tensor_shape = [SPECULATE_MAX_BSZ * MAX_DRAFT_TOKENS + SPECULATE_MAX_BSZ + 2, 1]
 
         read_res_process = mp.Process(
             target=read_res_func, args=[self.model_name_or_path, tensor_queue, result_queue, done_event]
@@ -1283,7 +1294,7 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
             output_tensor_shape = [MAX_BSZ + 2, 1]
         else:
             read_res_func = llm_utils.speculate_read_res
-            output_tensor_shape = [MAX_BSZ * MAX_DRAFT_TOKENS + MAX_BSZ + 2, 1]
+            output_tensor_shape = [SPECULATE_MAX_BSZ * MAX_DRAFT_TOKENS + SPECULATE_MAX_BSZ + 2, 1]
 
         read_res_process = mp.Process(
             target=read_res_func, args=[self.model_name_or_path, tensor_queue, result_queue, done_event]
@@ -1434,11 +1445,12 @@ def create_predictor(
         )
     else:
         if predictor_args.src_length + predictor_args.max_length > max_position_embeddings:
-            raise ValueError(
+            logger.warning(
                 f"The sum of src_length<{predictor_args.src_length}> and "
                 f"max_length<{predictor_args.max_length}> should be smaller than or equal to "
                 f"the maximum position embedding size<{max_position_embeddings}>"
             )
+            predictor_args.src_length = max_position_embeddings - predictor_args.max_length
 
     # update config parameter for inference predictor
     if predictor_args.decode_strategy == "greedy_search":
@@ -1505,6 +1517,8 @@ def create_predictor(
 def predict():
     parser = PdArgumentParser((PredictorArgument, ModelArgument))
     predictor_args, model_args = parser.parse_args_into_dataclasses()
+
+    llm_utils.set_triton_cache(predictor_args.model_name_or_path, predictor_args.mode)
 
     tensor_parallel_degree = paddle.distributed.get_world_size()
     if tensor_parallel_degree > 1:

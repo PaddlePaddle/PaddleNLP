@@ -20,6 +20,10 @@ import pickle
 import re
 import subprocess
 import time
+import requests
+import tarfile
+import shutil
+from tqdm import tqdm
 from datetime import datetime
 from enum import Enum
 from logging.handlers import BaseRotatingHandler
@@ -187,6 +191,67 @@ def datetime_diff(datetime_start, datetime_end):
         cost = datetime_start - datetime_end
     return cost.total_seconds()
 
+
+def download_file(url, save_path):
+    """Download file with progress bar"""
+    try:
+        response = requests.get(url, stream=True)
+        response.raise_for_status()
+        
+        total_size = int(response.headers.get('content-length', 0))
+        progress_bar = tqdm(
+            total=total_size,
+            unit='iB',
+            unit_scale=True,
+            desc=f"Downloading {os.path.basename(url)}"
+        )
+
+        with open(save_path, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=1024):
+                if chunk:  # filter out keep-alive chunks
+                    f.write(chunk)
+                    progress_bar.update(len(chunk))
+        
+        progress_bar.close()
+        return True
+    except Exception as e:
+        if os.path.exists(save_path):
+            os.remove(save_path)
+        raise RuntimeError(f"Download failed: {str(e)}")
+
+def extract_tar(tar_path, output_dir):
+    """Extract tar file with progress tracking"""
+    try:
+        with tarfile.open(tar_path) as tar:
+            members = tar.getmembers()
+            with tqdm(total=len(members), desc="Extracting files") as pbar:
+                for member in members:
+                    tar.extract(member, path=output_dir)
+                    pbar.update(1)
+        print(f"Successfully extracted to: {output_dir}")
+    except Exception as e:
+        raise RuntimeError(f"Extraction failed: {str(e)}")
+
+def download_model(url, output_dir, temp_tar):
+    try:
+        temp_tar = os.path.join(output_dir, temp_tar)
+        # Download the file
+        model_server_logger.info(f"\nStarting download from: {url} {temp_tar}")
+        download_file(url, temp_tar)
+        # Extract the archive
+        print("\nExtracting files...")
+        extract_tar(temp_tar, output_dir)
+
+    except Exception as e:
+        # Cleanup on failure
+        if os.path.exists(temp_tar):
+            os.remove(temp_tar)
+        raise Exception(f"Failed to get model from {url}, please recheck the model name from https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/static_models.md")
+        exit(1)
+    finally:
+        # Cleanup temp file
+        if os.path.exists(temp_tar):
+            os.remove(temp_tar)
 
 model_server_logger = get_logger("model_server", "infer_server.log")
 http_server_logger = get_logger("http_server", "http_server.log")

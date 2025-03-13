@@ -180,8 +180,13 @@ def main():
     if (
         any(architecture in str(model_config.architectures) for architecture in architectures_to_check)
         and training_args.data_parallel_degree > 1
+        and not training_args.use_expert_parallel
     ):
-        training_args.use_expert_parallel = True
+        raise ValueError("Plese set use_expert_parallel to true in expert parallel mode.")
+
+    # (Liuting) Not support acc calculation now due to MTP.
+    if "DeepseekV3" in str(model_config.architectures):
+        training_args.prediction_loss_only = True
 
     LlmMetaConfig.set_llm_config(model_config, training_args)
     model_config.use_fast_layer_norm = model_args.use_fast_layer_norm
@@ -200,11 +205,14 @@ def main():
         model_config.fuse_attention_ffn = model_args.fuse_attention_ffn
 
     model_config.seq_length = data_args.max_length
-    orig_ctx_len = getattr(model_config, "max_position_embeddings", None)
-    model_args.rope_scaling_factor = data_args.max_length // orig_ctx_len
 
     # Config for model useing long sequence strategy
     if model_args.use_long_sequence_strategies:
+        scaled_max_length = (
+            int(data_args.max_length * model_args.rope_scaling_factor)
+            if data_args.use_pose_convert
+            else data_args.max_length
+        )
         data_args.scaled_max_length = int(data_args.max_length * model_args.rope_scaling_factor)
         model_config.use_long_sequence_strategies = True
         model_config.long_sequence_strategy_type = model_args.strategy_type
@@ -212,7 +220,7 @@ def main():
         model_config.rope_scaling_factor = model_args.rope_scaling_factor
         model_config.long_sequence_init_args = {
             "dim": int(model_config.hidden_size / model_config.num_attention_heads),
-            "max_position_embeddings": data_args.scaled_max_length,  # extended context window
+            "max_position_embeddings": scaled_max_length,  # extended context window
             "base": model_config.rope_theta,
             "scaling_factor": model_args.rope_scaling_factor,
         }
@@ -467,7 +475,6 @@ def main():
     if training_args.do_predict:
         eval_result = trainer.predict(test_ds).metrics
         trainer.log_metrics("test", eval_result)
-
     # Evaluation dev set
     if training_args.do_eval:
         logger.info("*** Evaluate result after train ***")

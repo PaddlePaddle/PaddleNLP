@@ -29,7 +29,7 @@ import paddle.distributed.fleet as fleet
 from paddle.base.framework import use_pir_api
 from paddlenlp_ops import speculate_step_paddle, step_paddle
 from server.data.processor import DataProcessor
-from server.engine.config import Config
+from server.engine.config import global_config
 from server.utils import get_logger
 from task_queue_manager import TaskQueueManager
 
@@ -37,6 +37,7 @@ from paddlenlp.experimental.transformers import (
     EagleProposer,
     InferenceWithReferenceProposer,
 )
+from paddlenlp.trl import llm_utils
 from paddlenlp.trl.llm_utils import get_rotary_position_embedding
 
 File_Path = os.path.realpath(sys.argv[0])
@@ -51,7 +52,7 @@ class ModelRunner:
         # 2**63 - 1
         self.MAX_INFER_SEED = 9223372036854775806
 
-        self.config = Config()
+        self.config = global_config
         self.model_cfg = self.config.get_model_config()
         self.speculate_config = self.config.get_speculate_config()
         self.is_speculate_decoding = self.speculate_config.speculate_method != "None"
@@ -64,6 +65,8 @@ class ModelRunner:
             self.qk_nope_head_dim = int(self.model_cfg["qk_nope_head_dim"])
             self.qk_rope_head_dim = int(self.model_cfg["qk_rope_head_dim"])
             self.v_head_dim = int(self.model_cfg["v_head_dim"])
+            self.kv_lora_rank = int(self.model_cfg["kv_lora_rank"])
+            self.mla_use_absorb = bool(self.model_cfg["mla_use_matrix_absorption"])
 
         self.max_stop_seqs_num = int(os.getenv("MAX_STOP_SEQS_NUM", 5))
         self.stop_seqs_max_len = int(os.getenv("STOP_SEQS_MAX_LEN", 8))
@@ -198,21 +201,33 @@ class ModelRunner:
                 cache_type = "uint8"
 
             if "deepseek" in self.model_cfg["model_type"]:
-                self.cache_kvs["key_caches_{}".format(i)] = paddle.full(
-                    shape=[
-                        self.args.max_block_num,
-                        kv_num_head,
-                        self.args.block_size,
-                        self.qk_nope_head_dim + self.qk_rope_head_dim,
-                    ],
-                    fill_value=0,
-                    dtype=cache_type,
-                )
-                self.cache_kvs["value_caches_{}".format(i)] = paddle.full(
-                    shape=[self.args.max_block_num, kv_num_head, self.args.block_size, self.v_head_dim],
-                    fill_value=0,
-                    dtype=cache_type,
-                )
+                if self.mla_use_absorb:
+                    self.cache_kvs["key_caches_{}".format(i)] = paddle.full(
+                        shape=[
+                            self.args.max_block_num,
+                            1,
+                            self.args.block_size,
+                            self.kv_lora_rank + self.qk_rope_head_dim,
+                        ],
+                        fill_value=0,
+                        dtype=cache_type,
+                    )
+                else:
+                    self.cache_kvs["key_caches_{}".format(i)] = paddle.full(
+                        shape=[
+                            self.args.max_block_num,
+                            kv_num_head,
+                            self.args.block_size,
+                            self.qk_nope_head_dim + self.qk_rope_head_dim,
+                        ],
+                        fill_value=0,
+                        dtype=cache_type,
+                    )
+                    self.cache_kvs["value_caches_{}".format(i)] = paddle.full(
+                        shape=[self.args.max_block_num, kv_num_head, self.args.block_size, self.v_head_dim],
+                        fill_value=0,
+                        dtype=cache_type,
+                    )
             else:
                 self.cache_kvs["key_caches_{}".format(i)] = paddle.full(
                     shape=[
@@ -294,7 +309,7 @@ class ModelRunner:
         self.share_inputs["max_length"] = paddle.full(
             shape=[self.args.max_batch_size, 1], fill_value=self.max_length, dtype="int64"
         )
-        self.share_inputs["not_need_stop"] = paddle.full(shape=[1], fill_value=False, dtype="bool")
+        self.share_inputs["not_need_stop"] = paddle.full(shape=[1], fill_value=False, dtype="bool").cpu()
         self.share_inputs["stop_flags"] = paddle.full(
             shape=[self.args.max_batch_size, 1], fill_value=True, dtype="bool"
         )
@@ -323,8 +338,12 @@ class ModelRunner:
         self.share_inputs["need_block_len"] = paddle.full(shape=[1], fill_value=0, dtype="int32")
         self.share_inputs["used_list_len"] = paddle.full(shape=[self.args.max_batch_size], fill_value=0, dtype="int32")
         self.share_inputs["infer_seed"] = paddle.full(shape=[self.args.max_batch_size, 1], fill_value=0, dtype="int64")
-        free_list = list(range(int(self.args.max_block_num * self.args.block_ratio)))
+
+        free_list = list(
+            range(self.args.max_block_num - 1, int(self.args.max_block_num * self.args.block_ratio) - 1, -1)
+        )
         self.free_list_len = len(free_list)
+
         self.share_inputs["free_list"] = paddle.to_tensor(free_list, dtype="int32")
         self.share_inputs["free_list_len"] = paddle.full(shape=[1], fill_value=self.free_list_len, dtype="int32")
 
@@ -368,7 +387,8 @@ class ModelRunner:
 
     def set_inputs(self):
         for i in range(self.args.num_layers):
-            self.share_inputs["value_caches_{}".format(i)] = self.cache_kvs["value_caches_{}".format(i)]
+            if not self.mla_use_absorb:
+                self.share_inputs["value_caches_{}".format(i)] = self.cache_kvs["value_caches_{}".format(i)]
             self.share_inputs["key_caches_{}".format(i)] = self.cache_kvs["key_caches_{}".format(i)]
 
         self.input_tensors = []
@@ -508,7 +528,6 @@ class ModelRunner:
                 self.share_inputs["first_token_ids"],
                 self.args.block_size,
                 self.args.enc_dec_block_num,
-                0,
             )
 
     def initialize_engine_ready_check_flag(self):
@@ -764,6 +783,7 @@ def main():
     start model runner
     """
     args = parse_args()
+    llm_utils.set_triton_cache(args.model_dir, "static")
     model_runner = ModelRunner(args)
     model_runner.run()
 

@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set -e
 export paddle=$1
 export nlp_dir=/workspace/PaddleNLP
 export log_path=/workspace/PaddleNLP/unittest_logs
@@ -33,8 +34,7 @@ install_requirements() {
     python -m pip install -r tests/requirements.txt
     python -m pip install -r paddlenlp/experimental/autonlp/requirements.txt 
     python -m pip uninstall paddlepaddle paddlepaddle_gpu -y
-    python -m pip install pillow -y
-    python -m pip install allure-pytest -y
+    python -m pip install pillow codecov-cli allure-pytest
     python -m pip install --no-cache-dir ${paddle}
     python -c "import paddle;print('paddle');print(paddle.__version__);print(paddle.version.show())" >> ${log_path}/commit_info.txt
 
@@ -42,19 +42,19 @@ install_requirements() {
     python -m pip install  dist/p****.whl
     python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)" >> ${log_path}/commit_info.txt
     
-    if git diff --numstat "$AGILE_COMPILE_BRANCH" | awk '{print $NF}' | grep -q '^csrc/'; then
-        echo "Found modifications in csrc, running setup_cuda.py install and uploading it to bos."
-        cd ${nlp_dir}/csrc
-        # python setup_cuda.py install
-        bash tools/build_wheel.sh python3.10 80
-        # cp ./dist/p****.whl ${PPNLP_HOME}/upload/
-        # cd ${PPNLP_HOME}
-        # python upload.py ${PPNLP_HOME}/upload 'paddlenlp/wheels'
-        # rm -rf upload/*
-    else
-        echo "No modifications in csrc, installing paddlenlp_ops wheel file..."
-        python -m pip install https://paddlenlp.bj.bcebos.com/wheels/paddlenlp_ops-0.0.0-py3-none-any.whl
-    fi
+    # if git diff --numstat "$AGILE_COMPILE_BRANCH" | awk '{print $NF}' | grep -q '^csrc/'; then
+    #     echo "Found modifications in csrc, running setup_cuda.py install and uploading it to bos."
+    #     cd ${nlp_dir}/csrc
+    #     # python setup_cuda.py install
+    #     bash tools/build_wheel.sh
+    #     # cp ./gpu_dist/p****.whl ${PPNLP_HOME}/upload/
+    #     # cd ${PPNLP_HOME}
+    #     # python upload.py ${PPNLP_HOME}/upload 'paddlenlp/wheels'
+    #     # rm -rf upload/*
+    # else
+    #     echo "No modifications in csrc, installing paddlenlp_ops wheel file..."
+    #     python -m pip install https://paddlenlp.bj.bcebos.com/wheels/paddlenlp_ops-0.0.0-py3-none-any.whl --no-cache-dir
+    # fi
 
     pip list 
 }
@@ -86,6 +86,8 @@ install_requirements
 set_env
 cd ${nlp_dir}
 echo ' Testing all unittest cases '
+export http_proxy=${proxy} && export https_proxy=${proxy}
+set +e
 pytest -v -n 8 \
   --dist loadgroup \
   --retries 1 --retry-delay 1 \

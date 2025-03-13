@@ -44,9 +44,9 @@ def create_chat_completion(req: Req):
     """
     try:
         http_server_logger.info(f"receive request: {req.req_id}")
-        grpc_port = int(os.getenv("GRPC_PORT", 0))
+        grpc_port = int(os.getenv("SERVICE_GRPC_PORT", 0))
         if grpc_port == 0:
-            return {"error_msg": f"GRPC_PORT ({grpc_port}) for infer service is invalid",
+            return {"error_msg": f"SERVICE_GRPC_PORT ({grpc_port}) for infer service is invalid",
                     "error_code": 400}
         grpc_url = f"localhost:{grpc_port}"
 
@@ -82,9 +82,9 @@ def create_openai_completion(request: Dict, chat_interface: bool):
     try:
         http_server_logger.info(f"receive request: {req.req_id}")
 
-        grpc_port = int(os.getenv("GRPC_PORT", 0))
+        grpc_port = int(os.getenv("SERVICE_GRPC_PORT", 0))
         if grpc_port == 0:
-            return {"error_msg": f"GRPC_PORT ({grpc_port}) for infer service is invalid",
+            return {"error_msg": f"SERVICE_GRPC_PORT ({grpc_port}) for infer service is invalid",
                     "error_code": 400}
         grpc_url = f"localhost:{grpc_port}"
 
