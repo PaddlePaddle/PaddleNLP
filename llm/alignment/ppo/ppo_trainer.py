@@ -1237,18 +1237,18 @@ class PPOTrainer(Trainer):
                 }
                 generated_seq = self.generate(prompt_only_batch, do_eval=True)[0]["input_ids"]
 
-            if self._model_config.sequence_parallel:
-                # pad to max_sequence_length
-                seq = self.tokenizer.pad(
-                    {"input_ids": [s for s in generated_seq]},
-                    padding="max_length",
-                    max_length=self._model_config.max_sequence_length,
-                    return_attention_mask=False,
-                )["input_ids"]
-            else:
-                seq = generated_seq
-
             if not self.args.use_rm_server:
+                if self._model_config.sequence_parallel:
+                    # pad to max_sequence_length
+                    seq = self.tokenizer.pad(
+                        {"input_ids": [s for s in generated_seq]},
+                        padding="longest",
+                        max_length=None,
+                        return_attention_mask=False,
+                        pad_to_multiple_of=self.args.tensor_parallel_degree,
+                    )["input_ids"]
+                else:
+                    seq = generated_seq
                 if self.reward_tokenizer is not self.tokenizer:
                     reward_tokenize_output = batch_retokenize(
                         input_ids=seq,
@@ -2360,10 +2360,12 @@ class PPOTrainer(Trainer):
 
                 padding_strategy = "longest"
                 padding_max_len = None
+                pad_to_multiple_of = None
 
                 if self._model_config.sequence_parallel:
-                    padding_strategy = "max_length"
-                    padding_max_len = self._model_config.max_sequence_length
+                    pad_to_multiple_of = self.args.tensor_parallel_degree
+                #     padding_strategy = "max_length"
+                #     padding_max_len = self._model_config.max_sequence_length
 
                 truncate_max_len = self._model_config.max_position_embeddings
 
@@ -2385,6 +2387,7 @@ class PPOTrainer(Trainer):
                     padding=padding_strategy,
                     max_length=padding_max_len,
                     return_attention_mask=False,
+                    pad_to_multiple_of=pad_to_multiple_of,
                 )["input_ids"]
 
                 position_ids = make_position_ids_from_input_ids(input_ids)
