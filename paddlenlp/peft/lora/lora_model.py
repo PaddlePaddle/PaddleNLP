@@ -359,7 +359,9 @@ class LoRAModel(nn.Layer):
                     base_name = name.replace("lora_A", "weight")
                     if not self.reinit_base_model:
                         # Reinit base model
-                        offset = init_loraA.cuda() @ init_loraB.cuda()
+                        offset = init_loraA._copy_to(
+                            paddle.framework._current_expected_place(), False
+                        ) @ init_loraB._copy_to(paddle.framework._current_expected_place(), False)
                         ori_weight = model_state_dict[base_name]
                         model_state_dict[base_name].set_value(ori_weight - self.lora_config.scaling * offset)
         del model_state_dict

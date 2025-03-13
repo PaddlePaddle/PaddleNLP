@@ -190,9 +190,10 @@ class PredictorArgument:
             self.append_attn = True
         if self.append_attn:
             self.block_attn = True
-        assert (
-            self.src_length + self.max_length <= self.total_max_length
-        ), "src_length + max_length should smaller than total_max_length."
+        if self.block_attn:
+            self.inference_model = True
+        assert self.max_length < self.total_max_length, "max_length should smaller than total_max_length."
+        self.src_length = self.total_max_length - self.max_length
 
 
 @dataclass
@@ -1444,11 +1445,12 @@ def create_predictor(
         )
     else:
         if predictor_args.src_length + predictor_args.max_length > max_position_embeddings:
-            raise ValueError(
+            logger.warning(
                 f"The sum of src_length<{predictor_args.src_length}> and "
                 f"max_length<{predictor_args.max_length}> should be smaller than or equal to "
                 f"the maximum position embedding size<{max_position_embeddings}>"
             )
+            predictor_args.src_length = max_position_embeddings - predictor_args.max_length
 
     # update config parameter for inference predictor
     if predictor_args.decode_strategy == "greedy_search":
