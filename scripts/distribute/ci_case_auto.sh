@@ -1282,8 +1282,8 @@ function llama_dpo_dy2st_auto_bs2_bf16_MP8_intermediate() {
         --log_dir $case_log_dir \
         ../../alignment/dpo/run_dpo_auto.py\
         --model_name_or_path "meta-llama/Meta-Llama-3.1-8B-Instruct" \
-        --train_dataset_path ../../../llama_data/data_dpo/data/train.jsonl \
-        --dev_dataset_path ../../../llama_data/data_dpo/data/dev.jsonl \
+        --train_dataset_path ${llama_data_path}/data_dpo/data/train.jsonl \
+        --dev_dataset_path ${llama_data_path}/data_dpo/data/dev.jsonl \
         --output_dir ./checkpoints/dpo_ckpts \
         --per_device_train_batch_size 1 \
         --gradient_accumulation_steps 1 \
@@ -3351,6 +3351,7 @@ function before_hook_for_llama() {
             echo "LLaMA data downloaded"
         else
             # download data for llama
+            mkdir ${llama_data_path};
             mkdir ${llama_data_path}/data;
             wget -O ${llama_data_path}/data/llama_openwebtext_100k_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy;
             wget -O ${llama_data_path}/data/llama_openwebtext_100k_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz;
