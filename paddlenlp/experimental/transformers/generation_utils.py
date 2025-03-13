@@ -755,7 +755,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
                     eos_token_id,
                     model_kwargs["next_tokens"],
                 )
-            if os.getenv("SAVE_OUTPUT", "TRUE").upper() == "TRUE":
+            if getattr(self, "save_output", True):
                 from paddlenlp_ops import save_output
 
                 save_output(

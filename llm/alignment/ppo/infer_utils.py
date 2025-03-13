@@ -170,6 +170,7 @@ def create_predictor(trainer: Trainer):
             tensor_parallel_degree=tensor_parallel_degree,
             tensor_parallel_rank=tensor_parallel_rank,
         )
+        model.save_output = False
         predictor = PolicyPredictor(
             predictor_args,
             tokenizer=trainer.tokenizer,
