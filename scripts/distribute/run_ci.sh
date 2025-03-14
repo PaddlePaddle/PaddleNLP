@@ -29,18 +29,14 @@ global_verification_fail_arr=()
 target_lists_for_gpt=(
     "slm/model_zoo/gpt-3"
     "llm/auto_parallel/gpt-3"
-    "paddlenlp/transformers/gpt/modeling.py"
-    "paddlenlp/transformers/gpt/modeling_pp.py"
-    "paddlenlp/transformers/gpt/modeling_auto.py"
+    "paddlenlp/transformers/gpt"
     "scripts/distribute"
 )
 
 target_lists_for_llama=(
     "llm/auto_parallel/llama"
     "paddlenlp/trainer/auto_trainer.py"
-    "paddlenlp/transformers/llama/modeling_auto_static.py"
-    "paddlenlp/transformers/llama/modeling_auto.py"
-    "paddlenlp/transformers/llama/modeling.py"
+    "paddlenlp/transformers/llama"
     "scripts/distribute"
 )
 
