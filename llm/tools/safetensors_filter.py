@@ -12,6 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
+# You can use it to convert the CKPT of a super large model into a CKPT
+# with a small number of layers by modifying _filter_func.
+# Note that the converted directory is missing some config files,
+# and you need to manually copy.
+# At the same time, you need to modify the layers in the config. json file.
+
 import json
 import os
 from argparse import ArgumentParser
