@@ -17,7 +17,7 @@
 # with a small number of layers by modifying _filter_func.
 # Note that the converted directory is missing some config files,
 # and you need to manually copy.
-# At the same time, you need to modify the layers in the config. json file.
+# At the same time, you need to modify the layers in the config.json file.
 
 import json
 import os
