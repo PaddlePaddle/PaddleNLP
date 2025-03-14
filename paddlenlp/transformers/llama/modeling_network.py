@@ -810,7 +810,8 @@ class LlamaModelNet(LlamaPretrainedModelNet):
             cache_length,
             inputs_embeds.dtype,
         )
-        attention_mask = self.reshard_row(attention_mask)
+        if attention_mask is not None:
+            attention_mask = self.reshard_row(attention_mask)
         if alibi is not None:
             alibi = self.reshard_row_and_col(alibi)
         # print(position_ids, attention_mask, alibi)
