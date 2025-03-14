@@ -182,3 +182,15 @@ class LoRAConfig:
             json_object = json.load(file)
 
         return json_object
+
+
+@dataclass
+class LoRAAutoConfig(LoRAConfig):
+    use_intermediate_api: bool = field(
+        default=False,
+        metadata={"help": "Weather to use auto_parallel intermediate api"},
+    )
+    pipeline_parallel_degree: bool = field(
+        default=False,
+        metadata={"help": "Weather to use pipeline parallel"},
+    )

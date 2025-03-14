@@ -59,6 +59,7 @@ class ChatGLMv2Config(PretrainedConfig):
         long_sequence_strategy_name=None,
         long_sequence_init_args=None,
         use_long_sequence_strategies=False,
+        rope_ratio=1,
         **kwargs
     ):
         super().__init__(pad_token_id=pad_token_id, eos_token_id=eos_token_id, **kwargs)
@@ -88,3 +89,4 @@ class ChatGLMv2Config(PretrainedConfig):
         self.long_sequence_strategy_name = long_sequence_strategy_name
         self.long_sequence_init_args = {} if long_sequence_init_args is None else long_sequence_init_args
         self.use_long_sequence_strategies = use_long_sequence_strategies
+        self.rope_ratio = rope_ratio

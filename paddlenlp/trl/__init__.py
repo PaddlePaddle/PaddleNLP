@@ -19,6 +19,7 @@ from .embedding_trainer import EmbeddingTrainer
 from .kto_trainer import KTOTrainer
 from .model_config import *
 from .quant_config import *
+from .sft_auto_trainer import *
 from .sft_config import *
 from .sft_trainer import *
 from .sftdata_config import *
