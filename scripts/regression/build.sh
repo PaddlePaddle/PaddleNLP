@@ -64,8 +64,8 @@ paddlenlp_build (){
     rm -rf paddle_pipelines.egg-info/
     rm -rf dist/
 
-    python -m pip install -r requirements.txt
-    python -m pip install -r requirements-dev.txt
+    python -m pip install -r requirements.txt --trusted-host pip.baidu-int.com
+    python -m pip install -r requirements-dev.txt --trusted-host pip.baidu-int.com
     python setup.py bdist_wheel
     python -m pip install --ignore-installed  dist/p****.whl
     python -c "import paddlenlp; import __version__; print('paddlenlp'); \
