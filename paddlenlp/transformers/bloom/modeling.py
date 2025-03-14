@@ -1254,7 +1254,8 @@ class BloomForCausalLM(BloomPreTrainedModel):
         [`~PreTrainedModel.beam_sample`] is called. This is required to match `past_key_values` with the correct
         beam_idx at every generation step.
         """
-        return tuple(tuple(past_state.index_select(0, beam_idx) for past_state in layer_past) for layer_past in past)
+        return tuple(tuple(paddle.index_select(past_state, beam_idx) for past_state in layer_past) for layer_past in past)
+        # return tuple(tuple(past_state.index_select(0, beam_idx) for past_state in layer_past) for layer_past in past)
 
 
 class BloomForSequenceClassification(BloomPreTrainedModel):

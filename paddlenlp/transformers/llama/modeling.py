@@ -2085,6 +2085,15 @@ class LlamaForCausalLM(LlamaPretrainedModel):
 
         return model_kwargs
 
+    @staticmethod
+    def _reorder_cache(past: Tuple[Tuple[Tensor]], beam_idx: Tensor) -> Tuple[Tuple[Tensor]]:
+        """
+        This function is used to re-order the `past_key_values` cache if [`~PreTrainedModel.beam_search`] or
+        [`~PreTrainedModel.beam_sample`] is called. This is required to match `past_key_values` with the correct
+        beam_idx at every generation step.
+        """
+        return tuple(tuple(paddle.index_select(past_state, beam_idx) for past_state in layer_past) for layer_past in past)
+
     def forward(
         self,
         input_ids=None,

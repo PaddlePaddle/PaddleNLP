@@ -162,7 +162,6 @@ class BeamSearchScorer(BeamScorer):
         self,
         batch_size: int,
         num_beams: int,
-        device: paddle.device,
         length_penalty: Optional[float] = 1.0,
         do_early_stopping: Optional[Union[bool, str]] = False,
         num_beam_hyps_to_keep: Optional[int] = 1,
@@ -170,7 +169,6 @@ class BeamSearchScorer(BeamScorer):
         max_length: Optional[int] = None,
     ):
         self.num_beams = num_beams
-        self.device = device
         self.length_penalty = length_penalty
         self.do_early_stopping = do_early_stopping
         self.num_beam_hyps_to_keep = num_beam_hyps_to_keep
@@ -278,7 +276,7 @@ class BeamSearchScorer(BeamScorer):
                         beam_index = None
 
                     self._beam_hyps[batch_group_idx].add(
-                        input_ids[batch_beam_idx].clone(),
+                        input_ids[int(batch_beam_idx)].clone(),
                         next_score.item(),
                         beam_indices=beam_index,
                         generated_len=cur_len - decoder_prompt_len,
@@ -348,10 +346,11 @@ class BeamSearchScorer(BeamScorer):
                 beam_hyp.add(final_tokens, final_score, beam_indices=beam_index, generated_len=generated_len)
 
         # select the best hypotheses
-        sent_lengths = input_ids.new(batch_size * self.num_beam_hyps_to_keep)
+        sent_lengths = paddle.ones([batch_size * self.num_beam_hyps_to_keep], dtype=input_ids.dtype)
+        # sent_lengths = input_ids.new(batch_size * self.num_beam_hyps_to_keep)
         best = []
         best_indices = []
-        best_scores = paddle.zeros(batch_size * self.num_beam_hyps_to_keep, device=self.device, dtype=paddle.float32)
+        best_scores = paddle.zeros(batch_size * self.num_beam_hyps_to_keep)
 
         # retrieve best hypotheses
         for i in range(batch_size):
@@ -376,10 +375,11 @@ class BeamSearchScorer(BeamScorer):
         # prepare for adding eos
         sent_lengths_max = sent_lengths.max().item() + 1
         sent_max_len = min(sent_lengths_max, max_length) if max_length is not None else sent_lengths_max
-        decoded: paddle.Tensor = input_ids.new(batch_size * self.num_beam_hyps_to_keep, sent_max_len)
-
+        # decoded: paddle.Tensor = input_ids.new(batch_size * self.num_beam_hyps_to_keep, sent_max_len)
+        decoded = paddle.ones([batch_size * self.num_beam_hyps_to_keep, sent_max_len], dtype=input_ids.dtype)
         if len(best_indices) > 0 and best_indices[0] is not None:
-            indices: paddle.Tensor = input_ids.new(batch_size * self.num_beam_hyps_to_keep, sent_max_len)
+            indices = paddle.ones([batch_size * self.num_beam_hyps_to_keep, sent_max_len], dtype=input_ids.dtype)
+            # indices: paddle.Tensor = input_ids.new(batch_size * self.num_beam_hyps_to_keep, sent_max_len)
         else:
             indices = None
 
@@ -387,7 +387,7 @@ class BeamSearchScorer(BeamScorer):
         if sent_lengths.min().item() != sent_lengths.max().item():
             if pad_token_id is None:
                 raise ValueError("`pad_token_id` has to be defined")
-            decoded.fill_(pad_token_id)
+            decoded.fill_(int(pad_token_id))
 
         if indices is not None:
             indices.fill_(-1)
@@ -859,6 +859,7 @@ class ConstrainedBeamSearchScorer(BeamScorer):
 
         # select the best hypotheses
         sent_lengths = input_ids.new(batch_size * self.num_beam_hyps_to_keep)
+        sent_lengths = paddle.ones([batch_size * self.num_beam_hyps_to_keep], dtype=input_ids.dtype)
         best = []
         best_indices = []
         best_scores = paddle.zeros(batch_size * self.num_beam_hyps_to_keep, dtype="float32")
@@ -885,10 +886,11 @@ class ConstrainedBeamSearchScorer(BeamScorer):
         sent_lengths_max = sent_lengths.max().item() + 1
 
         sent_max_len = min(sent_lengths_max, max_length) if max_length is not None else sent_lengths_max
-        decoded: paddle.Tensor = input_ids.new(batch_size * self.num_beam_hyps_to_keep, sent_max_len)
-
+        # decoded: paddle.Tensor = input_ids.new(batch_size * self.num_beam_hyps_to_keep, sent_max_len)
+        decoded = paddle.ones([batch_size * self.num_beam_hyps_to_keep, sent_max_len], dtype=input_ids.dtype)
         if len(best_indices) > 0 and best_indices[0] is not None:
-            indices: paddle.Tensor = input_ids.new(batch_size * self.num_beam_hyps_to_keep, sent_max_len)
+            indices = paddle.ones([batch_size * self.num_beam_hyps_to_keep, sent_max_len], dtype=input_ids.dtype)
+            # indices: paddle.Tensor = input_ids.new(batch_size * self.num_beam_hyps_to_keep, sent_max_len)
         else:
             indices = None
 
