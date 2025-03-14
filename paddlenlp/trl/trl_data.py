@@ -245,7 +245,7 @@ def preference_collate_fn(batch, max_seq_len=None, data_type="pairwise"):
 
 def preference_collate_fn_auto_parallel(batch, max_seq_len=None, data_type="pairwise", enable_auto_parallel=False):
     input_dict = preference_collate_fn(batch, max_seq_len, data_type)
-    return {
+    result = {
         "input_ids": [
             input_dict["input_ids"],
             input_dict["position_ids"],
@@ -253,7 +253,6 @@ def preference_collate_fn_auto_parallel(batch, max_seq_len=None, data_type="pair
             input_dict["attention_mask"],
             input_dict["chosen_labels"],
             input_dict["rejected_labels"],
-            input_dict["attn_mask_startend_row_indices"],
         ],
         "labels": [
             input_dict["chosen_labels"],
@@ -263,3 +262,6 @@ def preference_collate_fn_auto_parallel(batch, max_seq_len=None, data_type="pair
             input_dict["reference_rejected_logps"],
         ],
     }
+    if "attn_mask_startend_row_indices" in input_dict:
+        result["input_ids"].append(input_dict["attn_mask_startend_row_indices"])
+    return result
