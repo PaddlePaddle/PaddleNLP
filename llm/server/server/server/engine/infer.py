@@ -52,7 +52,9 @@ class ModelRunner:
         # 2**63 - 1
         self.MAX_INFER_SEED = 9223372036854775806
 
-        self.config = global_config
+        self.use_dynamic_graph = int(os.getenv("USE_DYNAMIC_GRAPH", "0"))
+
+        self.config = global_config()
         self.model_cfg = self.config.get_model_config()
         self.speculate_config = self.config.get_speculate_config()
         self.is_speculate_decoding = self.speculate_config.speculate_method != "None"
@@ -108,6 +110,7 @@ class ModelRunner:
             cache_kvs=self.cache_kvs,
             config=self.config,
             mp_degree=self.nranks,
+            args=self.args,
         )
 
         if self.config.return_full_hidden_states:
@@ -249,6 +252,9 @@ class ModelRunner:
                     fill_value=0,
                     dtype=cache_type,
                 )
+
+        if self.use_dynamic_graph:
+            self.share_inputs["cache_kvs"] = list(self.cache_kvs.values())
 
         pre_max_block_num = (
             self.args.max_seq_len + self.args.block_size - 1
@@ -657,7 +663,8 @@ class ModelRunner:
                     self.share_inputs["seq_lens_this_time"].name = "seq_lens_this_time"
                     self.input_tensors[-1] = self.share_inputs["seq_lens_this_time"]
                 if not self.config.return_full_hidden_states:
-                    self.infer_engine.seq_lens_handle.share_external_data(self.share_inputs["seq_lens_this_time"])
+                    if not self.use_dynamic_graph:
+                        self.infer_engine.seq_lens_handle.share_external_data(self.share_inputs["seq_lens_this_time"])
                 self.share_inputs["not_need_stop"][0] = True
 
             if not self.share_inputs["not_need_stop"]:
@@ -680,7 +687,10 @@ class ModelRunner:
                 outputs = self.infer_engine.predictor.run(self.input_tensors)
                 self.helper_tensors["full_hidden_states"] = outputs[0]
             else:
-                self.infer_engine.predictor.run()
+                if self.use_dynamic_graph:
+                    self.infer_engine.predictor.model.generate(**self.share_inputs)
+                else:
+                    self.infer_engine.predictor.run()
 
             self.share_inputs["infer_seed"].add_(infer_seed_increment)
             self.share_inputs["infer_seed"][:] %= self.MAX_INFER_SEED
@@ -700,7 +710,7 @@ class InferenceEngine(object):
         mp_degree (int): model parallel size
     """
 
-    def __init__(self, model_dir, share_inputs, cache_kvs, config, mp_degree=1):
+    def __init__(self, model_dir, share_inputs, cache_kvs, config, mp_degree=1, args=None):
         self.config = config
         self.model_dir = model_dir
         self.mp_degree = mp_degree
@@ -715,8 +725,37 @@ class InferenceEngine(object):
             self.nranks = fleet.worker_num()
             self.rank = fleet.worker_index()
 
-        self._init_predictor()
-        if not self.config.return_full_hidden_states:
+        self.use_dynamic_graph = int(os.getenv("USE_DYNAMIC_GRAPH", "0"))
+
+        if self.use_dynamic_graph:  # 动态图
+            llm_utils.set_triton_cache(args.model_dir, "dynamic")
+            from llm.predict.predictor import (
+                ModelArgument,
+                PredictorArgument,
+                create_predictor,
+            )
+
+            predictor_args = PredictorArgument()
+            model_args = ModelArgument()
+            assert args is not None, "args should not be None when USE_DYNAMIC_GRAPH=1."
+
+            predictor_args.model_name_or_path = args.model_dir
+            predictor_args.max_length = args.max_dec_len
+            predictor_args.dtype = args.dtype
+            predictor_args.total_max_length = args.max_seq_len
+            predictor_args.inference_model = True
+            predictor_args.mode = "dynamic"
+            predictor_args.block_attn = True
+            predictor_args.append_attn = True
+
+            self.predictor = create_predictor(predictor_args, model_args)
+            self.predictor.model.eval()
+
+        else:  # 静态图
+            llm_utils.set_triton_cache(args.model_dir, "static")
+            self._init_predictor()
+
+        if not (self.config.return_full_hidden_states or self.use_dynamic_graph):
             self.share_data()
 
     def _init_predictor(self):
@@ -783,7 +822,6 @@ def main():
     start model runner
     """
     args = parse_args()
-    llm_utils.set_triton_cache(args.model_dir, "static")
     model_runner = ModelRunner(args)
     model_runner.run()
 
