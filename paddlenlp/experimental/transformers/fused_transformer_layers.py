@@ -45,7 +45,8 @@ if not is_paddlenlp_ops_available():
 if (
     paddle.device.get_all_custom_device_type() is not None and len(paddle.device.get_all_custom_device_type()) > 0
 ) or paddle.is_compiled_with_cuda():
-    from paddlenlp_ops import rebuild_padding_v2
+    if is_paddlenlp_ops_available():
+        from paddlenlp_ops import rebuild_padding_v2
 
 
 def use_cutlass_fp8_gemm():
