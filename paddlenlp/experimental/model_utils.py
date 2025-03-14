@@ -516,3 +516,12 @@ def block_quant_to_fp8(x: paddle.Tensor, weight_block_size=[128, 128], eps=1e-6)
     x_q = x_scaled.view_as(x_padded)[:m, :n].contiguous()
     x_s = (x_amax / 448.0).view([x_view.shape[0], x_view.shape[2]])
     return x_q.cast(paddle.float8_e4m3fn), x_s
+
+
+def per_tensor_quant_to_fp8(x: paddle.Tensor, weight_block_size=[128, 128], eps=1e-6):
+    assert x.ndim == 2
+    x_fp32 = x.cast("float32")
+    x_s = x_fp32.abs().max().clip(min=0.000001) / 448.0
+    x_q = x_fp32 / x_s
+    x_q = x_q.clip(min=-448.0, max=448.0)
+    return x_q.cast("float8_e4m3fn"), x_s.reshape([1])

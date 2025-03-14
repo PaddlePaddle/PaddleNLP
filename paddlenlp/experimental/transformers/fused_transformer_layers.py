@@ -4241,21 +4241,21 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                 v_b_o_proj_weight_scale_attr = self.get_attr(self.config.mla_config.v_b_o_proj_weight_scale_attrs, i)
                 if q_nope_k_b_proj_weight_scale_attr:
                     q_nope_k_b_proj_weight_scale = self.create_parameter(
-                        shape=self.get_scale_shape(self.q_nope_k_b_proj_weight_shape),
+                        shape=[1],
                         attr=q_nope_k_b_proj_weight_scale_attr,
                         dtype="float32",
                         is_bias=False,
                     )
                 if q_rope_proj_weight_scale_attr:
                     q_rope_proj_weight_scale = self.create_parameter(
-                        shape=self.get_scale_shape(self.q_rope_proj_weight_shape),
+                        shape=[1],
                         attr=q_rope_proj_weight_scale_attr,
                         dtype="float32",
                         is_bias=False,
                     )
                 if v_b_o_proj_weight_scale_attr:
                     v_b_o_proj_weight_scale = self.create_parameter(
-                        shape=self.get_scale_shape(self.v_b_o_proj_weight_shape),
+                        shape=[1],
                         attr=v_b_o_proj_weight_scale_attr,
                         dtype="float32",
                         is_bias=False,
@@ -4791,7 +4791,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
         x_s = x_fp32.abs().max().clip(min=0.000001) / 448.0
         x_q = x_fp32 / x_s
         x_q = x_q.clip(min=-448.0, max=448.0)
-        return x_q.cast("float8_e4m3fn"), x_s
+        return x_q.cast("float8_e4m3fn"), x_s.reshape([1])
 
     def dynamic_quant(self, x):
         if self.weight_block_size[0] == 0 and self.weight_block_size[1] == 0:
@@ -4885,6 +4885,33 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                 output_dtype=output_dtype,
                 act=act,
             )
+        return out
+
+    def cutlass_fp8_gemm_per_tensor(
+        self,
+        x,
+        y,
+        x_s=None,
+        y_s=None,
+        bias=None,
+        output_dtype="bfloat16",
+        act="identity",
+        ffn1=False,
+    ):
+        from paddlenlp_ops import (
+            cutlass_fp8_fp8_half_gemm_ptr_scale_fused as fp8_gemm_fused_ptr_scale,
+        )
+
+        out = fp8_gemm_fused_ptr_scale(
+            x=x,
+            y=y,
+            x_scale=x_s,
+            y_scale=y_s,
+            bias=bias,
+            transpose_x=False,
+            transpose_y=True,
+            output_dtype=output_dtype,
+        )
         return out
 
     def compute_qkv_linear(self, ln_out, i, latent_cache=None, **kwargs):
@@ -5136,7 +5163,8 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                 epsilon=self._epsilon,
                 begin_norm_axis=1,
             )[0]
-            query_nope = self.cutlass_fp8_gemm(
+            ln_out_or_q_c_fp8, ln_out_or_q_c_scale = self.per_tensor_quant_fp8(ln_out_or_q_c)
+            query_nope = self.cutlass_fp8_gemm_per_tensor(
                 x=ln_out_or_q_c_fp8,
                 y=self.q_nope_k_b_proj_weights[i],
                 x_s=ln_out_or_q_c_scale,
@@ -5146,7 +5174,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                 act="identity",
             )
             query_nope = query_nope.reshape(shape=[-1, self.num_heads, self.config.mla_config.kv_lora_rank])
-            query_pe = self.cutlass_fp8_gemm(
+            query_pe = self.cutlass_fp8_gemm_per_tensor(
                 x=ln_out_or_q_c_fp8,
                 y=self.q_rope_proj_weights[i],
                 y_s=self.q_rope_proj_weights_scale[i],
@@ -5227,8 +5255,8 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                 True,  # causal
                 self.config.speculate_config.speculate_method is not None,  # speculate_decoder
             )
-            fmha_out_decode_fp8, fmha_out_decode_scale = self.dynamic_quant(fmha_out_decode)
-            out_linear_out_decode = self.cutlass_fp8_gemm(
+            fmha_out_decode_fp8, fmha_out_decode_scale = self.per_tensor_quant_fp8(fmha_out_decode)
+            out_linear_out_decode = self.cutlass_fp8_gemm_per_tensor(
                 x=fmha_out_decode_fp8,
                 y=self.v_b_o_proj_weights[i],
                 y_s=self.v_b_o_proj_weights_scale[i],
