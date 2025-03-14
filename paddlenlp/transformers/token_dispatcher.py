@@ -21,7 +21,7 @@ import paddle
 from paddle.distributed.communication.group import Group
 
 from .fused_a2a import fused_combine, fused_dispatch
-from .moe_utils import permute, unpermute
+from .moe_utils import IndicesToMultihot, permute, unpermute
 
 
 class _DispatchManager(ABC):
@@ -142,6 +142,13 @@ class _DeepepManager(_DispatchManager):
                 - routing_map: Multihot vector.
                 - probs: Multihot probabilities.
         """
+        multihot_routing_map, multihot_probs = IndicesToMultihot.apply(
+            indices.cast(paddle.int32), probs, router_topk=self.router_topk, num_local_experts=self.num_local_experts
+        )
+        """
+        multihot_routing_map, multihot_probs = TDU.fused_topk_to_multihot(indices.cast(paddle.int32), probs,seqlen=indices.shape[0], topk=self.router_topk, num_experts=self.num_local_experts)
+        """
+        """
         batch_size = indices.shape[0]
         multihot_routing_map = paddle.zeros((batch_size, self.num_local_experts), dtype=paddle.int64)
 
@@ -152,6 +159,7 @@ class _DeepepManager(_DispatchManager):
         row_indices = paddle.arange(batch_size).repeat_interleave(mask.sum(axis=1))
         multihot_routing_map[row_indices, valid_indices] = 1
         multihot_probs[row_indices, valid_indices] = probs[mask]
+        """
         return multihot_routing_map.cast(paddle.bool), multihot_probs
 
     def get_dispached_metadata(self) -> paddle.Tensor:
