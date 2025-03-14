@@ -53,7 +53,7 @@ def main(input_path, output_path):
         if len(new_state_dict) > 0:
             file_name = os.path.basename(safetensor_file)
             new_safetensor_file = os.path.join(output_path, file_name)
-            save_file(new_state_dict, new_safetensor_file)
+            save_file(new_state_dict, new_safetensor_file, metadata={"format": "np"})
 
     # Update model index
     new_model_index_file = os.path.join(output_path, "model.safetensors.index.json")
