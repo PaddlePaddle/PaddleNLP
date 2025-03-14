@@ -297,11 +297,6 @@ def main():
                 )
             )
 
-    if training_args.do_eval:
-        eval_result = trainer.evaluate()
-        trainer.log_metrics("eval", eval_result)
-        trainer.save_metrics("eval", eval_result)
-
 
 if __name__ == "__main__":
     main()

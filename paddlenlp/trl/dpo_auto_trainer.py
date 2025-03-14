@@ -1091,7 +1091,7 @@ class DPOAutoTrainer(Trainer):
             "position_ids": inputs["input_ids"][1],
         }
         dpo_inputs["attention_mask"] = inputs["input_ids"][3]
-        # dpo_inputs["attn_mask_startend_row_indices"] = inputs["input_ids"][6]
+        dpo_inputs["attn_mask_startend_row_indices"] = inputs["input_ids"][6]
 
         input_ids, labels = tuple(inputs.values())
         labels = (labels[0], labels[1], labels[2], None, None)

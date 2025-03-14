@@ -184,6 +184,7 @@ def preference_collate_fn(batch, max_seq_len=None, data_type="pairwise"):
         "response_0_labels": [],
         "response_1_labels": [],
         "response_indexs": [],
+        "attention_mask": paddle.to_tensor([0], dtype="float32"),
         "reference_chosen_logps": paddle.to_tensor([0], dtype="float32"),
         "reference_rejected_logps": paddle.to_tensor([0], dtype="float32"),
     }
@@ -252,6 +253,7 @@ def preference_collate_fn_auto_parallel(batch, max_seq_len=None, data_type="pair
             input_dict["attention_mask"],
             input_dict["chosen_labels"],
             input_dict["rejected_labels"],
+            input_dict["attn_mask_startend_row_indices"],
         ],
         "labels": [
             input_dict["chosen_labels"],

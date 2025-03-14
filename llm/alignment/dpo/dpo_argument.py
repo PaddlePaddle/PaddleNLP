@@ -44,8 +44,8 @@ class DPOTrainingArguments(TrainingArguments):
         default=False,
         metadata={"help": "Whether to run benchmark by autotuner. True for from_scratch."},
     )
-    use_intermediate_api: str = field(
-        default="use_intermediate_api",
+    use_intermediate_api: bool = field(
+        default=False,
         metadata={"help": "Flag indicating whether to use the intermediate API for model."},
     )
     max_seq_length: int = field(default=128, metadata={"help": "The maximum sequence length for model inputs."})
