@@ -738,6 +738,10 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                 state_dict[f"{self.base_model_prefix}.layers.{idx}.self_attn.kv_b_proj.weight"]
             ).cast(dtype)
 
+            linear_weight = paddle.to_tensor(
+                state_dict[f"{self.base_model_prefix}.layers.{idx}.self_attn.o_proj.weight"]
+            ).cast(dtype)
+
             if self.config.mla_use_matrix_absorption:
                 if self.config.q_lora_rank is None:
                     q_proj_weight_inner = q_proj_weight.reshape(
@@ -825,10 +829,6 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                     self.transformer_block.q_nope_k_b_proj_weights[idx].set_value(W_Q_UK)
                     self.transformer_block.q_rope_proj_weights[idx].set_value(W_QR)
                     self.transformer_block.v_b_o_proj_weights[idx].set_value(W_UV_O)
-
-            linear_weight = paddle.to_tensor(
-                state_dict[f"{self.base_model_prefix}.layers.{idx}.self_attn.o_proj.weight"]
-            ).cast(dtype)
 
             if self.use_weight_only:
                 kv_a_proj_with_mqa_quanted_weight, kv_a_proj_with_mqa_weight_scale = weight_quantize(
