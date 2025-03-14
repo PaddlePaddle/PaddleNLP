@@ -20,24 +20,20 @@ import paddle
 np.random.seed(2023)
 
 
-class GetUpdateInputsTest(unittest.TestCase):
-    def test_update_inputs(self):
+def test_update_inputs():
+    seq_lens_encoder = paddle.to_tensor(
+        [[0], [0], [0], [0]], dtype="int32", place=paddle.XPUPlace(0), stop_gradient=True
+    )
+    seq_lens_decoder = paddle.to_tensor(
+        [[27], [29], [31], [31]], dtype="int32", place=paddle.XPUPlace(0), stop_gradient=True
+    )
+    batch_size = paddle.to_tensor(
+        [0, 8191, 16382, 24573], dtype="int32", place=paddle.XPUPlace(0), stop_gradient=True
+    )
 
-        seq_lens_encoder = paddle.to_tensor(
-            [[0], [0], [0], [0]], dtype="int32", place=paddle.XPUPlace(0), stop_gradient=True
-        )
-        seq_lens_decoder = paddle.to_tensor(
-            [[27], [29], [31], [31]], dtype="int32", place=paddle.XPUPlace(0), stop_gradient=True
-        )
-        batch_size = paddle.to_tensor(
-            [0, 8191, 16382, 24573], dtype="int32", place=paddle.XPUPlace(0), stop_gradient=True
-        )
+    a, b = paddle.incubate.nn.functional.blha_get_max_len(seq_lens_encoder, seq_lens_decoder, batch_size)
 
-        a, b = paddle.incubate.nn.functional.blha_get_max_len(seq_lens_encoder, seq_lens_decoder, batch_size)
+    print(a)
+    print(b)
 
-        print(a)
-        print(b)
-
-
-if __name__ == "__main__":
-    unittest.main()
+test_update_inputs()

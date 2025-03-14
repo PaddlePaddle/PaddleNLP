@@ -1437,7 +1437,9 @@ class FusedMultiTransformerBase(Layer):
         )
 
         if e_score_correction_bias is not None:
-            top_k_weights = scores_no_bias.take_along_axis(permute_indices_per_token, axis=1)
+            shape0 = permute_indices_per_token.shape[0]
+            shape1 = permute_indices_per_token.shape[1]
+            top_k_weights = scores_no_bias.take_along_axis(permute_indices_per_token.reshape([shape1, shape0]), axis=1)
 
         # norm gate to sum 1
         if self.config.moe_config.top_k > 1 and self.config.moe_config.norm_topk_prob:

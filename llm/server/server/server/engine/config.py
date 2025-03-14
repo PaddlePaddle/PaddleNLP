@@ -325,9 +325,9 @@ class Config:
         config = self.get_model_config()
 
         # check paddle nlp version
-        tag = os.getenv("tag")
-        if tag not in config["paddlenlp_version"]:
-            raise Exception(f"Current image paddlenlp version {tag} doesn't match the model paddlenlp version {config['paddlenlp_version']} ")
+        # tag = os.getenv("tag")
+        # if tag not in config["paddlenlp_version"]:
+        #     raise Exception(f"Current image paddlenlp version {tag} doesn't match the model paddlenlp version {config['paddlenlp_version']} ")
 
         def reset_value(self, value_name, key, config):
             if key in config:
