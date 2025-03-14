@@ -3651,16 +3651,16 @@ class FusedBlockMultiTransformerA8W8(FusedBlockMultiTransformer, FusedMultiTrans
                     kwargs.get("max_len_kv", None),
                     rotary_embs,
                     None,  # attn_mask
-                    None,  # qkv_bias
-                    None,  # qkv_out_scales
+                    self.qkv_biases[i] if len(self.qkv_biases) > 0 else None,
+                    self.qkv_out_scales[i] if not self.skip_quant("qkv_weight_scale", i) else None,
                     k_quant_scales[i] if k_quant_scales is not None else None,
                     v_quant_scales[i] if v_quant_scales is not None else None,
                     k_dequant_scales[i] if k_dequant_scales is not None else None,
                     v_dequant_scales[i] if v_dequant_scales is not None else None,
                     cache_k_zps[i] if cache_k_zps is not None else None,
                     cache_v_zps[i] if cache_v_zps is not None else None,
-                    None,  # linear_shifts
-                    None,  # linear_smooths
+                    self.linear_shifts[i] if len(self.linear_shifts) > 0 else None,
+                    self.linear_smooths[i] if len(self.linear_smooths) > 0 else None,
                     self._fuse_kernel_compute_dtype,
                     cache_quant_type_str,
                     self.use_neox_rotary_style,
@@ -3671,7 +3671,7 @@ class FusedBlockMultiTransformerA8W8(FusedBlockMultiTransformer, FusedMultiTrans
                     self.act_scales["out_linear_in_scale"][i],
                     self.config.speculate_config.speculate_max_draft_token_num,
                     True,  # causal
-                    False,  # speculate_decoder
+                    self.config.speculate_config.speculate_method is not None,  # speculate_decoder
                 )[0]
             else:
                 from paddlenlp_ops import append_attention

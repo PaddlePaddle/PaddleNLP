@@ -91,7 +91,15 @@ std::vector<paddle::Tensor> SageAttentionKernel(
     init_flag = true;
   }
 
-  paddle::Tensor qkv_out = qkv;
+  paddle::Tensor qkv_out;
+  if (qkv_out_scales) {
+    qkv_out = GetEmptyTensor(qkv.dims(), D, qkv.place());
+  } else {
+    qkv_out = qkv;
+  }
+  if (out_linear_in_scale > 0.0) {
+    PD_THROW("out_linear_in_scale > 0.0 not supported.");
+  }
   paddle::Tensor fmha_out = GetEmptyTensor(
         {meta_data.token_nums, meta_data.q_num_heads * meta_data.head_dims_v},
         D,
@@ -102,32 +110,62 @@ std::vector<paddle::Tensor> SageAttentionKernel(
       cudaEventRecord(main_event, main_stream);
     }
     // prefill write cache, no quant
-    EncoderWriteCacheWithRopeKernel<data_t, data_t>(
-        meta_data,
-        qkv_out,
-        seq_lens_this_time,
-        seq_lens_encoder,
-        seq_lens_decoder,
-        padding_offsets,
-        cum_offsets,
-        block_tables,
-        kv_batch_ids,
-        kv_tile_ids_per_batch,
-        rotary_embs,
-        qkv_out_scales,
-        qkv_bias,
-        cache_k_quant_scales,
-        cache_v_quant_scales,
-        cache_k_zp,
-        cache_v_zp,
-        cache_quant_type_str,
-        kv_num_blocks_data,
-        max_input_length,
-        use_neox_rotary_style,
-        main_stream,
-        &qkv_out,
-        const_cast<paddle::Tensor*>(&key_cache),
-        const_cast<paddle::Tensor*>(&value_cache));
+    if (qkv_out_scales) {
+      EncoderWriteCacheWithRopeKernel<data_t, int>(
+          meta_data,
+          qkv,
+          seq_lens_this_time,
+          seq_lens_encoder,
+          seq_lens_decoder,
+          padding_offsets,
+          cum_offsets,
+          block_tables,
+          kv_batch_ids,
+          kv_tile_ids_per_batch,
+          rotary_embs,
+          qkv_out_scales,
+          qkv_bias,
+          cache_k_quant_scales,
+          cache_v_quant_scales,
+          cache_k_zp,
+          cache_v_zp,
+          cache_quant_type_str,
+          kv_num_blocks_data,
+          max_input_length,
+          use_neox_rotary_style,
+          main_stream,
+          &qkv_out,
+          const_cast<paddle::Tensor*>(&key_cache),
+          const_cast<paddle::Tensor*>(&value_cache));
+    } else {
+      EncoderWriteCacheWithRopeKernel<data_t, data_t>(
+          meta_data,
+          qkv_out,
+          seq_lens_this_time,
+          seq_lens_encoder,
+          seq_lens_decoder,
+          padding_offsets,
+          cum_offsets,
+          block_tables,
+          kv_batch_ids,
+          kv_tile_ids_per_batch,
+          rotary_embs,
+          qkv_out_scales,
+          qkv_bias,
+          cache_k_quant_scales,
+          cache_v_quant_scales,
+          cache_k_zp,
+          cache_v_zp,
+          cache_quant_type_str,
+          kv_num_blocks_data,
+          max_input_length,
+          use_neox_rotary_style,
+          main_stream,
+          &qkv_out,
+          const_cast<paddle::Tensor*>(&key_cache),
+          const_cast<paddle::Tensor*>(&value_cache));
+    }
+    
 
     // qkv_out: [token_num, (q_num_head + 2 x kv_num_head) x head_dim]
     int batch_size = seq_lens_this_time.shape()[0];
