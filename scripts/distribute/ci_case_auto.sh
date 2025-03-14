@@ -2581,7 +2581,7 @@ EOF
     python -u  -m paddle.distributed.launch \
             --gpus "0,1" \
             --log_dir "$case_log_dir" \
-        run_pretrain_3D_auto.py ./$config_json \
+        run_pretrain_auto.py ./$config_json \
         >>${log_path}/$FUNCNAME 2>&1
     loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
     ips=-1
@@ -2674,7 +2674,7 @@ EOF
     python -u  -m paddle.distributed.launch \
             --gpus "0,1,2,3" \
             --log_dir "$case_log_dir" \
-        run_pretrain_3D_auto.py $config_json \
+        run_pretrain_auto.py $config_json \
         >>${log_path}/$FUNCNAME 2>&1
     loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
     ips=-1
@@ -2767,7 +2767,7 @@ EOF
     python -u  -m paddle.distributed.launch \
             --gpus "0,1,2,3,4,5,6,7" \
             --log_dir "$case_log_dir" \
-        run_pretrain_3D_auto.py $config_json \
+        run_pretrain_auto.py $config_json \
         >>${log_path}/$FUNCNAME 2>&1
     loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
     ips=-1
@@ -2860,7 +2860,7 @@ EOF
     python -u  -m paddle.distributed.launch \
             --gpus "0,1,2,3,4,5,6,7" \
             --log_dir "$case_log_dir" \
-        run_pretrain_3D_auto.py $config_json \
+        run_pretrain_auto.py $config_json \
         >>${log_path}/$FUNCNAME 2>&1
     loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
     ips=-1
@@ -2906,7 +2906,7 @@ function llm_qwen_pir_auto_bs1_bf16_TP2(){
     python -u  -m paddle.distributed.launch \
         --gpus "0,1" \
         --log_dir "$case_log_dir" \
-        run_pretrain_3D_auto.py \
+        run_pretrain_auto.py \
         --model_name_or_path "qwen/qwen-14b" \
         --tokenizer_name_or_path "qwen/qwen-14b" \
         --input_dir "./data" \
@@ -2985,7 +2985,7 @@ function llm_qwen_pir_auto_bs1_bf16_TP2_PP2(){
     python -u  -m paddle.distributed.launch \
         --gpus "0,1,2,3" \
         --log_dir "$case_log_dir" \
-        run_pretrain_3D_auto.py \
+        run_pretrain_auto.py \
         --model_name_or_path "qwen/qwen-14b" \
         --tokenizer_name_or_path "qwen/qwen-14b" \
         --input_dir "./data" \
