@@ -17,6 +17,32 @@
 from typing import Optional
 
 import paddle
+import TokenDispatherUtils as TDU
+from paddle.autograd import PyLayer
+
+
+class IndicesToMultihot(PyLayer):
+    @staticmethod
+    def forward(ctx, indices, probs, router_topk, num_local_experts):
+        ctx.save_for_backward(indices)
+        ctx.router_topk = router_topk
+        ctx.num_local_experts = num_local_experts
+        multihot_routing_map, multihot_probs = TDU.fused_topk_to_multihot(
+            indices.cast(paddle.int32), probs, seqlen=indices.shape[0], topk=router_topk, num_experts=num_local_experts
+        )
+        return multihot_routing_map.cast(paddle.bool), multihot_probs
+
+    @staticmethod
+    def backward(ctx, grad_multihot_rouitng_map, grad_multihot_probs):
+        (indices,) = ctx.saved_tensor()
+        grad_probs = TDU.fused_multihot_prob_backto_topk(
+            indices,
+            grad_multihot_probs,
+            seqlen=indices.shape[0],
+            topk=ctx.router_topk,
+            num_experts=ctx.num_local_experts,
+        )
+        return None, grad_probs
 
 
 def permute(
