@@ -77,6 +77,7 @@ setup(
                 "./get_position_ids_v2.cc",
                 "./adjust_batch.cc",
                 "./gather_next_token.cc",
+                "step.cc",
             ],
             include_dirs=[".", "./plugin/include", XRE_INC_PATH, XFT_INC_PATH, XFA_INC_PATH, XBLAS_INC_PATH],
             extra_objects=["./plugin/build/libxpuplugin.a", XRE_LIB_PATH, XFT_LIB_PATH, XFA_LIB_PATH, XBLAS_LIB_PATH],

@@ -1326,6 +1326,7 @@ class FusedMultiTransformerBase(Layer):
         return tmp_out, residual_input
 
     def compute_fused_moe_xpu(self, tmp_out, i):
+        assert paddle.is_compiled_with_xpu()
         e_score_correction_bias = self.e_score_correction_biases[i]
 
         def get_moe_scores(
@@ -1436,7 +1437,7 @@ class FusedMultiTransformerBase(Layer):
         )
 
         if e_score_correction_bias is not None:
-            top_k_weights = scores_no_bias.take_along_axis(top_k_indices, axis=1)
+            top_k_weights = scores_no_bias.take_along_axis(permute_indices_per_token, axis=1)
 
         # norm gate to sum 1
         if self.config.moe_config.top_k > 1 and self.config.moe_config.norm_topk_prob:
