@@ -50,7 +50,7 @@ class TestSimpleFusedMoe(unittest.TestCase):
 
     def set_config(self):
         self.dtype = "bfloat16"
-        self.batch_size = 4
+        self.batch_size = 16
         self.seq_len = 128
         self.num_experts = 4
         self.d_model = 64
