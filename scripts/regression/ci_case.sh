@@ -64,12 +64,12 @@ print_info() {
             echo -e "\033[32m ${log_path}/$2_SUCCESS \033[0m"
         fi
 
-        if [ -e "${PPNLP_HOME}/upload" ] && [ "$(ls -A "${PPNLP_HOME}/upload")" ]; then
-            cd ${PPNLP_HOME} && ls -A "${PPNLP_HOME}/upload"
-            python upload.py ${PPNLP_HOME}/upload 'paddlenlp/wheels'
-            rm -rf upload/*
-            echo -e "\033[32m upload wheels SUCCESS \033[0m"
-        fi
+        # if [ -e "${PPNLP_HOME}/upload" ] && [ "$(ls -A "${PPNLP_HOME}/upload")" ]; then
+        #     cd ${PPNLP_HOME} && ls -A "${PPNLP_HOME}/upload"
+        #     python upload.py ${PPNLP_HOME}/upload 'paddlenlp/wheels'
+        #     rm -rf upload/*
+        #     echo -e "\033[32m upload wheels SUCCESS \033[0m"
+        # fi
     fi
 }
 # case list
