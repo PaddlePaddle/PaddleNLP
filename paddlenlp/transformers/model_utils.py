@@ -47,11 +47,6 @@ from paddle.distributed.fleet.meta_parallel.parallel_layers import (
     PipelineLayer,
     SharedLayerDesc,
 )
-
-try:
-    from paddle.distributed.fleet.meta_parallel import LocalSharedLayerDesc
-except:
-    LocalSharedLayerDesc = None
 from paddle.nn import Embedding, Layer
 
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
@@ -2967,10 +2962,7 @@ class PipelinePretrainedModel(PretrainedModel):
                                 f"Please check! we treat this key as last layer, get {k}, set origin name as {'.'.join(single_name)}"
                             )
                     elif name_splited[0] == "shared_layers":
-                        single_name = [self.get_shardlayer_prefix(name_splited, SharedLayerDesc)]
-                        single_name.extend(name_splited[2:])
-                    elif name_splited[0] == "local_shared_layers":
-                        single_name = [self.get_shardlayer_prefix(name_splited, LocalSharedLayerDesc)]
+                        single_name = [self.get_shardlayer_prefix(name_splited)]
                         single_name.extend(name_splited[2:])
                     else:
                         raise ValueError(f"Unexpected key: {k} for pp layer.")
@@ -2982,10 +2974,7 @@ class PipelinePretrainedModel(PretrainedModel):
                         single_name = [] if prefixes[idx] == "" else [prefixes[idx]]
                         single_name.extend(name_splited[1:])
                     elif idx == "shared_layers":
-                        single_name = [self.get_shardlayer_prefix(name_splited, SharedLayerDesc)]
-                        single_name.extend(name_splited[2:])
-                    elif idx == "local_shared_layers":
-                        single_name = [self.get_shardlayer_prefix(name_splited, LocalSharedLayerDesc)]
+                        single_name = [self.get_shardlayer_prefix(name_splited)]
                         single_name.extend(name_splited[2:])
                     else:
                         raise ValueError(f"Unexpected key: {k} for pp layer.")
@@ -2998,7 +2987,7 @@ class PipelinePretrainedModel(PretrainedModel):
 
         return self._single_to_pp_mapping
 
-    def get_shardlayer_prefix(self, name_splited, shared_layer_class=SharedLayerDesc):
+    def get_shardlayer_prefix(self, name_splited):
         """_summary_
             This function retrieves the prefix of a shared layer. The process involves:
             1. Identifying all key names of shared layers, like 'shared_weight01', 'shared_weight02', etc.
@@ -3015,11 +3004,11 @@ class PipelinePretrainedModel(PretrainedModel):
         Returns:
             _type_: _description_
         """
-        shared_layer_names = {s.layer_name for s in self._layers_desc if isinstance(s, shared_layer_class)}
+        shared_layer_names = {s.layer_name for s in self._layers_desc if isinstance(s, SharedLayerDesc)}
         assert name_splited[1] in shared_layer_names, f"The shared layer name {name_splited[1]} must be in prefixes!"
         shared_layer_key = name_splited[1]
         for idx, layer in enumerate(self._layers_desc):
-            if isinstance(layer, shared_layer_class) and layer.layer_name == shared_layer_key:
+            if isinstance(layer, SharedLayerDesc) and layer.layer_name == shared_layer_key:
                 if self.get_stage_from_index(idx) == self._stage_id:
                     return self.get_sequential_name_prefixes()[str(idx)]
 

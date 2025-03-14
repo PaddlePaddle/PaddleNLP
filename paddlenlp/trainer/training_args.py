@@ -1268,8 +1268,11 @@ class TrainingArguments:
                                 "enable_overlap_p2p_comm",
                                 "disable_batch_p2p_comm",
                                 "best_unbalanced_scheduler",
+<<<<<<< HEAD
                                 "enable_offload_queue",
                                 "use_dualpipev",
+=======
+>>>>>>> parent of 5329d2888... [Distribution] Support DualPipeV for GPT3 (#9993)
                             ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
