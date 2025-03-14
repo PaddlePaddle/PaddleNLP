@@ -3232,7 +3232,7 @@ EOF
 
     export FLAGS_enable_moe_utils=true
 
-if [ $IS_A100 -ne 0 ]; then
+if [ $IS_A100 -eq 1 ]; then
     python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
     --log_dir  "output/$task_name""_log" \
@@ -3379,7 +3379,7 @@ EOF
     export NVIDIA_TF32_OVERRIDE=0
     
     export FLAGS_enable_moe_utils=true
-if [ $IS_A100 -eq 0 ]; then
+if [ $IS_A100 -eq 1 ]; then
     python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
     --log_dir  "output/$task_name""_log" \
