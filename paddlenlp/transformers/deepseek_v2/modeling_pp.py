@@ -20,7 +20,10 @@ import paddle.distributed.fleet as fleet
 import paddle.nn as nn
 from paddle.distributed.fleet.meta_parallel import (
     LayerDesc,
+    LocalSharedLayerDesc,
     PipelineLayer,
+    ScheduleChunk,
+    ScheduleNode,
     SharedLayerDesc,
 )
 from paddle.distributed.fleet.recompute.recompute import recompute
@@ -39,13 +42,25 @@ from .modeling import (
     DeepseekV2RMSNorm,
 )
 
+try:
+    import paddle.distributed.communication.deep_ep as deep_ep
+except ImportError:
+    deep_ep = None
+
+from paddlenlp.transformers.fused_a2a import (
+    FusedCombine_backward,
+    FusedCombine_forward,
+    FusedDispatch_backward,
+    FusedDispatch_forward,
+)
+
 __all__ = [
     "DeepseekV2ForCausalLMPipe",
 ]
 
 
 def parse_args(args):
-    if isinstance(args, tuple):
+    if isinstance(args, (tuple, list)):
         if len(args) == 4:
             hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids = args
 
@@ -55,6 +70,9 @@ def parse_args(args):
         elif len(args) == 2:
             hidden_states, attention_mask = args
             attn_mask_startend_row_indices, position_ids = None, None
+        else:  # len(args) == 1:
+            hidden_states = args[0]
+            attention_mask, attn_mask_startend_row_indices, position_ids = None, None, None
     else:
         hidden_states = args
         attention_mask, attn_mask_startend_row_indices, position_ids = None, None, None
@@ -91,6 +109,326 @@ def get_attr(layer, name):
         return getattr(layer, name, None)
     else:
         return get_attr(layer._layer, name)
+
+
+def calc_stream_wait(group_id):
+    comm_event = deep_ep.get_event_from_comm_stream(group_id)
+    comm_event.calc_stream_wait(group_id)
+
+
+class TensorMeta:
+    """Recording the meta info of forward inputs, to avoid 0-size problems"""
+
+    def __init__(self, tensor):
+        self.shape = tensor.shape
+        self.dtype = tensor.dtype
+
+
+class DecoderLayerNode(ScheduleNode):
+    def __init__(
+        self,
+        attn_and_gate_node,
+        dispatch_node,
+        mlp_node,
+        combine_node,
+        post_process_node,
+        moe_group,
+        num_experts,
+        name="DecoderLayerNode",
+    ):
+        super().__init__(fwd_func=None, name=name)
+        assert (dispatch_node is None and combine_node is None) or (
+            dispatch_node is not None and combine_node is not None
+        )
+        self.attn_and_gate_node = attn_and_gate_node
+        self.dispatch_node = dispatch_node
+        self.mlp_node = mlp_node
+        self.combine_node = combine_node
+        self.post_process_node = post_process_node
+
+        self.moe_group = moe_group
+        self.num_experts = num_experts
+
+        self.states = None
+        self.hidden_states_meta = None
+        self.dispatched_probs_meta = None
+        self.combine_output_meta = None
+
+    def dispatch_forward(self, inputs):
+        paddle.base.core.nvprof_nvtx_push("raw_dispatch_forward")
+        (
+            inputs_embeds_mtp,
+            ori_hidden_states,
+            residual,
+            probs,
+            l_aux,
+            hidden_states,
+            token_indices,
+            token_probs,
+        ) = inputs
+
+        with paddle.no_grad():
+            hidden_states, dispatched_probs, states = FusedDispatch_forward(
+                hidden_states, token_indices, token_probs, self.num_experts, self.moe_group
+            )
+        tokens_per_expert = states["tokens_per_expert"]
+        dispatched_indices = states["dispatched_indices"]
+        # tokens_per_expert.stop_gradient = False
+        # dispatched_indices.stop_gradient = False
+        hidden_states.stop_gradient = False
+        dispatched_probs.stop_gradient = False
+        self.states = states
+        self.hidden_states_meta = TensorMeta(hidden_states)
+        self.dispatched_probs_meta = TensorMeta(dispatched_probs)
+
+        inputs = (
+            inputs_embeds_mtp,
+            ori_hidden_states,
+            residual,
+            probs,
+            l_aux,
+            hidden_states,
+            tokens_per_expert,
+            dispatched_indices,
+            dispatched_probs,
+        )
+        paddle.base.core.nvprof_nvtx_pop()
+        return inputs
+
+    def combine_forward(self, inputs):
+        paddle.base.core.nvprof_nvtx_push("raw_combine_forward")
+        (
+            inputs_embeds_mtp,
+            ori_hidden_states,
+            residual,
+            probs,
+            l_aux,
+            expert_output,
+        ) = inputs
+
+        with paddle.no_grad():
+            combine_output = FusedCombine_forward(expert_output, self.moe_group, self.states)
+        combine_output.stop_gradient = False
+        self.combine_output_meta = TensorMeta(combine_output)
+        inputs = (
+            inputs_embeds_mtp,
+            ori_hidden_states,
+            residual,
+            probs,
+            l_aux,
+            combine_output,
+        )
+        paddle.base.core.nvprof_nvtx_pop()
+        return inputs
+
+    def dispatch_backward(self, output_grad):
+        paddle.base.core.nvprof_nvtx_push("raw_dispatch_backward")
+        (
+            inputs_embeds_mtp_grad,
+            ori_hidden_states_grad,
+            residual_grad,
+            probs_grad,
+            l_aux_grad,
+            hidden_states_grad,
+            tokens_per_expert_grad,
+            dispatched_indices_grad,
+            dispatched_probs_grad,
+        ) = output_grad
+
+        if hidden_states_grad is None:
+            hidden_states_grad = paddle.zeros(self.hidden_states_meta.shape, self.hidden_states_meta.dtype)
+        if dispatched_probs_grad is None:
+            dispatched_probs_grad = paddle.zeros(self.dispatched_probs_meta.shape, self.dispatched_probs_meta.dtype)
+        with paddle.no_grad():
+            hidden_states_grad, token_indices_grad, token_probs_grad = FusedDispatch_backward(
+                self.moe_group, self.states["handle"], hidden_states_grad, dispatched_probs_grad
+            )
+
+        output_grad = (
+            inputs_embeds_mtp_grad,
+            ori_hidden_states_grad,
+            residual_grad,
+            probs_grad,
+            l_aux_grad,
+            hidden_states_grad,
+            token_indices_grad,
+            token_probs_grad,
+        )
+        paddle.base.core.nvprof_nvtx_pop()
+        return output_grad
+
+    def combine_backward(self, output_grad):
+        paddle.base.core.nvprof_nvtx_push("raw_combine_backward")
+        (
+            inputs_embeds_mtp_grad,
+            ori_hidden_states_grad,
+            residual_grad,
+            probs_grad,
+            l_aux_grad,
+            combine_output_grad,
+        ) = output_grad
+
+        if combine_output_grad is None:
+            combine_output_grad = paddle.zeros(self.combine_output_meta.shape, self.combine_output_meta.dtype)
+        with paddle.no_grad():
+            expert_output_grad = FusedCombine_backward(self.moe_group, self.states["handle"], combine_output_grad)
+
+        output_grad = (
+            inputs_embeds_mtp_grad,
+            ori_hidden_states_grad,
+            residual_grad,
+            probs_grad,
+            l_aux_grad,
+            expert_output_grad,
+        )
+        paddle.base.core.nvprof_nvtx_pop()
+        return output_grad
+
+    def forward(self, inputs):
+        inputs = self.attn_and_gate_node.forward(inputs)
+
+        if self.dispatch_node is None:
+            inputs = self.dispatch_forward(inputs)
+            calc_stream_wait(self.moe_group.id)
+        else:
+            inputs = self.dispatch_node.forward(inputs)
+
+        inputs = self.mlp_node.forward(inputs)
+
+        if self.combine_node is None:
+            inputs = self.combine_forward(inputs)
+            calc_stream_wait(self.moe_group.id)
+        else:
+            inputs = self.combine_node.forward(inputs)
+
+        inputs = self.post_process_node.forward(inputs)
+        return inputs
+
+    def backward(self, output_grad=None, scaler=None):
+        assert (output_grad is not None) and (scaler is None)
+
+        output_grad = self.post_process_node.backward(output_grad)
+
+        if self.combine_node is None:
+            output_grad = self.combine_backward(output_grad)
+            calc_stream_wait(self.moe_group.id)
+        else:
+            output_grad = self.combine_node.backward(output_grad)
+
+        output_grad = self.mlp_node.backward(output_grad)
+
+        if self.dispatch_node is None:
+            output_grad = self.dispatch_backward(output_grad)
+            calc_stream_wait(self.moe_group.id)
+        else:
+            output_grad = self.dispatch_node.backward(output_grad)
+
+        output_grad = self.attn_and_gate_node.backward(output_grad)
+        return output_grad
+
+
+class OverlapedScheduleChunk:
+    def __init__(self, forward_nodes, backward_nodes):
+        assert len(forward_nodes) == len(backward_nodes)
+        self.nodes = []
+        for f, b in zip(forward_nodes, backward_nodes):
+            self.nodes.append(OverlapedScheduleNode(f, b, f"OverlapedScheduleNode_{len(self.nodes)}"))
+
+    def forward_backward(self, inputs, output_grad):
+        for n in self.nodes:
+            inputs, output_grad = n.forward_backward(inputs, output_grad)
+        return inputs, output_grad
+
+
+class OverlapedScheduleNode:
+    def __init__(self, forward_node, backward_node, name=""):
+        assert isinstance(forward_node, DecoderLayerNode) and isinstance(backward_node, DecoderLayerNode)
+        self.forward_node = forward_node
+        self.backward_node = backward_node
+        self.name = name
+
+    def forward_backward(self, inputs, output_grad):
+        paddle.base.core.nvprof_nvtx_push("forward_backward")
+        output_grad = self.backward_node.post_process_node.backward(output_grad)
+
+        output_grad = self.backward_node.combine_backward(output_grad)
+        inputs = self.forward_node.attn_and_gate_node.forward(inputs)
+
+        calc_stream_wait(self.backward_node.moe_group.id)
+
+        inputs = self.forward_node.dispatch_forward(inputs)
+        output_grad = self.backward_node.mlp_node.backward(output_grad)
+
+        calc_stream_wait(self.forward_node.moe_group.id)
+
+        output_grad = self.backward_node.dispatch_backward(output_grad)
+        inputs = self.forward_node.mlp_node.forward(inputs)
+
+        calc_stream_wait(self.backward_node.moe_group.id)
+
+        inputs = self.forward_node.combine_forward(inputs)
+        output_grad = self.backward_node.attn_and_gate_node.backward(output_grad)
+
+        calc_stream_wait(self.forward_node.moe_group.id)
+
+        inputs = self.forward_node.post_process_node.forward(inputs)
+        paddle.base.core.nvprof_nvtx_pop()
+        return inputs, output_grad
+
+
+def build_overlapped_nodes(forward_chunk, backward_chunk):
+    forward_decoder_layer_num = 0
+    backward_decoder_layer_num = 0
+    assert isinstance(forward_chunk, ScheduleChunk) and isinstance(backward_chunk, ScheduleChunk)
+    for n in forward_chunk.nodes:
+        if isinstance(n, DecoderLayerNode):
+            forward_decoder_layer_num += 1
+    for n in reversed(backward_chunk.nodes):
+        if isinstance(n, DecoderLayerNode):
+            backward_decoder_layer_num += 1
+
+    overlap_layers_num = min(forward_decoder_layer_num, backward_decoder_layer_num)
+    forward_pre_overlap_layers = []
+    forward_post_overlap_layers = []
+    forward_overlap_layers = []
+    is_pre = True
+    for n in forward_chunk.nodes:
+        if not isinstance(n, DecoderLayerNode):
+            if is_pre:
+                forward_pre_overlap_layers.append(n)
+            else:
+                forward_post_overlap_layers.append(n)
+        else:
+            is_pre = False
+            if len(forward_overlap_layers) == overlap_layers_num:
+                forward_post_overlap_layers.append(n)
+            else:
+                forward_overlap_layers.append(n)
+    forward_pre_node = ScheduleChunk(forward_pre_overlap_layers)
+    forward_post_node = ScheduleChunk(forward_post_overlap_layers)
+
+    backward_pre_overlap_layers = []
+    backward_post_overlap_layers = []
+    backward_overlap_layers = []
+    is_pre = True
+    for n in reversed(backward_chunk.nodes):
+        if not isinstance(n, DecoderLayerNode):
+            if is_pre:
+                backward_pre_overlap_layers.append(n)
+            else:
+                backward_post_overlap_layers.append(n)
+        else:
+            is_pre = False
+            if len(backward_overlap_layers) == overlap_layers_num:
+                backward_post_overlap_layers.append(n)
+            else:
+                backward_overlap_layers.append(n)
+
+    backward_pre_node = ScheduleChunk(list(reversed(backward_pre_overlap_layers)))
+    backward_post_node = ScheduleChunk(list(reversed(backward_post_overlap_layers)))
+
+    overlap_node = OverlapedScheduleChunk(forward_overlap_layers, backward_overlap_layers)
+    return forward_pre_node, backward_pre_node, overlap_node, forward_post_node, backward_post_node
 
 
 class DeepseekV2EmbeddingPipe(nn.Layer):
@@ -184,6 +522,9 @@ class DeepseekV2EmbeddingPipe(nn.Layer):
                 inputs_embeds = ScatterOp.apply(inputs_embeds)
             return return_args(inputs_embeds, attention_mask, attn_mask_startend_row_indices, position_ids)
 
+    def build_schedule_node(self):
+        return ScheduleNode(self.forward, name="DeepseekV2EmbeddingPipe")
+
 
 class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
     def forward(self, args):
@@ -240,12 +581,27 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
 
         return return_args(hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids)
 
+    def build_schedule_node(self):
+        attn_and_gate_node = ScheduleNode(self.self_attn_and_gate_compute, name="attn_and_gate_node")
+        mlp_node = ScheduleNode(self.mlp_compute, name="mlp_node")
+        post_process_node = ScheduleNode(self.post_process_compute, name="post_process_node")
+        return DecoderLayerNode(
+            attn_and_gate_node=attn_and_gate_node,
+            dispatch_node=None,
+            mlp_node=mlp_node,
+            combine_node=None,
+            post_process_node=post_process_node,
+            moe_group=self.mlp.moe_group,
+            num_experts=self.mlp.num_experts,
+            name="DeepseekV2DecoderLayerPipe",
+        )
+
 
 class DeepseekV2MTPLayerPipe(DeepseekV2MTPLayer):
     def forward(self, args):
         hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids = parse_args(args)
 
-        hidden_states_list = paddle.split(hidden_states, self.config.num_nextn_predict_layers + 1, axis=-1)
+        hidden_states_list = paddle.split(hidden_states, self.config.num_nextn_predict_layers + 1)
         hidden_states_main_model = hidden_states_list[0]
         inputs_embeds_cur_depth_list = hidden_states_list[1:]
         has_gradient = not hidden_states_main_model.stop_gradient
@@ -299,6 +655,9 @@ class DeepseekV2MTPLayerPipe(DeepseekV2MTPLayer):
         hidden_states = paddle.concat(output_list, axis=-1)
         return return_args(hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids)
 
+    def build_schedule_node(self):
+        return ScheduleNode(self.forward, name="DeepseekV2MTPLayerPipe")
+
 
 class DeepseekV2RMSNormPipe(nn.Layer):
     def __init__(self, config):
@@ -321,10 +680,13 @@ class DeepseekV2RMSNormPipe(nn.Layer):
         else:
             return self.norm(hidden_states)
 
+    def build_schedule_node(self):
+        return ScheduleNode(self.forward, name="DeepseekV2RMSNormPipe")
+
 
 class DeepseekV2LMHeadPipe(DeepseekV2LMHead):
-    def __init__(self, config):
-        super(DeepseekV2LMHeadPipe, self).__init__(config)
+    def __init__(self, config, embedding_weight=None):
+        super(DeepseekV2LMHeadPipe, self).__init__(config, embedding_weight=embedding_weight)
 
     @property
     def embedding_weight(self):
@@ -340,6 +702,9 @@ class DeepseekV2LMHeadPipe(DeepseekV2LMHead):
         logits = super().forward(hidden_states)
         return logits
 
+    def build_schedule_node(self):
+        return ScheduleNode(self.forward, name="DeepseekV2LMHeadPipe")
+
 
 class DeepseekV2PretrainingCriterionPipe(DeepseekV2PretrainingCriterion):
     def forward(self, logits, labels):
@@ -350,6 +715,9 @@ class DeepseekV2PretrainingCriterionPipe(DeepseekV2PretrainingCriterion):
         else:
             loss = super().forward(logits, labels)
         return loss
+
+    def build_schedule_node(self):
+        return ScheduleNode(self.forward, name="DeepseekV2PretrainingCriterionPipe")
 
 
 class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
@@ -408,6 +776,10 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
             assert len(self.no_recompute_layers) == 0, "for pp with full recompute, no_recompute_layers is not support"
 
         virtual_pp_degree = getattr(self.config, "virtual_pp_degree", 1)
+        use_dualpipev = getattr(self.config, "use_dualpipev", False)
+        if use_dualpipev:
+            assert LocalSharedLayerDesc is not None, "LocalSharedLayerDesc is None, please update your paddle."
+        shared_class = LocalSharedLayerDesc if use_dualpipev else SharedLayerDesc
 
         def get_hcg():
             return fleet.get_hybrid_communicate_group()
@@ -422,7 +794,7 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
 
         if config.tie_word_embeddings:
             self.add_sequential_layer(
-                SharedLayerDesc(
+                shared_class(
                     "DeepseekV2_shared_weight",
                     DeepseekV2EmbeddingPipe,
                     shared_weight_attr="embedding_weight",
@@ -455,12 +827,11 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
 
         if config.tie_word_embeddings:
             self.add_sequential_layer(
-                SharedLayerDesc(
+                shared_class(
                     "DeepseekV2_shared_weight",
                     DeepseekV2LMHeadPipe,
                     shared_weight_attr="embedding_weight",
                     config=config,
-                    **{"transpose_y": True},
                 ),
                 "lm_head",
             )
@@ -491,6 +862,7 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
                 "partition": False,
             },
             num_virtual_pipeline_stages=virtual_pp_degree,
+            use_dualpipev=use_dualpipev,
         )
         # You should call init here, since there is a  diamond inheritance problem
         self.apply(self._init_weights)
@@ -499,3 +871,39 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
 
     def get_loss_fn(self, config):
         return DeepseekV2PretrainingCriterionPipe(config)
+
+    def overlapped_forward_backward(
+        self,
+        forward_chunk,  # the module of the forward chunk
+        forward_inputs,
+        forward_loss_fn_node,
+        backward_chunk,  # the module of the backward chunk, maybe not used
+        backward_loss_fn_node,
+        backward_input_grads,
+        scaler,
+    ):
+        if backward_loss_fn_node is not None:
+            if scaler:
+                backward_input_grads = backward_loss_fn_node.backward(scaler=scaler)
+            else:
+                backward_input_grads = backward_loss_fn_node.backward()
+
+        (
+            forward_pre_node,
+            backward_pre_node,
+            overlap_node,
+            forward_post_node,
+            backward_post_node,
+        ) = build_overlapped_nodes(forward_chunk, backward_chunk)
+        forward_inputs = forward_pre_node.forward(forward_inputs)
+        backward_input_grads = backward_pre_node.backward(backward_input_grads)
+        forward_inputs, backward_input_grads = overlap_node.forward_backward(forward_inputs, backward_input_grads)
+        forward_inputs = forward_post_node.forward(forward_inputs)
+        backward_input_grads = backward_post_node.backward(backward_input_grads)
+
+        if forward_loss_fn_node is not None:
+            forward_loss = forward_loss_fn_node.forward(forward_inputs)
+        else:
+            forward_loss = None
+
+        return forward_inputs, forward_loss, backward_input_grads
