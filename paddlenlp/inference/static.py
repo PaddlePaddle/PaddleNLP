@@ -39,14 +39,14 @@ from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
 
 from .base import BasePredictor, BlockInferencePredictorMixin, InferencePredictorMixin
-from .utils import PredictorArgument
+from .utils import PredictorConfig
 
 __all__ = ["StaticGraphInferencePredictor", "StaticGraphBlockInferencePredictor", "StaticGraphPredictor"]
 
 
 class StaticGraphPredictor(BasePredictor):
     def __init__(
-        self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None, model: PretrainedModel = None, **kwargs
+        self, config: PredictorConfig, tokenizer: PretrainedTokenizer = None, model: PretrainedModel = None, **kwargs
     ):
         super().__init__(config, tokenizer, model)
 
@@ -101,7 +101,7 @@ class StaticGraphPredictor(BasePredictor):
 class StaticGraphInferencePredictor(InferencePredictorMixin):
     def __init__(
         self,
-        config: PredictorArgument,
+        config: PredictorConfig,
         tokenizer: PretrainedTokenizer = None,
         model: PretrainedModel = None,
         **kwargs,
@@ -113,7 +113,7 @@ class StaticGraphInferencePredictor(InferencePredictorMixin):
 
         self.predictor = self._create_predictor(config)
 
-    def _create_predictor(self, predictor_args: PredictorArgument):
+    def _create_predictor(self, predictor_args: PredictorConfig):
         if not is_paddlenlp_ops_available():
             raise ValueError(
                 "you should install the paddlenlp ops to run inference predictor, "
@@ -179,7 +179,7 @@ class StaticGraphInferencePredictor(InferencePredictorMixin):
 class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
     def __init__(
         self,
-        config: PredictorArgument,
+        config: PredictorConfig,
         tokenizer: PretrainedTokenizer = None,
         model: PretrainedModel = None,
         **kwargs,
@@ -236,7 +236,7 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
         else:
             self.proposer = None
 
-    def _create_predictor(self, predictor_args: PredictorArgument):
+    def _create_predictor(self, predictor_args: PredictorConfig):
         if not is_paddlenlp_ops_available():
             raise ValueError(
                 "you should install the paddlenlp ops to run inference predictor, "

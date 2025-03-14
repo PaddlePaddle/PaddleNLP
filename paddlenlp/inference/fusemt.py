@@ -28,7 +28,7 @@ from paddlenlp.utils.env import MAX_BSZ, MAX_DRAFT_TOKENS, SPECULATE_MAX_BSZ
 from paddlenlp.utils.log import logger
 
 from .base import BlockInferencePredictorMixin, InferencePredictorMixin
-from .utils import PredictorArgument
+from .utils import PredictorConfig
 
 __all__ = ["DygraphInferencePredictor", "DygraphBlockInferencePredictor"]
 
@@ -36,7 +36,7 @@ __all__ = ["DygraphInferencePredictor", "DygraphBlockInferencePredictor"]
 class DygraphInferencePredictor(InferencePredictorMixin):
     def __init__(
         self,
-        config: PredictorArgument,
+        config: PredictorConfig,
         tokenizer: PretrainedTokenizer = None,
         model: PretrainedModel = None,
         **kwargs,
@@ -67,7 +67,7 @@ class DygraphInferencePredictor(InferencePredictorMixin):
 
 class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
     def __init__(
-        self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None, model: PretrainedModel = None, **kwargs
+        self, config: PredictorConfig, tokenizer: PretrainedTokenizer = None, model: PretrainedModel = None, **kwargs
     ):
         self.return_full_hidden_states = config.return_full_hidden_states
         self.full_hidden_states = None

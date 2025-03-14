@@ -33,19 +33,17 @@ from paddlenlp.transformers import (
 from paddlenlp.trl import llm_utils
 from paddlenlp.utils.log import logger
 
-from .utils import PredictorArgument
+from .utils import PredictorConfig
 
 
 class BasePredictor:
-    def __init__(
-        self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None, model: PretrainedModel = None
-    ):
+    def __init__(self, config: PredictorConfig, tokenizer: PretrainedTokenizer = None, model: PretrainedModel = None):
         if model is not None and hasattr(model, "config"):
             self.model_config = model.config
         else:
             self.model_config = AutoConfig.from_pretrained(config.model_name_or_path)
 
-        self.config: PredictorArgument = config
+        self.config: PredictorConfig = config
         if tokenizer is None:
             tokenizer = AutoTokenizer.from_pretrained(config.model_name_or_path, padding_side="left")
 
@@ -118,7 +116,7 @@ class BasePredictor:
 
 class DygraphPredictor(BasePredictor):
     def __init__(
-        self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None, model: PretrainedModel = None, **kwargs
+        self, config: PredictorConfig, tokenizer: PretrainedTokenizer = None, model: PretrainedModel = None, **kwargs
     ):
         super().__init__(config, tokenizer, model)
         self.model = model
@@ -198,7 +196,7 @@ class DygraphPredictor(BasePredictor):
 
 
 class InferencePredictorMixin(BasePredictor):
-    def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer, model: PretrainedModel = None):
+    def __init__(self, config: PredictorConfig, tokenizer: PretrainedTokenizer, model: PretrainedModel = None):
         BasePredictor.__init__(self, config, tokenizer, model)
         self.architectures = self.model_config.architectures[0].lower()
 
@@ -446,7 +444,7 @@ class InferencePredictorMixin(BasePredictor):
 class BlockInferencePredictorMixin(BasePredictor):
     def __init__(
         self,
-        config: PredictorArgument,
+        config: PredictorConfig,
         tokenizer: PretrainedTokenizer = None,
         model: PretrainedModel = None,
     ):
@@ -523,7 +521,7 @@ class BlockInferencePredictorMixin(BasePredictor):
             self.input_ids[i, :length] = np.array(inst)
         return seq_lens
 
-    def init_model_inputs(self, config: PredictorArgument):
+    def init_model_inputs(self, config: PredictorConfig):
         self.input_ids = paddle.full(
             shape=[config.batch_size, config.total_max_length], fill_value=self.tokenizer.pad_token_id, dtype="int64"
         )
