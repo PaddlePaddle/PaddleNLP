@@ -17,14 +17,11 @@ import time
 import paddle
 import paddle.incubate.multiprocessing as mp
 
-try:
-    from paddlenlp.experimental.transformers import (
-        EagleProposer,
-        InferenceWithReferenceProposer,
-        SpeculateArgument,
-    )
-except:
-    pass
+from paddlenlp.experimental.transformers import (
+    EagleProposer,
+    InferenceWithReferenceProposer,
+    SpeculateArgument,
+)
 from paddlenlp.transformers import PretrainedModel, PretrainedTokenizer
 from paddlenlp.trl import llm_utils
 from paddlenlp.utils.env import MAX_BSZ, MAX_DRAFT_TOKENS, SPECULATE_MAX_BSZ

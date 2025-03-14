@@ -20,14 +20,11 @@ import paddle
 import paddle.incubate.multiprocessing as mp
 from paddle.base.framework import in_cinn_mode, in_pir_executor_mode
 
-try:
-    from paddlenlp.experimental.transformers import (
-        EagleProposer,
-        InferenceWithReferenceProposer,
-        SpeculateArgument,
-    )
-except:
-    pass
+from paddlenlp.experimental.transformers import (
+    EagleProposer,
+    InferenceWithReferenceProposer,
+    SpeculateArgument,
+)
 from paddlenlp.taskflow.utils import static_mode_guard
 from paddlenlp.transformers import PretrainedModel, PretrainedTokenizer
 from paddlenlp.trl import llm_utils

@@ -19,10 +19,6 @@ from threading import Thread
 import numpy as np
 import paddle
 
-try:
-    pass
-except:
-    pass
 from paddlenlp.generation import GenerationConfig, TextIteratorStreamer
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.transformers import (

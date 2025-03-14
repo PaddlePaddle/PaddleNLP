@@ -19,10 +19,6 @@ import time
 import paddle
 from paddle.distributed import fleet
 
-try:
-    pass
-except:
-    pass
 from paddlenlp.trainer import PdArgumentParser
 from paddlenlp.transformers import (
     AutoConfig,
