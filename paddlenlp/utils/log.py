@@ -139,6 +139,10 @@ class MetricsDumper(object):
         self.process = multiprocessing.Process(target=self._write_json, args=(self.queue,))
         self.process.start()
 
+        # process pid and the start time
+        self.pid = os.getpid()
+        self.start_time = int(time.time())
+
         # Ensure subprocess exits when main process is interrupted
         signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
@@ -151,6 +155,9 @@ class MetricsDumper(object):
 
         :param data: The JSON object to append.
         """
+        data.update({
+            "metrics_dumper_pid": self.pid,
+            "metrics_dumper_start_time": self.start_time})
         self.queue.put(data)
 
     def _write_json(self, queue):
