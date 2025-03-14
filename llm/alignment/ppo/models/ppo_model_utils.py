@@ -426,7 +426,6 @@ class RLHFPPOMixedLoss(nn.Layer):
                 weight = weight.cast(paddle.float32)
                 if bias is not None:
                     bias = bias.cast(paddle.float32)
-            hidden_states = hidden_states / self.temperature if self.temperature > 0.0 else hidden_states
             total_loss, pg_loss, entropy_loss, kl_loss = actor_fused_pg_entropy_kl_loss(
                 hidden_states,
                 weight,
@@ -449,6 +448,7 @@ class RLHFPPOMixedLoss(nn.Layer):
                 loop_chunk_size=1024,
                 response_start=response_start,
                 use_actor_fused_loss=True,  # TODO, currently only support kunbo's fused head loss
+                temperature=self.temperature,
             )
             with paddle.no_grad():
                 self.info_buffer["kl_loss"] = (
@@ -637,6 +637,7 @@ class ActorFusedLoss(paddle.autograd.PyLayer):
         clip_range_ratio: float,
         clip_range_score: float,
         kl_loss_coeff: float,  # KL loss coefficient
+        temperature: float,
     ):
         """
         forward function of ActorFusedLoss
@@ -684,7 +685,8 @@ class ActorFusedLoss(paddle.autograd.PyLayer):
         hidden_states = hidden_states.reshape([-1, original_shape[-1]])
         labels = labels.reshape([-1])
         old_log_probs = old_log_probs.reshape([-1])
-        ref_log_probs = ref_log_probs.reshape([-1])
+        if kl_loss_coeff > 0:
+            ref_log_probs = ref_log_probs.reshape([-1])
         advantages = advantages.reshape([-1])
         loss_mask = mask.reshape([-1]).astype("float32")  # .astype(dtype)
 
@@ -746,6 +748,8 @@ class ActorFusedLoss(paddle.autograd.PyLayer):
             # logits_chunk_cast = paddle.nn.functional.linear(hidden_states_chunk, lm_head_weight_cast, lm_head_bias)
 
             logits_chunk = logits_chunk_cast.astype("float32")
+            logits_chunk = logits_chunk / temperature
+
             labels_one_hot = labels_chunk.unsqueeze(1) == indices
             # rewritten as cross entropy
             if tensor_parallel_degree > 1 and tensor_parallel_output:
@@ -801,7 +805,7 @@ class ActorFusedLoss(paddle.autograd.PyLayer):
             d_loss_d_log_probs_chunk = d_loss_d_log_probs_chunk * mask_chunk / divisor
 
             # ∂log_probs/∂logits, just take the previous one.
-            d_log_probs_d_logits_chunk = grad_logits_chunk
+            d_log_probs_d_logits_chunk = grad_logits_chunk / temperature
             # ∂loss/∂logits
             d_loss_d_logits_chunk = d_loss_d_log_probs_chunk.unsqueeze(-1) * d_log_probs_d_logits_chunk
 
@@ -988,6 +992,7 @@ class ActorFusedPGEntropyKLLoss(paddle.autograd.PyLayer):
         kl_loss_coeff: float,  # clip loss
         fused_linear: bool,
         loop_chunk_size: int,
+        temperature: float,
     ):
         if ref_log_probs is None:
             kl_loss_coeff = 0.0
@@ -1061,7 +1066,7 @@ class ActorFusedPGEntropyKLLoss(paddle.autograd.PyLayer):
             else:
                 logits_chunk = F.linear(hidden_chunk, maybe_transpose(lm_head_weight_cast), bias=lm_head_bias_cast)
             logits_chunk = logits_chunk.astype("float32")
-
+            logits_chunk = logits_chunk / temperature
             # 计算交叉熵和softmax
             if tensor_parallel_degree > 1 and tensor_parallel_output:
                 ce_loss_chunk, softmax_out_chunk = mp_ops._c_softmax_with_cross_entropy(
@@ -1074,6 +1079,7 @@ class ActorFusedPGEntropyKLLoss(paddle.autograd.PyLayer):
             log_probs_chunk = -ce_loss_chunk.squeeze(axis=-1)
             labels_one_hot = labels_chunk.unsqueeze(1) == indices
             grad_logits_chunk = labels_one_hot.astype("float32") - softmax_out_chunk
+            grad_logits_chunk = grad_logits_chunk / temperature
 
             # [1] pg loss
             ratio_chunk = paddle.exp(log_probs_chunk - old_log_prob_chunk)
@@ -1119,7 +1125,7 @@ class ActorFusedPGEntropyKLLoss(paddle.autograd.PyLayer):
                 H = entropy_loss_chunk.unsqueeze(-1)
                 d_entropy_logits_chunk = (
                     -softmax_out_chunk * (log_prob_chunk + H) * mask_chunk.unsqueeze(-1) * entropy_coeff / divisor
-                )
+                ) / temperature
 
             if kl_loss_coeff > 0:
                 # [3] kl loss
@@ -1238,6 +1244,7 @@ def actor_fused_pg_entropy_kl_loss(
     response_start: int = 0,
     loop_chunk_size: int = 1024,
     use_actor_fused_loss: bool = True,
+    temperature: float = 1.0,
 ):
     hidden_next = hidden_states[:, response_start:-1, :]
     labels_next = input_ids[:, response_start + 1 :]
@@ -1265,6 +1272,7 @@ def actor_fused_pg_entropy_kl_loss(
             clip_range_score=clip_range_score,
             kl_loss_coeff=kl_loss_coeff,
             ignore_index=-100,
+            temperature=temperature,
         )
 
     return ActorFusedPGEntropyKLLoss.apply(
@@ -1287,4 +1295,5 @@ def actor_fused_pg_entropy_kl_loss(
         kl_loss_coeff=kl_loss_coeff,  # clip loss
         fused_linear=fused_linear,
         loop_chunk_size=loop_chunk_size,
+        temperature=temperature,
     )
