@@ -76,14 +76,6 @@ class PreTrainingArguments(AutoTrainingArguments):
             "help": "Enable fused linear grad add strategy, which will reduce elementwise add for grad accumulation in the backward of nn.Linear ."
         },
     )
-    job_schedule_profiler_start: int = field(
-        default=-1,
-        metadata={"help": "The step to start job_schedule_profiler."},
-    )
-    job_schedule_profiler_end: int = field(
-        default=-1,
-        metadata={"help": "The step to end job_schedule_profiler."},
-    )
     pipeline_schedule_mode: str = field(
         default="1F1B", metadata={"help": "The pipeline schedule mode, support FThenB, 1F1B, VPP and Eager-1F1B."}
     )
@@ -158,7 +150,7 @@ class ModelArguments:
     """
 
     model_type: Optional[str] = field(
-        default="deepseekv3", metadata={"help": "Only support for llama pre-training for now."}
+        default="deepseekv3_auto", metadata={"help": "Only support for llama pre-training for now."}
     )
     model_name_or_path: str = field(
         default="deepseek-ai/DeepSeek-V3",
@@ -237,8 +229,24 @@ class ModelArguments:
         metadata={"help": "recompute_use_reentrant"},
     )
     first_k_dense_replace: int = field(
-        default=3,
+        default=None,
         metadata={"help": "first_k_dense_replace"},
+    )
+    moe_group: str = field(
+        default="None",
+        metadata={"help": "The mesh dimension for expert parallel, must in ['dp', 'mp', 'None']"},
+    )
+    n_routed_experts: int = field(
+        default=256,
+        metadata={
+            "help": "The number of routed experts in moe group. DeepSeekV3 default value is 256, and you can change it according to your own situation."
+        },
+    )
+    pp_extra_layer_num: int = field(
+        default=1,
+        metadata={
+            "help": "When use pipeline parallel intermediate api, if the matched layer contains a non attention layer, the number of additional matching layers needs to be passed in for ipp calculation. For example, the layer of lm_head is not attention layer, so need to add 1 for ipp calculation."
+        },
     )
 
 
@@ -536,11 +544,15 @@ def main():
     config.pp_recompute_interval = model_args.pp_recompute_interval
     config.recompute_use_reentrant = model_args.recompute_use_reentrant
     config.first_k_dense_replace = model_args.first_k_dense_replace
+    config.moe_group = model_args.moe_group
+    config.n_routed_experts = model_args.n_routed_experts
+    config.pp_extra_layer_num = model_args.pp_extra_layer_num
 
     config.use_recompute = training_args.recompute
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
     config.sharding_parallel_degree = training_args.sharding_parallel_degree
+    config.pipeline_parallel_degree = training_args.pipeline_parallel_degree
 
     if training_args.strategy.pipeline.enable and config.virtual_pp_degree > 1:
         pipeline = training_args.strategy.pipeline

@@ -1,4 +1,4 @@
-# 🚣‍♂️ 使用 PaddleNLP 在海光 DCU 上运行 llama2-13b 模型 🚣
+# 使用 PaddleNLP 在海光 DCU 上运行 llama2-13b 模型
 Paddle 框架与 PaddleNLP 套件在海光的 DCU 产品上进行了深度的适配和优化，实现了大模型在训练和推理上与 GPU 高度统一，在精度和性能上拥有先进水平。
 
 海光 DCU 产品在 PaddleNLP 组合套件上拥有多种技术优点：
