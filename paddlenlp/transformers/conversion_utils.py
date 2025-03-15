@@ -432,6 +432,8 @@ def normal_fuse_split_tp(weight, tensor_parallel_degree, tensor_parallel_rank=No
     else:
         splited_weights = np.split(weight, tensor_parallel_degree, axis=0)
 
+    
+
     if tensor_parallel_rank is not None:
         return splited_weights[tensor_parallel_rank]
 
@@ -664,6 +666,18 @@ def get_tensor_parallel_split_func(tensor_parallel_degree, tensor_parallel_rank,
 
         return normal_fuse_split_tp(x, tensor_parallel_degree, tensor_parallel_rank, is_column=is_column)
 
+    return fn
+
+def get_ep_func(tensor_parallel_degree, tensor_parallel_rank, expert_num=-1):
+    def fn(x, expert_id):
+        assert "PySafeSlice" in str(type(x))
+        size = x.get_shape()
+        if expert_id // (expert_num // tensor_parallel_degree) == tensor_parallel_rank:
+            return x[:]
+        else:
+            # return a small tensor.
+            size = [1,1]
+            return np.zeros(size).astype("float32")
     return fn
 
 
