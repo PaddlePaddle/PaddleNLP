@@ -1559,88 +1559,71 @@ class DeepseekV2DecoderLayer(nn.Layer):
             warnings.warn(
                 "Passing `padding_mask` is deprecated and will be removed in v4.37. Please make sure use `attention_mask` instead.`"
             )
-        # residual = hidden_states
+        residual = hidden_states
 
-        # hidden_states = self.input_layernorm(hidden_states)
+        hidden_states = self.input_layernorm(hidden_states)
 
-        # # Self Attention
-        # has_gradient = not hidden_states.stop_gradient
-        # if (
-        #     self.enable_recompute
-        #     and self.layerwise_recompute
-        #     and has_gradient
-        #     and self.recompute_granularity == "full_attn"
-        # ):
-        #     outputs = recompute(
-        #         self.self_attn,
-        #         hidden_states=hidden_states,
-        #         position_ids=position_ids,
-        #         attention_mask=attention_mask,
-        #         output_attentions=output_attentions,
-        #         past_key_value=past_key_value,
-        #         use_cache=use_cache,
-        #         attn_mask_startend_row_indices=attn_mask_startend_row_indices,
-        #         **kwargs,
-        #     )
-        # else:
-        #     outputs = self.self_attn(
-        #         hidden_states=hidden_states,
-        #         position_ids=position_ids,
-        #         attention_mask=attention_mask,
-        #         output_attentions=output_attentions,
-        #         past_key_value=past_key_value,
-        #         use_cache=use_cache,
-        #         attn_mask_startend_row_indices=attn_mask_startend_row_indices,
-        #         **kwargs,
-        #     )
+        # Self Attention
+        has_gradient = not hidden_states.stop_gradient
+        if (
+            self.enable_recompute
+            and self.layerwise_recompute
+            and has_gradient
+            and self.recompute_granularity == "full_attn"
+        ):
+            outputs = recompute(
+                self.self_attn,
+                hidden_states=hidden_states,
+                position_ids=position_ids,
+                attention_mask=attention_mask,
+                output_attentions=output_attentions,
+                past_key_value=past_key_value,
+                use_cache=use_cache,
+                attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+                **kwargs,
+            )
+        else:
+            outputs = self.self_attn(
+                hidden_states=hidden_states,
+                position_ids=position_ids,
+                attention_mask=attention_mask,
+                output_attentions=output_attentions,
+                past_key_value=past_key_value,
+                use_cache=use_cache,
+                attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+                **kwargs,
+            )
 
-        # if type(outputs) is tuple:
-        #     hidden_states = outputs[0]
-        # else:
-        #     hidden_states = outputs
+        if type(outputs) is tuple:
+            hidden_states = outputs[0]
+        else:
+            hidden_states = outputs
 
-        # if output_attentions:
-        #     self_attn_weights = outputs[1]
+        if output_attentions:
+            self_attn_weights = outputs[1]
 
-        # if use_cache:
-        #     present_key_value = outputs[2 if output_attentions else 1]
+        if use_cache:
+            present_key_value = outputs[2 if output_attentions else 1]
 
-        # hidden_states = residual + hidden_states
+        hidden_states = residual + hidden_states
 
-        # # Fully Connected
-        # residual = hidden_states
-        # hidden_states = self.post_attention_layernorm(hidden_states)
-        # hidden_states = self.mlp(hidden_states)
-        # hidden_states = residual + hidden_states
+        # Fully Connected
+        residual = hidden_states
+        hidden_states = self.post_attention_layernorm(hidden_states)
+        hidden_states = self.mlp(hidden_states)
+        hidden_states = residual + hidden_states
 
-        # outputs = (hidden_states,)
+        outputs = (hidden_states,)
 
-        # if output_attentions:
-        #     outputs += (self_attn_weights,)
+        if output_attentions:
+            outputs += (self_attn_weights,)
 
-        # if use_cache:
-        #     outputs += (present_key_value,)
+        if use_cache:
+            outputs += (present_key_value,)
 
-        # if type(outputs) is tuple and len(outputs) == 1:
-        #     outputs = outputs[0]
+        if type(outputs) is tuple and len(outputs) == 1:
+            outputs = outputs[0]
 
-        # return outputs
-
-        hidden_states, residual = self.self_attn_compute(hidden_states)
-        l_aux, l_zloss, intermediate_hidden_states, token_indices, token_probs = self.pre_dispatch_compute(
-            hidden_states
-        )
-        (
-            intermediate_hidden_states,
-            tokens_per_expert,
-            dispatched_indices,
-            dispatched_probs,
-        ) = self.mlp.token_dispatcher._comm_manager.dispatch(intermediate_hidden_states, token_indices, token_probs)
-        expert_output = self.expert_forward_compute(
-            intermediate_hidden_states, dispatched_indices, dispatched_probs, tokens_per_expert
-        )
-        combine_output = self.mlp.token_dispatcher._comm_manager.combine(expert_output)
-        outputs = self.post_combine_compute(residual, hidden_states, combine_output, l_aux)
         return outputs
 
     def self_attn_compute(self, hidden_states, **kwargs):
