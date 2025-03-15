@@ -352,7 +352,6 @@ class MoEFlexTokenLayer(nn.Layer):
 
     def expert_forward(self, dispatched_input, tokens_per_expert):
         outputs = []
-        tokens_per_expert = tokens_per_expert.tolist()
         # print(f"all tokens: {sum(tokens_per_expert)}, detail: {tokens_per_expert}")
         chunks = paddle.split(dispatched_input, num_or_sections=tokens_per_expert, axis=0)
         for chunk, expert in zip(chunks, self.experts):
@@ -369,13 +368,13 @@ class MoEFlexTokenLayer(nn.Layer):
         (
             dispatched_input,
             tokens_per_expert,
-            reversed_mapping_for_combine,
-            dispatched_routing_map,
+            token_permuted_indices,
+            prob_permuted_indices,
             dispatched_probs,
         ) = self.token_dispatcher.token_permutation(hidden_states, probs, routing_map)
         expert_output = self.expert_forward(dispatched_input, tokens_per_expert)
         output, _ = self.token_dispatcher.token_unpermutation(
-            expert_output, reversed_mapping_for_combine, dispatched_routing_map, dispatched_probs, None
+            expert_output, token_permuted_indices, prob_permuted_indices, dispatched_probs, None
         )
         return output, l_aux, l_zloss
 

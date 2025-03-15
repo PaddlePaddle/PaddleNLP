@@ -2355,10 +2355,11 @@ class DeepseekV2PretrainingCriterion(nn.Layer):
                     masked_lm_loss > 0, paddle.ones_like(masked_lm_loss), paddle.zeros_like(masked_lm_loss)
                 )
                 count = paddle.sum(binary_sequence)
-                if count == 0:
-                    loss = paddle.sum(masked_lm_loss * binary_sequence)
-                else:
-                    loss = paddle.sum(masked_lm_loss * binary_sequence) / count
+                loss = paddle.where(
+                    count == 0,
+                    paddle.sum(masked_lm_loss * binary_sequence),
+                    paddle.sum(masked_lm_loss * binary_sequence) / count,
+                )
                 return loss
 
         def add_loss(main_loss, loss):
@@ -2377,7 +2378,7 @@ class DeepseekV2PretrainingCriterion(nn.Layer):
                 masked_lm_labels_cur_depth = masked_lm_labels_ori[:, (depth + 1) : (depth + 1 + seq_length)]
                 res_cur_depth = compute_loss(prediction_scores_cur_depth, masked_lm_labels_cur_depth)
                 mtp_loss_res.append(res_cur_depth)
-            loss = add_loss(loss, self.config.num_nextn_predict_lambda * sum([x for x in mtp_loss_res]) / len(mtp_loss_res))  # fmt: skip
+            loss = add_loss(loss, self.config.num_nextn_predict_lambda * paddle.sum(paddle.concat(mtp_loss_res)) / len(mtp_loss_res))  # fmt: skip
 
         else:
             loss = compute_loss(prediction_scores, masked_lm_labels)
