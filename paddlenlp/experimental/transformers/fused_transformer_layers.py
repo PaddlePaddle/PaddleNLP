@@ -5344,8 +5344,8 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                 .transpose([1, 0, 2])
                 .reshape([-1, self.num_heads * self.config.mla_config.v_head_dim])
             )
-            fmha_out_decode_fp8, fmha_out_decode_scale = self.per_tensor_quant_fp8(fmha_out_decode)
-            out_linear_out_decode = self.cutlass_fp8_gemm_per_tensor(
+            fmha_out_decode_fp8, fmha_out_decode_scale = self.dynamic_quant(fmha_out_decode)
+            out_linear_out_decode = self.cutlass_fp8_gemm(
                 x=fmha_out_decode_fp8,
                 y=self.linear_weights[i],
                 x_s=fmha_out_decode_scale,
