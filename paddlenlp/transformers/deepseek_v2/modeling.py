@@ -1094,7 +1094,7 @@ class AddAuxiliaryLoss(paddle.autograd.PyLayer):
     def forward(ctx, x, loss):
         ctx.dtype = loss.dtype
         ctx.required_aux_loss = not loss.stop_gradient
-        return x
+        return x.clone()  # clone to avoid inplace problem when using overlap
 
     @staticmethod
     def backward(ctx, grad_output):

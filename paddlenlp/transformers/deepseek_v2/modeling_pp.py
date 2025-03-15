@@ -156,20 +156,21 @@ class DecoderLayerNode(ScheduleNode):
 
     def dispatch_forward(self, inputs):
         paddle.base.core.nvprof_nvtx_push("raw_dispatch_forward")
+        if isinstance(inputs, list):
+            inputs = tuple(inputs)
         (
             inputs_embeds_mtp,
-            ori_hidden_states,
-            residual,
-            probs,
-            l_aux,
             hidden_states,
+            residual,
+            l_aux,
+            intermediate_hidden_states,
             token_indices,
             token_probs,
         ) = inputs
 
         with paddle.no_grad():
-            hidden_states, dispatched_probs, states, _ = fused_dispatch_forward_func(
-                hidden_states,
+            intermediate_hidden_states, dispatched_probs, states, _ = fused_dispatch_forward_func(
+                intermediate_hidden_states,
                 token_indices,
                 token_probs,
                 self.moe_num_experts,
@@ -180,19 +181,18 @@ class DecoderLayerNode(ScheduleNode):
         dispatched_indices = states["dispatched_indices"]
         tokens_per_expert.stop_gradient = True
         dispatched_indices.stop_gradient = True
-        hidden_states.stop_gradient = False
+        intermediate_hidden_states.stop_gradient = False
         dispatched_probs.stop_gradient = False
         self.states = states
-        self.hidden_states_meta = TensorMeta(hidden_states)
+        self.hidden_states_meta = TensorMeta(intermediate_hidden_states)
         self.dispatched_probs_meta = TensorMeta(dispatched_probs)
 
-        inputs = (
+        return (
             inputs_embeds_mtp,
-            ori_hidden_states,
-            residual,
-            probs,
-            l_aux,
             hidden_states,
+            residual,
+            l_aux,
+            intermediate_hidden_states,
             tokens_per_expert,
             dispatched_indices,
             dispatched_probs,
@@ -202,27 +202,15 @@ class DecoderLayerNode(ScheduleNode):
 
     def combine_forward(self, inputs):
         paddle.base.core.nvprof_nvtx_push("raw_combine_forward")
-        (
-            inputs_embeds_mtp,
-            ori_hidden_states,
-            residual,
-            probs,
-            l_aux,
-            expert_output,
-        ) = inputs
+        if isinstance(inputs, list):
+            inputs = tuple(inputs)
+        (inputs_embeds_mtp, hidden_states, residual, l_aux, expert_output) = inputs
 
         with paddle.no_grad():
             combine_output = fused_combine_forward_func(expert_output, self.moe_group, self.states, async_finish=True)
         combine_output.stop_gradient = False
         self.combine_output_meta = TensorMeta(combine_output)
-        inputs = (
-            inputs_embeds_mtp,
-            ori_hidden_states,
-            residual,
-            probs,
-            l_aux,
-            combine_output,
-        )
+        inputs = (inputs_embeds_mtp, hidden_states, residual, l_aux, combine_output)
         paddle.base.core.nvprof_nvtx_pop()
         return inputs
 
@@ -230,32 +218,36 @@ class DecoderLayerNode(ScheduleNode):
         paddle.base.core.nvprof_nvtx_push("raw_dispatch_backward")
         (
             inputs_embeds_mtp_grad,
-            ori_hidden_states_grad,
-            residual_grad,
-            probs_grad,
-            l_aux_grad,
             hidden_states_grad,
+            residual_grad,
+            l_aux_grad,
+            intermediate_hidden_states_grad,
             tokens_per_expert_grad,
             dispatched_indices_grad,
             dispatched_probs_grad,
         ) = output_grad
 
-        if hidden_states_grad is None:
-            hidden_states_grad = paddle.zeros(self.hidden_states_meta.shape, self.hidden_states_meta.dtype)
+        if intermediate_hidden_states_grad is None:
+            intermediate_hidden_states_grad = paddle.zeros(
+                self.hidden_states_meta.shape, self.hidden_states_meta.dtype
+            )
         if dispatched_probs_grad is None:
             dispatched_probs_grad = paddle.zeros(self.dispatched_probs_meta.shape, self.dispatched_probs_meta.dtype)
         with paddle.no_grad():
-            hidden_states_grad, token_indices_grad, token_probs_grad = fused_dispatch_backward_func(
-                hidden_states_grad, dispatched_probs_grad, self.moe_group, self.states["handle"], async_finish=True
+            intermediate_hidden_states_grad, token_indices_grad, token_probs_grad = fused_dispatch_backward_func(
+                intermediate_hidden_states_grad,
+                dispatched_probs_grad,
+                self.moe_group,
+                self.states["handle"],
+                async_finish=True,
             )
 
         output_grad = (
             inputs_embeds_mtp_grad,
-            ori_hidden_states_grad,
-            residual_grad,
-            probs_grad,
-            l_aux_grad,
             hidden_states_grad,
+            residual_grad,
+            l_aux_grad,
+            intermediate_hidden_states_grad,
             token_indices_grad,
             token_probs_grad,
         )
@@ -266,9 +258,8 @@ class DecoderLayerNode(ScheduleNode):
         paddle.base.core.nvprof_nvtx_push("raw_combine_backward")
         (
             inputs_embeds_mtp_grad,
-            ori_hidden_states_grad,
+            hidden_states_grad,
             residual_grad,
-            probs_grad,
             l_aux_grad,
             combine_output_grad,
         ) = output_grad
@@ -282,9 +273,8 @@ class DecoderLayerNode(ScheduleNode):
 
         output_grad = (
             inputs_embeds_mtp_grad,
-            ori_hidden_states_grad,
+            hidden_states_grad,
             residual_grad,
-            probs_grad,
             l_aux_grad,
             expert_output_grad,
         )
@@ -714,9 +704,9 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
 
     def build_schedule_node(self):
         attn_node = ScheduleNode(self.attn_compute, name="attn_node")
-        dispatch_node = ScheduleNode(self.dispatch_comm, name="dispatch_node")
+        dispatch_node = None  # ScheduleNode(self.dispatch_comm, name="dispatch_node")
         mlp_node = ScheduleNode(self.mlp_compute, name="mlp_node")
-        combine_node = ScheduleNode(self.combine_comm, name="combine_node")
+        combine_node = None  # ScheduleNode(self.combine_comm, name="combine_node")
         post_process_node = ScheduleNode(self.post_process_compute, name="post_process_node")
         return DecoderLayerNode(
             attn_node=attn_node,
@@ -1007,7 +997,7 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     def get_loss_fn(self, config):
         return DeepseekV2PretrainingCriterionPipe(config)
 
-    def _overlapped_forward_backward(
+    def overlapped_forward_backward(
         self,
         forward_chunk,  # the module of the forward chunk
         forward_inputs,
@@ -1042,29 +1032,3 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
             forward_loss = None
 
         return forward_inputs, forward_loss, backward_input_grads
-
-    def overlapped_forward_backward(
-        self,
-        forward_chunk,  # the module of the forward chunk
-        forward_inputs,
-        forward_loss_fn_node,
-        backward_chunk,  # the module of the backward chunk, maybe not used
-        backward_loss_fn_node,
-        backward_input_grads,
-        scaler,
-    ):
-        forward_outputs = forward_chunk.forward(forward_inputs)
-        forward_outputs = [forward_outputs] if isinstance(forward_outputs, paddle.Tensor) else forward_outputs
-
-        if forward_loss_fn_node is not None:
-            forward_loss = forward_loss_fn_node.forward(forward_outputs)
-        else:
-            forward_loss = None
-
-        if backward_loss_fn_node is not None:
-            if scaler:
-                backward_input_grads = backward_loss_fn_node.backward(scaler=scaler)
-            else:
-                backward_input_grads = backward_loss_fn_node.backward()
-        backward_input_grads = backward_chunk.backward(backward_input_grads)
-        return forward_outputs, forward_loss, backward_input_grads
