@@ -397,6 +397,12 @@ class TrainingArguments:
             Whether to release gradients during training. Default is `False`.
         ckpt_quant_stage (`str`, *optional*):
             Whether activate checkpoint quantization. O0: deactivate, O1: Int8 compression, O2: Int4 compression. (default: O0).
+        use_lorapro (`bool`, *optional*):
+            Whether to use AdamWLoRAPro optimizer for finetuning. Default is `False`.
+        lorapro_x_mode (`str`, *optional*):
+            X mode for AdamWLoRAPro optimizer (zero, sylvester, symmetry). Default is `zero`.
+        lorapro_scaling_factor (`float`, *optional*):
+            Scaling factor for AdamWLoRAPro optimizer. Default is 2.0.
     """
 
     output_dir: str = field(
@@ -1007,6 +1013,19 @@ class TrainingArguments:
     pad_token_id: int = field(
         default=0,
         metadata={"help": "The id of the padding token."},
+    )
+
+    use_lorapro: bool = field(
+        default=False,
+        metadata={"help": "Whether to use AdamWLoRAPro optimizer for finetuning."},
+    )
+    lorapro_x_mode: str = field(
+        default="zero",
+        metadata={"help": "X mode for AdamWLoRAPro optimizer (zero, sylvester, symmetry)."},
+    )
+    lorapro_scaling_factor: float = field(
+        default=2.0,
+        metadata={"help": "Scaling factor for AdamWLoRAPro optimizer."},
     )
 
     def __post_init__(self):

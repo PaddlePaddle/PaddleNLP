@@ -65,6 +65,7 @@ class LoRALinear(nn.Linear):
         pissa: bool = False,
         lora_use_mixer: bool = False,
         use_mora: bool = False,
+        lorapro: bool = False,
         **kwargs
     ):
         nn.Linear.__init__(self, in_features, out_features, **kwargs)
@@ -82,6 +83,7 @@ class LoRALinear(nn.Linear):
         self.merged = False
         self.pissa = pissa
         self.lora_use_mixer = lora_use_mixer
+        self.lorapro = lorapro
 
         # Actual trainable parameters
         if use_mora:  # reset the rank and create high rank matrix

@@ -274,6 +274,8 @@ def main():
         else:
             raise NotImplementedError("Only support neftune for model with get_input_embeddings")
 
+    training_args.use_lorapro = model_args.lorapro
+
     # Load tokenizer & dataset
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, from_aistudio=model_args.from_aistudio)
     reft_layers = None
@@ -556,7 +558,15 @@ def create_peft_model(model_args, reft_args, training_args, dtype, model_config,
                 use_quick_lora=model_args.use_quick_lora,
                 lora_use_mixer=model_args.lora_use_mixer,
                 use_mora=model_args.use_mora,
+                lorapro=model_args.lorapro,
             )
+            if model_args.lorapro:
+                import math
+
+                if model_args.rslora:
+                    training_args.lorapro_scaling_factor = lora_config.lora_alpha / math.sqrt(lora_config.r)
+                else:
+                    training_args.lorapro_scaling_factor = lora_config.lora_alpha / lora_config.r
             model = LoRAModel(model, lora_config)
         else:
             model = LoRAModel.from_pretrained(model=model, lora_path=model_args.lora_path)

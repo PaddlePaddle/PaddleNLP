@@ -1990,7 +1990,15 @@ class Trainer:
             "beta2": args.adam_beta2,
             "epsilon": args.adam_epsilon,
         }
-        if args.optim == OptimizerNames.ADAMW:
+        if args.use_lorapro:
+            from ..utils import AdamWLoRAPro
+
+            optimizer_cls = AdamWLoRAPro
+            optimizer_kwargs.update(adam_kwargs)
+
+            lorapro_kwargs = {"x_mode": args.lorapro_x_mode, "scaling_factor": args.lorapro_scaling_factor}
+            optimizer_kwargs.update(lorapro_kwargs)
+        elif args.optim == OptimizerNames.ADAMW:
             from paddle.optimizer import AdamW
 
             optimizer_cls = AdamW
@@ -2012,6 +2020,7 @@ class Trainer:
             optimizer_kwargs.update(adam_kwargs)
         else:
             raise ValueError(f"Trainer cannot instantiate unsupported optimizer: {args.optim}")
+
         return optimizer_cls, optimizer_kwargs
 
     def create_scheduler(self, num_training_steps: int):

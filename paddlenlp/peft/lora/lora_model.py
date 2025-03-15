@@ -500,6 +500,7 @@ class LoRAModel(nn.Layer):
                 use_quick_lora=lora_config.use_quick_lora,
                 lora_use_mixer=lora_config.lora_use_mixer,
                 use_mora=lora_config.use_mora,
+                lorapro=lora_config.lorapro,
             )
         if isinstance(module, nn.Conv2D):
             lora_module = LoRAConv2D(
