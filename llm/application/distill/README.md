@@ -83,21 +83,22 @@ python distill_data.py \
     --concurrency 32
 ```
 
+
 调用参数详细解释如下：
 ```text
---input_file：指定输入的 JSONL 文件路径。例如，在之前的示例中，我们使用了 meta-math_gsm8k_zh.jsonl 文件作为输入。
---output_dir：设置输出目录，用于保存蒸馏处理后的 JSONL 文件。此目录支持断点蒸馏功能，即如果程序意外中断，可以重新运行脚本以恢复蒸馏过程。
---prompt_key：指定输入 JSONL 文件中用作 prompt 的字段名（key）。在 GSM8K 数据集中，例如，我们使用 question_zh 字段的内容作为问题文本。
---response_key：指定输出 JSONL 文件中用作 response 的字段名（key）。例如，我们使用 deepseek_r1_response_zh 作为输出回复文本字段。
---reasoning_key：指定输出 JSONL 文件中用作 reasoning 的字段名（key）。例如，我们使用 deepseek_r1_reasoning_zh 作为输出推理文本字段。
---prompt_suffix：在 prompt 文本后添加的附加内容。对于 DeepSeek R1 处理数学问题，我们建议在 prompt 后添加 \n请一步一步地推理，并将你的最终答案放在\boxed{}中。，以符合 DeepSeek R1 的最佳实践。
---base_urls：指定服务地址，多个地址可用英文逗号分隔，以实现负载均衡。如果是本地部署的推理服务，应设置为 http://127.0.0.1:8XXX/v1
---api_keys：提供服务密钥，多个密钥可用英文逗号分隔，并与 base_urls 中的地址一一对应。如果是本地部署的服务，则无需设置此参数。
---model：指定蒸馏的目标模型名称，例如 deepseek-r1:671b。
---temperature：设置生成温度，用于调整生成内容的随机性程度。
---top_p：设置生成概率阈值，用于控制生成内容的多样性。
---max_tokens：指定生成内容的最大 token 数限制。
---concurrency：设置并发数，即同时向 API 发起的请求数量，以控制请求处理的并行度。
+--input_file：此参数用于指定输入的 JSONL 文件路径。例如，在之前的案例中，我们使用了 meta-math_gsm8k_zh.jsonl 文件作为输入源。
+--output_dir：该参数用于设置输出目录，该目录将用于保存经过蒸馏处理后的 JSONL 文件。此目录还具备断点蒸馏功能，即若程序运行中断，您可以重新运行脚本以继续蒸馏过程，无需从头开始。
+--prompt_key：此参数用于指定输入 JSONL 文件中用作 prompt 的字段名称。在 GSM8K 数据集中，我们使用了 question_zh 字段的内容作为问题文本。
+--response_key：该参数用于指定输出 JSONL 文件中用作 response 的字段名称。例如，我们选择了 deepseek_r1_response_zh 作为输出回复文本的字段。
+--reasoning_key：此参数用于指定输出 JSONL 文件中用作 reasoning 的字段名称。在示例中，我们使用了 deepseek_r1_reasoning_zh 作为输出推理文本的字段。
+--prompt_suffix：该参数允许您在 prompt 文本后添加附加内容。对于 DeepSeek R1 处理数学问题，我们建议在 prompt 后添加 "\n请一步一步地推理，并将你的最终答案放在\boxed{}中。"，以符合 DeepSeek R1 的最佳实践要求。
+--base_urls：此参数用于指定服务地址，您可以输入多个地址，地址间用英文逗号分隔，以实现负载均衡。如果服务是本地部署的，请设置为 http://127.0.0.1:8XXX/v1。
+--api_keys：该参数用于提供服务密钥，您可以输入多个密钥，密钥间用英文逗号分隔，并与 base_urls 中的地址一一对应。如果服务是本地部署的，则无需设置此参数。
+--model：此参数用于指定蒸馏的目标模型名称，例如 deepseek-r1:671b。
+--temperature：该参数用于设置生成温度，通过调整该参数，您可以控制生成内容的随机性程度。
+--top_p：此参数用于设置生成概率阈值，通过调整该参数，您可以控制生成内容的多样性。
+--max_tokens：该参数用于指定生成内容的最大 token 数限制，以确保输出内容在合理范围内。
+--concurrency：此参数用于设置并发数，即同时向 API 发起的请求数量，您可以根据需要调整此参数，以控制请求处理的并行度。
 ```
 运行过程中可以看到如下的进度条，表示蒸馏进度。蒸馏过程中会在 output_dir 目录下生成三个文件，分别是蒸馏后的数据集、请求 API 时的日志和当前蒸馏状态。
 ```text
