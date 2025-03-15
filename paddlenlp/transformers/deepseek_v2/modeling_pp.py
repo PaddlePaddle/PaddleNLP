@@ -187,7 +187,7 @@ class DecoderLayerNode(ScheduleNode):
         self.hidden_states_meta = TensorMeta(intermediate_hidden_states)
         self.dispatched_probs_meta = TensorMeta(dispatched_probs)
 
-        return (
+        inputs = (
             inputs_embeds_mtp,
             hidden_states,
             residual,
