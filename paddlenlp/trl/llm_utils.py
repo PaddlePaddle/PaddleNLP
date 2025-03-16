@@ -16,13 +16,13 @@ from __future__ import annotations
 import glob
 import math
 import os
+import shutil
 import struct
 from typing import List, Optional
 
 import numpy as np
 import paddle
 import paddle.distributed as dist
-import paddle.distributed.fleet.base.topology as tp
 import paddle.incubate.multiprocessing as mp
 from paddle.distributed import fleet
 from sklearn.metrics import accuracy_score
@@ -650,7 +650,7 @@ def read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Q
 def speculate_read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Queue, done_event: mp.Event):
     from paddlenlp.utils.env import USE_FAST_TOKENIZER
 
-    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, use_fast=USE_FAST_TOKENIZER)
+    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, padding_side="left", use_fast=USE_FAST_TOKENIZER)
     paddle.device.set_device("cpu")
     paddle.disable_static()
     outputs = []
@@ -744,24 +744,46 @@ def get_rotary_position_embedding(position_ids, head_dim, rope_theta=10000.0, ro
 
 
 def init_dist_env():
-    tensor_parallel_degree = paddle.distributed.get_world_size()
-    tensor_parallel_rank = paddle.distributed.get_rank()
+    """
+    Initialize the distributed environment and obtain tensor parallel degree and rank.
 
-    if tensor_parallel_degree > 1:
-        # refer to: https://github.com/PaddlePaddle/Paddle/blob/4abea956ee852ce52791a1e08fa92ed4d3be150d/python/paddle/distributed/fleet/fleet.py#L298C23-L298C45
-        hcg = tp._HYBRID_PARALLEL_GROUP
-        if hcg is None:
+    Returns:
+        tuple: A tuple containing tensor parallel rank and degree.
+    """
+    world_size = paddle.distributed.get_world_size()  # Get the total number of distributed nodes
+
+    if world_size > 1:
+        is_fleet_init = True
+        try:
+            # Try to get the hybrid communicate group to check if Fleet has been initialized
+            hcg = fleet.get_hybrid_communicate_group()
+        except AttributeError:
+            is_fleet_init = False  # Fleet has not been initialized
+
+        if is_fleet_init:
+            # If Fleet is already initialized, get tensor parallel degree and rank
+            tensor_parallel_degree = hcg.get_model_parallel_world_size()
+            tensor_parallel_rank = hcg.get_model_parallel_rank()
+        else:
+            # If Fleet is not initialized, set up the distributed strategy and initialize Fleet
             strategy = fleet.DistributedStrategy()
             strategy.hybrid_configs = {
-                "dp_degree": 1,
-                "mp_degree": tensor_parallel_degree,
-                "pp_degree": 1,
-                "sharding_degree": 1,
+                "dp_degree": 1,  # Data parallelism degree
+                "mp_degree": world_size,  # Model parallelism degree (to be determined or set)
+                "pp_degree": 1,  # Pipeline parallelism degree
+                "sharding_degree": 1,  # Sharding parallelism degree
             }
-            fleet.init(is_collective=True, strategy=strategy)
-            hcg = fleet.get_hybrid_communicate_group()
+            fleet.init(is_collective=True, strategy=strategy)  # Initialize Fleet
+            hcg = fleet.get_hybrid_communicate_group()  # Get the hybrid communicate group after initialization
 
-        tensor_parallel_rank = hcg.get_model_parallel_rank()
+            # Get tensor parallel degree and rank after Fleet initialization
+            tensor_parallel_degree = hcg.get_model_parallel_world_size()
+            tensor_parallel_rank = hcg.get_model_parallel_rank()
+    else:
+        # If not in a distributed environment, set tensor parallel degree and rank to 1 and 0 respectively
+        tensor_parallel_degree = 1
+        tensor_parallel_rank = 0
+
     return tensor_parallel_rank, tensor_parallel_degree
 
 
@@ -785,3 +807,29 @@ def get_eos_token_id(
 
     eos_token_ids_dict = {str(item): item for item in eos_token_ids}
     return list(eos_token_ids_dict.values())
+
+
+def set_triton_cache(model_name_or_path, mode):
+    """
+    Set triton cache.
+    """
+    valid_modes = {"export", "static", "dynamic"}
+    if mode not in valid_modes:
+        raise ValueError(f"Invalid mode: {mode}. Valid modes are: {valid_modes}")
+    mp_id = paddle.distributed.get_rank()
+    triton_dir = f"triton_ops_rank_{mp_id}"
+    triton_kernel_cache_dir = f"{model_name_or_path}/{triton_dir}"
+    if mode == "export":
+        os.environ["TRITON_KERNEL_CACHE_DIR"] = triton_kernel_cache_dir
+        if os.path.exists(triton_kernel_cache_dir):
+            # del old triton_ops
+            shutil.rmtree(triton_kernel_cache_dir)
+    elif mode == "static":
+        os.environ["TRITON_KERNEL_CACHE_DIR"] = triton_kernel_cache_dir
+        for root, dirs, files in os.walk(triton_kernel_cache_dir):
+            for file in files:
+                if file.endswith("_package.so"):
+                    so_full_path = os.path.join(root, file)
+                    paddle.utils.cpp_extension.load_op_meta_info_and_register_op(so_full_path)
+    else:
+        os.environ["TRITON_KERNEL_CACHE_DIR"] = f"/root/.paddlenlp/{triton_dir}"

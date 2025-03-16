@@ -1568,10 +1568,10 @@ void CascadeAppendAttentionC16Kernel(
           {DISPATCH_GQA_GROUP_SIZE(
               group_size,
               GROUP_SIZE,
-              {DISPATCH_HEAD_DIM(
+              {DISPATCH_GQA_HEAD_DIM(
                   head_dim_qk,
                   HEAD_DIM_QK,
-                  {DISPATCH_HEAD_DIM(
+                  {DISPATCH_GQA_HEAD_DIM(
                       head_dim_v,
                       HEAD_DIM_V,
                       {DISPATCH_BLOCK_SIZE(

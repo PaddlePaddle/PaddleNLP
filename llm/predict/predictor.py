@@ -20,17 +20,19 @@ import time
 from abc import abstractmethod
 from dataclasses import dataclass, field
 from threading import Thread
+from typing import List
 
 import numpy as np
 import paddle
 import paddle.incubate.multiprocessing as mp
-from paddle.base.framework import in_cinn_mode, in_pir_executor_mode, use_pir_api
+from paddle.base.framework import in_cinn_mode, in_pir_executor_mode
 from paddle.distributed import fleet
 
 try:
     from paddlenlp.experimental.transformers import (
         EagleProposer,
         InferenceWithReferenceProposer,
+        SpeculateArgument,
     )
 except:
     pass
@@ -48,10 +50,17 @@ from paddlenlp.transformers import (
     Llama3Tokenizer,
     LlamaTokenizer,
     PretrainedConfig,
+    PretrainedModel,
     PretrainedTokenizer,
 )
 from paddlenlp.trl import llm_utils
-from paddlenlp.utils.env import MAX_BSZ, MAX_DRAFT_TOKENS
+from paddlenlp.utils.env import (
+    MAX_BSZ,
+    MAX_DRAFT_TOKENS,
+    PADDLE_INFERENCE_MODEL_SUFFIX,
+    PADDLE_INFERENCE_WEIGHTS_SUFFIX,
+    SPECULATE_MAX_BSZ,
+)
 from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
 
@@ -65,7 +74,7 @@ class PredictorArgument:
     max_length: int = field(default=1024, metadata={"help": "the max length for decoding."})
     top_k: int = field(default=0, metadata={"help": "top_k parameter for generation"})
     top_p: float = field(default=0.7, metadata={"help": "top_p parameter for generation"})
-    temperature: float = field(default=0.95, metadata={"help": "top_p parameter for generation"})
+    temperature: float = field(default=0.95, metadata={"help": "temperature parameter for generation"})
     repetition_penalty: float = field(default=1.0, metadata={"help": "repetition penalty parameter for generation"})
     device: str = field(default="gpu", metadata={"help": "Device"})
     dtype: str = field(default=None, metadata={"help": "Model dtype"})
@@ -163,16 +172,28 @@ class PredictorArgument:
         default="",
         metadata={"help": "Draft model quantization type. Reserved for future"},
     )
-    return_full_hidden_states: int = field(default=False, metadata={"help": "whether return full hidden_states"})
+    return_full_hidden_states: bool = field(default=False, metadata={"help": "whether return full hidden_states"})
+
+    mla_use_matrix_absorption: bool = field(default=False, metadata={"help": "implement mla with matrix-absorption."})
+    weightonly_group_size: int = field(default=-1, metadata={"help": "the max length of candidate tokens."})
+    weight_block_size: List[int] = field(
+        default_factory=lambda: [128, 128],
+        metadata={"help": "Quantitative granularity of weights. Supported values: [128 128]"},
+    )
+    moe_quant_type: str = field(
+        default="",
+        metadata={"help": "Quantization type of moe. Supported values: weight_only_int4, weight_only_int8"},
+    )
 
     def __post_init__(self):
         if self.speculate_method is not None:
             self.append_attn = True
         if self.append_attn:
             self.block_attn = True
-        assert (
-            self.src_length + self.max_length <= self.total_max_length
-        ), "src_length + max_length should smaller than total_max_length."
+        if self.block_attn:
+            self.inference_model = True
+        assert self.max_length < self.total_max_length, "max_length should smaller than total_max_length."
+        self.src_length = self.total_max_length - self.max_length
 
 
 @dataclass
@@ -195,8 +216,14 @@ def batchfy_text(texts, batch_size):
 
 
 class BasePredictor:
-    def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None):
-        self.model_config = AutoConfig.from_pretrained(config.model_name_or_path)
+    def __init__(
+        self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None, model: PretrainedModel = None
+    ):
+        if model is not None and hasattr(model, "config"):
+            self.model_config = model.config
+        else:
+            self.model_config = AutoConfig.from_pretrained(config.model_name_or_path)
+
         self.config: PredictorArgument = config
         if tokenizer is None:
             tokenizer = AutoTokenizer.from_pretrained(config.model_name_or_path, padding_side="left")
@@ -269,9 +296,11 @@ class BasePredictor:
 
 
 class DygraphPredictor(BasePredictor):
-    def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None, **kwargs):
-        super().__init__(config, tokenizer)
-        self.model = kwargs.get("model", None)
+    def __init__(
+        self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None, model: PretrainedModel = None, **kwargs
+    ):
+        super().__init__(config, tokenizer, model)
+        self.model = model
         if config.lora_path is not None:
             lora_config = LoRAConfig.from_pretrained(config.lora_path)
             dtype = lora_config.dtype
@@ -348,8 +377,10 @@ class DygraphPredictor(BasePredictor):
 
 
 class StaticGraphPredictor(BasePredictor):
-    def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None, **kwargs):
-        super().__init__(config, tokenizer)
+    def __init__(
+        self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None, model: PretrainedModel = None, **kwargs
+    ):
+        super().__init__(config, tokenizer, model)
 
         inference_config = paddle.inference.Config(self.config.model_name_or_path, self.config.model_prefix)
 
@@ -400,9 +431,8 @@ class StaticGraphPredictor(BasePredictor):
 
 
 class InferencePredictorMixin(BasePredictor):
-    def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer):
-        BasePredictor.__init__(self, config, tokenizer)
-
+    def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer, model: PretrainedModel = None):
+        BasePredictor.__init__(self, config, tokenizer, model)
         self.architectures = self.model_config.architectures[0].lower()
 
         self.dtype = config.dtype or self.model_config.dtype
@@ -418,7 +448,7 @@ class InferencePredictorMixin(BasePredictor):
             self.tgt_pos = None
         else:
             self.cache_kvs = [paddle.zeros(shape, dtype=self.dtype) for shape in self.cache_kvs_shape]
-            self.num_layers, self.num_attention_heads, self.head_dim = (
+            self.num_layers, self.num_key_value_heads, self.head_dim = (
                 len(self.cache_kvs),
                 self.cache_kvs[0].shape[-3],
                 self.cache_kvs[0].shape[-1],
@@ -454,7 +484,7 @@ class InferencePredictorMixin(BasePredictor):
                             self.num_layers,
                             2,
                             config.batch_size,
-                            self.num_attention_heads,
+                            self.num_key_value_heads,
                             prefix_cache.shape[-2],
                             self.head_dim,
                         ],
@@ -464,7 +494,7 @@ class InferencePredictorMixin(BasePredictor):
                     ]
                 else:
                     prefix_cache = paddle.zeros(
-                        [self.num_layers, 2, config.batch_size, self.num_attention_heads, 128, self.head_dim],
+                        [self.num_layers, 2, config.batch_size, self.num_key_value_heads, 128, self.head_dim],
                         dtype=self.dtype,
                     )
                     self.pre_caches = [
@@ -651,12 +681,13 @@ class StaticGraphInferencePredictor(InferencePredictorMixin):
         self,
         config: PredictorArgument,
         tokenizer: PretrainedTokenizer = None,
+        model: PretrainedModel = None,
         **kwargs,
     ):
         self.cache_kvs_shape = kwargs.get("cache_kvs_shape", None)
         if self.cache_kvs_shape is None:
             raise ValueError("cache_kvs_shape should be provided for StaticGraphInferencePredictor")
-        InferencePredictorMixin.__init__(self, config, tokenizer)
+        InferencePredictorMixin.__init__(self, config, tokenizer, model)
 
         self.predictor = self._create_predictor(config)
 
@@ -670,10 +701,11 @@ class StaticGraphInferencePredictor(InferencePredictorMixin):
         infer_model_path = llm_utils.get_infer_model_path(
             predictor_args.model_name_or_path, predictor_args.model_prefix
         )
-        if use_pir_api():
-            config = paddle.inference.Config(infer_model_path + ".json", infer_model_path + ".pdiparams")
-        else:
-            config = paddle.inference.Config(infer_model_path + ".pdmodel", infer_model_path + ".pdiparams")
+
+        config = paddle.inference.Config(
+            infer_model_path + PADDLE_INFERENCE_MODEL_SUFFIX,
+            infer_model_path + PADDLE_INFERENCE_WEIGHTS_SUFFIX,
+        )
 
         config.switch_ir_optim(True)
         # remove `gpu_cpu_map_matmul_v2_to_matmul_pass` to avoid mapping matmul_v2 -> matmul op
@@ -727,13 +759,13 @@ class DygraphInferencePredictor(InferencePredictorMixin):
         self,
         config: PredictorArgument,
         tokenizer: PretrainedTokenizer = None,
+        model: PretrainedModel = None,
         **kwargs,
     ):
-        model = kwargs.get("model", None)
         if model is None:
             raise ValueError("model should be provided for DygraphInferencePredictor")
         self.cache_kvs_shape = model.get_cache_kvs_shape(model.config, config.batch_size, config.total_max_length)
-        InferencePredictorMixin.__init__(self, config, tokenizer)
+        InferencePredictorMixin.__init__(self, config, tokenizer, model)
         self.model = model
 
     @paddle.no_grad()
@@ -755,13 +787,18 @@ class DygraphInferencePredictor(InferencePredictorMixin):
 
 
 class BlockInferencePredictorMixin(BasePredictor):
-    def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer):
-        BasePredictor.__init__(self, config, tokenizer)
+    def __init__(
+        self,
+        config: PredictorArgument,
+        tokenizer: PretrainedTokenizer = None,
+        model: PretrainedModel = None,
+    ):
+        BasePredictor.__init__(self, config, tokenizer, model)
 
-        self.num_layers = len(self.cache_kvs_shape) // 2
-        self.num_attention_heads = self.cache_kvs_shape[0][-3]
-        self.head_dim = self.cache_kvs_shape[0][-1]
-        self.max_block_nums = self.cache_kvs_shape[0][0]
+        self.num_layers = len(self.cache_k_shapes)
+        self.num_key_value_heads = self.cache_k_shapes[0][-3]
+        self.head_dim = self.cache_k_shapes[0][-1]
+        self.max_block_nums = self.cache_k_shapes[0][0]
         self.batch_size = config.batch_size
         self.model_name_or_path = config.model_name_or_path
 
@@ -780,7 +817,7 @@ class BlockInferencePredictorMixin(BasePredictor):
             config.max_length -= self.pre_cache_length
             self.pre_caches = [
                 paddle.zeros(
-                    [config.batch_size, self.num_attention_heads, self.pre_cache_length, self.head_dim],
+                    [config.batch_size, self.num_key_value_heads, self.pre_cache_length, self.head_dim],
                     dtype=self.dtype,
                 )
                 for _ in range(2 * self.num_layers)
@@ -804,19 +841,19 @@ class BlockInferencePredictorMixin(BasePredictor):
 
         if config.cachekv_int8_type == "dynamic":
             self.k_quant_scales = [
-                paddle.zeros([config.batch_size, self.num_attention_heads], dtype="float32")
+                paddle.zeros([config.batch_size, self.num_key_value_heads], dtype="float32")
                 for _ in range(self.num_layers)
             ]
             self.v_quant_scales = [
-                paddle.zeros([config.batch_size, self.num_attention_heads], dtype="float32")
+                paddle.zeros([config.batch_size, self.num_key_value_heads], dtype="float32")
                 for _ in range(self.num_layers)
             ]
             self.k_dequant_scales = [
-                paddle.zeros([config.batch_size, self.num_attention_heads], dtype="float32")
+                paddle.zeros([config.batch_size, self.num_key_value_heads], dtype="float32")
                 for _ in range(self.num_layers)
             ]
             self.v_dequant_scales = [
-                paddle.zeros([config.batch_size, self.num_attention_heads], dtype="float32")
+                paddle.zeros([config.batch_size, self.num_key_value_heads], dtype="float32")
                 for _ in range(self.num_layers)
             ]
 
@@ -884,7 +921,7 @@ class BlockInferencePredictorMixin(BasePredictor):
                 shape=[config.batch_size, 1, 1, config.total_max_length], fill_value=1, dtype=self.dtype
             )
             arange_tensor_encoder = paddle.arange(config.total_max_length).astype(self.dtype)
-            alibi_slopes = llm_utils.get_alibi_slopes(self.num_attention_heads)
+            alibi_slopes = llm_utils.get_alibi_slopes(self.num_key_value_heads)
             alibi = alibi_slopes[None, :, None, None] * arange_tensor_encoder
             alibi_encoder = alibi.tile([config.batch_size, 1, config.total_max_length, 1])
             alibi_decoder = alibi.tile(
@@ -912,7 +949,7 @@ class BlockInferencePredictorMixin(BasePredictor):
                 shape=[config.batch_size, 1, 1, config.total_max_length], fill_value=1, dtype=self.dtype
             )
             arange_tensor_encoder = paddle.arange(config.total_max_length).astype(self.dtype)
-            alibi_slopes = llm_utils.get_alibi_slopes(self.num_attention_heads)
+            alibi_slopes = llm_utils.get_alibi_slopes(self.num_key_value_heads)
             alibi = alibi_slopes[None, :, None, None] * arange_tensor_encoder
             alibi_encoder = alibi.tile([config.batch_size, 1, config.total_max_length, 1])
             alibi_decoder = alibi.tile(
@@ -976,7 +1013,7 @@ class BlockInferencePredictorMixin(BasePredictor):
             shape=[self.config.batch_size, 1], fill_value=0, dtype="int32"
         )
         self.model_inputs["step_idx"] = paddle.full(shape=[self.config.batch_size, 1], fill_value=0, dtype="int64")
-        self.model_inputs["not_need_stop"] = paddle.full(shape=[1], fill_value=True, dtype="bool")
+        self.model_inputs["not_need_stop"] = paddle.full(shape=[1], fill_value=True, dtype="bool").cpu()  # cpu
         self.model_inputs["stop_flags"] = paddle.full(
             shape=[self.config.batch_size, 1], fill_value=False, dtype="bool"
         )
@@ -1008,6 +1045,8 @@ class BlockInferencePredictorMixin(BasePredictor):
                 self.model_inputs["pre_ids"][bid, 0] = self.model_inputs["input_ids"][bid][
                     self.seq_lens[bid] - 1
                 ]  # get the last token before padding of this batch
+                if self.config.speculate_method == "inference_with_reference":
+                    self.proposer.input_ids_len[bid, 0] = self.seq_lens[bid]
 
         if self.config.mode == "static":
             for k, v in self.model_inputs.items():
@@ -1015,17 +1054,27 @@ class BlockInferencePredictorMixin(BasePredictor):
 
 
 class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
-    def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None, **kwargs):
-        model = kwargs.get("model", None)
+    def __init__(
+        self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None, model: PretrainedModel = None, **kwargs
+    ):
         self.return_full_hidden_states = config.return_full_hidden_states
         self.full_hidden_states = None
         if model is None:
             raise ValueError("model should be provided for DygraphBlockInferencePredictor")
-        self.cache_kvs_shape = model.get_cache_kvs_shape(model.config, config.batch_size)
-        BlockInferencePredictorMixin.__init__(self, config, tokenizer)
+        self.cache_k_shapes, self.cache_v_shapes = model.get_cache_kvs_shape(model.config, config.batch_size)
+        BlockInferencePredictorMixin.__init__(self, config, tokenizer, model)
 
         cachekv_dtype = self.dtype if config.cachekv_int8_type is None else "uint8"
-        self.cache_kvs = [paddle.zeros(shape, dtype=cachekv_dtype) for shape in self.cache_kvs_shape]
+
+        self.cache_kvs = []
+        if self.cache_k_shapes and self.cache_v_shapes:
+            for cache_k_shape, cache_v_shape in zip(self.cache_k_shapes, self.cache_v_shapes):
+                self.cache_kvs.append(paddle.zeros(cache_k_shape, dtype=cachekv_dtype))
+                self.cache_kvs.append(paddle.zeros(cache_v_shape, dtype=cachekv_dtype))
+        else:
+            # for mla's absorption
+            assert self.cache_v_shapes is None
+            self.cache_kvs = [paddle.zeros(shape, dtype=cachekv_dtype) for shape in self.cache_k_shapes]
 
         self.model = model
 
@@ -1049,7 +1098,8 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                 config.max_length,
             )
         elif config.speculate_method in ["eagle", "mtp"]:
-            self.proposer = EagleProposer(args=config)
+            speculate_model_args = SpeculateArgument.build_from_predictor(config)
+            self.proposer = EagleProposer(args=speculate_model_args)
         else:
             self.proposer = None
 
@@ -1076,7 +1126,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
             output_tensor_shape = [MAX_BSZ + 2, 1]
         else:
             read_res_func = llm_utils.speculate_read_res
-            output_tensor_shape = [MAX_BSZ * MAX_DRAFT_TOKENS + MAX_BSZ + 2, 1]
+            output_tensor_shape = [SPECULATE_MAX_BSZ * MAX_DRAFT_TOKENS + SPECULATE_MAX_BSZ + 2, 1]
 
         read_res_process = mp.Process(
             target=read_res_func, args=[self.model_name_or_path, tensor_queue, result_queue, done_event]
@@ -1103,10 +1153,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                 self.full_hidden_states = self._infer(self.model_inputs)
             else:
                 self._infer(self.model_inputs)
-        logger.info(f"running spend {time.time()  -  s_time}")
-
-        if self.proposer is not None:
-            self.proposer.postprocess(base_model_inputs=self.model_inputs)
+        logger.info(f"running spend {time.time() - s_time}")
 
         if self.tensor_parallel_rank == 0:
             outputs = []
@@ -1129,14 +1176,18 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
         self,
         config: PredictorArgument,
         tokenizer: PretrainedTokenizer = None,
+        model: PretrainedModel = None,
         **kwargs,
     ):
-        self.cache_kvs_shape = kwargs.get("cache_kvs_shape", None)
+        self.cache_k_shapes = kwargs.get("cache_k_shapes", None)
+        self.cache_v_shapes = kwargs.get("cache_v_shapes", None)
         self.model_args = kwargs.get("model_args", None)
         self.return_full_hidden_states = config.return_full_hidden_states
         self.full_hidden_states = None
-        if self.cache_kvs_shape is None:
-            raise ValueError("cache_kvs_shape should be provided for StaticGraphBlockInferencePredictor")
+        if self.cache_k_shapes is None:
+            raise ValueError(
+                "cache_k_shapes and cache_v_shapes should be provided for StaticGraphBlockInferencePredictor"
+            )
         BlockInferencePredictorMixin.__init__(self, config, tokenizer)
 
         self._create_predictor(config)
@@ -1148,13 +1199,16 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
                 self.model_inputs["pre_caches_{}".format(i)] = self.pre_caches[i]
 
         cachekv_dtype = config.dtype if config.cachekv_int8_type is None else "uint8"
-        for i in range(len(self.cache_kvs_shape) // 2):
-            self.model_inputs["key_caches_{}".format(i)] = paddle.zeros(
-                self.cache_kvs_shape[2 * i], dtype=cachekv_dtype
-            )
-            self.model_inputs["value_caches_{}".format(i)] = paddle.zeros(
-                self.cache_kvs_shape[2 * i + 1], dtype=cachekv_dtype
-            )
+
+        for i in range(self.num_layers):
+            if self.cache_k_shapes is not None:
+                self.model_inputs["key_caches_{}".format(i)] = paddle.zeros(
+                    self.cache_k_shapes[i], dtype=cachekv_dtype
+                )
+            if self.cache_v_shapes is not None:
+                self.model_inputs["value_caches_{}".format(i)] = paddle.zeros(
+                    self.cache_v_shapes[i], dtype=cachekv_dtype
+                )
 
         for i in range(self.num_layers):
             if self.config.cachekv_int8_type == "dynamic":
@@ -1172,10 +1226,8 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
                 config.max_length,
             )
         elif config.speculate_method in ["eagle", "mtp"]:
-            self.proposer = EagleProposer(
-                args=config,
-                model_args=self.model_args,
-            )
+            speculate_model_args = SpeculateArgument.build_from_predictor(config)
+            self.proposer = EagleProposer(args=speculate_model_args)
         else:
             self.proposer = None
 
@@ -1190,10 +1242,10 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
             predictor_args.model_name_or_path, predictor_args.model_prefix
         )
 
-        if use_pir_api():
-            config = paddle.inference.Config(infer_model_path + ".json", infer_model_path + ".pdiparams")
-        else:
-            config = paddle.inference.Config(infer_model_path + ".pdmodel", infer_model_path + ".pdiparams")
+        config = paddle.inference.Config(
+            infer_model_path + PADDLE_INFERENCE_MODEL_SUFFIX,
+            infer_model_path + PADDLE_INFERENCE_WEIGHTS_SUFFIX,
+        )
 
         config.switch_ir_optim(False)
         if predictor_args.device in paddle.device.get_all_custom_device_type():
@@ -1230,7 +1282,7 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
             self.proposer.insert_query(
                 base_model_inputs=self.model_inputs, real_bs=len(input_texts), seq_lens=self.seq_lens
             )
-        logger.info(f"preprocess spend {time.time()  -  s_time}")
+        logger.info(f"preprocess spend {time.time() - s_time}")
 
         result_queue = mp.Queue()
         tensor_queue = mp.Queue()
@@ -1242,7 +1294,7 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
             output_tensor_shape = [MAX_BSZ + 2, 1]
         else:
             read_res_func = llm_utils.speculate_read_res
-            output_tensor_shape = [MAX_BSZ * MAX_DRAFT_TOKENS + MAX_BSZ + 2, 1]
+            output_tensor_shape = [SPECULATE_MAX_BSZ * MAX_DRAFT_TOKENS + SPECULATE_MAX_BSZ + 2, 1]
 
         read_res_process = mp.Process(
             target=read_res_func, args=[self.model_name_or_path, tensor_queue, result_queue, done_event]
@@ -1269,10 +1321,8 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
                 self.full_hidden_states = self.predictor.run(list(self.model_inputs.values()))[0]
             else:
                 self.predictor.run(list(self.model_inputs.values()))
-        logger.info(f"running spend {time.time()  -  s_time}")
+        logger.info(f"running spend {time.time() - s_time}")
 
-        if self.proposer is not None:
-            self.proposer.postprocess(base_model_inputs=self.model_inputs)
         if self.tensor_parallel_rank == 0:
             outputs = []
             output_tokens = []
@@ -1303,7 +1353,8 @@ class AutoPredictor:
         config: PretrainedConfig,
         model_args: ModelArgument,
         tokenizer: PretrainedTokenizer = None,
-        **kwargs
+        model: PretrainedModel = None,
+        **kwargs,
     ):
         """
         Create a predictor
@@ -1317,8 +1368,9 @@ class AutoPredictor:
         Returns:
             Predictor: The predictor.
         """
-        model = kwargs.pop("model", None)
-        cache_kvs_shape = None
+        cache_kvs_shape = None  # used for not block_attn/append_attn
+        cache_k_shapes = None  # used for block_attn/append_attn
+        cache_v_shapes = None  # used for block_attn/append_attn
 
         # static or dynamic
         execute_mode = "Dygraph" if predictor_args.mode == "dynamic" else "StaticGraph"
@@ -1328,14 +1380,17 @@ class AutoPredictor:
             # block/no block
             if predictor_args.block_attn:
                 attn_type = "Block"
+                if predictor_args.mode == "static":
+                    cache_k_shapes, cache_v_shapes = model.get_cache_kvs_shape(
+                        config, predictor_args.batch_size, predictor_args.total_max_length
+                    )
             else:
                 attn_type = ""
+                if predictor_args.mode == "static":
+                    cache_kvs_shape = model.get_cache_kvs_shape(
+                        config, predictor_args.batch_size, predictor_args.total_max_length
+                    )
             inference_mode = f"{attn_type}Inference"
-
-            if predictor_args.mode == "static":
-                cache_kvs_shape = model.get_cache_kvs_shape(
-                    config, predictor_args.batch_size, predictor_args.total_max_length
-                )
         else:
             inference_mode = ""
 
@@ -1348,7 +1403,13 @@ class AutoPredictor:
 
         # instance
         predictor = predictor_class(
-            predictor_args, tokenizer=tokenizer, model=model, cache_kvs_shape=cache_kvs_shape, model_args=model_args
+            predictor_args,
+            tokenizer=tokenizer,
+            model=model,
+            cache_k_shapes=cache_k_shapes,
+            cache_v_shapes=cache_v_shapes,
+            cache_kvs_shape=cache_kvs_shape,
+            model_args=model_args,
         )
         return predictor
 
@@ -1384,11 +1445,12 @@ def create_predictor(
         )
     else:
         if predictor_args.src_length + predictor_args.max_length > max_position_embeddings:
-            raise ValueError(
+            logger.warning(
                 f"The sum of src_length<{predictor_args.src_length}> and "
                 f"max_length<{predictor_args.max_length}> should be smaller than or equal to "
                 f"the maximum position embedding size<{max_position_embeddings}>"
             )
+            predictor_args.src_length = max_position_embeddings - predictor_args.max_length
 
     # update config parameter for inference predictor
     if predictor_args.decode_strategy == "greedy_search":
@@ -1455,6 +1517,8 @@ def create_predictor(
 def predict():
     parser = PdArgumentParser((PredictorArgument, ModelArgument))
     predictor_args, model_args = parser.parse_args_into_dataclasses()
+
+    llm_utils.set_triton_cache(predictor_args.model_name_or_path, predictor_args.mode)
 
     tensor_parallel_degree = paddle.distributed.get_world_size()
     if tensor_parallel_degree > 1:

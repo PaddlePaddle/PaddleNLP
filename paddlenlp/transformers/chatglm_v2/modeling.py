@@ -105,13 +105,14 @@ def parallel_matmul(x: Tensor, y: Tensor, tensor_parallel_output):
 
 
 class RotaryEmbedding(nn.Layer):
-    def __init__(self, dim, original_impl=False):
+    def __init__(self, dim, rope_ratio=1, original_impl=False):
         super().__init__()
         self.default_dtype = paddle.get_default_dtype()
         inv_freq = 1.0 / (10000 ** (paddle.arange(0, dim, 2, dtype=self.default_dtype) / dim))
         self.register_buffer("inv_freq", inv_freq)
         self.dim = dim
         self.original_impl = original_impl
+        self.rope_ratio = rope_ratio
 
     def forward_impl(self, seq_len: int, n_elem: int, base: int = 10000):
         """Enhanced Transformer with Rotary Position Embedding.
@@ -120,6 +121,7 @@ class RotaryEmbedding(nn.Layer):
         https://github.com/labmlai/annotated_deep_learning_paper_implementations/blob/master/license.
         """
         # $\Theta = {\theta_i = 10000^{\frac{2(i-1)}{d}}, i \in [1, 2, ..., \frac{d}{2}]}$
+        base = base * self.rope_ratio
         theta = 1.0 / (base ** (paddle.arange(0, n_elem, 2, dtype="float32") / n_elem))
 
         # Create position indexes `[0, 1, ..., seq_len - 1]`
@@ -1027,7 +1029,7 @@ class ChatGLMv2Model(ChatGLMv2PretrainedModel):
                 **config.long_sequence_init_args,
             )
         else:
-            self.rotary_pos_emb = RotaryEmbedding(rotary_dim // 2)
+            self.rotary_pos_emb = RotaryEmbedding(rotary_dim // 2, rope_ratio=config.rope_ratio)
         self.encoder = GLMTransformer(config)
         self.output_layer = Chatglmv2LMHead(config)
         self.apply(self.init_weights)

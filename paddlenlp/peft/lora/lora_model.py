@@ -46,7 +46,7 @@ from ...utils.distributed import distributed_allgather, distributed_gather
 from ...utils.env import LORA_WEIGHTS_NAME, SAFE_PEFT_WEIGHTS_INDEX_NAME
 from ...utils.log import logger
 from ...utils.tools import get_env_device
-from .lora_config import LoRAConfig
+from .lora_config import LoRAAutoConfig, LoRAConfig
 
 
 def get_lora_layers():
@@ -359,7 +359,9 @@ class LoRAModel(nn.Layer):
                     base_name = name.replace("lora_A", "weight")
                     if not self.reinit_base_model:
                         # Reinit base model
-                        offset = init_loraA.cuda() @ init_loraB.cuda()
+                        offset = init_loraA._copy_to(
+                            paddle.framework._current_expected_place(), False
+                        ) @ init_loraB._copy_to(paddle.framework._current_expected_place(), False)
                         ori_weight = model_state_dict[base_name]
                         model_state_dict[base_name].set_value(ori_weight - self.lora_config.scaling * offset)
         del model_state_dict
@@ -443,7 +445,10 @@ class LoRAModel(nn.Layer):
         ), f"Saving directory ({save_directory}) should be a directory, not a file"
         os.makedirs(save_directory, exist_ok=True)
 
-        lora_config_to_save = LoRAConfig(**self.lora_config.to_dict())
+        if isinstance(self.lora_config, LoRAConfig):
+            lora_config_to_save = LoRAConfig(**self.lora_config.to_dict())
+        else:
+            lora_config_to_save = LoRAAutoConfig(**self.lora_config.to_dict())
 
         trainable_state_dict = self.get_trainable_state_dict(concat_init_lora=lora_config_to_save.loraga)
 

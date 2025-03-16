@@ -47,7 +47,7 @@
 - PaddlePaddle >= 2.6.0
 - PaddleNLP 最新版本
 
-如需使用生成加速功能，需要安装 [paddlenlp_ops](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/csrc) ，请使用 `git clone https://github.com/PaddlePaddle/PaddleNLP.git` 克隆 PaddleNLP 代码库并且将 PaddleNLP/llm 目录的路径加入 PYTHONPATH（后续将进行完善）。安装 paddlenlp_ops 后训练时将直接开启生成加速（开启流水线并行时不支持生成加速），否则使用原生动态图进行生成。
+如需使用生成加速功能，需要安装 [paddlenlp_ops](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/csrc) ，请使用 `git clone https://github.com/PaddlePaddle/PaddleNLP.git` 克隆 PaddleNLP 代码库并且将 PaddleNLP/llm 与PaddleNLP/llm/alignment/ppo 目录的路径加入 PYTHONPATH（后续将进行完善）。安装 paddlenlp_ops 后训练时将直接开启生成加速（开启流水线并行时不支持生成加速），否则使用原生动态图进行生成。
 
 ### 数据准备
 

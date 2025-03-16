@@ -1,5 +1,5 @@
 # Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2023 DeepSeek-AI and The HuggingFace Inc. team. All rights reserved.
+# Copyright (c) 2023 DeepSeek. All rights reserved.
 #
 # This code is based on EleutherAI's GPT-NeoX library and the GPT-NeoX
 # and OPT implementations in this library. It has been modified from its
@@ -24,6 +24,7 @@ from __future__ import annotations
 from typing import List, Optional, Tuple, Union
 
 import paddle
+import paddle.distributed as dist
 
 try:
     from paddle.incubate.nn.functional import fused_rotary_position_embedding
@@ -34,8 +35,6 @@ try:
     from paddle.nn.functional.flash_attention import flash_attention
 except:
     flash_attention = None
-
-import paddle.distributed as dist
 
 from ...utils.log import logger
 from ..deepseek_v2.modeling_auto import (
@@ -170,20 +169,26 @@ class DeepseekV3ForCausalLMAuto(DeepseekV3PretrainedModelAuto):
         )
 
         hidden_states = outputs[0]
+        mtp_outputs = outputs[-1]
 
         # if labels is None，means we need full output, instead of tensor_parallel_output
         # tensor_parallel_output is together with ParallelCrossEntropy
         tensor_parallel_output = self.config.tensor_parallel_output and self.config.tensor_parallel_degree > 1
 
         logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
+        mtp_logits = [self.lm_head(_hidden_states) for _hidden_states in mtp_outputs] if len(mtp_outputs) > 0 else []
 
-        return logits
+        return self.criterion(logits, labels, mtp_logits=mtp_logits)
 
     def auto_dist_config(self, prefix=""):
         if prefix != "":
             assert prefix.endswith(".")
         config = {
-            "dp_config": {"sharding_level": 1, "offload": False, "exclude_layer": None},
+            "dp_config": {"sharding_level": 0, "offload": False, "exclude_layer": None},
+            "pp_config": {
+                "split_spec": [f"{prefix}deepseek_v3.layers", f"{prefix}lm_head"],
+                "global_spec": "deepseek_v3.global_layer",
+            },
             "mp_config": {
                 "parallelize_plan": {
                     f"{prefix}deepseek_v3.embed_tokens": dist.ColWiseParallel(gather_output=True),

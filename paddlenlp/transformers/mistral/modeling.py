@@ -39,6 +39,14 @@ from ..model_outputs import (
 from ..model_utils import PretrainedModel
 from .configuration import MistralConfig
 
+__all__ = [
+    "MistralModel",
+    "MistralLMHead",
+    "MistralPreTrainedModel",
+    "MistralForCausalLM",
+    "MistralPretrainingCriterion",
+]
+
 
 def _make_causal_mask(
     input_ids_shape: paddle.shape,
