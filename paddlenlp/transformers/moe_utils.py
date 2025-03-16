@@ -15,6 +15,31 @@
 # limitations under the License.
 
 import paddle
+import TokenDispatherUtils as TDU
+
+
+class IndicesToMultihot(paddle.autograd.PyLayer):
+    @staticmethod
+    def forward(ctx, indices, probs, router_topk, num_local_experts):
+        ctx.save_for_backward(indices)
+        ctx.router_topk = router_topk
+        ctx.num_local_experts = num_local_experts
+        multihot_routing_map, multihot_probs = TDU.fused_topk_to_multihot(
+            indices.cast(paddle.int32), probs, seqlen=indices.shape[0], topk=router_topk, num_experts=num_local_experts
+        )
+        return multihot_routing_map.cast(paddle.bool), multihot_probs
+
+    @staticmethod
+    def backward(ctx, grad_multihot_rouitng_map, grad_multihot_probs):
+        (indices,) = ctx.saved_tensor()
+        grad_probs = TDU.fused_multihot_prob_backto_topk(
+            indices,
+            grad_multihot_probs,
+            seqlen=indices.shape[0],
+            topk=ctx.router_topk,
+            num_experts=ctx.num_local_experts,
+        )
+        return None, grad_probs
 
 
 def permute(
@@ -94,3 +119,58 @@ def unpermute(
         include_self=True,
     )
     return output_tokens
+
+
+class PermuteNode:
+    def __init__(self, token_dispatcher, name="permute"):
+        self.token_dispatcher = token_dispatcher
+        self.name = name
+
+    def forward(self, hidden_states, hidden_states_scale, indices, probs):
+        self.hidden_states = hidden_states
+        self.indices = indices
+        self.router_topk = self.token_dispatcher._comm_manager.router_topk
+        self.num_local_experts = self.token_dispatcher._comm_manager.num_local_experts
+        self.token_dispatcher._comm_manager.hidden_shape_before_permute = self.hidden_states.shape
+
+        # multi_hot_init
+        multihot_routing_map, multihot_probs = TDU.fused_topk_to_multihot(
+            self.indices.cast(paddle.int32),
+            probs,
+            seqlen=self.indices.shape[0],
+            topk=self.router_topk,
+            num_experts=self.num_local_experts,
+        )
+        self.multihot_routing_map = multihot_routing_map.cast(paddle.bool)
+
+        # permute act
+        routing_map = self.multihot_routing_map.cast(paddle.bool).T.contiguous()
+        token_indices = (
+            paddle.arange(self.hidden_states.shape[0]).unsqueeze(0).expand([self.multihot_routing_map.shape[1], -1])
+        )
+        self.sorted_indices = token_indices.masked_select(routing_map)
+        output = self.hidden_states.index_select(axis=0, index=self.sorted_indices)
+        # permute scale
+        output_scale = hidden_states_scale.index_select(axis=0, index=self.sorted_indices)
+
+        return (
+            output,
+            output_scale,
+            self.sorted_indices,
+            self.multihot_routing_map,
+            multihot_probs,
+        )
+
+    def backward(self, output_grad, multihot_probs_grad):
+        # permute_grad
+        hidden_states_grad = paddle._C_ops.index_select_grad(self.hidden_states, self.sorted_indices, output_grad, 0)
+
+        # multi_hot_grad
+        probs_grad = TDU.fused_multihot_prob_backto_topk(
+            self.indices.cast(paddle.int32),
+            multihot_probs_grad,
+            seqlen=self.indices.shape[0],
+            topk=self.router_topk,
+            num_experts=self.num_local_experts,
+        )
+        return hidden_states_grad, probs_grad

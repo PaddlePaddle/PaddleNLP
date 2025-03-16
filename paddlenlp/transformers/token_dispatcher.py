@@ -20,7 +20,7 @@ import paddle
 from paddle.distributed.communication.group import Group
 
 from .fused_a2a import fused_combine, fused_dispatch
-from .moe_utils import permute, unpermute
+from .moe_utils import IndicesToMultihot, permute, unpermute
 
 
 class _DeepepManager:
@@ -87,16 +87,9 @@ class _DeepepManager:
                 - routing_map: Multihot vector.
                 - probs: Multihot probabilities.
         """
-        batch_size = indices.shape[0]
-        multihot_routing_map = paddle.zeros((batch_size, self.num_local_experts), dtype=paddle.int64)
-
-        multihot_probs = paddle.zeros((batch_size, self.num_local_experts), dtype=paddle.float32)
-
-        mask = indices != -1
-        valid_indices = indices[mask]
-        row_indices = paddle.arange(batch_size).repeat_interleave(mask.sum(axis=1))
-        multihot_routing_map[row_indices, valid_indices] = 1
-        multihot_probs[row_indices, valid_indices] = probs[mask]
+        multihot_routing_map, multihot_probs = IndicesToMultihot.apply(
+            indices.cast(paddle.int32), probs, router_topk=self.router_topk, num_local_experts=self.num_local_experts
+        )
         return multihot_routing_map.cast(paddle.bool), multihot_probs
 
     def combine(self, hidden_states: paddle.Tensor) -> paddle.Tensor:
@@ -231,3 +224,35 @@ class MoEFlexTokenDispatcher:
 
         hidden_states = self.post_combine(hidden_states)
         return hidden_states, None
+
+
+class PreDispatchNode:
+    def __init__(self, token_dispatcher):
+        self.token_dispatcher = token_dispatcher
+        self.probs_origin_shape = None
+
+    def forward(self, routing_map, probs):
+        num_tokens = routing_map.shape[0]
+        self.probs_origin_shape = probs.shape
+        # routing_map = routing_map.reshape([num_tokens, token_dispatcher._comm_manager.num_experts])
+        self.probs = probs
+        reshaped_probs = probs.reshape([num_tokens, self.token_dispatcher._comm_manager.num_experts])
+        self.reshaped_probs = reshaped_probs
+        token_probs, token_indices = paddle.topk(
+            reshaped_probs, self.token_dispatcher._comm_manager.router_topk, axis=-1
+        )
+        self.token_indices = token_indices
+        return token_indices, token_probs
+
+    def backward(self, token_probs_g):
+        probs_grad = paddle._C_ops.topk_grad(
+            self.reshaped_probs,
+            self.token_indices,
+            token_probs_g,
+            self.token_dispatcher._comm_manager.router_topk,
+            -1,
+            True,
+            True,
+        )
+        probs_reshape_g = paddle._C_ops.reshape_grad(probs_grad, self.probs)
+        return probs_reshape_g
