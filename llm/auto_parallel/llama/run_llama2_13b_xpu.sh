@@ -73,8 +73,9 @@ python -u  -m paddle.distributed.launch \
     --tensor_parallel_degree 1 \
     --pipeline_parallel_degree 4 \
     --sharding "stage1" \
+    --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate" \
     --sharding_parallel_config "enable_overlap" \
-    --tensor_parallel_config "enable_mp_async_allreduce enable_mp_skip_c_identity enable_mp_fused_linear_param_grad_add" \
+    --tensor_parallel_config "enable_mp_async_allreduce" \
     --pipeline_parallel_config "enable_send_recv_overlap" \
     --sequence_parallel 0 \
     --use_flash_attention 1 \
@@ -88,7 +89,7 @@ python -u  -m paddle.distributed.launch \
     --learning_rate 3e-05 \
     --min_learning_rate 3e-06 \
     --warmup_steps 30 \
-    --logging_steps 2 \
+    --logging_steps 1 \
     --max_steps 1000 \
     --save_steps 100000 \
     --eval_steps 10000 \

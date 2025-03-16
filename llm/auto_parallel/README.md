@@ -33,6 +33,7 @@
 注：当前提供的DeepSeek-v3模型配置脚本为一个规模较小的示例demo（调小了网络层数），以支持在单机8卡的环境下运行，如果你想运行完整671B规模的DeepSeek-v3，需要将层数配置为61层，并对应地调整并行策略。当前自动并行提供的deepseek-v3版本中，暂未集成FP8、DeepEP等优化策略。
 
 ## 环境准备
+
 1.安装 PaddlePaddle 最新版本
 
 首先，您需要安装最新的`Paddle`， 推荐使用`Nightly`版本。访问 [Paddle 官网](https://www.paddlepaddle.org.cn/install/quick?docurl=undefined) 获取安装指导。
@@ -49,15 +50,22 @@ print(paddle.utils.run_check())
 
 
 ## 预训练
+
 ### 数据准备
+
 项目提供了预先处理好的数据方便用户测试模型，下载到 `data` 目录下：
+
 ```shell
 mkdir -p data && cd data
 wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.{bin,idx}
 ```
+
 ### 启动预训练
 
+#### GPU 启动预训练
+
 - 动态图模式
+
 ```python
 # Llama pretrain example
 # assume that cur dir is auto_parallel
@@ -67,16 +75,34 @@ python -u  -m paddle.distributed.launch \
     --log_dir "llama_auto_3d"           \
     ./llama/run_pretrain_auto.py ./llama/pretrain_argument.json
 ```
+
 该配置下运行`facebook/llama-7b`预训练任务，并行策略为MP2-PP2-DP2，分片策略为Stage1。
 更多可配置参数，请参考`ModelArguments`, `DataArguments`, `PreTrainingArguments`。
 
 - 动转静模式
 <br>追加 `to_static`参数
 
+#### XPU 启动预训练
+
+除了 GPU，XPU 也支持自动并行，目前支持 llama 模型 7b 和 13b，更多模型支持正在开发中。
+
+用户可以使用 `PaddleNLP/llm/auto_parallel/llama` 目录下的 `run_llama2_7b_xpu.sh` 和 `run_llama2_13b_xpu.sh` 脚本启动 XPU 上的预训练任务。
+
+```shell
+# cd ${PaddleNLP_Path}/llm/auto_parallel/llama
+bash run_llama2_7b_xpu.sh
+# or
+bash run_llama2_13b_xpu.sh
+```
+
+Llama 7b 并行策略为 DP8，分片策略为 Stage1。Llama 13b 并行策略为 DP2-PP4，分片策略为 Stage1。
+
 
 ## 监督微调(SFT)
 ### 数据准备
+
 项目提供预处理好的精调数据方便用户测试模型，下载并解压到`data`目录下：
+
 ```shell
 wget -O AdvertiseGen.tar.gz https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz
 tar -xvf AdvertiseGen.tar.gz
