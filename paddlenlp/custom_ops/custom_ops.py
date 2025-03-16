@@ -16,9 +16,10 @@ from typing import List, Optional
 
 import paddle
 
-import paddlenlp.custom_ops._C as _C
+from .utils import custom_dispatch
 
 
+@custom_dispatch
 def append_attention(
     qkv: paddle.Tensor,
     key_cache: paddle.Tensor,
@@ -65,60 +66,15 @@ def append_attention(
     causal: bool,
     speculate_decoder: bool,
 ) -> List[paddle.Tensor]:
-
-    return _C.append_attention(
-        qkv,
-        key_cache,
-        value_cache,
-        seq_lens_encoder,
-        seq_lens_decoder,
-        seq_lens_this_time,
-        padding_offsets,
-        cum_offsets,
-        block_tables,
-        encoder_batch_ids,
-        encoder_tile_ids_per_batch,
-        encoder_num_blocks,
-        kv_batch_ids,
-        kv_tile_ids_per_batch,
-        kv_num_blocks,
-        decoder_batch_ids,
-        decoder_tile_ids_per_batch,
-        decoder_num_blocks,
-        max_enc_len_this_time,
-        max_dec_len_this_time,
-        max_len_kv,
-        rotary_embs,
-        attn_mask,
-        qkv_bias,
-        qkv_out_scales,
-        cache_k_quant_scales,
-        cache_v_quant_scales,
-        cache_k_dequant_scales,
-        cache_v_dequant_scales,
-        cache_k_zp,
-        cache_v_zp,
-        out_linear_shifts,
-        out_linear_smooths,
-        compute_type,
-        cache_quant_type,
-        use_neox_rotary_style,
-        max_input_length,
-        softmax_scale,
-        quant_max_bound,
-        quant_min_bound,
-        out_linear_in_scale,
-        speculate_max_draft_token_num,
-        causal,
-        speculate_decoder,
-    )
+    pass
 
 
+@custom_dispatch
 def avx_weight_only(x: paddle.Tensor, weight: paddle.Tensor, alog: str, trans: bool) -> paddle.Tensor:
+    pass
 
-    return _C.avx_weight_only(x, weight, alog, trans)
 
-
+@custom_dispatch
 def decode_mla_write_cache(
     kv_nope: paddle.Tensor,
     kv_pe: paddle.Tensor,
@@ -132,37 +88,25 @@ def decode_mla_write_cache(
     max_seq_len: int,
     speculate_decoder: bool,
 ) -> paddle.Tensor:
-    return _C.decode_mla_write_cache(
-        kv_nope,
-        kv_pe,
-        kv_cache,
-        seq_lens,
-        seq_lens_encoder,
-        padding_offsets,
-        cum_offsets,
-        block_tables,
-        cache_quant_type_str,
-        max_seq_len,
-        speculate_decoder,
-    )
+    pass
 
 
+@custom_dispatch
 def dequant_int8(intput: paddle.Tensor, out_scale: paddle.Tensor, dtype: str) -> paddle.Tensor:
+    pass
 
-    return _C.dequant_int8(intput, out_scale, dtype)
 
-
+@custom_dispatch
 def draft_model_postprocess(
     base_model_draft_tokens: paddle.Tensor,
     base_model_seq_lens_this_time: paddle.Tensor,
     base_model_seq_lens_encoder: paddle.Tensor,
     base_model_stop_flags: paddle.Tensor,
 ) -> List[paddle.Tensor]:
-    return _C.draft_model_postprocess(
-        base_model_draft_tokens, base_model_seq_lens_this_time, base_model_seq_lens_encoder, base_model_stop_flags
-    )
+    pass
 
 
+@custom_dispatch
 def draft_model_preprocess(
     draft_tokens: paddle.Tensor,
     input_ids: paddle.Tensor,
@@ -183,28 +127,10 @@ def draft_model_preprocess(
     max_draft_token: int,
     truncate_first_token: bool,
 ) -> List[paddle.Tensor]:
-    return _C.draft_model_preprocess(
-        draft_tokens,
-        input_ids,
-        stop_flags,
-        seq_lens_this_time,
-        seq_lens_encoder,
-        seq_lens_decoder,
-        step_idx,
-        first_token_record,
-        not_need_stop,
-        accept_tokens,
-        accept_num,
-        base_model_seq_lens_encoder,
-        base_model_seq_lens_decoder,
-        base_model_step_idx,
-        base_model_stop_flags,
-        base_model_draft_tokens,
-        max_draft_token,
-        truncate_first_token,
-    )
+    pass
 
 
+@custom_dispatch
 def draft_model_set_value_by_flags(
     draft_tokens: paddle.Tensor,
     pre_ids_all: paddle.Tensor,
@@ -214,11 +140,10 @@ def draft_model_set_value_by_flags(
     seq_lens_decoder: paddle.Tensor,
     step_idx: paddle.Tensor,
 ) -> paddle.Tensor:
-    return _C.draft_model_set_value_by_flags(
-        draft_tokens, pre_ids_all, stop_flags, seq_lens_this_time, seq_lens_encoder, seq_lens_decoder, step_idx
-    )
+    pass
 
 
+@custom_dispatch
 def draft_model_update(
     inter_next_tokens: paddle.Tensor,
     draft_tokens: paddle.Tensor,
@@ -236,25 +161,10 @@ def draft_model_update(
     max_seq_len: int,
     substep: int,
 ) -> List[paddle.Tensor]:
-    return _C.draft_model_update(
-        inter_next_tokens,
-        draft_tokens,
-        pre_ids,
-        seq_lens_this_time,
-        seq_lens_encoder,
-        seq_lens_decoder,
-        step_idx,
-        output_cum_offsets,
-        stop_flags,
-        not_need_stop,
-        max_dec_len,
-        end_ids,
-        base_model_draft_tokens,
-        max_seq_len,
-        substep,
-    )
+    pass
 
 
+@custom_dispatch
 def eagle_get_base_model_hidden_states(
     input: paddle.Tensor,
     seq_lens_this_time: paddle.Tensor,
@@ -266,28 +176,20 @@ def eagle_get_base_model_hidden_states(
     base_model_seq_lens_encoder: paddle.Tensor,
     actual_draft_token_num: int,
 ) -> paddle.Tensor:
-    return _C.eagle_get_base_model_hidden_states(
-        input,
-        seq_lens_this_time,
-        seq_lens_encoder,
-        seq_lens_decoder,
-        stop_flags,
-        accept_nums,
-        base_model_seq_lens_this_time,
-        base_model_seq_lens_encoder,
-        actual_draft_token_num,
-    )
+    pass
 
 
+@custom_dispatch
 def eagle_get_self_hidden_states(
     input: paddle.Tensor,
     last_seq_lens_this_time: paddle.Tensor,
     seq_lens_this_time: paddle.Tensor,
     step_idx: paddle.Tensor,
 ) -> paddle.Tensor:
-    return _C.eagle_get_self_hidden_states(input, last_seq_lens_this_time, seq_lens_this_time, step_idx)
+    pass
 
 
+@custom_dispatch
 def encode_rotary_qk(
     q: paddle.Tensor,
     kv: paddle.Tensor,
@@ -296,10 +198,10 @@ def encode_rotary_qk(
     rotary_emb_dims: int,
     use_neox: bool,
 ) -> List[paddle.Tensor]:
+    pass
 
-    return _C.encode_rotary_qk(q, kv, rotary_emb, seq_lens, rotary_emb_dims, use_neox)
 
-
+@custom_dispatch
 def flash_attn_bwd(
     q: paddle.Tensor,
     k: paddle.Tensor,
@@ -312,10 +214,10 @@ def flash_attn_bwd(
     dropout: float,
     causal: bool,
 ) -> List[paddle.Tensor]:
+    pass
 
-    return _C.flash_attn_bwd(q, k, v, out, softmax_lse, seed_offset, attn_mask, out_grad, dropout, causal)
 
-
+@custom_dispatch
 def cutlass_fp8_fp8_fp8_dual_gemm_fused(
     x: paddle.Tensor,
     y0: paddle.Tensor,
@@ -329,12 +231,10 @@ def cutlass_fp8_fp8_fp8_dual_gemm_fused(
     scale_out: float,
     act: str,
 ) -> paddle.Tensor:
-
-    return _C.cutlass_fp8_fp8_fp8_dual_gemm_fused(
-        x, y0, y1, bias0, bias1, transpose_x, transpose_y, scale0, scale1, scale_out, act
-    )
+    pass
 
 
+@custom_dispatch
 def cutlass_fp8_fp8_half_gemm_fused(
     x: paddle.Tensor,
     y: paddle.Tensor,
@@ -345,10 +245,10 @@ def cutlass_fp8_fp8_half_gemm_fused(
     output_type: str,
     act: str,
 ) -> paddle.Tensor:
+    pass
 
-    return _C.cutlass_fp8_fp8_half_gemm_fused(x, y, bias, transpose_x, transpose_y, scale, output_type, act)
 
-
+@custom_dispatch
 def cutlass_fp8_fp8_half_block_gemm_fused(
     x: paddle.Tensor,
     y: paddle.Tensor,
@@ -360,11 +260,10 @@ def cutlass_fp8_fp8_half_block_gemm_fused(
     output_type: str,
     activation_type: str,
 ) -> paddle.Tensor:
-    return _C.cutlass_fp8_fp8_half_block_gemm_fused(
-        x, y, x_scale, y_scale, bias, trans_x, trans_y, output_type, activation_type
-    )
+    pass
 
 
+@custom_dispatch
 def cutlass_fp8_fp8_half_gemm_ptr_scale_fused(
     x: paddle.Tensor,
     y: paddle.Tensor,
@@ -375,9 +274,10 @@ def cutlass_fp8_fp8_half_gemm_ptr_scale_fused(
     trans_y: bool,
     output_type: str,
 ) -> paddle.Tensor:
-    return _C.cutlass_fp8_fp8_half_gemm_ptr_scale_fused(x, y, x_scale, y_scale, bias, trans_x, trans_y, output_type)
+    pass
 
 
+@custom_dispatch
 def fused_get_rotary_embedding(
     input_ids: paddle.Tensor,
     position_ids: paddle.Tensor,
@@ -386,10 +286,10 @@ def fused_get_rotary_embedding(
     theta: float,
     use_neox: bool,
 ) -> paddle.Tensor:
+    pass
 
-    return _C.fused_get_rotary_embedding(input_ids, position_ids, head_dim_shape_tensor, prompt_num, theta, use_neox)
 
-
+@custom_dispatch
 def fused_rotary_position_encoding(
     query: paddle.Tensor,
     key: paddle.Tensor,
@@ -398,14 +298,15 @@ def fused_rotary_position_encoding(
     head_size: int,
     is_neox: bool,
 ) -> List[paddle.Tensor]:
-    return _C.fused_rotary_position_encoding(query, key, position_ids, cos_sin_cache, head_size, is_neox)
+    pass
 
 
+@custom_dispatch
 def gemm_dequant(x: paddle.Tensor, y: paddle.Tensor, scale: paddle.Tensor, out_dtype: str) -> paddle.Tensor:
+    pass
 
-    return _C.gemm_dequant(x, y, scale, out_dtype)
 
-
+@custom_dispatch
 def get_block_shape_and_split_kv_block(
     seq_lens_encoder: paddle.Tensor,
     seq_lens_decoder: paddle.Tensor,
@@ -417,32 +318,22 @@ def get_block_shape_and_split_kv_block(
     block_size: int,
     decoder_step_token_num: int,
 ) -> List[paddle.Tensor]:
-
-    return _C.get_block_shape_and_split_kv_block(
-        seq_lens_encoder,
-        seq_lens_decoder,
-        max_enc_len_this_time,
-        max_dec_len_this_time,
-        seq_lens_this_time,
-        cum_offsets,
-        group_size,
-        block_size,
-        decoder_step_token_num,
-    )
+    pass
 
 
+@custom_dispatch
 def get_output(x: paddle.Tensor, rank_id: int, wait_flag: float) -> List[paddle.Tensor]:
+    pass
 
-    return _C.get_output(x, rank_id, wait_flag)
 
-
+@custom_dispatch
 def get_padding_offset(
     input_ids: paddle.Tensor, cum_offsets: paddle.Tensor, token_num: paddle.Tensor, seq_len: paddle.Tensor
 ) -> List[paddle.Tensor]:
+    pass
 
-    return _C.get_padding_offset(input_ids, cum_offsets, token_num, seq_len)
 
-
+@custom_dispatch
 def get_padding_offset_v2(
     input_ids: paddle.Tensor,
     cum_offsets: paddle.Tensor,
@@ -451,19 +342,20 @@ def get_padding_offset_v2(
     draft_tokens: Optional[paddle.Tensor],
     seq_lens_encoder: Optional[paddle.Tensor],
 ) -> List[paddle.Tensor]:
+    pass
 
-    return _C.get_padding_offset_v2(input_ids, cum_offsets, token_num, seq_len, draft_tokens, seq_lens_encoder)
 
-
+@custom_dispatch
 def get_position_ids(
     seq_lens_encoder: paddle.Tensor,
     seq_lens_decoder: paddle.Tensor,
     seq_lens_this_time: paddle.Tensor,
     position_ids: paddle.Tensor,
 ) -> paddle.Tensor:
-    return _C.get_position_ids(seq_lens_encoder, seq_lens_decoder, seq_lens_this_time, position_ids)
+    pass
 
 
+@custom_dispatch
 def get_position_ids_and_mask_encoder_batch(
     seq_lens_encoder: paddle.Tensor,
     seq_lens_decoder: paddle.Tensor,
@@ -471,11 +363,10 @@ def get_position_ids_and_mask_encoder_batch(
     position_ids: paddle.Tensor,
     mask_encoder_batch: paddle.Tensor,
 ) -> List[paddle.Tensor]:
-    return _C.get_position_ids_and_mask_encoder_batch(
-        seq_lens_encoder, seq_lens_decoder, seq_lens_this_time, position_ids, mask_encoder_batch
-    )
+    pass
 
 
+@custom_dispatch
 def get_token_penalty_multi_scores(
     pre_ids: paddle.Tensor,
     logits: paddle.Tensor,
@@ -486,12 +377,10 @@ def get_token_penalty_multi_scores(
     min_len: paddle.Tensor,
     eos_token_id: paddle.Tensor,
 ) -> paddle.Tensor:
-
-    return _C.get_token_penalty_multi_scores(
-        pre_ids, logits, penalty_scores, frequency_scores, presence_scores, cur_len, min_len, eos_token_id
-    )
+    pass
 
 
+@custom_dispatch
 def get_token_penalty_multi_scores_v2(
     pre_ids: paddle.Tensor,
     logits: paddle.Tensor,
@@ -504,26 +393,17 @@ def get_token_penalty_multi_scores_v2(
     min_len: paddle.Tensor,
     eos_token_id: paddle.Tensor,
 ) -> paddle.Tensor:
-    return _C.get_token_penalty_multi_scores_v2(
-        pre_ids,
-        logits,
-        penalty_scores,
-        frequency_scores,
-        presence_scores,
-        temperatures,
-        bad_tokens,
-        cur_len,
-        min_len,
-        eos_token_id,
-    )
+    pass
 
 
+@custom_dispatch
 def group_quant(
     x: paddle.Tensor, group_size: int, transpose_scale: bool, quant_max_bound: float, quant_min_bound: float
 ) -> List[paddle.Tensor]:
-    return _C.group_quant(x, group_size, transpose_scale, quant_max_bound, quant_min_bound)
+    pass
 
 
+@custom_dispatch
 def multi_head_latent_attention(
     query: paddle.Tensor,
     key_cache: paddle.Tensor,
@@ -571,55 +451,10 @@ def multi_head_latent_attention(
     causal: bool,
     speculate_decoder: bool,
 ) -> paddle.Tensor:
-    return _C.multi_head_latent_attention(
-        query,
-        key_cache,
-        value_cache,
-        seq_lens_encoder,
-        seq_lens_decoder,
-        seq_lens_this_time,
-        cu_seqlens_q,
-        padding_offsets,
-        cum_offsets,
-        block_tables,
-        encoder_batch_ids,
-        encoder_tile_ids_per_batch,
-        encoder_num_blocks,
-        kv_batch_ids,
-        kv_tile_ids_per_batch,
-        kv_num_blocks,
-        decoder_batch_ids,
-        decoder_tile_ids_per_batch,
-        decoder_num_blocks,
-        decoder_num_blocks_cpu,
-        max_enc_len_this_time,
-        max_dec_len_this_time,
-        max_len_kv,
-        attn_mask,
-        query_bias,
-        query_out_scales,
-        cache_k_quant_scales,
-        cache_v_quant_scales,
-        cache_k_dequant_scales,
-        cache_v_dequant_scales,
-        cache_k_zp,
-        cache_v_zp,
-        out_linear_shifts,
-        out_linear_smooths,
-        compute_type,
-        cache_quant_type,
-        nope_size,
-        max_input_length,
-        softmax_scale,
-        quant_max_bound,
-        quant_min_bound,
-        out_linear_in_scale,
-        speculate_max_draft_token_num,
-        causal,
-        speculate_decoder,
-    )
+    pass
 
 
+@custom_dispatch
 def noaux_tc(
     scores: paddle.Tensor,
     scores_with_bias: paddle.Tensor,
@@ -628,9 +463,10 @@ def noaux_tc(
     topk: int,
     routed_scaling_factor: float,
 ) -> paddle.Tensor:
-    return _C.noaux_tc(scores, scores_with_bias, n_group, topk_group, topk, routed_scaling_factor)
+    pass
 
 
+@custom_dispatch
 def ngram_match(
     input_ids: paddle.Tensor,
     input_ids_len: paddle.Tensor,
@@ -646,24 +482,10 @@ def ngram_match(
     max_ngram_size: int,
     max_draft_tokens: int,
 ) -> List[paddle.Tensor]:
-
-    return _C.ngram_match(
-        input_ids,
-        input_ids_len,
-        pre_ids,
-        step_idx,
-        draft_token_num,
-        draft_tokens,
-        seq_lens_this_time,
-        seq_lens_encoder,
-        seq_lens_decoder,
-        max_dec_len,
-        real_batch_size,
-        max_ngram_size,
-        max_draft_tokens,
-    )
+    pass
 
 
+@custom_dispatch
 def prefill_mla_write_cache(
     kv_nope: paddle.Tensor,
     kv_pe: paddle.Tensor,
@@ -676,24 +498,15 @@ def prefill_mla_write_cache(
     cache_quant_type_str: str,
     max_seq_len: int,
 ) -> paddle.Tensor:
-    return _C.prefill_mla_write_cache(
-        kv_nope,
-        kv_pe,
-        kv_cache,
-        seq_lens,
-        seq_lens_decoder,
-        padding_offsets,
-        cum_offsets,
-        block_tables,
-        cache_quant_type_str,
-        max_seq_len,
-    )
+    pass
 
 
+@custom_dispatch
 def preprocess_for_moe(topk_ids: paddle.Tensor, num_experts: int, block_size: int) -> List[paddle.Tensor]:
-    return _C.preprocess_for_moe(topk_ids, num_experts, block_size)
+    pass
 
 
+@custom_dispatch
 def qkv_transpose_split(
     qkv: paddle.Tensor,
     padding_offset: paddle.Tensor,
@@ -702,10 +515,10 @@ def qkv_transpose_split(
     num_head: int,
     head_size: int,
 ) -> List[paddle.Tensor]:
+    pass
 
-    return _C.qkv_transpose_split(qkv, padding_offset, seq_lens, input_ids, num_head, head_size)
 
-
+@custom_dispatch
 def quant_int8(
     intput: paddle.Tensor,
     shift: paddle.Tensor,
@@ -715,17 +528,17 @@ def quant_int8(
     max_bound: float,
     min_bound: float,
 ) -> paddle.Tensor:
+    pass
 
-    return _C.quant_int8(intput, shift, smooth, scale, round_type, max_bound, min_bound)
 
-
+@custom_dispatch
 def rebuild_padding(
     tmp_out: paddle.Tensor, padding_offset: paddle.Tensor, seq_lens: paddle.Tensor, input_ids: paddle.Tensor
 ) -> paddle.Tensor:
+    pass
 
-    return _C.rebuild_padding(tmp_out, padding_offset, seq_lens, input_ids)
 
-
+@custom_dispatch
 def rebuild_padding_v2(
     tmp_out: paddle.Tensor,
     cum_offsets: paddle.Tensor,
@@ -734,12 +547,10 @@ def rebuild_padding_v2(
     output_padding_offset: paddle.Tensor,
     max_input_length: int,
 ) -> paddle.Tensor:
-
-    return _C.rebuild_padding_v2(
-        tmp_out, cum_offsets, seq_lens_decoder, seq_lens_encoder, output_padding_offset, max_input_length
-    )
+    pass
 
 
+@custom_dispatch
 def sage_attention(
     q: paddle.Tensor,
     k: paddle.Tensor,
@@ -756,24 +567,10 @@ def sage_attention(
     smooth_v: bool,
     return_lse: bool,
 ) -> paddle.Tensor:
-    return _C.sage_attention(
-        q,
-        k,
-        v,
-        km,
-        seq_len_this_time,
-        vm,
-        sm_scale,
-        qk_quant_gran,
-        pv_accum_dtype,
-        tensor_layout,
-        is_causal,
-        smooth_k,
-        smooth_v,
-        return_lse,
-    )
+    pass
 
 
+@custom_dispatch
 def sage_attention_dsk(
     q: paddle.Tensor,
     k: paddle.Tensor,
@@ -790,36 +587,22 @@ def sage_attention_dsk(
     smooth_v: bool,
     return_lse: bool,
 ) -> paddle.Tensor:
-    return _C.sage_attention_dsk(
-        q,
-        k,
-        v,
-        km,
-        seq_len_this_time,
-        vm,
-        sm_scale,
-        qk_quant_gran,
-        pv_accum_dtype,
-        tensor_layout,
-        is_causal,
-        smooth_k,
-        smooth_v,
-        return_lse,
-    )
+    pass
 
 
+@custom_dispatch
 def save_output(x: paddle.Tensor, not_need_stop: paddle.Tensor, rank_id: int) -> paddle.Tensor:
+    pass
 
-    return _C.save_output(x, not_need_stop, rank_id)
 
-
+@custom_dispatch
 def save_with_output(
     x: paddle.Tensor, batch_idx: paddle.Tensor, step_idx: paddle.Tensor, file_path: str, rank_id: int
 ) -> paddle.Tensor:
+    pass
 
-    return _C.save_with_output(x, batch_idx, step_idx, file_path, rank_id)
 
-
+@custom_dispatch
 def set_preids_token_penalty_multi_scores(
     pre_ids: paddle.Tensor,
     input_ids: paddle.Tensor,
@@ -837,33 +620,17 @@ def set_preids_token_penalty_multi_scores(
     min_len: paddle.Tensor,
     eos_token_id: paddle.Tensor,
 ) -> List[paddle.Tensor]:
-
-    return _C.set_preids_token_penalty_multi_scores(
-        pre_ids,
-        input_ids,
-        seq_lens_encoder,
-        seq_lens_decoder,
-        step_idx,
-        stop_flags,
-        logits,
-        penalty_scores,
-        frequency_scores,
-        presence_scores,
-        temperatures,
-        bad_tokens,
-        cur_len,
-        min_len,
-        eos_token_id,
-    )
+    pass
 
 
+@custom_dispatch
 def set_stop_value_multi_ends(
     topk_ids: paddle.Tensor, stop_flags: paddle.Tensor, end_ids: paddle.Tensor, mode: int
 ) -> List[paddle.Tensor]:
+    pass
 
-    return _C.set_stop_value_multi_ends(topk_ids, stop_flags, end_ids, mode)
 
-
+@custom_dispatch
 def set_stop_value_multi_ends_v2(
     topk_ids: paddle.Tensor,
     stop_flags: paddle.Tensor,
@@ -871,16 +638,17 @@ def set_stop_value_multi_ends_v2(
     end_ids: paddle.Tensor,
     next_tokens: paddle.Tensor,
 ) -> List[paddle.Tensor]:
-    return _C.set_stop_value_multi_ends_v2(topk_ids, stop_flags, seq_lens, end_ids, next_tokens)
+    pass
 
 
+@custom_dispatch
 def set_value_by_flags_and_idx(
     pre_ids_all: paddle.Tensor, pre_ids_now: paddle.Tensor, step_idx: paddle.Tensor, stop_flags: paddle.Tensor
 ) -> paddle.Tensor:
+    pass
 
-    return _C.set_value_by_flags_and_idx(pre_ids_all, pre_ids_now, step_idx, stop_flags)
 
-
+@custom_dispatch
 def set_value_by_flags_and_idx_v2(
     pre_ids_all: paddle.Tensor,
     input_ids: paddle.Tensor,
@@ -890,37 +658,37 @@ def set_value_by_flags_and_idx_v2(
     step_idx: paddle.Tensor,
     stop_flags: paddle.Tensor,
 ) -> paddle.Tensor:
-    return _C.set_value_by_flags_and_idx_v2(
-        pre_ids_all, input_ids, seq_lens_this_time, seq_lens_encoder, seq_lens_decoder, step_idx, stop_flags
-    )
+    pass
 
 
+@custom_dispatch
 def speculate_clear_accept_nums(accept_num: paddle.Tensor, seq_lens_decoder: paddle.Tensor) -> paddle.Tensor:
-    return _C.speculate_clear_accept_nums(accept_num, seq_lens_decoder)
+    pass
 
 
+@custom_dispatch
 def speculate_get_output(x: paddle.Tensor, rank_id: int, wait_flag: bool) -> paddle.Tensor:
+    pass
 
-    return _C.speculate_get_output(x, rank_id, wait_flag)
 
-
+@custom_dispatch
 def speculate_get_output_padding_offset(
     output_cum_offsets_tmp: paddle.Tensor,
     out_token_num: paddle.Tensor,
     seq_lens_output: paddle.Tensor,
     max_seq_len: int,
 ) -> List[paddle.Tensor]:
+    pass
 
-    return _C.speculate_get_output_padding_offset(output_cum_offsets_tmp, out_token_num, seq_lens_output, max_seq_len)
 
-
+@custom_dispatch
 def speculate_get_seq_lens_output(
     seq_lens_this_time: paddle.Tensor, seq_lens_encoder: paddle.Tensor, seq_lens_decoder: paddle.Tensor
 ) -> paddle.Tensor:
+    pass
 
-    return _C.speculate_get_seq_lens_output(seq_lens_this_time, seq_lens_encoder, seq_lens_decoder)
 
-
+@custom_dispatch
 def speculate_get_token_penalty_multi_scores(
     pre_ids: paddle.Tensor,
     logits: paddle.Tensor,
@@ -937,32 +705,17 @@ def speculate_get_token_penalty_multi_scores(
     output_cum_offsets: paddle.Tensor,
     max_seq_len: int,
 ) -> paddle.Tensor:
-
-    return _C.speculate_get_token_penalty_multi_scores(
-        pre_ids,
-        logits,
-        penalty_scores,
-        frequency_scores,
-        presence_scores,
-        temperatures,
-        bad_tokens,
-        cur_len,
-        min_len,
-        eos_token_id,
-        seq_lens_this_time,
-        output_padding_offset,
-        output_cum_offsets,
-        max_seq_len,
-    )
+    pass
 
 
+@custom_dispatch
 def speculate_save_output(
     accept_tokens: paddle.Tensor, accept_num: paddle.Tensor, not_need_stop: paddle.Tensor, rank_id: int
 ) -> paddle.Tensor:
+    pass
 
-    return _C.speculate_save_output(accept_tokens, accept_num, not_need_stop, rank_id)
 
-
+@custom_dispatch
 def speculate_set_value_by_flags_and_idx(
     pre_ids_all: paddle.Tensor,
     accept_tokens: paddle.Tensor,
@@ -973,19 +726,10 @@ def speculate_set_value_by_flags_and_idx(
     seq_lens_decoder: paddle.Tensor,
     step_idx: paddle.Tensor,
 ) -> paddle.Tensor:
-
-    return _C.speculate_set_value_by_flags_and_idx(
-        pre_ids_all,
-        accept_tokens,
-        accept_num,
-        stop_flags,
-        seq_lens_this_time,
-        seq_lens_encoder,
-        seq_lens_decoder,
-        step_idx,
-    )
+    pass
 
 
+@custom_dispatch
 def speculate_step_paddle(
     stop_flags: paddle.Tensor,
     seq_lens_this_time: paddle.Tensor,
@@ -1014,36 +758,10 @@ def speculate_step_paddle(
     encoder_decoder_block_num: int,
     max_draft_tokens: int,
 ) -> List[paddle.Tensor]:
-    return _C.speculate_step_paddle(
-        stop_flags,
-        seq_lens_this_time,
-        ori_seq_lens_encoder,
-        seq_lens_encoder,
-        seq_lens_decoder,
-        block_tables,
-        encoder_block_lens,
-        is_block_step,
-        step_block_list,
-        step_lens,
-        recover_block_list,
-        recover_lens,
-        need_block_list,
-        need_block_len,
-        used_list_len,
-        free_list,
-        free_list_len,
-        input_ids,
-        pre_ids,
-        step_idx,
-        next_tokens,
-        first_token_ids,
-        accept_num,
-        block_size,
-        encoder_decoder_block_num,
-        max_draft_tokens,
-    )
+    pass
 
 
+@custom_dispatch
 def speculate_update(
     seq_lens_encoder: paddle.Tensor,
     seq_lens_decoder: paddle.Tensor,
@@ -1056,20 +774,10 @@ def speculate_update(
     seq_lens_this_time: paddle.Tensor,
     is_block_step: paddle.Tensor,
 ) -> List[paddle.Tensor]:
-    return _C.speculate_update(
-        seq_lens_encoder,
-        seq_lens_decoder,
-        not_need_stop,
-        draft_tokens,
-        actual_draft_token_nums,
-        accept_tokens,
-        accept_num,
-        stop_flags,
-        seq_lens_this_time,
-        is_block_step,
-    )
+    pass
 
 
+@custom_dispatch
 def speculate_verify(
     accept_tokens: paddle.Tensor,
     accept_num: paddle.Tensor,
@@ -1092,30 +800,10 @@ def speculate_verify(
     verify_window: int,
     enable_topp: bool,
 ) -> List[paddle.Tensor]:
-    return _C.speculate_verify(
-        accept_tokens,
-        accept_num,
-        step_idx,
-        seq_lens_encoder,
-        seq_lens_decoder,
-        stop_flags,
-        draft_tokens,
-        seq_lens_this_time,
-        verify_tokens,
-        verify_scores,
-        max_dec_len,
-        end_tokens,
-        is_block_step,
-        output_cum_offsets,
-        actual_candidate_len,
-        actual_draft_token_nums,
-        topp,
-        max_seq_len,
-        verify_window,
-        enable_topp,
-    )
+    pass
 
 
+@custom_dispatch
 def step_paddle(
     stop_flags: paddle.Tensor,
     seq_lens_this_time: paddle.Tensor,
@@ -1142,34 +830,10 @@ def step_paddle(
     block_size: int,
     encoder_decoder_block_num: int,
 ) -> List[paddle.Tensor]:
-    return _C.step_paddle(
-        stop_flags,
-        seq_lens_this_time,
-        ori_seq_lens_encoder,
-        seq_lens_encoder,
-        seq_lens_decoder,
-        block_tables,
-        encoder_block_lens,
-        is_block_step,
-        step_block_list,
-        step_lens,
-        recover_block_list,
-        recover_lens,
-        need_block_list,
-        need_block_len,
-        used_list_len,
-        free_list,
-        free_list_len,
-        input_ids,
-        pre_ids,
-        step_idx,
-        next_tokens,
-        first_token_ids,
-        block_size,
-        encoder_decoder_block_num,
-    )
+    pass
 
 
+@custom_dispatch
 def top_p_candidates(
     probs: paddle.Tensor,
     top_p: paddle.Tensor,
@@ -1177,22 +841,22 @@ def top_p_candidates(
     candidates_len: int,
     max_seq_len: int,
 ) -> List[paddle.Tensor]:
+    pass
 
-    return _C.top_p_candidates(probs, top_p, output_padding_offset, candidates_len, max_seq_len)
 
-
+@custom_dispatch
 def top_p_sampling_reject(probs: paddle.Tensor, top_p: paddle.Tensor, seed: int) -> paddle.Tensor:
+    pass
 
-    return _C.top_p_sampling_reject(probs, top_p, seed)
 
-
+@custom_dispatch
 def transpose_remove_padding(
     input: paddle.Tensor, seq_lens: paddle.Tensor, padding_offset: paddle.Tensor
 ) -> paddle.Tensor:
+    pass
 
-    return _C.transpose_remove_padding(input, seq_lens, padding_offset)
 
-
+@custom_dispatch
 def tune_cublaslt_gemm(
     k: paddle.Tensor,
     n: paddle.Tensor,
@@ -1203,9 +867,10 @@ def tune_cublaslt_gemm(
     is_read_from_file: bool,
     path: str,
 ) -> None:
-    _C.tune_cublaslt_gemm(k, n, m_start, m_end, dtype, is_test, is_read_from_file, path)
+    pass
 
 
+@custom_dispatch
 def update_inputs(
     stop_flags: paddle.Tensor,
     not_need_stop: paddle.Tensor,
@@ -1217,19 +882,10 @@ def update_inputs(
     next_tokens: paddle.Tensor,
     is_block_step: paddle.Tensor,
 ) -> List[paddle.Tensor]:
-    return _C.update_inputs(
-        stop_flags,
-        not_need_stop,
-        seq_lens_this_time,
-        seq_lens_encoder,
-        seq_lens_decoder,
-        input_ids,
-        stop_nums,
-        next_tokens,
-        is_block_step,
-    )
+    pass
 
 
+@custom_dispatch
 def update_inputs_v2(
     stop_flags: paddle.Tensor,
     step_idx: paddle.Tensor,
@@ -1245,36 +901,22 @@ def update_inputs_v2(
     end_ids: paddle.Tensor,
     kwargs_next_tokens: paddle.Tensor,
 ) -> None:
-
-    _C.update_inputs_v2(
-        stop_flags,
-        step_idx,
-        not_need_stop,
-        seq_lens_this_time,
-        seq_lens_encoder,
-        seq_lens_decoder,
-        max_dec_len,
-        input_ids,
-        stop_nums,
-        next_tokens,
-        is_block_step,
-        end_ids,
-        kwargs_next_tokens,
-    )
+    pass
 
 
+@custom_dispatch
 def write_cache_kv(
     input_k: paddle.Tensor, input_v: paddle.Tensor, cache_kv: paddle.Tensor, sequence_lengths: paddle.Tensor
 ) -> paddle.Tensor:
+    pass
 
-    return _C.write_cache_kv(input_k, input_v, cache_kv, sequence_lengths)
 
-
+@custom_dispatch
 def xft_greedy_search(probs: paddle.Tensor) -> paddle.Tensor:
+    pass
 
-    return _C.xft_greedy_search(probs)
 
-
+@custom_dispatch
 def xft_transformer(
     input: paddle.Tensor,
     ln1Gamma: List[paddle.Tensor],
@@ -1300,29 +942,4 @@ def xft_transformer(
     maxPosEmbed: int,
     intermediateSize: int,
 ) -> paddle.Tensor:
-
-    return _C.xft_transformer(
-        input,
-        ln1Gamma,
-        qkvWeight,
-        attnOutWeight,
-        ln2Gamma,
-        gateWeight,
-        upWeight,
-        downWeight,
-        pastSeqLen,
-        currentSeqLen,
-        step,
-        hiddensize,
-        totalLayer,
-        computeType,
-        cacheDtype,
-        activation,
-        normType,
-        attHeadDim,
-        attHeadNum,
-        kvHeadNum,
-        maxPositions,
-        maxPosEmbed,
-        intermediateSize,
-    )
+    pass

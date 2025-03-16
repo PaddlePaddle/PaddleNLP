@@ -12,4 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .custom_ops import *
+from paddle_custom_device.npu.ops import *

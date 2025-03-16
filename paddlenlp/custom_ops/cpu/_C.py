@@ -12,4 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Generate python api for custom ops when run setup command
+# Generate python api for custom ops in CPU when run setup command

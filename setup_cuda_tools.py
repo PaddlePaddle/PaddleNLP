@@ -54,7 +54,7 @@ def get_ext_and_cmd():
         sm_version = int(os.getenv("CUDA_SM_VERSION", "0"))
 
         custom_ops_path = "./csrc"
-        name = "paddlenlp.custom_ops._C"
+        name = "paddlenlp.custom_ops.gpu._C"
 
         class GenerateBuildExtension(BuildExtension):
             """
