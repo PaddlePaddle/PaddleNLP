@@ -28,7 +28,7 @@ import paddle.distributed as dist
 import paddle.distributed.fleet as fleet
 from paddle.base.framework import use_pir_api
 from server.data.processor import DataProcessor
-from server.engine.config import Config
+from server.engine.config import global_config
 from server.utils import get_logger
 from task_queue_manager import TaskQueueManager
 
@@ -52,7 +52,7 @@ class ModelRunner:
         # 2**63 - 1
         self.MAX_INFER_SEED = 9223372036854775806
 
-        self.config = Config()
+        self.config = global_config
         self.model_cfg = self.config.get_model_config()
         self.speculate_config = self.config.get_speculate_config()
         self.is_speculate_decoding = self.speculate_config.speculate_method != "None"
@@ -338,8 +338,12 @@ class ModelRunner:
         self.share_inputs["need_block_len"] = paddle.full(shape=[1], fill_value=0, dtype="int32")
         self.share_inputs["used_list_len"] = paddle.full(shape=[self.args.max_batch_size], fill_value=0, dtype="int32")
         self.share_inputs["infer_seed"] = paddle.full(shape=[self.args.max_batch_size, 1], fill_value=0, dtype="int64")
-        free_list = list(range(int(self.args.max_block_num * self.args.block_ratio)))
+
+        free_list = list(
+            range(self.args.max_block_num - 1, int(self.args.max_block_num * self.args.block_ratio) - 1, -1)
+        )
         self.free_list_len = len(free_list)
+
         self.share_inputs["free_list"] = paddle.to_tensor(free_list, dtype="int32")
         self.share_inputs["free_list_len"] = paddle.full(shape=[1], fill_value=self.free_list_len, dtype="int32")
 

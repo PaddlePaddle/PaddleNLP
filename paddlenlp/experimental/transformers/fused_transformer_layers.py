@@ -1504,6 +1504,7 @@ class FusedMultiTransformerBase(Layer):
                 kwargs["decoder_tile_ids_per_batch"],
                 kwargs["decoder_num_blocks"],
                 kwargs["decoder_num_blocks_cpu"],
+                kwargs["decoder_chunk_size_cpu"],
                 kwargs["max_len_kv"],
             ) = get_block_shape_and_split_kv_block(
                 kwargs.get("seq_lens_encoder", None),
@@ -3108,6 +3109,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 kwargs.get("decoder_tile_ids_per_batch", None),
                 kwargs.get("decoder_num_blocks", None),
                 kwargs.get("decoder_num_blocks_cpu", None),
+                kwargs.get("decoder_chunk_size_cpu", None),
                 kwargs.get("max_enc_len_this_time", None),
                 kwargs.get("max_dec_len_this_time", None),
                 kwargs.get("max_len_kv", None),
@@ -3130,7 +3132,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 0.0,  # quant_max_bound
                 0.0,  # quant_min_bound
                 0.0,  # out_linear_in_scale
-                self.config.speculate_config.speculate_max_draft_token_num,
+                self.config.speculate_config.speculate_max_draft_token_num + 1,
                 True,  # causal
                 self.config.speculate_config.speculate_method is not None,  # speculate_decoder
             )
@@ -3501,6 +3503,7 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
                 kwargs.get("decoder_tile_ids_per_batch", None),
                 kwargs.get("decoder_num_blocks", None),
                 kwargs.get("decoder_num_blocks_cpu", None),
+                kwargs.get("decoder_chunk_size_cpu", None),
                 kwargs.get("max_enc_len_this_time", None),
                 kwargs.get("max_dec_len_this_time", None),
                 kwargs.get("max_len_kv", None),
@@ -3523,7 +3526,7 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
                 0.0,  # quant_max_bound
                 0.0,  # quant_min_bound
                 0.0,  # out_linear_in_scale
-                self.config.speculate_config.speculate_max_draft_token_num,
+                self.config.speculate_config.speculate_max_draft_token_num + 1,
                 True,  # causal
                 self.config.speculate_config.speculate_method is not None,  # speculate_decoder
             )
@@ -5239,6 +5242,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                 kwargs.get("decoder_tile_ids_per_batch", None),
                 kwargs.get("decoder_num_blocks", None),
                 kwargs.get("decoder_num_blocks_cpu", None),
+                kwargs.get("decoder_chunk_size_cpu", None),
                 kwargs.get("max_enc_len_this_time", None),
                 kwargs.get("max_dec_len_this_time", None),
                 kwargs.get("max_len_kv", None),
@@ -5261,7 +5265,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                 0.0,  # quant_max_bound
                 0.0,  # quant_min_bound
                 0.0,  # out_linear_in_scale
-                self.config.speculate_config.speculate_max_draft_token_num,
+                self.config.speculate_config.speculate_max_draft_token_num + 1,
                 True,  # causal
                 self.config.speculate_config.speculate_method is not None,  # speculate_decoder
             )

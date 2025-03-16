@@ -33,14 +33,16 @@
 
 ## News 📢
 
-* **2025.03.06 PaddleNLP 现已支持 Qwen/QwQ-32B 模型**: 其模型参数仅有 32B，但其数学推理、编程能力和通用能力可与具备 671B 参数（其中 37B 被激活）的 DeepSeek-R1 媲美。借助 PaddleNLP 3.0套件，现可实现多种并行策略[微调训练](./llm/README.md)、[高性能推理、低比特量化](./llm/docs/predict/qwen.md)和[服务化部署](./llm/server/README.md)。
+* **2025.03.12 [PaddleNLP v3.0 Beta4](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v3.0.0-beta4)**：全面支持 DeepSeek V3/R1/R1-Distill, 及QwQ-32B等热门思考模型。**DeepSeek V3/R1完整版支持FP8、INT8、4-bit量化推理，MTP投机解码**。单机FP8推理输出超**1000 tokens/s**; 4-bit推理输出超**2100 tokens/s**! 发布新版推理部署镜像，热门模型[一键部署](https://paddlenlp.readthedocs.io/zh/latest/llm/server/docs/general_model_inference.html)。推理部署[使用文档](https://paddlenlp.readthedocs.io/zh/latest/llm/docs/predict/index.html)全面更新，体验全面提升！自研下一代通用信息抽取模型 PP-UIE [全新发布](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/application/information_extraction)，支持8K长度信息抽取。新增大模型 Embedding 训练，支持INF-CL超大batch size训练。新增[MergeKit](https://paddlenlp.readthedocs.io/zh/latest/llm/docs/mergekit.html)模型融合工具，缓解对齐代价。低资源训练全面优化，16G小显存可以流畅训练。
 
-* **2025.02.20 🔥🔥《PP-UIE 信息抽取智能引擎全新升级》** 强化零样本学习能力，支持极少甚至零标注数据实现高效冷启动与迁移学习，显著降低数据标注成本；具备处理长文本能力，支持 8192 个 Token 长度文档信息抽取，实现跨段落识别关键信息，形成完整理解；提供完整可定制化的训练和推理全流程，训练效率相较于 LLama-Factory 实现了1.8倍的提升。
-2月26日（周三）19：00为您深度解析全新 PP-UIE 技术方案及在部署方面的功能、优势与技巧。报名链接：https://www.wjx.top/vm/mBKC6pb.aspx?udsid=606418
+* **2025.03.06 PaddleNLP 现已支持 Qwen/QwQ-32B 模型**: 其模型参数仅有 32B，但其数学推理、编程能力和通用能力可与具备 671B 参数（其中 37B 被激活）的 DeepSeek-R1 媲美。借助 PaddleNLP 3.0套件，现可实现多种并行策略[微调训练](./llm/README.md)、[高性能推理、低比特量化](./llm/docs/predict/qwen.md)和[服务化部署](./llm/server/README.md)。
 
 * **2025.02.10 PaddleNLP 现已支持 DeepSeek-R1系列模型，[在线使用](https://aistudio.baidu.com/projectdetail/8775758)**：依托全新的 PaddleNLP 3.0套件，DeepSeek-R1系列模型现已全面支持。凭借数据并行、数据分组切分并行、模型并行、流水线并行以及专家并行等一系列先进的分布式训练能力，结合 Paddle 框架独有的列稀疏注意力掩码表示技术——FlashMask 方法，DeepSeek-R1系列模型在训练过程中显著降低了显存消耗，同时取得了卓越的训练性能提升。
 
 <details><summary> <b>点击展开</b> </summary><div>
+
+* **2025.02.20 🔥🔥《PP-UIE 信息抽取智能引擎全新升级》** 强化零样本学习能力，支持极少甚至零标注数据实现高效冷启动与迁移学习，显著降低数据标注成本；具备处理长文本能力，支持 8192 个 Token 长度文档信息抽取，实现跨段落识别关键信息，形成完整理解；提供完整可定制化的训练和推理全流程，训练效率相较于 LLama-Factory 实现了1.8倍的提升。
+2月26日（周三）19：00为您深度解析全新 PP-UIE 技术方案及在部署方面的功能、优势与技巧。报名链接：https://www.wjx.top/vm/mBKC6pb.aspx?udsid=606418
 
 * **2024.12.16 [PaddleNLP v3.0 Beta3](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v3.0.0-beta3)**：大模型功能全新升级，新增了 Llama-3.2、DeepSeekV2模型，升级了 TokenizerFast，快速分词，重构了 SFTTrainer，一键开启 SFT 训练。此外，PaddleNLP 还支持了优化器状态的卸载和重载功能，实现了精细化的重新计算，训练性能提升7%。在 Unified Checkpoint 方面，进一步优化了异步保存逻辑，新增 Checkpoint 压缩功能，可节省78.5%存储空间。
 最后，在大模型推理方面，升级 Append Attention，支持了 FP8量化，支持投机解码。
@@ -174,14 +176,14 @@
 ### 环境依赖
 
 * python >= 3.8
-* paddlepaddle >= 3.0.0rc0
+* paddlepaddle >= 3.0.0rc1
 
 如果您尚未安装 PaddlePaddle，请参考 [飞桨官网](https://www.paddlepaddle.org.cn/) 进行安装。
 
 ### pip 安装
 
 ```shell
-pip install --upgrade paddlenlp==3.0.0b3
+pip install --upgrade paddlenlp==3.0.0b4
 ```
 
 或者可通过以下命令安装最新 develop 分支代码：

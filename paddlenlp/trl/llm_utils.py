@@ -650,7 +650,7 @@ def read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Q
 def speculate_read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Queue, done_event: mp.Event):
     from paddlenlp.utils.env import USE_FAST_TOKENIZER
 
-    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, use_fast=USE_FAST_TOKENIZER)
+    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, padding_side="left", use_fast=USE_FAST_TOKENIZER)
     paddle.device.set_device("cpu")
     paddle.disable_static()
     outputs = []
@@ -825,6 +825,7 @@ def set_triton_cache(model_name_or_path, mode):
             # del old triton_ops
             shutil.rmtree(triton_kernel_cache_dir)
     elif mode == "static":
+        os.environ["TRITON_KERNEL_CACHE_DIR"] = triton_kernel_cache_dir
         for root, dirs, files in os.walk(triton_kernel_cache_dir):
             for file in files:
                 if file.endswith("_package.so"):

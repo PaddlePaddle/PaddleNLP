@@ -92,7 +92,7 @@ def decode_mla_write_cache(
 
 
 @custom_dispatch
-def dequant_int8(intput: paddle.Tensor, out_scale: paddle.Tensor, dtype: str) -> paddle.Tensor:
+def dequant_int8(input: paddle.Tensor, out_scale: paddle.Tensor, dtype: str) -> paddle.Tensor:
     pass
 
 
@@ -425,6 +425,7 @@ def multi_head_latent_attention(
     decoder_tile_ids_per_batch: paddle.Tensor,
     decoder_num_blocks: paddle.Tensor,
     decoder_num_blocks_cpu: paddle.Tensor,
+    decoder_chunk_size_cpu: paddle.Tensor,
     max_enc_len_this_time: paddle.Tensor,
     max_dec_len_this_time: paddle.Tensor,
     max_len_kv: paddle.Tensor,
@@ -520,7 +521,7 @@ def qkv_transpose_split(
 
 @custom_dispatch
 def quant_int8(
-    intput: paddle.Tensor,
+    input: paddle.Tensor,
     shift: paddle.Tensor,
     smooth: paddle.Tensor,
     scale: float,

@@ -47,13 +47,13 @@ python -u  -m paddle.distributed.launch \
     --log_dir  "log/$task_name""_log" \
     ../run_finetune_auto.py \
     --model_name_or_path "meta-llama/Meta-Llama-3.1-8B-Instruct" \
-    --dataset_name_or_path "../../finetune_data/data" \
+    --dataset_name_or_path "./data" \
     --output_dir "output/$task_name/" \
     --enable_auto_parallel true \
     --lora false \
     --use_mora false \
-    --model_type "llama" \
-    --use_intermediate_api false \
+    --model_type "llama_network" \
+    --use_intermediate_api true \
     --to_static $to_static \
     --per_device_train_batch_size 2 \
     --gradient_accumulation_steps 2 \

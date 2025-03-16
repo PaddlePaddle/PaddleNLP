@@ -21,6 +21,20 @@ import copy
 import paddle
 import paddle.distributed as dist
 import paddle.nn.functional as F
+
+try:
+    from paddle.distributed.auto_parallel.local_layer import LocalLayer
+except:
+
+    class LocalLayer(object):
+        """
+        A dummy class for LocalLayer, used when the actual class
+        cannot be imported.
+        """
+
+        pass
+
+
 from paddle import nn
 
 from .auto_utils import einsum, get_mesh
@@ -91,7 +105,7 @@ def combining(x, combine_weights, scatter_index):
     return paddle.matmul(combine_weights, x).squeeze(1)  # [seq,1,2] @ [seq,2,dim] -> [seq,1,dim]
 
 
-class LocalGatePart1(dist.LocalLayer):
+class LocalGatePart1(LocalLayer):
     def __init__(self, config, gate: PretrainedMoEGate, ipp=None):
         mesh = get_mesh(ipp)
         out_dist_attrs = [
@@ -127,7 +141,7 @@ class LocalGatePart1(dist.LocalLayer):
         return reshaped_input, reshaped_scores, exp_counts, l_aux, l_zloss
 
 
-class LocalGateAndDispatch(dist.LocalLayer):
+class LocalGateAndDispatch(LocalLayer):
     def __init__(self, gate: PretrainedMoEGate, ipp=None):
         mesh = get_mesh(ipp)
         out_dist_attrs = [
@@ -147,7 +161,7 @@ class LocalGateAndDispatch(dist.LocalLayer):
         return dispatched_input, combine_weights
 
 
-class LocalCombine(dist.LocalLayer):
+class LocalCombine(LocalLayer):
     def __init__(self, ipp=None):
         self.mesh = get_mesh(ipp)
         out_dist_attrs = [(self.mesh, [dist.Shard(0)])]

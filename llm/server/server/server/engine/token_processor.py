@@ -159,9 +159,10 @@ class TokenProcessor(object):
         # fill some extra information
         result["token_ids"] = []
         for token_id in token_ids:
+            self.number_of_output_tokens += 1
             if token_id in task["eos_token_ids"]:
                 result["is_end"] = 1
-                result["token_ids"] = []
+                result["send_idx"] = self.tokens_counter[task_id]
                 result["tokens_all_num"] = len(self.all_tokens[i]) + 1
                 result["tokens_all_ids"] = self.all_tokens[i]
 
@@ -183,6 +184,8 @@ class TokenProcessor(object):
                 monitor_logger.info(f"{info_dict}")
                 break
             else:
+                self.tokens_counter[task_id] += 1
+                self.all_tokens[i].append(token_id)
                 result["token_ids"].append(token_id)
 
         return result
@@ -227,7 +230,6 @@ class TokenProcessor(object):
                     + accept_num[i, 0],
                     0,
                 ].tolist()
-
             if any(token_id < 0 for token_id in token_ids):
                 continue
 
@@ -238,11 +240,6 @@ class TokenProcessor(object):
             self.total_step += 1
 
             for token_id in token_ids:
-                self.tokens_counter[task_id] += 1
-                if token_id not in task["eos_token_ids"]:
-                    self.all_tokens[i].append(token_id)
-
-                self.number_of_output_tokens += 1
                 if token_id in task["eos_token_ids"]:
                     self._recycle_resources(task_id, i, task)
                     model_server_logger.info("req_id: {0} finished".format(task_id))
