@@ -203,7 +203,6 @@ def kitchen_fp8_gemm(x_fp8, x_scale, w_fp8, w_scale, is_a_1d_scaled, is_b_1d_sca
 class LinearFP8Func(paddle.autograd.PyLayer):
     @staticmethod
     def forward(ctx, x, weight):
-        print("linear fp8")
         x_orig_shape = x.shape
         # deep_gemm only support 2D
         x = x.reshape([-1, x_orig_shape[-1]])
@@ -283,7 +282,6 @@ class FP8Linear(paddle.nn.Layer):
 class Fuse_FFN_FP8_Func(paddle.autograd.PyLayer):
     @staticmethod
     def forward(ctx, x, w1, w2):
-        print("linear Fuse_FFN_FP8_Func")
         # deep_gemm only support 2D
         x_orig_shape = x.shape
         x = x.reshape([-1, x_orig_shape[-1]])
