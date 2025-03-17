@@ -414,8 +414,6 @@ class FusionMoe(paddle.autograd.PyLayer):
 
         ctx.save_for_backward(hidden_states, output_combie, dispatched_probs, token_permuted_indices)
 
-        print("output: ", output)
-
         return output
 
     @staticmethod
