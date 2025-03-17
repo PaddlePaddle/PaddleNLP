@@ -1,15 +1,15 @@
 # PaddleNLP 模型压缩 API
 
  **目录**
-   * [模型压缩 API 功能简介](#模型压缩 API 功简介)
+   * [模型压缩 API 功能简介](#模型压缩-API-功能简介)
    * [三大场景快速启动模型压缩示例](#三大场景快速启动模型压缩示例)
    * [四步启动模型压缩](#四步启动模型压缩)
-       * [Step1：获取模型压缩参数 compression_args](#获取模型压缩参数 compression_args)
-       * [Step2：实例化 Trainer 并调用 compress()](#实例化 Trainer 并调用 compress())
-           * [Trainer 实例化参数介绍](#Trainer 实例化参数介绍)
-       * [Step3：实现自定义评估函数（按需可选）](#实现自定义评估函数（按需可选）)
-       * [Step4：传参并运行压缩脚本](#传参并运行压缩脚本)
-           * [CompressionArguments 参数介绍](#CompressionArguments 参数介绍)
+       * [Step1：获取模型压缩参数 compression_args](#step-1获取模型压缩参数-compression_args)
+       * [Step2：实例化 Trainer 并调用 compress()](#step-2实例化-trainer-并调用-compress)
+           * [Trainer 实例化参数介绍](#trainer-实例化参数介绍)
+       * [Step3：实现自定义评估函数，以适配自定义压缩任务](#step-3实现自定义评估函数以适配自定义压缩任务)
+       * [Step4：传参并运行压缩脚本](#step-4传参并运行压缩脚本)
+           * [CompressionArguments 参数介绍](#compressionarguments-参数介绍)
    * [模型评估与部署](#模型评估与部署)
    * [FAQ](#FAQ)
    * [参考文献](#References)
@@ -136,7 +136,7 @@ trainer.compress()
 ```
 
 ```shell
-# Step4: 传参并运行压缩脚本
+# Step 4: 传参并运行压缩脚本
 python compress.py \
     --output_dir ./compress_models  \
     --per_device_train_batch_size 32 \
@@ -237,7 +237,7 @@ trainer.compress()
 
 <a name="实现自定义评估函数(按需可选）"></a>
 
-### Step3：实现自定义评估函数，以适配自定义压缩任务
+### Step 3：实现自定义评估函数，以适配自定义压缩任务
 
 当使用 DynaBERT 裁剪功能时，如果模型、Metrics 不符合下表的情况，那么模型压缩 API 中评估函数需要自定义。
 
@@ -393,7 +393,7 @@ python compress.py \
 
 - **activation_quantize_type** 激活 tensor 的量化类型。支持 'abs_max', 'range_abs_max' 和 'moving_average_abs_max'。在 'ptq' 策略中，默认是 'range_abs_max'；
 
-- **--round_type** 权重值从 FP32 到 INT8 的转化方法，目前支持 `'round'` 和 '[adaround](https://arxiv.org/abs/2004.10568.)'，默认是 `'round'`；
+- **--round_type** 权重值从 FP32 到 INT8 的转化方法，目前支持 `'round'` 和 '[adaround](https://arxiv.org/abs/2004.10568)'，默认是 `'round'`；
 
 - **--bias_correction** 如果是 True，表示使用 [bias correction](https://arxiv.org/abs/1810.05723) 功能，默认为 False。
 

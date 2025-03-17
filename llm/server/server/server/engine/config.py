@@ -213,8 +213,8 @@ class Config:
 
     def _get_download_model(self, model_type="default"):
         env = os.environ
-        # Define supported model patterns
         model_name = env.get("model_name")
+        # Define supported model patterns
         supported_patterns = [
             r".*Qwen.*", 
             r".+Llama.+",
@@ -321,7 +321,6 @@ class Config:
             self._get_download_model()
 
         config = self.get_model_config()
-
         # check paddle nlp version
         tag = os.getenv("tag")
         if tag not in config["paddlenlp_version"]:
@@ -361,3 +360,5 @@ class Config:
 
     def __str__(self) -> str:
         return json.dumps(self.__dict__, indent=4)
+
+global_config = Config()

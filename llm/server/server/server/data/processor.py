@@ -17,7 +17,7 @@ from abc import ABC, abstractmethod
 
 from paddlenlp.transformers import Llama3Tokenizer, LlamaTokenizer
 from paddlenlp.trl.llm_utils import get_eos_token_id
-from server.engine.config import Config
+from server.engine.config import global_config
 from server.utils import data_processor_logger
 from paddlenlp.utils.env import USE_FAST_TOKENIZER
 
@@ -120,7 +120,7 @@ class BaseDataProcessor(ABC):
 
 class DataProcessor(BaseDataProcessor):
     def __init__(self):
-        self.config = Config()
+        self.config = global_config
 
         self.decode_status = dict()
         self.tokenizer = self._load_tokenizer()

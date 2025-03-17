@@ -44,6 +44,17 @@ target_lists_for_llama=(
     "scripts/distribute"
 )
 
+target_lists_for_deepseek=(
+    "llm/auto_parallel/deepseek-v3"
+    "paddlenlp/trainer/auto_trainer.py"
+    "paddlenlp/transformers/deepseek_v2/modeling_auto.py"
+    "paddlenlp/transformers/deepseek_v2/modeling.py"
+    "paddlenlp/transformers/deepseek_v3/modeling_auto.py"
+    "paddlenlp/transformers/moe_layer_auto.py"
+    "paddlenlp/transformers/moe_gate_auto.py"
+    "scripts/distribute"
+)
+
 target_path_for_ci_scripts="scripts/distribute"
 
 ####################################
@@ -116,11 +127,17 @@ get_diff_TO_case(){
                         case_list[${#case_list[*]}]=llama_auto
                     fi
                 done
+                for ((i=0; i<${#target_lists_for_deepseek[@]}; i++)); do
+                    if [[ ${file_item} == *${target_lists_for_deepseek[i]}* ]];then
+                        case_list[${#case_list[*]}]=deepseek_auto
+                    fi
+                done
             fi
         done
     else
         case_list[${#case_list[*]}]=gpt-3_auto
         case_list[${#case_list[*]}]=llama_auto
+        case_list[${#case_list[*]}]=deepseek_auto
         for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
             arr_file_name=(${file_name//// })
             dir1=${arr_file_name[0]}
@@ -285,6 +302,17 @@ if [[ ${#case_list[*]} -ne 0 ]];then
         let case_num++        
         clean_file $nlp_dir/llm/auto_parallel/gpt-3
     fi
+    if [[ $(contain_case deepseek_auto ${case_list[@]}; echo $?) -eq 1 ]];then
+        echo -e "\033[31m ---- running case $case_num/${#case_list[*]}: deepseek_auto \033"
+        cmd=/workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh 
+        bash $cmd prepare_case deepseek_case_list_auto $FLAGS_install_deps $FLAGS_download_data
+        execute_func_list $cmd deepseek_auto
+        export FLAGS_install_deps=1
+        export FLAGS_download_data="deepseek ""$FLAGS_download_data"
+        let case_num++        
+        clean_file $nlp_dir/llm/auto_parallel/deepseek-v3
+    fi
+    
     if [[ $(contain_case gpt-3_dygraph ${case_list[@]}; echo $?) -eq 1 ]];then
         echo -e "\033[31m ---- running case $case_num/${#case_list[*]}: gpt-3_dygraph \033"
         cmd=/workspace/PaddleNLP/scripts/distribute/ci_case_dy.sh
