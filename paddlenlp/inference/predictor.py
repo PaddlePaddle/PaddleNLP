@@ -65,7 +65,7 @@ class AutoPredictor:
         cls,
         predictor_args: PredictorConfig,
         config: PretrainedConfig,
-        model_config: ModelConfig,
+        model_args: ModelConfig,
         tokenizer: PretrainedTokenizer = None,
         model: PretrainedModel = None,
         **kwargs,
@@ -76,7 +76,7 @@ class AutoPredictor:
         Args:
             predictor_args (PredictorConfig): The predictor arguments.
             config (PretrainedConfig): The model configuration.
-            model_config (ModelConfig): The model arguments.
+            model_args (ModelConfig): The model arguments.
             tokenizer (PretrainedTokenizer): The tokenizer.
             **kwargs: Additional keyword arguments.
         Returns:
@@ -119,14 +119,14 @@ class AutoPredictor:
             cache_k_shapes=cache_k_shapes,
             cache_v_shapes=cache_v_shapes,
             cache_kvs_shape=cache_kvs_shape,
-            model_config=model_config,
+            model_args=model_args,
         )
         return predictor
 
 
 def create_predictor(
     predictor_args: PredictorConfig,
-    model_config: ModelConfig,
+    model_args: ModelConfig,
 ):
 
     paddle.set_device(predictor_args.device)
@@ -177,7 +177,7 @@ def create_predictor(
             predictor_args.model_name_or_path,
             config=config,
             predictor_args=predictor_args,
-            model_config=model_config,
+            model_args=model_args,
             dtype=predictor_args.dtype,
             tensor_parallel_degree=tensor_parallel_degree,
             tensor_parallel_rank=tensor_parallel_rank,
@@ -185,7 +185,7 @@ def create_predictor(
     else:
         if predictor_args.mode == "dynamic":
             # model import (gpt-3,ernie) or AutoModel
-            # if model_config.model_type == "gpt-3":
+            # if model_args.model_type == "gpt-3":
             #     sys.path.append("./gpt-3")
             #     from modeling import GPTForCausalLM
 
@@ -196,7 +196,7 @@ def create_predictor(
             #         tensor_parallel_rank=tensor_parallel_rank,
             #         tensor_parallel_output=False,
             #     )
-            # elif model_config.model_type == "ernie-3.5-se":
+            # elif model_args.model_type == "ernie-3.5-se":
             #     sys.path.append("./ernie-3.5-se")
             #     from modeling import Ernie35ForCausalLM
 
@@ -219,14 +219,14 @@ def create_predictor(
                 tensor_parallel_output=False,
             )
 
-    predictor = AutoPredictor.create_predictor(predictor_args, config, model_config, tokenizer, model=model)
+    predictor = AutoPredictor.create_predictor(predictor_args, config, model_args, tokenizer, model=model)
 
     return predictor
 
 
 def predict():
     parser = PdArgumentParser((PredictorConfig, ModelConfig))
-    predictor_args, model_config = parser.parse_args_into_dataclasses()
+    predictor_args, model_args = parser.parse_args_into_dataclasses()
 
     llm_utils.set_triton_cache(predictor_args.model_name_or_path, predictor_args.mode)
 
@@ -241,12 +241,12 @@ def predict():
         }
         fleet.init(is_collective=True, strategy=strategy)
 
-    predictor = create_predictor(predictor_args, model_config)
+    predictor = create_predictor(predictor_args, model_args)
 
     source_texts = []
     target_texts = []
-    if model_config.data_file:
-        with open(model_config.data_file, "r", encoding="utf-8") as f:
+    if model_args.data_file:
+        with open(model_args.data_file, "r", encoding="utf-8") as f:
             for line in f:
                 example = json.loads(line)
                 if isinstance(example["src"], str) or predictor.tokenizer.chat_template is None:
@@ -270,7 +270,7 @@ def predict():
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
     batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
 
-    with open(model_config.output_file, "w", encoding="utf-8") as f:
+    with open(model_args.output_file, "w", encoding="utf-8") as f:
         for bs, batch_source_text in enumerate(batch_source_texts):
             logger.info("Start predict")
             outputs = predictor.predict(batch_source_text)
@@ -289,10 +289,10 @@ def predict():
                 f.write(json.dumps(out, ensure_ascii=False) + "\n")
 
     if predictor_args.benchmark:
-        benchmark(predictor, predictor_args, model_config)
+        benchmark(predictor, predictor_args, model_args)
 
 
-def benchmark(predictor, predictor_args, model_config):
+def benchmark(predictor, predictor_args, model_args):
     # Just construct a simple benchmark input. We pad input to the src_length.
     test_texts = "hello world, how are you?"
     benchmark_texts = [test_texts + "<pad>" * predictor_args.src_length for _ in range(predictor_args.batch_size)]

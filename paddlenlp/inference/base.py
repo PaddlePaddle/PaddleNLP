@@ -92,6 +92,7 @@ class BasePredictor:
             add_special_tokens=self.tokenizer.chat_template is None
             or isinstance(self.tokenizer, (ChatGLMv2Tokenizer, ChatGLMTokenizer)),
         )
+
         return tokenized_source
 
     @abstractmethod
