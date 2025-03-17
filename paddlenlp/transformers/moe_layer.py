@@ -16,6 +16,7 @@
 # limitations under the License.
 from __future__ import annotations
 
+import os
 from typing import Any, List, Tuple
 
 import numpy as np
@@ -34,6 +35,8 @@ try:
     import kitchen
 except:
     pass
+
+DSV3_USE_FP8_GEMM = os.getenv("DSV3_USE_FP8_GEMM", "False").lower() == "true"
 
 
 def dispatching(x, dispatch_mask, scatter_index, num_experts, capacity):
@@ -496,17 +499,19 @@ class MoEFlexTokenLayer(nn.Layer):
         _, _, d_model = hidden_states.shape
         # reshaped_input = hidden_states.reshape([-1, d_model])
         probs, routing_map, l_aux, l_zloss = self.router(hidden_states)
-        # (
-        #     dispatched_input,
-        #     token_permuted_indices,
-        #     prob_permuted_indices,
-        #     dispatched_probs,
-        # ) = self.token_dispatcher.token_permutation(hidden_states, probs, routing_map)
-        # expert_output = self.expert_forward(dispatched_input)
-        # output, _ = self.token_dispatcher.token_unpermutation(
-        #     expert_output, token_permuted_indices, prob_permuted_indices, dispatched_probs, None
-        # )
-        output = FusionMoe.apply(hidden_states, probs, routing_map, self)
+        if DSV3_USE_FP8_GEMM:
+            output = FusionMoe.apply(hidden_states, probs, routing_map, self)
+        else:
+            (
+                dispatched_input,
+                token_permuted_indices,
+                prob_permuted_indices,
+                dispatched_probs,
+            ) = self.token_dispatcher.token_permutation(hidden_states, probs, routing_map)
+            expert_output = self.expert_forward(dispatched_input)
+            output, _ = self.token_dispatcher.token_unpermutation(
+                expert_output, token_permuted_indices, prob_permuted_indices, dispatched_probs, None
+            )
         return output, l_aux, l_zloss
 
     def pre_dispatch_compute(self, hidden_states):
