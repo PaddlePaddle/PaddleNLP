@@ -71,9 +71,9 @@ paddlenlp_build (){
     python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)" >> ${log_path}/commit_info.txt
 
     # for test https://www.paddlepaddle.org.cn/whl/paddlenlp.html
-    cp $build_dev_path/dist/p****.whl ${upload_path}/
+    cp $nlp_dir/dist/p****.whl ${upload_path}/
     # for ci pr test
-    cp $build_dev_path/dist/p****.whl ${upload_path}/paddlenlp-ci-py3-none-any.whl
+    cp $nlp_dir/dist/p****.whl ${upload_path}/paddlenlp-ci-py3-none-any.whl
 }
 
 paddlenlp_ops_build (){
