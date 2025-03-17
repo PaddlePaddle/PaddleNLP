@@ -426,7 +426,7 @@ std::vector<std::vector<int64_t>> GetBlockShapeAndSplitKVBlockInferShape(
           dynamic_shape,
           {1},
           {1},
-          {64},
+          {1},
           {1}};
 }
 
