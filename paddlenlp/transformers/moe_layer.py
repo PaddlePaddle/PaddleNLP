@@ -412,13 +412,15 @@ class FusionMoe(paddle.autograd.PyLayer):
         # post combine
         output = output_combie.reshape(token_dispatcher.hidden_shape)
 
-        ctx.save_for_backward(hidden_states, output_combie, dispatched_probs)
+        ctx.save_for_backward(hidden_states, output_combie, dispatched_probs, token_permuted_indices)
+
+        print("output: ", output)
 
         return output
 
     @staticmethod
     def backward(ctx, output_grad):
-        hidden_states, output_combie, dispatched_probs = ctx.saved_tensor()
+        hidden_states, output_combie, dispatched_probs, token_permuted_indices = ctx.saved_tensor()
 
         # post combine grad
         output_combie_grad = paddle._C_ops.reshape_grad(output_combie, output_grad)
@@ -434,9 +436,12 @@ class FusionMoe(paddle.autograd.PyLayer):
 
         # unpermute grad -> fp8
         expert_out_grad, dispatched_probs_grad = ctx.Node_unpermute.backward(hidden_states_out_grad)
+        hidden_states_out_grad_scale_grad = hidden_states_out_grad_scale.index_select(
+            axis=0, index=token_permuted_indices
+        )
 
         # expert_grad
-        hs_out_grad = ctx.Node_experts.backward(expert_out_grad, hidden_states_out_grad_scale)
+        hs_out_grad = ctx.Node_experts.backward(expert_out_grad, hidden_states_out_grad_scale_grad)
 
         # permute_grad
         hs_fp8_dispatched_grad = ctx.Node_permute.backward(hs_out_grad, dispatched_probs)

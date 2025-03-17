@@ -166,6 +166,8 @@ class UnPermuteNode:
         return output_tokens.to(self.input_dtype)
 
     def backward(self, out_grad):
+        hidden_states_grad = out_grad.index_select(axis=0, index=self.token_permuted_indices)
+
         output_tokens_grad = out_grad.to(self.permuted_tokens_dtype)
 
         _, permuted_tokens_grad = paddle._C_ops.put_along_axis_grad(
@@ -179,12 +181,7 @@ class UnPermuteNode:
             True,
         )
 
-        hidden_states_grad = permuted_tokens_grad * self.permuted_probs.unsqueeze(-1)
         permuted_probs_grad = (permuted_tokens_grad * self.hidden_states).sum(axis=-1)
-
-        permuted_probs_grad = paddle._C_ops.unsqueeze_grad(
-            self.permuted_probs, permuted_tokens_grad * self.hidden_states, -1
-        )
 
         faltten_dispatched_probs_grad = paddle._C_ops.index_select_grad(
             self.faltten_dispatched_probs, self.prob_permuted_indices, permuted_probs_grad, 0
