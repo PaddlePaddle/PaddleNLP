@@ -1165,11 +1165,11 @@ class SequenceBiasLogitsProcessor(LogitsProcessor):
                     input_ids[:, -prefix_length:],
                     paddle.to_tensor(sequence_ids[:-1], dtype=input_ids.dtype),
                 )
-                .prod(axis=1)
                 .astype(paddle.int64)
+                .prod(axis=1)
             )
             bias[:, last_token] += paddle.where(
-                matching_rows.bool(),
+                matching_rows.astype(paddle.bool),
                 paddle.to_tensor(sequence_bias),
                 paddle.to_tensor(0.0),
             )

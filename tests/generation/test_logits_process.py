@@ -406,7 +406,7 @@ class LogitsProcessorTest(unittest.TestCase):
 
         # make sure at least 2 tokens are kept
         epsilon_warp = EpsilonLogitsWarper(5e-2, min_tokens_to_keep=2, filter_value=0.0)
-        filtered_dist = epsilon_warp(input_ids, ramp_logits)
+        filtered_dist = epsilon_warp(input_ids, ramp_logits.cast("float32"))
 
         # first batch should keep 3 tokens, second batch would keep only 1, but due to `min_tokens_to_keep=2` keeps 2.
         self.assertListEqual((filtered_dist != 0.0).sum(axis=-1).tolist(), [3, 2])
@@ -440,7 +440,7 @@ class LogitsProcessorTest(unittest.TestCase):
 
         # make sure at least 2 tokens are kept
         eta_warp = EtaLogitsWarper(0.1, min_tokens_to_keep=2, filter_value=0.0)
-        filtered_dist = eta_warp(input_ids, ramp_logits)
+        filtered_dist = eta_warp(input_ids, ramp_logits.cast("float32"))
 
         # first batch should keep 2 tokens, second batch would keep only 1, but due to `min_tokens_to_keep=2` keeps 2.
         self.assertListEqual((filtered_dist != 0.0).sum(axis=-1).tolist(), [2, 2])
@@ -710,7 +710,7 @@ class LogitsProcessorTest(unittest.TestCase):
         batch_size = 4
         bos_token_id = 0
 
-        logits_processor = ForcedBOSTokenLogitsProcessor(forced_bos_token_id=bos_token_id)
+        logits_processor = ForcedBOSTokenLogitsProcessor(bos_token_id)
 
         # check that all scores are -inf except the bos_token_id score
         input_ids = ids_tensor((batch_size, 1), vocab_size=20)
@@ -915,7 +915,7 @@ class LogitsProcessorTest(unittest.TestCase):
             return out
 
         def lsm(x):
-            return paddle.nn.functional.log_softmax(x, dim=-1)
+            return paddle.nn.functional.log_softmax(x, axis=-1)
 
         # explicit unconditional prompt + attention mask
         input_ids = paddle.to_tensor([[0]])
@@ -1103,7 +1103,7 @@ class LogitsProcessorTest(unittest.TestCase):
                 _ = logits_processor(ngrams[:, :idx], fixed_logits)
 
             updated_scores = logits_processor(ngrams, fixed_logits)
-            updated_softmaxes += paddle.nn.functional.softmax(updated_scores, dim=1).cpu().numpy()
+            updated_softmaxes += paddle.nn.functional.softmax(updated_scores, axis=1).cpu().numpy()
 
         updated_softmaxes = np.mean(updated_softmaxes, axis=0) / num_keys
         is_close = paddle.all(

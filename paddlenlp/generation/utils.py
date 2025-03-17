@@ -726,9 +726,9 @@ class GenerationMixin:
                 raise ValueError(
                     f"`decoder_start_token_id` expected to have length {batch_size} but got {decoder_start_token_id.shape[0]}"
                 )
-            decoder_start_token_id = decoder_start_token_id.view(-1, 1)
+            decoder_start_token_id = decoder_start_token_id.view([-1, 1])
         else:
-            decoder_start_token_id = paddle.ones((batch_size, 1), dtype="int64") * decoder_start_token_id
+            decoder_start_token_id = paddle.ones([batch_size, 1], dtype="int64") * decoder_start_token_id
 
         # 3. Encoder-decoder models expect the `decoder_input_ids` to start with a special token. Let's ensure that.
         # no user input -> use decoder_start_token_id as decoder_input_ids
@@ -1364,18 +1364,18 @@ class GenerationMixin:
         # TODO(joao): remove this function in v4.50, i.e. when we remove the inheritance of `GenerationMixin` from
         # `PreTrainedModel`. With that inheritance removed, all model classes inheriting from `GenerationMixin` can
         # safely call `GenerationMixin.generate`
-        if not self.can_generate():
-            terminations_with_generation_support = [
-                "ForCausalLM",
-                "ForConditionalGeneration",
-                "ForSpeechSeq2Seq",
-                "ForVision2Seq",
-            ]
-            raise TypeError(
-                f"The current model class ({self.__class__.__name__}) is not compatible with `.generate()`, as "
-                "it doesn't have a language model head. Classes that support generation often end in one of these "
-                f"names: {terminations_with_generation_support}."
-            )
+        # if not self.can_generate():
+        #     terminations_with_generation_support = [
+        #         "ForCausalLM",
+        #         "ForConditionalGeneration",
+        #         "ForSpeechSeq2Seq",
+        #         "ForVision2Seq",
+        #     ]
+        #     raise TypeError(
+        #         f"The current model class ({self.__class__.__name__}) is not compatible with `.generate()`, as "
+        #         "it doesn't have a language model head. Classes that support generation often end in one of these "
+        #         f"names: {terminations_with_generation_support}."
+        #     )
 
     def _validate_assistant(self, assistant_model, tokenizer, assistant_tokenizer):
         if assistant_model is None:
@@ -2045,7 +2045,6 @@ class GenerationMixin:
         self._validate_model_class()
         tokenizer = kwargs.pop("tokenizer", None)  # Pull this out first, we only use it for stopping criteria
         assistant_tokenizer = kwargs.pop("assistant_tokenizer", None)  # only used for assisted generation
-
         generation_config, model_kwargs = self._prepare_generation_config(generation_config, **kwargs)
         self._validate_model_kwargs(model_kwargs.copy())
         self._validate_assistant(assistant_model, tokenizer, assistant_tokenizer)
@@ -3524,7 +3523,7 @@ class GenerationMixin:
 
                 outputs = stack_model_outputs(outputs_per_sub_batch, self.config.get_text_config())
 
-            else:  # Unchanged original behavior
+            else:  # Unchanged original behavior             
                 outputs = self(**model_inputs, return_dict=True)
 
             # synced_gpus: don't waste resources running the code we don't need; kwargs must be updated before skipping
