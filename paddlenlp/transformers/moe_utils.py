@@ -91,3 +91,104 @@ def unpermute(
         include_self=True,
     )
     return output_tokens
+
+
+class PermuteNode:
+    def __init__(self, token_dispatcher, name="permute"):
+        self.token_dispatcher = token_dispatcher
+        self.name = name
+
+    def forward(self, hidden_states, hidden_states_scale, dispatched_indices):
+        self.token_dispatcher._comm_manager.hidden_shape_before_permute = hidden_states.shape
+        self.token_permuted_indices, self.prob_permuted_indices = topk_to_permuted_indices(
+            dispatched_indices,
+            self.token_dispatcher._comm_manager.tokens_per_expert,
+            self.token_dispatcher._comm_manager.router_topk,
+        )
+        hidden_states = permute(hidden_states, self.token_permuted_indices)
+        # permute scale
+        hidden_states_scale = permute(hidden_states_scale, self.token_permuted_indices)
+
+        return hidden_states, hidden_states_scale, self.token_permuted_indices, self.prob_permuted_indices
+
+    def backward(self, out_grad, dispatched_probs):
+        input_dtype = out_grad.dtype
+        hidden_states_grad = unpermute(
+            permuted_tokens=out_grad,
+            token_permuted_indices=self.token_permuted_indices,
+            prob_permuted_indices=self.prob_permuted_indices,
+            restore_shape=self.token_dispatcher._comm_manager.hidden_shape_before_permute,
+            probs=dispatched_probs,
+        )
+        return hidden_states_grad.to(input_dtype)
+
+
+class UnPermuteNode:
+    def __init__(self, token_dispatcher, name="unpermute"):
+        self.token_dispatcher = token_dispatcher
+        self.name = name
+
+    def forward(
+        self,
+        hidden_states,
+        token_permuted_indices,
+        prob_permuted_indices,
+        dispatched_probs,
+    ):
+        self.token_permuted_indices = token_permuted_indices
+        self.input_dtype = hidden_states.dtype
+        self.hidden_states = hidden_states
+        self.prob_permuted_indices = prob_permuted_indices
+        self.dispatched_probs = dispatched_probs
+        # permute
+        _, self.hidden = self.token_dispatcher._comm_manager.hidden_shape_before_permute
+
+        self.faltten_dispatched_probs = self.dispatched_probs.flatten()
+
+        self.permuted_probs = self.faltten_dispatched_probs.index_select(axis=0, index=self.prob_permuted_indices)
+        self.permuted_tokens = hidden_states * self.permuted_probs.unsqueeze(-1)
+        self.permuted_tokens_dtype = self.permuted_tokens.dtype
+
+        # Create an output tensor filled with zeros
+        output_tokens = paddle.zeros(
+            self.token_dispatcher._comm_manager.hidden_shape_before_permute, dtype=self.permuted_tokens_dtype
+        )
+        # Scatter add the permuted_input back to the original positions
+        output_tokens.put_along_axis_(
+            axis=0,
+            indices=self.token_permuted_indices.unsqueeze(1).expand([-1, self.hidden]),
+            values=self.permuted_tokens,
+            reduce="add",
+            include_self=True,
+        )
+        self.output_tokens = output_tokens
+
+        return output_tokens.to(self.input_dtype)
+
+    def backward(self, out_grad):
+        output_tokens_grad = out_grad.to(self.permuted_tokens_dtype)
+
+        _, permuted_tokens_grad = paddle._C_ops.put_along_axis_grad(
+            self.output_tokens,
+            self.token_permuted_indices.unsqueeze(1).expand([-1, self.hidden]),
+            self.permuted_tokens,
+            self.output_tokens,
+            output_tokens_grad,
+            0,
+            "add",
+            True,
+        )
+
+        hidden_states_grad = permuted_tokens_grad * self.permuted_probs.unsqueeze(-1)
+
+        permuted_probs_grad = paddle._C_ops.unsqueeze_grad(
+            self.permuted_probs, permuted_tokens_grad * self.hidden_states, -1
+        )
+
+        faltten_dispatched_probs_grad = paddle._C_ops.index_select_grad(
+            self.faltten_dispatched_probs, self.prob_permuted_indices, permuted_probs_grad, 0
+        )
+
+        dispatched_probs_grad = paddle._C_ops.flatten_grad(self.dispatched_probs, faltten_dispatched_probs_grad)
+
+        return hidden_states_grad, dispatched_probs_grad

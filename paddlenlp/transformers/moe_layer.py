@@ -24,8 +24,16 @@ import paddle.distributed as dist
 from paddle import Tensor, nn
 from paddle.distributed.communication.group import Group
 
+from .fp8_utils import ExpertsNode, kitchen_quant
+from .fused_a2a import CombineNode, DispatchNode
 from .moe_gate import PretrainedMoEGate
-from .token_dispatcher import MoEFlexTokenDispatcher
+from .moe_utils import PermuteNode, UnPermuteNode
+from .token_dispatcher import MoEFlexTokenDispatcher, PreDispatchNode
+
+try:
+    import kitchen
+except:
+    pass
 
 
 def dispatching(x, dispatch_mask, scatter_index, num_experts, capacity):
@@ -333,6 +341,120 @@ class MoELayer(nn.Layer):
         return final_out, l_aux, l_zloss
 
 
+class FusionMoe(paddle.autograd.PyLayer):
+    @staticmethod
+    def forward(ctx, hidden_states, probs, routing_map, custom_map):
+        token_dispatcher = custom_map.token_dispatcher
+        experts = custom_map.experts
+
+        # construct some Node
+        ctx.Node_pre_dispatch = PreDispatchNode(token_dispatcher)
+        ctx.Node_dispatch_act = DispatchNode()
+        ctx.Node_dispatch_scale = DispatchNode()
+        ctx.Node_permute = PermuteNode(token_dispatcher)
+        ctx.Node_experts = ExpertsNode(experts)
+        ctx.Node_unpermute = UnPermuteNode(token_dispatcher)
+        ctx.Node_combine = CombineNode()
+
+        # reshape
+        token_dispatcher.hidden_shape = hidden_states.shape
+        hs_2d = hidden_states.view([-1, token_dispatcher.hidden_shape[-1]])
+
+        # quant
+        hs_fp8, hs_scale = kitchen_quant(
+            hs_2d, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+        )
+
+        # pre_dispatch
+        token_indices, token_probs = ctx.Node_pre_dispatch.forward(routing_map, probs)
+
+        # dispatch
+        hs_fp8_dispatched, dispatched_probs, states = ctx.Node_dispatch_act.forward(
+            hs_fp8,
+            token_indices,
+            token_probs,
+            token_dispatcher._comm_manager.num_experts,
+            token_dispatcher._comm_manager.group,
+        )
+        token_dispatcher._comm_manager.handle = states["handle"]
+        token_dispatcher._comm_manager.tokens_per_expert = states["tokens_per_expert"]
+        dispatched_indices = states["dispatched_indices"]
+
+        hs_scale_dispatched, _, _ = ctx.Node_dispatch_scale.forward(
+            hs_scale,
+            token_indices,
+            token_probs,
+            token_dispatcher._comm_manager.num_experts,
+            token_dispatcher._comm_manager.group,
+        )
+
+        # permute
+        (
+            hs_out,
+            hs_scale_out,
+            token_permuted_indices,
+            prob_permuted_indices,
+        ) = ctx.Node_permute.forward(hs_fp8_dispatched, hs_scale_dispatched, dispatched_indices)
+
+        # experts
+        expert_out = ctx.Node_experts.forward(hs_out, hs_scale_out, token_dispatcher._comm_manager.tokens_per_expert)
+
+        # unpermute
+        hidden_states_out = ctx.Node_unpermute.forward(
+            expert_out, token_permuted_indices, prob_permuted_indices, dispatched_probs
+        )
+
+        # combine
+        output_combie = ctx.Node_combine.forward(
+            hidden_states_out, token_dispatcher._comm_manager.group, token_dispatcher._comm_manager.handle
+        )
+
+        # post combine
+        output = output_combie.reshape(token_dispatcher.hidden_shape)
+
+        ctx.save_for_backward(hidden_states, output_combie, dispatched_probs)
+
+        return output
+
+    @staticmethod
+    def backward(ctx, output_grad):
+        hidden_states, output_combie, dispatched_probs = ctx.saved_tensor()
+
+        # post combine grad
+        output_combie_grad = paddle._C_ops.reshape_grad(output_combie, output_grad)
+
+        # output_combie_grad quant to fp8
+        output_combie_grad_fp8, output_combie_grad_scale = kitchen_quant(
+            output_combie_grad, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+        )
+
+        # combine grad -> fp8
+        hidden_states_out_grad = ctx.Node_combine.backward(output_combie_grad_fp8)
+        hidden_states_out_grad_scale = ctx.Node_combine.backward(output_combie_grad_scale)
+
+        # unpermute grad -> fp8
+        expert_out_grad, dispatched_probs_grad = ctx.Node_unpermute.backward(hidden_states_out_grad)
+
+        # expert_grad
+        hs_out_grad = ctx.Node_experts.backward(expert_out_grad, hidden_states_out_grad_scale)
+
+        # permute_grad
+        hs_fp8_dispatched_grad = ctx.Node_permute.backward(hs_out_grad, dispatched_probs)
+
+        # dispatch grad
+        hs_fp8_grad, token_indices_grad, token_probs_grad = ctx.Node_dispatch_act.backward(
+            hs_fp8_dispatched_grad, dispatched_probs_grad
+        )
+
+        # predispatch grad
+        probs_grad = ctx.Node_pre_dispatch.backward(token_probs_grad)
+
+        # reshape_grad
+        hs_grad = paddle._C_ops.reshape_grad(hidden_states, hs_fp8_grad)
+
+        return hs_grad, probs_grad, None
+
+
 class MoEFlexTokenLayer(nn.Layer):
     def __init__(self, config, moe_num_experts, expert_class, expert_kwargs, gate, moe_group):
 
@@ -371,16 +493,17 @@ class MoEFlexTokenLayer(nn.Layer):
         _, _, d_model = hidden_states.shape
         # reshaped_input = hidden_states.reshape([-1, d_model])
         probs, routing_map, l_aux, l_zloss = self.router(hidden_states)
-        (
-            dispatched_input,
-            token_permuted_indices,
-            prob_permuted_indices,
-            dispatched_probs,
-        ) = self.token_dispatcher.token_permutation(hidden_states, probs, routing_map)
-        expert_output = self.expert_forward(dispatched_input)
-        output, _ = self.token_dispatcher.token_unpermutation(
-            expert_output, token_permuted_indices, prob_permuted_indices, dispatched_probs, None
-        )
+        # (
+        #     dispatched_input,
+        #     token_permuted_indices,
+        #     prob_permuted_indices,
+        #     dispatched_probs,
+        # ) = self.token_dispatcher.token_permutation(hidden_states, probs, routing_map)
+        # expert_output = self.expert_forward(dispatched_input)
+        # output, _ = self.token_dispatcher.token_unpermutation(
+        #     expert_output, token_permuted_indices, prob_permuted_indices, dispatched_probs, None
+        # )
+        output = FusionMoe.apply(hidden_states, probs, routing_map, self)
         return output, l_aux, l_zloss
 
     def pre_dispatch_compute(self, hidden_states):

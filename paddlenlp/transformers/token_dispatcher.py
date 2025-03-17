@@ -220,3 +220,35 @@ class MoEFlexTokenDispatcher:
 
         hidden_states = self.post_combine(hidden_states)
         return hidden_states, None
+
+
+class PreDispatchNode:
+    def __init__(self, token_dispatcher):
+        self.token_dispatcher = token_dispatcher
+        self.probs_origin_shape = None
+
+    def forward(self, routing_map, probs):
+        num_tokens = routing_map.shape[0]
+        self.probs_origin_shape = probs.shape
+        # routing_map = routing_map.reshape([num_tokens, token_dispatcher._comm_manager.num_experts])
+        self.probs = probs
+        reshaped_probs = probs.reshape([num_tokens, self.token_dispatcher._comm_manager.num_experts])
+        self.reshaped_probs = reshaped_probs
+        token_probs, token_indices = paddle.topk(
+            reshaped_probs, self.token_dispatcher._comm_manager.router_topk, axis=-1
+        )
+        self.token_indices = token_indices
+        return token_indices, token_probs
+
+    def backward(self, token_probs_g):
+        probs_grad = paddle._C_ops.topk_grad(
+            self.reshaped_probs,
+            self.token_indices,
+            token_probs_g,
+            self.token_dispatcher._comm_manager.router_topk,
+            -1,
+            True,
+            True,
+        )
+        probs_reshape_g = paddle._C_ops.reshape_grad(probs_grad, self.probs)
+        return probs_reshape_g

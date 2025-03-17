@@ -235,3 +235,45 @@ if HAVE_DEEP_EP:
 else:
     fused_dispatch = None
     fused_combine = None
+
+
+class DispatchNode:
+    def __init__(self, name="dispatch"):
+        self.name = name
+
+    def forward(self, x, token_indices, token_probs, num_experts, group, previous_event=None):
+        """Forward pass of fused dispatch."""
+        recv_x, recv_token_probs, states, event = fused_dispatch_forward_func(
+            x, token_indices, token_probs, num_experts, group, previous_event
+        )
+
+        self.group = group
+        self.handle = states["handle"]
+        self.event = event
+
+        return recv_x, recv_token_probs, states
+
+    def backward(self, grad_output, grad_token_probs):
+        """Backward pass of fused dispatch."""
+        return fused_dispatch_backward_func(grad_output, grad_token_probs, self.group, self.handle)
+
+
+class CombineNode:
+    def __init__(self, name="combine"):
+        self.name = name
+
+    def forward(self, x, group, handle, previous_event=None):
+        """Forward pass of fused combine."""
+        states = dict()
+        states["handle"] = handle
+        combined_x = fused_combine_forward_func(x, group, states, previous_event)
+
+        self.handle = handle
+        self.group = group
+        self.previous_event = previous_event
+
+        return combined_x
+
+    def backward(self, grad_output):
+        """Backward pass of fused combine."""
+        return fused_combine_backward_func(grad_output, self.group, self.handle, self.previous_event)
