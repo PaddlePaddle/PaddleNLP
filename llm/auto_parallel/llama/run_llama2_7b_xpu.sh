@@ -100,6 +100,8 @@ python -u  -m paddle.distributed.launch \
     --bf16 \
     --fp16_opt_level "O2"  \
     --amp_master_grad true \
+    --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
+    --amp_custom_white_list "lookup_table" "lookup_table_v2" \
     --warmup_ratio 0.01 \
     --max_grad_norm 1.0 \
     --dataloader_num_workers 1 \
