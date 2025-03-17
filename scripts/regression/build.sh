@@ -68,8 +68,7 @@ paddlenlp_build (){
     python -m pip install -r requirements-dev.txt --trusted-host pip.baidu-int.com
     python setup.py bdist_wheel
     python -m pip install --ignore-installed  dist/p****.whl
-    python -c "import paddlenlp; import __version__; print('paddlenlp'); \
-        print(__version__);print(paddlenlp.version.commit)" >> ${log_path}/commit_info.txt
+    python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)" >> ${log_path}/commit_info.txt
 
     # for test https://www.paddlepaddle.org.cn/whl/paddlenlp.html
     cp $build_dev_path/dist/p****.whl ${upload_path}/
@@ -78,6 +77,8 @@ paddlenlp_build (){
 }
 
 paddlenlp_ops_build (){
+    echo "install_nlp_develop"
+    python -m pip install --user https://paddlenlp.bj.bcebos.com/wheels/paddlenlp-ci-py3-none-any.whl --no-cache-dir
     cd ${nlp_dir}/csrc
     bash tools/build_wheel.sh
     python -c "import paddlenlp_ops"

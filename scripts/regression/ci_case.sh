@@ -567,6 +567,7 @@ taskflow (){
 }
 llm(){
     export http_proxy=${proxy} && export https_proxy=${proxy}
+    set -e
     if git diff --numstat "$AGILE_COMPILE_BRANCH" | awk '{print $NF}' | grep -q '^csrc/'; then
         echo "Found modifications in csrc, running setup_cuda.py install and uploading it to bos."
         cd ${nlp_dir}/csrc
@@ -580,7 +581,7 @@ llm(){
         echo "No modifications in csrc, installing paddlenlp_ops wheel file..."
         python -m pip install --pre --upgrade paddlenlp_ops -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html --no-cache-dir
     fi
-
+    set +e
     sleep 5
     
     echo ' Testing all LLMs '
