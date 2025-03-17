@@ -168,19 +168,9 @@ public:
     const int64_t num_experts = ffn1_dims[0];
     const int64_t k = moe_topk;
 
-    VLOG(4) << "[MoE Info] "
-            << "num_rows: " << num_rows << ", "
-            << "hidden_size: " << hidden_size << ", "
-            << "inter_size: " << inter_size << ", "
-            << "num_experts: " << num_experts << ", "
-            << "k: " << k << ", "
-            << "group_moe: " << std::boolalpha << group_moe;
-
 
     int64_t bytes =
         getWorkspaceSize<T>(num_rows, hidden_size, inter_size, num_experts, k);
-
-    VLOG(4) << "bytes ---- " << bytes;
 
     // Pointers
     int *expert_for_source_row;
@@ -241,9 +231,6 @@ public:
         GetEmptyTensor({num_rows * k, inter_size}, input_type, place);
     T *fc1_out = fc1_out_tensor.data<T>();
 
-    VLOG(4) << " gemm method is :" << gemm_method_
-            << ". group_moe is :" << group_moe;
-
     auto input_cast_tensor =
         paddle::experimental::cast(*input, paddle::DataType::FLOAT32);
     auto gate_tensor =
@@ -251,7 +238,6 @@ public:
     float *gating_output = gate_tensor.data<float>();
 
     if (moe_token_type_ids) {
-      VLOG(4) << "moe_token_type_ids is on";
       auto *moe_token_type_ids_out = moe_token_type_ids->data<int>();
       moe_token_type_ids_kernelLauncher<float>(gating_output,
                                                moe_token_type_ids_out,
@@ -304,8 +290,6 @@ public:
                                      num_experts,
                                      total_rows_before_expert_,
                                      stream);
-
-    VLOG(4) << " ENTER EXPERT \n";
 
     if (gemm_method_ == "weight_only_int8") {
       int8_moe_gemm_runner_->moe_gemm_bias_act(
@@ -431,7 +415,6 @@ public:
           routed_scaling_factor,
           stream);
     }
-    VLOG(4) << " Finished EXPERT \n";
   }
 
 private:

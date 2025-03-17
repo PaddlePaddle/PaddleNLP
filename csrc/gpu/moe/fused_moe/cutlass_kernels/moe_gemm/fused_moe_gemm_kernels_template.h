@@ -716,29 +716,10 @@ void MoeGemmRunner<T, WeightType>::run_gemm<EpilogueTag>(
         best_time = elapsed;
         best_config = candidate_configs[ii];
       }
-      VLOG(4) << "profile_total_rows" << profile_total_rows;
-      VLOG(4) << "candidate_config tile_config"
-              << static_cast<int>(candidate_configs[ii].tile_config);
-      VLOG(4) << "candidate_config split_k_style"
-              << static_cast<int>(candidate_configs[ii].split_k_style);
-      VLOG(4) << "candidate_config split_k_factor "
-              << candidate_configs[ii].split_k_factor;
-      VLOG(4) << "candidate_config stages " << candidate_configs[ii].stages;
-      VLOG(4) << "elapsed time: " << elapsed;
-      VLOG(4) << "best_time: " << best_time;
     }
     gemmConfigManager.addBestConfig(gemmId, profile_total_rows, best_config);
     chosen_config = best_config;
   }
-
-  VLOG(4) << "chosen_config tile_config"
-          << static_cast<int>(chosen_config.tile_config);
-  VLOG(4) << "chosen_config split_k_style"
-          << static_cast<int>(chosen_config.split_k_style);
-  VLOG(4) << "chosen_config split_k_factor " << chosen_config.split_k_factor;
-  VLOG(4) << "chosen_config stages " << chosen_config.stages;
-  VLOG(4) << "total_rows  " << total_rows << "gemm_n  " << gemm_n << "gemm_k  "
-          << gemm_k;
 
   dispatch_to_arch<EpilogueTag>(A,
                                 B,

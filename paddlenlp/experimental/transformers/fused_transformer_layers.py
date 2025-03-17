@@ -64,16 +64,16 @@ if paddle.is_compiled_with_cuda():
         from paddlenlp_ops import (
             dequant_int8,
             encode_rotary_qk,
+            fused_expert_moe,
+            moe_expert_dispatch,
+            moe_expert_ffn,
+            moe_expert_reduce,
             qkv_transpose_split,
             quant_int8,
             rebuild_padding,
             transpose_remove_padding,
             write_cache_kv,
-            moe_expert_dispatch,
-            moe_expert_ffn,
-            moe_expert_reduce,
-            fused_expert_moe
-            )
+        )
     except:
         pass
 
@@ -1344,7 +1344,7 @@ class FusedMultiTransformerBase(Layer):
                 self.quant_type if hasattr(self, "quant_type") else "None",
                 self.config.moe_config.top_k,
                 self.config.moe_config.norm_topk_prob,
-                False
+                False,
             )
         return fused_moe_out
 

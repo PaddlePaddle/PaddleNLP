@@ -107,13 +107,6 @@ void MoeDispatchKernel(const paddle::Tensor& input,
     softmax_out_ = nullptr;
   }
 
-    VLOG(4) << "[MoE Info] "
-            << "num_rows: " << num_rows << ", "
-            << "hidden_size: " << hidden_size << ", "
-            << "num_experts: " << expert_num << ", "
-            << "k: " << moe_topk << ", "
-            << "group_moe: " << std::boolalpha << group_moe;
-
   topk_gating_softmax_kernelLauncher<float>(gating_output.data<float>(),
                                             expert_scales_float->data<float>(),
                                             softmax_out_,
