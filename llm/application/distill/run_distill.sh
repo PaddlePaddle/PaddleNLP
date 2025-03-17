@@ -13,8 +13,8 @@
 # limitations under the License.
 
 nohup python distill_data.py \
-    --input_file "data/gsm8k_zh/GSM8K_zh.jsonl" \
-    --output_dir "data/paddle/GSM8K_distilled_en" \
+    --input_file "./data/gsm8k_zh/GSM8K_zh.jsonl" \
+    --output_dir "./data/paddle/GSM8K_distilled_en" \
     --prompt_key "question" \
     --response_key "deepseek_r1_response" \
     --reasoning_key "deepseek_r1_reasoning" \
@@ -27,8 +27,8 @@ nohup python distill_data.py \
     --concurrency 16 > ./meta-math_gsm8k_en_distill.log 2>&1 &
 
 nohup python distill_data.py \
-    --input_file "data/gsm8k_zh/GSM8K_zh.jsonl" \
-    --output_dir "data/gsm8k_zh/GSM8K_distilled_zh" \
+    --input_file "./data/gsm8k_zh/GSM8K_zh.jsonl" \
+    --output_dir "./data/gsm8k_zh/GSM8K_distilled_zh" \
     --prompt_key "question_zh" \
     --response_key "deepseek_r1_response_zh" \
     --reasoning_key "deepseek_r1_reasoning_zh" \

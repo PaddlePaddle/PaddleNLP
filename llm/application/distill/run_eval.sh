@@ -74,28 +74,28 @@ nohup python -u -m paddle.distributed.launch \
     --temperature ${TEMPERATURE} \
     --top_p ${TOP_P} \
     --data_file ${INPUT_FILE} \
-    --eval_results ${EVAL_RESULTS} > /dev/null &
+    --eval_results ${EVAL_RESULTS} > log_zh.txt &
 
 
-EVAL_RESULTS="${OUTPUT_DIR}/output_en.json"
-mkdir -p ${OUTPUT_DIR} && touch ${EVAL_RESULTS}
-nohup python -u -m paddle.distributed.launch \
-    --devices "4,5,6,7" \
-    distill_eval.py \
-    --eval_file ${INPUT_FILE} \
-    --eval_question_key "question" \
-    --eval_answer_key "answer_only" \
-    --eval_prompt "\nPlease reason step by step, and put your final answer within \\boxed{}." \
-    --model_name_or_path ${MODEL_PATH} \
-    --inference_model true \
-    --dtype ${DTYPE} \
-    --batch_size 32 \
-    --use_flash_attention true \
-    --src_length ${SRC_LENGTH} \
-    --max_length ${MAX_LENGTH} \
-    --total_max_length ${TOTAL_MAX_LENGTH} \
-    --decode_strategy ${DECODE_STRATEGY} \
-    --temperature ${TEMPERATURE} \
-    --top_p ${TOP_P} \
-    --data_file ${INPUT_FILE} \
-    --eval_results ${EVAL_RESULTS} > /dev/null &
+# EVAL_RESULTS="${OUTPUT_DIR}/output_en.json"
+# mkdir -p ${OUTPUT_DIR} && touch ${EVAL_RESULTS}
+# nohup python -u -m paddle.distributed.launch \
+#     --devices "4,5,6,7" \
+#     distill_eval.py \
+#     --eval_file ${INPUT_FILE} \
+#     --eval_question_key "question" \
+#     --eval_answer_key "answer_only" \
+#     --eval_prompt "\nPlease reason step by step, and put your final answer within \\boxed{}." \
+#     --model_name_or_path ${MODEL_PATH} \
+#     --inference_model true \
+#     --dtype ${DTYPE} \
+#     --batch_size 32 \
+#     --use_flash_attention true \
+#     --src_length ${SRC_LENGTH} \
+#     --max_length ${MAX_LENGTH} \
+#     --total_max_length ${TOTAL_MAX_LENGTH} \
+#     --decode_strategy ${DECODE_STRATEGY} \
+#     --temperature ${TEMPERATURE} \
+#     --top_p ${TOP_P} \
+#     --data_file ${INPUT_FILE} \
+#     --eval_results ${EVAL_RESULTS} > log_en.txt &
