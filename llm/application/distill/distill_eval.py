@@ -13,19 +13,38 @@
 # limitations under the License.
 
 import json
-import os
 import re
+from dataclasses import dataclass, field
 
+import paddle
 from grader import math_equal
+from paddle.distributed import fleet
 
-# dataset_name = "aime2024"
-dataset_name = "gsm8k"
-# dataset_name = "math500"
+from llm.predict.predictor import (
+    ModelArgument,
+    PredictorArgument,
+    batchfy_text,
+    create_predictor,
+)
+from paddlenlp.trainer import PdArgumentParser
+from paddlenlp.trl import llm_utils
+from paddlenlp.utils.log import logger
 
-test_dataset_path = f"./data/{dataset_name}/dev.json"
-output_dataset_path = f"./results-{dataset_name}/Qwen/Qwen2.5-Math-7B/output.json"
-output_result_path = os.path.join(os.path.dirname(output_dataset_path), f"{dataset_name}.log")
-IS_BASE = False
+
+@dataclass
+class EvalArgument:
+    eval_file: str = field(
+        default="gsm8k",
+        metadata={"help": "the name of dataset for evalution. Supported values: aime2024, gsm8k, math500"},
+    )
+    eval_question_key: str = field(default="input_ids", metadata={"help": "the question key of dataset"})
+    eval_answer_key: str = field(default="output_ids", metadata={"help": "the answer key of dataset"})
+    eval_prompt: str = field(
+        default="\nPlease reason step by step, and put your final answer within \\boxed{}.",
+        metadata={"help": "the prompt used during evaluation"},
+    )
+
+    eval_results: str = field(default="output.json", metadata={"help": "predict result file directory"})
 
 
 def extract_answer(solution_str):
@@ -35,77 +54,101 @@ def extract_answer(solution_str):
     return final_answer
 
 
-def extract_solution(solution_str, base=False):
+def extract_solution(solution_str, just_last_number=False):
     """Extract the answer number from the sentence using regular expressions."""
     # Remove commas for easier extraction
     sentence = solution_str.replace(",", "")
     # Find all numbers in the sentence
-    if base:
+    # 提取boxed{}中的任意值
+    pattern = r"boxed\{(.*)\}"
+    numbers = [s for s in re.findall(pattern, sentence)]
+
+    # when boxed{} has not results, try fetch last number as result.
+    if not numbers:
         pattern = r"-?\d+\.?\d*"
         numbers = [s for s in re.findall(pattern, sentence)]
-    else:
-        if dataset_name in ["aime2024", "gsm8k"]:
-            pattern = r"boxed\{([0-9]+(\.[0-9]+)?)"
-            numbers = [s for s in re.findall(pattern, sentence)]
-        elif dataset_name == "math500":
-            # 提取boxed{}中的任意值
-            pattern = r"boxed\{(.*)\}"
-            numbers = [s for s in re.findall(pattern, sentence)]
 
     if not numbers:
         return None  # Return 'inf' if no number is found
     else:
         # Return the last number found as a float
-        if dataset_name == "math500":
-            return str(numbers[-1]) if not base else str(numbers[-1])
-        else:
-            return str(numbers[-1][0]) if not base else str(numbers[-1])
+        return str(numbers[-1])
 
 
-ground, solution = [], []
-with open(test_dataset_path, "r") as f:
-    for line in f.readlines():
-        line = line.strip()
-        if not line:
-            continue
-        jsline = json.loads(line)
-        if "answer" in jsline.keys():
-            ground.append(str(jsline["answer"]))
-        else:
-            ground.append(extract_answer(jsline["tgt"]))
+def predict():
+    parser = PdArgumentParser((PredictorArgument, ModelArgument, EvalArgument))
+    predictor_args, model_args, eval_args = parser.parse_args_into_dataclasses()
+
+    llm_utils.set_triton_cache(predictor_args.model_name_or_path, predictor_args.mode)
+
+    tensor_parallel_degree = paddle.distributed.get_world_size()
+    if tensor_parallel_degree > 1:
+        strategy = fleet.DistributedStrategy()
+        strategy.hybrid_configs = {
+            "dp_degree": 1,
+            "mp_degree": tensor_parallel_degree,
+            "pp_degree": 1,
+            "sharding_degree": 1,
+        }
+        fleet.init(is_collective=True, strategy=strategy)
+
+    predictor = create_predictor(predictor_args, model_args)
+
+    source_texts = []
+    target_texts = []
+    assert eval_args.eval_file is not None, "eval_file is None, please set a file (.json or .jsonl) to eval"
+
+    with open(eval_args.eval_file, "r", encoding="utf-8") as f:
+        for line in f:
+            example = json.loads(line)
+            source_texts.append(example[eval_args.eval_question_key] + eval_args.eval_prompt)
+            target_texts.append(example[eval_args.eval_answer_key])
+
+    batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
+    batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
+
+    with open(eval_args.eval_results, "w", encoding="utf-8") as f:
+        cnt, bad_format = 0, 0
+
+        for bs, batch_source_text in enumerate(batch_source_texts):
+            # logger.info("Start predict")
+            outputs = predictor.predict(batch_source_text)
+            # logger.info("End predict")
+
+            if predictor.tensor_parallel_rank > 0:
+                continue
+
+            for output, source, target in zip(outputs, batch_source_texts[bs], batch_target_texts[bs]):
+                target_answer = extract_solution(target, just_last_number=True)
+                output_answer = extract_solution(output)
+                equal = False
+                if output_answer is None:
+                    bad_format += 1
+                else:
+                    equal = math_equal(output_answer, target_answer)
+                cnt = cnt + 1 if equal else cnt
+
+                logger.info("***********Source**********")
+                logger.info(source)
+                logger.info("***********Target**********")
+                logger.info(target_answer)
+                logger.info("***********Output**********")
+                logger.info(output_answer)
+                logger.info("***********IS EQUAL**********")
+                logger.info(equal)
+
+                out = {
+                    "src": source,
+                    "tgt": target,
+                    "output": output,
+                    "output_answer": output_answer,
+                    "is_equal": equal,
+                }
+                f.write(json.dumps(out, ensure_ascii=False) + "\n")
+
+        f.write(f"accuracy: {cnt / len(target_texts)}")
+        logger.info(f"accuracy: {cnt / len(target_texts)}")
 
 
-bad_format = 0
-with open(output_dataset_path, "r") as f:
-    for line in f.readlines():
-        line = line.strip()
-        if not line:
-            continue
-        jsline = json.loads(line)
-        solution.append(extract_solution(jsline["output"], base=IS_BASE))
-        if solution[-1] is None:
-            bad_format += 1
-
-print(f"after line, bad_format= {bad_format}")
-
-# ground = ground[:len(solution)]
-# print(solution)
-# breakpoint()
-
-assert len(ground) == len(solution)
-
-cnt = 0
-with open(output_result_path, "w") as f:
-    for idx, (i, j) in enumerate(zip(ground, solution)):
-        if math_equal(i, j):
-            cnt += 1
-        else:
-            print(f"{idx}: ground: {i}, answer: {j}", flush=True)
-            f.write(f"{idx}: ground: {i}, answer: {j} \n")
-
-    print(
-        f"accuracy: {cnt / len(ground)}, right: {cnt}, format_error: {bad_format}, answer_error: {len(ground) - cnt - bad_format}"
-    )
-    f.write(
-        f"accuracy: {cnt / len(ground)}, right: {cnt}, format_error: {bad_format}, answer_error: {len(ground) - cnt - bad_format}"
-    )
+if __name__ == "__main__":
+    predict()
