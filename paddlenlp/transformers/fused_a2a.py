@@ -88,7 +88,7 @@ def fused_dispatch_forward_func(
         token_indices,
         num_experts,
         previous_event=previous_event,
-        async_finish=False,
+        async_finish=async_finish,
         allocate_on_comm_stream=False,
     )
 
@@ -103,16 +103,14 @@ def fused_dispatch_forward_func(
         num_tokens_per_rdma_rank=num_tokens_per_rdma_rank,
         is_token_in_rank=is_token_in_rank,
         num_tokens_per_expert=num_tokens_per_expert,
-        previous_event=None,
+        previous_event=previous_event,
         async_finish=async_finish,
         allocate_on_comm_stream=False,
     )
 
-    tokens_per_expert = paddle.to_tensor(num_recv_tokens_per_expert_list)
-
     states = dict()
     states["dispatched_indices"] = recv_token_indices
-    states["tokens_per_expert"] = tokens_per_expert
+    states["tokens_per_expert"] = num_recv_tokens_per_expert_list
     states["handle"] = handle
 
     return recv_x, recv_token_probs, states, event
