@@ -180,6 +180,7 @@ def setup_token_dispatcher_utils():
         ext_modules=CUDAExtension(
             sources=[
                 "token_dispatcher_utils/topk_to_multihot.cu",
+                "token_dispatcher_utils/tokens_unzip.cu",
             ],
             extra_compile_args={
                 "cxx": [
@@ -204,7 +205,7 @@ def setup_token_dispatcher_utils():
                     "-lineinfo",
                     "-DCUTLASS_DEBUG_TRACE_LEVEL=0",
                     "-maxrregcount=50",
-                    "-arch=sm_90a",
+                    "-arch=sm_80",
                     "-DNDEBUG"
                 ],
             },
