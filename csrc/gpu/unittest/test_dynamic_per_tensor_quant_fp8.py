@@ -41,6 +41,7 @@ class CutlassBlockGemmTest(unittest.TestCase):
         hidden_size = 1152
         dtype = paddle.bfloat16
         x = paddle.rand([num_tokens, hidden_size], dtype=dtype)
+        paddle.device.synchronize()
         for i in range(warm_up + test_time):
             if i == warm_up:
                 paddle.device.synchronize()
