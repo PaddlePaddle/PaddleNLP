@@ -4144,9 +4144,6 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
         self.q_b_proj_weights_scale = []
         self.kv_a_proj_with_mqa_weights_scale = []
         self.kv_b_proj_weights_scale = []
-        self.q_nope_k_b_proj_weights_scale = []
-        self.q_rope_proj_weights_scale = []
-        self.v_b_o_proj_weights_scale = []
         self.k_b_proj_weights_scale = []
         self.v_b_proj_weights_scale = []
 
@@ -4238,40 +4235,11 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                     is_bias=False,
                 )
 
-            q_nope_k_b_proj_weight_scale = None
-            q_rope_proj_weight_scale = None
-            v_b_o_proj_weight_scale = None
             k_b_proj_weight_scale = None
             v_b_proj_weight_scale = None
             if self.config.mla_config.use_absorb():
-                q_nope_k_b_proj_weight_scale_attr = self.get_attr(
-                    self.config.mla_config.q_nope_k_b_proj_weight_scale_attrs, i
-                )
-                q_rope_proj_weight_scale_attr = self.get_attr(self.config.mla_config.q_rope_proj_weight_scale_attrs, i)
-                v_b_o_proj_weight_scale_attr = self.get_attr(self.config.mla_config.v_b_o_proj_weight_scale_attrs, i)
                 k_b_proj_weight_scale_attr = self.get_attr(self.config.mla_config.k_b_proj_weight_scale_attrs, i)
                 v_b_proj_weight_scale_attr = self.get_attr(self.config.mla_config.v_b_proj_weight_scale_attrs, i)
-                if q_nope_k_b_proj_weight_scale_attr:
-                    q_nope_k_b_proj_weight_scale = self.create_parameter(
-                        shape=[1],
-                        attr=q_nope_k_b_proj_weight_scale_attr,
-                        dtype="float32",
-                        is_bias=False,
-                    )
-                if q_rope_proj_weight_scale_attr:
-                    q_rope_proj_weight_scale = self.create_parameter(
-                        shape=[1],
-                        attr=q_rope_proj_weight_scale_attr,
-                        dtype="float32",
-                        is_bias=False,
-                    )
-                if v_b_o_proj_weight_scale_attr:
-                    v_b_o_proj_weight_scale = self.create_parameter(
-                        shape=[1],
-                        attr=v_b_o_proj_weight_scale_attr,
-                        dtype="float32",
-                        is_bias=False,
-                    )
                 if k_b_proj_weight_scale_attr:
                     k_b_proj_weight_scale = self.create_parameter(
                         shape=[1],
@@ -4369,9 +4337,6 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
             self.kv_b_proj_weights_scale.append(kv_b_proj_weight_scale)
             self.qkv_weights_scale.append(qkv_weight_scale)
 
-            self.q_nope_k_b_proj_weights_scale.append(q_nope_k_b_proj_weight_scale)
-            self.q_rope_proj_weights_scale.append(q_rope_proj_weight_scale)
-            self.v_b_o_proj_weights_scale.append(v_b_o_proj_weight_scale)
             self.k_b_proj_weights_scale.append(k_b_proj_weight_scale)
             self.v_b_proj_weights_scale.append(v_b_proj_weight_scale)
 
@@ -4388,10 +4353,6 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
             self._add_parameter(kv_a_proj_with_mqa_weight_scale)
             self._add_parameter(kv_b_proj_weight_scale)
             self._add_parameter(qkv_weight_scale)
-
-            self._add_parameter(q_nope_k_b_proj_weight_scale)
-            self._add_parameter(q_rope_proj_weight_scale)
-            self._add_parameter(v_b_o_proj_weight_scale)
 
             self._add_parameter(k_b_proj_weight_scale)
             self._add_parameter(v_b_proj_weight_scale)
@@ -4438,18 +4399,6 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                 self.config.mla_config.kv_lora_rank,
             ]
 
-            self.q_nope_k_b_proj_weight_shape = [
-                self.num_heads * self.config.mla_config.kv_lora_rank,
-                self.embed_dim if self.config.mla_config.q_lora_rank is None else self.config.mla_config.q_lora_rank,
-            ]
-            self.q_rope_proj_weight_shape = [
-                self.num_heads * self.config.mla_config.qk_rope_head_dim,
-                self.embed_dim if self.config.mla_config.q_lora_rank is None else self.config.mla_config.q_lora_rank,
-            ]
-            self.v_b_o_proj_weight_shape = [
-                self.embed_dim,
-                self.num_heads * self.config.mla_config.kv_lora_rank,
-            ]
             self.k_b_proj_weight_shape = [
                 self.num_heads,
                 self.config.mla_config.kv_lora_rank,
@@ -4551,9 +4500,6 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
         self.kv_a_proj_with_mqa_weights = []
         self.kv_a_layernorm_weights = []
         self.kv_b_proj_weights = []
-        self.q_nope_k_b_proj_weights = []
-        self.q_rope_proj_weights = []
-        self.v_b_o_proj_weights = []
         self.k_b_proj_weights = []
         self.v_b_proj_weights = []
 
@@ -4565,9 +4511,6 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
             kv_a_proj_with_mqa_weight = None
             kv_a_layernorm_weight = None
             kv_b_proj_weight = None
-            q_nope_k_b_proj_weight = None
-            q_rope_proj_weight = None
-            v_b_o_proj_weight = None
             k_b_proj_weight = None
             v_b_proj_weight = None
             if self.config.mla_config.use_mla():
@@ -4609,9 +4552,6 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                 )
                 kv_a_layernorm_weight_attr = self.get_attr(self.config.mla_config.kv_a_layernorm_weight_attrs, i)
                 kv_b_proj_weight_attr = self.get_attr(self.config.mla_config.kv_b_proj_weight_attrs, i)
-                q_nope_k_b_proj_weight_attr = self.get_attr(self.config.mla_config.q_nope_k_b_proj_weight_attrs, i)
-                q_rope_proj_weight_attr = self.get_attr(self.config.mla_config.q_rope_proj_weight_attrs, i)
-                v_b_o_proj_weight_attr = self.get_attr(self.config.mla_config.v_b_o_proj_weight_attrs, i)
 
                 k_b_proj_weight_attr = self.get_attr(self.config.mla_config.k_b_proj_weight_attrs, i)
                 v_b_proj_weight_attr = self.get_attr(self.config.mla_config.v_b_proj_weight_attrs, i)
@@ -4634,27 +4574,6 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                     kv_b_proj_weight = self.create_parameter(
                         shape=self.kv_b_proj_weight_shape,
                         attr=kv_b_proj_weight_attr,
-                        dtype=self.fp8_type,
-                        is_bias=False,
-                    )
-                if q_nope_k_b_proj_weight_attr:
-                    q_nope_k_b_proj_weight = self.create_parameter(
-                        shape=self.q_nope_k_b_proj_weight_shape,
-                        attr=q_nope_k_b_proj_weight_attr,
-                        dtype=self.fp8_type,
-                        is_bias=False,
-                    )
-                if q_rope_proj_weight_attr:
-                    q_rope_proj_weight = self.create_parameter(
-                        shape=self.q_rope_proj_weight_shape,
-                        attr=q_rope_proj_weight_attr,
-                        dtype=self.fp8_type,
-                        is_bias=False,
-                    )
-                if v_b_o_proj_weight_attr:
-                    v_b_o_proj_weight = self.create_parameter(
-                        shape=self.v_b_o_proj_weight_shape,
-                        attr=v_b_o_proj_weight_attr,
                         dtype=self.fp8_type,
                         is_bias=False,
                     )
@@ -4789,12 +4708,9 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                 _set_var_distributed(q_proj_weight)
                 _set_var_distributed(q_b_proj_weight)
                 _set_var_distributed(kv_b_proj_weight)
-                _set_var_distributed(q_nope_k_b_proj_weight)
-                _set_var_distributed(q_rope_proj_weight)
                 _set_var_distributed(ffn1_weight)
                 # row parallel
                 _set_var_distributed(linear_weight)
-                _set_var_distributed(v_b_o_proj_weight)
                 _set_var_distributed(ffn2_weight)
 
                 _set_var_distributed(shared_expert_ffn1_weight)
@@ -4809,9 +4725,6 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
             self.kv_b_proj_weights.append(kv_b_proj_weight)
             self.qkv_weights.append(qkv_weight)
 
-            self.q_nope_k_b_proj_weights.append(q_nope_k_b_proj_weight)
-            self.q_rope_proj_weights.append(q_rope_proj_weight)
-            self.v_b_o_proj_weights.append(v_b_o_proj_weight)
             self.k_b_proj_weights.append(k_b_proj_weight)
             self.v_b_proj_weights.append(v_b_proj_weight)
 
@@ -4833,9 +4746,6 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
             self._add_parameter(kv_a_layernorm_weight)
             self._add_parameter(kv_b_proj_weight)
 
-            self._add_parameter(q_nope_k_b_proj_weight)
-            self._add_parameter(q_rope_proj_weight)
-            self._add_parameter(v_b_o_proj_weight)
             self._add_parameter(k_b_proj_weight)
             self._add_parameter(v_b_proj_weight)
             self._add_parameter(qkv_weight)
@@ -4854,11 +4764,9 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
         return "float8_e4m3fn"
 
     def per_tensor_quant_fp8(self, x):
-        x_fp32 = x.cast("float32")
-        x_s = x_fp32.abs().max().clip(min=0.000001) / 448.0
-        x_q = x_fp32 / x_s
-        x_q = x_q.clip(min=-448.0, max=448.0)
-        return x_q.cast("float8_e4m3fn"), x_s.reshape([1])
+        from paddlenlp_ops import dynamic_per_tensor_quant_fp8
+
+        return dynamic_per_tensor_quant_fp8(x)
 
     def dynamic_quant(self, x):
         if self.weight_block_size[0] == 0 and self.weight_block_size[1] == 0:
@@ -5230,8 +5138,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                 epsilon=self._epsilon,
                 begin_norm_axis=1,
             )[0]
-            ln_out_or_q_c_fp8, ln_out_or_q_c_scale = self.per_tensor_quant_fp8(ln_out_or_q_c)
-            query = self.cutlass_fp8_gemm_per_tensor(
+            query = self.cutlass_fp8_gemm(
                 x=ln_out_or_q_c_fp8,
                 y=self.q_b_proj_weights[i],
                 x_s=ln_out_or_q_c_scale,
