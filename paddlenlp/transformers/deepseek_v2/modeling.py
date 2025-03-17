@@ -1681,20 +1681,15 @@ class DeepseekV2DecoderLayer(nn.Layer):
 
         return l_aux, l_zloss, intermediate_hidden_states, token_indices, token_probs
 
-    def expert_forward_compute(
-        self, intermediate_hidden_states, dispatched_indices, dispatched_probs, tokens_per_expert
-    ):
-        (
-            global_input_tokens,
-            reversed_mapping_for_combine,
-            dispatched_routing_map,
-            dispatched_probs,
-        ) = self.mlp.post_dispatch_compute(intermediate_hidden_states, dispatched_indices, dispatched_probs)
+    def expert_forward_compute(self, intermediate_hidden_states, dispatched_indices, dispatched_probs):
+        (global_input_tokens, token_permuted_indices, prob_permuted_indices) = self.mlp.post_dispatch_compute(
+            intermediate_hidden_states, dispatched_indices, dispatched_probs
+        )
 
-        expert_output = self.mlp.expert_forward(global_input_tokens, tokens_per_expert)
+        expert_output = self.mlp.expert_forward(global_input_tokens)
 
         expert_output = self.mlp.pre_combine_compute(
-            expert_output, reversed_mapping_for_combine, dispatched_routing_map, dispatched_probs
+            expert_output, token_permuted_indices, prob_permuted_indices, dispatched_probs
         )
 
         return expert_output

@@ -350,10 +350,16 @@ class MoEFlexTokenLayer(nn.Layer):
         self.experts = nn.LayerList([expert_class(**expert_kwargs)] * self.num_local_experts)
         self.router = gate
 
-    def expert_forward(self, dispatched_input, tokens_per_expert):
+    def get_tokens_per_expert(self):
+        return self.token_dispatcher._comm_manager.tokens_per_expert_list
+
+    def set_tokens_per_expert(self, tokens_per_expert_list):
+        self.token_dispatcher._comm_manager.tokens_per_expert_list = tokens_per_expert_list
+
+    def expert_forward(self, dispatched_input):
         outputs = []
         # print(f"all tokens: {sum(tokens_per_expert)}, detail: {tokens_per_expert}")
-        chunks = paddle.split(dispatched_input, num_or_sections=tokens_per_expert, axis=0)
+        chunks = paddle.split(dispatched_input, num_or_sections=self.get_tokens_per_expert(), axis=0)
         for chunk, expert in zip(chunks, self.experts):
             chunk = chunk.contiguous()
             # assert chunk.shape[0] != 0, "Cannot dispatch empty input"
@@ -367,12 +373,11 @@ class MoEFlexTokenLayer(nn.Layer):
         probs, routing_map, l_aux, l_zloss = self.router(hidden_states)
         (
             dispatched_input,
-            tokens_per_expert,
             token_permuted_indices,
             prob_permuted_indices,
             dispatched_probs,
         ) = self.token_dispatcher.token_permutation(hidden_states, probs, routing_map)
-        expert_output = self.expert_forward(dispatched_input, tokens_per_expert)
+        expert_output = self.expert_forward(dispatched_input)
         output, _ = self.token_dispatcher.token_unpermutation(
             expert_output, token_permuted_indices, prob_permuted_indices, dispatched_probs, None
         )
@@ -387,19 +392,14 @@ class MoEFlexTokenLayer(nn.Layer):
         return l_aux, l_zloss, hidden_states, token_indices, token_probs
 
     def post_dispatch_compute(self, hidden_states, dispatched_indices, dispatched_probs):
-        (
-            global_input_tokens,
-            reversed_mapping_for_combine,
-            dispatched_routing_map,
-            dispatched_probs,
-        ) = self.token_dispatcher.post_dispatch(hidden_states, dispatched_indices, dispatched_probs)
-        return (global_input_tokens, reversed_mapping_for_combine, dispatched_routing_map, dispatched_probs)
+        (global_input_tokens, token_permuted_indices, prob_permuted_indices) = self.token_dispatcher.post_dispatch(
+            hidden_states, dispatched_indices
+        )
+        return (global_input_tokens, token_permuted_indices, prob_permuted_indices)
 
-    def pre_combine_compute(
-        self, hidden_states, reversed_mapping_for_combine, dispatched_routing_map, dispatched_probs
-    ):
+    def pre_combine_compute(self, hidden_states, token_permuted_indices, prob_permuted_indices, dispatched_probs):
         hidden_states = self.token_dispatcher.pre_combine(
-            hidden_states, reversed_mapping_for_combine, dispatched_routing_map, dispatched_probs
+            hidden_states, token_permuted_indices, prob_permuted_indices, dispatched_probs
         )
         return hidden_states
 

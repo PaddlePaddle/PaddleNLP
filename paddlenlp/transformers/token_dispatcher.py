@@ -68,11 +68,10 @@ class _DeepepManager:
             hidden_states, token_indices, token_probs, self.num_experts, self.group
         )
         self.handle = states["handle"]
-        tokens_per_expert = states["tokens_per_expert"]
+        self.tokens_per_expert_list = states["tokens_per_expert"]
         dispatched_indices = states["dispatched_indices"]
-        dispatched_probs = dispatched_probs
 
-        return hidden_states, tokens_per_expert, dispatched_indices, dispatched_probs
+        return hidden_states, dispatched_indices, dispatched_probs
 
     def _indices_to_multihot(self, indices, probs):
         """
@@ -104,11 +103,11 @@ class _DeepepManager:
         return hidden_states
 
     def get_permuted_hidden_states_by_experts(
-        self, hidden_states: paddle.Tensor, dispatched_indices: paddle.Tensor, tokens_per_expert_list: list
+        self, hidden_states: paddle.Tensor, dispatched_indices: paddle.Tensor
     ) -> paddle.Tensor:
         self.hidden_shape_before_permute = hidden_states.shape
         token_permuted_indices, prob_permuted_indices = topk_to_permuted_indices(
-            dispatched_indices, tokens_per_expert_list, self.router_topk
+            dispatched_indices, self.tokens_per_expert_list, self.router_topk
         )
         hidden_states = permute(hidden_states, token_permuted_indices)
         return hidden_states, token_permuted_indices, prob_permuted_indices
@@ -169,14 +168,12 @@ class MoEFlexTokenDispatcher:
         token_probs, token_indices = paddle.topk(probs, self._comm_manager.router_topk, axis=-1)
         return hidden_states, token_indices, token_probs
 
-    def post_dispatch(self, hidden_states, dispatched_indices, tokens_per_expert_list):
+    def post_dispatch(self, hidden_states, dispatched_indices):
         (
             global_input_tokens,
             token_permuted_indices,
             prob_permuted_indices,
-        ) = self._comm_manager.get_permuted_hidden_states_by_experts(
-            hidden_states, dispatched_indices, tokens_per_expert_list
-        )
+        ) = self._comm_manager.get_permuted_hidden_states_by_experts(hidden_states, dispatched_indices)
         return (global_input_tokens, token_permuted_indices, prob_permuted_indices)
 
     def pre_combine(self, hidden_states, token_permuted_indices, prob_permuted_indices, dispatched_probs):
@@ -193,16 +190,15 @@ class MoEFlexTokenDispatcher:
         self, hidden_states: paddle.Tensor, probs: paddle.Tensor, routing_map: paddle.Tensor
     ) -> Tuple[paddle.Tensor, paddle.Tensor]:
         hidden_states, token_indices, token_probs = self.pre_dispatch(hidden_states, probs, routing_map)
-        hidden_states, tokens_per_expert_list, dispatched_indices, dispatched_probs = self._comm_manager.dispatch(
+        hidden_states, dispatched_indices, dispatched_probs = self._comm_manager.dispatch(
             hidden_states, token_indices, token_probs
         )
         (global_input_tokens, token_permuted_indices, prob_permuted_indices) = self.post_dispatch(
-            hidden_states, dispatched_indices, tokens_per_expert_list
+            hidden_states, dispatched_indices
         )
 
         return (
             global_input_tokens,
-            tokens_per_expert_list,
             token_permuted_indices,
             prob_permuted_indices,
             dispatched_probs,
