@@ -49,7 +49,6 @@ class DPOTrainingArguments(TrainingArguments):
         metadata={"help": "Flag indicating whether to use the intermediate API for model."},
     )
     max_seq_length: int = field(default=128, metadata={"help": "The maximum sequence length for model inputs."})
-    global_batch_size: int = field(default=1, metadata={"help": "Total batch size for training."})
     num_hidden_layers: int = field(default=2, metadata={"help": "The number of hidden layers in the network model."})
 
     def __post_init__(self):
