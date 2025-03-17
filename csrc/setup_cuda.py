@@ -221,9 +221,8 @@ setup(
     ext_modules=CUDAExtension(
         sources=sources,
         extra_compile_args={"cxx": ["-O3", "-fopenmp", "-lgomp", "-std=c++17", "-DENABLE_BF16"], "nvcc": nvcc_compile_args},
-        libraries=["cublasLt", "glog"],
+        libraries=["cublasLt"],
         library_dirs=library_path,
         include_dirs=include_dirs,
-        define_macros=[("GLOG_USE_GLOG_EXPORT", "1")],
     ),
 )
