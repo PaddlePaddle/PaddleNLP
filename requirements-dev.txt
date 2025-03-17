@@ -12,7 +12,7 @@ yacs
 unidecode
 soundfile
 librosa
-numpy==1.23.5
+numpy
 rouge
 tiktoken
 visualdl
