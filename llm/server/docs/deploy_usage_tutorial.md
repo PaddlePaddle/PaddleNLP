@@ -416,6 +416,7 @@ docker build --network=host -f ./dockerfiles/Dockerfile_serving_cuda124_cudnn9 -
 | USE_CACHE_KV_INT8 | int | 是否将 INT8配置为 KV Cache 的类型 | 否 | 0 | c8量化模型需要配置为1 |
 | MODEL_DIR | str | 模型文件路径 | 否 | /models/ |  |
 | model_name | str | 模型名称 | 否 | 无 |  用于支持模型静态图下载，具体名称参考文档(#./static_models.md)|
+| OUTPUT_LOG_TO_CONSOLE | str | 是否定向输出到console 文件中 | 否 | 0 |  |
 
 
 ## 显存相关参数推荐
