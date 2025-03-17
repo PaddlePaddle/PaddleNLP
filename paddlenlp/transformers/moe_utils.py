@@ -146,7 +146,7 @@ class UnPermuteNode:
         self.faltten_dispatched_probs = self.dispatched_probs.flatten()
 
         self.permuted_probs = self.faltten_dispatched_probs.index_select(axis=0, index=self.prob_permuted_indices)
-        self.permuted_tokens = hidden_states * self.permuted_probs.unsqueeze(-1)
+        self.permuted_tokens = self.hidden_states * self.permuted_probs.unsqueeze(-1)
         self.permuted_tokens_dtype = self.permuted_tokens.dtype
 
         # Create an output tensor filled with zeros
@@ -180,6 +180,7 @@ class UnPermuteNode:
         )
 
         hidden_states_grad = permuted_tokens_grad * self.permuted_probs.unsqueeze(-1)
+        permuted_probs_grad = (permuted_tokens_grad * self.hidden_states).sum(axis=-1)
 
         permuted_probs_grad = paddle._C_ops.unsqueeze_grad(
             self.permuted_probs, permuted_tokens_grad * self.hidden_states, -1
