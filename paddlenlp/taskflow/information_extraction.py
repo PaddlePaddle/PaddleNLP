@@ -853,6 +853,8 @@ class UIETask(Task):
         """
         if paddle.get_device().split(":", 1)[0] == "npu":
             input_spec_dtype = "int32"
+        elif paddle.get_device().split(":", 1)[0] == "mlu":
+            input_spec_dtype = "int32"
         else:
             input_spec_dtype = "int64"
         if self._init_class in ["UIEX"]:

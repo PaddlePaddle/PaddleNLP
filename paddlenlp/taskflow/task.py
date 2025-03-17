@@ -175,6 +175,9 @@ class Task(metaclass=abc.ABCMeta):
         elif paddle.get_device().split(":", 1)[0] == "npu":
             if self._infer_precision == "fp16":
                 logger.info("Inference on npu with fp16 precison")
+        elif paddle.get_device().split(":", 1)[0] == "mlu":
+            if self._infer_precision == "fp16":
+                logger.info("Inference on mlu with fp16 precison")
         else:
             if self._infer_precision == "fp16":
                 self._predictor_type = "onnxruntime"
@@ -215,6 +218,9 @@ class Task(metaclass=abc.ABCMeta):
         elif paddle.get_device().split(":", 1)[0] == "npu":
             self._config.disable_gpu()
             self._config.enable_custom_device("npu", self.kwargs["device_id"])
+        elif paddle.get_device().split(":", 1)[0] == "mlu":
+            self._config.disable_gpu()
+            self._config.enable_custom_device("mlu", self.kwargs["device_id"])
         else:
             if self._infer_precision == "int8":
                 logger.info(
@@ -373,7 +379,11 @@ class Task(metaclass=abc.ABCMeta):
         self._static_model_file = self.inference_model_path + PADDLE_INFERENCE_MODEL_SUFFIX
         self._static_params_file = self.inference_model_path + PADDLE_INFERENCE_WEIGHTS_SUFFIX
 
-        if paddle.get_device().split(":", 1)[0] == "npu" and self._infer_precision == "fp16":
+        if (
+            paddle.get_device().split(":", 1)[0] == "npu"
+            or paddle.get_device().split(":", 1)[0] == "mlu"
+            and self._infer_precision == "fp16"
+        ):
             # transform fp32 model tp fp16 model
             self._static_fp16_model_file = self.inference_model_path + f"-fp16{PADDLE_INFERENCE_MODEL_SUFFIX}"
             self._static_fp16_params_file = self.inference_model_path + f"-fp16{PADDLE_INFERENCE_WEIGHTS_SUFFIX}"
