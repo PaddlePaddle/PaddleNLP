@@ -143,7 +143,7 @@ std::vector<paddle::Tensor> FusedExpertMoe(
                                                 &output);
       break;
     default:
-      throw std::runtime_error("Unsupported data type for FusedMoeKernel");
+      PD_THROW("Unsupported data type for FusedMoeKernel");
   }
   return {output};
 }

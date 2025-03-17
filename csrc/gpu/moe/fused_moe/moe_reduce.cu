@@ -101,7 +101,7 @@ std::vector<paddle::Tensor> MoeExpertReduce(
                                                   &output);
       break;
     default:
-      throw std::runtime_error("Unsupported data type for MoeDispatchKernel");
+      PD_THROW("Unsupported data type for MoeDispatchKernel");
   }
   return {output};
 }

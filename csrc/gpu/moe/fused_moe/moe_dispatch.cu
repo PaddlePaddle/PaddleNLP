@@ -226,7 +226,7 @@ std::vector<paddle::Tensor> MoeExpertDispatch(
                                                    &top_k_indices);
       break;
     default:
-      throw std::runtime_error("Unsupported data type for MoeDispatchKernel");
+      PD_THROW("Unsupported data type for MoeDispatchKernel");
   }
   return {permute_input,
           token_nums_per_expert,

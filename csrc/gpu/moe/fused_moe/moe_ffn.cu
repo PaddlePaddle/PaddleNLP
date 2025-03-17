@@ -190,7 +190,7 @@ std::vector<paddle::Tensor> MoeExpertFFN(
                                               ffn_out);
       break;
     default:
-      throw std::runtime_error("Unsupported data type for MoeExpertFFN");
+      PD_THROW("Unsupported data type for MoeExpertFFN");
   }
   return {ffn_out};
 }
