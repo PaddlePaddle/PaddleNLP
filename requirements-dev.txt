@@ -1,4 +1,5 @@
 paddleocr
+simsimd==1.1.2
 pre-commit
 pytest==8.1.1
 parameterized
