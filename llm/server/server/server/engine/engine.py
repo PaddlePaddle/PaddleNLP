@@ -36,6 +36,10 @@ class Engine(object):
     """
     def __init__(self, cfg, token_processor):
         self.cfg = cfg
+        # Master node only
+        if self.cfg.nnode == 1 or self.cfg.host_ip == os.getenv('POD_0_IP', '127.0.0.1'):
+            self.queue_service = self._start_tasks_queue_service()
+        self.tasks_queue = TaskQueueManager(mp_num=self.cfg.mp_num, port=self.cfg.infer_port)
         self.resource_manager = ResourceManager(self.cfg)
         self.token_processor = token_processor
         self.token_processor.set_resource_manager(self.resource_manager)
@@ -50,11 +54,7 @@ class Engine(object):
         """
         assert not self.is_started, "The engine is already started.!"
         start_time = time.time()
-        # Master node only
-        if self.cfg.nnode == 1 or self.cfg.host_ip == os.getenv('POD_0_IP', '127.0.0.1'):
-            self.queue_service = self._start_tasks_queue_service()
-        self.tasks_queue = TaskQueueManager(mp_num=self.cfg.mp_num, port=self.cfg.infer_port)
-
+        
         self.token_processor.tasks_queue = self.tasks_queue
         self.infer_proc = self._start_infer_service()
         model_server_logger.info("Waitting infer processes ready...")

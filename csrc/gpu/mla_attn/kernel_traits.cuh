@@ -19,6 +19,8 @@
  * Modified by the FlashInfer team.
  */
 
+#pragma once
+
 #ifndef ATTENTION_HOPPER_KERNEL_TRAITS_CUH_
 #define ATTENTION_HOPPER_KERNEL_TRAITS_CUH_
 

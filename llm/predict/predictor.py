@@ -74,7 +74,7 @@ class PredictorArgument:
     max_length: int = field(default=1024, metadata={"help": "the max length for decoding."})
     top_k: int = field(default=0, metadata={"help": "top_k parameter for generation"})
     top_p: float = field(default=0.7, metadata={"help": "top_p parameter for generation"})
-    temperature: float = field(default=0.95, metadata={"help": "top_p parameter for generation"})
+    temperature: float = field(default=0.95, metadata={"help": "temperature parameter for generation"})
     repetition_penalty: float = field(default=1.0, metadata={"help": "repetition penalty parameter for generation"})
     device: str = field(default="gpu", metadata={"help": "Device"})
     dtype: str = field(default=None, metadata={"help": "Model dtype"})
@@ -190,9 +190,10 @@ class PredictorArgument:
             self.append_attn = True
         if self.append_attn:
             self.block_attn = True
-        assert (
-            self.src_length + self.max_length <= self.total_max_length
-        ), "src_length + max_length should smaller than total_max_length."
+        if self.block_attn:
+            self.inference_model = True
+        assert self.max_length < self.total_max_length, "max_length should smaller than total_max_length."
+        self.src_length = self.total_max_length - self.max_length
 
 
 @dataclass
@@ -1444,11 +1445,12 @@ def create_predictor(
         )
     else:
         if predictor_args.src_length + predictor_args.max_length > max_position_embeddings:
-            raise ValueError(
+            logger.warning(
                 f"The sum of src_length<{predictor_args.src_length}> and "
                 f"max_length<{predictor_args.max_length}> should be smaller than or equal to "
                 f"the maximum position embedding size<{max_position_embeddings}>"
             )
+            predictor_args.src_length = max_position_embeddings - predictor_args.max_length
 
     # update config parameter for inference predictor
     if predictor_args.decode_strategy == "greedy_search":

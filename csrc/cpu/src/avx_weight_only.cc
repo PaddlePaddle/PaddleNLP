@@ -137,12 +137,12 @@ std::vector<paddle::Tensor> InvokeAvxWeightOnly(const paddle::Tensor &x,
 
 std::vector<std::vector<int64_t>> AvxWeightOnlyInferShape(
     std::vector<int64_t> x_shape,
-    std::vector<int64_t> weigh_shape) {
+    std::vector<int64_t> weight_shape) {
   int m = 1;
   for (int i = 0; i < x_shape.size() - 1; i++) {
     m = m * x_shape[i];
   }
-  return {std::vector<int64_t>{m, weigh_shape[1]}};
+  return {std::vector<int64_t>{m, weight_shape[1]}};
 }
 
 std::vector<paddle::DataType> AvxWeightOnlyInferDtype(
