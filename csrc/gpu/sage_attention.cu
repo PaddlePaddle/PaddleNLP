@@ -97,13 +97,29 @@ std::vector<paddle::Tensor> SageAttentionKernel(
   } else {
     qkv_out = qkv;
   }
+
+  paddle::Tensor fmha_out;
   if (out_linear_in_scale > 0.0) {
-    PD_THROW("out_linear_in_scale > 0.0 not supported.");
-  }
-  paddle::Tensor fmha_out = GetEmptyTensor(
+    if (fabs(quant_max_bound - 127.0f) < 0.000001) {
+      fmha_out = GetEmptyTensor(
+        {meta_data.token_nums, meta_data.q_num_heads * meta_data.head_dims_v},
+        paddle::DataType::INT8,
+        qkv.place());
+    } 
+    else if (fabs(quant_max_bound - 448.0f) < 0.000001) {
+      fmha_out = GetEmptyTensor(
+        {meta_data.token_nums, meta_data.q_num_heads * meta_data.head_dims_v},
+        paddle::DataType::FLOAT8_E4M3FN,
+        qkv.place());
+    }else{
+      PD_THROW("Only supported attr of quant_max_bound in ['127.0', '448.0'].");
+    }
+  } else {
+    fmha_out = GetEmptyTensor(
         {meta_data.token_nums, meta_data.q_num_heads * meta_data.head_dims_v},
         D,
         qkv.place());
+  }
 
   if (max_enc_len_this_time_data > 0) {
     if (max_dec_len_this_time_data > 0) {
@@ -183,10 +199,10 @@ std::vector<paddle::Tensor> SageAttentionKernel(
     paddle::Tensor km = paddle::experimental::mean(k, {1}, true);
     km = paddle::experimental::squeeze(km, {1});
     
-    paddle::optional<paddle::Tensor> vm = paddle::optional<paddle::Tensor>(paddle::empty({1}, paddle::DataType::FLOAT32, paddle::GPUPlace()));
+    const paddle::optional<paddle::Tensor> vm = paddle::optional<paddle::Tensor>(paddle::empty({1}, paddle::DataType::FLOAT32, paddle::GPUPlace()));
 
     fmha_out = sage_attention_fwd(q, k, v, km, 
-                                  seq_lens_this_time, vm, 
+                                  seq_lens_this_time, vm, out_linear_shifts, out_linear_smooths,
                                   softmax_scale, std::string("per_warp"), 
                                   std::string("any"), 
                                   0, causal, true, false, false)[0];

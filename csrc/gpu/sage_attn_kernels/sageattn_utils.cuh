@@ -160,6 +160,26 @@
     PD_CHECK(false, oss.str());                                                      \
   }
 
+// Support Other datatypes
+#define DISPATCH_PADDLE_DTYPE_TO_CTYPE(paddle_dtype, c_type, ...)                \
+  if (paddle_dtype == paddle::DataType::FLOAT16) {                                          \
+    using c_type = half;                                                                \
+    __VA_ARGS__                                                                         \
+  } else if (paddle_dtype == paddle::DataType::BFLOAT16) {                               \
+    using c_type = nv_bfloat16;                                                         \
+    __VA_ARGS__                                                                         \
+  } else if (paddle_dtype == paddle::DataType::INT8) {                                  \
+    using c_type = int8_t;                                                         \
+    __VA_ARGS__                                                                         \
+  } else if (paddle_dtype == paddle::DataType::FLOAT8_E4M3FN) {                           \
+    using c_type = __nv_fp8_e4m3;                                                         \
+    __VA_ARGS__                                                                         \
+  } else {                                                                              \
+    std::ostringstream oss;                                                             \
+    oss << __PRETTY_FUNCTION__ << " failed to dispatch data type " << paddle_dtype;    \
+    PD_CHECK(false, oss.str());                                                      \
+  }
+
 #define DISPATCH_BLOCK_SIZE(block_size, BLOCK_SIZE, ...)        \
   if (block_size == 64) {                                       \
     constexpr int BLOCK_SIZE = 64;                              \
@@ -2413,49 +2433,21 @@ __device__ __forceinline__ void compute_fp8_sv_inst_buf(const smem_t<swizzle_mod
 }
 
 // paddle converter zone
-namespace pd_cvt {
-
 // phi::dtype::xx16 -> half or nv_bfloat16
-template <typename T>
-struct PD16bitTrait {
-  using DataType = T;
-};
-
-template <>
-struct PD16bitTrait<phi::dtype::float16> {
-  // Since LayerNormDirectCUDAFunctor register half type, we need to convert
-  // phi::float16 to half.
-  using DataType = half;
-};
-
-#ifdef PADDLE_CUDA_BF16
-template <>
-class PD16bitTrait<phi::dtype::bfloat16> {
-public:
-  using DataType = __nv_bfloat16;
-};
-#endif
-
-// half or nv_bfloat16 -> phi::dtype::xx16
-template <typename T>
-struct PD16bitReTrait {
-  using DataType = T;
-};
-
-template <>
-struct PD16bitReTrait<half> {
-  using DataType = phi::dtype::float16;
-};
-
-#ifdef PADDLE_CUDA_BF16
-template<>
-class PD16bitReTrait<__nv_bfloat16> {
-public:
-  using DataType = phi::dtype::bfloat16;
-};
-#endif
-
-}; // paddle converter zone end
+#define SAGEATTN_DTYPE_CONVERT(dtype, DTypeQuant) \
+  if (dtype == paddle::DataType::FLOAT16) {                                          \
+    using DTypeQuant = half;                                                         \
+  } else if (dtype == paddle::DataType::BFLOAT16) {                                  \
+    using DTypeQuant = __nv_bfloat16;                                                \
+  } else if (dtype == paddle::DataType::INT8) {                                      \
+    using DTypeQuant = int8_t;                                                       \
+  } else if (dtype == paddle::DataType::FLOAT8_E4M3FN) {                             \
+    using DTypeQuant = __nv_fp8_e4m3;                                                \
+  } else {                                                                           \
+    std::ostringstream oss;                                                          \
+    oss << __PRETTY_FUNCTION__ << " failed to dispatch data type " << paddle_dtype;  \
+    PD_CHECK(false, oss.str());                                                      \
+  }
 
 // namespace wgmma
 namespace wgmma{
@@ -2739,3 +2731,111 @@ __device__ __forceinline__ void wgmma_f8f8f32(float d[][8], uint32_t* RA, T* sB)
 }
 
 } // namespace wgmma
+
+// template <uint32_t group_size,
+//           uint32_t num_frags_x,
+//           uint32_t num_frags_y,
+//           bool partition_kv,
+//           typename T,
+//           typename OutT>
+// __device__ __forceinline__ void write_o_reg_gmem_shift_smooth_quant(
+//     float (*o_frag)[num_frags_y][8],
+//     smem_t* o_smem,
+//     OutT* o_ptr_base,
+//     const T* shift_bias,
+//     const T* smooth_weight,
+//     uint32_t o_idx_base,
+//     const uint32_t q_head_idx_base,
+//     const float quant_max_bound,
+//     const float quant_min_bound,
+//     const float in_scale,
+//     const uint32_t qo_upper_bound,
+//     const uint32_t qo_n_stride,
+//     const uint32_t qo_h_stride) {
+//   constexpr uint32_t head_dim = num_frags_y * 16;
+//   constexpr uint32_t num_vecs_per_head = head_dim / num_elems_per_128b<T>();
+//   const uint32_t tx = threadIdx.x, ty = threadIdx.y;
+//   constexpr int VEC_SIZE = 8;
+//   AlignedVector<T, VEC_SIZE> ori_out_vec;
+//   AlignedVector<T, VEC_SIZE> shift_bias_vec;
+//   AlignedVector<T, VEC_SIZE> smooth_weight_vec;
+//   AlignedVector<OutT, VEC_SIZE> out_vec;
+// #pragma unroll
+//   for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
+// #pragma unroll
+//     for (uint32_t fy = 0; fy < num_frags_y; ++fy) {
+//       uint32_t o_frag_f16[4];
+//       vec_cast<T, float, 8>((T*)o_frag_f16, o_frag[fx][fy]);
+//       uint32_t o_smem_offset_w = smem_t::get_permuted_offset<
+//           num_vecs_per_head>(
+//           (ty * num_frags_x + fx) * 16 + tx / 4,
+//           fy * 2);
+//       ((uint32_t*)(o_smem->base + o_smem_offset_w))[tx % 4] = o_frag_f16[0];
+//       ((uint32_t*)(o_smem->base + o_smem_offset_w +
+//                    8 * num_vecs_per_head))[tx % 4] = o_frag_f16[1];
+//       ((uint32_t*)(o_smem->base + (o_smem_offset_w ^ 0x1)))[tx % 4] =
+//           o_frag_f16[2];
+//       ((uint32_t*)(o_smem->base + (o_smem_offset_w ^ 0x1) +
+//                    8 * num_vecs_per_head))[tx % 4] = o_frag_f16[3];
+//     }
+//   }
+//   __syncthreads();
+
+//   uint32_t o_smem_offset_w = smem_t::get_permuted_offset<num_vecs_per_head>(
+//       ty * num_frags_x * 16 + tx / 8,
+//       tx % 8);
+
+//   const uint32_t tx_offset = tx / 8;
+// #pragma unroll
+//   for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
+//     const uint32_t base_offset = o_idx_base + fx * 16 + tx_offset;
+// #pragma unroll
+//     for (uint32_t j = 0; j < 4; ++j) {  // 4 * 4 = 16
+//       const uint32_t offset_now = base_offset + j * 4;
+//       const uint32_t n_offset = offset_now / group_size;
+//       const uint32_t h_offset = offset_now % group_size;
+//       OutT* o_ptr =
+//           o_ptr_base + n_offset * qo_n_stride + h_offset * qo_h_stride;
+//       uint32_t shift_smooth_offset = (q_head_idx_base + h_offset) * head_dim +
+//                                      tx % 8 * num_elems_per_128b<T>();
+// #pragma unroll
+//       for (uint32_t fyo = 0; fyo < num_frags_y / 4;
+//            ++fyo) {
+//         if (n_offset < qo_upper_bound) {
+//           if (!partition_kv && in_scale > 0.0) {
+//             if (shift_bias) {
+//               Load<T, VEC_SIZE>(shift_bias + shift_smooth_offset,
+//                                 &shift_bias_vec);
+//               Load<T, VEC_SIZE>(smooth_weight + shift_smooth_offset,
+//                                 &smooth_weight_vec);
+//             }
+//             Load<T, VEC_SIZE>(
+//                 reinterpret_cast<T*>(o_smem->base + o_smem_offset_w),
+//                 &ori_out_vec);
+// #pragma unroll
+//             for (int i = 0; i < VEC_SIZE; ++i) {
+//               StoreFunc<T, VEC_SIZE, OutT>()(ori_out_vec,
+//                                              shift_bias_vec,
+//                                              smooth_weight_vec,
+//                                              out_vec,
+//                                              quant_max_bound,
+//                                              quant_min_bound,
+//                                              in_scale,
+//                                              i);
+//             }
+//             Store<OutT, VEC_SIZE>(out_vec, o_ptr);
+//           } else {
+//             o_smem->store_128b(o_smem_offset_w, o_ptr);
+//           }
+//         }
+//         o_ptr += 8 * num_elems_per_128b<T>();
+//         shift_smooth_offset += 8 * num_elems_per_128b<T>();
+//         o_smem_offset_w =
+//             o_smem->advance_offset_by_column<8>(o_smem_offset_w, fyo);
+//       }
+//       o_smem_offset_w =
+//           o_smem->advance_offset_by_row<4, num_vecs_per_head>(o_smem_offset_w) -
+//           2 * num_frags_y;
+//     }
+//   }
+// }
