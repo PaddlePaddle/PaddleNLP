@@ -37,7 +37,7 @@
     "fused_linear_param_grad_add": 1,
     "use_fused_rope": true,
     "use_fused_rms_norm": true,
-    "recompute": 0,
+    "recompute": 1,
     "recompute_use_reentrant": true,
     "recompute_granularity": "full",
     "pp_recompute_interval": 1,
