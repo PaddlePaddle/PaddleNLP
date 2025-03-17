@@ -8,7 +8,7 @@
 ## 安装 C++ 依赖
 
 ```shell
-bash tools/prepare_env.sh
+pip install -r requirements.txt
 ```
 
 ## 编译 Cuda 算子
