@@ -721,6 +721,8 @@ class PPOMetric:
                     "norm_reward",
                     "kl_reward",
                     "norm_reward_with_kl",
+                    "pure_policy_loss",
+                    "entropy_loss",
                     *(["values"] if self.args.rl_algorithm == "ppo" else []),
                     "returns",
                     "kl_divergence",
@@ -745,9 +747,9 @@ class PPOMetric:
         ]
 
         if self.args.rl_algorithm == "ppo":
-            self.metric_ops = ["mean"] * 11 + ["max", "min"]
+            self.metric_ops = ["mean"] * 13 + ["max", "min"]
         elif self.args.rl_algorithm == "reinforce_plus_plus":
-            self.metric_ops = ["mean"] * 9 + ["max", "min"]
+            self.metric_ops = ["mean"] * 11 + ["max", "min"]
         else:
             self.metric_ops = ["mean"] * 8 + ["max", "min"]
         if not use_ptx:
@@ -2159,6 +2161,8 @@ class PPOTrainer(Trainer):
                     "train_norm_reward": rewards,
                     "train_kl_reward": kl_rewards,
                     "train_norm_reward_with_kl": rewards_with_kl,
+                    "train_pure_policy_loss": self.policy_trainer.info_buffer.get("pure_policy_loss"),
+                    "train_entropy_loss": self.policy_trainer.info_buffer.get("entropy_loss"),
                     **(
                         {
                             "train_values": values,
