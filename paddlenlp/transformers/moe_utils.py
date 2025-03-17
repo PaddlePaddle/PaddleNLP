@@ -45,8 +45,7 @@ def permute(
                                        and pads the number of tokens to the expert capacity.
     """
     assert not drop_and_pad, "token-drop and pads is not supported"
-    permuted_input = tokens.index_select(axis=0, index=token_permuted_indices)
-
+    permuted_input = paddle.gather(tokens, token_permuted_indices)
     return permuted_input
 
 
@@ -77,7 +76,7 @@ def unpermute(
     _, hidden = restore_shape
 
     if probs is not None:
-        permuted_probs = probs.flatten().index_select(axis=0, index=prob_permuted_indices)
+        permuted_probs = paddle.gather(probs.flatten(), prob_permuted_indices)
         permuted_tokens = permuted_tokens * permuted_probs.unsqueeze(-1)
 
     # Create an output tensor filled with zeros
