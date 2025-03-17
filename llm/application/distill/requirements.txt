@@ -2,3 +2,5 @@ openai
 tenacity
 aiofiles
 datasets
+git+https://github.com/ZubinGou/latex2sympy.git
+omegaconf==2.4.0.dev3
