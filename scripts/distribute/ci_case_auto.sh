@@ -2345,7 +2345,7 @@ function llm_gpt_pir_auto_bs4_TP2_PP2(){
             --sharding "" \
             --tensor_parallel_degree 2 \
             --pipeline_parallel_degree 2 \
-            ${pipeline_parallel_config} \
+             ${pp_config} \
             --sequence_parallel 0 \
             --fuse_attention_qkv 1 \
             --use_flash_attention 0 \
