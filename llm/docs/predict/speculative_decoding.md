@@ -53,18 +53,29 @@ Paper：https://github.com/deepseek-ai/DeepSeek-V3/blob/main/DeepSeek_V3.pdf
 3. 使用分离框架，即 Base Model 和 MTP 分别加载权重，导出后兼容多种解码方式。
 
 ### MTP 支持量化精度
+
 | 基础模型 | 部署机器 | 基础模型量化类型 | MTP 量化类型 |
 | --- | --- | --- | --- |
-| DeepSeek-V3 | TP8 | weight_only_int4 | weight_only_int8 |
-| DeepSeek-V3 | TP16(2*TP8) | weight_only_int8 |weight_only_int8 |
-| DeepSeek-V3 | TP16(2*TP8) | a8w8_fp8 | a8w8_fp8 |
+| DeepSeek-R1 | TP8 | a8w8_fp8_wint4 | a8w8_fp8 |
 | DeepSeek-R1 | TP8 | weight_only_int4 | weight_only_int8 |
-| DeepSeek-R1 | TP16(2*TP8) | weight_only_int8 |weight_only_int8 |
 | DeepSeek-R1 | TP16(2*TP8) | a8w8_fp8 | a8w8_fp8 |
+| DeepSeek-R1 | TP16(2*TP8) | weight_only_int8 |weight_only_int8 |
 
- 支持 DeepSeek-V3/R1 与 MTP 的多种推理混合精度，可通过容器部署或脚本的方式进行推理，以下为部分示例
+ 支持 DeepSeek-R1 与 MTP 的多种推理混合精度，可通过容器部署或脚本的方式进行推理，以下为部分示例
 
 ### 方法一：使用容器一键部署
+**DeepSeek-R1(a8w8_fp8_wint4) + MTP(a8w8_fp8), 单机 TP8 部署**
+
+```shell
+export MODEL_PATH=${MODEL_PATH:-/PATH_TO_MODEL/}
+export MODEL_MTP_PATH=${MODEL_PATH:-/PATH_TO_MTP/}
+export model_name="deepseek-ai/DeepSeek-R1-MTP/a8w8_fp8_wint4"
+
+docker run --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
+-v $MODEL_PATH:/models -v $MODEL_MTP_PATH:/models-mtp -v /ssd2/paddle_example:/work -e "model_name=${model_name}" \
+-dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.1 /bin/bash \
+-c -ex 'export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 && export MP_NUM=8 && export SPECULATE_MODEL_QUANT_TYPE="a8w8_fp8" && export SPECULATE_METHOD="mtp" && export SPECULATE_MODEL_PATH="/models-mtp" && export SPECULATE_MAX_DRAFT_TOKEN_NUM=1 && export BLOCK_BS=32 && export BLOCK_RATIO=0.25 && export BATCH_SIZE="128" && start_server $model_name && tail -f /dev/null'
+```
 **DeepSeek-R1(weight_only_int8) + MTP(weight_only_int8), 双机 TP16 划分**
 
 1. 一键容器启动  MTP 推理服务
