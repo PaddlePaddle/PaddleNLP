@@ -18,6 +18,7 @@ __global__ void token_unzip_kernel(
     phi::bfloat16 *__restrict__ X_unzipped,
     int *__restrict__ rowmap_unzipped,
     float *__restrict__ probs_unzipped,
+    int* __restrict__ expert_idx,
     int *__restrict__ atomic_extended_offset_counter,
     int *__restrict__ row_valid,
     const int total_zipped_tokens_num,
@@ -46,15 +47,18 @@ __global__ void token_unzip_kernel(
               isFirst = false;
               rowmap_unzipped[row_idx] = row_idx;
               probs_unzipped[row_idx] = local_probs_topk;
+              expert_idx[row_idx] = local_routemap_topk;
             } else {
               // 增广部分， 原子更新行偏置
               extended_row_offset =
                   atomicAdd(&atomic_extended_offset_counter[0], 1);
+              // 立即唤起相关的线程组1，减少忙等
+              atomicExch(&row_valid[extended_row_offset], 1);
               int extended_row_idx =
                   total_zipped_tokens_num + extended_row_offset;
               rowmap_unzipped[extended_row_idx] = row_idx;
               probs_unzipped[extended_row_idx] = local_probs_topk;
-              atomicExch(&row_valid[extended_row_offset], 1);
+              expert_idx[extended_row_idx] =local_routemap_topk;
             }
           }
         }
@@ -89,6 +93,7 @@ void dispatch_tokens_unzip(const paddle::Tensor &X,
                            paddle::Tensor &X_unzipped,
                            paddle::Tensor &expert_rowmap_unzipped,
                            paddle::Tensor &token_prob_unzipped,
+                           paddle::Tensor &expert_idx,
                            paddle::Tensor &atomic_extended_offset_counter,
                            paddle::Tensor &row_valid,
                            const int total_zipped_tokens_num,
@@ -107,6 +112,7 @@ void dispatch_tokens_unzip(const paddle::Tensor &X,
         X_unzipped.data<phi::bfloat16>(),
         expert_rowmap_unzipped.data<int>(),
         token_prob_unzipped.data<float>(),
+        expert_idx.data<int>(),
         atomic_extended_offset_counter.data<int>(),
         row_valid.data<int>(),
         total_zipped_tokens_num,
@@ -127,18 +133,19 @@ std::vector<paddle::Tensor> tokens_unzip(
   int rows = X.shape()[0];  // seqlen
   int cols = X.shape()[1];  //一般为7168
 
+  //------------------------ 输出四张量 ------------------------
   auto X_unzipped =
       paddle::empty({total_unzipped_tokens_num, cols}, X.dtype(), X.place());
-
   auto token_rowmap_unzipped = paddle::empty(
       {total_unzipped_tokens_num}, paddle::DataType::INT32, X.place());
   auto token_prob_unzipped = paddle::empty(
       {total_unzipped_tokens_num}, paddle::DataType::FLOAT32, X.place());
+  auto expert_idx = paddle::empty({total_unzipped_tokens_num}, paddle::DataType::INT32, X.place());
 
+  //------------------------ 辅助二张量 ------------------------
   //用于原子记录当前以增广的行数，其上限应为 total_unzipped_tokens_num - rows
   auto atomic_extended_offset_counter =
       paddle::zeros({1}, paddle::DataType::INT32, X.place());
-
   // 增广行数的合法性向量，用于线程组1唤起
   auto row_valid = paddle::zeros({total_unzipped_tokens_num - rows + 1},
                                  paddle::DataType::INT32,
@@ -150,6 +157,7 @@ std::vector<paddle::Tensor> tokens_unzip(
                         X_unzipped,
                         token_rowmap_unzipped,
                         token_prob_unzipped,
+                        expert_idx,
                         atomic_extended_offset_counter,
                         row_valid,
                         rows,
@@ -157,11 +165,11 @@ std::vector<paddle::Tensor> tokens_unzip(
                         cols,
                         topk,
                         num_experts);
-  return {X_unzipped, token_rowmap_unzipped, token_prob_unzipped};
+  return {X_unzipped, token_rowmap_unzipped, token_prob_unzipped, expert_idx};
 }
 
 PD_BUILD_OP(tokens_unzip)
     .Inputs({"X", "expert_routemap_topk", "expert_prob_topk"})
-    .Outputs({"X_unzipped", "token_rowmap_unzipped", "token_prob_unzipped"})
+    .Outputs({"X_unzipped", "token_rowmap_unzipped", "token_prob_unzipped", "expert_idx"})
     .Attrs({"total_unzipped_tokens_num: int", "topk: int", "num_experts: int"})
     .SetKernelFn(PD_KERNEL(tokens_unzip));

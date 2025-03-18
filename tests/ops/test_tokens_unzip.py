@@ -92,13 +92,21 @@ def verify_tokens_unzip():
         2,
         0
     ]
+    expected_unzipped_expert_idx = [
+        0,
+        1,
+        0,
+        1 
+    ]
     tokens_zipped = paddle.to_tensor(tokens_zipped, dtype='bfloat16')
     routemap_topk = paddle.to_tensor(routemap_topk, dtype='int32')
     probs_topk = paddle.to_tensor(probs_topk, dtype='float32')
     expected_unzipped_probs = paddle.to_tensor(expected_unzipped_probs, dtype='float32')
     expected_unzipped_rowmap = paddle.to_tensor(expected_unzipped_rowmap, dtype='int32')
     expected_unzipped_tokens = paddle.to_tensor(expected_unzipped_tokens, dtype='bfloat16')
-    unzipped_tokens, unzipped_rowmap, unzipped_probs= TDU.tokens_unzip(tokens_zipped,routemap_topk, probs_topk,total_unzipped_tokens_num=total_unzipped_tokens_num, topk=topk, num_experts=expert_num)
+    expected_unzipped_expert_idx = paddle.to_tensor(expected_unzipped_expert_idx, dtype='int32')
+
+    unzipped_tokens, unzipped_rowmap, unzipped_probs, unzipped_expert_idx = TDU.tokens_unzip(tokens_zipped,routemap_topk, probs_topk,total_unzipped_tokens_num=total_unzipped_tokens_num, topk=topk, num_experts=expert_num)
 
     # ------------------------- 前向验证 ------------------------
     print("-------- Tokens unzipped by customed op: ------------")
@@ -113,6 +121,10 @@ def verify_tokens_unzip():
     print(unzipped_rowmap)
     print("-------- rowmap expected: ------------")
     print(expected_unzipped_rowmap)
+    print("-------- expert_idx unzipped by customed op: ------------")
+    print(unzipped_expert_idx)
+    print("-------- expert_idx expected: ------------")
+    print(expected_unzipped_expert_idx)
 
     
 def run():
