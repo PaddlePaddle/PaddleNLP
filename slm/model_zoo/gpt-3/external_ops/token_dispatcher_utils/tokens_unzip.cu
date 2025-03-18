@@ -42,7 +42,6 @@ __global__ void token_unzip_kernel(
         for (int i = 0; i < topk; i++) {
           int local_routemap_topk = routemap_topk[row_idx * topk + i];
           __nv_bfloat16 local_probs_topk = probs_topk[row_idx * topk + i];
-
           if (local_routemap_topk < num_experts && 
               local_routemap_topk >= 0) [[unlikely]] {
             if (isFirst) [[likely]] {
@@ -54,11 +53,11 @@ __global__ void token_unzip_kernel(
               // 增广部分， 原子更新行偏置
               extended_row_offset =
                   atomicAdd(&atomic_extended_offset_counter[0], 1);
-              // 立即唤起相关的线程组1，减少忙等
-              atomicExch(&row_valid[extended_row_offset], 1);
               int extended_row_idx =
                   total_zipped_tokens_num + extended_row_offset;
-              rowmap_unzipped[extended_row_idx] = row_idx;
+              // 立即唤起相关的线程组1，减少忙等, 也强保证rowmap_unzipped的变动对组1可见
+              atomicExch(&rowmap_unzipped[extended_row_idx], row_idx);
+              atomicExch(&row_valid[extended_row_offset], 1);
               probs_unzipped[extended_row_idx] = local_probs_topk;
               expert_idx[extended_row_idx] =local_routemap_topk;
             }
