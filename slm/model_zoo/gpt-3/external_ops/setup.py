@@ -181,6 +181,7 @@ def setup_token_dispatcher_utils():
             sources=[
                 "token_dispatcher_utils/topk_to_multihot.cu",
                 "token_dispatcher_utils/tokens_unzip_and_zip.cu",
+                "token_dispatcher_utils/tokens_guided_unzip.cu",
             ],
             extra_compile_args={
                 "cxx": [

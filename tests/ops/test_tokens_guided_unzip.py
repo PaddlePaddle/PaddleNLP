@@ -97,7 +97,13 @@ def verify_tokens_unzip():
         0,
         1 
     ]
-    for prec in ['fp8e4m3', 'bfloat16']:
+    expected_guided_unzipped_probs= [ 
+        [0,0,0.3,0.5,0,0,0,0],
+        [0.5,0,0,0,0,0,0,0],
+        [0,0.7,0,0,0,0,0,0],
+        [0,0,0.3,0.5,0,0,0,0],
+    ]
+    for prec in ['bfloat16']:
         tokens_zipped = paddle.to_tensor(tokens_zipped, dtype=prec)
         routemap_topk = paddle.to_tensor(routemap_topk, dtype='int32')
         probs_topk = paddle.to_tensor(probs_topk, dtype='bfloat16')
@@ -105,26 +111,16 @@ def verify_tokens_unzip():
         expected_zipped_expertwise_rowmap = paddle.to_tensor(expected_zipped_expertwise_rowmap, dtype='int32')
         expected_unzipped_tokens = paddle.to_tensor(expected_unzipped_tokens, dtype=prec)
         expected_unzipped_expert_idx = paddle.to_tensor(expected_unzipped_expert_idx, dtype='int32')
-
+        expected_guided_unzipped_probs = paddle.to_tensor(expected_guided_unzipped_probs, dtype='bfloat16')
         unzipped_tokens, zipped_expertwise_rowmap, unzipped_probs, unzipped_expert_idx = TDU.tokens_unzip(tokens_zipped,routemap_topk, probs_topk,total_unzipped_tokens_num=total_unzipped_tokens_num, topk=topk, num_experts=expert_num)
 
+        guided_unzipped_probs = TDU.tokens_guided_unzip(probs_topk,zipped_expertwise_rowmap, total_unzipped_token_num=total_unzipped_tokens_num,num_experts=expert_num)
+
         # ------------------------- 前向验证 ------------------------
-        print("-------- Tokens unzipped by customed op: ------------")
-        print(unzipped_tokens)
-        print("-------- Tokens expected : ------------")
-        print(expected_unzipped_tokens)
-        print("-------- Probs unzipped by customed op: ------------")
-        print(unzipped_probs)
-        print("-------- Probs expected: ------------")
-        print(expected_unzipped_probs)
-        print("-------- zipped expertwize rowmap by customed op: ------------")
-        print(zipped_expertwise_rowmap)
-        print("-------- rowmap expected: ------------")
-        print(expected_zipped_expertwise_rowmap)
-        print("-------- expert_idx unzipped by customed op: ------------")
-        print(unzipped_expert_idx)
-        print("-------- expert_idx expected: ------------")
-        print(expected_unzipped_expert_idx)
+        print("-------- guided unzipped by customed op: ------------")
+        print(guided_unzipped_probs)
+        print("-------- guided unzipped expected ------------")
+        print(expected_guided_unzipped_probs)
 
     
 
