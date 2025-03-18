@@ -130,6 +130,8 @@ def _get_distributed_seeds(seed: int = 1234, topo: Topology = None):
         pp_rank, pp_size = 0, 1
         dp_rank, dp_size = 0, 1
         sharding_rank, _ = 0, 1
+    # when tp=8,tp_rank=7 , fleet model_parallel_random_seed would gen local_seed seed+1+mp_rank(seed+1+7),it is conflict with global_seed = seed+sharding_rank*mp_size(seed+1*8)
+    seed_offset = seed + paddle.distributed.get_world_size()
 
     seed_offset = seed
     global_seed = (
