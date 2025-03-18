@@ -31,75 +31,79 @@ __global__ void token_unzip_kernel(
   // 每个线程处理一行数据
   const int row_idx = blockIdx.x;
   // 仅在线程组2中被更新，不初始化
-  int extended_row_offset;
+  extern __shared__ int shared_original_row;
 
   if (row_idx < total_unzipped_tokens_num) [[likely]] {
     // 线程组0，
     // 主要处理topk和增广部分的行索引、处理专家广播后的行表、一对一搬移
     if (row_idx < total_zipped_tokens_num) [[likely]] {
+      // ----------------- 增广行的任务派发逻辑，交给thread0 --------------
       if (threadIdx.x == 0) [[unlikely]] {
         // 寄存器加载、存储，消耗2xtopk 个reg
         // 每行只有一次非广播的机会
         bool isFirst = true;
         int local_expert_rowmap[num_experts];
-// 填入非法值，避免误用（0为合法rowidx）
-#pragma unroll
+        // 寄存器填入非法值，避免误用（0为合法rowidx）
+        #pragma unroll
         for (int i = 0; i < num_experts; i++) {
           local_expert_rowmap[i] = -1;
         }
         for (int i = 0; i < topk; i++) {
           int this_expert_idx = routemap_topk[row_idx * topk + i];
           __nv_bfloat16 this_expert_prob = probs_topk[row_idx * topk + i];
-          if (this_expert_idx < num_experts && this_expert_idx >= 0)
-              [[unlikely]] {
-            if (isFirst) [[likely]] {
-              isFirst = false;
-              probs_unzipped[row_idx] = this_expert_prob;
-              expert_idx_unzipped[row_idx] = this_expert_idx;
-              local_expert_rowmap[this_expert_idx] = row_idx;
-            } else {
-              // 增广部分， 原子更新行偏置
-              extended_row_offset =
-                  atomicAdd(&atomic_extended_offset_counter[0], 1);
-              int extended_row_idx =
-                  total_zipped_tokens_num + extended_row_offset;
-              // 立即唤起相关的线程组1，减少忙等,
-              // 也强保证zipped_expertwise_rowmap的变动对组1可见
-              atomicExch(&zipped_expertwise_rowmap[extended_row_idx], row_idx);
-              atomicExch(&row_valid[extended_row_offset], 1);
-              probs_unzipped[extended_row_idx] = this_expert_prob;
-              expert_idx_unzipped[extended_row_idx] = this_expert_idx;
-              // 处理专家广播后的行表，用于zip进行收集
-              local_expert_rowmap[this_expert_idx] = extended_row_idx;
-            }
+          if(this_expert_idx < 0)[[likely]] continue;
+          // 第一次出现，直接搬入
+          if (isFirst) [[likely]] {
+            isFirst = false;
+            probs_unzipped[row_idx] = this_expert_prob;
+            expert_idx_unzipped[row_idx] = this_expert_idx;
+            local_expert_rowmap[this_expert_idx] = row_idx;
+          } else { // 增广部分, 原子更新行偏置,并计算扩展行索引
+            int extended_row_offset;
+            extended_row_offset =
+                atomicAdd(&atomic_extended_offset_counter[0], 1);
+            int extended_row_idx =
+                total_zipped_tokens_num + extended_row_offset;
+            probs_unzipped[extended_row_idx] = this_expert_prob;
+            expert_idx_unzipped[extended_row_idx] = this_expert_idx;
+            // 处理专家广播后的行表，用于zip进行收集
+            local_expert_rowmap[this_expert_idx] = extended_row_idx;
           }
         }
-// 将合法值和未被触碰的非法值返回给zipped_expertwise_rowmap
-#pragma unroll
+        // ------------------ 更新专家广播后的行表，用于zip进行收集 -----------
+        // 将合法值和未被触碰的非法值返回给zipped_expertwise_rowmap
+        #pragma unroll
         for (int i = 0; i < num_experts; i++) {
-          zipped_expertwise_rowmap[row_idx * num_experts + i] =
-              local_expert_rowmap[i];
+          zipped_expertwise_rowmap[row_idx * num_experts + i] = local_expert_rowmap[i];
+          int valid_offset = local_expert_rowmap[i] - total_zipped_tokens_num;
+          // 只给增广行传递信号量，非法值保持为0
+          if (valid_offset >= 0) {
+            atomicExch(&row_valid[valid_offset], row_idx); // 发送任务信号量
+          }
         }
       }
       //这个syncthread可能并不必要，但尽可能为了不让线程间差太多，还是这样吧。
       __syncthreads();
-      // 搬第一次出现的数据
+      // 处理完增广事务，对位搬搬移第一次出现的数据,可用inplace优化
       for (int i = threadIdx.x; i < token_length; i += blockDim.x) {
         X_unzipped[row_idx * token_length + i] = X[row_idx * token_length + i];
       }
     } else {  // 线程组1， 忙等、并发处理数据搬移
       if (threadIdx.x == 0) {
         int extended_row_offset = row_idx - total_zipped_tokens_num;
-        // 忙等该行的 row_valid变为1
-        while (!atomicExch(&row_valid[extended_row_offset], 0)) {
+        int local_original_row = -1;
+        // 忙等该行的 row_valid变为非-1的合法值
+        while (local_original_row == -1) {
+          local_original_row = atomicExch(&row_valid[extended_row_offset], -1);
         }
+        // 传递给同组线程共享
+        shared_original_row = local_original_row;
       }
-      __syncthreads();  // 所有该组线程都等0完成等待
+      __syncthreads();  // 所有该组线程都等0号取任务，再搬移数据
+      int original_row = shared_original_row;
       // 搬
       for (int i = threadIdx.x; i < token_length; i += blockDim.x) {
-        int origin_row = zipped_expertwise_rowmap[row_idx];
-        X_unzipped[row_idx * token_length + i] =
-            X[origin_row * token_length + i];
+        X_unzipped[row_idx * token_length + i] = X[original_row * token_length + i];
       }
     }
   }
@@ -167,9 +171,13 @@ std::vector<paddle::Tensor> tokens_unzip(
   auto atomic_extended_offset_counter =
       paddle::zeros({1}, paddle::DataType::INT32, X.place());
   // 增广行数的合法性向量，用于线程组1唤起
-  auto row_valid = paddle::zeros({total_unzipped_tokens_num - rows + 1},
+  int extended_row_num = total_unzipped_tokens_num - rows;
+  auto row_valid = paddle::zeros({extended_row_num},
                                  paddle::DataType::INT32,
                                  X.place());
+  void* row_valid_gpu = reinterpret_cast<void*>(row_valid.data<int>());
+  cudaMemsetAsync(row_valid_gpu, -1, sizeof(int) * extended_row_num, X.stream());
+
 
   dispatch_tokens_unzip(X,
                         expert_routemap_topk,
