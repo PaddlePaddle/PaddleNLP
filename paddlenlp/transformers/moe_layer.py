@@ -347,7 +347,9 @@ class MoEFlexTokenLayer(nn.Layer):
             self.num_local_experts, self.moe_router_topk, self.moe_num_experts, moe_group
         )
 
-        self.experts = nn.LayerList([expert_class(**expert_kwargs)] * self.num_local_experts)
+        self.experts = nn.LayerList([])
+        for i in range(self.num_local_experts):
+            self.experts.append(expert_class(**expert_kwargs))
         self.router = gate
 
     def get_tokens_per_expert(self):

@@ -1651,6 +1651,7 @@ class Trainer:
                 batch_size=self.args.per_device_train_batch_size,
                 collate_fn=self.data_collator,
                 num_workers=self.args.dataloader_num_workers,
+                prefetch_factor=32,
                 **additional_configs,
             )
         else:
@@ -1663,6 +1664,7 @@ class Trainer:
                 batch_sampler=train_sampler,
                 collate_fn=self.data_collator,
                 num_workers=self.args.dataloader_num_workers,
+                prefetch_factor=32,
                 **additional_configs,
             )
 
