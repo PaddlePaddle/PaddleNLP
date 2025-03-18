@@ -1596,27 +1596,29 @@ def benchmark(predictor, predictor_args, model_args):
     print("***********Start Warmup**********")
     for _ in range(warmup_time):
         for bs, batch_source_text in enumerate(batch_benchmark_texts):
-            outputs = predictor.predict(batch_source_text)
+            predictor.predict(batch_source_text)
 
     print("***********Start Speed Test**********")
     start = time.perf_counter()
     output_tokens = 0
     for _ in range(test_time):
         for bs, batch_source_text in enumerate(batch_benchmark_texts):
-            outputs, batch_tokens = predictor.predict(batch_source_text, return_tokens=True)
-            output_tokens += sum([len(tokens) for tokens in batch_tokens])
+            results = predictor.predict(batch_source_text, return_tokens=True)
+            if predictor.tensor_parallel_rank == 0:
+                output_tokens += sum([len(tokens) for tokens in results[-1]])
     end = time.perf_counter()
-    print("Avg Elapse time is: ", (end - start) / test_time)
-    print("Output tokens is: ", output_tokens)
-    print(
-        "Input length is: {}, Output length is: {}, bs is: {}, IPS: {:.3f} tokens/s, QPS: {:.3f} requests/s. ".format(
-            predictor_args.src_length,
-            predictor_args.max_length,
-            predictor_args.batch_size,
-            (output_tokens / (end - start)),
-            (predictor_args.batch_size * test_time / (end - start)),
+    if predictor.tensor_parallel_rank == 0:
+        print("Avg Elapse time is: ", (end - start) / test_time)
+        print("Output tokens is: ", output_tokens)
+        print(
+            "Input length is: {}, Output length is: {}, bs is: {}, IPS: {:.3f} tokens/s, QPS: {:.3f} requests/s. ".format(
+                predictor_args.src_length,
+                predictor_args.max_length,
+                predictor_args.batch_size,
+                (output_tokens / (end - start)),
+                (predictor_args.batch_size * test_time / (end - start)),
+            )
         )
-    )
 
 
 if __name__ == "__main__":
