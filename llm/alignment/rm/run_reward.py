@@ -19,11 +19,6 @@ from typing import Any, Dict, Tuple
 
 import paddle
 
-try:
-    from typing import Literal
-except ImportError:
-    from typing_extensions import Literal
-
 from data import PreferenceDataset, parse_dataset
 from models import AutoModelForScore
 from reward_trainer import RewardTrainer
@@ -35,11 +30,12 @@ from paddlenlp.utils.log import logger
 
 @dataclass
 class TrainingArguments(TrainingArguments):
-    loss_type: Literal["token-wise", "sequence-wise"] = field(
+    loss_type: str = field(
         default="sequence-wise",
         metadata={
-            "help": "Calculate ranking loss with all token-wise reward outputs in the sequence or the "
-            "sequence-wise reward output only (the reward of the last token in each sequence)."
+            "help": "Calculate ranking loss using either 'token-wise' (all token-wise reward outputs in the sequence) "
+                    "or 'sequence-wise' (reward of the last token in each sequence). "
+                    "Allowed values: ['token-wise', 'sequence-wise']."
         },
     )
     # regularization
@@ -57,8 +53,11 @@ class ModelArgument:
     normalize_score_during_training: bool = field(
         default=False, metadata={"help": "Whether to normalize score during training."}
     )
-    normalizer_type: Literal["RunningMeanStd", "ExponentialMovingAverage"] = field(
-        default=None, metadata={"help": "The type of the reward normalizer."}
+    normalizer_type: str = field(
+        default="ExponentialMovingAverage",
+        metadata={
+            "help": "The type of the reward normalizer. Allowed values: ['RunningMeanStd', 'ExponentialMovingAverage']."
+        },
     )
     normalizer_momentum: float = field(
         default=None,

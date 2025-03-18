@@ -1,5 +1,5 @@
 # Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2023 Mistral AI and the HuggingFace Inc. team. All rights reserved.
+# Copyright (c) 2023 DeepSeek. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -139,7 +139,8 @@ class DeepseekV2Config(PretrainedConfig):
         intermediate_size=11008,
         moe_intermediate_size=1407,
         num_hidden_layers=30,
-        num_nextn_predict_layers=1,
+        num_nextn_predict_layers=0,
+        num_nextn_predict_lambda=1.0,
         num_attention_heads=32,
         num_key_value_heads=32,
         n_shared_experts=None,
@@ -177,6 +178,7 @@ class DeepseekV2Config(PretrainedConfig):
         attention_bias=False,
         attention_dropout=0.0,
         speculate_model_type=False,
+        using_flex_token=False,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -187,6 +189,7 @@ class DeepseekV2Config(PretrainedConfig):
         self.moe_intermediate_size = moe_intermediate_size
         self.num_hidden_layers = num_hidden_layers
         self.num_nextn_predict_layers = num_nextn_predict_layers
+        self.num_nextn_predict_lambda = num_nextn_predict_lambda
         self.num_attention_heads = num_attention_heads
         self.n_shared_experts = n_shared_experts
         self.n_routed_experts = n_routed_experts
@@ -222,6 +225,8 @@ class DeepseekV2Config(PretrainedConfig):
         self.attention_bias = attention_bias
         self.attention_dropout = attention_dropout
         self.speculate_model_type = speculate_model_type
+        self.use_fp8 = False
+        self.using_flex_token = using_flex_token
 
         super().__init__(
             pad_token_id=pad_token_id,

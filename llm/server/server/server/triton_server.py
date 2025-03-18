@@ -146,11 +146,11 @@ class TritonServer(object):
         # start health checker
         use_custom_health_checker = int(os.getenv("USE_CUSTOM_HEALTH_CHECKER", 1))
         # if set USE_CUSTOM_HEALTH_CHECKER=1, use custom health checker, need set --allow-http=false
-        # else use tritonserver's health checker, need set --http-port=${HTTP_PORT}
+        # else use tritonserver's health checker, need set --http-port=${HEALTH_HTTP_PORT}
         if use_custom_health_checker:
-            http_port = os.getenv("HTTP_PORT")
+            http_port = os.getenv("HEALTH_HTTP_PORT")
             if http_port is None:
-                raise Exception("HTTP_PORT must be set")
+                raise Exception("HEALTH_HTTP_PORT must be set")
             from server.triton_server_helper import start_health_checker
             multiprocessing.Process(target=start_health_checker, args=(int(http_port), )).start()
             time.sleep(1)
@@ -164,7 +164,7 @@ class TritonServer(object):
                 enable decoupled transaction policy in model configuration to
                 serve this model""".format(args["model_name"]))
 
-        # add metrics，use METRICS_PORT get server metrics
+        # add metrics，use METRICS_HTTP_PORT get server metrics
         self.metric_family = pb_utils.MetricFamily(
             name="inference_server_metrics",
             description="Metrics for monitoring inference server status",
@@ -201,7 +201,9 @@ class TritonServer(object):
         self.engine.start()
         model_server_logger.info("Create engine success")
 
-        self._initialize_push_mode()
+        # Master node only
+        if self.cfg.nnode == 1 or os.getenv('POD_0_IP',"127.0.0.1") == self.cfg.host_ip:
+            self._initialize_push_mode()
         model_server_logger.info("Init triton server success")
 
 

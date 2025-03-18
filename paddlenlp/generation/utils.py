@@ -1437,16 +1437,8 @@ class GenerationMixin(object):
             outputs, input_ids, cur_len_gpu, origin_len_gpu, scores, unfinished_flag, model_kwargs, pad_token_id
         )
 
-        if hasattr(paddle.framework, "_no_check_dy2st_diff"):
-            # TODO(daisiming): _no_check_dy2st_diff is used to turn off the checking of behavior
-            # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
-            # removed after static graphs support inplace and stride.
-            with paddle.framework._no_check_dy2st_diff():
-                paddle.increment(cur_len)
-                paddle.increment(cur_len_gpu)
-        else:
-            paddle.increment(cur_len)
-            paddle.increment(cur_len_gpu)
+        cur_len += 1
+        cur_len_gpu += 1
 
         attn_mask = model_kwargs["attention_mask"]
         # make the shape of attention_mask = (-1, -1, -1, -1) in dy2static.
@@ -1454,38 +1446,19 @@ class GenerationMixin(object):
         model_kwargs["cache"] = outputs[1] if isinstance(outputs, tuple) else None
         max_new_tokens = paddle.full([1], max_new_tokens + cur_len - 1, dtype="int64")
 
-        if hasattr(paddle.framework, "_no_check_dy2st_diff"):
-            # TODO(daisiming): _no_check_dy2st_diff is used to turn off the checking of behavior
-            # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
-            # removed after static graphs support inplace and stride.
-            with paddle.framework._no_check_dy2st_diff():
-                while cur_len < max_new_tokens and paddle.any(unfinished_flag):
-                    input_ids, scores, unfinished_flag, model_kwargs = _post_process_(
-                        _forward_(**model_kwargs),
-                        input_ids,
-                        cur_len_gpu,
-                        origin_len_gpu,
-                        scores,
-                        unfinished_flag,
-                        model_kwargs,
-                        pad_token_id,
-                    )
-                    paddle.increment(cur_len)
-                    paddle.increment(cur_len_gpu)
-        else:
-            while cur_len < max_new_tokens and paddle.any(unfinished_flag):
-                input_ids, scores, unfinished_flag, model_kwargs = _post_process_(
-                    _forward_(**model_kwargs),
-                    input_ids,
-                    cur_len_gpu,
-                    origin_len_gpu,
-                    scores,
-                    unfinished_flag,
-                    model_kwargs,
-                    pad_token_id,
-                )
-                paddle.increment(cur_len)
-                paddle.increment(cur_len_gpu)
+        while cur_len < max_new_tokens and paddle.any(unfinished_flag):
+            input_ids, scores, unfinished_flag, model_kwargs = _post_process_(
+                _forward_(**model_kwargs),
+                input_ids,
+                cur_len_gpu,
+                origin_len_gpu,
+                scores,
+                unfinished_flag,
+                model_kwargs,
+                pad_token_id,
+            )
+            cur_len += 1
+            cur_len_gpu += 1
 
         return input_ids[:, origin_len:], scores
 

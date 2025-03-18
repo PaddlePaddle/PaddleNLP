@@ -1,4 +1,7 @@
 # Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) Microsoft Corporation.
+# Copyright (c) Facebook, Inc. and its affiliates. All rights reserved.
+# Copyright (C) 2024 THL A29 Limited, a Tencent company.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -124,6 +127,24 @@ class MoEGateMixin:
             me = paddle.stack(me_list).mean(0)
             ce = paddle.stack(ce_list).mean(0)
         aux_loss = paddle.sum(me * ce) * float(self.num_experts)
+        return aux_loss
+
+    def _cal_seq_aux_loss(self, gates, top_k, topk_idx) -> paddle.Tensor:
+        """
+        Calculate sequence auxiliary loss.
+
+        Args:
+            logits (paddle.Tensor): Model output.
+
+        Returns:
+            paddle.Tensor: The value of sequence auxiliary loss.
+        """
+        batch_size, seq_len, _ = gates.shape
+        ce = paddle.zeros([batch_size, self.num_experts])
+        topk_idx = topk_idx.reshape([batch_size, -1])
+        ce.put_along_axis_(indices=topk_idx, values=paddle.ones([batch_size, seq_len * top_k]), axis=1)
+        ce = ce / (seq_len * top_k / self.num_experts)
+        aux_loss = (ce * paddle.mean(gates, axis=1)).sum(axis=1).mean()
         return aux_loss
 
     def _cal_z_loss(self, logits) -> paddle.Tensor:
@@ -313,7 +334,7 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
             scores_for_choice.reshape([bsz_seq_len, self.n_group, -1]).topk(2, axis=-1)[0].sum(axis=-1)
         )  # fmt:skip [n, n_group]
         group_idx = paddle.topk(group_scores, k=topk_group, axis=-1, sorted=False)[1]  # [n, top_k_group]
-        group_mask = paddle.zeros_like(group_scores).put_along_axis(group_idx, paddle.to_tensor(1.0), axis=-1)  # fmt:skip
+        group_mask = paddle.zeros_like(group_scores).put_along_axis(group_idx, paddle.to_tensor(1.0, dtype="float32"), axis=-1)  # fmt:skip
         score_mask = (
             group_mask.unsqueeze(-1).expand([bsz_seq_len, n_group, n_experts // n_group]).reshape([bsz_seq_len, -1])
         )  # [n, e]
@@ -377,7 +398,9 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
 
         _, top_idx = paddle.topk(mask1_rand, k=capacity, axis=0)  # Select top_capacity tokens
 
-        new_mask1 = mask1 * paddle.zeros_like(mask1).put_along_axis(top_idx, paddle.to_tensor(1.0), axis=0)
+        new_mask1 = mask1 * paddle.zeros_like(mask1).put_along_axis(
+            top_idx, paddle.to_tensor(1.0, dtype="float32"), axis=0
+        )
         mask1 = new_mask1
 
         # Compute locations in capacity buffer
@@ -477,6 +500,10 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         gates: paddle.Tensor,
     ) -> Tuple[int, paddle.Tensor, paddle.Tensor, paddle.Tensor, paddle.Tensor, paddle.Tensor]:
         """Implements TopKGating on logits."""
+        batch_size, seq_len, d_model = gates.shape
+        gates_ori = gates
+        gates = gates.reshape([-1, d_model])
+
         l_zloss = self._cal_z_loss(gates)
 
         # get topk gates
@@ -497,8 +524,11 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         top_gate = top_gate * self.routed_scaling_factor
 
         # get topk mask
-        mask = paddle.zeros_like(gates).put_along_axis(top_idx, paddle.to_tensor(1.0), axis=1)
-        l_aux = self._cal_aux_loss(gates, mask)
+        mask = paddle.zeros_like(gates).put_along_axis(top_idx, paddle.to_tensor(1.0, dtype="float32"), axis=1)
+        if hasattr(self.config, "seq_aux") and self.config.seq_aux:
+            l_aux = self._cal_seq_aux_loss(gates_ori, self.top_k, top_idx)
+        else:
+            l_aux = self._cal_aux_loss(gates, mask)
 
         exp_counts = paddle.sum(mask.cast(paddle.int64), axis=0)
 
@@ -536,15 +566,48 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
             denom_s = paddle.clip(gates_s, min=paddle.finfo(gates_masked.dtype).eps)
             if self.norm_topk_prob:
                 gates_masked = gates_masked / denom_s
-            combine_weights = paddle.einsum(
-                "se,sec->sec", gates_masked, token_priority.cast(paddle.get_default_dtype())
-            )
+            combine_weights = paddle.einsum("se,sec->sec", gates_masked, token_priority.cast(paddle.float32))
         else:
             topk_masked_gates = paddle.zeros_like(gates).put_along_axis(top_idx, top_gate, axis=1)
-            combine_weights = paddle.einsum(
-                "se,sec->sec", topk_masked_gates, token_priority.cast(paddle.get_default_dtype())
-            )
+            combine_weights = paddle.einsum("se,sec->sec", topk_masked_gates, token_priority.cast(paddle.float32))
 
         dispatch_mask = combine_weights.cast(paddle.bool)
 
         return capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss
+
+    def topkgating_nodrop(self, gates: paddle.Tensor):
+        """Implements TopKGating on logits."""
+        batch_size, seq_len, d_model = gates.shape
+        gates_ori = gates
+        gates = gates.reshape([-1, d_model])
+
+        l_zloss = self._cal_z_loss(gates)
+
+        # get topk gates
+        if self.topk_method == "greedy":
+            top_gate, top_idx = self._topk_greedy(gates, k=self.top_k)
+        elif self.topk_method == "group_limited_greedy":
+            top_gate, top_idx = self._topk_group_limited_greedy(
+                gates, k=self.top_k, n_group=self.n_group, topk_group=self.topk_group
+            )
+        elif self.topk_method == "noaux_tc":
+            top_gate, top_idx = self._topk_noaux_tc(
+                gates, k=self.top_k, n_group=self.n_group, topk_group=self.topk_group
+            )
+            # norm gate to sum 1
+        if self.top_k > 1 and self.norm_topk_prob:
+            denominator = top_gate.sum(axis=-1, keepdim=True) + 1e-20
+            top_gate = top_gate / denominator
+        top_gate = top_gate * self.routed_scaling_factor
+
+        # get topk mask
+        mask = paddle.zeros_like(gates).put_along_axis(top_idx, paddle.to_tensor(1.0), axis=1)
+
+        if hasattr(self.config, "seq_aux") and self.config.seq_aux:
+            l_aux = self._cal_seq_aux_loss(gates_ori, self.top_k, top_idx)
+        else:
+            l_aux = self._cal_aux_loss(gates, mask)
+
+        exp_counts = paddle.sum(mask.cast(paddle.int64), axis=0)
+        topk_masked_gates = paddle.zeros_like(gates).put_along_axis(top_idx, top_gate, axis=1)
+        return topk_masked_gates, mask, exp_counts, l_aux, l_zloss

@@ -415,14 +415,14 @@ class GenerationBlockInferenceModel(GenerationMixin):
         dtype = config.get("dtype", paddle.get_default_dtype())
         cachekv_dtype = dtype
 
-        cache_kvs_shapes = self.get_cache_kvs_shape(
+        cache_k_shapes, cache_v_shapes = self.get_cache_kvs_shape(
             self.config, max_batch_size=config.get("max_batch_size", -1), max_length=config.get("max_length", None)
         )
         export_precache = config.get("export_precache", False)
         if export_precache:
             precache_kv_spec = [
                 paddle.static.InputSpec(shape=[None, None, None, None], dtype=dtype, name=f"pre_caches_{i}")
-                for i in range(len(cache_kvs_shapes))
+                for i in range(len(cache_k_shapes + cache_v_shapes))
             ]
         else:
             precache_kv_spec = None
@@ -438,7 +438,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
                     dtype="float32",
                     name="k_quant_scales_{}".format(i),
                 )
-                for i in range(int(len(cache_kvs_shapes) / 2))
+                for i in range(int(len(cache_k_shapes)))
             ]
 
             cache_v_quant_scales = [
@@ -447,7 +447,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
                     dtype="float32",
                     name="v_quant_scales_{}".format(i),
                 )
-                for i in range(int(len(cache_kvs_shapes) / 2))
+                for i in range(int(len(cache_v_shapes)))
             ]
 
             cache_k_dequant_scales = [
@@ -456,7 +456,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
                     dtype="float32",
                     name="k_dequant_scales_{}".format(i),
                 )
-                for i in range(int(len(cache_kvs_shapes) / 2))
+                for i in range(int(len(cache_k_shapes)))
             ]
             cache_v_dequant_scales = [
                 paddle.static.InputSpec(
@@ -464,7 +464,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
                     dtype="float32",
                     name="v_dequant_scales_{}".format(i),
                 )
-                for i in range(int(len(cache_kvs_shapes) / 2))
+                for i in range(int(len(cache_v_shapes)))
             ]
         else:
             cache_k_quant_scales = None
@@ -473,17 +473,19 @@ class GenerationBlockInferenceModel(GenerationMixin):
             cache_v_dequant_scales = None
 
         caches = []
-        for i in range(len(cache_kvs_shapes) // 2):
-            caches.append(
-                paddle.static.InputSpec(
-                    shape=cache_kvs_shapes[2 * i], dtype=cachekv_dtype, name="key_caches_{}".format(i)
+        for i in range(len(cache_k_shapes)):
+            if cache_k_shapes is not None:
+                caches.append(
+                    paddle.static.InputSpec(
+                        shape=cache_k_shapes[i], dtype=cachekv_dtype, name="key_caches_{}".format(i)
+                    )
                 )
-            )
-            caches.append(
-                paddle.static.InputSpec(
-                    shape=cache_kvs_shapes[2 * i + 1], dtype=cachekv_dtype, name="value_caches_{}".format(i)
+            if cache_v_shapes is not None:
+                caches.append(
+                    paddle.static.InputSpec(
+                        shape=cache_v_shapes[i], dtype=cachekv_dtype, name="value_caches_{}".format(i)
+                    )
                 )
-            )
         if export_precache:
             src_mask_spec = paddle.static.InputSpec(shape=[None, 1, None, None], dtype=dtype, name="src_mask")
         else:
@@ -831,28 +833,26 @@ class GenerationBlockInferenceModel(GenerationMixin):
             probs = F.softmax(logits)
 
             from paddlenlp_ops import (
+                speculate_clear_accept_nums,
                 speculate_save_output,
                 speculate_set_value_by_flags_and_idx,
-                speculate_verify_and_update,
+                speculate_update,
+                speculate_verify,
                 top_p_candidates,
             )
 
             verify_scores, verify_tokens, actual_candidate_len = top_p_candidates(
                 probs, top_p, model_kwargs["output_padding_offset"], self.max_candidate_len, self.max_seq_len
-            )  # [token_num, max_candidate_len]
+            )
 
-            # Speculate Verify And Update
-            speculate_verify_and_update(
+            speculate_verify(
                 model_kwargs["accept_tokens"],
                 model_kwargs["accept_num"],
                 model_kwargs["step_idx"],
+                model_kwargs["stop_flags"],
                 model_kwargs["seq_lens_encoder"],
                 model_kwargs["seq_lens_decoder"],
-                model_kwargs["stop_flags"],
-                model_kwargs["not_need_stop"],
-                model_kwargs[
-                    "draft_tokens"
-                ],  # Both input and output, need to write the last 1 token accepted to position 0.
+                model_kwargs["draft_tokens"],  # 既是输入又是输出，需要把接收的最后1个token写入到第0个位置
                 model_kwargs["seq_lens_this_time"],
                 verify_tokens,
                 verify_scores,
@@ -868,6 +868,25 @@ class GenerationBlockInferenceModel(GenerationMixin):
                 True,  # enable_topp
             )
 
+            if self.config.tensor_parallel_degree > 1:
+                paddle.distributed.broadcast(model_kwargs["accept_tokens"], 0)
+                paddle.distributed.broadcast(model_kwargs["accept_num"], 0)
+                paddle.distributed.broadcast(model_kwargs["step_idx"], 0)
+                paddle.distributed.broadcast(model_kwargs["stop_flags"], 0)
+
+            speculate_update(
+                model_kwargs["seq_lens_encoder"],
+                model_kwargs["seq_lens_decoder"],
+                model_kwargs["not_need_stop"],
+                model_kwargs["draft_tokens"],
+                model_kwargs["actual_draft_token_num"],
+                model_kwargs["accept_tokens"],
+                model_kwargs["accept_num"],
+                model_kwargs["stop_flags"],
+                model_kwargs["seq_lens_this_time"],
+                model_kwargs["is_block_step"],
+            )
+
             speculate_save_output(
                 model_kwargs["accept_tokens"],
                 model_kwargs["accept_num"],
@@ -876,7 +895,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
             )
 
             # If seq_lens_decoder is 0 (means stop), accept_num should be set to 0
-            model_kwargs["accept_num"][model_kwargs["seq_lens_decoder"] == 0] = 0
+            speculate_clear_accept_nums(model_kwargs["accept_num"], model_kwargs["seq_lens_decoder"])
 
             # Update pre_ids through accept tokens
             speculate_set_value_by_flags_and_idx(

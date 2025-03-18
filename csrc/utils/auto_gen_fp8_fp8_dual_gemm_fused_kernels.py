@@ -215,10 +215,10 @@ bool fp8_fp8_dual_gemm_scale_bias_act(DualGemmEpilogueAllParams params) {
   int N = params.N;
   int K = params.K;
 
-  std::string mnk_string = "dual_gemm<"+ std::to_string(M)+ ", " +std::to_string(N) + ", "+ std::to_string(K)+ ">";
-  std::string regex_mnk_string = "dual_gemm<(\\d+), " + std::to_string(N) + ", " + std::to_string(K) + ">";
-  std::string mnk_split_k_string =  "dual_gemm<"+ std::to_string(M)+ ", " +std::to_string(N) + ", "+ std::to_string(K)+ ">" + ", split_k";
-  std::string regex_mnk_split_k_string = "dual_gemm<(\\d+), " + std::to_string(N) + ", " + std::to_string(K) + ">, split_k";
+  std::string mnk_string = "tensor_dual_gemm_sm89<"+ std::to_string(M)+ ", " +std::to_string(N) + ", "+ std::to_string(K)+ ">";
+  std::string regex_mnk_string = "tensor_dual_gemm_sm89<(\\d+), " + std::to_string(N) + ", " + std::to_string(K) + ">";
+  std::string mnk_split_k_string =  "tensor_dual_gemm_sm89<"+ std::to_string(M)+ ", " +std::to_string(N) + ", "+ std::to_string(K)+ ">" + ", split_k";
+  std::string regex_mnk_split_k_string = "tensor_dual_gemm_sm89<(\\d+), " + std::to_string(N) + ", " + std::to_string(K) + ">, split_k";
   int split_k;
   int kernel_id;
   std::string best_config;
