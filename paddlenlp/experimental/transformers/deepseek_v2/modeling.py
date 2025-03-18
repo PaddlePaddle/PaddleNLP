@@ -52,7 +52,7 @@ from paddlenlp.transformers.model_utils import (
 )
 from paddlenlp.utils.log import logger
 
-__all__ = ["DeepseekV2ForCausalLMBlockInferenceModel"]
+__all__ = ["DeepseekV2ForCausalLMBlockInferenceModel","DeepseekVLV2ForCausalLMBlockInferenceModel"]
 
 
 class DeepseekScalingRotaryEmbedding(nn.Layer):
@@ -1440,9 +1440,15 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
         kwargs["padding_offsets"] = padding_offset
         kwargs["max_input_length"] = self.max_seq_len
         kwargs["block_size"] = self.block_size
-
-        inputs_embeds = self.embed_tokens(ids_remove_padding)
-
+        
+        if inputs_embeds is None:
+            inputs_embeds = self.embed_tokens(ids_remove_padding)
+        else:
+            assert len(inputs_embeds.shape) == 3
+            # This is the case in the image-to-text model such as qwen2-vl,
+            # In the prefill phase, the language model is first fed with inputs_embeds instead of input_ids
+            # but in decoder phase, the language model is fed with input_ids just like normal text-to-text model.
+            inputs_embeds = inputs_embeds.reshape([-1, inputs_embeds.shape[2]])
         with dy2st_nocheck_guard_context():
             hidden_states, _ = self.transformer_block(
                 input_ids=input_ids,
@@ -1694,6 +1700,7 @@ class DeepseekV2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, De
     def prepare_inputs_for_generation(self, **kwargs):
         # only last token for inputs_ids if cache is defined in kwargs
         input_ids = kwargs["input_ids"]
+        inputs_embeds = kwargs.get("inputs_embeds", None)
         src_mask = kwargs.get("src_mask", None)
         block_tables = kwargs.get("block_tables", None)
 
@@ -1714,6 +1721,7 @@ class DeepseekV2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, De
 
         model_inputs = {
             "input_ids": input_ids,
+            "inputs_embeds": inputs_embeds,
             "src_mask": src_mask,
             "rope_emb": None,
             "pre_caches": pre_caches,
@@ -1734,6 +1742,7 @@ class DeepseekV2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, De
     def forward(
         self,
         input_ids,
+        inputs_embeds=None,
         src_mask=None,
         pre_caches=None,
         caches=None,
@@ -1751,6 +1760,7 @@ class DeepseekV2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, De
     ):
         outputs = self.deepseek_v2(
             input_ids,
+            inputs_embeds=inputs_embeds,
             src_mask=src_mask,
             caches=caches,
             rope_emb=None,
@@ -1926,3 +1936,18 @@ class MTPDeepseekV2ForCausalLMBlockInferenceModel(DeepseekV2ForCausalLMBlockInfe
         )
 
         return logits, hidden_states
+
+class DeepseekVLV2ForCausalLMBlockInferenceModel(DeepseekV2ForCausalLMBlockInferenceModel):
+    def __init__(self, config: DeepseekV2Config):
+        super().__init__(config,base_model_prefix = "language.model")
+    
+    def get_input_embeddings(self):
+        return self.deepseek_v2.embed_tokens
+
+    @paddle.no_grad()
+    def set_state_dict(self, state_dict):
+        if f"language.lm_head.weight" in state_dict:
+            self.lm_head.weight.set_value(
+                paddle.to_tensor(state_dict[f"language.lm_head.weight"]).cast(self.lm_head.weight.dtype)
+            )
+        self.deepseek_v2.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
