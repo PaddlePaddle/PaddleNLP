@@ -76,9 +76,13 @@ paddlenlp_build (){
     cp $nlp_dir/dist/p****.whl ${upload_path}/paddlenlp-ci-py3-none-any.whl
 }
 
-paddlenlp_ops_build (){
+install_paddlenlp(){
     echo "install_nlp_develop"
     python -m pip install --user https://paddlenlp.bj.bcebos.com/wheels/paddlenlp-ci-py3-none-any.whl --no-cache-dir
+    python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)" >> ${log_path}/commit_info.txt
+}
+
+paddlenlp_ops_build (){
     cd ${nlp_dir}/csrc
     bash tools/build_wheel.sh
     python -c "import paddlenlp_ops"
@@ -99,18 +103,26 @@ contain_case(){
 cd ${nlp_dir}
 get_diff_case
 Build_list=($(awk -v RS=' ' '!a[$1]++' <<< ${Build_list[*]}))
-install_paddle
-if [[ $(contain_case paddlenlp ${Build_list[@]}; echo $?) -eq 1 ]];then
-    paddlenlp_build
-elif [[ $(contain_case paddlenlp_ops ${Build_list[@]}; echo $?) -eq 1 ]];then
-    paddlenlp_ops_build
+if [[ ${#Build_list[*]} -ne 0 ]];then
+    echo -e "\033[31m ---- Build_list length: ${#Build_list[*]}, cases: ${Build_list[*]} \033[0m"
+    echo -e "\033[31m ============================= \033[0m"
+    install_paddle
+    if [[ $(contain_case paddlenlp ${Build_list[@]}; echo $?) -eq 1 ]];then
+        paddlenlp_build
+    else
+        install_paddlenlp
+    fi
+    
+    if [[ $(contain_case paddlenlp_ops ${Build_list[@]}; echo $?) -eq 1 ]];then
+        paddlenlp_ops_build
+    fi
+
+    if [ -e "${upload_path}" ] && [ "$(ls -A "${upload_path}/")" ]; then
+        cd ${upload_path} && ls -A "${upload_path}"
+        cd ${PPNLP_HOME} && python upload.py ${upload_path} 'paddlenlp/wheels'
+        rm -rf ${upload_path}
+        echo -e "\033[32m upload wheels SUCCESS \033[0m"
+    fi
 else
     echo -e "\033[32m Don't need build any whl  \033[0m"
-fi
-
-if [ -e "${upload_path}" ] && [ "$(ls -A "${upload_path}/")" ]; then
-    cd ${upload_path} && ls -A "${upload_path}"
-    cd ${PPNLP_HOME} && python upload.py ${upload_path} 'paddlenlp/wheels'
-    rm -rf ${upload_path}
-    echo -e "\033[32m upload wheels SUCCESS \033[0m"
 fi
