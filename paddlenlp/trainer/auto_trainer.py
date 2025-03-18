@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import os
 import random
 import time
@@ -27,9 +28,8 @@ from paddle.profiler.utils import switch_job_schedule_profiler
 from tqdm.auto import tqdm
 
 from paddlenlp.trainer import Trainer
-from ..transformers.model_utils import unwrap_model
-import copy
 
+from ..transformers.model_utils import unwrap_model
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.log import logger
 from .argparser import strtobool
