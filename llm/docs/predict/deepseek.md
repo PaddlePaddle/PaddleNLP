@@ -31,6 +31,8 @@
 |:------|:-:|:-:|:-:|:-:|
 | deepseek-ai/DeepSeek-R1  |weight_only_int4|否|1| deepseek-ai/DeepSeek-R1/weight_only_int4 |
 | deepseek-ai/DeepSeek-R1  |weight_only_int4|是|1| deepseek-ai/DeepSeek-R1-MTP/weight_only_int4 |
+| deepseek-ai/DeepSeek-R1  |a8w8_fp8_wint4|否|1| deepseek-ai/DeepSeek-R1/a8w8_fp8_wint4 |
+| deepseek-ai/DeepSeek-R1  |a8w8_fp8_wint4|是|1| deepseek-ai/DeepSeek-R1-MTP/a8w8_fp8_wint4 |
 | deepseek-ai/DeepSeek-R1  |weight_only_int8|否|2| deepseek-ai/DeepSeek-R1-2nodes/weight_only_int8 |
 | deepseek-ai/DeepSeek-R1  |weight_only_int8|是|2| deepseek-ai/DeepSeek-R1-MTP-2nodes/weight_only_int8 |
 | deepseek-ai/DeepSeek-R1  |a8w8_fp8|否|2| deepseek-ai/DeepSeek-R1-2nodes/a8w8_fp8|
