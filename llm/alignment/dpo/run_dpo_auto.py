@@ -38,11 +38,7 @@ from paddlenlp.transformers import (
     AutoConfig,
     AutoModelForCausalLMPipe,
     AutoTokenizer,
-    LlamaForCausalLM,
     LlamaForCausalLMNetDPO,
-    LlamaForCausalLMPipe,
-    Qwen2ForCausalLM,
-    Qwen2ForCausalLMPipe,
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig
 from paddlenlp.trl import (
@@ -55,11 +51,7 @@ from paddlenlp.trl.llm_utils import get_lora_target_modules
 from paddlenlp.utils.log import logger
 
 flash_mask_support_list = [
-    Qwen2ForCausalLM,
-    Qwen2ForCausalLMPipe,
     LlamaForCausalLMNetDPO,
-    LlamaForCausalLM,
-    LlamaForCausalLMPipe,
 ]
 
 
