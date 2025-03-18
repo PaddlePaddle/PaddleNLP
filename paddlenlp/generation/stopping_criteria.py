@@ -414,9 +414,8 @@ class StopStringCriteria(StoppingCriteria):
 
         # Size of the vector of positions a single token can match
         max_valid_positions = self.max_valid_positions
-
         # The embedding vec contains the valid positions, end_lengths and total lengths for each token
-        embedded = F.embedding(flipped_ids, self.embedding_vec)
+        embedded = F.embedding(flipped_ids, self.embedding_vec.cast("float32"))
 
         # Now we split the embedding vector. valid_positions is the positions in the stop string the token can fit
         valid_positions = embedded[:, 1:, : max_valid_positions * self.num_stop_strings].unflatten(
@@ -454,7 +453,7 @@ class StopStringCriteria(StoppingCriteria):
 
         # The string is matched if we reached a cumsum equal to or greater than the length of the string
         # before hitting the mask
-        string_matches = paddle.amax(cumsum * mask, axis=(1, -1)) >= self.target_lens[None, :]
+        string_matches = paddle.amax(cumsum * mask.cast("float32"), axis=(1, -1)) >= self.target_lens[None, :].cast("float32")
 
         # We return a per-sample vector that is True if any stop string is matched for that sample
         return paddle.any(string_matches, axis=-1)

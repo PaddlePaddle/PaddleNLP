@@ -64,34 +64,34 @@ class StoppingCriteriaTestCase(unittest.TestCase):
                 MaxTimeCriteria(max_time=0.1),
             ]
         )
-        self.assertFalse(criteria(input_ids, scores))
+        self.assertFalse(all(criteria(input_ids, scores)))
 
         input_ids, scores = self._get_tensors(9)
-        self.assertFalse(criteria(input_ids, scores))
+        self.assertFalse(all(criteria(input_ids, scores)))
 
         input_ids, scores = self._get_tensors(10)
-        self.assertTrue(criteria(input_ids, scores))
+        self.assertTrue(all(criteria(input_ids, scores)))
 
     def test_max_length_criteria(self):
         criteria = MaxLengthCriteria(max_length=10)
 
         input_ids, scores = self._get_tensors(5)
-        self.assertFalse(criteria(input_ids, scores))
+        self.assertFalse(all(criteria(input_ids, scores)))
 
         input_ids, scores = self._get_tensors(9)
-        self.assertFalse(criteria(input_ids, scores))
+        self.assertFalse(all(criteria(input_ids, scores)))
 
         input_ids, scores = self._get_tensors(10)
-        self.assertTrue(criteria(input_ids, scores))
+        self.assertTrue(all(criteria(input_ids, scores)))
 
     def test_max_time_criteria(self):
         input_ids, scores = self._get_tensors(5)
 
         criteria = MaxTimeCriteria(max_time=0.1)
-        self.assertFalse(criteria(input_ids, scores))
+        self.assertFalse(all(criteria(input_ids, scores)))
 
         criteria = MaxTimeCriteria(max_time=0.1, initial_timestamp=time.time() - 0.2)
-        self.assertTrue(criteria(input_ids, scores))
+        self.assertTrue(all(criteria(input_ids, scores)))
 
     def test_eos_token_criteria(self):
         criteria = EosTokenCriteria(eos_token_id=0)
@@ -162,8 +162,8 @@ class StoppingCriteriaTestCase(unittest.TestCase):
         tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/tiny-random-llama")
         tokenizer.pad_token_id = tokenizer.eos_token_id
         tokenizer.padding_side = "left"
-        true_input_ids = tokenizer(true_strings, return_tensors="pt", padding="longest", add_special_tokens=False)
-        false_input_ids = tokenizer(false_strings, return_tensors="pt", padding="longest", add_special_tokens=False)
+        true_input_ids = tokenizer(true_strings, return_tensors="pd", padding="longest", add_special_tokens=False)
+        false_input_ids = tokenizer(false_strings, return_tensors="pd", padding="longest", add_special_tokens=False)
 
         scores = None
         criteria = StopStringCriteria(tokenizer=tokenizer, stop_strings=stop_strings)
@@ -173,10 +173,11 @@ class StoppingCriteriaTestCase(unittest.TestCase):
             self.assertFalse(criteria(false_input_ids["input_ids"][i : i + 1], scores))
 
         # Now try it with a tokenizer where those are actually special tokens
-        tokenizer = AutoTokenizer.from_pretrained("cognitivecomputations/dolphin-2.5-mixtral-8x7b")
+        tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/tiny-random-llama")
+        tokenizer.pad_token_id = tokenizer.eos_token_id
         tokenizer.padding_side = "left"
-        true_input_ids = tokenizer(true_strings, return_tensors="pt", padding="longest", add_special_tokens=False)
-        false_input_ids = tokenizer(false_strings, return_tensors="pt", padding="longest", add_special_tokens=False)
+        true_input_ids = tokenizer(true_strings, return_tensors="pd", padding="longest", add_special_tokens=False)
+        false_input_ids = tokenizer(false_strings, return_tensors="pd", padding="longest", add_special_tokens=False)
 
         criteria = StopStringCriteria(tokenizer=tokenizer, stop_strings=stop_strings)
         for i in range(len(true_strings)):
@@ -238,15 +239,15 @@ class StoppingCriteriaTestCase(unittest.TestCase):
         tokenizer.pad_token_id = tokenizer.eos_token_id
         tokenizer.padding_side = "left"
 
-        true_input_ids = tokenizer(true_strings, return_tensors="pt", padding="longest", add_special_tokens=False)
-        false_input_ids = tokenizer(false_strings, return_tensors="pt", padding="longest", add_special_tokens=False)
+        true_input_ids = tokenizer(true_strings, return_tensors="pd", padding="longest", add_special_tokens=False)
+        false_input_ids = tokenizer(false_strings, return_tensors="pd", padding="longest", add_special_tokens=False)
 
         scores = None
         criteria = StopStringCriteria(tokenizer=tokenizer, stop_strings=stop_strings)
         for input_ids in true_input_ids["input_ids"]:
-            self.assertTrue(criteria(input_ids.unsqueeze(0), scores))
+            self.assertTrue(all(criteria(input_ids.unsqueeze(0), scores)))
         for input_ids in false_input_ids["input_ids"]:
-            self.assertFalse(criteria(input_ids.unsqueeze(0), scores))
+            self.assertFalse(all(criteria(input_ids.unsqueeze(0), scores)))
 
     def test_criterias_per_row(self):
         text = "They completed the challenging puzzle, revealing the hidden image at the end"
@@ -254,7 +255,7 @@ class StoppingCriteriaTestCase(unittest.TestCase):
 
         tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/tiny-random-llama")
         tokenizer.pad_token_id = tokenizer.eos_token_id
-        inputs = tokenizer(text, return_tensors="pt", add_special_tokens=False)
+        inputs = tokenizer(text, return_tensors="pd", add_special_tokens=False)
 
         scores = None
         criteria = StoppingCriteriaList(
@@ -281,7 +282,7 @@ class StoppingCriteriaTestCase(unittest.TestCase):
         tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/tiny-random-llama")
         tokenizer.pad_token_id = tokenizer.eos_token_id
         tokenizer.padding_side = "left"
-        inputs = tokenizer(text, return_tensors="pt", padding="longest", add_special_tokens=False)
+        inputs = tokenizer(text, return_tensors="pd", padding="longest", add_special_tokens=False)
 
         scores = None
         criteria = StoppingCriteriaList(

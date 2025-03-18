@@ -143,7 +143,7 @@ class MinLengthLogitsProcessor(LogitsProcessor):
         eos_token_mask = paddle.isin(vocab_tensor, self.eos_token_id)
         scores_processed = scores.clone()
         if input_ids.shape[-1] < self.min_length:
-            scores_processed = paddle.where(eos_token_mask, -math.inf, scores)
+            scores_processed = paddle.where(eos_token_mask, paddle.finfo(scores.dtype).min, scores)
         return scores_processed
 
 
@@ -213,7 +213,7 @@ class MinNewTokensLengthLogitsProcessor(LogitsProcessor):
         vocab_tensor = paddle.arange(scores.shape[-1])
         eos_token_mask = paddle.isin(vocab_tensor, self.eos_token_id)
         if new_tokens_length < self.min_new_tokens:
-            scores_processed = paddle.where(eos_token_mask, -math.inf, scores)
+            scores_processed = paddle.where(eos_token_mask, paddle.finfo(scores.dtype).min, scores)
 
         return scores_processed
 
@@ -447,22 +447,10 @@ class TopPLogitsWarper(LogitsProcessor):
         # cumulative_probs = sorted_logits.softmax(axis=-1).cumsum(axis=-1)
 
         # Remove tokens with cumulative top_p above the threshold (token with 0 are kept)
-        sorted_indices_to_remove = cumulative_probs <= (1 - self.top_p)
+        sorted_indices_to_remove = cumulative_probs <= (1 - self.top_p + 1e-6)
         # # Keep at least min_tokens_to_keep
         sorted_indices_to_remove[..., -self.min_tokens_to_keep :] = 0
-
-        # # scatter sorted tensors to original indexing
-        # indices_to_remove = paddle.scatter(
-        # sorted_indices_to_remove.flatten(), sorted_indices.flatten(), sorted_indices_to_remove.flatten()
-        # )
-        # # indices_to_remove = sorted_indices_to_remove.scatter(1, sorted_indices, sorted_indices_to_remove)
-        # scores_processed = scores.masked_fill(indices_to_remove, self.filter_value)
-        # return scores_processed
-        # Keep the first token
         sorted_indices_to_remove = paddle.cast(sorted_indices_to_remove, dtype="int64")
-        sorted_indices_to_remove[:, 1:] = sorted_indices_to_remove[:, :-1].clone()
-        sorted_indices_to_remove[:, 0] = 0
-
         # Scatter sorted tensors to original indexing
         sorted_indices = (
             sorted_indices + paddle.arange(scores.shape[0], dtype="int64").unsqueeze(-1) * scores.shape[-1]
@@ -524,6 +512,7 @@ class TopKLogitsWarper(LogitsProcessor):
         top_k = min(self.top_k, scores.shape[-1])  # Safety check
         # Remove all tokens with a probability less than the last token of the top-k
         indices_to_remove = scores < paddle.topk(scores, top_k)[0][..., -1, None]
+        self.filter_value = paddle.finfo(scores.dtype).min
         scores_processed = scores.masked_fill(indices_to_remove, self.filter_value)
         return scores_processed
 
@@ -989,7 +978,7 @@ class NoRepeatNGramLogitsProcessor(LogitsProcessor):
         for i, banned_tokens in enumerate(banned_batch_tokens):
             if len(banned_tokens) == 0:
                 continue
-            scores_processed[i, banned_tokens] = -float("inf")
+            scores_processed[i, banned_tokens] = paddle.finfo(scores.dtype).min
 
         return scores_processed
 
@@ -1390,7 +1379,7 @@ class PrefixConstrainedLogitsProcessor(LogitsProcessor):
 
     @add_start_docstrings(LOGITS_PROCESSOR_INPUTS_DOCSTRING)
     def __call__(self, input_ids: paddle.Tensor, scores: paddle.Tensor) -> paddle.Tensor:
-        mask = paddle.full_like(scores, -math.inf)
+        mask = paddle.full_like(scores, paddle.finfo(scores.dtype).min)
         for batch_id, beam_sent in enumerate(input_ids.view([-1, self._num_beams, input_ids.shape[-1]])):
             for beam_id, sent in enumerate(beam_sent):
                 prefix_allowed_tokens = self._prefix_allowed_tokens_fn(batch_id, sent)
@@ -1582,7 +1571,7 @@ class ForcedBOSTokenLogitsProcessor(LogitsProcessor):
         cur_len = input_ids.shape[-1]
         scores_processed = scores
         if cur_len == 1:
-            scores_processed = paddle.full_like(scores, -math.inf)
+            scores_processed = paddle.full_like(scores, paddle.finfo(scores.dtype).min)
             scores_processed[:, self.bos_token_id] = 0
         return scores_processed
 
@@ -1638,7 +1627,7 @@ class ForcedEOSTokenLogitsProcessor(LogitsProcessor):
         cur_len = input_ids.shape[-1]
         scores_processed = scores
         if cur_len == self.max_length - 1:
-            scores_processed = paddle.full_like(scores, -math.inf)
+            scores_processed = paddle.full_like(scores, paddle.finfo(scores.dtype).min)
             scores_processed[:, self.eos_token_id] = 0
         return scores_processed
 

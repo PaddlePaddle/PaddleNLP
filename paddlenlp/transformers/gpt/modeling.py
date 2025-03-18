@@ -1657,6 +1657,15 @@ class GPTForCausalLM(GPTPretrainedModel):
         }
 
     @staticmethod
+    def _reorder_cache(past, beam_idx):
+        """
+        This function is used to re-order the `past_key_values` cache if [`~PreTrainedModel.beam_search`] or
+        [`~PreTrainedModel.beam_sample`] is called. This is required to match `past_key_values` with the correct
+        beam_idx at every generation step.
+        """
+        return tuple(tuple(paddle.index_select(past_state, beam_idx) for past_state in layer_past) for layer_past in past)
+
+    @staticmethod
     def prepare_attention_mask_for_generation(input_ids, pad_token_id, eos_token_id):
         is_pad_token_in_inputs_ids = (pad_token_id is not None) and float(paddle.any(input_ids == pad_token_id))
         is_pad_token_not_equal_to_eos_token_id = (eos_token_id is None) or (

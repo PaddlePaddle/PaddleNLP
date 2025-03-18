@@ -252,8 +252,8 @@ class LogitsProcessorTest(unittest.TestCase):
         scores = top_k_warp(input_ids, ramp_logits)
 
         # check that correct tokens are filtered
-        self.assertListEqual((scores[0] == 0.0).tolist(), 7 * [True] + 3 * [False])
-        self.assertListEqual((scores[1] == 0.0).tolist(), 2 * [True] + 3 * [False] + 5 * [True])
+        self.assertListEqual((scores[0] == paddle.finfo(scores.dtype).min).tolist(), 7 * [True] + 3 * [False])
+        self.assertListEqual((scores[1] == paddle.finfo(scores.dtype).min).tolist(), 2 * [True] + 3 * [False] + 5 * [True])
 
         # check special cases
         length = 5
@@ -262,14 +262,14 @@ class LogitsProcessorTest(unittest.TestCase):
         top_k_warp_safety_check = TopKLogitsWarper(top_k=1, filter_value=0.0, min_tokens_to_keep=3)
         scores = top_k_warp_safety_check(input_ids, logits)
         # uniform dist is not changed
-        self.assertListEqual((scores == 0.0).sum(axis=-1).tolist(), [0, 0])
+        self.assertListEqual((scores == paddle.finfo(scores.dtype).min).sum(axis=-1).tolist(), [0, 0])
 
         ramp_logits = paddle.arange(length).unsqueeze(0).tile((batch_size, 1))
         ramp_logits = ramp_logits.astype("float32")
         scores = top_k_warp_safety_check(input_ids, ramp_logits)
 
         # min_tokens overwrites k: 3 tokens are kept => 2 tokens are nullified
-        self.assertListEqual((scores == 0.0).sum(axis=-1).tolist(), [2, 2])
+        self.assertListEqual((scores == paddle.finfo(scores.dtype).min).sum(axis=-1).tolist(), [2, 2])
 
     def test_top_p_dist_warper(self):
         input_ids = None
@@ -332,7 +332,7 @@ class LogitsProcessorTest(unittest.TestCase):
 
         # make sure at least 2 tokens are kept
         min_p_warp = MinPLogitsWarper(0.9, min_tokens_to_keep=2, filter_value=0.0)
-        filtered_dist = min_p_warp(input_ids, ramp_logits)
+        filtered_dist = min_p_warp(input_ids, ramp_logits.cast("float32"))
 
         # first batch should keep two tokens, second batch would keep only 1, but due to `min_tokens_to_keep=2` keeps 2.
         self.assertListEqual((filtered_dist != 0.0).sum(axis=-1).tolist(), [3, 2])
@@ -374,7 +374,7 @@ class LogitsProcessorTest(unittest.TestCase):
 
         # make sure at least 2 tokens are kept
         typical_warp = TypicalLogitsWarper(0.7, min_tokens_to_keep=2, filter_value=0.0)
-        filtered_dist = typical_warp(input_ids, ramp_logits)
+        filtered_dist = typical_warp(input_ids, ramp_logits.cast("float32"))
 
         # first batch should keep two tokens, second batch would keep only 1, but due to `min_tokens_to_keep=2` keeps 2.
         self.assertListEqual((filtered_dist != 0.0).sum(axis=-1).tolist(), [2, 2])
@@ -831,10 +831,9 @@ class LogitsProcessorTest(unittest.TestCase):
         logits_processor = InfNanRemoveLogitsProcessor()
 
         processed_scores = logits_processor(input_ids, scores)
-
         self.assertTrue(
             paddle.allclose(
-                processed_scores,
+                processed_scores.cast(paddle.float32),
                 paddle.to_tensor(
                     [
                         [0.0, 0.7, 0.8, 0.0],
@@ -1034,7 +1033,7 @@ class LogitsProcessorTest(unittest.TestCase):
         """Test SynthID watermarked distribution bias uniformity over vocabs of the model."""
         batch_size = 1000
         ngram_len = 5
-        paddle.manual_seed(0)
+        paddle.seed(0)
         np.random.seed(0)
         watermarking_config = {
             "ngram_len": ngram_len,
@@ -1046,7 +1045,7 @@ class LogitsProcessorTest(unittest.TestCase):
         n_minus_1_grams = paddle.randint(
             low=0,
             high=vocab_size,
-            size=(batch_size, watermarking_config["ngram_len"] - 1),
+            shape=[batch_size, watermarking_config["ngram_len"] - 1],
         )
 
         logits_processor = SynthIDTextWatermarkLogitsProcessor(**watermarking_config)

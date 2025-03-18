@@ -74,7 +74,7 @@ class StreamerTester(unittest.TestCase):
         streamer_text = ""
         for new_text in streamer:
             streamer_text += new_text
-
+        import pdb;pdb.set_trace()
         self.assertEqual(streamer_text, greedy_text)
 
     @slow
