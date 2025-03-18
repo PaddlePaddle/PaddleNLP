@@ -172,7 +172,7 @@ std::vector<paddle::Tensor> tokens_unzip(
       paddle::zeros({1}, paddle::DataType::INT32, X.place());
   // 增广行数的合法性向量，用于线程组1唤起
   int extended_row_num = total_unzipped_tokens_num - rows;
-  auto row_valid = paddle::zeros({extended_row_num},
+  auto row_valid = paddle::empty({extended_row_num},
                                  paddle::DataType::INT32,
                                  X.place());
   void* row_valid_gpu = reinterpret_cast<void*>(row_valid.data<int>());
@@ -199,7 +199,7 @@ std::vector<paddle::Tensor> tokens_unzip(
           expert_idx_unzipped};
 }
 
-// ---------------------------------- zip -------------------------------
+// ---------------------------------- Dispatch -------------------------------
 
 template <int num_experts>
 __global__ void tokens_weighted_zip_kernel(
@@ -267,7 +267,6 @@ void dispatch_tokens_weighted_zip(
         total_zipped_tokens_num,
         token_length);
   }
-  cudaDeviceSynchronize();
 }
 
 std::vector<paddle::Tensor> tokens_weighted_zip(
@@ -304,6 +303,12 @@ PD_BUILD_OP(tokens_unzip)
               "expert_idx_unzipped"})
     .Attrs({"total_unzipped_tokens_num: int", "topk: int", "num_experts: int"})
     .SetKernelFn(PD_KERNEL(tokens_unzip));
+
+PD_BUILD_OP(guided_unzip)
+    .Inputs({"X", "zipped_expertwise_rowmap"})
+    .Outputs({"X_guided_unzipped"})
+    .Attrs({"total_unzipped_tokens_num: int", "num_experts: int"})
+    .SetKernelFn(PD_KERNEL(guided_unzip));
 
 PD_BUILD_OP(tokens_weighted_zip)
     .Inputs({"unzipped_tokens",
