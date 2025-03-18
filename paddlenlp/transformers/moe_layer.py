@@ -499,6 +499,7 @@ class MoEFlexTokenLayer(nn.Layer):
         _, _, d_model = hidden_states.shape
         # reshaped_input = hidden_states.reshape([-1, d_model])
         probs, routing_map, l_aux, l_zloss = self.router(hidden_states)
+
         if DSV3_USE_FP8_GEMM:
             output = FusionMoe.apply(hidden_states, probs, routing_map, self)
         else:
@@ -512,6 +513,7 @@ class MoEFlexTokenLayer(nn.Layer):
             output, _ = self.token_dispatcher.token_unpermutation(
                 expert_output, token_permuted_indices, prob_permuted_indices, dispatched_probs, None
             )
+
         return output, l_aux, l_zloss
 
     def pre_dispatch_compute(self, hidden_states):
