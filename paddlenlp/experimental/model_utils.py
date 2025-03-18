@@ -473,10 +473,10 @@ def get_dequant_weight(w, w_s=None, dtype=None, weight_block_size=[128, 128]):
         return w
 
     assert weight_block_size == [128, 128]
-    from paddlenlp_ops import group_quant
+    from paddlenlp.custom_ops import group_quant
 
     try:
-        from paddlenlp_ops import (
+        from paddlenlp.custom_ops import (
             cutlass_fp8_fp8_half_block_gemm_fused as fp8_block_gemm_fused,
         )
     except:

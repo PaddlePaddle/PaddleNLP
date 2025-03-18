@@ -16,7 +16,12 @@ import unittest
 
 import numpy as np
 import paddle
-from paddlenlp_ops import set_stop_value_multi_ends_v2, update_inputs_v2, update_inputs
+
+from paddlenlp.custom_ops import (
+    set_stop_value_multi_ends_v2,
+    update_inputs,
+    update_inputs_v2,
+)
 
 np.random.seed(100)
 

@@ -27,12 +27,12 @@ import paddle
 import paddle.distributed as dist
 import paddle.distributed.fleet as fleet
 from paddle.base.framework import use_pir_api
-from paddlenlp_ops import speculate_step_paddle, step_paddle
 from server.data.processor import DataProcessor
 from server.engine.config import global_config
 from server.utils import get_logger
 from task_queue_manager import TaskQueueManager
 
+from paddlenlp.custom_ops import speculate_step_paddle, step_paddle
 from paddlenlp.experimental.transformers import (
     EagleProposer,
     InferenceWithReferenceProposer,
@@ -472,7 +472,6 @@ class ModelRunner:
         """
         step cuda
         """
-
         if self.is_speculate_decoding:
             speculate_step_paddle(
                 self.share_inputs["stop_flags"],
@@ -634,6 +633,7 @@ class ModelRunner:
 
             if flag_broadcast_array[0] == 1 or self.infer_queue.read_finish_flag.get() == 1:
                 logger.info(f"rank: {self.rank} start to get")
+
                 self.insert_step = True
                 if self.share_inputs["seq_lens_this_time"] is not None:
                     self.helper_tensors["seq_lens_this_time"][:real_bsz] = self.share_inputs["seq_lens_this_time"]

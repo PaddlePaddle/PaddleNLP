@@ -471,7 +471,7 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
     def remove_padding(self, input_ids, seq_lens_this_time):
         cum_offsets_now = paddle.cumsum(paddle.max(seq_lens_this_time) - seq_lens_this_time)
         token_num = paddle.sum(seq_lens_this_time)
-        from paddlenlp_ops import get_padding_offset
+        from paddlenlp.custom_ops import get_padding_offset
 
         ids_remove_padding, cum_offsets, padding_offset = get_padding_offset(
             input_ids, cum_offsets_now, token_num, seq_lens_this_time
@@ -558,7 +558,7 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
         if not is_decoder and pre_caches is not None:
             position_offset = 128
 
-        from paddlenlp_ops import fused_get_rotary_embedding
+        from paddlenlp.custom_ops import fused_get_rotary_embedding
 
         new_rope = fused_get_rotary_embedding(
             input_ids, position_ids, self.head_dim_shape_tensor, position_offset, self.rope_theta, self.use_neox
@@ -776,7 +776,7 @@ class Qwen2MoeBlockInferenceModel(Qwen2MoeInferenceModel):
     def remove_padding(self, input_ids, seq_lens_this_time, draft_tokens=None, seq_lens_encoder=None):
         cum_offsets_now = paddle.cumsum(self.max_seq_len - seq_lens_this_time)
         token_num = paddle.sum(seq_lens_this_time)
-        from paddlenlp_ops import get_padding_offset_v2
+        from paddlenlp.custom_ops import get_padding_offset_v2
 
         ids_remove_padding, cum_offsets, padding_offset, cu_seqlens_q, cu_seqlens_k = get_padding_offset_v2(
             input_ids, cum_offsets_now, token_num, seq_lens_this_time, draft_tokens, seq_lens_encoder

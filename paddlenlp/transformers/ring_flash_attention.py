@@ -223,7 +223,7 @@ def balanced_ring_flash_attention_bwd_func(
         attn_masks_list = paddle.split(attn_mask, num_or_sections=cp_size * 2, axis=3)
 
     try:
-        from paddlenlp_ops import flash_attn_bwd
+        from paddlenlp.custom_ops import flash_attn_bwd
     except (ImportError, ModuleNotFoundError):
         from paddlenlp.utils.log import logger
 

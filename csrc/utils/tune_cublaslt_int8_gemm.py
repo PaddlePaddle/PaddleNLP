@@ -13,7 +13,8 @@
 # limitations under the License.
 
 import paddle
-from paddlenlp_ops import tune_cublaslt_gemm
+
+from paddlenlp.custom_ops import tune_cublaslt_gemm
 
 M_start = 1
 M_end = 32768

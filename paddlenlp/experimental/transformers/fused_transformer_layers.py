@@ -45,7 +45,7 @@ if not is_paddlenlp_ops_available():
 if (
     paddle.device.get_all_custom_device_type() is not None and len(paddle.device.get_all_custom_device_type()) > 0
 ) or paddle.is_compiled_with_cuda():
-    from paddlenlp_ops import rebuild_padding_v2
+    from paddlenlp.custom_ops import rebuild_padding_v2
 
 
 def use_cutlass_fp8_gemm():
@@ -55,14 +55,16 @@ def use_cutlass_fp8_gemm():
 if paddle.is_compiled_with_cuda():
     if use_cutlass_fp8_gemm():
         logger.info("cutlass fp8 gemm is used. you can turn it off by setting FLAGS_CUTLASS_FP8_GEMM to False.")
-        from paddlenlp_ops import (
+        from paddlenlp.custom_ops import (
             cutlass_fp8_fp8_fp8_dual_gemm_fused as fp8_dual_gemm_fused,
         )
-        from paddlenlp_ops import cutlass_fp8_fp8_half_gemm_fused as fp8_gemm_fused
+        from paddlenlp.custom_ops import (
+            cutlass_fp8_fp8_half_gemm_fused as fp8_gemm_fused,
+        )
     else:
         from paddle.linalg import fp8_fp8_half_gemm_fused as fp8_gemm_fused
     try:
-        from paddlenlp_ops import (
+        from paddlenlp.custom_ops import (
             dequant_int8,
             encode_rotary_qk,
             qkv_transpose_split,
@@ -1075,7 +1077,7 @@ class FusedMultiTransformerBase(Layer):
             query_pe, key_pe = self.config.rotary_emb(self.position_ids, query_pe, key_pe)
 
             if self.config.mla_config.use_absorb():
-                from paddlenlp_ops import prefill_mla_write_cache
+                from paddlenlp.custom_ops import prefill_mla_write_cache
 
                 prefill_mla_write_cache(
                     compressed_kv,
@@ -1284,7 +1286,7 @@ class FusedMultiTransformerBase(Layer):
                 raise ValueError(
                     f"Unsupported topk_method: {config.topk_method}. Please choose 'group_limited_greedy' or 'noaux_tc'."
                 )
-            from paddlenlp_ops import noaux_tc
+            from paddlenlp.custom_ops import noaux_tc
 
             scores = noaux_tc(
                 scores,
@@ -1400,7 +1402,7 @@ class FusedMultiTransformerBase(Layer):
             self.position_ids = paddle.empty(shape=position_ids_shape, dtype=seq_lens_encoder.dtype)
             self.mask_encoder_batch = paddle.empty(shape=position_ids_shape, dtype=seq_lens_encoder.dtype).unsqueeze(1)
 
-            from paddlenlp_ops import get_position_ids_and_mask_encoder_batch
+            from paddlenlp.custom_ops import get_position_ids_and_mask_encoder_batch
 
             # In-place operations that compute the position_ids.
             os.environ["stride_in_no_check_dy2st_diff"] = "1"
@@ -1489,7 +1491,7 @@ class FusedMultiTransformerBase(Layer):
 
         if self.config.append_attn:
 
-            from paddlenlp_ops import get_block_shape_and_split_kv_block
+            from paddlenlp.custom_ops import get_block_shape_and_split_kv_block
 
             (
                 kwargs["encoder_batch_ids"],
@@ -2109,7 +2111,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             query_pe, key_pe = self.config.rotary_emb(self.position_ids, query_pe, key_pe)
 
             if self.config.mla_config.use_absorb():
-                from paddlenlp_ops import prefill_mla_write_cache
+                from paddlenlp.custom_ops import prefill_mla_write_cache
 
                 prefill_mla_write_cache(
                     compressed_kv,
@@ -2469,7 +2471,7 @@ class FusedMultiTransformerAvx(Layer):
         step_idx=None,
         **kwargs,
     ):
-        from paddlenlp_ops import xft_transformer
+        from paddlenlp.custom_ops import xft_transformer
 
         xft_out = xft_transformer(
             paddle.cast(src, "float32"),  # input
@@ -2850,7 +2852,7 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
                 out_linear_out = dequant_int8(out_linear_out, self.linear_out_scales[i], self._dtype)
             else:
                 if self.use_gemm_dequant:
-                    from paddlenlp_ops import gemm_dequant
+                    from paddlenlp.custom_ops import gemm_dequant
 
                     out_linear_out = gemm_dequant(
                         fmha_out, self.linear_weights[i], self.linear_out_scales[i], self._dtype
@@ -2911,7 +2913,7 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
                 ffn2_out = dequant_int8(ffn2_out, self.ffn2_out_scales[i], self._dtype)
             else:
                 if self.use_gemm_dequant:
-                    from paddlenlp_ops import gemm_dequant
+                    from paddlenlp.custom_ops import gemm_dequant
 
                     ffn2_out = gemm_dequant(ffn1_out, self.ffn2_weights[i], self.ffn2_out_scales[i], self._dtype)
                 else:
@@ -2961,7 +2963,10 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
         i,
         **kwargs,
     ):
-        from paddlenlp_ops import decode_mla_write_cache, multi_head_latent_attention
+        from paddlenlp.custom_ops import (
+            decode_mla_write_cache,
+            multi_head_latent_attention,
+        )
 
         ln_out = qkv_out
         latent_cache = caches[i]
@@ -2974,7 +2979,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
             from paddlenlp.utils.env import PREFILL_USE_SAGE_ATTN
 
             if PREFILL_USE_SAGE_ATTN:
-                from paddlenlp_ops import sage_attention_dsk
+                from paddlenlp.custom_ops import sage_attention_dsk
 
                 query_256 = paddle.nn.functional.pad(paddle.unsqueeze(query, axis=0), (0, 256 - 192))
                 key_256 = paddle.nn.functional.pad(paddle.unsqueeze(key, axis=0), (0, 256 - 192))
@@ -3159,7 +3164,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
             return self.compute_mla_absorb(qkv_out, caches, i, **kwargs)
 
         if self.config.append_attn:
-            from paddlenlp_ops import append_attention
+            from paddlenlp.custom_ops import append_attention
 
             fmha_out = append_attention(
                 qkv_out,
@@ -3328,7 +3333,10 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
         i,
         **kwargs,
     ):
-        from paddlenlp_ops import decode_mla_write_cache, multi_head_latent_attention
+        from paddlenlp.custom_ops import (
+            decode_mla_write_cache,
+            multi_head_latent_attention,
+        )
 
         ln_out = qkv_out
         latent_cache = caches[i]
@@ -3341,7 +3349,7 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
             from paddlenlp.utils.env import PREFILL_USE_SAGE_ATTN
 
             if PREFILL_USE_SAGE_ATTN:
-                from paddlenlp_ops import sage_attention_dsk
+                from paddlenlp.custom_ops import sage_attention_dsk
 
                 query_256 = paddle.nn.functional.pad(paddle.unsqueeze(query, axis=0), (0, 256 - 192))
                 key_256 = paddle.nn.functional.pad(paddle.unsqueeze(key, axis=0), (0, 256 - 192))
@@ -3573,7 +3581,7 @@ class FusedBlockMultiTransformerA8W8(FusedBlockMultiTransformer, FusedMultiTrans
             cache_quant_type_str = "cache_int8"
 
         if self.config.append_attn:
-            from paddlenlp_ops import append_attention
+            from paddlenlp.custom_ops import append_attention
 
             fmha_out = append_attention(
                 qkv_out,
@@ -3931,7 +3939,7 @@ class FusedBlockMultiTransformerFP8(FusedBlockMultiTransformer):
             cache_quant_type_str = "cache_int8"
 
         if self.config.append_attn:
-            from paddlenlp_ops import append_attention
+            from paddlenlp.custom_ops import append_attention
 
             fmha_out = append_attention(
                 qkv_out,
@@ -4843,7 +4851,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
             else:
                 x_q = x
             try:
-                from paddlenlp_ops import (
+                from paddlenlp.custom_ops import (
                     cutlass_fp8_fp8_half_gemm_ptr_scale_fused as fp8_gemm_fused_ptr_scale,
                 )
             except:
@@ -4890,7 +4898,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
             if x_s is None:
                 x, x_s = self.dynamic_quant(x)
             try:
-                from paddlenlp_ops import (
+                from paddlenlp.custom_ops import (
                     cutlass_fp8_fp8_half_block_gemm_fused as fp8_block_gemm_fused,
                 )
             except:
@@ -4977,7 +4985,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
             query_pe, key_pe = self.config.rotary_emb(self.position_ids, query_pe, key_pe)
 
             if self.config.mla_config.use_absorb():
-                from paddlenlp_ops import prefill_mla_write_cache
+                from paddlenlp.custom_ops import prefill_mla_write_cache
 
                 prefill_mla_write_cache(
                     compressed_kv,
@@ -5057,7 +5065,10 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
         i,
         **kwargs,
     ):
-        from paddlenlp_ops import decode_mla_write_cache, multi_head_latent_attention
+        from paddlenlp.custom_ops import (
+            decode_mla_write_cache,
+            multi_head_latent_attention,
+        )
 
         ln_out = qkv_out
         latent_cache = caches[i]
@@ -5070,7 +5081,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
             from paddlenlp.utils.env import PREFILL_USE_SAGE_ATTN
 
             if PREFILL_USE_SAGE_ATTN:
-                from paddlenlp_ops import sage_attention_dsk
+                from paddlenlp.custom_ops import sage_attention_dsk
 
                 query_256 = paddle.nn.functional.pad(paddle.unsqueeze(query, axis=0), (0, 256 - 192))
                 key_256 = paddle.nn.functional.pad(paddle.unsqueeze(key, axis=0), (0, 256 - 192))
@@ -5318,7 +5329,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                 raise ValueError(
                     f"Unsupported topk_method: {config.topk_method}. Please choose 'group_limited_greedy' or 'noaux_tc'."
                 )
-            from paddlenlp_ops import noaux_tc
+            from paddlenlp.custom_ops import noaux_tc
 
             scores = noaux_tc(
                 scores,

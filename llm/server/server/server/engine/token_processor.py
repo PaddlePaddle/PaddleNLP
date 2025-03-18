@@ -19,9 +19,9 @@ import traceback
 from collections import Counter
 from datetime import datetime
 
-from paddlenlp_ops import get_output, speculate_get_output
 from server.utils import datetime_diff, model_server_logger, monitor_logger
 
+from paddlenlp.custom_ops import get_output, speculate_get_output
 from paddlenlp.utils.env import MAX_BSZ, MAX_DRAFT_TOKENS, SPECULATE_MAX_BSZ
 
 

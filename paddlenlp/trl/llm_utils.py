@@ -627,7 +627,7 @@ def read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Q
     logger.info("Start read result message")
     logger.info(f"Current path is {os.getcwd()}")
 
-    from paddlenlp_ops import get_output
+    from paddlenlp.custom_ops import get_output
 
     while True:
         get_output(output_tensor, 0, True)
@@ -663,7 +663,7 @@ def speculate_read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_q
     logger.info("Start speculate read result message")
     logger.info(f"Current path is {os.getcwd()}")
 
-    from paddlenlp_ops import speculate_get_output
+    from paddlenlp.custom_ops import speculate_get_output
 
     while True:
         speculate_get_output(output_tensor, 0, True)

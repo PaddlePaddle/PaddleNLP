@@ -20,6 +20,13 @@ from datetime import datetime
 
 import setuptools
 
+from setup_cuda_tools import (
+    get_ext_and_cmd,
+    get_nvcc_cuda_version,
+    get_package_name,
+    is_cuda,
+)
+
 PADDLENLP_STABLE_VERSION = "PADDLENLP_STABLE_VERSION"
 
 
@@ -112,16 +119,20 @@ def show():
 
 
 # only use this file to contral the version
-__version__ = "3.0.0b4.post"
+__version__ = "3.0.0b4+post"
+
 if os.getenv(PADDLENLP_STABLE_VERSION):
-    __version__ = __version__.replace(".post", "")
+    __version__ = __version__.replace("+post", "")
 else:
     formatted_date = datetime.now().date().strftime("%Y%m%d")
-    __version__ = __version__.replace(".post", ".post{}".format(formatted_date))
+    __version__ = __version__.replace("+post", "+post{}".format(formatted_date))
+
+if is_cuda:
+    __version__ += f".cu{get_nvcc_cuda_version()}"
 
 
-# write the version information for the develop version
 def append_version_py(filename="paddlenlp/__init__.py"):
+    # write the version information for the develop version
     assert os.path.exists(filename), f"{filename} does not exist!"
 
     with open(filename, "r") as file:
@@ -173,9 +184,12 @@ def get_package_data_files(package, data, package_dir=None):
 if commit != "unknown":
     write_version_py(filename="paddlenlp/version/__init__.py")
 
+ext_modules, cmdclass = get_ext_and_cmd()
+package_name = get_package_name()
+
 try:
     setuptools.setup(
-        name="paddlenlp",
+        name=package_name,
         version=__version__,
         author="PaddleNLP Team",
         author_email="paddlenlp@baidu.com",
@@ -184,6 +198,9 @@ try:
         long_description_content_type="text/markdown",
         url="https://github.com/PaddlePaddle/PaddleNLP",
         license_files=("LICENSE",),
+        ext_modules=ext_modules,
+        zip_safe=False,
+        cmdclass=cmdclass,
         packages=setuptools.find_packages(
             where=".",
             exclude=("examples*", "tests*", "applications*", "fast_generation*", "model_zoo*"),

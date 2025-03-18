@@ -928,7 +928,7 @@ def fused_experts_impl(
 
     compute_type = tl.bfloat16 if hidden_states.dtype == paddle.bfloat16 else tl.float16
 
-    from paddlenlp_ops import preprocess_for_moe
+    from paddlenlp.custom_ops import preprocess_for_moe
 
     sorted_token_ids, expert_ids, num_tokens_post_padded = preprocess_for_moe(topk_ids, E, config["BLOCK_SIZE_M"])
 

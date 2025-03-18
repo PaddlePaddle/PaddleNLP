@@ -15,7 +15,8 @@
 import argparse
 
 import paddle
-from paddlenlp_ops import cutlass_fp8_fp8_fp8_dual_gemm_fused
+
+from paddlenlp.custom_ops import cutlass_fp8_fp8_fp8_dual_gemm_fused
 
 
 def setup_args():

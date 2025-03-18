@@ -15,7 +15,8 @@ import time
 
 import numpy as np
 import paddle
-import paddlenlp_ops
+
+import paddlenlp.custom_ops
 
 np.random.seed(2024)
 paddle.seed(2024)
@@ -122,7 +123,7 @@ def fake_prefill(input_length, compressed_kv, key_pe, latent_cache_shape, block_
     latent_cache = paddle.zeros(shape=latent_cache_shape).astype(dtype)
     # import pdb; pdb.set_trace()
 
-    paddlenlp_ops.prefill_mla_write_cache(
+    paddlenlp.custom_ops.prefill_mla_write_cache(
         compressed_kv,
         key_pe,
         latent_cache,
@@ -188,7 +189,7 @@ def test_append_c16_attention(cache_length, bsz):
         decoder_num_blocks,
         decoder_chunk_size,
         max_len_kv,
-    ) = paddlenlp_ops.get_block_shape_and_split_kv_block(
+    ) = paddlenlp.custom_ops.get_block_shape_and_split_kv_block(
         seq_lens_encoder,
         seq_lens_decoder,
         max_enc_len_this_time,
@@ -214,7 +215,7 @@ def test_append_c16_attention(cache_length, bsz):
     key_pe_shape = [token_num, NUM_KV_HEAD, PE_SIZE]
     compressed_kv = paddle.rand(shape=compressed_kv_shape).astype(dtype)
     key_pe = paddle.rand(shape=key_pe_shape).astype(dtype)
-    paddlenlp_ops.decode_mla_write_cache(
+    paddlenlp.custom_ops.decode_mla_write_cache(
         compressed_kv,
         key_pe,
         latent_cache,
@@ -234,7 +235,7 @@ def test_append_c16_attention(cache_length, bsz):
     for i in range(RUN_TIME + WARM_UP):
         if i == WARM_UP:
             s_time = time.time()
-        out = paddlenlp_ops.multi_head_latent_attention(
+        out = paddlenlp.custom_ops.multi_head_latent_attention(
             query,
             latent_cache,
             latent_cache,

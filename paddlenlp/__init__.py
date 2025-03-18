@@ -41,6 +41,7 @@ if "datasets" in sys.modules.keys():
 import paddle
 
 from . import (
+    custom_ops,
     data,
     dataaug,
     datasets,

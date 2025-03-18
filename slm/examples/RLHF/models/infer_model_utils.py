@@ -19,12 +19,12 @@ import paddle
 
 
 def patch_paddlenlp_ops(eos_token_id, pad_token_id):
-    import paddlenlp_ops
+    import paddlenlp.custom_ops
 
-    paddlenlp_ops.save_with_output = lambda *args, **kwargs: None
+    paddlenlp.custom_ops.save_with_output = lambda *args, **kwargs: None
 
     # TODO(guosheng): update the custom op code directly.
-    ori_set_ends = paddlenlp_ops.set_stop_value_multi_ends
+    ori_set_ends = paddlenlp.custom_ops.set_stop_value_multi_ends
 
     def _set_ends(topk_ids, stop_flags, end_ids, mode):
         # infer model uses eos_token_id to pad and discriminate ending,
@@ -34,7 +34,7 @@ def patch_paddlenlp_ops(eos_token_id, pad_token_id):
             topk_ids_out = paddle.where(stop_flags, pad_token_id, topk_ids_out)
         return topk_ids_out, stop_flags_out
 
-    paddlenlp_ops.set_stop_value_multi_ends = _set_ends
+    paddlenlp.custom_ops.set_stop_value_multi_ends = _set_ends
 
 
 def patch_infer_generate(eos_token_id, pad_token_id):

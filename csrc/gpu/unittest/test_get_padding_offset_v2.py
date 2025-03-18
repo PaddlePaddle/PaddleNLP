@@ -16,7 +16,8 @@ import unittest
 
 import numpy as np
 import paddle
-from paddlenlp_ops import get_padding_offset_v2
+
+from paddlenlp.custom_ops import get_padding_offset_v2
 
 np.random.seed(2023)
 
