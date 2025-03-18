@@ -33,7 +33,7 @@ from paddlenlp.transformers import (
 from paddlenlp.trl import llm_utils
 from paddlenlp.utils.log import logger
 
-from .utils import PredictorConfig
+from .config import PredictorConfig
 
 
 class BasePredictor:

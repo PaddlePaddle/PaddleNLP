@@ -39,7 +39,7 @@ from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
 
 from .base import BasePredictor, BlockInferencePredictorMixin, InferencePredictorMixin
-from .utils import PredictorConfig
+from .config import PredictorConfig
 
 __all__ = ["StaticGraphInferencePredictor", "StaticGraphBlockInferencePredictor", "StaticGraphPredictor"]
 

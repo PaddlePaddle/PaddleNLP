@@ -28,7 +28,7 @@ from paddlenlp.utils.env import MAX_BSZ, MAX_DRAFT_TOKENS, SPECULATE_MAX_BSZ
 from paddlenlp.utils.log import logger
 
 from .base import BlockInferencePredictorMixin, InferencePredictorMixin
-from .utils import PredictorConfig
+from .config import PredictorConfig
 
 __all__ = ["DygraphInferencePredictor", "DygraphBlockInferencePredictor"]
 

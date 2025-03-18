@@ -35,13 +35,23 @@ from paddlenlp.trl import llm_utils
 from paddlenlp.utils.log import logger
 
 from .base import DygraphPredictor
+from .config import (
+    AvxConfig,
+    GenerationConfig,
+    InferConfig,
+    ModelConfig,
+    PeftConfig,
+    PredictorConfig,
+    QuantConfig,
+    SpeculateConfig,
+)
 from .fusemt import DygraphBlockInferencePredictor, DygraphInferencePredictor
 from .static import (
     StaticGraphBlockInferencePredictor,
     StaticGraphInferencePredictor,
     StaticGraphPredictor,
 )
-from .utils import ModelConfig, PredictorConfig, batchfy_text
+from .utils import batchfy_text
 
 PredictorMaps = {
     "DygraphPredictor": DygraphPredictor,
@@ -54,6 +64,138 @@ PredictorMaps = {
 
 
 class AutoPredictor:
+    @classmethod
+    def from_pretrained(self, model, tokenizer=None, **kwargs):
+        self.infer_config = kwargs.pop("InferConfig", InferConfig())
+        self.generation_config = kwargs.pop("GenerationConfig", GenerationConfig())
+        self.sepeculate_config = kwargs.pop("SpeculateConfig", SpeculateConfig())
+        self.peft_config = kwargs.pop("PeftConfig", PeftConfig())
+        self.quant_config = kwargs.pop("QuantConfig", QuantConfig())
+        self.avx_config = kwargs.pop("AvxConfig", AvxConfig())
+
+        def fuse_all_config(dst_config, other_config):
+            for config in other_config:
+                print(config, type(config))
+                for k, v in config.__dict__.items():
+                    setattr(dst_config, k, v)
+
+        fuse_all_config(
+            self.infer_config,
+            [self.generation_config, self.sepeculate_config, self.peft_config, self.avx_config, self.quant_config],
+        )
+
+        paddle.set_device(self.infer_config.device)
+        if self.infer_config.dtype:
+            paddle.set_default_dtype(self.infer_config.dtype)
+
+        if isinstance(model, str):
+            model_name_or_path = model
+
+            from paddlenlp.utils.env import USE_FAST_TOKENIZER
+
+            tokenizer = AutoTokenizer.from_pretrained(
+                model_name_or_path, padding_side="left", use_fast=USE_FAST_TOKENIZER
+            )
+
+            # init chat_template for tokenizer
+            llm_utils.init_chat_template(tokenizer, model_name_or_path, self.infer_config.chat_template)
+            config = AutoConfig.from_pretrained(model_name_or_path)
+        else:
+            config = model.config
+
+        if self.infer_config.dtype is None:
+            self.infer_config.dtype = "float32"
+            # raise ValueError(config.dtype)
+
+        max_position_embeddings = llm_utils.get_model_max_position_embeddings(config)
+        if max_position_embeddings is None:
+            max_position_embeddings = self.infer_config.src_length + self.infer_config.max_length
+            logger.warning(
+                f"Can not retrieval `max_position_embeddings` from config.json, use default value {max_position_embeddings}"
+            )
+        else:
+            if self.infer_config.src_length + self.infer_config.max_length > max_position_embeddings:
+                logger.warning(
+                    f"The sum of src_length<{self.infer_config.src_length}> and "
+                    f"max_length<{self.infer_config.max_length}> should be smaller than or equal to "
+                    f"the maximum position embedding size<{max_position_embeddings}>"
+                )
+                self.infer_config.src_length = max_position_embeddings - self.infer_config.max_length
+
+        # update config parameter for inference predictor
+        if self.infer_config.decode_strategy == "greedy_search":
+            self.infer_config.top_p = 0.0
+            self.infer_config.temperature = 1.0
+
+        tensor_parallel_rank, tensor_parallel_degree = llm_utils.init_dist_env()
+
+        model = None
+
+        # model loading
+        if self.infer_config.inference_model:
+            model = AutoInferenceModelForCausalLM.from_pretrained(
+                model_name_or_path,
+                config=config,
+                predictor_args=self.infer_config,
+                model_args=None,
+                dtype=self.infer_config.dtype,
+                tensor_parallel_degree=tensor_parallel_degree,
+                tensor_parallel_rank=tensor_parallel_rank,
+            )
+        else:
+            if self.infer_config.mode == "dynamic":
+                model = AutoModelForCausalLM.from_pretrained(
+                    model_name_or_path,
+                    dtype=self.infer_config.dtype,
+                    use_flash_attention=self.infer_config.use_flash_attention,
+                    tensor_parallel_degree=tensor_parallel_degree,
+                    tensor_parallel_rank=tensor_parallel_rank,
+                    tensor_parallel_output=False,
+                )
+
+        cache_kvs_shape = None  # used for not block_attn/append_attn
+        cache_k_shapes = None  # used for block_attn/append_attn
+        cache_v_shapes = None  # used for block_attn/append_attn
+
+        # static or dynamic
+        execute_mode = "Dygraph" if self.infer_config.mode == "dynamic" else "StaticGraph"
+
+        # infer/ no infer
+        if self.infer_config.inference_model:
+            # block/no block
+            if self.infer_config.block_attn:
+                attn_type = "Block"
+                if self.infer_config.mode == "static":
+                    cache_k_shapes, cache_v_shapes = model.get_cache_kvs_shape(
+                        config, self.infer_config.batch_size, self.infer_config.total_max_length
+                    )
+            else:
+                attn_type = ""
+                if self.infer_config.mode == "static":
+                    cache_kvs_shape = model.get_cache_kvs_shape(
+                        config, self.infer_config.batch_size, self.infer_config.total_max_length
+                    )
+            inference_mode = f"{attn_type}Inference"
+        else:
+            inference_mode = ""
+
+        predictor_class_name = execute_mode + inference_mode + "Predictor"
+
+        predictor_class = PredictorMaps[predictor_class_name]
+        # instance
+        predictor = predictor_class(
+            self.infer_config,
+            tokenizer=tokenizer,
+            model=model,
+            cache_k_shapes=cache_k_shapes,
+            cache_v_shapes=cache_v_shapes,
+            cache_kvs_shape=cache_kvs_shape,
+            model_args=None,
+        )
+        return predictor
+
+
+class AutoPredictorInner:
     def __init__(self, *args, **kwargs):
         raise EnvironmentError(
             f"{self.__class__.__name__} is designed to be instantiated "
@@ -219,7 +361,7 @@ def create_predictor(
                 tensor_parallel_output=False,
             )
 
-    predictor = AutoPredictor.create_predictor(predictor_args, config, model_args, tokenizer, model=model)
+    predictor = AutoPredictorInner.create_predictor(predictor_args, config, model_args, tokenizer, model=model)
 
     return predictor
 
