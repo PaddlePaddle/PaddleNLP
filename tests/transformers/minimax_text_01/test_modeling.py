@@ -32,6 +32,8 @@ from tests.transformers.test_modeling_common import (
     random_attention_mask,
 )
 
+from ...testing_utils import require_gpu
+
 
 class MiniMaxText01ModelTester:
     def __init__(
@@ -266,6 +268,7 @@ class MiniMaxText01ModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.T
 
 
 class MiniMaxText01IntegrationTest(unittest.TestCase):
+    @require_gpu(1)
     def test_model_tiny_logits(self):
         input_ids = [1, 306, 4658, 278, 6593, 310, 2834, 338]
 
