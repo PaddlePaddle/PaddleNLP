@@ -3620,7 +3620,7 @@ function before_hook_for_deepseek() {
     python -m pip install -r $root_path/requirements.txt
     python -m pip install -r $root_path/requirements-dev.txt
     unset http_proxy && unset https_proxy
-    if [[ ! $FLAGS_download_data =~ "llama" ]];then
+    if [[ ! $FLAGS_download_data =~ "deepseek" ]];then
         echo -e "\033[31m ---- Download LLaMA data  \033[0m"
         rm -rf data
         if [[ -e ${llama_data_path}/data ]]; then
