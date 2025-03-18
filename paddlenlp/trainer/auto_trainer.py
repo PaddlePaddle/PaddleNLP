@@ -27,6 +27,8 @@ from paddle.profiler.utils import switch_job_schedule_profiler
 from tqdm.auto import tqdm
 
 from paddlenlp.trainer import Trainer
+from ..transformers.model_utils import unwrap_model
+import copy
 
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.log import logger
@@ -827,7 +829,22 @@ class AutoTrainer(Trainer):
 
                 if self.do_grad_scaling:
                     paddle.save(self.scaler.state_dict(), os.path.join(output_dir, SCALER_NAME))
-
+                    
+                # Save tokenizer config files
+                if self.tokenizer is not None:
+                    self.tokenizer.save_pretrained(output_dir)
+                    # Save train arguments together with the trained model
+                    paddle.save(self.args, os.path.join(output_dir, TRAINING_ARGS_NAME))
+                # Save the config
+                model_to_save = unwrap_model(model)
+                config_to_save = copy.deepcopy(model_to_save.config)
+                config_to_save.mp_degree = getattr(config_to_save, "config_to_save", 1)
+                # Attach architecture to the config
+                config_to_save.architectures = [model_to_save.__class__.__name__]
+                
+                config_to_save.save_pretrained(output_dir)
+                if model.can_generate():
+                    model_to_save.generation_config.save_pretrained(output_dir)
         # Determine the new best metric / best model checkpoint
         if metrics is not None and self.args.metric_for_best_model is not None:
             metric_to_check = self.args.metric_for_best_model
