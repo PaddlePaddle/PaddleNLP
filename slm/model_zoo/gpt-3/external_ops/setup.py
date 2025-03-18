@@ -206,7 +206,7 @@ def setup_token_dispatcher_utils():
                     "-lineinfo",
                     "-DCUTLASS_DEBUG_TRACE_LEVEL=0",
                     "-maxrregcount=50",
-                    "-arch=sm_80,sm_90a",
+                    "-arch=sm_80",
                     "-DNDEBUG"
                 ],
             },
