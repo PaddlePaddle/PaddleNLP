@@ -276,10 +276,10 @@ class DispatchNode:
     def __init__(self, name="dispatch"):
         self.name = name
 
-    def forward(self, x, token_indices, token_probs, num_experts, group, previous_event=None):
+    def forward(self, x, token_indices, token_probs, num_experts, group, previous_event=None, async_finish=False):
         """Forward pass of fused dispatch."""
         recv_x, recv_token_probs, states, event = fused_dispatch_forward_func(
-            x, token_indices, token_probs, num_experts, group, previous_event
+            x, token_indices, token_probs, num_experts, group, previous_event=previous_event, async_finish=async_finish
         )
 
         self.group = group
@@ -288,20 +288,29 @@ class DispatchNode:
 
         return recv_x, recv_token_probs, states
 
-    def backward(self, grad_output, grad_token_probs):
+    def backward(self, grad_output, grad_token_probs, previous_event=None, async_finish=False):
         """Backward pass of fused dispatch."""
-        return fused_dispatch_backward_func(grad_output, grad_token_probs, self.group, self.handle)
+        return fused_dispatch_backward_func(
+            grad_output,
+            grad_token_probs,
+            self.group,
+            self.handle,
+            previous_event=previous_event,
+            async_finish=async_finish,
+        )
 
 
 class CombineNode:
     def __init__(self, name="combine"):
         self.name = name
 
-    def forward(self, x, group, handle, previous_event=None):
+    def forward(self, x, group, handle, previous_event=None, async_finish=False):
         """Forward pass of fused combine."""
         states = dict()
         states["handle"] = handle
-        combined_x = fused_combine_forward_func(x, group, states, previous_event)
+        combined_x = fused_combine_forward_func(
+            x, group, states, previous_event=previous_event, async_finish=async_finish
+        )
 
         self.handle = handle
         self.group = group
@@ -309,6 +318,8 @@ class CombineNode:
 
         return combined_x
 
-    def backward(self, grad_output):
+    def backward(self, grad_output, previous_event=None, async_finish=False):
         """Backward pass of fused combine."""
-        return fused_combine_backward_func(grad_output, self.group, self.handle, self.previous_event)
+        return fused_combine_backward_func(
+            grad_output, self.group, self.handle, previous_event=previous_event, async_finish=False
+        )

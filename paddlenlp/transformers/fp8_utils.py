@@ -106,6 +106,17 @@ class ExpertsNode:
         self.o1s = []
         self.dxs = []
 
+    def reset_statue(self):
+        self.outputs = []
+        self.x_t_fp8s = []
+        self.x_t_scales = []
+        self.w1_fp8s = []
+        self.w1_sacles = []
+        self.w2_fp8s = []
+        self.w2_sacles = []
+        self.o1s = []
+        self.dxs = []
+
     def forward(self, hs_out, hs_scale_out, tokens_per_expert):
         self.tokens_per_expert = tokens_per_expert
         x_fp8_list = paddle.split(hs_out, num_or_sections=self.tokens_per_expert, axis=0)  # FP8 chunk
@@ -181,6 +192,8 @@ class ExpertsNode:
             self.dxs += [dx]
 
         dx = paddle.concat(self.dxs, axis=0)
+
+        self.reset_statue()
         return dx
 
     def fwd_gate_up(self, x_fp8, x_scale, w1):

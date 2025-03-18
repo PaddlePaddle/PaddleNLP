@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
+import os
 from typing import OrderedDict, Tuple, Union
 
 import paddle
@@ -54,10 +54,14 @@ from paddlenlp.transformers.fused_a2a import (
     fused_dispatch_backward_func,
     fused_dispatch_forward_func,
 )
+from paddlenlp.transformers.moe_layer import FusionMoeNode
 
 __all__ = [
     "DeepseekV2ForCausalLMPipe",
 ]
+
+
+DSV3_USE_FP8_GEMM = os.getenv("DSV3_USE_FP8_GEMM", "False").lower() == "true"
 
 
 def parse_args(args):
@@ -327,11 +331,12 @@ class DecoderLayerNode(ScheduleNode):
 
 
 class OverlapedScheduleChunk:
-    def __init__(self, forward_nodes, backward_nodes):
+    def __init__(self, forward_nodes, backward_nodes, use_fuion=True):
+        schedule_node_class = OverlapedFUsionScheduleNode if use_fuion else OverlapedScheduleNode
         assert len(forward_nodes) == len(backward_nodes)
         self.nodes = []
         for f, b in zip(forward_nodes, backward_nodes):
-            self.nodes.append(OverlapedScheduleNode(f, b, f"OverlapedScheduleNode_{len(self.nodes)}"))
+            self.nodes.append(schedule_node_class(f, b, f"OverlapedNode_{len(self.nodes)}"))
 
     def forward_backward(self, inputs, output_grad):
         for n in self.nodes:
@@ -374,15 +379,281 @@ class OverlapedScheduleNode:
         return inputs, output_grad
 
 
+class FusionFp8DecoderLayerNode(ScheduleNode):
+    def __init__(self, attn_and_gate_node, fp8_fusion_moe_node, post_process_node, mlp_layer, name=""):
+        self.attn_and_gate_node = attn_and_gate_node
+        self.fp8_fusion_moe_node = fp8_fusion_moe_node
+        self.post_process_node = post_process_node
+        self.name = name
+
+        self.moe_group = mlp_layer.moe_group
+
+    def attn_forward(self, inputs):
+        (
+            inputs_embeds_mtp,
+            hidden_states,
+            residual,
+            probs,
+            routing_map,
+            l_aux,
+        ) = self.attn_and_gate_node.forward(inputs)
+        hs_fp8, hs_scale, token_indices, token_probs = self.fp8_fusion_moe_node.dispatch_quant_node.forward(
+            hidden_states, probs, routing_map
+        )
+        return (
+            inputs_embeds_mtp,
+            hidden_states,
+            residual,
+            l_aux,
+            hs_fp8,
+            hs_scale,
+            token_indices,
+            token_probs,
+        )
+
+    def dispatch_forward(self, inputs, previous_event=None):
+        (
+            inputs_embeds_mtp,
+            hidden_states,
+            residual,
+            l_aux,
+            hs_fp8,
+            hs_scale,
+            token_indices,
+            token_probs,
+        ) = inputs
+
+        (
+            hs_fp8_dispatched,
+            hs_scale_dispatched,
+            dispatched_indices,
+            dispatched_probs,
+        ) = self.fp8_fusion_moe_node.dispatch_node.forward(
+            hs_fp8, hs_scale, token_indices, token_probs, previous_event=previous_event, async_finish=True
+        )
+        return (
+            inputs_embeds_mtp,
+            hidden_states,
+            residual,
+            l_aux,
+            hs_fp8_dispatched,
+            hs_scale_dispatched,
+            dispatched_indices,
+            dispatched_probs,
+        )
+
+    def mlp_forward(self, inputs):
+        (
+            inputs_embeds_mtp,
+            hidden_states,
+            residual,
+            l_aux,
+            hs_fp8_dispatched,
+            hs_scale_dispatched,
+            dispatched_indices,
+            dispatched_probs,
+        ) = inputs
+        hidden_states_out = self.fp8_fusion_moe_node.mlp_node.forward(
+            hs_fp8_dispatched, hs_scale_dispatched, dispatched_indices, dispatched_probs
+        )
+        return (inputs_embeds_mtp, hidden_states, residual, l_aux, hidden_states_out)
+
+    def combine_forward(self, inputs):
+        (inputs_embeds_mtp, hidden_states, residual, l_aux, hidden_states_out) = inputs
+        output_combie = self.fp8_fusion_moe_node.combine_node.forward(hidden_states_out)
+        return (inputs_embeds_mtp, hidden_states, residual, l_aux, output_combie)
+
+    def post_process_forward(self, inputs):
+        (inputs_embeds_mtp, hidden_states, residual, l_aux, output_combie) = inputs
+        final_hidden_states = self.fp8_fusion_moe_node.combine_quant_node.forward(output_combie)
+        inputs = (inputs_embeds_mtp, hidden_states, residual, l_aux, final_hidden_states)
+        inputs = self.post_process_node.forward(inputs)
+        return inputs
+
+    def post_process_backward(self, output_grad):
+        (
+            inputs_embeds_mtp_grad,
+            hidden_states_grad,
+            residual_grad,
+            l_aux_grad,
+            final_hidden_states_grad,
+        ) = self.post_process_node.backward(output_grad)
+        output_combie_grad_fp8, output_combie_grad_scale = self.fp8_fusion_moe_node.combine_quant_node.backward(
+            final_hidden_states_grad
+        )
+        return (
+            inputs_embeds_mtp_grad,
+            hidden_states_grad,
+            residual_grad,
+            l_aux_grad,
+            output_combie_grad_fp8,
+            output_combie_grad_scale,
+        )
+
+    def combine_backward(self, output_grad):
+        (
+            inputs_embeds_mtp_grad,
+            hidden_states_grad,
+            residual_grad,
+            l_aux_grad,
+            output_combie_grad_fp8,
+            output_combie_grad_scale,
+        ) = output_grad
+        hidden_states_out_grad, hidden_states_out_grad_scale = self.fp8_fusion_moe_node.combine_node.backward(
+            output_combie_grad_fp8, output_combie_grad_scale
+        )
+        return (
+            inputs_embeds_mtp_grad,
+            hidden_states_grad,
+            residual_grad,
+            l_aux_grad,
+            hidden_states_out_grad,
+            hidden_states_out_grad_scale,
+        )
+
+    def mlp_backward(self, output_grad):
+        (
+            inputs_embeds_mtp_grad,
+            hidden_states_grad,
+            residual_grad,
+            l_aux_grad,
+            hidden_states_out_grad,
+            hidden_states_out_grad_scale,
+        ) = output_grad
+        hs_fp8_dispatched_grad, dispatched_probs_grad = self.fp8_fusion_moe_node.mlp_node.backward(
+            hidden_states_out_grad, hidden_states_out_grad_scale
+        )
+
+        return (
+            inputs_embeds_mtp_grad,
+            hidden_states_grad,
+            residual_grad,
+            l_aux_grad,
+            hs_fp8_dispatched_grad,
+            dispatched_probs_grad,
+        )
+
+    def dispatch_backward(self, output_grad):
+        (
+            inputs_embeds_mtp_grad,
+            hidden_states_grad,
+            residual_grad,
+            l_aux_grad,
+            hs_fp8_dispatched_grad,
+            dispatched_probs_grad,
+        ) = output_grad
+        hs_fp8_grad, token_probs_grad = self.fp8_fusion_moe_node.dispatch_node.backward(
+            hs_fp8_dispatched_grad, dispatched_probs_grad
+        )
+        return (inputs_embeds_mtp_grad, hidden_states_grad, residual_grad, l_aux_grad, hs_fp8_grad, token_probs_grad)
+
+    def attn_backward(self, output_grad):
+        (
+            inputs_embeds_mtp_grad,
+            hidden_states_grad,
+            residual_grad,
+            l_aux_grad,
+            hs_fp8_grad,
+            token_probs_grad,
+        ) = output_grad
+        hidden_states_grad_, probs_grad, routing_map_grad = self.fp8_fusion_moe_node.dispatch_quant_node.backward(
+            hs_fp8_grad, token_probs_grad
+        )
+        output_grad = (
+            inputs_embeds_mtp_grad,
+            hidden_states_grad + hidden_states_grad_,
+            residual_grad,
+            probs_grad,
+            routing_map_grad,
+            l_aux_grad,
+        )
+        output_grad = self.attn_and_gate_node.backward(output_grad)
+        return output_grad
+
+    def forward(self, inputs):
+        inputs = self.attn_forward(inputs)
+        inputs = self.dispatch_forward(inputs)
+        inputs = self.mlp_forward(inputs)
+        inputs = self.combine_forward(inputs)
+        inputs = self.post_process_forward(inputs)
+        return inputs
+
+    def backward(self, output_grad=None, scaler=None):
+        assert (output_grad is not None) and (scaler is None)
+        output_grad = self.post_process_backward(output_grad)
+        output_grad = self.combine_backward(output_grad)
+        output_grad = self.mlp_backward(output_grad)
+        output_grad = self.dispatch_backward(output_grad)
+        output_grad = self.attn_backward(output_grad)
+        return output_grad
+
+
+class OverlapedFUsionScheduleNode:
+    def __init__(self, forward_node, backward_node, name=""):
+        assert isinstance(forward_node, FusionFp8DecoderLayerNode) and isinstance(
+            backward_node, FusionFp8DecoderLayerNode
+        )
+        self.forward_node = forward_node
+        self.backward_node = backward_node
+        self.name = name
+
+    def forward_backward(self, inputs, output_grad):
+        paddle.base.core.nvprof_nvtx_push("forward_backward")
+
+        paddle.base.core.nvprof_nvtx_push("post_process_backward")
+        output_grad = self.backward_node.post_process_backward(output_grad)
+        paddle.base.core.nvprof_nvtx_pop()
+
+        paddle.base.core.nvprof_nvtx_push("combine_backward")
+        output_grad = self.backward_node.combine_backward(output_grad)
+        paddle.base.core.nvprof_nvtx_pop()
+        paddle.base.core.nvprof_nvtx_push("attn_forward")
+        inputs = self.forward_node.attn_forward(inputs)
+        paddle.base.core.nvprof_nvtx_pop()
+
+        calc_stream_wait(self.backward_node.moe_group.id)
+        # attn_compute_event = deep_ep.get_event_from_calc_stream(self.forward_node.moe_group.id)
+        paddle.base.core.nvprof_nvtx_push("dispatch_forward")
+        inputs = self.forward_node.dispatch_forward(inputs, previous_event=None)
+        paddle.base.core.nvprof_nvtx_pop()
+        paddle.base.core.nvprof_nvtx_push("mlp_backward")
+        output_grad = self.backward_node.mlp_backward(output_grad)
+        paddle.base.core.nvprof_nvtx_pop()
+
+        calc_stream_wait(self.forward_node.moe_group.id)
+        paddle.base.core.nvprof_nvtx_push("dispatch_backward")
+        output_grad = self.backward_node.dispatch_backward(output_grad)
+        paddle.base.core.nvprof_nvtx_pop()
+        paddle.base.core.nvprof_nvtx_push("mlp_forward")
+        inputs = self.forward_node.mlp_forward(inputs)
+        paddle.base.core.nvprof_nvtx_pop()
+
+        calc_stream_wait(self.backward_node.moe_group.id)
+        paddle.base.core.nvprof_nvtx_push("combine_forward")
+        inputs = self.forward_node.combine_forward(inputs)
+        paddle.base.core.nvprof_nvtx_pop()
+        paddle.base.core.nvprof_nvtx_push("attn_backward")
+        output_grad = self.backward_node.attn_backward(output_grad)
+        paddle.base.core.nvprof_nvtx_pop()
+
+        calc_stream_wait(self.forward_node.moe_group.id)
+        paddle.base.core.nvprof_nvtx_push("post_process_forward")
+        inputs = self.forward_node.post_process_forward(inputs)
+        paddle.base.core.nvprof_nvtx_pop()
+        paddle.base.core.nvprof_nvtx_pop()
+        return inputs, output_grad
+
+
 def build_overlapped_nodes(forward_chunk, backward_chunk):
+    overlap_element_class = FusionFp8DecoderLayerNode if DSV3_USE_FP8_GEMM else DecoderLayerNode
     forward_decoder_layer_num = 0
     backward_decoder_layer_num = 0
     assert isinstance(forward_chunk, ScheduleChunk) and isinstance(backward_chunk, ScheduleChunk)
     for n in forward_chunk.nodes:
-        if isinstance(n, DecoderLayerNode):
+        if isinstance(n, overlap_element_class):
             forward_decoder_layer_num += 1
     for n in reversed(backward_chunk.nodes):
-        if isinstance(n, DecoderLayerNode):
+        if isinstance(n, overlap_element_class):
             backward_decoder_layer_num += 1
 
     overlap_layers_num = min(forward_decoder_layer_num, backward_decoder_layer_num)
@@ -391,7 +662,7 @@ def build_overlapped_nodes(forward_chunk, backward_chunk):
     forward_overlap_layers = []
     is_pre = True
     for n in forward_chunk.nodes:
-        if not isinstance(n, DecoderLayerNode):
+        if not isinstance(n, overlap_element_class):
             if is_pre:
                 forward_pre_overlap_layers.append(n)
             else:
@@ -410,7 +681,7 @@ def build_overlapped_nodes(forward_chunk, backward_chunk):
     backward_overlap_layers = []
     is_pre = True
     for n in reversed(backward_chunk.nodes):
-        if not isinstance(n, DecoderLayerNode):
+        if not isinstance(n, overlap_element_class):
             if is_pre:
                 backward_pre_overlap_layers.append(n)
             else:
@@ -425,7 +696,7 @@ def build_overlapped_nodes(forward_chunk, backward_chunk):
     backward_pre_node = ScheduleChunk(list(reversed(backward_pre_overlap_layers)))
     backward_post_node = ScheduleChunk(list(reversed(backward_post_overlap_layers)))
 
-    overlap_node = OverlapedScheduleChunk(forward_overlap_layers, backward_overlap_layers)
+    overlap_node = OverlapedScheduleChunk(forward_overlap_layers, backward_overlap_layers, use_fuion=DSV3_USE_FP8_GEMM)
     return forward_pre_node, backward_pre_node, overlap_node, forward_post_node, backward_post_node
 
 
@@ -609,6 +880,30 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
 
         return (inputs_embeds_mtp, *outputs)
 
+    def attn_compute_for_fusion(self, args):
+        hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids = parse_args(args)
+        assert attention_mask is None
+        assert attn_mask_startend_row_indices is None
+        assert position_ids is None
+        assert self.config.num_nextn_predict_layers > 0
+
+        batch_size, _, hidden_size = hidden_states.shape
+        batch_size_mtp = hidden_size // (self.config.num_nextn_predict_layers + 1)
+        inputs_embeds_mtp = hidden_states[..., -batch_size_mtp:]
+        hidden_states = hidden_states[..., :batch_size_mtp]
+
+        hidden_states, residual = self.self_attn_compute(hidden_states)
+        _, _, d_model = hidden_states.shape
+        probs, routing_map, l_aux, _ = self.mlp.router(hidden_states)
+        return (
+            inputs_embeds_mtp,
+            hidden_states,
+            residual,
+            probs,
+            routing_map,
+            l_aux,
+        )
+
     def mlp_compute(self, inputs):
         if isinstance(inputs, list):
             inputs = tuple(inputs)
@@ -664,19 +959,54 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
 
         return return_args(hidden_states)
 
+    def post_process_compute_for_fusion(self, inputs):
+        assert self.config.num_nextn_predict_layers > 0
+
+        if isinstance(inputs, list):
+            inputs = tuple(inputs)
+        (inputs_embeds_mtp, hidden_states, residual, l_aux, final_hidden_states) = inputs
+
+        final_hidden_states = self.mlp.post_process(hidden_states, final_hidden_states, l_aux)
+
+        hidden_states = residual + final_hidden_states
+
+        hidden_states = (hidden_states,)
+
+        if type(hidden_states) is tuple and len(hidden_states) == 1:
+            hidden_states = hidden_states[0]
+
+        if self.config.num_nextn_predict_layers > 0:
+            hidden_states = paddle.concat([hidden_states, inputs_embeds_mtp], axis=-1)
+
+        return return_args(hidden_states)
+
     def build_schedule_node(self):
-        attn_node = ScheduleNode(self.attn_compute, name="attn_node")
-        mlp_node = ScheduleNode(self.mlp_compute, name="mlp_node")
-        post_process_node = ScheduleNode(self.post_process_compute, name="post_process_node")
-        return DecoderLayerNode(
-            attn_node=attn_node,
-            dispatch_node=None,
-            mlp_node=mlp_node,
-            combine_node=None,
-            post_process_node=post_process_node,
-            mlp_layer=self.mlp,
-            name="DeepseekV2DecoderLayerPipe",
-        )
+        if DSV3_USE_FP8_GEMM:
+            attn_and_gate_node = ScheduleNode(self.attn_compute_for_fusion, name="attn_and_gate_node")
+            fp8_fusion_moe_node = FusionMoeNode(
+                self.mlp.token_dispatcher, self.mlp.experts, name="fp8_fusion_moe_node"
+            )
+            post_process_node = ScheduleNode(self.post_process_compute_for_fusion, name="post_process_node")
+            return FusionFp8DecoderLayerNode(
+                attn_and_gate_node=attn_and_gate_node,
+                fp8_fusion_moe_node=fp8_fusion_moe_node,
+                post_process_node=post_process_node,
+                mlp_layer=self.mlp,
+                name="FusionFp8DecoderLayerNode",
+            )
+        else:
+            attn_node = ScheduleNode(self.attn_compute, name="attn_node")
+            mlp_node = ScheduleNode(self.mlp_compute, name="mlp_node")
+            post_process_node = ScheduleNode(self.post_process_compute, name="post_process_node")
+            return DecoderLayerNode(
+                attn_node=attn_node,
+                dispatch_node=None,
+                mlp_node=mlp_node,
+                combine_node=None,
+                post_process_node=post_process_node,
+                mlp_layer=self.mlp,
+                name="DeepseekV2DecoderLayerPipe",
+            )
 
 
 class DeepseekV2MTPLayerPipe(DeepseekV2MTPLayer):
