@@ -573,10 +573,6 @@ llm(){
         cd ${nlp_dir}/csrc
         # python setup_cuda.py install
         bash tools/build_wheel.sh
-        cp ${nlp_dir}/csrc/gpu_dist/p****.whl ${PPNLP_HOME}/upload/
-        cd ${PPNLP_HOME}
-        python upload.py ${PPNLP_HOME}/upload 'paddlenlp/wheels'
-        rm -rf upload/*
     else
         echo "No modifications in csrc, installing paddlenlp_ops wheel file..."
         python -m pip install --pre --upgrade paddlenlp_ops -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html --no-cache-dir
