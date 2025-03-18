@@ -139,7 +139,7 @@ std::vector<paddle::Tensor> tokens_unzip(
   auto token_rowmap_unzipped = paddle::empty(
       {total_unzipped_tokens_num}, paddle::DataType::INT32, X.place());
   auto token_prob_unzipped = paddle::empty(
-      {total_unzipped_tokens_num}, paddle::DataType::FLOAT32, X.place());
+      {total_unzipped_tokens_num}, paddle::DataType::BFLOAT16, X.place());
   auto expert_idx = paddle::empty({total_unzipped_tokens_num}, paddle::DataType::INT32, X.place());
 
   //------------------------ 辅助二张量 ------------------------
