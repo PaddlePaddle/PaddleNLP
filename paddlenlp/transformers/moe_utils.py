@@ -16,6 +16,8 @@
 
 import paddle
 
+from .fp8_utils import dequantize_fp8_to_bf16
+
 
 def topk_to_permuted_indices(x, num_tokens_per_expert_list, topk):
     x = paddle.flatten(x)
@@ -165,9 +167,10 @@ class UnPermuteNode:
 
         return output_tokens.to(self.input_dtype)
 
-    def backward(self, out_grad):
+    def backward(self, out_grad, out_grad_scale):
         hidden_states_grad = paddle.gather(out_grad, self.token_permuted_indices)
 
+        output_tokens_grad = dequantize_fp8_to_bf16(out_grad, out_grad_scale)
         output_tokens_grad = out_grad.to(self.permuted_tokens_dtype)
 
         _, permuted_tokens_grad = paddle._C_ops.put_along_axis_grad(
