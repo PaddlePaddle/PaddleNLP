@@ -154,7 +154,7 @@ class DecoderLayerNode(ScheduleNode):
         self.dispatched_probs_meta = None
         self.combine_output_meta = None
 
-    def dispatch_forward(self, inputs, previous_event=None):
+    def dispatch_forward(self, inputs, previous_event=None, allocate_on_comm_stream=False):
         paddle.base.core.nvprof_nvtx_push("raw_dispatch_forward")
         if isinstance(inputs, list):
             inputs = tuple(inputs)
@@ -177,6 +177,7 @@ class DecoderLayerNode(ScheduleNode):
                 self.moe_group,
                 previous_event=previous_event,
                 async_finish=True,
+                allocate_on_comm_stream=allocate_on_comm_stream,
             )
         dispatched_indices = states["dispatched_indices"]
         self.mlp_layer.set_tokens_per_expert(states["tokens_per_expert"])
@@ -351,10 +352,12 @@ class OverlapedScheduleNode:
         output_grad = self.backward_node.combine_backward(output_grad)
         inputs = self.forward_node.attn_node.forward(inputs)
 
-        # calc_stream_wait(self.backward_node.moe_group.id)
-        # attn_compute_event = deep_ep.get_event_from_calc_stream(self.forward_node.moe_group.id)
-        inputs = self.forward_node.dispatch_forward(inputs, previous_event=None)
+        calc_stream_wait(self.backward_node.moe_group.id)
+        attn_compute_event = deep_ep.get_event_from_calc_stream(self.forward_node.moe_group.id)
         output_grad = self.backward_node.mlp_node.backward(output_grad)
+        inputs = self.forward_node.dispatch_forward(
+            inputs, previous_event=attn_compute_event, allocate_on_comm_stream=True
+        )
 
         calc_stream_wait(self.forward_node.moe_group.id)
         output_grad = self.backward_node.dispatch_backward(output_grad)

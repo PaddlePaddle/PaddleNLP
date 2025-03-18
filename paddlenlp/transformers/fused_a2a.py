@@ -73,7 +73,14 @@ def get_buffer(group: Group, hidden_bytes: int):
 
 
 def fused_dispatch_forward_func(
-    x, token_indices, token_probs, num_experts, group, previous_event=None, async_finish=False
+    x,
+    token_indices,
+    token_probs,
+    num_experts,
+    group,
+    previous_event=None,
+    async_finish=False,
+    allocate_on_comm_stream=False,
 ):
     """Forward pass of fused dispatch."""
     # Calculate layout before actual dispatch
@@ -83,29 +90,30 @@ def fused_dispatch_forward_func(
         num_tokens_per_rdma_rank,
         num_tokens_per_expert,
         is_token_in_rank,
-        previous_event,
+        previous_event_,
     ) = buffer.get_dispatch_layout(
         token_indices,
         num_experts,
         previous_event=previous_event,
         async_finish=async_finish,
-        allocate_on_comm_stream=False,
+        allocate_on_comm_stream=allocate_on_comm_stream,
     )
 
+    assert token_probs.dtype == paddle.float32
     # Do MoE dispatch
     # NOTES: the CPU will wait for GPU's signal to arrive,
     # so this is not compatible with CUDA graph
     (recv_x, recv_token_indices, recv_token_probs, num_recv_tokens_per_expert_list, handle, event,) = buffer.dispatch(
         x,
         topk_idx=token_indices,
-        topk_weights=token_probs.cast(paddle.float32),
+        topk_weights=token_probs,
         num_tokens_per_rank=num_tokens_per_rank,
         num_tokens_per_rdma_rank=num_tokens_per_rdma_rank,
         is_token_in_rank=is_token_in_rank,
         num_tokens_per_expert=num_tokens_per_expert,
         previous_event=previous_event,
         async_finish=async_finish,
-        allocate_on_comm_stream=False,
+        allocate_on_comm_stream=allocate_on_comm_stream,
     )
 
     states = dict()
@@ -117,7 +125,13 @@ def fused_dispatch_forward_func(
 
 
 def fused_dispatch_backward_func(
-    grad_output, grad_token_probs, group, handle, previous_event=None, async_finish=False
+    grad_output,
+    grad_token_probs,
+    group,
+    handle,
+    previous_event=None,
+    async_finish=False,
+    allocate_on_comm_stream=False,
 ):
     """Backward pass of fused dispatch."""
     buffer = get_buffer(group, get_hidden_bytes(grad_output))
@@ -128,22 +142,30 @@ def fused_dispatch_backward_func(
         topk_weights=grad_token_probs.cast(paddle.float32),
         previous_event=previous_event,
         async_finish=async_finish,
-        allocate_on_comm_stream=False,
+        allocate_on_comm_stream=allocate_on_comm_stream,
     )
     return grad_x, None, grad_token_probs
 
 
-def fused_combine_forward_func(x, group, states, previous_event=None, async_finish=False):
+def fused_combine_forward_func(
+    x, group, states, previous_event=None, async_finish=False, allocate_on_comm_stream=False
+):
     """Forward pass of fused combine."""
     handle = states["handle"]
     buffer = get_buffer(group, get_hidden_bytes(x))
     combined_x, _, event = buffer.combine(
-        x, handle=handle, async_finish=async_finish, previous_event=previous_event, allocate_on_comm_stream=False
+        x,
+        handle=handle,
+        async_finish=async_finish,
+        previous_event=previous_event,
+        allocate_on_comm_stream=allocate_on_comm_stream,
     )
     return combined_x
 
 
-def fused_combine_backward_func(grad_output, group, handle, previous_event=None, async_finish=False):
+def fused_combine_backward_func(
+    grad_output, group, handle, previous_event=None, async_finish=False, allocate_on_comm_stream=False
+):
     """Backward pass of fused combine."""
     buffer = get_buffer(group, get_hidden_bytes(grad_output))
     grad_x, _, _, _, _, event = buffer.dispatch(
@@ -151,7 +173,7 @@ def fused_combine_backward_func(grad_output, group, handle, previous_event=None,
         handle=handle,
         previous_event=previous_event,
         async_finish=async_finish,
-        allocate_on_comm_stream=False,
+        allocate_on_comm_stream=allocate_on_comm_stream,
     )
     return grad_x
 
