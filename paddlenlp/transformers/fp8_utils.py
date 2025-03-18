@@ -168,12 +168,12 @@ class ExpertsNode:
             do1 = self.bwd_swiglu(o1, do2)
             dx = self.bwd_gate_up_input(do1, w1_fp8, w1_sacle)
 
-            if expert.w2.main_grad is not None:
+            if hasattr(expert.w2, "main_grad") and expert.w2.main_grad is not None:
                 expert.w2.main_grad = self.bwd_down_weight(do3, do3_scale, o1, expert.w2.main_grad)
             else:
                 expert.w2.grad = self.bwd_down_weight(do3, do3_scale, o1, expert.w2.grad)
 
-            if expert.w1.main_grad is not None:
+            if hasattr(expert.w1, "main_grad") and expert.w1.main_grad is not None:
                 expert.w1.main_grad = self.bwd_gate_up_weight(do1, x_t_fp8, x_t_scale, expert.w1.main_grad)
             else:
                 expert.w1.grad = self.bwd_gate_up_weight(do1, x_t_fp8, x_t_scale, expert.w1.grad)
