@@ -14,10 +14,10 @@ template <int topk>
 __global__ void token_unzip_kernel(
     const phi::bfloat16 *__restrict__ X,
     const int *__restrict__ routemap_topk,
-    const float *__restrict__ probs_topk,
+    const phi::bfloat16*__restrict__ probs_topk_in,
     phi::bfloat16 *__restrict__ X_unzipped,
     int *__restrict__ rowmap_unzipped,
-    float *__restrict__ probs_unzipped,
+    phi::bfloat16*__restrict__ probs_unzipped_out,
     int* __restrict__ expert_idx,
     int *__restrict__ atomic_extended_offset_counter,
     int *__restrict__ row_valid,
@@ -25,6 +25,8 @@ __global__ void token_unzip_kernel(
     const int total_unzipped_tokens_num,
     const int token_length,
     const int num_experts) {
+  const __nv_bfloat16* probs_topk = reinterpret_cast<const __nv_bfloat16*>(probs_topk_in);
+  __nv_bfloat16* probs_unzipped= reinterpret_cast<__nv_bfloat16*>(probs_unzipped_out);
   // 每个线程处理一行数据
   const int row_idx = blockIdx.x;
   // 仅在线程组2中被更新，不初始化
@@ -39,7 +41,7 @@ __global__ void token_unzip_kernel(
         bool isFirst = true;
         for (int i = 0; i < topk; i++) {
           int local_routemap_topk = routemap_topk[row_idx * topk + i];
-          float local_probs_topk = probs_topk[row_idx * topk + i];
+          __nv_bfloat16 local_probs_topk = probs_topk[row_idx * topk + i];
 
           if (local_routemap_topk < num_experts && 
               local_routemap_topk >= 0) [[unlikely]] {
@@ -108,10 +110,10 @@ void dispatch_tokens_unzip(const paddle::Tensor &X,
     token_unzip_kernel<8><<<grid, block, 0, X.stream()>>>(
         X.data<phi::bfloat16>(),
         expert_routemap_topk.data<int>(),
-        expert_prob_topk.data<float>(),
+        expert_prob_topk.data<phi::bfloat16>(),
         X_unzipped.data<phi::bfloat16>(),
         expert_rowmap_unzipped.data<int>(),
-        token_prob_unzipped.data<float>(),
+        token_prob_unzipped.data<phi::bfloat16>(),
         expert_idx.data<int>(),
         atomic_extended_offset_counter.data<int>(),
         row_valid.data<int>(),

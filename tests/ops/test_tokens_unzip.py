@@ -100,8 +100,8 @@ def verify_tokens_unzip():
     ]
     tokens_zipped = paddle.to_tensor(tokens_zipped, dtype='bfloat16')
     routemap_topk = paddle.to_tensor(routemap_topk, dtype='int32')
-    probs_topk = paddle.to_tensor(probs_topk, dtype='float32')
-    expected_unzipped_probs = paddle.to_tensor(expected_unzipped_probs, dtype='float32')
+    probs_topk = paddle.to_tensor(probs_topk, dtype='bfloat16')
+    expected_unzipped_probs = paddle.to_tensor(expected_unzipped_probs, dtype='bfloat16')
     expected_unzipped_rowmap = paddle.to_tensor(expected_unzipped_rowmap, dtype='int32')
     expected_unzipped_tokens = paddle.to_tensor(expected_unzipped_tokens, dtype='bfloat16')
     expected_unzipped_expert_idx = paddle.to_tensor(expected_unzipped_expert_idx, dtype='int32')
