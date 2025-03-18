@@ -67,14 +67,16 @@ def kitchen_quant(x, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, retu
 def kitchen_fp8_gemm(x_fp8, x_scale, w_fp8, w_scale, is_a_1d_scaled, is_b_1d_scaled, out=None):
     if out is not None:
         accumulate = True
+        out_dtype = out.dtype
     else:
         accumulate = False
+        out_dtype = paddle.bfloat16
     y = kitchen.ops.fp8_gemm_blockwise(
         a=x_fp8,
         a_decode_scale=x_scale,
         b=w_fp8,
         b_decode_scale=w_scale,
-        out_dtype=paddle.bfloat16,
+        out_dtype=out_dtype,
         out=out,
         accumulate=accumulate,
         use_split_accumulator=True,
@@ -166,8 +168,15 @@ class ExpertsNode:
             do1 = self.bwd_swiglu(o1, do2)
             dx = self.bwd_gate_up_input(do1, w1_fp8, w1_sacle)
 
-            expert.w2.grad = self.bwd_down_weight(do3, do3_scale, o1, expert.w2.grad)
-            expert.w1.grad = self.bwd_gate_up_weight(do1, x_t_fp8, x_t_scale, expert.w1.grad)
+            if expert.w2.main_grad is not None:
+                expert.w2.main_grad = self.bwd_down_weight(do3, do3_scale, o1, expert.w2.main_grad)
+            else:
+                expert.w2.grad = self.bwd_down_weight(do3, do3_scale, o1, expert.w2.grad)
+
+            if expert.w1.main_grad is not None:
+                expert.w1.main_grad = self.bwd_gate_up_weight(do1, x_t_fp8, x_t_scale, expert.w1.main_grad)
+            else:
+                expert.w1.grad = self.bwd_gate_up_weight(do1, x_t_fp8, x_t_scale, expert.w1.grad)
 
             self.dxs += [dx]
 
