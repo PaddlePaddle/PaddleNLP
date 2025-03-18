@@ -829,7 +829,7 @@ class AutoTrainer(Trainer):
 
                 if self.do_grad_scaling:
                     paddle.save(self.scaler.state_dict(), os.path.join(output_dir, SCALER_NAME))
-                    
+
                 # Save tokenizer config files
                 if self.tokenizer is not None:
                     self.tokenizer.save_pretrained(output_dir)
@@ -841,7 +841,7 @@ class AutoTrainer(Trainer):
                 config_to_save.mp_degree = getattr(config_to_save, "config_to_save", 1)
                 # Attach architecture to the config
                 config_to_save.architectures = [model_to_save.__class__.__name__]
-                
+
                 config_to_save.save_pretrained(output_dir)
                 if model.can_generate():
                     model_to_save.generation_config.save_pretrained(output_dir)
