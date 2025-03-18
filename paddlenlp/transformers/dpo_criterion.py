@@ -233,21 +233,32 @@ class DPOCriterion(nn.Layer):
                 axis=0,
             )
         else:
-            batch_idx = response_indexs[:, 0]
-            start_idx = response_indexs[:, 1]
-            end_idx = response_indexs[:, 2]
-            end2_idx = response_indexs[:, 3]
-            seq_len = per_token_logps.shape[1]
-
-            _range = paddle.arange(seq_len).unsqueeze(0)
-            ranges = _range.expand([batch_idx.shape[0], seq_len])
-
-            chosen_mask = (ranges >= paddle.unsqueeze(start_idx, 1)) & (ranges < paddle.unsqueeze(end_idx, 1))
-            rejected_mask = (ranges >= paddle.unsqueeze(end_idx + offset, 1)) & (
-                ranges < paddle.unsqueeze(end2_idx, 1)
+            chosen_logps = paddle.stack(
+                [
+                    (
+                        paddle.gather(
+                            paddle.gather(per_token_logps, response_index[0], axis=0),
+                            paddle.arange(response_index[1], response_index[2], dtype=paddle.int32),
+                            axis=0,
+                        ).sum()
+                    )
+                    for response_index in response_indexs
+                ],
+                axis=0,
             )
-            chosen_logps = paddle.sum(per_token_logps[batch_idx] * chosen_mask.astype("float32"), axis=1)
-            rejected_logps = paddle.sum(per_token_logps[batch_idx] * rejected_mask.astype("float32"), axis=1)
+            rejected_logps = paddle.stack(
+                [
+                    (
+                        paddle.gather(
+                            paddle.gather(per_token_logps, response_index[0], axis=0),
+                            paddle.arange(response_index[2] + offset, response_index[3], dtype=paddle.int32),
+                            axis=0,
+                        ).sum()
+                    )
+                    for response_index in response_indexs
+                ],
+                axis=0,
+            )
 
         sft_loss = -chosen_logps.sum() / (chosen_labels != 0).sum()
         if average_log_prob:
@@ -318,3 +329,107 @@ class AutoDPOCriterion(DPOCriterion):
         if len(result) == 5:
             return result[-1]
         return result
+
+    def dpo_logps(
+        self,
+        logits,
+        chosen_labels,
+        rejected_labels,
+        response_indexs,
+        average_log_prob=False,
+    ):
+        """DPO logprobs"""
+        use_fused_head_and_loss_fn = getattr(self.config, "use_fused_head_and_loss_fn", False)
+        use_sparse_head_and_loss_fn = getattr(self.config, "use_sparse_head_and_loss_fn", False)
+        chunk_size = getattr(self.config, "chunk_size", 1024)
+        labels = chosen_labels + rejected_labels
+        if use_fused_head_and_loss_fn:
+            hidden_states, weight, bias, transpose_y = logits
+        elif use_sparse_head_and_loss_fn:
+            hidden_states, weight, bias = logits
+
+        if use_sparse_head_and_loss_fn:
+            if self.config.tensor_parallel_degree > 1 and self.config.sequence_parallel:
+                labels, sparse_tgt_idx = sequence_parallel_sparse_mask_labels(labels, 0)
+
+                hidden_states = paddle.gather(hidden_states, sparse_tgt_idx, axis=0)
+                hidden_states = AllGatherVarlenOp.apply(hidden_states)
+            else:
+                labels = labels.flatten()
+                sparse_tgt_idx = paddle.nonzero(labels != 0).flatten()
+                labels = paddle.take_along_axis(labels, sparse_tgt_idx, axis=0)
+
+                hidden_states = hidden_states.reshape([-1, hidden_states.shape[-1]])
+                hidden_states = paddle.gather(hidden_states, sparse_tgt_idx, axis=0)
+        elif use_fused_head_and_loss_fn:
+            if self.config.tensor_parallel_degree > 1 and self.config.sequence_parallel:
+                hidden_states = GatherOp.apply(hidden_states)
+                hidden_states = hidden_states.reshape(
+                    [
+                        -1,
+                        self.config.max_sequence_length,
+                        hidden_states.shape[-1],
+                    ]
+                )
+        if use_fused_head_and_loss_fn:
+            per_token_logps = -fused_head_and_loss_fn(
+                hidden_states,
+                weight,
+                bias,
+                labels,
+                None,
+                transpose_y,
+                self.config.vocab_size,
+                self.config.tensor_parallel_degree,
+                self.config.tensor_parallel_output,
+                False,  # fused_linear
+                chunk_size,
+                return_token_loss=True,
+                ignore_index=0,
+            )
+        elif use_sparse_head_and_loss_fn:
+            if bias is None:
+                logits = parallel_matmul(hidden_states, weight, self.config.tensor_parallel_output)
+            else:
+                logits = parallel_linear(hidden_states, weight, bias, self.config.tensor_parallel_output)
+            logits = logits.astype("float32")
+            per_token_logps = -self.logprobs(logits, labels)
+        else:
+            if isinstance(logits, tuple):
+                logits = logits[0]
+            elif isinstance(logits, CausalLMOutputWithPast):
+                logits = logits.logits
+            logits = logits.astype("float32")
+            if logits.shape[:-1] != labels.shape:
+                raise ValueError("Logits (batch and sequence length dim) and labels must have the same shape.")
+            # bs, seq
+            per_token_logps = -self.logprobs(logits, labels.unsqueeze(2)).squeeze(2)
+
+        if len(response_indexs.shape) == 3:
+            response_indexs = response_indexs[0]
+
+        offset = 1 if self.ignore_eos_token else 0
+        batch_idx = response_indexs[:, 0]
+        start_idx = response_indexs[:, 1]
+        end_idx = response_indexs[:, 2]
+        end2_idx = response_indexs[:, 3]
+        seq_len = per_token_logps.shape[1]
+        _range = paddle.arange(seq_len).unsqueeze(0)
+        ranges = _range.expand([batch_idx.shape[0], seq_len])
+        chosen_mask = (ranges >= paddle.unsqueeze(start_idx, 1)) & (ranges < paddle.unsqueeze(end_idx, 1))
+        rejected_mask = (ranges >= paddle.unsqueeze(end_idx + offset, 1)) & (ranges < paddle.unsqueeze(end2_idx, 1))
+        # while control flow lacks support for dynamic shapes and TensorArray, compute logps using masks.
+        if use_sparse_head_and_loss_fn:
+            chosen_logps = paddle.sum(per_token_logps.reshape([-1]) * chosen_mask.astype("float32"), axis=1)
+            rejected_logps = paddle.sum(per_token_logps.reshape([-1]) * rejected_mask.astype("float32"), axis=1)
+        else:
+            chosen_logps = paddle.sum(per_token_logps[batch_idx] * chosen_mask.astype("float32"), axis=1)
+            rejected_logps = paddle.sum(per_token_logps[batch_idx] * rejected_mask.astype("float32"), axis=1)
+
+        sft_loss = -chosen_logps.sum() / (chosen_labels != 0).sum()
+        if average_log_prob:
+            chosen_response_length = response_indexs[:, 2] - response_indexs[:, 1] - offset
+            rejected_response_length = response_indexs[:, 3] - response_indexs[:, 2]
+            chosen_logps /= chosen_response_length.astype("float32")
+            rejected_logps /= rejected_response_length.astype("float32")
+        return chosen_logps, rejected_logps, sft_loss * self.dpo_config.sft_loss_ratio
