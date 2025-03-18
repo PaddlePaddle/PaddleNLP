@@ -27,13 +27,14 @@ struct msgdata {
 };
 
 void GetOutput(const paddle::Tensor& x,
-               int64_t rank_id,
+               int64_t tp_rank,
+               int64_t dp_rank,
                bool wait_flag) {
-  if (rank_id > 0) return;
+  if (tp_rank > 0) return;
 
   static struct msgdata msg_rcv;
 
-  static key_t key = ftok("./", 1);
+  static key_t key = ftok("./", dp_rank+1);
 
   static int msgid = msgget(key, IPC_CREAT | 0666);
 
@@ -62,7 +63,7 @@ void GetOutput(const paddle::Tensor& x,
 
 PD_BUILD_OP(get_output)
     .Inputs({"x"})
-    .Attrs({"rank_id: int64_t",
+    .Attrs({"tp_rank: int64_t", "dp_rank: int64_t",
             "wait_flag: bool"})
     .Outputs({"x_out"})
     .SetInplaceMap({{"x", "x_out"}})

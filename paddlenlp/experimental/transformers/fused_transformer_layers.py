@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from __future__ import annotations
+from paddle.distributed import fleet
 
 import os
 from dataclasses import dataclass
@@ -27,6 +28,9 @@ from paddle.incubate.nn.functional import (
     fused_moe,
     fused_rms_norm,
     masked_multihead_attention,
+    moe_dispatch,
+    moe_ffn,
+    moe_reduce,
     variable_length_memory_efficient_attention,
 )
 from paddle.nn import Layer
@@ -118,6 +122,8 @@ class MoeConfig:
     first_k_dense_replace: int = 0
     moe_intermediate_size: int = 0
     routed_scaling_factor: float = 1.0
+
+    use_ep_parallel = False
 
     shared_expert_with_gate: bool = True
 
@@ -395,6 +401,13 @@ class FusedMultiTransformerBase(Layer):
         self._epsilon = config.epsilon
         self._residual_alpha = config.residual_alpha
         self.nranks = config.nranks
+
+        if self.nranks > 1:
+            dp_degree = fleet.get_hybrid_communicate_group().get_data_parallel_world_size()
+            self.tp_group = None
+            if dp_degree > 1:
+                self.tp_group = fleet.get_hybrid_communicate_group().get_model_parallel_group()
+
         self.norm_type = config.norm_type
         if self.norm_type == "layernorm":
             self.norm_func = fused_layer_norm
@@ -427,6 +440,12 @@ class FusedMultiTransformerBase(Layer):
         self.config.moe_config.shared_expert_intermediate_size //= config.nranks
         self.config.moe_config.moe_intermediate_size //= config.nranks
 
+        if self.config.moe_config.use_ep_parallel:
+            self.config.moe_config.moe_intermediate_size *= config.nranks
+            self.ep_num_per_gpu = self.config.moe_config.num_experts // paddle.distributed.get_world_size()
+        else:
+            self.ep_num_per_gpu = self.config.moe_config.num_experts
+
         self.num_layers = config.num_layers
         assert self.num_layers > 0
         if config.qkv_weight_attrs is not None and isinstance(config.qkv_weight_attrs, (list, tuple)):
@@ -454,6 +473,10 @@ class FusedMultiTransformerBase(Layer):
         self.shared_expert_gate_weights = []
         self.shared_expert_ffn1_weights = []
         self.shared_expert_ffn2_weights = []
+        
+        self.hahas = [0] * self.num_layers
+        for i in range(self.num_layers):
+            self.hahas[i] = paddle.incubate.jit.inference(self.haha, save_model_dir=f"/zkk/{i}")
 
         self.cache_k_scales, self.cache_v_scales = [], []
         self.cache_k_out_scales, self.cache_v_out_scales = [], []
@@ -1001,12 +1024,12 @@ class FusedMultiTransformerBase(Layer):
 
         if self.config.moe_config.has_moe():
             self.moe_ffn1_weight_shape = (
-                [self.config.moe_config.num_experts, self.embed_dim, self.config.moe_config.moe_intermediate_size * 2]
+                [self.ep_num_per_gpu, self.embed_dim, self.config.moe_config.moe_intermediate_size * 2]
                 if self.activation.endswith("glu")
-                else [self.config.moe_config.num_experts, self.embed_dim, self.config.moe_config.moe_intermediate_size]
+                else [self.ep_num_per_gpu, self.embed_dim, self.config.moe_config.moe_intermediate_size]
             )
             self.moe_ffn2_weight_shape = [
-                self.config.moe_config.num_experts,
+                self.ep_num_per_gpu,
                 self.config.moe_config.moe_intermediate_size,
                 self.embed_dim,
             ]
@@ -1261,6 +1284,199 @@ class FusedMultiTransformerBase(Layer):
 
         return tmp_out, residual_input
 
+    def compute_moe_ep_with_tp(self, tmp_out, i):
+        mp_id = paddle.distributed.get_rank()
+        gate_out = paddle.matmul(tmp_out.cast("float32"), self.gate_weights[i])
+        (
+            permute_input,
+            token_nums_per_expert,
+            permute_indices_per_token,
+            expert_scales_float,
+            top_k_indices,
+        ) = moe_dispatch(tmp_out, gate_out, self.config.moe_config.top_k, False)
+
+        
+        token_nums_per_expert = token_nums_per_expert
+
+        def get_start_end(mp_id):
+            start = 0
+            if mp_id > 0:
+                start = token_nums_per_expert[mp_id * self.ep_num_per_gpu - 1]
+            end = token_nums_per_expert[mp_id * self.ep_num_per_gpu+self.ep_num_per_gpu - 1]
+            return start, end
+        
+        start, end = get_start_end(mp_id)
+
+        permute_input_per_card = permute_input[start:end]
+
+        token_nums_per_expert_per_card = token_nums_per_expert[mp_id*self.ep_num_per_gpu:mp_id*self.ep_num_per_gpu+self.ep_num_per_gpu]
+        if mp_id > 0:
+            token_nums_per_expert_per_card = token_nums_per_expert_per_card - token_nums_per_expert[mp_id*self.ep_num_per_gpu-1]
+        
+        ffn_out = moe_ffn(
+            permute_input_per_card,
+            token_nums_per_expert_per_card,
+            self.ffn1_weights[i],
+            self.ffn2_weights[i],
+            self.ffn1_biases[i],
+            self.ffn1_weights_scale[i] if hasattr(self, "ffn1_weights_scale") else None,
+            self.ffn2_weights_scale[i] if hasattr(self, "ffn2_weights_scale") else None,
+            self.quant_type if hasattr(self, "quant_type") else "None",
+        )
+
+        tmp_shape = permute_input.shape
+        expanded_ffn_out = paddle.zeros(tmp_shape, dtype=tmp_out.dtype)
+        expanded_ffn_out[start:end] = ffn_out
+
+        fused_moe_out = moe_reduce(
+            expanded_ffn_out,
+            expert_scales_float,
+            permute_indices_per_token,
+            top_k_indices,
+            self.ffn2_biases[i],
+            norm_topk_prob=self.config.moe_config.norm_topk_prob,
+        )
+
+        return fused_moe_out
+
+
+
+    def compute_moe_ep_with_tp_dp(self, tmp_out, i):
+        # 为了少写代码，这里进行了rename
+        gate_weights = self.gate_weights[i]
+        ffn1_weights = self.ffn1_weights[i]
+        ffn2_weights = self.ffn2_weights[i]
+        ffn1_biases = self.ffn1_biases[i]
+        ffn2_biases = self.ffn2_biases[i]
+        ffn1_weights_scale = self.ffn1_weights_scale[i] if hasattr(self, "ffn1_weights_scale") else None
+        ffn2_weights_scale = self.ffn2_weights_scale[i] if hasattr(self, "ffn2_weights_scale") else None
+        quant_type = self.quant_type if hasattr(self, "quant_type") else "None"
+        norm_topk_prob=self.config.moe_config.norm_topk_prob
+        
+        top_k = self.config.moe_config.top_k
+        hidden_size = self.embed_dim
+        ep_num_per_gpu = self.ep_num_per_gpu
+        total_cards = paddle.distributed.get_world_size()
+        act_dtype = tmp_out.dtype
+        IsFirstGPUInAttentionTP = fleet.get_hybrid_communicate_group().get_model_parallel_rank() == 0
+
+        gate_out = paddle.matmul(tmp_out.cast("float32"), gate_weights)
+
+        (
+            permute_input,
+            token_cumsum_by_expert,
+            permute_indices_per_token,
+            expert_scales_float,
+            top_k_indices,
+        ) = moe_dispatch(tmp_out, gate_out, top_k, False)
+
+        def get_adjacent_minus(x):
+            y = paddle.assign(x)
+            y[1:] = y[0:-1]
+            y[0] = 0
+            y = x - y
+            return y
+
+        if IsFirstGPUInAttentionTP:
+            permute_input = permute_input
+            token_num_by_expert = get_adjacent_minus(token_cumsum_by_expert).reshape([total_cards, ep_num_per_gpu])
+            act_in_split_size = token_num_by_expert.sum(axis=-1)
+        else:
+            # Give a fake input, because we do not need get activation from this gpu.
+            permute_input = paddle.empty([0, hidden_size], act_dtype)
+            token_num_by_expert = paddle.zeros_like(token_cumsum_by_expert).reshape([total_cards, ep_num_per_gpu])
+            act_in_split_size = paddle.zeros([total_cards], token_cumsum_by_expert.dtype)
+
+        # allocate space for token_num_from_all_cards [total_cards, ep_num_per_gpu]
+        token_num_from_all_cards = paddle.empty_like(token_num_by_expert)
+
+        dist.alltoall(token_num_from_all_cards, token_num_by_expert)
+        
+        # allocate space for permute_input_per_card
+        act_out_split_size = token_num_from_all_cards.sum(axis=-1)
+        permute_input_per_card = paddle.empty([act_out_split_size.sum(), hidden_size], act_dtype)
+        # act_in_split_size = act_in_split_size.numpy().tolist()
+        # act_out_split_size = act_out_split_size.numpy().tolist()
+        dist.alltoall_single(permute_input_per_card, permute_input, act_in_split_size, act_out_split_size)
+
+        def run_permute_input(act_after_all2all, flag=True):
+            if ep_num_per_gpu == 1:
+                # not need reorder.
+                return act_after_all2all
+            result = paddle.empty_like(act_after_all2all)
+            
+            # token_num_from_all_cards [total_cards, ep_num_per_gpu]
+            # compute in cpu.
+            tmp = token_num_from_all_cards.numpy().reshape(-1)
+            tmp = tmp.cumsum() - tmp
+            token_cumsum_from_all_cards = tmp.tolist()
+
+            token_num_from_all_cards_list = token_num_from_all_cards.numpy().tolist()
+
+            index_select_indices = [0] * act_out_split_size.sum().item()
+            # index_select_indices = [0] * sum(act_out_split_size)
+            j = 0
+            for i in range(ep_num_per_gpu):
+                for in_gpu_id in range(total_cards):
+                    num = token_num_from_all_cards_list[in_gpu_id][i]
+                    j1 = token_cumsum_from_all_cards[in_gpu_id * ep_num_per_gpu + i]
+                    if num > 0:
+                        if flag:
+                            index_select_indices[j:j+num] = list(range(j1,j1+num))
+                        else:
+                            index_select_indices[j1:j1+num] = list(range(j,j+num))
+                    j += num
+            if len(index_select_indices) > 0:
+                result = act_after_all2all.index_select(paddle.to_tensor(index_select_indices))
+            return result
+        
+        permute_input_per_card = run_permute_input(permute_input_per_card)
+        
+        token_cumsum_by_expert_per_card = token_num_from_all_cards.transpose([1,0]).sum(axis=-1).cumsum()
+        ffn_out = moe_ffn(
+            permute_input_per_card,
+            token_cumsum_by_expert_per_card,
+            ffn1_weights,
+            ffn2_weights,
+            ffn1_biases,
+            ffn1_weights_scale,
+            ffn2_weights_scale,
+            quant_type,
+        )
+
+        ffn_out = run_permute_input(ffn_out, False)
+        dist.alltoall_single(permute_input, ffn_out, act_out_split_size, act_in_split_size)
+        moe_reduce_input = permute_input
+
+        fused_moe_out = moe_reduce(
+            moe_reduce_input,
+            expert_scales_float,
+            permute_indices_per_token,
+            top_k_indices,
+            ffn2_biases,
+            norm_topk_prob,
+        )
+
+        return fused_moe_out
+
+
+
+    def haha(self, tmp_out, i): 
+        fused_moe_out = fused_moe(
+            tmp_out,
+            self.gate_weights[i],
+            self.ffn1_weights[i],
+            self.ffn2_weights[i],
+            self.ffn1_biases[i],
+            self.ffn1_weights_scale[i] if hasattr(self, "ffn1_weights_scale") else None,
+            self.ffn2_biases[i],
+            self.ffn2_weights_scale[i] if hasattr(self, "ffn2_weights_scale") else None,
+            self.quant_type if hasattr(self, "quant_type") else "None",
+            self.config.moe_config.top_k,
+            self.config.moe_config.norm_topk_prob,
+        )
+        return fused_moe_out
+
     def compute_fused_moe(self, tmp_out, i):
         e_score_correction_bias = self.e_score_correction_biases[i]
 
@@ -1332,20 +1548,21 @@ class FusedMultiTransformerBase(Layer):
                 norm_topk_prob=False,  # 在noaux_tc中做了
                 routed_scaling_factor=1.0,  # 在noaux_tc中做了
             )
+        elif self.config.moe_config.use_ep_parallel and False :
+            fused_moe_out = self.compute_moe_ep_with_tp(tmp_out, i)
+            return fused_moe_out
+        elif self.config.moe_config.use_ep_parallel:
+            result_place_holder = paddle.assign(tmp_out)
+            fused_moe_out = self.compute_moe_ep_with_tp_dp(tmp_out, i)
+
+            if result_place_holder.shape == fused_moe_out.shape:
+                result_place_holder = paddle.assign(fused_moe_out)
+
+            rank = fleet.get_hybrid_communicate_group().get_data_parallel_rank() * self.nranks
+            dist.broadcast(result_place_holder, rank, group = self.tp_group)
+            return result_place_holder / self.nranks
         else:
-            fused_moe_out = fused_moe(
-                tmp_out,
-                self.gate_weights[i],
-                self.ffn1_weights[i],
-                self.ffn2_weights[i],
-                self.ffn1_biases[i],
-                self.ffn1_weights_scale[i] if hasattr(self, "ffn1_weights_scale") else None,
-                self.ffn2_biases[i],
-                self.ffn2_weights_scale[i] if hasattr(self, "ffn2_weights_scale") else None,
-                self.quant_type if hasattr(self, "quant_type") else "None",
-                self.config.moe_config.top_k,
-                self.config.moe_config.norm_topk_prob,
-            )
+            fused_moe_out = self.haha(tmp_out, i)
         return fused_moe_out
 
     def compute_activation(self, ffn1_out, i):
@@ -1515,6 +1732,24 @@ class FusedMultiTransformerBase(Layer):
                 kwargs.get("block_size", 64),
                 self.config.speculate_config.speculate_max_draft_token_num,
             )
+        
+        # split batch
+        # bs = input_ids.shape[0]
+        # want_bs = bs // 2
+        # src = src[0:want_bs]
+        # input_ids = input_ids[0:want_bs]
+        # keys = list(kwargs.keys())
+        # for key in keys:
+        #     if kwargs[key] is None or key in ["rope_emb", "max_input_length"]:
+        #         continue
+        #     if (kwargs[key].numel() == 1):
+        #         pass
+        #     if (kwargs[key].shape[0] == bs):
+        #         kwargs[key] = kwargs[key][0:want_bs]
+        #         continue
+        #     print("hi")
+
+        # print("牛逼")
 
         residual_input = src
         for i in range(self.num_layers):
@@ -1543,14 +1778,24 @@ class FusedMultiTransformerBase(Layer):
 
             # all_reduce
             if self.nranks > 1:
-                dist.all_reduce(out_linear_out)
+                dist.all_reduce(out_linear_out, group = self.tp_group)
 
             # ffn layernorm
             tmp_out, residual_input = self.compute_ffn_layernorm(out_linear_out, residual_input, i)
 
             if self.config.moe_config.use_moe(i):
+
+                start_event = paddle.device.Event(enable_timing=True)
+                end_event = paddle.device.Event(enable_timing=True)
+
+                start_event.record()
+                
                 # fused moe
                 ffn2_out = self.compute_fused_moe(tmp_out, i)
+
+                end_event.record()
+                elapsed_time_ms = start_event.elapsed_time(end_event)
+                # print(f"compute_fused_moe: {round(elapsed_time_ms,2)} ms")
 
                 # shared_expert
                 if self.config.moe_config.use_shared_expert(i):
@@ -1566,7 +1811,7 @@ class FusedMultiTransformerBase(Layer):
 
             # all_reduce
             if self.nranks > 1:
-                dist.all_reduce(ffn2_out)
+                dist.all_reduce(ffn2_out, group = self.tp_group)
 
             # norm + residual_add_bias
             tmp_out, residual_input = self.compute_bias_residual_layernorm(
@@ -1825,9 +2070,9 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             ffn2_weight_scale_attr = self.get_attr(config.ffn2_weight_scale_attrs, i)
             if self.config.moe_config.use_moe(i):
                 ffn1_weight_scale = self.create_parameter(
-                    shape=[self.config.moe_config.num_experts, self.config.moe_config.moe_intermediate_size * 2]
+                    shape=[self.ep_num_per_gpu, self.config.moe_config.moe_intermediate_size * 2]
                     if config.activation.endswith("glu")
-                    else [self.config.moe_config.num_experts, self.config.moe_config.moe_intermediate_size],
+                    else [self.ep_num_per_gpu, self.config.moe_config.moe_intermediate_size],
                     attr=ffn1_weight_scale_attr,
                     dtype=self.weight_scale_dtype,
                     is_bias=False,
@@ -1850,7 +2095,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
 
             if self.config.moe_config.use_moe(i):
                 ffn2_weight_scale = self.create_parameter(
-                    shape=[self.config.moe_config.num_experts, self.embed_dim],
+                    shape=[self.ep_num_per_gpu, self.embed_dim],
                     attr=ffn2_weight_scale_attr,
                     dtype=self.weight_scale_dtype,
                     is_bias=False,
@@ -2014,12 +2259,12 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
 
         if self.config.moe_config.has_moe():
             self.moe_ffn1_weight_shape = (
-                [self.config.moe_config.num_experts, self.embed_dim, self.config.moe_config.moe_intermediate_size * 2]
+                [self.ep_num_per_gpu, self.embed_dim, self.config.moe_config.moe_intermediate_size * 2]
                 if self.activation.endswith("glu")
-                else [self.config.moe_config.num_experts, self.embed_dim, self.config.moe_config.moe_intermediate_size]
+                else [self.ep_num_per_gpu, self.embed_dim, self.config.moe_config.moe_intermediate_size]
             )
             self.moe_ffn2_weight_shape = [
-                self.config.moe_config.num_experts,
+                self.ep_num_per_gpu,
                 self.config.moe_config.moe_intermediate_size,
                 self.embed_dim,
             ]

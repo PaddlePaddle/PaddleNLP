@@ -69,6 +69,7 @@ from paddlenlp.utils.log import logger
 class PredictorArgument:
     model_name_or_path: str = field(default=None, metadata={"help": "The directory of model."})
     model_prefix: str = field(default="model", metadata={"help": "the prefix name of static model"})
+    dp_degree: int = field(default=8, metadata={"help": "The data parallel degree."})
     src_length: int = field(default=1024, metadata={"help": "The max length of source text."})
     min_length: int = field(default=1, metadata={"help": "the min length for decoding."})
     max_length: int = field(default=1024, metadata={"help": "the max length for decoding."})
@@ -1140,6 +1141,8 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         if self.tensor_parallel_rank == 0:
             done_event.wait()
         s_time = time.time()
+        ii = 0
+
         while self.model_inputs["not_need_stop"]:
             # whether speculative decoding
             if self.proposer is not None:
@@ -1149,10 +1152,25 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                     seq_lens_this_time=self.model_inputs["seq_lens_this_time"],
                     base_model_full_hidden_states=self.full_hidden_states,
                 )
+            
+            from paddle.framework import core
+            ii += 1
+            if ii == 1:
+                core.nvprof_start()
+
             if self.return_full_hidden_states:
                 self.full_hidden_states = self._infer(self.model_inputs)
             else:
                 self._infer(self.model_inputs)
+
+            if ii == 7:
+                core.nvprof_stop()
+
+        logger.info(f"running spend {time.time()  -  s_time}")
+
+        if self.proposer is not None:
+            self.proposer.postprocess(base_model_inputs=self.model_inputs)
+
         logger.info(f"running spend {time.time() - s_time}")
 
         if self.tensor_parallel_rank == 0:
@@ -1518,13 +1536,18 @@ def predict():
     parser = PdArgumentParser((PredictorArgument, ModelArgument))
     predictor_args, model_args = parser.parse_args_into_dataclasses()
 
-    llm_utils.set_triton_cache(predictor_args.model_name_or_path, predictor_args.mode)
+    paddle.set_device(predictor_args.device)
+    paddle.set_default_dtype(predictor_args.dtype)
 
+    world_size = paddle.distributed.get_world_size()
+    dp_degree = predictor_args.dp_degree
+    tensor_parallel_degree = world_size // dp_degree
+    llm_utils.set_triton_cache(predictor_args.model_name_or_path, predictor_args.mode)
     tensor_parallel_degree = paddle.distributed.get_world_size()
     if tensor_parallel_degree > 1:
         strategy = fleet.DistributedStrategy()
         strategy.hybrid_configs = {
-            "dp_degree": 1,
+            "dp_degree": dp_degree,
             "mp_degree": tensor_parallel_degree,
             "pp_degree": 1,
             "sharding_degree": 1,
@@ -1552,16 +1575,37 @@ def predict():
                     target_texts.append("")
 
     else:
-        source_texts = [
-            "2014年3月，大范围雾霾天气长时间影响我国东部地区，严重危害人体健康。造成雾霾天气的人为原因有____\r\n①工业生产中使用矿物作为燃料，大量排放污染物     ②汽车尾气的大量排放     \r\n③风力小，空气流动不畅     ④冬季取暖排放粉尘\nA. ①②③\nB. ②③④\nC. ①③④\nD. ①②④"
-        ] * predictor_args.batch_size
-        target_texts = [""] * predictor_args.batch_size
+        source_texts = ["解释一下温故而知新", 
+                        "你好，你是谁", 
+                        "法国为什么叫法兰西呢？",
+                        "请问法国的首都是哪里呢？",
+                        "请问日本的首都是哪里呢？",
+                        "请问南非的首都是哪里呢？",
+                        "请问英国的首都是哪里呢？",
+                        "小日本为什么叫小日本呢？",
+                        ]
+        # source_texts = ["解释一下温故而知新"] * 8
+        target_texts = [""] * len(source_texts)
+        # source_texts = [
+        #     "2014年3月，大范围雾霾天气长时间影响我国东部地区，严重危害人体健康。造成雾霾天气的人为原因有____\r\n①工业生产中使用矿物作为燃料，大量排放污染物     ②汽车尾气的大量排放     \r\n③风力小，空气流动不畅     ④冬季取暖排放粉尘\nA. ①②③\nB. ②③④\nC. ①③④\nD. ①②④"
+        # ] * predictor_args.batch_size
+        # target_texts = [""] * predictor_args.batch_size
 
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
     batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
 
+    if predictor_args.dp_degree > 1:
+        hcg = fleet.get_hybrid_communicate_group()
+        dp_degree = hcg.get_data_parallel_world_size()
+        dp_id = hcg.get_data_parallel_rank()
+    else:
+        dp_degree = 1
+        dp_id = 0
+
     with open(model_args.output_file, "w", encoding="utf-8") as f:
         for bs, batch_source_text in enumerate(batch_source_texts):
+            if bs % dp_degree != dp_id:
+                continue
             logger.info("Start predict")
             outputs = predictor.predict(batch_source_text)
             logger.info("End predict")
@@ -1581,6 +1625,11 @@ def predict():
     if predictor_args.benchmark:
         benchmark(predictor, predictor_args, model_args)
 
+    paddle.distributed.barrier()
+    import paddle.distributed as dist
+    data = paddle.to_tensor([1])
+    dist.all_reduce(data)
+    print(data)
 
 def benchmark(predictor, predictor_args, model_args):
     # Just construct a simple benchmark input. We pad input to the src_length.

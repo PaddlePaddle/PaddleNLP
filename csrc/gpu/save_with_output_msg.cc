@@ -27,15 +27,16 @@ struct msgdata {
 };
 
 void SaveOutMmsg(const paddle::Tensor& x,
-                 const paddle::Tensor& not_need_stop, // cpu
-                 int64_t rank_id) {
-    if (rank_id > 0) return;
+                 const paddle::Tensor& not_need_stop,
+                 int64_t tp_rank,
+                 int64_t dp_rank) {
+    if (tp_rank > 0) return;
     auto x_cpu = x.copy_to(paddle::CPUPlace(), false);
     int64_t *x_data = x_cpu.data<int64_t>();
     auto not_need_stop_data = not_need_stop.data<bool>()[0];
 
     static struct msgdata msg_sed;
-    static key_t key = ftok("./", 1);
+    static key_t key = ftok("./", dp_rank+1);
     static int msgid = msgget(key, IPC_CREAT | 0666);
 
     msg_sed.mtype = 1;
@@ -53,7 +54,7 @@ void SaveOutMmsg(const paddle::Tensor& x,
 
 PD_BUILD_OP(save_output)
     .Inputs({"x", "not_need_stop"})
-    .Attrs({"rank_id: int64_t"})
+    .Attrs({"tp_rank: int64_t", "dp_rank: int64_t"})
     .Outputs({"x_out"})
     .SetInplaceMap({{"x", "x_out"}})
     .SetKernelFn(PD_KERNEL(SaveOutMmsg));
