@@ -299,8 +299,14 @@ class AutoTrainer(Trainer):
                             paddle.prod(next_dtensor, axis=-1) if len(next_dtensor.shape) != 1 else next_dtensor
                         )
                         global_datas = dtensors.split(next_dtensor_list.cast("int64").tolist(), axis=0)
-                        for index, data in enumerate(global_datas):
-                            global_micro_batchs[index].update({key: data})
+                        for index in range(self.args.gradient_accumulation_steps):
+                            tensor_list = []
+                            for offset in range(self.args.per_device_train_batch_size):
+                                tensor_list.append(
+                                    global_datas[index * self.args.per_device_train_batch_size + offset]
+                                )
+                            concat_tensor = paddle.concat(tensor_list, axis=0)
+                            global_micro_batchs[index].update({key: [concat_tensor]})
                         global_datas_next = next_dtensor.split(self.args.gradient_accumulation_steps, axis=0)
                         for index, data in enumerate(global_datas):
                             global_micro_batchs[index].update({key: data})
@@ -338,11 +344,17 @@ class AutoTrainer(Trainer):
                                         else next_dtensor
                                     )
                                     global_datas = dtensor.split(next_dtensor_list.cast("int64").tolist(), axis=0)
-                                    for index, data in enumerate(global_datas):
+                                    for index in range(self.args.gradient_accumulation_steps):
+                                        tensor_list = []
+                                        for offset in range(self.args.per_device_train_batch_size):
+                                            tensor_list.append(
+                                                global_datas[index * self.args.per_device_train_batch_size + offset]
+                                            )
+                                        concat_tensor = paddle.concat(tensor_list, axis=0)
                                         if key in global_micro_batchs[index].keys():
-                                            global_micro_batchs[index][key].append(data)
+                                            global_micro_batchs[index][key].append(concat_tensor)
                                         else:
-                                            global_micro_batchs[index].update({key: [data]})
+                                            global_micro_batchs[index].update({key: [concat_tensor]})
 
                                     global_datas_next = next_dtensor.split(
                                         self.args.gradient_accumulation_steps, axis=0
