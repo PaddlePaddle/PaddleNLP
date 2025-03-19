@@ -36,6 +36,126 @@ from paddle.nn.quant import weight_only_linear
 from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
 
+import paddle
+import contextlib
+import time
+import numpy as np
+from paddle.framework import core
+import paddle.distributed as dist
+from paddle.distributed import fleet
+from paddle.framework import in_dynamic_mode
+from paddle.inference import Config, create_predictor
+from paddle.nn.initializer import Constant
+from paddle import _C_ops
+from paddle.autograd import PyLayer
+from paddle.distributed import collective
+from paddle.base.data_feeder import check_dtype, check_variable_and_dtype
+from paddle.nn import Layer
+from paddle.nn.utils import dygraph_utils
+from paddle.framework import (
+    LayerHelper,
+    _create_tensor,
+    in_dynamic_mode,
+    in_pir_mode,
+)
+from paddle import framework
+from paddle.distributed import init_parallel_env
+
+import paddlenlp_ops
+
+def _get_reduce_op(reduce_op, func_name):
+    if framework.in_dynamic_mode():
+        return framework.core.ReduceOp.SUM
+    else:
+        return f'c_{func_name}_sum'
+
+    raise ValueError(f"Unknown reduce_op type for {func_name}.")
+
+
+class mp_allreduce_eager(PyLayer):
+    @staticmethod
+    def forward(
+        ctx,
+        tensor,
+        group,
+        use_calc_stream,
+        use_model_parallel,
+        op,
+        skip_c_identity_dynamic,
+    ):
+        ctx.ring_id = group.id
+        ctx.skip_c_identity_dynamic = skip_c_identity_dynamic
+
+        if use_calc_stream:
+            op_type = _get_reduce_op(op, "_mp_allreduce")
+            group.process_group.all_reduce_on_calc_stream(tensor, op_type)
+            return tensor
+        else:
+            return _C_ops.all_reduce_(
+                tensor,
+                group.id,
+                paddle.distributed.ReduceOp.SUM,
+            )
+
+    @staticmethod
+    def backward(ctx, dy):
+        if ctx.skip_c_identity_dynamic:
+            return dy
+        else:
+            return _C_ops.c_identity(dy, ctx.ring_id, True, True)
+
+
+def _mp_allreduce(
+    tensor,
+    op=paddle.distributed.ReduceOp.SUM,
+    group=None,
+    use_calc_stream=True,
+    use_model_parallel=True,
+    skip_c_identity_dynamic=False,
+):
+    """[it is same as allreduce above, but it supports model parallel. And it support inplace strategy]"""
+    if group is not None and not group.is_member():
+        return
+
+    if in_dynamic_mode():
+        group = collective._get_default_group() if group is None else group
+        assert op == paddle.distributed.ReduceOp.SUM, f"Unknown parameter: {op}."
+        return mp_allreduce_eager.apply(
+            tensor,
+            group,
+            use_calc_stream,
+            use_model_parallel,
+            op,
+            skip_c_identity_dynamic,
+        )
+    elif in_pir_mode():
+        ring_id = 0 if group is None else group.id
+        return _C_ops.mp_allreduce_sum(tensor, ring_id)
+    else:
+        ring_id = 0 if group is None else group.id
+        op_type = 'mp_allreduce_sum'
+        helper = LayerHelper(op_type, **locals())
+        out = helper.create_variable_for_type_inference(dtype=tensor.dtype)
+
+        check_variable_and_dtype(
+            tensor,
+            'tensor',
+            ['float16', 'float32', 'float64', 'int32', 'int64', 'uint16'],
+            op_type,
+        )
+
+        helper.append_op(
+            type=op_type,
+            inputs={'X': tensor},
+            outputs={'Out': out},
+            attrs={
+                'ring_id': ring_id,
+                'use_calc_stream': use_calc_stream,
+            },
+        )
+        return out
+
+
 if not is_paddlenlp_ops_available():
     logger.warning(
         "The paddlenlp_ops package is not installed. you can read the docs and install it by hand, "
@@ -1075,9 +1195,9 @@ class FusedMultiTransformerBase(Layer):
             query_pe, key_pe = self.config.rotary_emb(self.position_ids, query_pe, key_pe)
 
             if self.config.mla_config.use_absorb():
-                from paddlenlp_ops import prefill_mla_write_cache
+                from paddlenlp_ops import f_prefill_mla_write_cache
 
-                prefill_mla_write_cache(
+                f_prefill_mla_write_cache(
                     compressed_kv,
                     key_pe,
                     latent_cache,
@@ -1489,7 +1609,7 @@ class FusedMultiTransformerBase(Layer):
 
         if self.config.append_attn:
 
-            from paddlenlp_ops import get_block_shape_and_split_kv_block
+            # from paddlenlp_ops import f_get_block_shape_and_split_kv_block
 
             (
                 kwargs["encoder_batch_ids"],
@@ -1502,8 +1622,9 @@ class FusedMultiTransformerBase(Layer):
                 kwargs["decoder_tile_ids_per_batch"],
                 kwargs["decoder_num_blocks"],
                 kwargs["decoder_num_blocks_cpu"],
+                kwargs["decoder_chunk_size"],
                 kwargs["max_len_kv"],
-            ) = get_block_shape_and_split_kv_block(
+            ) = paddlenlp_ops.f_get_block_shape_and_split_kv_block(
                 kwargs.get("seq_lens_encoder", None),
                 kwargs.get("seq_lens_decoder", None),
                 max_enc_len_this_time,
@@ -1542,7 +1663,7 @@ class FusedMultiTransformerBase(Layer):
 
             # all_reduce
             if self.nranks > 1:
-                dist.all_reduce(out_linear_out)
+                _mp_allreduce(out_linear_out)
 
             # ffn layernorm
             tmp_out, residual_input = self.compute_ffn_layernorm(out_linear_out, residual_input, i)
@@ -1565,7 +1686,7 @@ class FusedMultiTransformerBase(Layer):
 
             # all_reduce
             if self.nranks > 1:
-                dist.all_reduce(ffn2_out)
+                _mp_allreduce(ffn2_out)
 
             # norm + residual_add_bias
             tmp_out, residual_input = self.compute_bias_residual_layernorm(
@@ -3103,6 +3224,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 kwargs.get("decoder_tile_ids_per_batch", None),
                 kwargs.get("decoder_num_blocks", None),
                 kwargs.get("decoder_num_blocks_cpu", None),
+                kwargs.get("decoder_chunk_size", None),
                 kwargs.get("max_enc_len_this_time", None),
                 kwargs.get("max_dec_len_this_time", None),
                 kwargs.get("max_len_kv", None),
@@ -3493,6 +3615,7 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
                 kwargs.get("decoder_tile_ids_per_batch", None),
                 kwargs.get("decoder_num_blocks", None),
                 kwargs.get("decoder_num_blocks_cpu", None),
+                kwargs.get("decoder_chunk_size", None),
                 kwargs.get("max_enc_len_this_time", None),
                 kwargs.get("max_dec_len_this_time", None),
                 kwargs.get("max_len_kv", None),
@@ -4818,8 +4941,8 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
             from paddlenlp.ops.triton_ops.fused_moe import per_token_group_quant_fp8_api
 
             x_q, x_s = per_token_group_quant_fp8_api(x, 128, True)
-            # x_q, x_s = group_quant(
-            #     x, group_size=128, transpose_scale=True, quant_max_bound=448.0, quant_min_bound=-448.0
+            # x_q, x_s = paddlenlp_ops.f_group_quant(
+            #     x, 128, True, 448.0, 448.0
             # )
         return x_q, x_s
 
@@ -4886,23 +5009,23 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
         else:
             if x_s is None:
                 x, x_s = self.dynamic_quant(x)
-            try:
-                from paddlenlp_ops import (
-                    cutlass_fp8_fp8_half_block_gemm_fused as fp8_block_gemm_fused,
-                )
-            except:
-                assert False, "fp8_block_gemm_fused only supported on sm90"
-            out = fp8_block_gemm_fused(
+            # try:
+            #     from paddlenlp_ops import (
+            #         f_cutlass_fp8_fp8_half_block_gemm_fused as fp8_block_gemm_fused,
+            #     )
+            # except:
+            #     assert False, "fp8_block_gemm_fused only supported on sm90"
+            out = paddlenlp_ops.f_cutlass_fp8_fp8_half_block_gemm_fused(
                 x,
                 y,
                 x_s,
                 y_s,
-                bias=bias,
-                transpose_x=False,
-                transpose_y=True,
-                output_dtype=output_dtype,
-                act=act,
-            )
+                bias,
+                False,
+                True,
+                output_dtype,
+                act,
+            )[0]
         return out
 
     def compute_qkv_linear(self, ln_out, i, latent_cache=None, **kwargs):
@@ -5054,7 +5177,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
         i,
         **kwargs,
     ):
-        from paddlenlp_ops import decode_mla_write_cache, multi_head_latent_attention
+        # from paddlenlp_ops import f_decode_mla_write_cache, f_multi_head_latent_attention
 
         ln_out = qkv_out
         latent_cache = caches[i]
@@ -5185,7 +5308,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
             query_pe = query_pe.reshape(shape=[-1, self.num_heads, self.config.mla_config.qk_rope_head_dim])
             query_pe, key_pe = self.config.rotary_emb(self.position_ids, query_pe, key_pe)
 
-            decode_mla_write_cache(
+            paddlenlp_ops.f_decode_mla_write_cache(
                 compressed_kv,
                 key_pe,
                 latent_cache,
@@ -5207,7 +5330,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                 ]
             )
 
-            fmha_out_decode = multi_head_latent_attention(
+            fmha_out_decode = paddlenlp_ops.f_multi_head_latent_attention(
                 q_input,
                 latent_cache,
                 latent_cache,
@@ -5228,6 +5351,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                 kwargs.get("decoder_tile_ids_per_batch", None),
                 kwargs.get("decoder_num_blocks", None),
                 kwargs.get("decoder_num_blocks_cpu", None),
+                kwargs.get("decoder_chunk_size", None),
                 kwargs.get("max_enc_len_this_time", None),
                 kwargs.get("max_dec_len_this_time", None),
                 kwargs.get("max_len_kv", None),
@@ -5253,7 +5377,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                 self.config.speculate_config.speculate_max_draft_token_num + 1,
                 True,  # causal
                 self.config.speculate_config.speculate_method is not None,  # speculate_decoder
-            )
+            )[0]
             fmha_out_decode_fp8, fmha_out_decode_scale = self.dynamic_quant(fmha_out_decode)
             out_linear_out_decode = self.cutlass_fp8_gemm(
                 x=fmha_out_decode_fp8,
@@ -5314,16 +5438,16 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                 raise ValueError(
                     f"Unsupported topk_method: {config.topk_method}. Please choose 'group_limited_greedy' or 'noaux_tc'."
                 )
-            from paddlenlp_ops import noaux_tc
+            # from paddlenlp_ops import f_noaux_tc
 
-            scores = noaux_tc(
+            scores = paddlenlp_ops.f_noaux_tc(
                 scores,
                 scores_with_bias,
                 config.num_expert_group,
                 config.topk_group,
                 config.top_k,
                 config.routed_scaling_factor,
-            )
+            )[0]
             return scores
 
         if self.config.moe_config.topk_method is not None:

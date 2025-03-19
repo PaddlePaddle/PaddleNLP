@@ -703,9 +703,9 @@ class GenerationBlockInferenceModel(GenerationMixin):
             step_idx = model_kwargs["step_idx"]
             logits = paddle.cast(outputs, paddle.float32)
 
-            from paddlenlp_ops import set_preids_token_penalty_multi_scores
+            from paddlenlp_ops import f_set_preids_token_penalty_multi_scores
 
-            set_preids_token_penalty_multi_scores(
+            f_set_preids_token_penalty_multi_scores(
                 model_kwargs["pre_ids"],
                 model_kwargs["input_ids"],
                 model_kwargs["seq_lens_encoder"],
@@ -738,9 +738,9 @@ class GenerationBlockInferenceModel(GenerationMixin):
                 paddle.distributed.broadcast(next_tokens, 0)
 
             with paddle.base.framework._stride_in_no_check_dy2st_diff():
-                from paddlenlp_ops import update_inputs_v2
+                from paddlenlp_ops import f_update_inputs_v2
 
-                update_inputs_v2(
+                f_update_inputs_v2(
                     model_kwargs["stop_flags"],
                     model_kwargs["step_idx"],
                     model_kwargs["not_need_stop"],

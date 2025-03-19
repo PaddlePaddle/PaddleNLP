@@ -54,7 +54,7 @@ class ModelRunner:
 
         self.use_dynamic_graph = int(os.getenv("USE_DYNAMIC_GRAPH", "0"))
 
-        self.config = global_config()
+        self.config = global_config
         self.model_cfg = self.config.get_model_config()
         self.speculate_config = self.config.get_speculate_config()
         self.is_speculate_decoding = self.speculate_config.speculate_method != "None"
@@ -68,7 +68,8 @@ class ModelRunner:
             self.qk_rope_head_dim = int(self.model_cfg["qk_rope_head_dim"])
             self.v_head_dim = int(self.model_cfg["v_head_dim"])
             self.kv_lora_rank = int(self.model_cfg["kv_lora_rank"])
-            self.mla_use_absorb = bool(self.model_cfg["mla_use_matrix_absorption"])
+            # self.mla_use_absorb = bool(self.model_cfg["mla_use_matrix_absorption"])
+            self.mla_use_absorb = True
 
         self.max_stop_seqs_num = int(os.getenv("MAX_STOP_SEQS_NUM", 5))
         self.stop_seqs_max_len = int(os.getenv("STOP_SEQS_MAX_LEN", 8))
@@ -747,6 +748,7 @@ class InferenceEngine(object):
             predictor_args.mode = "dynamic"
             predictor_args.block_attn = True
             predictor_args.append_attn = True
+            # predictor_args.quant_type = "a8w8_fp8"
 
             self.predictor = create_predictor(predictor_args, model_args)
             self.predictor.model.eval()
