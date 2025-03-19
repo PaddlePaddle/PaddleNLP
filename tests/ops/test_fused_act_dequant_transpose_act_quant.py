@@ -83,42 +83,27 @@ def verify_swiglu_quant_result():
         for height in [256, 1026, 4098]:
             print("#"*60 + f" Testing width:{width}, height:{height} " + "#"*60)
             x= paddle.clip(paddle.randn([height, width]).astype("bfloat16"), min=-50, max=50)
-            y= paddle.clip(paddle.randn([height, width]).astype("bfloat16"), min=-50, max=50)
-            for transposing in [True,False]:
-                for padding in [True]:
-                    for optional_y in [y,None]:
-                        y_tag = "is_combined: False" if optional_y is not None else "is_combined: True"
-                        pad_tag = "Padded: True" if padding is not None else "Padded: False"
-                        print("-" * 20 + f"Testing swiglu with {y_tag} , {pad_tag} and transposing: {transposing}" + "-" * 20)
-                        fused_res, fused_scales = FQO.fused_swiglu_act_quant(x,optional_y,transpose_output=transposing, to_e4m3=True, using_pow2_scaling=False, padding_last_dim_to_8x=padding)
-                        np_results=[]
-                        if optional_y is None:
-                            golden_res = F.swiglu(x) if not transposing else F.swiglu(x).T
-                            np_results.append(golden_res.astype("float").numpy())
-                        else:
-                            golden_res = F.swiglu(x,y) if not transposing else F.swiglu(x,y).T
-                            np_results.append(golden_res.astype("float").numpy())
-                        if padding:
-                            if transposing:
-                                dequanted_sliced_result = dequantize_fp8_to_bf16(fused_res, fused_scales)
-                                np_results.append(dequanted_sliced_result[:, :height].numpy())
-                            else:
-                                rank = width//2 if optional_y is None else width
-                                dequanted_sliced_result = dequantize_fp8_to_bf16(fused_res, fused_scales)
-                                np_results.append(dequanted_sliced_result[:, :rank].numpy())
-                        else:
-                            np_results.append(dequantize_fp8_to_bf16(fused_res, fused_scales).numpy())
-                        nan_cnt_golden, nan_cnt_fused= np.sum(np.isnan(np_results[0])), np.sum(np.isnan(np_results[1]))
-                        print(np_results[0])
-                        print("---------------")
-                        print(np_results[1])
-                        print(f"Nan count of Golden result: {nan_cnt_golden}; Nan count of Fused result: {nan_cnt_fused}")
-                        try:
-                            np.testing.assert_allclose(np_results[0], np_results[1], rtol=0.01, atol=1) #存在截断误差，atol=1，通常在1e-6
-                            print("+++++++ Passed ++++++++")
-                        except AssertionError as err:
-                            print(err)
-                            compare_tensors(np_results[0], np_results[1])
+            for padding in [False]:
+                pad_tag = "Padded: True" if padding is not None else "Padded: False"
+                print("-" * 20 + f"Testing with {pad_tag}" + "-" * 20)
+                x_fp8, scale = FQO.fused_act_quant(x, transpose_output=True, padding_last_dim_to_8x=padding, using_pow2_scaling=False)
+                fused_res, fused_scales = FQO.fused_act_dequant_transpose_act_quant(x_fp8,scale,padding_last_dim_to_8x=padding,using_pow2_scaling=False)
+                np_results=[]
+                golden_res = x
+                np_results.append(golden_res.astype("float").numpy())
+                if padding:
+                    dequanted_sliced_result = dequantize_fp8_to_bf16(fused_res, fused_scales)
+                    np_results.append(dequanted_sliced_result[:, :height].numpy())
+                else:
+                    np_results.append(dequantize_fp8_to_bf16(fused_res, fused_scales).numpy())
+                nan_cnt_golden, nan_cnt_fused= np.sum(np.isnan(np_results[0])), np.sum(np.isnan(np_results[1]))
+                print(f"Nan count of Golden result: {nan_cnt_golden}; Nan count of Fused result: {nan_cnt_fused}")
+                try:
+                    np.testing.assert_allclose(np_results[0], np_results[1], rtol=0.01, atol=1) #存在截断误差，atol=1，通常在1e-6
+                    print("+++++++ Passed ++++++++")
+                except AssertionError as err:
+                    print(err)
+                    compare_tensors(np_results[0], np_results[1])
             
 def run():
     verify_swiglu_quant_result()

@@ -140,6 +140,8 @@ def setup_fused_quant_ops():
         ext_modules=CUDAExtension(
             sources=[
                 "fused_quanted_ops/fused_swiglu_act_quant.cu",
+                "fused_quanted_ops/fused_act_quant.cu",
+                "fused_quanted_ops/fused_act_dequant_transpose_act_quant.cu",
             ],
             extra_compile_args={
                 "cxx": [
@@ -164,7 +166,8 @@ def setup_fused_quant_ops():
                     "-lineinfo",
                     "-DCUTLASS_DEBUG_TRACE_LEVEL=0",
                     "-maxrregcount=50",
-                    "-arch=sm_90a",
+                    "-gencode=arch=compute_80,code=sm_80",
+                    "-gencode=arch=compute_90a,code=sm_90a",
                     "-DNDEBUG"
                 ] + gencode_flags,
             },
