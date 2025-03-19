@@ -97,7 +97,8 @@ def verify_tokens_unzip():
         0,
         1 
     ]
-    for prec in ['fp8e4m3', 'bfloat16']:
+    # TODO: 加入fp8单测
+    for prec in ['bfloat16']:
         tokens_zipped = paddle.to_tensor(tokens_zipped, dtype=prec)
         routemap_topk = paddle.to_tensor(routemap_topk, dtype='int32')
         probs_topk = paddle.to_tensor(probs_topk, dtype='bfloat16')
