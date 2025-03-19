@@ -13,9 +13,10 @@
 # limitations under the License.
 
 
-# 1. RocketQA V1
-
 task=SciFact # MSMARCOTITLE, ...
+
+
+# 1. RocketQA V1
 python3.10 -u evaluation/eval_mteb.py \
        --corpus_model_name_or_path rocketqa-en-base-v1/passage_model \
        --query_model_name_or_path rocketqa-en-base-v1/query_model \
@@ -35,8 +36,6 @@ python3.10 -u evaluation/eval_mteb.py \
 
 
 # 2. RocketQA V2     
-
-task=SciFact # MSMARCOTITLE, ...
 python3.10 -u evaluation/eval_mteb.py \
        --corpus_model_name_or_path rocketqa-en-base-v2/passage_model \
        --query_model_name_or_path rocketqa-en-base-v2/query_model \
@@ -57,13 +56,12 @@ python3.10 -u evaluation/eval_mteb.py \
 
 
 # 3. BGE
-
 export CUDA_VISIBLE_DEVICES=0
 python evaluation/eval_mteb.py \
        --base_model_name_or_path BAAI/bge-large-en-v1.5 \
        --output_folder en_results/bge-large-en-v1.5 \
-       --task_name SciFact \
-       --task_split test \
+       --task_name "$task" \
+       --task_split $(if [[ "$task" == *"MSMARCO"* ]]; then echo "dev"; else echo "test"; fi) \
        --document_instruction 'Represent this sentence for searching relevant passages: ' \
        --pooling_method mean \
        --max_seq_length 512 \
@@ -72,20 +70,18 @@ python evaluation/eval_mteb.py \
        --padding_side right \
        --add_bos_token 0 \
        --add_eos_token 0
-# results will be saved in en_results/bge-large-en-v1.5/SciFact/mean/no_revision_available/SciFact.json
 
 
 
 
 
 # 4. RepLLaMA
-
 export CUDA_VISIBLE_DEVICES=0
 python evaluation/eval_mteb.py \
        --base_model_name_or_path castorini/repllama-v1-7b-lora-passage \
        --output_folder en_results/repllama-v1-7b-lora-passage \
-       --task_name SciFact \
-       --task_split test \
+       --task_name "$task" \
+       --task_split $(if [[ "$task" == *"MSMARCO"* ]]; then echo "dev"; else echo "test"; fi) \
        --query_instruction 'query: ' \
        --document_instruction 'passage: ' \
        --pooling_method last \
@@ -95,22 +91,19 @@ python evaluation/eval_mteb.py \
        --padding_side right \
        --add_bos_token 0 \
        --add_eos_token 1
-# results will be saved in en_results/repllama-v1-7b-lora-passage/SciFact/last/no_revision_available/SciFact.json
-
 
 
 
 
 # 5. NV-Embed-v1
-
 export CUDA_VISIBLE_DEVICES=0
 python evaluation/eval_mteb.py \
        --base_model_name_or_path nvidia/NV-Embed-v1 \
        --output_folder en_results/nv-embed-v1 \
        --query_instruction "Given a claim, find documents that refute the claim" \
-       --task_name 'SciFact' \
+       --task_name "$task" \
+       --task_split $(if [[ "$task" == *"MSMARCO"* ]]; then echo "dev"; else echo "test"; fi) \
        --eval_batch_size 8
-# results will be saved in en_results/nv-embed-v1/SciFact/last/no_model_name_available/no_revision_available/SciFact.json
 
 
 
@@ -118,13 +111,12 @@ python evaluation/eval_mteb.py \
 
 
 # 6. BGE-EN-ICL
-
 export CUDA_VISIBLE_DEVICES=0
 python evaluation/eval_mteb.py \
        --base_model_name_or_path BAAI/bge-en-icl \
        --output_folder en_results/bge-en-icl \
-       --task_name SciFact \
-       --task_split "test" \
+       --task_name "$task" \
+       --task_split $(if [[ "$task" == *"MSMARCO"* ]]; then echo "dev"; else echo "test"; fi) \
        --query_instruction $'<instruct> Given a scientific claim, retrieve documents that support or refute the claim.\n<query>' \
        --max_seq_length 512 \
        --eval_batch_size 32 \
@@ -133,36 +125,21 @@ python evaluation/eval_mteb.py \
        --padding_side left \
        --add_bos_token 1 \
        --add_eos_token 1
-# results will be saved in en_results/bge-en-icl/SciFact/last/no_model_name_available/no_revision_available/SciFact.json
 
 
 
 
 
 # 7. LLARA-passage
-
 export CUDA_VISIBLE_DEVICES=0
 python evaluation/eval_mteb.py \
        --base_model_name_or_path BAAI/LLARA-passage \
        --output_folder en_results/llara-passage \
-       --task_name 'SciFact' \
+       --task_name "$task" \
+       --task_split $(if [[ "$task" == *"MSMARCO"* ]]; then echo "dev"; else echo "test"; fi) \
        --eval_batch_size 8 \
        --pooling_method last_8 \
        --model_flag llara \
        --add_bos_token 1 \
        --add_eos_token 0 \
        --max_seq_length 532
-# results will be saved in en_results/llara-passage/SciFact/last_8/no_model_name_available/no_revision_available/SciFact.json
-
-export CUDA_VISIBLE_DEVICES=0
-python evaluation/eval_mteb.py \
-       --base_model_name_or_path BAAI/LLARA-passage \
-       --output_folder en_results/llara-passage \
-       --task_name 'MSMARCOTITLE' \
-       --eval_batch_size 8 \
-       --pooling_method last_8 \
-       --model_flag llara \
-       --add_bos_token 1 \
-       --add_eos_token 0 \
-       --max_seq_length 532
-# results will be saved in en_results/llara-passage/MSMARCOTITLE/last_8/no_model_name_available/no_revision_available/MSMARCOTITLE.json

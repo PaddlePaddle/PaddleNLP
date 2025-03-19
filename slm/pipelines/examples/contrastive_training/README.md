@@ -182,16 +182,16 @@ python -u evaluation/eval_mteb.py \
 # MTEB 评估
 [MTEB](https://github.com/embeddings-benchmark/mteb)
 是一个大规模文本嵌入评测基准，包含了丰富的向量检索评估任务和数据集。
-本仓库主要面向其中的中英文检索任务（Retrieval），并额外支持针对 MSMARCO-Title 的评估。
+本仓库主要面向其中的英文检索任务（Retrieval），并额外支持针对 MSMARCO-Title 的评估。
 
 评估脚本为 `evaluation/eval_mteb.sh`, 支持7个模型：
-RocketQA V1([RocketQA](https://github.com/PaddlePaddle/RocketQA/tree/main/research/RocketQA_NAACL2021)),
-RocketQA V2([RocketQAv2](https://github.com/PaddlePaddle/RocketQA/tree/main/research/RocketQAv2_EMNLP2021)),
-BGE([bge-large-en-v1.5](https://huggingface.co/BAAI/bge-large-en-v1.5)),
-RepLLaMA([repllama-v1-7b-lora-passage](https://huggingface.co/castorini/repllama-v1-7b-lora-passage)),
-NV-Embed ([NV-Embed-v1](https://huggingface.co/nvidia/NV-Embed-v1)),
-BGE-EN-ICL([BGE-EN-ICL](https://huggingface.co/BAAI/bge-en-icl)),
-LLARA ([LLARA-passage](https://huggingface.co/BAAI/LLARA-passage))
+[RocketQA V1](https://github.com/PaddlePaddle/RocketQA/tree/main/research/RocketQA_NAACL2021),
+[RocketQA V2](https://github.com/PaddlePaddle/RocketQA/tree/main/research/RocketQAv2_EMNLP2021),
+[BGE-Large-en-v1.5](https://huggingface.co/BAAI/bge-large-en-v1.5),
+[RepLLaMA-passage](https://huggingface.co/castorini/repllama-v1-7b-lora-passage),
+[NV-Embed-v1](https://huggingface.co/nvidia/NV-Embed-v1),
+[BGE-EN-ICL](https://huggingface.co/BAAI/bge-en-icl),
+[LLARA-passage](https://huggingface.co/BAAI/LLARA-passage)
 
 可支持配置的参数：
 - `base_model_name_or_path`: 模型名称或路径
@@ -209,30 +209,30 @@ LLARA ([LLARA-passage](https://huggingface.co/BAAI/LLARA-passage))
 - `add_eos_token`：是否添加结束符，0表示不添加，1表示添加
 
 
-评估结果如下：
-| Model                       | Max&nbsp;Length | ArguAna |           |        | ClimateFEVER |           |        | CQADupstackRetrieval |           |        | DBPedia |           |        |  FEVER  |           |        | FiQA2018 |           |        | HotpotQA |           |        | MSMARCO |           |        | NFCorpus |           |        |    NQ   |           |        | QuoraRetrieval |           |        | SCIDOCS |           |        | SciFact |           |        | Touche2020 |           |        | TRECCOVID |           |        |
-|-----------------------------|:----------:|:-------:|:---------:|:------:|:------------:|:---------:|:------:|:--------------------:|:---------:|:------:|:-------:|:---------:|:------:|:-------:|:---------:|:------:|:--------:|:---------:|:------:|:--------:|:---------:|:------:|:-------:|:---------:|:------:|:--------:|:---------:|:------:|:-------:|:---------:|:------:|:--------------:|:---------:|:------:|:-------:|:---------:|:------:|:-------:|:---------:|:------:|:----------:|:---------:|:------:|:---------:|:---------:|:------:|
-|                             |            | NDCG@10 | Recall@10 | MRR@10 |    NDCG@10   | Recall@10 | MRR@10 |        NDCG@10       | Recall@10 | MRR@10 | NDCG@10 | Recall@10 | MRR@10 | NDCG@10 | Recall@10 | MRR@10 |  NDCG@10 | Recall@10 | MRR@10 |  NDCG@10 | Recall@10 | MRR@10 | NDCG@10 | Recall@10 | MRR@10 |  NDCG@10 | Recall@10 | MRR@10 | NDCG@10 | Recall@10 | MRR@10 |     NDCG@10    | Recall@10 | MRR@10 | NDCG@10 | Recall@10 | MRR@10 | NDCG@10 | Recall@10 | MRR@10 |   NDCG@10  | Recall@10 | MRR@10 |  NDCG@10  | Recall@10 | MRR@10 |
-| RocketQA v1                 |    512     |  47.16  |           |        |    21.02     |           |        |        32.12         |           |        |  37.53  |           |        |  70.30  |           |        |  32.89   |           |        |  55.21   |           |        |  41.93  |           |        |  29.65   |           |        |  53.26  |           |        |     76.44      |           |        |  13.63  |           |        |  59.85  |           |        |   30.37    |           |        |   69.75   |           |        |
-| RocketQA v2                 |    512     |  44.66  |           |        |    19.15     |           |        |        29.51         |           |        |  35.75  |           |        |  69.00  |           |        |  30.34   |           |        |  53.56   |           |        |  43.59  |           |        |  29.38   |           |        |  50.16  |           |        |     74.22      |           |        |  12.82  |           |        |  55.08  |           |        |   30.60    |           |        |   68.56   |           |        |
-| bge‑large‑en‑v1.5          |    512     |  65.17  |   90.26   | 57.56  |    32.75     |   39.13   | 43.09  |        43.05         |   55.23   | 41.89  |  43.69  |   26.44   | 77.26  |  85.09  |   93.39   | 85.39  |  44.69   |   51.45   | 52.91  |  72.57   |   76.87   | 84.72  |  41.90  |   63.54   | 35.52  |  38.35   |   19.37   | 56.94  |  54.42  |   76.32   | 48.86  |     89.14      |   95.74   | 88.43  |  23.37  |   24.92   | 38.28  |  75.50  |   88.49   | 71.98  |   23.01    |   15.65   | 44.95  |   72.48   |   2.03    | 90.00  |
-| repllama‑v1‑7b‑lora‑passage |    4096    |  49.19  |   78.88   | 40.16  |    32.57     |   40.03   | 42.07  |        40.75         |   52.53   | 39.53  |  41.80  |   25.89   | 72.62  |  81.27  |   92.01   | 79.58  |  45.47   |   52.19   | 53.37  |  67.27   |   69.54   | 84.29  |  41.23  |   63.60   | 34.55  |  37.77   |   19.04   | 58.04  |  59.24  |   78.50   | 50.81  |     88.15      |   95.38   | 87.43  |  18.93  |   19.91   | 32.33  |  75.74  |   88.27   | 72.19  |   23.90    |   16.62   | 40.18  |   73.88   |   1.82    | 82.87  |
-| NV‑Embed‑v1                 |    4096    |  68.30  |   93.95   | 60.28  |    34.37     |   41.07   | 45.17  |        50.27         |   64.66   | 48.14  |  48.29  |   28.67   | 80.19  |  86.58  |   95.24   | 86.78  |  62.90   |   70.62   | 69.24  |  79.92   |   85.19   | 88.36  |  46.48  |   69.15   | 39.73  |  37.98   |   18.45   | 59.40  |  71.22  |   89.16   | 66.70  |     89.20      |   95.92   | 88.35  |  20.16  |   21.27   | 34.27  |  78.30  |   90.02   | 75.17  |   23.98    |   15.94   | 42.50  |   84.91   |   2.36    | 94.33  |
-| bge‑en‑icl (zero‑shot)      |    4096    |  82.34  |           |        |    45.33     |           |        |        47.27         |           |        |  50.60  |           |        |  91.91  |           |        |  59.13   |           |        |  84.90   |           |        |  46.78  |           |        |  40.66   |           |        |  73.85  |           |        |     91.03      |           |        |  25.46  |           |        |  77.91  |           |        |   30.71    |           |        |   76.38   |           |        |
-| LLARA-passage               |    4096    |  47.51  |   76.17   | 38.77  |    26.13     |   32.52   | 34.58  |        37.26         |   47.91   | 36.19  |  44.12  |   26.33   | 75.50  |  81.09  |   90.48   | 81.02  |  43.98   |   51.09   | 51.72  |  69.17   |   71.16   | 86.36  |  45.49  |   67.82   | 38.81  |  37.07   |   17.67   | 57.69  |  61.76  |   81.89   | 56.85  |     82.29      |   92.54   | 80.58  |  17.30  |   18.12   | 30.15  |  76.07  |   86.80   | 73.17  |   36.73    |   21.81   | 67.20  |   81.30   |   2.23    | 93.07  |
+评估结果如下，
+
+MTEB-Retrieval 数据集, NDCG@10分数：
+| 模型                        | 平均分数 | ArguAna | ClimateFEVER | CQADupstackRetrieval | DBPedia |  FEVER | FiQA2018 | HotpotQA | MSMARCO | NFCorpus |   NQ   | QuoraRetrieval | SCIDOCS | SciFact | Touche2020 | TRECCOVID |
+|-----------------------------|:--------:|:-------:|:------------:|:--------------------:|:-------:|:------:|:--------:|:--------:|:-------:|:--------:|:------:|:--------------:|:-------:|:-------:|:----------:|:---------:|
+| RocketQA v1                 |  44.74   |  47.16  |    21.02     |        32.12         |  37.53  | 70.30  |  32.89   |  55.21   |  41.93  |  29.65   | 53.26  |     76.44      |  13.63  |  59.85  |   30.37    |   69.75   |
+| RocketQA v2                 |  43.09   |  44.66  |    19.15     |        29.51         |  35.75  | 69.00  |  30.34   |  53.56   |  43.59  |  29.38   | 50.16  |     74.22      |  12.82  |  55.08  |   30.60    |   68.56   |
+| bge‑large‑en‑v1.5           |  53.68   |  65.17  |    32.75     |        43.05         |  43.69  | 85.09  |  44.69   |  72.57   |  41.90  |  38.35   | 54.42  |     89.14      |  23.37  |  75.50  |   23.01    |   72.48   |
+| repllama‑v1‑7b‑lora‑passage |  51.81   |  49.19  |    32.57     |        40.75         |  41.80  | 81.27  |  45.47   |  67.27   |  41.23  |  37.77   | 59.24  |     88.15      |  18.93  |  75.74  |   23.90    |   73.88   |
+| NV‑Embed‑v1                 |  58.86   |  68.30  |    34.37     |        50.27         |  48.29  | 86.58  |  62.90   |  79.92   |  46.48  |  37.98   | 71.22  |     89.20      |  20.16  |  78.30  |   23.98    |   84.91   |
+| bge‑en‑icl (zero‑shot)      |  61.62   |  82.34  |    45.33     |        47.27         |  50.60  | 91.91  |  59.13   |  84.90   |  46.78  |  40.66   | 73.85  |     91.03      |  25.46  |  77.91  |   30.71    |   76.38   |
+| LLARA-passage               |  52.48   |  47.51  |    26.13     |        37.26         |  44.12  | 81.09  |  43.98   |  69.17   |  45.49  |  37.07   | 61.76  |     82.29      |  17.30  |  76.07  |   36.73    |   81.30   |
 
 
-
-| Model                       | Max Length | MSMARCO-Title |           |        |
-|-----------------------------|:----------:|:-------------:|:---------:|:------:|
-|                             |            |    NDCG@10    | Recall@10 | MRR@10 |
-| RocketQA v1                 |    512     |               |           | 36.90  |
-| RocketQA v2                 |    512     |               |           | 38.90  |
-| bge-large-en-v1.5           |    512     |     41.96     |   64.24   | 35.30  |
-| repllama-v1-7b-lora-passage |    4096    |     45.13     |   68.18   | 38.24  |
-| NV-Embed-v1                 |    4096    |     45.21     |   68.02   | 38.39  |
-| bge-en-icl (zero-shot)      |    4096    |               |           | 42.77  |
-| LLARA-passage               |    4096    |     49.87     |   72.59   | 43.04  |
+MSMARCO-Title 数据集, MRR@10, Recall@10, NDCG@10分数：
+| Model                       | Max Length | MRR@10 | Recall@100 | NDCG@10 |
+|-----------------------------|:----------:|:------:|:----------:|:-------:|
+| RocketQA v1                 |    512     | 36.90  |            |         |
+| RocketQA v2                 |    512     | 38.90  |            |         |
+| bge-large-en-v1.5           |    512     | 35.30  |   89.96    |  41.96  |
+| repllama-v1-7b-lora-passage |    4096    | 38.24  |   91.95    |  45.13  |
+| NV-Embed-v1                 |    4096    | 38.39  |   92.72    |  45.21  |
+| bge-en-icl (zero-shot)      |    4096    | 42.77  |            |         |
+| LLARA-passage               |    4096    | 43.04  |   94.75    |  49.87  |
 
 
 
