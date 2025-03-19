@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import copy
 import os
 import random
 import time
@@ -29,7 +28,6 @@ from tqdm.auto import tqdm
 
 from paddlenlp.trainer import Trainer
 
-from ..transformers.model_utils import unwrap_model
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.log import logger
 from .argparser import strtobool
@@ -301,8 +299,14 @@ class AutoTrainer(Trainer):
                             paddle.prod(next_dtensor, axis=-1) if len(next_dtensor.shape) != 1 else next_dtensor
                         )
                         global_datas = dtensors.split(next_dtensor_list.cast("int64").tolist(), axis=0)
-                        for index, data in enumerate(global_datas):
-                            global_micro_batchs[index].update({key: data})
+                        for index in range(self.args.gradient_accumulation_steps):
+                            tensor_list = []
+                            for offset in range(self.args.per_device_train_batch_size):
+                                tensor_list.append(
+                                    global_datas[index * self.args.per_device_train_batch_size + offset]
+                                )
+                            concat_tensor = paddle.concat(tensor_list, axis=0)
+                            global_micro_batchs[index].update({key: [concat_tensor]})
                         global_datas_next = next_dtensor.split(self.args.gradient_accumulation_steps, axis=0)
                         for index, data in enumerate(global_datas):
                             global_micro_batchs[index].update({key: data})
@@ -340,11 +344,17 @@ class AutoTrainer(Trainer):
                                         else next_dtensor
                                     )
                                     global_datas = dtensor.split(next_dtensor_list.cast("int64").tolist(), axis=0)
-                                    for index, data in enumerate(global_datas):
+                                    for index in range(self.args.gradient_accumulation_steps):
+                                        tensor_list = []
+                                        for offset in range(self.args.per_device_train_batch_size):
+                                            tensor_list.append(
+                                                global_datas[index * self.args.per_device_train_batch_size + offset]
+                                            )
+                                        concat_tensor = paddle.concat(tensor_list, axis=0)
                                         if key in global_micro_batchs[index].keys():
-                                            global_micro_batchs[index][key].append(data)
+                                            global_micro_batchs[index][key].append(concat_tensor)
                                         else:
-                                            global_micro_batchs[index].update({key: [data]})
+                                            global_micro_batchs[index].update({key: [concat_tensor]})
 
                                     global_datas_next = next_dtensor.split(
                                         self.args.gradient_accumulation_steps, axis=0
@@ -830,21 +840,6 @@ class AutoTrainer(Trainer):
                 if self.do_grad_scaling:
                     paddle.save(self.scaler.state_dict(), os.path.join(output_dir, SCALER_NAME))
 
-                # Save tokenizer config files
-                if self.tokenizer is not None:
-                    self.tokenizer.save_pretrained(output_dir)
-                    # Save train arguments together with the trained model
-                    paddle.save(self.args, os.path.join(output_dir, TRAINING_ARGS_NAME))
-                # Save the config
-                model_to_save = unwrap_model(model)
-                config_to_save = copy.deepcopy(model_to_save.config)
-                config_to_save.mp_degree = getattr(config_to_save, "config_to_save", 1)
-                # Attach architecture to the config
-                config_to_save.architectures = [model_to_save.__class__.__name__]
-
-                config_to_save.save_pretrained(output_dir)
-                if model.can_generate():
-                    model_to_save.generation_config.save_pretrained(output_dir)
         # Determine the new best metric / best model checkpoint
         if metrics is not None and self.args.metric_for_best_model is not None:
             metric_to_check = self.args.metric_for_best_model
