@@ -67,7 +67,10 @@ paddlenlp_build (){
     python -m pip install -r requirements.txt --trusted-host pip.baidu-int.com
     python -m pip install -r requirements-dev.txt --trusted-host pip.baidu-int.com
     python setup.py bdist_wheel
-    python -m pip install --ignore-installed  dist/p****.whl
+    python -m pip uninstall protobuf -y
+    python -m pip install protobuf==3.20.2
+    python -m pip install numpy==1.26.4 --force-reinstall
+    python -m pip install --ignore-installed  dist/p****.whl --force-reinstall
     python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)" >> ${log_path}/commit_info.txt
 
     # for test https://www.paddlepaddle.org.cn/whl/paddlenlp.html
@@ -78,6 +81,9 @@ paddlenlp_build (){
 
 install_paddlenlp(){
     echo "install_nlp_develop"
+    python -m pip uninstall protobuf -y
+    python -m pip install protobuf==3.20.2
+    python -m pip install numpy==1.26.4 --force-reinstall
     python -m pip install --user https://paddlenlp.bj.bcebos.com/wheels/paddlenlp-ci-py3-none-any.whl --no-cache-dir
     python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)" >> ${log_path}/commit_info.txt
 }
@@ -86,7 +92,10 @@ paddlenlp_ops_build (){
     cd ${nlp_dir}/csrc
     bash tools/build_wheel.sh
     python -c "import paddlenlp_ops"
+    # for test https://www.paddlepaddle.org.cn/whl/paddlenlp.html
     cp ${nlp_dir}/csrc/gpu_dist/p****.whl ${upload_path}/
+    # for ci pr test
+    cp ${nlp_dir}/csrc/gpu_dist/p****.whl ${upload_path}/paddlenlp_ops-ci-py3-none-any.whl
 }
 
 contain_case(){

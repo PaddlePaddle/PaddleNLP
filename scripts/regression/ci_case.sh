@@ -575,7 +575,7 @@ llm(){
         bash tools/build_wheel.sh
     else
         echo "No modifications in csrc, installing paddlenlp_ops wheel file..."
-        python -m pip install --pre --upgrade paddlenlp_ops -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html --no-cache-dir
+        python -m pip install --user https://paddlenlp.bj.bcebos.com/wheels/paddlenlp-ci-py3-none-any.whl --no-cache-dir
     fi
     set +e
     sleep 5
