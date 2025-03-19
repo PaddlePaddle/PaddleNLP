@@ -578,7 +578,7 @@ llm(){
         rm -rf upload/*
     else
         echo "No modifications in csrc, installing paddlenlp_ops wheel file..."
-        python -m pip install --pre --upgrade paddlenlp_ops -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html --no-cache-dir
+        python -m pip install --user https://paddlenlp.bj.bcebos.com/wheels/paddlenlp_ops-ci-py3-none-any.whl --no-cache-dir
     fi
 
     sleep 5
