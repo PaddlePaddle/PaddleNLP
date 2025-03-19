@@ -37,7 +37,7 @@ except:
 __all__ = [
     "kitchen_quant",
     "kitchen_fp8_gemm",
-    "dequantize_fp8_to_bf16",
+    "dequantize_fp8_to_fp32",
     "ExpertsNode",
 ]
 
@@ -86,7 +86,7 @@ def kitchen_fp8_gemm(x_fp8, x_scale, w_fp8, w_scale, is_a_1d_scaled, is_b_1d_sca
     return y
 
 
-def dequantize_fp8_to_bf16(fp8_tensor, scale):
+def dequantize_fp8_to_fp32(fp8_tensor, scale):
     expanded_scale = paddle.repeat_interleave(scale, repeats=128, axis=-1)
     # 非规整情况，需要截断
     expanded_scale = expanded_scale[:, : fp8_tensor.shape[-1]]
@@ -120,7 +120,7 @@ class ExpertsNode:
             self.outputs += [o3]
 
             # save for bwd
-            x_t = dequantize_fp8_to_bf16(x_fp8, chunk_scale).T.contiguous()
+            x_t = dequantize_fp8_to_fp32(x_fp8, chunk_scale).T.contiguous()
             if x_t.shape[-1] % 128 != 0 or x_t.shape[-1] % 512 != 0:
                 if (x_t.shape[-1] + 128 - (x_t.shape[-1] % 128)) % 512 != 0:
                     padding_size = 512
@@ -235,7 +235,7 @@ class ExpertsNode:
             o2_t, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
         )
 
-        do3_t = dequantize_fp8_to_bf16(do3_fp8, do3_scale).T.contiguous()
+        do3_t = dequantize_fp8_to_fp32(do3_fp8, do3_scale).T.contiguous()
         if do3_t.shape[-1] % 128 != 0 or do3_t.shape[-1] % 512 != 0:
             if (do3_t.shape[-1] + 128 - (do3_t.shape[-1] % 128)) % 512 != 0:
                 padding_size = 512
