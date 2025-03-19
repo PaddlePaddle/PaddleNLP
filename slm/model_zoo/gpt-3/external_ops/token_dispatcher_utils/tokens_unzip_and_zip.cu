@@ -17,7 +17,7 @@ __global__ void token_unzip_kernel(
     const T *__restrict__ X,
     const int *__restrict__ routemap_topk,
     const phi::bfloat16 *__restrict__ probs_topk_in,
-    T*__restrict__ X_unzipped,
+    T *__restrict__ X_unzipped,
     int *__restrict__ zipped_expertwise_rowmap,
     phi::bfloat16 *__restrict__ probs_unzipped_out,
     int *__restrict__ expert_idx_unzipped,
@@ -25,9 +25,11 @@ __global__ void token_unzip_kernel(
     int *__restrict__ row_valid,
     const int total_zipped_tokens_num,
     const int total_unzipped_tokens_num,
-    const int token_length) {};
+    const int token_length){};
 
-template <typename T, int topk, int num_experts,
+template <typename T,
+          int topk,
+          int num_experts,
           typename = std::enable_if_t<std::is_same_v<T, phi::bfloat16>>>
 __global__ void token_unzip_kernel(
     const phi::bfloat16 *__restrict__ X,
@@ -61,22 +63,23 @@ __global__ void token_unzip_kernel(
         // 每行只有一次非广播的机会
         bool isFirst = true;
         int local_expert_rowmap[num_experts];
-        // 寄存器填入非法值，避免误用（0为合法rowidx）
-        #pragma unroll
+// 寄存器填入非法值，避免误用（0为合法rowidx）
+#pragma unroll
         for (int i = 0; i < num_experts; i++) {
           local_expert_rowmap[i] = -1;
         }
         for (int i = 0; i < topk; i++) {
           int this_expert_idx = routemap_topk[row_idx * topk + i];
           __nv_bfloat16 this_expert_prob = probs_topk[row_idx * topk + i];
-          if(this_expert_idx < 0)[[likely]] continue;
+          if (this_expert_idx < 0) [[likely]]
+            continue;
           // 第一次出现，直接搬入
           if (isFirst) [[likely]] {
             isFirst = false;
             probs_unzipped[row_idx] = this_expert_prob;
             expert_idx_unzipped[row_idx] = this_expert_idx;
             local_expert_rowmap[this_expert_idx] = row_idx;
-          } else { // 增广部分, 原子更新行偏置,并计算扩展行索引
+          } else {  // 增广部分, 原子更新行偏置,并计算扩展行索引
             int extended_row_offset;
             extended_row_offset =
                 atomicAdd(&atomic_extended_offset_counter[0], 1);
@@ -88,15 +91,16 @@ __global__ void token_unzip_kernel(
             local_expert_rowmap[this_expert_idx] = extended_row_idx;
           }
         }
-        // ------------------ 更新专家广播后的行表，用于zip进行收集 -----------
-        // 将合法值和未被触碰的非法值返回给zipped_expertwise_rowmap
-        #pragma unroll
+// ------------------ 更新专家广播后的行表，用于zip进行收集 -----------
+// 将合法值和未被触碰的非法值返回给zipped_expertwise_rowmap
+#pragma unroll
         for (int i = 0; i < num_experts; i++) {
-          zipped_expertwise_rowmap[row_idx * num_experts + i] = local_expert_rowmap[i];
+          zipped_expertwise_rowmap[row_idx * num_experts + i] =
+              local_expert_rowmap[i];
           int valid_offset = local_expert_rowmap[i] - total_zipped_tokens_num;
           // 只给增广行传递信号量，非法值保持为0
           if (valid_offset >= 0) {
-            atomicExch(&row_valid[valid_offset], row_idx); // 发送任务信号量
+            atomicExch(&row_valid[valid_offset], row_idx);  // 发送任务信号量
           }
         }
       }
@@ -121,12 +125,15 @@ __global__ void token_unzip_kernel(
       int original_row = shared_original_row;
       // 搬
       for (int i = threadIdx.x; i < token_length; i += blockDim.x) {
-        X_unzipped[row_idx * token_length + i] = X[original_row * token_length + i];
+        X_unzipped[row_idx * token_length + i] =
+            X[original_row * token_length + i];
       }
     }
   }
 }
-template <typename T, int topk, int num_experts,
+template <typename T,
+          int topk,
+          int num_experts,
           typename = std::enable_if_t<std::is_same_v<T, phi::float8_e4m3fn>>>
 __global__ void token_unzip_kernel(
     const phi::float8_e4m3fn *__restrict__ X,
@@ -160,22 +167,23 @@ __global__ void token_unzip_kernel(
         // 每行只有一次非广播的机会
         bool isFirst = true;
         int local_expert_rowmap[num_experts];
-        // 寄存器填入非法值，避免误用（0为合法rowidx）
-        #pragma unroll
+// 寄存器填入非法值，避免误用（0为合法rowidx）
+#pragma unroll
         for (int i = 0; i < num_experts; i++) {
           local_expert_rowmap[i] = -1;
         }
         for (int i = 0; i < topk; i++) {
           int this_expert_idx = routemap_topk[row_idx * topk + i];
           __nv_bfloat16 this_expert_prob = probs_topk[row_idx * topk + i];
-          if(this_expert_idx < 0)[[likely]] continue;
+          if (this_expert_idx < 0) [[likely]]
+            continue;
           // 第一次出现，直接搬入
           if (isFirst) [[likely]] {
             isFirst = false;
             probs_unzipped[row_idx] = this_expert_prob;
             expert_idx_unzipped[row_idx] = this_expert_idx;
             local_expert_rowmap[this_expert_idx] = row_idx;
-          } else { // 增广部分, 原子更新行偏置,并计算扩展行索引
+          } else {  // 增广部分, 原子更新行偏置,并计算扩展行索引
             int extended_row_offset;
             extended_row_offset =
                 atomicAdd(&atomic_extended_offset_counter[0], 1);
@@ -187,15 +195,16 @@ __global__ void token_unzip_kernel(
             local_expert_rowmap[this_expert_idx] = extended_row_idx;
           }
         }
-        // ------------------ 更新专家广播后的行表，用于zip进行收集 -----------
-        // 将合法值和未被触碰的非法值返回给zipped_expertwise_rowmap
-        #pragma unroll
+// ------------------ 更新专家广播后的行表，用于zip进行收集 -----------
+// 将合法值和未被触碰的非法值返回给zipped_expertwise_rowmap
+#pragma unroll
         for (int i = 0; i < num_experts; i++) {
-          zipped_expertwise_rowmap[row_idx * num_experts + i] = local_expert_rowmap[i];
+          zipped_expertwise_rowmap[row_idx * num_experts + i] =
+              local_expert_rowmap[i];
           int valid_offset = local_expert_rowmap[i] - total_zipped_tokens_num;
           // 只给增广行传递信号量，非法值保持为0
           if (valid_offset >= 0) {
-            atomicExch(&row_valid[valid_offset], row_idx); // 发送任务信号量
+            atomicExch(&row_valid[valid_offset], row_idx);  // 发送任务信号量
           }
         }
       }
@@ -220,7 +229,8 @@ __global__ void token_unzip_kernel(
       int original_row = shared_original_row;
       // 搬
       for (int i = threadIdx.x; i < token_length; i += blockDim.x) {
-        X_unzipped[row_idx * token_length + i] = X[original_row * token_length + i];
+        X_unzipped[row_idx * token_length + i] =
+            X[original_row * token_length + i];
       }
     }
   }
@@ -243,7 +253,7 @@ void dispatch_tokens_unzip(const paddle::Tensor &X,
   grid.x = total_unzipped_tokens_num;
   block.x = 256;
   if (topk == 8 && num_experts == 4) {
-    if(X.dtype() == paddle::DataType::BFLOAT16){
+    if (X.dtype() == paddle::DataType::BFLOAT16) {
       token_unzip_kernel<phi::bfloat16, 8, 4><<<grid, block, 0, X.stream()>>>(
           X.data<phi::bfloat16>(),
           expert_routemap_topk.data<int>(),
@@ -257,20 +267,21 @@ void dispatch_tokens_unzip(const paddle::Tensor &X,
           total_zipped_tokens_num,
           total_unzipped_tokens_num,
           token_length);
-    }else if(X.dtype() == paddle::DataType::FLOAT8_E4M3FN){
-      token_unzip_kernel<phi::float8_e4m3fn, 8, 4><<<grid, block, 0, X.stream()>>>(
-          X.data<phi::float8_e4m3fn>(),
-          expert_routemap_topk.data<int>(),
-          expert_prob_topk.data<phi::bfloat16>(),
-          X_unzipped.data<phi::float8_e4m3fn>(),
-          zipped_expertwise_rowmap.data<int>(),
-          token_prob_unzipped.data<phi::bfloat16>(),
-          expert_idx_unzipped.data<int>(),
-          atomic_extended_offset_counter.data<int>(),
-          row_valid.data<int>(),
-          total_zipped_tokens_num,
-          total_unzipped_tokens_num,
-          token_length);
+    } else if (X.dtype() == paddle::DataType::FLOAT8_E4M3FN) {
+      token_unzip_kernel<phi::float8_e4m3fn, 8, 4>
+          <<<grid, block, 0, X.stream()>>>(
+              X.data<phi::float8_e4m3fn>(),
+              expert_routemap_topk.data<int>(),
+              expert_prob_topk.data<phi::bfloat16>(),
+              X_unzipped.data<phi::float8_e4m3fn>(),
+              zipped_expertwise_rowmap.data<int>(),
+              token_prob_unzipped.data<phi::bfloat16>(),
+              expert_idx_unzipped.data<int>(),
+              atomic_extended_offset_counter.data<int>(),
+              row_valid.data<int>(),
+              total_zipped_tokens_num,
+              total_unzipped_tokens_num,
+              token_length);
     }
   }
 }
@@ -282,7 +293,8 @@ std::vector<paddle::Tensor> tokens_unzip(
     const int &total_unzipped_tokens_num,
     const int &topk,
     const int &num_experts) {
-  PD_CHECK(X.dtype() == paddle::DataType::BFLOAT16 || X.dtype() == paddle::DataType::FLOAT8_E4M3FN);
+  PD_CHECK(X.dtype() == paddle::DataType::BFLOAT16 ||
+           X.dtype() == paddle::DataType::FLOAT8_E4M3FN);
   PD_CHECK(expert_prob_topk.dtype() == paddle::DataType::BFLOAT16);
   PD_CHECK(expert_routemap_topk.dtype() == paddle::DataType::INT32);
   int rows = X.shape()[0];  // seqlen
@@ -306,11 +318,11 @@ std::vector<paddle::Tensor> tokens_unzip(
       paddle::zeros({1}, paddle::DataType::INT32, X.place());
   // 增广行数的合法性向量，用于线程组1唤起
   int extended_row_num = total_unzipped_tokens_num - rows;
-  auto row_valid = paddle::empty({extended_row_num},
-                                 paddle::DataType::INT32,
-                                 X.place());
-  void* row_valid_gpu = reinterpret_cast<void*>(row_valid.data<int>());
-  cudaMemsetAsync(row_valid_gpu, -1, sizeof(int) * extended_row_num, X.stream());
+  auto row_valid =
+      paddle::empty({extended_row_num}, paddle::DataType::INT32, X.place());
+  void *row_valid_gpu = reinterpret_cast<void *>(row_valid.data<int>());
+  cudaMemsetAsync(
+      row_valid_gpu, -1, sizeof(int) * extended_row_num, X.stream());
 
 
   dispatch_tokens_unzip(X,
