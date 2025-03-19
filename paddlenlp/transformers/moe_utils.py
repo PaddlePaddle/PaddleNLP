@@ -101,6 +101,7 @@ class PermuteNode:
 
     def forward(self, hidden_states, hidden_states_scale, dispatched_indices):
         self.token_dispatcher._comm_manager.hidden_shape_before_permute = hidden_states.shape
+        self.hidden_shape_before_permute = hidden_states.shape
         self.token_permuted_indices, self.prob_permuted_indices = topk_to_permuted_indices(
             dispatched_indices,
             self.token_dispatcher._comm_manager.tokens_per_expert,
@@ -118,7 +119,7 @@ class PermuteNode:
             permuted_tokens=out_grad,
             token_permuted_indices=self.token_permuted_indices,
             prob_permuted_indices=self.prob_permuted_indices,
-            restore_shape=self.token_dispatcher._comm_manager.hidden_shape_before_permute,
+            restore_shape=self.hidden_shape_before_permute,
             probs=dispatched_probs,
         )
         return hidden_states_grad.to(input_dtype)

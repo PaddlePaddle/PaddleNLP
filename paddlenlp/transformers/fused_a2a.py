@@ -84,7 +84,10 @@ def fused_dispatch_forward_func(
 ):
     """Forward pass of fused dispatch."""
     # Calculate layout before actual dispatch
-    buffer = get_buffer(group, get_hidden_bytes(x))
+    if isinstance(x, tuple):
+        buffer = get_buffer(group, get_hidden_bytes(x[0]))
+    else:
+        buffer = get_buffer(group, get_hidden_bytes(x))
     (
         num_tokens_per_rank,
         num_tokens_per_rdma_rank,
@@ -167,14 +170,24 @@ def fused_combine_backward_func(
     grad_output, group, handle, previous_event=None, async_finish=False, allocate_on_comm_stream=False
 ):
     """Backward pass of fused combine."""
-    buffer = get_buffer(group, get_hidden_bytes(grad_output))
-    grad_x, _, _, _, _, event = buffer.dispatch(
-        grad_output.contiguous(),
-        handle=handle,
-        previous_event=previous_event,
-        async_finish=async_finish,
-        allocate_on_comm_stream=allocate_on_comm_stream,
-    )
+    if isinstance(grad_output, tuple):
+        buffer = get_buffer(group, get_hidden_bytes(grad_output[0]))
+        grad_x, _, _, _, _, event = buffer.dispatch(
+            (grad_output[0].contiguous(), grad_output[1].contiguous()),
+            handle=handle,
+            previous_event=previous_event,
+            async_finish=async_finish,
+            allocate_on_comm_stream=allocate_on_comm_stream,
+        )
+    else:
+        buffer = get_buffer(group, get_hidden_bytes(grad_output))
+        grad_x, _, _, _, _, event = buffer.dispatch(
+            grad_output.contiguous(),
+            handle=handle,
+            previous_event=previous_event,
+            async_finish=async_finish,
+            allocate_on_comm_stream=allocate_on_comm_stream,
+        )
     return grad_x
 
 

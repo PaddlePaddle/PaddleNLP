@@ -469,8 +469,8 @@ class FusionMoe(paddle.autograd.PyLayer):
         token_indices, token_probs = ctx.Node_pre_dispatch.forward(routing_map, probs)
 
         # dispatch
-        hs_fp8_dispatched, dispatched_probs, states = ctx.Node_dispatch_act.forward(
-            hs_fp8,
+        (hs_fp8_dispatched, hs_scale_dispatched), dispatched_probs, states = ctx.Node_dispatch_act.forward(
+            (hs_fp8, hs_scale),
             token_indices,
             token_probs,
             token_dispatcher._comm_manager.num_experts,
@@ -479,14 +479,6 @@ class FusionMoe(paddle.autograd.PyLayer):
         token_dispatcher._comm_manager.handle = states["handle"]
         token_dispatcher._comm_manager.tokens_per_expert = states["tokens_per_expert"]
         dispatched_indices = states["dispatched_indices"]
-
-        hs_scale_dispatched, _, _ = ctx.Node_dispatch_scale.forward(
-            hs_scale,
-            token_indices,
-            token_probs,
-            token_dispatcher._comm_manager.num_experts,
-            token_dispatcher._comm_manager.group,
-        )
 
         # permute
         (
@@ -529,8 +521,9 @@ class FusionMoe(paddle.autograd.PyLayer):
         )
 
         # combine grad -> fp8
-        hidden_states_out_grad = ctx.Node_combine.backward(output_combie_grad_fp8)
-        hidden_states_out_grad_scale = ctx.Node_combine.backward(output_combie_grad_scale)
+        (hidden_states_out_grad, hidden_states_out_grad_scale) = ctx.Node_combine.backward(
+            (output_combie_grad_fp8, output_combie_grad_scale)
+        )
 
         # unpermute grad -> fp8
         expert_out_grad, dispatched_probs_grad = ctx.Node_unpermute.backward(
