@@ -28,7 +28,6 @@ from paddle import _C_ops
 from paddle.base.framework import OpProtoHolder
 from paddle.base.layer_helper import LayerHelper
 from paddle.framework import in_dynamic_or_pir_mode
-from paddlenlp.utils.log import logger
 
 from paddlenlp.ops.triton_ops.triton_utils import (
     get_dtype_str,
@@ -41,22 +40,11 @@ padding_size = 0
 has_deep_gemm = False
 try:
     import deep_gemm as dg
+
     has_deep_gemm = True
 except ImportError:
     pass
 
-
-def valid_deep_gemm(hidden_states, w1, w2, use_fp8_w8a8: bool) -> bool:
-    if not has_deep_gemm or not use_fp8_w8a8:
-        return False
-
-    M, K = hidden_states.shape
-    N = w2.shape[-1]
-    if M % 128 != 0 or N % 128 != 0 or K % 128 != 0:
-        return False
-
-    return (hidden_states.is_contiguous() and w1.is_contiguous()
-            and w2.is_contiguous())
 
 @paddle_use_triton(
     key=["1"],
@@ -517,8 +505,18 @@ def invoke_fused_moe_kernel(
             A, A_scale = per_token_group_quant_fp8_api(A, block_k)
         if use_dg:
             if not mul_routed_weight:
-                A = A.reshape([A.shape[0], -1, A.shape[1]]).view(paddle.uint8).expand([-1, top_k, -1]).view(A.dtype).reshape([-1, A.shape[1]])
-                A_scale = A_scale.reshape([A_scale.shape[0], -1, A_scale.shape[1]]).expand([-1, top_k, -1]).reshape([-1, A_scale.shape[1]])
+                A = (
+                    A.reshape([A.shape[0], -1, A.shape[1]])
+                    .view(paddle.uint8)
+                    .expand([-1, top_k, -1])
+                    .view(A.dtype)
+                    .reshape([-1, A.shape[1]])
+                )
+                A_scale = (
+                    A_scale.reshape([A_scale.shape[0], -1, A_scale.shape[1]])
+                    .expand([-1, top_k, -1])
+                    .reshape([-1, A_scale.shape[1]])
+                )
                 A = A.view(paddle.uint8)[sorted_token_ids].view(A.dtype)
                 A_scale = A_scale[sorted_token_ids]
 
@@ -914,7 +912,7 @@ def fused_experts_impl(
     a1_scale=None,
     a2_scale=None,
     block_shape: Optional[List[int]] = None,
-    use_deepgemm: bool = False,
+    use_dg: bool = False,
 ):
     padded_size = padding_size
     if not use_fp8_w8a8 or block_shape is not None:
@@ -943,9 +941,8 @@ def fused_experts_impl(
 
     top_k = topk_ids.shape[1]
     assert top_k == 8
-    use_dg = use_deepgemm and valid_deep_gemm(hidden_states, w1, w2, use_fp8_w8a8)
 
-    block_m = config['BLOCK_SIZE_M'] if not use_dg else 128
+    block_m = config["BLOCK_SIZE_M"] if not use_dg else 128
     assert not use_dg or block_m == 128
 
     from paddlenlp_ops import preprocess_for_moe
@@ -953,7 +950,7 @@ def fused_experts_impl(
     sorted_token_ids, expert_ids, num_tokens_post_padded = preprocess_for_moe(topk_ids, E, block_m)
 
     inv_perm = paddle.argsort(sorted_token_ids)
-    
+
     if use_dg:
 
         assert w1_scale is not None
@@ -962,12 +959,9 @@ def fused_experts_impl(
         w1_scale = dg.get_col_major_tma_aligned_tensor(w1_scale).contiguous()
         w2_scale = dg.get_col_major_tma_aligned_tensor(w2_scale).contiguous()
         num_tokens = top_k * M
-        pad_size = (((sorted_token_ids.numel() + block_m - 1) // block_m) *
-                    block_m) - sorted_token_ids.numel()
+        pad_size = (((sorted_token_ids.numel() + block_m - 1) // block_m) * block_m) - sorted_token_ids.numel()
         if pad_size > 0:
-            sorted_token_ids = paddle.pad(sorted_token_ids,
-                                            (0, pad_size),
-                                            "constant", num_tokens)
+            sorted_token_ids = paddle.pad(sorted_token_ids, (0, pad_size), "constant", num_tokens)
         sorted_token_ids = sorted_token_ids.clip(max=num_tokens - 1)
         expert_ids = expert_ids.clip(max=E - 1)
         expert_ids = paddle.repeat_interleave(expert_ids, block_m, axis=0)
@@ -977,12 +971,9 @@ def fused_experts_impl(
         new_S = paddle.repeat_interleave(hidden_states, top_k, axis=0)[sorted_token_ids, ...].shape
         new_M = new_S[0]
 
-        intermediate_cache1 = paddle.empty((new_M, N),
-                                          dtype=hidden_states.dtype)
-        intermediate_cache2 = paddle.empty((new_M, N // 2),
-                                          dtype=hidden_states.dtype)
-        intermediate_cache3 = paddle.empty((new_M, w2.shape[1]),
-                                          dtype=hidden_states.dtype)
+        intermediate_cache1 = paddle.empty((new_M, N), dtype=hidden_states.dtype)
+        intermediate_cache2 = paddle.empty((new_M, N // 2), dtype=hidden_states.dtype)
+        intermediate_cache3 = paddle.empty((new_M, w2.shape[1]), dtype=hidden_states.dtype)
     else:
 
         intermediate_cache1 = paddle.empty(
@@ -1050,11 +1041,11 @@ def fused_experts_impl(
         M = topk_weights.shape[0]
         # Note: these operations should all happen in-place with views.
         out_C = intermediate_cache3[inv_perm, ...]
-        out_C = out_C[:(M * real_top_k), ...]
+        out_C = out_C[: (M * real_top_k), ...]
         out_C = out_C.reshape([-1, real_top_k, w2.shape[1]])
-        tmp_cache3 = (out_C * topk_weights.reshape([M, -1, 1])).astype(intermediate_cache3.dtype)
+        tmp_cache3 = out_C * topk_weights.reshape([M, -1, 1])
     else:
-        tmp_cache3 = intermediate_cache3 
+        tmp_cache3 = intermediate_cache3
 
     out_hidden_states = paddle.sum(
         tmp_cache3,
@@ -1077,7 +1068,7 @@ def fused_moe(
     a1_scale=None,
     a2_scale=None,
     block_shape: Optional[List[int]] = None,
-    use_deepgemm: bool = False,
+    use_dg: bool = False,
 ):
     # Check constraints.
     assert scores.shape[1] == w1.shape[0], "Number of experts mismatch"
@@ -1099,5 +1090,5 @@ def fused_moe(
         a1_scale,
         a2_scale,
         block_shape,
-        use_deepgemm,
+        use_dg,
     )

@@ -108,8 +108,8 @@ std::vector<paddle::Tensor> preprocess_for_moe_kernel(const paddle::Tensor& topk
 
     int max_num_m_blocks = max_num_tokens_padded / block_size;
     
-    auto expert_ids = paddle::empty(
-        {max_num_m_blocks}, paddle::DataType::INT32, 
+    auto expert_ids = paddle::full(
+        {max_num_m_blocks}, num_experts, paddle::DataType::INT32, 
         topk_ids.place()
     );
 
