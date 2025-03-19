@@ -27,9 +27,6 @@ from paddle.incubate.nn.functional import (
     fused_layer_norm,
     fused_rms_norm,
     masked_multihead_attention,
-    moe_dispatch,
-    moe_ffn,
-    moe_reduce,
     variable_length_memory_efficient_attention,
 )
 from paddle.nn import Layer
@@ -1355,7 +1352,7 @@ class FusedMultiTransformerBase(Layer):
             permute_indices_per_token,
             expert_scales_float,
             top_k_indices,
-        ) = moe_dispatch(tmp_out, gate_out, self.config.moe_config.top_k, False)
+        ) = moe_expert_dispatch(tmp_out, gate_out, self.config.moe_config.top_k, False, topk_only_mode=False)
 
         token_nums_per_expert = token_nums_per_expert
 
@@ -1378,7 +1375,7 @@ class FusedMultiTransformerBase(Layer):
                 token_nums_per_expert_per_card - token_nums_per_expert[mp_id * self.ep_num_per_gpu - 1]
             )
 
-        ffn_out = moe_ffn(
+        ffn_out = moe_expert_ffn(
             permute_input_per_card,
             token_nums_per_expert_per_card,
             self.ffn1_weights[i],
@@ -1393,13 +1390,14 @@ class FusedMultiTransformerBase(Layer):
         expanded_ffn_out = paddle.zeros(tmp_shape, dtype=tmp_out.dtype)
         expanded_ffn_out[start:end] = ffn_out
 
-        fused_moe_out = moe_reduce(
+        fused_moe_out = moe_expert_reduce(
             expanded_ffn_out,
             expert_scales_float,
             permute_indices_per_token,
             top_k_indices,
             self.ffn2_biases[i],
             norm_topk_prob=self.config.moe_config.norm_topk_prob,
+            routed_scaling_factor=1.0,
         )
 
         return fused_moe_out
@@ -1431,7 +1429,7 @@ class FusedMultiTransformerBase(Layer):
             permute_indices_per_token,
             expert_scales_float,
             top_k_indices,
-        ) = moe_dispatch(tmp_out, gate_out, top_k, False)
+        ) = moe_expert_dispatch(tmp_out, gate_out, top_k, False, topk_only_mode=False)
 
         def get_adjacent_minus(x):
             y = paddle.assign(x)
@@ -1496,7 +1494,7 @@ class FusedMultiTransformerBase(Layer):
         permute_input_per_card = run_permute_input(permute_input_per_card)
 
         token_cumsum_by_expert_per_card = token_num_from_all_cards.transpose([1, 0]).sum(axis=-1).cumsum()
-        ffn_out = moe_ffn(
+        ffn_out = moe_expert_ffn(
             permute_input_per_card,
             token_cumsum_by_expert_per_card,
             ffn1_weights,
@@ -1511,13 +1509,14 @@ class FusedMultiTransformerBase(Layer):
         dist.alltoall_single(permute_input, ffn_out, act_out_split_size, act_in_split_size)
         moe_reduce_input = permute_input
 
-        fused_moe_out = moe_reduce(
+        fused_moe_out = moe_expert_reduce(
             moe_reduce_input,
             expert_scales_float,
             permute_indices_per_token,
             top_k_indices,
             ffn2_biases,
             norm_topk_prob,
+            routed_scaling_factor=1.0,
         )
 
         return fused_moe_out
@@ -1692,7 +1691,6 @@ class FusedMultiTransformerBase(Layer):
             )
             return scores
 
-        breakpoint()
         if self.config.moe_config.topk_method is not None:
             gate_out = paddle.matmul(tmp_out.cast("float32"), self.gate_weights[i])
             # 应用各种策略后重塑的 scores
