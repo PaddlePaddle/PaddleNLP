@@ -140,6 +140,8 @@ def setup_fused_quant_ops():
         ext_modules=CUDAExtension(
             sources=[
                 "fused_quanted_ops/fused_swiglu_act_quant.cu",
+                "fused_quanted_ops/fused_act_quant.cu",
+                "fused_quanted_ops/fused_act_dequant_transpose_act_quant.cu",
             ],
             extra_compile_args={
                 "cxx": [
@@ -164,7 +166,8 @@ def setup_fused_quant_ops():
                     "-lineinfo",
                     "-DCUTLASS_DEBUG_TRACE_LEVEL=0",
                     "-maxrregcount=50",
-                    "-arch=sm_90a",
+                    "-gencode=arch=compute_80,code=sm_80",
+                    "-gencode=arch=compute_90a,code=sm_90a",
                     "-DNDEBUG"
                 ] + gencode_flags,
             },
@@ -176,10 +179,14 @@ def setup_token_dispatcher_utils():
 
     change_pwd()
     setup(
-        name="TokenDispatherUtils",
+        name="TokenDispatcherUtils",
         ext_modules=CUDAExtension(
             sources=[
                 "token_dispatcher_utils/topk_to_multihot.cu",
+                "token_dispatcher_utils/topk_to_multihot_grad.cu",
+                "token_dispatcher_utils/tokens_unzip_and_zip.cu",
+                "token_dispatcher_utils/tokens_guided_unzip.cu",
+                "token_dispatcher_utils/regroup_tokens.cu",
             ],
             extra_compile_args={
                 "cxx": [
@@ -189,24 +196,25 @@ def setup_token_dispatcher_utils():
                     "-fPIC",
                     "-std=c++17"
                 ],
-                "nvcc": [
-                    "-O3",
-                    "-U__CUDA_NO_HALF_OPERATORS__",
-                    "-U__CUDA_NO_HALF_CONVERSIONS__",
-                    "-U__CUDA_NO_BFLOAT16_OPERATORS__",
-                    "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
-                    "-U__CUDA_NO_BFLOAT162_OPERATORS__",
-                    "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
-                    "-DCUTE_ARCH_MMA_SM90A_ENABLE",
-                    "--expt-relaxed-constexpr",
-                    "--expt-extended-lambda",
-                    "--use_fast_math",
-                    "-lineinfo",
-                    "-DCUTLASS_DEBUG_TRACE_LEVEL=0",
-                    "-maxrregcount=50",
-                    "-arch=sm_90a",
-                    "-DNDEBUG"
-                ],
+            "nvcc": [
+                "-O3",
+                "-U__CUDA_NO_HALF_OPERATORS__",
+                "-U__CUDA_NO_HALF_CONVERSIONS__",
+                "-U__CUDA_NO_BFLOAT16_OPERATORS__",
+                "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
+                "-U__CUDA_NO_BFLOAT162_OPERATORS__",
+                "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
+                "-DCUTE_ARCH_MMA_SM90A_ENABLE",
+                "--expt-relaxed-constexpr",
+                "--expt-extended-lambda",
+                "--use_fast_math",
+                "-lineinfo",
+                "-DCUTLASS_DEBUG_TRACE_LEVEL=0",
+                "-maxrregcount=50",
+                "-gencode=arch=compute_80,code=sm_80",
+                "-gencode=arch=compute_90a,code=sm_90a",
+                "-DNDEBUG"
+            ]
             },
         ),
     )

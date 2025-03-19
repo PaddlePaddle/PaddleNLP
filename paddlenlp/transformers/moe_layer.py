@@ -439,9 +439,7 @@ class FusionMoe(paddle.autograd.PyLayer):
         expert_out_grad, dispatched_probs_grad = ctx.Node_unpermute.backward(
             hidden_states_out_grad, hidden_states_out_grad_scale
         )
-        hidden_states_out_grad_scale_grad = hidden_states_out_grad_scale.index_select(
-            axis=0, index=token_permuted_indices
-        )
+        hidden_states_out_grad_scale_grad = paddle.gather(hidden_states_out_grad_scale, token_permuted_indices)
 
         # expert_grad
         hs_out_grad = ctx.Node_experts.backward(expert_out_grad, hidden_states_out_grad_scale_grad)
@@ -504,19 +502,19 @@ class MoEFlexTokenLayer(nn.Layer):
         # reshaped_input = hidden_states.reshape([-1, d_model])
         probs, routing_map, l_aux, l_zloss = self.router(hidden_states)
 
-        # if DSV3_USE_FP8_GEMM:
-        #     output = FusionMoe.apply(hidden_states, probs, routing_map, self)
-        # else:
-        (
-            dispatched_input,
-            token_permuted_indices,
-            prob_permuted_indices,
-            dispatched_probs,
-        ) = self.token_dispatcher.token_permutation(hidden_states, probs, routing_map)
-        expert_output = self.expert_forward(dispatched_input)
-        output, _ = self.token_dispatcher.token_unpermutation(
-            expert_output, token_permuted_indices, prob_permuted_indices, dispatched_probs, None
-        )
+        if DSV3_USE_FP8_GEMM:
+            output = FusionMoe.apply(hidden_states, probs, routing_map, self)
+        else:
+            (
+                dispatched_input,
+                token_permuted_indices,
+                prob_permuted_indices,
+                dispatched_probs,
+            ) = self.token_dispatcher.token_permutation(hidden_states, probs, routing_map)
+            expert_output = self.expert_forward(dispatched_input)
+            output, _ = self.token_dispatcher.token_unpermutation(
+                expert_output, token_permuted_indices, prob_permuted_indices, dispatched_probs, None
+            )
 
         return output, l_aux, l_zloss
 
