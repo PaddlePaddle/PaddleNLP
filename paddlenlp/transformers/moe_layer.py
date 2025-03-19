@@ -611,7 +611,7 @@ class MlpNode:
         expert_out_grad, dispatched_probs_grad = self.unpermute_node.backward(
             hidden_states_out_grad, hidden_states_out_grad_scale
         )
-        hidden_states_out_grad_scale_grad = paddle.gather(hidden_states_out_grad_scale, token_permuted_indices)
+        hidden_states_out_grad_scale_grad = paddle.gather(hidden_states_out_grad_scale, self.token_permuted_indices)
 
         # expert_grad
         hs_out_grad = self.experts_node.backward(expert_out_grad, hidden_states_out_grad_scale_grad)
