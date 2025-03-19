@@ -109,9 +109,6 @@ def verify_swiglu_quant_result():
                         else:
                             np_results.append(dequantize_fp8_to_bf16(fused_res, fused_scales).numpy())
                         nan_cnt_golden, nan_cnt_fused= np.sum(np.isnan(np_results[0])), np.sum(np.isnan(np_results[1]))
-                        print(np_results[0])
-                        print("---------------")
-                        print(np_results[1])
                         print(f"Nan count of Golden result: {nan_cnt_golden}; Nan count of Fused result: {nan_cnt_fused}")
                         try:
                             np.testing.assert_allclose(np_results[0], np_results[1], rtol=0.01, atol=1) #存在截断误差，atol=1，通常在1e-6
