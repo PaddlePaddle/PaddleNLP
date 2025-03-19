@@ -134,7 +134,7 @@ class ExpertsNode:
                     axis=1,
                 )
             x_t_fp8, x_t_scale = kitchen_quant(
-                x_t, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+                x_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
             )
             self.x_t_fp8s += [x_t_fp8]
             self.x_t_scales += [x_t_scale]
@@ -232,7 +232,7 @@ class ExpertsNode:
                 axis=-1,
             )
         o2_t_fp8, o2_t_scale = kitchen_quant(
-            o2_t, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+            o2_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
         )
 
         do3_t = dequantize_fp8_to_fp32(do3_fp8, do3_scale).T.contiguous()
@@ -249,7 +249,7 @@ class ExpertsNode:
                 axis=-1,
             )
         do3_t_fp8, do3_t_scale = kitchen_quant(
-            do3_t, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+            do3_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
         )
         dw2 = kitchen_fp8_gemm(o2_t_fp8, o2_t_scale, do3_t_fp8, do3_t_scale, True, True, dw2)
         return dw2
