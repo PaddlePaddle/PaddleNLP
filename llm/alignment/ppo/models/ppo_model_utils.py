@@ -313,36 +313,41 @@ class RLHFPPOLoss(nn.Layer):
         return actor_loss
 
 
-def entropy_from_logits(logits: paddle.Tensor, tensor_parallel_output=False):
-    try:
-        hcg = fleet.get_hybrid_communicate_group()
-        model_parallel_group = hcg.get_model_parallel_group()
-        tensor_parallel_degree = hcg.get_model_parallel_world_size()
-    except:
-        tensor_parallel_degree = 1
+class VocabParallelEntropy(paddle.autograd.PyLayer):
+    @staticmethod
+    def forward(ctx, vocab_parallel_logits: paddle.Tensor, tensor_parallel_output=False) -> paddle.Tensor:
+        try:
+            hcg = fleet.get_hybrid_communicate_group()
+            model_parallel_group = hcg.get_model_parallel_group()
+            tensor_parallel_degree = hcg.get_model_parallel_world_size()
+        except:
+            tensor_parallel_degree = 1
+        logits_max = vocab_parallel_logits.max(axis=-1, keepdim=True)
 
-    max_logits = paddle.max(logits, axis=-1, keepdim=True)
-    if tensor_parallel_degree > 1 and tensor_parallel_output:
-        dist.all_reduce(max_logits, op=dist.ReduceOp.MAX, group=model_parallel_group)
-    normed_logits = logits - max_logits
-    sum_exp_logits = paddle.exp(normed_logits).sum(axis=-1, keepdim=True)
-    if tensor_parallel_degree > 1 and tensor_parallel_output:
-        dist.all_reduce(
-            sum_exp_logits,
-            op=dist.ReduceOp.SUM,
-            group=model_parallel_group,
-        )
-    log_sum_exp_logits = paddle.log(sum_exp_logits)
-    log_probs = normed_logits - log_sum_exp_logits
-    pd = log_probs.exp()
-    entropy = -(pd * log_probs).sum(axis=-1)
-    if tensor_parallel_degree > 1 and tensor_parallel_output:
-        dist.all_reduce(
-            entropy,
-            op=dist.ReduceOp.SUM,
-            group=model_parallel_group,
-        )
-    return entropy
+        if tensor_parallel_degree > 1 and tensor_parallel_output:
+            dist.all_reduce(logits_max, op=dist.ReduceOp.MAX, group=model_parallel_group)
+        normalized_vocab_parallel_logits = vocab_parallel_logits - logits_max
+        normalized_exp_logits = normalized_vocab_parallel_logits.exp()
+        normalized_sum_exp_logits = normalized_exp_logits.sum(axis=-1, keepdim=True)
+
+        if tensor_parallel_degree > 1 and tensor_parallel_output:
+            dist.all_reduce(normalized_sum_exp_logits, group=model_parallel_group)
+        softmax_logits = normalized_exp_logits / normalized_sum_exp_logits
+        sum_softmax_times_logits = (softmax_logits * vocab_parallel_logits).sum(axis=-1, keepdim=True)
+
+        if tensor_parallel_degree > 1 and tensor_parallel_output:
+            dist.all_reduce(sum_softmax_times_logits, group=model_parallel_group)
+        entropy = logits_max + normalized_sum_exp_logits.log() - sum_softmax_times_logits
+        ctx.save_for_backward(softmax_logits * (sum_softmax_times_logits - vocab_parallel_logits))
+        return entropy.squeeze(axis=-1)
+
+    @staticmethod
+    def backward(ctx, grad_output: paddle.Tensor) -> paddle.Tensor:
+        return grad_output.unsqueeze(axis=-1) * ctx.saved_tensor()[0]
+
+
+def entropy_from_logits(logits: paddle.Tensor, tensor_parallel_output=False):
+    return VocabParallelEntropy.apply(logits, tensor_parallel_output)
 
 
 @merge_fwd_labels
@@ -1126,6 +1131,10 @@ class ActorFusedPGEntropyKLLoss(paddle.autograd.PyLayer):
                 # gradgradgradgrad entropy loss
                 # grad_softmax_out_chunk = -(log_prob_chunk + 1) * mask_chunk.unsqueeze(-1) * entropy_coeff / divisor
                 # sum_term = (softmax_out_chunk * grad_softmax_out_chunk).sum(axis=-1, keepdim=True)
+                # if tensor_parallel_degree > 1 and tensor_parallel_output:
+                #     paddle.distributed.all_reduce(
+                #         sum_term, op=paddle.distributed.ReduceOp.SUM, group=model_parallel_group
+                #     )
                 # d_entropy_logits_chunk = softmax_out_chunk * (grad_softmax_out_chunk - sum_term)
                 H = entropy_loss_chunk.unsqueeze(-1)
                 d_entropy_logits_chunk = (
