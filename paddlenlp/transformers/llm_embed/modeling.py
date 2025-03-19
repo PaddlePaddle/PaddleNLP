@@ -60,7 +60,7 @@ class BiEncoderModel(PretrainedModel):
         model_flag: str = None,
     ):
         super().__init__()
-        
+
         # Load Model
         self.model = None
         self.model_config = None
@@ -70,13 +70,19 @@ class BiEncoderModel(PretrainedModel):
             self.model = AutoModel.from_pretrained(model_name_or_path, dtype=dtype, convert_from_torch=True)
             self.model_config = AutoConfig.from_pretrained(model_name_or_path)
         if corpus_model_name_or_path is not None:
-            self.corpus_model = AutoModel.from_pretrained(corpus_model_name_or_path, dtype=dtype, convert_from_torch=True)
+            self.corpus_model = AutoModel.from_pretrained(
+                corpus_model_name_or_path, dtype=dtype, convert_from_torch=True
+            )
         if query_model_name_or_path is not None:
-            self.query_model = AutoModel.from_pretrained(query_model_name_or_path, dtype=dtype, convert_from_torch=True)
-        if self.corpus_model is None: self.corpus_model = self.model
-        if self.query_model is None: self.query_model = self.model
+            self.query_model = AutoModel.from_pretrained(
+                query_model_name_or_path, dtype=dtype, convert_from_torch=True
+            )
+        if self.corpus_model is None:
+            self.corpus_model = self.model
+        if self.query_model is None:
+            self.query_model = self.model
         assert self.corpus_model is not None and self.query_model is not None
-        
+
         self.cross_entropy = nn.CrossEntropyLoss(reduction="mean")
 
         self.normalized = normalized
@@ -240,7 +246,9 @@ class BiEncoderModel(PretrainedModel):
         self.model.save_pretrained(output_dir, state_dict=state_dict)
 
     @paddle.no_grad()
-    def encode_sentences(self, sentences: List[str], model: AutoModel, tokenizer: AutoTokenizer, titles: List[str] = None, **kwargs) -> np.ndarray:
+    def encode_sentences(
+        self, sentences: List[str], model: AutoModel, tokenizer: AutoTokenizer, titles: List[str] = None, **kwargs
+    ) -> np.ndarray:
         model.eval()
         all_embeddings = []
         for start_index in tqdm(range(0, len(sentences), self.eval_batch_size), desc="Batches"):
@@ -267,7 +275,7 @@ class BiEncoderModel(PretrainedModel):
                     return_attention_mask=True,
                 )
             outputs = model(
-                **inputs, # 注意 bert 类型有 token_type_ids
+                **inputs,  # 注意 bert 类型有 token_type_ids
                 return_dict=True,
                 output_hidden_states=True,
             )
@@ -319,11 +327,7 @@ class BiEncoderModel(PretrainedModel):
         if self.model_flag == "bge-en-icl":
             input_texts = self.preprocess_sentences_for_bge_en_icl(input_texts, query_or_doc="query")
 
-        encode_results = self.encode_sentences(
-            sentences = input_texts, 
-            model = self.query_model,
-            tokenizer = self.tokenizer
-        )
+        encode_results = self.encode_sentences(sentences=input_texts, model=self.query_model, tokenizer=self.tokenizer)
         return encode_results
 
     def encode_corpus(self, corpus: List[Union[Dict[str, str], str]], **kwargs) -> np.ndarray:
@@ -345,19 +349,16 @@ class BiEncoderModel(PretrainedModel):
             else:
                 input_texts = corpus
         input_titles = None
-        
+
         if self.model_flag == "llara":
             input_texts = self.preprocess_sentences_for_llara(input_texts, query_or_doc="doc")
         if "RocketQA" in self.model_flag:
             if isinstance(corpus[0], dict):
-                input_texts = [doc['text'] for doc in corpus]
-                input_titles = [doc.get('title', '') for doc in corpus]
-        
+                input_texts = [doc["text"] for doc in corpus]
+                input_titles = [doc.get("title", "") for doc in corpus]
+
         encode_results = self.encode_sentences(
-            sentences = input_texts,
-            titles = input_titles,
-            model = self.corpus_model,
-            tokenizer = self.tokenizer
+            sentences=input_texts, titles=input_titles, model=self.corpus_model, tokenizer=self.tokenizer
         )
         return encode_results
 
