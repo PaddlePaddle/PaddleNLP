@@ -210,6 +210,7 @@ class LinearFP8Func(paddle.autograd.PyLayer):
         x_quant, x_scale = kitchen_quant(
             x, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
         )
+
         w_quant, w_sacle, w_t_quant, w_t_scale = kitchen_quant(
             weight, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
         )
@@ -290,11 +291,14 @@ class Fuse_FFN_FP8_Func(paddle.autograd.PyLayer):
         x_fp8, x_scale = kitchen_quant(
             x, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
         )
-        w1_fp8, w1_sacle, w1_t_fp8, w1_t_scale = kitchen_quant(
-            w1, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
+
+        w_t = w1.T.contiguous()
+
+        w1_fp8, w1_sacle = kitchen_quant(
+            w_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
         )
-        o1 = paddle.empty([x_fp8.shape[0], w1_t_fp8.shape[0]], dtype=x.dtype)
-        deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale), (w1_t_fp8, w1_t_scale), o1)
+        o1 = paddle.empty([x_fp8.shape[0], w1_fp8.shape[0]], dtype=x.dtype)
+        deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale), (w1_fp8, w1_sacle), o1)
 
         # ===== o2 = swiglu(o1) =====
         # TODO: [Fusion] swiglu + quant
@@ -331,8 +335,9 @@ class Fuse_FFN_FP8_Func(paddle.autograd.PyLayer):
         ctx.save_for_backward(
             x_t_fp8,
             x_t_scale,
-            w1_fp8,
-            w1_sacle,
+            w1,
+            # w1_fp8,
+            # w1_sacle,
             o1,
             w2_fp8,
             w2_sacle,
@@ -346,7 +351,7 @@ class Fuse_FFN_FP8_Func(paddle.autograd.PyLayer):
         do3_orig_shape = do3.shape
         do3 = do3.reshape([-1, do3_orig_shape[-1]])
 
-        x_t_fp8, x_t_scale, w1_fp8, w1_sacle, o1, w2_fp8, w2_sacle, x_orig_shape = ctx.saved_tensor()
+        x_t_fp8, x_t_scale, w1, o1, w2_fp8, w2_sacle, x_orig_shape = ctx.saved_tensor()
         x_orig_shape = x_orig_shape.numpy()
 
         # ===== [recompute] o2 = swiglu(o1) =====
@@ -404,6 +409,10 @@ class Fuse_FFN_FP8_Func(paddle.autograd.PyLayer):
         do1, _ = paddle._C_ops.swiglu_grad(o1, None, do2)
         do1_fp8, do1_scale = kitchen_quant(
             do1, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+        )
+
+        w1_fp8, w1_sacle = kitchen_quant(
+            w1, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
         )
 
         # ===== dx = deep_gemm(do1_fp8, w1_fp8)
