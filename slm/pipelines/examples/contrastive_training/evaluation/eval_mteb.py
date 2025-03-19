@@ -69,7 +69,6 @@ class MSMARCOTITLE(AbsTaskRetrieval):
                 keep_in_memory=False,
             ).load(split=split)
             corpus = load_dataset(self.metadata_dict["dataset"]["corpus_path"], trust_remote_code=True)["train"]
-            print(f"corpus[0] {corpus[0]}")
             # Conversion from DataSet
             queries = {query["id"]: query["text"] for query in queries}
             corpus = {doc["docid"]: {"title": doc["title"], "text": doc["text"]} for doc in corpus}
@@ -81,23 +80,12 @@ class MSMARCOTITLE(AbsTaskRetrieval):
 
         self.data_loaded = True
 
-
-class MTEB_EvalModel:
-    def __init__(self, model, tokenizer):
-        self.model = model
-        self.tokenizer = tokenizer
-
-    def encode_queries(self, queries, **kwargs):
-        return self.model.encode_queries(queries)
-
-    def encode_corpus(self, corpus, **kwargs):
-        return self.model.encode_corpus(corpus)
-
-
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--base_model_name_or_path", type=str)
+    parser.add_argument("--base_model_name_or_path", default=None, type=str)
     parser.add_argument("--peft_model_name_or_path", default=None, type=str)
+    parser.add_argument("--corpus_model_name_or_path", default=None, type=str)
+    parser.add_argument("--query_model_name_or_path", default=None, type=str)
     parser.add_argument("--output_folder", default="tmp", type=str)
 
     parser.add_argument("--task_name", default="SciFact", type=str)
@@ -127,11 +115,19 @@ if __name__ == "__main__":
     args = get_args()
     for k, v in vars(args).items():
         print(f"{k}: {v}")
-
+    
+    assert args.padding_side in [
+        "right",
+        "left",
+    ], f"padding_side should be either 'right' or 'left', but got {args.padding_side}"
+    assert not (
+        args.padding_side == "left" and args.pooling_method == "cls"
+    ), "Padding 'left' is not supported for pooling method 'cls'"
+    
     logger = logging.getLogger(__name__)
     logging.basicConfig(level=logging.INFO)
 
-    if "NV-Embed" in args.base_model_name_or_path:
+    if args.base_model_name_or_path is not None and "NV-Embed" in args.base_model_name_or_path:
         logger.info("Using NV-Embed")
 
         query_prefix = "Instruct: " + args.query_instruction + "\nQuery: "
@@ -158,6 +154,23 @@ if __name__ == "__main__":
                 encode_model, args.peft_model_name_or_path, lora_config=lora_config, dtype="bfloat16"
             )
         tokenizer = encode_model.tokenizer
+    if "RocketQA" in args.model_flag:
+        logger.info("Using RocketQA")
+        assert args.padding_side == "right" and args.pooling_method == "cls", "Padding 'left' is not supported for RocketQA"
+        tokenizer = AutoTokenizer.from_pretrained(args.query_model_name_or_path)
+        tokenizer.padding_side = args.padding_side
+        encode_model = BiEncoderModel(
+            corpus_model_name_or_path=args.corpus_model_name_or_path,
+            query_model_name_or_path=args.query_model_name_or_path,
+            normalized=False,
+            sentence_pooling_method=args.pooling_method,
+            query_instruction=args.query_instruction,
+            tokenizer=tokenizer,
+            eval_batch_size=args.eval_batch_size,
+            max_seq_length=args.max_seq_length,
+            model_flag=args.model_flag,
+            dtype=args.dtype,
+        )
 
     else:
         logger.info("Using Normal AutoModel")
@@ -168,13 +181,6 @@ if __name__ == "__main__":
         assert hasattr(tokenizer, args.pad_token), f"Tokenizer does not have {args.pad_token} token"
         token_dict = {"unk_token": tokenizer.unk_token, "eos_token": tokenizer.eos_token}
         tokenizer.pad_token = token_dict[args.pad_token]
-        assert args.padding_side in [
-            "right",
-            "left",
-        ], f"padding_side should be either 'right' or 'left', but got {args.padding_side}"
-        assert not (
-            args.padding_side == "left" and args.pooling_method == "cls"
-        ), "Padding 'left' is not supported for pooling method 'cls'"
         tokenizer.padding_side = args.padding_side
         tokenizer.add_bos_token = bool(args.add_bos_token)
         tokenizer.add_eos_token = bool(args.add_eos_token)
@@ -203,7 +209,6 @@ if __name__ == "__main__":
             )
 
     encode_model.eval()
-    mtb_eval_model = MTEB_EvalModel(encode_model, tokenizer)
 
     logger.info("Ready to eval")
     if args.task_name == "MSMARCOTITLE":
@@ -219,5 +224,6 @@ if __name__ == "__main__":
         evaluation.run(
             encode_model,
             output_folder=f"{args.output_folder}/{args.task_name}/{args.pooling_method}",
+            score_function="dot",
             eval_splits=[args.task_split],
         )
