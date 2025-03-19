@@ -1,0 +1,123 @@
+# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+#     http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# 1. LLARA-passage
+
+export CUDA_VISIBLE_DEVICES=0
+python evaluation/eval_mteb.py \
+       --base_model_name_or_path BAAI/LLARA-passage \
+       --output_folder en_results/llara-passage \
+       --task_name 'SciFact' \
+       --eval_batch_size 8 \
+       --pooling_method last_8 \
+       --model_flag llara \
+       --add_bos_token 1 \
+       --add_eos_token 0 \
+       --max_seq_length 532
+# results will be saved in en_results/llara-passage/SciFact/last_8/no_model_name_available/no_revision_available/SciFact.json
+
+export CUDA_VISIBLE_DEVICES=0
+python evaluation/eval_mteb.py \
+       --base_model_name_or_path BAAI/LLARA-passage \
+       --output_folder en_results/llara-passage \
+       --task_name 'MSMARCOTITLE' \
+       --eval_batch_size 8 \
+       --pooling_method last_8 \
+       --model_flag llara \
+       --add_bos_token 1 \
+       --add_eos_token 0 \
+       --max_seq_length 532
+# results will be saved in en_results/llara-passage/MSMARCOTITLE/last_8/no_model_name_available/no_revision_available/MSMARCOTITLE.json
+
+
+
+
+
+# 2. NV-Embed-v1
+
+export CUDA_VISIBLE_DEVICES=0
+python evaluation/eval_mteb.py \
+       --base_model_name_or_path nvidia/NV-Embed-v1 \
+       --output_folder en_results/nv-embed-v1 \
+       --query_instruction "Given a claim, find documents that refute the claim" \
+       --task_name 'SciFact' \
+       --eval_batch_size 8
+# results will be saved in en_results/nv-embed-v1/SciFact/last/no_model_name_available/no_revision_available/SciFact.json
+
+
+
+
+
+# 3. BGE-EN-ICL
+
+export CUDA_VISIBLE_DEVICES=0
+python evaluation/eval_mteb.py \
+       --base_model_name_or_path BAAI/bge-en-icl \
+       --output_folder en_results/bge-en-icl \
+       --task_name SciFact \
+       --task_split "test" \
+       --query_instruction $'<instruct> Given a scientific claim, retrieve documents that support or refute the claim.\n<query>' \
+       --max_seq_length 512 \
+       --eval_batch_size 32 \
+       --dtype "float32" \
+       --pad_token unk_token \
+       --padding_side left \
+       --add_bos_token 1 \
+       --add_eos_token 1
+# results will be saved in en_results/bge-en-icl/SciFact/last/no_model_name_available/no_revision_available/SciFact.json
+
+
+
+
+
+# 4. RepLLaMA
+
+export CUDA_VISIBLE_DEVICES=0
+python evaluation/eval_mteb.py \
+       --base_model_name_or_path castorini/repllama-v1-7b-lora-passage \
+       --output_folder en_results/repllama-v1-7b-lora-passage \
+       --task_name SciFact \
+       --task_split test \
+       --query_instruction 'query: ' \
+       --document_instruction 'passage: ' \
+       --pooling_method last \
+       --max_seq_length 512 \
+       --eval_batch_size 2 \
+       --pad_token unk_token \
+       --padding_side right \
+       --add_bos_token 0 \
+       --add_eos_token 1
+# results will be saved in en_results/repllama-v1-7b-lora-passage/SciFact/last/no_revision_available/SciFact.json
+
+
+
+
+
+# 5. BGE
+
+export CUDA_VISIBLE_DEVICES=0
+python evaluation/eval_mteb.py \
+       --base_model_name_or_path BAAI/bge-large-en-v1.5 \
+       --output_folder en_results/bge-large-en-v1.5 \
+       --task_name SciFact \
+       --task_split test \
+       --document_instruction 'Represent this sentence for searching relevant passages: ' \
+       --pooling_method mean \
+       --max_seq_length 512 \
+       --eval_batch_size 32 \
+       --pad_token pad_token \
+       --padding_side right \
+       --add_bos_token 0 \
+       --add_eos_token 0
+# results will be saved in en_results/bge-large-en-v1.5/SciFact/mean/no_revision_available/SciFact.json

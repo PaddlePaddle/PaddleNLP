@@ -179,168 +179,17 @@ python -u evaluation/eval_mteb.py \
 - `add_bos_token`：是否添加起始符，0表示不添加，1表示添加
 - `add_eos_token`：是否添加结束符，0表示不添加，1表示添加
 
-## MTEB 评估
+# MTEB 评估
 [MTEB](https://github.com/embeddings-benchmark/mteb)
 是一个大规模文本嵌入评测基准，包含了丰富的向量检索评估任务和数据集。
-本仓库主要面向其中的中英文检索任务（Retrieval），并以 SciFact 数据集作为主要示例。
+本仓库主要面向其中的中英文检索任务（Retrieval），并额外支持针对 MSMARCO-Title 的评估。
 
-评估 LLARA 向量检索模型 ([LLARA-passage](https://huggingface.co/BAAI/LLARA-passage)):
-
-评估其在 SciFact 数据集上的性能:
-```
-export CUDA_VISIBLE_DEVICES=0
-python evaluation/eval_mteb.py \
-       --base_model_name_or_path BAAI/LLARA-passage \
-       --output_folder en_results/llara-passage \
-       --task_name 'SciFact' \
-       --eval_batch_size 8 \
-       --pooling_method last_8 \
-       --model_flag llara \
-       --add_bos_token 1 \
-       --add_eos_token 0 \
-       --max_seq_length 532
-```
-结果文件保存在`en_results/llara-passage/SciFact/last_8/no_model_name_available/no_revision_available/SciFact.json`，包含以下类似的评估结果：
-```
-'ndcg_at_1': 0.65333,
-'ndcg_at_3': 0.7272,
-'ndcg_at_5': 0.74047,
-'ndcg_at_10': 0.7607,
-'ndcg_at_20': 0.76895,
-'ndcg_at_100': 0.78079,
-'ndcg_at_1000': 0.78594,
-```
-
-评估其在 MSMARCOTITLE 数据集上的性能:
-```
-export CUDA_VISIBLE_DEVICES=0
-python evaluation/eval_mteb.py \
-       --base_model_name_or_path BAAI/LLARA-passage \
-       --output_folder en_results/llara-passage \
-       --task_name 'MSMARCOTITLE' \
-       --eval_batch_size 8 \
-       --pooling_method last_8 \
-       --model_flag llara \
-       --add_bos_token 1 \
-       --add_eos_token 0 \
-       --max_seq_length 532
-```
-结果文件保存在`en_results/llara-passage/MSMARCOTITLE/last_8/no_model_name_available/no_revision_available/MSMARCOTITLE.json`，包含以下类似的评估结果：
-```
-"mrr_at_1": 0.29369627507163326,
-"mrr_at_3": 0.3915234001910231,
-"mrr_at_5": 0.41467526265520616,
-"mrr_at_10": 0.43047454177468664,
-"mrr_at_20": 0.4369588035569348,
-"mrr_at_100": 0.4403890327706938,
-"mrr_at_1000": 0.44061882383373324
-```
-
-评估 NV-Embed 向量检索模型（[NV-Embed-v1](https://huggingface.co/nvidia/NV-Embed-v1)）：
-```
-export CUDA_VISIBLE_DEVICES=0
-python evaluation/eval_mteb.py \
-       --base_model_name_or_path nvidia/NV-Embed-v1 \
-       --output_folder en_results/nv-embed-v1 \
-       --query_instruction "Given a claim, find documents that refute the claim" \
-       --task_name 'SciFact' \
-       --eval_batch_size 8
-```
-结果文件保存在`en_results/nv-embed-v1/SciFact/last/no_model_name_available/no_revision_available/SciFact.json`，包含以下类似的评估结果：
-```
-'ndcg_at_1': 0.67667,
-'ndcg_at_3': 0.73826,
-'ndcg_at_5': 0.76662,
-'ndcg_at_10': 0.783,
-'ndcg_at_20': 0.7936,
-'ndcg_at_100': 0.80206,
-'ndcg_at_1000': 0.80444
-```
-
-评估 BGE-EN-ICL 向量检索模型（[BGE-EN-ICL](https://huggingface.co/BAAI/bge-en-icl)）：
-```
-export CUDA_VISIBLE_DEVICES=0
-python evaluation/eval_mteb.py \
-       --base_model_name_or_path BAAI/bge-en-icl \
-       --output_folder en_results/bge-en-icl \
-       --task_name SciFact \
-       --task_split "test" \
-       --query_instruction $'<instruct> Given a scientific claim, retrieve documents that support or refute the claim.\n<query>' \
-       --max_seq_length 512 \
-       --eval_batch_size 32 \
-       --dtype "float32" \
-       --pad_token unk_token \
-       --padding_side left \
-       --add_bos_token 1 \
-       --add_eos_token 1
-```
-结果文件保存在`en_results/bge-en-icl/SciFact/last/no_model_name_available/no_revision_available/SciFact.json`，包含以下类似的评估结果：
-```
-'ndcg_at_1': 0.65667,
-'ndcg_at_3': 0.72839,
-'ndcg_at_5': 0.76257,
-'ndcg_at_10': 0.77912,
-'ndcg_at_20': 0.78618,
-'ndcg_at_100': 0.79211,
-'ndcg_at_1000': 0.79459,
-```
-
-评估 RepLLaMA 向量检索模型（[repllama-v1-7b-lora-passage](https://huggingface.co/castorini/repllama-v1-7b-lora-passage)）：
-```
-export CUDA_VISIBLE_DEVICES=0
-python evaluation/eval_mteb.py \
-       --base_model_name_or_path castorini/repllama-v1-7b-lora-passage \
-       --output_folder en_results/repllama-v1-7b-lora-passage \
-       --task_name SciFact \
-       --task_split test \
-       --query_instruction 'query: ' \
-       --document_instruction 'passage: ' \
-       --pooling_method last \
-       --max_seq_length 512 \
-       --eval_batch_size 2 \
-       --pad_token unk_token \
-       --padding_side right \
-       --add_bos_token 0 \
-       --add_eos_token 1
-```
-结果文件保存在`en_results/repllama-v1-7b-lora-passage/SciFact/last/no_revision_available/SciFact.json`，包含以下类似的评估结果：
-```
-'ndcg_at_1': 0.63,
-'ndcg_at_3': 0.71785,
-'ndcg_at_5': 0.73735,
-'ndcg_at_10': 0.75708,
-'ndcg_at_20': 0.7664,
-'ndcg_at_100': 0.77394,
-'ndcg_at_1000': 0.7794
-```
-
-评估 BGE 向量检索模型（[bge-large-en-v1.5](https://huggingface.co/BAAI/bge-large-en-v1.5)）：
-```
-export CUDA_VISIBLE_DEVICES=0
-python evaluation/eval_mteb.py \
-       --base_model_name_or_path BAAI/bge-large-en-v1.5 \
-       --output_folder en_results/bge-large-en-v1.5 \
-       --task_name SciFact \
-       --task_split test \
-       --document_instruction 'Represent this sentence for searching relevant passages: ' \
-       --pooling_method mean \
-       --max_seq_length 512 \
-       --eval_batch_size 32 \
-       --pad_token pad_token \
-       --padding_side right \
-       --add_bos_token 0 \
-       --add_eos_token 0
-```
-结果文件保存在`en_results/bge-large-en-v1.5/SciFact/mean/no_revision_available/SciFact.json`，包含以下类似的评估结果：
-```
-'ndcg_at_1': 0.64667,
-'ndcg_at_3': 0.70359,
-'ndcg_at_5': 0.7265,
-'ndcg_at_10': 0.75675,
-'ndcg_at_20': 0.76743,
-'ndcg_at_100': 0.77511,
-'ndcg_at_1000': 0.77939
-```
+评估脚本为 `eval_mteb.sh`, 支持5个模型：
+LLARA ([LLARA-passage](https://huggingface.co/BAAI/LLARA-passage)),
+NV-Embed ([NV-Embed-v1](https://huggingface.co/nvidia/NV-Embed-v1)),
+BGE-EN-ICL([BGE-EN-ICL](https://huggingface.co/BAAI/bge-en-icl)),
+RepLLaMA([repllama-v1-7b-lora-passage](https://huggingface.co/castorini/repllama-v1-7b-lora-passage)),
+BGE([bge-large-en-v1.5](https://huggingface.co/BAAI/bge-large-en-v1.5))
 
 可支持配置的参数：
 - `base_model_name_or_path`: 模型名称或路径
@@ -356,6 +205,17 @@ python evaluation/eval_mteb.py \
 - `padding_side`：设置 padding 的位置，可取 left 或 right
 - `add_bos_token`：是否添加起始符，0表示不添加，1表示添加
 - `add_eos_token`：是否添加结束符，0表示不添加，1表示添加
+
+
+评估结果如下：
+| Model                       | Max Length |    MTEB   |        |         | MSMARCO-Title |        |         |
+|-----------------------------|:----------:|:---------:|:------:|:-------:|:-------------:|:------:|:-------:|
+|                             |            | Recall@10 | MRR@10 | NDCG@10 |   Recall@10   | MRR@10 | NDCG@10 |
+| bge-large-en-v1.5           |    512     |           |        |  53.68  |               | 35.30  |         |
+| repllama-v1-7b-lora-passage |    4096    |           |        |  51.81  |               | 38.24  |         |
+| NV-Embed-v1                 |    4096    |           |        |  58.86  |               | 38.39  |         |
+| bge-en-icl (zero-shot)      |    4096    |           |        |  61.62  |               | 42.77  |         |
+| LLARA-passage               |    4096    |           |        |  52.48  |               | 43.04  |         |
 
 
 ## Reference
