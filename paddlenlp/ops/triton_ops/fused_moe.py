@@ -37,11 +37,9 @@ from paddlenlp.ops.triton_ops.triton_utils import (
 
 padding_size = 0
 
-has_deep_gemm = False
 try:
     import deep_gemm as dg
 
-    has_deep_gemm = True
 except ImportError:
     pass
 
