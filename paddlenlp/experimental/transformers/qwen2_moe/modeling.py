@@ -256,6 +256,7 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
             use_neox_rotary_style=self.use_neox,
             rank_id=config.tensor_parallel_rank,
             moe_config=moe_config,
+            use_ep_parallel=config.use_ep_parallel,
             append_attn=config.append_attn,
         )
 
@@ -396,7 +397,7 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
             ffn1_scales = []
             ffn2_scales = []
             for expert_idx in range(self.num_experts):
-                if self.moe_config.use_ep_parallel:
+                if self.config.use_ep_parallel:
                     rank_id = paddle.distributed.get_rank()
                     total_cards = paddle.distributed.get_world_size()
                     experts_per_gpu = self.num_experts // total_cards
@@ -892,8 +893,7 @@ class Qwen2MoeForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen
             tensor_parallel_rank=paddle.distributed.get_rank(),
             expert_num=config.num_experts,
         )
-        use_ep_parallel = False
-        if use_ep_parallel == False:
+        if config.use_ep_parallel == False:
             fn_expert = fn
 
         def get_tensor_parallel_split_mappings(num_layers):
@@ -928,7 +928,7 @@ class Qwen2MoeForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen
                     base_actions[f"layers.0.mlp.experts.{expert_idx}.up_proj.weight"] = partial(fn, is_column=True)
                     base_actions[f"layers.0.mlp.experts.{expert_idx}.gate_proj.weight"] = partial(fn, is_column=True)
                     base_actions[f"layers.0.mlp.experts.{expert_idx}.down_proj.weight"] = partial(fn, is_column=False)
-                    if use_ep_parallel:
+                    if config.use_ep_parallel:
                         base_actions[f"layers.0.mlp.experts.{expert_idx}.up_proj.weight"] = partial(fn_expert, expert_id=expert_idx)
                         base_actions[f"layers.0.mlp.experts.{expert_idx}.gate_proj.weight"] = partial(fn_expert, expert_id=expert_idx)
                         base_actions[f"layers.0.mlp.experts.{expert_idx}.down_proj.weight"] = partial(fn_expert, expert_id=expert_idx)

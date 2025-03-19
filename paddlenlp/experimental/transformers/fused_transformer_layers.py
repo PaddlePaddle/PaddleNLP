@@ -122,11 +122,7 @@ class MoeConfig:
     first_k_dense_replace: int = 0
     moe_intermediate_size: int = 0
     routed_scaling_factor: float = 1.0
-
-    use_ep_parallel = False
-
     shared_expert_with_gate: bool = True
-
     shared_expert_intermediate_size: int = 0
     shared_expert_ffn1_weight_attrs: Optional[List[paddle.ParamAttr]] = None
     shared_expert_ffn1_weight_scale_attrs: Optional[List[paddle.ParamAttr]] = None
@@ -275,6 +271,7 @@ class FusedMultiTransformerConfig:
         kv_num_heads=-1,
         cachekv_int8_type=None,
         rank_id=-1,
+        use_ep_parallel=False,
         append_attn=False,
         moe_config=MoeConfig(),
         avx_config=AvxConfig(),
@@ -360,9 +357,8 @@ class FusedMultiTransformerConfig:
         self.rank_id = rank_id
         self.trans_qkvw = trans_qkvw
         self.ring_id = ring_id
-
+        self.use_ep_parallel = use_ep_parallel
         self.append_attn = append_attn
-
         self.moe_config = moe_config
         self.avx_config = avx_config
         self.speculate_config = speculate_config
@@ -439,8 +435,7 @@ class FusedMultiTransformerBase(Layer):
         self.intermediate_size = config.intermediate_size // config.nranks
         self.config.moe_config.shared_expert_intermediate_size //= config.nranks
         self.config.moe_config.moe_intermediate_size //= config.nranks
-
-        if self.config.moe_config.use_ep_parallel:
+        if self.config.use_ep_parallel:
             self.config.moe_config.moe_intermediate_size *= config.nranks
             self.ep_num_per_gpu = self.config.moe_config.num_experts // paddle.distributed.get_world_size()
         else:
@@ -1548,10 +1543,10 @@ class FusedMultiTransformerBase(Layer):
                 norm_topk_prob=False,  # 在noaux_tc中做了
                 routed_scaling_factor=1.0,  # 在noaux_tc中做了
             )
-        elif self.config.moe_config.use_ep_parallel and False :
+        elif self.config.use_ep_parallel and False :
             fused_moe_out = self.compute_moe_ep_with_tp(tmp_out, i)
             return fused_moe_out
-        elif self.config.moe_config.use_ep_parallel:
+        elif self.config.use_ep_parallel:
             result_place_holder = paddle.assign(tmp_out)
             fused_moe_out = self.compute_moe_ep_with_tp_dp(tmp_out, i)
 

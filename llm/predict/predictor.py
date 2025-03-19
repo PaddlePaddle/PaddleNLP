@@ -69,7 +69,8 @@ from paddlenlp.utils.log import logger
 class PredictorArgument:
     model_name_or_path: str = field(default=None, metadata={"help": "The directory of model."})
     model_prefix: str = field(default="model", metadata={"help": "the prefix name of static model"})
-    dp_degree: int = field(default=8, metadata={"help": "The data parallel degree."})
+    dp_degree: int = field(default=1, metadata={"help": "The data parallel degree."})
+    use_ep_parallel: bool = field(default=False, metadata={"help": "Whether to use ep parallel"})
     src_length: int = field(default=1024, metadata={"help": "The max length of source text."})
     min_length: int = field(default=1, metadata={"help": "the min length for decoding."})
     max_length: int = field(default=1024, metadata={"help": "the max length for decoding."})
@@ -1543,7 +1544,6 @@ def predict():
     dp_degree = predictor_args.dp_degree
     tensor_parallel_degree = world_size // dp_degree
     llm_utils.set_triton_cache(predictor_args.model_name_or_path, predictor_args.mode)
-    tensor_parallel_degree = paddle.distributed.get_world_size()
     if tensor_parallel_degree > 1:
         strategy = fleet.DistributedStrategy()
         strategy.hybrid_configs = {
