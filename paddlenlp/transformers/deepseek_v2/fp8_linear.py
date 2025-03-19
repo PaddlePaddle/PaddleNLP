@@ -399,11 +399,6 @@ class Fuse_FFN_FP8_Func(paddle.autograd.PyLayer):
                 axis=-1,
             )
 
-        do3_t_fp8 = kitchen_quant(do3_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True)
-        dw2 = paddle.zeros(w2_fp8.shape, do3.dtype)
-        if numpy.prod(o2_t_fp8.shape) != 0 and numpy.prod(do3_t_fp8[0].shape) != 0:
-            deep_gemm.gemm_fp8_fp8_bf16_nt((o2_t_fp8, o2_t_scale), (do3_t_fp8[0], do3_t_fp8[1]), dw2)
-
         do3_t_fp8, do3_t_scale = kitchen_quant(
             do3_t, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
         )

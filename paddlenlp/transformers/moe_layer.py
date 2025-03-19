@@ -439,9 +439,7 @@ class FusionMoe(paddle.autograd.PyLayer):
         expert_out_grad, dispatched_probs_grad = ctx.Node_unpermute.backward(
             hidden_states_out_grad, hidden_states_out_grad_scale
         )
-        hidden_states_out_grad_scale_grad = hidden_states_out_grad_scale.index_select(
-            axis=0, index=token_permuted_indices
-        )
+        hidden_states_out_grad_scale_grad = paddle.gather(hidden_states_out_grad_scale, token_permuted_indices)
 
         # expert_grad
         hs_out_grad = ctx.Node_experts.backward(expert_out_grad, hidden_states_out_grad_scale_grad)
