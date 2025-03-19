@@ -210,14 +210,14 @@ class LinearFP8Func(paddle.autograd.PyLayer):
         x_quant, x_scale = kitchen_quant(
             x, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
         )
-
-        w_quant, w_sacle, w_t_quant, w_t_scale = kitchen_quant(
-            weight, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
+        weight_t = weight.T.contiguous()
+        w_quant, w_scale = kitchen_quant(
+            weight_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
         )
 
         # compute out = mm(x, w_t)
         out = paddle.empty([x.shape[0], weight.shape[-1]], dtype=x.dtype)
-        deep_gemm.gemm_fp8_fp8_bf16_nt((x_quant, x_scale), (w_t_quant, w_t_scale), out)
+        deep_gemm.gemm_fp8_fp8_bf16_nt((x_quant, x_scale), (w_quant, w_scale), out)
         out = out.reshape([x_orig_shape[0], -1, weight.shape[-1]])
 
         # save for bwd
@@ -230,13 +230,13 @@ class LinearFP8Func(paddle.autograd.PyLayer):
             x_t.contiguous(), backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
         )
         ctx.save_for_backward(
-            x_t_quant, x_t_scale, w_quant, w_sacle, paddle.to_tensor(x_t_shape, dtype="int64", place=paddle.CPUPlace())
+            x_t_quant, x_t_scale, weight, paddle.to_tensor(x_t_shape, dtype="int64", place=paddle.CPUPlace())
         )
         return out
 
     @staticmethod
     def backward(ctx, dout):
-        x_t_quant, x_t_scale, w_quant, w_sacle, x_t_shape = ctx.saved_tensor()
+        x_t_quant, x_t_scale, weight, x_t_shape = ctx.saved_tensor()
         x_t_shape = x_t_shape.numpy()
         # compute dx = mm(dout, w)
         dx = paddle.empty([x_t_shape[1], x_t_shape[0]], dout.dtype)
@@ -248,7 +248,10 @@ class LinearFP8Func(paddle.autograd.PyLayer):
             is_1d_scaled=True,
             return_transpose=False,
         )
-        deep_gemm.gemm_fp8_fp8_bf16_nt((dout_quant, dout_scale), (w_quant, w_sacle), dx)
+        w_quant, w_scale = kitchen_quant(
+            weight, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
+        )
+        deep_gemm.gemm_fp8_fp8_bf16_nt((dout_quant, dout_scale), (w_quant, w_scale), dx)
         dx = dx.reshape(dx_orig_shape)
 
         # compute dw = mm(x_t, dout_t)
