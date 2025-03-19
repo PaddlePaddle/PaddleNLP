@@ -114,13 +114,13 @@ def verify_tokens_unzip():
         expected_guided_unzipped_probs = paddle.to_tensor(expected_guided_unzipped_probs, dtype='bfloat16')
         unzipped_tokens, zipped_expertwise_rowmap, unzipped_probs, unzipped_expert_idx = TDU.tokens_unzip(tokens_zipped,routemap_topk, probs_topk,total_unzipped_tokens_num=total_unzipped_tokens_num, topk=topk, num_experts=expert_num)
 
-        guided_unzipped_probs = TDU.tokens_guided_unzip(probs_topk,zipped_expertwise_rowmap, total_unzipped_token_num=total_unzipped_tokens_num,num_experts=expert_num)
+        guided_unzipped_probs = TDU.probs_topk_guided_unzip(probs_topk,routemap_topk, zipped_expertwise_rowmap, total_unzipped_token_num=total_unzipped_tokens_num,num_experts=expert_num, topk=topk)
 
         # ------------------------- 前向验证 ------------------------
         print("-------- guided unzipped by customed op: ------------")
         print(guided_unzipped_probs)
         print("-------- guided unzipped expected ------------")
-        print(expected_guided_unzipped_probs)
+        print(expected_unzipped_probs)
 
     
 
