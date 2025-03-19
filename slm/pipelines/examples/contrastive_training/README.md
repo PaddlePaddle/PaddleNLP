@@ -185,9 +185,9 @@ python -u evaluation/eval_mteb.py \
 本仓库主要面向其中的英文检索任务（Retrieval），并额外支持针对 MSMARCO-Title 的评估。
 
 评估脚本为 `evaluation/eval_mteb.sh`，支持7个模型：
-| **模型**         | [RocketQA&nbsp;V1](https://github.com/PaddlePaddle/RocketQA/tree/main/research/RocketQA_NAACL2021) | [RocketQA&nbsp;V2](https://github.com/PaddlePaddle/RocketQA/tree/main/research/RocketQAv2_EMNLP2021) | [BGE‑Large‑en‑v1.5](https://huggingface.co/BAAI/bge-large-en-v1.5) | [RepLLaMA‑passage](https://huggingface.co/castorini/repllama-v1-7b-lora-passage) | [NV‑Embed‑v1](https://huggingface.co/nvidia/NV-Embed-v1) | [BGE‑EN‑ICL](https://huggingface.co/BAAI/bge-en-icl) | [LLARA‑passage](https://huggingface.co/BAAI/LLARA-passage) |
+|  **模&nbsp;型**         | [RocketQA&nbsp;V1](https://github.com/PaddlePaddle/RocketQA/tree/main/research/RocketQA_NAACL2021) | [RocketQA&nbsp;V2](https://github.com/PaddlePaddle/RocketQA/tree/main/research/RocketQAv2_EMNLP2021) | [BGE‑Large‑en‑v1.5](https://huggingface.co/BAAI/bge-large-en-v1.5) | [RepLLaMA‑passage](https://huggingface.co/castorini/repllama-v1-7b-lora-passage) | [NV‑Embed‑v1](https://huggingface.co/nvidia/NV-Embed-v1) | [BGE‑EN‑ICL](https://huggingface.co/BAAI/bge-en-icl) | [LLARA‑passage](https://huggingface.co/BAAI/LLARA-passage) |
 |--------------|-------------|-------------|-------------------|-----------------------------|-------------|------------------------|---------------|
-| **最大序列长度** | 512         |     512     |        512        |            4096             |    4096     |          4096          |     4096      |
+| **最&nbsp;大&nbsp;序&nbsp;列&nbsp;长&nbsp;度**  | 512         |     512     |        512        |            4096             |    4096     |          4096          |     4096      |
 
 
 可支持配置的参数：
