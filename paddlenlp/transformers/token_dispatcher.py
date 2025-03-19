@@ -190,13 +190,20 @@ class MoEFlexTokenDispatcher:
         self, hidden_states: paddle.Tensor, probs: paddle.Tensor, routing_map: paddle.Tensor
     ) -> Tuple[paddle.Tensor, paddle.Tensor]:
         hidden_states, token_indices, token_probs = self.pre_dispatch(hidden_states, probs, routing_map)
+
+        from paddlenlp.trainer.plugins.timer import get_timers
+
+        timers = get_timers()
+
+        timers and timers("dispatch").start()
         hidden_states, dispatched_indices, dispatched_probs = self._comm_manager.dispatch(
             hidden_states, token_indices, token_probs
         )
+        timers and timers("dispatch").stop()
+
         (global_input_tokens, token_permuted_indices, prob_permuted_indices) = self.post_dispatch(
             hidden_states, dispatched_indices
         )
-
         return (
             global_input_tokens,
             token_permuted_indices,
@@ -216,7 +223,12 @@ class MoEFlexTokenDispatcher:
         hidden_states = self.pre_combine(
             hidden_states, token_permuted_indices, prob_permuted_indices, dispatched_probs
         )
+        from paddlenlp.trainer.plugins.timer import get_timers
+
+        timers = get_timers()
+        timers and timers("combine").start()
         hidden_states = self._comm_manager.combine(hidden_states)
+        timers and timers("combine").stop()
 
         hidden_states = self.post_combine(hidden_states)
         return hidden_states, None
