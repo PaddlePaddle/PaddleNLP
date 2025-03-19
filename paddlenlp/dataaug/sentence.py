@@ -180,8 +180,8 @@ class SentenceSummarize:
 class SentenceBackTranslate:
     """
     SentenceBackTranslate is a sentence-level data augmentation strategy
-    that translates the input sequence into one langugage, and backtranslate
-    back into the sourche language by the language models.
+    that translates the input sequence into one language, and backtranslate
+    back into the source language by the language models.
 
     Args:
         src_lang (str):

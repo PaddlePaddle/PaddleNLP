@@ -48,7 +48,7 @@
 
 #include "paddle/extension.h"
 
-// currently we do not support INT4, so we implement INT8 sage attention inference temperarily
+// currently we do not support INT4, so we implement INT8 sage attention inference temporarily
 
 #define FINAL_MASK 0xffffffff
 #define WARP_SIZE 32
@@ -1288,7 +1288,7 @@ using b128_t = uint4;
  * permutation in the granularity of 128bit.
  * 
  * This struct treats all offsets to be the number of `b128_t` elements. It is designed to be stateless,
- * meaning it does not maintain any information about the current pointer position. The offset returnd by 
+ * meaning it does not maintain any information about the current pointer position. The offset returned by 
  * the struct can be used to access the shared memory through the provided interface.
  * 
  * The struct guarantees that the read to permuted offset (i, j) will be the value stored in permuted offset (i, j).

@@ -405,9 +405,9 @@ docker build --network=host -f ./dockerfiles/Dockerfile_serving_cuda124_cudnn9 -
 | SERVICE_HTTP_PORT | int | 服务请求 HTTP 端口号 | 否 | 9965 | (3.0.0版本前镜像使用PUSH_MODE_HTTP_PORT)  |
 | DISABLE_STREAMING | int | 是否使用流式返回 | 否 | 0 |  |
 | MAX_SEQ_LEN | int | 最大输入序列长度 | 否 | 8192 | 服务会拒绝 input token 数量超过 MAX_SEQ_LEN 的请求，并返回错误提示 |
-| MAX_DEC_LEN | int | 最大 decoer 序列长度 | 否 | 1024 | 服务会拒绝请求中 max_dec_len/min_dec_len 超过此参数的请求，并返回错误提示 |
+| MAX_DEC_LEN | int | 最大 decoder 序列长度 | 否 | 1024 | 服务会拒绝请求中 max_dec_len/min_dec_len 超过此参数的请求，并返回错误提示 |
 | BATCH_SIZE | int | 最大 Batch Size | 否 | 50 | 模型可同时并发处理的最大输入数量，不能高于128 |
-| BLOCK_BS | int | 缓存 Block 支持的最大 Query Batch Size | 否 | 50 | 如果出现 out of memeory 错误，尝试减少该数值 |
+| BLOCK_BS | int | 缓存 Block 支持的最大 Query Batch Size | 否 | 50 | 如果出现 out of memory 错误，尝试减少该数值 |
 | BLOCK_RATIO | float |  | 否 | 0.75 | 建议设为输入长度占总长度的比例 |
 | MAX_CACHED_TASK_NUM | int | 服务缓存队列最大长度 | 否 | 128 | 队列达到上限后，会拒绝新的请求 |
 | PUSH_MODE_HTTP_WORKERS | int | HTTP 服务进程数 | 否 | 1 | 在  配置的情况下有效，高并发下提高该数值，建议最高配置为8 |

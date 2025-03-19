@@ -31,7 +31,7 @@ from paddlenlp.transformers import (
 @dataclass
 class ModelArgument:
     model_name_or_path: str = field(
-        default=None, metadata={"help": "Build-in pretrained model name or the path to local model."}
+        default=None, metadata={"help": "Built-in pretrained model name or the path to local model."}
     )
     test_mode: str = field(default="export", metadata={"help": "export data_split or rank_guard."})
 
