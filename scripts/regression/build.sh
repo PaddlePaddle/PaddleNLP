@@ -127,6 +127,7 @@ if [[ ${#Build_list[*]} -ne 0 ]];then
     fi
 
     if [ -e "${upload_path}" ] && [ "$(ls -A "${upload_path}/")" ]; then
+        python -m pip install bce-python-sdk==0.8.74 --trusted-host pip.baidu-int.com --force-reinstall
         cd ${upload_path} && ls -A "${upload_path}"
         cd ${PPNLP_HOME} && python upload.py ${upload_path} 'paddlenlp/wheels'
         rm -rf ${upload_path}
