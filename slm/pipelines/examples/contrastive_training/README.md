@@ -184,14 +184,11 @@ python -u evaluation/eval_mteb.py \
 是一个大规模文本嵌入评测基准，包含了丰富的向量检索评估任务和数据集。
 本仓库主要面向其中的英文检索任务（Retrieval），并额外支持针对 MSMARCO-Title 的评估。
 
-评估脚本为 `evaluation/eval_mteb.sh`, 支持7个模型：
-[RocketQA V1](https://github.com/PaddlePaddle/RocketQA/tree/main/research/RocketQA_NAACL2021),
-[RocketQA V2](https://github.com/PaddlePaddle/RocketQA/tree/main/research/RocketQAv2_EMNLP2021),
-[BGE-Large-en-v1.5](https://huggingface.co/BAAI/bge-large-en-v1.5),
-[RepLLaMA-passage](https://huggingface.co/castorini/repllama-v1-7b-lora-passage),
-[NV-Embed-v1](https://huggingface.co/nvidia/NV-Embed-v1),
-[BGE-EN-ICL](https://huggingface.co/BAAI/bge-en-icl),
-[LLARA-passage](https://huggingface.co/BAAI/LLARA-passage)
+评估脚本为 `evaluation/eval_mteb.sh`，支持7个模型：
+| 模型         | [RocketQA V1](https://github.com/PaddlePaddle/RocketQA/tree/main/research/RocketQA_NAACL2021) | [RocketQA V2](https://github.com/PaddlePaddle/RocketQA/tree/main/research/RocketQAv2_EMNLP2021) | [BGE-Large-en-v1.5](https://huggingface.co/BAAI/bge-large-en-v1.5) | [RepLLaMA-passage](https://huggingface.co/castorini/repllama-v1-7b-lora-passage) | [NV-Embed-v1](https://huggingface.co/nvidia/NV-Embed-v1) | [BGE-EN-ICL](https://huggingface.co/BAAI/bge-en-icl) | [LLARA-passage](https://huggingface.co/BAAI/LLARA-passage) |
+|--------------|-------------|-------------|-------------------|-----------------------------|-------------|------------------------|---------------|
+| 最大序列长度 | 512         |     512     |        512        |            4096             |    4096     |          4096          |     4096      |
+
 
 可支持配置的参数：
 - `base_model_name_or_path`: 模型名称或路径
@@ -223,16 +220,16 @@ MTEB-Retrieval 数据集, NDCG@10分数：
 | LLARA-passage               |  52.48   |  47.51  |    26.13     |        37.26         |  44.12  | 81.09  |  43.98   |  69.17   |  45.49  |  37.07   | 61.76  |     82.29      |  17.30  |  76.07  |   36.73    |   81.30   |
 
 
-MSMARCO-Title 数据集, MRR@10, Recall@10, NDCG@10分数：
-| Model                       | Max Length | MRR@10 | Recall@100 | NDCG@10 |
-|-----------------------------|:----------:|:------:|:----------:|:-------:|
-| RocketQA v1                 |    512     | 36.90  |            |         |
-| RocketQA v2                 |    512     | 38.90  |            |         |
-| bge-large-en-v1.5           |    512     | 35.30  |   89.96    |  41.96  |
-| repllama-v1-7b-lora-passage |    4096    | 38.24  |   91.95    |  45.13  |
-| NV-Embed-v1                 |    4096    | 38.39  |   92.72    |  45.21  |
-| bge-en-icl (zero-shot)      |    4096    | 42.77  |            |         |
-| LLARA-passage               |    4096    | 43.04  |   94.75    |  49.87  |
+MSMARCO-Title 数据集, MRR@10, Recall@100, NDCG@10分数：
+| 模型                        | MRR@10 | Recall@100 | NDCG@10 |
+|-----------------------------|:------:|:----------:|:-------:|
+| RocketQA v1                 | 36.90  |            |         |
+| RocketQA v2                 | 38.90  |            |         |
+| bge-large-en-v1.5           | 35.30  |   89.96    |  41.96  |
+| repllama-v1-7b-lora-passage | 38.24  |   91.95    |  45.13  |
+| NV-Embed-v1                 | 38.39  |   92.72    |  45.21  |
+| bge-en-icl (zero-shot)      | 42.77  |            |         |
+| LLARA-passage               | 43.04  |   94.75    |  49.87  |
 
 
 
@@ -246,11 +243,11 @@ MSMARCO-Title 数据集, MRR@10, Recall@10, NDCG@10分数：
 
 [4] Niklas Muennighoff, Nouamane Tazi, Loic Magne, Nils Reimers: MTEB: Massive Text Embedding Benchmark. EACL 2023.
 
-[5] Chankyu Lee, Rajarshi Roy, Mengyao Xu, Jonathan Raiman, Mohammad Shoeybi, Bryan Catanzaro, Wei Ping: NV-Embed: Improved Techniques for Training LLMs as Generalist Embedding Models. arXiv 2024.
+[5] Chankyu Lee, Rajarshi Roy, Mengyao Xu, Jonathan Raiman, Mohammad Shoeybi, Bryan Catanzaro, Wei Ping: NV-Embed: Improved Techniques for Training LLMs as Generalist Embedding Models. ICLR 2025.
 
-[6] Zheng Liu, Chaofan Li, Shitao Xiao, Yingxia Shao, Defu Lian: Llama2Vec: Unsupervised Adaptation of Large Language Models for Dense Retrieval. ACL 2024
+[6] Zheng Liu, Chaofan Li, Shitao Xiao, Yingxia Shao, Defu Lian: Llama2Vec: Unsupervised Adaptation of Large Language Models for Dense Retrieval. ACL 2024.
 
-[7] Chaofan Li, MingHao Qin, Shitao Xiao, Jianlyu Chen, Kun Luo, Yingxia Shao, Defu Lian, Zheng Liu: Making Text Embedders Few-Shot Learners. arXiv 2024
+[7] Chaofan Li, MingHao Qin, Shitao Xiao, Jianlyu Chen, Kun Luo, Yingxia Shao, Defu Lian, Zheng Liu: Making Text Embedders Few-Shot Learners. ICLR 2025.
 
 [8] Yingqi Qu, Yuchen Ding, Jing Liu, Kai Liu, Ruiyang Ren, Wayne Xin Zhao, Daxiang Dong, Hua Wu, Haifeng Wang: RocketQA: An Optimized Training Approach to Dense Passage Retrieval for Open-Domain Question Answering. NAACL 2021
 
