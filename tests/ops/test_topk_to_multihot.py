@@ -1,7 +1,7 @@
 import numpy as np
 import paddle
 import paddle.incubate.nn.functional as F
-import TokenDispatherUtils as TDU
+import TokenDispatcherUtils as TDU
 
 def compare_tensors(a, b):
     # 形状一致性检查

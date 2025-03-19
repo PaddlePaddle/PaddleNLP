@@ -1,7 +1,7 @@
 import numpy as np
 import paddle
 import paddle.incubate.nn.functional as F
-import TokenDispatherUtils as TDU
+import TokenDispatcherUtils as TDU
 
 def compare_tensors(a, b):
     # 形状一致性检查
@@ -114,13 +114,21 @@ def verify_tokens_unzip():
         expected_guided_unzipped_probs = paddle.to_tensor(expected_guided_unzipped_probs, dtype='bfloat16')
         unzipped_tokens, zipped_expertwise_rowmap, unzipped_probs, unzipped_expert_idx = TDU.tokens_unzip(tokens_zipped,routemap_topk, probs_topk,total_unzipped_tokens_num=total_unzipped_tokens_num, topk=topk, num_experts=expert_num)
 
+        # 用于probs的给定顺序增广
         guided_unzipped_probs = TDU.probs_topk_guided_unzip(probs_topk,routemap_topk, zipped_expertwise_rowmap, total_unzipped_token_num=total_unzipped_tokens_num,num_experts=expert_num, topk=topk)
 
+        # 用于dout的给定顺序增广
+        guided_unzipped_dout = TDU.tokens_guided_unzip(probs_topk,zipped_expertwise_rowmap, total_unzipped_token_num=total_unzipped_tokens_num,num_experts=expert_num)
+
         # ------------------------- 前向验证 ------------------------
-        print("-------- guided unzipped by customed op: ------------")
+        print("-------- probs guided unzipped by customed op: ------------")
         print(guided_unzipped_probs)
-        print("-------- guided unzipped expected ------------")
+        print("-------- probs guided unzipped expected ------------")
         print(expected_unzipped_probs)
+        print("-------- tokens guided unzipped by customed op: ------------")
+        print(guided_unzipped_dout)
+        print("-------- tokens guided unzipped expected ------------")
+        print(expected_guided_unzipped_probs)
 
     
 

@@ -11,6 +11,7 @@
 #include "paddle/phi/kernels/funcs/math_cuda_utils.h"
 
 
+// ---------------------------- kernels ----------------------------
 // 主模版，用于支持所有数据类型
 template <typename T, int topk, int num_experts>
 __global__ void token_unzip_kernel(
@@ -235,6 +236,55 @@ __global__ void token_unzip_kernel(
     }
   }
 }
+
+
+
+template <int num_experts>
+__global__ void tokens_weighted_zip_kernel(
+    const phi::bfloat16 *__restrict__ unzipped_tokens_in,
+    const phi::bfloat16 *__restrict__ unzipped_token_probs_in,
+    const int *__restrict__ zipped_expertwise_rowmap,
+    phi::bfloat16 *__restrict__ weighted_zipped_tokens_out,
+    const int total_zipped_tokens_num,
+    const int token_length) {
+  const int this_row = blockIdx.x;
+  if (this_row >= total_zipped_tokens_num) return;
+
+  const __nv_bfloat16 *unzipped_tokens =
+      reinterpret_cast<const __nv_bfloat16 *>(unzipped_tokens_in);
+  const __nv_bfloat16 *probs_unzipped =
+      reinterpret_cast<const __nv_bfloat16 *>(unzipped_token_probs_in);
+  __nv_bfloat16 *weighted_zipped_tokens =
+      reinterpret_cast<__nv_bfloat16 *>(weighted_zipped_tokens_out);
+
+  int local_row_fetchlist[num_experts];
+  __nv_bfloat16 local_expert_problist[num_experts];
+// 填充该行token被广播到的rows和对应的概率
+#pragma unroll
+  for (int expert = 0; expert < num_experts; ++expert) {
+    local_row_fetchlist[expert] =
+        zipped_expertwise_rowmap[this_row * num_experts + expert];
+    if (local_row_fetchlist[expert] >= 0)
+      local_expert_problist[expert] =
+          probs_unzipped[local_row_fetchlist[expert]];
+  }
+
+  for (int i = threadIdx.x; i < token_length; i += blockDim.x) {
+// tensor内部元素加权和
+#pragma unroll
+    for (int expert = 0; expert < num_experts; ++expert) {
+      const bool is_expert_taken = (local_row_fetchlist[expert] >= 0);
+      const int fetch_row = local_row_fetchlist[expert];
+      if (is_expert_taken) {
+      }
+      weighted_zipped_tokens[this_row * token_length + i] +=
+          is_expert_taken ? local_expert_problist[expert] *
+                                unzipped_tokens[fetch_row * token_length + i]
+                          : (__nv_bfloat16)0;
+    }
+  }
+}
+// ---------------------------- Dispatch ---------------------------------
 void dispatch_tokens_unzip(const paddle::Tensor &X,
                            const paddle::Tensor &expert_routemap_topk,
                            const paddle::Tensor &expert_prob_topk,
@@ -284,6 +334,54 @@ void dispatch_tokens_unzip(const paddle::Tensor &X,
               token_length);
     }
   }
+}
+
+void dispatch_tokens_weighted_zip(
+    const paddle::Tensor &unzipped_tokens,
+    const paddle::Tensor &unzipped_token_probs,
+    const paddle::Tensor &zipped_expertwise_rowmap,
+    paddle::Tensor &weighted_zipped_tokens,
+    const int total_zipped_tokens_num,
+    const int num_experts,
+    const int token_length) {
+  dim3 grid, block;
+  grid.x = total_zipped_tokens_num;
+  block.x = 256;
+  if (num_experts == 4) {
+    tokens_weighted_zip_kernel<4><<<grid, block, 0, unzipped_tokens.stream()>>>(
+        unzipped_tokens.data<phi::bfloat16>(),
+        unzipped_token_probs.data<phi::bfloat16>(),
+        zipped_expertwise_rowmap.data<int>(),
+        weighted_zipped_tokens.data<phi::bfloat16>(),
+        total_zipped_tokens_num,
+        token_length);
+  }
+}
+
+// -------------------------------- API -----------------------------------
+std::vector<paddle::Tensor> tokens_weighted_zip(
+    const paddle::Tensor &unzipped_tokens,
+    const paddle::Tensor &unzipped_token_probs,
+    const paddle::Tensor &zipped_expertwise_rowmap,
+    const int &total_zipped_tokens_num,
+    const int &num_experts) {
+  PD_CHECK(unzipped_tokens.dtype() == paddle::DataType::BFLOAT16);
+  int rows = unzipped_tokens.shape()[0];  // seqlen
+  int cols = unzipped_tokens.shape()[1];  //一般为7168
+
+  //------------------------ 输出1张量 ------------------------
+  auto weighted_zipped_tokens = paddle::empty({total_zipped_tokens_num, cols},
+                                              unzipped_tokens.dtype(),
+                                              unzipped_tokens.place());
+
+  dispatch_tokens_weighted_zip(unzipped_tokens,
+                               unzipped_token_probs,
+                               zipped_expertwise_rowmap,
+                               weighted_zipped_tokens,
+                               total_zipped_tokens_num,
+                               num_experts,
+                               cols);
+  return {weighted_zipped_tokens};
 }
 
 std::vector<paddle::Tensor> tokens_unzip(
@@ -344,102 +442,6 @@ std::vector<paddle::Tensor> tokens_unzip(
           token_prob_unzipped,
           expert_idx_unzipped};
 }
-
-// ---------------------------------- Dispatch -------------------------------
-
-template <int num_experts>
-__global__ void tokens_weighted_zip_kernel(
-    const phi::bfloat16 *__restrict__ unzipped_tokens_in,
-    const phi::bfloat16 *__restrict__ unzipped_token_probs_in,
-    const int *__restrict__ zipped_expertwise_rowmap,
-    phi::bfloat16 *__restrict__ weighted_zipped_tokens_out,
-    const int total_zipped_tokens_num,
-    const int token_length) {
-  const int this_row = blockIdx.x;
-  if (this_row >= total_zipped_tokens_num) return;
-
-  const __nv_bfloat16 *unzipped_tokens =
-      reinterpret_cast<const __nv_bfloat16 *>(unzipped_tokens_in);
-  const __nv_bfloat16 *probs_unzipped =
-      reinterpret_cast<const __nv_bfloat16 *>(unzipped_token_probs_in);
-  __nv_bfloat16 *weighted_zipped_tokens =
-      reinterpret_cast<__nv_bfloat16 *>(weighted_zipped_tokens_out);
-
-  int local_row_fetchlist[num_experts];
-  __nv_bfloat16 local_expert_problist[num_experts];
-// 填充该行token被广播到的rows和对应的概率
-#pragma unroll
-  for (int expert = 0; expert < num_experts; ++expert) {
-    local_row_fetchlist[expert] =
-        zipped_expertwise_rowmap[this_row * num_experts + expert];
-    if (local_row_fetchlist[expert] >= 0)
-      local_expert_problist[expert] =
-          probs_unzipped[local_row_fetchlist[expert]];
-  }
-
-  for (int i = threadIdx.x; i < token_length; i += blockDim.x) {
-// tensor内部元素加权和
-#pragma unroll
-    for (int expert = 0; expert < num_experts; ++expert) {
-      const bool is_expert_taken = (local_row_fetchlist[expert] >= 0);
-      const int fetch_row = local_row_fetchlist[expert];
-      if (is_expert_taken) {
-      }
-      weighted_zipped_tokens[this_row * token_length + i] +=
-          is_expert_taken ? local_expert_problist[expert] *
-                                unzipped_tokens[fetch_row * token_length + i]
-                          : (__nv_bfloat16)0;
-    }
-  }
-}
-
-void dispatch_tokens_weighted_zip(
-    const paddle::Tensor &unzipped_tokens,
-    const paddle::Tensor &unzipped_token_probs,
-    const paddle::Tensor &zipped_expertwise_rowmap,
-    paddle::Tensor &weighted_zipped_tokens,
-    const int total_zipped_tokens_num,
-    const int num_experts,
-    const int token_length) {
-  dim3 grid, block;
-  grid.x = total_zipped_tokens_num;
-  block.x = 256;
-  if (num_experts == 4) {
-    tokens_weighted_zip_kernel<4><<<grid, block, 0, unzipped_tokens.stream()>>>(
-        unzipped_tokens.data<phi::bfloat16>(),
-        unzipped_token_probs.data<phi::bfloat16>(),
-        zipped_expertwise_rowmap.data<int>(),
-        weighted_zipped_tokens.data<phi::bfloat16>(),
-        total_zipped_tokens_num,
-        token_length);
-  }
-}
-
-std::vector<paddle::Tensor> tokens_weighted_zip(
-    const paddle::Tensor &unzipped_tokens,
-    const paddle::Tensor &unzipped_token_probs,
-    const paddle::Tensor &zipped_expertwise_rowmap,
-    const int &total_zipped_tokens_num,
-    const int &num_experts) {
-  PD_CHECK(unzipped_tokens.dtype() == paddle::DataType::BFLOAT16);
-  int rows = unzipped_tokens.shape()[0];  // seqlen
-  int cols = unzipped_tokens.shape()[1];  //一般为7168
-
-  //------------------------ 输出1张量 ------------------------
-  auto weighted_zipped_tokens = paddle::empty({total_zipped_tokens_num, cols},
-                                              unzipped_tokens.dtype(),
-                                              unzipped_tokens.place());
-
-  dispatch_tokens_weighted_zip(unzipped_tokens,
-                               unzipped_token_probs,
-                               zipped_expertwise_rowmap,
-                               weighted_zipped_tokens,
-                               total_zipped_tokens_num,
-                               num_experts,
-                               cols);
-  return {weighted_zipped_tokens};
-}
-
 
 PD_BUILD_OP(tokens_unzip)
     .Inputs({"X", "expert_routemap_topk", "expert_prob_topk"})
