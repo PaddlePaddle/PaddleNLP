@@ -267,6 +267,77 @@ class LinearFP8Func(paddle.autograd.PyLayer):
         dweight = kitchen_fp8_gemm(x_t_quant, x_t_scale, dout_t_quant, dout_t_scale, True, True)
         return dx, dweight
 
+class LinearFP8KeepXFunc(paddle.autograd.PyLayer):
+    @staticmethod
+    def forward(ctx, x, weight):
+        x_orig_shape = x.shape
+        # deep_gemm only support 2D
+        x = x.reshape([-1, x_orig_shape[-1]])
+        # quant
+        x_quant, x_scale = kitchen_quant(
+            x, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+        )
+        weight_t = weight.T.contiguous()
+        w_quant, w_scale = kitchen_quant(
+            weight_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
+        )
+
+        # compute out = mm(x, w_t)
+        out = paddle.empty([x.shape[0], weight.shape[-1]], dtype=x.dtype)
+        deep_gemm.gemm_fp8_fp8_bf16_nt((x_quant, x_scale), (w_quant, w_scale), out)
+        out = out.reshape([x_orig_shape[0], -1, weight.shape[-1]])
+
+       
+        ctx.save_for_backward(
+            x, weight
+        )
+        return out
+
+    @staticmethod
+    def backward(ctx, dout):
+        x, weight= ctx.saved_tensor()
+
+        # padding
+        x_t = x.T.contiguous()
+        if x_t.shape[-1] % 8 != 0:
+            x_t = paddle.concat([x_t, paddle.zeros([x_t.shape[0], 8 - (x_t.shape[-1] % 8)], dtype=x_t.dtype)], axis=-1)
+        x_t_quant, x_t_scale = kitchen_quant(
+            x_t, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+        )
+
+        
+        x_t_shape = x_t_shape.numpy()
+        # compute dx = mm(dout, w)
+        dx = paddle.empty(x.shape, dout.dtype)
+        dx_orig_shape = x.shape
+        
+        dout_quant, dout_scale = kitchen_quant(
+            dout.reshape([-1, dout.shape[-1]]),
+            backend=kitchen.ops.Backend.CUTLASS,
+            is_1d_scaled=True,
+            return_transpose=False,
+        )
+        w_quant, w_scale = kitchen_quant(
+            weight, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
+        )
+        deep_gemm.gemm_fp8_fp8_bf16_nt((dout_quant, dout_scale), (w_quant, w_scale), dx)
+        dx = dx.reshape(dx_orig_shape)
+
+        # compute dw = mm(x_t, dout_t)
+        dout_t = dout.reshape([-1, dout.shape[-1]]).T.contiguous()
+        # padding
+        if dout_t.shape[-1] % 8 != 0:
+            pad_size = 8 - (dout_t.shape[-1] % 8)
+            dout_t = paddle.concat([dout_t, paddle.zeros([dout_t.shape[0], pad_size], dtype=dout_t.dtype)], axis=-1)
+
+        dout_t_quant, dout_t_scale = kitchen_quant(
+            dout_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
+        )
+        dweight = kitchen_fp8_gemm(x_t_quant, x_t_scale, dout_t_quant, dout_t_scale, True, True)
+        return dx, dweight
+
+
+
 
 class FP8Linear(paddle.nn.Layer):
     def __init__(self, in_features: int, out_features: int, bias_attr: bool = False) -> None:
@@ -281,6 +352,21 @@ class FP8Linear(paddle.nn.Layer):
 
     def forward(self, x):
         return LinearFP8Func.apply(x, self.weight)
+
+class FP8KeepXLinear(paddle.nn.Layer):
+    def __init__(self, in_features: int, out_features: int, bias_attr: bool = False) -> None:
+        super().__init__()
+        self._dtype = self._helper.get_default_dtype()
+
+        self.weight = self.create_parameter(
+            shape=[in_features, out_features],
+            dtype="bfloat16",
+            is_bias=False,
+        )
+
+    def forward(self, x):
+        return LinearFP8KeepXFunc.apply(x, self.weight)        
+
 
 
 class Fuse_FFN_FP8_Func(paddle.autograd.PyLayer):

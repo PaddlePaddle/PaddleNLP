@@ -79,7 +79,7 @@ from ..moe_layer import MoEFlexTokenLayer, MoELayer
 from ..utils import device_guard
 from . import fp8_linear as linear_utils
 from .configuration import DeepseekV2Config
-from .fp8_linear import FP8DeepseekV2MLP, FP8Linear, Linear
+from .fp8_linear import FP8DeepseekV2MLP, FP8Linear, Linear, FP8KeepXLinear
 
 DSV3_USE_FP8_GEMM = os.getenv("DSV3_USE_FP8_GEMM", "False").lower() == "true"
 Linear = FP8Linear if DSV3_USE_FP8_GEMM else Linear
@@ -244,10 +244,9 @@ def scaled_dot_product_attention(
         )
 
         if sequence_parallel:
-            attn_output = outputs.reshape([bsz * q_len, v_head_dim * num_heads])
-        else:
-            attn_output = outputs.reshape([bsz, q_len, v_head_dim * num_heads])
-        return attn_output
+            outputs = outputs.reshape([bsz * q_len, v_head_dim * num_heads])
+
+        return outputs
 
     else:
         #  [ bz, seqlen, nhead, head_dim] -> [bs, nhead, seq_len, head_dim]
@@ -1005,7 +1004,10 @@ class DeepseekV2Attention(nn.Layer):
             with linear_dtype_gaurd():
                 self.kv_a_proj_with_mqa = paddle.nn.Linear(self.hidden_size, config.kv_lora_rank + config.qk_rope_head_dim, bias_attr=config.attention_bias)
                 self.kv_b_proj = Linear(config.kv_lora_rank, self.num_heads * (self.q_head_dim - self.qk_rope_head_dim + self.v_head_dim), bias_attr=False)
-                self.o_proj = Linear(self.num_heads * self.v_head_dim, self.hidden_size, bias_attr=config.attention_bias)
+                if DSV3_USE_FP8_GEMM:
+                    self.o_proj = FP8KeepXLinear(self.num_heads * self.v_head_dim, self.hidden_size, bias_attr=config.attention_bias)
+                else:
+                    self.o_proj = Linear(self.num_heads * self.v_head_dim, self.hidden_size, bias_attr=config.attention_bias)
             self.kv_a_layernorm = DeepseekV2RMSNorm(config=config, hidden_size=config.kv_lora_rank)
 
         # fmt: on
