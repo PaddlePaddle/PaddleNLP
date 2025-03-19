@@ -440,6 +440,9 @@ class FusedMultiTransformerBase(Layer):
         self.config.moe_config.moe_intermediate_size //= config.nranks
 
         if self.config.use_ep_parallel:
+            assert (
+                self.config.moe_config.num_experts % paddle.distributed.get_world_size() == 0
+            ), "num_experts must be divisible by nranks to enable expert parallel"
             self.config.moe_config.moe_intermediate_size *= config.nranks
             self.ep_num_per_gpu = self.config.moe_config.num_experts // paddle.distributed.get_world_size()
         else:
@@ -1724,7 +1727,7 @@ class FusedMultiTransformerBase(Layer):
                 norm_topk_prob=False,  # 在noaux_tc中做了
                 routed_scaling_factor=1.0,  # 在noaux_tc中做了
             )
-        elif self.config.use_ep_parallel and self.data_parallel_degree ==1:
+        elif self.config.use_ep_parallel and self.data_parallel_degree == 1:
             fused_moe_out = self.compute_moe_ep_with_tp(tmp_out, i)
             return fused_moe_out
         elif self.config.use_ep_parallel and self.data_parallel_degree > 1:
