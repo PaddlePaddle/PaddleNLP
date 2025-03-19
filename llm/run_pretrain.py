@@ -28,6 +28,7 @@ from paddlenlp.data.causal_dataset import (
 )
 from paddlenlp.trainer import (
     PdArgumentParser,
+    StepFlexToken,
     Trainer,
     TrainingArguments,
     get_last_checkpoint,
@@ -515,6 +516,7 @@ def main():
         config.use_fused_rms_norm = True
         config.fuse_attention_ffn = True
         config.use_fused_rope = True
+        config.token_drop_steps = 0
         model = model_class.from_config(config, dtype=dtype)
 
     if training_args.recompute:
@@ -564,6 +566,8 @@ def main():
         * data_args.max_seq_length
     )
 
+    callbacks = [StepFlexToken()]
+
     trainer = PretrainingTrainer(
         model=model,
         args=training_args,
@@ -572,6 +576,7 @@ def main():
         eval_dataset=eval_dataset if training_args.do_eval else None,
         optimizers=(None, lr_scheduler),
         tokenizer=tokenizer,
+        callbacks=callbacks,
     )
 
     checkpoint = None

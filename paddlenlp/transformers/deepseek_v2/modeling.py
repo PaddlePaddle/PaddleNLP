@@ -75,7 +75,7 @@ from ..model_outputs import (
 )
 from ..model_utils import PretrainedModel, register_base_model
 from ..moe_gate import PretrainedMoEGate
-from ..moe_layer import MoEFlexTokenLayer, MoELayer
+from ..moe_layer import MoELayer
 from ..utils import device_guard
 from . import fp8_linear as linear_utils
 from .configuration import DeepseekV2Config
@@ -101,7 +101,21 @@ __all__ = [
     "DeepseekV2ForSequenceClassification",
     "DeepseekV2Model",
     "DeepseekV2PretrainedModel",
+    "set_global_step",
+    "get_global_step",
 ]
+
+global_step = 0
+
+
+def set_global_step(cur_step):
+    global global_step
+    global_step = cur_step
+
+
+def get_global_step():
+    global global_step
+    return global_step
 
 
 def rms_norm_fused(x_in, w, eps, use_fast_ln=False):
@@ -746,7 +760,7 @@ class MoEGate(PretrainedMoEGate):
             )
             self.e_score_correction_bias.is_distributed = True
 
-        self.using_flex_token = config.using_flex_token
+        self.using_flex_token = False
 
     def forward(self, hidden_states):
         """
@@ -801,6 +815,8 @@ class DeepseekV2MoE(MoELayer):
     """
 
     def __init__(self, config: DeepseekV2Config):
+        assert config.tensor_parallel_degree <= 1, "tensor_parallel_degree should be 1"
+
         gate = MoEGate(
             config=config,
             num_experts=config.n_routed_experts,
@@ -814,11 +830,7 @@ class DeepseekV2MoE(MoELayer):
             drop_tokens=False,
         )
         DeepseekV2MLPClass = FP8DeepseekV2MLP if DSV3_USE_FP8_GEMM else DeepseekV2MLP
-        # (LiuTing) only support either tp or ep.
-        moe_group = dist.fleet.get_hybrid_communicate_group().get_data_parallel_group()
-        expert_parallel_degree = dist.get_world_size(moe_group)
-        expert_parallel_degree = 1 if expert_parallel_degree < 0 else expert_parallel_degree
-        act_tp_shard = config.tensor_parallel_degree > 1 and expert_parallel_degree <= 1
+
         super().__init__(
             config=config,
             moe_num_experts=config.n_routed_experts,
@@ -826,62 +838,14 @@ class DeepseekV2MoE(MoELayer):
             expert_kwargs={
                 "config": config,
                 "intermediate_size": config.moe_intermediate_size,
-                "is_moe": not act_tp_shard,
+                "is_moe": True,
             },
             gate=gate,
             capacity=2.0,
-        )
-        self.alpha = config.aux_loss_alpha
-        if config.n_shared_experts is not None:
-            intermediate_size = config.moe_intermediate_size * config.n_shared_experts
-            self.shared_experts = DeepseekV2MLPClass(config=config, intermediate_size=intermediate_size, is_moe=False)
-
-    def forward(self, hidden_states):
-        final_hidden_states, l_aux, l_zloss = super().forward(hidden_states)
-        if self.training and self.alpha > 0.0:
-            l_aux = l_aux * self.alpha
-            final_hidden_states = AddAuxiliaryLoss.apply(final_hidden_states, l_aux)
-
-        if self.config.n_shared_experts is not None:
-            shared_expert_output = self.shared_experts(hidden_states)
-            final_hidden_states = final_hidden_states + shared_expert_output
-        return final_hidden_states
-
-
-class DeepseekV2MoEFlexToken(MoEFlexTokenLayer):
-    """
-    A mixed expert module containing shared experts.
-    """
-
-    def __init__(self, config: DeepseekV2Config):
-        gate = MoEGate(
-            config=config,
-            num_experts=config.n_routed_experts,
-            expert_hidden_size=config.hidden_size,
-            top_k=config.num_experts_per_tok,
-            topk_method=config.topk_method,
-            n_group=config.n_group,
-            topk_group=config.topk_group,
-            norm_topk_prob=config.norm_topk_prob,
-            routed_scaling_factor=config.routed_scaling_factor,
-            drop_tokens=False,
+            moe_group="expert",
         )
 
-        hcg = fleet.get_hybrid_communicate_group()
-        moe_group = hcg.expert_parallel_group
-        moe_grad_group = hcg.expert_grad_comm_group
-
-        DeepseekV2MLPClass = FP8DeepseekV2MLP if DSV3_USE_FP8_GEMM else DeepseekV2MLP
-
-        super().__init__(
-            config=config,
-            moe_num_experts=config.n_routed_experts,
-            expert_class=DeepseekV2MLPClass,
-            expert_kwargs={"config": config, "intermediate_size": config.moe_intermediate_size, "is_moe": True},
-            gate=gate,
-            moe_group=moe_group,
-        )
-
+        moe_grad_group = fleet.get_hybrid_communicate_group().expert_grad_comm_group
         for p in self.experts.parameters():
             setattr(p, "color", {"color": "moe_expert", "group": moe_grad_group})
 
@@ -1212,12 +1176,10 @@ class DeepseekV2DecoderLayer(nn.Layer):
 
         self.self_attn = DeepseekV2Attention(config=config, layerwise_recompute=layerwise_recompute)
 
-        MoELayerClass = DeepseekV2MoEFlexToken if config.using_flex_token else DeepseekV2MoE
-
         DeepseekV2MLPClass = FP8DeepseekV2MLP if DSV3_USE_FP8_GEMM else DeepseekV2MLP
 
         self.mlp = (
-            MoELayerClass(config)
+            DeepseekV2MoE(config)
             if (
                 config.n_routed_experts is not None
                 and layer_idx >= config.first_k_dense_replace
@@ -1258,7 +1220,6 @@ class DeepseekV2DecoderLayer(nn.Layer):
                 "Passing `padding_mask` is deprecated and will be removed in v4.37. Please make sure use `attention_mask` instead.`"
             )
         residual = hidden_states
-
         hidden_states = self.input_layernorm(hidden_states)
 
         # Self Attention
@@ -1640,7 +1601,6 @@ class DeepseekV2PretrainedModel(PretrainedModel):
         return mappings
 
     def _init_weights(self, layer):
-        return
         if self.config.tensor_parallel_degree > 1:
             rng_tracker = get_rng_state_tracker().rng_state
 
@@ -1692,6 +1652,9 @@ class DeepseekV2PretrainedModel(PretrainedModel):
 
         if isinstance(layer, MoEGate):
             kaiming_uniform_(layer.weight, a=math.sqrt(5))
+
+    def step_flex_token(self, cur_step):
+        set_global_step(cur_step)
 
 
 @register_base_model

@@ -25,6 +25,7 @@ import paddle.distributed as dist
 from paddle import Tensor, nn
 from paddle.distributed.communication.group import Group
 
+from ..utils.log import logger
 from .fp8_utils import ExpertsNode, kitchen_quant
 from .fused_a2a import CombineNode, DispatchNode
 from .moe_gate import PretrainedMoEGate
@@ -187,8 +188,11 @@ class MoELayer(nn.Layer):
         except AttributeError:
             is_fleet_init = False
 
-        if is_fleet_init and dist.get_world_size() > 1 and moe_group == "data":
-            self.moe_group = dist.fleet.get_hybrid_communicate_group().get_data_parallel_group()
+        if is_fleet_init and dist.get_world_size() > 1:
+            if moe_group == "data":
+                self.moe_group = dist.fleet.get_hybrid_communicate_group().get_data_parallel_group()
+            elif moe_group == "expert":
+                self.moe_group = dist.fleet.get_hybrid_communicate_group().expert_parallel_group
             self.moe_rank = dist.get_rank(self.moe_group)
             self.moe_rank = 0 if self.moe_rank < 0 else self.moe_rank
             self.expert_parallel_degree = dist.get_world_size(self.moe_group)
@@ -217,7 +221,29 @@ class MoELayer(nn.Layer):
 
         self.gate = gate
         self.gate.group = self.moe_group
+        # for flex token moe layer
+        self.router = gate
+        self.ep_size = dist.get_world_size(self.moe_group)
+        self.moe_router_topk = gate.top_k
+        self.num_local_experts = moe_num_experts // self.ep_size
+        self.token_dispatcher = MoEFlexTokenDispatcher(
+            self.num_local_experts, self.moe_router_topk, self.moe_num_experts, self.moe_group
+        )
+        self.token_drop_steps = config.token_drop_steps
+        self.using_flex_token = False
         self._post_init()
+
+    def update_flex_token(self):
+        from paddlenlp.transformers.deepseek_v2 import get_global_step
+
+        if (not self.config.using_flex_token) or (get_global_step() < self.token_drop_steps):
+            self.using_flex_token = False
+            self.router.using_flex_token = False
+        else:
+            if not self.using_flex_token:
+                logger.info("Changing to flex token moe mode")
+            self.using_flex_token = True
+            self.router.using_flex_token = True
 
     def _parse_moe_expert_parallel(self, moe_num_experts, expert_parallel_degree):
         assert (
@@ -240,7 +266,15 @@ class MoELayer(nn.Layer):
                     p.no_sync = not self.is_dummy_moe
                     # logger.info(f"expert param={p.name}, no-sync={p.no_sync}")
 
-    def forward(
+    def forward(self, hidden_states: paddle.Tensor):
+        self.update_flex_token()
+
+        if self.using_flex_token:
+            return self.forward_flex_token(hidden_states)
+        else:
+            return self.forward_drop_token(hidden_states)
+
+    def forward_drop_token(
         self,
         hidden_state: paddle.Tensor,
     ):
@@ -342,6 +376,69 @@ class MoELayer(nn.Layer):
         )
 
         return final_out, l_aux, l_zloss
+
+    def forward_flex_token(self, hidden_states: paddle.Tensor):
+        _, _, d_model = hidden_states.shape
+        # reshaped_input = hidden_states.reshape([-1, d_model])
+        probs, routing_map, l_aux, l_zloss = self.router(hidden_states)
+
+        if DSV3_USE_FP8_GEMM:
+            output = FusionMoe.apply(hidden_states, probs, routing_map, self)
+        else:
+            (
+                dispatched_input,
+                token_permuted_indices,
+                prob_permuted_indices,
+                dispatched_probs,
+            ) = self.token_dispatcher.token_permutation(hidden_states, probs, routing_map)
+            expert_output = self.expert_forward(dispatched_input)
+            output, _ = self.token_dispatcher.token_unpermutation(
+                expert_output, token_permuted_indices, prob_permuted_indices, dispatched_probs, None
+            )
+
+        return output, l_aux, l_zloss
+
+    def get_tokens_per_expert(self):
+        return self.token_dispatcher._comm_manager.tokens_per_expert_list
+
+    def set_tokens_per_expert(self, tokens_per_expert_list):
+        self.token_dispatcher._comm_manager.tokens_per_expert_list = tokens_per_expert_list
+
+    def expert_forward(self, dispatched_input):
+        outputs = []
+        # print(f"all tokens: {sum(tokens_per_expert)}, detail: {tokens_per_expert}")
+        chunks = paddle.split(dispatched_input, num_or_sections=self.get_tokens_per_expert(), axis=0)
+        for i, chunk in enumerate(chunks):
+            chunk = chunk.contiguous()
+            # assert chunk.shape[0] != 0, "Cannot dispatch empty input"
+            expert = self.experts[i + self.moe_rank * self.moe_num_experts_per_device]
+            outputs += [expert(chunk)]
+
+        return paddle.concat(outputs, axis=0)
+
+    def pre_dispatch_compute(self, hidden_states):
+        _, _, d_model = hidden_states.shape
+        probs, routing_map, l_aux, l_zloss = self.router(hidden_states)
+        hidden_states, token_indices, token_probs = self.token_dispatcher.pre_dispatch(
+            hidden_states, probs, routing_map
+        )
+        return l_aux, l_zloss, hidden_states, token_indices, token_probs
+
+    def post_dispatch_compute(self, hidden_states, dispatched_indices, dispatched_probs):
+        (global_input_tokens, token_permuted_indices, prob_permuted_indices) = self.token_dispatcher.post_dispatch(
+            hidden_states, dispatched_indices
+        )
+        return (global_input_tokens, token_permuted_indices, prob_permuted_indices)
+
+    def pre_combine_compute(self, hidden_states, token_permuted_indices, prob_permuted_indices, dispatched_probs):
+        hidden_states = self.token_dispatcher.pre_combine(
+            hidden_states, token_permuted_indices, prob_permuted_indices, dispatched_probs
+        )
+        return hidden_states
+
+    def post_combine_compute(self, hidden_states):
+        hidden_states = self.token_dispatcher.post_combine(hidden_states)
+        return hidden_states
 
 
 class FusionMoe(paddle.autograd.PyLayer):
@@ -459,85 +556,3 @@ class FusionMoe(paddle.autograd.PyLayer):
         hs_grad = paddle._C_ops.reshape_grad(hidden_states, hs_fp8_grad)
 
         return hs_grad, probs_grad, None
-
-
-class MoEFlexTokenLayer(nn.Layer):
-    def __init__(self, config, moe_num_experts, expert_class, expert_kwargs, gate, moe_group):
-
-        super().__init__()
-        self.config = config
-        self.moe_group = moe_group
-        self.ep_size = dist.get_world_size(self.moe_group)
-        self.moe_router_topk = gate.top_k
-        self.moe_num_experts = moe_num_experts
-        self.num_local_experts = moe_num_experts // self.ep_size
-        self.token_dispatcher = MoEFlexTokenDispatcher(
-            self.num_local_experts, self.moe_router_topk, self.moe_num_experts, moe_group
-        )
-
-        self.experts = nn.LayerList([])
-        for i in range(self.num_local_experts):
-            self.experts.append(expert_class(**expert_kwargs))
-        self.router = gate
-
-    def get_tokens_per_expert(self):
-        return self.token_dispatcher._comm_manager.tokens_per_expert_list
-
-    def set_tokens_per_expert(self, tokens_per_expert_list):
-        self.token_dispatcher._comm_manager.tokens_per_expert_list = tokens_per_expert_list
-
-    def expert_forward(self, dispatched_input):
-        outputs = []
-        # print(f"all tokens: {sum(tokens_per_expert)}, detail: {tokens_per_expert}")
-        chunks = paddle.split(dispatched_input, num_or_sections=self.get_tokens_per_expert(), axis=0)
-        for chunk, expert in zip(chunks, self.experts):
-            chunk = chunk.contiguous()
-            # assert chunk.shape[0] != 0, "Cannot dispatch empty input"
-            outputs += [expert(chunk)]
-
-        return paddle.concat(outputs, axis=0)
-
-    def forward(self, hidden_states: paddle.Tensor):
-        _, _, d_model = hidden_states.shape
-        # reshaped_input = hidden_states.reshape([-1, d_model])
-        probs, routing_map, l_aux, l_zloss = self.router(hidden_states)
-
-        if DSV3_USE_FP8_GEMM:
-            output = FusionMoe.apply(hidden_states, probs, routing_map, self)
-        else:
-            (
-                dispatched_input,
-                token_permuted_indices,
-                prob_permuted_indices,
-                dispatched_probs,
-            ) = self.token_dispatcher.token_permutation(hidden_states, probs, routing_map)
-            expert_output = self.expert_forward(dispatched_input)
-            output, _ = self.token_dispatcher.token_unpermutation(
-                expert_output, token_permuted_indices, prob_permuted_indices, dispatched_probs, None
-            )
-
-        return output, l_aux, l_zloss
-
-    def pre_dispatch_compute(self, hidden_states):
-        _, _, d_model = hidden_states.shape
-        probs, routing_map, l_aux, l_zloss = self.router(hidden_states)
-        hidden_states, token_indices, token_probs = self.token_dispatcher.pre_dispatch(
-            hidden_states, probs, routing_map
-        )
-        return l_aux, l_zloss, hidden_states, token_indices, token_probs
-
-    def post_dispatch_compute(self, hidden_states, dispatched_indices, dispatched_probs):
-        (global_input_tokens, token_permuted_indices, prob_permuted_indices) = self.token_dispatcher.post_dispatch(
-            hidden_states, dispatched_indices
-        )
-        return (global_input_tokens, token_permuted_indices, prob_permuted_indices)
-
-    def pre_combine_compute(self, hidden_states, token_permuted_indices, prob_permuted_indices, dispatched_probs):
-        hidden_states = self.token_dispatcher.pre_combine(
-            hidden_states, token_permuted_indices, prob_permuted_indices, dispatched_probs
-        )
-        return hidden_states
-
-    def post_combine_compute(self, hidden_states):
-        hidden_states = self.token_dispatcher.post_combine(hidden_states)
-        return hidden_states

@@ -40,6 +40,7 @@ from .modeling import (
     DeepseekV2PretrainedModel,
     DeepseekV2PretrainingCriterion,
     DeepseekV2RMSNorm,
+    set_global_step,
 )
 
 try:
@@ -821,6 +822,9 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     _tied_weights_keys = ["lm_head.weight"]
 
     # DONOT Add base_model_prefix !!!!
+
+    def step_flex_token(self, cur_step):
+        set_global_step(cur_step)
 
     @classmethod
     def _prepare_pipeline_inputs_func(cls, inputs):

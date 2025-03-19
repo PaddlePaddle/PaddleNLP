@@ -40,6 +40,7 @@ __all__ = [
     "ProgressCallback",
     "PrinterCallback",
     "EarlyStoppingCallback",
+    "StepFlexToken",
 ]
 
 
@@ -601,3 +602,16 @@ class EarlyStoppingCallback(TrainerCallback):
         self.check_metric_value(args, state, control, metric_value)
         if self.early_stopping_patience_counter >= self.early_stopping_patience:
             control.should_training_stop = True
+
+
+class StepFlexToken(TrainerCallback):
+    def on_step_begin(
+        self,
+        args: TrainingArguments,
+        state: TrainerState,
+        control: TrainerControl,
+        **kwargs,
+    ):
+        model = kwargs.pop("model")
+        if hasattr(model, "step_flex_token"):
+            model.step_flex_token(state.global_step)
