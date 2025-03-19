@@ -184,12 +184,14 @@ python -u evaluation/eval_mteb.py \
 是一个大规模文本嵌入评测基准，包含了丰富的向量检索评估任务和数据集。
 本仓库主要面向其中的中英文检索任务（Retrieval），并额外支持针对 MSMARCO-Title 的评估。
 
-评估脚本为 `evaluation/eval_mteb.sh`, 支持5个模型：
-LLARA ([LLARA-passage](https://huggingface.co/BAAI/LLARA-passage)),
+评估脚本为 `evaluation/eval_mteb.sh`, 支持7个模型：
+RocketQA V1,
+RocketQA V2,
+BGE([bge-large-en-v1.5](https://huggingface.co/BAAI/bge-large-en-v1.5)),
+RepLLaMA([repllama-v1-7b-lora-passage](https://huggingface.co/castorini/repllama-v1-7b-lora-passage)),
 NV-Embed ([NV-Embed-v1](https://huggingface.co/nvidia/NV-Embed-v1)),
 BGE-EN-ICL([BGE-EN-ICL](https://huggingface.co/BAAI/bge-en-icl)),
-RepLLaMA([repllama-v1-7b-lora-passage](https://huggingface.co/castorini/repllama-v1-7b-lora-passage)),
-BGE([bge-large-en-v1.5](https://huggingface.co/BAAI/bge-large-en-v1.5))
+LLARA ([LLARA-passage](https://huggingface.co/BAAI/LLARA-passage))
 
 可支持配置的参数：
 - `base_model_name_or_path`: 模型名称或路径
