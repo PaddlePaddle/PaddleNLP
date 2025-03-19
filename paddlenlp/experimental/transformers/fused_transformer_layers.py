@@ -1724,7 +1724,7 @@ class FusedMultiTransformerBase(Layer):
                 norm_topk_prob=False,  # 在noaux_tc中做了
                 routed_scaling_factor=1.0,  # 在noaux_tc中做了
             )
-        elif self.config.use_ep_parallel and self.data_parallel_degree < 2:
+        elif self.config.use_ep_parallel and self.data_parallel_degree ==1:
             fused_moe_out = self.compute_moe_ep_with_tp(tmp_out, i)
             return fused_moe_out
         elif self.config.use_ep_parallel and self.data_parallel_degree > 1:

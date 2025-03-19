@@ -1520,9 +1520,6 @@ def predict():
     parser = PdArgumentParser((PredictorArgument, ModelArgument))
     predictor_args, model_args = parser.parse_args_into_dataclasses()
 
-    paddle.set_device(predictor_args.device)
-    paddle.set_default_dtype(predictor_args.dtype)
-
     world_size = paddle.distributed.get_world_size()
     data_parallel_degree = predictor_args.data_parallel_degree
     tensor_parallel_degree = world_size // data_parallel_degree
