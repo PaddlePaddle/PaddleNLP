@@ -39,6 +39,5 @@
   "recompute": false,
   "distributed_dataloader": 1,
   "unified_checkpoint": true,
-  "save_total_limit": 2,
-  "skip_profile_timer": false
+  "save_total_limit": 2
 }
