@@ -185,8 +185,8 @@ python -u evaluation/eval_mteb.py \
 本仓库主要面向其中的中英文检索任务（Retrieval），并额外支持针对 MSMARCO-Title 的评估。
 
 评估脚本为 `evaluation/eval_mteb.sh`, 支持7个模型：
-RocketQA V1,
-RocketQA V2,
+RocketQA V1([RocketQA](https://github.com/PaddlePaddle/RocketQA/tree/main/research/RocketQA_NAACL2021)),
+RocketQA V2([RocketQAv2](https://github.com/PaddlePaddle/RocketQA/tree/main/research/RocketQAv2_EMNLP2021)),
 BGE([bge-large-en-v1.5](https://huggingface.co/BAAI/bge-large-en-v1.5)),
 RepLLaMA([repllama-v1-7b-lora-passage](https://huggingface.co/castorini/repllama-v1-7b-lora-passage)),
 NV-Embed ([NV-Embed-v1](https://huggingface.co/nvidia/NV-Embed-v1)),
@@ -251,3 +251,7 @@ LLARA ([LLARA-passage](https://huggingface.co/BAAI/LLARA-passage))
 [6] Zheng Liu, Chaofan Li, Shitao Xiao, Yingxia Shao, Defu Lian: Llama2Vec: Unsupervised Adaptation of Large Language Models for Dense Retrieval. ACL 2024
 
 [7] Chaofan Li, MingHao Qin, Shitao Xiao, Jianlyu Chen, Kun Luo, Yingxia Shao, Defu Lian, Zheng Liu: Making Text Embedders Few-Shot Learners. arXiv 2024
+
+[8] Yingqi Qu, Yuchen Ding, Jing Liu, Kai Liu, Ruiyang Ren, Wayne Xin Zhao, Daxiang Dong, Hua Wu, Haifeng Wang: RocketQA: An Optimized Training Approach to Dense Passage Retrieval for Open-Domain Question Answering. NAACL 2021
+
+[9] Ruiyang Ren, Yingqi Qu, Jing Liu, Wayne Xin Zhao, Qiaoqiao She, Hua Wu, Haifeng Wang, Ji-Rong Wen: RocketQAv2: A Joint Training Method for Dense Passage Retrieval and Passage Re-ranking. EMNLP 2021

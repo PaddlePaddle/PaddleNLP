@@ -15,11 +15,12 @@
 
 # 1. RocketQA V1
 
+task=SciFact # MSMARCOTITLE, ...
 python3.10 -u evaluation/eval_mteb.py \
-       --corpus_model_name_or_path /141nfs/zhuqiming2023/models/rocketqa-en-base-v1/passage_model \
-       --query_model_name_or_path /141nfs/zhuqiming2023/models/rocketqa-en-base-v1/query_model \
+       --corpus_model_name_or_path rocketqa-en-base-v1/passage_model \
+       --query_model_name_or_path rocketqa-en-base-v1/query_model \
        --model_flag RocketQA-V1 \
-       --output_folder "$output_folder" \
+       --output_folder en_results/rocketqa-en-base-v1 \
        --task_name "$task" \
        --task_split $(if [[ "$task" == *"MSMARCO"* ]]; then echo "dev"; else echo "test"; fi) \
        --query_instruction "" \
@@ -35,11 +36,12 @@ python3.10 -u evaluation/eval_mteb.py \
 
 # 2. RocketQA V2     
 
+task=SciFact # MSMARCOTITLE, ...
 python3.10 -u evaluation/eval_mteb.py \
-       --corpus_model_name_or_path /141nfs/zhuqiming2023/models/rocketqa-en-base-v2/passage_model \
-       --query_model_name_or_path /141nfs/zhuqiming2023/models/rocketqa-en-base-v2/query_model \
+       --corpus_model_name_or_path rocketqa-en-base-v2/passage_model \
+       --query_model_name_or_path rocketqa-en-base-v2/query_model \
        --model_flag RocketQA-V2 \
-       --output_folder "$output_folder" \
+       --output_folder en_results/rocketqa-en-base-v2 \
        --task_name "$task" \
        --task_split $(if [[ "$task" == *"MSMARCO"* ]]; then echo "dev"; else echo "test"; fi) \
        --query_instruction "" \
