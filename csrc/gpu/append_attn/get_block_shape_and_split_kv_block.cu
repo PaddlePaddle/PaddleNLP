@@ -296,6 +296,8 @@ std::vector<paddle::Tensor> GetBlockShapeAndSplitKVBlock(
                                           group_size);
       decoder_num_blocks_x_cpu =
         decoder_num_blocks_x.copy_to(paddle::CPUPlace(), false);
+      decoder_chunk_size_cpu =
+        paddle::full({1}, 64, paddle::DataType::INT32, paddle::CPUPlace());
     }
   } else {
     decoder_batch_ids =
@@ -303,7 +305,7 @@ std::vector<paddle::Tensor> GetBlockShapeAndSplitKVBlock(
     decoder_tile_ids_per_batch =
         paddle::full({1}, -1, paddle::DataType::INT32, paddle::GPUPlace());
     decoder_chunk_size_cpu =
-        paddle::full({64}, -1, paddle::DataType::INT32, paddle::CPUPlace());
+        paddle::full({1}, 64, paddle::DataType::INT32, paddle::CPUPlace());
     decoder_num_blocks_x = 
         paddle::full({1}, -1, paddle::DataType::INT32, paddle::GPUPlace());
     decoder_num_blocks_x_cpu =
@@ -401,6 +403,7 @@ std::vector<paddle::DataType> GetBlockShapeAndSplitKVBlockInferDtype(
           paddle::DataType::INT32,
           paddle::DataType::INT32,
           paddle::DataType::INT32,
+          paddle::DataType::INT32,
           paddle::DataType::INT32};
 }
 
@@ -421,6 +424,7 @@ std::vector<std::vector<int64_t>> GetBlockShapeAndSplitKVBlockInferShape(
           {1},
           dynamic_shape,
           dynamic_shape,
+          {1},
           {1},
           {1},
           {1}};
