@@ -1,4 +1,4 @@
-## 🚣‍♂️ 使用 PaddleNLP 在 XPU 下跑通 llama2-7b 模型  🚣
+# 使用 PaddleNLP 在 XPU 下跑通 llama2-7b 模型
 PaddleNLP 在昆仑 XPU（[了解昆仑](https://www.kunlunxin.com/)）上对 llama2-7B 模型进行了深度适配和优化,下面给出详细安装步骤。
 
 ##  🚀 快速开始 🚀

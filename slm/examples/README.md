@@ -33,9 +33,10 @@ PaddleNLP provides rich application examples covering mainstream NLP task to hel
 
 ## NLP 拓展应用 (NLP Extented Applications)
 
-| 目录 Folder       | 任务 Task                                                               |
-|:------------------|-------------------------------------------------------------------------|
-| few_shot          | [小样本学习 (Few-shot Learning)](./few_shot/):star2:                    |
-| text_to_knowledge | [解语知识关联框架 (Text Knowledge Mining)](./text_to_knowledge/):star2: |
-| model_compression | [模型压缩 (Model Compression）](./model_compression/)                   |
-| text_graph        | [文本图学习 (Text Graph Learning)](./text_graph/erniesage/)             |
+| 目录 Folder          | 任务 Task                                                               |
+|:---------------------|-------------------------------------------------------------------------|
+| few_shot             | [小样本学习 (Few-shot Learning)](./few_shot/):star2:                    |
+| text_to_knowledge    | [解语知识关联框架 (Text Knowledge Mining)](./text_to_knowledge/):star2:  |
+| model_compression    | [模型压缩 (Model Compression）](./model_compression/)                    |
+| text_graph           | [文本图学习 (Text Graph Learning)](./text_graph/erniesage/)             |
+| contrastive_learning | [对比学习 (Contrastive Learning)](./contrastive_learning/)              |

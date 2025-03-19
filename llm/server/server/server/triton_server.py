@@ -28,7 +28,6 @@ from datetime import datetime
 import numpy as np
 from server.checker import add_default_params, check_basic_params
 from server.engine import engine
-from server.engine.config import Config
 from server.utils import error_logger, model_server_logger
 
 import server
@@ -44,15 +43,6 @@ if sys.stdout.encoding is None:
     enc = os.environ["LANG"].split(".")[1]
     sys.stdout = codecs.getwriter(enc)(sys.stdout)
 
-
-class TritonConfig(Config):
-    """
-    Triton Inference Server config
-    """
-    def __init__(self, base_config):
-        super().__init__()
-        for k, v in base_config.__dict__.items():
-            setattr(self, k, v)
 
 
 class TritonTokenProcessor(engine.TokenProcessor):
@@ -189,9 +179,8 @@ class TritonServer(object):
 
         # response_sender thread lock
         self.thread_lock = threading.Lock()
-
-        base_config = Config()
-        self.cfg = TritonConfig(base_config)
+        from server.engine.config import global_config
+        self.cfg = global_config
         self.cfg.print(file="log/fastdeploy_init.info")
 
         # init engine
