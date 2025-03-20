@@ -992,34 +992,34 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
         return return_args(hidden_states)
 
     def build_schedule_node(self):
-        self.mlp.update_flex_token()
-        if self.mlp.using_flex_token and isinstance(self.mlp, DeepseekV2MoE):
-            if DSV3_USE_FP8_GEMM:
-                attn_and_gate_node = ScheduleNode(self.attn_compute_for_fusion, name="attn_and_gate_node")
-                fp8_fusion_moe_node = FusionMoeNode(self.mlp, name="fp8_fusion_moe_node")
-                post_process_node = ScheduleNode(self.post_process_compute_for_fusion, name="post_process_node")
-                return FusionFp8DecoderLayerNode(
-                    attn_and_gate_node=attn_and_gate_node,
-                    fp8_fusion_moe_node=fp8_fusion_moe_node,
-                    post_process_node=post_process_node,
-                    mlp_layer=self.mlp,
-                    name="FusionFp8DecoderLayerNode",
-                )
-            else:
-                attn_node = ScheduleNode(self.attn_compute, name="attn_node")
-                mlp_node = ScheduleNode(self.mlp_compute, name="mlp_node")
-                post_process_node = ScheduleNode(self.post_process_compute, name="post_process_node")
-                return DecoderLayerNode(
-                    attn_node=attn_node,
-                    dispatch_node=None,
-                    mlp_node=mlp_node,
-                    combine_node=None,
-                    post_process_node=post_process_node,
-                    mlp_layer=self.mlp,
-                    name="DecoderLayerNode",
-                )
-        else:
-            return ScheduleNode(self.forward, name="DeepseekV2DecoderLayerPipe")
+        if isinstance(self.mlp, DeepseekV2MoE):
+            self.mlp.update_flex_token()
+            if self.mlp.using_flex_token:
+                if DSV3_USE_FP8_GEMM:
+                    attn_and_gate_node = ScheduleNode(self.attn_compute_for_fusion, name="attn_and_gate_node")
+                    fp8_fusion_moe_node = FusionMoeNode(self.mlp, name="fp8_fusion_moe_node")
+                    post_process_node = ScheduleNode(self.post_process_compute_for_fusion, name="post_process_node")
+                    return FusionFp8DecoderLayerNode(
+                        attn_and_gate_node=attn_and_gate_node,
+                        fp8_fusion_moe_node=fp8_fusion_moe_node,
+                        post_process_node=post_process_node,
+                        mlp_layer=self.mlp,
+                        name="FusionFp8DecoderLayerNode",
+                    )
+                else:
+                    attn_node = ScheduleNode(self.attn_compute, name="attn_node")
+                    mlp_node = ScheduleNode(self.mlp_compute, name="mlp_node")
+                    post_process_node = ScheduleNode(self.post_process_compute, name="post_process_node")
+                    return DecoderLayerNode(
+                        attn_node=attn_node,
+                        dispatch_node=None,
+                        mlp_node=mlp_node,
+                        combine_node=None,
+                        post_process_node=post_process_node,
+                        mlp_layer=self.mlp,
+                        name="DecoderLayerNode",
+                    )
+        return ScheduleNode(self.forward, name="DeepseekV2DecoderLayerPipe")
 
 
 class DeepseekV2MTPLayerPipe(DeepseekV2MTPLayer):
