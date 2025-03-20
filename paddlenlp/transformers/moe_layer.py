@@ -627,7 +627,7 @@ class MlpNode:
         return hs_fp8_dispatched_grad, dispatched_probs_grad
 
 
-class FusionMoeNodeLJD:
+class FusionMoeNode:
     def __init__(self, custom_map, name="fusion_moe_node"):
         self.token_dispatcher = custom_map.token_dispatcher
 
