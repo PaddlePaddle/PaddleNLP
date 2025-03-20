@@ -17,7 +17,7 @@ for task in "ArguAna" "ClimateFEVER" "DBPedia" "FEVER" "FiQA2018" "HotpotQA" "MS
 do
 
        # 1. RocketQA V1
-       python -u evaluation/eval_mteb.py \
+       python3.10 -u eval_mteb.py \
               --corpus_model_name_or_path rocketqa-en-base-v1/passage_model \
               --query_model_name_or_path rocketqa-en-base-v1/query_model \
               --model_flag RocketQA-V1 \
@@ -33,7 +33,7 @@ do
               --pooling_method "cls"
 
        # 2. RocketQA V2     
-       python -u evaluation/eval_mteb.py \
+       python3.10 -u eval_mteb.py \
               --corpus_model_name_or_path rocketqa-en-base-v2/passage_model \
               --query_model_name_or_path rocketqa-en-base-v2/query_model \
               --model_flag RocketQA-V2 \
@@ -49,7 +49,7 @@ do
               --pooling_method "cls"
 
        # 3. BGE
-       python evaluation/eval_mteb.py \
+       python3.10 eval_mteb.py \
               --base_model_name_or_path BAAI/bge-large-en-v1.5 \
               --output_folder en_results/bge-large-en-v1.5 \
               --task_name "$task" \
@@ -58,13 +58,12 @@ do
               --pooling_method mean \
               --max_seq_length 512 \
               --eval_batch_size 32 \
-              --pad_token pad_token \
               --padding_side right \
               --add_bos_token 0 \
               --add_eos_token 0
 
        # 4. RepLLaMA
-       python evaluation/eval_mteb.py \
+       python3.10 eval_mteb.py \
               --base_model_name_or_path castorini/repllama-v1-7b-lora-passage \
               --output_folder en_results/repllama-v1-7b-lora-passage \
               --task_name "$task" \
@@ -74,13 +73,12 @@ do
               --pooling_method last \
               --max_seq_length 512 \
               --eval_batch_size 2 \
-              --pad_token unk_token \
               --padding_side right \
               --add_bos_token 0 \
               --add_eos_token 1
 
        # 5. NV-Embed-v1
-       python evaluation/eval_mteb.py \
+       python3.10 eval_mteb.py \
               --base_model_name_or_path nvidia/NV-Embed-v1 \
               --output_folder en_results/nv-embed-v1 \
               --query_instruction "Given a claim, find documents that refute the claim" \
@@ -89,7 +87,7 @@ do
               --eval_batch_size 8
 
        # 6. BGE-EN-ICL
-       python evaluation/eval_mteb.py \
+       python3.10 eval_mteb.py \
               --base_model_name_or_path BAAI/bge-en-icl \
               --output_folder en_results/bge-en-icl \
               --task_name "$task" \
@@ -98,13 +96,12 @@ do
               --max_seq_length 512 \
               --eval_batch_size 32 \
               --dtype "float32" \
-              --pad_token unk_token \
               --padding_side left \
               --add_bos_token 1 \
               --add_eos_token 1
 
        # 7. LLARA-passage
-       python evaluation/eval_mteb.py \
+       python3.10 eval_mteb.py \
               --base_model_name_or_path BAAI/LLARA-passage \
               --output_folder en_results/llara-passage \
               --task_name "$task" \

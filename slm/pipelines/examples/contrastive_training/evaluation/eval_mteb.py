@@ -80,6 +80,7 @@ class MSMARCOTITLE(AbsTaskRetrieval):
 
         self.data_loaded = True
 
+
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--base_model_name_or_path", default=None, type=str)
@@ -101,7 +102,7 @@ def get_args():
     parser.add_argument("--eval_batch_size", default=1, type=int)
 
     parser.add_argument("--dtype", default="float16", type=str)
-    parser.add_argument("--model_flag", default=None, type=str)
+    parser.add_argument("--model_flag", default="", type=str)
 
     parser.add_argument("--pad_token", default="unk_token", type=str)  # unk_token, eos_token
     parser.add_argument("--padding_side", default="left", type=str)  # right, left
@@ -115,7 +116,7 @@ if __name__ == "__main__":
     args = get_args()
     for k, v in vars(args).items():
         print(f"{k}: {v}")
-    
+
     assert args.padding_side in [
         "right",
         "left",
@@ -123,7 +124,7 @@ if __name__ == "__main__":
     assert not (
         args.padding_side == "left" and args.pooling_method == "cls"
     ), "Padding 'left' is not supported for pooling method 'cls'"
-    
+
     logger = logging.getLogger(__name__)
     logging.basicConfig(level=logging.INFO)
 
@@ -154,9 +155,11 @@ if __name__ == "__main__":
                 encode_model, args.peft_model_name_or_path, lora_config=lora_config, dtype="bfloat16"
             )
         tokenizer = encode_model.tokenizer
-    if "RocketQA" in args.model_flag:
+    elif "RocketQA" in args.model_flag:
         logger.info("Using RocketQA")
-        assert args.padding_side == "right" and args.pooling_method == "cls", "Padding 'left' is not supported for RocketQA"
+        assert (
+            args.padding_side == "right" and args.pooling_method == "cls"
+        ), "Padding 'left' is not supported for RocketQA"
         tokenizer = AutoTokenizer.from_pretrained(args.query_model_name_or_path)
         tokenizer.padding_side = args.padding_side
         encode_model = BiEncoderModel(
