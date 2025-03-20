@@ -22,7 +22,11 @@ from .import_utils import *
 from .infohub import infohub
 from .initializer import to
 from .memory_utils import empty_device_cache
-from .optimizer import *
+
+try:
+    from .optimizer import *
+except:
+    pass
 from .paddle_patch import *
 from .serialization import load_torch
 
