@@ -276,10 +276,27 @@ class DispatchNode:
     def __init__(self, name="dispatch"):
         self.name = name
 
-    def forward(self, x, token_indices, token_probs, num_experts, group, previous_event=None, async_finish=False):
+    def forward(
+        self,
+        x,
+        token_indices,
+        token_probs,
+        num_experts,
+        group,
+        previous_event=None,
+        async_finish=False,
+        allocate_on_comm_stream=False,
+    ):
         """Forward pass of fused dispatch."""
         recv_x, recv_token_probs, states, event = fused_dispatch_forward_func(
-            x, token_indices, token_probs, num_experts, group, previous_event=previous_event, async_finish=async_finish
+            x,
+            token_indices,
+            token_probs,
+            num_experts,
+            group,
+            previous_event=previous_event,
+            async_finish=async_finish,
+            allocate_on_comm_stream=allocate_on_comm_stream,
         )
 
         self.group = group
@@ -321,5 +338,5 @@ class CombineNode:
     def backward(self, grad_output, previous_event=None, async_finish=False):
         """Backward pass of fused combine."""
         return fused_combine_backward_func(
-            grad_output, self.group, self.handle, previous_event=previous_event, async_finish=False
+            grad_output, self.group, self.handle, previous_event=previous_event, async_finish=async_finish
         )
