@@ -14,12 +14,16 @@
 | deepseek-ai/DeepSeek-V3                   | 🚧 |
 
 ### DeepSeekR1
+部署硬件要求：
+- 除MTP模型，Fp8模型之外支持的最低版本是SM80 (机器：A100 / A800) 要求CUDA 11.8 以上
+- DeepSeek-R1-MTP 与 Fp8 模型 支持的最低版本是SM90 (机器：H800) 要求CUDA 12.4 以上
+
 |模型名称|精度|MTP|节点数|静态图下载 model_name|
 |:------|:-:|:-:|:-:|:-:|
 | deepseek-ai/DeepSeek-R1  |weight_only_int4|否|1| deepseek-ai/DeepSeek-R1/weight_only_int4 |
-| deepseek-ai/DeepSeek-R1  |weight_only_int4|是|1| deepseek-ai/DeepSeek-R1-MTP/weight-only-int4 |
+| deepseek-ai/DeepSeek-R1  |weight_only_int4|是|1| deepseek-ai/DeepSeek-R1-MTP/weight_only_int4 |
 | deepseek-ai/DeepSeek-R1  |weight_only_int8|否|2| deepseek-ai/DeepSeek-R1-2nodes/weight_only_int8 |
-| deepseek-ai/DeepSeek-R1  |weight_only_int8|是|2| deepseek-ai/DeepSeek-R1-MTP-2nodes/weight-only-int8 |
+| deepseek-ai/DeepSeek-R1  |weight_only_int8|是|2| deepseek-ai/DeepSeek-R1-MTP-2nodes/weight_only_int8 |
 | deepseek-ai/DeepSeek-R1  |a8w8_fp8|否|2| deepseek-ai/DeepSeek-R1-2nodes/a8w8_fp8|
 | deepseek-ai/DeepSeek-R1  |a8w8_fp8|是|2| deepseek-ai/DeepSeek-R1-MTP-2nodes/a8w8_fp8|
 | deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B |weight_only_int8|-|-| deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B/weight_only_int8 |
@@ -49,6 +53,16 @@
 | meta-llama/Llama-2-70b-chat | 🚧 |
 
 ### Llama3
+
+部署硬件要求：
+- Append-Attn：
+  - 支持的最低版本是SM80 (机器：A100 / A800)
+  - 要求CUDA 11.8 以上
+- Block-Attn:
+  - 支持的最低版本是SM70 (机器：V100)
+  - 要求CUDA 11.8 以上
+
+
 | 模型名称 | 静态图下载 model_name |
 |:------|:-:|
 | meta-llama/Meta-Llama-3-8B | 🚧 |
@@ -98,6 +112,11 @@
 | qwen/qwen-72b-chat | 🚧 |
 
 ### Qwen1.5
+部署硬件要求：
+- Block-Attn:
+  - 支持的最低版本是SM70 (机器：V100)
+  - 要求CUDA 11.8 以上
+
 | 模型名称 | 静态图下载 model_name |
 |:------|:-:|
 | Qwen/Qwen1.5-0.5B | Qwen/Qwen1.5-0.5B-Block-Attn/bfloat16,Qwen/Qwen1.5-0.5B-Block-Attn/float16 |
@@ -120,6 +139,14 @@
 | Qwen/Qwen1.5-MoE-A2.7B-Chat | 🚧 |
 
 ### Qwen2
+部署硬件要求：
+- Append-Attn：
+  - 支持的最低版本是SM80 (机器：A100 / A800)
+  - 要求CUDA 11.8 以上
+- Block-Attn:
+  - 支持的最低版本是SM70 (机器：V100)
+  - 要求CUDA 11.8 以上
+
 | 模型名称 | 静态图下载 model_name |
 |:------|:-:|
 | Qwen/Qwen2-0.5B | 🚧 |

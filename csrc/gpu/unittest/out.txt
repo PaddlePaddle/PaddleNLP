@@ -1,0 +1,29 @@
+Tensor(shape=[1, 262148], dtype=float32, place=Place(xpu:0), stop_gradient=True,
+       [[ 0.71167356, -0.32448494, -1.00187063, ...,  2.36799788,
+         -0.21087708, -1.17099285]])
+Running set_value_by_flags_and_idx_v2...
+Results after first operation:
+pre_ids
+ [[     1      1      3      4      5      6      7 262145 262145 262145
+  262147 262147 262147 262147 262147 262147     -1     -1     -1]
+ [     1      9      7      6      5 262145 262145 262145 262147 262147
+  262147 262147 262147 262147      4     -1     -1     -1     -1]]
+logits
+ [[-1.0000000e+10 -1.0000000e+10 -1.6697843e+00 ...  3.4466631e+00
+  -3.5146177e-01 -2.9516547e+00]]
+penalty_scores
+ [1. 1.]
+frequency_scores
+ [0.1 0.1]
+presence_scores
+ [0. 0.]
+temperatures
+ [0.6 0.6]
+bad_tokens
+ [0 1]
+cur_len
+ [7 6]
+min_len
+ [1 8]
+eos_token_id
+ [2 9]
