@@ -1345,7 +1345,6 @@ function llama_dpo_dy2st_auto_bs2_bf16_MP8_intermediate() {
         --seed 42 \
         --to_static true \
         --enable_auto_parallel true \
-        --model_type llama_dpo_network \
         --use_intermediate_api true \
         >>${log_path}/$FUNCNAME 2>&1
     loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`

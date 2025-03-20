@@ -84,5 +84,4 @@ python -u  -m paddle.distributed.launch \
     --seed 42 \
     --to_static true \
     --enable_auto_parallel true \
-    --model_type "llama_dpo_network" \
     --use_intermediate_api true \
