@@ -1,5 +1,5 @@
 {
-  "model_name_or_path": "deepseek-ai/DeepSeek-V3",
+  "model_name_or_path": "./DeepSeek-V3-mini",
   "tokenizer_name_or_path": "deepseek-ai/DeepSeek-V3",
   "input_dir": "./data",
   "output_dir": "./checkpoints/pretrain_ckpts",
