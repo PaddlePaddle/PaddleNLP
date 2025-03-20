@@ -936,9 +936,9 @@ class FusionMoeNodeZip:
         grad_regroup = grad_regroup.reshape([self.expert_w_count * self.m, max_seq_len])
 
         grad_regroup_fp8 = grad_regroup.reshape([self.expert_w_count, self.m, -1])
-        grad_regroup_scale = grad_regroup_scale.reshape([self.expert_w_count, self.m, -1])
 
-        raise RuntimeError(grad_regroup_fp8)
+        #如何求grad_regroup_scale?
+        grad_regroup_scale = grad_regroup_scale.reshape([self.expert_w_count, self.m, -1])
 
         # for i in range(self.expert_w_count):
 
@@ -960,49 +960,3 @@ class FusionMoeNodeZip:
         de3_w1 = kitchen_fp8_gemm(
             swiglu_regroup_fp8[3], swiglu_regroup_scale[3], grad_regroup_fp8[3], grad_regroup_scale[3], True, True
         )
-
-        #  dw0, x = unzip token; dout = dt1
-        input_x_regroup, dt1_regroup = TDU.regroup_tokens(
-            self.unzipped_tokens, dt1, self.unzipped_expert_idx, expert_num=4, token_max_per_expert=max_seq_len
-        )
-
-        input_x_regroup = (
-            input_x_regroup.reshape([max_seq_len, self.expert_w_count, -1]).transpose([1, 2, 0]).contiguous()
-        )
-
-        dt1_regroup = dt1_regroup.reshape([max_seq_len, self.expert_w_count, -1]).transpose([1, 2, 0]).contiguous()
-
-        input_x_regroup = input_x_regroup.reshape([self.expert_w_count, self.m, max_seq_len])
-        input_x_regroup_fp8, input_x_regroup_scale = kitchen_quant(
-            input_x_regroup, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
-        )
-        input_x_regroup_fp8 = input_x_regroup_fp8.reshape([self.expert_w_count, self.m, input_x_regroup.shape[-1]])
-        input_x_regroup_scale = input_x_regroup_scale.reshape([4, H1, -1])
-
-        dt1_regroup = dt1_regroup.reshape([4 * 2 * H2, max_seq_len])
-        dt1_regroup_fp8, dt1_regroup_scale = kitchen_quant(
-            dt1_regroup, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
-        )
-
-        dt1_regroup_fp8 = dt1_regroup_fp8.reshape([self.expert_w_count, n, -1])
-
-        # 如何得到dt1_regroup_scale？
-        dt1_regroup_scale = dt1_regroup_scale.reshape([self.expert_w_count, n, -1])
-
-        # for fp8 gemm
-
-        # de0_w0 = kitchen_fp8_gemm(input_x_regroup_fp8[0], input_x_regroup_scale[0], dt1_regroup_fp8[0], dt1_regroup_scale[0], True, True)
-        # de1_w0 = kitchen_fp8_gemm(input_x_regroup_fp8[1], input_x_regroup_scale[1], dt1_regroup_fp8[1], dt1_regroup_scale[1], True, True)
-        # de2_w0 = kitchen_fp8_gemm(input_x_regroup_fp8[2], input_x_regroup_scale[2], dt1_regroup_fp8[2], dt1_regroup_scale[2], True, True)
-        # de3_w0 = kitchen_fp8_gemm(input_x_regroup_fp8[3], input_x_regroup_scale[3], dt1_regroup_fp8[3], dt1_regroup_scale[3], True, True)
-
-
-class FusionMoe(paddle.autograd.PyLayer):
-    @staticmethod
-    def forward(ctx, hidden_states, probs, routing_map, custom_map):
-        ctx.node = FusionMoeNode(custom_map)
-        return ctx.node.forward(hidden_states, probs, routing_map)
-
-    @staticmethod
-    def backward(ctx, output_grad):
-        return ctx.node.backward(output_grad)
