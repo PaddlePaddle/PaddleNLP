@@ -42,7 +42,9 @@ __all__ = [
 ]
 
 
-def kitchen_quant(x, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False):
+def kitchen_quant(x, backend=None, is_1d_scaled=True, return_transpose=False):
+    if backend is None:
+        backend = kitchen.ops.Backend.CUBLAS
     quant_tile_shape = (1, 128) if is_1d_scaled else (128, 128)
     x_qparams = QParams(
         quant_dtype=paddle.float8_e4m3fn,
@@ -98,9 +100,22 @@ class ExpertsNode:
         self.experts = experts
         self.x_t_fp8s = []
         self.x_t_scales = []
+<<<<<<< HEAD
         self.o1s = []       
         self.custom_map = custom_map
 
+=======
+        self.o1s = []
+        self.dxs = []
+        self.custom_map = custom_map
+
+    def reset_statue(self):
+        self.x_t_fp8s = []
+        self.x_t_scales = []
+        self.o1s = []
+        self.dxs = []
+
+>>>>>>> 53bc36b555dc22175212dc3aa7ef6226c230c030
     def forward(self, hs_out, hs_scale_out, tokens_per_expert):
         self.tokens_per_expert = tokens_per_expert
         x_fp8_list = paddle.split(hs_out, num_or_sections=self.tokens_per_expert, axis=0)  # FP8 chunk
@@ -112,7 +127,11 @@ class ExpertsNode:
             x_fp8 = chunk.contiguous()
             o1 = self.fwd_gate_up(x_fp8, chunk_scale, expert.w1)
             o2 = self.fwd_swiglu(o1)
+<<<<<<< HEAD
             o3 = self.fwd_down(o2, expert.w2)        
+=======
+            o3 = self.fwd_down(o2, expert.w2)
+>>>>>>> 53bc36b555dc22175212dc3aa7ef6226c230c030
 
             outputs.append(o3)
 
@@ -135,7 +154,11 @@ class ExpertsNode:
             )
 
             self.x_t_fp8s.append(x_t_fp8)
+<<<<<<< HEAD
             self.x_t_scales.append(x_t_scale)  
+=======
+            self.x_t_scales.append(x_t_scale)
+>>>>>>> 53bc36b555dc22175212dc3aa7ef6226c230c030
             self.o1s.append(o1)
 
         expert_output = paddle.concat(outputs, axis=0)
@@ -146,7 +169,10 @@ class ExpertsNode:
 
         out_grad_scale_list = paddle.split(out_grad_scale, num_or_sections=self.tokens_per_expert, axis=0)
 
+<<<<<<< HEAD
         dxs = []
+=======
+>>>>>>> 53bc36b555dc22175212dc3aa7ef6226c230c030
         for i, (do3, do3_scale, x_t_fp8, x_t_scale, o1) in enumerate(
             zip(
                 out_grad_list,
@@ -158,6 +184,7 @@ class ExpertsNode:
         ):
             expert = self.experts[i + self.custom_map.moe_rank * self.custom_map.moe_num_experts_per_device]
             w1_fp8, w1_scale = kitchen_quant(
+<<<<<<< HEAD
                     expert.w1, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
                 )
             w2_t_fp8, w2_t_scale = kitchen_quant(
@@ -165,6 +192,15 @@ class ExpertsNode:
                 )
 
             do2 = self.bwd_dowm_input(do3, do3_scale, w2_fp8, w2_sacle)
+=======
+                expert.w1, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
+            )
+            w2_fp8, w2_scale = kitchen_quant(
+                expert.w2, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
+            )
+
+            do2 = self.bwd_dowm_input(do3, do3_scale, w2_fp8, w2_scale)
+>>>>>>> 53bc36b555dc22175212dc3aa7ef6226c230c030
             do1 = self.bwd_swiglu(o1, do2)
             dx = self.bwd_gate_up_input(do1, w1_fp8, w1_scale)
 
@@ -180,7 +216,10 @@ class ExpertsNode:
             
             dxs.append(dx)
 
-        dx = paddle.concat(dxs, axis=0)
+            self.dxs += [dx]
+
+        dx = paddle.concat(self.dxs, axis=0)
+        self.reset_statue()
         return dx
 
     def fwd_gate_up(self, x_fp8, x_scale, w1):

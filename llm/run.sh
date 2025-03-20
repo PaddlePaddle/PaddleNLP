@@ -13,6 +13,7 @@
 # limitations under the License.
 
 # llama 模型数据下载
+# mkdir -p data
 # wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.bin
 # wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.idx
 

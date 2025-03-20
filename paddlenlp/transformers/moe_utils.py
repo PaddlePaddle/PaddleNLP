@@ -165,8 +165,9 @@ class UnPermuteNode:
             include_self=True,
         )
         with paddle.base.device_guard("cpu"):
-            self.output_tokens = paddle._C_ops.empty( output_tokens.shape, output_tokens.dtype, paddle.CPUPlace() )
-        return output_tokens
+            self.output_tokens = paddle.empty(shape=output_tokens.shape, dtype=output_tokens.dtype)
+
+        return output_tokens.to(self.input_dtype)
 
     def backward(self, out_grad, out_grad_scale):
         hidden_states_grad = paddle.gather(out_grad, self.token_permuted_indices)

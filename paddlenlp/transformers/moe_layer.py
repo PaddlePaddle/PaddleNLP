@@ -484,7 +484,16 @@ class Fp8DispatchNode:
         self.name = name
 
     @paddle.no_grad()
-    def forward(self, hs_fp8, hs_scale, token_indices, token_probs, previous_event=None, async_finish=False):
+    def forward(
+        self,
+        hs_fp8,
+        hs_scale,
+        token_indices,
+        token_probs,
+        previous_event=None,
+        async_finish=False,
+        allocate_on_comm_stream=False,
+    ):
         # dispatch
         (hs_fp8_dispatched, hs_scale_dispatched), dispatched_probs, states = self.dispatch_act_node.forward(
             (hs_fp8, hs_scale),
@@ -494,6 +503,7 @@ class Fp8DispatchNode:
             self.token_dispatcher._comm_manager.group,
             previous_event=previous_event,
             async_finish=async_finish,
+            allocate_on_comm_stream=allocate_on_comm_stream,
         )
         self.token_dispatcher._comm_manager.handle = states["handle"]
         self.token_dispatcher._comm_manager.tokens_per_expert = states["tokens_per_expert"]
