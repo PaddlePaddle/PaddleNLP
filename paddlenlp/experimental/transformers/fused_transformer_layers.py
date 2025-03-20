@@ -33,6 +33,7 @@ from paddle.nn import Layer
 from paddle.nn.initializer import Constant
 from paddle.nn.quant import weight_only_linear
 
+from paddlenlp.ops.triton_ops.paged_attn import PagedAttention
 from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
 
@@ -3003,18 +3004,82 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 fmha_out_prefill = paddle.nn.functional.pad(fmha_out_prefill, (0, 192 - 128))
                 fmha_out_prefill = paddle.squeeze(fmha_out_prefill, axis=0)
             else:
-                fmha_out_prefill = paddle.nn.functional.flash_attention.flash_attn_unpadded(
-                    query,
-                    key,
-                    value,
-                    kwargs.get("cu_seqlens_q", None),
-                    kwargs.get("cu_seqlens_k", None),
-                    kwargs.get("max_enc_len_this_time", -1),
-                    kwargs.get("max_enc_len_this_time", -1),
-                    self.softmax_scale,
-                    causal=True,
-                    training=False,
-                )[0]
+                if paddle.is_compiled_with_rocm():
+                    """query: shape = [num_tokens, num_heads * head_size]
+                    key: shape = [num_tokens, num_kv_heads * head_size]
+                    value: shape = [num_tokens, num_kv_heads * head_size]
+                    kv_cache = [2, num_blocks, block_size * num_kv_heads * head_size]
+                    """
+                    alibi_slopes = None
+                    sliding_window = (-1, -1)
+                    kv_cache_dtype = "auto"
+                    slot_mapping = None
+                    k_scale = paddle.to_tensor(1.0, dtype="float32")
+                    v_scale = paddle.to_tensor(1.0, dtype="float32")
+                    block_tables = kwargs.get("block_tables", None)
+
+                    query = query.reshape([-1, self.num_heads, self.head_dim])
+                    if key is not None:
+                        key = key.reshape([-1, self.num_heads, self.head_dim])
+                        value = value.reshape([-1, self.num_heads, self.head_dim])
+                    else:
+                        assert value is None
+
+                    key_cache, value_cache = PagedAttention.split_kv_cache(caches, self.kv_num_heads, self.head_dim)
+
+                    PagedAttention.write_to_paged_cache(
+                        key,
+                        value,
+                        key_cache,
+                        value_cache,
+                        slot_mapping,
+                        kv_cache_dtype,
+                        k_scale,
+                        v_scale,
+                    )
+
+                    if block_tables is not None:
+                        num_blocks_per_seq = (block_tables != -1).sum(axis=1)
+                        block_size = key_cache.shape[2] // (self.kv_num_heads * self.head_dim)
+                        seq_lens = num_blocks_per_seq * block_size
+                        seq_lens_tensor = paddle.to_tensor(seq_lens, dtype="int32")
+                        max_query_len = int(seq_lens.max().item())
+                        query_start_loc = paddle.cumsum(seq_lens_tensor, exclusive=True)
+                    else:
+                        num_tokens = query.shape[0]
+                        seq_lens_tensor = paddle.to_tensor([num_tokens], dtype="int32")
+                        max_query_len = num_tokens
+                        query_start_loc = paddle.to_tensor([0], dtype="int32")
+
+                    fmha_out_prefill = PagedAttention.forward_prefix(
+                        query=query,
+                        key=key,
+                        value=value,
+                        kv_cache_dtype=kv_cache_dtype,  # fp8/fp8_e4m3 or fp8_e5m2
+                        key_cache=key_cache,
+                        value_cache=value_cache,
+                        block_tables=block_tables,
+                        query_start_loc=query_start_loc,
+                        seq_lens_tensor=seq_lens_tensor,
+                        max_query_len=max_query_len,
+                        alibi_slopes=alibi_slopes,
+                        sliding_window=sliding_window,
+                        k_scale=k_scale,
+                        v_scale=v_scale,
+                    )
+                else:
+                    fmha_out_prefill = paddle.nn.functional.flash_attention.flash_attn_unpadded(
+                        query,
+                        key,
+                        value,
+                        kwargs.get("cu_seqlens_q", None),
+                        kwargs.get("cu_seqlens_k", None),
+                        kwargs.get("max_enc_len_this_time", -1),
+                        kwargs.get("max_enc_len_this_time", -1),
+                        self.softmax_scale,
+                        causal=True,
+                        training=False,
+                    )[0]
 
             fmha_out_prefill = fmha_out_prefill.reshape([-1, self.num_heads, self.config.mla_config.qk_head_dim])
             fmha_out_prefill = fmha_out_prefill[:, :, : self.config.mla_config.v_head_dim]
