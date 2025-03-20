@@ -163,7 +163,8 @@ class UnPermuteNode:
             reduce="add",
             include_self=True,
         )
-        self.output_tokens = output_tokens
+        with paddle.base.device_guard("cpu"):
+            self.output_tokens = paddle.empty(shape=output_tokens.shape, dtype=output_tokens.dtype)
 
         return output_tokens.to(self.input_dtype)
 
