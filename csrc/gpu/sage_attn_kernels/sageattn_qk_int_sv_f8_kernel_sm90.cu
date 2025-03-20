@@ -148,7 +148,10 @@ __global__ void qk_int8_sv_f8_attn_kernel(const __grid_constant__ CUtensorMap te
                                         DTypeQuant* shift_bias, DTypeQuant* smooth_weight,
                                         DTypeOut* O, uint32_t stride_bz_o, uint32_t stride_h_o, uint32_t stride_seq_o,
                                         const uint32_t qo_len, const uint32_t kv_len, const uint32_t num_kv_groups,
-                                        float sm_scale)
+                                        float sm_scale,
+                                        const float quant_max_bound,
+                                        const float quant_min_bound,
+                                        const float in_scale)
 {
   static_assert(NUM_THREADS == 128);
   static_assert(CTA_Q <= CTA_K);
@@ -167,6 +170,8 @@ __global__ void qk_int8_sv_f8_attn_kernel(const __grid_constant__ CUtensorMap te
   const uint32_t head_id = blockIdx.y;
   const uint32_t num_qo_heads = gridDim.y;
   const uint32_t kv_head_id = head_id / num_kv_groups;
+  const uint32_t tile_id = bloxkIdx.x;
+  const uint32_t q_base_seq_id_this_block = bx * num_tiles_q * 16;
 
   sm_scale *= math::log2e;
 
@@ -533,41 +538,65 @@ __global__ void qk_int8_sv_f8_attn_kernel(const __grid_constant__ CUtensorMap te
   }
 
   DTypeOut *O_lane_ptr = O + batch_id * stride_bz_o + head_id * stride_h_o + (bx * CTA_Q + warp_idx * 16 + (lane_id / 4)) * stride_seq_o + (lane_id % 4) * 2 ;
+
+  if (shift_bias == nullptr && smooth_weight == nullptr) {
 #pragma unroll
-  for (uint32_t fq = 0; fq < num_tiles_q; fq++)
-  {
+    for (uint32_t fq = 0; fq < num_tiles_q; fq++)
+    {
 #pragma unroll
-    for (uint32_t fv = 0; fv < head_dim/16; fv++)
-    { 
-      if (Q_idx_lane_base + fq * 64 < qo_len)
-      {
-        if constexpr (std::is_same<DTypeOut, half>::value)
+      for (uint32_t fv = 0; fv < head_dim/16; fv++)
+      { 
+        if (Q_idx_lane_base + fq * 64 < qo_len)
         {
-          ((half2*)(O_lane_ptr + fq * 64 * stride_seq_o + fv * 16))[0] = __float22half2_rn(((float2*)(RO[fq][fv]))[0]);
-          ((half2*)(O_lane_ptr + fq * 64 * stride_seq_o + fv * 16 + 8))[0] = __float22half2_rn(((float2*)(RO[fq][fv]))[2]);
+          if constexpr (std::is_same<DTypeOut, half>::value)
+          {
+            ((half2*)(O_lane_ptr + fq * 64 * stride_seq_o + fv * 16))[0] = __float22half2_rn(((float2*)(RO[fq][fv]))[0]);
+            ((half2*)(O_lane_ptr + fq * 64 * stride_seq_o + fv * 16 + 8))[0] = __float22half2_rn(((float2*)(RO[fq][fv]))[2]);
+          }
+          else
+          {
+            ((nv_bfloat162*)(O_lane_ptr + fq * 64 * stride_seq_o + fv * 16))[0] = __float22bfloat162_rn(((float2*)(RO[fq][fv]))[0]);
+            ((nv_bfloat162*)(O_lane_ptr + fq * 64 * stride_seq_o + fv * 16 + 8))[0] = __float22bfloat162_rn(((float2*)(RO[fq][fv]))[2]);  
+          }
         }
-        else
+        
+        if (Q_idx_lane_base + fq * 64 + 8 < qo_len)
         {
-          ((nv_bfloat162*)(O_lane_ptr + fq * 64 * stride_seq_o + fv * 16))[0] = __float22bfloat162_rn(((float2*)(RO[fq][fv]))[0]);
-          ((nv_bfloat162*)(O_lane_ptr + fq * 64 * stride_seq_o + fv * 16 + 8))[0] = __float22bfloat162_rn(((float2*)(RO[fq][fv]))[2]);  
-        }
-      }
-      
-      if (Q_idx_lane_base + fq * 64 + 8 < qo_len)
-      {
-        if constexpr (std::is_same<DTypeOut, half>::value)
-        {
-          ((half2*)(O_lane_ptr + fq * 64 * stride_seq_o + fv * 16 + 8 * stride_seq_o))[0] = __float22half2_rn(((float2*)(RO[fq][fv]))[1]);
-          ((half2*)(O_lane_ptr + fq * 64 * stride_seq_o + fv * 16 + 8 + 8 * stride_seq_o))[0] = __float22half2_rn(((float2*)(RO[fq][fv]))[3]);
-        }
-        else
-        {
-          ((nv_bfloat162*)(O_lane_ptr + fq * 64 * stride_seq_o + fv * 16 + 8 * stride_seq_o))[0] = __float22bfloat162_rn(((float2*)(RO[fq][fv]))[1]);
-          ((nv_bfloat162*)(O_lane_ptr + fq * 64 * stride_seq_o + fv * 16 + 8 + 8 * stride_seq_o))[0] = __float22bfloat162_rn(((float2*)(RO[fq][fv]))[3]);      
+          if constexpr (std::is_same<DTypeOut, half>::value)
+          {
+            ((half2*)(O_lane_ptr + fq * 64 * stride_seq_o + fv * 16 + 8 * stride_seq_o))[0] = __float22half2_rn(((float2*)(RO[fq][fv]))[1]);
+            ((half2*)(O_lane_ptr + fq * 64 * stride_seq_o + fv * 16 + 8 + 8 * stride_seq_o))[0] = __float22half2_rn(((float2*)(RO[fq][fv]))[3]);
+          }
+          else
+          {
+            ((nv_bfloat162*)(O_lane_ptr + fq * 64 * stride_seq_o + fv * 16 + 8 * stride_seq_o))[0] = __float22bfloat162_rn(((float2*)(RO[fq][fv]))[1]);
+            ((nv_bfloat162*)(O_lane_ptr + fq * 64 * stride_seq_o + fv * 16 + 8 + 8 * stride_seq_o))[0] = __float22bfloat162_rn(((float2*)(RO[fq][fv]))[3]);      
+          }
         }
       }
     }
+  } else {
+    write_o_reg_gmem_multi_warps_shift_smooth_quant<num_kv_groups,
+                                                    num_tiles_q,
+                                                    num_tiles_v,
+                                                    false,
+                                                    DTypeQuant,
+                                                    DTypeOut>(
+        RO,
+        &qo_smem,
+        O_lane_ptr,
+        shift_bias,
+        smooth_weight,
+        Q_idx_lane_base,  // TODO: unsure
+        head_id,
+        quant_max_bound,
+        quant_min_bound,
+        in_scale,
+        q_len,
+        q_n_stride,
+        HEAD_DIM);
   }
+
 }
 
 std::vector<paddle::Tensor> qk_int8_sv_f8_accum_f32_attn_inst_buf_sm90_fwd(
@@ -760,6 +789,9 @@ std::vector<paddle::Tensor> qk_int8_sv_f8_accum_f32_fuse_v_scale_attn_inst_buf_s
                     int is_causal,
                     int qk_quant_gran,
                     float sm_scale,
+                    const float quant_max_bound,
+                    const float quant_min_bound,
+                    const float in_scale,
                     int return_lse)
 {
   CHECK_CUDA(query);
@@ -918,7 +950,7 @@ std::vector<paddle::Tensor> qk_int8_sv_f8_accum_f32_fuse_v_scale_attn_inst_buf_s
               smooth_weight ? reinterpret_cast<DTypeQuant*>(const_cast<DTypeQuant*>(smooth_weight.get().data<DTypeQuant>())) : nullptr,
               reinterpret_cast<DTypeOut*>(output.data()),
               stride_bz_o, stride_h_o, stride_seq_o,
-              qo_len, kv_len, num_kv_groups, sm_scale);
+              qo_len, kv_len, num_kv_groups, sm_scale, quant_max_bound, quant_min_bound, in_scale);
           });
         });
       });
@@ -941,6 +973,9 @@ std::vector<paddle::Tensor> sage_attention_fwd(paddle::Tensor& q,
                                                const paddle::optional<paddle::Tensor>& shift_bias,
                                                const paddle::optional<paddle::Tensor>& smooth_weight,
                                                float sm_scale,
+                                               float quant_max_bound,
+                                               float quant_min_bound,
+                                               float in_scale,
                                                std::string qk_quant_gran,
                                                std::string pv_accum_dtype,
                                                int tensor_layout,
@@ -1012,6 +1047,9 @@ PD_BUILD_OP(sage_attention_forward)
     .Inputs({"q", "k", "v", "km", "seq_len_this_time", paddle::Optional("vm"), paddle::Optional("shift_bias"), paddle::Optional("smooth_weight")})
     .Outputs({"o"})
     .Attrs({"sm_scale: float",
+            "quant_max_bound: float",
+            "quant_min_bound: float",
+            "in_scale: float",
             "qk_quant_gran: std::string",
             "pv_accum_dtype: std::string",
             "tensor_layout: int",
