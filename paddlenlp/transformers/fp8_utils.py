@@ -94,7 +94,7 @@ def dequantize_fp8_to_fp32(fp8_tensor, scale):
 
 
 class ExpertsNode:
-    def __init__(self, experts, name="moe_experts_node"):
+    def __init__(self, experts, custom_map, name="moe_experts_node"):
         self.experts = experts
         self.outputs = []
         self.x_t_fp8s = []
@@ -105,6 +105,7 @@ class ExpertsNode:
         self.w2_sacles = []
         self.o1s = []
         self.dxs = []
+        self.custom_map = custom_map
 
     def reset_statue(self):
         self.outputs = []
@@ -122,7 +123,8 @@ class ExpertsNode:
         x_fp8_list = paddle.split(hs_out, num_or_sections=self.tokens_per_expert, axis=0)  # FP8 chunk
         x_scale_list = paddle.split(hs_scale_out, num_or_sections=self.tokens_per_expert, axis=0)  # FP8 chunk
 
-        for chunk, chunk_scale, expert in zip(x_fp8_list, x_scale_list, self.experts):
+        for i, (chunk, chunk_scale) in enumerate(zip(x_fp8_list, x_scale_list)):
+            expert = self.experts[i + self.custom_map.moe_rank * self.custom_map.moe_num_experts_per_device]
             x_fp8 = chunk.contiguous()
             o1, w1_fp8, w1_sacle = self.fwd_gate_up(x_fp8, chunk_scale, expert.w1)
             o2 = self.fwd_swiglu(o1)
@@ -163,18 +165,20 @@ class ExpertsNode:
 
         out_grad_scale_list = paddle.split(out_grad_scale, num_or_sections=self.tokens_per_expert, axis=0)
 
-        for do3, do3_scale, expert, x_t_fp8, x_t_scale, w1_fp8, w1_sacle, o1, w2_fp8, w2_sacle in zip(
-            out_grad_list,
-            out_grad_scale_list,
-            self.experts,
-            self.x_t_fp8s,
-            self.x_t_scales,
-            self.w1_fp8s,
-            self.w1_sacles,
-            self.o1s,
-            self.w2_fp8s,
-            self.w2_sacles,
+        for i, (do3, do3_scale, x_t_fp8, x_t_scale, w1_fp8, w1_sacle, o1, w2_fp8, w2_sacle) in enumerate(
+            zip(
+                out_grad_list,
+                out_grad_scale_list,
+                self.x_t_fp8s,
+                self.x_t_scales,
+                self.w1_fp8s,
+                self.w1_sacles,
+                self.o1s,
+                self.w2_fp8s,
+                self.w2_sacles,
+            )
         ):
+            expert = self.experts[i + self.custom_map.moe_rank * self.custom_map.moe_num_experts_per_device]
             do2 = self.bwd_dowm_input(do3, do3_scale, w2_fp8, w2_sacle)
             do1 = self.bwd_swiglu(o1, do2)
             dx = self.bwd_gate_up_input(do1, w1_fp8, w1_sacle)

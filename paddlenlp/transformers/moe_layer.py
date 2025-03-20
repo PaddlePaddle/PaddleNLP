@@ -538,7 +538,9 @@ class Fp8CombineNode:
     def backward(self, output_combie_grad_fp8, output_combie_grad_scale, previous_event=None, async_finish=False):
         # combine grad -> fp8
         (hidden_states_out_grad, hidden_states_out_grad_scale) = self.combine_node.backward(
-            (output_combie_grad_fp8, output_combie_grad_scale), previous_event=previous_event, async_finish=async_finish
+            (output_combie_grad_fp8, output_combie_grad_scale),
+            previous_event=previous_event,
+            async_finish=async_finish,
         )
         return hidden_states_out_grad, hidden_states_out_grad_scale
 
@@ -569,12 +571,12 @@ class Fp8CombineQuantNode:
 
 
 class MlpNode:
-    def __init__(self, token_dispatcher, experts, name="mlp_node"):
-        self.token_dispatcher = token_dispatcher
-        self.experts = experts
-        self.permute_node = PermuteNode(token_dispatcher)
-        self.experts_node = ExpertsNode(experts)
-        self.unpermute_node = UnPermuteNode(token_dispatcher)
+    def __init__(self, custom_map, name="mlp_node"):
+        self.token_dispatcher = custom_map.token_dispatcher
+        self.experts = custom_map.experts
+        self.permute_node = PermuteNode(self.token_dispatcher)
+        self.experts_node = ExpertsNode(self.experts, custom_map)
+        self.unpermute_node = UnPermuteNode(self.token_dispatcher)
         self.name = name
 
     def reset_statue(self):
@@ -624,15 +626,14 @@ class MlpNode:
 
 
 class FusionMoeNode:
-    def __init__(self, token_dispatcher, experts, name="fusion_moe_node"):
-        self.token_dispatcher = token_dispatcher
-        self.experts = experts
+    def __init__(self, custom_map, name="fusion_moe_node"):
+        self.token_dispatcher = custom_map.token_dispatcher
 
-        self.dispatch_quant_node = Fp8DispatchQuantNode(token_dispatcher)
-        self.dispatch_node = Fp8DispatchNode(token_dispatcher)
-        self.mlp_node = MlpNode(token_dispatcher, experts)
-        self.combine_node = Fp8CombineNode(token_dispatcher)
-        self.combine_quant_node = Fp8CombineQuantNode(token_dispatcher)
+        self.dispatch_quant_node = Fp8DispatchQuantNode(self.token_dispatcher)
+        self.dispatch_node = Fp8DispatchNode(self.token_dispatcher)
+        self.mlp_node = MlpNode(custom_map)
+        self.combine_node = Fp8CombineNode(self.token_dispatcher)
+        self.combine_quant_node = Fp8CombineQuantNode(self.token_dispatcher)
         self.name = name
 
     @paddle.no_grad()
@@ -659,7 +660,6 @@ class FusionMoeNode:
             output_combie_grad_fp8, output_combie_grad_scale
         )
 
-        return hs_grad, probs_grad, None
         hs_fp8_dispatched_grad, dispatched_probs_grad = self.mlp_node.backward(
             hidden_states_out_grad, hidden_states_out_grad_scale
         )
@@ -671,7 +671,7 @@ class FusionMoeNode:
 class FusionMoe(paddle.autograd.PyLayer):
     @staticmethod
     def forward(ctx, hidden_states, probs, routing_map, custom_map):
-        ctx.node = FusionMoeNode(custom_map.token_dispatcher, custom_map.experts)
+        ctx.node = FusionMoeNode(custom_map)
         return ctx.node.forward(hidden_states, probs, routing_map)
 
     @staticmethod
