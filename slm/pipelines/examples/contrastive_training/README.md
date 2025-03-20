@@ -185,10 +185,18 @@ python -u evaluation/eval_mteb.py \
 本仓库主要面向其中的英文检索任务（Retrieval），并额外支持针对 MSMARCO-Title 的评估。
 
 评估脚本为 `evaluation/eval_mteb.sh`，支持7个模型：
-|  **模&nbsp;型**         | [RocketQA&nbsp;V1](https://github.com/PaddlePaddle/RocketQA/tree/main/research/RocketQA_NAACL2021) | [RocketQA&nbsp;V2](https://github.com/PaddlePaddle/RocketQA/tree/main/research/RocketQAv2_EMNLP2021) | [BGE‑Large‑en‑v1.5](https://huggingface.co/BAAI/bge-large-en-v1.5) | [RepLLaMA‑passage](https://huggingface.co/castorini/repllama-v1-7b-lora-passage) | [NV‑Embed‑v1](https://huggingface.co/nvidia/NV-Embed-v1) | [BGE‑EN‑ICL](https://huggingface.co/BAAI/bge-en-icl) | [LLARA‑passage](https://huggingface.co/BAAI/LLARA-passage) |
+<!-- |  **模&nbsp;型**         | [RocketQA&nbsp;V1](https://github.com/PaddlePaddle/RocketQA/tree/main/research/RocketQA_NAACL2021) | [RocketQA&nbsp;V2](https://github.com/PaddlePaddle/RocketQA/tree/main/research/RocketQAv2_EMNLP2021) | [BGE‑Large‑en‑v1.5](https://huggingface.co/BAAI/bge-large-en-v1.5) | [RepLLaMA‑passage](https://huggingface.co/castorini/repllama-v1-7b-lora-passage) | [NV‑Embed‑v1](https://huggingface.co/nvidia/NV-Embed-v1) | [BGE‑EN‑ICL](https://huggingface.co/BAAI/bge-en-icl) | [LLARA‑passage](https://huggingface.co/BAAI/LLARA-passage) |
 |--------------|-------------|-------------|-------------------|-----------------------------|-------------|------------------------|---------------|
-| **最&nbsp;大&nbsp;序&nbsp;列&nbsp;长&nbsp;度**  | 512         |     512     |        512        |            4096             |    4096     |          4096          |     4096      |
-
+| **最&nbsp;大&nbsp;序&nbsp;列&nbsp;长&nbsp;度**  | 512         |     512     |        512        |            4096             |    4096     |          4096          |     4096      | -->
+| 模型                        | 最大序列长度 |
+|-----------------------------|--------------|
+| [RocketQA&nbsp;V1](https://github.com/PaddlePaddle/RocketQA/tree/main/research/RocketQA_NAACL2021)    |     512      |
+| [RocketQA&nbsp;V2](https://github.com/PaddlePaddle/RocketQA/tree/main/research/RocketQAv2_EMNLP2021)  |     512      |
+| [BGE‑Large‑en‑v1.5](https://huggingface.co/BAAI/bge-large-en-v1.5)                                    |     512      |
+| [RepLLaMA‑passage](https://huggingface.co/castorini/repllama-v1-7b-lora-passage)                      |     4096     |
+| [NV‑Embed‑v1](https://huggingface.co/nvidia/NV-Embed-v1)                                              |     4096     |
+| [BGE‑EN‑ICL](https://huggingface.co/BAAI/bge-en-icl)                                                  |     4096     |
+| [LLARA‑passage](https://huggingface.co/BAAI/LLARA-passage)                                            |     4096     |
 
 可支持配置的参数：
 - `base_model_name_or_path`: 模型名称或路径
@@ -223,12 +231,12 @@ MTEB-Retrieval 数据集, NDCG@10分数：
 MSMARCO-Title 数据集, MRR@10, Recall@100, NDCG@10分数：
 | 模型                        | MRR@10 | Recall@100 | NDCG@10 |
 |-----------------------------|:------:|:----------:|:-------:|
-| RocketQA v1                 | 36.90  |            |         |
-| RocketQA v2                 | 38.90  |            |         |
+| RocketQA v1                 | 36.90  |   90.03    |  43.51  |
+| RocketQA v2                 | 38.90  |   90.37    |  45.28  |
 | bge-large-en-v1.5           | 35.30  |   89.96    |  41.96  |
 | repllama-v1-7b-lora-passage | 38.24  |   91.95    |  45.13  |
 | NV-Embed-v1                 | 38.39  |   92.72    |  45.21  |
-| bge-en-icl (zero-shot)      | 42.77  |            |         |
+| bge-en-icl (zero-shot)      | 42.77  |   94.31    |  49.47  |
 | LLARA-passage               | 43.04  |   94.75    |  49.87  |
 
 
