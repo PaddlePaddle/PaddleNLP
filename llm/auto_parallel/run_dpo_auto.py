@@ -20,13 +20,13 @@ import time
 from functools import partial
 
 import paddle
-from dpo_argument import (
+
+from llm.alignment.dpo.dpo_argument import (
     DPOConfig,
     DPODataArgument,
     DPOModelArgument,
     DPOTrainingArguments,
 )
-
 from paddlenlp.datasets import (
     ZeroPaddingIterableDataset,
     ZeroPaddingMapDataset,

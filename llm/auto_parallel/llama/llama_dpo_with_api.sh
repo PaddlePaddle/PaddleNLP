@@ -42,7 +42,7 @@ export PYTHONPATH=../../../:$PYTHONPATH
 python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
     --log_dir  "log/$task_name""_log" \
-    ../../alignment/dpo/run_dpo_auto.py \
+    ../run_dpo_auto.py \
     --model_name_or_path "meta-llama/Meta-Llama-3-8B-Instruct" \
     --train_dataset_path "../../data/train.jsonl" \
     --dev_dataset_path "../../data/dev.jsonl" \

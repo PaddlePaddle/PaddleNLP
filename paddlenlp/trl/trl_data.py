@@ -245,7 +245,7 @@ def preference_collate_fn(batch, max_seq_len=None, data_type="pairwise"):
 def preference_collate_fn_auto_parallel(batch, max_seq_len=None, data_type="pairwise", enable_auto_parallel=False):
     input_dict = preference_collate_fn(batch, max_seq_len, data_type)
     if "attn_mask_startend_row_indices" in input_dict:
-        input_dict["attention_mask"] = (paddle.to_tensor([0], dtype="float32"),)
+        input_dict["attention_mask"] = np.array(paddle.to_tensor([0], dtype="float32"))
     result = {
         "input_ids": [
             input_dict["input_ids"],
