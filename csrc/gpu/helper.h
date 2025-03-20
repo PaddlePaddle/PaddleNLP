@@ -45,6 +45,7 @@ namespace cub = hipcub;
 #include "paddle/phi/backends/gpu/gpu_info.h"
 #include "nlohmann/json.hpp"
 
+
 using json = nlohmann::json;
 
 #define CUDA_CHECK(call)                           \
@@ -236,4 +237,11 @@ inline int GetSMVersion() {
   static int sm_version = phi::backends::gpu::GetGPUComputeCapability(
       phi::backends::gpu::GetCurrentDeviceId());
   return sm_version;
+}
+
+inline bool GetMlaUseTensorcore() {
+  static const bool flags_mla_use_tensorcore = get_flags_mla_use_tensorcore();
+  static const bool enable_mla_tensorcore = GetSMVersion() >= 90 ? true : false;
+  const bool mla_use_tensorcore = flags_mla_use_tensorcore && enable_mla_tensorcore;
+  return mla_use_tensorcore;
 }

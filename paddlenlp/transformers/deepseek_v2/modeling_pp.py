@@ -129,7 +129,9 @@ class DeepseekV2EmbeddingPipe(nn.Layer):
             seq_length -= self.config.num_nextn_predict_layers
 
             if attention_mask is not None:
-                attention_mask = attention_mask[:, : -self.config.num_nextn_predict_layers]
+                attention_mask = attention_mask[
+                    :, :, : -self.config.num_nextn_predict_layers, : -self.config.num_nextn_predict_layers
+                ]
 
         if attention_mask is not None:
             assert (
@@ -174,7 +176,7 @@ class DeepseekV2EmbeddingPipe(nn.Layer):
             # mtp_embeds: [B*num_nextn_predict_layers, seq_len, hidden_size]
             # else:
             # mtp_embeds: [B*seq_len*num_nextn_predict_layers, hidden_size]
-            inputs_embeds = paddle.concat(embeds_res)
+            inputs_embeds = paddle.concat(embeds_res, axis=-1)
             return return_args(inputs_embeds, attention_mask, attn_mask_startend_row_indices, position_ids)
         else:
             if self.sequence_parallel:
@@ -189,9 +191,9 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
 
         if self.config.num_nextn_predict_layers > 0:
             batch_size, _, hidden_size = hidden_states.shape
-            batch_size_mtp = batch_size // (self.config.num_nextn_predict_layers + 1)
-            inputs_embeds_mtp = hidden_states[-batch_size_mtp:, :, :]
-            hidden_states = hidden_states[:batch_size_mtp, :, :]
+            batch_size_mtp = hidden_size // (self.config.num_nextn_predict_layers + 1)
+            inputs_embeds_mtp = hidden_states[..., -batch_size_mtp:]
+            hidden_states = hidden_states[..., :batch_size_mtp]
 
         has_gradient = not hidden_states.stop_gradient
 
@@ -234,7 +236,7 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
             )
 
         if self.config.num_nextn_predict_layers > 0:
-            hidden_states = paddle.concat([hidden_states, inputs_embeds_mtp])
+            hidden_states = paddle.concat([hidden_states, inputs_embeds_mtp], axis=-1)
 
         return return_args(hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids)
 
@@ -243,7 +245,7 @@ class DeepseekV2MTPLayerPipe(DeepseekV2MTPLayer):
     def forward(self, args):
         hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids = parse_args(args)
 
-        hidden_states_list = paddle.split(hidden_states, self.config.num_nextn_predict_layers + 1)
+        hidden_states_list = paddle.split(hidden_states, self.config.num_nextn_predict_layers + 1, axis=-1)
         hidden_states_main_model = hidden_states_list[0]
         inputs_embeds_cur_depth_list = hidden_states_list[1:]
         has_gradient = not hidden_states_main_model.stop_gradient
@@ -294,7 +296,7 @@ class DeepseekV2MTPLayerPipe(DeepseekV2MTPLayer):
                 )
             output_list.append(hidden_states)
 
-        hidden_states = paddle.concat(output_list)
+        hidden_states = paddle.concat(output_list, axis=-1)
         return return_args(hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids)
 
 
@@ -308,7 +310,7 @@ class DeepseekV2RMSNormPipe(nn.Layer):
         hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids = parse_args(args)
 
         if self.config.num_nextn_predict_layers > 0:
-            hidden_states_list = paddle.split(hidden_states, self.config.num_nextn_predict_layers + 1)
+            hidden_states_list = paddle.split(hidden_states, self.config.num_nextn_predict_layers + 1, axis=-1)
             hidden_states = hidden_states_list[0]
             hidden_states_mtp = hidden_states_list[-self.config.num_nextn_predict_layers :]
 
@@ -472,7 +474,7 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
             ), "pp recompute interval should smaller than num layers of each pp chunk"
             recompute_interval = self.config.pp_recompute_interval
 
-        seg_method = "layer:DeepseekV2DecoderLayer|MTPLayer"
+        seg_method = "layer:DeepseekV2DecoderLayer|DeepseekV2MTPLayerPipe"
         if config.num_hidden_layers % get_hcg().topology().get_dim_size("pipe") != 0:
             seg_method = "uniform"
 

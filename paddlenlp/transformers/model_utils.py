@@ -1936,7 +1936,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         is_safetensors = False
 
         model_state_dict = model.state_dict()
-
         expected_keys = list(model_state_dict.keys())
         prefix = model.base_model_prefix
 
@@ -2040,7 +2039,13 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # Make sure we are able to load base models as well as derived models (with heads)
         start_prefix = ""
         model_to_load = model
-        if len(cls.base_model_prefix) > 0 and not hasattr(model, cls.base_model_prefix) and has_prefix_module:
+        # (LiuTing) Non-causalLM Model dont have base_model_prefix attr, so need to remove the prefix in model state dict keyname.
+        if (
+            len(cls.base_model_prefix) > 0
+            and not hasattr(model, cls.base_model_prefix)
+            and has_prefix_module
+            and not isinstance(model, PipelinePretrainedModel)
+        ):
             start_prefix = cls.base_model_prefix + "."
         if len(cls.base_model_prefix) > 0 and hasattr(model, cls.base_model_prefix) and not has_prefix_module:
             model_to_load = getattr(model, cls.base_model_prefix)
@@ -2091,7 +2096,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
             before_fuse_keys = list(state_dict.keys())
             if pre_tensor_parallel_split:
-                tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys, ignore_error=True)
+                tp_actions = cls.get_tensor_parallel_convert_actions(
+                    config, loaded_keys, ignore_error=True, base_model_prefix=prefix
+                )
             else:
                 tp_actions = None
             state_dict, resume_state_dict = cls.convert_fuse_and_split(config, state_dict, tp_actions)
@@ -2157,7 +2164,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 ):
                     pre_tensor_parallel_split = True
                     assert loaded_keys is not None, "loaded_keys is not None."
-                    tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys, ignore_error=True)
+                    tp_actions = cls.get_tensor_parallel_convert_actions(
+                        config, loaded_keys, ignore_error=True, base_model_prefix=prefix
+                    )
                 # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
                 filter_dict_keys = set(expected_keys)
                 fuse_actions, _ = cls.get_fuse_or_split_param_convert_actions(config, loaded_keys, is_fuse=True)

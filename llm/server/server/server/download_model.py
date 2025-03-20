@@ -28,10 +28,14 @@ def calculate_md5(file_path, chunk_size=8192):
 
 def download_file(url, save_path, md5sum):
     """download file"""
+    md5_check= int(os.getenv("MD5_CHECK", 0)) == 1
     try:
         with requests.get(url, stream=True) as response:
             response.raise_for_status()
             if os.path.exists(save_path):
+                if not md5_check:
+                    print(f"{save_path} already exists and md5 check is off, skip this step")
+                    return save_path
                 current_md5sum = calculate_md5(save_path)
                 if md5sum != current_md5sum:
                     os.remove(save_path)

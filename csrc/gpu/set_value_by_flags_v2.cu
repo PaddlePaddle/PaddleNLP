@@ -29,11 +29,11 @@ __global__ void set_value_by_flag_and_id_v2(const bool *stop_flags,
         const int64_t *input_ids_now = input_ids + tid * length_input_ids;
         const int seq_len_dec = seq_lens_decoder[tid];
         const int seq_len_enc = seq_lens_encoder[tid];
-        if (seq_len_dec == 0 && seq_len_enc == 0) return; // stoped
+        if (seq_len_dec == 0 && seq_len_enc == 0) return; // stopped
         if (step_idx[tid] >= 0) {
             if (seq_len_dec == 0) { // encoder, get last token accord to seq_lens_encoder
                 pre_ids_all_now[step_idx[tid]] = input_ids_now[seq_len_enc - 1];
-            } else { // decoedr, get first token
+            } else { // decoder, get first token
                 pre_ids_all_now[step_idx[tid]] = input_ids_now[0];
             }
         }
