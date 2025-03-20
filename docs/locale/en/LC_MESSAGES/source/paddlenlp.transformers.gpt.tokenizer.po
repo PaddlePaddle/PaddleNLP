@@ -90,7 +90,7 @@ msgid "返回"
 msgstr ""
 
 #: of paddlenlp.transformers.gpt.tokenizer.GPTTokenizer.vocab_size:3
-msgid "The sum of size of vocabulary and the size of speical tokens."
+msgid "The sum of size of vocabulary and the size of special tokens."
 msgstr ""
 
 #: of

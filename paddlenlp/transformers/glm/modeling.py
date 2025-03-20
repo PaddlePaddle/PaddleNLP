@@ -766,7 +766,7 @@ class GLMForMultipleChoice(GLMPretrainedModel):
             if self.glm.config.tensor_parallel_degree > 1:
                 assert (
                     self.glm.config.tensor_parallel_output is False
-                ), "GLMForMultipleChoice not avaliable for tensor_parallel_output!"
+                ), "GLMForMultipleChoice not available for tensor_parallel_output!"
 
             loss = F.cross_entropy(log_probs, labels)
 

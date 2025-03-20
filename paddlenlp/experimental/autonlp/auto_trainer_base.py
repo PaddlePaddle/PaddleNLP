@@ -37,14 +37,14 @@ from paddlenlp.utils.log import logger
 
 class AutoTrainerBase(metaclass=ABCMeta):
     """
-    The meta classs of AutoTrainer, which contains the common properies and methods of AutoNLP.
+    The meta class of AutoTrainer, which contains the common properties and methods of AutoNLP.
     Task-specific AutoTrainers need to inherit from the meta class.
 
     Args:
         train_dataset (Dataset, required): Training dataset, must contains the 'text_column' and 'label_column' specified below
         eval_dataset (Dataset, required): Evaluation dataset, must contains the 'text_column' and 'label_column' specified below
         language (string, required): language of the text
-        metric_for_best_model (string, optional): the name of the metrc for selecting the best model.
+        metric_for_best_model (string, optional): the name of the metric for selecting the best model.
         greater_is_better (bool, required): Whether better models should have a greater metric or not. Use in conjuction with `metric_for_best_model`.
         output_dir (str, optional): Output directory for the experiments, defaults to "autpnlp_results"
         verbosity: (int, optional): controls the verbosity of the run. Defaults to 1, which let the workers log to the driver.To reduce the amount of logs,

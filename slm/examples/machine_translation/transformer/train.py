@@ -294,7 +294,7 @@ def do_train(args):
             if args.profiler_options is not None:
                 profiler.add_profiler_step(args.profiler_options)
 
-            # NOTE: For benchmark, loss infomation on all cards will be printed.
+            # NOTE: For benchmark, loss information on all cards will be printed.
             if step_idx % args.print_step == 0 and (args.benchmark or rank == 0):
                 total_avg_cost = avg_cost.numpy()
                 tokens_sum_val = tokens_sum.numpy()

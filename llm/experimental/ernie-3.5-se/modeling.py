@@ -1152,7 +1152,7 @@ class Ernie35PretrainingCriterion(paddle.nn.Layer):
         if self.enable_parallel_cross_entropy:
             assert (
                 prediction_scores.shape[-1] != self.config.vocab_size
-            ), f"enable_parallel_cross_entropy, the vocab_size should be splited: {prediction_scores.shape[-1]}, {self.config.vocab_size}"
+            ), f"enable_parallel_cross_entropy, the vocab_size should be split: {prediction_scores.shape[-1]}, {self.config.vocab_size}"
 
         with paddle.amp.auto_cast(False):
             masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
@@ -1406,7 +1406,7 @@ class Ernie35ForCausalLM(Ernie35PretrainedModel):
 
         hidden_states = outputs[0]
         # if labels is None，means we need full output, instead of tensor_parallel_output
-        # tensor_parallel_output is togather with ParallelCrossEntropy
+        # tensor_parallel_output is together with ParallelCrossEntropy
         # tensor_parallel_output = (
         #     self.config.tensor_parallel_output and labels is not None and self.config.tensor_parallel_degree > 1
         # )

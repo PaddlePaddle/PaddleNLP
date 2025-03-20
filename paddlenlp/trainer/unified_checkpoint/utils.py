@@ -189,10 +189,10 @@ def mapping_optimizer_tp_actions(tp_actions, optimizer_loaded_keys):
     or param.key/beta1_XXX
     or param.key/beta2_XXX
     Args:
-        tp_actions (dict): dictionay of tensor parallel actions {key: action}
+        tp_actions (dict): dictionary of tensor parallel actions {key: action}
         optimizer_loaded_keys (list or set): [param.key1/moment1_0, param.key2/beta1_XXX, param.key3/beta2_XXX]
     Returns:
-        dict: new dictionay of tensor parallel actions {key: action}
+        dict: new dictionary of tensor parallel actions {key: action}
     """
     new_actions = {}
     for key in optimizer_loaded_keys:

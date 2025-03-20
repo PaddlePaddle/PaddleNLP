@@ -52,7 +52,7 @@ def ssa_scaled_dot_product_attention(
         raise ValueError("Context parallel requires `use_flash_attention=True`")
     # [ bz, seqlen, nhead, head_dim] -> [bs, nhead, seq_len, head_dim]
     query_states = paddle.transpose(query_states, [0, 2, 1, 3])
-    # merge with the next tranpose
+    # merge with the next transpose
     key_states = paddle.transpose(key_states, [0, 2, 1, 3])
     value_states = paddle.transpose(value_states, [0, 2, 1, 3])
     assert ssa_group_size_ratio is not None, "ssa_group_size_ratio must provide"

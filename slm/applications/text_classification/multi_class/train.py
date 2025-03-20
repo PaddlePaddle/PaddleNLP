@@ -83,7 +83,7 @@ class DataArguments:
 
 @dataclass
 class ModelArguments:
-    model_name_or_path: str = field(default="ernie-3.0-tiny-medium-v2-zh", metadata={"help": "Build-in pretrained model name or the path to local model."})
+    model_name_or_path: str = field(default="ernie-3.0-tiny-medium-v2-zh", metadata={"help": "Built-in pretrained model name or the path to local model."})
     export_model_dir: Optional[str] = field(default=None, metadata={"help": "Path to directory to store the exported inference model."})
 # yapf: enable
 

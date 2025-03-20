@@ -634,7 +634,7 @@ class DalleBartForConditionalGeneration(DalleBartPretrainedModel):
                 See :class:`DalleBartModel`.
             decoder_attention_mask (Tensor, optional):
                 See :class:`DalleBartModel`.
-            encoder_output (Tensor, optonal):
+            encoder_output (Tensor, optional):
                 See :class:`DalleBartModel`.
             use_cache (bool, optional):
                 See :class:`DalleBartModel`.

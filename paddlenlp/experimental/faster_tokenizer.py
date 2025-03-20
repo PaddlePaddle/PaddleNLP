@@ -149,4 +149,4 @@ class FasterTokenizer(nn.Layer):
             faster_tokenizer = cls(tokenizer.vocab.token_to_idx, tokenizer.do_lower_case)
             return faster_tokenizer
         else:
-            raise ValueError("Unknown name %s. Now %s surports  %s" % (name, cls.__name__, list(cls.name_map.keys())))
+            raise ValueError("Unknown name %s. Now %s supports  %s" % (name, cls.__name__, list(cls.name_map.keys())))

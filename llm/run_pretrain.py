@@ -47,7 +47,7 @@ from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.tools import get_env_device
 
-# Pretaining Environment Variables to support sharding stage1 overlap optimization.
+# Pretraining Environment Variables to support sharding stage1 overlap optimization.
 os.environ["USE_CASUAL_MASK"] = "True"
 
 

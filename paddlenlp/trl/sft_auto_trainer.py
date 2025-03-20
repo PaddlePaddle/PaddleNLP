@@ -88,7 +88,7 @@ class SFTAutoTrainer(SFTTrainer):
         if kwargs.get("args", None) is not None and kwargs["args"].use_intermediate_api:
             model = kwargs.get("model", None)
             assert model is not None
-            # NOTE(zhangwl): some param_init_func is not suuport lazy init
+            # NOTE(zhangwl): some param_init_func is not support lazy init
             auto_dist_degree = {
                 "tensor_parallel": kwargs["args"].tensor_parallel_degree > 1,
                 "sequence_parallel": sequence_parallel,

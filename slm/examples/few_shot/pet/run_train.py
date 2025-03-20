@@ -53,7 +53,7 @@ class DataArguments:
 
 @dataclass
 class ModelArguments:
-    model_name_or_path: str = field(default="ernie-1.0-large-zh-cw", metadata={"help": "Build-in pretrained model name or the path to local model."})
+    model_name_or_path: str = field(default="ernie-1.0-large-zh-cw", metadata={"help": "Built-in pretrained model name or the path to local model."})
     export_type: str = field(default='paddle', metadata={"help": "The type to export. Support `paddle` and `onnx`."})
     dropout: float = field(default=0.1, metadata={"help": "The dropout used for pretrained model."})
 # yapf: enable

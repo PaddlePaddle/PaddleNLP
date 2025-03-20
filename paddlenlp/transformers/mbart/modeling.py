@@ -661,7 +661,7 @@ class MBartForSequenceClassification(MBartPretrainedModel):
                 See :class:`MBartModel`.
             decoder_attention_mask (Tensor, optional):
                 See :class:`MBartModel`.
-            encoder_output (Tensor, optonal):
+            encoder_output (Tensor, optional):
                 See :class:`MBartModel`.
             use_cache (bool, optional):
                 See :class:`MBartModel`.
@@ -826,7 +826,7 @@ class MBartForQuestionAnswering(MBartPretrainedModel):
                 See :class:`MBartModel`.
             decoder_attention_mask (Tensor, optional):
                 See :class:`MBartModel`.
-            encoder_output (Tensor, optonal):
+            encoder_output (Tensor, optional):
                 See :class:`MBartModel`.
             inputs_embeds (Tensor, optional):
                 See :class:`MBartModel`.
@@ -1017,7 +1017,7 @@ class MBartForConditionalGeneration(MBartPretrainedModel):
                 See :class:`MBartModel`.
             decoder_attention_mask (Tensor, optional):
                 See :class:`MBartModel`.
-            encoder_output (Tensor, optonal):
+            encoder_output (Tensor, optional):
                 See :class:`MBartModel`.
                 See :class:`MBartModel`.
             use_cache (bool, optional):

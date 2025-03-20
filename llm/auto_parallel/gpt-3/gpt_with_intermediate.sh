@@ -25,7 +25,7 @@ export FLAGS_benchmark=false
 
 export GLOG_v=0
 export FLAGS_print_ir=0
-#this optional is for compare train precison
+#this optional is for compare train precision
 export FLAGS_cudnn_deterministic=1
 export FLAGS_embedding_deterministic=1 
 # export NVIDIA_TF32_OVERRIDE=0

@@ -87,7 +87,7 @@ void MoeDispatchKernel(const paddle::Tensor& input,
   if (group_moe) {
     paddle::Tensor softmax_max_prob_tensor =
         GetEmptyTensor({num_rows, moe_topk}, paddle::DataType::FLOAT32, place);
-    // (TODO: check fill sucess ?)
+    // (TODO: check fill success ?)
     paddle::experimental::fill(softmax_max_prob_tensor, 0.f);
     softmax_max_prob = softmax_max_prob_tensor.data<float>();
   }

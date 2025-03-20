@@ -199,7 +199,7 @@ class MBartTokenizer(PretrainedTokenizer):
         Returns the size of vocabulary.
 
         Returns:
-            int: The sum of size of vocabulary and the size of speical tokens.
+            int: The sum of size of vocabulary and the size of special tokens.
 
         """
 
@@ -517,7 +517,7 @@ class MBart50Tokenizer(PretrainedTokenizer):
         Returns the size of vocabulary.
 
         Returns:
-            int: The sum of size of vocabulary and the size of speical tokens.
+            int: The sum of size of vocabulary and the size of special tokens.
 
         """
 

@@ -165,7 +165,7 @@ def is_torch_available() -> bool:
 
 
 def is_package_available(package_name: str) -> bool:
-    """check if the package is avaliable
+    """check if the package is available
     Args:
         package_name (str): the installed package name
     Returns:
@@ -176,9 +176,9 @@ def is_package_available(package_name: str) -> bool:
 
 
 def is_fast_tokenizer_available() -> bool:
-    """check if `fast_tokenizer` ia avaliable
+    """check if `fast_tokenizer` ia available
     Returns:
-        bool: if `fast_tokenizer` is avaliable
+        bool: if `fast_tokenizer` is available
     """
     return is_package_available("fast_tokenizer")
 
@@ -192,9 +192,9 @@ def is_tokenizers_available() -> bool:
 
 
 def is_paddlenlp_ops_available() -> bool:
-    """check if `paddlenlp_ops` ia avaliable
+    """check if `paddlenlp_ops` ia available
     Returns:
-        bool: if `paddlenlp_ops` is avaliable
+        bool: if `paddlenlp_ops` is available
     """
     return is_package_available("paddlenlp_ops")
 
