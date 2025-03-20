@@ -15,18 +15,30 @@
 # limitations under the License.
 
 set -x
+
 skip_kill_time=${1:-"False"}
 function kill_impl() {
     skip_kill_time=$1
     # kill aadiff test finally.
-    pids=`ps -ef | grep pretrain.py | grep -v grep | awk '{print $2}'`
+    pids=`ps -ef | grep paddle_py310_yiqun | grep -v grep | awk '{print $2}'`
     if [[ "$pids" != "" ]] ; then
         echo $pids
         echo $pids | xargs kill -9
     fi
 
-    echo "Killing processes on gpu"
+    echo "Killing GPU processes on node ${PADDLE_TRAINER_ID}"
     lsof /dev/nvidia* | awk '{print $2}' | xargs -I {} kill -9 {}
 }
+
+START_RANK=0
+END_RANK=8
+
+if [[ ${PADDLE_TRAINER_ID} -lt $START_RANK ]]; then
+    exit 0
+fi
+
+if [[ ${PADDLE_TRAINER_ID} -ge $END_RANK ]]; then
+    exit 0
+fi
 
 kill_impl $skip_kill_time || true

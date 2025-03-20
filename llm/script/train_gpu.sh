@@ -12,6 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+WORK_ROOT=/root/paddlejob/workspace/env_run/liuyiqun
+export PYTHONPATH=${WORK_ROOT}/env/virtualenvs_cuda12.8/paddle_py310_yiqun
+export PATH=${PYTHONPATH}/bin:${PATH}
+
+#pip install -r $WORK_ROOT/PaddleNLP/requirements-dev.txt 
+#pip install -r $WORK_ROOT/PaddleNLP/requirements.txt 
+#pip install colorlog
+#pip install ml_dtypes
+#pip install safetensors
+#pip install aistudio_sdk
+#pip install kitchen
+#exit
+
+export PYTHONPATH=${WORK_ROOT}/PaddleNLP:${WORK_ROOT}/PaPerf:$PYTHONPATH
+
 unset PADDLE_ELASTIC_JOB_ID
 unset PADDLE_TRAINER_ENDPOINTS
 unset DISTRIBUTED_TRAINER_ENDPOINTS
@@ -38,27 +53,34 @@ export NVSHMEM_BOOTSTRAP_UID_SOCK_IFNAME==xgbe0
 START_RANK=0
 END_RANK=8
 
-if [[ $rank -lt $START_RANK ]]; then
+if [[ ${rank} -lt $START_RANK ]]; then
     exit 0
 fi
 
-if [[ $rank -ge $END_RANK ]]; then
+if [[ ${rank} -ge $END_RANK ]]; then
     exit 0
 fi
 
-rank=$(($rank-$START_RANK))
-nnodes=$(($END_RANK-$START_RANK))
+rank=$(($rank - $START_RANK))
+nnodes=$(($END_RANK - $START_RANK))
+echo "rank: ${rank}, nnodes: ${nnodes}"
+
+python -c "import paddle; print(paddle.version.commit)"
 
 master=`cat /root/paddlejob/workspace/hostfile | head -n 1 | awk '{print $1}'`
-port=36679
+port=36699
 export PYTHONPATH=../:$PYTHONPATH
 export PATH=/opt/nvidia/nsight-systems/2025.1.1/bin/:$PATH
 
-python3.10 -m paddle.distributed.launch \
-    --log_dir output/paddle_distributed_logs \
+SUFFIX=${nnodes}nodes_timer_20250320_0
+
+rm -rf checkpoints log_${nnodes}nodes${SUFFIX}
+
+python -m paddle.distributed.launch \
+    --log_dir log_${SUFFIX} \
     --master $master:$port \
     --nnodes $nnodes \
     --rank $rank \
     --run_mode=collective \
-    ${script:-run_pretrain.py}  \
-    $@
+    ../run_pretrain.py  \
+    ../config/deepseek-v3/pretrain_argument.json 2>&1 | tee log_deepseek-v3.bf16.${SUFFIX}.txt 

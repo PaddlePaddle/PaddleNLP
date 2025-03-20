@@ -171,6 +171,7 @@ from .utils.helper import (  # nested_truncate,
     nested_truncate,
 )
 from .utils.sharding_io import ShardingIO
+from paddlenlp.transformers import deepep_timer
 
 DEFAULT_CALLBACKS = [DefaultFlowCallback]
 DEFAULT_PROGRESS_CALLBACK = ProgressCallback
@@ -340,6 +341,7 @@ class Trainer:
         self.tokenizer = tokenizer
         if not args.skip_profile_timer:
             set_timers()
+            self.ep_timer = deepep_timer.get_ep_timer(None, True)
         self.timers = get_timers()
         self.runtime_timer = RuntimeTimer("RuntimeTimer")
 
@@ -1361,6 +1363,9 @@ class Trainer:
 
         metrics["train_loss"] = train_loss
 
+        if self.ep_timer is not None:
+            self.ep_timer.sumary()
+
         self.is_in_train = False
 
         self._memory_tracker.stop_and_update_metrics(metrics)
@@ -1463,6 +1468,9 @@ class Trainer:
 
         if timer_info or paddle_timer_info:
             logger.info(f"[Profile global_step: {self.state.global_step}] {timer_info} {paddle_timer_info}")
+
+        if self.ep_timer is not None:
+            self.ep_timer.add_step()
 
     def _check_loss_valid(self, loss):
         assert isinstance(loss, paddle.Tensor) and loss._is_initialized()

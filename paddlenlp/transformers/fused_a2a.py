@@ -25,6 +25,8 @@ import paddle
 from paddle.autograd import PyLayer
 from paddle.distributed.communication.group import Group
 
+import paddlenlp.transformers.deepep_timer as timer 
+
 _buffer = None
 
 
@@ -68,6 +70,7 @@ def get_buffer(group: Group, hidden_bytes: int):
         or _buffer.num_nvl_bytes < num_nvl_bytes
         or _buffer.num_rdma_bytes < num_rdma_bytes
     ):
+        print(f"-- group.world_size: {group.world_size}, num_nvl_bytes: {num_nvl_bytes}, num_rdma_bytes: {num_rdma_bytes}")
         _buffer = deep_ep.Buffer(group, num_nvl_bytes, num_rdma_bytes)
     return _buffer
 
@@ -85,9 +88,14 @@ def fused_dispatch_forward_func(
     """Forward pass of fused dispatch."""
     # Calculate layout before actual dispatch
     if isinstance(x, tuple):
+        timer_name_suffix = "_tuple"
         buffer = get_buffer(group, get_hidden_bytes(x[0]))
     else:
+        timer_name_suffix = ""
         buffer = get_buffer(group, get_hidden_bytes(x))
+
+    ep_timer = timer.get_ep_timer(buffer, True)
+    ep_timer.start(f"dispatch_forward-get_dispatch_layout{timer_name_suffix}")
     (
         num_tokens_per_rank,
         num_tokens_per_rdma_rank,
@@ -101,11 +109,13 @@ def fused_dispatch_forward_func(
         async_finish=async_finish,
         allocate_on_comm_stream=allocate_on_comm_stream,
     )
+    ep_timer.stop(f"dispatch_forward-get_dispatch_layout{timer_name_suffix}")
 
     assert token_probs.dtype == paddle.float32
     # Do MoE dispatch
     # NOTES: the CPU will wait for GPU's signal to arrive,
     # so this is not compatible with CUDA graph
+    ep_timer.start(f"dispatch_forward-dispatch{timer_name_suffix}")
     (recv_x, recv_token_indices, recv_token_probs, num_recv_tokens_per_expert_list, handle, event,) = buffer.dispatch(
         x,
         topk_idx=token_indices,
@@ -118,6 +128,7 @@ def fused_dispatch_forward_func(
         async_finish=async_finish,
         allocate_on_comm_stream=allocate_on_comm_stream,
     )
+    ep_timer.stop(f"dispatch_forward-dispatch{timer_name_suffix}")
 
     states = dict()
     states["dispatched_indices"] = recv_token_indices
@@ -139,6 +150,8 @@ def fused_dispatch_backward_func(
     """Backward pass of fused dispatch."""
     buffer = get_buffer(group, get_hidden_bytes(grad_output))
 
+    ep_timer = timer.get_ep_timer(buffer, True)
+    ep_timer.start("dispatch_backward-combine")
     grad_x, grad_token_probs, event = buffer.combine(
         grad_output.contiguous(),
         handle,
@@ -147,6 +160,7 @@ def fused_dispatch_backward_func(
         async_finish=async_finish,
         allocate_on_comm_stream=allocate_on_comm_stream,
     )
+    ep_timer.stop("dispatch_backward-combine")
     return grad_x, None, grad_token_probs
 
 
@@ -156,6 +170,9 @@ def fused_combine_forward_func(
     """Forward pass of fused combine."""
     handle = states["handle"]
     buffer = get_buffer(group, get_hidden_bytes(x))
+
+    ep_timer = timer.get_ep_timer(buffer, True)
+    ep_timer.start("combine_forward-combine")
     combined_x, _, event = buffer.combine(
         x,
         handle=handle,
@@ -163,6 +180,7 @@ def fused_combine_forward_func(
         previous_event=previous_event,
         allocate_on_comm_stream=allocate_on_comm_stream,
     )
+    ep_timer.stop("combine_forward-combine")
     return combined_x
 
 
@@ -172,6 +190,9 @@ def fused_combine_backward_func(
     """Backward pass of fused combine."""
     if isinstance(grad_output, tuple):
         buffer = get_buffer(group, get_hidden_bytes(grad_output[0]))
+
+        ep_timer = timer.get_ep_timer(buffer, True)
+        ep_timer.start("combine_backward-dispatch_tuple")
         grad_x, _, _, _, _, event = buffer.dispatch(
             (grad_output[0].contiguous(), grad_output[1].contiguous()),
             handle=handle,
@@ -179,8 +200,12 @@ def fused_combine_backward_func(
             async_finish=async_finish,
             allocate_on_comm_stream=allocate_on_comm_stream,
         )
+        ep_timer.stop("combine_backward-dispatch_tuple")
     else:
         buffer = get_buffer(group, get_hidden_bytes(grad_output))
+
+        ep_timer = timer.get_ep_timer(buffer, True)
+        ep_timer.start("combine_backward-dispatch")
         grad_x, _, _, _, _, event = buffer.dispatch(
             grad_output.contiguous(),
             handle=handle,
@@ -188,6 +213,7 @@ def fused_combine_backward_func(
             async_finish=async_finish,
             allocate_on_comm_stream=allocate_on_comm_stream,
         )
+        ep_timer.stop("combine_backward-dispatch")
     return grad_x
 
 
