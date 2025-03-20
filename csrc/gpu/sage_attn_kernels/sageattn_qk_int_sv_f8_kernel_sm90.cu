@@ -689,7 +689,7 @@ std::vector<paddle::Tensor> qk_int8_sv_f8_accum_f32_attn_inst_buf_sm90_fwd(
     DISPATCH_CAUSAL(is_causal, IS_CAUSAL, {
       DISPATCH_QK_QUANT_GRAN(qk_quant_gran, QK_QUANT_GRAN, {
         DISPATCH_PADDLE_DTYPE_TO_CTYPE(output_type, DTypeOut, {
-          DISPATCH_PADDLE_DTYPE_TO_CTYPE(shift_bias_dtype, DTypeQuant, {
+          DISPATCH_PADDLE_DTYPE_TO_CTYPE_FP16(shift_bias_dtype, DTypeQuant, {
             constexpr int CTA_Q = 64;
             constexpr int CTA_K = 128;
             constexpr int NUM_THREADS = 128;
@@ -870,7 +870,7 @@ std::vector<paddle::Tensor> qk_int8_sv_f8_accum_f32_fuse_v_scale_attn_inst_buf_s
     DISPATCH_CAUSAL(is_causal, IS_CAUSAL, {
       DISPATCH_QK_QUANT_GRAN(qk_quant_gran, QK_QUANT_GRAN, {
         DISPATCH_PADDLE_DTYPE_TO_CTYPE(output_dtype, DTypeOut, {
-          DISPATCH_PADDLE_DTYPE_TO_CTYPE(shift_bias_dtype, DTypeQuant, {
+          DISPATCH_PADDLE_DTYPE_TO_CTYPE_FP16(shift_bias_dtype, DTypeQuant, {
             constexpr int CTA_Q = 64;
             constexpr int CTA_K = 128;
             constexpr int NUM_THREADS = 128;
@@ -905,7 +905,7 @@ std::vector<paddle::Tensor> qk_int8_sv_f8_accum_f32_fuse_v_scale_attn_inst_buf_s
               cudaFuncSetAttribute(
                   kernel,
                   cudaFuncAttributeMaxDynamicSharedMemorySize, sMemSize);
-              
+            
             dim3 grid(div_ceil(qo_len, CTA_Q), num_qo_heads, batch_size);
             kernel<<<grid, NUM_THREADS, sMemSize>>>(
               tma_map_Q,

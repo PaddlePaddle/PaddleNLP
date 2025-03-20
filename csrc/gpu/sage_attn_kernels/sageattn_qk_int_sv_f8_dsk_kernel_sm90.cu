@@ -747,7 +747,7 @@ std::vector<paddle::Tensor> qk_int8_sv_f8_accum_f32_attn_inst_buf_dsk_sm90_fwd(
   DISPATCH_HEAD_DIM(head_dim, HEAD_DIM, {
     DISPATCH_CAUSAL(is_causal, IS_CAUSAL, {
       DISPATCH_QK_QUANT_GRAN(qk_quant_gran, QK_QUANT_GRAN, {
-        DISPATCH_PADDLE_DTYPE_TO_CTYPE(output_type, DTypeOut, {
+        DISPATCH_PADDLE_DTYPE_TO_CTYPE_FP16(output_type, DTypeOut, {
           constexpr int CTA_Q = 64;
           constexpr int CTA_K = 128;
           constexpr int NUM_THREADS = 128;
@@ -950,7 +950,7 @@ std::vector<paddle::Tensor> qk_int8_sv_f8_accum_f32_fuse_v_scale_attn_inst_buf_d
   DISPATCH_HEAD_DIM(head_dim, HEAD_DIM, {
     DISPATCH_CAUSAL(is_causal, IS_CAUSAL, {
       DISPATCH_QK_QUANT_GRAN(qk_quant_gran, QK_QUANT_GRAN, {
-        DISPATCH_PADDLE_DTYPE_TO_CTYPE(output_dtype, DTypeOut, {
+        DISPATCH_PADDLE_DTYPE_TO_CTYPE_FP16(output_dtype, DTypeOut, {
           constexpr int CTA_Q = 64;
           constexpr int CTA_K = 128;
           constexpr int NUM_THREADS = 128;

@@ -47,6 +47,7 @@
 #include <stdexcept>
 
 #include "paddle/extension.h"
+#include "helper.h"
 
 // currently we do not support INT4, so we implement INT8 sage attention inference temperarily
 
@@ -1461,6 +1462,243 @@ struct smem_t {
   }
 };
 
+/* 
+ * These functions and structs were adapted from append attn.
+ * See the original impl in `gpu/append_attn/append_attn_func.cuh`,
+ * `gpu/append_attn/mem_utils.cuh` and `gpu/helper.h`.
+ */
+
+template <uint32_t stride, uint32_t inv_stride = 0>
+__device__ __forceinline__ uint32_t get_permuted_offset(uint32_t i,
+                                                        uint32_t j) {
+  if constexpr (inv_stride <= 1) {
+    return i * stride + (j ^ (i % 8));
+  } else {
+    return i / inv_stride * 8 + ((j + (i % inv_stride) * stride)) ^
+            ((i / inv_stride) % 8);
+  }
+}
+
+template <typename dst_t, typename src_t, size_t vec_size>
+__forceinline__ __host__ __device__ void vec_cast(dst_t* dst,
+                                                  const src_t* src) {
+#pragma unroll
+  for (size_t i = 0; i < vec_size; ++i) {
+    dst[i] = src[i];
+  }
+}
+
+template <size_t vec_size>
+__forceinline__ __host__ __device__ void vec_cast<half, float>(
+    half* dst, const float* src) {
+#pragma unroll
+  for (size_t i = 0; i < vec_size / 2; ++i) {
+    ((half2*)dst)[i] = __float22half2_rn(((float2*)src)[i]);
+  }
+}
+
+template <size_t vec_size>
+__forceinline__ __host__ __device__ void vec_cast<nv_bfloat16, float>(
+    nv_bfloat16* dst, const float* src) {
+#pragma unroll
+  for (size_t i = 0; i < vec_size / 2; ++i) {
+    ((nv_bfloat162*)dst)[i] = __float22bfloat162_rn(((float2*)src)[i]);
+  }
+}
+
+template <typename T, int VEC_SIZE, typename OutT>
+struct StoreFunc {
+  __device__ __forceinline__ void operator()(
+      const AlignedVector<T, VEC_SIZE>& ori_out_vec,
+      const AlignedVector<T, VEC_SIZE>& shift_bias_vec,
+      const AlignedVector<T, VEC_SIZE>& smooth_weight_vec,
+      AlignedVector<OutT, VEC_SIZE>& out_vec,
+      const float quant_max_bound,
+      const float quant_min_bound,
+      const float in_scale,
+      const int i) {
+    out_vec[i] = static_cast<OutT>(ori_out_vec[i]);
+    printf("Fatal! Unimplemented StoreFunc for sage attention\n");
+  }
+};
+
+template <typename T, int VEC_SIZE>
+struct StoreFunc<T, VEC_SIZE, int8_t> {
+  __device__ __forceinline__ void operator()(
+      const AlignedVector<T, VEC_SIZE>& ori_out_vec,
+      const AlignedVector<T, VEC_SIZE>& shift_bias_vec,
+      const AlignedVector<T, VEC_SIZE>& smooth_weight_vec,
+      AlignedVector<int8_t, VEC_SIZE>& out_vec,
+      const float quant_max_bound,
+      const float quant_min_bound,
+      const float in_scale,
+      const int i) {
+    float quant_value =
+        quant_max_bound *
+        static_cast<float>((ori_out_vec[i] + shift_bias_vec[i]) *
+                           smooth_weight_vec[i]) *
+        in_scale;
+    quant_value = rintf(quant_value);
+    quant_value = quant_value > quant_max_bound ? quant_max_bound : quant_value;
+    quant_value = quant_value < quant_min_bound ? quant_min_bound : quant_value;
+    out_vec[i] = static_cast<int8_t>(quant_value);
+  }
+};
+
+template <typename T, int VEC_SIZE>
+struct StoreFunc<T, VEC_SIZE, __nv_fp8_e4m3> {
+  __device__ __forceinline__ void operator()(
+      const AlignedVector<T, VEC_SIZE>& ori_out_vec,
+      const AlignedVector<T, VEC_SIZE>& shift_bias_vec,
+      const AlignedVector<T, VEC_SIZE>& smooth_weight_vec,
+      AlignedVector<__nv_fp8_e4m3, VEC_SIZE>& out_vec,
+      const float quant_max_bound,
+      const float quant_min_bound,
+      const float in_scale,
+      const int i) {
+    float quant_value =
+        quant_max_bound * static_cast<float>(ori_out_vec[i]) * in_scale;
+    quant_value = quant_value > quant_max_bound ? quant_max_bound : quant_value;
+    quant_value = quant_value < quant_min_bound ? quant_min_bound : quant_value;
+    out_vec[i] = static_cast<__nv_fp8_e4m3>(quant_value);
+  }
+};
+
+template <typename T, int VEC_SIZE>
+struct StoreFunc<T, VEC_SIZE, T> {
+  __device__ __forceinline__ void operator()(
+      const AlignedVector<T, VEC_SIZE>& ori_out_vec,
+      const AlignedVector<T, VEC_SIZE>& shift_bias_vec,
+      const AlignedVector<T, VEC_SIZE>& smooth_weight_vec,
+      AlignedVector<T, VEC_SIZE>& out_vec,
+      const float quant_max_bound,
+      const float quant_min_bound,
+      const float in_scale,
+      const int i) {
+    out_vec[i] = ori_out_vec[i];
+  }
+};
+
+template <typename T>
+constexpr __host__ __device__ __forceinline__ uint32_t num_elems_per_128b() {
+  return sizeof(b128_t) / sizeof(T);
+}
+
+template <uint32_t group_size,
+          uint32_t num_frags_x,
+          uint32_t num_frags_y,
+          bool partition_kv,
+          typename T,
+          typename OutT,
+          SwizzleMode swizzle_mode=SwizzleMode::k128B, 
+          uint32_t stride=8>
+__device__ __forceinline__ void write_o_reg_gmem_multi_warps_shift_smooth_quant(
+    float (*o_frag)[num_frags_y][8],
+    smem_t<swizzle_mode, stride>* o_smem,
+    OutT* o_ptr_base,
+    const T* shift_bias,
+    const T* smooth_weight,
+    uint32_t o_idx_base,
+    const uint32_t q_head_idx_base,
+    const float quant_max_bound,
+    const float quant_min_bound,
+    const float in_scale,
+    const uint32_t qo_upper_bound,
+    const uint32_t qo_n_stride,
+    const uint32_t qo_h_stride) {
+  constexpr uint32_t head_dim = num_frags_y * 16;
+  constexpr uint32_t num_vecs_per_head = head_dim / num_elems_per_128b<T>();
+  const uint32_t tx = threadIdx.x, ty = threadIdx.y;
+  constexpr int VEC_SIZE = 16 / sizeof(T);
+  AlignedVector<T, VEC_SIZE> ori_out_vec;
+  AlignedVector<T, VEC_SIZE> shift_bias_vec;
+  AlignedVector<T, VEC_SIZE> smooth_weight_vec;
+  AlignedVector<OutT, VEC_SIZE> out_vec;
+  // [num_warps * num_frags_x * 16, num_frags_y * 16]
+  if (ty == 0) {
+    // [num_frags_x * 16, num_frags_y * 16]
+#pragma unroll
+    for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
+#pragma unroll
+      for (uint32_t fy = 0; fy < num_frags_y; ++fy) {
+        uint32_t o_frag_f16[4];
+        vec_cast<T, float, 8>((T*)o_frag_f16, o_frag[fx][fy]);
+        uint32_t o_smem_offset_w = get_permuted_offset<
+            num_vecs_per_head>(
+            fx * 16 + tx / 4,
+            fy * 2);
+        ((uint32_t*)(o_smem->base + o_smem_offset_w))[tx % 4] = o_frag_f16[0];
+        ((uint32_t*)(o_smem->base + o_smem_offset_w +
+                     8 * num_vecs_per_head))[tx % 4] = o_frag_f16[1];
+        ((uint32_t*)(o_smem->base + (o_smem_offset_w ^ 0x1)))[tx % 4] =
+            o_frag_f16[2];
+        ((uint32_t*)(o_smem->base + (o_smem_offset_w ^ 0x1) +
+                     8 * num_vecs_per_head))[tx % 4] = o_frag_f16[3];
+      }
+    }
+  }
+  __syncthreads();
+
+  uint32_t o_smem_offset_w = get_permuted_offset<num_vecs_per_head>(
+      ty * 4 + tx / 8, tx % 8); 
+
+  const uint32_t tx_offset = tx / 8;
+#pragma unroll
+  for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
+    const uint32_t base_offset = o_idx_base + fx * 16 + tx_offset;
+#pragma unroll
+    const int j = ty;
+    const uint32_t offset_now = base_offset + j * 4;
+    const uint32_t n_offset = offset_now / group_size;
+    const uint32_t h_offset = offset_now % group_size;
+
+    OutT* o_ptr = o_ptr_base + n_offset * qo_n_stride + h_offset * qo_h_stride;
+
+    uint32_t shift_smooth_offset = (q_head_idx_base + h_offset) * head_dim +
+                                   tx % 8 * num_elems_per_128b<T>();
+#pragma unroll
+    for (uint32_t fyo = 0; fyo < num_frags_y / 4;
+         ++fyo) {
+      if (n_offset < qo_upper_bound) {
+        if constexpr (!partition_kv) {
+          if (in_scale > 0.0) {
+            if (shift_bias) {
+              Load<T, VEC_SIZE>(shift_bias + shift_smooth_offset,
+                                &shift_bias_vec);
+              Load<T, VEC_SIZE>(smooth_weight + shift_smooth_offset,
+                                &smooth_weight_vec);
+            }
+          }
+          Load<T, VEC_SIZE>(
+              reinterpret_cast<T*>(o_smem->base + o_smem_offset_w),
+              &ori_out_vec);
+
+#pragma unroll
+          for (int i = 0; i < VEC_SIZE; ++i) {
+            StoreFunc<T, VEC_SIZE, OutT>()(ori_out_vec,
+                                           shift_bias_vec,
+                                           smooth_weight_vec,
+                                           out_vec,
+                                           quant_max_bound,
+                                           quant_min_bound,
+                                           in_scale,
+                                           i);
+          }
+          Store<OutT, VEC_SIZE>(out_vec, o_ptr);
+        } else {
+          o_smem->store_128b(o_smem_offset_w, o_ptr);
+        }
+      }
+      o_ptr += 8 * num_elems_per_128b<T>();
+      shift_smooth_offset += 8 * num_elems_per_128b<T>();
+      o_smem_offset_w =
+          o_smem->advance_offset_by_column<8>(o_smem_offset_w, fyo);
+    }
+    o_smem_offset_w =
+        o_smem->advance_offset_by_row<16>(o_smem_offset_w) - 2 * num_frags_y;
+  }
+}
+
 
 // numeric conversion
 __device__ __forceinline__ void floatx4_to_e4m3x4(uint32_t *dest, float *source0, float *source1)
@@ -2731,111 +2969,3 @@ __device__ __forceinline__ void wgmma_f8f8f32(float d[][8], uint32_t* RA, T* sB)
 }
 
 } // namespace wgmma
-
-// template <uint32_t group_size,
-//           uint32_t num_frags_x,
-//           uint32_t num_frags_y,
-//           bool partition_kv,
-//           typename T,
-//           typename OutT>
-// __device__ __forceinline__ void write_o_reg_gmem_shift_smooth_quant(
-//     float (*o_frag)[num_frags_y][8],
-//     smem_t* o_smem,
-//     OutT* o_ptr_base,
-//     const T* shift_bias,
-//     const T* smooth_weight,
-//     uint32_t o_idx_base,
-//     const uint32_t q_head_idx_base,
-//     const float quant_max_bound,
-//     const float quant_min_bound,
-//     const float in_scale,
-//     const uint32_t qo_upper_bound,
-//     const uint32_t qo_n_stride,
-//     const uint32_t qo_h_stride) {
-//   constexpr uint32_t head_dim = num_frags_y * 16;
-//   constexpr uint32_t num_vecs_per_head = head_dim / num_elems_per_128b<T>();
-//   const uint32_t tx = threadIdx.x, ty = threadIdx.y;
-//   constexpr int VEC_SIZE = 8;
-//   AlignedVector<T, VEC_SIZE> ori_out_vec;
-//   AlignedVector<T, VEC_SIZE> shift_bias_vec;
-//   AlignedVector<T, VEC_SIZE> smooth_weight_vec;
-//   AlignedVector<OutT, VEC_SIZE> out_vec;
-// #pragma unroll
-//   for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
-// #pragma unroll
-//     for (uint32_t fy = 0; fy < num_frags_y; ++fy) {
-//       uint32_t o_frag_f16[4];
-//       vec_cast<T, float, 8>((T*)o_frag_f16, o_frag[fx][fy]);
-//       uint32_t o_smem_offset_w = smem_t::get_permuted_offset<
-//           num_vecs_per_head>(
-//           (ty * num_frags_x + fx) * 16 + tx / 4,
-//           fy * 2);
-//       ((uint32_t*)(o_smem->base + o_smem_offset_w))[tx % 4] = o_frag_f16[0];
-//       ((uint32_t*)(o_smem->base + o_smem_offset_w +
-//                    8 * num_vecs_per_head))[tx % 4] = o_frag_f16[1];
-//       ((uint32_t*)(o_smem->base + (o_smem_offset_w ^ 0x1)))[tx % 4] =
-//           o_frag_f16[2];
-//       ((uint32_t*)(o_smem->base + (o_smem_offset_w ^ 0x1) +
-//                    8 * num_vecs_per_head))[tx % 4] = o_frag_f16[3];
-//     }
-//   }
-//   __syncthreads();
-
-//   uint32_t o_smem_offset_w = smem_t::get_permuted_offset<num_vecs_per_head>(
-//       ty * num_frags_x * 16 + tx / 8,
-//       tx % 8);
-
-//   const uint32_t tx_offset = tx / 8;
-// #pragma unroll
-//   for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
-//     const uint32_t base_offset = o_idx_base + fx * 16 + tx_offset;
-// #pragma unroll
-//     for (uint32_t j = 0; j < 4; ++j) {  // 4 * 4 = 16
-//       const uint32_t offset_now = base_offset + j * 4;
-//       const uint32_t n_offset = offset_now / group_size;
-//       const uint32_t h_offset = offset_now % group_size;
-//       OutT* o_ptr =
-//           o_ptr_base + n_offset * qo_n_stride + h_offset * qo_h_stride;
-//       uint32_t shift_smooth_offset = (q_head_idx_base + h_offset) * head_dim +
-//                                      tx % 8 * num_elems_per_128b<T>();
-// #pragma unroll
-//       for (uint32_t fyo = 0; fyo < num_frags_y / 4;
-//            ++fyo) {
-//         if (n_offset < qo_upper_bound) {
-//           if (!partition_kv && in_scale > 0.0) {
-//             if (shift_bias) {
-//               Load<T, VEC_SIZE>(shift_bias + shift_smooth_offset,
-//                                 &shift_bias_vec);
-//               Load<T, VEC_SIZE>(smooth_weight + shift_smooth_offset,
-//                                 &smooth_weight_vec);
-//             }
-//             Load<T, VEC_SIZE>(
-//                 reinterpret_cast<T*>(o_smem->base + o_smem_offset_w),
-//                 &ori_out_vec);
-// #pragma unroll
-//             for (int i = 0; i < VEC_SIZE; ++i) {
-//               StoreFunc<T, VEC_SIZE, OutT>()(ori_out_vec,
-//                                              shift_bias_vec,
-//                                              smooth_weight_vec,
-//                                              out_vec,
-//                                              quant_max_bound,
-//                                              quant_min_bound,
-//                                              in_scale,
-//                                              i);
-//             }
-//             Store<OutT, VEC_SIZE>(out_vec, o_ptr);
-//           } else {
-//             o_smem->store_128b(o_smem_offset_w, o_ptr);
-//           }
-//         }
-//         o_ptr += 8 * num_elems_per_128b<T>();
-//         shift_smooth_offset += 8 * num_elems_per_128b<T>();
-//         o_smem_offset_w =
-//             o_smem->advance_offset_by_column<8>(o_smem_offset_w, fyo);
-//       }
-//       o_smem_offset_w =
-//           o_smem->advance_offset_by_row<4, num_vecs_per_head>(o_smem_offset_w) -
-//           2 * num_frags_y;
-//     }
-//   }
-// }
