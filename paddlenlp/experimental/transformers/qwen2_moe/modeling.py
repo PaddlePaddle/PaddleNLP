@@ -934,13 +934,13 @@ class Qwen2MoeForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen
 
                     if config.use_ep_parallel:
                         base_actions[f"layers.0.mlp.experts.{expert_idx}.up_proj.weight"] = partial(
-                            fn_expert, expert_id=expert_idx
+                            fn_expert, expert_idx=expert_idx
                         )
                         base_actions[f"layers.0.mlp.experts.{expert_idx}.gate_proj.weight"] = partial(
-                            fn_expert, expert_id=expert_idx
+                            fn_expert, expert_idx=expert_idx
                         )
                         base_actions[f"layers.0.mlp.experts.{expert_idx}.down_proj.weight"] = partial(
-                            fn_expert, expert_id=expert_idx
+                            fn_expert, expert_idx=expert_idx
                         )
 
             base_actions["layers.0.mlp.shared_expert.up_proj.weight"] = partial(fn, is_column=True)

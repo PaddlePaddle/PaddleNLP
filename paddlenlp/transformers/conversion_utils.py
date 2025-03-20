@@ -668,10 +668,10 @@ def get_tensor_parallel_split_func(tensor_parallel_degree, tensor_parallel_rank,
 
 
 def get_ep_func(tensor_parallel_degree, tensor_parallel_rank, expert_num=-1):
-    def fn(x, expert_id):
+    def fn(x, expert_idx):
         assert "PySafeSlice" in str(type(x))
         size = x.get_shape()
-        if expert_id // (expert_num // tensor_parallel_degree) == tensor_parallel_rank:
+        if expert_idx // (expert_num // tensor_parallel_degree) == tensor_parallel_rank:
             return x[:]
         else:
             # return a small tensor.
