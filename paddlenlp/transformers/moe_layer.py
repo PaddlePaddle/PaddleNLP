@@ -19,9 +19,11 @@ from __future__ import annotations
 import os
 from typing import Any, List, Tuple
 
+import deep_gemm
 import numpy as np
 import paddle
 import paddle.distributed as dist
+import TokenDispatcherUtils as TDU
 from paddle import Tensor, nn
 from paddle.distributed.communication.group import Group
 
@@ -484,16 +486,7 @@ class Fp8DispatchNode:
         self.name = name
 
     @paddle.no_grad()
-    def forward(
-        self,
-        hs_fp8,
-        hs_scale,
-        token_indices,
-        token_probs,
-        previous_event=None,
-        async_finish=False,
-        allocate_on_comm_stream=False,
-    ):
+    def forward(self, hs_fp8, hs_scale, token_indices, token_probs, previous_event=None, async_finish=False):
         # dispatch
         (hs_fp8_dispatched, hs_scale_dispatched), dispatched_probs, states = self.dispatch_act_node.forward(
             (hs_fp8, hs_scale),
@@ -503,7 +496,6 @@ class Fp8DispatchNode:
             self.token_dispatcher._comm_manager.group,
             previous_event=previous_event,
             async_finish=async_finish,
-            allocate_on_comm_stream=allocate_on_comm_stream,
         )
         self.token_dispatcher._comm_manager.handle = states["handle"]
         self.token_dispatcher._comm_manager.tokens_per_expert = states["tokens_per_expert"]
@@ -676,6 +668,261 @@ class FusionMoeNode:
         hs_fp8_grad, token_probs_grad = self.dispatch_node.backward(hs_fp8_dispatched_grad, dispatched_probs_grad)
         hs_grad, probs_grad, routing_map_grad = self.dispatch_quant_node.backward(hs_fp8_grad, token_probs_grad)
         return hs_grad, probs_grad, routing_map_grad
+
+
+class FusionMoeNodeZip:
+    def __init__(self, custom_map, name="fusion_moe_node"):
+        self.token_dispatcher = custom_map.token_dispatcher
+
+        self.dispatch_quant_node = Fp8DispatchQuantNode(self.token_dispatcher)
+        self.dispatch_node = Fp8DispatchNode(self.token_dispatcher)
+        self.mlp_node = MlpNode(custom_map)
+        self.combine_node = Fp8CombineNode(self.token_dispatcher)
+        self.combine_quant_node = Fp8CombineQuantNode(self.token_dispatcher)
+        self.name = name
+        self.experts = custom_map.experts
+        self.expert_node = ExpertsNode(self.experts, self.token_dispatcher)
+        self.dispatched_indices = None
+        self.dispatched_probs = None
+        self.total_unzipped_tokens_num = None
+        self.topk = None
+        self.unzipped_probs = None
+        self.expert_w1 = None
+        self.concatenated_w1 = None
+        self.concatenated_w2 = None
+        self.unzipped_expert_idx = None
+        self.o1 = None
+        self.hs_fp8_dispatched_shape = None
+        self.zipped_expertwise_rowmap = None
+
+    @paddle.no_grad()
+    def forward(self, hidden_states, probs, routing_map):
+
+        # =======================pre_dispatch_and_quant================
+        hs_fp8, hs_scale, token_indices, token_probs = self.dispatch_quant_node.forward(
+            hidden_states, probs, routing_map
+        )
+
+        # =======================dispatch=======================
+        hs_fp8_dispatched, hs_scale_dispatched, dispatched_indices, dispatched_probs = self.dispatch_node.forward(
+            hs_fp8, hs_scale, token_indices, token_probs
+        )
+
+        # =======================unzip hs_fp8_dispatched=======================
+        dispatched_probs = dispatched_probs.to(paddle.bfloat16)
+        dispatched_indices = dispatched_indices.to(paddle.int32)
+        total_unzipped_tokens_num = int((dispatched_indices != -1).astype("int64").sum())
+        unzipped_tokens, zipped_expertwise_rowmap, unzipped_probs, unzipped_expert_idx = TDU.tokens_unzip(
+            hs_fp8_dispatched,
+            dispatched_indices,
+            dispatched_probs,
+            total_unzipped_tokens_num=total_unzipped_tokens_num,
+            topk=self.token_dispatcher._comm_manager.router_topk,
+            num_experts=4,
+        )
+        self.dispatched_indices = dispatched_indices
+        self.dispatched_probs = dispatched_probs
+        self.topk = self.token_dispatcher._comm_manager.router_topk
+        self.unzipped_probs = unzipped_probs
+        self.total_unzipped_tokens_num = total_unzipped_tokens_num
+        self.unzipped_expert_idx = unzipped_expert_idx
+
+        # =======================unzip hs_scale_dispatched=======================
+        # 临时操作将fp32转成bf16，待zhaowu优化后删除：
+        hs_scale_dispatched = hs_scale_dispatched.to(paddle.bfloat16)
+        unzipped_scale = TDU.tokens_guided_unzip(
+            hs_scale_dispatched,
+            zipped_expertwise_rowmap,
+            total_unzipped_token_num=total_unzipped_tokens_num,
+            num_experts=4,
+        )
+
+        # =======================MLA=======================
+        # 1 concat and transpose w1
+        expert_w1 = [x.w1 for x in self.experts if x is not None]
+        w1_shape = expert_w1[0].shape
+        concatenated_w1 = paddle.concat(expert_w1, axis=0).reshape([len(expert_w1), w1_shape[0], -1])
+        concatenated_w1_t = (
+            paddle.transpose(concatenated_w1, [0, 2, 1])
+            .contiguous()
+            .reshape([len(expert_w1) * w1_shape[1], w1_shape[0]])
+        )
+        self.concatenated_w1 = concatenated_w1
+        # 2 quant w1
+        w1_quant, w1_sacle = kitchen_quant(
+            concatenated_w1_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
+        )
+
+        # 3 group gemm
+        w1_quant = w1_quant.reshape([len(expert_w1), w1_shape[1], -1])
+        w1_sacle = w1_sacle.reshape([len(expert_w1), w1_shape[1] // 128, -1])
+
+        o1 = paddle.empty([unzipped_tokens.shape[0], w1_quant.shape[1]], dtype="bfloat16")
+        self.o1 = o1
+        print("unzipped_tokens:", unzipped_tokens)
+        print("unzipped_scale:", unzipped_scale)
+        print("w1_quant: ", w1_quant)
+        print("w1_sacle: ", w1_sacle)
+        print("o1:", o1)
+        print("unzipped_expert_idx:", unzipped_expert_idx)
+        unzipped_scale = unzipped_scale.to(paddle.float32)
+        deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
+            (unzipped_tokens, unzipped_scale), (w1_quant, w1_sacle), o1, unzipped_expert_idx
+        )
+        o1 = o1 * unzipped_probs.unsqueeze(-1)
+
+        # 4 swiglu
+        o2 = self.expert_node.fwd_swiglu(o1)
+
+        # 5 quant o2
+        o2_quant, o2_scale = kitchen_quant(
+            o2, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+        )
+
+        # 6 concat and transpose w2
+        expert_w2 = [x.w2 for x in self.experts if x is not None]
+        print("expert_w2:", expert_w2)
+        w2_shape = expert_w2[0].shape
+        print("w2_shape:", w2_shape)
+        concatenated_w2 = paddle.concat(expert_w2, axis=0).reshape([len(expert_w2), w2_shape[0], -1])
+        print("concatenated_w2:", concatenated_w2)
+        concatenated_w2_t = (
+            paddle.transpose(concatenated_w2, [0, 2, 1])
+            .contiguous()
+            .reshape([len(expert_w2) * w2_shape[1], w2_shape[0]])
+        )
+        print("concatenated_w2_t:", concatenated_w2_t)
+        self.concatenated_w2 = concatenated_w2
+
+        # 7 quant w2
+        w2_quant, w2_sacle = kitchen_quant(
+            concatenated_w2_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
+        )
+        print("w2_quant:", w2_quant)
+        print("w2_sacle:", w2_sacle)
+        w2_quant = w2_quant.reshape([len(expert_w2), w2_shape[1], -1])
+        print("w2_quant:", w2_quant)
+        w2_sacle = w2_sacle.reshape([len(expert_w2), w2_shape[1] // 128, -1])
+        print("w2_sacle:", w2_sacle)
+        # 临时操作，后续删掉
+        o3 = paddle.empty([o2_quant.shape[0], w2_shape[1]], dtype="bfloat16")
+
+        deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
+            (o2_quant, o2_scale), (w2_quant, w2_sacle), o3, unzipped_expert_idx
+        )
+        print("o3: ", o3)
+
+        # =======================unzip=======================
+        weighted_zipped_tokens = TDU.tokens_weighted_zip(
+            o3, unzipped_probs, zipped_expertwise_rowmap, total_zipped_tokens=hs_fp8_dispatched.shape[0], num_experts=4
+        )
+        self.hs_fp8_dispatched_shape = hs_fp8_dispatched.shape
+        self.zipped_expertwise_rowmap = zipped_expertwise_rowmap
+        print("weighted_zipped_tokens:", weighted_zipped_tokens)
+
+        # =======================combine=======================
+        output_combie = self.combine_node.forward(weighted_zipped_tokens)
+        print("output_combie:", output_combie)
+        output = self.combine_quant_node.forward(output_combie)
+        print("output:", output)
+        output.stop_gradient = False
+
+        return output
+
+    @paddle.no_grad()
+    def backward(self, output_grad):
+        output_combie_grad_fp8, output_combie_grad_scale = self.combine_quant_node.backward(output_grad)
+        hidden_states_out_grad, hidden_states_out_grad_scale = self.combine_node.backward(
+            output_combie_grad_fp8, output_combie_grad_scale
+        )
+
+        # =====================zip grad=======================
+        unzipped_grad, zipped_expertwise_rowmap_grad, _, _ = TDU.tokens_unzip(
+            hidden_states_out_grad,
+            self.dispatched_indices,
+            self.dispatched_probs,
+            total_unzipped_tokens_num=self.total_unzipped_tokens_num,
+            topk=self.topk,
+            num_experts=4,
+        )
+
+        hidden_states_out_grad_scale = hidden_states_out_grad_scale.to(paddle.bfloat16)
+        unzipped_scale = TDU.tokens_guided_unzip(
+            hidden_states_out_grad_scale,
+            zipped_expertwise_rowmap_grad,
+            total_unzipped_token_num=self.total_unzipped_tokens_num,
+            num_experts=4,
+        )
+
+        # =====================MLP backward=======================
+        concatenated_w2_2d = self.concatenated_w2.reshape(
+            [self.concatenated_w2.shape[0] * self.concatenated_w2.shape[1], -1]
+        )
+
+        bw_w2_quant, bw_w2_scale = kitchen_quant(
+            concatenated_w2_2d, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
+        )
+        bw_w2_quant = bw_w2_quant.reshape([self.concatenated_w2.shape[0], self.concatenated_w2.shape[1], -1])
+        bw_w2_scale = bw_w2_scale.reshape([self.concatenated_w2.shape[0], self.concatenated_w2.shape[1] // 128, -1])
+
+        swiglu_grad = paddle.empty([unzipped_grad.shape[0], bw_w2_quant.shape[1]], dtype="bfloat16")
+        # 临时操作
+        unzipped_scale = unzipped_scale.to(paddle.float32)
+        print("self.unzipped_expert_idx:", self.unzipped_expert_idx)  # 32855
+        print("unzipped_scale:", unzipped_scale)  #
+        print("unzipped_grad:", unzipped_grad)
+        print("bw_w2_quant:", bw_w2_quant)
+        print("bw_w2_scale:", bw_w2_scale)
+        print("swiglu_grad:", swiglu_grad)
+        # self.unzipped_expert_idx = self.unzipped_expert_idx.to(paddle.int64)
+        deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
+            (unzipped_grad, unzipped_scale), (bw_w2_quant, bw_w2_scale), swiglu_grad, self.unzipped_expert_idx
+        )
+        print("swiglu_grad:", swiglu_grad)
+        dt1, _ = paddle._C_ops.swiglu_grad(self.o1, None, swiglu_grad)
+        prob_grad = (dt1 * self.o1).sum(axis=1)
+        print("prob_grad:", prob_grad)
+        print("dt1:", dt1)
+        dt1_fp8, dt1_scale = kitchen_quant(
+            dt1, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+        )
+
+        print("self.concatenated_w1:", self.concatenated_w1)
+        concatenated_w1_2d = self.concatenated_w1.reshape(
+            [self.concatenated_w1.shape[0] * self.concatenated_w1.shape[1], -1]
+        )
+        print("concatenated_w1_2d:", concatenated_w1_2d)
+
+        bw_w1_quant, bw_w1_scale = kitchen_quant(
+            concatenated_w1_2d, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
+        )
+        bw_w1_quant = bw_w1_quant.reshape([self.concatenated_w1.shape[0], self.concatenated_w1.shape[1], -1])
+        bw_w1_scale = bw_w1_scale.reshape([self.concatenated_w1.shape[0], self.concatenated_w1.shape[1] // 128, -1])
+        print("bw_w1_quant:", bw_w1_quant)
+        print("bw_w1_scale:", bw_w1_scale)
+
+        dt0 = paddle.empty([dt1_fp8.shape[0], bw_w1_quant.shape[1]], dtype="bfloat16")
+        deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
+            (dt1_fp8, dt1_scale), (bw_w1_quant, bw_w1_scale), dt0, self.unzipped_expert_idx
+        )
+
+        print("dt0:", dt0)
+
+        weighted_zipped_tokens = TDU.tokens_weighted_zip(
+            dt0,
+            self.unzipped_probs,
+            self.zipped_expertwise_rowmap,
+            total_zipped_tokens=self.hs_fp8_dispatched_shape[0],
+            num_experts=4,
+        )
+
+        print("weighted_zipped_tokens:", weighted_zipped_tokens)
+
+        # raise RuntimeError("-----")
+
+        # hs_fp8_grad, token_probs_grad = self.dispatch_node.backward(hs_fp8_dispatched_grad, dispatched_probs_grad)
+        # hs_grad, probs_grad, routing_map_grad = self.dispatch_quant_node.backward(hs_fp8_grad, token_probs_grad)
+        # return hs_grad, probs_grad, routing_map_grad
 
 
 class FusionMoe(paddle.autograd.PyLayer):
