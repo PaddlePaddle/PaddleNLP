@@ -12,8 +12,28 @@
 #include "paddle/phi/common/float8_e5m2.h"
 #include "paddle/phi/kernels/funcs/math_cuda_utils.h"
 
+
+#include <type_traits>  
+
+// 类型萃取
+template <typename DoutT>
+struct PhiToNvType {
+    using type = DoutT;  // 默认保留原类型
+};
+
+template <>
+struct PhiToNvType<phi::bfloat16> {
+    using type = __nv_bfloat16;
+};
+
+template <>
+struct PhiToNvType<phi::float8_e4m3fn> {
+    using type = __nv_fp8_e4m3;
+};
+
+template<typename DoutT>
 __global__ void regroup_tokens_kernel(const phi::bfloat16* __restrict__ X_in,
-                                      const phi::bfloat16* __restrict__ dout_in,
+                                      const DoutT* __restrict__ dout_in,
                                       const int* __restrict__ expert_idx,
                                       const int original_token_num,
                                       const int h1,
@@ -21,25 +41,27 @@ __global__ void regroup_tokens_kernel(const phi::bfloat16* __restrict__ X_in,
                                       const int expert_token_num,
                                       int* __restrict__ atomic_offset_counters,
                                       phi::bfloat16* grouped_X_out,
-                                      phi::bfloat16* grouped_dout_out) {
+                                      DoutT* grouped_dout_out) {
+  using nv_dout_t = typename PhiToNvType<DoutT>::type;
+
   int row_idx = blockIdx.x;
   if (row_idx >= original_token_num) return;
 
   const __nv_bfloat16* X = reinterpret_cast<const __nv_bfloat16*>(X_in);
-  const __nv_bfloat16* dout = reinterpret_cast<const __nv_bfloat16*>(dout_in);
+  const nv_dout_t* dout = reinterpret_cast<const nv_dout_t*>(dout_in);
   __nv_bfloat16* grouped_X = reinterpret_cast<__nv_bfloat16*>(grouped_X_out);
-  __nv_bfloat16* grouped_dout =
-      reinterpret_cast<__nv_bfloat16*>(grouped_dout_out);
+  nv_dout_t* grouped_dout =
+      reinterpret_cast<nv_dout_t*>(grouped_dout_out);
 
-  extern __shared__ __nv_bfloat16* target_rowbase_X;
-  extern __shared__ __nv_bfloat16* target_rowbase_dout;
+  __shared__ __nv_bfloat16* target_rowbase_X;
+  __shared__ nv_dout_t* target_rowbase_dout;
   if (threadIdx.x == 0) {
     int target_group = expert_idx[row_idx];
     int offset_X = target_group * expert_token_num * h1;  // stride = token_len
     int offset_dout =
         target_group * expert_token_num * h2;  // stride = feature_len
     __nv_bfloat16* group_base_X = grouped_X + offset_X;
-    __nv_bfloat16* group_base_dout = grouped_dout + offset_dout;
+    nv_dout_t* group_base_dout = grouped_dout + offset_dout;
     int target_row_idx = atomicAdd(&(atomic_offset_counters[target_group]), 1);
     target_rowbase_X = group_base_X + target_row_idx * h1;
     target_rowbase_dout = group_base_dout + target_row_idx * h2;
@@ -58,6 +80,7 @@ __global__ void regroup_tokens_kernel(const phi::bfloat16* __restrict__ X_in,
   }
 }
 
+
 void dispatch_regroup_tokens_kernel(const paddle::Tensor& X,
                                     const paddle::Tensor& dout,
                                     const paddle::Tensor& expert_idx,
@@ -72,24 +95,39 @@ void dispatch_regroup_tokens_kernel(const paddle::Tensor& X,
   int h2 = dout.shape()[1];
   grid.x = original_token_num;
   block.x = 256;  // 单block处理单token+dout
-  regroup_tokens_kernel<<<grid, block, 0, X.stream()>>>(
-      X.data<phi::bfloat16>(),
-      dout.data<phi::bfloat16>(),
-      expert_idx.data<int>(),
-      original_token_num,
-      h1,
-      h2,
-      expert_token_num,
-      atomic_offset_counters.data<int>(),
-      grouped_X.data<phi::bfloat16>(),
-      grouped_dout.data<phi::bfloat16>());
+  if(dout.dtype() == paddle::DataType::FLOAT8_E4M3FN){
+    regroup_tokens_kernel<phi::float8_e4m3fn><<<grid, block, 0, X.stream()>>>(
+        X.data<phi::bfloat16>(),
+        dout.data<phi::float8_e4m3fn>(),
+        expert_idx.data<int>(),
+        original_token_num,
+        h1,
+        h2,
+        expert_token_num,
+        atomic_offset_counters.data<int>(),
+        grouped_X.data<phi::bfloat16>(),
+        grouped_dout.data<phi::float8_e4m3fn>());
+  }else if(dout.dtype() == paddle::DataType::BFLOAT16){
+    regroup_tokens_kernel<phi::bfloat16><<<grid, block, 0, X.stream()>>>(
+        X.data<phi::bfloat16>(),
+        dout.data<phi::bfloat16>(),
+        expert_idx.data<int>(),
+        original_token_num,
+        h1,
+        h2,
+        expert_token_num,
+        atomic_offset_counters.data<int>(),
+        grouped_X.data<phi::bfloat16>(),
+        grouped_dout.data<phi::bfloat16>());
+  }
 }
 std::vector<paddle::Tensor> regroup_tokens(const paddle::Tensor& X,
                                            const paddle::Tensor& dout,
                                            const paddle::Tensor& expert_idx,
                                            const int& expert_num,
                                            const int& token_max_per_expert) {
-  PD_CHECK(X.dtype() == paddle::DataType::BFLOAT16);  // 当前只支持BFLOAT16
+  PD_CHECK(X.dtype() == paddle::DataType::BFLOAT16);
+  PD_CHECK(dout.dtype() == paddle::DataType::FLOAT8_E4M3FN || dout.dtype() == paddle::DataType::BFLOAT16);  
   int seqlen = X.shape()[0];
   int h1 = X.shape()[1];
   int h2 = dout.shape()[1];
