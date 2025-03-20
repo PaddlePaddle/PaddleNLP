@@ -19,9 +19,7 @@ flask
 paddlenlp_ops (可选，高性能自定义加速算子， 安装参考这里)
 ```
 
-服务化部署脚本
-
-# 单卡，可以使用 paddle.distributed.launch 启动多卡推理
+服务化部署,单卡脚本如下:
 ```bash
 
 python  ./predict/flask_server.py \
@@ -30,10 +28,18 @@ python  ./predict/flask_server.py \
     --flask_port 8011 \
     --dtype "float16"
 ```
-port: Gradio UI 服务端口号，默认8010。
-flask_port: Flask 服务端口号，默认8011。
+用户也可以使用 paddle.distributed.launch 启动多卡推理。
+
+其中参数如下：
+- port: Gradio UI 服务端口号，默认8010。
+- flask_port: Flask 服务端口号，默认8011。
+
 其他参数请参见推理文档中推理参数配置。
-图形化界面: 打开 http://127.0.0.1:8010 即可使用 gradio 图形化界面，即可开启对话。 API 访问: 您也可用通过 flask 服务化 API 的形式
+
+图形化界面:
+- 打开 http://127.0.0.1:8010 即可使用 gradio 图形化界面，即可开启对话。 API 访问: 您也可用通过 flask 服务化 API 的形式
+
+访问服务:
 
 1. 您可以直接使用 curl, 调用开始对话
 ```
