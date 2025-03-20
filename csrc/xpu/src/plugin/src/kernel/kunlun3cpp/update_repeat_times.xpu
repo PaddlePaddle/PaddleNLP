@@ -27,7 +27,7 @@ __global__ void update_repeat_times(const int64_t *pre_ids,
   int nclusters = cluster_num();
   int tid = clusterid * ncores + cid;
 
-  const int max_sm_len = 256 * 1024 / sizeof(int);
+  const int max_sm_len = 128 * 1024 / sizeof(int);
   __shared__ int repeated_times_sm[max_sm_len];
   int64_t pre_id_lm;
   int n_length = (length + max_sm_len - 1) / max_sm_len;

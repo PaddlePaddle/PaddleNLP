@@ -1459,9 +1459,28 @@ class FusedMultiTransformerBase(Layer):
         )
         return fused_moe_out
 
+    def compute_fused_moe_xpu3(self, tmp_out, i):
+        # import pdb;pdb.set_trace()
+        assert paddle.is_compiled_with_xpu()
+        config = self.config.moe_config
+        from paddlenlp_ops import moe_fused_xpu
+        fused_moe_out = moe_fused_xpu(tmp_out, 
+                                self.gate_weights[i].transpose((1, 0)).cast("float32"),
+                                self.ffn1_weights[i],
+                                self.ffn2_weights[i],                                
+                                self.ffn1_weights_scale[i].cast("float32") if hasattr(self, "ffn1_weights_scale") else None,
+                                self.ffn2_weights_scale[i].cast("float32") if hasattr(self, "ffn2_weights_scale") else None,
+                                self.e_score_correction_biases[i],
+                                config.top_k,
+                                config.num_expert_group,
+                                config.topk_group,
+                                )
+        return fused_moe_out
+    
     def compute_fused_moe(self, tmp_out, i):
+        # import pdb; pdb.set_trace()
         if paddle.is_compiled_with_xpu():
-            return self.compute_fused_moe_xpu(tmp_out, i)
+            return self.compute_fused_moe_xpu3(tmp_out, i)
 
         e_score_correction_bias = self.e_score_correction_biases[i]
 
@@ -1629,7 +1648,92 @@ class FusedMultiTransformerBase(Layer):
             out = multi_block_output
 
         return out
+    def xpu_attention_fused(self, qkv_out, i, caches, rotary_embs, **kwargs):        
 
+        q_a_proj_weight = self.q_a_proj_weights[i]
+        q_a_layernorm_weight = self.q_a_layernorm_weights[i]
+        q_a_layernorm_bias = None
+        q_b_proj_weight = self.q_b_proj_weights[i]
+        q_proj_weight = self.q_proj_weights[i]
+        kv_a_proj_weight = self.kv_a_proj_with_mqa_weights[i]
+        kv_a_layernorm_weight = self.kv_a_layernorm_weights[i]
+        kv_a_layernorm_bias = None
+        kv_b_proj_weight = self.kv_b_proj_weights[i]
+        o_proj_weight = self.linear_weights[i]
+        
+
+        from paddlenlp_ops import mla_block_multihead_attention_xpu_v2
+
+        q, k, v = qkv_out.split(
+            [
+                self.num_heads * self.config.mla_config.qk_head_dim,
+                self.num_heads * self.config.mla_config.qk_head_dim,
+                self.num_heads * self.config.mla_config.v_head_dim,
+            ],
+            axis=-1,
+        )
+
+        fmha_out = mla_block_multihead_attention_xpu_v2(
+            q,
+            k,
+            v,
+            q_a_proj_weight,
+            q_a_layernorm_weight,
+            q_a_layernorm_bias,
+            q_b_proj_weight,
+            q_proj_weight,
+            kv_a_proj_weight,
+            kv_a_layernorm_weight,
+            kv_a_layernorm_bias,
+            kv_b_proj_weight,
+            o_proj_weight,
+            caches[2 * i],
+            caches[2 * i + 1],
+            kwargs.get("seq_lens_encoder", None),
+            kwargs.get("seq_lens_decoder", None),
+            kwargs.get("seq_lens_this_time", None),
+            kwargs.get("padding_offsets", None),
+            kwargs.get("cum_offsets", None),
+            kwargs.get("block_tables", None),
+            kwargs.get("encoder_batch_ids", None),
+            kwargs.get("encoder_tile_ids_per_batch", None),
+            kwargs.get("encoder_num_blocks", None),
+            kwargs.get("kv_batch_ids", None),
+            kwargs.get("kv_tile_ids_per_batch", None),
+            kwargs.get("kv_num_blocks", None),
+            kwargs.get("decoder_batch_ids", None),
+            kwargs.get("decoder_tile_ids_per_batch", None),
+            kwargs.get("decoder_num_blocks", None),
+            kwargs.get("max_enc_len_this_time", None),
+            kwargs.get("max_dec_len_this_time", None),
+            kwargs.get("max_len_kv", None),
+            rotary_embs,
+            None,  # attn_mask
+            None,  # qkv_bias
+            None,  # qkv_out_scales
+            None,  # cache_k_quant_scales
+            None,  # cache_v_quant_scales
+            None,  # cache_k_dequant_scales
+            None,  # cache_v_dequant_scales
+            None,  # cache_k_zp
+            None,  # cache_v_zp
+            None,  # out_shifts
+            None,  # out_smooths
+            "none",  # cache_quant_type
+            self.use_neox_rotary_style,
+            kwargs.get("max_input_length", -1),
+            self.softmax_scale,  # softmax_scale
+            0.0,  # quant_max_bound
+            0.0,  # quant_min_bound
+            0.0,  # out_linear_in_scale
+            self.config.speculate_config.speculate_max_draft_token_num,
+            False,  # causal
+            False,  # speculate_decoder
+        )
+
+
+        return fmha_out
+    
     def forward(
         self,
         input_ids,
@@ -1735,23 +1839,29 @@ class FusedMultiTransformerBase(Layer):
                 kwargs.get("max_input_length", -1),
             )
         residual_input = src
-        for i in range(self.num_layers):
+        for i in range(self.num_layers):            
             qkv_out, residual_input = self.compute_qkv(src, residual_input, i)
-            fmha_out = self.compute_attn(
-                time_step,
-                qkv_out,
-                padding_offset,
-                seq_lens,
-                input_ids,
-                rotary_embs,
-                rotary_emb_dims,
-                caches,
-                pre_caches,
-                pre_caches_length,
-                attn_mask,
-                i,
-                **kwargs,
-            )
+            # import pdb; pdb.set_trace()
+            import os
+            if paddle.is_compiled_with_xpu() and os.getenv("ATTENTION_DEBUG"):
+                fmha_out = self.xpu_attention_fused(qkv_out, i, caches, rotary_embs, **kwargs)
+                # import pdb; pdb.set_trace()
+            else:
+                fmha_out = self.compute_attn(
+                    time_step,
+                    qkv_out,
+                    padding_offset,
+                    seq_lens,
+                    input_ids,
+                    rotary_embs,
+                    rotary_emb_dims,
+                    caches,
+                    pre_caches,
+                    pre_caches_length,
+                    attn_mask,
+                    i,
+                    **kwargs,
+                )
             if self.config.mla_config.use_absorb():
                 out_linear_out = fmha_out
             else:
