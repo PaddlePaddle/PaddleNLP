@@ -205,6 +205,20 @@ def dumpy(*args, **kwarsg):
 
 
 def load_torch(path: str, **pickle_load_args):
+    import torch
+
+    state_dict = torch.load(path, map_location="cpu")
+
+    for key in list(state_dict.keys()):
+        if isinstance(state_dict[key], torch.Tensor):
+            t = state_dict.pop(key)
+            capsule = torch.utils.dlpack.to_dlpack(t)
+            t = paddle.utils.dlpack.from_dlpack(capsule)
+            state_dict[key] = t
+    return state_dict
+
+
+def load_torch_inner(path: str, **pickle_load_args):
     """
     load torch weight file with the following steps:
     1. load the structure of pytorch weight file
