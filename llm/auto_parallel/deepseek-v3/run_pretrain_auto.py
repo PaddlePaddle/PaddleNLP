@@ -76,14 +76,6 @@ class PreTrainingArguments(AutoTrainingArguments):
             "help": "Enable fused linear grad add strategy, which will reduce elementwise add for grad accumulation in the backward of nn.Linear ."
         },
     )
-    job_schedule_profiler_start: int = field(
-        default=-1,
-        metadata={"help": "The step to start job_schedule_profiler."},
-    )
-    job_schedule_profiler_end: int = field(
-        default=-1,
-        metadata={"help": "The step to end job_schedule_profiler."},
-    )
     pipeline_schedule_mode: str = field(
         default="1F1B", metadata={"help": "The pipeline schedule mode, support FThenB, 1F1B, VPP and Eager-1F1B."}
     )
@@ -243,6 +235,18 @@ class ModelArguments:
     moe_group: str = field(
         default="None",
         metadata={"help": "The mesh dimension for expert parallel, must in ['dp', 'mp', 'None']"},
+    )
+    n_routed_experts: int = field(
+        default=256,
+        metadata={
+            "help": "The number of routed experts in moe group. DeepSeekV3 default value is 256, and you can change it according to your own situation."
+        },
+    )
+    pp_extra_layer_num: int = field(
+        default=1,
+        metadata={
+            "help": "When use pipeline parallel intermediate api, if the matched layer contains a non attention layer, the number of additional matching layers needs to be passed in for ipp calculation. For example, the layer of lm_head is not attention layer, so need to add 1 for ipp calculation."
+        },
     )
 
 
@@ -508,7 +512,7 @@ def main():
 
     if not model_args.continue_training:
         config.vocab_size = max(config.vocab_size, ((tokenizer.vocab_size - 1) // 128 + 1) * 128)
-        logger.info(f"Reset vocab size to {config.vocab_size} for batter amp peformance.")
+        logger.info(f"Reset vocab size to {config.vocab_size} for batter amp performance.")
 
     if model_args.no_recompute_layers is not None:
         model_args.no_recompute_layers.sort()
@@ -541,11 +545,14 @@ def main():
     config.recompute_use_reentrant = model_args.recompute_use_reentrant
     config.first_k_dense_replace = model_args.first_k_dense_replace
     config.moe_group = model_args.moe_group
+    config.n_routed_experts = model_args.n_routed_experts
+    config.pp_extra_layer_num = model_args.pp_extra_layer_num
 
     config.use_recompute = training_args.recompute
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
     config.sharding_parallel_degree = training_args.sharding_parallel_degree
+    config.pipeline_parallel_degree = training_args.pipeline_parallel_degree
 
     if training_args.strategy.pipeline.enable and config.virtual_pp_degree > 1:
         pipeline = training_args.strategy.pipeline
@@ -576,7 +583,7 @@ def main():
 
         model.apply(fn)
 
-    # Create the learning_rate sheduler and optimizer
+    # Create the learning_rate scheduler and optimizer
     if training_args.decay_steps is None:
         training_args.decay_steps = training_args.max_steps
 

@@ -36,32 +36,3 @@ void DecodeMLAAttentionKernel(
     bool causal,
     cudaStream_t &stream,
     paddle::Tensor *out);
-
-inline uint32_t get_max_partition_size(int bsz) {
-    static const char* max_partition_size_env = std::getenv("FLAGS_cascade_attention_max_partition_size");
-    static const uint32_t max_partition_size =
-            max_partition_size_env == nullptr ? 0 : std::stoul(std::string(max_partition_size_env));
-    return (max_partition_size != 0 ? max_partition_size : (bsz == 1 ? 128 : 512));
-}
-
-
-inline uint32_t get_cascade_attention_deal_each_time() {
-    static const char* cascade_attention_deal_each_time_env = std::getenv("FLAGS_cascade_attention_deal_each_time");
-    static const uint32_t cascade_attention_deal_each_time =
-            cascade_attention_deal_each_time_env == nullptr ? 0 : std::stoul(std::string(cascade_attention_deal_each_time_env));
-    return (cascade_attention_deal_each_time != 0 ? cascade_attention_deal_each_time : 32);
-}
-
-inline uint32_t get_cascade_attention_num_stages() {
-    static const char* cascade_attention_num_stages_env = std::getenv("FLAGS_cascade_attention_num_stages");
-    static const uint32_t cascade_attention_num_stages =
-            cascade_attention_num_stages_env == nullptr ? 0 : std::stoul(std::string(cascade_attention_num_stages_env));
-    return cascade_attention_num_stages != 0 ? cascade_attention_num_stages : 2;
-}
-
-inline uint32_t get_cascade_attention_num_threads() {
-    static const char* cascade_attention_num_threads_env = std::getenv("FLAGS_cascade_attention_num_threads");
-    static const uint32_t cascade_attention_num_threads =
-            cascade_attention_num_threads_env == nullptr ? 0 : std::stoul(std::string(cascade_attention_num_threads_env));
-    return cascade_attention_num_threads != 0 ? cascade_attention_num_threads : 128;
-}

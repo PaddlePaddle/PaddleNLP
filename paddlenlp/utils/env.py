@@ -148,3 +148,4 @@ else:
     PADDLE_INFERENCE_WEIGHTS_SUFFIX = ".pdiparams"
 
 USE_FAST_TOKENIZER: bool = _get_bool_env("USE_FAST_TOKENIZER", "false")
+PREFILL_USE_SAGE_ATTN: bool = _get_bool_env("PREFILL_USE_SAGE_ATTN", "false")

@@ -28,7 +28,6 @@ from datetime import datetime
 import numpy as np
 from server.checker import add_default_params, check_basic_params
 from server.engine import engine
-from server.engine.config import Config
 from server.utils import error_logger, model_server_logger
 
 import server
@@ -44,15 +43,6 @@ if sys.stdout.encoding is None:
     enc = os.environ["LANG"].split(".")[1]
     sys.stdout = codecs.getwriter(enc)(sys.stdout)
 
-
-class TritonConfig(Config):
-    """
-    Triton Inference Server config
-    """
-    def __init__(self, base_config):
-        super().__init__()
-        for k, v in base_config.__dict__.items():
-            setattr(self, k, v)
 
 
 class TritonTokenProcessor(engine.TokenProcessor):
@@ -121,12 +111,12 @@ class TritonTokenProcessor(engine.TokenProcessor):
                             ["req_id"]] + batch_result[i]["token_scores"]
                     del self.score_buffer[batch_result[i]["req_id"]]
 
-    def postprocess(self, batch_result, exist_finished_task=False):
+    def postprocess(self, batch_result):
         """
         single postprocess for triton
         """
         try:
-            self._cache_special_tokens(batch_result)
+            # self._cache_special_tokens(batch_result)
             self.cached_generated_tokens.put(batch_result)
         except Exception as e:
             model_server_logger.info(
@@ -146,11 +136,11 @@ class TritonServer(object):
         # start health checker
         use_custom_health_checker = int(os.getenv("USE_CUSTOM_HEALTH_CHECKER", 1))
         # if set USE_CUSTOM_HEALTH_CHECKER=1, use custom health checker, need set --allow-http=false
-        # else use tritonserver's health checker, need set --http-port=${HTTP_PORT}
+        # else use tritonserver's health checker, need set --http-port=${HEALTH_HTTP_PORT}
         if use_custom_health_checker:
-            http_port = os.getenv("HTTP_PORT")
+            http_port = os.getenv("HEALTH_HTTP_PORT")
             if http_port is None:
-                raise Exception("HTTP_PORT must be set")
+                raise Exception("HEALTH_HTTP_PORT must be set")
             from server.triton_server_helper import start_health_checker
             multiprocessing.Process(target=start_health_checker, args=(int(http_port), )).start()
             time.sleep(1)
@@ -164,7 +154,7 @@ class TritonServer(object):
                 enable decoupled transaction policy in model configuration to
                 serve this model""".format(args["model_name"]))
 
-        # add metrics，use METRICS_PORT get server metrics
+        # add metrics，use METRICS_HTTP_PORT get server metrics
         self.metric_family = pb_utils.MetricFamily(
             name="inference_server_metrics",
             description="Metrics for monitoring inference server status",
@@ -189,9 +179,8 @@ class TritonServer(object):
 
         # response_sender thread lock
         self.thread_lock = threading.Lock()
-
-        base_config = Config()
-        self.cfg = TritonConfig(base_config)
+        from server.engine.config import global_config
+        self.cfg = global_config
         self.cfg.print(file="log/fastdeploy_init.info")
 
         # init engine

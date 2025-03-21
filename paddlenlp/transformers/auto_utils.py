@@ -16,12 +16,12 @@ import paddle
 import paddle.distributed as dist
 
 
-def get_mesh(pp_idx=0):
+def get_mesh(pp_idx=None):
     """
     获得pp_idx的mesh
     """
     mesh = dist.fleet.auto.get_mesh()
-    if "pp" in mesh.dim_names:
+    if pp_idx is not None and "pp" in mesh.dim_names:
         mesh = mesh.get_mesh_with_dim("pp", pp_idx)
     return mesh
 

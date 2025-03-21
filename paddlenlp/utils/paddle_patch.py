@@ -58,8 +58,7 @@ paddle_numel_mapping = {
 paddle_set_value_mapping = {
     paddle.float8_e5m2: (paddle.int8, None),
     paddle.float8_e4m3fn: (paddle.int8, None),
-    paddle.bfloat16: (paddle.int16, None),
-    # paddle.bfloat16: (paddle.int16, np.bfloat16),
+    # paddle.bfloat16: (paddle.int16, None),
     np.dtype(np.float8_e5m2): (np.int8, paddle.float8_e5m2),
     np.dtype(np.float8_e4m3fn): (np.int8, paddle.float8_e4m3fn),
 }

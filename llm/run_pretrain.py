@@ -375,12 +375,18 @@ def main():
 
     if not model_args.continue_training:
         config.vocab_size = max(config.vocab_size, ((tokenizer.vocab_size - 1) // 128 + 1) * 128)
-        logger.info(f"Reset vocab size to {config.vocab_size} for batter amp peformance.")
+        logger.info(f"Reset vocab size to {config.vocab_size} for batter amp performance.")
 
     config.num_hidden_layers = (
         model_args.num_hidden_layers if model_args.num_hidden_layers is not None else config.num_hidden_layers
     )
     # Config for model using dropout, such as GPT.
+    if hasattr(config, "use_dualpipev"):
+        # NOTE(zhangyuqin): In Paddle, the segmentation and scheduling of pipeline parallel
+        # models are separate. Therefore, first we need to set the flag in the model config
+        # to perform V-shape segmentation. Second, we need to set the flag in the training_args
+        # to configure strategy.hybrid_configs to choose the DualPipeV schedule.
+        config.use_dualpipev = "use_dualpipev" in training_args.pipeline_parallel_config
     if hasattr(config, "hidden_dropout_prob"):
         config.hidden_dropout_prob = model_args.hidden_dropout_prob
     if hasattr(config, "attention_probs_dropout_prob"):
@@ -463,7 +469,7 @@ def main():
     if training_args.recompute:
         model.recompute_enable()
 
-    # Create the learning_rate sheduler and optimizer
+    # Create the learning_rate scheduler and optimizer
     if training_args.decay_steps is None:
         training_args.decay_steps = training_args.max_steps
 
