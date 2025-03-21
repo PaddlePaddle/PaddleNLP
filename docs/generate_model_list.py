@@ -48,7 +48,7 @@ MODEL_TEMPLATE = """
 - [{{ file.name }}]({{ model_path }}/{{ file.name }}) ({{ file.size }})
 {% endfor %}
 
-[Back to Main](/website/index.html)
+[Back to Main]({{back_to_main_path}})
 """
 
 
@@ -85,6 +85,15 @@ def process_license(text):
     return processed_text
 
 
+def get_back_to_main_path(model_path):
+    # calculate the level by counting the number of slashes
+    level = model_path.count("/") + 1
+
+    # back_to_main_path = '../' * (level - 1)
+    back_to_main_path = "../" * level
+    return back_to_main_path
+
+
 def generate_model_page(model_path, model_name):
     full_path = os.path.join(MODEL_ROOT, model_path)
     files = []
@@ -111,6 +120,7 @@ def generate_model_page(model_path, model_name):
         readme_content = process_image_links(readme_content, model_path)
         readme_content = process_license(readme_content)
     huggingface_url = os.path.join("https://huggingface.co", model_path)
+    back_to_main_path = get_back_to_main_path(model_path)
     template = Template(MODEL_TEMPLATE)
     markdown_content = template.render(
         model_name=model_name,
@@ -118,6 +128,7 @@ def generate_model_page(model_path, model_name):
         model_path=URL_BASE + model_path,
         files=sorted(files, key=lambda x: x["name"]),
         readme_content=readme_content,
+        back_to_main_path=back_to_main_path,
     )
 
     with open(os.path.join(output_path, "index.md"), "w") as f:
