@@ -651,14 +651,13 @@ class FusionMoeNodeLJD:
         hs_fp8_dispatched, hs_scale_dispatched, dispatched_indices, dispatched_probs = self.dispatch_node.forward(
             hs_fp8, hs_scale, token_indices, token_probs
         )
-
+        print("dispatched_probs:", dispatched_probs)
         hidden_states_out = self.mlp_node.forward(
             hs_fp8_dispatched, hs_scale_dispatched, dispatched_indices, dispatched_probs
         )
         output_combie = self.combine_node.forward(hidden_states_out)
         output = self.combine_quant_node.forward(output_combie)
         output.stop_gradient = False
-        raise RuntimeError(output)
         return output
 
     @paddle.no_grad()
@@ -671,6 +670,7 @@ class FusionMoeNodeLJD:
         hs_fp8_dispatched_grad, dispatched_probs_grad = self.mlp_node.backward(
             hidden_states_out_grad, hidden_states_out_grad_scale
         )
+        raise RuntimeError(hs_fp8_dispatched_grad, dispatched_probs_grad)
         hs_fp8_grad, token_probs_grad = self.dispatch_node.backward(hs_fp8_dispatched_grad, dispatched_probs_grad)
         hs_grad, probs_grad, routing_map_grad = self.dispatch_quant_node.backward(hs_fp8_grad, token_probs_grad)
         return hs_grad, probs_grad, routing_map_grad
@@ -736,6 +736,7 @@ class FusionMoeNode:
             topk=self.token_dispatcher._comm_manager.router_topk,
             num_experts=4,
         )
+        print("unzipped_probs:", unzipped_probs)
         self.unzipped_tokens = unzipped_tokens  # [33004, 7168]
         self.dispatched_indices = dispatched_indices
         self.dispatched_probs = dispatched_probs
@@ -791,12 +792,12 @@ class FusionMoeNode:
 
         o1 = paddle.empty([unzipped_tokens.shape[0], n], dtype="bfloat16")
 
+        o1 = o1 * unzipped_probs.unsqueeze(-1)
         self.o1 = o1
         unzipped_scale = unzipped_scale.to(paddle.float32)
         deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
             (unzipped_tokens, unzipped_scale), (w1_quant, w1_sacle), o1, unzipped_expert_idx
         )
-        o1 = o1 * unzipped_probs.unsqueeze(-1)
 
         # 4 swiglu
         o2 = self.expert_node.fwd_swiglu(o1)
@@ -928,25 +929,18 @@ class FusionMoeNode:
 
         # recompute o2
         o2 = self.expert_node.fwd_swiglu(o1_regroup)
-        print("o2:", o2)
         o2_t = o2.reshape([max_seq_len, self.expert_w_count, -1]).transpose([1, 2, 0]).contiguous()
-        print("o2_t:", o2_t)
         unzipped_grad_regroup_t = (
             unzipped_grad_regroup.reshape([max_seq_len, self.expert_w_count, -1]).transpose([1, 2, 0]).contiguous()
         )
-        print("unzipped_grad_regroup_t:", unzipped_grad_regroup_t.shape)
         # quant o2_t
         o2_t = o2_t.reshape([self.expert_w_count * (self.n // 2), max_seq_len])
         print("o2_t", o2_t.shape)
         o2_t_fp8, o2_t_scale = kitchen_quant(
             o2_t, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
         )
-        print("o2_t_fp8", o2_t_fp8.shape)
-        print("o2_t_scale", o2_t_scale.shape)
         o2_t_fp8 = o2_t_fp8.reshape([self.expert_w_count, self.n // 2, -1])
-        print("o2_t_fp8", o2_t_fp8.shape)
         o2_t_scale = o2_t_scale.reshape([self.expert_w_count, self.n // 2, -1])
-        print("o2_t_scale", o2_t_scale.shape)
 
         # quant unzipped_grad_regroup_t
         unzipped_grad_regroup_t = unzipped_grad_regroup_t.reshape([self.expert_w_count * self.m, -1])
@@ -985,14 +979,11 @@ class FusionMoeNode:
         input_x_regroup, do1_regroup = TDU.regroup_tokens(
             unzipped_tokens, do1_dequant, self.unzipped_expert_idx, expert_num=4, token_max_per_expert=max_seq_len
         )
-        print("input_x_regroup:", input_x_regroup)
-        print("do1_regroup:", do1_regroup)
         # quant intput_x
         input_x_regroup = (
             input_x_regroup.reshape([max_seq_len, self.expert_w_count, -1]).transpose([1, 2, 0]).contiguous()
         )
         input_x_regroup = input_x_regroup.reshape([self.expert_w_count * self.m, max_seq_len])
-        print("input_x_regroup:", input_x_regroup)
         input_x_regroup_fp8, input_x_regroup_scale = kitchen_quant(
             input_x_regroup, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
         )
@@ -1001,31 +992,57 @@ class FusionMoeNode:
 
         # quant do1
         do1_regroup = do1_regroup.reshape([self.expert_w_count * self.n, max_seq_len])
-        print("do1_regroup:", do1_regroup.shape)
         do1_regroup_fp8, do1_regroup_scale = kitchen_quant(
             do1_regroup, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
         )
-        print("do1_regroup_fp8:", do1_regroup_fp8.shape)
         do1_regroup_fp8 = do1_regroup_fp8.reshape([self.expert_w_count, self.n, -1])
         do1_regroup_scale = do1_regroup_scale.reshape([self.expert_w_count, self.n, -1])
+        # 求dw1(do1,x)
 
-        # 求dw1
         self.expert_w1[0] = kitchen_fp8_gemm(
-            input_x_regroup_fp8[0], input_x_regroup_scale[0], do1_regroup_fp8[0], do1_regroup_scale[0], True, True
+            ingroup_fp8[0], input_x_regroup_scale[0], do1_regroup_fp8[0], do1_regroup_scale[0], True, True
         )
-        self.expert_w1[0] = kitchen_fp8_gemm(
-            input_x_regroup_fp8[1], input_x_regroup_scale[1], do1_regroup_fp8[1], do1_regroup_scale[1], True, True
+        self.expert_w1[1] = kitchen_fp8_gemm(
+            ingroup_fp8[1], input_x_regroup_scale[1], do1_regroup_fp8[1], do1_regroup_scale[1], True, True
         )
-        self.expert_w1[0] = kitchen_fp8_gemm(
-            input_x_regroup_fp8[2], input_x_regroup_scale[2], do1_regroup_fp8[2], do1_regroup_scale[2], True, True
+        self.expert_w1[2] = kitchen_fp8_gemm(
+            ingroup_fp8[2], input_x_regroup_scale[2], do1_regroup_fp8[2], do1_regroup_scale[2], True, True
         )
-        self.expert_w1[0] = kitchen_fp8_gemm(
-            input_x_regroup_fp8[3], input_x_regroup_scale[3], do1_regroup_fp8[3], do1_regroup_scale[3], True, True
+        self.expert_w1[3] = kitchen_fp8_gemm(
+            ingroup_fp8[3], input_x_regroup_scale[3], do1_regroup_fp8[3], do1_regroup_scale[3], True, True
         )
-        raise RuntimeError("---------")
-        # hs_fp8_grad, token_probs_grad = self.dispatch_node.backward(hs_fp8_dispatched_grad, dispatched_probs_grad)
-        # hs_grad, probs_grad, routing_map_grad = self.dispatch_quant_node.backward(hs_fp8_grad, token_probs_grad)
-        # return hs_grad, probs_grad, routing_map_grad
+
+        # unzip 反向
+        weighted_zipped_tokens = TDU.tokens_weighted_zip(
+            dx,
+            self.unzipped_probs,
+            self.zipped_expertwise_rowmap,
+            total_zipped_tokens=hidden_states_out_grad.shape[0],
+            num_experts=4,
+        )
+        print("weighted_zipped_tokens:", weighted_zipped_tokens)  # shape=[16427, 2048]
+
+        print("probs_grad:", probs_grad)
+
+        probs_grad_zipped = TDU.tokens_weighted_zip(
+            probs_grad.unsqueeze(-1),
+            self.unzipped_probs,
+            self.zipped_expertwise_rowmap,
+            total_zipped_tokens=hidden_states_out_grad.shape[0],
+            num_experts=4,
+        )
+
+        print("probs_grad_zipped:", probs_grad_zipped)
+
+        hs_fp8_grad, token_probs_grad = self.dispatch_node.backward(weighted_zipped_tokens, probs_grad_zipped)
+        print("hs_fp8_grad:", hs_fp8_grad)
+
+        print("token_probs_grad:", token_probs_grad)
+        hs_grad, probs_grad, routing_map_grad = self.dispatch_quant_node.backward(hs_fp8_grad, token_probs_grad)
+        print("hs_grad:", hs_grad)
+        print("probs_grad:", probs_grad)
+        print("routing_map_grad:", routing_map_grad)
+        return hs_grad, probs_grad, routing_map_grad
 
 
 class FusionMoe(paddle.autograd.PyLayer):
