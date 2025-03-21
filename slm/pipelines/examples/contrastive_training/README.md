@@ -231,12 +231,12 @@ MTEB-Retrieval 数据集, NDCG@10分数：
 MSMARCO-Title 数据集, MRR@10, Recall@10, NDCG@10分数：
 | 模型                        | MRR@10 | Recall@10 | NDCG@10 |
 |-----------------------------|:------:|:---------:|:-------:|
-| RocketQA v1                 | 36.94  |           |  43.51  |
-| RocketQA v2                 | 38.88  |           |  45.28  |
+| RocketQA v1                 | 36.94  |   65.67   |  43.51  |
+| RocketQA v2                 | 38.88  |   67.06   |  45.28  |
 | bge-large-en-v1.5           | 35.30  |   64.24   |  41.96  |
 | repllama-v1-7b-lora-passage | 38.24  |   66.26   |  45.13  |
 | NV-Embed-v1                 | 38.39  |   68.02   |  45.21  |
-| bge-en-icl (zero-shot)      | 42.74  |           |  49.47  |
+| bge-en-icl (zero-shot)      | 42.74  |   71.90   |  49.47  |
 | LLARA-passage               | 43.04  |   72.59   |  49.87  |
 
 
