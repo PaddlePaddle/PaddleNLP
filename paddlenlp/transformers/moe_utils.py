@@ -18,6 +18,11 @@ import paddle
 
 from .fp8_utils import dequantize_fp8_to_fp32
 
+try:
+    import TokenDispatcherUtils as TDU
+except:
+    pass
+
 
 def topk_to_permuted_indices(x, num_tokens_per_expert_list, topk):
     x = paddle.flatten(x)
@@ -92,6 +97,65 @@ def unpermute(
         include_self=True,
     )
     return output_tokens
+
+
+class UnZipNode:
+    def __init__(self, token_dispatcher, name="unzip"):
+        self.token_dispatcher = token_dispatcher
+        self.name = name
+
+    def forward(
+        self,
+        hs_fp8_dispatched,
+        hs_scale_dispatched,
+        dispatched_indices,
+        dispatched_probs,
+        total_unzipped_tokens_num,
+        topk,
+        num_experts,
+    ):
+
+        unzipped_tokens, zipped_expertwise_rowmap, unzipped_probs, unzipped_expert_idx = TDU.tokens_unzip(
+            hs_fp8_dispatched,
+            dispatched_indices,
+            dispatched_probs,
+            total_unzipped_tokens_num=total_unzipped_tokens_num,
+            topk=self.token_dispatcher._comm_manager.router_topk,
+            num_experts=4,
+        )
+
+        unzipped_scale = TDU.tokens_guided_unzip(
+            hs_scale_dispatched,
+            zipped_expertwise_rowmap,
+            total_unzipped_token_num=total_unzipped_tokens_num,
+            num_experts=num_experts,
+        )
+
+        return unzipped_tokens, unzipped_scale, zipped_expertwise_rowmap, unzipped_probs, unzipped_expert_idx
+
+        # self.unzipped_scale = unzipped_scale
+
+        # self.unzipped_tokens = unzipped_tokens
+        # self.dispatched_indices = dispatched_indices
+        # self.dispatched_probs = dispatched_probs
+        # self.topk = self.token_dispatcher._comm_manager.router_topk
+        # self.unzipped_probs = unzipped_probs
+        # self.total_unzipped_tokens_num = total_unzipped_tokens_num
+        # self.unzipped_expert_idx = unzipped_expert_idx
+
+
+class ZipNode:
+    def __init__(self, token_dispatcher, name="zip"):
+        self.token_dispatcher = token_dispatcher
+        self.name = name
+
+    def forward(self, expert_out, unzipped_probs, zipped_expertwise_rowmap, total_zipped_tokens, num_experts):
+        # self.hs_fp8_dispatched_shape = hs_fp8_dispatched.shape
+        # self.zipped_expertwise_rowmap = zipped_expertwise_rowmap
+        expert_out_zipped = TDU.tokens_weighted_zip(
+            expert_out, unzipped_probs, zipped_expertwise_rowmap, total_zipped_tokens, num_experts
+        )
+        return expert_out_zipped
 
 
 class PermuteNode:

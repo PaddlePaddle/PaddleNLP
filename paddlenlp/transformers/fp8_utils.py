@@ -39,12 +39,11 @@ __all__ = [
     "kitchen_fp8_gemm",
     "dequantize_fp8_to_fp32",
     "ExpertsNode",
+    "ExpertsNodeZip",
 ]
 
 
-def kitchen_quant(x, backend=None, is_1d_scaled=True, return_transpose=False):
-    if backend is None:
-        backend = kitchen.ops.Backend.CUBLAS
+def kitchen_quant(x, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False):
     quant_tile_shape = (1, 128) if is_1d_scaled else (128, 128)
     x_qparams = QParams(
         quant_dtype=paddle.float8_e4m3fn,
@@ -93,6 +92,127 @@ def dequantize_fp8_to_fp32(fp8_tensor, scale):
     # 非规整情况，需要截断
     expanded_scale = expanded_scale[:, : fp8_tensor.shape[-1]]
     return fp8_tensor.astype("float32") * expanded_scale
+
+
+class ExpertsNodeZip:
+    def __init__(self, experts, custom_map, name="moe_experts_node"):
+        self.m = None
+        self.n = None
+        self.expert_w_count = None
+        self.o1 = None
+        self.x_t_fp8s = None
+        self.x_t_scales = None
+        self.custom_map = custom_map
+
+    def reset_statue(self):
+        pass
+
+    def fwd_gate_up(self, x_fp8, x_scale, expert_w1, expert_w_count, unzipped_probs, unzipped_expert_idx):
+        m, n = expert_w1[0].shape
+        # concat
+        concatenated_w1 = paddle.concat(expert_w1, axis=0).reshape([expert_w_count, m, -1])  # 4, 4096, 7198
+        concatenated_w1_t = (
+            paddle.transpose(concatenated_w1, [0, 2, 1]).contiguous().reshape([expert_w_count * n, m])
+        )  # 4*7198, 4096
+        # self.concatenated_w1 = concatenated_w1
+
+        # quant w1
+        w1_t_quant, w1_t_scale = kitchen_quant(
+            concatenated_w1_t,
+            backend=kitchen.ops.Backend.CUBLAS,
+            is_1d_scaled=False,
+            return_transpose=False,  # 4*7198, 4096
+        )
+
+        # group gemm
+        w1_t_quant = w1_t_quant.reshape([expert_w_count, -1, w1_t_quant.shape[-1]])
+        w1_t_scale = w1_t_scale.reshape([expert_w_count, -1, w1_t_scale.shape[-1]])
+        o1 = paddle.empty([x_fp8.shape[0], n], dtype="bfloat16")
+        o1 = o1 * unzipped_probs.unsqueeze(-1)
+        x_scale = x_scale.to(paddle.float32)
+        deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
+            (x_fp8, x_scale), (w1_t_quant, w1_t_scale), o1, unzipped_expert_idx
+        )
+        self.o1 = o1
+        return o1
+
+    def fwd_swiglu(self, o1):
+        o2 = swiglu(o1)
+        return o2
+
+    def fwd_down(self, o2, expert_w2, expert_w_count, unzipped_expert_idx):
+        # concat and transpose w2
+        expert_w2 = [x.w2 for x in self.custom_map.experts if x is not None]
+        # self.expert_w2 = expert_w2
+        concatenated_w2 = paddle.concat(expert_w2, axis=0).reshape([expert_w_count, -1, expert_w2[0].shape[-1]])
+        concatenated_w2_t = (
+            paddle.transpose(concatenated_w2, [0, 2, 1])
+            .contiguous()
+            .reshape([expert_w_count * concatenated_w2.shape[-1], -1])
+        )
+
+        # quant w2
+        w2_quant, w2_sacle = kitchen_quant(
+            concatenated_w2_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
+        )
+        w2_quant = w2_quant.reshape([expert_w_count, -1, w2_quant.shape[-1]])
+        w2_sacle = w2_sacle.reshape([expert_w_count, -1, w2_sacle.shape[-1]])
+
+        # quant o2
+        o2_quant, o2_scale = kitchen_quant(
+            o2, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+        )
+        # self.o2_quant = o2_quant
+        # self.o2_scale = o2_scale
+        o3 = paddle.empty([o2_quant.shape[0], w2_quant.shape[1]], dtype=paddle.bfloat16)
+        deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
+            (o2_quant, o2_scale), (w2_quant, w2_sacle), o3, unzipped_expert_idx
+        )
+
+        return o3
+
+    def forward(self, hs_out, hs_scale_out, unzipped_probs, unzipped_expert_idx):
+        # 1 concat and transpose w1
+        expert_w1 = [x.w1 for x in self.custom_map.experts if x is not None]
+
+        m, n = expert_w1[0].shape
+        self.m, self.n = m, n
+        # w1_shape = expert_w1[0].shape
+
+        expert_w_count = len(expert_w1)
+        self.expert_w_count = expert_w_count
+
+        # concat and transpose w2
+        expert_w2 = [x.w2 for x in self.custom_map.experts if x is not None]
+        # self.expert_w2 = expert_w2
+
+        o1 = self.fwd_gate_up(hs_out, hs_scale_out, expert_w1, expert_w_count, unzipped_probs, unzipped_expert_idx)
+        o2 = self.fwd_swiglu(o1)
+        o3 = self.fwd_down(o2, expert_w2, expert_w_count, unzipped_expert_idx)
+
+        # save for bwd
+        x_t = dequantize_fp8_to_fp32(hs_out, hs_scale_out).T.contiguous()
+        if x_t.shape[-1] % 128 != 0 or x_t.shape[-1] % 512 != 0:
+            if (x_t.shape[-1] + 128 - (x_t.shape[-1] % 128)) % 512 != 0:
+                padding_size = 512
+            else:
+                padding_size = 128
+            x_t = paddle.concat(
+                [
+                    x_t,
+                    paddle.zeros([x_t.shape[0], padding_size - (x_t.shape[-1] % padding_size)], dtype=x_t.dtype),
+                ],
+                axis=1,
+            )
+        x_t_fp8, x_t_scale = kitchen_quant(
+            x_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
+        )
+        self.x_t_fp8s = x_t_fp8
+        self.x_t_scales = x_t_scale
+        return o3
+
+    def backward(self, out_grad, out_grad_scale):
+        pass
 
 
 class ExpertsNode:
