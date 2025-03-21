@@ -704,6 +704,7 @@ class FusionMoeNode:
         self.swiglu_res = None
         self.token_per_expert = None
         self.unzipped_tokens = None
+        self.unzipped_scale = None
         self.m = None
         self.n = None
         self.expert_w_count = None
@@ -752,7 +753,7 @@ class FusionMoeNode:
             total_unzipped_token_num=total_unzipped_tokens_num,
             num_experts=4,
         )
-
+        self.unzipped_scale = unzipped_scale
         # =======================MLA=======================
         # 1 concat and transpose w1
         expert_w1 = [x.w1 for x in self.experts if x is not None]
@@ -961,6 +962,7 @@ class FusionMoeNode:
         # de2_w2 =  paddle.empty([self.n//2, self.m],dtype="bfloat16")
         # de3_w2 =  paddle.empty([self.n//2, self.m],dtype="bfloat16")
 
+        # dw2
         self.expert_w2[0] = kitchen_fp8_gemm(
             o2_t_fp8[0], o2_t_scale[0], unzipped_grad_regroup_t_fp8[0], unzipped_grad_regroup_t_scale[0], True, True
         )
@@ -974,42 +976,56 @@ class FusionMoeNode:
             o2_t_fp8[3], o2_t_scale[3], unzipped_grad_regroup_t_fp8[3], unzipped_grad_regroup_t_scale[3], True, True
         )
 
-        raise RuntimeError("----------")
-        # # dw0, x = unzip token; dout = dt1
-        # input_x_regroup, dt1_regroup= TDU.regroup_tokens(
-        #     self.unzipped_tokens,
-        #     dt1,
-        #     self.unzipped_expert_idx,
-        #     expert_num=4,
-        #     token_max_per_expert=max_seq_len)
+        # dw1
+        # regroup之前需要dequant
+        do1_dequant = dequantize_fp8_to_fp32(do1_fp8, do1_scale)
+        do1_dequant = do1_dequant.to(paddle.bfloat16)
+        unzipped_tokens = dequantize_fp8_to_fp32(self.unzipped_tokens, self.unzipped_scale)
+        unzipped_tokens = unzipped_tokens.to(paddle.bfloat16)
+        input_x_regroup, do1_regroup = TDU.regroup_tokens(
+            unzipped_tokens, do1_dequant, self.unzipped_expert_idx, expert_num=4, token_max_per_expert=max_seq_len
+        )
+        print("input_x_regroup:", input_x_regroup)
+        print("do1_regroup:", do1_regroup)
+        # quant intput_x
+        input_x_regroup = (
+            input_x_regroup.reshape([max_seq_len, self.expert_w_count, -1]).transpose([1, 2, 0]).contiguous()
+        )
+        input_x_regroup = input_x_regroup.reshape([self.expert_w_count * self.m, max_seq_len])
+        print("input_x_regroup:", input_x_regroup)
+        input_x_regroup_fp8, input_x_regroup_scale = kitchen_quant(
+            input_x_regroup, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+        )
+        ingroup_fp8 = input_x_regroup_fp8.reshape([self.expert_w_count, self.m, input_x_regroup.shape[-1]])
+        input_x_regroup_scale = input_x_regroup_scale.reshape([self.expert_w_count, self.m, -1])
 
-        # input_x_regroup = input_x_regroup.reshape([max_seq_len, self.expert_w_count, -1]).transpose( [1, 2, 0]).contiguous()
+        # quant do1
+        do1_regroup = do1_regroup.reshape([self.expert_w_count * self.n, max_seq_len])
+        print("do1_regroup:", do1_regroup.shape)
+        do1_regroup_fp8, do1_regroup_scale = kitchen_quant(
+            do1_regroup, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+        )
+        print("do1_regroup_fp8:", do1_regroup_fp8.shape)
+        do1_regroup_fp8 = do1_regroup_fp8.reshape([self.expert_w_count, self.n, -1])
+        do1_regroup_scale = do1_regroup_scale.reshape([self.expert_w_count, self.n, -1])
 
-        # dt1_regroup = dt1_regroup.reshape( [ max_seq_len, self.expert_w_count, -1]).transpose( [1, 2, 0]).contiguous()
-
-        # input_x_regroup = input_x_regroup.reshape([self.expert_w_count, self.m,max_seq_len])
-        # input_x_regroup_fp8, input_x_regroup_scale =  kitchen_quant(
-        #         input_x_regroup, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
-        #     )
-        # input_x_regroup_fp8 = input_x_regroup_fp8.reshape( [self.expert_w_count, self.m,input_x_regroup.shape[-1]])
-        # input_x_regroup_scale = input_x_regroup_scale.reshape( [4, H1, -1])
-
-        # dt1_regroup = dt1_regroup.reshape( [ 4 * 2 * H2,max_seq_len])
-        # dt1_regroup_fp8, dt1_regroup_scale =  kitchen_quant(
-        #         dt1_regroup, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
-        #     )
-
-        # dt1_regroup_fp8 = dt1_regroup_fp8.reshape( [self.expert_w_count, n, -1])
-
-        # #如何得到dt1_regroup_scale？
-        # dt1_regroup_scale = dt1_regroup_scale.reshape( [self.expert_w_count, n, -1])
-
-        # for fp8 gemm
-
-        # de0_w0 = kitchen_fp8_gemm(input_x_regroup_fp8[0], input_x_regroup_scale[0], dt1_regroup_fp8[0], dt1_regroup_scale[0], True, True)
-        # de1_w0 = kitchen_fp8_gemm(input_x_regroup_fp8[1], input_x_regroup_scale[1], dt1_regroup_fp8[1], dt1_regroup_scale[1], True, True)
-        # de2_w0 = kitchen_fp8_gemm(input_x_regroup_fp8[2], input_x_regroup_scale[2], dt1_regroup_fp8[2], dt1_regroup_scale[2], True, True)
-        # de3_w0 = kitchen_fp8_gemm(input_x_regroup_fp8[3], input_x_regroup_scale[3], dt1_regroup_fp8[3], dt1_regroup_scale[3], True, True)
+        # 求dw1
+        self.expert_w1[0] = kitchen_fp8_gemm(
+            input_x_regroup_fp8[0], input_x_regroup_scale[0], do1_regroup_fp8[0], do1_regroup_scale[0], True, True
+        )
+        self.expert_w1[0] = kitchen_fp8_gemm(
+            input_x_regroup_fp8[1], input_x_regroup_scale[1], do1_regroup_fp8[1], do1_regroup_scale[1], True, True
+        )
+        self.expert_w1[0] = kitchen_fp8_gemm(
+            input_x_regroup_fp8[2], input_x_regroup_scale[2], do1_regroup_fp8[2], do1_regroup_scale[2], True, True
+        )
+        self.expert_w1[0] = kitchen_fp8_gemm(
+            input_x_regroup_fp8[3], input_x_regroup_scale[3], do1_regroup_fp8[3], do1_regroup_scale[3], True, True
+        )
+        raise RuntimeError("---------")
+        # hs_fp8_grad, token_probs_grad = self.dispatch_node.backward(hs_fp8_dispatched_grad, dispatched_probs_grad)
+        # hs_grad, probs_grad, routing_map_grad = self.dispatch_quant_node.backward(hs_fp8_grad, token_probs_grad)
+        # return hs_grad, probs_grad, routing_map_grad
 
 
 class FusionMoe(paddle.autograd.PyLayer):
