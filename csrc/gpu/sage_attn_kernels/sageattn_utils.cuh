@@ -1584,8 +1584,7 @@ constexpr __host__ __device__ __forceinline__ uint32_t num_elems_per_128b() {
   return sizeof(b128_t) / sizeof(T);
 }
 
-template <uint32_t group_size,
-          uint32_t num_frags_x,
+template <uint32_t num_frags_x,
           uint32_t num_frags_y,
           bool partition_kv,
           typename T,
@@ -1605,7 +1604,8 @@ __device__ __forceinline__ void write_o_reg_gmem_multi_warps_shift_smooth_quant(
     const float in_scale,
     const uint32_t qo_upper_bound,
     const uint32_t qo_n_stride,
-    const uint32_t qo_h_stride) {
+    const uint32_t qo_h_stride,
+    const uint32_t group_size) {
   constexpr uint32_t head_dim = num_frags_y * 16;
   constexpr uint32_t num_vecs_per_head = head_dim / num_elems_per_128b<T>();
   const uint32_t tx = threadIdx.x, ty = threadIdx.y;

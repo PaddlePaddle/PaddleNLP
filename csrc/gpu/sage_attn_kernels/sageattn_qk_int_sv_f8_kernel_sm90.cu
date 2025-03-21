@@ -170,8 +170,7 @@ __global__ void qk_int8_sv_f8_attn_kernel(const __grid_constant__ CUtensorMap te
   const uint32_t head_id = blockIdx.y;
   const uint32_t num_qo_heads = gridDim.y;
   const uint32_t kv_head_id = head_id / num_kv_groups;
-  const uint32_t tile_id = bloxkIdx.x;
-  const uint32_t q_base_seq_id_this_block = bx * num_tiles_q * 16;
+  const uint32_t q_n_stride = num_qo_heads * head_dim;
 
   sm_scale *= math::log2e;
 
@@ -181,6 +180,7 @@ __global__ void qk_int8_sv_f8_attn_kernel(const __grid_constant__ CUtensorMap te
   int8_t *sK = (int8_t*)(smem_ + CTA_Q * head_dim * sizeof(int8_t));
   int8_t *sV = (int8_t*)(smem_ + CTA_Q * head_dim * sizeof(int8_t) + CTA_K * head_dim * sizeof(int8_t));
   half *sO = (half*)smem_;
+  smem_t<SwizzleMode::k128B, 8> qo_smem(smem_);  // for write O quantization int8 or fp8, 8 = 128 B / 16 B
 
   int32_t RS[num_tiles_q][num_tiles_k][8];
   float RO[num_tiles_q][num_tiles_v][8];
@@ -576,8 +576,7 @@ __global__ void qk_int8_sv_f8_attn_kernel(const __grid_constant__ CUtensorMap te
       }
     }
   } else {
-    write_o_reg_gmem_multi_warps_shift_smooth_quant<num_kv_groups,
-                                                    num_tiles_q,
+    write_o_reg_gmem_multi_warps_shift_smooth_quant<num_tiles_q,
                                                     num_tiles_v,
                                                     false,
                                                     DTypeQuant,
@@ -592,9 +591,10 @@ __global__ void qk_int8_sv_f8_attn_kernel(const __grid_constant__ CUtensorMap te
         quant_max_bound,
         quant_min_bound,
         in_scale,
-        q_len,
+        qo_len,
         q_n_stride,
-        HEAD_DIM);
+        head_dim,
+        num_kv_groups);
   }
 
 }
@@ -612,6 +612,9 @@ std::vector<paddle::Tensor> qk_int8_sv_f8_accum_f32_attn_inst_buf_sm90_fwd(
                   int is_causal,
                   int qk_quant_gran,
                   float sm_scale,
+                  const float quant_max_bound,
+                  const float quant_min_bound,
+                  const float in_scale,
                   int return_lse)
 {
   CHECK_CUDA(query);
@@ -764,7 +767,8 @@ std::vector<paddle::Tensor> qk_int8_sv_f8_accum_f32_attn_inst_buf_sm90_fwd(
               smooth_weight ? reinterpret_cast<DTypeQuant*>(const_cast<DTypeQuant*>(smooth_weight.get().data<DTypeQuant>())) : nullptr,
               reinterpret_cast<DTypeOut*>(output.data()),
               stride_bz_o, stride_h_o, stride_seq_o,
-              qo_len, kv_len, num_kv_groups, sm_scale);
+              qo_len, kv_len, num_kv_groups, sm_scale,
+              quant_max_bound, quant_min_bound, in_scale);
           });
         });
       });
@@ -950,7 +954,8 @@ std::vector<paddle::Tensor> qk_int8_sv_f8_accum_f32_fuse_v_scale_attn_inst_buf_s
               smooth_weight ? reinterpret_cast<DTypeQuant*>(const_cast<DTypeQuant*>(smooth_weight.get().data<DTypeQuant>())) : nullptr,
               reinterpret_cast<DTypeOut*>(output.data()),
               stride_bz_o, stride_h_o, stride_seq_o,
-              qo_len, kv_len, num_kv_groups, sm_scale, quant_max_bound, quant_min_bound, in_scale);
+              qo_len, kv_len, num_kv_groups, sm_scale, 
+              quant_max_bound, quant_min_bound, in_scale);
           });
         });
       });
@@ -995,8 +1000,8 @@ std::vector<paddle::Tensor> sage_attention_fwd(paddle::Tensor& q,
 
   // quant q, k -> q_int8, k_int8
   constexpr int BLKQ = 64;
-  int WARPQ = 16;
   constexpr int BLKK = 128;
+  int WARPQ = 16;
   std::vector<paddle::Tensor>&& quant_qk_results = per_warp_int8_cuda(q, k, km, BLKQ, WARPQ, BLKK, tensor_layout); // q_int8, q_scale, k_int8, k_scale
 
   paddle::Tensor o = paddle::empty(q.shape(), q.dtype(), paddle::GPUPlace());
@@ -1014,7 +1019,8 @@ std::vector<paddle::Tensor> sage_attention_fwd(paddle::Tensor& q,
 
   std::vector<paddle::Tensor>&& quant_vfp8_results = per_channel_fp8(v, tensor_layout, 448.0, false);
 
-  qk_int8_sv_f8_accum_f32_fuse_v_scale_attn_inst_buf_sm90_fwd(quant_qk_results[0], quant_qk_results[2], quant_vfp8_results[0], o, quant_qk_results[1], quant_qk_results[3], quant_vfp8_results[1], shift_bias, smooth_weight, tensor_layout, _is_causal, _qk_quant_gran, sm_scale, _return_lse);
+  qk_int8_sv_f8_accum_f32_fuse_v_scale_attn_inst_buf_sm90_fwd(quant_qk_results[0], quant_qk_results[2], quant_vfp8_results[0], o, quant_qk_results[1], quant_qk_results[3], quant_vfp8_results[1], shift_bias, smooth_weight, tensor_layout, _is_causal, _qk_quant_gran, sm_scale, 
+  quant_max_bound, quant_min_bound, in_scale, _return_lse);
 
   return {o};
 }

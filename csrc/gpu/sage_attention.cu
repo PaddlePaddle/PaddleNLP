@@ -202,8 +202,11 @@ std::vector<paddle::Tensor> SageAttentionKernel(
     const paddle::optional<paddle::Tensor> vm = paddle::optional<paddle::Tensor>(paddle::empty({1}, paddle::DataType::FLOAT32, paddle::GPUPlace()));
 
     fmha_out = sage_attention_fwd(q, k, v, km, 
-                                  seq_lens_this_time, vm, out_linear_shifts, out_linear_smooths,
-                                  softmax_scale, std::string("per_warp"), 
+                                  seq_lens_this_time, vm, 
+                                  out_linear_shifts, out_linear_smooths,
+                                  softmax_scale, 
+                                  quant_max_bound, quant_min_bound, out_linear_in_scale,
+                                  std::string("per_warp"), 
                                   std::string("any"), 
                                   0, causal, true, false, false)[0];
     fmha_out = paddle::reshape(paddle::experimental::squeeze(fmha_out, {0}), {-1, num_q_head * head_dim_qk});
