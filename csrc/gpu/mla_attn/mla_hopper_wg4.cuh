@@ -149,7 +149,7 @@ MLAWithKVCacheWG4Kernel(CUTE_GRID_CONSTANT
     PipelineState smem_pipe_write_kv = cutlass::make_producer_start_state<MainloopPipeline>();
     const int block_id = blockIdx.x;
     const int bid = mainloop_params.batch_ids[block_id];
-    const int tile_id = mainloop_params.tile_ids_per_batch[block_id];
+    const int tile_id = mainloop_params.tile_ids_per_batch ? mainloop_params.tile_ids_per_batch[block_id] : 0;
     const int q_tile_id = mainloop_params.q_tile_ids_per_batch ? mainloop_params.q_tile_ids_per_batch[block_id] : 0;
     const int seq_len_now = mainloop_params.seq_lens_this_time[bid];
     const int seq_len_decoder_now = mainloop_params.seq_lens_decoder[bid] + seq_len_now;
@@ -202,7 +202,7 @@ MLAWithKVCacheWG4Kernel(CUTE_GRID_CONSTANT
     const int block_id = blockIdx.x;
     clear(attention_updater.scores_scale);
     const int bid = mainloop_params.batch_ids[block_id];
-    const int tile_id = mainloop_params.tile_ids_per_batch[block_id];
+    const int tile_id = mainloop_params.tile_ids_per_batch ? mainloop_params.tile_ids_per_batch[block_id] : 0;
     const int q_tile_id = mainloop_params.q_tile_ids_per_batch ? mainloop_params.q_tile_ids_per_batch[block_id] : 0;
     const int seq_len_now = mainloop_params.seq_lens_this_time[bid];
     const int seq_len_decoder_now = mainloop_params.seq_lens_decoder[bid] + seq_len_now;
@@ -290,7 +290,7 @@ MLAWithKVCacheWG4Kernel(CUTE_GRID_CONSTANT
       seq_len_decoder_now,
       mainloop_params.chunk_size,
       mainloop_params.draft_total_token_num,
-      mainloop_params.o_stride_bsz);
+      mainloop_params.o_stride_head_num);
   }
 }
 

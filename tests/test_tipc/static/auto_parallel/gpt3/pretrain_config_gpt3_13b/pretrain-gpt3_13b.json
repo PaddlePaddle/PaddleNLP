@@ -14,11 +14,11 @@
     "scale_loss": 1024,
     "learning_rate": 0.00001,
     "min_learning_rate": 0.000001,
-    "max_steps": 500,
+    "max_steps": 50,
     "save_steps": 50000,
     "weight_decay": 0.01,
     "warmup_ratio": 0.01,
-    "logging_steps": 5,
+    "logging_steps": 1,
     "continue_training": 0,
     "dataloader_num_workers": 1,
     "eval_steps": 100000,
@@ -37,7 +37,7 @@
     "fused_linear_param_grad_add": 1,
     "use_fused_rope": true,
     "use_fused_rms_norm": true,
-    "recompute": 0,
+    "recompute": 1,
     "recompute_use_reentrant": true,
     "recompute_granularity": "full",
     "pp_recompute_interval": 1,
@@ -50,5 +50,5 @@
     "hidden_dropout_prob": 0.1,
     "tensor_parallel_config": "enable_mp_async_allreduce replace_with_parallel_cross_entropy",
     "data_parallel_config": "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate",
-    "pipeline_parallel_config": "enable_send_recv_overlap enable_split_backward"
+    "pipeline_parallel_config": "enable_send_recv_overlap enable_split_backward auto_parallel_sync_shared_params"
 }

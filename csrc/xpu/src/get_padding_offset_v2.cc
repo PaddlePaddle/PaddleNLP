@@ -16,10 +16,15 @@
 #include "paddle/extension.h"
 #include "xpu/plugin.h"
 
-std::vector<paddle::Tensor> GetPaddingOffset(const paddle::Tensor& input_ids,
+std::vector<paddle::Tensor> GetPaddingOffsetV2(const paddle::Tensor& input_ids,
                                              const paddle::Tensor& cum_offsets,
                                              const paddle::Tensor& token_num,
-                                             const paddle::Tensor& seq_len) {
+                                             const paddle::Tensor& seq_len,
+                                             const paddle::optional<paddle::Tensor>& draft_tokens,
+                                             const paddle::optional<paddle::Tensor>& seq_lens_encoder) {
+    if (draft_tokens) {
+        PD_THROW("speculative decoding is not supported in XPU.");
+    }
   phi::XPUPlace place(phi::backends::xpu::GetXPUCurrentDeviceId());
   auto dev_ctx = paddle::experimental::DeviceContextPool::Instance().Get(place);
   auto xpu_ctx = static_cast<const phi::XPUContext*>(dev_ctx);
@@ -60,35 +65,29 @@ std::vector<paddle::Tensor> GetPaddingOffset(const paddle::Tensor& input_ids,
           cu_seqlens_k};
 }
 
-std::vector<std::vector<int64_t>> GetPaddingOffsetInferShape(
-    const std::vector<int64_t>& input_ids_shape,
-    const std::vector<int64_t>& cum_offsets_shape,
-    const std::vector<int64_t>& token_num_shape,
-    const std::vector<int64_t>& seq_len_shape) {
-  int64_t bsz = seq_len_shape[0];
-  int64_t seq_len = input_ids_shape[1];
-  return {{-1}, {bsz}, {-1}, {bsz + 1}, {bsz + 1}};
+std::vector<std::vector<int64_t>> GetPaddingOffsetV2InferShape(const std::vector<int64_t>& input_ids_shape,
+                                                             const std::vector<int64_t>& cum_offsets_shape,
+                                                             const std::vector<int64_t>& token_num_shape,
+                                                             const std::vector<int64_t>& seq_len_shape,
+                                                             const std::vector<int64_t>& draft_tokens_shape,
+                                                             const std::vector<int64_t>& seq_lens_encoder_shape) {
+    int64_t bsz = seq_len_shape[0];
+    int64_t seq_len = input_ids_shape[1];
+    return {{-1}, {bsz}, {-1}, {bsz + 1}, {bsz + 1}};
 }
 
-std::vector<paddle::DataType> GetPaddingOffsetInferDtype(
-    const paddle::DataType& input_ids_dtype,
-    const paddle::DataType& cum_offsets_dtype,
-    const paddle::DataType& token_num_dtype,
-    const paddle::DataType& seq_len_dtype) {
-  return {input_ids_dtype,
-          seq_len_dtype,
-          seq_len_dtype,
-          seq_len_dtype,
-          seq_len_dtype};
+std::vector<paddle::DataType> GetPaddingOffsetV2InferDtype(const paddle::DataType& input_ids_dtype,
+                                                         const paddle::DataType& cum_offsets_dtype,
+                                                         const paddle::DataType& token_num_dtype,
+                                                         const paddle::DataType& seq_len_dtype,
+                                                         const paddle::DataType& draft_tokens_dtype,
+                                                         const paddle::DataType& seq_lens_encoder_dtype) {
+    return {input_ids_dtype, seq_len_dtype, seq_len_dtype, seq_len_dtype, seq_len_dtype};
 }
 
 PD_BUILD_OP(get_padding_offset_v2)
-    .Inputs({"input_ids", "token_num", "cum_offsets", "seq_len"})
-    .Outputs({"x_remove_padding",
-              "cum_offsets_out",
-              "padding_offset",
-              "cu_seqlens_q",
-              "cu_seqlens_k"})
-    .SetKernelFn(PD_KERNEL(GetPaddingOffset))
-    .SetInferShapeFn(PD_INFER_SHAPE(GetPaddingOffsetInferShape))
-    .SetInferDtypeFn(PD_INFER_DTYPE(GetPaddingOffsetInferDtype));
+    .Inputs({"input_ids", "cum_offsets", "token_num", "seq_len", paddle::Optional("draft_tokens"), paddle::Optional("seq_lens_encoder"),})
+    .Outputs({"x_remove_padding", "cum_offsets_out", "padding_offset", "cu_seqlens_q", "cu_seqlens_k"})
+    .SetKernelFn(PD_KERNEL(GetPaddingOffsetV2))
+    .SetInferShapeFn(PD_INFER_SHAPE(GetPaddingOffsetV2InferShape))
+    .SetInferDtypeFn(PD_INFER_DTYPE(GetPaddingOffsetV2InferDtype));

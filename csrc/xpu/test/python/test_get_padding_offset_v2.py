@@ -12,12 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import unittest
+
 import numpy as np
 import paddle
-import unittest
 from paddlenlp_ops import get_padding_offset_v2
 
 np.random.seed(2023)
+
 
 class GetPaddingOffsetV2Test(unittest.TestCase):
     def test_get_padding_offset_v2(self):
@@ -36,6 +38,8 @@ class GetPaddingOffsetV2Test(unittest.TestCase):
             paddle.to_tensor(cum_offset),
             paddle.to_tensor(token_num),
             paddle.to_tensor(seq_lens),
+            None,
+            None,
         )
 
         print("input_ids:\n", input_ids)
@@ -48,22 +52,18 @@ class GetPaddingOffsetV2Test(unittest.TestCase):
         print("cu_seqlens_q:\n", cu_seqlens_q)
         print("cu_seqlens_k:\n", cu_seqlens_k)
 
-        ref_x_remove_padding = np.array(
-            [8, 7, 8, 2, 4, 5, 5, 7, 6, 1, 7, 2, 6], "int64")
+        ref_x_remove_padding = np.array([8, 7, 8, 2, 4, 5, 5, 7, 6, 1, 7, 2, 6], "int64")
         ref_cum_offsets_out = np.array([0, 6, 13], "int32")
-        ref_padding_offset = np.array(
-            [0, 0, 0, 0, 6, 6, 6, 13, 13, 13, 13, 13, 13], "int32")
-        ref_cu_seqlens_q = np.array([0 , 4 , 7 , 13], "int32")
-        ref_cu_seqlens_k = np.array([0 , 4 , 7 , 13], "int32")
+        ref_padding_offset = np.array([0, 0, 0, 0, 6, 6, 6, 13, 13, 13, 13, 13, 13], "int32")
+        ref_cu_seqlens_q = np.array([0, 4, 7, 13], "int32")
+        ref_cu_seqlens_k = np.array([0, 4, 7, 13], "int32")
 
-        assert sum(ref_x_remove_padding
-                - x_remove_padding) == 0, 'Check x_remove_padding failed.'
-        assert sum(ref_cum_offsets_out
-                - cum_offsets_out) == 0, 'Check cum_offsets_out failed.'
-        assert sum(ref_padding_offset
-                - padding_offset) == 0, 'Check padding_offset failed.'
-        assert sum(ref_cu_seqlens_q - cu_seqlens_q) == 0, 'Check cu_seqlens_q failed.'
-        assert sum(ref_cu_seqlens_k - cu_seqlens_k) == 0, 'Check cu_seqlens_k failed.'
+        assert sum(ref_x_remove_padding - x_remove_padding) == 0, "Check x_remove_padding failed."
+        assert sum(ref_cum_offsets_out - cum_offsets_out) == 0, "Check cum_offsets_out failed."
+        assert sum(ref_padding_offset - padding_offset) == 0, "Check padding_offset failed."
+        assert sum(ref_cu_seqlens_q - cu_seqlens_q) == 0, "Check cu_seqlens_q failed."
+        assert sum(ref_cu_seqlens_k - cu_seqlens_k) == 0, "Check cu_seqlens_k failed."
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

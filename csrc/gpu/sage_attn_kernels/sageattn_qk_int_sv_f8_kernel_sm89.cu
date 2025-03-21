@@ -568,7 +568,7 @@ __global__ void qk_int_sv_f8_attn_kernel(int8_t *__restrict__ Q, int8_t *__restr
 
   normalize_d<num_tiles_q, num_tiles_v, ComputeUnit::kCudaCore>(RO, m, d);
 
-  // ! here we just implement the case for fp32 acumulation
+  // ! here we just implement the case for fp32 accumulation
   if constexpr (fuse_v_scale)
   {
     float v_scale[4];

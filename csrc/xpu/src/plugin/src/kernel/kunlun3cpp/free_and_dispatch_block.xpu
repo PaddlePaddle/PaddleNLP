@@ -1,0 +1,323 @@
+#include "xpu/kernel/cluster.h"
+#include "xpu/kernel/cluster_partition.h"
+#include "xpu/kernel/cluster_primitive.h"
+
+namespace xpu3 {
+namespace plugin {
+
+static __device__ inline int loada_float(_shared_ptr_ const int *ptr) {
+  int ret;
+  __asm__ __volatile__("loada.w %0,%1" : "=&r"(ret) : "r"(ptr));
+  return ret;
+}
+
+static __device__ inline bool storea_float(_shared_ptr_ int *ptr, int value) {
+  bool ret;
+  __asm__ __volatile__("storea.w %0,%1,%2" : "=&r"(ret) : "r"(value), "r"(ptr));
+  return ret;
+}
+
+static __device__ int atomic_add(_shared_ptr_ int *ptr, int value) {
+  bool fail = true;
+  int old_value;
+  while (fail) {
+    old_value = loada_float(ptr);
+    int new_value = old_value + value;
+    fail = storea_float(ptr, new_value);
+  }
+  return old_value;
+}
+
+static __device__ bool in_need_block_list(const int qid,
+                                          _shared_ptr_ int *need_block_list,
+                                          const int need_block_len) {
+  bool res = false;
+  for (int i = 0; i < need_block_len; i++) {
+    if (qid == need_block_list[i]) {
+      need_block_list[i] = -1;
+      res = true;
+      break;
+    }
+  }
+  return res;
+}
+
+__global__ void free_and_dispatch_block(bool *stop_flags,
+                                        int *seq_lens_this_time,
+                                        int *seq_lens_decoder,
+                                        int *block_tables,
+                                        int *encoder_block_lens,
+                                        bool *is_block_step,
+                                        int *step_block_list,  // [bsz]
+                                        int *step_len,
+                                        int *recover_block_list,
+                                        int *recover_len,
+                                        int *need_block_list,
+                                        int *need_block_len,
+                                        int *used_list_len,
+                                        int *free_list,
+                                        int *free_list_len,
+                                        int64_t *first_token_ids,
+                                        const int bsz,
+                                        const int block_size,
+                                        const int block_num_per_seq,
+                                        const int max_decoder_block_num) {
+  int cid = core_id();
+  int ncores = core_num();
+  int clusterid = cluster_id();
+  if (clusterid != 0 || cid >= bsz) return;
+
+  // assert bsz <= 640
+  const int max_bs = 640;
+  int value_zero = 0;
+  bool flag_true = true;
+
+  // 128 = seq_len(8192) / block_size(64)
+  // 每次最多处理block_table数量为128
+  const int block_table_now_len = 128;
+  int block_table_now[block_table_now_len];
+  for (int i = 0; i < block_table_now_len; i++) {
+    block_table_now[i] = -1;
+  }
+  bool stop_flag_lm;
+  int seq_lens_decoder_lm;
+
+  __shared__ int free_list_len_sm;
+  // 每次最多处理free_list数量为block_table_now_len
+  int free_list_now[block_table_now_len];
+  __shared__ int need_block_len_sm;
+  __shared__ int need_block_list_sm[max_bs];
+  __shared__ int used_list_len_sm[max_bs];
+  __shared__ bool step_max_block_flag;
+  __shared__ int in_need_block_list_len;
+  if (cid == 0) {
+    step_max_block_flag = false;
+    in_need_block_list_len = 0;
+    GM2SM_ASYNC(free_list_len, &free_list_len_sm, sizeof(int));
+    GM2SM_ASYNC(need_block_len, &need_block_len_sm, sizeof(int));
+    mfence();
+    if (need_block_len_sm > 0) {
+      GM2SM_ASYNC(
+          need_block_list, need_block_list_sm, sizeof(int) * need_block_len_sm);
+    }
+    GM2SM_ASYNC(used_list_len, used_list_len_sm, sizeof(int) * bsz);
+    mfence();
+  }
+  sync_cluster();
+
+  for (int tid = cid; tid < bsz; tid += ncores) {
+    bool is_block_step_lm;
+    int seq_lens_this_time_lm;
+    mfence();
+    GM2LM_ASYNC(stop_flags + tid, &stop_flag_lm, sizeof(bool));
+    GM2LM_ASYNC(is_block_step + tid, &is_block_step_lm, sizeof(bool));
+    GM2LM_ASYNC(seq_lens_decoder + tid, &seq_lens_decoder_lm, sizeof(int));
+    GM2LM_ASYNC(seq_lens_this_time + tid, &seq_lens_this_time_lm, sizeof(int));
+    mfence();
+    if (stop_flag_lm && !is_block_step_lm) {
+      // 回收block块
+      int64_t first_token_id_lm = -1;
+      mfence_lm();
+      LM2GM(&first_token_id_lm, first_token_ids + tid, sizeof(int64_t));
+      int encoder_block_len_lm;
+      int decoder_used_len_lm = used_list_len_sm[tid];
+      GM2LM(encoder_block_lens + tid, &encoder_block_len_lm, sizeof(int));
+      if (decoder_used_len_lm > 0) {
+        const int ori_free_list_len =
+            atomic_add(&free_list_len_sm, decoder_used_len_lm);
+        for (int i = 0; i < decoder_used_len_lm; i += block_table_now_len) {
+          int process_len = min(block_table_now_len, decoder_used_len_lm - i);
+          GM2LM(
+              block_tables + tid * block_num_per_seq + encoder_block_len_lm + i,
+              free_list_now,
+              process_len * sizeof(int));
+          LM2GM(free_list_now,
+                free_list + ori_free_list_len + i,
+                process_len * sizeof(int));
+          LM2GM(
+              block_table_now,
+              block_tables + tid * block_num_per_seq + encoder_block_len_lm + i,
+              process_len * sizeof(int));
+        }
+        used_list_len_sm[tid] = 0;
+        mfence();
+        LM2GM(&value_zero, encoder_block_lens + tid, sizeof(int));
+      }
+    } else if (seq_lens_this_time_lm != 0) {
+      int next_block_id;
+      GM2LM(block_tables + tid * block_num_per_seq +
+                seq_lens_decoder_lm / block_size,
+            &next_block_id,
+            sizeof(int));
+      if (next_block_id == -1) {
+        // 统计需要分配block的位置和总数
+        const int ori_need_block_len = atomic_add(&need_block_len_sm, 1);
+        need_block_list_sm[ori_need_block_len] = tid;
+      }
+    }
+  }
+  sync_cluster();
+
+  bool is_block_step_lm[max_bs];
+  int step_len_lm;
+  int step_block_list_lm[max_bs];
+  int recover_len_lm;
+  int recover_block_list_lm[max_bs];
+  if (cid == 0) {
+    GM2LM_ASYNC(is_block_step, is_block_step_lm, sizeof(bool) * bsz);
+    GM2LM_ASYNC(step_len, &step_len_lm, sizeof(int));
+    GM2LM_ASYNC(step_block_list, step_block_list_lm, sizeof(int) * bsz);
+    GM2LM_ASYNC(recover_len, &recover_len_lm, sizeof(int));
+    GM2LM_ASYNC(recover_block_list, recover_block_list_lm, sizeof(int) * bsz);
+    mfence();
+  }
+
+  if (cid == 0) {
+    while (need_block_len_sm > free_list_len_sm) {
+      // 调度block，根据used_list_len从大到小回收block，直到满足need_block_len，已解码到最后一个block的query不参与调度（马上就结束）
+      int max_used_list_len_id = 0;
+      int max_used_list_len = 0;
+      for (int i = 0; i < bsz; i++) {
+        if (!is_block_step_lm[i] &&
+            (step_max_block_flag ||
+             used_list_len_sm[i] != max_decoder_block_num) &&
+            (used_list_len_sm[i] > max_used_list_len)) {
+          max_used_list_len_id = i;
+          max_used_list_len = used_list_len_sm[i];
+        }
+      }
+
+      if (max_used_list_len == 0) {
+        step_max_block_flag = true;
+      } else {
+        int encoder_block_len;
+        GM2LM(encoder_block_lens + max_used_list_len_id,
+              &encoder_block_len,
+              sizeof(int));
+        for (int i = 0; i < max_used_list_len; i += block_table_now_len) {
+          int process_len = min(block_table_now_len, max_used_list_len - i);
+          GM2LM(block_tables + max_used_list_len_id * block_num_per_seq +
+                    encoder_block_len + i,
+                free_list_now,
+                process_len * sizeof(int));
+          LM2GM(free_list_now,
+                free_list + free_list_len_sm + i,
+                process_len * sizeof(int));
+          LM2GM(block_table_now,
+                block_tables + max_used_list_len_id * block_num_per_seq +
+                    encoder_block_len + i,
+                process_len * sizeof(int));
+        }
+        step_block_list_lm[step_len_lm] = max_used_list_len_id;
+        int need_block_len_all = need_block_len_sm + in_need_block_list_len;
+        if (in_need_block_list(
+                max_used_list_len_id, need_block_list_sm, need_block_len_all)) {
+          need_block_len_sm--;
+          in_need_block_list_len++;
+        }
+        step_len_lm++;
+        free_list_len_sm += max_used_list_len;
+        LM2GM_ASYNC(
+            &flag_true, stop_flags + max_used_list_len_id, sizeof(bool));
+        is_block_step_lm[max_used_list_len_id] = true;
+        LM2GM_ASYNC(&value_zero,
+                    seq_lens_this_time + max_used_list_len_id,
+                    sizeof(int));
+        LM2GM_ASYNC(
+            &value_zero, seq_lens_decoder + max_used_list_len_id, sizeof(int));
+        mfence();
+      }
+    }
+  }
+  sync_cluster();
+
+  int need_block_len_all = need_block_len_sm + in_need_block_list_len;
+  for (int tid = cid; tid < need_block_len_all; tid += ncores) {
+    // 为需要block的位置分配block，每个位置分配一个block
+    const int need_block_id = need_block_list_sm[tid];
+    if (need_block_id != -1) {
+      GM2LM(stop_flags + need_block_id, &stop_flag_lm, sizeof(bool));
+      if (!stop_flag_lm) {
+        // 如果需要的位置正好是上一步中被释放的位置，不做处理
+        used_list_len_sm[need_block_id]++;
+        const int ori_free_list_len = atomic_add(&free_list_len_sm, -1);
+        int tmp_seq_lens_decoder;
+        GM2LM(seq_lens_decoder + need_block_id,
+              &tmp_seq_lens_decoder,
+              sizeof(int));
+        int free_block_id = 0;
+        GM2LM(free_list + ori_free_list_len - 1, &free_block_id, sizeof(int));
+        LM2GM(&free_block_id,
+              block_tables + need_block_id * block_num_per_seq +
+                  tmp_seq_lens_decoder / block_size,
+              sizeof(int));
+      }
+      need_block_list_sm[tid] = -1;
+    }
+  }
+  sync_cluster();
+
+  // 计算可以复原的query id
+  if (cid == 0 && step_len_lm > 0) {
+    int ori_free_list_len = free_list_len_sm;
+    int ori_step_block_id = step_block_list_lm[step_len_lm - 1];
+    int tmp_used_len = used_list_len_sm[ori_step_block_id];
+    int encoder_block_len_lm;
+    GM2LM(encoder_block_lens + ori_step_block_id,
+          &encoder_block_len_lm,
+          sizeof(int));
+    const int max_decoder_block_num_this_seq =
+        max_decoder_block_num - encoder_block_len_lm;
+    // 比之前调度时多分配一个block，防止马上恢复刚调度的query(比如回收的seq_id在need_block_list中）
+    int used_len = tmp_used_len + 1 < max_decoder_block_num_this_seq
+                       ? tmp_used_len + 1
+                       : max_decoder_block_num_this_seq;
+    while (step_len_lm > 0 && ori_free_list_len >= used_len) {
+      recover_block_list_lm[recover_len_lm] = ori_step_block_id;
+      is_block_step_lm[ori_step_block_id] = false;
+      used_list_len_sm[ori_step_block_id] = used_len;
+      ori_free_list_len -= used_len;
+      step_block_list_lm[step_len_lm - 1] = -1;
+      step_len_lm--;
+      recover_len_lm++;
+      if (step_len_lm > 0) {
+        ori_step_block_id = step_block_list_lm[step_len_lm - 1];
+        tmp_used_len = used_list_len_sm[ori_step_block_id];
+        used_len = tmp_used_len + 1 < max_decoder_block_num_this_seq
+                       ? tmp_used_len + 1
+                       : max_decoder_block_num_this_seq;
+      }
+    }
+  }
+
+  // TODO(zhupengyang):
+  // Before the operator: need_block_len is 0, need_block_list is -1
+  // After the operator: need_block_len is 0, need_block_list is -1
+  // May need_block_len and need_block_list not need update?
+  int ori_need_block_len;
+  if (cid == 0) {
+    ori_need_block_len = need_block_len_sm;
+    need_block_len_sm = 0;
+  }
+
+  if (cid == 0) {
+    mfence();
+    LM2GM_ASYNC(step_block_list_lm, step_block_list, sizeof(int) * bsz);
+    LM2GM_ASYNC(is_block_step_lm, is_block_step, sizeof(bool) * bsz);
+    LM2GM_ASYNC(&step_len_lm, step_len, sizeof(int));
+    LM2GM_ASYNC(&recover_len_lm, recover_len, sizeof(int));
+    LM2GM_ASYNC(recover_block_list_lm, recover_block_list, sizeof(int) * bsz);
+    SM2GM_ASYNC(&free_list_len_sm, free_list_len, sizeof(int));
+    SM2GM_ASYNC(&need_block_len_sm, need_block_len, sizeof(int));
+    if (ori_need_block_len > 0) {
+      SM2GM_ASYNC(need_block_list_sm,
+                  need_block_list,
+                  sizeof(int) * ori_need_block_len);
+    }
+    SM2GM_ASYNC(used_list_len_sm, used_list_len, sizeof(int) * bsz);
+    mfence();
+  }
+}
+
+}  // namespace plugin
+}  // namespace xpu3

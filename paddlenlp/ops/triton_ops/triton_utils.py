@@ -181,11 +181,11 @@ def get_value_hint(x):
     for ele in x:
         if type(ele) == int:
             if ele % 16 == 0 and ele > 0:
-                hint += "i32:16,"
+                hint += "i64:16,"
             elif ele == 1:
-                hint += "i32:1,"
+                hint += "i64:1,"
             else:
-                hint += "i32,"
+                hint += "i64,"
         if type(ele) == float:
             hint += "fp32,"
     return hint
