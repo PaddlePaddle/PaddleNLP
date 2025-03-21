@@ -89,12 +89,12 @@ from paddlenlp.transformers.model_utils import _add_variant
 from paddlenlp.utils.env import PADDLE_WEIGHTS_NAME
 
 
-class StepTrainer(Trainer):
+class RLTrainer(Trainer):
     """
-    Features of StepTrainer:
+    Features of RLTrainer:
     1. Trainer enhanced with step-level training combining with patches of
     Trianer. We can use this to do training whose step is composed of multi
-    models via multiple instances of StepTrainer, such as PPO.
+    models via multiple instances of RLTrainer, such as PPO.
     2. Additionally, using a mixed loss and get the separated loss metrics is
     supported, which is helpful to PipelienParallel with a mixed loss.
     3. EMA is supported.
@@ -157,7 +157,7 @@ class StepTrainer(Trainer):
 
     def loss_identifier(self, inputs: Dict) -> str:
         """
-        Moreover, a model/StepTrainer instance may use a mixed loss which uses a
+        Moreover, a model/RLTrainer instance may use a mixed loss which uses a
         different loss for different step and inputs, while we often want to get
         the separated loss metric. We use a callable discriminator using inputs
         (dict) as arguments and returning corresponding loss name to identify
@@ -218,7 +218,7 @@ class StepTrainer(Trainer):
     def get_train_step_vars(self, vars: Optional[Dict] = None) -> Dict:
         """
         NOTE: This is transparent to users.
-        When using multiple instances of StepTrainer collaborate to do one training
+        When using multiple instances of RLTrainer collaborate to do one training
         step, each should use its own vars such as loss/model/step_control which are
         local vars in Trainer.train, we define these vars by `train_step_vars`. They
         are vars needed by full_training_step for training control, as following:
@@ -284,7 +284,7 @@ class StepTrainer(Trainer):
         # NOTE: `tr_loss` in trainer.train not only accumulate mean loss for
         # steps in one `gradient_accumulation_steps`, but also accumulate for
         # one logging intervel which may contains more than one accumulated steps.
-        # However, in StepTrainer we only want to use `tr_loss` to accumulate
+        # However, in RLTrainer we only want to use `tr_loss` to accumulate
         # mean loss for steps in a `gradient_accumulation_steps` range. As for
         # logging intervel loss accumulation is not take into account here and
         # should be considered in outter.
@@ -572,10 +572,10 @@ class StepTrainer(Trainer):
 
 
 class ema(paddle.no_grad.__mro__[1]):
-    def __init__(self, trainer: StepTrainer):
+    def __init__(self, trainer: RLTrainer):
         """
         Args:
-        trainer (StepTrainer): Trainer object to be used for training.
+        trainer (RLTrainer): Trainer object to be used for training.
         """
         self.trainer = trainer
 
@@ -671,7 +671,7 @@ class Enable(paddle.no_grad.__mro__[1]):
             paddle.device.synchronize()
 
 
-class PolicyTrainer(StepTrainer):
+class ActorReferenceTrainer(RLTrainer):
     loss_cls = RLHFPPOMixedLoss
     trainer_type = "policy"
 
@@ -690,7 +690,7 @@ class PolicyTrainer(StepTrainer):
         return loss_name
 
 
-class ValueTrainer(StepTrainer):
+class CriticTrainer(RLTrainer):
     loss_cls = RLHFValueLoss
     trainer_type = "value"
     # define loss name for logging
@@ -933,7 +933,7 @@ class PPOTrainer(Trainer):
         if self.use_ptx:
             policy_training_args.gradient_accumulation_steps *= 2
         lr_scheduler = self.get_scheduler(policy_training_args)
-        self.policy_trainer = PolicyTrainer(
+        self.policy_trainer = ActorReferenceTrainer(
             policy_model,
             criterion,
             policy_training_args,
@@ -962,7 +962,7 @@ class PPOTrainer(Trainer):
                         getattr(value_training_args, attr_name),
                     )
             lr_scheduler = self.get_scheduler(value_training_args)
-            self.value_trainer = ValueTrainer(
+            self.value_trainer = CriticTrainer(
                 value_model,
                 criterion,
                 value_training_args,
@@ -1006,7 +1006,7 @@ class PPOTrainer(Trainer):
                 ),  # workaround for pipeline parallel model check
             },
         ):
-            self.reference_trainer = StepTrainer(
+            self.reference_trainer = RLTrainer(
                 reference_model,
                 criterion,
                 copy.deepcopy(args),
@@ -1020,7 +1020,7 @@ class PPOTrainer(Trainer):
                 preprocess_logits_for_metrics,
             )
             if isinstance(reward_model, PretrainedModel):
-                self.reward_trainer = StepTrainer(
+                self.reward_trainer = RLTrainer(
                     reward_model,
                     criterion,
                     copy.deepcopy(args),

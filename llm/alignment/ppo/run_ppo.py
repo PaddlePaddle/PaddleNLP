@@ -158,7 +158,7 @@ def main():
         }
     else:
         # non-pipe modelForCausalLM does not accept extra_args and use other ways
-        # (StepTrainer.create_criterion) to set hyper-parameters
+        # (RLTrainer.create_criterion) to set hyper-parameters
         extra_args = {}
 
     common_config = dict(
