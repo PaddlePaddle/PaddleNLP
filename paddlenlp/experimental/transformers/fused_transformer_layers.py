@@ -1346,12 +1346,8 @@ class FusedMultiTransformerBase(Layer):
 
         return tmp_out, residual_input
 
-    def compute_moe_ep_with_tp(self, tmp_out, scores, i):
+    def compute_moe_ep_with_tp(self, tmp_out, scores, i, topk_only_mode):
         mp_id = paddle.distributed.get_rank()
-        topk_only_mode = True
-        if scores is None:
-            scores = paddle.matmul(tmp_out.cast("float32"), self.gate_weights[i])
-            topk_only_mode = False
         (
             permute_input,
             token_nums_per_expert,
@@ -1406,9 +1402,8 @@ class FusedMultiTransformerBase(Layer):
 
         return fused_moe_out
 
-    def compute_moe_ep_with_tp_dp(self, tmp_out, scores, i):
+    def compute_moe_ep_with_tp_dp(self, tmp_out, scores, i, topk_only_mode):
         # 为了少写代码，这里进行了rename
-        gate_weights = self.gate_weights[i]
         ffn1_weights = self.ffn1_weights[i]
         ffn2_weights = self.ffn2_weights[i]
         ffn1_biases = self.ffn1_biases[i]
@@ -1423,11 +1418,6 @@ class FusedMultiTransformerBase(Layer):
         total_cards = paddle.distributed.get_world_size()
         act_dtype = tmp_out.dtype
         IsFirstGPUInAttentionTP = fleet.get_hybrid_communicate_group().get_model_parallel_rank() == 0
-
-        topk_only_mode = True
-        if scores is None:
-            scores = paddle.matmul(tmp_out.cast("float32"), gate_weights)
-            topk_only_mode = False
 
         (
             permute_input,
@@ -1698,16 +1688,17 @@ class FusedMultiTransformerBase(Layer):
             return scores
 
         if self.config.use_ep_parallel:
-            scores = None
+            scores = paddle.matmul(tmp_out.cast("float32"), self.gate_weights[i])
+            topk_only_mode = False
             if self.config.moe_config.topk_method is not None:
-                gate_out = paddle.matmul(tmp_out.cast("float32"), self.gate_weights[i])
-                scores = get_moe_scores(gate_out, self.config.moe_config)
+                scores = get_moe_scores(scores, self.config.moe_config)
+                topk_only_mode = True
             if self.data_parallel_degree == 1:
-                fused_moe_out = self.compute_moe_ep_with_tp(tmp_out, scores, i)
+                fused_moe_out = self.compute_moe_ep_with_tp(tmp_out, scores, i, topk_only_mode)
                 return fused_moe_out
             elif self.data_parallel_degree > 1:
                 result_place_holder = paddle.assign(tmp_out)
-                fused_moe_out = self.compute_moe_ep_with_tp_dp(tmp_out, scores, i)
+                fused_moe_out = self.compute_moe_ep_with_tp_dp(tmp_out, scores, i, topk_only_mode)
 
                 if result_place_holder.shape == fused_moe_out.shape:
                     result_place_holder = paddle.assign(fused_moe_out)
