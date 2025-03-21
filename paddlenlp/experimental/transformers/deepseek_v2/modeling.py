@@ -22,10 +22,7 @@ from paddle import nn
 from paddle.distributed import fleet
 from paddle.nn.quant import weight_quantize
 
-from paddlenlp.experimental.model_utils import (
-    block_quant_to_tensor_quant,
-    get_dequant_weight,
-)
+from paddlenlp.experimental.model_utils import get_dequant_weight
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedBlockMultiTransformer,
     FusedBlockMultiTransformerFP8DynamicQuant,
@@ -809,7 +806,12 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                     kv_b_proj_weight_scale = paddle.to_tensor(
                         state_dict[f"{self.base_model_prefix}.layers.{idx}.self_attn.kv_b_proj.weight_scale_inv"]
                     ).cast(paddle.float32)
-                    w, scale = block_quant_to_tensor_quant(kv_b_proj_weight, kv_b_proj_weight_scale, [128, 128])
+                    w = get_dequant_weight(
+                        kv_b_proj_weight,
+                        kv_b_proj_weight_scale,
+                        dtype=dtype,
+                        weight_block_size=self.weight_block_size,
+                    )
                     w = w.reshape(
                         shape=[
                             self.config.kv_lora_rank,
@@ -817,14 +819,12 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                             -1,
                         ]
                     ).transpose(perm=[1, 2, 0])
-                    # wk_b: [num_heads, kv_lora_rank, qk_nope_head_dim]
-                    # wv_b: [num_heads, v_head_dim, kv_lora_rank]
-                    wk_b = w[:, : self.config.qk_nope_head_dim, :].transpose(perm=[0, 2, 1])
-                    wv_b = w[:, -self.config.v_head_dim :, :]
-                    self.transformer_block.k_b_proj_weights[idx].copy_(wk_b, False)
-                    self.transformer_block.v_b_proj_weights[idx].copy_(wv_b, False)
-                    self.transformer_block.k_b_proj_weights_scale[idx].set_value(scale)
-                    self.transformer_block.v_b_proj_weights_scale[idx].set_value(scale)
+                    # wk_b: [num_heads, qk_nope_head_dim, kv_lora_rank]
+                    # wv_b: [num_heads, kv_lora_rank, v_head_dim]
+                    wk_b = w[:, : self.config.qk_nope_head_dim, :]
+                    wv_b = w[:, -self.config.v_head_dim :, :].transpose(perm=[0, 2, 1])
+                    self.transformer_block.k_b_proj_weights[idx].set_value(wk_b)
+                    self.transformer_block.v_b_proj_weights[idx].set_value(wv_b)
                 else:
                     self.transformer_block.q_nope_k_b_proj_weights[idx].set_value(W_Q_UK)
                     self.transformer_block.q_rope_proj_weights[idx].set_value(W_QR)
