@@ -39,6 +39,9 @@
 #include "sageattn_utils.cuh"
 #include "sageattn_fused.cuh"
 
+using float16 = phi::dtype::float16;
+using bfloat16 = phi::dtype::bfloat16;
+
 template <int BlockMajorSize, int BlockMinorSize, bool swizzle=true, CUtensorMapL2promotion_enum promotion_mode=CU_TENSOR_MAP_L2_PROMOTION_NONE, typename T>
 CUtensorMap create_tensor_map_4D(T* gmem_ptr, int d1, int d2, int d3, int d4, int stride1, int stride2, int stride3) {
     constexpr int smem_stride = BlockMinorSize * sizeof(T);
@@ -576,7 +579,7 @@ __global__ void qk_int8_sv_f8_attn_kernel(const __grid_constant__ CUtensorMap te
       }
     }
   } else {
-    write_o_reg_gmem_multi_warps_shift_smooth_quant<num_tiles_q,
+    write_o_reg_gmem_multi_warps_shift_smooth_quant_sm90<num_tiles_q,
                                                     num_tiles_v,
                                                     false,
                                                     DTypeQuant,
@@ -941,6 +944,16 @@ std::vector<paddle::Tensor> qk_int8_sv_f8_accum_f32_fuse_v_scale_attn_inst_buf_s
               cudaFuncSetAttribute(
                   kernel,
                   cudaFuncAttributeMaxDynamicSharedMemorySize, sMemSize);
+
+            DTypeQuant* shift_bias_ptr = nullptr;
+            DTypeQuant* smooth_weight_ptr = nullptr;
+            if (shift_bias_dtype == paddle::DataType::BFLOAT16) {
+              shift_bias_ptr = shift_bias ? reinterpret_cast<DTypeQuant*>(const_cast<bfloat16*>(shift_bias.get().data<bfloat16>())) : nullptr;
+              smooth_weight_ptr = smooth_weight ? reinterpret_cast<DTypeQuant*>(const_cast<bfloat16*>(smooth_weight.get().data<bfloat16>())) : nullptr;
+            } else {
+              shift_bias_ptr = shift_bias ? reinterpret_cast<DTypeQuant*>(const_cast<float16*>(shift_bias.get().data<float16>())) : nullptr;
+              smooth_weight_ptr = smooth_weight ? reinterpret_cast<DTypeQuant*>(const_cast<float16*>(smooth_weight.get().data<float16>())) : nullptr;
+            }
             
             dim3 grid(div_ceil(qo_len, CTA_Q), num_qo_heads, batch_size);
             kernel<<<grid, NUM_THREADS, sMemSize>>>(
@@ -950,8 +963,8 @@ std::vector<paddle::Tensor> qk_int8_sv_f8_accum_f32_fuse_v_scale_attn_inst_buf_s
               reinterpret_cast<float*>(query_scale.data()),
               reinterpret_cast<float*>(key_scale.data()),
               reinterpret_cast<float*>(value_scale.data()),
-              shift_bias ? reinterpret_cast<DTypeQuant*>(const_cast<DTypeQuant*>(shift_bias.get().data<DTypeQuant>())) : nullptr,
-              smooth_weight ? reinterpret_cast<DTypeQuant*>(const_cast<DTypeQuant*>(smooth_weight.get().data<DTypeQuant>())) : nullptr,
+              shift_bias_ptr,
+              smooth_weight_ptr,
               reinterpret_cast<DTypeOut*>(output.data()),
               stride_bz_o, stride_h_o, stride_seq_o,
               qo_len, kv_len, num_kv_groups, sm_scale, 
@@ -1004,7 +1017,13 @@ std::vector<paddle::Tensor> sage_attention_fwd(paddle::Tensor& q,
   int WARPQ = 16;
   std::vector<paddle::Tensor>&& quant_qk_results = per_warp_int8_cuda(q, k, km, BLKQ, WARPQ, BLKK, tensor_layout); // q_int8, q_scale, k_int8, k_scale
 
-  paddle::Tensor o = paddle::empty(q.shape(), q.dtype(), paddle::GPUPlace());
+  paddle::Tensor o;
+
+  if (shift_bias && smooth_weight) {
+    o = paddle::empty(q.shape(), paddle::DataType::INT8, paddle::GPUPlace());
+  } else {
+    o = = paddle::empty(q.shape(), q.dtype(), paddle::GPUPlace());
+  }
 
   int v_seq_len = (tensor_layout == 0) ? v.shape()[1] : v.shape()[2];
   int v_pad_len = (v_seq_len % 128 != 0) ? (128 - v_seq_len % 128) : 0;
@@ -1034,7 +1053,7 @@ std::vector<std::vector<int64_t>> sage_attention_InferShape(
   const paddle::optional<std::vector<int64_t>>& vm_shape,
   const paddle::optional<std::vector<int64_t>>& shift_bias_shape,
   const paddle::optional<std::vector<int64_t>>& smooth_weight_shape) {
-    return {value_shape};
+    return {query_shape};
 }
 
 std::vector<paddle::DataType> sage_attention_InferDtype(
@@ -1046,6 +1065,9 @@ std::vector<paddle::DataType> sage_attention_InferDtype(
   const paddle::optional<paddle::DataType>& F_dtype,
   const paddle::optional<paddle::DataType>& G_dtype,
   const paddle::optional<paddle::DataType>& H_dtype) {
+  if (G_dtype && H_dtype) {
+    return {paddle::DataType::INT8};
+  }
   return {C_dtype};
 }
 

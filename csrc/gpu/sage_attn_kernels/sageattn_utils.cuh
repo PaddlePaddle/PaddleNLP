@@ -153,7 +153,7 @@
     using c_type = half;                                                                \
     __VA_ARGS__                                                                         \
   } else if (paddle_dtype == paddle::DataType::BFLOAT16) {                               \
-    using c_type = nv_bfloat16;                                                         \
+    using c_type = __nv_bfloat16;                                                         \
     __VA_ARGS__                                                                         \
   } else {                                                                              \
     std::ostringstream oss;                                                             \
@@ -167,7 +167,7 @@
     using c_type = half;                                                                \
     __VA_ARGS__                                                                         \
   } else if (paddle_dtype == paddle::DataType::BFLOAT16) {                               \
-    using c_type = nv_bfloat16;                                                         \
+    using c_type = __nv_bfloat16;                                                         \
     __VA_ARGS__                                                                         \
   } else if (paddle_dtype == paddle::DataType::INT8) {                                  \
     using c_type = int8_t;                                                         \
@@ -1591,7 +1591,7 @@ template <uint32_t num_frags_x,
           typename OutT,
           SwizzleMode swizzle_mode=SwizzleMode::k128B, 
           uint32_t stride=8>
-__device__ __forceinline__ void write_o_reg_gmem_multi_warps_shift_smooth_quant(
+__device__ __forceinline__ void write_o_reg_gmem_multi_warps_shift_smooth_quant_sm90(
     float (*o_frag)[num_frags_y][8],
     smem_t<swizzle_mode, stride>* o_smem,
     OutT* o_ptr_base,
@@ -1608,7 +1608,8 @@ __device__ __forceinline__ void write_o_reg_gmem_multi_warps_shift_smooth_quant(
     const uint32_t group_size) {
   constexpr uint32_t head_dim = num_frags_y * 16;
   constexpr uint32_t num_vecs_per_head = head_dim / num_elems_per_128b<T>();
-  const uint32_t tx = threadIdx.x, ty = threadIdx.y;
+  const uint32_t tx = threadIdx.x, ty = threadIdx.x / 32;
+
   constexpr int VEC_SIZE = 16 / sizeof(T);
   AlignedVector<T, VEC_SIZE> ori_out_vec;
   AlignedVector<T, VEC_SIZE> shift_bias_vec;
