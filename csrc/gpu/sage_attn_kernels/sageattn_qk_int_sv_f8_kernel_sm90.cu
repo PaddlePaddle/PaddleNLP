@@ -1022,7 +1022,7 @@ std::vector<paddle::Tensor> sage_attention_fwd(paddle::Tensor& q,
   if (shift_bias && smooth_weight) {
     o = paddle::empty(q.shape(), paddle::DataType::INT8, paddle::GPUPlace());
   } else {
-    o = = paddle::empty(q.shape(), q.dtype(), paddle::GPUPlace());
+    o = paddle::empty(q.shape(), q.dtype(), paddle::GPUPlace());
   }
 
   int v_seq_len = (tensor_layout == 0) ? v.shape()[1] : v.shape()[2];
