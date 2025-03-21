@@ -1346,18 +1346,19 @@ class FusedMultiTransformerBase(Layer):
 
         return tmp_out, residual_input
 
-    def compute_moe_ep_with_tp(self, tmp_out, i):
+    def compute_moe_ep_with_tp(self, tmp_out, scores, i):
         mp_id = paddle.distributed.get_rank()
-        gate_out = paddle.matmul(tmp_out.cast("float32"), self.gate_weights[i])
+        topk_only_mode = True
+        if scores is None:
+            scores = paddle.matmul(tmp_out.cast("float32"), self.gate_weights[i])
+            topk_only_mode = False
         (
             permute_input,
             token_nums_per_expert,
             permute_indices_per_token,
             expert_scales_float,
             top_k_indices,
-        ) = moe_expert_dispatch(tmp_out, gate_out, self.config.moe_config.top_k, False, topk_only_mode=False)
-
-        token_nums_per_expert = token_nums_per_expert
+        ) = moe_expert_dispatch(tmp_out, scores, self.config.moe_config.top_k, False, topk_only_mode=topk_only_mode)
 
         def get_start_end(mp_id):
             start = 0
@@ -1405,7 +1406,7 @@ class FusedMultiTransformerBase(Layer):
 
         return fused_moe_out
 
-    def compute_moe_ep_with_tp_dp(self, tmp_out, i):
+    def compute_moe_ep_with_tp_dp(self, tmp_out, scores, i):
         # 为了少写代码，这里进行了rename
         gate_weights = self.gate_weights[i]
         ffn1_weights = self.ffn1_weights[i]
@@ -1417,14 +1418,16 @@ class FusedMultiTransformerBase(Layer):
         quant_type = self.quant_type if hasattr(self, "quant_type") else "None"
         norm_topk_prob = self.config.moe_config.norm_topk_prob
 
-        top_k = self.config.moe_config.top_k
         hidden_size = self.embed_dim
         ep_num_per_gpu = self.ep_num_per_gpu
         total_cards = paddle.distributed.get_world_size()
         act_dtype = tmp_out.dtype
         IsFirstGPUInAttentionTP = fleet.get_hybrid_communicate_group().get_model_parallel_rank() == 0
 
-        gate_out = paddle.matmul(tmp_out.cast("float32"), gate_weights)
+        topk_only_mode = True
+        if scores is None:
+            scores = paddle.matmul(tmp_out.cast("float32"), gate_weights)
+            topk_only_mode = False
 
         (
             permute_input,
@@ -1432,7 +1435,7 @@ class FusedMultiTransformerBase(Layer):
             permute_indices_per_token,
             expert_scales_float,
             top_k_indices,
-        ) = moe_expert_dispatch(tmp_out, gate_out, top_k, False, topk_only_mode=False)
+        ) = moe_expert_dispatch(tmp_out, scores, self.config.moe_config.top_k, False, topk_only_mode=topk_only_mode)
 
         def get_adjacent_minus(x):
             y = paddle.assign(x)
@@ -1694,7 +1697,25 @@ class FusedMultiTransformerBase(Layer):
             )
             return scores
 
-        if self.config.moe_config.topk_method is not None:
+        if self.config.use_ep_parallel:
+            scores = None
+            if self.config.moe_config.topk_method is not None:
+                gate_out = paddle.matmul(tmp_out.cast("float32"), self.gate_weights[i])
+                scores = get_moe_scores(gate_out, self.config.moe_config)
+            if self.data_parallel_degree == 1:
+                fused_moe_out = self.compute_moe_ep_with_tp(tmp_out, scores, i)
+                return fused_moe_out
+            elif self.data_parallel_degree > 1:
+                result_place_holder = paddle.assign(tmp_out)
+                fused_moe_out = self.compute_moe_ep_with_tp_dp(tmp_out, scores, i)
+
+                if result_place_holder.shape == fused_moe_out.shape:
+                    result_place_holder = paddle.assign(fused_moe_out)
+
+                rank = fleet.get_hybrid_communicate_group().get_data_parallel_rank() * self.nranks
+                dist.broadcast(result_place_holder, rank, group=self.tp_group)
+                return result_place_holder / self.nranks
+        elif self.config.moe_config.topk_method is not None:
             gate_out = paddle.matmul(tmp_out.cast("float32"), self.gate_weights[i])
             # 应用各种策略后重塑的 scores
             scores = get_moe_scores(gate_out, self.config.moe_config)
@@ -1727,20 +1748,6 @@ class FusedMultiTransformerBase(Layer):
                 norm_topk_prob=False,  # 在noaux_tc中做了
                 routed_scaling_factor=1.0,  # 在noaux_tc中做了
             )
-        elif self.config.use_ep_parallel and self.data_parallel_degree == 1:
-            fused_moe_out = self.compute_moe_ep_with_tp(tmp_out, i)
-            return fused_moe_out
-        elif self.config.use_ep_parallel and self.data_parallel_degree > 1:
-            result_place_holder = paddle.assign(tmp_out)
-            fused_moe_out = self.compute_moe_ep_with_tp_dp(tmp_out, i)
-
-            if result_place_holder.shape == fused_moe_out.shape:
-                result_place_holder = paddle.assign(fused_moe_out)
-
-            rank = fleet.get_hybrid_communicate_group().get_data_parallel_rank() * self.nranks
-            dist.broadcast(result_place_holder, rank, group=self.tp_group)
-            return result_place_holder / self.nranks
-
         else:
             fused_moe_out = fused_expert_moe(
                 tmp_out,

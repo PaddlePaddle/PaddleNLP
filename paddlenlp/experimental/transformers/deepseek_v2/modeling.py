@@ -1640,22 +1640,22 @@ class DeepseekV2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, De
                     fn, is_column=False
                 )
                 if config.use_ep_parallel:
-                    base_actions[f"layers.0.mlp.experts.{expert_idx}.up_proj.weight"] = partial(
+                    base_actions[f"layers.3.mlp.experts.{expert_idx}.up_proj.weight"] = partial(
                         fn_expert, expert_idx=expert_idx
                     )
-                    base_actions[f"layers.0.mlp.experts.{expert_idx}.gate_proj.weight"] = partial(
+                    base_actions[f"layers.3.mlp.experts.{expert_idx}.gate_proj.weight"] = partial(
                         fn_expert, expert_idx=expert_idx
                     )
-                    base_actions[f"layers.0.mlp.experts.{expert_idx}.down_proj.weight"] = partial(
+                    base_actions[f"layers.3.mlp.experts.{expert_idx}.down_proj.weight"] = partial(
                         fn_expert, expert_idx=expert_idx
                     )
-                    base_actions[f"layers.0.mlp.experts.{expert_idx}.up_proj.weight_scale_inv"] = partial(
+                    base_actions[f"layers.3.mlp.experts.{expert_idx}.up_proj.weight_scale_inv"] = partial(
                         fn_expert, expert_idx=expert_idx
                     )
-                    base_actions[f"layers.0.mlp.experts.{expert_idx}.gate_proj.weight_scale_inv"] = partial(
+                    base_actions[f"layers.3.mlp.experts.{expert_idx}.gate_proj.weight_scale_inv"] = partial(
                         fn_expert, expert_idx=expert_idx
                     )
-                    base_actions[f"layers.0.mlp.experts.{expert_idx}.down_proj.weight_scale_inv"] = partial(
+                    base_actions[f"layers.3.mlp.experts.{expert_idx}.down_proj.weight_scale_inv"] = partial(
                         fn_expert, expert_idx=expert_idx
                     )
 
@@ -1675,6 +1675,10 @@ class DeepseekV2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, De
                 if "layers.0." in key:
                     for i in range(num_layers):
                         final_actions[key.replace("layers.0.", f"layers.{i}.")] = action
+                if "layers.3." in key:
+                    for i in range(3, num_layers):
+                        final_actions[key.replace("layers.3.", f"layers.{i}.")] = action
+
                 final_actions[key] = action
 
             return final_actions
