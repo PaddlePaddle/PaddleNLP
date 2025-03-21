@@ -682,12 +682,7 @@ class ActorReferenceTrainer(RLTrainer):
             inputs (Dict): 包含两个键值对，分别为"inputs"和"labels"，其中"inputs"是模型的输入，"labels"是可选的，表示是否使用ptx损失函数。默认值为None。
             返回值 (str): 返回一个字符串，分别为"ptx_loss"或"actor_loss"，表示是否使用ptx损失函数和演员损失函数。
         """
-        labels = inputs.get("labels", None)
-        if labels is not None:  # use ptx
-            loss_name = "ptx_loss"
-        else:
-            loss_name = "actor_loss"
-        return loss_name
+        return "actor_loss"
 
 
 class CriticTrainer(RLTrainer):
@@ -698,13 +693,11 @@ class CriticTrainer(RLTrainer):
 
 
 class PPOMetric:
-    def set_metric_meta(self, use_ptx=True):
+    def set_metric_meta(self):
         """
         设置指标的元信息，包括指标名称和运算方式。
-        如果不使用PTX（即不需要计算策略网络的损失），则会从指标名称中移除对应项。
 
         Args:
-            use_ptx (bool, optional): 是否使用PTX（默认为True）. Defaults to True.
 
         Returns:
             None: 无返回值，直接修改了类属性。
@@ -714,7 +707,6 @@ class PPOMetric:
             for name in (
                 [
                     "policy_loss",
-                    "ptx_loss",
                     "value_loss",
                     "reward",
                     "norm_reward",
@@ -730,7 +722,6 @@ class PPOMetric:
                 if self.args.rl_algorithm == "ppo"
                 else [
                     "policy_loss",
-                    "ptx_loss",
                     "pure_policy_loss",
                     "kl_loss",
                     "reward",
@@ -745,11 +736,8 @@ class PPOMetric:
         self.metric_ops = (
             ["mean"] * 10 + ["max", "min"] if self.args.rl_algorithm == "ppo" else ["mean"] * 7 + ["max", "min"]
         )
-        if not use_ptx:
-            self.metric_names.pop(1)
-            self.metric_ops.pop(1)
 
-    def __init__(self, freq, args, use_stack=True, use_ptx=True):
+    def __init__(self, freq, args, use_stack=True):
         """
         Args:
         freq (int): frequency of metrics collection.
@@ -760,7 +748,7 @@ class PPOMetric:
             ValueError: when freq is less than 1.
         """
         self.args = args
-        self.set_metric_meta(use_ptx=use_ptx)
+        self.set_metric_meta()
         self.freq = freq
         self.counter = 0
         self.use_stack = use_stack
@@ -846,7 +834,6 @@ class PPOTrainer(Trainer):
         args: TrainingArguments = None,
         data_collator: Optional[DataCollator] = None,
         train_dataset: Optional[Dataset] = None,
-        ptx_dataset: Optional[Dataset] = None,
         eval_dataset: Union[Dataset, Dict[str, Dataset]] = None,
         tokenizer: Optional[PretrainedTokenizer] = None,
         compute_metrics: Optional[Callable[[EvalPrediction], Dict]] = None,
@@ -865,7 +852,6 @@ class PPOTrainer(Trainer):
             mini-batches. If not provided, a simple batching function that drops remaining samples will be used.
             Defaults to None.
         train_dataset (Optional[Dataset], optional): The dataset to be used for training. Defaults to None.
-        ptx_dataset (Optional[Dataset], optional): The dataset to be used for ptx. Defaults to None.
         eval_dataset (Union[Dataset, Dict[str, Dataset]], optional): The dataset to be used for evaluation.
             Defaults to None.
         tokenizer (Optional[PretrainedTokenizer], optional): The tokenizer used for encoding. Defaults to None.
@@ -904,7 +890,6 @@ class PPOTrainer(Trainer):
             )
 
         self.train_dataset = train_dataset
-        self.ptx_dataset = ptx_dataset
         self.eval_dataset = eval_dataset
 
         (
@@ -929,9 +914,6 @@ class PPOTrainer(Trainer):
         ) = tokenizer
 
         policy_training_args = copy.deepcopy(args)
-        self.use_ptx = self.ptx_dataset is not None
-        if self.use_ptx:
-            policy_training_args.gradient_accumulation_steps *= 2
         lr_scheduler = self.get_scheduler(policy_training_args)
         self.policy_trainer = ActorReferenceTrainer(
             policy_model,
@@ -1071,7 +1053,6 @@ class PPOTrainer(Trainer):
         # Those value can be changed
         self.kl_coeff = self.args.kl_coeff
         self.clip_range_score = self.args.clip_range_score
-        self.ptx_coeff = self.args.ptx_coeff
         self.gamma = 1.0
         self.gae_lambda = 0.95
 
@@ -1722,29 +1703,6 @@ class PPOTrainer(Trainer):
         ):
             train_dataloader = self.prompt_only_dataloader = self.get_train_dataloader()
 
-        if self.use_ptx:
-            with (
-                guard_set_args(
-                    args,
-                    {
-                        "per_device_train_batch_size": (
-                            1
-                            if getattr(self.ptx_dataset, "is_intokens", False)
-                            else self.args.per_device_prompt_batch_size * self.args.num_return_sequences
-                        )
-                    },
-                ),
-                guard_set_args(
-                    self,
-                    {
-                        "train_dataset": self.ptx_dataset,
-                        "data_collator": self.ptx_dataset.get_collator(),
-                    },
-                ),
-            ):
-                self.ptx_dataloader = self.get_train_dataloader()
-        else:
-            self.ptx_dataloader = range(100)
         (
             total_train_batch_size,
             len_dataloader,
@@ -1773,7 +1731,11 @@ class PPOTrainer(Trainer):
         # ##### set training state and resume #####
         # consumed_samples used to set train_dataloader.batch_sampler may not be
         # correct. Thus, data cannot be resumed perfectly when not breaking at epoch end.
-        (epochs_trained, steps_trained_in_current_epoch, steps_trained_progress_bar,) = self.init_train_state(
+        (
+            epochs_trained,
+            steps_trained_in_current_epoch,
+            steps_trained_progress_bar,
+        ) = self.init_train_state(
             resume_from_checkpoint,
             train_dataloader,
             max_steps,
@@ -1822,28 +1784,12 @@ class PPOTrainer(Trainer):
                     self.timers and self.timers(get_timer_label(ActorStages.RL_STEP)).start()
                     rl_info = self.rl_step(rl_batch)
                     self.timers and self.timers(get_timer_label(ActorStages.RL_STEP)).stop()
-                    if self.use_ptx:
-                        logger.info("Doing ptx step...")
-                        self.timers and self.timers(get_timer_label(ActorStages.PTX_STEP)).start()
-                        with guard_set_args(
-                            self._model_config,
-                            {
-                                # "set_attn_func": True,
-                                "use_flash_attention": True
-                            },
-                        ):
-                            ptx_info = self.ptx_step(ptx_batch)
-                        rl_info.update(ptx_info)
-                        self.timers and self.timers(get_timer_label(ActorStages.PTX_STEP)).stop()
+
                 if self.timers:
                     self.timers(get_timer_label(ActorStages.MODEL_ENABLE_DISABLE)).stop()
                     self.timers(get_timer_label(ActorStages.MODEL_ENABLE_DISABLE)).elapsed_ -= self.timers(
                         get_timer_label(ActorStages.RL_STEP)
                     ).elapsed_
-                    if self.use_ptx:
-                        self.timers(get_timer_label(ActorStages.MODEL_ENABLE_DISABLE)).elapsed_ -= self.timers(
-                            get_timer_label(ActorStages.PTX_STEP)
-                        ).elapsed_
 
                 paddle.device.cuda.empty_cache()
                 if self.args.rl_algorithm == "ppo":
@@ -1972,9 +1918,6 @@ class PPOTrainer(Trainer):
             # use_ptx would double the gradient_accumulation_steps which causes
             # policy_loss and ptx_loss reduced by half. Moreover, ptx_loss should
             # be divided by ptx_coeff for logging.
-            if "train_ptx_loss" in tr_loss:
-                tr_loss["train_policy_loss"] = tr_loss["train_policy_loss"] * 2
-                tr_loss["train_ptx_loss"] = tr_loss["train_ptx_loss"] * 2 / self.ptx_coeff
             logs.update(tr_loss)
             logs["global_step"] = int(self.state.global_step)
             logs["train_actor_lr"] = float(f"{self.policy_trainer._get_learning_rate():.3e}")
@@ -2209,16 +2152,6 @@ class PPOTrainer(Trainer):
 
         return {"train_value_loss": reward_critic_loss}
 
-    def ptx_step(self, ptx_batch: Dict[str, paddle.Tensor]) -> Dict[str, Any]:
-        """Perform a single update step with PTX loss."""
-        # sft inputs use right padding, position_ids is optional
-        # ptx_batch["position_ids"] = ptx_batch.get(
-        #     "position_ids", make_position_ids(ptx_batch["attention_mask"]))
-        ptx_loss = self.policy_trainer.full_training_step(**ptx_batch)
-        return {
-            "train_ptx_loss": ptx_loss,
-        }
-
     def enable(self, *args):
         """
             启用指定的对象或方法。
@@ -2259,22 +2192,6 @@ class PPOTrainer(Trainer):
         # NOTE(GONGENLEI)： new offload
         objs = [(arg, enable_map.get(arg, "")) for arg in args if enable_map.get(arg, "") in self.args.offload_level]
         return Enable(objs)
-
-    def split_ptx_micro_batches(
-        self,
-        ptx_batch: Dict[str, paddle.Tensor],
-    ) -> List[Dict[str, paddle.Tensor]]:
-        """Split a batch of PTX samples into micro-batches."""
-        micro_batches = []
-        total_batch_size = ptx_batch["input_ids"].shape[0]
-        micro_batch_size = self.args.per_device_train_batch_size
-        for i in range(0, total_batch_size, micro_batch_size):
-            micro_batch = map_structure(
-                lambda tensor: tensor[i : i + micro_batch_size],
-                ptx_batch,
-            )
-            micro_batches.append(micro_batch)
-        return micro_batches
 
     @paddle.no_grad()
     @data_dispatch  # 3.10 static methods are now callable as regular functions.
