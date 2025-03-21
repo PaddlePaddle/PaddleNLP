@@ -120,7 +120,7 @@ def extract_tar(app, config):
     try:
         url = "https://paddlenlp.bj.bcebos.com/datasets/website_v2.tar"
         response = requests.get(url)
-        response.raise_for_status() # raise an exception if the request failed
+        response.raise_for_status()  # raise an exception if the request failed
 
         file_stream = BytesIO(response.content)
 

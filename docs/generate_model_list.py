@@ -60,31 +60,35 @@ def convert_size(size_bytes):
         unit_index += 1
     return f"{size_bytes:.1f} {units[unit_index]}"
 
+
 def process_image_links(text, model_path):
-    image_link_pattern = re.compile(r'!\[.*?\]\((.*?)\)')
-    
+    image_link_pattern = re.compile(r"!\[.*?\]\((.*?)\)")
+
     image_links = image_link_pattern.findall(text)
     for i, link in enumerate(image_links):
-        if not link.startswith(('http://', 'https://', '/')):
-            prefix=f"https://huggingface.co/{model_path}/resolve/main/"
+        if not link.startswith(("http://", "https://", "/")):
+            prefix = f"https://huggingface.co/{model_path}/resolve/main/"
             image_links[i] = prefix + link
-    
+
     def replace_link(match):
         original_link = match.group(1)
         new_link = next((new_link for new_link in image_links if original_link in new_link), original_link)
         return f'![{match.group(0).split("](")[0]}]({new_link})'
+
     processed_text = image_link_pattern.sub(replace_link, text)
     return processed_text
 
+
 def process_license(text):
-    license_pattern = re.compile(r'---\nlicense:.*?---', re.DOTALL)
-    processed_text = license_pattern.sub('', text)
+    license_pattern = re.compile(r"---\nlicense:.*?---", re.DOTALL)
+    processed_text = license_pattern.sub("", text)
     return processed_text
+
 
 def generate_model_page(model_path, model_name):
     full_path = os.path.join(MODEL_ROOT, model_path)
     files = []
-    readme_content=False
+    readme_content = False
 
     for root, _, filenames in os.walk(full_path):
         for f in filenames:
@@ -102,18 +106,18 @@ def generate_model_page(model_path, model_name):
 
     output_path = os.path.join(OUTPUT_DIR, model_path)
     os.makedirs(output_path, exist_ok=True)
-    
+
     if readme_content:
-        readme_content=process_image_links(readme_content, model_path)
-        readme_content=process_license(readme_content)
+        readme_content = process_image_links(readme_content, model_path)
+        readme_content = process_license(readme_content)
     huggingface_url = os.path.join("https://huggingface.co", model_path)
     template = Template(MODEL_TEMPLATE)
     markdown_content = template.render(
-        model_name=model_name, 
+        model_name=model_name,
         huggingface_url=huggingface_url,
-        model_path=URL_BASE + model_path, 
+        model_path=URL_BASE + model_path,
         files=sorted(files, key=lambda x: x["name"]),
-        readme_content=readme_content
+        readme_content=readme_content,
     )
 
     with open(os.path.join(output_path, "index.md"), "w") as f:
@@ -145,7 +149,17 @@ def is_model_directory(path):
     return len(model_files) > 0 or len(sharded_files) > 0
 
 
-ommit_paths = ["_internal_", "hf-internal", "zhuweiguo", "ziqingyang", "yuhuili", "westfish", "junnyu", "Yang-Changhui", "baicai"]
+ommit_paths = [
+    "_internal_",
+    "hf-internal",
+    "zhuweiguo",
+    "ziqingyang",
+    "yuhuili",
+    "westfish",
+    "junnyu",
+    "Yang-Changhui",
+    "baicai",
+]
 
 
 def find_models():
