@@ -42,7 +42,7 @@ class SparsifyMethod:
             tensor = paddle.nn.functional.dropout(tensor, p=1 - self.merge_config.reserve_p, mode=mode, training=True)
             return tensor
         else:
-            raise ValueError(f"Unkonwn tensor type {self.merge_config.tensor_type}")
+            raise ValueError(f"Unknown tensor type {self.merge_config.tensor_type}")
 
     def magprune(self, tensor):
         if self.merge_config.tensor_type == "np":
@@ -86,7 +86,7 @@ class SparsifyMethod:
                 tensor /= 1 - probs
             return tensor
         else:
-            raise ValueError(f"Unkonwn tensor type {self.merge_config.tensor_type}")
+            raise ValueError(f"Unknown tensor type {self.merge_config.tensor_type}")
 
     def trim(self, tensor):
         if self.merge_config.tensor_type == "np":
@@ -115,4 +115,4 @@ class SparsifyMethod:
                     tensor *= org_sum / new_sum
             return tensor
         else:
-            raise ValueError(f"Unkonwn tensor type {self.merge_config.tensor_type}")
+            raise ValueError(f"Unknown tensor type {self.merge_config.tensor_type}")

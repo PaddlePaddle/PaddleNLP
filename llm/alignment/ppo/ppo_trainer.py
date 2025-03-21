@@ -915,7 +915,7 @@ class PPOTrainer(Trainer):
             policy_model_eval,
             value_model_eval,
         ) = model
-        self._model_config = policy_model.config  # use this to change flash attention dynamicly
+        self._model_config = policy_model.config  # use this to change flash attention dynamically
         self._policy_model_eval = policy_model_eval
         if args.rl_algorithm == "ppo":
             self._value_model_eval = value_model_eval
@@ -1080,7 +1080,7 @@ class PPOTrainer(Trainer):
         self.reward_var = 1.0
         self.sample_batch_num = 0
 
-        # dummy class and object for model to be compaible with methods of
+        # dummy class and object for model to be compatible with methods of
         # Trainer, such as evaluation_loop
         self.DummyPPOModel = type(
             "DummyPPOModel",

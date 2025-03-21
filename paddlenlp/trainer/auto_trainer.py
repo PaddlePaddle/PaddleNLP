@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import os
 import random
 import time
@@ -28,6 +29,7 @@ from tqdm.auto import tqdm
 
 from paddlenlp.trainer import Trainer
 
+from ..transformers.model_utils import unwrap_model
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.log import logger
 from .argparser import strtobool
@@ -831,9 +833,7 @@ class AutoTrainer(Trainer):
                         OPTIMIZER_NAME: optim_state_dict,
                     }
 
-                self._save_ckpt_func(state_dict, os.path.join(output_dir, DIST_CKPT_PATH))
-                logger.info(f"Model weights and optimizer states saved in {output_dir}/{DIST_CKPT_PATH}")
-
+                self._save(output_dir=os.path.join(output_dir, DIST_CKPT_PATH), state_dict=state_dict)
                 # FIXME: maybe only save one copy
                 paddle.save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
 
@@ -899,10 +899,20 @@ class AutoTrainer(Trainer):
                 self.tokenizer.save_pretrained(output_dir)
             # Good practice: save your training arguments together with the trained model
             paddle.save(self.args, os.path.join(output_dir, TRAINING_ARGS_NAME))
+            # Save the config
+            model_to_save = unwrap_model(self.model)
+            config_to_save = copy.deepcopy(model_to_save.config)
+            config_to_save.mp_degree = getattr(config_to_save, "config_to_save", 1)
+            # Attach architecture to the config
+            config_to_save.architectures = [model_to_save.__class__.__name__]
+
+            config_to_save.save_pretrained(output_dir)
+            if self.model.can_generate():
+                model_to_save.generation_config.save_pretrained(output_dir)
 
         if self.args.should_save_model_state:
-            self._save_ckpt_func(self.model.state_dict(), os.path.join(output_dir, MODEL_NAME))
-            logger.info(f"Model weights saved in {output_dir}/{MODEL_NAME}")
+            self._save_ckpt_func(self.model.state_dict(), output_dir)
+            logger.info(f"Model weights and optimizer states saved in {output_dir}")
 
     def _load_from_checkpoint(self, resume_from_checkpoint=None):
 
