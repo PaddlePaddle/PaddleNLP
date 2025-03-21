@@ -114,7 +114,7 @@ tar -zxvf ultrafeedback_binarized.tar.gz
 ### 启动 DPO 训练
 可以在 PaddleNLP/llm/auto_parallel/llama 目录下运行：
 ```shell
-bash run llama_dpo_with_api.sh
+bash llama_dpo_with_api.sh
 ```
 同样，可以通过配置`to_static`开关控制是否使用动转静模式。
 
