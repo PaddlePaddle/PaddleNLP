@@ -1199,6 +1199,35 @@ class PretrainedConfig:
         else:
             return value
 
+    def get_text_config(self, decoder=False) -> "PretrainedConfig":
+        """
+        Returns the config that is meant to be used with text IO. On most models, it is the original config instance
+        itself. On specific composite models, it is under a set of valid names.
+
+        If `decoder` is set to `True`, then only search for decoder config names.
+        """
+        decoder_possible_text_config_names = ("decoder", "generator", "text_config")
+        encoder_possible_text_config_names = ("text_encoder",)
+        if decoder:
+            possible_text_config_names = decoder_possible_text_config_names
+        else:
+            possible_text_config_names = encoder_possible_text_config_names + decoder_possible_text_config_names
+
+        valid_text_config_names = []
+        for text_config_name in possible_text_config_names:
+            if hasattr(self, text_config_name):
+                text_config = getattr(self, text_config_name, None)
+                if text_config is not None:
+                    valid_text_config_names += [text_config_name]
+
+        if len(valid_text_config_names) > 1:
+            raise ValueError(
+                f"Multiple valid text configs were found in the model config: {valid_text_config_names}. In this "
+                "case, using `get_text_config()` would be ambiguous. Please specify the desied text config directly."
+            )
+        elif len(valid_text_config_names) == 1:
+            return getattr(self, valid_text_config_names[0])
+        return self
 
 def get_configuration_file(configuration_files: List[str]) -> str:
     """

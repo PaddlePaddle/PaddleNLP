@@ -103,12 +103,16 @@ def _is_package_available(pkg_name: str, return_version: bool = False) -> Union[
 
 _g2p_en_available = _is_package_available("g2p_en")
 _sentencepiece_available = _is_package_available("sentencepiece")
-_sklearn_available = importlib.util.find_spec("sklearn") is not None
-if _sklearn_available:
-    try:
-        importlib.metadata.version("scikit-learn")
-    except importlib.metadata.PackageNotFoundError:
-        _sklearn_available = False
+
+def is_sklearn_available():
+    _sklearn_available = importlib.util.find_spec("sklearn") is not None
+    if _sklearn_available:
+        try:
+            importlib.metadata.version("scikit-learn")
+        except importlib.metadata.PackageNotFoundError:
+            _sklearn_available = False
+
+    return _sklearn_available
 
 
 def is_datasets_available():

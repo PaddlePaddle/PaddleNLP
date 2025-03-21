@@ -14,15 +14,14 @@
 # limitations under the License.
 
 import inspect
-import math
 from typing import Callable, Iterable, List, Optional, Tuple, Union
 
 import numpy as np
 import paddle
 
-from paddlenlp.utils.log import logger
+from ..utils.log import logger
 
-from ..utils import add_start_docstrings
+from ..trainer.utils import add_start_docstrings
 
 LOGITS_PROCESSOR_INPUTS_DOCSTRING = r"""
     Args:
@@ -331,8 +330,8 @@ class RepetitionPenaltyLogitsProcessor(LogitsProcessor):
     def __call__(self, input_ids: paddle.Tensor, scores: paddle.Tensor) -> paddle.Tensor:
         score = paddle.index_sample(scores, input_ids)
         score = paddle.where(score < 0, score * self.penalty, score / self.penalty)
-        input_ids = input_ids + paddle.arange(scores.shape[0], dtype="int64").unsqueeze(-1) * scores.shape[-1]
-        scores_processed = paddle.scatter(scores.flatten(), input_ids.flatten(), score.flatten()).reshape(scores.shape)
+        scores_processed = paddle.put_along_axis(scores, input_ids, score, 1)
+
         return scores_processed
 
 
@@ -384,8 +383,7 @@ class EncoderRepetitionPenaltyLogitsProcessor(LogitsProcessor):
     def __call__(self, input_ids: paddle.Tensor, scores: paddle.Tensor) -> paddle.Tensor:
         score = paddle.index_sample(scores, self.encoder_input_ids)
         score = paddle.where(score < 0, score * self.penalty, score / self.penalty)
-        input_ids = input_ids + paddle.arange(scores.shape[0], dtype="int64").unsqueeze(-1) * scores.shape[-1]
-        scores_processed = paddle.scatter(scores.flatten(), input_ids.flatten(), score.flatten()).reshape(scores.shape)
+        scores_processed = paddle.put_along_axis(scores, input_ids, score, 1)
         return scores_processed
 
 
@@ -444,21 +442,14 @@ class TopPLogitsWarper(LogitsProcessor):
     def __call__(self, input_ids: paddle.Tensor, scores: paddle.Tensor) -> paddle.Tensor:
         sorted_logits, sorted_indices = paddle.sort(scores, descending=False), paddle.argsort(scores, descending=False)
         cumulative_probs = paddle.nn.functional.softmax(sorted_logits, axis=-1).cumsum(axis=-1)
-        # cumulative_probs = sorted_logits.softmax(axis=-1).cumsum(axis=-1)
-
         # Remove tokens with cumulative top_p above the threshold (token with 0 are kept)
         sorted_indices_to_remove = cumulative_probs <= (1 - self.top_p + 1e-6)
         # # Keep at least min_tokens_to_keep
         sorted_indices_to_remove[..., -self.min_tokens_to_keep :] = 0
         sorted_indices_to_remove = paddle.cast(sorted_indices_to_remove, dtype="int64")
-        # Scatter sorted tensors to original indexing
-        sorted_indices = (
-            sorted_indices + paddle.arange(scores.shape[0], dtype="int64").unsqueeze(-1) * scores.shape[-1]
-        )
-        condition = paddle.scatter(
-            sorted_indices_to_remove.flatten(), sorted_indices.flatten(), sorted_indices_to_remove.flatten()
-        )
-        condition = paddle.cast(condition, "bool").reshape(scores.shape)
+        condition = paddle.put_along_axis(
+            sorted_indices_to_remove, sorted_indices, sorted_indices_to_remove, 1
+        ).astype("bool")
         scores_processed = paddle.where(condition, paddle.full_like(scores, self.filter_value), scores)
         return scores_processed
 
@@ -500,7 +491,7 @@ class TopKLogitsWarper(LogitsProcessor):
     ```
     """
 
-    def __init__(self, top_k: int, filter_value: float = -float("Inf"), min_tokens_to_keep: int = 1):
+    def __init__(self, top_k: int, filter_value: float = paddle.finfo(paddle.float32).min, min_tokens_to_keep: int = 1):
         if not isinstance(top_k, int) or top_k <= 0:
             raise ValueError(f"`top_k` has to be a strictly positive integer, but is {top_k}")
 
@@ -509,10 +500,10 @@ class TopKLogitsWarper(LogitsProcessor):
 
     @add_start_docstrings(LOGITS_PROCESSOR_INPUTS_DOCSTRING)
     def __call__(self, input_ids: paddle.Tensor, scores: paddle.Tensor) -> paddle.Tensor:
+        import pdb;pdb.set_trace()
         top_k = min(self.top_k, scores.shape[-1])  # Safety check
         # Remove all tokens with a probability less than the last token of the top-k
         indices_to_remove = scores < paddle.topk(scores, top_k)[0][..., -1, None]
-        self.filter_value = paddle.finfo(scores.dtype).min
         scores_processed = scores.masked_fill(indices_to_remove, self.filter_value)
         return scores_processed
 
@@ -585,19 +576,20 @@ class MinPLogitsWarper(LogitsProcessor):
         tokens_to_remove = probs < scaled_min_p
         sorted_indices = paddle.argsort(scores, descending=True, axis=-1)
         sorted_indices_to_remove = paddle.take_along_axis(
-            tokens_to_remove.cast("int64"), sorted_indices, axis=-1
+            tokens_to_remove.astype("int64"), sorted_indices, axis=-1
         ).cast("bool")
         sorted_indices_to_remove[..., : self.min_tokens_to_keep] = False
 
-        sorted_indices = sorted_indices + paddle.arange(probs.shape[0], dtype="int64").unsqueeze(-1) * probs.shape[-1]
-        indices_to_remove = paddle.scatter(
-            sorted_indices_to_remove.flatten().cast("int64"),
-            sorted_indices.flatten(),
-            sorted_indices_to_remove.flatten().cast("int64"),
+        # sorted_indices = sorted_indices + paddle.arange(probs.shape[0], dtype="int64").unsqueeze(-1) * probs.shape[-1]
+        indices_to_remove = paddle.put_along_axis(
+            sorted_indices_to_remove.astype("int64"),
+            sorted_indices,
+            sorted_indices_to_remove.astype("int64"),
+            1
         )
-        indices_to_remove = paddle.cast(indices_to_remove, "bool").reshape(probs.shape)
+        indices_to_remove = paddle.cast(indices_to_remove, "bool")
         # Apply mask to scores
-        scores_processed = paddle.where(indices_to_remove, paddle.full_like(scores, self.filter_value), scores)
+        scores_processed = scores.masked_fill(indices_to_remove, self.filter_value)
         return scores_processed
 
 
@@ -690,16 +682,14 @@ class TypicalLogitsWarper(LogitsProcessor):
         # sorted_indices_to_remove = sorted_scores > sorted_scores.gather(1, last_ind.view(-1, 1))
         sorted_indices_to_remove[..., : self.min_tokens_to_keep] = False
 
-        sorted_indices = (
-            sorted_indices + paddle.arange(scores.shape[0], dtype="int64").unsqueeze(-1) * scores.shape[-1]
-        )
-        indices_to_remove = paddle.scatter(
-            sorted_indices_to_remove.flatten().cast("int64"),
-            sorted_indices.flatten(),
-            sorted_indices_to_remove.flatten().cast("int64"),
+        indices_to_remove = paddle.put_along_axis(
+            sorted_indices_to_remove.astype("int64"),
+            sorted_indices,
+            sorted_indices_to_remove.astype("int64"),
+            1
         )
         # indices_to_remove = sorted_indices_to_remove.scatter(1, sorted_indices, sorted_indices_to_remove)
-        indices_to_remove = paddle.cast(indices_to_remove, "bool").reshape(scores.shape)
+        indices_to_remove = paddle.cast(indices_to_remove, "bool")
         scores_processed = scores.masked_fill(indices_to_remove, self.filter_value)
         return scores_processed
 
@@ -2606,6 +2596,7 @@ class SynthIDTextWatermarkLogitsProcessor(LogitsProcessor):
     ):
         self.ngram_len = ngram_len
         self.keys = paddle.to_tensor(keys)
+        # TODO
         generator = paddle.framework.core.default_cuda_generator(int(paddle.device.get_device()[-1])).seed(
             sampling_table_seed
         )

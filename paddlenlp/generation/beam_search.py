@@ -20,7 +20,7 @@ from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
 import paddle
 
-from ..utils import add_start_docstrings
+from ..trainer.utils import add_start_docstrings
 from .beam_constraints import Constraint, ConstraintListState
 
 PROCESS_INPUTS_DOCSTRING = r"""
@@ -134,9 +134,6 @@ class BeamSearchScorer(BeamScorer):
             Batch Size of `input_ids` for which standard beam search decoding is run in parallel.
         num_beams (`int`):
             Number of beams for beam search.
-        device (`paddle.device`):
-            Defines the device type (*e.g.*, `"cpu"` or `"cuda"`) on which this instance of `BeamSearchScorer` will be
-            allocated.
         length_penalty (`float`, *optional*, defaults to 1.0):
             Exponential penalty to the length that is used with beam-based generation. It is applied as an exponent to
             the sequence length, which in turn is used to divide the score of the sequence. Since the score is the log
@@ -346,11 +343,11 @@ class BeamSearchScorer(BeamScorer):
                 beam_hyp.add(final_tokens, final_score, beam_indices=beam_index, generated_len=generated_len)
 
         # select the best hypotheses
-        sent_lengths = paddle.ones([batch_size * self.num_beam_hyps_to_keep], dtype=input_ids.dtype)
+        sent_lengths = input_ids.clone().view([batch_size * self.num_beam_hyps_to_keep])
         # sent_lengths = input_ids.new(batch_size * self.num_beam_hyps_to_keep)
         best = []
         best_indices = []
-        best_scores = paddle.zeros(batch_size * self.num_beam_hyps_to_keep)
+        best_scores = paddle.zeros([batch_size * self.num_beam_hyps_to_keep], dytpe="float32")
 
         # retrieve best hypotheses
         for i in range(batch_size):
@@ -376,7 +373,7 @@ class BeamSearchScorer(BeamScorer):
         sent_lengths_max = sent_lengths.max().item() + 1
         sent_max_len = min(sent_lengths_max, max_length) if max_length is not None else sent_lengths_max
         # decoded: paddle.Tensor = input_ids.new(batch_size * self.num_beam_hyps_to_keep, sent_max_len)
-        decoded = paddle.ones([batch_size * self.num_beam_hyps_to_keep, sent_max_len], dtype=input_ids.dtype)
+        decoded = input_ids.clone().view([batch_size * self.num_beam_hyps_to_keep, sent_max_len])
         if len(best_indices) > 0 and best_indices[0] is not None:
             indices = paddle.ones([batch_size * self.num_beam_hyps_to_keep, sent_max_len], dtype=input_ids.dtype)
             # indices: paddle.Tensor = input_ids.new(batch_size * self.num_beam_hyps_to_keep, sent_max_len)
@@ -425,9 +422,6 @@ class ConstrainedBeamSearchScorer(BeamScorer):
         constraints (`List[Constraint]`):
             A list of positive constraints represented as `Constraint` objects that must be fulfilled in the generation
             output. For more information, the documentation of [`Constraint`] should be read.
-        device (`paddle.device`):
-            Defines the device type (*e.g.*, `"cpu"` or `"cuda"`) on which this instance of `BeamSearchScorer` will be
-            allocated.
         length_penalty (`float`, *optional*, defaults to 1.0):
             Exponential penalty to the length that is used with beam-based generation. It is applied as an exponent to
             the sequence length, which in turn is used to divide the score of the sequence. Since the score is the log
@@ -454,7 +448,6 @@ class ConstrainedBeamSearchScorer(BeamScorer):
         batch_size: int,
         num_beams: int,
         constraints: List[Constraint],
-        device: paddle.device,
         length_penalty: Optional[float] = 1.0,
         do_early_stopping: Optional[Union[bool, str]] = False,
         num_beam_hyps_to_keep: Optional[int] = 1,
@@ -462,7 +455,6 @@ class ConstrainedBeamSearchScorer(BeamScorer):
         max_length: Optional[int] = None,
     ):
         self.num_beams = num_beams
-        self.device = device
         self.length_penalty = length_penalty
         self.do_early_stopping = do_early_stopping
         self.num_beam_hyps_to_keep = num_beam_hyps_to_keep
@@ -684,7 +676,6 @@ class ConstrainedBeamSearchScorer(BeamScorer):
         #     that fulfill our constraints.
 
         orig_len = sent_beam_indices.shape[0]
-        device = sent_beam_indices.device
 
         # initialize states
         topk_contraint_states = self.make_constraint_states(orig_len)
@@ -718,7 +709,7 @@ class ConstrainedBeamSearchScorer(BeamScorer):
             advance_state.reset(pre_seq.cpu().tolist())
 
             if not advance_state.completed:
-                advance_tokens = paddle.to_tensor(advance_state.advance()).to(device)
+                advance_tokens = paddle.to_tensor(advance_state.advance())
                 for advance_token in advance_tokens:
                     # since adding each `advance_token` leads to a different hypothesis, create new state instance.
                     new_state = advance_state.copy(stateful=True)
@@ -769,14 +760,14 @@ class ConstrainedBeamSearchScorer(BeamScorer):
                     track_new["new_states"].append(advance_state)
 
         if len(track_new["new_indices"]) > 0:
-            new_indices = paddle.Tensor(track_new["new_indices"]).to(device)
-            new_tokens = paddle.stack(track_new["new_tokens"]).to(device)
-            new_scores = paddle.stack(track_new["new_scores"]).to(device)
+            new_indices = paddle.to_tensor(track_new["new_indices"])
+            new_tokens = paddle.stack(track_new["new_tokens"])
+            new_scores = paddle.stack(track_new["new_scores"])
 
             all_states = topk_contraint_states + track_new["new_states"]
             all_tokens = paddle.concat((sent_beam_tokens, new_tokens), -1)
             all_scores = paddle.concat((sent_beam_scores, new_scores), -1)
-            all_banks = paddle.Tensor([one.get_bank() for one in all_states]).to(device)
+            all_banks = paddle.Tensor([one.get_bank() for one in all_states])
 
             zipped = all_banks * 100 + all_scores
             indices = zipped.sort(descending=True).indices
@@ -800,7 +791,7 @@ class ConstrainedBeamSearchScorer(BeamScorer):
 
             sent_beam_scores = all_scores[indices]
             sent_beam_tokens = all_tokens[indices]
-            sent_beam_indices = paddle.cat((sent_beam_indices, new_indices))[indices]
+            sent_beam_indices = paddle.concat((sent_beam_indices, new_indices))[indices]
 
         return sent_beam_scores, sent_beam_tokens, sent_beam_indices
 
@@ -858,8 +849,8 @@ class ConstrainedBeamSearchScorer(BeamScorer):
                         break
 
         # select the best hypotheses
-        sent_lengths = input_ids.new(batch_size * self.num_beam_hyps_to_keep)
-        sent_lengths = paddle.ones([batch_size * self.num_beam_hyps_to_keep], dtype=input_ids.dtype)
+        # sent_lengths = input_ids.new(batch_size * self.num_beam_hyps_to_keep)
+        sent_lengths = input_ids.clone().view([batch_size * self.num_beam_hyps_to_keep])
         best = []
         best_indices = []
         best_scores = paddle.zeros(batch_size * self.num_beam_hyps_to_keep, dtype="float32")
@@ -887,9 +878,9 @@ class ConstrainedBeamSearchScorer(BeamScorer):
 
         sent_max_len = min(sent_lengths_max, max_length) if max_length is not None else sent_lengths_max
         # decoded: paddle.Tensor = input_ids.new(batch_size * self.num_beam_hyps_to_keep, sent_max_len)
-        decoded = paddle.ones([batch_size * self.num_beam_hyps_to_keep, sent_max_len], dtype=input_ids.dtype)
+        decoded = input_ids.clone().view([batch_size * self.num_beam_hyps_to_keep, sent_max_len])
         if len(best_indices) > 0 and best_indices[0] is not None:
-            indices = paddle.ones([batch_size * self.num_beam_hyps_to_keep, sent_max_len], dtype=input_ids.dtype)
+            indices = input_ids.clone().view([batch_size * self.num_beam_hyps_to_keep, sent_max_len])
             # indices: paddle.Tensor = input_ids.new(batch_size * self.num_beam_hyps_to_keep, sent_max_len)
         else:
             indices = None

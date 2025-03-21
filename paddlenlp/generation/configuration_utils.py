@@ -20,7 +20,6 @@ import os
 import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, is_dataclass
-from enum import Enum
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
 
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
@@ -29,7 +28,7 @@ from paddlenlp.utils.log import logger
 
 from .. import __version__
 from ..utils import GENERATION_CONFIG_NAME
-
+from ..trainer import ExplicitEnum
 # from ..utils import (
 #     GENERATION_CONFIG_NAME,
 #     ExplicitEnum,
@@ -45,7 +44,7 @@ from ..utils import GENERATION_CONFIG_NAME
 if TYPE_CHECKING:
     from paddlenlp.transformers.model_utils import PretrainedModel
 
-from paddlenlp.utils.cache_utils import (  # HQQQuantizedCache,; QuantoQuantizedCache,
+from ..utils.cache_utils import (  # HQQQuantizedCache,; QuantoQuantizedCache,
     HybridCache,
     MambaCache,
     OffloadedStaticCache,
@@ -81,19 +80,6 @@ NEED_SETUP_CACHE_CLASSES_MAPPING = {
 ALL_CACHE_IMPLEMENTATIONS = (
     list(NEED_SETUP_CACHE_CLASSES_MAPPING.keys()) + list(CACHE_CONFIG_MAPPING.keys()) + ["offloaded"]
 )
-
-
-class ExplicitEnum(str, Enum):
-    """
-    Enum with more explicit error message for missing values.
-    """
-
-    @classmethod
-    def _missing_(cls, value):
-        raise ValueError(
-            f"{value} is not a valid {cls.__name__}, please select one of {list(cls._value2member_map_.keys())}"
-        )
-
 
 class GenerationMode(ExplicitEnum):
     """
@@ -1102,11 +1088,11 @@ class GenerationConfig:
         converts PaddlePaddle dtype to a string of just the type. For example, `paddle.float32` gets converted into *"float32"*
         string, which can then be stored in the json format.
         """
-        if "paddle_dtype" in d and d["paddle_dtype"] is not None and not isinstance(d["paddle_dtype"], str):
-            d["paddle_dtype"] = (
-                str(d["paddle_dtype"]).split(".")[1]
-                if hasattr(d["paddle_dtype"], "__name__")
-                else str(d["paddle_dtype"])
+        if "dtype" in d and d["dtype"] is not None and not isinstance(d["dtype"], str):
+            d["dtype"] = (
+                str(d["dtype"]).split(".")[1]
+                if hasattr(d["dtype"], "__name__")
+                else str(d["dtype"])
             )
 
         for key, value in d.items():
@@ -1263,14 +1249,14 @@ class GenerationConfig:
                     ):
                         setattr(generation_config, attr, decoder_config[attr])
 
-        # decoder_config = model_config.get_text_config(decoder=True)
-        # if decoder_config is not model_config:
-        #     default_generation_config = GenerationConfig()
-        #     decoder_config_dict = decoder_config.to_dict()
-        #     for attr in generation_config.to_dict().keys():
-        #         is_unset = getattr(generation_config, attr) == getattr(default_generation_config, attr)
-        #         if attr in decoder_config_dict and is_unset:
-        #             setattr(generation_config, attr, decoder_config_dict[attr])
+        decoder_config = model_config.get_text_config(decoder=True)
+        if decoder_config is not model_config:
+            default_generation_config = GenerationConfig()
+            decoder_config_dict = decoder_config.to_dict()
+            for attr in generation_config.to_dict().keys():
+                is_unset = getattr(generation_config, attr) == getattr(default_generation_config, attr)
+                if attr in decoder_config_dict and is_unset:
+                    setattr(generation_config, attr, decoder_config_dict[attr])
 
         # If any `output_...` flag is set to `True`, we ensure `return_dict_in_generate` is set to `True`.
         if generation_config.return_dict_in_generate is False:

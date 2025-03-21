@@ -262,14 +262,14 @@ class LogitsProcessorTest(unittest.TestCase):
         top_k_warp_safety_check = TopKLogitsWarper(top_k=1, filter_value=0.0, min_tokens_to_keep=3)
         scores = top_k_warp_safety_check(input_ids, logits)
         # uniform dist is not changed
-        self.assertListEqual((scores == paddle.finfo(scores.dtype).min).sum(axis=-1).tolist(), [0, 0])
+        self.assertListEqual((scores == 0).sum(axis=-1).tolist(), [0, 0])
 
         ramp_logits = paddle.arange(length).unsqueeze(0).tile((batch_size, 1))
         ramp_logits = ramp_logits.astype("float32")
         scores = top_k_warp_safety_check(input_ids, ramp_logits)
 
         # min_tokens overwrites k: 3 tokens are kept => 2 tokens are nullified
-        self.assertListEqual((scores == paddle.finfo(scores.dtype).min).sum(axis=-1).tolist(), [2, 2])
+        self.assertListEqual((scores == 0).sum(axis=-1).tolist(), [2, 2])
 
     def test_top_p_dist_warper(self):
         input_ids = None
@@ -332,10 +332,10 @@ class LogitsProcessorTest(unittest.TestCase):
 
         # make sure at least 2 tokens are kept
         min_p_warp = MinPLogitsWarper(0.9, min_tokens_to_keep=2, filter_value=0.0)
-        filtered_dist = min_p_warp(input_ids, ramp_logits.cast("float32"))
+        filtered_dist = min_p_warp(input_ids, ramp_logits.astype("float32"))
 
         # first batch should keep two tokens, second batch would keep only 1, but due to `min_tokens_to_keep=2` keeps 2.
-        self.assertListEqual((filtered_dist != 0.0).sum(axis=-1).tolist(), [3, 2])
+        self.assertListEqual((filtered_dist != 0.0).sum(axis=-1).tolist(), [2, 2])
 
     def test_typical_dist_warper(self):
         input_ids = None

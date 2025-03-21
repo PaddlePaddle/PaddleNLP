@@ -14,21 +14,19 @@
 # limitations under the License.
 
 import copy
-import importlib.util
 import weakref
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 
 import numpy as np
 import paddle
 
-# from ..utils import is_sklearn_available
+from ..utils.import_utils import is_sklearn_available
 
 
-if importlib.util.find_spec("sklearn") is not None:
-    is_sklearn_available = True
+if is_sklearn_available():
     from sklearn.metrics import roc_curve
 
-from paddlenlp.utils.cache_utils import DynamicCache
+from ..utils.cache_utils import DynamicCache
 
 from .logits_process import (
     LogitsProcessorList,

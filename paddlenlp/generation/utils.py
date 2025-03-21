@@ -26,10 +26,10 @@ import paddle.distributed as dist
 import paddle.nn as nn
 import paddle.nn.functional as F
 
-from paddlenlp.generation.candidate_generator import AssistantVocabTranslatorCache
-from paddlenlp.transformers import PretrainedConfig
-from paddlenlp.transformers.model_outputs import ModelOutput
-from paddlenlp.transformers.tokenizer_utils import ExtensionsTrie
+from .candidate_generator import AssistantVocabTranslatorCache
+from ..transformers import PretrainedConfig
+from ..transformers.model_outputs import ModelOutput
+from ..transformers.tokenizer_utils import ExtensionsTrie
 from paddlenlp.utils.cache_utils import (  # StaticCache,
     Cache,
     DynamicCache,
@@ -648,9 +648,12 @@ class GenerationMixin:
         is_input_ids = len(inputs_tensor.shape) == 2 and inputs_tensor.dtype in ["int32", "int64"]
         if not is_input_ids:
             return default_attention_mask
-
-        is_pad_token_in_inputs = pad_token_id is not None
-        is_pad_token_not_equal_to_eos_token_id = eos_token_id is None
+        is_pad_token_in_inputs = (pad_token_id is not None) and (
+            paddle.isin(elements=inputs_tensor, test_elements=pad_token_id).any()
+        )
+        is_pad_token_not_equal_to_eos_token_id = (eos_token_id is None) or ~(
+            paddle.isin(elements=eos_token_id, test_elements=pad_token_id).any()
+        )
         can_infer_attention_mask = is_pad_token_in_inputs * is_pad_token_not_equal_to_eos_token_id
         attention_mask_from_padding = inputs_tensor.not_equal(pad_token_id)
 
@@ -668,14 +671,6 @@ class GenerationMixin:
     ) -> Dict[str, Any]:
         # 1. get encoder
         encoder = self.get_encoder()
-        # Compatibility with Accelerate big model inference: we need the encoder to outputs stuff on the same device
-        # as the inputs.
-        if hasattr(self, "hf_device_map"):
-            if hasattr(encoder, "_hf_hook"):
-                encoder._hf_hook.io_same_device = True
-            # else:
-            #     add_hook_to_module(encoder, AlignDevicesHook(io_same_device=True))
-
         # 2. Prepare encoder args and encoder kwargs from model kwargs and generation config.
         irrelevant_prefix = ["decoder_", "cross_attn", "use_cache"]
         encoder_kwargs = {
@@ -1364,18 +1359,18 @@ class GenerationMixin:
         # TODO(joao): remove this function in v4.50, i.e. when we remove the inheritance of `GenerationMixin` from
         # `PreTrainedModel`. With that inheritance removed, all model classes inheriting from `GenerationMixin` can
         # safely call `GenerationMixin.generate`
-        # if not self.can_generate():
-        #     terminations_with_generation_support = [
-        #         "ForCausalLM",
-        #         "ForConditionalGeneration",
-        #         "ForSpeechSeq2Seq",
-        #         "ForVision2Seq",
-        #     ]
-        #     raise TypeError(
-        #         f"The current model class ({self.__class__.__name__}) is not compatible with `.generate()`, as "
-        #         "it doesn't have a language model head. Classes that support generation often end in one of these "
-        #         f"names: {terminations_with_generation_support}."
-        #     )
+        if not self.can_generate():
+            terminations_with_generation_support = [
+                "ForCausalLM",
+                "ForConditionalGeneration",
+                "ForSpeechSeq2Seq",
+                "ForVision2Seq",
+            ]
+            raise TypeError(
+                f"The current model class ({self.__class__.__name__}) is not compatible with `.generate()`, as "
+                "it doesn't have a language model head. Classes that support generation often end in one of these "
+                f"names: {terminations_with_generation_support}."
+            )
 
     def _validate_assistant(self, assistant_model, tokenizer, assistant_tokenizer):
         if assistant_model is None:

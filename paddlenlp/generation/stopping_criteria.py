@@ -23,9 +23,8 @@ import numpy as np
 import paddle
 import paddle.nn.functional as F
 
-from paddlenlp.utils.log import logger
-
-from ..utils import add_start_docstrings
+from ..utils.log import logger
+from ..trainer.utils import add_start_docstrings
 
 # from ..tokenization_utils_base import PreTrainedTokenizerBase
 
