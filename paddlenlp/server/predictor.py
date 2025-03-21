@@ -21,6 +21,7 @@ from multiprocessing import cpu_count
 
 import paddle
 
+from ..utils.env import PADDLE_INFERENCE_MODEL_SUFFIX, PADDLE_INFERENCE_WEIGHTS_SUFFIX
 from ..utils.log import logger
 
 
@@ -40,13 +41,15 @@ class Predictor:
 
     def _get_default_static_model_path(self):
         # The model path had the static_model_path
-        static_model_path = os.path.join(self._model_path, self._default_static_model_path, "inference.pdmodel")
+        static_model_path = os.path.join(
+            self._model_path, self._default_static_model_path, f"inference{PADDLE_INFERENCE_MODEL_SUFFIX}"
+        )
         if os.path.exists(static_model_path):
             return os.path.join(self._model_path, self._default_static_model_path, "inference")
         for file_name in os.listdir(self._model_path):
             # FIXME(wawltor) The path maybe not correct
-            if file_name.count(".pdmodel"):
-                return os.path.join(self._model_path, file_name[:-8])
+            if file_name.count(PADDLE_INFERENCE_MODEL_SUFFIX):
+                return os.path.join(self._model_path, file_name[: -len(PADDLE_INFERENCE_MODEL_SUFFIX)])
         return None
 
     def _is_int8_model(self, model_path):
@@ -110,7 +113,10 @@ class Predictor:
         """
         Construct the input data and predictor in the PaddlePaddele static mode.
         """
-        self._config = paddle.inference.Config(static_model_path + ".pdmodel", static_model_path + ".pdiparams")
+        self._config = paddle.inference.Config(
+            static_model_path + PADDLE_INFERENCE_MODEL_SUFFIX,
+            static_model_path + PADDLE_INFERENCE_WEIGHTS_SUFFIX,
+        )
         self._config.disable_glog_info()
         if paddle.get_device() == "cpu":
             self._config.disable_gpu()
@@ -146,7 +152,7 @@ class Predictor:
             os.mkdir(onnx_dir)
         float_onnx_file = os.path.join(onnx_dir, "model.onnx")
         if not os.path.exists(float_onnx_file):
-            model_path = static_model_path + ".pdmodel"
+            model_path = static_model_path + PADDLE_INFERENCE_MODEL_SUFFIX
             params_file = static_model_path + ".pdiparams"
             onnx_model = paddle2onnx.command.c_paddle_to_onnx(
                 model_file=model_path, params_file=params_file, opset_version=13, enable_onnx_checker=True

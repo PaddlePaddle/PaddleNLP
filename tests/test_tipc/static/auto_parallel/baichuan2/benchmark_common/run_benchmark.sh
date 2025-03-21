@@ -24,6 +24,9 @@ function _set_params(){
     fp_item="bf16"
     MODEL_TYPE=${model_type:-"baichuan2_13b"}
 
+    # for intermediate api
+    intermediate_api=${intermediate_api:-""}
+
     ip_lists=($(echo $TRAINER_INSTANCES | tr ',' ' '))
     master_ip=${ip_lists[0]}
     nnodes=${nnodes:-1}
@@ -170,17 +173,17 @@ function _train(){
         train_cmd="python -u -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
             --nnodes 1 --nproc_per_node 8 \
             --log_dir mylog run_pretrain_auto.py \
-            ./pretrain_config_${MODEL_TYPE}/pretrain-${MODEL_TYPE}.json"
+            ./pretrain_config_${MODEL_TYPE}/${intermediate_api}pretrain-${MODEL_TYPE}.json"
         ;;
     N4C32) echo "Run with: device_num=${device_num} run_mode=${run_mode}"
         train_cmd="python -u -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
             --log_dir mylog run_pretrain_auto.py \
-            ./pretrain_config_${MODEL_TYPE}/pretrain-${MODEL_TYPE}.json"
+            ./pretrain_config_${MODEL_TYPE}/${intermediate_api}pretrain-${MODEL_TYPE}.json"
         ;;
     *) echo "Run with: device_num=${device_num}, run_mode=${run_mode}"
         train_cmd="python -u -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
             --log_dir mylog run_pretrain_auto.py \
-            ./pretrain_config_${MODEL_TYPE}/pretrain-${MODEL_TYPE}.json"
+            ./pretrain_config_${MODEL_TYPE}/${intermediate_api}pretrain-${MODEL_TYPE}.json"
         ;;
     esac
     cd ../llm/auto_parallel/llama
@@ -242,6 +245,8 @@ export FLAGS_enable_sharding_stage1_tensor_fusion=1
 # 只有13b的任务需要打开CUDA_DEVICE_MAX_CONNECTIONS,7b与13b关闭
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export PARALLEL_CROSS_ENTROPY=true
+# benchmark框架中会默认设置CUDA_MODULE_LOADING=LAZY,影响case执行，修复框架问题后再移除该变量
+unset CUDA_MODULE_LOADING
 
 source ${BENCHMARK_ROOT}/scripts/run_model.sh   # 在该脚本中会对符合benchmark规范的log使用analysis.py 脚本进行性能数据解析;如果不联调只想要产出训练log可以注掉本行,提交时需打开
 _set_params $@

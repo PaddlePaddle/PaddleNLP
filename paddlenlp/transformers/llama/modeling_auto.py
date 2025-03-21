@@ -52,7 +52,9 @@ from paddlenlp.transformers.model_outputs import (
     CausalLMOutputWithCrossAttentions,
 )
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
+from paddlenlp.utils.tools import get_env_device
 
+from . import fusion_ops
 from .configuration import (
     LLAMA_PRETRAINED_INIT_CONFIGURATION,
     LLAMA_PRETRAINED_RESOURCE_FILES_MAP,
@@ -69,7 +71,6 @@ from .modeling import (
     build_alibi_tensor,
     get_triangle_upper_mask,
     repeat_kv,
-    rms_norm_fused,
 )
 
 try:
@@ -141,14 +142,8 @@ def scaled_dot_product_attention(
                 return_softmax=output_attentions,
             )
         else:
-            if alibi is not None:
-                attention_mask = attention_mask.cast(alibi.dtype) + alibi
-            attn_output = F.scaled_dot_product_attention(
-                query_states,
-                key_states,
-                value_states,
-                attn_mask=attention_mask,
-                is_causal=attention_mask is None and query_states.shape[1] != 1,
+            attn_output = fusion_ops.fusion_flash_attention(
+                query_states, config, key_states, value_states, attention_mask, output_attentions, alibi
             )
             attn_weights = None
 
@@ -194,6 +189,10 @@ def scaled_dot_product_attention(
         return (attn_output, attn_weights) if output_attentions else attn_output
 
 
+colwise_placements = [dist.Replicate(), dist.Shard(1)]
+rowise_placement = [dist.Replicate(), dist.Shard(0)]
+
+
 class LlamaRMSNormAuto(nn.Layer):
     def __init__(self, config, ipp):
         super().__init__()
@@ -214,7 +213,9 @@ class LlamaRMSNormAuto(nn.Layer):
 
     def forward(self, hidden_states):
         if self.config.use_fused_rms_norm:
-            return rms_norm_fused(hidden_states, self.weight, self.variance_epsilon)
+            return fusion_ops.fusion_rms_norm(
+                hidden_states, self.weight, self.variance_epsilon, self.config.use_fast_layer_norm
+            )
 
         with paddle.amp.auto_cast(False):
             variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
@@ -240,28 +241,28 @@ class LlamaMLPAuto(nn.Layer):
             self.gate_up_fused_proj.weight = dist.shard_tensor(
                 self.gate_up_fused_proj.weight,
                 get_mesh(self.ipp),
-                [dist.Replicate(), dist.Shard(1)],
+                colwise_placements,
             )
         else:
             self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
             self.gate_proj.weight = dist.shard_tensor(
                 self.gate_proj.weight,
                 get_mesh(self.ipp),
-                [dist.Replicate(), dist.Shard(1)],
+                colwise_placements,
             )
 
             self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
             self.up_proj.weight = dist.shard_tensor(
                 self.up_proj.weight,
                 get_mesh(self.ipp),
-                [dist.Replicate(), dist.Shard(1)],
+                colwise_placements,
             )
 
         self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
         self.down_proj.weight = dist.shard_tensor(
             self.down_proj.weight,
             get_mesh(self.ipp),
-            [dist.Replicate(), dist.Shard(0)],
+            rowise_placement,
         )
 
     def forward(self, x):
@@ -304,7 +305,7 @@ class LlamaAttentionAuto(nn.Layer):
         self.ipp = ipp
 
         self.use_fused_rope = config.use_fused_rope
-        if self.use_fused_rope:
+        if self.use_fused_rope and get_env_device() not in ["npu", "mlu", "xpu", "gcu", "intel_hpu"]:
             if "gpu" not in paddle.device.get_device() or fused_rotary_position_embedding is None:
                 warnings.warn(
                     "Enable fuse rope in the config, but fuse rope is not available. "
@@ -321,7 +322,7 @@ class LlamaAttentionAuto(nn.Layer):
             self.qkv_proj.weight = dist.shard_tensor(
                 self.qkv_proj.weight,
                 get_mesh(self.ipp),
-                [dist.Replicate(), dist.Shard(1)],
+                colwise_placements,
             )
 
         else:
@@ -333,7 +334,7 @@ class LlamaAttentionAuto(nn.Layer):
             self.q_proj.weight = dist.shard_tensor(
                 self.q_proj.weight,
                 get_mesh(self.ipp),
-                [dist.Replicate(), dist.Shard(1)],
+                colwise_placements,
             )
 
             self.k_proj = nn.Linear(
@@ -344,7 +345,7 @@ class LlamaAttentionAuto(nn.Layer):
             self.k_proj.weight = dist.shard_tensor(
                 self.k_proj.weight,
                 get_mesh(self.ipp),
-                [dist.Replicate(), dist.Shard(1)],
+                colwise_placements,
             )
 
             self.v_proj = nn.Linear(
@@ -355,7 +356,7 @@ class LlamaAttentionAuto(nn.Layer):
             self.v_proj.weight = dist.shard_tensor(
                 self.v_proj.weight,
                 get_mesh(self.ipp),
-                [dist.Replicate(), dist.Shard(1)],
+                colwise_placements,
             )
 
         self.o_proj = nn.Linear(
@@ -366,7 +367,7 @@ class LlamaAttentionAuto(nn.Layer):
         self.o_proj.weight = dist.shard_tensor(
             self.o_proj.weight,
             get_mesh(self.ipp),
-            [dist.Replicate(), dist.Shard(0)],
+            rowise_placement,
         )
 
         if config.rope:
@@ -515,9 +516,10 @@ class LlamaAttentionAuto(nn.Layer):
         # repeat k/v heads if n_kv_heads < n_heads
         # paddle version > 2.6 or develop support flash-attn with gqa/mqa
         paddle_version = float(paddle.__version__[:3])
-        if (paddle_version != 0.0) and (paddle_version <= 2.6):
+        if not self.config.use_flash_attention or (paddle_version != 0.0) and (paddle_version <= 2.6):
             key_states = repeat_kv(key_states, self.num_key_value_groups)
             value_states = repeat_kv(value_states, self.num_key_value_groups)
+
         attention_mask = (
             dist.reshard(attention_mask, get_mesh(self.ipp), [dist.Shard(0), dist.Replicate()])
             if attention_mask is not None
@@ -930,7 +932,22 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
         else:
             expanded_attn_mask = _make_causal_mask(input_shape, past_key_values_length=past_key_values_length)
         # Convert bool attention_mask to float attention mask, which will be added to attention_scores later
-        expanded_attn_mask = paddle.where(expanded_attn_mask, 0.0, paddle.finfo(dtype).min).astype(dtype)
+        if get_env_device() in ["npu", "mlu", "intel_hpu"]:
+            x = paddle.to_tensor(0.0, dtype="float32")
+            y = paddle.to_tensor(paddle.finfo(dtype).min, dtype="float32")
+            expanded_attn_mask = paddle.where(expanded_attn_mask.cast("bool"), x, y).astype(dtype)
+        elif get_env_device() == "xpu":
+            x = paddle.to_tensor(0.0, dtype="float32")
+            y = paddle.to_tensor(-1.7005809656952787e38, dtype="float32")
+            expanded_attn_mask = paddle.where(expanded_attn_mask.cast("bool"), x, y)
+        elif get_env_device() == "gcu":
+            min_val = paddle.finfo(dtype).min
+            x = paddle.to_tensor(0.0, dtype=dtype)
+            y = paddle.to_tensor(min_val, dtype=dtype)
+            expanded_attn_mask = paddle.where(expanded_attn_mask.cast("bool"), x, y).astype(dtype)
+        else:
+            expanded_attn_mask = paddle.where(expanded_attn_mask, 0.0, paddle.finfo(dtype).min)
+            expanded_attn_mask = expanded_attn_mask.astype(dtype)
         return expanded_attn_mask
 
     def forward(
@@ -1033,6 +1050,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             if not is_pp_enable():
                 position_ids_input = position_ids
                 attention_mask_input = attention_mask
+                alibi_input = alibi
             else:
                 if position_ids is not None:
                     position_ids_input = dist.reshard(
@@ -1051,14 +1069,15 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
                     if attention_mask is not None
                     else None
                 )
-                if alibi is not None:
-                    pp_mesh = get_mesh(ipp)
-                    alibi_place = [dist.Replicate() for _ in range(len(pp_mesh._shape))]
-                    alibi = dist.reshard(
+                alibi_input = (
+                    dist.reshard(
                         alibi,
-                        pp_mesh,
-                        alibi_place,
+                        get_mesh(ipp),
+                        [dist.Replicate(), dist.Replicate()],
                     )
+                    if alibi is not None
+                    else None
+                )
             if idx in self.next_pp_stage_indexes:
                 hidden_states = dist.reshard(
                     hidden_states,
@@ -1080,7 +1099,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
                     output_attentions,
                     past_key_value,
                     use_cache,
-                    alibi=alibi,
+                    alibi_input,
                 )
             else:
                 layer_outputs = decoder_layer(
@@ -1090,7 +1109,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
                     output_attentions,
                     past_key_value,
                     use_cache,
-                    alibi=alibi,
+                    alibi_input,
                 )
 
             if type(layer_outputs) is tuple:
@@ -1159,8 +1178,33 @@ class LlamaPretrainingCriterion3DAuto(paddle.nn.Layer):
                     masked_lm_labels.unsqueeze(2),
                 )
 
-            masked_lm_loss = paddle.masked_select(masked_lm_loss, masked_lm_loss > 0).astype("float32")
-            loss = paddle.mean(masked_lm_loss)
+            # XPU dose not support allgather mask with bool dtype, so we use LocalLayer here.
+            if get_env_device() == "xpu":
+
+                class LocalLossLayer(paddle.distributed.LocalLayer):
+                    def __init__(self, out_dist_attrs, grad_dist_attrs):
+                        super().__init__(out_dist_attrs, grad_dist_attrs)
+
+                    def forward(self, x, mask):
+                        masked_lm_loss = paddle.masked_select(x, mask).astype("float32")
+                        loss = paddle.mean(masked_lm_loss).unsqueeze(0)
+                        return loss.unsqueeze(0)
+
+                out_dist_attrs = [
+                    (masked_lm_loss.process_mesh, [dist.Shard(0), dist.Replicate()]),
+                ]
+                grad_dist_attrs = [
+                    (masked_lm_loss.process_mesh, [dist.Shard(0), dist.Replicate()]),
+                    None,
+                ]
+                loss_func = LocalLossLayer(out_dist_attrs, grad_dist_attrs)
+
+                loss = loss_func(masked_lm_loss, masked_lm_loss > 0)
+                loss = loss.mean()
+            else:
+                masked_lm_loss = paddle.masked_select(masked_lm_loss, masked_lm_loss > 0).astype("float32")
+                loss = paddle.mean(masked_lm_loss)
+
         return loss
 
 
@@ -1168,6 +1212,7 @@ class LlamaLMHeadAuto(nn.Layer):
     def __init__(self, config: LlamaConfig):
         super(LlamaLMHeadAuto, self).__init__()
         self.config = config
+
         vocab_size = config.vocab_size
         self.weight = self.create_parameter(
             shape=[config.hidden_size, vocab_size],
@@ -1176,7 +1221,7 @@ class LlamaLMHeadAuto(nn.Layer):
         self.weight = dist.shard_tensor(
             self.weight,
             get_mesh(-1),
-            [dist.Replicate(), dist.Shard(1)],
+            colwise_placements,
         )
 
     def forward(self, hidden_states, tensor_parallel_output=None):
@@ -1319,20 +1364,3 @@ class LlamaForCausalLM3DAuto(LlamaPretrainedModelAuto):
         logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
 
         return logits
-
-        # loss = None
-        # if labels is not None:
-        #     labels.stop_gradient = True
-        #     loss = self.criterion(logits, labels)
-
-        # if not return_dict:
-        #     output = (logits,) + outputs[1:]
-        #     return (loss,) + output if loss is not None else output
-
-        # return CausalLMOutputWithCrossAttentions(
-        #     loss=loss,
-        #     logits=logits,
-        #     past_key_values=outputs.past_key_values,
-        #     hidden_states=outputs.hidden_states,
-        #     attentions=outputs.attentions,
-        # )

@@ -56,6 +56,8 @@ CONFIG_MAPPING_NAMES = OrderedDict(
         ("dallebart", "DalleBartConfig"),
         ("deberta", "DebertaConfig"),
         ("debertav2", "DebertaV2Config"),
+        ("deepseek_v2", "DeepseekV2Config"),
+        ("deepseek_v3", "DeepseekV3Config"),
         ("distilbert", "DistilBertConfig"),
         ("dpt", "DPTConfig"),
         ("electra", "ElectraConfig"),
@@ -113,6 +115,7 @@ CONFIG_MAPPING_NAMES = OrderedDict(
         ("unimo", "UNIMOConfig"),
         ("visualglm", "VisualGLMConfig"),
         ("xlm", "XLMConfig"),
+        ("xlm-roberta", "XLMRobertaConfig"),
         ("xlnet", "XLNetConfig"),
         ("yuan", "YuanConfig"),
     ]
@@ -145,6 +148,8 @@ MODEL_NAMES_MAPPING = OrderedDict(
         ("dallebart", "DalleBart"),
         ("deberta", "Deberta"),
         ("debertav2", "DebertaV2"),
+        ("deepseek_v2", "DeepseekV2"),
+        ("deepseek_v3", "DeepseekV3"),
         ("distilbert", "DistilBert"),
         ("dpt", "DPT"),
         ("electra", "Electra"),
@@ -202,8 +207,17 @@ MODEL_NAMES_MAPPING = OrderedDict(
         ("unimo", "UNIMO"),
         ("visualglm", "VisualGLM"),
         ("xlm", "XLM"),
+        ("xlm-roberta", "XLMRoberta"),
         ("xlnet", "XLNet"),
         ("yuan", "Yuan"),
+    ]
+)
+
+MULTI_MODELS_MAPPING = OrderedDict(
+    # multi models mapping
+    [
+        ("qwen2_vl", "qwen2"),
+        ("qwen2_5_vl", "qwen2"),
     ]
 )
 
@@ -232,8 +246,9 @@ class _LazyConfigMapping(OrderedDict):
 
     def __getitem__(self, key):
         # NOTE: (changwenbin) This is to enable the qwen2_vl language model to use qwen2 reasoning optimization
-        if key == "qwen2_vl":
-            key = "qwen2"
+        for model_type, model_key in MULTI_MODELS_MAPPING.items():
+            if key == model_type:
+                key = model_key
         if key in self._extra_content:
             return self._extra_content[key]
         if key not in self._mapping:

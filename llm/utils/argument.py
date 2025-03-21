@@ -76,6 +76,10 @@ class EmbeddingArgument:
             )
         },
     )
+    return_position_ids: bool = field(
+        default=True,
+        metadata={"help": "Whether to return position ids for each sentence."},
+    )
     embedding_temperature: float = field(
         default=0.02,
         metadata={"help": "The temperature used in embedding learning."},
@@ -87,4 +91,12 @@ class EmbeddingArgument:
     embedding_matryoshka_dims: Optional[List[int]] = field(
         default=None,
         metadata={"help": "The dims for matryoshka training."},
+    )
+    loss_type: str = field(
+        default="contrastive",
+        metadata={"help": "The type of loss computation."},
+    )
+    inf_cl_head_dim: int = field(
+        default=64,
+        metadata={"help": "The size of the head dimension when gpu ops are set as 'inf_cl'."},
     )

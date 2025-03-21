@@ -21,9 +21,12 @@ from paddle.distributed import fleet
 from paddlenlp.trainer import Trainer
 from paddlenlp.transformers.contrastive_loss import (
     MatryoshkaContrastiveLoss,
+    MatryoshkaInfclLoss,
     SimpleContrastiveLoss,
+    SimpleInfclLoss,
 )
 from paddlenlp.transformers.embedding_utils import dist_gather_tensor_with_gradient
+from paddlenlp.utils import empty_device_cache
 
 __all__ = ["EmbeddingTrainer"]
 
@@ -44,16 +47,24 @@ class EmbeddingTrainer(Trainer):
         self.accum_rng_states["hybrid"] = []
 
         if model_args.embedding_matryoshka_dims is not None and len(model_args.embedding_matryoshka_dims) > 0:
-            self.loss_fn = MatryoshkaContrastiveLoss(
-                model_args.embedding_temperature, model_args.embedding_matryoshka_dims
-            )
+            if model_args.loss_type == "inf_cl":
+                self.embedding_negatives_cross_device = False
+                self.loss_fn = MatryoshkaInfclLoss(model_args.embedding_matryoshka_dims, model_args.inf_cl_head_dim)
+            elif model_args.loss_type == "contrastive":
+                self.loss_fn = MatryoshkaContrastiveLoss(
+                    model_args.embedding_temperature, model_args.embedding_matryoshka_dims
+                )
         else:
-            self.loss_fn = SimpleContrastiveLoss(model_args.embedding_temperature)
+            if model_args.loss_type == "inf_cl":
+                self.embedding_negatives_cross_device = False
+                self.loss_fn = SimpleInfclLoss(model_args.inf_cl_head_dim)
+            elif model_args.loss_type == "contrastive":
+                self.loss_fn = SimpleContrastiveLoss(model_args.embedding_temperature)
 
     def clear_memory(self):
         self.accum_q_features.clear()
         self.accum_p_features.clear()
-        paddle.device.cuda.empty_cache()
+        empty_device_cache()
 
     def clear_state(self):
         self.accum_data.clear()

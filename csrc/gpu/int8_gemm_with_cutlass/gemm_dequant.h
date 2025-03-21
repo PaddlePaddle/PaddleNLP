@@ -1582,3 +1582,12 @@ class GemmDequant {
 };
 
 }  // namespace cutlass
+
+typedef struct {
+  void const* act;
+  void const* weight;
+  void const* scale;
+  void* output;
+  int32_t m, n, k;
+  cudaStream_t stream;
+} GemmDequantParams;

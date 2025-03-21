@@ -76,6 +76,208 @@ __all__ = [
 ]
 
 
+def convert_to_unicode(text):
+    """
+    Converts `text` to Unicode (if it's not already), assuming utf-8 input.
+    Args:
+        text (str|bytes): Text to be converted to unicode.
+    Returns:
+        str: converted text.
+    """
+    if isinstance(text, str):
+        return text
+    elif isinstance(text, bytes):
+        return text.decode("utf-8", "ignore")
+    else:
+        raise ValueError("Unsupported string type: %s" % (type(text)))
+
+
+def whitespace_tokenize(text):
+    """
+    Runs basic whitespace cleaning and splitting on a piece of text.
+    Args:
+        text (str): Text to be tokenized.
+    Returns:
+        list(str): Token list.
+    """
+    text = text.strip()
+    if not text:
+        return []
+    tokens = text.split()
+    return tokens
+
+
+def _is_whitespace(char):
+    """
+    Checks whether `chars` is a whitespace character.
+    """
+    # \t, \n, and \r are technically control characters but we treat them
+    # as whitespace since they are generally considered as such.
+    if char == " " or char == "\t" or char == "\n" or char == "\r":
+        return True
+    cat = unicodedata.category(char)
+    if cat == "Zs":
+        return True
+    return False
+
+
+def _is_control(char):
+    """Checks whether `chars` is a control character."""
+    # These are technically control characters but we count them as whitespace
+    # characters.
+    if char == "\t" or char == "\n" or char == "\r":
+        return False
+    cat = unicodedata.category(char)
+    if cat.startswith("C"):
+        return True
+    return False
+
+
+def _is_punctuation(char):
+    """Checks whether `chars` is a punctuation character."""
+    cp = ord(char)
+    # We treat all non-letter/number ASCII as punctuation.
+    # Characters such as "^", "$", and "`" are not in the Unicode
+    # Punctuation class but we treat them as punctuation anyways, for
+    # consistency.
+    if (cp >= 33 and cp <= 47) or (cp >= 58 and cp <= 64) or (cp >= 91 and cp <= 96) or (cp >= 123 and cp <= 126):
+        return True
+    cat = unicodedata.category(char)
+    if cat.startswith("P"):
+        return True
+    return False
+
+
+def _is_end_of_word(text):
+    """Checks whether the last character in text is one of a punctuation, control or whitespace character."""
+    last_char = text[-1]
+    return bool(_is_control(last_char) | _is_punctuation(last_char) | _is_whitespace(last_char))
+
+
+def _is_start_of_word(text):
+    """Checks whether the first character in text is one of a punctuation, control or whitespace character."""
+    first_char = text[0]
+    return bool(_is_control(first_char) | _is_punctuation(first_char) | _is_whitespace(first_char))
+
+
+def _insert_one_token_to_ordered_list(token_list: List[str], new_token: str):
+    """
+    Inserts one token to an ordered list if it does not already exist. Note: token_list must be sorted.
+    """
+    insertion_idx = bisect.bisect_left(token_list, new_token)
+    # Checks if new_token is already in the ordered token_list
+    if insertion_idx < len(token_list) and token_list[insertion_idx] == new_token:
+        # new_token is in token_list, don't add
+        return
+    else:
+        token_list.insert(insertion_idx, new_token)
+
+
+def is_chinese_char(cp):
+    """Checks whether CP is the codepoint of a CJK character."""
+    # This defines a "chinese character" as anything in the CJK Unicode block:
+    #     https://en.wikipedia.org/wiki/CJK_Unified_Ideographs_(Unicode_block)
+    #
+    # Note that the CJK Unicode block is NOT all Japanese and Korean characters,
+    # despite its name. The modern Korean Hangul alphabet is a different block,
+    # as is Japanese Hiragana and Katakana. Those alphabets are used to write
+    # space-separated words, so they are not treated specially and handled
+    # like the all of the other languages.
+    if (
+        (cp >= 0x4E00 and cp <= 0x9FFF)
+        or (cp >= 0x3400 and cp <= 0x4DBF)  #
+        or (cp >= 0x20000 and cp <= 0x2A6DF)  #
+        or (cp >= 0x2A700 and cp <= 0x2B73F)  #
+        or (cp >= 0x2B740 and cp <= 0x2B81F)  #
+        or (cp >= 0x2B820 and cp <= 0x2CEAF)  #
+        or (cp >= 0xF900 and cp <= 0xFAFF)
+        or (cp >= 0x2F800 and cp <= 0x2FA1F)  #
+    ):  #
+        return True
+
+    return False
+
+
+def _is_nonnormalized_char(char):
+    """Check whther `chars` is a non-normalized character."""
+    cp = ord(char)
+    if (
+        (0xFF00 <= cp <= 0xFFEF)
+        or (0xFE50 <= cp <= 0xFE6B)  # Halfwidth and Fullwidth Forms
+        or (0x3358 <= cp <= 0x33FF)  # Small Form Variants
+        or (0x249C <= cp <= 0x24E9)  # CJK Compatibility
+        or (0x3200 <= cp <= 0x32FF)  # Enclosed Alphanumerics: Ⓛ ⒰
+    ):  # Enclosed CJK Letters and Months
+        return True
+
+    return False
+
+
+def _is_nonnormalized_numeric(char):
+    """Check whether `chars` is a non-normalized numeric character."""
+    cp = ord(char)
+    if (
+        (0x2460 <= cp <= 0x249B)
+        or (0x24EA <= cp <= 0x24FF)  #
+        or (0x2776 <= cp <= 0x2793)  #
+        or (0x2160 <= cp <= 0x217F)  # Enclosed Alphanumerics
+    ):  # Number Forms
+        return True
+
+    return False
+
+
+def normalize_chars(text):
+    """
+    Normalize the text for multiligual and chinese models. Unicode range:
+    https://www.ling.upenn.edu/courses/Spring_2003/ling538/UnicodeRanges.html
+    """
+    output = []
+    for char in text:
+        if _is_nonnormalized_char(char):
+            for c in unicodedata.normalize("NFKC", char):
+                output.append(c)
+        elif _is_nonnormalized_numeric(char):
+            output.append(" ")
+            for c in str(int(unicodedata.numeric(char))):
+                output.append(c)
+            output.append(" ")
+        elif ord(char) == 0xF979:  # https://www.zhihu.com/question/20697984
+            output.append("凉")
+        else:
+            output.append(char)
+    return "".join(output)
+
+
+def _is_symbol(char):
+    """Check whether CP is the codepoint of a Symbol character."""
+    cp = ord(char)
+    if unicodedata.category(char).startswith("S") or (
+        cp in [0x00AD, 0x00B2, 0x00BA, 0x3007, 0x00B5, 0x00D8, 0x014B, 0x01B1]
+    ):
+        return True
+    return False
+
+
+def tokenize_special_chars(text):
+    """Adds whitespace around any special character."""
+    output = []
+    for char in text:
+        cp = ord(char)
+        if (
+            (0x3040 <= cp <= 0x30FF)
+            or (0x0370 <= cp <= 0x04FF)  # Japanese
+            or (0x0250 <= cp <= 0x02AF)  # Greek/Coptic & Cyrillic
+            or _is_symbol(char)  # IPA
+        ):
+            output.append(" ")
+            output.append(char)
+            output.append(" ")
+        else:
+            output.append(char)
+    return "".join(output)
+
+
 class Trie:
     """
     Trie in Python. Creates a Trie out of a list of words. The trie is used to split on `added_tokens` in one pass
@@ -859,7 +1061,9 @@ class ChatTemplateMixin:
             ans.append(ans_roundi)
 
         non_learnable_parts = self._extract_non_learnable_parts(origin_msg, ans)
-        assert len(non_learnable_parts) == len(ans)
+        assert len(non_learnable_parts) == len(
+            ans
+        ), f"Get non_learnable_parts len: {len(non_learnable_parts)}, but ans len: {len(ans)}."
 
         conversation_ids = []
         for i in range(len(non_learnable_parts)):

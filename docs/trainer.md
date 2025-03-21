@@ -524,9 +524,9 @@ Trainer 是一个简单，但功能完整的 Paddle 训练和评估模块，并�
                         (注: 该方法对通信开销较大, 建议 tensor_parallel_degree<=8, 尽量使用机器内部通信)
 
                         Tensor parallelism is a parallel technique which proposed in (https://arxiv.org/pdf/2104.04473.pdf see 2.3 Tensor Model Parallelism).
-                        This techique splits one transformer layer into multi-cards (For examples, tensor_parallel_degree=4, will split a layer to 4-parts)
+                        This technique splits one transformer layer into multi-cards (For examples, tensor_parallel_degree=4, will split a layer to 4-parts)
                         tensor_parallel_degree means split the transformer layer to how many parts.
-                        default -1 for not use tensor parallel,  Suggest tensor_parallel_degree<=8 for better proformance.
+                        default -1 for not use tensor parallel,  Suggest tensor_parallel_degree<=8 for better performance.
                         Note, this need model support in source code, currently GPT/BLOOM/LLAMA/BLOOM/CLM/CHATGLM is supported.
 
   --tensor_parallel_config
@@ -567,10 +567,10 @@ Trainer 是一个简单，但功能完整的 Paddle 训练和评估模块，并�
                             enable_dp_comm_overlap : 开启PP+DP使用时候的通信优化.
                             enable_delay_scale_loss : 开启, 使得梯度累积, 先累积最后除以累积次数. 而不是每次除以累积次数.
 
-                        Some additional config it highly affect the useage of pipeline parallel, we provide some option to config it.
+                        Some additional config it highly affect the usage of pipeline parallel, we provide some option to config it.
                         following config is support:
                           disable_p2p_cache_shape, if you max sequence length is varying, please set disable_p2p_cache_shape.
-                          disable_partial_send_recv, optmize send speed for tensor parallel.
+                          disable_partial_send_recv, optimize send speed for tensor parallel.
                           enable_delay_scale_loss, accumulate gradients until optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.
                           enable_dp_comm_overlap, fuse data parallel gradient communication.
 
@@ -600,6 +600,87 @@ Trainer 是一个简单，但功能完整的 Paddle 训练和评估模块，并�
                         (`bool`, 可选, 默认为 `False`)
 
                         Recompute the forward pass to calculate gradients. Used for saving memory (default: False)
+
+  --refined_recompute
+                        精化重新计算参数，用于在GPU显存使用和计算速度之间寻求最佳平衡。
+                        此参数允许用户对重新计算过程进行细致控制，以优化资源利用。具体配置示例如下：
+                        `"attention_column_ln:-1,attention_row_ln:-1,flash_attn:-1,mlp_column_ln:5,mlp_row_ln:-1"`
+
+                        在配置中，支持的参数包括：
+                            `attention_column_ln`
+                            `attention_row_ln`
+                            `mlp_column_ln`
+                            `mlp_row_ln`
+                            `flash_attn`
+
+                        每个参数后的数字，即`skip_num`，决定了对应操作跳过重计算的次数。具体解释如下：
+                            `skip_num` 为 `-1`：表示在所有阶段均不进行重新计算，从而最大化显存使用。
+                            `skip_num` 为 `0`：表示在每个阶段都强制进行重新计算，以最小化显存使用。
+
+                        此外，您还可以将`skip_num`设置为`[1, ..., num_layers]`范围内的任意值。若`skip_num`超出`num_layers`，其行为将等同于设置为`-1`。
+                        若配置中省略了某个参数，则系统默认将其设置为`xxx:0`。
+
+                        (类型: `str`, 可选, 默认为: "")
+
+                        Refined recompute parameter for optimizing the balance between GPU memory usage and computational speed.
+                        This parameter allows fine-grained control over the recomputation process to optimize resource utilization. An example configuration is as follows:
+                        `"attention_column_ln:-1,attention_row_ln:-1,flash_attn:-1,mlp_column_ln:5,mlp_row_ln:-1"`
+
+                        The supported parameters in the configuration include:
+                            `attention_column_ln`
+                            `attention_row_ln`
+                            `mlp_column_ln`
+                            `mlp_row_ln`
+                            `flash_attn`
+
+                        The number following each parameter, `skip_num`, determines the number of times to bypass recomputation for the specified operation. Specifically:
+                            `skip_num of -1`: Indicates no recomputation across all stages, maximizing memory usage.
+                            `skip_num of 0`: Enforces recomputation at every stage, minimizing memory usage.
+
+                        Additionally, you can set skip_num to any value within the range `[1, ..., num_layers]`. If `skip_num` exceeds `num_layers`, it will behave as if set to `-1`.
+                        If a parameter is omitted from the configuration, it defaults to `xxx:0`.
+
+                        (Type: `str`, optional, default: "")
+
+  --refined_ops_patterns
+                        静态图半自动并行精化重新计算参数，用于在GPU显存使用和计算速度之间寻求最佳平衡。
+                        此参数允许用户对重新计算过程进行细致控制，以优化资源利用。具体配置示例如下：
+                        `'[{"main_ops":["matmul"],"num":-1,"pre_ops":["softmax"],"suf_ops":[]},{"main_ops":["flash_attn"],"num":-1,"pre_ops":["matmul"],"suf_ops":[]}]'`
+
+                        在配置中，支持的参数包括：
+                            `main_ops`
+                            `num`
+                            `pre_ops`
+                            `suf_ops`
+
+                        `pattern = pre_ops + main_ops + suf_ops`会在 program 中进行匹配, `main_ops`决定了哪些操作会被重新计算,
+                        `pre_ops`和`suf_ops`只是起到辅助定位的作用。
+                        参数`num`决定了对应操作跳过重计算的次数。具体解释如下：
+                            `num` 为 `-1`：表示在所有阶段均不进行重新计算，从而最大化显存使用。
+                            `num` 为 `0`：表示在每个阶段都强制进行重新计算，以最小化显存使用。
+
+                        此外，您还可以将`num`设置为`[1, ..., num_layers]`范围内的任意值。若`num`超出`num_layers`，其行为将等同于设置为`-1`。
+
+                        (类型: `str`, 可选, 默认为: "")
+
+                        Static semi-automatic parallel refined recompute parameter for optimizing the balance between GPU memory usage and computational speed.
+                        This parameter allows fine-grained control over the recomputation process to optimize resource utilization. An example configuration is as follows:
+                        `'[{"main_ops":["matmul"],"num":-1,"pre_ops":["softmax"],"suf_ops":[]},{"main_ops":["flash_attn"],"num":-1,"pre_ops":["matmul"],"suf_ops":[]}]'`
+
+                        The supported parameters in the configuration include:
+                            `main_ops`
+                            `num`
+                            `pre_ops`
+                            `suf_ops`
+
+                        `Pattern = pre_ops + main_ops + suf_ops' will be matched in the program. `Main_ops' determines which operations will be recomputed, `Pre_ops and suf_ops only serve as auxiliary positioning tools
+                        The number following each parameter, `num`, determines the number of times to bypass recomputation for the specified operation. Specifically:
+                            `num of -1`: Indicates no recomputation across all stages, maximizing memory usage.
+                            `num of 0`: Enforces recomputation at every stage, minimizing memory usage.
+
+                        Additionally, you can set num to any value within the range `[1, ..., num_layers]`. If `num` exceeds `num_layers`, it will behave as if set to `-1`.
+
+                        (Type: `str`, optional, default: "")
 
   --minimum_eval_times
                         最少评估次数，如果当前设置的eval_steps，评估次数少于minimum_eval_times，

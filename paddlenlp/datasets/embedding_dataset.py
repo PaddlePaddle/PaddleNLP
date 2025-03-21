@@ -101,6 +101,8 @@ class EmbeddingDatasetMixin:
         # If the template does not contain a suffix token, add the EOS token to the end
         if getattr(self, suffix_key) == []:
             setattr(self, suffix_key, [self.tokenizer.eos_token_id])
+        if getattr(self, prefix_key) == []:
+            setattr(self, prefix_key, [self.tokenizer.bos_token_id])
 
         # Calculate the available length
         max_len = getattr(self, max_len_key)
@@ -117,10 +119,10 @@ class EmbeddingDatasetMixin:
         pos_ids = list(range(len(token_ids)))
         return token_ids, pos_ids
 
-    def _postprocess_sequence(self, example: Example):
+    def _postprocess_sequence(self, example: Example, rng):
         """Post process sequence: tokenization & truncation."""
         query = example.query
-        pos_passage = random.choice(example.pos_passage)
+        pos_passage = rng.choice(example.pos_passage)
         neg_passage = example.neg_passage
         if len(neg_passage) > 0:
             if len(neg_passage) < self.group_size - 1:
@@ -132,12 +134,12 @@ class EmbeddingDatasetMixin:
                 selected_neg_passage = neg_passage * full_sets_needed
 
                 # Ensure the remainder part is filled; randomly select from neg_passage
-                selected_neg_passage += random.sample(neg_passage, remainder)
+                selected_neg_passage += rng.sample(neg_passage, remainder)
 
                 # Shuffle the result to ensure randomness
-                random.shuffle(selected_neg_passage)
+                rng.shuffle(selected_neg_passage)
             else:
-                selected_neg_passage = random.sample(neg_passage, self.group_size - 1)
+                selected_neg_passage = rng.sample(neg_passage, self.group_size - 1)
         else:
             selected_neg_passage = []
         # Process query tokens
@@ -241,9 +243,11 @@ class EmbeddingIterableDataset(EmbeddingDatasetMixin, IterableDataset):
         """Iterates through one epoch of the dataset."""
 
         num_sequences = 0
-        for index, example in enumerate(self.example_dataset):
+        rng = random.Random()
+        for _, example in enumerate(self.example_dataset):
             example = self.convert_example(example)
-            sequence = self._postprocess_sequence(example)
+            rng.seed(num_sequences)
+            sequence = self._postprocess_sequence(example, rng)
             if sequence is None:
                 continue
             num_sequences += 1

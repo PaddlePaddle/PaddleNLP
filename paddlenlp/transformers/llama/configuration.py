@@ -158,6 +158,7 @@ class LlamaConfig(PretrainedConfig):
         use_flash_attention_for_generation=False,
         use_last_token_for_generation=False,
         immediate_clear_past_key_value=False,
+        dpo_config=None,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -195,6 +196,7 @@ class LlamaConfig(PretrainedConfig):
         self.use_flash_attention_for_generation = use_flash_attention_for_generation
         self.use_last_token_for_generation = use_last_token_for_generation
         self.immediate_clear_past_key_value = immediate_clear_past_key_value
+        self.dpo_config = dpo_config
 
         super().__init__(
             pad_token_id=pad_token_id,

@@ -56,13 +56,10 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
     const std::string& cache_quant_type_str,
     const bool use_neox_rotary_style,
     const int max_input_length,
+    const float softmax_scale,
     const float quant_max_bound,
     const float quant_min_bound,
     const float out_linear_in_scale,
-    const int encoder_block_shape_q,
-    const int decoder_block_shape_q,
-    const int max_partition_size,
-    const int encoder_max_partition_size,
     const int speculate_max_draft_token_num,
     const bool causal,
     const bool speculate_decoder) {
@@ -76,7 +73,8 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
   int max_enc_len_this_time_data = max_enc_len_this_time.data<int>()[0];
   int max_dec_len_this_time_data = max_dec_len_this_time.data<int>()[0];
   int max_len_kv_data = max_len_kv.data<int>()[0];
-
+  const int encoder_block_shape_q = get_encoder_block_shape_q();
+  const int decoder_block_shape_q = get_decoder_block_shape_q();
   auto main_stream = qkv.stream();
   static cudaEvent_t main_event;
   static cudaEvent_t decoder_event;       
@@ -100,13 +98,13 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
   if (out_linear_in_scale > 0.0) {
     if (fabs(quant_max_bound - 127.0f) < 0.000001) {
       fmha_out = GetEmptyTensor(
-        {meta_data.token_nums, meta_data.q_num_heads * meta_data.head_dims},
+        {meta_data.token_nums, meta_data.q_num_heads * meta_data.head_dims_v},
         paddle::DataType::INT8,
         qkv.place());
     } 
     else if (fabs(quant_max_bound - 448.0f) < 0.000001) {
       fmha_out = GetEmptyTensor(
-        {meta_data.token_nums, meta_data.q_num_heads * meta_data.head_dims},
+        {meta_data.token_nums, meta_data.q_num_heads * meta_data.head_dims_v},
         paddle::DataType::FLOAT8_E4M3FN,
         qkv.place());
     }else{
@@ -114,7 +112,7 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
     }
   } else {
     fmha_out = GetEmptyTensor(
-        {meta_data.token_nums, meta_data.q_num_heads * meta_data.head_dims},
+        {meta_data.token_nums, meta_data.q_num_heads * meta_data.head_dims_v},
         D,
         qkv.place());
   }
@@ -206,11 +204,10 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
             encoder_block_shape_q,
             max_input_length,
             max_enc_len_this_time_data,
+            softmax_scale,
             quant_max_bound,
             quant_min_bound,
             out_linear_in_scale,
-            max_partition_size,
-            encoder_max_partition_size,
             speculate_max_draft_token_num,
             causal,
             false,
@@ -245,11 +242,10 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
             encoder_block_shape_q,
             max_input_length,
             max_enc_len_this_time_data,
+            softmax_scale,
             quant_max_bound,
             quant_min_bound,
             out_linear_in_scale,
-            max_partition_size,
-            encoder_max_partition_size,
             speculate_max_draft_token_num,
             causal,
             false,
@@ -289,11 +285,10 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
           encoder_block_shape_q,
           max_input_length,
           max_enc_len_this_time_data,
+          softmax_scale,
           quant_max_bound,
           quant_min_bound,
           out_linear_in_scale,
-          max_partition_size,
-          encoder_max_partition_size,
           speculate_max_draft_token_num,
           causal,
           false,
@@ -437,11 +432,10 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
             decoder_block_shape_q,
             max_input_length,
             max_len_kv_data,
+            softmax_scale,
             quant_max_bound,
             quant_min_bound,
             out_linear_in_scale,
-            max_partition_size,
-            encoder_max_partition_size,
             speculate_max_draft_token_num,
             causal,
             !speculate_decoder,
@@ -476,11 +470,10 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
             decoder_block_shape_q,
             max_input_length,
             max_len_kv_data,
+            softmax_scale,
             quant_max_bound,
             quant_min_bound,
             out_linear_in_scale,
-            max_partition_size,
-            encoder_max_partition_size,
             speculate_max_draft_token_num,
             causal,
             !speculate_decoder,
@@ -521,11 +514,10 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
           decoder_block_shape_q,
           max_input_length,
           max_len_kv_data,
+          softmax_scale,
           quant_max_bound,
           quant_min_bound,
           out_linear_in_scale,
-          max_partition_size,
-          encoder_max_partition_size,
           speculate_max_draft_token_num,
           causal,
           !speculate_decoder,
@@ -580,13 +572,10 @@ std::vector<paddle::Tensor> AppendAttention(
     const std::string& cache_quant_type_str,
     const bool use_neox_rotary_style,
     const int max_input_length,
+    const float softmax_scale,
     const float quant_max_bound,
     const float quant_min_bound,
     const float out_linear_in_scale,
-    const int encoder_block_shape_q,
-    const int decoder_block_shape_q,
-    const int max_partition_size,
-    const int encoder_max_partition_size,
     const int speculate_max_draft_token_num,
     const bool causal,
     const bool speculate_decoder) {
@@ -597,9 +586,10 @@ std::vector<paddle::Tensor> AppendAttention(
   meta_data.token_nums = qkv_dims[0];
   meta_data.kv_num_heads = key_cache_dims[1];
   meta_data.head_dims = key_cache_dims[3];
-  const int total_num_head =
-      qkv_dims[qkv_dims.size() - 1] / meta_data.head_dims;
-  meta_data.q_num_heads = total_num_head - 2 * meta_data.kv_num_heads;
+  meta_data.head_dims_v = value_cache.dims()[3];
+  const int q_hidden_size =
+      qkv_dims[qkv_dims.size() - 1] - meta_data.kv_num_heads * (meta_data.head_dims + meta_data.head_dims_v);
+  meta_data.q_num_heads = q_hidden_size / meta_data.head_dims;
 
   meta_data.max_blocks_per_seq = block_tables.dims()[1];
   meta_data.block_size = key_cache.dims()[2];
@@ -645,13 +635,10 @@ std::vector<paddle::Tensor> AppendAttention(
           cache_quant_type_str,
           use_neox_rotary_style,
           max_input_length,
+          softmax_scale,
           quant_max_bound,
           quant_min_bound,
           out_linear_in_scale,
-          encoder_block_shape_q,
-          decoder_block_shape_q,
-          max_partition_size,
-          encoder_max_partition_size,
           speculate_max_draft_token_num,
           causal,
           speculate_decoder);
@@ -695,13 +682,10 @@ std::vector<paddle::Tensor> AppendAttention(
           cache_quant_type_str,
           use_neox_rotary_style,
           max_input_length,
+          softmax_scale,
           quant_max_bound,
           quant_min_bound,
           out_linear_in_scale,
-          encoder_block_shape_q,
-          decoder_block_shape_q,
-          max_partition_size,
-          encoder_max_partition_size,
           speculate_max_draft_token_num,
           causal,
           speculate_decoder);
@@ -746,13 +730,10 @@ std::vector<paddle::Tensor> AppendAttention(
             cache_quant_type_str,
             use_neox_rotary_style,
             max_input_length,
+            softmax_scale,
             quant_max_bound,
             quant_min_bound,
             out_linear_in_scale,
-            encoder_block_shape_q,
-            decoder_block_shape_q,
-            max_partition_size,
-            encoder_max_partition_size,
             speculate_max_draft_token_num,
             causal,
             speculate_decoder);
@@ -795,13 +776,10 @@ std::vector<paddle::Tensor> AppendAttention(
             cache_quant_type_str,
             use_neox_rotary_style,
             max_input_length,
+            softmax_scale,
             quant_max_bound,
             quant_min_bound,
             out_linear_in_scale,
-            encoder_block_shape_q,
-            decoder_block_shape_q,
-            max_partition_size,
-            encoder_max_partition_size,
             speculate_max_draft_token_num,
             causal,
             speculate_decoder);
@@ -856,10 +834,12 @@ std::vector<std::vector<int64_t>> AppendAttentionInferShape(
     const paddle::optional<std::vector<int64_t>>& out_linear_smooths_shape) {
   const int token_num = qkv_shape[0];
   const int kv_num_heads = key_cache_shape[1];
-  const int head_dim = key_cache_shape[3];
-  const int total_num_head = qkv_shape[qkv_shape.size() - 1] / head_dim;
-  const int num_heads = total_num_head - 2 * kv_num_heads;
-  return {{token_num, num_heads * head_dim}, qkv_shape};
+  const int head_dim_qk = key_cache_shape[3];
+  const int head_dim_v = value_cache_shape[3];
+  const int q_hidden_size =
+      qkv_shape[qkv_shape.size() - 1] - kv_num_heads * (head_dim_qk + head_dim_v);
+  const int num_heads = q_hidden_size / head_dim_qk;
+  return {{token_num, num_heads * head_dim_v}, qkv_shape};
 }
 
 std::vector<paddle::DataType> AppendAttentionInferDtype(
@@ -900,13 +880,10 @@ std::vector<paddle::DataType> AppendAttentionInferDtype(
     const std::string& cache_quant_type_str,
     const bool use_neox_rotary_style,
     const int max_input_length,
+    const float softmax_scale,
     const float quant_max_bound,
     const float quant_min_bound,
     const float out_linear_in_scale,
-    const int encoder_block_shape_q,
-    const int decoder_block_shape_q,
-    const int max_partition_size,
-    const int encoder_max_partition_size,
     const int speculate_max_draft_token_num,
     const bool causal,
     const bool speculate_decoder) {
@@ -980,13 +957,10 @@ PD_BUILD_OP(append_attention)
             "cache_quant_type: std::string",
             "use_neox_rotary_style: bool",
             "max_input_length: int",
+            "softmax_scale: float",
             "quant_max_bound: float",
             "quant_min_bound: float",
             "out_linear_in_scale: float",
-            "encoder_block_shape_q: int",
-            "decoder_block_shape_q: int",
-            "max_partition_size: int",
-            "encoder_max_partition_size: int",
             "speculate_max_draft_token_num: int",
             "causal: bool",
             "speculate_decoder: bool"})

@@ -22,17 +22,12 @@ function _set_params(){
     tensor_parallel_degree=${tensor_parallel_degree:-1}
     pipeline_parallel_degree=${pipeline_parallel_degree:-1}
     sharding_parallel_degree=${sharding_parallel_degree:-1}
-    sharding=${sharding:-"stage1"}
-    recompute=${recompute:-1}
-    recompute_granularity=${recompute_granularity:-"full"}
     gradient_accumulation_steps=${gradient_accumulation_steps:-1}
     run_stage=${run_stage:-"sft"}
     run_mode=${run_mode:-"DP1-MP1-PP4-mbs1-acc8-recompute"}
     device_num=${device_num:-"N1C8"}
     global_batch_size=${global_batch_size:-16}
     model_item=${model_item:-"qwen-qwen-7b_seqlen2048_pretrain"}
-    max_steps=${max_steps:-150}
-    logging_steps=${logging_steps:-1}
     base_batch_size=${global_batch_size}
 
     profiling=${PROFILING:-"false"}      # (必选) Profiling  开关，默认关闭，通过全局变量传递
@@ -41,7 +36,7 @@ function _set_params(){
     skip_steps=0                  # (必选)解析日志，跳过模型前几个性能不稳定的step
     keyword="Effective_Tokens_per_second_per_gpu:"                 # (必选)解析日志，筛选出性能数据所在行的关键字
     is_large_model=True           # (可选)普通模型默认为False，如果添加大模型且只取一条ips设置为True
-    convergence_key="loss:"        # (可选)解析日志，筛选出收敛数据所在行的关键字 如：convergence_key="loss:"
+    convergence_key="Total_Tokens_per_second_per_gpu:"        # (可选)解析日志，筛选出收敛数据所在行的关键字 如：convergence_key="loss:"
 
     fp_item="bf16"
     # 以下为通用执行命令，无特殊可不用修改
@@ -110,18 +105,25 @@ function _train(){
         ;;
     esac
     cd ../llm/
+    export no_proxy=bcebos.com
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
     python -c "import paddlenlp"
     if [[ ${model_name_or_path} =~ "CE" ]];then # CE精度-不限制执行时间
         ${train_cmd} > ${log_file} 2>&1
     else
-        timeout 30m ${train_cmd} > ${log_file} 2>&1
+        timeout 60m ${train_cmd} > ${log_file} 2>&1
         # echo ${train_cmd}
         Effective_Tokens_per_second=`cat ${log_file} | grep -E 'Effective_Tokens_per_second|Effective tokens per second:' \
                                             |awk -F': ' '{print $2}' |awk -F' ' '{print $1}'`
         num_gpu=$(echo "$device_num" | sed 's/^.*C//')
-        ips=$(awk -v a="$Effective_Tokens_per_second" -v b="$num_gpu" 'BEGIN {printf "%.2f\n", a / b}')
-        echo "Effective_Tokens_per_second_per_gpu: ${ips}" >> ${log_file}
+        Effective_Tokens_per_second_per_gpu=$(awk -v a="$Effective_Tokens_per_second" -v b="$num_gpu" 'BEGIN {printf "%.2f\n", a / b}')
+        echo "Effective_Tokens_per_second_per_gpu: ${Effective_Tokens_per_second_per_gpu}" >> ${log_file}
+        Train_samples_per_second=`cat ${log_file} | grep 'train_samples_per_second' \
+                                            |awk -F'train_samples_per_second: ' '{print $2}' |awk -F', ' '{print $1}'`
+        length=4096
+        Total_Tokens_per_second=$(awk -v a="$Train_samples_per_second" -v b="$length" 'BEGIN {printf "%.2f\n", a * b}')
+        Total_Tokens_per_second_per_gpu=$(awk -v a="$Total_Tokens_per_second" -v b="$num_gpu" 'BEGIN {printf "%.2f\n", a / b}')
+        echo "Total_Tokens_per_second_per_gpu: ${Total_Tokens_per_second_per_gpu}" >> ${log_file}
     fi
     if [ $? -ne 0 ];then
         echo -e "${model_name}, FAIL"

@@ -35,23 +35,28 @@ __all__ = [
 
 class PromptOnlySample(TypedDict, total=True):
     input_ids: paddle.Tensor  # size = (L,)
+    label_ids: paddle.Tensor  # size = (L,)
 
 
 class PromptOnlyBatch(TypedDict, total=True):
     input_ids: paddle.Tensor  # size = (B, L)
     attention_mask: paddle.Tensor  # size = (B, L)
+    label_ids: paddle.Tensor  # size = (B, L)
 
 
 class PromptOnlyDataset(TokenizedDataset):
     def preprocess(self, raw_sample: RawSample) -> PromptOnlySample:
+        input_dict = {}
         prompt = format_prompt(input=raw_sample["input"], eos_token=self.tokenizer.eos_token)
-        input_ids = self.tokenize(prompt)
-        return {
-            "input_ids": input_ids,  # size = (L,)
-        }
+        input_dict["input_ids"] = self.tokenize(prompt)
+        if self.use_rm_server:
+            answer = format_prompt(input=raw_sample["answer"], eos_token=self.tokenizer.eos_token)
+            input_dict["label_ids"] = self.tokenize(answer)
+
+        return input_dict
 
     def get_collator(self) -> Callable[[list[dict[str, paddle.Tensor]]], dict[str, paddle.Tensor]]:
-        return PromptOnlyCollator(self.tokenizer.pad_token_id)
+        return PromptOnlyCollator(self.tokenizer.pad_token_id, self.use_rm_server)
 
     def _merge_raw_datasets(self, seed: int | None = None) -> Dataset[RawSample]:
         """Merge multiple raw datasets into one dataset and remove duplicates."""
@@ -67,12 +72,15 @@ class PromptOnlyDataset(TokenizedDataset):
 
 class PromptOnlyCollator(CollatorBase):
     def __call__(self, samples: list[PromptOnlySample]) -> PromptOnlyBatch:
+        input_dict = {}
+
         input_ids = [sample["input_ids"] for sample in samples]
         attention_mask = [np.ones(input_id.shape, dtype=bool) for input_id in input_ids]
+        input_dict["input_ids"] = left_padding(input_ids, padding_value=self.pad_token_id)
+        input_dict["attention_mask"] = left_padding(attention_mask, padding_value=0)
 
-        input_ids = left_padding(input_ids, padding_value=self.pad_token_id)
-        attention_mask = left_padding(attention_mask, padding_value=0)
-        return {
-            "input_ids": input_ids,  # size = (B, L)
-            "attention_mask": attention_mask,  # size = (B, L)
-        }
+        if self.use_rm_server:
+            label_ids = [sample["label_ids"] for sample in samples]
+            input_dict["label_ids"] = left_padding(label_ids, padding_value=self.pad_token_id)
+
+        return input_dict
