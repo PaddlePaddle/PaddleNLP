@@ -79,7 +79,7 @@ from ..moe_layer import MoELayer
 from ..utils import device_guard
 from . import fp8_linear as linear_utils
 from .configuration import DeepseekV2Config
-from .fp8_linear import FP8DeepseekV2MLP, FP8Linear, Linear, FP8KeepXLinear
+from .fp8_linear import FP8DeepseekV2MLP, FP8KeepXLinear, FP8Linear, Linear
 
 DSV3_USE_FP8_GEMM = os.getenv("DSV3_USE_FP8_GEMM", "False").lower() == "true"
 Linear = FP8Linear if DSV3_USE_FP8_GEMM else Linear
@@ -1393,7 +1393,7 @@ class DeepseekV2MTPLayer(DeepseekV2DecoderLayer):
 
         self.enorm = DeepseekV2RMSNorm(config)
         self.hnorm = DeepseekV2RMSNorm(config)
-        self.eh_proj = nn.Linear(2 * config.hidden_size, config.hidden_size)
+        self.eh_proj = Linear(2 * config.hidden_size, config.hidden_size)
 
     def forward(
         self,
