@@ -17,7 +17,7 @@ import re
 
 from jinja2 import Template
 
-MODEL_ROOT = "../4.mount_bos/mount/community/"
+MODEL_ROOT = "/xx/bos/community/"
 URL_BASE = "https://paddlenlp.bj.bcebos.com/models/community/"
 OUTPUT_DIR = "./website"
 
