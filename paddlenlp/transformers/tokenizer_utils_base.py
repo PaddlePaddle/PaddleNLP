@@ -14,6 +14,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""
+Base classes common to both the slow and the fast tokenization classes: PreTrainedTokenizerBase (host all the user
+fronting encoding methods) Special token mixing (host the special tokens logic) and BatchEncoding (wrap the dictionary
+of output with special method for the Fast tokenizers)
+"""
+
 import copy
 import inspect
 import io
@@ -25,17 +31,7 @@ import warnings
 from collections import UserDict
 from dataclasses import dataclass
 from enum import Enum
-from typing import (
-    Any,
-    Dict,
-    List,
-    Literal,
-    NamedTuple,
-    Optional,
-    Sequence,
-    Tuple,
-    Union,
-)
+from typing import Any, Dict, List, Literal, NamedTuple, Optional, Sequence, Tuple, Union
 
 import aistudio_sdk
 import numpy as np
@@ -49,9 +45,11 @@ from huggingface_hub import (
 )
 from huggingface_hub.utils import EntryNotFoundError
 
+from .utils import ExplicitEnum, PaddingStrategy, TensorType
+
 from ..utils.download import resolve_file_path
 from ..utils.env import CHAT_TEMPLATE_CONFIG_NAME, TOKENIZER_CONFIG_NAME
-from ..utils.import_utils import is_protobuf_available, is_tokenizers_available
+from ..utils.import_utils import is_protobuf_available, is_tokenizers_available, PROTOBUF_IMPORT_ERROR
 from ..utils.log import logger
 
 
@@ -61,13 +59,7 @@ def import_protobuf_decode_error(error_message=""):
 
         return DecodeError
     else:
-        raise ImportError(
-            f"""
-{error_message} requires the protobuf library but it was not found in your environment. Checkout the instructions on the
-installation page of its repo: https://github.com/protocolbuffers/protobuf/tree/master/python#installation and follow the ones
-that match your environment. Please note that you may need to restart your runtime after installation.
-"""
-        )
+        raise ImportError(PROTOBUF_IMPORT_ERROR.format(error_message))
 
 
 if is_tokenizers_available():
@@ -80,6 +72,7 @@ else:
         """
         AddedToken represents a token to be added to a Tokenizer An AddedToken can have special options defining the
         way it should behave.
+
         The `normalized` will default to `not special` if it is not specified, similarly to the definition in
         `tokenizers`.
         """
@@ -105,7 +98,7 @@ else:
 
     @dataclass
     class EncodingFast:
-        """This is dummy class reserved for fast tokenizer"""
+        """This is dummy class because without the `tokenizers` library we don't have these objects anyway"""
 
         pass
 
@@ -807,9 +800,9 @@ class SpecialTokensMixin:
             if key in self.SPECIAL_TOKENS_ATTRIBUTES:
                 if key == "additional_special_tokens":
                     assert isinstance(value, (list, tuple)), f"Value {value} is not a list or tuple"
-                    assert all(
-                        isinstance(t, (str, AddedToken)) for t in value
-                    ), "One of the tokens is not a string or an AddedToken"
+                    assert all(isinstance(t, (str, AddedToken)) for t in value), (
+                        "One of the tokens is not a string or an AddedToken"
+                    )
                     setattr(self, key, value)
                 elif isinstance(value, (str, AddedToken)):
                     setattr(self, key, value)
@@ -896,9 +889,9 @@ class SpecialTokensMixin:
                 logger.info(f"Assigning {value} to the {key} key of the tokenizer")
 
             if key == "additional_special_tokens":
-                assert isinstance(value, (list, tuple)) and all(
-                    isinstance(t, (str, AddedToken)) for t in value
-                ), f"Tokens {value} for key {key} should all be str or AddedToken instances"
+                assert isinstance(value, (list, tuple)) and all(isinstance(t, (str, AddedToken)) for t in value), (
+                    f"Tokens {value} for key {key} should all be str or AddedToken instances"
+                )
 
                 to_add = []
                 for token in value:
@@ -1411,9 +1404,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         # By default, do not split special tokens for both fast and slow tokenizers
         self.split_special_tokens = kwargs.pop("split_special_tokens", False)
 
-        self.deprecation_warnings = (
-            {}
-        )  # Use to store when we have already noticed a deprecation warning (avoid overlogging).
+        self.deprecation_warnings = {}  # Use to store when we have already noticed a deprecation warning (avoid overlogging).
 
         super().__init__(**kwargs)
 
@@ -1437,12 +1428,12 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         if value == self.model_max_length - self.num_special_tokens_to_add(pair=False) and self.verbose:
             if not self.deprecation_warnings.get("max_len_single_sentence", False):
                 warnings.warn(
-                    "Setting 'max_len_single_sentence' is now deprecated. " "This value is automatically set up."
+                    "Setting 'max_len_single_sentence' is now deprecated. This value is automatically set up."
                 )
             self.deprecation_warnings["max_len_single_sentence"] = True
         else:
             raise ValueError(
-                "Setting 'max_len_single_sentence' is now deprecated. " "This value is automatically set up."
+                "Setting 'max_len_single_sentence' is now deprecated. This value is automatically set up."
             )
 
     def _switch_to_input_mode(self):
@@ -1457,13 +1448,11 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         if value == self.model_max_length - self.num_special_tokens_to_add(pair=True) and self.verbose:
             if not self.deprecation_warnings.get("max_len_sentences_pair", False):
                 warnings.warn(
-                    "Setting 'max_len_sentences_pair' is now deprecated. " "This value is automatically set up."
+                    "Setting 'max_len_sentences_pair' is now deprecated. This value is automatically set up."
                 )
             self.deprecation_warnings["max_len_sentences_pair"] = True
         else:
-            raise ValueError(
-                "Setting 'max_len_sentences_pair' is now deprecated. " "This value is automatically set up."
-            )
+            raise ValueError("Setting 'max_len_sentences_pair' is now deprecated. This value is automatically set up.")
 
     def _set_processor_class(self, processor_class: str):
         """Sets processor class as an attribute."""
@@ -2245,7 +2234,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         padding_side: Optional[Literal["right", "left"]] = None,
         return_tensors: Optional[Union[str, TensorType]] = None,
         verbose: bool = True,
-        **kwargs
+        **kwargs,
     ):
         """
         Performs tokenization and uses the tokenized tokens to prepare model
@@ -2517,7 +2506,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         return_length: bool = False,
         verbose: bool = True,
         return_position_ids=None,
-        **kwargs
+        **kwargs,
     ) -> BatchEncoding:
         """
         Tokenize and prepare for the model a sequence or a pair of sequences.
@@ -2670,7 +2659,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         return_offsets_mapping: bool = False,
         return_length: bool = False,
         verbose: bool = True,
-        **kwargs
+        **kwargs,
     ) -> BatchEncoding:
         raise NotImplementedError
 
@@ -2703,7 +2692,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         padding_side: Optional[Literal["right", "left"]] = None,
         return_tensors: Optional[Union[str, TensorType]] = None,
         verbose: bool = True,
-        **kwargs
+        **kwargs,
     ) -> BatchEncoding:
         """
         Performs tokenization and uses the tokenized tokens to prepare model
@@ -2793,7 +2782,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         return_offsets_mapping: bool = False,
         return_length: bool = False,
         verbose: bool = True,
-        **kwargs
+        **kwargs,
     ) -> BatchEncoding:
         raise NotImplementedError
 
@@ -2942,9 +2931,9 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             return BatchEncoding(encoded_inputs, tensor_type=return_tensors)
 
         batch_size = len(required_input)
-        assert all(
-            len(v) == batch_size for v in encoded_inputs.values()
-        ), "Some items in the output dictionary have a different batch size than others."
+        assert all(len(v) == batch_size for v in encoded_inputs.values()), (
+            "Some items in the output dictionary have a different batch size than others."
+        )
 
         if padding_strategy == PaddingStrategy.LONGEST:
             max_length = max(len(inputs) for inputs in required_input)
@@ -3497,7 +3486,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         sequences: Union[List[int], List[List[int]], "np.ndarray", "paddle.Tensor"],
         skip_special_tokens: bool = False,
         clean_up_tokenization_spaces: bool = True,
-        **kwargs
+        **kwargs,
     ) -> List[str]:
         """
         Convert a list of lists of token ids into a list of strings by calling decode.
@@ -3530,7 +3519,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         token_ids: Union[int, List[int], "np.ndarray", "paddle.Tensor"],
         skip_special_tokens: bool = False,
         clean_up_tokenization_spaces: bool = True,
-        **kwargs
+        **kwargs,
     ) -> str:
         """
         Converts a sequence of ids in a string, using the tokenizer and vocabulary with options to remove special
@@ -3566,7 +3555,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         token_ids: Union[int, List[int]],
         skip_special_tokens: bool = False,
         clean_up_tokenization_spaces: bool = True,
-        **kwargs
+        **kwargs,
     ) -> str:
         raise NotImplementedError
 
