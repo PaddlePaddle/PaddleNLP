@@ -26,7 +26,7 @@ from paddle import Tensor, nn
 from paddle.distributed.communication.group import Group
 
 from ..utils.log import logger
-from .fp8_utils import ExpertsNode, ExpertsNodeZip, kitchen_quant
+from .fp8_utils import ExpertsGroupGemmNode, ExpertsNode, kitchen_quant
 from .fused_a2a import CombineNode, DispatchNode
 from .moe_gate import PretrainedMoEGate
 from .moe_utils import PermuteNode, UnPermuteNode, UnZipNode, ZipNode
@@ -585,7 +585,7 @@ class MlpNode:
         self.experts = custom_map.experts
         self.permute_node = PermuteNode(self.token_dispatcher)
         self.experts_node = ExpertsNode(self.experts, custom_map)
-        self.experts_node_zip = ExpertsNodeZip(self.experts, custom_map)
+        self.experts_group_gemm_node = ExpertsGroupGemmNode(self.experts, custom_map)
         self.unpermute_node = UnPermuteNode(self.token_dispatcher)
         self.name = name
         self.unzip_node = UnZipNode(self.token_dispatcher)
@@ -604,15 +604,11 @@ class MlpNode:
     @paddle.no_grad()
     def forward(self, hs_fp8_dispatched, hs_scale_dispatched, dispatched_indices, dispatched_probs):
         if len(self.token_dispatcher._comm_manager.tokens_per_expert) == 4:
-            print("================================use unzip==================================")
             # 1 unzip
             total_unzipped_tokens_num = int((dispatched_indices != -1).astype("int64").sum())
             self.dispatched_indices = dispatched_indices
             self.total_unzipped_tokens_num = total_unzipped_tokens_num
-            # 下面三行代码临时代码，待zhaowu优化
-            dispatched_probs = dispatched_probs.to(paddle.bfloat16)
             dispatched_indices = dispatched_indices.to(paddle.int32)
-            hs_scale_dispatched = hs_scale_dispatched.to(paddle.bfloat16)
             (
                 unzipped_tokens,
                 unzipped_scale,
@@ -629,10 +625,14 @@ class MlpNode:
                 num_experts=4,
             )
 
+            # 临时操作，unzipped_probs后续要和o1(bfloat16)乘，故这里做了cast
+            unzipped_probs = unzipped_probs.to(paddle.bfloat16)
+
             # 2 experts
-            expert_out = self.experts_node_zip.forward(
+            expert_out = self.experts_group_gemm_node.forward(
                 unzipped_tokens, unzipped_scale, unzipped_probs, unzipped_expert_idx
             )
+
             self.unzipped_expert_idx = unzipped_expert_idx
             self.unzipped_tokens = unzipped_tokens
             self.unzipped_scale = unzipped_scale
@@ -676,7 +676,7 @@ class MlpNode:
     def backward(self, hidden_states_out_grad, hidden_states_out_grad_scale):
         if len(self.token_dispatcher._comm_manager.tokens_per_expert) == 4:
             # zip_grad
-            hidden_states_out_grad_scale = hidden_states_out_grad_scale.to(paddle.bfloat16)
+            # hidden_states_out_grad_scale = hidden_states_out_grad_scale.to(paddle.bfloat16)
             unzipped_grad, unzipped_scale_grad = self.zip_node.backward(
                 hidden_states_out_grad,
                 hidden_states_out_grad_scale,
@@ -688,13 +688,12 @@ class MlpNode:
             )
 
             # expert_grad
-            expert_out, probs_grad = self.experts_node_zip.backward(
+            # unzipped_scale_grad = unzipped_scale_grad.to(paddle.float32)
+            expert_out, probs_grad = self.experts_group_gemm_node.backward(
                 unzipped_grad,
                 unzipped_scale_grad,
                 self.unzipped_expert_idx,
                 self.dispatched_indices,
-                self.unzipped_tokens,
-                self.unzipped_scale,
             )
 
             # unzip_grad
@@ -746,6 +745,7 @@ class FusionMoeNode:
         hidden_states_out = self.mlp_node.forward(
             hs_fp8_dispatched, hs_scale_dispatched, dispatched_indices, dispatched_probs
         )
+
         output_combie = self.combine_node.forward(hidden_states_out)
         output = self.combine_quant_node.forward(output_combie)
         output.stop_gradient = False

@@ -40,7 +40,7 @@ __all__ = [
     "kitchen_fp8_gemm",
     "dequantize_fp8_to_fp32",
     "ExpertsNode",
-    "ExpertsNodeZip",
+    "ExpertsGroupGemmNode",
 ]
 
 
@@ -95,38 +95,27 @@ def dequantize_fp8_to_fp32(fp8_tensor, scale):
     return fp8_tensor.astype("float32") * expanded_scale
 
 
-class ExpertsNodeZip:
+class ExpertsGroupGemmNode:
     def __init__(self, experts, custom_map, name="moe_experts_node"):
-        self.m = None
-        self.n = None
-        self.expert_w_count = None
         self.o1 = None
-        self.x_t_fp8s = None
-        self.x_t_scales = None
+        self.unzipped_scale = None
+        self.unzipped_tokens = None
         self.custom_map = custom_map
-        self.expert_w2 = None
-        self.expert_w1 = None
 
     def reset_statue(self):
-        self.m = None
-        self.n = None
-        self.expert_w_count = None
         self.o1 = None
-        self.x_t_fp8s = None
-        self.x_t_scales = None
+        self.unzipped_scale = None
+        self.unzipped_tokens = None
 
     def fwd_gate_up(self, x_fp8, x_scale, expert_w1, expert_w_count, unzipped_probs, unzipped_expert_idx):
-        m, n = expert_w1[0].shape
-        # concat
-        concatenated_w1 = paddle.concat(expert_w1, axis=0).reshape([expert_w_count, m, -1])  # 4, 4096, 7198
-        concatenated_w1_t = (
-            paddle.transpose(concatenated_w1, [0, 2, 1]).contiguous().reshape([expert_w_count * n, m])
-        )  # 4*7198, 4096
-        # self.concatenated_w1 = concatenated_w1
+        # concat w1
+        stacked_w1 = paddle.stack(expert_w1, axis=0)
+        stacked_w1_t = paddle.transpose(stacked_w1, [0, 2, 1]).contiguous()
+        concated_w1_t = stacked_w1_t.reshape([-1, stacked_w1_t.shape[-1]])
 
         # quant w1
         w1_t_quant, w1_t_scale = kitchen_quant(
-            concatenated_w1_t,
+            concated_w1_t,
             backend=kitchen.ops.Backend.CUBLAS,
             is_1d_scaled=False,
             return_transpose=False,  # 4*7198, 4096
@@ -135,13 +124,10 @@ class ExpertsNodeZip:
         # group gemm
         w1_t_quant = w1_t_quant.reshape([expert_w_count, -1, w1_t_quant.shape[-1]])
         w1_t_scale = w1_t_scale.reshape([expert_w_count, -1, w1_t_scale.shape[-1]])
-        o1 = paddle.empty([x_fp8.shape[0], n], dtype="bfloat16")
-        o1 = o1 * unzipped_probs.unsqueeze(-1)
-        x_scale = x_scale.to(paddle.float32)
+        o1 = paddle.empty([x_fp8.shape[0], w1_t_quant.shape[1]], dtype="bfloat16")
         deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
             (x_fp8, x_scale), (w1_t_quant, w1_t_scale), o1, unzipped_expert_idx
         )
-        self.o1 = o1
         return o1
 
     def fwd_swiglu(self, o1):
@@ -151,17 +137,14 @@ class ExpertsNodeZip:
     def fwd_down(self, o2, expert_w2, expert_w_count, unzipped_expert_idx):
         # concat and transpose w2
         expert_w2 = [x.w2 for x in self.custom_map.experts if x is not None]
-        # self.expert_w2 = expert_w2
-        concatenated_w2 = paddle.concat(expert_w2, axis=0).reshape([expert_w_count, -1, expert_w2[0].shape[-1]])
-        concatenated_w2_t = (
-            paddle.transpose(concatenated_w2, [0, 2, 1])
-            .contiguous()
-            .reshape([expert_w_count * concatenated_w2.shape[-1], -1])
-        )
+
+        stacked_w2 = paddle.stack(expert_w2, axis=0)
+        stacked_w2_t = paddle.transpose(stacked_w2, [0, 2, 1]).contiguous()
+        concated_w2_t = stacked_w2_t.reshape([-1, stacked_w2_t.shape[-1]])
 
         # quant w2
         w2_quant, w2_sacle = kitchen_quant(
-            concatenated_w2_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
+            concated_w2_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
         )
         w2_quant = w2_quant.reshape([expert_w_count, -1, w2_quant.shape[-1]])
         w2_sacle = w2_sacle.reshape([expert_w_count, -1, w2_sacle.shape[-1]])
@@ -170,8 +153,8 @@ class ExpertsNodeZip:
         o2_quant, o2_scale = kitchen_quant(
             o2, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
         )
-        # self.o2_quant = o2_quant
-        # self.o2_scale = o2_scale
+
+        # group gemm
         o3 = paddle.empty([o2_quant.shape[0], w2_quant.shape[1]], dtype=paddle.bfloat16)
         deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
             (o2_quant, o2_scale), (w2_quant, w2_sacle), o3, unzipped_expert_idx
@@ -181,20 +164,16 @@ class ExpertsNodeZip:
 
     # ===== do2 = deep_gemm(do3_fp8, w2_fp8)
     def bwd_dowm_input(self, expert_w2, unzipped_grad, unzipped_scale, unzipped_expert_idx):
-        # recompute concatenated_w2_2d
-        concatenated_w2 = paddle.concat(self.expert_w2, axis=0).reshape(
-            [self.expert_w_count, -1, expert_w2[0].shape[-1]]
-        )
-        concatenated_w2_2d = concatenated_w2.reshape([self.expert_w_count * concatenated_w2.shape[1], -1])
-
+        # recompute concated_w2_2d
+        stacked_w2 = paddle.stack(expert_w2, axis=0)
+        concated_w2 = stacked_w2.reshape([-1, stacked_w2.shape[-1]])
         # quant w2
         bw_w2_quant, bw_w2_scale = kitchen_quant(
-            concatenated_w2_2d, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
+            concated_w2, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
         )
-        bw_w2_quant = bw_w2_quant.reshape([self.expert_w_count, -1, bw_w2_quant.shape[-1]])
-        bw_w2_scale = bw_w2_scale.reshape([self.expert_w_count, -1, bw_w2_scale.shape[-1]])
-
-        do2 = paddle.empty([unzipped_grad.shape[0], self.n // 2], dtype="bfloat16")
+        bw_w2_quant = bw_w2_quant.reshape([len(expert_w2), -1, bw_w2_quant.shape[-1]])
+        bw_w2_scale = bw_w2_scale.reshape([len(expert_w2), -1, bw_w2_scale.shape[-1]])
+        do2 = paddle.empty([unzipped_grad.shape[0], bw_w2_quant.shape[1]], dtype="bfloat16")
 
         # 求do2
         deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
@@ -210,22 +189,16 @@ class ExpertsNodeZip:
 
     # ===== dx = deep_gemm(do1_fp8, w1_fp8)
     def bwd_gate_up_input(self, do1, expert_w1, unzipped_expert_idx):
-        # recompute concatenated_w1_2d
-        concatenated_w1 = paddle.concat(self.expert_w1, axis=0).reshape(
-            [self.expert_w_count, -1, expert_w1[0].shape[-1]]
-        )  # 4, 4096, 7198
-        concatenated_w1_2d = (
-            paddle.transpose(concatenated_w1, [0, 2, 1])
-            .contiguous()
-            .reshape([self.expert_w_count * concatenated_w1.shape[1], -1])
-        )  # 4*7198, 4096
+        # recompute concated_w1_t
+        stacked_w1 = paddle.stack(expert_w1, axis=0)
+        concated_w1_t_2d = stacked_w1.reshape([-1, stacked_w1.shape[-1]])
 
         # quant w1
         bw_w1_quant, bw_w1_scale = kitchen_quant(
-            concatenated_w1_2d, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
+            concated_w1_t_2d, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
         )
-        bw_w1_quant = bw_w1_quant.reshape([self.expert_w_count, -1, bw_w1_quant.shape[-1]])
-        bw_w1_scale = bw_w1_scale.reshape([self.expert_w_count, -1, bw_w1_scale.shape[-1]])
+        bw_w1_quant = bw_w1_quant.reshape([len(expert_w1), -1, bw_w1_quant.shape[-1]])
+        bw_w1_scale = bw_w1_scale.reshape([len(expert_w1), -1, bw_w1_scale.shape[-1]])
         # quant do1
         do1_fp8, do1_scale = kitchen_quant(
             do1, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
@@ -237,12 +210,14 @@ class ExpertsNodeZip:
         )
         return dx, do1_fp8, do1_scale
 
-    def dequant_and_regroup_dout_and_o1(self, out_grad, out_grad_scale, o1, unzipped_expert_idx, dispatched_indices):
+    def dequant_and_regroup_dout_and_o1(
+        self, out_grad, out_grad_scale, o1, expert_w1_len, unzipped_expert_idx, dispatched_indices
+    ):
         # regroup dout and o2:regroup之前需要dequant
         out_grad_dequant = dequantize_fp8_to_fp32(out_grad, out_grad_scale)
         out_grad_dequant_fp16 = out_grad_dequant.to(paddle.bfloat16)
         token_per_expert = []
-        for i in range(self.expert_w_count):
+        for i in range(expert_w1_len):
             e_num = int((dispatched_indices == i).astype("int64").sum())
             token_per_expert.append(e_num)
         self.token_per_expert = token_per_expert
@@ -251,152 +226,128 @@ class ExpertsNodeZip:
         o1_regroup, out_grad_regroup = TDU.regroup_tokens(
             o1, out_grad_dequant_fp16, unzipped_expert_idx, expert_num=4, token_max_per_expert=max_seq_len  # int32
         )  # int32
-
         return o1_regroup, out_grad_regroup, max_seq_len
 
     def dequant_do1_and_regroup_do1_fp8_and_unzipped_tokens(
-        self, do1_fp8, do1_scale, unzipped_expert_idx, max_seq_len, unzipped_tokens, unzipped_scale
+        self, do1_fp8, do1_scale, unzipped_expert_idx, max_seq_len
     ):
         # dequant do1_fp8 and regroup do1_fp8,unzipped_tokens
+
         do1_dequant = dequantize_fp8_to_fp32(do1_fp8, do1_scale)
         do1_dequant = do1_dequant.to(paddle.bfloat16)
-        intput_x = dequantize_fp8_to_fp32(unzipped_tokens, unzipped_scale)
-        intput_x = unzipped_tokens.to(paddle.bfloat16)
+
+        intput_x = dequantize_fp8_to_fp32(self.unzipped_tokens, self.unzipped_scale)
+        intput_x = intput_x.to(paddle.bfloat16)
         input_x_regroup, do1_regroup = TDU.regroup_tokens(
             intput_x, do1_dequant, unzipped_expert_idx, expert_num=4, token_max_per_expert=max_seq_len
         )
         return do1_regroup, input_x_regroup
 
     # ===== dw2 = deep_gemm(o2_t_fp8, do3_t_fp8)
-    def bwd_down_weight(self, out_grad_regroup, o1, max_seq_len):
+    def bwd_down_weight(self, out_grad_regroup, o1, max_seq_len, expert_w2_len, dw2):
         # recompute o2
         o2 = self.fwd_swiglu(o1)
-        o2_t = o2.reshape([max_seq_len, self.expert_w_count, -1]).transpose([1, 2, 0]).contiguous()
+        o2_t = o2.reshape([max_seq_len, expert_w2_len, -1]).transpose([1, 2, 0]).contiguous()
         # quant o2_t
-        o2_t = o2_t.reshape([self.expert_w_count * o2_t.shape[1], -1])
+        o2_t = o2_t.reshape([expert_w2_len * o2_t.shape[1], -1])
 
         o2_t_fp8, o2_t_scale = kitchen_quant(
             o2_t, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
         )
-        o2_t_fp8 = o2_t_fp8.reshape([self.expert_w_count, -1, o2_t_fp8.shape[-1]])
-        o2_t_scale = o2_t_scale.reshape([self.expert_w_count, -1, o2_t_scale.shape[-1]])
-        # quant out_grad_regroup
+        o2_t_fp8 = o2_t_fp8.reshape([expert_w2_len, -1, o2_t_fp8.shape[-1]])
+        o2_t_scale = o2_t_scale.reshape([expert_w2_len, -1, o2_t_scale.shape[-1]])
 
-        out_grad_regroup = (
-            out_grad_regroup.reshape([max_seq_len, self.expert_w_count, -1]).transpose([1, 2, 0]).contiguous()
-        )
-        out_grad_regroup = out_grad_regroup.reshape([self.expert_w_count * self.m, -1])
+        # quant out_grad_regroup
+        out_grad_regroup = out_grad_regroup.reshape([max_seq_len, expert_w2_len, -1]).transpose([1, 2, 0]).contiguous()
+        out_grad_regroup = out_grad_regroup.reshape([-1, out_grad_regroup.shape[-1]])
         out_grad_regroup_fp8, out_grad_regroup_scale = kitchen_quant(
             out_grad_regroup, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
         )
 
-        out_grad_regroup_fp8 = out_grad_regroup_fp8.reshape([self.expert_w_count, -1, out_grad_regroup_fp8.shape[-1]])
-        out_grad_regroup_scale = out_grad_regroup_scale.reshape(
-            [self.expert_w_count, -1, out_grad_regroup_scale.shape[-1]]
-        )
-        for i in range(self.expert_w_count):
-            self.expert_w2[i] = kitchen_fp8_gemm(
-                o2_t_fp8[i], o2_t_scale[i], out_grad_regroup_fp8[i], out_grad_regroup_scale[i], True, True
+        out_grad_regroup_fp8 = out_grad_regroup_fp8.reshape([expert_w2_len, -1, out_grad_regroup_fp8.shape[-1]])
+        out_grad_regroup_scale = out_grad_regroup_scale.reshape([expert_w2_len, -1, out_grad_regroup_scale.shape[-1]])
+        for i in range(expert_w2_len):
+            dw2[i] = kitchen_fp8_gemm(
+                o2_t_fp8[i], o2_t_scale[i], out_grad_regroup_fp8[i], out_grad_regroup_scale[i], True, True, dw2[i]
             )
+        return dw2
 
-    def bwd_gate_up_weight(self, do1_regroup, input_x_regroup, max_seq_len):
+    def bwd_gate_up_weight(self, do1_regroup, input_x_regroup, max_seq_len, expert_w1_len, dw1):
         # quant intput_x
-        input_x_regroup = (
-            input_x_regroup.reshape([max_seq_len, self.expert_w_count, -1]).transpose([1, 2, 0]).contiguous()
-        )
-        input_x_regroup = input_x_regroup.reshape([self.expert_w_count * input_x_regroup.shape[1], -1])
+        input_x_regroup = input_x_regroup.reshape([max_seq_len, expert_w1_len, -1]).transpose([1, 2, 0]).contiguous()
+        input_x_regroup = input_x_regroup.reshape([expert_w1_len * input_x_regroup.shape[1], -1])
         input_x_regroup_fp8, input_x_regroup_scale = kitchen_quant(
             input_x_regroup, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
         )
-        ingroup_fp8 = input_x_regroup_fp8.reshape([self.expert_w_count, -1, input_x_regroup_fp8.shape[-1]])
-        input_x_regroup_scale = input_x_regroup_scale.reshape(
-            [self.expert_w_count, -1, input_x_regroup_scale.shape[-1]]
-        )
+        ingroup_fp8 = input_x_regroup_fp8.reshape([expert_w1_len, -1, input_x_regroup_fp8.shape[-1]])
+        input_x_regroup_scale = input_x_regroup_scale.reshape([expert_w1_len, -1, input_x_regroup_scale.shape[-1]])
 
         # quant do1
-        do1_regroup = do1_regroup.reshape([max_seq_len, self.expert_w_count, -1]).transpose([1, 2, 0]).contiguous()
-        do1_regroup = do1_regroup.reshape([self.expert_w_count * do1_regroup.shape[1], -1])
+        do1_regroup = do1_regroup.reshape([max_seq_len, expert_w1_len, -1]).transpose([1, 2, 0]).contiguous()
+        do1_regroup = do1_regroup.reshape([-1, do1_regroup.shape[-1]])
         do1_regroup_fp8, do1_regroup_scale = kitchen_quant(
             do1_regroup, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
         )
-        do1_regroup_fp8 = do1_regroup_fp8.reshape([self.expert_w_count, self.n, -1])
-        do1_regroup_scale = do1_regroup_scale.reshape([self.expert_w_count, self.n, -1])
+        do1_regroup_fp8 = do1_regroup_fp8.reshape([expert_w1_len, -1, do1_regroup_fp8.shape[-1]])
+        do1_regroup_scale = do1_regroup_scale.reshape([expert_w1_len, -1, do1_regroup_scale.shape[-1]])
         # dw1
-        for i in range(self.expert_w_count):
-            self.expert_w1[i] = kitchen_fp8_gemm(
-                ingroup_fp8[i], input_x_regroup_scale[i], do1_regroup_fp8[i], do1_regroup_scale[i], True, True
+        for i in range(expert_w1_len):
+            dw1[i] = kitchen_fp8_gemm(
+                ingroup_fp8[i], input_x_regroup_scale[i], do1_regroup_fp8[i], do1_regroup_scale[i], True, True, dw1[i]
             )
+        return dw1
 
     def forward(self, hs_out, hs_scale_out, unzipped_probs, unzipped_expert_idx):
-        # 1 concat and transpose w1
+        # get w1
         expert_w1 = [x.w1 for x in self.custom_map.experts if x is not None]
-        self.expert_w1 = expert_w1
-        m, n = expert_w1[0].shape
-        self.m, self.n = m, n
-        # w1_shape = expert_w1[0].shape
 
         expert_w_count = len(expert_w1)
-        self.expert_w_count = expert_w_count
 
-        # concat and transpose w2
+        # get w2
         expert_w2 = [x.w2 for x in self.custom_map.experts if x is not None]
-        self.expert_w2 = expert_w2
 
         o1 = self.fwd_gate_up(hs_out, hs_scale_out, expert_w1, expert_w_count, unzipped_probs, unzipped_expert_idx)
+        o1 = o1 * unzipped_probs.unsqueeze(-1)
         self.o1 = o1
         o2 = self.fwd_swiglu(o1)
         o3 = self.fwd_down(o2, expert_w2, expert_w_count, unzipped_expert_idx)
 
         # save for bwd
-        x_t = dequantize_fp8_to_fp32(hs_out, hs_scale_out).T.contiguous()
-        if x_t.shape[-1] % 128 != 0 or x_t.shape[-1] % 512 != 0:
-            if (x_t.shape[-1] + 128 - (x_t.shape[-1] % 128)) % 512 != 0:
-                padding_size = 512
-            else:
-                padding_size = 128
-            x_t = paddle.concat(
-                [
-                    x_t,
-                    paddle.zeros([x_t.shape[0], padding_size - (x_t.shape[-1] % padding_size)], dtype=x_t.dtype),
-                ],
-                axis=1,
-            )
-        x_t_fp8, x_t_scale = kitchen_quant(
-            x_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
-        )
-        self.x_t_fp8s = x_t_fp8
-        self.x_t_scales = x_t_scale
+        self.unzipped_tokens = hs_out
+        self.unzipped_scale = hs_scale_out
+
         return o3
 
-    def backward(
-        self, out_grad, out_grad_scale, unzipped_expert_idx, dispatched_indices, unzipped_tokens, unzipped_scale
-    ):
+    def backward(self, out_grad, out_grad_scale, unzipped_expert_idx, dispatched_indices):
+        # recompute expert_w2 and expert_w1
+        expert_w2 = [x.w2 for x in self.custom_map.experts if x is not None]
+        expert_w1 = [x.w1 for x in self.custom_map.experts if x is not None]
+
         # do2
-        # 临时操作
-        out_grad_scale = out_grad_scale.to(paddle.float32)
-        do2 = self.bwd_dowm_input(self.expert_w2, out_grad, out_grad_scale, unzipped_expert_idx)
+        do2 = self.bwd_dowm_input(expert_w2, out_grad, out_grad_scale, unzipped_expert_idx)
 
         # do1
         probs_grad, do1 = self.bwd_swiglu(self.o1, do2)
 
         # dx
-        dx, do1_fp8, do1_scale = self.bwd_gate_up_input(do1, self.expert_w1, unzipped_expert_idx)
+        dx, do1_fp8, do1_scale = self.bwd_gate_up_input(do1, expert_w1, unzipped_expert_idx)
 
         # dequant dout and regroup dout
         o1_regroup, out_grad_regroup, max_seq_len = self.dequant_and_regroup_dout_and_o1(
-            out_grad, out_grad_scale, self.o1, unzipped_expert_idx, dispatched_indices
+            out_grad, out_grad_scale, self.o1, len(expert_w1), unzipped_expert_idx, dispatched_indices
         )
-        print("o1_regroup:", o1_regroup)
-        print("out_grad_regroup:", out_grad_regroup)
 
         # dw2
-        self.bwd_down_weight(out_grad_regroup, o1_regroup, max_seq_len)
+
+        dw2 = self.bwd_down_weight(out_grad_regroup, o1_regroup, max_seq_len, len(expert_w2), expert_w2)
+
         # dequant do1_fp8 and regroup do1_fp8,unzipped_tokens
         do1_regroup, input_x_regroup = self.dequant_do1_and_regroup_do1_fp8_and_unzipped_tokens(
-            do1_fp8, do1_scale, unzipped_expert_idx, max_seq_len, unzipped_tokens, unzipped_scale
+            do1_fp8, do1_scale, unzipped_expert_idx, max_seq_len
         )
+
         # dw1
-        self.bwd_gate_up_weight(do1_regroup, input_x_regroup, max_seq_len)
+        dw1 = self.bwd_gate_up_weight(do1_regroup, input_x_regroup, max_seq_len, len(expert_w1), expert_w1)
         self.reset_statue()
         return dx, probs_grad
 
@@ -448,7 +399,6 @@ class ExpertsNode:
             x_t_fp8, x_t_scale = kitchen_quant(
                 x_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
             )
-
             self.x_t_fp8s.append(x_t_fp8)
             self.x_t_scales.append(x_t_scale)
             self.o1s.append(o1)
@@ -477,7 +427,6 @@ class ExpertsNode:
             w2_fp8, w2_scale = kitchen_quant(
                 expert.w2, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
             )
-
             do2 = self.bwd_dowm_input(do3, do3_scale, w2_fp8, w2_scale)
             do1 = self.bwd_swiglu(o1, do2)
             dx = self.bwd_gate_up_input(do1, w1_fp8, w1_scale)
