@@ -26,10 +26,10 @@ from paddle import Tensor, nn
 from paddle.distributed.communication.group import Group
 
 from ..utils.log import logger
-from .fp8_utils import ExpertsNode, kitchen_quant
+from .fp8_utils import ExpertsGroupGemmNode, ExpertsNode, kitchen_quant
 from .fused_a2a import CombineNode, DispatchNode
 from .moe_gate import PretrainedMoEGate
-from .moe_utils import PermuteNode, UnPermuteNode
+from .moe_utils import PermuteNode, UnPermuteNode, UnZipNode, ZipNode
 from .token_dispatcher import MoEFlexTokenDispatcher, PreDispatchNode
 
 try:
@@ -503,7 +503,6 @@ class Fp8DispatchNode:
             self.token_dispatcher._comm_manager.group,
             previous_event=previous_event,
             async_finish=async_finish,
-            allocate_on_comm_stream=allocate_on_comm_stream,
         )
         self.token_dispatcher._comm_manager.handle = states["handle"]
         self.token_dispatcher._comm_manager.tokens_per_expert = states["tokens_per_expert"]
@@ -586,8 +585,17 @@ class MlpNode:
         self.experts = custom_map.experts
         self.permute_node = PermuteNode(self.token_dispatcher)
         self.experts_node = ExpertsNode(self.experts, custom_map)
+        self.experts_group_gemm_node = ExpertsGroupGemmNode(self.experts, custom_map)
         self.unpermute_node = UnPermuteNode(self.token_dispatcher)
         self.name = name
+        self.unzip_node = UnZipNode(self.token_dispatcher)
+        self.zip_node = ZipNode(self.token_dispatcher)
+        self.dispatched_indices = None
+        self.total_unzipped_tokens_num = None
+        self.dispatched_probs = None
+        self.unzipped_expert_idx = None
+        self.unzipped_tokens = None
+        self.unzipped_scale = None
 
     def reset_statue(self):
         self.token_permuted_indices = None
@@ -595,44 +603,124 @@ class MlpNode:
 
     @paddle.no_grad()
     def forward(self, hs_fp8_dispatched, hs_scale_dispatched, dispatched_indices, dispatched_probs):
-        # permute
-        (
-            hs_out,
-            hs_scale_out,
-            token_permuted_indices,
-            prob_permuted_indices,
-        ) = self.permute_node.forward(hs_fp8_dispatched, hs_scale_dispatched, dispatched_indices)
+        if len(self.token_dispatcher._comm_manager.tokens_per_expert) == 4:
+            # 1 unzip
+            total_unzipped_tokens_num = int((dispatched_indices != -1).astype("int64").sum())
+            self.dispatched_indices = dispatched_indices
+            self.total_unzipped_tokens_num = total_unzipped_tokens_num
+            dispatched_indices = dispatched_indices.to(paddle.int32)
+            (
+                unzipped_tokens,
+                unzipped_scale,
+                zipped_expertwise_rowmap,
+                unzipped_probs,
+                unzipped_expert_idx,
+            ) = self.unzip_node.forward(
+                hs_fp8_dispatched,
+                hs_scale_dispatched,
+                dispatched_indices,
+                dispatched_probs,
+                total_unzipped_tokens_num=total_unzipped_tokens_num,
+                topk=self.token_dispatcher._comm_manager.router_topk,
+                num_experts=4,
+            )
 
-        # experts
-        expert_out = self.experts_node.forward(
-            hs_out, hs_scale_out, self.token_dispatcher._comm_manager.tokens_per_expert
-        )
+            # 临时操作，unzipped_probs后续要和o1(bfloat16)乘，故这里做了cast
+            unzipped_probs = unzipped_probs.to(paddle.bfloat16)
 
-        # unpermute
-        hidden_states_out = self.unpermute_node.forward(
-            expert_out, token_permuted_indices, prob_permuted_indices, dispatched_probs
-        )
-        self.dispatched_probs = dispatched_probs
-        self.token_permuted_indices = token_permuted_indices
-        hidden_states_out.stop_gradient = False
-        return hidden_states_out
+            # 2 experts
+            expert_out = self.experts_group_gemm_node.forward(
+                unzipped_tokens, unzipped_scale, unzipped_probs, unzipped_expert_idx
+            )
+
+            self.unzipped_expert_idx = unzipped_expert_idx
+            self.unzipped_tokens = unzipped_tokens
+            self.unzipped_scale = unzipped_scale
+
+            # 3 zip
+            expert_out_zipped = self.zip_node.forward(
+                expert_out,
+                unzipped_probs,
+                zipped_expertwise_rowmap,
+                total_zipped_tokens=hs_fp8_dispatched.shape[0],
+                num_experts=4,
+            )
+            self.dispatched_probs = dispatched_probs
+            self.dispatched_indices = dispatched_indices
+            expert_out_zipped.stop_gradient = False
+            return expert_out_zipped
+        else:
+            # permute
+            (
+                hs_out,
+                hs_scale_out,
+                token_permuted_indices,
+                prob_permuted_indices,
+            ) = self.permute_node.forward(hs_fp8_dispatched, hs_scale_dispatched, dispatched_indices)
+
+            # experts
+            expert_out = self.experts_node.forward(
+                hs_out, hs_scale_out, self.token_dispatcher._comm_manager.tokens_per_expert
+            )
+
+            # unpermute
+            hidden_states_out = self.unpermute_node.forward(
+                expert_out, token_permuted_indices, prob_permuted_indices, dispatched_probs
+            )
+            self.dispatched_probs = dispatched_probs
+            self.token_permuted_indices = token_permuted_indices
+            hidden_states_out.stop_gradient = False
+            return hidden_states_out
 
     @paddle.no_grad()
     def backward(self, hidden_states_out_grad, hidden_states_out_grad_scale):
-        # unpermute grad -> fp8
-        expert_out_grad, dispatched_probs_grad = self.unpermute_node.backward(
-            hidden_states_out_grad, hidden_states_out_grad_scale
-        )
-        hidden_states_out_grad_scale_grad = paddle.gather(hidden_states_out_grad_scale, self.token_permuted_indices)
+        if len(self.token_dispatcher._comm_manager.tokens_per_expert) == 4:
+            # zip_grad
+            # hidden_states_out_grad_scale = hidden_states_out_grad_scale.to(paddle.bfloat16)
+            unzipped_grad, unzipped_scale_grad = self.zip_node.backward(
+                hidden_states_out_grad,
+                hidden_states_out_grad_scale,
+                self.dispatched_indices,
+                self.dispatched_probs,
+                total_unzipped_tokens_num=self.total_unzipped_tokens_num,
+                top_k=self.token_dispatcher._comm_manager.router_topk,
+                num_experts=4,
+            )
 
-        # expert_grad
-        hs_out_grad = self.experts_node.backward(expert_out_grad, hidden_states_out_grad_scale_grad)
+            # expert_grad
+            # unzipped_scale_grad = unzipped_scale_grad.to(paddle.float32)
+            expert_out, probs_grad = self.experts_group_gemm_node.backward(
+                unzipped_grad,
+                unzipped_scale_grad,
+                self.unzipped_expert_idx,
+                self.dispatched_indices,
+            )
 
-        # permute_grad
-        hs_fp8_dispatched_grad = self.permute_node.backward(hs_out_grad, self.dispatched_probs)
+            # unzip_grad
+            hs_fp8_dispatched_grad, dispatched_probs_grad = self.unzip_node.backward(
+                expert_out, hidden_states_out_grad, probs_grad
+            )
 
-        self.reset_statue()
-        return hs_fp8_dispatched_grad, dispatched_probs_grad
+            self.reset_statue()
+            return hs_fp8_dispatched_grad, dispatched_probs_grad
+
+        else:
+            # unpermute grad -> fp8
+            expert_out_grad, dispatched_probs_grad = self.unpermute_node.backward(
+                hidden_states_out_grad, hidden_states_out_grad_scale
+            )
+            hidden_states_out_grad_scale_grad = paddle.gather(
+                hidden_states_out_grad_scale, self.token_permuted_indices
+            )
+
+            # expert_grad
+            hs_out_grad = self.experts_node.backward(expert_out_grad, hidden_states_out_grad_scale_grad)
+
+            # permute_grad
+            hs_fp8_dispatched_grad = self.permute_node.backward(hs_out_grad, self.dispatched_probs)
+
+            self.reset_statue()
+            return hs_fp8_dispatched_grad, dispatched_probs_grad
 
 
 class FusionMoeNode:
@@ -654,10 +742,10 @@ class FusionMoeNode:
         hs_fp8_dispatched, hs_scale_dispatched, dispatched_indices, dispatched_probs = self.dispatch_node.forward(
             hs_fp8, hs_scale, token_indices, token_probs
         )
-
         hidden_states_out = self.mlp_node.forward(
             hs_fp8_dispatched, hs_scale_dispatched, dispatched_indices, dispatched_probs
         )
+
         output_combie = self.combine_node.forward(hidden_states_out)
         output = self.combine_quant_node.forward(output_combie)
         output.stop_gradient = False
