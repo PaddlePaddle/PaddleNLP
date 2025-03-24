@@ -143,18 +143,18 @@ __device__ __forceinline__ void arrive(uint64_t* bar) {
 // ======= kernel impl =======
 //
 
-template<uint32_t CTA_Q, uint32_t CTA_K, uint32_t NUM_THREADS, uint32_t head_dim, QuantGranularity Q_GRAN, QuantGranularity K_GRAN, typename DTypeOut, typename DTypeQuant, MaskMode mask_mode = MaskMode::kNone, bool fuse_v_scale=false>
+template<uint32_t CTA_Q, uint32_t CTA_K, uint32_t NUM_THREADS, uint32_t head_dim, QuantGranularity Q_GRAN, QuantGranularity K_GRAN, typename DTypeOut, /* typename DTypeQuant */, MaskMode mask_mode = MaskMode::kNone, bool fuse_v_scale=false>
 __global__ void qk_int8_sv_f8_attn_kernel(const __grid_constant__ CUtensorMap tensorMapQ, 
                                         const __grid_constant__ CUtensorMap tensorMapK,
                                         const __grid_constant__ CUtensorMap tensorMapV,
                                         float *__restrict__ Q_scale, float *__restrict__ K_scale, float *__restrict__ V_scale,
-                                        DTypeQuant* shift_bias, DTypeQuant* smooth_weight,
+                                        /* DTypeQuant* shift_bias, DTypeQuant* smooth_weight, */
                                         DTypeOut* O, uint32_t stride_bz_o, uint32_t stride_h_o, uint32_t stride_seq_o,
                                         const uint32_t qo_len, const uint32_t kv_len, const uint32_t num_kv_groups,
-                                        float sm_scale,
-                                        const float quant_max_bound,
+                                        float sm_scale
+                                        /* const float quant_max_bound,
                                         const float quant_min_bound,
-                                        const float in_scale)
+                                        const float in_scale */)
 {
   static_assert(NUM_THREADS == 128);
   static_assert(CTA_Q <= CTA_K);
@@ -542,7 +542,7 @@ __global__ void qk_int8_sv_f8_attn_kernel(const __grid_constant__ CUtensorMap te
 
   DTypeOut *O_lane_ptr = O + batch_id * stride_bz_o + head_id * stride_h_o + (bx * CTA_Q + warp_idx * 16 + (lane_id / 4)) * stride_seq_o + (lane_id % 4) * 2 ;
 
-  if (shift_bias == nullptr && smooth_weight == nullptr) {
+  // if (shift_bias == nullptr && smooth_weight == nullptr) {
 #pragma unroll
     for (uint32_t fq = 0; fq < num_tiles_q; fq++)
     {
@@ -578,8 +578,8 @@ __global__ void qk_int8_sv_f8_attn_kernel(const __grid_constant__ CUtensorMap te
         }
       }
     }
-  } else {
-    write_o_reg_gmem_multi_warps_shift_smooth_quant_sm90<num_tiles_q,
+  // } else {
+    /* write_o_reg_gmem_multi_warps_shift_smooth_quant_sm90<num_tiles_q,
                                                     num_tiles_v,
                                                     false,
                                                     DTypeQuant,
@@ -598,7 +598,7 @@ __global__ void qk_int8_sv_f8_attn_kernel(const __grid_constant__ CUtensorMap te
         q_n_stride,
         head_dim,
         num_kv_groups);
-  }
+  } */
 
 }
 
@@ -609,15 +609,15 @@ std::vector<paddle::Tensor> qk_int8_sv_f8_accum_f32_attn_inst_buf_sm90_fwd(
                   paddle::Tensor& output,
                   paddle::Tensor& query_scale,
                   paddle::Tensor& key_scale,
-                  const paddle::optional<paddle::Tensor>& shift_bias,
-                  const paddle::optional<paddle::Tensor>& smooth_weight,
+                  /* const paddle::optional<paddle::Tensor>& shift_bias,
+                  const paddle::optional<paddle::Tensor>& smooth_weight, */
                   int tensor_layout,
                   int is_causal,
                   int qk_quant_gran,
                   float sm_scale,
-                  const float quant_max_bound,
+                  /* const float quant_max_bound,
                   const float quant_min_bound,
-                  const float in_scale,
+                  const float in_scale, */
                   int return_lse)
 {
   CHECK_CUDA(query);
@@ -723,8 +723,8 @@ std::vector<paddle::Tensor> qk_int8_sv_f8_accum_f32_attn_inst_buf_sm90_fwd(
   DISPATCH_HEAD_DIM(head_dim, HEAD_DIM, {
     DISPATCH_CAUSAL(is_causal, IS_CAUSAL, {
       DISPATCH_QK_QUANT_GRAN(qk_quant_gran, QK_QUANT_GRAN, {
-        DISPATCH_PADDLE_DTYPE_TO_CTYPE(output_type, DTypeOut, {
-          DISPATCH_PADDLE_DTYPE_TO_CTYPE_FP16(shift_bias_dtype, DTypeQuant, {
+        DISPATCH_PADDLE_DTYPE_TO_CTYPE_FP16(output_type, DTypeOut, { // will shift to CTYPE soon.
+          // DISPATCH_PADDLE_DTYPE_TO_CTYPE_FP16(shift_bias_dtype, DTypeQuant, {
             constexpr int CTA_Q = 64;
             constexpr int CTA_K = 128;
             constexpr int NUM_THREADS = 128;
@@ -752,7 +752,7 @@ std::vector<paddle::Tensor> qk_int8_sv_f8_accum_f32_attn_inst_buf_sm90_fwd(
             CUtensorMap tma_map_K = create_tensor_map_4D<CTA_K, HEAD_DIM>(reinterpret_cast<int8_t*>(key.data()), batch_size, num_kv_heads, kv_len, HEAD_DIM, stride_bz_k, stride_h_k, stride_seq_k);
             CUtensorMap tma_map_V = create_tensor_map_4D<HEAD_DIM, CTA_K>(reinterpret_cast<int8_t*>(value.data()), batch_size, num_kv_heads, HEAD_DIM, value.shape()[3], stride_bz_v, stride_h_v, stride_d_v);
 
-            auto* kernel = qk_int8_sv_f8_attn_kernel<CTA_Q, CTA_K, NUM_THREADS, HEAD_DIM, static_cast<QuantGranularity>(QK_QUANT_GRAN), static_cast<QuantGranularity>(QK_QUANT_GRAN), DTypeOut, DTypeQuant, mask_mode, false>;
+            auto* kernel = qk_int8_sv_f8_attn_kernel<CTA_Q, CTA_K, NUM_THREADS, HEAD_DIM, static_cast<QuantGranularity>(QK_QUANT_GRAN), static_cast<QuantGranularity>(QK_QUANT_GRAN), DTypeOut, /* DTypeQuant, */ mask_mode, false>;
             size_t sMemSize = CTA_Q * HEAD_DIM * sizeof(int8_t) + CTA_K * HEAD_DIM * sizeof(int8_t) + CTA_K * HEAD_DIM * sizeof(int8_t);
             cudaFuncSetAttribute(
                 kernel,
@@ -766,13 +766,13 @@ std::vector<paddle::Tensor> qk_int8_sv_f8_accum_f32_attn_inst_buf_sm90_fwd(
               reinterpret_cast<float*>(query_scale.data()),
               reinterpret_cast<float*>(key_scale.data()),
               nullptr,
-              shift_bias ? reinterpret_cast<DTypeQuant*>(const_cast<DTypeQuant*>(shift_bias.get().data<DTypeQuant>())) : nullptr,
-              smooth_weight ? reinterpret_cast<DTypeQuant*>(const_cast<DTypeQuant*>(smooth_weight.get().data<DTypeQuant>())) : nullptr,
+              /* shift_bias ? reinterpret_cast<DTypeQuant*>(const_cast<DTypeQuant*>(shift_bias.get().data<DTypeQuant>())) : nullptr,
+              smooth_weight ? reinterpret_cast<DTypeQuant*>(const_cast<DTypeQuant*>(smooth_weight.get().data<DTypeQuant>())) : nullptr, */
               reinterpret_cast<DTypeOut*>(output.data()),
               stride_bz_o, stride_h_o, stride_seq_o,
-              qo_len, kv_len, num_kv_groups, sm_scale,
-              quant_max_bound, quant_min_bound, in_scale);
-          });
+              qo_len, kv_len, num_kv_groups, sm_scale
+              /* quant_max_bound, quant_min_bound, in_scale */);
+          // });
         });
       });
     });
@@ -790,15 +790,15 @@ std::vector<paddle::Tensor> qk_int8_sv_f8_accum_f32_fuse_v_scale_attn_inst_buf_s
                     paddle::Tensor& query_scale,
                     paddle::Tensor& key_scale,
                     paddle::Tensor& value_scale,
-                    const paddle::optional<paddle::Tensor>& shift_bias,
-                    const paddle::optional<paddle::Tensor>& smooth_weight,
+                    // const paddle::optional<paddle::Tensor>& shift_bias,
+                    // const paddle::optional<paddle::Tensor>& smooth_weight,
                     int tensor_layout,
                     int is_causal,
                     int qk_quant_gran,
                     float sm_scale,
-                    const float quant_max_bound,
-                    const float quant_min_bound,
-                    const float in_scale,
+                    // const float quant_max_bound,
+                    // const float quant_min_bound,
+                    // const float in_scale,
                     int return_lse)
 {
   CHECK_CUDA(query);
@@ -908,8 +908,8 @@ std::vector<paddle::Tensor> qk_int8_sv_f8_accum_f32_fuse_v_scale_attn_inst_buf_s
   DISPATCH_HEAD_DIM(head_dim, HEAD_DIM, {
     DISPATCH_CAUSAL(is_causal, IS_CAUSAL, {
       DISPATCH_QK_QUANT_GRAN(qk_quant_gran, QK_QUANT_GRAN, {
-        DISPATCH_PADDLE_DTYPE_TO_CTYPE(output_dtype, DTypeOut, {
-          DISPATCH_PADDLE_DTYPE_TO_CTYPE_FP16(shift_bias_dtype, DTypeQuant, {
+        DISPATCH_PADDLE_DTYPE_TO_CTYPE_FP16(output_dtype, DTypeOut, { // will shift to CTYPE soon.
+          // DISPATCH_PADDLE_DTYPE_TO_CTYPE_FP16(shift_bias_dtype, DTypeQuant, {
             constexpr int CTA_Q = 64;
             constexpr int CTA_K = 128;
             constexpr int NUM_THREADS = 128;
@@ -945,15 +945,15 @@ std::vector<paddle::Tensor> qk_int8_sv_f8_accum_f32_fuse_v_scale_attn_inst_buf_s
                   kernel,
                   cudaFuncAttributeMaxDynamicSharedMemorySize, sMemSize);
 
-            DTypeQuant* shift_bias_ptr = nullptr;
-            DTypeQuant* smooth_weight_ptr = nullptr;
-            if (shift_bias_dtype == paddle::DataType::BFLOAT16) {
-              shift_bias_ptr = shift_bias ? reinterpret_cast<DTypeQuant*>(const_cast<bfloat16*>(shift_bias.get().data<bfloat16>())) : nullptr;
-              smooth_weight_ptr = smooth_weight ? reinterpret_cast<DTypeQuant*>(const_cast<bfloat16*>(smooth_weight.get().data<bfloat16>())) : nullptr;
-            } else {
-              shift_bias_ptr = shift_bias ? reinterpret_cast<DTypeQuant*>(const_cast<float16*>(shift_bias.get().data<float16>())) : nullptr;
-              smooth_weight_ptr = smooth_weight ? reinterpret_cast<DTypeQuant*>(const_cast<float16*>(smooth_weight.get().data<float16>())) : nullptr;
-            }
+            // DTypeQuant* shift_bias_ptr = nullptr;
+            // DTypeQuant* smooth_weight_ptr = nullptr;
+            // if (shift_bias_dtype == paddle::DataType::BFLOAT16) {
+            //   shift_bias_ptr = shift_bias ? reinterpret_cast<DTypeQuant*>(const_cast<bfloat16*>(shift_bias.get().data<bfloat16>())) : nullptr;
+            //   smooth_weight_ptr = smooth_weight ? reinterpret_cast<DTypeQuant*>(const_cast<bfloat16*>(smooth_weight.get().data<bfloat16>())) : nullptr;
+            // } else {
+            //   shift_bias_ptr = shift_bias ? reinterpret_cast<DTypeQuant*>(const_cast<float16*>(shift_bias.get().data<float16>())) : nullptr;
+            //   smooth_weight_ptr = smooth_weight ? reinterpret_cast<DTypeQuant*>(const_cast<float16*>(smooth_weight.get().data<float16>())) : nullptr;
+            // }
             
             dim3 grid(div_ceil(qo_len, CTA_Q), num_qo_heads, batch_size);
             kernel<<<grid, NUM_THREADS, sMemSize>>>(
@@ -963,13 +963,13 @@ std::vector<paddle::Tensor> qk_int8_sv_f8_accum_f32_fuse_v_scale_attn_inst_buf_s
               reinterpret_cast<float*>(query_scale.data()),
               reinterpret_cast<float*>(key_scale.data()),
               reinterpret_cast<float*>(value_scale.data()),
-              shift_bias_ptr,
-              smooth_weight_ptr,
+              // shift_bias_ptr,
+              // smooth_weight_ptr,
               reinterpret_cast<DTypeOut*>(output.data()),
               stride_bz_o, stride_h_o, stride_seq_o,
-              qo_len, kv_len, num_kv_groups, sm_scale, 
-              quant_max_bound, quant_min_bound, in_scale);
-          });
+              qo_len, kv_len, num_kv_groups, sm_scale
+              /* quant_max_bound, quant_min_bound, in_scale */);
+          // });
         });
       });
     });
@@ -988,12 +988,12 @@ std::vector<paddle::Tensor> sage_attention_fwd(paddle::Tensor& q,
                                                paddle::Tensor& km,
                                                const paddle::Tensor& seq_len_this_time,
                                                const paddle::optional<paddle::Tensor>& vm,
-                                               const paddle::optional<paddle::Tensor>& shift_bias,
-                                               const paddle::optional<paddle::Tensor>& smooth_weight,
+                                              //  const paddle::optional<paddle::Tensor>& shift_bias,
+                                              //  const paddle::optional<paddle::Tensor>& smooth_weight,
                                                float sm_scale,
-                                               float quant_max_bound,
-                                               float quant_min_bound,
-                                               float in_scale,
+                                              //  float quant_max_bound,
+                                              //  float quant_min_bound,
+                                              //  float in_scale,
                                                std::string qk_quant_gran,
                                                std::string pv_accum_dtype,
                                                int tensor_layout,
@@ -1038,8 +1038,8 @@ std::vector<paddle::Tensor> sage_attention_fwd(paddle::Tensor& q,
 
   std::vector<paddle::Tensor>&& quant_vfp8_results = per_channel_fp8(v, tensor_layout, 448.0, false);
 
-  qk_int8_sv_f8_accum_f32_fuse_v_scale_attn_inst_buf_sm90_fwd(quant_qk_results[0], quant_qk_results[2], quant_vfp8_results[0], o, quant_qk_results[1], quant_qk_results[3], quant_vfp8_results[1], shift_bias, smooth_weight, tensor_layout, _is_causal, _qk_quant_gran, sm_scale, 
-  quant_max_bound, quant_min_bound, in_scale, _return_lse);
+  qk_int8_sv_f8_accum_f32_fuse_v_scale_attn_inst_buf_sm90_fwd(quant_qk_results[0], quant_qk_results[2], quant_vfp8_results[0], o, quant_qk_results[1], quant_qk_results[3], quant_vfp8_results[1], /* shift_bias, smooth_weight, */ tensor_layout, _is_causal, _qk_quant_gran, sm_scale, 
+  /* quant_max_bound, quant_min_bound, in_scale, */ _return_lse);
 
   return {o};
 }
@@ -1050,9 +1050,9 @@ std::vector<std::vector<int64_t>> sage_attention_InferShape(
   const std::vector<int64_t> value_shape,
   const std::vector<int64_t> km_shape,
   const std::vector<int64_t> seq_len_this_time_shape,
-  const paddle::optional<std::vector<int64_t>>& vm_shape,
-  const paddle::optional<std::vector<int64_t>>& shift_bias_shape,
-  const paddle::optional<std::vector<int64_t>>& smooth_weight_shape) {
+  const paddle::optional<std::vector<int64_t>>& vm_shape
+  /* const paddle::optional<std::vector<int64_t>>& shift_bias_shape,
+  const paddle::optional<std::vector<int64_t>>& smooth_weight_shape */) {
     return {query_shape};
 }
 
@@ -1062,22 +1062,23 @@ std::vector<paddle::DataType> sage_attention_InferDtype(
   const paddle::DataType C_dtype,
   const paddle::DataType D_dtype,
   const paddle::DataType E_dtype,
-  const paddle::optional<paddle::DataType>& F_dtype,
-  const paddle::optional<paddle::DataType>& G_dtype,
+  // const paddle::optional<paddle::DataType>& F_dtype,
+  // const paddle::optional<paddle::DataType>& G_dtype,
   const paddle::optional<paddle::DataType>& H_dtype) {
-  if (G_dtype && H_dtype) {
-    return {paddle::DataType::INT8};
-  }
+  // if (G_dtype && H_dtype) {
+  //   return {paddle::DataType::INT8};
+  // }
   return {C_dtype};
 }
 
 PD_BUILD_OP(sage_attention_forward)
-    .Inputs({"q", "k", "v", "km", "seq_len_this_time", paddle::Optional("vm"), paddle::Optional("shift_bias"), paddle::Optional("smooth_weight")})
+    .Inputs({"q", "k", "v", "km", "seq_len_this_time", paddle::Optional("vm")
+              /* paddle::Optional("shift_bias"), paddle::Optional("smooth_weight") */})
     .Outputs({"o"})
     .Attrs({"sm_scale: float",
-            "quant_max_bound: float",
+            /* "quant_max_bound: float",
             "quant_min_bound: float",
-            "in_scale: float",
+            "in_scale: float",*/
             "qk_quant_gran: std::string",
             "pv_accum_dtype: std::string",
             "tensor_layout: int",
