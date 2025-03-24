@@ -64,9 +64,11 @@ __global__ void tokens_guided_unzip_kernel(
     const int token_length) {
   const int this_row = blockIdx.x;
   if (this_row >= total_zipped_tokens_num) return;
+	/*
   const __nv_bfloat16 *X = reinterpret_cast<const __nv_bfloat16 *>(X_in);
   __nv_bfloat16 *guided_unzipped_X =
       reinterpret_cast<__nv_bfloat16 *>(guided_unzipped_X_out);
+  */
 
   int local_row_pushlist[num_experts];
 // 填充该行token被广播到的rows和对应的概率
@@ -81,8 +83,8 @@ __global__ void tokens_guided_unzip_kernel(
     if (push_row == -1) continue;
     // 可通过向量化优化
     for (int i = threadIdx.x; i < token_length; i += blockDim.x) {
-      guided_unzipped_X[push_row * token_length + i] =
-          X[this_row * token_length + i];
+      guided_unzipped_X_out[push_row * token_length + i] =
+          X_in[this_row * token_length + i];
     }
   }
 }
