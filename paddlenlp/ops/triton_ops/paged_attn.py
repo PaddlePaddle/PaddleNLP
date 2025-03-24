@@ -62,18 +62,17 @@ class PagedAttention:
         k_scale: paddle.Tensor,
         v_scale: paddle.Tensor,
     ) -> None:
-        pass
-        # ops.reshape_and_cache(
-        #     key,
-        #     value,
-        #     key_cache,
-        #     value_cache,
-        #     slot_mapping.flatten(),
-        #     kv_cache_dtype,
-        #     k_scale,
-        #     v_scale,
-        # )
-
+        from paddlenlp_ops import reshape_and_cache
+        reshape_and_cache(
+            key,
+            value,
+            key_cache,
+            value_cache,
+            slot_mapping.flatten(),
+            k_scale,
+            v_scale,
+            kv_cache_dtype
+        )
     @staticmethod
     def forward_prefix(
         query,

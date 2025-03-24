@@ -33,7 +33,6 @@ from paddle.nn import Layer
 from paddle.nn.initializer import Constant
 from paddle.nn.quant import weight_only_linear
 
-from paddlenlp.ops.triton_ops.paged_attn import PagedAttention
 from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
 
@@ -3005,6 +3004,8 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 fmha_out_prefill = paddle.squeeze(fmha_out_prefill, axis=0)
             else:
                 if paddle.is_compiled_with_rocm():
+                    from paddlenlp.ops.triton_ops.paged_attn import PagedAttention
+                    
                     """query: shape = [num_tokens, num_heads * head_size]
                     key: shape = [num_tokens, num_kv_heads * head_size]
                     value: shape = [num_tokens, num_kv_heads * head_size]
@@ -3013,9 +3014,9 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                     alibi_slopes = None
                     sliding_window = (-1, -1)
                     kv_cache_dtype = "auto"
-                    slot_mapping = None
-                    k_scale = paddle.to_tensor(1.0, dtype="float32")
-                    v_scale = paddle.to_tensor(1.0, dtype="float32")
+                    slot_mapping =  paddle.arange(0, src.shape[0] * seq_lens, dtype="int64")
+                    k_scale = paddle.to_tensor(1.0, dtype="bfloat16")
+                    v_scale = paddle.to_tensor(1.0, dtype="bfloat16")
                     block_tables = kwargs.get("block_tables", None)
 
                     query = query.reshape([-1, self.num_heads, self.head_dim])
@@ -3025,7 +3026,9 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                     else:
                         assert value is None
 
-                    key_cache, value_cache = PagedAttention.split_kv_cache(caches, self.kv_num_heads, self.head_dim)
+                    if isinstance(caches, list):
+                        kv_cache_tensor = paddle.concat(kv_cache)
+                    key_cache, value_cache = PagedAttention.split_kv_cache(kv_cache_tensor, self.kv_num_heads, self.head_dim)
 
                     PagedAttention.write_to_paged_cache(
                         key,
@@ -3038,18 +3041,11 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                         v_scale,
                     )
 
-                    if block_tables is not None:
-                        num_blocks_per_seq = (block_tables != -1).sum(axis=1)
-                        block_size = key_cache.shape[2] // (self.kv_num_heads * self.head_dim)
-                        seq_lens = num_blocks_per_seq * block_size
-                        seq_lens_tensor = paddle.to_tensor(seq_lens, dtype="int32")
-                        max_query_len = int(seq_lens.max().item())
-                        query_start_loc = paddle.cumsum(seq_lens_tensor, exclusive=True)
-                    else:
-                        num_tokens = query.shape[0]
-                        seq_lens_tensor = paddle.to_tensor([num_tokens], dtype="int32")
-                        max_query_len = num_tokens
-                        query_start_loc = paddle.to_tensor([0], dtype="int32")
+                    batch_size = self.src.shape[0]
+                    seq_lens_1 = [item for sublist in seq_lens for item in sublist]
+                    query_start_loc = paddle.to_tensor([0] + [sum(seq_lens_1[:i + 1]) for i in range(len(seq_lens_1))], dtype="int64")
+                    seq_lens_tensor = paddle.to_tensor(seq_lens_1, dtype="int64")
+                    max_query_len = max(seq_lens)
 
                     fmha_out_prefill = PagedAttention.forward_prefix(
                         query=query,
