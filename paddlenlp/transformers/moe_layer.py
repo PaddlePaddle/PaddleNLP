@@ -598,6 +598,8 @@ class MlpNode:
     def reset_statue(self):
         self.token_permuted_indices = None
         self.dispatched_probs = None
+        self.total_unzipped_tokens_num = None
+        self.unzipped_expert_idx = None
 
     @paddle.no_grad()
     def forward(self, hs_fp8_dispatched, hs_scale_dispatched, dispatched_indices, dispatched_probs):
