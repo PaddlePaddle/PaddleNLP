@@ -47,7 +47,7 @@ class PromptOnlyDataset(TokenizedDataset):
     def preprocess(self, raw_sample: RawSample) -> PromptOnlySample:
         input_dict = {}
         prompt = format_prompt(input=raw_sample["input"], eos_token=self.tokenizer.eos_token)
-        input_dict["input_ids"] = self.tokenize(prompt)
+        input_dict["input_ids"] = self.tokenize(prompt, truncation=True, max_length=self.max_src_len)
         if self.use_rm_server:
             answer = format_prompt(input=raw_sample["answer"], eos_token=self.tokenizer.eos_token)
             input_dict["label_ids"] = self.tokenize(answer)

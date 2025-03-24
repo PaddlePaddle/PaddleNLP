@@ -396,13 +396,19 @@ def main():
 
     if training_args.should_load_dataset:
         train_ds = PromptOnlyDataset(
-            data_args.parsed_train_datasets, tokenizer=actor_tokenizer, use_rm_server=training_args.use_rm_server
+            data_args.parsed_train_datasets,
+            tokenizer=actor_tokenizer,
+            use_rm_server=training_args.use_rm_server,
+            max_src_len=training_args.max_src_len,
         )
         if data_args.eval_datasets is None and data_args.eval_split_ratio:
             train_ds, dev_ds = train_ds.split_train_test(split_ratio=data_args.eval_split_ratio)
         elif data_args.eval_datasets is not None:
             dev_ds = PromptOnlyDataset(
-                data_args.parsed_eval_datasets, tokenizer=actor_tokenizer, use_rm_server=training_args.use_rm_server
+                data_args.parsed_eval_datasets,
+                tokenizer=actor_tokenizer,
+                use_rm_server=training_args.use_rm_server,
+                max_src_len=training_args.max_src_len,
             )
         else:
             dev_ds = None
