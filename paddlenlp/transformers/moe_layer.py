@@ -591,11 +591,9 @@ class MlpNode:
         self.unzip_node = UnZipNode(self.token_dispatcher)
         self.zip_node = ZipNode(self.token_dispatcher)
         self.dispatched_indices = None
-        self.total_unzipped_tokens_num = None
         self.dispatched_probs = None
+        self.total_unzipped_tokens_num = None
         self.unzipped_expert_idx = None
-        self.unzipped_tokens = None
-        self.unzipped_scale = None
 
     def reset_statue(self):
         self.token_permuted_indices = None

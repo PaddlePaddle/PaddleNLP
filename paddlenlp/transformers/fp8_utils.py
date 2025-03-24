@@ -44,7 +44,9 @@ __all__ = [
 ]
 
 
-def kitchen_quant(x, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False):
+def kitchen_quant(x, backend=None, is_1d_scaled=True, return_transpose=False):
+    if backend is None:
+        backend = kitchen.ops.Backend.CUBLAS
     quant_tile_shape = (1, 128) if is_1d_scaled else (128, 128)
     x_qparams = QParams(
         quant_dtype=paddle.float8_e4m3fn,
@@ -244,58 +246,92 @@ class ExpertsGroupGemmNode:
         return do1_regroup, input_x_regroup
 
     # ===== dw2 = deep_gemm(o2_t_fp8, do3_t_fp8)
-    def bwd_down_weight(self, out_grad_regroup, o1, max_seq_len, expert_w2_len, dw2):
+    def bwd_down_weight(self, out_grad_regroup, o1, max_seq_len, expert_w2):
         # recompute o2
         o2 = self.fwd_swiglu(o1)
-        o2_t = o2.reshape([max_seq_len, expert_w2_len, -1]).transpose([1, 2, 0]).contiguous()
+        o2_t = o2.reshape([max_seq_len, len(expert_w2), -1]).transpose([1, 2, 0]).contiguous()
         # quant o2_t
-        o2_t = o2_t.reshape([expert_w2_len * o2_t.shape[1], -1])
+        o2_t = o2_t.reshape([len(expert_w2) * o2_t.shape[1], -1])
 
         o2_t_fp8, o2_t_scale = kitchen_quant(
             o2_t, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
         )
-        o2_t_fp8 = o2_t_fp8.reshape([expert_w2_len, -1, o2_t_fp8.shape[-1]])
-        o2_t_scale = o2_t_scale.reshape([expert_w2_len, -1, o2_t_scale.shape[-1]])
+        o2_t_fp8 = o2_t_fp8.reshape([len(expert_w2), -1, o2_t_fp8.shape[-1]])
+        o2_t_scale = o2_t_scale.reshape([len(expert_w2), -1, o2_t_scale.shape[-1]])
 
         # quant out_grad_regroup
-        out_grad_regroup = out_grad_regroup.reshape([max_seq_len, expert_w2_len, -1]).transpose([1, 2, 0]).contiguous()
+        out_grad_regroup = (
+            out_grad_regroup.reshape([max_seq_len, len(expert_w2), -1]).transpose([1, 2, 0]).contiguous()
+        )
         out_grad_regroup = out_grad_regroup.reshape([-1, out_grad_regroup.shape[-1]])
         out_grad_regroup_fp8, out_grad_regroup_scale = kitchen_quant(
             out_grad_regroup, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
         )
 
-        out_grad_regroup_fp8 = out_grad_regroup_fp8.reshape([expert_w2_len, -1, out_grad_regroup_fp8.shape[-1]])
-        out_grad_regroup_scale = out_grad_regroup_scale.reshape([expert_w2_len, -1, out_grad_regroup_scale.shape[-1]])
-        for i in range(expert_w2_len):
-            dw2[i] = kitchen_fp8_gemm(
-                o2_t_fp8[i], o2_t_scale[i], out_grad_regroup_fp8[i], out_grad_regroup_scale[i], True, True, dw2[i]
-            )
-        return dw2
+        out_grad_regroup_fp8 = out_grad_regroup_fp8.reshape([len(expert_w2), -1, out_grad_regroup_fp8.shape[-1]])
+        out_grad_regroup_scale = out_grad_regroup_scale.reshape([len(expert_w2), -1, out_grad_regroup_scale.shape[-1]])
+        for i in range(len(expert_w2)):
+            if hasattr(expert_w2[i], "main_grad"):
+                expert_w2[i].main_grad = kitchen_fp8_gemm(
+                    o2_t_fp8[i],
+                    o2_t_scale[i],
+                    out_grad_regroup_fp8[i],
+                    out_grad_regroup_scale[i],
+                    True,
+                    True,
+                    expert_w2[i].main_grad,
+                )
+            else:
+                expert_w2[i].grad = kitchen_fp8_gemm(
+                    o2_t_fp8[i],
+                    o2_t_scale[i],
+                    out_grad_regroup_fp8[i],
+                    out_grad_regroup_scale[i],
+                    True,
+                    True,
+                    expert_w2[i].grad,
+                )
 
-    def bwd_gate_up_weight(self, do1_regroup, input_x_regroup, max_seq_len, expert_w1_len, dw1):
+    def bwd_gate_up_weight(self, do1_regroup, input_x_regroup, max_seq_len, expert_w1):
         # quant intput_x
-        input_x_regroup = input_x_regroup.reshape([max_seq_len, expert_w1_len, -1]).transpose([1, 2, 0]).contiguous()
-        input_x_regroup = input_x_regroup.reshape([expert_w1_len * input_x_regroup.shape[1], -1])
+        input_x_regroup = input_x_regroup.reshape([max_seq_len, len(expert_w1), -1]).transpose([1, 2, 0]).contiguous()
+        input_x_regroup = input_x_regroup.reshape([len(expert_w1) * input_x_regroup.shape[1], -1])
         input_x_regroup_fp8, input_x_regroup_scale = kitchen_quant(
             input_x_regroup, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
         )
-        ingroup_fp8 = input_x_regroup_fp8.reshape([expert_w1_len, -1, input_x_regroup_fp8.shape[-1]])
-        input_x_regroup_scale = input_x_regroup_scale.reshape([expert_w1_len, -1, input_x_regroup_scale.shape[-1]])
+        ingroup_fp8 = input_x_regroup_fp8.reshape([len(expert_w1), -1, input_x_regroup_fp8.shape[-1]])
+        input_x_regroup_scale = input_x_regroup_scale.reshape([len(expert_w1), -1, input_x_regroup_scale.shape[-1]])
 
         # quant do1
-        do1_regroup = do1_regroup.reshape([max_seq_len, expert_w1_len, -1]).transpose([1, 2, 0]).contiguous()
+        do1_regroup = do1_regroup.reshape([max_seq_len, len(expert_w1), -1]).transpose([1, 2, 0]).contiguous()
         do1_regroup = do1_regroup.reshape([-1, do1_regroup.shape[-1]])
         do1_regroup_fp8, do1_regroup_scale = kitchen_quant(
             do1_regroup, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
         )
-        do1_regroup_fp8 = do1_regroup_fp8.reshape([expert_w1_len, -1, do1_regroup_fp8.shape[-1]])
-        do1_regroup_scale = do1_regroup_scale.reshape([expert_w1_len, -1, do1_regroup_scale.shape[-1]])
+        do1_regroup_fp8 = do1_regroup_fp8.reshape([len(expert_w1), -1, do1_regroup_fp8.shape[-1]])
+        do1_regroup_scale = do1_regroup_scale.reshape([len(expert_w1), -1, do1_regroup_scale.shape[-1]])
         # dw1
-        for i in range(expert_w1_len):
-            dw1[i] = kitchen_fp8_gemm(
-                ingroup_fp8[i], input_x_regroup_scale[i], do1_regroup_fp8[i], do1_regroup_scale[i], True, True, dw1[i]
-            )
-        return dw1
+        for i in range(len(expert_w1)):
+            if hasattr(expert_w1[i], "main_grad"):
+                expert_w1[i].main_grad = kitchen_fp8_gemm(
+                    ingroup_fp8[i],
+                    input_x_regroup_scale[i],
+                    do1_regroup_fp8[i],
+                    do1_regroup_scale[i],
+                    True,
+                    True,
+                    expert_w1[i].main_grad,
+                )
+            else:
+                expert_w1[i].grad = kitchen_fp8_gemm(
+                    ingroup_fp8[i],
+                    input_x_regroup_scale[i],
+                    do1_regroup_fp8[i],
+                    do1_regroup_scale[i],
+                    True,
+                    True,
+                    expert_w1[i].grad,
+                )
 
     def forward(self, hs_out, hs_scale_out, unzipped_probs, unzipped_expert_idx):
         # get w1
@@ -339,7 +375,7 @@ class ExpertsGroupGemmNode:
 
         # dw2
 
-        dw2 = self.bwd_down_weight(out_grad_regroup, o1_regroup, max_seq_len, len(expert_w2), expert_w2)
+        self.bwd_down_weight(out_grad_regroup, o1_regroup, max_seq_len, expert_w2)
 
         # dequant do1_fp8 and regroup do1_fp8,unzipped_tokens
         do1_regroup, input_x_regroup = self.dequant_do1_and_regroup_do1_fp8_and_unzipped_tokens(
@@ -347,7 +383,7 @@ class ExpertsGroupGemmNode:
         )
 
         # dw1
-        dw1 = self.bwd_gate_up_weight(do1_regroup, input_x_regroup, max_seq_len, len(expert_w1), expert_w1)
+        self.bwd_gate_up_weight(do1_regroup, input_x_regroup, max_seq_len, expert_w1)
         self.reset_statue()
         return dx, probs_grad
 
