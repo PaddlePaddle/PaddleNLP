@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ..transformers.dpo_criterion import DPOCriterion
+from ..transformers.dpo_criterion import AutoDPOCriterion, DPOCriterion
 from ..transformers.kto_criterion import KTOCriterion
+from .dpo_auto_trainer import DPOAutoTrainer
 from .dpo_trainer import DPOTrainer
 from .embedding_trainer import EmbeddingTrainer
 from .kto_trainer import KTOTrainer

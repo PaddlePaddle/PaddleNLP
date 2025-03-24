@@ -45,6 +45,7 @@ namespace cub = hipcub;
 #include "paddle/phi/backends/gpu/gpu_info.h"
 #include "nlohmann/json.hpp"
 
+
 using json = nlohmann::json;
 
 #define CUDA_CHECK(call)                           \

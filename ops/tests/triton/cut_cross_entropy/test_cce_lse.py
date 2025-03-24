@@ -28,7 +28,7 @@ def test_lse(dtype: paddle.dtype, softcap: Union[float, None], shape: tuple[int,
     paddle.seed(0)
 
     if dtype == paddle.bfloat16 and not paddle.device.is_compiled_with_cuda():
-        pytest.skip(reason="BF16 not avaliable")
+        pytest.skip(reason="BF16 not available")
 
     N, V, D = shape
     e = paddle.randn((N, D), dtype=dtype) / (D**0.5)

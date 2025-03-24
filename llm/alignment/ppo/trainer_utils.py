@@ -327,11 +327,11 @@ class TrainingArguments(TrainingArguments):
 class ModelArgument:
     actor_model_name_or_path: str = field(
         default=None,
-        metadata={"help": "Build-in pretrained model name or the path to local model."},
+        metadata={"help": "Built-in pretrained model name or the path to local model."},
     )
     reward_model_name_or_path: str = field(
         default=None,
-        metadata={"help": "Build-in pretrained model name or the path to local model."},
+        metadata={"help": "Built-in pretrained model name or the path to local model."},
     )
     reward_server: str = field(
         default=None,
@@ -339,7 +339,7 @@ class ModelArgument:
     )
     reward_critic_model_name_or_path: str = field(
         default=None,
-        metadata={"help": "Build-in pretrained model name or the path to local model."},
+        metadata={"help": "Built-in pretrained model name or the path to local model."},
     )
     actor_tokenizer_alpha: float = field(default=None, metadata={"help": "Tokenizer will tokenize randomly"})
     reward_tokenizer_alpha: float = field(default=None, metadata={"help": "Tokenizer will tokenize randomly"})
@@ -699,16 +699,16 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
     if self.args.use_hybrid_parallel:
         forbidden_no_sync = True
 
-    availiable_no_sync = dp_enabled and not forbidden_no_sync
+    available_no_sync = dp_enabled and not forbidden_no_sync
 
     is_no_sync = (
         ((step_control + 1) % args.gradient_accumulation_steps != 0)
-        and availiable_no_sync
+        and available_no_sync
         and args._no_sync_in_gradient_accumulation
-    ) or (args.recompute and availiable_no_sync)
+    ) or (args.recompute and available_no_sync)
     # sharding
     # stage1. the same as ddp
-    # stage2. manualy collect gradient on dp group
+    # stage2. manually collect gradient on dp group
 
     dp_master_grad = self.args.world_size > 1 and self.args.amp_master_grad and not self.args.use_hybrid_parallel
     if dp_master_grad:
@@ -733,7 +733,7 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
 
         # self.timers and self.timers(f"{timer_name}: forward-backward").stop()
 
-        # Maunally collect gradients
+        # Manually collect gradients
         # Case 1: Use recompute and dp
         # Case 2: Hack dp with master_grad
         # Case 3: Pipeline or sharding overlap
@@ -741,12 +741,12 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
         # self.timers and self.timers(f"{timer_name}: all-reduce").start()
 
         # Case 1: Use recompute and dp / sharding stage1,
-        # manualy collect gradient for dp.
-        if args.recompute and availiable_no_sync:
+        # manually collect gradient for dp.
+        if args.recompute and available_no_sync:
             fused_allreduce_gradients(list(model.parameters()), None)
 
         # Case 2: hack dp with master_grad
-        if dp_master_grad and not (args.recompute and availiable_no_sync):
+        if dp_master_grad and not (args.recompute and available_no_sync):
             fused_allreduce_gradients(list(model.parameters()), None)
 
         # Pipeline parallel mode,  handle gradient reduce here to overlap

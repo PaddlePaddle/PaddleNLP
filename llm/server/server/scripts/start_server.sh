@@ -55,6 +55,21 @@ export SERVICE_GRPC_PORT=${GRPC_PORT:-${SERVICE_GRPC_PORT:-"8811"}}
 export INTER_PROC_PORT=${INTER_QUEUE_PORT:-${INTER_PROC_PORT:-"8813"}}
 export SERVICE_HTTP_PORT=${PUSH_MODE_HTTP_PORT:-${SERVICE_HTTP_PORT:-"9965"}}
 
+check_port_occupied() {
+    local port=$1
+    if netstat -tuln | grep -q ":${port}\b"; then
+        echo  "PORT: ${port} occupied! Please change the port!"
+        exit 1
+    fi
+}
+
+check_port_occupied ${HEALTH_HTTP_PORT}
+check_port_occupied ${METRICS_HTTP_PORT}
+check_port_occupied ${SERVICE_GRPC_PORT}
+check_port_occupied ${INTER_PROC_PORT}
+check_port_occupied ${SERVICE_HTTP_PORT}
+
+
 
 if [ ! -d "llm_model" ];then
     ln -s /opt/source/PaddleNLP/llm/server/server/llm_model llm_model
@@ -83,15 +98,20 @@ else
     sleep ${SERVER_WAITTING_TIME:-"25"}
 fi
 
-
-
-tritonserver --exit-timeout-secs 100000 --cuda-memory-pool-byte-size 0:0 --cuda-memory-pool-byte-size 1:0 \
+OUTPUT_LOG_TO_CONSOLE=${OUTPUT_LOG_TO_CONSOLE:-"0"}
+# Set the log redirection based on whether logs should be output to the console
+LOG_REDIRECT=""
+# If OUTPUT_LOG_TO_CONSOLE is set to "1", redirect logs to the console log file
+if [ "$OUTPUT_LOG_TO_CONSOLE" == "1" ]; then
+    LOG_REDIRECT="> log/console.log 2>&1"
+fi
+eval tritonserver --exit-timeout-secs 100000 --cuda-memory-pool-byte-size 0:0 --cuda-memory-pool-byte-size 1:0 \
                  --cuda-memory-pool-byte-size 2:0 --cuda-memory-pool-byte-size 3:0 --cuda-memory-pool-byte-size 4:0 \
                  --cuda-memory-pool-byte-size 5:0 --cuda-memory-pool-byte-size 6:0 --cuda-memory-pool-byte-size 7:0 \
                  --pinned-memory-pool-byte-size 0 --model-repository llm_model/ \
                  --allow-http false \
                  --grpc-port=${SERVICE_GRPC_PORT} \
                  --metrics-port=${METRICS_HTTP_PORT} \
-                 --log-file log/server.log --log-info true &
+                 --log-file log/server.log --log-info true $LOG_REDIRECT &
 
 echo "The logs for the model service, please check" ${PWD}"/log/server.log and "${PWD}"/log/workerlog.0"
