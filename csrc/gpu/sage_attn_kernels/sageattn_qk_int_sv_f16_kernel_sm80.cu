@@ -811,7 +811,7 @@ std::vector<paddle::Tensor>  qk_int8_sv_f16_accum_f32_attn_fwd(paddle::Tensor& q
     DISPATCH_CAUSAL(is_causal, IS_CAUSAL, {
       DISPATCH_QK_QUANT_GRAN(qk_quant_gran, QK_QUANT_GRAN, {
         DISPATCH_RETURN_LSE(return_lse, RETURN_LSE, {
-          DISPATCH_PADDLE_DTYPE_TO_CTYPE(output_dtype, DTypeOut, {
+          DISPATCH_PADDLE_DTYPE_TO_CTYPE_FP16(output_dtype, DTypeOut, {
             constexpr int CTA_Q = 128;
             constexpr int CTA_K = 64;
             constexpr int WARP_Q = 32;
@@ -988,7 +988,7 @@ std::vector<paddle::Tensor> qk_int8_sv_f16_accum_f16_attn_fwd(
     DISPATCH_CAUSAL(is_causal, IS_CAUSAL, {
       DISPATCH_QK_QUANT_GRAN(qk_quant_gran, QK_QUANT_GRAN, {
         DISPATCH_RETURN_LSE(return_lse, RETURN_LSE, {
-          DISPATCH_PADDLE_DTYPE_TO_CTYPE(output_dtype, DTypeOut, {
+          DISPATCH_PADDLE_DTYPE_TO_CTYPE_FP16(output_dtype, DTypeOut, {
             constexpr int CTA_Q = 128;
             constexpr int CTA_K = 64;
             constexpr int WARP_Q = 32;
@@ -1162,7 +1162,7 @@ std::vector<paddle::Tensor> qk_int8_sv_f16_accum_f16_attn_inst_buf_fwd(paddle::T
     DISPATCH_CAUSAL(is_causal, IS_CAUSAL, {
       DISPATCH_QK_QUANT_GRAN(qk_quant_gran, QK_QUANT_GRAN, {
         DISPATCH_RETURN_LSE(return_lse, RETURN_LSE, {
-          DISPATCH_PADDLE_DTYPE_TO_CTYPE(output_dtype, DTypeOut, {
+          DISPATCH_PADDLE_DTYPE_TO_CTYPE_FP16(output_dtype, DTypeOut, {
               
             constexpr int CTA_Q = 128;
             constexpr int CTA_K = 64;
@@ -1344,7 +1344,7 @@ std::vector<paddle::Tensor> qk_int8_sv_f16_accum_f16_fuse_v_mean_attn_fwd(paddle
     DISPATCH_CAUSAL(is_causal, IS_CAUSAL, {
       DISPATCH_QK_QUANT_GRAN(qk_quant_gran, QK_QUANT_GRAN, {
         DISPATCH_RETURN_LSE(return_lse, RETURN_LSE, {
-          DISPATCH_PADDLE_DTYPE_TO_CTYPE(output_dtype, DTypeOut, {
+          DISPATCH_PADDLE_DTYPE_TO_CTYPE_FP16(output_dtype, DTypeOut, {
               
             constexpr int CTA_Q = 128;
             constexpr int CTA_K = 64;
