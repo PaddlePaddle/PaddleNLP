@@ -2671,23 +2671,6 @@ __device__ __forceinline__ void compute_fp8_sv_inst_buf(const smem_t<swizzle_mod
   }
 }
 
-// paddle converter zone
-// phi::dtype::xx16 -> half or nv_bfloat16
-#define SAGEATTN_DTYPE_CONVERT(dtype, DTypeQuant) \
-  if (dtype == paddle::DataType::FLOAT16) {                                          \
-    using DTypeQuant = half;                                                         \
-  } else if (dtype == paddle::DataType::BFLOAT16) {                                  \
-    using DTypeQuant = __nv_bfloat16;                                                \
-  } else if (dtype == paddle::DataType::INT8) {                                      \
-    using DTypeQuant = int8_t;                                                       \
-  } else if (dtype == paddle::DataType::FLOAT8_E4M3FN) {                             \
-    using DTypeQuant = __nv_fp8_e4m3;                                                \
-  } else {                                                                           \
-    std::ostringstream oss;                                                          \
-    oss << __PRETTY_FUNCTION__ << " failed to dispatch data type " << paddle_dtype;  \
-    PD_CHECK(false, oss.str());                                                      \
-  }
-
 // namespace wgmma
 namespace wgmma{
 __device__ __forceinline__ uint64_t matrix_descriptor_encode(uint64_t x) { return (((x) & 0x3FFFF) >> 0x4); }
