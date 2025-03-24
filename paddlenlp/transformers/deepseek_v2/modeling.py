@@ -1162,9 +1162,6 @@ class MemroyRecomputeAttnFunc(paddle.autograd.PyLayer):
         # call up proj
         d_kv_ln_t, d_kv_up_weight = _C_ops.matmul_grad(kv_ln_t, kv_up_weight, d_kv, False, False)
 
-        # print( d_kv_ln_t)
-        # print("661")
-
         d_compressed_kv, d_kv_ln_weight = fused_ln.fused_rms_norm_grad_func(
             compressed_kv, kv_ln_weight, kv_ln_invar, d_kv_ln_t, eps
         )
@@ -1603,7 +1600,6 @@ class DeepseekV2Attention(nn.Layer):
                 value_states = paddle.concat([past_key_value[1], value_states], axis=1)
             past_key_value = (key_states, value_states) if use_cache else None
 
-            # print(query_states)
             has_gradient = not (query_states.stop_gradient and key_states.stop_gradient and value_states.stop_gradient)
             if (
                 self.enable_recompute
@@ -1626,8 +1622,6 @@ class DeepseekV2Attention(nn.Layer):
                     use_reentrant=self.config.recompute_use_reentrant,
                 )
             else:
-                # query_states.register_hook( print_grad)
-
                 outputs = self.attn_func(
                     query_states,
                     self.config,
@@ -1771,9 +1765,7 @@ class DeepseekV2DecoderLayer(nn.Layer):
         # Fully Connected
         residual = hidden_states
 
-        # print("before moe memory_allocated = ", paddle.device.cuda.memory_allocated() // (1024 ** 2), "max_memory_allocated = ", paddle.device.cuda.max_memory_allocated() // (1024 ** 2))
-
-        # hidden_states = self.post_attention_layernorm(hidden_states)
+        hidden_states = self.post_attention_layernorm(hidden_states)
         hidden_states = self.mlp(hidden_states)
         hidden_states = residual + hidden_states
 
