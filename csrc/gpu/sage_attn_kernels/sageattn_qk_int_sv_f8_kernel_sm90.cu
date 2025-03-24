@@ -718,7 +718,7 @@ std::vector<paddle::Tensor> qk_int8_sv_f8_accum_f32_attn_inst_buf_sm90_fwd(
   const int num_kv_groups = num_qo_heads / num_kv_heads;
 
   auto output_type = output.dtype();
-  auto shift_bias_dtype = shift_bias ? shift_bias.get().dtype() : paddle::DataType::FLOAT16;
+  // auto shift_bias_dtype = shift_bias ? shift_bias.get().dtype() : paddle::DataType::FLOAT16;
 
   DISPATCH_HEAD_DIM(head_dim, HEAD_DIM, {
     DISPATCH_CAUSAL(is_causal, IS_CAUSAL, {
@@ -903,7 +903,7 @@ std::vector<paddle::Tensor> qk_int8_sv_f8_accum_f32_fuse_v_scale_attn_inst_buf_s
   const int num_kv_groups = num_qo_heads / num_kv_heads;
 
   auto output_dtype = output.dtype();
-  auto shift_bias_dtype = shift_bias ? shift_bias.get().dtype() : paddle::DataType::FLOAT16;
+  // auto shift_bias_dtype = shift_bias ? shift_bias.get().dtype() : paddle::DataType::FLOAT16;
 
   DISPATCH_HEAD_DIM(head_dim, HEAD_DIM, {
     DISPATCH_CAUSAL(is_causal, IS_CAUSAL, {
