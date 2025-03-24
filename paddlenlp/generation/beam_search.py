@@ -343,11 +343,13 @@ class BeamSearchScorer(BeamScorer):
                 beam_hyp.add(final_tokens, final_score, beam_indices=beam_index, generated_len=generated_len)
 
         # select the best hypotheses
-        sent_lengths = input_ids.clone().view([batch_size * self.num_beam_hyps_to_keep])
         # sent_lengths = input_ids.new(batch_size * self.num_beam_hyps_to_keep)
+        sent_lengths = paddle.empty([batch_size * self.num_beam_hyps_to_keep], dtype=input_ids.dtype)
+        
+        
         best = []
         best_indices = []
-        best_scores = paddle.zeros([batch_size * self.num_beam_hyps_to_keep], dytpe="float32")
+        best_scores = paddle.zeros([batch_size * self.num_beam_hyps_to_keep], dtype="float32")
 
         # retrieve best hypotheses
         for i in range(batch_size):
@@ -373,9 +375,9 @@ class BeamSearchScorer(BeamScorer):
         sent_lengths_max = sent_lengths.max().item() + 1
         sent_max_len = min(sent_lengths_max, max_length) if max_length is not None else sent_lengths_max
         # decoded: paddle.Tensor = input_ids.new(batch_size * self.num_beam_hyps_to_keep, sent_max_len)
-        decoded = input_ids.clone().view([batch_size * self.num_beam_hyps_to_keep, sent_max_len])
+        decoded = paddle.empty([batch_size * self.num_beam_hyps_to_keep, sent_max_len], dtype=input_ids.dtype)
         if len(best_indices) > 0 and best_indices[0] is not None:
-            indices = paddle.ones([batch_size * self.num_beam_hyps_to_keep, sent_max_len], dtype=input_ids.dtype)
+            indices = paddle.empty([batch_size * self.num_beam_hyps_to_keep, sent_max_len], dtype=input_ids.dtype)
             # indices: paddle.Tensor = input_ids.new(batch_size * self.num_beam_hyps_to_keep, sent_max_len)
         else:
             indices = None
@@ -850,7 +852,7 @@ class ConstrainedBeamSearchScorer(BeamScorer):
 
         # select the best hypotheses
         # sent_lengths = input_ids.new(batch_size * self.num_beam_hyps_to_keep)
-        sent_lengths = input_ids.clone().view([batch_size * self.num_beam_hyps_to_keep])
+        sent_lengths = paddle.empty([batch_size * self.num_beam_hyps_to_keep], dtype=input_ids.dtype)
         best = []
         best_indices = []
         best_scores = paddle.zeros(batch_size * self.num_beam_hyps_to_keep, dtype="float32")
@@ -878,9 +880,9 @@ class ConstrainedBeamSearchScorer(BeamScorer):
 
         sent_max_len = min(sent_lengths_max, max_length) if max_length is not None else sent_lengths_max
         # decoded: paddle.Tensor = input_ids.new(batch_size * self.num_beam_hyps_to_keep, sent_max_len)
-        decoded = input_ids.clone().view([batch_size * self.num_beam_hyps_to_keep, sent_max_len])
+        decoded = paddle.empty([batch_size * self.num_beam_hyps_to_keep, sent_max_len], dtype=input_ids.dtype)
         if len(best_indices) > 0 and best_indices[0] is not None:
-            indices = input_ids.clone().view([batch_size * self.num_beam_hyps_to_keep, sent_max_len])
+            indices = paddle.empty([batch_size * self.num_beam_hyps_to_keep, sent_max_len], dtype=input_ids.dtype)
             # indices: paddle.Tensor = input_ids.new(batch_size * self.num_beam_hyps_to_keep, sent_max_len)
         else:
             indices = None
