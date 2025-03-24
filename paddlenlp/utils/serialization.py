@@ -207,7 +207,7 @@ def dumpy(*args, **kwarsg):
 def load_torch(path: str, **pickle_load_args):
     import torch
 
-    state_dict = torch.load(path, map_location="cpu")
+    state_dict = torch.load(path, map_location="cpu", weights_only=False)
 
     for key in list(state_dict.keys()):
         if isinstance(state_dict[key], torch.Tensor):
