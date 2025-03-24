@@ -238,4 +238,15 @@ PD_BUILD_GRAD_OP(fused_rms_norm)
     ;
 
 
+PD_BUILD_OP(fused_rms_norm_grad_func)
+    .Inputs({"x", "scale", "invvar", "dy"})
+    .Outputs({"dx", "d_scale"})
+    .Attrs({"epsilon: float"})
+    .SetKernelFn(PD_KERNEL(RMSLnBwd))
+    .SetInferShapeFn(PD_INFER_SHAPE(RMSLnBwdInferShape))
+#ifdef CUSTOM_OP_WITH_SPMD
+    .SetInferSpmdFn(PD_INFER_SPMD_RULE(phi::distributed::RmsNormGradInferSpmd))
+#endif
+    ;
+
 // https://github.com/NVIDIA/apex/blob/85e9eddece9d4ac72b48c2407f8162f2173e1bf4/csrc/layer_norm_cuda_kernel.cu#L679

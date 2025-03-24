@@ -59,6 +59,8 @@ except:
     flash_attention = None
 
 
+from paddle import _C_ops
+
 from paddlenlp.transformers.model_utils import dtype_guard
 
 from ...utils.initializer import kaiming_uniform_
@@ -79,16 +81,15 @@ from ..moe_layer import MoELayer
 from ..utils import device_guard
 from . import fp8_linear as linear_utils
 from .configuration import DeepseekV2Config
-from .fp8_linear import FP8DeepseekV2MLP, FP8Linear, Linear, FP8KeepXLinear
-from paddle import _C_ops
+from .fp8_linear import FP8DeepseekV2MLP, FP8KeepXLinear, FP8Linear, Linear
 
 DSV3_USE_FP8_GEMM = os.getenv("DSV3_USE_FP8_GEMM", "False").lower() == "true"
 DSV3_USE_ATTEN_RECOMPUTE = os.getenv("DSV3_USE_ATTEN_RECOMPUTE", "False").lower() == "true"
 Linear = FP8Linear if DSV3_USE_FP8_GEMM else Linear
 
 try:
-    from paddle.incubate.nn.functional import swiglu
     import fused_ln
+    from paddle.incubate.nn.functional import swiglu
 except ImportError:
 
     def swiglu(x, y=None):
@@ -900,7 +901,10 @@ def repeat_kv(hidden_states: paddle.Tensor, n_rep: int) -> paddle.Tensor:
     hidden_states = hidden_states.unsqueeze(-2).tile([1, 1, 1, n_rep, 1])
     return hidden_states.reshape([batch, slen, num_key_value_heads * n_rep, head_axis])
 
-def qkv_pre_process( q, kv, k_pe, rotary_emb, num_heads, q_head_dim, qk_nope_head_dim, v_head_dim, qk_rope_head_dim, position_ids):
+
+def qkv_pre_process(
+    q, kv, k_pe, rotary_emb, num_heads, q_head_dim, qk_nope_head_dim, v_head_dim, qk_rope_head_dim, position_ids
+):
     bsz, q_len, _ = q.shape
 
     target_query_shape = [0, 0, num_heads, q_head_dim]
@@ -911,18 +915,16 @@ def qkv_pre_process( q, kv, k_pe, rotary_emb, num_heads, q_head_dim, qk_nope_hea
 
     # DeepSeekV2 kv_lora_rank+qk_rope_head_dim=512+64
 
-    kv  = kv.reshape(shape=target_key_value_shape)
+    kv = kv.reshape(shape=target_key_value_shape)
 
-    k_pe = k_pe.reshape([-1, q_len, 1, qk_rope_head_dim]).expand(
-        [-1, q_len, num_heads, qk_rope_head_dim]
-    )
+    k_pe = k_pe.reshape([-1, q_len, 1, qk_rope_head_dim]).expand([-1, q_len, num_heads, qk_rope_head_dim])
 
     # self.q_head_dim = config.qk_nope_head_dim + config.qk_rope_head_dim = 128+64
     # self.num_heads * (self.q_head_dim - self.qk_rope_head_dim + self.v_head_dim) = config.qk_nope_head_dim + self.v_head_dim = 128+128
 
     k_nope, value_states = paddle.split(kv, [qk_nope_head_dim, v_head_dim], axis=-1)
     kv_seq_len = value_states.shape[1]
- 
+
     cos, sin = rotary_emb(value_states, seq_len=kv_seq_len)
     cos = cos[None, :, None, :]
     sin = sin[None, :, None, :]
@@ -933,33 +935,115 @@ def qkv_pre_process( q, kv, k_pe, rotary_emb, num_heads, q_head_dim, qk_nope_hea
 
     return query_states, key_states, value_states
 
-def manul_fwd(q_init, kv_init, q_ln_weight, kv_ln_weight, q_up_weight, kv_up_weight, rotary_emb, 
-    num_heads, q_head_dim, qk_nope_head_dim, v_head_dim, qk_rope_head_dim, position_ids,
-    eps, kv_lora_rank, softmax_scale):
 
+def manul_fwd(
+    q_init,
+    kv_init,
+    q_ln_weight,
+    kv_ln_weight,
+    q_up_weight,
+    kv_up_weight,
+    rotary_emb,
+    num_heads,
+    q_head_dim,
+    qk_nope_head_dim,
+    v_head_dim,
+    qk_rope_head_dim,
+    position_ids,
+    eps,
+    kv_lora_rank,
+    softmax_scale,
+):
 
-    
-    bsz = q_init.shape[0]
-    q_ln_t, q_ln_invar = fused_ln.fused_rms_norm( q_init, q_ln_weight, eps)
-    q = paddle.matmul( q_ln_t, q_up_weight)
-    
+    q_ln_t, q_ln_invar = fused_ln.fused_rms_norm(q_init, q_ln_weight, eps)
+    q = paddle.matmul(q_ln_t, q_up_weight)
+
     compressed_kv, k_pe = paddle.split(kv_init, [kv_lora_rank, qk_rope_head_dim], axis=-1)
-    
-    kv_ln_t, kv_ln_invar = fused_ln.fused_rms_norm( compressed_kv, kv_ln_weight, eps)
 
-    kv = paddle.matmul( kv_ln_t, kv_up_weight)
-    
-    kv.register_hook( print_grad)
-    query_states, key_states, value_states = qkv_pre_process(q, kv, k_pe, rotary_emb, num_heads,
-        q_head_dim, qk_nope_head_dim, v_head_dim, qk_rope_head_dim, position_ids)
-    
+    kv_ln_t, kv_ln_invar = fused_ln.fused_rms_norm(compressed_kv, kv_ln_weight, eps)
+
+    kv = paddle.matmul(kv_ln_t, kv_up_weight)
+
+    query_states, key_states, value_states = qkv_pre_process(
+        q, kv, k_pe, rotary_emb, num_heads, q_head_dim, qk_nope_head_dim, v_head_dim, qk_rope_head_dim, position_ids
+    )
+
     q_head_dim = query_states.shape[-1]
     softmax_scale = softmax_scale * (q_head_dim**0.5)
     query_states = query_states * softmax_scale
-    kv_seq_len = value_states.shape[1]
-    v_num_heads = value_states.shape[2]
 
     attn_out, _, softmax_lse, seed_offset = _C_ops.flash_attn(
+        query_states,
+        key_states,
+        query_states,
+        None,
+        None,
+        0.0,
+        True,
+        False,
+        False,
+        "",
+    )
+
+    return attn_out
+
+
+class MemroyRecomputeAttnFunc(paddle.autograd.PyLayer):
+    @staticmethod
+    def forward(
+        ctx,
+        q_init,
+        kv_init,
+        q_ln_weight,
+        kv_ln_weight,
+        q_up_weight,
+        kv_up_weight,
+        rotary_emb,
+        num_heads,
+        q_head_dim,
+        qk_nope_head_dim,
+        v_head_dim,
+        qk_rope_head_dim,
+        position_ids,
+        eps,
+        kv_lora_rank,
+        softmax_scale,
+    ):
+
+        bsz = q_init.shape[0]
+        q_ln_t, q_ln_invar = fused_ln.fused_rms_norm(q_init, q_ln_weight, eps)
+        q = paddle.matmul(q_ln_t, q_up_weight)
+
+        compressed_kv, k_pe = paddle.split(kv_init, [kv_lora_rank, qk_rope_head_dim], axis=-1)
+
+        kv_ln_t, kv_ln_invar = fused_ln.fused_rms_norm(compressed_kv, kv_ln_weight, eps)
+        kv = paddle.matmul(kv_ln_t, kv_up_weight)
+
+        query_states, key_states, value_states = qkv_pre_process(
+            q,
+            kv,
+            k_pe,
+            rotary_emb,
+            num_heads,
+            q_head_dim,
+            qk_nope_head_dim,
+            v_head_dim,
+            qk_rope_head_dim,
+            position_ids,
+        )
+
+        q_head_dim = query_states.shape[-1]
+        softmax_scale = softmax_scale * (q_head_dim**0.5)
+        query_states = query_states * softmax_scale
+        kv_seq_len = value_states.shape[1]
+        v_num_heads = value_states.shape[2]
+        value_padding = paddle.zeros(
+            [bsz, kv_seq_len, v_num_heads, q_head_dim - v_head_dim],
+            dtype=value_states.dtype,
+        )
+        value_states_pad = paddle.concat([value_states, value_padding], axis=-1)
+
+        attn_out, _, softmax_lse, seed_offset = _C_ops.flash_attn(
             query_states,
             key_states,
             value_states_pad,
@@ -972,78 +1056,81 @@ def manul_fwd(q_init, kv_init, q_ln_weight, kv_ln_weight, q_up_weight, kv_up_wei
             "",
         )
 
-    return attn_out
-
-class MemroyRecomputeAttnFunc(paddle.autograd.PyLayer):
-    @staticmethod
-    def forward(ctx, q_init, kv_init, q_ln_weight, kv_ln_weight, q_up_weight, kv_up_weight, rotary_emb, 
-        num_heads, q_head_dim, qk_nope_head_dim, v_head_dim, qk_rope_head_dim, position_ids,
-        eps, kv_lora_rank, softmax_scale):
-        
-        bsz = q_init.shape[0]
-        q_ln_t, q_ln_invar = fused_ln.fused_rms_norm( q_init, q_ln_weight, eps)
-        q = paddle.matmul( q_ln_t, q_up_weight)
-        
-        compressed_kv, k_pe = paddle.split(kv_init, [kv_lora_rank, qk_rope_head_dim], axis=-1)
-        
-        kv_ln_t, kv_ln_invar = fused_ln.fused_rms_norm( compressed_kv, kv_ln_weight, eps)
-        kv = paddle.matmul( kv_ln_t, kv_up_weight)
-
-        query_states, key_states, value_states = qkv_pre_process(q, kv, k_pe, rotary_emb, num_heads,
-            q_head_dim, qk_nope_head_dim, v_head_dim, qk_rope_head_dim, position_ids)
-        
-        q_head_dim = query_states.shape[-1]
-        softmax_scale = softmax_scale * (q_head_dim**0.5)
-        query_states = query_states * softmax_scale
-        kv_seq_len = value_states.shape[1]
-        v_num_heads = value_states.shape[2]
-        value_padding = paddle.zeros(
-            [bsz, kv_seq_len, v_num_heads, q_head_dim - v_head_dim],
-            dtype=value_states.dtype,
+        ctx.save_for_backward(
+            q_init,
+            kv_init,
+            attn_out,
+            softmax_lse,
+            seed_offset,
+            q_ln_weight,
+            kv_ln_weight,
+            q_up_weight,
+            kv_up_weight,
+            rotary_emb,
+            num_heads,
+            q_head_dim,
+            qk_nope_head_dim,
+            v_head_dim,
+            qk_rope_head_dim,
+            position_ids,
+            eps,
+            kv_lora_rank,
+            softmax_scale,
         )
-        value_states_pad = paddle.concat([value_states, value_padding], axis=-1)
-       
-        attn_out, _, softmax_lse, seed_offset = _C_ops.flash_attn(
-                query_states,
-                key_states,
-                value_states_pad,
-                None,
-                None,
-                0.0,
-                True,
-                False,
-                False,
-                "",
-            )
-        
-        ctx.save_for_backward(q_init, kv_init, attn_out, softmax_lse, seed_offset, q_ln_weight, kv_ln_weight, q_up_weight, kv_up_weight, rotary_emb, 
-            num_heads, q_head_dim, qk_nope_head_dim, v_head_dim, qk_rope_head_dim, position_ids,
-            eps, kv_lora_rank, softmax_scale)
         return attn_out
 
     @staticmethod
     def backward(ctx, dout):
-        q_init, kv_init, attn_out, softmax_lse, seed_offset, q_ln_weight, kv_ln_weight, q_up_weight, kv_up_weight, rotary_emb, num_heads, q_head_dim, qk_nope_head_dim, v_head_dim, qk_rope_head_dim, position_ids, eps, kv_lora_rank, softmax_scale =  ctx.saved_tensor()
+        (
+            q_init,
+            kv_init,
+            attn_out,
+            softmax_lse,
+            seed_offset,
+            q_ln_weight,
+            kv_ln_weight,
+            q_up_weight,
+            kv_up_weight,
+            rotary_emb,
+            num_heads,
+            q_head_dim,
+            qk_nope_head_dim,
+            v_head_dim,
+            qk_rope_head_dim,
+            position_ids,
+            eps,
+            kv_lora_rank,
+            softmax_scale,
+        ) = ctx.saved_tensor()
 
+        q_ln_t, q_ln_invar = fused_ln.fused_rms_norm(q_init, q_ln_weight, eps)
+        q = paddle.matmul(q_ln_t, q_up_weight)
 
-        q_ln_t, q_ln_invar  = fused_ln.fused_rms_norm( q_init, q_ln_weight, eps)
-        q = paddle.matmul( q_ln_t, q_up_weight)
-        
         compressed_kv, k_pe = paddle.split(kv_init, [kv_lora_rank, qk_rope_head_dim], axis=-1)
-        
-        kv_ln_t, kv_ln_invar = fused_ln.fused_rms_norm( compressed_kv, kv_ln_weight, eps)
-        kv = paddle.matmul( kv_ln_t, kv_up_weight)
-        
+
+        kv_ln_t, kv_ln_invar = fused_ln.fused_rms_norm(compressed_kv, kv_ln_weight, eps)
+        kv = paddle.matmul(kv_ln_t, kv_up_weight)
+
         paddle.base.core._set_has_grad(True)
         q.stop_gradient = False
         kv.stop_gradient = False
         k_pe.stop_gradient = False
-        query_states, key_states, value_states = qkv_pre_process(q, kv, k_pe, rotary_emb, num_heads,
-            q_head_dim, qk_nope_head_dim, v_head_dim, qk_rope_head_dim, position_ids)
-        
+        query_states, key_states, value_states = qkv_pre_process(
+            q,
+            kv,
+            k_pe,
+            rotary_emb,
+            num_heads,
+            q_head_dim,
+            qk_nope_head_dim,
+            v_head_dim,
+            qk_rope_head_dim,
+            position_ids,
+        )
+
         q_head_dim = query_states.shape[-1]
         query_states = query_states * softmax_scale
-        
+
         bsz = value_states.shape[0]
         kv_seq_len = value_states.shape[1]
         v_num_heads = value_states.shape[2]
@@ -1055,52 +1142,74 @@ class MemroyRecomputeAttnFunc(paddle.autograd.PyLayer):
 
         with paddle.no_grad():
 
-            q_grad, k_grad, v_grad = _C_ops.flash_attn_grad( query_states, key_states, value_states_pad, attn_out, softmax_lse, seed_offset,
-                None, dout, 0.0, True)    
+            q_grad, k_grad, v_grad = _C_ops.flash_attn_grad(
+                query_states, key_states, value_states_pad, attn_out, softmax_lse, seed_offset, None, dout, 0.0, True
+            )
 
             v_grad = v_grad[..., :v_head_dim]
             q_grad = q_grad * softmax_scale
 
-        d_q, d_kv, d_k_pe = paddle.grad( outputs=[ query_states, key_states, value_states],
-                inputs=[q, kv, k_pe],
-                grad_outputs=[q_grad, k_grad, v_grad ],
-                create_graph=False,
-                retain_graph=False)
+        d_q, d_kv, d_k_pe = paddle.grad(
+            outputs=[query_states, key_states, value_states],
+            inputs=[q, kv, k_pe],
+            grad_outputs=[q_grad, k_grad, v_grad],
+            create_graph=False,
+            retain_graph=False,
+        )
 
         paddle.base.core._set_has_grad(False)
 
         # call up proj
-        d_kv_ln_t, d_kv_up_weight = _C_ops.matmul_grad( kv_ln_t, kv_up_weight, d_kv, False, False)
-        
-        #print( d_kv_ln_t)
+        d_kv_ln_t, d_kv_up_weight = _C_ops.matmul_grad(kv_ln_t, kv_up_weight, d_kv, False, False)
+
+        # print( d_kv_ln_t)
         # print("661")
 
-        d_compressed_kv, d_kv_ln_weight = fused_ln.fused_rms_norm_grad1( compressed_kv, kv_ln_weight, kv_ln_invar, d_kv_ln_t, eps)
+        d_compressed_kv, d_kv_ln_weight = fused_ln.fused_rms_norm_grad_func(
+            compressed_kv, kv_ln_weight, kv_ln_invar, d_kv_ln_t, eps
+        )
 
-        d_kv_init = paddle.concat( [d_compressed_kv, d_k_pe], axis=-1)
+        d_kv_init = paddle.concat([d_compressed_kv, d_k_pe], axis=-1)
 
-        d_q_ln_t, d_q_up_weight = _C_ops.matmul_grad( q_ln_t, q_up_weight, d_q,  False, False)
-        d_q_init, d_q_ln_weight = fused_ln.fused_rms_norm_grad1( q_init, q_ln_weight, q_ln_invar, d_q_ln_t, eps)
+        d_q_ln_t, d_q_up_weight = _C_ops.matmul_grad(q_ln_t, q_up_weight, d_q, False, False)
+        d_q_init, d_q_ln_weight = fused_ln.fused_rms_norm_grad_func(q_init, q_ln_weight, q_ln_invar, d_q_ln_t, eps)
 
         return d_q_init, d_kv_init, d_q_ln_weight, d_kv_ln_weight, d_q_up_weight, d_kv_up_weight
 
+
 class MemroyRecomputeAttn(paddle.nn.Layer):
-    def __init__(self, q_norm_hidden_size, kv_norm_hidden_size, q_up_in_dim, q_up_out_dim, kv_up_in_dim, kv_up_out_dim,
-            rotary_emb, num_heads, q_head_dim, qk_nope_head_dim, v_head_dim, qk_rope_head_dim, eps, kv_lora_rank, softmax_scale) -> None:
+    def __init__(
+        self,
+        q_norm_hidden_size,
+        kv_norm_hidden_size,
+        q_up_in_dim,
+        q_up_out_dim,
+        kv_up_in_dim,
+        kv_up_out_dim,
+        rotary_emb,
+        num_heads,
+        q_head_dim,
+        qk_nope_head_dim,
+        v_head_dim,
+        qk_rope_head_dim,
+        eps,
+        kv_lora_rank,
+        softmax_scale,
+    ) -> None:
         super().__init__()
         self._dtype = self._helper.get_default_dtype()
-        
+
         self.q_ln_weight = paddle.create_parameter(
             shape=[q_norm_hidden_size],
-            dtype=self._dtype ,
+            dtype=self._dtype,
             default_initializer=nn.initializer.Constant(1.0),
         )
         self.kv_ln_weight = paddle.create_parameter(
             shape=[kv_norm_hidden_size],
-            dtype=self._dtype ,
+            dtype=self._dtype,
             default_initializer=nn.initializer.Constant(1.0),
         )
-        
+
         self.q_up_weight = self.create_parameter(
             shape=[q_up_in_dim, q_up_out_dim],
             dtype=self._dtype,
@@ -1112,55 +1221,88 @@ class MemroyRecomputeAttn(paddle.nn.Layer):
             dtype=self._dtype,
             is_bias=False,
         )
-        self.rotary_emb,   self.num_heads, self.q_head_dim, self.qk_nope_head_dim, self.v_head_dim, self.qk_rope_head_dim,  self.eps, self.kv_lora_rank, self.softmax_scale =  rotary_emb,   num_heads, q_head_dim, qk_nope_head_dim, v_head_dim, qk_rope_head_dim, eps, kv_lora_rank, softmax_scale
+        (
+            self.rotary_emb,
+            self.num_heads,
+            self.q_head_dim,
+            self.qk_nope_head_dim,
+            self.v_head_dim,
+            self.qk_rope_head_dim,
+            self.eps,
+            self.kv_lora_rank,
+            self.softmax_scale,
+        ) = (
+            rotary_emb,
+            num_heads,
+            q_head_dim,
+            qk_nope_head_dim,
+            v_head_dim,
+            qk_rope_head_dim,
+            eps,
+            kv_lora_rank,
+            softmax_scale,
+        )
 
     def forward(self, q_init, kv_init, position_ids):
-  
-        return MemroyRecomputeAttnFunc.apply(q_init, kv_init, self.q_ln_weight, self.kv_ln_weight, self.q_up_weight, self.kv_up_weight, 
-            self.rotary_emb,   self.num_heads, self.q_head_dim, self.qk_nope_head_dim, self.v_head_dim, self.qk_rope_head_dim, 
-            position_ids, self.eps, self.kv_lora_rank, self.softmax_scale)
+
+        return MemroyRecomputeAttnFunc.apply(
+            q_init,
+            kv_init,
+            self.q_ln_weight,
+            self.kv_ln_weight,
+            self.q_up_weight,
+            self.kv_up_weight,
+            self.rotary_emb,
+            self.num_heads,
+            self.q_head_dim,
+            self.qk_nope_head_dim,
+            self.v_head_dim,
+            self.qk_rope_head_dim,
+            position_ids,
+            self.eps,
+            self.kv_lora_rank,
+            self.softmax_scale,
+        )
 
 
 class FusedRMSLinearFunc(paddle.autograd.PyLayer):
     @staticmethod
     def forward(ctx, x, rms_norm_weight, q_down_weight, kv_down_weight, eps):
-        
-        hidden_states, invar = fused_ln.fused_rms_norm( x, rms_norm_weight, eps)
-        q = paddle.matmul( hidden_states, q_down_weight)
 
-        kv = paddle.matmul( hidden_states, kv_down_weight)
-    
+        hidden_states, invar = fused_ln.fused_rms_norm(x, rms_norm_weight, eps)
+        q = paddle.matmul(hidden_states, q_down_weight)
+
+        kv = paddle.matmul(hidden_states, kv_down_weight)
+
         ctx.save_for_backward(x, rms_norm_weight, q_down_weight, kv_down_weight, eps)
         return q, kv
 
     @staticmethod
     def backward(ctx, d_q, d_kv):
-        x, rms_norm_weight, q_down_weight, kv_down_weight, eps =  ctx.saved_tensor()
-        hidden_states, invar = fused_ln.fused_rms_norm( x, rms_norm_weight, eps)
+        x, rms_norm_weight, q_down_weight, kv_down_weight, eps = ctx.saved_tensor()
+        hidden_states, invar = fused_ln.fused_rms_norm(x, rms_norm_weight, eps)
 
-        h_grad_0, d_q_down_weight = _C_ops.matmul_grad( hidden_states, q_down_weight, d_q, False, False )
-        h_grad_1, d_kv_down_weight = _C_ops.matmul_grad( hidden_states, kv_down_weight, d_kv, False, False )
+        h_grad_0, d_q_down_weight = _C_ops.matmul_grad(hidden_states, q_down_weight, d_q, False, False)
+        h_grad_1, d_kv_down_weight = _C_ops.matmul_grad(hidden_states, kv_down_weight, d_kv, False, False)
 
         h_grad = h_grad_0 + h_grad_1
 
-        dx, d_rms_norm_weight = fused_ln.fused_rms_norm_grad1( x, rms_norm_weight, invar, h_grad, eps)
+        dx, d_rms_norm_weight = fused_ln.fused_rms_norm_grad_func(x, rms_norm_weight, invar, h_grad, eps)
 
         return dx, d_rms_norm_weight, d_q_down_weight, d_kv_down_weight
-
 
 
 class FusedRMSLinear(paddle.nn.Layer):
     def __init__(self, hidden_size, q_out_dim, kv_outdim, eps=1e-6) -> None:
         super().__init__()
         self._dtype = self._helper.get_default_dtype()
-        
+
         self.rms_norm_weight = paddle.create_parameter(
             shape=[hidden_size],
-            dtype=self._dtype ,
+            dtype=self._dtype,
             default_initializer=nn.initializer.Constant(1.0),
         )
-   
-        
+
         self.q_down_weight = self.create_parameter(
             shape=[hidden_size, q_out_dim],
             dtype=self._dtype,
@@ -1175,42 +1317,43 @@ class FusedRMSLinear(paddle.nn.Layer):
         self.eps = eps
 
     def forward(self, x):
-    
+
         return FusedRMSLinearFunc.apply(x, self.rms_norm_weight, self.q_down_weight, self.kv_down_weight, self.eps)
+
 
 class FusedRMSLinearSingleFunc(paddle.autograd.PyLayer):
     @staticmethod
     def forward(ctx, x, rms_norm_weight, linear_weight, eps):
-        
-        hidden_states, invar = fused_ln.fused_rms_norm( x, rms_norm_weight, eps)
-        q = paddle.matmul( hidden_states, linear_weight)
-    
+
+        hidden_states, invar = fused_ln.fused_rms_norm(x, rms_norm_weight, eps)
+        q = paddle.matmul(hidden_states, linear_weight)
+
         ctx.save_for_backward(x, rms_norm_weight, linear_weight, eps)
-        return q, kv
+        return q
 
     @staticmethod
     def backward(ctx, d_q, d_kv):
-        x, rms_norm_weight, linear_weight, eps =  ctx.saved_tensor()
-        hidden_states, invar = fused_ln.fused_rms_norm( x, rms_norm_weight, eps)
+        x, rms_norm_weight, linear_weight, eps = ctx.saved_tensor()
+        hidden_states, invar = fused_ln.fused_rms_norm(x, rms_norm_weight, eps)
 
-        h_grad_0, d_linear_weight = _C_ops.matmul_grad( hidden_states, linear_weight, d_q, False, False )
+        h_grad, d_linear_weight = _C_ops.matmul_grad(hidden_states, linear_weight, d_q, False, False)
+
+        dx, d_rms_norm_weight = fused_ln.fused_rms_norm_grad_func(x, rms_norm_weight, invar, h_grad, eps)
 
         return dx, d_rms_norm_weight, d_linear_weight
-
 
 
 class FusedRMSLinearSingle(paddle.nn.Layer):
     def __init__(self, hidden_size, q_out_dim, kv_outdim, eps=1e-6) -> None:
         super().__init__()
         self._dtype = self._helper.get_default_dtype()
-        
+
         self.rms_norm_weight = paddle.create_parameter(
             shape=[hidden_size],
-            dtype=self._dtype ,
+            dtype=self._dtype,
             default_initializer=nn.initializer.Constant(1.0),
         )
-   
-        
+
         self.linear_weight = self.create_parameter(
             shape=[hidden_size, q_out_dim],
             dtype=self._dtype,
@@ -1219,7 +1362,7 @@ class FusedRMSLinearSingle(paddle.nn.Layer):
         self.eps = eps
 
     def forward(self, x):
-    
+
         return FusedRMSLinearFunc.apply(x, self.rms_norm_weight, self.linear_weight, self.eps)
 
 
@@ -1251,7 +1394,7 @@ class DeepseekV2Attention(nn.Layer):
         else:
             self.seq_length = config.seq_length
         self.sequence_parallel = config.sequence_parallel
-		
+
         self.input_layernorm = DeepseekV2RMSNorm(config)
 
         # Note that we will actually perform a recompute only if both enable_recompute and layerwise_recompute are set to True
@@ -1270,10 +1413,9 @@ class DeepseekV2Attention(nn.Layer):
         # are the small weight and cannot achieve performance gain. So we use the original
         # linear layers. We use the tensor parallel linear layers for q_proj，q_b_proj and kv_b_proj
         # for which are the large weight and can achieve performance gain.
-       
+
         self._init_rope()
         self.softmax_scale = self.q_head_dim ** (-0.5)
-
 
         # fmt: off
         if self.config.tensor_parallel_degree > 1:
@@ -1319,16 +1461,11 @@ class DeepseekV2Attention(nn.Layer):
                     self.o_proj = Linear(self.num_heads * self.v_head_dim, self.hidden_size, bias_attr=config.attention_bias)
             self.kv_a_layernorm = DeepseekV2RMSNorm(config=config, hidden_size=config.kv_lora_rank)
             if DSV3_USE_ATTEN_RECOMPUTE:
-                print("using DSV3_USE_ATTEN_RECOMPUTE")
-                self.fused_rms_norm_linear = FusedRMSLinear( self.hidden_size, config.q_lora_rank, config.kv_lora_rank + config.qk_rope_head_dim, 1e-6)
-                self.memory_recompute_att =  MemroyRecomputeAttn( config.q_lora_rank, config.kv_lora_rank, config.q_lora_rank, self.num_heads * self.q_head_dim,
-                        config.kv_lora_rank, self.num_heads * (self.q_head_dim - self.qk_rope_head_dim + self.v_head_dim),
-                        self.rotary_emb, self.num_heads, self.q_head_dim, self.qk_nope_head_dim, 
-                        self.v_head_dim, self.qk_rope_head_dim, 1e-6, self.kv_lora_rank, self.softmax_scale)
- 
+                self.fused_rms_norm_linear = FusedRMSLinear(self.hidden_size, config.q_lora_rank, config.kv_lora_rank + config.qk_rope_head_dim, 1e-6)
+                kv_up_dim = self.num_heads * (self.q_head_dim - self.qk_rope_head_dim + self.v_head_dim)
+                self.memory_recompute_att = MemroyRecomputeAttn(config.q_lora_rank, config.kv_lora_rank, config.q_lora_rank, self.num_heads * self.q_head_dim, config.kv_lora_rank, kv_up_dim, self.rotary_emb, self.num_heads, self.q_head_dim, self.qk_nope_head_dim, self.v_head_dim, self.qk_rope_head_dim, 1e-6, self.kv_lora_rank, self.softmax_scale)
+
         # fmt: on
-
-
         self.softmax_scale = self.q_head_dim ** (-0.5)
         if self.config.rope_scaling is not None:
             mscale_all_dim = self.config.rope_scaling.get("mscale_all_dim", 0)
@@ -1406,15 +1543,15 @@ class DeepseekV2Attention(nn.Layer):
         bsz, q_len, _ = hidden_states.shape
 
         # DeepSeekV2 q_lora_rank=1536
-        # DeepSeekV2-lite q_lora_rank=None      
+        # DeepSeekV2-lite q_lora_rank=None
         if DSV3_USE_ATTEN_RECOMPUTE:
 
-            q_t1, compressed_kv = self.fused_rms_norm_linear( hidden_states)
+            q_t1, compressed_kv = self.fused_rms_norm_linear(hidden_states)
 
-            outputs = self.memory_recompute_att( q_t1, compressed_kv, position_ids)
+            outputs = self.memory_recompute_att(q_t1, compressed_kv, position_ids)
 
             outputs = outputs.reshape([bsz, q_len, self.num_heads, -1])
-            outputs = outputs[..., :self.v_head_dim]
+            outputs = outputs[..., : self.v_head_dim]
             outputs = outputs.reshape([bsz, q_len, -1])
         else:
             hidden_states = self.input_layernorm(hidden_states)
@@ -1423,7 +1560,6 @@ class DeepseekV2Attention(nn.Layer):
             else:
                 q = self.q_b_proj(self.q_a_layernorm(self.q_a_proj(hidden_states)))
 
-            
             if self.sequence_parallel:
                 target_query_shape = [-1, self.seq_length, self.num_heads, self.q_head_dim]
                 target_key_value_shape = [-1, self.seq_length, self.num_heads, self.qk_nope_head_dim + self.v_head_dim]
@@ -1431,9 +1567,8 @@ class DeepseekV2Attention(nn.Layer):
                 target_query_shape = [0, 0, self.num_heads, self.q_head_dim]
                 target_key_value_shape = [0, 0, self.num_heads, self.qk_nope_head_dim + self.v_head_dim]
 
-           
             q = q.reshape(shape=target_query_shape)
-            #q.register_hook( print_grad)
+            # q.register_hook( print_grad)
             q_nope, q_pe = paddle.split(q, [self.qk_nope_head_dim, self.qk_rope_head_dim], axis=-1)
 
             # DeepSeekV2 kv_lora_rank+qk_rope_head_dim=512+64
@@ -1468,7 +1603,7 @@ class DeepseekV2Attention(nn.Layer):
                 value_states = paddle.concat([past_key_value[1], value_states], axis=1)
             past_key_value = (key_states, value_states) if use_cache else None
 
-            #print(query_states)
+            # print(query_states)
             has_gradient = not (query_states.stop_gradient and key_states.stop_gradient and value_states.stop_gradient)
             if (
                 self.enable_recompute
@@ -1491,7 +1626,7 @@ class DeepseekV2Attention(nn.Layer):
                     use_reentrant=self.config.recompute_use_reentrant,
                 )
             else:
-                #query_states.register_hook( print_grad)
+                # query_states.register_hook( print_grad)
 
                 outputs = self.attn_func(
                     query_states,
@@ -1588,7 +1723,7 @@ class DeepseekV2DecoderLayer(nn.Layer):
                 "Passing `padding_mask` is deprecated and will be removed in v4.37. Please make sure use `attention_mask` instead.`"
             )
         residual = hidden_states
-       
+
         # Self Attention
         has_gradient = not hidden_states.stop_gradient
         if (
@@ -1636,9 +1771,9 @@ class DeepseekV2DecoderLayer(nn.Layer):
         # Fully Connected
         residual = hidden_states
 
-        #print("before moe memory_allocated = ", paddle.device.cuda.memory_allocated() // (1024 ** 2), "max_memory_allocated = ", paddle.device.cuda.max_memory_allocated() // (1024 ** 2))
+        # print("before moe memory_allocated = ", paddle.device.cuda.memory_allocated() // (1024 ** 2), "max_memory_allocated = ", paddle.device.cuda.max_memory_allocated() // (1024 ** 2))
 
-        #hidden_states = self.post_attention_layernorm(hidden_states)
+        # hidden_states = self.post_attention_layernorm(hidden_states)
         hidden_states = self.mlp(hidden_states)
         hidden_states = residual + hidden_states
 
