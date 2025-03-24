@@ -21,6 +21,7 @@ import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, is_dataclass
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
+from enum import Enum
 
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 from paddlenlp.utils.download import resolve_file_path
@@ -28,7 +29,6 @@ from paddlenlp.utils.log import logger
 
 from .. import __version__
 from ..utils import GENERATION_CONFIG_NAME
-from ..trainer import ExplicitEnum
 # from ..utils import (
 #     GENERATION_CONFIG_NAME,
 #     ExplicitEnum,
@@ -80,6 +80,16 @@ NEED_SETUP_CACHE_CLASSES_MAPPING = {
 ALL_CACHE_IMPLEMENTATIONS = (
     list(NEED_SETUP_CACHE_CLASSES_MAPPING.keys()) + list(CACHE_CONFIG_MAPPING.keys()) + ["offloaded"]
 )
+
+class ExplicitEnum(Enum):
+    """
+    Enum with more explicit error message for missing values.
+    """
+    @classmethod
+    def _missing_(cls, value):
+        raise ValueError(
+            f"{value} is not a valid {cls.__name__}, please select one of {list(cls._value2member_map_.keys())}"
+        )
 
 class GenerationMode(ExplicitEnum):
     """

@@ -41,7 +41,7 @@ from paddlenlp.utils.log import logger
 
 # from ..integrations.deepspeed import is_deepspeed_zero3_enabled
 # from ..integrations.fsdp import is_fsdp_managed_module
-from ..utils import CausalLMOutputWithPast, Seq2SeqLMOutput
+
 
 # from ..utils import (
 # ModelOutput,
@@ -1645,7 +1645,7 @@ class GenerationMixin:
         return model_kwargs
 
     def _get_cache(
-        self, cache_implementation: str, batch_size: int, max_cache_len: int, device: paddle.place, model_kwargs
+        self, cache_implementation: str, batch_size: int, max_cache_len: int, device: paddle.device, model_kwargs
     ):
         """
         Sets a cache for `generate`, that will persist across calls. A new cache will only be initialized a
@@ -1730,7 +1730,7 @@ class GenerationMixin:
         assistant_model: "PreTrainedModel",
         batch_size: int,
         max_cache_length: int,
-        device: paddle.place,
+        device: paddle.device,
     ) -> bool:
         """
         Prepares the cache for generation (if applicable), given `generate`'s parameterization. If a cache is
@@ -2790,6 +2790,7 @@ class GenerationMixin:
             `model.config.is_encoder_decoder=True`.
         """
         # init values
+        from ..transformers import CausalLMOutputWithPast, Seq2SeqLMOutput
         has_eos_stopping_criteria = any(hasattr(criteria, "eos_token_id") for criteria in stopping_criteria)
         top_k = generation_config.top_k
         penalty_alpha = generation_config.penalty_alpha

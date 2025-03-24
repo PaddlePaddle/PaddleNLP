@@ -20,9 +20,15 @@ import numpy as np
 import paddle
 
 from ..utils.log import logger
+try:
+    from ..trainer.utils import add_start_docstrings
+except:
+    def add_start_docstrings(*docstr):
+        def docstring_decorator(fn):
+            fn.__doc__ = "".join(docstr) + (fn.__doc__ if fn.__doc__ is not None else "")
+            return fn
 
-from ..trainer.utils import add_start_docstrings
-
+        return docstring_decorator
 LOGITS_PROCESSOR_INPUTS_DOCSTRING = r"""
     Args:
         input_ids (`paddle.Tensor` of shape `(batch_size, sequence_length)`):

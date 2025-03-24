@@ -19,12 +19,19 @@ from typing import Optional
 import packaging.version
 
 from .. import __version__
-from .doc import ExplicitEnum
+from enum import Enum
 
-# This is needed in case we deprecate a kwarg of a function/method being compiled
-# if is_torch_available():
-#     import torch  # noqa: F401
 
+class ExplicitEnum(Enum):
+    """
+    Enum with more explicit error message for missing values.
+    """
+
+    @classmethod
+    def _missing_(cls, value):
+        raise ValueError(
+            f"{value} is not a valid {cls.__name__}, please select one of {list(cls._value2member_map_.keys())}"
+        )
 
 class Action(ExplicitEnum):
     NONE = "none"
