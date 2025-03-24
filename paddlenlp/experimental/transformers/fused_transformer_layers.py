@@ -4014,8 +4014,6 @@ class FusedBlockMultiTransformerA8W8(FusedBlockMultiTransformer, FusedMultiTrans
                 rope_theta=self.config.rope_theta,
             )[0]
 
-        # breakpoint()
-
         return fmha_out
 
 
