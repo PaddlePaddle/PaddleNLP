@@ -77,7 +77,7 @@ struct Params {
 
     alignas(16) IdType *batch_ids;
     alignas(16) IdType *q_tile_ids_per_batch = nullptr;
-    alignas(16) IdType *tile_ids_per_batch;
+    alignas(16) IdType *tile_ids_per_batch = nullptr;
     alignas(16) IdType *num_blocks_x;
 
 
@@ -116,6 +116,9 @@ struct Params {
     __VA_ARGS__                                              \
   } else if (group_size == 64) {                             \
     constexpr size_t GROUP_SIZE = 64;                        \
+    __VA_ARGS__                                              \
+  } else if (group_size == 128) {                            \
+    constexpr size_t GROUP_SIZE = 128;                       \
     __VA_ARGS__                                              \
   } else {                                                   \
     PD_THROW("not support the group_size: ", group_size);    \
@@ -210,7 +213,7 @@ MLAWithKVCacheKernel(CUTE_GRID_CONSTANT
     PipelineState smem_pipe_write_kv = cutlass::make_producer_start_state<MainloopPipeline>();
     const int block_id = blockIdx.x;
     const int bid = mainloop_params.batch_ids[block_id];
-    const int tile_id = mainloop_params.tile_ids_per_batch[block_id];
+    const int tile_id = mainloop_params.tile_ids_per_batch ? mainloop_params.tile_ids_per_batch[block_id] : 0;
     const int q_tile_id = mainloop_params.q_tile_ids_per_batch ? mainloop_params.q_tile_ids_per_batch[block_id] : 0;
     const int seq_len_now = mainloop_params.seq_lens_this_time[bid];
     const int seq_len_encoder_now = mainloop_params.seq_lens_encoder[bid];
@@ -268,7 +271,7 @@ MLAWithKVCacheKernel(CUTE_GRID_CONSTANT
     clear(tOrO);
     clear(attention_updater.scores_scale);
     const int bid = mainloop_params.batch_ids[block_id];
-    const int tile_id = mainloop_params.tile_ids_per_batch[block_id];
+    const int tile_id = mainloop_params.tile_ids_per_batch ? mainloop_params.tile_ids_per_batch[block_id] : 0;
     const int q_tile_id = mainloop_params.q_tile_ids_per_batch ? mainloop_params.q_tile_ids_per_batch[block_id] : 0;
     const int seq_len_now = mainloop_params.seq_lens_this_time[bid];
     const int seq_len_encoder_now = mainloop_params.seq_lens_encoder[bid];
@@ -325,7 +328,7 @@ MLAWithKVCacheKernel(CUTE_GRID_CONSTANT
         seq_len_decoder_now,
         mainloop_params.chunk_size,
         mainloop_params.draft_total_token_num,
-        mainloop_params.o_stride_bsz);
+        mainloop_params.o_stride_head_num);
   }
 }
 

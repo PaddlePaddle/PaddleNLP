@@ -90,10 +90,11 @@ static int cpu_wrapper(Context* ctx,
       const int seq_len_enc = seq_lens_encoder[i];
       if (seq_len_dec == 0 && seq_len_enc == 0) continue;
       if (step_idx[i] >= 0) {
-        if (seq_len_dec ==
-            0) {  // encoder, get last token accord to seq_lens_encoder
+        if (seq_len_enc > 0) {
+          // encoder, get last token accord to seq_lens_encoder
           pre_ids_all_now[step_idx[i]] = input_ids_now[seq_len_enc - 1];
-        } else {  // decoder, get first token
+        } else {
+          // decoder, get first token
           pre_ids_all_now[step_idx[i]] = input_ids_now[0];
         }
       }
@@ -113,7 +114,9 @@ static int xpu2or3_wrapper(Context* ctx,
                         int length,
                         int length_input_ids) {
   using XPU_INT64 = typename XPUIndexType<int64_t>::type;
-  auto set_value_by_flags_and_idx_kernel = xpu2::plugin::set_value_by_flags_and_idx;
+  bool is_xpu2 = ctx->dev().type() == api::kXPU2;
+  auto set_value_by_flags_and_idx_kernel = 
+    is_xpu2 ? xpu2::plugin::set_value_by_flags_and_idx : xpu3::plugin::set_value_by_flags_and_idx;
   set_value_by_flags_and_idx_kernel<<<ctx->ncluster(), 64, ctx->xpu_stream>>>(
       stop_flags,
       reinterpret_cast<XPU_INT64*>(pre_ids_all),
@@ -166,6 +169,7 @@ int set_value_by_flags_and_idx(Context* ctx,
   WRAPPER_CHECK_PTR(ctx, int, seq_lens_encoder_len, seq_lens_encoder);
   WRAPPER_CHECK_PTR(ctx, int, seq_lens_decoder_len, seq_lens_decoder);
   WRAPPER_CHECK_PTR(ctx, int64_t, step_idx_len, step_idx);
+
   if (ctx->dev().type() == api::kCPU) {
     return cpu_wrapper(ctx,
                        stop_flags,

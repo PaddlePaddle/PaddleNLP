@@ -1257,11 +1257,11 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
             config.set_xpu_device_id(device_id)
             xpu_config = paddle.inference.XpuConfig()
             xpu_config.device_id = device_id
-            xpu_config.l3_size = 63 * 1024 * 1024
-            xpu_config.l3_autotune_size = 63 * 1024 * 1024
+            xpu_config.l3_size = 0
+            xpu_config.l3_autotune_size = 0
             config.set_xpu_config(xpu_config)
             config.switch_ir_optim(True)
-            config.enable_memory_optim()
+            # config.enable_memory_optim()
         else:
             device_id = int(os.environ.get("FLAGS_selected_gpus", 0))
             config.enable_use_gpu(100, device_id)
@@ -1519,7 +1519,13 @@ def predict():
     predictor_args, model_args = parser.parse_args_into_dataclasses()
 
     llm_utils.set_triton_cache(predictor_args.model_name_or_path, predictor_args.mode)
+    try:
+        from paddle.utils import try_import
 
+        try_import("paddlenlp_ops")
+    except ImportError:
+        logger.warning("paddlenlp_ops does not exist, please install paddlenlp_ops.")
+        return
     tensor_parallel_degree = paddle.distributed.get_world_size()
     if tensor_parallel_degree > 1:
         strategy = fleet.DistributedStrategy()
@@ -1596,27 +1602,29 @@ def benchmark(predictor, predictor_args, model_args):
     print("***********Start Warmup**********")
     for _ in range(warmup_time):
         for bs, batch_source_text in enumerate(batch_benchmark_texts):
-            outputs = predictor.predict(batch_source_text)
+            predictor.predict(batch_source_text)
 
     print("***********Start Speed Test**********")
     start = time.perf_counter()
     output_tokens = 0
     for _ in range(test_time):
         for bs, batch_source_text in enumerate(batch_benchmark_texts):
-            outputs, batch_tokens = predictor.predict(batch_source_text, return_tokens=True)
-            output_tokens += sum([len(tokens) for tokens in batch_tokens])
+            results = predictor.predict(batch_source_text, return_tokens=True)
+            if predictor.tensor_parallel_rank == 0:
+                output_tokens += sum([len(tokens) for tokens in results[-1]])
     end = time.perf_counter()
-    print("Avg Elapse time is: ", (end - start) / test_time)
-    print("Output tokens is: ", output_tokens)
-    print(
-        "Input length is: {}, Output length is: {}, bs is: {}, IPS: {:.3f} tokens/s, QPS: {:.3f} requests/s. ".format(
-            predictor_args.src_length,
-            predictor_args.max_length,
-            predictor_args.batch_size,
-            (output_tokens / (end - start)),
-            (predictor_args.batch_size * test_time / (end - start)),
+    if predictor.tensor_parallel_rank == 0:
+        print("Avg Elapse time is: ", (end - start) / test_time)
+        print("Output tokens is: ", output_tokens)
+        print(
+            "Input length is: {}, Output length is: {}, bs is: {}, IPS: {:.3f} tokens/s, QPS: {:.3f} requests/s. ".format(
+                predictor_args.src_length,
+                predictor_args.max_length,
+                predictor_args.batch_size,
+                (output_tokens / (end - start)),
+                (predictor_args.batch_size * test_time / (end - start)),
+            )
         )
-    )
 
 
 if __name__ == "__main__":

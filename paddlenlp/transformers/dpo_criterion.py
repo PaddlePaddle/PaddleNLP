@@ -259,6 +259,7 @@ class DPOCriterion(nn.Layer):
                 ],
                 axis=0,
             )
+
         sft_loss = -chosen_logps.sum() / (chosen_labels != 0).sum()
         if average_log_prob:
             chosen_response_length = response_indexs[:, 2] - response_indexs[:, 1] - offset
@@ -304,3 +305,72 @@ class DPOCriterion(nn.Layer):
             return loss
         else:
             return policy_chosen_logps, policy_rejected_logps, sft_loss, dpo_loss, loss
+
+
+class AutoDPOCriterion(DPOCriterion):
+    def __init__(self, config, dpo_config=None, use_infohub=False, ignore_eos_token=False):
+        super(AutoDPOCriterion, self).__init__(config, dpo_config, use_infohub, ignore_eos_token)
+        self.logprobs = nn.CrossEntropyLoss(reduction="none")
+
+    def forward(
+        self,
+        logits,
+        chosen_labels,
+        rejected_labels,
+        response_indexs,
+        reference_chosen_logps,
+        reference_rejected_logps,
+    ):
+        if not paddle.is_grad_enabled():
+            reference_chosen_logps = None
+            reference_rejected_logps = None
+        labels = (chosen_labels, rejected_labels, response_indexs, reference_chosen_logps, reference_rejected_logps)
+        result = super().forward(logits, labels)
+        if len(result) == 5:
+            return result[-1]
+        return result
+
+    def dpo_logps(
+        self,
+        logits,
+        chosen_labels,
+        rejected_labels,
+        response_indexs,
+        average_log_prob=False,
+    ):
+        """DPO logprobs"""
+        labels = chosen_labels + rejected_labels
+        if isinstance(logits, tuple):
+            logits = logits[0]
+        elif isinstance(logits, CausalLMOutputWithPast):
+            logits = logits.logits
+        logits = logits.astype("float32")
+        if logits.shape[:-1] != labels.shape:
+            raise ValueError("Logits (batch and sequence length dim) and labels must have the same shape.")
+        # bs, seq
+        per_token_logps = -self.logprobs(logits, labels.unsqueeze(2)).squeeze(2)
+        if len(response_indexs.shape) == 3:
+            response_indexs = response_indexs[0]
+
+        offset = 1 if self.ignore_eos_token else 0
+
+        # while control flow lacks support for dynamic shapes and TensorArray, compute logps using masks.
+        batch_idx = response_indexs[:, 0]
+        start_idx = response_indexs[:, 1]
+        end_idx = response_indexs[:, 2]
+        end2_idx = response_indexs[:, 3]
+        seq_len = per_token_logps.shape[1]
+        _range = paddle.arange(seq_len).unsqueeze(0)
+        ranges = _range.expand([batch_idx.shape[0], seq_len])
+        chosen_mask = (ranges >= paddle.unsqueeze(start_idx, 1)) & (ranges < paddle.unsqueeze(end_idx, 1))
+        rejected_mask = (ranges >= paddle.unsqueeze(end_idx + offset, 1)) & (ranges < paddle.unsqueeze(end2_idx, 1))
+        chosen_logps = paddle.sum(per_token_logps[batch_idx] * chosen_mask.astype("float32"), axis=1)
+        rejected_logps = paddle.sum(per_token_logps[batch_idx] * rejected_mask.astype("float32"), axis=1)
+
+        sft_loss = -chosen_logps.sum() / (chosen_labels != 0).sum()
+        if average_log_prob:
+            chosen_response_length = response_indexs[:, 2] - response_indexs[:, 1] - offset
+            rejected_response_length = response_indexs[:, 3] - response_indexs[:, 2]
+            chosen_logps /= chosen_response_length.astype("float32")
+            rejected_logps /= rejected_response_length.astype("float32")
+        return chosen_logps, rejected_logps, sft_loss * self.dpo_config.sft_loss_ratio

@@ -27,7 +27,9 @@ import paddle
 import paddle.distributed as dist
 import paddle.distributed.fleet as fleet
 from paddle.base.framework import use_pir_api
-from paddlenlp_ops import speculate_step_paddle, step_paddle
+from paddlenlp_ops import step_paddle
+if not paddle.is_compiled_with_xpu():
+    from paddlenlp_ops import speculate_step_paddle
 from server.data.processor import DataProcessor
 from server.engine.config import global_config
 from server.utils import get_logger
@@ -612,7 +614,7 @@ class ModelRunner:
                 engine_healthy_recorded_time_array,
             ) = self.initialize_engine_healthy_recorded_time_flag()
             engine_healthy_recorded_time_array[0] = time.time()
-            # infer_live_flag_shm = self.initialize_engine_live_flag()
+            infer_live_flag_shm = self.initialize_engine_live_flag()
         infer_seed_increment = paddle.full(shape=[self.args.max_batch_size, 1], fill_value=4, dtype="int64")
         # thread_executor = ThreadPoolExecutor(max_workers=1)
         real_bsz = None
@@ -732,8 +734,19 @@ class InferenceEngine(object):
             self.param_file = os.path.join(self.model_dir, "model.pdiparams")
         config = paddle.inference.Config(self.model_file, self.param_file)
 
-        config.enable_use_gpu(100, device_id)
-
+        if paddle.is_compiled_with_xpu():
+            config.enable_xpu()
+            device_id = int(os.environ.get("FLAGS_selected_xpus", 0))
+            config.set_xpu_device_id(device_id)
+            xpu_config = paddle.inference.XpuConfig()
+            xpu_config.device_id = device_id
+            xpu_config.l3_size = 0
+            xpu_config.l3_autotune_size = 0
+            config.set_xpu_config(xpu_config)
+            config.switch_ir_optim(True)
+        else:
+            config.enable_use_gpu(100, device_id)
+        
         if use_pir_api():
             config.enable_new_executor()
             config.enable_new_ir()
@@ -784,6 +797,13 @@ def main():
     """
     args = parse_args()
     llm_utils.set_triton_cache(args.model_dir, "static")
+    try:
+        from paddle.utils import try_import
+
+        try_import("paddlenlp_ops")
+    except ImportError:
+        logger.warning("paddlenlp_ops does not exist, please install paddlenlp_ops.")
+        return
     model_runner = ModelRunner(args)
     model_runner.run()
 

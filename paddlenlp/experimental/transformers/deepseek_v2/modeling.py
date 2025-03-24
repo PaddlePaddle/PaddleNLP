@@ -139,6 +139,107 @@ class DeepseekScalingRotaryEmbedding(nn.Layer):
         return query, key
 
 
+class DeepseekScalingRotaryEmbeddingXPU(nn.Layer):
+    """RotaryEmbedding extended with YaRN method.
+
+    Credits to Peng et al. github.com/jquesnelle/yarn
+    """
+
+    def __init__(
+        self,
+        rotary_dim: int,
+        max_position_embeddings: int,
+        base: int,
+        scaling_factor: float,
+        *,
+        extrapolation_factor: float = 1,
+        attn_factor: float = 1,
+        beta_fast: int = 32,
+        beta_slow: int = 1,
+        mscale: float = 1,
+        mscale_all_dim: float = 0,
+    ) -> None:
+        super().__init__()
+        ori_device = paddle.device.get_device()
+        paddle.device.set_device("cpu")
+        self._dtype = paddle.get_default_dtype()
+
+        self.rotary_dim = rotary_dim
+        self.max_position_embeddings = max_position_embeddings
+        self.base = base
+
+        self.scaling_factor = scaling_factor
+        self.extrapolation_factor = extrapolation_factor
+        self.attn_factor = attn_factor
+        self.beta_fast = beta_fast
+        self.beta_slow = beta_slow
+        # Get n-d magnitude scaling corrected for interpolation.
+        self.mscale = float(
+            yarn_get_mscale(self.scaling_factor, float(mscale))
+            / yarn_get_mscale(self.scaling_factor, float(mscale_all_dim))
+            * attn_factor
+        )
+
+        cos_cache, sin_cache = self._compute_cos_sin_cache()
+
+        self.cos_cache: paddle.Tensor
+        self.register_buffer("cos_cache", cos_cache, persistable=True)
+        self.sin_cache: paddle.Tensor
+        self.register_buffer("sin_cache", sin_cache, persistable=True)
+        paddle.device.set_device(ori_device)
+
+    def _compute_inv_freq(self, scaling_factor: float) -> paddle.Tensor:
+        pos_freqs = self.base ** (paddle.arange(0, self.rotary_dim, 2, dtype=paddle.float32) / self.rotary_dim)
+
+        inv_freq_extrapolation = 1.0 / pos_freqs
+        inv_freq_interpolation = 1.0 / (scaling_factor * pos_freqs)
+
+        low, high = yarn_find_correction_range(
+            self.beta_fast, self.beta_slow, self.rotary_dim, self.base, self.max_position_embeddings
+        )
+        # Get n-d rotational scaling corrected for extrapolation
+        inv_freq_mask = (1 - yarn_linear_ramp_mask(low, high, self.rotary_dim // 2)) * self.extrapolation_factor
+        inv_freq = inv_freq_interpolation * (1 - inv_freq_mask) + inv_freq_extrapolation * inv_freq_mask
+        return inv_freq
+
+    def _compute_cos_sin_cache(self) -> paddle.Tensor:
+        inv_freq = self._compute_inv_freq(self.scaling_factor)
+        t = paddle.arange(self.max_position_embeddings * self.scaling_factor, dtype=paddle.float32)
+
+        freqs = paddle.outer(t, inv_freq)
+        emb = paddle.concat((freqs, freqs), axis=-1)
+        cos = emb.cos() * self.mscale
+        sin = emb.sin() * self.mscale
+
+        return cos.cast(self._dtype), sin.cast(self._dtype)
+
+    def forward(
+        self,
+        position_ids: paddle.Tensor,
+        query: paddle.Tensor,
+        key: paddle.Tensor,
+    ) -> Tuple[paddle.Tensor, paddle.Tensor]:
+        cos = self.cos_cache[position_ids].unsqueeze(1)
+        sin = self.sin_cache[position_ids].unsqueeze(1)
+
+        def rotate_half(x):
+            """Rotates half the hidden axiss of the input."""
+            x1 = x[..., : x.shape[-1] // 2]
+            x2 = x[..., x.shape[-1] // 2 :]
+            return paddle.concat([-x2, x1], axis=-1)  # shape is the same as x
+
+        s, h, d = query.shape
+        query = query.reshape([s, h, d // 2, 2]).transpose([0, 1, 3, 2]).reshape([s, h, d])
+
+        s, h, d = key.shape
+        key = key.reshape([s, h, d // 2, 2]).transpose([0, 1, 3, 2]).reshape([s, h, d])
+
+        query = (query * cos) + (rotate_half(query) * sin)
+        key = (key * cos) + (rotate_half(key) * sin)
+
+        return query, key
+
+
 class DeepseekV2RMSNorm(nn.Layer):
     def __init__(self, config: DeepseekV2Config):
         super().__init__()
@@ -197,7 +298,8 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
         if "fp8" in self.quant_type:
             self.dynamic_quant = True
 
-        assert config.append_attn is True
+        if not paddle.is_compiled_with_xpu():
+            assert config.append_attn is True
 
         self.first_k_dense_replace = config.first_k_dense_replace
         self.n_routed_experts = config.n_routed_experts
@@ -229,13 +331,22 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
             for k, v in config.rope_scaling.items()
             if k in ("extrapolation_factor", "attn_factor", "beta_fast", "beta_slow", "mscale", "mscale_all_dim")
         }
-        self.rotary_emb = DeepseekScalingRotaryEmbedding(
-            config.qk_rope_head_dim,
-            original_max_position,
-            config.rope_theta,
-            scaling_factor,
-            **extra_kwargs,
-        )
+        if paddle.is_compiled_with_xpu():
+            self.rotary_emb = DeepseekScalingRotaryEmbeddingXPU(
+                config.qk_rope_head_dim,
+                original_max_position,
+                config.rope_theta,
+                scaling_factor,
+                **extra_kwargs,
+            )
+        else:
+            self.rotary_emb = DeepseekScalingRotaryEmbedding(
+                config.qk_rope_head_dim,
+                original_max_position,
+                config.rope_theta,
+                scaling_factor,
+                **extra_kwargs,
+            )
 
         # get ring_id
         ring_id = -1
@@ -560,7 +671,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
             rank_id=config.tensor_parallel_rank,
             moe_config=moe_config,
             mla_config=mla_config,
-            append_attn=True,
+            append_attn=config.append_attn,
             speculate_config=speculate_config,
         )
 
@@ -1143,6 +1254,20 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                             ffn2_weights.append(ffn2_quanted_weight.view(paddle.uint8))
                             ffn1_scales.append(ffn1_weight_scale)
                             ffn2_scales.append(ffn2_weight_scale)
+                    elif self.moe_quant_type in ["weight_only_int8"]:
+                        assert paddle.is_compiled_with_xpu()
+                        ffn1_quanted_weight, ffn1_weight_scale = weight_quantize(
+                            ffn1_weight.cast("float16"), algo=self.moe_quant_type, group_size=-1, arch=70
+                        )
+                        ffn2_quanted_weight, ffn2_weight_scale = weight_quantize(
+                            ffn2_weight.cast("float16"), algo=self.moe_quant_type, group_size=-1, arch=70
+                        )
+                        ffn1_weight_scale = ffn1_weight_scale.cast("float16")
+                        ffn2_weight_scale = ffn2_weight_scale.cast("float16")
+                        ffn1_weights.append(ffn1_quanted_weight.reshape([self.transformer_block.config.embed_dim, -1]))
+                        ffn2_weights.append(ffn2_quanted_weight.reshape([-1, self.transformer_block.config.embed_dim]))
+                        ffn1_scales.append(ffn1_weight_scale)
+                        ffn2_scales.append(ffn2_weight_scale)
                     else:
                         ffn1_weights.append(ffn1_weight)
                         ffn2_weights.append(ffn2_weight)
@@ -1160,7 +1285,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                     ).cast("float32")
                     self.transformer_block.e_score_correction_biases[idx].set_value(e_score_correction_bias)
 
-                if self.use_weight_only:
+                if self.use_weight_only or self.moe_quant_type in ["weight_only_int8"]:
                     self.transformer_block.ffn1_weights[idx].set_value(fused_moe_ffn1_weight)
                     self.transformer_block.ffn2_weights[idx].set_value(fused_moe_ffn2_weight)
                 elif "fp8" in self.quant_type:
@@ -1177,7 +1302,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                     self.transformer_block.ffn2_weights[idx].set_value(fused_moe_ffn2_weight)
                 self.transformer_block.gate_weights[idx].set_value(gate_weight)
 
-                if self.use_weight_only:
+                if self.use_weight_only or self.moe_quant_type in ["weight_only_int8"]:
                     self.transformer_block.ffn1_weights_scale[idx].set_value(fused_moe_ffn1_weight_scale)
                     self.transformer_block.ffn2_weights_scale[idx].set_value(fused_moe_ffn2_weight_scale)
                 elif "fp8" in self.quant_type:
