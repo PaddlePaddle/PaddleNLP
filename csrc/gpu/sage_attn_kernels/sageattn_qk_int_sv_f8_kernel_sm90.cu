@@ -143,7 +143,7 @@ __device__ __forceinline__ void arrive(uint64_t* bar) {
 // ======= kernel impl =======
 //
 
-template<uint32_t CTA_Q, uint32_t CTA_K, uint32_t NUM_THREADS, uint32_t head_dim, QuantGranularity Q_GRAN, QuantGranularity K_GRAN, typename DTypeOut, /* typename DTypeQuant */, MaskMode mask_mode = MaskMode::kNone, bool fuse_v_scale=false>
+template<uint32_t CTA_Q, uint32_t CTA_K, uint32_t NUM_THREADS, uint32_t head_dim, QuantGranularity Q_GRAN, QuantGranularity K_GRAN, typename DTypeOut, /* typename DTypeQuant,*/ MaskMode mask_mode = MaskMode::kNone, bool fuse_v_scale=false>
 __global__ void qk_int8_sv_f8_attn_kernel(const __grid_constant__ CUtensorMap tensorMapQ, 
                                         const __grid_constant__ CUtensorMap tensorMapK,
                                         const __grid_constant__ CUtensorMap tensorMapV,
@@ -939,7 +939,7 @@ std::vector<paddle::Tensor> qk_int8_sv_f8_accum_f32_fuse_v_scale_attn_inst_buf_s
             CUtensorMap tma_map_K = create_tensor_map_4D<CTA_K, HEAD_DIM>(reinterpret_cast<int8_t*>(key.data()), batch_size, num_kv_heads, kv_len, HEAD_DIM, stride_bz_k, stride_h_k, stride_seq_k);
             CUtensorMap tma_map_V = create_tensor_map_4D<HEAD_DIM, CTA_K>(reinterpret_cast<int8_t*>(value.data()), batch_size, num_kv_heads, HEAD_DIM, value.shape()[3], stride_bz_v, stride_h_v, stride_d_v);
 
-            auto* kernel = qk_int8_sv_f8_attn_kernel<CTA_Q, CTA_K, NUM_THREADS, HEAD_DIM,  static_cast<QuantGranularity>(QK_QUANT_GRAN), static_cast<QuantGranularity>(QK_QUANT_GRAN), DTypeOut, DTypeQuant, mask_mode, true>;
+            auto* kernel = qk_int8_sv_f8_attn_kernel<CTA_Q, CTA_K, NUM_THREADS, HEAD_DIM,  static_cast<QuantGranularity>(QK_QUANT_GRAN), static_cast<QuantGranularity>(QK_QUANT_GRAN), DTypeOut, /* DTypeQuant,*/ mask_mode, true>;
             size_t sMemSize = CTA_Q * HEAD_DIM * sizeof(int8_t) + CTA_K * HEAD_DIM * sizeof(int8_t) + CTA_K * HEAD_DIM * sizeof(int8_t);
               cudaFuncSetAttribute(
                   kernel,
@@ -1017,13 +1017,13 @@ std::vector<paddle::Tensor> sage_attention_fwd(paddle::Tensor& q,
   int WARPQ = 16;
   std::vector<paddle::Tensor>&& quant_qk_results = per_warp_int8_cuda(q, k, km, BLKQ, WARPQ, BLKK, tensor_layout); // q_int8, q_scale, k_int8, k_scale
 
-  paddle::Tensor o;
+  paddle::Tensor o = paddle::empty(q.shape(), q.dtype(), paddle::GPUPlace()); // we will change this soon..
 
-  if (shift_bias && smooth_weight) {
-    o = paddle::empty(q.shape(), paddle::DataType::INT8, paddle::GPUPlace());
-  } else {
-    o = paddle::empty(q.shape(), q.dtype(), paddle::GPUPlace());
-  }
+  // if (shift_bias && smooth_weight) {
+  //   o = paddle::empty(q.shape(), paddle::DataType::INT8, paddle::GPUPlace());
+  // } else {
+  //   o = paddle::empty(q.shape(), q.dtype(), paddle::GPUPlace());
+  // }
 
   int v_seq_len = (tensor_layout == 0) ? v.shape()[1] : v.shape()[2];
   int v_pad_len = (v_seq_len % 128 != 0) ? (128 - v_seq_len % 128) : 0;
