@@ -99,6 +99,10 @@ class PermuteNode:
         self.token_dispatcher = token_dispatcher
         self.name = name
 
+    def reset_status(self):
+        self.token_permuted_indices = None
+        self.prob_permuted_indices = None
+
     def forward(self, hidden_states, hidden_states_scale, dispatched_indices):
         self.token_dispatcher._comm_manager.hidden_shape_before_permute = hidden_states.shape
         self.hidden_shape_before_permute = hidden_states.shape
@@ -122,6 +126,7 @@ class PermuteNode:
             restore_shape=self.hidden_shape_before_permute,
             probs=dispatched_probs,
         )
+        self.reset_status()
         return hidden_states_grad.to(input_dtype)
 
 
@@ -129,6 +134,15 @@ class UnPermuteNode:
     def __init__(self, token_dispatcher, name="unpermute"):
         self.token_dispatcher = token_dispatcher
         self.name = name
+
+    def reset_status(self):
+        self.token_permuted_indices = None
+        self.hidden_states = None
+        self.prob_permuted_indices = None
+        # self.faltten_dispatched_probs = None
+        self.hidden = None
+        self.permuted_tokens = None
+        self.output_tokens = None
 
     def forward(
         self,
@@ -141,11 +155,11 @@ class UnPermuteNode:
         self.input_dtype = hidden_states.dtype
         self.hidden_states = hidden_states
         self.prob_permuted_indices = prob_permuted_indices
-        self.dispatched_probs = dispatched_probs
+        self.dispatched_probs_shape = dispatched_probs.shape
         # permute
         _, self.hidden = self.token_dispatcher._comm_manager.hidden_shape_before_permute
 
-        self.faltten_dispatched_probs = self.dispatched_probs.flatten()
+        self.faltten_dispatched_probs = dispatched_probs.flatten()
 
         self.permuted_probs = paddle.gather(self.faltten_dispatched_probs, self.prob_permuted_indices)
         self.permuted_tokens = self.hidden_states * self.permuted_probs.unsqueeze(-1)
@@ -190,6 +204,8 @@ class UnPermuteNode:
             self.faltten_dispatched_probs, self.prob_permuted_indices, permuted_probs_grad, 0
         )
 
-        dispatched_probs_grad = paddle._C_ops.flatten_grad(self.dispatched_probs, faltten_dispatched_probs_grad)
+        # dispatched_probs_grad = paddle._C_ops.flatten_grad(self.dispatched_probs, faltten_dispatched_probs_grad)
+        dispatched_probs_grad = faltten_dispatched_probs_grad.reshape(self.dispatched_probs_shape)
 
+        self.reset_status()
         return hidden_states_grad, dispatched_probs_grad

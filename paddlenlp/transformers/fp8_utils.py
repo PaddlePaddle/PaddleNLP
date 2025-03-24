@@ -109,6 +109,7 @@ class ExpertsNode:
         self.x_t_scales = []
         self.o1s = []
         self.dxs = []
+        self.tokens_per_expert = None
 
     def forward(self, hs_out, hs_scale_out, tokens_per_expert):
         self.tokens_per_expert = tokens_per_expert
