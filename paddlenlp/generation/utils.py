@@ -481,10 +481,8 @@ class GenerationMixin:
         if past_key_values is not None and attention_mask.ndim == 2:
             if model_inputs["inputs_embeds"] is not None:
                 batch_size, sequence_length, _ = model_inputs["inputs_embeds"].shape
-                device = model_inputs["inputs_embeds"].device
             else:
                 batch_size, sequence_length = model_inputs[input_ids_key].shape
-                device = model_inputs[input_ids_key].device
 
             # Create the causal mask with fixed shape in advance, to reduce recompilations. If the function to create
             # the 4D causal mask exists, it should be present in the base model (XXXModel class).
@@ -510,7 +508,6 @@ class GenerationMixin:
                     sequence_length=sequence_length,
                     target_length=past_key_values.get_max_cache_shape(),
                     dtype=self.dtype,
-                    device=device,
                     cache_position=cache_position,
                     batch_size=batch_size,
                     config=self.config,
@@ -701,7 +698,6 @@ class GenerationMixin:
         model_input_name: str,
         model_kwargs: Dict[str, paddle.Tensor],
         decoder_start_token_id: paddle.Tensor,
-        device: paddle.device = None,
     ) -> Tuple[paddle.Tensor, Dict[str, paddle.Tensor]]:
         """Prepares `decoder_input_ids` for generation with encoder-decoder models"""
         # 1. Check whether the user has defined `decoder_input_ids` manually. To facilitate in terms of input naming,
@@ -714,8 +710,6 @@ class GenerationMixin:
             decoder_input_ids = None
 
         # 2. `decoder_start_token_id` must have shape (batch_size, 1)
-        if device is None:
-            device = self.device
         if decoder_start_token_id.ndim == 1:
             if decoder_start_token_id.shape[0] != batch_size:
                 raise ValueError(
@@ -859,7 +853,7 @@ class GenerationMixin:
             past_positions = model_kwargs.pop("cache_position")
             new_positions = paddle.arange(
                 past_positions[-1] + 1, past_positions[-1] + num_new_tokens + 1, dtype=past_positions.dtype
-            ).to(past_positions.place)
+            )
             model_kwargs["cache_position"] = paddle.concat((past_positions, new_positions))
         return model_kwargs
 
@@ -904,7 +898,7 @@ class GenerationMixin:
         elif different_tokenizers:
             if generation_config.do_sample is True:
                 atm_translator = AssistantVocabTranslatorCache.get_translator(
-                    target_tokenizer, assistant_tokenizer, self.config.vocab_size, assistant_model.device
+                    target_tokenizer, assistant_tokenizer, self.config.vocab_size, assistant_model.place
                 )
                 candidate_generator = UniversalSpeculativeDecodingGenerator(
                     input_ids=input_ids,
@@ -950,7 +944,6 @@ class GenerationMixin:
         encoder_input_ids: paddle.Tensor,
         prefix_allowed_tokens_fn: Callable[[int, paddle.Tensor], List[int]],
         logits_processor: Optional[LogitsProcessorList],
-        device: str = None,
         model_kwargs: Optional[Dict[str, Any]] = None,
         negative_prompt_ids: Optional[paddle.Tensor] = None,
         negative_prompt_attention_mask: Optional[paddle.Tensor] = None,
@@ -1154,14 +1147,14 @@ class GenerationMixin:
             if generation_config.eta_cutoff is not None and 0.0 < generation_config.eta_cutoff < 1.0:
                 processors.append(
                     EtaLogitsWarper(
-                        epsilon=generation_config.eta_cutoff, min_tokens_to_keep=min_tokens_to_keep, device=device
+                        epsilon=generation_config.eta_cutoff, min_tokens_to_keep=min_tokens_to_keep
                     )
                 )
 
         # Watermarking should be after all logits processing is finished (see #34630)
         if generation_config.watermarking_config is not None:
             processors.append(
-                generation_config.watermarking_config.construct_processor(self.config.vocab_size, device)
+                generation_config.watermarking_config.construct_processor(self.config.vocab_size)
             )
 
         # `LogitNormalization` should always be the last logit processor, when present
@@ -1314,7 +1307,7 @@ class GenerationMixin:
         # 1. In absence of `beam_indices`, we can assume that we come from e.g. greedy search, which is equivalent
         # to a beam search approach were the first (and only) beam is always selected
         if beam_indices is None:
-            beam_indices = paddle.arange(scores[0].shape[0]).view(-1, 1).to(sequences.device)
+            beam_indices = paddle.arange(scores[0].shape[0]).view([-1, 1])
             beam_indices = beam_indices.expand(-1, len(scores))
 
         # 2. reshape scores as [batch_size*vocab_size, # generation steps] with # generation steps being
@@ -1329,7 +1322,7 @@ class GenerationMixin:
 
         # 4. cut beam_indices to longest beam length
         beam_indices_mask = beam_indices < 0
-        max_beam_length = (1 - beam_indices_mask.long()).sum(-1).max()
+        max_beam_length = (1 - beam_indices_mask).sum(-1).max()
         beam_indices = beam_indices.clone()[:, :max_beam_length]
         beam_indices_mask = beam_indices_mask[:, :max_beam_length]
 
@@ -1344,7 +1337,8 @@ class GenerationMixin:
         indices = sequences[:, cut_idx:] + beam_sequence_indices
 
         # 8. Compute scores
-        transition_scores = scores.gather(0, indices)
+        transition_scores = paddle.take_along_axis(scores, indices, 0)
+        # transition_scores = scores.gather(0, indices)
 
         # 9. Mask out transition_scores of beams that stopped early
         transition_scores[beam_indices_mask] = 0
@@ -1651,7 +1645,7 @@ class GenerationMixin:
         return model_kwargs
 
     def _get_cache(
-        self, cache_implementation: str, batch_size: int, max_cache_len: int, device: paddle.device, model_kwargs
+        self, cache_implementation: str, batch_size: int, max_cache_len: int, device: paddle.place, model_kwargs
     ):
         """
         Sets a cache for `generate`, that will persist across calls. A new cache will only be initialized a
@@ -1736,7 +1730,7 @@ class GenerationMixin:
         assistant_model: "PreTrainedModel",
         batch_size: int,
         max_cache_length: int,
-        device: paddle.device,
+        device: paddle.place,
     ) -> bool:
         """
         Prepares the cache for generation (if applicable), given `generate`'s parameterization. If a cache is
@@ -1874,8 +1868,7 @@ class GenerationMixin:
                 return token
 
             device = device if device is not None else self.device
-            if isinstance(token, paddle.Tensor):
-                return token.to(device)
+
             return paddle.to_tensor(token, place=device, dtype="int64")
 
         bos_token_tensor = _tensor_or_none(generation_config.bos_token_id, device=device)
@@ -2108,7 +2101,6 @@ class GenerationMixin:
                 model_input_name=model_input_name,
                 model_kwargs=model_kwargs,
                 decoder_start_token_id=generation_config._decoder_start_token_tensor,
-                device=inputs_tensor.place,
             )
         else:
             input_ids = inputs_tensor if model_input_name == "input_ids" else model_kwargs.pop("input_ids")
@@ -2181,7 +2173,6 @@ class GenerationMixin:
             encoder_input_ids=inputs_tensor,
             prefix_allowed_tokens_fn=prefix_allowed_tokens_fn,
             logits_processor=logits_processor,
-            device=inputs_tensor.place,
             model_kwargs=model_kwargs,
             negative_prompt_ids=negative_prompt_ids,
             negative_prompt_attention_mask=negative_prompt_attention_mask,
@@ -2397,7 +2388,6 @@ class GenerationMixin:
                 constraints=final_constraints,
                 batch_size=batch_size,
                 num_beams=generation_config.num_beams,
-                device=inputs_tensor.device,
                 length_penalty=generation_config.length_penalty,
                 do_early_stopping=generation_config.early_stopping,
                 num_beam_hyps_to_keep=generation_config.num_return_sequences,
@@ -2490,7 +2480,7 @@ class GenerationMixin:
             prompts,
             return_tensors="pt",
             padding=True,
-        ).input_ids.to(input_ids.device)
+        ).input_ids
 
         # replace bos with pad to not condition healing on it
         input_ids = paddle.where(input_ids == bos_token_id, pad_token_id, input_ids)
@@ -2617,7 +2607,7 @@ class GenerationMixin:
 
         # keep track of which sequences are already finished
         batch_size = input_ids.shape[0]
-        unfinished_sequences = paddle.ones(batch_size, dtype=paddle.long, device=input_ids.device)
+        unfinished_sequences = paddle.ones(batch_size, dtype=paddle.int64)
         model_kwargs = self._get_initial_cache_position(input_ids, model_kwargs)
 
         this_peer_finished = False
@@ -2685,7 +2675,7 @@ class GenerationMixin:
             for candidate_premature_layer in candidate_premature_layers:
                 candidate_premature_logits[candidate_premature_layer] = lm_head(
                     outputs.hidden_states[candidate_premature_layer][:, -1, :]
-                ).to(final_logits.device)
+                )
 
             # synced_gpus: don't waste resources running the code we don't need; kwargs must be updated before skipping
             model_kwargs = self._update_model_kwargs_for_generation(
@@ -2699,7 +2689,6 @@ class GenerationMixin:
             next_token_logits = _dola_select_contrast(
                 candidate_premature_layers, candidate_premature_logits, final_logits
             )
-            next_token_logits = next_token_logits.to(input_ids.device)
             # pre-process distribution
             next_token_scores = logits_processor(input_ids, next_token_logits)
 
@@ -2828,11 +2817,11 @@ class GenerationMixin:
 
         # keep track of which sequences are already finished
         batch_size = input_ids.shape[0]
-        unfinished_sequences = paddle.ones(batch_size, dtype=paddle.long, device=input_ids.device)
+        unfinished_sequences = paddle.ones(batch_size, dtype=paddle.int64)
         model_kwargs = self._get_initial_cache_position(input_ids, model_kwargs)
 
         # Create cosine_matrix_mask based on the attention_mask
-        cosine_matrix_mask = paddle.ones_like(input_ids, dtype=paddle.long)
+        cosine_matrix_mask = paddle.ones_like(input_ids, dtype=paddle.int64)
         if self.config.is_encoder_decoder:
             if "decoder_attention_mask" in model_kwargs and model_kwargs["decoder_attention_mask"] is not None:
                 cosine_matrix_mask = model_kwargs["decoder_attention_mask"]
@@ -2870,8 +2859,7 @@ class GenerationMixin:
                 # Clone is needed to avoid keeping a hanging ref to outputs.logits which may be very large for this first iteration
                 # (the clone itself is always small)
                 # .float() is needed to retain precision for later logits manipulations
-                logit_for_next_step = outputs.logits[:, -1, :].clone().float()
-                logit_for_next_step = logit_for_next_step.to(input_ids.device)
+                logit_for_next_step = outputs.logits[:, -1, :].clone().astype(paddle.float32)
 
                 model_kwargs = self._update_model_kwargs_for_generation(
                     outputs,
@@ -3006,7 +2994,7 @@ class GenerationMixin:
                 full_hidden_states = outputs.hidden_states
 
             # .float() is needed to retain precision for later logits manipulations
-            logits = outputs.logits[:, -1, :].float()
+            logits = outputs.logits[:, -1, :].astype(paddle.float32)
             context_hidden = last_hidden_states.repeat_interleave(top_k, axis=0)
 
             # compute the degeneration penalty and re-rank the candidates based on the degeneration penalty and the
@@ -3021,7 +3009,7 @@ class GenerationMixin:
             selected_idx = selected_idx.to("cpu")
 
             # This will be used instead of the previous inneficient paddle.stack(paddle.split())
-            augmented_idx = paddle.tensor([x + i * top_k for i, x in enumerate(selected_idx)])
+            augmented_idx = paddle.to_tensor([x + i * top_k for i, x in enumerate(selected_idx)])
 
             # prepare for the next step: (1) next token_id; (2) past_key_values; (3) last_hidden_states for computing
             # the degeneration penalty; (4) logits for selecting next top-k candidates; (5) selected tokens scores
@@ -3072,7 +3060,6 @@ class GenerationMixin:
                     next_past_key_values = tuple(new_key_values)
 
             logit_for_next_step = paddle.stack(paddle.split(logits, top_k))[range(batch_size), selected_idx, :]
-            logit_for_next_step = logit_for_next_step.to(input_ids.device)
 
             # Rebuilds the relevant parts of the model output for the selected token, for use in the next iteration
             if self.config.is_encoder_decoder:
@@ -3534,7 +3521,7 @@ class GenerationMixin:
             # Clone is needed to avoid keeping a hanging ref to outputs.logits which may be very large for first iteration
             # (the clone itself is always small)
             # .float() is needed to retain precision for later logits manipulations
-            next_token_logits = outputs.logits[:, -1, :].clone().cast(paddle.float32)
+            next_token_logits = outputs.logits[:, -1, :].clone().astype(paddle.float32)
             next_token_scores = nn.functional.log_softmax(
                 next_token_logits, axis=-1
             )  # (batch_size * num_beams, vocab_size)
@@ -3574,9 +3561,11 @@ class GenerationMixin:
             if do_sample:
                 probs = nn.functional.softmax(next_token_scores, axis=-1)
                 next_tokens = paddle.multinomial(probs, num_samples=n_tokens_to_keep)
-                next_token_scores = paddle.gather(next_token_scores, -1, next_tokens)
+                # next_token_scores = paddle.gather(next_token_scores, -1, next_tokens)
+                next_token_scores = paddle.take_along_axis(next_token_scores, next_tokens, -1)
                 next_token_scores, _indices = paddle.sort(next_token_scores, descending=True, axis=1)
-                next_tokens = paddle.gather(next_tokens, -1, _indices)
+                next_tokens = paddle.take_along_axis(next_tokens, _indices, -1)
+                # next_tokens = paddle.gather(next_tokens, -1, _indices)
             else:
                 next_token_scores, next_tokens = paddle.topk(
                     next_token_scores, n_tokens_to_keep, axis=1, largest=True, sorted=True
@@ -3599,7 +3588,7 @@ class GenerationMixin:
 
             beam_scores = beam_outputs["next_beam_scores"]
             beam_next_tokens = beam_outputs["next_beam_tokens"]
-            beam_idx = beam_outputs["next_beam_indices"].cast(paddle.int64)
+            beam_idx = beam_outputs["next_beam_indices"].astype(paddle.int64)
 
             input_ids = paddle.concat([input_ids[beam_idx, :], beam_next_tokens.unsqueeze(-1)], axis=-1)
 
@@ -3852,7 +3841,7 @@ class GenerationMixin:
                 )
                 beam_scores[batch_group_indices] = beam_outputs["next_beam_scores"]
                 beam_next_tokens = beam_outputs["next_beam_tokens"]
-                beam_idx = beam_outputs["next_beam_indices"].cast(paddle.int64)
+                beam_idx = beam_outputs["next_beam_indices"].astype(paddle.int64)
 
                 if return_dict_in_generate and output_scores:
                     beam_indices[beam_group_idx] = tuple(
@@ -3868,7 +3857,7 @@ class GenerationMixin:
                 # (beam_idx // group_size) -> batch_idx
                 # (beam_idx % group_size) -> offset of idx inside the group
                 reordering_indices[batch_group_indices] = (
-                    num_beams * paddle.divide(beam_idx, paddle.to_tensor(group_size)).cast(paddle.int64)
+                    num_beams * paddle.divide(beam_idx, paddle.to_tensor(group_size)).astype(paddle.int64)
                     + group_start_idx
                     + (beam_idx % group_size)
                 )
@@ -4039,14 +4028,14 @@ class GenerationMixin:
 
         # initialise score of first beam with 0 and the rest with -1e9. This makes sure that only tokens
         # of the first beam are considered to avoid sampling the exact same tokens across all beams.
-        beam_scores = paddle.zeros((batch_size, num_beams), dtype=paddle.float, device=input_ids.device)
+        beam_scores = paddle.zeros([batch_size, num_beams], dtype=paddle.float32)
         beam_scores[:, 1:] = -1e9
         beam_scores = beam_scores.view([batch_size * num_beams,])
 
         this_peer_finished = False
 
         decoder_prompt_len = input_ids.shape[-1]  # record the prompt length of decoder
-        while self._has_unfinished_sequences(this_peer_finished, synced_gpus, device=input_ids.device):
+        while self._has_unfinished_sequences(this_peer_finished, synced_gpus):
 
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
 
@@ -4069,8 +4058,7 @@ class GenerationMixin:
             # Clone is needed to avoid keeping a hanging ref to outputs.logits which may be very large for first iteration
             # (the clone itself is always small)
             # .float() is needed to retain precision for later logits manipulations
-            next_token_logits = outputs.logits[:, -1, :].clone().float()
-            next_token_logits = next_token_logits.to(input_ids.device)
+            next_token_logits = outputs.logits[:, -1, :].clone().astype(paddle.float32)
             next_token_scores = nn.functional.log_softmax(
                 next_token_logits, axis=-1
             )  # (batch_size * num_beams, vocab_size)
@@ -4269,19 +4257,16 @@ class GenerationMixin:
 
         # keep track of which sequences are already finished
         batch_size = input_ids.shape[0]
-        unfinished_sequences = paddle.ones(batch_size, dtype=paddle.long, device=input_ids.device)
+        unfinished_sequences = paddle.ones(batch_size, dtype=paddle.int64)
         model_kwargs = self._get_initial_cache_position(input_ids, model_kwargs)
 
         this_peer_finished = False
         is_first_iteration = True  # to preserve the same API in the output as other generation methods
-        while self._has_unfinished_sequences(this_peer_finished, synced_gpus, device=input_ids.device):
+        while self._has_unfinished_sequences(this_peer_finished, synced_gpus):
             cur_len = input_ids.shape[-1]
 
             #  1. Fetch candidate sequences from a `CandidateGenerator` and move to the correct device
             candidate_input_ids, candidate_logits = candidate_generator.get_candidates(input_ids)
-            candidate_input_ids = candidate_input_ids.to(self.device)
-            if candidate_logits is not None:
-                candidate_logits = candidate_logits.to(self.device)
 
             candidate_length = candidate_input_ids.shape[1] - input_ids.shape[1]
             is_done_candidate = stopping_criteria(candidate_input_ids, None)
@@ -4300,7 +4285,7 @@ class GenerationMixin:
                 candidate_kwargs["cache_position"] = paddle.concat(
                     (
                         candidate_kwargs["cache_position"],
-                        paddle.arange(cur_len, cur_len + candidate_length, device=input_ids.device, dtype=paddle.long),
+                        paddle.arange(cur_len, cur_len + candidate_length, dtype=paddle.int64),
                     ),
                     axis=0,
                 )
@@ -4318,8 +4303,7 @@ class GenerationMixin:
 
             # 2.3. Process the new logits
             # .float() is needed to retain precision for later logits manipulations
-            new_logits = outputs.logits[:, -candidate_length - 1 :].float()  # excludes the input prompt if present
-            new_logits = new_logits.to(input_ids.device)
+            new_logits = outputs.logits[:, -candidate_length - 1 :].astype(paddle.float32)  # excludes the input prompt if present
             next_token_logits = new_logits.clone()
             if len(logits_processor) > 0:
                 for i in range(candidate_length + 1):
@@ -4718,7 +4702,7 @@ def stack_model_outputs(model_outputs: List[ModelOutput], config: PretrainedConf
                 return tuple(paddle.concat([attr[i] for attr in data], axis=0) for i in range(len(data[0])))
         elif isinstance(data[0], (int, float)):
             # If the elements are integers or floats, return a tensor
-            return paddle.tensor(data)
+            return paddle.to_tensor(data)
         else:
             raise TypeError(f"Unexpected attribute type: {type(data[0])}")
 

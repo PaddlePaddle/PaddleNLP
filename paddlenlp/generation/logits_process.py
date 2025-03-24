@@ -500,7 +500,6 @@ class TopKLogitsWarper(LogitsProcessor):
 
     @add_start_docstrings(LOGITS_PROCESSOR_INPUTS_DOCSTRING)
     def __call__(self, input_ids: paddle.Tensor, scores: paddle.Tensor) -> paddle.Tensor:
-        import pdb;pdb.set_trace()
         top_k = min(self.top_k, scores.shape[-1])  # Safety check
         # Remove all tokens with a probability less than the last token of the top-k
         indices_to_remove = scores < paddle.topk(scores, top_k)[0][..., -1, None]
@@ -577,7 +576,7 @@ class MinPLogitsWarper(LogitsProcessor):
         sorted_indices = paddle.argsort(scores, descending=True, axis=-1)
         sorted_indices_to_remove = paddle.take_along_axis(
             tokens_to_remove.astype("int64"), sorted_indices, axis=-1
-        ).cast("bool")
+        ).astype("bool")
         sorted_indices_to_remove[..., : self.min_tokens_to_keep] = False
 
         # sorted_indices = sorted_indices + paddle.arange(probs.shape[0], dtype="int64").unsqueeze(-1) * probs.shape[-1]

@@ -111,11 +111,6 @@ class AssistedCandidateGenerator(CandidateGenerator):
         inputs_tensor: Optional[paddle.Tensor] = None,
         logits_processor: "LogitsProcessorList" = None,
     ):
-        # Make sure all data at the same device as assistant model
-        device = assistant_model.device
-        input_ids = input_ids.to(device)
-        if inputs_tensor is not None:
-            inputs_tensor = inputs_tensor.to(device)
 
         # Prepare the assistant and the starting number of candidate tokens
         self.assistant_model = assistant_model
@@ -130,7 +125,7 @@ class AssistedCandidateGenerator(CandidateGenerator):
         for key, value in model_kwargs.items():  # deepcopy crashes if we attempt to copy encoder outputs with grads
             if key not in ("encoder_outputs", "past_key_values"):
                 assistant_kwargs[key] = (
-                    value.detach().to(device) if isinstance(value, paddle.Tensor) else copy.deepcopy(value)
+                    value.detach() if isinstance(value, paddle.Tensor) else copy.deepcopy(value)
                 )
 
         # Remove potential default "logits_to_keep" key
@@ -158,7 +153,7 @@ class AssistedCandidateGenerator(CandidateGenerator):
             self.input_ids_key = "input_ids"
             self.assistant_kwargs["attention_mask"] = self.assistant_kwargs.get(
                 "decoder_attention_mask",
-                paddle.ones((input_ids.shape[0], 1), device=input_ids.device, dtype=paddle.int64),
+                paddle.ones((input_ids.shape[0], 1), dtype=paddle.int64),
             )
         else:
             # both are decoder-only
@@ -210,7 +205,6 @@ class AssistedCandidateGenerator(CandidateGenerator):
             assessed by the model and a `paddle.Tensor` of shape `(batch_size, candidate_length,
             vocabulary_size)` containing the logits associated to each candidate.
         """
-        input_ids = input_ids.to(self.assistant_model.device)
         # Calculate new tokens to generate
         min_new_tokens, max_new_tokens = self._calculate_new_tokens(input_ids)
         if max_new_tokens == 0:
@@ -491,7 +485,7 @@ class AssistedCandidateGeneratorDifferentTokenizers(AssistedCandidateGenerator):
         """
         text = source_tokenizer.batch_decode(input_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True)
         dest_ids = destination_tokenizer(text, add_special_tokens=True, return_tensors="pt")["input_ids"]
-        return dest_ids.to(input_ids.device)
+        return dest_ids
 
     def get_candidates(self, input_ids: paddle.Tensor) -> Tuple[paddle.Tensor, Optional[paddle.Tensor]]:
         """
@@ -510,7 +504,6 @@ class AssistedCandidateGeneratorDifferentTokenizers(AssistedCandidateGenerator):
         if max_new_tokens == 0:
             return input_ids, None
 
-        input_ids = input_ids.to(self.assistant_model.device)
         remove_from_pkv = 0
 
         assistant_input_ids, remove_from_pkv = self._prepare_assistant_input_ids(input_ids)
@@ -692,7 +685,7 @@ class AssistantToTargetTranslator:
             if target_id is not None:
                 assistant_to_target_input_ids[assistant_id] = target_id
                 target_to_assistant_input_ids[target_id] = assistant_id
-        return assistant_to_target_input_ids.to(self._assistant_model_device), target_to_assistant_input_ids
+        return assistant_to_target_input_ids, target_to_assistant_input_ids
 
     def _get_suppress_input_ids(self) -> list[int]:
         """
@@ -722,7 +715,7 @@ class AssistantToTargetTranslator:
         """
 
         target_shape: tuple[int, ...] = (*assistant_logits.shape[:-1], self.target_vocab_size)
-        target_logits: paddle.Tensor = paddle.full(target_shape, self.FILTER_VALUE).to(self._assistant_model_device)
+        target_logits: paddle.Tensor = paddle.full(target_shape, self.FILTER_VALUE)
         # Mask for valid indices
         assistant_indices_mask = self._assistant_to_target_input_ids != self.SUPPRESS_TOKEN_ID
         # Exclude invalid indices
@@ -821,7 +814,7 @@ class UniversalSpeculativeDecodingGenerator(AssistedCandidateGeneratorDifferentT
         """
         Simplified version of get_candidates that uses the translator cache for token conversion.
         """
-        target_input_ids = input_ids.to(self.assistant_model.device)
+        target_input_ids = input_ids
         assistant_input_ids, num_added_tokens = self._prepare_assistant_input_ids(target_input_ids)
         min_new_tokens, max_new_tokens = self._calculate_new_tokens(target_input_ids)
 
@@ -881,9 +874,9 @@ class UniversalSpeculativeDecodingGenerator(AssistedCandidateGeneratorDifferentT
             )
             assistant_new_ids = self.assistant_tokenizer(
                 target_new_text, add_special_tokens=False, return_tensors="pt"
-            )["input_ids"].to(self.assistant_model.device)
+            )["input_ids"]
         else:
-            assistant_new_ids = paddle.Tensor([[assistant_new_ids]], device=self.assistant_model.device)
+            assistant_new_ids = paddle.to_tensor([[assistant_new_ids]])
 
         # Update or initialize assistant IDs
         if self._prev_assistant_ids is None:

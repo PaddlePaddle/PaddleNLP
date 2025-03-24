@@ -1447,10 +1447,9 @@ class WatermarkingConfig(BaseWatermarkingConfig):
                 ),
             )
 
-    def construct_processor(self, vocab_size: int, device) -> "WatermarkLogitsProcessor":
+    def construct_processor(self, vocab_size: int) -> "WatermarkLogitsProcessor":
         return WatermarkLogitsProcessor(
             vocab_size=vocab_size,
-            device=device,
             greenlist_ratio=self.greenlist_ratio,
             bias=self.bias,
             hashing_key=self.hashing_key,
@@ -1536,14 +1535,13 @@ class SynthIDTextWatermarkingConfig(BaseWatermarkingConfig):
                 ),
             )
 
-    def construct_processor(self, vocab_size: int, device) -> "WatermarkLogitsProcessor":
+    def construct_processor(self, vocab_size: int) -> "WatermarkLogitsProcessor":
         return SynthIDTextWatermarkLogitsProcessor(
             ngram_len=self.ngram_len,
             keys=self.keys,
             sampling_table_size=self.sampling_table_size,
             sampling_table_seed=self.sampling_table_seed,
             context_history_size=self.context_history_size,
-            device=device,
             skip_first_ngram_calls=self.skip_first_ngram_calls,
             debug_mode=self.debug_mode,
         )
