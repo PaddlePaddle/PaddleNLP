@@ -20,27 +20,18 @@ import paddle
 from paddle import nn
 
 import paddlenlp
-from paddlenlp.transformers import (
-    LlamaConfig,
-    LlamaModel,
-    LlamaPretrainedModel,
-    PretrainedConfig,
-    PretrainedModel,
-)
-from paddlenlp.transformers.conversion_utils import (
-    StateDictNameMapping,
-    init_name_mappings,
-)
+from paddlenlp.transformers import PretrainedConfig, PretrainedModel
+from paddlenlp.transformers.auto import AutoModel
 
 from .score_model_utils import ScoreModelMixin, ScoreModelOutput
 
 
-class LlamaModelForScore(ScoreModelMixin, LlamaPretrainedModel):
+class AutoModelForScore(ScoreModelMixin, PretrainedModel):
     _keys_to_ignore_on_load_missing = ["lm_head.weight"]
 
     def __init__(self, config: PretrainedConfig, **kwargs: Any) -> None:
         """
-        Initializes a `LlamaForSequenceClassification` model.
+        Initializes a `AutoModelForScore` model.
 
         Args:
             config (PretrainedConfig): Model configuration class with all the parameters of the model.
@@ -51,7 +42,7 @@ class LlamaModelForScore(ScoreModelMixin, LlamaPretrainedModel):
             TypeError: If the config is not an instance of `PretrainedConfig`.
         """
         super().__init__(config)
-        self.llama = LlamaModel(config)
+        self.model = AutoModel.from_config(config)
 
         # config.architectures = [self.__class__.__name__]
         self.init_score_head(config, hidden_size=config.hidden_size, **kwargs)
@@ -64,7 +55,7 @@ class LlamaModelForScore(ScoreModelMixin, LlamaPretrainedModel):
         Returns:
             Optional[nn.Embedding]: 输入嵌入的nn.Embedding对象，或者None（如果没有使用嵌入）。
         """
-        return self.llama.embed_tokens
+        return self.model.embed_tokens
 
     def set_input_embeddings(self, value: nn.Embedding) -> None:
         """
@@ -76,7 +67,7 @@ class LlamaModelForScore(ScoreModelMixin, LlamaPretrainedModel):
         Returns:
             NoneType: No return value is returned. Instead, the input embeddings are updated in-place.
         """
-        self.llama.embed_tokens = value
+        self.model.embed_tokens = value
 
     def get_decoder(self) -> PretrainedModel:
         """
@@ -85,7 +76,7 @@ class LlamaModelForScore(ScoreModelMixin, LlamaPretrainedModel):
         Returns:
             PretrainedModel (Pytorch): 返回解码器模型，类型为Pytorch的PretrainedModel。
         """
-        return self.llama
+        return self.model
 
     def set_decoder(self, decoder: PretrainedModel) -> None:
         """
@@ -97,7 +88,7 @@ class LlamaModelForScore(ScoreModelMixin, LlamaPretrainedModel):
         Returns:
             None; 无返回值。
         """
-        self.llama = decoder
+        self.model = decoder
 
     def forward(  # pylint: disable=too-many-arguments
         self,
@@ -148,7 +139,7 @@ class LlamaModelForScore(ScoreModelMixin, LlamaPretrainedModel):
         )
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
-        outputs = self.llama(
+        outputs = self.model(
             input_ids=input_ids,
             attention_mask=attention_mask,
             position_ids=position_ids,
@@ -167,81 +158,5 @@ class LlamaModelForScore(ScoreModelMixin, LlamaPretrainedModel):
             return_dict=return_dict,
         )
 
-    @classmethod
-    def _get_name_mappings(cls, config: LlamaConfig) -> list[StateDictNameMapping]:
-        """
-        获取模型的名称映射列表，包括模型参数和额外的映射。
-        如果配置中没有"LlamaModel"，则将基础模型前缀添加到每个映射中。
 
-        Args:
-            config (LlamaConfig): 配置对象，其中包含模型参数。
-
-        Returns:
-            list[StateDictNameMapping]: 一个包含模型参数和额外映射的名称映射列表。
-            每个元素是一个三元组（原始名称，转换后的名称，转换类型），其中转换类型可以为None、"transpose"或者"add_prefix"。
-        """
-        mappings: list[StateDictNameMapping] = []
-        model_mappings = [
-            ["embed_tokens.weight"],
-            ["norm.weight"],
-        ]
-        for layer_index in range(config.num_hidden_layers):
-            layer_mappings = [
-                [
-                    f"layers.{layer_index}.self_attn.q_proj.weight",
-                    None,
-                    "transpose",
-                ],
-                [
-                    f"layers.{layer_index}.self_attn.k_proj.weight",
-                    None,
-                    "transpose",
-                ],
-                [
-                    f"layers.{layer_index}.self_attn.v_proj.weight",
-                    None,
-                    "transpose",
-                ],
-                [
-                    f"layers.{layer_index}.self_attn.o_proj.weight",
-                    None,
-                    "transpose",
-                ],
-                [f"layers.{layer_index}.self_attn.rotary_emb.inv_freq"],
-                [
-                    f"layers.{layer_index}.mlp.gate_proj.weight",
-                    None,
-                    "transpose",
-                ],
-                [
-                    f"layers.{layer_index}.mlp.down_proj.weight",
-                    None,
-                    "transpose",
-                ],
-                [f"layers.{layer_index}.mlp.up_proj.weight", None, "transpose"],
-                [f"layers.{layer_index}.input_layernorm.weight"],
-                [f"layers.{layer_index}.post_attention_layernorm.weight"],
-            ]
-            model_mappings.extend(layer_mappings)
-
-        init_name_mappings(mappings=model_mappings)
-        # base-model prefix "LlamaModel"
-        if "LlamaModel" not in config.architectures:
-            for mapping in model_mappings:
-                mapping[0] = "model." + mapping[0]
-                mapping[1] = "llama." + mapping[1]
-            model_mappings.append(["lm_head.weight", "lm_head.weight", "transpose"])
-            model_mappings.extend(
-                [
-                    ["score_head.weight", "score_head.weight", "transpose"],
-                    ["normalizer.var", "normalizer.var"],
-                    ["normalizer.mean", "normalizer.mean"],
-                    ["normalizer.count", "normalizer.count"],
-                ]
-            )
-
-        mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
-        return mappings
-
-
-paddlenlp.transformers.LlamaModelForScore = LlamaModelForScore
+paddlenlp.transformers.AutoModelForScore = AutoModelForScore
