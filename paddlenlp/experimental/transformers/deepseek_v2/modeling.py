@@ -52,7 +52,7 @@ from paddlenlp.transformers.model_utils import (
 )
 from paddlenlp.utils.log import logger
 
-__all__ = ["DeepseekV2ForCausalLMBlockInferenceModel","DeepseekVLV2ForCausalLMBlockInferenceModel"]
+__all__ = ["DeepseekV2ForCausalLMBlockInferenceModel", "DeepseekVLV2ForCausalLMBlockInferenceModel"]
 
 
 class DeepseekScalingRotaryEmbedding(nn.Layer):
@@ -1440,12 +1440,12 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
         kwargs["padding_offsets"] = padding_offset
         kwargs["max_input_length"] = self.max_seq_len
         kwargs["block_size"] = self.block_size
-        
+
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(ids_remove_padding)
         else:
             assert len(inputs_embeds.shape) == 3
-            # This is the case in the image-to-text model such as qwen2-vl,
+            # This is the case in the image-to-text model
             # In the prefill phase, the language model is first fed with inputs_embeds instead of input_ids
             # but in decoder phase, the language model is fed with input_ids just like normal text-to-text model.
             inputs_embeds = inputs_embeds.reshape([-1, inputs_embeds.shape[2]])
@@ -1937,17 +1937,18 @@ class MTPDeepseekV2ForCausalLMBlockInferenceModel(DeepseekV2ForCausalLMBlockInfe
 
         return logits, hidden_states
 
+
 class DeepseekVLV2ForCausalLMBlockInferenceModel(DeepseekV2ForCausalLMBlockInferenceModel):
     def __init__(self, config: DeepseekV2Config):
-        super().__init__(config,base_model_prefix = "language.model")
-    
+        super().__init__(config, base_model_prefix="language.model")
+
     def get_input_embeddings(self):
         return self.deepseek_v2.embed_tokens
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
-        if f"language.lm_head.weight" in state_dict:
+        if "language.lm_head.weight" in state_dict:
             self.lm_head.weight.set_value(
-                paddle.to_tensor(state_dict[f"language.lm_head.weight"]).cast(self.lm_head.weight.dtype)
+                paddle.to_tensor(state_dict["language.lm_head.weight"]).cast(self.lm_head.weight.dtype)
             )
         self.deepseek_v2.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
