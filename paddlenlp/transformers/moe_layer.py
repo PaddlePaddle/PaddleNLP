@@ -391,7 +391,12 @@ class MoELayer(nn.Layer):
                 prob_permuted_indices,
                 dispatched_probs,
             ) = self.token_dispatcher.token_permutation(hidden_states, probs, routing_map)
-            expert_output = self.expert_forward(dispatched_input)
+
+            permute_prob = paddle.gather(
+                dispatched_probs.flatten().cast(dispatched_input.dtype), prob_permuted_indices
+            )
+
+            expert_output = self.expert_forward(dispatched_input, permute_prob)
             output, _ = self.token_dispatcher.token_unpermutation(
                 expert_output, token_permuted_indices, prob_permuted_indices, dispatched_probs, None
             )
@@ -404,15 +409,16 @@ class MoELayer(nn.Layer):
     def set_tokens_per_expert(self, tokens_per_expert_list):
         self.token_dispatcher._comm_manager.tokens_per_expert_list = tokens_per_expert_list
 
-    def expert_forward(self, dispatched_input):
+    def expert_forward(self, dispatched_input, dispatched_probs=None):
         outputs = []
         # print(f"all tokens: {sum(tokens_per_expert)}, detail: {tokens_per_expert}")
         chunks = paddle.split(dispatched_input, num_or_sections=self.get_tokens_per_expert(), axis=0)
+        split_prob = paddle.split(dispatched_probs, num_or_sections=self.get_tokens_per_expert(), axis=0)
         for i, chunk in enumerate(chunks):
             chunk = chunk.contiguous()
             # assert chunk.shape[0] != 0, "Cannot dispatch empty input"
             expert = self.experts[i + self.moe_rank * self.moe_num_experts_per_device]
-            outputs += [expert(chunk)]
+            outputs += [expert(chunk, split_prob[i])]
 
         return paddle.concat(outputs, axis=0)
 

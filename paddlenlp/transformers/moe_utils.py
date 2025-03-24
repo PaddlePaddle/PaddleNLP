@@ -23,7 +23,7 @@ def topk_to_permuted_indices(x, num_tokens_per_expert_list, topk):
     x = paddle.flatten(x)
     prob_permuted_indices = paddle.concat(
         [
-            paddle.tensor.search._restrict_nonzero(x == i, total_true_num)
+            paddle.tensor.search._restrict_nonzero(x == i, total_true_num).cast("int32")
             for i, total_true_num in enumerate(num_tokens_per_expert_list)
         ]
     ).flatten()
@@ -76,13 +76,10 @@ def unpermute(
     """
     assert not drop_and_pad, "token-drop and pads is not supported"
     _, hidden = restore_shape
-
-    if probs is not None:
-        permuted_probs = paddle.gather(probs.flatten(), prob_permuted_indices)
-        permuted_tokens = permuted_tokens * permuted_probs.unsqueeze(-1)
+    input_dtype = permuted_tokens.dtype
 
     # Create an output tensor filled with zeros
-    output_tokens = paddle.zeros(restore_shape, dtype=permuted_tokens.dtype)
+    output_tokens = paddle.zeros(restore_shape, dtype=input_dtype)
     # Scatter add the permuted_input back to the original positions
     output_tokens.put_along_axis_(
         axis=0,

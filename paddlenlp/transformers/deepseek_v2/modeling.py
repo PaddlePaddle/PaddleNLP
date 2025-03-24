@@ -676,6 +676,68 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids, fuse_rope=False):
     return q_embed, k_embed
 
 
+class FusedFFNFunc(paddle.autograd.PyLayer):
+    @staticmethod
+    def forward(ctx, x, prob, w1, w2):
+        o1 = paddle.matmul(x, w1)
+
+        swiglu_out = swiglu(o1)
+
+        swiglu_out = swiglu_out * prob.unsqueeze(-1)
+
+        o2 = paddle.matmul(swiglu_out, w2)
+
+        ctx.save_for_backward(x, prob, o1, w1, w2)
+        return o2
+
+    @staticmethod
+    def backward(
+        ctx,
+        dout,
+    ):
+        x, prob, o1, w1, w2 = ctx.saved_tensor()
+
+        swiglu_out = swiglu(o1)
+        swiglu_out = swiglu_out * prob.unsqueeze(-1)
+
+        swiglu_grad, d_w2 = _C_ops.matmul_grad(swiglu_out, w2, dout, False, False)
+
+        swiglu_grad_p = swiglu_grad * prob.unsqueeze(-1)
+
+        d_prob = (swiglu_grad * swiglu_out).sum(axis=-1)
+
+        o1_grad, _ = paddle._C_ops.swiglu_grad(o1, None, swiglu_grad_p)
+
+        dx, d_w1 = _C_ops.matmul_grad(x, w1, o1_grad, False, False)
+
+        return dx, d_prob, d_w1, d_w2
+
+
+class FusedFFN(paddle.nn.Layer):
+    def __init__(self, config: DeepseekV2Config, hidden_size=None, intermediate_size=None, is_moe=False) -> None:
+        super().__init__()
+        self._dtype = self._helper.get_default_dtype()
+        self.config = config
+        self.hidden_size = config.hidden_size if hidden_size is None else hidden_size
+        self.intermediate_size = config.intermediate_size if intermediate_size is None else intermediate_size
+
+        self.w1 = self.create_parameter(
+            shape=[self.hidden_size, self.intermediate_size * 2],
+            dtype=self._dtype,
+            is_bias=False,
+        )
+
+        self.w2 = self.create_parameter(
+            shape=[self.intermediate_size, self.hidden_size],
+            dtype=self._dtype,
+            is_bias=False,
+        )
+
+    def forward(self, x, prob):
+
+        return FusedFFNFunc.apply(x, prob, self.w1, self.w2)
+
+
 class DeepseekV2MLP(nn.Layer):
     def __init__(self, config: DeepseekV2Config, hidden_size=None, intermediate_size=None, is_moe=False):
         super().__init__()
@@ -847,7 +909,7 @@ class DeepseekV2MoE(MoELayer):
             routed_scaling_factor=config.routed_scaling_factor,
             drop_tokens=False,
         )
-        DeepseekV2MLPClass = FP8DeepseekV2MLP if DSV3_USE_FP8_GEMM else DeepseekV2MLP
+        DeepseekV2MLPClass = FP8DeepseekV2MLP if DSV3_USE_FP8_GEMM else FusedFFN
 
         super().__init__(
             config=config,
@@ -870,7 +932,7 @@ class DeepseekV2MoE(MoELayer):
         self.alpha = config.aux_loss_alpha
         if config.n_shared_experts is not None:
             intermediate_size = config.moe_intermediate_size * config.n_shared_experts
-            self.shared_experts = DeepseekV2MLPClass(config=config, intermediate_size=intermediate_size, is_moe=False)
+            self.shared_experts = DeepseekV2MLP(config=config, intermediate_size=intermediate_size, is_moe=False)
 
     def forward(self, hidden_states):
         final_hidden_states, l_aux, l_zloss = super().forward(hidden_states)
