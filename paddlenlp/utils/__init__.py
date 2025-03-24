@@ -21,8 +21,17 @@ from .env import CONFIG_NAME, GENERATION_CONFIG_NAME, LEGACY_CONFIG_NAME
 from .import_utils import *
 from .infohub import infohub
 from .initializer import to
+from .log import logger
 from .memory_utils import empty_device_cache
-from .optimizer import *
+
+
+try:
+    from .optimizer import *
+except:
+    logger.info("Not support custom optimizer")
+
+
+>>>>>>> b7ee0bae02596af008bc1b395ae728c11e3affc6
 from .paddle_patch import *
 from .serialization import load_torch
 

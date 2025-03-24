@@ -144,7 +144,11 @@ void BatchMLAWithPagedKVCacheKernel(
           params.cumsum_q_seqlens = const_cast<int*>(cu_seqlens_q.data<int>());
           params.padding_offsets = const_cast<int*>(padding_offsets.data<int>());
           params.batch_ids = const_cast<int*>(batch_ids.data<int>());
-          params.tile_ids_per_batch = const_cast<int*>(tile_ids_per_batch.data<int>());
+          if (q_head_num <=64) {
+            params.tile_ids_per_batch = const_cast<int*>(tile_ids_per_batch.data<int>());
+          } else {
+            params.q_tile_ids_per_batch = const_cast<int*>(tile_ids_per_batch.data<int>());
+          }
           params.num_blocks_x = const_cast<int*>(num_blocks_x_device.data<int>());
           params.num_blocks_x_int = num_blocks_x;
           params.q_stride_bsz = q_head_num * q_head_dim;
@@ -186,7 +190,11 @@ void BatchMLAWithPagedKVCacheKernel(
         params.cumsum_q_seqlens = const_cast<int*>(cu_seqlens_q.data<int>());
         params.padding_offsets = const_cast<int*>(padding_offsets.data<int>());
         params.batch_ids = const_cast<int*>(batch_ids.data<int>());
-        params.tile_ids_per_batch = const_cast<int*>(tile_ids_per_batch.data<int>());
+        if (q_head_num <=64) {
+          params.tile_ids_per_batch = const_cast<int*>(tile_ids_per_batch.data<int>());
+        } else {
+          params.q_tile_ids_per_batch = const_cast<int*>(tile_ids_per_batch.data<int>());
+        }
         params.num_blocks_x = const_cast<int*>(num_blocks_x_device.data<int>());
         params.num_blocks_x_int = num_blocks_x;
         params.q_stride_bsz = q_head_num * q_head_dim;
@@ -216,6 +224,7 @@ void BatchMLAWithPagedKVCacheKernel(
       PD_THROW("error!!! q_head_dim must be 576 !!!\n");
   }
 }
+
 
 template void BatchMLAWithPagedKVCacheKernel<paddle::bfloat16>(
     const AppendAttnMetaData& meta_data,

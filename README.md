@@ -33,6 +33,9 @@
 
 ## News 📢
 
+* **2025.03.17 《DeepSeek-R1满血版单机部署实测》** 🔥🔥🔥 飞桨框架3.0大模型推理部署全面升级，支持多款主流大模型，DeepSeek-R1满血版实现单机部署，吞吐提升一倍！欢迎广大用户开箱体验～现已开启有奖活动：完成DeepSeek-R1-MTP 单机部署任务、提交高质量测评blog，即可实时赢取奖金！💰💰💰
+报名[地址](https://www.wjx.top/vm/OlzzmbG.aspx#)， 活动详情：https://github.com/PaddlePaddle/PaddleNLP/issues/10166 ， 参考文档：https://github.com/PaddlePaddle/PaddleNLP/issues/10157 。
+
 * **2025.03.12 [PaddleNLP v3.0 Beta4](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v3.0.0-beta4)**：全面支持 DeepSeek V3/R1/R1-Distill, 及QwQ-32B等热门思考模型。**DeepSeek V3/R1完整版支持FP8、INT8、4-bit量化推理，MTP投机解码**。单机FP8推理输出超**1000 tokens/s**; 4-bit推理输出超**2100 tokens/s**! 发布新版推理部署镜像，热门模型[一键部署](https://paddlenlp.readthedocs.io/zh/latest/llm/server/docs/general_model_inference.html)。推理部署[使用文档](https://paddlenlp.readthedocs.io/zh/latest/llm/docs/predict/index.html)全面更新，体验全面提升！自研下一代通用信息抽取模型 PP-UIE [全新发布](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/application/information_extraction)，支持8K长度信息抽取。新增大模型 Embedding 训练，支持INF-CL超大batch size训练。新增[MergeKit](https://paddlenlp.readthedocs.io/zh/latest/llm/docs/mergekit.html)模型融合工具，缓解对齐代价。低资源训练全面优化，16G小显存可以流畅训练。
 
 * **2025.03.06 PaddleNLP 现已支持 Qwen/QwQ-32B 模型**: 其模型参数仅有 32B，但其数学推理、编程能力和通用能力可与具备 671B 参数（其中 37B 被激活）的 DeepSeek-R1 媲美。借助 PaddleNLP 3.0套件，现可实现多种并行策略[微调训练](./llm/README.md)、[高性能推理、低比特量化](./llm/docs/predict/qwen.md)和[服务化部署](./llm/server/README.md)。

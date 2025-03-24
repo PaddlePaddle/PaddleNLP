@@ -243,7 +243,7 @@ def main():
         model_config.fuse_attention_ffn = model_args.fuse_attention_ffn
     model_config.seq_length = data_args.max_length
 
-    # Config for model useing long sequence strategy
+    # Config for model using long sequence strategy
     if model_args.use_long_sequence_strategies:
         data_args.scaled_max_length = int(data_args.max_length * model_args.rope_scaling_factor)
         model_config.use_long_sequence_strategies = True
@@ -630,7 +630,7 @@ def create_peft_model(model_args, reft_args, training_args, dtype, model_config,
         )
         # get reft model
         model = ReFTModel(reft_config, model)
-        # disable origianl model gradients
+        # disable original model gradients
         model.disable_model_gradients()
         model.print_trainable_parameters()
 

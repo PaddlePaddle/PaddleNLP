@@ -59,7 +59,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         eval_dataset (Dataset, required): Evaluation dataset, must contains the 'text_column' and 'label_column' specified below
         text_column (string, required): Name of the column that contains the input text.
         label_column (string, required): Name of the column that contains the target variable to predict.
-        metric_for_best_model (string, optional): the name of the metrc for selecting the best model. Defaut to 'eval_accuracy'.
+        metric_for_best_model (string, optional): the name of the metrc for selecting the best model. Default to 'eval_accuracy'.
         greater_is_better (bool, optional): Whether better models should have a greater metric or not. Use in conjuction with `metric_for_best_model`.
         problem_type (str, optional): Select among ["multi_class", "multi_label"] based on the nature of your problem
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task.

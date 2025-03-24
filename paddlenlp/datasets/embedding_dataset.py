@@ -101,6 +101,8 @@ class EmbeddingDatasetMixin:
         # If the template does not contain a suffix token, add the EOS token to the end
         if getattr(self, suffix_key) == []:
             setattr(self, suffix_key, [self.tokenizer.eos_token_id])
+        if getattr(self, prefix_key) == []:
+            setattr(self, prefix_key, [self.tokenizer.bos_token_id])
 
         # Calculate the available length
         max_len = getattr(self, max_len_key)

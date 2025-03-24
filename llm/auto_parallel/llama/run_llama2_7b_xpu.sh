@@ -55,6 +55,7 @@ export PYTHONPATH=../../../:$PYTHONPATH
 # for debug
 #export GLOG_v=10
 export FLAGS_call_stack_level=2
+export GLOG_minloglevel=2
 
 rm -rf output/$task_name_or_path
 PYTHONPATH=../:$PYTHONPATH  \
@@ -72,9 +73,10 @@ python -u  -m paddle.distributed.launch \
     --tensor_parallel_degree 1 \
     --pipeline_parallel_degree 1 \
     --sharding "stage1" \
+    --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate" \
     --sharding_parallel_config "enable_overlap" \
-    --tensor_parallel_config "enable_delay_scale_loss enable_mp_async_allreduce" \
-    --pipeline_parallel_config "enable_delay_scale_loss enable_release_grads disable_partial_send_recv" \
+    --tensor_parallel_config "enable_mp_async_allreduce" \
+    --pipeline_parallel_config "" \
     --virtual_pp_degree 1 \
     --sequence_parallel 0 \
     --use_flash_attention 1 \
@@ -98,8 +100,10 @@ python -u  -m paddle.distributed.launch \
     --bf16 \
     --fp16_opt_level "O2"  \
     --amp_master_grad true \
+    --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
+    --amp_custom_white_list "lookup_table" "lookup_table_v2" \
     --warmup_ratio 0.01 \
-    --max_grad_norm 0.0 \
+    --max_grad_norm 1.0 \
     --dataloader_num_workers 1 \
     --continue_training 0 \
     --do_predict 0 \
