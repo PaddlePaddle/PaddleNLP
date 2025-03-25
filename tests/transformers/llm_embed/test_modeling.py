@@ -34,7 +34,7 @@ class BiEncoderModelIntegrationTest(unittest.TestCase):
         model_name_or_path = "BAAI/bge-large-en-v1.5"
         tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
         model = BiEncoderModel(
-            model_name_or_path=model_name_or_path, dtype="float16", tokenizer=tokenizer, model_flag=""
+            model_name_or_path=model_name_or_path, dtype="float32", tokenizer=tokenizer, model_flag=""
         )
         with paddle.no_grad():
             out = model.encode_corpus(corpus=input_texts)
