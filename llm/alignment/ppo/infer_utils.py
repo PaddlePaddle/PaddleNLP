@@ -132,9 +132,9 @@ class Predictor:
         """inputs can be reused among multiple predictions, such as cache"""
         if hasattr(self, "cache_kvs_shape"):  # has created cache
             input_length = getattr(self, "input_length", 0)
-            # TODO(guosheng): better way to get history max cahce length, we can
-            # not get cahce length form cache tensor when not know cache layout
-            if input_length <= self.config.src_length:  # reuse cahce
+            # TODO(guosheng): better way to get history max cache length, we can
+            # not get cache length form cache tensor when not know cache layout
+            if input_length <= self.config.src_length:  # reuse cache
                 return
             else:  # create longer cache
                 self._clear_caches()

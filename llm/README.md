@@ -448,7 +448,7 @@ client = OpenAI(
 # Completion API
 stream = True
 completion = client.chat.completions.create(
-    model="paddlenlp",
+    model="default",
     messages=[
         {"role": "user", "content": "PaddleNLP好厉害！这句话的感情色彩是？"}
     ],

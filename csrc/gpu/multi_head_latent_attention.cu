@@ -38,6 +38,7 @@ std::vector<paddle::Tensor> MultiHeadLatentAttentionKernel(
     const paddle::Tensor& decoder_tile_ids_per_batch,
     const paddle::Tensor& decoder_num_blocks,
     const paddle::Tensor& decoder_num_blocks_cpu,
+    const paddle::Tensor& decoder_chunk_size_cpu,
     const paddle::Tensor& max_enc_len_this_time,
     const paddle::Tensor& max_dec_len_this_time,
     const paddle::Tensor& max_len_kv,
@@ -58,17 +59,15 @@ std::vector<paddle::Tensor> MultiHeadLatentAttentionKernel(
     const float quant_max_bound,
     const float quant_min_bound,
     const float out_linear_in_scale,
-    const int speculate_max_draft_token_num,
+    const int speculate_draft_total_token_num,
     const bool causal,
     const bool speculate_decoder) {
   typedef PDTraits<D> traits_;
   typedef typename traits_::data_t data_t;
-
   int decoder_num_blocks_data = decoder_num_blocks_cpu.data<int>()[0];
   int max_dec_len_this_time_data = max_dec_len_this_time.data<int>()[0];
+  int chunk_size = decoder_chunk_size_cpu.data<int>()[0];
   int max_len_kv_data = max_len_kv.data<int>()[0];
-
-
   auto mla_use_tensorcore = GetMlaUseTensorcore();
 
   if (speculate_decoder && !mla_use_tensorcore) {
@@ -76,7 +75,6 @@ std::vector<paddle::Tensor> MultiHeadLatentAttentionKernel(
   }
 
   auto main_stream = query.stream();
-
   paddle::Tensor fmha_out = paddle::full(
       {meta_data.token_nums, meta_data.q_num_heads * meta_data.head_dims_v},
       0,
@@ -107,13 +105,14 @@ std::vector<paddle::Tensor> MultiHeadLatentAttentionKernel(
                                              decoder_num_blocks,
                                              cache_quant_type_str,
                                              decoder_num_blocks_data,
+                                             chunk_size,
                                              max_input_length,
                                              max_len_kv_data,
                                              softmax_scale,
                                              quant_max_bound,
                                              quant_min_bound,
                                              out_linear_in_scale,
-                                             speculate_max_draft_token_num,
+                                             speculate_draft_total_token_num,
                                              causal,
                                              main_stream,
                                              &fmha_out);
@@ -164,6 +163,7 @@ std::vector<paddle::Tensor> MultiHeadLatentAttention(
     const paddle::Tensor& decoder_tile_ids_per_batch,
     const paddle::Tensor& decoder_num_blocks,
     const paddle::Tensor& decoder_num_blocks_cpu,
+    const paddle::Tensor& decoder_chunk_size_cpu,
     const paddle::Tensor& max_enc_len_this_time,
     const paddle::Tensor& max_dec_len_this_time,
     const paddle::Tensor& max_len_kv,
@@ -186,7 +186,7 @@ std::vector<paddle::Tensor> MultiHeadLatentAttention(
     const float quant_max_bound,
     const float quant_min_bound,
     const float out_linear_in_scale,
-    const int speculate_max_draft_token_num,
+    const int speculate_draft_total_token_num,
     const bool causal,
     const bool speculate_decoder) {
   AppendAttnMetaData meta_data;
@@ -228,6 +228,7 @@ std::vector<paddle::Tensor> MultiHeadLatentAttention(
           decoder_tile_ids_per_batch,
           decoder_num_blocks,
           decoder_num_blocks_cpu,
+          decoder_chunk_size_cpu,
           max_enc_len_this_time,
           max_dec_len_this_time,
           max_len_kv,
@@ -248,7 +249,7 @@ std::vector<paddle::Tensor> MultiHeadLatentAttention(
           quant_max_bound,
           quant_min_bound,
           out_linear_in_scale,
-          speculate_max_draft_token_num,
+          speculate_draft_total_token_num,
           causal,
           speculate_decoder);
     }
@@ -275,6 +276,7 @@ std::vector<paddle::Tensor> MultiHeadLatentAttention(
           decoder_tile_ids_per_batch,
           decoder_num_blocks,
           decoder_num_blocks_cpu,
+          decoder_chunk_size_cpu,
           max_enc_len_this_time,
           max_dec_len_this_time,
           max_len_kv,
@@ -295,7 +297,7 @@ std::vector<paddle::Tensor> MultiHeadLatentAttention(
           quant_max_bound,
           quant_min_bound,
           out_linear_in_scale,
-          speculate_max_draft_token_num,
+          speculate_draft_total_token_num,
           causal,
           speculate_decoder);
     }
@@ -329,6 +331,7 @@ std::vector<std::vector<int64_t>> MultiHeadLatentAttentionInferShape(
     const std::vector<int64_t>& decoder_tile_ids_per_batch_shape,
     const std::vector<int64_t>& decoder_num_blocks_shape,
     const std::vector<int64_t>& decoder_num_blocks_cpu_shape,
+    const std::vector<int64_t>& decoder_chunk_size_cpu_shape,
     const std::vector<int64_t>& max_enc_len_this_time_shape,
     const std::vector<int64_t>& max_dec_len_this_time_shape,
     const std::vector<int64_t>& max_len_kv_shape,
@@ -351,7 +354,7 @@ std::vector<std::vector<int64_t>> MultiHeadLatentAttentionInferShape(
     const float quant_max_bound,
     const float quant_min_bound,
     const float out_linear_in_scale,
-    const int speculate_max_draft_token_num,
+    const int speculate_draft_total_token_num,
     const bool causal,
     const bool speculate_decoder) {
   const int token_num = query_shape[0];
@@ -362,6 +365,8 @@ std::vector<std::vector<int64_t>> MultiHeadLatentAttentionInferShape(
   const int num_heads = q_hidden_size / head_dim_qk;
   return {{token_num, num_heads * head_dim_v}};
 }
+
+
 
 std::vector<paddle::DataType> MultiHeadLatentAttentionInferDtype(
     const paddle::DataType& query_dtype,
@@ -384,6 +389,7 @@ std::vector<paddle::DataType> MultiHeadLatentAttentionInferDtype(
     const paddle::DataType& decoder_tile_ids_per_batch_dtype,
     const paddle::DataType& decoder_num_blocks_dtype,
     const paddle::DataType& decoder_num_blocks_cpu_dtype,
+    const paddle::DataType& decoder_chunk_size_cpu_dtype,
     const paddle::DataType& max_enc_len_this_time_dtype,
     const paddle::DataType& max_dec_len_this_time_dtype,
     const paddle::DataType& max_len_kv_dtype,
@@ -406,7 +412,7 @@ std::vector<paddle::DataType> MultiHeadLatentAttentionInferDtype(
     const float quant_max_bound,
     const float quant_min_bound,
     const float out_linear_in_scale,
-    const int speculate_max_draft_token_num,
+    const int speculate_draft_total_token_num,
     const bool causal,
     const bool speculate_decoder) {
   if (compute_dtype == "bf16") {
@@ -439,6 +445,7 @@ PD_BUILD_OP(multi_head_latent_attention)
              "decoder_tile_ids_per_batch",
              "decoder_num_blocks",
              "decoder_num_blocks_cpu",
+             "decoder_chunk_size_cpu",
              "max_enc_len_this_time",
              "max_dec_len_this_time",
              "max_len_kv",
@@ -462,7 +469,7 @@ PD_BUILD_OP(multi_head_latent_attention)
             "quant_max_bound: float",
             "quant_min_bound: float",
             "out_linear_in_scale: float",
-            "speculate_max_draft_token_num: int",
+            "speculate_draft_total_token_num: int",
             "causal: bool",
             "speculate_decoder: bool"})
     .SetKernelFn(PD_KERNEL(MultiHeadLatentAttention))

@@ -117,7 +117,7 @@ class LeftSiLUAndMul {
   CUTLASS_HOST_DEVICE
   FragmentOutput operator()(FragmentAccumulator const &lhs,
                             FragmentAccumulator const &rhs) const {
-    // Convert source to interal compute numeric type
+    // Convert source to internal compute numeric type
     NumericArrayConverter<ElementCompute, ElementAccumulator, kCount, Round>
         accumulator_to_compute;
 

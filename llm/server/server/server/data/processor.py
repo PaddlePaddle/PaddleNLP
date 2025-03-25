@@ -17,7 +17,7 @@ from abc import ABC, abstractmethod
 
 from paddlenlp.transformers import Llama3Tokenizer, LlamaTokenizer
 from paddlenlp.trl.llm_utils import get_eos_token_id
-from server.engine.config import Config
+from server.engine.config import global_config
 from server.utils import data_processor_logger
 from paddlenlp.utils.env import USE_FAST_TOKENIZER
 
@@ -120,7 +120,7 @@ class BaseDataProcessor(ABC):
 
 class DataProcessor(BaseDataProcessor):
     def __init__(self):
-        self.config = Config()
+        self.config = global_config
 
         self.decode_status = dict()
         self.tokenizer = self._load_tokenizer()
@@ -183,7 +183,9 @@ class DataProcessor(BaseDataProcessor):
         response_dict["usage"] = {"completion_tokens" : response_dict["send_idx"] + 1}
 
         if is_end:
-            response_dict["tokens_all"] = self.clear_request_status(req_id)
+            self.clear_request_status(req_id)
+            token_ids = response_dict.get("tokens_all_ids", [])
+            response_dict["tokens_all"] = self.ids2tokens(token_ids, response_dict["req_id"])
         return response_dict
 
     def text2ids(self, text):

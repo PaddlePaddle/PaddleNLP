@@ -76,6 +76,10 @@ class EmbeddingArgument:
             )
         },
     )
+    return_position_ids: bool = field(
+        default=True,
+        metadata={"help": "Whether to return position ids for each sentence."},
+    )
     embedding_temperature: float = field(
         default=0.02,
         metadata={"help": "The temperature used in embedding learning."},

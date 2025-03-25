@@ -50,19 +50,75 @@ __global__ void split_q_block(const int* __restrict__ seq_lens_q,
   }
 }
 
-__global__ void split_q_block_mla(const int * __restrict__ seq_lens_q,
-                              const int * __restrict__ seq_lens_encoder,
-                              const int * __restrict__ seq_lens_decoder,
-                              int * __restrict__ batch_ids,
-                              int * __restrict__ tile_ids_per_batch,
-                              int * __restrict__ num_blocks_x,
-                              const int bsz,
-                              const int num_rows_per_block,
-                              const int chunk_size,
-                              const int GROUP_SIZE,
-                              const bool is_encoder) {
+template <uint32_t config_size>
+__global__ void search_chunk_size_for_mla(
+  const int * __restrict__ seq_lens_q,
+  const int * __restrict__ seq_lens_encoder,
+  const int * __restrict__ seq_lens_decoder,
+  int * __restrict__ num_blocks_x,
+  int * __restrict__ res_chunk_size,
+  const int bsz,
+  const int set_chunk_size,
+  const int block_size,
+  const int sm_cout) {
+  const uint32_t conf_id = threadIdx.x;
+  int gridx = 0;
+  if (set_chunk_size > 0 && conf_id == 0) {
+    for (uint32_t bid = 0; bid < bsz; bid++) {
+      int seq_len = seq_lens_q[bid];
+      int seq_len_encoder = seq_lens_encoder[bid];
+      int seq_len_decoder = seq_lens_decoder[bid] + seq_len;
+      if (seq_len == 0 || seq_len_encoder > 0) continue;
+
+      int loop_times;
+      loop_times = cute::ceil_div(seq_len_decoder, set_chunk_size);
+      gridx += loop_times;
+    }
+    *num_blocks_x = gridx;
+    *res_chunk_size = set_chunk_size;
+  } else if (conf_id < config_size) {
+    __shared__ int gridx_shared[config_size];
+    // chunk_size is a multiple of 64
+    const int chunk_size = block_size << conf_id;
+    for (uint32_t bid = 0; bid < bsz; bid++) {
+      int seq_len = seq_lens_q[bid];
+      int seq_len_encoder = seq_lens_encoder[bid];
+      int seq_len_decoder = seq_lens_decoder[bid] + seq_len;
+      if (seq_len == 0 || seq_len_encoder > 0) continue;
+
+      int loop_times;
+      loop_times = cute::ceil_div(seq_len_decoder, chunk_size);
+      gridx += loop_times;
+    }
+    gridx_shared[conf_id] = gridx;
+    __syncthreads();
+    if (threadIdx.x == 0) {
+      uint32_t res_id = 0;
+      uint32_t max_last_wave_block = 0;
+      for (uint32_t i = 1; i < config_size; i++) {
+        uint32_t last_wave_block = gridx_shared[i] % sm_cout;
+        if (last_wave_block >= max_last_wave_block) {
+          res_id = i;
+          max_last_wave_block = last_wave_block;
+        }
+      }
+      *num_blocks_x = gridx_shared[res_id];
+      *res_chunk_size = block_size << res_id;
+    }
+  }
+}
+
+
+
+__global__ void split_block_for_mla(
+  const int * __restrict__ seq_lens_q,
+  const int * __restrict__ seq_lens_encoder,
+  const int * __restrict__ seq_lens_decoder,
+  int * __restrict__ batch_ids,
+  int * __restrict__ tile_ids_per_batch,
+  const int bsz,
+  const int chunk_size) {
   if (threadIdx.x == 0) {
-    int gridx = 0;
     int index = 0;
     for (uint32_t bid = 0; bid < bsz; bid++) {
       int seq_len = seq_lens_q[bid];
@@ -72,24 +128,15 @@ __global__ void split_q_block_mla(const int * __restrict__ seq_lens_q,
       if (seq_len == 0) continue;
 
       int loop_times;
-      if (is_encoder) {
-        loop_times = cute::ceil_div(seq_len * GROUP_SIZE, num_rows_per_block);
-        if (seq_len_decoder > 0) {
-          loop_times = 0;
-        }
-      } else {
-        loop_times = cute::ceil_div(seq_len_decoder, chunk_size);
-        if (seq_len_encoder > 0) {
-          loop_times = 0;
-        }
+      loop_times = cute::ceil_div(seq_len_decoder, chunk_size);
+      if (seq_len_encoder > 0) {
+        loop_times = 0;
       }
       for (uint32_t tile_id = 0; tile_id < loop_times; tile_id++) {
         batch_ids[index] = bid;
         tile_ids_per_batch[index++] = tile_id;
       }
-      gridx += loop_times;
     }
-    *num_blocks_x = gridx;
   }
 }
 
@@ -155,7 +202,7 @@ std::vector<paddle::Tensor> GetBlockShapeAndSplitKVBlock(
     const int decoder_step_token_num) {
   paddle::Tensor encoder_batch_ids, encoder_tile_ids_per_batch, encoder_num_blocks_x_cpu,
     kv_batch_ids, kv_tile_ids_per_batch, kv_num_blocks_x_cpu, decoder_batch_ids,
-    decoder_tile_ids_per_batch, decoder_num_blocks_x, decoder_num_blocks_x_cpu;
+    decoder_tile_ids_per_batch, decoder_num_blocks_x, decoder_num_blocks_x_cpu, decoder_chunk_size_device, decoder_chunk_size_cpu;
   auto stream = seq_lens_this_time.stream();
   int bsz = cum_offsets.shape()[0];
   const int encoder_block_shape_q = get_encoder_block_shape_q();
@@ -177,31 +224,54 @@ std::vector<paddle::Tensor> GetBlockShapeAndSplitKVBlock(
   int max_dec_len_this_time_data = max_dec_len_this_time.data<int>()[0];
   if (max_dec_len_this_time_data > 0) {
     const bool mla_use_tensorcore = GetMlaUseTensorcore();
-    if (mla_use_tensorcore) {
-      const int chunk_size = get_max_partition_size(bsz);
-      const int decoder_max_tile_size_per_bs = div_up(max_len_kv_cpu.data<int>()[0], chunk_size);
+    if (mla_use_tensorcore && group_size <=64) {
+      const int set_chunk_size = get_mla_dec_chunk_size(bsz);
+      decoder_chunk_size_device =
+          GetEmptyTensor({1}, paddle::DataType::INT32, seq_lens_encoder.place());
+      decoder_num_blocks_x =
+          GetEmptyTensor({1}, paddle::DataType::INT32, seq_lens_encoder.place());
+
+      int device;
+      cudaGetDevice(&device);
+      int sm_cout;
+      cudaDeviceGetAttribute(&sm_cout, cudaDevAttrMultiProcessorCount, device);
+      constexpr int config_size = 12; // search space for chunk size:[64, 128, 256, ... 131072]
+
+      search_chunk_size_for_mla<config_size><<<1, 32, 0, stream>>>(
+        seq_lens_this_time.data<int>(),
+        seq_lens_encoder.data<int>(),
+        seq_lens_decoder.data<int>(),
+        decoder_num_blocks_x.data<int>(),
+        decoder_chunk_size_device.data<int>(),
+        bsz,
+        set_chunk_size,
+        block_size,
+        sm_cout);
+
+      decoder_chunk_size_cpu =
+        decoder_chunk_size_device.copy_to(paddle::CPUPlace(), false);
+      decoder_num_blocks_x_cpu =
+        decoder_num_blocks_x.copy_to(paddle::CPUPlace(), false);
+
+      const int chunk_size = decoder_chunk_size_cpu.data<int>()[0];
+      const int num_blocks = decoder_num_blocks_x_cpu.data<int>()[0];
       decoder_batch_ids = 
-          GetEmptyTensor({bsz * decoder_max_tile_size_per_bs},
+          GetEmptyTensor({num_blocks},
                         paddle::DataType::INT32,
                         seq_lens_encoder.place());
       decoder_tile_ids_per_batch =
-          GetEmptyTensor({bsz * decoder_max_tile_size_per_bs},
+          GetEmptyTensor({num_blocks},
                         paddle::DataType::INT32,
                         seq_lens_encoder.place());
-      decoder_num_blocks_x =
-          GetEmptyTensor({1}, paddle::DataType::INT32, seq_lens_encoder.place());                  
-      split_q_block_mla<<<1, 32, 0, stream>>>(
+
+      split_block_for_mla<<<1, 32, 0, stream>>>(
         seq_lens_this_time.data<int>(),
         seq_lens_encoder.data<int>(),
         seq_lens_decoder.data<int>(),
         decoder_batch_ids.data<int>(),
         decoder_tile_ids_per_batch.data<int>(),
-        decoder_num_blocks_x.data<int>(),
         bsz,
-        block_size,
-        chunk_size,
-        group_size,
-        false // is_encoder
+        chunk_size
       );
     } else {
       const uint32_t decoder_max_tile_size_per_bs_q =
@@ -224,15 +294,18 @@ std::vector<paddle::Tensor> GetBlockShapeAndSplitKVBlock(
                                           bsz,
                                           decoder_block_shape_q,
                                           group_size);
-    }
-
-    decoder_num_blocks_x_cpu =
+      decoder_num_blocks_x_cpu =
         decoder_num_blocks_x.copy_to(paddle::CPUPlace(), false);
+      decoder_chunk_size_cpu =
+        paddle::full({1}, 131072, paddle::DataType::INT32, paddle::CPUPlace());
+    }
   } else {
     decoder_batch_ids =
         paddle::full({1}, -1, paddle::DataType::INT32, paddle::GPUPlace());
     decoder_tile_ids_per_batch =
         paddle::full({1}, -1, paddle::DataType::INT32, paddle::GPUPlace());
+    decoder_chunk_size_cpu =
+        paddle::full({1}, 131072, paddle::DataType::INT32, paddle::CPUPlace());
     decoder_num_blocks_x = 
         paddle::full({1}, -1, paddle::DataType::INT32, paddle::GPUPlace());
     decoder_num_blocks_x_cpu =
@@ -309,6 +382,7 @@ std::vector<paddle::Tensor> GetBlockShapeAndSplitKVBlock(
           decoder_tile_ids_per_batch,
           decoder_num_blocks_x,
           decoder_num_blocks_x_cpu, /*cpu*/
+          decoder_chunk_size_cpu, /*cpu*/
           max_len_kv_cpu /*cpu*/};
 }
 
@@ -320,6 +394,7 @@ std::vector<paddle::DataType> GetBlockShapeAndSplitKVBlockInferDtype(
     const paddle::DataType& seq_lens_this_time_dtype,
     const paddle::DataType& cum_offsets_dtype) {
   return {paddle::DataType::INT32,
+          paddle::DataType::INT32,
           paddle::DataType::INT32,
           paddle::DataType::INT32,
           paddle::DataType::INT32,
@@ -351,6 +426,7 @@ std::vector<std::vector<int64_t>> GetBlockShapeAndSplitKVBlockInferShape(
           dynamic_shape,
           {1},
           {1},
+          {1},
           {1}};
 }
 
@@ -371,6 +447,7 @@ PD_BUILD_OP(get_block_shape_and_split_kv_block)
               "decoder_tile_ids_per_batch",
               "decoder_num_blocks",
               "decoder_num_blocks_cpu",
+              "decoder_chunk_size_cpu",
               "max_len_kv"})
     .Attrs({"group_size: int",
             "block_size: int",

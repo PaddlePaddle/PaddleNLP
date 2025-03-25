@@ -281,6 +281,7 @@ class TrainingArguments:
               enable_overlap_p2p_comm, overlap p2p communication with computation.
               enable_clear_every_step_cache, clear every step cache for pipeline parallel.
               disable_non_batch_p2p_comm, disable batched send/recv in pipeline parallel mode.
+              auto_parallel_sync_shared_params, optimize the parameter sharing between two stages in a pipeline parallel scenario.
         sharding_parallel_config (`str`, *optional*)(
             Some additional config it highly affect the useage of sharding parallel, we provide some option to config it.
             following config is support:
@@ -742,6 +743,7 @@ class TrainingArguments:
                 "enable_clear_every_step_cache, clear every step cache for pipeline parallel. \n"
                 "disable_batch_p2p_comm, disable batched send/recv in pipeline parallel mode. \n"
                 "enable_split_backward, only can be used in StaticGraph-AutoParallel! split the `backward` program into `backward_b` and `backward_w` to decrease the bubble in VPP pipeline mode when `acc_step == pp_degree`. it increase the memory! \n"
+                "auto_parallel_sync_shared_params, optimize the parameter sharing between two stages in a pipeline parallel scenario."
             )
         },
     )
@@ -1646,6 +1648,7 @@ class TrainingArguments:
                             # "enable_timer",                 # no implemenation for auto_parallel
                             # "disable_batch_p2p_comm",       # no implemenation for auto_parallel
                             "enable_split_backward",
+                            "auto_parallel_sync_shared_params",
                         ]:
                             raise ValueError(
                                 f"Found unknown pipeline mode config {x}, accpet config is enable_send_recv_overlap."

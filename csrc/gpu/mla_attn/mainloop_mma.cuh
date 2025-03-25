@@ -69,6 +69,7 @@ CUTLASS_DEVICE void mma_f16(const Params& mainloop_params,
 
   Tensor sQ = make_tensor(make_smem_ptr(shared_storage.smem_q.data()), SmemLayoutQ{});
   Tensor sK = make_tensor(make_smem_ptr(shared_storage.smem_kv.data()), SmemLayoutK{});
+  // todo: split rope/norope for sVt, not use s1~s2.
   Tensor sVt_s1 = make_tensor(make_smem_ptr(shared_storage.smem_kv.data()), SmemLayoutVtOneStage{});
   Tensor sVt_s2 = make_tensor(make_smem_ptr(shared_storage.smem_kv.data() + Ktraits::NUM_PER_STAGE), SmemLayoutVtOneStage{});
   Tensor sPSS = make_tensor(make_smem_ptr(shared_storage.smem_p.data()), SmemLayoutP{});
@@ -193,7 +194,7 @@ CUTLASS_DEVICE void mma_f16(const Params& mainloop_params,
 
         if (token_idx < qo_len) {
           // const int head_idx = token_group_idx % Ktraits::GROUP_SIZE;
-          const int bid_offset = mainloop_params.max_draft_token_num * Ktraits::GROUP_SIZE;
+          const int bid_offset = mainloop_params.draft_total_token_num * Ktraits::GROUP_SIZE;
           const int write_idx = bid * bid_offset + token_group_idx;
           mM(write_idx) = static_cast<DTypeMD>(attention_updater.row_max(w_i));
           mD(write_idx) = static_cast<DTypeMD>(attention_updater.row_sum(w_i));
@@ -281,6 +282,7 @@ CUTLASS_DEVICE void mma_f16_two_stages(const Params& mainloop_params,
 
   Tensor sQ = make_tensor(make_smem_ptr(shared_storage.smem_q.data()), SmemLayoutQ{});
   Tensor sK = make_tensor(make_smem_ptr(shared_storage.smem_kv.data()), SmemLayoutK{});
+  // TODO: split rope/norope for sVt, not use s1~s4.
   Tensor sVt_s1 = make_tensor(make_smem_ptr(shared_storage.smem_kv.data()), SmemLayoutVtOneStage{});
   Tensor sVt_s2 = make_tensor(make_smem_ptr(shared_storage.smem_kv.data() + Ktraits::NUM_PER_STAGE), SmemLayoutVtOneStage{});
   Tensor sVt_s3 = make_tensor(make_smem_ptr(shared_storage.smem_kv.data() + 2 * Ktraits::NUM_PER_STAGE), SmemLayoutVtOneStage{});
@@ -466,7 +468,7 @@ CUTLASS_DEVICE void mma_f16_two_stages(const Params& mainloop_params,
 
         if (token_idx < qo_len) {
           // const int head_idx = token_group_idx % Ktraits::GROUP_SIZE;
-          const int bid_offset = mainloop_params.max_draft_token_num * Ktraits::GROUP_SIZE;
+          const int bid_offset = mainloop_params.draft_total_token_num * Ktraits::GROUP_SIZE;
           const int write_idx = bid * bid_offset + token_group_idx;
           mM(write_idx) = static_cast<DTypeMD>(attention_updater.row_max(w_i));
           mD(write_idx) = static_cast<DTypeMD>(attention_updater.row_sum(w_i));
@@ -647,7 +649,7 @@ CUTLASS_DEVICE void mma_qk_one_stages(const Params& mainloop_params,
       const int token_idx = token_group_idx / Ktraits::GROUP_SIZE;
       if (token_idx < qo_len) {
         // const int head_idx = token_group_idx % Ktraits::GROUP_SIZE;
-        const int bid_offset = mainloop_params.max_draft_token_num * Ktraits::GROUP_SIZE;
+        const int bid_offset = mainloop_params.draft_total_token_num * Ktraits::GROUP_SIZE;
         const int write_idx = bid * bid_offset + token_group_idx;
         mM(write_idx) = static_cast<DTypeMD>(attention_updater.row_max(w_i));
         mD(write_idx) = static_cast<DTypeMD>(attention_updater.row_sum(w_i));
@@ -844,7 +846,7 @@ CUTLASS_DEVICE void mma_qk_two_stages(const Params& mainloop_params,
       const int token_group_idx = warp_idx * 16 + (thread_idx % 32) / 4 + 8 * w_i + q_group_offset;
       const int token_idx = token_group_idx / Ktraits::GROUP_SIZE;
       if (token_idx < qo_len) {
-        const int bid_offset = mainloop_params.max_draft_token_num * Ktraits::GROUP_SIZE;
+        const int bid_offset = mainloop_params.draft_total_token_num * Ktraits::GROUP_SIZE;
         const int write_idx = bid * bid_offset + token_group_idx;
         mM(write_idx) = static_cast<DTypeMD>(attention_updater.row_max(w_i));
         mD(write_idx) = static_cast<DTypeMD>(attention_updater.row_sum(w_i));
@@ -888,7 +890,7 @@ CUTLASS_DEVICE void mma_pv_one_stages(const Params& mainloop_params,
   static constexpr int BLOCK_SHAPE_KV = get<1>(TileShape_QKD{});
 
   const int chunk_num_this_seq = cute::ceil_div(kv_len, mainloop_params.chunk_size);
-
+  // todo: split rope/norope for sVt, not use s1~s4.
   Tensor sVt_s1 = make_tensor(make_smem_ptr(shared_storage.smem_kv.data()), SmemLayoutVtOneStage{});
   Tensor sVt_s2 = make_tensor(make_smem_ptr(shared_storage.smem_kv.data() + Ktraits::NUM_PER_STAGE), SmemLayoutVtOneStage{});
   Tensor sVt_s3 = make_tensor(make_smem_ptr(shared_storage.smem_kv.data() + 2 * Ktraits::NUM_PER_STAGE), SmemLayoutVtOneStage{});

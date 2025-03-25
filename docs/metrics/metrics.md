@@ -11,5 +11,5 @@
 | PearsonAndSpearman                                       | 皮尔森相关性系数和斯皮尔曼相关系数。可用于GLUE中的STS-B任务  | `paddlenlp.metrics.PearsonAndSpearman`                       |
 | Mcc(Matthews correlation coefficient)                    | 马修斯相关系数，用以测量二分类的分类性能的指标。可用于GLUE中的CoLA任务 | `paddlenlp.metrics.Mcc`                                      |
 | ChunkEvaluator                                           | 计算了块检测的精确率、召回率和F1-score。常用于序列标记任务，如命名实体识别（NER） | `paddlenlp.metrics.ChunkEvaluator`                           |
-| Squad Evalutaion                        | 用于SQuAD和DuReader-robust的评价指标                         | `paddlenlp.metrics.compute_predictions`, `paddlenlp.metrics.squad_evaluate` |
+| Squad Evaluation                        | 用于SQuAD和DuReader-robust的评价指标                         | `paddlenlp.metrics.compute_predictions`, `paddlenlp.metrics.squad_evaluate` |
 | [Distinct](https://arxiv.org/abs/1510.03055) | 多样性指标，常用来衡量文本生成模型生成的句子形式上的多样性。 | `paddlenlp.metrics.Distinct` |

@@ -6,7 +6,7 @@ fi
 
 python benchmark_client.py \
   --dataset_path ./filtered_sharedgpt_short_3000.json \
-  --backend paddle \
+  --backend $1 \
   --num_prompts 3000 \
   --warmup_round 1 \
   --concurrency 256 \

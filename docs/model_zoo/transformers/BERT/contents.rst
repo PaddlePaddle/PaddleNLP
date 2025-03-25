@@ -55,7 +55,7 @@ BERT模型汇总
 |                                                                                  |              | 12-heads, 108M parameters.                                                       |
 |                                                                                  |              | Trained on cased Chinese Simplified                                              |
 |                                                                                  |              | and Traditional text using                                                       |
-|                                                                                  |              | Whole-Word-Masking with extented data.                                           |
+|                                                                                  |              | Whole-Word-Masking with extended data.                                           |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
 | ``uer/chinese-roberta-base``                                                     | Chinese      | Please refer to:                                                                 |
 |                                                                                  |              | `uer/chinese_roberta_L-12_H-768`_                                                |
@@ -102,7 +102,7 @@ BERT模型汇总
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
 | ``Langboat/mengzi-bert-base-fin``                                                | Chinese      | 12-layer, 768-hidden,                                                            |
 |                                                                                  |              | 12-heads, 102M parameters.                                                       |
-|                                                                                  |              | Trained on 20G Finacial Corpus,                                                  |
+|                                                                                  |              | Trained on 20G Financial Corpus,                                                  |
 |                                                                                  |              | based on ``Langboat/mengzi-bert-base``.                                          |
 +----------------------------------------------------------------------------------+--------------+----------------------------------------------------------------------------------+
 | ``cross-encoder/ms-marco-MiniLM-L-12-v2``                                        | English      | Please refer to:                                                                 |                                   

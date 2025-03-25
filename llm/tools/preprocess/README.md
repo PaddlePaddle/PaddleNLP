@@ -95,7 +95,7 @@ optional arguments:
                         Spliter between documents. We will strip the line, if you use blank line to split doc, leave it blank.
                         根据实际情况修改，默认空行作为文章换行符。
   --min_doc_length MIN_DOC_LENGTH
-                        Minimal char of a documment.
+                        Minimal char of a document.
                         可选。过滤掉长度多短的文章，默认值10
   --workers WORKERS     Number of worker processes to launch
                         可选。多进程转化文件，适用于 input_path 中包含的文件数据较多的情况。每个文件，分配给不同worker处理

@@ -73,9 +73,9 @@ paddlenlp内置的 :class:`paddlenlp.datasets.MapDataset` 的 :func:`map` 方法
 .. code-block::
 
     def convert_examples(examples, tokenizer):
-        querys = [example['query'] for example in examples]
+        queries = [example['query'] for example in examples]
         titles = [example['title'] for example in examples]
-        tokenized_examples = tokenizer(text=querys, text_pair=titles,return_dict=False)
+        tokenized_examples = tokenizer(text=queries, text_pair=titles,return_dict=False)
 
         # 加上label用于训练
         for idx in range(len(tokenized_examples)):

@@ -182,7 +182,7 @@ def main():
         and training_args.data_parallel_degree > 1
         and not training_args.use_expert_parallel
     ):
-        raise ValueError("Plese set use_expert_parallel to true in expert parallel mode.")
+        raise ValueError("Please set use_expert_parallel to true in expert parallel mode.")
 
     # (Liuting) Not support acc calculation now due to MTP.
     if "DeepseekV3" in str(model_config.architectures):
@@ -206,7 +206,7 @@ def main():
 
     model_config.seq_length = data_args.max_length
 
-    # Config for model useing long sequence strategy
+    # Config for model using long sequence strategy
     if model_args.use_long_sequence_strategies:
         scaled_max_length = (
             int(data_args.max_length * model_args.rope_scaling_factor)
@@ -234,7 +234,7 @@ def main():
     model_class = AutoModelForCausalLM
     if training_args.pipeline_parallel_degree > 1:
         if data_args.eval_with_do_generation and training_args.do_eval:
-            raise ValueError("Plese set eval_with_do_generation to false in pipeline parallel mode.")
+            raise ValueError("Please set eval_with_do_generation to false in pipeline parallel mode.")
 
         model_class = AutoModelForCausalLMPipe
 
@@ -601,7 +601,7 @@ def create_peft_model(model_args, reft_args, training_args, dtype, model_config,
         )
         # get reft model
         model = ReFTModel(reft_config, model)
-        # disable origianl model gradients
+        # disable original model gradients
         model.disable_model_gradients()
         model.print_trainable_parameters()
 

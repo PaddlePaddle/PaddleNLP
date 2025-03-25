@@ -48,7 +48,7 @@ namespace mla_attn {
 
 using namespace cute;
 
-template <typename CollectiveMainloop, typename CollectiveEpilogue, typename Ktraits, bool CAUSAL, int SM_COUNT = 132, bool USE_REG_EALLOC=false, bool USE_FIXED_BLOCK_NUM=false, bool USE_QK_TWO_STAGE=false>
+template <typename CollectiveMainloop, typename CollectiveEpilogue, typename Ktraits, bool CAUSAL, bool USE_REG_EALLOC=false, bool USE_QK_TWO_STAGE=false>
 __global__ void __launch_bounds__(Ktraits::NUM_WARPS * cutlass::NumThreadsPerWarp, 1)
 MLAWithKVCacheWG4Kernel(CUTE_GRID_CONSTANT
                         typename CollectiveMainloop::Params const mainloop_params,
@@ -68,10 +68,6 @@ MLAWithKVCacheWG4Kernel(CUTE_GRID_CONSTANT
   static constexpr int BLOCK_SHAPE_Q = Ktraits::BLOCK_SHAPE_Q;
   static constexpr int BLOCK_SHAPE_KV = Ktraits::BLOCK_SHAPE_KV;
   const int num_blocks_x = mainloop_params.num_blocks_x[0];
-  int block_stride = SM_COUNT;
-  if constexpr (USE_FIXED_BLOCK_NUM) {
-    block_stride = num_blocks_x;
-  }
 
   static constexpr bool use_tma_load_kv = CollectiveMainloop::USE_TMA_LOAD_KV;
 
@@ -151,28 +147,38 @@ MLAWithKVCacheWG4Kernel(CUTE_GRID_CONSTANT
     const uint32_t warp_idx_in_warpgroup = __shfl_sync(0xffffffff, warp_idx % 4, 0);
     PipelineStateQ smem_pipe_write_q = cutlass::make_producer_start_state<MainloopPipelineQ>();
     PipelineState smem_pipe_write_kv = cutlass::make_producer_start_state<MainloopPipeline>();
-    for (int i = blockIdx.x; i < num_blocks_x; i += block_stride) {
-      const int bid = mainloop_params.batch_ids[i];
-      const int tile_id = mainloop_params.tile_ids_per_batch[i];
-      const int q_tile_id = mainloop_params.q_tile_ids_per_batch ? mainloop_params.q_tile_ids_per_batch[i] : 0;
-      const int seq_len_now = mainloop_params.seq_lens_this_time[bid];
-      const int seq_len_decoder_now = mainloop_params.seq_lens_decoder[bid] + seq_len_now;
-      const int start_token_idx = mainloop_params.cumsum_q_seqlens[bid];
-      cutlass::arch::NamedBarrier::sync(Ktraits::NUM_THREADS,
-                                        /*id=*/static_cast<int>(NamedBarriers::kAllWGSync));
-      // load Q
-      collective_mainloop.load_q(
-          mainloop_params,
-          pipeline_q,
-          smem_pipe_write_q,
-          shared_storage,
-          threadIdx.x,
-          bid,
-          q_tile_id);
+    const int block_id = blockIdx.x;
+    const int bid = mainloop_params.batch_ids[block_id];
+    const int tile_id = mainloop_params.tile_ids_per_batch ? mainloop_params.tile_ids_per_batch[block_id] : 0;
+    const int q_tile_id = mainloop_params.q_tile_ids_per_batch ? mainloop_params.q_tile_ids_per_batch[block_id] : 0;
+    const int seq_len_now = mainloop_params.seq_lens_this_time[bid];
+    const int seq_len_decoder_now = mainloop_params.seq_lens_decoder[bid] + seq_len_now;
+    const int start_token_idx = mainloop_params.cumsum_q_seqlens[bid];
+    // load Q
+    collective_mainloop.load_q(
+        mainloop_params,
+        pipeline_q,
+        smem_pipe_write_q,
+        shared_storage,
+        threadIdx.x,
+        bid,
+        q_tile_id);
 
-      if constexpr (!use_tma_load_kv) {
-        // load kv
-        collective_mainloop.load_kv(
+    if constexpr (!use_tma_load_kv) {
+      // load kv
+      collective_mainloop.load_kv(
+          mainloop_params,
+          pipeline_kv,
+          smem_pipe_write_kv,
+          shared_storage,
+          bid,
+          seq_len_decoder_now,
+          tile_id
+      );
+    } else {
+      if (warp_idx_in_warpgroup == 0) {
+        // load kv tma
+        collective_mainloop.load_kv_tma(
             mainloop_params,
             pipeline_kv,
             smem_pipe_write_kv,
@@ -181,19 +187,6 @@ MLAWithKVCacheWG4Kernel(CUTE_GRID_CONSTANT
             seq_len_decoder_now,
             tile_id
         );
-      } else {
-        if (warp_idx_in_warpgroup == 0) {
-          // load kv tma
-          collective_mainloop.load_kv_tma(
-              mainloop_params,
-              pipeline_kv,
-              smem_pipe_write_kv,
-              shared_storage,
-              bid,
-              seq_len_decoder_now,
-              tile_id
-          );
-        }
       }
     }
   } else if (warp_group_idx == 1) {
@@ -206,50 +199,47 @@ MLAWithKVCacheWG4Kernel(CUTE_GRID_CONSTANT
     PipelineStateQ smem_pipe_read_q;
     PipelineState smem_pipe_read_kv;
     PipelineStateQK smem_pipe_write_qk = cutlass::make_producer_start_state<MainloopPipelineQK>();
-    for (int i = blockIdx.x; i < num_blocks_x; i += block_stride) {
-      clear(attention_updater.scores_scale);
-      const int bid = mainloop_params.batch_ids[i];
-      const int tile_id = mainloop_params.tile_ids_per_batch[i];
-      const int q_tile_id = mainloop_params.q_tile_ids_per_batch ? mainloop_params.q_tile_ids_per_batch[i] : 0;
-      const int seq_len_now = mainloop_params.seq_lens_this_time[bid];
-      const int seq_len_decoder_now = mainloop_params.seq_lens_decoder[bid] + seq_len_now;
-      cutlass::arch::NamedBarrier::sync(Ktraits::NUM_THREADS,
-                                        /*id=*/static_cast<int>(NamedBarriers::kAllWGSync));
-      if constexpr (USE_QK_TWO_STAGE) {
-        mma_qk_two_stages<Ktraits, CAUSAL>(
-            mainloop_params, 
-            pipeline_q, 
-            smem_pipe_read_q,
-            pipeline_qk,
-            smem_pipe_write_qk,
-            pipeline_kv, 
-            smem_pipe_read_kv,
-            attention_updater, 
-            threadIdx.x - NUM_COPY_THREADS,
-            bid,
-            seq_len_decoder_now,
-            seq_len_now,
-            tile_id,
-            q_tile_id,
-            shared_storage);
-      } else {
-        mma_qk_one_stages<Ktraits, CAUSAL>(
-            mainloop_params, 
-            pipeline_q, 
-            smem_pipe_read_q,
-            pipeline_qk,
-            smem_pipe_write_qk,
-            pipeline_kv, 
-            smem_pipe_read_kv,
-            attention_updater, 
-            threadIdx.x - NUM_COPY_THREADS,
-            bid,
-            seq_len_decoder_now,
-            seq_len_now,
-            tile_id,
-            q_tile_id,
-            shared_storage);
-      }
+    const int block_id = blockIdx.x;
+    clear(attention_updater.scores_scale);
+    const int bid = mainloop_params.batch_ids[block_id];
+    const int tile_id = mainloop_params.tile_ids_per_batch ? mainloop_params.tile_ids_per_batch[block_id] : 0;
+    const int q_tile_id = mainloop_params.q_tile_ids_per_batch ? mainloop_params.q_tile_ids_per_batch[block_id] : 0;
+    const int seq_len_now = mainloop_params.seq_lens_this_time[bid];
+    const int seq_len_decoder_now = mainloop_params.seq_lens_decoder[bid] + seq_len_now;
+    if constexpr (USE_QK_TWO_STAGE) {
+      mma_qk_two_stages<Ktraits, CAUSAL>(
+          mainloop_params, 
+          pipeline_q, 
+          smem_pipe_read_q,
+          pipeline_qk,
+          smem_pipe_write_qk,
+          pipeline_kv, 
+          smem_pipe_read_kv,
+          attention_updater, 
+          threadIdx.x - NUM_COPY_THREADS,
+          bid,
+          seq_len_decoder_now,
+          seq_len_now,
+          tile_id,
+          q_tile_id,
+          shared_storage);
+    } else {
+      mma_qk_one_stages<Ktraits, CAUSAL>(
+          mainloop_params, 
+          pipeline_q, 
+          smem_pipe_read_q,
+          pipeline_qk,
+          smem_pipe_write_qk,
+          pipeline_kv, 
+          smem_pipe_read_kv,
+          attention_updater, 
+          threadIdx.x - NUM_COPY_THREADS,
+          bid,
+          seq_len_decoder_now,
+          seq_len_now,
+          tile_id,
+          q_tile_id,
+          shared_storage);
     }
   } else {
     // mm pv and store 160 reg
@@ -261,53 +251,50 @@ MLAWithKVCacheWG4Kernel(CUTE_GRID_CONSTANT
     auto attention_updater = OnlineSoftmax<2 * BLOCK_SHAPE_Q / 64, /*WITH_SCALE=*/true>(mainloop_params.sm_scale);
     PipelineState smem_pipe_read_kv;
     PipelineStateQK smem_pipe_read_qk;
-    for (int i = blockIdx.x; i < num_blocks_x; i += block_stride) {
-      const int bid = mainloop_params.batch_ids[i];
-      const int tile_id = mainloop_params.tile_ids_per_batch[i];
-      const int q_tile_id = mainloop_params.q_tile_ids_per_batch ? mainloop_params.q_tile_ids_per_batch[i] : 0;
-      const int seq_len_now = mainloop_params.seq_lens_this_time[bid];
-      const int seq_len_decoder_now = mainloop_params.seq_lens_decoder[bid] + seq_len_now;
-      const int start_token_idx = mainloop_params.cumsum_q_seqlens[bid];
-      cutlass::arch::NamedBarrier::sync(Ktraits::NUM_THREADS,
-                                        /*id=*/static_cast<int>(NamedBarriers::kAllWGSync));
-      clear(tOrO);
-      clear(attention_updater.scores_scale);
-      mma_pv_one_stages<Ktraits, CAUSAL>(
-          mainloop_params, 
-          pipeline_qk, 
-          smem_pipe_read_qk,
-          pipeline_kv, 
-          smem_pipe_read_kv,
-          attention_updater,
-          tOrO,
-          threadIdx.x - NUM_COPY_THREADS - NUM_MMA_THREADS_QK,
-          bid,
-          seq_len_decoder_now,
-          seq_len_now,
-          tile_id,
-          shared_storage);
-      collective_epilogue.store(
-        epilogue_params, 
-        tOrO, 
-        attention_updater.get_lse(),
-        shared_storage,
-        tiled_mma_pv, 
+    const int block_id = blockIdx.x;
+    const int bid = mainloop_params.batch_ids[block_id];
+    const int tile_id = mainloop_params.tile_ids_per_batch[block_id];
+    const int q_tile_id = mainloop_params.q_tile_ids_per_batch ? mainloop_params.q_tile_ids_per_batch[block_id] : 0;
+    const int seq_len_now = mainloop_params.seq_lens_this_time[bid];
+    const int seq_len_decoder_now = mainloop_params.seq_lens_decoder[bid] + seq_len_now;
+    const int start_token_idx = mainloop_params.cumsum_q_seqlens[bid];
+    clear(tOrO);
+    clear(attention_updater.scores_scale);
+    mma_pv_one_stages<Ktraits, CAUSAL>(
+        mainloop_params, 
+        pipeline_qk, 
+        smem_pipe_read_qk,
+        pipeline_kv, 
+        smem_pipe_read_kv,
+        attention_updater,
+        tOrO,
         threadIdx.x - NUM_COPY_THREADS - NUM_MMA_THREADS_QK,
         bid,
-        mainloop_params.bsz,
-        seq_len_now,
-        start_token_idx,
-        tile_id,
-        q_tile_id,
         seq_len_decoder_now,
-        mainloop_params.chunk_size,
-        mainloop_params.max_draft_token_num,
-        mainloop_params.o_stride_bsz);
-    }
+        seq_len_now,
+        tile_id,
+        shared_storage);
+    collective_epilogue.store(
+      epilogue_params, 
+      tOrO, 
+      attention_updater.get_lse(),
+      shared_storage,
+      tiled_mma_pv, 
+      threadIdx.x - NUM_COPY_THREADS - NUM_MMA_THREADS_QK,
+      bid,
+      mainloop_params.bsz,
+      seq_len_now,
+      start_token_idx,
+      tile_id,
+      q_tile_id,
+      seq_len_decoder_now,
+      mainloop_params.chunk_size,
+      mainloop_params.draft_total_token_num,
+      mainloop_params.o_stride_head_num);
   }
 }
 
-template <typename KernelTraits, bool CAUSAL, typename Params, bool USE_REG_EALLOC=false, bool USE_FIXED_BLOCK_NUM=false, bool USE_QK_TWO_STAGE=false>
+template <typename KernelTraits, bool CAUSAL, typename Params, bool USE_REG_EALLOC=false, bool USE_QK_TWO_STAGE=false>
 cudaError_t BatchMLAWithPagedKVCacheWG4KernelTraitsDispatched(Params& params,
                                                               cudaStream_t stream) {
   using DTypeQ = typename KernelTraits::DTypeQ;
@@ -322,7 +309,7 @@ cudaError_t BatchMLAWithPagedKVCacheWG4KernelTraitsDispatched(Params& params,
   typename CollectiveMainloop::Params mainloop_params = CollectiveMainloop::to_underlying_arguments({
       make_layout(make_shape(KernelTraits::BLOCK_SHAPE_Q, params.qk_head_dim), make_stride(params.qk_head_dim, _1{})), // layout q
       make_layout(make_shape(params.block_size, params.qk_head_dim, params.max_block_num), make_stride(params.qk_head_dim, _1{}, params.block_size * params.qk_head_dim)),
-      make_layout(make_shape(params.chunk_num, params.bsz * params.max_draft_token_num * params.q_num_head), make_stride(params.bsz * params.max_draft_token_num * params.q_num_head, _1{})),
+      make_layout(make_shape(params.chunk_num, params.bsz * params.draft_total_token_num * params.q_num_head), make_stride(params.bsz * params.draft_total_token_num * params.q_num_head, _1{})),
       params.Q,
       params.KV,
       params.m,
@@ -348,7 +335,7 @@ cudaError_t BatchMLAWithPagedKVCacheWG4KernelTraitsDispatched(Params& params,
       params.o_stride_head_num,
       params.chunk_size,
       params.chunk_num,
-      params.max_draft_token_num
+      params.draft_total_token_num
   });
   typename CollectiveEpilogue::Params epilogue_params = CollectiveEpilogue::to_underlying_arguments_ntma({
       params.O,
@@ -359,7 +346,7 @@ cudaError_t BatchMLAWithPagedKVCacheWG4KernelTraitsDispatched(Params& params,
 
   // Get the ptr to kernel function.
   auto kernel =
-      MLAWithKVCacheWG4Kernel<CollectiveMainloop, CollectiveEpilogue, KernelTraits, CAUSAL, 132, USE_REG_EALLOC, USE_FIXED_BLOCK_NUM, USE_QK_TWO_STAGE>;
+      MLAWithKVCacheWG4Kernel<CollectiveMainloop, CollectiveEpilogue, KernelTraits, CAUSAL, USE_REG_EALLOC, USE_QK_TWO_STAGE>;
   int smem_size = sizeof(typename KernelTraits::SharedStorage);
   cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
   int device;
@@ -369,14 +356,7 @@ cudaError_t BatchMLAWithPagedKVCacheWG4KernelTraitsDispatched(Params& params,
   int act_blocks_per_sm;
   cudaOccupancyMaxActiveBlocksPerMultiprocessor(
       &act_blocks_per_sm, kernel, KernelTraits::NUM_WARPS * 32, smem_size);
-  int gridx;
-  if constexpr (USE_FIXED_BLOCK_NUM) {
-    gridx = multiprocessor_count;
-  } else {
-    gridx = params.num_blocks_x_int;
-  }
-  printf("gridx: %d\n", gridx);
-  dim3 grid_dims = {gridx, 1, 1};
+  dim3 grid_dims = {params.num_blocks_x_int, 1, 1};
   static constexpr int ctaSize = KernelTraits::NUM_WARPS * 32;
   dim3 block_dims(ctaSize, 1, 1);
   kernel<<<grid_dims, block_dims, smem_size, stream>>>(
@@ -405,13 +385,13 @@ cudaError_t BatchMLAWithPagedKVCacheWG4KernelTraitsDispatched(Params& params,
       params.vo_head_dim,
       params.token_num,
       params.bsz,
-      params.max_draft_token_num
+      params.draft_total_token_num
     );
   }
   return cudaSuccess;
 }
 
-template <uint32_t HEAD_DIM_QK, uint32_t HEAD_DIM_VO, typename NV_TYPE, typename Params, bool USE_REG_EALLOC=false, bool USE_FIXED_BLOCK_NUM=false, bool USE_QK_TWO_STAGE=false>
+template <uint32_t HEAD_DIM_QK, uint32_t HEAD_DIM_VO, typename NV_TYPE, typename Params, bool USE_REG_EALLOC=false, bool USE_QK_TWO_STAGE=false>
 cudaError_t BatchMLAWithPagedKVCacheWG4Dispatched(Params& params, cudaStream_t stream) {
   constexpr bool CAUSAL = true;
   if constexpr (HEAD_DIM_QK == 576) {
@@ -433,7 +413,6 @@ cudaError_t BatchMLAWithPagedKVCacheWG4Dispatched(Params& params, cudaStream_t s
             CAUSAL,
             Params,
             USE_REG_EALLOC,
-            USE_FIXED_BLOCK_NUM,
             USE_QK_TWO_STAGE>(params, stream);)
     }
   } else {
