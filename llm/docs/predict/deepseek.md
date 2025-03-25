@@ -124,7 +124,7 @@ export model_name=${model_name:-"deepseek-ai/DeepSeek-R1-Distill-Qwen-14B/weight
 docker run --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
 -v /MODEL_PATH/:/models -e "model_name=${model_name}"\
 -dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.1 /bin/bash \
--c -ex 'bash start_server.sh $model_name && tail -f /dev/null'
+-c -ex 'start_server $model_name && tail -f /dev/null'
 ```
 
 ### 请求服务化
@@ -179,7 +179,7 @@ export MODEL_TAG=deepseek-ai/DeepSeek-R1
 export QUANT_MODE=weight_only_int4
 export TOTAL_MAX_LENGTH=8192
 export MAX_DEC_LEN=4096
-export FLAGS_mla_use_tensorcore=1 # only support Hopper, Amper shoule be 0
+export FLAGS_mla_use_tensorcore=1 # only support Hopper, Amper should be 0
 export FLAGS_cascade_attention_max_partition_size=${TOTAL_MAX_LENGTH}
 export CUDA_VISIBLE_DEVICES="0,1,2,3,4,5,6,7"
 python -m paddle.distributed.launch \
@@ -220,7 +220,7 @@ export OUTPUT_PATH=/path/to/exported_model
 export QUANT_MODE=weight_only_int4
 export TOTAL_MAX_LENGTH=8192
 export MAX_DEC_LEN=4096
-export FLAGS_mla_use_tensorcore=1 # only support Hopper, Amper shoule be 0
+export FLAGS_mla_use_tensorcore=1 # only support Hopper, Amper should be 0
 export FLAGS_cascade_attention_max_partition_size=${TOTAL_MAX_LENGTH}
 export CUDA_VISIBLE_DEVICES="0,1,2,3,4,5,6,7"
 python -m paddle.distributed.launch \
@@ -253,7 +253,7 @@ export MODEL_TAG=deepseek-ai/DeepSeek-R1
 export QUANT_MODE=weight_only_int8
 export TOTAL_MAX_LENGTH=8192
 export MAX_DEC_LEN=4096
-export FLAGS_mla_use_tensorcore=1 # only support Hopper, Amper shoule be 0
+export FLAGS_mla_use_tensorcore=1 # only support Hopper, Amper should be 0
 export FLAGS_cascade_attention_max_partition_size=${TOTAL_MAX_LENGTH}
 export CUDA_VISIBLE_DEVICES="0,1,2,3,4,5,6,7"
 python -m paddle.distributed.launch \
@@ -294,7 +294,7 @@ export OUTPUT_PATH=/path/to/exported_model
 export QUANT_MODE=weight_only_int8
 export TOTAL_MAX_LENGTH=8192
 export MAX_DEC_LEN=4096
-export FLAGS_mla_use_tensorcore=1 # only support Hopper, Amper shoule be 0
+export FLAGS_mla_use_tensorcore=1 # only support Hopper, Amper should be 0
 export FLAGS_cascade_attention_max_partition_size=${TOTAL_MAX_LENGTH}
 export CUDA_VISIBLE_DEVICES="0,1,2,3,4,5,6,7"
 python -m paddle.distributed.launch --ips "192.168.0.1,192.168.0.2"\
@@ -327,7 +327,7 @@ export MODEL_TAG=deepseek-ai/DeepSeek-R1-FP8
 export QUANT_MODE=a8w8_fp8
 export TOTAL_MAX_LENGTH=8192
 export MAX_DEC_LEN=4096
-export FLAGS_mla_use_tensorcore=1 # only support Hopper, Amper shoule be 0
+export FLAGS_mla_use_tensorcore=1 # only support Hopper, Amper should be 0
 export FLAGS_cascade_attention_max_partition_size=${TOTAL_MAX_LENGTH}
 export CUDA_VISIBLE_DEVICES="0,1,2,3,4,5,6,7"
 python -m paddle.distributed.launch --ips "192.168.0.1,192.168.0.2"\
@@ -370,7 +370,7 @@ export OUTPUT_PATH=/path/to/exported_model
 export QUANT_MODE=a8w8_fp8
 export TOTAL_MAX_LENGTH=8192
 export MAX_DEC_LEN=4096
-export FLAGS_mla_use_tensorcore=1 # only support Hopper, Amper shoule be 0
+export FLAGS_mla_use_tensorcore=1 # only support Hopper, Amper should be 0
 export FLAGS_cascade_attention_max_partition_size=${TOTAL_MAX_LENGTH}
 export CUDA_VISIBLE_DEVICES="0,1,2,3,4,5,6,7"
 python -m paddle.distributed.launch --ips "192.168.0.1,192.168.0.2"\

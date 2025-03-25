@@ -30,6 +30,7 @@ parameterized
 scikit-learn
 cma
 paddleocr
+simsimd==1.1.2
 https://paddle-qa.bj.bcebos.com/PaddleSlim/paddleslim-0.0.0.dev0-py3-none-any.whl
 fast_dataindex
 emoji

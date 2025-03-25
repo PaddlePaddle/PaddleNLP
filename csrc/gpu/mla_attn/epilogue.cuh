@@ -133,7 +133,7 @@ struct CollectiveEpilogue {
                             const int kv_len,
                             const int chunk_size,
                             const int draft_total_token_num,
-                            const int o_stride_bsz) {
+                            const int o_stride_head) {
     const int q_group_offset = q_tile_idx * BLOCK_SHAPE_Q;
     const int num_chunks = cute::ceil_div(kv_len, chunk_size);
     Tensor sO = make_tensor(make_smem_ptr(shared_storage.smem_o.data()), SmemLayoutO{});
@@ -152,7 +152,7 @@ struct CollectiveEpilogue {
     cutlass::arch::NamedBarrier::sync(NUM_MMA_THREADS,
                                       /*id=*/static_cast<int>(NamedBarriers::kValueEmpty));
     TiledCopyO gmem_tiled_copy_O;
-    auto O_ptr = num_chunks == 1 ? epilogue_params.O_ptr + (start_token_idx + q_group_offset) * o_stride_bsz : epilogue_params.O_ptr_tmp + (tile_idx * bsz + bid) * draft_total_token_num * o_stride_bsz;
+    auto O_ptr = num_chunks == 1 ? epilogue_params.O_ptr + (start_token_idx * Ktraits::GROUP_SIZE + q_group_offset) * o_stride_head : epilogue_params.O_ptr_tmp + (((tile_idx * bsz + bid) * draft_total_token_num) * Ktraits::GROUP_SIZE + q_group_offset) * o_stride_head;
     Tensor mO = make_tensor(make_gmem_ptr(O_ptr), epilogue_params.layout_O);
     Tensor gO = local_tile(mO, select<0, 1>(TileShape_PDV{}), make_coord(_, _0{}))(_, _, _0{});
     Tensor cO = make_identity_tensor(gO.shape());  // (O, D) -> (o_idx, d_idx)
