@@ -1,7 +1,7 @@
 {
   "model_name_or_path": "Qwen/Qwen2.5-Math-7B",
-  "dataset_name_or_path": "./data/gsm8k_distilled",
-  "output_dir": "./checkpoints/Qwen/Qwen2.5-Math-7B/gsm8k_distilled/",
+  "dataset_name_or_path": "./data/gsm8k_distilled_en_sft",
+  "output_dir": "./checkpoints/Qwen2.5-Math-7B/gsm8k_distilled/",
   "per_device_train_batch_size": 1,
   "gradient_accumulation_steps": 4,
   "per_device_eval_batch_size": 1,

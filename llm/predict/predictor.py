@@ -69,7 +69,7 @@ from paddlenlp.utils.log import logger
 class PredictorArgument:
     model_name_or_path: str = field(default=None, metadata={"help": "The directory of model."})
     model_prefix: str = field(default="model", metadata={"help": "the prefix name of static model"})
-    src_length: int = field(default=1024, metadata={"help": "The max length of source text."})
+    src_length: int = field(default=None, metadata={"help": "The max length of source text."})
     min_length: int = field(default=1, metadata={"help": "the min length for decoding."})
     max_length: int = field(default=1024, metadata={"help": "the max length for decoding."})
     top_k: int = field(default=0, metadata={"help": "top_k parameter for generation"})
@@ -193,7 +193,12 @@ class PredictorArgument:
         if self.block_attn:
             self.inference_model = True
         assert self.max_length < self.total_max_length, "max_length should smaller than total_max_length."
-        self.src_length = self.total_max_length - self.max_length
+        if self.src_length is None:
+            self.src_length = self.total_max_length - self.max_length
+        # update config parameter for inference predictor
+        if self.decode_strategy == "greedy_search":
+            self.top_p = 0.0
+            self.temperature = 1.0
 
 
 @dataclass
@@ -1436,26 +1441,6 @@ def create_predictor(
         tokenizer.pad_token = tokenizer.eos_token
 
     config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
-
-    max_position_embeddings = llm_utils.get_model_max_position_embeddings(config)
-    if max_position_embeddings is None:
-        max_position_embeddings = predictor_args.src_length + predictor_args.max_length
-        logger.warning(
-            f"Can not retrieval `max_position_embeddings` from config.json, use default value {max_position_embeddings}"
-        )
-    else:
-        if predictor_args.src_length + predictor_args.max_length > max_position_embeddings:
-            logger.warning(
-                f"The sum of src_length<{predictor_args.src_length}> and "
-                f"max_length<{predictor_args.max_length}> should be smaller than or equal to "
-                f"the maximum position embedding size<{max_position_embeddings}>"
-            )
-            predictor_args.src_length = max_position_embeddings - predictor_args.max_length
-
-    # update config parameter for inference predictor
-    if predictor_args.decode_strategy == "greedy_search":
-        predictor_args.top_p = 0.0
-        predictor_args.temperature = 1.0
 
     tensor_parallel_rank, tensor_parallel_degree = llm_utils.init_dist_env()
 

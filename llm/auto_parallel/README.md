@@ -130,7 +130,19 @@ python -u -m paddle.distributed.launch \
 更多的参数，可以参考[model_config.py](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/trl/model_config.py)。
 
 ## DPO
-TODO
+### 数据准备
+为了方便测试，我们将 [ultrafeedback_binarized](https://huggingface.co/datasets/HuggingFaceH4/ultrafeedback_binarized) 的数据集处理成对应的数据集格式，可以在 PaddleNLP/llm 目录下运行：
+```shell
+wget https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized.tar.gz
+tar -zxvf ultrafeedback_binarized.tar.gz
+```
+
+### 启动 DPO 训练
+可以在 PaddleNLP/llm/auto_parallel/llama 目录下运行：
+```shell
+bash llama_dpo_with_api.sh
+```
+同样，可以通过配置`to_static`开关控制是否使用动转静模式。
 
 ## 推理
 推理流程包括：动态图推理，动转静导出模型 -> 静态图推理。
