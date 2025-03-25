@@ -1,4 +1,3 @@
-trainer.md
 # PaddleNLP Trainer API
 
 PaddleNLP 提供了 Trainer 训练 API，针对训练过程的通用训练配置做了封装，比如：
