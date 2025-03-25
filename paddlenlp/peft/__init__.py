@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from .lokr import LoKrConfig, LoKrModel
-from .lora import LoRAConfig, LoRAModel
+from .lora import LoRAAutoConfig, LoRAAutoModel, LoRAConfig, LoRAModel
 from .prefix import PrefixConfig, PrefixModelForCausalLM
 from .reft import ReFTModel
 from .vera import VeRAConfig, VeRAModel

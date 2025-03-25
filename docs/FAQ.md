@@ -390,7 +390,7 @@ model.set_state_dict(paddle.load("xxx_para"))
 
 **A:** 更新 label 文件`tag.dict`，添加 修改下 CRF 的标签数即可。
 
-可参考[自定义标签示例](https://github.com/PaddlePaddle/PaddleNLP/issues/662)，[增量训练自定义 LABLE 示例](https://github.com/PaddlePaddle/PaddleNLP/issues/657)。
+可参考[自定义标签示例](https://github.com/PaddlePaddle/PaddleNLP/issues/662)，[增量训练自定义 LABEL 示例](https://github.com/PaddlePaddle/PaddleNLP/issues/657)。
 
 <a name="6-2"></a>
 

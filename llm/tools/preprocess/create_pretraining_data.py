@@ -316,7 +316,7 @@ def main():
 
     convert = Converter(args)
 
-    # Try tokenizer is availiable
+    # Try tokenizer is available
     sample_tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
     if sample_tokenizer.vocab_size < 2**16 - 1:
         save_dtype = np.uint16

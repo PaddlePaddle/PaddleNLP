@@ -363,6 +363,8 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
         self.cache_kvs = None
         self.head_dim_shape_tensor = paddle.ones((self.hidden_size // self.num_attention_heads), dtype="int8")
 
+        self._weights_initialized = False
+
     def set_transformer_block(self, transformer_config):
         if self.use_weight_only:
             self.transformer_block = FusedMultiTransformerWeightOnly(transformer_config)
@@ -554,7 +556,9 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
         self.set_quant_scale()
-        self.transformer_block.init_weight()
+        if not self._weights_initialized:
+            self.transformer_block.init_weight()
+            self._weights_initialized = True
         split_fn = split_param_func()
         self.embed_tokens.weight.set_value(
             paddle.to_tensor(state_dict[f"{self.base_model_prefix}.embed_tokens.weight"]).cast(
@@ -567,7 +571,7 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
 
         for idx in range(self.num_layers):
             model_prefix = self.base_model_prefix + f".layers.{idx}"
-            logger.info(f"set state for layer {idx}")
+            # logger.info(f"set state for layer {idx}")
 
             ln_scale = paddle.to_tensor(state_dict[f"{model_prefix}.input_layernorm.weight"]).cast(
                 self.transformer_block.ln_scales[idx].dtype

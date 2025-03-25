@@ -62,6 +62,18 @@ class SFTConfig(TrainingArguments):
     model_init_kwargs: Optional[dict[str, Any]] = None
     dataset_kwargs: Optional[dict[str, Any]] = None
     eval_packing: Optional[bool] = None
+    use_ssa: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to use Shifted Sparse Attention (SSA), an efficient attention mechanism introduced in the LongLoRA paper."
+        },
+    )
+    ssa_group_size_ratio: float = field(
+        default=0.25,
+        metadata={
+            "help": "The ratio parameter for grouping in SSA, controlling the number of tokens considered in each group for sparse attention calculation."
+        },
+    )
 
     def __post_init__(self):
         super().__post_init__()

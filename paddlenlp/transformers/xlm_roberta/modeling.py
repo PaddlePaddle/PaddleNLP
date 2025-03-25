@@ -17,15 +17,20 @@
 """Paddle XLM-RoBERTa model."""
 
 import math
-from typing import List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import paddle
+import paddle.distributed as dist
 from paddle import nn
+from paddle.distributed.fleet.recompute.recompute import recompute
 from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
+
+from paddlenlp.transformers.contrastive_loss import SimpleContrastiveLoss
 
 from ...utils import logger
 from ...utils.converter import StateDictNameMapping
 from ..activations import ACT2FN
+from ..embedding_utils import dist_gather_tensor_with_gradient
 from ..model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     BaseModelOutputWithPoolingAndCrossAttentions,
@@ -52,6 +57,7 @@ __all__ = [
     "XLMRobertaForMaskedLM",
     "XLMRobertaForMultipleChoice",
     "XLMRobertaForCausalLM",
+    "XLMRobertaSentenceEmbedding",
 ]
 
 
@@ -483,7 +489,7 @@ class XLMRobertaEncoder(nn.Layer):
             past_key_value = past_key_values[i] if past_key_values is not None else None
 
             if self.enable_recompute and not hidden_states.stop_gradient:
-                layer_outputs = self._gradient_checkpointing_func(
+                layer_outputs = recompute(
                     layer_module.__call__,
                     hidden_states,
                     attention_mask,
@@ -563,7 +569,7 @@ class XLMRobertaPretrainedModel(PretrainedModel):
             "hf-internal-testing/tiny-random-onnx-xlm-roberta": "https://bj.bcebos.com/paddlenlp/models/community/hf-internal-testing/tiny-random-onnx-xlm-roberta/model.safetensors",
         }
     }
-    base_model_prefix = "roberta"
+    base_model_prefix = "xlm_roberta"
     supports_gradient_checkpointing = True
     _no_split_modules = ["XLMRobertaEmbeddings", "XLMRobertaSelfAttention"]
 
@@ -796,7 +802,9 @@ class XLMRobertaModel(XLMRobertaPretrainedModel):
 
         # We can provide a self-attention mask of dimensions [batch_size, from_seq_length, to_seq_length]
         # ourselves in which case we just need to make it broadcastable to all heads.
-        if attention_mask.ndim == 3:
+        if attention_mask.ndim == 4:
+            extended_attention_mask = attention_mask
+        elif attention_mask.ndim == 3:
             extended_attention_mask = attention_mask[:, None, :, :]
         elif attention_mask.ndim == 2:
             # Provided a padding mask of dimensions [batch_size, seq_length]
@@ -807,6 +815,7 @@ class XLMRobertaModel(XLMRobertaPretrainedModel):
                     input_shape, attention_mask
                 )
             else:
+                # bs, n_head, seq_length, seq_length
                 extended_attention_mask = attention_mask[:, None, None, :]
         else:
             raise ValueError(
@@ -956,10 +965,10 @@ class XLMRobertaForCausalLM(XLMRobertaPretrainedModel):
         if not config.is_decoder:
             logger.warning("If you want to use `XLMRobertaLMHeadModel` as a standalone, add `is_decoder=True.`")
 
-        self.roberta = XLMRobertaModel(config, add_pooling_layer=False)
+        self.xlm_roberta = XLMRobertaModel(config, add_pooling_layer=False)
 
         if config.tie_word_embeddings:
-            input_embeddings = self.roberta.embeddings.word_embeddings.weight
+            input_embeddings = self.xlm_roberta.embeddings.word_embeddings.weight
         else:
             input_embeddings = None
         self.lm_head = XLMRobertaLMHead(config, input_embeddings=input_embeddings)
@@ -1044,7 +1053,7 @@ class XLMRobertaForCausalLM(XLMRobertaPretrainedModel):
         if labels is not None:
             use_cache = False
 
-        outputs = self.roberta(
+        outputs = self.xlm_roberta(
             input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
@@ -1131,10 +1140,10 @@ class XLMRobertaForMaskedLM(XLMRobertaPretrainedModel):
                 "bi-directional self-attention."
             )
 
-        self.roberta = XLMRobertaModel(config, add_pooling_layer=False)
+        self.xlm_roberta = XLMRobertaModel(config, add_pooling_layer=False)
 
         if config.tie_word_embeddings:
-            input_embeddings = self.roberta.embeddings.word_embeddings.weight
+            input_embeddings = self.xlm_roberta.embeddings.word_embeddings.weight
         else:
             input_embeddings = None
         self.lm_head = XLMRobertaLMHead(config, input_embeddings=input_embeddings)
@@ -1180,7 +1189,7 @@ class XLMRobertaForMaskedLM(XLMRobertaPretrainedModel):
         """
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
-        outputs = self.roberta(
+        outputs = self.xlm_roberta(
             input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
@@ -1265,7 +1274,7 @@ class XLMRobertaForSequenceClassification(XLMRobertaPretrainedModel):
         self.num_labels = config.num_labels
         self.config = config
 
-        self.roberta = XLMRobertaModel(config, add_pooling_layer=False)
+        self.xlm_roberta = XLMRobertaModel(config, add_pooling_layer=False)
         self.classifier = XLMRobertaClassificationHead(config)
 
         # Initialize weights and apply final processing
@@ -1291,7 +1300,7 @@ class XLMRobertaForSequenceClassification(XLMRobertaPretrainedModel):
         """
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
-        outputs = self.roberta(
+        outputs = self.xlm_roberta(
             input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
@@ -1344,7 +1353,7 @@ class XLMRobertaForMultipleChoice(XLMRobertaPretrainedModel):
     def __init__(self, config):
         super().__init__(config)
 
-        self.roberta = XLMRobertaModel(config)
+        self.xlm_roberta = XLMRobertaModel(config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, 1)
 
@@ -1386,7 +1395,7 @@ class XLMRobertaForMultipleChoice(XLMRobertaPretrainedModel):
             else None
         )
 
-        outputs = self.roberta(
+        outputs = self.xlm_roberta(
             flat_input_ids,
             position_ids=flat_position_ids,
             token_type_ids=flat_token_type_ids,
@@ -1425,7 +1434,7 @@ class XLMRobertaForTokenClassification(XLMRobertaPretrainedModel):
         super().__init__(config)
         self.num_labels = config.num_labels
 
-        self.roberta = XLMRobertaModel(config, add_pooling_layer=False)
+        self.xlm_roberta = XLMRobertaModel(config, add_pooling_layer=False)
         classifier_dropout = (
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
@@ -1453,7 +1462,7 @@ class XLMRobertaForTokenClassification(XLMRobertaPretrainedModel):
         """
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
-        outputs = self.roberta(
+        outputs = self.xlm_roberta(
             input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
@@ -1524,7 +1533,7 @@ class XLMRobertaForQuestionAnswering(XLMRobertaPretrainedModel):
         super().__init__(config)
         self.num_labels = config.num_labels
 
-        self.roberta = XLMRobertaModel(config, add_pooling_layer=False)
+        self.xlm_roberta = XLMRobertaModel(config, add_pooling_layer=False)
         self.qa_outputs = nn.Linear(config.hidden_size, config.num_labels)
 
         # Initialize weights and apply final processing
@@ -1555,7 +1564,7 @@ class XLMRobertaForQuestionAnswering(XLMRobertaPretrainedModel):
         """
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
-        outputs = self.roberta(
+        outputs = self.xlm_roberta(
             input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids,
@@ -1616,3 +1625,77 @@ def create_position_ids_from_input_ids(input_ids, padding_idx, past_key_values_l
     mask = (input_ids != padding_idx).cast("int64")
     incremental_indices = (paddle.cumsum(mask, axis=1) + past_key_values_length) * mask
     return incremental_indices.cast("int64") + padding_idx
+
+
+class XLMRobertaSentenceEmbedding(XLMRobertaPretrainedModel):
+    def __init__(self, config: XLMRobertaConfig, embedding_temperature: float = 0.02):
+        """XLMRobertaSentenceEmbedding
+        For getting larger batch_size, we use tensor parallel to get larger batch_size.
+
+        Args:
+            config (XLMRobertaConfig): _description_
+            model (XLMRobertaModel): _description_
+            embedding_temperature (float, optional): _description_. Defaults to 0.02.
+        """
+        super(XLMRobertaSentenceEmbedding, self).__init__(config)
+        self.config = config
+        self.xlm_roberta = XLMRobertaModel(config)
+        self.in_batch_negative_loss = SimpleContrastiveLoss(embedding_temperature)
+        self.world_size = dist.get_world_size()
+        self.process_rank = dist.get_rank()
+        self.embedding_negatives_cross_device = config.embedding_negatives_cross_device
+        if self.world_size <= 1:
+            self.embedding_negatives_cross_device = False
+
+    def forward(
+        self,
+        query: Optional[Dict[str, paddle.Tensor]] = None,
+        passages: Optional[Dict[str, paddle.Tensor]] = None,
+        return_encode=False,
+    ):
+        """forward"""
+        q_reps = self.encode(**query)
+        p_reps = self.encode(**passages)
+
+        q_reps = nn.functional.normalize(q_reps, axis=-1)
+        p_reps = nn.functional.normalize(p_reps, axis=-1)
+
+        if return_encode:
+            return q_reps, p_reps
+
+        if self.embedding_negatives_cross_device:
+            q_reps = dist_gather_tensor_with_gradient(q_reps)
+            p_reps = dist_gather_tensor_with_gradient(p_reps)
+
+        loss = self.in_batch_negative_loss(q_reps, p_reps)
+        return loss
+
+    def encode(
+        self,
+        input_ids,
+        position_ids=None,
+        embedding_indices=None,
+        attention_mask=None,
+        output_attentions=False,
+        output_hidden_states=False,
+        return_dict=False,
+        **kwargs,
+    ):
+        """encode"""
+        input_type = type(input_ids)
+        outputs = self.xlm_roberta(
+            input_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+            **kwargs,
+        )
+        if isinstance(outputs, input_type):
+            hidden_states = outputs
+        else:
+            hidden_states = outputs[0]
+        # last_hidden_states = hidden_states.gather_nd(embedding_indices)
+        last_hidden_states = hidden_states[:, 0]
+        return last_hidden_states

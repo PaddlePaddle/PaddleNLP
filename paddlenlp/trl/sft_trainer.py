@@ -160,10 +160,8 @@ class SFTTrainer(Trainer):
                     )
                 if not _multiple:
                     eval_dataset = _eval_datasets["singleton"]
-
         if data_collator is None:
             data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer)
-
         super().__init__(
             model=model,
             criterion=criterion,

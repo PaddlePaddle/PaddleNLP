@@ -16,6 +16,7 @@ from paddle.io import Dataset
 
 from .alpaca import *
 from .base import *
+from .jsondata import *
 from .preference import *
 from .prompt_only import *
 from .safe_rlhf import *

@@ -176,7 +176,7 @@ class ErnieViLVisionConfig(PretrainedConfig):
         layer_norm_eps (`float`, *optional*,
             defaults to 1e-6): The epsilon used by the layer normalization layers.
         dropout (`float`, *optional*, defaults to 0.0):
-            The dropout probabilitiy for all fully connected layers in the embeddings, encoder, and pooler.
+            The dropout probability for all fully connected layers in the embeddings, encoder, and pooler.
         attention_dropout (`float`, *optional*, defaults to 0.0):
             The dropout ratio for the attention probabilities.
         initializer_range (`float`, *optional*, defaults to 0.02):
@@ -266,7 +266,7 @@ class ErnieViLConfig(PretrainedConfig):
         vision_config (`dict`, *optional*):
             Dictionary of configuration options used to initialize [`ErnieViLVisionConfig`].
         logit_scale_init_value (`float`, *optional*, defaults to 2.6592):
-            The inital value of the *logit_scale* paramter. Default is used as per the original ErnieViL implementation.
+            The initial value of the *logit_scale* parameter. Default is used as per the original ErnieViL implementation.
         kwargs (*optional*):
             Dictionary of keyword arguments.
 

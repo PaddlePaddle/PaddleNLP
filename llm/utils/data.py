@@ -84,7 +84,7 @@ def tokenize_unsupervised_example(tokenizer, example, data_args, is_test=True, z
         source,
         truncation=False,
         padding=True,
-        max_length=data_args.scaled_max_length,
+        max_length=data_args.src_length,
         add_special_tokens=True,
     )
 
