@@ -31,52 +31,74 @@
 .. toctree::
    :maxdepth: 1
    :caption: 模型库列表
-
+   
+   热门模型介绍 <hot_model.md>
    模型库列表 <model_list.rst>
-
-
+   
 
 .. toctree::
    :maxdepth: 1
    :caption: 快速开始
 
    安装 <get_started/installation>
-   10分钟完成高精度中文情感分析 <get_started/quick_start>
-   对话模板 <get_started/chat_template>
-
-
-.. toctree::
-   :maxdepth: 1
-   :caption: 数据准备
-
-   整体介绍 <data_prepare/overview>
-   数据集列表 <data_prepare/dataset_list>
-   加载数据集 <data_prepare/dataset_load>
-   自定义数据集 <data_prepare/dataset_self_defined>
-   数据处理 <data_prepare/data_preprocess>
+   文本生成  <get_started/generate>
+   快速训练 <get_started/training>
+   快速推理 <get_started/inference>
 
 .. toctree::
    :maxdepth: 1
-   :caption: 飞桨大模型
+   :caption: 飞桨大模型训练
 
    飞桨大模型主文档 <llm/README.md>
    大模型-预训练文档 <llm/docs/pretrain.rst>
    大模型-精调文档 <llm/docs/finetune.md>
    大模型-DPO文档 <llm/docs/dpo.md>
    大模型-RLHF文档 <llm/docs/rlhf.md>
-   大模型-推理部署教程 <llm/docs/predict/index.rst>
-   大模型-量化教程 <llm/docs/quantization.md>
-   大模型-高级技术文档 <llm/docs/advanced.rst>
-   
+   模型融合文档 <llm/docs/mergekit.md>
+
+
 .. toctree::
    :maxdepth: 1
-   :caption: 模型库
+   :caption: 飞桨大模型推理
 
-   Transformer预训练模型 <model_zoo/index>
-   使用Trainer API训练 <trainer.md>
-   使用Trainer API进行模型压缩 <compression.md>
+   Docker部署-快速开始教程 <llm/server/docs/general_model_inference.md>
+   大模型推理教程 <llm/docs/predict/inference_index.rst>
+   实践调优 <llm/docs/predict/infer_optimize.rst>
+   静态图模型列表 <llm/server/docs/static_models.md>
+   各个模型推理量化教程 <llm/docs/predict/models.rst>
+   异构设备推理 <llm/docs/predict/devices.rst>
+   大模型-量化教程 <llm/docs/quantization.md>
+
+
+.. toctree::
+   :maxdepth: 1
+   :caption: 飞桨大模型特色技术
+
+   <llm/docs/unified_checkpoint.md>
+   <llm/docs/flashmask.md>
+   <llm/docs/llm_trainer.rst>
+
+
+
+.. toctree::
+   :maxdepth: 1
+   :caption: PaddleNLP工具库
+
    一键预测功能 <model_zoo/taskflow>
    预训练词向量 <model_zoo/embeddings>
+
+.. toctree::
+   :maxdepth: 1
+   :caption: PaddleNLP 教程
+
+   Transformer预训练模型 <model_zoo/index>
+   Trainer API训练教程 <trainer.md>
+   对话模板教程 <get_started/chat_template>
+   多轮对话精调教程 <llm/docs/chat_template.md>
+   中文情感分析教程 <get_started/quick_start>
+   模型压缩教程 <compression.md>
+   Torch2Paddle 权重转换教程 <llm/docs/torch2paddle.md>
+
 
 
 .. toctree::
@@ -84,6 +106,18 @@
    :caption: 评价指标
 
    评价指标 <metrics/metrics.md>
+
+
+
+..    :maxdepth: 1
+..    :caption: 数据准备
+
+..    整体介绍 <data_prepare/overview>
+..    数据集列表 <data_prepare/dataset_list>
+..    加载数据集 <data_prepare/dataset_load>
+..    自定义数据集 <data_prepare/dataset_self_defined>
+..    数据处理 <data_prepare/data_preprocess>
+
 
 .. toctree::
    :maxdepth: 1
