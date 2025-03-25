@@ -36,6 +36,7 @@ try:
     )
 except:
     pass
+import paddlenlp
 from paddlenlp.generation import GenerationConfig, TextIteratorStreamer
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.taskflow.utils import static_mode_guard
@@ -97,7 +98,7 @@ class PredictorArgument:
     mode: str = field(
         default="dynamic", metadata={"help": "the type of predictor, it should be one of [dynamic, static]"}
     )
-    inference_model: bool = field(default=False, metadata={"help": "whether use InferenceModel to do generation"})
+    inference_model: bool = field(default=True, metadata={"help": "whether use InferenceModel to do generation"})
     quant_type: str = field(
         default="",
         metadata={
@@ -1422,6 +1423,13 @@ def create_predictor(
     paddle.set_device(predictor_args.device)
     paddle.set_default_dtype(predictor_args.dtype)
 
+    if not is_paddlenlp_ops_available():
+        if predictor_args.inference_model:
+            logger.warning(
+                "The paddlenlp_ops accelerate ops is not installed, disable accelerate mode. you can install it in https://github.com/PaddlePaddle/PaddleNLP/tree/develop/csrc "
+            )
+        predictor_args.inference_model = False
+
     from paddlenlp.utils.env import USE_FAST_TOKENIZER
 
     tokenizer = AutoTokenizer.from_pretrained(
@@ -1436,6 +1444,13 @@ def create_predictor(
         tokenizer.pad_token = tokenizer.eos_token
 
     config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
+
+    if predictor_args.inference_model:
+        if not hasattr(paddlenlp.experimental.transformers, f"{config.model_type}"):
+            predictor_args.inference_model = False
+            logger.warning(
+                f"paddlenlp_ops not support for current model_type: {config.model_type}, set inference_model to false."
+            )
 
     max_position_embeddings = llm_utils.get_model_max_position_embeddings(config)
     if max_position_embeddings is None:

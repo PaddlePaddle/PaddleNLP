@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from .ernie_model import *
 from .faster_tokenizer import *
 from .model_utils import *
-from .ernie_model import *
+from .transformers import LlamaInferenceModel
