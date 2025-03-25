@@ -1,14 +1,4 @@
-#include <cuda.h>
-#include <cuda_bf16.h>
-#include <cuda_fp8.h>
-#include <cuda_runtime.h>
-
-#include <iostream>
-#include <limits>
-
-#include "paddle/extension.h"
-#include "paddle/phi/api/all.h"
-#include "paddle/phi/kernels/funcs/math_cuda_utils.h"
+#include "utils.h"
 
 // --------------------------- kernels ------------------------
 template <int topk, int num_experts>
@@ -64,7 +54,7 @@ __global__ void tokens_guided_unzip_kernel(
     const int token_length) {
   const int this_row = blockIdx.x;
   if (this_row >= total_zipped_tokens_num) return;
-	/*
+  /*
   const __nv_bfloat16 *X = reinterpret_cast<const __nv_bfloat16 *>(X_in);
   __nv_bfloat16 *guided_unzipped_X =
       reinterpret_cast<__nv_bfloat16 *>(guided_unzipped_X_out);
@@ -81,11 +71,15 @@ __global__ void tokens_guided_unzip_kernel(
     int push_row = local_row_pushlist[expert];
     // 该专家没被发到，跳过
     if (push_row == -1) continue;
-    // 可通过向量化优化
+    /*
     for (int i = threadIdx.x; i < token_length; i += blockDim.x) {
       guided_unzipped_X_out[push_row * token_length + i] =
           X_in[this_row * token_length + i];
     }
+    */
+    vectorized_memcpy(&X_in[this_row * token_length],
+                      &guided_unzipped_X_out[push_row * token_length],
+                      token_length);
   }
 }
 // ------------------------------ Dispatch -----------------------------
@@ -152,7 +146,7 @@ std::vector<paddle::Tensor> probs_topk_guided_unzip(
     const int &topk) {
   PD_CHECK(probs_topk.dtype() == paddle::DataType::BFLOAT16);
   int rows = probs_topk.shape()[0];  // seqlen
-  int cols = probs_topk.shape()[1];  //一般为8
+  int cols = probs_topk.shape()[1];  // 一般为8
   PD_CHECK(topk == cols);
 
   //------------------------ 输出1张量 ------------------------
@@ -176,7 +170,7 @@ std::vector<paddle::Tensor> tokens_guided_unzip(
   PD_CHECK(X.dtype() == paddle::DataType::BFLOAT16 ||
            X.dtype() == paddle::DataType::FLOAT32);
   int rows = X.shape()[0];  // seqlen
-  int cols = X.shape()[1];  //一般为7168
+  int cols = X.shape()[1];  // 一般为7168
 
   //------------------------ 输出1张量 ------------------------
   auto guided_unzipped_X =
