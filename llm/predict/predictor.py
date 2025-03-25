@@ -1533,7 +1533,7 @@ def predict():
         logger.warning("paddlenlp_ops does not exist, please install paddlenlp_ops.")
         return
 
-    if tensor_parallel_degree > 1:
+    if world_size > 1 :
         strategy = fleet.DistributedStrategy()
         strategy.hybrid_configs = {
             "dp_degree": data_parallel_degree,

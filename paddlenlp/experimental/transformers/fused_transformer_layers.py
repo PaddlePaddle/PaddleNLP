@@ -21,6 +21,10 @@ import numpy as np
 import paddle
 import paddle.distributed as dist
 from paddle.distributed import fleet
+
+import paddle.distributed.communication.deep_ep as ep
+from paddle.distributed.communication.group import Group
+
 from paddle.framework import in_dynamic_mode
 from paddle.incubate.nn.functional import (
     fused_bias_act,
@@ -375,6 +379,29 @@ class FusedMultiTransformerBase(Layer):
         self.config = config
         self.moe_quant_type = config.moe_quant_type
 
+        self.max_num_tokens_per_card = 128
+        hidden_size = 2048
+        num_topk = 4
+        num_experts =self.config.moe_config.num_experts
+        ep_group = dist.get_group()
+        num_ranks = dist.get_world_size()
+        num_rdma_bytes = ep.Buffer.get_low_latency_rdma_size_hint(
+            self.max_num_tokens_per_card,
+            hidden_size,
+            num_ranks,
+            num_experts
+        )
+
+        self.buffer = ep.Buffer(
+            ep_group,
+            0,
+            num_rdma_bytes,
+            low_latency_mode = True,
+            num_qps_per_rank = num_experts // num_ranks,
+        )
+
+
+
         assert config.embed_dim > 0, "Expected embed_dim to be greater than 0, " "but received {}".format(
             config.embed_dim
         )
@@ -401,7 +428,7 @@ class FusedMultiTransformerBase(Layer):
         self._residual_alpha = config.residual_alpha
         self.nranks = config.nranks
 
-        if self.nranks > 1:
+        if self.nranks > 1 or True:
             self.data_parallel_degree = fleet.get_hybrid_communicate_group().get_data_parallel_world_size()
             self.tp_group = None
             if self.data_parallel_degree > 1:
@@ -1418,6 +1445,58 @@ class FusedMultiTransformerBase(Layer):
         total_cards = paddle.distributed.get_world_size()
         act_dtype = tmp_out.dtype
         IsFirstGPUInAttentionTP = fleet.get_hybrid_communicate_group().get_model_parallel_rank() == 0
+        
+        tmp_scores = paddle.nn.functional.softmax(scores, axis=-1)
+        topk_info = paddle.topk(tmp_scores, self.config.moe_config.top_k, axis=-1, largest=True, sorted=False)
+        topk_weights = topk_info[0]
+        # topk_weights /= topk_weights.sum(axis=-1, keepdim=True)
+        topk_idx = topk_info[1]
+
+        (
+            packed_recv_x, 
+            packed_recv_count, 
+            handle, 
+            event, 
+            hook
+        ) = self.buffer.low_latency_dispatch(
+            tmp_out if IsFirstGPUInAttentionTP else tmp_out[0:0],
+            topk_idx if IsFirstGPUInAttentionTP else topk_idx[0:0],
+            self.max_num_tokens_per_card,
+            self.config.moe_config.num_experts,
+            False,
+            False,)
+        
+        max_tokens_all = self.max_num_tokens_per_card * total_cards
+
+        x_bf16 = packed_recv_x[0].cast("bfloat16").reshape([0,0,-1,128])
+        scales = packed_recv_x[1].transpose([0,2,1]).unsqueeze(-1)
+        permute_input_tmp = (x_bf16 * scales).reshape([-1, hidden_size]).cast("bfloat16")
+        # packed_recv_count += (paddle.arange(0, ep_num_per_gpu * max_tokens_all, max_tokens_all)).cast("int32")
+        packed_recv_count = paddle.arange(1, ep_num_per_gpu + 1) * max_tokens_all 
+
+
+        ffn_out = moe_expert_ffn(
+            permute_input_tmp,
+            packed_recv_count.cast("int64"),
+            ffn1_weights,
+            ffn2_weights,
+            ffn1_biases,
+            ffn1_weights_scale,
+            ffn2_weights_scale,
+            quant_type,
+        )
+        ffn_out = ffn_out.reshape([ep_num_per_gpu, max_tokens_all, hidden_size])
+
+
+        combined_x, event, hook = self.buffer.low_latency_combine(ffn_out, topk_idx, topk_weights, handle, return_recv_hook=False)
+
+        return combined_x
+
+        # total_length = paddle.sum(packed_recv_count, axis=-1).item()
+        # permute_input_list = []
+        # for index, value in enumerate(packed_recv_count.numpy()):
+        #     permute_input_list.append(permute_input_tmp[index][:value])
+        # permute_input_per_card = paddle.concat(permute_input_list, axis=0)
 
         (
             permute_input,
