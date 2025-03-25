@@ -100,12 +100,12 @@ class TestPrefixModel(unittest.TestCase):
     def test_prefix_model_generate(self):
         inputs = {
             "input_ids": paddle.randint(100, 200, [1, 20]),
-            "attention_mask": paddle.ones([1, 20]),
+            "attention_mask": paddle.ones([1, 20], dtype = paddle.int64),
             "position_ids": paddle.arange(20).unsqueeze(0),
         }
         self.prefix_model.generate(
             **inputs,
-            max_length=5,
+            max_length=25,
             decode_strategy="sampling",
             temperature=1.0,
             top_k=1,
@@ -172,12 +172,12 @@ class TestPrefixModelMultiQuery(unittest.TestCase):
     def test_prefix_model_generate(self):
         inputs = {
             "input_ids": paddle.randint(100, 200, [1, 20]),
-            "attention_mask": paddle.ones([1, 20]),
+            "attention_mask": paddle.ones([1, 20], dtype = paddle.int64),
             "position_ids": paddle.arange(20).unsqueeze(0),
         }
         self.prefix_model.generate(
             **inputs,
-            max_length=5,
+            max_length=25,
             decode_strategy="sampling",
             temperature=1.0,
             top_k=1,

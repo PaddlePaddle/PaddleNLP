@@ -27,7 +27,7 @@ from paddlenlp.transformers import AutoModelForConditionalGeneration, AutoTokeni
 class TestSentAug(unittest.TestCase):
     def setUp(self):
         self.sequences = ["人类语言是抽象的信息符号。", "而计算机只能处理数值化的信息。"]
-        self.max_length = 10
+        self.max_length = 20
 
     def test_sent_generate(self):
         aug = SentenceGenerate(model_name="__internal_testing__/tiny-random-roformer-sim", max_length=self.max_length)

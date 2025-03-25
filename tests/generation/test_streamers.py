@@ -32,7 +32,7 @@ from tests.transformers.test_modeling_common import ids_tensor
 
 class StreamerTester(unittest.TestCase):
     def get_inputs(self, model):
-        input_ids = ids_tensor([1, 5], vocab_size=model.config.vocab_size, dtype="int64")
+        input_ids = ids_tensor([1, 5], vocab_size=model.config.vocab_size, dtype=paddle.int64)
         attention_mask = paddle.ones_like(input_ids, dtype="bool")
         return {
             "input_ids": input_ids,
@@ -74,7 +74,6 @@ class StreamerTester(unittest.TestCase):
         streamer_text = ""
         for new_text in streamer:
             streamer_text += new_text
-        import pdb;pdb.set_trace()
         self.assertEqual(streamer_text, greedy_text)
 
     @slow
@@ -124,7 +123,7 @@ class AsyncStreamerTester(unittest.IsolatedAsyncioTestCase):
         model = AutoModelForCausalLM.from_pretrained("__internal_testing__/tiny-random-llama")
         model.config.eos_token_id = -1
 
-        input_ids = ids_tensor((1, 5), vocab_size=model.config.vocab_size)
+        input_ids = ids_tensor((1, 5), vocab_size=model.config.vocab_size, dtype=paddle.int64)
         greedy_ids = model.generate(input_ids, max_new_tokens=10, do_sample=False)
         greedy_text = tokenizer.decode(greedy_ids[0])
 
@@ -143,7 +142,7 @@ class AsyncStreamerTester(unittest.IsolatedAsyncioTestCase):
         model = AutoModelForCausalLM.from_pretrained("__internal_testing__/tiny-random-llama")
         model.config.eos_token_id = -1
 
-        input_ids = ids_tensor((1, 5), vocab_size=model.config.vocab_size)
+        input_ids = ids_tensor((1, 5), vocab_size=model.config.vocab_size, dtype=paddle.int64)
         streamer = AsyncTextIteratorStreamer(tokenizer, timeout=0.001)
         generation_kwargs = {"input_ids": input_ids, "max_new_tokens": 10, "do_sample": False, "streamer": streamer}
         thread = Thread(target=model.generate, kwargs=generation_kwargs)

@@ -103,13 +103,11 @@ class LogitsProcessorTest(unittest.TestCase):
         new_min_dist_processor = MinNewTokensLengthLogitsProcessor(
             prompt_length_to_skip=input_ids.shape[-1], min_new_tokens=3, eos_token_id=eos_token_id
         )
-
-        expected_eos_scores_before_min_length = batch_size * [-float("inf")]
-        if isinstance(eos_token_id, list):
-            expected_eos_scores_before_min_length *= len(eos_token_id)
-
         scores = self._get_uniform_logits(batch_size, vocab_size)
         scores_before_min_length = new_min_dist_processor(input_ids, scores)
+        expected_eos_scores_before_min_length = batch_size * [paddle.finfo(scores.dtype).min]
+        if isinstance(eos_token_id, list):
+            expected_eos_scores_before_min_length *= len(eos_token_id)
         self.assertListEqual(
             scores_before_min_length[:, eos_token_id].flatten().tolist(), expected_eos_scores_before_min_length
         )
@@ -811,7 +809,7 @@ class LogitsProcessorTest(unittest.TestCase):
         input_ids = ids_tensor((batch_size, 4), vocab_size=20)
         scores = self._get_uniform_logits(batch_size, vocab_size)
         processed_scores = logits_processor(input_ids, scores)
-        self.assertTrue(paddle.isneginf(processed_scores[:, eos_token_id + 1 :]).all())
+        self.assertTrue((processed_scores[:, eos_token_id + 1 :] == paddle.finfo(scores.dtype).min).all())
         # score for eos_token_id should be zero
         self.assertListEqual(processed_scores[:, eos_token_id].tolist(), 4 * [0])
 

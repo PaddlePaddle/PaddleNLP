@@ -219,8 +219,7 @@ def scaled_dot_product_attention(
             )
 
         if attention_mask is None:
-            attention_mask = get_triangle_upper_mask(attn_weights)
-
+            attention_mask = get_triangle_upper_mask(attn_weights) 
         attention_mask = attention_mask.reshape([bsz, 1, q_len, kv_seq_len])
         if attention_mask.shape != [bsz, 1, q_len, kv_seq_len]:
             raise ValueError(
@@ -1532,6 +1531,15 @@ class Qwen2ForCausalLM(Qwen2PretrainedModel):
         }
 
     @staticmethod
+    def _reorder_cache(past: Tuple[Tuple[Tensor]], beam_idx: Tensor) -> Tuple[Tuple[Tensor]]:
+        """
+        This function is used to re-order the `past_key_values` cache if [`~PreTrainedModel.beam_search`] or
+        [`~PreTrainedModel.beam_sample`] is called. This is required to match `past_key_values` with the correct
+        beam_idx at every generation step.
+        """
+        return tuple(tuple(paddle.index_select(past_state, beam_idx) for past_state in layer_past) for layer_past in past)
+
+    @staticmethod
     def update_model_kwargs_for_generation(outputs, model_kwargs, is_encoder_decoder=False):
         # update cache
         if isinstance(outputs, tuple) and len(outputs) > 1 and not isinstance(outputs[1], paddle.Tensor):
@@ -1615,6 +1623,7 @@ class Qwen2ForCausalLM(Qwen2PretrainedModel):
             attention_mask = None
 
         # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
+        import pdb;pdb.set_trace() 
         outputs = self.qwen2(
             input_ids=input_ids,
             position_ids=position_ids,

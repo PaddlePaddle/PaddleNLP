@@ -800,6 +800,7 @@ class MT5PretrainedModel(PretrainedModel):
 
 
 class MT5Stack(nn.Layer):
+    main_input_name = "input_ids"
     def __init__(self, config: MT5Config, embed_tokens: Optional[nn.Embedding] = None):
         super().__init__()
         self.is_decoder = config.is_decoder
@@ -1636,6 +1637,15 @@ class MT5ForConditionalGeneration(MT5PretrainedModel):
 
     def prepare_decoder_input_ids_from_labels(self, labels: paddle.Tensor):
         return self._shift_right(labels)
+        
+    @staticmethod
+    def _reorder_cache(past: Tuple[Tuple[Tensor]], beam_idx: Tensor) -> Tuple[Tuple[Tensor]]:
+        """
+        This function is used to re-order the `past_key_values` cache if [`~PretrainedModel.beam_search`] or
+        [`~PretrainedModel.beam_sample`] is called. This is required to match `past_key_values` with the correct
+        beam_idx at every generation step.
+        """
+        return tuple(tuple(paddle.index_select(past_state, beam_idx) for past_state in layer_past) for layer_past in past)
 
     @staticmethod
     def expand_inputs_for_generation(input_ids, expand_size, attention_mask=None, **model_kwargs):

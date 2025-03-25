@@ -602,10 +602,10 @@ class GenerationMixin:
         if inputs is not None:
             return inputs
 
-        encoder_outputs = model_kwargs.get("encoder_outputs")
-        if self.config.is_encoder_decoder and encoder_outputs is not None:
+        encoder_output = model_kwargs.get("encoder_output")
+        if self.config.is_encoder_decoder and encoder_output is not None:
             # make dummy input_ids with value -100, as a sanity check ensuring that they won't be used for encoding
-            shape = encoder_outputs.last_hidden_state.size()[:-1]
+            shape = encoder_output.last_hidden_state.size()[:-1]
             return paddle.ones(shape, dtype="int64") * -100
 
         # If there is some tensor in `model_kwargs`, we can infer the batch size from it. This is helpful with
@@ -688,7 +688,7 @@ class GenerationMixin:
         model_input_name = model_input_name if model_input_name is not None else self.main_input_name
         encoder_kwargs["return_dict"] = True
         encoder_kwargs[model_input_name] = inputs_tensor
-        model_kwargs["encoder_outputs"]: ModelOutput = encoder(**encoder_kwargs)  # type: ignore
+        model_kwargs["encoder_output"]: ModelOutput = encoder(**encoder_kwargs)  # type: ignore
 
         return model_kwargs
 
@@ -775,9 +775,9 @@ class GenerationMixin:
         model_kwargs = _expand_dict_for_generation(model_kwargs)
 
         if is_encoder_decoder:
-            if model_kwargs.get("encoder_outputs") is None:
-                raise ValueError("If `is_encoder_decoder` is True, make sure that `encoder_outputs` is defined.")
-            model_kwargs["encoder_outputs"] = _expand_dict_for_generation(model_kwargs["encoder_outputs"])
+            if model_kwargs.get("encoder_output") is None:
+                raise ValueError("If `is_encoder_decoder` is True, make sure that `encoder_output` is defined.")
+            model_kwargs["encoder_output"] = _expand_dict_for_generation(model_kwargs["encoder_output"])
 
         return input_ids, model_kwargs
 
@@ -1655,7 +1655,7 @@ class GenerationMixin:
         """
         cache_cls: Cache = NEED_SETUP_CACHE_CLASSES_MAPPING[cache_implementation]
         requires_cross_attention_cache = (
-            self.config.is_encoder_decoder or model_kwargs.get("encoder_outputs") is not None
+            self.config.is_encoder_decoder or model_kwargs.get("encoder_output") is not None
         )
 
         if hasattr(self, "_cache"):
@@ -1675,7 +1675,7 @@ class GenerationMixin:
         if requires_cross_attention_cache and hasattr(self, "_cache"):
             need_new_cache = (
                 need_new_cache
-                or self._cache.cross_attention_cache.max_cache_len != model_kwargs["encoder_outputs"][0].shape[1]
+                or self._cache.cross_attention_cache.max_cache_len != model_kwargs["encoder_output"][0].shape[1]
             )
 
         if need_new_cache:
@@ -1700,7 +1700,7 @@ class GenerationMixin:
             self._cache = cache_cls(**cache_kwargs)
             if requires_cross_attention_cache:
                 encoder_kwargs = cache_kwargs.copy()
-                encoder_kwargs["max_cache_len"] = model_kwargs["encoder_outputs"][0].shape[1]
+                encoder_kwargs["max_cache_len"] = model_kwargs["encoder_output"][0].shape[1]
                 self._cache = EncoderDecoderCache(self._cache, cache_cls(**encoder_kwargs))
         else:
             self._cache.reset()
@@ -1739,7 +1739,7 @@ class GenerationMixin:
 
         cache_name = "past_key_values" if "mamba" not in self.__class__.__name__.lower() else "cache_params"
         requires_cross_attention_cache = (
-            self.config.is_encoder_decoder or model_kwargs.get("encoder_outputs") is not None
+            self.config.is_encoder_decoder or model_kwargs.get("encoder_output") is not None
         )
 
         # Quick escape route 1: if the user specifies a cache, we only need to:
@@ -2028,7 +2028,6 @@ class GenerationMixin:
                     - [`~generation.GenerateEncoderDecoderOutput`],
                     - [`~generation.GenerateBeamEncoderDecoderOutput`]
         """
-
         # 1. Handle `generation_config` and kwargs that might update it, and validate the `.generate()` call
         self._validate_model_class()
         tokenizer = kwargs.pop("tokenizer", None)  # Pull this out first, we only use it for stopping criteria
@@ -2045,7 +2044,7 @@ class GenerationMixin:
         stopping_criteria = stopping_criteria if stopping_criteria is not None else StoppingCriteriaList()
 
         accepts_attention_mask = "attention_mask" in set(inspect.signature(self.forward).parameters.keys())
-        requires_attention_mask = "encoder_outputs" not in model_kwargs
+        requires_attention_mask = "encoder_output" not in model_kwargs
         kwargs_has_attention_mask = model_kwargs.get("attention_mask", None) is not None
 
         # 3. Define model inputs
@@ -2088,8 +2087,8 @@ class GenerationMixin:
         #     if model_input_name == "input_ids" and len(model_kwargs["attention_mask"].shape) > 2:
         #         raise ValueError("`attention_mask` passed to `generate` must be 2D.")
 
-        if self.config.is_encoder_decoder and "encoder_outputs" not in model_kwargs:
-            # if model is encoder decoder encoder_outputs are created and added to `model_kwargs`
+        if self.config.is_encoder_decoder and "encoder_output" not in model_kwargs:
+            # if model is encoder decoder encoder_output are created and added to `model_kwargs`
             model_kwargs = self._prepare_encoder_decoder_kwargs_for_generation(
                 inputs_tensor, model_kwargs, model_input_name, generation_config
             )
@@ -2575,7 +2574,7 @@ class GenerationMixin:
                 through `streamer.put(token_ids)` and the streamer is responsible for any further processing.
             model_kwargs:
                 Additional model specific keyword arguments will be forwarded to the `forward` function of the model.
-                If model is an encoder-decoder model the kwargs should include `encoder_outputs`.
+                If model is an encoder-decoder model the kwargs should include `encoder_output`.
 
         Return:
             [`~generation.GenerateDecoderOnlyOutput`], [`~generation.GenerateEncoderDecoderOutput`]
@@ -2780,7 +2779,7 @@ class GenerationMixin:
                 through `streamer.put(token_ids)` and the streamer is responsible for any further processing.
             model_kwargs:
                 Additional model specific keyword arguments will be forwarded to the `forward` function of the model.
-                If model is an encoder-decoder model the kwargs should include `encoder_outputs`.
+                If model is an encoder-decoder model the kwargs should include `encoder_output`.
 
         Return:
             [`~generation.GenerateDecoderOnlyOutput`], [`~generation.GenerateEncoderDecoderOutput`]
@@ -2811,9 +2810,9 @@ class GenerationMixin:
 
         # if model is an encoder-decoder, retrieve encoder attention weights and hidden states
         if return_dict_in_generate and self.config.is_encoder_decoder:
-            encoder_attentions = model_kwargs["encoder_outputs"].get("attentions") if output_attentions else None
+            encoder_attentions = model_kwargs["encoder_output"].get("attentions") if output_attentions else None
             encoder_hidden_states = (
-                model_kwargs["encoder_outputs"].get("hidden_states") if output_hidden_states else None
+                model_kwargs["encoder_output"].get("hidden_states") if output_hidden_states else None
             )
 
         # keep track of which sequences are already finished
@@ -2844,7 +2843,7 @@ class GenerationMixin:
                 model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
 
                 # encode the given prefix and prepare model inputs; encoder-decoder model process the prefix and save
-                # the `encoder_outputs`
+                # the `encoder_output`
                 outputs = self(
                     **model_inputs, return_dict=True, output_hidden_states=True, output_attentions=output_attentions
                 )
@@ -3192,7 +3191,7 @@ class GenerationMixin:
                 through `streamer.put(token_ids)` and the streamer is responsible for any further processing.
             model_kwargs:
                 Additional model specific kwargs will be forwarded to the `forward` function of the model. If model is
-                an encoder-decoder model the kwargs should include `encoder_outputs`.
+                an encoder-decoder model the kwargs should include `encoder_output`.
 
         Return:
             [`~generation.GenerateDecoderOnlyOutput`], [`~generation.GenerateEncoderDecoderOutput`] or `paddle.Tensor`:
@@ -3221,9 +3220,9 @@ class GenerationMixin:
 
         # if model is an encoder-decoder, retrieve encoder attention weights and hidden states
         if return_dict_in_generate and self.config.is_encoder_decoder:
-            encoder_attentions = model_kwargs["encoder_outputs"].get("attentions") if output_attentions else None
+            encoder_attentions = model_kwargs["encoder_output"].get("attentions") if output_attentions else None
             encoder_hidden_states = (
-                model_kwargs["encoder_outputs"].get("hidden_states") if output_hidden_states else None
+                model_kwargs["encoder_output"].get("hidden_states") if output_hidden_states else None
             )
 
         # keep track of which sequences are already finished
@@ -3312,8 +3311,6 @@ class GenerationMixin:
             input_ids = paddle.concat([input_ids, next_tokens[:, None]], axis=-1)
             if streamer is not None:
                 streamer.put(next_tokens.cpu())
-            # print("unfinsed_sequences:", unfinished_sequences)
-            # print("stopping_criteria:", stopping_criteria(input_ids, scores))
             unfinished_sequences = unfinished_sequences & ~stopping_criteria(input_ids, scores).astype("int64")
             this_peer_finished = unfinished_sequences.max() == 0
             cur_len += 1
@@ -3409,7 +3406,7 @@ class GenerationMixin:
                 `FullyShardedDataParallel` and DeepSpeed ZeRO Stage 3).
             model_kwargs:
                 Additional model specific kwargs will be forwarded to the `forward` function of the model. If model is
-                an encoder-decoder model the kwargs should include `encoder_outputs`.
+                an encoder-decoder model the kwargs should include `encoder_output`.
 
         Return:
             [`generation.GenerateBeamDecoderOnlyOutput`], [`~generation.GenerateBeamEncoderDecoderOutput`] or
@@ -3452,9 +3449,9 @@ class GenerationMixin:
 
         # if model is an encoder-decoder, retrieve encoder attention weights and hidden states
         if return_dict_in_generate and self.config.is_encoder_decoder:
-            encoder_attentions = model_kwargs["encoder_outputs"].get("attentions") if output_attentions else None
+            encoder_attentions = model_kwargs["encoder_output"].get("attentions") if output_attentions else None
             encoder_hidden_states = (
-                model_kwargs["encoder_outputs"].get("hidden_states") if output_hidden_states else None
+                model_kwargs["encoder_output"].get("hidden_states") if output_hidden_states else None
             )
 
         # initialise score of first beam with 0 and the rest with -1e9. This makes sure that only tokens
@@ -3690,7 +3687,7 @@ class GenerationMixin:
                 `FullyShardedDataParallel` and DeepSpeed ZeRO Stage 3).
             model_kwargs:
                 Additional model specific kwargs that will be forwarded to the `forward` function of the model. If
-                model is an encoder-decoder model the kwargs should include `encoder_outputs`.
+                model is an encoder-decoder model the kwargs should include `encoder_output`.
 
         Return:
             [`~generation.GenerateBeamDecoderOnlyOutput`], [`~generation.GenerateBeamEncoderDecoderOutput`] or
@@ -3735,9 +3732,9 @@ class GenerationMixin:
 
         # if model is an encoder-decoder, retrieve encoder attention weights and hidden states
         if return_dict_in_generate and self.config.is_encoder_decoder:
-            encoder_attentions = model_kwargs["encoder_outputs"].get("attentions") if output_attentions else None
+            encoder_attentions = model_kwargs["encoder_output"].get("attentions") if output_attentions else None
             encoder_hidden_states = (
-                model_kwargs["encoder_outputs"].get("hidden_states") if output_hidden_states else None
+                model_kwargs["encoder_output"].get("hidden_states") if output_hidden_states else None
             )
 
         # initialise score of first beam of each group with 0 and the rest with -1e9. This ensures that the beams in
@@ -3981,7 +3978,7 @@ class GenerationMixin:
                 `FullyShardedDataParallel` and DeepSpeed ZeRO Stage 3).
             model_kwargs:
                 Additional model specific kwargs will be forwarded to the `forward` function of the model. If model is
-                an encoder-decoder model the kwargs should include `encoder_outputs`.
+                an encoder-decoder model the kwargs should include `encoder_output`.
 
         Return:
             [`~generation.GenerateBeamDecoderOnlyOutput`], [`~generation.GenerateBeamEncoderDecoderOutput`] or
@@ -4022,9 +4019,9 @@ class GenerationMixin:
 
         # if model is an encoder-decoder, retrieve encoder attention weights and hidden states
         if return_dict_in_generate and self.config.is_encoder_decoder:
-            encoder_attentions = model_kwargs["encoder_outputs"].get("attentions") if output_attentions else None
+            encoder_attentions = model_kwargs["encoder_output"].get("attentions") if output_attentions else None
             encoder_hidden_states = (
-                model_kwargs["encoder_outputs"].get("hidden_states") if output_hidden_states else None
+                model_kwargs["encoder_output"].get("hidden_states") if output_hidden_states else None
             )
 
         # initialise score of first beam with 0 and the rest with -1e9. This makes sure that only tokens
@@ -4225,7 +4222,7 @@ class GenerationMixin:
                 through `streamer.put(token_ids)` and the streamer is responsible for any further processing.
             model_kwargs:
                 Additional model specific keyword arguments will be forwarded to the `forward` function of the model.
-                If model is an encoder-decoder model the kwargs should include `encoder_outputs`.
+                If model is an encoder-decoder model the kwargs should include `encoder_output`.
 
         Return:
             [`~generation.GenerateDecoderOnlyOutput`], [`~generation.GenerateEncoderDecoderOutput`] or
@@ -4251,9 +4248,9 @@ class GenerationMixin:
 
         # if model is an encoder-decoder, retrieve encoder attention weights and hidden states
         if return_dict_in_generate and self.config.is_encoder_decoder:
-            encoder_attentions = model_kwargs["encoder_outputs"].get("attentions") if output_attentions else None
+            encoder_attentions = model_kwargs["encoder_output"].get("attentions") if output_attentions else None
             encoder_hidden_states = (
-                model_kwargs["encoder_outputs"].get("hidden_states") if output_hidden_states else None
+                model_kwargs["encoder_output"].get("hidden_states") if output_hidden_states else None
             )
 
         # keep track of which sequences are already finished
@@ -4608,7 +4605,7 @@ def _split_model_inputs(
     previous forward pass.
     """
     # Edge case: if model_input is None, return a list of Nones
-    # this happens with Whisper where encoder_outputs is None
+    # this happens with Whisper where encoder_output is None
     if model_input is None:
         return [model_input] * (full_batch_size // split_size)
     # Infer the class from the object
@@ -4627,11 +4624,11 @@ def _split_model_inputs(
     )
     # We only keep keys that are in the model_input
     keys = [k for k in keys if k in model_input]
-    # Here we can have four types of values: tensors, tuples of tensors and booleans, and encoder_outputs which is a
+    # Here we can have four types of values: tensors, tuples of tensors and booleans, and encoder_output which is a
     # ModelOutput object.
     # bool should not be split but replicated for each split
     bool_keys = [k for k in keys if isinstance(model_input[k], bool) or k == "cache_position"]
-    keys_to_ignore = ["cache_position", "encoder_outputs", "logits_to_keep"]
+    keys_to_ignore = ["cache_position", "encoder_output", "logits_to_keep"]
     non_bool_keys = [k for k in keys if not isinstance(model_input[k], bool) and k not in keys_to_ignore]
 
     # we split the tensors and tuples of tensors
@@ -4641,13 +4638,13 @@ def _split_model_inputs(
     ]
     # bool values are the same and replicated for each split
     bool_data = {k: model_input[k] for k in bool_keys}
-    # encoder_outputs is a ModelOutput object and should be split by its own
-    if "encoder_outputs" in model_input:
-        encoder_outputs_split = _split_model_inputs(
-            model_input["encoder_outputs"], split_size, full_batch_size, config.get_text_config()
+    # encoder_output is a ModelOutput object and should be split by its own
+    if "encoder_output" in model_input:
+        encoder_output_split = _split_model_inputs(
+            model_input["encoder_output"], split_size, full_batch_size, config.get_text_config()
         )
         data_split_list = [
-            {**data_split, "encoder_outputs": encoder_outputs_split[i]} for i, data_split in enumerate(data_split_list)
+            {**data_split, "encoder_output": encoder_output_split[i]} for i, data_split in enumerate(data_split_list)
         ]
     # logits_to_keep should be replicated for each split, similar to bool values
     if "logits_to_keep" in model_input:

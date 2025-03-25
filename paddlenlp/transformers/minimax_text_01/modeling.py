@@ -1121,13 +1121,13 @@ class MiniMaxText01ForCausalLM(MiniMaxText01PreTrainedModel):
         return model_inputs
 
     @staticmethod
-    def _reorder_cache(past_key_values, beam_idx):
-        reordered_past = ()
-        for layer_past in past_key_values:
-            reordered_past += (
-                tuple(past_state.index_select(0, beam_idx.astype(past_state.dtype)) for past_state in layer_past),
-            )
-        return reordered_past
+    def _reorder_cache(past: Tuple[Tuple[Tensor]], beam_idx: Tensor) -> Tuple[Tuple[Tensor]]:
+        """
+        This function is used to re-order the `past_key_values` cache if [`~PretrainedModel.beam_search`] or
+        [`~PretrainedModel.beam_sample`] is called. This is required to match `past_key_values` with the correct
+        beam_idx at every generation step.
+        """
+        return tuple(tuple(paddle.index_select(past_state, beam_idx) for past_state in layer_past) for layer_past in past)
 
 
 class MiniMaxText01ForSequenceClassification(MiniMaxText01PreTrainedModel):

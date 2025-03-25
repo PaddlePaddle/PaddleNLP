@@ -90,7 +90,7 @@ class SentenceGenerate:
         decoded_outputs = tokenizer.batch_decode(
             model.generate(
                 **tokenized_input,
-                num_return_sequences=self.generate_n,
+                # num_return_sequences=self.generate_n,
                 top_p=self.top_p,
                 decode_strategy="sampling",
                 max_length=self.max_length,

@@ -1303,7 +1303,7 @@ class NoBadWordsLogitsProcessor(SequenceBiasLogitsProcessor):
             )
 
         # Forbidding a sequence is equivalent to setting its bias to -inf
-        sequence_bias = {tuple(sequence): float("-inf") for sequence in bad_words_ids}
+        sequence_bias = {tuple(sequence): paddle.finfo(paddle.float32).min for sequence in bad_words_ids}
         super().__init__(sequence_bias=sequence_bias)
 
     def _validate_arguments(self):
