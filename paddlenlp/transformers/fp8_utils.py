@@ -218,12 +218,7 @@ class ExpertsGroupGemmNode:
         # regroup dout and o2:regroup之前需要dequant
         out_grad_dequant = dequantize_fp8_to_fp32(out_grad, out_grad_scale)
         out_grad_dequant_fp16 = out_grad_dequant.to(paddle.bfloat16)
-        token_per_expert = []
-        for i in range(expert_w1_len):
-            e_num = int((dispatched_indices == i).astype("int64").sum())
-            token_per_expert.append(e_num)
-        self.token_per_expert = token_per_expert
-        max_seq_len = max(token_per_expert)
+        max_seq_len = max(self.tokens_per_expert)
         max_seq_len = ((max_seq_len + 127) // 128) * 128
         o1_regroup, out_grad_regroup = TDU.regroup_tokens(
             o1, out_grad_dequant_fp16, unzipped_expert_idx, expert_num=4, token_max_per_expert=max_seq_len  # int32
@@ -333,7 +328,8 @@ class ExpertsGroupGemmNode:
                     expert_w1[i].grad,
                 )
 
-    def forward(self, hs_out, hs_scale_out, unzipped_probs, unzipped_expert_idx):
+    def forward(self, hs_out, hs_scale_out, unzipped_probs, unzipped_expert_idx, tokens_per_expert):
+        self.tokens_per_expert = tokens_per_expert
         # get w1
         expert_w1 = [x.w1 for x in self.custom_map.experts if x is not None]
 

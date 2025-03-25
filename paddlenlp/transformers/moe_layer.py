@@ -630,7 +630,11 @@ class MlpNode:
 
             # 2 experts
             expert_out = self.experts_group_gemm_node.forward(
-                unzipped_tokens, unzipped_scale, unzipped_probs, unzipped_expert_idx
+                unzipped_tokens,
+                unzipped_scale,
+                unzipped_probs,
+                unzipped_expert_idx,
+                self.token_dispatcher._comm_manager.tokens_per_expert,
             )
 
             self.unzipped_expert_idx = unzipped_expert_idx
