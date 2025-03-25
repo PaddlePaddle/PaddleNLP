@@ -103,6 +103,9 @@ bool dispatch_dual_gemm_act_sm90(DualGemmEpilogueAllParams params) {
     ElementA const* ptr_A = reinterpret_cast<ElementA const*>(params.A);
     ElementB const* ptr_B0 = reinterpret_cast<ElementB const*>(params.B0);
     ElementB const* ptr_B1 = reinterpret_cast<ElementB const*>(params.B1);
+    float const* x_scale_ptr = reinterpret_cast<float const*>(params.x_scale_ptr);
+    float const* scale0_ptr = reinterpret_cast<float const*>(params.scale0_ptr);
+    float const* scale1_ptr = reinterpret_cast<float const*>(params.scale1_ptr);
     if constexpr (SwapAB)
     {
         arg_m = params.N;
@@ -116,7 +119,7 @@ bool dispatch_dual_gemm_act_sm90(DualGemmEpilogueAllParams params) {
     StrideD stride_D = cutlass::make_cute_packed_stride(StrideD{}, cute::make_shape(arg_m, arg_n, params.batch_count));
 
     typename Gemm::Arguments arguments = {cutlass::gemm::GemmUniversalMode::kGemm, {arg_m, arg_n, params.K, params.batch_count},
-        {ptr_A, stride_A, ptr_B0, ptr_B1, stride_B, params.scale0, params.scale1},
+        {ptr_A, stride_A, ptr_B0, ptr_B1, stride_B, params.scale0, params.scale1, x_scale_ptr, scale0_ptr, scale1_ptr},
         {{}, // epilogue.thread
             nullptr, stride_C, reinterpret_cast<ElementOutput*>(params.D), stride_D}};
     arguments.epilogue.thread.alpha = params.scale_out;
@@ -144,4 +147,3 @@ bool dispatch_dual_gemm_act_sm90(DualGemmEpilogueAllParams params) {
   }
   return true;
 }
-

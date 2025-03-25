@@ -154,6 +154,9 @@ struct CollectiveMmaGated<MainloopSm90TmaGmmaWarpSpecializedFP8<Stages, ClusterS
         StrideB dB;
         float scale_d0 = 1.0f;
         float scale_d1 = 1.0f;
+        float const* x_scale_ptr = nullptr;
+        float const* scale_d0_ptr = nullptr;
+        float const* scale_d1_ptr = nullptr;
         uint32_t mma_promotion_interval = 4;
     };
 
@@ -176,6 +179,9 @@ struct CollectiveMmaGated<MainloopSm90TmaGmmaWarpSpecializedFP8<Stages, ClusterS
         TMA_Aux tma_load_aux;
         float scale_d0 = 1.0f;
         float scale_d1 = 1.0f;
+        float const* x_scale_ptr = nullptr;
+        float const* scale_d0_ptr = nullptr;
+        float const* scale_d1_ptr = nullptr;
         uint32_t mma_promotion_interval = 4;
     };
 
@@ -211,7 +217,7 @@ struct CollectiveMmaGated<MainloopSm90TmaGmmaWarpSpecializedFP8<Stages, ClusterS
             typename Params::TMA_Aux tma_load_aux = make_tma_copy(GmemTiledCopyA{}, tensor_aux,
                 SmemLayoutA{}(_, _, cute::Int<0>{}), make_shape(shape<0>(TileShape{}), shape<2>(TileShape{})),
                 size<1>(ClusterShape{})); // mcast along N mode for this M load, if any
-            return {tma_load_a, tma_load_b, tma_load_aux, args.scale_d0, args.scale_d1, args.mma_promotion_interval};
+            return {tma_load_a, tma_load_b, tma_load_aux, args.scale_d0, args.scale_d1, args.x_scale_ptr, args.scale_d0_ptr, args.scale_d1_ptr, args.mma_promotion_interval};
         }
         else
         {
@@ -220,7 +226,7 @@ struct CollectiveMmaGated<MainloopSm90TmaGmmaWarpSpecializedFP8<Stages, ClusterS
             typename Params::TMA_Aux tma_load_aux = make_tma_copy(GmemTiledCopyB{}, tensor_aux,
                 SmemLayoutB{}(_, _, cute::Int<0>{}), make_shape(shape<1>(TileShape{}), shape<2>(TileShape{})),
                 size<0>(ClusterShape{})); // mcast along M mode for this N load, if any
-            return {tma_load_a, tma_load_b, tma_load_aux, args.scale_d0, args.scale_d1, args.mma_promotion_interval};
+            return {tma_load_a, tma_load_b, tma_load_aux, args.scale_d0, args.scale_d1, args.x_scale_ptr, args.scale_d0_ptr, args.scale_d1_ptr, args.mma_promotion_interval};
         }
     }
 

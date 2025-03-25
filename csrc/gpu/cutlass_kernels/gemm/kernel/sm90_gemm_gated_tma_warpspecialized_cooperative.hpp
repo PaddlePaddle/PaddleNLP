@@ -551,8 +551,8 @@ public:
 
             // Do we potentially issue tail arrives for TMA stores, if epilogue load is waiting for it
             bool do_store_tail = false;
-            float scale_d0 = params.mainloop.scale_d0;
-            float scale_d1 = params.mainloop.scale_d1;
+            float scale_d0 = params.mainloop.x_scale_ptr ? (*params.mainloop.x_scale_ptr) * (*params.mainloop.scale_d0_ptr) : params.mainloop.scale_d0;
+            float scale_d1 = params.mainloop.x_scale_ptr ? (*params.mainloop.x_scale_ptr) * (*params.mainloop.scale_d1_ptr) : params.mainloop.scale_d1;
             while (work_tile_info.is_valid())
             {
                 // Compute m_coord, n_coord, l_coord with the post-tiled m-shape and n-shape
