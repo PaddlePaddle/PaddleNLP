@@ -1,11 +1,11 @@
 # Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -13,19 +13,11 @@
 # limitations under the License.
 
 import os
-import sys
-from enum import Enum, auto
 
 import paddle
-import paddle.distributed as dist
-from paddle import nn
 
 from paddlenlp.trainer import strtobool
-from paddlenlp.trainer.trainer import Trainer, logger
-from paddlenlp.utils.distributed import distributed_gather
-from paddlenlp.utils.nested import flatten_list, nested_broadcast_tensor_with_empty
-
-global_dev_id = 0 if paddle.get_device() == "cpu" else int(paddle.get_device().split(":")[1])
+from paddlenlp.trainer.trainer import logger
 
 
 @paddle.no_grad()
@@ -153,7 +145,7 @@ def reload_tensor_to_gpu(tensors):
         logger.debug(f"Can't parse for type {tensors[1]}")
 
 
-class OffloadController(...):
+class OffloadController:
     def __init__(self, objs):
         self.objs = objs
 

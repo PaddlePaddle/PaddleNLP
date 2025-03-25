@@ -50,6 +50,7 @@ from models.ppo_model_utils import (
     make_position_ids,
 )
 from paddle import nn
+from paddle.distributed.fleet.meta_parallel import PipelineLayer
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import ParallelCrossEntropy
 from paddle.io import DataLoader, Dataset, DistributedBatchSampler
@@ -313,15 +314,6 @@ class RLTrainer(Trainer):
 
         self.mark_step_loss(loss_name)
 
-        if self.use_ema and self.is_accumulation_step:
-            # TODO(guosheng): assume rollout next thus make ema weights on gpu,
-            # but may not, maybe need a way to specify it.
-            self.ema_update(
-                beta=self.ema_beta,
-                offload_ema=self.offload_ema,
-                offload_model=not self.offload_ema,
-            )
-
         return train_step_vars[loss_name]
 
     def _prepare_inputs(self, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> Dict[str, Union[paddle.Tensor, Any]]:
@@ -479,196 +471,6 @@ class RLTrainer(Trainer):
             return result
         else:
             return model.state_dict()
-
-    def ema_init(self, offload_ema=True, offload_model=False, shard_ema=True):
-        """should be called after model and optimizer are created and wrapped"""
-        self.ema_state_dict = {}
-        self.bak_state_dict = {}
-        hcg = fleet.get_hybrid_communicate_group()
-        sharding_size = hcg.get_sharding_parallel_world_size()
-        # NOTE: use optimizer.master_weight instead of model.state_dict to set
-        # ema_state_dict would make ema coupled with master_weight reshard.
-        structured_names = (
-            self.get_sharding_master_weight_structured_names(self.model, self.optimizer)
-            if sharding_size > 1 and shard_ema
-            else None
-        )
-        # for pipeline model, use `model.state_dict()` would auto map param name
-        # for name, p in self.model.named_parameters():
-        for name, p in self.model.state_dict().items():
-            if structured_names is None or name in structured_names:
-                ema_p = p.detach().cast(dtype=paddle.float32)
-                if offload_ema:
-                    ema_p = ema_p.pin_memory()
-                self.ema_state_dict[name] = ema_p
-            if offload_model:
-                cpu_p = p.pin_memory()
-                cpu_p._share_buffer_to(p)
-            self.bak_state_dict[name] = p
-        if getattr(self.model, "tie_word_embeddings", False):
-            raise NotImplementedError
-
-    @paddle.no_grad()
-    def ema_update(self, beta=0.992, offload_ema=True, offload_model=False):
-        """
-        This would be called automatically in `full_training_step` if `use_ema`
-        is True to update ema state when ending an accumulated step intervel.
-        """
-        model_keys = list(self.ema_state_dict.keys())
-        hcg = fleet.get_hybrid_communicate_group()
-        sharding_size = hcg.get_sharding_parallel_world_size()
-        trainer_state_dict = (
-            self.get_master_weight_state_dict(self.model, self.optimizer)
-            if sharding_size > 1 and self.shard_ema
-            else self.model.state_dict()
-        )
-        for key in model_keys:
-            if getattr(self.model, "tie_word_embeddings", False) and "lm_head" in key:
-                raise NotImplementedError
-            trainer_data = trainer_state_dict[key].cuda()
-            if trainer_data.dtype != paddle.float32:
-                # use model state dict instead of master weights
-                trainer_data = trainer_data.cast(dtype=paddle.float32)
-            ema_data = self.ema_state_dict[key].cuda()
-            # update ema & offload ema
-            ema_result = (beta * ema_data) + (1.0 - beta) * trainer_data
-            self.ema_state_dict[key] = ema_result.pin_memory() if offload_ema else ema_result
-            if offload_model:
-                cpu_p = trainer_data.pin_memory()
-                cpu_p._share_buffer_to(trainer_data)
-        if getattr(self.model, "tie_word_embeddings", False):
-            raise NotImplementedError
-
-    def ema_apply(self):
-        """
-        If use sharding and `shard_ema` is true, `ema_state_dict` only includes
-        sharded weights, thus we need the completed ema state to apply it to model
-        and ema would be coupled with reshard, then we need to reshard here.
-        """
-        # TODO(guosheng): `bak_state_dict` is indeed trainer.model, allow to use
-        # a new model instead of trainer.model as target model.
-        # NOTE: if `shard_ema` is True, `ema_state_dict` is just a subset (sharded
-        # part) of model state_dict, and ema would coupled with reshard.
-        for k, v in self.bak_state_dict.items():
-            # TODO(guosheng): reshard here
-            value = self.ema_state_dict[k].cuda().cast(dtype=v.dtype)
-            value._share_buffer_to(v)
-
-    def ema_restore(self):
-        """
-        将EMA的权重值还原到模型中，并且将其移动到GPU上。
-        如果在初始化时设置了offload_ema=True，则会将EMA的权重值移动到GPU上。
-
-        Returns:
-            None, 无返回值，直接修改模型的权重值。
-        """
-        for k, v in self.bak_state_dict.items():
-            value = v.cuda()
-            value._share_buffer_to(v)
-            if self.offload_ema:  # ema weights always in pin_memory in fact
-                ema_v = self.ema_state_dict[k]
-                ema_value = ema_v.pin_memory()
-                ema_value._share_buffer_to(ema_v)
-
-
-class ema(paddle.no_grad.__mro__[1]):
-    def __init__(self, trainer: RLTrainer):
-        """
-        Args:
-        trainer (RLTrainer): Trainer object to be used for training.
-        """
-        self.trainer = trainer
-
-    def __enter__(self):
-        """
-        在进入上下文管理器时，如果使用了EMA，则初始化它。
-        如果模型和优化器已经创建并包装，则调用ema_init。
-        如果使用了EMA，则应用它。
-
-        Returns:
-            None, 无返回值。
-        """
-        trainer = self.trainer
-        if trainer.use_ema and not hasattr(trainer, "ema_state_dict"):
-            # call ema_init here since it should be called after model and
-            # optimizer are created and wrapped
-            trainer.ema_init(
-                offload_ema=trainer.offload_ema,
-                offload_model=not trainer.offload_ema,
-                shard_ema=trainer.shard_ema,
-            )
-        if self.trainer.use_ema:
-            self.trainer.ema_apply()
-
-    def __exit__(self, *args):
-        """
-        如果使用了EMA，则恢复EMA状态。
-        参数：
-            args (tuple) - 可选，不填或为空元组，默认值为None。
-        返回值：
-            None - 无返回值。
-        """
-        if self.trainer.use_ema:
-            self.trainer.ema_restore()
-
-
-class Enable(paddle.no_grad.__mro__[1]):
-    """offload"""
-
-    def __init__(self, args):
-        """
-        初始化函数，用于设置类属性objs为传入的参数args。
-        Args:
-            args (Any): 需要传入的参数，将作为类属性objs。
-        """
-        self.objs = args
-
-    def __enter__(self):
-        """
-        在进入上下文管理器时，将所有的对象都启用。
-        如果对象没有 enable 方法，则使用 reload_tensor_to_gpu 来重新加载到 GPU。
-
-        Returns:
-            None, 无返回值。
-        """
-        for obj in self.objs:
-            if hasattr(obj[0], "enable"):
-                obj[0].enable()
-            else:
-                if obj[1] != "":
-                    reload_tensor_to_gpu(obj)
-        # offload_tensor_to_cpu/reload_tensor_to_gpu use non-blocking copy
-        # maybe overlap with compute later
-        if len(self.objs) > 0:
-            paddle.device.synchronize()
-
-    def __exit__(self, *args):
-        """
-        当with语句结束时，调用该方法。
-        关闭所有的对象，并将其中的张量转换为CPU内存。
-
-        Args:
-            args (tuple, optional): 可选参数，默认为None。
-
-            - 第一个元素是错误类型的对象（如果有）。
-            - 第二个元素是错误信息（如果有）。
-            - 第三个元素是错误的traceback（如果有）。
-
-            这些参数与Python标准库中的__exit__方法相同。
-
-        Returns:
-            None: 无返回值。
-        """
-        for obj in self.objs:
-            if hasattr(obj[0], "disable"):
-                obj[0].disable()
-            else:
-                if obj[1] != "":
-                    offload_tensor_to_cpu(obj)
-        # offload_tensor_to_cpu/reload_tensor_to_gpu use non-blocking copy
-        # maybe overlap with compute later
-        if len(self.objs) > 0:
-            paddle.device.synchronize()
 
 
 class ActorReferenceTrainer(RLTrainer):
@@ -975,7 +777,7 @@ class PPOTrainer(Trainer):
         # and PipelineParallel. maybe we should allow models to use different dist
         # strategies later
 
-        from paddle.distributed.fleet.meta_parallel import PipelineLayer
+        
 
         # allow reference_model/reward_model to use different dist strategy
         with guard_set_args(
@@ -1528,31 +1330,18 @@ class PPOTrainer(Trainer):
         """
 
         def gen_epoch_data():
-            for prompt_only_batch, ptx_batch in zip(
-                self.prompt_only_dataloader,
-                itertools.cycle(self.ptx_dataloader),
-            ):
+            for prompt_only_batch in self.prompt_only_dataloader:
                 # generate batches
                 self.set_eval()
-
-                with (
-                    ema(self.policy_trainer),
-                    ema(self.value_trainer) if self.args.rl_algorithm == "ppo" else contextlib.nullcontext(),
-                ):
-                    with guard_set_args(self._model_config, {"use_fused_head_and_loss_fn": False}):
-                        rl_batches = self.split_rl_micro_batches(prompt_only_batch)
-
-                if self.use_ptx:
-                    ptx_batches = self.split_ptx_micro_batches(ptx_batch)
-                else:
-                    ptx_batches = [None for _ in range(len(rl_batches))]
+                with guard_set_args(self._model_config, {"use_fused_head_and_loss_fn": False}):
+                    rl_batches = self.split_rl_micro_batches(prompt_only_batch)
 
                 paddle.device.cuda.empty_cache()
 
                 self.set_train()
                 for _ in range(self.args.update_iters):
-                    for rl_batch, ptx_batch in zip(rl_batches, ptx_batches):
-                        yield rl_batch, ptx_batch
+                    for rl_batch  in rl_batches:
+                        yield rl_batch
 
         class EpochIterator:
             def __iter__(self):
@@ -1758,7 +1547,7 @@ class PPOTrainer(Trainer):
         self.control = self.callback_handler.on_train_begin(args, self.state, self.control)
 
         self._globalstep_last_logged = self.state.global_step
-        metric = PPOMetric(freq=self.args.logging_steps, args=self.args, use_ptx=self.use_ptx)
+        metric = PPOMetric(freq=self.args.logging_steps, args=self.args)
 
         start_time = time.time()
         self._globalstep_last_start_time = start_time

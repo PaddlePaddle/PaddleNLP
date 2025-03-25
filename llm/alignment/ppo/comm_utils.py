@@ -24,7 +24,7 @@ from paddlenlp.trainer import strtobool
 from paddlenlp.trainer.trainer import Trainer, logger
 from paddlenlp.utils.distributed import distributed_gather
 from paddlenlp.utils.nested import flatten_list, nested_broadcast_tensor_with_empty
-
+from offload_utils import offload_tensor_to_cpu
 global_dev_id = 0 if paddle.get_device() == "cpu" else int(paddle.get_device().split(":")[1])
 
 
