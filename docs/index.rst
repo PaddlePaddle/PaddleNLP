@@ -97,6 +97,7 @@
    多轮对话精调教程 <llm/docs/chat_template.md>
    中文情感分析教程 <get_started/quick_start>
    模型压缩教程 <compression.md>
+   数据蒸馏教程 <llm/application/distill/README.md>
    Torch2Paddle 权重转换教程 <llm/docs/torch2paddle.md>
 
 
