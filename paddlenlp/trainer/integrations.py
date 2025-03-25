@@ -272,8 +272,6 @@ class WandbCallback(TrainerCallback):
         """
         if self._wandb is None:
             return
-        if args.wandb_http_proxy:
-            os.environ["WANDB_HTTPS_PROXY"] = args.wandb_http_proxy
 
         if args.wandb_http_proxy:
             os.environ["WANDB_HTTPS_PROXY"] = args.wandb_http_proxy

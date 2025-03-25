@@ -1417,28 +1417,21 @@ class Trainer:
         if self.train_dataset is None or not has_length(self.train_dataset):
             return None
 
-        if os.getenv("JINGDUDUIQI", "FALSE").lower() in ["true", "1"]:
-            shuffle = False
-            drop_last = True
-        else:
-            shuffle = True
-            drop_last = self.args.dataloader_drop_last
-
         if self.args.world_size <= 1:
             return paddle.io.BatchSampler(
                 dataset=self.train_dataset,
-                shuffle=shuffle,
+                shuffle=True,
                 batch_size=self.args.per_device_train_batch_size,
-                drop_last=drop_last,
+                drop_last=self.args.dataloader_drop_last,
             )
 
         return DistributedBatchSampler(
             self.train_dataset,
             batch_size=self.args.per_device_train_batch_size,
-            shuffle=shuffle,
+            shuffle=True,
             num_replicas=self.args.dataset_world_size,
             rank=self.args.dataset_rank,
-            drop_last=drop_last,
+            drop_last=self.args.dataloader_drop_last,
         )
 
     def _set_state_dict_in_model(self, state_dict):
