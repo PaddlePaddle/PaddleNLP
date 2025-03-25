@@ -240,7 +240,7 @@ python -u -m paddle.distributed.launch \
     sft_argument.json
 ```
 
-`sft_argument.json` 配置文件如下, 具体参数配置含义请参考[文档](../../docs/finetune.md):
+`sft_argument.json` 配置文件如下, 具体参数配置含义请参考[文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/finetune.md):
 ```json
 {
   "model_name_or_path": "Qwen/Qwen2.5-Math-7B",
@@ -328,6 +328,6 @@ python -u -m paddle.distributed.launch \
 | DeepSeek-R1-Distill-Qwen-1.5B | vLLM-0.7.3 | W8A8 |   256    |        0.23         |       8.34       | 28.11 | 5259.05 |          |
 |                               | paddlenlp  | W8A8 |   256    |        2.92         |       6.7        | 36.51 | 6884.9  |   31%    |
 
-在这里我们总结部署流程如下，用户可参考[教程](../../server/docs/general_model_inference.md)动手实践：
+在这里我们总结部署流程如下，用户可参考[教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/general_model_inference.md)动手实践：
 - 模型动转静：将动态图模型转为静态图模型，便于推理部署。
 - 模型服务化部署：将静态图模型部署为服务，便于调用。
