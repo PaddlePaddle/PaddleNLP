@@ -181,14 +181,17 @@ class ExpertsGroupGemmNode:
         deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
             (unzipped_grad, unzipped_scale), (bw_w2_quant, bw_w2_scale), do2, unzipped_expert_idx
         )
-        probs_grad = (do2 * self.o2).sum(axis=1)
-        return do2, probs_grad
+        # recomput o2
+        o2 = self.fwd_swiglu(self.o1)
+
+        # probs_grad
+        probs_grad = (do2 * o2).sum(axis=1)
+
+        return do2, probs_grad, o2
 
     # ===== do1 = swiglu_grad(o1, None, do2) =====
     def bwd_swiglu(self, o1, do2):
         do1, _ = paddle._C_ops.swiglu_grad(self.o1, None, do2)
-        # probs_grad = (do1 * self.o1).sum(axis=1)
-        # return probs_grad, do1
         return do1
 
     # ===== dx = deep_gemm(do1_fp8, w1_fp8)
@@ -243,10 +246,10 @@ class ExpertsGroupGemmNode:
         return do1_regroup, input_x_regroup
 
     # ===== dw2 = deep_gemm(o2_t_fp8, do3_t_fp8)
-    def bwd_down_weight(self, out_grad_regroup, o1, max_seq_len, expert_w2):
-        # recompute o2
-        o2 = self.fwd_swiglu(o1)
+    def bwd_down_weight(self, out_grad_regroup, o1, o2, max_seq_len, expert_w2):
+        # transpose o2
         o2_t = o2.reshape([max_seq_len, len(expert_w2), -1]).transpose([1, 2, 0]).contiguous()
+
         # quant o2_t
         o2_t = o2_t.reshape([len(expert_w2) * o2_t.shape[1], -1])
 
@@ -363,7 +366,7 @@ class ExpertsGroupGemmNode:
         expert_w1 = [x.w1 for x in self.custom_map.experts if x is not None]
 
         # do2
-        do2, probs_grad = self.bwd_dowm_input(expert_w2, out_grad, out_grad_scale, unzipped_expert_idx)
+        do2, probs_grad, o2 = self.bwd_dowm_input(expert_w2, out_grad, out_grad_scale, unzipped_expert_idx)
 
         # do1
         do1 = self.bwd_swiglu(self.o1, do2)
@@ -378,7 +381,7 @@ class ExpertsGroupGemmNode:
 
         # dw2
 
-        self.bwd_down_weight(out_grad_regroup, o1_regroup, max_seq_len, expert_w2)
+        self.bwd_down_weight(out_grad_regroup, o1_regroup, o2, max_seq_len, expert_w2)
 
         # dequant do1_fp8 and regroup do1_fp8,unzipped_tokens
         do1_regroup, input_x_regroup = self.dequant_do1_and_regroup_do1_fp8_and_unzipped_tokens(
