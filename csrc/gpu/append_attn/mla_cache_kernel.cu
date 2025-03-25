@@ -134,6 +134,7 @@ std::vector<paddle::Tensor> DecodeMLAWriteCache(
                     const paddle::Tensor& cum_offsets,
                     const paddle::Tensor& block_tables,
                     const int max_seq_len,
+                    const bool speculate_decoder,
                     cudaStream_t& stream,
                     paddle::Tensor* kv_cache) {
   typedef PDTraits<T> traits_;
@@ -142,35 +143,59 @@ std::vector<paddle::Tensor> DecodeMLAWriteCache(
   
   auto max_blocks_per_seq = meta_data.max_blocks_per_seq;
   auto bsz = meta_data.batch_size;
+  auto token_num = meta_data.token_nums;
   auto block_size = meta_data.block_size;
   auto nope_size = meta_data.head_dims_v;
   auto all_size = meta_data.head_dims;
   int pe_size = all_size - nope_size;
   auto kv_num_heads = meta_data.kv_num_heads;
-  const uint32_t elem_nums = bsz * kv_num_heads * all_size;
-
   constexpr int PackSize = 16 / sizeof(DataType_);
-  const int pack_num = elem_nums / PackSize;
   const int blocksize = 128;
   int grid_size = 1;
-  GetNumBlocks<128>(pack_num, &grid_size);
 
-  decode_absorb_cache_kernel<DataType_, PackSize>
-      <<<grid_size, blocksize, 0, stream>>>(
-          reinterpret_cast<DataType_*>(const_cast<data_t*>(kv_nope.data<data_t>())),
-          reinterpret_cast<DataType_*>(const_cast<data_t*>(kv_pe.data<data_t>())),
-          reinterpret_cast<DataType_*>(kv_cache->data<data_t>()),
-          block_tables.data<int>(),
-          cum_offsets.data<int>(),
-          seq_lens.data<int>(),
-          seq_lens_encoder.data<int>(),
-          max_seq_len,
-          max_blocks_per_seq,
-          kv_num_heads,
-          nope_size,
-          pe_size,
-          block_size,
-          elem_nums);
+
+  if (speculate_decoder) {
+    const uint32_t elem_nums = token_num * kv_num_heads * all_size;
+    const int pack_num = elem_nums / PackSize;
+    GetNumBlocks<128>(pack_num, &grid_size);
+    speculate_decode_absorb_cache_kernel<DataType_, PackSize>
+        <<<grid_size, blocksize, 0, stream>>>(
+            reinterpret_cast<DataType_*>(const_cast<data_t*>(kv_nope.data<data_t>())),
+            reinterpret_cast<DataType_*>(const_cast<data_t*>(kv_pe.data<data_t>())),
+            reinterpret_cast<DataType_*>(kv_cache->data<data_t>()),
+            block_tables.data<int>(),
+            padding_offsets.data<int>(),
+            cum_offsets.data<int>(),
+            seq_lens.data<int>(),
+            seq_lens_encoder.data<int>(),
+            max_seq_len,
+            max_blocks_per_seq,
+            kv_num_heads,
+            nope_size,
+            pe_size,
+            block_size,
+            elem_nums);
+  } else {
+    const uint32_t elem_nums = bsz * kv_num_heads * all_size;
+    const int pack_num = elem_nums / PackSize;
+    GetNumBlocks<128>(pack_num, &grid_size);
+    decode_absorb_cache_kernel<DataType_, PackSize>
+        <<<grid_size, blocksize, 0, stream>>>(
+            reinterpret_cast<DataType_*>(const_cast<data_t*>(kv_nope.data<data_t>())),
+            reinterpret_cast<DataType_*>(const_cast<data_t*>(kv_pe.data<data_t>())),
+            reinterpret_cast<DataType_*>(kv_cache->data<data_t>()),
+            block_tables.data<int>(),
+            cum_offsets.data<int>(),
+            seq_lens.data<int>(),
+            seq_lens_encoder.data<int>(),
+            max_seq_len,
+            max_blocks_per_seq,
+            kv_num_heads,
+            nope_size,
+            pe_size,
+            block_size,
+            elem_nums);
+  }
   return {};
 }
 
@@ -184,7 +209,8 @@ std::vector<paddle::Tensor> DecodeMLAWriteCacheKernel(
     const paddle::Tensor& cum_offsets,
     const paddle::Tensor& block_tables,
     const std::string& cache_quant_type_str,
-    const int max_seq_len) {
+    const int max_seq_len,
+    const bool speculate_decoder) {
   cudaStream_t stream = kv_pe.stream();
   AppendAttnMetaData meta_data;
   const auto& kv_nope_dims = kv_nope.dims();
@@ -210,6 +236,7 @@ std::vector<paddle::Tensor> DecodeMLAWriteCacheKernel(
                               cum_offsets,
                               block_tables,
                               max_seq_len,
+                              speculate_decoder,
                               stream,
                               const_cast<paddle::Tensor*>(&kv_cache));
     }
@@ -223,6 +250,7 @@ std::vector<paddle::Tensor> DecodeMLAWriteCacheKernel(
                               cum_offsets,
                               block_tables,
                               max_seq_len,
+                              speculate_decoder,
                               stream,
                               const_cast<paddle::Tensor*>(&kv_cache));
     }
@@ -258,5 +286,6 @@ PD_BUILD_OP(decode_mla_write_cache)
     .Outputs({"kv_cache_out"})
     .SetInplaceMap({{"kv_cache", "kv_cache_out"}})
     .Attrs({"cache_quant_type_str: std::string",
-            "max_seq_len: int"})
+            "max_seq_len: int",
+            "speculate_decoder: bool"})
     .SetKernelFn(PD_KERNEL(DecodeMLAWriteCacheKernel));

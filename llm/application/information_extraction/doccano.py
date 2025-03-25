@@ -133,7 +133,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--doccano_file", default="./data/doccano_ext.json", type=str, help="The doccano file exported from doccano platform.")
     parser.add_argument("--save_dir", default="./data", type=str, help="The path of data that you wanna save.")
-    parser.add_argument("--negative_ratio", default=5, type=int, help="Used only for the extraction task, the ratio of positive and negative samples, number of negtive samples = negative_ratio * number of positive samples")
+    parser.add_argument("--negative_ratio", default=5, type=int, help="Used only for the extraction task, the ratio of positive and negative samples, number of negative samples = negative_ratio * number of positive samples")
     parser.add_argument("--splits", default=[0.8, 0.1, 0.1], type=float, nargs="*", help="The ratio of samples in datasets. [0.6, 0.2, 0.2] means 60% samples used for training, 20% for evaluation and 20% for test.")
     parser.add_argument("--task_type", choices="ie", default="ie", type=str, help="Select task type, ie for the information extraction task used qwen2, defaults to ie.")
     parser.add_argument("--is_shuffle", default="False", type=strtobool, help="Whether to shuffle the labeled dataset, defaults to True.")

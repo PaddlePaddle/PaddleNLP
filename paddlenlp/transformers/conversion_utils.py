@@ -1205,11 +1205,20 @@ class ConversionMixin:
 
     @classmethod
     def get_tensor_parallel_convert_actions(
-        cls, config: PretrainedConfig, loaded_state_dict_keys, is_split=True, ignore_error=False
+        cls,
+        config: PretrainedConfig,
+        loaded_state_dict_keys,
+        is_split=True,
+        ignore_error=False,
+        base_model_prefix=None,
     ):
         name_action_mappings = cls._get_tensor_parallel_mappings(config, is_split=is_split)
-        state_keys_map = cls._resolve_prefix_keys(name_action_mappings.keys(), loaded_state_dict_keys, ignore_error)
+        state_keys_map = cls._resolve_prefix_keys(
+            name_action_mappings.keys(), loaded_state_dict_keys, ignore_error, base_model_prefix=base_model_prefix
+        )
         for k, v in state_keys_map.items():
+            if k not in name_action_mappings:
+                continue
             name_action_mappings[v] = name_action_mappings.pop(k)
         return name_action_mappings
 
@@ -1308,9 +1317,17 @@ class ConversionMixin:
         raise NotImplementedError
 
     @staticmethod
-    def _resolve_prefix_keys(state_keys_base, state_keys_real, ignore_error=False):
+    def _resolve_prefix_keys(state_keys_base, state_keys_real, ignore_error=False, base_model_prefix=None):
         # state_keys_map base to real
         state_keys_map = {}
+
+        if base_model_prefix:
+            for k in state_keys_real:
+                if k.startswith("lm_head."):
+                    continue
+                # remove real key name `base_model_prefix` + '.'
+                state_keys_map[k[len(base_model_prefix + ".") :]] = k
+            return state_keys_map
 
         # sorted by length，match from long to short for A.key B.key ...
         state_keys_base = sorted(state_keys_base, key=lambda x: len(x), reverse=True)

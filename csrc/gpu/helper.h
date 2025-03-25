@@ -33,14 +33,18 @@ namespace cub = hipcub;
 #else
 #include <cub/cub.cuh>
 #include <curand_kernel.h>
+#include <cuda_fp8.h>
 #endif
 #include <iostream>
 #include <fstream>
 
+#include "env.h"
 #include "paddle/extension.h"
 #include "paddle/phi/core/dense_tensor.h"
 #include "paddle/phi/core/allocator.h"
+#include "paddle/phi/backends/gpu/gpu_info.h"
 #include "nlohmann/json.hpp"
+
 
 using json = nlohmann::json;
 
@@ -151,6 +155,13 @@ public:
   typedef paddle::bfloat16 data_t;
 };
 
+template <>
+class PDTraits<paddle::DataType::FLOAT8_E4M3FN> {
+public:
+  typedef __nv_fp8_e4m3 DataType;
+  typedef paddle::float8_e4m3fn data_t;
+};
+
 template <typename T, int Size>
 struct alignas(sizeof(T) * Size) AlignedVector {
   T val[Size];
@@ -222,16 +233,15 @@ __device__ inline bool is_in_end(const int64_t id, const int64_t *end_ids, int l
     return flag;
 }
 
-inline uint32_t get_decoder_block_shape_q() {
-    static const char* decoder_block_shape_q_env = std::getenv("FLAGS_dec_block_shape_q");
-    static const uint32_t decoder_block_shape_q =
-            decoder_block_shape_q_env == nullptr ? 16 : std::stoi(std::string(decoder_block_shape_q_env));
-    return decoder_block_shape_q;
+inline int GetSMVersion() {
+  static int sm_version = phi::backends::gpu::GetGPUComputeCapability(
+      phi::backends::gpu::GetCurrentDeviceId());
+  return sm_version;
 }
 
-inline uint32_t get_encoder_block_shape_q() {
-    static const char* encoder_block_shape_q_env = std::getenv("FLAGS_enc_block_shape_q");
-    static const uint32_t encoder_block_shape_q =
-            encoder_block_shape_q_env == nullptr ? 64 : std::stoi(std::string(encoder_block_shape_q_env));
-    return encoder_block_shape_q;
+inline bool GetMlaUseTensorcore() {
+  static const bool flags_mla_use_tensorcore = get_flags_mla_use_tensorcore();
+  static const bool enable_mla_tensorcore = GetSMVersion() >= 90 ? true : false;
+  const bool mla_use_tensorcore = flags_mla_use_tensorcore && enable_mla_tensorcore;
+  return mla_use_tensorcore;
 }

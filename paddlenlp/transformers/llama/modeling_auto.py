@@ -142,14 +142,8 @@ def scaled_dot_product_attention(
                 return_softmax=output_attentions,
             )
         else:
-            if alibi is not None:
-                attention_mask = attention_mask.cast(alibi.dtype) + alibi
-            attn_output = F.scaled_dot_product_attention(
-                query_states,
-                key_states,
-                value_states,
-                attn_mask=attention_mask,
-                is_causal=attention_mask is None and query_states.shape[1] != 1,
+            attn_output = fusion_ops.fusion_flash_attention(
+                query_states, config, key_states, value_states, attention_mask, output_attentions, alibi
             )
             attn_weights = None
 
@@ -1204,7 +1198,9 @@ class LlamaPretrainingCriterion3DAuto(paddle.nn.Layer):
                     None,
                 ]
                 loss_func = LocalLossLayer(out_dist_attrs, grad_dist_attrs)
+
                 loss = loss_func(masked_lm_loss, masked_lm_loss > 0)
+                loss = loss.mean()
             else:
                 masked_lm_loss = paddle.masked_select(masked_lm_loss, masked_lm_loss > 0).astype("float32")
                 loss = paddle.mean(masked_lm_loss)

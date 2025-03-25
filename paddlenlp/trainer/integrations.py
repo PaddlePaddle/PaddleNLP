@@ -275,6 +275,9 @@ class WandbCallback(TrainerCallback):
         if args.wandb_http_proxy:
             os.environ["WANDB_HTTPS_PROXY"] = args.wandb_http_proxy
 
+        if args.wandb_http_proxy:
+            os.environ["WANDB_HTTPS_PROXY"] = args.wandb_http_proxy
+
         # Check if a Weights & Biases (wandb) API key is provided in the training arguments
         if args.wandb_api_key:
             if self._wandb.api.api_key:

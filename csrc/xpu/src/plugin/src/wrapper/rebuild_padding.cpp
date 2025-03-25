@@ -33,6 +33,22 @@ __attribute__((global)) void rebuild_padding(T *output_data, // [bs, dim_embed]
 }  // namespace plugin
 }  // namespace xpu2
 
+namespace xpu3 {
+namespace plugin {
+
+template <typename T>
+__attribute__((global)) void rebuild_padding(T *output_data, // [bs, dim_embed]
+                                            const T *input_data, // [token_num, dim_embed]
+                                            const int *cum_offsets, // [bs]
+                                            const int *seq_len_decoder, // [bs]
+                                            const int *seq_len_encoder, // [bs]
+                                            const int seq_len,
+                                            const int dim_embed,
+                                            const int elem_nums);
+
+}  // namespace plugin
+}  // namespace xpu3
+
 namespace baidu {
 namespace xpu {
 namespace api {
@@ -76,7 +92,9 @@ static int xpu2or3_wrapper(Context *ctx,
                         const int seq_len,
                         const int dim_embed,
                         const int elem_nums) {
-  xpu2::plugin::rebuild_padding<<<ctx->ncluster(), 64, ctx->xpu_stream>>>(output_data,
+  bool is_xpu2 = ctx->dev().type() == api::kXPU2;
+  if (is_xpu2) {
+    xpu2::plugin::rebuild_padding<<<ctx->ncluster(), 64, ctx->xpu_stream>>>(output_data,
                                                                input_data,
                                                                cum_offsets,
                                                                seq_len_decoder,
@@ -84,6 +102,17 @@ static int xpu2or3_wrapper(Context *ctx,
                                                                seq_len,
                                                                dim_embed,
                                                                elem_nums);
+  } else {
+    xpu3::plugin::rebuild_padding<<<ctx->ncluster(), 64, ctx->xpu_stream>>>(output_data,
+                                                               input_data,
+                                                               cum_offsets,
+                                                               seq_len_decoder,
+                                                               seq_len_encoder,
+                                                               seq_len,
+                                                               dim_embed,
+                                                               elem_nums);
+  }
+  
   return api::SUCCESS;
 }
 
@@ -146,6 +175,16 @@ template int rebuild_padding<float16>(Context *ctx,
                     const int dim_embed,
                     const int elem_nums);
 
+
+// template int rebuild_padding<bfloat16>(Context *ctx,
+//                     bfloat16 *output_data, // [bs, dim_embed]
+//                     const bfloat16 *input_data, // [token_num, dim_embed]
+//                     const int *cum_offsets, // [bs]
+//                     const int *seq_len_decoder, // [bs]
+//                     const int *seq_len_encoder, // [bs]
+//                     const int seq_len,
+//                     const int dim_embed,
+//                     const int elem_nums);
 
 }  // namespace plugin
 }  // namespace api

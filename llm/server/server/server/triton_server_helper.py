@@ -25,11 +25,11 @@ import numpy as np
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
-from server.engine.config import Config
+from server.engine.config import global_config
 from server.utils import get_logger
 
 app = FastAPI()
-env_config = Config()
+env_config = global_config
 logger = get_logger("health_checker", "health_checker.log")
 
 
@@ -89,7 +89,7 @@ def check():
         status: bool, True if process is alive else False
     """
     error_info = {}
-    grpc_port = os.getenv("GRPC_PORT")
+    grpc_port = os.getenv("SERVICE_GRPC_PORT")
 
     # 1. check server is ready
     if grpc_port is not None:
