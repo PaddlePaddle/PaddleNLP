@@ -181,13 +181,15 @@ class ExpertsGroupGemmNode:
         deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
             (unzipped_grad, unzipped_scale), (bw_w2_quant, bw_w2_scale), do2, unzipped_expert_idx
         )
-        return do2
+        probs_grad = (do2 * self.o2).sum(axis=1)
+        return do2, probs_grad
 
     # ===== do1 = swiglu_grad(o1, None, do2) =====
     def bwd_swiglu(self, o1, do2):
         do1, _ = paddle._C_ops.swiglu_grad(self.o1, None, do2)
-        probs_grad = (do1 * self.o1).sum(axis=1)
-        return probs_grad, do1
+        # probs_grad = (do1 * self.o1).sum(axis=1)
+        # return probs_grad, do1
+        return do1
 
     # ===== dx = deep_gemm(do1_fp8, w1_fp8)
     def bwd_gate_up_input(self, do1, expert_w1, unzipped_expert_idx):
@@ -339,9 +341,14 @@ class ExpertsGroupGemmNode:
         expert_w2 = [x.w2 for x in self.custom_map.experts if x is not None]
 
         o1 = self.fwd_gate_up(hs_out, hs_scale_out, expert_w1, expert_w_count, unzipped_probs, unzipped_expert_idx)
-        o1 = o1 * unzipped_probs.unsqueeze(-1)
+
         self.o1 = o1
+
+        # o2
         o2 = self.fwd_swiglu(o1)
+        o2 = o2 * unzipped_probs.unsqueeze(-1)
+
+        # o3
         o3 = self.fwd_down(o2, expert_w2, expert_w_count, unzipped_expert_idx)
 
         # save for bwd
@@ -356,10 +363,10 @@ class ExpertsGroupGemmNode:
         expert_w1 = [x.w1 for x in self.custom_map.experts if x is not None]
 
         # do2
-        do2 = self.bwd_dowm_input(expert_w2, out_grad, out_grad_scale, unzipped_expert_idx)
+        do2, probs_grad = self.bwd_dowm_input(expert_w2, out_grad, out_grad_scale, unzipped_expert_idx)
 
         # do1
-        probs_grad, do1 = self.bwd_swiglu(self.o1, do2)
+        do1 = self.bwd_swiglu(self.o1, do2)
 
         # dx
         dx, do1_fp8, do1_scale = self.bwd_gate_up_input(do1, expert_w1, unzipped_expert_idx)
