@@ -1433,7 +1433,7 @@ trainer = Trainer(
 trainer.compress()
 
 ```
-压缩 API 可以传入的超参数可参考[文档](../../../docs/compression.md)。
+压缩 API 可以传入的超参数可参考[文档](../../../docs/zh/compression.md)。
 
 本项目提供了压缩 API 在分类（包含文本分类、文本匹配、自然语言推理、代词消歧等任务）、序列标注、阅读理解三大场景下的使用样例，可以分别参考 `compress_seq_cls.py` 、`compress_token_cls.py`、`compress_qa.py`，启动方式如下：
 
