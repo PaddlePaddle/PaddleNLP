@@ -55,19 +55,20 @@ __global__ void probs_topk_guided_unzip_kernel(
 }
 
 
-
-template <int num_experts>
+template <typename T, int num_experts>
 __global__ void tokens_guided_unzip_kernel(
-    const phi::bfloat16 *__restrict__ X_in,
+    const T *__restrict__ X_in,
     const int *__restrict__ zipped_expertwise_rowmap,
-    phi::bfloat16 *__restrict__ guided_unzipped_X_out,
+    T *__restrict__ guided_unzipped_X_out,
     const int total_zipped_tokens_num,
     const int token_length) {
   const int this_row = blockIdx.x;
   if (this_row >= total_zipped_tokens_num) return;
+	/*
   const __nv_bfloat16 *X = reinterpret_cast<const __nv_bfloat16 *>(X_in);
   __nv_bfloat16 *guided_unzipped_X =
       reinterpret_cast<__nv_bfloat16 *>(guided_unzipped_X_out);
+  */
 
   int local_row_pushlist[num_experts];
 // 填充该行token被广播到的rows和对应的概率
@@ -82,8 +83,8 @@ __global__ void tokens_guided_unzip_kernel(
     if (push_row == -1) continue;
     // 可通过向量化优化
     for (int i = threadIdx.x; i < token_length; i += blockDim.x) {
-      guided_unzipped_X[push_row * token_length + i] =
-          X[this_row * token_length + i];
+      guided_unzipped_X_out[push_row * token_length + i] =
+          X_in[this_row * token_length + i];
     }
   }
 }
@@ -122,12 +123,22 @@ void dispatch_tokens_guided_unzip(
   grid.x = total_zipped_tokens_num;
   block.x = 256;
   if (num_experts == 4) {
-    tokens_guided_unzip_kernel<4><<<grid, block, 0, X.stream()>>>(
-        X.data<phi::bfloat16>(),
-        zipped_expertwise_rowmap.data<int>(),
-        guided_unzipped_X.data<phi::bfloat16>(),
-        total_zipped_tokens_num,
-        token_length);
+    if (X.dtype() == paddle::DataType::BFLOAT16) {
+      tokens_guided_unzip_kernel<phi::bfloat16, 4>
+          <<<grid, block, 0, X.stream()>>>(
+              X.data<phi::bfloat16>(),
+              zipped_expertwise_rowmap.data<int>(),
+              guided_unzipped_X.data<phi::bfloat16>(),
+              total_zipped_tokens_num,
+              token_length);
+    } else if (X.dtype() == paddle::DataType::FLOAT32) {
+      tokens_guided_unzip_kernel<float, 4>
+          <<<grid, block, 0, X.stream()>>>(X.data<float>(),
+                                           zipped_expertwise_rowmap.data<int>(),
+                                           guided_unzipped_X.data<float>(),
+                                           total_zipped_tokens_num,
+                                           token_length);
+    }
   }
 }
 
@@ -162,7 +173,8 @@ std::vector<paddle::Tensor> tokens_guided_unzip(
     const paddle::Tensor &zipped_expertwise_rowmap,
     const int &total_unzipped_tokens_num,
     const int &num_experts) {
-  PD_CHECK(X.dtype() == paddle::DataType::BFLOAT16);
+  PD_CHECK(X.dtype() == paddle::DataType::BFLOAT16 ||
+           X.dtype() == paddle::DataType::FLOAT32);
   int rows = X.shape()[0];  // seqlen
   int cols = X.shape()[1];  //一般为7168
 

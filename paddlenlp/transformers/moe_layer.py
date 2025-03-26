@@ -441,24 +441,17 @@ class MoELayer(nn.Layer):
         return hidden_states
 
 
-class FusionMoe(paddle.autograd.PyLayer):
-    @staticmethod
-    def forward(ctx, hidden_states, probs, routing_map, custom_map):
-        token_dispatcher = custom_map.token_dispatcher
-        experts = custom_map.experts
+class Fp8DispatchQuantNode:
+    def __init__(self, token_dispatcher, name="fp8_dispatch_quant_node"):
+        self.token_dispatcher = token_dispatcher
+        self.pre_dispatch_node = PreDispatchNode(token_dispatcher)
+        self.name = name
 
-        # construct some Node
-        ctx.Node_pre_dispatch = PreDispatchNode(token_dispatcher)
-        ctx.Node_dispatch_act = DispatchNode()
-        ctx.Node_dispatch_scale = DispatchNode()
-        ctx.Node_permute = PermuteNode(token_dispatcher)
-        ctx.Node_experts = ExpertsNode(experts)
-        ctx.Node_unpermute = UnPermuteNode(token_dispatcher)
-        ctx.Node_combine = CombineNode()
-
+    @paddle.no_grad()
+    def forward(self, hidden_states, probs, routing_map):
         # reshape
-        token_dispatcher.hidden_shape = hidden_states.shape
-        hs_2d = hidden_states.view([-1, token_dispatcher.hidden_shape[-1]])
+        self.token_dispatcher.hidden_shape = hidden_states.shape
+        hs_2d = hidden_states.view([-1, self.token_dispatcher.hidden_shape[-1]])
 
         # quant
         hs_fp8, hs_scale = kitchen_quant(
@@ -466,86 +459,231 @@ class FusionMoe(paddle.autograd.PyLayer):
         )
 
         # pre_dispatch
-        token_indices, token_probs = ctx.Node_pre_dispatch.forward(routing_map, probs)
+        token_indices, token_probs = self.pre_dispatch_node.forward(routing_map, probs)
 
+        self.hidden_states_shape = hidden_states.shape
+        hs_fp8.stop_gradient = False
+        token_probs.stop_gradient = False
+        return hs_fp8, hs_scale, token_indices, token_probs
+
+    @paddle.no_grad()
+    def backward(self, hs_fp8_grad, token_probs_grad):
+        # predispatch grad
+        probs_grad = self.pre_dispatch_node.backward(token_probs_grad)
+
+        # reshape_grad
+        hs_grad = paddle.reshape(hs_fp8_grad, self.hidden_states_shape)
+
+        return hs_grad, probs_grad, None
+
+
+class Fp8DispatchNode:
+    def __init__(self, token_dispatcher, name="fp8_dispatch_node"):
+        self.token_dispatcher = token_dispatcher
+        self.dispatch_act_node = DispatchNode(token_dispatcher)
+        self.name = name
+
+    @paddle.no_grad()
+    def forward(
+        self,
+        hs_fp8,
+        hs_scale,
+        token_indices,
+        token_probs,
+        previous_event=None,
+        async_finish=False,
+        allocate_on_comm_stream=False,
+    ):
         # dispatch
-        (hs_fp8_dispatched, hs_scale_dispatched), dispatched_probs, states = ctx.Node_dispatch_act.forward(
+        (hs_fp8_dispatched, hs_scale_dispatched), dispatched_probs, states = self.dispatch_act_node.forward(
             (hs_fp8, hs_scale),
             token_indices,
             token_probs,
-            token_dispatcher._comm_manager.num_experts,
-            token_dispatcher._comm_manager.group,
+            self.token_dispatcher._comm_manager.num_experts,
+            self.token_dispatcher._comm_manager.group,
+            previous_event=previous_event,
+            async_finish=async_finish,
+            allocate_on_comm_stream=allocate_on_comm_stream,
         )
-        token_dispatcher._comm_manager.handle = states["handle"]
-        token_dispatcher._comm_manager.tokens_per_expert = states["tokens_per_expert"]
+        self.token_dispatcher._comm_manager.handle = states["handle"]
+        self.token_dispatcher._comm_manager.tokens_per_expert = states["tokens_per_expert"]
         dispatched_indices = states["dispatched_indices"]
 
+        hs_fp8_dispatched.stop_gradient = False
+        dispatched_probs.stop_gradient = False
+        return hs_fp8_dispatched, hs_scale_dispatched, dispatched_indices, dispatched_probs
+
+    @paddle.no_grad()
+    def backward(self, hs_fp8_dispatched_grad, dispatched_probs_grad, previous_event=None, async_finish=False):
+        # dispatch grad
+        hs_fp8_grad, _, token_probs_grad = self.dispatch_act_node.backward(
+            hs_fp8_dispatched_grad,
+            dispatched_probs_grad,
+            previous_event=previous_event,
+            async_finish=async_finish,
+        )
+        return hs_fp8_grad, token_probs_grad
+
+
+class Fp8CombineNode:
+    def __init__(self, token_dispatcher, name="fp8_combine_node"):
+        self.token_dispatcher = token_dispatcher
+        self.combine_node = CombineNode(token_dispatcher)
+        self.name = name
+
+    @paddle.no_grad()
+    def forward(self, hidden_states_out, previous_event=None, async_finish=False):
+        # combine
+        output_combie = self.combine_node.forward(
+            hidden_states_out,
+            self.token_dispatcher._comm_manager.group,
+            self.token_dispatcher._comm_manager.handle,
+            previous_event=previous_event,
+            async_finish=async_finish,
+        )
+        output_combie.stop_gradient = False
+        return output_combie
+
+    @paddle.no_grad()
+    def backward(self, output_combie_grad_fp8, output_combie_grad_scale, previous_event=None, async_finish=False):
+        # combine grad -> fp8
+        (hidden_states_out_grad, hidden_states_out_grad_scale) = self.combine_node.backward(
+            (output_combie_grad_fp8, output_combie_grad_scale),
+            previous_event=previous_event,
+            async_finish=async_finish,
+        )
+        return hidden_states_out_grad, hidden_states_out_grad_scale
+
+
+class Fp8CombineQuantNode:
+    def __init__(self, token_dispatcher, name="fp8_combine_quant_node"):
+        self.token_dispatcher = token_dispatcher
+        self.name = name
+
+    @paddle.no_grad()
+    def forward(self, output_combie):
+        # post combine
+        output = output_combie.reshape(self.token_dispatcher.hidden_shape)
+        self.output_combie_shape = output_combie.shape
+        output.stop_gradient = False
+        return output
+
+    @paddle.no_grad()
+    def backward(self, output_grad):
+        # post combine grad
+        output_combie_grad = paddle.reshape(output_grad, self.output_combie_shape)
+
+        # output_combie_grad quant to fp8
+        output_combie_grad_fp8, output_combie_grad_scale = kitchen_quant(
+            output_combie_grad, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+        )
+        return output_combie_grad_fp8, output_combie_grad_scale
+
+
+class MlpNode:
+    def __init__(self, custom_map, name="mlp_node"):
+        self.token_dispatcher = custom_map.token_dispatcher
+        self.experts = custom_map.experts
+        self.permute_node = PermuteNode(self.token_dispatcher)
+        self.experts_node = ExpertsNode(self.experts, custom_map)
+        self.unpermute_node = UnPermuteNode(self.token_dispatcher)
+        self.name = name
+
+    def reset_statue(self):
+        self.token_permuted_indices = None
+        self.dispatched_probs = None
+
+    @paddle.no_grad()
+    def forward(self, hs_fp8_dispatched, hs_scale_dispatched, dispatched_indices, dispatched_probs):
         # permute
         (
             hs_out,
             hs_scale_out,
             token_permuted_indices,
             prob_permuted_indices,
-        ) = ctx.Node_permute.forward(hs_fp8_dispatched, hs_scale_dispatched, dispatched_indices)
+        ) = self.permute_node.forward(hs_fp8_dispatched, hs_scale_dispatched, dispatched_indices)
 
         # experts
-        expert_out = ctx.Node_experts.forward(hs_out, hs_scale_out, token_dispatcher._comm_manager.tokens_per_expert)
+        expert_out = self.experts_node.forward(
+            hs_out, hs_scale_out, self.token_dispatcher._comm_manager.tokens_per_expert
+        )
 
         # unpermute
-        hidden_states_out = ctx.Node_unpermute.forward(
+        hidden_states_out = self.unpermute_node.forward(
             expert_out, token_permuted_indices, prob_permuted_indices, dispatched_probs
         )
+        self.dispatched_probs = dispatched_probs
+        self.token_permuted_indices = token_permuted_indices
+        hidden_states_out.stop_gradient = False
+        return hidden_states_out
 
-        # combine
-        output_combie = ctx.Node_combine.forward(
-            hidden_states_out, token_dispatcher._comm_manager.group, token_dispatcher._comm_manager.handle
+    @paddle.no_grad()
+    def backward(self, hidden_states_out_grad, hidden_states_out_grad_scale):
+        # unpermute grad -> fp8
+        expert_out_grad, dispatched_probs_grad = self.unpermute_node.backward(
+            hidden_states_out_grad, hidden_states_out_grad_scale
+        )
+        hidden_states_out_grad_scale_grad = paddle.gather(hidden_states_out_grad_scale, self.token_permuted_indices)
+
+        # expert_grad
+        hs_out_grad = self.experts_node.backward(expert_out_grad, hidden_states_out_grad_scale_grad)
+
+        # permute_grad
+        hs_fp8_dispatched_grad = self.permute_node.backward(hs_out_grad, self.dispatched_probs)
+
+        self.reset_statue()
+        return hs_fp8_dispatched_grad, dispatched_probs_grad
+
+
+class FusionMoeNode:
+    def __init__(self, custom_map, name="fusion_moe_node"):
+        self.token_dispatcher = custom_map.token_dispatcher
+
+        self.dispatch_quant_node = Fp8DispatchQuantNode(self.token_dispatcher)
+        self.dispatch_node = Fp8DispatchNode(self.token_dispatcher)
+        self.mlp_node = MlpNode(custom_map)
+        self.combine_node = Fp8CombineNode(self.token_dispatcher)
+        self.combine_quant_node = Fp8CombineQuantNode(self.token_dispatcher)
+        self.name = name
+
+    @paddle.no_grad()
+    def forward(self, hidden_states, probs, routing_map):
+        hs_fp8, hs_scale, token_indices, token_probs = self.dispatch_quant_node.forward(
+            hidden_states, probs, routing_map
+        )
+        hs_fp8_dispatched, hs_scale_dispatched, dispatched_indices, dispatched_probs = self.dispatch_node.forward(
+            hs_fp8, hs_scale, token_indices, token_probs
         )
 
-        # post combine
-        output = output_combie.reshape(token_dispatcher.hidden_shape)
-
-        ctx.save_for_backward(hidden_states, output_combie, dispatched_probs, token_permuted_indices)
-
+        hidden_states_out = self.mlp_node.forward(
+            hs_fp8_dispatched, hs_scale_dispatched, dispatched_indices, dispatched_probs
+        )
+        output_combie = self.combine_node.forward(hidden_states_out)
+        output = self.combine_quant_node.forward(output_combie)
+        output.stop_gradient = False
         return output
+
+    @paddle.no_grad()
+    def backward(self, output_grad):
+        output_combie_grad_fp8, output_combie_grad_scale = self.combine_quant_node.backward(output_grad)
+        hidden_states_out_grad, hidden_states_out_grad_scale = self.combine_node.backward(
+            output_combie_grad_fp8, output_combie_grad_scale
+        )
+
+        hs_fp8_dispatched_grad, dispatched_probs_grad = self.mlp_node.backward(
+            hidden_states_out_grad, hidden_states_out_grad_scale
+        )
+        hs_fp8_grad, token_probs_grad = self.dispatch_node.backward(hs_fp8_dispatched_grad, dispatched_probs_grad)
+        hs_grad, probs_grad, routing_map_grad = self.dispatch_quant_node.backward(hs_fp8_grad, token_probs_grad)
+        return hs_grad, probs_grad, routing_map_grad
+
+
+class FusionMoe(paddle.autograd.PyLayer):
+    @staticmethod
+    def forward(ctx, hidden_states, probs, routing_map, custom_map):
+        ctx.node = FusionMoeNode(custom_map)
+        return ctx.node.forward(hidden_states, probs, routing_map)
 
     @staticmethod
     def backward(ctx, output_grad):
-        hidden_states, output_combie, dispatched_probs, token_permuted_indices = ctx.saved_tensor()
-
-        # post combine grad
-        output_combie_grad = paddle._C_ops.reshape_grad(output_combie, output_grad)
-
-        # output_combie_grad quant to fp8
-        output_combie_grad_fp8, output_combie_grad_scale = kitchen_quant(
-            output_combie_grad, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
-        )
-
-        # combine grad -> fp8
-        (hidden_states_out_grad, hidden_states_out_grad_scale) = ctx.Node_combine.backward(
-            (output_combie_grad_fp8, output_combie_grad_scale)
-        )
-
-        # unpermute grad -> fp8
-        expert_out_grad, dispatched_probs_grad = ctx.Node_unpermute.backward(
-            hidden_states_out_grad, hidden_states_out_grad_scale
-        )
-        hidden_states_out_grad_scale_grad = paddle.gather(hidden_states_out_grad_scale, token_permuted_indices)
-
-        # expert_grad
-        hs_out_grad = ctx.Node_experts.backward(expert_out_grad, hidden_states_out_grad_scale_grad)
-
-        # permute_grad
-        hs_fp8_dispatched_grad = ctx.Node_permute.backward(hs_out_grad, dispatched_probs)
-
-        # dispatch grad
-        hs_fp8_grad, token_indices_grad, token_probs_grad = ctx.Node_dispatch_act.backward(
-            hs_fp8_dispatched_grad, dispatched_probs_grad
-        )
-
-        # predispatch grad
-        probs_grad = ctx.Node_pre_dispatch.backward(token_probs_grad)
-
-        # reshape_grad
-        hs_grad = paddle._C_ops.reshape_grad(hidden_states, hs_fp8_grad)
-
-        return hs_grad, probs_grad, None
+        return ctx.node.backward(output_grad)

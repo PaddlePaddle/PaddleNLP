@@ -162,7 +162,9 @@ class RowSequenceParallelLinear(PD_RowSequenceParallelLinear):
         register_scale(self)
 
 
-def kitchen_quant(x, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False):
+def kitchen_quant(x, backend=None, is_1d_scaled=True, return_transpose=False):
+    if backend is None:
+        backend = kitchen.ops.Backend.CUBLAS
     quant_tile_shape = (1, 128) if is_1d_scaled else (128, 128)
     x_qparams = QParams(
         quant_dtype=paddle.float8_e4m3fn,

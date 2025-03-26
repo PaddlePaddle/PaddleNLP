@@ -43,7 +43,9 @@ __all__ = [
 ]
 
 
-def kitchen_quant(x, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False):
+def kitchen_quant(x, backend=None, is_1d_scaled=True, return_transpose=False):
+    if backend is None:
+        backend = kitchen.ops.Backend.CUBLAS
     quant_tile_shape = (1, 128) if is_1d_scaled else (128, 128)
     x_qparams = QParams(
         quant_dtype=paddle.float8_e4m3fn,
@@ -95,30 +97,35 @@ def dequantize_fp8_to_fp32(fp8_tensor, scale):
 
 
 class ExpertsNode:
-    def __init__(self, experts, name="moe_experts_node"):
+    def __init__(self, experts, custom_map, name="moe_experts_node"):
         self.experts = experts
-        self.outputs = []
         self.x_t_fp8s = []
         self.x_t_scales = []
-        self.w1_fp8s = []
-        self.w1_sacles = []
-        self.w2_fp8s = []
-        self.w2_sacles = []
         self.o1s = []
         self.dxs = []
+        self.custom_map = custom_map
+
+    def reset_statue(self):
+        self.x_t_fp8s = []
+        self.x_t_scales = []
+        self.o1s = []
+        self.dxs = []
+        self.tokens_per_expert = None
 
     def forward(self, hs_out, hs_scale_out, tokens_per_expert):
         self.tokens_per_expert = tokens_per_expert
         x_fp8_list = paddle.split(hs_out, num_or_sections=self.tokens_per_expert, axis=0)  # FP8 chunk
         x_scale_list = paddle.split(hs_scale_out, num_or_sections=self.tokens_per_expert, axis=0)  # FP8 chunk
 
-        for chunk, chunk_scale, expert in zip(x_fp8_list, x_scale_list, self.experts):
+        outputs = []
+        for i, (chunk, chunk_scale) in enumerate(zip(x_fp8_list, x_scale_list)):
+            expert = self.experts[i + self.custom_map.moe_rank * self.custom_map.moe_num_experts_per_device]
             x_fp8 = chunk.contiguous()
-            o1, w1_fp8, w1_sacle = self.fwd_gate_up(x_fp8, chunk_scale, expert.w1)
+            o1 = self.fwd_gate_up(x_fp8, chunk_scale, expert.w1)
             o2 = self.fwd_swiglu(o1)
-            o3, w2_fp8, w2_sacle = self.fwd_down(o2, expert.w2)
+            o3 = self.fwd_down(o2, expert.w2)
 
-            self.outputs += [o3]
+            outputs.append(o3)
 
             # save for bwd
             x_t = dequantize_fp8_to_fp32(x_fp8, chunk_scale).T.contiguous()
@@ -137,15 +144,12 @@ class ExpertsNode:
             x_t_fp8, x_t_scale = kitchen_quant(
                 x_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
             )
-            self.x_t_fp8s += [x_t_fp8]
-            self.x_t_scales += [x_t_scale]
-            self.w1_fp8s += [w1_fp8]
-            self.w1_sacles += [w1_sacle]
-            self.o1s += [o1]
-            self.w2_fp8s += [w2_fp8]
-            self.w2_sacles += [w2_sacle]
 
-        expert_output = paddle.concat(self.outputs, axis=0)
+            self.x_t_fp8s.append(x_t_fp8)
+            self.x_t_scales.append(x_t_scale)
+            self.o1s.append(o1)
+
+        expert_output = paddle.concat(outputs, axis=0)
         return expert_output
 
     def backward(self, out_grad, out_grad_scale):
@@ -153,21 +157,26 @@ class ExpertsNode:
 
         out_grad_scale_list = paddle.split(out_grad_scale, num_or_sections=self.tokens_per_expert, axis=0)
 
-        for do3, do3_scale, expert, x_t_fp8, x_t_scale, w1_fp8, w1_sacle, o1, w2_fp8, w2_sacle in zip(
-            out_grad_list,
-            out_grad_scale_list,
-            self.experts,
-            self.x_t_fp8s,
-            self.x_t_scales,
-            self.w1_fp8s,
-            self.w1_sacles,
-            self.o1s,
-            self.w2_fp8s,
-            self.w2_sacles,
+        for i, (do3, do3_scale, x_t_fp8, x_t_scale, o1) in enumerate(
+            zip(
+                out_grad_list,
+                out_grad_scale_list,
+                self.x_t_fp8s,
+                self.x_t_scales,
+                self.o1s,
+            )
         ):
-            do2 = self.bwd_dowm_input(do3, do3_scale, w2_fp8, w2_sacle)
+            expert = self.experts[i + self.custom_map.moe_rank * self.custom_map.moe_num_experts_per_device]
+            w1_fp8, w1_scale = kitchen_quant(
+                expert.w1, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
+            )
+            w2_fp8, w2_scale = kitchen_quant(
+                expert.w2, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
+            )
+
+            do2 = self.bwd_dowm_input(do3, do3_scale, w2_fp8, w2_scale)
             do1 = self.bwd_swiglu(o1, do2)
-            dx = self.bwd_gate_up_input(do1, w1_fp8, w1_sacle)
+            dx = self.bwd_gate_up_input(do1, w1_fp8, w1_scale)
 
             if hasattr(expert.w2, "main_grad"):
                 expert.w2.main_grad = self.bwd_down_weight(do3, do3_scale, o1, expert.w2.main_grad)
@@ -182,15 +191,16 @@ class ExpertsNode:
             self.dxs += [dx]
 
         dx = paddle.concat(self.dxs, axis=0)
+        self.reset_statue()
         return dx
 
     def fwd_gate_up(self, x_fp8, x_scale, w1):
-        w1_fp8, w1_sacle, w1_t_fp8, w1_t_scale = kitchen_quant(
-            w1, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
+        w1_t_fp8, w1_t_scale = kitchen_quant(
+            w1.T.contiguous(), backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
         )
         o1 = paddle.empty([x_fp8.shape[0], w1_t_fp8.shape[0]], dtype=paddle.bfloat16)
         deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale), (w1_t_fp8, w1_t_scale), o1)
-        return o1, w1_fp8, w1_sacle
+        return o1
 
     # ===== o2 = swiglu(o1) =====
     def fwd_swiglu(self, o1):
@@ -202,12 +212,12 @@ class ExpertsNode:
         o2_fp8, o2_scale = kitchen_quant(
             o2, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
         )
-        w2_fp8, w2_sacle, w2_t_fp8, w2_t_scale = kitchen_quant(
-            w2, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
+        w2_t_fp8, w2_t_scale = kitchen_quant(
+            w2.T.contiguous(), backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
         )
         o3 = paddle.empty([o2_fp8.shape[0], w2_t_fp8.shape[0]], dtype=o2.dtype)
         deep_gemm.gemm_fp8_fp8_bf16_nt((o2_fp8, o2_scale), (w2_t_fp8, w2_t_scale), o3)
-        return o3, w2_fp8, w2_sacle
+        return o3
 
     # ===== do2 = deep_gemm(do3_fp8, w2_fp8)
     def bwd_dowm_input(self, do3_fp8, do3_scale, w2_fp8, w2_sacle):

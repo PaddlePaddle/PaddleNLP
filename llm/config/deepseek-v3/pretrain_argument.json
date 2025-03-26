@@ -1,5 +1,5 @@
 {
-  "model_name_or_path": "deepseek-ai/DeepSeek-V3",
+  "model_name_or_path": "./model_config/DeepSeek-V3-test",
   "tokenizer_name_or_path": "deepseek-ai/DeepSeek-V3",
   "input_dir": "/root/paddlejob/workspace/env_run/liuyiqun/PaddleNLP/llm/data",
   "output_dir": "./checkpoints/pretrain_ckpts",
@@ -16,7 +16,7 @@
   "virtual_pp_degree": 1,
   "sequence_parallel": 0,
   "use_flash_attention": true,
-  "max_seq_length": 4096,
+  "max_seq_length": 4097,
   "learning_rate": 3e-05,
   "min_learning_rate": 3e-06,
   "warmup_steps": 30,
