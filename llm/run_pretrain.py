@@ -48,9 +48,6 @@ from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.tools import get_env_device
 
-# from paddle.base import core
-
-
 # Pretaining Environment Variables to support sharding stage1 overlap optimization.
 os.environ["USE_CASUAL_MASK"] = "True"
 
@@ -406,6 +403,7 @@ def main():
 
     tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
     config = AutoConfig.from_pretrained(model_args.model_name_or_path)
+
     # set all llm config
     LlmMetaConfig.set_llm_config(config, training_args)
     config.use_fast_layer_norm = model_args.use_fast_layer_norm
@@ -507,19 +505,20 @@ def main():
             )
     else:
         # 修改这里降低模型层数，deepseek前3层为dense层，之后才有稀疏层
-        config.num_hidden_layers = 4  # v3是61
-        config.first_k_dense_replace = 0  # v3是3
-        # 修改这里降低模型专家数量，如果希望进行EP并行，专家数量要能够被并行度整除
-        config.n_routed_experts = 16  # v3是256
-        config.num_experts_per_tok = 8  # v3是8
-        config.topk_group = 4  # v3是4
-        config.using_flex_token = True
-        config.num_nextn_predict_layers = 0
-        config.using_fake_gate = True
-        config.use_fused_rms_norm = True
-        config.fuse_attention_ffn = True
-        config.use_fused_rope = True
-        config.token_drop_steps = 0
+        # config.num_hidden_layers = 4  # v3是61
+        # config.first_k_dense_replace = 0  # v3是3
+        # # 修改这里降低模型专家数量，如果希望进行EP并行，专家数量要能够被并行度整除
+        # config.n_routed_experts = 64  # v3是256
+        # config.num_experts_per_tok = 8  # v3是8
+        # config.topk_group = 4  # v3是4
+
+        # config.using_flex_token = True
+        # config.num_nextn_predict_layers = 1
+        # config.using_fake_gate = True
+        # config.use_fused_rms_norm = True
+        # config.fuse_attention_ffn = True
+        # config.use_fused_rope = True
+        # config.token_drop_steps = 0
         model = model_class.from_config(config, dtype=dtype)
 
     if training_args.recompute:
@@ -534,7 +533,6 @@ def main():
     else:
         warmup_steps = training_args.warmup_ratio * training_args.max_steps
 
-    # core.nvprof_enable_record_event()
     lr_scheduler = None
     if training_args.lr_scheduler_type.value == "cosine":
         lr_scheduler = CosineAnnealingWithWarmupDecay(
