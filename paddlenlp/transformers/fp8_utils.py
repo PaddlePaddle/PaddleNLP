@@ -100,15 +100,13 @@ class ExpertsNode:
         self.experts = experts
         self.x_t_fp8s = []
         self.x_t_scales = []
-        self.o1s = []
-        self.dxs = []
+        self.o1s = []        
         self.custom_map = custom_map
 
     def reset_statue(self):
         self.x_t_fp8s = []
         self.x_t_scales = []
-        self.o1s = []
-        self.dxs = []
+        self.o1s = []      
 
     def forward(self, hs_out, hs_scale_out, tokens_per_expert):
         self.tokens_per_expert = tokens_per_expert
@@ -155,6 +153,7 @@ class ExpertsNode:
 
         out_grad_scale_list = paddle.split(out_grad_scale, num_or_sections=self.tokens_per_expert, axis=0)
 
+        dxs = []
         for i, (do3, do3_scale, x_t_fp8, x_t_scale, o1) in enumerate(
             zip(
                 out_grad_list,
@@ -185,6 +184,8 @@ class ExpertsNode:
                 expert.w1.main_grad = self.bwd_gate_up_weight(do1, x_t_fp8, x_t_scale, expert.w1.main_grad)
             else:
                 expert.w1.grad = self.bwd_gate_up_weight(do1, x_t_fp8, x_t_scale, expert.w1.grad)
+            
+            dxs.append(dx)
 
             self.dxs += [dx]
 
