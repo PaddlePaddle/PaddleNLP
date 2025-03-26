@@ -39,8 +39,6 @@ from comm_utils import (
     get_timer_label,
     masked_whiten,
     new_timer_log,
-    offload_tensor_to_cpu,
-    reload_tensor_to_gpu,
 )
 from infer_utils import InferEvalModel, infer_guard
 from models.ppo_model_utils import (  # make_attention_mask,; make_position_ids,
@@ -50,6 +48,11 @@ from models.ppo_model_utils import (  # make_attention_mask,; make_position_ids,
     create_startend_row_indices,
     gather_log_probabilities,
     make_position_ids_from_input_ids,
+)
+from offload_utils import (
+    offload_tensor_to_cpu,
+    reload_tensor_to_gpu,
+    OffloadController
 )
 from paddle import nn
 from paddle.distributed import fleet
@@ -1489,7 +1492,7 @@ class PPOTrainer(Trainer):
                 self,
                 {
                     "train_dataset": self.train_dataset,
-                    "data_collator": self.train_dataset.get_collator(),
+                    "data_collator": self.data_collator,
                 },
             ),
         ):
@@ -1523,7 +1526,11 @@ class PPOTrainer(Trainer):
         # ##### set training state and resume #####
         # consumed_samples used to set train_dataloader.batch_sampler may not be
         # correct. Thus, data cannot be resumed perfectly when not breaking at epoch end.
-        (epochs_trained, steps_trained_in_current_epoch, steps_trained_progress_bar,) = self.init_train_state(
+        (
+            epochs_trained,
+            steps_trained_in_current_epoch,
+            steps_trained_progress_bar,
+        ) = self.init_train_state(
             resume_from_checkpoint,
             train_dataloader,
             max_steps,
@@ -1564,7 +1571,7 @@ class PPOTrainer(Trainer):
                 # self.timers and self.timers("read-data").stop()
                 # os.environ["TRAINER_GLOBAL_STEP"] = str(self.state.global_step)
                 # self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
-                rl_batch, ptx_batch = inputs
+                rl_batch = inputs
                 # TODO(guosheng): make rl_step/ptx_step run with autocast_smart_context_manager
                 # logger.info("Doing rl step...")
                 self.timers and self.timers(get_timer_label(ActorStages.MODEL_ENABLE_DISABLE)).start()
@@ -1995,7 +2002,7 @@ class PPOTrainer(Trainer):
             enable_map.update({self.value_trainer._inner_eval_model: "freeze_model"})
         # NOTE(GONGENLEI)： new offload
         objs = [(arg, enable_map.get(arg, "")) for arg in args if enable_map.get(arg, "") in self.args.offload_level]
-        return Enable(objs)
+        return OffloadController(objs)
 
     @paddle.no_grad()
     @data_dispatch  # 3.10 static methods are now callable as regular functions.

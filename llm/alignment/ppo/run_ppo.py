@@ -19,8 +19,8 @@ import sys
 from functools import partial
 
 import paddle
-from comm_utils import offload_tensor_to_cpu
-from models.score_model import AutoModelForScore  # noqa
+from models.score_model import AutoModelForScore
+from offload_utils import offload_tensor_to_cpu
 from ppo_trainer import PPOTrainer
 from trainer_utils import DataArgument, ModelArgument, TrainingArguments
 
@@ -140,8 +140,9 @@ def main():
     else:
         if model_args.reward_model_name_or_path is None:
             raise ValueError("Please specify reward_model_name_or_path when use_rm_server is false.")
+        requires_label = False
 
-    model_class_lm, model_class_score = AutoModelForCausalLM, LlamaModelForScore
+    model_class_lm, model_class_score = AutoModelForCausalLM, AutoModelForScore
     if training_args.pipeline_parallel_degree > 1:
         from models.model_pp import LlamaPolicyPipe, LlamaValuePipe
 
@@ -390,26 +391,22 @@ def main():
             tokenizer.pad_token_id = tokenizer.eos_token_id
 
     if training_args.should_load_dataset:
-        train_ds = PromptOnlyDataset(
-            data_args.parsed_train_datasets, tokenizer=actor_tokenizer, use_rm_server=training_args.use_rm_server
+        train_ds = RLHFDataset(
+            dataset_name_or_path=data_args.train_datasets,
+            tokenizer=actor_tokenizer,
+            max_prompt_len=data_args.max_prompt_len,
+            requires_label=requires_label,
+            label_key=data_args.label_key,
+            splits="train",
         )
-        if data_args.eval_datasets is None and data_args.eval_split_ratio:
-            train_ds, dev_ds = train_ds.split_train_test(split_ratio=data_args.eval_split_ratio)
-        elif data_args.eval_datasets is not None:
-            dev_ds = PromptOnlyDataset(
-                data_args.parsed_eval_datasets, tokenizer=actor_tokenizer, use_rm_server=training_args.use_rm_server
-            )
-        else:
-            dev_ds = None
-
-        ptx_ds = (
-            SupervisedDataset(data_args.parsed_ptx_datasets, tokenizer=actor_tokenizer)
-            if data_args.ptx_datasets is not None
-            else None
+        dev_ds = RLHFDataset(
+            dataset_name_or_path=data_args.eval_datasets,
+            tokenizer=actor_tokenizer,
+            max_prompt_len=data_args.max_prompt_len,
+            requires_label=requires_label,
+            label_key=data_args.label_key,
+            splits="dev",
         )
-        if ptx_ds is not None:
-            # PretrainingCriterion requires shifted inputs and labels
-            ptx_ds.get_collator = types.MethodType(partial(ptx_ds.get_collator.__func__, shift=True), ptx_ds)
 
     if "freeze_model" in training_args.offload_level:
         offload_tensor_to_cpu((actor_reference_model, "freeze_model"))

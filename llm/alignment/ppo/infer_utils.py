@@ -20,7 +20,7 @@ from contextlib import contextmanager
 
 import paddle
 import paddle.distributed as dist
-from comm_utils import offload_tensor_to_cpu, reload_tensor_to_gpu
+from offload_utils import offload_tensor_to_cpu, reload_tensor_to_gpu
 from paddle.utils import try_import
 from predict.predictor import (
     DygraphBlockInferencePredictor,
