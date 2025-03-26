@@ -219,7 +219,6 @@ python ./predict/reft_predictor.py \
 ## 4. Fine-tuning Parameters Introduction
 <summary>&emsp; Model Parameters (ModelArgument) </summary><div>
 
-- `model_name_or_path`
 - `model_name_or_path`: Pretrained model name or local path, used to warm-start the model and tokenizer, defaults to None. For **supported model weights** of each model, please refer to the respective model directories.
 - `use_flash_attention`: Whether to use FlashAttention, defaults to False.
 - `flash_mask`: Whether to use FlashMask, defaults to False. Please enable FlashAttention first.
@@ -272,7 +271,6 @@ The following only introduces some commonly used parameters in TrainingArguments
 
 - `output_dir`: Directory for saving related files, mainly including model-related files, checkpoints during training, tokenizer-related files, and evaluation result files. Defaults to None.
 - `per_device_train_batch_size`: Batch size for training set, corresponding to micro batch size. Defaults to 8. This parameter needs to be set according to the specific dataset. Larger values require higher GPU memory and increase training costs, while smaller values reduce GPU memory usage and speed up training.
-- `gradient_accumulation_steps`
 - `gradient_accumulation_steps`: The number of steps for gradient accumulation. As the name suggests, this parameter accumulates gradients over multiple steps before performing a single parameter update, with a default value of 1. This is equivalent to multiplying the original training batch size by `gradient_accumulation_steps`.
 - `per_device_eval_batch_size`: The evaluation batch size for the validation set, corresponding to micro batch size, with a default of 8. Larger values consume more GPU memory, while smaller values reduce memory usage.
 - `num_train_epochs`: The number of training epochs, with a default of 3.
