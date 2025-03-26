@@ -18,7 +18,7 @@ param+="device_num=N4C32 "
 param+="global_batch_size=32 "
 param+="nnodes=4 "
 param+="model_type=llama2_7b "
-param+='dynamic_suffix=_dynamic '
+param+='dynamic_auto=_dynamic_auto '
 
 cd ./tests
 bash ./test_tipc/static/auto_parallel/llama2/benchmark_common/prepare.sh
