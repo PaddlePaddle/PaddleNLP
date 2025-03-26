@@ -160,8 +160,8 @@ __global__ void tokens_weighted_zip_kernel(
                          ? __bfloat162float(local_expert_problist[expert])
                          : 0.0f;
         float2 prob_vec = {prob, prob};
-        sum.x = __fmaf_rn(token_vec.x , prob_vec.x, sum.x);
-        sum.y = __fmaf_rn(token_vec.y , prob_vec.y, sum.y);
+        sum.x = __fmaf_rn(token_vec.x, prob_vec.x, sum.x);
+        sum.y = __fmaf_rn(token_vec.y, prob_vec.y, sum.y);
       }
       // 类型下降为原有精度
       *out_ptr = __float22bfloat162_rn(sum);
