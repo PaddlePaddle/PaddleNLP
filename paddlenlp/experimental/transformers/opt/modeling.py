@@ -119,7 +119,7 @@ class OPTInferenceModel(OPTPretrainedModel):
             activation="relu",
             normalize_before=True,
             num_layers=config.num_hidden_layers,
-            nranks=1,
+            tp_degree=1,
             ring_id=-1,
             ln_scale_attrs=ln_scale_attrs,
             ln_bias_attrs=ln_bias_attrs,
