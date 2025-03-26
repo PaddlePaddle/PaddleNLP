@@ -1512,10 +1512,8 @@ class FusedMultiTransformerBase(Layer):
                 i,
                 **kwargs,
             )
-            if self.config.mla_config.use_absorb():
-                out_linear_out = fmha_out
-            else:
-                out_linear_out = self.compute_out_linear(fmha_out, i)
+
+            out_linear_out = self.compute_out_linear(fmha_out, i)
 
             # print(f"{i}: out_linear_out: {out_linear_out}")
 
@@ -2884,7 +2882,9 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
         ln_out = qkv_out
         latent_cache = caches[i]
 
-        out_linear_out = paddle.zeros(shape=[ln_out.shape[0], self.embed_dim], dtype=ln_out.dtype)
+        fmha_out = paddle.zeros(
+            shape=[ln_out.shape[0], self.num_heads * self.config.mla_config.v_head_dim], dtype=ln_out.dtype
+        )
 
         if kwargs["max_enc_len_this_time"]:  # prefill phase
             query, key, value = self.compute_qkv_linear(ln_out, i, latent_cache=latent_cache, **kwargs)
@@ -2932,10 +2932,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
 
             fmha_out_prefill = fmha_out_prefill * self.mask_encoder_batch.cast(fmha_out_prefill.dtype)
 
-            out_linear_out_prefill = self.compute_out_linear(fmha_out_prefill, i)
-            out_linear_out = out_linear_out + out_linear_out_prefill
-
-            # print(f"prefill {i}: out_linear_out: {out_linear_out}")
+            fmha_out = fmha_out + fmha_out_prefill
 
         if kwargs["max_dec_len_this_time"]:  # decode phase
             if self.config.mla_config.q_lora_rank is not None:
@@ -2963,8 +2960,10 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 epsilon=self._epsilon,
                 begin_norm_axis=1,
             )[0]
-
-            query = paddle.matmul(ln_out_or_q_c, self.q_b_proj_weights[i])
+            if self.config.mla_config.q_lora_rank is not None:
+                query = paddle.matmul(ln_out_or_q_c, self.q_b_proj_weights[i])
+            else:
+                query = paddle.matmul(ln_out_or_q_c, self.q_proj_weights[i])
             query = query.reshape([-1, self.num_heads, self.config.mla_config.qk_head_dim])
             query_nope, query_pe = query.split(
                 [self.config.mla_config.qk_nope_head_dim, self.config.mla_config.qk_rope_head_dim], axis=-1
@@ -3054,12 +3053,9 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 .transpose([1, 0, 2])
                 .reshape([-1, self.num_heads * self.config.mla_config.v_head_dim])
             )
-            out_linear_out_decode = paddle.matmul(fmha_out_decode, self.linear_weights[i])
-            out_linear_out = out_linear_out + out_linear_out_decode
+            fmha_out = fmha_out + fmha_out_decode
 
-            # print(f"decode {i}: out_linear_out: {out_linear_out}")
-
-        return out_linear_out
+        return fmha_out
 
     def compute_attn(
         self,
@@ -3255,7 +3251,9 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
         ln_out = qkv_out
         latent_cache = caches[i]
 
-        out_linear_out = paddle.zeros(shape=[ln_out.shape[0], self.embed_dim], dtype=ln_out.dtype)
+        fmha_out = paddle.zeros(
+            shape=[ln_out.shape[0], self.num_heads * self.config.mla_config.v_head_dim], dtype=ln_out.dtype
+        )
 
         if kwargs["max_enc_len_this_time"]:  # prefill phase
             query, key, value = self.compute_qkv_linear(ln_out, i, latent_cache=latent_cache, **kwargs)
@@ -3303,10 +3301,7 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
 
             fmha_out_prefill = fmha_out_prefill * self.mask_encoder_batch.cast(fmha_out_prefill.dtype)
 
-            out_linear_out_prefill = self.compute_out_linear(fmha_out_prefill, i)
-            out_linear_out = out_linear_out + out_linear_out_prefill
-
-            # print(f"prefill {i}: out_linear_out: {out_linear_out}")
+            fmha_out = fmha_out + fmha_out_prefill
 
         if kwargs["max_dec_len_this_time"]:  # decode phase
             if self.config.mla_config.q_lora_rank is not None:
@@ -3346,14 +3341,22 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
                 epsilon=self._epsilon,
                 begin_norm_axis=1,
             )[0]
-
-            query = weight_only_linear(
-                ln_out_or_q_c,
-                weight=self.q_b_proj_weights[i],
-                weight_scale=self.q_b_proj_weights_scale[i],
-                weight_dtype=self.weight_dtype,
-                group_size=self.weightonly_group_size,
-            )
+            if self.config.mla_config.q_lora_rank is not None:
+                query = weight_only_linear(
+                    ln_out_or_q_c,
+                    weight=self.q_b_proj_weights[i],
+                    weight_scale=self.q_b_proj_weights_scale[i],
+                    weight_dtype=self.weight_dtype,
+                    group_size=self.weightonly_group_size,
+                )
+            else:
+                query = weight_only_linear(
+                    ln_out_or_q_c,
+                    weight=self.q_proj_weights[i],
+                    weight_scale=self.q_proj_weights_scale[i],
+                    weight_dtype=self.weight_dtype,
+                    group_size=self.weightonly_group_size,
+                )
             query = query.reshape([-1, self.num_heads, self.config.mla_config.qk_head_dim])
             query_nope, query_pe = query.split(
                 [self.config.mla_config.qk_nope_head_dim, self.config.mla_config.qk_rope_head_dim], axis=-1
@@ -3443,18 +3446,10 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
                 .transpose([1, 0, 2])
                 .reshape([-1, self.num_heads * self.config.mla_config.v_head_dim])
             )
-            out_linear_out_decode = weight_only_linear(
-                fmha_out_decode,
-                weight=self.linear_weights[i],
-                weight_scale=self.linear_weights_scale[i],
-                weight_dtype=self.weight_dtype,
-                group_size=self.weightonly_group_size,
-            )
-            out_linear_out = out_linear_out + out_linear_out_decode
 
-            # print(f"decode {i}: out_linear_out: {out_linear_out}")
+            fmha_out = fmha_out + fmha_out_decode
 
-        return out_linear_out
+        return fmha_out
 
 
 class FusedBlockMultiTransformerA8W8(FusedBlockMultiTransformer, FusedMultiTransformerA8W8):
@@ -4923,7 +4918,9 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
         ln_out = qkv_out
         latent_cache = caches[i]
 
-        out_linear_out = paddle.zeros(shape=[ln_out.shape[0], self.embed_dim], dtype=ln_out.dtype)
+        fmha_out = paddle.zeros(
+            shape=[ln_out.shape[0], self.num_heads * self.config.mla_config.v_head_dim], dtype=ln_out.dtype
+        )
 
         if kwargs["max_enc_len_this_time"]:  # prefill phase
             query, key, value = self.compute_qkv_linear(ln_out, i, latent_cache=latent_cache, **kwargs)
@@ -4971,8 +4968,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
 
             fmha_out_prefill = fmha_out_prefill * self.mask_encoder_batch.cast(fmha_out_prefill.dtype)
 
-            out_linear_out_prefill = self.compute_out_linear(fmha_out_prefill, i)
-            out_linear_out = out_linear_out + out_linear_out_prefill
+            fmha_out = fmha_out + fmha_out_prefill
 
         if kwargs["max_dec_len_this_time"]:  # decode phase
             if self.config.mla_config.q_lora_rank is not None:
@@ -5018,15 +5014,26 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                 epsilon=self._epsilon,
                 begin_norm_axis=1,
             )[0]
-            query = self.cutlass_fp8_gemm(
-                x=ln_out_or_q_c_fp8,
-                y=self.q_b_proj_weights[i],
-                x_s=ln_out_or_q_c_scale,
-                y_s=self.q_b_proj_weights_scale[i],
-                bias=None,
-                output_dtype=self._dtype,
-                act="identity",
-            )
+            if self.config.mla_config.q_lora_rank is not None:
+                query = self.cutlass_fp8_gemm(
+                    x=ln_out_or_q_c_fp8,
+                    y=self.q_b_proj_weights[i],
+                    x_s=ln_out_or_q_c_scale,
+                    y_s=self.q_b_proj_weights_scale[i],
+                    bias=None,
+                    output_dtype=self._dtype,
+                    act="identity",
+                )
+            else:
+                query = self.cutlass_fp8_gemm(
+                    x=ln_out_or_q_c_fp8,
+                    y=self.q_proj_weights[i],
+                    x_s=ln_out_or_q_c_scale,
+                    y_s=self.q_proj_weights_scale[i],
+                    bias=None,
+                    output_dtype=self._dtype,
+                    act="identity",
+                )
             query = query.reshape([-1, self.num_heads, self.config.mla_config.qk_head_dim])
             query_nope, query_pe = query.split(
                 [self.config.mla_config.qk_nope_head_dim, self.config.mla_config.qk_rope_head_dim], axis=-1
@@ -5116,19 +5123,10 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                 .transpose([1, 0, 2])
                 .reshape([-1, self.num_heads * self.config.mla_config.v_head_dim])
             )
-            fmha_out_decode_fp8, fmha_out_decode_scale = self.dynamic_quant(fmha_out_decode)
-            out_linear_out_decode = self.cutlass_fp8_gemm(
-                x=fmha_out_decode_fp8,
-                y=self.linear_weights[i],
-                x_s=fmha_out_decode_scale,
-                y_s=self.linear_weights_scale[i],
-                bias=None,
-                output_dtype=self._dtype,
-                act="identity",
-            )
-            out_linear_out = out_linear_out + out_linear_out_decode
 
-        return out_linear_out
+            fmha_out = fmha_out + fmha_out_decode
+
+        return fmha_out
 
     def compute_ffn1(self, tmp_out, i):
         out = self.cutlass_fp8_gemm(
