@@ -141,6 +141,7 @@ def setup_fused_quant_ops():
             sources=[
                 "fused_quanted_ops/fused_swiglu_act_quant.cu",
                 "fused_quanted_ops/fused_act_quant.cu",
+                "fused_quanted_ops/fused_act_dequant.cu",
                 "fused_quanted_ops/fused_act_dequant_transpose_act_quant.cu",
             ],
             extra_compile_args={
