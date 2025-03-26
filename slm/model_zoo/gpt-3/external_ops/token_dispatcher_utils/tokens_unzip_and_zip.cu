@@ -102,7 +102,7 @@ __global__ void token_unzip_kernel(
 }
 
 
-template <int num_experts>
+template <int num_experts, bool MP = true>
 __global__ void tokens_weighted_zip_kernel(
     const phi::bfloat16 *__restrict__ unzipped_tokens_in,
     const phi::bfloat16 *__restrict__ unzipped_token_probs_in,
@@ -139,42 +139,91 @@ __global__ void tokens_weighted_zip_kernel(
   const int remaining_elems = token_length % vecSize;
   const int thread_stride = blockDim.x * vecSize;
 
-  // ----------------------- 填数（加权和）-------------------------
-  // 齐整区域向量化搬移
-  for (int x_offset = threadIdx.x * vecSize; x_offset < num_full_vec * vecSize;
-       x_offset += thread_stride) {
-    __nv_bfloat162 sum = {0, 0};
-    __nv_bfloat162 *out_ptr = reinterpret_cast<__nv_bfloat162 *>(
-        &weighted_zipped_tokens[this_row * token_length + x_offset]);
+  if constexpr (MP) {
+    // ------------------------ 手动混合精度 ---------------------------------
+    // 齐整区域向量化搬移
+    for (int x_offset = threadIdx.x * vecSize;
+         x_offset < num_full_vec * vecSize;
+         x_offset += thread_stride) {
+      float2 sum = {0.0f, 0.0f};
+      __nv_bfloat162 *out_ptr = reinterpret_cast<__nv_bfloat162 *>(
+          &weighted_zipped_tokens[this_row * token_length + x_offset]);
 #pragma unroll
-    for (int expert = 0; expert < num_experts; ++expert) {
-      const int fetch_row = local_row_fetchlist[expert];
-      const int fetch_row_index = fetch_row >= 0 ? fetch_row : 0;
-      __nv_bfloat162 token_vec = *reinterpret_cast<const __nv_bfloat162 *>(
-          &unzipped_tokens[fetch_row_index * token_length + x_offset]);
-      __nv_bfloat16 prob =
-          fetch_row >= 0 ? local_expert_problist[expert] : (__nv_bfloat16)0;
-      __nv_bfloat162 prob_vec = {prob, prob};
-      sum = __hfma2(token_vec, prob_vec, sum);
+      for (int expert = 0; expert < num_experts; ++expert) {
+        const int fetch_row = local_row_fetchlist[expert];
+        const int fetch_row_index = fetch_row >= 0 ? fetch_row : 0;
+        // 手动类型提升
+        float2 token_vec =
+            __bfloat1622float2(*reinterpret_cast<const __nv_bfloat162 *>(
+                &unzipped_tokens[fetch_row_index * token_length + x_offset]));
+        float prob = fetch_row >= 0
+                         ? __bfloat162float(local_expert_problist[expert])
+                         : 0.0f;
+        float2 prob_vec = {prob, prob};
+        sum.x = __fmaf_rn(token_vec.x , prob_vec.x, sum.x);
+        sum.y = __fmaf_rn(token_vec.y , prob_vec.y, sum.y);
+      }
+      // 类型下降为原有精度
+      *out_ptr = __float22bfloat162_rn(sum);
     }
-    *out_ptr = sum;
-  }
 
     // 剩余元素处理
-  for (int i = num_full_vec * vecSize + threadIdx.x; i < token_length;
-        i += blockDim.x) {
-    __nv_bfloat16 sum = (__nv_bfloat16)0;
+    for (int i = num_full_vec * vecSize + threadIdx.x; i < token_length;
+         i += blockDim.x) {
+      float sum = 0.0f;
 #pragma unroll
-    for (int expert = 0; expert < num_experts; ++expert) {
-      int fetch_row = local_row_fetchlist[expert];
-      int fetch_row_index = fetch_row >= 0 ? fetch_row : 0;
-      __nv_bfloat16 token_val =
-          unzipped_tokens[fetch_row_index * token_length + i];
-      __nv_bfloat16 prob =
-          fetch_row >= 0 ? local_expert_problist[expert] : (__nv_bfloat16)0;
-      sum += prob * token_val;
+      for (int expert = 0; expert < num_experts; ++expert) {
+        int fetch_row = local_row_fetchlist[expert];
+        int fetch_row_index = fetch_row >= 0 ? fetch_row : 0;
+        float token_val = __bfloat162float(
+            unzipped_tokens[fetch_row_index * token_length + i]);
+        float prob = fetch_row >= 0
+                         ? __bfloat162float(local_expert_problist[expert])
+                         : 0.0f;
+        sum += prob * token_val;
+      }
+      weighted_zipped_tokens[this_row * token_length + i] =
+          __float2bfloat16_rn(sum);
     }
-    weighted_zipped_tokens[this_row * token_length + i] = sum;
+  } else {
+    // ------------------------ BF16 intrinsics 加权累加 -----------------------
+    // 齐整区域向量化搬移
+    for (int x_offset = threadIdx.x * vecSize;
+         x_offset < num_full_vec * vecSize;
+         x_offset += thread_stride) {
+      __nv_bfloat162 sum = {0, 0};
+      __nv_bfloat162 *out_ptr = reinterpret_cast<__nv_bfloat162 *>(
+          &weighted_zipped_tokens[this_row * token_length + x_offset]);
+#pragma unroll
+      for (int expert = 0; expert < num_experts; ++expert) {
+        const int fetch_row = local_row_fetchlist[expert];
+        const int fetch_row_index = fetch_row >= 0 ? fetch_row : 0;
+        __nv_bfloat162 token_vec = *reinterpret_cast<const __nv_bfloat162 *>(
+            &unzipped_tokens[fetch_row_index * token_length + x_offset]);
+        __nv_bfloat16 prob =
+            fetch_row >= 0 ? local_expert_problist[expert] : (__nv_bfloat16)0;
+        __nv_bfloat162 prob_vec = {prob, prob};
+        sum = __hfma2(token_vec, prob_vec, sum);
+      }
+      *out_ptr = sum;
+    }
+
+    // 剩余元素处理
+    for (int i = num_full_vec * vecSize + threadIdx.x; i < token_length;
+         i += blockDim.x) {
+      __nv_bfloat16 sum = (__nv_bfloat16)0;
+#pragma unroll
+      for (int expert = 0; expert < num_experts; ++expert) {
+        int fetch_row = local_row_fetchlist[expert];
+        int fetch_row_index = fetch_row >= 0 ? fetch_row : 0;
+        __nv_bfloat16 token_val =
+            unzipped_tokens[fetch_row_index * token_length + i];
+        __nv_bfloat16 prob =
+            fetch_row >= 0 ? local_expert_problist[expert] : (__nv_bfloat16)0;
+        sum += prob * token_val;
+      }
+      weighted_zipped_tokens[this_row * token_length + i] = sum;
+    }
   }
 }
 
