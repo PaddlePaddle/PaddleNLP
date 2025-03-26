@@ -270,7 +270,7 @@ class FusedMultiTransformerConfig:
         epsilon=1e-5,
         residual_alpha=1.0,
         num_layers=-1,
-        nranks=1,
+        tp_ranks=1,
         trans_qkvw=True,
         ring_id=-1,
         kv_num_heads=-1,
@@ -358,7 +358,7 @@ class FusedMultiTransformerConfig:
         self.epsilon = epsilon
         self.residual_alpha = residual_alpha
         self.num_layers = num_layers
-        self.nranks = nranks
+        self.tp_ranks = tp_ranks
         self.rank_id = rank_id
         self.trans_qkvw = trans_qkvw
         self.ring_id = ring_id
@@ -426,9 +426,9 @@ class FusedMultiTransformerBase(Layer):
             )
         self._epsilon = config.epsilon
         self._residual_alpha = config.residual_alpha
-        self.nranks = config.nranks
+        self.tp_ranks = config.tp_ranks
 
-        if self.nranks > 1 or True:
+        if self.tp_ranks > 1 or True:
             self.data_parallel_degree = fleet.get_hybrid_communicate_group().get_data_parallel_world_size()
             self.tp_group = None
             if self.data_parallel_degree > 1:
@@ -454,23 +454,23 @@ class FusedMultiTransformerBase(Layer):
             assert self.head_dim * config.num_heads == config.embed_dim, "embed_dim must be divisible by num_heads"
 
         # tensor model parallel
-        if config.nranks > 1:
+        if config.tp_ranks > 1:
             assert config.ring_id != -1
-        assert config.num_heads % config.nranks == 0
-        assert config.intermediate_size % config.nranks == 0
-        assert config.moe_config.shared_expert_intermediate_size % config.nranks == 0
-        assert config.moe_config.moe_intermediate_size % config.nranks == 0
-        self.num_heads = config.num_heads // config.nranks
-        self.kv_num_heads = config.kv_num_heads // config.nranks
-        self.intermediate_size = config.intermediate_size // config.nranks
-        self.config.moe_config.shared_expert_intermediate_size //= config.nranks
-        self.config.moe_config.moe_intermediate_size //= config.nranks
+        assert config.num_heads % config.tp_ranks == 0
+        assert config.intermediate_size % config.tp_ranks == 0
+        assert config.moe_config.shared_expert_intermediate_size % config.tp_ranks == 0
+        assert config.moe_config.moe_intermediate_size % config.tp_ranks == 0
+        self.num_heads = config.num_heads // config.tp_ranks
+        self.kv_num_heads = config.kv_num_heads // config.tp_ranks
+        self.intermediate_size = config.intermediate_size // config.tp_ranks
+        self.config.moe_config.shared_expert_intermediate_size //= config.tp_ranks
+        self.config.moe_config.moe_intermediate_size //= config.tp_ranks
 
         if self.config.use_ep_parallel:
             assert (
                 self.config.moe_config.num_experts % paddle.distributed.get_world_size() == 0
-            ), "num_experts must be divisible by nranks to enable expert parallel"
-            self.config.moe_config.moe_intermediate_size *= config.nranks
+            ), "num_experts must be divisible by tp_ranks to enable expert parallel"
+            self.config.moe_config.moe_intermediate_size *= config.tp_ranks
             self.ep_num_per_gpu = self.config.moe_config.num_experts // paddle.distributed.get_world_size()
         else:
             self.ep_num_per_gpu = self.config.moe_config.num_experts
@@ -666,7 +666,7 @@ class FusedMultiTransformerBase(Layer):
                 )
 
             # tensor model parallel
-            if config.nranks > 1:
+            if config.tp_ranks > 1:
                 # column parallel
                 _set_var_distributed(qkv_bias)
                 _set_var_distributed(ffn1_bias)
@@ -982,7 +982,7 @@ class FusedMultiTransformerBase(Layer):
                     )
 
             # tensor model parallel
-            if self.config.nranks > 1:
+            if self.config.tp_ranks > 1:
                 # column parallel
                 _set_var_distributed(qkv_weight)
                 _set_var_distributed(q_proj_weight)
@@ -1494,6 +1494,7 @@ class FusedMultiTransformerBase(Layer):
 
 
         combined_x, event, hook = self.buffer.low_latency_combine(ffn_out, topk_idx, topk_weights, handle, return_recv_hook=False)
+        # breakpoint()
 
         return combined_x
 
@@ -1782,9 +1783,9 @@ class FusedMultiTransformerBase(Layer):
                 if result_place_holder.shape == fused_moe_out.shape:
                     result_place_holder = paddle.assign(fused_moe_out)
 
-                rank = fleet.get_hybrid_communicate_group().get_data_parallel_rank() * self.nranks
+                rank = fleet.get_hybrid_communicate_group().get_data_parallel_rank() * self.tp_ranks
                 dist.broadcast(result_place_holder, rank, group=self.tp_group)
-                return result_place_holder / self.nranks
+                return result_place_holder / self.tp_ranks
         elif self.config.moe_config.topk_method is not None:
             gate_out = paddle.matmul(tmp_out.cast("float32"), self.gate_weights[i])
             # 应用各种策略后重塑的 scores
@@ -2047,7 +2048,7 @@ class FusedMultiTransformerBase(Layer):
             # print(f"{i}: out_linear_out: {out_linear_out}")
 
             # all_reduce
-            if self.nranks > 1:
+            if self.tp_ranks > 1:
                 dist.all_reduce(out_linear_out, group=self.tp_group)
 
             # ffn layernorm
@@ -2070,7 +2071,7 @@ class FusedMultiTransformerBase(Layer):
                 ffn2_out = self.compute_ffn2(ffn1_out, i)
 
             # all_reduce
-            if self.nranks > 1:
+            if self.tp_ranks > 1:
                 dist.all_reduce(ffn2_out, group=self.tp_group)
 
             # norm + residual_add_bias
@@ -2755,8 +2756,8 @@ class FusedMultiTransformerAvx(Layer):
         self.head_dim = config.embed_dim // config.num_heads
         assert self.head_dim * config.num_heads == config.embed_dim, "embed_dim must be divisible by num_heads"
 
-        assert config.num_heads % config.nranks == 0
-        assert config.intermediate_size % config.nranks == 0
+        assert config.num_heads % config.tp_ranks == 0
+        assert config.intermediate_size % config.tp_ranks == 0
 
         intermediate_size = config.intermediate_size
         self.num_heads = config.num_heads
@@ -3172,7 +3173,7 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
                 )
 
             # tensor model parallel
-            if self.config.nranks > 1:
+            if self.config.tp_ranks > 1:
                 # column parallel
                 _set_var_distributed(qkv_weight)
                 _set_var_distributed(ffn1_weight)
@@ -4251,7 +4252,7 @@ class FusedBlockMultiTransformerFP8(FusedBlockMultiTransformer):
                 )
 
             # tensor model parallel
-            if config.nranks > 1:
+            if config.tp_ranks > 1:
                 # column parallel
                 _set_var_distributed(ffn1_0_bias)
                 _set_var_distributed(ffn1_1_bias)
@@ -4308,7 +4309,7 @@ class FusedBlockMultiTransformerFP8(FusedBlockMultiTransformer):
             )
 
             # tensor model parallel
-            if self.config.nranks > 1:
+            if self.config.tp_ranks > 1:
                 # column parallel
                 _set_var_distributed(qkv_weight)
                 _set_var_distributed(ffn1_0_weight)
@@ -5278,7 +5279,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                     )
 
             # tensor model parallel
-            if self.config.nranks > 1:
+            if self.config.tp_ranks > 1:
                 # column parallel
                 _set_var_distributed(qkv_weight)
                 _set_var_distributed(q_proj_weight)

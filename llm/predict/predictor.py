@@ -1570,14 +1570,14 @@ def predict():
         # target_texts = [""] * predictor_args.batch_size
 
         source_texts = [
-            "解释一下温故而知新",
-            "你好，你是谁",
-            "法国为什么叫法兰西呢？",
-            "请问法国的首都是哪里呢？",
-            "请问日本的首都是哪里呢？",
             "请问南非的首都是哪里呢？",
-            "请问英国的首都是哪里呢？",
-            "小日本为什么叫小日本呢？",
+            "请问南非的首都是哪里呢？",
+            "请问南非的首都是哪里呢？",
+            "请问南非的首都是哪里呢？",
+            "请问南非的首都是哪里呢？",
+            "请问南非的首都是哪里呢？",
+            "请问南非的首都是哪里呢？",
+            "请问南非的首都是哪里呢？",
         ] * predictor_args.batch_size
         target_texts = [""] * len(source_texts) * predictor_args.batch_size
 
