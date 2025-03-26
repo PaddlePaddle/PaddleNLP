@@ -48,12 +48,12 @@ except ImportError:
 
 try:
     import deep_gemm
+    import kitchen
+    import kitchen.quantization_subchannel_block_hybrid
+    from kitchen.quantization import QParams, ScalingType
 except:
     pass
 
-import kitchen
-import kitchen.quantization_subchannel_block_hybrid
-from kitchen.quantization import QParams, ScalingType
 
 __all__ = [
     "Linear",
