@@ -44,34 +44,33 @@ Welcome to PaddleNLP
    Quick Inference <get_started/inference>
 
 .. toctree::
-```rst
-:maxdepth: 1
-:caption: Paddle Large Model Training
-
-Paddle Large Model Main Documentation <llm/README.md>
-Large Model - Pre-training Documentation <llm/docs/pretrain.rst>
-Large Model - Fine-tuning Documentation <llm/docs/finetune.md>
-Large Model - DPO Documentation <llm/docs/dpo.md>
-Large Model - RLHF Documentation <llm/docs/rlhf.md>
-Model Merging Documentation <llm/docs/mergekit.md>
+   :maxdepth: 1
+   :caption: Paddle LLM Training
+   
+   Paddle LLM Main Documentation <llm/README.md>
+   LLM - Pre-training Documentation <llm/docs/pretrain.rst>
+   LLM - Fine-tuning Documentation <llm/docs/finetune.md>
+   LLM - DPO Documentation <llm/docs/dpo.md>
+   LLM - RLHF Documentation <llm/docs/rlhf.md>
+   Model Merging Documentation <llm/docs/mergekit.md>
 
 
 .. toctree::
    :maxdepth: 1
-   :caption: Paddle Large Model Inference
+   :caption: Paddle LLM Inference
 
    Docker Deployment - Quick Start Guide <llm/server/docs/general_model_inference.md>
-   Large Model Inference Tutorial <llm/docs/predict/inference_index.rst>
+   LLM Inference Tutorial <llm/docs/predict/inference_index.rst>
    Practical Optimization <llm/docs/predict/infer_optimize.rst>
    Static Graph Model List <llm/server/docs/static_models.md>
    Inference Quantization Tutorial for Various Models <llm/docs/predict/models.rst>
    Heterogeneous Device Inference <llm/docs/predict/devices.rst>
-   Large Model - Quantization Tutorial <llm/docs/quantization.md>
+   LLM - Quantization Tutorial <llm/docs/quantization.md>
 
 
 .. toctree::
    :maxdepth: 1
-   :caption: Paddle Large Model Featured Technologies
+   :caption: Paddle LLM Featured Technologies
 
    <llm/docs/unified_checkpoint.md>
    <llm/docs/flashmask.md>
@@ -102,8 +101,6 @@ Model Merging Documentation <llm/docs/mergekit.md>
 
 
 .. toctree::
-```
-
    :maxdepth: 1
    :caption: Evaluation Metrics
 
@@ -151,22 +148,21 @@ Model Merging Documentation <llm/docs/mergekit.md>
    FAQ <FAQ.md>
 
 .. toctree::
-```rst
-:maxdepth: 1
-:caption: API Reference
-
-paddlenlp.data <source/paddlenlp.data>
-paddlenlp.datasets <source/paddlenlp.datasets>
-paddlenlp.embeddings <source/paddlenlp.embeddings>
-paddlenlp.layers <source/paddlenlp.layers>
-paddlenlp.losses <source/paddlenlp.losses>
-paddlenlp.metrics <source/paddlenlp.metrics>
-paddlenlp.ops <source/paddlenlp.ops>
-paddlenlp.seq2vec <source/paddlenlp.seq2vec>
-paddlenlp.taskflow <source/paddlenlp.taskflow>
-paddlenlp.trainer <source/paddlenlp.trainer>
-paddlenlp.transformers <source/paddlenlp.transformers>
-paddlenlp.utils <source/paddlenlp.utils>
+   :maxdepth: 1
+   :caption: API Reference
+   
+   paddlenlp.data <source/paddlenlp.data>
+   paddlenlp.datasets <source/paddlenlp.datasets>
+   paddlenlp.embeddings <source/paddlenlp.embeddings>
+   paddlenlp.layers <source/paddlenlp.layers>
+   paddlenlp.losses <source/paddlenlp.losses>
+   paddlenlp.metrics <source/paddlenlp.metrics>
+   paddlenlp.ops <source/paddlenlp.ops>
+   paddlenlp.seq2vec <source/paddlenlp.seq2vec>
+   paddlenlp.taskflow <source/paddlenlp.taskflow>
+   paddlenlp.trainer <source/paddlenlp.trainer>
+   paddlenlp.transformers <source/paddlenlp.transformers>
+   paddlenlp.utils <source/paddlenlp.utils>
 
 Indices and tables
 ====================
