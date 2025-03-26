@@ -217,7 +217,7 @@ class OPTInferenceModel(OPTPretrainedModel):
 
         var_embedding_output = None
         if not is_decoder:
-            # support variable seqence length embeddings
+            # support variable sequence length embeddings
             var_embedding_output = embedding_output[0, 0 : seq_len_encoder[0][0], :]
             for b in range(1, batch):
                 var_embedding_output = paddle.concat(

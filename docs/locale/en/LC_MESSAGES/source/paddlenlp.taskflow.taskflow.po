@@ -63,7 +63,7 @@ msgid ""
 msgstr ""
 
 #: of paddlenlp.taskflow.taskflow.Taskflow:12
-msgid "The device id for the gpu, xpu and other devices, the defalut value is 0."
+msgid "The device id for the gpu, xpu and other devices, the default value is 0."
 msgstr ""
 
 #: of paddlenlp.taskflow.taskflow.Taskflow:14
