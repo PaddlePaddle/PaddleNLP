@@ -35,6 +35,7 @@ from comm_utils import (
     create_data_trans_group,
     data_group_merge,
     data_group_split,
+    gather_and_pad,
     get_timer_label,
     masked_whiten,
     new_timer_log,
@@ -1278,10 +1279,14 @@ class PPOTrainer(Trainer):
                 prompt_len = inputs["input_ids"].shape[-1]
                 if "label_ids" not in inputs:
                     raise ValueError("Rule-based reward needs labels.")
-                src = self.tokenizer.batch_decode(inputs["input_ids"], skip_special_tokens=True)
-                tgt = self.tokenizer.batch_decode(inputs["label_ids"], skip_special_tokens=True)
-                response = self.tokenizer.batch_decode(generated_seq[:, prompt_len:], skip_special_tokens=True)
-                reward_score = self.request_reward_server(src, tgt, response)
+                src = self.tokenizer.batch_decode(inputs["input_ids"], skip_special_tokens=False)
+                tgt = self.tokenizer.batch_decode(inputs["label_ids"], skip_special_tokens=False)
+                response = self.tokenizer.batch_decode(generated_seq[:, prompt_len:], skip_special_tokens=False)
+                reward_score = self.request_reward_server(
+                    [i.replace(self.tokenizer.pad_token, "") for i in src],
+                    [i.replace(self.tokenizer.pad_token, "") for i in tgt],
+                    [i.replace(self.tokenizer.pad_token, "") for i in response],
+                )
 
             reward_score = reward_score.squeeze(axis=-1).cast(paddle.float32)
         # keep the first batch of eval output sequence to print and check
@@ -2440,12 +2445,57 @@ class PPOTrainer(Trainer):
                 get_timer_label(RolloutStages.ROLLOUT_REWARD_VALUE)
             ).elapsed_
 
-        micro_batches = self.normalize_batch_data(micro_batches, use_tgt_len_value=self.args.use_tgt_len_value)
-
-        # size of micro_batches (num of training batch) would be:
-        # per_device_prompt_batch_size * num_return_sequences // per_device_train_batch_size
-        # micro_batches = [self.post_rollout(**micro_batch) for micro_batch in micro_batches]
+        if self.args.rl_algorithm == "reinforce_plus_plus":
+            old_log_probs = [micro_batch["log_probs"] for micro_batch in micro_batches]
+            ref_log_probs = [micro_batch["ref_log_probs"] for micro_batch in micro_batches]
+            rewards = [micro_batch["rewards"] for micro_batch in micro_batches]
+            eos_mask = [
+                (micro_batch["input_ids"] != self.tokenizer.pad_token_id)[:, micro_batch["prompt"].shape[-1] :].to(
+                    old_log_probs[0].dtype
+                )
+                for micro_batch in micro_batches
+            ]
+            shapes = [micro_batch["log_probs"].shape for micro_batch in micro_batches]
+            try:
+                hcg = fleet.get_hybrid_communicate_group()
+                sd_group = hcg.get_sharding_parallel_group()
+                dp_group = hcg.get_data_parallel_group()
+            except AttributeError:
+                pass
+            new_batch = {
+                "rewards": gather_and_pad(rewards, dp_group, sd_group, pad=False),
+                "log_probs": gather_and_pad(old_log_probs, dp_group, sd_group),
+                "ref_log_probs": gather_and_pad(ref_log_probs, dp_group, sd_group),
+                "eos_mask": gather_and_pad(eos_mask, dp_group, sd_group),
+            }
+            new_batches = self.normalize_batch_data([new_batch], use_tgt_len_value=self.args.use_tgt_len_value)
+            local_data = {
+                "reward_advantages": self.get_rank_data(new_batches[0]["reward_advantages"]),
+                "rewards": self.get_rank_data(new_batches[0]["rewards"]),
+                "ori_rewards": self.get_rank_data(new_batches[0]["ori_rewards"]),
+                "reward_returns": self.get_rank_data(new_batches[0]["reward_returns"]),
+                "kl_rewards": self.get_rank_data(new_batches[0]["kl_rewards"]),
+                "rewards_with_kl": self.get_rank_data(new_batches[0]["rewards_with_kl"]),
+                "eos_mask": self.get_rank_data(new_batches[0]["eos_mask"]),
+            }
+            offset = 0
+            for idx, batch in enumerate(micro_batches):
+                for k, v in local_data.items():
+                    if local_data[k][offset].ndim < 1:
+                        micro_batches[idx].update(
+                            {k: local_data[k][offset : offset + len(batch["log_probs"])][: shapes[idx][-1]]}
+                        )
+                    else:
+                        micro_batches[idx].update(
+                            {k: local_data[k][offset : offset + len(batch["log_probs"])][:, : shapes[idx][-1]]}
+                        )
+                offset += len(batch["log_probs"])
+        else:
+            micro_batches = self.normalize_batch_data(micro_batches, use_tgt_len_value=self.args.use_tgt_len_value)
         return micro_batches
+
+    def get_rank_data(self, tensor):
+        return tensor.split(self.args.dataset_world_size)[self.args.dataset_rank]
 
     @paddle.no_grad()
     def generate(self, prompt_only_batch: Dict, do_eval=False) -> List[Dict[str, Any]]:
@@ -2799,8 +2849,8 @@ class PPOTrainer(Trainer):
                 reward_score = paddle.to_tensor(
                     result["score"], dtype=self._model_config.dtype if not self.args.use_fp32_compute else "float32"
                 )
-            except:
-                logger.warning("Request reward server failed and rewards_score will be set zero.")
+            except Exception as e:
+                logger.warning(f"Request reward server failed({e}) and rewards_score will be set zero.")
                 reward_score = paddle.zeros(
                     len(response), dtype=self._model_config.dtype if not self.args.use_fp32_compute else "float32"
                 )
@@ -2891,26 +2941,20 @@ class PPOTrainer(Trainer):
                 rl_batch["rewards"] = (rl_batch["rewards"] - reward_mean) / (reward_std + 1e-8)
 
         for rl_batch in rl_batches:
-            prompt = rl_batch["prompt"]  # length: src
             old_log_probs = rl_batch["log_probs"]  # length: src + tgt -1
             ref_log_probs = rl_batch["ref_log_probs"]  # length: src + tgt -1
             rewards = rl_batch["rewards"]  # length: 1
             if self.args.rl_algorithm == "ppo":
                 old_reward_values = rl_batch["reward_values"]  # length: src + tgt -1
-
-            start = prompt.shape[-1] - 1
-            eos_mask = (rl_batch["input_ids"] != self.tokenizer.pad_token_id)[:, 1:].to(old_log_probs.dtype)
-            if use_tgt_len_value:
-                ref_log_probs = ref_log_probs[:, start:].contiguous()
-                old_log_probs = old_log_probs[:, start:].contiguous()
-                if self.args.rl_algorithm == "ppo":
-                    old_reward_values = old_reward_values[:, start:].contiguous()
-                eos_mask = eos_mask[:, start:].contiguous()
             if self.args.rl_algorithm == "grpo":
+                eos_mask = (rl_batch["input_ids"] != self.tokenizer.pad_token_id)[:, 1:].to(old_log_probs.dtype)
+                start = rl_batch["prompt"].shape[-1] - 1
                 reward_advantages = compute_grpo_advantages(
                     rewards, rl_batch["index"], eos_mask[:, start:], old_log_probs.shape[-1]
                 )
             elif self.args.rl_algorithm == "ppo":
+                start = rl_batch["prompt"].shape[-1] - 1
+                eos_mask = (rl_batch["input_ids"] != self.tokenizer.pad_token_id)[:, 1:].to(old_log_probs.dtype)
                 rewards_with_kl, kl_rewards = self.add_kl_divergence_regularization(
                     None,  # prompt,
                     old_log_probs,
@@ -2926,6 +2970,8 @@ class PPOTrainer(Trainer):
                     use_tgt_len_return=use_tgt_len_value,
                 )  # length: tgt if use_tgt_len_value src + tgt -1
             elif self.args.rl_algorithm == "reinforce_plus_plus":
+                start = 0
+                eos_mask = rl_batch["eos_mask"]
                 rewards_with_kl, kl_rewards = self.add_kl_divergence_regularization(
                     None,  # prompt,
                     old_log_probs,
@@ -2998,7 +3044,7 @@ class PPOTrainer(Trainer):
                 rl_batch["reward_advantages"] = (rl_batch["reward_advantages"] - all_advantages_mean) / (
                     all_advantages_std + 1e-8
                 )
-                rl_batch["reward_advantages"] = rl_batch["reward_advantages"] * rl_batch["sequence_mask"]
+                rl_batch["reward_advantages"] = rl_batch["reward_advantages"] * rl_batch["eos_mask"]
 
         return rl_batches
 
@@ -3064,6 +3110,6 @@ def compute_reinforce_plus_plus_advantages_and_returns(
         returns[:, t] = running_return
         running_return = running_return * eos_mask[:, t]
 
-    advantages = masked_whiten(returns.cast("float32"), eos_mask.cast("float32"))
-    advantages = (advantages * eos_mask).cast(rewards.dtype)
+    advantages = masked_whiten(returns, eos_mask)
+    advantages = advantages * eos_mask
     return advantages, returns
