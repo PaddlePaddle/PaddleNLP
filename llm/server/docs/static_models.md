@@ -18,7 +18,7 @@
 ### DeepSeekR1
 部署硬件要求：
 - 除MTP模型，Fp8模型之外支持的最低版本是SM80 (机器：A100 / A800) 要求CUDA 11.8 以上
-- DeepSeek-R1-MTP 与 Fp8 模型 支持的最低版本是SM90 (机器：H100 / H800) 要求CUDA 12.4 以上
+- DeepSeek-R1-MTP 与 Fp8 模型 支持的最低版本是SM90 (机器：H800) 要求CUDA 12.4 以上
 
 |模型名称|精度|MTP|节点数|静态图下载 model_name|
 |:------|:-:|:-:|:-:|:-:|
@@ -32,7 +32,8 @@
 | deepseek-ai/DeepSeek-R1-Distill-Qwen-7B   |weight_only_int8|-|-|deepseek-ai/DeepSeek-R1-Distill-Qwen-7B/weight_only_int8 |
 | deepseek-ai/DeepSeek-R1-Distill-Qwen-14B  |weight_only_int8|-|-|deepseek-ai/DeepSeek-R1-Distill-Qwen-14B/weight_only_int8 |
 | deepseek-ai/DeepSeek-R1-Distill-Qwen-32B  |weight_only_int8|-|-|deepseek-ai/DeepSeek-R1-Distill-Qwen-32B/weight_only_int8 |
-| deepseek-ai/DeepSeek-R1-Distill-Llama-8B  |weight_only_int8|-|-|deepseek-ai/DeepSeek-R1-Distill-Llama-8B/weight_only_int8 |
+| deepseek-ai/DeepSeek-R1-Distill-Llama-8B  |weight_only_int8|-|-|deepseek-ai/DeepSeek-R1-Distill-Llama-8B/weight_only_int8,deepseek-ai/DeepSeek-R1-Distill-Llama-8B-Block-Attn/weight_only_int8 |
+| deepseek-ai/DeepSeek-R1-Distill-Llama-8B  |fp16|-|-|deepseek-ai/DeepSeek-R1-Distill-Llama-8B-Block-Attn/float16 |
 | deepseek-ai/DeepSeek-R1-Distill-Llama-70B |weight_only_int8|-|-|deepseek-ai/DeepSeek-R1-Distill-Llama-70B/weight_only_int8 |
 
 

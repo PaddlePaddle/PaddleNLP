@@ -3,6 +3,29 @@
 
 *该部署工具是基于英伟达 Triton 框架专为服务器场景的大模型服务化部署而设计。它提供了支持 gRPC、HTTP 协议的服务接口，以及流式 Token 输出能力。底层推理引擎支持连续批处理、weight only int8、后训练量化（PTQ）等加速优化策略，为用户带来易用且高性能的部署体验。*
 
+## 静态图快速部署
+
+该方法仅支持[可一键跑通的模型列表](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/static_models.md)中的模型进行一键启动推理服务。
+  
+为了避免模型过大导致的下载时间过长问题，我们直接提供了自动下载的[脚本](#静态图下载)，支持下载后再启动服务进行推理。进入容器后根据单机或多机模型进行静态图下载。
+
+`MODEL_PATH` 为指定模型下载的存储路径，可自行指定
+`model_name` 为指定下载模型名称，具体支持模型可查看[文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/static_models.md)
+
+Note:
+1. 请保证 shm-size >= 5，不然可能会导致服务启动失败
+2. 部署前请确认模型所需要的环境和硬件，请参考[文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/static_models.md)
+
+**A100部署示例**
+```shell
+export MODEL_PATH=${MODEL_PATH:-$PWD}
+export model_name=${model_name:-"deepseek-ai/DeepSeek-R1-Distill-Llama-8B/weight_only_int8"}
+docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
+-v $MODEL_PATH:/models -e "model_name=${model_name}" \
+-dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.1 /bin/bash \
+-c -ex 'start_server $model_name && tail -f /dev/null'
+```
+
 
 ## 部署环境准备
 
@@ -19,10 +42,14 @@
 
 ### 准备部署镜像
 
-为了方便部署，我们提供了 cuda12.4 与 cuda 11.8 的镜像，可以直接拉取镜像，或者使用我们提供的 `Dockerfile` [构建自定义镜像](#基于 dockerfile 创建自己的镜像)
-```
-docker pull ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.1
-```
+为了方便部署，我们提供了 cuda12.4 与 cuda 11.8 的镜像，可以直接拉取镜像，或者使用我们提供的 `Dockerfile` [构建自定义镜像](#基于-dockerfile-创建自己的镜像)
+
+
+|cuda版本| 支持硬件架构|镜像地址|支持的典型设备|
+|:------|:-:|:-:|:-:|
+| cuda11.8 | 70 75 80 86 |ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda118-cudnn8-v2.1 |V100，T4，A100，A30，A10 |
+| cuda12.4 | 80 86 89 90 |ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.1 |A100，A30，A10,L20，H20，H100 |
+
 
 ### 准备模型
 
@@ -45,7 +72,7 @@ cd /home/workspace/models_dir
 
 #### 静态图下载
 
-除了支持通过设置`model_name` 在启动时进行自动下载，服务提供脚本可以进行自行下载
+除了支持通过设置`model_name` 在启动时进行自动下载，服务提供脚本可以进行自行下载。**部署时需指定环境变量`MODEL_DIR` 为模型下载存储路径**
 
 脚本所在路径`/opt/output/download_model.py`
 
@@ -139,7 +166,7 @@ export CUDA_VISIBLE_DEVICES=0
 export HEALTH_HTTP_PORT="8110"                         # 探活服务的http端口（当前仅用于健康检查、探活）
 export SERVICE_GRPC_PORT="8811"                         # 模型推服务的grpc端口
 export METRICS_HTTP_PORT="8722"                      # 模型服务中监督指标的端口
-export INFER_PROC_PORT="8813"                  # 模型服务内部使用的端口
+export INTER_PROC_PORT="8813"                  # 模型服务内部使用的端口
 export SERVICE_HTTP_PORT="9965"               # 服务请求HTTP端口号，如不配置，默认为-1，即服务只支持GRPC协议
 
 # MAX_SEQ_LEN: 服务会拒绝input token数量超过MAX_SEQ_LEN的请求，并返回错误提示
@@ -170,28 +197,34 @@ export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 更多请求参数请参考[模型配置参数介绍](#模型配置参数介绍)
 
 ### 启动服务
+针对模型部署我们提供两种方案：
+- 模型已保存在指定路径下进行部署
+- 静态图自动下载部署
+
 #### 单机启动
+模型已保存在指定路径下进行部署
 
 ```shell
+export MODEL_DIR=${MODEL_DIR:-"/models"}
 start_server
 
 # 重新启动服务前，需要停止服务，执行 stop_server
 ```
-启动脚本位置： /opt/output/Serving
+静态图自动下载部署  
+`model_name` 为指定下载模型名称，具体支持模型可查看[文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/static_models.md)
+
+```shell
+model_name="deepseek-ai/DeepSeek-R1-2nodes/weight_only_int8"
+start_server $model_name
+
+# 重新启动服务前，需要停止服务，执行 stop_server
+```
 #### 多机启动
 ##### 依次启动服务
 1. 启动 master node 主节点服务
 2. 依次启动其他节点的服务
 
-**启动命令**
-
-```
-start_server
-
-# 重新启动服务前，需要停止服务
-
-stop_server
-```
+启动命令与单机相同
 
 ##### mpi启动
 若使用mpi 进行启动需提前配置各机器的ssh 可以正常访问
@@ -372,10 +405,10 @@ docker build --network=host -f ./dockerfiles/Dockerfile_serving_cuda124_cudnn9 -
 | SERVICE_HTTP_PORT | int | 服务请求 HTTP 端口号 | 否 | 9965 | (3.0.0版本前镜像使用PUSH_MODE_HTTP_PORT)  |
 | DISABLE_STREAMING | int | 是否使用流式返回 | 否 | 0 |  |
 | MAX_SEQ_LEN | int | 最大输入序列长度 | 否 | 8192 | 服务会拒绝 input token 数量超过 MAX_SEQ_LEN 的请求，并返回错误提示 |
-| MAX_DEC_LEN | int | 最大 decoer 序列长度 | 否 | 1024 | 服务会拒绝请求中 max_dec_len/min_dec_len 超过此参数的请求，并返回错误提示 |
+| MAX_DEC_LEN | int | 最大 decoder 序列长度 | 否 | 1024 | 服务会拒绝请求中 max_dec_len/min_dec_len 超过此参数的请求，并返回错误提示 |
 | BATCH_SIZE | int | 最大 Batch Size | 否 | 50 | 模型可同时并发处理的最大输入数量，不能高于128 |
-| BLOCK_BS | int | 缓存 Block 支持的最大 Query Batch Size | 否 | 50 | 如果出现 out of memeory 错误，尝试减少该数值 |
-| BLOCK_RATIO | float |  | 否 | 0.75 | 建议配置 输入平均 Token 数/（输入+输出平均 Token 数) |
+| BLOCK_BS | int | 缓存 Block 支持的最大 Query Batch Size | 否 | 50 | 如果出现 out of memory 错误，尝试减少该数值 |
+| BLOCK_RATIO | float |  | 否 | 0.75 | 建议设为输入长度占总长度的比例 |
 | MAX_CACHED_TASK_NUM | int | 服务缓存队列最大长度 | 否 | 128 | 队列达到上限后，会拒绝新的请求 |
 | PUSH_MODE_HTTP_WORKERS | int | HTTP 服务进程数 | 否 | 1 | 在  配置的情况下有效，高并发下提高该数值，建议最高配置为8 |
 | USE_WARMUP | int | 是否进行 warmup | 否 | 0 |  |
@@ -383,6 +416,29 @@ docker build --network=host -f ./dockerfiles/Dockerfile_serving_cuda124_cudnn9 -
 | USE_CACHE_KV_INT8 | int | 是否将 INT8配置为 KV Cache 的类型 | 否 | 0 | c8量化模型需要配置为1 |
 | MODEL_DIR | str | 模型文件路径 | 否 | /models/ |  |
 | model_name | str | 模型名称 | 否 | 无 |  用于支持模型静态图下载，具体名称参考文档(#./static_models.md)|
+| OUTPUT_LOG_TO_CONSOLE | str | 是否定向输出到console 文件中 | 否 | 0 |  |
+
+
+## 显存相关参数推荐
+
+* BLOCK_BS：设定 cacheKV block 的数量，服务支持的输入、输出的总 token 数为 NUM_TOTAL_TOKEN = BLOCK_BS * INFER_MODEL_MAX_SEQ_LEN
+  * 例如 8K 的模型 BLOCK_BS 设为 40，则共可以支持 40*8 = 320K 的 token 长度
+  * 例如 8K 的模型推荐配置 BLOCK_BS设为 40，运行 32K 的模型，支持的总 token 数不变，则 BLOCK_BS 设为 40 / (32K/8K) = 10，考虑到输入长度变化，影响激活峰值显存，可适当下调到 8 或 9
+* BLOCK_RATIO: block 分配给 encoder 和 decoder 的比例，建议设为 (平均输入长度+128) /(平均输入长度 + 平均输出长度) * EXTEND_RATIO，其中 EXTEND_RATIO 是超参，在大部分情况中，设为1即可，如输入长度方差较大，可根据具体情况设为 1.1~1.3
+  * 例如一份平均输入 300，平均输出 1500，则 block_ratio 推荐值为 (300 + 128) / (300 + 1500) ≈ 0.25
+* BATCH_SIZE: 一般小于 NUM_TOTAL_TOKEN / (平均输入长度 + 平均输出长度)
+
+| GPU 显存 | 部署模型         | 静态图权重                                       | 节点数 | 量化类型           | 导出长度 | 是否 MTP | MTP 量化类型      | 推荐 block_bs |
+|----------|--------------------|------------------------------------------------|------|----------------|--------|--------|---------------|---------|
+| 80GB     | DeepSeek-V3/R1 | deepseek-ai/DeepSeek-R1/a8w8_fp8_wint4        | 1    | a8w8_fp8_wint4 | 8K     | 否     | -             | 40      |
+| 80GB     | DeepSeek-V3/R1 | deepseek-ai/DeepSeek-R1-MTP/a8w8_fp8_wint4    | 1    | a8w8_fp8_wint4 | 8K     | 是     | a8w8_fp8      | 36      |
+| 80GB     | DeepSeek-V3/R1 | deepseek-ai/DeepSeek-R1/weight_only_int4      | 1    | weight_only_int4 | 8K   | 否     | -             | 40      |
+| 80GB     | DeepSeek-V3/R1 | deepseek-ai/DeepSeek-R1-MTP/weight_only_int4  | 1    | weight_only_int4 | 8K   | 是     | weight_only_int8 | 36      |
+| 80GB     | DeepSeek-V3/R1 | deepseek-ai/DeepSeek-R1-2nodes/a8w8_fp8      | 2    | a8w8_fp8       | 8K     | 否     | -             | 50      |
+| 80GB     | DeepSeek-V3/R1 | deepseek-ai/DeepSeek-R1-MTP-2nodes/a8w8_fp8  | 2    | a8w8_fp8       | 8K     | 是     | a8w8_fp8      | 36      |
+| 80GB     | DeepSeek-V3/R1 | deepseek-ai/DeepSeek-R1-2nodes/weight_only_int8 | 2  | weight_only_int8 | 8K   | 否     | -             | 40      |
+| 80GB     | DeepSeek-V3/R1 | deepseek-ai/DeepSeek-R1-MTP-2nodes/weight_only_int8 | 2  | weight_only_int8 | 8K | 是     | weight_only_int8 | 36      |
+
 
 ## 请求参数介绍
 

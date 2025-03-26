@@ -5,6 +5,14 @@
 
 .. _飞桨官网: https://www.paddlepaddle.org.cn/
 
+cuda12.3 cuda11.8 可以参考一下安装链接:
+
+.. code-block:: bash
+
+  python -m pip install paddlepaddle-gpu==3.0.0rc1 -i https://www.paddlepaddle.org.cn/packages/stable/cu118/
+  python -m pip install paddlepaddle-gpu==3.0.0rc1 -i https://www.paddlepaddle.org.cn/packages/stable/cu123/
+
+
 pip安装
 --------
 
@@ -12,7 +20,7 @@ pip安装
 
 .. code-block:: bash
 
-  pip install --upgrade --pre paddlenlp
+  pip install --upgrade --pre paddlenlp==3.0.0b4
 
 这将会自动安装最新版本的PaddleNLP。
 

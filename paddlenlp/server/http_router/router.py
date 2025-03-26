@@ -37,7 +37,7 @@ class HttpRouterManager(BaseRouterManager):
         # Url path to register the model
         paths = [f"/{task_name}"]
         for path in paths:
-            logger.info("   Transformer model request [path]={} is genereated.".format(path))
+            logger.info("   Transformer model request [path]={} is generated.".format(path))
 
         # Unique name to create the pydantic model
         unique_name = hashlib.md5(task_name.encode()).hexdigest()
@@ -80,7 +80,7 @@ class HttpRouterManager(BaseRouterManager):
         # Url path to register the model
         paths = [f"/{task_name}"]
         for path in paths:
-            logger.info("   Taskflow  request [path]={} is genereated.".format(path))
+            logger.info("   Taskflow  request [path]={} is generated.".format(path))
 
         # Unique name to create the pydantic model
         unique_name = hashlib.md5(task_name.encode()).hexdigest()

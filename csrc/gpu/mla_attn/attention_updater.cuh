@@ -19,6 +19,8 @@
  * Modified by the FlashInfer team.
  */
 
+#pragma once
+
 #include <cute/tensor.hpp>
 #include <cutlass/detail/helper_macros.hpp>
 

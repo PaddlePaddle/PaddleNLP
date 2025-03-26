@@ -37,5 +37,4 @@ class DeepseekV3ForCausalLMPipe(DeepseekV2ForCausalLMPipe):
     _get_model_flops = DeepseekV3PretrainedModel._get_model_flops
     _get_hardware_flops = DeepseekV3PretrainedModel._get_hardware_flops
     _tied_weights_keys = ["lm_head.weight"]
-
-    # DONOT Add base_model_prefix !!!!
+    base_model_prefix = DeepseekV3PretrainedModel.base_model_prefix

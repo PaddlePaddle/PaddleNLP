@@ -19,6 +19,8 @@
  * Modified by the FlashInfer team.
  */
 
+#pragma once
+
 #ifndef ATTENTION_HOPPER_NAMED_BARRIERS_CUH_
 #define ATTENTION_HOPPER_NAMED_BARRIERS_CUH_
 
@@ -40,6 +42,7 @@ enum class NamedBarriers {
   kWG1WG2Sync = 7,
   kWG0WG1WG2Sync = 8,
   kWG1WG2LastSync = 9,
+  kAllWGSync = 10,
 };
 
 }  // namespace mla_attn

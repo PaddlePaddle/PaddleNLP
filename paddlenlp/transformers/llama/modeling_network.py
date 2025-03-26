@@ -23,6 +23,9 @@ from typing import Optional, Tuple
 import paddle
 import paddle.nn.functional as F
 from paddle import nn
+from paddle.distributed.auto_parallel.intermediate.tensor_parallel import (
+    PrepareLayerInput,
+)
 from paddle.distributed.fleet.utils import recompute
 
 try:
@@ -75,6 +78,7 @@ except:
 
 __all__ = [
     "LlamaForCausalLMNet",
+    "LlamaForCausalLMNetDPO",
     "LlamaPretrainingCriterionNet",
 ]
 
@@ -98,6 +102,7 @@ def scaled_dot_product_attention(
     attention_mask,
     output_attentions,
     alibi=None,
+    attn_mask_startend_row_indices=None,
 ):
     bsz, q_len, num_heads, head_dim = query_states.shape
     _, kv_seq_len, _, _ = value_states.shape
@@ -119,13 +124,24 @@ def scaled_dot_product_attention(
         else:
             if alibi is not None:
                 attention_mask = attention_mask.cast(alibi.dtype) + alibi
-            attn_output = F.scaled_dot_product_attention(
-                query_states,
-                key_states,
-                value_states,
-                attn_mask=attention_mask,
-                is_causal=attention_mask is None and query_states.shape[1] != 1,
-            )
+            if attn_mask_startend_row_indices is not None:
+                if len(attn_mask_startend_row_indices.shape) == 2:
+                    attn_mask_startend_row_indices = paddle.unsqueeze(attn_mask_startend_row_indices, axis=1)
+                attn_output = F.flashmask_attention(
+                    query_states,
+                    key_states,
+                    value_states,
+                    startend_row_indices=attn_mask_startend_row_indices.unsqueeze(-1),
+                    causal=True,
+                )
+            else:
+                attn_output = F.scaled_dot_product_attention(
+                    query_states,
+                    key_states,
+                    value_states,
+                    attn_mask=attention_mask,
+                    is_causal=attention_mask is None and query_states.shape[1] != 1,
+                )
             attn_weights = None
 
         attn_output = attn_output.reshape([bsz, q_len, head_dim * query_states.shape[-2]])
@@ -351,6 +367,7 @@ class LlamaAttentionNet(nn.Layer):
         output_attentions: bool = False,
         use_cache: bool = False,
         alibi: Optional[paddle.Tensor] = None,
+        attn_mask_startend_row_indices: Optional[paddle.Tensor] = None,
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
         # [bs, seq_len, num_head * head_dim] or [seq_len / n, bs, num_head * head_dim] (if sequence_parallel)
@@ -458,6 +475,7 @@ class LlamaAttentionNet(nn.Layer):
                 attention_mask,
                 output_attentions,
                 alibi,
+                attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                 use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
@@ -469,6 +487,7 @@ class LlamaAttentionNet(nn.Layer):
                 attention_mask,
                 output_attentions,
                 alibi,
+                attn_mask_startend_row_indices=attn_mask_startend_row_indices,
             )
         if output_attentions:
             attn_output, attn_weights = outputs
@@ -520,6 +539,7 @@ class LlamaDecoderLayerNet(nn.Layer):
         past_key_value: Optional[Tuple[paddle.Tensor]] = None,
         use_cache: Optional[bool] = False,
         alibi: Optional[paddle.Tensor] = None,
+        attn_mask_startend_row_indices: Optional[paddle.Tensor] = None,
     ) -> Tuple[paddle.Tensor, Optional[Tuple[paddle.Tensor, paddle.Tensor]]]:
         """
         Args:
@@ -556,6 +576,7 @@ class LlamaDecoderLayerNet(nn.Layer):
                 output_attentions,
                 use_cache,
                 alibi,
+                attn_mask_startend_row_indices,
                 use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
@@ -567,6 +588,7 @@ class LlamaDecoderLayerNet(nn.Layer):
                 output_attentions,
                 use_cache,
                 alibi,
+                attn_mask_startend_row_indices=attn_mask_startend_row_indices,
             )
 
         if type(outputs) is tuple:
@@ -609,10 +631,19 @@ class LlamaDecoderLayerNet(nn.Layer):
         return outputs
 
 
+class ReshardLayer(paddle.nn.Layer):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, input):
+        return input
+
+
 class GlobalOutputNet(nn.Layer):
     def __init__(self, config) -> None:
         super().__init__()
         self.config = config
+        self.reshard_replicate = ReshardLayer()
 
     @staticmethod
     def _prepare_decoder_attention_mask(attention_mask, input_shape, past_key_values_length, dtype):
@@ -647,11 +678,14 @@ class GlobalOutputNet(nn.Layer):
         if not self.config.use_flash_attention and attention_mask is None:
             # [bs, seq_len]
             attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
-
+            attention_mask = self.reshard_replicate(attention_mask)
         if self.config.alibi:
             if attention_mask is None:
                 attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
+                attention_mask = self.reshard_replicate(attention_mask)
+
             alibi = build_alibi_tensor(attention_mask, self.config.num_attention_heads, dtype=emb_dtype)
+            alibi = self.reshard_replicate(alibi)
         else:
             alibi = None
         if self.config.use_flash_attention and not self.config.alibi:
@@ -662,6 +696,7 @@ class GlobalOutputNet(nn.Layer):
             attention_mask = self._prepare_decoder_attention_mask(
                 attention_mask, (batch_size, seq_length), cache_length, emb_dtype
             )  # [bs, 1, seq_len, seq_len]
+            attention_mask = self.reshard_replicate(attention_mask)
         return position_ids, attention_mask, alibi
 
 
@@ -709,6 +744,9 @@ class LlamaModelNet(LlamaPretrainedModelNet):
 
         self.gradient_checkpointing = False
 
+        self.reshard_row = ReshardLayer()
+        self.reshard_row_and_col = ReshardLayer()
+
     def get_input_embeddings(self):
         return self.embed_tokens
 
@@ -726,6 +764,7 @@ class LlamaModelNet(LlamaPretrainedModelNet):
         output_attentions=False,
         output_hidden_states=None,
         return_dict=False,
+        attn_mask_startend_row_indices=None,
         **kwargs,
     ):
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
@@ -791,6 +830,10 @@ class LlamaModelNet(LlamaPretrainedModelNet):
             cache_length,
             inputs_embeds.dtype,
         )
+        if attention_mask is not None:
+            attention_mask = self.reshard_row(attention_mask)
+        if alibi is not None:
+            alibi = self.reshard_row_and_col(alibi)
         # print(position_ids, attention_mask, alibi)
         hidden_states = inputs_embeds
 
@@ -820,6 +863,7 @@ class LlamaModelNet(LlamaPretrainedModelNet):
                     past_key_value,
                     use_cache,
                     alibi,
+                    attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                 )
             else:
                 layer_outputs = decoder_layer(
@@ -830,6 +874,7 @@ class LlamaModelNet(LlamaPretrainedModelNet):
                     past_key_value,
                     use_cache,
                     alibi,
+                    attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                 )
 
             if type(layer_outputs) is tuple:
@@ -918,6 +963,48 @@ class LlamaLMHeadNet(nn.Layer):
             tensor_parallel_output = self.config.tensor_parallel_output
         logits = paddle.matmul(hidden_states, self.weight, transpose_y=False)
         return logits
+
+
+def layer_input_parallel_row_hook(process_mesh):
+    def hook(layer, inputs, output=None):
+        res_inputs = []
+        for input in inputs:
+            if not input.is_dist():
+                x = dist.shard_tensor(input, process_mesh, [dist.Shard(0), dist.Replicate()])
+                res_inputs.append(dist.reshard(x, process_mesh, [dist.Shard(0), dist.Replicate()]))
+            else:
+                res_inputs.append(dist.reshard(input, process_mesh, [dist.Shard(0), dist.Replicate()]))
+        return tuple(res_inputs)
+
+    return hook
+
+
+def layer_input_parallel_row_and_col_hook(process_mesh):
+    def hook(layer, inputs, output=None):
+        res_inputs = []
+        for input in inputs:
+            if not input.is_dist():
+                x = dist.shard_tensor(input, process_mesh, [dist.Shard(0), dist.Shard(1)])
+                res_inputs.append(dist.reshard(x, process_mesh, [dist.Shard(0), dist.Shard(1)]))
+            else:
+                res_inputs.append(dist.reshard(input, process_mesh, [dist.Shard(0), dist.Shard(1)]))
+        return tuple(res_inputs)
+
+    return hook
+
+
+def layer_input_replicate_hook(process_mesh):
+    def hook(layer, inputs, output=None):
+        res_inputs = []
+        for input in inputs:
+            if not input.is_dist():
+                x = dist.shard_tensor(input, process_mesh, [dist.Replicate(), dist.Replicate()])
+                res_inputs.append(dist.reshard(x, process_mesh, [dist.Replicate(), dist.Replicate()]))
+            else:
+                res_inputs.append(dist.reshard(input, process_mesh, [dist.Replicate(), dist.Replicate()]))
+        return tuple(res_inputs)
+
+    return hook
 
 
 class LlamaForCausalLMNet(LlamaPretrainedModelNet):
@@ -1016,6 +1103,7 @@ class LlamaForCausalLMNet(LlamaPretrainedModelNet):
         output_attentions=None,
         output_hidden_states=None,
         return_dict=None,
+        attn_mask_startend_row_indices=None,
     ):
         input_ids.stop_gradient = True
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
@@ -1033,6 +1121,7 @@ class LlamaForCausalLMNet(LlamaPretrainedModelNet):
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
+            attn_mask_startend_row_indices=attn_mask_startend_row_indices,
         )
 
         hidden_states = outputs[0]  # [bs, seq_len, dim]
@@ -1057,6 +1146,9 @@ class LlamaForCausalLMNet(LlamaPretrainedModelNet):
                         dist.ColWiseParallel(),
                         dist.SequenceParallelBegin(),
                     ],
+                    f"{prefix}llama.reshard_row": PrepareLayerInput(layer_input_parallel_row_hook),
+                    f"{prefix}llama.reshard_row_and_col": PrepareLayerInput(layer_input_parallel_row_and_col_hook),
+                    f"{prefix}llama.global_layer.reshard_replicate": PrepareLayerInput(layer_input_replicate_hook),
                     f"{prefix}llama.layers.*.self_attn.qkv_proj": dist.ColWiseParallel(),
                     f"{prefix}llama.layers.*.self_attn.q_proj": dist.ColWiseParallel(),
                     f"{prefix}llama.layers.*.self_attn.k_proj": dist.ColWiseParallel(),
@@ -1074,7 +1166,10 @@ class LlamaForCausalLMNet(LlamaPretrainedModelNet):
             },
             "mp_config": {
                 "parallelize_plan": {
-                    f"{prefix}llama.embed_tokens": dist.RowWiseParallel(),
+                    f"{prefix}llama.embed_tokens": dist.ColWiseParallel(gather_output=True),
+                    f"{prefix}llama.reshard_row": PrepareLayerInput(layer_input_parallel_row_hook),
+                    f"{prefix}llama.reshard_row_and_col": PrepareLayerInput(layer_input_parallel_row_and_col_hook),
+                    f"{prefix}llama.global_layer.reshard_replicate": PrepareLayerInput(layer_input_replicate_hook),
                     f"{prefix}llama.layers.*.self_attn.qkv_proj": dist.ColWiseParallel(),
                     f"{prefix}llama.layers.*.self_attn.q_proj": dist.ColWiseParallel(),
                     f"{prefix}llama.layers.*.self_attn.k_proj": dist.ColWiseParallel(),
@@ -1091,3 +1186,40 @@ class LlamaForCausalLMNet(LlamaPretrainedModelNet):
         }
 
         return config
+
+
+class LlamaForCausalLMNetDPO(LlamaForCausalLMNet):
+    def __init__(self, config):
+        super().__init__(config)
+
+    def forward(
+        self,
+        input_ids=None,
+        position_ids=None,
+        response_indexs=None,
+        attention_mask=None,
+        chosen_labels=None,
+        rejected_labels=None,
+        attn_mask_startend_row_indices=None,
+        labels=None,
+        inputs_embeds=None,
+        use_cache=False,
+        past_key_values=None,
+        output_attentions=None,
+        output_hidden_states=None,
+        return_dict=None,
+    ):
+        logits = super().forward(
+            input_ids=input_ids,
+            labels=labels,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
+            use_cache=use_cache,
+            past_key_values=past_key_values,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+            attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+        )
+        return logits

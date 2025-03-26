@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import os
 import random
 import time
@@ -28,6 +29,7 @@ from tqdm.auto import tqdm
 
 from paddlenlp.trainer import Trainer
 
+from ..transformers.model_utils import unwrap_model
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.log import logger
 from .argparser import strtobool
@@ -286,12 +288,39 @@ class AutoTrainer(Trainer):
                 paddle.assign(local_micro_batch, global_micro_batch._local_value())
             return global_micro_batchs
 
+        skip_next_i = False
         for i, (key, dtensors) in enumerate(inputs.items()):
+            if skip_next_i:
+                skip_next_i = False
+                continue
             if isinstance(dtensors, paddle.Tensor):
                 if self.dense_tensor_idx is not None and self.dense_tensor_idx[i] != []:
-                    global_datas = dtensors.split(self.args.gradient_accumulation_steps, axis=0)
-                    for index, data in enumerate(global_datas):
-                        global_micro_batchs[index].update({key: data})
+                    next_dtensor = dtensors[i + 1]
+                    if isinstance(next_dtensor, paddle.Tensor):
+                        next_dtensor_list = (
+                            paddle.prod(next_dtensor, axis=-1) if len(next_dtensor.shape) != 1 else next_dtensor
+                        )
+                        global_datas = dtensors.split(next_dtensor_list.cast("int64").tolist(), axis=0)
+                        for index in range(self.args.gradient_accumulation_steps):
+                            tensor_list = []
+                            for offset in range(self.args.per_device_train_batch_size):
+                                tensor_list.append(
+                                    global_datas[index * self.args.per_device_train_batch_size + offset]
+                                )
+                            concat_tensor = paddle.concat(tensor_list, axis=0)
+                            global_micro_batchs[index].update({key: [concat_tensor]})
+                        global_datas_next = next_dtensor.split(self.args.gradient_accumulation_steps, axis=0)
+                        for index, data in enumerate(global_datas):
+                            global_micro_batchs[index].update({key: data})
+                    elif isinstance(next_dtensor, int):
+                        global_datas = dtensors.split(next_dtensor, axis=0)
+                        for index, data in enumerate(global_datas):
+                            global_micro_batchs[index].update({key: data})
+                        for index in range(self.args.gradient_accumulation_steps):
+                            global_micro_batchs[index].update({key: next_dtensor})
+                    else:
+                        raise ValueError(f"unsupported split dense_tensor with type: {type(next_dtensor)}")
+                    skip_next_i = True
                 else:
                     mesh, placements = dtensors.process_mesh, dtensors.placements
                     global_datas = split_dtensor_by_axis(dtensors, 0)
@@ -302,15 +331,56 @@ class AutoTrainer(Trainer):
                     for j in range(self.args.gradient_accumulation_steps):
                         global_micro_batchs[j].update({key: []})
                 else:
+                    skip_next_j = False
                     for j, dtensor in enumerate(dtensors):
+                        if skip_next_j:
+                            skip_next_j = False
+                            continue
                         if isinstance(dtensor, paddle.Tensor):
                             if self.dense_tensor_idx is not None and j in self.dense_tensor_idx[i]:
-                                global_datas = dtensor.split(self.args.gradient_accumulation_steps, axis=0)
-                                for index, data in enumerate(global_datas):
-                                    if key in global_micro_batchs[index].keys():
-                                        global_micro_batchs[index][key].append(data)
-                                    else:
-                                        global_micro_batchs[index].update({key: [data]})
+                                next_dtensor = dtensors[j + 1]
+                                if isinstance(next_dtensor, paddle.Tensor):
+                                    next_dtensor_list = (
+                                        paddle.prod(next_dtensor, axis=-1)
+                                        if len(next_dtensor.shape) != 1
+                                        else next_dtensor
+                                    )
+                                    global_datas = dtensor.split(next_dtensor_list.cast("int64").tolist(), axis=0)
+                                    for index in range(self.args.gradient_accumulation_steps):
+                                        tensor_list = []
+                                        for offset in range(self.args.per_device_train_batch_size):
+                                            tensor_list.append(
+                                                global_datas[index * self.args.per_device_train_batch_size + offset]
+                                            )
+                                        concat_tensor = paddle.concat(tensor_list, axis=0)
+                                        if key in global_micro_batchs[index].keys():
+                                            global_micro_batchs[index][key].append(concat_tensor)
+                                        else:
+                                            global_micro_batchs[index].update({key: [concat_tensor]})
+
+                                    global_datas_next = next_dtensor.split(
+                                        self.args.gradient_accumulation_steps, axis=0
+                                    )
+                                    for index, data in enumerate(global_datas_next):
+                                        if key in global_micro_batchs[index].keys():
+                                            global_micro_batchs[index][key].append(data)
+                                        else:
+                                            global_micro_batchs[index].update({key: [data]})
+                                elif isinstance(next_dtensor, int):
+                                    global_datas = dtensor.split(next_dtensor, axis=0)
+                                    for index, data in enumerate(global_datas):
+                                        if key in global_micro_batchs[index].keys():
+                                            global_micro_batchs[index][key].append(data)
+                                        else:
+                                            global_micro_batchs[index].update({key: [data]})
+                                    for index in range(self.args.gradient_accumulation_steps):
+                                        if key in global_micro_batchs[index].keys():
+                                            global_micro_batchs[index][key].append(next_dtensor)
+                                        else:
+                                            global_micro_batchs[index].update({key: next_dtensor})
+                                else:
+                                    raise ValueError(f"unsupported split dense_tensor with type: {type(next_dtensor)}")
+                                skip_next_j = True
                             else:
                                 mesh, placements = dtensor.process_mesh, dtensor.placements
                                 global_datas = split_dtensor_by_axis(dtensor, 0)
@@ -463,7 +533,8 @@ class AutoTrainer(Trainer):
                 if self.args.to_static:
                     schedule_start_step = self.args.job_schedule_profiler_start
                     schedule_end_step = self.args.job_schedule_profiler_end
-                    switch_job_schedule_profiler(model, step, schedule_start_step, schedule_end_step)
+                    if schedule_start_step >= 0:
+                        switch_job_schedule_profiler(model, step, schedule_start_step, schedule_end_step)
 
                 for inputs in inputs_list:
                     if step_control % args.gradient_accumulation_steps == 0:
@@ -763,9 +834,7 @@ class AutoTrainer(Trainer):
                         OPTIMIZER_NAME: optim_state_dict,
                     }
 
-                self._save_ckpt_func(state_dict, os.path.join(output_dir, DIST_CKPT_PATH))
-                logger.info(f"Model weights and optimizer states saved in {output_dir}/{DIST_CKPT_PATH}")
-
+                self._save(output_dir=os.path.join(output_dir, DIST_CKPT_PATH), state_dict=state_dict)
                 # FIXME: maybe only save one copy
                 paddle.save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
 
@@ -831,10 +900,20 @@ class AutoTrainer(Trainer):
                 self.tokenizer.save_pretrained(output_dir)
             # Good practice: save your training arguments together with the trained model
             paddle.save(self.args, os.path.join(output_dir, TRAINING_ARGS_NAME))
+            # Save the config
+            model_to_save = unwrap_model(self.model)
+            config_to_save = copy.deepcopy(model_to_save.config)
+            config_to_save.mp_degree = getattr(config_to_save, "config_to_save", 1)
+            # Attach architecture to the config
+            config_to_save.architectures = [model_to_save.__class__.__name__]
+
+            config_to_save.save_pretrained(output_dir)
+            if self.model.can_generate():
+                model_to_save.generation_config.save_pretrained(output_dir)
 
         if self.args.should_save_model_state:
-            self._save_ckpt_func(self.model.state_dict(), os.path.join(output_dir, MODEL_NAME))
-            logger.info(f"Model weights saved in {output_dir}/{MODEL_NAME}")
+            self._save_ckpt_func(self.model.state_dict(), output_dir)
+            logger.info(f"Model weights and optimizer states saved in {output_dir}")
 
     def _load_from_checkpoint(self, resume_from_checkpoint=None):
 

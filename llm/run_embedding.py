@@ -27,6 +27,8 @@ from paddlenlp.transformers import (
     AutoTokenizer,
     Qwen2Config,
     Qwen2SentenceEmbedding,
+    XLMRobertaConfig,
+    XLMRobertaSentenceEmbedding,
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig
 from paddlenlp.trl import DataConfig, EmbeddingTrainer, ModelConfig, SFTConfig
@@ -84,7 +86,7 @@ def main():
         dtype=dtype,
         from_aistudio=model_args.from_aistudio,
     )
-    assert isinstance(model_config, Qwen2Config), "Now only qwen2 supported"
+    assert isinstance(model_config, (XLMRobertaConfig, Qwen2Config)), "Only XLMRoberta and Qwen2 are supported"
 
     LlmMetaConfig.set_llm_config(model_config, training_args)
     model_config.use_fast_layer_norm = model_args.use_fast_layer_norm
@@ -106,7 +108,10 @@ def main():
     model_config.embedding_negatives_cross_device = embedding_args.embedding_negatives_cross_device
     logger.info(f"Final model config: {model_config}")
 
-    model_class = Qwen2SentenceEmbedding
+    if isinstance(model_config, XLMRobertaConfig):
+        model_class = XLMRobertaSentenceEmbedding
+    elif isinstance(model_config, Qwen2Config):
+        model_class = Qwen2SentenceEmbedding
 
     if model_args.continue_training and not training_args.autotuner_benchmark:
         model = model_class.from_pretrained(
@@ -248,6 +253,7 @@ def main():
         return_tensors="np",
         return_attention_mask=not model_args.flash_mask,
         pad_to_multiple_of=data_args.pad_to_multiple_of,
+        return_position_ids=embedding_args.return_position_ids,
     )
     trainer = EmbeddingTrainer(
         model=model,

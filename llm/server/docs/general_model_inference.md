@@ -12,7 +12,7 @@
 |cuda版本| 支持硬件架构|镜像地址|支持的典型设备|
 |:------|:-:|:-:|:-:|
 | cuda11.8 | 70 75 80 86 |ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda118-cudnn8-v2.1 |V100，T4，A100，A30，A10 |
-| cuda12.4 | 80 86 89 90 |ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.1 |A100，A30，A10,L20，H20，H100 |
+| cuda12.4 | 80 86 89 90 |ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.1 |A100，A30，A10，L20，H20，H800 |
 
  ### 静态图快速部署
 
@@ -31,7 +31,7 @@ Note:
 **A100部署示例**
 ```shell
 export MODEL_PATH=${MODEL_PATH:-$PWD}
-export model_name=${model_name:-"meta-llama/Meta-Llama-3-8B-Instruct-Append-Attn/bfloat16"}
+export model_name=${model_name:-"deepseek-ai/DeepSeek-R1-Distill-Llama-8B/weight_only_int8"}
 docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
 -v $MODEL_PATH:/models -e "model_name=${model_name}" \
 -dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.1 /bin/bash \

@@ -244,10 +244,9 @@ export NCCL_IB_DISABLE=0
 export PYTHONPATH=$(dirname "$PWD"):$PYTHONPATH
 # https://github.com/PaddlePaddle/Paddle/pull/69410 合入影响
 # 如不设置参数为1,则默认选择不带tensor fusion的sharding stage1版本
-export FLAGS_enable_sharding_stage1_tensor_fusion=1
 
 # 只有13b的任务需要打开CUDA_DEVICE_MAX_CONNECTIONS,7b与13b关闭
-export CUDA_DEVICE_MAX_CONNECTIONS=1
+# export CUDA_DEVICE_MAX_CONNECTIONS=1
 export PARALLEL_CROSS_ENTROPY=true
 # benchmark框架中会默认设置CUDA_MODULE_LOADING=LAZY,影响case执行，修复框架问题后再移除该变量
 unset CUDA_MODULE_LOADING

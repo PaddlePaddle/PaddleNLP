@@ -142,7 +142,7 @@ class MoEGateMixin:
         batch_size, seq_len, _ = gates.shape
         ce = paddle.zeros([batch_size, self.num_experts])
         topk_idx = topk_idx.reshape([batch_size, -1])
-        ce.put_along_axis_(indices=topk_idx, values=paddle.ones([batch_size, seq_len * top_k]), axis=1)
+        ce.put_along_axis_(indices=topk_idx, values=paddle.ones([batch_size, seq_len * top_k]), axis=1, reduce="add")
         ce = ce / (seq_len * top_k / self.num_experts)
         aux_loss = (ce * paddle.mean(gates, axis=1)).sum(axis=1).mean()
         return aux_loss
@@ -221,44 +221,16 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         Returns:
             paddle.Tensor: cumsum locations
         """
-        # Make num_selected_experts the leading axis to ensure that top-1 choices
-        # have priority over top-2 choices, which have priority over top-3 choices,
-        # etc.
-        expert_index = paddle.transpose(topk_idx, [1, 0])  # [topk, B*S]
-        # Shape: [num_selected_experts * tokens_per_group]
-        expert_index = expert_index.reshape([-1])
+        _, k = topk_idx.shape
+        # Shape: [seq_len * k]
+        chosen_expert = topk_idx.reshape([-1])
+        # Shape: [seq_len * k, num_experts].
+        token_priority = F.one_hot(chosen_expert, self.num_experts).cast(paddle.int32)
+        token_priority = paddle.logical_and(token_priority > 0, token_priority.cumsum(axis=0) < capacity)
+        # Shape: [seq_len, num_experts].
+        token_priority = token_priority.reshape([-1, k, self.num_experts]).sum(axis=1)
 
-        # Create mask out of indices.
-        # Shape: [tokens_per_group * num_selected_experts, num_experts].
-        expert_mask = F.one_hot(expert_index, self.num_experts).cast(paddle.int32)
-
-        # Experts have a fixed capacity that we cannot exceed. A token's priority
-        # within the expert's buffer is given by the masked, cumulative capacity of
-        # its target expert.
-        # Shape: [tokens_per_group * num_selected_experts, num_experts].
-        token_priority = paddle.cumsum(expert_mask, axis=0) * expert_mask - 1
-        # Shape: [num_selected_experts, tokens_per_group, num_experts].
-        token_priority = token_priority.reshape((self.top_k, -1, self.num_experts))
-        # Shape: [tokens_per_group, num_selected_experts, num_experts].
-        token_priority = paddle.transpose(token_priority, [1, 0, 2])
-        # For each token, across all selected experts, select the only non-negative
-        # (unmasked) priority. Now, for group G routing to expert E, token T has
-        # non-negative priority (i.e. token_priority[G,T,E] >= 0) if and only if E
-        # is its targeted expert.
-        # Shape: [tokens_per_group, num_experts].
-        token_priority = paddle.max(token_priority, axis=1)
-
-        # Token T can only be routed to expert E if its priority is positive and
-        # less than the expert capacity. One-hot matrix will ignore indices outside
-        # the range [0, expert_capacity).
-        # Shape: [tokens_per_group, num_experts, expert_capacity].
-        valid_mask = paddle.logical_and(token_priority >= 0, token_priority < capacity)
-        token_priority = paddle.masked_fill(token_priority, ~valid_mask, 0)
-        dispatch_mask = F.one_hot(token_priority, capacity).cast(paddle.int32)
-        valid_mask = valid_mask.unsqueeze(-1).expand(valid_mask.shape + [capacity])
-        dispatch_mask = paddle.masked_fill(dispatch_mask, ~valid_mask, 0)
-
-        return dispatch_mask
+        return (token_priority > 0.0).astype("float32")
 
     def _topk_greedy(self, scores: paddle.Tensor, k: int) -> Tuple[paddle.Tensor, paddle.Tensor]:
         """_summary_
@@ -297,13 +269,13 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         assert n_experts % n_group == 0, "n_experts must be divisible by n_groups"
 
         group_scores = scores.reshape([0, n_group, -1]).max(axis=-1)  # [n, n_group]
-        group_idx = paddle.topk(group_scores, k=topk_group, axis=-1, sorted=False)[1]  # [n, top_k_group]
+        group_idx = paddle.topk(group_scores, k=topk_group, axis=-1, sorted=True)[1]  # [n, top_k_group]
         group_mask = paddle.zeros_like(group_scores).put_along_axis(group_idx, paddle.to_tensor(1.0), axis=-1)  # fmt:skip
         score_mask = (
             group_mask.unsqueeze(-1).expand([bsz_seq_len, n_group, n_experts // n_group]).reshape([bsz_seq_len, -1])
         )  # [n, e]
         tmp_scores = scores * score_mask  # [n, e]
-        topk_weight, topk_idx = paddle.topk(tmp_scores, k=k, axis=-1, sorted=False)
+        topk_weight, topk_idx = paddle.topk(tmp_scores, k=k, axis=-1, sorted=True)
 
         return topk_weight, topk_idx
 
@@ -333,13 +305,13 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         group_scores = (
             scores_for_choice.reshape([bsz_seq_len, self.n_group, -1]).topk(2, axis=-1)[0].sum(axis=-1)
         )  # fmt:skip [n, n_group]
-        group_idx = paddle.topk(group_scores, k=topk_group, axis=-1, sorted=False)[1]  # [n, top_k_group]
+        group_idx = paddle.topk(group_scores, k=topk_group, axis=-1, sorted=True)[1]  # [n, top_k_group]
         group_mask = paddle.zeros_like(group_scores).put_along_axis(group_idx, paddle.to_tensor(1.0, dtype="float32"), axis=-1)  # fmt:skip
         score_mask = (
             group_mask.unsqueeze(-1).expand([bsz_seq_len, n_group, n_experts // n_group]).reshape([bsz_seq_len, -1])
         )  # [n, e]
         tmp_scores = scores_for_choice * score_mask  # [n, e]
-        topk_weight, topk_idx = paddle.topk(tmp_scores, k=k, axis=-1, sorted=False)
+        topk_weight, topk_idx = paddle.topk(tmp_scores, k=k, axis=-1, sorted=True)
         topk_weight = scores.take_along_axis(topk_idx, axis=1) if not self.training else topk_weight
 
         return topk_weight, topk_idx
@@ -560,20 +532,21 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
             token_priority = self._priority(top_idx, capacity)
 
         # normalize gates
+        gates_masked = gates * mask
         if self.training:
-            gates_masked = gates * mask
             gates_s = paddle.sum(gates_masked, axis=-1, keepdim=True)
             denom_s = paddle.clip(gates_s, min=paddle.finfo(gates_masked.dtype).eps)
             if self.norm_topk_prob:
                 gates_masked = gates_masked / denom_s
-            combine_weights = paddle.einsum("se,sec->sec", gates_masked, token_priority.cast(paddle.float32))
-        else:
-            topk_masked_gates = paddle.zeros_like(gates).put_along_axis(top_idx, top_gate, axis=1)
-            combine_weights = paddle.einsum("se,sec->sec", topk_masked_gates, token_priority.cast(paddle.float32))
 
-        dispatch_mask = combine_weights.cast(paddle.bool)
-
-        return capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss
+        return (
+            capacity,
+            gates_masked.take_along_axis(top_idx, axis=-1),
+            top_idx,
+            token_priority.take_along_axis(top_idx, axis=-1),
+            l_aux,
+            l_zloss,
+        )
 
     def topkgating_nodrop(self, gates: paddle.Tensor):
         """Implements TopKGating on logits."""

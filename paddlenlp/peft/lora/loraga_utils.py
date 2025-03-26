@@ -167,7 +167,7 @@ def get_module_gradient(
 
     rank_suffix = "_" + str(local_rank)
     local_grad_name = ".".join(grad_name.split(".")[1:]) + ".weight" + rank_suffix
-    gradient = gradient_dict.pop(local_grad_name).cuda()
+    gradient = gradient_dict.pop(local_grad_name)._copy_to(paddle.framework._current_expected_place(), False)
 
     is_fleet_init = True
     try:
@@ -187,7 +187,7 @@ def get_module_gradient(
             dist.all_gather(output_tensors, gradient, group=model_parallel_group)
 
             output_tensors = [t if len(t.shape) > 0 else t.reshape_([-1]) for t in output_tensors]
-            gradient = merge_func(output_tensors).cuda()
+            gradient = merge_func(output_tensors)._copy_to(paddle.framework._current_expected_place(), False)
 
     # sharding
     if sharding_degree > 1:
@@ -381,7 +381,12 @@ class GradientOffloadHookContext:
                             gradient_dict[local_grad_name] = grad.clone() / self.loraga_init_iters
                     else:
                         if self.gradient_offload:
-                            new_grad = gradient_dict[local_grad_name].cuda() + grad / self.loraga_init_iters
+                            new_grad = (
+                                gradient_dict[local_grad_name]._copy_to(
+                                    paddle.framework._current_expected_place(), False
+                                )
+                                + grad / self.loraga_init_iters
+                            )
                             gradient_dict[local_grad_name] = new_grad.cpu()
                         else:
                             gradient_dict[local_grad_name] += grad / self.loraga_init_iters

@@ -18,11 +18,11 @@ set -e
 export python=$1
 export paddle=$2
 export nlp_dir=/workspace/PaddleNLP
-mkdir /workspace/PaddleNLP/logs
-mkdir /workspace/PaddleNLP/model_logs
-mkdir /workspace/PaddleNLP/unittest_logs
-mkdir /workspace/PaddleNLP/coverage_logs
-mkdir /workspace/PaddleNLP/upload
+mkdir -p /workspace/PaddleNLP/logs
+mkdir -p /workspace/PaddleNLP/model_logs
+mkdir -p /workspace/PaddleNLP/unittest_logs
+mkdir -p /workspace/PaddleNLP/coverage_logs
+mkdir -p /workspace/PaddleNLP/upload
 export log_path=/workspace/PaddleNLP/model_logs
 export P0case_list=()
 export APIcase_list=()
@@ -205,25 +205,25 @@ get_diff_TO_P0case
 P0case_list=($(awk -v RS=' ' '!a[$1]++' <<< ${P0case_list[*]}))
 APIcase_list=($(awk -v RS=' ' '!a[$1]++' <<< ${APIcase_list[*]}))
 ####################################
-# upload latest paddlenlp pipelines ppddifusers whl
-if [[ ${#Build_list[*]} -ne 0 ]];then
-    echo -e "\033[32m start build ${Build_list[*]} whl \033[0m"
-    install_paddle
-    for build_pkg in ${Build_list[*]};do
-        upload ${build_pkg}
-    done
-    echo -e "\033[32m make PaddleNLP.tar.gz  \033[0m"
-    cd /workspace
-    rm -rf PaddleNLP_dev/build/*
-    cd PaddleNLP_dev && git submodule update --init --recursive
-    cd /workspace && tar -zcf PaddleNLP.tar.gz PaddleNLP_dev/
-    mv PaddleNLP.tar.gz ${PPNLP_HOME}/upload
-    # cd ${PPNLP_HOME}
-    # python upload.py ${PPNLP_HOME}/upload 'paddlenlp/wheels'
-    # rm -rf upload/*
-else
-   echo -e "\033[32m Don't need build whl  \033[0m"
-fi
+# # upload latest paddlenlp pipelines ppddifusers whl
+# if [[ ${#Build_list[*]} -ne 0 ]];then
+#     echo -e "\033[32m start build ${Build_list[*]} whl \033[0m"
+#     install_paddle
+#     for build_pkg in ${Build_list[*]};do
+#         upload ${build_pkg}
+#     done
+#     echo -e "\033[32m make PaddleNLP.tar.gz  \033[0m"
+#     cd /workspace
+#     rm -rf PaddleNLP_dev/build/*
+#     cd PaddleNLP_dev && git submodule update --init --recursive
+#     cd /workspace && tar -zcf PaddleNLP.tar.gz PaddleNLP_dev/
+#     mv PaddleNLP.tar.gz ${PPNLP_HOME}/upload
+#     cd ${PPNLP_HOME}
+#     python upload.py ${PPNLP_HOME}/upload 'paddlenlp/wheels'
+#     rm -rf upload/*
+# else
+#    echo -e "\033[32m Don't need build whl  \033[0m"
+# fi
 ###################################
 if [[ ${#P0case_list[*]} -ne 0 ]] || [[ ${#APIcase_list[*]} -ne 0 ]];then
     # Install paddlenlp

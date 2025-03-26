@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#pragma once
+
 #ifndef ATTENTION_HOPPER_MAINLOOP_LOAD_CUH_
 #define ATTENTION_HOPPER_MAINLOOP_LOAD_CUH_
 
@@ -147,7 +149,7 @@ struct CollectiveMainloop {
     int o_stride_head_num;
     int chunk_size;
     int chunk_num;
-    int max_draft_token_num;
+    int draft_total_token_num;
   };
 
   // Device side kernel params
@@ -180,7 +182,7 @@ struct CollectiveMainloop {
     int o_stride_head_num;
     int chunk_size;
     int chunk_num;
-    int max_draft_token_num;
+    int draft_total_token_num;
     TMA_KV tma_load_KV;
   };
 
@@ -219,7 +221,7 @@ struct CollectiveMainloop {
             args.o_stride_head_num,
             args.chunk_size,
             args.chunk_num,
-            args.max_draft_token_num,
+            args.draft_total_token_num,
             tma_load_KV
             };
   }
@@ -240,8 +242,8 @@ struct CollectiveMainloop {
                              const int bid,
                              const int q_tile_idx) {
     const int q_group_offset = q_tile_idx * BLOCK_SHAPE_Q;
-    int start_q_token_idx = mainloop_params.cumsum_q_seqlens[bid] + q_group_offset;
-    int offset_Q = mainloop_params.q_stride_bsz * start_q_token_idx;
+    int start_q_head_idx = mainloop_params.cumsum_q_seqlens[bid] * Ktraits::GROUP_SIZE + q_group_offset;
+    int offset_Q = mainloop_params.q_stride_head_num * start_q_head_idx;
     Tensor mQ = make_tensor(make_gmem_ptr(mainloop_params.Q_ptr + offset_Q), mainloop_params.layout_Q);
     Tensor gQ =
         local_tile(mQ, select<0, 2>(TileShape_QKD{}), make_coord(_, _0{}))(_, _, _0{});

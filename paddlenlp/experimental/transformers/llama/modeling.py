@@ -208,7 +208,7 @@ class LlamaAvxInferenceModel(LlamaPretrainedModel):
             norm_type="rmsnorm",
             epsilon=self.epsilon,
             rope_theta=self.rope_theta,
-            nranks=config.tensor_parallel_degree,
+            tp_degree=config.tensor_parallel_degree,
             avx_config=avx_config,
         )
 
@@ -245,7 +245,7 @@ class LlamaAvxInferenceModel(LlamaPretrainedModel):
         elif input_ids is None and inputs_embeds is None:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
 
-        # genereate a fake input_ids according to inputs_embeds
+        # generate a fake input_ids according to inputs_embeds
         if input_ids is None and inputs_embeds is not None:
             input_ids = self.prepare_input_ids_for_generation(self.config.bos_token_id, inputs_embeds)
         if inputs_embeds is not None:
@@ -624,7 +624,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             weightonly_group_size=self.weightonly_group_size,
             activation="swiglu",
             num_layers=config.num_hidden_layers,
-            nranks=config.tensor_parallel_degree,
+            tp_degree=config.tensor_parallel_degree,
             ring_id=ring_id,
             ln_scale_attrs=ln_scale_attrs,
             qkv_weight_attrs=qkv_weight_attrs,
@@ -740,7 +740,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         elif input_ids is None and inputs_embeds is None:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
 
-        # genereate a fake input_ids according to inputs_embeds
+        # generate a fake input_ids according to inputs_embeds
         # this is usually occurred in img2txt multimodal model when first enter into this forward function.
         if input_ids is None and inputs_embeds is not None:
             input_ids = self.prepare_input_ids_for_generation(self.config.bos_token_id, inputs_embeds)
