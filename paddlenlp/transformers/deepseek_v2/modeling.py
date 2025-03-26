@@ -54,6 +54,7 @@ except:
     pass
 
 try:
+    from paddle.nn.functional import flash_attn_v3
     from paddle.nn.functional.flash_attention import flash_attention
 except:
     flash_attention = None
@@ -85,6 +86,9 @@ from .fp8_linear import FP8DeepseekV2MLP, FP8KeepXLinear, FP8Linear, Linear
 
 DSV3_USE_FP8_GEMM = os.getenv("DSV3_USE_FP8_GEMM", "False").lower() == "true"
 DSV3_USE_ATTEN_RECOMPUTE = os.getenv("DSV3_USE_ATTEN_RECOMPUTE", "False").lower() == "true"
+
+FA_VERSION = int(os.getenv("FA_VERSION", 2))
+
 Linear = FP8Linear if DSV3_USE_FP8_GEMM else Linear
 
 try:
@@ -1034,74 +1038,132 @@ class MemroyRecomputeAttnFunc(paddle.autograd.PyLayer):
 
         q_head_dim = query_states.shape[-1]
         softmax_scale = softmax_scale * (q_head_dim**0.5)
-        query_states = query_states * softmax_scale
-        kv_seq_len = value_states.shape[1]
-        v_num_heads = value_states.shape[2]
-        value_padding = paddle.zeros(
-            [bsz, kv_seq_len, v_num_heads, q_head_dim - v_head_dim],
-            dtype=value_states.dtype,
-        )
-        value_states_pad = paddle.concat([value_states, value_padding], axis=-1)
 
-        attn_out, _, softmax_lse, seed_offset = _C_ops.flash_attn(
-            query_states,
-            key_states,
-            value_states_pad,
-            None,
-            None,
-            0.0,
-            True,
-            False,
-            False,
-            "",
-        )
+        if FA_VERSION == 2:
+            query_states = query_states * softmax_scale
+            kv_seq_len = value_states.shape[1]
+            v_num_heads = value_states.shape[2]
+            value_padding = paddle.zeros(
+                [bsz, kv_seq_len, v_num_heads, q_head_dim - v_head_dim],
+                dtype=value_states.dtype,
+            )
+            value_states_pad = paddle.concat([value_states, value_padding], axis=-1)
 
-        ctx.save_for_backward(
-            q_init,
-            kv_init,
-            attn_out,
-            softmax_lse,
-            seed_offset,
-            q_ln_weight,
-            kv_ln_weight,
-            q_up_weight,
-            kv_up_weight,
-            rotary_emb,
-            num_heads,
-            q_head_dim,
-            qk_nope_head_dim,
-            v_head_dim,
-            qk_rope_head_dim,
-            position_ids,
-            eps,
-            kv_lora_rank,
-            softmax_scale,
-        )
+            attn_out, _, softmax_lse, seed_offset = _C_ops.flash_attn(
+                query_states,
+                key_states,
+                value_states_pad,
+                None,
+                None,
+                0.0,
+                True,
+                False,
+                False,
+                "",
+            )
+
+        elif FA_VERSION == 3:
+            attn_out, softmax_lse = flash_attn_v3(
+                query_states, key_states, value_states, softmax_scale=softmax_scale, causal=True
+            )
+        else:
+            assert False, f"invalid {FA_VERSION=}"
+
+        if FA_VERSION == 2:
+            ctx.save_for_backward(
+                q_init,
+                kv_init,
+                attn_out,
+                softmax_lse,
+                seed_offset,
+                q_ln_weight,
+                kv_ln_weight,
+                q_up_weight,
+                kv_up_weight,
+                rotary_emb,
+                num_heads,
+                q_head_dim,
+                qk_nope_head_dim,
+                v_head_dim,
+                qk_rope_head_dim,
+                position_ids,
+                eps,
+                kv_lora_rank,
+                softmax_scale,
+            )
+        elif FA_VERSION == 3:
+            ctx.save_for_backward(
+                q_init,
+                kv_init,
+                attn_out,
+                softmax_lse,
+                q_ln_weight,
+                kv_ln_weight,
+                q_up_weight,
+                kv_up_weight,
+                rotary_emb,
+                num_heads,
+                q_head_dim,
+                qk_nope_head_dim,
+                v_head_dim,
+                qk_rope_head_dim,
+                position_ids,
+                eps,
+                kv_lora_rank,
+                softmax_scale,
+            )
+        else:
+            assert False, f"invalid {FA_VERSION=}"
+
         return attn_out
 
     @staticmethod
     def backward(ctx, dout):
-        (
-            q_init,
-            kv_init,
-            attn_out,
-            softmax_lse,
-            seed_offset,
-            q_ln_weight,
-            kv_ln_weight,
-            q_up_weight,
-            kv_up_weight,
-            rotary_emb,
-            num_heads,
-            q_head_dim,
-            qk_nope_head_dim,
-            v_head_dim,
-            qk_rope_head_dim,
-            position_ids,
-            eps,
-            kv_lora_rank,
-            softmax_scale,
-        ) = ctx.saved_tensor()
+        if FA_VERSION == 2:
+            (
+                q_init,
+                kv_init,
+                attn_out,
+                softmax_lse,
+                seed_offset,
+                q_ln_weight,
+                kv_ln_weight,
+                q_up_weight,
+                kv_up_weight,
+                rotary_emb,
+                num_heads,
+                q_head_dim,
+                qk_nope_head_dim,
+                v_head_dim,
+                qk_rope_head_dim,
+                position_ids,
+                eps,
+                kv_lora_rank,
+                softmax_scale,
+            ) = ctx.saved_tensor()
+        elif FA_VERSION == 3:
+            (
+                q_init,
+                kv_init,
+                attn_out,
+                softmax_lse,
+                q_ln_weight,
+                kv_ln_weight,
+                q_up_weight,
+                kv_up_weight,
+                rotary_emb,
+                num_heads,
+                q_head_dim,
+                qk_nope_head_dim,
+                v_head_dim,
+                qk_rope_head_dim,
+                position_ids,
+                eps,
+                kv_lora_rank,
+                softmax_scale,
+            ) = ctx.saved_tensor()
+        else:
+            assert False, f"invalid {FA_VERSION=}"
 
         q_ln_t, q_ln_invar = fused_ln.fused_rms_norm(q_init, q_ln_weight, eps)
         q = paddle.matmul(q_ln_t, q_up_weight)
@@ -1128,26 +1190,54 @@ class MemroyRecomputeAttnFunc(paddle.autograd.PyLayer):
             position_ids,
         )
 
-        q_head_dim = query_states.shape[-1]
-        query_states = query_states * softmax_scale
+        if FA_VERSION == 2:
+            q_head_dim = query_states.shape[-1]
+            query_states = query_states * softmax_scale
 
-        bsz = value_states.shape[0]
-        kv_seq_len = value_states.shape[1]
-        v_num_heads = value_states.shape[2]
-        value_padding = paddle.zeros(
-            [bsz, kv_seq_len, v_num_heads, q_head_dim - v_head_dim],
-            dtype=value_states.dtype,
-        )
-        value_states_pad = paddle.concat([value_states, value_padding], axis=-1)
-
-        with paddle.no_grad():
-
-            q_grad, k_grad, v_grad = _C_ops.flash_attn_grad(
-                query_states, key_states, value_states_pad, attn_out, softmax_lse, seed_offset, None, dout, 0.0, True
+            bsz = value_states.shape[0]
+            kv_seq_len = value_states.shape[1]
+            v_num_heads = value_states.shape[2]
+            value_padding = paddle.zeros(
+                [bsz, kv_seq_len, v_num_heads, q_head_dim - v_head_dim],
+                dtype=value_states.dtype,
             )
+            value_states_pad = paddle.concat([value_states, value_padding], axis=-1)
 
-            v_grad = v_grad[..., :v_head_dim]
-            q_grad = q_grad * softmax_scale
+            with paddle.no_grad():
+
+                q_grad, k_grad, v_grad = _C_ops.flash_attn_grad(
+                    query_states,
+                    key_states,
+                    value_states_pad,
+                    attn_out,
+                    softmax_lse,
+                    seed_offset,
+                    None,
+                    dout,
+                    0.0,
+                    True,
+                )
+
+                v_grad = v_grad[..., :v_head_dim]
+                q_grad = q_grad * softmax_scale
+        elif FA_VERSION == 3:
+            with paddle.no_grad():
+                q_grad, k_grad, v_grad = _C_ops.flash_attn_v3_grad(
+                    query_states,
+                    key_states,
+                    value_states,
+                    attn_out,
+                    softmax_lse,
+                    dout,
+                    softmax_scale,
+                    True,
+                    -1,
+                    -1,
+                    0.0,
+                    0,
+                )
+        else:
+            assert False, f"invalid {FA_VERSION=}"
 
         d_q, d_kv, d_k_pe = paddle.grad(
             outputs=[query_states, key_states, value_states],
