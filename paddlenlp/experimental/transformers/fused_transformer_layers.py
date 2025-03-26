@@ -1449,7 +1449,8 @@ class FusedMultiTransformerBase(Layer):
         tmp_scores = paddle.nn.functional.softmax(scores, axis=-1)
         topk_info = paddle.topk(tmp_scores, self.config.moe_config.top_k, axis=-1, largest=True, sorted=False)
         topk_weights = topk_info[0]
-        # topk_weights /= topk_weights.sum(axis=-1, keepdim=True)
+        if topk_only_mode is True:
+            topk_weights /= topk_weights.sum(axis=-1, keepdim=True)
         topk_idx = topk_info[1]
 
         (
@@ -1466,11 +1467,15 @@ class FusedMultiTransformerBase(Layer):
             False,
             False,)
         
+        # FP8's packed_recv_x is dequantized
         max_tokens_all = self.max_num_tokens_per_card * total_cards
-
-        x_bf16 = packed_recv_x[0].cast("bfloat16").reshape([0,0,-1,128])
+        scale_size = 128
+        x_bf16 = packed_recv_x[0].cast("bfloat16").reshape([0,0,-1,scale_size])
         scales = packed_recv_x[1].transpose([0,2,1]).unsqueeze(-1)
         permute_input_tmp = (x_bf16 * scales).reshape([-1, hidden_size]).cast("bfloat16")
+        
+        # Here we use the maximum number of tokens each expert gets, not the actual number of tokens;
+        # in high concurrency, all experts have the same number of tokens.
         # packed_recv_count += (paddle.arange(0, ep_num_per_gpu * max_tokens_all, max_tokens_all)).cast("int32")
         packed_recv_count = paddle.arange(1, ep_num_per_gpu + 1) * max_tokens_all 
 
@@ -1492,11 +1497,6 @@ class FusedMultiTransformerBase(Layer):
 
         return combined_x
 
-        # total_length = paddle.sum(packed_recv_count, axis=-1).item()
-        # permute_input_list = []
-        # for index, value in enumerate(packed_recv_count.numpy()):
-        #     permute_input_list.append(permute_input_tmp[index][:value])
-        # permute_input_per_card = paddle.concat(permute_input_list, axis=0)
 
         (
             permute_input,
