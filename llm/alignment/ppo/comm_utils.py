@@ -18,13 +18,14 @@ from enum import Enum, auto
 
 import paddle
 import paddle.distributed as dist
+from offload_utils import offload_tensor_to_cpu
 from paddle import nn
 
 from paddlenlp.trainer import strtobool
 from paddlenlp.trainer.trainer import Trainer, logger
 from paddlenlp.utils.distributed import distributed_gather
 from paddlenlp.utils.nested import flatten_list, nested_broadcast_tensor_with_empty
-from offload_utils import offload_tensor_to_cpu
+
 global_dev_id = 0 if paddle.get_device() == "cpu" else int(paddle.get_device().split(":")[1])
 
 
@@ -696,6 +697,7 @@ def new_timer_log(self, names, normalizer=1.0, reset=True):
 
 
 Trainer.export_evaluate_model = export_evaluate_model
+
 
 def masked_mean(values, mask, axis=None):
     """Compute mean of tensor with a masked values."""

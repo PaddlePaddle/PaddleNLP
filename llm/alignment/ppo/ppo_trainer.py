@@ -51,9 +51,8 @@ from models.ppo_model_utils import (  # make_attention_mask,; make_position_ids,
     make_position_ids_from_input_ids,
 )
 from paddle import nn
-from paddle.distributed.fleet.meta_parallel import PipelineLayer
 from paddle.distributed import fleet
-from paddle.distributed.fleet.meta_parallel import ParallelCrossEntropy
+from paddle.distributed.fleet.meta_parallel import ParallelCrossEntropy, PipelineLayer
 from paddle.io import DataLoader, Dataset, DistributedBatchSampler
 from paddle.utils import map_structure
 from rich.console import Console
@@ -785,8 +784,6 @@ class PPOTrainer(Trainer):
         # and PipelineParallel. maybe we should allow models to use different dist
         # strategies later
 
-        
-
         # allow reference_model/reward_model to use different dist strategy
         with guard_set_args(
             args,
@@ -1341,7 +1338,7 @@ class PPOTrainer(Trainer):
 
                 self.set_train()
                 for _ in range(self.args.update_iters):
-                    for rl_batch  in rl_batches:
+                    for rl_batch in rl_batches:
                         yield rl_batch
 
         class EpochIterator:
@@ -1521,11 +1518,7 @@ class PPOTrainer(Trainer):
         # ##### set training state and resume #####
         # consumed_samples used to set train_dataloader.batch_sampler may not be
         # correct. Thus, data cannot be resumed perfectly when not breaking at epoch end.
-        (
-            epochs_trained,
-            steps_trained_in_current_epoch,
-            steps_trained_progress_bar,
-        ) = self.init_train_state(
+        (epochs_trained, steps_trained_in_current_epoch, steps_trained_progress_bar,) = self.init_train_state(
             resume_from_checkpoint,
             train_dataloader,
             max_steps,
