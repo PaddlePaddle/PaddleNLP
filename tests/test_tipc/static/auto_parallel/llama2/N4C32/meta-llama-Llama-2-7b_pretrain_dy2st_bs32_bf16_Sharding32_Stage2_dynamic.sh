@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-param="model_item=meta-llama-Llama-2-7b_pretrain_dynamic "
+param="model_item=meta-llama-Llama-2-7b_pretrain_dynamic_auto "
 param+="run_mode=Sharding32_Stage2 "
 param+="device_num=N4C32 "
 param+="global_batch_size=32 "
