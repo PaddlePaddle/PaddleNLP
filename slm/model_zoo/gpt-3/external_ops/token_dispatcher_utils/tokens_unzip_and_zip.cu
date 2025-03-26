@@ -1,5 +1,18 @@
-#include "utils.h"
+// Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
+#include "utils.h"
 
 template <typename X_T,
           typename routemap_T,
@@ -75,12 +88,12 @@ __global__ void token_unzip_kernel(
           }
         }
       }
-      //这个syncthread可能并不必要，但尽可能为了不让线程间差太多，还是这样吧。
+      // 这个syncthread可能并不必要，但尽可能为了不让线程间差太多，还是这样吧。
       __syncthreads();
       // 处理完增广事务，对位搬搬移第一次出现的数据,可用inplace优化
-      for (int i = threadIdx.x; i < token_length; i += blockDim.x) {
-        X_unzipped[row_idx * token_length + i] = X[row_idx * token_length + i];
-      }
+      vectorized_memcpy(&X[row_idx * token_length],
+                        &X_unzipped[row_idx * token_length],
+                        token_length);
     } else {  // 线程组1， 忙等、并发处理数据搬移
       if (threadIdx.x == 0) {
         int extended_row_offset = row_idx - total_zipped_tokens_num;
@@ -95,10 +108,9 @@ __global__ void token_unzip_kernel(
       __syncthreads();  // 所有该组线程都等0号取任务，再搬移数据
       int original_row = shared_original_row;
       // 搬
-      for (int i = threadIdx.x; i < token_length; i += blockDim.x) {
-        X_unzipped[row_idx * token_length + i] =
-            X[original_row * token_length + i];
-      }
+      vectorized_memcpy(&X[original_row * token_length],
+                        &X_unzipped[row_idx * token_length],
+                        token_length);
     }
   }
 }
@@ -124,31 +136,62 @@ __global__ void tokens_weighted_zip_kernel(
 
   int local_row_fetchlist[num_experts];
   __nv_bfloat16 local_expert_problist[num_experts];
-// 填充该行token被广播到的rows和对应的概率
+
+// -------------------------初始化任务表 ------------------------
 #pragma unroll
   for (int expert = 0; expert < num_experts; ++expert) {
-    local_row_fetchlist[expert] =
+    const int fetch_row =
         zipped_expertwise_rowmap[this_row * num_experts + expert];
-    if (local_row_fetchlist[expert] >= 0)
-      local_expert_problist[expert] =
-          probs_unzipped[local_row_fetchlist[expert]];
-  }
-
-  for (int i = threadIdx.x; i < token_length; i += blockDim.x) {
-// tensor内部元素加权和
-#pragma unroll
-    for (int expert = 0; expert < num_experts; ++expert) {
-      const bool is_expert_taken = (local_row_fetchlist[expert] >= 0);
-      const int fetch_row = local_row_fetchlist[expert];
-      if (is_expert_taken) {
-      }
-      weighted_zipped_tokens[this_row * token_length + i] +=
-          is_expert_taken ? local_expert_problist[expert] *
-                                unzipped_tokens[fetch_row * token_length + i]
-                          : (__nv_bfloat16)0;
+    local_row_fetchlist[expert] = fetch_row;
+    if (fetch_row >= 0) {
+      local_expert_problist[expert] = probs_unzipped[fetch_row];
     }
   }
+
+  constexpr int vecSize = 2;  // __nv_bfloat162 = 2 x bfloat16
+  const int num_full_vec = token_length / vecSize;
+  const int remaining_elems = token_length % vecSize;
+  const int thread_stride = blockDim.x * vecSize;
+
+  // ----------------------- 填数（加权和）-------------------------
+  // 齐整区域向量化搬移
+  for (int x_offset = threadIdx.x * vecSize; x_offset < num_full_vec * vecSize;
+       x_offset += thread_stride) {
+    __nv_bfloat162 sum = {0, 0};
+    __nv_bfloat162 *out_ptr = reinterpret_cast<__nv_bfloat162 *>(
+        &weighted_zipped_tokens[this_row * token_length + x_offset]);
+#pragma unroll
+    for (int expert = 0; expert < num_experts; ++expert) {
+      const int fetch_row = local_row_fetchlist[expert];
+      const int fetch_row_index = fetch_row >= 0 ? fetch_row : 0;
+      __nv_bfloat162 token_vec = *reinterpret_cast<const __nv_bfloat162 *>(
+          &unzipped_tokens[fetch_row_index * token_length + x_offset]);
+      __nv_bfloat16 prob =
+          fetch_row >= 0 ? local_expert_problist[expert] : (__nv_bfloat16)0;
+      __nv_bfloat162 prob_vec = {prob, prob};
+      sum = __hfma2(token_vec, prob_vec, sum);
+    }
+    *out_ptr = sum;
+  }
+
+    // 剩余元素处理
+  for (int i = num_full_vec * vecSize + threadIdx.x; i < token_length;
+        i += blockDim.x) {
+    __nv_bfloat16 sum = (__nv_bfloat16)0;
+#pragma unroll
+    for (int expert = 0; expert < num_experts; ++expert) {
+      int fetch_row = local_row_fetchlist[expert];
+      int fetch_row_index = fetch_row >= 0 ? fetch_row : 0;
+      __nv_bfloat16 token_val =
+          unzipped_tokens[fetch_row_index * token_length + i];
+      __nv_bfloat16 prob =
+          fetch_row >= 0 ? local_expert_problist[expert] : (__nv_bfloat16)0;
+      sum += prob * token_val;
+    }
+    weighted_zipped_tokens[this_row * token_length + i] = sum;
+  }
 }
+
 // ---------------------------- Dispatch ---------------------------------
 void dispatch_tokens_unzip(const paddle::Tensor &X,
                            const paddle::Tensor &expert_routemap_topk,
@@ -194,7 +237,7 @@ void dispatch_tokens_unzip(const paddle::Tensor &X,
   if (topk == 8 && num_experts == 4) {             \
     DISPATCH_CASE(TOKEN_T, PROB_T, INT_T, 8, 4)    \
   } else {                                         \
-    /* 超出当前任务范围，*/               \
+    /* 超出当前任务范围，*/                        \
     std::__throw_invalid_argument;                 \
   }
 
@@ -258,7 +301,7 @@ std::vector<paddle::Tensor> tokens_weighted_zip(
     const int &num_experts) {
   PD_CHECK(unzipped_tokens.dtype() == paddle::DataType::BFLOAT16);
   int rows = unzipped_tokens.shape()[0];  // seqlen
-  int cols = unzipped_tokens.shape()[1];  //一般为7168
+  int cols = unzipped_tokens.shape()[1];  // 一般为7168
 
   //------------------------ 输出1张量 ------------------------
   auto weighted_zipped_tokens = paddle::empty({total_zipped_tokens_num, cols},
@@ -288,7 +331,7 @@ std::vector<paddle::Tensor> tokens_unzip(
            expert_prob_topk.dtype() == paddle::DataType::FLOAT32);
   PD_CHECK(expert_routemap_topk.dtype() == paddle::DataType::INT32);
   int rows = X.shape()[0];  // seqlen
-  int cols = X.shape()[1];  //一般为7168
+  int cols = X.shape()[1];  // 一般为7168
   int original_token_num = rows;
 
   //------------------------ 输出四张量 ------------------------
@@ -304,7 +347,7 @@ std::vector<paddle::Tensor> tokens_unzip(
       {total_unzipped_tokens_num}, paddle::DataType::INT32, X.place());
 
   //------------------------ 辅助二张量 ------------------------
-  //用于原子记录当前以增广的行数，其上限应为 total_unzipped_tokens_num - rows
+  // 用于原子记录当前以增广的行数，其上限应为 total_unzipped_tokens_num - rows
   auto atomic_extended_offset_counter =
       paddle::zeros({1}, paddle::DataType::INT32, X.place());
   // 增广行数的合法性向量，用于线程组1唤起

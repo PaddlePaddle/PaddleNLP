@@ -1,16 +1,4 @@
-#include <cuda.h>
-#include <cuda_bf16.h>
-#include <cuda_fp8.h>
-#include <cuda_runtime.h>
-
-#include <iostream>
-#include <limits>
-
-#include "paddle/extension.h"
-#include "paddle/phi/api/all.h"
-#include "paddle/phi/common/float8_e4m3fn.h"
-#include "paddle/phi/common/float8_e5m2.h"
-#include "paddle/phi/kernels/funcs/math_cuda_utils.h"
+#include "utils.h"
 
 __global__ void regroup_tokens_kernel(const phi::bfloat16* __restrict__ X_in,
                                       const phi::bfloat16* __restrict__ dout_in,
@@ -47,15 +35,21 @@ __global__ void regroup_tokens_kernel(const phi::bfloat16* __restrict__ X_in,
   __syncthreads();
 
   // X相关的数据搬移
+  /*
   for (int col_offset = threadIdx.x; col_offset < h1;
        col_offset += blockDim.x) {
     target_rowbase_X[col_offset] = X[row_idx * h1 + col_offset];
   }
+  */
+  vectorized_memcpy(&X[row_idx * h1], target_rowbase_X, h1);
   // dout相关的数据搬移
+  /*
   for (int col_offset = threadIdx.x; col_offset < h2;
        col_offset += blockDim.x) {
     target_rowbase_dout[col_offset] = dout[row_idx * h2 + col_offset];
   }
+  */
+  vectorized_memcpy(&dout[row_idx * h2], target_rowbase_dout, h2);
 }
 
 void dispatch_regroup_tokens_kernel(const paddle::Tensor& X,
@@ -100,7 +94,7 @@ std::vector<paddle::Tensor> regroup_tokens(const paddle::Tensor& X,
       {expert_num * token_max_per_expert, h1}, X.dtype(), X.place());
   grouped_dout = paddle::zeros(
       {expert_num * token_max_per_expert, h2}, X.dtype(), X.place());
-  //将原子计数数组初始化为0
+  // 将原子计数数组初始化为0
   auto atomic_offset_counters =
       paddle::zeros({expert_num}, paddle::DataType::INT32, X.place());
   dispatch_regroup_tokens_kernel(X,
