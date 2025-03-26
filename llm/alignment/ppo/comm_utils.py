@@ -696,3 +696,34 @@ def new_timer_log(self, names, normalizer=1.0, reset=True):
 
 
 Trainer.export_evaluate_model = export_evaluate_model
+
+def masked_mean(values, mask, axis=None):
+    """Compute mean of tensor with a masked values."""
+    return (values * mask).sum(axis=None) / mask.sum(axis=None)
+
+
+def masked_var(values, mask, unbiased=True):
+    """Compute variance of tensor with masked values."""
+    mean = masked_mean(values, mask)
+    centered_values = values - mean
+    variance = masked_mean(centered_values**2, mask)
+    if unbiased:
+        mask_sum = mask.sum()
+        if mask_sum == 0:
+            raise ValueError("At least one element in the mask has to be 1.")
+        # note that if mask_sum == 1, then there is a division by zero issue
+        # to avoid it you just need to use a larger minibatch_size
+        if mask_sum == 1:
+            raise ValueError("The sum of the mask is one, which can cause a division by zero.")
+        bessel_correction = mask_sum / (mask_sum - 1)
+        variance = variance * bessel_correction
+    return variance
+
+
+def masked_whiten(values, mask, shift_mean=True):
+    """Whiten values with masked values."""
+    mean, var = masked_mean(values, mask), masked_var(values, mask)
+    whitened = (values - mean) * paddle.rsqrt(var + 1e-8)
+    if not shift_mean:
+        whitened += mean
+    return whitened

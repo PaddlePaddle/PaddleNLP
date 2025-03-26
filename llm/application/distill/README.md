@@ -6,6 +6,11 @@
 
 在性能优化方面，我们对 MLA 算子进行多级流水线编排、精细的寄存器及共享内存分配优化，性能相比 FlashMLA 最高可提升23%。综合 FP8矩阵计算调优及动态量化算子优化等基于飞桨的 DeepSeek R1 FP8推理，单机每秒输出 token 数超1000；若采用4比特单机部署方案，每秒输出 token 数可达2000以上！推理性能显著领先其他开源方案。此外，还支持了 MTP 投机解码，突破大批次推理加速，在解码速度保持不变的情况下，吞吐提升144%；吞吐接近的情况下，解码速度提升42%。针对长序列 Prefill 阶段，通过注意力计算动态量化，首 token 推理速度提升37%。
 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/84a90f79-6fb7-434d-857e-cbd964558f02" align="middle"  width="500" />
+</p>
+
+
 DeepSeek-R1 单机 WINT4推理：以1台 H800/A800为例，部署单机4比特量化推理服务。
   * 设置变量 model_name 声明需要下载的模型，具体支持的静态图模型详见文档。
   * 设置模型存储路径 MODEL_PATH，默认挂载至容器内/models 路径下（请确认对存储路径 MODEL_PATH 具有写权限）
@@ -31,16 +36,15 @@ curl ${ip}:9965/v1/chat/completions \
   }'
 ```
 
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/84a90f79-6fb7-434d-857e-cbd964558f02" align="middle"  width="500" />
-</p>
+**详细部署启动命令请参考[DeepSeek 部署](../../docs/predict/deepseek.md)。**
+
 
 ## 2. 超详细的飞桨数据蒸馏-训练-评测方案
 我们将数据蒸馏的方案划分为三部分，分别为数据蒸馏、模型训练和模型评估，相关代码已经上传至 PaddleNLP。
 
 ## 环境准备
 
-### 安装PaddleNLP组件
+### 安装 PaddleNLP 组件
 ```shell
 pip install --upgrade paddlenlp==3.0.0b4
 ```
@@ -54,7 +58,7 @@ pip install --pre --upgrade paddlenlp -f https://www.paddlepaddle.org.cn/whl/pad
 ### 安装高性能算子组件
 请参考[文档](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/csrc)安装高性能算子组件。
 
-如果您正在使用Python3.10，可以使用如下命令安装预编译版本。
+如果您正在使用 Python3.10，可以使用如下命令安装预编译版本。
 ```shell
 pip install --pre --upgrade paddlenlp_ops -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
 ```
@@ -70,12 +74,15 @@ pip install -r requirements.txt
 我们将使用中文版 GSM8K 数据集进行数据蒸馏，随后将其转换为 JSONL 格式。
 ```python
 import os
-# 设置huggingface镜像源，加速国内下载
+
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+from copy import deepcopy
+
 from datasets import load_dataset
-# 加载huggingface上的 meta-math/GSM8K_zh 数据集
-dataset = load_dataset("meta-math/GSM8K_zh", split="train")
-# 将数据转换为 jsonl 格式
+
+# convert data for distill
+# GSM8K
+dataset = load_dataset("meta-math/GSM8K_zh")["train"]
 dataset.to_json("data/gsm8k_zh/GSM8K_zh.jsonl", force_ascii=False)
 ```
 
@@ -83,7 +90,7 @@ dataset.to_json("data/gsm8k_zh/GSM8K_zh.jsonl", force_ascii=False)
 ```shell
 python distill_data.py \
     --input_file "./data/gsm8k_zh/GSM8K_zh.jsonl" \
-    --output_dir "./data/gsm8k_zh/GSM8K_distilled_zh" \
+    --output_dir "./data/GSM8K_distilled_zh" \
     --prompt_key "question_zh" \
     --response_key "deepseek_r1_response_zh" \
     --reasoning_key "deepseek_r1_reasoning_zh" \
@@ -95,7 +102,6 @@ python distill_data.py \
     --max_tokens 32768 \
     --concurrency 16
 ```
-
 
 调用参数详细解释如下：
 ```text
@@ -117,25 +123,24 @@ python distill_data.py \
 ```text
 [deepseek-r1:7b] Data Distilling Progress:   0%|▊           | 36/8792 [05:57<15:29:58,  6.37s/it]
 
-tree ./meta-math_gsm8k_zh_distill
-./meta-math_gsm8k_zh_distill
-├── openai-meta-math_gsm8k_zh.jsonl
-├── openai-meta-math_gsm8k_zh.log
-└── openai-meta-math_gsm8k_zh.status
+tree ./data/GSM8K_distilled_zh
+./data/GSM8K_distilled_zh
+├── distilled-GSM8K_zh.jsonl
+├── distilled-GSM8K_zh.log
+└── distilled-GSM8K_zh.status
+
 0 directories, 3 files
 ```
 
 由于我们采用了8路并发，导致最终蒸馏后的数据集是乱序的，如果我们需要恢复原始数据集的顺序，可以使用以下代码：
 ```python
-import os
-os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 from datasets import load_dataset, Dataset
 
-ds = load_dataset("json", data_files="./meta-math_gsm8k_zh_distill/openai-meta-math_gsm8k_zh.jsonl", split="train")
+ds = load_dataset("json", data_files="./data/GSM8K_distilled_zh/distilled-GSM8K_zh.jsonl", split="train")
 df = ds.to_pandas()
 sorted_df = df.sort_values(by='line_num')
 sorted_ds = Dataset.from_pandas(sorted_df)
-sorted_ds.to_json("./meta-math_gsm8k_zh_distill/sorted-openai-meta-math_gsm8k_zh.jsonl", force_ascii=False)
+sorted_ds.to_json("./data/GSM8K_distilled_zh/sorted-distilled-GSM8K_zh.jsonl", force_ascii=False)
 ```
 最终我们将会得到如下字段的数据集，新增了 deepseek_r1_reasoning , deepseek_r1_response, deepseek_r1_completion_tokens 和 deepseek_r1_prompt_tokens 字段，分别对应 DeepSeek R1 的推理过程和回答。
 ```json
@@ -153,7 +158,7 @@ sorted_ds.to_json("./meta-math_gsm8k_zh_distill/sorted-openai-meta-math_gsm8k_zh
 ......
 ```
 
-接下来我们可以将蒸馏后的数据进一步进行蒸馏训练, 此处采用的数据为我们蒸馏后数据集 [PaddlePaddle/GSM8K_distilled_zh](https://huggingface.co/datasets/PaddlePaddle/GSM8K_distilled_zh), PaddleNLP 支持的格式如下:
+接下来我们可以将蒸馏后的数据进一步进行蒸馏训练， 此处采用的数据为我们蒸馏后数据集 [PaddlePaddle/GSM8K_distilled_zh](https://huggingface.co/datasets/PaddlePaddle/GSM8K_distilled_zh)，用户可自行修改输入输出数据为蒸馏后数据， PaddleNLP 支持的格式如下:
 * src : str, List(str), 模型的输入指令（instruction）、提示（prompt），模型应该执行的任务。
 * tgt : str, List(str), 模型的输出。
 样例数据：
@@ -163,31 +168,53 @@ sorted_ds.to_json("./meta-math_gsm8k_zh_distill/sorted-openai-meta-math_gsm8k_zh
 ```
 ```python
 import os
+
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+from copy import deepcopy
+
 from datasets import load_dataset
 
+# PaddlePaddle/GSM8K_distilled_zh
 dataset = load_dataset("PaddlePaddle/GSM8K_distilled_zh")
 dataset["train"].to_json("data/gsm8k_distilled_zh/GSM8K_distilled_zh-train.json", force_ascii=False)
 dataset["test"].to_json("data/gsm8k_distilled_zh/GSM8K_distilled_zh-test.json", force_ascii=False)
 
 # make data for sft
-def process_data(example):
+def process_data_zh(example):
     src = example.get("question_zh", "")
     content = example.get("deepseek_r1_response_zh", "")
     reasoning_content = example.get("deepseek_r1_reasoning_zh", "")
     tgt = reasoning_content + content
     return {"src": src, "tgt": tgt}
 
+def process_data_en(example):
+    src = example.get("question", "")
+    content = example.get("deepseek_r1_response", "")
+    reasoning_content = example.get("deepseek_r1_reasoning", "")
+    tgt = reasoning_content + content
+    return {"src": src, "tgt": tgt}
 
+# construct Chinese sft dataset
 paddlenlp_datatset = deepcopy(dataset)
 paddlenlp_datatset["train"] = paddlenlp_datatset["train"].map(
-    process_data, remove_columns=paddlenlp_datatset["train"].column_names
+    process_data_zh, remove_columns=paddlenlp_datatset["train"].column_names
 )
 paddlenlp_datatset["test"] = paddlenlp_datatset["test"].map(
-    process_data, remove_columns=paddlenlp_datatset["test"].column_names
+    process_data_zh, remove_columns=paddlenlp_datatset["test"].column_names
 )
-paddlenlp_datatset["train"].to_json("data/gsm8k_distilled_zh_sft/GSM8K_distilled_zh-train.json", force_ascii=False)
-paddlenlp_datatset["test"].to_json("data/gsm8k_distilled_zh_sft/GSM8K_distilled_zh-test.json", force_ascii=False)
+paddlenlp_datatset["train"].to_json("data/gsm8k_distilled_zh_sft/train.json", force_ascii=False)
+paddlenlp_datatset["test"].to_json("data/gsm8k_distilled_zh_sft/dev.json", force_ascii=False)
+
+# construct English sft dataset
+paddlenlp_datatset = deepcopy(dataset)
+paddlenlp_datatset["train"] = paddlenlp_datatset["train"].map(
+    process_data_en, remove_columns=paddlenlp_datatset["train"].column_names
+)
+paddlenlp_datatset["test"] = paddlenlp_datatset["test"].map(
+    process_data_en, remove_columns=paddlenlp_datatset["test"].column_names
+)
+paddlenlp_datatset["train"].to_json("data/gsm8k_distilled_en_sft/train.json", force_ascii=False)
+paddlenlp_datatset["test"].to_json("data/gsm8k_distilled_en_sft/dev.json", force_ascii=False)
 
 ```
 最终我们将会得到如下字段的数据集
@@ -197,9 +224,9 @@ paddlenlp_datatset["test"].to_json("data/gsm8k_distilled_zh_sft/GSM8K_distilled_
 ```
 
 ### 2.2. 模型训练
-通过对模型蒸馏后的模型进行精调即可让模型具备思考能力，蒸馏后的数据相对较长，需要依赖训练套件的长文训能力。PaddleNLP在精调（微调）训练进行了极致优化性能，并支持了128K长上下文训练。
+通过对模型蒸馏后的模型进行精调即可让模型具备思考能力，蒸馏后的数据相对较长，需要依赖训练套件的长文训能力。PaddleNLP 在精调（微调）训练进行了极致优化性能，并支持了128K 长上下文训练。
 
-飞桨框架凭借其独有的FlashMask高性能变长注意力掩码计算技术，结合PaddleNLP中的Zero Padding零填充数据流优化策略，实现了显存开销的大幅缩减。这一创新使得精调训练代码能够无缝地从8K扩展至前所未有的128K长文本训练，训练效率相较于LLama-Factory更是实现了显著提升，高达1.8倍。
+飞桨框架凭借其独有的 FlashMask 高性能变长注意力掩码计算技术，结合 PaddleNLP 中的 Zero Padding 零填充数据流优化策略，实现了显存开销的大幅缩减。这一创新使得精调训练代码能够无缝地从8K 扩展至前所未有的128K 长文本训练，训练效率相较于 LLama-Factory 更是实现了显著提升，高达1.8倍。
 
 在这里，我们运用了全参监督精调（SFT）算法来精细调整小型模型的参数。这一流程极为高效便捷，仅需要输入模型和数据集即可完成微调、模型压缩等任务。此外，我们提供了一键式启动多卡训练、混合精度训练、梯度累积、断点重启以及日志显示等一系列功能。同时，我们还对训练过程中的通用配置进行了封装，涵盖了优化器选择、学习率调度等关键环节。若您希望探索更多精调算法，请查阅大模型精调的相关配置指南。
 
@@ -213,12 +240,12 @@ python -u -m paddle.distributed.launch \
     sft_argument.json
 ```
 
-`sft_argument.json` 配置文件如下, 具体参数配置含义请参考[文档](../../docs/finetune.md):
+`sft_argument.json` 配置文件如下, 具体参数配置含义请参考[文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/finetune.md):
 ```json
 {
   "model_name_or_path": "Qwen/Qwen2.5-Math-7B",
-  "dataset_name_or_path": "./data/gsm8k_distilled",
-  "output_dir": "./checkpoints/Qwen/Qwen2.5-Math-7B/gsm8k_distilled/",
+  "dataset_name_or_path": "./data/gsm8k_distilled_en_sft",
+  "output_dir": "./checkpoints/Qwen2.5-Math-7B/gsm8k_distilled/",
   "per_device_train_batch_size": 1,
   "gradient_accumulation_steps": 4,
   "per_device_eval_batch_size": 1,
@@ -253,7 +280,7 @@ python -u -m paddle.distributed.launch \
 ```
 
 ### 2.3. 模型评估
-我们提供了在GSM8K上的评估脚本，便于比较模型在进行微调后在数学处理方面的能力，详细代码可以参考评估脚本。
+我们提供了在 GSM8K 上的评估脚本，便于比较模型在进行微调后在数学处理方面的能力，详细代码可以参考评估脚本。
 ```shell
 python -u -m paddle.distributed.launch \
     --devices 0,1,2,3 \
@@ -288,9 +315,9 @@ python -u -m paddle.distributed.launch \
 
 ## 3. 高效快速的飞桨模型本地部署方案
 
-经过模型评估后，用户可将模型用于下游任务部署，PaddleNLP提供了动态图高性能部署（简单易用）和服务化部署方案（高效稳定）方便用户适配不同场景使用。经过在L20环境下的测试，我们的服务化部署方案在推理性能方面展现出了卓越的表现，显著超越其他开源方案。
+经过模型评估后，用户可将模型用于下游任务部署，PaddleNLP 提供了动态图高性能部署（简单易用）和服务化部署方案（高效稳定）方便用户适配不同场景使用。经过在 L20环境下的测试，我们的服务化部署方案在推理性能方面展现出了卓越的表现，显著超越其他开源方案。
 
-|         distill model         |    框架    | 精度 | 测试并发 | 平均首token时延 (s) | 平均整句时延 (s) |  QPS  |  OTPS   | 提升比例 |
+|         distill model         |    框架    | 精度 | 测试并发 | 平均首 token 时延 (s) | 平均整句时延 (s) |  QPS  |  OTPS   | 提升比例 |
 |:-----------------------------:|:----------:|:----:|:--------:|:-------------------:|:----------------:|:-----:|:-------:|:--------:|
 | DeepSeek-R1-Distill-Qwen-32B  | vLLM-0.7.3 | W8A8 |    64    |        1.29         |      23.71       | 2.63  | 496.76  |          |
 |                               | paddlenlp  | W8A8 |    64    |        3.76         |      18.81       | 3.32  | 626.22  |   26%    |
@@ -301,81 +328,6 @@ python -u -m paddle.distributed.launch \
 | DeepSeek-R1-Distill-Qwen-1.5B | vLLM-0.7.3 | W8A8 |   256    |        0.23         |       8.34       | 28.11 | 5259.05 |          |
 |                               | paddlenlp  | W8A8 |   256    |        2.92         |       6.7        | 36.51 | 6884.9  |   31%    |
 
-
-### 3.1. Flask & Gradio UI 服务化部署
-我们提供了一套基于动态图推理的简单易用 UI 服务化部署方法，用户可以快速部署服务化推理。
-请确保，在部署前请确保已正确安装 NLP，clone 本 repo 下位置代码。以及自定义算子库。本部署的服务是兼容 OpenAI API 接口
-环境准备
-* python >= 3.8
-* gradio
-* flask
-* paddlenlp_ops (可选，高性能自定义加速算子， 安装参考 paddlenlp_ops 高性能算子安装)
-服务化部署脚本
-# 单卡，可以使用 paddle.distributed.launch 启动多卡推理
-```shell
-python  ./predict/flask_server.py \
-    --model_name_or_path Qwen/Qwen2.5-0.5B-Instruct \
-    --port 8010 \
-    --flask_port 8011 \
-    --dtype "float16"
-```
-* port: Gradio UI 服务端口号，默认8010。
-* flask_port: Flask 服务端口号，默认8011。
-* 其他参数请参见推理文档中推理参数配置。
-
-图形化界面: 打开 http://127.0.0.1:8010 即可使用 gradio 图形化界面，即可开启对话。
-API 访问: 您也可用通过 flask 服务化 API 的形式
-1. 可参考：./predict/request_flask_server.py 文件访问。
-python predict/request_flask_server.py
-2. 或者直接使用 curl,调用开始对话
-curl 127.0.0.1:8011/v1/chat/completions \
--H 'Content-Type: application/json' \
--d '{"message": [{"role": "user", "content": "你好"}]}'
-3. 使用 OpenAI 格式调用：
-```python
-from openai import OpenAI
-
-client = OpenAI(
-    api_key="EMPTY",
-    base_url="http://localhost:8011/v1/",
-)
-
-# Completion API
-stream = True
-completion = client.chat.completions.create(
-    model="default",
-    messages=[
-        {"role": "user", "content": "PaddleNLP好厉害！这句话的感情色彩是？"}
-    ],
-    max_tokens=1024,
-    stream=stream,
-)
-
-if stream:
-    for c in completion:
-        print(c.choices[0].delta.content, end="")
-else:
-    print(completion.choices[0].message.content)
-```
-
-### 3.2. 大模型服务化部署工具
-该部署工具是基于英伟达 Triton 框架专为服务器场景的大模型服务化部署而设计。它提供了支持 gRPC、HTTP 协议的服务接口，以及流式 Token 输出能力。底层推理引擎支持连续批处理、weight only int8、后训练量化（PTQ）等加速优化策略，为用户带来易用且高性能的部署体验。
-基于预编译镜像部署，本节以 DeepSeek-R1-Distill-Llama-8B（weight_only_int8） 为例，自动下载静态图进行部署，具体支持模型可查看文档。更细致的模型推理、量化教程可以参考大模型推理教程
-```shell
-export MODEL_PATH=${MODEL_PATH:-$PWD}
-export model_name=${model_name:-"deepseek-ai/DeepSeek-R1-Distill-Llama-8B/weight_only_int8"}
-docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
--v $MODEL_PATH:/models -e "model_name=${model_name}" \
--dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.1 /bin/bash \
--c -ex 'start_server $model_name && tail -f /dev/null'
-```
-等待服务启动成功（服务初次启动大概需要40s），可以通过以下命令测试：
-```shell
-curl 127.0.0.1:9965/v1/chat/completions \
--H 'Content-Type: application/json' \
--d '{"text": "hello, llm"}'
-```
-Note:
-1. 请保证 shm-size >= 5，不然可能会导致服务启动失败
-更多关于该部署工具的使用方法，请查看静态图高性能部署全流程
-2. 部署前请确认模型所需要的环境和硬件，请参考文档
+在这里我们总结部署流程如下，用户可参考[教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/general_model_inference.md)动手实践：
+- 模型动转静：将动态图模型转为静态图模型，便于推理部署。
+- 模型服务化部署：将静态图模型部署为服务，便于调用。

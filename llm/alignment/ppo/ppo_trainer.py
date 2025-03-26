@@ -36,18 +36,19 @@ from comm_utils import (
     data_group_merge,
     data_group_split,
     get_timer_label,
+    masked_whiten,
     new_timer_log,
     offload_tensor_to_cpu,
     reload_tensor_to_gpu,
 )
 from infer_utils import InferEvalModel, infer_guard
-from models.ppo_model_utils import (
+from models.ppo_model_utils import (  # make_attention_mask,; make_position_ids,
     RLHFPPOMixedLoss,
     RLHFValueLoss,
     create_loss,
+    create_startend_row_indices,
     gather_log_probabilities,
-    make_attention_mask,
-    make_position_ids,
+    make_position_ids_from_input_ids,
 )
 from paddle import nn
 from paddle.distributed.fleet.meta_parallel import PipelineLayer
@@ -509,23 +510,27 @@ class PPOMetric:
             for name in (
                 [
                     "policy_loss",
-                    "value_loss",
+                    "ptx_loss",
+                    *(["value_loss"] if self.args.rl_algorithm == "ppo" else []),
                     "reward",
                     "norm_reward",
                     "kl_reward",
                     "norm_reward_with_kl",
-                    "values",
+                    "pure_policy_loss",
+                    "entropy_loss",
+                    *(["values"] if self.args.rl_algorithm == "ppo" else []),
                     "returns",
                     "kl_divergence",
                     "mean_generated_length",
                     "max_generated_length",
                     "min_generated_length",
                 ]
-                if self.args.rl_algorithm == "ppo"
+                if self.args.rl_algorithm in ["ppo", "reinforce_plus_plus"]
                 else [
                     "policy_loss",
                     "pure_policy_loss",
                     "kl_loss",
+                    "entropy_loss",
                     "reward",
                     "kl_divergence",
                     "mean_generated_length",
@@ -535,9 +540,12 @@ class PPOMetric:
             )
         ]
 
-        self.metric_ops = (
-            ["mean"] * 10 + ["max", "min"] if self.args.rl_algorithm == "ppo" else ["mean"] * 7 + ["max", "min"]
-        )
+        if self.args.rl_algorithm == "ppo":
+            self.metric_ops = ["mean"] * 13 + ["max", "min"]
+        elif self.args.rl_algorithm == "reinforce_plus_plus":
+            self.metric_ops = ["mean"] * 11 + ["max", "min"]
+        else:
+            self.metric_ops = ["mean"] * 8 + ["max", "min"]
 
     def __init__(self, freq, args, use_stack=True):
         """
@@ -1009,27 +1017,24 @@ class PPOTrainer(Trainer):
         inputs = self._prepare_inputs(inputs)
         with self.enable(self.actor_model, self.reference_model, self.policy_trainer):
             with infer_guard(self.policy_trainer):
-                position_ids = inputs.get("position_ids", make_position_ids(inputs["attention_mask"]))
                 prompt_only_batch = {
                     "input_ids": inputs["input_ids"],
-                    "attention_mask": inputs["attention_mask"],
-                    "position_ids": position_ids,
                     **({"label_ids": inputs["label_ids"]} if self.args.use_rm_server else {}),
                 }
                 generated_seq = self.generate(prompt_only_batch, do_eval=True)[0]["input_ids"]
 
-            if self._model_config.sequence_parallel:
-                # pad to max_sequence_length
-                seq = self.tokenizer.pad(
-                    {"input_ids": [s for s in generated_seq]},
-                    padding="max_length",
-                    max_length=self._model_config.max_sequence_length,
-                    return_attention_mask=False,
-                )["input_ids"]
-            else:
-                seq = generated_seq
-
             if not self.args.use_rm_server:
+                if self._model_config.sequence_parallel:
+                    # pad to max_sequence_length
+                    seq = self.tokenizer.pad(
+                        {"input_ids": [s for s in generated_seq]},
+                        padding="longest",
+                        max_length=None,
+                        return_attention_mask=False,
+                        pad_to_multiple_of=self.args.tensor_parallel_degree,
+                    )["input_ids"]
+                else:
+                    seq = generated_seq
                 if self.reward_tokenizer is not self.tokenizer:
                     reward_tokenize_output = batch_retokenize(
                         input_ids=seq,
@@ -1037,18 +1042,14 @@ class PPOTrainer(Trainer):
                         dest_tokenizer=self.reward_tokenizer,
                     )
                     reward_input_ids = reward_tokenize_output["input_ids"]
-                    reward_attention_mask = reward_tokenize_output["attention_mask"]
+                    # reward_attention_mask = reward_tokenize_output["attention_mask"]
                     reward_position_ids = reward_tokenize_output["position_ids"]
                 else:
                     reward_input_ids = seq
-                    reward_attention_mask = make_attention_mask(
-                        seq,
-                        pad_id=self.reward_tokenizer.pad_token_id,
-                        eos_id=self.reward_tokenizer.eos_token_id,
-                        unk_id=self.reward_tokenizer.unk_token_id,
-                        causal_mask=True,
+                    reward_attention_mask = None
+                    reward_position_ids = make_position_ids_from_input_ids(
+                        reward_attention_mask, self.reward_tokenizer.pad_token_id
                     )
-                    reward_position_ids = make_position_ids(reward_attention_mask)
 
                 # .end_scores
                 reward_score = self.reward_model(
@@ -1828,24 +1829,31 @@ class PPOTrainer(Trainer):
     def rl_step(self, rl_batch: Dict[str, paddle.Tensor]) -> Dict[str, Any]:
         # inputs shared by policy and value trainer
         input_ids = rl_batch["input_ids"].contiguous()  # length: src+tgt
-        attention_mask = rl_batch["attention_mask"]  # length: src+tgt
         position_ids = rl_batch["position_ids"]  # length: src+tgt
-        sequence_mask = rl_batch["sequence_mask"]  # length: src+tgt(-1)
+        sequence_mask = rl_batch["eos_mask"]  # length: tgt(-1)
+        if self.args.use_fp32_compute and sequence_mask.dtype != paddle.float32:
+            sequence_mask = sequence_mask.cast(paddle.float32)
         # inputs used by policy trainer
-        old_log_probs = rl_batch["log_probs"]  # length: src+tgt(-1)
-        reward_advantages = rl_batch["reward_advantages"]  # length: src+tgt(-1)
+        old_log_probs = rl_batch["log_probs"]  # length: tgt(-1)
+        reward_advantages = rl_batch["reward_advantages"]  # length: tgt(-1)
 
+        response_start = rl_batch["prompt"].shape[-1] - 1
+
+        attn_mask_startend_row_indices = create_startend_row_indices(input_ids, self.tokenizer.pad_token_id)
         policy_trainer_inputs = {
             "input_ids": input_ids,
-            "attention_mask": attention_mask,
             "position_ids": position_ids,
             "old_log_probs": old_log_probs,
             "reward_advantages": reward_advantages,
             "sequence_mask": sequence_mask,
+            "response_start": response_start,
+            "attn_mask_startend_row_indices": attn_mask_startend_row_indices,
         }
 
         if self.args.rl_algorithm == "grpo":
             policy_trainer_inputs.update({"ref_log_probs": rl_batch["ref_log_probs"]})
+        else:
+            policy_trainer_inputs.update({"ref_log_probs": None})
 
         actor_loss = self.policy_trainer.full_training_step(**policy_trainer_inputs)
 
@@ -1854,13 +1862,13 @@ class PPOTrainer(Trainer):
             rewards = rl_batch["rewards"].mean()
             ori_rewards = rl_batch["ori_rewards"].mean()
             mask_cast = sequence_mask.cast(paddle.float32)
-            if self.args.rl_algorithm == "ppo":
+            if self.args.rl_algorithm in ["ppo", "reinforce_plus_plus"]:
                 kl_rewards = (rl_batch["kl_rewards"] * mask_cast).sum() / mask_cast.sum()
                 rewards_with_kl = (rl_batch["rewards_with_kl"] * mask_cast).sum() / mask_cast.sum()
-                values = (rl_batch["reward_values"] * mask_cast).sum() / mask_cast.sum()
+                if self.args.rl_algorithm == "ppo":
+                    values = (rl_batch["reward_values"] * mask_cast).sum() / mask_cast.sum()
                 returns = (rl_batch["reward_returns"] * mask_cast).sum() / mask_cast.sum()
             ref_log_probs = rl_batch["ref_log_probs"]
-            # kl_divergence = ((old_log_probs - ref_log_probs) * sequence_mask).sum(axis=-1).mean()
             kl_divergence = ((old_log_probs - ref_log_probs) * mask_cast).sum() / mask_cast.sum()
             mean_generated_length = mask_cast.sum(axis=-1).mean()
             max_generated_length = mask_cast.sum(axis=-1).max()
@@ -1875,6 +1883,7 @@ class PPOTrainer(Trainer):
                 {
                     "train_pure_policy_loss": self.policy_trainer.info_buffer.get("pure_policy_loss"),
                     "train_kl_loss": self.policy_trainer.info_buffer.get("kl_loss"),
+                    "train_entropy_loss": self.policy_trainer.info_buffer.get("entropy_loss"),
                 }
                 if self.args.rl_algorithm == "grpo"
                 else {}
@@ -1885,10 +1894,18 @@ class PPOTrainer(Trainer):
                     "train_norm_reward": rewards,
                     "train_kl_reward": kl_rewards,
                     "train_norm_reward_with_kl": rewards_with_kl,
-                    "train_values": values,
+                    "train_pure_policy_loss": self.policy_trainer.info_buffer.get("pure_policy_loss"),
+                    "train_entropy_loss": self.policy_trainer.info_buffer.get("entropy_loss"),
+                    **(
+                        {
+                            "train_values": values,
+                        }
+                        if self.args.rl_algorithm == "ppo"
+                        else {}
+                    ),
                     "train_returns": returns,
                 }
-                if self.args.rl_algorithm == "ppo"
+                if self.args.rl_algorithm in ["ppo", "reinforce_plus_plus"]
                 else {}
             ),
             "train_kl_divergence": kl_divergence,
@@ -2054,10 +2071,12 @@ class PPOTrainer(Trainer):
 
                 padding_strategy = "longest"
                 padding_max_len = None
+                pad_to_multiple_of = None
 
                 if self._model_config.sequence_parallel:
-                    padding_strategy = "max_length"
-                    padding_max_len = self._model_config.max_sequence_length
+                    pad_to_multiple_of = self.args.tensor_parallel_degree
+                #     padding_strategy = "max_length"
+                #     padding_max_len = self._model_config.max_sequence_length
 
                 truncate_max_len = self._model_config.max_position_embeddings
 
@@ -2079,30 +2098,15 @@ class PPOTrainer(Trainer):
                     padding=padding_strategy,
                     max_length=padding_max_len,
                     return_attention_mask=False,
+                    pad_to_multiple_of=pad_to_multiple_of,
                 )["input_ids"]
 
-                sequence_mask = make_attention_mask(
-                    input_ids,
-                    pad_id=self.tokenizer.pad_token_id,
-                    eos_id=None,
-                    unk_id=self.tokenizer.unk_token_id,
-                    causal_mask=False,
-                ).cast(self._model_config.dtype)
-                attention_mask = make_attention_mask(
-                    input_ids,
-                    pad_id=self.tokenizer.pad_token_id,
-                    eos_id=None,
-                    unk_id=self.tokenizer.unk_token_id,
-                    causal_mask=True,
-                ).cast(self._model_config.dtype)
-                position_ids = make_position_ids(attention_mask)
+                position_ids = make_position_ids_from_input_ids(input_ids)
                 prompt = prompt_only_batch["input_ids"][i : i + per_device_train_batch_size]
 
                 micro_batch = {
                     "prompt": prompt,
                     "input_ids": input_ids,
-                    "sequence_mask": sequence_mask,
-                    "attention_mask": attention_mask,
                     "position_ids": position_ids,
                     "index": indices[i : i + per_device_train_batch_size],
                     **(
@@ -2111,7 +2115,10 @@ class PPOTrainer(Trainer):
                         else {}
                     ),
                 }
-                micro_batch.update(self.rollout_logprob(**micro_batch))
+                if self.args.rollout_logprob_batch_size is not None:
+                    micro_batch.update(self.rollout_logprob_with_batch_size(**micro_batch))
+                else:
+                    micro_batch.update(self.rollout_logprob(**micro_batch))
                 micro_batches.append(micro_batch)
             self.timers and self.timers(get_timer_label(RolloutStages.ROLLOUT_LOGPROB)).stop()
             self.tokenizer.padding_side = origin_padding_side
@@ -2151,31 +2158,32 @@ class PPOTrainer(Trainer):
     def generate(self, prompt_only_batch: Dict, do_eval=False) -> List[Dict[str, Any]]:
         """Rollout a batch of experiences."""
         input_ids = prompt_only_batch["input_ids"]
-        attention_mask = prompt_only_batch["attention_mask"]
+        # attention_mask = prompt_only_batch["attention_mask"]
         if do_eval:
             train_num_return_sequences = self.args.num_return_sequences
             self.args.num_return_sequences = 1
 
-        position_ids = (
-            prompt_only_batch["position_ids"]
-            if "position_ids" in prompt_only_batch
-            else make_position_ids(attention_mask)
-        )
+        # position_ids = (
+        #     prompt_only_batch["position_ids"]
+        #     if "position_ids" in prompt_only_batch
+        #     else make_position_ids(attention_mask)
+        # )
 
         if self.args.num_return_sequences > 1:
             input_ids = input_ids.repeat_interleave(self.args.num_return_sequences, axis=0)
-            raw_dtype = attention_mask.dtype
-            attention_mask = (
-                attention_mask.cast("int32").repeat_interleave(self.args.num_return_sequences, axis=0).cast(raw_dtype)
-            )
-            position_ids = position_ids.repeat_interleave(self.args.num_return_sequences, axis=0)
+            # raw_dtype = attention_mask.dtype
+            # attention_mask = (
+            #     attention_mask.cast("int32").repeat_interleave(self.args.num_return_sequences, axis=0).cast(raw_dtype)
+            # )
+            # position_ids = position_ids.repeat_interleave(self.args.num_return_sequences, axis=0)
 
         sequences = self.actor_model.generate(
             input_ids=input_ids,
-            attention_mask=attention_mask,
-            position_ids=position_ids,
+            attention_mask=None,
+            position_ids=None,
             generation_config=self.generation_config,
             synced_gpus=ShardingOption.FULL_SHARD in self.policy_trainer.args.sharding,
+            do_eval=do_eval,
         )[0]
 
         if self.args.use_rm_server:
@@ -2196,20 +2204,20 @@ class PPOTrainer(Trainer):
                 "input_ids": seq,
                 **({"label_ids": label_ids[idx * len(seq) : (idx + 1) * len(seq)]} if self.args.use_rm_server else {}),
                 "index": np.array([str(uuid.uuid4())] * len(seq), dtype=object),
-                "attention_mask": make_attention_mask(
-                    seq,
-                    pad_id=self.tokenizer.pad_token_id,
-                    eos_id=None,
-                    unk_id=self.tokenizer.unk_token_id,
-                    causal_mask=True,
-                ).cast(self._model_config.dtype),
-                "sequence_mask": make_attention_mask(
-                    seq,
-                    pad_id=self.tokenizer.pad_token_id,
-                    eos_id=None,
-                    unk_id=self.tokenizer.unk_token_id,
-                    causal_mask=False,
-                ).cast(self._model_config.dtype),
+                # "attention_mask": make_attention_mask(
+                #     seq,
+                #     pad_id=self.tokenizer.pad_token_id,
+                #     eos_id=None,
+                #     unk_id=self.tokenizer.unk_token_id,
+                #     causal_mask=True,
+                # ).cast(self._model_config.dtype),
+                # "sequence_mask": make_attention_mask(
+                #     seq,
+                #     pad_id=self.tokenizer.pad_token_id,
+                #     eos_id=None,
+                #     unk_id=self.tokenizer.unk_token_id,
+                #     causal_mask=False,
+                # ).cast(self._model_config.dtype),
             }
             for idx, seq in enumerate(sequences)
         ]
@@ -2218,7 +2226,6 @@ class PPOTrainer(Trainer):
     def rollout_logprob(
         self,
         input_ids: paddle.Tensor,
-        attention_mask: paddle.Tensor,
         position_ids: paddle.Tensor = None,
         **kwargs,
     ) -> Dict[str, paddle.Tensor]:
@@ -2247,54 +2254,177 @@ class PPOTrainer(Trainer):
         """
         # pipe model outputs a logits tensor with LMHead, while non-pipe model
         # outputs a tuple with logits tensor as the only one element.
-
+        startend_row_indices = create_startend_row_indices(input_ids, self.tokenizer.pad_token_id)
+        response_start = kwargs["prompt"].shape[-1] - 1 if "prompt" in kwargs else 0
         logits = self.actor_model(
             input_ids,
-            attention_mask=attention_mask,
             position_ids=position_ids,
+            attn_mask_startend_row_indices=startend_row_indices,
             # return_dict=True,
         )  # .logits
         if not isinstance(logits, paddle.Tensor):
             logits = logits[0]  # [2, 355, 12544]
         ref_logits = self.reference_model(
             input_ids,
-            attention_mask=attention_mask,
             position_ids=position_ids,
+            attn_mask_startend_row_indices=startend_row_indices,
             # return_dict=True,
         )  # .logits
 
         if not isinstance(ref_logits, paddle.Tensor):
             ref_logits = ref_logits[0]  # [2, 355, 12544]
+
+        if self.args.use_fp32_compute and logits.dtype != paddle.float32:
+            logits = logits.cast(paddle.float32)
         logits = logits / self.args.temperature if self.args.temperature > 0.0 else logits
+        if self.args.use_fp32_compute and ref_logits.dtype != paddle.float32:
+            ref_logits = ref_logits.cast(paddle.float32)
         ref_logits = ref_logits / self.args.temperature if self.args.temperature > 0.0 else ref_logits
+
         if self.actor_model.config.tensor_parallel_degree > 1 and self.actor_model.config.tensor_parallel_output:
             log_probs = (
-                -ParallelCrossEntropy()(logits[:, :-1].astype("float32"), input_ids[:, 1:])
+                -ParallelCrossEntropy()(
+                    logits[:, response_start:-1].astype("float32"), input_ids[:, response_start + 1 :]
+                )
                 .squeeze(axis=-1)
                 .astype(logits.dtype)
             )
         else:
-            log_probs = gather_log_probabilities(logits[:, :-1], input_ids[:, 1:])
+            log_probs = gather_log_probabilities(logits[:, response_start:-1], input_ids[:, response_start + 1 :])
 
         if (
             self.reference_model.config.tensor_parallel_degree > 1
             and self.reference_model.config.tensor_parallel_output
         ):
             ref_log_probs = (
-                -ParallelCrossEntropy()(ref_logits[:, :-1].astype("float32"), input_ids[:, 1:])
+                -ParallelCrossEntropy()(
+                    ref_logits[:, response_start:-1].astype("float32"), input_ids[:, response_start + 1 :]
+                )
                 .squeeze(axis=-1)
                 .astype(ref_logits.dtype)
             )
         else:
-            ref_log_probs = gather_log_probabilities(ref_logits[:, :-1], input_ids[:, 1:])
+            ref_log_probs = gather_log_probabilities(
+                ref_logits[:, response_start:-1], input_ids[:, response_start + 1 :]
+            )
 
         return {"log_probs": log_probs, "ref_log_probs": ref_log_probs}
+
+    @paddle.no_grad()
+    def rollout_logprob_with_batch_size(
+        self,
+        input_ids: paddle.Tensor,
+        position_ids: paddle.Tensor = None,
+        **kwargs,
+    ) -> Dict[str, paddle.Tensor]:
+        # Initialize lists to store results
+        log_probs_list = []
+        ref_log_probs_list = []
+        batch_size, sequence_length = input_ids.shape
+        if str(self.args.rollout_logprob_batch_size).lower() == "auto":
+            # auto compute
+            if sequence_length > 4096 - 128:
+                rollout_logprob_batch_size = 2
+            elif sequence_length > 2048 - 128:
+                rollout_logprob_batch_size = 4
+            else:
+                rollout_logprob_batch_size = batch_size
+        else:
+            rollout_logprob_batch_size = int(self.args.rollout_logprob_batch_size)
+
+        num_batches = (batch_size + rollout_logprob_batch_size - 1) // rollout_logprob_batch_size
+        response_start = kwargs["prompt"].shape[-1] - 1 if "prompt" in kwargs else 0
+
+        startend_row_indices = create_startend_row_indices(input_ids, self.tokenizer.pad_token_id)
+
+        for i in range(num_batches):
+            # Calculate the start and end indices for the current batch
+            start_index = i * rollout_logprob_batch_size
+            end_index = min(start_index + rollout_logprob_batch_size, batch_size)
+
+            # Extract the current batch
+            current_input_ids = input_ids[start_index:end_index]
+            current_startend_row_indices = (
+                startend_row_indices[start_index:end_index] if startend_row_indices is not None else None
+            )
+            current_position_ids = position_ids[start_index:end_index] if position_ids is not None else None
+
+            logits = self.actor_model(
+                current_input_ids,
+                attention_mask=None,
+                attn_mask_startend_row_indices=current_startend_row_indices,
+                position_ids=current_position_ids,
+            )
+            if not isinstance(logits, paddle.Tensor):
+                logits = logits[0]  # [2, 355, 12544]
+
+            if self.args.use_fp32_compute and logits.dtype != paddle.float32:
+                logits = logits.cast(paddle.float32)
+            logits = logits / self.args.temperature if self.args.temperature > 0.0 else logits
+
+            if self.actor_model.config.tensor_parallel_degree > 1 and self.actor_model.config.tensor_parallel_output:
+                log_probs = (
+                    -ParallelCrossEntropy()(
+                        logits[:, response_start:-1].astype("float32"), current_input_ids[:, response_start + 1 :]
+                    )
+                    .squeeze(axis=-1)
+                    .astype(logits.dtype)
+                )
+            else:
+                log_probs = gather_log_probabilities(
+                    logits[:, response_start:-1], current_input_ids[:, response_start + 1 :]
+                )
+
+            log_probs_list.append(log_probs)
+            # set logits to none, save memory
+            logits = None
+            paddle.device.cuda.empty_cache()
+
+            ref_logits = self.reference_model(
+                current_input_ids,
+                attention_mask=None,
+                attn_mask_startend_row_indices=current_startend_row_indices,
+                position_ids=current_position_ids,
+            )
+
+            if not isinstance(ref_logits, paddle.Tensor):
+                ref_logits = ref_logits[0]  # [2, 355, 12544]
+
+            if self.args.use_fp32_compute and ref_logits.dtype != paddle.float32:
+                ref_logits = ref_logits.cast(paddle.float32)
+            ref_logits = ref_logits / self.args.temperature if self.args.temperature > 0.0 else ref_logits
+
+            if (
+                self.reference_model.config.tensor_parallel_degree > 1
+                and self.reference_model.config.tensor_parallel_output
+            ):
+                ref_log_probs = (
+                    -ParallelCrossEntropy()(
+                        ref_logits[:, response_start:-1].astype("float32"), current_input_ids[:, response_start + 1 :]
+                    )
+                    .squeeze(axis=-1)
+                    .astype(ref_logits.dtype)
+                )
+            else:
+                ref_log_probs = gather_log_probabilities(
+                    ref_logits[:, response_start:-1], current_input_ids[:, response_start + 1 :]
+                )
+            ref_log_probs_list.append(ref_log_probs)
+            # set logits to none, save memory
+            ref_logits = None
+            paddle.device.cuda.empty_cache()
+
+        if num_batches > 1:
+            return {
+                "log_probs": paddle.concat(log_probs_list, axis=0),
+                "ref_log_probs": paddle.concat(ref_log_probs_list, axis=0),
+            }
+        return {"log_probs": log_probs_list[0], "ref_log_probs": ref_log_probs_list[0]}
 
     @paddle.no_grad()
     def rollout_reward_value(
         self,
         input_ids: paddle.Tensor,
-        attention_mask: paddle.Tensor,
         position_ids: paddle.Tensor = None,
         **kwargs,
     ) -> Dict[str, paddle.Tensor]:
@@ -2322,17 +2452,19 @@ class PPOTrainer(Trainer):
                     dest_tokenizer=self.reward_tokenizer,
                 )
                 reward_input_ids = reward_tokenize_output["input_ids"]
-                reward_attention_mask = reward_tokenize_output["attention_mask"]
                 reward_position_ids = reward_tokenize_output["position_ids"]
             else:
                 reward_input_ids = input_ids
-                reward_attention_mask = attention_mask
                 reward_position_ids = position_ids
 
+            attn_mask_startend_row_indices = create_startend_row_indices(
+                reward_input_ids, self.reward_tokenizer.pad_token_id
+            )
             # .end_scores
             reward_score = self.reward_model(
                 reward_input_ids,
-                attention_mask=reward_attention_mask,
+                attention_mask=None,
+                attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                 position_ids=reward_position_ids,
                 # return_dict=True,
             )[1]
@@ -2347,14 +2479,16 @@ class PPOTrainer(Trainer):
 
         reward_score = reward_score.squeeze(axis=-1)
 
-        if self.args.rl_algorithm == "grpo":
+        if self.args.rl_algorithm in ["grpo", "reinforce_plus_plus"]:
             return {"rewards": reward_score}
 
+        attn_mask_startend_row_indices = create_startend_row_indices(input_ids, self.reward_tokenizer.pad_token_id)
         # .scores
         reward_value = self.reward_critic_model(
             input_ids,
-            attention_mask=attention_mask,
+            attention_mask=None,
             position_ids=position_ids,
+            attn_mask_startend_row_indices=attn_mask_startend_row_indices,
             # return_dict=True,
         )[0]
         reward_value = reward_value.squeeze(axis=-1)
@@ -2369,10 +2503,14 @@ class PPOTrainer(Trainer):
             try:
                 res = requests.post(self.reward_server, json=data)
                 result = json.loads(res.text)
-                reward_score = paddle.to_tensor(result["score"], dtype=self._model_config.dtype)
+                reward_score = paddle.to_tensor(
+                    result["score"], dtype=self._model_config.dtype if not self.args.use_fp32_compute else "float32"
+                )
             except:
                 logger.warning("Request reward server failed and rewards_score will be set zero.")
-                reward_score = paddle.zeros(len(response), dtype=self._model_config.dtype)
+                reward_score = paddle.zeros(
+                    len(response), dtype=self._model_config.dtype if not self.args.use_fp32_compute else "float32"
+                )
             return reward_score
 
         try:
@@ -2390,7 +2528,10 @@ class PPOTrainer(Trainer):
             if tp_rank == 0:
                 reward_score = post()
             else:
-                reward_score = paddle.empty(shape=[len(response)], dtype=self._model_config.dtype)
+                reward_score = paddle.empty(
+                    shape=[len(response)],
+                    dtype=self._model_config.dtype if not self.args.use_fp32_compute else "float32",
+                )
             paddle.distributed.barrier(tp_group)
             paddle.distributed.broadcast(reward_score, src=tp_group.ranks[0], group=tp_group)
 
@@ -2458,10 +2599,6 @@ class PPOTrainer(Trainer):
 
         for rl_batch in rl_batches:
             prompt = rl_batch["prompt"]  # length: src
-            attention_mask = rl_batch["attention_mask"]  # length: src + tgt
-            if len(attention_mask.shape) == 4:
-                # use padding mask instead of causal mask
-                attention_mask = rl_batch["sequence_mask"]  # length: src + tgt
             old_log_probs = rl_batch["log_probs"]  # length: src + tgt -1
             ref_log_probs = rl_batch["ref_log_probs"]  # length: src + tgt -1
             rewards = rl_batch["rewards"]  # length: 1
@@ -2469,22 +2606,16 @@ class PPOTrainer(Trainer):
                 old_reward_values = rl_batch["reward_values"]  # length: src + tgt -1
 
             start = prompt.shape[-1] - 1
-            # sequence_mask is for label masking, make source be masked out
-            # clone to avoid to change attention_mask
-            sequence_mask = attention_mask[:, 1:].clone()  # length: src + tgt -1
-            sequence_mask[:, :start] = False
+            eos_mask = (rl_batch["input_ids"] != self.tokenizer.pad_token_id)[:, 1:].to(old_log_probs.dtype)
             if use_tgt_len_value:
                 ref_log_probs = ref_log_probs[:, start:].contiguous()
                 old_log_probs = old_log_probs[:, start:].contiguous()
                 if self.args.rl_algorithm == "ppo":
                     old_reward_values = old_reward_values[:, start:].contiguous()
-                sequence_mask = sequence_mask[:, start:].contiguous()
+                eos_mask = eos_mask[:, start:].contiguous()
             if self.args.rl_algorithm == "grpo":
-                eos_mask = (rl_batch["input_ids"] != self.tokenizer.pad_token_id)[:, 1:].to(old_log_probs.dtype)
-                if use_tgt_len_value:
-                    eos_mask = eos_mask[:, start:].contiguous()
                 reward_advantages = compute_grpo_advantages(
-                    rewards, rl_batch["index"], eos_mask, old_log_probs.shape[-1]
+                    rewards, rl_batch["index"], eos_mask[:, start:], old_log_probs.shape[-1]
                 )
             elif self.args.rl_algorithm == "ppo":
                 rewards_with_kl, kl_rewards = self.add_kl_divergence_regularization(
@@ -2492,14 +2623,27 @@ class PPOTrainer(Trainer):
                     old_log_probs,
                     ref_log_probs,
                     rewards,
-                    sequence_mask,
+                    eos_mask[:, start:],
                 )  # length: tgt if use_tgt_len_value src + tgt -1
                 reward_advantages, reward_returns = self.get_advantages_and_returns(
                     old_reward_values,
                     rewards_with_kl,
-                    sequence_mask,
+                    eos_mask[:, start:],
                     start=0 if use_tgt_len_value else start,
                     use_tgt_len_return=use_tgt_len_value,
+                )  # length: tgt if use_tgt_len_value src + tgt -1
+            elif self.args.rl_algorithm == "reinforce_plus_plus":
+                rewards_with_kl, kl_rewards = self.add_kl_divergence_regularization(
+                    None,  # prompt,
+                    old_log_probs,
+                    ref_log_probs,
+                    rewards,
+                    eos_mask[:, start:],
+                )  # length: tgt if use_tgt_len_value src + tgt -1
+                reward_advantages, reward_returns = compute_reinforce_plus_plus_advantages_and_returns(
+                    rewards_with_kl,
+                    eos_mask[:, start:],
+                    self.gamma,
                 )  # length: tgt if use_tgt_len_value src + tgt -1
             else:
                 raise ValueError(f"Unknown rl_algorithm: {self.args.rl_algorithm}")
@@ -2508,15 +2652,17 @@ class PPOTrainer(Trainer):
                 {
                     "log_probs": old_log_probs,
                     "reward_advantages": reward_advantages,
-                    "sequence_mask": sequence_mask,
                     "ref_log_probs": ref_log_probs,
                     "rewards": rewards,
+                    "eos_mask": eos_mask[:, start:],
                 }
             )
-            if self.args.rl_algorithm == "ppo":
+            if self.args.rl_algorithm in ["reinforce_plus_plus", "ppo"]:
+                if self.args.rl_algorithm == "ppo":
+                    rl_batch.update({"reward_values": old_reward_values})
+
                 rl_batch.update(
                     {
-                        "reward_values": old_reward_values,
                         "reward_returns": reward_returns,
                         "kl_rewards": kl_rewards,
                         "rewards_with_kl": rewards_with_kl,
@@ -2524,14 +2670,13 @@ class PPOTrainer(Trainer):
                 )
 
             # pop out to reduce data dispatch comm overhead
-            rl_batch.pop("prompt")
+            # rl_batch.pop("prompt")
 
         if use_advantage_normalization:
             all_advantages_list = []
             for rl_batch in rl_batches:
-                sequence_mask = rl_batch["sequence_mask"].cast(paddle.int64)  # length: src + tgt
                 advantages = rl_batch["reward_advantages"]
-                all_advantages_list.append(advantages[sequence_mask != 0])
+                all_advantages_list.append(advantages[eos_mask[:, start:] != 0])
             all_advantages = paddle.concat(all_advantages_list, axis=0)
             all_advantages = all_advantages.cast(paddle.float32)
 
@@ -2609,3 +2754,23 @@ def compute_grpo_advantages(
         rewards[i] = (rewards[i] - id2mean[index[i]]) / (id2std[index[i]] + epsilon)
     rewards = rewards.unsqueeze(-1).tile([1, response_length]) * sequence_mask
     return rewards
+
+
+@paddle.no_grad()
+def compute_reinforce_plus_plus_advantages_and_returns(
+    rewards: paddle.Tensor,
+    eos_mask: paddle.Tensor,
+    gamma: float,
+) -> Tuple[paddle.Tensor, paddle.Tensor]:
+    """Compute reinforce_plus_plus_advantages_and_returns."""
+    length = rewards.shape[-1]
+    returns = paddle.zeros_like(rewards)
+    running_return = 0
+    for t in reversed(range(length)):
+        running_return = rewards[:, t] + gamma * running_return
+        returns[:, t] = running_return
+        running_return = running_return * eos_mask[:, t]
+
+    advantages = masked_whiten(returns.cast("float32"), eos_mask.cast("float32"))
+    advantages = (advantages * eos_mask).cast(rewards.dtype)
+    return advantages, returns

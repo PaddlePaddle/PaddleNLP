@@ -107,7 +107,7 @@ class Qwen2Config(PretrainedConfig):
         use_cache=True,
         tie_word_embeddings=False,
         rope_theta=10000.0,
-        pad_token_id=0,
+        pad_token_id=151643,
         bos_token_id=151643,
         eos_token_id=151643,
         use_sliding_window=False,
