@@ -85,7 +85,7 @@ def auto_tuning_with_compilation_grouped_gemm_contiguous(m, n, k, num_groups, nu
             ("grouped_layout", paddle.int32),
             ("m", int),
             ("num_groups", int),
-            ("stream", paddle.device.cuda.Stream),
+            ("stream", paddle.device.current_stream().stream_base),
             ("num_sms", int),
             ("smem_size", int),
         ),
