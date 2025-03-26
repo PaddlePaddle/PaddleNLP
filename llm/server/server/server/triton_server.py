@@ -22,7 +22,7 @@ import sys
 import threading
 import time
 import traceback
-from collections import Counter, deque
+from collections import deque
 from datetime import datetime
 
 import numpy as np
@@ -30,25 +30,21 @@ from server.checker import add_default_params, check_basic_params
 from server.engine import engine
 from server.utils import error_logger, model_server_logger
 
-import server
-
 try:
     import triton_python_backend_utils as pb_utils
 except:
-    model_server_logger.warning(
-        "TritonPythonModel is only available under triton inference server framework."
-    )
+    model_server_logger.warning("TritonPythonModel is only available under triton inference server framework.")
 
 if sys.stdout.encoding is None:
     enc = os.environ["LANG"].split(".")[1]
     sys.stdout = codecs.getwriter(enc)(sys.stdout)
 
 
-
 class TritonTokenProcessor(engine.TokenProcessor):
     """
     initialize Triton Processor
     """
+
     def __init__(self, cfg, triton_server):
         super().__init__(cfg)
         self.triton_server = triton_server
@@ -73,11 +69,17 @@ class TritonTokenProcessor(engine.TokenProcessor):
                     return_all_tokens = result.get("return_all_tokens", False)
                     if is_end == 0 and (return_all_tokens or self.cfg.disable_streaming):
                         continue
+                    elif is_end == 1 and (return_all_tokens or self.cfg.disable_streaming):
+                        result["token_ids"] = result.get("tokens_all_ids", [])
+
                     if return_all_tokens and "topk_tokens" in result:
                         del result["topk_tokens"]
                     result = self.triton_server.data_processor.process_response(result)
                     if "usage" in result:
                         result["usage"]["prompt_tokens"] = self.triton_server.task_info[req_id]["prompt_tokens"]
+                    if is_end == 1 and len(result["token_ids"]) != 0:
+                        result["token_ids"] = []
+
                     model_server_logger.debug(f"Send result to client under push mode: {result}")
                     with self.triton_server.thread_lock:
                         _send_result([result], self.triton_server.response_sender[req_id], is_end)
@@ -86,42 +88,18 @@ class TritonTokenProcessor(engine.TokenProcessor):
                             del self.triton_server.task_info[req_id]
                             self.triton_server._update_metrics()
             except Exception as e:
-                    model_server_logger.error("Unexcepted error happend: {}, {}".format(e, str(traceback.format_exc())))
-
-    def _cache_special_tokens(self, batch_result):
-        for i in range(len(batch_result)):
-            is_end = batch_result[i].get("is_end", 0)
-            token_ids = batch_result[i]["token_ids"]
-            if is_end != 1:
-                if batch_result[i]["req_id"] not in self.token_buffer:
-                    self.token_buffer[batch_result[i]["req_id"]] = list()
-                    self.score_buffer[batch_result[i]["req_id"]] = list()
-                self.token_buffer[batch_result[i]["req_id"]].extend(token_ids)
-                self.score_buffer[batch_result[i]["req_id"]].extend(batch_result[i].get("token_scores", []))
-                batch_result[i]["token_ids"] = []
-                if "token_scores" in batch_result[i]:
-                    batch_result[i]["token_scores"] = []
-            else:
-                if batch_result[i]["req_id"] in self.token_buffer:
-                    batch_result[i]["token_ids"] = self.token_buffer[batch_result[i]
-                        ["req_id"]] + batch_result[i]["token_ids"]
-                    del self.token_buffer[batch_result[i]["req_id"]]
-                    if "token_scores" in batch_result[i]:
-                        batch_result[i]["token_scores"] = self.score_buffer[batch_result[i]
-                            ["req_id"]] + batch_result[i]["token_scores"]
-                    del self.score_buffer[batch_result[i]["req_id"]]
+                model_server_logger.error("Unexcepted error happend: {}, {}".format(e, str(traceback.format_exc())))
 
     def postprocess(self, batch_result):
         """
         single postprocess for triton
         """
         try:
-            # self._cache_special_tokens(batch_result)
             self.cached_generated_tokens.put(batch_result)
         except Exception as e:
             model_server_logger.info(
-                "Unexcepted problem happend while process output token: {}, {}"
-                .format(e, str(traceback.format_exc())))
+                "Unexcepted problem happend while process output token: {}, {}".format(e, str(traceback.format_exc()))
+            )
 
 
 class TritonServer(object):
@@ -142,44 +120,39 @@ class TritonServer(object):
             if http_port is None:
                 raise Exception("HEALTH_HTTP_PORT must be set")
             from server.triton_server_helper import start_health_checker
-            multiprocessing.Process(target=start_health_checker, args=(int(http_port), )).start()
+
+            multiprocessing.Process(target=start_health_checker, args=(int(http_port),)).start()
             time.sleep(1)
 
         model_config = json.loads(args["model_config"])
-        using_decoupled = pb_utils.using_decoupled_model_transaction_policy(
-            model_config)
+        using_decoupled = pb_utils.using_decoupled_model_transaction_policy(model_config)
         if not using_decoupled:
             raise pb_utils.TritonModelException(
                 """the model `{}` can generate any number of responses per request,
                 enable decoupled transaction policy in model configuration to
-                serve this model""".format(args["model_name"]))
+                serve this model""".format(
+                    args["model_name"]
+                )
+            )
 
         # add metrics，use METRICS_HTTP_PORT get server metrics
         self.metric_family = pb_utils.MetricFamily(
             name="inference_server_metrics",
             description="Metrics for monitoring inference server status",
-            kind=pb_utils.MetricFamily.
-            GAUGE,
+            kind=pb_utils.MetricFamily.GAUGE,
         )
         self.metrics = {
-            "batch_size":
-            self.metric_family.Metric(labels={"batch_size": "batch_size"}),
-            "block_num":
-            self.metric_family.Metric(labels={"block_num": "block_num"}),
-            "max_batch_size":
-            self.metric_family.Metric(
-                labels={"max_batch_size": "max_batch_size"}),
-            "max_block_num":
-            self.metric_family.Metric(
-                labels={"max_block_num": "max_block_num"}),
-            "available_resource":
-            self.metric_family.Metric(
-                labels={"available_resource": "available_resource"}),
+            "batch_size": self.metric_family.Metric(labels={"batch_size": "batch_size"}),
+            "block_num": self.metric_family.Metric(labels={"block_num": "block_num"}),
+            "max_batch_size": self.metric_family.Metric(labels={"max_batch_size": "max_batch_size"}),
+            "max_block_num": self.metric_family.Metric(labels={"max_block_num": "max_block_num"}),
+            "available_resource": self.metric_family.Metric(labels={"available_resource": "available_resource"}),
         }
 
         # response_sender thread lock
         self.thread_lock = threading.Lock()
         from server.engine.config import global_config
+
         self.cfg = global_config
         self.cfg.print(file="log/fastdeploy_init.info")
 
@@ -191,10 +164,9 @@ class TritonServer(object):
         model_server_logger.info("Create engine success")
 
         # Master node only
-        if self.cfg.nnode == 1 or os.getenv('POD_0_IP',"127.0.0.1") == self.cfg.host_ip:
+        if self.cfg.nnode == 1 or os.getenv("POD_0_IP", "127.0.0.1") == self.cfg.host_ip:
             self._initialize_push_mode()
         model_server_logger.info("Init triton server success")
-
 
     def execute(self, requests):
         """
@@ -202,8 +174,7 @@ class TritonServer(object):
         handling requests received by the Triton framework
         """
         if len(requests) != 1:
-            raise pb_utils.TritonModelException(
-                "Only support batch=1, but now it's {}.".format(len(requests)))
+            raise pb_utils.TritonModelException("Only support batch=1, but now it's {}.".format(len(requests)))
         request = requests[0]
         current_response_sender = request.get_response_sender()
         request_tensor = pb_utils.get_input_tensor_by_name(request, "IN")
@@ -221,7 +192,7 @@ class TritonServer(object):
         wait_time = 300
         while not self.engine.all_tasks_finished():
             if wait_time <= 0:
-                model_server_logger.warning(f"Ignore the unfinished tasks, force to stop.")
+                model_server_logger.warning("Ignore the unfinished tasks, force to stop.")
                 break
             model_server_logger.info(f"There's unfinished tasks, wait {wait_time}...")
             wait_time -= 5
@@ -236,6 +207,7 @@ class TritonServer(object):
 
     def _initialize_push_mode(self):
         from server.data.processor import DataProcessor
+
         self.data_processor = DataProcessor()
         model_server_logger.info("create data processor success")
 
@@ -247,8 +219,10 @@ class TritonServer(object):
             current_dir_path = os.path.split(os.path.abspath(__file__))[0]
             http_py_file = "app.py"
             http_py_path = os.path.join(current_dir_path, "http_server", http_py_file)
-            http_cmd = f"python3 {http_py_path} --port={self.cfg.push_mode_http_port} " \
-                     f"--workers={self.cfg.push_mode_http_workers} >log/launch_http.log 2>&1"
+            http_cmd = (
+                f"python3 {http_py_path} --port={self.cfg.push_mode_http_port} "
+                f"--workers={self.cfg.push_mode_http_workers} >log/launch_http.log 2>&1"
+            )
 
             model_server_logger.info(f"Launch HTTP server for push mode, command:{http_cmd}")
             self.http_process = subprocess.Popen(http_cmd, shell=True, preexec_fn=os.setsid)
@@ -258,8 +232,10 @@ class TritonServer(object):
                 http_url = f"http://127.0.0.1:{self.cfg.push_mode_http_port}/v1/chat/completions"
                 model_server_logger.info(f"Launch HTTP server for push mode success, http_url:{http_url}")
             else:
-                error_msg = "\n Launch HTTP service for push mode failed in 3 seconds. " \
-                            "Please check log/launch_http.log file \n"
+                error_msg = (
+                    "\n Launch HTTP service for push mode failed in 3 seconds. "
+                    "Please check log/launch_http.log file \n"
+                )
                 model_server_logger.error(error_msg)
             model_server_logger.info("init push server success")
 
@@ -267,8 +243,7 @@ class TritonServer(object):
             self.task_info = dict()
             self.cached_task_deque = deque()
             self.enable_insert_task_push_mode = True
-            self.insert_task_to_engine_thread = threading.Thread(
-                target=self._insert_task_push_mode, args=())
+            self.insert_task_to_engine_thread = threading.Thread(target=self._insert_task_push_mode, args=())
             self.insert_task_to_engine_thread.daemon = True
             self.insert_task_to_engine_thread.start()
 
@@ -285,14 +260,14 @@ class TritonServer(object):
             req_id = tasks[0]["req_id"]
             cached_task_num = len(self.cached_task_deque)
             if cached_task_num >= self.cfg.max_cached_task_num:
-                error_msg = f"cached task num ({cached_task_num}) exceeds " \
-                            f"the limit ({self.cfg.max_cached_task_num})"
+                error_msg = (
+                    f"cached task num ({cached_task_num}) exceeds " f"the limit ({self.cfg.max_cached_task_num})"
+                )
                 _send_error(error_msg, current_response_sender, req_id=req_id)
                 return
 
             if not tasks or len(tasks) != 1 or not tasks[0]:
-                error_msg = f"request data should not be empty and query " \
-                            f"num {len(tasks)} should be 1"
+                error_msg = f"request data should not be empty and query " f"num {len(tasks)} should be 1"
                 _send_error(error_msg, current_response_sender, req_id=req_id)
                 return
 
@@ -307,8 +282,10 @@ class TritonServer(object):
             task_id = task["req_id"]
             with self.thread_lock:
                 if task_id in self.response_sender:
-                    error_msg =  f"The req_id {task_id} already exists in the current batch, " \
-                                    f"the current request will be ignored."
+                    error_msg = (
+                        f"The req_id {task_id} already exists in the current batch, "
+                        f"the current request will be ignored."
+                    )
                     _send_error(error_msg, current_response_sender, req_id=req_id)
                     return
 
@@ -325,13 +302,17 @@ class TritonServer(object):
                 task["max_dec_len"] = min(self.cfg.max_seq_len - input_ids_len, self.cfg.dec_len_limit)
             min_dec_len = task["min_dec_len"]
             if input_ids_len + min_dec_len >= self.cfg.max_seq_len:
-                error_msg = f"Input text is too long, input_ids_len ({input_ids_len}) " \
-                            f"+ min_dec_len ({min_dec_len}) >= max_seq_len "
+                error_msg = (
+                    f"Input text is too long, input_ids_len ({input_ids_len}) "
+                    f"+ min_dec_len ({min_dec_len}) >= max_seq_len "
+                )
                 _send_error(error_msg, current_response_sender, req_id=req_id)
                 return
 
             if input_ids_len > self.cfg.seq_len_limit:
-                error_msg = f"Length of input token({input_ids_len}) exceeds the limit MAX_SEQ_LEN({self.cfg.seq_len_limit})."
+                error_msg = (
+                    f"Length of input token({input_ids_len}) exceeds the limit MAX_SEQ_LEN({self.cfg.seq_len_limit})."
+                )
                 _send_error(error_msg, current_response_sender, req_id=req_id)
                 return
             if task["max_dec_len"] > self.cfg.dec_len_limit:
@@ -352,12 +333,15 @@ class TritonServer(object):
             task["preprocess_end_time"] = datetime.now()
             self.cached_task_deque.appendleft(task)
             tok = time.time()
-            model_server_logger.info(f"cache task with req_id ({task_id}), "
-                                     f"cost time: {tok-tik}s, cached_task_num: {len(self.cached_task_deque)}.")
+            model_server_logger.info(
+                f"cache task with req_id ({task_id}), "
+                f"cost time: {tok-tik}s, cached_task_num: {len(self.cached_task_deque)}."
+            )
             model_server_logger.debug(f"cache task: {task}")
         except Exception as e:
             error_msg = "Unexcepted promblem happend while insert new task to server task queue: {}, {}".format(
-                e, str(traceback.format_exc()))
+                e, str(traceback.format_exc())
+            )
             _send_error(error_msg, current_response_sender)
 
     def _insert_task_push_mode(self):
@@ -400,15 +384,16 @@ class TritonServer(object):
                         self.engine.insert_tasks([task])
                     except Exception as e:
                         err_msg = "Error happend while insert task to engine: {}, {}.".format(
-                            e, str(traceback.format_exc()))
+                            e, str(traceback.format_exc())
+                        )
                         with self.thread_lock:
-                            _send_result({"error_msg": err_msg},
-                                        self.response_sender[task["req_id"]], 1)
+                            _send_result({"error_msg": err_msg}, self.response_sender[task["req_id"]], 1)
                             del self.response_sender[task["req_id"]]
             model_server_logger.info("finish insert_task_push_mode thread")
         except Exception as e:
-            model_server_logger.error("insert_task_push_mode thread exit "
-                                      f"unexpectedly, {e}. {str(traceback.format_exc())}")
+            model_server_logger.error(
+                "insert_task_push_mode thread exit " f"unexpectedly, {e}. {str(traceback.format_exc())}"
+            )
 
     def _update_metrics(self):
         """
@@ -420,22 +405,19 @@ class TritonServer(object):
         self.metrics["max_batch_size"].set(self.cfg.max_batch_size)
         self.metrics["batch_size"].set(self.cfg.max_batch_size - batch_size)
         self.metrics["max_block_num"].set(self.cfg.max_block_num)
-        self.metrics["available_resource"].set(block_num * 1.0 /
-                                               self.cfg.max_block_num)
+        self.metrics["available_resource"].set(block_num * 1.0 / self.cfg.max_block_num)
 
     def _get_current_server_info(self):
         """
         get server info
         """
-        available_batch_size = min(self.cfg.max_prefill_batch,
-                                   self.engine.available_batch())
+        available_batch_size = min(self.cfg.max_prefill_batch, self.engine.available_batch())
         available_block_num = self.engine.available_block_num()
         server_info = {
             "block_size": int(self.cfg.block_size),
             "block_num": int(available_block_num),
             "dec_token_num": int(self.cfg.dec_token_num),
-            "available_resource":
-            1.0 * available_block_num / self.cfg.max_block_num,
+            "available_resource": 1.0 * available_block_num / self.cfg.max_block_num,
             "max_batch_size": int(available_batch_size),
         }
         return server_info
@@ -453,12 +435,12 @@ def _send_result(result_dict, sender, end_flag=0):
     response = None
     if result_dict:
         result_dict = json.dumps(result_dict)
-        end_output = pb_utils.Tensor("OUT",
-                                     np.array([result_dict], dtype=np.object_))
+        end_output = pb_utils.Tensor("OUT", np.array([result_dict], dtype=np.object_))
         response = pb_utils.InferenceResponse(output_tensors=[end_output])
     if response is None and end_flag == 0:
         return
     sender.send(response, flags=end_flag)
+
 
 def _send_error(error_msg, sender, error_code=200, req_id=None):
     """
@@ -472,7 +454,13 @@ def _send_error(error_msg, sender, error_code=200, req_id=None):
     """
     if not isinstance(error_msg, str):
         error_msg = str(error_msg)
-    error_info = {"req_id": req_id, "error_msg": error_msg, "error_code": error_code, "version": "4.6", "timestamp": time.time()}
+    error_info = {
+        "req_id": req_id,
+        "error_msg": error_msg,
+        "error_code": error_code,
+        "version": "4.6",
+        "timestamp": time.time(),
+    }
     error_logger.info(f"{error_info}")
     model_server_logger.error(error_msg)
     _send_result(error_info, sender, 1)
