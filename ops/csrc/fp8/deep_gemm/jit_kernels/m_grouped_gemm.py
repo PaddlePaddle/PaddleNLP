@@ -156,7 +156,7 @@ def m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
         m_indices,
         m,
         num_groups,
-        paddle.device.cuda.current_stream(),
+        paddle.device.current_stream().stream_base,
         num_sms,
         smem_size,
     )
@@ -231,7 +231,7 @@ def m_grouped_gemm_fp8_fp8_bf16_nt_masked(
         out,
         masked_m,
         m,
-        paddle.device.cuda.current_stream(),
+        paddle.device.current_stream().stream_base,
         num_sms,
         smem_size,
     )
