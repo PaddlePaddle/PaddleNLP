@@ -12,9 +12,6 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v3
-      - name: hhh
-        run: |
-          echo ${{ secrets.CODECOV_TOKEN }}
       - uses: actions/setup-python@v4
         with:
           python-version: '3.10'
@@ -28,3 +25,5 @@ jobs:
         run: make test
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
