@@ -257,7 +257,7 @@ def m_grouped_gemm_fp8_fp8_bf16_nt_masked(
             ("out", paddle.bfloat16),
             ("grouped_layout", paddle.int32),
             ("m", int),
-            ("stream", paddle.device.cuda.Stream),
+            ("stream", paddle.device.current_stream().stream_base),
             ("num_sms", int),
             ("smem_size", int),
         ),
