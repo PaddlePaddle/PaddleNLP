@@ -978,8 +978,11 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
         (inputs_embeds_mtp, hidden_states, residual, l_aux, final_hidden_states) = inputs
 
         final_hidden_states = self.mlp.post_process(hidden_states, final_hidden_states, l_aux)
+        hidden_states._record_stream()
+        l_aux._record_stream()
 
         hidden_states = residual + final_hidden_states
+        residual._record_stream()
 
         hidden_states = (hidden_states,)
 
@@ -988,6 +991,7 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
 
         if self.config.num_nextn_predict_layers > 0:
             hidden_states = paddle.concat([hidden_states, inputs_embeds_mtp], axis=-1)
+            inputs_embeds_mtp._record_stream()
 
         return return_args(hidden_states)
 

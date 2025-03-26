@@ -470,9 +470,11 @@ class Fp8DispatchQuantNode:
     def backward(self, hs_fp8_grad, token_probs_grad):
         # predispatch grad
         probs_grad = self.pre_dispatch_node.backward(token_probs_grad)
+        token_probs_grad._record_stream()
 
         # reshape_grad
         hs_grad = paddle.reshape(hs_fp8_grad, self.hidden_states_shape)
+        hs_fp8_grad._record_stream()
 
         return hs_grad, probs_grad, None
 
@@ -564,6 +566,7 @@ class Fp8CombineQuantNode:
     def forward(self, output_combie):
         # post combine
         output = output_combie.reshape(self.token_dispatcher.hidden_shape)
+        output_combie._record_stream()
         self.output_combie_shape = output_combie.shape
         output.stop_gradient = False
         return output
@@ -602,6 +605,9 @@ class MlpNode:
             token_permuted_indices,
             prob_permuted_indices,
         ) = self.permute_node.forward(hs_fp8_dispatched, hs_scale_dispatched, dispatched_indices)
+        hs_fp8_dispatched._record_stream()
+        hs_scale_dispatched._record_stream()
+        dispatched_indices._record_stream()
 
         # experts
         expert_out = self.experts_node.forward(
@@ -612,6 +618,7 @@ class MlpNode:
         hidden_states_out = self.unpermute_node.forward(
             expert_out, token_permuted_indices, prob_permuted_indices, dispatched_probs
         )
+        dispatched_probs._record_stream()
         self.dispatched_probs = dispatched_probs
         self.token_permuted_indices = token_permuted_indices
         hidden_states_out.stop_gradient = False
@@ -624,6 +631,9 @@ class MlpNode:
             hidden_states_out_grad, hidden_states_out_grad_scale
         )
         hidden_states_out_grad_scale_grad = paddle.gather(hidden_states_out_grad_scale, self.token_permuted_indices)
+
+        hidden_states_out_grad._record_stream()
+        hidden_states_out_grad_scale._record_stream()
 
         # expert_grad
         hs_out_grad = self.experts_node.backward(expert_out_grad, hidden_states_out_grad_scale_grad)
