@@ -78,7 +78,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py -
 # For QLoRA:
 python -u -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py --config ./config/llama/sft_argument.json --q_lora ./config/llama/lora_argument.json
 ```
-```
+```bash
 # Single-GPU LoRA
 python  run_finetune.py ./config/llama/lora_argument.json
 
@@ -101,7 +101,7 @@ python  -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7"  run_finetune.
 6. Supports algorithms like rsLoRA, LoRa+, PiSSA, and MosLoRA (currently not supporting tensor model parallelism) through parameters `rslora`, `lora_plus_scale`, `pissa`, `lora_use_mixer`, `use_mora`, etc.
 
 To facilitate subsequent **compression** and **static graph inference**, we provide a LoRA parameter merging script that integrates LoRA parameters into the backbone model and saves the corresponding weights.
-```
+```bash
 python merge_lora_params.py \
     --model_name_or_path ./base_model \
     --lora_path ./checkpoints/lora_ckpts \
@@ -113,17 +113,12 @@ python merge_lora_params.py \
 <summary>&emsp; Script Parameter Description</summary><div>
 
 - `lora_path`: Path to LoRA parameters and configuration for initializing LoRA parameters, default is None.
-- `output_path`: Output path for merged model.
-- `device`: Specifies the computation device type, either "gpu" or "xpu".
-- `dtype`: (Optional) Data type for model weights, supports "float16" or "bfloat16".
-- `safe_serialization`: Enables safe serialization using safetensors.
-
-</div></summary>
 `model_name_or_path`: Required, path to the backbone model parameters, default None.
 - `merge_model_path`: Required, path to save merged parameters, default None.
 - `device`: Running environment, default gpu.
 - `safe_serialization`: Whether to save as safetensor format, default True.
 </div>
+
 
 #### 3.4.2 Prefix Tuning
 ```
@@ -294,10 +289,7 @@ The following only introduces some commonly used parameters in TrainingArguments
 - `refined_recompute`: Fine-grained recomputation that balances memory and performance by precisely controlling recomputed components. Currently only supports `llama` series and `qwen` series models. For detailed usage, refer to the [TrainingArguments documentation](#这里).
 - `tensor_parallel_degree`: The degree of tensor parallelism, indicating the number of splits for a transformer layer. Note: This method increases communication overhead. Recommended value ≤8, preferably using intra-machine communication. Default is -1 (disabled).
 - `pipeline_parallel_degree`: The degree of pipeline parallelism. (E.g., if set to 4 for a 12-layer model, each pipeline stage contains 3 layers.) Default is -1 (disabled).
-- `sharding_parallel_degree`
-<summary>&emsp; Data Parallelism Parameters (DataParallelArgument) </summary><div>
-
-- `group_size`: Indicates the data parallelism size for grouped parameter sharding. Default value is 1, meaning group parameter sharding is not enabled.
+- `sharding_parallel_degree`: Indicates the Sharding parallelism size for grouped parameter sharding. Default value is 1, meaning group parameter sharding is not enabled.
 - `sharding`: Whether to use Paddle's Sharding data parallelism. Supports sharding `stage1`, `stage2` or `stage3`. Note that `stage2` and `stage3` can be combined with `offload`.
 - `optim`: Default is `adamw`, supports `adamw`, `adamw_mini`.
 </div>
