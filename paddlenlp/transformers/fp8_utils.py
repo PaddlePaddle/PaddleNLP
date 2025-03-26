@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import numpy
 import paddle
 import paddle.nn.functional as F
 
@@ -73,18 +74,24 @@ def kitchen_fp8_gemm(x_fp8, x_scale, w_fp8, w_scale, is_a_1d_scaled, is_b_1d_sca
     else:
         accumulate = False
         out_dtype = paddle.bfloat16
-    y = kitchen.ops.fp8_gemm_blockwise(
-        a=x_fp8,
-        a_decode_scale=x_scale,
-        b=w_fp8,
-        b_decode_scale=w_scale,
-        out_dtype=out_dtype,
-        out=out,
-        accumulate=accumulate,
-        use_split_accumulator=True,
-        is_a_1d_scaled=is_a_1d_scaled,
-        is_b_1d_scaled=is_b_1d_scaled,
-    )
+    if numpy.prod(x_fp8.shape) != 0 and numpy.prod(w_fp8.shape) != 0:
+        y = kitchen.ops.fp8_gemm_blockwise(
+            a=x_fp8,
+            a_decode_scale=x_scale,
+            b=w_fp8,
+            b_decode_scale=w_scale,
+            out_dtype=out_dtype,
+            out=out,
+            accumulate=accumulate,
+            use_split_accumulator=True,
+            is_a_1d_scaled=is_a_1d_scaled,
+            is_b_1d_scaled=is_b_1d_scaled,
+        )
+    else:
+        y = paddle.zeros([x_fp8.shape[0], w_fp8.shape[0]], out_dtype)
+        if out is not None:
+            out = out + y
+            return out
     return y
 
 
@@ -107,6 +114,7 @@ class ExpertsNode:
         self.x_t_fp8s = []
         self.x_t_scales = []
         self.o1s = []
+        self.tokens_per_expert = None
 
     def forward(self, hs_out, hs_scale_out, tokens_per_expert):
         self.tokens_per_expert = tokens_per_expert

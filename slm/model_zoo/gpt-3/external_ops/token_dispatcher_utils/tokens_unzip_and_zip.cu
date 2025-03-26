@@ -1,54 +1,24 @@
-#include <cuda.h>
-#include <cuda_bf16.h>
-#include <cuda_fp8.h>
-#include <cuda_runtime.h>
-
-#include <iostream>
-#include <limits>
-
-#include "paddle/extension.h"
-#include "paddle/phi/api/all.h"
-#include "paddle/phi/kernels/funcs/math_cuda_utils.h"
+#include "utils.h"
 
 
-// ---------------------------- kernels ----------------------------
-// 主模版，用于支持所有数据类型
-template <typename T, int topk, int num_experts>
-__global__ void token_unzip_kernel(
-    const T *__restrict__ X,
-    const int *__restrict__ routemap_topk,
-    const phi::bfloat16 *__restrict__ probs_topk_in,
-    T *__restrict__ X_unzipped,
-    int *__restrict__ zipped_expertwise_rowmap,
-    phi::bfloat16 *__restrict__ probs_unzipped_out,
-    int *__restrict__ expert_idx_unzipped,
-    int *__restrict__ atomic_extended_offset_counter,
-    int *__restrict__ row_valid,
-    const int total_zipped_tokens_num,
-    const int total_unzipped_tokens_num,
-    const int token_length){};
-
-template <typename T,
+template <typename X_T,
+          typename routemap_T,
+          typename probs_T,
           int topk,
-          int num_experts,
-          typename = std::enable_if_t<std::is_same_v<T, phi::bfloat16>>>
+          int num_experts>
 __global__ void token_unzip_kernel(
-    const phi::bfloat16 *__restrict__ X,
-    const int *__restrict__ routemap_topk,
-    const phi::bfloat16 *__restrict__ probs_topk_in,
-    phi::bfloat16 *__restrict__ X_unzipped,
+    const X_T *__restrict__ X,
+    const routemap_T *__restrict__ routemap_topk,
+    const probs_T *__restrict__ probs_topk,
+    X_T *__restrict__ X_unzipped,
     int *__restrict__ zipped_expertwise_rowmap,
-    phi::bfloat16 *__restrict__ probs_unzipped_out,
+    probs_T *__restrict__ probs_unzipped,
     int *__restrict__ expert_idx_unzipped,
     int *__restrict__ atomic_extended_offset_counter,
     int *__restrict__ row_valid,
     const int total_zipped_tokens_num,
     const int total_unzipped_tokens_num,
     const int token_length) {
-  const __nv_bfloat16 *probs_topk =
-      reinterpret_cast<const __nv_bfloat16 *>(probs_topk_in);
-  __nv_bfloat16 *probs_unzipped =
-      reinterpret_cast<__nv_bfloat16 *>(probs_unzipped_out);
   // 每个线程处理一行数据
   const int row_idx = blockIdx.x;
   // 仅在线程组2中被更新，不初始化
@@ -70,8 +40,8 @@ __global__ void token_unzip_kernel(
           local_expert_rowmap[i] = -1;
         }
         for (int i = 0; i < topk; i++) {
-          int this_expert_idx = routemap_topk[row_idx * topk + i];
-          __nv_bfloat16 this_expert_prob = probs_topk[row_idx * topk + i];
+          routemap_T this_expert_idx = routemap_topk[row_idx * topk + i];
+          probs_T this_expert_prob = probs_topk[row_idx * topk + i];
           if (this_expert_idx < 0) [[likely]]
             continue;
           // 第一次出现，直接搬入
@@ -132,111 +102,6 @@ __global__ void token_unzip_kernel(
     }
   }
 }
-template <typename T,
-          int topk,
-          int num_experts,
-          typename = std::enable_if_t<std::is_same_v<T, phi::float8_e4m3fn>>>
-__global__ void token_unzip_kernel(
-    const phi::float8_e4m3fn *__restrict__ X,
-    const int *__restrict__ routemap_topk,
-    const phi::bfloat16 *__restrict__ probs_topk_in,
-    phi::float8_e4m3fn *__restrict__ X_unzipped,
-    int *__restrict__ zipped_expertwise_rowmap,
-    phi::bfloat16 *__restrict__ probs_unzipped_out,
-    int *__restrict__ expert_idx_unzipped,
-    int *__restrict__ atomic_extended_offset_counter,
-    int *__restrict__ row_valid,
-    const int total_zipped_tokens_num,
-    const int total_unzipped_tokens_num,
-    const int token_length) {
-  const __nv_bfloat16 *probs_topk =
-      reinterpret_cast<const __nv_bfloat16 *>(probs_topk_in);
-  __nv_bfloat16 *probs_unzipped =
-      reinterpret_cast<__nv_bfloat16 *>(probs_unzipped_out);
-  // 每个线程处理一行数据
-  const int row_idx = blockIdx.x;
-  // 仅在线程组2中被更新，不初始化
-  extern __shared__ int shared_original_row;
-
-  if (row_idx < total_unzipped_tokens_num) [[likely]] {
-    // 线程组0，
-    // 主要处理topk和增广部分的行索引、处理专家广播后的行表、一对一搬移
-    if (row_idx < total_zipped_tokens_num) [[likely]] {
-      // ----------------- 增广行的任务派发逻辑，交给thread0 --------------
-      if (threadIdx.x == 0) [[unlikely]] {
-        // 寄存器加载、存储，消耗2xtopk 个reg
-        // 每行只有一次非广播的机会
-        bool isFirst = true;
-        int local_expert_rowmap[num_experts];
-// 寄存器填入非法值，避免误用（0为合法rowidx）
-#pragma unroll
-        for (int i = 0; i < num_experts; i++) {
-          local_expert_rowmap[i] = -1;
-        }
-        for (int i = 0; i < topk; i++) {
-          int this_expert_idx = routemap_topk[row_idx * topk + i];
-          __nv_bfloat16 this_expert_prob = probs_topk[row_idx * topk + i];
-          if (this_expert_idx < 0) [[likely]]
-            continue;
-          // 第一次出现，直接搬入
-          if (isFirst) [[likely]] {
-            isFirst = false;
-            probs_unzipped[row_idx] = this_expert_prob;
-            expert_idx_unzipped[row_idx] = this_expert_idx;
-            local_expert_rowmap[this_expert_idx] = row_idx;
-          } else {  // 增广部分, 原子更新行偏置,并计算扩展行索引
-            int extended_row_offset;
-            extended_row_offset =
-                atomicAdd(&atomic_extended_offset_counter[0], 1);
-            int extended_row_idx =
-                total_zipped_tokens_num + extended_row_offset;
-            probs_unzipped[extended_row_idx] = this_expert_prob;
-            expert_idx_unzipped[extended_row_idx] = this_expert_idx;
-            // 处理专家广播后的行表，用于zip进行收集
-            local_expert_rowmap[this_expert_idx] = extended_row_idx;
-          }
-        }
-// ------------------ 更新专家广播后的行表，用于zip进行收集 -----------
-// 将合法值和未被触碰的非法值返回给zipped_expertwise_rowmap
-#pragma unroll
-        for (int i = 0; i < num_experts; i++) {
-          zipped_expertwise_rowmap[row_idx * num_experts + i] =
-              local_expert_rowmap[i];
-          int valid_offset = local_expert_rowmap[i] - total_zipped_tokens_num;
-          // 只给增广行传递信号量，非法值保持为0
-          if (valid_offset >= 0) {
-            atomicExch(&row_valid[valid_offset], row_idx);  // 发送任务信号量
-          }
-        }
-      }
-      //这个syncthread可能并不必要，但尽可能为了不让线程间差太多，还是这样吧。
-      __syncthreads();
-      // 处理完增广事务，对位搬搬移第一次出现的数据,可用inplace优化
-      for (int i = threadIdx.x; i < token_length; i += blockDim.x) {
-        X_unzipped[row_idx * token_length + i] = X[row_idx * token_length + i];
-      }
-    } else {  // 线程组1， 忙等、并发处理数据搬移
-      if (threadIdx.x == 0) {
-        int extended_row_offset = row_idx - total_zipped_tokens_num;
-        int local_original_row = -1;
-        // 忙等该行的 row_valid变为非-1的合法值
-        while (local_original_row == -1) {
-          local_original_row = atomicExch(&row_valid[extended_row_offset], -1);
-        }
-        // 传递给同组线程共享
-        shared_original_row = local_original_row;
-      }
-      __syncthreads();  // 所有该组线程都等0号取任务，再搬移数据
-      int original_row = shared_original_row;
-      // 搬
-      for (int i = threadIdx.x; i < token_length; i += blockDim.x) {
-        X_unzipped[row_idx * token_length + i] =
-            X[original_row * token_length + i];
-      }
-    }
-  }
-}
-
 
 
 template <int num_experts>
@@ -302,38 +167,62 @@ void dispatch_tokens_unzip(const paddle::Tensor &X,
   dim3 grid, block;
   grid.x = total_unzipped_tokens_num;
   block.x = 256;
-  if (topk == 8 && num_experts == 4) {
-    if (X.dtype() == paddle::DataType::BFLOAT16) {
-      token_unzip_kernel<phi::bfloat16, 8, 4><<<grid, block, 0, X.stream()>>>(
-          X.data<phi::bfloat16>(),
-          expert_routemap_topk.data<int>(),
-          expert_prob_topk.data<phi::bfloat16>(),
-          X_unzipped.data<phi::bfloat16>(),
-          zipped_expertwise_rowmap.data<int>(),
-          token_prob_unzipped.data<phi::bfloat16>(),
-          expert_idx_unzipped.data<int>(),
-          atomic_extended_offset_counter.data<int>(),
-          row_valid.data<int>(),
-          total_zipped_tokens_num,
-          total_unzipped_tokens_num,
-          token_length);
-    } else if (X.dtype() == paddle::DataType::FLOAT8_E4M3FN) {
-      token_unzip_kernel<phi::float8_e4m3fn, 8, 4>
-          <<<grid, block, 0, X.stream()>>>(
-              X.data<phi::float8_e4m3fn>(),
-              expert_routemap_topk.data<int>(),
-              expert_prob_topk.data<phi::bfloat16>(),
-              X_unzipped.data<phi::float8_e4m3fn>(),
-              zipped_expertwise_rowmap.data<int>(),
-              token_prob_unzipped.data<phi::bfloat16>(),
-              expert_idx_unzipped.data<int>(),
-              atomic_extended_offset_counter.data<int>(),
-              row_valid.data<int>(),
-              total_zipped_tokens_num,
-              total_unzipped_tokens_num,
-              token_length);
-    }
+
+// 定义类型获取宏
+#define DTYPE_CASE(dtype, type) dtype == paddle::DataType::type
+#define GET_DATA(tensor, type) tensor.data<type>()
+
+// 分发处理不同的类型组合
+#define DISPATCH_CASE(TOKEN_T, PROB_T, INT_T, TOPK, NUM_EXPERTS)               \
+  auto kernel = token_unzip_kernel<TOKEN_T, INT_T, PROB_T, TOPK, NUM_EXPERTS>; \
+  kernel<<<grid, block, 0, X.stream()>>>(                                      \
+      GET_DATA(X, TOKEN_T),                                                    \
+      GET_DATA(expert_routemap_topk, INT_T),                                   \
+      GET_DATA(expert_prob_topk, PROB_T),                                      \
+      GET_DATA(X_unzipped, TOKEN_T),                                           \
+      GET_DATA(zipped_expertwise_rowmap, INT_T),                               \
+      GET_DATA(token_prob_unzipped, PROB_T),                                   \
+      expert_idx_unzipped.data<int>(),                                         \
+      atomic_extended_offset_counter.data<int>(),                              \
+      row_valid.data<int>(),                                                   \
+      total_zipped_tokens_num,                                                 \
+      total_unzipped_tokens_num,                                               \
+      token_length);
+
+// 可扩展：处理特定的topk和num_experts组合,可根据之后需求进行扩展
+#define HANDLE_EXPERT_CASE(TOKEN_T, PROB_T, INT_T) \
+  if (topk == 8 && num_experts == 4) {             \
+    DISPATCH_CASE(TOKEN_T, PROB_T, INT_T, 8, 4)    \
+  } else {                                         \
+    /* 超出当前任务范围，*/               \
+    std::__throw_invalid_argument;                 \
   }
+
+#define HANDLE_TOKEN_TYPE(PROB_T, INT_T)                  \
+  if (DTYPE_CASE(X.dtype(), BFLOAT16)) {                  \
+    HANDLE_EXPERT_CASE(phi::bfloat16, PROB_T, INT_T)      \
+  } else if (DTYPE_CASE(X.dtype(), FLOAT8_E4M3FN)) {      \
+    HANDLE_EXPERT_CASE(phi::float8_e4m3fn, PROB_T, INT_T) \
+  }
+
+#define HANDLE_PROB_TYPE(INT_T)                               \
+  if (DTYPE_CASE(expert_prob_topk.dtype(), BFLOAT16)) {       \
+    HANDLE_TOKEN_TYPE(phi::bfloat16, INT_T)                   \
+  } else if (DTYPE_CASE(expert_prob_topk.dtype(), FLOAT32)) { \
+    HANDLE_TOKEN_TYPE(float, INT_T)                           \
+  }
+
+  // 可扩展：根据整型类型控制派发，未来可支持int8，但int64不行，因为下标开销太重了，建议直接cast到int32
+  if (DTYPE_CASE(zipped_expertwise_rowmap.dtype(), INT32)) {
+    HANDLE_PROB_TYPE(int)
+  }
+
+#undef DTYPE_CASE
+#undef GET_DATA
+#undef DISPATCH_CASE
+#undef HANDLE_EXPERT_CASE
+#undef HANDLE_TOKEN_TYPE
+#undef HANDLE_PROB_TYPE
 }
 
 void dispatch_tokens_weighted_zip(
@@ -347,6 +236,8 @@ void dispatch_tokens_weighted_zip(
   dim3 grid, block;
   grid.x = total_zipped_tokens_num;
   block.x = 256;
+
+  // Map data types to C++ types
   if (num_experts == 4) {
     tokens_weighted_zip_kernel<4><<<grid, block, 0, unzipped_tokens.stream()>>>(
         unzipped_tokens.data<phi::bfloat16>(),
@@ -393,7 +284,8 @@ std::vector<paddle::Tensor> tokens_unzip(
     const int &num_experts) {
   PD_CHECK(X.dtype() == paddle::DataType::BFLOAT16 ||
            X.dtype() == paddle::DataType::FLOAT8_E4M3FN);
-  PD_CHECK(expert_prob_topk.dtype() == paddle::DataType::BFLOAT16);
+  PD_CHECK(expert_prob_topk.dtype() == paddle::DataType::BFLOAT16 ||
+           expert_prob_topk.dtype() == paddle::DataType::FLOAT32);
   PD_CHECK(expert_routemap_topk.dtype() == paddle::DataType::INT32);
   int rows = X.shape()[0];  // seqlen
   int cols = X.shape()[1];  //一般为7168
@@ -405,8 +297,9 @@ std::vector<paddle::Tensor> tokens_unzip(
   // seqlen x num_experts, 每个token的每个专家(如果被发到)对应的行索引, 未初始化
   auto zipped_expertwise_rowmap = paddle::empty(
       {original_token_num, num_experts}, paddle::DataType::INT32, X.place());
-  auto token_prob_unzipped = paddle::empty(
-      {total_unzipped_tokens_num}, paddle::DataType::BFLOAT16, X.place());
+  auto token_prob_unzipped = paddle::empty({total_unzipped_tokens_num},
+                                           expert_prob_topk.dtype(),
+                                           expert_prob_topk.place());
   auto expert_idx_unzipped = paddle::empty(
       {total_unzipped_tokens_num}, paddle::DataType::INT32, X.place());
 
@@ -459,3 +352,7 @@ PD_BUILD_OP(tokens_weighted_zip)
     .Outputs({"weighted_zipped_tokens"})
     .Attrs({"total_zipped_tokens: int", "num_experts: int"})
     .SetKernelFn(PD_KERNEL(tokens_weighted_zip));
+
+#undef DISPATCH_CASE
+#undef DISPATCH_TOKEN_TYPE
+#undef DISPATCH_PROB_TYPE

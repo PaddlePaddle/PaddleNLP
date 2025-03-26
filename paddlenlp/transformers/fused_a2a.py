@@ -276,6 +276,9 @@ class DispatchNode:
     def __init__(self, name="dispatch"):
         self.name = name
 
+    def reset_statue(self):
+        self.handle = None
+
     def forward(
         self,
         x,
@@ -307,7 +310,7 @@ class DispatchNode:
 
     def backward(self, grad_output, grad_token_probs, previous_event=None, async_finish=False):
         """Backward pass of fused dispatch."""
-        return fused_dispatch_backward_func(
+        out = fused_dispatch_backward_func(
             grad_output,
             grad_token_probs,
             self.group,
@@ -315,11 +318,16 @@ class DispatchNode:
             previous_event=previous_event,
             async_finish=async_finish,
         )
+        self.reset_statue()
+        return out
 
 
 class CombineNode:
     def __init__(self, name="combine"):
         self.name = name
+
+    def reset_statue(self):
+        self.handle = None
 
     def forward(self, x, group, handle, previous_event=None, async_finish=False):
         """Forward pass of fused combine."""
@@ -337,6 +345,8 @@ class CombineNode:
 
     def backward(self, grad_output, previous_event=None, async_finish=False):
         """Backward pass of fused combine."""
-        return fused_combine_backward_func(
+        out = fused_combine_backward_func(
             grad_output, self.group, self.handle, previous_event=previous_event, async_finish=async_finish
         )
+        self.reset_statue()
+        return out
