@@ -162,18 +162,18 @@ class UnPermuteNode:
         self.faltten_dispatched_probs = dispatched_probs.flatten()
 
         self.permuted_probs = paddle.gather(self.faltten_dispatched_probs, self.prob_permuted_indices)
-        self.permuted_tokens = self.hidden_states * self.permuted_probs.unsqueeze(-1)
-        self.permuted_tokens_dtype = self.permuted_tokens.dtype
+        permuted_tokens = self.hidden_states * self.permuted_probs.unsqueeze(-1)
+        permuted_tokens = permuted_tokens.cast(self.hidden_states.dtype)
 
         # Create an output tensor filled with zeros
         output_tokens = paddle.zeros(
-            self.token_dispatcher._comm_manager.hidden_shape_before_permute, dtype=self.permuted_tokens_dtype
+            self.token_dispatcher._comm_manager.hidden_shape_before_permute, dtype=self.hidden_states.dtype
         )
         # Scatter add the permuted_input back to the original positions
         output_tokens.put_along_axis_(
             axis=0,
-            indices=self.token_permuted_indices.unsqueeze(1).expand([-1, self.hidden]),
-            values=self.permuted_tokens,
+            indices=self.token_permuted_indices.cast("int32").unsqueeze(1).expand([-1, self.hidden]),
+            values=permuted_tokens,
             reduce="add",
             include_self=True,
         )
@@ -186,11 +186,13 @@ class UnPermuteNode:
         hidden_states_grad = paddle.gather(out_grad, self.token_permuted_indices)
 
         output_tokens_grad = dequantize_fp8_to_fp32(out_grad, out_grad_scale)
+        permuted_tokens = self.hidden_states * self.permuted_probs.unsqueeze(-1)
+        permuted_tokens = permuted_tokens.cast(self.hidden_states.dtype)
 
         _, permuted_tokens_grad = paddle._C_ops.put_along_axis_grad(
             self.output_tokens,
-            self.token_permuted_indices.unsqueeze(1).expand([-1, self.hidden]),
-            self.permuted_tokens,
+            self.token_permuted_indices.cast("int32").unsqueeze(1).expand([-1, self.hidden]),
+            permuted_tokens,
             self.output_tokens,
             output_tokens_grad,
             0,
