@@ -118,7 +118,7 @@ class ExpertsGroupGemmNode:
         self.unzipped_tokens = None
         self.unzipped_probs = None
 
-    def fwd_gate_up(self, x_fp8, x_scale, expert_w1, expert_w_count, unzipped_probs, unzipped_expert_idx):
+    def fwd_gate_up(self, x_fp8, x_scale, expert_w1, expert_w_count, unzipped_expert_idx):
         # concat w1
         stacked_w1 = paddle.stack(expert_w1, axis=0)
         stacked_w1_t = paddle.transpose(stacked_w1, [0, 2, 1]).contiguous()
@@ -244,18 +244,11 @@ class ExpertsGroupGemmNode:
         )  # int32
         return o2_regroup, out_grad_regroup, max_seq_len
 
-    def dequant_do1_and_regroup_do1_fp8_and_unzipped_tokens(
-        self, do1_fp8, do1_scale, unzipped_expert_idx, max_seq_len
-    ):
-        # dequant do1_fp8 and regroup do1_fp8,unzipped_tokens
-
-        do1_dequant = dequantize_fp8_to_fp32(do1_fp8, do1_scale)
-        do1_dequant = do1_dequant.to(paddle.bfloat16)
-
+    def dequant_do1_and_regroup_do1_fp8_and_unzipped_tokens(self, do1, unzipped_expert_idx, max_seq_len):
         intput_x = dequantize_fp8_to_fp32(self.unzipped_tokens, self.unzipped_scale)
         intput_x = intput_x.to(paddle.bfloat16)
         input_x_regroup, do1_regroup = TDU.regroup_tokens(
-            intput_x, do1_dequant, unzipped_expert_idx, expert_num=4, token_max_per_expert=max_seq_len
+            intput_x, do1, unzipped_expert_idx, expert_num=4, token_max_per_expert=max_seq_len
         )
         return do1_regroup, input_x_regroup
 
@@ -358,7 +351,7 @@ class ExpertsGroupGemmNode:
         # get w2
         expert_w2 = [x.w2 for x in self.custom_map.experts if x is not None]
 
-        o1 = self.fwd_gate_up(hs_out, hs_scale_out, expert_w1, expert_w_count, unzipped_probs, unzipped_expert_idx)
+        o1 = self.fwd_gate_up(hs_out, hs_scale_out, expert_w1, expert_w_count, unzipped_expert_idx)
 
         self.o1 = o1
         # o2
@@ -399,7 +392,7 @@ class ExpertsGroupGemmNode:
 
         # dequant do1_fp8 and regroup do1_fp8,unzipped_tokens
         do1_regroup, input_x_regroup = self.dequant_do1_and_regroup_do1_fp8_and_unzipped_tokens(
-            do1_fp8, do1_scale, unzipped_expert_idx, max_seq_len
+            do1, unzipped_expert_idx, max_seq_len
         )
 
         # dw1
