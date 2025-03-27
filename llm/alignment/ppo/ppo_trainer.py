@@ -42,17 +42,9 @@ from comm_utils import (
 )
 from infer_utils import InferEvalModel, infer_guard
 from models.ppo_model_utils import (  # make_attention_mask,; make_position_ids,
-    RLHFPPOMixedLoss,
-    RLHFValueLoss,
-    create_loss,
     create_startend_row_indices,
     gather_log_probabilities,
     make_position_ids_from_input_ids,
-)
-from offload_utils import (
-    offload_tensor_to_cpu,
-    reload_tensor_to_gpu,
-    OffloadController
 )
 from paddle import nn
 from paddle.distributed import fleet
@@ -61,17 +53,23 @@ from paddle.io import DataLoader, Dataset, DistributedBatchSampler
 from paddle.utils import map_structure
 from rich.console import Console
 from rich.table import Table
-from trainer_utils import (
+from trainer.trainer_utils import (
     MuteDefaultFlowCallback,
-    PipeEvalModel,
     batch_retokenize,
     guard_set_args,
     is_same_tokenizer,
     process_row,
 )
+from trainer.rl_trainer import ActorReferenceTrainer, 
+from utils.offload_utils import (
+    OffloadController,
+    offload_tensor_to_cpu,
+    reload_tensor_to_gpu,
+)
 
 from paddlenlp.data import DataCollator
 from paddlenlp.generation import GenerationConfig
+from paddlenlp.trainer import ProgressCallback
 from paddlenlp.trainer.trainer import (
     EvalLoopOutput,
     EvalPrediction,
@@ -82,7 +80,7 @@ from paddlenlp.trainer.trainer import (
     logger,
     speed_metrics,
 )
-from paddlenlp.trainer.trainer_utils import TrainOutput
+from paddlenlp.trainer.trainer_utils import ShardingOption, TrainOutput
 from paddlenlp.trainer.utils import distributed_concat
 from paddlenlp.transformers import (
     CosineAnnealingWithWarmupDecay,
@@ -92,410 +90,6 @@ from paddlenlp.transformers import (
 )
 from paddlenlp.transformers.model_utils import _add_variant
 from paddlenlp.utils.env import PADDLE_WEIGHTS_NAME
-
-
-class RLTrainer(Trainer):
-    """
-    Features of RLTrainer:
-    1. Trainer enhanced with step-level training combining with patches of
-    Trianer. We can use this to do training whose step is composed of multi
-    models via multiple instances of RLTrainer, such as PPO.
-    2. Additionally, using a mixed loss and get the separated loss metrics is
-    supported, which is helpful to PipelienParallel with a mixed loss.
-    3. EMA is supported.
-    """
-
-    # used to create criterion for trainer, please refer to `create_criterion`
-    # for details.
-    loss_cls: type
-
-    def __init__(
-        self,
-        model: Union[PretrainedModel, nn.Layer] = None,
-        criterion: nn.Layer = None,
-        args: TrainingArguments = None,
-        data_collator: Optional[DataCollator] = None,
-        train_dataset: Optional[Dataset] = None,
-        eval_dataset: Union[Dataset, Dict[str, Dataset]] = None,
-        tokenizer: Optional[PretrainedTokenizer] = None,
-        compute_metrics: Optional[Callable[[EvalPrediction], Dict]] = None,
-        callbacks: Optional[List[TrainerCallback]] = None,
-        optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
-        preprocess_logits_for_metrics: Optional[Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor]] = None,
-    ):
-        super().__init__(
-            model,
-            criterion,
-            args,
-            data_collator,
-            train_dataset,
-            eval_dataset,
-            tokenizer,
-            compute_metrics,
-            callbacks,
-            optimizers,
-            preprocess_logits_for_metrics,
-        )
-        # criterion is only used for non-PipelineParallel models. criterion is
-        # included in model for PipelineParallel.
-        self.info_buffer = {}
-        if getattr(self, "loss_cls", None) and self.criterion is None:
-            self.criterion = self.create_criterion()
-
-        self.use_fusemt = getattr(args, "use_fusemt", False)
-        # ablout 4s slower than infer generation without ema
-        self.use_ema = getattr(args, "use_ema", False)
-        self.shard_ema = getattr(args, "shard_ema", False)
-        self.offload_ema = getattr(args, "offload_ema", True)
-        self.ema_beta = getattr(args, "ema_beta", 0.992)
-        # if self.timers:
-        #     self.timers.log = types.MethodType(new_timer_log, self.timers)
-
-    def create_criterion(self):
-        """
-        create loss using `loss_cls` for trainer. It would use a wrapped loss_cls
-        whose label arguments are merged into one argument, this is useful to
-        PipelineParallel and trainer.criterion which limit loss format.
-        """
-        criterion = create_loss(self.loss_cls, self.model.config, self.args, self.info_buffer, merge_labels=True)
-        return criterion
-
-    def loss_identifier(self, inputs: Dict) -> str:
-        """
-        Moreover, a model/RLTrainer instance may use a mixed loss which uses a
-        different loss for different step and inputs, while we often want to get
-        the separated loss metric. We use a callable discriminator using inputs
-        (dict) as arguments and returning corresponding loss name to identify
-        current loss. NOTE: please make the loss name ends with "_loss". `tr_loss`
-        is the default loss name used in trainer.train.
-        """
-        return "tr_loss"
-
-    def set_eval_model(self, model):
-        """
-        To avoid eval/generation with PipelineParallel when training with PP, we
-        allow to use an extra eval model to do eval/generation, which would need
-        to reshard parameters and dispatch data according to model's distributed
-        topo. Currently, the eval model should cancel PP setting and keep the same
-        TP setting with training.
-        """
-        if model is None:
-            logger.warning("use None to set eval model for trainer and it would be ignored")
-            return
-        else:
-            self._inner_eval_model = model
-        # bind a new comm group for eval model data dispatch
-        # param dispatch is binded in `InferEvalModel.enable`
-        hcg = fleet.get_hybrid_communicate_group()
-        sd_group = hcg.get_sharding_parallel_group()
-        dp_group = hcg.get_data_parallel_group()
-        global_rank = dist.get_rank()
-        eval_tp_size = max(model.config.tensor_parallel_degree, 1)
-        eval_tp_rank = max(model.config.tensor_parallel_rank, 0)
-        old_dp_workers = self.args.world_size // (max(sd_group.nranks, 1) * max(dp_group.nranks, 1))
-        group_nums = self.args.logical_process_index // old_dp_workers * eval_tp_size + eval_tp_rank
-        self._data_trans_group = create_data_trans_group(global_rank, group_nums)
-        # just for compatiable with old code
-        self._policy_model_eval_group = self._data_trans_group
-
-    def get_model(self, train=False):
-        """
-        model visitor wrapps PipelineParalle and Inference model to do evaulation
-        and generation.
-        """
-        if train:
-            return self.model_wrapped
-        model = getattr(self, "_eval_model", None)
-        if model is not None:
-            return model
-        inner_eval_model = getattr(self, "_inner_eval_model", None)
-        if (self.args.pipeline_parallel_degree > 1 and inner_eval_model is None) or isinstance(
-            inner_eval_model, fleet.model.PipelineParallel
-        ):
-            # Only accept wrapped model for pipeline_parallel mode
-            model = PipeEvalModel(self)
-            self._eval_model = model
-        else:
-            model = InferEvalModel(self)
-            self._eval_model = model
-        return model
-
-    def get_train_step_vars(self, vars: Optional[Dict] = None) -> Dict:
-        """
-        NOTE: This is transparent to users.
-        When using multiple instances of RLTrainer collaborate to do one training
-        step, each should use its own vars such as loss/model/step_control which are
-        local vars in Trainer.train, we define these vars by `train_step_vars`. They
-        are vars needed by full_training_step for training control, as following:
-        tr_loss, model, epoch, step, step_control.
-        some vars such as `epoch` are meaningless, they are needed just because
-        full_training_step copies code from Trainer.train which is designed for
-        complete training process.
-
-        return `train_step_vars` (dict). If not exists, create it first. If `vars`
-        is not None, update `train_step_vars` with it.
-
-        TODO(guosheng): use namedtuple or dataclass to make it more readable.
-        """
-        if not hasattr(self, "train_step_vars"):
-            # should be called after model is wrapped since the model field should
-            # use model_wrapped.
-
-            if paddle.distributed.get_world_size() > 1:
-                assert self.model is not self.model_wrapped
-            self.train_step_vars = {
-                # meaningless vars can pass from outter, dummy value is enough
-                "epoch": 0,  # meaningless for step training
-                "step": 0,  # meaningless for step training
-                "steps_in_epoch": 100000,  # meaningless for step training
-                "step_control": 0,  # to control training process
-                "model": self.model_wrapped,
-                # "tr_loss": paddle.to_tensor(0.0),  # lazy create
-            }
-        if vars:
-            self.train_step_vars.update(vars)
-        return self.train_step_vars
-
-    @property
-    def loss_names(self):
-        """
-        返回所有损失项的名称列表，只在第一次调用时计算。
-        如果没有损失项，则返回空列表。
-
-        Returns:
-            List[str]: 损失项的名称列表，每个名称以"_loss"结尾。
-        """
-        if not hasattr(self, "_loss_names"):
-            self._loss_names = [var_name for var_name in self.get_train_step_vars() if var_name.endswith("_loss")]
-            assert len(self._loss_names) > 0
-        return self._loss_names
-
-    def full_training_step(self, **inputs) -> paddle.Tensor:
-        """
-        Accept any valid key word arguments of model and loss as inputs, they
-        would be sent to model and then loss. Mostly it is similar to output from
-        data collator.
-        Return loss var. However when using PipelienParallel, the loss returned
-        is 0 when not reach accumulated step and the loss returned at accumulated
-        step is a mixed loss. We can use `get_step_loss` to get the actual loss.
-        """
-        # if model has multi losses which are combined into one mixed criterion,
-        # loss statistic var may change for different training steps according
-        # to inputs.
-        train_step_vars = self.get_train_step_vars()
-        loss_name = self.loss_identifier(inputs)
-        loss_var = train_step_vars.get(loss_name, None)
-        # trainer.train use `tr_loss` as loss var to accumulate loss.
-        # NOTE: `tr_loss` in trainer.train not only accumulate mean loss for
-        # steps in one `gradient_accumulation_steps`, but also accumulate for
-        # one logging intervel which may contains more than one accumulated steps.
-        # However, in RLTrainer we only want to use `tr_loss` to accumulate
-        # mean loss for steps in a `gradient_accumulation_steps` range. As for
-        # logging intervel loss accumulation is not take into account here and
-        # should be considered in outter.
-        if loss_var is None:  # the first step of current loss type
-            loss_var = paddle.to_tensor(0.0)
-            train_step_vars[loss_name] = loss_var
-        elif self.is_accumulation_step:  # begin a new accumulation step intervel
-            for name in self.loss_names:
-                train_step_vars[name] = paddle.to_tensor(0.0)
-            loss_var = train_step_vars[loss_name]
-
-        train_step_vars["tr_loss"] = loss_var
-        # train_step_vars["timer_name"] = self.__class__.__name__
-
-        new_train_step_vars = super().full_training_step(inputs, **train_step_vars)
-
-        # minimally update
-        train_step_vars = self.get_train_step_vars(
-            {
-                "step_control": new_train_step_vars["step_control"],
-                loss_name: new_train_step_vars["tr_loss"],
-            }
-        )
-        if loss_name != "tr_loss":
-            train_step_vars.pop("tr_loss")
-
-        self.mark_step_loss(loss_name)
-
-        return train_step_vars[loss_name]
-
-    def _prepare_inputs(self, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> Dict[str, Union[paddle.Tensor, Any]]:
-        """
-        trainer.criterion only support criterion(prediction, labels), so we need
-        to reorganize the inputs to extract label data into one argument. This is
-        only used in non-PipelineParallel model training since loss is included
-        in PipelineLayer.
-        """
-        inputs = super()._prepare_input(inputs)
-        if self.criterion is None or getattr(self.criterion, "label_names", None) is None:
-            return inputs
-        # criterion created by create_loss has `label_names` and `label_default_values`
-        label_names = self.criterion.__class__.label_names
-        # some data fields are used both in model and loss
-        shared_fields = {"input_ids", "attention_mask"}
-        labels = []
-        for name in label_names:
-            if name not in inputs:
-                label = self.criterion.__class__.label_default_values.get(name, None)
-            elif name in shared_fields:
-                label = inputs[name]
-            else:
-                label = inputs.pop(name)
-            labels.append(label)
-        # "labels" is the pre-defined label name in Trainer
-        inputs["labels"] = labels
-        # NOTE: TensorParallel model requires non-Tensor inputs to be lists and
-        # broadcast them, thus do not or optionally use these inputs. labels use
-        # in criterion not send to model can workaround this.
-        return inputs
-
-    def mark_step_loss(self, loss_name):
-        """
-        NOTE: This is transparent to users.
-        When using a mixed loss we often want to get the separated loss metrics,
-        thus we mark loss type of each training step to separate them. This is
-        not necessary since the loss would be returnd after each training step.
-        However when using PipelienParallel, the loss returned is 0 when not reach
-        accumulated step and the loss returned at accumulated step is a mixed loss.
-        To separate loss metrics in PipelienParallel:
-        1. We hack PipelineParallel._forward_step to record actual loss for each
-           step in a list (only in training and not in evaluation currently).
-        2. We mark the loss type only once for each step using `loss_step_indice`
-           (dict), then wen can check out the corresponding loss metrics from the
-           loss list.
-        We assume a static order of multi-losses and mark the loss indice only once.
-        """
-        self.loss_step_indice = getattr(self, "loss_step_indice", {})
-        if loss_name not in self.loss_step_indice:
-            self.loss_step_indice[loss_name] = len(self.loss_step_indice)
-
-    @paddle.no_grad()
-    def get_step_loss(self, loss_prefix: str = "", loss_accumulator: Dict = {}) -> Dict[str, paddle.Tensor]:
-        """
-        Return a dict mapping loss name to value of current training step. This
-        is mainly to get loss for metric logging, and it would not affect the
-        training. This is mostly helpful to PipelienParallel with a mixed loss
-        in which the loss returned is 0 when not reach accumulated step and the
-        loss returned at accumulated step is a mixed loss.
-        NOTE: 1. Only when reaching accumulated step the losses returned are
-        accurate, and each loss is a mean loss of steps among one accumulated
-        steps range.
-        """
-        if not self.is_accumulation_step:
-            msg = "The loss returned may not be accurate when not reaching accumulated step."
-            logger.error(msg)
-        model = self.get_model(train=True)
-        loss_dict = loss_accumulator if loss_accumulator else {}
-        if isinstance(model, fleet.model.PipelineParallel) and len(self.loss_names) > 1:
-            # NOTE: PipelineParallel only returns a accumulated loss after
-            # accumulated steps, which is a mixed loss of ppo-loss and
-            # ptx-loss. We hack PipelineParallel._forward_step to record
-            # loss metrics and postprocess the recorded losses here.
-            # Maybe better to make the last_stage worker log to reduce
-            # comm and for simplicity.
-            with paddle.no_grad():
-                if model.is_pipeline_last_stage():
-                    # loss is 0D tensor, use stack rather than concat
-                    mix_loss = paddle.stack(model._step_losses)
-                    model._step_losses = None
-                else:
-                    # The tessor shape is not policy_model.accumulate_steps
-                    # (args.accu_steps) but policy_trainer.args.accu_steps,
-                    # since policy_model is created with global pp_config
-                    # using global args.accu_steps which is only half of
-                    # policy_trainer.args.accu_steps, and indeed trainer hack
-                    # model.accumulate_steps in training_pipeline_step to use
-                    # trainer.args.accu_steps. The dtype is fp32(to be check),
-                    # thus no need to broadcast.
-                    mix_loss = paddle.empty(
-                        shape=[self.args.gradient_accumulation_steps],
-                        dtype=paddle.float32,
-                    )
-                paddle.distributed.broadcast(mix_loss, src=model.pp_group.ranks[-1], group=model.pp_group)
-                for loss_name in self.loss_names:
-                    # We assume a static order of multi-losses and mark the loss
-                    # indice only once.
-                    value = mix_loss[self.loss_step_indice[loss_name] :: len(self.loss_names)].mean()
-                    loss_name = loss_prefix + loss_name if loss_prefix else loss_name
-                    loss_dict[loss_name] = loss_dict[loss_name].add_(value) if loss_name in loss_dict else value
-            return loss_dict
-        elif isinstance(model, fleet.model.PipelineParallel):
-            model._step_losses = None
-
-        for loss_name in self.loss_names:
-            value = self.get_train_step_vars()[loss_name]
-            loss_name = loss_prefix + loss_name if loss_prefix else loss_name
-            loss_dict[loss_name] = loss_dict[loss_name].add_(value) if loss_name in loss_dict else value
-        return loss_dict
-
-    @property
-    def is_accumulation_step(self):
-        """Indicate whether accumulation steps' training is done."""
-        return self.get_train_step_vars()["step_control"] == 0
-
-    def get_sharding_master_weight_structured_names(self, model, optimizer):
-        """
-        获取分片主机权重的结构化名称列表。
-        参数：
-            model (torch.nn.Module) - 模型对象，包含需要进行权重分片的参数。
-            optimizer (torch.optim.Optimizer) - 优化器对象，包含需要进行权重分片的参数。
-        返回值（list[str]）- 一个包含所有参数的结构化名称列表，这些参数在当前分片主机上被训练。
-        """
-        rank_param_names = [p.name for p in optimizer._rank2params[optimizer._sharding_rank]]
-        structured_names = []
-        # for pipeline model, use `model.state_dict()` would auto map param name
-        # for name, p in model.named_parameters():
-        for name, p in model.state_dict().items():
-            if p.name in rank_param_names:
-                structured_names.append(name)
-        return structured_names
-
-    def get_master_weight_state_dict(self, model, optimizer):
-        """
-        获取模型的权重状态字典，如果使用了AMP且支持pipeline并且存在master weights，则返回master weights。
-        否则返回model.state_dict()。
-
-        Args:
-            model (nn.Module): 待获取权重状态字典的模型。
-            optimizer (Optimizer): 与模型关联的优化器，可选参数，默认为None。
-
-        Returns:
-            Union[Dict[str, Tensor], Dict[str, Any]]: 返回一个包含模型权重状态的字典，字典中的键是参数名称，值是对应的Tensor或Any类型的值。
-            如果使用了AMP且支持pipeline并且存在master weights，则返回的字典只包含master weights。
-        """
-        if self.amp_dtype in ["float16", "bfloat16"] and hasattr(optimizer, "_master_weights"):
-            master_weights = dict(optimizer._master_weights)
-            result = {}
-            # for pipeline model, use `model.state_dict()` would auto map param name
-            # for name, p in model.named_parameters():
-            for name, p in model.state_dict().items():
-                if p.name in master_weights:
-                    result[name] = master_weights[p.name]
-            return result
-        else:
-            return model.state_dict()
-
-
-class ActorReferenceTrainer(RLTrainer):
-    loss_cls = RLHFPPOMixedLoss
-    trainer_type = "policy"
-
-    def loss_identifier(self, inputs: Dict) -> str:
-        """
-        根据输入的字典，判断是否使用ptx损失函数和演员损失函数。如果有标签（labels），则返回"ptx_loss"；否则返回"actor_loss"。
-        参数：
-            inputs (Dict): 包含两个键值对，分别为"inputs"和"labels"，其中"inputs"是模型的输入，"labels"是可选的，表示是否使用ptx损失函数。默认值为None。
-            返回值 (str): 返回一个字符串，分别为"ptx_loss"或"actor_loss"，表示是否使用ptx损失函数和演员损失函数。
-        """
-        return "actor_loss"
-
-
-class CriticTrainer(RLTrainer):
-    loss_cls = RLHFValueLoss
-    trainer_type = "value"
-    # define loss name for logging
-    loss_identifier = lambda self, inputs: "reward_critic_loss"
 
 
 class PPOMetric:
@@ -630,7 +224,7 @@ def data_dispatch(fun):
     """
 
     def _impl(self, data):
-        gp = getattr(self.policy_trainer, "_data_trans_group", None)
+        gp = getattr(self.actor_trainer, "_data_trans_group", None)
         data = data_group_split(data, group=gp)
         data = fun(self, data)
         data = data_group_merge(data, group=gp)
@@ -706,143 +300,95 @@ class PPOTrainer(Trainer):
         self.eval_dataset = eval_dataset
 
         (
-            policy_model,
+            actor_model,
             reference_model,
             reward_model,
-            value_model,
-            policy_model_eval,
-            value_model_eval,
+            critic_model,
+            actor_model_eval,
+            critic_model_eval,
         ) = model
-        self._model_config = policy_model.config  # use this to change flash attention dynamically
-        self._policy_model_eval = policy_model_eval
-        if args.rl_algorithm == "ppo":
-            self._value_model_eval = value_model_eval
+        self._model_config = actor_model.config  # use this to change flash attention dynamically
+        self._actor_model_eval = actor_model_eval
 
         # policy_tokenizer and value_tokenizer should be same
-        (
-            policy_tokenizer,
-            reference_tokenizer,
-            reward_tokenizer,
-            value_tokenizer,
-        ) = tokenizer
+        actor_tokenizer, reference_tokenizer, reward_tokenizer, value_tokenizer = tokenizer
 
-        policy_training_args = copy.deepcopy(args)
-        lr_scheduler = self.get_scheduler(policy_training_args)
-        self.policy_trainer = ActorReferenceTrainer(
-            policy_model,
+        self.actor_trainer = self.create_actor_trainer(
+            actor_model,
             criterion,
-            policy_training_args,
+            args,
             data_collator,
             train_dataset,
             eval_dataset,
-            policy_tokenizer,
+            actor_tokenizer,
             compute_metrics,
             callbacks,
-            [None, lr_scheduler],
+            optimizers,
             preprocess_logits_for_metrics,
         )
+        self.actor_trainer.set_eval_model(actor_model_eval)
+        # disable inner trainers' callback/state/control
+        self.actor_trainer.add_callback(MuteDefaultFlowCallback)
+        if not self.args.disable_tqdm:
+            self.actor_trainer.pop_callback(ProgressCallback)
+
         if args.rl_algorithm == "ppo":
-            value_training_args = copy.deepcopy(args)
-            for attr_name in [
-                "critic_learning_rate",
-                "critic_weight_decay",
-                "critic_lr_scheduler_type",
-                "critic_warmup_ratio",
-                "critic_recompute",
-            ]:
-                if getattr(value_training_args, attr_name, None) is not None:
-                    setattr(
-                        value_training_args,
-                        attr_name[len("critic_") :],
-                        getattr(value_training_args, attr_name),
-                    )
-            lr_scheduler = self.get_scheduler(value_training_args)
-            self.value_trainer = CriticTrainer(
-                value_model,
+            self._critic_model_eval = critic_model_eval
+            self.critic_trainer = self.create_critic_trainer(
+                critic_model,
                 criterion,
-                value_training_args,
+                args,
                 data_collator,
                 train_dataset,
                 eval_dataset,
                 value_tokenizer,
                 compute_metrics,
                 callbacks,
-                [None, lr_scheduler],
-                preprocess_logits_for_metrics,
-            )
-        self.policy_trainer.set_eval_model(policy_model_eval)
-        if args.rl_algorithm == "ppo":
-            self.value_trainer.set_eval_model(value_model_eval)
-        # disable inner trainers' callback/state/control
-        self.policy_trainer.add_callback(MuteDefaultFlowCallback)
-        if args.rl_algorithm == "ppo":
-            self.value_trainer.add_callback(MuteDefaultFlowCallback)
-        if not self.args.disable_tqdm:
-            from paddlenlp.trainer import ProgressCallback
-
-            self.policy_trainer.pop_callback(ProgressCallback)
-            if args.rl_algorithm == "ppo":
-                self.value_trainer.pop_callback(ProgressCallback)
-
-        # use trainer for reference_model/reward_model to enable sharding stage-3
-        # and PipelineParallel. maybe we should allow models to use different dist
-        # strategies later
-
-        # allow reference_model/reward_model to use different dist strategy
-        with guard_set_args(
-            args,
-            {
-                "recompute": False,
-                # "fp16_opt_level": "O1",
-                "pipeline_parallel_degree": (
-                    args.pipeline_parallel_degree if isinstance(reference_model, PipelineLayer) else 1
-                ),  # workaround for pipeline parallel model check
-            },
-        ):
-            self.reference_trainer = RLTrainer(
-                reference_model,
-                criterion,
-                copy.deepcopy(args),
-                data_collator,
-                train_dataset,
-                eval_dataset,
-                reference_tokenizer,
-                compute_metrics,
-                callbacks,
                 optimizers,
                 preprocess_logits_for_metrics,
             )
-            if isinstance(reward_model, PretrainedModel):
-                self.reward_trainer = RLTrainer(
-                    reward_model,
-                    criterion,
-                    copy.deepcopy(args),
-                    data_collator,
-                    train_dataset,
-                    eval_dataset,
-                    reward_tokenizer,
-                    compute_metrics,
-                    callbacks,
-                    optimizers,
-                    preprocess_logits_for_metrics,
-                )
-            else:
-                self.reward_server = reward_model
-            # TODO(guosheng): sharding stage3 should create master weight optionally
-            # instead of creation and clear.
-            from paddlenlp.trainer.trainer_utils import ShardingOption
+            self.critic_trainer.add_callback(MuteDefaultFlowCallback)
+            self.critic_trainer.set_eval_model(critic_model_eval)
+            if not self.args.disable_tqdm:
+                self.critic_trainer.pop_callback(ProgressCallback)
 
-            if args.pipeline_parallel_degree > 1 or ShardingOption.FULL_SHARD in args.sharding:
-                self.reference_trainer.init_train_model_opt(100, None, clear_master_weight=True)  # dummy max_steps
-                if isinstance(reward_model, PretrainedModel):
-                    self.reward_trainer.init_train_model_opt(100, None, clear_master_weight=True)  # dummy max_steps
+        # use trainer for reference_model/reward_model to enable sharding stage-3
+        # and PipelineParallel. allow reference_model/reward_model to use different
+        # dist strategy
+        self.reference_trainer = self.create_reference_trainer(
+            reference_model,
+            criterion,
+            args,
+            data_collator,
+            train_dataset,
+            eval_dataset,
+            reference_tokenizer,
+            compute_metrics,
+            callbacks,
+            optimizers,
+            preprocess_logits_for_metrics,
+        )
+
+        self.reward_trainer, self.reward_server = self.create_reference_trainer(
+            reward_model,
+            criterion,
+            args,
+            data_collator,
+            train_dataset,
+            eval_dataset,
+            reward_tokenizer,
+            compute_metrics,
+            callbacks,
+            optimizers,
+            preprocess_logits_for_metrics,
+        )
 
         self.reference_model.eval()
         if isinstance(reward_model, PretrainedModel):
             self.reward_model.eval()
 
         self.reward_tokenizer = reward_tokenizer
-        self.tokenizer = policy_tokenizer
+        self.tokenizer = actor_tokenizer
         if is_same_tokenizer(self.tokenizer, self.reward_tokenizer):
             self.reward_tokenizer = self.tokenizer
 
@@ -886,6 +432,171 @@ class PPOTrainer(Trainer):
         if self.timers:
             self.timers.log = types.MethodType(new_timer_log, self.timers)
 
+    def create_actor_trainer(
+        self,
+        model: Union[PretrainedModel, nn.Layer] = None,
+        criterion: nn.Layer = None,
+        args: TrainingArguments = None,
+        data_collator: Optional[DataCollator] = None,
+        train_dataset: Optional[Dataset] = None,
+        eval_dataset: Union[Dataset, Dict[str, Dataset]] = None,
+        tokenizer: Optional[PretrainedTokenizer] = None,
+        compute_metrics: Optional[Callable[[EvalPrediction], Dict]] = None,
+        callbacks: Optional[List[TrainerCallback]] = None,
+        optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
+        preprocess_logits_for_metrics: Optional[Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor]] = None,
+    ):
+        policy_training_args = copy.deepcopy(args)
+        lr_scheduler = self.get_scheduler(policy_training_args)
+        actor_trainer = ActorReferenceTrainer(
+            model,
+            criterion,
+            policy_training_args,
+            data_collator,
+            self.train_dataset,
+            self.eval_dataset,
+            tokenizer,
+            compute_metrics,
+            callbacks,
+            [None, lr_scheduler],
+            preprocess_logits_for_metrics,
+        )
+        return actor_trainer
+
+    def create_critic_trainer(
+        self,
+        model: Union[PretrainedModel, nn.Layer] = None,
+        criterion: nn.Layer = None,
+        args: TrainingArguments = None,
+        data_collator: Optional[DataCollator] = None,
+        train_dataset: Optional[Dataset] = None,
+        eval_dataset: Union[Dataset, Dict[str, Dataset]] = None,
+        tokenizer: Optional[PretrainedTokenizer] = None,
+        compute_metrics: Optional[Callable[[EvalPrediction], Dict]] = None,
+        callbacks: Optional[List[TrainerCallback]] = None,
+        optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
+        preprocess_logits_for_metrics: Optional[Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor]] = None,
+    ):
+        value_training_args = copy.deepcopy(args)
+        for attr_name in [
+            "critic_learning_rate",
+            "critic_weight_decay",
+            "critic_lr_scheduler_type",
+            "critic_warmup_ratio",
+            "critic_recompute",
+        ]:
+            if getattr(value_training_args, attr_name, None) is not None:
+                setattr(
+                    value_training_args,
+                    attr_name[len("critic_") :],
+                    getattr(value_training_args, attr_name),
+                )
+        lr_scheduler = self.get_scheduler(value_training_args)
+        critic_trainer = CriticTrainer(
+            model,
+            criterion,
+            value_training_args,
+            data_collator,
+            train_dataset,
+            eval_dataset,
+            tokenizer,
+            compute_metrics,
+            callbacks,
+            [None, lr_scheduler],
+            preprocess_logits_for_metrics,
+        )
+        return critic_trainer
+
+    def create_reference_trainer(
+        self,
+        model: Union[PretrainedModel, nn.Layer] = None,
+        criterion: nn.Layer = None,
+        args: TrainingArguments = None,
+        data_collator: Optional[DataCollator] = None,
+        train_dataset: Optional[Dataset] = None,
+        eval_dataset: Union[Dataset, Dict[str, Dataset]] = None,
+        tokenizer: Optional[PretrainedTokenizer] = None,
+        compute_metrics: Optional[Callable[[EvalPrediction], Dict]] = None,
+        callbacks: Optional[List[TrainerCallback]] = None,
+        optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
+        preprocess_logits_for_metrics: Optional[Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor]] = None,
+    ):
+        with guard_set_args(
+            args,
+            {
+                "recompute": False,
+                # "fp16_opt_level": "O1",
+                "pipeline_parallel_degree": (
+                    args.pipeline_parallel_degree if isinstance(model, PipelineLayer) else 1
+                ),  # workaround for pipeline parallel model check
+            },
+        ):
+            reference_trainer = RLTrainer(
+                model,
+                criterion,
+                copy.deepcopy(args),
+                data_collator,
+                train_dataset,
+                eval_dataset,
+                tokenizer,
+                compute_metrics,
+                callbacks,
+                optimizers,
+                preprocess_logits_for_metrics,
+            )
+            if args.pipeline_parallel_degree > 1 or ShardingOption.FULL_SHARD in args.sharding:
+                reference_trainer.init_train_model_opt(100, None, clear_master_weight=True)  # dummy max_steps
+
+        return reference_trainer
+
+    def create_reward_trainer(
+        self,
+        model: Union[PretrainedModel, nn.Layer] = None,
+        criterion: nn.Layer = None,
+        args: TrainingArguments = None,
+        data_collator: Optional[DataCollator] = None,
+        train_dataset: Optional[Dataset] = None,
+        eval_dataset: Union[Dataset, Dict[str, Dataset]] = None,
+        tokenizer: Optional[PretrainedTokenizer] = None,
+        compute_metrics: Optional[Callable[[EvalPrediction], Dict]] = None,
+        callbacks: Optional[List[TrainerCallback]] = None,
+        optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
+        preprocess_logits_for_metrics: Optional[Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor]] = None,
+    ):
+        with guard_set_args(
+            args,
+            {
+                "recompute": False,
+                # "fp16_opt_level": "O1",
+                "pipeline_parallel_degree": (
+                    args.pipeline_parallel_degree if isinstance(model, PipelineLayer) else 1
+                ),  # workaround for pipeline parallel model check
+            },
+        ):
+            if isinstance(model, PretrainedModel):
+                reward_trainer = RLTrainer(
+                    model,
+                    criterion,
+                    copy.deepcopy(args),
+                    data_collator,
+                    train_dataset,
+                    eval_dataset,
+                    tokenizer,
+                    compute_metrics,
+                    callbacks,
+                    optimizers,
+                    preprocess_logits_for_metrics,
+                )
+                if args.pipeline_parallel_degree > 1 or ShardingOption.FULL_SHARD in args.sharding:
+                    self.reward_trainer.init_train_model_opt(100, None, clear_master_weight=True)  # dummy max_steps
+
+                reward_server = None
+            else:
+                reward_trainer = None
+                reward_server = model
+
+        return reward_trainer, reward_server
+
     @property
     def reference_model(self):
         """
@@ -919,7 +630,7 @@ class PPOTrainer(Trainer):
         Returns:
             torch.nn.Module, torch.jit.ScriptModule: Actor模型，可以是torch.nn.Module或者torch.jit.ScriptModule类型。
         """
-        return self.policy_trainer.get_model(train=self.training)
+        return self.actor_trainer.get_model(train=self.training)
 
     @property
     def reward_critic_model(self):
@@ -929,7 +640,7 @@ class PPOTrainer(Trainer):
         Returns:
             tf.keras.Model, optional: critic model，如果没有设置则返回 None。
         """
-        return self.value_trainer.get_model(train=self.training)
+        return self.critic_trainer.get_model(train=self.training)
 
     def set_train(self, mode: bool = True) -> None:
         """Set training mode for all models."""
@@ -1016,8 +727,8 @@ class PPOTrainer(Trainer):
             ValueError: 如果 `ignore_keys` 不是可选参数或者不是一个列表。
         """
         inputs = self._prepare_inputs(inputs)
-        with self.enable(self.actor_model, self.reference_model, self.policy_trainer):
-            with infer_guard(self.policy_trainer):
+        with self.enable(self.actor_model, self.reference_model, self.actor_trainer):
+            with infer_guard(self.actor_trainer):
                 prompt_only_batch = {
                     "input_ids": inputs["input_ids"],
                     **({"label_ids": inputs["label_ids"]} if self.args.use_rm_server else {}),
@@ -1130,7 +841,7 @@ class PPOTrainer(Trainer):
         # NOTE: use here rather than in prediction_step since actor_model would
         # be set to eval out of prediction_step
         # with guard_set_args(
-        #     self.policy_trainer,  # disable _inner_eval_model
+        #     self.actor_trainer,  # disable _inner_eval_model
         #     {
         #         "_eval_model": None,  # otherwise would use cached _eval_model
         #         "_inner_eval_model": None,  # otherwise would use _inner_eval_model to create _eval_model
@@ -1189,35 +900,35 @@ class PPOTrainer(Trainer):
         Returns:
             None.
         """
-        # maybe change args.output_dir of policy_trainer/value_trainer directly
+        # maybe change args.output_dir of actor_trainer/critic_trainer directly
         self.runtime_timer.start("checkpoint saving time")
         with guard_set_args(
-            self.policy_trainer.args,
+            self.actor_trainer.args,
             {"output_dir": os.path.join(self.args.output_dir, "policy")},
         ):
-            if self.policy_trainer.args.unified_checkpoint:
-                if "train_model" in self.policy_trainer.args.offload_level:
-                    reload_tensor_to_gpu((self.policy_trainer.model, "train_model"))
+            if self.actor_trainer.args.unified_checkpoint:
+                if "train_model" in self.actor_trainer.args.offload_level:
+                    reload_tensor_to_gpu((self.actor_trainer.model, "train_model"))
                 if (
-                    "optimizer" in self.policy_trainer.args.offload_level
-                    and not self.policy_trainer.args.ignore_save_lr_and_optim
+                    "optimizer" in self.actor_trainer.args.offload_level
+                    and not self.actor_trainer.args.ignore_save_lr_and_optim
                 ):
-                    reload_tensor_to_gpu((self.policy_trainer.optimizer, "optimizer"))
-            self.policy_trainer._save_checkpoint(model, metrics)
+                    reload_tensor_to_gpu((self.actor_trainer.optimizer, "optimizer"))
+            self.actor_trainer._save_checkpoint(model, metrics)
         if self.args.rl_algorithm == "ppo":
             with guard_set_args(
-                self.value_trainer.args,
+                self.critic_trainer.args,
                 {"output_dir": os.path.join(self.args.output_dir, "value")},
             ):
-                if self.value_trainer.args.unified_checkpoint:
-                    if "train_model" in self.value_trainer.args.offload_level:
-                        reload_tensor_to_gpu((self.value_trainer.model, "train_model"))
+                if self.critic_trainer.args.unified_checkpoint:
+                    if "train_model" in self.critic_trainer.args.offload_level:
+                        reload_tensor_to_gpu((self.critic_trainer.model, "train_model"))
                     if (
-                        "optimizer" in self.value_trainer.args.offload_level
-                        and not self.value_trainer.args.ignore_save_lr_and_optim
+                        "optimizer" in self.critic_trainer.args.offload_level
+                        and not self.critic_trainer.args.ignore_save_lr_and_optim
                     ):
-                        reload_tensor_to_gpu((self.value_trainer.optimizer, "optimizer"))
-                self.value_trainer._save_checkpoint(model, metrics)
+                        reload_tensor_to_gpu((self.critic_trainer.optimizer, "optimizer"))
+                self.critic_trainer._save_checkpoint(model, metrics)
 
         # Determine the new best metric / best model checkpoint
         if metrics is not None and self.args.metric_for_best_model is not None:
@@ -1234,9 +945,9 @@ class PPOTrainer(Trainer):
             ):
                 self.state.best_metric = metric_value
                 metrics = {
-                    "policy": self.policy_trainer.state.best_model_checkpoint,
+                    "policy": self.actor_trainer.state.best_model_checkpoint,
                     **(
-                        {"value": self.value_trainer.state.best_model_checkpoint}
+                        {"value": self.critic_trainer.state.best_model_checkpoint}
                         if self.args.rl_algorithm == "ppo"
                         else {}
                     ),
@@ -1262,12 +973,12 @@ class PPOTrainer(Trainer):
             output_dir = self.args.output_dir
 
         if "train_model" in self.args.offload_level:
-            reload_tensor_to_gpu((self.policy_trainer.model, "model"))
+            reload_tensor_to_gpu((self.actor_trainer.model, "model"))
             if self.args.rl_algorithm == "ppo":
-                reload_tensor_to_gpu((self.value_trainer.model, "model"))
-        self.policy_trainer.save_model(os.path.join(output_dir, "policy"), merge_tensor_parallel)
+                reload_tensor_to_gpu((self.critic_trainer.model, "model"))
+        self.actor_trainer.save_model(os.path.join(output_dir, "policy"), merge_tensor_parallel)
         if self.args.rl_algorithm == "ppo":
-            self.value_trainer.save_model(os.path.join(output_dir, "value"), merge_tensor_parallel)
+            self.critic_trainer.save_model(os.path.join(output_dir, "value"), merge_tensor_parallel)
 
     def init_train_model_opt(
         self: Trainer,
@@ -1290,12 +1001,12 @@ class PPOTrainer(Trainer):
             Tuple[PretrainedModel, PretrainedModel]: 返回两个元组，分别包含策略模型和价值函数模型。
         """
         # resume should be triggered here
-        # maybe change args.output_dir of policy_trainer/value_trainer directly
+        # maybe change args.output_dir of actor_trainer/critic_trainer directly
         with guard_set_args(
-            self.policy_trainer.args,
+            self.actor_trainer.args,
             {"output_dir": os.path.join(self.args.output_dir, "policy")},
         ):
-            policy_model = self.policy_trainer.init_train_model_opt(
+            actor_model = self.actor_trainer.init_train_model_opt(
                 max_steps,
                 (
                     os.path.join(resume_from_checkpoint, "policy")
@@ -1305,10 +1016,10 @@ class PPOTrainer(Trainer):
             )
         if self.args.rl_algorithm == "ppo":
             with guard_set_args(
-                self.value_trainer.args,
+                self.critic_trainer.args,
                 {"output_dir": os.path.join(self.args.output_dir, "value")},
             ):
-                value_model = self.value_trainer.init_train_model_opt(
+                critic_model = self.critic_trainer.init_train_model_opt(
                     max_steps,
                     (
                         os.path.join(resume_from_checkpoint, "value")
@@ -1317,8 +1028,8 @@ class PPOTrainer(Trainer):
                     ),
                 )
         else:
-            value_model = None
-        return policy_model, value_model
+            critic_model = None
+        return actor_model, critic_model
 
     def get_epoch_iterator(self):
         """
@@ -1433,8 +1144,8 @@ class PPOTrainer(Trainer):
         # gradient_accumulation_steps as PPO trainer.
         # if (step_control + 1) % args.gradient_accumulation_steps == 0
         if self.args.rl_algorithm == "ppo":
-            return self.value_trainer.is_accumulation_step
-        return self.policy_trainer.is_accumulation_step
+            return self.critic_trainer.is_accumulation_step
+        return self.actor_trainer.is_accumulation_step
 
     def get_step_loss(self, loss_prefix: str = "") -> Dict:
         """
@@ -1447,9 +1158,9 @@ class PPOTrainer(Trainer):
         Returns:
             Dict[str, float]: 返回一个字典，包含两个损失项：rl_loss（策略训练的损失）和value_loss（价值函数训练的损失）。
         """
-        rl_loss = self.policy_trainer.get_step_loss(loss_prefix)
+        rl_loss = self.actor_trainer.get_step_loss(loss_prefix)
         if self.args.rl_algorithm == "ppo":
-            value_loss = self.value_trainer.get_step_loss(loss_prefix)
+            value_loss = self.critic_trainer.get_step_loss(loss_prefix)
             rl_loss.update(value_loss)
         return rl_loss
 
@@ -1509,18 +1220,18 @@ class PPOTrainer(Trainer):
         ) = self.init_train_num(train_dataloader)
 
         # ##### model and optimizer related setting #####
-        policy_model, value_model = self.init_train_model_opt(max_steps, resume_from_checkpoint)
+        actor_model, critic_model = self.init_train_model_opt(max_steps, resume_from_checkpoint)
         paddle.device.cuda.empty_cache()
 
         # ##### traing statistic logging #####
-        # Number of trainable parameters only account for policy_model
+        # Number of trainable parameters only account for actor_model
         self.init_train_log(
             num_examples,
             num_train_epochs,
             total_train_batch_size,
             max_steps,
             num_train_samples,
-            policy_model,
+            actor_model,
         )
 
         # ##### set training state and resume #####
@@ -1575,7 +1286,7 @@ class PPOTrainer(Trainer):
                 # TODO(guosheng): make rl_step/ptx_step run with autocast_smart_context_manager
                 # logger.info("Doing rl step...")
                 self.timers and self.timers(get_timer_label(ActorStages.MODEL_ENABLE_DISABLE)).start()
-                with self.enable(self.actor_model, self.policy_trainer.optimizer):
+                with self.enable(self.actor_model, self.actor_trainer.optimizer):
                     self.timers and self.timers(get_timer_label(ActorStages.RL_STEP)).start()
                     rl_info = self.rl_step(rl_batch)
                     self.timers and self.timers(get_timer_label(ActorStages.RL_STEP)).stop()
@@ -1630,10 +1341,10 @@ class PPOTrainer(Trainer):
             best_model_checkpoint = json.loads(self.state.best_model_checkpoint)
 
             logger.info(f"Loading best model from {best_model_checkpoint['value']}(score: {self.state.best_metric}).")
-            self.load_best_ckpt(best_model_checkpoint["value"], self.value_trainer)
+            self.load_best_ckpt(best_model_checkpoint["value"], self.critic_trainer)
 
             logger.info(f"Loading best model from {best_model_checkpoint['policy']}(score: {self.state.best_metric}).")
-            self.load_best_ckpt(best_model_checkpoint["policy"], self.policy_trainer)
+            self.load_best_ckpt(best_model_checkpoint["policy"], self.actor_trainer)
 
         metrics = speed_metrics(
             "train",
@@ -1715,9 +1426,9 @@ class PPOTrainer(Trainer):
             # be divided by ptx_coeff for logging.
             logs.update(tr_loss)
             logs["global_step"] = int(self.state.global_step)
-            logs["train_actor_lr"] = float(f"{self.policy_trainer._get_learning_rate():.3e}")
+            logs["train_actor_lr"] = float(f"{self.actor_trainer._get_learning_rate():.3e}")
             if self.args.rl_algorithm == "ppo":
-                logs["train_reward_critic_lr"] = float(f"{self.value_trainer._get_learning_rate():.3e}")
+                logs["train_reward_critic_lr"] = float(f"{self.critic_trainer._get_learning_rate():.3e}")
 
             total_train_batch_size = (
                 self.args.train_batch_size * self.args.gradient_accumulation_steps * self.args.dataset_world_size
@@ -1860,7 +1571,7 @@ class PPOTrainer(Trainer):
         else:
             policy_trainer_inputs.update({"ref_log_probs": None})
 
-        actor_loss = self.policy_trainer.full_training_step(**policy_trainer_inputs)
+        actor_loss = self.actor_trainer.full_training_step(**policy_trainer_inputs)
 
         # metric
         with paddle.no_grad():
@@ -1886,9 +1597,9 @@ class PPOTrainer(Trainer):
             "train_policy_loss": actor_loss,
             **(
                 {
-                    "train_pure_policy_loss": self.policy_trainer.info_buffer.get("pure_policy_loss"),
-                    "train_kl_loss": self.policy_trainer.info_buffer.get("kl_loss"),
-                    "train_entropy_loss": self.policy_trainer.info_buffer.get("entropy_loss"),
+                    "train_pure_policy_loss": self.actor_trainer.info_buffer.get("pure_policy_loss"),
+                    "train_kl_loss": self.actor_trainer.info_buffer.get("kl_loss"),
+                    "train_entropy_loss": self.actor_trainer.info_buffer.get("entropy_loss"),
                 }
                 if self.args.rl_algorithm == "grpo"
                 else {}
@@ -1899,8 +1610,8 @@ class PPOTrainer(Trainer):
                     "train_norm_reward": rewards,
                     "train_kl_reward": kl_rewards,
                     "train_norm_reward_with_kl": rewards_with_kl,
-                    "train_pure_policy_loss": self.policy_trainer.info_buffer.get("pure_policy_loss"),
-                    "train_entropy_loss": self.policy_trainer.info_buffer.get("entropy_loss"),
+                    "train_pure_policy_loss": self.actor_trainer.info_buffer.get("pure_policy_loss"),
+                    "train_entropy_loss": self.actor_trainer.info_buffer.get("entropy_loss"),
                     **(
                         {
                             "train_values": values,
@@ -1950,9 +1661,9 @@ class PPOTrainer(Trainer):
             "sequence_mask": sequence_mask,
         }
         self.timers and self.timers(get_timer_label(CriticStages.MODEL_ENABLE_DISABLE)).start()
-        with self.enable(self.reward_critic_model, self.value_trainer.optimizer):
+        with self.enable(self.reward_critic_model, self.critic_trainer.optimizer):
             self.timers and self.timers(get_timer_label(CriticStages.CRITIC_TRAINING_STEP)).start()
-            reward_critic_loss = self.value_trainer.full_training_step(**value_trainer_inputs)
+            reward_critic_loss = self.critic_trainer.full_training_step(**value_trainer_inputs)
             self.timers and self.timers(get_timer_label(CriticStages.CRITIC_TRAINING_STEP)).stop()
 
         if self.timers:
@@ -1965,7 +1676,7 @@ class PPOTrainer(Trainer):
 
     def enable(self, *args):
         """
-            启用指定的对象或方法。
+        启用指定的对象或方法。
         如果指定的对象是模型，则会将其设置为训练状态；如果是优化器，则会将其设置为训练状态。
         如果指定的方法是"train_model"，则会将所有需要训练的模型设置为训练状态。
         如果指定的方法是"freeze_model"，则会将所有不需要训练的模型设置为非训练状态。
@@ -1985,21 +1696,21 @@ class PPOTrainer(Trainer):
             self.actor_model: "train_model",
             self.reference_model: "freeze_model",
             **({self.reward_model: "freeze_model"} if not self.args.use_rm_server else {}),
-            self.policy_trainer.optimizer: "optimizer",
+            self.actor_trainer.optimizer: "optimizer",
         }
         if self.args.rl_algorithm == "ppo":
             enable_map.update(
                 {
                     self.reward_critic_model: "train_model",
-                    self.value_trainer.optimizer: "optimizer",
+                    self.critic_trainer.optimizer: "optimizer",
                 }
             )
         # if use an extra eval model to do eval/generation, switch on actor_model
         # and reward_critic_model; otherwise no need to switch
-        if getattr(self.policy_trainer, "_inner_eval_model", None) is not None:
-            enable_map.update({self.policy_trainer._inner_eval_model: "freeze_model"})
-        if self.args.rl_algorithm == "ppo" and getattr(self.value_trainer, "_inner_eval_model", None) is not None:
-            enable_map.update({self.value_trainer._inner_eval_model: "freeze_model"})
+        if getattr(self.actor_trainer, "_inner_eval_model", None) is not None:
+            enable_map.update({self.actor_trainer._inner_eval_model: "freeze_model"})
+        if self.args.rl_algorithm == "ppo" and getattr(self.critic_trainer, "_inner_eval_model", None) is not None:
+            enable_map.update({self.critic_trainer._inner_eval_model: "freeze_model"})
         # NOTE(GONGENLEI)： new offload
         objs = [(arg, enable_map.get(arg, "")) for arg in args if enable_map.get(arg, "") in self.args.offload_level]
         return OffloadController(objs)
@@ -2030,7 +1741,7 @@ class PPOTrainer(Trainer):
             if self.args.use_rm_server:
                 label_ids_batches = []
             self.timers and self.timers(get_timer_label(RolloutStages.GENERATE)).start()
-            with infer_guard(self.policy_trainer):
+            with infer_guard(self.actor_trainer):
                 for i in range(0, total_batch_size, per_device_rollout_batch_size):
                     micro_batch = {}
                     micro_batch = map_structure(
@@ -2232,7 +1943,7 @@ class PPOTrainer(Trainer):
             attention_mask=None,
             position_ids=None,
             generation_config=self.generation_config,
-            synced_gpus=ShardingOption.FULL_SHARD in self.policy_trainer.args.sharding,
+            synced_gpus=ShardingOption.FULL_SHARD in self.actor_trainer.args.sharding,
             do_eval=do_eval,
         )[0]
 

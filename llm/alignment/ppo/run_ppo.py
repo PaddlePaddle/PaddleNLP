@@ -32,140 +32,38 @@ from paddlenlp.trl import llm_utils
 from paddlenlp.utils.log import logger
 
 
-def main():
-    """
-    主函数，用于运行训练。
-
-    Args:
-        无参数。
-
-    Returns:
-        None: 该函数没有返回值。
-
-    Raises:
-        无异常抛出。
-    """
-    # Arguments
-    parser = PdArgumentParser((ModelArgument, DataArgument, TrainingArguments))
-    if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
-        model_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
-    else:
-        model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-
+def process_args(model_args, data_args, training_args):
     training_args.max_src_len = data_args.max_prompt_len
     training_args.actor_model_name_or_path = model_args.actor_model_name_or_path
-
-    if training_args.sequence_parallel:
-        if training_args.tensor_parallel_degree <= 1:
-            training_args.sequence_parallel = False
-            logger.info("Tensor_parallel_degree = 1. Set sequence_parallel to False.")
-
-    if training_args.tensor_parallel_degree <= 1:
-        training_args.tensor_parallel_output = False
-        logger.info("Tensor_parallel_degree = 1. Set tensor_parallel_output to False.")
-
-    if training_args.sharding_parallel_degree > 1:
-        if (
-            ShardingOption.SHARD_GRAD_OP in training_args.sharding
-            or ShardingOption.FULL_SHARD in training_args.sharding
-        ):
-            if training_args.release_grads is True:
-                training_args.release_grads = False
-
-    if training_args.unified_checkpoint and "async_save" in training_args.unified_checkpoint_config:
-        training_args.unified_checkpoint_config.remove("async_save")
-        logger.warning(
-            "PPO training currently does not support asynchronous saving! "
-            "Remove `async_save` from unified_checkpoint_config."
-        )
-
-    training_args.offload_level = training_args.offload_level.split()
-    training_args.print_config(model_args, "Model")
-    training_args.print_config(data_args, "Data")
-    runtime_timer = RuntimeTimer("Training")
-
-    if training_args.eval_mode is not None and len(training_args.eval_mode) == 0:
-        training_args.eval_mode = None
-    # if training_args.eval_mode is None and training_args.offload_level is not None:
-    #     training_args.offload_level = training_args.offload_level.replace("eval", "")
-
-    # Setup GPU & distributed training
-    paddle.set_device(training_args.device)
-    logger.warning(
-        f"Process rank: {training_args.local_rank}, device: {training_args.device}, "
-        f"world_size: {training_args.world_size}, " + f"distributed training: {bool(training_args.local_rank != -1)}, "
-        f"16-bits training: {training_args.fp16 or training_args.bf16}"
-    )
-
-    # Detecting last checkpoint.
-    last_checkpoint = None
-    if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
-        last_checkpoint = get_last_checkpoint(training_args.output_dir)
-        # if last_checkpoint is None and len(os.listdir(training_args.output_dir)) > 1:
-        #     raise ValueError(
-        #         f"Output directory ({training_args.output_dir}) already exists and is not empty. "
-        #         "Use --overwrite_output_dir to overcome."
-        #     )
-        if last_checkpoint is not None and training_args.resume_from_checkpoint is None:
-            logger.info(
-                f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
-                "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
-            )
-
-    # Load model
-    if training_args.fp16_opt_level == "O2":
-        if training_args.fp16:
-            dtype = "float16"
-        elif training_args.bf16:
-            dtype = "bfloat16"
-        else:
-            raise ValueError("Please specific dtype: --fp16 or --bf16")
-    else:
-        dtype = "float32"
-
     training_args.max_length = data_args.max_length
-
-    if training_args.decay_steps is None:
-        training_args.decay_steps = training_args.max_steps
 
     if training_args.use_rm_server:
         if model_args.reward_server is None:
             raise ValueError("Please specify reward_server when use_rm_server is true.")
         logger.info(f"Use reward server: {model_args.reward_server} for training.")
-        if training_args.rl_algorithm == "ppo" and model_args.reward_critic_model_name_or_path is None:
-            raise ValueError("Please specify reward_critic_model_name_or_path when use_rm_server is true.")
-
-        requires_label = True
-
+        if training_args.rl_algorithm == "ppo" and model_args.critic_model_name_or_path is None:
+            raise ValueError("Please specify critic_model_name_or_path when use_rm_server is true.")
     else:
         if model_args.reward_model_name_or_path is None:
             raise ValueError("Please specify reward_model_name_or_path when use_rm_server is false.")
-        requires_label = False
 
-    model_class_lm, model_class_score = AutoModelForCausalLM, AutoModelForScore
-    if training_args.pipeline_parallel_degree > 1:
-        from models.model_pp import LlamaPolicyPipe, LlamaValuePipe
+    training_args.print_config(model_args, "Model")
+    training_args.print_config(data_args, "Data")
 
-        model_class_lm = LlamaPolicyPipe
-        model_class_score = LlamaValuePipe
-        extra_args = {
-            "ptx_coeff": training_args.ptx_coeff,
-            "clip_range_ratio": training_args.clip_range_ratio,
-        }
-    else:
-        # non-pipe modelForCausalLM does not accept extra_args and use other ways
-        # (RLTrainer.create_criterion) to set hyper-parameters
-        extra_args = {}
-
-    common_config = dict(
-        use_flash_attention=model_args.use_flash_attention,
-        sequence_parallel=training_args.sequence_parallel,
-        fused_rotary=False,
-        max_sequence_length=data_args.max_length,
+    logger.warning(
+        f"Process rank: {training_args.local_rank}, device: {training_args.device}, "
+        f"world_size: {training_args.world_size}, " + f"distributed training: {bool(training_args.local_rank != -1)}, "
+        f"16-bits training: {training_args.fp16 or training_args.bf16}"
     )
+    return model_args, data_args, training_args
 
+
+def create_rlhf_dataset():
+    pass
+
+
+def create_actor_models(model_args, data_args, training_args, common_config, runtime_timer: RuntimeTimer):
     runtime_timer.start("Actor model loading time")
-
     # actor model
     actor_model_config = AutoConfig.from_pretrained(
         model_args.actor_model_name_or_path,
@@ -173,7 +71,7 @@ def main():
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
         recompute_granularity=model_args.recompute_granularity,
-        dtype=dtype,
+        dtype=training_args.model_dtype,
         recompute=training_args.recompute,
         recompute_use_reentrant=training_args.recompute_use_reentrant,
         **common_config,
@@ -190,22 +88,11 @@ def main():
     print(f"Loading Actor model with config:\n\t{actor_model_config}\n")
 
     if not training_args.autotuner_benchmark:
-        actor_model = model_class_lm.from_pretrained(
-            model_args.actor_model_name_or_path,
-            config=actor_model_config,
-            **extra_args,
-            # ptx_coeff=training_args.ptx_coeff,
-            # clip_range_ratio=training_args.clip_range_ratio,
+        actor_model = AutoModelForCausalLM.from_pretrained(
+            model_args.actor_model_name_or_path, config=actor_model_config
         )
     else:
-        actor_model = model_class_lm.from_config(
-            actor_model_config,
-            **extra_args,
-            # ptx_coeff=training_args.ptx_coeff,
-            # clip_range_ratio=training_args.clip_range_ratio,
-        )
-
-    logger.info(f"{runtime_timer.log()}")
+        actor_model = AutoModelForCausalLM.from_config(actor_model_config)
 
     if training_args.eval_mode is not None:
         config = copy.deepcopy(actor_model.config)
@@ -216,39 +103,22 @@ def main():
         runtime_timer.start("Actor eval model loading time")
         actor_eval_model = AutoModelForCausalLM.from_config(config)
         logger.info(f"{runtime_timer.log()}")
-        # TODO(guosheng): AutoModel (in `_get_model_class_from_config`) pop out
-        # architecture which is necessary for infer predictor currently
-        config.architectures = actor_model.config.architectures
-        # actor_eval_model = AutoModelForCausalLM.from_pretrained(model_args.actor_model_name_or_path, config=config)
-        # cleanup_tensor_space(actor_eval_model.state_dict())
     else:
         actor_eval_model = None
 
     runtime_timer.start("Actor reference model loading time")
-    # todo reference model
+
+    config = copy.deepcopy(actor_model_config)
     if training_args.eval_mode is not None:
-        config = copy.deepcopy(actor_model_config)
         config.use_fused_head_and_loss_fn = False
         if training_args.eval_mode == "single":
             config.tensor_parallel_degree = -1
             config.tensor_parallel_rank = 0
-        if not training_args.autotuner_benchmark:
-            actor_reference_model = AutoModelForCausalLM.from_pretrained(
-                model_args.actor_model_name_or_path,
-                config=config,
-            )
-        else:
-            actor_reference_model = AutoModelForCausalLM.from_config(
-                config,
-                dtype=dtype,
-            )
+
+    if not training_args.autotuner_benchmark:
+        reference_model = AutoModelForCausalLM.from_pretrained(model_args.actor_model_name_or_path, config=config)
     else:
-        actor_reference_model = model_class_lm.from_config(
-            actor_model_config,
-            dtype=dtype,
-        )
-        if not training_args.autotuner_benchmark:
-            actor_reference_model.set_state_dict(actor_model.state_dict())
+        reference_model = AutoModelForCausalLM.from_config(config, dtype=training_args.model_dtype)
     logger.info(f"{runtime_timer.log()}")
 
     actor_tokenizer = AutoTokenizer.from_pretrained(
@@ -260,162 +130,212 @@ def main():
     )
     llm_utils.init_chat_template(actor_tokenizer, model_args.actor_model_name_or_path, model_args.chat_template)
 
-    training_args.autotuner_benchmark = True
-    if not training_args.use_rm_server and model_args.reward_model_name_or_path is not None:
-        runtime_timer.start("Reward model loading time")
-        # reward model
-        reward_model_config = AutoConfig.from_pretrained(
-            model_args.reward_model_name_or_path,
-            tensor_parallel_output=False,
-            tensor_parallel_degree=training_args.tensor_parallel_degree,
-            tensor_parallel_rank=training_args.tensor_parallel_rank,
-            dtype=dtype,
-            recompute=training_args.critic_recompute,
-            recompute_granularity=model_args.critic_recompute_granularity,
-            recompute_use_reentrant=training_args.recompute_use_reentrant,
-            **common_config,
-        )
-        reward_model_config.num_hidden_layers = 2
-        reward_model_config.max_position_embeddings = data_args.max_length
-        reward_model_config.use_sparse_head_and_loss_fn = False
-        reward_model_config.fused_linear = model_args.fused_linear
-        print(f"Loading Reward model with config:\n\t{reward_model_config}\n")
+    return actor_model, actor_eval_model, reference_model, actor_tokenizer, actor_model_config
 
-        if training_args.eval_mode is not None:
-            config = copy.deepcopy(reward_model_config)
-            if training_args.eval_mode == "single":
-                config.tensor_parallel_degree = -1
-                config.tensor_parallel_rank = 0
-            if not training_args.autotuner_benchmark:
-                reward_model = AutoModelForScore.from_pretrained(
-                    model_args.reward_model_name_or_path,
-                    config=config,
-                    score_type="reward",
-                    do_normalize=False,
-                )
-            else:
-                reward_model = AutoModelForScore.from_config(
-                    config,
-                    score_type="reward",
-                    do_normalize=False,
-                )
-        else:
-            if not training_args.autotuner_benchmark:
-                reward_model = model_class_score.from_pretrained(
-                    model_args.reward_model_name_or_path,
-                    config=reward_model_config,
-                    score_type="reward",
-                    do_normalize=False,
-                )
-            else:
-                reward_model = model_class_score.from_config(
-                    reward_model_config,
-                    score_type="reward",
-                    do_normalize=False,
-                )
 
-        logger.info(f"{runtime_timer.log()}")
-        reward_tokenizer = AutoTokenizer.from_pretrained(
+def create_reward_models(model_args, data_args, training_args, common_config, runtime_timer: RuntimeTimer):
+    runtime_timer.start("Reward model loading time")
+    # reward model
+    reward_model_config = AutoConfig.from_pretrained(
+        model_args.reward_model_name_or_path,
+        tensor_parallel_output=False,
+        tensor_parallel_degree=training_args.tensor_parallel_degree,
+        tensor_parallel_rank=training_args.tensor_parallel_rank,
+        dtype=training_args.model_dtype,
+        recompute=training_args.critic_recompute,
+        recompute_granularity=model_args.critic_recompute_granularity,
+        recompute_use_reentrant=training_args.recompute_use_reentrant,
+        **common_config,
+    )
+    reward_model_config.max_position_embeddings = data_args.max_length
+    reward_model_config.use_sparse_head_and_loss_fn = False
+    reward_model_config.fused_linear = model_args.fused_linear
+    print(f"Loading Reward model with config:\n\t{reward_model_config}\n")
+
+    config = copy.deepcopy(reward_model_config)
+    if training_args.eval_mode is not None:
+        if training_args.eval_mode == "single":
+            config.tensor_parallel_degree = -1
+            config.tensor_parallel_rank = 0
+
+    if not training_args.autotuner_benchmark:
+        reward_model = AutoModelForScore.from_pretrained(
             model_args.reward_model_name_or_path,
-            model_max_length=data_args.max_length,
-            padding_side="right",
-            tokenizer_alpha=model_args.reward_tokenizer_alpha,
-            use_fast=True,
+            config=config,
+            score_type="reward",
+            do_normalize=False,
         )
-        llm_utils.init_chat_template(reward_tokenizer, model_args.reward_model_name_or_path, model_args.chat_template)
     else:
-        reward_tokenizer = actor_tokenizer
-        reward_model = model_args.reward_server
-    if training_args.rl_algorithm == "ppo":
-        # critic model
-        runtime_timer.start("Reward critic model loading time")
-        if model_args.reward_critic_model_name_or_path is None:
-            model_args.reward_critic_model_name_or_path = model_args.reward_model_name_or_path
-            reward_critic_model = model_class_score.from_config(
-                reward_model_config,
-                dtype=dtype,
+        reward_model = AutoModelForScore.from_config(
+            config,
+            score_type="reward",
+            do_normalize=False,
+        )
+
+    logger.info(f"{runtime_timer.log()}")
+
+    reward_tokenizer = AutoTokenizer.from_pretrained(
+        model_args.reward_model_name_or_path,
+        model_max_length=data_args.max_length,
+        padding_side="right",
+        tokenizer_alpha=model_args.reward_tokenizer_alpha,
+        use_fast=True,
+    )
+    llm_utils.init_chat_template(
+        reward_tokenizer,
+        model_args.reward_model_name_or_path,
+        model_args.chat_template,
+    )
+    return reward_model, reward_tokenizer, reward_model_config
+
+
+def create_critic_models(
+    model_args, data_args, training_args, common_config, reward_model, reward_model_config, runtime_timer: RuntimeTimer
+):
+    # critic model
+    runtime_timer.start("Reward critic model loading time")
+    if model_args.critic_model_name_or_path is None:
+        model_args.critic_model_name_or_path = model_args.reward_model_name_or_path
+        critic_model = AutoModelForScore.from_config(
+            reward_model_config,
+            dtype=training_args.model_dtype,
+            score_type="critic",
+            do_normalize=False,
+            clip_range_value=training_args.clip_range_value,
+        )
+        if not training_args.autotuner_benchmark:
+            critic_model.set_state_dict(reward_model.state_dict())
+    else:
+        if not training_args.autotuner_benchmark:
+            critic_model = AutoModelForScore.from_pretrained(
+                model_args.critic_model_name_or_path,
+                config=reward_model_config,
                 score_type="critic",
                 do_normalize=False,
                 clip_range_value=training_args.clip_range_value,
             )
-            if not training_args.autotuner_benchmark:
-                reward_critic_model.set_state_dict(reward_model.state_dict())
         else:
-            if not training_args.autotuner_benchmark:
-                reward_critic_model = model_class_score.from_pretrained(
-                    model_args.reward_critic_model_name_or_path,
-                    config=reward_model_config,
-                    score_type="critic",
-                    do_normalize=False,
-                    clip_range_value=training_args.clip_range_value,
-                )
-            else:
-                reward_critic_model = model_class_score.from_config(
-                    reward_model_config,
-                    score_type="critic",
-                    do_normalize=False,
-                    clip_range_value=training_args.clip_range_value,
-                )
+            critic_model = AutoModelForScore.from_config(
+                reward_model_config,
+                score_type="critic",
+                do_normalize=False,
+                clip_range_value=training_args.clip_range_value,
+            )
+    logger.info(f"{runtime_timer.log()}")
+    critic_tokenizer = AutoTokenizer.from_pretrained(
+        model_args.critic_model_name_or_path,
+        model_max_length=data_args.max_length,
+        padding_side="left",
+        tokenizer_alpha=model_args.reward_critic_tokenizer_alpha,
+        use_fast=True,
+    )
+    llm_utils.init_chat_template(
+        critic_tokenizer,
+        model_args.critic_model_name_or_path,
+        model_args.chat_template,
+    )
+    if training_args.eval_mode is not None:
+        config = copy.deepcopy(critic_model.config)
+        if training_args.eval_mode == "single":
+            config.tensor_parallel_degree = -1
+            config.tensor_parallel_rank = 0
+        runtime_timer.start("Reward critic eval model loading time")
+        critic_eval_model = AutoModelForScore.from_config(config)
         logger.info(f"{runtime_timer.log()}")
-        reward_critic_tokenizer = AutoTokenizer.from_pretrained(
-            model_args.reward_critic_model_name_or_path,
-            model_max_length=data_args.max_length,
-            padding_side="left",
-            tokenizer_alpha=model_args.reward_critic_tokenizer_alpha,
-            use_fast=True,
+    else:
+        critic_eval_model = None
+
+    return critic_model, critic_eval_model, critic_tokenizer
+
+
+def create_rl_dataset(data_args, training_args, tokenizer):
+    requires_label = True if training_args.use_rm_server else False
+    train_ds = RLHFDataset(
+        dataset_name_or_path=data_args.train_datasets,
+        tokenizer=tokenizer,
+        max_prompt_len=data_args.max_prompt_len,
+        requires_label=requires_label,
+        label_key=data_args.label_key,
+        splits="train",
+    )
+    dev_ds = RLHFDataset(
+        dataset_name_or_path=data_args.eval_datasets,
+        tokenizer=tokenizer,
+        max_prompt_len=data_args.max_prompt_len,
+        requires_label=requires_label,
+        label_key=data_args.label_key,
+        splits="dev",
+    )
+    return train_ds, dev_ds
+
+
+def main():
+    # Arguments
+    parser = PdArgumentParser((ModelArgument, DataArgument, TrainingArguments))
+    if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
+        model_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
+    else:
+        model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+
+    # pre-precess args
+    model_args, data_args, training_args = process_args(model_args, data_args, training_args)
+    # Setup GPU & distributed training
+    paddle.set_device(training_args.device)
+
+    runtime_timer = RuntimeTimer("Training")
+
+    # Detecting last checkpoint.
+    last_checkpoint = None
+    if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
+        last_checkpoint = get_last_checkpoint(training_args.output_dir)
+        if last_checkpoint is not None and training_args.resume_from_checkpoint is None:
+            logger.info(
+                f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
+                "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
+            )
+
+    common_config = dict(
+        use_flash_attention=model_args.use_flash_attention,
+        sequence_parallel=training_args.sequence_parallel,
+        fused_rotary=False,
+        max_sequence_length=data_args.max_length,
+    )
+
+    actor_model, actor_eval_model, reference_model, actor_tokenizer, actor_model_config = create_actor_models(
+        model_args, data_args, training_args, common_config, runtime_timer
+    )
+
+    if not training_args.use_rm_server and model_args.reward_model_name_or_path is not None:
+        reward_model, reward_tokenizer, reward_model_config = create_reward_models(
+            model_args, data_args, training_args, common_config, runtime_timer
         )
-        llm_utils.init_chat_template(
-            reward_critic_tokenizer, model_args.reward_critic_model_name_or_path, model_args.chat_template
+    else:
+        reward_model, reward_tokenizer = model_args.reward_server, actor_tokenizer
+
+    if training_args.rl_algorithm == "ppo":
+        critic_model, critic_eval_model, critic_tokenizer = create_critic_models(
+            model_args, data_args, training_args, common_config, runtime_timer
         )
-        if training_args.eval_mode is not None:
-            config = copy.deepcopy(reward_critic_model.config)
-            if training_args.eval_mode == "single":
-                config.tensor_parallel_degree = -1
-                config.tensor_parallel_rank = 0
-            runtime_timer.start("Reward critic eval model loading time")
-            reward_critic_eval_model = AutoModelForScore.from_config(config)
-            logger.info(f"{runtime_timer.log()}")
-            # reward_critic_eval_model =  AutoModelForScore.from_pretrained(
-            #     model_args.reward_critic_model_name_or_path,config=model_config
-            # )
-            # cleanup_tensor_space(reward_critic_eval_model.state_dict())
-        else:
-            reward_critic_eval_model = None
 
     for tokenizer in [
         actor_tokenizer,
         reward_tokenizer,
-        reward_critic_tokenizer if training_args.rl_algorithm == "ppo" else None,
+        critic_tokenizer if training_args.rl_algorithm == "ppo" else None,
     ]:
         if tokenizer and tokenizer.pad_token_id is None:
             tokenizer.pad_token_id = tokenizer.eos_token_id
 
     if training_args.should_load_dataset:
-        train_ds = RLHFDataset(
-            dataset_name_or_path=data_args.train_datasets,
-            tokenizer=actor_tokenizer,
-            max_prompt_len=data_args.max_prompt_len,
-            requires_label=requires_label,
-            label_key=data_args.label_key,
-            splits="train",
-        )
-        dev_ds = RLHFDataset(
-            dataset_name_or_path=data_args.eval_datasets,
-            tokenizer=actor_tokenizer,
-            max_prompt_len=data_args.max_prompt_len,
-            requires_label=requires_label,
-            label_key=data_args.label_key,
-            splits="dev",
-        )
+        train_ds, dev_ds = create_rl_dataset(data_args, training_args, actor_tokenizer)
 
     if "freeze_model" in training_args.offload_level:
-        offload_tensor_to_cpu((actor_reference_model, "freeze_model"))
+        offload_tensor_to_cpu((reference_model, "freeze_model"))
         if training_args.rl_algorithm == "ppo":
             offload_tensor_to_cpu((reward_model, "freeze_model"))
         if actor_eval_model is not None:
             offload_tensor_to_cpu((actor_eval_model, "freeze_model"))
-        if training_args.rl_algorithm == "ppo" and reward_critic_eval_model is not None:
-            offload_tensor_to_cpu((reward_critic_eval_model, "freeze_model"))
+        if training_args.rl_algorithm == "ppo" and critic_eval_model is not None:
+            offload_tensor_to_cpu((critic_eval_model, "freeze_model"))
         # NOTE(gongenlei): release memory_reserved_size to equal to memory_allocated_size
         paddle.device.cuda.empty_cache()
 
@@ -426,19 +346,14 @@ def main():
         }
 
     trainer = PPOTrainer(
-        #  (policy_model, reference_model, reward_model, value_model)
-        #   policy_model, sft_model,       reward_model, value_model
-        #  (policy_model, reference_model, reward_model, value_model,
-        #  (policy_model, reference_model, reward_model, value_model, policy_eval_model, value_eval_model
-        #  (actor_model, actor_reference_model, reward_model, reward_critic_model, actor_eval_model,
-        #   reward_critic_eval_model
+        #  (policy_model, reference_model, reward_model, critic_model, actor_eval_model, critic_eval_model
         model=(
             actor_model,
-            actor_reference_model,
+            reference_model,
             reward_model,
-            reward_critic_model if training_args.rl_algorithm == "ppo" else None,
+            critic_model if training_args.rl_algorithm == "ppo" else None,
             actor_eval_model,
-            reward_critic_eval_model if training_args.rl_algorithm == "ppo" else None,
+            critic_eval_model if training_args.rl_algorithm == "ppo" else None,
         ),
         args=training_args,
         train_dataset=(train_ds if training_args.do_train and training_args.should_load_dataset else None),
@@ -447,9 +362,13 @@ def main():
             actor_tokenizer,
             actor_tokenizer,
             reward_tokenizer,
-            reward_critic_tokenizer if training_args.rl_algorithm == "ppo" else None,
+            critic_tokenizer if training_args.rl_algorithm == "ppo" else None,
         ),
-        data_collator=partial(collate_fn, pad_token_id=actor_tokenizer.pad_token_id, requires_label=requires_label),
+        data_collator=partial(
+            collate_fn,
+            pad_token_id=actor_tokenizer.pad_token_id,
+            requires_label=True if training_args.use_rm_server else False,
+        ),
         compute_metrics=compute_metrics,  # TODO: only used for grpo (kk datasets)
     )
 
