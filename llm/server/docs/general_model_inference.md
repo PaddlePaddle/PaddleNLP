@@ -40,7 +40,7 @@ docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap
 
 
 **V100部署示例**
-
+>注意：float16精度下可能出现计算溢出，可以使用export FLAGS_blha_use_fp32_qk_sum=1 避免溢出
 ```shell
 export MODEL_PATH=${MODEL_PATH:-$PWD}
 export model_name=${model_name:-"meta-llama/Meta-Llama-3-8B-Instruct-Block-Attn/float16"}
@@ -80,7 +80,7 @@ docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap
 ```
 
 **V100部署示例**
- ⚠️ v100由于硬件指令限制，仅支持float16  
+>⚠️ v100由于硬件指令限制，仅支持float16  
 ```shell
 export MODEL_PATH=${MODEL_PATH:-$PWD}
 docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
@@ -92,7 +92,7 @@ docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap
 ### 服务化推理
 具体的部署细节以及参数说明可以查看[文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/deploy_usage_tutorial.md)
 
-
+>注意：v100在float16精度下可能出现计算溢出，可以使用export FLAGS_blha_use_fp32_qk_sum=1 避免溢出  
 ```shell
 export docker_img=ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.1
 
