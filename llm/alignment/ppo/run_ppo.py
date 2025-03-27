@@ -16,16 +16,15 @@
 import copy
 import os
 import sys
-import types
 from functools import partial
 
 import paddle
 from comm_utils import offload_tensor_to_cpu
-from data import PromptOnlyDataset, SupervisedDataset
-from models.score_model import LlamaModelForScore  # noqa
+from models.score_model import AutoModelForScore  # noqa
 from ppo_trainer import PPOTrainer
 from trainer_utils import DataArgument, ModelArgument, TrainingArguments
 
+from paddlenlp.datasets.rlhf_datasets import RLHFDataset, collate_fn
 from paddlenlp.trainer import PdArgumentParser, RuntimeTimer, get_last_checkpoint
 from paddlenlp.trainer.trainer_utils import ShardingOption
 from paddlenlp.transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
@@ -135,9 +134,14 @@ def main():
         logger.info(f"Use reward server: {model_args.reward_server} for training.")
         if training_args.rl_algorithm == "ppo" and model_args.reward_critic_model_name_or_path is None:
             raise ValueError("Please specify reward_critic_model_name_or_path when use_rm_server is true.")
+
+        requires_label = True
+
     else:
         if model_args.reward_model_name_or_path is None:
             raise ValueError("Please specify reward_model_name_or_path when use_rm_server is false.")
+
+        requires_label = False
 
     if training_args.rl_algorithm != "ppo" and training_args.use_fused_head_and_loss_fn:
         logger.warning(
@@ -146,7 +150,7 @@ def main():
         )
         training_args.use_fused_head_and_loss_fn = False
 
-    model_class_lm, model_class_score = AutoModelForCausalLM, LlamaModelForScore
+    model_class_lm, model_class_score = AutoModelForCausalLM, AutoModelForScore
     if training_args.pipeline_parallel_degree > 1:
         from models.model_pp import LlamaPolicyPipe, LlamaValuePipe
 
@@ -287,14 +291,14 @@ def main():
                 config.tensor_parallel_degree = -1
                 config.tensor_parallel_rank = 0
             if not training_args.autotuner_benchmark:
-                reward_model = LlamaModelForScore.from_pretrained(
+                reward_model = AutoModelForScore.from_pretrained(
                     model_args.reward_model_name_or_path,
                     config=config,
                     score_type="reward",
                     do_normalize=False,
                 )
             else:
-                reward_model = LlamaModelForScore.from_config(
+                reward_model = AutoModelForScore.from_config(
                     config,
                     score_type="reward",
                     do_normalize=False,
@@ -371,7 +375,7 @@ def main():
                 config.tensor_parallel_degree = -1
                 config.tensor_parallel_rank = 0
             runtime_timer.start("Reward critic eval model loading time")
-            reward_critic_eval_model = LlamaModelForScore.from_config(config)
+            reward_critic_eval_model = AutoModelForScore.from_config(config)
             logger.info(f"{runtime_timer.log()}")
             # reward_critic_eval_model =  AutoModelForScore.from_pretrained(
             #     model_args.reward_critic_model_name_or_path,config=model_config
@@ -389,26 +393,18 @@ def main():
             tokenizer.pad_token_id = tokenizer.eos_token_id
 
     if training_args.should_load_dataset:
-        train_ds = PromptOnlyDataset(
-            data_args.parsed_train_datasets, tokenizer=actor_tokenizer, use_rm_server=training_args.use_rm_server
+        train_ds = RLHFDataset(
+            dataset_name_or_path=data_args.train_datasets,
+            tokenizer=actor_tokenizer,
+            max_prompt_len=data_args.max_prompt_len,
+            splits="train",
         )
-        if data_args.eval_datasets is None and data_args.eval_split_ratio:
-            train_ds, dev_ds = train_ds.split_train_test(split_ratio=data_args.eval_split_ratio)
-        elif data_args.eval_datasets is not None:
-            dev_ds = PromptOnlyDataset(
-                data_args.parsed_eval_datasets, tokenizer=actor_tokenizer, use_rm_server=training_args.use_rm_server
-            )
-        else:
-            dev_ds = None
-
-        ptx_ds = (
-            SupervisedDataset(data_args.parsed_ptx_datasets, tokenizer=actor_tokenizer)
-            if data_args.ptx_datasets is not None
-            else None
+        dev_ds = RLHFDataset(
+            dataset_name_or_path=data_args.eval_datasets,
+            tokenizer=actor_tokenizer,
+            max_prompt_len=data_args.max_prompt_len,
+            splits="dev",
         )
-        if ptx_ds is not None:
-            # PretrainingCriterion requires shifted inputs and labels
-            ptx_ds.get_collator = types.MethodType(partial(ptx_ds.get_collator.__func__, shift=True), ptx_ds)
 
     if "freeze_model" in training_args.offload_level:
         offload_tensor_to_cpu((actor_reference_model, "freeze_model"))
@@ -445,14 +441,13 @@ def main():
         args=training_args,
         train_dataset=(train_ds if training_args.do_train and training_args.should_load_dataset else None),
         eval_dataset=(dev_ds if training_args.do_eval and training_args.should_load_dataset else None),
-        ptx_dataset=ptx_ds,
         tokenizer=(
             actor_tokenizer,
             actor_tokenizer,
             reward_tokenizer,
             reward_critic_tokenizer if training_args.rl_algorithm == "ppo" else None,
         ),
-        data_collator=train_ds.get_collator(),
+        data_collator=partial(collate_fn, pad_token_id=actor_tokenizer.pad_token_id, requires_label=requires_label),
         compute_metrics=compute_metrics,  # TODO: only used for grpo (kk datasets)
     )
 

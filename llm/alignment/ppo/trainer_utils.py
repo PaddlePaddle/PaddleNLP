@@ -19,12 +19,11 @@ import os
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, Tuple
+from typing import Dict, Optional
 
 import numpy as np
 import paddle
 import tqdm
-from data import parse_dataset
 from models.ppo_model_utils import make_attention_mask, make_position_ids
 from paddle.distributed import fleet
 from paddle.io import DataLoader
@@ -378,8 +377,6 @@ class ModelArgument:
 class DataArgument:
     train_datasets: str = field(default=None, metadata={"help": "Dataset name(s) registered in the raw dataset."})
     eval_datasets: str = field(default=None, metadata={"help": "Dataset name(s) registered in the raw dataset."})
-    eval_split_ratio: float = field(default=None, metadata={"help": "Ratio of eval data to train data"})
-    ptx_datasets: str = field(default=None, metadata={"help": "Dataset name(s) registered in the raw dataset."})
     max_length: int = field(
         default=2048,
         metadata={
@@ -387,25 +384,6 @@ class DataArgument:
         },
     )
     max_prompt_len: int = field(default=4096, metadata={"help": "Maximum prompt length."})
-
-    @property
-    def parsed_train_datasets(self) -> Tuple[str, Dict[str, Any]]:
-        """Parse dataset path and its proportion and optionally additional arguments from `train_datasets`."""
-        return [parse_dataset(string) for string in self.train_datasets.split(",")]
-
-    @property
-    def parsed_eval_datasets(self) -> Tuple[str, Dict[str, Any]]:
-        """Parse dataset path and its proportion and optionally additional arguments from `eval_datasets`."""
-        if self.eval_datasets is None:
-            return None
-        return [parse_dataset(string) for string in self.eval_datasets.split(",")]
-
-    @property
-    def parsed_ptx_datasets(self) -> Tuple[str, Dict[str, Any]]:
-        """Parse dataset path and its proportion and optionally additional arguments from `ptx_datasets`."""
-        if self.ptx_datasets is None:
-            return None
-        return [parse_dataset(string) for string in self.ptx_datasets.split(",")]
 
 
 # ########## patches for Trianer ##########

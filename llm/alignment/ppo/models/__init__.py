@@ -14,6 +14,7 @@
 # limitations under the License.
 """Utility functions for score models."""
 
-from .score_model_utils import AutoModelForScore, ScoreModelOutput
+from .score_model import AutoModelForScore
+from .score_model_utils import ScoreModelOutput
 
 __all__ = ["AutoModelForScore", "ScoreModelOutput"]

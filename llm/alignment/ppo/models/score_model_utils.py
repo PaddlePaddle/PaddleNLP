@@ -16,10 +16,7 @@
 
 from __future__ import annotations
 
-import importlib
-import json
 from abc import abstractmethod
-from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -28,107 +25,7 @@ import paddle.distributed as dist
 import paddle.nn as nn
 
 from paddlenlp.transformers import PretrainedConfig
-from paddlenlp.transformers.auto.modeling import (
-    MAPPING_NAMES,
-    _BaseAutoModelClass,
-    get_init_configurations,
-    get_name_mapping,
-    is_standard_config,
-)
 from paddlenlp.transformers.model_outputs import ModelOutput
-
-
-class AutoModelForScore(_BaseAutoModelClass):
-    CONFIGURATION_MODEL_MAPPING = get_init_configurations()
-    _pretrained_model_dict = CONFIGURATION_MODEL_MAPPING
-    # "ForScore" might be more consistent with other tasks, while this suffix is
-    # consistent with Beaver now.
-    _task_suffix = "ModelForScore"
-    _name_mapping: OrderedDict[str, Any] = get_name_mapping(_task_suffix)
-    _score_module_name: str = "models.score_model"
-
-    @classmethod
-    def _get_model_class_from_config(cls, pretrained_model_name_or_path, config_file_path, config=None):
-        """
-            Get the model class from config file path. If no config is provided, it will try to load the config from
-        the given config_file_path. The config should be a dict containing at least one of the following keys:
-        - "architectures": A list of strings indicating the architecture names. The last element in the list will
-          be used as the model class.
-        - "init_class": A string indicating the model class name.
-
-        Args:
-            pretrained_model_name_or_path (str): The pretrained model name or path. This argument is only used to
-              infer the model class when no config is provided.
-            config_file_path (str): The path to the config file.
-            config (Optional, dict, optional): The config dictionary. Defaults to None.
-
-        Raises:
-            AttributeError: Unable to parse 'architectures' or 'init_class' from config_file_path. Also unable to
-              infer model class from 'pretrained_model_name_or_path'.
-
-        Returns:
-            type: The model class.
-        """
-        if config is None:
-            with open(config_file_path, encoding="utf-8") as f:
-                config = json.load(f)
-
-        # Get class name corresponds to this configuration
-        if is_standard_config(config):
-            architectures = config["architectures"]
-            init_class = architectures.pop() if len(architectures) > 0 else None
-        else:
-            init_class = config.pop("init_class", None)
-
-        # Get class name corresponds to this task, since we might init Score
-        # model with CausalLM model.
-        init_class = init_class[:-5] if init_class is not None and init_class.endswith("Model") else init_class
-        model_name = None
-        if init_class:
-            for model_flag, name in MAPPING_NAMES.items():
-                if model_flag in init_class:
-                    model_name = model_flag + "Model"
-                    break
-        if model_name is None:
-            raise AttributeError(
-                f"Unable to parse 'architectures' or 'init_class' from {config_file_path}."
-                "Also unable to infer model class from 'pretrained_model_name_or_path'"
-            )
-        init_class = cls._name_mapping[model_name + "_Import_Class"]
-        # module_name = cls._name_mapping[init_class]
-        module_name = cls._score_module_name
-
-        import_class = importlib.import_module(module_name)
-        model_class = getattr(import_class, init_class)
-        return model_class
-
-    @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, *model_args, **kwargs):
-        """
-        Instantiate a PreTrainedModel from a pre-trained model file.
-
-        Args:
-            pretrained_model_name_or_path (str):
-                This can be either:
-                    - a string with the name of a pre-trained model to load selected in the list of:
-                      . `bert-base-uncased`
-                      . `bert-large-uncased`
-                      . `bert-base-cased`
-                      . `bert-large-cased`
-                      . `bert-base-multilingual-uncased`
-                      . `bert-base-multilingual-cased`
-                      . `bert-base-chinese`
-                    - a path to a pre-trained model configuration file (e.g., `.json`) or a key to find such
-                      file in a PyTorch state dictionary (e.g., returned by torch.save()).
-            *model_args (tuple):
-                Additional positional arguments that will be passed to the underlying model's `__init__` method.
-            **kwargs (dict):
-                Additional keyword arguments that will be passed to the underlying model's `__init__` method.
-
-        Returns:
-            PreTrainedModel: A model with weights loaded from the specified pre-trained model file.
-        """
-        return cls._from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
 
 
 @dataclass
