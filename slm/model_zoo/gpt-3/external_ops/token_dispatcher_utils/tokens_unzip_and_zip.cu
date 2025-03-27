@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "utils.h"
+
 template <typename X_T,
           typename routemap_T,
           typename probs_T,
