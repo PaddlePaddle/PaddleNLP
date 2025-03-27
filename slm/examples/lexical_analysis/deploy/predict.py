@@ -27,7 +27,7 @@ parser.add_argument("--params_file", type=str, required=True, default='./static_
 parser.add_argument("--data_dir", type=str, default=None, help="The folder where the dataset is located.")
 parser.add_argument("--init_checkpoint", type=str, default=None, help="Path to init model.")
 parser.add_argument("--batch_size", type=int, default=2, help="The number of sequences contained in a mini-batch.")
-parser.add_argument("--max_seq_len", type=int, default=64, help="Number of words of the longest seqence.")
+parser.add_argument("--max_seq_len", type=int, default=64, help="Number of words of the longest sequence.")
 parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu"], help="The device to select to train the model, is must be cpu/gpu.")
 parser.add_argument("--epochs", default=1, type=int, help="The number of epochs when running benchmark.")
 

@@ -271,7 +271,7 @@ class LlamaModelTester:
 
     def create_and_check_gqa_model(self, config, input_ids, input_mask, *args):
         model = LlamaForCausalLM(config)
-        config.num_key_value_heads = 8 # gqa
+        config.num_key_value_heads = 8  # gqa
         config.use_fused_rope = True
         model.eval()
 
@@ -411,7 +411,7 @@ class LlamaCompatibilityTest(unittest.TestCase):
 
     @require_package("transformers", "torch")
     def test_llama_converter(self):
-        # 1. create commmon input
+        # 1. create common input
         input_ids = np.random.randint(100, 200, [1, 20])
 
         # 2. forward the paddle model
@@ -441,7 +441,7 @@ class LlamaCompatibilityTest(unittest.TestCase):
     def test_llama_converter_from_local_dir(self):
         with tempfile.TemporaryDirectory() as tempdir:
 
-            # 1. create commmon input
+            # 1. create common input
             input_ids = np.random.randint(100, 200, [1, 20])
 
             # 2. forward the torch  model
@@ -474,7 +474,7 @@ class LlamaCompatibilityTest(unittest.TestCase):
         pytorch_class_name = pytorch_class_name or class_name
         with tempfile.TemporaryDirectory() as tempdir:
 
-            # 1. create commmon input
+            # 1. create common input
             input_ids = np.random.randint(100, 200, [1, 20])
 
             # 2. forward the torch model

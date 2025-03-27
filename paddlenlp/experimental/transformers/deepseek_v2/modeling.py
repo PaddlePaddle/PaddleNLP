@@ -631,7 +631,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
             weightonly_group_size=self.weightonly_group_size,
             activation="swiglu",
             num_layers=config.num_hidden_layers,
-            nranks=config.tensor_parallel_degree,
+            tp_degree=config.tensor_parallel_degree,
             ring_id=ring_id,
             ln_scale_attrs=ln_scale_attrs,
             linear_weight_attrs=out_proj_weight_attrs,

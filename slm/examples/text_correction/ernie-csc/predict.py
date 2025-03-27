@@ -37,7 +37,7 @@ parser.add_argument(
     help="The path to parameters in static graph.",
 )
 parser.add_argument("--batch_size", type=int, default=2, help="The number of sequences contained in a mini-batch.")
-parser.add_argument("--max_seq_len", type=int, default=64, help="Number of words of the longest seqence.")
+parser.add_argument("--max_seq_len", type=int, default=64, help="Number of words of the longest sequence.")
 parser.add_argument(
     "--device",
     default="gpu",

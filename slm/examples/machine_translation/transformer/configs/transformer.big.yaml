@@ -92,7 +92,7 @@ n_best: 1
 # automatically according to the passed vocabulary path and special tokens.
 # Size of source word dictionary.
 src_vocab_size: 10000
-# Size of target word dictionay
+# Size of target word dictionary
 trg_vocab_size: 10000
 # Used to pad vocab size to be multiple of pad_factor.
 pad_factor: 8
