@@ -1623,7 +1623,6 @@ class Qwen2ForCausalLM(Qwen2PretrainedModel):
             attention_mask = None
 
         # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
-        import pdb;pdb.set_trace() 
         outputs = self.qwen2(
             input_ids=input_ids,
             position_ids=position_ids,
