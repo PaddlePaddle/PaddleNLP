@@ -1,6 +1,7 @@
 #include "utils.h"
 
 #define CUMSUM_BLOCK_SIZE 64
+#define CUMSUM_INVALID_TAG -114514
 
 // 多阶段算法，控制每block处理的行数来权衡额外开销
 //  首先解析routemap来更新专家当前所收到的token数，然后check前一个block给的前缀和并更新给下一个block
@@ -33,7 +34,7 @@ __global__ void tokens_unzip_stable_kernel(
     int local_cumsum[num_experts];
     #pragma unroll
     for(int i = 0; i < num_experts; i++){
-      cumsum_offset[i] = (blockIdx.x==0)? 0 : -1; // 除了第0个block，其他的都以非法值初始化,因为atomic忙等要用
+      cumsum_offset[i] = (blockIdx.x==0)? 0 : CUMSUM_INVALID_TAG; // 除了第0个block，其他的都以非法值初始化,因为atomic忙等要用
       expert_offset[i] = i * max_tokens_per_expert;
       local_cumsum[i] = 0;
     }
@@ -70,8 +71,8 @@ __global__ void tokens_unzip_stable_kernel(
       #pragma unroll
       for(int i = 0; i < num_experts; i++){
         if(blockIdx.x !=0)[[likely]]{
-          while(cumsum_offset[i] == -1)[[likely]]{
-            cumsum_offset[i] = atomicExch(&global_expertwise_block_cumsum[blockIdx.x * num_experts + i], -1);
+          while(cumsum_offset[i] == CUMSUM_INVALID_TAG)[[likely]]{
+            cumsum_offset[i] = atomicExch(&global_expertwise_block_cumsum[blockIdx.x * num_experts + i], CUMSUM_INVALID_TAG);
           }
         }
         const int proposed_offset = cumsum_offset[i] + local_cumsum[i];
@@ -255,9 +256,9 @@ std::vector<paddle::Tensor> tokens_unzip_stable(
   const int cumsum_blocknum = (rows + CUMSUM_BLOCK_SIZE - 1) / CUMSUM_BLOCK_SIZE;
   auto global_expertwise_block_cumsum = paddle::empty({cumsum_blocknum + 1, num_experts}, paddle::DataType::INT32, X.place());
   auto global_expertwise_block_cumsum_ptr = reinterpret_cast<void *>(global_expertwise_block_cumsum.data<int>());
-  // 设置为非法值-1，用于线程块等待时使用
+  // 设置为非法值CUMSUM_INVALID_TAG,规避-1（rowmap合法值），用于线程块等待时使用
   cudaMemsetAsync(global_expertwise_block_cumsum_ptr,
-                  -1,
+                  CUMSUM_INVALID_TAG,
                   sizeof(int) * (cumsum_blocknum + 1) * num_experts,
                   global_expertwise_block_cumsum.stream());
 
