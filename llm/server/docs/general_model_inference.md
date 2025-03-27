@@ -95,7 +95,7 @@ docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap
 >注意：v100在float16精度下可能出现计算溢出，可以使用export FLAGS_blha_use_fp32_qk_sum=1 避免溢出  
 ```shell
 export docker_img=ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.1
-
+# v100 export docker_img=ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda118-cudnn8-v2.1
 export MODEL_PATH=${MODEL_PATH:-$PWD}
 docker run --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
 -v $MODEL_PATH/:/models -dit $docker_img /bin/bash \
