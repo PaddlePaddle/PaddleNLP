@@ -653,6 +653,7 @@ def unified_optimizer_into_shards(
         logger.info("Unified optimizer tensor parallel in shards")
         optim_state_dict = merge_tensor_parallel_for_optimizer(
             optim_state_dict,
+            state_dict,
             tp_actions,
             filter_optim_keys,
         )
@@ -662,6 +663,7 @@ def unified_optimizer_into_shards(
             logger.info("Unified master weight tensor parallel in shards")
             master_weights = merge_tensor_parallel_for_optimizer(
                 master_weights,
+                state_dict,
                 tp_actions,
                 filter_master_keys,
             )
