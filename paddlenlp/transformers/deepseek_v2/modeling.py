@@ -226,12 +226,6 @@ def parallel_matmul(x: Tensor, y: Tensor, transpose_y=False, tensor_parallel_out
         return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
 
     else:
-        # print("parallel matmul here", transpose_y)
-        # if DSV3_USE_FP8_GEMM and not transpose_y:
-        #     print("use fp8", x.shape, y.shape)
-        #     logits = LinearFP8Func.apply(x, y)
-        #     return logits
-        # else:
         logits = paddle.matmul(x, y, transpose_y=transpose_y)
         return logits
 

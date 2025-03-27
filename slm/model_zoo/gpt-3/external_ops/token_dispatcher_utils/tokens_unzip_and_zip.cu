@@ -237,49 +237,6 @@ __global__ void tokens_weighted_zip_kernel(
       weighted_zipped_tokens[this_row * token_length + i] = sum;
     }
   }
-
-  constexpr int vecSize = 2;  // __nv_bfloat162 = 2 x bfloat16
-  const int num_full_vec = token_length / vecSize;
-  const int remaining_elems = token_length % vecSize;
-  const int thread_stride = blockDim.x * vecSize;
-
-  // ----------------------- 填数（加权和）-------------------------
-  // 齐整区域向量化搬移
-  for (int x_offset = threadIdx.x * vecSize; x_offset < num_full_vec * vecSize;
-       x_offset += thread_stride) {
-    __nv_bfloat162 sum = {0, 0};
-    __nv_bfloat162 *out_ptr = reinterpret_cast<__nv_bfloat162 *>(
-        &weighted_zipped_tokens[this_row * token_length + x_offset]);
-#pragma unroll
-    for (int expert = 0; expert < num_experts; ++expert) {
-      const int fetch_row = local_row_fetchlist[expert];
-      const int fetch_row_index = fetch_row >= 0 ? fetch_row : 0;
-      __nv_bfloat162 token_vec = *reinterpret_cast<const __nv_bfloat162 *>(
-          &unzipped_tokens[fetch_row_index * token_length + x_offset]);
-      __nv_bfloat16 prob =
-          fetch_row >= 0 ? local_expert_problist[expert] : (__nv_bfloat16)0;
-      __nv_bfloat162 prob_vec = {prob, prob};
-      sum = __hfma2(token_vec, prob_vec, sum);
-    }
-    *out_ptr = sum;
-  }
-
-    // 剩余元素处理
-  for (int i = num_full_vec * vecSize + threadIdx.x; i < token_length;
-        i += blockDim.x) {
-    __nv_bfloat16 sum = (__nv_bfloat16)0;
-#pragma unroll
-    for (int expert = 0; expert < num_experts; ++expert) {
-      int fetch_row = local_row_fetchlist[expert];
-      int fetch_row_index = fetch_row >= 0 ? fetch_row : 0;
-      __nv_bfloat16 token_val =
-          unzipped_tokens[fetch_row_index * token_length + i];
-      __nv_bfloat16 prob =
-          fetch_row >= 0 ? local_expert_problist[expert] : (__nv_bfloat16)0;
-      sum += prob * token_val;
-    }
-    weighted_zipped_tokens[this_row * token_length + i] = sum;
-  }
 }
 
 // ---------------------------- Dispatch ---------------------------------
