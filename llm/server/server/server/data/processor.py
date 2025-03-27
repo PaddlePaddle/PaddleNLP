@@ -120,7 +120,7 @@ class BaseDataProcessor(ABC):
 
 class DataProcessor(BaseDataProcessor):
     def __init__(self):
-        self.config = global_config()
+        self.config = global_config
 
         self.decode_status = dict()
         self.tokenizer = self._load_tokenizer()
