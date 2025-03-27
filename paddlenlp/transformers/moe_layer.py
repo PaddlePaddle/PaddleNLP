@@ -39,6 +39,8 @@ except:
 
 DSV3_USE_FP8_GEMM = os.getenv("DSV3_USE_FP8_GEMM", "False").lower() == "true"
 
+DSV3_USE_FP8_GROUP_GEMM = os.getenv("DSV3_USE_FP8_GROUP_GEMM", "False").lower() == "true"
+
 
 def dispatching(x, dispatch_mask, scatter_index, num_experts, capacity):
     """
@@ -607,7 +609,7 @@ class MlpNode:
 
     @paddle.no_grad()
     def forward(self, hs_fp8_dispatched, hs_scale_dispatched, dispatched_indices, dispatched_probs):
-        if len(self.token_dispatcher._comm_manager.tokens_per_expert) == 4:
+        if len(self.token_dispatcher._comm_manager.tokens_per_expert) == 4 and DSV3_USE_FP8_GROUP_GEMM:
             # 1 unzip
             total_unzipped_tokens_num = int((dispatched_indices != -1).astype("int64").sum())
             self.dispatched_indices = dispatched_indices
@@ -691,7 +693,7 @@ class MlpNode:
 
     @paddle.no_grad()
     def backward(self, hidden_states_out_grad, hidden_states_out_grad_scale):
-        if len(self.token_dispatcher._comm_manager.tokens_per_expert) == 4:
+        if len(self.token_dispatcher._comm_manager.tokens_per_expert) == 4 and DSV3_USE_FP8_GROUP_GEMM:
             # zip_grad
             # hidden_states_out_grad_scale = hidden_states_out_grad_scale.to(paddle.bfloat16)
             unzipped_grad, unzipped_scale_grad = self.zip_node.backward(
