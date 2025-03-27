@@ -117,7 +117,7 @@ docker run --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_P
 开启 MTP 模式，参考 [投机解码部分](./speculative_decoding.md)。
 
 ### deepseek-ai/DeepSeek-R1-Distill-Qwen-14B
-
+> v100跑蒸馏模型可以参考[一键部署推理服务](../../../llm/server/docs/general_model_inference.md)部分。
 ```shell
 export MODEL_PATH=${MODEL_PATH:-$PWD}
 export model_name=${model_name:-"deepseek-ai/DeepSeek-R1-Distill-Qwen-14B/weight_only_int8"}
