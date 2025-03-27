@@ -380,14 +380,14 @@ class FusedMultiTransformerBase(Layer):
         self.moe_quant_type = config.moe_quant_type
 
         self.max_num_tokens_per_card = 128
-        hidden_size = 2048
-        num_topk = 4
-        num_experts =self.config.moe_config.num_experts
+        self.hidden_size = self.config.embed_dim
+        # self.num_topk = self.config.moe_config.top_k
+        num_experts = self.config.moe_config.num_experts
         ep_group = dist.get_group()
         num_ranks = dist.get_world_size()
         num_rdma_bytes = ep.Buffer.get_low_latency_rdma_size_hint(
             self.max_num_tokens_per_card,
-            hidden_size,
+            self.hidden_size,
             num_ranks,
             num_experts
         )
@@ -1494,7 +1494,6 @@ class FusedMultiTransformerBase(Layer):
 
 
         combined_x, event, hook = self.buffer.low_latency_combine(ffn_out, topk_idx, topk_weights, handle, return_recv_hook=False)
-        # breakpoint()
 
         return combined_x
 
@@ -1570,16 +1569,19 @@ class FusedMultiTransformerBase(Layer):
         permute_input_per_card = run_permute_input(permute_input_per_card)
 
         token_cumsum_by_expert_per_card = token_num_from_all_cards.transpose([1, 0]).sum(axis=-1).cumsum()
-        ffn_out = moe_expert_ffn(
-            permute_input_per_card,
-            token_cumsum_by_expert_per_card,
-            ffn1_weights,
-            ffn2_weights,
-            ffn1_biases,
-            ffn1_weights_scale,
-            ffn2_weights_scale,
-            quant_type,
-        )
+        if permute_input_per_card.shape[0] == 0:
+            ffn_out = permute_input_per_card
+        else:
+            ffn_out = moe_expert_ffn(
+                permute_input_per_card,
+                token_cumsum_by_expert_per_card,
+                ffn1_weights,
+                ffn2_weights,
+                ffn1_biases,
+                ffn1_weights_scale,
+                ffn2_weights_scale,
+                quant_type,
+            )
 
         ffn_out = run_permute_input(ffn_out, False)
         dist.alltoall_single(permute_input, ffn_out, act_out_split_size, act_in_split_size)
