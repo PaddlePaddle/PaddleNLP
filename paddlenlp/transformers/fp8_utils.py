@@ -103,11 +103,13 @@ class ExpertsGroupGemmNode:
         self.unzipped_scale = None
         self.unzipped_tokens = None
         self.custom_map = custom_map
+        self.unzipped_probs = None
 
     def reset_statue(self):
         self.o1 = None
         self.unzipped_scale = None
         self.unzipped_tokens = None
+        self.unzipped_probs = None
 
     def fwd_gate_up(self, x_fp8, x_scale, expert_w1, expert_w_count, unzipped_probs, unzipped_expert_idx):
         # concat w1
@@ -181,6 +183,9 @@ class ExpertsGroupGemmNode:
         deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
             (unzipped_grad, unzipped_scale), (bw_w2_quant, bw_w2_scale), do2, unzipped_expert_idx
         )
+
+        do2 = do2 * self.unzipped_probs.unsqueeze(-1)
+
         # recomput o2
         o2 = self.fwd_swiglu(self.o1)
 
@@ -217,18 +222,18 @@ class ExpertsGroupGemmNode:
         )
         return dx, do1_fp8, do1_scale
 
-    def dequant_and_regroup_dout_and_o1(
-        self, out_grad, out_grad_scale, o1, expert_w1_len, unzipped_expert_idx, dispatched_indices
+    def dequant_and_regroup_dout_and_o2(
+        self, out_grad, out_grad_scale, o2, expert_w1_len, unzipped_expert_idx, dispatched_indices
     ):
         # regroup dout and o2:regroup之前需要dequant
         out_grad_dequant = dequantize_fp8_to_fp32(out_grad, out_grad_scale)
         out_grad_dequant_fp16 = out_grad_dequant.to(paddle.bfloat16)
         max_seq_len = max(self.tokens_per_expert)
         max_seq_len = ((max_seq_len + 127) // 128) * 128
-        o1_regroup, out_grad_regroup = TDU.regroup_tokens(
-            o1, out_grad_dequant_fp16, unzipped_expert_idx, expert_num=4, token_max_per_expert=max_seq_len  # int32
+        o2_regroup, out_grad_regroup = TDU.regroup_tokens(
+            o2, out_grad_dequant_fp16, unzipped_expert_idx, expert_num=4, token_max_per_expert=max_seq_len  # int32
         )  # int32
-        return o1_regroup, out_grad_regroup, max_seq_len
+        return o2_regroup, out_grad_regroup, max_seq_len
 
     def dequant_do1_and_regroup_do1_fp8_and_unzipped_tokens(
         self, do1_fp8, do1_scale, unzipped_expert_idx, max_seq_len
@@ -246,9 +251,9 @@ class ExpertsGroupGemmNode:
         return do1_regroup, input_x_regroup
 
     # ===== dw2 = deep_gemm(o2_t_fp8, do3_t_fp8)
-    def bwd_down_weight(self, out_grad_regroup, o1, o2, max_seq_len, expert_w2):
+    def bwd_down_weight(self, out_grad_regroup, o2_regroup, max_seq_len, expert_w2):
         # transpose o2
-        o2_t = o2.reshape([max_seq_len, len(expert_w2), -1]).transpose([1, 2, 0]).contiguous()
+        o2_t = o2_regroup.reshape([max_seq_len, len(expert_w2), -1]).transpose([1, 2, 0]).contiguous()
 
         # quant o2_t
         o2_t = o2_t.reshape([len(expert_w2) * o2_t.shape[1], -1])
@@ -335,6 +340,7 @@ class ExpertsGroupGemmNode:
 
     def forward(self, hs_out, hs_scale_out, unzipped_probs, unzipped_expert_idx, tokens_per_expert):
         self.tokens_per_expert = tokens_per_expert
+        self.unzipped_probs = unzipped_probs
         # get w1
         expert_w1 = [x.w1 for x in self.custom_map.experts if x is not None]
 
@@ -374,14 +380,14 @@ class ExpertsGroupGemmNode:
         # dx
         dx, do1_fp8, do1_scale = self.bwd_gate_up_input(do1, expert_w1, unzipped_expert_idx)
 
-        # dequant dout and regroup dout
-        o1_regroup, out_grad_regroup, max_seq_len = self.dequant_and_regroup_dout_and_o1(
-            out_grad, out_grad_scale, self.o1, len(expert_w1), unzipped_expert_idx, dispatched_indices
+        # dequant dout,o2 and regroup dout,o2
+        o2_regroup, out_grad_regroup, max_seq_len = self.dequant_and_regroup_dout_and_o2(
+            out_grad, out_grad_scale, o2, len(expert_w1), unzipped_expert_idx, dispatched_indices
         )
 
         # dw2
 
-        self.bwd_down_weight(out_grad_regroup, o1_regroup, o2, max_seq_len, expert_w2)
+        self.bwd_down_weight(out_grad_regroup, o2_regroup, max_seq_len, expert_w2)
 
         # dequant do1_fp8 and regroup do1_fp8,unzipped_tokens
         do1_regroup, input_x_regroup = self.dequant_do1_and_regroup_do1_fp8_and_unzipped_tokens(
