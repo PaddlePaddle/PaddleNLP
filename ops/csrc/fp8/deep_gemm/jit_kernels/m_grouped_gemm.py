@@ -18,6 +18,7 @@
 
 import functools
 from typing import Tuple
+from functools import reduce
 
 import paddle
 from paddle import Tensor
@@ -123,7 +124,8 @@ def m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
     m, k = lhs.shape
     num_groups, n, k_ = rhs.shape
     m_, n_ = out.shape
-    m__ = m_indices.numel()
+    m_shape = m_indices.shape
+    m__ = reduce(lambda x, y: x*y, m_shape)
     # Type and shape checks
     assert m == m_ == m__ and k == k_ and n == n_
     assert lhs_scales.shape == [m, (k + 127) // 128]
