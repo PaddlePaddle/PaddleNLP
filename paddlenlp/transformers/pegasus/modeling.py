@@ -525,6 +525,7 @@ class PegasusForConditionalGeneration(PegasusPretrainedModel):
         use_cache: Optional[bool] = None,
         cache: Optional[List[Tuple[Cache, StaticCache]]] = None,
         labels: Optional[Tensor] = None,
+        return_dict: Optional[bool] = None,
     ):
         r"""
         The PegasusForConditionalGeneration forward method, overrides the __call__() special method.
@@ -571,6 +572,7 @@ class PegasusForConditionalGeneration(PegasusPretrainedModel):
                 outputs = model(**inputs)
 
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         output, new_cache, encoder_output, attention_mask = self.pegasus(
             input_ids, attention_mask, decoder_input_ids, decoder_attention_mask, encoder_output, use_cache, cache
         )

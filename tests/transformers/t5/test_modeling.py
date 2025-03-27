@@ -420,7 +420,7 @@ class T5ModelTester:
         model = T5ForConditionalGeneration(config)
         model.eval()
 
-        output_without_past_cache, _ = model.generate(
+        output_without_past_cache = model.generate(
             input_ids[:1], top_k=1, max_length=5, decode_strategy="sampling", use_cache=False
         )
 
@@ -428,7 +428,7 @@ class T5ModelTester:
         np.random.seed(0)
         random.seed(0)
 
-        output_with_past_cache, _ = model.generate(input_ids[:1], top_k=1, max_length=5, decode_strategy="sampling")
+        output_with_past_cache = model.generate(input_ids[:1], top_k=1, max_length=5, decode_strategy="sampling")
 
         self.parent.assertTrue(paddle.all(output_with_past_cache == output_without_past_cache))
 

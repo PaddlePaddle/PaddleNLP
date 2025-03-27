@@ -217,9 +217,9 @@ def scaled_dot_product_attention(
                 f"Attention weights should be of shape {(bsz, num_heads, q_len, kv_seq_len)}, but is"
                 f" {attn_weights.shape}"
             )
-
         if attention_mask is None:
             attention_mask = get_triangle_upper_mask(attn_weights) 
+        
         attention_mask = attention_mask.reshape([bsz, 1, q_len, kv_seq_len])
         if attention_mask.shape != [bsz, 1, q_len, kv_seq_len]:
             raise ValueError(
@@ -1506,7 +1506,8 @@ class Qwen2ForCausalLM(Qwen2PretrainedModel):
         if past_key_values:
             input_ids = input_ids[:, -1].unsqueeze(axis=-1)
             position_ids = position_ids[:, -1].unsqueeze(-1)
-
+            if attention_mask is not None and len(attention_mask.shape) == 4:
+                attention_mask = attention_mask[:, :, -1, :]
         # if `inputs_embeds` are passed, we only want to use them in the 1st generation step
         if inputs_embeds is not None and past_key_values is None:
             model_inputs = {"inputs_embeds": inputs_embeds}
@@ -1623,7 +1624,6 @@ class Qwen2ForCausalLM(Qwen2PretrainedModel):
             attention_mask = None
 
         # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
-        import pdb;pdb.set_trace() 
         outputs = self.qwen2(
             input_ids=input_ids,
             position_ids=position_ids,

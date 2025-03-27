@@ -222,7 +222,7 @@ class GenerationTesterMixin:
         max_length,
     ):
         if self.is_encoder_decoder:
-            max_length = 4
+            max_length = 3
         logits_process_kwargs, logits_processor = self._get_logits_processor_and_kwargs(
             eos_token_id=getattr(model, model.base_model_prefix).config["eos_token_id"],
             forced_bos_token_id=getattr(getattr(model, model.base_model_prefix).config, "forced_bos_token_id", None),
@@ -438,7 +438,6 @@ class GenerationTesterMixin:
             paddle.seed(124)
             model = self._make_model_instance(config, model_class)
             model.eval()
-
             output_generate = self._greedy_generate(
                 model=model, input_ids=input_ids, attention_mask=attention_mask, max_length=max_length
             )
@@ -523,7 +522,6 @@ class GenerationTesterMixin:
             beam_kwargs, beam_scorer = self._get_beam_scorer_and_kwargs(
                 input_ids.shape[0], max_length + 1 if self.is_encoder_decoder else max_length + input_ids.shape[-1]
             )
-
             # check `generate()` and `beam_search()` are equal
             output_generate = self._beam_search_generate(
                 model=model,

@@ -460,7 +460,7 @@ class GenerationMixin:
             and kwargs.get(position_ids_key) is None
             and position_ids_key in set(inspect.signature(self.forward).parameters.keys())
         ):
-            position_ids = attention_mask.long().cumsum(-1) - 1
+            position_ids = attention_mask.cumsum(-1) - 1
             position_ids.masked_fill_(attention_mask == 0, 1)
             kwargs[position_ids_key] = position_ids  # placed in kwargs for further processing (see below)
 
@@ -790,7 +790,7 @@ class GenerationMixin:
     ) -> Dict[str, Any]:
         # update past_key_values keeping its naming used in model code
         for possible_cache_name in ALL_CACHE_NAMES:
-            if possible_cache_name in outputs:
+            if isinstance(outputs, dict) and possible_cache_name in outputs:
                 # TODO (joao): remove output/input mismatch when these old models (xlnet, reformer) are deprecated
                 if possible_cache_name in ("past_buckets_states", "mems"):
                     cache_name = "past_key_values"
@@ -2668,8 +2668,8 @@ class GenerationMixin:
             )
 
             # .float() is needed to retain precision for later logits manipulations
-            final_layer_next_token_logits = outputs.logits[:, -1, :].detach().clone().float()
-            final_logits = outputs.logits[:, -1, :].float()
+            final_layer_next_token_logits = outputs.logits[:, -1, :].detach().clone().astype("float32")
+            final_logits = outputs.logits[:, -1, :].astype("float32")
             candidate_premature_logits = {}
             for candidate_premature_layer in candidate_premature_layers:
                 candidate_premature_logits[candidate_premature_layer] = lm_head(
@@ -2949,7 +2949,7 @@ class GenerationMixin:
                 all_outputs = []
                 for i in range(top_k):
                     # compute the candidate tokens by the language model and collect their hidden_states
-                    next_model_inputs = self.prepare_inputs_for_generation(top_k_ids[:, i].view(-1, 1), **model_kwargs)
+                    next_model_inputs = self.prepare_inputs_for_generation(top_k_ids[:, i].view([-1, 1]), **model_kwargs)
 
                     outputs = self(
                         **next_model_inputs,
@@ -2972,7 +2972,7 @@ class GenerationMixin:
             else:
                 # compute the candidate tokens by the language model and collect their hidden_states
                 # assembles top_k_ids into batch of size k
-                next_model_inputs = self.prepare_inputs_for_generation(top_k_ids.view(-1, 1), **model_kwargs)
+                next_model_inputs = self.prepare_inputs_for_generation(top_k_ids.view([-1, 1]), **model_kwargs)
 
                 outputs = self(
                     **next_model_inputs,
@@ -3027,7 +3027,7 @@ class GenerationMixin:
             # generate past_key_values cache of only the selected token
             if sequential:
                 next_model_input = self.prepare_inputs_for_generation(
-                    top_k_ids[:, selected_idx].view(-1, 1), **model_kwargs
+                    top_k_ids[:, selected_idx].view([-1, 1]), **model_kwargs
                 )
 
                 selected_outputs = self(
@@ -3271,7 +3271,6 @@ class GenerationMixin:
             # Clone is needed to avoid keeping a hanging ref to outputs.logits which may be very large for first iteration
             # (the clone itself is always small)
             next_token_logits = outputs.logits[:, -1, :].clone().astype("float32")
-            next_token_logits = next_token_logits.to(input_ids.place)
 
             # pre-process distribution
             next_token_scores = logits_processor(input_ids, next_token_logits)

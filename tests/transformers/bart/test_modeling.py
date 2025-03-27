@@ -360,7 +360,7 @@ class BartHeadTests(unittest.TestCase):
             num_return_sequences=1,
             max_length=max_length,
             top_k=4,
-        )[0]
+        )
         self.assertEqual(generated_ids.shape, [input_ids.shape[0], max_length])
 
     def test_shift_tokens_right(self):
