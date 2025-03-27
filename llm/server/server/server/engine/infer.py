@@ -27,7 +27,7 @@ import paddle
 import paddle.distributed as dist
 import paddle.distributed.fleet as fleet
 from paddle.base.framework import use_pir_api
-from paddlenlp_ops import speculate_step_paddle, step_paddle
+from paddlenlp_ops import f_step_paddle, speculate_step_paddle
 from server.data.processor import DataProcessor
 from server.engine.config import global_config
 from server.utils import get_logger
@@ -45,12 +45,24 @@ Dir_Path = os.path.dirname(File_Path)
 logger = get_logger("infer_server", "infer.log")
 
 
+def print_memory(location):
+    memory_reserved_size = paddle.device.cuda.memory_reserved("gpu:0")
+    memory_allocated_size = paddle.device.cuda.memory_allocated("gpu:0")
+    max_memory_reserved_size = paddle.device.cuda.max_memory_reserved("gpu:0")
+    max_memory_allocated_size = paddle.device.cuda.max_memory_allocated("gpu:0")
+    print(
+        f"{location} >>> memory_reserved_size: {memory_reserved_size}, memory_allocated_size: {memory_allocated_size}, max_memory_reserved_size: {max_memory_reserved_size}, max_memory_allocated_size: {max_memory_allocated_size}"
+    )
+
+
 class ModelRunner:
     def __init__(self, args):
         self.args = args
 
         # 2**63 - 1
         self.MAX_INFER_SEED = 9223372036854775806
+
+        self.use_dynamic_graph = int(os.getenv("USE_DYNAMIC_GRAPH", "0"))
 
         self.config = global_config
         self.model_cfg = self.config.get_model_config()
@@ -66,7 +78,8 @@ class ModelRunner:
             self.qk_rope_head_dim = int(self.model_cfg["qk_rope_head_dim"])
             self.v_head_dim = int(self.model_cfg["v_head_dim"])
             self.kv_lora_rank = int(self.model_cfg["kv_lora_rank"])
-            self.mla_use_absorb = bool(self.model_cfg["mla_use_matrix_absorption"])
+            # self.mla_use_absorb = bool(self.model_cfg["mla_use_matrix_absorption"])
+            self.mla_use_absorb = True
 
         self.max_stop_seqs_num = int(os.getenv("MAX_STOP_SEQS_NUM", 5))
         self.stop_seqs_max_len = int(os.getenv("STOP_SEQS_MAX_LEN", 8))
@@ -80,7 +93,9 @@ class ModelRunner:
         self.share_inputs = {}
         self.helper_tensors = {}
         self.cache_kvs = {}
+        print_memory("before self.init_inputs()")
         self.init_inputs()
+        print_memory("after self.init_inputs()")
 
         if self.is_speculate_decoding:
             logger.info(f"Using speculate decoding, method: {self.speculate_config.speculate_method}.")
@@ -107,6 +122,7 @@ class ModelRunner:
             share_inputs=self.share_inputs,
             cache_kvs=self.cache_kvs,
             config=self.config,
+            args=self.args,
             mp_degree=self.nranks,
         )
 
@@ -249,6 +265,11 @@ class ModelRunner:
                     fill_value=0,
                     dtype=cache_type,
                 )
+
+        if self.use_dynamic_graph:
+            self.share_inputs["cache_kvs"] = list(self.cache_kvs.values())
+            for value in self.cache_kvs.values():
+                del value
 
         pre_max_block_num = (
             self.args.max_seq_len + self.args.block_size - 1
@@ -503,7 +524,7 @@ class ModelRunner:
                 self.speculate_config.speculate_max_draft_token_num,
             )
         else:
-            step_paddle(
+            f_step_paddle(
                 self.share_inputs["stop_flags"],
                 self.share_inputs["seq_lens_this_time"],
                 self.share_inputs["step_seq_lens_encoder"],
@@ -653,11 +674,12 @@ class ModelRunner:
                 self.share_inputs["seq_lens_this_time"] = copy.deepcopy(
                     self.helper_tensors["seq_lens_this_time"][:real_bsz]
                 )
-                if self.config.return_full_hidden_states:
-                    self.share_inputs["seq_lens_this_time"].name = "seq_lens_this_time"
-                    self.input_tensors[-1] = self.share_inputs["seq_lens_this_time"]
-                if not self.config.return_full_hidden_states:
-                    self.infer_engine.seq_lens_handle.share_external_data(self.share_inputs["seq_lens_this_time"])
+                if not self.use_dynamic_graph:
+                    if self.config.return_full_hidden_states:
+                        self.share_inputs["seq_lens_this_time"].name = "seq_lens_this_time"
+                        self.input_tensors[-1] = self.share_inputs["seq_lens_this_time"]
+                    else:
+                        self.infer_engine.seq_lens_handle.share_external_data(self.share_inputs["seq_lens_this_time"])
                 self.share_inputs["not_need_stop"][0] = True
 
             if not self.share_inputs["not_need_stop"]:
@@ -676,11 +698,18 @@ class ModelRunner:
                     insert_step=self.insert_step,
                 )
 
-            if self.config.return_full_hidden_states:
-                outputs = self.infer_engine.predictor.run(self.input_tensors)
-                self.helper_tensors["full_hidden_states"] = outputs[0]
+            if self.use_dynamic_graph:
+                if self.config.return_full_hidden_states:
+                    outputs = self.infer_engine.predictor.generate(**self.share_inputs)
+                    self.helper_tensors["full_hidden_states"] = outputs[0]
+                else:
+                    self.infer_engine.predictor.generate(**self.share_inputs)
             else:
-                self.infer_engine.predictor.run()
+                if self.config.return_full_hidden_states:
+                    outputs = self.infer_engine.predictor.run(self.input_tensors)
+                    self.helper_tensors["full_hidden_states"] = outputs[0]
+                else:
+                    self.infer_engine.predictor.run()
 
             self.share_inputs["infer_seed"].add_(infer_seed_increment)
             self.share_inputs["infer_seed"][:] %= self.MAX_INFER_SEED
@@ -700,7 +729,8 @@ class InferenceEngine(object):
         mp_degree (int): model parallel size
     """
 
-    def __init__(self, model_dir, share_inputs, cache_kvs, config, mp_degree=1):
+    def __init__(self, model_dir, share_inputs, cache_kvs, config, args, mp_degree=1):
+        self.args = args
         self.config = config
         self.model_dir = model_dir
         self.mp_degree = mp_degree
@@ -715,14 +745,58 @@ class InferenceEngine(object):
             self.nranks = fleet.worker_num()
             self.rank = fleet.worker_index()
 
-        self._init_predictor()
-        if not self.config.return_full_hidden_states:
-            self.share_data()
+        print_memory("before _init_predictor")
+        self.use_dynamic_graph = int(os.getenv("USE_DYNAMIC_GRAPH", "0"))
+        if self.use_dynamic_graph:  # 动态图
+            self._init_dygraph_predictor()
+        else:  # 静态图
+            self._init_predictor()
+            if not self.config.return_full_hidden_states:
+                self.share_data()
+        print_memory("after _init_predictor")
+
+    def _init_dygraph_predictor(self):
+        llm_utils.set_triton_cache(self.args.model_dir, "dynamic")
+        from llm.predict.predictor import ModelArgument, PredictorArgument
+
+        predictor_args = PredictorArgument()
+        model_args = ModelArgument()
+
+        predictor_args.model_name_or_path = self.args.model_dir
+        predictor_args.max_length = self.args.max_dec_len
+        predictor_args.dtype = self.args.dtype
+        predictor_args.total_max_length = self.args.max_seq_len
+        predictor_args.inference_model = True
+        predictor_args.mode = "dynamic"
+        predictor_args.block_attn = True
+        predictor_args.append_attn = True
+        predictor_args.quant_type = "weight_only_int4"
+        predictor_args.mla_use_matrix_absorption = True
+
+        paddle.set_device(predictor_args.device)
+        paddle.set_default_dtype(predictor_args.dtype)
+
+        from paddlenlp.transformers import AutoConfig, AutoInferenceModelForCausalLM
+
+        config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
+
+        tensor_parallel_rank, tensor_parallel_degree = llm_utils.init_dist_env()
+
+        self.predictor = AutoInferenceModelForCausalLM.from_pretrained(
+            predictor_args.model_name_or_path,
+            config=config,
+            predictor_args=predictor_args,
+            model_args=model_args,
+            dtype=predictor_args.dtype,
+            tensor_parallel_degree=tensor_parallel_degree,
+            tensor_parallel_rank=tensor_parallel_rank,
+        )
 
     def _init_predictor(self):
         """
         predictor init
         """
+        llm_utils.set_triton_cache(self.args.model_dir, "static")
         device_id = self.rank % self.config.mp_num_per_node
         if use_pir_api():
             self.model_file = os.path.join(self.model_dir, "model.json")
@@ -782,10 +856,12 @@ def main():
     """
     start model runner
     """
+    print_memory("before parse_args")
     args = parse_args()
-    llm_utils.set_triton_cache(args.model_dir, "static")
     model_runner = ModelRunner(args)
+    print_memory("after ModelRunner")
     model_runner.run()
+    print_memory("after model_runner.run()")
 
 
 if __name__ == "__main__":

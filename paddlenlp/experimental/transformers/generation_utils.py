@@ -265,6 +265,7 @@ class GenerationInferenceModel(GenerationMixin):
         model_kwargs["next_tokens"] = next_tokens
         return model_kwargs
 
+    @paddle.no_grad()
     def sample(
         self,
         input_ids=None,
@@ -557,6 +558,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
             seq_len = encoder_output.shape[1]
         return paddle.ones([batch_size, seq_len], dtype="int64") * bos_token_id
 
+    @paddle.no_grad()
     def get_output_padding_offset(self, seq_lens_this_time, seq_lens_encoder, seq_lens_decoder):
         """
         In the senerio of speculate decoding, the length of output token after rebuild_padding is no longer bsz.
@@ -674,6 +676,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
             )
         return ret
 
+    @paddle.no_grad()
     def sample(
         self,
         eos_token_id,
@@ -703,9 +706,9 @@ class GenerationBlockInferenceModel(GenerationMixin):
             step_idx = model_kwargs["step_idx"]
             logits = paddle.cast(outputs, paddle.float32)
 
-            from paddlenlp_ops import set_preids_token_penalty_multi_scores
+            from paddlenlp_ops import f_set_preids_token_penalty_multi_scores
 
-            set_preids_token_penalty_multi_scores(
+            f_set_preids_token_penalty_multi_scores(
                 model_kwargs["pre_ids"],
                 model_kwargs["input_ids"],
                 model_kwargs["seq_lens_encoder"],
@@ -738,9 +741,9 @@ class GenerationBlockInferenceModel(GenerationMixin):
                 paddle.distributed.broadcast(next_tokens, 0)
 
             with paddle.base.framework._stride_in_no_check_dy2st_diff():
-                from paddlenlp_ops import update_inputs_v2
+                from paddlenlp_ops import f_update_inputs_v2
 
-                update_inputs_v2(
+                f_update_inputs_v2(
                     model_kwargs["stop_flags"],
                     model_kwargs["step_idx"],
                     model_kwargs["not_need_stop"],
@@ -756,9 +759,9 @@ class GenerationBlockInferenceModel(GenerationMixin):
                     model_kwargs["next_tokens"],
                 )
 
-            from paddlenlp_ops import save_output
+            from paddlenlp_ops import f_save_output
 
-            save_output(
+            f_save_output(
                 next_tokens,
                 model_kwargs["not_need_stop"],
                 self.config.tensor_parallel_rank,
@@ -781,6 +784,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
 
         return next_tokens
 
+    @paddle.no_grad()
     def speculate_decoding(
         self,
         eos_token_id,
@@ -934,6 +938,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
         else:
             return None
 
+    @paddle.no_grad()
     def draft_model_sample(
         self,
         eos_token_id,
@@ -1156,6 +1161,7 @@ class GenerationAvxInferenceModel(GenerationMixin):
         model_kwargs["next_tokens"] = next_tokens
         return model_kwargs
 
+    @paddle.no_grad()
     def sample(
         self,
         input_ids=None,

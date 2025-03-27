@@ -30,6 +30,16 @@ from paddlenlp.transformers.utils import (
 )
 
 
+def print_memory(location):
+    memory_reserved_size = paddle.device.cuda.memory_reserved("gpu:0")
+    memory_allocated_size = paddle.device.cuda.memory_allocated("gpu:0")
+    max_memory_reserved_size = paddle.device.cuda.max_memory_reserved("gpu:0")
+    max_memory_allocated_size = paddle.device.cuda.max_memory_allocated("gpu:0")
+    print(
+        f"{location} >>> memory_reserved_size: {memory_reserved_size}, memory_allocated_size: {memory_allocated_size}, max_memory_reserved_size: {max_memory_reserved_size}, max_memory_allocated_size: {max_memory_allocated_size}"
+    )
+
+
 def infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs, return_numpy=True):
     r"""
     Instantiate a pretrained model configuration from a pre-trained model name or path.
@@ -73,7 +83,16 @@ def infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, 
 
     model_path = os.path.dirname(resolved_archive_file)
     state_dict = load_tp_checkpoint(model_path, cls, config, return_numpy=return_numpy)
+
+    print_memory("before model.set_state_dict")
+
     model.set_state_dict(state_dict)
+
+    print_memory("after model.set_state_dict")
+
+    paddle.device.cuda.empty_cache()
+
+    print_memory("after cuda.empty_cache")
 
     return model
 

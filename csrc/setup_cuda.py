@@ -118,6 +118,7 @@ sources = [
     "./gpu/speculate_decoding_kernels/ngram_match.cc",
     "./gpu/speculate_decoding_kernels/speculate_save_output.cc",
     "./gpu/speculate_decoding_kernels/speculate_get_output.cc",
+    "./gpu/ops_pybind.cu",
 ]
 sources += find_end_files("./gpu/speculate_decoding_kernels", ".cu")
 
@@ -177,19 +178,15 @@ if cc >= 80 and cuda_version >= 12.4:
     ]
     sources += ["./gpu/sage_attn_kernels/sageattn_fused.cu"]
     if cc >= 80 and cc < 89:
-        sources += [
-            "./gpu/sage_attn_kernels/sageattn_qk_int_sv_f16_kernel_sm80.cu"
-        ]
+        sources += ["./gpu/sage_attn_kernels/sageattn_qk_int_sv_f16_kernel_sm80.cu"]
         nvcc_compile_args += ["-gencode", f"arch=compute_80,code=compute_80"]
     elif cc >= 89 and cc < 90:
-        sources += [
-            "./gpu/sage_attn_kernels/sageattn_qk_int_sv_f8_kernel_sm89.cu"
-        ]
+        sources += ["./gpu/sage_attn_kernels/sageattn_qk_int_sv_f8_kernel_sm89.cu"]
         nvcc_compile_args += ["-gencode", f"arch=compute_89,code=compute_89"]
     elif cc >= 90:
         sources += [
             "./gpu/sage_attn_kernels/sageattn_qk_int_sv_f8_kernel_sm90.cu",
-            "./gpu/sage_attn_kernels/sageattn_qk_int_sv_f8_dsk_kernel_sm90.cu"
+            "./gpu/sage_attn_kernels/sageattn_qk_int_sv_f8_dsk_kernel_sm90.cu",
         ]
         nvcc_compile_args += ["-gencode", f"arch=compute_90a,code=compute_90a"]
 
@@ -213,7 +210,10 @@ setup(
     name=ops_name,
     ext_modules=CUDAExtension(
         sources=sources,
-        extra_compile_args={"cxx": ["-O3", "-fopenmp", "-lgomp", "-std=c++17", "-DENABLE_BF16"], "nvcc": nvcc_compile_args},
+        extra_compile_args={
+            "cxx": ["-O3", "-fopenmp", "-lgomp", "-std=c++17", "-DENABLE_BF16"],
+            "nvcc": nvcc_compile_args,
+        },
         libraries=["cublasLt"],
         library_dirs=[library_path],
     ),

@@ -14,11 +14,12 @@
 
 import json
 import os
-from datetime import datetime
 import re
+from datetime import datetime
 
-from server.utils import model_server_logger
 from server.download_model import download_from_txt
+from server.utils import model_server_logger
+
 from paddlenlp.experimental.transformers import SpeculateArgument
 from paddlenlp.generation import GenerationConfig
 
@@ -210,26 +211,25 @@ class Config:
                 f.write("{:<20}:{:<6}{}\n".format(k, "", v))
             f.close()
 
-
     def _get_download_model(self, model_type="default"):
         env = os.environ
         model_name = env.get("model_name")
         # Define supported model patterns
         supported_patterns = [
-            r".*Qwen.*", 
+            r".*Qwen.*",
             r".+Llama.+",
-            r".+Mixtral.+", 
+            r".+Mixtral.+",
             r".+DeepSeek.+",
         ]
-        
+
         # Check if model_name matches any supported pattern
         if not any(re.match(pattern, model_name) for pattern in supported_patterns):
             raise ValueError(
                 f"{model_name} is not in the supported list. Currently supported models: Qwen, Llama, Mixtral, DeepSeek. Please check the model name from this document https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/static_models.md"
             )
         model_server_logger.info(f"Start downloading model: {model_name}")
-        tag=env.get("tag")
-        base_url=f"https://paddlenlp.bj.bcebos.com/models/static/{tag}/{model_name}"
+        tag = env.get("tag")
+        base_url = f"https://paddlenlp.bj.bcebos.com/models/static/{tag}/{model_name}"
         if self.nnode == 1:
             # single node model
             temp_file = "model"
@@ -239,14 +239,12 @@ class Config:
         else:
             temp_file = "node2"
         if model_type == "default":
-            path = self.model_dir 
+            path = self.model_dir
         elif model_type == "speculate":
             path = os.getenv("SPECULATE_MODEL_PATH")
-            temp_file="mtp"
-        model_url = base_url+f"/{temp_file}"
+            temp_file = "mtp"
+        model_url = base_url + f"/{temp_file}"
         download_from_txt(model_url, path)
-
-
 
     def get_model_config(self):
         """
@@ -255,7 +253,7 @@ class Config:
         Returns:
             dict: the config file
         """
-        
+
         model_config_json = json.load(open(self.model_config_path, "r", encoding="utf-8"))
         return model_config_json
 
@@ -288,7 +286,7 @@ class Config:
 
             if not os.path.exists(speculate_model_name_or_path):
                 self._get_download_model(model_type="speculate")
-            
+
             speculate_args = SpeculateArgument.build_from_serving(
                 speculate_method=speculate_method,
                 speculate_max_draft_token_num=speculate_max_draft_token_num,
@@ -316,15 +314,11 @@ class Config:
 
         logger = get_logger("model_server", "infer_config.log")
         env = os.environ
-        model_name=env.get("model_name")
+        model_name = env.get("model_name")
         if model_name:
             self._get_download_model()
 
         config = self.get_model_config()
-        # check paddle nlp version
-        tag = os.getenv("tag")
-        if tag not in config["paddlenlp_version"]:
-            logger.warning(f"Current image paddlenlp version {tag} doesn't match the model paddlenlp version {config['paddlenlp_version']} ")
 
         def reset_value(self, value_name, key, config):
             if key in config:
@@ -336,11 +330,7 @@ class Config:
         reset_value(self, "max_seq_len", "infer_model_max_seq_len", config)
         reset_value(self, "return_full_hidden_states", "return_full_hidden_states", config)
         reset_value(self, "dtype", "infer_model_dtype", config)
-        reset_value(self, "use_cache_kv_int8", "infer_model_cachekv_int8_type", config)
-        if self.use_cache_kv_int8 == None:
-            self.use_cache_kv_int8 = 0
-        else:
-            self.use_cache_kv_int8 = 1
+
         if self.seq_len_limit > self.max_seq_len:
             self.seq_len_limit = self.max_seq_len
             logger.warning(f"The loading model requires len(input_ids) <= {self.max_seq_len}, now reset MAX_SEQ_LEN.")
@@ -360,5 +350,6 @@ class Config:
 
     def __str__(self) -> str:
         return json.dumps(self.__dict__, indent=4)
+
 
 global_config = Config()

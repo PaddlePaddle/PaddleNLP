@@ -19,9 +19,33 @@ export GLOG_logtostderr=1
 export PYTHONIOENCODING=utf8
 export LC_ALL=C.UTF-8
 
+export PYTHONPATH=/root/paddlejob/workspace/env_run/output/liuyuanle/PaddleNLP/llm/server/server/:$PYTHONPATH
+export PYTHONPATH=/root/paddlejob/workspace/env_run/output/liuyuanle/PaddleNLP/llm/:$PYTHONPATH
+export PYTHONPATH=/root/paddlejob/workspace/env_run/output/liuyuanle/PaddleNLP/:$PYTHONPATH
+export PATH=/opt/tritonserver/bin/:$PATH
+
+export NCCL_ALGO=Tree
+export MP_NUM=8
+export MP_NNODE=1
+export MAX_SEQ_LEN=131072
+export MAX_DEC_LEN=32768
+export BLOCK_BS=2.55
+export BATCH_SIZE=128
+export BLOCK_RATIO=0.5
+export MAX_PREFILL_BATCH=3
+export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+# export MODEL_DIR=/root/paddlejob/workspace/env_run/output/liuyuanle/0_Origin_Models/DeepSeek-R1__weight_only_int4__131072
+export MODEL_DIR=/root/.paddlenlp/models/deepseek-ai/DeepSeek-R1
+# export MODEL_DIR=/root/.paddlenlp/models/deepseek-ai/DeepSeek-V2-Lite-Chat
+
 # PaddlePaddle environment variables
 export FLAGS_gemm_use_half_precision_compute_type=0
 export NVIDIA_TF32_OVERRIDE=0
+
+# export FLAGS_cascade_attention_deal_each_time=16
+export FLAGS_cascade_attention_max_partition_size=131072
+# export FLAGS_mla_use_tensorcore=1
+export USE_DYNAMIC_GRAPH=1
 
 # Model hyperparameters
 export MP_NUM=${MP_NUM:-"1"}                                # number of model parallelism
@@ -36,8 +60,8 @@ export ENC_DEC_BLOCK_NUM=${ENC_DEC_BLOCK_NUM:-"4"}
 export MAX_PREFILL_BATCH=${MAX_PREFILL_BATCH:-"4"}
 export STOP_THRESHOLD=${STOP_THRESHOLD:-"0"}
 
-export tag=${tag:-"3.0.0.b4"}
-export model_name=$1
+export tag=${tag:-"3.0.0b4"}
+export model_name=${1:-""}
 export MODEL_DIR=${MODEL_DIR:-"/models"}
 
 if [ ! "$model_name" == "" ]; then
@@ -69,12 +93,6 @@ check_port_occupied ${SERVICE_GRPC_PORT}
 check_port_occupied ${INTER_PROC_PORT}
 check_port_occupied ${SERVICE_HTTP_PORT}
 
-
-
-if [ ! -d "llm_model" ];then
-    ln -s /opt/source/PaddleNLP/llm/server/server/llm_model llm_model
-fi
-
 mkdir -p log
 rm -rf console.log log/*
 rm -rf /dev/shm/*
@@ -84,8 +102,24 @@ if [ "$MP_NNODE" -gt 1 ]; then
     POD_0_IP=$POD_0_IP
     export HOST_IP=$FED_POD_IP
 else
-    POD_0_IP="127.0.0.1"
-    HOST_IP="127.0.0.1"
+    POD_0_IP="10.54.96.20"
+    HOST_IP="10.54.96.20"
+    export TRAINER_INSTANCES='10.54.96.20'
+    export TRIANER_IP_LIST='10.54.96.20'
+    export TRAINER_IP_PORT_LIST='10.54.96.20:56392'
+    export PADDLE_WORKERS_IP_PORT_LIST='10.54.96.20:56392'
+    export PADDLE_TRAINER_ENDPOINTS='10.54.96.20:56392'
+    export GPUTRAINER_ENDPOINTS='10.54.96.20:56392'
+    export DISTRIBUTED_TRAINER_ENDPOINTS='10.54.96.20:56392,10.54.96.20:56393,10.54.96.20:56394,10.54.96.20:56395,10.54.96.20:56396,10.54.96.20:56397,10.54.96.20:56398,10.54.96.20:56399'
+    export POD_0_IP='10.54.96.20'
+    export PADDLE_NUM_GRADIENT_SERVERS='1'
+    export NCCL_IB_QPS_PER_CONNECTION='1'
+    export K8S_TRAINERS_COUNT='1'
+    export PSERVER_PORTS_NUM='1'
+    export TRAINER_INSTANCES_NUM='1'
+    export TRAINERS_NUM='1'
+    export PADDLE_TRAINERS_NUM='1'
+    export TRAINERS='1'
 fi
 
 echo "POD_0_IP: $POD_0_IP HOST_IP: $HOST_IP"
@@ -105,10 +139,10 @@ LOG_REDIRECT=""
 if [ "$OUTPUT_LOG_TO_CONSOLE" == "1" ]; then
     LOG_REDIRECT="> log/console.log 2>&1"
 fi
-eval tritonserver --exit-timeout-secs 100000 --cuda-memory-pool-byte-size 0:0 --cuda-memory-pool-byte-size 1:0 \
+eval fastdeployserver --exit-timeout-secs 100000 --cuda-memory-pool-byte-size 0:0 --cuda-memory-pool-byte-size 1:0 \
                  --cuda-memory-pool-byte-size 2:0 --cuda-memory-pool-byte-size 3:0 --cuda-memory-pool-byte-size 4:0 \
                  --cuda-memory-pool-byte-size 5:0 --cuda-memory-pool-byte-size 6:0 --cuda-memory-pool-byte-size 7:0 \
-                 --pinned-memory-pool-byte-size 0 --model-repository llm_model/ \
+                 --pinned-memory-pool-byte-size 0 --model-repository ../llm_model/ \
                  --allow-http false \
                  --grpc-port=${SERVICE_GRPC_PORT} \
                  --metrics-port=${METRICS_HTTP_PORT} \

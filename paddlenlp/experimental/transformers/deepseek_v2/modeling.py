@@ -55,6 +55,16 @@ from paddlenlp.utils.log import logger
 __all__ = ["DeepseekV2ForCausalLMBlockInferenceModel"]
 
 
+def print_memory(location):
+    memory_reserved_size = paddle.device.cuda.memory_reserved("gpu:0")
+    memory_allocated_size = paddle.device.cuda.memory_allocated("gpu:0")
+    max_memory_reserved_size = paddle.device.cuda.max_memory_reserved("gpu:0")
+    max_memory_allocated_size = paddle.device.cuda.max_memory_allocated("gpu:0")
+    print(
+        f"{location} >>> memory_reserved_size: {memory_reserved_size}, memory_allocated_size: {memory_allocated_size}, max_memory_reserved_size: {max_memory_reserved_size}, max_memory_allocated_size: {max_memory_allocated_size}"
+    )
+
+
 class DeepseekScalingRotaryEmbedding(nn.Layer):
     """RotaryEmbedding extended with YaRN method.
 
@@ -122,6 +132,7 @@ class DeepseekScalingRotaryEmbedding(nn.Layer):
         cache = paddle.concat((cos, sin), axis=-1)
         return cache.cast(self._dtype)
 
+    @paddle.no_grad()
     def forward(
         self,
         position_ids: paddle.Tensor,
@@ -130,11 +141,11 @@ class DeepseekScalingRotaryEmbedding(nn.Layer):
     ) -> Tuple[paddle.Tensor, paddle.Tensor]:
         import os
 
-        from paddlenlp_ops import fused_rotary_position_encoding
+        from paddlenlp_ops import f_fused_rotary_position_encoding
 
         # In-place operations that update the query and key tensors.
         os.environ["stride_in_no_check_dy2st_diff"] = "1"
-        fused_rotary_position_encoding(query, key, position_ids, self.cos_sin_cache, self.rotary_dim, False)
+        f_fused_rotary_position_encoding(query, key, position_ids, self.cos_sin_cache, self.rotary_dim, False)
 
         return query, key
 
@@ -149,12 +160,14 @@ class DeepseekV2RMSNorm(nn.Layer):
             default_initializer=nn.initializer.Constant(1.0),
         )
 
+    @paddle.no_grad()
     def forward(self, x):
         return paddle.incubate.nn.functional.fused_rms_norm(x, self.weight, None, self.eps, begin_norm_axis=1)[0]
 
 
 @register_base_model
 class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
+    @paddle.no_grad()
     def __init__(self, config: DeepseekV2Config, base_model_prefix: str):
         super(DeepseekV2PretrainedModel, self).__init__(config)
         self.base_model_prefix = base_model_prefix
@@ -574,7 +587,12 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
+
+        print_memory("before init_weight")
+
         self.transformer_block.init_weight()
+
+        print_memory("after init_weight")
 
         dtype = paddle.get_default_dtype()
         embed_tokens_weight = paddle.to_tensor(state_dict[f"{self.base_model_prefix}.embed_tokens.weight"]).cast(
@@ -592,6 +610,8 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
             logger.info(f"fp8 is enabled, weight_block_size = {self.weight_block_size}")
         for idx in range(self.num_layers):
             logger.info(f"set state for layer {idx}")
+
+            print_memory(f"before layer {idx}")
 
             ln_scale = paddle.to_tensor(
                 state_dict[f"{self.base_model_prefix}.layers.{idx}.input_layernorm.weight"]
@@ -1274,6 +1294,8 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                     self.transformer_block.shared_expert_ffn1_weights[idx].set_value(shared_expert_ffn1_weight)
                     self.transformer_block.shared_expert_ffn2_weights[idx].set_value(shared_expert_ffn2_weight)
 
+            print_memory(f"after layer {idx}")
+
     def set_transformer_block(self, transformer_config):
         if self.use_weight_only:
             self.transformer_block = FusedBlockMultiTransformerWeightOnly(transformer_config)
@@ -1285,13 +1307,14 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
     def remove_padding(self, input_ids, seq_lens_this_time, draft_tokens=None, seq_lens_encoder=None):
         cum_offsets_now = paddle.cumsum(self.max_seq_len - seq_lens_this_time)
         token_num = paddle.sum(seq_lens_this_time)
-        from paddlenlp_ops import get_padding_offset_v2
+        from paddlenlp_ops import f_get_padding_offset_v2
 
-        ids_remove_padding, cum_offsets, padding_offset, cu_seqlens_q, cu_seqlens_k = get_padding_offset_v2(
+        ids_remove_padding, cum_offsets, padding_offset, cu_seqlens_q, cu_seqlens_k = f_get_padding_offset_v2(
             input_ids, cum_offsets_now, token_num, seq_lens_this_time, draft_tokens, seq_lens_encoder
         )
         return ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k
 
+    @paddle.no_grad()
     def forward(
         self,
         input_ids=None,
@@ -1357,6 +1380,7 @@ class MTPDeepseekV2BlockInferenceModel(DeepseekV2BlockInferenceModel):
         else:
             self.eh_proj = nn.Linear(self.hidden_size * 2, self.hidden_size, bias_attr=True)
 
+    @paddle.no_grad()
     def forward(
         self,
         input_ids=None,
@@ -1606,6 +1630,7 @@ class DeepseekV2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, De
         }
         return model_inputs
 
+    @paddle.no_grad()
     def forward(
         self,
         input_ids,
@@ -1642,7 +1667,7 @@ class DeepseekV2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, De
             output_padding_offset=output_padding_offset,
         )
         if self.return_full_hidden_states:
-            from paddlenlp_ops import rebuild_padding_v2
+            from paddlenlp_ops import f_rebuild_padding_v2
 
             full_hidden_states = outputs[0]
             cum_offsets = outputs[1]
@@ -1755,6 +1780,7 @@ class MTPDeepseekV2ForCausalLMBlockInferenceModel(DeepseekV2ForCausalLMBlockInfe
 
         self.mtp.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
 
+    @paddle.no_grad()
     def forward(
         self,
         input_ids,
