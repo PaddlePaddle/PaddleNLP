@@ -131,14 +131,15 @@ class ExpertsGroupGemmNode:
             is_1d_scaled=False,
             return_transpose=False,  # 4*7198, 4096
         )
-
         # group gemm
         w1_t_quant = w1_t_quant.reshape([expert_w_count, -1, w1_t_quant.shape[-1]])
         w1_t_scale = w1_t_scale.reshape([expert_w_count, -1, w1_t_scale.shape[-1]])
         o1 = paddle.empty([x_fp8.shape[0], w1_t_quant.shape[1]], dtype="bfloat16")
+
         deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
             (x_fp8, x_scale), (w1_t_quant, w1_t_scale), o1, unzipped_expert_idx
         )
+
         return o1
 
     def fwd_swiglu(self, o1):
@@ -198,6 +199,7 @@ class ExpertsGroupGemmNode:
 
         # probs_grad
         probs_grad = (do2 * o2).sum(axis=1)
+        o2 = o2 * self.unzipped_probs.unsqueeze(-1)
 
         return do2, probs_grad, o2
 
@@ -359,7 +361,6 @@ class ExpertsGroupGemmNode:
         o1 = self.fwd_gate_up(hs_out, hs_scale_out, expert_w1, expert_w_count, unzipped_probs, unzipped_expert_idx)
 
         self.o1 = o1
-
         # o2
         o2 = self.fwd_swiglu(o1)
         o2 = o2 * unzipped_probs.unsqueeze(-1)
@@ -413,20 +414,21 @@ class ExpertsNode:
         self.x_t_fp8s = []
         self.x_t_scales = []
         self.o1s = []
+        self.dxs = []
         self.custom_map = custom_map
 
     def reset_statue(self):
         self.x_t_fp8s = []
         self.x_t_scales = []
         self.o1s = []
-        self.tokens_per_expert = None
+        self.dxs = []
 
     def forward(self, hs_out, hs_scale_out, tokens_per_expert):
         self.tokens_per_expert = tokens_per_expert
         x_fp8_list = paddle.split(hs_out, num_or_sections=self.tokens_per_expert, axis=0)  # FP8 chunk
         x_scale_list = paddle.split(hs_scale_out, num_or_sections=self.tokens_per_expert, axis=0)  # FP8 chunk
-
         outputs = []
+
         for i, (chunk, chunk_scale) in enumerate(zip(x_fp8_list, x_scale_list)):
             expert = self.experts[i + self.custom_map.moe_rank * self.custom_map.moe_num_experts_per_device]
             x_fp8 = chunk.contiguous()
@@ -465,7 +467,6 @@ class ExpertsNode:
 
         out_grad_scale_list = paddle.split(out_grad_scale, num_or_sections=self.tokens_per_expert, axis=0)
 
-        dxs = []
         for i, (do3, do3_scale, x_t_fp8, x_t_scale, o1) in enumerate(
             zip(
                 out_grad_list,
@@ -496,9 +497,9 @@ class ExpertsNode:
             else:
                 expert.w1.grad = self.bwd_gate_up_weight(do1, x_t_fp8, x_t_scale, expert.w1.grad)
 
-            dxs.append(dx)
+            self.dxs += [dx]
 
-        dx = paddle.concat(dxs, axis=0)
+        dx = paddle.concat(self.dxs, axis=0)
         self.reset_statue()
         return dx
 
@@ -506,6 +507,7 @@ class ExpertsNode:
         w1_t_fp8, w1_t_scale = kitchen_quant(
             w1.T.contiguous(), backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
         )
+
         o1 = paddle.empty([x_fp8.shape[0], w1_t_fp8.shape[0]], dtype=paddle.bfloat16)
         deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale), (w1_t_fp8, w1_t_scale), o1)
         return o1
