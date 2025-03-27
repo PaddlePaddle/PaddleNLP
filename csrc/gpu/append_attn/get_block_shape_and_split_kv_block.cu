@@ -224,7 +224,7 @@ std::vector<paddle::Tensor> GetBlockShapeAndSplitKVBlock(
   int max_dec_len_this_time_data = max_dec_len_this_time.data<int>()[0];
   if (max_dec_len_this_time_data > 0) {
     const bool mla_use_tensorcore = GetMlaUseTensorcore();
-    if (mla_use_tensorcore) {
+    if (mla_use_tensorcore && group_size <=64) {
       const int set_chunk_size = get_mla_dec_chunk_size(bsz);
       decoder_chunk_size_device =
           GetEmptyTensor({1}, paddle::DataType::INT32, seq_lens_encoder.place());
@@ -297,7 +297,7 @@ std::vector<paddle::Tensor> GetBlockShapeAndSplitKVBlock(
       decoder_num_blocks_x_cpu =
         decoder_num_blocks_x.copy_to(paddle::CPUPlace(), false);
       decoder_chunk_size_cpu =
-        paddle::full({1}, 64, paddle::DataType::INT32, paddle::CPUPlace());
+        paddle::full({1}, 131072, paddle::DataType::INT32, paddle::CPUPlace());
     }
   } else {
     decoder_batch_ids =
@@ -305,7 +305,7 @@ std::vector<paddle::Tensor> GetBlockShapeAndSplitKVBlock(
     decoder_tile_ids_per_batch =
         paddle::full({1}, -1, paddle::DataType::INT32, paddle::GPUPlace());
     decoder_chunk_size_cpu =
-        paddle::full({1}, 64, paddle::DataType::INT32, paddle::CPUPlace());
+        paddle::full({1}, 131072, paddle::DataType::INT32, paddle::CPUPlace());
     decoder_num_blocks_x = 
         paddle::full({1}, -1, paddle::DataType::INT32, paddle::GPUPlace());
     decoder_num_blocks_x_cpu =

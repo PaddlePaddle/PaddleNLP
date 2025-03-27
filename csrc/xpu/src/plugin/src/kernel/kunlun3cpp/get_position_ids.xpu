@@ -1,0 +1,59 @@
+#include "xpu/kernel/cluster.h"
+#include "xpu/kernel/cluster_partition.h"
+#include "xpu/kernel/cluster_primitive.h"
+
+namespace xpu3 {
+namespace plugin {
+
+__global__ void get_position_ids(const int *seq_lens_encoder,
+                                  const int *seq_lens_decoder,
+                                  const int *seq_lens_this_time,
+                                  int *position_ids,
+                                  const int bs) {
+  int cid = core_id();
+  int ncores = core_num();
+  int clusterid = cluster_id();
+  int nclusters = cluster_num();
+  int tid = clusterid * ncores + cid;
+
+
+  int buf_len = 256;
+  __simd__ int seq_lens_encoder_lm[buf_len];
+  __simd__ int seq_lens_decoder_lm[buf_len];
+  __simd__ int seq_lens_this_time_lm[buf_len];
+  __simd__ int position_ids_lm[buf_len];
+
+  GM2LM_ASYNC(seq_lens_encoder, seq_lens_encoder_lm, bs * sizeof(int));
+  GM2LM_ASYNC(seq_lens_decoder, seq_lens_decoder_lm, bs * sizeof(int));
+  GM2LM(seq_lens_this_time, seq_lens_this_time_lm, bs * sizeof(int));
+
+  int offset = 0;
+  for(int ind = tid; ind < bs; ind += ncores * nclusters){
+    for (int i = 0; i < ind; i++) {
+      offset += seq_lens_encoder_lm[i];
+      if (seq_lens_decoder_lm[i] > 0) {
+        offset += seq_lens_this_time_lm[i];
+      }
+    }
+    int encoder_len = seq_lens_encoder_lm[ind];
+    int decoder_len = seq_lens_decoder_lm[ind];
+    int seq_len_this_time = decoder_len > 0 ? seq_lens_this_time_lm[ind] : 0;
+
+    int begin_offset = offset;
+    for (int i = 0; i < encoder_len; i++) {
+      position_ids_lm[offset + i] = i;
+    }
+    offset += encoder_len;
+    if (decoder_len > 0) {
+      for (int i = 0; i < seq_len_this_time; i++) {
+        position_ids_lm[offset + i] = decoder_len + i;  // 使用 decoder 长度本身
+      }
+    }
+    if (encoder_len + seq_len_this_time > 0) {
+      LM2GM(position_ids_lm + begin_offset, position_ids + begin_offset, (encoder_len + seq_len_this_time) * sizeof(int));
+    }
+  }
+}
+
+}  // namespace plugin
+}  // namespace xpu3

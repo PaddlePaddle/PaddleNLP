@@ -116,6 +116,7 @@ function llama_case_list_auto() {
         # llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2_intermediate
         llama_dy2st_auto_bs2_bf16_DP2-MP1-PP1-CINN
         llama_lora_static_graph_auto_bs_2_bf16_DP2-TP2-PP1
+        llama_dpo_dy2st_auto_bs2_bf16_MP8_intermediate
     )
     if [ $1 = "prepare_case" ]; then
         restore_func $fun_list  
@@ -1281,6 +1282,88 @@ function llama_dy2st_auto_bs2_bf16_DP2-MP1-PP1-CINN() {
     echo "=========== $FUNCNAME run  end ==========="
 }
 
+function llama_dpo_dy2st_auto_bs2_bf16_MP8_intermediate() {
+    echo "=========== $FUNCNAME run begin ==========="
+    set -x
+    unset CUDA_VISIBLE_DEVICES
+    
+    export PYTHONPATH=$root_path/:$PYTHONPATH
+    export FLAGS_call_stack_level=3
+    export NVIDIA_TF32_OVERRIDE=0
+    export FLAGS_cudnn_deterministic=1
+    export FLAGS_embedding_deterministic=1
+    export FLAGS_enable_pir_api=1
+
+    task_name="llama_dpo_dy2st_auto_bs2_bf16_MP8_intermediate"
+    case_out_dir="output/$task_name"
+    case_log_dir="output/$task_name""_log"
+    rm -rf $case_out_dir
+    rm -rf $case_log_dir
+    python -u -m paddle.distributed.launch \
+        --gpus "0,1,2,3,4,5,6,7" \
+        --log_dir $case_log_dir \
+        ../run_dpo_auto.py\
+        --model_name_or_path "meta-llama/Meta-Llama-3.1-8B-Instruct" \
+        --train_dataset_path ${llama_data_path}/data_dpo/data/train.jsonl \
+        --dev_dataset_path ${llama_data_path}/data_dpo/data/dev.jsonl \
+        --output_dir ./checkpoints/dpo_ckpts \
+        --per_device_train_batch_size 1 \
+        --gradient_accumulation_steps 1 \
+        --per_device_eval_batch_size 1 \
+        --num_train_epochs 1 \
+        --num_hidden_layers 2 \
+        --max_steps 10 \
+        --learning_rate 1e-06 \
+        --warmup_steps 10 \
+        --logging_steps 1 \
+        --evaluation_strategy no \
+        --save_strategy no \
+        --eval_steps 100 \
+        --save_steps 500 \
+        --max_seq_len 4096 \
+        --max_prompt_len 2048 \
+        --bf16 false \
+        --fp16_opt_level O2 \
+        --do_train true \
+        --do_eval false \
+        --disable_tqdm true \
+        --load_best_model_at_end true \
+        --tensor_parallel_degree 8 \
+        --sharding stage1 \
+        --use_flash_attention false \
+        --flash_mask false \
+        --recompute false \
+        --recompute_granularity full \
+        --beta 0.1 \
+        --benchmark false \
+        --loss_type sigmoid \
+        --label_smoothing 0.0 \
+        --unified_checkpoint true \
+        --autotuner_benchmark false \
+        --lazy false \
+        --max_grad_norm 0.0 \
+        --seed 42 \
+        --to_static true \
+        --enable_auto_parallel true \
+        --use_intermediate_api true \
+        >>${log_path}/$FUNCNAME 2>&1
+    loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+    ips=-1
+    mem=-1
+    echo "result: to_static=$to_static loss=$loss ips=$ips mem=$mem"
+    loss_base=1.22546506
+    if [ $IS_A100 -ne 0 ];then
+        loss_base=1.22545731
+    fi
+    ips_base=-1
+    mem_base=-1
+    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
+    rm -rf data
+    rm -rf ultrafeedback_binarized.tar.gz
+
+    echo "=========== $FUNCNAME run  end ==========="
+}
+
 function llama_align_dygraph_dy2st_pir_auto_grad_merge_bs2_fp32_DP1-MP1-PP1() {
     echo "=========== $FUNCNAME run begin ==========="
     export PYTHONPATH=$root_path/:$PYTHONPATH
@@ -2347,50 +2430,58 @@ function llm_gpt_pir_auto_bs4_TP2_PP2(){
     rm -rf $case_out_dir
     rm -rf $case_log_dir
 
-    python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
-        --log_dir $case_log_dir \
-        run_pretrain_auto.py \
-        --model_name_or_path gpt3-13B-en \
-        --tokenizer_name_or_path gpt3-13B-en \
-        --input_dir "$gpt_data_path/data" \
-        --output_dir "output/$task_name" \
-        --split 949,50,1 \
-        --max_seq_length 1024 \
-        --per_device_train_batch_size 1 \
-        --per_device_eval_batch_size 1 \
-        --sharding "" \
-        --tensor_parallel_degree 2 \
-        --pipeline_parallel_degree 2 \
-        --sequence_parallel 0 \
-        --fuse_attention_qkv 1 \
-        --use_flash_attention 0 \
-        --scale_loss 1024 \
-        --learning_rate 0.00001 \
-        --min_learning_rate 0.000005 \
-        --max_steps 10 \
-        --save_steps 50000 \
-        --weight_decay 0.01 \
-        --warmup_ratio 0.01 \
-        --max_grad_norm 1.0 \
-        --logging_steps 1\
-        --continue_training 0\
-        --dataloader_num_workers 1 \
-        --eval_steps 100000 \
-        --report_to "visualdl" \
-        --disable_tqdm true \
-        --recompute 0 \
-        --gradient_accumulation_steps 4 \
-        --do_train \
-        --do_eval \
-        --device "gpu" \
-        --model_type "gpt" \
-        --enable_auto_parallel 1 \
-        --to_static 1 \
-        --fp16 1 \
-        --fp16_opt_level "O2" \
-        --num_hidden_layers 2 \
-        --intermediate_size 1024 \
-        >>${log_path}/$FUNCNAME 2>&1
+    pipeline_parallel_config=(
+        "--pipeline_parallel_config auto_parallel_sync_shared_params" 
+        " "
+    )
+
+    for pp_config in "${pipeline_parallel_config[@]}"; do
+        python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
+            --log_dir $case_log_dir \
+            run_pretrain_auto.py \
+            --model_name_or_path gpt3-13B-en \
+            --tokenizer_name_or_path gpt3-13B-en \
+            --input_dir "$gpt_data_path/data" \
+            --output_dir "output/$task_name" \
+            --split 949,50,1 \
+            --max_seq_length 1024 \
+            --per_device_train_batch_size 1 \
+            --per_device_eval_batch_size 1 \
+            --sharding "" \
+            --tensor_parallel_degree 2 \
+            --pipeline_parallel_degree 2 \
+             ${pp_config} \
+            --sequence_parallel 0 \
+            --fuse_attention_qkv 1 \
+            --use_flash_attention 0 \
+            --scale_loss 1024 \
+            --learning_rate 0.00001 \
+            --min_learning_rate 0.000005 \
+            --max_steps 10 \
+            --save_steps 50000 \
+            --weight_decay 0.01 \
+            --warmup_ratio 0.01 \
+            --max_grad_norm 1.0 \
+            --logging_steps 1\
+            --continue_training 0\
+            --dataloader_num_workers 1 \
+            --eval_steps 100000 \
+            --report_to "visualdl" \
+            --disable_tqdm true \
+            --recompute 0 \
+            --gradient_accumulation_steps 4 \
+            --do_train \
+            --do_eval \
+            --device "gpu" \
+            --model_type "gpt" \
+            --enable_auto_parallel 1 \
+            --to_static 1 \
+            --fp16 1 \
+            --fp16_opt_level "O2" \
+            --num_hidden_layers 2 \
+            --intermediate_size 1024 \
+            >>${log_path}/$FUNCNAME 2>&1
+    done
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -3583,12 +3674,21 @@ function before_hook_for_llama() {
             echo "LLaMA data downloaded"
         else
             # download data for llama
+            mkdir ${llama_data_path};
             mkdir ${llama_data_path}/data;
             wget -O ${llama_data_path}/data/llama_openwebtext_100k_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy;
             wget -O ${llama_data_path}/data/llama_openwebtext_100k_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz;
             # download data for llama finetune
             wget -O ${llama_data_path}/AdvertiseGen.tar.gz https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz
             tar -xvf ${llama_data_path}/AdvertiseGen.tar.gz -C ${llama_data_path}
+        fi
+        if [[ -e ${llama_data_path}/data_dpo ]]; then
+            echo "LLaMA DPO data downloaded"
+        else
+            # download data for llama dpo
+            wget -O ${llama_data_path}/ultrafeedback_binarized.tar.gz https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized.tar.gz
+            mkdir ${llama_data_path}/data_dpo;
+            tar -xvf ${llama_data_path}/ultrafeedback_binarized.tar.gz -C ${llama_data_path}/data_dpo
         fi
         cp -r ${llama_data_path}/data ${llama_case_path}/
     else
@@ -3612,7 +3712,7 @@ function before_hook_for_deepseek() {
     python -m pip install -r $root_path/requirements.txt
     python -m pip install -r $root_path/requirements-dev.txt
     unset http_proxy && unset https_proxy
-    if [[ ! $FLAGS_download_data =~ "llama" ]];then
+    if [[ ! $FLAGS_download_data =~ "deepseek" ]];then
         echo -e "\033[31m ---- Download LLaMA data  \033[0m"
         rm -rf data
         if [[ -e ${llama_data_path}/data ]]; then

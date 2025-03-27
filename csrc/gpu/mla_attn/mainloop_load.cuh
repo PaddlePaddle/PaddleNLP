@@ -242,8 +242,8 @@ struct CollectiveMainloop {
                              const int bid,
                              const int q_tile_idx) {
     const int q_group_offset = q_tile_idx * BLOCK_SHAPE_Q;
-    int start_q_token_idx = mainloop_params.cumsum_q_seqlens[bid] + q_group_offset;
-    int offset_Q = mainloop_params.q_stride_bsz * start_q_token_idx;
+    int start_q_head_idx = mainloop_params.cumsum_q_seqlens[bid] * Ktraits::GROUP_SIZE + q_group_offset;
+    int offset_Q = mainloop_params.q_stride_head_num * start_q_head_idx;
     Tensor mQ = make_tensor(make_gmem_ptr(mainloop_params.Q_ptr + offset_Q), mainloop_params.layout_Q);
     Tensor gQ =
         local_tile(mQ, select<0, 2>(TileShape_QKD{}), make_coord(_, _0{}))(_, _, _0{});

@@ -15,7 +15,7 @@
 #include "matmul_helper.h"
 #include "my_types.h"
 #include "paddle/extension.h"
-git adtemplate <typename T>
+template <typename T>
 void AvxCompute(const paddle::Tensor &x,
                 const paddle::Tensor &weight,
                 bool trans,

@@ -183,7 +183,9 @@ class DataProcessor(BaseDataProcessor):
         response_dict["usage"] = {"completion_tokens" : response_dict["send_idx"] + 1}
 
         if is_end:
-            response_dict["tokens_all"] = self.clear_request_status(req_id)
+            self.clear_request_status(req_id)
+            token_ids = response_dict.get("tokens_all_ids", [])
+            response_dict["tokens_all"] = self.ids2tokens(token_ids, response_dict["req_id"])
         return response_dict
 
     def text2ids(self, text):

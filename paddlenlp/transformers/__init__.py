@@ -229,6 +229,8 @@ from .minigpt4.configuration import *
 from .minigpt4.image_processing import *
 from .minigpt4.modeling import *
 from .minigpt4.processing import *
+from .minimax_text_01.modeling import *
+from .minimax_text_01.configuration import *
 from .mistral.configuration import *
 from .mistral.modeling import *
 from .mixtral.configuration import *
@@ -319,3 +321,5 @@ from .xlm_roberta.modeling import *
 from .xlm_roberta.tokenizer import *
 from .xlm_roberta.configuration import *
 from .yuan import *
+from .llm_embed import *
+from .nv_embed import *

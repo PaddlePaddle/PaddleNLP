@@ -236,13 +236,20 @@ static int xpu2or3_wrapper(Context* ctx,
                         const int64_t length_bad_words) {
   api::ctx_guard RAII_GUARD(ctx);
   using XPU_INT64 = typename XPUIndexType<int64_t>::type;
-  auto min_length_logits_process_kernel = xpu2::plugin::min_length_logits_process<T>;
-  auto update_repeat_times_kernel = xpu2::plugin::update_repeat_times;
-  auto update_value_by_repeat_times_kernel = xpu2::plugin::update_value_by_repeat_times<T>;
+  bool is_xpu2 = ctx->dev().type() == api::kXPU2;
+
+  auto min_length_logits_process_kernel = 
+    is_xpu2 ? xpu2::plugin::min_length_logits_process<T> : xpu3::plugin::min_length_logits_process<T>;
+  auto update_repeat_times_kernel = 
+    is_xpu2 ? xpu2::plugin::update_repeat_times : xpu3::plugin::update_repeat_times;
+  auto update_value_by_repeat_times_kernel = 
+    is_xpu2 ? xpu2::plugin::update_value_by_repeat_times<T> : xpu3::plugin::update_value_by_repeat_times<T>;
   if(length % 16 == 0) {
-    update_value_by_repeat_times_kernel = xpu2::plugin::update_value_by_repeat_times_simd<T>;
+    update_value_by_repeat_times_kernel = 
+      is_xpu2 ? xpu2::plugin::update_value_by_repeat_times_simd<T> : xpu3::plugin::update_value_by_repeat_times_simd<T>;
   }
-  auto ban_bad_words_kernel = xpu2::plugin::ban_bad_words<T>;
+  auto ban_bad_words_kernel = 
+    is_xpu2 ? xpu2::plugin::ban_bad_words<T> : xpu3::plugin::ban_bad_words<T>;
 
   int* repeat_times = RAII_GUARD.alloc_l3_or_gm<int>(bs * length);
   WRAPPER_ASSERT_WORKSPACE(ctx, repeat_times);
