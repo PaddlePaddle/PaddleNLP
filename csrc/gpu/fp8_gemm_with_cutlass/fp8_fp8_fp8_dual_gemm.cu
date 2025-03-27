@@ -265,6 +265,7 @@ std::vector<paddle::Tensor> cutlass_fp8_fp8_fp8_dual_gemm_scale_ptr(
     float scale0,     // only support per-tensor quantization
     float scale1,     // only support per-tensor quantization
     float scale_out,  // only support per-tensor quantization
+    std::string output_dtype,
     std::string activation_type) {
   paddle::Tensor out;
   void* out_ptr = nullptr;
@@ -311,31 +312,36 @@ std::vector<paddle::Tensor> cutlass_fp8_fp8_fp8_dual_gemm_scale_ptr(
   }
 
   std::string input_dtype = "";
-  std::string output_dtype = "";
   std::vector<int64_t> out_shape = x.shape();
   out_shape[rank - 1] = N;
   out_shape[rank - 2] = M;
   
   if (x.dtype() == phi::DataType::FLOAT8_E4M3FN) {
     input_dtype = "float8_e4m3fn";
-    output_dtype = "float8_e4m3fn";
     x_ptr = reinterpret_cast<const void*>(x.data<phi::dtype::float8_e4m3fn>());
     y0_ptr = reinterpret_cast<const void*>(y_fuesd.data<phi::dtype::float8_e4m3fn>());
     y1_ptr = reinterpret_cast<const void*>(y_fuesd.data<phi::dtype::float8_e4m3fn>() + N * K);
-    out = paddle::empty(out_shape, paddle::DataType::FLOAT8_E4M3FN, x.place());
-    out_ptr = reinterpret_cast<void*>(out.data<phi::dtype::float8_e4m3fn>());
   } 
   else if (x.dtype() == phi::DataType::FLOAT8_E5M2) {
     input_dtype = "float8_e5m2";
-    output_dtype = "float8_e5m2";
     x_ptr = reinterpret_cast<const void*>(x.data<phi::dtype::float8_e5m2>());
     y0_ptr = reinterpret_cast<const void*>(y_fuesd.data<phi::dtype::float8_e5m2>());
     y1_ptr = reinterpret_cast<const void*>(y_fuesd.data<phi::dtype::float8_e5m2>() + N * K);
-    out = paddle::empty(out_shape, paddle::DataType::FLOAT8_E5M2, x.place());
-    out_ptr = reinterpret_cast<void*>(out.data<phi::dtype::float8_e5m2>());
   } else {
     PADDLE_THROW(phi::errors::Fatal(
         "fp8_fp8_fp8_dual_gemm_fused only support e4m3 and e5m2 input"));
+  }
+
+  if (output_dtype == "bfloat16") {
+    out = paddle::empty(out_shape, paddle::DataType::BFLOAT16, x.place());
+    out_ptr = reinterpret_cast<void*>(out.data<phi::dtype::bfloat16>());
+    
+  } else if (output_dtype == "float16") {
+    out = paddle::empty(out_shape, paddle::DataType::FLOAT16, x.place());
+    out_ptr = reinterpret_cast<void*>(out.data<phi::dtype::float16>());
+  } else {
+    PADDLE_THROW(phi::errors::Fatal(
+        "cutlass_fp8_fp8_fp8_dual_gemm_scale_ptr only support bfloat16 and float16 output"));
   }
 
   if(x_scale){
@@ -478,7 +484,14 @@ std::vector<paddle::DataType> CutlassFp8Fp8Fp8DualGemmFusedPtrScaleInferDtype(
     const paddle::optional<paddle::DataType>& x_scale_type,
     const paddle::optional<paddle::DataType>& y_fuesd_scale_type,
     const paddle::optional<paddle::DataType>& bias0_type,
-    const paddle::optional<paddle::DataType>& bias1_type) {
+    const paddle::optional<paddle::DataType>& bias1_type,
+    bool trans_x,
+    bool trans_y,
+    float scale0,     // only support per-tensor quantization
+    float scale1,     // only support per-tensor quantization
+    float scale_out,  // only support per-tensor quantization
+    std::string output_dtype,
+    std::string activation_type) {
 
 
     if(x_type != y_fused_type){
@@ -502,7 +515,13 @@ std::vector<paddle::DataType> CutlassFp8Fp8Fp8DualGemmFusedPtrScaleInferDtype(
     }
 
     paddle::DataType data_type;
-    data_type = paddle::DataType::FLOAT8_E4M3FN;
+    if (output_dtype == "bfloat16")
+        data_type = paddle::DataType::BFLOAT16;
+    else if (output_dtype == "float16")
+        data_type = paddle::DataType::FLOAT16;
+    else 
+        PD_THROW(
+                "cutlass_fp8_fp8_fp8_dual_gemm_fused_scale_ptr only support bfloat16 and float16 output, but got %s", output_dtype);
     return {data_type};
 }
 
@@ -527,6 +546,7 @@ PD_BUILD_OP(cutlass_fp8_fp8_fp8_dual_gemm_fused_scale_ptr)
             "scale0: float",
             "scale1: float",
             "scale_out: float",
+            "output_dtype: std::string",
             "act: std::string"})
     .Outputs({"out"})
     .SetKernelFn(PD_KERNEL(cutlass_fp8_fp8_fp8_dual_gemm_scale_ptr))

@@ -4354,25 +4354,12 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
         self.shared_expert_ffn2_weights_scale = []
 
         for i in range(self.num_layers):
-
-            linear_weight_scale_attr = self.get_attr(self.config.linear_weight_scale_attrs, i)
-            ffn1_weight_scale_attr = self.get_attr(self.config.ffn1_weight_scale_attrs, i)
-            ffn2_weight_scale_attr = self.get_attr(self.config.ffn2_weight_scale_attrs, i)
-
-            if self.config.moe_config.use_shared_expert(i):
-                shared_expert_ffn1_weight_scale_attr = self.get_attr(
-                    self.config.moe_config.shared_expert_ffn1_weight_scale_attrs, i
-                )
-                shared_expert_ffn2_weight_scale_attr = self.get_attr(
-                    self.config.moe_config.shared_expert_ffn2_weight_scale_attrs, i
-                )
-
+            q_proj_weight_scale = None
             q_a_proj_weight_scale = None
             q_b_proj_weight_scale = None
             kv_a_proj_with_mqa_weight_scale = None
             kv_b_proj_weight_scale = None
             if self.config.mla_config.use_mla():
-                q_proj_weight_scale = None
                 q_proj_weight_scale_attr = self.get_attr(self.config.mla_config.q_proj_weight_scale_attrs, i)
                 if q_proj_weight_scale_attr:
                     q_proj_weight_scale = self.create_parameter(
@@ -4996,7 +4983,8 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                     scale1=1.0,
                     scale_out=1.0,
                     act="swiglu",
-                ).cast(self._dtype)
+                    output_dtype=self._dtype,
+                )
             else:
                 try:
                     from paddlenlp_ops import (
@@ -5406,16 +5394,37 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
         return out_linear_out
 
     def compute_ffn1(self, tmp_out, i):
-        out = self.cutlass_fp8_gemm(
-            x=tmp_out,
-            y=self.ffn1_weights[i],
-            y_s=self.ffn1_weights_scale[i],
-            bias=None,
-            output_dtype=self._dtype,
-            act="identity",
-            ffn1=True,
-        )
-        return out
+        if self.weight_block_size[0] == 0 and self.weight_block_size[1] == 0:
+            from paddlenlp_ops import (
+                cutlass_fp8_fp8_fp8_dual_gemm_fused_scale_ptr as fp8_dual_gemm_fused_ptr_scale,
+            )
+
+            x, x_s = self.per_tensor_quant_fp8(tmp_out)
+            ffn1_out = fp8_dual_gemm_fused_ptr_scale(
+                x,
+                self.ffn1_weights[i],
+                x_s,
+                self.ffn1_weights_scale[i],
+                transpose_x=False,
+                transpose_y=True,
+                bias0=None,
+                bias1=None,
+                scale0=1.0,
+                scale1=1.0,
+                scale_out=1.0,
+                act="swiglu",
+                output_dtype=self._dtype,
+            )
+        else:
+            ffn1_out = self.cutlass_fp8_gemm(
+                x=tmp_out,
+                y=self.ffn1_weights[i],
+                y_s=self.ffn1_weights_scale[i],
+                bias=None,
+                output_dtype=self._dtype,
+                act="identity",
+            )
+        return ffn1_out
 
     def compute_activation(self, ffn1_out, i):
         if self.weight_block_size[0] == 0 and self.weight_block_size[1] == 0:
@@ -5528,24 +5537,65 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
         return fused_moe_out
 
     def compute_shared_expert(self, tmp_out, i):
-        ffn1_out = self.cutlass_fp8_gemm(
-            x=tmp_out,
-            y=self.shared_expert_ffn1_weights[i],
-            y_s=self.shared_expert_ffn1_weights_scale[i],
-            bias=None,
-            output_dtype=self._dtype,
-            act="identity",
-        )
-        ffn1_out = fused_bias_act(ffn1_out, None, act_method=self.activation)
+        if self.weight_block_size[0] == 0 and self.weight_block_size[1] == 0:
+            x, x_s = self.per_tensor_quant_fp8(tmp_out)
+            from paddlenlp_ops import (
+                cutlass_fp8_fp8_fp8_dual_gemm_fused_scale_ptr as fp8_dual_gemm_fused_ptr_scale,
+            )
 
-        ffn2_out = self.cutlass_fp8_gemm(
-            x=ffn1_out,
-            y=self.shared_expert_ffn2_weights[i],
-            y_s=self.shared_expert_ffn2_weights_scale[i],
-            bias=None,
-            output_dtype=self._dtype,
-            act="identity",
-        )
+            ffn1_out = fp8_dual_gemm_fused_ptr_scale(
+                x,
+                self.shared_expert_ffn1_weights[i],
+                x_s,
+                self.shared_expert_ffn1_weights_scale[i],
+                transpose_x=False,
+                transpose_y=True,
+                bias0=None,
+                bias1=None,
+                scale0=1.0,
+                scale1=1.0,
+                scale_out=1.0,
+                act="swiglu",
+                output_dtype=self._dtype,
+            )
+        else:
+            ffn1_out = self.cutlass_fp8_gemm(
+                x=tmp_out,
+                y=self.shared_expert_ffn1_weights[i],
+                y_s=self.shared_expert_ffn1_weights_scale[i],
+                bias=None,
+                output_dtype=self._dtype,
+                act="identity",
+            )
+            ffn1_out = fused_bias_act(ffn1_out, None, act_method=self.activation)
+
+        if self.weight_block_size[0] == 0 and self.weight_block_size[1] == 0:
+            try:
+                from paddlenlp_ops import (
+                    cutlass_fp8_fp8_half_gemm_ptr_scale_fused as fp8_gemm_fused_ptr_scale,
+                )
+            except:
+                assert False, "fp8_gemm_fused_ptr_scale only supported on sm90"
+            x, x_s = self.per_tensor_quant_fp8(ffn1_out)
+            ffn2_out = fp8_gemm_fused_ptr_scale(
+                x=x,
+                y=self.shared_expert_ffn2_weights[i],
+                x_scale=x_s,
+                y_scale=self.shared_expert_ffn2_weights_scale[i],
+                bias=None,
+                transpose_x=False,
+                transpose_y=True,
+                output_dtype=self._dtype,
+            )
+        else:
+            ffn2_out = self.cutlass_fp8_gemm(
+                x=ffn1_out,
+                y=self.shared_expert_ffn2_weights[i],
+                y_s=self.shared_expert_ffn2_weights_scale[i],
+                bias=None,
+                output_dtype=self._dtype,
+                act="identity",
+            )
         if self.config.moe_config.shared_expert_with_gate:
             gate_out = paddle.matmul(tmp_out, self.shared_expert_gate_weights[i])
             gate_out = paddle.nn.functional.sigmoid(gate_out)

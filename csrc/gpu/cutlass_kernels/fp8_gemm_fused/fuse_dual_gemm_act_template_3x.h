@@ -30,7 +30,7 @@
 
 using namespace cute;
 
-template <typename InputType, typename CTAShape, typename ClusterShape,
+template <typename InputType, typename OutputType, typename CTAShape, typename ClusterShape,
     typename MainloopScheduleType, typename EpilogueScheduleType, typename TileSchedulerType = void,
     template <class /* ElementCompute */> class Activation = cutlass::epilogue::thread::SiLu, bool SwapAB = true>
 bool dispatch_dual_gemm_act_sm90(DualGemmEpilogueAllParams params) {
@@ -58,7 +58,20 @@ bool dispatch_dual_gemm_act_sm90(DualGemmEpilogueAllParams params) {
                                                        // elements (up to 16 bytes)
 
     // Output matrix configuration
-    using ElementOutput = ElementA; // Element type for output matrix operands
+    using ElementOutput = typename std::conditional_t<
+        std::is_same_v<OutputType, phi::dtype::float8_e4m3fn>,
+        cutlass::float_e4m3_t,
+        std::conditional_t<
+            std::is_same_v<OutputType, phi::dtype::float8_e5m2>,
+            cutlass::float_e5m2_t,
+            std::conditional_t<
+                std::is_same_v<OutputType, phi::dtype::bfloat16>,
+                cutlass::bfloat16_t,
+                cutlass::half_t
+            >
+        >
+    >;
+
     // using LayoutOutput = cutlass::layout::RowMajor; // Layout type for output matrix operands
     using LayoutOutput = cute::conditional_t<SwapAB, cutlass::layout::ColumnMajor, cutlass::layout::RowMajor>;
     static constexpr int AlignmentOutput = 128 / cutlass::sizeof_bits<ElementOutput>::value;
