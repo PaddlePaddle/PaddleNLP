@@ -41,6 +41,7 @@ void StepPaddle(const paddle::Tensor& stop_flags,
                 const paddle::Tensor& first_token_ids,
                 const int block_size,
                 const int encoder_decoder_block_num) {
+    
   phi::XPUPlace place(phi::backends::xpu::GetXPUCurrentDeviceId());
   auto dev_ctx = paddle::experimental::DeviceContextPool::Instance().Get(place);
   auto xpu_ctx = static_cast<const phi::XPUContext*>(dev_ctx);
@@ -81,6 +82,7 @@ void StepPaddle(const paddle::Tensor& stop_flags,
   auto recover_lens_cpu = recover_lens.copy_to(paddle::CPUPlace(), false);
   int recover_lens_cpu_data = recover_lens_cpu.data<int>()[0];
   if (recover_lens_cpu_data > 0) {
+    printf("wht --- step");
     r = baidu::xpu::api::plugin::recover_block(
         xpu_ctx->x_context(),
         const_cast<int*>(recover_block_list.data<int>()),

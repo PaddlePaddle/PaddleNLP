@@ -425,6 +425,23 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                 )
                 for idx in range(self.num_layers)
             ]
+        k_b_proj_weight_attrs = None
+        v_b_proj_weight_attrs = None
+        if config.mla_use_matrix_absorption:
+            k_b_proj_weight_attrs = [
+                paddle.ParamAttr(
+                    name=f"fuse{self.base_model_prefix}.{idx}.k_b_proj_weight",
+                    initializer=paddle.nn.initializer.Constant(value=0),
+                )
+                for idx in range(self.num_layers)
+            ]
+            v_b_proj_weight_attrs = [
+                paddle.ParamAttr(
+                    name=f"fuse{self.base_model_prefix}.{idx}.v_b_proj_weight",
+                    initializer=paddle.nn.initializer.Constant(value=0),
+                )
+                for idx in range(self.num_layers)
+            ]
 
         out_proj_weight_attrs = [
             paddle.ParamAttr(
@@ -490,9 +507,11 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
         q_b_proj_weight_scale_attrs = None
         kv_a_proj_with_mqa_weight_scale_attrs = None
         kv_b_proj_weight_scale_attrs = None
-        q_nope_k_b_proj_weight_scale_attrs = None
-        q_rope_proj_weight_scale_attrs = None
-        v_b_o_proj_weight_scale_attrs = None
+        # q_nope_k_b_proj_weight_scale_attrs = None
+        # q_rope_proj_weight_scale_attrs = None
+        # v_b_o_proj_weight_scale_attrs = None
+        k_b_proj_weight_scale_attrs = None
+        v_b_proj_weight_scale_attrs = None
 
         out_proj_weight_scale_attrs = None
         ffn1_weight_scale_attrs = None
@@ -571,6 +590,17 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                 for idx in range(self.num_layers)
             ]
 
+            
+            if self.config.mla_use_matrix_absorption:
+                k_b_proj_weight_scale_attrs = [
+                    paddle.ParamAttr(name=f"fuse{self.base_model_prefix}.{idx}.k_b_proj_weight_scale")
+                    for idx in range(self.num_layers)
+                ]
+                v_b_proj_weight_scale_attrs = [
+                    paddle.ParamAttr(name=f"fuse{self.base_model_prefix}.{idx}.v_b_proj_weight_scale")
+                    for idx in range(self.num_layers)
+                ]
+
         mla_config = MLAConfig(
             use_matrix_absorption=self.config.mla_use_matrix_absorption,
             q_lora_rank=self.config.q_lora_rank,
@@ -591,12 +621,14 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
             kv_a_layernorm_weight_attrs=kv_a_layernorm_weight_attrs,
             kv_b_proj_weight_attrs=kv_b_proj_weight_attrs,
             kv_b_proj_weight_scale_attrs=kv_b_proj_weight_scale_attrs,
-            q_nope_k_b_proj_weight_attrs=q_nope_k_b_proj_weight_attrs,
-            q_nope_k_b_proj_weight_scale_attrs=q_nope_k_b_proj_weight_scale_attrs,
-            q_rope_proj_weight_attrs=q_rope_proj_weight_attrs,
-            q_rope_proj_weight_scale_attrs=q_rope_proj_weight_scale_attrs,
-            v_b_o_proj_weight_attrs=v_b_o_proj_weight_attrs,
-            v_b_o_proj_weight_scale_attrs=v_b_o_proj_weight_scale_attrs,
+            # q_nope_k_b_proj_weight_attrs=q_nope_k_b_proj_weight_attrs,
+            # q_nope_k_b_proj_weight_scale_attrs=q_nope_k_b_proj_weight_scale_attrs,
+            # q_rope_proj_weight_attrs=q_rope_proj_weight_attrs,
+            # q_rope_proj_weight_scale_attrs=q_rope_proj_weight_scale_attrs,
+            # v_b_o_proj_weight_attrs=v_b_o_proj_weight_attrs,
+            # v_b_o_proj_weight_scale_attrs=v_b_o_proj_weight_scale_attrs,
+            k_b_proj_weight_attrs=k_b_proj_weight_attrs,
+            v_b_proj_weight_attrs=v_b_proj_weight_attrs,
         )
 
         moe_config = MoeConfig(
@@ -890,9 +922,27 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                     [self.config.qk_nope_head_dim, self.config.v_head_dim], axis=-1
                 )
                 W_O = linear_weight_inner
-                W_Q_UK = paddle.einsum("qnd,lnd -> qnl", W_Q, W_UK).flatten(start_axis=1)
-                W_UV_O = paddle.einsum("lnd,hnd -> nlh", W_UV, W_O).flatten(start_axis=0, stop_axis=1)
 
+
+                # kv_b_proj_weight = paddle.to_tensor(
+                #     state_dict[f"{self.base_model_prefix}.layers.{idx}.self_attn.kv_b_proj.weight"]
+                #     )
+                # kv_b_proj_weight_scale = paddle.to_tensor(
+                #     state_dict[f"{self.base_model_prefix}.layers.{idx}.self_attn.kv_b_proj.weight_scale_inv"]
+                #     ).cast(paddle.float32)
+                
+                # fuse
+                # W_Q_t = W_Q.cast(paddle.float32) # [2048, 16, 128]
+                # W_UK_t = W_UK.cast(paddle.float32) # [512, 16, 128]
+                # W_UV_t = W_UV.cast(paddle.float32) # [512, 16, 128]
+                # W_O_t = W_O.cast(paddle.float32) # [2048, 16, 128]
+                # W_Q_UK_t = paddle.einsum("qnd,lnd -> qnl", W_Q_t, W_UK_t).flatten(start_axis=1) # [2048, 8192]
+                # W_UV_O_t = paddle.einsum("lnd,hnd -> nlh", W_UV_t, W_O_t).flatten(start_axis=0, stop_axis=1) # [8192, 2048]
+                # W_Q_UK = W_Q_UK_t.cast(paddle.bfloat16)
+                # W_UV_O = W_UV_O_t.cast(paddle.bfloat16)
+
+                # W_Q_UK = paddle.einsum("qnd,lnd -> qnl", W_Q, W_UK).flatten(start_axis=1)
+                # W_UV_O = paddle.einsum("lnd,hnd -> nlh", W_UV, W_O).flatten(start_axis=0, stop_axis=1)
                 if self.use_weight_only:
                     W_Q_UK_quanted, W_Q_UK_scale = weight_quantize(
                         W_Q_UK.cpu(), algo=self.quant_algo, group_size=self.weightonly_group_size
@@ -933,9 +983,19 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                         paddle.to_tensor(W_UV_O_scale).transpose((1, 0)).cast(paddle.float32)
                     )
                 else:
-                    self.transformer_block.q_nope_k_b_proj_weights[idx].set_value(W_Q_UK)
-                    self.transformer_block.q_rope_proj_weights[idx].set_value(W_QR)
-                    self.transformer_block.v_b_o_proj_weights[idx].set_value(W_UV_O)
+                    # self.transformer_block.q_nope_k_b_proj_weights[idx].set_value(W_Q_UK)
+                    # self.transformer_block.q_rope_proj_weights[idx].set_value(W_QR)
+                    # self.transformer_block.v_b_o_proj_weights[idx].set_value(W_UV_O)
+                    # import pdb; pdb.set_trace()
+                    # no fuse
+                    self.transformer_block.k_b_proj_weights[idx].set_value(W_UK.transpose([1, 2, 0]))
+                    self.transformer_block.v_b_proj_weights[idx].set_value(W_UV.transpose([1,0,2]))
+                    # self.transformer_block.k_b_proj_weights.append(W_UK.transpose([1,2,0]))
+                    # self.transformer_block.v_b_proj_weights.append(W_UV.transpose([1,0,2]))
+                    
+
+
+                    
 
             if self.use_weight_only:
                 kv_a_proj_with_mqa_quanted_weight, kv_a_proj_with_mqa_weight_scale = weight_quantize(

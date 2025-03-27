@@ -19,7 +19,7 @@ from paddlenlp.transformers import Llama3Tokenizer, LlamaTokenizer
 from paddlenlp.trl.llm_utils import get_eos_token_id
 from server.engine.config import global_config
 from server.utils import data_processor_logger
-from paddlenlp.utils.env import USE_FAST_TOKENIZER
+# from paddlenlp.utils.env import USE_FAST_TOKENIZER
 
 
 class BaseDataProcessor(ABC):
@@ -290,7 +290,7 @@ class DataProcessor(BaseDataProcessor):
             return AutoTokenizer.from_pretrained(self.config.model_dir, use_fast=False)
         else:
             from paddlenlp.transformers import AutoTokenizer
-            return AutoTokenizer.from_pretrained(self.config.model_dir, use_fast=USE_FAST_TOKENIZER)
+            return AutoTokenizer.from_pretrained(self.config.model_dir, use_fast=False)
 
     def clear_request_status(self, task_id):
         """

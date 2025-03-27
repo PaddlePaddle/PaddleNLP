@@ -18,24 +18,24 @@ set -e
 
 rm -rf build
 
-export PATH=/opt/output/work_dir/deps/cmake-3.26.0-linux-x86_64/bin:$PATH
+export PATH=/opt/output/work_dir/deepseek/deps/cmake-3.26.0-linux-x86_64/bin:$PATH
 # export XDNN_PATH=Paddle/build/third_party/xpu/src/extern_xpu/xdnn-ubuntu_x86_64/ # <path_to_xdnn>
 # export XRE_PATH=Paddle/build/third_party/xpu/src/extern_xpu/xre-ubuntu_x86_64/  # <path_to_xre>
 # export CLANG_PATH=xtdk-ubuntu_1604_x86_64 # <path_to_xtdk>
 # export HOST_SYSROOT=/opt/compiler/gcc-8.2/bin/gcc # <path_to_gcc>
 
-export XDNN_PATH=/opt/output/work_dir/paddle-deepseek/xpu_libs/xhpc/xdnn
-export XRE_PATH=/opt/output/work_dir/paddle-deepseek/xpu_libs/xre
-export CLANG_PATH=/opt/output/work_dir/paddle-deepseek/xpu_libs/xdnn_plugin/xtdk_output/xtdk-llvm15-ubuntu2004_x86_64
+export XDNN_PATH=/opt/output/work_dir/deepseek/xpu_libs/xhpc/xdnn
+export XRE_PATH=/opt/output/work_dir/deepseek/xpu_libs/xre
+export CLANG_PATH=/opt/output/work_dir/deepseek/xpu_libs/xdnn_plugin/xtdk_output/xtdk-llvm15-ubuntu2004_x86_64
 cd plugin
-./cmake_build.sh
+bash ./cmake_build.sh
 cd -
 
 unset XDNN_PATH
 unset XRE_PATH
 unset CLANG_PATH
 
-export XPU_LIB=/opt/output/work_dir/paddle-deepseek/xpu_libs
+export XPU_LIB=/opt/output/work_dir/deepseek/xpu_libs
 
 python -m pip  uninstall paddlenlp_ops -y
 python setup.py install

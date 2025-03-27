@@ -46,7 +46,8 @@ class TokenProcessor(object):
 
         self.tokens_counter = Counter()
 
-        self.is_speculate_decoding = self.cfg.get_speculate_config().speculate_method != "None"
+        # self.is_speculate_decoding = self.cfg.get_speculate_config().speculate_method != "None"
+        self.is_speculate_decoding = False
         if self.is_speculate_decoding:
             self.output_tokens = paddle.full(
                 shape=[SPECULATE_MAX_BSZ * MAX_DRAFT_TOKENS + SPECULATE_MAX_BSZ + 2, 1], fill_value=2, dtype="int64"

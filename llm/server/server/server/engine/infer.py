@@ -56,8 +56,9 @@ class ModelRunner:
 
         self.config = global_config
         self.model_cfg = self.config.get_model_config()
-        self.speculate_config = self.config.get_speculate_config()
-        self.is_speculate_decoding = self.speculate_config.speculate_method != "None"
+        # self.speculate_config = self.config.get_speculate_config()
+        # self.is_speculate_decoding = self.speculate_config.speculate_method != "None"
+        self.is_speculate_decoding = False
         self.format_print_configuration()
 
         self.args.num_layers = self.get_value(self.model_cfg, ["num_hidden_layers", "num_layers"])
@@ -668,6 +669,11 @@ class ModelRunner:
 
                 time.sleep(0.001)
                 continue
+            
+            # logger.info(f"wht---rank: {self.rank} --- self.share_inputs['seq_lens_this_time'] is {self.share_inputs['seq_lens_this_time']}")
+            # logger.info(f"wht---rank: {self.rank} --- self.share_inputs['seq_lens_encoder'] is {self.share_inputs['seq_lens_encoder']}")
+            # logger.info(f"wht---rank: {self.rank} --- self.share_inputs['seq_lens_decoder'] is {self.share_inputs['seq_lens_decoder']}")
+            # logger.info(f"wht---rank: {self.rank} --- self.share_inputs['block_tables'] is {self.share_inputs['block_tables']}")
 
             if self.proposer is not None:
                 self.proposer.run(
@@ -744,6 +750,7 @@ class InferenceEngine(object):
             xpu_config.l3_autotune_size = 0
             config.set_xpu_config(xpu_config)
             config.switch_ir_optim(True)
+            config.delete_pass("fc_xpu_fuse_pass")
         else:
             config.enable_use_gpu(100, device_id)
         
@@ -796,7 +803,7 @@ def main():
     start model runner
     """
     args = parse_args()
-    llm_utils.set_triton_cache(args.model_dir, "static")
+    # llm_utils.set_triton_cache(args.model_dir, "static")
     try:
         from paddle.utils import try_import
 

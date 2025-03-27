@@ -19,7 +19,7 @@ import re
 
 from server.utils import model_server_logger
 from server.download_model import download_from_txt
-from paddlenlp.experimental.transformers import SpeculateArgument
+# from paddlenlp.experimental.transformers import SpeculateArgument
 from paddlenlp.generation import GenerationConfig
 
 
