@@ -321,3 +321,5 @@ from .xlm_roberta.modeling import *
 from .xlm_roberta.tokenizer import *
 from .xlm_roberta.configuration import *
 from .yuan import *
+from .llm_embed import *
+from .nv_embed import *
