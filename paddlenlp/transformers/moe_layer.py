@@ -628,6 +628,10 @@ class MlpNode:
                 topk=self.token_dispatcher._comm_manager.router_topk,
                 num_experts=4,
             )
+            hs_fp8_dispatched._record_stream()
+            hs_scale_dispatched._record_stream()
+            dispatched_indices._record_stream()
+            dispatched_probs._record_stream()
 
             # 临时操作，unzipped_probs后续要和o1(bfloat16)乘，故这里做了cast
             unzipped_probs = unzipped_probs.to(paddle.bfloat16)
@@ -653,6 +657,7 @@ class MlpNode:
                 total_zipped_tokens=hs_fp8_dispatched.shape[0],
                 num_experts=4,
             )
+
             self.dispatched_probs = dispatched_probs
             self.dispatched_indices = dispatched_indices
             expert_out_zipped.stop_gradient = False
@@ -678,6 +683,7 @@ class MlpNode:
             hidden_states_out = self.unpermute_node.forward(
                 expert_out, token_permuted_indices, prob_permuted_indices, dispatched_probs
             )
+            dispatched_probs._record_stream()
             self.dispatched_probs = dispatched_probs
             self.token_permuted_indices = token_permuted_indices
             hidden_states_out.stop_gradient = False
@@ -697,6 +703,9 @@ class MlpNode:
                 top_k=self.token_dispatcher._comm_manager.router_topk,
                 num_experts=4,
             )
+
+            hidden_states_out_grad._record_stream()
+            hidden_states_out_grad_scale._record_stream()
 
             # expert_grad
             # unzipped_scale_grad = unzipped_scale_grad.to(paddle.float32)
