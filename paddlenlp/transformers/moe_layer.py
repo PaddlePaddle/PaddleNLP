@@ -507,6 +507,7 @@ class Fp8DispatchNode:
             self.token_dispatcher._comm_manager.group,
             previous_event=previous_event,
             async_finish=async_finish,
+            allocate_on_comm_stream=allocate_on_comm_stream,
         )
         self.token_dispatcher._comm_manager.handle = states["handle"]
         self.token_dispatcher._comm_manager.tokens_per_expert = states["tokens_per_expert"]

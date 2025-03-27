@@ -1161,7 +1161,7 @@ class Trainer:
                         tr_loss /= self.args.gradient_accumulation_steps
 
                     # assert if loss is invalid
-                    # self._check_loss_valid(tr_loss)
+                    self._check_loss_valid(tr_loss)
 
                     self.timers and self.timers("forward-backward").stop()
                     # Maunally collect gradients
