@@ -134,10 +134,6 @@ msgid "paddlenlp.datasets"
 msgstr ""
 
 #: ../index.rst:88
-msgid "paddlenlp.embeddings"
-msgstr ""
-
-#: ../index.rst:88
 msgid "paddlenlp.layers"
 msgstr ""
 
