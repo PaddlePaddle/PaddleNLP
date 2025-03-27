@@ -53,6 +53,39 @@ def compare_tensors(a, b):
         }
     }
 
+def check_expert_idx(unzipped_expert_idx, zipped_expertwise_rowmap, expert_num=4, zipped_tokens_num=3):
+    unzipped_expert_idx = unzipped_expert_idx.reshape((1, -1))
+    print(unzipped_expert_idx)
+    assert zipped_tokens_num == zipped_expertwise_rowmap.shape[0]
+    for token_idx in range(zipped_tokens_num):
+        for expert_idx in range(expert_num):
+            this_expert_row = zipped_expertwise_rowmap[token_idx][expert_idx]
+            if this_expert_row != -1:
+                expected_expert_idx = expert_idx
+                this_unzipped_expert_idx = unzipped_expert_idx[0][this_expert_row]
+                if this_unzipped_expert_idx != expected_expert_idx:
+                    print(f"第{token_idx}行第{expert_idx}号专家不匹配， rowmap里是{expected_expert_idx}, unzipped里是{this_unzipped_expert_idx}")
+                    return  
+                else:
+                    print(f"rowmap [{token_idx}][{expert_idx}] 指向{this_expert_row}, unzipped[{this_expert_row}] = {this_unzipped_expert_idx}")
+    print("检查结束，通过")
+
+def check_indices(dispatched_indices, zipped_expertwise_rowmap, unzipped_expert_idx):
+    topk = dispatched_indices.shape[1]
+    zipped_token_num = zipped_expertwise_rowmap.shape[0]
+    for token_idx in range(zipped_token_num):
+        for k in range(topk):
+            this_expert = dispatched_indices[token_idx][k]
+            if this_expert != -1: #有效专家
+                this_expert_row = zipped_expertwise_rowmap[token_idx][this_expert]
+                unzipped_expert = unzipped_expert_idx[this_expert_row]
+                if unzipped_expert != this_expert:
+                    print(f"unzipped[{this_expert_row}] 为{unzipped_expert}, 而原始数据[{token_idx}][{k}]为{this_expert}")
+                    return 
+                else:
+                    print(f"dispatched_indices[{token_idx}][{k}] 派发到专家{this_expert}, unzipped[{this_expert_row}]结果为{unzipped_expert}")
+    print("检查结束，通过")
+
 def verify_tokens_unzip():
     expert_num = 4
     topk = 8
@@ -109,6 +142,8 @@ def verify_tokens_unzip():
 
         unzipped_tokens, zipped_expertwise_rowmap, unzipped_probs, unzipped_expert_idx = TDU.tokens_unzip(tokens_zipped,routemap_topk, probs_topk,total_unzipped_tokens_num=total_unzipped_tokens_num, topk=topk, num_experts=expert_num)
 
+        check_expert_idx(unzipped_expert_idx,zipped_expertwise_rowmap)
+        check_indices(routemap_topk, zipped_expertwise_rowmap, unzipped_expert_idx)
         # ------------------------- 前向验证 ------------------------
         print("-------- Tokens unzipped by customed op: ------------")
         print(unzipped_tokens)
