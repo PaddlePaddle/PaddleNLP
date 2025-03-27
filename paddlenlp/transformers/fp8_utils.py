@@ -28,6 +28,7 @@ except ImportError:
 
 try:
     import deep_gemm
+    import FusedQuantOps as FQO
     import kitchen
     import kitchen.quantization_subchannel_block_hybrid
     import TokenDispatcherUtils as TDU
@@ -224,8 +225,8 @@ class ExpertsGroupGemmNode:
         self, out_grad, out_grad_scale, o1, expert_w1_len, unzipped_expert_idx, dispatched_indices
     ):
         # regroup dout and o2:regroup之前需要dequant
-        out_grad_dequant = dequantize_fp8_to_fp32(out_grad, out_grad_scale)
-        out_grad_dequant_fp16 = out_grad_dequant.to(paddle.bfloat16)
+
+        out_grad_dequant_fp16 = FQO.fused_act_dequant(out_grad, out_grad_scale)
         # token_per_expert = []
         # for i in range(expert_w1_len):
         #     e_num = int((dispatched_indices == i).astype("int64").sum())
@@ -242,8 +243,8 @@ class ExpertsGroupGemmNode:
     def dequant_do1_and_regroup_do1_fp8_and_unzipped_tokens(self, do1, unzipped_expert_idx, max_seq_len):
         # dequant do1_fp8 and regroup do1_fp8,unzipped_tokens
 
-        intput_x = dequantize_fp8_to_fp32(self.unzipped_tokens, self.unzipped_scale)
-        intput_x = intput_x.to(paddle.bfloat16)
+        intput_x = FQO.fused_act_dequant(self.unzipped_tokens, self.unzipped_scale)
+
         input_x_regroup, do1_regroup = TDU.regroup_tokens(
             intput_x, do1, unzipped_expert_idx, expert_num=4, token_max_per_expert=max_seq_len
         )
