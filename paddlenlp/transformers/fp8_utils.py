@@ -414,21 +414,20 @@ class ExpertsNode:
         self.x_t_fp8s = []
         self.x_t_scales = []
         self.o1s = []
-        self.dxs = []
         self.custom_map = custom_map
 
     def reset_statue(self):
         self.x_t_fp8s = []
         self.x_t_scales = []
         self.o1s = []
-        self.dxs = []
+        self.tokens_per_expert = None
 
     def forward(self, hs_out, hs_scale_out, tokens_per_expert):
         self.tokens_per_expert = tokens_per_expert
         x_fp8_list = paddle.split(hs_out, num_or_sections=self.tokens_per_expert, axis=0)  # FP8 chunk
         x_scale_list = paddle.split(hs_scale_out, num_or_sections=self.tokens_per_expert, axis=0)  # FP8 chunk
-        outputs = []
 
+        outputs = []
         for i, (chunk, chunk_scale) in enumerate(zip(x_fp8_list, x_scale_list)):
             expert = self.experts[i + self.custom_map.moe_rank * self.custom_map.moe_num_experts_per_device]
             x_fp8 = chunk.contiguous()
@@ -455,6 +454,7 @@ class ExpertsNode:
             x_t_fp8, x_t_scale = kitchen_quant(
                 x_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
             )
+
             self.x_t_fp8s.append(x_t_fp8)
             self.x_t_scales.append(x_t_scale)
             self.o1s.append(o1)
@@ -467,6 +467,7 @@ class ExpertsNode:
 
         out_grad_scale_list = paddle.split(out_grad_scale, num_or_sections=self.tokens_per_expert, axis=0)
 
+        dxs = []
         for i, (do3, do3_scale, x_t_fp8, x_t_scale, o1) in enumerate(
             zip(
                 out_grad_list,
@@ -483,6 +484,7 @@ class ExpertsNode:
             w2_fp8, w2_scale = kitchen_quant(
                 expert.w2, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
             )
+
             do2 = self.bwd_dowm_input(do3, do3_scale, w2_fp8, w2_scale)
             do1 = self.bwd_swiglu(o1, do2)
             dx = self.bwd_gate_up_input(do1, w1_fp8, w1_scale)
@@ -497,9 +499,9 @@ class ExpertsNode:
             else:
                 expert.w1.grad = self.bwd_gate_up_weight(do1, x_t_fp8, x_t_scale, expert.w1.grad)
 
-            self.dxs += [dx]
+            dxs.append(dx)
 
-        dx = paddle.concat(self.dxs, axis=0)
+        dx = paddle.concat(dxs, axis=0)
         self.reset_statue()
         return dx
 
@@ -507,7 +509,6 @@ class ExpertsNode:
         w1_t_fp8, w1_t_scale = kitchen_quant(
             w1.T.contiguous(), backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
         )
-
         o1 = paddle.empty([x_fp8.shape[0], w1_t_fp8.shape[0]], dtype=paddle.bfloat16)
         deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale), (w1_t_fp8, w1_t_scale), o1)
         return o1
