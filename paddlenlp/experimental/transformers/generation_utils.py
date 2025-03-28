@@ -356,15 +356,15 @@ class GenerationInferenceModel(GenerationMixin):
             else:
                 model_kwargs["all_input_ids"] = paddle.concat([model_kwargs["all_input_ids"], next_tokens], axis=1)
 
-            from paddlenlp_ops import save_with_output
+            # from paddlenlp_ops import save_with_output
 
-            save_with_output(
-                next_tokens,
-                batch_idx,
-                step_idx_ori,
-                "real_time_save.temp_ids",
-                self.config.tensor_parallel_rank,
-            )
+            # save_with_output(
+            #     next_tokens,
+            #     batch_idx,
+            #     step_idx_ori,
+            #     "real_time_save.temp_ids",
+            #     self.config.tensor_parallel_rank,
+            # )
 
             return next_tokens, model_kwargs
 
@@ -703,9 +703,9 @@ class GenerationBlockInferenceModel(GenerationMixin):
             step_idx = model_kwargs["step_idx"]
             logits = paddle.cast(outputs, paddle.float32)
 
-            from paddlenlp_ops import set_preids_token_penalty_multi_scores
+            from paddlenlp_ops import f_set_preids_token_penalty_multi_scores
 
-            set_preids_token_penalty_multi_scores(
+            f_set_preids_token_penalty_multi_scores(
                 model_kwargs["pre_ids"],
                 model_kwargs["input_ids"],
                 model_kwargs["seq_lens_encoder"],
@@ -738,9 +738,9 @@ class GenerationBlockInferenceModel(GenerationMixin):
                 paddle.distributed.broadcast(next_tokens, 0)
 
             with paddle.base.framework._stride_in_no_check_dy2st_diff():
-                from paddlenlp_ops import update_inputs_v2
+                from paddlenlp_ops import f_update_inputs_v2
 
-                update_inputs_v2(
+                f_update_inputs_v2(
                     model_kwargs["stop_flags"],
                     model_kwargs["step_idx"],
                     model_kwargs["not_need_stop"],
@@ -756,13 +756,13 @@ class GenerationBlockInferenceModel(GenerationMixin):
                     model_kwargs["next_tokens"],
                 )
 
-            from paddlenlp_ops import save_output
+            # from paddlenlp_ops import save_output
 
-            save_output(
-                next_tokens,
-                model_kwargs["not_need_stop"],
-                self.config.tensor_parallel_rank,
-            )
+            # save_output(
+            #     next_tokens,
+            #     model_kwargs["not_need_stop"],
+            #     self.config.tensor_parallel_rank,
+            # )
             return next_tokens
 
         # encoder
