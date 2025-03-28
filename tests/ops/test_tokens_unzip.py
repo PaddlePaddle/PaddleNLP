@@ -142,7 +142,7 @@ def verify_tokens_unzip():
 
         unzipped_tokens, zipped_expertwise_rowmap, unzipped_probs, unzipped_expert_idx = TDU.tokens_unzip(tokens_zipped,routemap_topk, probs_topk,total_unzipped_tokens_num=total_unzipped_tokens_num, topk=topk, num_experts=expert_num)
         
-        unzipped_tokens_stable, zipped_expertwise_rowmap_stable, unzipped_probs_stable, unzipped_expert_idx_stable,_= TDU.tokens_unzip_stable(tokens_zipped,routemap_topk, probs_topk, topk=topk, num_experts=2,max_tokens_per_expert=2)
+        unzipped_tokens_stable, zipped_expertwise_rowmap_stable, unzipped_probs_stable, unzipped_expert_idx_stable= TDU.tokens_unzip_stable(tokens_zipped,routemap_topk, probs_topk, topk=topk, num_experts=2,max_tokens_per_expert=2)
 
         check_expert_idx(unzipped_expert_idx,zipped_expertwise_rowmap)
         check_indices(routemap_topk, zipped_expertwise_rowmap, unzipped_expert_idx)
