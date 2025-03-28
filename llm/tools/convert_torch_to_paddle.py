@@ -296,9 +296,9 @@ def convert_safetensors_from_torch_to_paddle(
             transpose_state_dict[name_mapping.target_name] = False
 
         if name_mapping.source_name.replace(torch_prefix_key, "") not in torch_to_paddle_key_mappings:
-            torch_to_paddle_key_mappings[name_mapping.source_name.replace(torch_prefix_key, "")] = (
-                name_mapping.target_name.replace(paddle_prefix_key, "")
-            )
+            torch_to_paddle_key_mappings[
+                name_mapping.source_name.replace(torch_prefix_key, "")
+            ] = name_mapping.target_name.replace(paddle_prefix_key, "")
             transpose_state_dict[name_mapping.target_name.replace(paddle_prefix_key, "")] = transpose_state_dict[
                 name_mapping.target_name
             ]
