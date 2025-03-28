@@ -209,6 +209,8 @@ class LinearFP8Func(paddle.autograd.PyLayer):
         # deep_gemm only support 2D
         x = x.reshape([-1, x_orig_shape[-1]])
         # quant
+        if not x.is_contiguous():
+            x = x.contiguous()
         x_quant, x_scale = kitchen_quant(
             x, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
         )

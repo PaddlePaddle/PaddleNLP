@@ -231,7 +231,7 @@ class UnPermuteNode:
         self.token_permuted_indices = None
         self.hidden_states = None
         self.prob_permuted_indices = None
-        # self.faltten_dispatched_probs = None
+        self.faltten_dispatched_probs = None
         self.hidden = None
         self.permuted_tokens = None
         self.output_tokens = None
