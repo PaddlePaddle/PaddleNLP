@@ -206,7 +206,7 @@ std::vector<paddle::Tensor> tokens_unzip_stable(
     const paddle::Tensor &expert_prob_topk,
     const int &topk,
     const int &num_experts,
-    const int &max_tokens_per_expert) {
+    const int &max_tokens_per_expert_in) {
   PD_CHECK(X.dtype() == paddle::DataType::BFLOAT16 ||
            X.dtype() == paddle::DataType::FLOAT8_E4M3FN);
   PD_CHECK(expert_routemap_topk.dtype() == paddle::DataType::INT32);
@@ -214,6 +214,7 @@ std::vector<paddle::Tensor> tokens_unzip_stable(
            expert_prob_topk.dtype() == paddle::DataType::FLOAT32);
   const int rows = X.shape()[0];  // 一般为seqlen
   const int cols = X.shape()[1];  // 一般为7168
+  const int max_tokens_per_expert = ((max_tokens_per_expert_in + 127) / 128) * 128;
   const int output_rows = num_experts * max_tokens_per_expert;
   //------------------------ 输出四张量 ------------------------
   auto X_unzipped = paddle::empty({output_rows, cols}, X.dtype(), X.place());
