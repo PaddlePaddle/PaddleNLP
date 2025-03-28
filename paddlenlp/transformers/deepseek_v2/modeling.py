@@ -972,6 +972,18 @@ def manul_fwd(
         q, kv, k_pe, rotary_emb, num_heads, q_head_dim, qk_nope_head_dim, v_head_dim, qk_rope_head_dim, position_ids
     )
 
+    bsz = q_init.shape[0]
+    kv_seq_len = value_states.shape[1]
+    v_num_heads = value_states.shape[2]
+    kv_seq_len = value_states.shape[1]
+
+    value_padding = paddle.zeros(
+        [bsz, kv_seq_len, v_num_heads, q_head_dim - v_head_dim],
+        dtype=value_states.dtype,
+    )
+    value_states_pad = paddle.concat([value_states, value_padding], axis=-1)
+
+    bsz = q_init.shape[0]
     q_head_dim = query_states.shape[-1]
     softmax_scale = softmax_scale * (q_head_dim**0.5)
     query_states = query_states * softmax_scale
@@ -979,7 +991,7 @@ def manul_fwd(
     attn_out, _, softmax_lse, seed_offset = _C_ops.flash_attn(
         query_states,
         key_states,
-        query_states,
+        value_states_pad,
         None,
         None,
         0.0,
@@ -1331,8 +1343,26 @@ class MemroyRecomputeAttn(paddle.nn.Layer):
         )
 
     def forward(self, q_init, kv_init, position_ids):
+        # return MemroyRecomputeAttnFunc.apply(
+        #     q_init,
+        #     kv_init,
+        #     self.q_ln_weight,
+        #     self.kv_ln_weight,
+        #     self.q_up_weight,
+        #     self.kv_up_weight,
+        #     self.rotary_emb,
+        #     self.num_heads,
+        #     self.q_head_dim,
+        #     self.qk_nope_head_dim,
+        #     self.v_head_dim,
+        #     self.qk_rope_head_dim,
+        #     position_ids,
+        #     self.eps,
+        #     self.kv_lora_rank,
+        #     self.softmax_scale,
+        # )
 
-        return MemroyRecomputeAttnFunc.apply(
+        return manul_fwd(
             q_init,
             kv_init,
             self.q_ln_weight,
