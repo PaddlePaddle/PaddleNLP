@@ -152,7 +152,7 @@ def scaled_dot_product_attention(
     else:
         #  [ bz, seqlen, nhead, head_dim] -> [bs, nhead, seq_len, head_dim]
         query_states = paddle.transpose(query_states, [0, 2, 1, 3])
-        # merge with the next tranpose
+        # merge with the next transpose
         key_states = paddle.transpose(key_states, [0, 2, 1, 3])
         value_states = paddle.transpose(value_states, [0, 2, 1, 3])
         # matmul and devide by sqrt(head_dim)

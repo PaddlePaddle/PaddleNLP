@@ -761,15 +761,14 @@ class GenerationBlockInferenceModel(GenerationMixin):
                     eos_token_id,
                     model_kwargs["next_tokens"],
                 )
-
-            from paddlenlp_ops import save_output
-
-            save_output(
-                next_tokens,
-                model_kwargs["not_need_stop"],
-                self.config.tensor_parallel_rank,
-                fleet.get_hybrid_communicate_group().get_data_parallel_rank(),
-            )
+            if getattr(self, "save_output", True):
+                from paddlenlp_ops import save_output
+                save_output(
+                    next_tokens,
+                    model_kwargs["not_need_stop"],
+                    self.config.tensor_parallel_rank,
+                    fleet.get_hybrid_communicate_group().get_data_parallel_rank(),
+                )
             return next_tokens
 
         # encoder

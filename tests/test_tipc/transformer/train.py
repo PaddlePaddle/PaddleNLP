@@ -233,7 +233,7 @@ def do_train(args):
             batch_cost_avg.record(train_batch_cost)
             batch_ips_avg.record(train_batch_cost, tokens_per_cards)
 
-            # NOTE: For benchmark, loss infomation on all cards will be printed.
+            # NOTE: For benchmark, loss information on all cards will be printed.
             if step_idx % args.print_step == 0 and (args.benchmark or rank == 0):
                 total_avg_cost = avg_cost.numpy()
 
