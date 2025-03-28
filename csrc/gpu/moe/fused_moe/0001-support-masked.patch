@@ -1,0 +1,69 @@
+From df6848af54e7abc113e1a2198a314ec2d084a0b0 Mon Sep 17 00:00:00 2001
+From: chang-wenbin <changwenbin@baidu.com>
+Date: Fri, 28 Mar 2025 17:10:59 +0800
+Subject: [PATCH] support masked
+
+---
+ .../gemm/kernel/moe_problem_visitor.h            | 11 +++++++----
+ .../moe_gemm/fused_moe_cutlass_kernel.h          | 16 +++++++++++-----
+ 2 files changed, 18 insertions(+), 9 deletions(-)
+
+diff --git a/csrc/gpu/moe/fused_moe/cutlass_extensions/gemm/kernel/moe_problem_visitor.h b/csrc/gpu/moe/fused_moe/cutlass_extensions/gemm/kernel/moe_problem_visitor.h
+index 302ba0764..9c2322209 100644
+--- a/csrc/gpu/moe/fused_moe/cutlass_extensions/gemm/kernel/moe_problem_visitor.h
++++ b/csrc/gpu/moe/fused_moe/cutlass_extensions/gemm/kernel/moe_problem_visitor.h
+@@ -156,10 +156,13 @@ struct BaseMoeProblemVisitor {
+ 
+   CUTLASS_HOST_DEVICE
+   cutlass::gemm::GemmCoord problem_size(int idx) const {
+-    const int64_t prev_problem_row =
+-        idx == 0 ? 0 : params.last_row_for_problem[idx - 1];
+-    const int64_t current_problem_row = params.last_row_for_problem[idx];
+-    const int64_t gemm_m = current_problem_row - prev_problem_row;
++    // const int64_t prev_problem_row =
++    //     idx == 0 ? 0 : params.last_row_for_problem[idx - 1];
++    // const int64_t current_problem_row = params.last_row_for_problem[idx];
++    // const int64_t gemm_m = current_problem_row - prev_problem_row;
++
++    const int64_t gemm_m = params.last_row_for_problem[idx];
++
+     GemmCoord problem(GemmCoord::Index(gemm_m),
+                       GemmCoord::Index(params.gemm_n),
+                       GemmCoord::Index(params.gemm_k));
+diff --git a/csrc/gpu/moe/fused_moe/cutlass_kernels/moe_gemm/fused_moe_cutlass_kernel.h b/csrc/gpu/moe/fused_moe/cutlass_kernels/moe_gemm/fused_moe_cutlass_kernel.h
+index 0acff733c..b34bdca93 100644
+--- a/csrc/gpu/moe/fused_moe/cutlass_kernels/moe_gemm/fused_moe_cutlass_kernel.h
++++ b/csrc/gpu/moe/fused_moe/cutlass_kernels/moe_gemm/fused_moe_cutlass_kernel.h
+@@ -42,7 +42,7 @@
+ #include "cutlass/layout/matrix.h"
+ #include "cutlass/trace.h"
+ 
+-#include "cutlass_extensions/gemm/kernel/gemm_moe_problem_visitor.h"
++#include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/gemm/kernel/gemm_moe_problem_visitor.h"
+ #include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/tile_interleaved_layout.h"
+ /////////////////////////////////////////////////////////////////////////////////////////////////
+ 
+@@ -436,10 +436,16 @@ struct MoeFCGemm {
+ 
+         // Load element pointers. Exchange pointers and strides if working on
+         // the transpose
+-        const int64_t rows_to_jump =
+-            problem_idx == 0
+-                ? 0
+-                : params.problem_visitor.last_row_for_problem[problem_idx - 1];
++        // const int64_t rows_to_jump =
++        //     problem_idx == 0
++        //         ? 0
++        //         : params.problem_visitor.last_row_for_problem[problem_idx - 1];
++
++        // const int64_t rows_to_jump = problem_idx * (args.total_rows_before_expert / args.problem_count);
++
++        // 128 * 16 = num_max_dispatch_tokens_per_rank * num_ranks
++        const int64_t rows_to_jump = problem_idx * (128 * 16);
++
+         ElementA* ptr_A =
+             reinterpret_cast<ElementA*>(params.ptr_A) + rows_to_jump * gemm_k;
+         typename LayoutA::LongIndex ldm_A = gemm_k;
+-- 
+2.25.1
+
