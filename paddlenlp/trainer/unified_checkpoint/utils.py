@@ -420,10 +420,10 @@ def merge_tensor_parallel_for_optimizer(state_dict, model_state_dict, tp_actions
                 continue
             # get base model key
             model_key = filter_keys[i].split("/")[0]
-            mp_moe = getattr(model_state_dict[model_key], "mp_moe", False)
             if filter_keys[i] not in state_dict:
                 continue
             tensor = state_dict[filter_keys[i]]
+            mp_moe = getattr(model_state_dict[model_key], "mp_moe", False)
             if model_key in tp_actions and not mp_moe:
                 # for example: beta1, beta2
                 if tensor.numel().item() == 1:
