@@ -119,12 +119,12 @@ __global__ void tokens_unzip_stable_kernel(
         probs_unzipped[unzipped_row_idx] =
             shared_expert_probmap[internal_row][expert];
       }
-      vectorized_memcpy(&X[row * token_length],
-                        &X_unzipped[unzipped_row_idx * token_length],
-                        token_length);
       if constexpr(has_scale){
         vectorized_memcpy(&XScale[row * scale_length], &XScale_unzipped[unzipped_row_idx * scale_length], scale_length);
       }
+      vectorized_memcpy(&X[row * token_length],
+                        &X_unzipped[unzipped_row_idx * token_length],
+                        token_length);
     }
   }
 }
@@ -145,7 +145,6 @@ void dispatch_tokens_unzip_stable(
     const int num_experts,
     const int max_tokens_per_expert,
     const int scale_length) {
-
   dim3 grid, block;
   grid.x =
       (total_zipped_tokens_num + CUMSUM_BLOCK_SIZE - 1) / CUMSUM_BLOCK_SIZE;
