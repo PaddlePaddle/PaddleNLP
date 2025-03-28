@@ -209,16 +209,24 @@ std::vector<paddle::Tensor> tokens_unzip_stable(
     const int &max_tokens_per_expert) {
   PD_CHECK(X.dtype() == paddle::DataType::BFLOAT16 ||
            X.dtype() == paddle::DataType::FLOAT8_E4M3FN);
+  PD_CHECK(expert_routemap_topk.dtype() == paddle::DataType::INT32);
   PD_CHECK(expert_prob_topk.dtype() == paddle::DataType::BFLOAT16 ||
            expert_prob_topk.dtype() == paddle::DataType::FLOAT32);
-  PD_CHECK(expert_routemap_topk.dtype() == paddle::DataType::INT32);
   const int rows = X.shape()[0];  // 一般为seqlen
   const int cols = X.shape()[1];  // 一般为7168
   const int output_rows = num_experts * max_tokens_per_expert;
   //------------------------ 输出四张量 ------------------------
   auto X_unzipped = paddle::empty({output_rows, cols}, X.dtype(), X.place());
-
+  // 核心数据结构，用于后续zip 【seqlen x num_experts】, 行对应zipped
+  // token，列对应专家，元素对应unzipped行号
+  auto zipped_expertwise_rowmap =
+      paddle::empty({rows, num_experts}, paddle::DataType::INT32, X.place());
+  auto expert_idx_unzipped =
+      paddle::empty({output_rows}, paddle::DataType::INT32, X.place());
   // 暂时将所有输出缓冲区初始化为0用于padding，后续可融合进kernel逻辑中?
+  auto token_prob_unzipped = paddle::empty(
+      {output_rows}, expert_prob_topk.dtype(), expert_prob_topk.place());
+
   if (X.dtype() == paddle::DataType::BFLOAT16) {
     auto X_unzipped_ptr =
         reinterpret_cast<void *>(X_unzipped.data<phi::bfloat16>());
@@ -234,15 +242,9 @@ std::vector<paddle::Tensor> tokens_unzip_stable(
                     sizeof(phi::float8_e4m3fn) * output_rows * cols,
                     X.stream());
   }
-  // 核心数据结构，用于后续zip 【seqlen x num_experts】, 行对应zipped
-  // token，列对应专家，元素对应unzipped行号
-  auto zipped_expertwise_rowmap =
-      paddle::empty({rows, num_experts}, paddle::DataType::INT32, X.place());
 
   // 重要数据结构，用于FP8 grouped_gemm，指示行所属专家号,行对应prob值
   // ------------- expert_idx padding 相关逻辑 -------------
-  auto expert_idx_unzipped =
-      paddle::empty({output_rows}, paddle::DataType::INT32, X.place());
   auto expert_idx_unzipped_ptr =
       reinterpret_cast<void *>(expert_idx_unzipped.data<int>());
   // 置非法值-1用于padding
@@ -251,18 +253,16 @@ std::vector<paddle::Tensor> tokens_unzip_stable(
                   sizeof(int) * output_rows,
                   expert_idx_unzipped.stream());
   // ------------- token_prob padding 相关逻辑 -------------
-  auto token_prob_unzipped = paddle::empty(
-      {output_rows}, expert_prob_topk.dtype(), expert_prob_topk.place());
   if (expert_prob_topk.dtype() == paddle::DataType::BFLOAT16) {
     auto token_prob_unzipped_ptr =
-        reinterpret_cast<void *>(X_unzipped.data<phi::bfloat16>());
+        reinterpret_cast<void *>(token_prob_unzipped.data<phi::bfloat16>());
     cudaMemsetAsync(token_prob_unzipped_ptr,
                     0,
                     sizeof(phi::bfloat16) * output_rows,
                     token_prob_unzipped.stream());
   } else if (expert_prob_topk.dtype() == paddle::DataType::FLOAT32) {
     auto token_prob_unzipped_ptr =
-        reinterpret_cast<void *>(X_unzipped.data<float>());
+        reinterpret_cast<void *>(token_prob_unzipped.data<float>());
     cudaMemsetAsync(token_prob_unzipped_ptr,
                     0,
                     sizeof(float) * output_rows,
@@ -297,8 +297,7 @@ std::vector<paddle::Tensor> tokens_unzip_stable(
   return {X_unzipped,
           zipped_expertwise_rowmap,
           token_prob_unzipped,
-          expert_idx_unzipped,
-          global_expertwise_block_cumsum};
+          expert_idx_unzipped};
 }
 
 PD_BUILD_OP(tokens_unzip_stable)
@@ -306,8 +305,7 @@ PD_BUILD_OP(tokens_unzip_stable)
     .Outputs({"X_unzipped",
               "zipped_expertwise_rowmap",
               "token_prob_unzipped",
-              "expert_idx_unzipped",
-              "debug_global_expertwise_block_cumsum"})
+              "expert_idx_unzipped"})
     .Attrs({"topk: int", "num_experts: int", "max_tokens_per_expert: int"})
     .SetKernelFn(PD_KERNEL(tokens_unzip_stable));
 

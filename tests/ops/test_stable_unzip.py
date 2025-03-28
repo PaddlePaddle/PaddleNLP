@@ -42,7 +42,7 @@ max_tokens = max(token_per_expert)
 def test_unzip_stable():
     # ---------------------------- Forward --------------------
     # ------------ unzip and preprocess --------------
-    unzipped_tokens, zipped_expertwise_rowmap, unzipped_probs, unzipped_expert_idx, global_cumsum= TDU.tokens_unzip_stable(reci_x,
+    unzipped_tokens, zipped_expertwise_rowmap, unzipped_probs, unzipped_expert_idx= TDU.tokens_unzip_stable(reci_x,
         topk_ind_base, 
         probs,
         topk=topk, num_experts=4, max_tokens_per_expert=max_tokens)
@@ -52,7 +52,6 @@ def test_unzip_stable():
     np.savetxt("zipped_expertwise_rowmap.csv", zipped_expertwise_rowmap, delimiter=",", fmt='%d')
     np.savetxt("topk_ind.csv", topk_ind, delimiter=",", fmt='%d')
     np.savetxt("unzipped_expert_idx.csv", unzipped_expert_idx, delimiter=",", fmt='%d')
-    np.savetxt("global_cumsum.csv", global_cumsum, delimiter=",", fmt='%d')
 
 # core.nvprof_enable_record_event()
 
