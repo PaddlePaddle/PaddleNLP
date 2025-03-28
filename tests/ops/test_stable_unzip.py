@@ -23,7 +23,7 @@ topk = 8
 topk_ind = np.load("topk_indice.npy")
 reci_x = paddle.randn( [ topk_ind.shape[0], H1], dtype="bfloat16")
 reci_x_fp8 = reci_x.cast("float8_e4m3fn")
-reci_x_scale = paddle.ones((reci_x.shape[0], int((H1 + 127) / 128)), dtype="float32")
+reci_x_scale = paddle.randn((reci_x.shape[0], int((H1 + 127) / 128)), dtype="float32")
 print("reci_x scale shape: ", reci_x_scale.shape)
 topk_ind_base = paddle.to_tensor(topk_ind, dtype="int32")
 probs = paddle.ones( topk_ind_base.shape, dtype="bfloat16") # uses ones as topk_ind_base???
