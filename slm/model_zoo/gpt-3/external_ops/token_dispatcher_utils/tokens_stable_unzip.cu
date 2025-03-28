@@ -1,6 +1,6 @@
 #include "utils.h"
 
-#define CUMSUM_BLOCK_SIZE 64   // cumsum开销和并行度之间的tradeoff的结果，勿动
+#define CUMSUM_BLOCK_SIZE 48   // cumsum开销和并行度之间的tradeoff的结果，勿动
 #define CUMSUM_INVALID_TAG -1  // 用于标记无效的cumsum，尝试过-114514但失败了
 
 // 多阶段算法，控制每block处理的行数来权衡额外开销
@@ -123,7 +123,7 @@ __global__ void tokens_unzip_stable_kernel(
                         &X_unzipped[unzipped_row_idx * token_length],
                         token_length);
       if constexpr(has_scale){
-        vectorized_memcpy(&XScale[row * token_length], &XScale_unzipped[unzipped_row_idx * scale_length], scale_length);
+        vectorized_memcpy(&XScale[row * scale_length], &XScale_unzipped[unzipped_row_idx * scale_length], scale_length);
       }
     }
   }
