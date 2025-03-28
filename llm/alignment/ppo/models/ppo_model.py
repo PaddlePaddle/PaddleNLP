@@ -12,10 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from paddlenlp.transformers import LlamaForCausalLM, PretrainedConfig
 
-from .ppo_model_utils import PolicyOutput, RLHFPPOMixedLoss, RLHFValueLoss, ValueOutput
+from .ppo_model_utils import (
+    PolicyOutput,
+    RLHFPPOMixedLoss,
+    RLHFValueLoss,
+    ValueOutput,
+    create_startend_row_indices,
+)
 from .score_model import LlamaModelForScore
 
 
@@ -38,6 +43,7 @@ class LlamaPolicyModel(LlamaForCausalLM):
         position_ids=None,
         attention_mask=None,
         inputs_embeds=None,
+        attn_mask_startend_row_indices=None,
         labels=None,
         use_cache=False,
         past_key_values=None,
@@ -58,10 +64,15 @@ class LlamaPolicyModel(LlamaForCausalLM):
             - the cache used in inference for next chunk.
             - the decoder's attention weights for each layer.
         """
+        assert attention_mask is None, "attention_mask should be None"
+        if attn_mask_startend_row_indices is None:
+            attn_mask_startend_row_indices = create_startend_row_indices(input_ids, self.config.pad_token_id)
+
         outputs = super().forward(
             input_ids=input_ids,
             position_ids=position_ids,
-            attention_mask=attention_mask,
+            attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+            attention_mask=None,
             inputs_embeds=inputs_embeds,
             labels=None,
             use_cache=use_cache,
@@ -109,6 +120,7 @@ class LlamaValueModel(LlamaModelForScore):
         input_ids=None,
         position_ids=None,
         attention_mask=None,
+        attn_mask_startend_row_indices=None,
         inputs_embeds=None,
         use_cache=False,
         past_key_values=None,
@@ -137,10 +149,14 @@ class LlamaValueModel(LlamaModelForScore):
                 - the hidden states;
                 - the attentions.
         """
+        assert attention_mask is None, "attention_mask should be None"
+        if attn_mask_startend_row_indices is None:
+            attn_mask_startend_row_indices = create_startend_row_indices(input_ids, self.config.pad_token_id)
         outputs = super().forward(
             input_ids=input_ids,
             position_ids=position_ids,
-            attention_mask=attention_mask,
+            attention_mask=None,
+            attn_mask_startend_row_indices=attn_mask_startend_row_indices,
             inputs_embeds=inputs_embeds,
             use_cache=use_cache,
             past_key_values=past_key_values,

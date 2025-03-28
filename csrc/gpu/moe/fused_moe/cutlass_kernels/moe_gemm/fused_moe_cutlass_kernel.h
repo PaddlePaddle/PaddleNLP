@@ -42,7 +42,7 @@
 #include "cutlass/layout/matrix.h"
 #include "cutlass/trace.h"
 
-#include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/gemm/kernel/gemm_moe_problem_visitor.h"
+#include "cutlass_extensions/gemm/kernel/gemm_moe_problem_visitor.h"
 #include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/tile_interleaved_layout.h"
 /////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 import gc
 import unittest
 
@@ -32,9 +33,9 @@ class BiEncoderModelIntegrationTest(unittest.TestCase):
 
         model_name_or_path = "BAAI/bge-large-en-v1.5"
         tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
-        model = BiEncoderModel(model_name_or_path=model_name_or_path, dtype="float16", tokenizer=tokenizer)
+        model = BiEncoderModel(model_name_or_path=model_name_or_path, tokenizer=tokenizer, model_flag="").to("gpu")
         with paddle.no_grad():
-            out = model.encode_sentences(sentences=input_texts)
+            out = model.encode_corpus(corpus=input_texts)
 
         print(out)
         """

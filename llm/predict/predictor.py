@@ -970,31 +970,42 @@ class BlockInferencePredictorMixin(BasePredictor):
             tgt_mask = (alibi_decoder + (1 - tgt_mask) * paddle.finfo(self.dtype).min).cast(self.dtype)
             self.model_inputs["rope_emb"] = paddle.concat([src_mask.reshape([-1]), tgt_mask.reshape([-1])])
 
-    def _preprocess(self, input_text: list[str]):
-        len_input_text = len(input_text)
-        if len_input_text < self.batch_size:
-            padding_len = self.batch_size - len_input_text
-            input_text += [""] * padding_len
-            assert len(input_text) == self.batch_size
+    def _preprocess(self, input_text: list[str] = None, input_ids: list[list[int]] = None):
+        if input_ids is None:
+            len_input_text = len(input_text)
+            if len_input_text < self.batch_size:
+                padding_len = self.batch_size - len_input_text
+                input_text += [""] * padding_len
+                assert len(input_text) == self.batch_size
 
-        if self.tokenizer.chat_template is not None:
-            if not isinstance(input_text, list) or not isinstance(input_text[0], str):
-                input_text = [input_text]
-            input_text = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in input_text]
+            if self.tokenizer.chat_template is not None:
+                if not isinstance(input_text, list) or not isinstance(input_text[0], str):
+                    input_text = [input_text]
+                input_text = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in input_text]
 
-        input_ids = []
-        for text in input_text:
-            tokens = self.tokenizer(
-                text,
-                return_tensors="np",
-                padding=True,
-                truncation=True,
-                max_length=self.config.src_length,
-                # if use chat_template, it will not add special_tokens
-                add_special_tokens=self.tokenizer.chat_template is None
-                or isinstance(self.tokenizer, (ChatGLMv2Tokenizer, ChatGLMTokenizer)),
-            )
-            input_ids.append(tokens["input_ids"][0])
+            input_ids = []
+            for text in input_text:
+                tokens = self.tokenizer(
+                    text,
+                    return_tensors="np",
+                    padding=True,
+                    truncation=True,
+                    max_length=self.config.src_length,
+                    # if use chat_template, it will not add special_tokens
+                    add_special_tokens=self.tokenizer.chat_template is None
+                    or isinstance(self.tokenizer, (ChatGLMv2Tokenizer, ChatGLMTokenizer)),
+                )
+                input_ids.append(tokens["input_ids"][0])
+        else:
+            assert isinstance(input_ids, list) and isinstance(input_ids[0], list), "input_ids must be a list of list"
+            assert (
+                input_text is None and input_ids is not None
+            ), "Only one of 'input_text' and 'input_ids' can be provided"
+            len_input_ids = len(input_ids)
+            if len_input_ids < self.batch_size:
+                padding_len = self.batch_size - len_input_ids
+                input_ids += [[self.tokenizer.pad_token_id]] * padding_len
+                assert len(input_ids) == self.batch_size
 
         self.seq_lens = self.pad_batch_data(input_ids)
         self.model_inputs["input_ids"] = self.input_ids

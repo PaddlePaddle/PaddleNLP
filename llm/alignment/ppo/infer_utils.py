@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import copy
 import inspect
-import types
 from contextlib import contextmanager
 
 import paddle
@@ -24,155 +23,102 @@ import paddle.distributed as dist
 from comm_utils import offload_tensor_to_cpu, reload_tensor_to_gpu
 from paddle.utils import try_import
 from predict.predictor import (
-    DygraphInferencePredictor,
-    PdArgumentParser,
+    DygraphBlockInferencePredictor,
+    ModelArgument,
     PredictorArgument,
 )
-from trainer_utils import guard_set_args
+from trainer_utils import process_row
 
-import paddlenlp
 from paddlenlp.trainer.trainer import Trainer, logger
-from paddlenlp.transformers import PretrainedModel, PretrainedTokenizer
+from paddlenlp.transformers import (
+    AutoInferenceModelForCausalLM,
+    PretrainedModel,
+    PretrainedTokenizer,
+)
 from paddlenlp.transformers.model_utils import dtype_guard
 from paddlenlp.trl.llm_utils import init_dist_env
 
 
-class Predictor:
-    def __init__(self, config, model: PretrainedModel = None, tokenizer: PretrainedTokenizer = None):
-        self.model_config = model.config
-        self.config = config
-        self.tokenizer = tokenizer
-        self.model = model
-        self.is_available = False
-        self._weights_mapping = None
-        # TODO(guosheng): Removde dependency on llm.Predictor
-        # 1. buffer_maker creates caches and other buffer inputs can be shared
-        # among multi time prediction. define caches and extra inputs creation
-        # method instead of using predictor.__init__
-        # 2. inputs_processer creates caches and other inputs can be shared among
-        # multi time prediction. define caches and extra inputs creation method
-        # instead of using predictor.__init__
-
-        self._buffer_maker = types.MethodType(DygraphInferencePredictor.__init__, self)
-        self._inputs_processer = types.MethodType(DygraphInferencePredictor._preprocess, self)
-
-    @staticmethod
-    def create_predictor(trainer):
-        # create infer model
-        # NOTE: infer model use static name param_attr to create and cannot be
-        # created multiple times.
-        def create_infer_model(model, dtype, set_state=False):
-            from models.infer_model_utils import patch_infer_generate
-
-            # apply patches to make FuseMT adapt
-            patch_infer_generate(
-                eos_token_id=trainer.tokenizer.eos_token_id, pad_token_id=trainer.tokenizer.pad_token_id
-            )
-            config = copy.deepcopy(model.config)
-            config.tensor_parallel_rank, config.tensor_parallel_degree = init_dist_env()
-            config.quant_type = []
-            config.cachekv_int8_type = None
-            config.append_attn = False
-            config.single_card_ptq = True
-
-            infer_model_cls = getattr(paddlenlp.experimental.transformers, model.__class__.__name__ + "InferenceModel")
-            # ori_init_weights = infer_model_cls.init_weights
-            # infer_model_cls.init_weights = lambda self: None
-            with dtype_guard(dtype):
-                infer_model = infer_model_cls(config)
-            # infer_model_cls.init_weights = ori_init_weights
-
-            if set_state:
-                state_dict = {}
-                for k, v in model.state_dict().items():
-                    # state_dict[k] = np.from_dlpack(paddle.utils.dlpack.to_dlpack(v))
-                    state_dict[k] = v.numpy()
-                infer_model.set_state_dict(state_dict)
-            return infer_model
-
-        # to avoid oom, clear param of infer_model imediately
-        ori_creat_param = paddle.nn.Layer.create_parameter
-
-        def _create_param(self, *args, **kwargs):
-            param = ori_creat_param(self, *args, **kwargs)
-            param._clear_data()
-            # param._clear()
-            return param
-
-        paddle.nn.Layer.create_parameter = _create_param
-        # trainer might use an extra model instead of trainer.model for eval
-        eval_model = getattr(trainer, "_inner_eval_model", None)
-        infer_model = create_infer_model(trainer.model if eval_model is None else eval_model, dtype=trainer.amp_dtype)
-        paddle.nn.Layer.create_parameter = ori_creat_param
-        # for k, v in infer_model.state_dict().items():
-        #     v._clear()
-
-        # create predictor
-        parser = PdArgumentParser((PredictorArgument,))
-        predictor_args = parser.parse_dict(
-            {
-                "model_name_or_path": trainer.args.actor_model_name_or_path,
-                "src_length": trainer.args.max_src_len,
-                "max_length": trainer.args.max_dec_len,
-                "total_max_length": trainer.args.max_src_len + trainer.args.max_dec_len,
-                "dtype": trainer.amp_dtype,
-                "batch_size": trainer.args.per_device_prompt_batch_size * trainer.args.num_return_sequences,
-                # infer model do not support top_k, and differ with non-infer model
-                # generation which gets default top_K=50 using generation_config.top_k
-                "top_p": trainer.args.top_p,
-                "temperature": trainer.args.temperature,
-                "repetition_penalty": trainer.args.repetition_penalty,
-            }
-        )[0]
-
-        policy_predictor = Predictor(predictor_args, model=infer_model, tokenizer=trainer.tokenizer)
-        return policy_predictor
-
-    def _create_caches(self):
-        """inputs can be reused among multiple predictions, such as cache"""
-        if hasattr(self, "cache_kvs_shape"):  # has created cache
-            input_length = getattr(self, "input_length", 0)
-            # TODO(guosheng): better way to get history max cache length, we can
-            # not get cache length form cache tensor when not know cache layout
-            if input_length <= self.config.src_length:  # reuse cache
-                return
-            else:  # create longer cache
-                self._clear_caches()
-        self.config.src_length = getattr(self, "input_length", self.config.src_length)
-        if not hasattr(self, "_buffer_attrs"):
-            pre_attrs = set(self.__dict__.keys())
-        self.cache_kvs_shapes = self.model.get_cache_kvs_shape(
-            self.model_config, self.config.batch_size, self.config.total_max_length
-        )
-
-        self.config.model_config = copy.deepcopy(self.model_config)
-
-        self._buffer_maker(self.config, self.tokenizer, self.model)
-        if not hasattr(self, "_buffer_attrs"):
-            self._buffer_attrs = set(self.__dict__.keys()) - pre_attrs
-
-    def _clear_caches(self):
-        # del or offload
-        for attr in self._buffer_attrs:
-            delattr(self, attr)
+class PolicyPredictor(DygraphBlockInferencePredictor):
+    def enable(self, model, offload_model=True):
+        if self.is_available:
+            return
+        self.set_state_dict(model, offload_model)
+        self.is_available = True
 
     def disable(self, model, onload_model=True):
-        # clear caches
-        self._clear_caches()
-        # clear params
         for _, param in self.model.state_dict().items():
             param._clear_data()
-            # param._clear()
         if onload_model:
             model.to(paddle.device.get_device())
         self.is_available = False
 
-    def enable(self, model, offload_model=True):
-        if self.is_available:
-            return
-        # set params
-        self.set_state_dict(model, offload_model)
-        self.is_available = True
+    @contextmanager
+    def update_predictor_params(self, **kwargs):
+        # update predictor config
+        if kwargs:
+            old_predictor_config = copy.deepcopy(self.config)
+            for key, new_value in kwargs.items():
+                if hasattr(self.config, key):
+                    old_value = getattr(self.config, key)
+                    if old_value != new_value:
+                        setattr(self.config, key, new_value)
+                        if key == "top_p":
+                            self.update_model_inputs("top_p", new_value)
+                        if key == "temperature":
+                            self.update_model_inputs("temperature", new_value)
+        yield
+        if kwargs:
+            if self.config.top_p != old_predictor_config:
+                self.update_model_inputs("top_p", old_predictor_config.top_p)
+            if self.config.temperature != old_predictor_config:
+                self.update_model_inputs("temperature", old_predictor_config.temperature)
+            self.config = old_predictor_config
+
+    def update_model_inputs(self, key, value):
+        assert key in self.model_inputs, f"{key} is not in model_inputs!"
+        old_value = self.model_inputs.pop(key)
+        self.model_inputs[key] = paddle.full(shape=old_value.shape, fill_value=value, dtype=old_value.dtype)
+
+    def init_cache_kv(self):
+        cachekv_dtype = self.dtype if self.config.cachekv_int8_type is None else "uint8"
+        self.cache_kvs = []
+        if self.cache_k_shapes and self.cache_v_shapes:
+            for cache_k_shape, cache_v_shape in zip(self.cache_k_shapes, self.cache_v_shapes):
+                self.cache_kvs.append(paddle.zeros(cache_k_shape, dtype=cachekv_dtype))
+                self.cache_kvs.append(paddle.zeros(cache_v_shape, dtype=cachekv_dtype))
+        else:
+            # for mla's absorption
+            assert self.cache_v_shapes is None
+            self.cache_kvs = [paddle.zeros(shape, dtype=cachekv_dtype) for shape in self.cache_k_shapes]
+        self.model_inputs["cache_kvs"] = self.cache_kvs
+
+    @paddle.no_grad()
+    def predict(self, input_ids: paddle.Tensor = None, **kwargs):
+        bs = input_ids.shape[0]
+        input_ids_list = []
+        for row in input_ids:
+            row_ids = process_row(row, remove_value=self.tokenizer.pad_token_id, remove_side="left").tolist()
+            input_ids_list.append(row_ids)
+
+        with self.update_predictor_params(**kwargs):
+            self._preprocess(input_text=None, input_ids=input_ids_list)
+            self.init_cache_kv()
+            all_tokens = []
+            while self.model_inputs["not_need_stop"]:
+                next_tokens = self._infer(self.model_inputs)[:bs]
+                all_tokens.append(next_tokens)
+
+        # remove cache kvs
+        self.cache_kvs = None
+        self.model_inputs["cache_kvs"] = None
+        paddle.device.cuda.empty_cache()
+
+        outputs = paddle.concat(all_tokens, axis=-1)
+        outputs = paddle.where(
+            outputs < 0, paddle.to_tensor(self.tokenizer.pad_token_id, dtype=outputs.dtype), outputs
+        )
+        return outputs
 
     @paddle.no_grad()
     def set_state_dict(self, model, offload_model=True):
@@ -183,47 +129,56 @@ class Predictor:
             for k, v in state_dict.items():
                 cpu_arg = v._copy_to(offload_place, blocking=False)
                 cpu_arg._share_buffer_to(v)
-                # v.value().get_tensor()._share_data_with(cpu_arg.value().get_tensor())
         paddle.device.synchronize()
 
-    def _preprocess(self, source):
-        # make cache when infer happens to get actual shape to save memory
-        self._create_caches()
-        with guard_set_args(self.config, {"src_length": getattr(self, "input_length", self.config.src_length)}):
-            inputs = self._inputs_processer(source)
-        # We want to use a defined input_length to create cache and input_ids.
-        # However predictor could not use a specified length to pad currently.
-        # Thus we use this way to let get the actual input length.
-        self.infer_input_length = inputs["input_ids"].shape[-1]
-        return inputs
 
-    @paddle.no_grad()
-    def _infer(self, inputs):
-        for key in inputs.keys():
-            if paddle.is_tensor(inputs[key]):
-                continue
-            if isinstance(inputs[key], list):
-                if paddle.is_tensor(inputs[key]):
-                    continue
-                inputs[key] = [paddle.to_tensor(item) for item in inputs[key]]
-            else:
-                inputs[key] = paddle.to_tensor(inputs[key])
-
-        inputs["cache_kvs"] = self.cache_kvs
-        return self.model.generate(**inputs)
-
-    def _postprocess(self, predictions):
-        return predictions
-
-    @paddle.no_grad()
-    def predict(self, input_texts: str | list[str]):
-        tokenized_source = self._preprocess(input_texts)
-        predictions = self._infer(tokenized_source)
-        decoded_predictions = self._postprocess(predictions)
-        return decoded_predictions
+policy_predictor: PolicyPredictor = None
 
 
-policy_predictor: Predictor = None
+def create_predictor(trainer: Trainer):
+    eval_model = getattr(trainer, "_inner_eval_model", None)
+    if eval_model is not None:
+        raise NotImplementedError("Currently do not support _inner_eval_model!")
+
+    predictor_args = PredictorArgument(
+        model_name_or_path=trainer.args.actor_model_name_or_path,
+        src_length=trainer.args.max_src_len,
+        min_length=trainer.args.min_dec_len,
+        max_length=trainer.args.max_dec_len,
+        total_max_length=trainer.args.max_src_len + trainer.args.max_dec_len,
+        batch_size=trainer.args.per_device_rollout_batch_size * trainer.args.num_return_sequences,
+        top_p=trainer.args.top_p,
+        temperature=trainer.args.temperature,
+        repetition_penalty=trainer.args.repetition_penalty,
+        append_attn=True,  # currently only support append_attn
+        inference_model=True,
+        dtype=trainer.amp_dtype,
+    )
+    model_args = ModelArgument()
+    config = copy.deepcopy(trainer.model.config)
+    config.sequence_parallel = False
+    config.use_fused_head_and_loss_fn = False
+    config.use_fused_rms_norm = False
+    tensor_parallel_rank, tensor_parallel_degree = init_dist_env()
+    with dtype_guard(predictor_args.dtype):
+        model = AutoInferenceModelForCausalLM.from_pretrained(
+            predictor_args.model_name_or_path,
+            config=config,
+            predictor_args=predictor_args,
+            model_args=model_args,
+            dtype=predictor_args.dtype,
+            tensor_parallel_degree=tensor_parallel_degree,
+            tensor_parallel_rank=tensor_parallel_rank,
+        )
+        model.save_output = False
+        predictor = PolicyPredictor(
+            predictor_args,
+            tokenizer=trainer.tokenizer,
+            model=model,
+            model_args=model_args,
+        )
+        predictor.is_available = True
+    return predictor
 
 
 @contextmanager
@@ -248,7 +203,7 @@ def infer_guard(trainer, offload_model=True):
 
     global policy_predictor
     if policy_predictor is None:
-        policy_predictor = Predictor.create_predictor(trainer)
+        policy_predictor = create_predictor(trainer)
     with dtype_guard(trainer.amp_dtype):
         if not policy_predictor.is_available:
             policy_predictor.enable(model, offload_model=offload_model)
@@ -325,51 +280,21 @@ class InferEvalModel:
         return self.model(*args, **kwargs)
 
     def generate(self, *args, **kwargs):
+        do_eval = kwargs.pop("do_eval", False)
         if policy_predictor is None or not policy_predictor.is_available:
             return self.model.generate(*args, **kwargs)
 
         arg_dict = inspect.signature(self.model.generate).bind(*args, **kwargs).arguments
         input_ids = arg_dict["input_ids"]
-        generation_config = arg_dict["generation_config"]
-        # convert text and tokenize again to convert left padding to right padding
-        # remove this if inputs is right padding
-        # TODO(guosheng): allow to use right padding to infer directly
-        prompts = self.tokenizer.batch_decode(input_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)
-        # decoded prompts has been applied with chat_template
-        # NOTE(guosheng): Whether to add special token should be checked, None
-        # chat_template would not add special token in predictor, since it assumes
-        # chat_template includes special tokens. While Beaver dataset tokenization
-        # does not use chat_template, it uses hard coded template which excludes
-        # special tokens.
-        with guard_set_args(
-            policy_predictor.tokenizer,
-            {
-                # predictor use right padding for infer model by default
-                # "padding_side": "right",
-                # "chat_template": None
-            },
-        ):
-            # NOTE: right padding in predictor according to prompt might have a
-            # different length with input_ids, espically when input_ids has more
-            # paddings than the necessary. Thus pass input_length to predictor to:
-            # 1. use a consistent length to replace input_ids back to output to
-            #    keep the same padding format. however predictor could not use a
-            #    specified length to pad currently
-            # 2. allow to use a dynamic length for memory efficiency (by a smaller
-            #    cache)
-            policy_predictor.input_length = input_ids.shape[-1]
-            outputs = policy_predictor.predict(prompts)
-
-        if generation_config.trunc_input:
-            outputs = (outputs[0][:, policy_predictor.infer_input_length :],)
-            return outputs
-
-        if policy_predictor.input_length != policy_predictor.infer_input_length:
-            outputs = (paddle.concat([input_ids, outputs[0][:, policy_predictor.infer_input_length :]], axis=-1),)
-            return outputs
-
-        outputs = (outputs[0],)
-        if self.tokenizer.padding_side == "left":
-            # convert back to left padding inputs
-            outputs[0][:, : input_ids.shape[-1]] = input_ids
-        return outputs
+        kwargs = {}
+        if do_eval:
+            # for greedy search
+            kwargs.update(
+                {
+                    "top_p": 0.0,
+                    "temperature": 1.0,
+                }
+            )
+        outputs = policy_predictor.predict(input_ids=input_ids, **kwargs)
+        outputs = paddle.concat([input_ids, outputs], axis=-1)
+        return (outputs,)

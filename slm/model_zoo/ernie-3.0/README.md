@@ -1439,7 +1439,7 @@ trainer.compress()
 
 ```shell
 # 分类任务
-# 该脚本共支持 CLUE 中 7 个分类任务，超参不全相同，因此分类任务中的超参配置利用 configs/defalut.yml 配置
+# 该脚本共支持 CLUE 中 7 个分类任务，超参不全相同，因此分类任务中的超参配置利用 configs/default.yml 配置
 python compress_seq_cls.py  --model_name_or_path best_models/afqmc/  --dataset afqmc --output_dir ./best_models/afqmc --config=configs/default.yml
 
 # 序列标注任务

@@ -110,7 +110,7 @@ def infer(
         stats.append(
             [first_token_latency, total_token_latency, input_seqlen, output_seqlen, token_num]
         )
-        print(f"Request queue size: {req_que.qsize()}, Real return tokens: {token_num}, Requset Chunks: {len(chunks)}, Label out_seq_len: {output_seqlen}")
+        print(f"Request queue size: {req_que.qsize()}, Real return tokens: {token_num}, Request Chunks: {len(chunks)}, Label out_seq_len: {output_seqlen}")
 
     print(f"Process ID {os.getpid()} has processed all requests.")
     if len(stats) > 0:
