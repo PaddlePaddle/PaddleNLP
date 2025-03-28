@@ -42,7 +42,7 @@
 #include "cutlass/layout/matrix.h"
 #include "cutlass/trace.h"
 
-#include "cutlass_extensions/gemm/kernel/gemm_moe_problem_visitor.h"
+#include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/gemm/kernel/gemm_moe_problem_visitor.h"
 #include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/tile_interleaved_layout.h"
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -436,10 +436,16 @@ struct MoeFCGemm {
 
         // Load element pointers. Exchange pointers and strides if working on
         // the transpose
-        const int64_t rows_to_jump =
-            problem_idx == 0
-                ? 0
-                : params.problem_visitor.last_row_for_problem[problem_idx - 1];
+        // const int64_t rows_to_jump =
+        //     problem_idx == 0
+        //         ? 0
+        //         : params.problem_visitor.last_row_for_problem[problem_idx - 1];
+
+        // const int64_t rows_to_jump = problem_idx * (args.total_rows_before_expert / args.problem_count);
+
+        // 128 * 16 = num_max_dispatch_tokens_per_rank * num_ranks
+        const int64_t rows_to_jump = problem_idx * (128 * 16);
+
         ElementA* ptr_A =
             reinterpret_cast<ElementA*>(params.ptr_A) + rows_to_jump * gemm_k;
         typename LayoutA::LongIndex ldm_A = gemm_k;
