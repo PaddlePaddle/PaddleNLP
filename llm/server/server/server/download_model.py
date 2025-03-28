@@ -9,7 +9,6 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description="download models")
     parser.add_argument('-m', '--model_name', default='deepseek-ai/DeepSeek-R1/weight_only_int4',
                        help="model_name")
-    parser.add_argument('-v', '--version', default='3.0.0.b4', help="PaddleNLP version tag")
     parser.add_argument('-d', '--dir', default='downloads',
                        help="save dir")
     parser.add_argument('-n', '--nnodes', type=int, default=1,
@@ -123,7 +122,7 @@ def main():
             f"{model_name} is not in the supported list. Currently supported models: Qwen, Llama, Mixtral, DeepSeek. Please check the model name from this document https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/static_models.md"
         )
     print(f"Start downloading model: {model_name}")
-    tag = args.version
+    tag = env.get("tag", "3.0.0.b4")
     base_url = f"https://paddlenlp.bj.bcebos.com/models/static/{tag}/{model_name}"
     temp_file = None
     if args.nnodes == 1:
