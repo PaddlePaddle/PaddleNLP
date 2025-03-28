@@ -759,13 +759,13 @@ class GenerationBlockInferenceModel(GenerationMixin):
                     model_kwargs["next_tokens"],
                 )
 
-            from paddlenlp_ops import f_save_output
+            # from paddlenlp_ops import f_save_output
 
-            f_save_output(
-                next_tokens,
-                model_kwargs["not_need_stop"],
-                self.config.tensor_parallel_rank,
-            )
+            # f_save_output(
+            #     next_tokens,
+            #     model_kwargs["not_need_stop"],
+            #     self.config.tensor_parallel_rank,
+            # )
             return next_tokens
 
         # encoder

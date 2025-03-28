@@ -52,17 +52,7 @@ from paddlenlp.transformers.model_utils import (
 )
 from paddlenlp.utils.log import logger
 
-__all__ = ["DeepseekV2ForCausalLMBlockInferenceModel"]
-
-
-def print_memory(location):
-    memory_reserved_size = paddle.device.cuda.memory_reserved("gpu:0")
-    memory_allocated_size = paddle.device.cuda.memory_allocated("gpu:0")
-    max_memory_reserved_size = paddle.device.cuda.max_memory_reserved("gpu:0")
-    max_memory_allocated_size = paddle.device.cuda.max_memory_allocated("gpu:0")
-    print(
-        f"{location} >>> memory_reserved_size: {memory_reserved_size}, memory_allocated_size: {memory_allocated_size}, max_memory_reserved_size: {max_memory_reserved_size}, max_memory_allocated_size: {max_memory_allocated_size}"
-    )
+__all__ = ["DeepseekV2ForCausalLMBlockInferenceModel", "DeepseekVLV2ForCausalLMBlockInferenceModel"]
 
 
 class DeepseekScalingRotaryEmbedding(nn.Layer):
@@ -132,7 +122,6 @@ class DeepseekScalingRotaryEmbedding(nn.Layer):
         cache = paddle.concat((cos, sin), axis=-1)
         return cache.cast(self._dtype)
 
-    @paddle.no_grad()
     def forward(
         self,
         position_ids: paddle.Tensor,
@@ -150,6 +139,107 @@ class DeepseekScalingRotaryEmbedding(nn.Layer):
         return query, key
 
 
+class DeepseekScalingRotaryEmbeddingXPU(nn.Layer):
+    """RotaryEmbedding extended with YaRN method.
+
+    Credits to Peng et al. github.com/jquesnelle/yarn
+    """
+
+    def __init__(
+        self,
+        rotary_dim: int,
+        max_position_embeddings: int,
+        base: int,
+        scaling_factor: float,
+        *,
+        extrapolation_factor: float = 1,
+        attn_factor: float = 1,
+        beta_fast: int = 32,
+        beta_slow: int = 1,
+        mscale: float = 1,
+        mscale_all_dim: float = 0,
+    ) -> None:
+        super().__init__()
+        ori_device = paddle.device.get_device()
+        paddle.device.set_device("cpu")
+        self._dtype = paddle.get_default_dtype()
+
+        self.rotary_dim = rotary_dim
+        self.max_position_embeddings = max_position_embeddings
+        self.base = base
+
+        self.scaling_factor = scaling_factor
+        self.extrapolation_factor = extrapolation_factor
+        self.attn_factor = attn_factor
+        self.beta_fast = beta_fast
+        self.beta_slow = beta_slow
+        # Get n-d magnitude scaling corrected for interpolation.
+        self.mscale = float(
+            yarn_get_mscale(self.scaling_factor, float(mscale))
+            / yarn_get_mscale(self.scaling_factor, float(mscale_all_dim))
+            * attn_factor
+        )
+
+        cos_cache, sin_cache = self._compute_cos_sin_cache()
+
+        self.cos_cache: paddle.Tensor
+        self.register_buffer("cos_cache", cos_cache, persistable=True)
+        self.sin_cache: paddle.Tensor
+        self.register_buffer("sin_cache", sin_cache, persistable=True)
+        paddle.device.set_device(ori_device)
+
+    def _compute_inv_freq(self, scaling_factor: float) -> paddle.Tensor:
+        pos_freqs = self.base ** (paddle.arange(0, self.rotary_dim, 2, dtype=paddle.float32) / self.rotary_dim)
+
+        inv_freq_extrapolation = 1.0 / pos_freqs
+        inv_freq_interpolation = 1.0 / (scaling_factor * pos_freqs)
+
+        low, high = yarn_find_correction_range(
+            self.beta_fast, self.beta_slow, self.rotary_dim, self.base, self.max_position_embeddings
+        )
+        # Get n-d rotational scaling corrected for extrapolation
+        inv_freq_mask = (1 - yarn_linear_ramp_mask(low, high, self.rotary_dim // 2)) * self.extrapolation_factor
+        inv_freq = inv_freq_interpolation * (1 - inv_freq_mask) + inv_freq_extrapolation * inv_freq_mask
+        return inv_freq
+
+    def _compute_cos_sin_cache(self) -> paddle.Tensor:
+        inv_freq = self._compute_inv_freq(self.scaling_factor)
+        t = paddle.arange(self.max_position_embeddings * self.scaling_factor, dtype=paddle.float32)
+
+        freqs = paddle.outer(t, inv_freq)
+        emb = paddle.concat((freqs, freqs), axis=-1)
+        cos = emb.cos() * self.mscale
+        sin = emb.sin() * self.mscale
+
+        return cos.cast(self._dtype), sin.cast(self._dtype)
+
+    def forward(
+        self,
+        position_ids: paddle.Tensor,
+        query: paddle.Tensor,
+        key: paddle.Tensor,
+    ) -> Tuple[paddle.Tensor, paddle.Tensor]:
+        cos = self.cos_cache[position_ids].unsqueeze(1)
+        sin = self.sin_cache[position_ids].unsqueeze(1)
+
+        def rotate_half(x):
+            """Rotates half the hidden axiss of the input."""
+            x1 = x[..., : x.shape[-1] // 2]
+            x2 = x[..., x.shape[-1] // 2 :]
+            return paddle.concat([-x2, x1], axis=-1)  # shape is the same as x
+
+        s, h, d = query.shape
+        query = query.reshape([s, h, d // 2, 2]).transpose([0, 1, 3, 2]).reshape([s, h, d])
+
+        s, h, d = key.shape
+        key = key.reshape([s, h, d // 2, 2]).transpose([0, 1, 3, 2]).reshape([s, h, d])
+
+        query = (query * cos) + (rotate_half(query) * sin)
+        key = (key * cos) + (rotate_half(key) * sin)
+
+        return query, key
+
+
 class DeepseekV2RMSNorm(nn.Layer):
     def __init__(self, config: DeepseekV2Config):
         super().__init__()
@@ -160,14 +250,12 @@ class DeepseekV2RMSNorm(nn.Layer):
             default_initializer=nn.initializer.Constant(1.0),
         )
 
-    @paddle.no_grad()
     def forward(self, x):
         return paddle.incubate.nn.functional.fused_rms_norm(x, self.weight, None, self.eps, begin_norm_axis=1)[0]
 
 
 @register_base_model
 class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
-    @paddle.no_grad()
     def __init__(self, config: DeepseekV2Config, base_model_prefix: str):
         super(DeepseekV2PretrainedModel, self).__init__(config)
         self.base_model_prefix = base_model_prefix
@@ -210,7 +298,8 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
         if "fp8" in self.quant_type:
             self.dynamic_quant = True
 
-        assert config.append_attn is True
+        if not paddle.is_compiled_with_xpu():
+            assert config.append_attn is True
 
         self.first_k_dense_replace = config.first_k_dense_replace
         self.n_routed_experts = config.n_routed_experts
@@ -242,13 +331,22 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
             for k, v in config.rope_scaling.items()
             if k in ("extrapolation_factor", "attn_factor", "beta_fast", "beta_slow", "mscale", "mscale_all_dim")
         }
-        self.rotary_emb = DeepseekScalingRotaryEmbedding(
-            config.qk_rope_head_dim,
-            original_max_position,
-            config.rope_theta,
-            scaling_factor,
-            **extra_kwargs,
-        )
+        if paddle.is_compiled_with_xpu():
+            self.rotary_emb = DeepseekScalingRotaryEmbeddingXPU(
+                config.qk_rope_head_dim,
+                original_max_position,
+                config.rope_theta,
+                scaling_factor,
+                **extra_kwargs,
+            )
+        else:
+            self.rotary_emb = DeepseekScalingRotaryEmbedding(
+                config.qk_rope_head_dim,
+                original_max_position,
+                config.rope_theta,
+                scaling_factor,
+                **extra_kwargs,
+            )
 
         # get ring_id
         ring_id = -1
@@ -573,7 +671,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
             rank_id=config.tensor_parallel_rank,
             moe_config=moe_config,
             mla_config=mla_config,
-            append_attn=True,
+            append_attn=config.append_attn,
             speculate_config=speculate_config,
         )
 
@@ -587,12 +685,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
-
-        print_memory("before init_weight")
-
         self.transformer_block.init_weight()
-
-        print_memory("after init_weight")
 
         dtype = paddle.get_default_dtype()
         embed_tokens_weight = paddle.to_tensor(state_dict[f"{self.base_model_prefix}.embed_tokens.weight"]).cast(
@@ -610,8 +703,6 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
             logger.info(f"fp8 is enabled, weight_block_size = {self.weight_block_size}")
         for idx in range(self.num_layers):
             logger.info(f"set state for layer {idx}")
-
-            print_memory(f"before layer {idx}")
 
             ln_scale = paddle.to_tensor(
                 state_dict[f"{self.base_model_prefix}.layers.{idx}.input_layernorm.weight"]
@@ -1163,6 +1254,20 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                             ffn2_weights.append(ffn2_quanted_weight.view(paddle.uint8))
                             ffn1_scales.append(ffn1_weight_scale)
                             ffn2_scales.append(ffn2_weight_scale)
+                    elif self.moe_quant_type in ["weight_only_int8"]:
+                        assert paddle.is_compiled_with_xpu()
+                        ffn1_quanted_weight, ffn1_weight_scale = weight_quantize(
+                            ffn1_weight.cast("float16"), algo=self.moe_quant_type, group_size=-1, arch=70
+                        )
+                        ffn2_quanted_weight, ffn2_weight_scale = weight_quantize(
+                            ffn2_weight.cast("float16"), algo=self.moe_quant_type, group_size=-1, arch=70
+                        )
+                        ffn1_weight_scale = ffn1_weight_scale.cast("float16")
+                        ffn2_weight_scale = ffn2_weight_scale.cast("float16")
+                        ffn1_weights.append(ffn1_quanted_weight.reshape([self.transformer_block.config.embed_dim, -1]))
+                        ffn2_weights.append(ffn2_quanted_weight.reshape([-1, self.transformer_block.config.embed_dim]))
+                        ffn1_scales.append(ffn1_weight_scale)
+                        ffn2_scales.append(ffn2_weight_scale)
                     else:
                         ffn1_weights.append(ffn1_weight)
                         ffn2_weights.append(ffn2_weight)
@@ -1180,7 +1285,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                     ).cast("float32")
                     self.transformer_block.e_score_correction_biases[idx].set_value(e_score_correction_bias)
 
-                if self.use_weight_only:
+                if self.use_weight_only or self.moe_quant_type in ["weight_only_int8"]:
                     self.transformer_block.ffn1_weights[idx].set_value(fused_moe_ffn1_weight)
                     self.transformer_block.ffn2_weights[idx].set_value(fused_moe_ffn2_weight)
                 elif "fp8" in self.quant_type:
@@ -1197,7 +1302,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                     self.transformer_block.ffn2_weights[idx].set_value(fused_moe_ffn2_weight)
                 self.transformer_block.gate_weights[idx].set_value(gate_weight)
 
-                if self.use_weight_only:
+                if self.use_weight_only or self.moe_quant_type in ["weight_only_int8"]:
                     self.transformer_block.ffn1_weights_scale[idx].set_value(fused_moe_ffn1_weight_scale)
                     self.transformer_block.ffn2_weights_scale[idx].set_value(fused_moe_ffn2_weight_scale)
                 elif "fp8" in self.quant_type:
@@ -1294,8 +1399,6 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                     self.transformer_block.shared_expert_ffn1_weights[idx].set_value(shared_expert_ffn1_weight)
                     self.transformer_block.shared_expert_ffn2_weights[idx].set_value(shared_expert_ffn2_weight)
 
-            print_memory(f"after layer {idx}")
-
     def set_transformer_block(self, transformer_config):
         if self.use_weight_only:
             self.transformer_block = FusedBlockMultiTransformerWeightOnly(transformer_config)
@@ -1314,7 +1417,6 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
         )
         return ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k
 
-    @paddle.no_grad()
     def forward(
         self,
         input_ids=None,
@@ -1339,8 +1441,14 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
         kwargs["max_input_length"] = self.max_seq_len
         kwargs["block_size"] = self.block_size
 
-        inputs_embeds = self.embed_tokens(ids_remove_padding)
-
+        if inputs_embeds is None:
+            inputs_embeds = self.embed_tokens(ids_remove_padding)
+        else:
+            assert len(inputs_embeds.shape) == 3
+            # This is the case in the image-to-text model
+            # In the prefill phase, the language model is first fed with inputs_embeds instead of input_ids
+            # but in decoder phase, the language model is fed with input_ids just like normal text-to-text model.
+            inputs_embeds = inputs_embeds.reshape([-1, inputs_embeds.shape[2]])
         with dy2st_nocheck_guard_context():
             hidden_states, _ = self.transformer_block(
                 input_ids=input_ids,
@@ -1380,7 +1488,6 @@ class MTPDeepseekV2BlockInferenceModel(DeepseekV2BlockInferenceModel):
         else:
             self.eh_proj = nn.Linear(self.hidden_size * 2, self.hidden_size, bias_attr=True)
 
-    @paddle.no_grad()
     def forward(
         self,
         input_ids=None,
@@ -1593,6 +1700,7 @@ class DeepseekV2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, De
     def prepare_inputs_for_generation(self, **kwargs):
         # only last token for inputs_ids if cache is defined in kwargs
         input_ids = kwargs["input_ids"]
+        inputs_embeds = kwargs.get("inputs_embeds", None)
         src_mask = kwargs.get("src_mask", None)
         block_tables = kwargs.get("block_tables", None)
 
@@ -1613,6 +1721,7 @@ class DeepseekV2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, De
 
         model_inputs = {
             "input_ids": input_ids,
+            "inputs_embeds": inputs_embeds,
             "src_mask": src_mask,
             "rope_emb": None,
             "pre_caches": pre_caches,
@@ -1630,10 +1739,10 @@ class DeepseekV2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, De
         }
         return model_inputs
 
-    @paddle.no_grad()
     def forward(
         self,
         input_ids,
+        inputs_embeds=None,
         src_mask=None,
         pre_caches=None,
         caches=None,
@@ -1651,6 +1760,7 @@ class DeepseekV2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, De
     ):
         outputs = self.deepseek_v2(
             input_ids,
+            inputs_embeds=inputs_embeds,
             src_mask=src_mask,
             caches=caches,
             rope_emb=None,
@@ -1671,7 +1781,7 @@ class DeepseekV2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, De
 
             full_hidden_states = outputs[0]
             cum_offsets = outputs[1]
-            hidden_states = rebuild_padding_v2(
+            hidden_states = f_rebuild_padding_v2(
                 full_hidden_states,
                 cum_offsets,
                 seq_lens_decoder,
@@ -1780,7 +1890,6 @@ class MTPDeepseekV2ForCausalLMBlockInferenceModel(DeepseekV2ForCausalLMBlockInfe
 
         self.mtp.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
 
-    @paddle.no_grad()
     def forward(
         self,
         input_ids,
@@ -1827,3 +1936,20 @@ class MTPDeepseekV2ForCausalLMBlockInferenceModel(DeepseekV2ForCausalLMBlockInfe
         )
 
         return logits, hidden_states
+
+class DeepseekVLV2ForCausalLMBlockInferenceModel(DeepseekV2ForCausalLMBlockInferenceModel):
+    def __init__(self, config: DeepseekV2Config):
+        super().__init__(config)
+        self.deepseek_v2.base_model_prefix="language.model"
+
+
+    def get_input_embeddings(self):
+        return self.deepseek_v2.embed_tokens
+
+    @paddle.no_grad()
+    def set_state_dict(self, state_dict):
+        if "language.lm_head.weight" in state_dict:
+            self.lm_head.weight.set_value(
+                paddle.to_tensor(state_dict["language.lm_head.weight"]).cast(self.lm_head.weight.dtype)
+            )
+        self.deepseek_v2.set_state_dict({k: state_dict[k] for k in state_dict.keys()})

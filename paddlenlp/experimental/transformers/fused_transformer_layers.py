@@ -3205,9 +3205,9 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
             return self.compute_mla_absorb(qkv_out, caches, i, **kwargs)
 
         if self.config.append_attn:
-            from paddlenlp_ops import append_attention
+            from paddlenlp_ops import f_append_attention
 
-            fmha_out = append_attention(
+            fmha_out = f_append_attention(
                 qkv_out,
                 caches[2 * i],
                 caches[2 * i + 1],
@@ -3612,9 +3612,9 @@ class FusedBlockMultiTransformerA8W8(FusedBlockMultiTransformer, FusedMultiTrans
             cache_quant_type_str = "cache_int8"
 
         if self.config.append_attn:
-            from paddlenlp_ops import append_attention
+            from paddlenlp_ops import f_append_attention
 
-            fmha_out = append_attention(
+            fmha_out = f_append_attention(
                 qkv_out,
                 caches[2 * i],
                 caches[2 * i + 1],

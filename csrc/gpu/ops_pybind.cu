@@ -274,7 +274,7 @@ PYBIND11_MODULE(paddlenlp_ops, m) {
   m.def("f_get_block_shape_and_split_kv_block", &GetBlockShapeAndSplitKVBlock, "GetBlockShapeAndSplitKVBlock");
   m.def("f_prefill_mla_write_cache", &PrefillMLAWriteCacheKernel, "PrefillMLAWriteCacheKernel");
   m.def("f_decode_mla_write_cache", &DecodeMLAWriteCacheKernel, "DecodeMLAWriteCacheKernel");
-  m.def("f_cutlass_fp8_fp8_half_block_gemm_fused", &cutlass_fp8_fp8_half_block_gemm_fused, "cutlass_fp8_fp8_half_block_gemm_fused");
+//   m.def("f_cutlass_fp8_fp8_half_block_gemm_fused", &cutlass_fp8_fp8_half_block_gemm_fused, "cutlass_fp8_fp8_half_block_gemm_fused");
   m.def("f_get_position_ids_and_mask_encoder_batch", &GetPositionIdsAndMaskEncoderBatch, "GetPositionIdsAndMaskEncoderBatch");
   m.def("f_set_preids_token_penalty_multi_scores", &SetPreidsTokenPenaltyMultiScores, "SetPreidsTokenPenaltyMultiScores");
   m.def("f_update_inputs_v2", &UpdateInputesV2, "UpdateInputesV2");
