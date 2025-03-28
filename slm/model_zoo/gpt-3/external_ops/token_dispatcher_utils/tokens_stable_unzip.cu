@@ -1,7 +1,7 @@
 #include "utils.h"
 
-#define CUMSUM_BLOCK_SIZE 64
-#define CUMSUM_INVALID_TAG -1  // 用于标记无效的cumsum值,可为啥不能是-114514？
+#define CUMSUM_BLOCK_SIZE 64   // cumsum开销和并行度之间的tradeoff的结果，勿动
+#define CUMSUM_INVALID_TAG -1  // 用于标记无效的cumsum，尝试过-114514但失败了
 
 // 多阶段算法，控制每block处理的行数来权衡额外开销
 //  首先解析routemap来更新专家当前所收到的token数，然后check前一个block给的前缀和并更新给下一个block
@@ -69,7 +69,7 @@ __global__ void tokens_unzip_stable_kernel(
         local_cumsum[expert] += 1;
       }
     }
-// 块间通信逻辑，更新下一个block的cumsum_offset
+// -------------------------- 块间通信逻辑 -----------------------------
 #pragma unroll
     for (int i = 0; i < num_experts; i++) {
       if (blockIdx.x != 0) [[likely]] {
@@ -84,6 +84,7 @@ __global__ void tokens_unzip_stable_kernel(
           proposed_offset;
     }  // 至此，给下一个block的cumsum已经更新完毕，下一个block可以开始cumsum的计算了
 
+// -------------------------- 块内通信逻辑 -----------------------------
 #pragma unroll
     for (int i = 0; i < CUMSUM_BLOCK_SIZE; i++) {
 #pragma unroll
@@ -96,11 +97,8 @@ __global__ void tokens_unzip_stable_kernel(
         shared_expert_probmap[i][j] = local_expert_probs[i][j];
       }
     }
-  }  // 至此，
-     // local_cumsum及其对应的rowmap、probs已经更新完毕，需要依据上一个block提供的信息将cumsum_offset更新并传递
-     // 至此，本线程块内的shared_mem已经规整完毕，接下来是向量化的数据搬运
-  __syncthreads();  // 其余线程等到了thread0，
-                    // 具体工作已经与上一个block沟通完毕、存储在 shared中
+  }// 至此，本线程块内的shared_mem已经规整完毕，接下来是向量化的数据搬运
+  __syncthreads();  // 其余线程等到了thread0，工作安排在shared_mem上
   // ------------------------- 所有block内线程 -------------------------
   for (int row = block_row_base; row < block_row_base + CUMSUM_BLOCK_SIZE;
        row++) {
@@ -109,9 +107,11 @@ __global__ void tokens_unzip_stable_kernel(
 #pragma unroll
     for (int expert = 0; expert < num_experts; expert++) {
       const int unzipped_row_idx = shared_expert_rowmap[internal_row][expert];
-      zipped_expertwise_rowmap[row * num_experts + expert] = unzipped_row_idx;
+      if (threadIdx.x == 0) {
+        zipped_expertwise_rowmap[row * num_experts + expert] = unzipped_row_idx;
+      }
       if (unzipped_row_idx == -1) continue;
-      // 更新三个核心数据结构，可以只让thread0做，但引入if没必要
+      // 更新三个核心数据结构
       if (threadIdx.x == 0) {
         probs_unzipped[unzipped_row_idx] =
             shared_expert_probmap[internal_row][expert];
