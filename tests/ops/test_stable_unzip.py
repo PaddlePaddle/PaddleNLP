@@ -22,6 +22,8 @@ topk = 8
 
 topk_ind = np.load("topk_indice.npy")
 reci_x = paddle.randn( [ topk_ind.shape[0], H1], dtype="bfloat16")
+reci_x_fp8 = reci_x.cast("float8_e4m3fn")
+reci_x_scale = paddle.ones((reci_x.shape[0],(reci_x.shape[1]+ 127 // 128)), dtype="float32")
 topk_ind_base = paddle.to_tensor(topk_ind, dtype="int32")
 probs = paddle.ones( topk_ind_base.shape, dtype="bfloat16") # uses ones as topk_ind_base???
 print( topk_ind.shape)
@@ -42,16 +44,31 @@ max_tokens = max(token_per_expert)
 def test_unzip_stable():
     # ---------------------------- Forward --------------------
     # ------------ unzip and preprocess --------------
-    unzipped_tokens, zipped_expertwise_rowmap, unzipped_probs, unzipped_expert_idx= TDU.tokens_unzip_stable(reci_x,
+    # ----------- FP8 -----------------
+    print("############## FP8 ################")
+    unzipped_tokens, zipped_expertwise_rowmap, unzipped_probs, unzipped_scales = TDU.tokens_unzip_stable(
+        reci_x_fp8,
+        reci_x_scale,
+        topk_ind_base, 
+        probs,
+        topk=topk, num_experts=4, max_tokens_per_expert=max_tokens)
+    
+    print("zipped_expertwise_rowmap_fp8: ", zipped_expertwise_rowmap)
+    np.savetxt("zipped_expertwise_rowmap_fp8.csv", zipped_expertwise_rowmap, delimiter=",", fmt='%d')
+    np.savetxt("topk_ind_fp8.csv", topk_ind, delimiter=",", fmt='%d')
+    np.savetxt("unzipped_scales_fp8.csv", unzipped_scales[:10, :], delimiter=",", fmt='%d')
+    # ----------- BF16 -----------------
+    print("############## BF16 ################")
+    unzipped_tokens, zipped_expertwise_rowmap, unzipped_probs, _= TDU.tokens_unzip_stable(
+        reci_x,
+        None,
         topk_ind_base, 
         probs,
         topk=topk, num_experts=4, max_tokens_per_expert=max_tokens)
     
     print("zipped_expertwise_rowmap: ", zipped_expertwise_rowmap)
-    print("unzipped_expert_idx:  ", unzipped_expert_idx)
     np.savetxt("zipped_expertwise_rowmap.csv", zipped_expertwise_rowmap, delimiter=",", fmt='%d')
     np.savetxt("topk_ind.csv", topk_ind, delimiter=",", fmt='%d')
-    np.savetxt("unzipped_expert_idx.csv", unzipped_expert_idx, delimiter=",", fmt='%d')
 
 # core.nvprof_enable_record_event()
 
