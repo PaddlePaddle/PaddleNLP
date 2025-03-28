@@ -1210,7 +1210,7 @@ class MemroyRecomputeAttnFunc(paddle.autograd.PyLayer):
                     key_states,
                     value_states_pad,
                     attn_out,
-                    softmax_lse,
+                    softmax_lse.view("bfloat16"),
                     seed_offset,
                     None,
                     dout,
@@ -1227,7 +1227,7 @@ class MemroyRecomputeAttnFunc(paddle.autograd.PyLayer):
                     key_states,
                     value_states,
                     attn_out,
-                    softmax_lse,
+                    softmax_lse.view("bfloat16"),
                     dout,
                     softmax_scale,
                     True,
@@ -1530,27 +1530,27 @@ class DeepseekV2Attention(nn.Layer):
             self.kv_a_layernorm = DeepseekV2RMSNorm(config=config, hidden_size=config.kv_lora_rank, use_sequence_parallel=False)
         else:
             # for without tensor parallel
-            if self.q_lora_rank is None:
-                with linear_dtype_gaurd():
-                    self.q_proj = Linear(self.hidden_size, self.num_heads * self.q_head_dim, bias_attr=False)
-            else:
-                with linear_dtype_gaurd():
-                    self.q_a_proj = Linear(self.hidden_size, config.q_lora_rank, bias_attr=config.attention_bias)
-                    self.q_b_proj = Linear(config.q_lora_rank, self.num_heads * self.q_head_dim, bias_attr=False)
-                self.q_a_layernorm = DeepseekV2RMSNorm(config=config, hidden_size=config.q_lora_rank)
-
-            with linear_dtype_gaurd():
-                self.kv_a_proj_with_mqa = paddle.nn.Linear(self.hidden_size, config.kv_lora_rank + config.qk_rope_head_dim, bias_attr=config.attention_bias)
-                self.kv_b_proj = Linear(config.kv_lora_rank, self.num_heads * (self.q_head_dim - self.qk_rope_head_dim + self.v_head_dim), bias_attr=False)
-                if DSV3_USE_FP8_GEMM:
-                    self.o_proj = FP8KeepXLinear(self.num_heads * self.v_head_dim, self.hidden_size, bias_attr=config.attention_bias)
-                else:
-                    self.o_proj = Linear(self.num_heads * self.v_head_dim, self.hidden_size, bias_attr=config.attention_bias)
-            self.kv_a_layernorm = DeepseekV2RMSNorm(config=config, hidden_size=config.kv_lora_rank)
             if DSV3_USE_ATTEN_RECOMPUTE:
                 self.fused_rms_norm_linear = FusedRMSLinear(self.hidden_size, config.q_lora_rank, config.kv_lora_rank + config.qk_rope_head_dim, 1e-6)
                 kv_up_dim = self.num_heads * (self.q_head_dim - self.qk_rope_head_dim + self.v_head_dim)
                 self.memory_recompute_att = MemroyRecomputeAttn(config.q_lora_rank, config.kv_lora_rank, config.q_lora_rank, self.num_heads * self.q_head_dim, config.kv_lora_rank, kv_up_dim, self.rotary_emb, self.num_heads, self.q_head_dim, self.qk_nope_head_dim, self.v_head_dim, self.qk_rope_head_dim, 1e-6, self.kv_lora_rank, self.softmax_scale)
+                self.o_proj = FP8KeepXLinear(self.num_heads * self.v_head_dim, self.hidden_size, bias_attr=config.attention_bias)
+            else:
+
+                if self.q_lora_rank is None:
+                    with linear_dtype_gaurd():
+                        self.q_proj = Linear(self.hidden_size, self.num_heads * self.q_head_dim, bias_attr=False)
+                else:
+                    with linear_dtype_gaurd():
+                        self.q_a_proj = Linear(self.hidden_size, config.q_lora_rank, bias_attr=config.attention_bias)
+                        self.q_b_proj = Linear(config.q_lora_rank, self.num_heads * self.q_head_dim, bias_attr=False)
+                    self.q_a_layernorm = DeepseekV2RMSNorm(config=config, hidden_size=config.q_lora_rank)
+
+                with linear_dtype_gaurd():
+                    self.kv_a_proj_with_mqa = paddle.nn.Linear(self.hidden_size, config.kv_lora_rank + config.qk_rope_head_dim, bias_attr=config.attention_bias)
+                    self.kv_b_proj = Linear(config.kv_lora_rank, self.num_heads * (self.q_head_dim - self.qk_rope_head_dim + self.v_head_dim), bias_attr=False)
+                    self.o_proj = Linear(self.num_heads * self.v_head_dim, self.hidden_size, bias_attr=config.attention_bias)
+                self.kv_a_layernorm = DeepseekV2RMSNorm(config=config, hidden_size=config.kv_lora_rank)
 
         # fmt: on
         self.softmax_scale = self.q_head_dim ** (-0.5)
@@ -1874,8 +1874,6 @@ class DeepseekV2DecoderLayer(nn.Layer):
 
     def self_attn_compute(self, hidden_states, **kwargs):
         residual = hidden_states
-
-        hidden_states = self.input_layernorm(hidden_states)
 
         # Self Attention
         has_gradient = not hidden_states.stop_gradient

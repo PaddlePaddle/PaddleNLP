@@ -113,12 +113,15 @@ class ExpertsGroupGemmNode:
         self.unzipped_tokens = None
         self.custom_map = custom_map
         self.unzipped_probs = None
+        self.tokens_per_expert = None
 
     def reset_statue(self):
         self.o1 = None
         self.unzipped_scale = None
         self.unzipped_tokens = None
         self.unzipped_probs = None
+        self.unzipped_expert_idx = None
+        self.tokens_per_expert = None
 
     def fwd_gate_up(self, x_fp8, x_scale, expert_w1, expert_w_count, unzipped_probs, unzipped_expert_idx):
         # concat w1
@@ -343,6 +346,7 @@ class ExpertsGroupGemmNode:
                     expert_w1[i].grad,
                 )
 
+    @paddle.no_grad()
     def forward(self, hs_out, hs_scale_out, unzipped_probs, unzipped_expert_idx, tokens_per_expert):
         self.tokens_per_expert = tokens_per_expert
         self.unzipped_probs = unzipped_probs
@@ -370,6 +374,7 @@ class ExpertsGroupGemmNode:
 
         return o3
 
+    @paddle.no_grad()
     def backward(self, out_grad, out_grad_scale, unzipped_expert_idx, dispatched_indices):
         # recompute expert_w2 and expert_w1
         expert_w2 = [x.w2 for x in self.custom_map.experts if x is not None]
@@ -418,6 +423,7 @@ class ExpertsNode:
         self.o1s = []
         self.tokens_per_expert = None
 
+    @paddle.no_grad()
     def forward(self, hs_out, hs_scale_out, tokens_per_expert):
         self.tokens_per_expert = tokens_per_expert
         x_fp8_list = paddle.split(hs_out, num_or_sections=self.tokens_per_expert, axis=0)  # FP8 chunk
@@ -457,6 +463,7 @@ class ExpertsNode:
         expert_output = paddle.concat(outputs, axis=0)
         return expert_output
 
+    @paddle.no_grad()
     def backward(self, out_grad, out_grad_scale):
         out_grad_list = paddle.split(out_grad, num_or_sections=self.tokens_per_expert, axis=0)
 

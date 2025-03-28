@@ -59,6 +59,8 @@ def act_quant(x: paddle.Tensor, block_size: int = 128) -> Tuple[paddle.Tensor, p
             - The quantized tensor with dtype `paddle.float8_e4m3fn`.
             - A tensor of scaling factors with dtype `paddle.float32`.
     """
+    if not x.is_contiguous():
+        x = x.contiguous()
     assert x.is_contiguous(), "Input tensor must be contiguous"
     assert (
         x.shape[-1] % block_size == 0
