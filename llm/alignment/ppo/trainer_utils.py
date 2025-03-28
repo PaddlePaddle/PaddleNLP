@@ -616,7 +616,7 @@ def init_train_log(
             trainable_numel_tensor = paddle.to_tensor(per_device_trainable_numel, dtype=all_reduce_dtype)
             paddle.distributed.all_reduce(trainable_numel_tensor)
             trainable_numel = int(trainable_numel_tensor.item()) // self.args.dataset_world_size
-            # the numel is roughly, because the tensor parallel still hold own bias or layer_norm weight without splited
+            # the numel is roughly, because the tensor parallel still hold own bias or layer_norm weight without split
             # so, the trainable numel is a little bigger than real.
             logger.debug(f"  Number of trainable parameters = {trainable_numel:,} (all devices, roughly)")
 

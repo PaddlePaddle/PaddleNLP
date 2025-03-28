@@ -190,12 +190,12 @@ class StepTrainer(Trainer):
         old_dp_workers = self.args.world_size // (max(sd_group.nranks, 1) * max(dp_group.nranks, 1))
         group_nums = self.args.logical_process_index // old_dp_workers * eval_tp_size + eval_tp_rank
         self._data_trans_group = create_data_trans_group(global_rank, group_nums)
-        # just for compatiable with old code
+        # just for compatible with old code
         self._policy_model_eval_group = self._data_trans_group
 
     def get_model(self, train=False):
         """
-        model visitor wrapps PipelineParalle and Inference model to do evaulation
+        model visitor wraps PipelineParallel and Inference model to do evaluation
         and generation.
         """
         if train:
@@ -239,7 +239,7 @@ class StepTrainer(Trainer):
             if paddle.distributed.get_world_size() > 1:
                 assert self.model is not self.model_wrapped
             self.train_step_vars = {
-                # meaningless vars can pass from outter, dummy value is enough
+                # meaningless vars can pass from outer, dummy value is enough
                 "epoch": 0,  # meaningless for step training
                 "step": 0,  # meaningless for step training
                 "steps_in_epoch": 100000,  # meaningless for step training
@@ -283,15 +283,15 @@ class StepTrainer(Trainer):
         # trainer.train use `tr_loss` as loss var to accumulate loss.
         # NOTE: `tr_loss` in trainer.train not only accumulate mean loss for
         # steps in one `gradient_accumulation_steps`, but also accumulate for
-        # one logging intervel which may contains more than one accumulated steps.
+        # one logging interval which may contains more than one accumulated steps.
         # However, in StepTrainer we only want to use `tr_loss` to accumulate
         # mean loss for steps in a `gradient_accumulation_steps` range. As for
-        # logging intervel loss accumulation is not take into account here and
-        # should be considered in outter.
+        # logging interval loss accumulation is not take into account here and
+        # should be considered in outer.
         if loss_var is None:  # the first step of current loss type
             loss_var = paddle.to_tensor(0.0)
             train_step_vars[loss_name] = loss_var
-        elif self.is_accumulation_step:  # begin a new accumulation step intervel
+        elif self.is_accumulation_step:  # begin a new accumulation step interval
             for name in self.loss_names:
                 train_step_vars[name] = paddle.to_tensor(0.0)
             loss_var = train_step_vars[loss_name]
@@ -359,10 +359,10 @@ class StepTrainer(Trainer):
         NOTE: This is transparent to users.
         When using a mixed loss we often want to get the separated loss metrics,
         thus we mark loss type of each training step to separate them. This is
-        not necessary since the loss would be returnd after each training step.
-        However when using PipelienParallel, the loss returned is 0 when not reach
+        not necessary since the loss would be returned after each training step.
+        However when using PipelineParallel, the loss returned is 0 when not reach
         accumulated step and the loss returned at accumulated step is a mixed loss.
-        To separate loss metrics in PipelienParallel:
+        To separate loss metrics in PipelineParallel:
         1. We hack PipelineParallel._forward_step to record actual loss for each
            step in a list (only in training and not in evaluation currently).
         2. We mark the loss type only once for each step using `loss_step_indice`
@@ -886,7 +886,7 @@ class PPOTrainer(Trainer):
                 "pipeline_parallel_degree": 1,  # workaround for pipeline parallel model check
             },
         ):
-            # just used to create trival attrs might be used in the training
+            # just used to create trivial attrs might be used in the training
             # process of trainer, while changing some args to avoid model usage
             # in __init__ such as recompute and AMP-O2
             super().__init__(

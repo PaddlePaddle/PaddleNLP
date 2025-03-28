@@ -147,9 +147,9 @@ class ConcatDataset(Dataset):
         return self.datasets[dataset_idx][sample_idx]
 
     @property
-    def cummulative_sizes(self):
+    def cumulative_sizes(self):
         warnings.warn(
-            "cummulative_sizes attribute is renamed to " "cumulative_sizes", DeprecationWarning, stacklevel=2
+            "cumulative_sizes attribute is renamed to " "cumulative_sizes", DeprecationWarning, stacklevel=2
         )
         return self.cumulative_sizes
 

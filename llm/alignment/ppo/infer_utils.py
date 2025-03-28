@@ -90,11 +90,11 @@ class Predictor:
                 infer_model.set_state_dict(state_dict)
             return infer_model
 
-        # to avoid oom, clear param of infer_model imediately
-        ori_creat_param = paddle.nn.Layer.create_parameter
+        # to avoid oom, clear param of infer_model immediately
+        ori_create_param = paddle.nn.Layer.create_parameter
 
         def _create_param(self, *args, **kwargs):
-            param = ori_creat_param(self, *args, **kwargs)
+            param = ori_create_param(self, *args, **kwargs)
             param._clear_data()
             # param._clear()
             return param
@@ -103,7 +103,7 @@ class Predictor:
         # trainer might use an extra model instead of trainer.model for eval
         eval_model = getattr(trainer, "_inner_eval_model", None)
         infer_model = create_infer_model(trainer.model if eval_model is None else eval_model, dtype=trainer.amp_dtype)
-        paddle.nn.Layer.create_parameter = ori_creat_param
+        paddle.nn.Layer.create_parameter = ori_create_param
         # for k, v in infer_model.state_dict().items():
         #     v._clear()
 
