@@ -25,7 +25,27 @@ import paddle
 from paddle.autograd import PyLayer
 from paddle.distributed.communication.group import Group
 
+import numpy as np
+
 _buffer = None
+
+dispatch_forward_time_stamps = []
+# dispatch_backward_time_stamps = []
+# combine_forward_time_stamps = []
+# combine_backward_time_stamps = []
+warm_up_done = False
+
+def dump(list_of_tensor, name):
+    name = f'{name}.npy'
+    stack_tensor = paddle.stack(list_of_tensor)
+    list_of_stack_tensor = []
+    paddle.distributed.all_gather(list_of_stack_tensor, stack_tensor)
+    stack_gatherd_tensor = paddle.stack(list_of_stack_tensor)
+    y = stack_gatherd_tensor.numpy()
+    np.save(name, y)
+
+def dump_current_deepep_timestamps():
+    dump(dispatch_forward_time_stamps, "dispatch_forward_time_stamps")
 
 
 def get_hidden_bytes(x: paddle.Tensor) -> int:
@@ -106,7 +126,7 @@ def fused_dispatch_forward_func(
     # Do MoE dispatch
     # NOTES: the CPU will wait for GPU's signal to arrive,
     # so this is not compatible with CUDA graph
-    (recv_x, recv_token_indices, recv_token_probs, num_recv_tokens_per_expert_list, handle, event,) = buffer.dispatch(
+    (recv_x, recv_token_indices, recv_token_probs, num_recv_tokens_per_expert_list, handle, event, time_stamp) = buffer.dispatch(
         x,
         topk_idx=token_indices,
         topk_weights=token_probs,
@@ -118,6 +138,12 @@ def fused_dispatch_forward_func(
         async_finish=async_finish,
         allocate_on_comm_stream=allocate_on_comm_stream,
     )
+
+    # if warm_up_done:
+    #     dispatch_forward_time_stamps.append(time_stamp)
+
+    # if len(dispatch_forward_time_stamps) == 10:
+    #     dump_current_deepep_timestamps()
 
     states = dict()
     states["dispatched_indices"] = recv_token_indices
@@ -172,7 +198,7 @@ def fused_combine_backward_func(
     """Backward pass of fused combine."""
     if isinstance(grad_output, tuple):
         buffer = get_buffer(group, get_hidden_bytes(grad_output[0]))
-        grad_x, _, _, _, _, event = buffer.dispatch(
+        grad_x, _, _, _, _, event, _ = buffer.dispatch(
             (grad_output[0].contiguous(), grad_output[1].contiguous()),
             handle=handle,
             previous_event=previous_event,
@@ -181,7 +207,7 @@ def fused_combine_backward_func(
         )
     else:
         buffer = get_buffer(group, get_hidden_bytes(grad_output))
-        grad_x, _, _, _, _, event = buffer.dispatch(
+        grad_x, _, _, _, _, event, _ = buffer.dispatch(
             grad_output.contiguous(),
             handle=handle,
             previous_event=previous_event,
