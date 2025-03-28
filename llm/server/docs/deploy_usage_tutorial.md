@@ -74,11 +74,12 @@ cd /home/workspace/models_dir
 
 除了支持通过设置`model_name` 在启动时进行自动下载，服务提供脚本可以进行自行下载。**部署时需指定环境变量`MODEL_DIR` 为模型下载存储路径**
 
-脚本所在路径`/opt/output/download_model.py`
+脚本所在路径`/opt/output/download_model.py` (当前路径为镜像内路径)
 
 ```
 python download_model.py \
 --model_name $model_name \
+--version "3.0.0.b4" \
 --dir $MODEL_PATH \
 --nnodes 2 \
 --mode "master" \
@@ -113,6 +114,7 @@ python download_model.py --model_name $model_name --dir $MODEL_PATH --nnodes 2 -
 | 字段名 | 字段类型 | 说明 | 是否必填 | 默认值 |
 | :---: | :-----: | :---: | :---: | :-----: |
 | model_name | str | 为指定下载模型名称，具体支持模型可查看[文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/static_models.md) | 否 | deepseek-ai/DeepSeek-R1/weight_only_int4 |
+| version | str | PaddleNLP 导出模型的版本号 | 否 | 3.0.0.b4 |
 | dir | str | 模型存储地址 | 否 | downloads |
 | nnodes | int | 节点个数 | 否 | 1 |
 | mode | str | 下载模式用于区分多机的不同节点 | 否 | 仅支持 master 和 slave 两个值 |
