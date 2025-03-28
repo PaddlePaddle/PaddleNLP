@@ -1158,7 +1158,7 @@ class TinyRandomGenerationTest(unittest.TestCase):
 
 #         model.eval()
 
-#         # Llama model do not contians ``
+#         # Llama model do not contains ``
 #         model.is_encoder_decoder = False
 
 #         max_length = 25
@@ -1234,7 +1234,7 @@ class TinyRandomGenerationTest(unittest.TestCase):
 
 #         model.eval()
 
-#         # Llama model do not contians ``
+#         # Llama model do not contains ``
 #         model.is_encoder_decoder = False
 
 #         max_length = 25

@@ -20,7 +20,7 @@ n_best: 1
 # automatically according to the passed vocabulary path and special tokens.
 # size of source word dictionary.
 src_vocab_size: 10000
-# size of target word dictionay
+# size of target word dictionary
 trg_vocab_size: 10000
 # index for <bos> token
 bos_idx: 0

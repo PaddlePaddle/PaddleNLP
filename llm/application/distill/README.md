@@ -22,7 +22,7 @@ docker run --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_P
 -e "model_name=${model_name}" \
 -e "MP_NUM=8" \
 -e "CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7" \
--dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.1 /bin/bash \
+-dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.2 /bin/bash \
 -c -ex 'start_server $model_name && tail -f /dev/null'&& docker logs -f $(docker ps -lq)
 ```
 

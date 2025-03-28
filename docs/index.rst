@@ -1,20 +1,25 @@
 欢迎使用PaddleNLP
 ==================
 
-`PaddleNLP <https://github.com/PaddlePaddle/PaddleNLP>`_ 是飞桨自然语言处理开发库，具备 **易用的文本领域API**，**多场景的应用示例**、和 **高性能分布式训练** 三大特点，旨在提升飞桨开发者文本领域建模效率，旨在提升开发者在文本领域的开发效率，并提供丰富的NLP应用示例。
+`PaddleNLP <https://github.com/PaddlePaddle/PaddleNLP>`_ PaddleNLP是一款基于飞桨深度学习框架的大语言模型(LLM)开发套件，支持在多种硬件上进行高效的大模型训练、无损压缩以及高性能推理。PaddleNLP 具备简单易用和性能极致的特点，致力于助力开发者实现高效的大模型产业级应用。
 
 
-- **易用的文本领域API**
+- **🔧 多硬件训推一体**
 
-  - 提供丰富的产业级预置任务能力 **Taskflow** 和全流程的文本领域API：支持丰富中文数据集加载的 **Dataset API**，可灵活高效地完成数据预处理的 **Data API** ，预置60+预训练词向量的 **Embedding API** ，提供100+预训练模型的 **Transformer API** 等，可大幅提升NLP任务建模的效率。
+  - 支持英伟达 GPU、昆仑 XPU、昇腾 NPU、燧原 GCU 和海光 DCU 等多个硬件的大模型和自然语言理解模型训练和推理，套件接口支持硬件快速切换，大幅降低硬件切换研发成本。
 
-- **多场景的应用示例**
+- **🚀 高效易用的预训练**
 
-  - 覆盖从学术到产业级的NLP应用示例，涵盖NLP基础技术、NLP系统应用以及相关拓展应用。全面基于飞桨核心框架2.0全新API体系开发，为开发者提供飞桨文本领域的最佳实践。
+  - 支持纯数据并行策略、分组参数切片的数据并行策略、张量模型并行策略和流水线模型并行策略的4D 高性能训练，Trainer 支持分布式策略配置化，降低复杂分布式组合带来的使用成本；可以使得训练断点支持机器资源动态扩缩容恢复。此外，异步保存，模型存储可加速95%，Checkpoint 压缩，可节省78.5%存储空间。
 
-- **高性能分布式训练**
+- **🤗 高效精调**
 
-  - 基于飞桨核心框架领先的自动混合精度优化策略，结合分布式Fleet API，支持4D混合并行策略，可高效地完成大规模预训练模型训练。
+  - 精调算法深度结合零填充数据流和 FlashMask 高性能算子，降低训练无效数据填充和计算，大幅提升精调训练吞吐。
+
+- **🎛️ 无损压缩和高性能推理**
+
+  - 大模型套件高性能推理模块内置动态插入和全环节算子融合策略，极大加快并行推理速度。底层实现细节封装化，实现开箱即用的高性能并行推理能力。
+
 
 
 * 项目GitHub: https://github.com/PaddlePaddle/PaddleNLP
@@ -61,7 +66,7 @@
    :maxdepth: 1
    :caption: 飞桨大模型推理
 
-   Docker部署-快速开始教程 <llm/server/docs/general_model_inference.md>
+   Docker快速部署教程 <llm/server/docs/general_model_inference.md>
    大模型推理教程 <llm/docs/predict/inference_index.rst>
    实践调优 <llm/docs/predict/infer_optimize.rst>
    静态图模型列表 <llm/server/docs/static_models.md>
@@ -74,10 +79,9 @@
    :maxdepth: 1
    :caption: 飞桨大模型特色技术
 
-   <llm/docs/unified_checkpoint.md>
-   <llm/docs/flashmask.md>
-   <llm/docs/llm_trainer.rst>
-
+   飞桨大模型统一存储文档 Unified Checkpoint <llm/docs/unified_checkpoint.md>
+   灵活注意力掩码 FlashMask <llm/docs/flashmask.md>
+   飞桨大模型统一训练器 PaddleNLP Trainer <llm/docs/llm_trainer.rst>
 
 
 .. toctree::

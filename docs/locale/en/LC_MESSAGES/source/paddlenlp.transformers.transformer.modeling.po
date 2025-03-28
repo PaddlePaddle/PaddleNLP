@@ -225,7 +225,7 @@ msgstr ""
 #: of
 #: paddlenlp.transformers.transformer.modeling.CrossEntropyCriterion.forward:7
 msgid ""
-"The label for correspoding results with shape `[batch_size, "
+"The label for corresponding results with shape `[batch_size, "
 "sequence_length, 1]`."
 msgstr ""
 

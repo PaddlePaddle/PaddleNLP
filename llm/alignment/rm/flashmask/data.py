@@ -216,7 +216,7 @@ def preprocess_process_data(data, tokenizer, data_args, model_args):
         add_special_tokens=False,
     )["input_ids"]
 
-    # NOTE: Truncation may leads to incompleteness of the last CoT step, howerver, the prm will not predict the
+    # NOTE: Truncation may leads to incompleteness of the last CoT step, however, the prm will not predict the
     # corresponding reward either. So it is ok then.
     if len(prompt_token_ids) + len(response_token_ids) > data_args.max_seq_len:
         prompt_token_ids = prompt_token_ids[-data_args.max_prompt_len :]

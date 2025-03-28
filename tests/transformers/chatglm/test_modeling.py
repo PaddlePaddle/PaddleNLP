@@ -352,7 +352,7 @@ class ChatGLMTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
 
 #         model.eval()
 
-#         # Llama model do not contians ``
+#         # Llama model do not contains ``
 #         model.is_encoder_decoder = False
 
 #         max_length = self.max_length
@@ -431,7 +431,7 @@ class ChatGLMTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
 
 #         model.eval()
 
-#         # Llama model do not contians ``
+#         # Llama model do not contains ``
 #         model.is_encoder_decoder = False
 
 #         max_length = self.max_length
