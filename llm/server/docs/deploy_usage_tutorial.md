@@ -74,7 +74,9 @@ cd /home/workspace/models_dir
 
 除了支持通过设置`model_name` 在启动时进行自动下载，服务提供脚本可以进行自行下载。**部署时需指定环境变量`MODEL_DIR` 为模型下载存储路径**
 
-脚本所在路径`/opt/output/download_model.py`
+脚本所在路径`/opt/output/download_model.py` (当前路径为镜像内路径)
+
+**注**：模型下载依赖当前镜像的版本号，若在镜像内启动下载脚本无需配置，若直接从代码仓库拉取需配置环境变量`tag`，当前默认下载的版本为3.0.0.b4
 
 ```
 python download_model.py \
