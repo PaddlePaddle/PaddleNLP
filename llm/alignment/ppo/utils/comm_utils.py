@@ -20,7 +20,6 @@ import paddle.distributed as dist
 from offload_utils import offload_tensor_to_cpu
 from paddle import nn
 
-from paddlenlp.trainer import strtobool
 from paddlenlp.trainer.trainer import Trainer, logger
 from paddlenlp.utils.distributed import distributed_gather
 from paddlenlp.utils.nested import flatten_list, nested_broadcast_tensor_with_empty

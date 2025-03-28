@@ -170,7 +170,7 @@ class OffloadController:
             paddle.device.synchronize()
 
 
-def offload_scope(trainer, *args):
+def reload_and_offload_scope(trainer, *args):
     offload_map = {
         trainer.actor_model: "train_model",
         trainer.reference_model: "freeze_model",

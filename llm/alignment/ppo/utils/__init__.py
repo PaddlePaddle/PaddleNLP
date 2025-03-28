@@ -12,4 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from offload_utils import *
+from .comm_utils import *
+from .config_utils import *
+from .infer_utils import *
+from .offload_utils import *

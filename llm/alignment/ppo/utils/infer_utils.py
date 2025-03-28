@@ -27,7 +27,7 @@ from predict.predictor import (
     ModelArgument,
     PredictorArgument,
 )
-from trainer_utils import process_row
+from trainer.trainer_utils import process_row
 
 from paddlenlp.trainer.trainer import Trainer, logger
 from paddlenlp.transformers import (

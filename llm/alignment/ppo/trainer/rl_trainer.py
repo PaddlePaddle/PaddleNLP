@@ -15,7 +15,6 @@
 
 from __future__ import annotations
 
-import itertools
 import os
 import time
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
@@ -23,51 +22,16 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import numpy as np
 import paddle
 import paddle.distributed as dist
-import requests
 import tqdm
-from comm_utils import (
-    ActorStages,
-    CriticStages,
-    RolloutStages,
-    create_data_trans_group,
-    data_group_merge,
-    data_group_split,
-    gather_and_pad,
-    get_timer_label,
-    masked_whiten,
-    new_timer_log,
-)
-from infer_utils import InferEvalModel, infer_guard
-from models.ppo_model_utils import (  # make_attention_mask,; make_position_ids,
-    RLHFPPOMixedLoss,
-    RLHFValueLoss,
-    create_loss,
-    create_startend_row_indices,
-    gather_log_probabilities,
-    make_attention_mask,
-    make_position_ids,
-    make_position_ids_from_input_ids,
-)
-from offload_utils import OffloadController, offload_tensor_to_cpu, reload_tensor_to_gpu
+from models.ppo_model_utils import create_loss
 from paddle import nn
 from paddle.distributed import fleet
-from paddle.distributed.fleet.meta_parallel import ParallelCrossEntropy, PipelineLayer
-from paddle.io import DataLoader, Dataset, DistributedBatchSampler
-from paddle.utils import map_structure
-from rich.console import Console
-from rich.table import Table
-from trainer_utils import (
-    MuteDefaultFlowCallback,
-    PipeEvalModel,
-    batch_retokenize,
-    guard_set_args,
-    is_same_tokenizer,
-    process_row,
-)
+from paddle.io import DataLoader, Dataset
+from trainer_utils import PipeEvalModel
 
+from llm.alignment.ppo.utils.comm_utils import create_data_trans_group
+from llm.alignment.ppo.utils.infer_utils import InferEvalModel
 from paddlenlp.data import DataCollator
-from paddlenlp.generation.utils import GenerationMixin
-from paddlenlp.trainer import IntervalStrategy
 from paddlenlp.trainer.trainer import (
     TRAINER_STATE_NAME,
     HybridParallelOptimizer,
@@ -75,7 +39,6 @@ from paddlenlp.trainer.trainer import (
     ShardingOption,
     Trainer,
     TrainerCallback,
-    TrainerControl,
     TrainerState,
     TrainingArguments,
     _obtain_optimizer_parameters_list,
@@ -86,10 +49,8 @@ from paddlenlp.trainer.trainer import (
     reshard_util,
     split_inputs_sequence_dim,
 )
-from paddlenlp.transformers import BatchEncoding, PretrainedModel, PretrainedTokenizer
-from paddlenlp.transformers.configuration_utils import PretrainedConfig
-from paddlenlp.transformers.model_outputs import ModelOutput
-from paddlenlp.transformers.tokenizer_utils_base import PaddingStrategy
+from paddlenlp.trainer.trainer_utils import EvalPrediction
+from paddlenlp.transformers import PretrainedModel, PretrainedTokenizer
 
 
 # ########## patches for Trianer ##########
@@ -409,7 +370,8 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
 
     if (step_control + 1) % args.gradient_accumulation_steps == 0 or (
         # last step in epoch but step is always smaller than gradient_accumulation_steps
-        steps_in_epoch <= args.gradient_accumulation_steps and (step + 1) == steps_in_epoch
+        steps_in_epoch <= args.gradient_accumulation_steps
+        and (step + 1) == steps_in_epoch
     ):
         if self.args.pipeline_parallel_degree <= 1 and self._enable_delay_scale_loss():
             tr_loss /= self.args.gradient_accumulation_steps
@@ -933,24 +895,3 @@ class RLTrainer(Trainer):
             return result
         else:
             return model.state_dict()
-
-
-class ActorReferenceTrainer(RLTrainer):
-    loss_cls = RLHFPPOMixedLoss
-    trainer_type = "policy"
-
-    def loss_identifier(self, inputs: Dict) -> str:
-        """
-        根据输入的字典，判断是否使用ptx损失函数和演员损失函数。如果有标签（labels），则返回"ptx_loss"；否则返回"actor_loss"。
-        参数：
-            inputs (Dict): 包含两个键值对，分别为"inputs"和"labels"，其中"inputs"是模型的输入，"labels"是可选的，表示是否使用ptx损失函数。默认值为None。
-            返回值 (str): 返回一个字符串，分别为"ptx_loss"或"actor_loss"，表示是否使用ptx损失函数和演员损失函数。
-        """
-        return "actor_loss"
-
-
-class CriticTrainer(RLTrainer):
-    loss_cls = RLHFValueLoss
-    trainer_type = "value"
-    # define loss name for logging
-    loss_identifier = lambda self, inputs: "reward_critic_loss"

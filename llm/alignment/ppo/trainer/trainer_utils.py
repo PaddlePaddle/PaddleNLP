@@ -16,34 +16,20 @@
 import inspect
 from contextlib import contextmanager
 
-import numpy as np
 import paddle
-import tqdm
 from models.ppo_model_utils import make_attention_mask, make_position_ids
 from paddle.distributed import fleet
-from paddle.io import DataLoader
 
 from paddlenlp.generation.utils import GenerationMixin
-from paddlenlp.trainer import IntervalStrategy
 from paddlenlp.trainer.trainer import (
-    TRAINER_STATE_NAME,
-    HybridParallelOptimizer,
-    NlpDistributedBatchSampler,
-    ShardingOption,
     Trainer,
     TrainerCallback,
     TrainerControl,
     TrainerState,
     TrainingArguments,
-    _obtain_optimizer_parameters_list,
-    distributed_file,
-    distributed_isfile,
-    fused_allreduce_gradients,
     logger,
-    reshard_util,
-    split_inputs_sequence_dim,
 )
-from paddlenlp.transformers import BatchEncoding, PretrainedModel, PretrainedTokenizer
+from paddlenlp.transformers import BatchEncoding, PretrainedTokenizer
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 from paddlenlp.transformers.model_outputs import ModelOutput
 from paddlenlp.transformers.tokenizer_utils_base import PaddingStrategy

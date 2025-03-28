@@ -1,5 +1,4 @@
 # Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2023 PKU-Alignment Team. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from actor_trainer import *
-from critic_trainer import *
-from rl_trainer import *
-from trainer_utils import *
+
+from __future__ import annotations
+
+from models.ppo_model_utils import RLHFValueLoss
+from trainer.rl_trainer import RLTrainer
+
+
+class CriticTrainer(RLTrainer):
+    loss_cls = RLHFValueLoss
+    trainer_type = "value"
+    # define loss name for logging
+    loss_identifier = lambda self, inputs: "reward_critic_loss"

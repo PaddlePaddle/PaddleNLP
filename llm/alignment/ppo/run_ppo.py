@@ -20,13 +20,12 @@ from functools import partial
 
 import paddle
 from models.score_model import AutoModelForScore
-from offload_utils import offload_tensor_to_cpu
-from ppo_trainer import PPOTrainer
-from trainer_utils import DataArgument, ModelArgument, TrainingArguments
+from utils.config_utils import DataArgument, ModelArgument, TrainingArguments
+from utils.offload_utils import offload_tensor_to_cpu
 
+from llm.alignment.ppo.trainer.ppo_trainer import PPOTrainer
 from paddlenlp.datasets.rlhf_datasets import RLHFDataset, collate_fn
 from paddlenlp.trainer import PdArgumentParser, RuntimeTimer, get_last_checkpoint
-from paddlenlp.trainer.trainer_utils import ShardingOption
 from paddlenlp.transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 from paddlenlp.trl import llm_utils
 from paddlenlp.utils.log import logger
