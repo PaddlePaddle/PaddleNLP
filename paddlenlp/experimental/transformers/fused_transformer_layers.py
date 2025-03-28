@@ -3004,20 +3004,42 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 fmha_out_prefill = paddle.squeeze(fmha_out_prefill, axis=0)
             else:
                 if paddle.is_compiled_with_rocm():
-                    from paddlenlp.ops.triton_ops.paged_attn import PagedAttention
-                    
-                    """query: shape = [num_tokens, num_heads * head_size]
+                    from paddlenlp.ops.triton_ops.paged_attn import PagedAttention, compute_slot_mappings
+                    from itertools import accumulate
+                    """
+                    query: shape = [num_tokens, num_heads * head_size]
                     key: shape = [num_tokens, num_kv_heads * head_size]
                     value: shape = [num_tokens, num_kv_heads * head_size]
                     kv_cache = [2, num_blocks, block_size * num_kv_heads * head_size]
                     """
+                    query_lens = kwargs.get("seq_lens_this_time", None)
+                    seq_lens = kwargs.get("seq_lens", None)
+                    block_tables = kwargs.get("block_tables", None)
+                    batch_size = self.src.shape[0]
+                    block_size = kwargs.get("block_size", 64)
+                    
+                    max_query_len = max(query_lens)
+                    query_start_loc = paddle.to_tensor(list(accumulate(query_lens, initial=0)), dtype=paddle.int64)
+                    seq_start_loc = paddle.to_tensor(list(accumulate(seq_lens, initial=0)), dtype=paddle.int64)
+                    seq_lens_tensor = paddle.to_tensor(seq_lens, dtype=paddle.int64)
+                    # context_lens_tensor = paddle.zeros([batch_size], dtype='int64')
+                    context_lens_tensor = paddle.full([batch_size], seq_lens[0] - 1, dtype='int64')
                     alibi_slopes = None
-                    sliding_window = (-1, -1)
+                    sliding_window = None
                     kv_cache_dtype = "auto"
-                    slot_mapping =  paddle.arange(0, src.shape[0] * seq_lens, dtype="int64")
                     k_scale = paddle.to_tensor(1.0, dtype="bfloat16")
                     v_scale = paddle.to_tensor(1.0, dtype="bfloat16")
-                    block_tables = kwargs.get("block_tables", None)
+
+                    slot_mapping = compute_slot_mappings(
+                        seq_lens=seq_lens,
+                        query_lens=query_lens,
+                        context_lens=context_lens_tensor.cpu().numpy().tolist(),
+                        block_tables=block_tables,
+                        block_size=block_size,     
+                        sliding_window=sliding_window 
+                    )
+                    slot_mapping_tensor = paddle.to_tensor(slot_mapping, dtype=paddle.int64)
+                    
 
                     query = query.reshape([-1, self.num_heads, self.head_dim])
                     if key is not None:
@@ -3041,22 +3063,17 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                         v_scale,
                     )
 
-                    batch_size = self.src.shape[0]
-                    seq_lens_1 = [item for sublist in seq_lens for item in sublist]
-                    query_start_loc = paddle.to_tensor([0] + [sum(seq_lens_1[:i + 1]) for i in range(len(seq_lens_1))], dtype="int64")
-                    seq_lens_tensor = paddle.to_tensor(seq_lens_1, dtype="int64")
-                    max_query_len = max(seq_lens)
-
                     fmha_out_prefill = PagedAttention.forward_prefix(
                         query=query,
                         key=key,
                         value=value,
-                        kv_cache_dtype=kv_cache_dtype,  # fp8/fp8_e4m3 or fp8_e5m2
+                        kv_cache_dtype=kv_cache_dtype,  
                         key_cache=key_cache,
                         value_cache=value_cache,
                         block_tables=block_tables,
                         query_start_loc=query_start_loc,
                         seq_lens_tensor=seq_lens_tensor,
+                        context_lens=context_lens_tensor,
                         max_query_len=max_query_len,
                         alibi_slopes=alibi_slopes,
                         sliding_window=sliding_window,

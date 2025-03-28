@@ -84,6 +84,7 @@ class PagedAttention:
         block_tables,
         query_start_loc,
         seq_lens_tensor,
+        context_lens,
         max_query_len: int,
         alibi_slopes,
         sliding_window: Optional[int],
@@ -103,6 +104,7 @@ class PagedAttention:
             # query_start_loc is (batch_size + 1,)
             query_start_loc,
             seq_lens_tensor,
+            context_lens,
             max_query_len,
             k_scale,
             v_scale,
@@ -110,3 +112,67 @@ class PagedAttention:
             sliding_window,
         )
         return output
+
+def compute_slot_mappings(
+    seq_lens: List[int],
+    query_lens: List[int],
+    context_lens: List[int],
+    block_tables: List[List[int]],
+    block_size: int,
+    sliding_window: int
+) -> List[int]:
+    PAD_SLOT_ID = -1
+    _COMPUTE_SLOT_MAPPING_NUMPY_NUMEL=256
+    slot_mapping = []
+    
+    for i in range(len(seq_lens)):
+        seq_len = seq_lens[i]
+        query_len = query_lens[i]
+        context_len = context_lens[i]
+        block_table = block_tables[i]
+        
+        is_profile_run = block_table is None
+        if is_profile_run:
+            slot_mapping.extend([PAD_SLOT_ID] * seq_len)
+            continue
+        
+        is_prompt = query_len > 1
+        
+        start_idx = 0
+        if is_prompt and sliding_window is not None:
+            start_idx = max(0, query_len - sliding_window)
+        
+        padding_mask_len = max(0, start_idx - context_len)
+        slot_mapping.extend([PAD_SLOT_ID] * padding_mask_len)
+        
+        range_start = max(start_idx, context_len)
+        range_end = seq_len
+        numel = range_end - range_start
+        
+        if numel <= 0:
+            continue
+        
+        if numel < _COMPUTE_SLOT_MAPPING_NUMPY_NUMEL: 
+            for j in range(range_start, range_end):
+                block_idx = j // block_size
+                if block_idx >= len(block_table):
+                    slot_mapping.append(PAD_SLOT_ID)
+                else:
+                    block_number = block_table[block_idx]
+                    slot = block_number * block_size + (j % block_size)
+                    slot_mapping.append(slot)
+        else:
+            j_indices = np.arange(range_start, range_end)
+            block_indices = j_indices // block_size
+            valid_mask = block_indices < len(block_table)
+            
+            block_numbers = np.where(
+                valid_mask,
+                np.array(block_table)[block_indices],
+                -1
+            )
+            offsets = j_indices % block_size
+            slots = block_numbers * block_size + offsets
+            slot_mapping.extend(slots.astype(np.int64).tolist())
+    
+    return slot_mapping
