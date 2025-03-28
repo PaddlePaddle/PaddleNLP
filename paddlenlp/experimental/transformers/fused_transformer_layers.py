@@ -1483,7 +1483,7 @@ class FusedMultiTransformerBase(Layer):
 
             (
                 permute_input,
-                token_nums_per_expert,
+                tokens_expert_prefix_sum,
                 permute_indices_per_token,
                 top_k_weights,
                 top_k_indices,
@@ -1491,7 +1491,7 @@ class FusedMultiTransformerBase(Layer):
 
             ffn_out = moe_expert_ffn(
                 permute_input,
-                token_nums_per_expert,
+                tokens_expert_prefix_sum,
                 self.ffn1_weights[i],
                 self.ffn2_weights[i],
                 self.ffn1_biases[i],
@@ -5472,24 +5472,18 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
             scores = get_moe_scores(gate_out, self.config.moe_config)
 
             if self.moe_quant_type in ["weight_only_int4", "weight_only_int8"]:
-                from paddle.incubate.nn.functional import (
-                    moe_dispatch,
-                    moe_ffn,
-                    moe_reduce,
-                )
 
-                # topk 在 moe_dispatch 中
                 (
                     permute_input,
-                    token_nums_per_expert,
+                    tokens_expert_prefix_sum,
                     permute_indices_per_token,
                     top_k_weights,
                     top_k_indices,
-                ) = moe_dispatch(tmp_out, scores, self.config.moe_config.top_k, False, topk_only_mode=True)
+                ) = moe_expert_dispatch(tmp_out, scores, self.config.moe_config.top_k, False, topk_only_mode=True)
 
-                ffn_out = moe_ffn(
+                ffn_out = moe_expert_ffn(
                     permute_input,
-                    token_nums_per_expert,
+                    tokens_expert_prefix_sum,
                     self.ffn1_weights[i],
                     self.ffn2_weights[i],
                     self.ffn1_biases[i],
@@ -5498,7 +5492,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                     self.moe_quant_type,
                 )
 
-                fused_moe_out = moe_reduce(
+                fused_moe_out = moe_expert_reduce(
                     ffn_out,
                     top_k_weights,
                     permute_indices_per_token,
