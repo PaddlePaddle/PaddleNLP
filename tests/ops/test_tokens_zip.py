@@ -104,15 +104,16 @@ def verify_tokens_unzip():
     ]
     tokens_zipped = paddle.to_tensor(tokens_zipped, dtype='bfloat16')
     routemap_topk = paddle.to_tensor(routemap_topk, dtype='int32')
-    probs_topk = paddle.to_tensor(probs_topk, dtype='bfloat16')
-    expected_unzipped_probs = paddle.to_tensor(expected_unzipped_probs, dtype='bfloat16')
+    probs_topk = paddle.to_tensor(probs_topk, dtype='float32')
+    expected_unzipped_probs = paddle.to_tensor(expected_unzipped_probs, dtype='float32')
     expected_zipped_expertwise_rowmap = paddle.to_tensor(expected_zipped_expertwise_rowmap, dtype='int32')
     expected_unzipped_tokens = paddle.to_tensor(expected_unzipped_tokens, dtype='bfloat16')
     expected_unzipped_expert_idx = paddle.to_tensor(expected_unzipped_expert_idx, dtype='int32')
 
     unzipped_tokens, zipped_expertwise_rowmap, unzipped_probs, unzipped_expert_idx = TDU.tokens_unzip(tokens_zipped,routemap_topk, probs_topk,total_unzipped_tokens_num=total_unzipped_tokens_num, topk=topk, num_experts=expert_num)
 
-    zipped_tokens = TDU.tokens_zip(unzipped_tokens, zipped_expertwise_rowmap, total_zipped_tokens=seqlen, num_experts=expert_num)
+    # 本算子
+    zipped_tokens, zipped_probs_topk = TDU.tokens_zip(unzipped_tokens, zipped_expertwise_rowmap, routemap_topk, unzipped_probs, total_zipped_tokens=seqlen, num_experts=expert_num)
     # ------------------------- 前向验证 ------------------------
     print("-------- Tokens unzipped by customed op: ------------")
     print(unzipped_tokens)
@@ -134,6 +135,11 @@ def verify_tokens_unzip():
     print(zipped_tokens)
     print("-------- zipped expected: ------------")
     print(tokens_simple_zipped)
+
+    print("-------- zipped probs_topk by customed op: ------------")
+    print(zipped_probs_topk)
+    print("-------- probs_topk expected: ------------")
+    print(probs_topk)
 
     
 def run():
