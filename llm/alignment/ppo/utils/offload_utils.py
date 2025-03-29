@@ -16,7 +16,7 @@ import os
 
 import paddle
 
-from paddlenlp.trainer import strtobool
+from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.trainer.trainer import logger
 
 

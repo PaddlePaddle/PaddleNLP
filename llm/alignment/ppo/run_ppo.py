@@ -19,16 +19,17 @@ import sys
 from functools import partial
 
 import paddle
-from models.score_model import AutoModelForScore
-from utils.config_utils import DataArgument, ModelArgument, TrainingArguments
-from utils.offload_utils import offload_tensor_to_cpu
 
-from llm.alignment.ppo.trainer.ppo_trainer import PPOTrainer
 from paddlenlp.datasets.rlhf_datasets import RLHFDataset, collate_fn
 from paddlenlp.trainer import PdArgumentParser, RuntimeTimer, get_last_checkpoint
 from paddlenlp.transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 from paddlenlp.trl import llm_utils
 from paddlenlp.utils.log import logger
+
+from .models.score_model import AutoModelForScore
+from .trainer.ppo_trainer import PPOTrainer
+from .utils.config_utils import DataArgument, ModelArgument, TrainingArguments
+from .utils.offload_utils import offload_tensor_to_cpu
 
 
 def process_args(model_args, data_args, training_args):

@@ -16,10 +16,10 @@ from typing import Any, Dict, List
 
 import numpy as np
 import paddle
-from trainer.rl_trainer import RLHFPPOMixedLoss, RLTrainer
 
-from llm.alignment.ppo.trainer.trainer_utils import guard_set_args
-from paddlenlp.trainer.trainer import ShardingOption
+from ..models.ppo_model_utils import RLHFPPOMixedLoss
+from .rl_trainer import RLTrainer
+from .trainer_utils import guard_set_args
 
 
 class ActorReferenceTrainer(RLTrainer):

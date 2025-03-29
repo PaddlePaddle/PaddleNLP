@@ -25,11 +25,6 @@ import numpy as np
 import paddle
 import paddle.distributed as dist
 import requests
-from models.ppo_model_utils import (  # make_attention_mask,; make_position_ids,
-    create_startend_row_indices,
-    gather_log_probabilities,
-    make_position_ids_from_input_ids,
-)
 from paddle import nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import ParallelCrossEntropy, PipelineLayer
@@ -37,15 +32,40 @@ from paddle.io import DataLoader, Dataset, DistributedBatchSampler
 from paddle.utils import map_structure
 from rich.console import Console
 from rich.table import Table
-from trainer import ActorReferenceTrainer, CriticTrainer, RLTrainer
-from trainer.trainer_utils import (
-    MuteDefaultFlowCallback,
-    batch_retokenize,
-    guard_set_args,
-    is_same_tokenizer,
-    process_row,
+
+from paddlenlp.data import DataCollator
+from paddlenlp.generation import GenerationConfig
+from paddlenlp.trainer.trainer import (
+    EvalLoopOutput,
+    EvalPrediction,
+    ProgressCallback,
+    ShardingOption,
+    Trainer,
+    TrainerCallback,
+    TrainingArguments,
+    TrainOutput,
+    logger,
+    speed_metrics,
 )
-from utils.comm_utils import (
+from paddlenlp.trainer.utils.helper import (
+    broadcast_dataset_rank0_model,
+    distributed_concat,
+)
+from paddlenlp.transformers import (
+    CosineAnnealingWithWarmupDecay,
+    LinearAnnealingWithWarmupDecay,
+    PretrainedModel,
+    PretrainedTokenizer,
+)
+from paddlenlp.transformers.model_utils import _add_variant
+from paddlenlp.utils.env import PADDLE_WEIGHTS_NAME
+
+from ..models.ppo_model_utils import (
+    create_startend_row_indices,
+    gather_log_probabilities,
+    make_position_ids_from_input_ids,
+)
+from ..utils.comm_utils import (
     ActorStages,
     CriticStages,
     RolloutStages,
@@ -56,32 +76,18 @@ from utils.comm_utils import (
     masked_whiten,
     new_timer_log,
 )
-from utils.infer_utils import infer_guard
-from utils.offload_utils import reload_and_offload_scope, reload_tensor_to_gpu
-
-from paddlenlp.data import DataCollator
-from paddlenlp.generation import GenerationConfig
-from paddlenlp.trainer import ProgressCallback
-from paddlenlp.trainer.trainer import (
-    EvalLoopOutput,
-    EvalPrediction,
-    ShardingOption,
-    Trainer,
-    TrainerCallback,
-    TrainingArguments,
-    TrainOutput,
-    logger,
-    speed_metrics,
+from ..utils.infer_utils import infer_guard
+from ..utils.offload_utils import reload_and_offload_scope, reload_tensor_to_gpu
+from .actor_trainer import ActorReferenceTrainer
+from .critic_trainer import CriticTrainer
+from .rl_trainer import RLTrainer
+from .trainer_utils import (
+    MuteDefaultFlowCallback,
+    batch_retokenize,
+    guard_set_args,
+    is_same_tokenizer,
+    process_row,
 )
-from paddlenlp.trainer.utils import distributed_concat
-from paddlenlp.transformers import (
-    CosineAnnealingWithWarmupDecay,
-    LinearAnnealingWithWarmupDecay,
-    PretrainedModel,
-    PretrainedTokenizer,
-)
-from paddlenlp.transformers.model_utils import _add_variant
-from paddlenlp.utils.env import PADDLE_WEIGHTS_NAME
 
 
 class PPOMetric:
@@ -228,13 +234,21 @@ def data_dispatch(fun):
 class PPOTrainer(Trainer):
     def __init__(
         self,
-        model: Union[PretrainedModel, nn.Layer] = None,
+        actor_model: Union[PretrainedModel, nn.Layer],
+        reference_model: Union[PretrainedModel, nn.Layer] = None,
+        reward_model: Union[PretrainedModel, nn.Layer] = None,
+        critic_model: Union[PretrainedModel, nn.Layer] = None,
+        actor_model_eval: Union[PretrainedModel, nn.Layer] = None,
+        critic_model_eval: Union[PretrainedModel, nn.Layer] = None,
         criterion: nn.Layer = None,
         args: TrainingArguments = None,
         data_collator: Optional[DataCollator] = None,  # type: ignore
         train_dataset: Optional[Dataset] = None,
         eval_dataset: Union[Dataset, Dict[str, Dataset]] = None,
-        tokenizer: Optional[PretrainedTokenizer] = None,
+        actor_tokenizer: Optional[PretrainedTokenizer] = None,
+        reference_tokenizer: Optional[PretrainedTokenizer] = None,
+        reward_tokenizer: Optional[PretrainedTokenizer] = None,
+        critic_tokenizer: Optional[PretrainedTokenizer] = None,
         compute_metrics: Optional[Callable[[EvalPrediction], Dict]] = None,
         callbacks: Optional[List[TrainerCallback]] = None,
         optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
@@ -254,6 +268,7 @@ class PPOTrainer(Trainer):
         eval_dataset (Union[Dataset, Dict[str, Dataset]], optional): The dataset to be used for evaluation.
             Defaults to None.
         tokenizer (Optional[PretrainedTokenizer], optional): The tokenizer used for encoding. Defaults to None.
+            actor_tokenizer and critic_tokenizer should be same
         compute_metrics (Optional[Callable[[EvalPrediction], Dict]], optional): The function to compute metrics
             during evaluation. Defaults to None.
         callbacks (Optional[List[TrainerCallback]], optional): A list of callbacks to customize the training
@@ -275,35 +290,18 @@ class PPOTrainer(Trainer):
             # process of trainer, while changing some args to avoid model usage
             # in __init__ such as recompute and AMP-O2
             super().__init__(
-                model,
+                (actor_model, reference_model, reward_model, critic_model, actor_model_eval, critic_model_eval),
                 criterion,
                 args,
                 data_collator,
                 train_dataset,
                 eval_dataset,
-                tokenizer,
+                (actor_tokenizer, reference_tokenizer, reward_tokenizer, critic_tokenizer),
                 compute_metrics,
                 callbacks,
                 optimizers,
                 preprocess_logits_for_metrics,
             )
-
-        self.train_dataset = train_dataset
-        self.eval_dataset = eval_dataset
-
-        (
-            actor_model,
-            reference_model,
-            reward_model,
-            critic_model,
-            actor_model_eval,
-            critic_model_eval,
-        ) = model
-        self._model_config = actor_model.config  # use this to change flash attention dynamically
-        self._actor_model_eval = actor_model_eval
-
-        # policy_tokenizer and critic_tokenizer should be same
-        actor_tokenizer, reference_tokenizer, reward_tokenizer, critic_tokenizer = tokenizer
 
         trainer_agrs = {
             "model": None,
@@ -319,41 +317,48 @@ class PPOTrainer(Trainer):
             "preprocess_logits_for_metrics": preprocess_logits_for_metrics,
         }
 
-        self.actor_trainer = self.create_actor_trainer(model=actor_model, tokenizer=actor_tokenizer, **trainer_agrs)
-        self.actor_trainer.set_eval_model(actor_model_eval)
-        # disable inner trainers' callback/state/control
-        self.actor_trainer.add_callback(MuteDefaultFlowCallback)
-        if not self.args.disable_tqdm:
-            self.actor_trainer.pop_callback(ProgressCallback)
+        self.actor_trainer = self.create_actor_trainer(
+            model=actor_model,
+            model_eval=actor_model_eval,
+            tokenizer=actor_tokenizer,
+            **trainer_agrs,
+        )
 
         if args.rl_algorithm == "ppo":
-            self._critic_model_eval = critic_model_eval
             self.critic_trainer = self.create_critic_trainer(
-                model=critic_model, tokenizer=critic_tokenizer, **trainer_agrs
+                model=critic_model,
+                tokenizer=critic_tokenizer,
+                **trainer_agrs,
             )
-            self.critic_trainer.set_eval_model(critic_model_eval)
-            self.critic_trainer.add_callback(MuteDefaultFlowCallback)
-            if not self.args.disable_tqdm:
-                self.critic_trainer.pop_callback(ProgressCallback)
 
         # use trainer for reference_model/reward_model to enable sharding stage-3
         # and PipelineParallel. allow reference_model/reward_model to use different
         # dist strategy
         self.reference_trainer = self.create_reference_trainer(
-            model=reference_model, tokenizer=reference_tokenizer, **trainer_agrs
+            model=reference_model,
+            tokenizer=reference_tokenizer,
+            **trainer_agrs,
         )
         self.reward_trainer, self.reward_server = self.create_reference_trainer(
-            model=reward_model, tokenizer=reward_model, **trainer_agrs
+            model=reward_model,
+            tokenizer=reward_model,
+            **trainer_agrs,
         )
 
+        self.train_dataset = train_dataset
+        self.eval_dataset = eval_dataset
+        self._model_config = actor_model.config  # use this to change flash attention dynamically
+        self._actor_model_eval = actor_model_eval
+        self._critic_model_eval = critic_model_eval
         self.reference_model.eval()
         if isinstance(reward_model, PretrainedModel):
             self.reward_model.eval()
 
-        self.reward_tokenizer = reward_tokenizer
         self.tokenizer = actor_tokenizer
-        if is_same_tokenizer(self.tokenizer, self.reward_tokenizer):
-            self.reward_tokenizer = self.tokenizer
+        if is_same_tokenizer(actor_tokenizer, reward_tokenizer):
+            self.reward_tokenizer = actor_tokenizer
+        else:
+            self.reward_tokenizer = reward_tokenizer
 
         self.generation_config = GenerationConfig(
             max_new_tokens=self.args.max_dec_len,
@@ -398,6 +403,7 @@ class PPOTrainer(Trainer):
     def create_actor_trainer(
         self,
         model: Union[PretrainedModel, nn.Layer] = None,
+        model_eval: Union[PretrainedModel, nn.Layer] = None,
         criterion: nn.Layer = None,
         args: TrainingArguments = None,
         data_collator: Optional[DataCollator] = None,  # type: ignore
@@ -424,11 +430,18 @@ class PPOTrainer(Trainer):
             [None, lr_scheduler],
             preprocess_logits_for_metrics,
         )
+        actor_trainer.set_eval_model(model_eval)
+
+        actor_trainer.add_callback(MuteDefaultFlowCallback)
+        if not args.disable_tqdm:
+            actor_trainer.pop_callback(ProgressCallback)
+
         return actor_trainer
 
     def create_critic_trainer(
         self,
         model: Union[PretrainedModel, nn.Layer] = None,
+        model_eval: Union[PretrainedModel, nn.Layer] = None,
         criterion: nn.Layer = None,
         args: TrainingArguments = None,
         data_collator: Optional[DataCollator] = None,  # type: ignore
@@ -468,6 +481,11 @@ class PPOTrainer(Trainer):
             [None, lr_scheduler],
             preprocess_logits_for_metrics,
         )
+
+        critic_trainer.set_eval_model(model_eval)
+        critic_trainer.add_callback(MuteDefaultFlowCallback)
+        if not args.disable_tqdm:
+            critic_trainer.pop_callback(ProgressCallback)
         return critic_trainer
 
     def create_reference_trainer(
@@ -1362,7 +1380,6 @@ class PPOTrainer(Trainer):
                     self.set_eval()
 
                     for i in range(0, total_batch_size, per_device_rollout_batch_size):
-                        micro_batch = {}
                         micro_batch = map_structure(
                             lambda tensor: tensor[i : i + per_device_rollout_batch_size],
                             prompt_only_batch,
@@ -1370,12 +1387,9 @@ class PPOTrainer(Trainer):
 
                         # generate for multi batches and then disable FuseMT model
                         generated_batches = self.actor_trainer.generate_sequences(micro_batch)
-                        # NOTE(drownfish19): do process for each micro_batch, prepare for splitting mode
-                        (
-                            micro_cleanup_batches,
-                            micro_indices,
-                            micro_label_ids_batches,
-                        ) = self.cleanup_data_after_generate(generated_batches)
+                        # NOTE(drownfish19): do process for each micro_batch, prepare for split mode
+                        micro_ret = self.cleanup_data_after_generate(generated_batches)
+                        micro_cleanup_batches, micro_indices, micro_label_ids_batches = micro_ret
                         cleanup_batches.extend(micro_cleanup_batches)
                         indices.extend(micro_indices)
                         label_ids_batches.extend(micro_label_ids_batches)
@@ -1478,7 +1492,6 @@ class PPOTrainer(Trainer):
             trainer (Trainer): The trainer instance that will receive the loaded weights.
             kwargs (Any, optional): Additional keyword arguments passed to the `load_unified_checkpoint` function.
         """
-        from paddlenlp.trainer.utils.helper import broadcast_dataset_rank0_model
 
         if trainer.args.unified_checkpoint:
             trainer.unified_checkpoint_handler.load_unified_checkpoint(

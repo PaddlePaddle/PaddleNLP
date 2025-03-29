@@ -20,7 +20,6 @@ from contextlib import contextmanager
 
 import paddle
 import paddle.distributed as dist
-from offload_utils import offload_tensor_to_cpu, reload_tensor_to_gpu
 from paddle.utils import try_import
 from predict.predictor import (
     DygraphBlockInferencePredictor,
@@ -37,6 +36,8 @@ from paddlenlp.transformers import (
 )
 from paddlenlp.transformers.model_utils import dtype_guard
 from paddlenlp.trl.llm_utils import init_dist_env
+
+from .offload_utils import offload_tensor_to_cpu, reload_tensor_to_gpu
 
 
 class PolicyPredictor(DygraphBlockInferencePredictor):

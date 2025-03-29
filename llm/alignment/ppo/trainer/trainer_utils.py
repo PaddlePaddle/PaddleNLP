@@ -17,7 +17,6 @@ import inspect
 from contextlib import contextmanager
 
 import paddle
-from models.ppo_model_utils import make_attention_mask, make_position_ids
 from paddle.distributed import fleet
 
 from paddlenlp.generation.utils import GenerationMixin
@@ -33,6 +32,8 @@ from paddlenlp.transformers import BatchEncoding, PretrainedTokenizer
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 from paddlenlp.transformers.model_outputs import ModelOutput
 from paddlenlp.transformers.tokenizer_utils_base import PaddingStrategy
+
+from ..models.ppo_model_utils import make_attention_mask, make_position_ids
 
 
 class MuteDefaultFlowCallback(TrainerCallback):
