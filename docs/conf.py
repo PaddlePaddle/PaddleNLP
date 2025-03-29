@@ -118,14 +118,14 @@ import requests
 
 def extract_tar(app, config):
     try:
-        url = "https://paddlenlp.bj.bcebos.com/datasets/website.tar"
+        url = "https://paddlenlp.bj.bcebos.com/datasets/website_v2.tar"
         response = requests.get(url)
-        response.raise_for_status()  # 检查请求是否成功
+        response.raise_for_status()  # raise an exception if the request failed
 
         file_stream = BytesIO(response.content)
 
         with tarfile.open(fileobj=file_stream, mode="r") as tar:
-            tar.extractall("_static/")
+            tar.extractall("./")
     except:
         pass
 

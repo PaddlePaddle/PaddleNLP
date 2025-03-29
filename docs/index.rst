@@ -38,7 +38,7 @@
    :caption: 模型库列表
    
    热门模型介绍 <hot_model.md>
-   模型库列表 <model_list.rst>
+   模型库列表 <website/index.md>
    
 
 .. toctree::
