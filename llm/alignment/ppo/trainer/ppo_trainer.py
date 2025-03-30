@@ -25,6 +25,11 @@ import numpy as np
 import paddle
 import paddle.distributed as dist
 import requests
+from models.ppo_model_utils import (
+    create_startend_row_indices,
+    gather_log_probabilities,
+    make_position_ids_from_input_ids,
+)
 from paddle import nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import ParallelCrossEntropy, PipelineLayer
@@ -32,9 +37,22 @@ from paddle.io import DataLoader, Dataset, DistributedBatchSampler
 from paddle.utils import map_structure
 from rich.console import Console
 from rich.table import Table
+from utils.comm_utils import (
+    ActorStages,
+    CriticStages,
+    RolloutStages,
+    data_group_merge,
+    data_group_split,
+    gather_and_pad,
+    get_timer_label,
+    masked_whiten,
+    new_timer_log,
+)
+from utils.infer_utils import infer_guard
+from utils.offload_utils import reload_and_offload_scope, reload_tensor_to_gpu
+from utils.timer_utils import timers_scope
 
 from paddlenlp.data import DataCollator
-from paddlenlp.generation import GenerationConfig
 from paddlenlp.trainer.trainer import (
     EvalLoopOutput,
     EvalPrediction,
@@ -60,24 +78,6 @@ from paddlenlp.transformers import (
 from paddlenlp.transformers.model_utils import _add_variant
 from paddlenlp.utils.env import PADDLE_WEIGHTS_NAME
 
-from ..models.ppo_model_utils import (
-    create_startend_row_indices,
-    gather_log_probabilities,
-    make_position_ids_from_input_ids,
-)
-from ..utils.comm_utils import (
-    ActorStages,
-    CriticStages,
-    RolloutStages,
-    data_group_merge,
-    data_group_split,
-    gather_and_pad,
-    get_timer_label,
-    masked_whiten,
-    new_timer_log,
-)
-from ..utils.infer_utils import infer_guard
-from ..utils.offload_utils import reload_and_offload_scope, reload_tensor_to_gpu
 from .actor_trainer import ActorReferenceTrainer
 from .critic_trainer import CriticTrainer
 from .rl_trainer import RLTrainer
@@ -304,13 +304,13 @@ class PPOTrainer(Trainer):
             )
 
         trainer_agrs = {
-            "model": None,
+            # "model": None,
             "criterion": criterion,
             "args": args,
             "data_collator": data_collator,
             "train_dataset": train_dataset,
             "eval_dataset": eval_dataset,
-            "tokenizer": None,
+            # "tokenizer": None,
             "compute_metrics": compute_metrics,
             "callbacks": callbacks,
             "optimizers": optimizers,
@@ -339,7 +339,7 @@ class PPOTrainer(Trainer):
             tokenizer=reference_tokenizer,
             **trainer_agrs,
         )
-        self.reward_trainer, self.reward_server = self.create_reference_trainer(
+        self.reward_trainer, self.reward_server = self.create_reward_trainer(
             model=reward_model,
             tokenizer=reward_model,
             **trainer_agrs,
@@ -347,7 +347,7 @@ class PPOTrainer(Trainer):
 
         self.train_dataset = train_dataset
         self.eval_dataset = eval_dataset
-        self._model_config = actor_model.config  # use this to change flash attention dynamically
+        self._model_config = actor_model.config
         self._actor_model_eval = actor_model_eval
         self._critic_model_eval = critic_model_eval
         self.reference_model.eval()
@@ -360,21 +360,6 @@ class PPOTrainer(Trainer):
         else:
             self.reward_tokenizer = reward_tokenizer
 
-        self.generation_config = GenerationConfig(
-            max_new_tokens=self.args.max_dec_len,
-            num_return_sequences=self.args.num_return_sequences,
-            temperature=self.args.temperature,
-            top_p=self.args.top_p,
-            top_k=0,  # to disable top_k sampling, default is 50
-            repetition_penalty=self.args.repetition_penalty,
-            min_length=self.args.min_dec_len,
-            do_sample=True,
-            # allow generation output to contain input
-            trunc_input=False,
-            bos_token_id=self.tokenizer.bos_token_id,
-            eos_token_id=self.tokenizer.cls_token_id,
-            pad_token_id=self.tokenizer.pad_token_id,
-        )
         # Those value can be changed
         self.kl_coeff = self.args.kl_coeff
         self.clip_range_score = self.args.clip_range_score
@@ -1195,20 +1180,17 @@ class PPOTrainer(Trainer):
             micro_batches.append(micro_batch)
 
         # get reward/value for multi batches and then disable reward/value model
-        self.timers and self.timers(get_timer_label(RolloutStages.REWARD_MODEL_ENABLE_DISABLE)).start()
-        with self.enable(
-            self.reward_critic_model if self.args.rl_algorithm == "ppo" else None,
-            self.reward_model if not self.args.use_rm_server else None,
+        with timers_scope(
+            self, RolloutStages.REWARD_MODEL_ENABLE_DISABLE, minus_names=[RolloutStages.ROLLOUT_REWARD_VALUE]
         ):
-            self.timers and self.timers(get_timer_label(RolloutStages.ROLLOUT_REWARD_VALUE)).start()
-            for micro_batch in micro_batches:
-                micro_batch.update(self.rollout_reward_value(**micro_batch))
-            self.timers and self.timers(get_timer_label(RolloutStages.ROLLOUT_REWARD_VALUE)).stop()
-        if self.timers:
-            self.timers and self.timers(get_timer_label(RolloutStages.REWARD_MODEL_ENABLE_DISABLE)).stop()
-            self.timers(get_timer_label(RolloutStages.REWARD_MODEL_ENABLE_DISABLE)).elapsed_ -= self.timers(
-                get_timer_label(RolloutStages.ROLLOUT_REWARD_VALUE)
-            ).elapsed_
+            with reload_and_offload_scope(
+                self,
+                self.reward_critic_model if self.args.rl_algorithm == "ppo" else None,
+                self.reward_model if not self.args.use_rm_server else None,
+            ):
+                with timers_scope(self, RolloutStages.ROLLOUT_REWARD_VALUE):
+                    for micro_batch in micro_batches:
+                        micro_batch.update(self.rollout_reward_value(**micro_batch))
 
         if self.args.rl_algorithm == "reinforce_plus_plus":
             old_log_probs = [micro_batch["log_probs"] for micro_batch in micro_batches]
@@ -1335,7 +1317,11 @@ class PPOTrainer(Trainer):
         # ##### set training state and resume #####
         # consumed_samples used to set train_dataloader.batch_sampler may not be
         # correct. Thus, data cannot be resumed perfectly when not breaking at epoch end.
-        (epochs_trained, steps_trained_in_current_epoch, steps_trained_progress_bar,) = self.init_train_state(
+        (
+            epochs_trained,
+            steps_trained_in_current_epoch,
+            steps_trained_progress_bar,
+        ) = self.init_train_state(
             resume_from_checkpoint,
             train_dataloader,
             max_steps,
@@ -1361,7 +1347,6 @@ class PPOTrainer(Trainer):
 
         start_time = time.time()
         self._globalstep_last_start_time = start_time
-        # self.timers and self.timers("read-data").start()
 
         for epoch in range(epochs_trained, num_train_epochs):
             if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
@@ -1372,70 +1357,71 @@ class PPOTrainer(Trainer):
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
             for prompt_only_batch in self.prompt_only_dataloader:
+                # step 1: rollout data with actor model (eval) and reward model
+                self.set_eval()
+
+                data_trans_group = getattr(self.actor_trainer, "_data_trans_group", None)
+                prompt_only_batch = data_group_split(prompt_only_batch, group=data_trans_group)
+
                 cleanup_batches, indices, label_ids_batches = [], [], []
                 total_batch_size = prompt_only_batch["input_ids"].shape[0]
                 per_device_rollout_batch_size = self.args.per_device_rollout_batch_size
 
                 with reload_and_offload_scope(self, self.actor_model, self.reference_model):
-                    self.set_eval()
+                    with infer_guard(self.actor_trainer):
+                        for i in range(0, total_batch_size, per_device_rollout_batch_size):
+                            micro_batch = map_structure(
+                                lambda tensor: tensor[i : i + per_device_rollout_batch_size],
+                                prompt_only_batch,
+                            )
 
-                    for i in range(0, total_batch_size, per_device_rollout_batch_size):
-                        micro_batch = map_structure(
-                            lambda tensor: tensor[i : i + per_device_rollout_batch_size],
-                            prompt_only_batch,
-                        )
+                            # generate for multi batches and then disable FuseMT model
+                            generated_batches = self.actor_trainer.generate_sequences(micro_batch)
+                            # NOTE(drownfish19): do process for each micro_batch, prepare for split mode
+                            micro_ret = self.cleanup_data_after_generate(generated_batches)
+                            micro_cleanup_batches, micro_indices, micro_label_ids_batches = micro_ret
+                            cleanup_batches.extend(micro_cleanup_batches)
+                            indices.extend(micro_indices)
+                            label_ids_batches.extend(micro_label_ids_batches)
+                        indices = np.concatenate(indices)
 
-                        # generate for multi batches and then disable FuseMT model
-                        generated_batches = self.actor_trainer.generate_sequences(micro_batch)
-                        # NOTE(drownfish19): do process for each micro_batch, prepare for split mode
-                        micro_ret = self.cleanup_data_after_generate(generated_batches)
-                        micro_cleanup_batches, micro_indices, micro_label_ids_batches = micro_ret
-                        cleanup_batches.extend(micro_cleanup_batches)
-                        indices.extend(micro_indices)
-                        label_ids_batches.extend(micro_label_ids_batches)
-                    indices = np.concatenate(indices)
-
-                    self.set_train()
-
-                rl_batch = self.prepare_data_for_train(
+                train_batch = self.prepare_data_for_train(
                     prompt_only_batch=prompt_only_batch,
                     cleanup_batches=cleanup_batches,
                     indices=indices,
                     label_ids_batches=label_ids_batches,
                 )
 
-                self.timers and self.timers(get_timer_label(ActorStages.MODEL_ENABLE_DISABLE)).start()
-                with reload_and_offload_scope(self, self.actor_model, self.actor_trainer.optimizer):
-                    self.timers and self.timers(get_timer_label(ActorStages.RL_STEP)).start()
-                    rl_info = self.rl_step(rl_batch)
-                    self.timers and self.timers(get_timer_label(ActorStages.RL_STEP)).stop()
+                train_batch = data_group_merge(train_batch, group=data_trans_group)
+                self.set_train()
 
-                if self.timers:
-                    self.timers(get_timer_label(ActorStages.MODEL_ENABLE_DISABLE)).stop()
-                    self.timers(get_timer_label(ActorStages.MODEL_ENABLE_DISABLE)).elapsed_ -= self.timers(
-                        get_timer_label(ActorStages.RL_STEP)
-                    ).elapsed_  # fmt:off
+                # step 2: train actor model and critic model with rollout data
+                for step, rl_batch in enumerate(train_batch):
+                    with timers_scope(self, ActorStages.MODEL_ENABLE_DISABLE, minus_names=[ActorStages.RL_STEP]):
+                        with reload_and_offload_scope(self, self.actor_model, self.actor_trainer.optimizer):
+                            with timers_scope(self, ActorStages.RL_STEP):
+                                rl_info = self.rl_step(rl_batch)
 
-                paddle.device.cuda.empty_cache()
-                if self.args.rl_algorithm == "ppo":
-                    rl_critic_info = self.rl_critic_step(rl_batch)
-                    rl_info.update(rl_critic_info)
-                if self.is_step_end():
-                    self.state.global_step += 1
-                    self.state.epoch = epoch + (step + 1) / steps_in_epoch
-                    rl_info.update(self.get_step_loss(loss_prefix="train_"))
-                    rl_info = metric.update(rl_info)
-                    # on_step_end
-                    self.control = self.callback_handler.on_step_end(args, self.state, self.control)
-                else:
-                    # on_sub_step_end
-                    self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
-                self._print_timer()
-                self._maybe_log_save_evaluate(rl_info, None, epoch, ignore_keys_for_eval, inputs=inputs)
-                paddle.device.cuda.empty_cache()
+                    paddle.device.cuda.empty_cache()
+                    if self.args.rl_algorithm == "ppo":
+                        rl_critic_info = self.rl_critic_step(rl_batch)
+                        rl_info.update(rl_critic_info)
+                    if self.is_step_end():
+                        self.state.global_step += 1
+                        self.state.epoch = epoch + (step + 1) / steps_in_epoch
+                        rl_info.update(self.get_step_loss(loss_prefix="train_"))
+                        rl_info = metric.update(rl_info)
+                        # on_step_end
+                        self.control = self.callback_handler.on_step_end(args, self.state, self.control)
+                    else:
+                        # on_sub_step_end
+                        self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
+                    self._print_timer()
+                    self._maybe_log_save_evaluate(rl_info, None, epoch, ignore_keys_for_eval, inputs=rl_batch)
+                    paddle.device.cuda.empty_cache()
 
-                if self.control.should_epoch_stop or self.control.should_training_stop:
-                    break
+                    if self.control.should_epoch_stop or self.control.should_training_stop:
+                        break
 
             if step < 0:
                 logger.warning(
@@ -1447,7 +1433,7 @@ class PPOTrainer(Trainer):
 
             self.control = self.callback_handler.on_epoch_end(args, self.state, self.control)
             # argument model is not used in _maybe_log_save_evaluate, thus use None
-            self._maybe_log_save_evaluate(rl_info, None, epoch, ignore_keys_for_eval, inputs=inputs)
+            self._maybe_log_save_evaluate(rl_info, None, epoch, ignore_keys_for_eval, inputs=rl_batch)
 
             if self.control.should_training_stop:
                 break
@@ -1778,60 +1764,13 @@ class PPOTrainer(Trainer):
             "reward_returns": reward_returns,
             "sequence_mask": sequence_mask,
         }
-        self.timers and self.timers(get_timer_label(CriticStages.MODEL_ENABLE_DISABLE)).start()
-        with self.enable(self.critic_model, self.critic_trainer.optimizer):
-            self.timers and self.timers(get_timer_label(CriticStages.CRITIC_TRAINING_STEP)).start()
-            reward_critic_loss = self.critic_trainer.full_training_step(**value_trainer_inputs)
-            self.timers and self.timers(get_timer_label(CriticStages.CRITIC_TRAINING_STEP)).stop()
 
-        if self.timers:
-            self.timers and self.timers(get_timer_label(CriticStages.MODEL_ENABLE_DISABLE)).stop()
-            self.timers(get_timer_label(CriticStages.MODEL_ENABLE_DISABLE)).elapsed_ -= self.timers(
-                get_timer_label(CriticStages.CRITIC_TRAINING_STEP)
-            ).elapsed_
+        with timers_scope(self, CriticStages.MODEL_ENABLE_DISABLE, minus_names=[CriticStages.CRITIC_TRAINING_STEP]):
+            with self.enable(self.critic_model, self.critic_trainer.optimizer):
+                with timers_scope(self, CriticStages.CRITIC_TRAINING_STEP):
+                    reward_critic_loss = self.critic_trainer.full_training_step(**value_trainer_inputs)
 
         return {"train_value_loss": reward_critic_loss}
-
-    @paddle.no_grad()
-    @data_dispatch  # 3.10 static methods are now callable as regular functions.
-    def split_rl_micro_batches(
-        self,
-        prompt_only_batch: Dict,
-    ) -> List[Dict]:
-        """Split a batch of RL samples into micro-batches."""
-
-        # micro_batch_size = self.args.per_device_train_batch_size
-        per_device_rollout_batch_size = self.args.per_device_rollout_batch_size
-        per_device_train_batch_size = self.args.per_device_train_batch_size
-        micro_batches = []
-
-        # TODO(guosheng): clean get_epoch_iterator:
-        # 1. scope guard for offload, we would split post_rollout into multiple
-        #    sub-methods to offload in-time
-        # 2. decorate split_rl_micro_batches to automatically split/merge data
-
-        self.timers and self.timers(get_timer_label(RolloutStages.ACTOR_MODEL_ENABLE_DISABLE)).start()
-        with reload_and_offload_scope(self, self.actor_model, self.reference_model):
-            # generate for multi batches and then disable FuseMT model
-
-            self.timers and self.timers(get_timer_label(RolloutStages.GENERATE)).start()
-
-            self.timers and self.timers(get_timer_label(RolloutStages.GENERATE)).stop()
-            # get log_probs for multi batches and then disable actor/refer rmodel
-
-            self.timers and self.timers(get_timer_label(RolloutStages.ROLLOUT_LOGPROB)).start()
-
-            self.timers and self.timers(get_timer_label(RolloutStages.ROLLOUT_LOGPROB)).stop()
-        # if self.timers:
-        #     self.timers(get_timer_label(RolloutStages.ACTOR_MODEL_ENABLE_DISABLE)).stop()
-        #     self.timers(get_timer_label(RolloutStages.ACTOR_MODEL_ENABLE_DISABLE)).elapsed_ -= self.timers(
-        #         get_timer_label(RolloutStages.GENERATE)
-        #     ).elapsed_
-        #     self.timers(get_timer_label(RolloutStages.ACTOR_MODEL_ENABLE_DISABLE)).elapsed_ -= self.timers(
-        #         get_timer_label(RolloutStages.ROLLOUT_LOGPROB)
-        #     ).elapsed_
-
-        # get reward/value for multi batches and then disable reward/value model
 
     @paddle.no_grad()
     def rollout_logprob(

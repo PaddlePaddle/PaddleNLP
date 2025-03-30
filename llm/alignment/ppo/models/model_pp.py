@@ -24,14 +24,14 @@ from paddlenlp.transformers.llama.modeling_pp import (
     return_args,
 )
 
-from .pp_model_utils import fwd_args_to_dict, get_expected_keys, pad_batches_inputs
-from .ppo_model_utils import (
+from pp_model_utils import fwd_args_to_dict, get_expected_keys, pad_batches_inputs
+from ppo_model_utils import (
     RLHFPPOMixedLoss,
     RLHFValueLoss,
     create_loss,
     make_position_ids,
 )
-from .score_model_utils import ScoreModelMixin
+from score_model_utils import ScoreModelMixin
 
 # patches for base pipe model
 # non-pipe model class, can be used to parse and convert forward args

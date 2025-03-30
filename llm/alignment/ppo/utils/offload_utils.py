@@ -175,7 +175,7 @@ def reload_and_offload_scope(trainer, *args):
         trainer.actor_model: "train_model",
         trainer.reference_model: "freeze_model",
         **({trainer.reward_model: "freeze_model"} if not trainer.args.use_rm_server else {}),
-        trainer.policy_trainer.optimizer: "optimizer",
+        trainer.actor_trainer.optimizer: "optimizer",
     }
 
     if trainer.args.rl_algorithm == "ppo":
@@ -186,8 +186,8 @@ def reload_and_offload_scope(trainer, *args):
             }
         )
 
-    if getattr(trainer.policy_trainer, "_inner_eval_model", None) is not None:
-        offload_map.update({trainer.policy_trainer._inner_eval_model: "freeze_model"})
+    if getattr(trainer.actor_trainer, "_inner_eval_model", None) is not None:
+        offload_map.update({trainer.actor_trainer._inner_eval_model: "freeze_model"})
 
     if trainer.args.rl_algorithm == "ppo" and getattr(trainer.value_trainer, "_inner_eval_model", None) is not None:
         offload_map.update({trainer.value_trainer._inner_eval_model: "freeze_model"})

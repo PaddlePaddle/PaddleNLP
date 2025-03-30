@@ -26,10 +26,12 @@ from paddlenlp.transformers import AutoConfig, AutoModelForCausalLM, AutoTokeniz
 from paddlenlp.trl import llm_utils
 from paddlenlp.utils.log import logger
 
-from .models.score_model import AutoModelForScore
-from .trainer.ppo_trainer import PPOTrainer
-from .utils.config_utils import DataArgument, ModelArgument, TrainingArguments
-from .utils.offload_utils import offload_tensor_to_cpu
+# isort: off
+from models.score_model import AutoModelForScore
+from trainer.ppo_trainer import PPOTrainer
+from utils.config_utils import DataArgument, ModelArgument, TrainingArguments
+from utils.offload_utils import offload_tensor_to_cpu
+# isort: on
 
 
 def process_args(model_args, data_args, training_args):
@@ -106,7 +108,7 @@ def create_actor_models(model_args, data_args, training_args, common_config, run
     else:
         actor_eval_model = None
 
-    runtime_timer.start("Actor reference model loading time")
+    # runtime_timer.start("Actor reference model loading time")
 
     config = copy.deepcopy(actor_model_config)
     if training_args.eval_mode is not None:
@@ -346,24 +348,19 @@ def main():
         }
 
     trainer = PPOTrainer(
-        #  (policy_model, reference_model, reward_model, critic_model, actor_eval_model, critic_eval_model
-        model=(
-            actor_model,
-            reference_model,
-            reward_model,
-            critic_model if training_args.rl_algorithm == "ppo" else None,
-            actor_eval_model,
-            critic_eval_model if training_args.rl_algorithm == "ppo" else None,
-        ),
+        actor_model=actor_model,
+        reference_model=reference_model,
+        reward_model=reward_model,
+        critic_model=critic_model if training_args.rl_algorithm == "ppo" else None,
+        actor_model_eval=actor_eval_model,
+        critic_model_eval=critic_eval_model if training_args.rl_algorithm == "ppo" else None,
         args=training_args,
         train_dataset=(train_ds if training_args.do_train and training_args.should_load_dataset else None),
         eval_dataset=(dev_ds if training_args.do_eval and training_args.should_load_dataset else None),
-        tokenizer=(
-            actor_tokenizer,
-            actor_tokenizer,
-            reward_tokenizer,
-            critic_tokenizer if training_args.rl_algorithm == "ppo" else None,
-        ),
+        actor_tokenizer=actor_tokenizer,
+        reference_tokenizer=actor_tokenizer,
+        reward_tokenizer=reward_tokenizer,
+        critic_tokenizer=critic_tokenizer if training_args.rl_algorithm == "ppo" else None,
         data_collator=partial(
             collate_fn,
             pad_token_id=actor_tokenizer.pad_token_id,

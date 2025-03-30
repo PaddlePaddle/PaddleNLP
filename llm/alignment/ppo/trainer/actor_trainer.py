@@ -11,13 +11,44 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
+import time
 import uuid
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import paddle
+import paddle.distributed as dist
+import tqdm
+from models.ppo_model_utils import RLHFPPOMixedLoss, create_loss
+from paddle import nn
+from paddle.distributed import fleet
+from paddle.io import DataLoader, Dataset
+from utils.comm_utils import create_data_trans_group
+from utils.infer_utils import InferEvalModel
 
-from ..models.ppo_model_utils import RLHFPPOMixedLoss
+from paddlenlp.data import DataCollator
+from paddlenlp.generation import GenerationConfig
+from paddlenlp.trainer.trainer import (
+    TRAINER_STATE_NAME,
+    HybridParallelOptimizer,
+    NlpDistributedBatchSampler,
+    ShardingOption,
+    Trainer,
+    TrainerCallback,
+    TrainerState,
+    TrainingArguments,
+    _obtain_optimizer_parameters_list,
+    distributed_file,
+    distributed_isfile,
+    fused_allreduce_gradients,
+    logger,
+    reshard_util,
+    split_inputs_sequence_dim,
+)
+from paddlenlp.trainer.trainer_utils import EvalPrediction, ShardingOption
+from paddlenlp.transformers import PretrainedModel, PretrainedTokenizer
+
 from .rl_trainer import RLTrainer
 from .trainer_utils import guard_set_args
 
@@ -25,6 +56,50 @@ from .trainer_utils import guard_set_args
 class ActorReferenceTrainer(RLTrainer):
     loss_cls = RLHFPPOMixedLoss
     trainer_type = "policy"
+
+    def __init__(
+        self,
+        model: Union[PretrainedModel, nn.Layer] = None,
+        criterion: nn.Layer = None,
+        args: TrainingArguments = None,
+        data_collator: Optional[DataCollator] = None,
+        train_dataset: Optional[Dataset] = None,
+        eval_dataset: Union[Dataset, Dict[str, Dataset]] = None,
+        tokenizer: Optional[PretrainedTokenizer] = None,
+        compute_metrics: Optional[Callable[[EvalPrediction], Dict]] = None,
+        callbacks: Optional[List[TrainerCallback]] = None,
+        optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
+        preprocess_logits_for_metrics: Optional[Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor]] = None,
+    ):
+        super().__init__(
+            model,
+            criterion,
+            args,
+            data_collator,
+            train_dataset,
+            eval_dataset,
+            tokenizer,
+            compute_metrics,
+            callbacks,
+            optimizers,
+            preprocess_logits_for_metrics,
+        )
+
+        self.generation_config = GenerationConfig(
+            max_new_tokens=self.args.max_dec_len,
+            num_return_sequences=self.args.num_return_sequences,
+            temperature=self.args.temperature,
+            top_p=self.args.top_p,
+            top_k=0,  # to disable top_k sampling, default is 50
+            repetition_penalty=self.args.repetition_penalty,
+            min_length=self.args.min_dec_len,
+            do_sample=True,
+            # allow generation output to contain input
+            trunc_input=False,
+            bos_token_id=self.tokenizer.bos_token_id,
+            eos_token_id=self.tokenizer.cls_token_id,
+            pad_token_id=self.tokenizer.pad_token_id,
+        )
 
     def loss_identifier(self, inputs: Dict) -> str:
         """
@@ -58,13 +133,13 @@ class ActorReferenceTrainer(RLTrainer):
             # )
             # position_ids = position_ids.repeat_interleave(self.args.num_return_sequences, axis=0)
 
-        with guard_set_args(self._model_config, {"use_fused_head_and_loss_fn": False}):
-            sequences = self.model.generate(
+        with guard_set_args(self.model.config, {"use_fused_head_and_loss_fn": False}):
+            sequences = self.get_model(False).generate(
                 input_ids=input_ids,
                 attention_mask=None,
                 position_ids=None,
                 generation_config=self.generation_config,
-                synced_gpus=ShardingOption.FULL_SHARD in self.actor_trainer.args.sharding,
+                synced_gpus=ShardingOption.FULL_SHARD in self.args.sharding,
                 do_eval=do_eval,
             )[0]
 

@@ -23,9 +23,12 @@ import numpy as np
 import paddle
 import paddle.distributed as dist
 import tqdm
+from models.ppo_model_utils import create_loss
 from paddle import nn
 from paddle.distributed import fleet
 from paddle.io import DataLoader, Dataset
+from utils.comm_utils import create_data_trans_group
+from utils.infer_utils import InferEvalModel
 
 from paddlenlp.data import DataCollator
 from paddlenlp.trainer.trainer import (
@@ -48,9 +51,6 @@ from paddlenlp.trainer.trainer import (
 from paddlenlp.trainer.trainer_utils import EvalPrediction
 from paddlenlp.transformers import PretrainedModel, PretrainedTokenizer
 
-from ..models.ppo_model_utils import create_loss
-from ..utils.comm_utils import create_data_trans_group
-from ..utils.infer_utils import InferEvalModel
 from .trainer_utils import PipeEvalModel
 
 

@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from actor_trainer import *
-from critic_trainer import *
-from rl_trainer import *
-from trainer_utils import *
+from .actor_trainer import *
+from .critic_trainer import *
+from .rl_trainer import *
+from .trainer_utils import *

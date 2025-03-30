@@ -14,14 +14,14 @@
 
 from paddlenlp.transformers import LlamaForCausalLM, PretrainedConfig
 
-from .ppo_model_utils import (
+from ppo_model_utils import (
     PolicyOutput,
     RLHFPPOMixedLoss,
     RLHFValueLoss,
     ValueOutput,
     create_startend_row_indices,
 )
-from .score_model import LlamaModelForScore
+from score_model import LlamaModelForScore
 
 
 # TODO(guosheng): create Mixin and make model classes using metaclass.
