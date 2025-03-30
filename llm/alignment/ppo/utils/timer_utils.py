@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from contextlib import contextmanager
-from typing import List, Str, Union
+from typing import List, Union
 
 from paddlenlp.trainer import Trainer
 from paddlenlp.trainer.plugins.timer import RuntimeTimer
@@ -23,7 +23,7 @@ from .comm_utils import get_timer_label
 
 
 @contextmanager
-def timers_scope(trainer: Trainer, name, minus_names: Union[List, Str] = None):
+def timers_scope(trainer: Trainer, name, minus_names: Union[List, str] = None):
     """
     Timing scope that will be used when training.
     Args:
@@ -48,7 +48,7 @@ def timers_scope(trainer: Trainer, name, minus_names: Union[List, Str] = None):
 
 
 @contextmanager
-def timers_scope_manual_label(trainer, name, minus_names: Union[List, Str] = None):
+def timers_scope_manual_label(trainer, name, minus_names: Union[List, str] = None):
     """
     Timing scope that will be used when training.
     Args:
@@ -81,7 +81,7 @@ def timers_scope_runtimer(name):
         name (str): Name of the timer.
         minus_name (str): Name of the timer to subtract from.
     """
-    timer = RuntimeTimer()
+    timer = RuntimeTimer(name)
 
     timer.start(name)
     yield
