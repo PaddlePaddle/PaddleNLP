@@ -821,3 +821,87 @@ def new_timer_log(self, names, normalizer=1.0, reset=True):
 
 
 Trainer.export_evaluate_model = export_evaluate_model
+
+
+def masked_mean(values, mask, axis=None):
+    """Compute mean of tensor with a masked values."""
+    return (values * mask).sum(axis=None) / mask.sum(axis=None)
+
+
+def masked_var(values, mask, unbiased=True):
+    """Compute variance of tensor with masked values."""
+    mean = masked_mean(values, mask)
+    centered_values = values - mean
+    variance = masked_mean(centered_values**2, mask)
+    if unbiased:
+        mask_sum = mask.sum()
+        if mask_sum == 0:
+            raise ValueError("At least one element in the mask has to be 1.")
+        # note that if mask_sum == 1, then there is a division by zero issue
+        # to avoid it you just need to use a larger minibatch_size
+        if mask_sum == 1:
+            raise ValueError("The sum of the mask is one, which can cause a division by zero.")
+        bessel_correction = mask_sum / (mask_sum - 1)
+        variance = variance * bessel_correction
+    return variance
+
+
+def masked_whiten(values, mask, shift_mean=True):
+    """Whiten values with masked values."""
+    mean, var = masked_mean(values, mask), masked_var(values, mask)
+    whitened = (values - mean) * paddle.rsqrt(var + 1e-8)
+    if not shift_mean:
+        whitened += mean
+    return whitened
+
+
+def gather_and_pad(tensor, dp_group, sd_group, pad_index=0.0, pad=True):
+    """Gather tensor from all devices."""
+    if not isinstance(tensor, list):
+        tensor = [tensor]
+    dtype = tensor[0].dtype
+
+    def pad_tensor(tensor_list):
+        max_size = max([i.shape[-1] for i in tensor_list])
+        data_num = sum([i.shape[0] for i in tensor_list])
+        new_tensor = paddle.full((data_num, max_size), pad_index, dtype=dtype)
+        offset = 0
+        for idx, i in enumerate(tensor_list):
+            new_tensor[offset : offset + i.shape[0], : i.shape[-1]] = i
+            offset += i.shape[0]
+        return new_tensor
+
+    if dp_group.nranks == 1 and sd_group.nranks == 1:
+        if not pad:
+            return paddle.concat(tensor, axis=0)
+        else:
+            return pad_tensor(tensor)
+
+    def map_func(weight):
+        if isinstance(weight, paddle.Tensor):
+            weight = weight.numpy()
+        return weight
+
+    tensor = [map_func(i) for i in tensor]
+
+    sd_gathered_tensor = []
+    if sd_group.nranks > 1:
+        dist.all_gather_object(sd_gathered_tensor, tensor, group=sd_group)
+
+    dp_gathered_tensor = []
+    if dp_group.nranks > 1:
+        if len(sd_gathered_tensor) > 0:
+            tensor = sd_gathered_tensor
+        dist.all_gather_object(dp_gathered_tensor, tensor, group=dp_group)
+
+    if len(dp_gathered_tensor) > 0:
+        gathered_tensor = dp_gathered_tensor
+    else:
+        gathered_tensor = sd_gathered_tensor
+
+    gathered_tensor = [paddle.to_tensor(i, dtype=dtype) for i in flatten_list(gathered_tensor)]
+
+    if not pad:
+        return paddle.concat(gathered_tensor, axis=0)
+    else:
+        return pad_tensor(gathered_tensor)
