@@ -23,16 +23,14 @@ import numpy as np
 import paddle
 import paddle.distributed as dist
 import tqdm
-from models.ppo_model_utils import create_loss
 from paddle import nn
 from paddle.distributed import fleet
 from paddle.io import DataLoader, Dataset
-from utils.comm_utils import create_data_trans_group
-from utils.infer_utils import InferEvalModel
 
 from paddlenlp.data import DataCollator
 from paddlenlp.trainer.trainer import (
     TRAINER_STATE_NAME,
+    EvalPrediction,
     HybridParallelOptimizer,
     NlpDistributedBatchSampler,
     ShardingOption,
@@ -48,11 +46,14 @@ from paddlenlp.trainer.trainer import (
     reshard_util,
     split_inputs_sequence_dim,
 )
-from paddlenlp.trainer.trainer_utils import EvalPrediction
 from paddlenlp.transformers import PretrainedModel, PretrainedTokenizer
 
+# isort: off
+from models.ppo_model_utils import create_loss
+from utils.comm_utils import create_data_trans_group
+from utils.infer_utils import InferEvalModel
 from .trainer_utils import PipeEvalModel
-
+#isort: on
 
 # ########## patches for Trianer ##########
 def init_train_model_opt(
@@ -535,7 +536,7 @@ class RLTrainer(Trainer):
         model: Union[PretrainedModel, nn.Layer] = None,
         criterion: nn.Layer = None,
         args: TrainingArguments = None,
-        data_collator: Optional[DataCollator] = None,
+        data_collator: Optional[DataCollator] = None, # type: ignore
         train_dataset: Optional[Dataset] = None,
         eval_dataset: Union[Dataset, Dict[str, Dataset]] = None,
         tokenizer: Optional[PretrainedTokenizer] = None,

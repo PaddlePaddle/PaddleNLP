@@ -18,13 +18,14 @@ import os
 import sys
 import time
 import types
-from collections import defaultdict
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import paddle
 import paddle.distributed as dist
 import requests
+from algos.advantage import compute_grpo_advantages, compute_reinforce_plus_plus_advantages_and_returns
+from algos.normalize import normalize_batch_data_ppo, normalize_batch_data_reinforce_plus_plus
 from models.ppo_model_utils import (
     create_startend_row_indices,
     gather_log_probabilities,
@@ -43,9 +44,6 @@ from utils.comm_utils import (
     RolloutStages,
     data_group_merge,
     data_group_split,
-    gather_and_pad,
-    get_timer_label,
-    masked_whiten,
     new_timer_log,
 )
 from utils.infer_utils import infer_guard
@@ -407,8 +405,8 @@ class PPOTrainer(Trainer):
             criterion,
             policy_training_args,
             data_collator,
-            self.train_dataset,
-            self.eval_dataset,
+            train_dataset,
+            eval_dataset,
             tokenizer,
             compute_metrics,
             callbacks,
@@ -1093,22 +1091,14 @@ class PPOTrainer(Trainer):
         for batch in generated_batches:
             cleanup_batches.extend(
                 [
-                    process_row(
-                        row,
-                        remove_value=self.tokenizer.pad_token_id,
-                        remove_side="right",
-                    )
+                    process_row(row, remove_value=self.tokenizer.pad_token_id, remove_side="right")
                     for row in batch["input_ids"]
                 ]
             )
             if self.args.use_rm_server:
                 label_ids_batches.extend(
                     [
-                        process_row(
-                            row,
-                            remove_value=self.tokenizer.pad_token_id,
-                            remove_side="right",
-                        )
+                        process_row(row, remove_value=self.tokenizer.pad_token_id, remove_side="right")
                         for row in batch["label_ids"]
                     ]
                 )
@@ -1192,53 +1182,13 @@ class PPOTrainer(Trainer):
                     for micro_batch in micro_batches:
                         micro_batch.update(self.rollout_reward_value(**micro_batch))
 
-        if self.args.rl_algorithm == "reinforce_plus_plus":
-            old_log_probs = [micro_batch["log_probs"] for micro_batch in micro_batches]
-            ref_log_probs = [micro_batch["ref_log_probs"] for micro_batch in micro_batches]
-            rewards = [micro_batch["rewards"] for micro_batch in micro_batches]
-            eos_mask = [
-                (micro_batch["input_ids"] != self.tokenizer.pad_token_id)[:, micro_batch["prompt"].shape[-1] :].to(
-                    old_log_probs[0].dtype
-                )
-                for micro_batch in micro_batches
-            ]
-            shapes = [micro_batch["log_probs"].shape for micro_batch in micro_batches]
-            try:
-                hcg = fleet.get_hybrid_communicate_group()
-                sd_group = hcg.get_sharding_parallel_group()
-                dp_group = hcg.get_data_parallel_group()
-            except AttributeError:
-                pass
-            new_batch = {
-                "rewards": gather_and_pad(rewards, dp_group, sd_group, pad=False),
-                "log_probs": gather_and_pad(old_log_probs, dp_group, sd_group),
-                "ref_log_probs": gather_and_pad(ref_log_probs, dp_group, sd_group),
-                "eos_mask": gather_and_pad(eos_mask, dp_group, sd_group),
-            }
-            new_batches = self.normalize_batch_data([new_batch], use_tgt_len_value=self.args.use_tgt_len_value)
-            local_data = {
-                "reward_advantages": self.get_rank_data(new_batches[0]["reward_advantages"]),
-                "rewards": self.get_rank_data(new_batches[0]["rewards"]),
-                "ori_rewards": self.get_rank_data(new_batches[0]["ori_rewards"]),
-                "reward_returns": self.get_rank_data(new_batches[0]["reward_returns"]),
-                "kl_rewards": self.get_rank_data(new_batches[0]["kl_rewards"]),
-                "rewards_with_kl": self.get_rank_data(new_batches[0]["rewards_with_kl"]),
-                "eos_mask": self.get_rank_data(new_batches[0]["eos_mask"]),
-            }
-            offset = 0
-            for idx, batch in enumerate(micro_batches):
-                for k, v in local_data.items():
-                    if local_data[k][offset].ndim < 1:
-                        micro_batches[idx].update(
-                            {k: local_data[k][offset : offset + len(batch["log_probs"])][: shapes[idx][-1]]}
-                        )
-                    else:
-                        micro_batches[idx].update(
-                            {k: local_data[k][offset : offset + len(batch["log_probs"])][:, : shapes[idx][-1]]}
-                        )
-                offset += len(batch["log_probs"])
+        if self.args.rl_algorithm in ["ppo", "grpo"]:
+            normalize_batch_data_ppo(self, micro_batches)
+        elif self.args.rl_algorithm == "reinforce_plus_plus":
+            normalize_batch_data_reinforce_plus_plus(self, micro_batches)
         else:
-            micro_batches = self.normalize_batch_data(micro_batches, use_tgt_len_value=self.args.use_tgt_len_value)
+            raise ValueError("Now support algos are ppo, grpo and reinforce_plus_plus.")
+
         return micro_batches
 
     def get_rank_data(self, tensor):
@@ -1782,44 +1732,38 @@ class PPOTrainer(Trainer):
         """
         计算rollout过程中每个token的log probability。
 
-            Args:
-                input_ids (paddle.Tensor, shape [batch_size, sequence_length]):
-                    输入序列，其中每个元素都是一个int，表示各自token的ID。
-                attention_mask (paddle.Tensor, shape [batch_size, sequence_length]):
-                    输入序列的attention mask，其中每个元素为0或1，用于指示哪些tokens应该被模型考虑。
-                position_ids (paddle.Tensor, optional, shape [batch_size, sequence_length], defaults to None):
-                    输入序列中每个token的位置ID，默认为None。
-                kwargs (Dict[str, Any], optional, defaults to {}):
-                    可选参数，目前未使用。
+        Args:
+            input_ids (paddle.Tensor, shape [batch_size, sequence_length]):
+                输入序列，其中每个元素都是一个int，表示各自token的ID。
+            attention_mask (paddle.Tensor, shape [batch_size, sequence_length]):
+                输入序列的attention mask，其中每个元素为0或1，用于指示哪些tokens应该被模型考虑。
+            position_ids (paddle.Tensor, optional, shape [batch_size, sequence_length], defaults to None):
+                输入序列中每个token的位置ID，默认为None。
+            kwargs (Dict[str, Any], optional, defaults to {}):
+                可选参数，目前未使用。
 
-            Returns:
-                Dict[str, paddle.Tensor]:
-                    - log_probs (paddle.Tensor, shape [batch_size, sequence_length - 1]):
-                        每个token在rollout过程中的log probability。
-                    - ref_log_probs (paddle.Tensor, shape [batch_size, sequence_length - 1]):
-                        每个token在rollout过程中的reference log probability。
+        Returns:
+            Dict[str, paddle.Tensor]:
+                - log_probs (paddle.Tensor, shape [batch_size, sequence_length - 1]):
+                    每个token在rollout过程中的log probability。
+                - ref_log_probs (paddle.Tensor, shape [batch_size, sequence_length - 1]):
+                    每个token在rollout过程中的reference log probability。
 
-            Raises:
-                None.
+        Raises:
+            None.
         """
         # pipe model outputs a logits tensor with LMHead, while non-pipe model
         # outputs a tuple with logits tensor as the only one element.
         startend_row_indices = create_startend_row_indices(input_ids, self.tokenizer.pad_token_id)
         response_start = kwargs["prompt"].shape[-1] - 1 if "prompt" in kwargs else 0
         logits = self.actor_model(
-            input_ids,
-            position_ids=position_ids,
-            attn_mask_startend_row_indices=startend_row_indices,
-            # return_dict=True,
-        )  # .logits
+            input_ids, position_ids=position_ids, attn_mask_startend_row_indices=startend_row_indices
+        )
         if not isinstance(logits, paddle.Tensor):
             logits = logits[0]  # [2, 355, 12544]
         ref_logits = self.reference_model(
-            input_ids,
-            position_ids=position_ids,
-            attn_mask_startend_row_indices=startend_row_indices,
-            # return_dict=True,
-        )  # .logits
+            input_ids, position_ids=position_ids, attn_mask_startend_row_indices=startend_row_indices
+        )
 
         if not isinstance(ref_logits, paddle.Tensor):
             ref_logits = ref_logits[0]  # [2, 355, 12544]
@@ -1981,17 +1925,17 @@ class PPOTrainer(Trainer):
         """
         根据输入的序列，计算每个时间步骤的奖励值和奖励得分。如果模型使用了不同的tokenizer，则先将输入序列转换为目标tokenizer的格式。
 
-            Args:
-                input_ids (paddle.Tensor): shape=[batch_size, seq_len], 输入序列的ID，取值范围是[0, vocabulary_size - 1]。
-                attention_mask (paddle.Tensor): shape=[batch_size, seq_len], 输入序列的注意力掩码，取值范围是{0, 1}。
-                position_ids (Optional, paddle.Tensor, optional): shape=[batch_size, seq_len], 输入序列的位置ID，默认为None。
-                kwargs (Dict, optional): 其他可选参数，包括：
-                    reward_tokenizer (Tokenizer, optional): 奖励tokenizer，默认为None，表示使用与模型相同的tokenizer。
+        Args:
+            input_ids (paddle.Tensor): shape=[batch_size, seq_len], 输入序列的ID，取值范围是[0, vocabulary_size - 1]。
+            attention_mask (paddle.Tensor): shape=[batch_size, seq_len], 输入序列的注意力掩码，取值范围是{0, 1}。
+            position_ids (Optional, paddle.Tensor, optional): shape=[batch_size, seq_len], 输入序列的位置ID，默认为None。
+            kwargs (Dict, optional): 其他可选参数，包括：
+                reward_tokenizer (Tokenizer, optional): 奖励tokenizer，默认为None，表示使用与模型相同的tokenizer。
 
-            Returns:
-                Dict[str, paddle.Tensor]: 返回一个字典，包含两个键值对：
-                    rewards (paddle.Tensor): shape=[batch_size, seq_len], 每个时间步骤的奖励得分，取值范围是[-inf, inf]。
-                    reward_values (paddle.Tensor): shape=[batch_size, seq_len-1], 每个时间步骤的奖励值，取值范围是[0, inf]。
+        Returns:
+            Dict[str, paddle.Tensor]: 返回一个字典，包含两个键值对：
+                rewards (paddle.Tensor): shape=[batch_size, seq_len], 每个时间步骤的奖励得分，取值范围是[-inf, inf]。
+                reward_values (paddle.Tensor): shape=[batch_size, seq_len-1], 每个时间步骤的奖励值，取值范围是[0, inf]。
         """
         if not self.args.use_rm_server:
             if self.reward_tokenizer is not self.tokenizer:
@@ -2016,7 +1960,6 @@ class PPOTrainer(Trainer):
                 attention_mask=None,
                 attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                 position_ids=reward_position_ids,
-                # return_dict=True,
             )[1]
         else:
             prompt_len = kwargs["prompt"].shape[-1]
@@ -2153,6 +2096,7 @@ class PPOTrainer(Trainer):
             rewards = rl_batch["rewards"]  # length: 1
             if self.args.rl_algorithm == "ppo":
                 old_reward_values = rl_batch["reward_values"]  # length: src + tgt -1
+
             if self.args.rl_algorithm == "grpo":
                 eos_mask = (rl_batch["input_ids"] != self.tokenizer.pad_token_id)[:, 1:].to(old_log_probs.dtype)
                 start = rl_batch["prompt"].shape[-1] - 1
@@ -2254,69 +2198,3 @@ class PPOTrainer(Trainer):
                 rl_batch["reward_advantages"] = rl_batch["reward_advantages"] * rl_batch["eos_mask"]
 
         return rl_batches
-
-
-@paddle.no_grad()
-def compute_grpo_advantages(
-    rewards: paddle.Tensor,
-    index: np.ndarray,
-    sequence_mask: paddle.Tensor,
-    response_length: int,
-    epsilon: float = 1e-6,
-):
-    """
-    计算每个prompt的GRPO优势。
-
-    Args:
-        rewards (paddle.Tensor, shape=[batch_size]): 回报，单位为float。
-        index (np.ndarray, shape=[batch_size]): 每个样本对应的prompt索引，类型为int。
-        sequence_mask (paddle.Tensor, shape=[batch_size, response_length]): 序列掩码，用于标记每个时间步是否有效，类型为bool。
-        response_length (int): 每个样本的响应长度。
-        epsilon (float, optional, default=1e-6): 避免除以0的值，默认为1e-6。
-
-    Returns:
-        rewards (paddle.Tensor, shape=[batch_size, response_length]): GRPO优势，单位为float。
-
-    Raises:
-        ValueError (ValueError): 如果没有在给定的prompt索引中有分数。
-    """
-    id2score = defaultdict(list)
-    id2mean = {}
-    id2std = {}
-    batch_size = rewards.shape[0]
-
-    for i in range(batch_size):
-        id2score[index[i]].append(rewards[i])
-    for idx in id2score:
-        if len(id2score[idx]) == 1:
-            id2mean[idx] = paddle.to_tensor(0.0, dtype=rewards.dtype)
-            id2std[idx] = paddle.to_tensor(1.0, dtype=rewards.dtype)
-        elif len(id2score[idx]) > 1:
-            id2mean[idx] = paddle.mean(paddle.stack(id2score[idx]))
-            id2std[idx] = paddle.std(paddle.stack(id2score[idx]))
-        else:
-            raise ValueError(f"No score in prompt index: {idx}")
-    for i in range(batch_size):
-        rewards[i] = (rewards[i] - id2mean[index[i]]) / (id2std[index[i]] + epsilon)
-    rewards = rewards.unsqueeze(-1).tile([1, response_length]) * sequence_mask
-    return rewards
-
-
-@paddle.no_grad()
-def compute_reinforce_plus_plus_advantages_and_returns(
-    rewards: paddle.Tensor,
-    eos_mask: paddle.Tensor,
-    gamma: float,
-) -> Tuple[paddle.Tensor, paddle.Tensor]:
-    """Compute reinforce_plus_plus_advantages_and_returns."""
-    length = rewards.shape[-1]
-    returns = paddle.zeros_like(rewards)
-    running_return = 0
-    for t in reversed(range(length)):
-        running_return = rewards[:, t] + gamma * running_return
-        returns[:, t] = running_return
-        running_return = running_return * eos_mask[:, t]
-
-    advantages = masked_whiten(returns, eos_mask)
-    advantages = advantages * eos_mask
-    return advantages, returns

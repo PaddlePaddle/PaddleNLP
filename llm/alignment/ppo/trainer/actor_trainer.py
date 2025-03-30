@@ -11,42 +11,23 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import os
-import time
 import uuid
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import paddle
-import paddle.distributed as dist
-import tqdm
-from models.ppo_model_utils import RLHFPPOMixedLoss, create_loss
+from models.ppo_model_utils import RLHFPPOMixedLoss
 from paddle import nn
-from paddle.distributed import fleet
-from paddle.io import DataLoader, Dataset
-from utils.comm_utils import create_data_trans_group
-from utils.infer_utils import InferEvalModel
+from paddle.io import Dataset
 
 from paddlenlp.data import DataCollator
 from paddlenlp.generation import GenerationConfig
 from paddlenlp.trainer.trainer import (
-    TRAINER_STATE_NAME,
-    HybridParallelOptimizer,
-    NlpDistributedBatchSampler,
+    EvalPrediction,
     ShardingOption,
-    Trainer,
     TrainerCallback,
-    TrainerState,
     TrainingArguments,
-    _obtain_optimizer_parameters_list,
-    distributed_file,
-    distributed_isfile,
-    fused_allreduce_gradients,
-    logger,
-    reshard_util,
-    split_inputs_sequence_dim,
 )
-from paddlenlp.trainer.trainer_utils import EvalPrediction, ShardingOption
 from paddlenlp.transformers import PretrainedModel, PretrainedTokenizer
 
 from .rl_trainer import RLTrainer
@@ -62,7 +43,7 @@ class ActorReferenceTrainer(RLTrainer):
         model: Union[PretrainedModel, nn.Layer] = None,
         criterion: nn.Layer = None,
         args: TrainingArguments = None,
-        data_collator: Optional[DataCollator] = None,
+        data_collator: Optional[DataCollator] = None, # type: ignore
         train_dataset: Optional[Dataset] = None,
         eval_dataset: Union[Dataset, Dict[str, Dataset]] = None,
         tokenizer: Optional[PretrainedTokenizer] = None,

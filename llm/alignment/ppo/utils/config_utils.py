@@ -17,6 +17,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional
 
+import paddle
+
 from paddlenlp.trainer import IntervalStrategy
 from paddlenlp.trainer.trainer import ShardingOption, TrainingArguments, logger
 
@@ -300,6 +302,9 @@ class TrainingArguments(TrainingArguments):
             if not self.disable_tqdm:
                 self.logging_steps = 1
                 self.logging_strategy = IntervalStrategy.STEPS
+
+        paddle.set_device(self.device)
+
         if self.per_device_rollout_batch_size < 0:
             self.per_device_rollout_batch_size = self.per_device_train_batch_size
         assert self.rl_algorithm in [

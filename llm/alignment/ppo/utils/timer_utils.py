@@ -16,12 +16,14 @@ from contextlib import contextmanager
 from typing import List, Str, Union
 
 from paddlenlp.trainer import Trainer
+from paddlenlp.trainer.plugins.timer import RuntimeTimer
+from paddlenlp.utils.log import logger
 
 from .comm_utils import get_timer_label
 
 
 @contextmanager
-def timers_scope(trainer: Trainer, name, minus_names:Union[List, Str]=None):
+def timers_scope(trainer: Trainer, name, minus_names: Union[List, Str] = None):
     """
     Timing scope that will be used when training.
     Args:
@@ -46,7 +48,7 @@ def timers_scope(trainer: Trainer, name, minus_names:Union[List, Str]=None):
 
 
 @contextmanager
-def timers_scope_manual_label(trainer, name, minus_names:Union[List, Str]=None):
+def timers_scope_manual_label(trainer, name, minus_names: Union[List, Str] = None):
     """
     Timing scope that will be used when training.
     Args:
@@ -67,4 +69,21 @@ def timers_scope_manual_label(trainer, name, minus_names:Union[List, Str]=None):
         if trainer.timers:
             for minus_label in minus_labels:
                 trainer.timers(label).elapsed_ -= trainer.timers(label).elapsed_(minus_label)
+    return
+
+
+@contextmanager
+def timers_scope_runtimer(name):
+    """
+    Timing scope that will be used when training.
+    Args:
+        trainer (Trainer): The trainer object.
+        name (str): Name of the timer.
+        minus_name (str): Name of the timer to subtract from.
+    """
+    timer = RuntimeTimer()
+
+    timer.start(name)
+    yield
+    logger.info(f"{timer.log()}")
     return
