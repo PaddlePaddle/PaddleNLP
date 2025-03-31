@@ -295,13 +295,23 @@ def convert_safetensors_from_torch_to_paddle(
         else:
             transpose_state_dict[name_mapping.target_name] = False
 
+        # for key without prefix
         if name_mapping.source_name.replace(torch_prefix_key, "") not in torch_to_paddle_key_mappings:
-            torch_to_paddle_key_mappings[
-                name_mapping.source_name.replace(torch_prefix_key, "")
-            ] = name_mapping.target_name.replace(paddle_prefix_key, "")
+            torch_to_paddle_key_mappings[name_mapping.source_name.replace(torch_prefix_key, "")] = (
+                name_mapping.target_name.replace(paddle_prefix_key, "")
+            )
             transpose_state_dict[name_mapping.target_name.replace(paddle_prefix_key, "")] = transpose_state_dict[
                 name_mapping.target_name
             ]
+
+        # for weight_scale_inv
+        if name_mapping.source_name.replace(".weight", ".weight_scale_inv") not in torch_to_paddle_key_mappings:
+            torch_to_paddle_key_mappings[name_mapping.source_name.replace(".weight", ".weight_scale_inv")] = (
+                name_mapping.target_name.replace(".weight", ".weight_scale_inv")
+            )
+            transpose_state_dict[name_mapping.target_name.replace(".weight", ".weight_scale_inv")] = (
+                transpose_state_dict[name_mapping.target_name]
+            )
 
     for key in list(tensors.keys()):
         if key not in torch_to_paddle_key_mappings:
@@ -427,7 +437,8 @@ parser.add_argument("--torch_path", type=str, default=None)
 parser.add_argument("--paddle_path", type=str, default=None)
 args = parser.parse_args()
 
-convert_from_torch_to_paddle(
-    torch_path=args.torch_path,
-    paddle_path=args.paddle_path,
-)
+if __name__ == "__main__":
+    convert_from_torch_to_paddle(
+        torch_path=args.torch_path,
+        paddle_path=args.paddle_path,
+    )
