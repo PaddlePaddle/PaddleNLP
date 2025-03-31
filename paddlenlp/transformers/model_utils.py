@@ -76,6 +76,11 @@ from paddlenlp.utils.env import (
 from paddlenlp.utils.log import logger
 
 from ..generation import GenerationConfig, GenerationMixin
+from ..quantization.quantization_utils import (
+    convert_to_quantize_state_dict,
+    replace_with_quantization_linear,
+    update_loaded_state_dict_keys,
+)
 from ..quantization.unified_checkpoint_quantization import dequant_unified_optimizer
 from ..utils import device_guard
 from ..utils.download import resolve_file_path
@@ -1965,36 +1970,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 quantization_linear_list = [".".join([prefix, s]) for s in quantization_linear_list]
 
         # Weight quantization if not yet quantized & update loaded_keys
-        if hasattr(config, "quantization_config") and config.quantization_config.is_weight_quantize():
-            try:
-                from ..quantization.quantization_utils import (
-                    convert_to_quantize_state_dict,
-                    update_loaded_state_dict_keys,
-                )
-            except ImportError:
-                raise ImportError("Quantization features require `paddlepaddle >= 2.5.2`")
-            if state_dict is not None:
-                state_dict = convert_to_quantize_state_dict(
-                    state_dict,
-                    quantization_linear_list,
-                    config.quantization_config,
-                    dtype,
-                )
-                loaded_keys = [k for k in state_dict.keys()]
-            else:
-                loaded_keys = update_loaded_state_dict_keys(
-                    loaded_keys, quantization_linear_list, config.quantization_config
-                )
-            if keep_in_fp32_modules is None:
-                keep_in_fp32_modules = (
-                    ["quant_scale"] if config.quantization_config.weight_quantize_algo in ["nf4", "fp4"] else None
-                )
-            else:
-                keep_in_fp32_modules = (
-                    keep_in_fp32_modules + ["quant_scale"]
-                    if config.quantization_config.weight_quantize_algo in ["nf4", "fp4"]
-                    else keep_in_fp32_modules
-                )
+        if quantization_linear_list is not None:
+            loaded_keys = update_loaded_state_dict_keys(
+                loaded_keys, quantization_linear_list, config.quantization_config
+            )
 
         missing_keys = list(set(expected_keys) - set(loaded_keys))
         unexpected_keys = list(set(loaded_keys) - set(expected_keys))
@@ -2109,16 +2088,33 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
             return state_dict, resume_state_dict, fused_keys, new_keys
 
-        if state_dict is not None:
-            # have loaded all state_dict, no resume state_dict
-            state_dict, _, fused_keys, new_keys = _fuse_or_split_keys(
-                state_dict,
-                config,
-                loaded_keys,
-                pre_tensor_parallel_split=True if config is not None and config.tensor_parallel_degree > 1 else False,
+        if quantization_linear_list is None:
+            keep_in_fp32_modules = (
+                (keep_in_fp32_modules or []) + ["quant_scale"]
+                if config.quantization_config.weight_quantize_algo in ["nf4", "fp4"]
+                else keep_in_fp32_modules
             )
-            missing_keys = list(set(missing_keys) - set(new_keys))
-            unexpected_keys = list(set(unexpected_keys) - set(fused_keys))
+        if state_dict is not None:
+            if quantization_linear_list is None:
+                # Have loaded all state_dict, no resume state_dict
+                state_dict, _, fused_keys, new_keys = _fuse_or_split_keys(
+                    state_dict,
+                    config,
+                    loaded_keys,
+                    pre_tensor_parallel_split=True
+                    if config is not None and config.tensor_parallel_degree > 1
+                    else False,
+                )
+                missing_keys = list(set(missing_keys) - set(new_keys))
+                unexpected_keys = list(set(unexpected_keys) - set(fused_keys))
+            else:
+                # Quantize state dict
+                state_dict = convert_to_quantize_state_dict(
+                    state_dict,
+                    quantization_linear_list,
+                    config.quantization_config,
+                    dtype,
+                )
 
             mismatched_keys = _find_mismatched_keys(
                 state_dict,
@@ -2129,7 +2125,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 ignore_mismatched_sizes,
             )
 
-            if hasattr(config, "quantization_config") and config.quantization_config.is_weight_quantize():
+            if quantization_linear_list is None:
                 error_msgs = _load_state_dict_into_meta_model(
                     model_to_load,
                     state_dict,
@@ -2436,19 +2432,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if dtype is None:
             dtype = config.dtype
 
-        if config.quantization_config.is_weight_quantize():
-            try:
-                from ..quantization.quantization_utils import (
-                    replace_with_quantization_linear,
-                )
-            except ImportError:
-                raise ImportError("You need to install paddlepaddle >= 2.6.0")
-
-            if dtype != "float16" and dtype != "bfloat16":
-                dtype = "float16"
-                logger.warning(
-                    "Overriding dtype='float16' due to quantization method required DataTypes: float16, bfloat16. Pass your own dtype to remove this warning"
-                )
         config.dtype = dtype
 
         init_contexts = []
@@ -2568,7 +2551,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         quantization_linear_list = None
         if config.quantization_config.is_weight_quantize():
             with ContextManagers(quantization_init_contexts):
-                quantization_linear_list = replace_with_quantization_linear(
+                replace_with_quantization_linear(
                     model=model,
                     quantization_config=config.quantization_config,
                     llm_int8_threshold=config.quantization_config.llm_int8_threshold,
