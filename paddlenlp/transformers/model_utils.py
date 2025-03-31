@@ -2401,14 +2401,14 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             )
             convert_from_torch = True
 
-        # from_hf_hub defalut enable convert_from_torch
+        # from_hf_hub default enable convert_from_torch
         if from_hf_hub and convert_from_torch is None:
             logger.warning(
                 "If you are attempting to load weights from Hugging Face Hub and want to disable the default behavior of considering torch weights,"
                 " you can set ·convert_from_torch=False·. By default, `convert_from_torch` is set to `True`. "
             )
             convert_from_torch = True
-        # convert_from_torch defalut is False
+        # convert_from_torch default is False
         if convert_from_torch is None:
             convert_from_torch = False
 

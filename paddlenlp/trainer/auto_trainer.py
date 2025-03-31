@@ -533,7 +533,8 @@ class AutoTrainer(Trainer):
                 if self.args.to_static:
                     schedule_start_step = self.args.job_schedule_profiler_start
                     schedule_end_step = self.args.job_schedule_profiler_end
-                    switch_job_schedule_profiler(model, step, schedule_start_step, schedule_end_step)
+                    if schedule_start_step >= 0:
+                        switch_job_schedule_profiler(model, step, schedule_start_step, schedule_end_step)
 
                 for inputs in inputs_list:
                     if step_control % args.gradient_accumulation_steps == 0:

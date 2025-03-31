@@ -359,7 +359,7 @@ class TokenEmbedding(nn.Embedding):
     def __repr__(self):
         """
         Returns:
-            `Str`: The token embedding infomation.
+            `Str`: The token embedding information.
 
         """
         info = "Object   type: {}\
