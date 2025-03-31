@@ -1498,6 +1498,7 @@ class FusedMultiTransformerBase(Layer):
                 self.ffn1_weights_scale[i] if hasattr(self, "ffn1_weights_scale") else None,
                 self.ffn2_weights_scale[i] if hasattr(self, "ffn2_weights_scale") else None,
                 self.quant_type if hasattr(self, "quant_type") else "None",
+                False,
             )
 
             fused_moe_out = moe_expert_reduce(
