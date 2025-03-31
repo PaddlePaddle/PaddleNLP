@@ -556,7 +556,7 @@ std::vector<paddle::Tensor> tokens_zip(
       reinterpret_cast<void *>(zipped_probs_topk.data<float>());
   cudaMemsetAsync(zipped_probs_topk_ptr,
                   0,
-                  sizeof(float) * rows * topk,
+                  sizeof(float) * total_zipped_tokens_num * topk,
                   unzipped_token_probs.stream());
 
   dispatch_tokens_zip(unzipped_tokens,
