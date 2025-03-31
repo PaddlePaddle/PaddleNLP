@@ -46,6 +46,12 @@
 | deepseek-ai/DeepSeek-R1-Distill-Llama-8B  |fp16|-|-|deepseek-ai/DeepSeek-R1-Distill-Llama-8B-Block-Attn/float16 |
 | deepseek-ai/DeepSeek-R1-Distill-Llama-70B |weight_only_int8|-|-|deepseek-ai/DeepSeek-R1-Distill-Llama-70B/weight_only_int8 |
 
+### QWQ
+
+| 模型名称 | 静态图下载 model_name |
+|:------|:-:|
+| Qwen/QwQ-32B | Qwen/QwQ-32B-Append-Attn/weight_only_int8 |
+| Qwen/QwQ-32B-Preview | 🚧 |
 
 ### LLaMA
 
