@@ -2638,6 +2638,9 @@ class Trainer:
             optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
             saved_signal_path = os.path.join(output_dir, f"saved_signal_{dist.get_rank()}")
 
+            if self.args.unified_checkpoint and self.args.offload_optim:
+                self._reload_optimizer()
+
             if self.args.use_hybrid_parallel:
                 if self.dp_group.rank <= 0 or self.args.use_expert_parallel:
                     os.makedirs(output_dir, exist_ok=True)
@@ -2717,6 +2720,9 @@ class Trainer:
                             or "remove_master_weight" not in self.args.unified_checkpoint_config
                         ):
                             paddle.save(global_rank, os.path.join(signal_dir, f".master_weight.done.{global_rank}"))
+
+            if self.args.unified_checkpoint and self.args.offload_optim:
+                self._offload_optimizer()
 
         self.runtime_timer.stop()
 
