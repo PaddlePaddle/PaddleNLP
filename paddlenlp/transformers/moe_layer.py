@@ -518,15 +518,12 @@ class Fp8DispatchNode:
 
     @paddle.no_grad()
     def backward(self, hs_fp8_dispatched_grad, dispatched_probs_grad, previous_event=None, async_finish=False):
-        # dispatch grad
-        paddle.base.core.eager._for_test_check_cuda_error()
         hs_fp8_grad, _, token_probs_grad = self.dispatch_act_node.backward(
             hs_fp8_dispatched_grad,
             dispatched_probs_grad,
             previous_event=previous_event,
             async_finish=async_finish,
         )
-        paddle.base.core.eager._for_test_check_cuda_error()
         return hs_fp8_grad, token_probs_grad
 
 
@@ -604,6 +601,9 @@ class MlpNode:
         self.unzipped_scale = None
         self.unzipped_tokens = None
 
+        # ---
+        self.zipped_expertwise_rowmap = None
+
     def reset_statue(self):
         self.token_permuted_indices = None
         self.dispatched_probs = None
@@ -618,6 +618,7 @@ class MlpNode:
         if len(self.token_dispatcher._comm_manager.tokens_per_expert) == 4 and DSV3_USE_FP8_GROUP_GEMM:
             # 1 unzip
             dispatched_indices = dispatched_indices.to(paddle.int32)
+
             self.dispatched_indices = dispatched_indices
             (unzipped_tokens, unzipped_scale, zipped_expertwise_rowmap, unzipped_probs,) = self.unzip_node.forward(
                 hs_fp8_dispatched,
@@ -628,14 +629,11 @@ class MlpNode:
                 num_experts=4,
                 max_tokens=max(self.token_dispatcher._comm_manager.tokens_per_expert),
             )
+            self.zipped_expertwise_rowmap = zipped_expertwise_rowmap
             hs_fp8_dispatched._record_stream()
             hs_scale_dispatched._record_stream()
             dispatched_indices._record_stream()
             dispatched_probs._record_stream()
-
-            # 临时操作，unzipped_probs后续要和o2(bfloat16)乘，故这里做了cast
-            # unzipped_probs = unzipped_probs.to(paddle.bfloat16)
-
             # 2 experts
             tokens_per_expert = paddle.to_tensor(
                 self.token_dispatcher._comm_manager.tokens_per_expert, dtype=paddle.int32
@@ -647,7 +645,6 @@ class MlpNode:
             self.unzipped_scale = unzipped_scale
 
             # 3 zip
-            # expert是3维，reshape成2维
             expert_out = expert_out.reshape([-1, expert_out.shape[-1]])
             expert_out_zipped = self.zip_node.forward(
                 expert_out,
@@ -714,12 +711,10 @@ class MlpNode:
                 tokens_per_expert,
                 self.dispatched_indices,
             )
-            # unzip_grad
-            paddle.base.core.eager._for_test_check_cuda_error()
+
             hs_fp8_dispatched_grad, dispatched_probs_grad = self.unzip_node.backward(
                 expert_out, hidden_states_out_grad, probs_grad, self.dispatched_indices
             )
-            paddle.base.core.eager._for_test_check_cuda_error()
             self.reset_statue()
             return hs_fp8_dispatched_grad, dispatched_probs_grad
 
@@ -731,6 +726,7 @@ class MlpNode:
             hidden_states_out_grad_scale_grad = paddle.gather(
                 hidden_states_out_grad_scale, self.token_permuted_indices
             )
+
             hidden_states_out_grad._record_stream()
             hidden_states_out_grad_scale._record_stream()
 
@@ -740,12 +736,6 @@ class MlpNode:
             # permute_grad
             hs_fp8_dispatched_grad = self.permute_node.backward(hs_out_grad, self.dispatched_probs)
             self.reset_statue()
-            import numpy as np
-
-            rank = paddle.distributed.get_rank()
-            np.save("hs_fp8_dispatched_grad_permute" + str(rank) + ".npy", hs_fp8_dispatched_grad)
-            np.save("dispatched_probs_grad_permute" + str(rank) + ".npy", dispatched_probs_grad)
-            raise RuntimeError("--")
             return hs_fp8_dispatched_grad, dispatched_probs_grad
 
 
@@ -771,7 +761,6 @@ class FusionMoeNode:
         hidden_states_out = self.mlp_node.forward(
             hs_fp8_dispatched, hs_scale_dispatched, dispatched_indices, dispatched_probs
         )
-
         output_combie = self.combine_node.forward(hidden_states_out)
         output = self.combine_quant_node.forward(output_combie)
         output.stop_gradient = False
@@ -783,13 +772,10 @@ class FusionMoeNode:
         hidden_states_out_grad, hidden_states_out_grad_scale = self.combine_node.backward(
             output_combie_grad_fp8, output_combie_grad_scale
         )
-
         hs_fp8_dispatched_grad, dispatched_probs_grad = self.mlp_node.backward(
             hidden_states_out_grad, hidden_states_out_grad_scale
         )
-        paddle.base.core.eager._for_test_check_cuda_error()
         hs_fp8_grad, token_probs_grad = self.dispatch_node.backward(hs_fp8_dispatched_grad, dispatched_probs_grad)
-        paddle.base.core.eager._for_test_check_cuda_error()
         hs_grad, probs_grad, routing_map_grad = self.dispatch_quant_node.backward(hs_fp8_grad, token_probs_grad)
         return hs_grad, probs_grad, routing_map_grad
 

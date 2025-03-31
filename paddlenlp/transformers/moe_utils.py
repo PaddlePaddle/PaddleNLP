@@ -122,14 +122,7 @@ class UnZipNode:
         num_experts,
         max_tokens,
     ):
-        import numpy as np
-
-        rank = paddle.distributed.get_rank()
         hs_fp8_dispatched_copy = hs_fp8_dispatched.cast(paddle.float32)
-        np.save("hs_fp8_dispatched" + str(rank) + ".npy", hs_fp8_dispatched_copy)
-        np.save("hs_scale_dispatched" + str(rank) + ".npy", hs_scale_dispatched)
-        np.save("dispatched_indices" + str(rank) + ".npy", dispatched_indices)
-        np.save("max_tokens_per_expert" + str(rank) + ".npy", max_tokens)
         unzipped_tokens, zipped_expertwise_rowmap, unzipped_probs, unzipped_scale = TDU.tokens_unzip_stable(
             hs_fp8_dispatched_copy.cast(paddle.float8_e4m3fn),
             hs_scale_dispatched,
@@ -150,10 +143,11 @@ class UnZipNode:
 
     @paddle.no_grad()
     def backward(self, dx, hidden_states_out_grad, probs_grad, dispatched_indices):
-        dx_copy = dx.cast(paddle.float32)
         probs_grad_copy = probs_grad.unsqueeze(-1).cast(paddle.float32)
+
         weighted_zipped_tokens, probs_grad_zipped = TDU.tokens_zip(
-            dx_copy.cast(paddle.bfloat16),
+            # dx_copy.cast(paddle.bfloat16),
+            dx,
             self.zipped_expertwise_rowmap,
             dispatched_indices,
             probs_grad_copy,
@@ -168,6 +162,7 @@ class ZipNode:
         self.token_dispatcher = token_dispatcher
         self.name = name
 
+    @paddle.no_grad()
     def forward(
         self, expert_out, zipped_expertwise_rowmap, routemap_topk, unzipped_probs, total_zipped_tokens, num_experts
     ):
@@ -176,6 +171,7 @@ class ZipNode:
         )
         return expert_out_zipped
 
+    @paddle.no_grad()
     def backward(
         self,
         grad_output,
@@ -194,6 +190,7 @@ class ZipNode:
         ) = TDU.tokens_unzip_stable(
             grad_output, grad_output_scale, dispatched_indices, dispatched_probs, top_k, num_experts, max_tokens
         )
+
         return unzipped_grad, unzipped_scale_grad
 
 

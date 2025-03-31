@@ -31,6 +31,7 @@ try:
     import FusedQuantOps as FQO
     import kitchen
     import kitchen.quantization_subchannel_block_hybrid
+    import TokenDispatcherUtils as TDU
     from kitchen.quantization import QParams, ScalingType
 except:
     pass
@@ -217,7 +218,10 @@ class ExpertsGroupGemmNode:
         # recomput o2
         o2 = self.fwd_swiglu(self.o1)
         o2 = o2 * self.unzipped_probs.cast(paddle.bfloat16)
+
+        # probs_grad = (do2 * o2).sum(axis=-1)
         probs_grad = ((do2.reshape([-1, do2.shape[-1]])) * (o2.reshape([-1, o2.shape[-1]]))).sum(axis=-1)
+
         return do2, probs_grad, o2
 
     # ===== do1 = swiglu_grad(o1, None, do2) =====
@@ -349,7 +353,7 @@ class ExpertsGroupGemmNode:
 
     @paddle.no_grad()
     def forward(self, hs_out, hs_scale_out, unzipped_probs, tokens_per_expert):
-        self.tokens_per_expert = tokens_per_expert
+        # self.tokens_per_expert = tokens_per_expert
         # get w1
         expert_w1 = [x.w1 for x in self.custom_map.experts if x is not None]
 
@@ -385,14 +389,12 @@ class ExpertsGroupGemmNode:
 
         # do2
         do2, probs_grad, o2 = self.bwd_dowm_input(expert_w2, out_grad, out_grad_scale, tokens_per_expert)
-
         # do1
         do1 = self.bwd_swiglu(self.o1, do2)
 
         # dx
         dx, do1_fp8, do1_scale = self.bwd_gate_up_input(do1, expert_w1, tokens_per_expert)
         dx = dx.reshape([-1, dx.shape[-1]])
-
         # dequant dout
         out_grad_dequant_fp16 = FQO.fused_act_dequant(out_grad, out_grad_scale)
 
