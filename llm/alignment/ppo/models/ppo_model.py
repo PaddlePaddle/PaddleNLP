@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from paddlenlp.transformers import LlamaForCausalLM, PretrainedConfig
-
 from ppo_model_utils import (
     PolicyOutput,
     RLHFPPOMixedLoss,
@@ -22,6 +20,8 @@ from ppo_model_utils import (
     create_startend_row_indices,
 )
 from score_model import LlamaModelForScore
+
+from paddlenlp.transformers import LlamaForCausalLM, PretrainedConfig
 
 
 # TODO(guosheng): create Mixin and make model classes using metaclass.
