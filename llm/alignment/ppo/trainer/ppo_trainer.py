@@ -24,8 +24,14 @@ import numpy as np
 import paddle
 import paddle.distributed as dist
 import requests
-from algos.advantage import compute_grpo_advantages, compute_reinforce_plus_plus_advantages_and_returns
-from algos.normalize import normalize_batch_data_ppo, normalize_batch_data_reinforce_plus_plus
+from algos.advantage import (
+    compute_grpo_advantages,
+    compute_reinforce_plus_plus_advantages_and_returns,
+)
+from algos.normalize import (
+    normalize_batch_data_ppo,
+    normalize_batch_data_reinforce_plus_plus,
+)
 from models.ppo_model_utils import (
     create_startend_row_indices,
     gather_log_probabilities,
@@ -691,13 +697,13 @@ class PPOTrainer(Trainer):
             ValueError: 如果 `ignore_keys` 不是可选参数或者不是一个列表。
         """
         inputs = self._prepare_inputs(inputs)
-        with self.enable(self.actor_model, self.reference_model, self.actor_trainer):
+        with reload_and_offload_scope(self, self.actor_model, self.reference_model, self.actor_trainer):
             with infer_guard(self.actor_trainer):
                 prompt_only_batch = {
                     "input_ids": inputs["input_ids"],
                     **({"label_ids": inputs["label_ids"]} if self.args.use_rm_server else {}),
                 }
-                generated_seq = self.generate(prompt_only_batch, do_eval=True)[0]["input_ids"]
+                generated_seq = self.actor_trainer.generate_sequences(prompt_only_batch, do_eval=True)[0]["input_ids"]
 
             if not self.args.use_rm_server:
                 if self._model_config.sequence_parallel:
@@ -848,7 +854,7 @@ class PPOTrainer(Trainer):
             Returns:
                 DataLoader: 包含用于评估的数据的DataLoader实例。
         """
-        with guard_set_args(self, {"data_collator": self.eval_dataset.get_collator()}):
+        with guard_set_args(self, {"data_collator": self.data_collator}):
             return super().get_eval_dataloader(eval_dataset)
 
     def _save_checkpoint(self, model, metrics=None):
@@ -1716,7 +1722,7 @@ class PPOTrainer(Trainer):
         }
 
         with timers_scope(self, CriticStages.MODEL_ENABLE_DISABLE, minus_names=[CriticStages.CRITIC_TRAINING_STEP]):
-            with self.enable(self.critic_model, self.critic_trainer.optimizer):
+            with reload_and_offload_scope(self, self.critic_model, self.critic_trainer.optimizer):
                 with timers_scope(self, CriticStages.CRITIC_TRAINING_STEP):
                     reward_critic_loss = self.critic_trainer.full_training_step(**value_trainer_inputs)
 
