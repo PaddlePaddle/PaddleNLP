@@ -1476,9 +1476,10 @@ class FusedMultiTransformerBase(Layer):
             ffn1_weights_scale,
             ffn2_weights_scale,
             quant_type,
+            True
         )
 
-        ffn_out2 = moe_ffn(
+        ffn_out2 = moe_expert_ffn(
             permute_input_tmp,
             (paddle.arange(1, ep_num_per_gpu + 1) * max_tokens_all).cast("int64"),
             ffn1_weights,
@@ -1487,6 +1488,7 @@ class FusedMultiTransformerBase(Layer):
             ffn1_weights_scale,
             ffn2_weights_scale,
             quant_type,
+            False,
         )
 
         ffn_out2 = ffn_out2.reshape([16, max_tokens_all, hidden_size])
@@ -2039,7 +2041,7 @@ class FusedMultiTransformerBase(Layer):
         residual_input = src
         for i in range(self.num_layers):
 
-            if i == 400000:
+            if i == 4:
                 from paddle.framework import core
                 core.nvprof_start()
             qkv_out, residual_input = self.compute_qkv(src, residual_input, i)
@@ -2100,8 +2102,8 @@ class FusedMultiTransformerBase(Layer):
         kwargs["multi_block_output"] = tmp_out
         kwargs["seq_lens"] = seq_lens
         kwargs["input_ids"] = input_ids
-        # from paddle.framework import core
-        # core.nvprof_stop()
+        from paddle.framework import core
+        core.nvprof_stop()
 
         out = self.post_process(**kwargs)
         return out, caches

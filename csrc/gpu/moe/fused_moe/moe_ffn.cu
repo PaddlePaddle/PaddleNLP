@@ -27,7 +27,7 @@ void MoeFFNKernel(const paddle::Tensor& permute_input,
                   const paddle::optional<paddle::Tensor>& ffn1_scale,
                   const paddle::optional<paddle::Tensor>& ffn2_scale,
                   const std::string& quant_method,
-                  paddle::Tensor ffn_out) {
+                  paddle::Tensor ffn_out, bool used_in_ep_low_latency) {
   typedef PDTraits<T> traits_;
   typedef typename traits_::DataType DataType_;
   typedef typename traits_::data_t data_t;
@@ -63,6 +63,10 @@ void MoeFFNKernel(const paddle::Tensor& permute_input,
       ffn1_bias
           ? const_cast<paddle::Tensor*>(ffn1_bias.get_ptr())->data<data_t>()
           : nullptr;
+  // This is a trick.
+  // expanded_active_expert_rows is not needed in variable group gemm.
+  // but is needed in accommodating deepep low latency mode 
+  const int64_t total_rows = used_in_ep_low_latency ? expanded_active_expert_rows : -1;
 
   if (quant_method == "weight_only_int8") {
     int8_moe_gemm_runner.moe_gemm_bias_act(
@@ -73,7 +77,7 @@ void MoeFFNKernel(const paddle::Tensor& permute_input,
         reinterpret_cast<const NvType*>(fc1_expert_biases),
         reinterpret_cast<NvType*>(fc1_out),
         const_cast<int64_t*>(tokens_expert_prefix_sum.data<int64_t>()),
-        expanded_active_expert_rows,
+        total_rows,
         inter_size,
         hidden_size,
         num_experts,
@@ -88,7 +92,7 @@ void MoeFFNKernel(const paddle::Tensor& permute_input,
         reinterpret_cast<const NvType*>(fc1_expert_biases),
         reinterpret_cast<NvType*>(fc1_out),
         const_cast<int64_t*>(tokens_expert_prefix_sum.data<int64_t>()),
-        expanded_active_expert_rows,
+        total_rows,
         inter_size,
         hidden_size,
         num_experts,
@@ -102,18 +106,20 @@ void MoeFFNKernel(const paddle::Tensor& permute_input,
         reinterpret_cast<const NvType*>(fc1_expert_biases),
         reinterpret_cast<NvType*>(fc1_out),
         const_cast<int64_t*>(tokens_expert_prefix_sum.data<int64_t>()),
-        expanded_active_expert_rows,
+        total_rows,
         inter_size,
         hidden_size,
         num_experts,
         "none",
         stream);
   }
-
-  //auto act_out_tensor = paddle::experimental::swiglu(fc1_out_tensor, nullptr);
-
   
-  auto act_out_tensor = group_swiglu_with_masked(fc1_out_tensor, tokens_expert_prefix_sum);
+  paddle::Tensor act_out_tensor;
+  if (used_in_ep_low_latency) {
+    act_out_tensor = group_swiglu_with_masked(fc1_out_tensor, tokens_expert_prefix_sum);
+  } else {
+    act_out_tensor = paddle::experimental::swiglu(fc1_out_tensor, nullptr);
+  }
 
   auto act_out = act_out_tensor.data<data_t>();
 
@@ -125,7 +131,7 @@ void MoeFFNKernel(const paddle::Tensor& permute_input,
             const_cast<paddle::Tensor*>(ffn2_scale.get_ptr())->data<data_t>()),
         reinterpret_cast<NvType*>(ffn_out_data),
         const_cast<int64_t*>(tokens_expert_prefix_sum.data<int64_t>()),
-        expanded_active_expert_rows,
+        total_rows,
         hidden_size,
         inter_size / 2,
         num_experts,
@@ -139,7 +145,7 @@ void MoeFFNKernel(const paddle::Tensor& permute_input,
             const_cast<paddle::Tensor*>(ffn2_scale.get_ptr())->data<data_t>()),
         reinterpret_cast<NvType*>(ffn_out_data),
         const_cast<int64_t*>(tokens_expert_prefix_sum.data<int64_t>()),
-        expanded_active_expert_rows,
+        total_rows,
         hidden_size,
         inter_size / 2,
         num_experts,
@@ -151,7 +157,7 @@ void MoeFFNKernel(const paddle::Tensor& permute_input,
         nullptr,
         reinterpret_cast<NvType*>(ffn_out_data),
         const_cast<int64_t*>(tokens_expert_prefix_sum.data<int64_t>()),
-        expanded_active_expert_rows,
+        total_rows,
         hidden_size,
         inter_size / 2,
         num_experts,
@@ -167,7 +173,8 @@ std::vector<paddle::Tensor> MoeExpertFFN(
     const paddle::optional<paddle::Tensor>& ffn1_bias,
     const paddle::optional<paddle::Tensor>& ffn1_scale,
     const paddle::optional<paddle::Tensor>& ffn2_scale,
-    const std::string& quant_method) {
+    const std::string& quant_method,
+    const bool used_in_ep_low_latency = false) {
   const auto input_type = permute_input.dtype();
   auto ffn_out = paddle::empty_like(permute_input);
 
@@ -181,7 +188,7 @@ std::vector<paddle::Tensor> MoeExpertFFN(
                                                ffn1_scale,
                                                ffn2_scale,
                                                quant_method,
-                                               ffn_out);
+                                               ffn_out, used_in_ep_low_latency);
       break;
     case paddle::DataType::FLOAT16:
       MoeFFNKernel<paddle::DataType::FLOAT16>(permute_input,
@@ -192,7 +199,7 @@ std::vector<paddle::Tensor> MoeExpertFFN(
                                               ffn1_scale,
                                               ffn2_scale,
                                               quant_method,
-                                              ffn_out);
+                                              ffn_out, used_in_ep_low_latency);
       break;
     default:
       PD_THROW("Unsupported data type for MoeExpertFFN");
@@ -231,7 +238,7 @@ PD_BUILD_OP(moe_expert_ffn)
              paddle::Optional("ffn1_scale"),
              paddle::Optional("ffn2_scale")})
     .Outputs({"output_tensor"})
-    .Attrs({"quant_method:std::string"})
+    .Attrs({"quant_method:std::string", "used_in_ep_low_latency:bool"})
     .SetKernelFn(PD_KERNEL(MoeExpertFFN))
     .SetInferShapeFn(PD_INFER_SHAPE(MoeExpertFFNInferShape))
     .SetInferDtypeFn(PD_INFER_DTYPE(MoeExpertFFNInferDtype));

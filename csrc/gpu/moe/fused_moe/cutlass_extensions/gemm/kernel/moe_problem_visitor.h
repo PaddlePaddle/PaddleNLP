@@ -67,6 +67,7 @@ struct BaseMoeProblemVisitor {
 
   struct Params {
     int64_t const* last_row_for_problem;
+    int64_t total_rows;
     int64_t gemm_n;
     int64_t gemm_k;
     int32_t problem_count;
@@ -81,6 +82,7 @@ struct BaseMoeProblemVisitor {
     CUTLASS_HOST_DEVICE
     Params()
         : last_row_for_problem(nullptr),
+          total_rows(-1),
           gemm_n(0),
           gemm_k(0),
           problem_count(0),
@@ -90,12 +92,14 @@ struct BaseMoeProblemVisitor {
     /// Ctor
     CUTLASS_HOST_DEVICE
     Params(int64_t const* last_row_for_problem,
+           int64_t total_rows,
            int64_t gemm_n,
            int64_t gemm_k,
            int32_t problem_count,
            void const* workspace = nullptr,
            int32_t tile_count = 0)
         : last_row_for_problem(last_row_for_problem),
+          total_rows(total_rows),
           gemm_n(gemm_n),
           gemm_k(gemm_k),
           problem_count(problem_count),
@@ -156,12 +160,16 @@ struct BaseMoeProblemVisitor {
 
   CUTLASS_HOST_DEVICE
   cutlass::gemm::GemmCoord problem_size(int idx) const {
-    // const int64_t prev_problem_row =
-    //     idx == 0 ? 0 : params.last_row_for_problem[idx - 1];
-    // const int64_t current_problem_row = params.last_row_for_problem[idx];
-    // const int64_t gemm_m = current_problem_row - prev_problem_row;
 
-    const int64_t gemm_m = params.last_row_for_problem[idx];
+    int64_t gemm_m = 0;
+
+    if (params.total_rows < 0) {
+      const int64_t prev_problem_row = idx == 0 ? 0 : params.last_row_for_problem[idx - 1];
+      const int64_t current_problem_row = params.last_row_for_problem[idx];
+      gemm_m = current_problem_row - prev_problem_row;
+    } else {
+      gemm_m = params.last_row_for_problem[idx];
+    }
 
     GemmCoord problem(GemmCoord::Index(gemm_m),
                       GemmCoord::Index(params.gemm_n),

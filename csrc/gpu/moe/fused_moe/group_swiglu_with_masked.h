@@ -25,7 +25,7 @@ __global__ void group_swiglu_with_masked_kernel(T* act_out,
         const int64_t group_id = row_id / group_size;
         const int64_t row_id_within_group = row_id % group_size;
 
-        // if (row_id_within_group >= token_nums_per_expert[group_id]) continue;
+        if (row_id_within_group >= token_nums_per_expert[group_id]) continue;
 
         Load<T, VecSize>(&input[r_offset], &src_vec0);
         Load<T, VecSize>(&input[r_offset + hidden_dim], &src_vec1);

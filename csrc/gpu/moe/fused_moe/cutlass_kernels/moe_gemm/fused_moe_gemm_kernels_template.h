@@ -63,6 +63,7 @@ void generic_moe_gemm_kernelLauncher(const T* A,
                                      const T* biases,
                                      T* C,
                                      int64_t* total_rows_before_expert,
+                                     int64_t total_rows,
                                      int64_t gemm_n,
                                      int64_t gemm_k,
                                      int num_experts,
@@ -190,6 +191,7 @@ void generic_moe_gemm_kernelLauncher(const T* A,
       reinterpret_cast<const ElementType*>(biases),
       reinterpret_cast<ElementType*>(C),
       total_rows_before_expert,
+      total_rows,
       gemm_n,
       gemm_k);
 
@@ -234,6 +236,7 @@ struct dispatch_stages {
                        const T* biases,
                        T* C,
                        int64_t* total_rows_before_expert,
+                       int64_t total_rows,
                        int64_t gemm_n,
                        int64_t gemm_k,
                        int num_experts,
@@ -268,6 +271,7 @@ struct dispatch_stages<T,
                        const T* biases,
                        T* C,
                        int64_t* total_rows_before_expert,
+                       int64_t total_rows,
                        int64_t gemm_n,
                        int64_t gemm_k,
                        int num_experts,
@@ -287,6 +291,7 @@ struct dispatch_stages<T,
                                        biases,
                                        C,
                                        total_rows_before_expert,
+                                       total_rows,
                                        gemm_n,
                                        gemm_k,
                                        num_experts,
@@ -317,6 +322,7 @@ struct dispatch_stages<T,
                        const T* biases,
                        T* C,
                        int64_t* total_rows_before_expert,
+                       int64_t total_rows,
                        int64_t gemm_n,
                        int64_t gemm_k,
                        int num_experts,
@@ -336,6 +342,7 @@ struct dispatch_stages<T,
                                             biases,
                                             C,
                                             total_rows_before_expert,
+                                            total_rows,
                                             gemm_n,
                                             gemm_k,
                                             num_experts,
@@ -358,6 +365,7 @@ void dispatch_gemm_config(const T* A,
                           const T* biases,
                           T* C,
                           int64_t* total_rows_before_expert,
+                          int64_t total_rows,
                           int64_t gemm_n,
                           int64_t gemm_k,
                           int num_experts,
@@ -379,6 +387,7 @@ void dispatch_gemm_config(const T* A,
                                      biases,                   \
                                      C,                        \
                                      total_rows_before_expert, \
+                                     total_rows,               \
                                      gemm_n,                   \
                                      gemm_k,                   \
                                      num_experts,              \
@@ -416,6 +425,7 @@ void dispatch_gemm_config(const T* A,
         biases,                                                 \
         C,                                                      \
         total_rows_before_expert,                               \
+        total_rows,                                           \
         gemm_n,                                                 \
         gemm_k,                                                 \
         num_experts,                                            \
