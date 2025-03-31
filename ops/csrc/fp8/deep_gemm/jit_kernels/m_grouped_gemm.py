@@ -17,8 +17,8 @@
 # Licensed under the MIT License - https://github.com/deepseek-ai/DeepEP/blob/main/LICENSE
 
 import functools
-from typing import Tuple
 from functools import reduce
+from typing import Tuple
 
 import paddle
 from paddle import Tensor
@@ -86,7 +86,7 @@ def auto_tuning_with_compilation_grouped_gemm_contiguous(m, n, k, num_groups, nu
             ("grouped_layout", paddle.int32),
             ("m", int),
             ("num_groups", int),
-            ("stream", paddle.device.current_stream().stream_base),
+            ("stream", paddle.device.cuda.Stream),
             ("num_sms", int),
             ("smem_size", int),
         ),
@@ -125,7 +125,7 @@ def m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
     num_groups, n, k_ = rhs.shape
     m_, n_ = out.shape
     m_shape = m_indices.shape
-    m__ = reduce(lambda x, y: x*y, m_shape)
+    m__ = reduce(lambda x, y: x * y, m_shape)
     # Type and shape checks
     assert m == m_ == m__ and k == k_ and n == n_
     assert lhs_scales.shape == [m, (k + 127) // 128]
@@ -165,6 +165,52 @@ def m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
     runtime(*args)
 
 
+@functools.lru_cache()
+def auto_tuning_with_compilation_grouped_gemm_masked(m, expected_m, n, k, num_groups, num_sms):
+    # Auto-tuning with compilation
+    global includes, template
+    block_m, block_n, num_stages, num_tma_multicast, smem_size = get_best_configs(
+        expected_m, n, k, num_groups, num_sms
+    )
+
+    # Extra checks for TMA store
+    if num_groups > 1 and m > block_m:
+        assert (
+            m % block_m == 0
+        ), f"For masked grouped GEMM, shape M should be multiple of the block M (current block M: {block_m})"
+
+    runtime = jit_tuner.compile_and_tune_group_gemm_masked(
+        name="m_grouped_gemm_fp8_fp8_bf16_nt",
+        keys={
+            "N": n,
+            "K": k,
+            "BLOCK_M": block_m,
+            "BLOCK_N": block_n,
+            "NUM_GROUPS": num_groups,
+            "NUM_STAGES": num_stages,
+            "NUM_TMA_MULTICAST": num_tma_multicast,
+            "GEMM_TYPE": "GroupedMasked",
+        },
+        space=(),
+        includes=includes,
+        arg_defs=(
+            ("lhs", paddle.float8_e4m3fn),
+            ("lhs_scales", paddle.float32),
+            ("rhs", paddle.float8_e4m3fn),
+            ("rhs_scales", paddle.float32),
+            ("out", paddle.bfloat16),
+            ("grouped_layout", paddle.int32),
+            ("m", int),
+            ("stream", paddle.device.cuda.Stream),
+            ("num_sms", int),
+            ("smem_size", int),
+        ),
+        template=template,
+    )
+
+    return runtime, num_sms, smem_size
+
+
 def m_grouped_gemm_fp8_fp8_bf16_nt_masked(
     lhs: Tuple[Tensor, Tensor], rhs: Tuple[Tensor, Tensor], out: Tensor, masked_m: Tensor, expected_m: int
 ) -> None:
@@ -193,7 +239,8 @@ def m_grouped_gemm_fp8_fp8_bf16_nt_masked(
     num_groups, m, k = lhs.shape
     num_groups_, n, k_ = rhs.shape
     num_groups__, m_, n_ = out.shape
-    num_groups___ = masked_m.numel()
+    masked_m_shape = masked_m.shape
+    num_groups___ = reduce(lambda x, y: x * y, masked_m_shape)
 
     # Type and shape checks
     assert num_groups == num_groups_ == num_groups__ == num_groups___
@@ -212,18 +259,10 @@ def m_grouped_gemm_fp8_fp8_bf16_nt_masked(
     lhs_scales = get_col_major_tma_aligned_tensor(lhs_scales)
     assert rhs_scales.is_contiguous()
 
-    # Auto-tuning with compilation
-    global includes, template
     num_sms = get_num_sms()
-    block_m, block_n, num_stages, num_tma_multicast, smem_size = get_best_configs(
-        expected_m, n, k, num_groups, num_sms
+    runtime, num_sms, smem_size = auto_tuning_with_compilation_grouped_gemm_masked(
+        m, expected_m, n, k, num_groups, num_sms
     )
-
-    # Extra checks for TMA store
-    if num_groups > 1 and m > block_m:
-        assert (
-            m % block_m == 0
-        ), f"For masked grouped GEMM, shape M should be multiple of the block M (current block M: {block_m})"
 
     args = (
         lhs,
@@ -236,35 +275,6 @@ def m_grouped_gemm_fp8_fp8_bf16_nt_masked(
         paddle.device.current_stream().stream_base,
         num_sms,
         smem_size,
-    )
-    runtime = jit_tuner.compile_and_tune_group_gemm_masked(
-        name="m_grouped_gemm_fp8_fp8_bf16_nt",
-        keys={
-            "N": n,
-            "K": k,
-            "BLOCK_M": block_m,
-            "BLOCK_N": block_n,
-            "NUM_GROUPS": num_groups,
-            "NUM_STAGES": num_stages,
-            "NUM_TMA_MULTICAST": num_tma_multicast,
-            "GEMM_TYPE": "GroupedMasked",
-        },
-        space=(),
-        includes=includes,
-        arg_defs=(
-            ("lhs", paddle.float8_e4m3fn),
-            ("lhs_scales", paddle.float32),
-            ("rhs", paddle.float8_e4m3fn),
-            ("rhs_scales", paddle.float32),
-            ("out", paddle.bfloat16),
-            ("grouped_layout", paddle.int32),
-            ("m", int),
-            ("stream", paddle.device.current_stream().stream_base),
-            ("num_sms", int),
-            ("smem_size", int),
-        ),
-        template=template,
-        args=args,
     )
 
     # Run the kernel
