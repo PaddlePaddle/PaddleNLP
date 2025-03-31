@@ -24,7 +24,7 @@
 
 template <paddle::DataType T>
 void MoeReduceKernel(const paddle::Tensor& ffn_out,
-                     const paddle::Tensor& expert_scales_float,
+                     const paddle::Tensor& top_k_weight,
                      const paddle::Tensor& permute_indices_per_token,
                      const paddle::Tensor& top_k_indices,
                      const paddle::optional<paddle::Tensor>& ffn2_bias,
@@ -43,7 +43,7 @@ void MoeReduceKernel(const paddle::Tensor& ffn_out,
       ffn_out.data<data_t>(),
       output->data<data_t>(),
       ffn2_bias ? ffn2_bias->data<data_t>() : nullptr,
-      expert_scales_float.data<float>(),
+      top_k_weight.data<float>(),
       permute_indices_per_token.data<int32_t>(),
       top_k_indices.data<int>(),
       num_rows,
@@ -58,7 +58,7 @@ void MoeReduceKernel(const paddle::Tensor& ffn_out,
 
 std::vector<paddle::Tensor> MoeExpertReduce(
     const paddle::Tensor& ffn_out,
-    const paddle::Tensor& expert_scales_float,
+    const paddle::Tensor& top_k_weight,
     const paddle::Tensor& permute_indices_per_token,
     const paddle::Tensor& top_k_indices,
     const paddle::optional<paddle::Tensor>& ffn2_bias,
@@ -76,7 +76,7 @@ std::vector<paddle::Tensor> MoeExpertReduce(
   switch (input_type) {
     case paddle::DataType::BFLOAT16:
       MoeReduceKernel<paddle::DataType::BFLOAT16>(ffn_out,
-                                                  expert_scales_float,
+                                                  top_k_weight,
                                                   permute_indices_per_token,
                                                   top_k_indices,
                                                   ffn2_bias,
@@ -89,7 +89,7 @@ std::vector<paddle::Tensor> MoeExpertReduce(
       break;
     case paddle::DataType::FLOAT16:
       MoeReduceKernel<paddle::DataType::BFLOAT16>(ffn_out,
-                                                  expert_scales_float,
+                                                  top_k_weight,
                                                   permute_indices_per_token,
                                                   top_k_indices,
                                                   ffn2_bias,
@@ -109,7 +109,7 @@ std::vector<paddle::Tensor> MoeExpertReduce(
 
 std::vector<std::vector<int64_t>> MoeExpertReduceInferShape(
     const std::vector<int64_t>& ffn_out_shape,
-    const std::vector<int64_t>& expert_scales_float_shape,
+    const std::vector<int64_t>& top_k_weight_shape,
     const std::vector<int64_t>& permute_indices_per_token_shape,
     const std::vector<int64_t>& top_k_indices_shape,
     const paddle::optional<std::vector<int64_t>>& ffn2_bias_shape) {
@@ -118,7 +118,7 @@ std::vector<std::vector<int64_t>> MoeExpertReduceInferShape(
 
 std::vector<paddle::DataType> MoeExpertReduceInferDtype(
     const paddle::DataType& ffn_out_dtype,
-    const paddle::DataType& expert_scales_float_dtype,
+    const paddle::DataType& top_k_weight_dtype,
     const paddle::DataType& permute_indices_per_token_dtype,
     const paddle::DataType& top_k_indices_dtype,
     const paddle::optional<paddle::DataType>& ffn2_bias_dtype) {
@@ -128,7 +128,7 @@ std::vector<paddle::DataType> MoeExpertReduceInferDtype(
 
 PD_BUILD_OP(moe_expert_reduce)
     .Inputs({"ffn_out",
-             "expert_scales_float",
+             "top_k_weight",
              "permute_indices_per_token",
              "top_k_indices",
              paddle::Optional("ffn2_bias")})
