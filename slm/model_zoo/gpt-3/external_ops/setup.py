@@ -185,6 +185,7 @@ def setup_token_dispatcher_utils():
                 "token_dispatcher_utils/topk_to_multihot.cu",
                 "token_dispatcher_utils/topk_to_multihot_grad.cu",
                 "token_dispatcher_utils/tokens_unzip_and_zip.cu",
+                "token_dispatcher_utils/tokens_stable_unzip.cu",
                 "token_dispatcher_utils/tokens_guided_unzip.cu",
                 "token_dispatcher_utils/regroup_tokens.cu",
             ],
@@ -208,6 +209,7 @@ def setup_token_dispatcher_utils():
                 "--expt-relaxed-constexpr",
                 "--expt-extended-lambda",
                 "--use_fast_math",
+                "-maxrregcount=80",
                 "-lineinfo",
                 "-DCUTLASS_DEBUG_TRACE_LEVEL=0",
                 "-gencode=arch=compute_90a,code=sm_90a",
@@ -218,6 +220,8 @@ def setup_token_dispatcher_utils():
     )
 
 run(setup_token_dispatcher_utils)
+'''
 run(setup_fused_quant_ops)
 run(setup_fast_ln)
 run(setup_fused_ln)
+'''

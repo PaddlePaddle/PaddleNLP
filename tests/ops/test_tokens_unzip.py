@@ -141,6 +141,8 @@ def verify_tokens_unzip():
         expected_unzipped_expert_idx = paddle.to_tensor(expected_unzipped_expert_idx, dtype='int32')
 
         unzipped_tokens, zipped_expertwise_rowmap, unzipped_probs, unzipped_expert_idx = TDU.tokens_unzip(tokens_zipped,routemap_topk, probs_topk,total_unzipped_tokens_num=total_unzipped_tokens_num, topk=topk, num_experts=expert_num)
+        
+        unzipped_tokens_stable, zipped_expertwise_rowmap_stable, unzipped_probs_stable, unzipped_expert_idx_stable= TDU.tokens_unzip_stable(tokens_zipped,routemap_topk, probs_topk, topk=topk, num_experts=2,max_tokens_per_expert=2)
 
         check_expert_idx(unzipped_expert_idx,zipped_expertwise_rowmap)
         check_indices(routemap_topk, zipped_expertwise_rowmap, unzipped_expert_idx)
@@ -161,6 +163,18 @@ def verify_tokens_unzip():
         print(unzipped_expert_idx)
         print("-------- expert_idx expected: ------------")
         print(expected_unzipped_expert_idx)
+
+        print("-------- Tokens unzipped by stable op: ------------")
+        print(unzipped_tokens_stable)
+
+        print("-------- Probs unzipped by stable op: ------------")
+        print(unzipped_probs_stable)
+
+        print("-------- zipped expertwize rowmap by stable op: ------------")
+        print(zipped_expertwise_rowmap_stable)
+
+        print("-------- expert_idx unzipped by stable op: ------------")
+        print(unzipped_expert_idx_stable)
 
     
 
