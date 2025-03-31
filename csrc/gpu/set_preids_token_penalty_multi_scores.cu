@@ -42,7 +42,7 @@ __global__ void set_preids_token_penalty_multi_scores_kernel(const bool *stop_fl
     int tid = threadIdx.x;
 
     if (tid < bs && !stop_flags[tid]) {
-        int64_t *pre_ids_now = pre_ids + tid * length;
+        int64_t *pre_ids_now = pre_ids + tid * length_id;
         const int64_t *input_ids_now = input_ids + tid * length_input_ids;
         const int seq_len_dec = seq_lens_decoder[tid];
         const int seq_len_enc = seq_lens_encoder[tid];
