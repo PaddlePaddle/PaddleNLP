@@ -50,8 +50,9 @@ paddle::Tensor group_swiglu_with_masked(const paddle::Tensor& fc1_out_tensor,
     const int64_t hidden_dim = fc1_out_tensor.shape()[1] / 2;
     auto act_out_tensor = paddle::empty({group_num * group_size, hidden_dim}, fc1_out_tensor.dtype(), fc1_out_tensor.place());
 
+    constexpr int VecSize = 8;
     PD_CHECK(fc1_out_tensor.dtype() == paddle::DataType::BFLOAT16);
-    PD_CHECK(hidden_dim % 8 == 0);
+    PD_CHECK(hidden_dim % VecSize == 0);
     
     constexpr paddle::DataType D = paddle::DataType::BFLOAT16;
     typedef PDTraits<D> traits_;
@@ -60,7 +61,7 @@ paddle::Tensor group_swiglu_with_masked(const paddle::Tensor& fc1_out_tensor,
     
     const int threads = 512;
     const int blocks = 256;
-    group_swiglu_with_masked_kernel<DataType_, 8><<<blocks, threads, 0, fc1_out_tensor.stream()>>>(
+    group_swiglu_with_masked_kernel<DataType_, VecSize><<<blocks, threads, 0, fc1_out_tensor.stream()>>>(
 
         reinterpret_cast<DataType_*>(const_cast<data_t*>(act_out_tensor.data<data_t>())),
         reinterpret_cast<const DataType_*>(fc1_out_tensor.data<data_t>()),
