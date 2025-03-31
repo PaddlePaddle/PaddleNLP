@@ -107,49 +107,50 @@ class UnZipNode:
         self.unzipped_probs = None
         self.zipped_expertwise_rowmap = None
 
+    def reset_statue(self):
+        self.unzipped_probs = None
+        self.zipped_expertwise_rowmap = None
+
+    @paddle.no_grad()
     def forward(
         self,
         hs_fp8_dispatched,
         hs_scale_dispatched,
         dispatched_indices,
         dispatched_probs,
-        total_unzipped_tokens_num,
         topk,
         num_experts,
+        max_tokens,
     ):
-
-        unzipped_tokens, zipped_expertwise_rowmap, unzipped_probs, unzipped_expert_idx = TDU.tokens_unzip(
-            hs_fp8_dispatched,
+        hs_fp8_dispatched_copy = hs_fp8_dispatched.cast(paddle.float32)
+        unzipped_tokens, zipped_expertwise_rowmap, unzipped_probs, unzipped_scale = TDU.tokens_unzip_stable(
+            hs_fp8_dispatched_copy.cast(paddle.float8_e4m3fn),
+            hs_scale_dispatched,
             dispatched_indices,
             dispatched_probs,
-            total_unzipped_tokens_num=total_unzipped_tokens_num,
-            topk=self.token_dispatcher._comm_manager.router_topk,
-            num_experts=4,
-        )
-
-        unzipped_scale = TDU.tokens_guided_unzip(
-            hs_scale_dispatched,
-            zipped_expertwise_rowmap,
-            total_unzipped_token_num=total_unzipped_tokens_num,
+            topk=self.token_dispatcher._comm_manager.router_topk,  # int32
             num_experts=num_experts,
+            max_tokens_per_expert=max_tokens,
         )
-        self.unzipped_probs = unzipped_probs.to(paddle.bfloat16)
+        self.unzipped_probs = unzipped_probs
         self.zipped_expertwise_rowmap = zipped_expertwise_rowmap
-        return unzipped_tokens, unzipped_scale, zipped_expertwise_rowmap, unzipped_probs, unzipped_expert_idx
-
-    def backward(self, dx, hidden_states_out_grad, probs_grad):
-
-        weighted_zipped_tokens = TDU.tokens_weighted_zip(
-            dx,
-            self.unzipped_probs,
-            self.zipped_expertwise_rowmap,
-            total_zipped_tokens=hidden_states_out_grad.shape[0],
-            num_experts=4,
+        return (
+            unzipped_tokens,
+            unzipped_scale,
+            zipped_expertwise_rowmap,
+            unzipped_probs,
         )
-        probs_grad_zipped = TDU.tokens_weighted_zip(
-            probs_grad.unsqueeze(-1),
-            self.unzipped_probs,
+
+    @paddle.no_grad()
+    def backward(self, dx, hidden_states_out_grad, probs_grad, dispatched_indices):
+        probs_grad_copy = probs_grad.unsqueeze(-1).cast(paddle.float32)
+
+        weighted_zipped_tokens, probs_grad_zipped = TDU.tokens_zip(
+            # dx_copy.cast(paddle.bfloat16),
+            dx,
             self.zipped_expertwise_rowmap,
+            dispatched_indices,
+            probs_grad_copy,
             total_zipped_tokens=hidden_states_out_grad.shape[0],
             num_experts=4,
         )
@@ -161,28 +162,35 @@ class ZipNode:
         self.token_dispatcher = token_dispatcher
         self.name = name
 
-    def forward(self, expert_out, unzipped_probs, zipped_expertwise_rowmap, total_zipped_tokens, num_experts):
-        expert_out_zipped = TDU.tokens_weighted_zip(
-            expert_out, unzipped_probs, zipped_expertwise_rowmap, total_zipped_tokens, num_experts
+    @paddle.no_grad()
+    def forward(
+        self, expert_out, zipped_expertwise_rowmap, routemap_topk, unzipped_probs, total_zipped_tokens, num_experts
+    ):
+        expert_out_zipped, zipped_probs_topk = TDU.tokens_zip(
+            expert_out, zipped_expertwise_rowmap, routemap_topk, unzipped_probs, total_zipped_tokens, num_experts
         )
         return expert_out_zipped
 
+    @paddle.no_grad()
     def backward(
         self,
         grad_output,
         grad_output_scale,
         dispatched_indices,
         dispatched_probs,
-        total_unzipped_tokens_num,
         top_k,
         num_experts,
+        max_tokens,
     ):
-        unzipped_grad, zipped_expertwise_rowmap_grad, _, _ = TDU.tokens_unzip(
-            grad_output, dispatched_indices, dispatched_probs, total_unzipped_tokens_num, top_k, num_experts
+        (
+            unzipped_grad,
+            zipped_expertwise_rowmap_grad,
+            unzipped_probs_grad,
+            unzipped_scale_grad,
+        ) = TDU.tokens_unzip_stable(
+            grad_output, grad_output_scale, dispatched_indices, dispatched_probs, top_k, num_experts, max_tokens
         )
-        unzipped_scale_grad = TDU.tokens_guided_unzip(
-            grad_output_scale, zipped_expertwise_rowmap_grad, total_unzipped_tokens_num, num_experts
-        )
+
         return unzipped_grad, unzipped_scale_grad
 
 
@@ -231,7 +239,7 @@ class UnPermuteNode:
         self.token_permuted_indices = None
         self.hidden_states = None
         self.prob_permuted_indices = None
-        # self.faltten_dispatched_probs = None
+        self.faltten_dispatched_probs = None
         self.hidden = None
         self.permuted_tokens = None
         self.output_tokens = None
