@@ -113,7 +113,7 @@ void MoeFFNKernel(const paddle::Tensor& permute_input,
   //auto act_out_tensor = paddle::experimental::swiglu(fc1_out_tensor, nullptr);
 
   
-  auto act_out_tensor = group_swiglu_with_masked(fc1_out_tensor, token_nums_per_expert);
+  auto act_out_tensor = group_swiglu_with_masked(fc1_out_tensor, tokens_expert_prefix_sum);
 
   auto act_out = act_out_tensor.data<data_t>();
 
