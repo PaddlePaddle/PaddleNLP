@@ -8,6 +8,7 @@ RUN python3 -m pip install --pre paddlepaddle-gpu -i https://www.paddlepaddle.or
     && python3 -m pip install --no-cache-dir --force-reinstall https://paddle-qa.bj.bcebos.com/paddlenlp/wheel/2f85a64edd4aa9911c94ccb5ce53e83ac41ce22b/paddlenlp-3.0.0b3.post20250123-py3-none-any.whl \
     && python3 -m pip install --no-cache-dir --force-reinstall https://paddlepaddle-inference-banchmark.bj.bcebos.com/paddlenlp_ops-0.0.0-py3-none-any.whl \
     && python3 -m pip install --no-cache-dir sentencepiece pycryptodome tritonclient[all]==2.41.1 \
+    && apt update && apt install net-tools \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # clone paddle & paddlenlp 源码（代码版本应与上述安装版本对齐）
