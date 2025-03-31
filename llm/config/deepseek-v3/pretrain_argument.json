@@ -1,5 +1,5 @@
 {
-  "model_name_or_path": "./model_config/DeepSeek-V3-test",
+  "model_name_or_path": "../model_config/DeepSeek-V3-test",
   "tokenizer_name_or_path": "deepseek-ai/DeepSeek-V3",
   "input_dir": "/root/paddlejob/workspace/env_run/liuyiqun/PaddleNLP/llm/data",
   "output_dir": "./checkpoints/pretrain_ckpts",
@@ -21,7 +21,7 @@
   "min_learning_rate": 3e-06,
   "warmup_steps": 30,
   "logging_steps": 1,
-  "max_steps": 10,
+  "max_steps": 3,
   "save_steps": 5000,
   "eval_steps": 1000,
   "weight_decay": 0.01,

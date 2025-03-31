@@ -171,7 +171,9 @@ from .utils.helper import (  # nested_truncate,
     nested_truncate,
 )
 from .utils.sharding_io import ShardingIO
-from paddlenlp.transformers import deepep_timer
+
+from paddlenlp.transformers import deepep_timer, fused_a2a
+#from paperf import profile_paddle
 
 DEFAULT_CALLBACKS = [DefaultFlowCallback]
 DEFAULT_PROGRESS_CALLBACK = ProgressCallback
@@ -341,7 +343,7 @@ class Trainer:
         self.tokenizer = tokenizer
         if not args.skip_profile_timer:
             set_timers()
-            self.ep_timer = deepep_timer.get_ep_timer(None, True)
+            #self.ep_timer = deepep_timer.get_ep_timer(None, True)
         self.timers = get_timers()
         self.runtime_timer = RuntimeTimer("RuntimeTimer")
 
@@ -1008,6 +1010,8 @@ class Trainer:
 
             npu_accelerate_plugin(self.optimizer)
 
+        #profile_paddle.register_profile_hook(model)
+
         if self.args.ignore_data_skip:
             self.timers and self.timers("read-data").start()
 
@@ -1110,8 +1114,20 @@ class Trainer:
                     continue
 
                 if step_control % args.gradient_accumulation_steps == 0:
+                    #profile_paddle.switch_profile(self.state.global_step, 5, 7, enable_layerwise_event=False)
+
+                    #if self.state.global_step == 2:
+                    #    fused_a2a.set_enable_md5sum_check(True)
+
+                    if self.state.global_step == 2:
+                        fused_a2a.set_enable_cuda_timestamp(True)   
+
                     self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
                     self.timers and self.timers("forward-backward").start()
+
+                    fused_a2a.set_is_training_step_start(True)
+                else:
+                    fused_a2a.set_is_training_step_start(False)
 
                 # stage2 and stage3 should not no_sync, because the is no DDP wrapper and no_sync API
                 # hybrid_parallel (tp or pp or sharding stage 1) should not no_sync
@@ -1172,6 +1188,7 @@ class Trainer:
                     # Case 3: Pipeline or sharding overlap
                     # local_rank != -1 don't means dp in networks.
                     self.timers and self.timers("all-reduce").start()
+                    #profile_paddle.push_record_event("all-reduce")
 
                     # Case 1: Use recompute and dp / sharding stage1,
                     # manualy collect gradient for dp.
@@ -1205,8 +1222,10 @@ class Trainer:
 
                             if self.optimizer._dp_enable or getattr(self.optimizer, "_sep_enable", False):
                                 fused_allreduce_gradients_no_sync(list(parameters_list), self.optimizer._hcg)
+                    #profile_paddle.pop_record_event()
                     self.timers and self.timers("all-reduce").stop()
                     self.timers and self.timers("optimizer-step").start()
+                    #profile_paddle.push_record_event("optimizer-step")
 
                     if self.args.gradient_accumulation_steps > 1 and self._enable_delay_scale_loss():
                         paddle.device.synchronize()
@@ -1253,11 +1272,13 @@ class Trainer:
                     if self.args.offload_optim:
                         self._offload_optimizer()
 
+                    #profile_paddle.pop_record_event()
                     self.timers and self.timers("optimizer-step").stop()
 
                     if optimizer_was_run:
                         self.lr_scheduler.step()
 
+                    #profile_paddle.push_record_event("clear_grad")
                     if args.release_grads or enable_release_grads:
                         self.optimizer.clear_grad(set_to_zero=False)
                         if args.pipeline_parallel_degree > 1:
@@ -1266,6 +1287,7 @@ class Trainer:
                                     buffer._clear_grad_storage()
                     else:
                         self.optimizer.clear_grad()
+                    #profile_paddle.pop_record_event()
 
                     self.callback_handler.on_optimizer_end(
                         args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
@@ -1363,8 +1385,10 @@ class Trainer:
 
         metrics["train_loss"] = train_loss
 
-        if self.ep_timer is not None:
-            self.ep_timer.sumary()
+        #if self.ep_timer is not None:
+        #    self.ep_timer.sumary()
+
+        fused_a2a.gather_and_dump_timestamps()
 
         self.is_in_train = False
 
@@ -1469,8 +1493,8 @@ class Trainer:
         if timer_info or paddle_timer_info:
             logger.info(f"[Profile global_step: {self.state.global_step}] {timer_info} {paddle_timer_info}")
 
-        if self.ep_timer is not None:
-            self.ep_timer.add_step()
+        #if self.ep_timer is not None:
+        #    self.ep_timer.add_step()
 
     def _check_loss_valid(self, loss):
         assert isinstance(loss, paddle.Tensor) and loss._is_initialized()
@@ -2432,16 +2456,21 @@ class Trainer:
 
         model.train()
         inputs = self._prepare_inputs(inputs)
+
+        #profile_paddle.push_record_event("forward")
         with self.autocast_smart_context_manager():
             loss = self.compute_loss(model, inputs)
 
         if self.args.gradient_accumulation_steps > 1 and not self._enable_delay_scale_loss():
             loss = loss / self.args.gradient_accumulation_steps
+        #profile_paddle.pop_record_event()
 
+        #profile_paddle.push_record_event("backward")
         if self.do_grad_scaling:
             self.scaler.scale(loss).backward()
         else:
             loss.backward()
+        #profile_paddle.pop_record_event()
         return loss.detach()
 
     def training_pipeline_step(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
