@@ -205,6 +205,7 @@ struct MoeFCGemm {
     ElementC* ptr_D;
 
     int64_t* total_rows_before_expert;
+    int64_t total_rows;
     int64_t gemm_n;
     int64_t gemm_k;
 
@@ -226,6 +227,7 @@ struct MoeFCGemm {
           ptr_C(nullptr),
           ptr_D(nullptr),
           total_rows_before_expert(nullptr),
+          total_rows(-1),
           gemm_n(0),
           gemm_k(0),
           host_problem_sizes(nullptr) {}
@@ -241,6 +243,7 @@ struct MoeFCGemm {
               const ElementC* ptr_C,
               ElementC* ptr_D,
               int64_t* total_rows_before_expert,
+              int64_t total_rows,
               int64_t gemm_n,
               int64_t gemm_k,
               GemmCoord* host_problem_sizes = nullptr)
@@ -253,6 +256,7 @@ struct MoeFCGemm {
           ptr_C(const_cast<ElementC*>(ptr_C)),
           ptr_D(ptr_D),
           total_rows_before_expert(total_rows_before_expert),
+          total_rows(total_rows),
           gemm_n(gemm_n),
           gemm_k(gemm_k),
           host_problem_sizes(nullptr) {
@@ -297,6 +301,7 @@ struct MoeFCGemm {
            void* workspace = nullptr,
            int tile_count = 0)  // NOLINT
         : problem_visitor(args.total_rows_before_expert,
+                          args.total_rows,
                           args.gemm_n,
                           args.gemm_k,
                           args.problem_count,
@@ -316,6 +321,7 @@ struct MoeFCGemm {
                 int tile_count = 0) {
       problem_visitor =
           typename ProblemVisitor::Params(args.total_rows_before_expert,
+                                          args.total_rows,
                                           args.gemm_n,
                                           args.gemm_k,
                                           args.problem_count,
@@ -436,10 +442,14 @@ struct MoeFCGemm {
 
         // Load element pointers. Exchange pointers and strides if working on
         // the transpose
-        const int64_t rows_to_jump =
-            problem_idx == 0
-                ? 0
-                : params.problem_visitor.last_row_for_problem[problem_idx - 1];
+        int64_t rows_to_jump = 0;
+
+        if (params.problem_visitor.total_rows < 0) {
+          rows_to_jump = problem_idx == 0 ? 0 : params.problem_visitor.last_row_for_problem[problem_idx - 1];
+        } else {
+          rows_to_jump = problem_idx * (params.problem_visitor.total_rows / params.problem_visitor.problem_count);
+        }
+
         ElementA* ptr_A =
             reinterpret_cast<ElementA*>(params.ptr_A) + rows_to_jump * gemm_k;
         typename LayoutA::LongIndex ldm_A = gemm_k;
