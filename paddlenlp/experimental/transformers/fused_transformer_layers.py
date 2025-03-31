@@ -33,6 +33,9 @@ from paddle.incubate.nn.functional import (
     masked_multihead_attention,
     variable_length_memory_efficient_attention,
 )
+
+from paddle.incubate.nn.functional import moe_ffn
+
 from paddle.nn import Layer
 from paddle.nn.initializer import Constant
 from paddle.nn.quant import weight_only_linear
@@ -1451,13 +1454,18 @@ class FusedMultiTransformerBase(Layer):
         scale_size = 128
         x_bf16 = packed_recv_x[0].cast("bfloat16").reshape([0,0,-1,scale_size])
         scales = packed_recv_x[1].transpose([0,2,1]).unsqueeze(-1)
-        permute_input_tmp = (x_bf16 * scales).reshape([-1, hidden_size]).cast("bfloat16")
+        permute_input_tmp = (x_bf16 * scales).cast("bfloat16")
+        permute_input_tmp = permute_input_tmp.reshape([-1, max_tokens_all, hidden_size])
+
+        # for i in range(ep_num_per_gpu):
+        #     permute_input_tmp[i,packed_recv_count[i]:,:] = paddle.randn([max_tokens_all-packed_recv_count[i], hidden_size], dtype="bfloat16")
+
+        permute_input_tmp = permute_input_tmp.reshape([-1, hidden_size])
         
         # Here we use the maximum number of tokens each expert gets, not the actual number of tokens;
         # in high concurrency, all experts have the same number of tokens.
         # packed_recv_count += (paddle.arange(0, ep_num_per_gpu * max_tokens_all, max_tokens_all)).cast("int32")
-        packed_recv_count = paddle.arange(1, ep_num_per_gpu + 1) * max_tokens_all 
-
+        # packed_recv_count = paddle.arange(1, ep_num_per_gpu + 1) * max_tokens_all
 
         ffn_out = moe_expert_ffn(
             permute_input_tmp,
@@ -1469,6 +1477,27 @@ class FusedMultiTransformerBase(Layer):
             ffn2_weights_scale,
             quant_type,
         )
+
+        ffn_out2 = moe_ffn(
+            permute_input_tmp,
+            (paddle.arange(1, ep_num_per_gpu + 1) * max_tokens_all).cast("int64"),
+            ffn1_weights,
+            ffn2_weights,
+            ffn1_biases,
+            ffn1_weights_scale,
+            ffn2_weights_scale,
+            quant_type,
+        )
+
+        ffn_out2 = ffn_out2.reshape([16, max_tokens_all, hidden_size])
+        ffn_out = ffn_out.reshape([16, max_tokens_all, hidden_size])
+        for i in range(256//16):
+            if (packed_recv_count[i]).item() > 0:
+                print((packed_recv_count[i]).item())
+                print((ffn_out2[i, :packed_recv_count[i],:] - ffn_out[i, :packed_recv_count[i],:]).abs().max())
+        print((ffn_out2-ffn_out).abs().max())
+        print((ffn_out[i, packed_recv_count[i]:,:]).abs().max())
+
         ffn_out = ffn_out.reshape([ep_num_per_gpu, max_tokens_all, hidden_size])
 
 
@@ -1545,12 +1574,10 @@ class FusedMultiTransformerBase(Layer):
                 result = act_after_all2all.index_select(paddle.to_tensor(index_select_indices))
             return result
 
-        permute_input_per_card = run_permute_input(permute_input_per_card)
+        if permute_input_per_card.shape[0] > 0:
+            permute_input_per_card = run_permute_input(permute_input_per_card)
+            token_cumsum_by_expert_per_card = token_num_from_all_cards.transpose([1, 0]).sum(axis=-1).cumsum()
 
-        token_cumsum_by_expert_per_card = token_num_from_all_cards.transpose([1, 0]).sum(axis=-1).cumsum()
-        if permute_input_per_card.shape[0] == 0:
-            ffn_out = permute_input_per_card
-        else:
             ffn_out = moe_expert_ffn(
                 permute_input_per_card,
                 token_cumsum_by_expert_per_card,
@@ -1562,19 +1589,25 @@ class FusedMultiTransformerBase(Layer):
                 quant_type,
             )
 
-        ffn_out = run_permute_input(ffn_out, False)
+            ffn_out = run_permute_input(permute_input_per_card, False)
+        else:
+            ffn_out = paddle.empty([0, hidden_size], act_dtype)
+
         dist.alltoall_single(permute_input, ffn_out, act_out_split_size, act_in_split_size)
         moe_reduce_input = permute_input
-
-        fused_moe_out = moe_expert_reduce(
-            moe_reduce_input,
-            expert_scales_float,
-            permute_indices_per_token,
-            top_k_indices,
-            ffn2_biases,
-            norm_topk_prob,
-            routed_scaling_factor=1.0,
-        )
+        
+        if moe_reduce_input.shape[0] > 0:
+            fused_moe_out = moe_expert_reduce(
+                moe_reduce_input,
+                expert_scales_float,
+                permute_indices_per_token,
+                top_k_indices,
+                ffn2_biases,
+                norm_topk_prob,
+                routed_scaling_factor=1.0,
+            )
+        else:
+            return permute_input
 
         return fused_moe_out
 
@@ -2005,6 +2038,10 @@ class FusedMultiTransformerBase(Layer):
             )
         residual_input = src
         for i in range(self.num_layers):
+
+            if i == 400000:
+                from paddle.framework import core
+                core.nvprof_start()
             qkv_out, residual_input = self.compute_qkv(src, residual_input, i)
             fmha_out = self.compute_attn(
                 time_step,
@@ -2063,6 +2100,8 @@ class FusedMultiTransformerBase(Layer):
         kwargs["multi_block_output"] = tmp_out
         kwargs["seq_lens"] = seq_lens
         kwargs["input_ids"] = input_ids
+        # from paddle.framework import core
+        # core.nvprof_stop()
 
         out = self.post_process(**kwargs)
         return out, caches

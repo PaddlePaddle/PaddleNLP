@@ -16,6 +16,7 @@
 #include "cutlass/numeric_conversion.h"
 #include "helper.h"
 #include "moe/fused_moe_helper.h"
+#include "group_swiglu_with_masked.h"
 
 template <paddle::DataType T>
 void MoeFFNKernel(const paddle::Tensor& permute_input,
@@ -109,7 +110,11 @@ void MoeFFNKernel(const paddle::Tensor& permute_input,
         stream);
   }
 
-  auto act_out_tensor = paddle::experimental::swiglu(fc1_out_tensor, nullptr);
+  //auto act_out_tensor = paddle::experimental::swiglu(fc1_out_tensor, nullptr);
+
+  
+  auto act_out_tensor = group_swiglu_with_masked(fc1_out_tensor, token_nums_per_expert);
+
   auto act_out = act_out_tensor.data<data_t>();
 
   if (quant_method == "weight_only_int8") {

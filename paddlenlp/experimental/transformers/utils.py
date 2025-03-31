@@ -95,7 +95,7 @@ def infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, 
 
         paddle.distributed.barrier()
         rank = paddle.distributed.get_rank()
-        file_name = f"/root/paddlejob/workspace/env_run/output/changwenbin/deepseekv3_DP/{rank}.pdparams"
+        file_name = f"/root/paddlejob/workspace/env_run/output/changwenbin/deepseekv3_DP_new/{rank}.pdparams"
         state_dict = model.state_dict()
         paddle.save(state_dict, file_name)
         exit(0)
@@ -107,7 +107,7 @@ def infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, 
 
         paddle.distributed.barrier()
         rank = paddle.distributed.get_rank()
-        file_name = f"/root/paddlejob/workspace/env_run/output/changwenbin/deepseekv3_DP/{rank}.pdparams"
+        file_name = f"/root/paddlejob/workspace/env_run/output/changwenbin/deepseekv3_DP_new/{rank}.pdparams"
         state_dict = paddle.load(file_name, return_numpy=False)
 
         for key, value in model.state_dict().items():

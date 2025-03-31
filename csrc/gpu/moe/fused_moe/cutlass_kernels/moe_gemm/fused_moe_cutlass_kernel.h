@@ -436,10 +436,13 @@ struct MoeFCGemm {
 
         // Load element pointers. Exchange pointers and strides if working on
         // the transpose
-        const int64_t rows_to_jump =
-            problem_idx == 0
-                ? 0
-                : params.problem_visitor.last_row_for_problem[problem_idx - 1];
+        // const int64_t rows_to_jump =
+        //     problem_idx == 0
+        //         ? 0
+        //         : params.problem_visitor.last_row_for_problem[problem_idx - 1];
+
+        const int64_t rows_to_jump = problem_idx * 128 * 16;
+
         ElementA* ptr_A =
             reinterpret_cast<ElementA*>(params.ptr_A) + rows_to_jump * gemm_k;
         typename LayoutA::LongIndex ldm_A = gemm_k;
