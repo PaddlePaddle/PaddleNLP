@@ -129,7 +129,11 @@ def compute_slot_mappings(
         seq_len = seq_lens[i]
         query_len = query_lens[i]
         context_len = context_lens[i]
-        block_table = block_tables[i]
+        if i < len(block_tables):
+            block_table = block_tables[i]
+        else:
+            slot_mapping.append(PAD_SLOT_ID)  
+            continue
         
         is_profile_run = block_table is None
         if is_profile_run:
