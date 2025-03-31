@@ -43,6 +43,15 @@ def replace_with_quantization_linear(model, quantization_config, llm_int8_thresh
             re.fullmatch(ignore_module, name) for ignore_module in quantization_config.ignore_modules
         ):
             continue
+        weight_quantize_algo = None
+        if isinstance(quantization_config.weight_quantize_algo, str):
+            weight_quantize_algo = quantization_config.weight_quantize_algo
+        else:
+            for algo in weight_quantize_algo:
+                if any(re.fullmatch(module, name) for module in quantization_config.weight_quantize_algo[algo]):
+                    weight_quantize_algo = algo
+        if weight_quantize_algo is None:
+            continue
         if any(isinstance(child, linear_class) for linear_class in LINEAR_CLASSES):
             if child.bias is None:
                 bias_attr = False
@@ -57,6 +66,7 @@ def replace_with_quantization_linear(model, quantization_config, llm_int8_thresh
                     in_features=child.weight.shape[0],
                     out_features=child.weight.shape[1],
                     quantization_config=quantization_config,
+                    weight_quantize_algo=weight_quantize_algo,
                     dtype=child._dtype,
                     bias_attr=bias_attr,
                 )
@@ -65,6 +75,7 @@ def replace_with_quantization_linear(model, quantization_config, llm_int8_thresh
                     in_features=child.weight.shape[0],
                     output_size_per_partition=child.weight.shape[1],
                     quantization_config=quantization_config,
+                    weight_quantize_algo=weight_quantize_algo,
                     dtype=child._dtype,
                     bias_attr=bias_attr,
                     gather_output=child.gather_output,
@@ -74,6 +85,7 @@ def replace_with_quantization_linear(model, quantization_config, llm_int8_thresh
                     input_size_per_partition=child.weight.shape[0],
                     out_features=child.weight.shape[1],
                     quantization_config=quantization_config,
+                    weight_quantize_algo=weight_quantize_algo,
                     dtype=child._dtype,
                     bias_attr=bias_attr,
                     input_is_parallel=child.input_is_parallel,
