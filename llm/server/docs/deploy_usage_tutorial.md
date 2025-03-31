@@ -74,7 +74,9 @@ cd /home/workspace/models_dir
 
 除了支持通过设置`model_name` 在启动时进行自动下载，服务提供脚本可以进行自行下载。**部署时需指定环境变量`MODEL_DIR` 为模型下载存储路径**
 
-脚本所在路径`/opt/output/download_model.py`
+脚本所在路径`/opt/output/download_model.py` (当前路径为镜像内路径)
+
+**注**：模型下载依赖当前镜像的版本号，若在镜像内启动下载脚本无需配置，若直接从代码仓库拉取需配置环境变量`tag`，当前默认下载的版本为3.0.0.b4
 
 ```
 python download_model.py \
@@ -175,7 +177,7 @@ export MAX_SEQ_LEN=8192
 export MAX_DEC_LEN=1024
 
 export BATCH_SIZE="48"                          # 设置最大Batch Size，模型可同时并发处理的最大输入数量，不能高于128
-export BLOCK_BS="5"                             # 缓存Block支持的最大Query Batch Size，如果出现out of memeory 错误，尝试减少该数值
+export BLOCK_BS="5"                             # 缓存Block支持的最大Query Batch Size，如果出现out of memory 错误，尝试减少该数值
 export BLOCK_RATIO="0.75"                       # 一般可以设置成 输入平均Token数/（输入+输出平均Token数)
 
 export MAX_CACHED_TASK_NUM="128"  # 服务缓存队列最大长度，队列达到上限后，会拒绝新的请求，默认128

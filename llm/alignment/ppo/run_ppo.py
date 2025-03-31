@@ -139,13 +139,6 @@ def main():
         if model_args.reward_model_name_or_path is None:
             raise ValueError("Please specify reward_model_name_or_path when use_rm_server is false.")
 
-    if training_args.rl_algorithm != "ppo" and training_args.use_fused_head_and_loss_fn:
-        logger.warning(
-            f"Fused_head_and_loss_fn currently does not support {training_args.rl_algorithm}. "
-            "Reset `use_fused_head_and_loss_fn` to False."
-        )
-        training_args.use_fused_head_and_loss_fn = False
-
     model_class_lm, model_class_score = AutoModelForCausalLM, LlamaModelForScore
     if training_args.pipeline_parallel_degree > 1:
         from models.model_pp import LlamaPolicyPipe, LlamaValuePipe
@@ -188,6 +181,9 @@ def main():
     actor_model_config.max_position_embeddings = data_args.max_length
     actor_model_config.use_sparse_head_and_loss_fn = False
     actor_model_config.fused_linear = model_args.fused_linear
+    actor_model_config.use_fused_rms_norm = training_args.use_fused_rms_norm
+    actor_model_config.seq_length = data_args.max_length
+    actor_model_config.max_sequence_length = data_args.max_length
     print(f"Loading Actor model with config:\n\t{actor_model_config}\n")
 
     if not training_args.autotuner_benchmark:
@@ -257,6 +253,7 @@ def main():
         model_max_length=data_args.max_length,
         padding_side="left",
         tokenizer_alpha=model_args.actor_tokenizer_alpha,
+        use_fast=True,
     )
     llm_utils.init_chat_template(actor_tokenizer, model_args.actor_model_name_or_path, model_args.chat_template)
 
@@ -320,6 +317,7 @@ def main():
             model_max_length=data_args.max_length,
             padding_side="right",
             tokenizer_alpha=model_args.reward_tokenizer_alpha,
+            use_fast=True,
         )
         llm_utils.init_chat_template(reward_tokenizer, model_args.reward_model_name_or_path, model_args.chat_template)
     else:
@@ -361,6 +359,7 @@ def main():
             model_max_length=data_args.max_length,
             padding_side="left",
             tokenizer_alpha=model_args.reward_critic_tokenizer_alpha,
+            use_fast=True,
         )
         llm_utils.init_chat_template(
             reward_critic_tokenizer, model_args.reward_critic_model_name_or_path, model_args.chat_template
@@ -390,13 +389,19 @@ def main():
 
     if training_args.should_load_dataset:
         train_ds = PromptOnlyDataset(
-            data_args.parsed_train_datasets, tokenizer=actor_tokenizer, use_rm_server=training_args.use_rm_server
+            data_args.parsed_train_datasets,
+            tokenizer=actor_tokenizer,
+            use_rm_server=training_args.use_rm_server,
+            max_src_len=training_args.max_src_len,
         )
         if data_args.eval_datasets is None and data_args.eval_split_ratio:
             train_ds, dev_ds = train_ds.split_train_test(split_ratio=data_args.eval_split_ratio)
         elif data_args.eval_datasets is not None:
             dev_ds = PromptOnlyDataset(
-                data_args.parsed_eval_datasets, tokenizer=actor_tokenizer, use_rm_server=training_args.use_rm_server
+                data_args.parsed_eval_datasets,
+                tokenizer=actor_tokenizer,
+                use_rm_server=training_args.use_rm_server,
+                max_src_len=training_args.max_src_len,
             )
         else:
             dev_ds = None

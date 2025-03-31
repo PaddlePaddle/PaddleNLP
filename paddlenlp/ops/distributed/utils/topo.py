@@ -77,7 +77,7 @@ class Topology:
             world=data_arr.reshape(-1).tolist(),
         )
 
-        assert self.data_info.world[device_rank] == self.data_info.rank, "Data rank caculate error!"
+        assert self.data_info.world[device_rank] == self.data_info.rank, "Data rank calculate error!"
         self.data_inner_times = self.world.size // self.data_info.size
 
     def __repr__(self):

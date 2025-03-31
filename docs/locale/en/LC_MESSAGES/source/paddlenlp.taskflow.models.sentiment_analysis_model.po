@@ -95,7 +95,7 @@ msgid ""
 msgstr ""
 
 #: of paddlenlp.taskflow.models.sentiment_analysis_model.LSTMModel:15
-msgid "The output size of the lstm, defalut value 198."
+msgid "The output size of the lstm, default value 198."
 msgstr ""
 
 #: of paddlenlp.taskflow.models.sentiment_analysis_model.LSTMModel:17

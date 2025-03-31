@@ -18,7 +18,6 @@ from __future__ import annotations
 
 from typing import Callable, Hashable
 
-import numpy as np
 import paddle
 from paddle.io import Dataset, Subset
 from typing_extensions import TypedDict  # Python 3.10+
@@ -40,7 +39,7 @@ class PromptOnlySample(TypedDict, total=True):
 
 class PromptOnlyBatch(TypedDict, total=True):
     input_ids: paddle.Tensor  # size = (B, L)
-    attention_mask: paddle.Tensor  # size = (B, L)
+    # attention_mask: paddle.Tensor  # size = (B, L)
     label_ids: paddle.Tensor  # size = (B, L)
 
 
@@ -48,7 +47,7 @@ class PromptOnlyDataset(TokenizedDataset):
     def preprocess(self, raw_sample: RawSample) -> PromptOnlySample:
         input_dict = {}
         prompt = format_prompt(input=raw_sample["input"], eos_token=self.tokenizer.eos_token)
-        input_dict["input_ids"] = self.tokenize(prompt)
+        input_dict["input_ids"] = self.tokenize(prompt, truncation=True, max_length=self.max_src_len)
         if self.use_rm_server:
             answer = format_prompt(input=raw_sample["answer"], eos_token=self.tokenizer.eos_token)
             input_dict["label_ids"] = self.tokenize(answer)
@@ -75,9 +74,9 @@ class PromptOnlyCollator(CollatorBase):
         input_dict = {}
 
         input_ids = [sample["input_ids"] for sample in samples]
-        attention_mask = [np.ones(input_id.shape, dtype=bool) for input_id in input_ids]
         input_dict["input_ids"] = left_padding(input_ids, padding_value=self.pad_token_id)
-        input_dict["attention_mask"] = left_padding(attention_mask, padding_value=0)
+        # attention_mask = [np.ones(input_id.shape, dtype=bool) for input_id in input_ids]
+        # input_dict["attention_mask"] = left_padding(attention_mask, padding_value=0)
 
         if self.use_rm_server:
             label_ids = [sample["label_ids"] for sample in samples]

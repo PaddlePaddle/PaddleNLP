@@ -1095,7 +1095,7 @@ class Trainer:
                         self.control.should_evaluate = False
                         self.control.should_save = False
 
-                        # log loss and memeory usage
+                        # log loss and memory usage
                         self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
                         self._print_timer()
                         step_control = 0

@@ -143,13 +143,13 @@ class TrainingArguments(TrainingArguments):
 @dataclass
 class ModelArgument:
     actor_model_name_or_path: str = field(
-        default=None, metadata={"help": "Build-in pretrained model name or the path to local model."}
+        default=None, metadata={"help": "Built-in pretrained model name or the path to local model."}
     )
     reward_model_name_or_path: str = field(
-        default=None, metadata={"help": "Build-in pretrained model name or the path to local model."}
+        default=None, metadata={"help": "Built-in pretrained model name or the path to local model."}
     )
     reward_critic_model_name_or_path: str = field(
-        default=None, metadata={"help": "Build-in pretrained model name or the path to local model."}
+        default=None, metadata={"help": "Built-in pretrained model name or the path to local model."}
     )
     use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
 

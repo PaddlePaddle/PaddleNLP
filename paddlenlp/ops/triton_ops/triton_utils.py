@@ -232,7 +232,7 @@ def build_package(generated_dir, python_package_name):
 
 def rename_c_to_cu(generated_dir):
     """
-    Rename the .c files int generated_dir to .cu file, becuase the triton aot tool generate the .c files.
+    Rename the .c files int generated_dir to .cu file, because the triton aot tool generate the .c files.
     """
     # rename the .c file to .cu
     for filename in os.listdir(generated_dir):
