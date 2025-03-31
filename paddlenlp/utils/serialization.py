@@ -207,9 +207,9 @@ def dumpy(*args, **kwarsg):
 def load_torch(path: str, **pickle_load_args):
     if path.endswith(PYTORCH_WEIGHTS_NAME) or os.path.split(path)[-1].startswith("pytorch_model-"):
         import torch
-    
+
         state_dict = torch.load(path, map_location="cpu", weights_only=False)
-    
+
         for key in list(state_dict.keys()):
             if isinstance(state_dict[key], torch.Tensor):
                 t = state_dict.pop(key)
@@ -231,7 +231,9 @@ def load_torch(path: str, **pickle_load_args):
             else:
                 arr = paddle.to_tensor(np.frombuffer(v["data"], dtype=dtype).reshape(v["shape"]))
             state_dict[k] = arr
+
     return state_dict
+
 
 def load_torch_inner(path: str, **pickle_load_args):
     """
