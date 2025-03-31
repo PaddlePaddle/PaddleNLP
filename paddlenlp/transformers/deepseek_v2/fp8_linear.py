@@ -212,9 +212,9 @@ class LinearFP8Func(paddle.autograd.PyLayer):
         x_quant, x_scale = kitchen_quant(
             x, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
         )
-        weight_t = weight.T.contiguous()
-        w_quant, w_scale = kitchen_quant(
-            weight_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
+
+        _, _, w_quant, w_scale = kitchen_quant(
+            weight, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
         )
 
         # compute out = mm(x, w_t)
@@ -280,9 +280,9 @@ class LinearFP8KeepXFunc(paddle.autograd.PyLayer):
         x_quant, x_scale = kitchen_quant(
             x, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
         )
-        weight_t = weight.T.contiguous()
-        w_quant, w_scale = kitchen_quant(
-            weight_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
+
+        _, _, w_quant, w_scale = kitchen_quant(
+            weight, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=False, return_transpose=True
         )
 
         # compute out = mm(x, w_t)

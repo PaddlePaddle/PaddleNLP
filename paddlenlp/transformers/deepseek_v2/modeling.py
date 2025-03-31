@@ -867,9 +867,12 @@ class DeepseekV2MoE(MoELayer):
             moe_group="expert",
         )
 
-        moe_grad_group = fleet.get_hybrid_communicate_group().expert_grad_comm_group
-        for p in self.experts.parameters():
-            setattr(p, "color", {"color": "moe_expert", "group": moe_grad_group})
+        ep = 4
+
+        if ep > 1:
+            moe_grad_group = fleet.get_hybrid_communicate_group().expert_grad_comm_group
+            for p in self.experts.parameters():
+                setattr(p, "color", {"color": "moe_expert", "group": moe_grad_group})
 
         self.alpha = config.aux_loss_alpha
         if config.n_shared_experts is not None:

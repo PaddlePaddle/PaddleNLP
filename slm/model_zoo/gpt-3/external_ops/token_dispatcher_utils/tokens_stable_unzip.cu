@@ -250,7 +250,7 @@ std::vector<paddle::Tensor> tokens_unzip_stable(
   const int cols = X.shape()[1];  // 一般为7168
   const int quanted_cols = (XScale) ? XScale->shape()[1] : 0;
   const int max_tokens_per_expert =
-      ((max_tokens_per_expert_in + 127) / 128) * 128;
+      ((max_tokens_per_expert_in + 511) / 512) * 512;
   const int output_rows = num_experts * max_tokens_per_expert;
   //------------------------ 输出缓冲区分配  ------------------------
   paddle::Tensor X_unzipped, XScale_unzipped, zipped_expertwise_rowmap,
