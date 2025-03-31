@@ -43,7 +43,7 @@ class ActorReferenceTrainer(RLTrainer):
         model: Union[PretrainedModel, nn.Layer] = None,
         criterion: nn.Layer = None,
         args: TrainingArguments = None,
-        data_collator: Optional[DataCollator] = None, # type: ignore
+        data_collator: Optional[DataCollator] = None,  # type: ignore
         train_dataset: Optional[Dataset] = None,
         eval_dataset: Union[Dataset, Dict[str, Dataset]] = None,
         tokenizer: Optional[PretrainedTokenizer] = None,

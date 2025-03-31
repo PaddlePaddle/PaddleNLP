@@ -15,7 +15,6 @@
 
 from __future__ import annotations
 
-
 from models.ppo_model_utils import RLHFValueLoss
 from trainer.rl_trainer import RLTrainer
 

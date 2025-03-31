@@ -33,7 +33,7 @@ from paddlenlp.transformers.configuration_utils import PretrainedConfig
 from paddlenlp.transformers.model_outputs import ModelOutput
 from paddlenlp.transformers.tokenizer_utils_base import PaddingStrategy
 
-from models.ppo_model_utils import make_attention_mask, make_position_ids # isort:skip
+from models.ppo_model_utils import make_attention_mask, make_position_ids  # isort:skip
 
 
 class MuteDefaultFlowCallback(TrainerCallback):

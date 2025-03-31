@@ -53,9 +53,12 @@ from models.ppo_model_utils import create_loss
 from utils.comm_utils import create_data_trans_group
 from utils.infer_utils import InferEvalModel
 from .trainer_utils import PipeEvalModel
-#isort: on
+
+# isort: on
 
 # ########## patches for Trianer ##########
+
+
 def init_train_model_opt(
     self: Trainer,
     max_steps: int,
@@ -536,7 +539,7 @@ class RLTrainer(Trainer):
         model: Union[PretrainedModel, nn.Layer] = None,
         criterion: nn.Layer = None,
         args: TrainingArguments = None,
-        data_collator: Optional[DataCollator] = None, # type: ignore
+        data_collator: Optional[DataCollator] = None,  # type: ignore
         train_dataset: Optional[Dataset] = None,
         eval_dataset: Union[Dataset, Dict[str, Dataset]] = None,
         tokenizer: Optional[PretrainedTokenizer] = None,

@@ -1273,11 +1273,7 @@ class PPOTrainer(Trainer):
         # ##### set training state and resume #####
         # consumed_samples used to set train_dataloader.batch_sampler may not be
         # correct. Thus, data cannot be resumed perfectly when not breaking at epoch end.
-        (
-            epochs_trained,
-            steps_trained_in_current_epoch,
-            steps_trained_progress_bar,
-        ) = self.init_train_state(
+        (epochs_trained, steps_trained_in_current_epoch, steps_trained_progress_bar,) = self.init_train_state(
             resume_from_checkpoint,
             train_dataloader,
             max_steps,
