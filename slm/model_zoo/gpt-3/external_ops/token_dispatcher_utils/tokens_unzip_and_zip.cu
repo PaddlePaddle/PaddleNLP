@@ -471,6 +471,18 @@ void dispatch_tokens_zip(const paddle::Tensor &unzipped_tokens,
         zipped_probs_topk.data<float>(),
         total_zipped_tokens_num,
         token_length);
+  } else if (topk == 8 && num_experts == 8) {
+    tokens_zip_kernel<8, 8><<<grid, block, 0, unzipped_tokens.stream()>>>(
+        unzipped_tokens.data<phi::bfloat16>(),
+        zipped_expertwise_rowmap.data<int>(),
+        expert_routemap_topk.data<int>(),
+        unzipped_token_probs.data<float>(),
+        zipped_tokens.data<phi::bfloat16>(),
+        zipped_probs_topk.data<float>(),
+        total_zipped_tokens_num,
+        token_length);
+  } else {
+    std::__throw_invalid_argument;
   }
 }
 
