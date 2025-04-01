@@ -14,7 +14,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Configuration base class and utilities."""
+"""Configuration base class and utilities."""
+
 from __future__ import annotations
 
 import copy
@@ -25,7 +26,7 @@ import re
 import shutil
 import sys
 import warnings
-from dataclasses import field
+from dataclasses import asdict, field, is_dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -200,6 +201,17 @@ def resolve_hf_config_path(repo_id: str, cache_dir: str, subfolder=None) -> str:
         library_name="PaddleNLP",
         library_version=__version__,
     )
+
+
+def set_not_none_keys(config, kwargs):
+    if is_dataclass(kwargs):
+        kwargs = asdict(kwargs)
+
+    for key, value in kwargs.items():
+        if value is not None and hasattr(config, key):
+            setattr(config, key, value)
+
+    return config
 
 
 def set_expected_keys(config, llm_meta, kwargs):
@@ -499,6 +511,7 @@ class PretrainedConfig:
             This attribute is currently not being used during model loading time, but this may change in the future
             versions. But we can already start preparing for the future by saving the dtype with save_pretrained.
     """
+
     model_type: str = ""
     is_composition: bool = False
 
@@ -935,7 +948,7 @@ class PretrainedConfig:
             id2label = kwargs["id2label"] if kwargs["id2label"] is not None else []
             if len(id2label) != num_labels:
                 raise ValueError(
-                    f"You passed along `num_labels={num_labels }` with an incompatible id to label map: "
+                    f"You passed along `num_labels={num_labels}` with an incompatible id to label map: "
                     f"{kwargs['id2label']}. Since those arguments are inconsistent with each other, you should remove "
                     "one of them."
                 )

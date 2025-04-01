@@ -65,9 +65,9 @@ from paddlenlp.transformers import (
     Qwen2MoeForCausalLM,
     Qwen2MoeForCausalLMPipe,
 )
-from paddlenlp.transformers.configuration_utils import LlmMetaConfig
+from paddlenlp.transformers.configuration_utils import LlmMetaConfig, set_not_none_keys
 from paddlenlp.transformers.longlora import replace_llama_attn, set_group_size
-from paddlenlp.trl import DataConfig, ModelConfig, SFTConfig, SFTTrainer
+from paddlenlp.trl import DataConfig, ModelConfig, SFTConfig, SFTTrainer, StructConfig
 from paddlenlp.trl.llm_utils import (
     ZeroPaddingIterDatasetCallback,
     compute_metrics,
@@ -107,15 +107,16 @@ def paddlenlp_verison_check():
 
 def main():
     paddlenlp_verison_check()
-    parser = PdArgumentParser((GenerateArgument, ModelConfig, ReftArgument, DataConfig, SFTConfig))
+    parser = PdArgumentParser((GenerateArgument, ModelConfig, StructConfig, ReftArgument, DataConfig, SFTConfig))
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
-        gen_args, model_args, reft_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
+        gen_args, model_args, struct_args, reft_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
     else:
-        gen_args, model_args, reft_args, data_args, training_args = parser.parse_args_into_dataclasses()
+        gen_args, model_args, struct_args, reft_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
     training_args.print_config(gen_args, "Generation")
+    training_args.print_config(struct_args, "Re-Struct")
 
     # Setup GPU & distributed training
     paddle.set_device(training_args.device)
@@ -189,6 +190,8 @@ def main():
         training_args.prediction_loss_only = True
 
     LlmMetaConfig.set_llm_config(model_config, training_args)
+    if struct_args.restruct_model:
+        set_not_none_keys(model_config, struct_args)
     model_config.use_fast_layer_norm = model_args.use_fast_layer_norm
 
     # Config for model using dropout, such as GPT.

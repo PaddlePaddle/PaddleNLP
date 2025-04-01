@@ -24,5 +24,6 @@ from .sft_auto_trainer import *
 from .sft_config import *
 from .sft_trainer import *
 from .sftdata_config import *
+from .struct_config import *
 from .trl_data import *
 from .trl_utils import *
