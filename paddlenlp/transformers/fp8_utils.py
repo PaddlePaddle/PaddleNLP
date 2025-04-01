@@ -587,7 +587,6 @@ class ExpertsNode:
         out_grad_scale_list = paddle.split(out_grad_scale, num_or_sections=self.tokens_per_expert, axis=0)
 
         dxs = []
-        do2_list = []
         for i, (do3, do3_scale, x_t_fp8, x_t_scale, o1) in enumerate(
             zip(
                 out_grad_list,
@@ -605,7 +604,6 @@ class ExpertsNode:
                 expert.w2, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
             )
             do2 = self.bwd_dowm_input(do3, do3_scale, w2_fp8, w2_scale)
-            do2_list.append(do2)
             do1 = self.bwd_swiglu(o1, do2)
             dx = self.bwd_gate_up_input(do1, w1_fp8, w1_scale)
 
