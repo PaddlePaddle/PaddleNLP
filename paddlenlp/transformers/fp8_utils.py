@@ -123,6 +123,7 @@ class ExpertsGroupGemmNode:
         self.unzipped_scale = None
         self.unzipped_tokens = None
         self.unzipped_probs = None
+        self.unzipped_expert_idx = None
         self.tokens_per_expert = None
 
     def fwd_gate_up(self, x_fp8, x_scale, expert_w1, expert_w_count, tokens_per_expert):

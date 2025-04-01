@@ -242,11 +242,14 @@ __global__ void tokens_weighted_zip_kernel(
 }
 
 
-template <int num_experts, bool MP = true>
+template <int topk, int num_experts, bool MP = true>
 __global__ void tokens_zip_kernel(
     const phi::bfloat16 *__restrict__ unzipped_tokens_in,
     const int *__restrict__ zipped_expertwise_rowmap,
+    const int *__restrict__ expert_routemap_topk,
+    const float *__restrict__ unzipped_token_probs,
     phi::bfloat16 *__restrict__ zipped_tokens_out,
+    float *__restrict__ zipped_probs_topk,
     const int total_zipped_tokens_num,
     const int token_length) {
   const int this_row = blockIdx.x;
@@ -265,6 +268,16 @@ __global__ void tokens_zip_kernel(
     const int fetch_row =
         zipped_expertwise_rowmap[this_row * num_experts + expert];
     local_row_fetchlist[expert] = fetch_row;
+  }
+
+#pragma unroll
+  for (int k = 0; k < topk; ++k) {
+    const int expert_idx = expert_routemap_topk[this_row * topk + k];
+    if (expert_idx < 0) [[likely]]
+      continue;
+    const int expert_fetch_row = local_row_fetchlist[expert_idx];
+    zipped_probs_topk[this_row * topk + k] =
+        unzipped_token_probs[expert_fetch_row];
   }
 
   constexpr int vecSize = 2;  // __nv_bfloat162 = 2 x bfloat16
@@ -422,22 +435,40 @@ void dispatch_tokens_unzip(const paddle::Tensor &X,
 #undef HANDLE_PROB_TYPE
 }
 
+/*
+  dispatch_tokens_zip(unzipped_tokens,
+                      zipped_expertwise_rowmap,
+                      expert_routemap_topk,
+                      unzipped_token_probs,
+                      zipped_tokens,
+                      zipped_probs_topk,
+                      total_zipped_tokens_num,
+                      num_experts,
+                      cols);
+*/
 void dispatch_tokens_zip(const paddle::Tensor &unzipped_tokens,
                          const paddle::Tensor &zipped_expertwise_rowmap,
+                         const paddle::Tensor &expert_routemap_topk,
+                         const paddle::Tensor &unzipped_token_probs,
                          paddle::Tensor &zipped_tokens,
+                         paddle::Tensor &zipped_probs_topk,
                          const int total_zipped_tokens_num,
                          const int num_experts,
-                         const int token_length) {
+                         const int token_length,
+                         const int topk) {
   dim3 grid, block;
   grid.x = total_zipped_tokens_num;
   block.x = 256;
 
   // Map data types to C++ types
-  if (num_experts == 4) {
-    tokens_zip_kernel<4><<<grid, block, 0, unzipped_tokens.stream()>>>(
+  if (topk == 8 && num_experts == 4) {
+    tokens_zip_kernel<8, 4><<<grid, block, 0, unzipped_tokens.stream()>>>(
         unzipped_tokens.data<phi::bfloat16>(),
         zipped_expertwise_rowmap.data<int>(),
+        expert_routemap_topk.data<int>(),
+        unzipped_token_probs.data<float>(),
         zipped_tokens.data<phi::bfloat16>(),
+        zipped_probs_topk.data<float>(),
         total_zipped_tokens_num,
         token_length);
   }
@@ -493,27 +524,52 @@ std::vector<paddle::Tensor> tokens_weighted_zip(
   return {weighted_zipped_tokens};
 }
 
+/*
+PD_BUILD_OP(tokens_zip)
+    .Inputs({"unzipped_tokens", "zipped_expertwise_rowmap",
+"expert_routemap_topk","unzipped_token_probs"}) .Outputs({"zipped_tokens",
+"zipped_probs_topk"}) .Attrs({"total_zipped_tokens: int", "num_experts: int"})
+    .SetKernelFn(PD_KERNEL(tokens_zip));
+*/
 std::vector<paddle::Tensor> tokens_zip(
     const paddle::Tensor &unzipped_tokens,
     const paddle::Tensor &zipped_expertwise_rowmap,
+    const paddle::Tensor &expert_routemap_topk,
+    const paddle::Tensor &unzipped_token_probs,
     const int &total_zipped_tokens_num,
     const int &num_experts) {
   PD_CHECK(unzipped_tokens.dtype() == paddle::DataType::BFLOAT16);
-  int rows = unzipped_tokens.shape()[0];  // seqlen
-  int cols = unzipped_tokens.shape()[1];  // 一般为7168
+  const int rows = unzipped_tokens.shape()[0];       // seqlen
+  const int cols = unzipped_tokens.shape()[1];       // 一般为7168
+  const int topk = expert_routemap_topk.shape()[1];  // 一般为8
+
 
   //------------------------ 输出1张量 ------------------------
   auto zipped_tokens = paddle::empty({total_zipped_tokens_num, cols},
                                      unzipped_tokens.dtype(),
                                      unzipped_tokens.place());
+  auto zipped_probs_topk = paddle::empty({total_zipped_tokens_num, topk},
+                                         unzipped_token_probs.dtype(),
+                                         unzipped_token_probs.place());
+  // ----------------------- 0初始化 zipped_probs_topk ------------------
+  void *zipped_probs_topk_ptr =
+      reinterpret_cast<void *>(zipped_probs_topk.data<float>());
+  cudaMemsetAsync(zipped_probs_topk_ptr,
+                  0,
+                  sizeof(float) * total_zipped_tokens_num * topk,
+                  unzipped_token_probs.stream());
 
   dispatch_tokens_zip(unzipped_tokens,
                       zipped_expertwise_rowmap,
+                      expert_routemap_topk,
+                      unzipped_token_probs,
                       zipped_tokens,
+                      zipped_probs_topk,
                       total_zipped_tokens_num,
                       num_experts,
-                      cols);
-  return {zipped_tokens};
+                      cols,
+                      topk);
+  return {zipped_tokens, zipped_probs_topk};
 }
 
 std::vector<paddle::Tensor> tokens_unzip(
@@ -587,8 +643,11 @@ PD_BUILD_OP(tokens_unzip)
     .SetKernelFn(PD_KERNEL(tokens_unzip));
 
 PD_BUILD_OP(tokens_zip)
-    .Inputs({"unzipped_tokens", "zipped_expertwise_rowmap"})
-    .Outputs({"zipped_tokens"})
+    .Inputs({"unzipped_tokens",
+             "zipped_expertwise_rowmap",
+             "expert_routemap_topk",
+             "unzipped_token_probs"})
+    .Outputs({"zipped_tokens", "zipped_probs_topk"})
     .Attrs({"total_zipped_tokens: int", "num_experts: int"})
     .SetKernelFn(PD_KERNEL(tokens_zip));
 

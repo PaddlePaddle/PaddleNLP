@@ -227,6 +227,11 @@ class PreDispatchNode:
         self.token_dispatcher = token_dispatcher
         self.probs_origin_shape = None
 
+    def reset_status(self):
+        self.prob = None
+        self.reshaped_probs = None
+        self.token_indices = None
+
     def forward(self, routing_map, probs):
         num_tokens = routing_map.shape[0]
         self.probs_origin_shape = probs.shape
@@ -251,4 +256,5 @@ class PreDispatchNode:
             True,
         )
         probs_reshape_g = paddle._C_ops.reshape_grad(probs_grad, self.probs)
+        self.reset_status()
         return probs_reshape_g

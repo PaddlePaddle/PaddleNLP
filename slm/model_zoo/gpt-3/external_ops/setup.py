@@ -220,8 +220,6 @@ def setup_token_dispatcher_utils():
     )
 
 run(setup_token_dispatcher_utils)
-'''
 run(setup_fused_quant_ops)
 run(setup_fast_ln)
 run(setup_fused_ln)
-'''
