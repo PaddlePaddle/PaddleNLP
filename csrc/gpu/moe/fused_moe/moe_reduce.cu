@@ -70,8 +70,6 @@ std::vector<paddle::Tensor> MoeExpertReduce(
   const int topk = top_k_indices.dims()[1];
   const int num_rows = ffn_out.dims()[0] / topk;
   const int hidden_size = ffn_out.dims()[1];
-  
-
 
   auto output = GetEmptyTensor({num_rows, hidden_size}, input_type, place);
 
@@ -79,7 +77,6 @@ std::vector<paddle::Tensor> MoeExpertReduce(
   // This avoids possible bugs when using EP parallel.
   if(ffn_out.dims()[0] ==0 )
     return {output};
-
 
   switch (input_type) {
     case paddle::DataType::BFLOAT16:
