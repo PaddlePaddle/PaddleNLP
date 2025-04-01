@@ -197,12 +197,11 @@ void dispatch_tokens_unzip_stable(
 #define HANDLE_EXPERT_CASE(TOKEN_T, PROB_T, INT_T, HAS_SCALE) \
   if (topk == 8 && num_experts == 4) {                        \
     DISPATCH_CASE(TOKEN_T, PROB_T, INT_T, 8, 4, HAS_SCALE)    \
-  } else if (topk == 8 && num_experts == 8) {
-  DISPATCH_CASE(TOKEN_T, PROB_T, INT_T, 8, 8, HAS_SCALE)
-}
-else {
-  std::__throw_invalid_argument;
-}
+  } else if (topk == 8 && num_experts == 8) {                 \
+    DISPATCH_CASE(TOKEN_T, PROB_T, INT_T, 8, 8, HAS_SCALE)    \
+  } else {                                                    \
+    std::__throw_invalid_argument;                            \
+  }
 
 #define HANDLE_TOKEN_TYPE(PROB_T, INT_T)                        \
   if (DTYPE_CASE(X.dtype(), BFLOAT16)) {                        \
@@ -218,10 +217,10 @@ else {
     HANDLE_TOKEN_TYPE(float, INT_T)                           \
   }
 
-// 可扩展：根据整型类型控制派发，未来可支持int8，但int64不行，因为下标开销太重了，建议在外面直接cast到int32
-if (DTYPE_CASE(zipped_expertwise_rowmap.dtype(), INT32)) {
-  HANDLE_PROB_TYPE(int)
-}
+  // 可扩展：根据整型类型控制派发，未来可支持int8，但int64不行，因为下标开销太重了，建议在外面直接cast到int32
+  if (DTYPE_CASE(zipped_expertwise_rowmap.dtype(), INT32)) {
+    HANDLE_PROB_TYPE(int)
+  }
 
 #undef DTYPE_CASE
 #undef GET_DATA
