@@ -20,11 +20,8 @@ from typing import List, Optional
 import numpy as np
 import paddle
 import paddle.distributed as dist
-from paddle.distributed import fleet
-
 import paddle.distributed.communication.deep_ep as ep
-from paddle.distributed.communication.group import Group
-
+from paddle.distributed import fleet
 from paddle.framework import in_dynamic_mode
 from paddle.incubate.nn.functional import (
     fused_bias_act,
@@ -382,21 +379,16 @@ class FusedMultiTransformerBase(Layer):
         ep_group = dist.get_group()
         num_ranks = dist.get_world_size()
         num_rdma_bytes = ep.Buffer.get_low_latency_rdma_size_hint(
-            self.max_num_tokens_per_card,
-            self.hidden_size,
-            num_ranks,
-            num_experts
+            self.max_num_tokens_per_card, self.hidden_size, num_ranks, num_experts
         )
 
         self.buffer = ep.Buffer(
             ep_group,
             0,
             num_rdma_bytes,
-            low_latency_mode = True,
-            num_qps_per_rank = num_experts // num_ranks,
+            low_latency_mode=True,
+            num_qps_per_rank=num_experts // num_ranks,
         )
-
-
 
         assert config.embed_dim > 0, "Expected embed_dim to be greater than 0, " "but received {}".format(
             config.embed_dim
@@ -1424,7 +1416,7 @@ class FusedMultiTransformerBase(Layer):
         total_cards = paddle.distributed.get_world_size()
         act_dtype = tmp_out.dtype
         IsFirstGPUInAttentionTP = fleet.get_hybrid_communicate_group().get_model_parallel_rank() == 0
-        
+
         tmp_scores = paddle.nn.functional.softmax(scores, axis=-1)
         topk_info = paddle.topk(tmp_scores, self.config.moe_config.top_k, axis=-1, largest=True, sorted=False)
         topk_weights = topk_info[0]
@@ -1432,32 +1424,26 @@ class FusedMultiTransformerBase(Layer):
             topk_weights /= topk_weights.sum(axis=-1, keepdim=True)
         topk_idx = topk_info[1]
 
-        (
-            packed_recv_x, 
-            packed_recv_count, 
-            handle, 
-            event, 
-            hook
-        ) = self.buffer.low_latency_dispatch(
+        (packed_recv_x, packed_recv_count, handle, event, hook) = self.buffer.low_latency_dispatch(
             tmp_out if IsFirstGPUInAttentionTP else tmp_out[0:0],
             topk_idx if IsFirstGPUInAttentionTP else topk_idx[0:0],
             self.max_num_tokens_per_card,
             self.config.moe_config.num_experts,
             False,
-            False,)
-        
+            False,
+        )
+
         # FP8's packed_recv_x is dequantized
         max_tokens_all = self.max_num_tokens_per_card * total_cards
         scale_size = 128
-        x_bf16 = packed_recv_x[0].cast("bfloat16").reshape([0,0,-1,scale_size])
-        scales = packed_recv_x[1].transpose([0,2,1]).unsqueeze(-1)
+        x_bf16 = packed_recv_x[0].cast("bfloat16").reshape([0, 0, -1, scale_size])
+        scales = packed_recv_x[1].transpose([0, 2, 1]).unsqueeze(-1)
         permute_input_tmp = (x_bf16 * scales).reshape([-1, hidden_size]).cast("bfloat16")
-        
+
         # Here we use the maximum number of tokens each expert gets, not the actual number of tokens;
         # in high concurrency, all experts have the same number of tokens.
         # packed_recv_count += (paddle.arange(0, ep_num_per_gpu * max_tokens_all, max_tokens_all)).cast("int32")
-        packed_recv_count = paddle.arange(1, ep_num_per_gpu + 1) * max_tokens_all 
-
+        packed_recv_count = paddle.arange(1, ep_num_per_gpu + 1) * max_tokens_all
 
         ffn_out = moe_expert_ffn(
             permute_input_tmp,
@@ -1471,11 +1457,11 @@ class FusedMultiTransformerBase(Layer):
         )
         ffn_out = ffn_out.reshape([ep_num_per_gpu, max_tokens_all, hidden_size])
 
-
-        combined_x, event, hook = self.buffer.low_latency_combine(ffn_out, topk_idx, topk_weights, handle, return_recv_hook=False)
+        combined_x, event, hook = self.buffer.low_latency_combine(
+            ffn_out, topk_idx, topk_weights, handle, return_recv_hook=False
+        )
 
         return combined_x
-
 
         (
             permute_input,
@@ -1548,19 +1534,17 @@ class FusedMultiTransformerBase(Layer):
         permute_input_per_card = run_permute_input(permute_input_per_card)
 
         token_cumsum_by_expert_per_card = token_num_from_all_cards.transpose([1, 0]).sum(axis=-1).cumsum()
-        if permute_input_per_card.shape[0] == 0:
-            ffn_out = permute_input_per_card
-        else:
-            ffn_out = moe_expert_ffn(
-                permute_input_per_card,
-                token_cumsum_by_expert_per_card,
-                ffn1_weights,
-                ffn2_weights,
-                ffn1_biases,
-                ffn1_weights_scale,
-                ffn2_weights_scale,
-                quant_type,
-            )
+
+        ffn_out = moe_expert_ffn(
+            permute_input_per_card,
+            token_cumsum_by_expert_per_card,
+            ffn1_weights,
+            ffn2_weights,
+            ffn1_biases,
+            ffn1_weights_scale,
+            ffn2_weights_scale,
+            quant_type,
+        )
 
         ffn_out = run_permute_input(ffn_out, False)
         dist.alltoall_single(permute_input, ffn_out, act_out_split_size, act_in_split_size)
@@ -2029,7 +2013,7 @@ class FusedMultiTransformerBase(Layer):
             # all_reduce
             if self.tp_degree > 1:
                 dist.all_reduce(out_linear_out)
-                
+
             # ffn layernorm
             tmp_out, residual_input = self.compute_ffn_layernorm(out_linear_out, residual_input, i)
 

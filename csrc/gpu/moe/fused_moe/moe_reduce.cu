@@ -73,6 +73,10 @@ std::vector<paddle::Tensor> MoeExpertReduce(
 
   auto output = GetEmptyTensor({num_rows, hidden_size}, input_type, place);
 
+  // Avoids ‘invalid configuration argument’ when we launch the kernel.
+  if(ffn_out.dims()[0] == 0 )
+    return {output};
+
   switch (input_type) {
     case paddle::DataType::BFLOAT16:
       MoeReduceKernel<paddle::DataType::BFLOAT16>(ffn_out,
