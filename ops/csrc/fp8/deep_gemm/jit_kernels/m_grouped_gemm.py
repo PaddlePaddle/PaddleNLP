@@ -57,6 +57,8 @@ GemmType::run(out, rhs_scales, grouped_layout,
 @functools.lru_cache()
 def auto_tuning_with_compilation_grouped_gemm_contiguous(m, n, k, num_groups, num_sms):
     global includes, template
+    if num_sms is None:
+        num_sms = get_num_sms()
     block_m, block_n, num_stages, num_tma_multicast, smem_size = get_best_configs(
         m, n, k, 1, num_sms, is_grouped_contiguous=True
     )
@@ -96,7 +98,7 @@ def auto_tuning_with_compilation_grouped_gemm_contiguous(m, n, k, num_groups, nu
 
 
 def m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
-    lhs: Tuple[Tensor, Tensor], rhs: Tuple[Tensor, Tensor], out: Tensor, m_indices: Tensor
+    lhs: Tuple[Tensor, Tensor], rhs: Tuple[Tensor, Tensor], out: Tensor, m_indices: Tensor, num_sms=112
 ) -> None:
     """
     Do a grouped GEMM (contiguous format) with FP8 inputs and BF16 output, with 1x128 LHS scaling and 128x128 RHS scaling.
@@ -146,7 +148,6 @@ def m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
         return
     # Auto-tuning with compilation
     global includes, template
-    num_sms = get_num_sms()
     runtime, num_sms, smem_size = auto_tuning_with_compilation_grouped_gemm_contiguous(m, n, k, num_groups, num_sms)
 
     args = (
@@ -169,6 +170,8 @@ def m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
 def auto_tuning_with_compilation_grouped_gemm_masked(m, expected_m, n, k, num_groups, num_sms):
     # Auto-tuning with compilation
     global includes, template
+    if num_sms is None:
+        num_sms = get_num_sms()
     block_m, block_n, num_stages, num_tma_multicast, smem_size = get_best_configs(
         expected_m, n, k, num_groups, num_sms
     )
@@ -212,7 +215,7 @@ def auto_tuning_with_compilation_grouped_gemm_masked(m, expected_m, n, k, num_gr
 
 
 def m_grouped_gemm_fp8_fp8_bf16_nt_masked(
-    lhs: Tuple[Tensor, Tensor], rhs: Tuple[Tensor, Tensor], out: Tensor, masked_m: Tensor, expected_m: int
+    lhs: Tuple[Tensor, Tensor], rhs: Tuple[Tensor, Tensor], out: Tensor, masked_m: Tensor, expected_m: int, num_sms=112
 ) -> None:
     """
     Do a grouped GEMM (masked format) with FP8 inputs and BF16 output, with 1x128 LHS scaling and 128x128 RHS scaling.
@@ -259,7 +262,6 @@ def m_grouped_gemm_fp8_fp8_bf16_nt_masked(
     lhs_scales = get_col_major_tma_aligned_tensor(lhs_scales)
     assert rhs_scales.is_contiguous()
 
-    num_sms = get_num_sms()
     runtime, num_sms, smem_size = auto_tuning_with_compilation_grouped_gemm_masked(
         m, expected_m, n, k, num_groups, num_sms
     )
