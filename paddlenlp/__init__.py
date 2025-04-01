@@ -44,7 +44,6 @@ from . import (
     data,
     dataaug,
     datasets,
-    embeddings,
     experimental,
     layers,
     losses,

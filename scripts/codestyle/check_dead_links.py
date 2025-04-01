@@ -137,10 +137,10 @@ def create_symlinks(root_dir, src_dir, tgt_dir, file_extension=".md"):
 
 
 def process_file(file_path):
-    # Default synchronization of the 'llm' and 'docs/llm' folders
-    count = create_symlinks(file_path, "llm", "docs/llm", file_extension=".md")
+    # Default synchronization of the 'llm' and 'docs/zh/llm' folders
+    count = create_symlinks(file_path, "llm", "docs/zh/llm", file_extension=".md")
     if count > 0:
-        print("New files were added to docs/llm. Please check them.")
+        print("New files were added to docs/zh/llm. Please check them.")
         sys.exit(1)
 
     dead_links = find_dead_links(file_path)

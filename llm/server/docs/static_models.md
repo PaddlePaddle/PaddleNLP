@@ -19,6 +19,12 @@
 部署硬件要求：
 - 除MTP模型，Fp8模型之外支持的最低版本是SM80 (机器：A100 / A800) 要求CUDA 11.8 以上
 - DeepSeek-R1-MTP 与 Fp8 模型 支持的最低版本是SM90 (机器：H800) 要求CUDA 12.4 以上
+- Append-Attn：
+  - 支持的最低版本是SM80 (机器：A100 / A800)
+  - 要求CUDA 11.8 以上
+- Block-Attn:
+  - 支持的最低版本是SM70 (机器：V100)
+  - 要求CUDA 11.8 以上
 
 |模型名称|精度|MTP|节点数|静态图下载 model_name|
 |:------|:-:|:-:|:-:|:-:|
@@ -29,17 +35,23 @@
 | deepseek-ai/DeepSeek-R1  |a8w8_fp8|否|2| deepseek-ai/DeepSeek-R1-2nodes/a8w8_fp8|
 | deepseek-ai/DeepSeek-R1  |a8w8_fp8|是|2| deepseek-ai/DeepSeek-R1-MTP-2nodes/a8w8_fp8|
 | deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B |weight_only_int8|-|-|deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B/weight_only_int8,deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B-Block-Attn/weight_only_int8  |
-| deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B |fp16|-|-|deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B/float16|
+| deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B |fp16|-|-|deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B-Block-Attn/float16|
 | deepseek-ai/DeepSeek-R1-Distill-Qwen-7B   |weight_only_int8|-|-|deepseek-ai/DeepSeek-R1-Distill-Qwen-7B/weight_only_int8,deepseek-ai/DeepSeek-R1-Distill-Qwen-7B-Block-Attn/weight_only_int8 |
-| deepseek-ai/DeepSeek-R1-Distill-Qwen-7B   |fp16|-|-|deepseek-ai/DeepSeek-R1-Distill-Qwen-7B/float16 |
+| deepseek-ai/DeepSeek-R1-Distill-Qwen-7B   |fp16|-|-|deepseek-ai/DeepSeek-R1-Distill-Qwen-7B-Block-Attn/float16 |
 | deepseek-ai/DeepSeek-R1-Distill-Qwen-14B  |weight_only_int8|-|-|deepseek-ai/DeepSeek-R1-Distill-Qwen-14B/weight_only_int8,deepseek-ai/DeepSeek-R1-Distill-Qwen-14B-Block-Attn/weight_only_int8 |
-| deepseek-ai/DeepSeek-R1-Distill-Qwen-14B  |fp16|-|-|deepseek-ai/DeepSeek-R1-Distill-Qwen-14B/float16 |
+| deepseek-ai/DeepSeek-R1-Distill-Qwen-14B  |fp16|-|-|deepseek-ai/DeepSeek-R1-Distill-Qwen-14B-Block-Attn/float16 |
 | deepseek-ai/DeepSeek-R1-Distill-Qwen-32B  |weight_only_int8|-|-|deepseek-ai/DeepSeek-R1-Distill-Qwen-32B/weight_only_int8,deepseek-ai/DeepSeek-R1-Distill-Qwen-32B-Block-Attn/weight_only_int8 |
 | deepseek-ai/DeepSeek-R1-Distill-Qwen-32B  |fp16|-|-|deepseek-ai/DeepSeek-R1-Distill-Qwen-32B-Block-Attn/float16 |
 | deepseek-ai/DeepSeek-R1-Distill-Llama-8B  |weight_only_int8|-|-|deepseek-ai/DeepSeek-R1-Distill-Llama-8B/weight_only_int8,deepseek-ai/DeepSeek-R1-Distill-Llama-8B-Block-Attn/weight_only_int8 |
 | deepseek-ai/DeepSeek-R1-Distill-Llama-8B  |fp16|-|-|deepseek-ai/DeepSeek-R1-Distill-Llama-8B-Block-Attn/float16 |
 | deepseek-ai/DeepSeek-R1-Distill-Llama-70B |weight_only_int8|-|-|deepseek-ai/DeepSeek-R1-Distill-Llama-70B/weight_only_int8 |
 
+### QWQ
+
+| 模型名称 | 静态图下载 model_name |
+|:------|:-:|
+| Qwen/QwQ-32B | Qwen/QwQ-32B-Append-Attn/weight_only_int8 |
+| Qwen/QwQ-32B-Preview | 🚧 |
 
 ### LLaMA
 
