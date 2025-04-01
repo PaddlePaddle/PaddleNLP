@@ -62,6 +62,8 @@ def main():
     parser = PdArgumentParser((GenerateArgument, QuantConfig, ModelConfig, DataConfig, SFTConfig))
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
         gen_args, quant_args, model_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
+    elif len(sys.argv) >= 2 and sys.argv[1].endswith(".yaml"):
+        gen_args, quant_args, model_args, data_args, training_args = parser.parse_yaml_file_and_cmd_lines()
     else:
         gen_args, quant_args, model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
