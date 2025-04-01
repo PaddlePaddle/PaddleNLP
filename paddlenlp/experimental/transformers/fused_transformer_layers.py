@@ -3011,16 +3011,17 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                     key: shape = [num_tokens, num_kv_heads * head_size]
                     value: shape = [num_tokens, num_kv_heads * head_size]
                     kv_cache = [2, num_blocks, block_size * num_kv_heads * head_size]
+                    block_tables = [batch_size, max_blocks_per_seq]
                     """
                     query_lens = kwargs.get("seq_lens_this_time", None)
                     seq_lens = kwargs.get("seq_lens", None)
                     block_tables = kwargs.get("block_tables", None)
-                    batch_size = self.src.shape[0]
+                    batch_size = block_tables.shape[0]
                     block_size = kwargs.get("block_size", 64)
                     
                     max_query_len = max(query_lens)
                     query_start_loc = paddle.to_tensor(list(accumulate(query_lens, initial=0)), dtype=paddle.int64)
-                    seq_start_loc = paddle.to_tensor(list(accumulate(seq_lens, initial=0)), dtype=paddle.int64)
+                    # seq_start_loc = paddle.to_tensor(list(accumulate(seq_lens, initial=0)), dtype=paddle.int64)
                     seq_lens_tensor = paddle.to_tensor(seq_lens, dtype=paddle.int64)
                     # context_lens_tensor = paddle.zeros([batch_size], dtype='int64')
                     context_lens_tensor = paddle.full([batch_size], seq_lens[0] - 1, dtype='int64')
@@ -3049,7 +3050,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                         assert value is None
 
                     if isinstance(caches, list):
-                        kv_cache_tensor = paddle.concat(kv_cache)
+                        kv_cache_tensor = paddle.concat(caches)
                     key_cache, value_cache = PagedAttention.split_kv_cache(kv_cache_tensor, self.kv_num_heads, self.head_dim)
 
                     PagedAttention.write_to_paged_cache(
@@ -3057,7 +3058,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                         value,
                         key_cache,
                         value_cache,
-                        slot_mapping,
+                        slot_mapping_tensor,
                         kv_cache_dtype,
                         k_scale,
                         v_scale,

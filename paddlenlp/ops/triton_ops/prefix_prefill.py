@@ -18,9 +18,6 @@ import paddle
 import triton
 import triton.language as tl
 
-from paddlenlp.ops.triton_ops.triton_utils import paddle_use_triton
-
-
 class CurrentPlatform:
     def __init__(self):
         self.device = paddle.get_device()
@@ -51,9 +48,7 @@ IS_TURING = current_platform.get_device_capability() == (7, 5)
 
 if triton.__version__ >= "2.1.0":
 
-    @paddle_use_triton(
-        key=["1"],
-    )
+    @triton.jit
     def _fwd_kernel(
         Q,
         K,
@@ -97,7 +92,7 @@ if triton.__version__ >= "2.1.0":
         IN_PRECISION: tl.constexpr,
         BLOCK_M: tl.constexpr,
         BLOCK_DMODEL: tl.constexpr,  # head size
-        BLOCK_DMODEL_PADDED: tl.constexpr,  # head size padded to a power of 2
+        BLOCK_D_PADDED: tl.constexpr,  # head size padded to a power of 2
         BLOCK_N: tl.constexpr,
         SLIDING_WINDOW: tl.constexpr,
     ):
@@ -120,7 +115,7 @@ if triton.__version__ >= "2.1.0":
         # [N]; starts at 0
         offs_n = tl.arange(0, BLOCK_N)
         # [D]; starts at 0
-        offs_d = tl.arange(0, BLOCK_DMODEL_PADDED)
+        offs_d = tl.arange(0, BLOCK_D_PADDED)
         # [M]; starts at current position in query
         offs_m = start_m * BLOCK_M + tl.arange(0, BLOCK_M)
         # [M,D]
@@ -129,7 +124,7 @@ if triton.__version__ >= "2.1.0":
             cur_head * stride_qh + offs_d[None, :] * stride_qd)
 
         dim_mask = tl.where(
-            tl.arange(0, BLOCK_DMODEL_PADDED) < BLOCK_DMODEL, 1,
+            tl.arange(0, BLOCK_D_PADDED) < BLOCK_DMODEL, 1,
             0).to(tl.int1)  # [D]
 
         q = tl.load(Q + off_q,
@@ -140,7 +135,7 @@ if triton.__version__ >= "2.1.0":
         # initialize pointer to m and l
         m_i = tl.zeros([BLOCK_M], dtype=tl.float32) - float("inf")  # [M]
         l_i = tl.zeros([BLOCK_M], dtype=tl.float32)  # [M]
-        acc = tl.zeros([BLOCK_M, BLOCK_DMODEL_PADDED],
+        acc = tl.zeros([BLOCK_M, BLOCK_D_PADDED],
                        dtype=tl.float32)  # [M,D]
 
         # compute query against context (no causal mask here)
@@ -298,6 +293,7 @@ if triton.__version__ >= "2.1.0":
                  (offs_m[:, None] < cur_batch_query_len))
         return
 
+    @triton.jit
     def _fwd_kernel_alibi(
         Q,
         K,
@@ -342,7 +338,7 @@ if triton.__version__ >= "2.1.0":
         IN_PRECISION: tl.constexpr,
         BLOCK_M: tl.constexpr,
         BLOCK_DMODEL: tl.constexpr,  # head size
-        BLOCK_DMODEL_PADDED: tl.constexpr,  # head size padded to a power of 2
+        BLOCK_D_PADDED: tl.constexpr,  # head size padded to a power of 2
         BLOCK_N: tl.constexpr,
     ):
         cur_batch = tl.program_id(0)
@@ -508,10 +504,7 @@ if triton.__version__ >= "2.1.0":
         k_scale,
         v_scale,
         alibi_slopes=None,
-        sliding_window=None,
-        sm_scale=None,
-        skip_decode=False,
-    ):
+        sliding_window=None):
         q_dtype_is_f32 = q.dtype is paddle.float32
         # need to reduce num. blocks when using fp32
         # due to increased use of GPU shared memory
@@ -552,12 +545,10 @@ if triton.__version__ >= "2.1.0":
         # round up Lk to a power of 2 - this is required for Triton block size
         Lk_padded = triton.next_power_of_2(Lk)
 
-        if sm_scale is None:
-            sm_scale = 1.0 / (Lq**0.5)
+        sm_scale = 1.0 / (Lq**0.5)
         batch, head = b_seq_len.shape[0], q.shape[1]
         num_queries_per_kv = q.shape[1] // k.shape[1]
 
-        assert batch + 1 == len(b_start_loc)
         grid = (batch, head, triton.cdiv(max_input_len, BLOCK))  # batch, head,
 
         # 0 means "disable"
@@ -582,36 +573,35 @@ if triton.__version__ >= "2.1.0":
                 v_cache.shape[3],
                 k_cache.shape[4],
                 o,
-                b_loc.stride(0),
-                b_loc.stride(1),
-                q.stride(0),
-                q.stride(1),
-                q.stride(2),
-                k.stride(0),
-                k.stride(1),
-                k.stride(2),
-                v.stride(0),
-                v.stride(1),
-                v.stride(2),
-                o.stride(0),
-                o.stride(1),
-                o.stride(2),
-                k_cache.stride(0),
-                k_cache.stride(1),
-                k_cache.stride(2),
-                k_cache.stride(3),
-                k_cache.stride(4),  # [num_blocks, num_kv_heads, head_size/x, block_size, x]
-                v_cache.stride(0),
-                v_cache.stride(1),
-                v_cache.stride(2),
-                v_cache.stride(3),  # [num_blocks, num_kv_heads, head_size, block_size]
+                b_loc.strides[0],
+                b_loc.strides[1],
+                q.strides[0],
+                q.strides[1],
+                q.strides[2],
+                k.strides[0],
+                k.strides[1],
+                k.strides[2],
+                v.strides[0],
+                v.strides[1],
+                v.strides[2],
+                o.strides[0],
+                o.strides[1],
+                o.strides[2],
+                k_cache.strides[0],
+                k_cache.strides[1],
+                k_cache.strides[2],
+                k_cache.strides[3],
+                k_cache.strides[4],  # [num_blocks, num_kv_heads, head_size/x, block_size, x]
+                v_cache.strides[0],
+                v_cache.strides[1],
+                v_cache.strides[2],
+                v_cache.strides[3],  # [num_blocks, num_kv_heads, head_size, block_size]
                 num_queries_per_kv=num_queries_per_kv,
                 IN_PRECISION=IN_PRECISION,
                 BLOCK_M=BLOCK,
                 BLOCK_DMODEL=Lk,
-                BLOCK_DMODEL_PADDED=Lk_padded,
+                BLOCK_D_PADDED=Lk_padded,
                 BLOCK_N=BLOCK,
-                SKIP_DECODE=skip_decode,
                 num_warps=NUM_WARPS,
                 num_stages=1,
             )
@@ -633,37 +623,36 @@ if triton.__version__ >= "2.1.0":
             v_cache.shape[3],
             k_cache.shape[4],
             o,
-            b_loc.stride(0),
-            b_loc.stride(1),
-            q.stride(0),
-            q.stride(1),
-            q.stride(2),
-            k.stride(0),
-            k.stride(1),
-            k.stride(2),
-            v.stride(0),
-            v.stride(1),
-            v.stride(2),
-            o.stride(0),
-            o.stride(1),
-            o.stride(2),
-            k_cache.stride(0),
-            k_cache.stride(1),
-            k_cache.stride(2),
-            k_cache.stride(3),
-            k_cache.stride(4),  # [num_blocks, num_kv_heads, head_size/x, block_size, x]
-            v_cache.stride(0),
-            v_cache.stride(1),
-            v_cache.stride(2),
-            v_cache.stride(3),  # [num_blocks, num_kv_heads, head_size, block_size]
+            b_loc.strides[0],
+            b_loc.strides[1],
+            q.strides[0],
+            q.strides[1],
+            q.strides[2],
+            k.strides[0],
+            k.strides[1],
+            k.strides[2],
+            v.strides[0],
+            v.strides[1],
+            v.strides[2],
+            o.strides[0],
+            o.strides[1],
+            o.strides[2],
+            k_cache.strides[0],
+            k_cache.strides[1],
+            k_cache.strides[2],
+            k_cache.strides[3],
+            k_cache.strides[4],  # [num_blocks, num_kv_heads, head_size/x, block_size, x]
+            v_cache.strides[0],
+            v_cache.strides[1],
+            v_cache.strides[2],
+            v_cache.strides[3],  # [num_blocks, num_kv_heads, head_size, block_size]
             num_queries_per_kv=num_queries_per_kv,
             IN_PRECISION=IN_PRECISION,
             BLOCK_M=BLOCK,
             BLOCK_DMODEL=Lk,
-            BLOCK_DMODEL_PADDED=Lk_padded,
+            BLOCK_D_PADDED=Lk_padded,
             BLOCK_N=BLOCK,
             SLIDING_WINDOW=sliding_window,
-            SKIP_DECODE=skip_decode,
             num_warps=NUM_WARPS,
             num_stages=1,
         )

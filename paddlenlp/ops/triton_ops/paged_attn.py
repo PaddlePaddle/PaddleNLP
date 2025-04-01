@@ -17,7 +17,7 @@
 from typing import List, Optional, Tuple
 
 import paddle
-
+import numpy as np
 from paddlenlp.ops.triton_ops.prefix_prefill import context_attention_fwd
 
 
