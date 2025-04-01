@@ -1180,6 +1180,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         config.weightonly_group_size = predictor_args.weightonly_group_size
         config.weight_block_size = predictor_args.weight_block_size
         config.moe_quant_type = predictor_args.moe_quant_type
+        config.enable_stream_output = predictor_args.enable_stream_output
         if config.quantization_config.quant_method is not None:
             predictor_args.weight_block_size = config.quantization_config.weight_block_size
             config.weight_block_size = predictor_args.weight_block_size
