@@ -647,6 +647,7 @@ class MlpNode:
                     paddle.full(shape=[1], fill_value=self.tokens_per_expert[idx], dtype="int32")
                 )
             tokens_per_expert = paddle.concat(tokens_per_expert_list)
+            # expected_m = int(max(tokens_per_expert))
             expert_out = self.experts_group_gemm_node.forward(
                 unzipped_tokens, unzipped_scale, unzipped_probs, tokens_per_expert
             )
