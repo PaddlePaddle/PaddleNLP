@@ -1081,6 +1081,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         self.full_hidden_states = None
         self.enable_stream_output = config.enable_stream_output
         self.model_name_or_path = config.model_name_or_path
+        self.tokenizer = tokenizer
         if model is None:
             raise ValueError("model should be provided for DygraphBlockInferencePredictor")
         self.cache_k_shapes, self.cache_v_shapes = model.get_cache_kvs_shape(model.config, config.batch_size)
@@ -1201,12 +1202,6 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                 base_model_inputs=self.model_inputs, real_bs=len(input_texts), seq_lens=self.seq_lens
             )
 
-        from paddlenlp.utils.env import USE_FAST_TOKENIZER
-
-        tokenizer = AutoTokenizer.from_pretrained(
-            self.model_name_or_path, padding_side="left", use_fast=USE_FAST_TOKENIZER
-        )
-
         output_tokens = []
         output_token = []
         s_time = time.time()
@@ -1224,7 +1219,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
             else:
                 outputs = self._infer(self.model_inputs)
                 outputs = outputs.numpy()
-                outputs[outputs == -1] = tokenizer.eos_token_id
+                outputs[outputs == -1] = self.tokenizer.eos_token_id
                 output_token.append(outputs)
         logger.info(f"running spend {time.time() - s_time}")
 
@@ -1232,7 +1227,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
             outputs = []
             while len(outputs) < len(input_texts):
                 output_tokens = np.concatenate(output_token, axis=1).tolist()
-                outputs = tokenizer.batch_decode(
+                outputs = self.tokenizer.batch_decode(
                     output_tokens, skip_special_tokens=True, clean_up_tokenization_spaces=False
                 )
 
