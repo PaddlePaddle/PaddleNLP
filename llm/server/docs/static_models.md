@@ -28,10 +28,14 @@
 | deepseek-ai/DeepSeek-R1  |weight_only_int8|是|2| deepseek-ai/DeepSeek-R1-MTP-2nodes/weight_only_int8 |
 | deepseek-ai/DeepSeek-R1  |a8w8_fp8|否|2| deepseek-ai/DeepSeek-R1-2nodes/a8w8_fp8|
 | deepseek-ai/DeepSeek-R1  |a8w8_fp8|是|2| deepseek-ai/DeepSeek-R1-MTP-2nodes/a8w8_fp8|
-| deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B |weight_only_int8|-|-| deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B/weight_only_int8 |
-| deepseek-ai/DeepSeek-R1-Distill-Qwen-7B   |weight_only_int8|-|-|deepseek-ai/DeepSeek-R1-Distill-Qwen-7B/weight_only_int8 |
-| deepseek-ai/DeepSeek-R1-Distill-Qwen-14B  |weight_only_int8|-|-|deepseek-ai/DeepSeek-R1-Distill-Qwen-14B/weight_only_int8 |
-| deepseek-ai/DeepSeek-R1-Distill-Qwen-32B  |weight_only_int8|-|-|deepseek-ai/DeepSeek-R1-Distill-Qwen-32B/weight_only_int8 |
+| deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B |weight_only_int8|-|-|deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B/weight_only_int8,deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B-Block-Attn/weight_only_int8  |
+| deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B |fp16|-|-|deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B/float16|
+| deepseek-ai/DeepSeek-R1-Distill-Qwen-7B   |weight_only_int8|-|-|deepseek-ai/DeepSeek-R1-Distill-Qwen-7B/weight_only_int8,deepseek-ai/DeepSeek-R1-Distill-Qwen-7B-Block-Attn/weight_only_int8 |
+| deepseek-ai/DeepSeek-R1-Distill-Qwen-7B   |fp16|-|-|deepseek-ai/DeepSeek-R1-Distill-Qwen-7B/float16 |
+| deepseek-ai/DeepSeek-R1-Distill-Qwen-14B  |weight_only_int8|-|-|deepseek-ai/DeepSeek-R1-Distill-Qwen-14B/weight_only_int8,deepseek-ai/DeepSeek-R1-Distill-Qwen-14B-Block-Attn/weight_only_int8 |
+| deepseek-ai/DeepSeek-R1-Distill-Qwen-14B  |fp16|-|-|deepseek-ai/DeepSeek-R1-Distill-Qwen-14B/float16 |
+| deepseek-ai/DeepSeek-R1-Distill-Qwen-32B  |weight_only_int8|-|-|deepseek-ai/DeepSeek-R1-Distill-Qwen-32B/weight_only_int8,deepseek-ai/DeepSeek-R1-Distill-Qwen-32B-Block-Attn/weight_only_int8 |
+| deepseek-ai/DeepSeek-R1-Distill-Qwen-32B  |fp16|-|-|deepseek-ai/DeepSeek-R1-Distill-Qwen-32B-Block-Attn/float16 |
 | deepseek-ai/DeepSeek-R1-Distill-Llama-8B  |weight_only_int8|-|-|deepseek-ai/DeepSeek-R1-Distill-Llama-8B/weight_only_int8,deepseek-ai/DeepSeek-R1-Distill-Llama-8B-Block-Attn/weight_only_int8 |
 | deepseek-ai/DeepSeek-R1-Distill-Llama-8B  |fp16|-|-|deepseek-ai/DeepSeek-R1-Distill-Llama-8B-Block-Attn/float16 |
 | deepseek-ai/DeepSeek-R1-Distill-Llama-70B |weight_only_int8|-|-|deepseek-ai/DeepSeek-R1-Distill-Llama-70B/weight_only_int8 |

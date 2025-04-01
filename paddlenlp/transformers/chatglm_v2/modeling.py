@@ -1000,7 +1000,7 @@ class Embedding(nn.Layer):
     def forward(self, input_ids):
         # Embeddings.
         embeddings = self.word_embeddings(input_ids)
-        # Data format change to avoid explicit tranposes
+        # Data format change to avoid explicit transposes
         # [batch_size, seq_length, hidden_size] --> [seq_length, batch_size, hidden_size].
         embeddings = embeddings.transpose([1, 0, 2])
         # If the input flag for fp32 residual connection is set, convert for float.

@@ -157,7 +157,7 @@ chinese words:
   --cn_seg_func {lac,seg,jieba}
                         Words segment function for chinese words.
                         默认jieba，jieba速度较快，lac模型更准确，计算量高。
-  --cn_splited          Is chinese corpus is splited in to words.
+  --cn_splited          Is chinese corpus is split into words.
                         分词后的文本，可选。设置此选项则，cn_seg_func不起作用。
                         例如分词后文本串 "中国 效仿 西方 发展 工业 的过 程"
   --cn_split_dimer CN_SPLIT_DIMER
@@ -166,7 +166,7 @@ chinese words:
 
 common config:
   --append_eos          Append an <eos> token to the end of a document.
-                        gpt类模型专用，gpt设置此选项，表示doc结束。针对tokenier中不包含eos_token情况，输出提示warning并且不添加<eos>。
+                        gpt类模型专用，gpt设置此选项，表示doc结束。针对tokenizer中不包含eos_token情况，输出提示warning并且不添加<eos>。
   --log_interval LOG_INTERVAL
                         Interval between progress updates
                         打印日志间隔，interval表示处理 文本行数/doc数的 间隔。
