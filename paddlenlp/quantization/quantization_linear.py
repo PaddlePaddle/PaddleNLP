@@ -181,6 +181,7 @@ class ColumnParallelQuantizationLinear(nn.Layer):
         dtype,
         bias_attr=None,
         gather_output=True,
+        mp_skip_c_identity=False,
         mp_group=None,
     ):
         super().__init__()
@@ -189,6 +190,7 @@ class ColumnParallelQuantizationLinear(nn.Layer):
         self.weight_quantize_algo = weight_quantize_algo
         self.quantization_config = quantization_config
         self._dtype = dtype
+        self.mp_skip_c_identity = mp_skip_c_identity
         self.quant_dtype, self.quant_weight_bit = QuantMapping[self.weight_quantize_algo]
 
         self.model_parallel_group = (
@@ -242,28 +244,32 @@ class ColumnParallelQuantizationLinear(nn.Layer):
 
     def forward(self, x):
         if self.is_mp:
-            input_parallel = mp_ops._c_identity(x, group=self.model_parallel_group)
+            input_parallel = mp_ops._c_identity(
+                x,
+                group=self.model_parallel_group,
+                skip_c_identity_dynamic=self.mp_skip_c_identity,
+            )
         else:
             input_parallel = x
 
-        with paddle.amp.auto_cast(enable=False):
-            if self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4"]:
-                output_parallel = weight_only_linear(
-                    x=input_parallel,
-                    weight=self.quant_weight,
-                    bias=self.bias,
-                    weight_scale=self.quant_scale,
-                    weight_dtype=self.quant_dtype,
-                    group_size=self.quantization_config.group_size,
-                )
-            elif self.weight_quantize_algo in ["llm.int8"]:
-                output_parallel = llm_int8_linear(
-                    input_parallel,
-                    self.quant_weight,
-                    self.bias,
-                    self.quant_scale,
-                    self.self.quantization_config.llm_int8_threshold,
-                )
+        # with paddle.amp.auto_cast(enable=False):
+        if self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4"]:
+            output_parallel = weight_only_linear(
+                x=input_parallel,
+                weight=self.quant_weight,
+                bias=self.bias,
+                weight_scale=self.quant_scale,
+                weight_dtype=self.quant_dtype,
+                group_size=self.quantization_config.group_size,
+            )
+        elif self.weight_quantize_algo in ["llm.int8"]:
+            output_parallel = llm_int8_linear(
+                input_parallel,
+                self.quant_weight,
+                self.bias,
+                self.quant_scale,
+                self.self.quantization_config.llm_int8_threshold,
+            )
 
         if self.gather_output and self.is_mp:
             output = mp_ops._c_concat(output_parallel, group=self.model_parallel_group)
@@ -291,6 +297,7 @@ class RowParallelQuantizationLinear(nn.Layer):
         dtype,
         bias_attr=None,
         input_is_parallel=False,
+        mp_skip_c_identity=False,
         mp_group=None,
     ):
         super().__init__()
@@ -299,6 +306,7 @@ class RowParallelQuantizationLinear(nn.Layer):
         self.quantization_config = quantization_config
         self.weight_quantize_algo = weight_quantize_algo
         self._dtype = dtype
+        self.mp_skip_c_identity = mp_skip_c_identity
         self.quant_dtype, self.quant_weight_bit = QuantMapping[self.weight_quantize_algo]
 
         self.model_parallel_group = (
@@ -356,44 +364,46 @@ class RowParallelQuantizationLinear(nn.Layer):
             # split last dim
             input_parallel = mp_ops._c_split(x, group=self.model_parallel_group)
 
-        with paddle.amp.auto_cast(enable=False):
-            if self.is_mp:
-                if self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4"]:
-                    output_parallel = weight_only_linear(
-                        x=input_parallel,
-                        weight=self.quant_weight,
-                        bias=None,
-                        weight_scale=self.quant_scale,
-                        weight_dtype=self.quant_dtype,
-                        group_size=self.quantization_config.group_size,
-                    )
-                elif self.weight_quantize_algo in ["llm.int8"]:
-                    output_parallel = llm_int8_linear(
-                        input_parallel,
-                        self.quant_weight,
-                        None,
-                        self.quant_scale,
-                        self.quantization_config.llm_int8_threshold,
-                    )
-                output_ = mp_ops._mp_allreduce(
-                    output_parallel,
-                    group=self.model_parallel_group,
-                    use_calc_stream=True,
-                    use_model_parallel=True,
+        # with paddle.amp.auto_cast(enable=False):
+        if self.is_mp:
+            if self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4"]:
+                output_parallel = weight_only_linear(
+                    x=input_parallel,
+                    weight=self.quant_weight,
+                    bias=None,
+                    weight_scale=self.quant_scale,
+                    weight_dtype=self.quant_dtype,
+                    group_size=self.quantization_config.group_size,
                 )
-                output = output_ + self.bias if self.bias is not None else output_
-            else:
-                if self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4"]:
-                    output = weight_only_linear(
-                        x=input_parallel,
-                        weight=self.quant_weight,
-                        bias=self.bias,
-                        weight_scale=self.quant_scale,
-                        weight_dtype=self.quant_dtype,
-                        group_size=self.quantization_config.group_size,
-                    )
-                elif self.weight_quantize_algo in ["llm.int8"]:
-                    output = llm_int8_linear(
-                        input_parallel, self.quant_weight, self.bias, self.quant_scale, self.llm_int8_threshold
-                    )
+            elif self.weight_quantize_algo in ["llm.int8"]:
+                output_parallel = llm_int8_linear(
+                    input_parallel,
+                    self.quant_weight,
+                    None,
+                    self.quant_scale,
+                    self.quantization_config.llm_int8_threshold,
+                )
+            output_ = mp_ops._mp_allreduce(
+                output_parallel,
+                group=self.model_parallel_group,
+                use_calc_stream=True,
+                use_model_parallel=True,
+                skip_c_identity_dynamic=self.mp_skip_c_identity,
+            )
+            output = output_ + self.bias if self.bias is not None else output_
+        else:
+            if self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4"]:
+                output = weight_only_linear(
+                    x=input_parallel,
+                    weight=self.quant_weight,
+                    bias=self.bias,
+                    weight_scale=self.quant_scale,
+                    weight_dtype=self.quant_dtype,
+                    group_size=self.quantization_config.group_size,
+                )
+            elif self.weight_quantize_algo in ["llm.int8"]:
+                output = llm_int8_linear(
+                    input_parallel, self.quant_weight, self.bias, self.quant_scale, self.llm_int8_threshold
+                )
+
         return output

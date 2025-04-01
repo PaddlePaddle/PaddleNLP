@@ -1971,6 +1971,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         # Weight quantization if not yet quantized & update loaded_keys
         if quantization_linear_list is not None:
+            origin_loaded_keys = copy.deepcopy(loaded_keys)
             loaded_keys = update_loaded_state_dict_keys(
                 loaded_keys, quantization_linear_list, config.quantization_config
             )
@@ -2088,14 +2089,22 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
             return state_dict, resume_state_dict, fused_keys, new_keys
 
-        if quantization_linear_list is None:
+        if quantization_linear_list is not None:
             keep_in_fp32_modules = (
                 (keep_in_fp32_modules or []) + ["quant_scale"]
                 if config.quantization_config.weight_quantize_algo in ["nf4", "fp4"]
                 else keep_in_fp32_modules
             )
         if state_dict is not None:
-            if quantization_linear_list is None:
+            if quantization_linear_list is not None:
+                # Quantize state dict
+                state_dict = convert_to_quantize_state_dict(
+                    state_dict,
+                    quantization_linear_list,
+                    config.quantization_config,
+                    dtype,
+                )
+            else:
                 # Have loaded all state_dict, no resume state_dict
                 state_dict, _, fused_keys, new_keys = _fuse_or_split_keys(
                     state_dict,
@@ -2107,14 +2116,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 )
                 missing_keys = list(set(missing_keys) - set(new_keys))
                 unexpected_keys = list(set(unexpected_keys) - set(fused_keys))
-            else:
-                # Quantize state dict
-                state_dict = convert_to_quantize_state_dict(
-                    state_dict,
-                    quantization_linear_list,
-                    config.quantization_config,
-                    dtype,
-                )
 
             mismatched_keys = _find_mismatched_keys(
                 state_dict,
@@ -2125,7 +2126,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 ignore_mismatched_sizes,
             )
 
-            if quantization_linear_list is None:
+            if quantization_linear_list is not None:
                 error_msgs = _load_state_dict_into_meta_model(
                     model_to_load,
                     state_dict,
@@ -2153,69 +2154,81 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
             for shard_file in resolved_archive_file:
                 pre_tensor_parallel_split = False
-                if (
-                    shard_file.endswith(".safetensors")
-                    and config.tensor_parallel_degree > 1
-                    and "tp" not in os.path.split(shard_file)[-1]
-                ):
-                    pre_tensor_parallel_split = True
-                    assert loaded_keys is not None, "loaded_keys is not None."
-                    tp_actions = cls.get_tensor_parallel_convert_actions(
-                        config, loaded_keys, ignore_error=True, base_model_prefix=prefix
+                if quantization_linear_list is not None:
+                    if (
+                        shard_file.endswith(".safetensors")
+                        and config.tensor_parallel_degree > 1
+                        and "tp" not in os.path.split(shard_file)[-1]
+                    ):
+                        pre_tensor_parallel_split = True
+                        assert origin_loaded_keys is not None, "loaded_keys is not None."
+                        tp_actions = cls.get_tensor_parallel_convert_actions(
+                            config, origin_loaded_keys, ignore_error=True, base_model_prefix=prefix
+                        )
+                    state_dict = load_state_dict(
+                        shard_file,
+                        tp_actions if pre_tensor_parallel_split else None,
+                        None,
                     )
-                # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
-                filter_dict_keys = set(expected_keys)
-                fuse_actions, _ = cls.get_fuse_or_split_param_convert_actions(config, loaded_keys, is_fuse=True)
-                split_actions, _ = cls.get_fuse_or_split_param_convert_actions(config, loaded_keys, is_fuse=False)
-                for k in list(fuse_actions.keys()):
-                    need_add_except_key = k[-1] in expected_keys
-                    if need_add_except_key:
-                        filter_dict_keys |= set(k[:-1])
-                    # remove pre_tensor_parallel_split function from tp_actions
-                    if pre_tensor_parallel_split:
-                        for item in k[:-1]:
-                            if item in tp_actions:
-                                tp_actions.pop(item, None)
-
-                for k in list(split_actions.keys()):
-                    need_add_except_key = False
-                    for item in k[:-1]:
-                        if item in expected_keys:
-                            need_add_except_key = True
-                            break
-                    if need_add_except_key:
-                        filter_dict_keys.add(k[-1])
-                    # remove pre_tensor_parallel_split function from tp_actions
-                    if pre_tensor_parallel_split:
-                        if k[-1] in tp_actions:
-                            fuse_actions.pop(k[-1], None)
-
-                if config.quantization_config.is_weight_quantize():
-                    filter_dict_keys = None
-                state_dict = load_state_dict(
-                    shard_file,
-                    tp_actions if pre_tensor_parallel_split else None,
-                    filter_dict_keys,
-                )
-
-                # convert for fusing or splitting weights
-                state_dict, resume_state_dict, fused_keys, new_keys = _fuse_or_split_keys(
-                    state_dict,
-                    config,
-                    loaded_keys,
-                    pre_tensor_parallel_split=pre_tensor_parallel_split,
-                    resume_state_dict=resume_state_dict,
-                )
-                missing_keys = list(set(missing_keys) - set(new_keys))
-                unexpected_keys = list(set(unexpected_keys) - set(fused_keys))
-
-                if config.quantization_config.is_weight_quantize():
                     state_dict = convert_to_quantize_state_dict(
                         state_dict,
                         quantization_linear_list,
                         config.quantization_config,
                         dtype,
                     )
+                else:
+                    if (
+                        shard_file.endswith(".safetensors")
+                        and config.tensor_parallel_degree > 1
+                        and "tp" not in os.path.split(shard_file)[-1]
+                    ):
+                        pre_tensor_parallel_split = True
+                        assert loaded_keys is not None, "loaded_keys is not None."
+                        tp_actions = cls.get_tensor_parallel_convert_actions(
+                            config, loaded_keys, ignore_error=True, base_model_prefix=prefix
+                        )
+                    # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
+                    filter_dict_keys = set(expected_keys)
+                    fuse_actions, _ = cls.get_fuse_or_split_param_convert_actions(config, loaded_keys, is_fuse=True)
+                    split_actions, _ = cls.get_fuse_or_split_param_convert_actions(config, loaded_keys, is_fuse=False)
+                    for k in list(fuse_actions.keys()):
+                        need_add_except_key = k[-1] in expected_keys
+                        if need_add_except_key:
+                            filter_dict_keys |= set(k[:-1])
+                        # remove pre_tensor_parallel_split function from tp_actions
+                        if pre_tensor_parallel_split:
+                            for item in k[:-1]:
+                                if item in tp_actions:
+                                    tp_actions.pop(item, None)
+
+                    for k in list(split_actions.keys()):
+                        need_add_except_key = False
+                        for item in k[:-1]:
+                            if item in expected_keys:
+                                need_add_except_key = True
+                                break
+                        if need_add_except_key:
+                            filter_dict_keys.add(k[-1])
+                        # remove pre_tensor_parallel_split function from tp_actions
+                        if pre_tensor_parallel_split:
+                            if k[-1] in tp_actions:
+                                fuse_actions.pop(k[-1], None)
+
+                    state_dict = load_state_dict(
+                        shard_file,
+                        tp_actions if pre_tensor_parallel_split else None,
+                        filter_dict_keys,
+                    )
+                    # convert for fusing or splitting weights
+                    state_dict, resume_state_dict, fused_keys, new_keys = _fuse_or_split_keys(
+                        state_dict,
+                        config,
+                        loaded_keys,
+                        pre_tensor_parallel_split=pre_tensor_parallel_split,
+                        resume_state_dict=resume_state_dict,
+                    )
+                    missing_keys = list(set(missing_keys) - set(new_keys))
+                    unexpected_keys = list(set(unexpected_keys) - set(fused_keys))
 
                 # Mistmatched keys contains tuples key/shape1/shape2 of weights in the checkpoint that have a shape not
                 # matching the weights in the model.
@@ -2236,7 +2249,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     )
                     logger.info("Converted state_dict to Tensor Parallel Format")
 
-                if low_cpu_mem_usage or config.quantization_config.is_weight_quantize():
+                if low_cpu_mem_usage or quantization_linear_list is not None:
                     new_error_msgs = _load_state_dict_into_meta_model(
                         model_to_load,
                         state_dict,
@@ -2560,7 +2573,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 for key in model.state_dict().keys():
                     if "quant_weight" in key:
                         quantization_linear_list.append(key[:-13])
-
         model, missing_keys, unexpected_keys, mismatched_keys = cls._load_pretrained_model(
             model=model,
             state_dict=state_dict,

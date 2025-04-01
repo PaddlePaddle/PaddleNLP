@@ -83,6 +83,7 @@ def replace_with_quantization_linear(model, quantization_config, llm_int8_thresh
                     dtype=child._dtype,
                     bias_attr=bias_attr,
                     gather_output=child.gather_output,
+                    mp_skip_c_identity=child.mp_skip_c_identity,
                 )
             elif isinstance(child, RowParallelLinear):
                 quant_linear = RowParallelQuantizationLinear(
@@ -93,8 +94,10 @@ def replace_with_quantization_linear(model, quantization_config, llm_int8_thresh
                     dtype=child._dtype,
                     bias_attr=bias_attr,
                     input_is_parallel=child.input_is_parallel,
+                    mp_skip_c_identity=child.mp_skip_c_identity,
                 )
             setattr(parent, last, quant_linear)
+            del child
 
 
 def convert_to_weight_quantize_state_dict(state_dict, name, quantization_config, dtype, weight_quantize_algo):
@@ -107,7 +110,7 @@ def convert_to_weight_quantize_state_dict(state_dict, name, quantization_config,
         return state_dict
     if weight_name in state_dict:
         # gpu weight_quantize will fix in future
-        target_weight = state_dict.pop(weight_name).cast(dtype).cpu()
+        target_weight = state_dict.pop(weight_name).cast(dtype).cuda()
         quant_weight, quant_scale = weight_quantize(
             x=target_weight,
             algo=weight_quantize_algo,
@@ -115,8 +118,7 @@ def convert_to_weight_quantize_state_dict(state_dict, name, quantization_config,
         )
         state_dict[quant_weight_name] = quant_weight
         state_dict[quant_scale_name] = quant_scale
-    else:
-        raise ValueError(f"Please check {weight_name} or {[quant_weight_name, quant_scale_name]}  in state_dict")
+        del target_weight
     return state_dict
 
 
@@ -148,14 +150,14 @@ def convert_to_qlora_state_dict(state_dict, name, quantization_config, dtype, we
             weight=target_weight,
             quant_algo=weight_quantize_algo,
             double_quant=quantization_config.qlora_weight_double_quant,
-            block_size=quantization_config.qlora_weight_blocksiz,
+            block_size=quantization_config.qlora_weight_blocksize,
             double_quant_block_size=quantization_config.qlora_weight_double_quant_block_size,
             linear_name=name,
             return_dict=True,
         )
         state_dict.update(qlora_state_dict)
-    else:
-        raise ValueError(f"Please check {weight_name} or {quant_name_list} in state_dict")
+        del target_weight
+
     return state_dict
 
 
@@ -167,15 +169,14 @@ def convert_to_quantize_state_dict(state_dict, quantization_linear_list, quantiz
             continue
         # Convert state dict
         if weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8"]:
-            return convert_to_weight_quantize_state_dict(
-                state_dict, name, quantization_config, dtype, weight_quantize_algo
-            )
+            convert_to_weight_quantize_state_dict(state_dict, name, quantization_config, dtype, weight_quantize_algo)
         elif weight_quantize_algo in ["fp4", "nf4"]:
-            return convert_to_qlora_state_dict(state_dict, name, quantization_config, dtype, weight_quantize_algo)
+            convert_to_qlora_state_dict(state_dict, name, quantization_config, dtype, weight_quantize_algo)
         else:
             raise NotImplementedError(
                 f"Please check the quantization_config.weight_quantize_algo: {quantization_config.weight_quantize_algo}"
             )
+    return state_dict
 
 
 def update_loaded_state_dict_keys(state_dict, quantization_linear_list, quantization_config, ignore_warning=False):
