@@ -344,10 +344,6 @@ class ExpertsGroupGemmNode:
         # group gemm
         if IF_USE_GROUP_GEMM_MASK:
             dx = paddle.empty(shape=[len(expert_w1), do1_fp8.shape[1], bw_w1_quant.shape[1]], dtype=paddle.bfloat16)
-            masked_m_float = paddle.cast(tokens_per_expert, "float32")
-            masked_m_mean = paddle.mean(masked_m_float)
-            masked_m_mean_int = paddle.cast(masked_m_mean, "int32")
-            expected_m = min(masked_m_mean_int + 1, do1_fp8.shape[1])
             deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_masked(
                 (do1_fp8, do1_scale), (bw_w1_quant, bw_w1_scale), dx, tokens_per_expert, expected_m
             )
