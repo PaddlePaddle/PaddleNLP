@@ -153,4 +153,4 @@ This idiom is often used in the context of education, where it is believed that 
 In addition to education, "温故而知新" can also be applied to other areas of life, such as business, where it is important to understand the traditions and practices of the industry before introducing new products or services. By understanding the past and the foundations of a particular field, one can gain a deeper appreciation of the present and make more informed decisions about the future.
 ```
 
-2. 您也可以尝试参考 [文档](../../../../slm/examples/benchmark/wiki_lambada/README.md) 中的说明使用 wikitext 数据集验证推理精度。
+2. 您也可以尝试参考 [文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/slm/examples/benchmark/wiki_lambada/README.md) 中的说明使用 wikitext 数据集验证推理精度。

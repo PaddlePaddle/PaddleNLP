@@ -146,8 +146,11 @@ __global__ void multi_query_decode_attention_kernel(T * __restrict__ q, // [toke
                                                     T * __restrict__ tmp_m, // [batch_size, num_chunks, num_heads]
                                                     T * __restrict__ tmp_d, // [batch_size, num_chunks, num_heads]
                                                     OutT * __restrict__ out) {
+  constexpr uint32_t q_block_num = GROUP_SIZE / bdy;
   const uint32_t bidx = blockIdx.x, kv_head_idx = blockIdx.z;
-  const uint32_t bid = bidx, gid = threadIdx.y;
+  const uint32_t bid = bidx / q_block_num, q_block_idx = bidx % q_block_num;
+  const uint32_t bidy = threadIdx.y;
+  const uint32_t gid = q_block_idx * bdy + threadIdx.y;
   const uint32_t tidx = threadIdx.x;
   constexpr uint32_t num_vec_per_head_qk = HEAD_DIM_QK / VEC_SIZE;
   constexpr uint32_t num_vec_per_head_v = HEAD_DIM_V / VEC_SIZE;
@@ -184,11 +187,10 @@ __global__ void multi_query_decode_attention_kernel(T * __restrict__ q, // [toke
   extern __shared__ uint8_t smem[];
   const T *q_now = q + (q_start_idx * q_num_heads + q_head_idx) * HEAD_DIM_QK;
   T *q_smem = reinterpret_cast<T*>(smem); // [HEAD_DIM_QK * sizeof(T)]
-  T *cu_q_smem = q_smem + gid * HEAD_DIM_QK;
+  T *cu_q_smem = q_smem + bidy * HEAD_DIM_QK;
 #pragma unroll
   for(uint32_t vid = tidx; vid < num_vec_per_head_qk; vid += bdx) {
     ((float4*)(&cu_q_smem[vid * VEC_SIZE]))[0] = ((float4*)(&q_now[vid * VEC_SIZE]))[0];
-
   }
   __syncthreads();
   using VecT = AlignedVector<T, VEC_SIZE>;
@@ -203,14 +205,14 @@ __global__ void multi_query_decode_attention_kernel(T * __restrict__ q, // [toke
   }
 
 
-  CacheT *kv_smem = reinterpret_cast<CacheT*>(smem + GROUP_SIZE * HEAD_DIM_QK * sizeof(CacheT)); 
+  CacheT *kv_smem = reinterpret_cast<CacheT*>(smem + bdy * HEAD_DIM_QK * sizeof(CacheT)); 
   uint32_t stage_idx = 0;  
   constexpr int loop_times = DEAL_EACH_TIME / bdy;
 #pragma unroll
   for (int i = 0; i < NUM_STAGES; ++i) {
 #pragma unroll
     for (int j = 0; j < loop_times; ++j) {
-      const uint32_t k_seq_offset = i * DEAL_EACH_TIME + j * bdy + gid;
+      const uint32_t k_seq_offset = i * DEAL_EACH_TIME + j * bdy + bidy;
       const uint32_t k_seq_id = chunk_start + k_seq_offset;
       produce_kv<SharedMemFillMode::kNoFill, HEAD_DIM_QK, VEC_SIZE, num_vec_per_head_qk, bdx, BLOCK_SIZE, CACHE_VEC_SIZE>(
         kv_smem,
@@ -267,7 +269,7 @@ __global__ void multi_query_decode_attention_kernel(T * __restrict__ q, // [toke
 
 #pragma unroll
     for (int j = 0; j < loop_times; ++j) {
-      const uint32_t k_seq_offset = j * bdy + gid;
+      const uint32_t k_seq_offset = j * bdy + bidy;
       produce_kv<SharedMemFillMode::kNoFill, HEAD_DIM_QK, VEC_SIZE, num_vec_per_head_qk, bdx, BLOCK_SIZE, CACHE_VEC_SIZE>(
         kv_smem,
         cache_k,
@@ -342,10 +344,10 @@ void MultiQueryDecoderAttention(
   constexpr int num_vec_per_head = HEAD_DIM_QK / vec_size;
   constexpr int blockx = num_vec_per_head < 32 ? num_vec_per_head : 32;
 
-  constexpr int blocky = GROUP_SIZE;
-  const int gridx = bsz;
+  constexpr int blocky = GROUP_SIZE > 16 ? 16 : GROUP_SIZE;
+  const int gridx = bsz * (GROUP_SIZE / blocky);
   
-  constexpr int num_threads = blockx * blocky;  
+  constexpr int num_threads = blockx * blocky; 
 
   auto splitkv_kernel = multi_query_decode_attention_kernel<true, NV_TYPE, NV_TYPE, NV_TYPE, num_stages, DEAL_EACH_TIME, GROUP_SIZE, HEAD_DIM_QK, HEAD_DIM_V,
                                                                         BLOCK_SIZE, vec_size, cache_vec_size, blockx, blocky>;
@@ -357,7 +359,7 @@ void MultiQueryDecoderAttention(
   
   const uint32_t chunk_size = get_max_partition_size(bsz);
   const int num_chunks = div_up(max_dec_len, chunk_size);
-  size_t smem_size = cache_smem_bytes + GROUP_SIZE * HEAD_DIM_QK * sizeof(T);
+  size_t smem_size = cache_smem_bytes + blocky * HEAD_DIM_QK * sizeof(T);
 
   if (smem_size >= 48 * 1024) {
     cudaFuncSetAttribute(

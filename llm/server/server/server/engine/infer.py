@@ -614,7 +614,7 @@ class ModelRunner:
                 engine_healthy_recorded_time_array,
             ) = self.initialize_engine_healthy_recorded_time_flag()
             engine_healthy_recorded_time_array[0] = time.time()
-            # infer_live_flag_shm = self.initialize_engine_live_flag()
+            infer_live_flag_shm = self.initialize_engine_live_flag()
         infer_seed_increment = paddle.full(shape=[self.args.max_batch_size, 1], fill_value=4, dtype="int64")
         # thread_executor = ThreadPoolExecutor(max_workers=1)
         real_bsz = None

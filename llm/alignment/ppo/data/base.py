@@ -328,6 +328,7 @@ class TokenizedDataset(Dataset):
         lazy_tokenization: bool = True,
         use_rm_server: bool = False,
         seed: int = 42,
+        max_src_len: int = 512,
     ) -> None:
         if not isinstance(dataset_names_and_attributes, dict):
             dataset_names_and_attributes = tuple(dataset_names_and_attributes)
@@ -372,6 +373,7 @@ class TokenizedDataset(Dataset):
         self.tokenizer = tokenizer
         self.seed = seed
         self.use_rm_server = use_rm_server
+        self.max_src_len = max_src_len
 
         merged_rawdata = self._merge_raw_datasets(seed=seed)
         self.rawdata = [merged_rawdata[i] for i in range(len(merged_rawdata))]

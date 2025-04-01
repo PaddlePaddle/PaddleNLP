@@ -22,7 +22,7 @@ export MODEL_PATH=${MODEL_PATH:-$PWD}
 export model_name=${model_name:-"deepseek-ai/DeepSeek-R1-Distill-Llama-8B/weight_only_int8"}
 docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
 -v $MODEL_PATH:/models -e "model_name=${model_name}" \
--dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.1 /bin/bash \
+-dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.2 /bin/bash \
 -c -ex 'start_server $model_name && tail -f /dev/null'
 ```
 
@@ -47,8 +47,8 @@ docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap
 
 |cuda版本| 支持硬件架构|镜像地址|支持的典型设备|
 |:------|:-:|:-:|:-:|
-| cuda11.8 | 70 75 80 86 |ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda118-cudnn8-v2.1 |V100，T4，A100，A30，A10 |
-| cuda12.4 | 80 86 89 90 |ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.1 |A100，A30，A10,L20，H20，H100 |
+| cuda11.8 | 70 75 80 86 |ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda118-cudnn8-v2.2 |V100，T4，A100，A30，A10 |
+| cuda12.4 | 80 86 89 90 |ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.2 |A100，A30，A10,L20，H20，H100 |
 
 
 ### 准备模型
@@ -74,7 +74,9 @@ cd /home/workspace/models_dir
 
 除了支持通过设置`model_name` 在启动时进行自动下载，服务提供脚本可以进行自行下载。**部署时需指定环境变量`MODEL_DIR` 为模型下载存储路径**
 
-脚本所在路径`/opt/output/download_model.py`
+脚本所在路径`/opt/output/download_model.py` (当前路径为镜像内路径)
+
+**注**：模型下载依赖当前镜像的版本号，若在镜像内启动下载脚本无需配置，若直接从代码仓库拉取需配置环境变量`tag`，当前默认下载的版本为3.0.0.b4
 
 ```
 python download_model.py \
@@ -132,7 +134,7 @@ docker run --gpus all \
     --network=host \
     --shm-size=5G \
     -v /home/workspace/models_dir:/models/ \
-    -dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.1 bash
+    -dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.2 bash
 
 # 进入容器，检查GPU环境和模型挂载是否正常
 docker exec -it paddlenlp_serving /bin/bash
@@ -166,7 +168,7 @@ export CUDA_VISIBLE_DEVICES=0
 export HEALTH_HTTP_PORT="8110"                         # 探活服务的http端口（当前仅用于健康检查、探活）
 export SERVICE_GRPC_PORT="8811"                         # 模型推服务的grpc端口
 export METRICS_HTTP_PORT="8722"                      # 模型服务中监督指标的端口
-export INFER_PROC_PORT="8813"                  # 模型服务内部使用的端口
+export INTER_PROC_PORT="8813"                  # 模型服务内部使用的端口
 export SERVICE_HTTP_PORT="9965"               # 服务请求HTTP端口号，如不配置，默认为-1，即服务只支持GRPC协议
 
 # MAX_SEQ_LEN: 服务会拒绝input token数量超过MAX_SEQ_LEN的请求，并返回错误提示
@@ -175,7 +177,7 @@ export MAX_SEQ_LEN=8192
 export MAX_DEC_LEN=1024
 
 export BATCH_SIZE="48"                          # 设置最大Batch Size，模型可同时并发处理的最大输入数量，不能高于128
-export BLOCK_BS="5"                             # 缓存Block支持的最大Query Batch Size，如果出现out of memeory 错误，尝试减少该数值
+export BLOCK_BS="5"                             # 缓存Block支持的最大Query Batch Size，如果出现out of memory 错误，尝试减少该数值
 export BLOCK_RATIO="0.75"                       # 一般可以设置成 输入平均Token数/（输入+输出平均Token数)
 
 export MAX_CACHED_TASK_NUM="128"  # 服务缓存队列最大长度，队列达到上限后，会拒绝新的请求，默认128
@@ -405,10 +407,10 @@ docker build --network=host -f ./dockerfiles/Dockerfile_serving_cuda124_cudnn9 -
 | SERVICE_HTTP_PORT | int | 服务请求 HTTP 端口号 | 否 | 9965 | (3.0.0版本前镜像使用PUSH_MODE_HTTP_PORT)  |
 | DISABLE_STREAMING | int | 是否使用流式返回 | 否 | 0 |  |
 | MAX_SEQ_LEN | int | 最大输入序列长度 | 否 | 8192 | 服务会拒绝 input token 数量超过 MAX_SEQ_LEN 的请求，并返回错误提示 |
-| MAX_DEC_LEN | int | 最大 decoer 序列长度 | 否 | 1024 | 服务会拒绝请求中 max_dec_len/min_dec_len 超过此参数的请求，并返回错误提示 |
+| MAX_DEC_LEN | int | 最大 decoder 序列长度 | 否 | 1024 | 服务会拒绝请求中 max_dec_len/min_dec_len 超过此参数的请求，并返回错误提示 |
 | BATCH_SIZE | int | 最大 Batch Size | 否 | 50 | 模型可同时并发处理的最大输入数量，不能高于128 |
-| BLOCK_BS | int | 缓存 Block 支持的最大 Query Batch Size | 否 | 50 | 如果出现 out of memeory 错误，尝试减少该数值 |
-| BLOCK_RATIO | float |  | 否 | 0.75 | 建议配置 输入平均 Token 数/（输入+输出平均 Token 数) |
+| BLOCK_BS | int | 缓存 Block 支持的最大 Query Batch Size | 否 | 50 | 如果出现 out of memory 错误，尝试减少该数值 |
+| BLOCK_RATIO | float |  | 否 | 0.75 | 建议设为输入长度占总长度的比例 |
 | MAX_CACHED_TASK_NUM | int | 服务缓存队列最大长度 | 否 | 128 | 队列达到上限后，会拒绝新的请求 |
 | PUSH_MODE_HTTP_WORKERS | int | HTTP 服务进程数 | 否 | 1 | 在  配置的情况下有效，高并发下提高该数值，建议最高配置为8 |
 | USE_WARMUP | int | 是否进行 warmup | 否 | 0 |  |
@@ -416,6 +418,29 @@ docker build --network=host -f ./dockerfiles/Dockerfile_serving_cuda124_cudnn9 -
 | USE_CACHE_KV_INT8 | int | 是否将 INT8配置为 KV Cache 的类型 | 否 | 0 | c8量化模型需要配置为1 |
 | MODEL_DIR | str | 模型文件路径 | 否 | /models/ |  |
 | model_name | str | 模型名称 | 否 | 无 |  用于支持模型静态图下载，具体名称参考文档(#./static_models.md)|
+| OUTPUT_LOG_TO_CONSOLE | str | 是否定向输出到console 文件中 | 否 | 0 |  |
+
+
+## 显存相关参数推荐
+
+* BLOCK_BS：设定 cacheKV block 的数量，服务支持的输入、输出的总 token 数为 NUM_TOTAL_TOKEN = BLOCK_BS * INFER_MODEL_MAX_SEQ_LEN
+  * 例如 8K 的模型 BLOCK_BS 设为 40，则共可以支持 40*8 = 320K 的 token 长度
+  * 例如 8K 的模型推荐配置 BLOCK_BS设为 40，运行 32K 的模型，支持的总 token 数不变，则 BLOCK_BS 设为 40 / (32K/8K) = 10，考虑到输入长度变化，影响激活峰值显存，可适当下调到 8 或 9
+* BLOCK_RATIO: block 分配给 encoder 和 decoder 的比例，建议设为 (平均输入长度+128) /(平均输入长度 + 平均输出长度) * EXTEND_RATIO，其中 EXTEND_RATIO 是超参，在大部分情况中，设为1即可，如输入长度方差较大，可根据具体情况设为 1.1~1.3
+  * 例如一份平均输入 300，平均输出 1500，则 block_ratio 推荐值为 (300 + 128) / (300 + 1500) ≈ 0.25
+* BATCH_SIZE: 一般小于 NUM_TOTAL_TOKEN / (平均输入长度 + 平均输出长度)
+
+| GPU 显存 | 部署模型         | 静态图权重                                       | 节点数 | 量化类型           | 导出长度 | 是否 MTP | MTP 量化类型      | 推荐 block_bs |
+|----------|--------------------|------------------------------------------------|------|----------------|--------|--------|---------------|---------|
+| 80GB     | DeepSeek-V3/R1 | deepseek-ai/DeepSeek-R1/a8w8_fp8_wint4        | 1    | a8w8_fp8_wint4 | 8K     | 否     | -             | 40      |
+| 80GB     | DeepSeek-V3/R1 | deepseek-ai/DeepSeek-R1-MTP/a8w8_fp8_wint4    | 1    | a8w8_fp8_wint4 | 8K     | 是     | a8w8_fp8      | 36      |
+| 80GB     | DeepSeek-V3/R1 | deepseek-ai/DeepSeek-R1/weight_only_int4      | 1    | weight_only_int4 | 8K   | 否     | -             | 40      |
+| 80GB     | DeepSeek-V3/R1 | deepseek-ai/DeepSeek-R1-MTP/weight_only_int4  | 1    | weight_only_int4 | 8K   | 是     | weight_only_int8 | 36      |
+| 80GB     | DeepSeek-V3/R1 | deepseek-ai/DeepSeek-R1-2nodes/a8w8_fp8      | 2    | a8w8_fp8       | 8K     | 否     | -             | 50      |
+| 80GB     | DeepSeek-V3/R1 | deepseek-ai/DeepSeek-R1-MTP-2nodes/a8w8_fp8  | 2    | a8w8_fp8       | 8K     | 是     | a8w8_fp8      | 36      |
+| 80GB     | DeepSeek-V3/R1 | deepseek-ai/DeepSeek-R1-2nodes/weight_only_int8 | 2  | weight_only_int8 | 8K   | 否     | -             | 40      |
+| 80GB     | DeepSeek-V3/R1 | deepseek-ai/DeepSeek-R1-MTP-2nodes/weight_only_int8 | 2  | weight_only_int8 | 8K | 是     | weight_only_int8 | 36      |
+
 
 ## 请求参数介绍
 
