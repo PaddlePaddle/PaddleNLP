@@ -1210,7 +1210,7 @@ class MemroyRecomputeAttnFunc(paddle.autograd.PyLayer):
                     key_states,
                     value_states_pad,
                     attn_out,
-                    softmax_lse,
+                    softmax_lse.view("bfloat16"),
                     seed_offset,
                     None,
                     dout,
@@ -1227,7 +1227,7 @@ class MemroyRecomputeAttnFunc(paddle.autograd.PyLayer):
                     key_states,
                     value_states,
                     attn_out,
-                    softmax_lse,
+                    softmax_lse.view("bfloat16"),
                     dout,
                     softmax_scale,
                     True,
@@ -1874,8 +1874,6 @@ class DeepseekV2DecoderLayer(nn.Layer):
 
     def self_attn_compute(self, hidden_states, **kwargs):
         residual = hidden_states
-
-        hidden_states = self.input_layernorm(hidden_states)
 
         # Self Attention
         has_gradient = not hidden_states.stop_gradient

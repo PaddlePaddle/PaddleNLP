@@ -107,6 +107,11 @@ class UnZipNode:
         self.unzipped_probs = None
         self.zipped_expertwise_rowmap = None
 
+    def reset_statue(self):
+        self.unzipped_probs = None
+        self.zipped_expertwise_rowmap = None
+
+    @paddle.no_grad()
     def forward(
         self,
         hs_fp8_dispatched,
@@ -137,6 +142,7 @@ class UnZipNode:
         self.zipped_expertwise_rowmap = zipped_expertwise_rowmap
         return unzipped_tokens, unzipped_scale, zipped_expertwise_rowmap, unzipped_probs, unzipped_expert_idx
 
+    @paddle.no_grad()
     def backward(self, dx, hidden_states_out_grad, probs_grad):
 
         weighted_zipped_tokens = TDU.tokens_weighted_zip(
@@ -147,12 +153,13 @@ class UnZipNode:
             num_experts=4,
         )
         probs_grad_zipped = TDU.tokens_weighted_zip(
-            probs_grad.unsqueeze(-1),
+            probs_grad.unsqueeze(-1).cast(paddle.bfloat16),
             self.unzipped_probs,
             self.zipped_expertwise_rowmap,
             total_zipped_tokens=hidden_states_out_grad.shape[0],
             num_experts=4,
         )
+        self.reset_statue()
         return weighted_zipped_tokens, probs_grad_zipped
 
 
@@ -161,12 +168,14 @@ class ZipNode:
         self.token_dispatcher = token_dispatcher
         self.name = name
 
+    @paddle.no_grad()
     def forward(self, expert_out, unzipped_probs, zipped_expertwise_rowmap, total_zipped_tokens, num_experts):
         expert_out_zipped = TDU.tokens_weighted_zip(
             expert_out, unzipped_probs, zipped_expertwise_rowmap, total_zipped_tokens, num_experts
         )
         return expert_out_zipped
 
+    @paddle.no_grad()
     def backward(
         self,
         grad_output,
@@ -231,7 +240,7 @@ class UnPermuteNode:
         self.token_permuted_indices = None
         self.hidden_states = None
         self.prob_permuted_indices = None
-        # self.faltten_dispatched_probs = None
+        self.faltten_dispatched_probs = None
         self.hidden = None
         self.permuted_tokens = None
         self.output_tokens = None
