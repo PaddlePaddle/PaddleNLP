@@ -73,9 +73,8 @@ std::vector<paddle::Tensor> MoeExpertReduce(
 
   auto output = GetEmptyTensor({num_rows, hidden_size}, input_type, place);
 
-  // when if the input is empty, return empty output.
-  // This avoids possible bugs when using EP parallel.
-  if(ffn_out.dims()[0] ==0 )
+  // Avoids ‘invalid configuration argument’ when we launch the kernel.
+  if(ffn_out.dims()[0] == 0 )
     return {output};
 
   switch (input_type) {
