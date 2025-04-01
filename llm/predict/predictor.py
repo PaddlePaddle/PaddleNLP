@@ -1134,6 +1134,13 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
     @paddle.no_grad()
     def predict(self, input_texts: list[str], return_tokens=False):
         self._preprocess(input_texts)
+        if self.proposer is not None:
+            self.proposer.insert_query(
+                base_model_inputs=self.model_inputs, real_bs=len(input_texts), seq_lens=self.seq_lens
+            )
+        result_queue = mp.Queue()
+        tensor_queue = mp.Queue()
+        done_event = mp.Event()
 
         # whether speculative decoding
         if self.proposer is None:
@@ -1143,32 +1150,62 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
             read_res_func = llm_utils.speculate_read_res
             output_tensor_shape = [SPECULATE_MAX_BSZ * MAX_DRAFT_TOKENS + SPECULATE_MAX_BSZ + 2, 1]
 
-        if self.enable_stream_output:
+        read_res_process = mp.Process(
+            target=read_res_func, args=[self.model_name_or_path, tensor_queue, result_queue, done_event]
+        )
+        if self.tensor_parallel_rank == 0:
+            read_res_process.start()
+
+        output_tensor = paddle.full(shape=output_tensor_shape, fill_value=2, dtype="int64").cpu()
+
+        tensor_queue.put(output_tensor)
+        if self.tensor_parallel_rank == 0:
+            done_event.wait()
+        s_time = time.time()
+        while self.model_inputs["not_need_stop"]:
+            # whether speculative decoding
             if self.proposer is not None:
-                self.proposer.insert_query(
-                    base_model_inputs=self.model_inputs, real_bs=len(input_texts), seq_lens=self.seq_lens
+                self.proposer.run(
+                    self.model_inputs,
+                    real_batch_size=self.batch_size,
+                    seq_lens_this_time=self.model_inputs["seq_lens_this_time"],
+                    base_model_full_hidden_states=self.full_hidden_states,
                 )
-            result_queue = mp.Queue()
-            tensor_queue = mp.Queue()
-            done_event = mp.Event()
+            if self.return_full_hidden_states:
+                self.full_hidden_states = self._infer(self.model_inputs)
+            else:
+                self._infer(self.model_inputs)
+        logger.info(f"running spend {time.time() - s_time}")
 
-            read_res_process = mp.Process(
-                target=read_res_func, args=[self.model_name_or_path, tensor_queue, result_queue, done_event]
+        if self.tensor_parallel_rank == 0:
+            outputs = []
+            output_tokens = []
+            while len(outputs) < len(input_texts):
+                result = result_queue.get(timeout=1)
+                outputs.append(result[-1])
+                output_tokens.append(result[-2])
+
+            read_res_process.terminate()
+
+            if return_tokens:
+                return outputs, output_tokens
+            else:
+                return outputs
+
+    @paddle.no_grad()
+    def predict_non_stream(self, input_texts: list[str], return_tokens=False):
+        self._preprocess(input_texts)
+
+        if self.proposer is not None:
+            self.proposer.insert_query(
+                base_model_inputs=self.model_inputs, real_bs=len(input_texts), seq_lens=self.seq_lens
             )
-            if self.tensor_parallel_rank == 0:
-                read_res_process.start()
 
-            output_tensor = paddle.full(shape=output_tensor_shape, fill_value=2, dtype="int64").cpu()
+        from paddlenlp.utils.env import USE_FAST_TOKENIZER
 
-            tensor_queue.put(output_tensor)
-            if self.tensor_parallel_rank == 0:
-                done_event.wait()
-        else:
-            from paddlenlp.utils.env import USE_FAST_TOKENIZER
-
-            tokenizer = AutoTokenizer.from_pretrained(
-                self.model_name_or_path, padding_side="left", use_fast=USE_FAST_TOKENIZER
-            )
+        tokenizer = AutoTokenizer.from_pretrained(
+            self.model_name_or_path, padding_side="left", use_fast=USE_FAST_TOKENIZER
+        )
 
         output_tokens = []
         output_token = []
@@ -1186,28 +1223,18 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                 self.full_hidden_states = self._infer(self.model_inputs)
             else:
                 outputs = self._infer(self.model_inputs)
-                if not self.enable_stream_output:
-                    outputs = outputs.numpy()
-                    outputs[outputs == -1] = tokenizer.eos_token_id
-                    output_token.append(outputs)
-
+                outputs = outputs.numpy()
+                outputs[outputs == -1] = tokenizer.eos_token_id
+                output_token.append(outputs)
         logger.info(f"running spend {time.time() - s_time}")
 
         if self.tensor_parallel_rank == 0:
             outputs = []
-            if self.enable_stream_output:
-                while len(outputs) < len(input_texts):
-                    result = result_queue.get(timeout=1)
-                    outputs.append(result[-1])
-                    output_tokens.append(result[-2])
-
-                read_res_process.terminate()
-            else:
-                while len(outputs) < len(input_texts):
-                    output_tokens = np.concatenate(output_token, axis=1).tolist()
-                    outputs = tokenizer.batch_decode(
-                        output_tokens, skip_special_tokens=True, clean_up_tokenization_spaces=False
-                    )
+            while len(outputs) < len(input_texts):
+                output_tokens = np.concatenate(output_token, axis=1).tolist()
+                outputs = tokenizer.batch_decode(
+                    output_tokens, skip_special_tokens=True, clean_up_tokenization_spaces=False
+                )
 
             if return_tokens:
                 return outputs, output_tokens
@@ -1593,7 +1620,10 @@ def predict():
     with open(model_args.output_file, "w", encoding="utf-8") as f:
         for bs, batch_source_text in enumerate(batch_source_texts):
             logger.info("Start predict")
-            outputs = predictor.predict(batch_source_text)
+            if predictor_args.enable_stream_output:
+                outputs = predictor.predict(batch_source_text)
+            else:
+                outputs = predictor.predict_non_stream(batch_source_text)
             logger.info("End predict")
 
             if predictor.tensor_parallel_rank > 0:
