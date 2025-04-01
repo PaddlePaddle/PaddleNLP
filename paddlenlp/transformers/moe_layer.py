@@ -518,12 +518,15 @@ class Fp8DispatchNode:
 
     @paddle.no_grad()
     def backward(self, hs_fp8_dispatched_grad, dispatched_probs_grad, previous_event=None, async_finish=False):
+        # dispatch grad
+        paddle.base.core.eager._for_test_check_cuda_error()
         hs_fp8_grad, _, token_probs_grad = self.dispatch_act_node.backward(
             hs_fp8_dispatched_grad,
             dispatched_probs_grad,
             previous_event=previous_event,
             async_finish=async_finish,
         )
+        paddle.base.core.eager._for_test_check_cuda_error()
         return hs_fp8_grad, token_probs_grad
 
 
@@ -600,9 +603,8 @@ class MlpNode:
         self.unzipped_expert_idx = None
         self.unzipped_scale = None
         self.unzipped_tokens = None
-
-        # ---
-        self.zipped_expertwise_rowmap = None
+        self.tokens_per_expert = None
+        self.router_topk = None
 
     def reset_statue(self):
         self.token_permuted_indices = None
@@ -612,9 +614,13 @@ class MlpNode:
         self.dispatched_indices = None
         self.unzipped_scale = None
         self.unzipped_tokens = None
+        self.tokens_per_expert = None
+        self.router_topk = None
 
     @paddle.no_grad()
     def forward(self, hs_fp8_dispatched, hs_scale_dispatched, dispatched_indices, dispatched_probs):
+        self.tokens_per_expert = self.token_dispatcher._comm_manager.tokens_per_expert
+        self.router_topk = self.token_dispatcher._comm_manager.router_topk
         if len(self.token_dispatcher._comm_manager.tokens_per_expert) == 4 and DSV3_USE_FP8_GROUP_GEMM:
             # 1 unzip
             dispatched_indices = dispatched_indices.to(paddle.int32)
@@ -625,19 +631,22 @@ class MlpNode:
                 hs_scale_dispatched,
                 dispatched_indices,
                 dispatched_probs,
-                topk=self.token_dispatcher._comm_manager.router_topk,
+                topk=self.router_topk,
                 num_experts=4,
-                max_tokens=max(self.token_dispatcher._comm_manager.tokens_per_expert),
+                max_tokens=max(self.tokens_per_expert),
             )
-            self.zipped_expertwise_rowmap = zipped_expertwise_rowmap
             hs_fp8_dispatched._record_stream()
             hs_scale_dispatched._record_stream()
             dispatched_indices._record_stream()
             dispatched_probs._record_stream()
+
             # 2 experts
-            tokens_per_expert = paddle.to_tensor(
-                self.token_dispatcher._comm_manager.tokens_per_expert, dtype=paddle.int32
-            )
+            tokens_per_expert_list = []
+            for idx in range(len(self.tokens_per_expert)):
+                tokens_per_expert_list.append(
+                    paddle.full(shape=[1], fill_value=self.tokens_per_expert[idx], dtype="int32")
+                )
+            tokens_per_expert = paddle.concat(tokens_per_expert_list)
             expert_out = self.experts_group_gemm_node.forward(
                 unzipped_tokens, unzipped_scale, unzipped_probs, tokens_per_expert
             )
@@ -645,6 +654,7 @@ class MlpNode:
             self.unzipped_scale = unzipped_scale
 
             # 3 zip
+            # expert是3维，reshape成2维
             expert_out = expert_out.reshape([-1, expert_out.shape[-1]])
             expert_out_zipped = self.zip_node.forward(
                 expert_out,
@@ -654,8 +664,8 @@ class MlpNode:
                 total_zipped_tokens=hs_fp8_dispatched.shape[0],
                 num_experts=4,
             )
+
             self.dispatched_probs = dispatched_probs
-            # self.dispatched_indices = dispatched_indices
             expert_out_zipped.stop_gradient = False
             return expert_out_zipped
         else:
@@ -694,24 +704,25 @@ class MlpNode:
                 hidden_states_out_grad_scale,
                 self.dispatched_indices,
                 self.dispatched_probs,
-                top_k=self.token_dispatcher._comm_manager.router_topk,
+                top_k=self.router_topk,
                 num_experts=4,
-                max_tokens=max(self.token_dispatcher._comm_manager.tokens_per_expert),
+                max_tokens=max(self.tokens_per_expert),
             )
             hidden_states_out_grad._record_stream()
             hidden_states_out_grad_scale._record_stream()
 
             # expert_grad
-            tokens_per_expert = paddle.to_tensor(
-                self.token_dispatcher._comm_manager.tokens_per_expert, dtype=paddle.int32
-            )
+            tokens_per_expert_list = []
+            for idx in range(len(self.tokens_per_expert)):
+                tokens_per_expert_list.append(
+                    paddle.full(shape=[1], fill_value=self.tokens_per_expert[idx], dtype="int32")
+                )
+            tokens_per_expert = paddle.concat(tokens_per_expert_list)
+            expected_m = int(max(self.tokens_per_expert))
             expert_out, probs_grad = self.experts_group_gemm_node.backward(
-                unzipped_grad,
-                unzipped_scale_grad,
-                tokens_per_expert,
-                self.dispatched_indices,
+                unzipped_grad, unzipped_scale_grad, tokens_per_expert, self.dispatched_indices, expected_m
             )
-
+            # unzip_grad
             hs_fp8_dispatched_grad, dispatched_probs_grad = self.unzip_node.backward(
                 expert_out, hidden_states_out_grad, probs_grad, self.dispatched_indices
             )

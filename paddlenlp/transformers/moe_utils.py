@@ -144,7 +144,6 @@ class UnZipNode:
     @paddle.no_grad()
     def backward(self, dx, hidden_states_out_grad, probs_grad, dispatched_indices):
         probs_grad_copy = probs_grad.unsqueeze(-1).cast(paddle.float32)
-
         weighted_zipped_tokens, probs_grad_zipped = TDU.tokens_zip(
             # dx_copy.cast(paddle.bfloat16),
             dx,
@@ -154,6 +153,7 @@ class UnZipNode:
             total_zipped_tokens=hidden_states_out_grad.shape[0],
             num_experts=4,
         )
+        self.reset_statue()
         return weighted_zipped_tokens, probs_grad_zipped
 
 
@@ -169,6 +169,7 @@ class ZipNode:
         expert_out_zipped, zipped_probs_topk = TDU.tokens_zip(
             expert_out, zipped_expertwise_rowmap, routemap_topk, unzipped_probs, total_zipped_tokens, num_experts
         )
+
         return expert_out_zipped
 
     @paddle.no_grad()
