@@ -282,9 +282,8 @@ class LinearFP8KeepXFunc(paddle.autograd.PyLayer):
         x_quant, x_scale = kitchen_quant(
             x, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
         )
-        weight_t = weight.T.contiguous()
-        w_quant, w_scale = kitchen_quant(
-            weight_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
+        _, _, w_quant, w_scale = kitchen_quant(
+            weight, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
         )
 
         # compute out = mm(x, w_t)
@@ -298,18 +297,19 @@ class LinearFP8KeepXFunc(paddle.autograd.PyLayer):
     @staticmethod
     def backward(ctx, dout):
         x, weight = ctx.saved_tensor()
-
+        dx_orig_shape = x.shape
         # padding
-        x_t = x.T.contiguous()
-        if x_t.shape[-1] % 8 != 0:
-            x_t = paddle.concat([x_t, paddle.zeros([x_t.shape[0], 8 - (x_t.shape[-1] % 8)], dtype=x_t.dtype)], axis=-1)
-        x_t_quant, x_t_scale = kitchen_quant(
-            x_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
+        x = x.reshape( [-1, x.shape[-1]])
+        if x.shape[0] % 8 != 0:
+            x = paddle.concat([x, paddle.zeros([ 8 - (x.shape[0] % 8), x.shape[-1]], dtype=x.dtype)], axis=0)
+
+        _, _, x_t_quant, x_t_scale = kitchen_quant(
+            x, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=True
         )
 
         # compute dx = mm(dout, w)
         dx = paddle.empty(x.shape, dout.dtype)
-        dx_orig_shape = x.shape
+       
 
         dout_quant, dout_scale = kitchen_quant(
             dout.reshape([-1, dout.shape[-1]]),
@@ -324,14 +324,14 @@ class LinearFP8KeepXFunc(paddle.autograd.PyLayer):
         dx = dx.reshape(dx_orig_shape)
 
         # compute dw = mm(x_t, dout_t)
-        dout_t = dout.reshape([-1, dout.shape[-1]]).T.contiguous()
-        # padding
-        if dout_t.shape[-1] % 8 != 0:
-            pad_size = 8 - (dout_t.shape[-1] % 8)
-            dout_t = paddle.concat([dout_t, paddle.zeros([dout_t.shape[0], pad_size], dtype=dout_t.dtype)], axis=-1)
+        dout_t = dout.reshape([-1, dout.shape[-1]])
 
-        dout_t_quant, dout_t_scale = kitchen_quant(
-            dout_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
+        if dout_t.shape[0] % 8 != 0:
+            pad_size = 8 - (dout_t.shape[0] % 8)
+            dout_t = paddle.concat([dout_t, paddle.zeros([pad_size, dout_t.shape[-1]], dtype=dout_t.dtype)], axis=0)
+
+        _, _, dout_t_quant, dout_t_scale = kitchen_quant(
+            dout_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=True
         )
         dweight = kitchen_fp8_gemm(x_t_quant, x_t_scale, dout_t_quant, dout_t_scale, True, True)
         return dx, dweight
