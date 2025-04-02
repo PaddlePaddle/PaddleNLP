@@ -1079,8 +1079,6 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
     ):
         self.return_full_hidden_states = config.return_full_hidden_states
         self.full_hidden_states = None
-        self.output_via_mq = config.output_via_mq
-        self.model_name_or_path = config.model_name_or_path
         self.tokenizer = tokenizer
         if model is None:
             raise ValueError("model should be provided for DygraphBlockInferencePredictor")
@@ -1195,7 +1193,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
 
     @paddle.no_grad()
     def predict(self, input_texts: list[str], return_tokens=False):
-        if self.output_via_mq:
+        if self.config.output_via_mq:
             return self.predict_via_mq(input_texts, return_tokens)
         self._preprocess(input_texts)
 
@@ -1251,8 +1249,6 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
         self.cache_v_shapes = kwargs.get("cache_v_shapes", None)
         self.model_args = kwargs.get("model_args", None)
         self.return_full_hidden_states = config.return_full_hidden_states
-        self.output_via_mq = config.output_via_mq
-        self.model_name_or_path = config.model_name_or_path
         self.tokenizer = tokenizer
         self.full_hidden_states = None
         if self.cache_k_shapes is None:
@@ -1410,7 +1406,7 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
                 return outputs
 
     def predict(self, input_texts: list[str], return_tokens=False):
-        if self.output_via_mq:
+        if self.config.output_via_mq:
             return self.predict_via_mq(input_texts, return_tokens)
 
         s_time = time.time()
