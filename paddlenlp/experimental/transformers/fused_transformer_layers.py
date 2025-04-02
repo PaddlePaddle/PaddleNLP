@@ -158,7 +158,6 @@ class AvxConfig:
 class SpeculateConfig:
     speculate_max_draft_token_num: int = 5
     speculate_method: str = None
-    return_full_hidden_states: bool = False
 
 
 @dataclass
@@ -1774,7 +1773,7 @@ class FusedMultiTransformerBase(Layer):
         kwargs["input_ids"] = input_ids
 
         out = self.post_process(**kwargs)
-        return out, caches
+        return out, kwargs["multi_block_output"]
 
 
 class FusedMultiTransformerPostLayernorm(FusedMultiTransformerBase):
@@ -3469,30 +3468,28 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
         max_input_length = kwargs.get("max_input_length", -1)
         output_padding_offset = kwargs.get("output_padding_offset", None)  # only used in speculative decoding
 
-        if self.config.speculate_config.return_full_hidden_states:
-            return multi_block_output
-        else:
-            if paddle.is_compiled_with_xpu():
-                from paddlenlp_ops import gather_next_token
+        if paddle.is_compiled_with_xpu():
+            from paddlenlp_ops import gather_next_token
 
-                out = gather_next_token(
-                    multi_block_output,
-                    cum_offsets,
-                    seq_lens_decoder,
-                    seq_lens_encoder,
-                    output_padding_offset,
-                    max_input_length,
-                )
-            else:
-                out = rebuild_padding_v2(
-                    multi_block_output,
-                    cum_offsets,
-                    seq_lens_decoder,
-                    seq_lens_encoder,
-                    output_padding_offset,
-                    max_input_length,
-                )
-            return out
+            out = gather_next_token(
+                multi_block_output,
+                cum_offsets,
+                seq_lens_decoder,
+                seq_lens_encoder,
+                output_padding_offset,
+                max_input_length,
+            )
+        else:
+            out = rebuild_padding_v2(
+                multi_block_output,
+                cum_offsets,
+                seq_lens_decoder,
+                seq_lens_encoder,
+                output_padding_offset,
+                max_input_length,
+            )
+
+        return out
 
 
 class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMultiTransformerWeightOnly):
