@@ -728,7 +728,6 @@ void MoeGemmRunner<T, WeightType>::run_gemm<EpilogueTag>(
       PADDLE_FATAL("[MoE Configure Search] find no one avaliable config.");
     }
   }
-
   dispatch_to_arch<EpilogueTag>(A,
                                 B,
                                 weight_scales,
