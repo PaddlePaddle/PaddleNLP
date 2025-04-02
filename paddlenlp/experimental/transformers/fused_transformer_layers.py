@@ -1431,14 +1431,18 @@ class FusedMultiTransformerBase(Layer):
             self.config.moe_config.num_experts,
             False,
             False,
+            False,
         )
 
-        # FP8's packed_recv_x is dequantized
         max_tokens_all = self.max_num_tokens_per_card * total_cards
-        scale_size = 128
-        x_bf16 = packed_recv_x[0].cast("bfloat16").reshape([0, 0, -1, scale_size])
-        scales = packed_recv_x[1].transpose([0, 2, 1]).unsqueeze(-1)
-        permute_input_tmp = (x_bf16 * scales).reshape([-1, hidden_size]).cast("bfloat16")
+        
+        # FP8's packed_recv_x is dequantized
+        # scale_size = 128
+        # x_bf16 = packed_recv_x[0].cast("bfloat16").reshape([0, 0, -1, scale_size])
+        # scales = packed_recv_x[1].transpose([0, 2, 1]).unsqueeze(-1)
+        # permute_input_tmp = (x_bf16 * scales).reshape([-1, hidden_size]).cast("bfloat16")
+
+        permute_input_tmp = packed_recv_x.reshape([-1, hidden_size])
 
         # Here we use the maximum number of tokens each expert gets, not the actual number of tokens;
         # in high concurrency, all experts have the same number of tokens.
