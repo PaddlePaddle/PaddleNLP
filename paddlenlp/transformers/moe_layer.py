@@ -619,7 +619,7 @@ class MlpNode:
     def forward(self, hs_fp8_dispatched, hs_scale_dispatched, dispatched_indices, dispatched_probs):
         self.tokens_per_expert = self.token_dispatcher._comm_manager.tokens_per_expert
         self.router_topk = self.token_dispatcher._comm_manager.router_topk
-        if len(self.token_dispatcher._comm_manager.tokens_per_expert) == 4 and DSV3_USE_FP8_GROUP_GEMM:
+        if DSV3_USE_FP8_GROUP_GEMM:
             # 1 unzip
             dispatched_indices = dispatched_indices.to(paddle.int32)
 
@@ -696,7 +696,7 @@ class MlpNode:
 
     @paddle.no_grad()
     def backward(self, hidden_states_out_grad, hidden_states_out_grad_scale):
-        if len(self.token_dispatcher._comm_manager.tokens_per_expert) == 4 and DSV3_USE_FP8_GROUP_GEMM:
+        if DSV3_USE_FP8_GROUP_GEMM:
             # zip_grad
             unzipped_grad, unzipped_scale_grad = self.zip_node.backward(
                 hidden_states_out_grad,
