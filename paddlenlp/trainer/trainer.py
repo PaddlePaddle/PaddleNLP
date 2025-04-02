@@ -169,13 +169,13 @@ from .utils import reshard as reshard_util
 from .utils.async_save import AsyncSaver
 
 try:
-    from .utils.flash_checkpoint import (
-        FlashCheckpointCallback,
-        FlashCheckpointManager,
+    from .utils.zero_cost_checkpoint import (
+        ZeroCostCheckpointCallback,
+        ZeroCostCheckpointManager,
         get_fused_param_mappings,
     )
 except (ImportError, ModuleNotFoundError):
-    FlashCheckpointManager, get_fused_param_mappings = None, None
+    ZeroCostCheckpointManager, get_fused_param_mappings = None, None
 from .utils.helper import (  # nested_truncate,
     broadcast_dataset_rank0_model,
     broadcast_dp_optimizer,
@@ -413,35 +413,35 @@ class Trainer:
         self._save_ckpt_func = _save_ckpt_func
         self._load_ckpt_func = dist.load_state_dict if self.args.enable_auto_parallel else paddle.load
 
-        if FlashCheckpointManager is None and self.args.enable_flash_save_mode:
+        if ZeroCostCheckpointManager is None and self.args.enable_zero_cost_checkpoint:
             logger.warning(
-                "enable_flash_save_mode has been set as True, but paddle version is too old to support this function, please upgrade it."
+                "enable_zero_cost_checkpoint has been set as True, but paddle version is too old to support this function, please upgrade it."
             )
-            self.args.enable_flash_save_mode = False
+            self.args.enable_zero_cost_checkpoint = False
 
-        if self.args.enable_flash_save_mode:
-            # Currently, flash save mode only support pretraining mode with hybrid parallel enabled
+        if self.args.enable_zero_cost_checkpoint:
+            # Currently, zero cost checkpoint only support pretraining mode with hybrid parallel enabled
             assert (
                 not self.args.ignore_save_lr_and_optim
-            ), "ignore_save_lr_and_optim should be False when using flash save mode"
-            assert self.args.use_hybrid_parallel, "use_hybrid_parallel must be True when using flash save mode"
+            ), "ignore_save_lr_and_optim should be False when using zero cost checkpoint"
+            assert self.args.use_hybrid_parallel, "use_hybrid_parallel must be True when using zero cost checkpoint"
             assert (
                 not self.args.unified_checkpoint
-            ), "use_unified_checkpoint should be False when using flash save mode"
+            ), "use_unified_checkpoint should be False when using zero cost checkpoint"
             assert not strtobool(
                 os.getenv("FLAG_LLM_PDC", "False")
-            ), "Dont support FLAG_LLM_PDC when using flash save mode"
+            ), "Dont support FLAG_LLM_PDC when using zero cost checkpoint"
             assert (
                 self.args.should_save_sharding_stage1_model
-            ), "should_save_sharding_stage1_model should be True when using flash save mode"
+            ), "should_save_sharding_stage1_model should be True when using zero cost checkpoint"
             assert (
                 ShardingOption.FULL_SHARD not in self.args.sharding
-            ), "FULL_SHARD is not supported when using flash save mode"
-            assert not self.args.save_tokenizer, "save_tokenizer is not supported when using flash save mode"
-            assert not self.args.save_rng_states, "save_rng_states is not supported when using flash save mode"
+            ), "FULL_SHARD is not supported when using zero cost checkpoint"
+            assert not self.args.save_tokenizer, "save_tokenizer is not supported when using zero cost checkpoint"
+            assert not self.args.save_rng_states, "save_rng_states is not supported when using zero cost checkpoint"
 
-            # init attributes for flash save mode
-            self.flash_checkpoint_manager = None
+            # init attributes for zero cost checkpoint mode
+            self.zcc_manager = None
 
         if self.args.ordered_save_group_size > 0:
             logger.info(f"using save in order, its group size is {self.args.ordered_save_group_size}")
@@ -757,58 +757,58 @@ class Trainer:
             self._load_from_checkpoint(resume_from_checkpoint)
         return model
 
-    def create_flash_checkpoint_manager(self, unwrapped_model, resume_from_checkpoint=None):
+    def create_zcc_manager(self, unwrapped_model, resume_from_checkpoint=None):
         """
-        Create flash checkpoint manager.
+        Create zero cost checkpoint manager.
         Has to be called after pipeline model is created.
         resume_from_checkpoint: if use Flash checkpoing EMA, load previous checkpoint status
         """
-        assert isinstance(self.model, PretrainedModel), "model should be a PretrainedModel when using flash"
-        logger.info("Create flash checkpoint manager...")
+        assert isinstance(
+            self.model, PretrainedModel
+        ), "model should be a PretrainedModel when using zero cost checkpoint"
+        logger.info("Create zero cost checkpoint manager...")
         if isinstance(self.model, PipelineLayer):
             pipeline_hooks_capacity = (
                 unwrapped_model.forward_pipeline_parallel_hook_capacity
                 + unwrapped_model.backward_pipeline_parallel_hook_capacity
             )
-            self.flash_checkpoint_manager = FlashCheckpointManager(
-                worker_num=self.args.flash_workers_num,
+            self.zcc_manager = ZeroCostCheckpointManager(
+                worker_num=self.args.zcc_workers_num,
                 pipeline_hooks_capacity=pipeline_hooks_capacity,
-                capacity_usage=self.args.flash_pipeline_hooks_capacity_usage,
+                capacity_usage=self.args.zcc_pipeline_hooks_capacity_usage,
                 use_expert_parallel=self.args.use_expert_parallel,
-                ema_coef=self.args.flash_save_ema_coef,
+                ema_coef=self.args.zcc_save_ema_coef,
             )
             for i in range(unwrapped_model.forward_pipeline_parallel_hook_capacity):
                 unwrapped_model.register_forward_pipeline_parallel_hook(
-                    location=i, hook=self.flash_checkpoint_manager.flash_checkpoint_pipeline_hook
+                    location=i, hook=self.zcc_manager.zcc_pipeline_hook
                 )
             for i in range(unwrapped_model.backward_pipeline_parallel_hook_capacity):
                 unwrapped_model.register_backward_pipeline_parallel_hook(
-                    location=i, hook=self.flash_checkpoint_manager.flash_checkpoint_pipeline_hook
+                    location=i, hook=self.zcc_manager.zcc_pipeline_hook
                 )
         else:
             pipeline_hooks_capacity = self.args.gradient_accumulation_steps
-            self.flash_checkpoint_manager = FlashCheckpointManager(
-                worker_num=self.args.flash_workers_num,
+            self.zcc_manager = ZeroCostCheckpointManager(
+                worker_num=self.args.zcc_workers_num,
                 pipeline_hooks_capacity=pipeline_hooks_capacity,
-                capacity_usage=self.args.flash_pipeline_hooks_capacity_usage,
+                capacity_usage=self.args.zcc_pipeline_hooks_capacity_usage,
                 use_expert_parallel=self.args.use_expert_parallel,
-                ema_coef=self.args.flash_save_ema_coef,
+                ema_coef=self.args.zcc_save_ema_coef,
             )
-        _callback = FlashCheckpointCallback(
-            self.args, self.flash_checkpoint_manager, self.runtime_timer, self.sharding_io
-        )
+        _callback = ZeroCostCheckpointCallback(self.args, self.zcc_manager, self.runtime_timer, self.sharding_io)
         self.add_callback(_callback)
 
         if resume_from_checkpoint is not None:
             path = _add_variant(PADDLE_OPTIMIZER_NAME, self.args.optimizer_name_suffix)
             path = os.path.join(resume_from_checkpoint, path).replace("optimizer", "ema")
             if os.path.exists(path):
-                logger.info(f"FC EMA load from {path}")
-                self.flash_checkpoint_manager.set_ema_state_dict(path)
+                logger.info(f"ZCC EMA load from {path}")
+                self.zcc_manager.set_ema_state_dict(path)
             else:
-                logger.info(f"FC EMA state dict not found, in: {path}")
+                logger.info(f"ZCC EMA state dict not found, in: {path}")
 
-        logger.info("Create flash checkpoint manager done.")
+        logger.info("Create zero cost checkpoint manager done.")
 
     def train(
         self,
@@ -945,8 +945,8 @@ class Trainer:
             if delay_optimizer_creation:
                 self.create_optimizer_and_scheduler(num_training_steps=max_steps)
 
-        if self.args.enable_flash_save_mode:
-            self.create_flash_checkpoint_manager(model, resume_from_checkpoint)
+        if self.args.enable_zero_cost_checkpoint:
+            self.create_zcc_manager(model, resume_from_checkpoint)
 
         logger.info(f"{self.runtime_timer.log()}")
         logger.info("***** Running training *****")
@@ -1406,8 +1406,8 @@ class Trainer:
             # Clean the state at the end of training
             delattr(self, "_past")
 
-        if self.args.enable_flash_save_mode:
-            self.flash_checkpoint_manager.finalize()
+        if self.args.enable_zero_cost_checkpoint:
+            self.zcc_manager.finalize()
         logger.info("\nTraining completed. \n")
 
         # unlink shared_memory if used.
@@ -2671,7 +2671,7 @@ class Trainer:
 
     def _save_checkpoint(self, model, metrics=None):
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
-        if self.args.enable_flash_save_mode:
+        if self.args.enable_zero_cost_checkpoint:
             return
 
         self.runtime_timer.start("checkpoint saving time")

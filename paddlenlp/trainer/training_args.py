@@ -996,27 +996,29 @@ class TrainingArguments:
     save_sharding_stage1_model_include_freeze_params: Optional[bool] = field(
         default=False, metadata={"help": "Save Sharding Stage1 Model Exclude Freeze Params"}
     )
-    enable_flash_save_mode: Optional[bool] = field(
+    enable_zero_cost_checkpoint: Optional[bool] = field(
         default=False,
         metadata={"help": "Enable Flash Save Mode"},
     )
-    flash_workers_num: Optional[int] = field(
+    zcc_workers_num: Optional[int] = field(
         default=3,
         metadata={
-            "help": "The worker num for flash save mode. Increase to gain performance but cost more memory and cpu usage."
+            "help": "The workers num for zero cost checkpoint save mode. Increase to gain performance but cost more memory and cpu usage."
         },
     )
-    flash_pipeline_hooks_capacity_usage: Optional[float] = field(
+    zcc_pipeline_hooks_capacity_usage: Optional[float] = field(
         default=0.6,
         metadata={
             "help": "Set pipeline hook capacity usage ratio. Lower value brings faster save speed but may effect calculation speed."
         },
     )
-    flash_save_ema_coef: Optional[float] = field(
+    zcc_save_ema_coef: Optional[float] = field(
         default=None,
-        metadata={"help": "The coefficient of EMA parameters in flash save mode. if set to 0, skip EMA process"},
+        metadata={
+            "help": "The coefficient of EMA parameters in zero cost checkpoint save mode. if set to 0, skip EMA process"
+        },
     )
-    flash_ema_interval: Optional[int] = field(
+    zcc_ema_interval: Optional[int] = field(
         default=1,
         metadata={"help": "Interval between updating EMA parameters."},
     )
@@ -1044,7 +1046,7 @@ class TrainingArguments:
         default=0,
         metadata={"help": "The id of the padding token."},
     )
-    flash_save_steps: Optional[int] = field(
+    flash_device_save_steps: Optional[int] = field(
         default=0,
         metadata={"help": "Save checkpoints on flash device every this many steps. Default is 0 which disables it"},
     )
@@ -1959,33 +1961,40 @@ class TrainingArguments:
 
         # process fault tolerance settings
         if is_ft_env():
-            pdc_flash_checkpoint_init_step = os.getenv("PDC_FC_INIT_STEP")
-            if (
-                self.pdc_use_flash_device
-                and pdc_flash_checkpoint_init_step is not None
-                and int(pdc_flash_checkpoint_init_step) > 0
-            ):
+            pdc_zcc_init_step = os.getenv("PDC_FC_INIT_STEP")
+            if pdc_zcc_init_step is not None and int(pdc_zcc_init_step) > 0:
                 self.resume_from_checkpoint = os.path.join(
-                    FLASH_DEVICE, f"{PREFIX_CHECKPOINT_DIR}-{pdc_flash_checkpoint_init_step}"
+                    FLASH_DEVICE, f"{PREFIX_CHECKPOINT_DIR}-{pdc_zcc_init_step}"
                 )
                 logger.warning(
-                    f"PDC_FC_INIT_STEP {pdc_flash_checkpoint_init_step} has been specified, automatically resume from FLASH_DEVICE: {self.resume_from_checkpoint}"
+                    f"PDC_FC_INIT_STEP {pdc_zcc_init_step} has been specified, automatically resume from FLASH_DEVICE: {self.resume_from_checkpoint}"
                 )
-            if self.flash_save_steps > 0:
+            if self.flash_device_save_steps > 0:
                 assert (
-                    self.pdc_use_flash_device and self.enable_flash_save_mode
-                ), "flash_save_steps should only be set in flash save mode with flash device mounted."
+                    self.enable_zero_cost_checkpoint
+                ), "flash_device_save_steps should only be set in zero cost checkpoint save mode with flash device mounted."
         else:
             if self.pdc_download_ckpt:
                 logger.warning(
                     "pdc_download_ckpt can only be set as true inside FT environment. Automatically disable it now."
                 )
                 self.pdc_download_ckpt = False
-            if self.flash_save_steps > 0:
+            if self.flash_device_save_steps > 0:
                 logger.warning(
-                    "flash_save_steps is only recommended to be set inside FT environment. Automatically disable it now."
+                    "flash_device_save_steps is only recommended to be set inside FT environment. Automatically disable it now."
                 )
-                self.flash_save_steps = 0
+                self.flash_device_save_steps = 0
+
+        assert (
+            self.flash_device_save_steps % self.zcc_ema_interval == 0
+        ), f"flash_device_save_steps[{self.flash_device_save_steps}] must be divisible by zcc_ema_interval[{self.zcc_ema_interval}]"
+        assert (
+            self.save_steps % self.zcc_ema_interval == 0
+        ), f"save_steps[{self.save_steps}] must be divisible by zcc_ema_interval[{self.zcc_ema_interval}]"
+        if self.zcc_save_ema_coef is not None:
+            assert (
+                self.zcc_workers_num == 1
+            ), "EMA function in zero cost checkpoint mode does not support zcc_workers_num > 1 for now."
 
     def add_moe_comm_group(self):
         hcg = fleet.get_hybrid_communicate_group()

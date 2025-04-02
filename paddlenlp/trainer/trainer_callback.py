@@ -457,8 +457,8 @@ class DefaultFlowCallback(TrainerCallback):
         # For Flash save
         if (
             args.save_strategy == IntervalStrategy.STEPS
-            and args.flash_save_steps > 0
-            and state.global_step % args.flash_save_steps == 0
+            and args.flash_device_save_steps > 0
+            and state.global_step % args.flash_device_save_steps == 0
         ):
             control.should_save = True
 
