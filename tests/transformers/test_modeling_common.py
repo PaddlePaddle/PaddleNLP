@@ -38,7 +38,13 @@ from paddlenlp.taskflow.utils import static_mode_guard
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 from paddlenlp.transformers.model_utils import PretrainedModel
-from paddlenlp.utils.env import CONFIG_NAME, LEGACY_CONFIG_NAME, MODEL_HOME
+from paddlenlp.utils.env import (
+    CONFIG_NAME,
+    LEGACY_CONFIG_NAME,
+    MODEL_HOME,
+    PADDLE_INFERENCE_MODEL_SUFFIX,
+    PADDLE_INFERENCE_WEIGHTS_SUFFIX,
+)
 
 from ..testing_utils import slow
 
@@ -968,11 +974,8 @@ class GenerationD2STestMixin:
                         use_top_p=False,
                     ),
                 )
-                if paddle.framework.use_pir_api():
-                    model_path = os.path.join(tempdir, "model.json")
-                else:
-                    model_path = os.path.join(tempdir, "model.pdmodel")
-                params_path = os.path.join(tempdir, "model.pdiparams")
+                model_path = os.path.join(tempdir, f"model{PADDLE_INFERENCE_MODEL_SUFFIX}")
+                params_path = os.path.join(tempdir, f"model{PADDLE_INFERENCE_WEIGHTS_SUFFIX}")
                 config = paddle.inference.Config(model_path, params_path)
 
                 config.disable_gpu()
@@ -1040,11 +1043,8 @@ class GenerationD2STestMixin:
                     ),
                 )
 
-                if paddle.framework.use_pir_api():
-                    model_path = os.path.join(tempdir, "model.json")
-                else:
-                    model_path = os.path.join(tempdir, "model.pdmodel")
-                params_path = os.path.join(tempdir, "model.pdiparams")
+                model_path = os.path.join(tempdir, f"model{PADDLE_INFERENCE_MODEL_SUFFIX}")
+                params_path = os.path.join(tempdir, f"model{PADDLE_INFERENCE_WEIGHTS_SUFFIX}")
                 config = paddle.inference.Config(model_path, params_path)
 
                 config.disable_gpu()

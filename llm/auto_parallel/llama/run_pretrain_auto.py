@@ -59,6 +59,7 @@ from paddlenlp.data.causal_dataset import (
     print_rank_0,
 )
 from paddlenlp.trainer.utils.doc import add_start_docstrings
+from paddlenlp.utils.tools import get_env_device
 
 
 @dataclass
@@ -79,14 +80,6 @@ class PreTrainingArguments(AutoTrainingArguments):
         metadata={
             "help": "Enable fused linear grad add strategy, which will reduce elementwise add for grad accumulation in the backward of nn.Linear ."
         },
-    )
-    job_schedule_profiler_start: int = field(
-        default=-1,
-        metadata={"help": "The step to start job_schedule_profiler."},
-    )
-    job_schedule_profiler_end: int = field(
-        default=-1,
-        metadata={"help": "The step to end job_schedule_profiler."},
     )
     pipeline_schedule_mode: str = field(
         default="1F1B", metadata={"help": "The pipeline schedule mode, support FThenB, 1F1B, VPP and Eager-1F1B."}
@@ -171,6 +164,11 @@ class ModelArguments:
     )
     tokenizer_name_or_path: Optional[str] = field(
         default=None, metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}
+    )
+
+    use_fast_layer_norm: bool = field(
+        default=False,
+        metadata={"help": "GPT3 model, use fast layernorm"},
     )
 
     config_name: Optional[str] = field(
@@ -496,6 +494,8 @@ def main():
 
     config = config_class.from_pretrained(model_args.model_name_or_path)
 
+    config.use_fast_layer_norm = model_args.use_fast_layer_norm
+
     config.seq_length = data_args.max_seq_length
     # There are some technique extend RotaryEmbedding context. so don't change max_position_embeddings
     if not model_args.continue_training:
@@ -503,7 +503,7 @@ def main():
 
     if not model_args.continue_training:
         config.vocab_size = max(config.vocab_size, ((tokenizer.vocab_size - 1) // 128 + 1) * 128)
-        logger.info(f"Reset vocab size to {config.vocab_size} for batter amp peformance.")
+        logger.info(f"Reset vocab size to {config.vocab_size} for batter amp performance.")
 
     if model_args.no_recompute_layers is not None:
         model_args.no_recompute_layers.sort()
@@ -527,7 +527,9 @@ def main():
     config.recompute_granularity = model_args.recompute_granularity
     config.virtual_pp_degree = model_args.virtual_pp_degree
     config.sequence_parallel = training_args.sequence_parallel
+
     config.fuse_sequence_parallel_allreduce = training_args.fuse_sequence_parallel_allreduce
+
     config.use_fused_rope = model_args.use_fused_rope
     config.no_recompute_layers = model_args.no_recompute_layers
     config.pp_recompute_interval = model_args.pp_recompute_interval
@@ -542,6 +544,15 @@ def main():
         pipeline = training_args.strategy.pipeline
         pipeline.vpp_degree = config.virtual_pp_degree
         pipeline.vpp_seg_method = training_args.virtual_pipeline_seg_method
+    if get_env_device() == "xpu" and training_args.gradient_accumulation_steps > 1:
+        try:
+            from paddle_xpu.layers.nn.linear import LinearConfig  # noqa: F401
+
+            LinearConfig.enable_accumulate_steps_opt()
+            LinearConfig.set_accumulate_steps(training_args.gradient_accumulation_steps)
+        except ImportError:
+            # It's OK, not use accumulate_steps optimization
+            pass
 
     print("Final pre-training config:", config)
 
@@ -565,7 +576,7 @@ def main():
 
         model.apply(fn)
 
-    # Create the learning_rate sheduler and optimizer
+    # Create the learning_rate scheduler and optimizer
     if training_args.decay_steps is None:
         training_args.decay_steps = training_args.max_steps
 
@@ -600,7 +611,6 @@ def main():
         tokenizer,
         need_data=training_args.should_load_dataset,
     )
-
     trainer = PretrainingTrainer(
         model=model,
         criterion=criterion,
@@ -610,7 +620,6 @@ def main():
         eval_dataset=eval_dataset if training_args.do_eval else None,
         optimizers=(None, lr_scheduler),
         tokenizer=tokenizer,
-        model_args=model_args,
     )
 
     checkpoint = None

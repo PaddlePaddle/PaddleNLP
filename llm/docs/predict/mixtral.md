@@ -12,7 +12,7 @@
 
 |Model|
 |:-|
-|mistralai/Mixtral-8x7B-v0.1-Instruct|
+|mistralai/Mixtral-8x7B-Instruct-v0.1|
 
 
 ## 模型推理

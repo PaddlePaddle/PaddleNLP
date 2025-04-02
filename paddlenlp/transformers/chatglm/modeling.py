@@ -132,14 +132,7 @@ class RotaryEmbeddings(nn.Layer):
             cos_cached = emb.cos().unsqueeze(1).cast(self.default_dtype)
             sin_cached = emb.sin().unsqueeze(1).cast(self.default_dtype)
 
-            if hasattr(paddle.framework, "_no_check_dy2st_diff"):
-                # TODO(daisiming): _no_check_dy2st_diff is used to turn off the checking of behavior
-                # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
-                # removed after static graphs support inplace and stride.
-                with paddle.framework._no_check_dy2st_diff():
-                    self.cos_cached, self.sin_cached = cos_cached, sin_cached
-            else:
-                self.cos_cached, self.sin_cached = cos_cached, sin_cached
+            self.cos_cached, self.sin_cached = cos_cached, sin_cached
 
         cos, sin = self.cos_cached[:seq_len, ...], self.sin_cached[:seq_len, ...]
         if self.position_encoding_2d:

@@ -19,7 +19,7 @@
 </div>
 <div align="center">
     <font size ="1">
-    飞桨与 Huggingface Transformers 微调性能比对
+    大模型精调原理介绍
      </font>
 </div>
 

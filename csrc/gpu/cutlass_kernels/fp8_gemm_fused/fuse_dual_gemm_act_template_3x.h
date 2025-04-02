@@ -110,12 +110,12 @@ bool dispatch_dual_gemm_act_sm90(DualGemmEpilogueAllParams params) {
         ptr_A = reinterpret_cast<ElementB const*>(params.B0);
         ptr_B0 = reinterpret_cast<ElementA const*>(params.A);
     }
-    StrideA stride_A = cutlass::make_cute_packed_stride(StrideA{}, cute::make_shape(arg_m, params.K, 1));
-    StrideB stride_B = cutlass::make_cute_packed_stride(StrideB{}, cute::make_shape(arg_n, params.K, 1));
+    StrideA stride_A = cutlass::make_cute_packed_stride(StrideA{}, cute::make_shape(arg_m, params.K, params.batch_count));
+    StrideB stride_B = cutlass::make_cute_packed_stride(StrideB{}, cute::make_shape(arg_n, params.K, params.batch_count));
     StrideC stride_C;
-    StrideD stride_D = cutlass::make_cute_packed_stride(StrideD{}, cute::make_shape(arg_m, arg_n, 1));
+    StrideD stride_D = cutlass::make_cute_packed_stride(StrideD{}, cute::make_shape(arg_m, arg_n, params.batch_count));
 
-    typename Gemm::Arguments arguments = {cutlass::gemm::GemmUniversalMode::kGemm, {arg_m, arg_n, params.K, 1},
+    typename Gemm::Arguments arguments = {cutlass::gemm::GemmUniversalMode::kGemm, {arg_m, arg_n, params.K, params.batch_count},
         {ptr_A, stride_A, ptr_B0, ptr_B1, stride_B, params.scale0, params.scale1},
         {{}, // epilogue.thread
             nullptr, stride_C, reinterpret_cast<ElementOutput*>(params.D), stride_D}};

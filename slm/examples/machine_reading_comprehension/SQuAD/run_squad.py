@@ -250,7 +250,7 @@ def run(args):
             partial(prepare_train_features, tokenizer=tokenizer, args=args),
             batched=True,
             remove_columns=column_names,
-            num_proc=4,
+            num_proc=1,
         )
         train_batch_sampler = paddle.io.DistributedBatchSampler(train_ds, batch_size=args.batch_size, shuffle=True)
         train_batchify_fn = DataCollatorWithPadding(tokenizer)
@@ -332,7 +332,7 @@ def run(args):
             partial(prepare_validation_features, tokenizer=tokenizer, args=args),
             batched=True,
             remove_columns=column_names,
-            num_proc=4,
+            num_proc=1,
         )
         dev_batch_sampler = paddle.io.BatchSampler(dev_ds, batch_size=args.batch_size, shuffle=False)
         dev_ds_for_model = dev_ds.remove_columns(["example_id", "offset_mapping"])

@@ -13,6 +13,7 @@
 # limitations under the License.
 """Test taskflow."""
 import os
+import unittest
 
 from paddlenlp import Taskflow
 
@@ -68,6 +69,7 @@ def test_corrector():
     corrector("遇到逆竟时，我们必须勇于面对，而且要愈挫愈勇，这样我们才能朝著成功之路前进。")
 
 
+@unittest.skip("dependency_parsing is not support for Paddle >= 2.6.1")
 def test_dependency_parsing():
     """
     test_dependency_parsing

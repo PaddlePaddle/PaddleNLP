@@ -405,19 +405,18 @@ __global__ void GQAVariableLengthRotaryKernel(
 }
 
 template <typename T, int VecSize = 1>
-__global__ void GQAVariableLengthRotaryKernel(
-    const T *qkv,
-    const float *cos_emb,
-    const float *sin_emb,
-    const int *padding_offsets,
-    const int *seq_lens,
-    const int *seq_lens_decoder,
-    T *qkv_out,
-    const int64_t elem_cnt,
-    const int q_num_head,
-    const int kv_num_head,
-    const int seq_len,
-    const int last_dim) {
+__global__ void GQAVariableLengthRotaryKernel(const T *qkv,
+                                              const float *cos_emb,
+                                              const float *sin_emb,
+                                              const int *padding_offsets,
+                                              const int *seq_lens,
+                                              const int *seq_lens_decoder,
+                                              T *qkv_out,
+                                              const int64_t elem_cnt,
+                                              const int q_num_head,
+                                              const int kv_num_head,
+                                              const int seq_len,
+                                              const int last_dim) {
   using LoadT = AlignedVector<T, VecSize>;
   constexpr int HalfVecSize = VecSize / 2;
   using LoadEmbT = AlignedVector<float, HalfVecSize>;
@@ -555,21 +554,20 @@ __global__ void GQANeoxVariableLengthRotaryKernel(
 }
 
 template <typename T, int VecSize = 1>
-__global__ void GQANeoxVariableLengthRotaryKernel(
-    const T *qkv,
-    const float *cos_emb,
-    const float *sin_emb,
-    const int *padding_offsets,
-    const int *seq_lens,
-    const int *seq_lens_decoder,
-    const float *qkv_out_scales,
-    const T *qkv_biases,
-    T *qkv_out,
-    const int64_t elem_cnt,
-    const int q_num_head,
-    const int kv_num_head,
-    const int seq_len,
-    const int last_dim) {
+__global__ void GQANeoxVariableLengthRotaryKernel(const T *qkv,
+                                                  const float *cos_emb,
+                                                  const float *sin_emb,
+                                                  const int *padding_offsets,
+                                                  const int *seq_lens,
+                                                  const int *seq_lens_decoder,
+                                                  const float *qkv_out_scales,
+                                                  const T *qkv_biases,
+                                                  T *qkv_out,
+                                                  const int64_t elem_cnt,
+                                                  const int q_num_head,
+                                                  const int kv_num_head,
+                                                  const int seq_len,
+                                                  const int last_dim) {
   using LoadT = AlignedVector<T, VecSize>;
   using LoadEmbT = AlignedVector<float, VecSize>;
   LoadT left_vec;
@@ -634,7 +632,8 @@ __global__ void cache_kernel(
     const int max_seq_len,
     const int max_blocks_per_seq,
     const int num_heads,
-    const int head_size,
+    const int head_size_qk,
+    const int head_size_v,
     const int block_size,
     const uint32_t elem_cnt,
     const int kv_num_heads) {
@@ -642,24 +641,21 @@ __global__ void cache_kernel(
   LoadT src_vec;
 
   uint32_t global_thread_idx = blockDim.x * blockIdx.x + threadIdx.x;
-  const uint32_t hidden_size = kv_num_heads * head_size;
-  const uint32_t offset = 2 * hidden_size;
+  const uint32_t hidden_size_q = num_heads * head_size_qk;
+  const uint32_t hidden_size_k = kv_num_heads * head_size_qk;
+  const uint32_t hidden_size_v = kv_num_heads * head_size_v;
+  const uint32_t offset = hidden_size_k + hidden_size_v;
   for (uint32_t linear_index = global_thread_idx * VecSize,
                 step = gridDim.x * blockDim.x * VecSize;
        linear_index < elem_cnt;
        linear_index += step) {
     const uint32_t token_idx = linear_index / offset;
     const uint32_t bias = linear_index % offset;
-    const uint32_t qkv_id = bias / hidden_size;  // skip q
-    const uint32_t qkv_bias = bias % hidden_size;
-    const uint32_t hi = qkv_bias / head_size;
-    const uint32_t h_bias = qkv_bias % head_size;
     const uint32_t ori_token_idx = token_idx + padding_offsets[token_idx];
     const uint32_t ori_bi = ori_token_idx / max_seq_len;
     if (seq_lens[ori_bi] == 0) continue;
     const uint32_t ori_seq_id =
         ori_token_idx % max_seq_len + seq_lens_decoder[ori_bi];
-
     const int32_t *block_table_now = nullptr;
 
     block_table_now = block_tables + ori_bi * max_blocks_per_seq;
@@ -667,16 +663,29 @@ __global__ void cache_kernel(
     const uint32_t block_idx = block_table_now[ori_seq_id / block_size];
     const uint32_t block_offset = ori_seq_id % block_size;
 
-    const uint32_t tgt_idx = block_idx * kv_num_heads * block_size * head_size +
-                             hi * block_size * head_size +
-                             block_offset * head_size + h_bias;
-    const uint32_t ori_idx =
-        token_idx * (num_heads + 2 * kv_num_heads) * head_size +
-        num_heads * head_size + qkv_id * hidden_size + hi * head_size + h_bias;
-    Load<T, VecSize>(&qkv[ori_idx], &src_vec);
-    if (qkv_id == 0) {
+    if (bias < hidden_size_k) {
+      const uint32_t qkv_bias = bias;
+      const uint32_t hi = qkv_bias / head_size_qk;
+      const uint32_t h_bias = qkv_bias % head_size_qk;
+      const uint32_t tgt_idx =
+          block_idx * kv_num_heads * block_size * head_size_qk +
+          hi * block_size * head_size_qk + block_offset * head_size_qk + h_bias;
+      const uint32_t ori_idx =
+          token_idx * (hidden_size_q + hidden_size_k + hidden_size_v) +
+          hidden_size_q + qkv_bias;
+      Load<T, VecSize>(&qkv[ori_idx], &src_vec);
       Store<T, VecSize>(src_vec, &key_cache[tgt_idx]);
     } else {
+      const uint32_t qkv_bias = bias - hidden_size_k;
+      const uint32_t hi = qkv_bias / head_size_v;
+      const uint32_t h_bias = qkv_bias % head_size_v;
+      const uint32_t tgt_idx =
+          block_idx * kv_num_heads * block_size * head_size_v +
+          hi * block_size * head_size_v + block_offset * head_size_v + h_bias;
+      const uint32_t ori_idx =
+          token_idx * (hidden_size_q + hidden_size_k + hidden_size_v) +
+          hidden_size_q + hidden_size_k + qkv_bias;
+      Load<T, VecSize>(&qkv[ori_idx], &src_vec);
       Store<T, VecSize>(src_vec, &value_cache[tgt_idx]);
     }
   }
@@ -736,8 +745,11 @@ __global__ void append_write_cache_kv_c8_qkv(
       batch_id * max_seq_len - cum_offsets[batch_id];
   const uint32_t kv_batch_stride = (num_heads + 2 * kv_num_heads) * HEAD_DIM;
   const uint32_t kv_h_stride = HEAD_DIM;
-  __shared__ T k_smem_ori[num_rows_per_block * HEAD_DIM];
-  __shared__ T v_smem_ori[num_rows_per_block * HEAD_DIM];
+  extern __shared__ uint8_t smem[];
+  T *k_smem_ori = (T *)smem;  // [num_rows_per_block * HEAD_DIM];
+  T *v_smem_ori =
+      (T *)(smem + num_rows_per_block * HEAD_DIM *
+                       sizeof(T));  // [num_rows_per_block * HEAD_DIM];
 
   smem_t k_smem(k_smem_ori);
   smem_t v_smem(v_smem_ori);
@@ -983,12 +995,22 @@ __global__ void append_write_cache_kv_c4_qkv(
       batch_id * max_seq_len - cum_offsets[batch_id];
   const uint32_t kv_batch_stride = (num_heads + 2 * kv_num_heads) * HEAD_DIM;
   const uint32_t kv_h_stride = HEAD_DIM;
-  __shared__ T k_smem_ori[num_rows_per_block * HEAD_DIM];
-  __shared__ T v_smem_ori[num_rows_per_block * HEAD_DIM];
-  __shared__ T k_scale_smem[HEAD_DIM];
-  __shared__ T v_scale_smem[HEAD_DIM];
-  __shared__ T k_zero_point_smem[HEAD_DIM];
-  __shared__ T v_zero_point_smem[HEAD_DIM];
+  extern __shared__ uint8_t smem[];
+  T *k_smem_ori = (T *)smem;  // [num_rows_per_block * HEAD_DIM];
+  T *v_smem_ori =
+      (T *)(smem + num_rows_per_block * HEAD_DIM *
+                       sizeof(T));  // [num_rows_per_block * HEAD_DIM];
+  T *k_scale_smem = (T *)(smem + num_rows_per_block * HEAD_DIM * 2 *
+                                     sizeof(T));  // [HEAD_DIM];
+  T *v_scale_smem =
+      (T *)(smem + (num_rows_per_block * HEAD_DIM * 2 + HEAD_DIM) *
+                       sizeof(T));  // [HEAD_DIM];
+  T *k_zero_point_smem =
+      (T *)(smem + (num_rows_per_block * HEAD_DIM * 2 + HEAD_DIM * 2) *
+                       sizeof(T));  // [HEAD_DIM];
+  T *v_zero_point_smem =
+      (T *)(smem + (num_rows_per_block * HEAD_DIM * 2 + HEAD_DIM * 3) *
+                       sizeof(T));  // [HEAD_DIM];
   const T *cache_k_scale_now = cache_k_scales + kv_head_idx * HEAD_DIM;
   const T *cache_k_zp_now = cache_k_zero_points + kv_head_idx * HEAD_DIM;
   const T *cache_v_scale_now = cache_v_scales + kv_head_idx * HEAD_DIM;
@@ -1033,16 +1055,10 @@ __global__ void append_write_cache_kv_c4_qkv(
       for (uint32_t fy = 0; fy < num_frags_y / 4;
            ++fy) {  // (num_frags_y * 16) / (8 *  num_elems_per_128b<T>())
         if (chunk_start >= start_len && chunk_start < end_len) {
-          k_smem
-              .load_128b_async<SharedMemFillMode::kNoFill>(
-                  kv_smem_offset_w,
-                  qkv_input + k_read_idx,
-                  chunk_start < end_len);
-          v_smem
-              .load_128b_async<SharedMemFillMode::kNoFill>(
-                  kv_smem_offset_w,
-                  qkv_input + v_read_idx,
-                  chunk_start < end_len);
+          k_smem.load_128b_async<SharedMemFillMode::kNoFill>(
+              kv_smem_offset_w, qkv_input + k_read_idx, chunk_start < end_len);
+          v_smem.load_128b_async<SharedMemFillMode::kNoFill>(
+              kv_smem_offset_w, qkv_input + v_read_idx, chunk_start < end_len);
         }
         kv_smem_offset_w =
             k_smem.advance_offset_by_column<8>(kv_smem_offset_w, fy);
@@ -1248,9 +1264,8 @@ void rotary_qk_variable(
     const int dim_head,
     const cudaStream_t &stream,
     bool use_neox_style = false) {
-  int64_t elem_nums =
-      qkv_out_scales ? token_num * 3 * head_num * dim_head
-                     : token_num * 2 * head_num * dim_head;
+  int64_t elem_nums = qkv_out_scales ? token_num * 3 * head_num * dim_head
+                                     : token_num * 2 * head_num * dim_head;
   if (use_neox_style) {
     elem_nums /= 2;
   }
@@ -1458,11 +1473,12 @@ void CascadeAppendWriteCacheKVQKV(
   auto num_tokens = meta_data.token_nums;
   auto num_heads = meta_data.q_num_heads;
   auto kv_num_heads = meta_data.kv_num_heads;
-  auto head_dim = meta_data.head_dims;
+  auto head_dim_qk = meta_data.head_dims;
+  auto head_dim_v = meta_data.head_dims_v;
   auto block_size = meta_data.block_size;
 
   const uint32_t elem_nums =
-      num_tokens * 2 * kv_num_heads * head_dim;
+      num_tokens * kv_num_heads * (head_dim_qk + head_dim_v);
   constexpr int PackSize = 16 / sizeof(T);
   const int pack_num = elem_nums / PackSize;
   const int blocksize = 128;
@@ -1479,7 +1495,8 @@ void CascadeAppendWriteCacheKVQKV(
       max_seq_len,
       max_blocks_per_seq,
       num_heads,
-      head_dim,
+      head_dim_qk,
+      head_dim_v,
       block_size,
       elem_nums,
       kv_num_heads);
@@ -1511,7 +1528,6 @@ void CascadeAppendWriteCacheKVC8QKV(
   auto num_tokens = meta_data.token_nums;
   auto num_heads = meta_data.q_num_heads;
   auto kv_num_heads = meta_data.kv_num_heads;
-  auto head_dim = meta_data.head_dims;
 
   const uint32_t pad_len = BLOCK_SIZE;
 
@@ -1530,24 +1546,27 @@ void CascadeAppendWriteCacheKVC8QKV(
                                                 HEAD_DIM,
                                                 BLOCK_SIZE,
                                                 num_warps>;
-  cudaFuncSetAttribute(
-      kernel_fn, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
-  kernel_fn<<<grids, blocks, 0, stream>>>(cache_k_out->data<uint8_t>(),
-                                          cache_v_out->data<uint8_t>(),
-                                          qkv.data<T>(),
-                                          cache_k_scale.data<T>(),
-                                          cache_v_scale.data<T>(),
-                                          batch_ids.data<int>(),
-                                          tile_ids_per_batch.data<int>(),
-                                          seq_lens_this_time.data<int>(),
-                                          seq_lens_decoder.data<int>(),
-                                          padding_offsets.data<int>(),
-                                          cum_offsets.data<int>(),
-                                          block_table.data<int>(),
-                                          max_seq_len,
-                                          max_blocks_per_seq,
-                                          num_heads,
-                                          kv_num_heads);
+  if (smem_size >= 48 * 1024) {
+    cudaFuncSetAttribute(
+        kernel_fn, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
+  }
+  kernel_fn<<<grids, blocks, smem_size, stream>>>(
+      cache_k_out->data<uint8_t>(),
+      cache_v_out->data<uint8_t>(),
+      qkv.data<T>(),
+      cache_k_scale.data<T>(),
+      cache_v_scale.data<T>(),
+      batch_ids.data<int>(),
+      tile_ids_per_batch.data<int>(),
+      seq_lens_this_time.data<int>(),
+      seq_lens_decoder.data<int>(),
+      padding_offsets.data<int>(),
+      cum_offsets.data<int>(),
+      block_table.data<int>(),
+      max_seq_len,
+      max_blocks_per_seq,
+      num_heads,
+      kv_num_heads);
 }
 
 template <typename T, uint32_t HEAD_DIM, uint32_t BLOCK_SIZE>
@@ -1578,7 +1597,6 @@ void CascadeAppendWriteCacheKVC4QKV(
   auto num_tokens = meta_data.token_nums;
   auto num_heads = meta_data.q_num_heads;
   auto kv_num_heads = meta_data.kv_num_heads;
-  auto head_dim = meta_data.head_dims;
 
   const uint32_t pad_len = BLOCK_SIZE;
 
@@ -1598,24 +1616,27 @@ void CascadeAppendWriteCacheKVC4QKV(
                                                 HEAD_DIM,
                                                 BLOCK_SIZE,
                                                 num_warps>;
-  cudaFuncSetAttribute(
-      kernel_fn, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
-  kernel_fn<<<grids, blocks, 0, stream>>>(cache_k_out->data<uint8_t>(),
-                                          cache_v_out->data<uint8_t>(),
-                                          qkv.data<T>(),
-                                          cache_k_scale.data<T>(),
-                                          cache_v_scale.data<T>(),
-                                          cache_k_zp.data<T>(),
-                                          cache_v_zp.data<T>(),
-                                          batch_ids.data<int>(),
-                                          tile_ids_per_batch.data<int>(),
-                                          seq_lens_this_time.data<int>(),
-                                          seq_lens_decoder.data<int>(),
-                                          padding_offsets.data<int>(),
-                                          cum_offsets.data<int>(),
-                                          block_table.data<int>(),
-                                          max_seq_len,
-                                          max_blocks_per_seq,
-                                          num_heads,
-                                          kv_num_heads);
+  if (smem_size >= 48 * 1024) {
+    cudaFuncSetAttribute(
+        kernel_fn, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
+  }
+  kernel_fn<<<grids, blocks, smem_size, stream>>>(
+      cache_k_out->data<uint8_t>(),
+      cache_v_out->data<uint8_t>(),
+      qkv.data<T>(),
+      cache_k_scale.data<T>(),
+      cache_v_scale.data<T>(),
+      cache_k_zp.data<T>(),
+      cache_v_zp.data<T>(),
+      batch_ids.data<int>(),
+      tile_ids_per_batch.data<int>(),
+      seq_lens_this_time.data<int>(),
+      seq_lens_decoder.data<int>(),
+      padding_offsets.data<int>(),
+      cum_offsets.data<int>(),
+      block_table.data<int>(),
+      max_seq_len,
+      max_blocks_per_seq,
+      num_heads,
+      kv_num_heads);
 }

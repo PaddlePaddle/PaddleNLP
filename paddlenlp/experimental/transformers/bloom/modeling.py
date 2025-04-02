@@ -177,7 +177,7 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
             quant_type=config.quant_type,
             activation="gelu",
             num_layers=config.n_layer,
-            nranks=config.tensor_parallel_degree,
+            tp_degree=config.tensor_parallel_degree,
             ring_id=ring_id,
             ln_scale_attrs=ln_scale_attrs,
             ln_bias_attrs=ln_bias_attrs,
@@ -668,7 +668,8 @@ class BloomForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, BloomPr
         else:
             max_block_nums = max_batch_size * max_block_per_seq
 
-        cache_kvs = []
+        cache_k_shapes = []
+        cache_v_shapes = []
         for _ in range(config.n_layer):
             cache_kv_shape = [
                 max_block_nums,
@@ -676,9 +677,9 @@ class BloomForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, BloomPr
                 config.block_size,
                 config.hidden_size // config.n_head,
             ]
-            cache_kvs.append(cache_kv_shape)
-            cache_kvs.append(cache_kv_shape)
-        return cache_kvs
+            cache_k_shapes.append(cache_kv_shape)
+            cache_v_shapes.append(cache_kv_shape)
+        return cache_k_shapes, cache_v_shapes
 
     def prepare_inputs_for_generation(self, **kwargs):
         # only last token for inputs_ids if cache is defined in kwargs

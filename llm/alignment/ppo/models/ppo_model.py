@@ -12,16 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from paddlenlp.transformers import LlamaForCausalLM, PretrainedConfig
 
-from .ppo_model_utils import PolicyOutput, RLHFPPOMixedLoss, RLHFValueLoss, ValueOutput
+from .ppo_model_utils import (
+    PolicyOutput,
+    RLHFPPOMixedLoss,
+    RLHFValueLoss,
+    ValueOutput,
+    create_startend_row_indices,
+)
 from .score_model import LlamaModelForScore
 
 
 # TODO(guosheng): create Mixin and make model classes using metaclass.
 class LlamaPolicyModel(LlamaForCausalLM):
     def __init__(self, config: PretrainedConfig, **kwargs):
+        """
+        Initializes a RLHFPPOMixedLossWrapper instance.
+
+        Args:
+            config (PretrainedConfig): The model configuration used for initialization.
+            kwargs (Dict[str, Any], optional): Additional keyword arguments passed along. Defaults to {}.
+        """
         super().__init__(config)
         self.loss_fn = RLHFPPOMixedLoss(config, **kwargs)
 
@@ -31,6 +43,7 @@ class LlamaPolicyModel(LlamaForCausalLM):
         position_ids=None,
         attention_mask=None,
         inputs_embeds=None,
+        attn_mask_startend_row_indices=None,
         labels=None,
         use_cache=False,
         past_key_values=None,
@@ -41,10 +54,25 @@ class LlamaPolicyModel(LlamaForCausalLM):
         output_hidden_states=None,
         return_dict=None,
     ):
+        """
+        Returns a tuple containing:
+        1. the loss, calculated as the sum of the cross entropy for each token and the KL divergence between the
+           policy distribution and the uniform distribution. If `advantages` are provided, the loss will be
+           augmented with the additional term -E[log P(a|x)] where x is the input and a is the action.
+        2. the model's output as a tuple of:
+            - the last layer's output of shape `(batch_size, sequence_length, config.vocab_size)`
+            - the cache used in inference for next chunk.
+            - the decoder's attention weights for each layer.
+        """
+        assert attention_mask is None, "attention_mask should be None"
+        if attn_mask_startend_row_indices is None:
+            attn_mask_startend_row_indices = create_startend_row_indices(input_ids, self.config.pad_token_id)
+
         outputs = super().forward(
             input_ids=input_ids,
             position_ids=position_ids,
-            attention_mask=attention_mask,
+            attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+            attention_mask=None,
             inputs_embeds=inputs_embeds,
             labels=None,
             use_cache=use_cache,
@@ -56,7 +84,10 @@ class LlamaPolicyModel(LlamaForCausalLM):
         logits = outputs[0]
         loss = None
         if labels is not None or advantages is not None:
-            loss = self.loss_fn(logits, (labels, input_ids, log_probs, advantages, sequence_mask))
+            loss = self.loss_fn(
+                logits,
+                (labels, input_ids, log_probs, advantages, sequence_mask),
+            )
         if not return_dict:
             return (loss,) + outputs if loss is not None else outputs
 
@@ -71,6 +102,16 @@ class LlamaPolicyModel(LlamaForCausalLM):
 
 class LlamaValueModel(LlamaModelForScore):
     def __init__(self, config, **kwargs):
+        """
+        Initializes the RLHFValueLossWrapper instance.
+
+        Args:
+            config (DictConfig): Config dict for the model.
+            **kwargs (Any, optional): Keyword arguments to be passed to the parent class. Defaults to None.
+
+        Returns:
+            None.
+        """
         super().__init__(config, **kwargs)
         self.loss_fn = RLHFValueLoss(config, **kwargs)
 
@@ -79,6 +120,7 @@ class LlamaValueModel(LlamaModelForScore):
         input_ids=None,
         position_ids=None,
         attention_mask=None,
+        attn_mask_startend_row_indices=None,
         inputs_embeds=None,
         use_cache=False,
         past_key_values=None,
@@ -89,10 +131,32 @@ class LlamaValueModel(LlamaModelForScore):
         output_hidden_states=None,
         return_dict=None,
     ):
+        """
+        Returns:
+        Union[Tuple[torch.Tensor], BaseModelOutputWithPastAndCrossAttentions]:
+            if `return_dict` is False, a tuple of tensors is returned, containing:
+                - the loss, if it is not None;
+                - the reward values;
+                - the rewards;
+                - the past key values;
+                - the hidden states;
+                - the attentions.
+            if `return_dict` is True, a [`ValueOutput`] is returned, containing:
+                - the loss, if it is not None;
+                - the reward values;
+                - the rewards;
+                - the past key values;
+                - the hidden states;
+                - the attentions.
+        """
+        assert attention_mask is None, "attention_mask should be None"
+        if attn_mask_startend_row_indices is None:
+            attn_mask_startend_row_indices = create_startend_row_indices(input_ids, self.config.pad_token_id)
         outputs = super().forward(
             input_ids=input_ids,
             position_ids=position_ids,
-            attention_mask=attention_mask,
+            attention_mask=None,
+            attn_mask_startend_row_indices=attn_mask_startend_row_indices,
             inputs_embeds=inputs_embeds,
             use_cache=use_cache,
             past_key_values=past_key_values,

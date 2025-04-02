@@ -31,6 +31,7 @@ class Req(BaseModel):
     req_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     input_ids: Optional[List[int]] = None
     text: Optional[str] = None
+    stop_sequences: Optional[List] = None
     messages: Optional[List] = None
     max_dec_len: Optional[int] = None
     seq_len: Optional[int] = None

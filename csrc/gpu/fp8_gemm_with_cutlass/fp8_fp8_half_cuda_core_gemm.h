@@ -26,12 +26,5 @@ typedef struct {
     cudaStream_t stream;
 } GemmParams;
 
-inline bool enable_cuda_core_fp8_gemm() {
-    static const char* enable_cuda_core_fp8_env = std::getenv("FLAGS_cuda_core_fp8_gemm");
-    static const bool enable_cuda_core_fp8_gemm =
-            enable_cuda_core_fp8_env != nullptr && std::string(enable_cuda_core_fp8_env) == "1";
-    return enable_cuda_core_fp8_gemm;
-}
-
 template <typename InputType, typename OutputType>
 bool cuda_core_gemm_launcher(GemmParams const& params);

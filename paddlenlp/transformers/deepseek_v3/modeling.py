@@ -1,5 +1,5 @@
 # Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2023 DeepSeek-AI and The HuggingFace Inc. team. All rights reserved.
+# Copyright (c) 2023 DeepSeek. All rights reserved.
 #
 # This code is based on EleutherAI's GPT-NeoX library and the GPT-NeoX
 # and OPT implementations in this library. It has been modified from its
@@ -27,14 +27,14 @@ import paddle
 
 from ..deepseek_v2.modeling import (
     DeepseekV2ForSequenceClassification,
-    DeepSeekV2LMHead,
+    DeepseekV2LMHead,
     DeepseekV2Model,
     DeepseekV2PretrainedModel,
-    DeepSeekV2PretrainingCriterion,
+    DeepseekV2PretrainingCriterion,
 )
 from ..model_outputs import CausalLMOutputWithPast
 from ..model_utils import register_base_model
-from .configuration import DeepseekV2Config
+from .configuration import DeepseekV3Config
 
 __all__ = [
     "DeepseekV3ForCausalLM",
@@ -45,26 +45,26 @@ __all__ = [
 
 
 class DeepseekV3PretrainedModel(DeepseekV2PretrainedModel):
-    config_class = DeepseekV2Config
+    config_class = DeepseekV3Config
     base_model_prefix = "deepseek_v3"
     _no_split_modules = ["DeepseekV2DecoderLayer"]
 
 
 @register_base_model
 class DeepseekV3Model(DeepseekV2Model):
-    def __init__(self, config: DeepseekV2Config):
+    def __init__(self, config: DeepseekV3Config):
         super().__init__(config)
 
 
 class DeepseekV3ForCausalLM(DeepseekV3PretrainedModel):
     _tied_weights_keys = ["lm_head.weight"]
 
-    def __init__(self, config: DeepseekV2Config):
+    def __init__(self, config: DeepseekV3Config):
         super().__init__(config)
         self.deepseek_v3 = DeepseekV3Model(config)
         self.vocab_size = config.vocab_size
-        self.lm_head = DeepSeekV2LMHead(config)
-        self.criterion = DeepSeekV2PretrainingCriterion(config)
+        self.lm_head = DeepseekV2LMHead(config)
+        self.criterion = DeepseekV2PretrainingCriterion(config)
 
     def get_input_embeddings(self):
         return self.deepseek_v3.embed_tokens
@@ -142,12 +142,15 @@ class DeepseekV3ForCausalLM(DeepseekV3PretrainedModel):
         )
 
         hidden_states = outputs[0]
+        mtp_outputs = outputs[-1]
+
         logits = self.lm_head(hidden_states)
+        mtp_logits = [self.lm_head(_hidden_states) for _hidden_states in mtp_outputs] if len(mtp_outputs) > 0 else []
 
         loss = None
         # TODO@DrownFish19: shift labels
         if labels is not None:
-            loss = self.criterion(logits, labels)
+            loss = self.criterion(logits, labels, mtp_logits=mtp_logits)
 
         if not return_dict:
             output = (logits,) + outputs[1:]

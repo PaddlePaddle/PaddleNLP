@@ -140,14 +140,14 @@ from .dallebart.tokenizer import *
 from .deberta.configuration import *
 from .deberta.modeling import *
 from .deberta.tokenizer import *
+from .nezha.configuration import *
+from .nezha.modeling import *
+from .nezha.tokenizer import *
 from .deberta_v2.configuration import *
 from .deberta_v2.modeling import *
 from .deberta_v2.tokenizer import *
-from .deepseek_v2.configuration import *
-from .deepseek_v2.modeling import *
-from .deepseek_v2.tokenizer_fast import *
-from .deepseek_v3.configuration import *
-from .deepseek_v3.modeling import *
+from .deepseek_v2 import *
+from .deepseek_v3 import *
 from .distilbert.configuration import *
 from .distilbert.modeling import *
 from .distilbert.tokenizer import *
@@ -191,9 +191,6 @@ from .fnet.tokenizer import *
 from .funnel.configuration import *
 from .funnel.modeling import *
 from .funnel.tokenizer import *
-from .gau_alpha.configuration import *
-from .gau_alpha.modeling import *
-from .gau_alpha.tokenizer import *
 from .gemma import *
 from .glm.configuration import *
 from .glm.modeling import *
@@ -215,6 +212,7 @@ from .layoutxlm.configuration import *
 from .layoutxlm.modeling import *
 from .layoutxlm.tokenizer import *
 from .llama import *
+from .llm_embed.modeling import *
 from .luke.configuration import *
 from .luke.modeling import *
 from .luke.tokenizer import *
@@ -231,6 +229,8 @@ from .minigpt4.configuration import *
 from .minigpt4.image_processing import *
 from .minigpt4.modeling import *
 from .minigpt4.processing import *
+from .minimax_text_01.modeling import *
+from .minimax_text_01.configuration import *
 from .mistral.configuration import *
 from .mistral.modeling import *
 from .mixtral.configuration import *
@@ -243,9 +243,7 @@ from .mpnet.modeling import *
 from .mpnet.tokenizer import *
 from .mt5.configuration import *
 from .mt5.modeling import *
-from .nezha.configuration import *
-from .nezha.modeling import *
-from .nezha.tokenizer import *
+from .nv_embed.modeling import *
 from .nystromformer.configuration import *
 from .nystromformer.modeling import *
 from .nystromformer.tokenizer import *
@@ -320,3 +318,5 @@ from .xlm_roberta.modeling import *
 from .xlm_roberta.tokenizer import *
 from .xlm_roberta.configuration import *
 from .yuan import *
+from .llm_embed import *
+from .nv_embed import *

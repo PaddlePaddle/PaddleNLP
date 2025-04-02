@@ -17,7 +17,6 @@
 from __future__ import annotations
 
 import importlib
-import io
 import json
 from abc import abstractmethod
 from collections import OrderedDict
@@ -50,8 +49,28 @@ class AutoModelForScore(_BaseAutoModelClass):
 
     @classmethod
     def _get_model_class_from_config(cls, pretrained_model_name_or_path, config_file_path, config=None):
+        """
+            Get the model class from config file path. If no config is provided, it will try to load the config from
+        the given config_file_path. The config should be a dict containing at least one of the following keys:
+        - "architectures": A list of strings indicating the architecture names. The last element in the list will
+          be used as the model class.
+        - "init_class": A string indicating the model class name.
+
+        Args:
+            pretrained_model_name_or_path (str): The pretrained model name or path. This argument is only used to
+              infer the model class when no config is provided.
+            config_file_path (str): The path to the config file.
+            config (Optional, dict, optional): The config dictionary. Defaults to None.
+
+        Raises:
+            AttributeError: Unable to parse 'architectures' or 'init_class' from config_file_path. Also unable to
+              infer model class from 'pretrained_model_name_or_path'.
+
+        Returns:
+            type: The model class.
+        """
         if config is None:
-            with io.open(config_file_path, encoding="utf-8") as f:
+            with open(config_file_path, encoding="utf-8") as f:
                 config = json.load(f)
 
         # Get class name corresponds to this configuration
@@ -72,7 +91,8 @@ class AutoModelForScore(_BaseAutoModelClass):
                     break
         if model_name is None:
             raise AttributeError(
-                f"Unable to parse 'architectures' or 'init_class' from {config_file_path}. Also unable to infer model class from 'pretrained_model_name_or_path'"
+                f"Unable to parse 'architectures' or 'init_class' from {config_file_path}."
+                "Also unable to infer model class from 'pretrained_model_name_or_path'"
             )
         init_class = cls._name_mapping[model_name + "_Import_Class"]
         # module_name = cls._name_mapping[init_class]
@@ -84,6 +104,30 @@ class AutoModelForScore(_BaseAutoModelClass):
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *model_args, **kwargs):
+        """
+        Instantiate a PreTrainedModel from a pre-trained model file.
+
+        Args:
+            pretrained_model_name_or_path (str):
+                This can be either:
+                    - a string with the name of a pre-trained model to load selected in the list of:
+                      . `bert-base-uncased`
+                      . `bert-large-uncased`
+                      . `bert-base-cased`
+                      . `bert-large-cased`
+                      . `bert-base-multilingual-uncased`
+                      . `bert-base-multilingual-cased`
+                      . `bert-base-chinese`
+                    - a path to a pre-trained model configuration file (e.g., `.json`) or a key to find such
+                      file in a PyTorch state dictionary (e.g., returned by torch.save()).
+            *model_args (tuple):
+                Additional positional arguments that will be passed to the underlying model's `__init__` method.
+            **kwargs (dict):
+                Additional keyword arguments that will be passed to the underlying model's `__init__` method.
+
+        Returns:
+            PreTrainedModel: A model with weights loaded from the specified pre-trained model file.
+        """
         return cls._from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
 
 
@@ -107,7 +151,7 @@ class ScoreModelMixin:
     """Base class for score models."""
 
     score_head: nn.Linear
-    normalizer: Normalizer
+    # normalizer: Normalizer
     do_normalize: bool = False
     normalize_function: NormalizeFunction = "affine"
     _initialized: bool = False
@@ -142,7 +186,11 @@ class ScoreModelMixin:
             "normalizer_type",
             getattr(config, "normalizer_type", None),
         )
-        if config.normalizer_type not in {"RunningMeanStd", "ExponentialMovingAverage", None}:
+        if config.normalizer_type not in {
+            "RunningMeanStd",
+            "ExponentialMovingAverage",
+            None,
+        }:
             raise ValueError(
                 f"Invalid norm type: {config.normalizer_type}."
                 "Expected one of 'RunningMeadStd', 'ExponentialMovingAverage', or None.",
@@ -174,6 +222,8 @@ class ScoreModelMixin:
     ) -> ScoreModelOutput:
         """Forward pass of the score model."""
         scores = self.score_head(hidden_state)  # size = (B, L, D)
+        if scores.dtype != hidden_state.dtype:  # EB rm cast to float32
+            scores = scores.cast(hidden_state.dtype)
 
         if position_ids is not None:
             first_pos = paddle.arange(hidden_state.shape[0]).unsqueeze(-1)
@@ -205,7 +255,6 @@ class ScoreModelMixin:
             end_score = paddle.stack(end_score, axis=0)  # size = (B, D)
 
         if self.training and self.do_normalize:
-
             if dist.is_initialized():
                 gathered_end_score_list = []
                 try:
@@ -235,6 +284,19 @@ class ScoreModelMixin:
         )
 
     def set_normalize(self, mode: bool = True) -> None:
+        """
+        设置是否对输入数据进行归一化处理，默认为True。
+        如果mode为True，则对输入数据进行归一化处理；如果mode为False，则不对输入数据进行归一化处理。
+
+        Args:
+            mode (bool, optional): 是否对输入数据进行归一化处理，默认为True. Defaults to True.
+
+        Returns:
+            None: 无返回值，直接修改了实例的do_normalize属性和config中的do_normalize属性。
+
+        Raises:
+            None: 没有异常抛出。
+        """
         if self.do_normalize == mode:
             return
 
@@ -333,7 +395,7 @@ class Normalizer(nn.Layer):
         shape: tuple[int, ...],
         device: str | None = None,
         **kwargs: Any,
-    ) -> Normalizer:
+    ):
         """Get a normalizer."""
         if normalizer_type == "RunningMeanStd":
             return RunningMeanStd(
@@ -395,6 +457,13 @@ class ExponentialMovingAverage(Normalizer):
         device: str | None = None,
         momentum: float = 0.9,
     ) -> None:
+        """
+        Args:
+        normalize_function (NormalizeFunction): Function to normalize the input tensor.
+        shape (tuple[int, ...]): Shape of the output tensor.
+        device (str, optional): Device where the tensor will be allocated. Defaults to None.
+        momentum (float, optional): Momentum for the moving average. Defaults to 0.9.
+        """
         super().__init__(normalize_function, shape=shape, device=device)
         self.momentum = momentum
 

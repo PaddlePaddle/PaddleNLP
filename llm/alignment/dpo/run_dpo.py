@@ -127,6 +127,8 @@ def main():
 
     if training_args.pipeline_parallel_degree > 1:
         model_class = AutoModelForCausalLMPipe
+        if not dpo_config.reference_free and not dpo_config.lora:
+            ref_model_config.dpo_config = dpo_config
         model_config.dpo_config = dpo_config
     else:
         model_class = AutoModelForCausalLM

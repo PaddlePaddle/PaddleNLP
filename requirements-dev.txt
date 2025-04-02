@@ -1,4 +1,5 @@
 paddleocr
+simsimd==1.1.2
 pre-commit
 pytest==8.1.1
 parameterized
@@ -12,7 +13,7 @@ yacs
 unidecode
 soundfile
 librosa
-numpy==1.23.5
+numpy
 rouge
 tiktoken
 visualdl
@@ -29,4 +30,5 @@ data
 wget
 huggingface_hub>=0.19.2
 tiktoken
-tokenizers>=0.21,<0.22
+tokenizers<=0.20.3; python_version<="3.8"
+tokenizers>=0.21,<0.22; python_version>"3.8"

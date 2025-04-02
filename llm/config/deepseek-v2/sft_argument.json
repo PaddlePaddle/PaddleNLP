@@ -29,5 +29,6 @@
     "sharding": "stage2",
     "zero_padding": false,
     "unified_checkpoint": true,
+    "use_expert_parallel": true,
     "use_flash_attention": true
   }

@@ -25,6 +25,7 @@ PaddleNLP 大模型推理提供压缩、推理、服务全流程体验 ：
 ## 1. 模型支持
 
 PaddleNLP 中已经添加高性能推理模型相关实现，已验证过的模型如下：
+
 | Models | Example Models |
 |--------|----------------|
 |Llama 3.x, Llama 2|`meta-llama/Llama-3.2-3B-Instruct`, `meta-llama/Meta-Llama-3.1-8B`, `meta-llama/Meta-Llama-3.1-8B-Instruct`, `meta-llama/Meta-Llama-3.1-405B`, `meta-llama/Meta-Llama-3.1-405B-Instruct`,`meta-llama/Meta-Llama-3-8B`, `meta-llama/Meta-Llama-3-8B-Instruct`, `meta-llama/Meta-Llama-3-70B`, `meta-llama/Meta-Llama-3-70B-Instruct`, `meta-llama/Llama-Guard-3-8B`, `Llama-2-7b, meta-llama/Llama-2-7b-chat`, `meta-llama/Llama-2-13b`, `meta-llama/Llama-2-13b-chat`, `meta-llama/Llama-2-70b`, `meta-llama/Llama-2-70b-chat`|
@@ -83,9 +84,13 @@ PaddleNLP 提供了多种参数，用于配置推理模型和优化推理性能�
 
 - `avx_type`: avx 计算类型，默认为 None。可选的数值有`fp16`、 `bf16`。
 
-- `src_length`: 模型输入上下文最大 token 长度，默认为1024。
+- `src_length`: 模型输入（仅 prompt）最大 token 长度，默认为 1024。
 
-- `max_length`:模型输入（上下文+生成内容）的最大 token 长度, 默认为2048。
+- `max_length`: 模型输出（仅生成内容）的最大 token 长度,默认为 1024。
+
+- `total_max_length`: 模型输入+输出（prompt+生成内容）的最大 token 长度,默认为 4096。
+
+- `mla_use_matrix_absorption`: 跑 DeepSeek-V3/R1 模型时，是否使用 MLA 模块性能更优的矩阵吸收实现，默认为 True。
 
 
 ### 3.2 性能优化参数
@@ -107,17 +112,31 @@ PaddleNLP 提供了多种量化策略，支持 Weight Only INT8及 INT4推理，
 
 - `cachekv_int8_type`: 是否使用 cachekv int8量化，默认值为 None。可选`dynamic`（已不再维护，不建议使用）和`static`两种，`static`需要额外的 cache kv 的 scale 校准表，传入的 `model_name_or_path` 为 PTQ 校准产出的量化模型。量化模型导出参考[大模型量化教程](../quantization.md)。
 
+- `weightonly_group_size`: `weight_only`模式下，使用`group wise`量化方式，`group size`目前支持 为 `64` 和 `128`，默认值为`-1`表示`channel wise`模式。
+
+- `weight_block_size`: FP8 权重量化粒度， 当前支持 DeepSeek-V3/R1 模型， 默认为[128 128]。
+
+- `moe_quant_type`: MoE 量化类型， 支持 DeepSeek-V3/R1-FP8 模型的 MoE 量化推理， 默认为空， 可选值`weight_only_int4`、`weight_only_int8`。
+
 ### 3.4 投机解码参数
 
-- `speculate_method`: 推理解码算法，默认值为`None`，可选的数值有`None`、`inference_with_reference`。为`None`时为正常自回归解码，为`inference_with_reference`时为基于上下文的投机解码[论文地址](https://arxiv.org/pdf/2304.04487)。
+PaddleNLP 提供了多种投机解码方法，具体细节请查阅[投机解码教程](./speculative_decoding.md).
 
-- `speculate_max_draft_token_num`: 投机解码算法中每轮产生的最大 draft tokens 数目，默认值为 1。
+- `speculate_method`: 推理解码算法，默认值为`None`，可选的数值有`None`、`inference_with_reference`、 `mtp`、 `eagle`。为`None`时为正常自回归解码，为`inference_with_reference`时为基于上下文的投机解码[论文地址](https://arxiv.org/pdf/2304.04487)。
+
+- `speculate_max_draft_token_num`: 投机解码算法中每轮产生的最大 draft tokens 数目，默认值为 1，最大支持 5。
 
 - `speculate_max_ngram_size`: n-gram 匹配 draft tokens 时的最大窗口大小，默认值为`1`。inference_with_reference 算法中会先从 prompt 中使用 ngram 窗口滑动匹配 draft tokens，窗口大小和输入输出重叠程度共同决定了产生 draft tokens 的开销从而影响 inference_with_reference 算法的加速效果。
 
-- `speculate_verify_window`: 投机解码 verify 策略默认采用 TopP + window verify 中的 window 大小，默认值为`2`。更多有关 TopP + window verify 的详细介绍参考[投机解码教程](./speculative_decoding.md)。
+- `speculate_verify_window`(暂时废弃): 投机解码 verify 策略默认采用 TopP + window verify 中的 window 大小，默认值为`2`。更多有关 TopP + window verify 的详细介绍参考[投机解码教程](./speculative_decoding.md)。
 
-- `speculate_max_candidate_len`: 产生的最大候选 tokens 数目，根据候选 tokens 与 draft tokens 比较来进行 verify(仅在 TopP + window verify 时生效)，默认值为`5`。
+- `speculate_max_candidate_len`(暂时废弃): 产生的最大候选 tokens 数目，根据候选 tokens 与 draft tokens 比较来进行 verify(仅在 TopP + window verify 时生效)，默认值为`5`。
+
+- `draft_model_name_or_path`: 在`MTP`或者`EAGLE`模式下，`Draft Model`的路径。
+
+- `draft_model_quant_type`: 在`MTP`或者`EAGLE`模式下，`Draft Model`的推理量化精度，参考`--quant_type`。
+
+- `return_full_hidden_states`: 在`MTP`或者`EAGLE`模式下，是否返回全部的隐藏层状态，默认为`False`。
 
 ### 3.5 解码策略参数
 
@@ -170,10 +189,82 @@ python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --
 2. `a8w8`与`a8w8_fp8`需要额外的 act 和 weight 的 scale 校准表，推理传入的 `model_name_or_path` 为 PTQ 校准产出的量化模型。量化模型导出参考[大模型量化教程](../quantization.md)。
 3. `cachekv_int8_type`可选`dynamic`（已不再维护，不建议使用）和`static`两种，`static`需要额外的 cache kv 的 scale 校准表，传入的 `model_name_or_path` 为 PTQ 校准产出的量化模型。量化模型导出参考[大模型量化教程](../quantization.md)。
 
+
+## 5. 服务化部署
+
+**高性能服务化部署请参考**：[静态图服务化部署教程](../../server/docs/deploy_usage_tutorial.md)。
+
+如果您想简单体验模型，我们提供了**简易的 Flash Server 动态图部署**方式，我们提供了一套基于动态图推理的简单易用 UI 服务化部署方法，用户可以快速部署服务化推理。
+
+环境准备
+
+- python >= 3.9
+- gradio
+- flask
+
+服务化部署脚本
+
+```shell
+# 单卡，可以使用 paddle.distributed.launch 启动多卡推理
+python  ./predict/flask_server.py \
+    --model_name_or_path Qwen/Qwen2.5-0.5B-Instruct \
+    --port 8010 \
+    --flask_port 8011 \
+    --dtype "float16"
+```
+
+- `port`: Gradio UI 服务端口号，默认8010。
+- `flask_port`: Flask 服务端口号，默认8011。
+
+图形化界面: 打开 `http://127.0.0.1:8010` 即可使用 gradio 图形化界面，即可开启对话。
+API 访问: 您也可用通过 flask 服务化 API 的形式.
+
+1. 可参考：`./predict/request_flask_server.py` 文件。
+```shell
+python predict/request_flask_server.py
+```
+
+2. 或者直接使用 curl,调用开始对话
+```shell
+curl 127.0.0.1:8011/v1/chat/completions \
+-H 'Content-Type: application/json' \
+-d '{"message": [{"role": "user", "content": "你好"}]}'
+```
+3.使用 OpenAI 客户端调用：
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    api_key="EMPTY",
+    base_url="http://localhost:8011/v1/",
+)
+
+# Completion API
+stream = True
+completion = client.chat.completions.create(
+    model="default",
+    messages=[
+        {"role": "user", "content": "PaddleNLP好厉害！这句话的感情色彩是？"}
+    ],
+    max_tokens=1024,
+    stream=stream,
+)
+
+if stream:
+    for c in completion:
+        print(c.choices[0].delta.content, end="")
+else:
+    print(completion.choices[0].message.content)
+```
+该方式部署，性能一般，高性能服务化部署请参考：[静态图服务化部署教程](../../server/docs/deploy_usage_tutorial.md)。
+
+
+
 更多大模型推理教程：
 
 -  [llama](./llama.md)
 -  [qwen](./qwen.md)
+-  [deepseek](./deepseek.md)
 -  [mixtral](./mixtral.md)
 -  [投机解码](./speculative_decoding.md)
 
@@ -188,7 +279,7 @@ python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --
 更多压缩、服务化推理体验：
 
 - [大模型量化教程](../quantization.md)
-- [服务化部署教程](https://github.com/PaddlePaddle/FastDeploy/blob/develop/README_CN.md)
+- [静态图服务化部署教程](../../server/docs/deploy_usage_tutorial.md)
 
 更多硬件大模型推理教程：
 

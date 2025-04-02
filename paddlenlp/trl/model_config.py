@@ -21,7 +21,7 @@ __all__ = ["ModelConfig"]
 @dataclass
 class ModelConfig:
     model_name_or_path: str = field(
-        default=None, metadata={"help": "Build-in pretrained model name or the path to local model."}
+        default=None, metadata={"help": "Built-in pretrained model name or the path to local model."}
     )
     tokenizer_name_or_path: Optional[str] = field(
         default=None, metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}

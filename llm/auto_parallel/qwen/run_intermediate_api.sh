@@ -47,7 +47,7 @@ export FLAGS_enable_pir_api=1
 python -u  -m paddle.distributed.launch \
     --gpus "4,5" \
     --log_dir "log/auto_3d_auto" \
-    run_pretrain_3D_auto.py \
+    run_pretrain_auto.py \
     --model_name_or_path "qwen/qwen-14b" \
     --tokenizer_name_or_path "qwen/qwen-14b" \
     --model_type "qwen_network" \

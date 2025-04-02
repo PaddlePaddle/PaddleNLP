@@ -235,6 +235,7 @@ class LlmMetaConfig:
         ("use_fused_rope", bool, False, "Enable rope fusion or not."),
         ("use_fused_linear", bool, False, "GPT3 model, use fused linear layer"),
         ("use_fused_dropout_add", bool, False, "GPT3 model, use fused `dropout + residual add` op."),
+        ("use_fused_linear_cross_entropy", bool, False, "use fused `linear + cross_entropy` fuse op."),
     ]
 
     hybrid_parallel_attributes = [
@@ -1022,7 +1023,7 @@ class PretrainedConfig:
 
     def register_unsavable_keys(self, keys):
         # Save: not save it in any case
-        # Print: show it if non defalut value
+        # Print: show it if non default value
         if type(keys) == list or type(keys) == tuple:
             for key in keys:
                 self._unsavable_keys.add(key)

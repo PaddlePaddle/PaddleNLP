@@ -20,5 +20,10 @@
 #include "fuse_gemm_gelu_template.h"
 
 #include "fuse_gemm_act_template_3x.h"
+#include "fuse_block_gemm_act_template_3x.h"
 
 bool fp8_fp8_gemm_scale_bias_act(GemmEpilogueAllParams params);
+
+bool fp8_fp8_gemm_ptr_scale_bias_act(GemmEpilogueAllParams params);
+
+bool fp8_fp8_block_gemm_scale_bias_act(GemmEpilogueAllParams params);

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import math
+import os
 import warnings
 
 import paddle
@@ -71,6 +72,17 @@ def get_triangle_upper_mask(x, mask=None):
     mask = paddle.triu(mask, diagonal=1)
     mask.stop_gradient = True
     return mask
+
+
+def enable_fuse_ffn_qkv_pass():
+    if os.getenv("FLAGS_enable_fused_ffn_qkv_pass") in [
+        "True",
+        "true",
+        "1",
+    ]:
+        return True
+    else:
+        return False
 
 
 attention_cnt = 0
@@ -285,8 +297,11 @@ class QWenMLPNet(nn.Layer):
         super().__init__()
         ff_dim_in = config.intermediate_size // 2
         self.fuse_attention_ffn = config.fuse_attention_ffn
-        self.w1 = nn.Linear(config.hidden_size, ff_dim_in, bias_attr=False)
-        self.w2 = nn.Linear(config.hidden_size, ff_dim_in, bias_attr=False)
+        if self.fuse_attention_ffn and not enable_fuse_ffn_qkv_pass():
+            self.gate_up_fused_proj = nn.Linear(config.hidden_size, ff_dim_in * 2, bias_attr=False)
+        else:
+            self.w1 = nn.Linear(config.hidden_size, ff_dim_in, bias_attr=False)
+            self.w2 = nn.Linear(config.hidden_size, ff_dim_in, bias_attr=False)
         self.c_proj = nn.Linear(ff_dim_in, config.hidden_size, bias_attr=False)
 
     def forward(self, hidden_states):
@@ -296,7 +311,7 @@ class QWenMLPNet(nn.Layer):
         # a2 = self.w2(hidden_states)
         # intermediate_parallel = a1 * F.silu(a2)
         # down
-        if self.fuse_attention_ffn:
+        if self.fuse_attention_ffn and not enable_fuse_ffn_qkv_pass():
             intermediate_parallel = swiglu(self.gate_up_fused_proj(hidden_states))
         else:
             intermediate_parallel = swiglu(self.w2(hidden_states), self.w1(hidden_states))
@@ -658,6 +673,7 @@ class QWenForCausalLMNet(QWenPretrainedModelNet):
                     f"{prefix}qwen.h.*.attn.c_attn": dist.ColWiseParallel(),
                     f"{prefix}qwen.h.*.attn.c_proj": dist.RowWiseParallel(),
                     f"{prefix}qwen.h.*.attn": dist.SequenceParallelDisable(),
+                    f"{prefix}qwen.h.*.mlp.gate_up_fused_proj": dist.ColWiseParallel(),
                     f"{prefix}qwen.h.*.mlp.w1": dist.ColWiseParallel(),
                     f"{prefix}qwen.h.*.mlp.w2": dist.ColWiseParallel(),
                     f"{prefix}qwen.h.*.mlp.c_proj": dist.RowWiseParallel(),
@@ -671,6 +687,7 @@ class QWenForCausalLMNet(QWenPretrainedModelNet):
                     f"{prefix}qwen.wte": dist.RowWiseParallel(),
                     f"{prefix}qwen.h.*.attn.c_attn": dist.ColWiseParallel(),
                     f"{prefix}qwen.h.*.attn.c_proj": dist.RowWiseParallel(),
+                    f"{prefix}qwen.h.*.mlp.gate_up_fused_proj": dist.ColWiseParallel(),
                     f"{prefix}qwen.h.*.mlp.w1": dist.ColWiseParallel(),
                     f"{prefix}qwen.h.*.mlp.w2": dist.ColWiseParallel(),
                     f"{prefix}qwen.h.*.mlp.c_proj": dist.RowWiseParallel(),

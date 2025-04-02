@@ -59,7 +59,7 @@ from ..model_outputs import (
     TokenClassifierOutput,
 )
 from ..model_utils import PretrainedModel, register_base_model
-from ..utils import caculate_llm_flops, logger
+from ..utils import caculate_llm_per_token_flops, logger
 from .configuration import Qwen2Config
 
 try:
@@ -202,8 +202,15 @@ def scaled_dot_product_attention(
         key_states = paddle.transpose(key_states, [0, 2, 1, 3])
         value_states = paddle.transpose(value_states, [0, 2, 1, 3])
 
-        # matmul and divide by sqrt(head_dim)
-        attn_weights = paddle.matmul(query_states / math.sqrt(head_dim), key_states.transpose([0, 1, 3, 2]))
+        # Add pre divided factor to fix nan under float16.
+        if paddle.in_dynamic_mode() and query_states.dtype == paddle.float16:
+            pre_divided_factor = 32
+        else:
+            pre_divided_factor = 1
+
+        attn_weights = paddle.matmul(
+            query_states / (math.sqrt(head_dim) * pre_divided_factor), key_states.transpose([0, 1, 3, 2])
+        )
 
         if attn_weights.shape != [bsz, num_heads, q_len, kv_seq_len]:
             raise ValueError(
@@ -213,6 +220,7 @@ def scaled_dot_product_attention(
 
         if attention_mask is None:
             attention_mask = get_triangle_upper_mask(attn_weights)
+
         attention_mask = attention_mask.reshape([bsz, 1, q_len, kv_seq_len])
         if attention_mask.shape != [bsz, 1, q_len, kv_seq_len]:
             raise ValueError(
@@ -220,11 +228,16 @@ def scaled_dot_product_attention(
             )
 
         attn_weights = attn_weights + attention_mask
+
         if not paddle.in_dynamic_mode():
-            attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
+            attn_weights = F.softmax(attn_weights * pre_divided_factor, axis=-1, dtype="float32").astype(
+                query_states.dtype
+            )
         else:
             with paddle.amp.auto_cast(False):
-                attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
+                attn_weights = F.softmax(
+                    attn_weights.astype("float32") * pre_divided_factor, axis=-1, dtype="float32"
+                ).astype(query_states.dtype)
 
         attn_weights = F.dropout(attn_weights, p=config.attention_dropout, training=training)
 
@@ -602,6 +615,7 @@ class Qwen2Attention(nn.Layer):
         output_attentions: bool = False,
         use_cache: bool = False,
         attn_mask_startend_row_indices: Optional[paddle.Tensor] = None,
+        batch_size: Optional[int] = None,
         **kwargs,
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
@@ -611,8 +625,8 @@ class Qwen2Attention(nn.Layer):
             mix_layer = self.qkv_proj(hidden_states)
             if self.sequence_parallel:
                 target_shape = [
+                    batch_size,
                     -1,
-                    self.seq_length,
                     self.num_key_value_heads,
                     (self.num_key_value_groups + 2) * self.head_dim,
                 ]
@@ -632,8 +646,8 @@ class Qwen2Attention(nn.Layer):
             value_states = self.v_proj(hidden_states)
 
             if self.sequence_parallel:
-                target_query_shape = [-1, self.seq_length, self.num_heads, self.head_dim]
-                target_key_value_shape = [-1, self.seq_length, self.num_key_value_heads, self.head_dim]
+                target_query_shape = [batch_size, -1, self.num_heads, self.head_dim]
+                target_key_value_shape = [batch_size, -1, self.num_key_value_heads, self.head_dim]
             else:
                 target_query_shape = [0, 0, self.num_heads, self.head_dim]
                 target_key_value_shape = [0, 0, self.num_key_value_heads, self.head_dim]
@@ -761,6 +775,7 @@ class Qwen2DecoderLayer(nn.Layer):
         past_key_value: Optional[Tuple[paddle.Tensor]] = None,
         use_cache: Optional[bool] = False,
         attn_mask_startend_row_indices: Optional[paddle.Tensor] = None,
+        batch_size: Optional[int] = None,
         **kwargs,
     ) -> Tuple[paddle.Tensor, Optional[Tuple[paddle.Tensor, paddle.Tensor]]]:
         """
@@ -800,6 +815,7 @@ class Qwen2DecoderLayer(nn.Layer):
                 output_attentions,
                 use_cache,
                 attn_mask_startend_row_indices,
+                batch_size,
                 use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
@@ -811,6 +827,7 @@ class Qwen2DecoderLayer(nn.Layer):
                 output_attentions,
                 use_cache,
                 attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+                batch_size=batch_size,
             )
 
         if type(outputs) is tuple:
@@ -1013,6 +1030,37 @@ class Qwen2PretrainedModel(PretrainedModel):
                     final_actions[keys] = partial(fn, split_nums=2)
         return final_actions
 
+    def _get_model_flops(self):
+        if hasattr(self.config, "seq_length"):
+            seq_length = self.config.seq_length
+        else:
+            seq_length = 2048
+
+        return caculate_llm_per_token_flops(
+            hidden_size=self.config.hidden_size,
+            intermediate_size=self.config.intermediate_size,
+            layer_num=self.config.num_hidden_layers,
+            vocab_size=self.config.vocab_size,
+            seq_length=seq_length,
+            recompute=False,
+        )
+
+    def _get_hardware_flops(self):
+        if hasattr(self.config, "seq_length"):
+            seq_length = self.config.seq_length
+        else:
+            seq_length = 2048
+
+        return caculate_llm_per_token_flops(
+            hidden_size=self.config.hidden_size,
+            intermediate_size=self.config.intermediate_size,
+            layer_num=self.config.num_hidden_layers,
+            vocab_size=self.config.vocab_size,
+            seq_length=seq_length,
+            recompute=self.config.recompute,
+            recompute_granularity=self.config.recompute_granularity,
+        )
+
     def _init_weights(self, layer):
         """Initialization hook"""
         if self.config.tensor_parallel_degree > 1:
@@ -1113,39 +1161,6 @@ class Qwen2Model(Qwen2PretrainedModel):
         )
         self.norm = Qwen2RMSNorm(config)
 
-    def get_model_flops(self, batch_size=1, seq_length=None, **kwargs):
-        if seq_length is None:
-            if hasattr(self.config, "seq_length"):
-                seq_length = self.config.seq_length
-            else:
-                seq_length = 2048
-
-        return caculate_llm_flops(
-            hidden_size=self.config.hidden_size,
-            intermediate_size=self.config.intermediate_size,
-            layer_num=self.config.num_hidden_layers,
-            vocab_size=self.config.vocab_size,
-            seq_length=seq_length,
-            recompute=False,
-        )
-
-    def get_hardware_flops(self, batch_size=1, seq_length=None, recompute=False, **kwargs):
-        if seq_length is None:
-            if hasattr(self.config, "seq_length"):
-                seq_length = self.config.seq_length
-            else:
-                seq_length = 2048
-
-        return caculate_llm_flops(
-            hidden_size=self.config.hidden_size,
-            intermediate_size=self.config.intermediate_size,
-            layer_num=self.config.num_hidden_layers,
-            vocab_size=self.config.vocab_size,
-            seq_length=seq_length,
-            recompute=recompute,
-            recompute_granularity=self.config.recompute_granularity,
-        )
-
     def get_input_embeddings(self):
         return self.embed_tokens
 
@@ -1198,6 +1213,7 @@ class Qwen2Model(Qwen2PretrainedModel):
         past_key_value: Tensor,
         use_cache: bool,
         attn_mask_startend_row_indices=None,
+        batch_size: int = None,
     ):
         def create_custom_forward(module):
             def custom_forward(*inputs):
@@ -1215,6 +1231,7 @@ class Qwen2Model(Qwen2PretrainedModel):
             past_key_value,
             use_cache,
             attn_mask_startend_row_indices,
+            batch_size,
             use_reentrant=self.config.recompute_use_reentrant,
         )
 
@@ -1317,6 +1334,7 @@ class Qwen2Model(Qwen2PretrainedModel):
                     past_key_value,
                     use_cache,
                     attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+                    batch_size=batch_size,
                 )
             else:
                 layer_outputs = decoder_layer(
@@ -1327,6 +1345,7 @@ class Qwen2Model(Qwen2PretrainedModel):
                     past_key_value,
                     use_cache,
                     attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+                    batch_size=batch_size,
                 )
 
             # NOTE: clear outdate cache after it has been used for memory saving
@@ -1440,11 +1459,10 @@ class Qwen2LMHead(nn.Layer):
             # for tie_word_embeddings
             self.weight.split_axis = 0 if self.transpose_y else 1
 
-    def forward(self, hidden_states, tensor_parallel_output=None):
+    def forward(self, hidden_states, tensor_parallel_output=None, batch_size=None):
         if self.config.sequence_parallel:
             hidden_states = GatherOp.apply(hidden_states)
-            seq_length = self.config.seq_length
-            hidden_states = paddle.reshape_(hidden_states, [-1, seq_length, self.config.hidden_size])
+            hidden_states = paddle.reshape_(hidden_states, [batch_size, -1, self.config.hidden_size])
 
         if tensor_parallel_output is None:
             tensor_parallel_output = self.config.tensor_parallel_output
@@ -1493,7 +1511,6 @@ class Qwen2ForCausalLM(Qwen2PretrainedModel):
     ):
         batch_size, seq_length = input_ids.shape
         position_ids = kwargs.get("position_ids", paddle.arange(seq_length).expand((batch_size, seq_length)))
-        attention_mask = kwargs.get("attention_mask", None)
         if past_key_values:
             input_ids = input_ids[:, -1].unsqueeze(axis=-1)
             position_ids = position_ids[:, -1].unsqueeze(-1)
@@ -1604,6 +1621,15 @@ class Qwen2ForCausalLM(Qwen2PretrainedModel):
             )
             attention_mask = None
 
+        if input_ids is not None and inputs_embeds is not None:
+            raise ValueError("You cannot specify both decoder_input_ids and decoder_inputs_embeds at the same time")
+        elif input_ids is not None:
+            batch_size = input_ids.shape[0]
+        elif inputs_embeds is not None:
+            batch_size = inputs_embeds.shape[0]
+        else:
+            raise ValueError("You have to specify either decoder_input_ids or decoder_inputs_embeds")
+
         # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
         outputs = self.qwen2(
             input_ids=input_ids,
@@ -1620,15 +1646,47 @@ class Qwen2ForCausalLM(Qwen2PretrainedModel):
 
         hidden_states = outputs[0]
 
+        # add this for fused_head_and_loss_fn
+        if self.config.use_fused_head_and_loss_fn and self.training:
+            if self.config.tensor_parallel_degree > 1 and self.config.sequence_parallel:
+                hidden_states = GatherOp.apply(hidden_states)
+                hidden_states = hidden_states.reshape(
+                    [
+                        batch_size,
+                        -1,
+                        hidden_states.shape[-1],
+                    ]
+                )
+            return hidden_states, self.lm_head.weight, None, self.lm_head.transpose_y
+
         # if labels is None，means we need full output, instead of tensor_parallel_output
         # tensor_parallel_output is together with ParallelCrossEntropy
         tensor_parallel_output = self.config.tensor_parallel_output and self.config.tensor_parallel_degree > 1
 
-        logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
+        if labels is not None and self.config.use_fused_linear_cross_entropy:
+            from paddlenlp_kernel.triton.cut_cross_entropy import linear_cross_entropy
 
-        loss = None
-        if labels is not None:
-            loss = self.criterion(logits, labels)
+            assert (
+                self.config.tensor_parallel_degree <= 1
+            ), "The argument `use_fused_linear_cross_entropy` is imcompatiable with tensor parallel "
+
+            masked_lm_loss = linear_cross_entropy(hidden_states, self.lm_head.weight, targets=labels)
+
+            binary_sequence = paddle.where(
+                masked_lm_loss > 0, paddle.ones_like(masked_lm_loss), paddle.zeros_like(masked_lm_loss)
+            )
+            count = paddle.sum(binary_sequence)
+            if count == 0:
+                loss = paddle.sum(masked_lm_loss * binary_sequence)
+            else:
+                loss = paddle.sum(masked_lm_loss * binary_sequence) / count
+            logits = None
+        else:
+            logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output, batch_size=batch_size)
+
+            loss = None
+            if labels is not None:
+                loss = self.criterion(logits, labels)
 
         if not return_dict:
             output = (logits,) + outputs[1:]

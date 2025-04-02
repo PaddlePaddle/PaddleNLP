@@ -123,6 +123,91 @@ __global__ void append_decode_cache_T_rope_kernel(
 }
 
 template <typename T, int VecSize = 1>
+__global__ void append_decode_cache_T_kernel(
+    const T* __restrict__ qkv,  // [bsz, num_heads + 2 * kv_num_heads,
+                                      // head_size]
+    T* __restrict__ key_cache,    // [num_blocks, kv_num_heads, block_size,
+                                  // head_size // 2]
+    T* __restrict__ value_cache,  // [num_blocks, kv_num_heads, block_size,
+                                  // head_size // 2]
+    const int* __restrict__ block_tables,     // [bsz, max_blocks_per_seq]
+    const int* __restrict__ padding_offsets,  // [num_tokens]
+    const int* __restrict__ cum_offsets,
+    const int* __restrict__ seq_lens,          // [bsz]
+    const int* __restrict__ seq_lens_encoder,  // [bsz]
+    const int max_seq_len,
+    const int max_blocks_per_seq,
+    const int num_heads,
+    const int head_size_qk,
+    const int head_size_v,
+    const int block_size,
+    const uint32_t elem_cnt,
+    const int kv_num_heads) {
+  using LoadT = AlignedVector<T, VecSize>;
+  using LoadBiasT = AlignedVector<T, VecSize>;
+  using LoadKVT = AlignedVector<T, VecSize>;
+  constexpr int HalfVecSize = VecSize / 2;
+  using LoadEmbT = AlignedVector<float, HalfVecSize>;
+  LoadT src_vec;
+  LoadBiasT out_vec;
+  LoadKVT cache_vec;
+
+  int64_t global_thread_idx = blockDim.x * blockIdx.x + threadIdx.x;
+  // const int64_t hidden_size = (num_heads + 2 * kv_num_heads) * head_size;
+  const uint32_t hidden_size_q = num_heads * head_size_qk;
+  const uint32_t hidden_size_k = kv_num_heads * head_size_qk;
+  const uint32_t hidden_size_v = kv_num_heads * head_size_v;
+  const int64_t hidden_size = hidden_size_q + hidden_size_k + hidden_size_v;
+  const uint32_t offset = kv_num_heads * (head_size_qk + head_size_v);
+  // const int64_t offset = 2 * hidden_size;
+  // const int half_head_size = head_size / 2;
+  for (int32_t linear_index = global_thread_idx * VecSize,
+               step = gridDim.x * blockDim.x * VecSize;
+       linear_index < elem_cnt;
+       linear_index += step) {
+    const int ori_bi = linear_index / offset;
+    const int bias = linear_index % offset;
+    const int start_token_idx = ori_bi * max_seq_len - cum_offsets[ori_bi];
+    if (seq_lens_encoder[ori_bi] > 0) return;
+    const int write_seq_id = seq_lens[ori_bi];
+    
+    if (write_seq_id == 0) continue;
+
+    const int* block_table_now = nullptr;
+
+    block_table_now = block_tables + ori_bi * max_blocks_per_seq;
+    const int block_idx = block_table_now[write_seq_id / block_size];
+    const int block_offset = write_seq_id % block_size;
+
+    if (bias < hidden_size_k) {
+      const uint32_t qkv_bias = bias;
+      const uint32_t hi = qkv_bias / head_size_qk;
+      const uint32_t h_bias = qkv_bias % head_size_qk;
+      const uint32_t tgt_idx = block_idx * kv_num_heads * block_size * head_size_qk +
+                             hi * block_size * head_size_qk +
+                             block_offset * head_size_qk + h_bias;
+      const uint32_t ori_idx =
+          start_token_idx * hidden_size +
+          hidden_size_q + qkv_bias;
+      Load<T, VecSize>(&qkv[ori_idx], &src_vec);
+      Store<T, VecSize>(src_vec, &key_cache[tgt_idx]);
+    } else {
+      const uint32_t qkv_bias = bias - hidden_size_k;
+      const uint32_t hi = qkv_bias / head_size_v;
+      const uint32_t h_bias = qkv_bias % head_size_v;
+      const uint32_t tgt_idx = block_idx * kv_num_heads * block_size * head_size_v +
+                             hi * block_size * head_size_v +
+                             block_offset * head_size_v + h_bias;
+      const uint32_t ori_idx =
+          start_token_idx * hidden_size +
+          hidden_size_q + hidden_size_k + qkv_bias;
+      Load<T, VecSize>(&qkv[ori_idx], &src_vec);
+      Store<T, VecSize>(src_vec, &value_cache[tgt_idx]);
+    }
+  }
+}
+
+template <typename T, int VecSize = 1>
 __global__ void append_decode_cache_T_rope_kernel(
     const int* __restrict__ quant_qkv,  // [bsz, num_heads + 2 * kv_num_heads,
                                         // head_size]

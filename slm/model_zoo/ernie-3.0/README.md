@@ -1329,6 +1329,7 @@ batch_size=32 和 1，预测精度为 FP16 时，GPU 下的效果-时延图：
 - paddlepaddle >= 2.3
 - paddlenlp >= 2.4
 - paddleslim >= 2.4
+- evaluate
 
 ### 数据准备
 此次微调数据主要是以 CLUE benchmark 数据集为主, CLUE benchmark 包括了文本分类、实体抽取、问答三大类数据集，而 CLUE benchmark 数据目前已经集成在 PaddleNLP 的 datasets 里面，可以通过下面的方式来使用数据集
@@ -1432,13 +1433,13 @@ trainer = Trainer(
 trainer.compress()
 
 ```
-压缩 API 可以传入的超参数可参考[文档](../../../docs/compression.md)。
+压缩 API 可以传入的超参数可参考[文档](../../../docs/zh/compression.md)。
 
 本项目提供了压缩 API 在分类（包含文本分类、文本匹配、自然语言推理、代词消歧等任务）、序列标注、阅读理解三大场景下的使用样例，可以分别参考 `compress_seq_cls.py` 、`compress_token_cls.py`、`compress_qa.py`，启动方式如下：
 
 ```shell
 # 分类任务
-# 该脚本共支持 CLUE 中 7 个分类任务，超参不全相同，因此分类任务中的超参配置利用 configs/defalut.yml 配置
+# 该脚本共支持 CLUE 中 7 个分类任务，超参不全相同，因此分类任务中的超参配置利用 configs/default.yml 配置
 python compress_seq_cls.py  --model_name_or_path best_models/afqmc/  --dataset afqmc --output_dir ./best_models/afqmc --config=configs/default.yml
 
 # 序列标注任务

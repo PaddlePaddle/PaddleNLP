@@ -188,7 +188,7 @@ class LlamaAvxInferenceModel(LlamaPretrainedModel):
             embed_dim=self.hidden_size,
             num_heads=self.num_attention_heads,
             kv_num_heads=self.num_layers,
-            dim_feedforward=self.intermediate_size,
+            intermediate_size=self.intermediate_size,
             activation="silu",
             num_layers=self.num_layers,
             ln_scale_attrs=ln_scale_attrs,
@@ -208,7 +208,7 @@ class LlamaAvxInferenceModel(LlamaPretrainedModel):
             norm_type="rmsnorm",
             epsilon=self.epsilon,
             rope_theta=self.rope_theta,
-            nranks=config.tensor_parallel_degree,
+            tp_degree=config.tensor_parallel_degree,
             avx_config=avx_config,
         )
 
@@ -245,7 +245,7 @@ class LlamaAvxInferenceModel(LlamaPretrainedModel):
         elif input_ids is None and inputs_embeds is None:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
 
-        # genereate a fake input_ids according to inputs_embeds
+        # generate a fake input_ids according to inputs_embeds
         if input_ids is None and inputs_embeds is not None:
             input_ids = self.prepare_input_ids_for_generation(self.config.bos_token_id, inputs_embeds)
         if inputs_embeds is not None:
@@ -397,6 +397,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         self.epsilon = config.rms_norm_eps
         self.max_position_embeddings = config.max_position_embeddings
         self.quant_type = config.get("quant_type", "")
+        self.return_full_hidden_states = config.get("return_full_hidden_states", False)
 
         self.rope_theta = config.rope_theta
         self.use_neox = True
@@ -404,13 +405,16 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         self.use_fake_parameter = config.get("use_fake_parameter", False)
 
         self.use_weight_only = False
+        self.weightonly_group_size = -1
         if config.quant_type == "weight_only_int8":
             self.use_weight_only = True
             self.quant_algo = "weight_only_int8"
+            self.weightonly_group_size = config.weightonly_group_size
         elif config.quant_type == "weight_only_int4":
             self.use_weight_only = True
             self.quant_algo = "weight_only_int4"
-        elif "a8w8" in config.quant_type:
+            self.weightonly_group_size = config.weightonly_group_size
+        elif config.quant_type and "a8w8" in config.quant_type:
             self.quant_model_path = config.model_name_or_path
             self.shift = config.quantization_config.shift
             self.smooth = config.quantization_config.smooth
@@ -609,16 +613,18 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         speculate_config = SpeculateConfig(
             speculate_method=config.get("speculate_method", None),
             speculate_max_draft_token_num=config.get("speculate_max_draft_token_num", 5),
+            return_full_hidden_states=config.get("return_full_hidden_states", False),
         )
         transformer_config = FusedMultiTransformerConfig(
             embed_dim=self.hidden_size,
             num_heads=self.num_attention_heads,
             kv_num_heads=self.num_key_value_heads,
-            dim_feedforward=self.intermediate_size,
+            intermediate_size=self.intermediate_size,
             quant_type=self.quant_type,
+            weightonly_group_size=self.weightonly_group_size,
             activation="swiglu",
             num_layers=config.num_hidden_layers,
-            nranks=config.tensor_parallel_degree,
+            tp_degree=config.tensor_parallel_degree,
             ring_id=ring_id,
             ln_scale_attrs=ln_scale_attrs,
             qkv_weight_attrs=qkv_weight_attrs,
@@ -669,6 +675,8 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         self.head_dim_shape_tensor = paddle.ones((self.hidden_size // self.num_attention_heads), dtype="int8")
 
         self.gradient_checkpointing = False
+
+        self._weights_initialized = False
 
     def set_transformer_block(self, transformer_config):
         if self.use_weight_only:
@@ -732,7 +740,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         elif input_ids is None and inputs_embeds is None:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
 
-        # genereate a fake input_ids according to inputs_embeds
+        # generate a fake input_ids according to inputs_embeds
         # this is usually occurred in img2txt multimodal model when first enter into this forward function.
         if input_ids is None and inputs_embeds is not None:
             input_ids = self.prepare_input_ids_for_generation(self.config.bos_token_id, inputs_embeds)
@@ -985,24 +993,28 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                         self.transformer_block.cache_v_out_scales[i_layer].set_value(weight_scale)
 
     @paddle.no_grad()
-    def set_state_dict(self, state_dict):
+    def set_state_dict(self, state_dict, is_eagle=False):
         self.set_quant_scale()
-        self.transformer_block.init_weight()
+        if not self._weights_initialized:
+            self.transformer_block.init_weight()
+            self._weights_initialized = True
         split_fn = split_param_func()
         self.embed_tokens.weight.set_value(
             paddle.to_tensor(state_dict["llama.embed_tokens.weight"]).cast(self.embed_tokens.weight.dtype)
         )
-        self.norm.weight.set_value(paddle.to_tensor(state_dict["llama.norm.weight"]).cast(self.norm.weight.dtype))
+        if not is_eagle:
+            self.norm.weight.set_value(paddle.to_tensor(state_dict["llama.norm.weight"]).cast(self.norm.weight.dtype))
         if self.use_weight_only:
             logger.info("weight only is enabled")
         for idx in range(self.config.num_hidden_layers):
             logger.info(f"set state for layer {idx}")
 
-            self.transformer_block.ln_scales[idx].set_value(
-                paddle.to_tensor(state_dict["llama.layers.{}.input_layernorm.weight".format(idx)]).cast(
-                    self.transformer_block.ln_scales[idx].dtype
+            if not is_eagle:
+                self.transformer_block.ln_scales[idx].set_value(
+                    paddle.to_tensor(state_dict["llama.layers.{}.input_layernorm.weight".format(idx)]).cast(
+                        self.transformer_block.ln_scales[idx].dtype
+                    )
                 )
-            )
             if "llama.layers.{}.self_attn.qkv_proj.weight".format(idx) in state_dict.keys():
                 concated_qkv_weight = paddle.to_tensor(
                     np.concatenate(
@@ -1084,10 +1096,10 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             if self.use_weight_only:
                 qkv_weight_tensor = paddle.transpose(qkv_weight_tensor, perm=[1, 0])
                 qkv_quanted_weight_tensor, qkv_weight_scale_tensor = weight_quantize(
-                    qkv_weight_tensor, algo=self.quant_algo
+                    qkv_weight_tensor.cpu(), algo=self.quant_algo, group_size=self.weightonly_group_size
                 )
-                self.transformer_block.qkv_weights[idx].set_value(qkv_quanted_weight_tensor)
-                self.transformer_block.qkv_weights_scale[idx].set_value(qkv_weight_scale_tensor)
+                self.transformer_block.qkv_weights[idx].set_value(qkv_quanted_weight_tensor.cuda())
+                self.transformer_block.qkv_weights_scale[idx].set_value(qkv_weight_scale_tensor.cuda())
             elif "fp8" in self.quant_type:
                 self.transformer_block.qkv_weights[idx].copy_(paddle.cast(concated_qkv_weight, "float8_e4m3fn"), False)
             elif "a8w8" in self.quant_type and not self.transformer_block.skip_quant("qkv_weight_scale", idx):
@@ -1102,10 +1114,10 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             ).cast(paddle.get_default_dtype())
             if self.use_weight_only:
                 linear_quanted_weight_tensor, linear_weight_scale_tensor = weight_quantize(
-                    linear_weight_tensor, algo=self.quant_algo
+                    linear_weight_tensor.cpu(), algo=self.quant_algo, group_size=self.weightonly_group_size
                 )
-                self.transformer_block.linear_weights[idx].set_value(linear_quanted_weight_tensor)
-                self.transformer_block.linear_weights_scale[idx].set_value(linear_weight_scale_tensor)
+                self.transformer_block.linear_weights[idx].set_value(linear_quanted_weight_tensor.cuda())
+                self.transformer_block.linear_weights_scale[idx].set_value(linear_weight_scale_tensor.cuda())
             elif "fp8" in self.quant_type:
                 self.transformer_block.linear_weights[idx].copy_(
                     paddle.cast(
@@ -1163,10 +1175,10 @@ class LlamaInferenceModel(LlamaPretrainedModel):
 
             if self.use_weight_only:
                 ffn1_quanted_weight_tensor, ffn1_weight_scale_tensor = weight_quantize(
-                    ffn1_weight_tensor, algo=self.quant_algo
+                    ffn1_weight_tensor.cpu(), algo=self.quant_algo, group_size=self.weightonly_group_size
                 )
-                self.transformer_block.ffn1_weights[idx].set_value(ffn1_quanted_weight_tensor)
-                self.transformer_block.ffn1_weights_scale[idx].set_value(ffn1_weight_scale_tensor)
+                self.transformer_block.ffn1_weights[idx].set_value(ffn1_quanted_weight_tensor.cuda())
+                self.transformer_block.ffn1_weights_scale[idx].set_value(ffn1_weight_scale_tensor.cuda())
             elif "fp8" in self.quant_type:
                 self.transformer_block.ffn1_0_weights[idx].copy_(
                     paddle.to_tensor(unfused_state_dict["mlp.gate_proj.weight"])
@@ -1200,10 +1212,10 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             )
             if self.use_weight_only:
                 ffn2_quanted_weight_tensor, ffn2_weight_scale_tensor = weight_quantize(
-                    ffn2_weight_tensor, algo=self.quant_algo
+                    ffn2_weight_tensor.cpu(), algo=self.quant_algo, group_size=self.weightonly_group_size
                 )
-                self.transformer_block.ffn2_weights[idx].set_value(ffn2_quanted_weight_tensor)
-                self.transformer_block.ffn2_weights_scale[idx].set_value(ffn2_weight_scale_tensor)
+                self.transformer_block.ffn2_weights[idx].set_value(ffn2_quanted_weight_tensor.cuda())
+                self.transformer_block.ffn2_weights_scale[idx].set_value(ffn2_weight_scale_tensor.cuda())
             elif "fp8" in self.quant_type:
                 self.transformer_block.ffn2_weights[idx].copy_(
                     paddle.to_tensor(state_dict["llama.layers.{}.mlp.down_proj.weight".format(idx)])
@@ -1374,6 +1386,7 @@ class LlamaBlockInferenceModel(LlamaInferenceModel):
         super().__init__(config)
         self.max_seq_len = config.max_seq_len
         self.block_size = config.block_size
+        self.config = config
 
     def set_transformer_block(self, transformer_config):
         if self.use_weight_only:
@@ -1427,6 +1440,7 @@ class LlamaBlockInferenceModel(LlamaInferenceModel):
         kwargs["cu_seqlens_k"] = cu_seqlens_k
         kwargs["padding_offsets"] = padding_offset
         kwargs["max_input_length"] = self.max_seq_len
+        kwargs["block_size"] = self.block_size
 
         inputs_embeds = self.embed_tokens(ids_remove_padding)
 
@@ -1442,6 +1456,75 @@ class LlamaBlockInferenceModel(LlamaInferenceModel):
                 **kwargs,
             )
         hidden_states = self.norm(hidden_states)
+
+        return BaseModelOutputWithPastAndCrossAttentions(
+            last_hidden_state=hidden_states,
+            past_key_values=None,
+            hidden_states=None,
+            attentions=None,
+            cum_offsets=cum_offsets,
+        )
+
+
+@register_base_model
+class EagleForLlamaInferenceModel(LlamaBlockInferenceModel):
+    def __init__(self, config: LlamaConfig):
+        self.append_attn = config.append_attn
+        super().__init__(config)
+        self.max_seq_len = config.max_seq_len
+        self.block_size = config.block_size
+        from paddle.distributed.fleet.layers.mpu.mp_layers import ColumnParallelLinear
+
+        if config.tensor_parallel_degree > 1:
+            self.fc = ColumnParallelLinear(
+                self.hidden_size * 2, self.hidden_size, has_bias=True, gather_output=True, fuse_matmul_bias=True
+            )
+        else:
+            self.fc = nn.Linear(self.hidden_size * 2, self.hidden_size, bias_attr=True)
+
+    def forward(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        inputs_embeds=None,
+        caches=None,
+        pre_caches=None,
+        output_attentions=False,
+        output_hidden_states=None,
+        return_dict=False,
+        **kwargs,
+    ):
+        seq_lens_this_time = kwargs.get("seq_lens_this_time", None)
+        rope_emb = kwargs.get("rope_emb", None)
+        draft_tokens = kwargs.get("draft_tokens", None)
+        seq_lens_encoder = kwargs.get("seq_lens_encoder", None)
+        pre_hidden_states = kwargs.get("pre_hidden_states", None)
+        ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k = self.remove_padding(
+            input_ids, seq_lens_this_time, draft_tokens, seq_lens_encoder
+        )
+
+        kwargs["cu_seqlens_q"] = cu_seqlens_q
+        kwargs["cu_seqlens_k"] = cu_seqlens_k
+        kwargs["padding_offsets"] = padding_offset
+        kwargs["max_input_length"] = self.max_seq_len
+
+        inputs_embeds = self.embed_tokens(ids_remove_padding)
+        inputs_embeds = paddle.concat([inputs_embeds, pre_hidden_states], axis=-1)
+        inputs_embeds = self.fc(inputs_embeds)
+
+        with dy2st_nocheck_guard_context():
+            hidden_states, _ = self.transformer_block(
+                input_ids=input_ids,
+                src=inputs_embeds,
+                cum_offsets=cum_offsets,
+                attn_mask=attention_mask,
+                caches=caches,
+                pre_caches=pre_caches,
+                rotary_embs=rope_emb,
+                post_rebuild_padding=True,
+                **kwargs,
+            )
+        # hidden_states = self.norm(hidden_states)
 
         return BaseModelOutputWithPastAndCrossAttentions(
             last_hidden_state=hidden_states,
@@ -1730,6 +1813,7 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
         self.max_candidate_len = config.get("speculate_max_candidate_len", 5)
         self.verify_window = config.get("speculate_verify_window", 2)
         self.max_seq_len = config.max_seq_len
+        self.return_full_hidden_states = config.get("return_full_hidden_states", False)
 
         self.llama = LlamaBlockInferenceModel(config)
         if config.tie_word_embeddings:
@@ -1757,6 +1841,8 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
 
             base_actions = {
                 "lm_head.weight": partial(fn, is_column=True),
+                "fc.weight": partial(fn, is_column=True),
+                "fc.bias": partial(fn, is_column=True),
                 # Row Linear
                 "embed_tokens.weight": partial(fn, is_column=False),
                 "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
@@ -1841,7 +1927,8 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
         else:
             max_block_nums = max_batch_size * max_block_per_seq
 
-        cache_kvs = []
+        cache_k_shapes = []
+        cache_v_shapes = []
         for _ in range(config.num_hidden_layers):
             cache_kv_shape = [
                 max_block_nums,
@@ -1849,9 +1936,9 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
                 config.block_size,
                 config.hidden_size // config.num_attention_heads,
             ]
-            cache_kvs.append(cache_kv_shape)
-            cache_kvs.append(cache_kv_shape)
-        return cache_kvs
+            cache_k_shapes.append(cache_kv_shape)
+            cache_v_shapes.append(cache_kv_shape)
+        return cache_k_shapes, cache_v_shapes
 
     def prepare_inputs_for_generation(self, **kwargs):
         # only last token for inputs_ids if cache is defined in kwargs
@@ -1929,14 +2016,31 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
             draft_tokens=draft_tokens,
             output_padding_offset=output_padding_offset,
         )
+        # hidden_states = outputs[0]
+        if self.return_full_hidden_states:
+            from paddlenlp_ops import rebuild_padding_v2
 
-        hidden_states = outputs[0]
+            # full_hidden_states = outputs[1]
+            full_hidden_states = outputs[0]
+            cum_offsets = outputs[1]
+            hidden_states = rebuild_padding_v2(
+                full_hidden_states,
+                cum_offsets,
+                seq_lens_decoder,
+                seq_lens_encoder,
+                output_padding_offset,
+                self.max_seq_len,
+            )
+        else:
+            hidden_states = outputs[0]
         logits = self.lm_head(
             hidden_states,
             tensor_parallel_output=False,
         )
-
-        return logits
+        if self.return_full_hidden_states:
+            return logits, full_hidden_states
+        else:
+            return logits
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
@@ -1945,6 +2049,121 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
                 paddle.to_tensor(state_dict["lm_head.weight"]).cast(self.lm_head.weight.dtype)
             )
         self.llama.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
+
+
+class EagleLlamaForCausalLMBlockInferenceModel(LlamaForCausalLMBlockInferenceModel):
+    def __init__(self, config):
+        super(LlamaForCausalLMBlockInferenceModel, self).__init__(config)
+        self.max_candidate_len = config.get("speculate_max_candidate_len", 5)
+        self.verify_window = config.get("speculate_verify_window", 2)
+        self.max_seq_len = config.max_seq_len
+
+        self.eagle = EagleForLlamaInferenceModel(config)
+        if config.tie_word_embeddings:
+            self.lm_head = LlamaLMHead(config, embedding_weights=self.llama.embed_tokens.weight, transpose_y=True)
+            self.tie_weights()
+        else:
+            self.lm_head = LlamaLMHead(config)
+
+    def prepare_inputs_for_generation(self, **kwargs):
+        # only last token for inputs_ids if cache is defined in kwargs
+        input_ids = kwargs["input_ids"]
+        src_mask = kwargs.get("src_mask", None)
+        block_tables = kwargs.get("block_tables", None)
+
+        pre_caches = kwargs.get("pre_caches", None)
+        caches = kwargs.get("caches", None)
+
+        rope_emb = kwargs["rope_emb"]
+        seq_lens_this_time = kwargs["seq_lens_this_time"]
+        seq_lens_encoder = kwargs["seq_lens_encoder"]
+        seq_lens_decoder = kwargs["seq_lens_decoder"]
+        k_quant_scales = kwargs.get("k_quant_scales", None)
+        v_quant_scales = kwargs.get("v_quant_scales", None)
+        k_dequant_scales = kwargs.get("k_dequant_scales", None)
+        v_dequant_scales = kwargs.get("v_dequant_scales", None)
+
+        # speculative decoding related parameters
+        draft_tokens = kwargs.get("draft_tokens", None)
+        output_padding_offset = kwargs.get("output_padding_offset", None)
+        hidden_states = kwargs.get("hidden_states", None)
+
+        model_inputs = {
+            "input_ids": input_ids,
+            "src_mask": src_mask,
+            "rope_emb": rope_emb,
+            "pre_caches": pre_caches,
+            "caches": caches,
+            "seq_lens_this_time": seq_lens_this_time,
+            "seq_lens_encoder": seq_lens_encoder,
+            "seq_lens_decoder": seq_lens_decoder,
+            "block_tables": block_tables,
+            "k_quant_scales": k_quant_scales,
+            "v_quant_scales": v_quant_scales,
+            "k_dequant_scales": k_dequant_scales,
+            "v_dequant_scales": v_dequant_scales,
+            "draft_tokens": draft_tokens,
+            "output_padding_offset": output_padding_offset,
+            "pre_hidden_states": hidden_states,
+        }
+        return model_inputs
+
+    @paddle.no_grad()
+    def set_state_dict(self, state_dict):
+        if "lm_head.weight" in state_dict:
+            self.lm_head.weight.set_value(
+                paddle.to_tensor(state_dict["lm_head.weight"]).cast(self.lm_head.weight.dtype)
+            )
+        self.eagle.fc.weight.set_value(paddle.to_tensor(state_dict["llama.fc.weight"]).cast(self.lm_head.weight.dtype))
+        self.eagle.fc.bias.set_value(paddle.to_tensor(state_dict["llama.fc.bias"]).cast(self.lm_head.weight.dtype))
+        self.eagle.set_state_dict({k: state_dict[k] for k in state_dict.keys()}, True)
+
+    def forward(
+        self,
+        input_ids,
+        src_mask=None,
+        pre_caches=None,
+        caches=None,
+        seq_lens_this_time=None,
+        seq_lens_encoder=None,
+        seq_lens_decoder=None,
+        rope_emb=None,
+        block_tables=None,
+        k_quant_scales=None,
+        v_quant_scales=None,
+        k_dequant_scales=None,
+        v_dequant_scales=None,
+        draft_tokens=None,
+        output_padding_offset=None,
+        pre_hidden_states=None,
+    ):
+        outputs = self.eagle(
+            input_ids,
+            src_mask=src_mask,
+            caches=caches,
+            rope_emb=rope_emb,
+            block_tables=block_tables,
+            pre_caches=pre_caches,
+            seq_lens_this_time=seq_lens_this_time,
+            seq_lens_encoder=seq_lens_encoder,
+            seq_lens_decoder=seq_lens_decoder,
+            k_quant_scales=k_quant_scales,
+            v_quant_scales=v_quant_scales,
+            k_dequant_scales=k_dequant_scales,
+            v_dequant_scales=v_dequant_scales,
+            draft_tokens=draft_tokens,
+            output_padding_offset=output_padding_offset,
+            pre_hidden_states=pre_hidden_states,
+        )
+
+        hidden_states = outputs[0]
+
+        logits = self.lm_head(
+            hidden_states,
+            tensor_parallel_output=False,
+        )
+
+        return logits, hidden_states
 
 
 class LlamaForMiniGPT4InferenceModel(LlamaForCausalLMInferenceModel):
@@ -2017,7 +2236,9 @@ class LlamaForMiniGPT4InferenceModel(LlamaForCausalLMInferenceModel):
     # rewrite to_static function in generation_utils.py
     def to_static(self, output_path: str, config: dict):
         dtype = config.get("dtype", paddle.get_default_dtype())
-        cache_kvs_shapes = self.get_cache_kvs_shape(self.config, max_length=config.get("max_length", None))
+        cache_k_shapes, cache_v_shapes = self.get_cache_kvs_shape(
+            self.config, max_length=config.get("max_length", None)
+        )
         input_spec = [
             paddle.static.InputSpec(
                 shape=[None, None, None], dtype="float32", name="image_features"
@@ -2051,7 +2272,7 @@ class LlamaForMiniGPT4InferenceModel(LlamaForCausalLMInferenceModel):
                     dtype=dtype,
                     name="cache_kvs_{}".format(i),
                 )
-                for i, shape in enumerate(cache_kvs_shapes)
+                for i, shape in enumerate(cache_k_shapes + cache_v_shapes)
             ],  # cache_kvs
         ]
 

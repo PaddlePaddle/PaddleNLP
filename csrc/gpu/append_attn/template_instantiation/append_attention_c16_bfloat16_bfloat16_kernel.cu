@@ -46,6 +46,7 @@ template void CascadeAppendAttentionC16Kernel<paddle::bfloat16, paddle::bfloat16
     const int block_shape_q,
     const int max_seq_len,
     const int max_dec_len,
+    const float softmax_scale,
     const float quant_max_bound,
     const float quant_min_bound,
     const float in_scale,

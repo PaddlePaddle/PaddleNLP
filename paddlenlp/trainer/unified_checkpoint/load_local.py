@@ -149,14 +149,6 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
 
 
 def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoint, safe_serialization=False):
-    # Special process with split param.
-    if is_sharding_split_param_mode(args):
-        returned_optim_state_dict = load_unified_optimizer_split_param(args, model, optimizer, resume_from_checkpoint)
-        return returned_optim_state_dict
-
-    # init and get optimizer LR_Scheduler
-    returned_optim_state_dict = nested_copy(optimizer.state_dict())
-
     if not safe_serialization:
         index_filename, index_filename_master_weights = (
             PADDLE_OPTIMIZER_INDEX_NAME,
@@ -164,6 +156,23 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
         )
     else:
         index_filename, index_filename_master_weights = SAFE_OPTIMIZER_INDEX_NAME, SAFE_MASTER_WEIGHTS_INDEX_NAME
+
+    with open(os.path.join(resume_from_checkpoint, index_filename), "r") as f:
+        index = json.loads(f.read())
+
+    ckpt_quant_stage = "O0"
+    if "ckpt_quant_stage" in index:
+        ckpt_quant_stage = index["ckpt_quant_stage"]
+
+    # Special process with split param.
+    if is_sharding_split_param_mode(args):
+        returned_optim_state_dict = load_unified_optimizer_split_param(
+            args, model, optimizer, resume_from_checkpoint, ckpt_quant_stage
+        )
+        return returned_optim_state_dict
+
+    # init and get optimizer LR_Scheduler
+    returned_optim_state_dict = nested_copy(optimizer.state_dict())
 
     resolved_archive_file, sharded_metadata = get_optimizer_shard_files(
         optimizer_path=resume_from_checkpoint,
@@ -183,13 +192,6 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
 
     if len(resolved_archive_file) > 1:
         resolved_archive_file = tqdm(resolved_archive_file, desc="Loading optimizer shards")
-
-    with open(os.path.join(resume_from_checkpoint, index_filename), "r") as f:
-        index = json.loads(f.read())
-
-    ckpt_quant_stage = "O0"
-    if "ckpt_quant_stage" in index:
-        ckpt_quant_stage = index["ckpt_quant_stage"]
 
     # update has_master_weights and index_filename_master_weights
     # 1. if the master weight exists, only has_master_weights is set True and loaded when needed

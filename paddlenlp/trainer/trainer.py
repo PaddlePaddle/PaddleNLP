@@ -434,11 +434,6 @@ class Trainer:
                     "We do not support skip_save_model_weight in peft model when using unified checkpoint, remove this config."
                 )
 
-        if args.sequence_parallel:
-            register_sequence_parallel_allreduce_hooks(
-                self.model, args.gradient_accumulation_steps, args.fuse_sequence_parallel_allreduce
-            )
-
         self.do_grad_scaling = False
         self.enable_autocast_context_manager = False
         if args.fp16 or args.bf16:
@@ -471,6 +466,9 @@ class Trainer:
 
         # very last
         self._memory_tracker.stop_and_update_metrics()
+        if self.args.count_trained_tokens:
+            self.trained_effective_tokens = 0
+            self.trained_tokens = 0
 
     def _wrap_amp_model(self, args, model):
         logger.info("Using half precision")
@@ -1022,9 +1020,17 @@ class Trainer:
 
             step = -1
             for step, inputs in enumerate(epoch_iterator):
-                if self.args.use_hybrid_parallel and self.args.sep_parallel_degree > 1:
+                if (
+                    self.args.use_hybrid_parallel
+                    and self.args.sep_parallel_degree > 1
+                    and self.args.split_inputs_sequence_dim
+                ):
                     inputs = split_inputs_sequence_dim(inputs)
-                if self.args.use_hybrid_parallel and self.args.context_parallel_degree > 1:
+                if (
+                    self.args.use_hybrid_parallel
+                    and self.args.context_parallel_degree > 1
+                    and self.args.split_inputs_sequence_dim
+                ):
                     inputs = split_inputs_sequence_dim_load_balance(inputs)
                 if self.args.ignore_data_skip:
                     self.timers and self.timers("read-data").stop()
@@ -1089,7 +1095,7 @@ class Trainer:
                         self.control.should_evaluate = False
                         self.control.should_save = False
 
-                        # log loss and memeory usage
+                        # log loss and memory usage
                         self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
                         self._print_timer()
                         step_control = 0
@@ -1127,6 +1133,9 @@ class Trainer:
                     is_no_sync = True
 
                 sync_context = model.no_sync() if is_no_sync else contextlib.nullcontext()
+                if self.args.count_trained_tokens:
+                    self.trained_effective_tokens += (inputs["input_ids"] != self.args.pad_token_id).sum()
+                    self.trained_tokens += inputs["input_ids"].numel()
                 with sync_context:
                     if "step_control" in inspect.signature(self.training_step).parameters:
                         tr_loss_step = self.training_step(model, inputs, step_control=step_control)
@@ -1510,13 +1519,13 @@ class Trainer:
             )
 
             seq_length = None
-            model_flops = None
+            model_flops_per_token = None
             if getattr(self, "is_pretraining", False) and hasattr(self.model, "config"):
                 seq_length = getattr(self.model.config, "seq_length", None)
                 try:
-                    model_flops = self.model.get_hardware_flops(seq_length=seq_length, recompute=self.args.recompute)
+                    model_flops_per_token = self.model.get_hardware_flops()
                 except NotImplementedError:
-                    model_flops = None
+                    model_flops_per_token = None
 
             # Do not log speed metrics if all steps are skipped since last log.
             if num_steps > 0:
@@ -1527,7 +1536,7 @@ class Trainer:
                         num_samples=total_train_batch_size * num_steps,
                         num_steps=num_steps,
                         seq_length=seq_length,
-                        model_flops=model_flops,
+                        model_flops_per_token=model_flops_per_token,
                     )
                 )
 
@@ -1575,6 +1584,27 @@ class Trainer:
             self._save_checkpoint(model, metrics=metrics)
             logger.info(f"{self.runtime_timer.log()}")
             self.control = self.callback_handler.on_save(self.args, self.state, self.control)
+            self.log_trained_tokens()
+
+    def log_trained_tokens(self):
+        if self.args.count_trained_tokens:
+            token_list = []
+            for token_num in [self.trained_effective_tokens, self.trained_tokens]:
+                tensors = token_num.reshape([1])
+                if self.hcg._sharding_degree > 1:
+                    output_tensors = []
+                    paddle.distributed.all_gather(output_tensors, tensors, group=self.hcg._sharding_comm_group)
+                    tensors = paddle.concat(output_tensors).sum().reshape([1])
+                if self.hcg._dp_degree > 1:
+                    output_tensors = []
+                    paddle.distributed.all_gather(output_tensors, tensors, group=self.hcg._dp_comm_group)
+                    tensors = paddle.concat(output_tensors).sum().reshape([1])
+                token_list.append(tensors.item())
+            if self.is_local_process_zero():
+
+                logger.info(
+                    f"Update to now, trained_effective_tokens: {token_list[0]}, trained_tokens: {token_list[1]}."
+                )
 
     def _get_learning_rate(self):
         return self.optimizer.get_lr()
@@ -1970,6 +2000,16 @@ class Trainer:
 
             optimizer_cls = AdamWMini
             optimizer_kwargs.update(adam_kwargs)
+        elif args.optim == OptimizerNames.ADAMW_CUSTOM:
+            from ..utils import AdamWCustom
+
+            optimizer_cls = AdamWCustom
+            optimizer_kwargs.update(adam_kwargs)
+        elif args.optim == OptimizerNames.ADAMW_16BIT_MOMENT:
+            from ..utils import AdamW_16Bit
+
+            optimizer_cls = AdamW_16Bit
+            optimizer_kwargs.update(adam_kwargs)
         else:
             raise ValueError(f"Trainer cannot instantiate unsupported optimizer: {args.optim}")
         return optimizer_cls, optimizer_kwargs
@@ -2053,6 +2093,11 @@ class Trainer:
                 model = decorated
             else:
                 model, self.optimizer = decorated
+
+        if self.args.tensor_parallel_degree > 1 and self.args.sequence_parallel:
+            register_sequence_parallel_allreduce_hooks(
+                model, self.args.gradient_accumulation_steps, self.args.fuse_sequence_parallel_allreduce
+            )
 
         if self.args.world_size == 1:
             if self.args.amp_master_grad:
@@ -2546,7 +2591,49 @@ class Trainer:
         else:
             self.save_model(output_dir)
 
-        # only save model state dict, ignore optimizer and scheduler
+        # Determine the new best metric / best model checkpoint
+        if metrics is not None and self.args.metric_for_best_model is not None:
+            metric_to_check = self.args.metric_for_best_model
+            if not metric_to_check.startswith("eval_"):
+                metric_to_check = f"eval_{metric_to_check}"
+            metric_value = metrics[metric_to_check]
+
+            operator = np.greater if self.args.greater_is_better else np.less
+            if (
+                self.state.best_metric is None
+                or self.state.best_model_checkpoint is None
+                or operator(metric_value, self.state.best_metric)
+            ):
+                self.state.best_metric = metric_value
+                self.state.best_model_checkpoint = output_dir
+
+        # Save the Trainer state
+        if self.args.should_save:
+            self.state.save_to_json(os.path.join(output_dir, TRAINER_STATE_NAME))
+
+        # Save RNG state in non-distributed training
+        rng_states = {
+            "python": random.getstate(),
+            "numpy": np.random.get_state(),
+            "cuda": paddle.get_rng_state(),
+            "cpu": paddle.framework.core.default_cpu_generator().get_state(),
+        }
+        if self.args.use_hybrid_parallel:
+            rng_states[
+                "hybrid_parallel_rng_state_tracker"
+            ] = fleet.meta_parallel.get_rng_state_tracker().get_states_tracker()
+
+        if self.args.world_size > 1:
+            rng_states_list = []
+            paddle.distributed.all_gather_object(rng_states_list, rng_states)
+            if self.args.should_save:
+                os.makedirs(output_dir, exist_ok=True)
+                paddle.save(rng_states_list, os.path.join(output_dir, f"rng_state_{self.args.world_size}.pth"))
+        else:
+            os.makedirs(output_dir, exist_ok=True)
+            paddle.save(rng_states, os.path.join(output_dir, "rng_state.pth"))
+
+            # only save model state dict, ignore optimizer and scheduler
         if not self.args.ignore_save_lr_and_optim:
             optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
             saved_signal_path = os.path.join(output_dir, f"saved_signal_{dist.get_rank()}")
@@ -2632,47 +2719,6 @@ class Trainer:
                             paddle.save(global_rank, os.path.join(signal_dir, f".master_weight.done.{global_rank}"))
 
         self.runtime_timer.stop()
-        # Determine the new best metric / best model checkpoint
-        if metrics is not None and self.args.metric_for_best_model is not None:
-            metric_to_check = self.args.metric_for_best_model
-            if not metric_to_check.startswith("eval_"):
-                metric_to_check = f"eval_{metric_to_check}"
-            metric_value = metrics[metric_to_check]
-
-            operator = np.greater if self.args.greater_is_better else np.less
-            if (
-                self.state.best_metric is None
-                or self.state.best_model_checkpoint is None
-                or operator(metric_value, self.state.best_metric)
-            ):
-                self.state.best_metric = metric_value
-                self.state.best_model_checkpoint = output_dir
-
-        # Save the Trainer state
-        if self.args.should_save:
-            self.state.save_to_json(os.path.join(output_dir, TRAINER_STATE_NAME))
-
-        # Save RNG state in non-distributed training
-        rng_states = {
-            "python": random.getstate(),
-            "numpy": np.random.get_state(),
-            "cuda": paddle.get_rng_state(),
-            "cpu": paddle.framework.core.default_cpu_generator().get_state(),
-        }
-        if self.args.use_hybrid_parallel:
-            rng_states[
-                "hybrid_parallel_rng_state_tracker"
-            ] = fleet.meta_parallel.get_rng_state_tracker().get_states_tracker()
-
-        if self.args.world_size > 1:
-            rng_states_list = []
-            paddle.distributed.all_gather_object(rng_states_list, rng_states)
-            if self.args.should_save:
-                os.makedirs(output_dir, exist_ok=True)
-                paddle.save(rng_states_list, os.path.join(output_dir, f"rng_state_{self.args.world_size}.pth"))
-        else:
-            os.makedirs(output_dir, exist_ok=True)
-            paddle.save(rng_states, os.path.join(output_dir, "rng_state.pth"))
 
         # Maybe delete some older checkpoints.
         # For hybrid parallel training, the checkpoint files maybe on different node.
@@ -3119,11 +3165,17 @@ class Trainer:
         if self.args.pipeline_parallel_degree > 1:
             from paddle.distributed.fleet.meta_parallel import PipelineLayer
 
+            _prepare_pipeline_inputs_func = getattr(self.model_wrapped, "_prepare_pipeline_inputs_func", None)
             # Only accept wrapped model for pipeline_parallel mode
             if self.model is self.model_wrapped and isinstance(self.model_wrapped, PipelineLayer):
                 # NOTE(gongenlei): when do_train=False, do_eval=True, we need to wrap model for pipeline
                 self.model_wrapped = fleet.distributed_model(self.model_wrapped)
+            if isinstance(self.model_wrapped, LoRAModel) and isinstance(self.model_wrapped.model, PipelineLayer):
+                # NOTE(liuting): when do_train=False, do_eval=True, lora=True, we need to wrap model for pipeline
+                self.model_wrapped = fleet.distributed_model(self.model_wrapped.model)
             model = self.model_wrapped
+            if _prepare_pipeline_inputs_func is not None:
+                model._prepare_pipeline_inputs_func = _prepare_pipeline_inputs_func
         else:
             model = self.model
 

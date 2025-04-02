@@ -967,6 +967,11 @@ class SpecialTokensMixin:
 
         return self._add_tokens(new_tokens, special_tokens=special_tokens)
 
+    @classmethod
+    def _add_extra_special_tokens(cls, extra_sp_token: Union[str, AddedToken]):
+        if extra_sp_token not in cls.SPECIAL_TOKENS_ATTRIBUTES:
+            cls.SPECIAL_TOKENS_ATTRIBUTES.append(extra_sp_token)
+
     def _add_tokens(self, new_tokens: Union[List[str], List[AddedToken]], special_tokens: bool = False) -> int:
         raise NotImplementedError
 
@@ -1213,7 +1218,13 @@ class SpecialTokensMixin:
         """
         set_attr = {}
         for attr in self.SPECIAL_TOKENS_ATTRIBUTES:
-            attr_value = getattr(self, "_" + attr)
+            try:
+                attr_value = getattr(self, "_" + attr)
+            except:
+                try:
+                    attr_value = getattr(self, attr)
+                except:
+                    continue
             if attr_value:
                 set_attr[attr] = (
                     type(attr_value)(str(attr_value_sub) for attr_value_sub in attr_value)
@@ -1233,7 +1244,13 @@ class SpecialTokensMixin:
         """
         set_attr = {}
         for attr in self.SPECIAL_TOKENS_ATTRIBUTES:
-            attr_value = getattr(self, "_" + attr)
+            try:
+                attr_value = getattr(self, "_" + attr)
+            except:
+                try:
+                    attr_value = getattr(self, attr)
+                except:
+                    continue
             if attr_value:
                 set_attr[attr] = attr_value
         return set_attr
@@ -1744,6 +1761,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 elif isinstance(value, list):
                     value = [AddedToken(**token) if isinstance(token, dict) else token for token in value]
                 setattr(tokenizer, key, value)
+                cls._add_extra_special_tokens(key)
 
         # Add supplementary tokens.
         special_tokens = tokenizer.all_special_tokens
@@ -1858,8 +1876,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         # Add tokenizer class to the tokenizer config to be able to reload it with from_pretrained
         tokenizer_class = self.__class__.__name__
         # Remove the Fast at the end unless we have a special `PreTrainedTokenizerFast`
-        if tokenizer_class.endswith("Fast") and tokenizer_class != "PreTrainedTokenizerFast":
-            tokenizer_class = tokenizer_class[:-4]
+        # if tokenizer_class.endswith("Fast") and tokenizer_class != "PreTrainedTokenizerFast":
+        #     tokenizer_class = tokenizer_class[:-4]
         tokenizer_config["tokenizer_class"] = tokenizer_class
 
         with io.open(tokenizer_config_file, "w", encoding="utf-8") as f:
@@ -3425,6 +3443,33 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             `str`: The joined tokens.
         """
         raise NotImplementedError
+
+    def decode_token(
+        self,
+        all_input_ids: List[int],
+        prefix_offset: int = 0,
+        read_offset: int = 0,
+    ) -> Tuple[str, int, int]:
+        """tokenizer decoding for the streaming generation use case. This method can be overrided for tokenizer that doesn't follow this API"""
+        # The prefix text is necessary only to defeat cleanup algorithms in the decode
+        # which decide to add a space or not depending on the surrounding ids.
+        prefix_text = self.decode(
+            all_input_ids[prefix_offset:read_offset], skip_special_tokens=False, clean_up_tokenization_spaces=False
+        )
+        new_text = self.decode(
+            all_input_ids[prefix_offset:], skip_special_tokens=False, clean_up_tokenization_spaces=False
+        )
+
+        if len(new_text) > len(prefix_text) and not prefix_text.endswith("�") and not new_text.endswith("�"):
+            # utf-8 char at the end means it's a potential unfinished byte sequence
+            # from byte fallback tokenization.
+            # If it's in the middle, it's probably a real invalid id generated
+            # by the model
+            prefix_index = new_text.index(prefix_text)
+            new_text = new_text[prefix_index + len(prefix_text) :]
+            return new_text, read_offset, len(all_input_ids)
+        else:
+            return "", prefix_offset, read_offset
 
     def batch_decode(
         self,

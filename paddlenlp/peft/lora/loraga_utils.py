@@ -16,6 +16,13 @@ import paddle
 import paddle.distributed as dist
 from paddle.distributed import fleet
 
+try:
+    from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+        register_sequence_parallel_allreduce_hooks,
+    )
+except:
+    pass
+
 from paddlenlp.peft import LoRAModel
 from paddlenlp.peft.lora.lora_layers import (
     ColumnParallelLoRALinear,
@@ -82,6 +89,11 @@ class LoRAGATrainer(Trainer):
 
     def _wrap_model(self, model):
         """Wrap Model without optimizer, support dp, tp and sharding"""
+
+        if self.args.tensor_parallel_degree > 1 and self.args.sequence_parallel:
+            register_sequence_parallel_allreduce_hooks(
+                model, self.args.gradient_accumulation_steps, self.args.fuse_sequence_parallel_allreduce
+            )
 
         in_pipeline_parallel_mode = self.args.pipeline_parallel_degree > 1
         in_sharding_parallel_mode = self.sharding is not None
@@ -155,7 +167,7 @@ def get_module_gradient(
 
     rank_suffix = "_" + str(local_rank)
     local_grad_name = ".".join(grad_name.split(".")[1:]) + ".weight" + rank_suffix
-    gradient = gradient_dict.pop(local_grad_name).cuda()
+    gradient = gradient_dict.pop(local_grad_name)._copy_to(paddle.framework._current_expected_place(), False)
 
     is_fleet_init = True
     try:
@@ -175,7 +187,7 @@ def get_module_gradient(
             dist.all_gather(output_tensors, gradient, group=model_parallel_group)
 
             output_tensors = [t if len(t.shape) > 0 else t.reshape_([-1]) for t in output_tensors]
-            gradient = merge_func(output_tensors).cuda()
+            gradient = merge_func(output_tensors)._copy_to(paddle.framework._current_expected_place(), False)
 
     # sharding
     if sharding_degree > 1:
@@ -369,7 +381,12 @@ class GradientOffloadHookContext:
                             gradient_dict[local_grad_name] = grad.clone() / self.loraga_init_iters
                     else:
                         if self.gradient_offload:
-                            new_grad = gradient_dict[local_grad_name].cuda() + grad / self.loraga_init_iters
+                            new_grad = (
+                                gradient_dict[local_grad_name]._copy_to(
+                                    paddle.framework._current_expected_place(), False
+                                )
+                                + grad / self.loraga_init_iters
+                            )
                             gradient_dict[local_grad_name] = new_grad.cpu()
                         else:
                             gradient_dict[local_grad_name] += grad / self.loraga_init_iters

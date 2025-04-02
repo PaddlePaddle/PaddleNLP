@@ -36,6 +36,10 @@ class Engine(object):
     """
     def __init__(self, cfg, token_processor):
         self.cfg = cfg
+        # Master node only
+        if self.cfg.nnode == 1 or self.cfg.host_ip == os.getenv('POD_0_IP', '127.0.0.1'):
+            self.queue_service = self._start_tasks_queue_service()
+        self.tasks_queue = TaskQueueManager(mp_num=self.cfg.mp_num, port=self.cfg.infer_port)
         self.resource_manager = ResourceManager(self.cfg)
         self.token_processor = token_processor
         self.token_processor.set_resource_manager(self.resource_manager)
@@ -50,9 +54,7 @@ class Engine(object):
         """
         assert not self.is_started, "The engine is already started.!"
         start_time = time.time()
-        self.queue_service = self._start_tasks_queue_service()
-        self.tasks_queue = TaskQueueManager(mp_num=self.cfg.mp_num, port=self.cfg.infer_port)
-
+        
         self.token_processor.tasks_queue = self.tasks_queue
         self.infer_proc = self._start_infer_service()
         model_server_logger.info("Waitting infer processes ready...")
@@ -258,7 +260,7 @@ class Engine(object):
         Returns:
             return: True if all ready, False otherwise
         """
-        if np.sum(self.flag_ready_array) == self.cfg.mp_num:
+        if np.sum(self.flag_ready_array) == self.cfg.mp_num_per_node:
             return True
         return False
 
@@ -378,13 +380,16 @@ class Engine(object):
         pd_cmd = "python3 -m paddle.distributed.launch "
         py_script = os.path.join(current_dir_path, "infer.py")
 
-        arguments = (f" --devices {self.cfg.device_ids} {py_script} --model_dir {self.cfg.model_dir}"
+        arguments = (f" --nnodes {str(self.cfg.nnode)}"
+                    f" --devices {self.cfg.device_ids} {py_script} --model_dir {self.cfg.model_dir}"
                     f" --max_batch_size {self.cfg.max_batch_size} --max_seq_len {self.cfg.max_seq_len}"
                     f" --max_dec_len {self.cfg.max_dec_len}"
                     f" --max_block_num {self.cfg.total_block_num} --block_size {self.cfg.block_size}"
                     f" --use_cache_kv_int8 {self.cfg.use_cache_kv_int8}"
                     f" --enc_dec_block_num {self.cfg.enc_dec_block_num}"
                     f" --block_ratio {self.cfg.block_ratio} --dtype {self.cfg.dtype}")
+        if self.cfg.nnode > 1:
+            pd_cmd = pd_cmd + f" --ips {self.cfg.ips}"
         pd_cmd = pd_cmd + arguments + " >log/launch_infer.log 2>&1"
         model_server_logger.info("Launch infer service command: {}".format(pd_cmd))
         p = subprocess.Popen(

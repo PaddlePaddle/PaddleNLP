@@ -24,6 +24,7 @@ import zipfile
 from collections import OrderedDict
 from typing import Optional, Union
 
+import paddle.distributed as dist
 import requests
 from filelock import FileLock
 from huggingface_hub import get_hf_file_metadata, hf_hub_url
@@ -33,7 +34,13 @@ from tqdm.auto import tqdm
 from .env import DOWNLOAD_SERVER, FAILED_STATUS, SUCCESS_STATUS
 from .fault_tolerance import PDC_DOWNLOAD_ERROR
 from .log import logger
-from .pdc_sdk import PDCErrorCode, PDCErrorMessageMap, pdc_tool
+from .pdc_sdk import (
+    FLASH_DEVICE,
+    PDCErrorCode,
+    PDCErrorMessageMap,
+    pdc_flash_device_available,
+    pdc_tool,
+)
 
 __all__ = ["get_weights_path_from_url"]
 
@@ -487,7 +494,7 @@ def download_from_pdc(remote_path, local_path, timeout):
     """
 
     try:
-        base_dir, _ = os.path.split(os.path.normpath(remote_path))
+        base_dir, _ = os.path.split(os.path.normpath(local_path))
         if not os.path.exists(base_dir) and base_dir != "":
             os.makedirs(base_dir, exist_ok=True)
     except Exception as e:
@@ -505,3 +512,81 @@ def download_from_pdc(remote_path, local_path, timeout):
         raise RuntimeError(
             f"{PDC_DOWNLOAD_ERROR}; Error occurred when trying to download object from PDC, remote_path: {remote_path}, local_path: {local_path}, timeout: {timeout}; error details: {PDCErrorMessageMap[result]}"
         )
+
+
+def get_static_model_on_pdc(remote_path, local_path, timeout, enable_flash_device=False):
+    """
+    Get static model from PDC. Use flash device if possible.
+    This function has to be called after distributed env is initialized in distributed mode.
+    Args:
+        remote_path (`str`):
+            remote path url for download
+        local_path (`str`):
+            local path to place downloaded object
+        timeout (`int`):
+            max wait time for download
+        enable_flash_device (`bool`):
+            Whether to use flash device
+    Returns:
+        str: path to load static model
+    """
+    try:
+        base_dir, target_dir = os.path.split(os.path.normpath(local_path))
+        if not os.path.exists(base_dir) and base_dir != "":
+            os.makedirs(base_dir, exist_ok=True)
+    except Exception as e:
+        raise RuntimeError(f"{PDC_DOWNLOAD_ERROR}; Failed to parse checkpoint path, details: {e}")
+
+    assert target_dir != ".", f"{PDC_DOWNLOAD_ERROR}, illegal local_path: {local_path}."
+
+    flash_path = os.path.join(FLASH_DEVICE, target_dir)
+    persistent_path = local_path
+
+    device_id = int(os.getenv("FLAGS_selected_gpus", "0"))
+    if device_id != 0:
+        logger.info("Waiting local process 0...")
+        dist.barrier()
+        return flash_path if (enable_flash_device and os.path.exists(flash_path)) else persistent_path
+
+    # step 1: load from flash device if possible
+    need_download_from_remote = True
+    need_backup_to_flash = False
+    if enable_flash_device and pdc_flash_device_available():
+        logger.info(f"flash device is available, checking status on {flash_path}...")
+        # skip download SC as default when flash device is available
+        need_download_from_remote = False
+        if os.path.exists(flash_path) and pdc_tool.pdc_flash_do_check(flash_path) == PDCErrorCode.Success:
+            logger.info("Static model checked successfully on flash device, ready to load...")
+        else:
+            logger.warning(
+                "flash device is available but no valid static model found on flash device, need to download from remote."
+            )
+            need_download_from_remote = True
+            need_backup_to_flash = True
+    else:
+        logger.info("Flash device is not enabled or available, will download static model from remote.")
+
+    # step 2: download from remote if neccesary
+    if need_download_from_remote:
+        logger.info("Beging download static model from remote...")
+        download_from_pdc(remote_path, persistent_path, timeout)
+        logger.info(f"downloaded static model from remote, path:{persistent_path}")
+
+    # step 3: backup to flash device if flash device is available
+    if enable_flash_device and need_backup_to_flash:
+        result = pdc_tool.pdc_backup_to_flash_device(persistent_path, flash_path)
+        if result == PDCErrorCode.Success:
+            logger.info(f"Backup static model to flash device {flash_path} successfully.")
+        else:
+            logger.error(f"Backup static model to flash device failed, error details: {PDCErrorMessageMap[result]}.")
+
+    # step 4: return flash path if available, otherwise return persistent path
+    if dist.get_world_size() > 1:
+        logger.info("Local node process done, waiting other nodes...")
+        dist.barrier()
+    if enable_flash_device and os.path.exists(flash_path):
+        logger.info(f"static model is ready on flash device, path: {flash_path}")
+        return flash_path
+    else:
+        logger.info(f"static model is only ready on persistent storage, path: {persistent_path}")
+        return persistent_path

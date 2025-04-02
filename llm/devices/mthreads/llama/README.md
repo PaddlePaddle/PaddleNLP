@@ -1,4 +1,4 @@
-## 🚣‍♂️ 使用 PaddleNLP 在 MTT S4000 下跑通 llama2-13b 模型预训练 🚣
+# 使用 PaddleNLP 在 MTT S4000 下跑通 llama2-13b 模型预训练
 PaddleNLP 在 MTT®S4000([了解摩尔线程](https://www.mthreads.com/))上对 llama2-13B 模型进行了深度适配和优化，下面给出详细安装步骤。
 
 ##  🚀 快速开始 🚀

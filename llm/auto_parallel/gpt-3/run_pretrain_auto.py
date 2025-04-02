@@ -44,6 +44,7 @@ from paddlenlp.transformers import (
     LinearAnnealingWithWarmupDecay,
 )
 from paddlenlp.utils.log import logger
+from paddlenlp.utils.tools import get_env_device
 
 MODEL_CLASSES = {
     "gpt": (GPTConfig, GPTForCausalLMAuto, GPTPretrainingCriterionAuto),
@@ -90,6 +91,13 @@ class PreTrainingArguments(AutoTrainingArguments):
     autotuner_benchmark: bool = field(
         default=False,
         metadata={"help": "Weather to run benchmark by autotuner. True for from_scratch and pad_max_length."},
+    )
+    pre_alloc_memory: float = field(
+        default=0.0,
+        metadata={
+            "help": "Pre-allocate one specific-capacity empty tensor "
+            "and release it for avoiding memory fragmentation"
+        },
     )
 
     def __post_init__(self):
@@ -224,7 +232,6 @@ class ModelArguments:
 
     hidden_dropout_prob: float = field(default=0.1, metadata={"help": "The hidden dropout prob."})
     attention_probs_dropout_prob: float = field(default=0.1, metadata={"help": "The attention hidden dropout prob."})
-
     use_fused_rope: Optional[bool] = field(
         default=False,
         metadata={"help": "Enable rope fusion or not."},
@@ -431,6 +438,20 @@ def main():
         os.makedirs(data_args.data_cache, exist_ok=True)
 
     init_seed(args=training_args)
+
+    if get_env_device() == "gpu":
+        prop = paddle.device.cuda.get_device_properties()
+        if prop.total_memory < training_args.pre_alloc_memory * 1024 * 1024 * 1024:
+            logger.warning("Invalid value for `pre_alloc_memory`, so pre-allocating just failed.")
+        elif training_args.pre_alloc_memory > 0:
+            memory_size = int(training_args.pre_alloc_memory * 1024 * 1024 * 1024)
+            x = paddle.empty([memory_size], dtype=paddle.uint8)
+            logger.warning(
+                f"pre-allocating a tensor whose memory capacity is {training_args.pre_alloc_memory} GB shape={x.shape} "
+                "and then release it."
+            )
+            del x
+
     paddle.set_device(training_args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
@@ -471,7 +492,7 @@ def main():
 
     if not model_args.continue_training:
         config.vocab_size = max(config.vocab_size, ((tokenizer.vocab_size - 1) // 128 + 1) * 128)
-        logger.info(f"Reset vocab size to {config.vocab_size} for batter amp peformance.")
+        logger.info(f"Reset vocab size to {config.vocab_size} for batter amp performance.")
 
     if model_args.no_recompute_layers is not None:
         model_args.no_recompute_layers.sort()
@@ -534,7 +555,7 @@ def main():
 
         model.apply(fn)
 
-    # Create the learning_rate sheduler and optimizer
+    # Create the learning_rate scheduler and optimizer
     if training_args.decay_steps is None:
         training_args.decay_steps = training_args.max_steps
     warmup_steps = training_args.warmup_ratio * training_args.max_steps
@@ -565,9 +586,6 @@ def main():
         tokenizer,
         need_data=training_args.should_load_dataset,
     )
-
-    # load_model_auto(model)
-    # model = shard_model(model)
 
     trainer = PretrainingTrainer(
         model=model,

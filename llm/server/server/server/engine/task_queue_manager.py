@@ -49,8 +49,9 @@ class TaskQueueManager(object):
         QueueManager.register('get_barrier1')
         QueueManager.register('get_barrier2')
         QueueManager.register('get_queue')
+        QueueManager.register('get_read_finish_flag')
 
-        self.client_manager = QueueManager(address=('127.0.0.1', port),
+        self.client_manager = QueueManager(address=(os.getenv("POD_0_IP","127.0.0.1"), port),
                                            authkey=b'infer_queue'
                                            )
         self.client_manager.connect()
@@ -60,6 +61,7 @@ class TaskQueueManager(object):
         self.barrier1 = self.client_manager.get_barrier1()
         self.barrier2 = self.client_manager.get_barrier2()
         self.queue = self.client_manager.get_queue()
+        self.read_finish_flag = self.client_manager.get_read_finish_flag()
         self.mp_num = mp_num
         self.rank = rank
         self.position = 1 << rank
@@ -155,7 +157,9 @@ def launch_queue_service(port, num_workers):
         QueueManager.register('get_barrier2', callable=lambda: barrier2)
         q = Queue()
         QueueManager.register("get_queue", callable=lambda: q)
-        m = QueueManager(address=('127.0.0.1', port), authkey=b'infer_queue')
+        read_finish_flag = Value("i", 0)
+        QueueManager.register("get_read_finish_flag", callable=lambda: read_finish_flag, proxytype=ValueProxy)
+        m = QueueManager(address=(os.getenv("POD_0_IP","127.0.0.1"), port), authkey=b'infer_queue')
         s = m.get_server()
         logger.info("launch queue service success")
         s.serve_forever()

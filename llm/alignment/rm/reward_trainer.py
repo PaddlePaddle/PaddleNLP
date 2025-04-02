@@ -37,7 +37,7 @@ _tr_acc = None
 speed_metrics = trainer.speed_metrics
 
 
-def patch_speed_metrics(split, start_time, num_samples=None, num_steps=None, seq_length=None):
+def patch_speed_metrics(split, start_time, num_samples=None, num_steps=None, seq_length=None, model_flops=None):
     # split: interval, train, eval, test
     result = speed_metrics(split, start_time, num_samples, num_steps, seq_length)
     if split not in ["train", "interval"]:

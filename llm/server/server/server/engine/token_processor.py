@@ -19,17 +19,25 @@ import traceback
 from collections import Counter
 from datetime import datetime
 
-import numpy as np
+import paddle
 from paddlenlp_ops import get_output
+
+if not paddle.is_compiled_with_xpu():
+    from paddlenlp_ops import speculate_get_output
+
 from server.utils import datetime_diff, model_server_logger, monitor_logger
+
+from paddlenlp.utils.env import MAX_BSZ, MAX_DRAFT_TOKENS, SPECULATE_MAX_BSZ
 
 
 class TokenProcessor(object):
     """
     get Token/Score from Paddle inference engine
     """
+
     def __init__(self, cfg):
         import paddle
+
         paddle.device.set_device("cpu")
         self.cfg = cfg
         self.resource_manager = None
@@ -37,7 +45,14 @@ class TokenProcessor(object):
         self.all_tokens = [[] for _ in range(self.cfg.max_batch_size)]
 
         self.tokens_counter = Counter()
-        self.output_tokens = paddle.full(shape=[self.cfg.max_batch_size + 2, 1], fill_value=2, dtype="int64")
+
+        self.is_speculate_decoding = self.cfg.get_speculate_config().speculate_method != "None"
+        if self.is_speculate_decoding:
+            self.output_tokens = paddle.full(
+                shape=[SPECULATE_MAX_BSZ * MAX_DRAFT_TOKENS + SPECULATE_MAX_BSZ + 2, 1], fill_value=2, dtype="int64"
+            )
+        else:
+            self.output_tokens = paddle.full(shape=[MAX_BSZ + 2, 1], fill_value=2, dtype="int64")
         self.worker = None
 
         self.record_time_interval = int(os.getenv("RECORD_TIME_INTERVAL", "600"))
@@ -46,6 +61,7 @@ class TokenProcessor(object):
         self.number_of_tasks = 0
         self.number_of_input_tokens = 0
         self.number_of_output_tokens = 0
+        self.total_step = 0
 
     def set_resource_manager(self, resource_manager):
         """
@@ -77,21 +93,24 @@ class TokenProcessor(object):
             try:
                 rank_id = 0
                 is_blocking = True
-                get_output(self.output_tokens, rank_id, is_blocking)
+                if self.is_speculate_decoding:
+                    speculate_get_output(self.output_tokens, rank_id, is_blocking)
+                else:
+                    get_output(self.output_tokens, rank_id, is_blocking)
 
                 if self.output_tokens[0, 0] == -2:
                     continue
+
                 self._process_batch_output()
             except Exception as e:
                 model_server_logger.info("while get input_data error: {0} {1}".format(e, str(traceback.format_exc())))
 
-    def postprocess(self, batch_result, exist_finished_task=False):
+    def postprocess(self, batch_result):
         """
         single post-processing function
 
         Args:
             batch_result (list): batch results
-            exist_finished_task (bool): whether there is a finished task
         """
         result_dir = "./generate_token_results"
         if not os.path.exists(result_dir):
@@ -101,14 +120,14 @@ class TokenProcessor(object):
             with open(result_file, "a") as f:
                 f.write("{}\n".format(result))
 
-    def _get_single_result(self, i, task_id, token_id, task):
+    def _get_single_result(self, i, task_id, token_ids, task):
         """
         processing single results
 
         Args:
             i (int): batch index
             task_id (str): task id
-            token_id (int): token id
+            token_ids (list): token id
             task (dict): task information
 
         Returns:
@@ -121,7 +140,7 @@ class TokenProcessor(object):
         result = {
             "req_id": task_id,
             "is_end": 0,
-            "token_ids": [token_id],
+            "token_ids": token_ids,
             "send_idx": self.tokens_counter[task_id],
             "inference_time_cost": inference_time_cost,
             "infer_seed": task["infer_seed"],
@@ -130,33 +149,48 @@ class TokenProcessor(object):
 
         # get benchmark msg
         if task.get("benchmark"):
-            keys = ["preprocess_start_time", "preprocess_end_time", "schedule_start_time",
-                    "inference_start_time", "inference_current_step_time"]
+            keys = [
+                "preprocess_start_time",
+                "preprocess_end_time",
+                "schedule_start_time",
+                "inference_start_time",
+                "inference_current_step_time",
+            ]
             for key in keys:
                 if key in task:
                     result[key] = str(task[key])
 
         # fill some extra information
-        if token_id in task["eos_token_ids"]:
-            result["is_end"] = 1
-            result["token_ids"] = []
-            result["tokens_all_num"] = len(self.all_tokens[i]) + 1
-            result["tokens_all_ids"] = self.all_tokens[i]
+        result["token_ids"] = []
+        for token_id in token_ids:
+            self.number_of_output_tokens += 1
+            if token_id in task["eos_token_ids"]:
+                result["is_end"] = 1
+                result["send_idx"] = self.tokens_counter[task_id]
+                result["tokens_all_num"] = len(self.all_tokens[i]) + 1
+                result["tokens_all_ids"] = self.all_tokens[i]
 
-            info_dict = {}
-            info_dict["req_id"] = task["req_id"]
-            info_dict["input_token_num"] = len(task["input_ids"])
-            info_dict["output_token_num"] = len(self.all_tokens[i])
-            if hasattr(task, "preprocess_start_time") and hasattr(task, "preprocess_end_time"):
-                info_dict["preprocess_cost_time"] = datetime_diff(task["preprocess_start_time"],
-                                                                  task["preprocess_end_time"])
-            if hasattr(task, "preprocess_end_time") and hasattr(task, "schedule_start_time"):
-                info_dict["cache_waiting_cost_time"] = datetime_diff(task["preprocess_end_time"],
-                                                                     task["schedule_start_time"])
-            info_dict["inference_time_cost"] = task["inference_time_cost"]
-            info_dict["version"] = "4.6"
-            info_dict["timestamp"] = time.time()
-            monitor_logger.info(f"{info_dict}")
+                info_dict = {}
+                info_dict["req_id"] = task["req_id"]
+                info_dict["input_token_num"] = len(task["input_ids"])
+                info_dict["output_token_num"] = len(self.all_tokens[i])
+                if hasattr(task, "preprocess_start_time") and hasattr(task, "preprocess_end_time"):
+                    info_dict["preprocess_cost_time"] = datetime_diff(
+                        task["preprocess_start_time"], task["preprocess_end_time"]
+                    )
+                if hasattr(task, "preprocess_end_time") and hasattr(task, "schedule_start_time"):
+                    info_dict["cache_waiting_cost_time"] = datetime_diff(
+                        task["preprocess_end_time"], task["schedule_start_time"]
+                    )
+                info_dict["inference_time_cost"] = task["inference_time_cost"]
+                info_dict["version"] = "OpenSource"
+                info_dict["timestamp"] = time.time()
+                monitor_logger.info(f"{info_dict}")
+                break
+            else:
+                self.tokens_counter[task_id] += 1
+                self.all_tokens[i].append(token_id)
+                result["token_ids"].append(token_id)
 
         return result
 
@@ -177,48 +211,63 @@ class TokenProcessor(object):
         """
         tokens = self.output_tokens.numpy()
         batch = self.output_tokens[1, 0]
-        tokens = tokens[2:batch + 2]
+        if not self.is_speculate_decoding:
+            tokens = tokens[2 : batch + 2]
+        else:
+            accept_num = tokens[2 : batch + 2]
 
         batch_result = list()
-        exist_finished_task = False
         for i in range(batch):
             if self.resource_manager.stop_flags[i]:
                 continue
 
-            token_id = int(tokens[i, 0])
-            if token_id < 0:
+            if not self.is_speculate_decoding:
+                token_ids = [int(tokens[i, 0])]
+            else:
+                token_ids = tokens[
+                    2
+                    + SPECULATE_MAX_BSZ
+                    + i * MAX_DRAFT_TOKENS : 2
+                    + SPECULATE_MAX_BSZ
+                    + i * MAX_DRAFT_TOKENS
+                    + accept_num[i, 0],
+                    0,
+                ].tolist()
+            if any(token_id < 0 for token_id in token_ids):
                 continue
 
             task = self.resource_manager.tasks_list[i]
 
             task_id = task["req_id"]
-            result = self._get_single_result(i, task_id, token_id, task)
+            result = self._get_single_result(i, task_id, token_ids, task)
+            self.total_step += 1
 
-            self.tokens_counter[task_id] += 1
-            if token_id not in task["eos_token_ids"]:
-                self.all_tokens[i].append(token_id)
-
-            self.number_of_output_tokens += 1
-            if token_id in task["eos_token_ids"]:
-                self._recycle_resources(task_id, i, task)
-                model_server_logger.info("req_id: {0} finished".format(task_id))
-                model_server_logger.info(f"{self.resource_manager.info()}")
-                exist_finished_task = True
+            for token_id in token_ids:
+                if token_id in task["eos_token_ids"]:
+                    self._recycle_resources(task_id, i, task)
+                    model_server_logger.info("req_id: {0} finished".format(task_id))
+                    model_server_logger.info(f"{self.resource_manager.info()}")
+                    model_server_logger.info(
+                        f"Speculate accept ratio: {1 - self.total_step * 1.0 / self.number_of_output_tokens}"
+                        f" total step: {self.total_step}. total_output_token_num: {self.number_of_output_tokens}"
+                    )
+                    break
             batch_result.append(result)
 
-        self.postprocess(batch_result, exist_finished_task)
+        self.postprocess(batch_result)
 
 
 class WarmUpTokenProcessor(TokenProcessor):
     """
     Warmup Processor
     """
+
     def __init__(self, cfg):
         super().__init__(cfg)
         self._is_running = True
         self._is_blocking = True
 
-    def postprocess(self, batch_result, exist_finished_task=False):
+    def postprocess(self, batch_result):
         pass
 
     def process_sampling_results(self):
@@ -228,7 +277,10 @@ class WarmUpTokenProcessor(TokenProcessor):
         while self._is_running:
             try:
                 rank_id = 0
-                get_output(self.output_tokens, rank_id, self._is_blocking)
+                if self.is_speculate_decoding:
+                    speculate_get_output(self.output_tokens, rank_id, self._is_blocking)
+                else:
+                    get_output(self.output_tokens, rank_id, self._is_blocking)
 
                 if self.output_tokens[0, 0] == -2:
                     continue

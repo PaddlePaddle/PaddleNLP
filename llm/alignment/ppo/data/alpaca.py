@@ -27,7 +27,7 @@ class AlpacaDataset(RawDataset):
     NAME: str = "alpaca"
     ALIASES: tuple[str, ...] = ("stanford-alpaca",)
 
-    def __init__(self, path: str | None = None) -> None:
+    def __init__(self, path: str | None = None, *args, **kwargs) -> None:
         self.data = load_dataset(path or "tatsu-lab/alpaca", split="train")
 
     def __getitem__(self, index: int) -> RawSample:

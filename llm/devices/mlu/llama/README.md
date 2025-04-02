@@ -1,4 +1,4 @@
-## 🚣‍♂️ 使用 PaddleNLP 在 MLU 下跑通 llama-13b 模型 🚣
+# 使用 PaddleNLP 在 MLU 下跑通 llama-13b 模型
 PaddleNLP 在寒武纪 MLU（[了解寒武纪](https://www.cambricon.com/)）上对 llama-13B 模型进行了深度适配和优化，该套件实现了寒武纪 MLU 和 GPU 的训推入口基本统一，达到了『无缝切换』的效果。
 
 ##  🚀 快速开始 🚀

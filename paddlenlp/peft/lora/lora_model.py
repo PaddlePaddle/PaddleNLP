@@ -46,7 +46,7 @@ from ...utils.distributed import distributed_allgather, distributed_gather
 from ...utils.env import LORA_WEIGHTS_NAME, SAFE_PEFT_WEIGHTS_INDEX_NAME
 from ...utils.log import logger
 from ...utils.tools import get_env_device
-from .lora_config import LoRAConfig
+from .lora_config import LoRAAutoConfig, LoRAConfig
 
 
 def get_lora_layers():
@@ -327,12 +327,18 @@ class LoRAModel(nn.Layer):
         model_state_dict = self.model.state_dict()
         if self.lora_config.loraga:
 
-            def process_split_and_assign(name, concat_tensor, axis, init_dict, state_dict):
+            def process_split_and_assign(name, concat_tensor, init_dict, state_dict):
+                if "lora_A" in name:
+                    axis = 1
+                else:
+                    axis = 0
                 if isinstance(concat_tensor, np.ndarray):
                     final_lora, init_lora = np.split(concat_tensor, 2, axis=axis)
                     init_lora = paddle.to_tensor(init_lora)
                 else:
                     final_lora, init_lora = paddle.split(concat_tensor, 2, axis=axis)
+                if "lora_B" in name:
+                    init_lora *= -1
                 init_dict[name] = init_lora
                 state_dict[name] = final_lora
                 return init_lora
@@ -341,19 +347,21 @@ class LoRAModel(nn.Layer):
                 if "lora_A" in name:
                     concat_lora_A = state_dict[name]
                     init_loraA = process_split_and_assign(
-                        name, concat_lora_A, axis=1, init_dict=self.loraga_init_dict, state_dict=state_dict
+                        name, concat_lora_A, init_dict=self.loraga_init_dict, state_dict=state_dict
                     )
 
                     loraB_name = name.replace("lora_A", "lora_B")
                     concat_lora_B = state_dict[loraB_name]
                     init_loraB = process_split_and_assign(
-                        loraB_name, concat_lora_B, axis=0, init_dict=self.loraga_init_dict, state_dict=state_dict
+                        loraB_name, concat_lora_B, init_dict=self.loraga_init_dict, state_dict=state_dict
                     )
 
                     base_name = name.replace("lora_A", "weight")
                     if not self.reinit_base_model:
                         # Reinit base model
-                        offset = init_loraA.cuda() @ init_loraB.cuda()
+                        offset = init_loraA._copy_to(
+                            paddle.framework._current_expected_place(), False
+                        ) @ init_loraB._copy_to(paddle.framework._current_expected_place(), False)
                         ori_weight = model_state_dict[base_name]
                         model_state_dict[base_name].set_value(ori_weight - self.lora_config.scaling * offset)
         del model_state_dict
@@ -437,7 +445,10 @@ class LoRAModel(nn.Layer):
         ), f"Saving directory ({save_directory}) should be a directory, not a file"
         os.makedirs(save_directory, exist_ok=True)
 
-        lora_config_to_save = LoRAConfig(**self.lora_config.to_dict())
+        if isinstance(self.lora_config, LoRAConfig):
+            lora_config_to_save = LoRAConfig(**self.lora_config.to_dict())
+        else:
+            lora_config_to_save = LoRAAutoConfig(**self.lora_config.to_dict())
 
         trainable_state_dict = self.get_trainable_state_dict(concat_init_lora=lora_config_to_save.loraga)
 
@@ -691,7 +702,7 @@ class LoRAModel(nn.Layer):
                     if "lora_A" in name:
                         trainable_state_dict[name] = paddle.concat([weight, self.loraga_init_dict[name]], axis=1)
                     else:
-                        trainable_state_dict[name] = paddle.concat([weight, self.loraga_init_dict[name]], axis=0)
+                        trainable_state_dict[name] = paddle.concat([weight, -self.loraga_init_dict[name]], axis=0)
                 else:
                     trainable_state_dict[name] = weight
 

@@ -131,7 +131,7 @@ def rms_norm_ref(
 def config_prune(configs):
     # if paddle.version.hip:
     #     try:
-    #         # set warp size based on gcn architecure
+    #         # set warp size based on gcn architecture
     #         gcn_arch_name = paddle.device.get_device_properties(0).gcnArchName
     #         if "gfx10" in gcn_arch_name or "gfx11" in gcn_arch_name:
     #             # radeon

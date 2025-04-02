@@ -710,7 +710,7 @@ class MT5CompatibilityTest(unittest.TestCase):
     def test_mt5_converter(self):
         with tempfile.TemporaryDirectory() as tempdir:
             model_id = "google/mt5-small"
-            # 1. create commmon input
+            # 1. create common input
             input_ids = np.random.randint(100, 200, [1, 20])
 
             # 2. forward the paddle model
@@ -742,7 +742,7 @@ class MT5CompatibilityTest(unittest.TestCase):
     def test_mt5_converter_from_local_dir(self):
         with tempfile.TemporaryDirectory() as tempdir:
             model_id = "google/mt5-small"
-            # 1. create commmon input
+            # 1. create common input
             input_ids = np.random.randint(100, 200, [1, 20])
 
             # 2. forward the torch  model
@@ -778,7 +778,7 @@ class MT5CompatibilityTest(unittest.TestCase):
     def test_mt5_for_conditional_generation(self):
         with tempfile.TemporaryDirectory() as tempdir:
             model_id = "google/mt5-small"
-            # 1. create commmon input
+            # 1. create common input
             input_ids = np.random.randint(100, 200, [1, 20])
 
             # 2. forward the torch  model

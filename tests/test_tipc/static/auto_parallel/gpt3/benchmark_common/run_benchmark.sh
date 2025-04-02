@@ -24,6 +24,9 @@ function _set_params(){
     fp_item="bf16"
     MODEL_TYPE=${model_type:-"gpt3_13b"}
 
+    # for intermediate api
+    intermediate_api=${intermediate_api:-""}
+
     ip_lists=($(echo $TRAINER_INSTANCES | tr ',' ' '))
     master_ip=${ip_lists[0]}
     nnodes=${nnodes:-1}
@@ -88,7 +91,7 @@ monitor_log_file() {
             # 文件大小未变化，增加无更新时长计数
             no_update_duration=$((no_update_duration + 5))
             echo "$(date '+%Y-%m-%d %H:%M:%S') 文件未写入..."
-            if [ "$no_update_duration" -ge 180 ]; then
+            if [ "$no_update_duration" -ge 900 ]; then
                 echo "$(date '+%Y-%m-%d %H:%M:%S') 文件在过去的 3 分钟内没有继续写入，准备杀掉进程 $training_pid."
                 # 创建标志文件
                 touch "$kill_flag_file"
@@ -174,17 +177,17 @@ function _train(){
         train_cmd="python -u -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
             --nnodes 1 --nproc_per_node 8 \
             --log_dir mylog run_pretrain_auto.py \
-            ./pretrain_config_${MODEL_TYPE}/pretrain-${MODEL_TYPE}.json"
+            ./pretrain_config_${MODEL_TYPE}/${intermediate_api}pretrain-${MODEL_TYPE}.json"
         ;;
     N4C32) echo "Run with: device_num=${device_num} run_mode=${run_mode}"
         train_cmd="python -u -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
             --log_dir mylog run_pretrain_auto.py \
-            ./pretrain_config_${MODEL_TYPE}/pretrain-${MODEL_TYPE}.json"
+            ./pretrain_config_${MODEL_TYPE}/${intermediate_api}pretrain-${MODEL_TYPE}.json"
         ;;
     *) echo "Run with: device_num=${device_num}, run_mode=${run_mode}"
         train_cmd="python -u -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
             --log_dir mylog run_pretrain_auto.py \
-            ./pretrain_config_${MODEL_TYPE}/pretrain-${MODEL_TYPE}.json"
+            ./pretrain_config_${MODEL_TYPE}/${intermediate_api}pretrain-${MODEL_TYPE}.json"
         ;;
     esac
     cd ../llm/auto_parallel/gpt-3
@@ -241,10 +244,9 @@ export NCCL_IB_DISABLE=0
 export PYTHONPATH=$(dirname "$PWD"):$PYTHONPATH
 # https://github.com/PaddlePaddle/Paddle/pull/69410 合入影响
 # 如不设置参数为1,则默认选择不带tensor fusion的sharding stage1版本
-export FLAGS_enable_sharding_stage1_tensor_fusion=1
 
 # 只有13b的任务需要打开CUDA_DEVICE_MAX_CONNECTIONS,7b与13b关闭
-export CUDA_DEVICE_MAX_CONNECTIONS=1
+# export CUDA_DEVICE_MAX_CONNECTIONS=1
 export PARALLEL_CROSS_ENTROPY=true
 # benchmark框架中会默认设置CUDA_MODULE_LOADING=LAZY,影响case执行，修复框架问题后再移除该变量
 unset CUDA_MODULE_LOADING

@@ -99,13 +99,13 @@ class SupervisedDataset(TokenizedDataset):
     def get_collator(
         self, shift: bool = False
     ) -> Callable[[list[dict[str, paddle.Tensor]]], dict[str, paddle.Tensor]]:
-        return SupervisedCollator(self.tokenizer.pad_token_id, shift)
+        return SupervisedCollator(self.tokenizer.pad_token_id, shift, use_rm_server=False)
 
 
 class SupervisedCollator(CollatorBase):
-    def __init__(self, pad_token_id: int, shift: bool = False) -> None:
+    def __init__(self, pad_token_id: int, shift: bool = False, use_rm_server: bool = False) -> None:
         """Initialize a collator."""
-        super().__init__(pad_token_id)
+        super().__init__(pad_token_id, use_rm_server=use_rm_server)
         self._shift = shift
 
     def __call__(self, samples: list[SupervisedSample]) -> SupervisedBatch:

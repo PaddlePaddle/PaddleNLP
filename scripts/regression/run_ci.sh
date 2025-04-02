@@ -14,14 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 ####################################
+set -e
 export python=$1
 export paddle=$2
 export nlp_dir=/workspace/PaddleNLP
-mkdir /workspace/PaddleNLP/logs
-mkdir /workspace/PaddleNLP/model_logs
-mkdir /workspace/PaddleNLP/unittest_logs
-mkdir /workspace/PaddleNLP/coverage_logs
-mkdir /workspace/PaddleNLP/upload
+mkdir -p /workspace/PaddleNLP/logs
+mkdir -p /workspace/PaddleNLP/model_logs
+mkdir -p /workspace/PaddleNLP/unittest_logs
+mkdir -p /workspace/PaddleNLP/coverage_logs
+mkdir -p /workspace/PaddleNLP/upload
 export log_path=/workspace/PaddleNLP/model_logs
 export P0case_list=()
 export APIcase_list=()
@@ -67,7 +68,7 @@ install_paddle(){
     echo -e "\033[35m ---- Install paddlepaddle-gpu  \033[0m"
     python -m pip install --user -r scripts/regression/requirements_ci.txt
     python -m pip uninstall paddlepaddle -y
-    python -m pip install pillow -y
+    python -m pip install pillow
     python -m pip install --user ${paddle} --no-cache-dir;
     python -c "import paddle;print('paddle');print(paddle.__version__);print(paddle.version.show())" >> ${log_path}/commit_info.txt
     python -c 'from visualdl import LogWriter'
@@ -90,7 +91,7 @@ nlp_build (){
 ####################################
 # upload paddlenlp  whl
 upload (){
-    mkdir ${PPNLP_HOME}/upload
+    mkdir -p ${PPNLP_HOME}/upload
     if [ $1 == "paddlenlp" ];then
         echo -e "\033[35m ---- build latest paddlenlp  \033[0m"
         build_dev_path=/workspace/PaddleNLP_dev
@@ -107,9 +108,9 @@ upload (){
 }
 ####################################
 # get diff case
-for line in `cat scripts/regression/model_list.txt`;do
-    all_example_dict[${#all_example_dict[*]}]=$line
-done
+# for line in `cat scripts/regression/model_list.txt`;do
+#     all_example_dict[${#all_example_dict[*]}]=$line
+# done
 cd ${nlp_dir}
 get_diff_TO_P0case(){
 for file_name in `git diff --numstat ${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
@@ -141,11 +142,11 @@ for file_name in `git diff --numstat ${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`
         done
         if [[ ${dir2} =~ "__init__" ]];then # 针对发版mini test
             P0case_list[${#P0case_list[*]}]=bert
-        elif [[ ${!all_P0case_dic[*]} =~ ${dir2} ]];then
+        elif [[ ${!all_P0case_dic[*]} == ${dir2} ]];then
             P0case_list[${#P0case_list[*]}]=${dir2}
         elif [[ ${dir2} =~ "transformers" ]];then
             P0case_list[${#P0case_list[*]}]=llm
-            if [[ ${!all_P0case_dic[*]} =~ ${dir3} ]];then
+            if [[ ${!all_P0case_dic[*]} == ${dir3} ]];then
                 P0case_list[${#P0case_list[*]}]=${dir3}
             fi
         elif [[ ${dir2} =~ "taskflow" ]];then
@@ -204,37 +205,35 @@ get_diff_TO_P0case
 P0case_list=($(awk -v RS=' ' '!a[$1]++' <<< ${P0case_list[*]}))
 APIcase_list=($(awk -v RS=' ' '!a[$1]++' <<< ${APIcase_list[*]}))
 ####################################
-# upload latest paddlenlp pipelines ppddifusers whl
-if [[ ${#Build_list[*]} -ne 0 ]];then
-    echo -e "\033[32m start build ${Build_list[*]} whl \033[0m"
-    install_paddle
-    for build_pkg in ${Build_list[*]};do
-        upload ${build_pkg}
-    done
-    echo -e "\033[32m make PaddleNLP.tar.gz  \033[0m"
-    cd /workspace
-    rm -rf PaddleNLP_dev/build/*
-    cd PaddleNLP_dev && git submodule update --init --recursive
-    cd /workspace && tar -zcvf PaddleNLP.tar.gz PaddleNLP_dev/
-    mv PaddleNLP.tar.gz ${PPNLP_HOME}/upload
-    cd ${PPNLP_HOME}
-    python upload.py ${PPNLP_HOME}/upload 'paddlenlp/wheels'
-    rm -rf upload/*
-else
-   echo -e "\033[32m Don't need build whl  \033[0m"
-fi
+# # upload latest paddlenlp pipelines ppddifusers whl
+# if [[ ${#Build_list[*]} -ne 0 ]];then
+#     echo -e "\033[32m start build ${Build_list[*]} whl \033[0m"
+#     install_paddle
+#     for build_pkg in ${Build_list[*]};do
+#         upload ${build_pkg}
+#     done
+#     echo -e "\033[32m make PaddleNLP.tar.gz  \033[0m"
+#     cd /workspace
+#     rm -rf PaddleNLP_dev/build/*
+#     cd PaddleNLP_dev && git submodule update --init --recursive
+#     cd /workspace && tar -zcf PaddleNLP.tar.gz PaddleNLP_dev/
+#     mv PaddleNLP.tar.gz ${PPNLP_HOME}/upload
+#     cd ${PPNLP_HOME}
+#     python upload.py ${PPNLP_HOME}/upload 'paddlenlp/wheels'
+#     rm -rf upload/*
+# else
+#    echo -e "\033[32m Don't need build whl  \033[0m"
+# fi
 ###################################
 if [[ ${#P0case_list[*]} -ne 0 ]] || [[ ${#APIcase_list[*]} -ne 0 ]];then
     # Install paddlenlp
     cd ${nlp_dir}
     python -m pip uninstall protobuf -y
-    python -m pip uninstall protobuf -y
     python -m pip install protobuf==3.20.2
     if [ ! -f ./dist/p****.whl ];then
         install_paddle
         echo "install_nlp_develop"
-        wget https://paddlenlp.bj.bcebos.com/wheels/paddlenlp-ci-py3-none-any.whl
-        python -m pip install --user paddlenlp-ci-py3-none-any.whl
+        python -m pip install --user https://paddlenlp.bj.bcebos.com/wheels/paddlenlp-ci-py3-none-any.whl --no-cache-dir
     else
         echo "instal_nlp_pr"
         python -m pip install  dist/p****.whl
@@ -306,8 +305,9 @@ if [[ ${#P0case_list[*]} -ne 0 ]] || [[ ${#APIcase_list[*]} -ne 0 ]];then
     fi
     cd ${nlp_dir}
     echo -e "\033[35m ---- Genrate Allure Report  \033[0m"
+    unset http_proxy && unset https_proxy
     cp scripts/regression/gen_allure_report.py ./
-    python gen_allure_report.py
+    python gen_allure_report.py > ${nlp_dir}/coverage_logs/gen_allure_report.log 2>&1
     echo -e "\033[35m ---- Report: https://xly.bce.baidu.com/ipipe/ipipe-report/report/${AGILE_JOB_BUILD_ID}/report/  \033[0m"
     ####################################
     # run coverage

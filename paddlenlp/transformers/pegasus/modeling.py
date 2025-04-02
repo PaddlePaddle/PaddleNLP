@@ -538,7 +538,7 @@ class PegasusForConditionalGeneration(PegasusPretrainedModel):
                 See :class:`PegasusModel`.
             decoder_attention_mask (Tensor, optional):
                 See :class:`PegasusModel`.
-            encoder_output (Tensor, optonal):
+            encoder_output (Tensor, optional):
                 See :class:`PegasusModel`.
             use_cache (bool, optional):
                 See :class:`PegasusModel`.

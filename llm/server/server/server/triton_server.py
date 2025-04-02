@@ -28,7 +28,6 @@ from datetime import datetime
 import numpy as np
 from server.checker import add_default_params, check_basic_params
 from server.engine import engine
-from server.engine.config import Config
 from server.utils import error_logger, model_server_logger
 
 import server
@@ -44,15 +43,6 @@ if sys.stdout.encoding is None:
     enc = os.environ["LANG"].split(".")[1]
     sys.stdout = codecs.getwriter(enc)(sys.stdout)
 
-
-class TritonConfig(Config):
-    """
-    Triton Inference Server config
-    """
-    def __init__(self, base_config):
-        super().__init__()
-        for k, v in base_config.__dict__.items():
-            setattr(self, k, v)
 
 
 class TritonTokenProcessor(engine.TokenProcessor):
@@ -98,11 +88,35 @@ class TritonTokenProcessor(engine.TokenProcessor):
             except Exception as e:
                     model_server_logger.error("Unexcepted error happend: {}, {}".format(e, str(traceback.format_exc())))
 
-    def postprocess(self, batch_result, exist_finished_task=False):
+    def _cache_special_tokens(self, batch_result):
+        for i in range(len(batch_result)):
+            is_end = batch_result[i].get("is_end", 0)
+            token_ids = batch_result[i]["token_ids"]
+            if is_end != 1:
+                if batch_result[i]["req_id"] not in self.token_buffer:
+                    self.token_buffer[batch_result[i]["req_id"]] = list()
+                    self.score_buffer[batch_result[i]["req_id"]] = list()
+                self.token_buffer[batch_result[i]["req_id"]].extend(token_ids)
+                self.score_buffer[batch_result[i]["req_id"]].extend(batch_result[i].get("token_scores", []))
+                batch_result[i]["token_ids"] = []
+                if "token_scores" in batch_result[i]:
+                    batch_result[i]["token_scores"] = []
+            else:
+                if batch_result[i]["req_id"] in self.token_buffer:
+                    batch_result[i]["token_ids"] = self.token_buffer[batch_result[i]
+                        ["req_id"]] + batch_result[i]["token_ids"]
+                    del self.token_buffer[batch_result[i]["req_id"]]
+                    if "token_scores" in batch_result[i]:
+                        batch_result[i]["token_scores"] = self.score_buffer[batch_result[i]
+                            ["req_id"]] + batch_result[i]["token_scores"]
+                    del self.score_buffer[batch_result[i]["req_id"]]
+
+    def postprocess(self, batch_result):
         """
         single postprocess for triton
         """
         try:
+            # self._cache_special_tokens(batch_result)
             self.cached_generated_tokens.put(batch_result)
         except Exception as e:
             model_server_logger.info(
@@ -122,11 +136,11 @@ class TritonServer(object):
         # start health checker
         use_custom_health_checker = int(os.getenv("USE_CUSTOM_HEALTH_CHECKER", 1))
         # if set USE_CUSTOM_HEALTH_CHECKER=1, use custom health checker, need set --allow-http=false
-        # else use tritonserver's health checker, need set --http-port=${HTTP_PORT}
+        # else use tritonserver's health checker, need set --http-port=${HEALTH_HTTP_PORT}
         if use_custom_health_checker:
-            http_port = os.getenv("HTTP_PORT")
+            http_port = os.getenv("HEALTH_HTTP_PORT")
             if http_port is None:
-                raise Exception("HTTP_PORT must be set")
+                raise Exception("HEALTH_HTTP_PORT must be set")
             from server.triton_server_helper import start_health_checker
             multiprocessing.Process(target=start_health_checker, args=(int(http_port), )).start()
             time.sleep(1)
@@ -140,7 +154,7 @@ class TritonServer(object):
                 enable decoupled transaction policy in model configuration to
                 serve this model""".format(args["model_name"]))
 
-        # add metrics，use METRICS_PORT get server metrics
+        # add metrics，use METRICS_HTTP_PORT get server metrics
         self.metric_family = pb_utils.MetricFamily(
             name="inference_server_metrics",
             description="Metrics for monitoring inference server status",
@@ -165,10 +179,9 @@ class TritonServer(object):
 
         # response_sender thread lock
         self.thread_lock = threading.Lock()
-
-        base_config = Config()
-        self.cfg = TritonConfig(base_config)
-        self.cfg.print(file="log/deploy_init.info")
+        from server.engine.config import global_config
+        self.cfg = global_config
+        self.cfg.print(file="log/fastdeploy_init.info")
 
         # init engine
         self.token_processor = TritonTokenProcessor(self.cfg, self)
@@ -177,7 +190,9 @@ class TritonServer(object):
         self.engine.start()
         model_server_logger.info("Create engine success")
 
-        self._initialize_push_mode()
+        # Master node only
+        if self.cfg.nnode == 1 or os.getenv('POD_0_IP',"127.0.0.1") == self.cfg.host_ip:
+            self._initialize_push_mode()
         model_server_logger.info("Init triton server success")
 
 

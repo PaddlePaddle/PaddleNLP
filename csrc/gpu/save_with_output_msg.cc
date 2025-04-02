@@ -27,20 +27,19 @@ struct msgdata {
 };
 
 void SaveOutMmsg(const paddle::Tensor& x,
-                 const paddle::Tensor& not_need_stop,
+                 const paddle::Tensor& not_need_stop, // cpu
                  int64_t rank_id) {
     if (rank_id > 0) return;
     auto x_cpu = x.copy_to(paddle::CPUPlace(), false);
     int64_t *x_data = x_cpu.data<int64_t>();
-    auto not_need_stop_cpu = not_need_stop.copy_to(paddle::CPUPlace(), false);
-    bool* not_need_stop_data = not_need_stop_cpu.data<bool>();
+    auto not_need_stop_data = not_need_stop.data<bool>()[0];
 
     static struct msgdata msg_sed;
     static key_t key = ftok("./", 1);
     static int msgid = msgget(key, IPC_CREAT | 0666);
 
     msg_sed.mtype = 1;
-    msg_sed.mtext[0] = not_need_stop_data[0] ? 1 : -1;
+    msg_sed.mtext[0] = not_need_stop_data ? 1 : -1;
     int bsz = x.shape()[0];
     msg_sed.mtext[1] = bsz;
     for (int i = 2; i < bsz + 2; i++) {
