@@ -1321,6 +1321,7 @@ class Qwen2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen2Pr
         self.max_candidate_len = config.get("speculate_max_candidate_len", 5)
         self.verify_window = config.get("speculate_verify_window", 2)
         self.max_seq_len = config.max_seq_len
+        self.return_full_hidden_states = config.get("return_full_hidden_states", False)
 
         self.qwen2 = Qwen2BlockInferenceModel(config, base_model_prefix)
         if config.tie_word_embeddings:
