@@ -1775,7 +1775,7 @@ class DeepseekV2DecoderLayer(nn.Layer):
             else DeepseekV2MLPClass(config)
         )
         self.input_layernorm = DeepseekV2RMSNorm(config)
-        self.post_attention_layernorm = DeepseekV2RMSNorm(config)
+        # self.post_attention_layernorm = DeepseekV2RMSNorm(config)
 
     def forward(
         self,
@@ -1807,6 +1807,8 @@ class DeepseekV2DecoderLayer(nn.Layer):
                 "Passing `padding_mask` is deprecated and will be removed in v4.37. Please make sure use `attention_mask` instead.`"
             )
         residual = hidden_states
+        
+        print("enter decoder memory_allocated = ", paddle.device.cuda.memory_allocated() // (1024 ** 2), "max_memory_allocated = ", paddle.device.cuda.max_memory_allocated() // (1024 ** 2),  "max_memory_reserved = ", paddle.device.cuda.max_memory_reserved() // (1024 ** 2))
 
         # Self Attention
         has_gradient = not hidden_states.stop_gradient
@@ -1851,15 +1853,17 @@ class DeepseekV2DecoderLayer(nn.Layer):
             present_key_value = outputs[2 if output_attentions else 1]
 
         hidden_states = residual + hidden_states
-
+        print("after attention memory_allocated = ", paddle.device.cuda.memory_allocated() // (1024 ** 2), "max_memory_allocated = ", paddle.device.cuda.max_memory_allocated() // (1024 ** 2),  "max_memory_reserved = ", paddle.device.cuda.max_memory_reserved() // (1024 ** 2))
         # Fully Connected
         residual = hidden_states
 
-        hidden_states = self.post_attention_layernorm(hidden_states)
+        # hidden_states = self.post_attention_layernorm(hidden_states)
         hidden_states = self.mlp(hidden_states)
         hidden_states = residual + hidden_states
 
         outputs = (hidden_states,)
+
+        print("after MLP memory_allocated = ", paddle.device.cuda.memory_allocated() // (1024 ** 2), "max_memory_allocated = ", paddle.device.cuda.max_memory_allocated() // (1024 ** 2),  "max_memory_reserved = ", paddle.device.cuda.max_memory_reserved() // (1024 ** 2))
 
         if output_attentions:
             outputs += (self_attn_weights,)
@@ -1914,7 +1918,7 @@ class DeepseekV2DecoderLayer(nn.Layer):
         hidden_states = residual + hidden_states
 
         residual = hidden_states
-        hidden_states = self.post_attention_layernorm(hidden_states)
+        # hidden_states = self.post_attention_layernorm(hidden_states)
 
         return hidden_states, residual
 

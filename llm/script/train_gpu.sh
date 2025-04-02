@@ -18,6 +18,17 @@ unset DISTRIBUTED_TRAINER_ENDPOINTS
 unset FLAGS_START_PORT
 unset PADDLE_ELASTIC_TIMEOUT
 
+source /root/paddlejob/workspace/env_run/output/zhangbo/py310/bin/activate
+export DSV3_USE_FP8_GEMM=true
+export DSV3_USE_ATTEN_RECOMPUTE=true
+export FA_VERSION=3
+export DSV3_USE_FP8_GROUP_GEMM=true
+export IF_USE_GROUP_GEMM_MASK=false
+
+# export CUDA_LAUNCH_BLOCKING=1
+# unset http_proxy && unset https_proxy
+# pip install -U --force-reinstall /root/paddlejob/workspace/env_run/output/paddlepaddle_gpu-0.0.0-cp310-cp310-linux_x86_64.whl
+
 nnodes=$PADDLE_TRAINERS_NUM
 rank=$PADDLE_TRAINER_ID
 
@@ -35,8 +46,8 @@ export NVSHMEM_IB_TRAFFIC_CLASS=162
 export NVSHMEM_BOOTSTRAP=UID
 export NVSHMEM_BOOTSTRAP_UID_SOCK_IFNAME==xgbe0
 
-START_RANK=0
-END_RANK=8
+START_RANK=16
+END_RANK=20
 
 if [[ $rank -lt $START_RANK ]]; then
     exit 0
@@ -49,13 +60,18 @@ fi
 rank=$(($rank-$START_RANK))
 nnodes=$(($END_RANK-$START_RANK))
 
-master=`cat /root/paddlejob/workspace/hostfile | head -n 1 | awk '{print $1}'`
+# master=`cat /root/paddlejob/workspace/hostfile | head -n 1 | awk '{print $1}'`
+master=`cat /root/paddlejob/workspace/hostfile | head -n $(($START_RANK+1)) | tail -n 1 | awk '{print $1}'`
 port=36679
 export PYTHONPATH=../:$PYTHONPATH
 export PATH=/opt/nvidia/nsight-systems/2025.1.1/bin/:$PATH
 
-python3.10 -m paddle.distributed.launch \
-    --log_dir output/paddle_distributed_logs \
+mkdir -p output/paddle_distributed_logs_overlap
+
+# /opt/nvidia/nsight-systems/2025.1.1/bin/nsys profile --stats=true -t cuda,nvtx -o pp4_ep64 --capture-range=cudaProfilerApi --force-overwrite true \
+# nsys profile -t cuda,nvtx -o pp4_ep64_mask_gemm_duilpipe_overlap_acc8 --force-overwrite true \
+python -m paddle.distributed.launch \
+    --log_dir output/paddle_distributed_logs_overlap \
     --master $master:$port \
     --nnodes $nnodes \
     --rank $rank \

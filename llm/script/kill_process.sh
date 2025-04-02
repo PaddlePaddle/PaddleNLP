@@ -15,6 +15,22 @@
 # limitations under the License.
 
 set -x
+
+rank=$PADDLE_TRAINER_ID
+
+START_RANK=16
+END_RANK=32
+
+echo $rank
+
+if [[ $rank -lt $START_RANK ]]; then
+    exit 0
+fi
+
+if [[ $rank -ge $END_RANK ]]; then
+    exit 0
+fi
+
 skip_kill_time=${1:-"False"}
 function kill_impl() {
     skip_kill_time=$1

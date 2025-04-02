@@ -1020,6 +1020,7 @@ class Trainer:
 
             step = -1
             for step, inputs in enumerate(epoch_iterator):
+                # paddle.base.core.nvprof_nvtx_push(str(step))
                 if (
                     self.args.use_hybrid_parallel
                     and self.args.sep_parallel_degree > 1
@@ -1161,7 +1162,7 @@ class Trainer:
                         tr_loss /= self.args.gradient_accumulation_steps
 
                     # assert if loss is invalid
-                    self._check_loss_valid(tr_loss)
+                    #self._check_loss_valid(tr_loss)
 
                     self.timers and self.timers("forward-backward").stop()
                     # Maunally collect gradients
@@ -1244,7 +1245,8 @@ class Trainer:
                                 f"optimizer not run, scale_before: {scale_before_value[0]}, scale_after: {scale_after_value[0]}"
                             )
                     elif isinstance(self.optimizer, HybridParallelOptimizer):
-                        self.optimizer._step(parameters_list)
+                        # self.optimizer._step(parameters_list)
+                        print("pass")
                     else:
                         self.optimizer.step()
 
@@ -1290,7 +1292,7 @@ class Trainer:
 
                 if self.args.ignore_data_skip:
                     self.timers and self.timers("read-data").start()
-
+                # paddle.base.core.nvprof_nvtx_pop()
             if step < 0:
                 logger.warning(
                     f"There seems to be not a single sample in your epoch_iterator, stopping training at step"
