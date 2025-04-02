@@ -916,6 +916,10 @@ class TrainingArguments:
         default=0,
         metadata={"help": "Save checkpoints on flash device every this many steps. Default is 0 which disables it"},
     )
+    split_norm_comm: Optional[bool] = field(
+        default=False,
+        metadata={"help": "是否开启单路sharding时global norm通信拆分全局通信组为pp通信和mp通信分别做"},
+    )
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
@@ -1313,6 +1317,15 @@ class TrainingArguments:
                         "sharding_degree": self.sharding_parallel_degree,
                         "order": order,
                     }
+
+                try:
+                    if self.split_norm_comm:
+                        hybrid_configs["split_norm_comm"] = True
+                except (KeyError, AttributeError):
+                    warnings.warn(
+                        "The split_norm_comm is not supported "
+                        "by current version of Paddle. Please try latest develop Paddle."
+                    )
 
                 try:
                     if self.enable_optimizer_timer:
