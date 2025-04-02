@@ -41,6 +41,8 @@ DSV3_USE_FP8_GEMM = os.getenv("DSV3_USE_FP8_GEMM", "False").lower() == "true"
 
 DSV3_USE_FP8_GROUP_GEMM = os.getenv("DSV3_USE_FP8_GROUP_GEMM", "False").lower() == "true"
 
+DSV3_USE_FUSED_Expert = os.getenv("DSV3_USE_FUSED_Expert", "False").lower() == "true"
+
 
 def dispatching(x, dispatch_mask, scatter_index, num_experts, capacity):
     """
@@ -218,6 +220,9 @@ class MoELayer(nn.Layer):
         for i in range(self.moe_num_experts):
             if i // self.moe_num_experts_per_device == self.moe_rank:
                 self.experts.append(expert_class(**expert_kwargs))
+
+                if DSV3_USE_FUSED_Expert:
+                    break
             else:
                 self.experts.append(None)
 

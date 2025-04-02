@@ -19,5 +19,5 @@
 
 mpirun sh script/kill_process.sh 
 mpirun rm -rf output
-mpirun sh script/train_gpu.sh config/deepseek-v3/pretrain_argument.json > test.log 2>&1
+mpirun sh script/train_gpu.sh config/deepseek-v3/pretrain_argument.json 
 
