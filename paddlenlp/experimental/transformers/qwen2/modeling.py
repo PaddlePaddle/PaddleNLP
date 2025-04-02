@@ -53,7 +53,6 @@ from paddlenlp.transformers import Qwen2Config, Qwen2PretrainedModel
 from paddlenlp.transformers.conversion_utils import split_param_func
 from paddlenlp.transformers.model_outputs import (  # CausalLMOutputWithCrossAttentions,
     BaseModelOutputWithPast,
-    BaseModelOutputWithPastAndCrossAttentions,
     CausalLMOutputWithPast,
 )
 from paddlenlp.transformers.model_utils import (
