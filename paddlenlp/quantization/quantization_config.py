@@ -105,7 +105,9 @@ class QuantizationConfig:
         self.group_size = group_size
 
     def is_weight_quantize(self):
-        if self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8", "nf4", "fp4", "a8w8"]:
+        if isinstance(self.weight_quantize_algo, dict):
+            return True
+        elif self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8", "nf4", "fp4", "a8w8"]:
             return True
         else:
             return False

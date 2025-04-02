@@ -45,7 +45,7 @@ def parse_weight_quantize_algo(quantization_config, name):
         weight_quantize_algo = quantization_config.weight_quantize_algo
     else:
         weight_quantize_algo = None
-        for algo in weight_quantize_algo:
+        for algo in quantization_config.weight_quantize_algo:
             if any(re.fullmatch(module, name) for module in quantization_config.weight_quantize_algo[algo]):
                 weight_quantize_algo = algo
     return weight_quantize_algo

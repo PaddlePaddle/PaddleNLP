@@ -1980,7 +1980,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         unexpected_keys = list(set(loaded_keys) - set(expected_keys))
 
         # Optimize for skip unused shard files for supper large model
-        if sharded_metadata is not None:
+        if sharded_metadata is not None and quantization_linear_list is None:
             assert isinstance(resolved_archive_file, list)
             new_archive_file = []
             skip_archive_file = []
@@ -2007,7 +2007,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 unexpected_keys = [k for k in unexpected_keys if re.search(pat, k) is None]
 
         # Set some modules to fp32 if any
-        if keep_in_fp32_modules is not None:
+        if keep_in_fp32_modules is not None and quantization_linear_list is None:
             for name, param in model.named_parameters():
                 if any(module_to_keep_in_fp32 in name for module_to_keep_in_fp32 in keep_in_fp32_modules):
                     if param.dtype != paddle.float32:
