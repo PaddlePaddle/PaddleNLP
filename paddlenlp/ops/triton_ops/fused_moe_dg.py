@@ -473,264 +473,6 @@ def per_tensor_quant_fp8(x, scale=None):
     return x_q.cast("float8_e4m3fn"), x_s
 
 
-def invoke_fused_moe_kernel(
-    A,
-    B,
-    C,  # out
-    A_scale,  # a1_scale
-    B_scale,  # w1_sacle
-    topk_weights,
-    topk_ids,
-    sorted_token_ids,
-    expert_ids,
-    num_tokens_post_padded,
-    mul_routed_weight: bool,
-    top_k: int,
-    config: Dict[str, Any],
-    compute_type: tl.dtype,
-    use_fp8_w8a8: bool,
-    use_int8_w8a16: bool,
-    block_shape: Optional[List[int]] = None,
-    use_dg: bool = False,
-) -> None:
-    padded_size = 0
-    if use_fp8_w8a8 or use_dg:
-        assert block_shape is not None
-        if block_shape is None:
-            A, A_scale = per_tensor_quant_fp8(A, A_scale)
-        else:
-            block_k = block_shape[1]
-            A, A_scale = per_token_group_quant_fp8_api(A, block_k)
-        if use_dg:
-            if not mul_routed_weight:
-                A = A.view(paddle.uint8)[sorted_token_ids // top_k].view(A.dtype)
-                A_scale = A_scale[sorted_token_ids // top_k]
-
-    # grid = lambda META: (
-    #     triton.cdiv(sorted_token_ids.shape[0], META["BLOCK_SIZE_M"]) * triton.cdiv(B.shape[1], META["BLOCK_SIZE_N"]),
-    # )
-
-    K = B.shape[2] - padded_size
-    if K % config["BLOCK_SIZE_K"] == 0:
-        even_Ks = True
-    else:
-        even_Ks = False
-
-    if use_dg:
-        dg.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous((A, A_scale), (B, B_scale), C, expert_ids)
-    else:
-        invoke_fused_moe_kernel_api(
-            A,
-            B,
-            C,  # out
-            A_scale,  # a1_scale
-            B_scale,  # w1_sacle
-            topk_weights,
-            topk_ids,
-            sorted_token_ids,
-            expert_ids,
-            num_tokens_post_padded,
-            mul_routed_weight,
-            top_k,
-            use_fp8_w8a8,
-            use_int8_w8a16,
-            even_Ks,
-            config,
-        )
-
-    assert compute_type == tl.bfloat16
-
-
-def invoke_fused_moe_kernel_api(
-    A,
-    B,
-    C,  # out
-    A_scale,  # a1_scale
-    B_scale,  # w1_sacle
-    topk_weights,
-    topk_ids,
-    sorted_token_ids,
-    expert_ids,
-    num_tokens_post_padded,
-    mul_routed_weight=False,
-    top_k=-1,
-    use_fp8_w8a8=False,
-    use_int8_w8a16=False,
-    even_Ks=False,
-    config=[],
-) -> None:
-    prepare_attr_for_triton_kernel = """
-            auto N = B.shape()[1];
-            auto K = B.shape()[2] - 0;
-            auto EM = sorted_token_ids.shape()[0];
-            auto num_valid_tokens = (topk_ids.shape()[0]) * (topk_ids.shape()[1]);
-            auto stride_am = A.strides()[0];
-            auto stride_ak = A.strides()[1];
-            auto stride_be = B.strides()[0];
-            auto stride_bk = B.strides()[2];
-            auto stride_bn = B.strides()[1];
-            auto stride_cm = C.strides()[1];
-            auto stride_cn = C.strides()[2];
-
-            // auto stride_cm = C.shape()[C.shape().size() - 1];
-            // auto stride_cn = 1;
-
-            auto stride_asm = A_scale.strides()[0];
-            auto stride_ask = A_scale.strides()[1];
-            auto stride_bse = B_scale.strides()[0];
-            auto stride_bsk = B_scale.strides()[2];
-            auto stride_bsn = B_scale.strides()[1];
-    """
-
-    config = {
-        "BLOCK_SIZE_M": config["BLOCK_SIZE_M"],
-        "BLOCK_SIZE_N": config["BLOCK_SIZE_N"],
-        "BLOCK_SIZE_K": config["BLOCK_SIZE_K"],
-        "GROUP_SIZE_M": config["GROUP_SIZE_M"],
-        "num_warps": config["num_warps"],
-        "num_stages": config["num_stages"],
-    }
-    configs = []
-
-    # for num_warps in [4, 8]:
-    #     for block_size_k in [64, 128]:
-    #         for block_size_n in [64, 128, 256]:
-    #             tmp = dict(config)
-    #             tmp["num_warps"] = num_warps
-    #             tmp["BLOCK_SIZE_K"] = block_size_k
-    #             tmp["BLOCK_SIZE_N"] = block_size_n
-    #             configs.append(tmp)
-    if B.shape[1] == 256:
-        config["BLOCK_SIZE_K"] = 128
-
-    configs.append(dict(config))
-
-    op_name = "fused_moe_paddle"
-    op_name += f"{get_dtype_str(A.dtype)}"
-    op_name += f"{B.shape[0]}"
-    op_name += f"{B.shape[1]}"
-    op_name += f"{B.shape[2]}"
-
-    assert config is not None
-    for key in config:
-        op_name += f"{key}_{config[key]}"
-
-    if op_name not in OpProtoHolder.instance().op_proto_map.keys():
-        prepare_ptr_for_triton_kernel = """
-        CUdeviceptr input_ptrs[9] = {
-            get_tensor_ptr(A),
-            get_tensor_ptr(B),
-            get_tensor_ptr(C),
-            get_tensor_ptr(A_scale),
-            get_tensor_ptr(B_scale),
-            get_tensor_ptr(topk_weights),
-            get_tensor_ptr(sorted_token_ids),
-            get_tensor_ptr(expert_ids),
-            get_tensor_ptr(num_tokens_post_padded),
-        };
-        """
-        template_used = rendering_common_template(
-            invoke_fused_moe_kernel_api,
-            prepare_attr_for_triton_kernel,
-            prepare_ptr_for_triton_kernel,
-        )
-        grid = ("(EM+BLOCK_SIZE_M-1)/BLOCK_SIZE_M * ((N+BLOCK_SIZE_N-1)/BLOCK_SIZE_N)",)
-        padded_size = 0
-
-        assert len(A.shape) == 2
-        assert len(C.shape) == 3
-        if in_dynamic_or_pir_mode():
-            assert C.shape[2] == B.shape[1]
-
-        fused_moe_kernel_paddle[(op_name, template_used, grid, configs)](
-            A,
-            B,
-            C,
-            A_scale,
-            B_scale,
-            topk_weights,
-            sorted_token_ids,
-            expert_ids,
-            num_tokens_post_padded,
-            B.shape[1],
-            B.shape[2] - padded_size,
-            -1,  # sorted_token_ids.shape[0],
-            -1,  # topk_ids.shape[0] * topk_ids.shape[1],
-            A.shape[1],  # A.strides[0],
-            1,  # A.strides[1],
-            B.shape[1] * B.shape[2],  # B.strides[0],
-            1,  # B.strides[2],
-            B.shape[2],  # B.strides[1],
-            B.shape[1],  # C.shape[2], # C.strides[1],
-            1,  # C.strides[2],
-            A_scale.shape[1],  # A_scale.strides[0] if A_scale is not None and A_scale.dim() == 2 else 0,
-            1,  # A_scale.strides[1] if A_scale is not None and A_scale.dim() == 2 else 0,
-            B_scale.shape[1]
-            * B_scale.shape[2],  # B_scale.strides[0] if B_scale is not None and B_scale.dim() >= 2 else 0,
-            1,  # B_scale.strides[2] if B_scale is not None and B_scale.dim() == 3 else 0,
-            B_scale.shape[2],  # B_scale.strides[1] if B_scale is not None and B_scale.dim() >= 2 else 0,
-            128,
-            128,
-            MUL_ROUTED_WEIGHT=(int)(mul_routed_weight),
-            top_k=top_k,
-            compute_type_enum=1,
-            use_fp8_w8a8=(int)(use_fp8_w8a8),
-            use_int8_w8a16=(int)(use_int8_w8a16),
-            even_Ks=(int)(even_Ks),
-        )
-
-    if in_dynamic_or_pir_mode():
-        outs = _C_ops._run_custom_op(
-            op_name,
-            A,
-            B,
-            C,  # out
-            A_scale,  # a1_scale
-            B_scale,  # w1_sacle
-            topk_weights,
-            topk_ids,
-            sorted_token_ids,
-            expert_ids,
-            num_tokens_post_padded,
-            mul_routed_weight,
-            top_k,
-            use_fp8_w8a8,
-            use_int8_w8a16,
-            even_Ks,
-        )
-        return outs[0]
-    else:
-        helper = LayerHelper(op_name, **locals())
-        inputs = {
-            "A": A,
-            "B": B,
-            "C": C,
-            "A_scale": A_scale,
-            "B_scale": B_scale,
-            "topk_weights": topk_weights,
-            "topk_ids": topk_ids,
-            "sorted_token_ids": sorted_token_ids,
-            "expert_ids": expert_ids,
-            "num_tokens_post_padded": num_tokens_post_padded,
-        }
-        attrs = {
-            "mul_routed_weight": mul_routed_weight,
-            "top_k": top_k,
-            "use_fp8_w8a8": use_fp8_w8a8,
-            "use_int8_w8a16": use_int8_w8a16,
-            "even_Ks": even_Ks,
-        }
-        useless = helper.create_variable_for_type_inference(dtype="int32")
-        outputs = {"useless": useless}
-        helper.append_op(
-            type=op_name,
-            inputs=inputs,
-            attrs=attrs,
-            outputs=outputs,
-        )
-        return useless
-
-
 def get_device_name(device_id: int = 0) -> str:
     return paddle.device.cuda.get_device_name(device_id)
 
@@ -884,169 +626,7 @@ def get_config_dtype_str(
     return None
 
 
-def fused_experts_impl(
-    hidden_states,
-    w1,
-    w2,
-    topk_weights,
-    topk_ids,
-    inplace: bool = False,
-    use_fp8_w8a8: bool = False,
-    use_int8_w8a16: bool = False,
-    w1_scale=None,
-    w2_scale=None,
-    a1_scale=None,
-    a2_scale=None,
-    block_shape: Optional[List[int]] = None,
-    use_dg: bool = False,
-):
-    padded_size = padding_size
-    if not use_fp8_w8a8 or block_shape is not None:
-        padded_size = 0
-
-    num_tokens, _ = hidden_states.shape
-    E, N, _ = w1.shape
-    M = num_tokens
-
-    config_dtype = get_config_dtype_str(
-        use_fp8_w8a8=use_fp8_w8a8,
-        use_int8_w8a16=use_int8_w8a16,
-        dtype=hidden_states.dtype,
-    )
-
-    get_config_func = functools.partial(
-        try_get_optimal_moe_config,
-        w1.shape,
-        (w2.shape[0], w2.shape[1], w2.shape[2] - padded_size),
-        topk_ids.shape[1],
-        config_dtype,
-        block_shape=block_shape,
-    )
-
-    config = get_config_func(128)
-
-    top_k = topk_ids.shape[1]
-    assert top_k == 8
-
-    block_m = config["BLOCK_SIZE_M"] if not use_dg else 128
-    assert not use_dg or block_m == 128
-
-    from paddlenlp_ops import preprocess_for_moe
-
-    sorted_token_ids, expert_ids, num_tokens_post_padded = preprocess_for_moe(topk_ids, E, block_m)
-
-    inv_perm = paddle.argsort(sorted_token_ids)[: M * top_k]
-
-    sorted_token_ids = sorted_token_ids[:num_tokens_post_padded]
-    expert_ids = expert_ids[: (num_tokens_post_padded // 128)]
-
-    if use_dg:
-
-        assert w1_scale is not None
-        assert w2_scale is not None
-
-        w1_scale = dg.get_col_major_tma_aligned_tensor(w1_scale).contiguous()
-        w2_scale = dg.get_col_major_tma_aligned_tensor(w2_scale).contiguous()
-        num_tokens = top_k * M
-        pad_size = (((sorted_token_ids.numel() + block_m - 1) // block_m) * block_m) - sorted_token_ids.numel()
-        if pad_size > 0:
-            sorted_token_ids = paddle.pad(sorted_token_ids, (0, pad_size), "constant", num_tokens)
-        sorted_token_ids = sorted_token_ids.clip(max=num_tokens - 1)
-        # expert_ids = expert_ids.clip(max=E - 1)
-        expert_ids = paddle.repeat_interleave(expert_ids, block_m, axis=0)
-        inv_perm = inv_perm[:num_tokens_post_padded]
-
-        assert sorted_token_ids[sorted_token_ids >= num_tokens].sum() == 0
-
-        # new_S = paddle.repeat_interleave(hidden_states, top_k, axis=0)[sorted_token_ids, ...].shape
-        # new_M = new_S[0]
-        new_M = sorted_token_ids.shape[0]
-
-        intermediate_cache1 = paddle.empty((new_M, N), dtype=hidden_states.dtype)
-        intermediate_cache2 = paddle.empty((new_M, N // 2), dtype=hidden_states.dtype)
-        intermediate_cache3 = paddle.empty((new_M, w2.shape[1]), dtype=hidden_states.dtype)
-    else:
-
-        intermediate_cache1 = paddle.empty(
-            [M, topk_ids.shape[1], N],
-            dtype=hidden_states.dtype,
-        )
-        intermediate_cache2 = paddle.empty(
-            (M * topk_ids.shape[1], N // 2),
-            dtype=hidden_states.dtype,
-        )
-        intermediate_cache3 = paddle.empty(
-            (M, topk_ids.shape[1], w2.shape[1]),
-            dtype=hidden_states.dtype,
-        )
-
-    compute_type = tl.bfloat16 if hidden_states.dtype == paddle.bfloat16 else tl.float16
-
-    invoke_fused_moe_kernel(
-        hidden_states,
-        w1,
-        intermediate_cache1,
-        a1_scale,
-        w1_scale,
-        topk_weights,
-        topk_ids,
-        sorted_token_ids,
-        expert_ids,
-        num_tokens_post_padded,
-        False,
-        topk_ids.shape[1],
-        config,
-        compute_type=compute_type,
-        use_fp8_w8a8=use_fp8_w8a8,
-        use_int8_w8a16=use_int8_w8a16,
-        block_shape=block_shape,
-        use_dg=use_dg,
-    )
-
-    intermediate_cache2 = paddle.incubate.nn.functional.swiglu(intermediate_cache1.reshape([-1, N]))
-
-    invoke_fused_moe_kernel(
-        intermediate_cache2,
-        w2,
-        intermediate_cache3,
-        a2_scale,
-        w2_scale,
-        topk_weights,
-        topk_ids,
-        sorted_token_ids,
-        expert_ids,
-        num_tokens_post_padded,
-        True,
-        1,
-        config,
-        compute_type=compute_type,
-        use_fp8_w8a8=use_fp8_w8a8,
-        use_int8_w8a16=use_int8_w8a16,
-        block_shape=block_shape,
-        use_dg=use_dg,
-    )
-
-    if use_dg:
-        assert inv_perm is not None
-        real_top_k = topk_ids.shape[1]
-        M = topk_weights.shape[0]
-        # Note: these operations should all happen in-place with views.
-        out_C = intermediate_cache3[inv_perm, ...]
-        out_C = out_C[: (M * real_top_k), ...]
-        out_C = out_C.reshape([-1, real_top_k, w2.shape[1]])
-        tmp_cache3 = out_C * topk_weights.reshape([M, -1, 1])
-    else:
-        tmp_cache3 = intermediate_cache3
-
-    out_hidden_states = paddle.sum(
-        tmp_cache3,
-        axis=1,
-    )
-
-    return out_hidden_states
-
-
-def fused_moe(
+def fused_moe_dg(
     hidden_states,
     w1,
     w2,
@@ -1059,27 +639,66 @@ def fused_moe(
     a1_scale=None,
     a2_scale=None,
     block_shape: Optional[List[int]] = None,
-    use_dg: bool = False,
 ):
     # Check constraints.
     assert scores.shape[1] == w1.shape[0], "Number of experts mismatch"
 
     # 经过分组策略后的scores计算topk
-    topk_weights, topk_ids = paddle.topk(scores, k=topk, axis=-1, sorted=False)
+    M, _ = hidden_states.shape
+    E, N, _ = w1.shape
+    num_tokens = M * topk
 
-    return fused_experts_impl(
-        hidden_states,
-        w1,
-        w2,
-        topk_weights,
-        topk_ids,
-        False,
-        use_fp8_w8a8,
-        use_int8_w8a16,
-        w1_scale,
-        w2_scale,
-        a1_scale,
-        a2_scale,
-        block_shape,
-        use_dg,
+    from paddlenlp_ops import moe_expert_dispatch, moe_expert_reduce
+
+    (
+        permute_hidden_states,
+        token_nums_per_expert,
+        permute_indices_per_token,
+        top_k_weights,
+        top_k_indices,
+    ) = moe_expert_dispatch(hidden_states, scores, topk, False, topk_only_mode=True)
+
+    # print("new dg top k weights", top_k_weights)
+    # print("new dg top k indices", top_k_indices)
+
+    expert_ids = paddle.zeros(num_tokens, dtype=paddle.int32)
+    for i in range(E):
+        start = token_nums_per_expert[i - 1] if i > 0 else 0
+        end = token_nums_per_expert[i]
+        expert_ids[start:end] = i
+    # print("new dg expert ids", expert_ids)
+    assert w1_scale is not None
+    assert w2_scale is not None
+
+    w1_scale = dg.get_col_major_tma_aligned_tensor(w1_scale).contiguous()
+    w2_scale = dg.get_col_major_tma_aligned_tensor(w2_scale).contiguous()
+
+    intermediate_cache1 = paddle.empty((num_tokens, N), dtype=hidden_states.dtype)
+    intermediate_cache2 = paddle.empty((num_tokens, N // 2), dtype=hidden_states.dtype)
+    intermediate_cache3 = paddle.empty((num_tokens, w2.shape[1]), dtype=hidden_states.dtype)
+
+    block_k = block_shape[1]
+    A, A_scale = per_token_group_quant_fp8_api(permute_hidden_states, block_k)
+    # print("new dg A after permute", A)
+
+    dg.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous((A, A_scale), (w1, w1_scale), intermediate_cache1, expert_ids)
+
+    # print("new dg inter1", intermediate_cache1)
+
+    intermediate_cache2 = paddle.incubate.nn.functional.swiglu(intermediate_cache1.reshape([-1, N]))
+
+    A, A_scale = per_token_group_quant_fp8_api(intermediate_cache2, block_k)
+    dg.m_grouped_gemm_fp8_fp8_bf16_nt_contiguous((A, A_scale), (w2, w2_scale), intermediate_cache3, expert_ids)
+
+    out_hidden_states = moe_expert_reduce(
+        intermediate_cache3,
+        top_k_weights,
+        permute_indices_per_token,
+        top_k_indices,
+        None,
+        norm_topk_prob=False,  # 在noaux_tc中做了
+        routed_scaling_factor=1.0,  # 在noaux_tc中做了
     )
+
+    # print('out_hidden_states shape: ', out_hidden_states.shape)
+    return out_hidden_states

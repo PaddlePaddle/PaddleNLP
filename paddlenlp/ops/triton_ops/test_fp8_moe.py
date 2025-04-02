@@ -14,13 +14,13 @@
 
 import time
 
-import paddle
+import paddle  # 初始化分布式环境
 
 from paddlenlp.ops.triton_ops.fused_moe import fused_moe
 
 # Constants
 DTYPES = paddle.bfloat16
-M = 32  # Batch size, token_num 32k 32 64
+M = 64  # Batch size, token_num 32k 32 64
 TP = 16
 N = 2048 // TP  # Intermediate size
 # N = 2048 # 128 256
@@ -39,6 +39,8 @@ block_size = BLOCK_SIZE
 
 # Gate logits (score after gate)
 score = paddle.randn((M, E), dtype=paddle.float32)
+# chosen_num = 8
+# score[:, chosen_num:] -= 5
 
 # Bfloat16 input
 a = paddle.randn((M, K), dtype=paddle.bfloat16) / 10
@@ -99,10 +101,13 @@ def moe_fp8():
     end_dg = time.time()
     print(f"fp8 moe dg : {((end_dg - start_dg) * 1000)} ms")
 
-    # for i in range(M):
-    #     row_diff = paddle.mean(paddle.abs(dg_out.to(paddle.float32)[i] - out.to(paddle.float32)[i]) / paddle.mean(paddle.abs(out.to(paddle.float32)[i])))
-    #     if row_diff > 0.03:
-    #         print(f"Row {i} difference: {row_diff}")
+    for i in range(M):
+        row_diff = paddle.mean(
+            paddle.abs(dg_out.to(paddle.float32)[i] - out.to(paddle.float32)[i])
+            / paddle.mean(paddle.abs(out.to(paddle.float32)[i]))
+        )
+        if row_diff > 0.03:
+            print(f"Row {i} difference: {row_diff}")
 
     rel_diff = paddle.mean(paddle.abs(dg_out.to(paddle.float32) - out.to(paddle.float32))) / paddle.mean(
         paddle.abs(out.to(paddle.float32))
@@ -111,4 +116,43 @@ def moe_fp8():
     assert rel_diff < 0.03
 
 
+def moe_fp8_tl():
+    """Function to test FP8 block-wise fused MoE."""
+    fused_moe(
+        a,
+        w1_fp8,
+        w2_fp8,
+        score,
+        topk,
+        use_fp8_w8a8=True,
+        w1_scale=w1_s,
+        w2_scale=w2_s,
+        block_shape=block_size,
+    )
+
+
+def moe_fp8_dg():
+    """Function to test FP8 block-wise fused MoE."""
+    fused_moe(
+        a,
+        w1_fp8,
+        w2_fp8,
+        score,
+        topk,
+        use_fp8_w8a8=True,
+        w1_scale=w1_s,
+        w2_scale=w2_s,
+        block_shape=block_size,
+        use_dg=True,
+    )
+
+
 moe_fp8()
+
+# for _ in range(100):
+#     moe_fp8_tl()
+
+# for _ in range(100):
+#     moe_fp8_dg()
+
+# moe_fp8_dg()

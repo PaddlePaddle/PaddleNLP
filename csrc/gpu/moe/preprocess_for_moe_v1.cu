@@ -12,23 +12,40 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "helper.h"
 #include "paddle/extension.h"
 
 
 #define CEILDIV(a,b) (((a+b-1)/b))
 
-template <typename scalar_t>
+template <typename scalar_t, typename data_t>
 __global__ void count_and_sort_expert_tokens_kernel(const scalar_t* __restrict__ topk_ids,
+                                                    const data_t* __restrict__ A,
+                                                    data_t* __restrict__ sorted_A,
                                                     int32_t* __restrict__ sorted_token_ids,
                                                     int32_t* __restrict__ cumsum_buffer, 
-                                                    size_t numel) {
+                                                    size_t numel, 
+                                                    const int64_t K) {
   const size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
   const size_t stride = blockDim.x * gridDim.x;
+
+  // printf("tid = %d\n", tid);
+  // printf("topk ids numel = %d\n", numel);
+  // printf("K = %d\n", K);
+
 
   for (size_t i = tid; i < numel; i += stride) {
     int32_t expert_id = topk_ids[i];
     int32_t rank_post_pad = atomicAdd(&cumsum_buffer[expert_id], 1);
     sorted_token_ids[rank_post_pad] = i;
+    // sorted_A[rank_post_pad] = A[i];
+    // printf("rank_post_pad = %d  i = %d\n", rank_post_pad, i);
+    for (int j = 0; j < K; j++) {
+      // printf("K=%d, j=%d, rank_post_pad * K + j=%d\n", K, j, rank_post_pad * K + j);
+      // printf("k = %d j = %d\n", K, j);
+      sorted_A[rank_post_pad * K + j] = A[(i / 8) * K + j];
+      // sorted_A[rank_post_pad * K + j] = A[i];
+    }
   }
 }
 
@@ -59,7 +76,6 @@ __global__ void moe_align_block_size_kernel(const scalar_t* __restrict__ topk_id
     for (int i = 1; i <= num_experts; ++i) {
       int expert_count = tokens_per_ep[i-1];
       cumsum_buffer[i] = cumsum_buffer[i - 1] + CEILDIV(expert_count, block_size) * block_size;
-      // printf("cumsum_buffer: %d\n", cumsum_buffer[i]);
     }
     *total_tokens_post_pad = cumsum_buffer[num_experts];
   }
@@ -74,7 +90,7 @@ __global__ void moe_align_block_size_kernel(const scalar_t* __restrict__ topk_id
 }
 
 
-std::vector<std::vector<int64_t>> preprocess_for_moeInferShape(const std::vector<int64_t>& topk_ids, int64_t num_experts, int64_t block_size) {
+std::vector<std::vector<int64_t>> preprocess_for_moe_v1InferShape(const std::vector<int64_t>& topk_ids, const std::vector<int64_t>& A, int64_t num_experts, int64_t block_size, int64_t K) {
 
 
     int topk_ids_numel = topk_ids[0] * topk_ids[1];
@@ -86,17 +102,21 @@ std::vector<std::vector<int64_t>> preprocess_for_moeInferShape(const std::vector
     std::vector<int64_t> expert_ids = {max_num_m_blocks};
     std::vector<int64_t> num_tokens_post_pad = {1};
 
-    return {sorted_ids, expert_ids, num_tokens_post_pad};
+    return {{max_num_tokens_padded, K}, sorted_ids, expert_ids, num_tokens_post_pad};
 }
 
-std::vector<paddle::DataType> preprocess_for_moeIferDtype(const paddle::DataType& topk_ids, int64_t num_experts, int64_t block_size) {
-    return {paddle::DataType::INT32, paddle::DataType::INT32, paddle::DataType::INT32};
+std::vector<paddle::DataType> preprocess_for_moe_v1IferDtype(const paddle::DataType& topk_ids, const paddle::DataType& A, int64_t num_experts, int64_t block_size, int64_t K ) {
+    return {A, paddle::DataType::INT32, paddle::DataType::INT32, paddle::DataType::INT32};
 }
 
 
 
-std::vector<paddle::Tensor> preprocess_for_moe_kernel(const paddle::Tensor& topk_ids, int64_t num_experts, int64_t block_size) {
+std::vector<paddle::Tensor> preprocess_for_moe_v1_kernel(const paddle::Tensor& topk_ids, const paddle::Tensor& A, int64_t num_experts, int64_t block_size, int64_t K ) {
     
+    typedef PDTraits<paddle::DataType::BFLOAT16> traits_;
+    typedef typename traits_::DataType DataType_;
+    typedef typename traits_::data_t data_t;
+
     int topk_ids_numel = topk_ids.shape()[0] * topk_ids.shape()[1];
     int max_num_tokens_padded = topk_ids_numel + num_experts * (block_size - 1);
 
@@ -106,11 +126,17 @@ std::vector<paddle::Tensor> preprocess_for_moe_kernel(const paddle::Tensor& topk
         paddle::DataType::INT32, 
         topk_ids.place()
     );
+    
+    auto sorted_A = paddle::empty(
+      {max_num_tokens_padded, K},
+      paddle::DataType::BFLOAT16,
+      topk_ids.place()
+    );
 
     int max_num_m_blocks = max_num_tokens_padded / block_size;
     
     auto expert_ids = paddle::full(
-        {max_num_m_blocks}, -1, paddle::DataType::INT32, 
+        {max_num_m_blocks}, num_experts, paddle::DataType::INT32, 
         topk_ids.place()
     );
 
@@ -154,25 +180,27 @@ std::vector<paddle::Tensor> preprocess_for_moe_kernel(const paddle::Tensor& topk
     const int max_blocks = 65535;
     const int actual_blocks = std::min(num_blocks, max_blocks);
 
-    auto sort_kernel = count_and_sort_expert_tokens_kernel<scalar_t>;
+    auto sort_kernel = count_and_sort_expert_tokens_kernel<scalar_t, data_t>;
 
     sort_kernel<<<actual_blocks, block_threads, 0, stream>>>(topk_ids.data<scalar_t>(),
+                                                              A.data<data_t>(),
+                                                              sorted_A.data<data_t>(),
                                                               sorted_ids.data<int32_t>(),
                                                               cumsum_buffer.data<int32_t>(), 
-                                                              topk_ids_numel);
+                                                              topk_ids_numel, K);
 
 
 
-    return {sorted_ids, expert_ids, num_tokens_post_pad};
+    return {sorted_A, sorted_ids, expert_ids, num_tokens_post_pad};
 }
 
-PD_BUILD_OP(preprocess_for_moe)
-    .Inputs({"topk_ids"})
-    .Attrs({"num_experts: int64_t", "block_size: int64_t"})
-    .Outputs({"sorted_ids", "expert_ids", "num_tokens_post_pad"})
-    .SetKernelFn(PD_KERNEL(preprocess_for_moe_kernel))
-    .SetInferShapeFn(PD_INFER_SHAPE(preprocess_for_moeInferShape))
-    .SetInferDtypeFn(PD_INFER_DTYPE(preprocess_for_moeIferDtype));
+PD_BUILD_OP(preprocess_for_moe_v1)
+    .Inputs({"topk_ids", "A"})
+    .Attrs({"num_experts: int64_t", "block_size: int64_t", "K: int64_t"})
+    .Outputs({"sorted_A", "sorted_ids", "expert_ids", "num_tokens_post_pad"})
+    .SetKernelFn(PD_KERNEL(preprocess_for_moe_v1_kernel))
+    .SetInferShapeFn(PD_INFER_SHAPE(preprocess_for_moe_v1InferShape))
+    .SetInferDtypeFn(PD_INFER_DTYPE(preprocess_for_moe_v1IferDtype));
 
 
 
