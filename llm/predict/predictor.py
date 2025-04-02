@@ -1133,7 +1133,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         )
 
     @paddle.no_grad()
-    def predict(self, input_texts: list[str], return_tokens=False):
+    def stream_predict(self, input_texts: list[str], return_tokens=False):
         self._preprocess(input_texts)
         if self.proposer is not None:
             self.proposer.insert_query(
@@ -1194,7 +1194,9 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                 return outputs
 
     @paddle.no_grad()
-    def predict_non_stream(self, input_texts: list[str], return_tokens=False):
+    def predict(self, input_texts: list[str], return_tokens=False):
+        if self.enable_stream_output:
+            return self.stream_predict(input_texts, return_tokens)
         self._preprocess(input_texts)
 
         if self.proposer is not None:
@@ -1341,7 +1343,7 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
 
         self.predictor = paddle.inference.create_predictor(config)
 
-    def predict(self, input_texts: list[str], return_tokens=False):
+    def stream_predict(self, input_texts: list[str], return_tokens=False):
         s_time = time.time()
         self._preprocess(input_texts)
         if self.proposer is not None:
@@ -1399,6 +1401,52 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
 
             read_res_process.terminate()
 
+            if return_tokens:
+                return outputs, output_tokens
+            else:
+                return outputs
+
+    def predict(self, input_texts: list[str], return_tokens=False):
+        if self.enable_stream_output:
+            return self.stream_predict(input_texts, return_tokens)
+
+        s_time = time.time()
+        self._preprocess(input_texts)
+        if self.proposer is not None:
+            self.proposer.insert_query(
+                base_model_inputs=self.model_inputs, real_bs=len(input_texts), seq_lens=self.seq_lens
+            )
+        logger.info(f"preprocess spend {time.time() - s_time}")
+
+        output_tokens = []
+        output_token = []
+        s_time = time.time()
+        while self.model_inputs["not_need_stop"]:
+            # whether speculative decoding
+            if self.proposer is not None:
+                self.proposer.run(
+                    self.model_inputs,
+                    real_batch_size=self.batch_size,
+                    seq_lens_this_time=self.model_inputs["seq_lens_this_time"],
+                    base_model_full_hidden_states=self.full_hidden_states,
+                )
+            if self.return_full_hidden_states:
+                self.full_hidden_states = self.predictor.run(list(self.model_inputs.values()))[0]
+            else:
+                outputs = self.predictor.run(list(self.model_inputs.values()))
+                outputs = outputs.numpy()
+                outputs[outputs == -1] = self.tokenizer.eos_token_id
+                output_token.append(outputs)
+        logger.info(f"running spend {time.time() - s_time}")
+
+        if self.tensor_parallel_rank == 0:
+            outputs = []
+            output_tokens = []
+            while len(outputs) < self.batch_size:
+                output_tokens = np.concatenate(output_token, axis=1).tolist()
+                outputs = self.tokenizer.batch_decode(
+                    output_tokens, skip_special_tokens=True, clean_up_tokenization_spaces=False
+                )
             if return_tokens:
                 return outputs, output_tokens
             else:
@@ -1615,10 +1663,7 @@ def predict():
     with open(model_args.output_file, "w", encoding="utf-8") as f:
         for bs, batch_source_text in enumerate(batch_source_texts):
             logger.info("Start predict")
-            if predictor_args.enable_stream_output:
-                outputs = predictor.predict(batch_source_text)
-            else:
-                outputs = predictor.predict_non_stream(batch_source_text)
+            outputs = predictor.predict(batch_source_text)
             logger.info("End predict")
 
             if predictor.tensor_parallel_rank > 0:
