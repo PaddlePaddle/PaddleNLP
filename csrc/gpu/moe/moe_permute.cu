@@ -23,9 +23,8 @@ void MoePermuteKernel(
     paddle::Tensor& token_expert_indicies,            // [n_token, topk]
     paddle::optional<paddle::Tensor>& expert_map,  // [n_expert]
     int n_expert, int n_local_expert, int topk,
-    // paddle::optional<int64_t>& align_block_size,
     int align_block_size,
-    paddle::Tensor& permuted_input,  // [topk * n_token/align_block_size_m, hidden]
+    paddle::Tensor& permuted_input,  // [align_expand_m, hidden]
     paddle::Tensor& expert_first_token_offset,  // [n_local_expert + 1]
     paddle::Tensor& src_row_id2dst_row_id_map,  // [n_token, topk]
     paddle::Tensor& m_indices) {                // [align_expand_m]
@@ -59,9 +58,8 @@ void MoePermuteKernel(
       input.place());
   auto permuted_experts_id = paddle::empty_like(topk_ids);
   auto dst_row_id2src_row_id_map = paddle::empty_like(src_row_id2dst_row_id_map);
-  auto align_expert_first_token_offset =
-      paddle::empty_like(expert_first_token_offset);
-  paddle::experimental::fill(align_expert_first_token_offset, 0);
+  auto align_expert_first_token_offset = paddle::full(
+    expert_first_token_offset.shape(), 0, expert_first_token_offset.dtype(), expert_first_token_offset.place());
 
   CubKeyValueSorter sorter{};
   int64_t* valid_num_ptr = nullptr;
@@ -82,7 +80,6 @@ void MoePermuteKernel(
     preprocessTopkIdLauncher(get_ptr<int>(topk_ids), n_token * topk,
                              expert_map_ptr, n_expert, stream);
   }
-  // std::cout << "tops id " << topk_ids << std::endl;
   // expert sort topk expert id and scan expert id get expert_first_token_offset
   sortAndScanExpert(get_ptr<int>(topk_ids), get_ptr<int>(token_expert_indicies),
                     get_ptr<int>(permuted_experts_id),
@@ -90,20 +87,7 @@ void MoePermuteKernel(
                     get_ptr<int64_t>(expert_first_token_offset), n_token,
                     n_expert, n_local_expert, topk, sorter,
                     reinterpret_cast<void*>(sort_workspace.data<int8_t>()), stream);
-  // std::cout << "permuted_experts_id" << permuted_experts_id << std::endl;
-  // std::cout << "dst_row_id2src_row_id_map" << dst_row_id2src_row_id_map
-  //           << std::endl;
 
-  // dispatch expandInputRowsKernelLauncher
-  // MOE_DISPATCH(input.dtype(), [&] {
-  //   expandInputRowsKernelLauncher<scalar_t>(
-  //       get_ptr<scalar_t>(input), get_ptr<scalar_t>(permuted_input),
-  //       get_ptr<float>(topk_weights), get_ptr<int>(permuted_experts_id),
-  //       get_ptr<int>(dst_row_id2src_row_id_map),
-  //       get_ptr<int>(src_row_id2dst_row_id_map),
-  //       get_ptr<int64_t>(expert_first_token_offset), n_token, valid_num_ptr,
-  //       n_hidden, topk, n_local_expert, align_block_size_value, stream);
-  // });
   expandInputRowsKernelLauncher<data_t>(
         get_ptr<data_t>(input), get_ptr<data_t>(permuted_input),
         get_ptr<float>(topk_weights), get_ptr<int>(permuted_experts_id),
@@ -147,7 +131,7 @@ std::vector<paddle::Tensor> MoePermute(
     auto src_row_id2dst_row_id_map =
         GetEmptyTensor({n_token, topk}, paddle::DataType::INT32, place);
     auto m_indices =
-        GetEmptyTensor({permuted_row_size}, paddle::DataType::INT64, place);
+        GetEmptyTensor({permuted_row_size}, paddle::DataType::INT32, place);
     
     switch (input_type) {
       case paddle::DataType::FLOAT32: 
@@ -174,6 +158,7 @@ std::vector<paddle::Tensor> MoePermute(
       default:
         PD_THROW("Unsupported data type for MoePermuteKernel");
     }
+    return {permute_input, expert_first_token_offset, src_row_id2dst_row_id_map, m_indices};
   }
 
 std::vector<std::vector<int64_t>> MoePermuteInferShape(
@@ -182,7 +167,6 @@ std::vector<std::vector<int64_t>> MoePermuteInferShape(
     const std::vector<int64_t>& topk_ids_shape,
     const std::vector<int64_t>& token_expert_indicies_shape,
     const paddle::optional<std::vector<int64_t>>& expert_map_shape,
-    // const paddle::optional<int64_t>& align_block_size,
     int n_expert, int n_local_expert, int topk, int align_block_size) {
   
   const int token_num = input_shape[0];
@@ -205,7 +189,6 @@ std::vector<paddle::DataType> MoePermuteInferDtype(
     const paddle::DataType& topk_ids_dtype,
     const paddle::DataType& token_expert_indicies_dtype,
     const paddle::optional<paddle::DataType>& expert_map_dtype
-    // const paddle::optional<paddle::DataType>& align_block_size_dtype
   ) {
   return {input_dtype,
           paddle::DataType::INT64,
