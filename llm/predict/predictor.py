@@ -1251,6 +1251,9 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
         self.cache_v_shapes = kwargs.get("cache_v_shapes", None)
         self.model_args = kwargs.get("model_args", None)
         self.return_full_hidden_states = config.return_full_hidden_states
+        self.enable_stream_output = config.enable_stream_output
+        self.model_name_or_path = config.model_name_or_path
+        self.tokenizer = tokenizer
         self.full_hidden_states = None
         if self.cache_k_shapes is None:
             raise ValueError(
