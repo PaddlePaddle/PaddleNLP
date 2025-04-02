@@ -755,7 +755,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
                     eos_token_id,
                     model_kwargs["next_tokens"],
                 )
-            if self.config.enable_stream_output:
+            if self.config.output_via_mq:
                 from paddlenlp_ops import save_output
 
                 save_output(

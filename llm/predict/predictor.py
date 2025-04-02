@@ -184,9 +184,9 @@ class PredictorArgument:
         default="",
         metadata={"help": "Quantization type of moe. Supported values: weight_only_int4, weight_only_int8"},
     )
-    enable_stream_output: bool = field(
+    output_via_mq: bool = field(
         default=True,
-        metadata={"help": "whether use streaming output"},
+        metadata={"help": "Controls whether the message queue is enabled for output"},
     )
 
     def __post_init__(self):
@@ -1079,7 +1079,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
     ):
         self.return_full_hidden_states = config.return_full_hidden_states
         self.full_hidden_states = None
-        self.enable_stream_output = config.enable_stream_output
+        self.output_via_mq = config.output_via_mq
         self.model_name_or_path = config.model_name_or_path
         self.tokenizer = tokenizer
         if model is None:
@@ -1133,7 +1133,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         )
 
     @paddle.no_grad()
-    def stream_predict(self, input_texts: list[str], return_tokens=False):
+    def predict_via_mq(self, input_texts: list[str], return_tokens=False):
         self._preprocess(input_texts)
         if self.proposer is not None:
             self.proposer.insert_query(
@@ -1195,8 +1195,8 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
 
     @paddle.no_grad()
     def predict(self, input_texts: list[str], return_tokens=False):
-        if self.enable_stream_output:
-            return self.stream_predict(input_texts, return_tokens)
+        if self.output_via_mq:
+            return self.predict_via_mq(input_texts, return_tokens)
         self._preprocess(input_texts)
 
         if self.proposer is not None:
@@ -1251,7 +1251,7 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
         self.cache_v_shapes = kwargs.get("cache_v_shapes", None)
         self.model_args = kwargs.get("model_args", None)
         self.return_full_hidden_states = config.return_full_hidden_states
-        self.enable_stream_output = config.enable_stream_output
+        self.output_via_mq = config.output_via_mq
         self.model_name_or_path = config.model_name_or_path
         self.tokenizer = tokenizer
         self.full_hidden_states = None
@@ -1346,7 +1346,7 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
 
         self.predictor = paddle.inference.create_predictor(config)
 
-    def stream_predict(self, input_texts: list[str], return_tokens=False):
+    def predict_via_mq(self, input_texts: list[str], return_tokens=False):
         s_time = time.time()
         self._preprocess(input_texts)
         if self.proposer is not None:
@@ -1410,8 +1410,8 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
                 return outputs
 
     def predict(self, input_texts: list[str], return_tokens=False):
-        if self.enable_stream_output:
-            return self.stream_predict(input_texts, return_tokens)
+        if self.output_via_mq:
+            return self.predict_via_mq(input_texts, return_tokens)
 
         s_time = time.time()
         self._preprocess(input_texts)
