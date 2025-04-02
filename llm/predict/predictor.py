@@ -1436,7 +1436,7 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
             if self.return_full_hidden_states:
                 self.full_hidden_states = self.predictor.run(list(self.model_inputs.values()))[0]
             else:
-                outputs = self.predictor.run(list(self.model_inputs.values()))
+                outputs = self.predictor.run(list(self.model_inputs.values()))[0]
                 outputs = outputs.numpy()
                 outputs[outputs == -1] = self.tokenizer.eos_token_id
                 output_token.append(outputs)
