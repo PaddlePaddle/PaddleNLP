@@ -219,7 +219,6 @@ std::vector<paddle::Tensor> GetBlockShapeAndSplitKVBlock(
   );
   auto max_len_kv_cpu =
       max_len_kv.copy_to(paddle::CPUPlace(), false);
-
   // decoder
   int max_dec_len_this_time_data = max_dec_len_this_time.data<int>()[0];
   if (max_dec_len_this_time_data > 0) {

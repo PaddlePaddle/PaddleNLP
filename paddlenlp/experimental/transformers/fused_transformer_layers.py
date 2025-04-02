@@ -34,6 +34,7 @@ from paddle.nn.quant import weight_only_linear
 
 from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
+import nvtx
 
 if not is_paddlenlp_ops_available():
     logger.warning(
@@ -1175,7 +1176,11 @@ class FusedMultiTransformerBase(Layer):
         if self.config.mla_config.use_absorb():
             qkv_out = ln_out
         else:
+            paddle.device.synchronize()
+            qkv_linear_nvtx = nvtx.start_range(message="qkv_linear", color="blue")
             qkv_out = self.compute_qkv_linear(ln_out, i)
+            paddle.device.synchronize()
+            nvtx.end_range(qkv_linear_nvtx)
 
         return qkv_out, residual_input
 
@@ -1714,6 +1719,7 @@ class FusedMultiTransformerBase(Layer):
             )
         residual_input = src
         for i in range(self.num_layers):
+            # print(666)
             qkv_out, residual_input = self.compute_qkv(src, residual_input, i)
             fmha_out = self.compute_attn(
                 time_step,
@@ -3307,6 +3313,12 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
         if self.config.append_attn:
             from paddlenlp_ops import append_attention
 
+            paddle.device.synchronize()
+            transformer_nvtx = nvtx.start_range(message="GQA_Append_attn", color="red")
+
+            # q: [bsz, seq_len, q_head, head_dim]   q_head -> 12
+            # k: [bsz, seq_len, kv_head, head_dim]  kv_head -> 2
+            # v: [bsz, seq_len, kv_head, head_dim]  kv_head -> 2
             fmha_out = append_attention(
                 qkv_out,
                 caches[2 * i],
@@ -3353,6 +3365,8 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 True,  # causal
                 self.config.speculate_config.speculate_method is not None,  # speculate_decoder
             )[0]
+            paddle.device.synchronize()
+            nvtx.end_range(transformer_nvtx)
         else:
             if paddle.is_compiled_with_xpu():
                 from paddlenlp_ops import mla_block_multihead_attention_xpu
