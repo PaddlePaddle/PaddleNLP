@@ -135,9 +135,10 @@ def get_best_configs(
 
 
 @functools.lru_cache()
-def auto_tuning_with_compilation(m, n, k):
+def auto_tuning_with_compilation(m, n, k, num_sms):
     global includes, template
-    num_sms = get_num_sms()
+    if num_sms is None:
+        num_sms = get_num_sms()
     block_m, block_n, num_stages, num_tma_multicast, smem_size = get_best_configs(m, n, k, 1, num_sms)
     runtime = jit_tuner.compile_and_tune(
         m,
@@ -170,7 +171,7 @@ def auto_tuning_with_compilation(m, n, k):
     return runtime, num_sms, smem_size
 
 
-def gemm_fp8_fp8_bf16_nt(lhs: Tuple[Tensor, Tensor], rhs: Tuple[Tensor, Tensor], out: Tensor) -> None:
+def gemm_fp8_fp8_bf16_nt(lhs: Tuple[Tensor, Tensor], rhs: Tuple[Tensor, Tensor], out: Tensor, num_sms=112) -> None:
     """
     Do a normal GEMM with FP8 inputs and BF16 output, with 1x128 LHS scaling and 128x128 RHS scaling.
     LHS, RHS, RHS scaling factors, and output tensors must be in contiguous format.
@@ -210,7 +211,7 @@ def gemm_fp8_fp8_bf16_nt(lhs: Tuple[Tensor, Tensor], rhs: Tuple[Tensor, Tensor],
     # Do nothing if `m` is zero
     if m == 0:
         return
-    runtime, num_sms, smem_size = auto_tuning_with_compilation(m, n, k)
+    runtime, num_sms, smem_size = auto_tuning_with_compilation(m, n, k, num_sms)
     args = (lhs, lhs_scales, rhs, rhs_scales, out, m, paddle.device.current_stream().stream_base, num_sms, smem_size)
     # Run the kernel.
     runtime(*args)
