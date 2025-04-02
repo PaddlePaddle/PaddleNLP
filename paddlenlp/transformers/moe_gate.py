@@ -24,7 +24,10 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 
 from ..utils.log import logger
+import math
+import os
 
+DSV3_FORCE_SELECT_SELF_NODE = os.getenv("DSV3_FORCE_SELECT_SELF_NODE", "False").lower() == "true"
 
 class MoEGateMixin:
     def gate_score_func(self, logits: paddle.Tensor) -> paddle.Tensor:
@@ -193,6 +196,9 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         if self.global_aux_loss:
             assert self.group is not None, "group is required when global_aux_loss is True"
             self.rank = dist.get_rank(self.group)
+        else:
+            self.rank = dist.get_rank()
+       
 
         self.expert_drop = kwargs.pop("expert_drop", False)
         self.noisy_gate_policy = kwargs.pop("noisy_gate_policy", None)
@@ -209,6 +215,29 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         self.topk_group = kwargs.pop("topk_group", 1)  # for group_limited_greedy
         self.norm_topk_prob = kwargs.pop("norm_topk_prob", False)
         self.routed_scaling_factor = kwargs.pop("routed_scaling_factor", 1.0)
+
+        if DSV3_FORCE_SELECT_SELF_NODE:
+            print( "self rank", self.rank )
+            ep_size = self.config.ep_size
+            self.ep_node_num =   math.ceil(ep_size / 8 )
+            current_ep_node_id = (self.rank  % self.ep_node_num)
+            # ep rang
+            groups_per_node = self.n_group // self.ep_node_num
+
+            start = groups_per_node * current_ep_node_id
+            end = groups_per_node * (current_ep_node_id+1)
+
+            print( "star end", start, end)
+
+            current_groupd_bias = paddle.zeros( [self.n_group], dtype="float32")
+            current_groupd_bias[start:end] = paddle.ones([1], dtype="float32") * 1000000
+
+
+            self.current_groupd_bias = current_groupd_bias
+            self.current_groupd_bias.stop_gradient = True
+            print( "group id")
+
+            print( current_groupd_bias )
 
     def _priority(self, topk_idx: paddle.Tensor, capacity: int) -> paddle.Tensor:
         """_summary_
@@ -305,6 +334,9 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         group_scores = (
             scores_for_choice.reshape([bsz_seq_len, self.n_group, -1]).topk(2, axis=-1)[0].sum(axis=-1)
         )  # fmt:skip [n, n_group]
+        if DSV3_FORCE_SELECT_SELF_NODE:
+            group_scores = group_scores + self.current_groupd_bias
+        
         group_idx = paddle.topk(group_scores, k=topk_group, axis=-1, sorted=True)[1]  # [n, top_k_group]
         group_mask = paddle.zeros_like(group_scores).put_along_axis(group_idx, paddle.ones([], dtype="float32"), axis=-1)  # fmt:skip
         score_mask = (
