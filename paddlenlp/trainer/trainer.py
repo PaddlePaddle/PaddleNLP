@@ -1291,6 +1291,23 @@ class Trainer:
                 if self.args.ignore_data_skip:
                     self.timers and self.timers("read-data").start()
 
+                print("===> run step ", step, flush=1)
+                if step == 20:
+                    paddle.base.core.nvprof_start()
+                    # paddle.base.core.nvprof_enable_record_event()
+                    # paddle.base.core.nvprof_nvtx_push(str(step))
+                if step == 50:
+                    # paddle.base.core.nvprof_nvtx_pop()
+                    paddle.base.core.nvprof_stop()
+
+                    print("===> finish exit", flush=1)
+                    import sys
+
+                    sys.exit()
+                # if step >= 20 and step < 50:
+                #     paddle.base.core.nvprof_nvtx_pop()
+                #     paddle.base.core.nvprof_nvtx_push(str(step))
+
             if step < 0:
                 logger.warning(
                     f"There seems to be not a single sample in your epoch_iterator, stopping training at step"

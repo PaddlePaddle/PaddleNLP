@@ -59,6 +59,12 @@ try:
 except:
     flash_attention = None
 
+try:
+    import deep_gemm
+    import kitchen
+    import kitchen.quantization_subchannel_block_hybrid
+except:
+    pass
 
 from paddle import _C_ops
 
@@ -82,10 +88,20 @@ from ..moe_layer import MoELayer
 from ..utils import device_guard
 from . import fp8_linear as linear_utils
 from .configuration import DeepseekV2Config
-from .fp8_linear import FP8DeepseekV2MLP, FP8KeepXLinear, FP8Linear, Linear
+from .fp8_linear import (
+    FP8DeepseekV2MLP,
+    FP8KeepXLinear,
+    FP8Linear,
+    FusedFP8DeepseekV2MLP,
+    Linear,
+    kitchen_fp8_gemm,
+    kitchen_quant,
+)
 
 DSV3_USE_FP8_GEMM = os.getenv("DSV3_USE_FP8_GEMM", "False").lower() == "true"
 DSV3_USE_ATTEN_RECOMPUTE = os.getenv("DSV3_USE_ATTEN_RECOMPUTE", "False").lower() == "true"
+DSV3_USE_FUSED_Expert = os.getenv("DSV3_USE_FUSED_Expert", "False").lower() == "true"
+
 
 FA_VERSION = int(os.getenv("FA_VERSION", 2))
 
@@ -853,6 +869,9 @@ class DeepseekV2MoE(MoELayer):
         )
         DeepseekV2MLPClass = FP8DeepseekV2MLP if DSV3_USE_FP8_GEMM else DeepseekV2MLP
 
+        if DSV3_USE_FUSED_Expert:
+            DeepseekV2MLPClass = FusedFP8DeepseekV2MLP
+
         super().__init__(
             config=config,
             moe_num_experts=config.n_routed_experts,
@@ -874,7 +893,12 @@ class DeepseekV2MoE(MoELayer):
         self.alpha = config.aux_loss_alpha
         if config.n_shared_experts is not None:
             intermediate_size = config.moe_intermediate_size * config.n_shared_experts
-            self.shared_experts = DeepseekV2MLPClass(config=config, intermediate_size=intermediate_size, is_moe=False)
+            if DSV3_USE_FP8_GEMM:
+                self.shared_experts = FP8DeepseekV2MLP(
+                    config=config, intermediate_size=intermediate_size, is_moe=False
+                )
+            else:
+                self.shared_experts = DeepseekV2MLP(config=config, intermediate_size=intermediate_size, is_moe=False)
 
     def forward(self, hidden_states):
         final_hidden_states, l_aux, l_zloss = super().forward(hidden_states)
@@ -1379,6 +1403,110 @@ class FusedRMSLinearFunc(paddle.autograd.PyLayer):
         return dx, d_rms_norm_weight, d_q_down_weight, d_kv_down_weight
 
 
+class FusedRMSFP8LinearFunc(paddle.autograd.PyLayer):
+    @staticmethod
+    def forward(ctx, x, rms_norm_weight, q_down_weight, kv_down_weight, eps):
+
+        hidden_states, invar = fused_ln.fused_rms_norm(x, rms_norm_weight, eps)
+
+        h_orig_shape = hidden_states.shape
+
+        hidden_states = hidden_states.reshape([-1, h_orig_shape[-1]])
+        # quant
+        x_quant, x_scale = kitchen_quant(
+            hidden_states, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+        )
+        _, _, q_w_quant, q_w_scale = kitchen_quant(
+            q_down_weight, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
+        )
+
+        # compute out = mm(x, w_t)
+        q_out = paddle.empty([hidden_states.shape[0], q_down_weight.shape[-1]], dtype=hidden_states.dtype)
+        deep_gemm.gemm_fp8_fp8_bf16_nt((x_quant, x_scale), (q_w_quant, q_w_scale), q_out)
+        q_out = q_out.reshape([h_orig_shape[0], -1, q_down_weight.shape[-1]])
+
+        _, _, kv_w_quant, kv_w_scale = kitchen_quant(
+            kv_down_weight, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
+        )
+
+        # compute out = mm(x, w_t)
+        kv_out = paddle.empty([hidden_states.shape[0], kv_down_weight.shape[-1]], dtype=hidden_states.dtype)
+        deep_gemm.gemm_fp8_fp8_bf16_nt((x_quant, x_scale), (kv_w_quant, kv_w_scale), kv_out)
+        kv_out = kv_out.reshape([h_orig_shape[0], -1, kv_down_weight.shape[-1]])
+
+        ctx.save_for_backward(x, rms_norm_weight, q_down_weight, kv_down_weight, eps)
+        return q_out, kv_out
+
+    @staticmethod
+    def backward(ctx, d_q, d_kv):
+        x, rms_norm_weight, q_down_weight, kv_down_weight, eps = ctx.saved_tensor()
+        hidden_states, invar = fused_ln.fused_rms_norm(x, rms_norm_weight, eps)
+
+        h_orig_shape = hidden_states.shape
+        hidden_states = hidden_states.reshape([-1, hidden_states.shape[-1]])
+
+        # compute dx = mm(dout, w)
+        dx1 = paddle.empty(hidden_states.shape, x.dtype)
+
+        dq_quant, dq_scale = kitchen_quant(
+            d_q.reshape([-1, d_q.shape[-1]]),
+            backend=kitchen.ops.Backend.CUTLASS,
+            is_1d_scaled=True,
+            return_transpose=False,
+        )
+
+        q_w_quant, q_w_scale = kitchen_quant(
+            q_down_weight, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
+        )
+
+        deep_gemm.gemm_fp8_fp8_bf16_nt((dq_quant, dq_scale), (q_w_quant, q_w_scale), dx1)
+        dx1 = dx1.reshape(h_orig_shape)
+
+        # compute dw = mm(x_t, dout_t)
+
+        _, _, x_t_quant, x_t_scale = kitchen_quant(
+            hidden_states, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=True
+        )
+
+        _, _, dq_t_quant, dq_t_scale = kitchen_quant(
+            d_q.reshape([-1, d_q.shape[-1]]),
+            backend=kitchen.ops.Backend.CUBLAS,
+            is_1d_scaled=True,
+            return_transpose=True,
+        )
+        d_q_down_weight = kitchen_fp8_gemm(x_t_quant, x_t_scale, dq_t_quant, dq_t_scale, True, True)
+
+        # kv_w_quant, kv_w_scale = kitchen_quant(
+        #     kv_down_weight, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
+        # )
+
+        # dx2 = paddle.empty(hidden_states.shape, hidden_states.dtype)
+        # d_kv_quant, d_kv_scale = kitchen_quant(
+        #     d_kv.reshape([-1, d_kv.shape[-1]]),
+        #     backend=kitchen.ops.Backend.CUTLASS,
+        #     is_1d_scaled=True,
+        #     return_transpose=False,
+        # )
+
+        # print("shaoe", d_kv_quant.shape, kv_w_quant.shape, dx2.shape)
+        # deep_gemm.gemm_fp8_fp8_bf16_nt((d_kv_quant, d_kv_scale), (kv_w_quant, kv_w_scale), dx2)
+        # dx2 = dx2.reshape(h_orig_shape)
+        dx2 = paddle.matmul(d_kv, kv_down_weight, transpose_y=True)
+        h_grad = dx1 + dx2
+
+        _, _, dkv_t_quant, dkv_t_scale = kitchen_quant(
+            d_kv.reshape([-1, d_kv.shape[-1]]),
+            backend=kitchen.ops.Backend.CUBLAS,
+            is_1d_scaled=True,
+            return_transpose=True,
+        )
+        d_kv_down_weight = kitchen_fp8_gemm(x_t_quant, x_t_scale, dkv_t_quant, dkv_t_scale, True, True)
+
+        dx, d_rms_norm_weight = fused_ln.fused_rms_norm_grad_func(x, rms_norm_weight, invar, h_grad, eps)
+
+        return dx, d_rms_norm_weight, d_q_down_weight, d_kv_down_weight
+
+
 class FusedRMSLinear(paddle.nn.Layer):
     def __init__(self, hidden_size, q_out_dim, kv_outdim, eps=1e-6) -> None:
         super().__init__()
@@ -1405,7 +1533,8 @@ class FusedRMSLinear(paddle.nn.Layer):
 
     def forward(self, x):
 
-        return FusedRMSLinearFunc.apply(x, self.rms_norm_weight, self.q_down_weight, self.kv_down_weight, self.eps)
+        # return FusedRMSLinearFunc.apply(x, self.rms_norm_weight, self.q_down_weight, self.kv_down_weight, self.eps)
+        return FusedRMSFP8LinearFunc.apply(x, self.rms_norm_weight, self.q_down_weight, self.kv_down_weight, self.eps)
 
 
 class FusedRMSLinearSingleFunc(paddle.autograd.PyLayer):
@@ -1729,6 +1858,7 @@ class DeepseekV2Attention(nn.Layer):
         else:
             attn_output = outputs
 
+        # print( "atten out", attn_output.shape, attn_output.is_contiguous() )
         # if sequence_parallel is true, out shape are [q_len / n, bs, num_head * head_dim]
         # else their shape are [bs, q_len, num_head * head_dim], n is mp parallelism.
         attn_output = self.o_proj(attn_output)
