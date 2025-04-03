@@ -219,9 +219,6 @@ class LinearFP8Func(paddle.autograd.PyLayer):
         w_quant, w_scale = kitchen_quant(
             weight_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
         )
-        # _, _, w_quant, w_scale = kitchen_quant(
-        #     weight, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
-        # )
 
         # compute out = mm(x, w_t)
         out = paddle.empty([x.shape[0], weight.shape[-1]], dtype=x.dtype)
@@ -289,9 +286,6 @@ class LinearFP8KeepXFunc(paddle.autograd.PyLayer):
         _, _, w_quant, w_scale = kitchen_quant(
             weight, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
         )
-        # _, _, w_quant, w_scale = kitchen_quant(
-        #     weight, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
-        # )
 
         # compute out = mm(x, w_t)
         out = paddle.empty([x.shape[0], weight.shape[-1]], dtype=x.dtype)
