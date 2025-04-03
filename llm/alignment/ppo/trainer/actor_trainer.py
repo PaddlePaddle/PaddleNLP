@@ -11,27 +11,87 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import copy
+import json
+import math
+import os
+import sys
+import time
+import types
 import uuid
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import paddle
-from models.ppo_model_utils import RLHFPPOMixedLoss
+import paddle.distributed as dist
+import requests
+from algos.advantage import (
+    compute_grpo_advantages,
+    compute_reinforce_plus_plus_advantages_and_returns,
+)
+from models.ppo_model_utils import (
+    RLHFPPOMixedLoss,
+    create_startend_row_indices,
+    gather_log_probabilities,
+    make_position_ids_from_input_ids,
+)
 from paddle import nn
-from paddle.io import Dataset
+from paddle.distributed import fleet
+from paddle.distributed.fleet.meta_parallel import ParallelCrossEntropy, PipelineLayer
+from paddle.io import DataLoader, Dataset, DistributedBatchSampler
+from paddle.utils import map_structure
+from rich.console import Console
+from rich.table import Table
+from utils.comm_utils import (
+    ActorStages,
+    CriticStages,
+    RolloutStages,
+    data_group_merge,
+    data_group_split,
+    gather_and_pad,
+    new_timer_log,
+)
+from utils.infer_utils import infer_guard
+from utils.offload_utils import reload_and_offload_scope, reload_tensor_to_gpu
+from utils.timer_utils import TimerScope
 
 from paddlenlp.data import DataCollator
 from paddlenlp.generation import GenerationConfig
 from paddlenlp.trainer.trainer import (
+    EvalLoopOutput,
     EvalPrediction,
+    ProgressCallback,
     ShardingOption,
+    Trainer,
     TrainerCallback,
     TrainingArguments,
+    TrainOutput,
+    logger,
+    speed_metrics,
 )
-from paddlenlp.transformers import PretrainedModel, PretrainedTokenizer
+from paddlenlp.trainer.utils.helper import (
+    broadcast_dataset_rank0_model,
+    distributed_concat,
+)
+from paddlenlp.transformers import (
+    CosineAnnealingWithWarmupDecay,
+    LinearAnnealingWithWarmupDecay,
+    PretrainedModel,
+    PretrainedTokenizer,
+)
+from paddlenlp.transformers.model_utils import _add_variant
+from paddlenlp.utils.env import PADDLE_WEIGHTS_NAME
 
+from .actor_trainer import ActorReferenceTrainer
+from .critic_trainer import CriticTrainer
 from .rl_trainer import RLTrainer
-from .trainer_utils import guard_set_args
+from .trainer_utils import (
+    MuteDefaultFlowCallback,
+    batch_retokenize,
+    guard_set_args,
+    is_same_tokenizer,
+    process_row,
+)
 
 
 class ActorReferenceTrainer(RLTrainer):
@@ -159,3 +219,93 @@ class ActorReferenceTrainer(RLTrainer):
             }
             for idx, seq in enumerate(sequences)
         ]
+
+    @paddle.no_grad()
+    def compute_logprob(self, input_ids: paddle.Tensor, position_ids: paddle.Tensor = None, **kwargs) -> paddle.Tensor:
+        """
+        计算rollout过程中每个token的log probability。
+
+        Args:
+            input_ids (paddle.Tensor, shape [batch_size, sequence_length]):
+                输入序列，其中每个元素都是一个int，表示各自token的ID。
+            attention_mask (paddle.Tensor, shape [batch_size, sequence_length]):
+                输入序列的attention mask，其中每个元素为0或1，用于指示哪些tokens应该被模型考虑。
+            position_ids (paddle.Tensor, optional, shape [batch_size, sequence_length], defaults to None):
+                输入序列中每个token的位置ID，默认为None。
+            kwargs (Dict[str, Any], optional, defaults to {}):
+                可选参数，目前未使用。
+
+        Returns:
+            Dict[str, paddle.Tensor]:
+                - log_probs (paddle.Tensor, shape [batch_size, sequence_length - 1]):
+                    每个token在rollout过程中的log probability。
+                - ref_log_probs (paddle.Tensor, shape [batch_size, sequence_length - 1]):
+                    每个token在rollout过程中的reference log probability。
+
+        Raises:
+            None.
+        """
+        log_probs_list = []
+        batch_size, sequence_length = input_ids.shape
+        if str(self.args.rollout_logprob_batch_size).lower() == "auto":
+            # auto compute
+            if sequence_length > 4096 - 128:
+                rollout_logprob_batch_size = 2
+            elif sequence_length > 2048 - 128:
+                rollout_logprob_batch_size = 4
+            else:
+                rollout_logprob_batch_size = batch_size
+        else:
+            rollout_logprob_batch_size = int(self.args.rollout_logprob_batch_size)
+
+        num_batches = (batch_size + rollout_logprob_batch_size - 1) // rollout_logprob_batch_size
+
+        # pipe model outputs a logits tensor with LMHead, while non-pipe model
+        # outputs a tuple with logits tensor as the only one element.
+        startend_row_indices = create_startend_row_indices(input_ids, self.tokenizer.pad_token_id)
+        response_start = kwargs["prompt"].shape[-1] - 1 if "prompt" in kwargs else 0
+
+        for i in range(num_batches):
+            # Calculate the start and end indices for the current batch
+            start_index = i * rollout_logprob_batch_size
+            end_index = min(start_index + rollout_logprob_batch_size, batch_size)
+
+            # Extract the current batch
+            current_input_ids = input_ids[start_index:end_index]
+            current_startend_row_indices = (
+                startend_row_indices[start_index:end_index] if startend_row_indices is not None else None
+            )
+            current_position_ids = position_ids[start_index:end_index] if position_ids is not None else None
+
+            logits = self.model(
+                current_input_ids,
+                attention_mask=None,
+                attn_mask_startend_row_indices=current_startend_row_indices,
+                position_ids=current_position_ids,
+            )
+            if not isinstance(logits, paddle.Tensor):
+                logits = logits[0]  # [2, 355, 12544]
+
+            if self.args.use_fp32_compute and logits.dtype != paddle.float32:
+                logits = logits.cast(paddle.float32)
+            logits = logits / self.args.temperature if self.args.temperature > 0.0 else logits
+
+            if self.model.config.tensor_parallel_degree > 1 and self.model.config.tensor_parallel_output:
+                log_probs = (
+                    -ParallelCrossEntropy()(
+                        logits[:, response_start:-1].astype("float32"), current_input_ids[:, response_start + 1 :]
+                    )
+                    .squeeze(axis=-1)
+                    .astype(logits.dtype)
+                )
+            else:
+                log_probs = gather_log_probabilities(
+                    logits[:, response_start:-1], current_input_ids[:, response_start + 1 :]
+                )
+
+            log_probs_list.append(log_probs)
+            # set logits to none, save memory
+            logits = None
+            paddle.device.cuda.empty_cache()
+
+        return paddle.concat(log_probs_list, axis=0)

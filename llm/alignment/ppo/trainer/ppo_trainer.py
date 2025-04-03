@@ -1109,14 +1109,6 @@ class PPOTrainer(Trainer):
         position_ids = make_position_ids_from_input_ids(input_ids)
         return input_ids, position_ids
 
-    def compute_rollout_logprob(self, micro_batch):
-        if self.args.rollout_logprob_batch_size is not None:
-            micro_batch.update(self.rollout_logprob_with_batch_size(**micro_batch))
-        else:
-            micro_batch.update(self.rollout_logprob(**micro_batch))
-
-        return micro_batch
-
     def distribute_gather_and_pad_data(self, micro_batches):
         old_log_probs = [micro_batch["log_probs"] for micro_batch in micro_batches]
         ref_log_probs = [micro_batch["ref_log_probs"] for micro_batch in micro_batches]
@@ -1344,8 +1336,9 @@ class PPOTrainer(Trainer):
                                     if self.args.use_rm_server
                                     else {}
                                 ),
+                                "log_probs": self.actor_trainer.compute_logprob(micro_batch),
+                                "ref_log_probs": self.reference_trainer.compute_logprob(micro_batch),
                             }
-                            micro_batches.append(self.compute_rollout_logprob(micro_batch))
 
                 timer_scope_actor_model.stop()
 
@@ -1765,199 +1758,6 @@ class PPOTrainer(Trainer):
                     reward_critic_loss = self.critic_trainer.full_training_step(**value_trainer_inputs)
 
         return {"train_value_loss": reward_critic_loss}
-
-    @paddle.no_grad()
-    def rollout_logprob(
-        self,
-        input_ids: paddle.Tensor,
-        position_ids: paddle.Tensor = None,
-        **kwargs,
-    ) -> Dict[str, paddle.Tensor]:
-        """
-        计算rollout过程中每个token的log probability。
-
-        Args:
-            input_ids (paddle.Tensor, shape [batch_size, sequence_length]):
-                输入序列，其中每个元素都是一个int，表示各自token的ID。
-            attention_mask (paddle.Tensor, shape [batch_size, sequence_length]):
-                输入序列的attention mask，其中每个元素为0或1，用于指示哪些tokens应该被模型考虑。
-            position_ids (paddle.Tensor, optional, shape [batch_size, sequence_length], defaults to None):
-                输入序列中每个token的位置ID，默认为None。
-            kwargs (Dict[str, Any], optional, defaults to {}):
-                可选参数，目前未使用。
-
-        Returns:
-            Dict[str, paddle.Tensor]:
-                - log_probs (paddle.Tensor, shape [batch_size, sequence_length - 1]):
-                    每个token在rollout过程中的log probability。
-                - ref_log_probs (paddle.Tensor, shape [batch_size, sequence_length - 1]):
-                    每个token在rollout过程中的reference log probability。
-
-        Raises:
-            None.
-        """
-        # pipe model outputs a logits tensor with LMHead, while non-pipe model
-        # outputs a tuple with logits tensor as the only one element.
-        startend_row_indices = create_startend_row_indices(input_ids, self.tokenizer.pad_token_id)
-        response_start = kwargs["prompt"].shape[-1] - 1 if "prompt" in kwargs else 0
-        logits = self.actor_model(
-            input_ids, position_ids=position_ids, attn_mask_startend_row_indices=startend_row_indices
-        )
-        if not isinstance(logits, paddle.Tensor):
-            logits = logits[0]  # [2, 355, 12544]
-        ref_logits = self.reference_model(
-            input_ids, position_ids=position_ids, attn_mask_startend_row_indices=startend_row_indices
-        )
-
-        if not isinstance(ref_logits, paddle.Tensor):
-            ref_logits = ref_logits[0]  # [2, 355, 12544]
-
-        if self.args.use_fp32_compute and logits.dtype != paddle.float32:
-            logits = logits.cast(paddle.float32)
-        logits = logits / self.args.temperature if self.args.temperature > 0.0 else logits
-        if self.args.use_fp32_compute and ref_logits.dtype != paddle.float32:
-            ref_logits = ref_logits.cast(paddle.float32)
-        ref_logits = ref_logits / self.args.temperature if self.args.temperature > 0.0 else ref_logits
-
-        if self.actor_model.config.tensor_parallel_degree > 1 and self.actor_model.config.tensor_parallel_output:
-            log_probs = (
-                -ParallelCrossEntropy()(
-                    logits[:, response_start:-1].astype("float32"), input_ids[:, response_start + 1 :]
-                )
-                .squeeze(axis=-1)
-                .astype(logits.dtype)
-            )
-        else:
-            log_probs = gather_log_probabilities(logits[:, response_start:-1], input_ids[:, response_start + 1 :])
-
-        if (
-            self.reference_model.config.tensor_parallel_degree > 1
-            and self.reference_model.config.tensor_parallel_output
-        ):
-            ref_log_probs = (
-                -ParallelCrossEntropy()(
-                    ref_logits[:, response_start:-1].astype("float32"), input_ids[:, response_start + 1 :]
-                )
-                .squeeze(axis=-1)
-                .astype(ref_logits.dtype)
-            )
-        else:
-            ref_log_probs = gather_log_probabilities(
-                ref_logits[:, response_start:-1], input_ids[:, response_start + 1 :]
-            )
-
-        return {"log_probs": log_probs, "ref_log_probs": ref_log_probs}
-
-    @paddle.no_grad()
-    def rollout_logprob_with_batch_size(
-        self,
-        input_ids: paddle.Tensor,
-        position_ids: paddle.Tensor = None,
-        **kwargs,
-    ) -> Dict[str, paddle.Tensor]:
-        # Initialize lists to store results
-        log_probs_list = []
-        ref_log_probs_list = []
-        batch_size, sequence_length = input_ids.shape
-        if str(self.args.rollout_logprob_batch_size).lower() == "auto":
-            # auto compute
-            if sequence_length > 4096 - 128:
-                rollout_logprob_batch_size = 2
-            elif sequence_length > 2048 - 128:
-                rollout_logprob_batch_size = 4
-            else:
-                rollout_logprob_batch_size = batch_size
-        else:
-            rollout_logprob_batch_size = int(self.args.rollout_logprob_batch_size)
-
-        num_batches = (batch_size + rollout_logprob_batch_size - 1) // rollout_logprob_batch_size
-        response_start = kwargs["prompt"].shape[-1] - 1 if "prompt" in kwargs else 0
-
-        startend_row_indices = create_startend_row_indices(input_ids, self.tokenizer.pad_token_id)
-
-        for i in range(num_batches):
-            # Calculate the start and end indices for the current batch
-            start_index = i * rollout_logprob_batch_size
-            end_index = min(start_index + rollout_logprob_batch_size, batch_size)
-
-            # Extract the current batch
-            current_input_ids = input_ids[start_index:end_index]
-            current_startend_row_indices = (
-                startend_row_indices[start_index:end_index] if startend_row_indices is not None else None
-            )
-            current_position_ids = position_ids[start_index:end_index] if position_ids is not None else None
-
-            logits = self.actor_model(
-                current_input_ids,
-                attention_mask=None,
-                attn_mask_startend_row_indices=current_startend_row_indices,
-                position_ids=current_position_ids,
-            )
-            if not isinstance(logits, paddle.Tensor):
-                logits = logits[0]  # [2, 355, 12544]
-
-            if self.args.use_fp32_compute and logits.dtype != paddle.float32:
-                logits = logits.cast(paddle.float32)
-            logits = logits / self.args.temperature if self.args.temperature > 0.0 else logits
-
-            if self.actor_model.config.tensor_parallel_degree > 1 and self.actor_model.config.tensor_parallel_output:
-                log_probs = (
-                    -ParallelCrossEntropy()(
-                        logits[:, response_start:-1].astype("float32"), current_input_ids[:, response_start + 1 :]
-                    )
-                    .squeeze(axis=-1)
-                    .astype(logits.dtype)
-                )
-            else:
-                log_probs = gather_log_probabilities(
-                    logits[:, response_start:-1], current_input_ids[:, response_start + 1 :]
-                )
-
-            log_probs_list.append(log_probs)
-            # set logits to none, save memory
-            logits = None
-            paddle.device.cuda.empty_cache()
-
-            ref_logits = self.reference_model(
-                current_input_ids,
-                attention_mask=None,
-                attn_mask_startend_row_indices=current_startend_row_indices,
-                position_ids=current_position_ids,
-            )
-
-            if not isinstance(ref_logits, paddle.Tensor):
-                ref_logits = ref_logits[0]  # [2, 355, 12544]
-
-            if self.args.use_fp32_compute and ref_logits.dtype != paddle.float32:
-                ref_logits = ref_logits.cast(paddle.float32)
-            ref_logits = ref_logits / self.args.temperature if self.args.temperature > 0.0 else ref_logits
-
-            if (
-                self.reference_model.config.tensor_parallel_degree > 1
-                and self.reference_model.config.tensor_parallel_output
-            ):
-                ref_log_probs = (
-                    -ParallelCrossEntropy()(
-                        ref_logits[:, response_start:-1].astype("float32"), current_input_ids[:, response_start + 1 :]
-                    )
-                    .squeeze(axis=-1)
-                    .astype(ref_logits.dtype)
-                )
-            else:
-                ref_log_probs = gather_log_probabilities(
-                    ref_logits[:, response_start:-1], current_input_ids[:, response_start + 1 :]
-                )
-            ref_log_probs_list.append(ref_log_probs)
-            # set logits to none, save memory
-            ref_logits = None
-            paddle.device.cuda.empty_cache()
-
-        if num_batches > 1:
-            return {
-                "log_probs": paddle.concat(log_probs_list, axis=0),
-                "ref_log_probs": paddle.concat(ref_log_probs_list, axis=0),
-            }
-        return {"log_probs": log_probs_list[0], "ref_log_probs": ref_log_probs_list[0]}
 
     @paddle.no_grad()
     def rollout_reward_value(
