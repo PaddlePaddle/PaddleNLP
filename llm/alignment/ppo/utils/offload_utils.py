@@ -150,22 +150,26 @@ class OffloadController:
         self.objs = objs
 
     def __enter__(self):
-        for obj, mode in self.objs:
-            if hasattr(obj, "enable"):
-                obj.enable()
-            elif mode != "":
-                reload_tensor_to_gpu(obj)
-
+        for obj in self.objs:
+            if hasattr(obj[0], "enable"):
+                obj[0].enable()
+            else:
+                if obj[1] != "":
+                    reload_tensor_to_gpu(obj)
+        # offload_tensor_to_cpu/reload_tensor_to_gpu use non-blocking copy
+        # maybe overlap with compute later
         if len(self.objs) > 0:
             paddle.device.synchronize()
 
     def __exit__(self, *args):
-        for obj, mode in self.objs:
-            if hasattr(obj, "disable"):
-                obj.disable()
-            elif mode != "":
-                offload_tensor_to_cpu(obj)
-
+        for obj in self.objs:
+            if hasattr(obj[0], "disable"):
+                obj[0].disable()
+            else:
+                if obj[1] != "":
+                    offload_tensor_to_cpu(obj)
+        # offload_tensor_to_cpu/reload_tensor_to_gpu use non-blocking copy
+        # maybe overlap with compute later
         if len(self.objs) > 0:
             paddle.device.synchronize()
 

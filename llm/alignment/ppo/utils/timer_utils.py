@@ -15,61 +15,59 @@
 from contextlib import contextmanager
 from typing import List, Union
 
-from paddlenlp.trainer import Trainer
 from paddlenlp.trainer.plugins.timer import RuntimeTimer
 from paddlenlp.utils.log import logger
 
 from .comm_utils import get_timer_label
 
 
-@contextmanager
-def timers_scope(trainer: Trainer, name, minus_names: Union[List, str] = None):
-    """
-    Timing scope that will be used when training.
-    Args:
-        trainer (Trainer): The trainer object.
-        name (str): Name of the timer.
-        minus_name (str): Name of the timer to subtract from.
-    """
-    label = get_timer_label(name)
-    trainer.timers and trainer.timers(label).start()
-    yield
-    trainer.timers and trainer.timers(label).stop()
-    if minus_names is not None:
-        # if minus_names is a list, then we need to get the label for each name
-        if isinstance(minus_names, list):
-            minus_labels = [get_timer_label(name) for name in minus_names]
-        else:
-            minus_labels = [get_timer_label(minus_names)]
-        if trainer.timers:
-            for minus_label in minus_labels:
-                trainer.timers(label).elapsed_ -= trainer.timers(label).elapsed_(minus_label)
-    return
+class TimerScope:
+    def __init__(self, timers, name: str, minus_names: Union[List[str], str] = None):
+        self.timers = timers
+        self.name = name
+        self.minus_names = minus_names
+        self.label = self.get_timer_label(name)
+        self._started = False  # 跟踪计时器状态
+
+    def start(self) -> None:
+        """显式启动计时器"""
+        if self.timers:
+            self.timers[self.label].start()
+            self._started = True
+
+    def stop(self) -> None:
+        """显式停止计时器并处理减法逻辑"""
+        if self.timers and self._started:
+            timer = self.timers[self.label]
+            timer.stop()
+
+            if self.minus_names:
+                minus_labels = [
+                    self._get_timer_label(name)
+                    for name in (self.minus_names if isinstance(self.minus_names, list) else [self.minus_names])
+                ]
+                for label in minus_labels:
+                    timer.elapsed_ -= self.timers[label].elapsed_
+            self._started = False
+
+    @staticmethod
+    def _get_timer_label(name: str) -> str:
+        # 根据实际标签生成逻辑修改
+        return get_timer_label(name)
+
+    def __enter__(self):
+        self.start()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.stop()
 
 
-@contextmanager
-def timers_scope_manual_label(trainer, name, minus_names: Union[List, str] = None):
-    """
-    Timing scope that will be used when training.
-    Args:
-        trainer (Trainer): The trainer object.
-        name (str): Name of the timer.
-        minus_name (str): Name of the timer to subtract from.
-    """
-    label = name
-    trainer.timers and trainer.timers(label).start()
-    yield
-    trainer.timers and trainer.timers(label).stop()
-    if minus_names is not None:
-        # if minus_names is a list, then we need to get the label for each name
-        if isinstance(minus_names, list):
-            minus_labels = [name for name in minus_names]
-        else:
-            minus_labels = [minus_names]
-        if trainer.timers:
-            for minus_label in minus_labels:
-                trainer.timers(label).elapsed_ -= trainer.timers(label).elapsed_(minus_label)
-    return
+class TimerScopeManualLabel(TimerScope):
+    @staticmethod
+    def _get_timer_label(name: str) -> str:
+        # 根据实际标签生成逻辑修改
+        return name
 
 
 @contextmanager
@@ -77,9 +75,7 @@ def timers_scope_runtimer(name):
     """
     Timing scope that will be used when training.
     Args:
-        trainer (Trainer): The trainer object.
         name (str): Name of the timer.
-        minus_name (str): Name of the timer to subtract from.
     """
     timer = RuntimeTimer(name)
 
