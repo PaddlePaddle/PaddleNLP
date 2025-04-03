@@ -170,7 +170,6 @@ class ZipNode:
         expert_out_zipped, zipped_probs_topk = TDU.tokens_zip(
             expert_out, zipped_expertwise_rowmap, routemap_topk, unzipped_probs, total_zipped_tokens, num_experts
         )
-
         return expert_out_zipped
 
     @paddle.no_grad()
