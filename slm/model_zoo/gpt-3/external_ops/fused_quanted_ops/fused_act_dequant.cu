@@ -100,7 +100,14 @@ std::vector<paddle::Tensor> fused_act_dequant(
   rows = X.shape()[0];
   cols = X.shape()[1];
   paddle::Tensor out;
+  
   out = paddle::empty({rows, cols}, paddle::DataType::BFLOAT16, X.place());
+  auto out_ptr =
+    reinterpret_cast<void *>(out.data<phi::bfloat16>());
+  cudaMemsetAsync(out_ptr,
+                  0,
+                  sizeof(phi::bfloat16) * rows * cols,
+                  out.stream());
   dispatch_fused_act_dequant(
       X,
       Xscale,

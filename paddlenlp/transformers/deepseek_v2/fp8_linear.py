@@ -32,6 +32,8 @@ from ..linear_utils import RowSequenceParallelLinear as PD_RowSequenceParallelLi
 from .configuration import DeepseekV2Config
 
 try:
+    import kitchen
+
     from .kernel import act_quant, fp8_gemm, weight_dequant
 except:
     pass
@@ -48,7 +50,6 @@ except ImportError:
 
 try:
     import deep_gemm
-    import kitchen
     import kitchen.quantization_subchannel_block_hybrid
     from kitchen.quantization import QParams, ScalingType
 except:

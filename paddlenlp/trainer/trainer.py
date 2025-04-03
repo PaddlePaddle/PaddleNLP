@@ -1245,8 +1245,8 @@ class Trainer:
                                 f"optimizer not run, scale_before: {scale_before_value[0]}, scale_after: {scale_after_value[0]}"
                             )
                     elif isinstance(self.optimizer, HybridParallelOptimizer):
-                        # self.optimizer._step(parameters_list)
-                        print("pass")
+                        self.optimizer._step(parameters_list)
+                        #print("pass")
                     else:
                         self.optimizer.step()
 
