@@ -1304,10 +1304,16 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                         ffn2_quanted_weight, ffn2_weight_scale = weight_quantize(
                             ffn2_weight, algo=self.moe_quant_type, group_size=-1, arch=70
                         )
-                        ffn1_weight_scale = ffn1_weight_scale.cast("float16")
-                        ffn2_weight_scale = ffn2_weight_scale.cast("float16")
-                        ffn1_weights.append(ffn1_quanted_weight.reshape([self.transformer_block.config.embed_dim, -1]))
-                        ffn2_weights.append(ffn2_quanted_weight.reshape([-1, self.transformer_block.config.embed_dim]))
+                        ffn1_weight_scale = ffn1_weight_scale.cast("bfloat16")
+                        ffn2_weight_scale = ffn2_weight_scale.cast("bfloat16")
+                        # ffn1_weights.append(ffn1_quanted_weight.reshape([self.transformer_block.config.embed_dim, -1]))
+                        # ffn2_weights.append(ffn2_quanted_weight.reshape([-1, self.transformer_block.config.embed_dim]))
+
+                        # import pdb; pdb.set_trace()
+
+                        ffn1_weights.append(ffn1_quanted_weight)
+                        ffn2_weights.append(ffn2_quanted_weight)
+
                         ffn1_scales.append(ffn1_weight_scale)
                         ffn2_scales.append(ffn2_weight_scale)
                     else:

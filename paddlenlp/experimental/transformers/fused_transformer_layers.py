@@ -1525,6 +1525,7 @@ class FusedMultiTransformerBase(Layer):
         assert paddle.is_compiled_with_xpu()
         config = self.config.moe_config
         from paddlenlp_ops import moe_fused_xpu
+        # import pdb; pdb.set_trace()
         fused_moe_out = moe_fused_xpu(tmp_out, 
                                 self.gate_weights[i].transpose((1, 0)).cast("float32"),
                                 self.ffn1_weights[i],
@@ -1541,8 +1542,8 @@ class FusedMultiTransformerBase(Layer):
     def compute_fused_moe(self, tmp_out, i):
         # import pdb; pdb.set_trace()
         if paddle.is_compiled_with_xpu():
-            # return self.compute_fused_moe_xpu3(tmp_out, i)
-            return self.compute_fused_moe_xpu(tmp_out, i)
+            return self.compute_fused_moe_xpu3(tmp_out, i)
+            # return self.compute_fused_moe_xpu(tmp_out, i)
 
         e_score_correction_bias = self.e_score_correction_biases[i]
 
