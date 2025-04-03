@@ -519,14 +519,12 @@ class Fp8DispatchNode:
     @paddle.no_grad()
     def backward(self, hs_fp8_dispatched_grad, dispatched_probs_grad, previous_event=None, async_finish=False):
         # dispatch grad
-        paddle.base.core.eager._for_test_check_cuda_error()
         hs_fp8_grad, _, token_probs_grad = self.dispatch_act_node.backward(
             hs_fp8_dispatched_grad,
             dispatched_probs_grad,
             previous_event=previous_event,
             async_finish=async_finish,
         )
-        paddle.base.core.eager._for_test_check_cuda_error()
         return hs_fp8_grad, token_probs_grad
 
 
