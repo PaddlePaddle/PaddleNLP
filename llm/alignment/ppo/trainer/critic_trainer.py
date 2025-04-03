@@ -15,7 +15,12 @@
 
 from __future__ import annotations
 
-from models.ppo_model_utils import RLHFValueLoss
+from typing import Dict
+
+import paddle
+from models.ppo_model_utils import RLHFValueLoss, create_startend_row_indices
+
+from paddlenlp.transformers import PretrainedTokenizer
 from trainer.rl_trainer import RLTrainer
 
 
@@ -24,3 +29,24 @@ class CriticTrainer(RLTrainer):
     trainer_type = "value"
     # define loss name for logging
     loss_identifier = lambda self, inputs: "reward_critic_loss"
+
+    def compute_reward(
+        self,
+        input_ids: paddle.Tensor,
+        position_ids: paddle.Tensor = None,
+        input_ids_tokenizer: PretrainedTokenizer = None,
+        **kwargs,
+    ) -> Dict[str, paddle.Tensor]:
+        # TODO: confirm actor_tokenizer or reward_tokenizer or critic_tokenizer
+        # need retokenize?
+        attn_mask_startend_row_indices = create_startend_row_indices(input_ids, self.tokenizer.pad_token_id)
+        reward_value = self.model(
+            input_ids,
+            attention_mask=None,
+            position_ids=position_ids,
+            attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+        )[0]
+        reward_value = reward_value.squeeze(axis=-1)
+        reward_value = reward_value[:, :-1]
+
+        return reward_value

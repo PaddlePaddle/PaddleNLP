@@ -30,12 +30,11 @@ from algos.advantage import (
 )
 from models.ppo_model_utils import (
     create_startend_row_indices,
-    gather_log_probabilities,
     make_position_ids_from_input_ids,
 )
 from paddle import nn
 from paddle.distributed import fleet
-from paddle.distributed.fleet.meta_parallel import ParallelCrossEntropy, PipelineLayer
+from paddle.distributed.fleet.meta_parallel import PipelineLayer
 from paddle.io import DataLoader, Dataset, DistributedBatchSampler
 from paddle.utils import map_structure
 from rich.console import Console
@@ -81,7 +80,7 @@ from paddlenlp.utils.env import PADDLE_WEIGHTS_NAME
 
 from .actor_trainer import ActorReferenceTrainer
 from .critic_trainer import CriticTrainer
-from .rl_trainer import RLTrainer
+from .reward_trainer import RewardTrainer
 from .trainer_utils import (
     MuteDefaultFlowCallback,
     batch_retokenize,
@@ -318,9 +317,9 @@ class PPOTrainer(Trainer):
             tokenizer=reference_tokenizer,
             **trainer_agrs,
         )
-        self.reward_trainer, self.reward_server = self.create_reward_trainer(
+        self.reward_trainer = self.create_reward_trainer(
             model=reward_model,
-            tokenizer=reward_model,
+            tokenizer=reward_tokenizer,
             **trainer_agrs,
         )
 
@@ -496,7 +495,7 @@ class PPOTrainer(Trainer):
 
     def create_reward_trainer(
         self,
-        model: Union[PretrainedModel, nn.Layer] = None,
+        model: Union[PretrainedModel, nn.Layer, str] = None,
         criterion: nn.Layer = None,
         args: TrainingArguments = None,
         data_collator: Optional[DataCollator] = None,  # type: ignore
@@ -518,29 +517,25 @@ class PPOTrainer(Trainer):
                 ),  # workaround for pipeline parallel model check
             },
         ):
-            if isinstance(model, PretrainedModel):
-                reward_trainer = RLTrainer(
-                    model,
-                    criterion,
-                    copy.deepcopy(args),
-                    data_collator,
-                    train_dataset,
-                    eval_dataset,
-                    tokenizer,
-                    compute_metrics,
-                    callbacks,
-                    optimizers,
-                    preprocess_logits_for_metrics,
-                )
+            reward_trainer = RewardTrainer(
+                model,
+                criterion,
+                copy.deepcopy(args),
+                data_collator,
+                train_dataset,
+                eval_dataset,
+                tokenizer,
+                compute_metrics,
+                callbacks,
+                optimizers,
+                preprocess_logits_for_metrics,
+                reward_server=model,
+            )
+
+            if not self.args.use_rm_server:
                 if args.pipeline_parallel_degree > 1 or ShardingOption.FULL_SHARD in args.sharding:
                     reward_trainer.init_train_model_opt(100, None, clear_master_weight=True)  # dummy max_steps
-
-                reward_server = None
-            else:
-                reward_trainer = None
-                reward_server = model
-
-        return reward_trainer, reward_server
+        return reward_trainer
 
     @property
     def reference_model(self):
@@ -562,10 +557,10 @@ class PPOTrainer(Trainer):
         获取奖励模型，如果没有则创建一个。
         返回值：tf.keras.models.Model，奖励模型。
         """
-        if hasattr(self, "reward_trainer"):
-            return self.reward_trainer.get_model(train=False)
-        else:
+        if self.args.use_rm_server:
             return self.reward_server
+        else:
+            return self.reward_trainer.get_model(train=False)
 
     @property
     def actor_model(self):
@@ -692,6 +687,9 @@ class PPOTrainer(Trainer):
                     )["input_ids"]
                 else:
                     seq = generated_seq
+
+
+                
                 if self.reward_tokenizer is not self.tokenizer:
                     reward_tokenize_output = batch_retokenize(
                         input_ids=seq,
@@ -1336,9 +1334,10 @@ class PPOTrainer(Trainer):
                                     if self.args.use_rm_server
                                     else {}
                                 ),
-                                "log_probs": self.actor_trainer.compute_logprob(micro_batch),
-                                "ref_log_probs": self.reference_trainer.compute_logprob(micro_batch),
                             }
+
+                            micro_batch["log_probs"] = self.actor_trainer.compute_logprob(micro_batch)
+                            micro_batch["ref_log_probs"] = self.reference_trainer.compute_logprob(micro_batch)
 
                 timer_scope_actor_model.stop()
 
@@ -1355,7 +1354,12 @@ class PPOTrainer(Trainer):
                     ):
                         with TimerScope(self.timers, RolloutStages.ROLLOUT_REWARD_VALUE):
                             for micro_batch in micro_batches:
-                                micro_batch.update(self.rollout_reward_value(**micro_batch))
+                                micro_batch["rewards"] = self.reward_trainer.compute_reward(
+                                    input_ids_tokenizer=self.tokenizer,
+                                    **micro_batch,
+                                )
+                                if self.args.rl_algorithm == "ppo":
+                                    micro_batch["reward_values"] = self.critic_trainer.compute_reward(**micro_batch)
 
                 # prepare data for reinforce_plus_plus
                 if self.args.rl_algorithm == "reinforce_plus_plus":
@@ -1623,12 +1627,18 @@ class PPOTrainer(Trainer):
 
         if not use_tgt_len_return:
             advantages = paddle.concat(
-                [paddle.zeros([advantages.shape[0], start], dtype=advantages.dtype), advantages],
-                -1,
+                [
+                    paddle.zeros([advantages.shape[0], start], dtype=advantages.dtype),
+                    advantages,
+                ],
+                axis=-1,
             )
             returns = paddle.concat(
-                [paddle.zeros([returns.shape[0], start], dtype=returns.dtype), returns],
-                -1,
+                [
+                    paddle.zeros([returns.shape[0], start], dtype=returns.dtype),
+                    returns,
+                ],
+                axis=-1,
             )
 
         return advantages.detach(), returns
@@ -1703,13 +1713,7 @@ class PPOTrainer(Trainer):
                     "train_norm_reward_with_kl": rewards_with_kl,
                     "train_pure_policy_loss": self.actor_trainer.info_buffer.get("pure_policy_loss"),
                     "train_entropy_loss": self.actor_trainer.info_buffer.get("entropy_loss"),
-                    **(
-                        {
-                            "train_values": values,
-                        }
-                        if self.args.rl_algorithm == "ppo"
-                        else {}
-                    ),
+                    **({"train_values": values} if self.args.rl_algorithm == "ppo" else {}),
                     "train_returns": returns,
                 }
                 if self.args.rl_algorithm in ["ppo", "reinforce_plus_plus"]
@@ -1781,98 +1785,6 @@ class PPOTrainer(Trainer):
                 rewards (paddle.Tensor): shape=[batch_size, seq_len], 每个时间步骤的奖励得分，取值范围是[-inf, inf]。
                 reward_values (paddle.Tensor): shape=[batch_size, seq_len-1], 每个时间步骤的奖励值，取值范围是[0, inf]。
         """
-        if not self.args.use_rm_server:
-            if self.reward_tokenizer is not self.tokenizer:
-                # right padding
-                reward_tokenize_output = batch_retokenize(
-                    input_ids,
-                    src_tokenizer=self.tokenizer,
-                    dest_tokenizer=self.reward_tokenizer,
-                )
-                reward_input_ids = reward_tokenize_output["input_ids"]
-                reward_position_ids = reward_tokenize_output["position_ids"]
-            else:
-                reward_input_ids = input_ids
-                reward_position_ids = position_ids
-
-            attn_mask_startend_row_indices = create_startend_row_indices(
-                reward_input_ids, self.reward_tokenizer.pad_token_id
-            )
-            # .end_scores
-            reward_score = self.reward_model(
-                reward_input_ids,
-                attention_mask=None,
-                attn_mask_startend_row_indices=attn_mask_startend_row_indices,
-                position_ids=reward_position_ids,
-            )[1]
-        else:
-            prompt_len = kwargs["prompt"].shape[-1]
-            if "label_ids" not in kwargs:
-                raise ValueError("Rule-based reward needs labels.")
-            src = self.tokenizer.batch_decode(input_ids[:, :prompt_len], skip_special_tokens=True)
-            tgt = self.tokenizer.batch_decode(kwargs["label_ids"], skip_special_tokens=True)
-            response = self.tokenizer.batch_decode(input_ids[:, prompt_len:], skip_special_tokens=True)
-            reward_score = self.request_reward_server(src, tgt, response)
-
-        reward_score = reward_score.squeeze(axis=-1)
-
-        if self.args.rl_algorithm in ["grpo", "reinforce_plus_plus"]:
-            return {"rewards": reward_score}
-
-        attn_mask_startend_row_indices = create_startend_row_indices(input_ids, self.reward_tokenizer.pad_token_id)
-        # .scores
-        reward_value = self.critic_model(
-            input_ids,
-            attention_mask=None,
-            position_ids=position_ids,
-            attn_mask_startend_row_indices=attn_mask_startend_row_indices,
-            # return_dict=True,
-        )[0]
-        reward_value = reward_value.squeeze(axis=-1)
-        reward_value = reward_value[:, :-1]
-
-        return {"rewards": reward_score, "reward_values": reward_value}
-
-    def request_reward_server(self, src, tgt, response):
-        data = {"src": src, "tgt": tgt, "response": response}
-
-        def post():
-            try:
-                res = requests.post(self.reward_server, json=data)
-                result = json.loads(res.text)
-                reward_score = paddle.to_tensor(
-                    result["score"], dtype=self._model_config.dtype if not self.args.use_fp32_compute else "float32"
-                )
-            except Exception as e:
-                logger.warning(f"Request reward server failed({e}) and rewards_score will be set zero.")
-                reward_score = paddle.zeros(
-                    len(response), dtype=self._model_config.dtype if not self.args.use_fp32_compute else "float32"
-                )
-            return reward_score
-
-        try:
-            hcg = fleet.get_hybrid_communicate_group()
-            tp_group = hcg.get_model_parallel_group()
-            nranks = tp_group.nranks
-            tp_rank = hcg.get_model_parallel_rank()
-        except:
-            nranks = 1
-            tp_rank = 0
-
-        if nranks == 1:
-            reward_score = post()
-        else:
-            if tp_rank == 0:
-                reward_score = post()
-            else:
-                reward_score = paddle.empty(
-                    shape=[len(response)],
-                    dtype=self._model_config.dtype if not self.args.use_fp32_compute else "float32",
-                )
-            paddle.distributed.barrier(tp_group)
-            paddle.distributed.broadcast(reward_score, src=tp_group.ranks[0], group=tp_group)
-
-        return reward_score.unsqueeze(-1)
 
     @paddle.no_grad()
     def compute_reward_normalization(self, rl_batches):

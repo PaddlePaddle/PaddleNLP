@@ -11,86 +11,36 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import copy
-import json
-import math
-import os
-import sys
-import time
-import types
 import uuid
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import paddle
-import paddle.distributed as dist
-import requests
-from algos.advantage import (
-    compute_grpo_advantages,
-    compute_reinforce_plus_plus_advantages_and_returns,
-)
 from models.ppo_model_utils import (
     RLHFPPOMixedLoss,
     create_startend_row_indices,
     gather_log_probabilities,
-    make_position_ids_from_input_ids,
 )
 from paddle import nn
-from paddle.distributed import fleet
-from paddle.distributed.fleet.meta_parallel import ParallelCrossEntropy, PipelineLayer
-from paddle.io import DataLoader, Dataset, DistributedBatchSampler
-from paddle.utils import map_structure
-from rich.console import Console
-from rich.table import Table
-from utils.comm_utils import (
-    ActorStages,
-    CriticStages,
-    RolloutStages,
-    data_group_merge,
-    data_group_split,
-    gather_and_pad,
-    new_timer_log,
-)
-from utils.infer_utils import infer_guard
-from utils.offload_utils import reload_and_offload_scope, reload_tensor_to_gpu
-from utils.timer_utils import TimerScope
+from paddle.distributed.fleet.meta_parallel import ParallelCrossEntropy
+from paddle.io import Dataset
 
 from paddlenlp.data import DataCollator
 from paddlenlp.generation import GenerationConfig
 from paddlenlp.trainer.trainer import (
-    EvalLoopOutput,
     EvalPrediction,
-    ProgressCallback,
     ShardingOption,
-    Trainer,
     TrainerCallback,
     TrainingArguments,
-    TrainOutput,
-    logger,
-    speed_metrics,
-)
-from paddlenlp.trainer.utils.helper import (
-    broadcast_dataset_rank0_model,
-    distributed_concat,
 )
 from paddlenlp.transformers import (
-    CosineAnnealingWithWarmupDecay,
-    LinearAnnealingWithWarmupDecay,
     PretrainedModel,
     PretrainedTokenizer,
 )
-from paddlenlp.transformers.model_utils import _add_variant
-from paddlenlp.utils.env import PADDLE_WEIGHTS_NAME
 
-from .actor_trainer import ActorReferenceTrainer
-from .critic_trainer import CriticTrainer
 from .rl_trainer import RLTrainer
 from .trainer_utils import (
-    MuteDefaultFlowCallback,
-    batch_retokenize,
     guard_set_args,
-    is_same_tokenizer,
-    process_row,
 )
 
 
