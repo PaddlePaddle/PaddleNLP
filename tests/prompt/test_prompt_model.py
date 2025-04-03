@@ -30,11 +30,11 @@ from paddlenlp.transformers import (
 class PromptModelTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/tiny-random-ernie")
-        cls.model = AutoModelForMaskedLM.from_pretrained("__internal_testing__/tiny-random-ernie")
+        cls.tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-tiny-nano-v2-zh")
+        cls.model = AutoModelForMaskedLM.from_pretrained("ernie-3.0-tiny-nano-v2-zh")
         cls.num_labels = 2
         cls.seq_cls_model = AutoModelForSequenceClassification.from_pretrained(
-            "__internal_testing__/tiny-random-ernie", num_labels=cls.num_labels
+            "ernie-3.0-tiny-nano-v2-zh", num_labels=cls.num_labels
         )
 
         cls.template = AutoTemplate.create_from(
