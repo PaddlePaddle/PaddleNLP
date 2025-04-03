@@ -1309,10 +1309,13 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                         # ffn1_weights.append(ffn1_quanted_weight.reshape([self.transformer_block.config.embed_dim, -1]))
                         # ffn2_weights.append(ffn2_quanted_weight.reshape([-1, self.transformer_block.config.embed_dim]))
 
+                        ffn1_weights.append(ffn1_quanted_weight.transpose([1, 0]).reshape([self.transformer_block.config.embed_dim, -1]))
+                        ffn2_weights.append(ffn2_quanted_weight.transpose([1, 0]).reshape([-1, self.transformer_block.config.embed_dim]))
+
                         # import pdb; pdb.set_trace()
 
-                        ffn1_weights.append(ffn1_quanted_weight)
-                        ffn2_weights.append(ffn2_quanted_weight)
+                        # ffn1_weights.append(ffn1_quanted_weight)
+                        # ffn2_weights.append(ffn2_quanted_weight)
 
                         ffn1_scales.append(ffn1_weight_scale)
                         ffn2_scales.append(ffn2_weight_scale)
