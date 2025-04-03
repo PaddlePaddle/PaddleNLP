@@ -669,11 +669,17 @@ class ModelRunner:
 
                 time.sleep(0.001)
                 continue
-            
-            # logger.info(f"wht---rank: {self.rank} --- self.share_inputs['seq_lens_this_time'] is {self.share_inputs['seq_lens_this_time']}")
-            # logger.info(f"wht---rank: {self.rank} --- self.share_inputs['seq_lens_encoder'] is {self.share_inputs['seq_lens_encoder']}")
-            # logger.info(f"wht---rank: {self.rank} --- self.share_inputs['seq_lens_decoder'] is {self.share_inputs['seq_lens_decoder']}")
-            # logger.info(f"wht---rank: {self.rank} --- self.share_inputs['block_tables'] is {self.share_inputs['block_tables']}")
+
+
+            # if self.rank == 0 and False:
+            #     global saver
+            #     saver.step(self.share_inputs, self.cache_kvs['key_caches_1'].cast('float'))
+                # logger.info(f"wht---rank: {self.rank} --- self.share_inputs['seq_lens_this_time'] is {self.share_inputs['seq_lens_this_time']}")
+                # logger.info(f"wht---rank: {self.rank} --- self.share_inputs['seq_lens_encoder'] is {self.share_inputs['seq_lens_encoder']}")
+                # logger.info(f"wht---rank: {self.rank} --- self.share_inputs['seq_lens_decoder'] is {self.share_inputs['seq_lens_decoder']}")
+                # logger.info(f"wht---rank: {self.rank} --- self.share_inputs['block_tables'] is {self.share_inputs['block_tables']}")
+                # self.share_inputs["not_need_stop"]
+                # self.share_inputs["stop_flags"]
 
             if self.proposer is not None:
                 self.proposer.run(
@@ -698,6 +704,102 @@ class ModelRunner:
             if self.proposer is not None:
                 self.proposer.postprocess()
 
+
+import numpy as np
+import time
+
+class DataSaver:
+    def __init__(self):
+        # 初始化历史数据存储字典
+        self.history = {
+            # "stop_flags": [],
+            "seq_lens_this_time": [],
+            "step_seq_lens_encoder": [],
+            "seq_lens_encoder": [],
+            "seq_lens_decoder": [],
+            "block_tables": [],
+            "cache_kv": [],
+            # "encoder_block_lens": [],
+            # "is_block_step": [],
+            # "step_block_list": [],
+            # "step_lens": [],
+            # "recover_block_list": [],
+            # "recover_lens": [],
+            # "need_block_list": [],
+            # "need_block_len": [],
+            # "used_list_len": [],
+            # "free_list": [],
+            # "free_list_len": [],
+            # "input_ids": [],
+            # "pre_ids": [],
+            "step_idx": [],
+            # "next_tokens": [],
+            # "first_token_ids": [],
+        }
+        # self.history = {
+        #     "stop_flags": [],
+        #     "seq_lens_this_time": [],
+        #     "step_seq_lens_encoder": [],
+        #     "seq_lens_encoder": [],
+        #     "seq_lens_decoder": [],
+        #     "block_tables": [],
+        #     "encoder_block_lens": [],
+        #     "is_block_step": [],
+        #     "step_block_list": [],
+        #     "step_lens": [],
+        #     "recover_block_list": [],
+        #     "recover_lens": [],
+        #     "need_block_list": [],
+        #     "need_block_len": [],
+        #     "used_list_len": [],
+        #     "free_list": [],
+        #     "free_list_len": [],
+        #     "input_ids": [],
+        #     "pre_ids": [],
+        #     "step_idx": [],
+        #     "next_tokens": [],
+        #     "first_token_ids": [],
+        # }
+        self.step_counter = 0
+
+    def _convert_to_numpy(self, tensor_dict):
+        """将Tensor字典转换为numpy字典"""
+        return {k: v.numpy() for k, v in tensor_dict.items()}
+
+    def save_data(self):
+        """保存累积数据到npz文件"""
+        timestamp = int(time.time())
+        filename = f"accumulated_data_step_{self.step_counter}_{timestamp}.npz"
+        
+        # 构建保存字典，处理不同形状的数据
+        save_dict = {}
+        for key in self.history:
+            try:
+                # 尝试堆叠成常规数组
+                save_dict[key] = np.array(self.history[key])
+            except ValueError:
+                # 处理形状不一致的情况
+                save_dict[key] = np.array(self.history[key], dtype=object)
+        
+        np.savez(filename, **save_dict)
+        print(f"已保存累积数据到文件: {filename}")
+
+    def step(self, share_inputs, cache_kv=None):
+        """处理每一步数据"""
+        if cache_kv is not None:
+            share_inputs["cache_kv"] = cache_kv
+        # 转换当前步骤的Tensor为numpy
+        numpy_data = self._convert_to_numpy(share_inputs)
+        
+        # 将数据存入历史记录
+        for key in self.history:
+            self.history[key].append(numpy_data[key])
+        
+        self.step_counter += 1
+        
+        # 每10步保存一次
+        if self.step_counter % 10 == 0:
+            self.save_data()
 
 class InferenceEngine(object):
     """
@@ -746,8 +848,9 @@ class InferenceEngine(object):
             config.set_xpu_device_id(device_id)
             xpu_config = paddle.inference.XpuConfig()
             xpu_config.device_id = device_id
-            xpu_config.l3_size = 0
+            xpu_config.l3_size = 0 
             xpu_config.l3_autotune_size = 0
+            xpu_config.context_gm_size = 134217728
             config.set_xpu_config(xpu_config)
             config.switch_ir_optim(True)
             config.delete_pass("fc_xpu_fuse_pass")
@@ -803,7 +906,7 @@ def main():
     start model runner
     """
     args = parse_args()
-    # llm_utils.set_triton_cache(args.model_dir, "static")
+    llm_utils.set_triton_cache(args.model_dir, "static")
     try:
         from paddle.utils import try_import
 
@@ -816,4 +919,6 @@ def main():
 
 
 if __name__ == "__main__":
+    global saver
+    saver = DataSaver()
     main()

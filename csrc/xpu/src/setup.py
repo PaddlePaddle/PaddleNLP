@@ -76,7 +76,7 @@ setup(
                 # "./mla_block_multihead_attention_xpu_v2.cc", # used for vllm
                 "./absorb_mla_block_mha_encoder_xpu.cc",
                 "./absorb_mla_block_mha_decoder_xpu.cc",
-                "./weight_only_linear.cc",
+                # "./weight_only_linear.cc",
                 "./get_position_ids.cc",
                 "./get_position_ids_v2.cc",
                 "./adjust_batch.cc",

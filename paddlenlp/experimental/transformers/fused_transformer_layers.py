@@ -1541,8 +1541,8 @@ class FusedMultiTransformerBase(Layer):
     def compute_fused_moe(self, tmp_out, i):
         # import pdb; pdb.set_trace()
         if paddle.is_compiled_with_xpu():
-            return self.compute_fused_moe_xpu3(tmp_out, i)
-            # return self.compute_fused_moe_xpu(tmp_out, i)
+            # return self.compute_fused_moe_xpu3(tmp_out, i)
+            return self.compute_fused_moe_xpu(tmp_out, i)
 
         e_score_correction_bias = self.e_score_correction_biases[i]
 
@@ -1812,6 +1812,7 @@ class FusedMultiTransformerBase(Layer):
         time_step=None,
         **kwargs,
     ):
+        # logger.info("{} begin: {}".format(time_step, caches[1][6,0,49,:]))
         r"""
         Applies multi transformer layers on the input.
 
@@ -1970,6 +1971,7 @@ class FusedMultiTransformerBase(Layer):
         kwargs["input_ids"] = input_ids
 
         out = self.post_process(**kwargs)
+        # logger.info("{} end: {}".format(time_step, caches[1][6,0,49,:]))
         return out, caches
 
 

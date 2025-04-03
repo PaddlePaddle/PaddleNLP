@@ -29,6 +29,13 @@ std::vector<paddle::Tensor> AdjustBatch(const paddle::Tensor& tmp_out, // [token
   xpu::ctx_guard RAII_GUARD(xpu_ctx->x_context());
   using XPUType = typename XPUTypeTrait<bfloat16>::Type; // only support bfloat16
   typedef paddle::bfloat16 data_t;
+
+  // int dev_id = -1;
+  // xpu_current_device(&dev_id);
+  // if (dev_id ==0) {
+  //     xpu_ctx->x_context()->set_debug_level(0xa1);
+  // }
+
   const int token_num = tmp_out.dims()[0]; 
   const int dim = tmp_out.dims()[1]; 
   const int bsz = cum_offsets.shape()[0];

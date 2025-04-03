@@ -67,7 +67,8 @@ def infer(
                 "topp": 0.95,
                 "temperature": 0.6,
                 "stream": True,
-                "return_all_tokens": False
+                "return_all_tokens": False,
+                "timeout": 1500
             }
         else:  # backend is trtllm
             pload = {
@@ -82,11 +83,15 @@ def infer(
         response = requests.post(url=api_url, headers=headers, json=pload, stream=True)
 
         chunks = []
-        for chunk in response.iter_content(chunk_size=1000000):
-            chunks.append(chunk)
+        try:
+            for chunk in response.iter_content(chunk_size=1000000):
+                chunks.append(chunk)
             if is_first:
                 first_token_latency = time.time() - start
                 is_first = False
+        except Exception as e:
+                    print(f"Chunked encoding error: {e}")
+                    time.sleep(1)
 
         total_token_latency = time.time() - start
 

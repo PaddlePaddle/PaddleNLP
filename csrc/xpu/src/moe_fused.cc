@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include <core/ctx_manager.h>
-#include <core/vllm_tensor.h>
+#include <core/xft_tensor.h>
 #include <core/xft_check.h>
 #include <core/xft_event.h>
 #include <core/xft_params.h>
@@ -46,6 +46,7 @@ std::vector<paddle::Tensor> MoeFusedKernel(
   using XPUType = typename XPUTypeTrait<bfloat16>::Type;
   typedef paddle::bfloat16 data_t;
 
+//   xpu_ctx->x_context()->set_debug_level(0x1);
 
   const int64_t m = input.shape()[0];
   const int64_t hidden_size = input.shape()[1];

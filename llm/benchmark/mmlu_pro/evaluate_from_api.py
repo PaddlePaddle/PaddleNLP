@@ -8,6 +8,12 @@ from datasets import load_dataset
 import argparse
 import requests
 
+import os
+import threading
+from concurrent.futures import ThreadPoolExecutor
+from tqdm import tqdm
+from functools import partial
+
 API_KEY = ""
 random.seed(12345)
 
@@ -211,7 +217,7 @@ def call_generate(prompt, **kwargs):
     if kwargs['backend'] == 'paddle':
         data = {
             "text": prompt,
-            "max_dec_len": 2048,
+            "max_dec_len": 8192,
             # "min_dec_len": 1,
             "topp": 0.95,
             "temperature": 0.6,
@@ -252,8 +258,16 @@ def call_generate(prompt, **kwargs):
     lines = b"".join(chunks).decode("utf-8")
     lines = lines.strip().split('\n')
     if kwargs['backend'] == 'paddle':
+        print('################################################################################')
+        print(f'wht --- query is \n{prompt}')
+        print(f'wht --- answer is \n{json.loads(lines[-1])["tokens_all"]}')
+        print('--------------------------------------------------------------------------------')
         return json.loads(lines[-1])["tokens_all"]
     elif kwargs['backend'] == 'trtllm' or kwargs['backend'] == 'vllm':
+        print('################################################################################')
+        print(f'wht --- query is \n{prompt}')
+        print(f'wht --- answer is \n{json.loads(lines[-1])["choices"][0]["message"]["content"]}')
+        print('--------------------------------------------------------------------------------')
         return json.loads(lines[-1])["choices"][0]["message"]["content"]
 
 def single_request(client, single_question, cot_examples_dict, exist_result):
@@ -269,7 +283,7 @@ def single_request(client, single_question, cot_examples_dict, exist_result):
     cot_examples = cot_examples_dict[category]
     question = single_question["question"]
     options = single_question["options"]
-    prompt = "The following are multiple choice questions (with answers) about {}. Think step by" \
+    prompt = "The following is a choice question about {}. Think step by" \
              " step and then output the answer in the format of \"The answer is (X)\" at the end.\n\n" \
         .format(category)
     for each in cot_examples:
@@ -329,6 +343,7 @@ def merge_result(res, curr):
 def evaluate(subjects):
     # client = get_client()
     test_df, dev_df = load_mmlu_pro()
+    # import pdb; pdb.set_trace()
     if not subjects:
         subjects = list(test_df.keys())
     print("assigned subjects", subjects)
@@ -370,6 +385,75 @@ def evaluate(subjects):
         save_res(res, output_res_path)
         save_summary(category_record, output_summary_path)
 
+
+# def evaluate(subjects):
+#     test_df, dev_df = load_mmlu_pro()
+#     if not subjects:
+#         subjects = list(test_df.keys())
+#     print("assigned subjects", subjects)
+    
+#     for subject in subjects:
+#         test_data = test_df[subject]
+#         output_res_path = os.path.join(args.output_dir, f"{subject}_result.json")
+#         output_summary_path = os.path.join(args.output_dir, f"{subject}_summary.json")
+#         res, category_record = update_result(output_res_path)
+        
+#         lock = threading.Lock()
+
+#         def process_each(each, subject, dev_df, output_res_path, output_summary_path, res):
+#             label = each["answer"]
+#             category = subject
+            
+#             # 多线程执行single_request
+#             pred, response, exist = single_request(None, each, dev_df, res)
+            
+#             if response is None:
+#                 return
+
+#             with lock:  # 保证以下操作单线程访问
+#                 # 读取最新结果
+#                 res, category_record = update_result(output_res_path)
+                
+#                 # 检查是否已处理（假设each有唯一标识）
+#                 if any(e['id'] == each['id'] for e in res.values()):
+#                     print('wht -----')
+#                     print(e['id'])
+#                     print(each['id'])
+#                     return
+                
+#                 # 更新结果数据
+#                 each["pred"] = pred
+#                 each["model_outputs"] = response
+#                 merge_result(res, each)
+                
+#                 # 更新统计信息
+#                 if category not in category_record:
+#                     category_record[category] = {"corr": 0, "wrong": 0}
+#                 if pred == label:
+#                     category_record[category]["corr"] += 1
+#                 else:
+#                     category_record[category]["wrong"] += 1
+                
+#                 # 保存更新
+#                 save_res(res, output_res_path)
+#                 save_summary(category_record, output_summary_path)
+
+#         # 绑定固定参数
+#         process_func = partial(process_each, 
+#                              subject=subject,
+#                              dev_df=dev_df,
+#                              output_res_path=output_res_path,
+#                              output_summary_path=output_summary_path,
+#                              res=res)
+        
+#         # 使用线程池并发处理
+#         with ThreadPoolExecutor(max_workers=3) as executor:
+#             tasks = list(tqdm(executor.map(process_func, test_data), total=len(test_data)))
+        
+#         # 最终保存确保完整性
+#         final_res, final_summary = update_result(output_res_path)
+#         save_res(final_res, output_res_path)
+#         save_summary(final_summary, output_summary_path)
 
 def save_res(res, output_res_path):
     temp = []

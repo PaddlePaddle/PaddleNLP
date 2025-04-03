@@ -247,8 +247,8 @@ std::vector<paddle::Tensor> MlaEnAttn(
             nullptr, // std::is_same<TK, int8_t>::value ? p_kcache_perhead_scale->data() : p_cache_k->max_data(),
             nullptr, // std::is_same<TK, int8_t>::value ? p_vcache_perhead_scale->data() : p_cache_v->max_data(),
             block_size, // block_size
-            max_block_per_seq, // max_blocks_per_seq (prefix cache)
-            page_param_.max_context_len_, // prefill_len
+            0, // max_blocks_per_seq (prefix cache)
+            -1, // prefill_len
             nullptr,
             softmax_scale * sqrt(dim_qk)); // block_tables (prefix cache)
 

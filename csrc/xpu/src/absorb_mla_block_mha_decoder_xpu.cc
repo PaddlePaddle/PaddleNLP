@@ -36,6 +36,53 @@ template <>
 struct kl3_pa_TL_trait<bfloat16> {
     using TL = float;
 };
+
+
+
+
+static int layer_count = 0;
+
+using XFT_BF16 = typename XPUTypeTrait<bfloat16>::Type;
+static void print_batch_xpu_data_part(
+        api::Context* ctx,
+        const XFT_BF16* data,
+        int batch_size,
+        int length_per_batch,
+        const std::string& name) {
+    if (layer_count > 5 && layer_count <= 59) {
+      layer_count = (layer_count + 1) % 61;
+      return;
+    } else {
+      layer_count = (layer_count + 1) % 61;
+    }
+    using T = bfloat16;
+    constexpr int max_print = 20;
+    int data_len = batch_size * length_per_batch;
+    std::vector<T> cpu_data(data_len);
+    xpu_wait(ctx->xpu_stream);
+    xpu_memcpy(
+            (void*)(&cpu_data.front()),
+            data,
+            data_len * sizeof(T),
+            XPUMemcpyKind::XPU_DEVICE_TO_HOST);
+    for (int i = 0 ; i < batch_size ; i++) {
+        T sum = std::accumulate(cpu_data.begin() + i * length_per_batch, cpu_data.begin() + length_per_batch * (i + 1), 0);
+        float avg = 1.0f * sum / length_per_batch;
+        std::cout << name << ", layer is " << layer_count - 1;
+        std::cout << " batch[" << i << "] len = " << length_per_batch << "[mean=" << avg << "]" << std::endl;
+        std::cout << "Top " << max_print << ": ";
+        for (int j = 0; j < length_per_batch && j < max_print; j++) {
+            std::cout << cpu_data[i * length_per_batch + j] << " ";
+        }
+        std::cout << std::endl;
+        std::cout << "Bot " << max_print << ": ";
+        for (int j = std::max(0, length_per_batch - max_print); j < length_per_batch; j++) {
+            std::cout << cpu_data[i * length_per_batch + j] << " ";
+        }
+        std::cout << std::endl;
+    }
+}
+
 std::vector<paddle::Tensor> MlaDeAttn(
     const paddle::Tensor& q,
     const paddle::Tensor& kv_cache,
@@ -168,14 +215,14 @@ std::vector<paddle::Tensor> MlaDeAttn(
 
   // decoder
   if(max_dec_len_this_time.data<int>()[0] > 0){
-    // context_len
-    baidu::xpu::api::VectorParam<int32_t> context_len_vp =
-        baidu::xpu::api::VectorParam<int32_t>{decoder_context_len.data(), dec_batch, nullptr}
-            .to_xpu(RAII_GUARD);
-    // real batch     
-    baidu::xpu::api::VectorParam<int32_t> valid_batch_vp =
-        baidu::xpu::api::VectorParam<int32_t>{decoder_batch_map.data(), dec_batch, nullptr}
-            .to_xpu(RAII_GUARD);
+  // context_len
+  baidu::xpu::api::VectorParam<int32_t> context_len_vp =
+  baidu::xpu::api::VectorParam<int32_t>{decoder_context_len.data(), dec_batch, nullptr}
+  .to_xpu(RAII_GUARD);
+  // real batch     
+  baidu::xpu::api::VectorParam<int32_t> valid_batch_vp =
+  baidu::xpu::api::VectorParam<int32_t>{decoder_batch_map.data(), dec_batch, nullptr}
+  .to_xpu(RAII_GUARD);
 
     // multi_latent_attention
     using TQ = bfloat16; 
@@ -215,7 +262,7 @@ std::vector<paddle::Tensor> MlaDeAttn(
             nullptr,
             nullptr);
   }
-
+    // print_batch_xpu_data_part(xpu_ctx->x_context(), fmha_out_xft.data(),bsz,num_head * kv_lora_rank,"fmha_out_decocder");
     return {fmha_out};   
 }
 

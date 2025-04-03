@@ -1260,6 +1260,7 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
             xpu_config.l3_autotune_size = 0
             config.set_xpu_config(xpu_config)
             config.switch_ir_optim(True)
+            config.delete_pass("fc_xpu_fuse_pass")
             # config.enable_memory_optim()
         else:
             device_id = int(os.environ.get("FLAGS_selected_gpus", 0))
@@ -1536,57 +1537,137 @@ def predict():
         fleet.init(is_collective=True, strategy=strategy)
 
     predictor = create_predictor(predictor_args, model_args)
-
-    source_texts = []
-    target_texts = []
-    if model_args.data_file:
-        with open(model_args.data_file, "r", encoding="utf-8") as f:
-            for line in f:
-                example = json.loads(line)
-                if isinstance(example["src"], str) or predictor.tokenizer.chat_template is None:
-                    if isinstance(example["src"], str):
-                        source_texts.append(example["src"])
-                        target_texts.append(example["tgt"])
+    for i in range(40):
+        print(f"--------------------in round {i}--------------")
+        source_texts = []
+        target_texts = []
+        if model_args.data_file:
+            with open(model_args.data_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    example = json.loads(line)
+                    if isinstance(example["src"], str) or predictor.tokenizer.chat_template is None:
+                        if isinstance(example["src"], str):
+                            source_texts.append(example["src"])
+                            target_texts.append(example["tgt"])
+                        else:
+                            # load multi-rounds dataset
+                            source_texts.append(example["src"][0])
+                            target_texts.append(example["tgt"][0])
                     else:
-                        # load multi-rounds dataset
-                        source_texts.append(example["src"][0])
-                        target_texts.append(example["tgt"][0])
-                else:
-                    source_texts.append(list(zip(example["src"], example["tgt"])))
-                    target_texts.append("")
+                        source_texts.append(list(zip(example["src"], example["tgt"])))
+                        target_texts.append("")
 
-    else:
-        source_texts = [
-            """The following are multiple choice questions (with answers) about business. Think step by step and then output the answer in the format of "The answer is (X)" at the end.\n\nQuestion: In contrast to _______, _______ aim to reward favourable behaviour by companies. The success of such campaigns have been heightened through the use of ___________, which allow campaigns to facilitate the company in achieving _________ .\nOptions: A. Boycotts, Buyalls, Blockchain technology, Increased Sales\nB. Buycotts, Boycotts, Digital technology, Decreased Sales\nC. Boycotts, Buycotts, Digital technology, Decreased Sales\nD. Buycotts, Boycotts, Blockchain technology, Charitable donations\nE. Boycotts, Buyalls, Blockchain technology, Charitable donations\nF. Boycotts, Buycotts, Digital technology, Increased Sales\nG. Buycotts, Boycotts, Digital technology, Increased Sales\nH. Boycotts, Buycotts, Physical technology, Increased Sales\nI. Buycotts, Buyalls, Blockchain technology, Charitable donations\nJ. Boycotts, Buycotts, Blockchain technology, Decreased Sales\nAnswer: Let\'s think step by step. We refer to Wikipedia articles on business ethics for help. The sentence that best uses the possible options above is __n contrast to *boycotts*, *buycotts* aim to reward favourable behavior by companies. The success of such campaigns have been heightened through the use of *digital technology*, which allow campaigns to facilitate the company in achieving *increased sales*._ The answer is (F).\n\nQuestion: _______ is the direct attempt to formally or informally manage ethical issues or problems, through specific policies, practices and programmes.\nOptions: A. Operational management\nB. Corporate governance\nC. Environmental management\nD. Business ethics management\nE. Sustainability\nF. Stakeholder management\nG. Social marketing\nH. Human resource management\nAnswer: Let\'s think step by step. We refer to Wikipedia articles on business ethics for help. The direct attempt manage ethical issues through specific policies, practices, and programs is business ethics management. The answer is (D).\n\nQuestion: How can organisational structures that are characterised by democratic and inclusive styles of management be described?\nOptions: A. Flat\nB. Bureaucratic\nC. Autocratic\nD. Hierarchical\nE. Functional\nF. Decentralized\nG. Matrix\nH. Network\nI. Divisional\nJ. Centralized\nAnswer: Let\'s think step by step. We refer to Wikipedia articles on management for help. Flat organizational structures are characterized by democratic and inclusive styles of management, and have few (if any) levels of management between the workers and managers.  The answer is (A).\n\nQuestion: Although the content and quality can be as controlled as direct mail, response rates of this medium are lower because of the lack of a personal address mechanism. This media format is known as:\nOptions: A. Online banners.\nB. Television advertising.\nC. Email marketing.\nD. Care lines.\nE. Direct mail.\nF. Inserts.\nG. Door to door.\nH. Radio advertising.\nI. Billboards.\nJ. Social media advertising.\nAnswer: Let\'s think step by step. We refer to Wikipedia articles on marketing for help. Door to door marketing delivers non-addressed items within all buildings within a geographic area. While it can control the content and quality as well as direct mail marketing, its response rate is lower because of the lack of a personal address mechanism. The answer is (G).\n\nQuestion: In an organization, the group of people tasked with buying decisions is referred to as the _______________.\nOptions: A. Procurement centre.\nB. Chief executive unit.\nC. Resources allocation group.\nD. Marketing department.\nE. Purchasing department.\nF. Supply chain management team.\nG. Outsourcing unit.\nH. Decision-making unit.\nI. Operations unit.\nJ. Financial management team.\nAnswer: Let\'s think step by step. We refer to Wikipedia articles on marketing for help. In an organization, the group of the people tasked with buying decision is referred to as the decision-making unit. The answer is (H).\n\nQuestion: Once a train pulls out of a station, or an aeroplane takes off or a film starts, those seats are lost and can never be sold. This is referred to as:\nOptions: A. Immeasurability.\nB. Impalpability.\nC. Variability.\nD. Non-storability.\nE. Indivisibility.\nF. Perishability.\nG. Non-recoverability.\nH. Inseparability.\nI. Heterogeneity.\nJ. Intangibility.\nAnswer: Let\'s think step by step.\n\n"""
-            #"2014年3月，大范围雾霾天气长时间影响我国东部地区，严重危害人体健康。造成雾霾天气的人为原因有____\r\n①工业生产中使用矿物作为燃料，大量排放污染物     ②汽车尾气的大量排放     \r\n③风力小，空气流动不畅     ④冬季取暖排放粉尘\nA. ①②③\nB. ②③④\nC. ①③④\nD. ①②④"
-        ] * predictor_args.batch_size
-        # source_texts = [
-        #     # """The following are multiple choice questions (with answers) about business. Think step by step and then output the answer in the format of "The answer is (X)" at the end.\n\nQuestion: In contrast to _______, _______ aim to reward favourable behaviour by companies. The success of such campaigns have been heightened through the use of ___________, which allow campaigns to facilitate the company in achieving _________ .\nOptions: A. Boycotts, Buyalls, Blockchain technology, Increased Sales\nB. Buycotts, Boycotts, Digital technology, Decreased Sales\nC. Boycotts, Buycotts, Digital technology, Decreased Sales\nD. Buycotts, Boycotts, Blockchain technology, Charitable donations\nE. Boycotts, Buyalls, Blockchain technology, Charitable donations\nF. Boycotts, Buycotts, Digital technology, Increased Sales\nG. Buycotts, Boycotts, Digital technology, Increased Sales\nH. Boycotts, Buycotts, Physical technology, Increased Sales\nI. Buycotts, Buyalls, Blockchain technology, Charitable donations\nJ. Boycotts, Buycotts, Blockchain technology, Decreased Sales\nAnswer: Let\'s think step by step. We refer to Wikipedia articles on business ethics for help. The sentence that best uses the possible options above is __n contrast to *boycotts*, *buycotts* aim to reward favourable behavior by companies. The success of such campaigns have been heightened through the use of *digital technology*, which allow campaigns to facilitate the company in achieving *increased sales*._ The answer is (F).\n\nQuestion: _______ is the direct attempt to formally or informally manage ethical issues or problems, through specific policies, practices and programmes.\nOptions: A. Operational management\nB. Corporate governance\nC. Environmental management\nD. Business ethics management\nE. Sustainability\nF. Stakeholder management\nG. Social marketing\nH. Human resource management\nAnswer: Let\'s think step by step. We refer to Wikipedia articles on business ethics for help. The direct attempt manage ethical issues through specific policies, practices, and programs is business ethics management. The answer is (D).\n\nQuestion: How can organisational structures that are characterised by democratic and inclusive styles of management be described?\nOptions: A. Flat\nB. Bureaucratic\nC. Autocratic\nD. Hierarchical\nE. Functional\nF. Decentralized\nG. Matrix\nH. Network\nI. Divisional\nJ. Centralized\nAnswer: Let\'s think step by step. We refer to Wikipedia articles on management for help. Flat organizational structures are characterized by democratic and inclusive styles of management, and have few (if any) levels of management between the workers and managers.  The answer is (A).\n\nQuestion: Although the content and quality can be as controlled as direct mail, response rates of this medium are lower because of the lack of a personal address mechanism. This media format is known as:\nOptions: A. Online banners.\nB. Television advertising.\nC. Email marketing.\nD. Care lines.\nE. Direct mail.\nF. Inserts.\nG. Door to door.\nH. Radio advertising.\nI. Billboards.\nJ. Social media advertising.\nAnswer: Let\'s think step by step. We refer to Wikipedia articles on marketing for help. Door to door marketing delivers non-addressed items within all buildings within a geographic area. While it can control the content and quality as well as direct mail marketing, its response rate is lower because of the lack of a personal address mechanism. The answer is (G).\n\nQuestion: In an organization, the group of people tasked with buying decisions is referred to as the _______________.\nOptions: A. Procurement centre.\nB. Chief executive unit.\nC. Resources allocation group.\nD. Marketing department.\nE. Purchasing department.\nF. Supply chain management team.\nG. Outsourcing unit.\nH. Decision-making unit.\nI. Operations unit.\nJ. Financial management team.\nAnswer: Let\'s think step by step. We refer to Wikipedia articles on marketing for help. In an organization, the group of the people tasked with buying decision is referred to as the decision-making unit. The answer is (H).\n\nQuestion: Typical advertising regulatory bodies suggest, for example that adverts must not: encourage _________, cause unnecessary ________ or _____, and must not cause _______ offence.\nOptions: A. Safe practices, Fear, Jealousy, Trivial\nB. Unsafe practices, Distress, Joy, Trivial\nC. Safe practices, Wants, Jealousy, Trivial\nD. Safe practices, Distress, Fear, Trivial\nE. Unsafe practices, Wants, Jealousy, Serious\nF. Safe practices, Distress, Jealousy, Serious\nG. Safe practices, Wants, Fear, Serious\nH. Unsafe practices, Wants, Fear, Trivial\nI. Unsafe practices, Distress, Fear, Serious\nAnswer: Let\'s think step by step.\n\n"""
-        #     #"2014年3月，大范围雾霾天气长时间影响我国东部地区，严重危害人体健康。造成雾霾天气的人为原因有____\r\n①工业生产中使用矿物作为燃料，大量排放污染物     ②汽车尾气的大量排放     \r\n③风力小，空气流动不畅     ④冬季取暖排放粉尘\nA. ①②③\nB. ②③④\nC. ①③④\nD. ①②④"
-        #     "你知道华为吗？"
-        # ] * predictor_args.batch_size
-        target_texts = [""] * predictor_args.batch_size
+        else:
+#             source_texts = [
+#                 """"The following is a choice question about business. Think step by step and then output the answer in the format of "The answer is (X)" at the end.
 
-    batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
-    batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
+# Question: In contrast to _______, _______ aim to reward favourable behaviour by companies. The success of such campaigns have been heightened through the use of ___________, which allow campaigns to facilitate the company in achieving _________ .
+# Options: A. Boycotts, Buyalls, Blockchain technology, Increased Sales
+# B. Buycotts, Boycotts, Digital technology, Decreased Sales
+# C. Boycotts, Buycotts, Digital technology, Decreased Sales
+# D. Buycotts, Boycotts, Blockchain technology, Charitable donations
+# E. Boycotts, Buyalls, Blockchain technology, Charitable donations
+# F. Boycotts, Buycotts, Digital technology, Increased Sales
+# G. Buycotts, Boycotts, Digital technology, Increased Sales
+# H. Boycotts, Buycotts, Physical technology, Increased Sales
+# I. Buycotts, Buyalls, Blockchain technology, Charitable donations
+# J. Boycotts, Buycotts, Blockchain technology, Decreased Sales
+# Answer: Let's think step by step. We refer to Wikipedia articles on business ethics for help. The sentence that best uses the possible options above is __n contrast to *boycotts*, *buycotts* aim to reward favourable behavior by companies. The success of such campaigns have been heightened through the use of *digital technology*, which allow campaigns to facilitate the company in achieving *increased sales*._ The answer is (F).
 
-    with open(model_args.output_file, "w", encoding="utf-8") as f:
-        for bs, batch_source_text in enumerate(batch_source_texts):
-            logger.info("Start predict")
-            outputs = predictor.predict(batch_source_text)
-            logger.info("End predict")
+# Question: _______ is the direct attempt to formally or informally manage ethical issues or problems, through specific policies, practices and programmes.
+# Options: A. Operational management
+# B. Corporate governance
+# C. Environmental management
+# D. Business ethics management
+# E. Sustainability
+# F. Stakeholder management
+# G. Social marketing
+# H. Human resource management
+# Answer: Let's think step by step. We refer to Wikipedia articles on business ethics for help. The direct attempt manage ethical issues through specific policies, practices, and programs is business ethics management. The answer is (D).
 
-            if predictor.tensor_parallel_rank > 0:
-                continue
-            for output, source, target in zip(outputs, batch_source_texts[bs], batch_target_texts[bs]):
-                print("***********Source**********")
-                print(source)
-                print("***********Target**********")
-                print(target)
-                print("***********Output**********")
-                print(output)
-                out = {"src": source, "tgt": target, "output": output}
-                f.write(json.dumps(out, ensure_ascii=False) + "\n")
+# Question: How can organisational structures that are characterised by democratic and inclusive styles of management be described?
+# Options: A. Flat
+# B. Bureaucratic
+# C. Autocratic
+# D. Hierarchical
+# E. Functional
+# F. Decentralized
+# G. Matrix
+# H. Network
+# I. Divisional
+# J. Centralized
+# Answer: Let's think step by step. We refer to Wikipedia articles on management for help. Flat organizational structures are characterized by democratic and inclusive styles of management, and have few (if any) levels of management between the workers and managers.  The answer is (A).
+
+# Question: Although the content and quality can be as controlled as direct mail, response rates of this medium are lower because of the lack of a personal address mechanism. This media format is known as:
+# Options: A. Online banners.
+# B. Television advertising.
+# C. Email marketing.
+# D. Care lines.
+# E. Direct mail.
+# F. Inserts.
+# G. Door to door.
+# H. Radio advertising.
+# I. Billboards.
+# J. Social media advertising.
+# Answer: Let's think step by step. We refer to Wikipedia articles on marketing for help. Door to door marketing delivers non-addressed items within all buildings within a geographic area. While it can control the content and quality as well as direct mail marketing, its response rate is lower because of the lack of a personal address mechanism. The answer is (G).
+
+# Question: In an organization, the group of people tasked with buying decisions is referred to as the _______________.
+# Options: A. Procurement centre.
+# B. Chief executive unit.
+# C. Resources allocation group.
+# D. Marketing department.
+# E. Purchasing department.
+# F. Supply chain management team.
+# G. Outsourcing unit.
+# H. Decision-making unit.
+# I. Operations unit.
+# J. Financial management team.
+# Answer: Let's think step by step. We refer to Wikipedia articles on marketing for help. In an organization, the group of the people tasked with buying decision is referred to as the decision-making unit. The answer is (H).
+
+# Question: Joe Troy purchased a chain saw for $1,200 for his lumber mill. The saw will last 6 years and have no residual value. Mr. Troy wishes to use the straight-line method of depreciation. Find the depreciation and book value for the first two years.
+# Options: A. $350 per year, $850 after first year, $500 after second year
+# B. $100 per year, $1100 after first year, $1000 after second year
+# C. $400 per year, $800 after first year, $400 after second year
+# D. $250 per year, $950 after first year, $700 after second year
+# E. $600 per year, $600 after first year, $0 after second year
+# F. $500 per year, $700 after first year, $200 after second year
+# G. $150 per year, $1050 after first year, $900 after second year
+# H. $200 per year, $1000 after first year, $800 after second year
+# I. $300 per year, $900 after first year, $600 after second year
+# J. $450 per year, $750 after first year, $300 after second year
+# Answer: Let's think step by step."""
+#             ] * predictor_args.batch_size
+            # source_texts = [
+            #     """The following are multiple choice questions (with answers) about business. Think step by step and then output the answer in the format of "The answer is (X)" at the end.\n\nQuestion: In contrast to _______, _______ aim to reward favourable behaviour by companies. The success of such campaigns have been heightened through the use of ___________, which allow campaigns to facilitate the company in achieving _________ .\nOptions: A. Boycotts, Buyalls, Blockchain technology, Increased Sales\nB. Buycotts, Boycotts, Digital technology, Decreased Sales\nC. Boycotts, Buycotts, Digital technology, Decreased Sales\nD. Buycotts, Boycotts, Blockchain technology, Charitable donations\nE. Boycotts, Buyalls, Blockchain technology, Charitable donations\nF. Boycotts, Buycotts, Digital technology, Increased Sales\nG. Buycotts, Boycotts, Digital technology, Increased Sales\nH. Boycotts, Buycotts, Physical technology, Increased Sales\nI. Buycotts, Buyalls, Blockchain technology, Charitable donations\nJ. Boycotts, Buycotts, Blockchain technology, Decreased Sales\nAnswer: Let\'s think step by step. We refer to Wikipedia articles on business ethics for help. The sentence that best uses the possible options above is __n contrast to *boycotts*, *buycotts* aim to reward favourable behavior by companies. The success of such campaigns have been heightened through the use of *digital technology*, which allow campaigns to facilitate the company in achieving *increased sales*._ The answer is (F).\n\nQuestion: _______ is the direct attempt to formally or informally manage ethical issues or problems, through specific policies, practices and programmes.\nOptions: A. Operational management\nB. Corporate governance\nC. Environmental management\nD. Business ethics management\nE. Sustainability\nF. Stakeholder management\nG. Social marketing\nH. Human resource management\nAnswer: Let\'s think step by step. We refer to Wikipedia articles on business ethics for help. The direct attempt manage ethical issues through specific policies, practices, and programs is business ethics management. The answer is (D).\n\nQuestion: How can organisational structures that are characterised by democratic and inclusive styles of management be described?\nOptions: A. Flat\nB. Bureaucratic\nC. Autocratic\nD. Hierarchical\nE. Functional\nF. Decentralized\nG. Matrix\nH. Network\nI. Divisional\nJ. Centralized\nAnswer: Let\'s think step by step. We refer to Wikipedia articles on management for help. Flat organizational structures are characterized by democratic and inclusive styles of management, and have few (if any) levels of management between the workers and managers.  The answer is (A).\n\nQuestion: Although the content and quality can be as controlled as direct mail, response rates of this medium are lower because of the lack of a personal address mechanism. This media format is known as:\nOptions: A. Online banners.\nB. Television advertising.\nC. Email marketing.\nD. Care lines.\nE. Direct mail.\nF. Inserts.\nG. Door to door.\nH. Radio advertising.\nI. Billboards.\nJ. Social media advertising.\nAnswer: Let\'s think step by step. We refer to Wikipedia articles on marketing for help. Door to door marketing delivers non-addressed items within all buildings within a geographic area. While it can control the content and quality as well as direct mail marketing, its response rate is lower because of the lack of a personal address mechanism. The answer is (G).\n\nQuestion: In an organization, the group of people tasked with buying decisions is referred to as the _______________.\nOptions: A. Procurement centre.\nB. Chief executive unit.\nC. Resources allocation group.\nD. Marketing department.\nE. Purchasing department.\nF. Supply chain management team.\nG. Outsourcing unit.\nH. Decision-making unit.\nI. Operations unit.\nJ. Financial management team.\nAnswer: Let\'s think step by step. We refer to Wikipedia articles on marketing for help. In an organization, the group of the people tasked with buying decision is referred to as the decision-making unit. The answer is (H).\n\nQuestion: Once a train pulls out of a station, or an aeroplane takes off or a film starts, those seats are lost and can never be sold. This is referred to as:\nOptions: A. Immeasurability.\nB. Impalpability.\nC. Variability.\nD. Non-storability.\nE. Indivisibility.\nF. Perishability.\nG. Non-recoverability.\nH. Inseparability.\nI. Heterogeneity.\nJ. Intangibility.\nAnswer: Let\'s think step by step.\n\n"""
+            #     # "2014年3月，大范围雾霾天气长时间影响我国东部地区，严重危害人体健康。造成雾霾天气的人为原因有____\r\n①工业生产中使用矿物作为燃料，大量排放污染物     ②汽车尾气的大量排放     \r\n③风力小，空气流动不畅     ④冬季取暖排放粉尘\nA. ①②③\nB. ②③④\nC. ①③④\nD. ①②④"
+            # ] * predictor_args.batch_size
+            source_texts = [
+                # """The following are multiple choice questions (with answers) about business. Think step by step and then output the answer in the format of "The answer is (X)" at the end.\n\nQuestion: In contrast to _______, _______ aim to reward favourable behaviour by companies. The success of such campaigns have been heightened through the use of ___________, which allow campaigns to facilitate the company in achieving _________ .\nOptions: A. Boycotts, Buyalls, Blockchain technology, Increased Sales\nB. Buycotts, Boycotts, Digital technology, Decreased Sales\nC. Boycotts, Buycotts, Digital technology, Decreased Sales\nD. Buycotts, Boycotts, Blockchain technology, Charitable donations\nE. Boycotts, Buyalls, Blockchain technology, Charitable donations\nF. Boycotts, Buycotts, Digital technology, Increased Sales\nG. Buycotts, Boycotts, Digital technology, Increased Sales\nH. Boycotts, Buycotts, Physical technology, Increased Sales\nI. Buycotts, Buyalls, Blockchain technology, Charitable donations\nJ. Boycotts, Buycotts, Blockchain technology, Decreased Sales\nAnswer: Let\'s think step by step. We refer to Wikipedia articles on business ethics for help. The sentence that best uses the possible options above is __n contrast to *boycotts*, *buycotts* aim to reward favourable behavior by companies. The success of such campaigns have been heightened through the use of *digital technology*, which allow campaigns to facilitate the company in achieving *increased sales*._ The answer is (F).\n\nQuestion: _______ is the direct attempt to formally or informally manage ethical issues or problems, through specific policies, practices and programmes.\nOptions: A. Operational management\nB. Corporate governance\nC. Environmental management\nD. Business ethics management\nE. Sustainability\nF. Stakeholder management\nG. Social marketing\nH. Human resource management\nAnswer: Let\'s think step by step. We refer to Wikipedia articles on business ethics for help. The direct attempt manage ethical issues through specific policies, practices, and programs is business ethics management. The answer is (D).\n\nQuestion: How can organisational structures that are characterised by democratic and inclusive styles of management be described?\nOptions: A. Flat\nB. Bureaucratic\nC. Autocratic\nD. Hierarchical\nE. Functional\nF. Decentralized\nG. Matrix\nH. Network\nI. Divisional\nJ. Centralized\nAnswer: Let\'s think step by step. We refer to Wikipedia articles on management for help. Flat organizational structures are characterized by democratic and inclusive styles of management, and have few (if any) levels of management between the workers and managers.  The answer is (A).\n\nQuestion: Although the content and quality can be as controlled as direct mail, response rates of this medium are lower because of the lack of a personal address mechanism. This media format is known as:\nOptions: A. Online banners.\nB. Television advertising.\nC. Email marketing.\nD. Care lines.\nE. Direct mail.\nF. Inserts.\nG. Door to door.\nH. Radio advertising.\nI. Billboards.\nJ. Social media advertising.\nAnswer: Let\'s think step by step. We refer to Wikipedia articles on marketing for help. Door to door marketing delivers non-addressed items within all buildings within a geographic area. While it can control the content and quality as well as direct mail marketing, its response rate is lower because of the lack of a personal address mechanism. The answer is (G).\n\nQuestion: In an organization, the group of people tasked with buying decisions is referred to as the _______________.\nOptions: A. Procurement centre.\nB. Chief executive unit.\nC. Resources allocation group.\nD. Marketing department.\nE. Purchasing department.\nF. Supply chain management team.\nG. Outsourcing unit.\nH. Decision-making unit.\nI. Operations unit.\nJ. Financial management team.\nAnswer: Let\'s think step by step. We refer to Wikipedia articles on marketing for help. In an organization, the group of the people tasked with buying decision is referred to as the decision-making unit. The answer is (H).\n\nQuestion: Typical advertising regulatory bodies suggest, for example that adverts must not: encourage _________, cause unnecessary ________ or _____, and must not cause _______ offence.\nOptions: A. Safe practices, Fear, Jealousy, Trivial\nB. Unsafe practices, Distress, Joy, Trivial\nC. Safe practices, Wants, Jealousy, Trivial\nD. Safe practices, Distress, Fear, Trivial\nE. Unsafe practices, Wants, Jealousy, Serious\nF. Safe practices, Distress, Jealousy, Serious\nG. Safe practices, Wants, Fear, Serious\nH. Unsafe practices, Wants, Fear, Trivial\nI. Unsafe practices, Distress, Fear, Serious\nAnswer: Let\'s think step by step.\n\n"""
+                #"2014年3月，大范围雾霾天气长时间影响我国东部地区，严重危害人体健康。造成雾霾天气的人为原因有____\r\n①工业生产中使用矿物作为燃料，大量排放污染物     ②汽车尾气的大量排放     \r\n③风力小，空气流动不畅     ④冬季取暖排放粉尘\nA. ①②③\nB. ②③④\nC. ①③④\nD. ①②④"
+                 "你能推荐一些适合游客的上海活动吗？",
+            ] * predictor_args.batch_size
+            target_texts = [""] * predictor_args.batch_size
+
+        batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
+        batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
+
+        with open(model_args.output_file, "w", encoding="utf-8") as f:
+            for bs, batch_source_text in enumerate(batch_source_texts):
+                logger.info("Start predict")
+                outputs = predictor.predict(batch_source_text)
+                logger.info("End predict")
+
+                if predictor.tensor_parallel_rank > 0:
+                    continue
+                for output, source, target in zip(outputs, batch_source_texts[bs], batch_target_texts[bs]):
+                    print("***********Source**********")
+                    print(source)
+                    print("***********Target**********")
+                    print(target)
+                    print("***********Output**********")
+                    print(output)
+                    out = {"src": source, "tgt": target, "output": output}
+                    f.write(json.dumps(out, ensure_ascii=False) + "\n")
 
     if predictor_args.benchmark:
         benchmark(predictor, predictor_args, model_args)

@@ -36,6 +36,17 @@ void UpdateInputesV2(const paddle::Tensor& stop_flags,
   auto dev_ctx = paddle::experimental::DeviceContextPool::Instance().Get(place);
   auto xpu_ctx = static_cast<const phi::XPUContext*>(dev_ctx);
 
+//   xpu_ctx->x_context()->set_debug_level(0xb1);
+
+    // int dev_id = -1;
+  // xpu_current_device(&dev_id);
+  // if (dev_id ==0) {
+  //   ctx->set_debug_level(0xa1);
+  // }
+
+    // printf("max mem need: %d\n", xpu_ctx->x_context()->_gm_mgr.get_size());
+//   xpu_ctx->x_context()->_gm_mgr.get_size();
+  
   auto not_need_stop_xpu = not_need_stop.copy_to(stop_flags.place(), false);
 
   const int max_bsz = stop_flags.shape()[0];
