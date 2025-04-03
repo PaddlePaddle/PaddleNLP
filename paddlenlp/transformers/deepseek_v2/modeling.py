@@ -1938,7 +1938,7 @@ class DeepseekV2DecoderLayer(nn.Layer):
             )
         residual = hidden_states
         
-        print("enter decoder memory_allocated = ", paddle.device.cuda.memory_allocated() // (1024 ** 2), "max_memory_allocated = ", paddle.device.cuda.max_memory_allocated() // (1024 ** 2),  "max_memory_reserved = ", paddle.device.cuda.max_memory_reserved() // (1024 ** 2))
+        #print("enter decoder memory_allocated = ", paddle.device.cuda.memory_allocated() // (1024 ** 2), "max_memory_allocated = ", paddle.device.cuda.max_memory_allocated() // (1024 ** 2),  "max_memory_reserved = ", paddle.device.cuda.max_memory_reserved() // (1024 ** 2))
 
         # Self Attention
         has_gradient = not hidden_states.stop_gradient
@@ -1983,7 +1983,7 @@ class DeepseekV2DecoderLayer(nn.Layer):
             present_key_value = outputs[2 if output_attentions else 1]
 
         hidden_states = residual + hidden_states
-        print("after attention memory_allocated = ", paddle.device.cuda.memory_allocated() // (1024 ** 2), "max_memory_allocated = ", paddle.device.cuda.max_memory_allocated() // (1024 ** 2),  "max_memory_reserved = ", paddle.device.cuda.max_memory_reserved() // (1024 ** 2))
+        #print("after attention memory_allocated = ", paddle.device.cuda.memory_allocated() // (1024 ** 2), "max_memory_allocated = ", paddle.device.cuda.max_memory_allocated() // (1024 ** 2),  "max_memory_reserved = ", paddle.device.cuda.max_memory_reserved() // (1024 ** 2))
         # Fully Connected
         residual = hidden_states
 
@@ -1993,7 +1993,7 @@ class DeepseekV2DecoderLayer(nn.Layer):
 
         outputs = (hidden_states,)
 
-        print("after MLP memory_allocated = ", paddle.device.cuda.memory_allocated() // (1024 ** 2), "max_memory_allocated = ", paddle.device.cuda.max_memory_allocated() // (1024 ** 2),  "max_memory_reserved = ", paddle.device.cuda.max_memory_reserved() // (1024 ** 2))
+        #print("after MLP memory_allocated = ", paddle.device.cuda.memory_allocated() // (1024 ** 2), "max_memory_allocated = ", paddle.device.cuda.max_memory_allocated() // (1024 ** 2),  "max_memory_reserved = ", paddle.device.cuda.max_memory_reserved() // (1024 ** 2))
 
         if output_attentions:
             outputs += (self_attn_weights,)
@@ -2115,6 +2115,7 @@ class DeepseekV2MTPLayer(DeepseekV2DecoderLayer):
         hidden_states = self.hnorm(hidden_states)
         nextn_hidden_state = self.enorm(nextn_hidden_state)
 
+        #hidden_states = hidden_states + nextn_hidden_state
         hidden_states = self.eh_proj(paddle.concat([hidden_states, nextn_hidden_state], axis=-1))
 
         layer_outputs = super(DeepseekV2MTPLayer, self).forward(

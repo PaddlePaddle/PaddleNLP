@@ -125,6 +125,7 @@ class ExpertsGroupGemmNode:
         self.unzipped_tokens = None
         self.unzipped_probs = None
         self.tokens_per_expert = None
+        self.custom_map = None
 
     def fwd_gate_up(self, x_fp8, x_scale, expert_w1, expert_w_count, tokens_per_expert):
         # concat w1

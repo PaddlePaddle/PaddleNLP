@@ -19,7 +19,7 @@ set -x
 rank=$PADDLE_TRAINER_ID
 
 START_RANK=16
-END_RANK=32
+END_RANK=18
 
 echo $rank
 

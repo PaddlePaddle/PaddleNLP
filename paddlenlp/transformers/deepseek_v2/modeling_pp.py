@@ -1279,6 +1279,18 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         if config.num_hidden_layers % get_hcg().topology().get_dim_size("pipe") != 0:
             seg_method = "uniform"
 
+        #pp 4
+        #seg_method = [0, 5, 9, 13, 17]
+        #seg_method = [0, 5, 9, 13, 16]
+
+        # pp 8
+        #seg_method = [0, 5, 9, 13, 17, 21, 25, 29, 33]
+        #seg_method = [0, 5, 9, 13, 17, 21, 25, 29, 32]
+        # pp 16
+        #seg_method = [0, 5, 9, 13, 17, 21, 25, 29, 33, 37, 41, 45, 49, 53, 57, 61, 65]
+        #seg_method = [0, 6, 10, 14, 18, 22, 26, 30, 34, 38, 42, 46, 50, 54, 58, 62, 65]
+        #seg_method = [0, 5, 9, 13, 17, 21, 25, 29, 33, 37, 41, 45, 49, 53, 57, 61, 64]
+
         PipelineLayer.__init__(
             self,
             layers=self.get_sequential_layers(),

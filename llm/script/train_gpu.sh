@@ -23,7 +23,9 @@ export DSV3_USE_FP8_GEMM=true
 export DSV3_USE_ATTEN_RECOMPUTE=true
 export FA_VERSION=3
 export DSV3_USE_FP8_GROUP_GEMM=true
-export IF_USE_GROUP_GEMM_MASK=false
+export IF_USE_GROUP_GEMM_MASK=true
+export DSV3_USE_FUSED_Expert=True
+
 
 # export CUDA_LAUNCH_BLOCKING=1
 # unset http_proxy && unset https_proxy
@@ -47,7 +49,7 @@ export NVSHMEM_BOOTSTRAP=UID
 export NVSHMEM_BOOTSTRAP_UID_SOCK_IFNAME==xgbe0
 
 START_RANK=16
-END_RANK=20
+END_RANK=18
 
 if [[ $rank -lt $START_RANK ]]; then
     exit 0
