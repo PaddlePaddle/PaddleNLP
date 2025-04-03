@@ -172,6 +172,19 @@ DLL_EXPORT int free_and_dispatch_block(Context *ctx,
                             const int block_size,
                             const int block_num_per_seq,
                             const int max_decoder_block_num);
+
+template <typename T, typename TR>
+DLL_EXPORT int rotary_embedding_neox(
+        Context* ctx,
+        const int* positions,  // [num_tokens]
+        T* query,                  // [num_tokens, num_heads, head_size]
+        T* key,                    // [num_tokens, num_kv_heads, head_size]
+        const TR* cos_sin_cache,   // [max_position, 2, rot_dim // 2]
+        const int rot_dim,
+        const int num_heads,
+        const int num_kv_heads,
+        const int head_size,
+        const int32_t num_tokens);
 }  // namespace plugin
 }  // namespace api
 }  // namespace xpu

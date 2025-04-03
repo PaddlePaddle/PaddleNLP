@@ -34,8 +34,8 @@ std::vector<paddle::Tensor> GatherNextToken(const paddle::Tensor& tmp_out, // [t
 
   std::vector<int> seq_lens_encoder_cpu(bsz, 0);
   std::vector<int> seq_lens_decoder_cpu(bsz, 0);
-  std::vector<int> encoder_batch_map; // 去除空隙的batch map
-  std::vector<int> decoder_batch_map; // 去除空隙的batch map
+  std::vector<int> encoder_batch_map;
+  std::vector<int> decoder_batch_map;
   std::vector<int> encoder_seq_lod;
   int r = xpu_memcpy(seq_lens_encoder_cpu.data(),
                  seq_lens_encoder.data<int>(),
