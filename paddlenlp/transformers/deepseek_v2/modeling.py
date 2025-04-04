@@ -2238,6 +2238,13 @@ class DeepseekV2PretrainedModel(PretrainedModel):
         if isinstance(layer, MoEGate):
             kaiming_uniform_(layer.weight, a=math.sqrt(5))
 
+        moe_grad_group = fleet.get_hybrid_communicate_group().expert_grad_comm_group
+        if moe_grad_group is not None and moe_grad_group.nranks > 1:
+            for p in layer.parameters():
+                if hasattr(p, "color") and "color" in p.color:
+                    if p.color["color"] == "moe_expert":
+                        paddle.distributed.broadcast(p, src=moe_grad_group.ranks[0], group=moe_grad_group)
+
     def step_flex_token(self, cur_step):
         set_global_step(cur_step)
 
