@@ -184,6 +184,7 @@ class PredictorArgument:
         default="",
         metadata={"help": "Quantization type of moe. Supported values: weight_only_int4, weight_only_int8"},
     )
+    reduce_dialogue_repetition: bool = field(default=False, metadata={"help": "whether compatible with VLLM style."})
 
     def __post_init__(self):
         if self.speculate_method is not None:
@@ -877,6 +878,11 @@ class BlockInferencePredictorMixin(BasePredictor):
         )
         self.model_inputs = {}
 
+        if config.reduce_dialogue_repetition:
+            self.model_inputs["first_token_ids"] = paddle.full(
+                shape=[config.batch_size, 1], fill_value=-1, dtype="int64"
+            )
+
         if config.export_precache:
             self.model_inputs["src_mask"] = (self.pre_cache_mask - 1) * 1e4
 
@@ -1038,6 +1044,12 @@ class BlockInferencePredictorMixin(BasePredictor):
             shape=[self.config.batch_size, self.config.max_length], fill_value=-1, dtype="int64"
         )
         self.model_inputs["next_tokens"] = paddle.full(shape=[self.config.batch_size, 1], fill_value=-1, dtype="int64")
+
+        if self.config.reduce_dialogue_repetition:
+            self.model_inputs["first_token_ids"] = self.model_inputs["input_ids"][:, 0]
+            self.model_inputs["ori_seq_lens_encoder"] = paddle.to_tensor(
+                np.array(self.seq_lens).astype("int32").reshape(-1, 1)
+            )
 
         # speculative decoding related parameters
         if self.config.speculate_method is not None:

@@ -532,6 +532,17 @@ class GenerationBlockInferenceModel(GenerationMixin):
             cache_v_dequant_scales,
             tgt_mask_spec,
         ]
+
+        if config.get("reduce_dialogue_repetition", False):
+            input_spec.append(
+                paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="first_token_ids")
+            )  # first_token_ids
+            input_spec.append(
+                paddle.static.InputSpec(shape=[None, 1], dtype="int32", name="ori_seq_lens_encoder")
+            )  # ori_seq_lens_encoder
+        else:
+            input_spec.extend([None, None])
+
         if config.get("speculate_method", None) is not None:
             speculate_spec = [
                 paddle.static.InputSpec(shape=[None, None], dtype="int64", name="draft_tokens"),
@@ -607,6 +618,8 @@ class GenerationBlockInferenceModel(GenerationMixin):
         v_quant_scales=None,
         k_dequant_scales=None,
         v_dequant_scales=None,
+        first_token_ids=None,
+        ori_seq_lens_encoder=None,
         tgt_mask=None,
         draft_tokens=None,
         accept_tokens=None,
@@ -642,6 +655,8 @@ class GenerationBlockInferenceModel(GenerationMixin):
         model_kwargs["is_block_step"] = is_block_step
         model_kwargs["src_mask"] = src_mask
         model_kwargs["tgt_mask"] = tgt_mask
+        model_kwargs["first_token_ids"] = first_token_ids
+        model_kwargs["ori_seq_lens_encoder"] = ori_seq_lens_encoder
         # speculate decoding related parameters
         model_kwargs["draft_tokens"] = draft_tokens
         model_kwargs["accept_tokens"] = accept_tokens
@@ -721,6 +736,8 @@ class GenerationBlockInferenceModel(GenerationMixin):
                 step_idx,
                 model_kwargs["min_dec_len"],
                 eos_token_id,
+                model_kwargs["first_token_ids"],
+                model_kwargs["ori_seq_lens_encoder"],
             )
 
             # sample
