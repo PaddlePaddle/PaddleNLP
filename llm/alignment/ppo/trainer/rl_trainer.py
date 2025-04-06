@@ -29,7 +29,6 @@ from paddle.io import DataLoader, Dataset
 
 from paddlenlp.data import DataCollator
 from paddlenlp.trainer.trainer import (
-    TRAINER_STATE_NAME,
     EvalPrediction,
     HybridParallelOptimizer,
     NlpDistributedBatchSampler,
@@ -47,6 +46,7 @@ from paddlenlp.trainer.trainer import (
     split_inputs_sequence_dim,
 )
 from paddlenlp.transformers import PretrainedModel, PretrainedTokenizer
+from paddlenlp.utils.env import TRAINER_STATE_NAME
 
 # isort: off
 from models.ppo_model_utils import create_loss
@@ -375,8 +375,7 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
 
     if (step_control + 1) % args.gradient_accumulation_steps == 0 or (
         # last step in epoch but step is always smaller than gradient_accumulation_steps
-        steps_in_epoch <= args.gradient_accumulation_steps
-        and (step + 1) == steps_in_epoch
+        steps_in_epoch <= args.gradient_accumulation_steps and (step + 1) == steps_in_epoch
     ):
         if self.args.pipeline_parallel_degree <= 1 and self._enable_delay_scale_loss():
             tr_loss /= self.args.gradient_accumulation_steps
