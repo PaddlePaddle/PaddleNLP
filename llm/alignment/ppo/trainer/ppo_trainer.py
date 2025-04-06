@@ -688,8 +688,6 @@ class PPOTrainer(Trainer):
                 else:
                     seq = generated_seq
 
-
-                
                 if self.reward_tokenizer is not self.tokenizer:
                     reward_tokenize_output = batch_retokenize(
                         input_ids=seq,
@@ -1395,14 +1393,13 @@ class PPOTrainer(Trainer):
                     with TimerScope(self.timers, ActorStages.MODEL_ENABLE_DISABLE, minus_names=[ActorStages.RL_STEP]):
                         with reload_and_offload_scope(self, self.actor_model, self.actor_trainer.optimizer):
                             with TimerScope(self.timers, ActorStages.RL_STEP):
-                                rl_info = self.rl_step(rl_batch)
+                                rl_info = self.actor_trainer.update_actor(rl_batch)
 
                     paddle.device.cuda.empty_cache()
 
                     self._print_timer()
                     if self.args.rl_algorithm == "ppo":
-                        rl_critic_info = self.rl_critic_step(rl_batch)
-                        rl_info.update(rl_critic_info)
+                        rl_info["train_value_loss"] = self.critic_trainer.update_critc(rl_batch)
                     if self.is_step_end():
                         self.state.global_step += 1
                         self.state.epoch = epoch + (step + 1) / steps_in_epoch
@@ -1642,149 +1639,6 @@ class PPOTrainer(Trainer):
             )
 
         return advantages.detach(), returns
-
-    def rl_step(self, rl_batch: Dict[str, paddle.Tensor]) -> Dict[str, Any]:
-        # inputs shared by policy and value trainer
-        input_ids = rl_batch["input_ids"].contiguous()  # length: src+tgt
-        position_ids = rl_batch["position_ids"]  # length: src+tgt
-        sequence_mask = rl_batch["eos_mask"]  # length: tgt(-1)
-        if self.args.use_fp32_compute and sequence_mask.dtype != paddle.float32:
-            sequence_mask = sequence_mask.cast(paddle.float32)
-        # inputs used by policy trainer
-        old_log_probs = rl_batch["log_probs"]  # length: tgt(-1)
-        reward_advantages = rl_batch["reward_advantages"]  # length: tgt(-1)
-
-        response_start = rl_batch["prompt"].shape[-1] - 1
-
-        attn_mask_startend_row_indices = create_startend_row_indices(input_ids, self.tokenizer.pad_token_id)
-        policy_trainer_inputs = {
-            "input_ids": input_ids,
-            "position_ids": position_ids,
-            "old_log_probs": old_log_probs,
-            "reward_advantages": reward_advantages,
-            "sequence_mask": sequence_mask,
-            "response_start": response_start,
-            "attn_mask_startend_row_indices": attn_mask_startend_row_indices,
-        }
-
-        if self.args.rl_algorithm == "grpo":
-            policy_trainer_inputs.update({"ref_log_probs": rl_batch["ref_log_probs"]})
-        else:
-            policy_trainer_inputs.update({"ref_log_probs": None})
-
-        actor_loss = self.actor_trainer.full_training_step(**policy_trainer_inputs)
-
-        # metric
-        with paddle.no_grad():
-            rewards = rl_batch["rewards"].mean()
-            ori_rewards = rl_batch["ori_rewards"].mean()
-            mask_cast = sequence_mask.cast(paddle.float32)
-            if self.args.rl_algorithm in ["ppo", "reinforce_plus_plus"]:
-                kl_rewards = (rl_batch["kl_rewards"] * mask_cast).sum() / mask_cast.sum()
-                rewards_with_kl = (rl_batch["rewards_with_kl"] * mask_cast).sum() / mask_cast.sum()
-                if self.args.rl_algorithm == "ppo":
-                    values = (rl_batch["reward_values"] * mask_cast).sum() / mask_cast.sum()
-                returns = (rl_batch["reward_returns"] * mask_cast).sum() / mask_cast.sum()
-            ref_log_probs = rl_batch["ref_log_probs"]
-            kl_divergence = ((old_log_probs - ref_log_probs) * mask_cast).sum() / mask_cast.sum()
-            mean_generated_length = mask_cast.sum(axis=-1).mean()
-            max_generated_length = mask_cast.sum(axis=-1).max()
-            min_generated_length = mask_cast.sum(axis=-1).min()
-
-        return {
-            # when using PipelienParallel, the loss returned is 0 when not reach
-            # accumulated step and the loss returned at accumulated step is a
-            # mixed loss.
-            "train_policy_loss": actor_loss,
-            **(
-                {
-                    "train_pure_policy_loss": self.actor_trainer.info_buffer.get("pure_policy_loss"),
-                    "train_kl_loss": self.actor_trainer.info_buffer.get("kl_loss"),
-                    "train_entropy_loss": self.actor_trainer.info_buffer.get("entropy_loss"),
-                }
-                if self.args.rl_algorithm == "grpo"
-                else {}
-            ),
-            "train_reward": ori_rewards,  # use original reward to log
-            **(
-                {
-                    "train_norm_reward": rewards,
-                    "train_kl_reward": kl_rewards,
-                    "train_norm_reward_with_kl": rewards_with_kl,
-                    "train_pure_policy_loss": self.actor_trainer.info_buffer.get("pure_policy_loss"),
-                    "train_entropy_loss": self.actor_trainer.info_buffer.get("entropy_loss"),
-                    **({"train_values": values} if self.args.rl_algorithm == "ppo" else {}),
-                    "train_returns": returns,
-                }
-                if self.args.rl_algorithm in ["ppo", "reinforce_plus_plus"]
-                else {}
-            ),
-            "train_kl_divergence": kl_divergence,
-            "train_mean_generated_length": mean_generated_length,
-            "train_max_generated_length": max_generated_length,
-            "train_min_generated_length": min_generated_length,
-        }
-
-    def rl_critic_step(self, rl_batch: Dict[str, paddle.Tensor]) -> Dict[str, Any]:
-        """
-        更新评价函数（奖励函数）的参数。
-            该函数需要接收一个字典类型的参数，包括以下键值对：
-                - input_ids (paddle.Tensor): 输入序列的ID，形状为（src+tgt, batch）。
-                - attention_mask (paddle.Tensor): 输入序列的注意力掩码，形状为（src+tgt, batch）。
-                - position_ids (paddle.Tensor): 输入序列的位置ID，形状为（src+tgt, batch）。
-                - old_reward_values (paddle.Tensor): 上一时间步的奖励值，形状为（src+tgt-1, batch）。
-                - reward_returns (paddle.Tensor): 回报返回值，形状为（src+tgt-1, batch）。
-                - sequence_mask (paddle.Tensor): 序列掩码，形状为（src+tgt-1, batch）。
-        返回值（Dict[str, Any]）：
-            - train_value_loss (float): 评价函数（奖励函数）的训练损失。
-        """
-        # inputs shared by policy and value trainer
-        input_ids = rl_batch["input_ids"].contiguous()  # length: src+tgt
-        attention_mask = rl_batch["attention_mask"]  # length: src+tgt
-        position_ids = rl_batch["position_ids"]  # length: src+tgt
-        sequence_mask = rl_batch["sequence_mask"]  # length: src+tgt(-1)
-        # inputs used by value trainer
-        old_reward_values = rl_batch["reward_values"]  # length: src+tgt(-1)
-        reward_returns = rl_batch["reward_returns"]  # length: src+tgt(-1)
-
-        value_trainer_inputs = {
-            "input_ids": input_ids,
-            "attention_mask": attention_mask,
-            "position_ids": position_ids,
-            "old_reward_values": old_reward_values,
-            "reward_returns": reward_returns,
-            "sequence_mask": sequence_mask,
-        }
-
-        with TimerScope(self, CriticStages.MODEL_ENABLE_DISABLE, minus_names=[CriticStages.CRITIC_TRAINING_STEP]):
-            with reload_and_offload_scope(self, self.critic_model, self.critic_trainer.optimizer):
-                with TimerScope(self, CriticStages.CRITIC_TRAINING_STEP):
-                    reward_critic_loss = self.critic_trainer.full_training_step(**value_trainer_inputs)
-
-        return {"train_value_loss": reward_critic_loss}
-
-    @paddle.no_grad()
-    def rollout_reward_value(
-        self,
-        input_ids: paddle.Tensor,
-        position_ids: paddle.Tensor = None,
-        **kwargs,
-    ) -> Dict[str, paddle.Tensor]:
-        """
-        根据输入的序列，计算每个时间步骤的奖励值和奖励得分。如果模型使用了不同的tokenizer，则先将输入序列转换为目标tokenizer的格式。
-
-        Args:
-            input_ids (paddle.Tensor): shape=[batch_size, seq_len], 输入序列的ID，取值范围是[0, vocabulary_size - 1]。
-            attention_mask (paddle.Tensor): shape=[batch_size, seq_len], 输入序列的注意力掩码，取值范围是{0, 1}。
-            position_ids (Optional, paddle.Tensor, optional): shape=[batch_size, seq_len], 输入序列的位置ID，默认为None。
-            kwargs (Dict, optional): 其他可选参数，包括：
-                reward_tokenizer (Tokenizer, optional): 奖励tokenizer，默认为None，表示使用与模型相同的tokenizer。
-
-        Returns:
-            Dict[str, paddle.Tensor]: 返回一个字典，包含两个键值对：
-                rewards (paddle.Tensor): shape=[batch_size, seq_len], 每个时间步骤的奖励得分，取值范围是[-inf, inf]。
-                reward_values (paddle.Tensor): shape=[batch_size, seq_len-1], 每个时间步骤的奖励值，取值范围是[0, inf]。
-        """
 
     @paddle.no_grad()
     def compute_reward_normalization(self, rl_batches):

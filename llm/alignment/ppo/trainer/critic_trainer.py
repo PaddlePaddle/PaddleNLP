@@ -15,10 +15,15 @@
 
 from __future__ import annotations
 
-from typing import Dict
+from typing import Any, Dict
 
 import paddle
 from models.ppo_model_utils import RLHFValueLoss, create_startend_row_indices
+from utils.comm_utils import (
+    CriticStages,
+)
+from utils.offload_utils import reload_and_offload_scope
+from utils.timer_utils import TimerScope
 
 from paddlenlp.transformers import PretrainedTokenizer
 from trainer.rl_trainer import RLTrainer
@@ -50,3 +55,41 @@ class CriticTrainer(RLTrainer):
         reward_value = reward_value[:, :-1]
 
         return reward_value
+
+    def update_critc(self, rl_batch: Dict[str, paddle.Tensor]) -> Dict[str, Any]:
+        """
+        更新评价函数（奖励函数）的参数。
+            该函数需要接收一个字典类型的参数，包括以下键值对：
+                - input_ids (paddle.Tensor): 输入序列的ID，形状为（src+tgt, batch）。
+                - attention_mask (paddle.Tensor): 输入序列的注意力掩码，形状为（src+tgt, batch）。
+                - position_ids (paddle.Tensor): 输入序列的位置ID，形状为（src+tgt, batch）。
+                - old_reward_values (paddle.Tensor): 上一时间步的奖励值，形状为（src+tgt-1, batch）。
+                - reward_returns (paddle.Tensor): 回报返回值，形状为（src+tgt-1, batch）。
+                - sequence_mask (paddle.Tensor): 序列掩码，形状为（src+tgt-1, batch）。
+        返回值（Dict[str, Any]）：
+            - train_value_loss (float): 评价函数（奖励函数）的训练损失。
+        """
+        # inputs shared by policy and value trainer
+        input_ids = rl_batch["input_ids"].contiguous()  # length: src+tgt
+        attention_mask = rl_batch["attention_mask"]  # length: src+tgt
+        position_ids = rl_batch["position_ids"]  # length: src+tgt
+        sequence_mask = rl_batch["sequence_mask"]  # length: src+tgt(-1)
+        # inputs used by value trainer
+        old_reward_values = rl_batch["reward_values"]  # length: src+tgt(-1)
+        reward_returns = rl_batch["reward_returns"]  # length: src+tgt(-1)
+
+        value_trainer_inputs = {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+            "position_ids": position_ids,
+            "old_reward_values": old_reward_values,
+            "reward_returns": reward_returns,
+            "sequence_mask": sequence_mask,
+        }
+
+        with TimerScope(self, CriticStages.MODEL_ENABLE_DISABLE, minus_names=[CriticStages.CRITIC_TRAINING_STEP]):
+            with reload_and_offload_scope(self, self.model, self.optimizer):
+                with TimerScope(self, CriticStages.CRITIC_TRAINING_STEP):
+                    reward_critic_loss = self.full_training_step(**value_trainer_inputs)
+
+        return reward_critic_loss

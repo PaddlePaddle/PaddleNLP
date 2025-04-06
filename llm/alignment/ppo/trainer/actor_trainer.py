@@ -259,3 +259,85 @@ class ActorReferenceTrainer(RLTrainer):
             paddle.device.cuda.empty_cache()
 
         return paddle.concat(log_probs_list, axis=0)
+
+    def update_actor(self, rl_batch: Dict[str, paddle.Tensor]) -> Dict[str, Any]:
+        # inputs shared by policy and value trainer
+        input_ids = rl_batch["input_ids"].contiguous()  # length: src+tgt
+        position_ids = rl_batch["position_ids"]  # length: src+tgt
+        sequence_mask = rl_batch["eos_mask"]  # length: tgt(-1)
+        if self.args.use_fp32_compute and sequence_mask.dtype != paddle.float32:
+            sequence_mask = sequence_mask.cast(paddle.float32)
+        # inputs used by policy trainer
+        old_log_probs = rl_batch["log_probs"]  # length: tgt(-1)
+        reward_advantages = rl_batch["reward_advantages"]  # length: tgt(-1)
+
+        response_start = rl_batch["prompt"].shape[-1] - 1
+
+        attn_mask_startend_row_indices = create_startend_row_indices(input_ids, self.tokenizer.pad_token_id)
+        policy_trainer_inputs = {
+            "input_ids": input_ids,
+            "position_ids": position_ids,
+            "old_log_probs": old_log_probs,
+            "reward_advantages": reward_advantages,
+            "sequence_mask": sequence_mask,
+            "response_start": response_start,
+            "attn_mask_startend_row_indices": attn_mask_startend_row_indices,
+        }
+
+        if self.args.rl_algorithm == "grpo":
+            policy_trainer_inputs.update({"ref_log_probs": rl_batch["ref_log_probs"]})
+        else:
+            policy_trainer_inputs.update({"ref_log_probs": None})
+
+        actor_loss = self.full_training_step(**policy_trainer_inputs)
+
+        # metric
+        with paddle.no_grad():
+            rewards = rl_batch["rewards"].mean()
+            ori_rewards = rl_batch["ori_rewards"].mean()
+            mask_cast = sequence_mask.cast(paddle.float32)
+            if self.args.rl_algorithm in ["ppo", "reinforce_plus_plus"]:
+                kl_rewards = (rl_batch["kl_rewards"] * mask_cast).sum() / mask_cast.sum()
+                rewards_with_kl = (rl_batch["rewards_with_kl"] * mask_cast).sum() / mask_cast.sum()
+                if self.args.rl_algorithm == "ppo":
+                    values = (rl_batch["reward_values"] * mask_cast).sum() / mask_cast.sum()
+                returns = (rl_batch["reward_returns"] * mask_cast).sum() / mask_cast.sum()
+            ref_log_probs = rl_batch["ref_log_probs"]
+            kl_divergence = ((old_log_probs - ref_log_probs) * mask_cast).sum() / mask_cast.sum()
+            mean_generated_length = mask_cast.sum(axis=-1).mean()
+            max_generated_length = mask_cast.sum(axis=-1).max()
+            min_generated_length = mask_cast.sum(axis=-1).min()
+
+        return {
+            # when using PipelienParallel, the loss returned is 0 when not reach
+            # accumulated step and the loss returned at accumulated step is a
+            # mixed loss.
+            "train_policy_loss": actor_loss,
+            **(
+                {
+                    "train_pure_policy_loss": self.info_buffer.get("pure_policy_loss"),
+                    "train_kl_loss": self.info_buffer.get("kl_loss"),
+                    "train_entropy_loss": self.info_buffer.get("entropy_loss"),
+                }
+                if self.args.rl_algorithm == "grpo"
+                else {}
+            ),
+            "train_reward": ori_rewards,  # use original reward to log
+            **(
+                {
+                    "train_norm_reward": rewards,
+                    "train_kl_reward": kl_rewards,
+                    "train_norm_reward_with_kl": rewards_with_kl,
+                    "train_pure_policy_loss": self.info_buffer.get("pure_policy_loss"),
+                    "train_entropy_loss": self.info_buffer.get("entropy_loss"),
+                    **({"train_values": values} if self.args.rl_algorithm == "ppo" else {}),
+                    "train_returns": returns,
+                }
+                if self.args.rl_algorithm in ["ppo", "reinforce_plus_plus"]
+                else {}
+            ),
+            "train_kl_divergence": kl_divergence,
+            "train_mean_generated_length": mean_generated_length,
+            "train_max_generated_length": max_generated_length,
+            "train_min_generated_length": min_generated_length,
+        }
