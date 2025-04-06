@@ -89,7 +89,6 @@
    :caption: PaddleNLP工具库
 
    一键预测功能 <model_zoo/taskflow>
-   预训练词向量 <model_zoo/embeddings>
 
 .. toctree::
    :maxdepth: 1
@@ -159,7 +158,6 @@
 
    paddlenlp.data <source/paddlenlp.data>
    paddlenlp.datasets <source/paddlenlp.datasets>
-   paddlenlp.embeddings <source/paddlenlp.embeddings>
    paddlenlp.layers <source/paddlenlp.layers>
    paddlenlp.losses <source/paddlenlp.losses>
    paddlenlp.metrics <source/paddlenlp.metrics>
