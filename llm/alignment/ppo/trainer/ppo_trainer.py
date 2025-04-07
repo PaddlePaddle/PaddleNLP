@@ -718,7 +718,7 @@ class PPOTrainer(Trainer):
                 src = self.tokenizer.batch_decode(inputs["input_ids"], skip_special_tokens=False)
                 tgt = self.tokenizer.batch_decode(inputs["label_ids"], skip_special_tokens=False)
                 response = self.tokenizer.batch_decode(generated_seq[:, prompt_len:], skip_special_tokens=False)
-                reward_score = self.request_reward_server(
+                reward_score = self.reward_trainer.request_reward_server(
                     [i.replace(self.tokenizer.pad_token, "") for i in src],
                     [i.replace(self.tokenizer.pad_token, "") for i in tgt],
                     [i.replace(self.tokenizer.pad_token, "") for i in response],
@@ -1334,8 +1334,9 @@ class PPOTrainer(Trainer):
                                 ),
                             }
 
-                            micro_batch["log_probs"] = self.actor_trainer.compute_logprob(micro_batch)
-                            micro_batch["ref_log_probs"] = self.reference_trainer.compute_logprob(micro_batch)
+                            micro_batch["log_probs"] = self.actor_trainer.compute_logprob(**micro_batch)
+                            micro_batch["ref_log_probs"] = self.reference_trainer.compute_logprob(**micro_batch)
+                            micro_batches.append(micro_batch)
 
                 timer_scope_actor_model.stop()
 
@@ -1397,7 +1398,6 @@ class PPOTrainer(Trainer):
 
                     paddle.device.cuda.empty_cache()
 
-                    self._print_timer()
                     if self.args.rl_algorithm == "ppo":
                         rl_info["train_value_loss"] = self.critic_trainer.update_critc(rl_batch)
                     if self.is_step_end():
@@ -1411,6 +1411,7 @@ class PPOTrainer(Trainer):
                         # on_sub_step_end
                         self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
 
+                    self._print_timer()
                     self._maybe_log_save_evaluate(rl_info, None, epoch, ignore_keys_for_eval, inputs=rl_batch)
                     paddle.device.cuda.empty_cache()
 

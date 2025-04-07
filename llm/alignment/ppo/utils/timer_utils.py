@@ -26,7 +26,7 @@ class TimerScope:
         self.timers = timers
         self.name = name
         self.minus_names = minus_names
-        self.label = self.get_timer_label(name)
+        self.label = get_timer_label(name)
         self._started = False  # 跟踪计时器状态
 
     def start(self) -> None:

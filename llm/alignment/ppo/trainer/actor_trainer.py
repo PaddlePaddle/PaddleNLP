@@ -33,15 +33,10 @@ from paddlenlp.trainer.trainer import (
     TrainerCallback,
     TrainingArguments,
 )
-from paddlenlp.transformers import (
-    PretrainedModel,
-    PretrainedTokenizer,
-)
+from paddlenlp.transformers import PretrainedModel, PretrainedTokenizer
 
 from .rl_trainer import RLTrainer
-from .trainer_utils import (
-    guard_set_args,
-)
+from .trainer_utils import guard_set_args
 
 
 class ActorReferenceTrainer(RLTrainer):
@@ -197,16 +192,19 @@ class ActorReferenceTrainer(RLTrainer):
         """
         log_probs_list = []
         batch_size, sequence_length = input_ids.shape
-        if str(self.args.rollout_logprob_batch_size).lower() == "auto":
-            # auto compute
-            if sequence_length > 4096 - 128:
-                rollout_logprob_batch_size = 2
-            elif sequence_length > 2048 - 128:
-                rollout_logprob_batch_size = 4
-            else:
-                rollout_logprob_batch_size = batch_size
+        if self.args.rollout_logprob_batch_size is None:
+            rollout_logprob_batch_size = batch_size
         else:
-            rollout_logprob_batch_size = int(self.args.rollout_logprob_batch_size)
+            if str(self.args.rollout_logprob_batch_size).lower() == "auto":
+                # auto compute
+                if sequence_length > 4096 - 128:
+                    rollout_logprob_batch_size = 2
+                elif sequence_length > 2048 - 128:
+                    rollout_logprob_batch_size = 4
+                else:
+                    rollout_logprob_batch_size = batch_size
+            else:
+                rollout_logprob_batch_size = int(self.args.rollout_logprob_batch_size)
 
         num_batches = (batch_size + rollout_logprob_batch_size - 1) // rollout_logprob_batch_size
 
@@ -229,9 +227,8 @@ class ActorReferenceTrainer(RLTrainer):
 
             logits = self.model(
                 current_input_ids,
-                attention_mask=None,
-                attn_mask_startend_row_indices=current_startend_row_indices,
                 position_ids=current_position_ids,
+                attn_mask_startend_row_indices=current_startend_row_indices,
             )
             if not isinstance(logits, paddle.Tensor):
                 logits = logits[0]  # [2, 355, 12544]

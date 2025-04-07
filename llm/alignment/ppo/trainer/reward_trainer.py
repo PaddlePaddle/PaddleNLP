@@ -26,7 +26,12 @@ from paddle.distributed import fleet
 from paddle.io import Dataset
 
 from paddlenlp.data import DataCollator
-from paddlenlp.trainer.trainer import EvalPrediction, TrainerCallback, TrainingArguments, logger
+from paddlenlp.trainer.trainer import (
+    EvalPrediction,
+    TrainerCallback,
+    TrainingArguments,
+    logger,
+)
 from paddlenlp.transformers import PretrainedModel, PretrainedTokenizer
 from trainer.rl_trainer import RLTrainer
 
@@ -51,8 +56,10 @@ class RewardTrainer(RLTrainer):
         preprocess_logits_for_metrics: Optional[Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor]] = None,
         reward_server: str = None,
     ):
-        if self.args.use_rm_server:
+        if args.use_rm_server:
             assert isinstance(model, str), "reward trainer need a str (http://xxx:port) for request"
+            self.args = args
+            self.tokenizer = tokenizer
             self.model = reward_server
         else:
             assert isinstance(model, PretrainedModel), "reward trainer need a PretrainedModel instance for forward"
@@ -102,10 +109,10 @@ class RewardTrainer(RLTrainer):
             )[1]
         else:
             prompt_len = kwargs["prompt"].shape[-1]
-            if "label_ids" not in kwargs:
+            if label_ids is None:
                 raise ValueError("Rule-based reward needs labels.")
             src = input_ids_tokenizer.batch_decode(input_ids[:, :prompt_len], skip_special_tokens=False)
-            tgt = input_ids_tokenizer.batch_decode(kwargs["label_ids"], skip_special_tokens=False)
+            tgt = input_ids_tokenizer.batch_decode(label_ids, skip_special_tokens=False)
             response = input_ids_tokenizer.batch_decode(input_ids[:, prompt_len:], skip_special_tokens=False)
             reward_score = self.request_reward_server(
                 [i.replace(self.tokenizer.pad_token, "") for i in src],
