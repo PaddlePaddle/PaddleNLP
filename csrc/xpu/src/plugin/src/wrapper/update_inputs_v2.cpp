@@ -191,17 +191,31 @@ int update_inputs_v2(Context* ctx,
                       stop_flags,
                       seq_lens_this_time,
                       seq_lens_encoder);
+  
   WRAPPER_DUMP_PARAM5(ctx,
                       seq_lens_decoder,
                       next_tokens,
                       kwargs_next_tokens,
                       input_ids,
                       end_ids);
+
   WRAPPER_DUMP_PARAM3(ctx, stop_nums, is_block_step, max_dec_len);
   WRAPPER_DUMP_PARAM4(ctx, now_bsz, max_bsz, input_ids_stride, end_length);
+
+  
   WRAPPER_DUMP(ctx);
+  WRAPPER_CHECK_PTR(ctx, int64_t, now_bsz, next_tokens);
+  WRAPPER_CHECK_PTR(ctx, int, now_bsz, seq_lens_this_time);
+  WRAPPER_CHECK_PTR(ctx, int, now_bsz, seq_lens_encoder);
+  WRAPPER_CHECK_PTR(ctx, int, now_bsz, seq_lens_decoder);
+  WRAPPER_CHECK_PTR(ctx, int64_t, end_length, end_ids);
+  WRAPPER_CHECK_PTR(ctx, int64_t, now_bsz, step_idx);
+  WRAPPER_CHECK_PTR(ctx, bool, now_bsz, stop_flags);
+
   WRAPPER_ASSERT_LE(ctx, max_bsz, 1024);
   WRAPPER_ASSERT_LE(ctx, now_bsz, max_bsz);
+
+  // std::cout << "wht --- ctx debug level is " << ctx->debug_level() << std::endl;
   // TODO(mayang02): check ptrs
   if (ctx->dev().type() == api::kCPU) {
     return cpu_wrapper(ctx,

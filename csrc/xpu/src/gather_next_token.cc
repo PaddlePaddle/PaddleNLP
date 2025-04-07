@@ -32,7 +32,7 @@ std::vector<paddle::Tensor> GatherNextToken(const paddle::Tensor& tmp_out, // [t
   const int dim = tmp_out.dims()[1]; 
   const int bsz = cum_offsets.shape()[0];
 
-  std::vector<int> seq_lens_encoder_cpu(bsz, 0);
+    std::vector<int> seq_lens_encoder_cpu(bsz, 0);
   std::vector<int> seq_lens_decoder_cpu(bsz, 0);
   std::vector<int> encoder_batch_map;
   std::vector<int> decoder_batch_map;

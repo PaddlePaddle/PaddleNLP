@@ -17,6 +17,7 @@
 #include "paddle/extension.h"
 #include "paddle/phi/core/enforce.h"
 #include "xpu/plugin.h"
+#include <core/vllm_tensor.h>
 #include <core/ctx_manager.h>
 #include <core/xft_check.h>
 #include <core/xft_event.h>
@@ -36,12 +37,22 @@ template <>
 struct kl3_pa_TL_trait<bfloat16> {
     using TL = float;
 };
-std::vector<paddle::Tensor> MlaAttn(
-    const paddle::Tensor& q,
+std::vector<paddle::Tensor> MlaAttnV2(
+    const paddle::Tensor& input,
     const paddle::Tensor& k,
     const paddle::Tensor& v,
-    const paddle::Tensor& key_cache,
-    const paddle::Tensor& value_cache,
+    const paddle::Tensor& q_a_proj_weight,
+    const paddle::Tensor& q_a_layernorm_weight,
+    const paddle::optional<paddle::Tensor>& q_a_layernorm_bias,
+    const paddle::Tensor& q_b_proj_weight,
+    const paddle::Tensor& q_proj_weight,
+    const paddle::Tensor& kv_a_proj_weight,
+    const paddle::Tensor& kv_a_layernorm_weight,
+    const paddle::optional<paddle::Tensor>& kv_a_layernorm_bias,
+    const paddle::Tensor& kv_b_proj_weight,
+    const paddle::Tensor& o_proj_weight,
+    const paddle::Tensor& key_cache,  // out
+    const paddle::Tensor& value_cache,  // out
     const paddle::Tensor& seq_lens_encoder,
     const paddle::Tensor& seq_lens_decoder,
     const paddle::Tensor& seq_lens_this_time,
@@ -88,10 +99,10 @@ std::vector<paddle::Tensor> MlaAttn(
 
   xpu::ctx_guard RAII_GUARD(xpu_ctx->x_context());
 
-  using QType = typename XPUTypeTrait<bfloat16>::Type;
+  using XPUType = typename XPUTypeTrait<bfloat16>::Type;
   using CacheType = typename XPUTypeTrait<bfloat16>::Type;
-  typedef paddle::bfloat16 qdata_t, cache_t;
-  const auto& input_dims = q.dims();
+  typedef paddle::bfloat16 data_t, cache_t;
+  const auto& input_dims = input.dims();
   const auto& key_cache_dims = key_cache.dims();
   const auto& value_cache_dims = value_cache.dims();
   const int bsz = seq_lens_encoder.dims()[0];
@@ -103,45 +114,108 @@ std::vector<paddle::Tensor> MlaAttn(
   const int max_block_per_seq = block_tables.dims()[1];
   const int block_size = key_cache_dims[2];  
   const int max_seq_len = block_size * max_block_per_seq;
-  // 初始化输入：q k v
-  auto q_xft = baidu::xpu::xft::xftTensor<QType, 2>(
-      reinterpret_cast<QType*>(const_cast<paddle::bfloat16*>(q.data<qdata_t>())),
-      std::array<int64_t, 2>{q.shape()[0],
-                             q.shape()[1]});
-  auto k_xft = baidu::xpu::xft::xftTensor<QType, 2>(
-      reinterpret_cast<QType*>(const_cast<paddle::bfloat16*>(k.data<qdata_t>())),
-      std::array<int64_t, 2>{k.shape()[0],
-                             k.shape()[1]});
-  auto v_xft = baidu::xpu::xft::xftTensor<QType, 2>(
-      reinterpret_cast<QType*>(const_cast<paddle::bfloat16*>(v.data<qdata_t>())),
-      std::array<int64_t, 2>{v.shape()[0],
-                             v.shape()[1]});                             
-  // 初始化输入：k cache
-  auto key_cache_xft = baidu::xpu::xft::xftTensor<CacheType, 4>(
-  reinterpret_cast<CacheType*>(const_cast<paddle::bfloat16*>(key_cache.data<cache_t>())),
-  std::array<int64_t, 4>{key_cache.shape()[0],
-                          key_cache.shape()[1],
-                          key_cache.shape()[2],
-                          key_cache.shape()[3]});   
-  // 初始化输入：v cache                                    
-  auto value_cache_xft = baidu::xpu::xft::xftTensor<CacheType, 4>(
-  reinterpret_cast<CacheType*>(const_cast<paddle::bfloat16*>(value_cache.data<cache_t>())),
-  std::array<int64_t, 4>{value_cache.shape()[0],
-                          value_cache.shape()[1],
-                          value_cache.shape()[2],
-                          value_cache.shape()[3]}); 
+  // 初始化输入：input
+  xft::Tensor input_tensor(
+      reinterpret_cast<XPUType*>(const_cast<data_t*>(input.data<data_t>())),
+      xft::DataType::DT_BFLOAT16,
+      input.shape());                            
+  // 初始化输入：kv cache
+  xft::Tensor k_cache_tensor(
+      reinterpret_cast<XPUType*>(const_cast<data_t*>(key_cache.data<data_t>())),
+      xft::DataType::DT_BFLOAT16,
+      key_cache.shape());
+  xft::Tensor v_cache_tensor(
+      reinterpret_cast<XPUType*>(const_cast<data_t*>(value_cache.data<data_t>())),
+      xft::DataType::DT_BFLOAT16,
+      value_cache.shape());
+        
+
+  // 初始化输出tensor
+  auto fmha_out = paddle::full({input.shape()[0], num_head * dim_v}, -2, input.type(), input.place()); 
+  xft::Tensor fmha_out(
+      reinterpret_cast<XPUType*>(const_cast<data_t*>(fmha_out.data<data_t>())),
+      xft::DataType::DT_BFLOAT16,
+      fmha_out.shape());
+
   // 初始化输入：block table
   auto block_tables_xft = baidu::xpu::xft::xftTensor<int, 2>(
   reinterpret_cast<int*>(const_cast<int*>(block_tables.data<int>())),
   std::array<int64_t, 2>{block_tables.shape()[0],
                           block_tables.shape()[1]}); 
-  // 初始化输出tensor
 
-  auto fmha_out = paddle::full({q.shape()[0], num_head * dim_v}, -2, q.type(), q.place()); 
-  auto fmha_out_xft = baidu::xpu::xft::xftTensor<QType, 2>(
-      reinterpret_cast<QType*>(const_cast<paddle::bfloat16*>(fmha_out.data<qdata_t>())),
-      std::array<int64_t, 2>{fmha_out.shape()[0],
-                             fmha_out.shape()[1]});
+  // 初始化weight
+  xft::MLAWeight mlaweight;
+  xft::Tensor q_a_proj_weight_tensor(
+      reinterpret_cast<XPUType*>(const_cast<data_t*>(q_a_proj_weight.data<data_t>())),
+      xft::DataType::DT_BFLOAT16,
+      q_a_proj_weight.shape());
+  mlaweight.q_a_proj_weight = &q_a_proj_weight_tensor;
+
+  xft::Tensor q_a_layernorm_weight_tensor(
+      reinterpret_cast<XPUType*>(const_cast<data_t*>(q_a_layernorm_weight.data<data_t>())),
+      xft::DataType::DT_BFLOAT16,
+      q_a_layernorm_weight.shape());
+  mlaweight.q_a_layernorm_weight = &q_a_layernorm_weight_tensor;
+
+  if(q_a_layernorm_bias){
+    xft::Tensor q_a_layernorm_bias_tensor(
+        reinterpret_cast<XPUType*>(const_cast<data_t*>(q_a_layernorm_bias.value().data<data_t>())),
+        xft::DataType::DT_BFLOAT16,
+        q_a_layernorm_bias.shape());
+    mlaweight.q_a_layernorm_bias = &q_a_layernorm_bias_tensor;
+  }
+
+  xft::Tensor q_b_proj_weight_tensor(
+      reinterpret_cast<XPUType*>(const_cast<data_t*>(q_b_proj_weight.data<data_t>())),
+      xft::DataType::DT_BFLOAT16,
+      q_b_proj_weight.shape());
+  mlaweight.q_b_proj_weight = &q_b_proj_weight_tensor;
+
+    xft::Tensor q_proj_weight_tensor(
+      reinterpret_cast<XPUType*>(const_cast<data_t*>(q_proj_weight.data<data_t>())),
+      xft::DataType::DT_BFLOAT16,
+      q_proj_weight.shape());
+  mlaweight.q_proj_weight = &q_proj_weight_tensor;
+
+    xft::Tensor kv_a_proj_weight_tensor(
+      reinterpret_cast<XPUType*>(const_cast<data_t*>(kv_a_proj_weight.data<data_t>())),
+      xft::DataType::DT_BFLOAT16,
+      kv_a_proj_weight.shape());
+  mlaweight.kv_a_proj_weight = &kv_a_proj_weight_tensor;
+
+    xft::Tensor kv_a_layernorm_weight_tensor(
+      reinterpret_cast<XPUType*>(const_cast<data_t*>(kv_a_layernorm_weight.data<data_t>())),
+      xft::DataType::DT_BFLOAT16,
+      kv_a_layernorm_weight.shape());
+  mlaweight.kv_a_layernorm_weight = &kv_a_layernorm_weight_tensor;
+
+  if(kv_a_layernorm_bias){
+        xft::Tensor kv_a_layernorm_bias_tensor(
+        reinterpret_cast<XPUType*>(const_cast<data_t*>(kv_a_layernorm_bias.data<data_t>())),
+        xft::DataType::DT_BFLOAT16,
+        kv_a_layernorm_bias.shape());
+    mlaweight.kv_a_layernorm_bias = &kv_a_layernorm_bias_tensor;
+  }
+
+    xft::Tensor kv_b_proj_weight_tensor(
+      reinterpret_cast<XPUType*>(const_cast<data_t*>(kv_b_proj_weight.data<data_t>())),
+      xft::DataType::DT_BFLOAT16,
+      kv_b_proj_weight.shape());
+  mlaweight.kv_b_proj_weight = &kv_b_proj_weight_tensor;
+
+    xft::Tensor o_proj_weight_tensor(
+      reinterpret_cast<XPUType*>(const_cast<data_t*>(o_proj_weight.data<data_t>())),
+      xft::DataType::DT_BFLOAT16,
+      o_proj_weight.shape());
+  mlaweight.o_proj_weight = &o_proj_weight_tensor;
+
+    xft::Tensor rotary_pos_embedding_tensor(
+      reinterpret_cast<XPUType*>(const_cast<data_t*>(rotary_pos_embedding.data<data_t>())),
+      xft::DataType::DT_BFLOAT16,
+      rotary_pos_embedding.shape());
+  mlaweight.rotary_pos_embedding = &rotary_pos_embedding_tensor;
+
+
   // encoder 判断逻辑
   std::vector<int> seq_lens_encoder_cpu(bsz, 0);
   std::vector<int> seq_lens_decoder_cpu(bsz, 0);
@@ -152,7 +226,7 @@ std::vector<paddle::Tensor> MlaAttn(
   std::vector<int> encoder_seq_lod;
   std::vector<int> decoder_context_len;
   std::vector<int> decoder_context_len_cache;
-  xpu_wait(xpu_ctx->x_context()->xpu_stream); // 是否需要！！！！TODO
+//   xpu_wait(xpu_ctx->x_context()->xpu_stream); // 是否需要！！！！TODO
   int r = xpu_memcpy(seq_lens_encoder_cpu.data(),
                  seq_lens_encoder.data<int>(),
                  sizeof(int32_t) * bsz,
@@ -187,8 +261,35 @@ std::vector<paddle::Tensor> MlaAttn(
     }
   }
 
+
+
+
+
+
+
+
+
+
+
   // encoder
   if(max_enc_len_this_time.data<int>()[0] > 0){
+
+  xft::TransformerParam param;
+  param.batch_size = enc_batch;
+  param.head_num = 
+
+
+
+
+
+
+
+
+
+
+
+
+
     // q_lod
     baidu::xpu::api::VectorParam<int32_t> context_len_vp =
         baidu::xpu::api::VectorParam<int32_t>{encoder_seq_lod.data(), enc_batch + 1, nullptr}
@@ -323,8 +424,7 @@ std::vector<paddle::Tensor> MlaAttn(
             block_size, // block_size
             max_block_per_seq, // max_blocks_per_seq (prefix cache)
             page_param_.max_context_len_, // prefill_len
-            nullptr,
-            softmax_scale * sqrt(dim_qk)); // block_tables (prefix cache)
+            nullptr); // block_tables (prefix cache)
 
     // std::cout << "fmha kernel done " <<std::endl;
   }
@@ -426,7 +526,7 @@ std::vector<paddle::Tensor> MlaAttn(
             const_cast<TKV*>(key_cache_xft.data()),
             const_cast<TKV*>(value_cache_xft.data()),
             attn_param_.kv_head_num_,
-            softmax_scale,
+            attn_param_.scale_,
             block_tables_xft.data(),
             attn_param_.context_len_vp_,
             attn_param_.valid_batch_vp_,
@@ -452,10 +552,20 @@ std::vector<paddle::Tensor> MlaAttn(
     return {fmha_out};   
 }
 
-std::vector<std::vector<int64_t>> MlaAttnInferShape(
+std::vector<std::vector<int64_t>> MlaAttnV2InferShape(
     const std::vector<int64_t>& q_shape,
     const std::vector<int64_t>& k_shape,
     const std::vector<int64_t>& v_shape,
+    const std::vector<int64_t>& q_a_proj_weight_shape,
+    const std::vector<int64_t>& q_a_layernorm_weight_shape,
+    const paddle::optional<std::vector<int64_t>>& q_a_layernorm_bias_shape,
+    const std::vector<int64_t>& q_b_proj_weight_shape,
+    const std::vector<int64_t>& q_proj_weight_shape,
+    const std::vector<int64_t>& kv_a_proj_weight_shape,
+    const std::vector<int64_t>& kv_a_layernorm_weight_shape,
+    const paddle::optional<std::vector<int64_t>>& kv_a_layernorm_bias_shape,
+    const std::vector<int64_t>& kv_b_proj_weight_shape,
+    const std::vector<int64_t>& o_proj_weight_shape,
     const std::vector<int64_t>& key_cache_shape,
     const std::vector<int64_t>& value_cache_shape,
     const std::vector<int64_t>& seq_lens_encoder_shape,
@@ -493,10 +603,20 @@ std::vector<std::vector<int64_t>> MlaAttnInferShape(
   return {{token_num, all_v_dim}};
 }
 
-std::vector<paddle::DataType> MlaAttnInferDtype(
+std::vector<paddle::DataType> MlaAttnV2InferDtype(
     const paddle::DataType& q_dtype,
     const paddle::DataType& k_dtype,
     const paddle::DataType& v_dtype,
+    const paddle::DataType& q_a_proj_weight_dtype,
+    const paddle::DataType& q_a_layernorm_weight_dtype,
+    const paddle::optional<paddle::DataType>& q_a_layernorm_bias_dtype,
+    const paddle::DataType& q_b_proj_weight_dtype,
+    const paddle::DataType& q_proj_weight_dtype,
+    const paddle::DataType& kv_a_proj_weight_dtype,
+    const paddle::DataType& kv_a_layernorm_weight_dtype,
+    const paddle::optional<paddle::DataType>& kv_a_layernorm_bias_dtype,
+    const paddle::DataType& kv_b_proj_weight_dtype,
+    const paddle::DataType& o_proj_weight_dtype,
     const paddle::DataType& key_cache_dtype,
     const paddle::DataType& value_cache_dtype,
     const paddle::DataType& seq_lens_encoder_dtype,
@@ -549,10 +669,22 @@ std::vector<paddle::DataType> MlaAttnInferDtype(
     }
 }
 
-PD_BUILD_OP(mla_block_multihead_attention_xpu)
+
+
+PD_BUILD_OP(mla_block_multihead_attention_xpu_v2)
     .Inputs({"q",
              "k",
              "v",
+             "q_a_proj_weight",
+             "q_a_layernorm_weight",
+             paddle::Optional("q_a_layernorm_bias"),
+             "q_b_proj_weight",
+             "q_proj_weight",
+             "kv_a_proj_weight",
+             "kv_a_layernorm_weight",
+             paddle::Optional("kv_a_layernorm_bias"),
+             "kv_b_proj_weight",
+             "o_proj_weight",
              "key_cache",
              "value_cache",
              "seq_lens_encoder",
@@ -585,9 +717,9 @@ PD_BUILD_OP(mla_block_multihead_attention_xpu)
              paddle::Optional("cache_v_zp"),
              paddle::Optional("out_linear_shifts"),
              paddle::Optional("out_linear_smooths")})
-    .Outputs({"fmha_out"})
-    // .SetInplaceMap({{"key_cache", "key_cache_out"},
-    //                 {"value_cache", "value_cache_out"}})
+    .Outputs({"fmha_out", "key_cache_out", "value_cache_out"})
+    .SetInplaceMap({{"key_cache", "key_cache_out"},
+                    {"value_cache", "value_cache_out"}})
     .Attrs({"cache_quant_type: std::string",
             "use_neox_rotary_style: bool",
             "max_input_length: int",
@@ -598,7 +730,6 @@ PD_BUILD_OP(mla_block_multihead_attention_xpu)
             "speculate_max_draft_token_num: int",
             "causal: bool",
             "speculate_decoder: bool"})
-    .SetKernelFn(PD_KERNEL(MlaAttn))
-    .SetInferShapeFn(PD_INFER_SHAPE(MlaAttnInferShape))
-    .SetInferDtypeFn(PD_INFER_DTYPE(MlaAttnInferDtype));
-
+    .SetKernelFn(PD_KERNEL(MlaAttnV2))
+    .SetInferShapeFn(PD_INFER_SHAPE(MlaAttnV2InferShape))
+    .SetInferDtypeFn(PD_INFER_DTYPE(MlaAttnV2InferDtype));
