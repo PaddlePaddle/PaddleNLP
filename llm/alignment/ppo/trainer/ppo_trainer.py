@@ -1799,16 +1799,3 @@ class PPOTrainer(Trainer):
                 all_advantages_std + 1e-8
             )
             rl_batch["reward_advantages"] = rl_batch["reward_advantages"] * rl_batch["eos_mask"]
-
-    @paddle.no_grad()
-    def normalize_batch_data(
-        self,
-        rl_batches: List[Dict[str, paddle.Tensor]],
-        use_tgt_len_value: bool = False,
-    ) -> Dict[str, Any]:
-        """
-        data dispatch comm among devices needs padding, while the lengths of
-        all data fields are different and related, and it's hard to pad.
-        """
-
-        return rl_batches

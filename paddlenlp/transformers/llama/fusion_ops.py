@@ -136,8 +136,14 @@ def rms_norm_fused(x_in, w, eps, use_fast_ln=False):
         fast_ln = try_import("fast_ln")
         return fast_ln.fast_rms_norm(x_in, w, eps)[0]
     else:
-        fused_ln = try_import("fused_ln")
-        return fused_ln.fused_rms_norm(x_in, w, eps)[0]
+        try:
+            from paddle.incubate.nn.functional import fused_rms_norm
+
+            return fused_rms_norm(x=x_in, norm_weight=w, norm_bias=None, epsilon=eps, begin_norm_axis=2)[0]
+        except ImportError:
+            fused_ln = try_import("fused_ln")
+
+            return fused_ln.fused_rms_norm(x_in, w, eps)[0]
 
 
 def fusion_rms_norm(hidden_states, weight, variance_epsilon, use_fast_ln=False):
@@ -300,9 +306,9 @@ def fusion_flash_attention(
             concat_axis=2,
         )
         # attn_output shape: [bs, seqlen/sep, num_head, head_dim]
-        assert (
-            config.sep_parallel_degree > 1 and q_len % config.sep_parallel_degree == 0
-        ), f"q_len:{q_len}, config.sep_parallel_degree:{config.sep_parallel_degree}"
+        assert config.sep_parallel_degree > 1 and q_len % config.sep_parallel_degree == 0, (
+            f"q_len:{q_len}, config.sep_parallel_degree:{config.sep_parallel_degree}"
+        )
         q_len = q_len // config.sep_parallel_degree
         num_heads = num_heads * config.sep_parallel_degree
 
