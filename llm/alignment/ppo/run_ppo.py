@@ -333,6 +333,8 @@ def main():
         critic_model, critic_eval_model, critic_tokenizer = create_critic_models(
             model_args, data_args, training_args, common_config, reward_model
         )
+    else:
+        critic_model, critic_eval_model, critic_tokenizer = None, None, None
 
     if training_args.should_load_dataset:
         train_ds, dev_ds = create_rl_dataset(data_args, training_args, actor_tokenizer)
@@ -358,16 +360,16 @@ def main():
         actor_model=actor_model,
         reference_model=reference_model,
         reward_model=reward_model,
-        critic_model=critic_model if training_args.rl_algorithm == "ppo" else None,
+        critic_model=critic_model,
         actor_model_eval=actor_eval_model,
-        critic_model_eval=critic_eval_model if training_args.rl_algorithm == "ppo" else None,
+        critic_model_eval=critic_eval_model,
         args=training_args,
         train_dataset=(train_ds if training_args.do_train and training_args.should_load_dataset else None),
         eval_dataset=(dev_ds if training_args.do_eval and training_args.should_load_dataset else None),
         actor_tokenizer=actor_tokenizer,
         reference_tokenizer=actor_tokenizer,
         reward_tokenizer=reward_tokenizer,
-        critic_tokenizer=critic_tokenizer if training_args.rl_algorithm == "ppo" else None,
+        critic_tokenizer=critic_tokenizer,
         data_collator=partial(
             collate_fn,
             pad_token_id=actor_tokenizer.pad_token_id,
