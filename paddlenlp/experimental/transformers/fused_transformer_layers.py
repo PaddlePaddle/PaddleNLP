@@ -940,7 +940,7 @@ class FusedMultiTransformerBase(Layer):
             self._add_parameter(gate_weight)
             self._add_parameter(ffn1_weight)
             self._add_parameter(ffn2_weight)
-    
+
     def get_moe_weight_dtype(self):
         return self.create_params_type
 
@@ -1272,7 +1272,6 @@ class FusedMultiTransformerBase(Layer):
 
         return tmp_out, residual_input
 
-
     def compute_fused_moe(self, tmp_out, i):
         e_score_correction_bias = self.e_score_correction_biases[i]
 
@@ -1603,6 +1602,7 @@ class FusedMultiTransformerBase(Layer):
 
     def process_batch(self, data, **kwargs):
         return data
+
 
 class FusedMultiTransformerPostLayernorm(FusedMultiTransformerBase):
     def __init__(self, config: FusedMultiTransformerConfig):
@@ -2127,7 +2127,9 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
                 epsilon=self._epsilon,
                 begin_norm_axis=1,
             )[0]
-            query_pe, key_pe = self.config.rotary_emb(self.position_ids[0 : kwargs.get("seq_lens_encoder", None).sum()], query_pe, key_pe)
+            query_pe, key_pe = self.config.rotary_emb(
+                self.position_ids[0 : kwargs.get("seq_lens_encoder", None).sum()], query_pe, key_pe
+            )
 
             if self.config.mla_config.use_absorb():
                 from paddlenlp_ops import prefill_mla_write_cache
@@ -3363,9 +3365,6 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
         self.kv_a_proj_with_mqa_weights = []
         self.kv_a_layernorm_weights = []
         self.kv_b_proj_weights = []
-        # self.q_nope_k_b_proj_weights = []
-        # self.q_rope_proj_weights = []
-        # self.v_b_o_proj_weights = []
 
         self.k_b_proj_weights = []
         self.v_b_proj_weights = []
@@ -3379,12 +3378,8 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
             kv_a_layernorm_weight = None
             kv_b_proj_weight = None
 
-            # q_nope_k_b_proj_weight = None
-            # q_rope_proj_weight = None
-            # v_b_o_proj_weight = None
-
             k_b_proj_weight = None
-            v_b_proj_weight = None 
+            v_b_proj_weight = None
             if self.config.mla_config.use_mla():
                 q_proj_weight_attr = self.get_attr(self.config.mla_config.q_proj_weight_attrs, i)
                 q_a_proj_weight_attr = self.get_attr(self.config.mla_config.q_a_proj_weight_attrs, i)
@@ -3445,33 +3440,6 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
                         dtype=self.create_params_type,
                         is_bias=False,
                     )
-
-                # q_nope_k_b_proj_weight_attr = self.get_attr(self.config.mla_config.q_nope_k_b_proj_weight_attrs, i)
-                # q_rope_proj_weight_attr = self.get_attr(self.config.mla_config.q_rope_proj_weight_attrs, i)
-                # v_b_o_proj_weight_attr = self.get_attr(self.config.mla_config.v_b_o_proj_weight_attrs, i)
-                # if q_nope_k_b_proj_weight_attr:
-                #     q_nope_k_b_proj_weight = self.create_parameter(
-                #         shape=self.q_nope_k_b_proj_weight_shape,
-                #         attr=q_nope_k_b_proj_weight_attr,
-                #         dtype=self.create_params_type,
-                #         is_bias=False,
-                #     )
-
-                # if q_rope_proj_weight_attr:
-                #     q_rope_proj_weight = self.create_parameter(
-                #         shape=self.q_rope_proj_weight_shape,
-                #         attr=q_rope_proj_weight_attr,
-                #         dtype=self.create_params_type,
-                #         is_bias=False,
-                #     )
-
-                # if v_b_o_proj_weight_attr:
-                #     v_b_o_proj_weight = self.create_parameter(
-                #         shape=self.v_b_o_proj_weight_shape,
-                #         attr=v_b_o_proj_weight_attr,
-                #         dtype=self.create_params_type,
-                #         is_bias=False,
-                #     )
 
                 k_b_proj_weight_attr = self.get_attr(self.config.mla_config.k_b_proj_weight_attrs, i)
                 v_b_proj_weight_attr = self.get_attr(self.config.mla_config.v_b_proj_weight_attrs, i)
@@ -3605,12 +3573,9 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
                 _set_var_distributed(q_proj_weight)
                 _set_var_distributed(q_b_proj_weight)
                 _set_var_distributed(kv_b_proj_weight)
-                # _set_var_distributed(q_nope_k_b_proj_weight)
-                # _set_var_distributed(q_rope_proj_weight)
                 _set_var_distributed(ffn1_weight)
                 # row parallel
                 _set_var_distributed(linear_weight)
-                # _set_var_distributed(v_b_o_proj_weight)
                 _set_var_distributed(ffn2_weight)
 
                 _set_var_distributed(shared_expert_ffn1_weight)
@@ -3624,10 +3589,6 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
             self.kv_a_layernorm_weights.append(kv_a_layernorm_weight)
             self.kv_b_proj_weights.append(kv_b_proj_weight)
             self.qkv_weights.append(qkv_weight)
-
-            # self.q_nope_k_b_proj_weights.append(q_nope_k_b_proj_weight)
-            # self.q_rope_proj_weights.append(q_rope_proj_weight)
-            # self.v_b_o_proj_weights.append(v_b_o_proj_weight)
 
             self.k_b_proj_weights.append(k_b_proj_weight)
             self.v_b_proj_weights.append(v_b_proj_weight)
@@ -3650,9 +3611,6 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
             self._add_parameter(kv_a_layernorm_weight)
             self._add_parameter(kv_b_proj_weight)
 
-            # self._add_parameter(q_nope_k_b_proj_weight)
-            # self._add_parameter(q_rope_proj_weight)
-            # self._add_parameter(v_b_o_proj_weight)
             self._add_parameter(v_b_proj_weight)
             self._add_parameter(k_b_proj_weight)
 
@@ -3691,19 +3649,6 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
                 self.config.mla_config.kv_lora_rank,
                 self.num_heads * (self.config.mla_config.qk_nope_head_dim + self.config.mla_config.v_head_dim),
             ]
-
-            # self.q_nope_k_b_proj_weight_shape = [
-            #     self.embed_dim if self.config.mla_config.q_lora_rank is None else self.config.mla_config.q_lora_rank,
-            #     self.num_heads * self.config.mla_config.kv_lora_rank,
-            # ]
-            # self.q_rope_proj_weight_shape = [
-            #     self.embed_dim if self.config.mla_config.q_lora_rank is None else self.config.mla_config.q_lora_rank,
-            #     self.num_heads * self.config.mla_config.qk_rope_head_dim,
-            # ]
-            # self.v_b_o_proj_weight_shape = [
-            #     self.num_heads * self.config.mla_config.kv_lora_rank,
-            #     self.embed_dim,
-            # ]
 
             self.k_b_proj_weight_shape = [
                 self.num_heads,
@@ -3759,22 +3704,24 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
                 ]
 
     def get_moe_weight_dtype(self):
-        return 'int8'
+        return "int8"
 
     def compute_fused_moe(self, tmp_out, i):
         config = self.config.moe_config
         from paddlenlp_ops import moe_fused_xpu
-        fused_moe_out = moe_fused_xpu(tmp_out, 
-                                self.gate_weights[i].transpose((1, 0)).cast("float32"),
-                                self.ffn1_weights[i],
-                                self.ffn2_weights[i],                                
-                                self.ffn1_weights_scale[i].cast("float32") if hasattr(self, "ffn1_weights_scale") else None,
-                                self.ffn2_weights_scale[i].cast("float32") if hasattr(self, "ffn2_weights_scale") else None,
-                                self.e_score_correction_biases[i],
-                                config.top_k,
-                                config.num_expert_group,
-                                config.topk_group,
-                                )
+
+        fused_moe_out = moe_fused_xpu(
+            tmp_out,
+            self.gate_weights[i].transpose((1, 0)).cast("float32"),
+            self.ffn1_weights[i],
+            self.ffn2_weights[i],
+            self.ffn1_weights_scale[i].cast("float32") if hasattr(self, "ffn1_weights_scale") else None,
+            self.ffn2_weights_scale[i].cast("float32") if hasattr(self, "ffn2_weights_scale") else None,
+            self.e_score_correction_biases[i],
+            config.top_k,
+            config.num_expert_group,
+            config.topk_group,
+        )
         return fused_moe_out
 
     def post_process(self, **kwargs):
@@ -3819,7 +3766,7 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
         assert self.config.mla_config.use_absorb()
         qkv_out = ln_out
         return qkv_out, residual_input
-    
+
     def compute_attn(
         self,
         time_step,
@@ -3873,11 +3820,14 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
                 begin_norm_axis=1,
             )[0]
             # TODO: 不能这样改，不然非吸收版没法用了
-            query_pe, key_pe = self.config.rotary_emb(self.position_ids[0 : kwargs.get("seq_lens_encoder", None).sum()], query_pe, key_pe)
+            query_pe, key_pe = self.config.rotary_emb(
+                self.position_ids[0 : kwargs.get("seq_lens_encoder", None).sum()], query_pe, key_pe
+            )
 
             if self.config.mla_config.use_absorb():
                 if paddle.is_compiled_with_xpu():
                     from paddlenlp_ops import prefill_mla_write_cache_xpu
+
                     prefill_mla_write_cache_xpu(
                         compressed_kv,
                         key_pe,
@@ -3890,9 +3840,10 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
                         "none",
                         kwargs.get("max_input_length", -1),
                         self.kv_num_heads,
-                    )                
+                    )
                 else:
                     from paddlenlp_ops import prefill_mla_write_cache
+
                     prefill_mla_write_cache(
                         compressed_kv,
                         key_pe,
@@ -3950,13 +3901,14 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
         ln_out = qkv_out
         latent_cache = caches[i]
         out_linear_out = paddle.zeros(shape=[ln_out.shape[0], ln_out.shape[1]], dtype=ln_out.dtype)
-        encoder_len = kwargs.get("seq_lens_encoder", None).sum()     
+        encoder_len = kwargs.get("seq_lens_encoder", None).sum()
 
         if kwargs["max_enc_len_this_time"] > 0:  # prefill phase
-            ln_out_encoder = ln_out[0 : encoder_len, :]
+            ln_out_encoder = ln_out[0:encoder_len, :]
             query, key, value = self.compute_qkv_linear(ln_out_encoder, i, latent_cache=latent_cache, **kwargs)
 
             from paddlenlp_ops import absorb_mla_block_mha_encoder_xpu
+
             fmha_out_prefill = absorb_mla_block_mha_encoder_xpu(
                 query,
                 key,
@@ -3994,34 +3946,22 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
                 "none",  # cache_quant_type
                 self.use_neox_rotary_style,
                 kwargs.get("max_input_length", -1),
-                self.softmax_scale, # softmax_scale
+                self.softmax_scale,  # softmax_scale
                 0.0,  # quant_max_bound
                 0.0,  # quant_min_bound
                 0.0,  # out_linear_in_scale
                 self.config.speculate_config.speculate_max_draft_token_num,
                 kwargs.get("block_size", 64),
-                self.num_heads,  
+                self.num_heads,
                 self.config.mla_config.qk_head_dim,
                 self.config.mla_config.v_head_dim,
                 False,  # causal
                 False,  # speculate_decoder
-            )  
+            )
             out_linear_out_prefill = self.compute_out_linear(fmha_out_prefill, i)
-            out_linear_out[0 : encoder_len, :] = out_linear_out_prefill
+            out_linear_out[0:encoder_len, :] = out_linear_out_prefill
         if kwargs["max_dec_len_this_time"]:  # decode phase
-            ln_out_decoder = ln_out[encoder_len :,:]
-            # if self.config.mla_config.q_lora_rank is not None:
-            #     query = paddle.matmul(ln_out_decoder, self.q_a_proj_weights[i])
-            #     query = self.norm_func(
-            #         x=query,
-            #         norm_weight=self.q_a_layernorm_weights[i],
-            #         norm_bias=None,
-            #         epsilon=self._epsilon,
-            #         begin_norm_axis=1,
-            #     )[0]
-            #     ln_out_or_q_c = query
-            # else:
-            #     ln_out_or_q_c = ln_out_decoder
+            ln_out_decoder = ln_out[encoder_len:, :]
 
             compressed_kv = paddle.matmul(ln_out_decoder, self.kv_a_proj_with_mqa_weights[i])
             compressed_kv, key_pe = compressed_kv.split(
@@ -4035,15 +3975,12 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
                 epsilon=self._epsilon,
                 begin_norm_axis=1,
             )[0]
-            from paddlenlp_ops import decode_mla_write_cache_xpu, absorb_mla_block_mha_decoder_xpu, batch_matmul_xpu
-            # --fuse
-            # query_nope = paddle.matmul(ln_out_or_q_c, self.q_nope_k_b_proj_weights[i])
-            # query_nope = query_nope.reshape(shape=[-1, self.num_heads, self.config.mla_config.kv_lora_rank])
-            # query_pe = paddle.matmul(ln_out_or_q_c, self.q_rope_proj_weights[i])
-            # query_pe = query_pe.reshape(shape=[-1, self.num_heads, self.config.mla_config.qk_rope_head_dim])
-            # ---
+            from paddlenlp_ops import (
+                absorb_mla_block_mha_decoder_xpu,
+                batch_matmul_xpu,
+                decode_mla_write_cache_xpu,
+            )
 
-            # --no fuse
             if self.config.mla_config.q_lora_rank is not None:
                 query = paddle.matmul(ln_out_decoder, self.q_a_proj_weights[i])
                 query = self.norm_func(
@@ -4065,10 +4002,11 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
             ).transpose(  # [num_head, n, qk_nope_head_dim]
                 [1, 0, 2]
             )
-            # ---
 
-            query_pe, key_pe = self.config.rotary_emb(self.position_ids[kwargs.get("seq_lens_encoder", None).sum():], query_pe, key_pe)
-            
+            query_pe, key_pe = self.config.rotary_emb(
+                self.position_ids[kwargs.get("seq_lens_encoder", None).sum() :], query_pe, key_pe
+            )
+
             decode_mla_write_cache_xpu(
                 compressed_kv,
                 key_pe,
@@ -4082,9 +4020,8 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
                 kwargs.get("max_input_length", -1),
                 self.kv_num_heads,
                 self.config.speculate_config.speculate_method is not None,  # speculate_decoder
-            )   
-            # q_input = paddle.concat([query_nope, query_pe], axis=-1)  # fuse
-            q_input = paddle.concat([q_nope_out, query_pe], axis=-1)  # no fuse  
+            )
+            q_input = paddle.concat([q_nope_out, query_pe], axis=-1)
 
             q_input = q_input.reshape(
                 [
@@ -4128,39 +4065,33 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
                 "none",  # cache_quant_type
                 self.use_neox_rotary_style,
                 kwargs.get("max_input_length", -1),
-                self.softmax_scale, # softmax_scale
+                self.softmax_scale,  # softmax_scale
                 0.0,  # quant_max_bound
                 0.0,  # quant_min_bound
                 0.0,  # out_linear_in_scale
                 self.config.speculate_config.speculate_max_draft_token_num,
                 kwargs.get("block_size", 64),
-                self.num_heads,  
+                self.num_heads,
                 self.config.mla_config.kv_lora_rank,
                 self.config.mla_config.qk_rope_head_dim,
                 self.config.mla_config.qk_head_dim,
-                self.config.mla_config.v_head_dim,                    
+                self.config.mla_config.v_head_dim,
                 False,  # causal
                 False,  # speculate_decoder
-            )  
-
-            # --fuse
-            # out_linear_out_decode = paddle.matmul(fmha_out_decode, self.v_b_o_proj_weights[i])
-            # --
-
+            )
             # --no fuse
             fmha_out_decode = fmha_out_decode.reshape(
                 [-1, self.num_heads, self.config.mla_config.kv_lora_rank]
             ).transpose([1, 0, 2])
             fmha_out_decode = (
-                batch_matmul_xpu(fmha_out_decode, self.v_b_proj_weights[i]) # self.W_V[i] self.v_b_proj_weights[i]
+                batch_matmul_xpu(fmha_out_decode, self.v_b_proj_weights[i])  # self.W_V[i] self.v_b_proj_weights[i]
                 .transpose([1, 0, 2])
                 .reshape([-1, self.num_heads * self.config.mla_config.v_head_dim])
             )
             out_linear_out_decode = paddle.matmul(fmha_out_decode, self.linear_weights[i])
-            #--
-            
-            out_linear_out[encoder_len :,:] = out_linear_out_decode
-            # print(f"decode {i}: out_linear_out: {out_linear_out}")
+            # --
+
+            out_linear_out[encoder_len:, :] = out_linear_out_decode
         return out_linear_out
 
 
@@ -4239,8 +4170,6 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
 
             out_linear_out_prefill = self.compute_out_linear(fmha_out_prefill, i)
             out_linear_out = out_linear_out + out_linear_out_prefill
-
-            # print(f"prefill {i}: out_linear_out: {out_linear_out}")
 
         if kwargs["max_dec_len_this_time"]:  # decode phase
             if self.config.mla_config.q_lora_rank is not None:
@@ -4378,8 +4307,6 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
                 group_size=self.weightonly_group_size,
             )
             out_linear_out = out_linear_out + out_linear_out_decode
-
-            # print(f"decode {i}: out_linear_out: {out_linear_out}")
 
         return out_linear_out
 
