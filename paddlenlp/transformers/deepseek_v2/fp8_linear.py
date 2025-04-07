@@ -188,18 +188,21 @@ def kitchen_quant(x, backend=None, is_1d_scaled=True, return_transpose=False):
 
 
 def kitchen_fp8_gemm(x_fp8, x_scale, w_fp8, w_scale, is_a_1d_scaled, is_b_1d_scaled):
-    y = kitchen.ops.fp8_gemm_blockwise(
-        a=x_fp8,
-        a_decode_scale=x_scale,
-        b=w_fp8,
-        b_decode_scale=w_scale,
-        out_dtype=paddle.bfloat16,
-        out=None,
-        accumulate=False,
-        use_split_accumulator=True,
-        is_a_1d_scaled=is_a_1d_scaled,
-        is_b_1d_scaled=is_b_1d_scaled,
-    )
+    if numpy.prod(x_fp8.shape) != 0 and numpy.prod(w_fp8.shape) != 0:
+        y = kitchen.ops.fp8_gemm_blockwise(
+            a=x_fp8,
+            a_decode_scale=x_scale,
+            b=w_fp8,
+            b_decode_scale=w_scale,
+            out_dtype=paddle.bfloat16,
+            out=None,
+            accumulate=False,
+            use_split_accumulator=True,
+            is_a_1d_scaled=is_a_1d_scaled,
+            is_b_1d_scaled=is_b_1d_scaled,
+        )
+    else:
+        y = paddle.zeros([x_fp8.shape[0], w_fp8.shape[0]], paddle.bfloat16)
     return y
 
 
@@ -229,8 +232,15 @@ class LinearFP8Func(paddle.autograd.PyLayer):
         x_t = x.T
         # padding
         x_t_shape = x_t.shape
-        if x_t.shape[-1] % 8 != 0:
-            x_t = paddle.concat([x_t, paddle.zeros([x_t.shape[0], 8 - (x_t.shape[-1] % 8)], dtype=x_t.dtype)], axis=-1)
+        if x_t.shape[-1] % 128 != 0 or x_t.shape[-1] % 512 != 0:
+            if (x_t.shape[-1] + 128 - (x_t.shape[-1] % 128)) % 512 != 0:
+                padding_size = 512
+            else:
+                padding_size = 128
+            x_t = paddle.concat(
+                [x_t, paddle.zeros([x_t.shape[0], padding_size - (x_t.shape[-1] % padding_size)], dtype=x_t.dtype)],
+                axis=1,
+            )
         x_t_quant, x_t_scale = kitchen_quant(
             x_t.contiguous(), backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
         )
@@ -262,9 +272,20 @@ class LinearFP8Func(paddle.autograd.PyLayer):
         # compute dw = mm(x_t, dout_t)
         dout_t = dout.reshape([-1, dout.shape[-1]]).T.contiguous()
         # padding
-        if dout_t.shape[-1] % 8 != 0:
-            pad_size = 8 - (dout_t.shape[-1] % 8)
-            dout_t = paddle.concat([dout_t, paddle.zeros([dout_t.shape[0], pad_size], dtype=dout_t.dtype)], axis=-1)
+        if dout_t.shape[-1] % 128 != 0 or dout_t.shape[-1] % 512 != 0:
+            if (dout_t.shape[-1] + 128 - (dout_t.shape[-1] % 128)) % 512 != 0:
+                padding_size = 512
+            else:
+                padding_size = 128
+            dout_t = paddle.concat(
+                [
+                    dout_t,
+                    paddle.zeros(
+                        [dout_t.shape[0], padding_size - (dout_t.shape[-1] % padding_size)], dtype=dout_t.dtype
+                    ),
+                ],
+                axis=1,
+            )
 
         dout_t_quant, dout_t_scale = kitchen_quant(
             dout_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
@@ -301,8 +322,15 @@ class LinearFP8KeepXFunc(paddle.autograd.PyLayer):
         dx_orig_shape = x.shape
         # padding
         x = x.reshape([-1, x.shape[-1]])
-        if x.shape[0] % 8 != 0:
-            x = paddle.concat([x, paddle.zeros([8 - (x.shape[0] % 8), x.shape[-1]], dtype=x.dtype)], axis=0)
+        if x.shape[0] % 128 != 0 or x.shape[0] % 512 != 0:
+            if (x.shape[0] + 128 - (x.shape[0] % 128)) % 512 != 0:
+                padding_size = 512
+            else:
+                padding_size = 128
+            x = paddle.concat(
+                [x, paddle.zeros([padding_size - (x.shape[0] % padding_size), x.shape[-1]], dtype=x.dtype)],
+                axis=0,
+            )
 
         _, _, x_t_quant, x_t_scale = kitchen_quant(
             x, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=True
@@ -325,10 +353,20 @@ class LinearFP8KeepXFunc(paddle.autograd.PyLayer):
 
         # compute dw = mm(x_t, dout_t)
         dout_t = dout.reshape([-1, dout.shape[-1]])
-
-        if dout_t.shape[0] % 8 != 0:
-            pad_size = 8 - (dout_t.shape[0] % 8)
-            dout_t = paddle.concat([dout_t, paddle.zeros([pad_size, dout_t.shape[-1]], dtype=dout_t.dtype)], axis=0)
+        if dout_t.shape[0] % 128 != 0 or dout_t.shape[0] % 512 != 0:
+            if (dout_t.shape[0] + 128 - (dout_t.shape[0] % 128)) % 512 != 0:
+                padding_size = 512
+            else:
+                padding_size = 128
+            dout_t = paddle.concat(
+                [
+                    dout_t,
+                    paddle.zeros(
+                        [padding_size - (dout_t.shape[0] % padding_size), dout_t.shape[-1]], dtype=dout_t.dtype
+                    ),
+                ],
+                axis=0,
+            )
 
         _, _, dout_t_quant, dout_t_scale = kitchen_quant(
             dout_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=True

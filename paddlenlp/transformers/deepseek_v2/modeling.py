@@ -1361,12 +1361,14 @@ class FusedRMSLinearFunc(paddle.autograd.PyLayer):
 
         kv = paddle.matmul(hidden_states, kv_down_weight)
 
-        ctx.save_for_backward(x, rms_norm_weight, q_down_weight, kv_down_weight, eps)
+        ctx.save_for_backward(x, rms_norm_weight, q_down_weight, kv_down_weight)
+        ctx.eps = eps
         return q, kv
 
     @staticmethod
     def backward(ctx, d_q, d_kv):
-        x, rms_norm_weight, q_down_weight, kv_down_weight, eps = ctx.saved_tensor()
+        x, rms_norm_weight, q_down_weight, kv_down_weight = ctx.saved_tensor()
+        eps = ctx.eps
         hidden_states, invar = fused_ln.fused_rms_norm(x, rms_norm_weight, eps)
 
         h_grad_0, d_q_down_weight = _C_ops.matmul_grad(hidden_states, q_down_weight, d_q, False, False)
