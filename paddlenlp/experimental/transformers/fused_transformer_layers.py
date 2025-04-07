@@ -194,6 +194,11 @@ class MLAConfig:
     v_b_o_proj_weight_attrs: Optional[List[paddle.ParamAttr]] = None
     v_b_o_proj_weight_scale_attrs: Optional[List[paddle.ParamAttr]] = None
 
+    k_b_proj_weight_attrs: Optional[List[paddle.ParamAttr]] = None
+    k_b_proj_weight_scale_attrs: Optional[List[paddle.ParamAttr]] = None
+    v_b_proj_weight_attrs: Optional[List[paddle.ParamAttr]] = None
+    v_b_proj_weight_scale_attrs: Optional[List[paddle.ParamAttr]] = None
+
     def use_mla(self) -> bool:
         return self.kv_lora_rank is not None
 
@@ -480,6 +485,7 @@ class FusedMultiTransformerBase(Layer):
             cache_k_out_scale_attr = self.get_attr(config.cache_k_out_scale_attrs, i)
             cache_v_out_scale_attr = self.get_attr(config.cache_v_out_scale_attrs, i)
 
+            # import pdb; pdb.set_trace()
             ln_scale = self.create_parameter(
                 attr=ln_scale_attr,
                 shape=[config.embed_dim],
@@ -816,13 +822,13 @@ class FusedMultiTransformerBase(Layer):
                 ffn1_weight = self.create_parameter(
                     shape=self.moe_ffn1_weight_shape,
                     attr=ffn1_weight_attr,
-                    dtype=get_moe_weight_dtype(),
+                    dtype=self.get_moe_weight_dtype(),
                     is_bias=False,
                 )
                 ffn2_weight = self.create_parameter(
                     shape=self.moe_ffn2_weight_shape,
                     attr=ffn2_weight_attr,
-                    dtype=get_moe_weight_dtype(),
+                    dtype=self.get_moe_weight_dtype(),
                     is_bias=False,
                 )
             else:
@@ -3292,7 +3298,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
 class FusedMultiTransformerXPU(FusedMultiTransformerBase):
     def __init__(self, config: FusedMultiTransformerConfig):
         assert paddle.is_compiled_with_xpu()
-        super().__init__()
+        super().__init__(config)
         if self.moe_quant_type in ["weight_only_int8"]:
 
             self.ffn1_weights_scale = []
@@ -3308,7 +3314,7 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
                         if config.activation.endswith("glu")
                         else [self.config.moe_config.num_experts, self.config.moe_config.moe_intermediate_size],
                         attr=ffn1_weight_scale_attr,
-                        dtype="float",
+                        dtype="bfloat16",
                         is_bias=False,
                     )
                 else:
@@ -3318,7 +3324,7 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
                     ffn1_weight_scale = self.create_parameter(
                         shape=base_shape,
                         attr=ffn1_weight_scale_attr,
-                        dtype="float",
+                        dtype="bfloat16",
                         is_bias=False,
                     )
 
@@ -3326,14 +3332,14 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
                     ffn2_weight_scale = self.create_parameter(
                         shape=[self.config.moe_config.num_experts, self.embed_dim],
                         attr=ffn2_weight_scale_attr,
-                        dtype="float",
+                        dtype="bfloat16",
                         is_bias=False,
                     )
                 else:
                     ffn2_weight_scale = self.create_parameter(
                         shape=[self.embed_dim],
                         attr=ffn2_weight_scale_attr,
-                        dtype="float",
+                        dtype="bfloat16",
                         is_bias=False,
                     )
 
@@ -3342,6 +3348,415 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
 
                 self._add_parameter(ffn1_weight_scale)
                 self._add_parameter(ffn2_weight_scale)
+
+    def init_weight(self):
+        self.qkv_weights = []
+        self.linear_weights = []
+        self.gate_weights = []
+        self.ffn1_weights = []
+        self.ffn2_weights = []
+
+        self.q_proj_weights = []
+        self.q_a_proj_weights = []
+        self.q_a_layernorm_weights = []
+        self.q_b_proj_weights = []
+        self.kv_a_proj_with_mqa_weights = []
+        self.kv_a_layernorm_weights = []
+        self.kv_b_proj_weights = []
+        # self.q_nope_k_b_proj_weights = []
+        # self.q_rope_proj_weights = []
+        # self.v_b_o_proj_weights = []
+
+        self.k_b_proj_weights = []
+        self.v_b_proj_weights = []
+
+        for i in range(self.num_layers):
+            q_proj_weight = None
+            q_a_proj_weight = None
+            q_a_layernorm_weight = None
+            q_b_proj_weight = None
+            kv_a_proj_with_mqa_weight = None
+            kv_a_layernorm_weight = None
+            kv_b_proj_weight = None
+
+            # q_nope_k_b_proj_weight = None
+            # q_rope_proj_weight = None
+            # v_b_o_proj_weight = None
+
+            k_b_proj_weight = None
+            v_b_proj_weight = None 
+            if self.config.mla_config.use_mla():
+                q_proj_weight_attr = self.get_attr(self.config.mla_config.q_proj_weight_attrs, i)
+                q_a_proj_weight_attr = self.get_attr(self.config.mla_config.q_a_proj_weight_attrs, i)
+                q_a_layernorm_weight_attr = self.get_attr(self.config.mla_config.q_a_layernorm_weight_attrs, i)
+                q_b_proj_weight_attr = self.get_attr(self.config.mla_config.q_b_proj_weight_attrs, i)
+                if q_proj_weight_attr:
+                    q_proj_weight = self.create_parameter(
+                        shape=self.q_proj_weight_shape,
+                        attr=q_proj_weight_attr,
+                        dtype=self.create_params_type,
+                        is_bias=False,
+                    )
+                if q_a_proj_weight_attr:
+                    q_a_proj_weight = self.create_parameter(
+                        shape=self.q_a_proj_weight_shape,
+                        attr=q_a_proj_weight_attr,
+                        dtype=self.create_params_type,
+                        is_bias=False,
+                    )
+                if q_a_layernorm_weight_attr:
+                    q_a_layernorm_weight = self.create_parameter(
+                        shape=[self.config.mla_config.q_lora_rank],
+                        attr=q_a_layernorm_weight_attr,
+                        dtype=self._norm_weight_dtype,
+                        is_bias=False,
+                    )
+                if q_b_proj_weight_attr:
+                    q_b_proj_weight = self.create_parameter(
+                        shape=self.q_b_proj_weight_shape,
+                        attr=q_b_proj_weight_attr,
+                        dtype=self.create_params_type,
+                        is_bias=False,
+                    )
+
+                kv_a_proj_with_mqa_weight_attr = self.get_attr(
+                    self.config.mla_config.kv_a_proj_with_mqa_weight_attrs, i
+                )
+                kv_a_layernorm_weight_attr = self.get_attr(self.config.mla_config.kv_a_layernorm_weight_attrs, i)
+                kv_b_proj_weight_attr = self.get_attr(self.config.mla_config.kv_b_proj_weight_attrs, i)
+                if kv_a_proj_with_mqa_weight_attr:
+                    kv_a_proj_with_mqa_weight = self.create_parameter(
+                        shape=self.kv_a_proj_with_mqa_weight_shape,
+                        attr=kv_a_proj_with_mqa_weight_attr,
+                        dtype=self.create_params_type,
+                        is_bias=False,
+                    )
+                if kv_a_layernorm_weight_attr:
+                    kv_a_layernorm_weight = self.create_parameter(
+                        shape=[self.config.mla_config.kv_lora_rank],
+                        attr=kv_a_layernorm_weight_attr,
+                        dtype=self._norm_weight_dtype,
+                        is_bias=False,
+                    )
+                if kv_b_proj_weight_attr:
+                    kv_b_proj_weight = self.create_parameter(
+                        shape=self.kv_b_proj_weight_shape,
+                        attr=kv_b_proj_weight_attr,
+                        dtype=self.create_params_type,
+                        is_bias=False,
+                    )
+
+                # q_nope_k_b_proj_weight_attr = self.get_attr(self.config.mla_config.q_nope_k_b_proj_weight_attrs, i)
+                # q_rope_proj_weight_attr = self.get_attr(self.config.mla_config.q_rope_proj_weight_attrs, i)
+                # v_b_o_proj_weight_attr = self.get_attr(self.config.mla_config.v_b_o_proj_weight_attrs, i)
+                # if q_nope_k_b_proj_weight_attr:
+                #     q_nope_k_b_proj_weight = self.create_parameter(
+                #         shape=self.q_nope_k_b_proj_weight_shape,
+                #         attr=q_nope_k_b_proj_weight_attr,
+                #         dtype=self.create_params_type,
+                #         is_bias=False,
+                #     )
+
+                # if q_rope_proj_weight_attr:
+                #     q_rope_proj_weight = self.create_parameter(
+                #         shape=self.q_rope_proj_weight_shape,
+                #         attr=q_rope_proj_weight_attr,
+                #         dtype=self.create_params_type,
+                #         is_bias=False,
+                #     )
+
+                # if v_b_o_proj_weight_attr:
+                #     v_b_o_proj_weight = self.create_parameter(
+                #         shape=self.v_b_o_proj_weight_shape,
+                #         attr=v_b_o_proj_weight_attr,
+                #         dtype=self.create_params_type,
+                #         is_bias=False,
+                #     )
+
+                k_b_proj_weight_attr = self.get_attr(self.config.mla_config.k_b_proj_weight_attrs, i)
+                v_b_proj_weight_attr = self.get_attr(self.config.mla_config.v_b_proj_weight_attrs, i)
+                if k_b_proj_weight_attr:
+                    k_b_proj_weight = self.create_parameter(
+                        shape=self.k_b_proj_weight_shape,
+                        attr=k_b_proj_weight_attr,
+                        dtype=self.create_params_type,
+                        is_bias=False,
+                    )
+                if v_b_proj_weight_attr:
+                    v_b_proj_weight = self.create_parameter(
+                        shape=self.v_b_proj_weight_shape,
+                        attr=v_b_proj_weight_attr,
+                        dtype=self.create_params_type,
+                        is_bias=False,
+                    )
+
+            qkv_weight = None
+            qkv_weight_attr = self.get_attr(self.config.qkv_weight_attrs, i)
+            if qkv_weight_attr:
+                qkv_weight = self.create_parameter(
+                    shape=self.qkv_weight_shape,
+                    attr=qkv_weight_attr,
+                    dtype=self.create_params_type,
+                    is_bias=False,
+                )
+
+            linear_weight = None
+            linear_weight_attr = self.get_attr(self.config.linear_weight_attrs, i)
+            if linear_weight_attr:
+                linear_weight = self.create_parameter(
+                    shape=self.linear_weight_shape,
+                    attr=linear_weight_attr,
+                    dtype=self.create_params_type,
+                    is_bias=False,
+                )
+
+            gate_weight = None
+            gate_weight_attr = self.get_attr(self.config.gate_weight_attrs, i)
+            if self.config.moe_config.use_moe(i):
+                gate_weight = self.create_parameter(
+                    shape=[self.config.embed_dim, self.config.moe_config.num_experts],
+                    attr=gate_weight_attr,
+                    dtype="float32",
+                    is_bias=False,
+                    default_initializer=paddle.nn.initializer.Constant(0),
+                )
+
+            ffn1_weight = None
+            ffn2_weight = None
+            ffn1_weight_attr = self.get_attr(self.config.ffn1_weight_attrs, i)
+            ffn2_weight_attr = self.get_attr(self.config.ffn2_weight_attrs, i)
+            if self.config.moe_config.use_moe(i):
+                if self.moe_quant_type in ["weight_only_int8"]:
+                    ffn1_weight = self.create_parameter(
+                        shape=self.moe_ffn1_weight_shape,
+                        attr=ffn1_weight_attr,
+                        dtype="int8",
+                        is_bias=False,
+                    )
+                    ffn2_weight = self.create_parameter(
+                        shape=self.moe_ffn2_weight_shape,
+                        attr=ffn2_weight_attr,
+                        dtype="int8",
+                        is_bias=False,
+                    )
+                else:
+                    ffn1_weight = self.create_parameter(
+                        shape=self.moe_ffn1_weight_shape,
+                        attr=ffn1_weight_attr,
+                        dtype=self.create_params_type,
+                        is_bias=False,
+                    )
+                    ffn2_weight = self.create_parameter(
+                        shape=self.moe_ffn2_weight_shape,
+                        attr=ffn2_weight_attr,
+                        dtype=self.create_params_type,
+                        is_bias=False,
+                    )
+            else:
+                ffn1_weight = self.create_parameter(
+                    shape=self.ffn1_weight_shape,
+                    attr=ffn1_weight_attr,
+                    dtype=self.create_params_type,
+                    is_bias=False,
+                )
+                ffn2_weight = self.create_parameter(
+                    shape=self.ffn2_weight_shape,
+                    attr=ffn2_weight_attr,
+                    dtype=self.create_params_type,
+                    is_bias=False,
+                )
+
+            shared_expert_ffn1_weight = None
+            shared_expert_ffn2_weight = None
+            shared_expert_gate_weight = None
+            if self.config.moe_config.use_shared_expert(i):
+                if self.config.moe_config.shared_expert_with_gate:
+                    shared_expert_gate_weight_attr = self.get_attr(
+                        self.config.moe_config.shared_expert_gate_weight_attrs, i
+                    )
+                shared_expert_ffn1_weight_attr = self.get_attr(
+                    self.config.moe_config.shared_expert_ffn1_weight_attrs, i
+                )
+                shared_expert_ffn2_weight_attr = self.get_attr(
+                    self.config.moe_config.shared_expert_ffn2_weight_attrs, i
+                )
+
+                shared_expert_ffn1_weight = self.create_parameter(
+                    shape=self.shared_expert_ffn1_weight_shape,
+                    attr=shared_expert_ffn1_weight_attr,
+                    dtype=self.create_params_type,
+                )
+                shared_expert_ffn2_weight = self.create_parameter(
+                    shape=self.shared_expert_ffn2_weight_shape,
+                    attr=shared_expert_ffn2_weight_attr,
+                    dtype=self.create_params_type,
+                )
+                if self.config.moe_config.shared_expert_with_gate:
+                    shared_expert_gate_weight = self.create_parameter(
+                        shape=self.shared_expert_gate_weight_shape,
+                        attr=shared_expert_gate_weight_attr,
+                        dtype=self._helper.get_default_dtype(),
+                    )
+
+            # tensor model parallel
+            if self.config.nranks > 1:
+                # column parallel
+                _set_var_distributed(qkv_weight)
+                _set_var_distributed(q_proj_weight)
+                _set_var_distributed(q_b_proj_weight)
+                _set_var_distributed(kv_b_proj_weight)
+                # _set_var_distributed(q_nope_k_b_proj_weight)
+                # _set_var_distributed(q_rope_proj_weight)
+                _set_var_distributed(ffn1_weight)
+                # row parallel
+                _set_var_distributed(linear_weight)
+                # _set_var_distributed(v_b_o_proj_weight)
+                _set_var_distributed(ffn2_weight)
+
+                _set_var_distributed(shared_expert_ffn1_weight)
+                _set_var_distributed(shared_expert_ffn2_weight)
+
+            self.q_proj_weights.append(q_proj_weight)
+            self.q_a_proj_weights.append(q_a_proj_weight)
+            self.q_a_layernorm_weights.append(q_a_layernorm_weight)
+            self.q_b_proj_weights.append(q_b_proj_weight)
+            self.kv_a_proj_with_mqa_weights.append(kv_a_proj_with_mqa_weight)
+            self.kv_a_layernorm_weights.append(kv_a_layernorm_weight)
+            self.kv_b_proj_weights.append(kv_b_proj_weight)
+            self.qkv_weights.append(qkv_weight)
+
+            # self.q_nope_k_b_proj_weights.append(q_nope_k_b_proj_weight)
+            # self.q_rope_proj_weights.append(q_rope_proj_weight)
+            # self.v_b_o_proj_weights.append(v_b_o_proj_weight)
+
+            self.k_b_proj_weights.append(k_b_proj_weight)
+            self.v_b_proj_weights.append(v_b_proj_weight)
+
+            self.linear_weights.append(linear_weight)
+
+            self.gate_weights.append(gate_weight)
+            self.ffn1_weights.append(ffn1_weight)
+            self.ffn2_weights.append(ffn2_weight)
+
+            self.shared_expert_ffn1_weights.append(shared_expert_ffn1_weight)
+            self.shared_expert_ffn2_weights.append(shared_expert_ffn2_weight)
+            self.shared_expert_gate_weights.append(shared_expert_gate_weight)
+
+            self._add_parameter(q_proj_weight)
+            self._add_parameter(q_a_proj_weight)
+            self._add_parameter(q_a_layernorm_weight)
+            self._add_parameter(q_b_proj_weight)
+            self._add_parameter(kv_a_proj_with_mqa_weight)
+            self._add_parameter(kv_a_layernorm_weight)
+            self._add_parameter(kv_b_proj_weight)
+
+            # self._add_parameter(q_nope_k_b_proj_weight)
+            # self._add_parameter(q_rope_proj_weight)
+            # self._add_parameter(v_b_o_proj_weight)
+            self._add_parameter(v_b_proj_weight)
+            self._add_parameter(k_b_proj_weight)
+
+            self._add_parameter(qkv_weight)
+
+            self._add_parameter(shared_expert_ffn1_weight)
+            self._add_parameter(shared_expert_ffn2_weight)
+            self._add_parameter(shared_expert_gate_weight)
+
+            self._add_parameter(linear_weight)
+
+            self._add_parameter(gate_weight)
+            self._add_parameter(ffn1_weight)
+            self._add_parameter(ffn2_weight)
+
+    def init_weight_shape(self, config):
+
+        if self.config.mla_config.use_mla():
+            if self.config.mla_config.q_lora_rank is None:
+                self.q_proj_weight_shape = [
+                    self.config.embed_dim,
+                    self.num_heads * (self.config.mla_config.qk_head_dim),
+                ]
+            else:
+                self.q_a_proj_weight_shape = [self.config.embed_dim, self.config.mla_config.q_lora_rank]
+                self.q_b_proj_weight_shape = [
+                    self.config.mla_config.q_lora_rank,
+                    self.num_heads * (self.config.mla_config.qk_head_dim),
+                ]
+
+            self.kv_a_proj_with_mqa_weight_shape = [
+                self.config.embed_dim,
+                self.config.mla_config.kv_lora_rank + self.config.mla_config.qk_rope_head_dim,
+            ]
+            self.kv_b_proj_weight_shape = [
+                self.config.mla_config.kv_lora_rank,
+                self.num_heads * (self.config.mla_config.qk_nope_head_dim + self.config.mla_config.v_head_dim),
+            ]
+
+            # self.q_nope_k_b_proj_weight_shape = [
+            #     self.embed_dim if self.config.mla_config.q_lora_rank is None else self.config.mla_config.q_lora_rank,
+            #     self.num_heads * self.config.mla_config.kv_lora_rank,
+            # ]
+            # self.q_rope_proj_weight_shape = [
+            #     self.embed_dim if self.config.mla_config.q_lora_rank is None else self.config.mla_config.q_lora_rank,
+            #     self.num_heads * self.config.mla_config.qk_rope_head_dim,
+            # ]
+            # self.v_b_o_proj_weight_shape = [
+            #     self.num_heads * self.config.mla_config.kv_lora_rank,
+            #     self.embed_dim,
+            # ]
+
+            self.k_b_proj_weight_shape = [
+                self.num_heads,
+                self.config.mla_config.qk_nope_head_dim,
+                self.config.mla_config.kv_lora_rank,
+            ]
+            self.v_b_proj_weight_shape = [
+                self.num_heads,
+                self.config.mla_config.kv_lora_rank,
+                self.config.mla_config.v_head_dim,
+            ]
+        else:
+            self.qkv_weight_shape = (
+                [(self.num_heads + 2 * self.kv_num_heads) * self.head_dim, self.embed_dim]
+                if config.trans_qkvw
+                else [self.embed_dim, (self.num_heads + 2 * self.kv_num_heads) * self.head_dim]
+            )
+
+        self.linear_weight_shape = [self.num_heads * self.head_dim, self.embed_dim]
+
+        self.ffn1_weight_shape = (
+            [self.embed_dim, self.intermediate_size * 2]
+            if self.activation.endswith("glu")
+            else [self.embed_dim, self.intermediate_size]
+        )
+        self.ffn2_weight_shape = [self.intermediate_size, self.embed_dim]
+
+        if self.config.moe_config.has_moe():
+            self.moe_ffn1_weight_shape = (
+                [self.config.moe_config.num_experts, self.embed_dim, self.config.moe_config.moe_intermediate_size * 2]
+                if self.activation.endswith("glu")
+                else [self.config.moe_config.num_experts, self.embed_dim, self.config.moe_config.moe_intermediate_size]
+            )
+            self.moe_ffn2_weight_shape = [
+                self.config.moe_config.num_experts,
+                self.config.moe_config.moe_intermediate_size,
+                self.embed_dim,
+            ]
+
+        if self.config.moe_config.has_shared_expert():
+            self.shared_expert_ffn1_weight_shape = [
+                self.embed_dim,
+                self.config.moe_config.shared_expert_intermediate_size * 2,
+            ]
+            self.shared_expert_ffn2_weight_shape = [
+                self.config.moe_config.shared_expert_intermediate_size,
+                self.embed_dim,
+            ]
+            if self.config.moe_config.shared_expert_with_gate:
+                self.shared_expert_gate_weight_shape = [
+                    self.embed_dim,
+                    1,
+                ]
 
     def get_moe_weight_dtype(self):
         return 'int8'
@@ -3401,7 +3816,7 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
 
     def compute_qkv(self, src, residual_input, i):
         ln_out = self.compute_layernorm_before_qkv(src, i)
-        assert self.config.mla_config.use_absorb():
+        assert self.config.mla_config.use_absorb()
         qkv_out = ln_out
         return qkv_out, residual_input
     
@@ -3423,7 +3838,7 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
     ):
         assert self.config.mla_config.use_absorb()
         # if self.config.mla_config.use_absorb():
-        return self.compute_mla_absorb(qkv_out, i, caches, rotary_embs, **kwargs)
+        return self.compute_mla_absorb(qkv_out, caches, i, **kwargs)
 
         # from paddlenlp_ops import mla_block_multihead_attention_xpu
 

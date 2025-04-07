@@ -1346,7 +1346,9 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
 @register_base_model
 class DeepseekV2BlockInferenceModelXPU(DeepseekV2BlockInferenceModel):
     def __init__(self, config: DeepseekV2Config, base_model_prefix: str):
-        super(DeepseekV2PretrainedModel, self).__init__(config)
+        # super(DeepseekV2PretrainedModel, self).__init__(config)
+        
+        DeepseekV2PretrainedModel.__init__(self, config)
         self.base_model_prefix = base_model_prefix
 
         self.config = config
@@ -1617,7 +1619,7 @@ class DeepseekV2BlockInferenceModelXPU(DeepseekV2BlockInferenceModel):
         shared_expert_ffn1_weight_scale_attrs = None
         shared_expert_ffn2_weight_scale_attrs = None
 
-        if self.use_weight_only or self.dynamic_quant:
+        if self.use_weight_only:
             if self.config.q_lora_rank is not None:
                 q_a_proj_weight_scale_attrs = [
                     paddle.ParamAttr(
@@ -1886,13 +1888,30 @@ class DeepseekV2BlockInferenceModelXPU(DeepseekV2BlockInferenceModel):
                     [self.config.qk_nope_head_dim, self.config.v_head_dim], axis=-1
                 )
                 W_O = linear_weight_inner
-                W_Q_UK = paddle.einsum("qnd,lnd -> qnl", W_Q, W_UK).flatten(start_axis=1)
-                W_UV_O = paddle.einsum("lnd,hnd -> nlh", W_UV, W_O).flatten(start_axis=0, stop_axis=1)
+                
+                if self.use_weight_only:
+                    pass
+                    # W_Q_UK_quanted, W_Q_UK_scale = weight_quantize(
+                    #     W_Q_UK.cpu(), algo=self.quant_algo, group_size=self.weightonly_group_size
+                    # )
+                    # W_QR_quanted, W_QR_scale = weight_quantize(
+                    #     W_QR.cpu(), algo=self.quant_algo, group_size=self.weightonly_group_size
+                    # )
+                    # W_UV_O_quanted, W_UV_O_scale = weight_quantize(
+                    #     W_UV_O.cpu(), algo=self.quant_algo, group_size=self.weightonly_group_size
+                    # )
 
-                self.transformer_block.q_nope_k_b_proj_weights[idx].set_value(W_Q_UK)
-                self.transformer_block.q_rope_proj_weights[idx].set_value(W_QR)
-                self.transformer_block.v_b_o_proj_weights[idx].set_value(W_UV_O)
-
+                    # self.transformer_block.q_nope_k_b_proj_weights[idx].set_value(W_Q_UK_quanted.cuda())
+                    # self.transformer_block.q_nope_k_b_proj_weights_scale[idx].set_value(W_Q_UK_scale.cuda())
+                    # self.transformer_block.q_rope_proj_weights[idx].set_value(W_QR_quanted.cuda())
+                    # self.transformer_block.q_rope_proj_weights_scale[idx].set_value(W_QR_scale.cuda())
+                    # self.transformer_block.v_b_o_proj_weights[idx].set_value(W_UV_O_quanted.cuda())
+                    # self.transformer_block.v_b_o_proj_weights_scale[idx].set_value(W_UV_O_scale.cuda())
+                else:
+                    # no fuse
+                    self.transformer_block.k_b_proj_weights[idx].set_value(W_UK.transpose([1, 2, 0]))
+                    self.transformer_block.v_b_proj_weights[idx].set_value(W_UV.transpose([1,0,2]))
+                    
             
             self.transformer_block.kv_a_proj_with_mqa_weights[idx].set_value(kv_a_proj_with_mqa_weight)
             self.transformer_block.kv_a_layernorm_weights[idx].set_value(kv_a_layernorm_weight)
@@ -1950,20 +1969,22 @@ class DeepseekV2BlockInferenceModelXPU(DeepseekV2BlockInferenceModel):
 
                     # quant moe
                     ffn1_quanted_weight, ffn1_weight_scale = weight_quantize(
-                        ffn1_weight.cast("float16"), algo=self.moe_quant_type, group_size=-1, arch=70
+                        ffn1_weight, algo=self.moe_quant_type, group_size=-1, arch=70
                     )
                     ffn2_quanted_weight, ffn2_weight_scale = weight_quantize(
-                        ffn2_weight.cast("float16"), algo=self.moe_quant_type, group_size=-1, arch=70
+                        ffn2_weight, algo=self.moe_quant_type, group_size=-1, arch=70
                     )
-                    ffn1_weight_scale = ffn1_weight_scale.cast("float16")
-                    ffn2_weight_scale = ffn2_weight_scale.cast("float16")
-                    ffn1_weights.append(ffn1_quanted_weight.reshape([self.transformer_block.config.embed_dim, -1]))
-                    ffn2_weights.append(ffn2_quanted_weight.reshape([-1, self.transformer_block.config.embed_dim]))
+                    ffn1_weight_scale = ffn1_weight_scale.cast("bfloat16")
+                    ffn2_weight_scale = ffn2_weight_scale.cast("bfloat16")
+                    ffn1_weights.append(ffn1_quanted_weight.transpose((1, 0)).reshape([self.transformer_block.config.embed_dim, -1]))
+                    ffn2_weights.append(ffn2_quanted_weight.transpose((1, 0)).reshape([-1, self.transformer_block.config.embed_dim]))
                     ffn1_scales.append(ffn1_weight_scale)
                     ffn2_scales.append(ffn2_weight_scale)
 
                 fused_moe_ffn1_weight = paddle.to_tensor(ffn1_weights)
                 fused_moe_ffn2_weight = paddle.to_tensor(ffn2_weights)
+
+                # 这里的 paddle.to_tensor，默认转为 bf16，而不是 ffn1_scales.dtype
                 fused_moe_ffn1_weight_scale = paddle.to_tensor(ffn1_scales)
                 fused_moe_ffn2_weight_scale = paddle.to_tensor(ffn2_scales)
                 gate_weight = paddle.to_tensor(
@@ -1980,6 +2001,8 @@ class DeepseekV2BlockInferenceModelXPU(DeepseekV2BlockInferenceModel):
                 self.transformer_block.ffn2_weights[idx].set_value(fused_moe_ffn2_weight)
 
                 self.transformer_block.gate_weights[idx].set_value(gate_weight)
+
+                # import pdb; pdb.set_trace()
 
                 self.transformer_block.ffn1_weights_scale[idx].set_value(fused_moe_ffn1_weight_scale)
                 self.transformer_block.ffn2_weights_scale[idx].set_value(fused_moe_ffn2_weight_scale)
@@ -2001,7 +2024,7 @@ class DeepseekV2BlockInferenceModelXPU(DeepseekV2BlockInferenceModel):
 
 
     def set_transformer_block(self, transformer_config):
-        assert paddle.is_compiled_with_xpu():
+        assert paddle.is_compiled_with_xpu()
         self.transformer_block = FusedMultiTransformerXPU(transformer_config)
 
 
@@ -2091,7 +2114,6 @@ class DeepseekV2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, De
         self.max_seq_len = config.max_seq_len
         self.return_full_hidden_states = config.get("return_full_hidden_states", False)
 
-        self.deepseek_v2 = DeepseekV2BlockInferenceModel(config, base_model_prefix)
         if paddle.is_compiled_with_xpu():
             self.deepseek_v2 = DeepseekV2BlockInferenceModelXPU(config, base_model_prefix)
         else:
