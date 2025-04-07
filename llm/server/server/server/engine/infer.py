@@ -740,10 +740,11 @@ class InferenceEngine(object):
             config.set_xpu_device_id(device_id)
             xpu_config = paddle.inference.XpuConfig()
             xpu_config.device_id = device_id
-            xpu_config.l3_size = 0
+            xpu_config.l3_size = 0 
             xpu_config.l3_autotune_size = 0
             config.set_xpu_config(xpu_config)
             config.switch_ir_optim(True)
+            config.delete_pass("fc_xpu_fuse_pass")
         else:
             config.enable_use_gpu(100, device_id)
         

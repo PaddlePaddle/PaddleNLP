@@ -1261,6 +1261,7 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
             xpu_config.l3_autotune_size = 0
             config.set_xpu_config(xpu_config)
             config.switch_ir_optim(True)
+            config.delete_pass("fc_xpu_fuse_pass")
             # config.enable_memory_optim()
         else:
             device_id = int(os.environ.get("FLAGS_selected_gpus", 0))
