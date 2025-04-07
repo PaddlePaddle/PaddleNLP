@@ -32,13 +32,13 @@ class TimerScope:
     def start(self) -> None:
         """显式启动计时器"""
         if self.timers:
-            self.timers[self.label].start()
+            self.timers(self.label).start()
             self._started = True
 
     def stop(self) -> None:
         """显式停止计时器并处理减法逻辑"""
         if self.timers and self._started:
-            timer = self.timers[self.label]
+            timer = self.timers(self.label)
             timer.stop()
 
             if self.minus_names:
@@ -47,7 +47,7 @@ class TimerScope:
                     for name in (self.minus_names if isinstance(self.minus_names, list) else [self.minus_names])
                 ]
                 for label in minus_labels:
-                    timer.elapsed_ -= self.timers[label].elapsed_
+                    timer.elapsed_ -= self.timers(label).elapsed_
             self._started = False
 
     @staticmethod

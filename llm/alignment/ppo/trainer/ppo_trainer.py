@@ -23,15 +23,11 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import numpy as np
 import paddle
 import paddle.distributed as dist
-import requests
 from algos.advantage import (
     compute_grpo_advantages,
     compute_reinforce_plus_plus_advantages_and_returns,
 )
-from models.ppo_model_utils import (
-    create_startend_row_indices,
-    make_position_ids_from_input_ids,
-)
+from models.ppo_model_utils import make_position_ids_from_input_ids
 from paddle import nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import PipelineLayer
@@ -41,7 +37,6 @@ from rich.console import Console
 from rich.table import Table
 from utils.comm_utils import (
     ActorStages,
-    CriticStages,
     RolloutStages,
     data_group_merge,
     data_group_split,
@@ -1262,7 +1257,9 @@ class PPOTrainer(Trainer):
 
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
+            step = 0
             for prompt_only_batch in self.prompt_only_dataloader:
+                self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
                 # step 1-1: rollout data with actor model (eval) and reward model
                 self.set_eval()
 
@@ -1334,8 +1331,10 @@ class PPOTrainer(Trainer):
                                 ),
                             }
 
-                            micro_batch["log_probs"] = self.actor_trainer.compute_logprob(**micro_batch)
-                            micro_batch["ref_log_probs"] = self.reference_trainer.compute_logprob(**micro_batch)
+                            with TimerScope(self.timers, RolloutStages.ROLLOUT_OLD_LOGPROB):
+                                micro_batch["log_probs"] = self.actor_trainer.compute_logprob(**micro_batch)
+                            with TimerScope(self.timers, RolloutStages.ROLLOUT_REF_LOGPROB):
+                                micro_batch["ref_log_probs"] = self.reference_trainer.compute_logprob(**micro_batch)
                             micro_batches.append(micro_batch)
 
                 timer_scope_actor_model.stop()
@@ -1373,12 +1372,13 @@ class PPOTrainer(Trainer):
                 if self.args.normalize_reward:
                     rl_batches = self.compute_reward_normalization(rl_batches)
 
-                # step 2-4: compute advantage
-                rl_batches = self.compute_advantage(rl_batches, use_tgt_len_value=args.use_tgt_len_value)
+                with TimerScope(self.timers, RolloutStages.ROLLOUT_ADVANTAGE):
+                    # step 2-4: compute advantage
+                    rl_batches = self.compute_advantage(rl_batches, use_tgt_len_value=args.use_tgt_len_value)
 
-                # step 2-5: compute advantage normalization
-                if self.args.normalize_advantage:
-                    rl_batches = self.compute_advantage_normalization(rl_batches)
+                    # step 2-5: compute advantage normalization
+                    if self.args.normalize_advantage:
+                        rl_batches = self.compute_advantage_normalization(rl_batches)
 
                 # prepare data for reinforce_plus_plus
                 if self.args.rl_algorithm == "reinforce_plus_plus":
@@ -1390,7 +1390,7 @@ class PPOTrainer(Trainer):
 
                 # step 3: train actor model and critic model with rollout data
                 self.set_train()
-                for step, rl_batch in enumerate(train_batch):
+                for rl_batch in train_batch:
                     with TimerScope(self.timers, ActorStages.MODEL_ENABLE_DISABLE, minus_names=[ActorStages.RL_STEP]):
                         with reload_and_offload_scope(self, self.actor_model, self.actor_trainer.optimizer):
                             with TimerScope(self.timers, ActorStages.RL_STEP):
@@ -1410,6 +1410,8 @@ class PPOTrainer(Trainer):
                     else:
                         # on_sub_step_end
                         self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
+
+                    step += 1
 
                     self._print_timer()
                     self._maybe_log_save_evaluate(rl_info, None, epoch, ignore_keys_for_eval, inputs=rl_batch)

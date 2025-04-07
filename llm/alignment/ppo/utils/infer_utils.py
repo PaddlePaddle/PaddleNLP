@@ -81,19 +81,6 @@ class PolicyPredictor(DygraphBlockInferencePredictor):
         old_value = self.model_inputs.pop(key)
         self.model_inputs[key] = paddle.full(shape=old_value.shape, fill_value=value, dtype=old_value.dtype)
 
-    def init_cache_kv(self):
-        cachekv_dtype = self.dtype if self.config.cachekv_int8_type is None else "uint8"
-        self.cache_kvs = []
-        if self.cache_k_shapes and self.cache_v_shapes:
-            for cache_k_shape, cache_v_shape in zip(self.cache_k_shapes, self.cache_v_shapes):
-                self.cache_kvs.append(paddle.zeros(cache_k_shape, dtype=cachekv_dtype))
-                self.cache_kvs.append(paddle.zeros(cache_v_shape, dtype=cachekv_dtype))
-        else:
-            # for mla's absorption
-            assert self.cache_v_shapes is None
-            self.cache_kvs = [paddle.zeros(shape, dtype=cachekv_dtype) for shape in self.cache_k_shapes]
-        self.model_inputs["cache_kvs"] = self.cache_kvs
-
     @paddle.no_grad()
     def predict(self, input_ids: paddle.Tensor = None, **kwargs):
         bs = input_ids.shape[0]
@@ -104,7 +91,7 @@ class PolicyPredictor(DygraphBlockInferencePredictor):
 
         with self.update_predictor_params(**kwargs):
             self._preprocess(input_text=None, input_ids=input_ids_list)
-            self.init_cache_kv()
+            self.init_cache_kvs()
             all_tokens = []
             while self.model_inputs["not_need_stop"]:
                 next_tokens = self._infer(self.model_inputs)[:bs]
@@ -162,14 +149,14 @@ def create_predictor(trainer: Trainer):
     config.use_fused_rms_norm = False
     tensor_parallel_rank, tensor_parallel_degree = init_dist_env()
     with dtype_guard(predictor_args.dtype):
-        model = AutoInferenceModelForCausalLM.from_pretrained(
-            predictor_args.model_name_or_path,
+        model = AutoInferenceModelForCausalLM.from_config(
             config=config,
             predictor_args=predictor_args,
             model_args=model_args,
             dtype=predictor_args.dtype,
             tensor_parallel_degree=tensor_parallel_degree,
             tensor_parallel_rank=tensor_parallel_rank,
+            low_cpu_mem_usage=True,
         )
         model.save_output = False
         predictor = PolicyPredictor(
@@ -177,8 +164,9 @@ def create_predictor(trainer: Trainer):
             tokenizer=trainer.tokenizer,
             model=model,
             model_args=model_args,
+            init_cache_kvs=False,
         )
-        predictor.is_available = True
+        predictor.is_available = False
     return predictor
 
 

@@ -55,8 +55,11 @@ class RolloutStages(Enum):
     ACTOR_MODEL_ENABLE_DISABLE = auto()
     GENERATE = auto()
     ROLLOUT_LOGPROB = auto()
+    ROLLOUT_OLD_LOGPROB = auto()
+    ROLLOUT_REF_LOGPROB = auto()
     REWARD_MODEL_ENABLE_DISABLE = auto()
     ROLLOUT_REWARD_VALUE = auto()
+    ROLLOUT_ADVANTAGE = auto()
 
 
 def get_timer_label(stage: Enum) -> str:
@@ -81,6 +84,8 @@ def get_timer_label(stage: Enum) -> str:
         RolloutStages.ACTOR_MODEL_ENABLE_DISABLE: "rollout",
         RolloutStages.GENERATE: "rollout",
         RolloutStages.ROLLOUT_LOGPROB: "rollout",
+        RolloutStages.ROLLOUT_OLD_LOGPROB: "rollout",
+        RolloutStages.ROLLOUT_REF_LOGPROB: "rollout",
         RolloutStages.REWARD_MODEL_ENABLE_DISABLE: "rollout",
         RolloutStages.ROLLOUT_REWARD_VALUE: "rollout",
     }
