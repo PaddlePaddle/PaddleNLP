@@ -17,6 +17,7 @@ from typing import Any
 
 import numpy as np
 import paddle
+from datasets import load_dataset
 from paddle.io import Dataset
 
 from paddlenlp.transformers import PretrainedTokenizer
@@ -90,7 +91,6 @@ class RLHFDataset(Dataset):
         splits=None,
         filter_overlong_prompts=True,
     ):
-
         self.dataset_name_or_path = dataset_name_or_path
         self.tokenizer = tokenizer
 
@@ -110,10 +110,8 @@ class RLHFDataset(Dataset):
         self.data = [self._SENTINEL for _ in range(len(self.rawdata))]
 
     def _read_files(self):
-
         if os.path.exists(self.dataset_name_or_path):
             # load file from local disk
-            from datasets import load_dataset
 
             self.rawdata = load_dataset("json", data_files=self.dataset_name_or_path, split="train")
         else:
