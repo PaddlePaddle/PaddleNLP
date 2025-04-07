@@ -111,12 +111,12 @@ class TritonTokenProcessor(engine.TokenProcessor):
                             ["req_id"]] + batch_result[i]["token_scores"]
                     del self.score_buffer[batch_result[i]["req_id"]]
 
-    def postprocess(self, batch_result, exist_finished_task=False):
+    def postprocess(self, batch_result):
         """
         single postprocess for triton
         """
         try:
-            self._cache_special_tokens(batch_result)
+            # self._cache_special_tokens(batch_result)
             self.cached_generated_tokens.put(batch_result)
         except Exception as e:
             model_server_logger.info(

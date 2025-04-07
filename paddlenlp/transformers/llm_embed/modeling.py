@@ -22,7 +22,7 @@ import paddle.nn as nn
 from tqdm import tqdm
 
 from ...utils.log import logger
-from .. import AutoConfig, AutoModel, PretrainedModel
+from .. import AutoConfig, AutoModel, AutoTokenizer, PretrainedModel
 from ..model_outputs import ModelOutput
 
 
@@ -41,6 +41,8 @@ class BiEncoderModel(PretrainedModel):
     def __init__(
         self,
         model_name_or_path: str = None,
+        corpus_model_name_or_path: str = None,
+        query_model_name_or_path: str = None,
         dtype: str = "float16",
         normalized: bool = False,
         sentence_pooling_method: str = "cls",
@@ -55,10 +57,32 @@ class BiEncoderModel(PretrainedModel):
         eval_batch_size: int = 8,
         tokenizer=None,
         max_seq_length: int = 4096,
+        model_flag: str = None,
     ):
         super().__init__()
-        self.model = AutoModel.from_pretrained(model_name_or_path, dtype=dtype, convert_from_torch=True)
-        self.model_config = AutoConfig.from_pretrained(model_name_or_path)
+
+        # Load Model
+        self.model = None
+        self.model_config = None
+        self.corpus_model = None
+        self.query_model = None
+        if model_name_or_path is not None:
+            self.model = AutoModel.from_pretrained(model_name_or_path, dtype=dtype, convert_from_torch=True)
+            self.model_config = AutoConfig.from_pretrained(model_name_or_path)
+        if corpus_model_name_or_path is not None:
+            self.corpus_model = AutoModel.from_pretrained(
+                corpus_model_name_or_path, dtype=dtype, convert_from_torch=True
+            )
+        if query_model_name_or_path is not None:
+            self.query_model = AutoModel.from_pretrained(
+                query_model_name_or_path, dtype=dtype, convert_from_torch=True
+            )
+        if self.corpus_model is None:
+            self.corpus_model = self.model
+        if self.query_model is None:
+            self.query_model = self.model
+        assert self.corpus_model is not None and self.query_model is not None
+
         self.cross_entropy = nn.CrossEntropyLoss(reduction="mean")
 
         self.normalized = normalized
@@ -93,6 +117,8 @@ class BiEncoderModel(PretrainedModel):
             self.process_rank = dist.get_rank()
             self.world_size = dist.get_world_size()
 
+        self.model_flag = model_flag
+
     def sentence_embedding(self, hidden_state, mask):
         if self.sentence_pooling_method == "mean":
             s = paddle.sum(hidden_state * mask.unsqueeze(-1).float(), axis=1)
@@ -114,8 +140,8 @@ class BiEncoderModel(PretrainedModel):
     ):
         return self.model_config.to_dict()
 
-    def encode(self, features):
-        psg_out = self.model(**features, return_dict=True, output_hidden_states=True)
+    def encode(self, features, model: AutoModel):
+        psg_out = model(**features, return_dict=True, output_hidden_states=True)
         p_reps = self.sentence_embedding(psg_out.hidden_states[-1], features["attention_mask"])
         return p_reps
 
@@ -152,8 +178,8 @@ class BiEncoderModel(PretrainedModel):
         passage: Dict[str, paddle.Tensor] = None,
         teacher_score: paddle.Tensor = None,
     ):
-        q_reps = self.encode(query)
-        p_reps = self.encode(passage)
+        q_reps = self.encode(query, self.query_model)
+        p_reps = self.encode(passage, self.corpus_model)
 
         # For non-matryoshka loss, we normalize the representations
         if not self.matryoshka_dims:
@@ -220,47 +246,67 @@ class BiEncoderModel(PretrainedModel):
         self.model.save_pretrained(output_dir, state_dict=state_dict)
 
     @paddle.no_grad()
-    def encode_sentences(self, sentences: List[str], **kwargs) -> np.ndarray:
-        self.model.eval()
+    def encode_sentences(
+        self, sentences: List[str], model: AutoModel, tokenizer: AutoTokenizer, titles: List[str] = None, **kwargs
+    ) -> np.ndarray:
+        model.eval()
         all_embeddings = []
         for start_index in tqdm(range(0, len(sentences), self.eval_batch_size), desc="Batches"):
             sentences_batch = sentences[start_index : start_index + self.eval_batch_size]
-
-            inputs = self.tokenizer(
-                sentences_batch,
-                padding=True,
-                truncation=True,
-                return_tensors="pd",
-                max_length=self.max_seq_length,
-                return_attention_mask=True,
-            )
-            outputs = self.model(
-                input_ids=inputs.input_ids,
-                attention_mask=inputs.attention_mask,
+            if titles:
+                titles_batch = titles[start_index : start_index + self.eval_batch_size]
+                assert len(sentences_batch) == len(titles_batch)
+                inputs = tokenizer(
+                    titles_batch,
+                    sentences_batch,
+                    padding=True,
+                    truncation=True,
+                    return_tensors="pd",
+                    max_length=self.max_seq_length,
+                    return_attention_mask=True,
+                )
+            else:
+                inputs = tokenizer(
+                    sentences_batch,
+                    padding=True,
+                    truncation=True,
+                    return_tensors="pd",
+                    max_length=self.max_seq_length,
+                    return_attention_mask=True,
+                )
+            outputs = model(
+                **inputs,  # 注意 bert 类型有 token_type_ids
                 return_dict=True,
                 output_hidden_states=True,
             )
             last_hidden_state = outputs.hidden_states[-1]
 
             if self.sentence_pooling_method == "last":
-                if self.tokenizer.padding_side == "right":
+                if tokenizer.padding_side == "right":
                     sequence_lengths = inputs.attention_mask.sum(axis=1)
                     last_token_indices = sequence_lengths - 1
                     embeddings = last_hidden_state[paddle.arange(last_hidden_state.shape[0]), last_token_indices]
-                elif self.tokenizer.padding_side == "left":
+                elif tokenizer.padding_side == "left":
                     embeddings = last_hidden_state[:, -1]
                 else:
-                    raise NotImplementedError(f"Padding side {self.tokenizer.padding_side} not supported.")
+                    raise NotImplementedError(f"Padding side {tokenizer.padding_side} not supported.")
             elif self.sentence_pooling_method == "cls":
-                embeddings = last_hidden_state[:, 1]
+                embeddings = last_hidden_state[:, 0]
             elif self.sentence_pooling_method == "mean":
+                inputs.attention_mask = paddle.cast(
+                    inputs.attention_mask, dtype="float32"
+                )  # float cannot * int64, maybe paddle's bug
                 s = paddle.sum(last_hidden_state * inputs.attention_mask.unsqueeze(-1), axis=1)
                 d = inputs.attention_mask.sum(axis=1, keepdim=True)
                 embeddings = s / d
+            elif self.sentence_pooling_method == "last_8":
+                last_8_embeddings = last_hidden_state[:, -8:, :]
+                embeddings = paddle.mean(last_8_embeddings, axis=1)
             else:
                 raise NotImplementedError(f"Pooling method {self.pooling_method} not supported.")
 
-            embeddings = paddle.nn.functional.normalize(embeddings, p=2, axis=-1)
+            if self.normalized:
+                embeddings = paddle.nn.functional.normalize(embeddings, p=2, axis=-1)
 
             all_embeddings.append(embeddings.cpu().numpy().astype("float32"))
 
@@ -275,7 +321,14 @@ class BiEncoderModel(PretrainedModel):
             input_texts = [f"{self.query_instruction}{query}" for query in queries]
         else:
             input_texts = queries
-        return self.encode_sentences(input_texts)
+
+        if self.model_flag == "llara":
+            input_texts = self.preprocess_sentences_for_llara(input_texts, query_or_doc="query")
+        if self.model_flag == "bge-en-icl":
+            input_texts = self.preprocess_sentences_for_bge_en_icl(input_texts, query_or_doc="query")
+
+        encode_results = self.encode_sentences(sentences=input_texts, model=self.query_model, tokenizer=self.tokenizer)
+        return encode_results
 
     def encode_corpus(self, corpus: List[Union[Dict[str, str], str]], **kwargs) -> np.ndarray:
         """
@@ -295,4 +348,70 @@ class BiEncoderModel(PretrainedModel):
                 input_texts = [f"{self.document_instruction}{doc}" for doc in corpus]
             else:
                 input_texts = corpus
-        return self.encode_sentences(input_texts)
+        input_titles = None
+
+        if self.model_flag == "llara":
+            input_texts = self.preprocess_sentences_for_llara(input_texts, query_or_doc="doc")
+        if "RocketQA" in self.model_flag:
+            if isinstance(corpus[0], dict):
+                input_texts = [doc["text"] for doc in corpus]
+                input_titles = [doc.get("title", "") for doc in corpus]
+
+        encode_results = self.encode_sentences(
+            sentences=input_texts, titles=input_titles, model=self.corpus_model, tokenizer=self.tokenizer
+        )
+        return encode_results
+
+    def preprocess_sentences_for_bge_en_icl(self, sentences: List[str], query_or_doc: str, **kwargs) -> List[str]:
+        if query_or_doc == "query":
+            query_suffix = "\n<response> "
+        else:
+            raise ValueError(f"Invalid query_or_doc: {query_or_doc}")
+
+        input_texts = []
+        for query in sentences:
+            new_query = f"{query}{query_suffix}"
+            input_length = len(self.tokenizer(new_query)["input_ids"])
+            if input_length > self.max_seq_length:
+                cur_len = 0
+                add_len = 1
+                while add_len < len(query):
+                    add_len *= 2
+                while add_len > 1:
+                    add_len //= 2
+                    assert isinstance(cur_len, int) and isinstance(
+                        add_len, int
+                    ), f"cur_len={cur_len} add_len={add_len}"
+                    new_query = f"{query[:cur_len+add_len]}{query_suffix}"
+                    input_length = len(self.tokenizer(new_query)["input_ids"])
+                    if input_length <= self.max_seq_length:
+                        cur_len += add_len
+                new_query = f"{query[:cur_len]}{query_suffix}"
+            input_texts.append(new_query)
+
+        return input_texts
+
+    def preprocess_sentences_for_llara(self, sentences: List[str], query_or_doc: str, **kwargs) -> List[str]:
+
+        prefix = '"'
+        if query_or_doc == "query":
+            suffix = '", predict the following passage within eight words: <s9><s10><s11><s12><s13><s14><s15><s16>'
+        elif query_or_doc == "doc":
+            suffix = '", summarize the above passage within eight words: <s1><s2><s3><s4><s5><s6><s7><s8>'
+        else:
+            raise ValueError(f"Invalid query_or_doc: {query_or_doc}")
+
+        sentences_after_process = []
+        for sentence in sentences:
+            inputs = self.tokenizer(
+                sentence,
+                return_tensors=None,
+                max_length=self.max_seq_length - 20,
+                truncation=True,
+                add_special_tokens=False,
+            )
+            sentences_after_process.append(self.tokenizer.decode(inputs["input_ids"], skip_special_tokens=True))
+
+        sentences_after_process = [prefix + " " + sentence + " " + suffix for sentence in sentences_after_process]
+
+        return sentences_after_process

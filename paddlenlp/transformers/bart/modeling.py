@@ -906,7 +906,7 @@ class BartForSequenceClassification(BartPretrainedModel):
                 See :class:`BartModel`.
             decoder_attention_mask (Tensor, optional):
                 See :class:`BartModel`.
-            encoder_output (Tensor, optonal):
+            encoder_output (Tensor, optional):
                 See :class:`BartModel`.
             inputs_embeds (Tensor, optional):
                 See :class:`BartModel`.
@@ -1075,7 +1075,7 @@ class BartForQuestionAnswering(BartPretrainedModel):
                 See :class:`BartModel`.
             decoder_attention_mask (Tensor, optional):
                 See :class:`BartModel`.
-            encoder_output (Tensor, optonal):
+            encoder_output (Tensor, optional):
                 See :class:`BartModel`.
             inputs_embeds (Tensor, optional):
                 See :class:`BartModel`.
@@ -1275,7 +1275,7 @@ class BartForConditionalGeneration(BartPretrainedModel):
                 See :class:`BartModel`.
             decoder_attention_mask (Tensor, optional):
                 See :class:`BartModel`.
-            encoder_output (Tensor, optonal):
+            encoder_output (Tensor, optional):
                 See :class:`BartModel`.
             inputs_embeds (Tensor, optional):
                 See :class:`BartModel`.

@@ -710,7 +710,7 @@ class PrefixTemplate(SoftTemplate):
 
         for index, part in enumerate(prompt):
             if "soft" in part:
-                raise ValueError("Keyward `soft` should not be used in PrefixTemplate.")
+                raise ValueError("Keyword `soft` should not be used in PrefixTemplate.")
             if "prefix" not in part:
                 continue
             if index != 0:

@@ -62,6 +62,8 @@ def main():
     parser = PdArgumentParser((GenerateArgument, QuantConfig, ModelConfig, DataConfig, SFTConfig))
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
         gen_args, quant_args, model_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
+    elif len(sys.argv) >= 2 and sys.argv[1].endswith(".yaml"):
+        gen_args, quant_args, model_args, data_args, training_args = parser.parse_yaml_file_and_cmd_lines()
     else:
         gen_args, quant_args, model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
@@ -139,7 +141,7 @@ def main():
     model_class = AutoModelForCausalLM
     if training_args.pipeline_parallel_degree > 1:
         if data_args.eval_with_do_generation and training_args.do_eval:
-            raise ValueError("Plese set eval_with_do_generation to false in pipeline parallel mode.")
+            raise ValueError("Please set eval_with_do_generation to false in pipeline parallel mode.")
 
         model_class = AutoModelForCausalLMPipe
 

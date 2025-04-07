@@ -32,7 +32,6 @@ from paddle.io import DataLoader
 from paddlenlp.generation.utils import GenerationMixin
 from paddlenlp.trainer import IntervalStrategy
 from paddlenlp.trainer.trainer import (
-    TRAINER_STATE_NAME,
     HybridParallelOptimizer,
     NlpDistributedBatchSampler,
     ShardingOption,
@@ -53,10 +52,19 @@ from paddlenlp.transformers import BatchEncoding, PretrainedModel, PretrainedTok
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 from paddlenlp.transformers.model_outputs import ModelOutput
 from paddlenlp.transformers.tokenizer_utils_base import PaddingStrategy
+from paddlenlp.utils.env import TRAINER_STATE_NAME
 
 
 @dataclass
 class TrainingArguments(TrainingArguments):
+    rollout_logprob_batch_size: str = field(
+        default=None,
+        metadata={"help": "The log prob batch size."},
+    )
+    use_fused_rms_norm: bool = field(
+        default=False,
+        metadata={"help": "qwen, use_fused_rms_norm"},
+    )
     kl_coeff: float = field(
         default=0.02,
         metadata={"help": "The coefficient for the KL divergence between the reference and actor policy."},
@@ -64,6 +72,14 @@ class TrainingArguments(TrainingArguments):
     kl_loss_coeff: float = field(
         default=0.001,
         metadata={"help": "The coefficient for the KL loss for GRPO."},
+    )
+    pg_loss_coeff: float = field(
+        default=1.0,
+        metadata={"help": "The coefficient for the PG loss for GRPO."},
+    )
+    entropy_coeff: float = field(
+        default=0.0,
+        metadata={"help": "The coefficient for the entropy loss for GRPO."},
     )
     clip_range_ratio: float = field(
         default=0.2,
@@ -73,7 +89,7 @@ class TrainingArguments(TrainingArguments):
         },
     )
     clip_range_score: float = field(
-        default=50.0,
+        default=10.0,
         metadata={
             "help": "The clipping range for the output of the score model. "
             "The reward is clipped into [-clip_range_score, clip_range_score]."
@@ -273,13 +289,16 @@ class TrainingArguments(TrainingArguments):
     )
     rl_algorithm: str = field(
         default="ppo",
-        metadata={"help": "RL algorithm (supports PPO and GRPO)."},
+        metadata={"help": "RL algorithm (supports PPO, GRPO and Reinforce++)."},
     )
     use_tgt_len_value: bool = field(
         default=False,
         metadata={"help": "Whether to use tgt for KL."},
     )
     use_rm_server: bool = field(default=False, metadata={"help": "Use reward server instead of reward model."})
+    use_fp32_compute: bool = field(
+        default=False, metadata={"help": "Use fp32 to compute xx_log_prob,rewards, advantages and loss."}
+    )
 
     def __post_init__(self):
         """
@@ -317,21 +336,34 @@ class TrainingArguments(TrainingArguments):
                 self.logging_strategy = IntervalStrategy.STEPS
         if self.per_device_rollout_batch_size < 0:
             self.per_device_rollout_batch_size = self.per_device_train_batch_size
-        assert self.rl_algorithm in ["ppo", "grpo"], 'self.rl_algorithm should be one of ["ppo", "grpo"]'
+        assert self.rl_algorithm in [
+            "ppo",
+            "grpo",
+            "reinforce_plus_plus",
+        ], 'self.rl_algorithm should be one of ["ppo", "grpo", "reinforce_plus_plus"]'
         if self.rl_algorithm == "grpo":
             self.normalize_reward = False
             self.normalize_advantage = False
+
+        if self.per_device_eval_batch_size > self.per_device_rollout_batch_size * self.num_return_sequences:
+            logger.warning(
+                f"per_device_eval_batch_size: {self.per_device_eval_batch_size} is larger than "
+                f"per_device_rollout_batch_size: {self.per_device_rollout_batch_size} * num_return_sequences: "
+                f"{self.num_return_sequences}, which may cause infer error. "
+                f"We will set it to per_device_rollout_batch_size * num_return_sequences!"
+            )
+            self.per_device_eval_batch_size = self.per_device_rollout_batch_size * self.num_return_sequences
 
 
 @dataclass
 class ModelArgument:
     actor_model_name_or_path: str = field(
         default=None,
-        metadata={"help": "Build-in pretrained model name or the path to local model."},
+        metadata={"help": "Built-in pretrained model name or the path to local model."},
     )
     reward_model_name_or_path: str = field(
         default=None,
-        metadata={"help": "Build-in pretrained model name or the path to local model."},
+        metadata={"help": "Built-in pretrained model name or the path to local model."},
     )
     reward_server: str = field(
         default=None,
@@ -339,7 +371,7 @@ class ModelArgument:
     )
     reward_critic_model_name_or_path: str = field(
         default=None,
-        metadata={"help": "Build-in pretrained model name or the path to local model."},
+        metadata={"help": "Built-in pretrained model name or the path to local model."},
     )
     actor_tokenizer_alpha: float = field(default=None, metadata={"help": "Tokenizer will tokenize randomly"})
     reward_tokenizer_alpha: float = field(default=None, metadata={"help": "Tokenizer will tokenize randomly"})
@@ -699,16 +731,16 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
     if self.args.use_hybrid_parallel:
         forbidden_no_sync = True
 
-    availiable_no_sync = dp_enabled and not forbidden_no_sync
+    available_no_sync = dp_enabled and not forbidden_no_sync
 
     is_no_sync = (
         ((step_control + 1) % args.gradient_accumulation_steps != 0)
-        and availiable_no_sync
+        and available_no_sync
         and args._no_sync_in_gradient_accumulation
-    ) or (args.recompute and availiable_no_sync)
+    ) or (args.recompute and available_no_sync)
     # sharding
     # stage1. the same as ddp
-    # stage2. manualy collect gradient on dp group
+    # stage2. manually collect gradient on dp group
 
     dp_master_grad = self.args.world_size > 1 and self.args.amp_master_grad and not self.args.use_hybrid_parallel
     if dp_master_grad:
@@ -733,7 +765,7 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
 
         # self.timers and self.timers(f"{timer_name}: forward-backward").stop()
 
-        # Maunally collect gradients
+        # Manually collect gradients
         # Case 1: Use recompute and dp
         # Case 2: Hack dp with master_grad
         # Case 3: Pipeline or sharding overlap
@@ -741,12 +773,12 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
         # self.timers and self.timers(f"{timer_name}: all-reduce").start()
 
         # Case 1: Use recompute and dp / sharding stage1,
-        # manualy collect gradient for dp.
-        if args.recompute and availiable_no_sync:
+        # manually collect gradient for dp.
+        if args.recompute and available_no_sync:
             fused_allreduce_gradients(list(model.parameters()), None)
 
         # Case 2: hack dp with master_grad
-        if dp_master_grad and not (args.recompute and availiable_no_sync):
+        if dp_master_grad and not (args.recompute and available_no_sync):
             fused_allreduce_gradients(list(model.parameters()), None)
 
         # Pipeline parallel mode,  handle gradient reduce here to overlap
@@ -788,6 +820,10 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
             scaler=self.scaler if self.do_grad_scaling else None,
         )
         optimizer_was_run = True
+
+        if self.args.offload_optim:
+            self._reload_optimizer()
+
         if self.do_grad_scaling:
             scale_before = paddle.assign(self.scaler._scale)
             self.scaler.step(self.optimizer)
@@ -810,17 +846,20 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
             self.optimizer.step()
 
         # self.timers and self.timers(f"{timer_name}: optimizer-step").stop()
+        if self.args.offload_optim:
+            self._offload_optimizer()
 
         if optimizer_was_run:
             self.lr_scheduler.step()
 
-        if enable_release_grads and args.pipeline_parallel_degree > 1:
+        if args.release_grads or enable_release_grads:
             self.optimizer.clear_grad(set_to_zero=False)
-            for _, buffers in model._chunk_2_comm_buffers.items():
-                for buffer in buffers:
-                    buffer._clear_grad_storage()
+            if args.pipeline_parallel_degree > 1:
+                for _, buffers in model._chunk_2_comm_buffers.items():
+                    for buffer in buffers:
+                        buffer._clear_grad_storage()
         else:
-            self.optimizer.clear_grad(set_to_zero=False)
+            self.optimizer.clear_grad()
 
         self.callback_handler.on_optimizer_end(
             args,

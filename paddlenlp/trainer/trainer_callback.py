@@ -454,6 +454,14 @@ class DefaultFlowCallback(TrainerCallback):
         ):
             control.should_save = True
 
+        # For Flash save
+        if (
+            args.save_strategy == IntervalStrategy.STEPS
+            and args.flash_device_save_steps > 0
+            and state.global_step % args.flash_device_save_steps == 0
+        ):
+            control.should_save = True
+
         # End training
         if state.global_step >= state.max_steps:
             control.should_training_stop = True

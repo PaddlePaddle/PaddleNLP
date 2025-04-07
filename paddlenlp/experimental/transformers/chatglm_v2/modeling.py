@@ -161,7 +161,7 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
             activation="swiglu",
             normalize_before=True,
             num_layers=config.num_hidden_layers,
-            nranks=1,
+            tp_degree=1,
             ring_id=-1,
             ln_scale_attrs=ln_scale_attrs,
             qkv_weight_attrs=qkv_weight_attrs,
