@@ -335,13 +335,18 @@ std::vector<paddle::Tensor> cutlass_fp8_fp8_fp8_dual_gemm_scale_ptr(
   if (output_dtype == "bfloat16") {
     out = paddle::empty(out_shape, paddle::DataType::BFLOAT16, x.place());
     out_ptr = reinterpret_cast<void*>(out.data<phi::dtype::bfloat16>());
-    
   } else if (output_dtype == "float16") {
     out = paddle::empty(out_shape, paddle::DataType::FLOAT16, x.place());
     out_ptr = reinterpret_cast<void*>(out.data<phi::dtype::float16>());
+  } else if (output_dtype == "float8_e4m3fn") {
+    out = paddle::empty(out_shape, paddle::DataType::FLOAT8_E4M3FN, x.place());
+    out_ptr = reinterpret_cast<void*>(out.data<phi::dtype::float8_e4m3fn>());
+  } else if (output_dtype == "float8_e5m2") {
+    out = paddle::empty(out_shape, paddle::DataType::FLOAT8_E5M2, x.place());
+    out_ptr = reinterpret_cast<void*>(out.data<phi::dtype::float8_e5m2>());
   } else {
     PADDLE_THROW(phi::errors::Fatal(
-        "cutlass_fp8_fp8_fp8_dual_gemm_scale_ptr only support bfloat16 and float16 output"));
+        "cutlass_fp8_fp8_fp8_dual_gemm_scale_ptr only support bfloat16, float16, float8_e4m3fn and float8_e5m2 output, but got %s", output_dtype));
   }
 
   if(x_scale){
@@ -519,9 +524,13 @@ std::vector<paddle::DataType> CutlassFp8Fp8Fp8DualGemmFusedPtrScaleInferDtype(
         data_type = paddle::DataType::BFLOAT16;
     else if (output_dtype == "float16")
         data_type = paddle::DataType::FLOAT16;
+    else if (output_dtype == "float8_e4m3fn")
+        data_type = paddle::DataType::FLOAT8_E4M3FN;
+    else if (output_dtype == "float8_e5m2")
+        data_type = paddle::DataType::FLOAT8_E5M2;
     else 
         PD_THROW(
-                "cutlass_fp8_fp8_fp8_dual_gemm_fused_scale_ptr only support bfloat16 and float16 output, but got %s", output_dtype);
+                "cutlass_fp8_fp8_fp8_dual_gemm_fused_scale_ptr only support bfloat16, float16, float8_e4m3fn and float8_e5m2 output, but got %s", output_dtype);
     return {data_type};
 }
 

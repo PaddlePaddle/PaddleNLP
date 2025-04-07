@@ -13,6 +13,7 @@
 # limitations under the License.
 from __future__ import annotations
 
+import os
 from functools import partial
 from typing import Tuple
 
@@ -56,6 +57,10 @@ from paddlenlp.transformers.model_utils import (
 from paddlenlp.utils.log import logger
 
 __all__ = ["DeepseekV2ForCausalLMBlockInferenceModel"]
+
+
+def use_static_quant():
+    return os.getenv("FLAGS_STATIC_QUANT", "False") in ["True", "1", "true"]
 
 
 class DeepseekScalingRotaryEmbedding(nn.Layer):
@@ -1180,6 +1185,13 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                                 .transpose((1, 0))
                                 .cast(paddle.float32)
                             )
+                            if self.flag_block_to_tensor:
+                                ffn1_quanted_weight, ffn1_weight_scale = block_quant_to_tensor_quant(
+                                    ffn1_quanted_weight, ffn1_weight_scale, self.default_weight_block_size
+                                )
+                                ffn2_quanted_weight, ffn2_weight_scale = block_quant_to_tensor_quant(
+                                    ffn2_quanted_weight, ffn2_weight_scale, self.default_weight_block_size
+                                )
                             ffn1_weights.append(ffn1_quanted_weight.view(paddle.uint8))
                             ffn2_weights.append(ffn2_quanted_weight.view(paddle.uint8))
                             ffn1_scales.append(ffn1_weight_scale)
@@ -1246,6 +1258,13 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                         self.transformer_block.ffn2_weights_scale[idx].set_value(
                             fused_moe_ffn2_weight_scale.cast(paddle.float32)
                         )
+                        if use_static_quant():
+                            self.transformer_block.ffn1_acts_scale[idx].set_value(
+                                paddle.full([1], 0.02, dtype="float32")
+                            )
+                            self.transformer_block.ffn2_acts_scale[idx].set_value(
+                                paddle.full([1], 0.02, dtype="float32")
+                            )
 
                 concated_gate_up_weight = np.concatenate(
                     [
@@ -1379,7 +1398,14 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
         if self.use_weight_only:
             self.transformer_block = FusedBlockMultiTransformerWeightOnly(transformer_config)
         elif "fp8" in self.quant_type:
-            self.transformer_block = FusedBlockMultiTransformerFP8DynamicQuant(transformer_config)
+            if use_static_quant():
+                from paddlenlp.experimental.transformers.fused_transformer_layers import (
+                    FusedBlockMultiTransformerFP8TensorWise,
+                )
+
+                self.transformer_block = FusedBlockMultiTransformerFP8TensorWise(transformer_config)
+            else:
+                self.transformer_block = FusedBlockMultiTransformerFP8DynamicQuant(transformer_config)
         else:
             self.transformer_block = FusedBlockMultiTransformer(transformer_config)
 
