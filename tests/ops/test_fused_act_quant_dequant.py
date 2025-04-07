@@ -5,21 +5,26 @@ import FusedQuantOps as FQO
 from enum import Enum
 
 def dynamic_range(x: paddle.Tensor) -> float:
-    x = x.astype('float32').abs()
-    amax = x.max()
-    amin = x.min()
-    if amax == 0:
+    # 一次性转换为float32并取绝对值
+    x_abs = paddle.abs(x.astype('float32'))
+    
+    # 找到非零元素
+    non_zero = x_abs != 0.0
+    if not paddle.any(non_zero).item():
         return 0.0
-    elif amin == 0.0:
-        amin = x[x != 0].min()
+    
+    # 一次性计算最大值和最小值
+    amax = paddle.max(x_abs)
+    amin = paddle.min(x_abs.masked_select(non_zero))
+    
+    # 计算对数范围
     d_range = (paddle.log2(amax) - paddle.log2(amin)).item()
     return d_range
 
 class QuantGranularity(Enum):
     PER_1x128 = 3
 
-def show_dynamic_range_stats(x: paddle.Tensor, granularity: QuantGranularity, dtype_name: str):
-    print(f"\nTesting dtype: {dtype_name}")
+def show_dynamic_range_stats(x: paddle.Tensor, granularity: QuantGranularity):
     drs = []
     if granularity == QuantGranularity.PER_1x128:
         for i in range(0, x.shape[0]):
@@ -27,14 +32,12 @@ def show_dynamic_range_stats(x: paddle.Tensor, granularity: QuantGranularity, dt
                 drs.append(dynamic_range(x[i, j : j + 128]))
     else:
         raise ValueError("Unsupported Granularity")
-
     n_quantize_groups = len(drs)
     drs = paddle.to_tensor(drs)
     percentile_50 = paddle.quantile(drs, 0.50)
     percentile_90 = paddle.quantile(drs, 0.90)
     percentile_95 = paddle.quantile(drs, 0.95)
     percentile_100 = paddle.quantile(drs, 1.0)
-
     print(
         f"n_quantize_groups: {n_quantize_groups}, dynamic_range_percentile_50: {percentile_50:.2f}, "
         f"dynamic_range_percentile_90: {percentile_90:.2f}, dynamic_range_percentile_95: {percentile_95:.2f}, "
@@ -63,6 +66,7 @@ def compare(x, x_q, x_qdq):
     print(f"recovered rms: {recovered_rms}")
     rmse = paddle.sqrt(paddle.sum(diff_squared) / x.numel())
     print(f"quantize_rmse: {rmse}")
+    show_dynamic_range_stats(x_qdq, QuantGranularity.PER_1x128)
     return ftz_rate, rmse
 
 """ Eval of various quantization schemes """
@@ -77,9 +81,7 @@ def verify_act_dequant():
     for width in [7168]:
         for height in [4096, 16384, 32768]:
             print("#"*60 + f" Testing width:{width}, height:{height} " + "#"*60)
-            #x= paddle.clip(paddle.randn([height, width]).astype("bfloat16"), min=-50, max=50)
             x= paddle.randn([height, width]).astype("bfloat16")
-            print("-" * 20 + f"Testing with {width} * {height}" + "-" * 20)
             eval_quant(x)
             
 def run():
