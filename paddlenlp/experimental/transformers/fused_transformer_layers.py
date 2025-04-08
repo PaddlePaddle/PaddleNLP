@@ -4934,11 +4934,9 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
         return "float8_e4m3fn"
 
     def per_tensor_quant_fp8(self, x):
-        x_fp32 = x.cast("float32")
-        x_s = x_fp32.abs().max().clip(min=0.000001) / 448.0
-        x_q = x_fp32 / x_s
-        x_q = x_q.clip(min=-448.0, max=448.0)
-        return x_q.cast("float8_e4m3fn"), x_s
+        from paddlenlp_ops import per_tensor_quant_fp8
+
+        return per_tensor_quant_fp8(x, scale=None)
 
     def dynamic_quant(self, x):
         if self.weight_block_size[0] == 0 and self.weight_block_size[1] == 0:
@@ -4947,9 +4945,6 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
             from paddlenlp.ops.triton_ops.fused_moe import per_token_group_quant_fp8_api
 
             x_q, x_s = per_token_group_quant_fp8_api(x, 128, True)
-            # x_q, x_s = group_quant(
-            #     x, group_size=128, transpose_scale=True, quant_max_bound=448.0, quant_min_bound=-448.0
-            # )
         return x_q, x_s
 
     def cutlass_fp8_gemm(
