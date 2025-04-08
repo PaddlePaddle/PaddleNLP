@@ -116,7 +116,7 @@ def add_relation_negative_example(redundants, text, num_positive, ratio):
         added_example.append(negative_result)
 
     for rest_idx in rest_idxs:
-        src = prompt_format.format_map({"sentence": text, "prompt": redundants[idx]})
+        src = prompt_format.format_map({"sentence": text, "prompt": redundants[rest_idx]})
         negative_result = {"src": src, "tgt": "无相应实体\n**回答结束**\n\n"}
         rest_example.append(negative_result)
 
