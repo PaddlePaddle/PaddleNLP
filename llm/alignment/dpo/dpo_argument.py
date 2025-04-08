@@ -44,6 +44,11 @@ class DPOTrainingArguments(TrainingArguments):
         default=False,
         metadata={"help": "Whether to run benchmark by autotuner. True for from_scratch."},
     )
+    use_intermediate_api: bool = field(
+        default=False,
+        metadata={"help": "Flag indicating whether to use the intermediate API for model."},
+    )
+    num_hidden_layers: int = field(default=2, metadata={"help": "The number of hidden layers in the network model."})
 
     def __post_init__(self):
         super().__post_init__()

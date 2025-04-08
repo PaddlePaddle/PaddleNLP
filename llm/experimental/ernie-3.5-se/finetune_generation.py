@@ -49,7 +49,7 @@ class DataArgument:
 class ModelArgument:
     model_name_or_path: str = field(
         default="baidu/ernie-3.5-se-3b",
-        metadata={"help": "Build-in pretrained model name or the path to local model."},
+        metadata={"help": "Built-in pretrained model name or the path to local model."},
     )
     label_smoothing: float = field(default=0.1, metadata={"help": "The label smoothing parameter."})
     lr_decay_ratio: float = field(default=0.1, metadata={"help": "The ratio for learning rate decrease"})

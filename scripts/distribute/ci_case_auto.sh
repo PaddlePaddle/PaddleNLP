@@ -116,6 +116,7 @@ function llama_case_list_auto() {
         # llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2_intermediate
         llama_dy2st_auto_bs2_bf16_DP2-MP1-PP1-CINN
         llama_lora_static_graph_auto_bs_2_bf16_DP2-TP2-PP1
+        llama_dpo_dy2st_auto_bs2_bf16_MP8_intermediate
     )
     if [ $1 = "prepare_case" ]; then
         restore_func $fun_list  
@@ -1278,6 +1279,88 @@ function llama_dy2st_auto_bs2_bf16_DP2-MP1-PP1-CINN() {
     unset FLAGS_dist_prim_all
     unset FLAGS_prim_forward_blacklist
     unset FLAGS_prim_backward_blacklist
+    echo "=========== $FUNCNAME run  end ==========="
+}
+
+function llama_dpo_dy2st_auto_bs2_bf16_MP8_intermediate() {
+    echo "=========== $FUNCNAME run begin ==========="
+    set -x
+    unset CUDA_VISIBLE_DEVICES
+    
+    export PYTHONPATH=$root_path/:$PYTHONPATH
+    export FLAGS_call_stack_level=3
+    export NVIDIA_TF32_OVERRIDE=0
+    export FLAGS_cudnn_deterministic=1
+    export FLAGS_embedding_deterministic=1
+    export FLAGS_enable_pir_api=1
+
+    task_name="llama_dpo_dy2st_auto_bs2_bf16_MP8_intermediate"
+    case_out_dir="output/$task_name"
+    case_log_dir="output/$task_name""_log"
+    rm -rf $case_out_dir
+    rm -rf $case_log_dir
+    python -u -m paddle.distributed.launch \
+        --gpus "0,1,2,3,4,5,6,7" \
+        --log_dir $case_log_dir \
+        ../run_dpo_auto.py\
+        --model_name_or_path "meta-llama/Meta-Llama-3.1-8B-Instruct" \
+        --train_dataset_path ${llama_data_path}/data_dpo/data/train.jsonl \
+        --dev_dataset_path ${llama_data_path}/data_dpo/data/dev.jsonl \
+        --output_dir ./checkpoints/dpo_ckpts \
+        --per_device_train_batch_size 1 \
+        --gradient_accumulation_steps 1 \
+        --per_device_eval_batch_size 1 \
+        --num_train_epochs 1 \
+        --num_hidden_layers 2 \
+        --max_steps 10 \
+        --learning_rate 1e-06 \
+        --warmup_steps 10 \
+        --logging_steps 1 \
+        --evaluation_strategy no \
+        --save_strategy no \
+        --eval_steps 100 \
+        --save_steps 500 \
+        --max_seq_len 4096 \
+        --max_prompt_len 2048 \
+        --bf16 false \
+        --fp16_opt_level O2 \
+        --do_train true \
+        --do_eval false \
+        --disable_tqdm true \
+        --load_best_model_at_end true \
+        --tensor_parallel_degree 8 \
+        --sharding stage1 \
+        --use_flash_attention false \
+        --flash_mask false \
+        --recompute false \
+        --recompute_granularity full \
+        --beta 0.1 \
+        --benchmark false \
+        --loss_type sigmoid \
+        --label_smoothing 0.0 \
+        --unified_checkpoint true \
+        --autotuner_benchmark false \
+        --lazy false \
+        --max_grad_norm 0.0 \
+        --seed 42 \
+        --to_static true \
+        --enable_auto_parallel true \
+        --use_intermediate_api true \
+        >>${log_path}/$FUNCNAME 2>&1
+    loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+    ips=-1
+    mem=-1
+    echo "result: to_static=$to_static loss=$loss ips=$ips mem=$mem"
+    loss_base=1.22546506
+    if [ $IS_A100 -ne 0 ];then
+        loss_base=1.22545731
+    fi
+    ips_base=-1
+    mem_base=-1
+    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
+    rm -rf data
+    rm -rf ultrafeedback_binarized.tar.gz
+
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -3591,12 +3674,21 @@ function before_hook_for_llama() {
             echo "LLaMA data downloaded"
         else
             # download data for llama
+            mkdir ${llama_data_path};
             mkdir ${llama_data_path}/data;
             wget -O ${llama_data_path}/data/llama_openwebtext_100k_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy;
             wget -O ${llama_data_path}/data/llama_openwebtext_100k_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz;
             # download data for llama finetune
             wget -O ${llama_data_path}/AdvertiseGen.tar.gz https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz
             tar -xvf ${llama_data_path}/AdvertiseGen.tar.gz -C ${llama_data_path}
+        fi
+        if [[ -e ${llama_data_path}/data_dpo ]]; then
+            echo "LLaMA DPO data downloaded"
+        else
+            # download data for llama dpo
+            wget -O ${llama_data_path}/ultrafeedback_binarized.tar.gz https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized.tar.gz
+            mkdir ${llama_data_path}/data_dpo;
+            tar -xvf ${llama_data_path}/ultrafeedback_binarized.tar.gz -C ${llama_data_path}/data_dpo
         fi
         cp -r ${llama_data_path}/data ${llama_case_path}/
     else

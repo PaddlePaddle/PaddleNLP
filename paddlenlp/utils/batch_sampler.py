@@ -35,7 +35,7 @@ class DistributedBatchSampler(paddle.io.BatchSampler):
                      `__len__` for BatchSampler to get sample
                      number of data source.
         batch_size(int): sample indice number in a mini-batch indices.
-        num_replicas(int, optional): porcess number in distributed training.
+        num_replicas(int, optional): process number in distributed training.
             If :attr:`num_replicas` is None, :attr:`num_replicas` will be
             retrieved from :code:`paddle.distributed.ParallenEnv`.
             Default None.

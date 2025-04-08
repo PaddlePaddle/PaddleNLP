@@ -22,30 +22,28 @@
 #include <cuda.h>
 #include <cuda_fp16.h>
 #include <math.h>
+
 #include <optional>
 #include <sstream>
-#include "cutlass/array.h"
-#include "cutlass/numeric_conversion.h"
 
+#include "cutlass/array.h"
 #include "cutlass/gemm/device/gemm_grouped.h"
 #include "cutlass/gemm/kernel/default_gemm_grouped.h"
-
+#include "cutlass/numeric_conversion.h"
+#include "cutlass_kernels/moe_gemm/fused_moe_cutlass_kernel.h"
+#include "cutlass_kernels/moe_gemm/fused_moe_gemm_kernels.h"
 #include "paddle/common/errors.h"
 #include "paddle/phi/core/enforce.h"
-
 #include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/compute_occupancy.h"
 #include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/epilogue_helpers.h"
 #include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/gemm/kernel/default_fpA_intB_traits.h"
 #include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/gemm/threadblock/default_mma.h"
-#include "cutlass_kernels/moe_gemm/fused_moe_cutlass_kernel.h"
-#include "cutlass_kernels/moe_gemm/fused_moe_gemm_kernels.h"
 
 #pragma GCC diagnostic pop
 
+#include "helper.h"
 #include "paddle/phi/kernels/fusion/cutlass/cutlass_kernels/cutlass_heuristic.h"
 #include "paddle/phi/kernels/fusion/cutlass/cutlass_kernels/gemm_config_manager.h"
-
-#include "helper.h"
 
 using namespace phi;
 // ============================= Variable batched Gemm things
@@ -207,7 +205,7 @@ void generic_moe_gemm_kernelLauncher(const T* A,
     std::string err_msg =
         "Failed to initialize cutlass variable batched gemm. Error: " +
         std::string(cutlassGetStatusString(init_status));
-    PADDLE_FATAL("[MoE Runner] " + err_msg);
+    throw std::runtime_error("[MoE Runner] " + err_msg);
   }
 
   auto run_status = gemm.run(stream);
@@ -215,7 +213,7 @@ void generic_moe_gemm_kernelLauncher(const T* A,
     std::string err_msg =
         "Failed to run cutlass variable batched gemm. Error: " +
         std::string(cutlassGetStatusString(run_status));
-    PADDLE_FATAL("[MoE Runner] " + err_msg);
+    throw std::runtime_error("[MoE Runner] " + err_msg);
   }
 }
 
@@ -670,57 +668,66 @@ void MoeGemmRunner<T, WeightType>::run_gemm<EpilogueTag>(
     int profile_total_rows =
         std::min(gemmConfigManager.nextPowerOfTwo(total_rows),
                  gemmConfigManager.getMaxProfileM());
-
+    bool find_one = false;
     for (size_t ii = 0; ii < candidate_configs.size(); ++ii) {
-      for (int i = 0; i < warm_time; i++) {
-        dispatch_to_arch<EpilogueTag>(A,
-                                      B,
-                                      weight_scales,
-                                      biases,
-                                      C,
-                                      total_rows_before_expert,
-                                      total_rows,
-                                      gemm_n,
-                                      gemm_k,
-                                      num_experts,
-                                      candidate_configs[ii],
-                                      stream);
-      }
-      cudaEvent_t start;
-      cudaEvent_t stop;
-      check_cuda_error(cudaEventCreate(&start));
-      check_cuda_error(cudaEventCreate(&stop));
-      check_cuda_error(cudaStreamSynchronize(stream));
-      check_cuda_error(cudaEventRecord(start, stream));
-      for (int i = 0; i < test_time; i++) {
-        dispatch_to_arch<EpilogueTag>(A,
-                                      B,
-                                      weight_scales,
-                                      biases,
-                                      C,
-                                      total_rows_before_expert,
-                                      total_rows,
-                                      gemm_n,
-                                      gemm_k,
-                                      num_experts,
-                                      candidate_configs[ii],
-                                      stream);
-      }
-      check_cuda_error(cudaEventRecord(stop, stream));
-      check_cuda_error(cudaEventSynchronize(stop));
-      float elapsed;
-      check_cuda_error(cudaEventElapsedTime(&elapsed, start, stop));
-      check_cuda_error(cudaEventDestroy(start));
-      check_cuda_error(cudaEventDestroy(stop));
-      if (elapsed < best_time) {
-        best_time = elapsed;
-        best_config = candidate_configs[ii];
+      try {
+        for (int i = 0; i < warm_time; i++) {
+          dispatch_to_arch<EpilogueTag>(A,
+                                        B,
+                                        weight_scales,
+                                        biases,
+                                        C,
+                                        total_rows_before_expert,
+                                        total_rows,
+                                        gemm_n,
+                                        gemm_k,
+                                        num_experts,
+                                        candidate_configs[ii],
+                                        stream);
+        }
+        cudaEvent_t start;
+        cudaEvent_t stop;
+        check_cuda_error(cudaEventCreate(&start));
+        check_cuda_error(cudaEventCreate(&stop));
+        check_cuda_error(cudaStreamSynchronize(stream));
+        check_cuda_error(cudaEventRecord(start, stream));
+        for (int i = 0; i < test_time; i++) {
+          dispatch_to_arch<EpilogueTag>(A,
+                                        B,
+                                        weight_scales,
+                                        biases,
+                                        C,
+                                        total_rows_before_expert,
+                                        total_rows,
+                                        gemm_n,
+                                        gemm_k,
+                                        num_experts,
+                                        candidate_configs[ii],
+                                        stream);
+        }
+        check_cuda_error(cudaEventRecord(stop, stream));
+        check_cuda_error(cudaEventSynchronize(stop));
+        float elapsed;
+        check_cuda_error(cudaEventElapsedTime(&elapsed, start, stop));
+        check_cuda_error(cudaEventDestroy(start));
+        check_cuda_error(cudaEventDestroy(stop));
+        if (elapsed < best_time) {
+          best_time = elapsed;
+          best_config = candidate_configs[ii];
+        }
+        find_one = true;
+      } catch (const std::exception& e) {
+        std::cerr << "MOE config[" << ii << "]  Caught exception: " << e.what()
+                  << std::endl;
       }
     }
-    gemmConfigManager.addBestConfig(gemmId, profile_total_rows, best_config);
-    chosen_config = best_config;
+    if (find_one) {
+      gemmConfigManager.addBestConfig(gemmId, profile_total_rows, best_config);
+      chosen_config = best_config;
+    } else {
+      PADDLE_FATAL("[MoE Configure Search] find no one avaliable config.");
+    }
   }
-
   dispatch_to_arch<EpilogueTag>(A,
                                 B,
                                 weight_scales,
