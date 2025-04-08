@@ -66,9 +66,9 @@ def weight_process(name, quant_config, lora_config, state_dict, device):
         state_dict[name + ".weight"] = qlora_weight_quantize_dequantize(
             weight,
             quant_algo=quant_config.weight_quantize_algo,
-            double_quant=quant_config.weight_double_quant,
-            block_size=quant_config.weight_blocksize,
-            double_quant_block_size=quant_config.weight_double_quant_block_size,
+            double_quant=quant_config.qlora_weight_double_quant,
+            block_size=quant_config.qlora_weight_blocksize,
+            double_quant_block_size=quant_config.qlora_weight_double_quant_block_size,
         ).cpu()
     elif quant_config.weight_quantize_algo in ["weight_only_int8"]:
         quant_weight = state_dict.pop(name + ".quant_weight").to(target_device)
