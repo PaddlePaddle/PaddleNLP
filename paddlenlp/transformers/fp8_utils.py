@@ -145,7 +145,6 @@ class ExpertsGroupGemmNode:
 
         if IF_USE_GROUP_GEMM_MASK:
             o1 = paddle.zeros([expert_w_count, x_fp8.shape[1], w1_t_quant.shape[1]], dtype="bfloat16")
-            #print( "shape", x_fp8.shape, w1_t_quant.shape, o1.shape)
             deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_masked(
                 (x_fp8, x_scale), (w1_t_quant, w1_t_scale), o1, tokens_per_expert, x_fp8.shape[1]
             )
@@ -347,13 +346,13 @@ class ExpertsGroupGemmNode:
         H2 = o2.shape[-1]
         o2 = o2.reshape([-1, H2])
 
+
         _, _, o2_t_fp8, o2_t_scale = kitchen_quant(
             o2, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=True
         )
 
         o2_t_fp8 = o2_t_fp8.reshape([H2, expert_w_count, -1]).transpose([1, 0, 2]).contiguous()
-        o2_t_scale = o2_t_scale.reshape([H2, expert_w_count, -1]).transpose([1, 0, 2]).contiguous()
-
+        o2_t_scale = o2_t_scale.reshape([expert_w_count, -1, H2])
         # quant out_grad
         H1 = out_grad.shape[-1]      
         out_grad = out_grad.reshape([-1, H1])
@@ -363,7 +362,7 @@ class ExpertsGroupGemmNode:
         )
 
         out_grad_fp8 = out_grad_fp8.reshape([H1, expert_w_count, -1]).transpose([1, 0, 2]).contiguous()
-        out_grad_scale = out_grad_scale.reshape([H1, expert_w_count, -1]).transpose([1, 0, 2]).contiguous()
+        out_grad_scale = out_grad_scale.reshape([expert_w_count, -1, H1])
 
         for i in range(expert_w_count):
             if DSV3_USE_FUSED_Expert:
@@ -385,9 +384,13 @@ class ExpertsGroupGemmNode:
                     True,
                     True,
                     weight_grad
-            )
+            )   
+            print("weight", weight_grad)
 
-            # print("grad", weight_grad)
+        
+            import sys
+            sys.exit()
+
 
     # ===== dw1 = deep_gemm(input_x_t_fp8, do1_t_fp8)
     def bwd_gate_up_weight(self, do1, input_x, expert_w1_list, expert_w_count):
@@ -399,12 +402,10 @@ class ExpertsGroupGemmNode:
 
         _, _, input_x_fp8, input_x_scale = kitchen_quant(
             input_x, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=True
-        )
-        input_x_fp8 = input_x_fp8.reshape([expert_w_count, H1, -1])
-        input_x_scale = input_x_scale.reshape([expert_w_count, H1, -1])
+        )        
 
         input_x_fp8 = input_x_fp8.reshape([H1, expert_w_count, -1]).transpose([1, 0, 2]).contiguous()
-        input_x_scale = input_x_scale.reshape([H1, expert_w_count, -1]).transpose([1, 0, 2]).contiguous()
+        input_x_scale = input_x_scale.reshape([expert_w_count, -1, H1])
 
         # transpose do1 and quant do1
         H2 = do1.shape[-1]
@@ -413,7 +414,7 @@ class ExpertsGroupGemmNode:
             do1, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=True
         )
         do1_fp8 = do1_fp8.reshape([H2, expert_w_count, -1]).transpose([1, 0, 2]).contiguous()
-        do1_scale = do1_scale.reshape([H2, expert_w_count, -1]).transpose([1, 0, 2]).contiguous()
+        do1_scale = do1_scale.reshape([expert_w_count, -1, H2])
 
         # dw1
         for i in range(expert_w_count):
