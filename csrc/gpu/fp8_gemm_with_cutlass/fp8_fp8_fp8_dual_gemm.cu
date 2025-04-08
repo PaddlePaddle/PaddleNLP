@@ -252,6 +252,289 @@ std::vector<paddle::DataType> CutlassFp8Fp8Fp8DualGemmFusedInferDtype(
     return {data_type};
 }
 
+
+std::vector<paddle::Tensor> cutlass_fp8_fp8_fp8_dual_gemm_scale_ptr(
+    const paddle::Tensor& x,
+    const paddle::Tensor& y_fuesd,
+    const paddle::optional<paddle::Tensor>& x_scale,
+    const paddle::optional<paddle::Tensor>& y_fuesd_scale,
+    const paddle::optional<paddle::Tensor>& bias0,
+    const paddle::optional<paddle::Tensor>& bias1,
+    bool trans_x,
+    bool trans_y,
+    float scale0,     // only support per-tensor quantization
+    float scale1,     // only support per-tensor quantization
+    float scale_out,  // only support per-tensor quantization
+    std::string output_dtype,
+    std::string activation_type) {
+  paddle::Tensor out;
+  void* out_ptr = nullptr;
+  const void* x_ptr = nullptr;
+  const void* y0_ptr = nullptr;
+  const void* y1_ptr = nullptr;
+  const void* x_scale_ptr = nullptr;
+  const void* y0_scale_ptr = nullptr;
+  const void* y1_scale_ptr = nullptr;
+
+  auto place = x.place();
+  cudaStream_t stream = x.stream();
+  int64_t device_id = place.GetDeviceId();
+  int sm_version = GetGPUComputeCapability(device_id);
+
+  int rank = x.dims().size();
+  int M = 0;
+  int K = 0;
+  int N = 0;
+  int ldd = 0;
+
+  int lda = x.dims()[rank - 1];
+  int ldb = y_fuesd.dims()[rank - 1] / 2;
+  if (!trans_x) {
+    M = x.dims()[rank - 2];
+    K = x.dims()[rank - 1];
+
+  } else {
+    M = x.dims()[rank - 1];
+    K = x.dims()[rank - 2];
+  }
+
+  if (!trans_y) {
+    N = y_fuesd.dims()[rank - 1] / 2;
+    ldd = y_fuesd.dims()[rank - 1] / 2;
+  } else {
+    N = y_fuesd.dims()[rank - 2] / 2;
+    ldd = y_fuesd.dims()[rank - 2] / 2;
+  }
+
+  int batch_count = 1;
+  for (size_t i = 0; i < rank - 2; ++i) {
+    batch_count *= x.dims()[i];
+  }
+
+  std::string input_dtype = "";
+  std::vector<int64_t> out_shape = x.shape();
+  out_shape[rank - 1] = N;
+  out_shape[rank - 2] = M;
+  
+  if (x.dtype() == phi::DataType::FLOAT8_E4M3FN) {
+    input_dtype = "float8_e4m3fn";
+    x_ptr = reinterpret_cast<const void*>(x.data<phi::dtype::float8_e4m3fn>());
+    y0_ptr = reinterpret_cast<const void*>(y_fuesd.data<phi::dtype::float8_e4m3fn>());
+    y1_ptr = reinterpret_cast<const void*>(y_fuesd.data<phi::dtype::float8_e4m3fn>() + N * K);
+  } 
+  else if (x.dtype() == phi::DataType::FLOAT8_E5M2) {
+    input_dtype = "float8_e5m2";
+    x_ptr = reinterpret_cast<const void*>(x.data<phi::dtype::float8_e5m2>());
+    y0_ptr = reinterpret_cast<const void*>(y_fuesd.data<phi::dtype::float8_e5m2>());
+    y1_ptr = reinterpret_cast<const void*>(y_fuesd.data<phi::dtype::float8_e5m2>() + N * K);
+  } else {
+    PADDLE_THROW(phi::errors::Fatal(
+        "fp8_fp8_fp8_dual_gemm_fused only support e4m3 and e5m2 input"));
+  }
+
+  if (output_dtype == "bfloat16") {
+    out = paddle::empty(out_shape, paddle::DataType::BFLOAT16, x.place());
+    out_ptr = reinterpret_cast<void*>(out.data<phi::dtype::bfloat16>());
+  } else if (output_dtype == "float16") {
+    out = paddle::empty(out_shape, paddle::DataType::FLOAT16, x.place());
+    out_ptr = reinterpret_cast<void*>(out.data<phi::dtype::float16>());
+  } else if (output_dtype == "float8_e4m3fn") {
+    out = paddle::empty(out_shape, paddle::DataType::FLOAT8_E4M3FN, x.place());
+    out_ptr = reinterpret_cast<void*>(out.data<phi::dtype::float8_e4m3fn>());
+  } else if (output_dtype == "float8_e5m2") {
+    out = paddle::empty(out_shape, paddle::DataType::FLOAT8_E5M2, x.place());
+    out_ptr = reinterpret_cast<void*>(out.data<phi::dtype::float8_e5m2>());
+  } else {
+    PADDLE_THROW(phi::errors::Fatal(
+        "cutlass_fp8_fp8_fp8_dual_gemm_scale_ptr only support bfloat16, float16, float8_e4m3fn and float8_e5m2 output, but got %s", output_dtype));
+  }
+
+  if(x_scale){
+    int32_t scale_numel = x_scale.get().numel();
+    PD_CHECK(scale_numel == 1, "x_scale.numel() must equal 1, but got %d", scale_numel);
+    x_scale_ptr = reinterpret_cast<const void*>(x_scale.get().data<float>());
+  }
+
+  if(y_fuesd_scale){
+    int32_t scale_numel = y_fuesd_scale.get().numel();
+    PD_CHECK(scale_numel == 2, "y_fuesd_scale.numel() must equal 2, but got %d", scale_numel);
+    y0_scale_ptr = reinterpret_cast<const void*>(y_fuesd_scale.get().data<float>());
+    y1_scale_ptr = reinterpret_cast<const void*>(y_fuesd_scale.get().data<float>() + 1);
+  }
+
+  std::string isbias = "false";
+  std::string bias_dtype = "float16";
+  void* bias_data0 = nullptr;
+  void* bias_data1 = nullptr;
+  std::vector<int64_t> bias_dims0{};
+  std::vector<int64_t> bias_dims1{};
+  if (bias0 && bias1) {
+    isbias = "true";
+    bias_dims0 = common::vectorize(bias0.get().dims());
+    bias_dims1 = common::vectorize(bias1.get().dims());
+    if (bias0.get().dtype() == phi::DataType::FLOAT16) {
+      bias_dtype = "float16";
+      bias_data0 = reinterpret_cast<void*>(const_cast<phi::dtype::float16*>(
+          bias0.get().data<phi::dtype::float16>()));
+      bias_data1 = reinterpret_cast<void*>(const_cast<phi::dtype::float16*>(
+          bias1.get().data<phi::dtype::float16>()));
+    } else {
+      bias_dtype = "bfloat16";
+      bias_data0 = reinterpret_cast<void*>(const_cast<phi::dtype::bfloat16*>(
+          bias0.get().data<phi::dtype::bfloat16>()));
+      bias_data1 = reinterpret_cast<void*>(const_cast<phi::dtype::bfloat16*>(
+          bias1.get().data<phi::dtype::bfloat16>()));
+    }
+  }
+
+  paddle::Tensor out0;
+  paddle::Tensor out1;
+  void* out0_ptr = nullptr;
+  void* out1_ptr = nullptr;
+  if (bias0 && bias1) {
+    if (bias_dtype == "float16") {
+      out0 = paddle::empty(out_shape, phi::DataType::FLOAT16, x.place());
+      out0_ptr = reinterpret_cast<void*>(out0.data<phi::dtype::float16>());
+      out1 = paddle::empty(out_shape, phi::DataType::FLOAT16, x.place());
+      out1_ptr = reinterpret_cast<void*>(out1.data<phi::dtype::float16>());
+    } else {
+      out0 = paddle::empty(out_shape, phi::DataType::BFLOAT16, x.place());
+      out0_ptr = reinterpret_cast<void*>(out0.data<phi::dtype::bfloat16>());
+      out1 = paddle::empty(out_shape, phi::DataType::BFLOAT16, x.place());
+      out1_ptr = reinterpret_cast<void*>(out1.data<phi::dtype::bfloat16>());
+    }
+  }
+
+  std::string act = (activation_type == "") ? "swiglu" : activation_type;
+
+  std::string fuse_gemm_config =
+      input_dtype + "_" + output_dtype + "_" + bias_dtype + "_" + isbias + "_" + act;
+
+  DualGemmEpilogueAllParams params = {
+      x_ptr,
+      y0_ptr,
+      y1_ptr,
+      out0_ptr,
+      out1_ptr,
+      out_ptr,
+      scale0,
+      scale1,
+      scale_out,
+      M,
+      N,
+      K,
+      lda,
+      ldb,
+      ldd,
+      batch_count,
+      place,
+      stream,
+      sm_version,
+      bias_data0,
+      bias_data1,
+      bias_dims0,
+      bias_dims1,
+      fuse_gemm_config,
+      1,
+      x_scale_ptr,
+      y0_scale_ptr,
+      y1_scale_ptr};
+  
+  fp8_fp8_dual_gemm_scale_bias_act(params);
+  
+  return {out};
+}
+
+
+
+std::vector<std::vector<int64_t>> CutlassFp8Fp8Fp8DualGemmFusedPtrScaleInferShape(
+    const std::vector<int64_t>& x_shape,
+    const std::vector<int64_t>& y_fused_shape,
+    const paddle::optional<std::vector<int64_t>>&  x_scale_shape,
+    const paddle::optional<std::vector<int64_t>>&  y_fused_scale_shape,
+    const paddle::optional<std::vector<int64_t>>&  bias0_shape,
+    const paddle::optional<std::vector<int64_t>>&  bias1_shape,
+    bool trans_x,
+    bool trans_y){
+  if(x_shape.size()!=y_fused_shape.size()){
+    PD_THROW("The rank of input x and y_fused should be equal, but received x's rank is %d, y_fused's rank is %d",
+                      x_shape.size(),
+                      y_fused_shape.size());
+  }
+  
+  int rank = x_shape.size();
+  int M = 0;
+  int N = 0;
+
+  if (!trans_x) {
+    M = x_shape[rank - 2];
+
+  } else {
+    M = x_shape[rank - 1];
+  }
+  if (!trans_y) {
+    N = y_fused_shape[rank - 1] / 2;
+  } else {
+    N = y_fused_shape[rank - 2] / 2;
+  }
+  std::vector<int64_t> out_shape = x_shape;
+  out_shape[rank - 1] = N;
+  out_shape[rank - 2] = M;
+  return {out_shape};
+}
+
+std::vector<paddle::DataType> CutlassFp8Fp8Fp8DualGemmFusedPtrScaleInferDtype(
+    const paddle::DataType& x_type,
+    const paddle::DataType& y_fused_type,
+    const paddle::optional<paddle::DataType>& x_scale_type,
+    const paddle::optional<paddle::DataType>& y_fuesd_scale_type,
+    const paddle::optional<paddle::DataType>& bias0_type,
+    const paddle::optional<paddle::DataType>& bias1_type,
+    bool trans_x,
+    bool trans_y,
+    float scale0,     // only support per-tensor quantization
+    float scale1,     // only support per-tensor quantization
+    float scale_out,  // only support per-tensor quantization
+    std::string output_dtype,
+    std::string activation_type) {
+
+
+    if(x_type != y_fused_type){
+      PD_THROW("The type of input x and y_fused_type should be equal, but received x's type is %s, y_fused_type's type is %s.",
+                    x_type,
+                    y_fused_type);
+    }
+
+    if(bias0_type != bias1_type){
+      PD_THROW("The type of bias0 and bias1 should be equal, but received bias0's type is %s, bias1's type is %s.",
+                      bias0_type,
+                      bias1_type);
+    }
+
+    if(x_scale_type && x_scale_type != paddle::DataType::FLOAT32){
+      PD_THROW("The type of x_scale should be float32, but received x_scale's type is %s.", x_scale_type);
+    }
+    
+    if(y_fuesd_scale_type && y_fuesd_scale_type != paddle::DataType::FLOAT32){
+      PD_THROW("The type of y_fuesd_scale should be float32, but received y_fuesd_scale's type is %s.", y_fuesd_scale_type);
+    }
+
+    paddle::DataType data_type;
+    if (output_dtype == "bfloat16")
+        data_type = paddle::DataType::BFLOAT16;
+    else if (output_dtype == "float16")
+        data_type = paddle::DataType::FLOAT16;
+    else if (output_dtype == "float8_e4m3fn")
+        data_type = paddle::DataType::FLOAT8_E4M3FN;
+    else if (output_dtype == "float8_e5m2")
+        data_type = paddle::DataType::FLOAT8_E5M2;
+    else 
+        PD_THROW(
+                "cutlass_fp8_fp8_fp8_dual_gemm_fused_scale_ptr only support bfloat16, float16, float8_e4m3fn and float8_e5m2 output, but got %s", output_dtype);
+    return {data_type};
+}
+
+
 PD_BUILD_OP(cutlass_fp8_fp8_fp8_dual_gemm_fused)
     .Inputs({"x", "y0", "y1", paddle::Optional("bias0"), paddle::Optional("bias1")})
     .Attrs({"transpose_x: bool",
@@ -264,3 +547,17 @@ PD_BUILD_OP(cutlass_fp8_fp8_fp8_dual_gemm_fused)
     .SetKernelFn(PD_KERNEL(cutlass_fp8_fp8_fp8_dual_gemm))
     .SetInferShapeFn(PD_INFER_SHAPE(CutlassFp8Fp8Fp8DualGemmFusedInferShape))
     .SetInferDtypeFn(PD_INFER_DTYPE(CutlassFp8Fp8Fp8DualGemmFusedInferDtype));
+
+PD_BUILD_OP(cutlass_fp8_fp8_fp8_dual_gemm_fused_scale_ptr)
+    .Inputs({"x", "y_fuesd", paddle::Optional("x_scale"), paddle::Optional("y_fuesd_scale"), paddle::Optional("bias0"), paddle::Optional("bias1")})
+    .Attrs({"transpose_x: bool",
+            "transpose_y: bool",
+            "scale0: float",
+            "scale1: float",
+            "scale_out: float",
+            "output_dtype: std::string",
+            "act: std::string"})
+    .Outputs({"out"})
+    .SetKernelFn(PD_KERNEL(cutlass_fp8_fp8_fp8_dual_gemm_scale_ptr))
+    .SetInferShapeFn(PD_INFER_SHAPE(CutlassFp8Fp8Fp8DualGemmFusedPtrScaleInferShape))
+    .SetInferDtypeFn(PD_INFER_DTYPE(CutlassFp8Fp8Fp8DualGemmFusedPtrScaleInferDtype));

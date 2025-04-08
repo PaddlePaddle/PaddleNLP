@@ -25,11 +25,12 @@ __inline__ __device__ T WarpReduceAbsMax(T val, unsigned lane_mask) {
   return val;
 }
 
-template <typename InType, typename OutType, int GroupSize, int VecSize, bool transpose_scale>
-__global__ void GroupQuantKernel(const InType* input,
+template <typename InType, typename OutType, int GroupSize, int VecSize>
+__global__ void PerTensorGroupQuantKernel(const InType* input,
                                    const int64_t numel,
                                    const int scale_rows,
                                    const int scale_cols,
+                                   bool transpose_scale,
                                    const float quant_max_bound,
                                    const float quant_min_bound,
                                    OutType* output,
@@ -44,7 +45,7 @@ __global__ void GroupQuantKernel(const InType* input,
   int scale_idx = 0;
   float abs_max_val = 0.000001;
 
-  if constexpr (transpose_scale) {
+  if (transpose_scale) {
     scale_idx = scale_col_idx * scale_rows + scale_row_idx;
   }else{
     scale_idx = scale_row_idx * scale_cols + scale_col_idx;
@@ -77,7 +78,7 @@ __global__ void GroupQuantKernel(const InType* input,
 }
 
 template <paddle::DataType InType, paddle::DataType OutType>
-std::vector<paddle::Tensor> LaunchGroupQuantKernel(const paddle::Tensor& x,
+std::vector<paddle::Tensor> LaunchPerTensorGroupQuantKernel(const paddle::Tensor& x,
                                                    const int group_size,
                                                    const bool transpose_scale,
                                                    const float quant_max_bound,
@@ -122,29 +123,30 @@ std::vector<paddle::Tensor> LaunchGroupQuantKernel(const paddle::Tensor& x,
     typedef typename out_traits::data_t out_data_t;
     
     if(group_size == 128){
-        GroupQuantKernel<InDataType, OutDataType, 128, VecSize, true><<<block_per_grid, threadsPerBlock, 0, stream>>>(reinterpret_cast<const InDataType*>(x.data<in_data_t>()),
+        PerTensorGroupQuantKernel<InDataType, OutDataType, 128, VecSize><<<block_per_grid, threadsPerBlock, 0, stream>>>(reinterpret_cast<const InDataType*>(x.data<in_data_t>()),
                             numel,
                             m,
                             n / 128,
+                            transpose_scale,
                             quant_max_bound,
                             quant_min_bound,
                             reinterpret_cast<OutDataType*>(out.data<out_data_t>()),
                             reinterpret_cast<float*>(scale_out.data<float>()));
     }else{
-        PD_THROW("group_quant's group_size only support 128.");
+        PD_THROW("per_tensor_group_quant's group_size only support 128.");
     }
     
     return {out, scale_out};
 }
 template <paddle::DataType InType>
-std::vector<paddle::Tensor> LaunchGroupQuant(const paddle::Tensor& x,
+std::vector<paddle::Tensor> LaunchPerTensorGroupQuant(const paddle::Tensor& x,
                                              const int group_size,
                                              const bool transpose_scale,
                                              const float quant_max_bound,
                                              const float quant_min_bound) {
 
     if(fabs(quant_max_bound - 448.0f) < 0.000001){
-        return LaunchGroupQuantKernel<InType, paddle::DataType::FLOAT8_E4M3FN>(x, group_size, transpose_scale, quant_max_bound, quant_min_bound);
+        return LaunchPerTensorGroupQuantKernel<InType, paddle::DataType::FLOAT8_E4M3FN>(x, group_size, transpose_scale, quant_max_bound, quant_min_bound);
     }else{
         PD_THROW("Only supported float8_e4m3fn quantization, please set quant_max_bound=448, quant_min_bound=-448.");
     }
@@ -152,23 +154,23 @@ std::vector<paddle::Tensor> LaunchGroupQuant(const paddle::Tensor& x,
 }
 
 
-std::vector<paddle::Tensor> GroupQuant(const paddle::Tensor& x,
+std::vector<paddle::Tensor> PerTensorGroupQuant(const paddle::Tensor& x,
                                         const int group_size,
                                         const bool transpose_scale,
                                         const float quant_max_bound,
                                         const float quant_min_bound) {
     if(x.dtype() == paddle::DataType::FLOAT32){
-        return LaunchGroupQuant<paddle::DataType::FLOAT32>(x, group_size, transpose_scale, quant_max_bound, quant_min_bound);
+        return LaunchPerTensorGroupQuant<paddle::DataType::FLOAT32>(x, group_size, transpose_scale, quant_max_bound, quant_min_bound);
     }else if(x.dtype() == paddle::DataType::FLOAT16){
-        return LaunchGroupQuant<paddle::DataType::FLOAT16>(x, group_size, transpose_scale, quant_max_bound, quant_min_bound);
+        return LaunchPerTensorGroupQuant<paddle::DataType::FLOAT16>(x, group_size, transpose_scale, quant_max_bound, quant_min_bound);
     }else if(x.dtype() == paddle::DataType::BFLOAT16){
-        return LaunchGroupQuant<paddle::DataType::BFLOAT16>(x, group_size, transpose_scale, quant_max_bound, quant_min_bound);
+        return LaunchPerTensorGroupQuant<paddle::DataType::BFLOAT16>(x, group_size, transpose_scale, quant_max_bound, quant_min_bound);
     }else{
         PD_THROW("Unsupported data type.");
     }
 }
 
-std::vector<std::vector<int64_t>> GroupQuantInferShape(const std::vector<int64_t>& input_shape, const int group_size, const bool transpose_scale, const float quant_max_bound,const float quant_min_bound) {
+std::vector<std::vector<int64_t>> PerTensorGroupQuantInferShape(const std::vector<int64_t>& input_shape, const int group_size, const bool transpose_scale, const float quant_max_bound,const float quant_min_bound) {
     std::vector<int64_t> scale_shape = input_shape;
     int rank = input_shape.size();
     if(transpose_scale){
@@ -180,7 +182,7 @@ std::vector<std::vector<int64_t>> GroupQuantInferShape(const std::vector<int64_t
     return {input_shape, scale_shape};
 }
 
-std::vector<paddle::DataType> GroupQuantInferDtype(const paddle::DataType& input_dtype, const int group_size, const bool transpose_scale, const float quant_max_bound,const float quant_min_bound) {
+std::vector<paddle::DataType> PerTensorGroupQuantInferDtype(const paddle::DataType& input_dtype, const int group_size, const bool transpose_scale, const float quant_max_bound,const float quant_min_bound) {
     
     if(fabs(quant_max_bound - 448.0f) < 0.000001){
         return {paddle::DataType::FLOAT8_E4M3FN, paddle::DataType::FLOAT32};
@@ -189,13 +191,13 @@ std::vector<paddle::DataType> GroupQuantInferDtype(const paddle::DataType& input
     }
 }
 
-PD_BUILD_OP(group_quant)
+PD_BUILD_OP(per_tensor_group_quant)
     .Inputs({"x"})
     .Outputs({"output", "scale"})
     .Attrs({"group_size: int",
             "transpose_scale: bool",
             "quant_max_bound: float",
             "quant_min_bound: float"})
-    .SetKernelFn(PD_KERNEL(GroupQuant))
-    .SetInferShapeFn(PD_INFER_SHAPE(GroupQuantInferShape))
-    .SetInferDtypeFn(PD_INFER_DTYPE(GroupQuantInferDtype));
+    .SetKernelFn(PD_KERNEL(PerTensorGroupQuant))
+    .SetInferShapeFn(PD_INFER_SHAPE(PerTensorGroupQuantInferShape))
+    .SetInferDtypeFn(PD_INFER_DTYPE(PerTensorGroupQuantInferDtype));

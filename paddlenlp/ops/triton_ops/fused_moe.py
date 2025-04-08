@@ -460,11 +460,11 @@ def ceil_div(a, b):
 
 # 初步实现，后期可以换成cuda kernel，实现动态or静态
 def per_tensor_quant_fp8(x, scale=None):
-    x_fp32 = x.cast("float32")
-    x_s = x_fp32.abs().max().clip(min=0.000001) / 448.0
-    x_q = x_fp32 / x_s
-    x_q = x_q.clip(min=-448.0, max=448.0)
-    return x_q.cast("float8_e4m3fn"), x_s
+    if scale is None:
+        from paddlenlp_ops import dynamic_per_tensor_quant_fp8
+
+        return dynamic_per_tensor_quant_fp8(x)
+    return x, scale
 
 
 def invoke_fused_moe_kernel(
@@ -488,7 +488,7 @@ def invoke_fused_moe_kernel(
 ) -> None:
     padded_size = 0
     if use_fp8_w8a8:
-        assert block_shape is not None
+        # assert block_shape is not None
         if block_shape is None:
             A, A_scale = per_tensor_quant_fp8(A, A_scale)
         else:
@@ -523,8 +523,6 @@ def invoke_fused_moe_kernel(
         even_Ks,
         config,
     )
-
-    assert compute_type == tl.bfloat16
 
 
 def invoke_fused_moe_kernel_api(
@@ -649,14 +647,13 @@ def invoke_fused_moe_kernel_api(
             B.shape[2],  # B.strides[1],
             B.shape[1],  # C.shape[2], # C.strides[1],
             1,  # C.strides[2],
-            A_scale.shape[1],  # A_scale.strides[0] if A_scale is not None and A_scale.dim() == 2 else 0,
-            1,  # A_scale.strides[1] if A_scale is not None and A_scale.dim() == 2 else 0,
-            B_scale.shape[1]
-            * B_scale.shape[2],  # B_scale.strides[0] if B_scale is not None and B_scale.dim() >= 2 else 0,
-            1,  # B_scale.strides[2] if B_scale is not None and B_scale.dim() == 3 else 0,
-            B_scale.shape[2],  # B_scale.strides[1] if B_scale is not None and B_scale.dim() >= 2 else 0,
-            128,
-            128,
+            0,  # A_scale.shape[1],  # A_scale.strides[0] if A_scale is not None and A_scale.dim() == 2 else 0,
+            0,  # 1,  # A_scale.strides[1] if A_scale is not None and A_scale.dim() == 2 else 0,
+            0,  # B_scale.shape[1] * B_scale.shape[2],  # B_scale.strides[0] if B_scale is not None and B_scale.dim() >= 2 else 0,
+            0,  # 1,  # B_scale.strides[2] if B_scale is not None and B_scale.dim() == 3 else 0,
+            0,  # B_scale.shape[2],  # B_scale.strides[1] if B_scale is not None and B_scale.dim() >= 2 else 0,
+            0,  # 128,
+            0,  # 128,
             MUL_ROUTED_WEIGHT=(int)(mul_routed_weight),
             top_k=top_k,
             compute_type_enum=1,
@@ -777,23 +774,32 @@ def get_default_config(
 ) -> Dict[str, int]:
     if dtype == "fp8_w8a8":
         if block_shape is None:
+            # config1
             config = {
-                "BLOCK_SIZE_M": 128,
-                "BLOCK_SIZE_N": 256,
+                "BLOCK_SIZE_M": 64,
+                "BLOCK_SIZE_N": 128,
                 "BLOCK_SIZE_K": 128,
                 "GROUP_SIZE_M": 32,
-                "num_warps": 8,
-                "num_stages": 4,
+                "num_warps": 4,
+                "num_stages": 3,
             }
-            if M <= E:
-                config = {
-                    "BLOCK_SIZE_M": 64,
-                    "BLOCK_SIZE_N": 128,
-                    "BLOCK_SIZE_K": 128,
-                    "GROUP_SIZE_M": 1,
-                    "num_warps": 4,
-                    "num_stages": 4,
-                }
+            # config = {
+            #     "BLOCK_SIZE_M": 128,
+            #     "BLOCK_SIZE_N": 256,
+            #     "BLOCK_SIZE_K": 128,
+            #     "GROUP_SIZE_M": 32,
+            #     "num_warps": 8,
+            #     "num_stages": 4,
+            # }
+            # if M <= E:
+            #     config = {
+            #         "BLOCK_SIZE_M": 64,
+            #         "BLOCK_SIZE_N": 128,
+            #         "BLOCK_SIZE_K": 128,
+            #         "GROUP_SIZE_M": 1,
+            #         "num_warps": 4,
+            #         "num_stages": 4,
+            #     }
         else:
             # Block-wise quant: BLOCK_SIZE_K must be divisable by block_shape[1]
             config = {
@@ -915,18 +921,19 @@ def fused_experts_impl(
 
     intermediate_cache1 = paddle.empty(
         [M, topk_ids.shape[1], N],
-        dtype=hidden_states.dtype,
+        dtype=paddle.bfloat16,
     )
     intermediate_cache2 = paddle.empty(
         (M * topk_ids.shape[1], N // 2),
-        dtype=hidden_states.dtype,
+        dtype=paddle.bfloat16,
     )
     intermediate_cache3 = paddle.empty(
         (M, topk_ids.shape[1], w2.shape[1]),
-        dtype=hidden_states.dtype,
+        dtype=paddle.bfloat16,
     )
 
-    compute_type = tl.bfloat16 if hidden_states.dtype == paddle.bfloat16 else tl.float16
+    # compute_type = tl.bfloat16 if hidden_states.dtype == paddle.bfloat16 else tl.float16
+    compute_type = tl.bfloat16
 
     from paddlenlp_ops import preprocess_for_moe
 
@@ -953,6 +960,7 @@ def fused_experts_impl(
     )
 
     intermediate_cache2 = paddle.incubate.nn.functional.swiglu(intermediate_cache1.reshape([-1, N]))
+    intermediate_cache2 = intermediate_cache2.cast(paddle.float8_e4m3fn)
 
     invoke_fused_moe_kernel(
         intermediate_cache2,

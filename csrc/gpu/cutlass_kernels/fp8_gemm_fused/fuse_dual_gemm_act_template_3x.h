@@ -30,7 +30,7 @@
 
 using namespace cute;
 
-template <typename InputType, typename CTAShape, typename ClusterShape,
+template <typename InputType, typename OutputType, typename CTAShape, typename ClusterShape,
     typename MainloopScheduleType, typename EpilogueScheduleType, typename TileSchedulerType = void,
     template <class /* ElementCompute */> class Activation = cutlass::epilogue::thread::SiLu, bool SwapAB = true>
 bool dispatch_dual_gemm_act_sm90(DualGemmEpilogueAllParams params) {
@@ -58,7 +58,20 @@ bool dispatch_dual_gemm_act_sm90(DualGemmEpilogueAllParams params) {
                                                        // elements (up to 16 bytes)
 
     // Output matrix configuration
-    using ElementOutput = ElementA; // Element type for output matrix operands
+    using ElementOutput = typename std::conditional_t<
+        std::is_same_v<OutputType, phi::dtype::float8_e4m3fn>,
+        cutlass::float_e4m3_t,
+        std::conditional_t<
+            std::is_same_v<OutputType, phi::dtype::float8_e5m2>,
+            cutlass::float_e5m2_t,
+            std::conditional_t<
+                std::is_same_v<OutputType, phi::dtype::bfloat16>,
+                cutlass::bfloat16_t,
+                cutlass::half_t
+            >
+        >
+    >;
+
     // using LayoutOutput = cutlass::layout::RowMajor; // Layout type for output matrix operands
     using LayoutOutput = cute::conditional_t<SwapAB, cutlass::layout::ColumnMajor, cutlass::layout::RowMajor>;
     static constexpr int AlignmentOutput = 128 / cutlass::sizeof_bits<ElementOutput>::value;
@@ -103,6 +116,9 @@ bool dispatch_dual_gemm_act_sm90(DualGemmEpilogueAllParams params) {
     ElementA const* ptr_A = reinterpret_cast<ElementA const*>(params.A);
     ElementB const* ptr_B0 = reinterpret_cast<ElementB const*>(params.B0);
     ElementB const* ptr_B1 = reinterpret_cast<ElementB const*>(params.B1);
+    float const* x_scale_ptr = reinterpret_cast<float const*>(params.x_scale_ptr);
+    float const* scale0_ptr = reinterpret_cast<float const*>(params.scale0_ptr);
+    float const* scale1_ptr = reinterpret_cast<float const*>(params.scale1_ptr);
     if constexpr (SwapAB)
     {
         arg_m = params.N;
@@ -116,7 +132,7 @@ bool dispatch_dual_gemm_act_sm90(DualGemmEpilogueAllParams params) {
     StrideD stride_D = cutlass::make_cute_packed_stride(StrideD{}, cute::make_shape(arg_m, arg_n, params.batch_count));
 
     typename Gemm::Arguments arguments = {cutlass::gemm::GemmUniversalMode::kGemm, {arg_m, arg_n, params.K, params.batch_count},
-        {ptr_A, stride_A, ptr_B0, ptr_B1, stride_B, params.scale0, params.scale1},
+        {ptr_A, stride_A, ptr_B0, ptr_B1, stride_B, params.scale0, params.scale1, x_scale_ptr, scale0_ptr, scale1_ptr},
         {{}, // epilogue.thread
             nullptr, stride_C, reinterpret_cast<ElementOutput*>(params.D), stride_D}};
     arguments.epilogue.thread.alpha = params.scale_out;
@@ -144,4 +160,3 @@ bool dispatch_dual_gemm_act_sm90(DualGemmEpilogueAllParams params) {
   }
   return true;
 }
-

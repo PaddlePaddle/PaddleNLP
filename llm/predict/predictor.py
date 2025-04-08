@@ -1324,6 +1324,9 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
         if self.tensor_parallel_rank == 0:
             done_event.wait()
         s_time = time.time()
+        ii = 0
+        from paddle.framework import core
+
         while self.model_inputs["not_need_stop"]:
             # whether speculative decoding
             if self.proposer is not None:
@@ -1333,10 +1336,16 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
                     seq_lens_this_time=self.model_inputs["seq_lens_this_time"],
                     base_model_full_hidden_states=self.full_hidden_states,
                 )
+
+            ii += 1
+            if ii == 5:
+                core.nvprof_start()
             if self.return_full_hidden_states:
                 self.full_hidden_states = self.predictor.run(list(self.model_inputs.values()))[0]
             else:
                 self.predictor.run(list(self.model_inputs.values()))
+            if ii == 7:
+                core.nvprof_stop()
         logger.info(f"running spend {time.time() - s_time}")
 
         if self.tensor_parallel_rank == 0:
@@ -1593,7 +1602,8 @@ def benchmark(predictor, predictor_args, model_args):
     print("***********Start Benchmark**********")
 
     warmup_time = 5
-    test_time = 20
+    test_time = 5
+    from paddle.framework import core
 
     print("***********Start Warmup**********")
     for _ in range(warmup_time):
@@ -1604,10 +1614,14 @@ def benchmark(predictor, predictor_args, model_args):
     start = time.perf_counter()
     output_tokens = 0
     for _ in range(test_time):
+        if _ == test_time - 1:
+            core.nvprof_start()
         for bs, batch_source_text in enumerate(batch_benchmark_texts):
             results = predictor.predict(batch_source_text, return_tokens=True)
             if predictor.tensor_parallel_rank == 0:
                 output_tokens += sum([len(tokens) for tokens in results[-1]])
+        if _ == test_time - 1:
+            core.nvprof_stop()
     end = time.perf_counter()
     if predictor.tensor_parallel_rank == 0:
         print("Avg Elapse time is: ", (end - start) / test_time)
