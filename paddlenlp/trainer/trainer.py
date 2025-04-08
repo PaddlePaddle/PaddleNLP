@@ -1020,19 +1020,19 @@ class Trainer:
 
             step = -1
             for step, inputs in enumerate(epoch_iterator):
-                print("===> run step ", step, flush=1)
-                if step == 10:
-                    paddle.base.core.nvprof_start()
-                    paddle.base.core.nvprof_enable_record_event()
-                    paddle.base.core.nvprof_nvtx_push(str(step))
-                if step == 50:
-                    paddle.base.core.nvprof_nvtx_pop()
-                    paddle.base.core.nvprof_stop()
-                    import sys 
-                    sys.exit()
-                if step >= 10 and step < 50:
-                    paddle.base.core.nvprof_nvtx_pop()
-                    paddle.base.core.nvprof_nvtx_push(str(step))
+                # print("===> run step ", step, flush=1)
+                # if step == 10:
+                #     paddle.base.core.nvprof_start()
+                #     paddle.base.core.nvprof_enable_record_event()
+                #     paddle.base.core.nvprof_nvtx_push(str(step))
+                # if step == 50:
+                #     paddle.base.core.nvprof_nvtx_pop()
+                #     paddle.base.core.nvprof_stop()
+                #     import sys 
+                #     sys.exit()
+                # if step >= 10 and step < 50:
+                #     paddle.base.core.nvprof_nvtx_pop()
+                #     paddle.base.core.nvprof_nvtx_push(str(step))
 
 
                 if (
