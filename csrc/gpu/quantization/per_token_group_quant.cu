@@ -120,16 +120,16 @@ std::vector<paddle::Tensor> LaunchPerTokenGroupQuantKernel(const paddle::Tensor&
     std::vector<int64_t> out_shape = x.shape();
     std::vector<int64_t> scale_shape = x.shape();
     int64_t m = x.shape()[rank - 2];
-    int64_t n = x.shape()[rank - 1];
+    int64_t k = x.shape()[rank - 1];
     PD_CHECK(n % group_size == 0);
-    int64_t scale_n = n / group_size;
+    int64_t scale_k = k / group_size;
 
     out = paddle::empty(out_shape, OutType, place);
     if(transpose_scale){
-        scale_shape[rank - 2] = scale_n;
+        scale_shape[rank - 2] = scale_k;
         scale_shape[rank - 1] = m;
     }else{
-        scale_shape[rank - 1] = scale_n;
+        scale_shape[rank - 1] = scale_k;
     }
     scale_out = paddle::empty(scale_shape, paddle::DataType::FLOAT32, place);
     int64_t numel = x.numel();
@@ -154,10 +154,9 @@ std::vector<paddle::Tensor> LaunchPerTokenGroupQuantKernel(const paddle::Tensor&
     int scale_stride = 0;
     if (transpose_scale){
         scale_num_rows = m;
-        scale_stride = scale_n;
+        scale_stride = scale_k;
     }
     
-
     dim3 grid(num_blocks);
     dim3 block(num_threads);
 
