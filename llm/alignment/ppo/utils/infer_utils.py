@@ -44,7 +44,8 @@ class PolicyPredictor(DygraphBlockInferencePredictor):
     def enable(self, model, offload_model=True):
         if self.is_available:
             return
-        self.set_state_dict(model, offload_model)
+        with paddle.LazyGuard():
+            self.set_state_dict(model, offload_model)
         self.is_available = True
 
     def disable(self, model, onload_model=True):
