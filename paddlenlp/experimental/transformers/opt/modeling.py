@@ -119,7 +119,7 @@ class OPTInferenceModel(OPTPretrainedModel):
             activation="relu",
             normalize_before=True,
             num_layers=config.num_hidden_layers,
-            nranks=1,
+            tp_degree=1,
             ring_id=-1,
             ln_scale_attrs=ln_scale_attrs,
             ln_bias_attrs=ln_bias_attrs,
@@ -199,7 +199,7 @@ class OPTInferenceModel(OPTPretrainedModel):
         elif input_ids is None and inputs_embeds is None:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
 
-        # genereate a fake input_ids according to inputs_embeds
+        # generate a fake input_ids according to inputs_embeds
         # this is usually occurred in img2txt multimodal model when first enter into this forward function.
         if input_ids is None and inputs_embeds is not None:
             input_ids = self.prepare_input_ids_for_generation(self.config.bos_token_id, inputs_embeds)
@@ -217,7 +217,7 @@ class OPTInferenceModel(OPTPretrainedModel):
 
         var_embedding_output = None
         if not is_decoder:
-            # support variable seqence length embeddings
+            # support variable sequence length embeddings
             var_embedding_output = embedding_output[0, 0 : seq_len_encoder[0][0], :]
             for b in range(1, batch):
                 var_embedding_output = paddle.concat(

@@ -84,6 +84,17 @@ class AutoTrainingArguments(TrainingArguments):
         metadata={"help": "The step to end job_schedule_profiler."},
     )
 
+    auto_parallel_sync_shared_params: bool = field(
+        default=False,
+        metadata={
+            "help": (
+                "Optimize the parameter sharing between two stages in a pipeline parallel scenario, setting `auto_parallel_sync_shared_params` to `True`. "
+                "It constructs identical parameters on the two stages, synchronizes gradients through allreduce, and then performs optimizer optimization"
+                " independently on each stage. Currently, only one shared parameter is supported."
+            )
+        },
+    )
+
     def __post_init__(self):
         super().__post_init__()
         assert self.enable_auto_parallel
@@ -109,6 +120,10 @@ class AutoTrainingArguments(TrainingArguments):
         mp_configs = split_parallel_config(self.tensor_parallel_config)
         if "replace_with_parallel_cross_entropy" in mp_configs:
             self.strategy.mp_optimization.replace_with_parallel_cross_entropy = True
+
+        pp_configs = split_parallel_config(self.pipeline_parallel_config)
+        if "auto_parallel_sync_shared_params" in pp_configs:
+            self.strategy.pipeline.auto_parallel_sync_shared_params = True
 
         if self.recompute:
             recompute = self.strategy.recompute

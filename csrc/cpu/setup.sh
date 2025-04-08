@@ -47,9 +47,11 @@ fi
 cd xFasterTransformer
 git apply paddle.patch
 
-# #4. build xFasterTransformer
-sh ./3rdparty/prepare_oneccl.sh
-source ./3rdparty/oneccl/build/_install/env/setvars.sh
+#4. build xFasterTransformer
+cd 3rdparty
+bash prepare_oneccl.sh
+source ./oneccl/build/_install/env/setvars.sh
+cd ..
 
 rm -rf build
 mkdir build && cd build

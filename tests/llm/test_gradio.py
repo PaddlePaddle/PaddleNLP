@@ -42,8 +42,8 @@ def is_port_in_use(port):
 class UITest(unittest.TestCase):
     def setUp(self):
         # start web ui
-        self.flask_port = self.avaliable_free_port()
-        self.port = self.avaliable_free_port([self.flask_port])
+        self.flask_port = self.available_free_port()
+        self.port = self.available_free_port([self.flask_port])
         self.model_path = "__internal_testing__/micro-random-llama"
         command = (
             "cd ./llm && PYTHONPATH=../:$PYTHONPATH"
@@ -63,7 +63,7 @@ class UITest(unittest.TestCase):
     def tearDown(self):
         self.ui_process.terminate()
 
-    def avaliable_free_port(self, exclude=None):
+    def available_free_port(self, exclude=None):
         exclude = exclude or []
         for port in range(8000, 10000):
             if port in exclude:

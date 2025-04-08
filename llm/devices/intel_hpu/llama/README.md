@@ -90,7 +90,7 @@ I1029 11:24:40.706897 14711 tcp_utils.cc:130] Successfully connected to 127.0.0.
 [2024-10-29 11:24:52,067] [    INFO] - We are using <class 'paddlenlp.transformers.llama.modeling.LlamaForCausalLM'> to load 'meta-llama/Llama-2-7b-chat'.
 [2024-10-29 11:24:52,067] [    INFO] - Loading configuration file /root/.paddlenlp/models/meta-llama/Llama-2-7b-chat/config.json
 [2024-10-29 11:24:52,068] [    INFO] - Loading weights file from cache at /root/.paddlenlp/models/meta-llama/Llama-2-7b-chat/model_state.pdparams
-[2024-10-29 11:25:43,202] [    INFO] - Starting to convert orignal state_dict to tensor parallel state_dict.
+[2024-10-29 11:25:43,202] [    INFO] - Starting to convert original state_dict to tensor parallel state_dict.
 [2024-10-29 11:25:45,125] [    INFO] - Loaded weights file from disk, setting weights to model.
 [2024-10-29 11:26:04,008] [    INFO] - All model checkpoint weights were used when initializing LlamaForCausalLM.
 [2024-10-29 11:26:04,008] [    INFO] - All the weights of LlamaForCausalLM were initialized from the model checkpoint at meta-llama/Llama-2-7b-chat.

@@ -56,12 +56,12 @@ class LlamaPolicyPipe(LlamaForCausalLMPipe):
         last_stage_keys = ["labels", "input_ids", "old_log_probs", "reward_advantages", "sequence_mask"]
 
         if type(inputs) is dict:
-            # for left padding, position_ids is nececessary
+            # for left padding, position_ids is necessary
             if "position_ids" not in inputs:
                 inputs["position_ids"] = make_position_ids(inputs["attention_mask"])
             # ppo-loss and ptx-loss need different labels, and data iter provides
-            # corrensponding data, thus add the not provided fields here.
-            # policy trian and infer has different inputs, infer uses position_ids.
+            # corresponding data, thus add the not provided fields here.
+            # policy train and infer has different inputs, infer uses position_ids.
             # for key in last_stage_keys:
             for key in first_stage_keys + last_stage_keys:
                 if key not in inputs:
@@ -99,8 +99,8 @@ class LlamaPolicyPipe(LlamaForCausalLMPipe):
             padding_value = self._ignore_index if key == "labels" else 1 if key == "position_ids" else 0
             inputs_batch[key] = pad_batches_inputs(inputs_batch[key], padding_value, pad_len=pad_len)
         # 2. For old_log_probs/reward_advantages/sequence_mask (target) padding:
-        # hard to pad acorss batches, think in some cases one batch might have the
-        # longest prompt+target length but the shortest target lengh, which might
+        # hard to pad across batches, think in some cases one batch might have the
+        # longest prompt+target length but the shortest target length, which might
         # cause mismatch between inputs with prompt+target length and labels with
         # target length. NOTE: however trick can be used here, label fields with
         # target length such as old_log_probs/reward_advantages/sequence_mask do

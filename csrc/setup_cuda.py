@@ -80,7 +80,7 @@ def get_gencode_flags():
 
 
 gencode_flags = get_gencode_flags()
-library_path = os.environ.get("LD_LIBRARY_PATH", "/usr/local/cuda/lib64")
+library_path = [os.environ.get("LD_LIBRARY_PATH", "/usr/local/cuda/lib64")]
 
 sources = [
     "./gpu/save_with_output.cc",
@@ -106,7 +106,7 @@ sources = [
     "./gpu/quant_int8.cu",
     "./gpu/dequant_int8.cu",
     "./gpu/group_quant.cu",
-    "./gpu/preprocess_for_moe.cu",
+    "./gpu/moe/preprocess_for_moe.cu",
     "./gpu/get_position_ids_and_mask_encoder_batch.cu",
     "./gpu/fused_rotary_position_encoding.cu",
     "./gpu/flash_attn_bwd.cc",
@@ -120,6 +120,8 @@ sources = [
     "./gpu/speculate_decoding_kernels/speculate_get_output.cc",
 ]
 sources += find_end_files("./gpu/speculate_decoding_kernels", ".cu")
+sources += find_end_files("./gpu/moe/fused_moe/cutlass_kernels/moe_gemm/", ".cu")
+sources += find_end_files("./gpu/moe/fused_moe/", ".cu")
 
 nvcc_compile_args = gencode_flags
 update_git_submodule()
@@ -132,16 +134,19 @@ nvcc_compile_args += [
     "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
     "-U__CUDA_NO_BFLOAT162_OPERATORS__",
     "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
-    "-Igpu",
-    "-Igpu/cutlass_kernels",
-    "-Igpu/fp8_gemm_with_cutlass",
-    "-Igpu/cutlass_kernels/fp8_gemm_fused/autogen",
-    "-Ithird_party/cutlass/include",
-    "-Ithird_party/cutlass/tools/util/include",
-    "-Ithird_party/nlohmann_json/single_include",
-    "-Igpu/sample_kernels",
 ]
 
+include_dirs = [
+    "./gpu",
+    "./gpu/cutlass_kernels",
+    "./gpu/fp8_gemm_with_cutlass",
+    "./gpu/cutlass_kernels/fp8_gemm_fused/autogen",
+    "./third_party/cutlass/include",
+    "./third_party/cutlass/tools/util/include",
+    "./third_party/nlohmann_json/single_include",
+    "./gpu/sample_kernels",
+    "./gpu/moe/fused_moe",
+]
 cc = get_sm_version()
 cuda_version = float(paddle.version.cuda())
 
@@ -157,6 +162,7 @@ if cc >= 80:
 fp8_auto_gen_directory = "gpu/cutlass_kernels/fp8_gemm_fused/autogen"
 if os.path.isdir(fp8_auto_gen_directory):
     shutil.rmtree(fp8_auto_gen_directory)
+
 
 if cc == 89 and cuda_version >= 12.4:
     os.system("python utils/auto_gen_fp8_fp8_gemm_fused_kernels.py --cuda_arch 89")
@@ -209,12 +215,14 @@ if cc >= 90 and cuda_version >= 12.0:
     sources += find_end_files("./gpu/mla_attn", ".cu")
 
 ops_name = f"paddlenlp_ops_{sm_version}" if sm_version != 0 else "paddlenlp_ops"
+
 setup(
     name=ops_name,
     ext_modules=CUDAExtension(
         sources=sources,
         extra_compile_args={"cxx": ["-O3", "-fopenmp", "-lgomp", "-std=c++17", "-DENABLE_BF16"], "nvcc": nvcc_compile_args},
         libraries=["cublasLt"],
-        library_dirs=[library_path],
+        library_dirs=library_path,
+        include_dirs=include_dirs,
     ),
 )
