@@ -53,14 +53,14 @@ class ModelConfig:
             "help": "Model weight quantization algorithm including 'nf4', 'fp4','weight_only_int4', 'weight_only_int8'."
         },
     )
-    weight_blocksize: int = field(
+    qlora_weight_blocksize: int = field(
         default=64,
         metadata={"help": "Block size for weight quantization(Only available for nf4 or fp4 quant_scale.)."},
     )
-    weight_double_quant: bool = field(
+    qlora_weight_double_quant: bool = field(
         default=False, metadata={"help": "Whether apply double quant(Only available for nf4 or fp4 quant_scale.)."}
     )
-    weight_double_quant_block_size: int = field(
+    qlora_weight_double_quant_block_size: int = field(
         default=256,
         metadata={
             "help": "Block size for quant_scale of weight quant_scale(Only available for nf4 or fp4 quant_scale.)"
