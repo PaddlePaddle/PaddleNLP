@@ -1491,6 +1491,31 @@ class FusedMultiTransformerBase(Layer):
         """
         self.pre_process(**kwargs)
         kwargs["cum_offsets"] = cum_offsets
+        from paddlenlp_ops import get_position_ids_v2, get_infer_param
+        infer_param_list = get_infer_param(kwargs.get("seq_lens_encoder", None), kwargs.get("seq_lens_decoder", None))
+        kwargs["encoder_batch_map"] = infer_param_list[0]
+        kwargs["decoder_batch_map"] = infer_param_list[1]
+        kwargs["encoder_batch_idx"] = infer_param_list[2]
+        kwargs["decoder_batch_idx"] = infer_param_list[3]
+        kwargs["encoder_seq_lod"] = infer_param_list[4]
+        kwargs["decoder_context_len"] = infer_param_list[5]
+        kwargs["decoder_context_len_cache"] = infer_param_list[6]
+        kwargs["encoder_batch_map_cpu"] = infer_param_list[7]
+        kwargs["decoder_batch_map_cpu"] = infer_param_list[8]
+        kwargs["encoder_batch_idx_cpu"] = infer_param_list[9]
+        kwargs["decoder_batch_idx_cpu"] = infer_param_list[10]
+        kwargs["encoder_seq_lod_cpu"] = infer_param_list[11]
+        kwargs["decoder_context_len_cpu"] = infer_param_list[12]
+        kwargs["decoder_context_len_cache_cpu"] = infer_param_list[13]
+        # 1
+        kwargs["enc_batch"] = infer_param_list[14]
+        kwargs["dec_batch"] = infer_param_list[15]
+        kwargs["total_enc_len"] = infer_param_list[16]
+
+        kwargs["start_token_raw"] = paddle.full(shape=[kwargs.get("seq_lens_encoder", None).shape[0]], fill_value=0, dtype="int32")  #  [0, 0, 0 ,0 ……] enc_batch
+        kwargs["kv_seq_lod_raw"] = paddle.arange(start=0, end=kwargs.get("seq_lens_encoder", None).shape[0]+1, step=1, dtype="int32")   #  [0, 1, 2 ,3 ……] dec_batch + 1
+        kwargs["start_token_raw_cpu"] = kwargs["start_token_raw"].cpu()  #  [0, 0, 0 ,0 ……] enc_batch
+        kwargs["kv_seq_lod_raw_cpu"] = kwargs["kv_seq_lod_raw"].cpu()   #  [0, 1, 2 ,3 ……] dec_batch + 1
 
         if caches is not None:
             assert len(caches) == len(self.linear_weights) or len(caches) == 2 * len(self.linear_weights)
@@ -3727,9 +3752,15 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
     def post_process(self, **kwargs):
         multi_block_output = kwargs.get("multi_block_output", None)
         cum_offsets = kwargs.get("cum_offsets", None)
-        seq_lens_encoder = kwargs.get("seq_lens_encoder", None)
-        seq_lens_decoder = kwargs.get("seq_lens_decoder", None)
+        encoder_seq_lod = kwargs.get("encoder_seq_lod", None)
+        encoder_batch_map = kwargs.get("encoder_batch_map", None)
+        decoder_batch_map = kwargs.get("decoder_batch_map", None)
+        encoder_seq_lod_cpu = kwargs.get("encoder_seq_lod_cpu", None)
+        encoder_batch_map_cpu = kwargs.get("encoder_batch_map_cpu", None)
+        decoder_batch_map_cpu = kwargs.get("decoder_batch_map_cpu", None)
         max_input_length = kwargs.get("max_input_length", -1)
+        enc_batch = kwargs.get("enc_batch", None)
+        dec_batch = kwargs.get("dec_batch", None)
         output_padding_offset = kwargs.get("output_padding_offset", None)  # only used in speculative decoding
 
         if self.config.speculate_config.return_full_hidden_states:
@@ -3740,8 +3771,14 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
             out = gather_next_token(
                 multi_block_output,
                 cum_offsets,
-                seq_lens_decoder,
-                seq_lens_encoder,
+                encoder_seq_lod,
+                encoder_batch_map,
+                decoder_batch_map,
+                encoder_seq_lod_cpu,
+                encoder_batch_map_cpu,
+                decoder_batch_map_cpu,
+                enc_batch,
+                dec_batch,
                 output_padding_offset,
                 max_input_length,
             )
@@ -3753,8 +3790,14 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
         src = adjust_batch(
             src,
             kwargs.get("cum_offsets", None),
-            kwargs.get("seq_lens_decoder", None),
-            kwargs.get("seq_lens_encoder", None),
+            kwargs.get("encoder_seq_lod", None),
+            kwargs.get("encoder_batch_idx", None),
+            kwargs.get("decoder_batch_idx", None),
+            kwargs.get("encoder_seq_lod_cpu", None),
+            kwargs.get("encoder_batch_idx_cpu", None),
+            kwargs.get("decoder_batch_idx_cpu", None),
+            kwargs.get("enc_batch", None),
+            kwargs.get("dec_batch", None),
             kwargs.get("output_padding_offset", None),
             kwargs.get("max_input_length", -1),
         )
@@ -3832,8 +3875,14 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
                         compressed_kv,
                         key_pe,
                         latent_cache,
-                        kwargs.get("seq_lens_encoder", None),
-                        kwargs.get("seq_lens_decoder", None),
+                        kwargs.get("encoder_seq_lod", None),
+                        kwargs.get("encoder_batch_map", None),
+                        kwargs.get("start_token_raw", None),
+                        kwargs.get("encoder_seq_lod_cpu", None),
+                        kwargs.get("encoder_batch_map_cpu", None),
+                        kwargs.get("start_token_raw_cpu", None),
+                        kwargs.get("enc_batch", None),
+                        kwargs.get("dec_batch", None),                        
                         kwargs.get("padding_offsets", None),
                         kwargs.get("cum_offsets", None),
                         kwargs.get("block_tables", None),
@@ -3913,9 +3962,11 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
                 query,
                 key,
                 value,
-                kwargs.get("seq_lens_encoder", None),
-                kwargs.get("seq_lens_decoder", None),
-                kwargs.get("seq_lens_this_time", None),
+                kwargs.get("encoder_seq_lod", None),
+                kwargs.get("encoder_batch_map", None),
+                kwargs.get("encoder_seq_lod_cpu", None),
+                kwargs.get("encoder_batch_map_cpu", None),
+                kwargs.get("enc_batch", None),
                 kwargs.get("padding_offsets", None),
                 kwargs.get("cum_offsets", None),
                 kwargs.get("block_tables", None),
@@ -4011,8 +4062,14 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
                 compressed_kv,
                 key_pe,
                 latent_cache,
-                kwargs.get("seq_lens_decoder", None),
-                kwargs.get("seq_lens_encoder", None),
+                kwargs.get("decoder_context_len_cache", None),
+                kwargs.get("decoder_batch_map", None),
+                kwargs.get("kv_seq_lod_raw", None),
+                kwargs.get("decoder_context_len_cache_cpu", None),
+                kwargs.get("decoder_batch_map_cpu", None),
+                kwargs.get("kv_seq_lod_raw_cpu", None),
+                kwargs.get("enc_batch", None),
+                kwargs.get("dec_batch", None),
                 kwargs.get("padding_offsets", None),
                 kwargs.get("cum_offsets", None),
                 kwargs.get("block_tables", None),
@@ -4032,9 +4089,11 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
             fmha_out_decode = absorb_mla_block_mha_decoder_xpu(
                 q_input,
                 latent_cache,
-                kwargs.get("seq_lens_encoder", None),
-                kwargs.get("seq_lens_decoder", None),
-                kwargs.get("seq_lens_this_time", None),
+                kwargs.get("decoder_context_len", None),
+                kwargs.get("decoder_batch_map", None),
+                kwargs.get("decoder_context_len_cpu", None),
+                kwargs.get("decoder_batch_map_cpu", None),
+                kwargs.get("dec_batch", None),
                 kwargs.get("padding_offsets", None),
                 kwargs.get("cum_offsets", None),
                 kwargs.get("block_tables", None),

@@ -40,9 +40,11 @@ std::vector<paddle::Tensor> MlaEnAttn(
     const paddle::Tensor& q,
     const paddle::Tensor& k,
     const paddle::Tensor& v,
-    const paddle::Tensor& seq_lens_encoder,
-    const paddle::Tensor& seq_lens_decoder,
-    const paddle::Tensor& seq_lens_this_time,
+    const paddle::Tensor& encoder_seq_lod,
+    const paddle::Tensor& encoder_batch_map,
+    const paddle::Tensor& encoder_seq_lod_cpu,
+    const paddle::Tensor& encoder_batch_map_cpu,
+    const paddle::Tensor& enc_batch_tensor,
     const paddle::Tensor& padding_offsets,
     const paddle::Tensor& cum_offsets,
     const paddle::Tensor& block_tables,
@@ -89,16 +91,16 @@ std::vector<paddle::Tensor> MlaEnAttn(
   auto xpu_ctx = static_cast<const phi::XPUContext*>(dev_ctx);
 
   xpu::ctx_guard RAII_GUARD(xpu_ctx->x_context());
-
   using QType = typename XPUTypeTrait<bfloat16>::Type;
   using CacheType = typename XPUTypeTrait<bfloat16>::Type;
   typedef paddle::bfloat16 qdata_t, cache_t;
   const auto& input_dims = q.dims();
-  const int bsz = seq_lens_encoder.dims()[0];
+  const int bsz = cum_offsets.dims()[0];
   const int token_num = input_dims[0];
   const int block_batch = block_tables.dims()[0]; // TODO参数含义 block_batch_  PageParam page_param_
   const int max_block_per_seq = block_tables.dims()[1];
   const int max_seq_len = block_size * max_block_per_seq;
+  int enc_batch = enc_batch_tensor.data<int32_t>()[0]; 
   // 初始化输入：q k v
   auto q_xft = baidu::xpu::xft::xftTensor<QType, 3>(
       reinterpret_cast<QType*>(const_cast<paddle::bfloat16*>(q.data<qdata_t>())),
@@ -122,66 +124,17 @@ std::vector<paddle::Tensor> MlaEnAttn(
       reinterpret_cast<QType*>(const_cast<paddle::bfloat16*>(fmha_out.data<qdata_t>())),
       std::array<int64_t, 2>{fmha_out.shape()[0],
                              fmha_out.shape()[1]});
-  // encoder 判断逻辑
-  std::vector<int> seq_lens_encoder_cpu(bsz, 0);
-  std::vector<int> seq_lens_decoder_cpu(bsz, 0);
-  std::vector<int> encoder_batch_map; // 
-  std::vector<int> decoder_batch_map; // 
-  std::vector<int> encoder_batch_idx; // 去除空隙的batch map
-  std::vector<int> decoder_batch_idx; // 去除空隙的batch map
-  std::vector<int> encoder_seq_lod;
-  std::vector<int> decoder_context_len;
-  std::vector<int> decoder_context_len_cache;
-  int r = xpu_memcpy(seq_lens_encoder_cpu.data(),
-                 seq_lens_encoder.data<int>(),
-                 sizeof(int32_t) * bsz,
-                 XPUMemcpyKind::XPU_DEVICE_TO_HOST);
-  r = xpu_memcpy(seq_lens_decoder_cpu.data(),
-                 seq_lens_decoder.data<int>(),
-                 sizeof(int32_t) * bsz,
-                 XPUMemcpyKind::XPU_DEVICE_TO_HOST);
-
-  int enc_batch = 0, dec_batch = 0;
-  int64_t total_enc_len = 0;
-  int batch_offset = 0;
-  encoder_seq_lod.push_back(0);
-  for(int i = 0; i < bsz; ++i){
-    if(seq_lens_encoder_cpu[i] > 0){
-      enc_batch++;
-      total_enc_len += seq_lens_encoder_cpu[i];
-      encoder_batch_map.push_back(i);
-      encoder_batch_idx.push_back(i - batch_offset);
-      encoder_seq_lod.push_back(seq_lens_encoder_cpu[i]);
-      encoder_seq_lod[enc_batch] += encoder_seq_lod[enc_batch - 1];
-    }
-    else if(seq_lens_decoder_cpu[i] > 0){
-      dec_batch++;
-      decoder_batch_map.push_back(i);
-      decoder_batch_idx.push_back(i - batch_offset);
-      decoder_context_len.push_back(seq_lens_decoder_cpu[i] + 1);
-      decoder_context_len_cache.push_back(seq_lens_decoder_cpu[i]);
-    }
-    else{
-        batch_offset++;
-    }
-  }
 
   // encoder
   if(max_enc_len_this_time.data<int>()[0] > 0){
     // q_lod
-    baidu::xpu::api::VectorParam<int32_t> context_len_vp =
-        baidu::xpu::api::VectorParam<int32_t>{encoder_seq_lod.data(), enc_batch + 1, nullptr}
-            .to_xpu(RAII_GUARD);
+    baidu::xpu::api::VectorParam<int32_t> context_len_vp{const_cast<int32_t*>(encoder_seq_lod_cpu.data<int32_t>()), enc_batch + 1, const_cast<int32_t*>(encoder_seq_lod.data<int32_t>())};
     // real batch（encoder阶段 kv cache写需要）
-    baidu::xpu::api::VectorParam<int32_t> valid_batch_vp =
-        baidu::xpu::api::VectorParam<int32_t>{encoder_batch_map.data(), enc_batch, nullptr}
-            .to_xpu(RAII_GUARD);
+    baidu::xpu::api::VectorParam<int32_t> valid_batch_vp{const_cast<int32_t*>(encoder_batch_map_cpu.data<int32_t>()), enc_batch, const_cast<int32_t*>(encoder_batch_map.data<int32_t>())};
     // prefix (not support)
     baidu::xpu::api::VectorParam<int32_t> prefix_lens_vp = baidu::xpu::api::VectorParam<int32_t>();
     // kv_lod (非prefix cache情况与q_lod一致)
-    baidu::xpu::api::VectorParam<int32_t> encoder_kv_lods_vp =
-        baidu::xpu::api::VectorParam<int32_t>{encoder_seq_lod.data(), enc_batch + 1, nullptr}
-            .to_xpu(RAII_GUARD);  
+    baidu::xpu::api::VectorParam<int32_t> encoder_kv_lods_vp{const_cast<int32_t*>(encoder_seq_lod_cpu.data<int32_t>()), enc_batch + 1, const_cast<int32_t*>(encoder_seq_lod.data<int32_t>())};
     // page_param_
     baidu::xpu::xft::PageParam page_param_(block_batch, // block_batch_
                                             max_enc_len_this_time.data<int>()[0], // max_enc_len_this_time.data<int>()[0],max_seq_len // max_context_len_
@@ -247,8 +200,8 @@ std::vector<paddle::Tensor> MlaEnAttn(
             nullptr, // std::is_same<TK, int8_t>::value ? p_kcache_perhead_scale->data() : p_cache_k->max_data(),
             nullptr, // std::is_same<TK, int8_t>::value ? p_vcache_perhead_scale->data() : p_cache_v->max_data(),
             block_size, // block_size
-            0, // max_blocks_per_seq (prefix cache)
-            -1, // prefill_len
+            max_block_per_seq, // max_blocks_per_seq (prefix cache)
+            page_param_.max_context_len_, // prefill_len
             nullptr,
             softmax_scale * sqrt(dim_qk)); // block_tables (prefix cache)
 
@@ -261,9 +214,11 @@ std::vector<std::vector<int64_t>> MlaEnAttnInferShape(
     const std::vector<int64_t>& q_shape,
     const std::vector<int64_t>& k_shape,
     const std::vector<int64_t>& v_shape,
-    const std::vector<int64_t>& seq_lens_encoder_shape,
-    const std::vector<int64_t>& seq_lens_decoder_shape,
-    const std::vector<int64_t>& seq_lens_this_time_shape,
+    const std::vector<int64_t>& encoder_seq_lod_shape,
+    const std::vector<int64_t>& encoder_batch_map_shape,
+    const std::vector<int64_t>& encoder_seq_lod_cpu_shape,
+    const std::vector<int64_t>& encoder_batch_map_cpu_shape,
+    const std::vector<int64_t>& enc_batch_tensor_shape,
     const std::vector<int64_t>& padding_offsets_shape,
     const std::vector<int64_t>& cum_offsets_shape,
     const std::vector<int64_t>& block_tables_shape,
@@ -299,9 +254,11 @@ std::vector<paddle::DataType> MlaEnAttnInferDtype(
     const paddle::DataType& q_dtype,
     const paddle::DataType& k_dtype,
     const paddle::DataType& v_dtype,
-    const paddle::DataType& seq_lens_encoder_dtype,
-    const paddle::DataType& seq_lens_decoder_dtype,
-    const paddle::DataType& seq_lens_this_time_dtype,
+    const paddle::DataType& encoder_seq_lod_dtype,
+    const paddle::DataType& encoder_batch_map_dtype,
+    const paddle::DataType& encoder_seq_lod_cpu_dtype,
+    const paddle::DataType& encoder_batch_map_cpu_dtype,
+    const paddle::DataType& enc_batch_tensor_dtype,
     const paddle::DataType& padding_offsets_dtype,
     const paddle::DataType& cum_offsets_dtype,
     const paddle::DataType& block_tables_dtype,
@@ -357,9 +314,11 @@ PD_BUILD_OP(absorb_mla_block_mha_encoder_xpu)
     .Inputs({"q",
              "k",
              "v",
-             "seq_lens_encoder",
-             "seq_lens_decoder",
-             "seq_lens_this_time",
+             "encoder_seq_lod",
+             "encoder_batch_map",
+             "encoder_seq_lod_cpu",
+             "encoder_batch_map_cpu",
+             "enc_batch_tensor",
              "padding_offsets",
              "cum_offsets",
              "block_tables",

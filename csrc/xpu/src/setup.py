@@ -85,6 +85,7 @@ setup(
                 "./fused_rotary_position_encoding.cc",
                 "./mla_cache_kernel_xpu.cc",
                 "./batch_matmul_xpu.cc",
+                "./get_infer_param.cc",
             ],
             include_dirs=[".", "./plugin/include", XRE_INC_PATH, XFT_INC_PATH, XFA_INC_PATH, XBLAS_INC_PATH],
             extra_objects=["./plugin/build/libxpuplugin.a", XRE_LIB_PATH, XFT_LIB_PATH, XFA_LIB_PATH, XBLAS_LIB_PATH],

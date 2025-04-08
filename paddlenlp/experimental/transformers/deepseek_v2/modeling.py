@@ -140,6 +140,93 @@ class DeepseekScalingRotaryEmbedding(nn.Layer):
         return query, key
 
 
+class DeepseekScalingRotaryEmbeddingXPU(nn.Layer):
+    """
+    RotaryEmbedding XPU Implemention. In XPU, cos and sin must be computed in cpu.
+    """
+
+    def __init__(
+        self,
+        rotary_dim: int,
+        max_position_embeddings: int,
+        base: int,
+        scaling_factor: float,
+        *,
+        extrapolation_factor: float = 1,
+        attn_factor: float = 1,
+        beta_fast: int = 32,
+        beta_slow: int = 1,
+        mscale: float = 1,
+        mscale_all_dim: float = 0,
+    ) -> None:
+        ori_device = paddle.device.get_device()
+        paddle.device.set_device("xpu")
+        super().__init__()
+        self._dtype = paddle.get_default_dtype()
+
+        self.rotary_dim = rotary_dim
+        self.max_position_embeddings = max_position_embeddings
+        self.base = base
+
+        self.scaling_factor = scaling_factor
+        self.extrapolation_factor = extrapolation_factor
+        self.attn_factor = attn_factor
+        self.beta_fast = beta_fast
+        self.beta_slow = beta_slow
+        # Get n-d magnitude scaling corrected for interpolation.
+        self.mscale = float(
+            yarn_get_mscale(self.scaling_factor, float(mscale))
+            / yarn_get_mscale(self.scaling_factor, float(mscale_all_dim))
+            * attn_factor
+        )
+
+        cache = self._compute_cos_sin_cache()
+        paddle.device.set_device(ori_device)
+        cache = cache.to("xpu")
+
+        self.cos_sin_cache: paddle.Tensor
+        self.register_buffer("cos_sin_cache", cache, persistable=True)
+
+    def _compute_inv_freq(self, scaling_factor: float) -> paddle.Tensor:
+        pos_freqs = self.base ** (paddle.arange(0, self.rotary_dim, 2, dtype=paddle.float32) / self.rotary_dim)
+
+        inv_freq_extrapolation = 1.0 / pos_freqs
+        inv_freq_interpolation = 1.0 / (scaling_factor * pos_freqs)
+
+        low, high = yarn_find_correction_range(
+            self.beta_fast, self.beta_slow, self.rotary_dim, self.base, self.max_position_embeddings
+        )
+        # Get n-d rotational scaling corrected for extrapolation
+        inv_freq_mask = (1 - yarn_linear_ramp_mask(low, high, self.rotary_dim // 2)) * self.extrapolation_factor
+        inv_freq = inv_freq_interpolation * (1 - inv_freq_mask) + inv_freq_extrapolation * inv_freq_mask
+        return inv_freq
+
+    def _compute_cos_sin_cache(self) -> paddle.Tensor:
+        inv_freq = self._compute_inv_freq(self.scaling_factor)
+        t = paddle.arange(self.max_position_embeddings * self.scaling_factor, dtype=paddle.float32)
+        freqs = paddle.einsum("i,j->ij", t, inv_freq)
+        cos = freqs.cos() * self.mscale
+        sin = freqs.sin() * self.mscale
+        cache = paddle.concat((cos, sin), axis=-1)
+        return cache.cast(self._dtype)
+
+    def forward(
+        self,
+        position_ids: paddle.Tensor,
+        query: paddle.Tensor,
+        key: paddle.Tensor,
+    ) -> Tuple[paddle.Tensor, paddle.Tensor]:
+        import os
+
+        from paddlenlp_ops import fused_rotary_position_encoding
+
+        # In-place operations that update the query and key tensors.
+        os.environ["stride_in_no_check_dy2st_diff"] = "1"
+        fused_rotary_position_encoding(query, key, position_ids, self.cos_sin_cache, self.rotary_dim, False)
+
+        return query, key
+
+
 class DeepseekV2RMSNorm(nn.Layer):
     def __init__(self, config: DeepseekV2Config):
         super().__init__()
@@ -1412,14 +1499,13 @@ class DeepseekV2BlockInferenceModelXPU(DeepseekV2BlockInferenceModel):
             if k in ("extrapolation_factor", "attn_factor", "beta_fast", "beta_slow", "mscale", "mscale_all_dim")
         }
 
-        self.rotary_emb = DeepseekScalingRotaryEmbedding(
+        self.rotary_emb = DeepseekScalingRotaryEmbeddingXPU(
             config.qk_rope_head_dim,
             original_max_position,
             config.rope_theta,
             scaling_factor,
             **extra_kwargs,
         )
-
         # get ring_id
         ring_id = -1
         try:

@@ -53,8 +53,14 @@ template <paddle::DataType T>
 std::vector<paddle::Tensor> PrefillMLAWriteCache(
                     const paddle::Tensor& kv_nope,
                     const paddle::Tensor& kv_pe,
-                    const paddle::Tensor& seq_lens,
-                    const paddle::Tensor& seq_lens_decoder,
+                    const paddle::Tensor& encoder_seq_lod,
+                    const paddle::Tensor& encoder_batch_map,
+                    const paddle::Tensor& start_token_raw, // encoder cache写时 start token为0 （不算prefix cache）
+                    const paddle::Tensor& encoder_seq_lod_cpu,
+                    const paddle::Tensor& encoder_batch_map_cpu,
+                    const paddle::Tensor& start_token_raw_cpu, // encoder cache写时 start token为0 （不算prefix cache）
+                    const paddle::Tensor& enc_batch_tensor,
+                    const paddle::Tensor& dec_batch_tensor,
                     const paddle::Tensor& padding_offsets,
                     const paddle::Tensor& cum_offsets,
                     const paddle::Tensor& block_tables,
@@ -64,7 +70,6 @@ std::vector<paddle::Tensor> PrefillMLAWriteCache(
   phi::XPUPlace place(phi::backends::xpu::GetXPUCurrentDeviceId());
   auto dev_ctx = paddle::experimental::DeviceContextPool::Instance().Get(place);
   auto xpu_ctx = static_cast<const phi::XPUContext*>(dev_ctx);
-  xpu::ctx_guard RAII_GUARD(xpu_ctx->x_context());
   typedef PaddleTypeToXPUType<T> traits_;
   typedef typename traits_::DataType DataType_;
   typedef typename traits_::data_t data_t;
@@ -79,7 +84,8 @@ std::vector<paddle::Tensor> PrefillMLAWriteCache(
   auto kv_lora_rank = kv_nope_dims[kv_nope_dims.size() - 1];
   auto rope_head_dim = kv_pe_dims[kv_pe_dims.size() - 1];
   auto bsz = cum_offsets.dims()[0];
-
+  int enc_batch = enc_batch_tensor.data<int32_t>()[0];
+  int dec_batch = dec_batch_tensor.data<int32_t>()[0];
   // 初始化输入
   auto kv_nope_xft = baidu::xpu::xft::xftTensor<DataType_, 2>(
       reinterpret_cast<DataType_*>(const_cast<data_t*>(kv_nope.data<data_t>())),
@@ -110,25 +116,7 @@ std::vector<paddle::Tensor> PrefillMLAWriteCache(
       reinterpret_cast<DataType_*>(const_cast<data_t*>(concat_out.data<data_t>())),
       std::array<int64_t, 2>{concat_out.shape()[0],
                              concat_out.shape()[1]});
-  // 初始化lod信息
-  std::vector<int> seq_lens_encoder_cpu(bsz, 0);
-  std::vector<int> encoder_batch_map; // 
-  std::vector<int> encoder_seq_lod;
-  int r = xpu_memcpy(seq_lens_encoder_cpu.data(),
-                 seq_lens.data<int>(),
-                 sizeof(int32_t) * bsz,
-                 XPUMemcpyKind::XPU_DEVICE_TO_HOST);
-  int enc_batch = 0;
-  encoder_seq_lod.push_back(0);
-  for(int i = 0; i < bsz; ++i){
-    if(seq_lens_encoder_cpu[i] > 0){
-      enc_batch++;
-      encoder_batch_map.push_back(i);
-      encoder_seq_lod.push_back(seq_lens_encoder_cpu[i]);
-      encoder_seq_lod[enc_batch] += encoder_seq_lod[enc_batch - 1];
-    }
-    else{}
-  }
+
   // 拼接kv_nope和kv_pe
   baidu::xpu::api::concat<DataType_>(xpu_ctx->x_context(),
                                       concat_input,
@@ -136,15 +124,10 @@ std::vector<paddle::Tensor> PrefillMLAWriteCache(
                                       {{num_tokens, kv_lora_rank},{num_tokens, rope_head_dim}},
                                       1);
 
-  baidu::xpu::api::VectorParam<int32_t> context_len_vp =
-      baidu::xpu::api::VectorParam<int32_t>{encoder_seq_lod.data(), enc_batch + 1, nullptr}
-          .to_xpu(RAII_GUARD);
-  baidu::xpu::api::VectorParam<int32_t> valid_batch_vp =
-      baidu::xpu::api::VectorParam<int32_t>{encoder_batch_map.data(), enc_batch, nullptr}
-          .to_xpu(RAII_GUARD);
-  std::vector<int> start_tokens(enc_batch, 0);
-  baidu::xpu::api::VectorParam<int32_t> start_tokens_vp =
-      baidu::xpu::api::VectorParam<int32_t>{start_tokens.data(), enc_batch, nullptr}.to_xpu(RAII_GUARD);
+
+  baidu::xpu::api::VectorParam<int32_t> context_len_vp{const_cast<int32_t*>(encoder_seq_lod_cpu.data<int32_t>()), enc_batch + 1, const_cast<int32_t*>(encoder_seq_lod.data<int32_t>())};
+  baidu::xpu::api::VectorParam<int32_t> valid_batch_vp{const_cast<int32_t*>(encoder_batch_map_cpu.data<int32_t>()), enc_batch, const_cast<int32_t*>(encoder_batch_map.data<int32_t>())};
+  baidu::xpu::api::VectorParam<int32_t> start_tokens_vp{const_cast<int32_t*>(start_token_raw_cpu.data<int32_t>()), enc_batch, const_cast<int32_t*>(start_token_raw.data<int32_t>())};
   int ret_cache = xftkernel::xft_reshape_cached_kv<float16, float16, int>(
           xpu_ctx->x_context(),
           reinterpret_cast<float16*>(concat_out_xft.data()),
@@ -171,8 +154,14 @@ std::vector<paddle::Tensor> PrefillMLAWriteCacheKernel(
     const paddle::Tensor& kv_nope,
     const paddle::Tensor& kv_pe,
     const paddle::Tensor& kv_cache,
-    const paddle::Tensor& seq_lens,
-    const paddle::Tensor& seq_lens_decoder,
+    const paddle::Tensor& encoder_seq_lod,
+    const paddle::Tensor& encoder_batch_map,
+    const paddle::Tensor& start_token_raw, // encoder cache写时 start token为0 （不算prefix cache）
+    const paddle::Tensor& encoder_seq_lod_cpu,
+    const paddle::Tensor& encoder_batch_map_cpu,
+    const paddle::Tensor& start_token_raw_cpu,
+    const paddle::Tensor& enc_batch_tensor,
+    const paddle::Tensor& dec_batch_tensor,
     const paddle::Tensor& padding_offsets,
     const paddle::Tensor& cum_offsets,
     const paddle::Tensor& block_tables,
@@ -185,8 +174,14 @@ std::vector<paddle::Tensor> PrefillMLAWriteCacheKernel(
       return PrefillMLAWriteCache<paddle::DataType::BFLOAT16>(
                               kv_nope,
                               kv_pe,
-                              seq_lens,
-                              seq_lens_decoder,
+                              encoder_seq_lod,
+                              encoder_batch_map,
+                              start_token_raw,
+                              encoder_seq_lod_cpu,
+                              encoder_batch_map_cpu,                            
+                              start_token_raw_cpu,
+                              enc_batch_tensor,
+                              dec_batch_tensor,
                               padding_offsets,
                               cum_offsets,
                               block_tables,
@@ -198,8 +193,14 @@ std::vector<paddle::Tensor> PrefillMLAWriteCacheKernel(
       return PrefillMLAWriteCache<paddle::DataType::FLOAT16>(
                               kv_nope,
                               kv_pe,
-                              seq_lens,
-                              seq_lens_decoder,
+                              encoder_seq_lod,
+                              encoder_batch_map,
+                              start_token_raw,
+                              encoder_seq_lod_cpu,
+                              encoder_batch_map_cpu,                            
+                              start_token_raw_cpu,
+                              enc_batch_tensor,
+                              dec_batch_tensor,
                               padding_offsets,
                               cum_offsets,
                               block_tables,
@@ -215,8 +216,14 @@ template <paddle::DataType T>
 std::vector<paddle::Tensor> DecodeMLAWriteCache(
                     const paddle::Tensor& kv_nope,
                     const paddle::Tensor& kv_pe,
-                    const paddle::Tensor& seq_lens,
-                    const paddle::Tensor& seq_lens_encoder,
+                    const paddle::Tensor& decoder_context_len_cache,
+                    const paddle::Tensor& decoder_batch_map,
+                    const paddle::Tensor& kv_seq_lod_raw, // decoder cache写时，lod为0，1，2，3，……
+                    const paddle::Tensor& decoder_context_len_cache_cpu,
+                    const paddle::Tensor& decoder_batch_map_cpu,
+                    const paddle::Tensor& kv_seq_lod_raw_cpu, // decoder cache写时，lod为0，1，2，3，……
+                    const paddle::Tensor& enc_batch_tensor,
+                    const paddle::Tensor& dec_batch_tensor,
                     const paddle::Tensor& padding_offsets,
                     const paddle::Tensor& cum_offsets,
                     const paddle::Tensor& block_tables,
@@ -242,6 +249,8 @@ std::vector<paddle::Tensor> DecodeMLAWriteCache(
   auto kv_lora_rank = kv_nope_dims[kv_nope_dims.size() - 1];
   auto rope_head_dim = kv_pe_dims[kv_pe_dims.size() - 1];
   auto bsz = cum_offsets.dims()[0];
+  int enc_batch = enc_batch_tensor.data<int32_t>()[0];
+  int dec_batch = dec_batch_tensor.data<int32_t>()[0];
 
   // 初始化输入
   auto kv_nope_xft = baidu::xpu::xft::xftTensor<DataType_, 2>(
@@ -274,52 +283,54 @@ std::vector<paddle::Tensor> DecodeMLAWriteCache(
       reinterpret_cast<DataType_*>(const_cast<data_t*>(concat_out.data<data_t>())),
       std::array<int64_t, 2>{concat_out.shape()[0],
                              concat_out.shape()[1]});
-  // 判断逻辑
-  std::vector<int> seq_lens_encoder_cpu(bsz, 0);
-  std::vector<int> seq_lens_decoder_cpu(bsz, 0);
-  std::vector<int> decoder_batch_map; // 
-  std::vector<int> decoder_context_len_cache;
-  int r = xpu_memcpy(seq_lens_encoder_cpu.data(),
-                 seq_lens_encoder.data<int>(),
-                 sizeof(int32_t) * bsz,
-                 XPUMemcpyKind::XPU_DEVICE_TO_HOST);
-  r = xpu_memcpy(seq_lens_decoder_cpu.data(),
-                 seq_lens.data<int>(),
-                 sizeof(int32_t) * bsz,
-                 XPUMemcpyKind::XPU_DEVICE_TO_HOST);
 
-  int enc_batch = 0, dec_batch = 0;
-  int64_t total_enc_len = 0;
-  for(int i = 0; i < bsz; ++i){
-    if(seq_lens_encoder_cpu[i] > 0){
-      enc_batch++;
-      total_enc_len += seq_lens_encoder_cpu[i];
-    }
-    else if(seq_lens_decoder_cpu[i] > 0){
-      dec_batch++;
-      decoder_batch_map.push_back(i);
-      decoder_context_len_cache.push_back(seq_lens_decoder_cpu[i]);
-    }
-    else{}
-  }
   // 拼接kv_nope和kv_pe
   baidu::xpu::api::concat<DataType_>(xpu_ctx->x_context(),
                                       concat_input,
                                       concat_out_xft.data(),
                                       {{num_tokens, kv_lora_rank},{num_tokens, rope_head_dim}},
                                       1);
+
+
+
+
   // context_len
-  baidu::xpu::api::VectorParam<int32_t> context_len_vp_cache =
-      baidu::xpu::api::VectorParam<int32_t>{decoder_context_len_cache.data(), dec_batch, nullptr}
-          .to_xpu(RAII_GUARD);
+  baidu::xpu::api::VectorParam<int32_t> context_len_vp_cache{const_cast<int32_t*>(decoder_context_len_cache_cpu.data<int32_t>()), dec_batch, const_cast<int32_t*>(decoder_context_len_cache.data<int32_t>())};
   // real batch     
-  baidu::xpu::api::VectorParam<int32_t> valid_batch_vp =
-      baidu::xpu::api::VectorParam<int32_t>{decoder_batch_map.data(), dec_batch, nullptr}
-          .to_xpu(RAII_GUARD);
+  baidu::xpu::api::VectorParam<int32_t> valid_batch_vp{const_cast<int32_t*>(decoder_batch_map_cpu.data<int32_t>()), dec_batch, const_cast<int32_t*>(decoder_batch_map.data<int32_t>())};
+  // baidu::xpu::api::VectorParam<int32_t> kv_seq_lod_vp{const_cast<int32_t*>(kv_seq_lod_raw_cpu.data<int32_t>()), dec_batch + 1, const_cast<int32_t*>(kv_seq_lod_raw.data<int32_t>())};
+  
+  // baidu::xpu::api::VectorParam<int32_t> kv_seq_lod_vp = baidu::xpu::api::VectorParam<int32_t>{const_cast<int32_t*>(kv_seq_lod_raw_cpu.data<int32_t>()), dec_batch + 1, const_cast<int32_t*>(kv_seq_lod_raw.data<int32_t>())};
+  
   std::vector<int> kv_seq_lod(dec_batch + 1);
   std::iota(kv_seq_lod.begin(), kv_seq_lod.end(), 0);
   baidu::xpu::api::VectorParam<int32_t> kv_seq_lod_vp =
       baidu::xpu::api::VectorParam<int32_t>{kv_seq_lod.data(), dec_batch + 1, nullptr}.to_xpu(RAII_GUARD);
+
+
+    // std::cout << "Tensor dtype: " << kv_seq_lod_raw_cpu.dtype() << std::endl;
+    // std::cout << "Tensor place: " << kv_seq_lod_raw_cpu.place() << std::endl;
+    
+    // // 打印形状信息
+    // std::cout << "Tensor shape: [";
+    // for (int i = 0; i < kv_seq_lod_raw_cpu.dims().size(); ++i) {
+    //     if (i > 0) std::cout << ", ";
+    //     std::cout << kv_seq_lod_raw_cpu.dims()[i];
+    // }
+    // std::cout << "]" << std::endl;
+
+    // std::cout << "Tensor dtype: " << kv_seq_lod_raw.dtype() << std::endl;
+    // std::cout << "Tensor place: " << kv_seq_lod_raw.place() << std::endl;
+    
+    // // 打印形状信息
+    // std::cout << "Tensor shape: [";
+    // for (int i = 0; i < kv_seq_lod_raw.dims().size(); ++i) {
+    //     if (i > 0) std::cout << ", ";
+    //     std::cout << kv_seq_lod_raw.dims()[i];
+    // }
+    // std::cout << "]" << std::endl;
+
+
   int ret_cache = xftkernel::xft_reshape_cached_kv<float16, float16, int>(
           xpu_ctx->x_context(),
           reinterpret_cast<float16*>(concat_out_xft.data()),
@@ -347,8 +358,14 @@ std::vector<paddle::Tensor> DecodeMLAWriteCacheKernel(
     const paddle::Tensor& kv_nope,
     const paddle::Tensor& kv_pe,
     const paddle::Tensor& kv_cache,
-    const paddle::Tensor& seq_lens,
-    const paddle::Tensor& seq_lens_encoder,
+    const paddle::Tensor& decoder_context_len_cache,
+    const paddle::Tensor& decoder_batch_map,
+    const paddle::Tensor& kv_seq_lod_raw,
+    const paddle::Tensor& decoder_context_len_cache_cpu,
+    const paddle::Tensor& decoder_batch_map_cpu,
+    const paddle::Tensor& kv_seq_lod_raw_cpu,
+    const paddle::Tensor& enc_batch_tensor,
+    const paddle::Tensor& dec_batch_tensor,
     const paddle::Tensor& padding_offsets,
     const paddle::Tensor& cum_offsets,
     const paddle::Tensor& block_tables,
@@ -361,8 +378,14 @@ std::vector<paddle::Tensor> DecodeMLAWriteCacheKernel(
       return DecodeMLAWriteCache<paddle::DataType::BFLOAT16>(
                               kv_nope,
                               kv_pe,
-                              seq_lens,
-                              seq_lens_encoder,
+                              decoder_context_len_cache,
+                              decoder_batch_map,
+                              kv_seq_lod_raw,
+                              decoder_context_len_cache_cpu,
+                              decoder_batch_map_cpu,
+                              kv_seq_lod_raw_cpu,
+                              enc_batch_tensor,
+                              dec_batch_tensor,
                               padding_offsets,
                               cum_offsets,
                               block_tables,
@@ -375,8 +398,14 @@ std::vector<paddle::Tensor> DecodeMLAWriteCacheKernel(
       return DecodeMLAWriteCache<paddle::DataType::FLOAT16>(
                               kv_nope,
                               kv_pe,
-                              seq_lens,
-                              seq_lens_encoder,
+                              decoder_context_len_cache,
+                              decoder_batch_map,
+                              kv_seq_lod_raw,
+                              decoder_context_len_cache_cpu,
+                              decoder_batch_map_cpu,
+                              kv_seq_lod_raw_cpu,
+                              enc_batch_tensor,
+                              dec_batch_tensor,
                               padding_offsets,
                               cum_offsets,
                               block_tables,
@@ -394,8 +423,14 @@ PD_BUILD_OP(prefill_mla_write_cache_xpu)
     .Inputs({"kv_nope",
              "kv_pe",
              "kv_cache",
-             "seq_lens",
-             "seq_lens_decoder",
+             "encoder_seq_lod",
+             "encoder_batch_map",
+             "start_token_raw",
+             "encoder_seq_lod_cpu",
+             "encoder_batch_map_cpu",
+             "start_token_raw_cpu",
+             "enc_batch_tensor",
+             "dec_batch_tensor",
              "padding_offsets",
              "cum_offsets",
              "block_tables"})
@@ -410,8 +445,14 @@ PD_BUILD_OP(decode_mla_write_cache_xpu)
     .Inputs({"kv_nope",
              "kv_pe",
              "kv_cache",
-             "seq_lens",
-             "seq_lens_encoder",
+             "decoder_context_len_cache",
+             "decoder_batch_map",
+             "kv_seq_lod_raw",
+             "decoder_context_len_cache_cpu",
+             "decoder_batch_map_cpu",
+             "kv_seq_lod_raw_cpu",
+             "enc_batch_tensor",
+             "dec_batch_tensor",
              "padding_offsets",
              "cum_offsets",
              "block_tables"})
