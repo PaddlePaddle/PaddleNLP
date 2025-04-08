@@ -2,7 +2,7 @@
   "model_name_or_path": "facebook/llama-7b",
   "tokenizer_name_or_path": "facebook/llama-7b",
   "input_dir": "./data",
-  "output_dir": "./output",
+  "output_dir": "./checkpoints/llama_pretrain",
   "split": "949,50,1",
   "seed": 1234,
   "to_static": false,

@@ -22,7 +22,6 @@ from args import parse_args
 from data import create_data_loader_for_small_model, create_pair_loader_for_small_model
 from paddle.metric import Accuracy
 
-from paddlenlp.embeddings import TokenEmbedding
 from paddlenlp.metrics import AccuracyAndF1
 
 METRIC_CLASSES = {"sst-2": Accuracy, "qqp": AccuracyAndF1, "chnsenticorp": Accuracy}
@@ -44,10 +43,7 @@ class BiLSTM(nn.Layer):
     ):
         super(BiLSTM, self).__init__()
         if embedding_name is not None:
-            self.embedder = TokenEmbedding(
-                embedding_name, extended_vocab_path=vocab_path, keep_extended_vocab_only=True
-            )
-            embed_dim = self.embedder.embedding_dim
+            raise ValueError("TokenEmbedding is depercated in PaddleNLP since 3.0, please set embedding_name to None ")
         else:
             self.embedder = nn.Embedding(vocab_size, embed_dim, padding_idx)
 

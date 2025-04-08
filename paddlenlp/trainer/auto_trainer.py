@@ -31,13 +31,18 @@ from paddlenlp.trainer import Trainer
 
 from ..transformers.model_utils import unwrap_model
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
+from ..utils.env import (
+    PREFIX_CHECKPOINT_DIR,
+    SCALER_NAME,
+    SCHEDULER_NAME,
+    TRAINER_STATE_NAME,
+    TRAINING_ARGS_NAME,
+)
 from ..utils.log import logger
 from .argparser import strtobool
 from .auto_training_args import AutoTrainingArguments
-from .trainer import SCALER_NAME, SCHEDULER_NAME, TRAINER_STATE_NAME, TRAINING_ARGS_NAME
 from .trainer_callback import TrainerState
 from .trainer_utils import (  # set_hyrbid_parallel_seed,
-    PREFIX_CHECKPOINT_DIR,
     ShardingOption,
     TrainOutput,
     _exec_mode_guard,
@@ -533,7 +538,8 @@ class AutoTrainer(Trainer):
                 if self.args.to_static:
                     schedule_start_step = self.args.job_schedule_profiler_start
                     schedule_end_step = self.args.job_schedule_profiler_end
-                    switch_job_schedule_profiler(model, step, schedule_start_step, schedule_end_step)
+                    if schedule_start_step >= 0:
+                        switch_job_schedule_profiler(model, step, schedule_start_step, schedule_end_step)
 
                 for inputs in inputs_list:
                     if step_control % args.gradient_accumulation_steps == 0:

@@ -187,7 +187,7 @@ class Attention(nn.Layer):
 
     def _merge_heads(self, x: Tensor) -> Tensor:
         """
-        Merge heads together over the last dimenstion
+        Merge heads together over the last dimension
 
         Args:
             x: (`Tensor`, *required*): [batch_size * num_heads, seq_length, head_dim]

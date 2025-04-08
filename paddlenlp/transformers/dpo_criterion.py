@@ -75,9 +75,10 @@ class DPOCriterion(nn.Layer):
             # for the IPO loss, denoted by tau in the paper.
             loss = (logits - 1 / (2 * self.dpo_config.beta)) ** 2
         elif self.dpo_config.loss_type == "dpop":
-            loss = -F.log_sigmoid(self.dpo_config.beta * logits)
             positive_reg = reference_chosen_logps - policy_chosen_logps
-            loss += self.dpo_config.dpop_lambda * paddle.clip(positive_reg, min=0)
+            loss = -F.log_sigmoid(
+                self.dpo_config.beta * (logits - self.dpo_config.dpop_lambda * paddle.clip(positive_reg, min=0))
+            )
         elif self.dpo_config.loss_type == "kto_pair":
             # eqn (7) of the HALOs paper
             chosen_KL = (policy_chosen_logps - reference_chosen_logps).mean().clip(min=0)
