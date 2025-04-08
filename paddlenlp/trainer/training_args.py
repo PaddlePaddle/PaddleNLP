@@ -996,29 +996,29 @@ class TrainingArguments:
     save_sharding_stage1_model_include_freeze_params: Optional[bool] = field(
         default=False, metadata={"help": "Save Sharding Stage1 Model Exclude Freeze Params"}
     )
-    enable_zero_cost_checkpoint: Optional[bool] = field(
+    enable_flash_save_mode: Optional[bool] = field(
         default=False,
         metadata={"help": "Enable Flash Save Mode"},
     )
-    zcc_workers_num: Optional[int] = field(
+    flash_workers_num: Optional[int] = field(
         default=3,
         metadata={
             "help": "The workers num for zero cost checkpoint save mode. Increase to gain performance but cost more memory and cpu usage."
         },
     )
-    zcc_pipeline_hooks_capacity_usage: Optional[float] = field(
+    flash_pipeline_hooks_capacity_usage: Optional[float] = field(
         default=0.6,
         metadata={
             "help": "Set pipeline hook capacity usage ratio. Lower value brings faster save speed but may effect calculation speed."
         },
     )
-    zcc_save_ema_coef: Optional[float] = field(
+    flash_save_ema_coef: Optional[float] = field(
         default=None,
         metadata={
             "help": "The coefficient of EMA parameters in zero cost checkpoint save mode. if set to 0, skip EMA process"
         },
     )
-    zcc_ema_interval: Optional[int] = field(
+    flash_ema_interval: Optional[int] = field(
         default=1,
         metadata={"help": "Interval between updating EMA parameters."},
     )
@@ -1973,7 +1973,7 @@ class TrainingArguments:
                 )
             if self.flash_device_save_steps > 0:
                 assert (
-                    self.enable_zero_cost_checkpoint
+                    self.enable_flash_save_mode
                 ), "flash_device_save_steps should only be set in zero cost checkpoint save mode with flash device mounted."
         else:
             if self.pdc_download_ckpt:
@@ -1988,15 +1988,15 @@ class TrainingArguments:
                 self.flash_device_save_steps = 0
 
         assert (
-            self.flash_device_save_steps % self.zcc_ema_interval == 0
-        ), f"flash_device_save_steps[{self.flash_device_save_steps}] must be divisible by zcc_ema_interval[{self.zcc_ema_interval}]"
+            self.flash_device_save_steps % self.flash_ema_interval == 0
+        ), f"flash_device_save_steps[{self.flash_device_save_steps}] must be divisible by flash_ema_interval[{self.flash_ema_interval}]"
         assert (
-            self.save_steps % self.zcc_ema_interval == 0
-        ), f"save_steps[{self.save_steps}] must be divisible by zcc_ema_interval[{self.zcc_ema_interval}]"
-        if self.zcc_save_ema_coef is not None:
+            self.save_steps % self.flash_ema_interval == 0
+        ), f"save_steps[{self.save_steps}] must be divisible by flash_ema_interval[{self.flash_ema_interval}]"
+        if self.flash_save_ema_coef is not None:
             assert (
-                self.zcc_workers_num == 1
-            ), "EMA function in zero cost checkpoint mode does not support zcc_workers_num > 1 for now."
+                self.flash_workers_num == 1
+            ), "EMA function in zero cost checkpoint mode does not support flash_workers_num > 1 for now."
 
     def add_moe_comm_group(self):
         hcg = fleet.get_hybrid_communicate_group()

@@ -386,13 +386,13 @@ class ZeroCostCheckpointCallback(TrainerCallback):
         self.manipulated_weight_suffix = None
         self.model_meta = None
         self.sharding_io = sharding_io
-        self.zcc_ema_interval = args.zcc_ema_interval
+        self.flash_ema_interval = args.flash_ema_interval
 
     def on_substep_end(self, args, state, control, **kwargs):
         self.manager.zcc_pipeline_hook(0)  # only works in non-pp model
 
     def on_optimizer_begin(self, args, state, control, **kwargs):
-        if args.enable_zero_cost_checkpoint and self.manager.current_worker is not None:
+        if args.enable_flash_save_mode and self.manager.current_worker is not None:
             logger.info("[ZCC manager] Start syncing checkpoints")
             assert self.manager.global_step != 0, "global_step should set, when calling `on_optimizer_begin`"
             self.manager.sync_offload_status()
@@ -402,10 +402,10 @@ class ZeroCostCheckpointCallback(TrainerCallback):
         if not isinstance(model, PipelineLayer):
             self.manager.zcc_pipeline_hook(0)
         # logger.info(
-        #     f"check coef: {args.zcc_save_ema_coef} {control.should_save}, {state.global_step}, {self.zcc_ema_interval}"
+        #     f"check coef: {args.flash_save_ema_coef} {control.should_save}, {state.global_step}, {self.flash_ema_interval}"
         # )
         if not control.should_save:
-            if args.zcc_save_ema_coef is not None and state.global_step % self.zcc_ema_interval == 0:
+            if args.flash_save_ema_coef is not None and state.global_step % self.flash_ema_interval == 0:
                 self.maybe_update_zcc_worker(args, model, optimizer, state.global_step)
                 self.manager.get_idle_worker_for_saving()  # prepare for dumping
         else:
