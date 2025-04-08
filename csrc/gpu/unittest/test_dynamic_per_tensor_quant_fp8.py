@@ -26,7 +26,7 @@ def create_random_cuda_tensor(shape, dtype, mean: float = 0, std: float = 1):
     return paddle.empty(shape, dtype=dtype).normal_(mean, std)
 
 
-class CutlassBlockGemmTest(unittest.TestCase):
+class DynamicPerTensorQuantFP8Test(unittest.TestCase):
     def native_dynamic_per_tensor_quant_fp8(self, x):
         x_fp32 = x.cast("float32")
         x_s = x_fp32.abs().max() / 448.0
