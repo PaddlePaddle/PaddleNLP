@@ -113,7 +113,7 @@ class PagedAttention:
         )
         return output
 
-def compute_slot_mappings(
+def compute_slot_mapping(
     seq_lens: List[int],
     query_lens: List[int],
     context_lens: List[int],
