@@ -1392,7 +1392,7 @@ class PPOTrainer(Trainer):
                 if self.args.rl_algorithm == "reinforce_plus_plus":
                     train_batch = self.distribute_get_rank_data(micro_batches, rl_batches)
                 else:
-                    train_batch = micro_batches
+                    train_batch = rl_batches
 
                 train_batch = data_group_merge(train_batch, group=data_trans_group)
 
