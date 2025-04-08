@@ -105,7 +105,6 @@ sources = [
     "./gpu/step.cu",
     "./gpu/quant_int8.cu",
     "./gpu/dequant_int8.cu",
-    "./gpu/group_quant.cu",
     "./gpu/moe/preprocess_for_moe.cu",
     "./gpu/get_position_ids_and_mask_encoder_batch.cu",
     "./gpu/fused_rotary_position_encoding.cu",
@@ -118,6 +117,7 @@ sources = [
     "./gpu/speculate_decoding_kernels/ngram_match.cc",
     "./gpu/speculate_decoding_kernels/speculate_save_output.cc",
     "./gpu/speculate_decoding_kernels/speculate_get_output.cc",
+    "./gpu/quantization/per_token_group_quant.cu",
     "./gpu/quantization/dynamic_per_tensor_quant_fp8.cu",
 ]
 sources += find_end_files("./gpu/speculate_decoding_kernels", ".cu")
