@@ -1020,6 +1020,21 @@ class Trainer:
 
             step = -1
             for step, inputs in enumerate(epoch_iterator):
+                print("===> run step ", step, flush=1)
+                if step == 10:
+                    paddle.base.core.nvprof_start()
+                    paddle.base.core.nvprof_enable_record_event()
+                    paddle.base.core.nvprof_nvtx_push(str(step))
+                if step == 50:
+                    paddle.base.core.nvprof_nvtx_pop()
+                    paddle.base.core.nvprof_stop()
+                    import sys 
+                    sys.exit()
+                if step >= 10 and step < 50:
+                    paddle.base.core.nvprof_nvtx_pop()
+                    paddle.base.core.nvprof_nvtx_push(str(step))
+
+
                 if (
                     self.args.use_hybrid_parallel
                     and self.args.sep_parallel_degree > 1
@@ -1248,6 +1263,8 @@ class Trainer:
                     else:
                         self.optimizer.step()
 
+                    
+
                     if self.args.offload_optim:
                         self._offload_optimizer()
 
@@ -1291,6 +1308,7 @@ class Trainer:
                 if self.args.ignore_data_skip:
                     self.timers and self.timers("read-data").start()
 
+            
             if step < 0:
                 logger.warning(
                     f"There seems to be not a single sample in your epoch_iterator, stopping training at step"

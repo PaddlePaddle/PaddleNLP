@@ -82,10 +82,11 @@ from ..moe_layer import MoELayer
 from ..utils import device_guard
 from . import fp8_linear as linear_utils
 from .configuration import DeepseekV2Config
-from .fp8_linear import FP8DeepseekV2MLP, FP8KeepXLinear, FP8Linear, Linear
+from .fp8_linear import FP8DeepseekV2MLP, FP8KeepXLinear, FP8Linear, Linear, FusedFP8DeepseekV2MLP
 
 DSV3_USE_FP8_GEMM = os.getenv("DSV3_USE_FP8_GEMM", "False").lower() == "true"
 DSV3_USE_ATTEN_RECOMPUTE = os.getenv("DSV3_USE_ATTEN_RECOMPUTE", "False").lower() == "true"
+DSV3_USE_FUSED_Expert = os.getenv("DSV3_USE_FUSED_Expert", "False").lower() == "true"
 
 FA_VERSION = int(os.getenv("FA_VERSION", 2))
 
@@ -852,6 +853,9 @@ class DeepseekV2MoE(MoELayer):
             drop_tokens=False,
         )
         DeepseekV2MLPClass = FP8DeepseekV2MLP if DSV3_USE_FP8_GEMM else DeepseekV2MLP
+	
+        if DSV3_USE_FUSED_Expert:
+            DeepseekV2MLPClass = FusedFP8DeepseekV2MLP
 
         super().__init__(
             config=config,
@@ -874,7 +878,12 @@ class DeepseekV2MoE(MoELayer):
         self.alpha = config.aux_loss_alpha
         if config.n_shared_experts is not None:
             intermediate_size = config.moe_intermediate_size * config.n_shared_experts
-            self.shared_experts = DeepseekV2MLPClass(config=config, intermediate_size=intermediate_size, is_moe=False)
+            if DSV3_USE_FP8_GEMM:
+                self.shared_experts = FP8DeepseekV2MLP(
+                    config=config, intermediate_size=intermediate_size, is_moe=False
+                )
+            else:
+                self.shared_experts = DeepseekV2MLP(config=config, intermediate_size=intermediate_size, is_moe=False)
 
     def forward(self, hidden_states):
         final_hidden_states, l_aux, l_zloss = super().forward(hidden_states)
@@ -1063,9 +1072,24 @@ class MemroyRecomputeAttnFunc(paddle.autograd.PyLayer):
             )
 
         elif FA_VERSION == 3:
-            attn_out, softmax_lse = flash_attn_v3(
-                query_states, key_states, value_states, softmax_scale=softmax_scale, causal=True
-            )
+            attn_out, softmax_lse = _C_ops.flash_attn_v3(
+                    query_states,
+                    key_states,
+                    value_states,
+                    None,  # q_v_
+                    None,  # q_descale_
+                    None,  # k_descale_
+                    None,  # v_descale_
+                    softmax_scale,
+                    True,
+                    -1,  # window_size_left
+                    -1,  # window_size_right
+                    0.0,  # softcap
+                    1,  # num_splits
+                    False,  # manual_set_pack_gqa
+                    False,  # pack_gqa_
+                    0,  # sm_margin
+                )
         else:
             assert False, f"invalid {FA_VERSION=}"
 
