@@ -19,14 +19,12 @@ from typing import Any, Dict
 
 import paddle
 from models.ppo_model_utils import RLHFValueLoss, create_startend_row_indices
-from utils.comm_utils import (
-    CriticStages,
-)
+from trainer.rl_trainer import RLTrainer
+from utils.comm_utils import CriticStages
 from utils.offload_utils import reload_and_offload_scope
 from utils.timer_utils import TimerScope
 
 from paddlenlp.transformers import PretrainedTokenizer
-from trainer.rl_trainer import RLTrainer
 
 
 class CriticTrainer(RLTrainer):
@@ -87,9 +85,11 @@ class CriticTrainer(RLTrainer):
             "sequence_mask": sequence_mask,
         }
 
-        with TimerScope(self, CriticStages.MODEL_ENABLE_DISABLE, minus_names=[CriticStages.CRITIC_TRAINING_STEP]):
+        with TimerScope(
+            self.timers, CriticStages.MODEL_ENABLE_DISABLE, minus_names=[CriticStages.CRITIC_TRAINING_STEP]
+        ):
             with reload_and_offload_scope(self, self.model, self.optimizer):
-                with TimerScope(self, CriticStages.CRITIC_TRAINING_STEP):
+                with TimerScope(self.timers, CriticStages.CRITIC_TRAINING_STEP):
                     reward_critic_loss = self.full_training_step(**value_trainer_inputs)
 
         return reward_critic_loss

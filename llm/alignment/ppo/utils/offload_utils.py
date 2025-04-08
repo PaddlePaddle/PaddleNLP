@@ -186,15 +186,15 @@ def reload_and_offload_scope(trainer, *args):
         offload_map.update(
             {
                 trainer.reward_critic_model: "train_model",
-                trainer.value_trainer.optimizer: "optimizer",
+                trainer.critic_trainer.optimizer: "optimizer",
             }
         )
 
     if getattr(trainer.actor_trainer, "_inner_eval_model", None) is not None:
         offload_map.update({trainer.actor_trainer._inner_eval_model: "freeze_model"})
 
-    if trainer.args.rl_algorithm == "ppo" and getattr(trainer.value_trainer, "_inner_eval_model", None) is not None:
-        offload_map.update({trainer.value_trainer._inner_eval_model: "freeze_model"})
+    if trainer.args.rl_algorithm == "ppo" and getattr(trainer.critic_trainer, "_inner_eval_model", None) is not None:
+        offload_map.update({trainer.critic_trainer._inner_eval_model: "freeze_model"})
 
     objs = [(arg, offload_map.get(arg, "")) for arg in args if offload_map.get(arg, "") in trainer.args.offload_level]
     return OffloadController(objs)
