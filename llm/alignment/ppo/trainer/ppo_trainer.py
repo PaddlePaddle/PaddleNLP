@@ -41,11 +41,12 @@ from utils.comm_utils import (
     data_group_merge,
     data_group_split,
     gather_and_pad,
+    get_timer_label,
     new_timer_log,
 )
 from utils.infer_utils import infer_guard
 from utils.offload_utils import reload_and_offload_scope, reload_tensor_to_gpu
-from utils.timer_utils import TimerScope
+from utils.timer_utils import TimerScope, TimerScopeManualLabel
 
 from paddlenlp.data import DataCollator
 from paddlenlp.trainer.trainer import (
@@ -389,11 +390,11 @@ class PPOTrainer(Trainer):
             preprocess_logits_for_metrics,
         )
         actor_trainer.set_eval_model(model_eval)
+        actor_trainer.timers = self.timers
 
         actor_trainer.add_callback(MuteDefaultFlowCallback)
         if not args.disable_tqdm:
             actor_trainer.pop_callback(ProgressCallback)
-
         return actor_trainer
 
     def create_critic_trainer(
@@ -441,6 +442,8 @@ class PPOTrainer(Trainer):
         )
 
         critic_trainer.set_eval_model(model_eval)
+        critic_trainer.timers = self.timers
+
         critic_trainer.add_callback(MuteDefaultFlowCallback)
         if not args.disable_tqdm:
             critic_trainer.pop_callback(ProgressCallback)
@@ -486,6 +489,8 @@ class PPOTrainer(Trainer):
             if args.pipeline_parallel_degree > 1 or ShardingOption.FULL_SHARD in args.sharding:
                 reference_trainer.init_train_model_opt(100, None, clear_master_weight=True)  # dummy max_steps
 
+        reference_trainer.timers = self.timers
+
         return reference_trainer
 
     def create_reward_trainer(
@@ -530,6 +535,9 @@ class PPOTrainer(Trainer):
             if not self.args.use_rm_server:
                 if args.pipeline_parallel_degree > 1 or ShardingOption.FULL_SHARD in args.sharding:
                     reward_trainer.init_train_model_opt(100, None, clear_master_weight=True)  # dummy max_steps
+
+        reward_trainer.timers = self.timers
+
         return reward_trainer
 
     @property
@@ -1257,7 +1265,7 @@ class PPOTrainer(Trainer):
 
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
-            step = 0
+            step = -1
             for prompt_only_batch in self.prompt_only_dataloader:
                 self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
                 # step 1-1: rollout data with actor model (eval) and reward model
@@ -1390,35 +1398,45 @@ class PPOTrainer(Trainer):
 
                 # step 3: train actor model and critic model with rollout data
                 self.set_train()
-                for rl_batch in train_batch:
-                    with TimerScope(self.timers, ActorStages.MODEL_ENABLE_DISABLE, minus_names=[ActorStages.RL_STEP]):
-                        with reload_and_offload_scope(self, self.actor_model, self.actor_trainer.optimizer):
-                            with TimerScope(self.timers, ActorStages.RL_STEP):
-                                rl_info = self.actor_trainer.update_actor(rl_batch)
+                with TimerScope(self.timers, ActorStages.MODEL_ENABLE_DISABLE, minus_names=[ActorStages.RL_STEP]):
+                    with reload_and_offload_scope(self, self.actor_model, self.actor_trainer.optimizer):
+                        with TimerScope(self.timers, ActorStages.RL_STEP):
+                            # timer_info = {} # prepare for each micro_step
 
-                    paddle.device.cuda.empty_cache()
+                            for micro_step, rl_batch in enumerate(train_batch):
+                                step = 0 if step == -1 else step
+                                with TimerScopeManualLabel(
+                                    self.timers,
+                                    get_timer_label(ActorStages.MICRO_STEPS) + f"_{micro_step}",
+                                    minus_names=[get_timer_label(ActorStages.OPTIMIZE_STEP)],
+                                ):
+                                    rl_info = self.actor_trainer.update_actor(rl_batch)
 
-                    if self.args.rl_algorithm == "ppo":
-                        rl_info["train_value_loss"] = self.critic_trainer.update_critc(rl_batch)
-                    if self.is_step_end():
-                        self.state.global_step += 1
-                        self.state.epoch = epoch + (step + 1) / steps_in_epoch
-                        rl_info.update(self.get_step_loss(loss_prefix="train_"))
-                        rl_info = metric.update(rl_info)
-                        # on_step_end
-                        self.control = self.callback_handler.on_step_end(args, self.state, self.control)
-                    else:
-                        # on_sub_step_end
-                        self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
+                                paddle.device.cuda.empty_cache()
 
-                    step += 1
+                                if self.args.rl_algorithm == "ppo":
+                                    rl_info["train_value_loss"] = self.critic_trainer.update_critc(rl_batch)
+                                if self.is_step_end():
+                                    self.state.global_step += 1
+                                    self.state.epoch = epoch + (step + 1) / steps_in_epoch
+                                    rl_info.update(self.get_step_loss(loss_prefix="train_"))
+                                    rl_info = metric.update(rl_info)
+                                    self.timers and rl_info.update(
+                                        self.timers.info(self.timers.timers.keys(), reset=False)
+                                    )
+                                    # on_step_end
+                                    self.control = self.callback_handler.on_step_end(args, self.state, self.control)
+                                else:
+                                    # on_sub_step_end
+                                    self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
 
-                    self._print_timer()
-                    self._maybe_log_save_evaluate(rl_info, None, epoch, ignore_keys_for_eval, inputs=rl_batch)
-                    paddle.device.cuda.empty_cache()
+                                step += 1
 
-                    if self.control.should_epoch_stop or self.control.should_training_stop:
-                        break
+                self._print_timer()
+                self._maybe_log_save_evaluate(rl_info, None, epoch, ignore_keys_for_eval, inputs=rl_batch)
+                paddle.device.cuda.empty_cache()
+                if self.control.should_epoch_stop or self.control.should_training_stop:
+                    break
 
             if step < 0:
                 logger.warning(

@@ -35,7 +35,8 @@ class ActorStages(Enum):
 
     MODEL_ENABLE_DISABLE = auto()
     RL_STEP = auto()
-    PTX_STEP = auto()
+    MICRO_STEPS = auto()
+    OPTIMIZE_STEP = auto()
 
 
 class CriticStages(Enum):
@@ -78,7 +79,8 @@ def get_timer_label(stage: Enum) -> str:
     step_prefix = {
         ActorStages.MODEL_ENABLE_DISABLE: "actor-step",
         ActorStages.RL_STEP: "actor-step",
-        ActorStages.PTX_STEP: "actor-step",
+        ActorStages.MICRO_STEPS: "actor-step",
+        ActorStages.OPTIMIZE_STEP: "actor-step",
         CriticStages.MODEL_ENABLE_DISABLE: "critic-step",
         CriticStages.CRITIC_TRAINING_STEP: "critic-step",
         RolloutStages.ACTOR_MODEL_ENABLE_DISABLE: "rollout",
@@ -86,6 +88,7 @@ def get_timer_label(stage: Enum) -> str:
         RolloutStages.ROLLOUT_LOGPROB: "rollout",
         RolloutStages.ROLLOUT_OLD_LOGPROB: "rollout",
         RolloutStages.ROLLOUT_REF_LOGPROB: "rollout",
+        RolloutStages.ROLLOUT_ADVANTAGE: "rollout",
         RolloutStages.REWARD_MODEL_ENABLE_DISABLE: "rollout",
         RolloutStages.ROLLOUT_REWARD_VALUE: "rollout",
     }

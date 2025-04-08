@@ -26,7 +26,12 @@ class TimerScope:
         self.timers = timers
         self.name = name
         self.minus_names = minus_names
-        self.label = get_timer_label(name)
+        if self.minus_names:
+            self.minus_labels = [
+                self._get_timer_label(name)
+                for name in (self.minus_names if isinstance(self.minus_names, list) else [self.minus_names])
+            ]
+        self.label = self._get_timer_label(name)
         self._started = False  # 跟踪计时器状态
 
     def start(self) -> None:
@@ -42,11 +47,7 @@ class TimerScope:
             timer.stop()
 
             if self.minus_names:
-                minus_labels = [
-                    self._get_timer_label(name)
-                    for name in (self.minus_names if isinstance(self.minus_names, list) else [self.minus_names])
-                ]
-                for label in minus_labels:
+                for label in self.minus_labels:
                     timer.elapsed_ -= self.timers(label).elapsed_
             self._started = False
 

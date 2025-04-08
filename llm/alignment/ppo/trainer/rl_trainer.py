@@ -53,6 +53,8 @@ from models.ppo_model_utils import create_loss
 from utils.comm_utils import create_data_trans_group
 from utils.infer_utils import InferEvalModel
 from .trainer_utils import PipeEvalModel
+from utils.timer_utils import TimerScope
+from utils.comm_utils import ActorStages
 
 # isort: on
 
@@ -375,7 +377,8 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
 
     if (step_control + 1) % args.gradient_accumulation_steps == 0 or (
         # last step in epoch but step is always smaller than gradient_accumulation_steps
-        steps_in_epoch <= args.gradient_accumulation_steps and (step + 1) == steps_in_epoch
+        steps_in_epoch <= args.gradient_accumulation_steps
+        and (step + 1) == steps_in_epoch
     ):
         if self.args.pipeline_parallel_degree <= 1 and self._enable_delay_scale_loss():
             tr_loss /= self.args.gradient_accumulation_steps
@@ -436,6 +439,9 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
             self.control,
             scaler=self.scaler if self.do_grad_scaling else None,
         )
+        optimizer_time_scope = TimerScope(self.timers, ActorStages.OPTIMIZE_STEP)
+        optimizer_time_scope.start()
+
         optimizer_was_run = True
 
         if self.args.offload_optim:
@@ -478,6 +484,8 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
         else:
             self.optimizer.clear_grad()
 
+        optimizer_time_scope.stop()
+
         self.callback_handler.on_optimizer_end(
             args,
             self.state,
@@ -489,7 +497,7 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
         self.state.epoch = epoch + (step + 1) / steps_in_epoch
         self.control = self.callback_handler.on_step_end(args, self.state, self.control)
         self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
-        self._print_timer()
+        # self._print_timer()
         step_control = 0
     else:
         self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
