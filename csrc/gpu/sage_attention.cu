@@ -24,18 +24,18 @@ template <paddle::DataType D>
 std::vector<paddle::Tensor> SageAttentionKernel(
     const AppendAttnMetaData& meta_data,
     const paddle::Tensor& qkv,  // write kv
-    const paddle::Tensor& q,
-    const paddle::Tensor& k,
-    const paddle::Tensor& v,
-    const paddle::Tensor& v_padded,
-    const paddle::Tensor& km,   // sage attn
+    paddle::Tensor& q,
+    paddle::Tensor& k,
+    paddle::Tensor& v,
+    paddle::Tensor& v_padded,
+    paddle::Tensor& km,   // sage attn
     const paddle::Tensor& key_cache,          // write kv
     const paddle::Tensor& value_cache,        // write kv
     const paddle::Tensor& seq_lens_encoder,   // write kv
     const paddle::Tensor& seq_lens_decoder,   // write kv
     const paddle::Tensor& seq_lens_this_time, // write kv
-    const paddle::Tensor& cu_seqlen,
-    const paddle::Tensor& cu_seqlen_v_padded,
+    paddle::Tensor& cu_seqlen,
+    paddle::Tensor& cu_seqlen_v_padded,
     const paddle::Tensor& padding_offsets,    // write kv
     const paddle::Tensor& cum_offsets,        // write kv
     const paddle::Tensor& block_tables,       // write kv
@@ -172,7 +172,7 @@ std::vector<paddle::Tensor> SageAttentionKernel(
     const int total_seqlen_v_padded = v_padded.shape()[0];
 
     // use varlen API
-    const paddle::optional<paddle::Tensor> vm = paddle::optional<paddle::Tensor>(paddle::empty({1}, paddle::DataType::FLOAT32, paddle::GPUPlace()));
+    paddle::optional<paddle::Tensor> vm = paddle::optional<paddle::Tensor>(paddle::empty({1}, paddle::DataType::FLOAT32, paddle::GPUPlace()));
 
     fmha_out = sage_attention_varlen_fwd(q, 
                                         k, 
@@ -202,18 +202,18 @@ std::vector<paddle::Tensor> SageAttentionKernel(
 
 std::vector<paddle::Tensor> SageAttention(
     const paddle::Tensor& qkv,
-    const paddle::Tensor& q,
-    const paddle::Tensor& k,
-    const paddle::Tensor& v,
-    const paddle::Tensor& v_padded,
-    const paddle::Tensor& km,
+    paddle::Tensor& q,
+    paddle::Tensor& k,
+    paddle::Tensor& v,
+    paddle::Tensor& v_padded,
+    paddle::Tensor& km,
     const paddle::Tensor& key_cache,
     const paddle::Tensor& value_cache,
     const paddle::Tensor& seq_lens_encoder,
     const paddle::Tensor& seq_lens_decoder,
     const paddle::Tensor& seq_lens_this_time,
-    const paddle::Tensor& cu_seqlen,
-    const paddle::Tensor& cu_seqlen_v_padded,
+    paddle::Tensor& cu_seqlen,
+    paddle::Tensor& cu_seqlen_v_padded,
     const paddle::Tensor& padding_offsets,
     const paddle::Tensor& cum_offsets,
     const paddle::Tensor& block_tables,

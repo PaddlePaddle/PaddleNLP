@@ -78,6 +78,32 @@ def infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, 
     return model
 
 
+def pad_sequences_to_aligned_chunks(v, cu_seqlens_v, align_size=128):
+    batch_size = len(cu_seqlens_v) - 1
+    seq_lengths = cu_seqlens_v[1:] - cu_seqlens_v[:-1]
+
+    padded_lengths = ((seq_lengths + align_size - 1) // align_size) * align_size
+    total_padded_length = paddle.sum(padded_lengths).item()
+
+    padded_v = paddle.zeros([total_padded_length, v.shape[1], v.shape[2]], dtype=v.dtype)
+
+    new_cu_seqlens = paddle.zeros_like(cu_seqlens_v)
+    new_cu_seqlens[0] = 0
+    for i in range(1, batch_size + 1):
+        new_cu_seqlens[i] = new_cu_seqlens[i - 1] + padded_lengths[i - 1]
+
+    for i in range(batch_size):
+        start = cu_seqlens_v[i].item()
+        end = cu_seqlens_v[i + 1].item()
+        chunk_length = end - start
+
+        padded_start = new_cu_seqlens[i].item()
+
+        padded_v[padded_start : padded_start + chunk_length] = v[start:end]
+
+    return padded_v, new_cu_seqlens
+
+
 class EmptyActScale:
     """
     For fake parameter
