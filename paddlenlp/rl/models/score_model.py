@@ -19,10 +19,8 @@ from typing import Any
 import paddle
 from paddle import nn
 
-import paddlenlp
-from paddlenlp.transformers import PretrainedConfig, PretrainedModel
-from paddlenlp.transformers.auto import AutoModel
-
+from ...transformers import PretrainedConfig, PretrainedModel
+from ...transformers.auto import AutoModel
 from .score_model_utils import ScoreModelMixin, ScoreModelOutput
 
 
@@ -157,6 +155,3 @@ class AutoModelForScore(ScoreModelMixin, PretrainedModel):
             position_ids=position_ids,
             return_dict=return_dict,
         )
-
-
-paddlenlp.transformers.AutoModelForScore = AutoModelForScore

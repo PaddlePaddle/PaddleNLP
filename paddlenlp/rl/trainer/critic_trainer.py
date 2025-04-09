@@ -18,13 +18,13 @@ from __future__ import annotations
 from typing import Any, Dict
 
 import paddle
-from models.ppo_model_utils import RLHFValueLoss, create_startend_row_indices
-from trainer.rl_trainer import RLTrainer
-from utils.comm_utils import CriticStages
-from utils.offload_utils import reload_and_offload_scope
-from utils.timer_utils import TimerScope
 
-from paddlenlp.transformers import PretrainedTokenizer
+from ...transformers import PretrainedTokenizer
+from ..models.ppo_model_utils import RLHFValueLoss, create_startend_row_indices
+from ..utils.comm_utils import CriticStages
+from ..utils.offload_utils import reload_and_offload_scope
+from ..utils.timer_utils import TimerScope
+from .rl_trainer import RLTrainer
 
 
 class CriticTrainer(RLTrainer):

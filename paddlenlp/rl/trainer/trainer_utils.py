@@ -19,8 +19,8 @@ from contextlib import contextmanager
 import paddle
 from paddle.distributed import fleet
 
-from paddlenlp.generation.utils import GenerationMixin
-from paddlenlp.trainer.trainer import (
+from ...generation.utils import GenerationMixin
+from ...trainer.trainer import (
     Trainer,
     TrainerCallback,
     TrainerControl,
@@ -28,12 +28,11 @@ from paddlenlp.trainer.trainer import (
     TrainingArguments,
     logger,
 )
-from paddlenlp.transformers import BatchEncoding, PretrainedTokenizer
-from paddlenlp.transformers.configuration_utils import PretrainedConfig
-from paddlenlp.transformers.model_outputs import ModelOutput
-from paddlenlp.transformers.tokenizer_utils_base import PaddingStrategy
-
-from models.ppo_model_utils import make_attention_mask, make_position_ids  # isort:skip
+from ...transformers.configuration_utils import PretrainedConfig
+from ...transformers.model_outputs import ModelOutput
+from ...transformers.tokenizer_utils import PretrainedTokenizer
+from ...transformers.tokenizer_utils_base import BatchEncoding, PaddingStrategy
+from ..models.ppo_model_utils import make_attention_mask, make_position_ids
 
 
 class MuteDefaultFlowCallback(TrainerCallback):
