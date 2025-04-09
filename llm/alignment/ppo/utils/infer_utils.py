@@ -142,6 +142,7 @@ def create_predictor(trainer: Trainer):
         append_attn=True,  # currently only support append_attn
         inference_model=True,
         dtype=trainer.amp_dtype,
+        output_via_mq=False,
     )
     model_args = ModelArgument()
     config = copy.deepcopy(trainer.model.config)
