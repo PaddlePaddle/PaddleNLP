@@ -348,6 +348,8 @@ class LinearFP8KeepXFunc(paddle.autograd.PyLayer):
         w_quant, w_scale = kitchen_quant(
             weight, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
         )
+
+        #print("shape", dout_quant.shape, w_quant.shape, dx.shape)
         deep_gemm.gemm_fp8_fp8_bf16_nt((dout_quant, dout_scale), (w_quant, w_scale), dx)
         dx = dx.reshape(dx_orig_shape)
 
@@ -416,11 +418,9 @@ class Fuse_FFN_FP8_Func(paddle.autograd.PyLayer):
         x_fp8, x_scale = kitchen_quant(
             x, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
         )
-
-        w_t = w1.T.contiguous()
-
-        w1_fp8, w1_sacle = kitchen_quant(
-            w_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
+        
+        _, _, w1_fp8, w1_sacle = kitchen_quant(
+            w1, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
         )
         o1 = paddle.empty([x_fp8.shape[0], w1_fp8.shape[0]], dtype=x.dtype)
         deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8, x_scale), (w1_fp8, w1_sacle), o1)
