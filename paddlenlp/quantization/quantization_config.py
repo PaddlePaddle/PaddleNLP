@@ -31,9 +31,9 @@ class QuantizationConfig:
         shift_smooth_all_linears: Whether the model applied shift or smooth strategy for all linears.
         quant_round_type: The quant round type, 0:-rounding to nearest ties to even， 1: -rounding to nearest ties away from zero.
         llm_int8_threshold: The threshold for llm.int8 quantization.
-        weight_double_quant: Whether quant weight scale.
-        weight_blocksize: Block size for weight quantization.
-        weight_double_quant_block_size: Block size for quant_scale of weight quant_scale.
+        qlora_weight_double_quant: Whether quant weight scale.
+        qlora_weight_blocksize: Block size for weight quantization.
+        qlora_weight_double_quant_block_size: Block size for quant_scale of weight quant_scale.
         weight_quant_method: The method for weight quantization.
         act_quant_method: The method for activation quantization.
     """
@@ -47,9 +47,9 @@ class QuantizationConfig:
         shift_smooth_all_linears=False,
         quant_round_type=0,
         llm_int8_threshold=6.0,
-        weight_double_quant=False,
-        weight_blocksize=64,
-        weight_double_quant_block_size=256,
+        qlora_weight_double_quant=False,
+        qlora_weight_blocksize=64,
+        qlora_weight_double_quant_block_size=256,
         weight_quant_method="abs_max_channel_wise",
         act_quant_method="abs_max",
         activation_scheme=None,
@@ -57,19 +57,30 @@ class QuantizationConfig:
         quant_method=None,
         weight_block_size=None,
         dtype=None,
+        ignore_modules=None,
+        group_size=-1,
         **kwargs,
     ):
-        if weight_quantize_algo is not None and weight_quantize_algo not in [
-            "weight_only_int8",
-            "weight_only_int4",
-            "llm.int8",
-            "a8w8",
-            "nf4",
-            "fp4",
-        ]:
-            raise ValueError(
-                f"weight_quantize_algo:{weight_quantize_algo} not in supported list ['weight_only_int8', 'weight_only_int4', 'llm.int8', 'a8w8', 'nf4', 'fp4']"
-            )
+        if weight_quantize_algo is not None:
+            if isinstance(self.weight_quantize_algo, dict):
+                if any(
+                    algo not in ["weight_only_int8", "weight_only_int4", "llm.int8", "a8w8", "nf4", "fp4"]
+                    for algo in weight_quantize_algo
+                ):
+                    raise ValueError(
+                        f"weight_quantize_algo:{weight_quantize_algo.keys()} not in supported list ['weight_only_int8', 'weight_only_int4', 'llm.int8', 'a8w8', 'nf4', 'fp4']"
+                    )
+            elif weight_quantize_algo not in [
+                "weight_only_int8",
+                "weight_only_int4",
+                "llm.int8",
+                "a8w8",
+                "nf4",
+                "fp4",
+            ]:
+                raise ValueError(
+                    f"weight_quantize_algo:{weight_quantize_algo} not in supported list ['weight_only_int8', 'weight_only_int4', 'llm.int8', 'a8w8', 'nf4', 'fp4']"
+                )
         if quant_type is not None and quant_type not in [
             "weight_only_int8",
             "weight_only_int4",
@@ -89,19 +100,23 @@ class QuantizationConfig:
         self.shift_smooth_all_linears = shift_smooth_all_linears
         self.quant_round_type = quant_round_type
         self.llm_int8_threshold = llm_int8_threshold
-        self.weight_double_quant = weight_double_quant
-        self.weight_blocksize = weight_blocksize
+        self.qlora_weight_double_quant = qlora_weight_double_quant
+        self.qlora_weight_blocksize = qlora_weight_blocksize
         self.weight_quant_method = weight_quant_method
         self.act_quant_method = quant_inference_mapping[act_quant_method]
-        self.weight_double_quant_block_size = weight_double_quant_block_size
+        self.qlora_weight_double_quant_block_size = qlora_weight_double_quant_block_size
         self.activation_scheme = activation_scheme
         self.fmt = fmt
         self.quant_method = quant_method
         self.weight_block_size = weight_block_size
         self.dtype = dtype
+        self.ignore_modules = ignore_modules
+        self.group_size = group_size
 
     def is_weight_quantize(self):
-        if self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8", "nf4", "fp4", "a8w8"]:
+        if isinstance(self.weight_quantize_algo, dict):
+            return True
+        elif self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8", "nf4", "fp4", "a8w8"]:
             return True
         else:
             return False

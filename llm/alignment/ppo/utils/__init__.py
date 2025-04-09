@@ -1,4 +1,4 @@
-# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,23 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from paddle.io import Dataset
-
-from .alpaca import *
-from .base import *
-from .jsondata import *
-from .preference import *
-from .prompt_only import *
-from .safe_rlhf import *
-from .supervised import *
-
-
-class DummyDataset(Dataset):
-    def __init__(self, length: int) -> None:
-        self.length = length
-
-    def __len__(self) -> int:
-        return self.length
-
-    def __getitem__(self, index: int):
-        return {}
+from .comm_utils import *
+from .config_utils import *
+from .infer_utils import *
+from .offload_utils import *
