@@ -385,11 +385,6 @@ class ExpertsGroupGemmNode:
                     True,
                     weight_grad
             )   
-            print("weight", weight_grad)
-
-        
-            import sys
-            sys.exit()
 
 
     # ===== dw1 = deep_gemm(input_x_t_fp8, do1_t_fp8)
