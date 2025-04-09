@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "sage_attn_kernels/sageattn_fused.cuh"
+#include "sage_attn_kernels/sageattn_fused_varlen.cuh"
 
 #include "append_attn/append_attention_kernel.h"
 #include "append_attn/decoder_write_cache_with_rope_kernel.h"
@@ -23,11 +24,18 @@ template <paddle::DataType D>
 std::vector<paddle::Tensor> SageAttentionKernel(
     const AppendAttnMetaData& meta_data,
     const paddle::Tensor& qkv,  // write kv, sage attn
+    const paddle::Tensor& q,
+    const paddle::Tensor& k,
+    const paddle::Tensor& v,
+    const paddle::Tensor& v_padded,
+    const paddle::Tensor& km,   // sage attn
     const paddle::Tensor& key_cache,          // write kv
     const paddle::Tensor& value_cache,        // write kv
     const paddle::Tensor& seq_lens_encoder,   // write kv
     const paddle::Tensor& seq_lens_decoder,   // write kv
     const paddle::Tensor& seq_lens_this_time, // write kv
+    const paddle::Tensor& cu_seqlen,
+    const paddle::Tensor& cu_seqlen_v_padded,
     const paddle::Tensor& padding_offsets,    // write kv
     const paddle::Tensor& cum_offsets,        // write kv
     const paddle::Tensor& block_tables,       // write kv
@@ -157,126 +165,36 @@ std::vector<paddle::Tensor> SageAttentionKernel(
     PD_CHECK(batch_size == 1, "Sage Attention Only support batch_size = 1");
 
     const int num_q_head = meta_data.q_num_heads;
-    const int num_kv_head = meta_data.kv_num_heads;
     const int head_dim_qk = meta_data.head_dims;
-    const int head_dim_v = meta_data.head_dims_v;
-    std::vector<paddle::Tensor>&& qkv_with_rope = paddle::split(qkv_out, {num_q_head * head_dim_qk, num_kv_head * head_dim_qk, num_kv_head * head_dim_v}, 1);
-    paddle::Tensor q = paddle::unsqueeze(paddle::reshape(qkv_with_rope[0], {-1, num_q_head, head_dim_qk}), {0});
-    paddle::Tensor k = paddle::unsqueeze(paddle::reshape(qkv_with_rope[1], {-1, num_kv_head, head_dim_qk}), {0});
-    paddle::Tensor v = paddle::unsqueeze(paddle::reshape(qkv_with_rope[2], {-1, num_kv_head, head_dim_v}), {0});
 
-    paddle::Tensor km = paddle::experimental::mean(k, {1}, true);
-    km = paddle::experimental::squeeze(km, {1});
-    
+    const int num_kv_head = meta_data.kv_num_heads;
+    const int head_dim_v = meta_data.head_dims_v;
+    const int total_seqlen_v_padded = v_padded.shape()[0];
+
+    // use varlen API
     const paddle::optional<paddle::Tensor> vm = paddle::optional<paddle::Tensor>(paddle::empty({1}, paddle::DataType::FLOAT32, paddle::GPUPlace()));
 
-    fmha_out = sage_attention_fwd(q, k, v, km, 
-                                  seq_lens_this_time, vm, 
-                                  // out_linear_shifts, out_linear_smooths,
-                                  softmax_scale, 
-                                  // quant_max_bound, quant_min_bound, out_linear_in_scale,
-                                  std::string("per_warp"), 
-                                  std::string("any"), 
-                                  0, causal, true, false, false)[0];
-    fmha_out = paddle::reshape(paddle::experimental::squeeze(fmha_out, {0}), {-1, num_q_head * head_dim_qk});
-  }
-
-  if (max_dec_len_this_time_data > 0) {
-    cudaStream_t exec_stream;
-    if (max_enc_len_this_time_data > 0) {
-      cudaStreamWaitEvent(decoder_stream, main_event);
-      exec_stream = decoder_stream;
-    } else {
-      exec_stream = main_stream;
-    }
-    if (speculate_decoder) {
-        SpeculateWriteCacheWithRoPEKernel<data_t, data_t>(
-            meta_data,
-            qkv_out,  // [token_num, num_heads, head_dim]
-            seq_lens_decoder,
-            seq_lens_encoder,
-            padding_offsets,
-            cum_offsets,
-            block_tables,
-            rotary_embs,
-            qkv_out_scales,
-            qkv_bias,
-            cache_k_quant_scales,
-            cache_v_quant_scales,
-            cache_k_zp,
-            cache_v_zp,
-            cache_quant_type_str,
-            use_neox_rotary_style,
-            max_input_length,
-            exec_stream,
-            &qkv_out,
-            const_cast<paddle::Tensor*>(&key_cache),
-            const_cast<paddle::Tensor*>(&value_cache));
-    } else {
-        DecoderWriteCacheWithRoPEKernel<data_t, data_t>(
-            meta_data,
-            qkv_out,  // [token_num, num_heads, head_dim]
-            seq_lens_decoder,
-            seq_lens_encoder,
-            padding_offsets,
-            cum_offsets,
-            block_tables,
-            rotary_embs,
-            qkv_out_scales,
-            qkv_bias,
-            cache_k_quant_scales,
-            cache_v_quant_scales,
-            cache_k_zp,
-            cache_v_zp,
-            cache_quant_type_str,
-            use_neox_rotary_style,
-            max_input_length,
-            exec_stream,
-            &qkv_out,
-            const_cast<paddle::Tensor*>(&key_cache),
-            const_cast<paddle::Tensor*>(&value_cache));
-    }
-
-    // decoding phase: use append attention
-    CascadeAppendAttentionKernel<data_t, data_t>(
-        meta_data,
-        qkv_out,
-        key_cache,
-        value_cache,
-        attn_mask,
-        cache_k_dequant_scales,
-        cache_v_dequant_scales,
-        cache_k_zp,
-        cache_v_zp,
-        out_linear_shifts,
-        out_linear_smooths,
-        seq_lens_this_time,
-        seq_lens_decoder,
-        seq_lens_encoder,
-        padding_offsets,
-        cum_offsets,
-        block_tables,
-        decoder_batch_ids,
-        decoder_tile_ids_per_batch,
-        cache_quant_type_str,
-        decoder_num_blocks_data,
-        decoder_block_shape_q,
-        max_input_length,
-        max_len_kv_data,
-        softmax_scale,
-        quant_max_bound,
-        quant_min_bound,
-        out_linear_in_scale,
-        speculate_max_draft_token_num,
-        causal,
-        !speculate_decoder,
-        !speculate_decoder,
-        exec_stream,
-        &fmha_out);
-    if (max_enc_len_this_time_data > 0) {
-      cudaEventRecord(decoder_event, exec_stream);
-      cudaStreamWaitEvent(main_stream, decoder_event);
-    }
+    fmha_out = sage_attention_varlen_fwd(q, 
+                                        k, 
+                                        v, 
+                                        v_padded,
+                                        cu_seqlen,
+                                        cu_seqlen,
+                                        cu_seqlen_v_padded,
+                                        km, 
+                                        vm, 
+                                        max_enc_len_this_time_data,
+                                        max_enc_len_this_time_data,
+                                        total_seqlen_v_padded,
+                                        softmax_scale, 
+                                        std::string("per_warp"), 
+                                        std::string("any"), 
+                                        0, 
+                                        causal, 
+                                        true, 
+                                        false, 
+                                        false)[0];
+    fmha_out = paddle::reshape(fmha_out, {-1, num_q_head * head_dim_qk});
   }
 
   return {fmha_out, qkv_out};
@@ -284,11 +202,14 @@ std::vector<paddle::Tensor> SageAttentionKernel(
 
 std::vector<paddle::Tensor> SageAttention(
     const paddle::Tensor& qkv,
+    const paddle::Tensor& km,
     const paddle::Tensor& key_cache,
     const paddle::Tensor& value_cache,
     const paddle::Tensor& seq_lens_encoder,
     const paddle::Tensor& seq_lens_decoder,
     const paddle::Tensor& seq_lens_this_time,
+    const paddle::Tensor& cu_seqlen,
+    const paddle::Tensor& cu_seqlen_v_padded,
     const paddle::Tensor& padding_offsets,
     const paddle::Tensor& cum_offsets,
     const paddle::Tensor& block_tables,
@@ -348,11 +269,14 @@ std::vector<paddle::Tensor> SageAttention(
       return SageAttentionKernel<paddle::DataType::FLOAT16>(
           meta_data,
           qkv,
+          km,
           key_cache,
           value_cache,
           seq_lens_encoder,
           seq_lens_decoder,
           seq_lens_this_time,
+          cu_seqlen,
+          cu_seqlen_v_padded,
           padding_offsets,
           cum_offsets,
           block_tables,
@@ -395,11 +319,14 @@ std::vector<paddle::Tensor> SageAttention(
       return SageAttentionKernel<paddle::DataType::BFLOAT16>(
           meta_data,
           qkv,
+          km,
           key_cache,
           value_cache,
           seq_lens_encoder,
           seq_lens_decoder,
           seq_lens_this_time,
+          cu_seqlen,
+          cu_seqlen_v_padded,
           padding_offsets,
           cum_offsets,
           block_tables,
@@ -450,11 +377,14 @@ std::vector<paddle::Tensor> SageAttention(
 
 std::vector<std::vector<int64_t>> SageAttentionInferShape(
     const std::vector<int64_t>& qkv_shape,
+    const std::vector<int64_t>& km_shape,
     const std::vector<int64_t>& key_cache_shape,
     const std::vector<int64_t>& value_cache_shape,
     const std::vector<int64_t>& seq_lens_encoder_shape,
     const std::vector<int64_t>& seq_lens_decoder_shape,
     const std::vector<int64_t>& seq_lens_this_time_shape,
+    const std::vector<int64_t>& cu_seqlen_shape,
+    const std::vector<int64_t>& cu_seqlen_v_padded_shape,
     const std::vector<int64_t>& padding_offsets_shape,
     const std::vector<int64_t>& cum_offsets_shape,
     const std::vector<int64_t>& block_tables_shape,
@@ -494,11 +424,14 @@ std::vector<std::vector<int64_t>> SageAttentionInferShape(
 
 std::vector<paddle::DataType> SageAttentionInferDtype(
     const paddle::DataType& qkv_dtype,
+    const paddle::DataType& km_dtype,
     const paddle::DataType& key_cache_dtype,
     const paddle::DataType& value_cache_dtype,
     const paddle::DataType& seq_lens_encoder_dtype,
     const paddle::DataType& seq_lens_decoder_dtype,
     const paddle::DataType& seq_lens_this_time_dtype,
+    const paddle::DataType& cu_seqlen_dtype,
+    const paddle::DataType& cu_seqlen_v_padded_dtype,
     const paddle::DataType& padding_offsets_dtype,
     const paddle::DataType& cum_offsets_dtype,
     const paddle::DataType& block_tables_dtype,
@@ -568,11 +501,14 @@ std::vector<paddle::DataType> SageAttentionInferDtype(
 
 PD_BUILD_OP(sage_attention)
     .Inputs({"qkv",
+             "km",
              "key_cache",
              "value_cache",
              "seq_lens_encoder",
              "seq_lens_decoder",
              "seq_lens_this_time",
+             "cu_seqlen",
+             "cu_seqlen_v_padded",
              "padding_offsets",
              "cum_offsets",
              "block_tables",
