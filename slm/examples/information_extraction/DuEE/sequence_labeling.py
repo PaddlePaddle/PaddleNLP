@@ -46,7 +46,7 @@ parser.add_argument("--do_train", type=ast.literal_eval, default=True, help="do 
 parser.add_argument("--do_predict", type=ast.literal_eval, default=True, help="do predict")
 parser.add_argument("--weight_decay", type=float, default=0.01, help="Weight decay rate for L2 regularizer.")
 parser.add_argument("--warmup_proportion", type=float, default=0.1, help="Warmup proportion params for warmup strategy")
-parser.add_argument("--max_seq_len", type=int, default=512, help="Number of words of the longest seqence.")
+parser.add_argument("--max_seq_len", type=int, default=512, help="Number of words of the longest sequence.")
 parser.add_argument("--valid_step", type=int, default=100, help="validation step")
 parser.add_argument("--skip_step", type=int, default=20, help="skip step")
 parser.add_argument("--batch_size", type=int, default=32, help="Total examples' number in batch for training.")

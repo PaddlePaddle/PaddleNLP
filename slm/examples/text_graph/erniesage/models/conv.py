@@ -78,7 +78,7 @@ class ErnieSageV2Conv(nn.Layer):
             input_size (int): input size of feature tensor.
             hidden_size (int): hidden size of the Conv layers.
             learning_rate (float): learning rate.
-            aggr_func (str): aggregate function. 'sum', 'mean', 'max' avaliable.
+            aggr_func (str): aggregate function. 'sum', 'mean', 'max' available.
         """
         super(ErnieSageV2Conv, self).__init__()
         assert aggr_func in [

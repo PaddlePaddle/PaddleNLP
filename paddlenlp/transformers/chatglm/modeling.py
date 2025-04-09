@@ -844,7 +844,11 @@ class ChatGLMForCausalLM(ChatGLMPretrainedModel):
                     context_lengths = paddle.to_tensor(context_lengths, dtype="int64")
                     block_position_ids = seq_length - context_lengths
                     position_ids = paddle.concat(
-                        [paddle.to_tensor(mask_positions, dtype="int64"), block_position_ids], axis=1
+                        [
+                            paddle.to_tensor(mask_positions, dtype="int64").unsqueeze(-1),
+                            block_position_ids.unsqueeze(-1),
+                        ],
+                        axis=1,
                     ).unsqueeze(-1)
                 else:
                     position_ids = paddle.to_tensor(mask_positions, dtype="int64").unsqueeze(-1)

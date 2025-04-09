@@ -236,7 +236,7 @@ class CrossEntropyCriterion(nn.Layer):
                 `[batch_size, sequence_length, vocab_size]` whose data type can
                 be float32 or float64.
             label (Tensor):
-                The label for correspoding results with shape
+                The label for corresponding results with shape
                 `[batch_size, sequence_length, 1]`.
 
         Returns:

@@ -35,7 +35,7 @@ from paddlenlp.utils.log import logger
 class EvalArgument:
     eval_file: str = field(
         default="gsm8k",
-        metadata={"help": "the name of dataset for evalution. Supported values: aime2024, gsm8k, math500"},
+        metadata={"help": "the name of dataset for evaluation. Supported values: aime2024, gsm8k, math500"},
     )
     eval_question_key: str = field(default="input_ids", metadata={"help": "the question key of dataset"})
     eval_answer_key: str = field(default="output_ids", metadata={"help": "the answer key of dataset"})

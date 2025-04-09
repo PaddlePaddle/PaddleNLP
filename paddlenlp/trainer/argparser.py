@@ -275,6 +275,25 @@ class PdArgumentParser(ArgumentParser):
         else:
             raise FileNotFoundError(f"The argument file {json_file} does not exist.")
 
+    def read_yaml(self, yaml_file: str) -> list:
+        import yaml
+
+        yaml_file = Path(yaml_file)
+        if yaml_file.exists():
+            with open(yaml_file, "r") as file:
+                data = yaml.safe_load(file)
+            yaml_args = []
+            for key, value in data.items():
+                if isinstance(value, list):
+                    yaml_args.extend([f"--{key}", *[str(v) for v in value]])
+                elif isinstance(value, dict):
+                    yaml_args.extend([f"--{key}", json.dumps(value)])
+                else:
+                    yaml_args.extend([f"--{key}", str(value)])
+            return yaml_args
+        else:
+            raise FileNotFoundError(f"The argument file {yaml_file} does not exist.")
+
     def parse_json_file(self, json_file: str, return_remaining_strings=False) -> Tuple[DataClass, ...]:
         """
         Alternative helper method that does not use `argparse` at all, instead loading a json file and populating the
@@ -301,6 +320,26 @@ class PdArgumentParser(ArgumentParser):
         json_args = self.read_json(sys.argv[1])
         # In case of conflict, command line arguments take precedence
         args = json_args + sys.argv[2:]
+        return self.common_parse(args, return_remaining_strings)
+
+    def parse_yaml_file_and_cmd_lines(self, return_remaining_strings=False) -> Tuple[DataClass, ...]:
+        """
+        Extend the functionality of `parse_yaml_file` to handle command line arguments in addition to loading a YAML
+        file.
+
+        When there is a conflict between the command line arguments and the YAML file configuration,
+        the command line arguments will take precedence.
+
+        Returns:
+            Tuple consisting of:
+
+                - the dataclass instances in the same order as they were passed to the initializer.abspath
+        """
+        if not sys.argv[1].endswith(".yaml"):
+            raise ValueError(f"The first argument should be a YAML file, but it is {sys.argv[1]}")
+        yaml_args = self.read_yaml(sys.argv[1])
+        # In case of conflict, command line arguments take precedence
+        args = yaml_args + sys.argv[2:]
         return self.common_parse(args, return_remaining_strings)
 
     def parse_dict(self, args: dict) -> Tuple[DataClass, ...]:

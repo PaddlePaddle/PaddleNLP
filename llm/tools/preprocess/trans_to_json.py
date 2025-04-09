@@ -33,7 +33,7 @@ def get_args():
         default="",
         help="Spliter between documents. We will strip the line, if you use blank line to split doc, leave it blank.",
     )
-    parser.add_argument("--min_doc_length", type=int, default=10, help="Minimal char of a documment.")
+    parser.add_argument("--min_doc_length", type=int, default=10, help="Minimal char of a document.")
     parser.add_argument("--workers", type=int, default=1, help="Number of worker processes to launch")
     parser.add_argument("--log_interval", type=int, default=1, help="Interval between progress updates.")
     parser.add_argument("--no-merge", action="store_true", help="Don't merge the file.")

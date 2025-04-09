@@ -264,14 +264,14 @@ function llama_dygraph_auto_bs8_fp32_DP2() {
         >>${log_path}/$FUNCNAME 2>&1
     loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
     ips=-1
-    mem=-1
+    mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
     echo "result: loss=$loss ips=$ips mem=$mem"
     loss_base=9.4992733
     if [ $IS_A100 -ne 0 ];then
         loss_base=9.50651741
     fi
     ips_base=-1
-    mem_base=-1
+    mem_base=9.381539106369019
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -334,14 +334,14 @@ function llama_dygraph_auto_bs8_fp32_DP2-MP2() {
         >>${log_path}/$FUNCNAME 2>&1
     loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
     ips=-1
-    mem=-1
+    mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
     echo "result: loss=$loss ips=$ips mem=$mem"
     loss_base=9.3507843
     if [ $IS_A100 -ne 0 ];then
         loss_base=9.38577747
     fi
     ips_base=-1
-    mem_base=-1
+    mem_base=5.1569297313690186
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
