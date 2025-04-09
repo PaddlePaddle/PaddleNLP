@@ -217,7 +217,7 @@ if [[ ${#P0case_list[*]} -ne 0 ]] || [[ ${#APIcase_list[*]} -ne 0 ]];then
         echo "instal_nlp_pr done"
     fi
     # install paddlenlp_ops
-    if [ -f ./csrc/gpu_dist/p****.whl ];then
+    if [ ! -f ./csrc/gpu_dist/p****.whl ];then
         echo "install_paddlenlp_ops_develop"
         python -m pip install --user https://paddlenlp.bj.bcebos.com/wheels/paddlenlp_ops-ci-py3-none-any.whl --no-cache-dir
     else
