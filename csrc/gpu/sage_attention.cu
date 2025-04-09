@@ -23,7 +23,7 @@
 template <paddle::DataType D>
 std::vector<paddle::Tensor> SageAttentionKernel(
     const AppendAttnMetaData& meta_data,
-    const paddle::Tensor& qkv,  // write kv, sage attn
+    const paddle::Tensor& qkv,  // write kv
     const paddle::Tensor& q,
     const paddle::Tensor& k,
     const paddle::Tensor& v,
@@ -202,6 +202,10 @@ std::vector<paddle::Tensor> SageAttentionKernel(
 
 std::vector<paddle::Tensor> SageAttention(
     const paddle::Tensor& qkv,
+    const paddle::Tensor& q,
+    const paddle::Tensor& k,
+    const paddle::Tensor& v,
+    const paddle::Tensor& v_padded,
     const paddle::Tensor& km,
     const paddle::Tensor& key_cache,
     const paddle::Tensor& value_cache,
@@ -269,6 +273,10 @@ std::vector<paddle::Tensor> SageAttention(
       return SageAttentionKernel<paddle::DataType::FLOAT16>(
           meta_data,
           qkv,
+          q,
+          k,
+          v,
+          v_padded,
           km,
           key_cache,
           value_cache,
@@ -319,6 +327,10 @@ std::vector<paddle::Tensor> SageAttention(
       return SageAttentionKernel<paddle::DataType::BFLOAT16>(
           meta_data,
           qkv,
+          q,
+          k,
+          v,
+          v_padded,
           km,
           key_cache,
           value_cache,
@@ -377,6 +389,10 @@ std::vector<paddle::Tensor> SageAttention(
 
 std::vector<std::vector<int64_t>> SageAttentionInferShape(
     const std::vector<int64_t>& qkv_shape,
+    const std::vector<int64_t>& q_shape,
+    const std::vector<int64_t>& k_shape,
+    const std::vector<int64_t>& v_shape,
+    const std::vector<int64_t>& v_padded_shape,
     const std::vector<int64_t>& km_shape,
     const std::vector<int64_t>& key_cache_shape,
     const std::vector<int64_t>& value_cache_shape,
@@ -424,6 +440,10 @@ std::vector<std::vector<int64_t>> SageAttentionInferShape(
 
 std::vector<paddle::DataType> SageAttentionInferDtype(
     const paddle::DataType& qkv_dtype,
+    const paddle::DataType& q_dtype,
+    const paddle::DataType& k_dtype,
+    const paddle::DataType& v_dtype,
+    const paddle::DataType& v_padded_dtype,
     const paddle::DataType& km_dtype,
     const paddle::DataType& key_cache_dtype,
     const paddle::DataType& value_cache_dtype,
@@ -501,6 +521,10 @@ std::vector<paddle::DataType> SageAttentionInferDtype(
 
 PD_BUILD_OP(sage_attention)
     .Inputs({"qkv",
+             "q", 
+             "k", 
+             "v", 
+             "v_padded",
              "km",
              "key_cache",
              "value_cache",
