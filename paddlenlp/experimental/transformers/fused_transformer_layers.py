@@ -3142,7 +3142,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
             else:
                 if paddle.is_compiled_with_rocm():
                     from paddlenlp.ops.triton_ops.paged_attn import PagedAttention, compute_slot_mapping
-                    from itertools import accumulate
+                    # from itertools import accumulate
                     """
                     query: shape = [num_tokens, num_heads * head_size]
                     key: shape = [num_tokens, num_kv_heads * head_size]
@@ -3153,16 +3153,18 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                     query_lens = kwargs.get("seq_lens_this_time", None).numpy().tolist()
                     query_lens = [item for sublist in query_lens for item in sublist]
                     # seq_lens = kwargs.get("seq_lens", None)
-                    seq_lens = kwargs.get("seq_lens_encoder", None).numpy().tolist()
-                    seq_lens = [item for sublist in seq_lens for item in sublist]
-                    seq_lens_tensor = kwargs.get("seq_lens_encoder", None)
+                    seq_lens = kwargs.get("seq_lens_this_time", None).numpy().tolist()   
+                    seq_lens = [item for sublist in seq_lens for item in sublist]   
+                    seq_lens_tensor = kwargs.get("seq_lens_this_time", None)
                     
                     block_tables = kwargs.get("block_tables", None)
                     batch_size = block_tables.shape[0]
                     block_size = kwargs.get("block_size", 64)
                     
-                    max_query_len = max(query_lens)
-                    query_start_loc = paddle.to_tensor(list(accumulate(query_lens, initial=0)), dtype=paddle.int64)
+                    # max_query_len = max(query_lens) 
+                    max_query_len = kwargs.get("max_input_length", None)
+                    query_start_loc = kwargs.get("cu_seqlens_q", None)
+                    # query_start_loc = paddle.to_tensor(list(accumulate(query_lens, initial=0)), dtype=paddle.int64)
                     # seq_start_loc = paddle.to_tensor(list(accumulate(seq_lens, initial=0)), dtype=paddle.int64)
                     # seq_lens_tensor = paddle.to_tensor(seq_lens, dtype=paddle.int64)
                     # context_lens_tensor = paddle.zeros([batch_size], dtype='int64')
@@ -3637,7 +3639,7 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
             else:
                 if paddle.is_compiled_with_rocm():
                     from paddlenlp.ops.triton_ops.paged_attn import PagedAttention, compute_slot_mapping
-                    from itertools import accumulate
+                    # from itertools import accumulate
                     """
                     query: shape = [num_tokens, num_heads * head_size]
                     key: shape = [num_tokens, num_kv_heads * head_size]
@@ -3648,16 +3650,18 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
                     query_lens = kwargs.get("seq_lens_this_time", None).numpy().tolist()
                     query_lens = [item for sublist in query_lens for item in sublist]
                     # seq_lens = kwargs.get("seq_lens", None)
-                    seq_lens = kwargs.get("seq_lens_encoder", None).numpy().tolist()
-                    seq_lens = [item for sublist in seq_lens for item in sublist]
-                    seq_lens_tensor = kwargs.get("seq_lens_encoder", None)
+                    seq_lens = kwargs.get("seq_lens_this_time", None).numpy().tolist()   # seq_lens_this_time
+                    seq_lens = [item for sublist in seq_lens for item in sublist]   
+                    seq_lens_tensor = kwargs.get("seq_lens_this_time", None)
                     
                     block_tables = kwargs.get("block_tables", None)
                     batch_size = block_tables.shape[0]
                     block_size = kwargs.get("block_size", 64)
                     
-                    max_query_len = max(query_lens)
-                    query_start_loc = paddle.to_tensor(list(accumulate(query_lens, initial=0)), dtype=paddle.int64)
+                    # max_query_len = max(query_lens) 
+                    max_query_len = kwargs.get("max_input_length", None)
+                    query_start_loc = kwargs.get("cu_seqlens_q", None)
+                    # query_start_loc = paddle.to_tensor(list(accumulate(query_lens, initial=0)), dtype=paddle.int64)
                     # seq_start_loc = paddle.to_tensor(list(accumulate(seq_lens, initial=0)), dtype=paddle.int64)
                     # seq_lens_tensor = paddle.to_tensor(seq_lens, dtype=paddle.int64)
                     # context_lens_tensor = paddle.zeros([batch_size], dtype='int64')
