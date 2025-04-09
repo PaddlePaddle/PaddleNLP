@@ -1,0 +1,6 @@
+# JSON for Modern C++ was originally written by Niels Lohmann.
+# Since 2013, over 250 contributors have helped to improve the library.
+# This CODEOWNERS file is only to make sure that @nlohmann is requested
+# for a code review in case of a pull request.
+
+* @nlohmann
