@@ -478,7 +478,6 @@ class FusedMultiTransformerBase(Layer):
             cache_k_out_scale_attr = self.get_attr(config.cache_k_out_scale_attrs, i)
             cache_v_out_scale_attr = self.get_attr(config.cache_v_out_scale_attrs, i)
 
-            # import pdb; pdb.set_trace()
             ln_scale = self.create_parameter(
                 attr=ln_scale_attr,
                 shape=[config.embed_dim],
@@ -804,13 +803,13 @@ class FusedMultiTransformerBase(Layer):
                 ffn1_weight = self.create_parameter(
                     shape=self.moe_ffn1_weight_shape,
                     attr=ffn1_weight_attr,
-                    dtype=self.get_moe_weight_dtype(),
+                    dtype=self.create_params_type,
                     is_bias=False,
                 )
                 ffn2_weight = self.create_parameter(
                     shape=self.moe_ffn2_weight_shape,
                     attr=ffn2_weight_attr,
-                    dtype=self.get_moe_weight_dtype(),
+                    dtype=self.create_params_type,
                     is_bias=False,
                 )
             else:
@@ -919,8 +918,6 @@ class FusedMultiTransformerBase(Layer):
             self._add_parameter(ffn1_weight)
             self._add_parameter(ffn2_weight)
 
-    def get_moe_weight_dtype(self):
-        return self.create_params_type
 
     def get_attr(self, attrs, idx):
         if isinstance(attrs, (list, tuple)):
@@ -1381,24 +1378,19 @@ class FusedMultiTransformerBase(Layer):
             seq_lens_encoder = kwargs.get("seq_lens_encoder", None)
             seq_lens_decoder = kwargs.get("seq_lens_decoder", None)
             seq_lens_this_time = kwargs.get("seq_lens_this_time", None)
-            if paddle.is_compiled_with_xpu():
-                from paddlenlp_ops import get_position_ids_v2
+            position_ids_shape = paddle.sum(seq_lens_this_time)
+            self.position_ids = paddle.empty(shape=position_ids_shape, dtype=seq_lens_encoder.dtype)
+            self.mask_encoder_batch = paddle.empty(
+                shape=position_ids_shape, dtype=seq_lens_encoder.dtype
+            ).unsqueeze(1)
 
-                self.position_ids = get_position_ids_v2(seq_lens_encoder, seq_lens_decoder, seq_lens_this_time)
-            else:
-                position_ids_shape = paddle.sum(seq_lens_this_time)
-                self.position_ids = paddle.empty(shape=position_ids_shape, dtype=seq_lens_encoder.dtype)
-                self.mask_encoder_batch = paddle.empty(
-                    shape=position_ids_shape, dtype=seq_lens_encoder.dtype
-                ).unsqueeze(1)
+            from paddlenlp_ops import get_position_ids_and_mask_encoder_batch
 
-                from paddlenlp_ops import get_position_ids_and_mask_encoder_batch
-
-                # In-place operations that compute the position_ids.
-                os.environ["stride_in_no_check_dy2st_diff"] = "1"
-                get_position_ids_and_mask_encoder_batch(
-                    seq_lens_encoder, seq_lens_decoder, seq_lens_this_time, self.position_ids, self.mask_encoder_batch
-                )
+            # In-place operations that compute the position_ids.
+            os.environ["stride_in_no_check_dy2st_diff"] = "1"
+            get_position_ids_and_mask_encoder_batch(
+                seq_lens_encoder, seq_lens_decoder, seq_lens_this_time, self.position_ids, self.mask_encoder_batch
+            )
 
     def post_process(self, **kwargs):
         time_step = kwargs.get("time_step", None)
@@ -1467,31 +1459,6 @@ class FusedMultiTransformerBase(Layer):
         """
         self.pre_process(**kwargs)
         kwargs["cum_offsets"] = cum_offsets
-        from paddlenlp_ops import get_position_ids_v2, get_infer_param
-        infer_param_list = get_infer_param(kwargs.get("seq_lens_encoder", None), kwargs.get("seq_lens_decoder", None))
-        kwargs["encoder_batch_map"] = infer_param_list[0]
-        kwargs["decoder_batch_map"] = infer_param_list[1]
-        kwargs["encoder_batch_idx"] = infer_param_list[2]
-        kwargs["decoder_batch_idx"] = infer_param_list[3]
-        kwargs["encoder_seq_lod"] = infer_param_list[4]
-        kwargs["decoder_context_len"] = infer_param_list[5]
-        kwargs["decoder_context_len_cache"] = infer_param_list[6]
-        kwargs["encoder_batch_map_cpu"] = infer_param_list[7]
-        kwargs["decoder_batch_map_cpu"] = infer_param_list[8]
-        kwargs["encoder_batch_idx_cpu"] = infer_param_list[9]
-        kwargs["decoder_batch_idx_cpu"] = infer_param_list[10]
-        kwargs["encoder_seq_lod_cpu"] = infer_param_list[11]
-        kwargs["decoder_context_len_cpu"] = infer_param_list[12]
-        kwargs["decoder_context_len_cache_cpu"] = infer_param_list[13]
-        # 1
-        kwargs["enc_batch"] = infer_param_list[14]
-        kwargs["dec_batch"] = infer_param_list[15]
-        kwargs["total_enc_len"] = infer_param_list[16]
-
-        kwargs["start_token_raw"] = paddle.full(shape=[kwargs.get("seq_lens_encoder", None).shape[0]], fill_value=0, dtype="int32")  #  [0, 0, 0 ,0 ……] enc_batch
-        kwargs["kv_seq_lod_raw"] = paddle.arange(start=0, end=kwargs.get("seq_lens_encoder", None).shape[0]+1, step=1, dtype="int32")   #  [0, 1, 2 ,3 ……] dec_batch + 1
-        kwargs["start_token_raw_cpu"] = kwargs["start_token_raw"].cpu()  #  [0, 0, 0 ,0 ……] enc_batch
-        kwargs["kv_seq_lod_raw_cpu"] = kwargs["kv_seq_lod_raw"].cpu()   #  [0, 1, 2 ,3 ……] dec_batch + 1
 
         if caches is not None:
             assert len(caches) == len(self.linear_weights) or len(caches) == 2 * len(self.linear_weights)
@@ -1532,8 +1499,6 @@ class FusedMultiTransformerBase(Layer):
                 kwargs.get("block_size", 64),
                 self.config.speculate_config.speculate_max_draft_token_num,
             )
-
-        src = self.process_batch(src, **kwargs)
 
         residual_input = src
         for i in range(self.num_layers):
@@ -1598,9 +1563,6 @@ class FusedMultiTransformerBase(Layer):
 
         out = self.post_process(**kwargs)
         return out, caches
-
-    def process_batch(self, data, **kwargs):
-        return data
 
 
 class FusedMultiTransformerPostLayernorm(FusedMultiTransformerBase):
@@ -3248,10 +3210,302 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
             return out
 
 
-class FusedMultiTransformerXPU(FusedMultiTransformerBase):
+class FusedMultiTransformerXPU(Layer):
     def __init__(self, config: FusedMultiTransformerConfig):
         assert paddle.is_compiled_with_xpu()
-        super().__init__(config)
+        super().__init__()
+
+        self.config = config
+        self.moe_quant_type = config.moe_quant_type
+
+        assert config.embed_dim > 0, "Expected embed_dim to be greater than 0, " "but received {}".format(
+            config.embed_dim
+        )
+        assert config.num_heads > 0, "Expected nhead to be greater than 0, " "but received {}".format(config.num_heads)
+        assert config.intermediate_size > 0, "Expected intermediate_size to be greater than 0, but received {}".format(
+            config.intermediate_size
+        )
+
+        # self.normalize_before = normalize_before
+        self._dtype = self._helper.get_default_dtype()
+        if self._dtype == "bfloat16":
+            self._fuse_kernel_compute_dtype = "bf16"
+        elif self._dtype == "float16":
+            self._fuse_kernel_compute_dtype = "fp16"
+        elif self._dtype == "float32":
+            self._fuse_kernel_compute_dtype = "fp32"
+        else:
+            raise ValueError(
+                "FusedMultiTransformer just support float32, float16 and bfloat16 as default dtype, but received {}".format(
+                    self._dtype
+                )
+            )
+        self._epsilon = config.epsilon
+        self._residual_alpha = config.residual_alpha
+        self.tp_degree = config.tp_degree
+        self.norm_type = config.norm_type
+        if self.norm_type == "layernorm":
+            self.norm_func = fused_layer_norm
+        elif self.norm_type == "rmsnorm":
+            self.norm_func = fused_rms_norm
+        else:
+            raise NotImplementedError("Only support norm type of [layernorm, rmsnorm]")
+        self.use_neox_rotary_style = config.use_neox_rotary_style
+        self._norm_weight_dtype = "float32" if self.norm_type == "layernorm" else self._dtype
+
+        self.activation = config.activation
+
+        self.embed_dim = config.embed_dim
+        if config.mla_config.use_mla():
+            self.head_dim = config.mla_config.v_head_dim
+        else:
+            self.head_dim = config.embed_dim // config.num_heads
+            assert self.head_dim * config.num_heads == config.embed_dim, "embed_dim must be divisible by num_heads"
+
+        # tensor model parallel
+        if config.tp_degree > 1:
+            assert config.ring_id != -1
+        assert config.num_heads % config.tp_degree == 0
+        assert config.intermediate_size % config.tp_degree == 0
+        assert config.moe_config.shared_expert_intermediate_size % config.tp_degree == 0
+        assert config.moe_config.moe_intermediate_size % config.tp_degree == 0
+        self.num_heads = config.num_heads // config.tp_degree
+        self.kv_num_heads = config.kv_num_heads // config.tp_degree
+        self.intermediate_size = config.intermediate_size // config.tp_degree
+        self.config.moe_config.shared_expert_intermediate_size //= config.tp_degree
+        self.config.moe_config.moe_intermediate_size //= config.tp_degree
+
+        self.num_layers = config.num_layers
+        assert self.num_layers > 0
+        if config.qkv_weight_attrs is not None and isinstance(config.qkv_weight_attrs, (list, tuple)):
+            assert self.num_layers == len(config.qkv_weight_attrs)
+
+        if self.config.mla_config.use_mla():
+            mscale = self.config.mla_config.mscale
+            self.softmax_scale = float(self.config.mla_config.qk_head_dim**-0.5) * mscale * mscale
+        else:
+            self.softmax_scale = float(self.head_dim**-0.5)
+
+        self.position_ids: list[int] = []
+
+        self.weight_dtype = self._dtype
+        self.create_params_type = self.get_weight_create_dype()
+
+        self.ln_scales, self.ln_biases = [], []
+        self.qkv_biases = []
+        self.linear_biases = []
+        self.ffn_ln_scales, self.ffn_ln_biases = [], []
+        self.ffn1_biases = []
+        self.ffn2_biases = []
+        self.e_score_correction_biases = []
+
+        self.shared_expert_gate_weights = []
+        self.shared_expert_ffn1_weights = []
+        self.shared_expert_ffn2_weights = []
+
+        self.cache_k_scales, self.cache_v_scales = [], []
+        self.cache_k_out_scales, self.cache_v_out_scales = [], []
+
+        self.init_weight_shape(config)
+
+        for i in range(self.num_layers):
+            ln_scale_attr = self.get_attr(config.ln_scale_attrs, i)
+            ln_bias_attr = self.get_attr(config.ln_bias_attrs, i)
+
+            qkv_bias_attr = self.get_attr(config.qkv_bias_attrs, i)
+            linear_bias_attr = self.get_attr(config.linear_bias_attrs, i)
+
+            ffn_ln_scale_attr = self.get_attr(config.ffn_ln_scale_attrs, i)
+            ffn_ln_bias_attr = self.get_attr(config.ffn_ln_bias_attrs, i)
+            ffn1_bias_attr = self.get_attr(config.ffn1_bias_attrs, i)
+            ffn2_bias_attr = self.get_attr(config.ffn2_bias_attrs, i)
+            e_score_correction_bias_attr = self.get_attr(config.e_score_correction_bias_attrs, i)
+
+            cache_k_scale_attr = self.get_attr(config.cache_k_scale_attrs, i)
+            cache_v_scale_attr = self.get_attr(config.cache_v_scale_attrs, i)
+            cache_k_out_scale_attr = self.get_attr(config.cache_k_out_scale_attrs, i)
+            cache_v_out_scale_attr = self.get_attr(config.cache_v_out_scale_attrs, i)
+
+            ln_scale = self.create_parameter(
+                attr=ln_scale_attr,
+                shape=[config.embed_dim],
+                default_initializer=Constant(value=1.0),
+                dtype=self._norm_weight_dtype,
+            )
+            ln_bias = None
+            if ln_bias_attr:
+                ln_bias = self.create_parameter(
+                    attr=ln_bias_attr,
+                    shape=[config.embed_dim],
+                    is_bias=True,
+                    dtype=self._norm_weight_dtype,
+                )
+
+            qkv_bias = None
+            if qkv_bias_attr:
+                qkv_bias = self.create_parameter(
+                    shape=[(self.num_heads + 2 * self.kv_num_heads) * self.head_dim],
+                    attr=qkv_bias_attr,
+                    dtype=self._dtype,
+                    is_bias=True,
+                )
+
+            linear_bias = None
+            if linear_bias_attr:
+                linear_bias = self.create_parameter(
+                    shape=[config.embed_dim],
+                    attr=linear_bias_attr,
+                    dtype=self._dtype,
+                    is_bias=True,
+                )
+
+            ffn_ln_scale = self.create_parameter(
+                shape=[config.embed_dim],
+                attr=ffn_ln_scale_attr,
+                is_bias=False,
+                default_initializer=Constant(1.0),
+                dtype=self._norm_weight_dtype,
+            )
+
+            ffn_ln_bias = None
+            if ffn_ln_bias_attr:
+                ffn_ln_bias = self.create_parameter(
+                    shape=[config.embed_dim],
+                    attr=ffn_ln_bias_attr,
+                    is_bias=True,
+                    dtype=self._norm_weight_dtype,
+                )
+
+            ffn1_bias = None
+            if ffn1_bias_attr:
+                if self.config.moe_config.use_moe(i):
+                    ffn1_bias = self.create_parameter(
+                        shape=[self.config.moe_config.num_experts, self.intermediate_size * 2]
+                        if self.activation.endswith("glu")
+                        else [self.config.moe_config.num_experts, self.intermediate_size],
+                        attr=ffn1_bias_attr,
+                        dtype=self._dtype,
+                        is_bias=True,
+                    )
+                else:
+                    ffn1_bias = self.create_parameter(
+                        shape=[self.intermediate_size * 2]
+                        if self.activation.endswith("glu")
+                        else [self.intermediate_size],
+                        attr=ffn1_bias_attr,
+                        dtype=self._dtype,
+                        is_bias=True,
+                    )
+
+            e_score_correction_bias = None
+            if e_score_correction_bias_attr:
+                if self.config.moe_config.use_moe(i):
+                    if self.config.moe_config.topk_method == "noaux_tc":
+                        e_score_correction_bias = self.create_parameter(
+                            shape=[self.config.moe_config.num_experts],
+                            attr=e_score_correction_bias_attr,
+                            dtype="float32",
+                            is_bias=True,
+                        )
+
+            ffn2_bias = None
+            if ffn2_bias_attr:
+                if self.config.moe_config.use_moe(i):
+                    ffn2_bias = self.create_parameter(
+                        shape=[self.config.moe_config.num_experts, config.embed_dim],
+                        attr=ffn2_bias_attr,
+                        dtype=self._dtype,
+                        is_bias=True,
+                    )
+                else:
+                    ffn2_bias = self.create_parameter(
+                        shape=[config.embed_dim],
+                        attr=ffn2_bias_attr,
+                        dtype=self._dtype,
+                        is_bias=True,
+                    )
+
+            cache_scale_dtype = "float32"
+            if self.config.append_attn:
+                cache_scale_dtype = self._dtype
+
+            cache_k_scale = None
+            if cache_k_scale_attr:
+                cache_k_scale = self.create_parameter(
+                    shape=[self.kv_num_heads],
+                    attr=cache_k_scale_attr,
+                    dtype=cache_scale_dtype,
+                    is_bias=False,
+                )
+
+            cache_v_scale = None
+            if cache_v_scale_attr:
+                cache_v_scale = self.create_parameter(
+                    shape=[self.kv_num_heads],
+                    attr=cache_v_scale_attr,
+                    dtype=cache_scale_dtype,
+                    is_bias=False,
+                )
+
+            cache_k_out_scale = None
+            if cache_k_out_scale_attr:
+                cache_k_out_scale = self.create_parameter(
+                    shape=[self.kv_num_heads],
+                    attr=cache_k_out_scale_attr,
+                    dtype=cache_scale_dtype,
+                    is_bias=False,
+                )
+
+            cache_v_out_scale = None
+            if cache_v_out_scale_attr:
+                cache_v_out_scale = self.create_parameter(
+                    shape=[self.kv_num_heads],
+                    attr=cache_v_out_scale_attr,
+                    dtype=cache_scale_dtype,
+                    is_bias=False,
+                )
+
+            # tensor model parallel
+            if config.tp_degree > 1:
+                # column parallel
+                _set_var_distributed(qkv_bias)
+                _set_var_distributed(ffn1_bias)
+
+            self.ln_scales.append(ln_scale)
+            self.ln_biases.append(ln_bias)
+            self.qkv_biases.append(qkv_bias)
+            self.linear_biases.append(linear_bias)
+
+            self.ffn_ln_scales.append(ffn_ln_scale)
+            self.ffn_ln_biases.append(ffn_ln_bias)
+            self.ffn1_biases.append(ffn1_bias)
+            self.ffn2_biases.append(ffn2_bias)
+            self.e_score_correction_biases.append(e_score_correction_bias)
+
+            self.cache_k_scales.append(cache_k_scale)
+            self.cache_v_scales.append(cache_v_scale)
+            self.cache_k_out_scales.append(cache_k_out_scale)
+            self.cache_v_out_scales.append(cache_v_out_scale)
+
+            self._add_parameter(ln_scale)
+            self._add_parameter(ln_bias)
+            self._add_parameter(qkv_bias)
+            self._add_parameter(linear_bias)
+
+            self._add_parameter(ffn_ln_scale)
+            self._add_parameter(ffn_ln_bias)
+            self._add_parameter(ffn1_bias)
+            self._add_parameter(ffn2_bias)
+            self._add_parameter(e_score_correction_bias)
+
+            self._add_parameter(cache_k_scale)
+            self._add_parameter(cache_v_scale)
+            self._add_parameter(cache_k_out_scale)
+            self._add_parameter(cache_v_out_scale)
+
+        self.dropout_rate = config.dropout_rate
+
+        # moe quant scale
         if self.moe_quant_type in ["weight_only_int8"]:
 
             self.ffn1_weights_scale = []
@@ -3445,32 +3699,18 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
             ffn1_weight_attr = self.get_attr(self.config.ffn1_weight_attrs, i)
             ffn2_weight_attr = self.get_attr(self.config.ffn2_weight_attrs, i)
             if self.config.moe_config.use_moe(i):
-                if self.moe_quant_type in ["weight_only_int8"]:
-                    ffn1_weight = self.create_parameter(
-                        shape=self.moe_ffn1_weight_shape,
-                        attr=ffn1_weight_attr,
-                        dtype="int8",
-                        is_bias=False,
-                    )
-                    ffn2_weight = self.create_parameter(
-                        shape=self.moe_ffn2_weight_shape,
-                        attr=ffn2_weight_attr,
-                        dtype="int8",
-                        is_bias=False,
-                    )
-                else:
-                    ffn1_weight = self.create_parameter(
-                        shape=self.moe_ffn1_weight_shape,
-                        attr=ffn1_weight_attr,
-                        dtype=self.create_params_type,
-                        is_bias=False,
-                    )
-                    ffn2_weight = self.create_parameter(
-                        shape=self.moe_ffn2_weight_shape,
-                        attr=ffn2_weight_attr,
-                        dtype=self.create_params_type,
-                        is_bias=False,
-                    )
+                ffn1_weight = self.create_parameter(
+                    shape=self.moe_ffn1_weight_shape,
+                    attr=ffn1_weight_attr,
+                    dtype=self.get_moe_weight_dtype(),
+                    is_bias=False,
+                )
+                ffn2_weight = self.create_parameter(
+                    shape=self.moe_ffn2_weight_shape,
+                    attr=ffn2_weight_attr,
+                    dtype=self.get_moe_weight_dtype(),
+                    is_bias=False,
+                )
             else:
                 ffn1_weight = self.create_parameter(
                     shape=self.ffn1_weight_shape,
@@ -3518,7 +3758,7 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
                     )
 
             # tensor model parallel
-            if self.config.nranks > 1:
+            if self.config.tp_degree > 1:
                 # column parallel
                 _set_var_distributed(qkv_weight)
                 _set_var_distributed(q_proj_weight)
@@ -3655,7 +3895,27 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
                 ]
 
     def get_moe_weight_dtype(self):
+        if self.moe_quant_type in ["weight_only_int8"]:
+            return "int8"
+        assert False
         return "int8"
+        
+    def get_weight_create_dype(self):
+        return self._dtype
+
+    def get_attr(self, attrs, idx):
+        if isinstance(attrs, (list, tuple)):
+            assert (
+                len(attrs) == self.num_layers
+            ), f"length of attrs is {len(attrs)} is not equal to self.num_layers {self.num_layers}"
+            return attrs[idx]
+        return attrs
+
+    def _add_parameter(self, param):
+        if param is None:
+            return
+        assert param.name not in self._parameters
+        self._parameters[param.name] = param
 
     def compute_fused_moe(self, tmp_out, i):
         config = self.config.moe_config
@@ -3729,6 +3989,21 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
         )
 
         return src
+
+    def compute_max_len(self, seq_lens_encoder, seq_lens_decoder, cum_offsets):
+        if seq_lens_encoder is None or seq_lens_decoder is None or cum_offsets is None:
+            return None, None
+        return paddle.incubate.nn.functional.blha_get_max_len(
+            seq_lens_encoder, seq_lens_decoder, cum_offsets  # cum_offsets.shape[0] used as bsz
+        )
+
+    def compute_layernorm_before_qkv(self, src, i):
+        if i == 0 and not self.config.speculate_config.speculate_method == "eagle":
+            ln_out = self.norm_func(src, self.ln_scales[i], self.ln_biases[i], self._epsilon, begin_norm_axis=1)[0]
+        else:
+            ln_out = src
+
+        return ln_out
 
     def compute_qkv(self, src, residual_input, i):
         ln_out = self.compute_layernorm_before_qkv(src, i)
@@ -3935,7 +4210,8 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
                 False,  # causal
                 False,  # speculate_decoder
             )
-            out_linear_out_prefill = self.compute_out_linear(fmha_out_prefill, i)
+            # out_linear_out_prefill = self.compute_out_linear(fmha_out_prefill, i)
+            out_linear_out_prefill = paddle.matmul(fmha_out_prefill, self.linear_weights[i])
             out_linear_out[0:encoder_len, :] = out_linear_out_prefill
         if kwargs["max_dec_len_this_time"]:  # decode phase
             ln_out_decoder = ln_out[encoder_len:, :]
@@ -4078,6 +4354,253 @@ class FusedMultiTransformerXPU(FusedMultiTransformerBase):
 
             out_linear_out[encoder_len:, :] = out_linear_out_decode
         return out_linear_out
+
+    def compute_activation(self, ffn1_out, i):
+        return fused_bias_act(ffn1_out, self.ffn1_biases[i], act_method=self.activation)
+
+    def compute_ffn1(self, tmp_out, i):
+        return paddle.matmul(tmp_out, self.ffn1_weights[i])
+
+    def compute_ffn2(self, ffn1_out, i):
+        return paddle.matmul(ffn1_out, self.ffn2_weights[i])
+
+    def compute_bias_residual_layernorm(self, ffn2_out, residual_input, i, num_layers):
+        if i != num_layers - 1:
+            norm_out = self.norm_func(
+                ffn2_out,
+                norm_weight=self.ln_scales[i + 1],
+                norm_bias=self.ln_biases[i + 1],
+                epsilon=self._epsilon,
+                begin_norm_axis=1,
+                bias=self.ffn2_biases[i],
+                residual=residual_input,
+            )
+            tmp_out, residual_input = norm_out[0], norm_out[1]
+        else:
+            tmp_out = fused_layer_norm(
+                ffn2_out,
+                norm_weight=None,
+                norm_bias=None,
+                epsilon=self._epsilon,
+                begin_norm_axis=1,
+                bias=self.ffn2_biases[i],
+                residual=residual_input,
+            )[0]
+        return tmp_out, residual_input
+
+    def compute_shared_expert(self, tmp_out, i):
+        ffn1_out = paddle.matmul(tmp_out, self.shared_expert_ffn1_weights[i])
+        ffn1_out = fused_bias_act(ffn1_out, None, act_method=self.activation)
+        ffn2_out = paddle.matmul(ffn1_out, self.shared_expert_ffn2_weights[i])
+        if self.config.moe_config.shared_expert_with_gate:
+            gate_out = paddle.matmul(tmp_out, self.shared_expert_gate_weights[i])
+            gate_out = paddle.nn.functional.sigmoid(gate_out)
+            return gate_out * ffn2_out
+        return ffn2_out
+
+    def compute_ffn_layernorm(self, out_linear_out, residual_input, i):
+        norm_out = self.norm_func(
+            out_linear_out,
+            norm_weight=self.ffn_ln_scales[i],
+            norm_bias=self.ffn_ln_biases[i],
+            epsilon=self._epsilon,
+            begin_norm_axis=1,
+            bias=self.linear_biases[i],
+            residual=residual_input,
+        )
+        tmp_out, residual_input = norm_out[0], norm_out[1]
+
+        return tmp_out, residual_input
+
+    def pre_process(self, **kwargs):
+        if self.config.mla_config.use_mla():
+            seq_lens_encoder = kwargs.get("seq_lens_encoder", None)
+            seq_lens_decoder = kwargs.get("seq_lens_decoder", None)
+            seq_lens_this_time = kwargs.get("seq_lens_this_time", None)
+            from paddlenlp_ops import get_position_ids_v2
+            self.position_ids = get_position_ids_v2(seq_lens_encoder, seq_lens_decoder, seq_lens_this_time)
+
+
+    def forward(
+        self,
+        input_ids,
+        src,
+        cum_offsets=None,
+        padding_offset=None,
+        attn_mask=None,
+        caches=None,
+        pre_caches=None,
+        pre_caches_length=0,
+        rotary_embs=None,
+        rotary_emb_dims=0,
+        seq_lens=None,
+        time_step=None,
+        **kwargs,
+    ):
+        r"""
+        Applies multi transformer layers on the input.
+
+        Parameters:
+            src (Tensor): The input of Transformer layers. It is
+                a tensor with shape `[batch_size, sequence_length, d_model]`.
+                The data type should be float16 or float32.
+            attn_mask (Tensor, optional): A tensor used in multi-head attention
+                to prevents attention to some unwanted positions, usually the
+                paddings or the subsequent positions. It is a tensor with shape
+                `[batch_size, 1, sequence_length, sequence_length]`. It can be
+                None when nothing wanted or needed to be prevented attention to.
+                Default None.
+            caches (list(Tensor)|tuple(Tensor), optional): The cache structure
+                tensors for the inference generation model. It is only used for
+                inference and should be None for training. The shape is
+                `[2, batch_size, num_head, max_seq_len, head_dim]`. Default None.
+            pre_caches (list(Tensor)|tuple(Tensor), optional): The prefix caches
+                for the generation model. The shape is `[2, bsz, num\_head, cache\_len, head\_dim]`. Default None.
+            rotary_embs (Tensor optional): The RoPE embs for the rotary computation. The shape is `[2, bsz, 1, seq\_len, head\_dim]`. Default None.
+            rotary_emb_dims (int, optional): The rotary_emb_dims of rotary computation, and it is 0 when rotary_embs is None,
+                1 when rotary_embs is not None and pos_extra_ids is None, 2 when rotary_embs and pos_extra_ids are both not None. Default 0.
+            seq_lens (Tensor optional): The sequence lengths of this batch. The shape is `[bsz]`. Default None.
+            time_step (Tensor, optional): The time step tensor for the generation
+                model. Which used in decode stage, to represent the time step,
+                that is, the real seq_len of CacheKV. The shape is `[1]`, must be
+                in CPUPlace. Default None.
+
+        Returns:
+            Tensor|tuple: If `caches` is None, return a tensor that has
+            the same shape and data type with `src`, representing the output
+            of Transformer layers. If `caches` is not None, return the
+            tuple (output, caches), which output is the output of
+            Transformer layers, caches is inplace with input `caches`.
+        """
+        self.pre_process(**kwargs)
+        kwargs["cum_offsets"] = cum_offsets
+        from paddlenlp_ops import get_position_ids_v2, get_infer_param
+        infer_param_list = get_infer_param(kwargs.get("seq_lens_encoder", None), kwargs.get("seq_lens_decoder", None))
+        kwargs["encoder_batch_map"] = infer_param_list[0]
+        kwargs["decoder_batch_map"] = infer_param_list[1]
+        kwargs["encoder_batch_idx"] = infer_param_list[2]
+        kwargs["decoder_batch_idx"] = infer_param_list[3]
+        kwargs["encoder_seq_lod"] = infer_param_list[4]
+        kwargs["decoder_context_len"] = infer_param_list[5]
+        kwargs["decoder_context_len_cache"] = infer_param_list[6]
+        kwargs["encoder_batch_map_cpu"] = infer_param_list[7]
+        kwargs["decoder_batch_map_cpu"] = infer_param_list[8]
+        kwargs["encoder_batch_idx_cpu"] = infer_param_list[9]
+        kwargs["decoder_batch_idx_cpu"] = infer_param_list[10]
+        kwargs["encoder_seq_lod_cpu"] = infer_param_list[11]
+        kwargs["decoder_context_len_cpu"] = infer_param_list[12]
+        kwargs["decoder_context_len_cache_cpu"] = infer_param_list[13]
+        # 1
+        kwargs["enc_batch"] = infer_param_list[14]
+        kwargs["dec_batch"] = infer_param_list[15]
+        kwargs["total_enc_len"] = infer_param_list[16]
+
+        kwargs["start_token_raw"] = paddle.full(shape=[kwargs.get("seq_lens_encoder", None).shape[0]], fill_value=0, dtype="int32")  #  [0, 0, 0 ,0 ……] enc_batch
+        kwargs["kv_seq_lod_raw"] = paddle.arange(start=0, end=kwargs.get("seq_lens_encoder", None).shape[0]+1, step=1, dtype="int32")   #  [0, 1, 2 ,3 ……] dec_batch + 1
+        kwargs["start_token_raw_cpu"] = kwargs["start_token_raw"].cpu()  #  [0, 0, 0 ,0 ……] enc_batch
+        kwargs["kv_seq_lod_raw_cpu"] = kwargs["kv_seq_lod_raw"].cpu()   #  [0, 1, 2 ,3 ……] dec_batch + 1
+
+        if caches is not None:
+            assert len(caches) == len(self.linear_weights) or len(caches) == 2 * len(self.linear_weights)
+
+        assert self.num_layers == len(self.linear_weights)
+
+        max_enc_len_this_time, max_dec_len_this_time = self.compute_max_len(
+            kwargs.get("seq_lens_encoder", None), kwargs.get("seq_lens_decoder", None), cum_offsets
+        )
+        kwargs["max_enc_len_this_time"] = max_enc_len_this_time
+        kwargs["max_dec_len_this_time"] = max_dec_len_this_time
+
+        if self.config.append_attn:
+
+            from paddlenlp_ops import get_block_shape_and_split_kv_block
+
+            (
+                kwargs["encoder_batch_ids"],
+                kwargs["encoder_tile_ids_per_batch"],
+                kwargs["encoder_num_blocks"],
+                kwargs["kv_batch_ids"],
+                kwargs["kv_tile_ids_per_batch"],
+                kwargs["kv_num_blocks"],
+                kwargs["decoder_batch_ids"],
+                kwargs["decoder_tile_ids_per_batch"],
+                kwargs["decoder_num_blocks"],
+                kwargs["decoder_num_blocks_cpu"],
+                kwargs["decoder_chunk_size_cpu"],
+                kwargs["max_len_kv"],
+            ) = get_block_shape_and_split_kv_block(
+                kwargs.get("seq_lens_encoder", None),
+                kwargs.get("seq_lens_decoder", None),
+                max_enc_len_this_time,
+                max_dec_len_this_time,
+                kwargs.get("seq_lens_this_time", None),
+                kwargs.get("cum_offsets", None),
+                self.num_heads // self.kv_num_heads,
+                kwargs.get("block_size", 64),
+                self.config.speculate_config.speculate_max_draft_token_num,
+            )
+
+        src = self.process_batch(src, **kwargs)
+
+        residual_input = src
+        for i in range(self.num_layers):
+            qkv_out, residual_input = self.compute_qkv(src, residual_input, i)
+            out_linear_out = self.compute_attn(
+                time_step,
+                qkv_out,
+                padding_offset,
+                seq_lens,
+                input_ids,
+                rotary_embs,
+                rotary_emb_dims,
+                caches,
+                pre_caches,
+                pre_caches_length,
+                attn_mask,
+                i,
+                **kwargs,
+            )
+
+            # all_reduce
+            if self.tp_degree > 1:
+                dist.all_reduce(out_linear_out)
+
+            # ffn layernorm
+            tmp_out, residual_input = self.compute_ffn_layernorm(out_linear_out, residual_input, i)
+
+            if self.config.moe_config.use_moe(i):
+                # fused moe
+                ffn2_out = self.compute_fused_moe(tmp_out, i)
+
+                # shared_expert
+                if self.config.moe_config.use_shared_expert(i):
+                    shared_expert_out = self.compute_shared_expert(tmp_out, i)
+                    ffn2_out = ffn2_out + shared_expert_out
+            else:
+                # ffn1 matmul
+                ffn1_out = self.compute_ffn1(tmp_out, i)
+                ffn1_out = self.compute_activation(ffn1_out, i)
+
+                # ffn2 matmul
+                ffn2_out = self.compute_ffn2(ffn1_out, i)
+
+            # all_reduce
+            if self.tp_degree > 1:
+                dist.all_reduce(ffn2_out)
+
+            # norm + residual_add_bias
+            tmp_out, residual_input = self.compute_bias_residual_layernorm(
+                ffn2_out, residual_input, i, self.num_layers
+            )
+            src = tmp_out
+
+        kwargs["time_step"] = time_step
+        kwargs["multi_block_output"] = tmp_out
+        kwargs["seq_lens"] = seq_lens
+        kwargs["input_ids"] = input_ids
+
+        out = self.post_process(**kwargs)
+        return out, caches
 
 
 class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMultiTransformerWeightOnly):

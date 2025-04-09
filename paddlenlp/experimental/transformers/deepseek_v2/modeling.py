@@ -1667,7 +1667,7 @@ class DeepseekV2BlockInferenceModelXPU(DeepseekV2BlockInferenceModel):
             weightonly_group_size=self.weightonly_group_size,
             activation="swiglu",
             num_layers=config.num_hidden_layers,
-            nranks=config.tensor_parallel_degree,
+            tp_degree=config.tensor_parallel_degree,
             ring_id=ring_id,
             ln_scale_attrs=ln_scale_attrs,
             linear_weight_attrs=out_proj_weight_attrs,
@@ -1744,7 +1744,6 @@ class DeepseekV2BlockInferenceModelXPU(DeepseekV2BlockInferenceModel):
             kv_b_proj_weight = paddle.to_tensor(
                 state_dict[f"{self.base_model_prefix}.layers.{idx}.self_attn.kv_b_proj.weight"]
             ).cast(dtype)
-
             linear_weight = paddle.to_tensor(
                 state_dict[f"{self.base_model_prefix}.layers.{idx}.self_attn.o_proj.weight"]
             ).cast(dtype)

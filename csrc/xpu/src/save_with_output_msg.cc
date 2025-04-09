@@ -29,7 +29,6 @@ struct msgdata {
 void SaveOutMmsg(const paddle::Tensor& x,
                  const paddle::Tensor& not_need_stop,
                  int64_t rank_id) {
-  std::cout << "wht --- in save_output_with_msg, rank_id:" << rank_id << std::endl;
   if (rank_id > 0) return;
   auto x_cpu = x.copy_to(paddle::CPUPlace(), false);
   int64_t* x_data = x_cpu.data<int64_t>();
@@ -40,10 +39,8 @@ void SaveOutMmsg(const paddle::Tensor& x,
   static int msgid = msgget(key, IPC_CREAT | 0666);
 
   msg_sed.mtype = 1;
-  std::cout << "wht --- not_need_stop_data:" << not_need_stop_data << std::endl;
   msg_sed.mtext[0] = not_need_stop_data ? 1 : -1;
   int bsz = x.shape()[0];
-  std::cout << "wht --- bsz:" << bsz << std::endl;
   msg_sed.mtext[1] = bsz;
   for (int i = 2; i < bsz + 2; i++) {
     msg_sed.mtext[i] = static_cast<int>(x_data[i - 2]);
@@ -51,7 +48,6 @@ void SaveOutMmsg(const paddle::Tensor& x,
   if ((msgsnd(msgid, &msg_sed, (MAX_BSZ + 2) * 4, 0)) == -1) {
     printf("full msg buffer\n");
   }
-  std::cout << "wht --- save_output_with_msg end" << std::endl;
   return;
 }
 
