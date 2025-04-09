@@ -136,8 +136,14 @@ def rms_norm_fused(x_in, w, eps, use_fast_ln=False):
         fast_ln = try_import("fast_ln")
         return fast_ln.fast_rms_norm(x_in, w, eps)[0]
     else:
-        fused_ln = try_import("fused_ln")
-        return fused_ln.fused_rms_norm(x_in, w, eps)[0]
+        try:
+            from paddle.incubate.nn.functional import fused_rms_norm
+
+            return fused_rms_norm(x=x_in, norm_weight=w, norm_bias=None, epsilon=eps, begin_norm_axis=2)[0]
+        except ImportError:
+            fused_ln = try_import("fused_ln")
+
+            return fused_ln.fused_rms_norm(x_in, w, eps)[0]
 
 
 def fusion_rms_norm(hidden_states, weight, variance_epsilon, use_fast_ln=False):

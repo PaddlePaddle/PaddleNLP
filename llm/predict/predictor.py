@@ -255,7 +255,6 @@ class BasePredictor:
             self.generation_config = None
 
     def _preprocess(self, source):
-
         if self.tokenizer.chat_template is not None:
             # for str -> List[str] eg. "hello"
             # for List[str] -> List[str]  eg. ["hello", "hello new"]
@@ -1085,18 +1084,6 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         self.cache_k_shapes, self.cache_v_shapes = model.get_cache_kvs_shape(model.config, config.batch_size)
         BlockInferencePredictorMixin.__init__(self, config, tokenizer, model)
 
-        cachekv_dtype = self.dtype if config.cachekv_int8_type is None else "uint8"
-
-        self.cache_kvs = []
-        if self.cache_k_shapes and self.cache_v_shapes:
-            for cache_k_shape, cache_v_shape in zip(self.cache_k_shapes, self.cache_v_shapes):
-                self.cache_kvs.append(paddle.zeros(cache_k_shape, dtype=cachekv_dtype))
-                self.cache_kvs.append(paddle.zeros(cache_v_shape, dtype=cachekv_dtype))
-        else:
-            # for mla's absorption
-            assert self.cache_v_shapes is None
-            self.cache_kvs = [paddle.zeros(shape, dtype=cachekv_dtype) for shape in self.cache_k_shapes]
-
         self.model = model
 
         self.init_model_inputs(config)
@@ -1108,7 +1095,8 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
             self.model_inputs["k_dequant_scales"] = self.k_dequant_scales
             self.model_inputs["v_dequant_scales"] = self.v_dequant_scales
 
-        self.model_inputs["cache_kvs"] = self.cache_kvs
+        if kwargs.get("init_cache_kvs", True):
+            self.init_cache_kvs()
 
         # init speculate components
         if config.speculate_method == "inference_with_reference":
@@ -1123,6 +1111,19 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
             self.proposer = EagleProposer(args=speculate_model_args)
         else:
             self.proposer = None
+
+    def init_cache_kvs(self):
+        cachekv_dtype = self.dtype if self.config.cachekv_int8_type is None else "uint8"
+        self.cache_kvs = []
+        if self.cache_k_shapes and self.cache_v_shapes:
+            for cache_k_shape, cache_v_shape in zip(self.cache_k_shapes, self.cache_v_shapes):
+                self.cache_kvs.append(paddle.zeros(cache_k_shape, dtype=cachekv_dtype))
+                self.cache_kvs.append(paddle.zeros(cache_v_shape, dtype=cachekv_dtype))
+        else:
+            # for mla's absorption
+            assert self.cache_v_shapes is None
+            self.cache_kvs = [paddle.zeros(shape, dtype=cachekv_dtype) for shape in self.cache_k_shapes]
+        self.model_inputs["cache_kvs"] = self.cache_kvs
 
     @paddle.no_grad()
     def _infer(self, inputs: dict[str, paddle.Tensor]):
@@ -1531,7 +1532,6 @@ def create_predictor(
     predictor_args: PredictorArgument,
     model_args: ModelArgument,
 ):
-
     paddle.set_device(predictor_args.device)
     paddle.set_default_dtype(predictor_args.dtype)
 
