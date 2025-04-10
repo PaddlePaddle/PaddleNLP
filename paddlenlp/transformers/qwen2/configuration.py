@@ -107,7 +107,7 @@ class Qwen2Config(PretrainedConfig):
         use_cache=True,
         tie_word_embeddings=False,
         rope_theta=10000.0,
-        pad_token_id=0,
+        pad_token_id=151643,
         bos_token_id=151643,
         eos_token_id=151643,
         use_sliding_window=False,
@@ -117,6 +117,7 @@ class Qwen2Config(PretrainedConfig):
         rope_scaling_factor=1.0,
         rope_scaling_type=None,
         dpo_config=None,
+        use_fused_head_and_loss_fn=False,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -150,6 +151,7 @@ class Qwen2Config(PretrainedConfig):
         self.bos_token_id = bos_token_id
         self.eos_token_id = eos_token_id
         self.dpo_config = dpo_config
+        self.use_fused_head_and_loss_fn = use_fused_head_and_loss_fn
 
         super().__init__(
             pad_token_id=pad_token_id,

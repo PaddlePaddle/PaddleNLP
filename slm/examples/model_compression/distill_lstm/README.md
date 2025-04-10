@@ -69,7 +69,7 @@ python -u ./run_glue.py \
 
 ```
 
-如果需要训练基于 ChnSentiCorp 数据集的 BERT finetuning 模型，可以进入[文本分类目录](../../text_classification/pretrained_models)下，将预训练模型改成 BERT，并基于 bert-base-chinese 和 bert-wwm-ext-chinese 模型进行 fine-tuning 训练。
+如果需要训练基于 ChnSentiCorp 数据集的 BERT finetuning 模型，可以进入[文本分类目录](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/slm/applications/text_classification/multi_class)下，将预训练模型改成 BERT，并基于 bert-base-chinese 和 bert-wwm-ext-chinese 模型进行 fine-tuning 训练。
 
 训练完成之后，可将训练效果最好的模型保存在本项目下的`pretrained_models/$TASK_NAME/`下。模型目录下有`model_config.json`, `model_state.pdparams`, `tokenizer_config.json`及`vocab.txt`这几个文件。
 

@@ -47,6 +47,7 @@ from paddlenlp.experimental.transformers.utils import (
     EmptyActScale,
     EmptyCacheScale,
     EmptyWeightScale,
+    infererence_model_from_config,
     infererence_model_from_pretrained,
 )
 from paddlenlp.transformers import Qwen2Config, Qwen2PretrainedModel
@@ -1082,6 +1083,10 @@ class Qwen2ForCausalLMInferenceModel(GenerationInferenceModel, Qwen2PretrainedMo
         return infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs)
 
     @classmethod
+    def from_config(cls, config, *args, **kwargs):
+        return infererence_model_from_config(cls, config, args, kwargs)
+
+    @classmethod
     def get_cache_kvs_shape(
         cls, config: Qwen2Config, max_batch_size: int = None, max_length: int = None
     ) -> list[list[int]]:
@@ -1420,6 +1425,10 @@ class Qwen2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen2Pr
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
         return infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs)
+
+    @classmethod
+    def from_config(cls, config, *args, **kwargs):
+        return infererence_model_from_config(cls, config, args, kwargs)
 
     @classmethod
     def get_cache_kvs_shape(

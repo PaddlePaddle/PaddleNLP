@@ -36,9 +36,9 @@ void MoeDispatchKernel(const paddle::Tensor& input,
                        const int hidden_size,
                        const int expert_num,
                        paddle::Tensor* permute_input,
-                       paddle::Tensor* token_nums_per_expert,
+                       paddle::Tensor* tokens_expert_prefix_sum,
                        paddle::Tensor* permute_indices_per_token,
-                       paddle::Tensor* expert_scales_float,
+                       paddle::Tensor* top_k_weight,
                        paddle::Tensor* top_k_indices) {
   typedef PDTraits<T> traits_;
   typedef typename traits_::DataType DataType_;
@@ -108,7 +108,7 @@ void MoeDispatchKernel(const paddle::Tensor& input,
   }
 
   topk_gating_softmax_kernelLauncher<float>(gating_output.data<float>(),
-                                            expert_scales_float->data<float>(),
+                                            top_k_weight->data<float>(),
                                             softmax_out_,
                                             expert_for_source_row,
                                             source_rows_,
@@ -147,7 +147,7 @@ void MoeDispatchKernel(const paddle::Tensor& input,
       permuted_experts_,
       moe_topk * num_rows,
       expert_num,
-      token_nums_per_expert->data<int64_t>(),
+      tokens_expert_prefix_sum->data<int64_t>(),
       stream);
 }
 
@@ -176,12 +176,12 @@ std::vector<paddle::Tensor> MoeExpertDispatch(
   auto permute_input =
       GetEmptyTensor({moe_topk * num_rows, hidden_size}, input_type, place);
   // correspond to the weighted coefficients of the results from each expert.
-  auto expert_scales_float =
+  auto top_k_weight =
       GetEmptyTensor({num_rows, moe_topk}, paddle::DataType::FLOAT32, place);
   auto top_k_indices =
       GetEmptyTensor({num_rows, moe_topk}, paddle::DataType::INT32, place);
 
-  auto token_nums_per_expert =
+  auto tokens_expert_prefix_sum =
       GetEmptyTensor({expert_num}, paddle::DataType::INT64, place);
   auto permute_indices_per_token =
       GetEmptyTensor({moe_topk, num_rows}, paddle::DataType::INT32, place);
@@ -198,9 +198,9 @@ std::vector<paddle::Tensor> MoeExpertDispatch(
                                                     hidden_size,
                                                     expert_num,
                                                     &permute_input,
-                                                    &token_nums_per_expert,
+                                                    &tokens_expert_prefix_sum,
                                                     &permute_indices_per_token,
-                                                    &expert_scales_float,
+                                                    &top_k_weight,
                                                     &top_k_indices);
       break;
     case paddle::DataType::FLOAT16:
@@ -213,18 +213,18 @@ std::vector<paddle::Tensor> MoeExpertDispatch(
                                                    hidden_size,
                                                    expert_num,
                                                    &permute_input,
-                                                   &token_nums_per_expert,
+                                                   &tokens_expert_prefix_sum,
                                                    &permute_indices_per_token,
-                                                   &expert_scales_float,
+                                                   &top_k_weight,
                                                    &top_k_indices);
       break;
     default:
       PD_THROW("Unsupported data type for MoeDispatchKernel");
   }
   return {permute_input,
-          token_nums_per_expert,
+          tokens_expert_prefix_sum,
           permute_indices_per_token,
-          expert_scales_float,
+          top_k_weight,
           top_k_indices};
 }
 
@@ -266,9 +266,9 @@ std::vector<paddle::DataType> MoeExpertDispatchInferDtype(
 PD_BUILD_OP(moe_expert_dispatch)
     .Inputs({"input", "gating_output"})
     .Outputs({"permute_input",
-              "token_nums_per_expert",
+              "tokens_expert_prefix_sum",
               "permute_indices_per_token",
-              "expert_scales_float",
+              "top_k_weight",
               "top_k_indices"})
     .Attrs({"moe_topk:int", "group_moe:bool", "topk_only_mode:bool"})
     .SetKernelFn(PD_KERNEL(MoeExpertDispatch))
