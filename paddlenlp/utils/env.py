@@ -19,6 +19,7 @@ PPNLP_HOME              -->  the root directory for storing PaddleNLP related da
 └─ DATA_HOME         -->  Store automatically downloaded datasets.
 """
 import os
+import re
 
 try:
     from paddle.base.framework import use_pir_api
@@ -79,6 +80,19 @@ CONFIG_NAME = "config.json"
 TOKENIZER_CONFIG_NAME = "tokenizer_config.json"
 CHAT_TEMPLATE_CONFIG_NAME = "chat_template.json"
 GENERATION_CONFIG_NAME = "generation_config.json"
+
+# Name of the files used for checkpointing
+TRAINING_ARGS_NAME = "training_args.bin"
+TRAINER_STATE_NAME = "trainer_state.json"
+MODEL_META_NAME = "model_meta.json"
+SCHEDULER_NAME = "scheduler.pdparams"
+SCALER_NAME = "scaler.pdparams"
+SHARDING_META_NAME = "shard_meta.json"
+
+# checkpoint dir name and regex
+PREFIX_CHECKPOINT_DIR = "checkpoint"
+_re_checkpoint = re.compile(r"^" + PREFIX_CHECKPOINT_DIR + r"\-(\d+)$")
+
 # Fast tokenizers (provided by HuggingFace tokenizer's library) can be saved in a single file
 FULL_TOKENIZER_NAME = "tokenizer.json"
 TIKTOKEN_VOCAB_FILE = "tokenizer.model"

@@ -26,7 +26,6 @@ import json
 import math
 import os
 import random
-import re
 import threading
 import time
 from contextlib import contextmanager
@@ -45,6 +44,7 @@ from paddlenlp.ops import Topology
 
 from ..trainer.argparser import strtobool
 from ..transformers.tokenizer_utils_base import BatchEncoding
+from ..utils.env import PREFIX_CHECKPOINT_DIR, _re_checkpoint  # noqa for compatibility
 from ..utils.fault_tolerance import PDC_DOWNLOAD_ERROR
 from ..utils.import_utils import is_paddle_cuda_available, is_psutil_available
 from ..utils.log import logger
@@ -237,10 +237,6 @@ class TrainOutput(NamedTuple):
     global_step: int
     training_loss: float
     metrics: Dict[str, float]
-
-
-PREFIX_CHECKPOINT_DIR = "checkpoint"
-_re_checkpoint = re.compile(r"^" + PREFIX_CHECKPOINT_DIR + r"\-(\d+)$")
 
 
 def _check_checkpoint_files(

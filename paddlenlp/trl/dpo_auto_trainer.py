@@ -33,7 +33,6 @@ from paddlenlp.transformers.model_utils import unwrap_model
 from paddlenlp.trl import AutoDPOCriterion
 from paddlenlp.utils import infohub
 
-from ..trainer.trainer import TRAINER_STATE_NAME
 from ..trainer.trainer_callback import TrainerState
 from ..trainer.trainer_utils import (
     ShardingOption,
@@ -46,6 +45,7 @@ from ..trainer.utils.helper import (  # nested_truncate,
     distributed_isfile,
 )
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
+from ..utils.env import TRAINER_STATE_NAME
 from ..utils.log import logger
 
 DPO_INFO_KEYS = [
