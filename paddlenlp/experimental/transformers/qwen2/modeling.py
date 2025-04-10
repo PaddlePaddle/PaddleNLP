@@ -1307,6 +1307,7 @@ class Qwen2BlockInferenceModel(Qwen2InferenceModel):
                 rotary_embs=rope_emb,
                 **kwargs,
             )
+            hidden_states = hidden_states[0]
         hidden_states = self.norm(hidden_states)
 
         return BaseModelOutputWithPastAndCrossAttentions(
