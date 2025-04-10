@@ -1361,7 +1361,7 @@ class PPOTrainer(Trainer):
                                     **micro_batch,
                                 )
                                 if self.args.rl_algorithm == "ppo":
-                                    micro_batch["reward_values"] = self.critic_trainer.compute_reward(**micro_batch)
+                                    micro_batch["reward_values"] = self.critic_trainer.compute_value(**micro_batch)
 
                 # prepare data for reinforce_plus_plus
                 if self.args.rl_algorithm == "reinforce_plus_plus":

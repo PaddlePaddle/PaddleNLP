@@ -33,7 +33,7 @@ class CriticTrainer(RLTrainer):
     # define loss name for logging
     loss_identifier = lambda self, inputs: "reward_critic_loss"
 
-    def compute_reward(
+    def compute_value(
         self,
         input_ids: paddle.Tensor,
         position_ids: paddle.Tensor = None,
