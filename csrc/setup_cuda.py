@@ -154,7 +154,7 @@ cuda_version = float(paddle.version.cuda())
 if cc >= 80:
     sources += ["gpu/int8_gemm_with_cutlass/gemm_dequant.cu"]
 
-    sources += ["./gpu/append_attention.cu", "./gpu/multi_head_latent_attention.cu"]
+    # sources += ["./gpu/append_attention.cu", "./gpu/multi_head_latent_attention.cu"]
 
     sources += find_end_files("./gpu/append_attn", ".cu")
     sources += find_end_files("./gpu/append_attn/template_instantiation", ".cu")
@@ -179,7 +179,7 @@ if cc >= 80 and cuda_version >= 12.4:
     nvcc_compile_args += [
         "-std=c++17",
         "--use_fast_math",
-        "--threads=8",
+        "--threads=128",
         "-D_GLIBCXX_USE_CXX11_ABI=1",
     ]
     sources += ["./gpu/sage_attn_kernels/sageattn_fused.cu"]
@@ -213,7 +213,7 @@ if cc >= 90 and cuda_version >= 12.0:
         "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_block_gemm.cu",
         "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_gemm_ptr_scale.cu",
     ]
-    sources += find_end_files("./gpu/mla_attn", ".cu")
+    # sources += find_end_files("./gpu/mla_attn", ".cu")
 
 ops_name = f"paddlenlp_ops_{sm_version}" if sm_version != 0 else "paddlenlp_ops"
 

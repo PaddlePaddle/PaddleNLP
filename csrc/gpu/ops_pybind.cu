@@ -270,7 +270,7 @@ void StepPaddle(const paddle::Tensor &stop_flags,
 PYBIND11_MODULE(paddlenlp_ops, m) {
   m.def("f_append_attention", &AppendAttention, "AppendAttention");
   m.def("f_fused_rotary_position_encoding", &FusedRotaryPositionEncoding, "FusedRotaryPositionEncoding");
-  m.def("f_multi_head_latent_attention", &MultiHeadLatentAttention, "MultiHeadLatentAttention");
+//   m.def("f_multi_head_latent_attention", &MultiHeadLatentAttention, "MultiHeadLatentAttention");
   m.def("f_noaux_tc", &NoauxTc, "NoauxTc");
   m.def("f_get_block_shape_and_split_kv_block", &GetBlockShapeAndSplitKVBlock, "GetBlockShapeAndSplitKVBlock");
   m.def("f_prefill_mla_write_cache", &PrefillMLAWriteCacheKernel, "PrefillMLAWriteCacheKernel");
