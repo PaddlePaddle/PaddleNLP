@@ -179,7 +179,7 @@ if cc >= 80 and cuda_version >= 12.4:
     nvcc_compile_args += [
         "-std=c++17",
         "--use_fast_math",
-        "--threads=8",
+        "--threads=128",
         "-D_GLIBCXX_USE_CXX11_ABI=1",
     ]
     sources += ["./gpu/sage_attn_kernels/sageattn_fused.cu"]
@@ -215,13 +215,17 @@ if cc >= 90 and cuda_version >= 12.0:
     ]
     sources += find_end_files("./gpu/mla_attn", ".cu")
 
+nvcc_compile_args += [
+    "-std=c++17",
+    "--threads=128",
+]
 ops_name = f"paddlenlp_ops_{sm_version}" if sm_version != 0 else "paddlenlp_ops"
 
 setup(
     name=ops_name,
     ext_modules=CUDAExtension(
         sources=sources,
-        extra_compile_args={"cxx": ["-O3", "-fopenmp", "-lgomp", "-std=c++17", "-DENABLE_BF16"], "nvcc": nvcc_compile_args},
+        extra_compile_args={"cxx": ["-O1", "-fopenmp", "-lgomp", "-std=c++17", "-DENABLE_BF16"], "nvcc": nvcc_compile_args},
         libraries=["cublasLt"],
         library_dirs=library_path,
         include_dirs=include_dirs,
