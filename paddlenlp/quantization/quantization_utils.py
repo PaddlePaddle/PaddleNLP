@@ -19,7 +19,16 @@ from paddle.distributed.fleet.meta_parallel import (
     ColumnParallelLinear,
     RowParallelLinear,
 )
-from paddle.nn.quant import weight_quantize
+from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+    ColumnSequenceParallelLinear,
+    RowSequenceParallelLinear,
+)
+from paddle.nn.quant import llm_int8_linear, weight_only_linear, weight_quantize
+
+try:
+    from .qlora import qlora_weight_linear
+except:
+    qlora_weight_linear = None
 
 from ..utils.log import logger
 from .quantization_linear import (
@@ -33,7 +42,13 @@ try:
 except:
     qlora_weight_quantize = None
 
-LINEAR_CLASSES = [nn.Linear, ColumnParallelLinear, RowParallelLinear]
+LINEAR_CLASSES = [
+    nn.Linear,
+    ColumnParallelLinear,
+    RowParallelLinear,
+    ColumnSequenceParallelLinear,
+    RowSequenceParallelLinear,
+]
 
 
 def parse_weight_quantize_algo(quantization_config, name):
@@ -95,6 +110,28 @@ def replace_with_quantization_linear(model, quantization_config, llm_int8_thresh
                     bias_attr=bias_attr,
                     input_is_parallel=child.input_is_parallel,
                     mp_skip_c_identity=child.mp_skip_c_identity,
+                )
+            elif isinstance(child, ColumnSequenceParallelLinear):
+                quant_linear = ColumnParallelQuantizationLinear(
+                    in_features=child.weight.shape[0],
+                    output_size_per_partition=child.weight.shape[1],
+                    quantization_config=quantization_config,
+                    weight_quantize_algo=weight_quantize_algo,
+                    dtype=child._dtype,
+                    bias_attr=bias_attr,
+                    gather_output=False,
+                    sequence_parallel=True,
+                )
+            elif isinstance(child, RowSequenceParallelLinear):
+                quant_linear = RowParallelQuantizationLinear(
+                    input_size_per_partition=child.weight.shape[0],
+                    out_features=child.weight.shape[1],
+                    quantization_config=quantization_config,
+                    weight_quantize_algo=weight_quantize_algo,
+                    dtype=child._dtype,
+                    bias_attr=bias_attr,
+                    input_is_parallel=True,
+                    sequence_parallel=True,
                 )
             setattr(parent, last, quant_linear)
             del child
@@ -206,3 +243,40 @@ def update_loaded_state_dict_keys(state_dict, quantization_linear_list, quantiza
                 )
 
     return state_dict
+
+
+def quant_weight_linear(
+    x,
+    quant_weight,
+    quant_dtype,
+    quantization_config,
+    weight_quantize_algo,
+    dtype,
+    quant_scale=None,
+    quant_state=None,
+    bias=None,
+):
+    if weight_quantize_algo in ["weight_only_int8", "weight_only_int4"]:
+        output = weight_only_linear(
+            x=x,
+            weight=quant_weight,
+            bias=bias,
+            weight_scale=quant_scale,
+            weight_dtype=quant_dtype,
+            group_size=quantization_config.group_size,
+        )
+    elif weight_quantize_algo in ["llm.int8"]:
+        output = llm_int8_linear(x, quant_weight, bias, quant_scale, quantization_config.llm_int8_threshold)
+    elif weight_quantize_algo in ["fp4", "nf4"]:
+        output = qlora_weight_linear(
+            x=x,
+            quant_weight=quant_weight,
+            dtype=dtype,
+            state=quant_state if quantization_config.qlora_weight_double_quant else quant_scale,
+            quant_algo=weight_quantize_algo,
+            double_quant=quantization_config.qlora_weight_double_quant,
+            block_size=quantization_config.qlora_weight_blocksize,
+            double_quant_block_size=quantization_config.qlora_weight_double_quant_block_size,
+            bias=bias,
+        )
+    return output
