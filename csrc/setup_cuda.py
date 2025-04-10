@@ -154,7 +154,7 @@ cuda_version = float(paddle.version.cuda())
 if cc >= 80:
     sources += ["gpu/int8_gemm_with_cutlass/gemm_dequant.cu"]
 
-    # sources += ["./gpu/append_attention.cu", "./gpu/multi_head_latent_attention.cu"]
+    sources += ["./gpu/append_attention.cu", "./gpu/multi_head_latent_attention.cu"]
 
     sources += find_end_files("./gpu/append_attn", ".cu")
     sources += find_end_files("./gpu/append_attn/template_instantiation", ".cu")
@@ -213,15 +213,19 @@ if cc >= 90 and cuda_version >= 12.0:
         "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_block_gemm.cu",
         "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_gemm_ptr_scale.cu",
     ]
-    # sources += find_end_files("./gpu/mla_attn", ".cu")
+    sources += find_end_files("./gpu/mla_attn", ".cu")
 
+nvcc_compile_args += [
+    "-std=c++17",
+    "--threads=128",
+]
 ops_name = f"paddlenlp_ops_{sm_version}" if sm_version != 0 else "paddlenlp_ops"
 
 setup(
     name=ops_name,
     ext_modules=CUDAExtension(
         sources=sources,
-        extra_compile_args={"cxx": ["-O3", "-fopenmp", "-lgomp", "-std=c++17", "-DENABLE_BF16"], "nvcc": nvcc_compile_args},
+        extra_compile_args={"cxx": ["-O1", "-fopenmp", "-lgomp", "-std=c++17", "-DENABLE_BF16"], "nvcc": nvcc_compile_args},
         libraries=["cublasLt"],
         library_dirs=library_path,
         include_dirs=include_dirs,
