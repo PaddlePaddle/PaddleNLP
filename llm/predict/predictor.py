@@ -1397,28 +1397,6 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
             shape=[max_batch_size, self.config.total_max_length], fill_value=0, dtype="int64"
         )
 
-        self.model_inputs["seq_lens_this_time"] = paddle.zeros(shape=[max_batch_size, 1], dtype="int32")
-        self.model_inputs["seq_lens_encoder"] = paddle.zeros(shape=[max_batch_size, 1], dtype="int32")
-        self.model_inputs["seq_lens_decoder"] = paddle.zeros(shape=[max_batch_size, 1], dtype="int32")
-
-        self.model_inputs["pre_ids"] = paddle.full(
-            shape=[self.config.batch_size, self.config.max_length], fill_value=-1, dtype="int64"
-        )
-        self.model_inputs["rope_emb"] = llm_utils.get_rotary_position_embedding(
-            paddle.arange(self.config.total_max_length).reshape((1, -1)),
-            self.head_dim,
-            self.rope_theta,
-            self.rope_scaling,
-        )
-
-        # Construct loop cvars
-        self.model_inputs["step_idx"] = paddle.full(shape=[max_batch_size, 1], fill_value=0, dtype="int64")
-        self.model_inputs["not_need_stop"] = paddle.full(shape=[1], fill_value=True, dtype="bool").cpu()  # cpu
-        self.model_inputs["stop_flags"] = paddle.ones(shape=[max_batch_size, 1], dtype="bool")
-        self.model_inputs["stop_nums"] = paddle.full(shape=[1], fill_value=max_batch_size, dtype="int64")
-        self.model_inputs["result_id"] = paddle.full(shape=[max_batch_size, 1], fill_value=-1).astype("int32").cpu()
-        self.model_inputs["next_tokens"] = paddle.full(shape=[max_batch_size, 1], fill_value=-1, dtype="int64")
-
         self.model_inputs["block_tables"] = paddle.full(
             shape=[
                 max_batch_size,
@@ -1430,30 +1408,22 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
 
         # self.model_inputs["excess_blocks"] = paddle.full(shape=[max_batch_size, 1], fill_value=-1, dtype="int32") # train
 
-        self.model_inputs["top_p"] = paddle.full(
-            shape=[max_batch_size, 1], fill_value=self.config.top_p, dtype="float32"
-        )
-        self.model_inputs["temperature"] = paddle.full(
-            shape=[max_batch_size, 1], fill_value=self.config.temperature, dtype="float32"
-        )
-        self.model_inputs["eos_token_id"] = paddle.to_tensor(
-            np.array(llm_utils.get_eos_token_id(self.tokenizer, self.generation_config)).reshape(-1, 1).astype("int64")
+        self.model_inputs["seq_lens_this_time"] = paddle.zeros(shape=[max_batch_size, 1], dtype="int32")
+        self.model_inputs["seq_lens_encoder"] = paddle.zeros(shape=[max_batch_size, 1], dtype="int32")
+        self.model_inputs["seq_lens_decoder"] = paddle.zeros(shape=[max_batch_size, 1], dtype="int32")
+
+        self.model_inputs["pre_ids"] = paddle.full(
+            shape=[max_batch_size, self.config.max_length], fill_value=-1, dtype="int64"
         )
 
-        self.model_inputs["penalty_score"] = paddle.full(
-            shape=[max_batch_size, 1], fill_value=self.config.repetition_penalty, dtype="float32"
-        )
-        self.model_inputs["frequency_score"] = paddle.full(shape=[max_batch_size, 1], fill_value=0.0, dtype="float32")
-        self.model_inputs["presence_score"] = paddle.full(shape=[max_batch_size, 1], fill_value=0.0, dtype="float32")
-        self.model_inputs["min_length"] = paddle.full(
-            shape=[max_batch_size, 1], fill_value=self.config.min_length, dtype="int64"
-        )
-        self.model_inputs["max_length"] = paddle.full(
-            shape=[max_batch_size, 1], fill_value=self.config.max_length, dtype="int64"
-        )
+        # Construct loop cvars
+        self.model_inputs["step_idx"] = paddle.full(shape=[max_batch_size, 1], fill_value=0, dtype="int64")
+        self.model_inputs["not_need_stop"] = paddle.full(shape=[1], fill_value=True, dtype="bool").cpu()  # cpu
+        self.model_inputs["stop_flags"] = paddle.ones(shape=[max_batch_size, 1], dtype="bool")
+        self.model_inputs["stop_nums"] = paddle.full(shape=[1], fill_value=max_batch_size, dtype="int64")
+        self.model_inputs["result_id"] = paddle.full(shape=[max_batch_size, 1], fill_value=-1).astype("int32").cpu()
+        self.model_inputs["next_tokens"] = paddle.full(shape=[max_batch_size, 1], fill_value=-1, dtype="int64")
 
-        self.model_inputs["bad_tokens"] = paddle.to_tensor([-1], dtype="int64")
-        self.model_inputs["is_block_step"] = paddle.full(shape=[max_batch_size], fill_value=False, dtype="bool")
         # output buffers for all inputs
         self.model_inputs["all_token_ids"] = paddle.full(
             shape=[total_request_num, self.config.max_length],
