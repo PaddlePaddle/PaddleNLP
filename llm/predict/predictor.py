@@ -13,11 +13,13 @@
 # limitations under the License.
 from __future__ import annotations
 
+import copy
 import json
 import os
 import sys
 import time
 from abc import abstractmethod
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from threading import Thread
 from typing import List
@@ -36,6 +38,8 @@ try:
     )
 except:
     pass
+import builtins
+
 from paddlenlp.generation import GenerationConfig, TextIteratorStreamer
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.taskflow.utils import static_mode_guard
@@ -63,6 +67,19 @@ from paddlenlp.utils.env import (
 )
 from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
+
+_original_import = builtins.__import__
+
+
+def custom_import(name, *args, **kwargs):
+    module = _original_import(name, *args, **kwargs)
+    if name == "paddlenlp_ops":
+        module.update_inputs_v2 = module.f_update_inputs_v2
+        module.save_output = module.f_save_output
+        module.set_preids_token_penalty_multi_scores = module.f_set_preids_token_penalty_multi_scores
+        module.rebuild_padding_v2 = module.f_rebuild_padding_v2
+        module.append_attention = module.f_append_attention
+    return module
 
 
 @dataclass
@@ -188,6 +205,9 @@ class PredictorArgument:
         default=True,
         metadata={"help": "Controls whether the message queue is enabled for output"},
     )
+    dynamic_insert: bool = field(default=False, metadata={"help": "whether use dynamic insert"})
+    total_request_num: int = field(default=1, metadata={"help": "The total number of request data"})
+    init_cache_kvs: bool = field(default=True, metadata={"help": "whether init cache_kvs"})
 
     def __post_init__(self):
         if self.speculate_method is not None:
@@ -1079,6 +1099,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         self.return_full_hidden_states = config.return_full_hidden_states
         self.full_hidden_states = None
         self.tokenizer = tokenizer
+        self.dynamic_insert = config.dynamic_insert
         if model is None:
             raise ValueError("model should be provided for DygraphBlockInferencePredictor")
         self.cache_k_shapes, self.cache_v_shapes = model.get_cache_kvs_shape(model.config, config.batch_size)
@@ -1095,7 +1116,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
             self.model_inputs["k_dequant_scales"] = self.k_dequant_scales
             self.model_inputs["v_dequant_scales"] = self.v_dequant_scales
 
-        if kwargs.get("init_cache_kvs", True):
+        if config.init_cache_kvs:
             self.init_cache_kvs()
 
         # init speculate components
@@ -1194,6 +1215,8 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
 
     @paddle.no_grad()
     def predict(self, input_texts: list[str], return_tokens=False):
+        if self.dynamic_insert:
+            return self.predict_dy_insert(input_texts, return_tokens)
         if self.config.output_via_mq:
             return self.predict_via_mq(input_texts, return_tokens)
         self._preprocess(input_texts)
@@ -1231,6 +1254,281 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                 outputs = self.tokenizer.batch_decode(
                     output_tokens, skip_special_tokens=True, clean_up_tokenization_spaces=False
                 )
+
+            if return_tokens:
+                return outputs, output_tokens
+            else:
+                return outputs
+
+    @contextmanager
+    def update_predictor_params(self, **kwargs):
+        if kwargs:
+            old_predictor_config = copy.deepcopy(self.config)
+            for key, new_value in kwargs.items():
+                if hasattr(self.config, key):
+                    old_value = getattr(self.config, key)
+                    if old_value != new_value:
+                        setattr(self.config, key, new_value)
+                        if key == "top_p":
+                            self.update_model_inputs("top_p", new_value)
+                        if key == "temperature":
+                            self.update_model_inputs("temperature", new_value)
+        yield
+        if kwargs:
+            self.restore_predictor_config(old_predictor_config)
+
+    def update_model_inputs(self, key, value):
+        assert key in self.model_inputs, f"{key} is not in model_inputs!"
+        old_value = self.model_inputs.pop(key)
+        self.model_inputs[key] = paddle.full(shape=old_value.shape, fill_value=value, dtype=old_value.dtype)
+
+    def restore_predictor_config(self, old_config):
+        if self.config.top_p != old_config.top_p:
+            self.update_model_inputs("top_p", old_config.top_p)
+        if self.config.temperature != old_config.temperature:
+            self.update_model_inputs("temperature", old_config.temperature)
+        self.config = old_config
+
+    def insert(self, pos, task_id):
+        # s = time.time()
+        # insert = nvtx.start_range(message="insert", color="blue")
+        query_id = task_id
+        length = len(self.input_ids[query_id])
+        # print(f"Insert task {task_id} while query id is {query_id} inserting pos {pos}")
+        self.model_inputs["input_ids"][pos, 0] = self.model_inputs["all_token_ids"][query_id, 0]
+        self.model_inputs["seq_lens_this_time"][pos] = 1
+        self.model_inputs["seq_lens_decoder"][pos] = length
+        self.model_inputs["stop_flags"][pos] = False
+        self.model_inputs["result_id"][pos][0] = query_id
+        self.model_inputs["step_idx"][pos, 0] = 1
+        self.model_inputs["not_need_stop"][0] = True
+
+        num_prefill_blocks = (length + self.block_size - 1) // self.block_size
+        num_decoder_blocks = (self.config.max_length + self.block_size - 1) // self.block_size
+        self.model_inputs["block_tables"][pos, :num_prefill_blocks] = np.array(self.prefill_blocks[query_id])
+        self.model_inputs["block_tables"][pos, num_prefill_blocks] = np.array(self.tail_blocks[task_id])
+        self.model_inputs["block_tables"][
+            pos, num_prefill_blocks + 1 : num_prefill_blocks + 1 + num_decoder_blocks
+        ] = np.array(self.decoder_blocks[pos])
+        # print(f'insert time(s): {time.time() - s}')
+        # paddle.device.synchronize()
+        # nvtx.end_range(insert)
+
+    @paddle.no_grad()
+    def predict_dy_insert(self, input_texts: list[str], return_tokens=False, **kwargs):
+        # pybind
+        builtins.__import__ = custom_import
+
+        # text2ids
+        if self.tokenizer.chat_template is not None:
+            if not isinstance(input_texts, list) or not isinstance(input_texts[0], str):
+                input_texts = [input_texts]
+            input_texts = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in input_texts]
+
+        self.input_ids = []
+        for text in input_texts:
+            tokens = self.tokenizer(
+                text,
+                return_tensors="np",
+                padding=True,
+                truncation=True,
+                max_length=self.config.src_length,
+                # if use chat_template, it will not add special_tokens
+                add_special_tokens=self.tokenizer.chat_template is None
+                or isinstance(self.tokenizer, (ChatGLMv2Tokenizer, ChatGLMTokenizer)),
+            )
+            self.input_ids.append(tokens["input_ids"][0])
+
+        assert self.proposer is None, "dynamic insert don't support proposer."
+
+        total_request_num = len(self.input_ids)
+        max_batch_size = self.config.batch_size
+        self.block_size = self.config.block_size
+
+        self.prefill_blocks = []
+        block_id = 0
+        for inst in self.input_ids:
+            length = len(inst)
+            num_blocks = (length + self.block_size - 1) // self.block_size
+            self.prefill_blocks.append(list(range(block_id, block_id + num_blocks)))
+            block_id += num_blocks
+        # print("prefill_blocks", self.prefill_blocks)
+
+        self.tail_blocks = []
+        for _ in range(len(self.input_ids)):
+            self.tail_blocks.append(block_id)
+            block_id += 1
+        # print("tail_blocks", self.tail_blocks)
+
+        self.decoder_blocks = []
+        for _ in range(max_batch_size):
+            num_blocks = (self.config.max_length + self.block_size - 1) // self.block_size
+            self.decoder_blocks.append(list(range(block_id, block_id + num_blocks)))
+            block_id += num_blocks
+        # print("self.decoder_blocks: ", self.decoder_blocks)
+
+        self.cache_k_shapes = []
+        self.cache_v_shapes = []
+
+        max_num_blocks_per_row_per_decoding = (self.config.max_length + self.block_size - 1) // self.block_size
+
+        # For decoder_blocks
+        max_num_blocks = max_batch_size * max_num_blocks_per_row_per_decoding
+
+        # For prefill_blocks
+        for prefill_block in self.prefill_blocks:
+            max_num_blocks += len(prefill_block)
+
+        # For tail_blocks
+        max_num_blocks += max_batch_size
+
+        for i in range(self.model.config.num_hidden_layers):
+            cache_kv_shape = [
+                max_num_blocks,
+                self.model.config.num_key_value_heads // max(self.model.config.tensor_parallel_degree, 1),
+                self.model.config.block_size,
+                self.model.config.hidden_size // self.model.config.num_attention_heads,
+            ]
+            self.cache_k_shapes.append(cache_kv_shape)
+            self.cache_v_shapes.append(cache_kv_shape)
+        self.init_cache_kvs()
+
+        self.model_inputs["input_ids"] = paddle.full(
+            shape=[max_batch_size, self.config.total_max_length], fill_value=0, dtype="int64"
+        )
+
+        self.model_inputs["seq_lens_this_time"] = paddle.zeros(shape=[max_batch_size, 1], dtype="int32")
+        self.model_inputs["seq_lens_encoder"] = paddle.zeros(shape=[max_batch_size, 1], dtype="int32")
+        self.model_inputs["seq_lens_decoder"] = paddle.zeros(shape=[max_batch_size, 1], dtype="int32")
+
+        self.model_inputs["pre_ids"] = paddle.full(
+            shape=[self.config.batch_size, self.config.max_length], fill_value=-1, dtype="int64"
+        )
+        self.model_inputs["rope_emb"] = llm_utils.get_rotary_position_embedding(
+            paddle.arange(self.config.total_max_length).reshape((1, -1)),
+            self.head_dim,
+            self.rope_theta,
+            self.rope_scaling,
+        )
+
+        # Construct loop cvars
+        self.model_inputs["step_idx"] = paddle.full(shape=[max_batch_size, 1], fill_value=0, dtype="int64")
+        self.model_inputs["not_need_stop"] = paddle.full(shape=[1], fill_value=True, dtype="bool").cpu()  # cpu
+        self.model_inputs["stop_flags"] = paddle.ones(shape=[max_batch_size, 1], dtype="bool")
+        self.model_inputs["stop_nums"] = paddle.full(shape=[1], fill_value=max_batch_size, dtype="int64")
+        self.model_inputs["result_id"] = paddle.full(shape=[max_batch_size, 1], fill_value=-1).astype("int32").cpu()
+        self.model_inputs["next_tokens"] = paddle.full(shape=[max_batch_size, 1], fill_value=-1, dtype="int64")
+
+        self.model_inputs["block_tables"] = paddle.full(
+            shape=[
+                max_batch_size,
+                (self.config.total_max_length + self.config.block_size - 1) // self.config.block_size + 1,
+            ],
+            fill_value=-1,
+            dtype="int32",
+        )
+
+        # self.model_inputs["excess_blocks"] = paddle.full(shape=[max_batch_size, 1], fill_value=-1, dtype="int32") # train
+
+        self.model_inputs["top_p"] = paddle.full(
+            shape=[max_batch_size, 1], fill_value=self.config.top_p, dtype="float32"
+        )
+        self.model_inputs["temperature"] = paddle.full(
+            shape=[max_batch_size, 1], fill_value=self.config.temperature, dtype="float32"
+        )
+        self.model_inputs["eos_token_id"] = paddle.to_tensor(
+            np.array(llm_utils.get_eos_token_id(self.tokenizer, self.generation_config)).reshape(-1, 1).astype("int64")
+        )
+
+        self.model_inputs["penalty_score"] = paddle.full(
+            shape=[max_batch_size, 1], fill_value=self.config.repetition_penalty, dtype="float32"
+        )
+        self.model_inputs["frequency_score"] = paddle.full(shape=[max_batch_size, 1], fill_value=0.0, dtype="float32")
+        self.model_inputs["presence_score"] = paddle.full(shape=[max_batch_size, 1], fill_value=0.0, dtype="float32")
+        self.model_inputs["min_length"] = paddle.full(
+            shape=[max_batch_size, 1], fill_value=self.config.min_length, dtype="int64"
+        )
+        self.model_inputs["max_length"] = paddle.full(
+            shape=[max_batch_size, 1], fill_value=self.config.max_length, dtype="int64"
+        )
+
+        self.model_inputs["bad_tokens"] = paddle.to_tensor([-1], dtype="int64")
+        self.model_inputs["is_block_step"] = paddle.full(shape=[max_batch_size], fill_value=False, dtype="bool")
+        # output buffers for all inputs
+        self.model_inputs["all_token_ids"] = paddle.full(
+            shape=[total_request_num, self.config.max_length],
+            fill_value=llm_utils.get_eos_token_id(self.tokenizer, self.generation_config)[0],
+            dtype="int64",
+        )
+        # self.model_inputs["all_scores"] = paddle.full(
+        #     shape=[total_request_num, self.config.max_length],
+        #     fill_value=-1,
+        #     dtype='float32',
+        # )
+
+        s_time = time.time()
+        with self.update_predictor_params(**kwargs):
+            step = 0
+            # s_prefill = time.time()
+            for i, inst in enumerate(self.input_ids):
+                length = len(inst)
+                self.model_inputs["input_ids"][0, :length] = np.array(inst)
+                self.model_inputs["seq_lens_this_time"][0] = length
+                self.model_inputs["seq_lens_encoder"][0] = length
+                self.model_inputs["stop_flags"][0] = False
+
+                num_prefill_blocks = (length + self.block_size - 1) // self.block_size
+                self.model_inputs["block_tables"][0, :num_prefill_blocks] = np.array(self.prefill_blocks[i])
+                self.model_inputs["block_tables"][0, num_prefill_blocks] = np.array(self.tail_blocks[i])
+                self.model_inputs["result_id"][0][:1] = np.arange(i, i + 1)
+
+                next_tokens = self._infer(self.model_inputs)
+                self.model_inputs["all_token_ids"][i, 0] = next_tokens[0, 0]
+                self.model_inputs["seq_lens_this_time"][0] = 0
+                self.model_inputs["seq_lens_encoder"][0] = 0
+                self.model_inputs["seq_lens_decoder"][0] = 0
+                self.model_inputs["stop_flags"][0] = True
+                self.model_inputs["step_idx"][0, 0] = 0
+                self.model_inputs["block_tables"][0] = -1
+                self.model_inputs["result_id"][0] = -1
+
+                # paddle.device.synchronize()
+                # logger.info(f"Prefill {step} elapse(s): {time.time() - s_prefill}")
+                step += 1
+                # s_prefill = time.time()
+
+            unfinished_ids = list(range(total_request_num - 1, -1, -1))
+            for cur_bs in range(max_batch_size):
+                if len(unfinished_ids) == 0:
+                    break
+                task_id = unfinished_ids.pop()
+                self.insert(cur_bs, task_id)
+
+            if kwargs.pop("max_length", self.config.max_length) > 1:
+                while self.model_inputs["not_need_stop"] or len(unfinished_ids) > 0:
+                    no_stop_num = max_batch_size - paddle.sum(self.model_inputs["stop_flags"]).item()
+                    if no_stop_num < max_batch_size:
+                        for i in range(max_batch_size):
+                            if self.model_inputs["stop_flags"][i] and len(unfinished_ids) > 0:
+                                task_id = unfinished_ids.pop()
+                                self.insert(i, task_id)
+                    next_tokens = self._infer(self.model_inputs)
+                    for bs in range(self.batch_size):
+                        task_id = self.model_inputs["result_id"][bs, 0]
+                        step_idx = self.model_inputs["step_idx"][bs, 0]
+                        self.model_inputs["all_token_ids"][task_id, step_idx - 1] = next_tokens[bs, 0]
+        logger.info(f"running spend {time.time() - s_time}")
+
+        if self.tensor_parallel_rank == 0:
+            output_tokens = self.model_inputs["all_token_ids"]
+            output_tokens = paddle.where(
+                output_tokens < 0,
+                paddle.to_tensor(self.tokenizer.pad_token_id, dtype=output_tokens.dtype),
+                output_tokens,
+            )
+            outputs = self.tokenizer.batch_decode(
+                output_tokens, skip_special_tokens=True, clean_up_tokenization_spaces=False
+            )
 
             if return_tokens:
                 return outputs, output_tokens
@@ -1651,13 +1949,17 @@ def predict():
                     target_texts.append("")
 
     else:
+        # source_texts = [
+        #     "2014年3月，大范围雾霾天气长时间影响我国东部地区，严重危害人体健康。造成雾霾天气的人为原因有____\r\n①工业生产中使用矿物作为燃料，大量排放污染物     ②汽车尾气的大量排放     \r\n③风力小，空气流动不畅     ④冬季取暖排放粉尘\nA. ①②③\nB. ②③④\nC. ①③④\nD. ①②④"
+        # ] * predictor_args.batch_size
+        # target_texts = [""] * predictor_args.batch_size
         source_texts = [
             "2014年3月，大范围雾霾天气长时间影响我国东部地区，严重危害人体健康。造成雾霾天气的人为原因有____\r\n①工业生产中使用矿物作为燃料，大量排放污染物     ②汽车尾气的大量排放     \r\n③风力小，空气流动不畅     ④冬季取暖排放粉尘\nA. ①②③\nB. ②③④\nC. ①③④\nD. ①②④"
-        ] * predictor_args.batch_size
-        target_texts = [""] * predictor_args.batch_size
+        ] * predictor_args.total_request_num
+        target_texts = [""] * predictor_args.total_request_num
 
-    batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
-    batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
+    batch_source_texts = batchfy_text(source_texts, predictor_args.total_request_num)
+    batch_target_texts = batchfy_text(target_texts, predictor_args.total_request_num)
 
     with open(model_args.output_file, "w", encoding="utf-8") as f:
         for bs, batch_source_text in enumerate(batch_source_texts):
