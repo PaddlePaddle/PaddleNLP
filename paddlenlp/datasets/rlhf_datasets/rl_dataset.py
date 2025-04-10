@@ -42,6 +42,7 @@ def padding_batch_data(samples: list[dict], pad_token_id: int, requires_label: b
     # attention_mask = [np.ones(input_id.shape, dtype=bool) for input_id in input_ids]
     input_dict["input_ids"] = left_padding(input_ids, padding_value=pad_token_id)
     # input_dict["attention_mask"] = left_padding(attention_mask, padding_value=0)
+    input_dict["raw_prompt_len"] = paddle.to_tensor([len(sample["input_ids"]) for sample in samples])
 
     if requires_label:
         label_ids = [sample["label_ids"] for sample in samples]

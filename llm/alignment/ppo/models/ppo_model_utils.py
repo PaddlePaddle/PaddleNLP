@@ -237,7 +237,7 @@ def create_startend_row_indices(input_ids, pad_token_id=0):
 
 
 class RLHFPPOLoss(nn.Layer):
-    def __init__(self, config, clip_range_ratio=0.2):
+    def __init__(self, config, clip_range_ratio=0.2, clip_range_ratio_low=None, clip_range_ratio_high=None):
         """
         Initialize the `ClipRewardRange` object.
 
@@ -255,6 +255,8 @@ class RLHFPPOLoss(nn.Layer):
         """
         super().__init__()
         self.clip_range_ratio = clip_range_ratio
+        self.clip_range_ratio_low = clip_range_ratio_low
+        self.clip_range_ratio_high = clip_range_ratio_high
         self.config = config
 
     def actor_loss_fn(
@@ -281,8 +283,8 @@ class RLHFPPOLoss(nn.Layer):
         pg_loss1 = -advantages * ratio
         pg_loss2 = -advantages * paddle.clip(
             ratio,
-            1.0 - self.clip_range_ratio,
-            1.0 + self.clip_range_ratio,
+            1.0 - self.clip_range_ratio_low,
+            1.0 + self.clip_range_ratio_high,
         )
         return paddle.sum(paddle.maximum(pg_loss1, pg_loss2) * mask) / mask.sum()
 
@@ -359,6 +361,8 @@ class RLHFPPOMixedLoss(nn.Layer):
         config,
         ptx_coeff=16,
         clip_range_ratio=0.2,
+        clip_range_ratio_low=None,
+        clip_range_ratio_high=None,
         kl_loss_coeff=0.001,
         clip_range_score=10,
         info_buffer=None,
@@ -377,10 +381,14 @@ class RLHFPPOMixedLoss(nn.Layer):
         self.config = config
         self.ptx_coeff = ptx_coeff
         # if self.config.use_fused_head_and_loss_fn:
-        #     self.ppo_criterion = FusedPPOLoss(config, clip_range_ratio)
+        #     self.ppo_criterion = FusedPPOLoss(config, clip_range_ratio, clip_range_ratio_low, clip_range_ratio_high)
         # else:
-        #     self.ppo_criterion = RLHFPPOLoss(config, clip_range_ratio)
-        self.ppo_criterion = RLHFPPOLoss(config, clip_range_ratio)
+        #     self.ppo_criterion = RLHFPPOLoss(config, clip_range_ratio, clip_range_ratio_low, clip_range_ratio_high)
+        self.clip_range_ratio_low = clip_range_ratio_low if clip_range_ratio_low is not None else clip_range_ratio
+        self.clip_range_ratio_high = clip_range_ratio_high if clip_range_ratio_high is not None else clip_range_ratio
+        self.ppo_criterion = RLHFPPOLoss(
+            config, clip_range_ratio, self.clip_range_ratio_low, self.clip_range_ratio_high
+        )
         self.sft_criterion = PretrainingCriterion(config)
         self.kl_loss_coeff = kl_loss_coeff
         self.clip_range_score = clip_range_score
@@ -447,6 +455,8 @@ class RLHFPPOMixedLoss(nn.Layer):
                 tensor_parallel_output=self.config.tensor_parallel_output,
                 pg_loss_coeff=self.pg_loss_coeff,  # donot use this
                 clip_range_ratio=self.clip_range_ratio,
+                clip_range_ratio_low=self.clip_range_ratio_low,
+                clip_range_ratio_high=self.clip_range_ratio_high,
                 entropy_coeff=self.entropy_coeff,  # donot support this
                 clip_range_score=self.clip_range_score,
                 kl_loss_coeff=self.kl_loss_coeff,
@@ -640,6 +650,8 @@ class ActorFusedLoss(paddle.autograd.PyLayer):
         ref_log_probs: paddle.Tensor,
         advantages: paddle.Tensor,
         clip_range_ratio: float,
+        clip_range_ratio_low: float,
+        clip_range_ratio_high: float,
         clip_range_score: float,
         kl_loss_coeff: float,  # KL loss coefficient
         temperature: float,
@@ -775,7 +787,9 @@ class ActorFusedLoss(paddle.autograd.PyLayer):
 
             # ratio
             ratio_chunk = paddle.exp(log_probs_chunk - old_log_probs_chunk)
-            clipped_ratio_chunk = paddle.clip(ratio_chunk, min=1.0 - clip_range_ratio, max=1.0 + clip_range_ratio)
+            clipped_ratio_chunk = paddle.clip(
+                ratio_chunk, min=1.0 - clip_range_ratio_low, max=1.0 + clip_range_ratio_high
+            )
 
             # final loss
             pg_loss1_chunk = -advantages_chunk * ratio_chunk
@@ -911,10 +925,12 @@ class ActorFusedLoss(paddle.autograd.PyLayer):
 class FusedPPOLoss(nn.Layer):
     """Fused PPOLoss"""
 
-    def __init__(self, config, clip_range_ratio=0.2):
+    def __init__(self, config, clip_range_ratio=0.2, clip_range_ratio_low=None, clip_range_ratio_high=None):
         """Initialize FusedPPOLoss class."""
         super().__init__()
         self.clip_range_ratio = clip_range_ratio
+        self.clip_range_ratio_low = clip_range_ratio_low
+        self.clip_range_ratio_high = clip_range_ratio_high
         self.config = config
 
     def forward(
@@ -968,6 +984,8 @@ class FusedPPOLoss(nn.Layer):
             old_log_probs=old_log_probs,
             advantages=reward_advantages,
             clip_range_ratio=self.clip_range_ratio,
+            clip_range_ratio_low=self.clip_range_ratio_low,
+            clip_range_ratio_high=self.clip_range_ratio_high,
         )
         return actor_loss
 
@@ -992,6 +1010,8 @@ class ActorFusedPGEntropyKLLoss(paddle.autograd.PyLayer):
         tensor_parallel_output: bool,
         pg_loss_coeff: float,
         clip_range_ratio: float,  # pg loss
+        clip_range_ratio_low: float,
+        clip_range_ratio_high: float,
         entropy_coeff: float,  # entropy loss
         clip_range_score: float,  # clip loss
         kl_loss_coeff: float,  # clip loss
@@ -1090,8 +1110,8 @@ class ActorFusedPGEntropyKLLoss(paddle.autograd.PyLayer):
             ratio_chunk = paddle.exp(log_probs_chunk - old_log_prob_chunk)
             clipped_ratio_chunk = paddle.clip(
                 ratio_chunk,
-                min=1.0 - clip_range_ratio,
-                max=1.0 + clip_range_ratio,
+                min=1.0 - clip_range_ratio_low,
+                max=1.0 + clip_range_ratio_high,
             )
 
             pg_loss1_chunk = -advantages_chunk * ratio_chunk
@@ -1247,6 +1267,8 @@ def actor_fused_pg_entropy_kl_loss(
     tensor_parallel_output: bool = False,
     pg_loss_coeff: float = 1.0,
     clip_range_ratio: float = 0.2,
+    clip_range_ratio_low: float = None,
+    clip_range_ratio_high: float = None,
     entropy_coeff: float = 0.001,
     clip_range_score: float = 10.0,
     kl_loss_coeff: float = 0.001,
@@ -1278,6 +1300,8 @@ def actor_fused_pg_entropy_kl_loss(
             fused_linear=fused_linear,
             loop_chunk_size=loop_chunk_size,
             clip_range_ratio=clip_range_ratio,
+            clip_range_ratio_low=clip_range_ratio_low,
+            clip_range_ratio_high=clip_range_ratio_high,
             clip_range_score=clip_range_score,
             kl_loss_coeff=kl_loss_coeff,
             ignore_index=-100,
@@ -1299,6 +1323,8 @@ def actor_fused_pg_entropy_kl_loss(
         tensor_parallel_output=tensor_parallel_output,
         pg_loss_coeff=pg_loss_coeff,
         clip_range_ratio=clip_range_ratio,  # pg loss
+        clip_range_ratio_low=clip_range_ratio_low,
+        clip_range_ratio_high=clip_range_ratio_high,
         entropy_coeff=entropy_coeff,  # entropy loss
         clip_range_score=clip_range_score,  # clip loss
         kl_loss_coeff=kl_loss_coeff,  # clip loss
