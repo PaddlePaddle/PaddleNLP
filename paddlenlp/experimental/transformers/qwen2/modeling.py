@@ -1287,10 +1287,12 @@ class Qwen2BlockInferenceModel(Qwen2InferenceModel):
 
         # breakpoint()
         
-        # if inputs_embeds is not None:
-        #     inputs_embeds = inputs_embeds.reshape([-1, inputs_embeds.shape[2]])
-            
-        # inputs_embeds = paddle.where(multimodal_embeds.reshape([-1, 1, 1]).expand(inputs_embeds.shape),inputs_embeds.reshape([-1, inputs_embeds.shape[2]]),self.embed_tokens(ids_remove_padding))
+        # if len(inputs_embeds.shape) == 3:
+        #     inputs_embeds = inputs_embeds[0]
+        # elif len(inputs_embeds.shape) == 2:
+        #     inputs_embeds = inputs_embeds[0:1,:]
+        # # breakpoint()
+        # inputs_embeds = paddle.where(multimodal_embeds,inputs_embeds,self.embed_tokens(ids_remove_padding))
 
         # breakpoint()
         # if inputs_embeds is None:
