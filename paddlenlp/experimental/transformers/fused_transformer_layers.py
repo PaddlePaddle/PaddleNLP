@@ -51,6 +51,10 @@ def use_cutlass_fp8_gemm():
     return os.getenv("FLAGS_CUTLASS_FP8_GEMM", "False") in ["True", "1", "true"]
 
 
+def use_custom_allreduce():
+    return os.getenv("FLAGS_custom_allreduce", "False") in ["True", "1", "true"]
+
+
 if paddle.is_compiled_with_cuda():
     if use_cutlass_fp8_gemm():
         logger.info("cutlass fp8 gemm is used. you can turn it off by setting FLAGS_CUTLASS_FP8_GEMM to False.")
@@ -704,6 +708,13 @@ class FusedMultiTransformerBase(Layer):
 
                 self._add_parameter(ffn1_weight_scale)
                 self._add_parameter(ffn2_weight_scale)
+        if use_custom_allreduce():
+            try:
+                from paddlenlp.ops.custom_all_reduce import custom_all_reduce
+            except:
+                pass
+            self.custom_all_reduce_max_bytes = 2 * 8192 * 1024
+            self.fa = custom_all_reduce.CustomAllreduce(self.custom_all_reduce_max_bytes)
 
     def init_weight(self):
         self.qkv_weights = []
@@ -1737,7 +1748,13 @@ class FusedMultiTransformerBase(Layer):
 
             # all_reduce
             if self.tp_degree > 1:
-                dist.all_reduce(out_linear_out)
+                if (
+                    use_custom_allreduce()
+                    and out_linear_out.numel() * out_linear_out.element_size() < self.custom_all_reduce_max_bytes
+                ):
+                    self.fa.all_reduce(out_linear_out, out_linear_out)
+                else:
+                    dist.all_reduce(out_linear_out)
 
             # ffn layernorm
             tmp_out, residual_input = self.compute_ffn_layernorm(out_linear_out, residual_input, i)
@@ -1760,7 +1777,13 @@ class FusedMultiTransformerBase(Layer):
 
             # all_reduce
             if self.tp_degree > 1:
-                dist.all_reduce(ffn2_out)
+                if (
+                    use_custom_allreduce()
+                    and ffn2_out.numel() * ffn2_out.element_size() < self.custom_all_reduce_max_bytes
+                ):
+                    self.fa.all_reduce(ffn2_out, ffn2_out)
+                else:
+                    dist.all_reduce(ffn2_out)
 
             # norm + residual_add_bias
             tmp_out, residual_input = self.compute_bias_residual_layernorm(
