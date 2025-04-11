@@ -79,6 +79,7 @@ def custom_import(name, *args, **kwargs):
         module.set_preids_token_penalty_multi_scores = module.f_set_preids_token_penalty_multi_scores
         module.rebuild_padding_v2 = module.f_rebuild_padding_v2
         module.append_attention = module.f_append_attention
+        module.save_output_dygraph = module.f_save_output_dygraph
     return module
 
 
@@ -1421,7 +1422,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         self.model_inputs["not_need_stop"] = paddle.full(shape=[1], fill_value=True, dtype="bool").cpu()  # cpu
         self.model_inputs["stop_flags"] = paddle.ones(shape=[max_batch_size, 1], dtype="bool")
         self.model_inputs["stop_nums"] = paddle.full(shape=[1], fill_value=max_batch_size, dtype="int64")
-        self.model_inputs["result_id"] = paddle.full(shape=[max_batch_size, 1], fill_value=-1).astype("int32").cpu()
+        self.model_inputs["result_id"] = paddle.full(shape=[max_batch_size, 1], fill_value=-1).astype("int32")
         self.model_inputs["next_tokens"] = paddle.full(shape=[max_batch_size, 1], fill_value=-1, dtype="int64")
 
         # output buffers for all inputs
@@ -1483,10 +1484,10 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                                 task_id = unfinished_ids.pop()
                                 self.insert(i, task_id)
                     next_tokens = self._infer(self.model_inputs)
-                    for bs in range(self.batch_size):
-                        task_id = self.model_inputs["result_id"][bs, 0]
-                        step_idx = self.model_inputs["step_idx"][bs, 0]
-                        self.model_inputs["all_token_ids"][task_id, step_idx - 1] = next_tokens[bs, 0]
+                    # for bs in range(self.batch_size):
+                    #     task_id = self.model_inputs["result_id"][bs, 0]
+                    #     step_idx = self.model_inputs["step_idx"][bs, 0]
+                    #     self.model_inputs["all_token_ids"][task_id, step_idx - 1] = next_tokens[bs, 0]
         logger.info(f"running spend {time.time() - s_time}")
 
         if self.tensor_parallel_rank == 0:

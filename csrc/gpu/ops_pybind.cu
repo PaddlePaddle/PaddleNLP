@@ -265,6 +265,12 @@ void StepPaddle(const paddle::Tensor &stop_flags,
                 const int block_size,
                 const int encoder_decoder_block_num);
 
+void SaveOutputDygraph(
+    const paddle::Tensor& all_token_ids,
+    const paddle::Tensor& tokens,
+    const paddle::Tensor& result_ids,
+    const paddle::Tensor& step_idx
+);
 
 PYBIND11_MODULE(paddlenlp_ops, m) {
   m.def("f_append_attention", &AppendAttention, "AppendAttention");
@@ -284,4 +290,5 @@ PYBIND11_MODULE(paddlenlp_ops, m) {
   m.def("f_save_output", &SaveOutMmsg, "SaveOutMmsg");
   m.def("f_get_output", &GetOutput, "GetOutput");
 //   m.def("f_step_paddle", &StepPaddle, "StepPaddle");
+  m.def("f_save_output_dygraph", &SaveOutputDygraph, "SaveOutputDygraph");
 }
