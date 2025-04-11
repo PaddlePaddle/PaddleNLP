@@ -14,7 +14,7 @@
 
 import argparse
 import os
-from typing import Dict
+from typing import Dict, Union
 
 import uvicorn
 from fastapi import FastAPI
@@ -34,9 +34,30 @@ from server.utils import http_server_logger
 http_server_logger.info("create fastapi app...")
 app = FastAPI()
 
+def _is_Req(request: Dict):
+    if "input_ids" in request or "text" in request:
+        return True
+    return False
+
+@app.post("/v1")
+def create_openai_adapter():
+    pass
+
+@app.post("/v1/completions")
+def openai_v1_completions(request: Union[Dict, Req]):
+    if isinstance(request, Req) or _is_Req(request):
+        return create_completion(request)
+    elif isinstance(request, dict):
+        return create_openai_completion(request, chat_interface=False)
 
 @app.post("/v1/chat/completions")
-def create_chat_completion(req: Req):
+def openai_v1_chat_completions(request: Union[Dict, Req]):
+    if isinstance(request, Req) or _is_Req(request):
+        return create_completion(request)
+    elif isinstance(request, dict):
+        return create_openai_completion(request, chat_interface=True)
+
+def create_completion(req: Req):
     """
     HTTP Server for chat completion
     Return:
@@ -66,14 +87,7 @@ def create_chat_completion(req: Req):
         return resp
 
 
-@app.post("/v1/chat/completions/completions")
-def openai_v1_completions(request: Dict):
-    return create_openai_completion(request, chat_interface=False)
 
-
-@app.post("/v1/chat/completions/chat/completions")
-def openai_v1_chat_completions(request: Dict):
-    return create_openai_completion(request, chat_interface=True)
 
 
 def create_openai_completion(request: Dict, chat_interface: bool):
