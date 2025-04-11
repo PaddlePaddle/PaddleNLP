@@ -20,13 +20,13 @@ from paddle.distributed.fleet.utils.sequence_parallel_utils import (
     AllGatherOp,
     ReduceScatterOp,
 )
-
-from .quantization_utils import quant_weight_linear
+from paddle.nn.quant import llm_int8_linear, weight_only_linear
 
 try:
     from .qlora import qlora_weight_linear
 except:
     qlora_weight_linear = None
+
 QuantMapping = {
     # (quant_dtype, quant_weight_bit)
     "weight_only_int8": ("int8", 8),
@@ -35,6 +35,43 @@ QuantMapping = {
     "fp4": ("fp4", 4),
     "nf4": ("nf4", 4),
 }
+
+
+def quant_weight_linear(
+    x,
+    quant_weight,
+    quant_dtype,
+    quantization_config,
+    weight_quantize_algo,
+    dtype,
+    quant_scale=None,
+    quant_state=None,
+    bias=None,
+):
+    if weight_quantize_algo in ["weight_only_int8", "weight_only_int4"]:
+        output = weight_only_linear(
+            x=x,
+            weight=quant_weight,
+            bias=bias,
+            weight_scale=quant_scale,
+            weight_dtype=quant_dtype,
+            group_size=quantization_config.group_size,
+        )
+    elif weight_quantize_algo in ["llm.int8"]:
+        output = llm_int8_linear(x, quant_weight, bias, quant_scale, quantization_config.llm_int8_threshold)
+    elif weight_quantize_algo in ["fp4", "nf4"]:
+        output = qlora_weight_linear(
+            x=x,
+            quant_weight=quant_weight,
+            dtype=dtype,
+            state=quant_state if quantization_config.qlora_weight_double_quant else quant_scale,
+            quant_algo=weight_quantize_algo,
+            double_quant=quantization_config.qlora_weight_double_quant,
+            block_size=quantization_config.qlora_weight_blocksize,
+            double_quant_block_size=quantization_config.qlora_weight_double_quant_block_size,
+            bias=bias,
+        )
+    return output
 
 
 class QuantizationLinear(nn.Layer):
@@ -233,6 +270,7 @@ class ColumnParallelQuantizationLinear(nn.Layer):
     def forward(self, x):
         if self.is_mp:
             if self.sequence_parallel:
+                print("self.sequence_parallel", self.sequence_parallel)
                 input_parallel = AllGatherOp.apply(x)
             else:
                 input_parallel = mp_ops._c_identity(

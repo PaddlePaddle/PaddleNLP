@@ -23,12 +23,13 @@ from paddle.distributed.fleet.utils.sequence_parallel_utils import (
     ColumnSequenceParallelLinear,
     RowSequenceParallelLinear,
 )
-from paddle.nn.quant import llm_int8_linear, weight_only_linear, weight_quantize
+from paddle.nn.quant import weight_quantize
 
 try:
-    from .qlora import qlora_weight_linear
+    from .qlora import qlora_weight_linear, qlora_weight_quantize
 except:
     qlora_weight_linear = None
+    qlora_weight_quantize = None
 
 from ..utils.log import logger
 from .quantization_linear import (
@@ -36,11 +37,6 @@ from .quantization_linear import (
     QuantizationLinear,
     RowParallelQuantizationLinear,
 )
-
-try:
-    from .qlora import qlora_weight_quantize
-except:
-    qlora_weight_quantize = None
 
 LINEAR_CLASSES = [
     nn.Linear,
@@ -243,40 +239,3 @@ def update_loaded_state_dict_keys(state_dict, quantization_linear_list, quantiza
                 )
 
     return state_dict
-
-
-def quant_weight_linear(
-    x,
-    quant_weight,
-    quant_dtype,
-    quantization_config,
-    weight_quantize_algo,
-    dtype,
-    quant_scale=None,
-    quant_state=None,
-    bias=None,
-):
-    if weight_quantize_algo in ["weight_only_int8", "weight_only_int4"]:
-        output = weight_only_linear(
-            x=x,
-            weight=quant_weight,
-            bias=bias,
-            weight_scale=quant_scale,
-            weight_dtype=quant_dtype,
-            group_size=quantization_config.group_size,
-        )
-    elif weight_quantize_algo in ["llm.int8"]:
-        output = llm_int8_linear(x, quant_weight, bias, quant_scale, quantization_config.llm_int8_threshold)
-    elif weight_quantize_algo in ["fp4", "nf4"]:
-        output = qlora_weight_linear(
-            x=x,
-            quant_weight=quant_weight,
-            dtype=dtype,
-            state=quant_state if quantization_config.qlora_weight_double_quant else quant_scale,
-            quant_algo=weight_quantize_algo,
-            double_quant=quantization_config.qlora_weight_double_quant,
-            block_size=quantization_config.qlora_weight_blocksize,
-            double_quant_block_size=quantization_config.qlora_weight_double_quant_block_size,
-            bias=bias,
-        )
-    return output

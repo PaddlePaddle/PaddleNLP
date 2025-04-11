@@ -23,13 +23,14 @@ from paddle.distributed.fleet.utils.sequence_parallel_utils import (
     mark_as_sequence_parallel_parameter,
 )
 
-from ...quantization.quantization_utils import quant_weight_linear
+from ...quantization.quantization_linear import quant_weight_linear
 from ...utils.log import logger
 from .utils import rng_ctx
 
 
 class QuantizationLoRABaseLinear(nn.Layer):
     def __init__(self, layer, lora_config):
+        super().__init__()
         # Model parameters
         self.quantization_config = layer.quantization_config
         self.weight_quantize_algo = layer.weight_quantize_algo
@@ -63,7 +64,7 @@ class QuantizationLoRABaseLinear(nn.Layer):
         else:
             self.lora_dropout = lambda x: x
 
-    def forward(self, x):
+    def forward(self, x, add_bias=True):
         output = quant_weight_linear(
             x=x,
             quant_weight=self.quant_weight,
@@ -75,7 +76,7 @@ class QuantizationLoRABaseLinear(nn.Layer):
             quant_state=(self.qquant_scale, self.double_quant_scale, self.quant_scale_offset)
             if (self.weight_quantize_algo in ["fp4", "nf4"] and self.quantization_config.qlora_weight_double_quant)
             else None,
-            bias=self.bias,
+            bias=self.bias if add_bias else None,
         )
         return output
 
@@ -205,6 +206,7 @@ class RowParallelQuantizationLoRALinear(QuantizationLoRABaseLinear):
     """
 
     def __init__(self, layer, lora_config):
+        super(RowParallelQuantizationLoRALinear, self).__init__(layer, lora_config)
         # Parallel parameters
         self.model_parallel_group = layer.model_parallel_group
         self.world_size = layer.world_size
@@ -245,7 +247,7 @@ class RowParallelQuantizationLoRALinear(QuantizationLoRABaseLinear):
             input_parallel = mp_ops._c_split(x, group=self.model_parallel_group)
 
         # base_model forward
-        output_parallel = super().forward(input_parallel)
+        output_parallel = super().forward(input_parallel, add_bias=False)
         if self.sequence_parallel:
             output = ReduceScatterOp.apply(output_parallel)
         else:
