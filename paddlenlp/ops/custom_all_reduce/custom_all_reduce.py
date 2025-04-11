@@ -55,9 +55,13 @@ class CustomAllreduce:
             # e.g. in a non-cuda environment
             return
 
-        rank = dist.get_rank()
-        self.rank = rank
-        world_size = dist.get_world_size()
+        try:
+            hcg = dist.fleet.get_hybrid_communicate_group()
+            self.group = hcg.get_model_parallel_group()
+        except:
+            self.group = None
+        self.rank = rank = dist.get_rank(group=self.group)
+        self.world_size = world_size = dist.get_world_size(group=self.group)
         if world_size == 1:
             # No need to initialize custom allreduce for single GPU case.
             return
@@ -73,11 +77,11 @@ class CustomAllreduce:
         # Buffers memory are owned by this Python class and passed to C++.
         # Meta data composes of two parts: meta data for synchronization and a
         # temporary buffer for storing intermediate allreduce results.
-        self.meta_ptrs = self.create_shared_buffer(meta_size() + max_size)
+        self.meta_ptrs = self.create_shared_buffer(meta_size() + max_size, group=self.group)
 
         # This is a pre-registered IPC buffer. In eager mode, input tensors
         # are first copied into this buffer before allreduce is performed
-        self.buffer_ptrs = self.create_shared_buffer(max_size)
+        self.buffer_ptrs = self.create_shared_buffer(max_size, group=self.group)
 
         # This is a buffer for storing the tuples of pointers pointing to
         # IPC buffers from all ranks. Each registered tuple has size of
@@ -93,7 +97,7 @@ class CustomAllreduce:
         register_buffer(self._ptr, self.buffer_ptrs)
 
     @staticmethod
-    def create_shared_buffer(size_in_bytes: int) -> List[int]:
+    def create_shared_buffer(size_in_bytes: int, group=None) -> List[int]:
         """
         Creates a shared buffer and returns a list of pointers
         representing the buffer on all processes in the group.
@@ -102,9 +106,9 @@ class CustomAllreduce:
         pointer = lib.cudaMalloc(size_in_bytes)
         # lib.cudaMemset(pointer, 2, size_in_bytes)
         handle = lib.cudaIpcGetMemHandle(pointer)
-        rank = dist.get_rank()
+        rank = dist.get_rank(group=group)
         handles = []
-        dist.all_gather_object(handles, handle)
+        dist.all_gather_object(handles, handle, group=group)
 
         pointers: List[int] = []
         for i, h in enumerate(handles):
@@ -116,9 +120,9 @@ class CustomAllreduce:
         return pointers
 
     @staticmethod
-    def free_shared_buffer(pointers: List[int], rank: Optional[int] = None) -> None:
+    def free_shared_buffer(pointers: List[int], rank: Optional[int] = None, group=None) -> None:
         if rank is None:
-            rank = dist.get_rank()
+            rank = dist.get_rank(group=group)
         lib = cuda_wrapper.CudaRTLibrary()
         lib.cudaFree(ctypes.c_void_p(pointers[rank]))
 
@@ -161,8 +165,8 @@ class CustomAllreduce:
         if not self.disabled and self._ptr:
             dispose(self._ptr)
             self._ptr = 0
-            self.free_shared_buffer(self.meta_ptrs, rank=self.rank)
-            self.free_shared_buffer(self.buffer_ptrs, rank=self.rank)
+            self.free_shared_buffer(self.meta_ptrs, rank=self.rank, group=self.group)
+            self.free_shared_buffer(self.buffer_ptrs, rank=self.rank, group=self.group)
 
     def __del__(self):
         self.close()
