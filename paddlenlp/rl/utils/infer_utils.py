@@ -33,7 +33,8 @@ from ...transformers import (
     PretrainedTokenizer,
 )
 from ...transformers.model_utils import dtype_guard
-from ...trl.llm_utils import get_eos_token_id, init_dist_env
+from ...trl import llm_utils
+from ...trl.llm_utils import init_dist_env
 from ..trainer.trainer_utils import process_row
 from .offload_utils import offload_tensor_to_cpu, reload_tensor_to_gpu
 
@@ -196,20 +197,18 @@ class PolicyPredictor(DygraphBlockInferencePredictor):
         self.model_inputs["not_need_stop"] = paddle.full(shape=[1], fill_value=True, dtype="bool").cpu()  # cpu
         self.model_inputs["stop_flags"] = paddle.ones(shape=[max_batch_size, 1], dtype="bool")
         self.model_inputs["stop_nums"] = paddle.full(shape=[1], fill_value=max_batch_size, dtype="int64")
-        self.model_inputs["result_id"] = paddle.full(shape=[max_batch_size, 1], fill_value=-1).astype("int32").cpu()
+        self.model_inputs["result_id"] = paddle.full(shape=[max_batch_size, 1], fill_value=-1).astype("int32")
         self.model_inputs["next_tokens"] = paddle.full(shape=[max_batch_size, 1], fill_value=-1, dtype="int64")
 
         # output buffers for all inputs
         self.model_inputs["all_token_ids"] = paddle.full(
             shape=[total_request_num, self.config.max_length],
-            fill_value=get_eos_token_id(self.tokenizer, self.generation_config)[0],
+            fill_value=llm_utils.get_eos_token_id(self.tokenizer, self.generation_config)[0],
             dtype="int64",
         )
 
         s_time = time.time()
         with self.update_predictor_params(**kwargs):
-            step = 0
-            # s_prefill = time.time()
             for i, inst in enumerate(self.input_ids):
                 length = len(inst)
                 self.model_inputs["input_ids"][0, :length] = np.array(inst)
@@ -232,8 +231,6 @@ class PolicyPredictor(DygraphBlockInferencePredictor):
                 self.model_inputs["block_tables"][0] = -1
                 self.model_inputs["result_id"][0] = -1
 
-                step += 1
-
             unfinished_ids = list(range(total_request_num - 1, -1, -1))
             for cur_bs in range(max_batch_size):
                 if len(unfinished_ids) == 0:
@@ -250,11 +247,8 @@ class PolicyPredictor(DygraphBlockInferencePredictor):
                                 task_id = unfinished_ids.pop()
                                 self.insert(i, task_id)
                     next_tokens = self._infer(self.model_inputs)
-                    for bs in range(self.batch_size):
-                        task_id = self.model_inputs["result_id"][bs, 0]
-                        step_idx = self.model_inputs["step_idx"][bs, 0]
-                        self.model_inputs["all_token_ids"][task_id, step_idx - 1] = next_tokens[bs, 0]
         logger.info(f"running spend {time.time() - s_time}")
+
         self.cache_kvs = None
         self.model_inputs["cache_kvs"] = None
         paddle.device.cuda.empty_cache()
