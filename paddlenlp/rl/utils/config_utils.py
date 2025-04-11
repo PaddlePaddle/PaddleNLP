@@ -267,6 +267,18 @@ class TrainingArguments(TrainingArguments):
     use_fp32_compute: bool = field(
         default=False, metadata={"help": "Use fp32 to compute xx_log_prob,rewards, advantages and loss."}
     )
+    per_device_train_split_batch_size: int = field(
+        default=-1,
+        metadata={"help": "Batch size per device for model training forward."},
+    )
+    rollout_use_fake_outputs: bool = field(
+        default=False,
+        metadata={"help": "Rollout use fake outputs for model training."},
+    )
+    rollout_use_dynamic_insert: bool = field(
+        default=False,
+        metadata={"help": "Rollout use dynamic insert for model inference."},
+    )
 
     def __post_init__(self):
         """
