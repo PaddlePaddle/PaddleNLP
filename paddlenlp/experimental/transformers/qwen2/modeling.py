@@ -1132,7 +1132,6 @@ class Qwen2ForCausalLMInferenceModel(GenerationInferenceModel, Qwen2PretrainedMo
         cache = kwargs.get("cache", None)
         pre_caches = kwargs.get("pre_caches", None)
         inputs_embeds = kwargs.get("inputs_embeds", None)
-        multimodal_embeds = kwargs.get("multimodal_embeds", None)
         if cache is not None:
             input_ids = tgt_ids
             position_ids = tgt_pos
@@ -1145,7 +1144,6 @@ class Qwen2ForCausalLMInferenceModel(GenerationInferenceModel, Qwen2PretrainedMo
         model_inputs = {
             "input_ids": input_ids,
             "inputs_embeds": inputs_embeds,
-            "multimodal_embeds": multimodal_embeds,
             "position_ids": position_ids,
             "attention_mask": attention_mask,
             "cache_kvs": cache_kvs,
@@ -1275,7 +1273,6 @@ class Qwen2BlockInferenceModel(Qwen2InferenceModel):
         rope_emb = kwargs.get("rope_emb", None)
         draft_tokens = kwargs.get("draft_tokens", None)
         seq_lens_encoder = kwargs.get("seq_lens_encoder", None)
-        multimodal_embeds = kwargs.get("multimodal_embeds", None)
 
         # whether speculative decoding or not
         if draft_tokens is None:
@@ -1291,26 +1288,13 @@ class Qwen2BlockInferenceModel(Qwen2InferenceModel):
         kwargs["padding_offsets"] = padding_offset
         kwargs["max_input_length"] = self.max_seq_len
 
-        # breakpoint()
 
-        # if len(inputs_embeds.shape) == 3:
-        #     inputs_embeds = inputs_embeds[0]
-        # elif len(inputs_embeds.shape) == 2:
-        #     inputs_embeds = inputs_embeds[0:1,:]
-        # # breakpoint()
-        # inputs_embeds = paddle.where(multimodal_embeds,inputs_embeds,self.embed_tokens(ids_remove_padding))
-
-        # breakpoint()
-        # if inputs_embeds is None:
-        # if  multimodal_embeds[0].item() is False:
-        if inputs_embeds.shape[1] == 1:
+        if inputs_embeds is None:
+        # if inputs_embeds.shape[1] == 1:
             inputs_embeds = self.embed_tokens(ids_remove_padding)
         else:
-            assert len(inputs_embeds.shape) == 3
-            # This is the case in the image-to-text model such as qwen2-vl,
-            # In the prefill phase, the language model is first fed with inputs_embeds instead of input_ids
-            # but in decoder phase, the language model is fed with input_ids just like normal text-to-text model.
-            inputs_embeds = inputs_embeds.reshape([-1, inputs_embeds.shape[2]])
+            if len(inputs_embeds.shape) == 3:
+                inputs_embeds = inputs_embeds.reshape([-1, inputs_embeds.shape[2]])
 
         with dy2st_nocheck_guard_context():
             hidden_states, _ = self.transformer_block(
@@ -1482,7 +1466,6 @@ class Qwen2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen2Pr
         # only last token for inputs_ids if cache is defined in kwargs
         input_ids = kwargs["input_ids"]
         inputs_embeds = kwargs.get("inputs_embeds", None)
-        multimodal_embeds = kwargs.get("multimodal_embeds", None)
         src_mask = kwargs.get("src_mask", None)
         block_tables = kwargs.get("block_tables", None)
 
@@ -1505,7 +1488,6 @@ class Qwen2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen2Pr
         model_inputs = {
             "input_ids": input_ids,
             "inputs_embeds": inputs_embeds,
-            "multimodal_embeds": multimodal_embeds,
             "src_mask": src_mask,
             "rope_emb": rope_emb,
             "pre_caches": pre_caches,
@@ -1527,7 +1509,6 @@ class Qwen2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen2Pr
         self,
         input_ids,
         inputs_embeds=None,
-        multimodal_embeds=None,
         src_mask=None,
         pre_caches=None,
         caches=None,
@@ -1546,7 +1527,6 @@ class Qwen2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen2Pr
         outputs = self.qwen2(
             input_ids,
             inputs_embeds=inputs_embeds,
-            multimodal_embeds=multimodal_embeds,
             src_mask=src_mask,
             caches=caches,
             rope_emb=rope_emb,

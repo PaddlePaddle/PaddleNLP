@@ -1316,14 +1316,13 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
         kwargs["max_input_length"] = self.max_seq_len
         kwargs["block_size"] = self.block_size
 
-        if inputs_embeds.shape[1] == 1:
+        if inputs_embeds is None:
+        # if inputs_embeds.shape[1] == 1:
             inputs_embeds = self.embed_tokens(ids_remove_padding)
         else:
-            assert len(inputs_embeds.shape) == 3
-            # This is the case in the image-to-text model
-            # In the prefill phase, the language model is first fed with inputs_embeds instead of input_ids
-            # but in decoder phase, the language model is fed with input_ids just like normal text-to-text model.
-            inputs_embeds = inputs_embeds.reshape([-1, inputs_embeds.shape[2]])
+            if len(inputs_embeds.shape) == 3:
+                inputs_embeds = inputs_embeds.reshape([-1, inputs_embeds.shape[2]])
+
         with dy2st_nocheck_guard_context():
             hidden_states, _ = self.transformer_block(
                 input_ids=input_ids,
