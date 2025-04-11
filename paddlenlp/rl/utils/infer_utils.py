@@ -21,23 +21,49 @@ from contextlib import contextmanager
 import paddle
 import paddle.distributed as dist
 from paddle.utils import try_import
-from predict.predictor import (
-    DygraphBlockInferencePredictor,
-    ModelArgument,
-    PredictorArgument,
-)
-from trainer.trainer_utils import process_row
 
-from paddlenlp.trainer.trainer import Trainer, logger
-from paddlenlp.transformers import (
+from ...trainer.trainer import Trainer, logger
+from ...transformers import (
     AutoInferenceModelForCausalLM,
     PretrainedModel,
     PretrainedTokenizer,
 )
-from paddlenlp.transformers.model_utils import dtype_guard
-from paddlenlp.trl.llm_utils import init_dist_env
-
+from ...transformers.model_utils import dtype_guard
+from ...trl.llm_utils import init_dist_env
+from ..trainer.trainer_utils import process_row
 from .offload_utils import offload_tensor_to_cpu, reload_tensor_to_gpu
+
+try:
+    from llm.predict.predictor import (
+        DygraphBlockInferencePredictor,
+        ModelArgument,
+        PredictorArgument,
+    )
+except ImportError:
+
+    class DygraphBlockInferencePredictor(object):
+        """
+        A dummy class for DygraphBlockInferencePredictor, used when the actual class
+        cannot be imported from llm.predict.predictor
+        """
+
+        pass
+
+    class ModelArgument(object):
+        """
+        A dummy class for ModelArgument, used when the actual class
+        cannot be imported from llm.predict.predictor
+        """
+
+        pass
+
+    class PredictorArgument(object):
+        """
+        A dummy class for ModelArgument, used when the actual class
+        cannot be imported from llm.predict.predictor
+        """
+
+        pass
 
 
 class PolicyPredictor(DygraphBlockInferencePredictor):
@@ -142,6 +168,7 @@ def create_predictor(trainer: Trainer):
         append_attn=True,  # currently only support append_attn
         inference_model=True,
         dtype=trainer.amp_dtype,
+        output_via_mq=False,
     )
     model_args = ModelArgument()
     config = copy.deepcopy(trainer.model.config)

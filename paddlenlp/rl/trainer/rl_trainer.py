@@ -27,8 +27,8 @@ from paddle import nn
 from paddle.distributed import fleet
 from paddle.io import DataLoader, Dataset
 
-from paddlenlp.data import DataCollator
-from paddlenlp.trainer.trainer import (
+from ...data import DataCollator
+from ...trainer.trainer import (
     EvalPrediction,
     HybridParallelOptimizer,
     NlpDistributedBatchSampler,
@@ -45,18 +45,13 @@ from paddlenlp.trainer.trainer import (
     reshard_util,
     split_inputs_sequence_dim,
 )
-from paddlenlp.transformers import PretrainedModel, PretrainedTokenizer
-from paddlenlp.utils.env import TRAINER_STATE_NAME
-
-# isort: off
-from models.ppo_model_utils import create_loss
-from utils.comm_utils import create_data_trans_group
-from utils.infer_utils import InferEvalModel
+from ...transformers import PretrainedModel, PretrainedTokenizer
+from ...utils.env import TRAINER_STATE_NAME
+from ..models.ppo_model_utils import create_loss
+from ..utils.comm_utils import ActorStages, create_data_trans_group
+from ..utils.infer_utils import InferEvalModel
+from ..utils.timer_utils import TimerScope
 from .trainer_utils import PipeEvalModel
-from utils.timer_utils import TimerScope
-from utils.comm_utils import ActorStages
-
-# isort: on
 
 # ########## patches for Trianer ##########
 

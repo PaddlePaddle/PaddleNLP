@@ -24,8 +24,8 @@ import paddle
 import paddle.distributed as dist
 import paddle.nn as nn
 
-from paddlenlp.transformers import PretrainedConfig
-from paddlenlp.transformers.model_outputs import ModelOutput
+from ...transformers.configuration_utils import PretrainedConfig
+from ...transformers.model_outputs import ModelOutput
 
 
 @dataclass

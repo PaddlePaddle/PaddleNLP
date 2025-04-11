@@ -23,11 +23,6 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import numpy as np
 import paddle
 import paddle.distributed as dist
-from algos.advantage import (
-    compute_grpo_advantages,
-    compute_reinforce_plus_plus_advantages_and_returns,
-)
-from models.ppo_model_utils import make_position_ids_from_input_ids
 from paddle import nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import PipelineLayer
@@ -35,21 +30,9 @@ from paddle.io import DataLoader, Dataset, DistributedBatchSampler
 from paddle.utils import map_structure
 from rich.console import Console
 from rich.table import Table
-from utils.comm_utils import (
-    ActorStages,
-    RolloutStages,
-    data_group_merge,
-    data_group_split,
-    gather_and_pad,
-    get_timer_label,
-    new_timer_log,
-)
-from utils.infer_utils import infer_guard
-from utils.offload_utils import reload_and_offload_scope, reload_tensor_to_gpu
-from utils.timer_utils import TimerScope, TimerScopeManualLabel
 
-from paddlenlp.data import DataCollator
-from paddlenlp.trainer.trainer import (
+from ...data import DataCollator
+from ...trainer.trainer import (
     EvalLoopOutput,
     EvalPrediction,
     ProgressCallback,
@@ -61,19 +44,32 @@ from paddlenlp.trainer.trainer import (
     logger,
     speed_metrics,
 )
-from paddlenlp.trainer.utils.helper import (
-    broadcast_dataset_rank0_model,
-    distributed_concat,
-)
-from paddlenlp.transformers import (
+from ...trainer.utils.helper import broadcast_dataset_rank0_model, distributed_concat
+from ...transformers import (
     CosineAnnealingWithWarmupDecay,
     LinearAnnealingWithWarmupDecay,
     PretrainedModel,
     PretrainedTokenizer,
 )
-from paddlenlp.transformers.model_utils import _add_variant
-from paddlenlp.utils.env import PADDLE_WEIGHTS_NAME
-
+from ...transformers.model_utils import _add_variant
+from ...utils.env import PADDLE_WEIGHTS_NAME
+from ..algos.advantage import (
+    compute_grpo_advantages,
+    compute_reinforce_plus_plus_advantages_and_returns,
+)
+from ..models.ppo_model_utils import make_position_ids_from_input_ids
+from ..utils.comm_utils import (
+    ActorStages,
+    RolloutStages,
+    data_group_merge,
+    data_group_split,
+    gather_and_pad,
+    get_timer_label,
+    new_timer_log,
+)
+from ..utils.infer_utils import infer_guard
+from ..utils.offload_utils import reload_and_offload_scope, reload_tensor_to_gpu
+from ..utils.timer_utils import TimerScope, TimerScopeManualLabel
 from .actor_trainer import ActorReferenceTrainer
 from .critic_trainer import CriticTrainer
 from .reward_trainer import RewardTrainer
@@ -1365,7 +1361,7 @@ class PPOTrainer(Trainer):
                                     **micro_batch,
                                 )
                                 if self.args.rl_algorithm == "ppo":
-                                    micro_batch["reward_values"] = self.critic_trainer.compute_reward(**micro_batch)
+                                    micro_batch["reward_values"] = self.critic_trainer.compute_value(**micro_batch)
 
                 # prepare data for reinforce_plus_plus
                 if self.args.rl_algorithm == "reinforce_plus_plus":

@@ -16,25 +16,24 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import paddle
-from models.ppo_model_utils import (
-    RLHFPPOMixedLoss,
-    create_startend_row_indices,
-    gather_log_probabilities,
-)
 from paddle import nn
 from paddle.distributed.fleet.meta_parallel import ParallelCrossEntropy
 from paddle.io import Dataset
 
-from paddlenlp.data import DataCollator
-from paddlenlp.generation import GenerationConfig
-from paddlenlp.trainer.trainer import (
+from ...data import DataCollator
+from ...generation import GenerationConfig
+from ...trainer.trainer import (
     EvalPrediction,
     ShardingOption,
     TrainerCallback,
     TrainingArguments,
 )
-from paddlenlp.transformers import PretrainedModel, PretrainedTokenizer
-
+from ...transformers import PretrainedModel, PretrainedTokenizer
+from ..models.ppo_model_utils import (
+    RLHFPPOMixedLoss,
+    create_startend_row_indices,
+    gather_log_probabilities,
+)
 from .rl_trainer import RLTrainer
 from .trainer_utils import guard_set_args
 

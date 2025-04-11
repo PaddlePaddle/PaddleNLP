@@ -16,8 +16,8 @@ import os
 
 import paddle
 
-from paddlenlp.trainer.argparser import strtobool
-from paddlenlp.trainer.trainer import logger
+from ...trainer.argparser import strtobool
+from ...trainer.trainer import logger
 
 
 @paddle.no_grad()
