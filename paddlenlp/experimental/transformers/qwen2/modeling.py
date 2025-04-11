@@ -1292,7 +1292,7 @@ class Qwen2BlockInferenceModel(Qwen2InferenceModel):
         kwargs["max_input_length"] = self.max_seq_len
 
         # breakpoint()
-        
+
         # if len(inputs_embeds.shape) == 3:
         #     inputs_embeds = inputs_embeds[0]
         # elif len(inputs_embeds.shape) == 2:
