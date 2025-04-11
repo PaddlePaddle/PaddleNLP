@@ -755,7 +755,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
                     eos_token_id,
                     model_kwargs["next_tokens"],
                 )
-            if self.config.output_via_mq:
+            if self.config.output_via_mq and not self.config.dynamic_insert:
                 from paddlenlp_ops import save_output
 
                 save_output(

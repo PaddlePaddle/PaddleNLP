@@ -1,4 +1,3 @@
-
 // Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -75,7 +74,7 @@ void FusedRotaryPositionEncoding(
     int head_size,
     bool is_neox);
 
-std::vector<paddle::Tensor> MultiHeadLatentAttention2(
+std::vector<paddle::Tensor> MultiHeadLatentAttention(
     const paddle::Tensor& query,
     const paddle::Tensor& key_cache,
     const paddle::Tensor& value_cache,
@@ -120,7 +119,7 @@ std::vector<paddle::Tensor> MultiHeadLatentAttention2(
     const float out_linear_in_scale,
     const int speculate_max_draft_token_num,
     const bool causal,
-    const bool speculate_decoder){}
+    const bool speculate_decoder);
 
 std::vector<paddle::Tensor> GetBlockShapeAndSplitKVBlock(
     const paddle::Tensor& seq_lens_encoder,
@@ -269,11 +268,11 @@ void StepPaddle(const paddle::Tensor &stop_flags,
 
 PYBIND11_MODULE(paddlenlp_ops, m) {
   m.def("f_append_attention", &AppendAttention, "AppendAttention");
-//   m.def("f_fused_rotary_position_encoding", &FusedRotaryPositionEncoding, "FusedRotaryPositionEncoding");
-//   m.def("f_multi_head_latent_attention", &MultiHeadLatentAttention2, "MultiHeadLatentAttention2");
+  m.def("f_fused_rotary_position_encoding", &FusedRotaryPositionEncoding, "FusedRotaryPositionEncoding");
+//   m.def("f_multi_head_latent_attention", &MultiHeadLatentAttention, "MultiHeadLatentAttention");
 //   m.def("f_noaux_tc", &NoauxTc, "NoauxTc");
 //   m.def("f_get_block_shape_and_split_kv_block", &GetBlockShapeAndSplitKVBlock, "GetBlockShapeAndSplitKVBlock");
-//   m.def("f_prefill_mla_write_cache", &PrefillMLAWriteCacheKernel, "PrefillMLAWriteCacheKernel");
+//   m.def("f_prefill_mla_write_cache"å, &PrefillMLAWriteCacheKernel, "PrefillMLAWriteCacheKernel");
 //   m.def("f_decode_mla_write_cache", &DecodeMLAWriteCacheKernel, "DecodeMLAWriteCacheKernel");
 //   m.def("f_cutlass_fp8_fp8_half_block_gemm_fused", &cutlass_fp8_fp8_half_block_gemm_fused, "cutlass_fp8_fp8_half_block_gemm_fused");
 //   m.def("f_get_position_ids_and_mask_encoder_batch", &GetPositionIdsAndMaskEncoderBatch, "GetPositionIdsAndMaskEncoderBatch");
@@ -281,19 +280,19 @@ PYBIND11_MODULE(paddlenlp_ops, m) {
   m.def("f_update_inputs_v2", &UpdateInputesV2, "UpdateInputesV2");
   m.def("f_rebuild_padding_v2", &RebuildPaddingV2, "RebuildPaddingV2");
 //   m.def("f_group_quant", &GroupQuant, "GroupQuant");
-//   m.def("f_get_padding_offset_v2", &GetPaddingOffsetV2, "GetPaddingOffsetV2");
+  m.def("f_get_padding_offset_v2", &GetPaddingOffsetV2, "GetPaddingOffsetV2");
   m.def("f_save_output", &SaveOutMmsg, "SaveOutMmsg");
-//   m.def("f_get_output", &GetOutput, "GetOutput");
-  m.def("f_step_paddle", &StepPaddle, "StepPaddle");
+  m.def("f_get_output", &GetOutput, "GetOutput");
+//   m.def("f_step_paddle", &StepPaddle, "StepPaddle");
 }
 
 PYBIND11_MODULE(paddlenlp_ops_90, m) {
   m.def("f_append_attention", &AppendAttention, "AppendAttention");
-//   m.def("f_fused_rotary_position_encoding", &FusedRotaryPositionEncoding, "FusedRotaryPositionEncoding");
-//   m.def("f_multi_head_latent_attention", &MultiHeadLatentAttention2, "MultiHeadLatentAttention2");
+  m.def("f_fused_rotary_position_encoding", &FusedRotaryPositionEncoding, "FusedRotaryPositionEncoding");
+//   m.def("f_multi_head_latent_attention", &MultiHeadLatentAttention, "MultiHeadLatentAttention");
 //   m.def("f_noaux_tc", &NoauxTc, "NoauxTc");
 //   m.def("f_get_block_shape_and_split_kv_block", &GetBlockShapeAndSplitKVBlock, "GetBlockShapeAndSplitKVBlock");
-//   m.def("f_prefill_mla_write_cache", &PrefillMLAWriteCacheKernel, "PrefillMLAWriteCacheKernel");
+//   m.def("f_prefill_mla_write_cache"å, &PrefillMLAWriteCacheKernel, "PrefillMLAWriteCacheKernel");
 //   m.def("f_decode_mla_write_cache", &DecodeMLAWriteCacheKernel, "DecodeMLAWriteCacheKernel");
 //   m.def("f_cutlass_fp8_fp8_half_block_gemm_fused", &cutlass_fp8_fp8_half_block_gemm_fused, "cutlass_fp8_fp8_half_block_gemm_fused");
 //   m.def("f_get_position_ids_and_mask_encoder_batch", &GetPositionIdsAndMaskEncoderBatch, "GetPositionIdsAndMaskEncoderBatch");
@@ -301,19 +300,19 @@ PYBIND11_MODULE(paddlenlp_ops_90, m) {
   m.def("f_update_inputs_v2", &UpdateInputesV2, "UpdateInputesV2");
   m.def("f_rebuild_padding_v2", &RebuildPaddingV2, "RebuildPaddingV2");
 //   m.def("f_group_quant", &GroupQuant, "GroupQuant");
-//   m.def("f_get_padding_offset_v2", &GetPaddingOffsetV2, "GetPaddingOffsetV2");
+  m.def("f_get_padding_offset_v2", &GetPaddingOffsetV2, "GetPaddingOffsetV2");
   m.def("f_save_output", &SaveOutMmsg, "SaveOutMmsg");
-//   m.def("f_get_output", &GetOutput, "GetOutput");
-  m.def("f_step_paddle", &StepPaddle, "StepPaddle");
+  m.def("f_get_output", &GetOutput, "GetOutput");
+//   m.def("f_step_paddle", &StepPaddle, "StepPaddle");
 }
 
 PYBIND11_MODULE(paddlenlp_ops_80, m) {
   m.def("f_append_attention", &AppendAttention, "AppendAttention");
-//   m.def("f_fused_rotary_position_encoding", &FusedRotaryPositionEncoding, "FusedRotaryPositionEncoding");
-//   m.def("f_multi_head_latent_attention", &MultiHeadLatentAttention2, "MultiHeadLatentAttention2");
+  m.def("f_fused_rotary_position_encoding", &FusedRotaryPositionEncoding, "FusedRotaryPositionEncoding");
+//   m.def("f_multi_head_latent_attention", &MultiHeadLatentAttention, "MultiHeadLatentAttention");
 //   m.def("f_noaux_tc", &NoauxTc, "NoauxTc");
 //   m.def("f_get_block_shape_and_split_kv_block", &GetBlockShapeAndSplitKVBlock, "GetBlockShapeAndSplitKVBlock");
-//   m.def("f_prefill_mla_write_cache", &PrefillMLAWriteCacheKernel, "PrefillMLAWriteCacheKernel");
+//   m.def("f_prefill_mla_write_cache"å, &PrefillMLAWriteCacheKernel, "PrefillMLAWriteCacheKernel");
 //   m.def("f_decode_mla_write_cache", &DecodeMLAWriteCacheKernel, "DecodeMLAWriteCacheKernel");
 //   m.def("f_cutlass_fp8_fp8_half_block_gemm_fused", &cutlass_fp8_fp8_half_block_gemm_fused, "cutlass_fp8_fp8_half_block_gemm_fused");
 //   m.def("f_get_position_ids_and_mask_encoder_batch", &GetPositionIdsAndMaskEncoderBatch, "GetPositionIdsAndMaskEncoderBatch");
@@ -321,8 +320,8 @@ PYBIND11_MODULE(paddlenlp_ops_80, m) {
   m.def("f_update_inputs_v2", &UpdateInputesV2, "UpdateInputesV2");
   m.def("f_rebuild_padding_v2", &RebuildPaddingV2, "RebuildPaddingV2");
 //   m.def("f_group_quant", &GroupQuant, "GroupQuant");
-//   m.def("f_get_padding_offset_v2", &GetPaddingOffsetV2, "GetPaddingOffsetV2");
+  m.def("f_get_padding_offset_v2", &GetPaddingOffsetV2, "GetPaddingOffsetV2");
   m.def("f_save_output", &SaveOutMmsg, "SaveOutMmsg");
-//   m.def("f_get_output", &GetOutput, "GetOutput");
-  m.def("f_step_paddle", &StepPaddle, "StepPaddle");
+  m.def("f_get_output", &GetOutput, "GetOutput");
+//   m.def("f_step_paddle", &StepPaddle, "StepPaddle");
 }
