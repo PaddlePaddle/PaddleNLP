@@ -117,13 +117,15 @@ __global__ void FusedActQuant(const phi::bfloat16 *__restrict__ Xin,
        y_offset += blockDim.y) {
     for (int x_offset = threadIdx.x; x_offset < BLOCK_SIZE;
          x_offset += blockDim.x) {
+      // ------------------- Critical to Precision ---------------
       const float scale_on_fp32_to_outputT =
           ComputeScale<__nv_bfloat16, OutT, using_pow2_scaling>(
               smem_max[y_offset], 0.0f);
-      const float scale_on_fp8_to_inputT = __frcp_rz(scale_on_fp32_to_outputT);
-      float output_scaled_fp32 =
+      const float scale_on_fp8_to_inputT = __frcp_rn(scale_on_fp32_to_outputT + 1e-4f);
+      const float output_scaled_fp32 =
           smem_tile[swizzled_2d_idx(y_offset, BLOCK_SIZE, x_offset)] *
           scale_on_fp32_to_outputT;
+      // ------------------- Critical to Precision ---------------
       const OutT output_scaled_fp8 = static_cast<OutT>(output_scaled_fp32);
       if constexpr (transpose_output) {
         const int g_output_y_offset = g_block_x_offset + y_offset;
