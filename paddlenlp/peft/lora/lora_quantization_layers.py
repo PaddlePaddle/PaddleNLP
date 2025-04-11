@@ -1,4 +1,4 @@
-# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,18 +17,76 @@ import math
 import paddle
 from paddle import nn
 from paddle.distributed.fleet.layers.mpu import mp_ops
-from paddle.nn.quant import  weight_only_linear, weight_quantize
-
-from ...quantization.qlora import  qlora_weight_quantize
-from ...quantization.quantization_linear import (
-    ColumnParallelQuantizationLinear,
-    QuantizationLinear,
-    RowParallelQuantizationLinear,
+from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+    AllGatherOp,
+    ReduceScatterOp,
+    mark_as_sequence_parallel_parameter,
 )
+
+from ...quantization.quantization_utils import quant_weight_linear
+from ...utils.log import logger
 from .utils import rng_ctx
 
 
-class QuantizationLoRALinear(QuantizationLinear):
+class QuantizationLoRABaseLinear(nn.Layer):
+    def __init__(self, layer, lora_config):
+        # Model parameters
+        self.quantization_config = layer.quantization_config
+        self.weight_quantize_algo = layer.weight_quantize_algo
+        self._dtype = layer._dtype
+        self.quant_dtype = layer.quant_dtype
+        self.quant_weight = layer.quant_weight
+        if self.weight_quantize_algo in ["fp4", "nf4"] and self.quantization_config.qlora_weight_double_quant:
+            self.qquant_scale = layer.qquant_scale
+            self.double_quant_scale = layer.double_quant_scale
+            self.quant_scale_offset = layer.quant_scale_offset
+        else:
+            self.quant_scale = layer.quant_scale
+        self.bias = layer.bias
+
+        # LoRA related parameters
+        self.lora_config = lora_config
+        if not isinstance(self.lora_config.r, int) or self.lora_config.r <= 0:
+            raise ValueError("Lora rank r should be a positive integer")
+        if self.weight_quantize_algo == "llm.int8":
+            raise NotImplementedError("llm.int8 not yet support lora strategy.")
+        if self.lora_config.rslora:
+            self.scaling = self.lora_config.lora_alpha / math.sqrt(self.lora_config.r)
+        else:
+            self.scaling = self.lora_config.lora_alpha / self.lora_config.r
+        self.disable_lora = False
+
+        # Mark the weight as unmerged
+        # Optional dropout
+        if self.lora_config.lora_dropout > 0.0:
+            self.lora_dropout = nn.Dropout(p=self.lora_config.lora_dropout)
+        else:
+            self.lora_dropout = lambda x: x
+
+    def forward(self, x):
+        output = quant_weight_linear(
+            x=x,
+            quant_weight=self.quant_weight,
+            quant_dtype=self.quant_dtype,
+            quantization_config=self.quantization_config,
+            weight_quantize_algo=self.weight_quantize_algo,
+            dtype=self._dtype,
+            quant_scale=self.quant_scale,
+            quant_state=(self.qquant_scale, self.double_quant_scale, self.quant_scale_offset)
+            if (self.weight_quantize_algo in ["fp4", "nf4"] and self.quantization_config.qlora_weight_double_quant)
+            else None,
+            bias=self.bias,
+        )
+        return output
+
+    def merge(self):
+        logger.warning("QuantizationLoRALinear does not support merge()")
+
+    def unmerge(self):
+        logger.warning("QuantizationLoRALinear does not support unmerge()")
+
+
+class QuantizationLoRALinear(QuantizationLoRABaseLinear):
     """
     Quantization lora Linear layer.
     The code implementation refers to paddlenlp.peft.lora.lora_layers.LoRALinear.
@@ -37,71 +95,30 @@ class QuantizationLoRALinear(QuantizationLinear):
     weight_only_linear for input tensor and origin weight(LoRA part still uses fp16/bf16).
     """
 
-    def __init__(
-        self,
-        module,
-        lora_config
-    ):
-
-        self.quantization_config = module.quantization_config
-        self.weight_quantize_algo = module.weight_quantize_algo
-        self._dtype = module._dtype
-        self.quant_dtype = module.quant_dtype
-        self.quant_weight = module.quant_weight
-        if self.weight_quantize_algo in ["fp4", "nf4"] and self.quantization_config.qlora_weight_double_quant:
-            self.qquant_scale = module.qquant_scale
-            self.double_quant_scale = module.double_quant_scale
-            self.quant_scale_offset = module.quant_scale_offset
-        else:
-            self.quant_scale = module.quant_scale      
-        self.bias = module.bias
-        self.lora_config = lora_config
-        if not isinstance(self.lora_config.r, int) or self.lora_config.r <= 0:
-            raise ValueError("Lora rank r should be a positive integer")
-        if self.weight_quantize_algo == "llm.int8":
-            raise NotImplementedError("llm.int8 not yet support lora strategy.")
-        if self.lora_config.rslora:
-            self.scaling = self.lora_config.lora_alpha / math.sqrt(self.lora_config.r)
-        else:
-            self.scaling = self.lora_config.lora_alpha / self.lora_config.r
-        self.disable_lora = False
-
-        # Mark the weight as unmerged
-        # Optional dropout
-        if lora_dropout > 0.0:
-            self.lora_dropout = nn.Dropout(p=lora_dropout)
-        else:
-            self.lora_dropout = lambda x: x
-
-        # Actual trainable parameters
+    def __init__(self, layer, lora_config):
+        super(QuantizationLoRALinear, self).__init__(layer, lora_config)
+        # LoRA parameters
         self.lora_A = self.create_parameter(
-            shape=[module.in_features, self.lora_config.r],
+            shape=[layer.in_features, self.lora_config.r],
             dtype=self._dtype,
             is_bias=False,
             default_initializer=nn.initializer.KaimingUniform(negative_slope=math.sqrt(5), nonlinearity="leaky_relu"),
         )
         self.lora_B = self.create_parameter(
-            shape=[self.lora_config.r, module.out_features],
+            shape=[self.lora_config.r, layer.out_features],
             dtype=self._dtype,
             is_bias=False,
             default_initializer=nn.initializer.Constant(value=0.0),
         )
-
 
     def forward(self, x):
         result = super().forward(x)
         if not self.disable_lora:
             result += (self.lora_dropout(x) @ self.lora_A @ self.lora_B) * self.scaling
         return result
-    
-    def merge(self):
-        logger.warning("QuantizationLoRALinear does not support merge()")
-
-    def unmerge(self):
-        logger.warning("QuantizationLoRALinear does not support unmerge()")
 
 
-class ColumnParallelQuantizationLoRALinear(ColumnParallelQuantizationLinear):
+class ColumnParallelQuantizationLoRALinear(QuantizationLoRABaseLinear):
     """
     Quantization lora Linear layer with mp parallelized(column).
     The code implementation refers to paddlenlp.peft.lora.lora_layers.ColumnParallelLoRALinear.
@@ -110,59 +127,30 @@ class ColumnParallelQuantizationLoRALinear(ColumnParallelQuantizationLinear):
     weight_only_linear for input tensor and origin weight(LoRA part still uses fp16/bf16).
     """
 
-    def __init__(
-        self,
-        module,
-        lora_config
-    ):
-
-        self.quantization_config = module.quantization_config
-        self.weight_quantize_algo = module.weight_quantize_algo
-        self._dtype = module._dtype
-        self.quant_dtype = module.quant_dtype
-        self.quant_weight = module.quant_weight
-        if self.weight_quantize_algo in ["fp4", "nf4"] and self.quantization_config.qlora_weight_double_quant:
-            self.qquant_scale = module.qquant_scale
-            self.double_quant_scale = module.double_quant_scale
-            self.quant_scale_offset = module.quant_scale_offset
-        else:
-            self.quant_scale = module.quant_scale      
-        self.bias = module.bias
-        self.lora_config = lora_config
-        if not isinstance(self.lora_config.r, int) or self.lora_config.r <= 0:
-            raise ValueError("Lora rank r should be a positive integer")
-        if self.weight_quantize_algo == "llm.int8":
-            raise NotImplementedError("llm.int8 not yet support lora strategy.")
-        if self.lora_config.rslora:
-            self.scaling = self.lora_config.lora_alpha / math.sqrt(self.lora_config.r)
-        else:
-            self.scaling = self.lora_config.lora_alpha / self.lora_config.r
-        self.disable_lora = False
+    def __init__(self, layer, lora_config):
+        super(ColumnParallelQuantizationLoRALinear, self).__init__(layer, lora_config)
 
         # Parallel parameters
-        self.model_parallel_group = module.model_parallel_group
-        self.world_size = module.world_size
-        self.is_mp = module.is_mp
-        self.gather_output = module.gather_output
-        self.sequence_parallel = module.sequence_parallel
+        self.model_parallel_group = layer.model_parallel_group
+        self.world_size = layer.world_size
+        self.gather_output = layer.gather_output
+        self.sequence_parallel = layer.sequence_parallel
+        self.mp_skip_c_identity = layer.mp_skip_c_identity
 
-        # Mark the weight as unmerged
-        # Optional dropout
-        if lora_dropout > 0.0:
-            self.lora_dropout = nn.Dropout(p=lora_dropout)
-        else:
-            self.lora_dropout = lambda x: x
-
-        # Actual trainable parameters
+        # LoRA parameters
         self.lora_A = self.create_parameter(
-            shape=[module.in_features, self.lora_config.r],
+            shape=[layer.in_features, self.lora_config.r],
             dtype=self._dtype,
             is_bias=False,
             default_initializer=nn.initializer.KaimingUniform(negative_slope=math.sqrt(5), nonlinearity="leaky_relu"),
         )
+        # Sync lora_A parameters before training
         self.lora_A.is_distributed = False
+        if self.sequence_parallel:
+            mark_as_sequence_parallel_parameter(self.lora_A)
+
         self.lora_B = self.create_parameter(
-            shape=[self.lora_config.r, module.output_size_per_partition],
+            shape=[self.lora_config.r, layer.output_size_per_partition],
             dtype=self._dtype,
             is_bias=False,
             default_initializer=nn.initializer.Constant(value=0.0),
@@ -171,31 +159,43 @@ class ColumnParallelQuantizationLoRALinear(ColumnParallelQuantizationLinear):
         self.lora_B.split_axis = 1
 
     def forward(self, x):
+        # base_model forward
+        if self.sequence_parallel:
+            # forward: all_gather backward: reduce scatter
+            input_parallel = AllGatherOp.apply(x)
+        else:
+            # forward: identity backward: all reduce
+            input_parallel = mp_ops._c_identity(
+                x,
+                group=self.model_parallel_group,
+                skip_c_identity_dynamic=self.mp_skip_c_identity,
+            )
+        output_parallel = super().forward(input_parallel)
 
-        result_mp = super().forward(x)
-
+        # LoRA forward
         if not self.disable_lora:
             input_a = self.lora_dropout(x) @ self.lora_A
             if self.sequence_parallel:
-                input_a = AllGatherOp.apply(input_a)
-            input_a_mp = mp_ops._c_identity(input_a, group=self.model_parallel_group)
-            delta_mp = (input_a_mp @ self.lora_B) * self.scaling
-            result_mp += delta_mp
+                # forward: all_gather backward: reduce scatter
+                input_a_parallel = AllGatherOp.apply(input_a)
+            else:
+                # forward: identity backward: all reduce
+                input_a_parallel = mp_ops._c_identity(
+                    input_a,
+                    group=self.model_parallel_group,
+                    skip_c_identity_dynamic=self.mp_skip_c_identity,
+                )
+            delta_parallel = (input_a_parallel @ self.lora_B) * self.scaling
+            output_parallel += delta_parallel
 
-        if self.gather_output and self.is_mp:
-            result = mp_ops._c_concat(result_mp, group=self.model_parallel_group)
+        if self.gather_output:
+            output = mp_ops._c_concat(output_parallel, group=self.model_parallel_group)
         else:
-            result = result_mp
-        return result
-
-    def merge(self):
-        logger.warning("ColumnParallelQuantizationLoRALinear does not support merge()")
-
-    def unmerge(self):
-        logger.warning("ColumnParallelQuantizationLoRALinearr does not support unmerge()")
+            output = output_parallel
+        return output
 
 
-class RowParallelQuantizationLoRALinear(RowParallelQuantizationLinear):
+class RowParallelQuantizationLoRALinear(QuantizationLoRABaseLinear):
     """
     Quantization lora Linear layer with mp parallelized(row).
     The code implementation refers to paddlenlp.peft.lora.lora_layers.RowParallelLoRALinear.
@@ -204,105 +204,73 @@ class RowParallelQuantizationLoRALinear(RowParallelQuantizationLinear):
     weight_only_linear for input tensor and origin weight(LoRA part still uses fp16/bf16).
     """
 
-    def __init__(
-        self,
-        in_features,
-        out_features,
-        quant_algo,
-        dtype,
-        weight_attr=None,
-        scale_attr=None,
-        bias_attr=None,
-        input_is_parallel=False,
-        mp_group=None,
-        r: int = 0,
-        lora_alpha: int = 1,
-        lora_dropout: float = 0.0,
-    ):
-        RowParallelQuantizationLinear.__init__(
-            self,
-            in_features,
-            out_features,
-            quant_algo,
-            dtype,
-            weight_attr,
-            scale_attr,
-            bias_attr,
-            input_is_parallel,
-            mp_group,
-        )
-        if not isinstance(r, int) or r <= 0:
-            raise ValueError("Lora rank r should be a positive integer")
-        if self.quant_algo == "llm.int8":
-            raise NotImplementedError("llm.int8 not yet support lora strategy.")
-        if self.quant_algo in ["fp4", "nf4"]:
-            raise NotImplementedError(f"{self.quant_algo} not yet support tensor parallelism.")
-        self.r = r
-        self.lora_alpha = lora_alpha
-        # Optional dropout
-        if lora_dropout > 0.0:
-            self.lora_dropout = nn.Dropout(p=lora_dropout)
-        else:
-            self.lora_dropout = lambda x: x
+    def __init__(self, layer, lora_config):
+        # Parallel parameters
+        self.model_parallel_group = layer.model_parallel_group
+        self.world_size = layer.world_size
+        self.input_is_parallel = layer.input_is_parallel
+        if not self.input_is_parallel and self.sequence_parallel:
+            raise ValueError("Sequence parallel only support input_is_parallel.")
+        self.sequence_parallel = layer.sequence_parallel
+        self.mp_skip_c_identity = layer.mp_skip_c_identity
 
-        # Actual trainable parameters
-        with rng_ctx(self.is_mp, paddle.in_dynamic_mode()):
+        # LoRA parameters
+        with rng_ctx(True, paddle.in_dynamic_mode()):
             self.lora_A = self.create_parameter(
-                shape=[self.input_size_per_partition, r],
+                shape=[layer.input_size_per_partition, self.lora_config.r],
                 dtype=self._dtype,
                 is_bias=False,
-                attr=paddle.ParamAttr(
-                    initializer=nn.initializer.KaimingUniform(negative_slope=math.sqrt(5), nonlinearity="leaky_relu")
+                default_initializer=nn.initializer.KaimingUniform(
+                    negative_slope=math.sqrt(5), nonlinearity="leaky_relu"
                 ),
             )
+        self.lora_A.is_distributed = True
+        self.lora_A.split_axis = 0
+
         self.lora_B = self.create_parameter(
-            shape=[r, self.out_features],
+            shape=[self.lora_config.r, layer.out_features],
             dtype=self._dtype,
             is_bias=False,
             default_initializer=nn.initializer.Constant(value=0.0),
         )
-        self.lora_A.is_distributed = True
-        self.lora_A.split_axis = 0
+        # Sync lora_B parameters before training
         self.lora_B.is_distributed = False
-        self.scaling = self.lora_alpha / self.r
-        self.disable_lora = False
+        if self.sequence_parallel:
+            mark_as_sequence_parallel_parameter(self.lora_B)
 
-    def forward(self, x: paddle.Tensor):
-        if not self.input_is_parallel:
-            input_mp = mp_ops._c_split(x, group=self.model_parallel_group)
+    def forward(self, x):
+        if self.input_is_parallel:
+            input_parallel = x
         else:
-            input_mp = x
+            input_parallel = mp_ops._c_split(x, group=self.model_parallel_group)
 
-        output = super().forward(x)
-
-        # x @ W : [bz, in_f / ws] ===> [bz, out_f]
-        with paddle.amp.auto_cast(enable=False):
-            result_mp = weight_only_linear(input_mp, self.quant_weight, None, self.quant_scale, self.quant_dtype)
-
-        output = mp_ops._mp_allreduce(
-            result_mp,
-            group=self.model_parallel_group,
-            use_calc_stream=True,
-            use_model_parallel=True,
-        )
-        if not self.disable_lora:
-            # x @ A: [bz, in_f/ ws] ===> [bz, r]
-            input_mp = self.lora_dropout(input_mp) @ self.lora_A
-            # all reduce to keep Lora B's gradient on different gpu consistent
-            input_dup = mp_ops._mp_allreduce(
-                input_mp,
+        # base_model forward
+        output_parallel = super().forward(input_parallel)
+        if self.sequence_parallel:
+            output = ReduceScatterOp.apply(output_parallel)
+        else:
+            output = mp_ops._mp_allreduce(
+                output_parallel,
                 group=self.model_parallel_group,
                 use_calc_stream=True,
                 use_model_parallel=True,
+                skip_c_identity_dynamic=self.mp_skip_c_identity,
             )
-            #  @ B: [bz, r] ===> [bz, out_f]
-            delta_mp = (input_dup @ self.lora_B) * self.scaling
-            output += delta_mp
         output = output + self.bias if self.bias is not None else output
+
+        # LoRA forward
+        if not self.disable_lora:
+            input_a_parallel = self.lora_dropout(input_parallel) @ self.lora_A
+            if self.sequence_parallel:
+                input_a_parallel = ReduceScatterOp.apply(input_a_parallel)
+            else:
+                input_a_parallel = mp_ops._mp_allreduce(
+                    input_a_parallel,
+                    group=self.model_parallel_group,
+                    use_calc_stream=True,
+                    use_model_parallel=True,
+                    skip_c_identity_dynamic=self.mp_skip_c_identity,
+                )
+            delta = (input_a_parallel @ self.lora_B) * self.scaling
+            output += delta
         return output
-
-    def merge(self):
-        logger.warning("QuantizationLoRALinear does not support merge()")
-
-    def unmerge(self):
-        logger.warning("QuantizationLoRALinear does not support unmerge()")

@@ -23,6 +23,10 @@ from paddle.distributed.fleet.utils.sequence_parallel_utils import (
 
 from .quantization_utils import quant_weight_linear
 
+try:
+    from .qlora import qlora_weight_linear
+except:
+    qlora_weight_linear = None
 QuantMapping = {
     # (quant_dtype, quant_weight_bit)
     "weight_only_int8": ("int8", 8),

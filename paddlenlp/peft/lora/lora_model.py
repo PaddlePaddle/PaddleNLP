@@ -20,7 +20,7 @@ import re
 import tempfile
 from collections import OrderedDict
 from functools import partial
-from typing import Dict, List, Union
+from typing import Dict, Union
 
 import aistudio_sdk
 import numpy as np
@@ -706,7 +706,10 @@ class LoRAModel(nn.Layer):
 
         if lora_config.target_modules is None:
             return model
-        for target_module in target_modules:
+        if isinstance(lora_config.target_modules, str):
+            lora_config.target_modules = [lora_config.target_modules]
+
+        for target_module in lora_config.target_modules:
             for i in model.named_sublayers():
                 module_name = i[0]
                 if re.fullmatch(target_module, module_name):
