@@ -918,7 +918,6 @@ class FusedMultiTransformerBase(Layer):
             self._add_parameter(ffn1_weight)
             self._add_parameter(ffn2_weight)
 
-
     def get_attr(self, attrs, idx):
         if isinstance(attrs, (list, tuple)):
             assert (
@@ -1380,9 +1379,7 @@ class FusedMultiTransformerBase(Layer):
             seq_lens_this_time = kwargs.get("seq_lens_this_time", None)
             position_ids_shape = paddle.sum(seq_lens_this_time)
             self.position_ids = paddle.empty(shape=position_ids_shape, dtype=seq_lens_encoder.dtype)
-            self.mask_encoder_batch = paddle.empty(
-                shape=position_ids_shape, dtype=seq_lens_encoder.dtype
-            ).unsqueeze(1)
+            self.mask_encoder_batch = paddle.empty(shape=position_ids_shape, dtype=seq_lens_encoder.dtype).unsqueeze(1)
 
             from paddlenlp_ops import get_position_ids_and_mask_encoder_batch
 
@@ -3899,7 +3896,7 @@ class FusedMultiTransformerXPU(Layer):
             return "int8"
         assert False
         return "int8"
-        
+
     def get_weight_create_dype(self):
         return self._dtype
 
@@ -4083,7 +4080,7 @@ class FusedMultiTransformerXPU(Layer):
                         kwargs.get("encoder_batch_map_cpu", None),
                         kwargs.get("start_token_raw_cpu", None),
                         kwargs.get("enc_batch", None),
-                        kwargs.get("dec_batch", None),                        
+                        kwargs.get("dec_batch", None),
                         kwargs.get("padding_offsets", None),
                         kwargs.get("cum_offsets", None),
                         kwargs.get("block_tables", None),
@@ -4418,8 +4415,8 @@ class FusedMultiTransformerXPU(Layer):
             seq_lens_decoder = kwargs.get("seq_lens_decoder", None)
             seq_lens_this_time = kwargs.get("seq_lens_this_time", None)
             from paddlenlp_ops import get_position_ids_v2
-            self.position_ids = get_position_ids_v2(seq_lens_encoder, seq_lens_decoder, seq_lens_this_time)
 
+            self.position_ids = get_position_ids_v2(seq_lens_encoder, seq_lens_decoder, seq_lens_this_time)
 
     def forward(
         self,
@@ -4474,7 +4471,8 @@ class FusedMultiTransformerXPU(Layer):
         """
         self.pre_process(**kwargs)
         kwargs["cum_offsets"] = cum_offsets
-        from paddlenlp_ops import get_position_ids_v2, get_infer_param
+        from paddlenlp_ops import get_infer_param
+
         infer_param_list = get_infer_param(kwargs.get("seq_lens_encoder", None), kwargs.get("seq_lens_decoder", None))
         kwargs["encoder_batch_map"] = infer_param_list[0]
         kwargs["decoder_batch_map"] = infer_param_list[1]
@@ -4495,10 +4493,14 @@ class FusedMultiTransformerXPU(Layer):
         kwargs["dec_batch"] = infer_param_list[15]
         kwargs["total_enc_len"] = infer_param_list[16]
 
-        kwargs["start_token_raw"] = paddle.full(shape=[kwargs.get("seq_lens_encoder", None).shape[0]], fill_value=0, dtype="int32")  #  [0, 0, 0 ,0 ……] enc_batch
-        kwargs["kv_seq_lod_raw"] = paddle.arange(start=0, end=kwargs.get("seq_lens_encoder", None).shape[0]+1, step=1, dtype="int32")   #  [0, 1, 2 ,3 ……] dec_batch + 1
-        kwargs["start_token_raw_cpu"] = kwargs["start_token_raw"].cpu()  #  [0, 0, 0 ,0 ……] enc_batch
-        kwargs["kv_seq_lod_raw_cpu"] = kwargs["kv_seq_lod_raw"].cpu()   #  [0, 1, 2 ,3 ……] dec_batch + 1
+        kwargs["start_token_raw"] = paddle.full(
+            shape=[kwargs.get("seq_lens_encoder", None).shape[0]], fill_value=0, dtype="int32"
+        )
+        kwargs["kv_seq_lod_raw"] = paddle.arange(
+            start=0, end=kwargs.get("seq_lens_encoder", None).shape[0] + 1, step=1, dtype="int32"
+        )
+        kwargs["start_token_raw_cpu"] = kwargs["start_token_raw"].cpu()
+        kwargs["kv_seq_lod_raw_cpu"] = kwargs["kv_seq_lod_raw"].cpu()
 
         if caches is not None:
             assert len(caches) == len(self.linear_weights) or len(caches) == 2 * len(self.linear_weights)
