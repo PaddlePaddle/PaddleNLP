@@ -1316,8 +1316,9 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
         kwargs["max_input_length"] = self.max_seq_len
         kwargs["block_size"] = self.block_size
 
+        # NOTE: (changwenbin) , When using multimodal prediction, the input is required to be inputs_embeds,
+        # input_ids -> inputs_embeds is processed before the language model.
         if inputs_embeds is None:
-        # if inputs_embeds.shape[1] == 1:
             inputs_embeds = self.embed_tokens(ids_remove_padding)
         else:
             if len(inputs_embeds.shape) == 3:
