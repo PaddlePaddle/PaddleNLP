@@ -89,6 +89,7 @@ def custom_import(name, *args, **kwargs):
             module.set_preids_token_penalty_multi_scores = module.f_set_preids_token_penalty_multi_scores
             module.rebuild_padding_v2 = module.f_rebuild_padding_v2
             module.append_attention = module.f_append_attention
+            module.save_output_dygraph = module.f_save_output_dygraph
             _paddlenlp_ops_updated = True
 
     _imported_modules[name] = module

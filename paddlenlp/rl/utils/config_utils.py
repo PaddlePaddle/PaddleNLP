@@ -279,6 +279,10 @@ class TrainingArguments(TrainingArguments):
         default=False,
         metadata={"help": "Rollout use dynamic insert for model inference."},
     )
+    rollout_continue_batching_batch_size: int = field(
+        default=1,
+        metadata={"help": "Batch size to rollout using continue batching."},
+    )
 
     def __post_init__(self):
         """
