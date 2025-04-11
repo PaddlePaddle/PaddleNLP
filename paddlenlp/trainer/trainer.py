@@ -2136,6 +2136,7 @@ class Trainer:
                 num_cycles=self.args.num_cycles,
                 lr_end=self.args.lr_end,
                 power=self.args.power,
+                min_lr=self.args.min_lr,
             )
 
         return self.lr_scheduler
