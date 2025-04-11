@@ -66,7 +66,7 @@ def compare(x, x_q, x_qdq):
     print(f"recovered rms: {recovered_rms}")
     rmse = paddle.sqrt(paddle.sum(diff_squared) / x.numel())
     print(f"quantize_rmse: {rmse}")
-    show_dynamic_range_stats(x_qdq, QuantGranularity.PER_1x128)
+    #show_dynamic_range_stats(x_qdq, QuantGranularity.PER_1x128)
     return ftz_rate, rmse
 
 """ Eval of various quantization schemes """
