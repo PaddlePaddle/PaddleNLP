@@ -1295,7 +1295,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         # insert = nvtx.start_range(message="insert", color="blue")
         query_id = task_id
         length = len(self.input_ids[query_id])
-        # print(f"Insert task {task_id} while query id is {query_id} inserting pos {pos}")
+        print(f"Insert task {task_id} while query id is {query_id} inserting pos {pos}")
         self.model_inputs["input_ids"][pos, 0] = self.model_inputs["all_token_ids"][query_id, 0]
         self.model_inputs["seq_lens_this_time"][pos] = 1
         self.model_inputs["seq_lens_decoder"][pos] = length
@@ -1439,8 +1439,6 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
 
         s_time = time.time()
         with self.update_predictor_params(**kwargs):
-            step = 0
-            # s_prefill = time.time()
             for i, inst in enumerate(self.input_ids):
                 length = len(inst)
                 self.model_inputs["input_ids"][0, :length] = np.array(inst)
@@ -1463,11 +1461,6 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                 self.model_inputs["block_tables"][0] = -1
                 self.model_inputs["result_id"][0] = -1
 
-                # paddle.device.synchronize()
-                # logger.info(f"Prefill {step} elapse(s): {time.time() - s_prefill}")
-                step += 1
-                # s_prefill = time.time()
-
             unfinished_ids = list(range(total_request_num - 1, -1, -1))
             for cur_bs in range(max_batch_size):
                 if len(unfinished_ids) == 0:
@@ -1484,10 +1477,6 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                                 task_id = unfinished_ids.pop()
                                 self.insert(i, task_id)
                     next_tokens = self._infer(self.model_inputs)
-                    # for bs in range(self.batch_size):
-                    #     task_id = self.model_inputs["result_id"][bs, 0]
-                    #     step_idx = self.model_inputs["step_idx"][bs, 0]
-                    #     self.model_inputs["all_token_ids"][task_id, step_idx - 1] = next_tokens[bs, 0]
         logger.info(f"running spend {time.time() - s_time}")
 
         if self.tensor_parallel_rank == 0:
@@ -1920,12 +1909,8 @@ def predict():
                     target_texts.append("")
 
     else:
-        # source_texts = [
-        #     "2014年3月，大范围雾霾天气长时间影响我国东部地区，严重危害人体健康。造成雾霾天气的人为原因有____\r\n①工业生产中使用矿物作为燃料，大量排放污染物     ②汽车尾气的大量排放     \r\n③风力小，空气流动不畅     ④冬季取暖排放粉尘\nA. ①②③\nB. ②③④\nC. ①③④\nD. ①②④"
-        # ] * predictor_args.batch_size
-        # target_texts = [""] * predictor_args.batch_size
         source_texts = [
-            "2014年3月，大范围雾霾天气长时间影响我国东部地区，严重危害人体健康。造成雾霾天气的人为原因有____\r\n①工业生产中使用矿物作为燃料，大量排放污染物     ②汽车尾气的大量排放     \r\n③风力小，空气流动不畅     ④冬季取暖排放粉尘\nA. ①②③\nB. ②③④\nC. ①③④\nD. ①②④"
+            'Given a word, you need to judge whether the usage of capitals in it is right or not.\n\n\n\nWe define the usage of capitals in a word to be right when one of the following cases holds:\n\nAll letters in this word are capitals, like "USA".\nAll letters in this word are not capitals, like "leetcode".\nOnly the first letter in this word is capital if it has more than one letter, like "Google".\n\nOtherwise, we define that this word doesn\'t use capitals in a right way.\n\n\n\nExample 1:\n\nInput: "USA"\nOutput: True\n\n\n\nExample 2:\n\nInput: "FlaG"\nOutput: False\n\n\n\nNote:\nThe input will be a non-empty word consisting of uppercase and lowercase latin letters.\n\n\nEnsure that when the python program runs, it reads the self.model_inputs, runs the algorithm and writes output to STDOUT.'
         ] * predictor_args.total_request_num
         target_texts = [""] * predictor_args.total_request_num
 
