@@ -1316,7 +1316,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
         kwargs["max_input_length"] = self.max_seq_len
         kwargs["block_size"] = self.block_size
 
-        if inputs_embeds is None:
+        if inputs_embeds.shape[1] == 1:
             inputs_embeds = self.embed_tokens(ids_remove_padding)
         else:
             assert len(inputs_embeds.shape) == 3
@@ -1618,8 +1618,6 @@ class DeepseekV2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, De
         }
         return model_inputs
 
-
-    @paddle.incubate.jit.inference()
     def forward(
         self,
         input_ids,
