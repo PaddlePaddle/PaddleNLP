@@ -78,6 +78,7 @@ def eval_quant(x: paddle.Tensor):
     return compare(x, x_q, x_qdq)
 
 def verify_act_dequant():
+    paddle.seed(42)
     for width in [7168]:
         for height in [4096, 16384, 32768]:
             print("#"*60 + f" Testing width:{width}, height:{height} " + "#"*60)
