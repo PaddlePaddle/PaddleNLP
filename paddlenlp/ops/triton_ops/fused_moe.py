@@ -268,6 +268,145 @@ def per_token_group_quant_fp8_api(
 @paddle_use_triton(
     key=["1"],
 )
+def _per_token_group_quant_fp8_kernel_masked(
+    y_ptr,
+    recv_expert_count,
+    y_q_ptr,
+    y_s_ptr,
+    flatten_num_blocks,
+    num_rows,
+    eps,
+    fp8_min,
+    fp8_max,
+    num_experts: tl.constexpr,
+    BLOCK_M: tl.constexpr,
+    BLOCK_N: tl.constexpr,
+):
+    start_block = tl.program_id(0) * BLOCK_M
+
+    expert_id = tl.program_id(1)
+
+    y_ptr = y_ptr + expert_id * flatten_num_blocks * BLOCK_N
+    y_q_ptr = y_q_ptr + expert_id * flatten_num_blocks * BLOCK_N
+    y_s_ptr = y_s_ptr + expert_id * flatten_num_blocks
+
+    blocks = tl.arange(0, BLOCK_M) + start_block
+
+    col_blocks = flatten_num_blocks // num_rows
+
+    if (start_block // col_blocks) >= tl.load(recv_expert_count + expert_id):
+        return
+
+    groups = tl.arange(0, BLOCK_N)
+    y_ptrs = y_ptr + blocks[:, None] * BLOCK_N + groups[None, :]
+    mask = blocks[:, None] < flatten_num_blocks
+
+    y = tl.load(y_ptrs, mask=mask, other=0.0).to(tl.float32)
+    # Quant
+    _absmax = tl.maximum(tl.max(tl.abs(y), axis=1), eps)
+    y_s = _absmax / fp8_max
+    y_q = tl.clamp(y / y_s[:, None], fp8_min, fp8_max).to(y_q_ptr.dtype.element_ty)
+
+    y_q_ptrs = y_q_ptr + blocks[:, None] * BLOCK_N + groups[None, :]
+    tl.store(y_q_ptrs, y_q, mask=mask)
+    if True:
+        new_rows = blocks // col_blocks
+        new_cols = blocks % col_blocks
+        y_s_ptrs = y_s_ptr + new_rows + new_cols * num_rows
+        tl.store(y_s_ptrs, y_s)
+
+
+def per_token_group_quant_fp8_api_masked(
+    x,
+    recv_expert_count,
+    group_size=-1,
+    eps=1e-10,
+):
+    fp8_max, fp8_min = 448.0, -448.0
+    assert len(x.shape) == 3
+    assert x.shape[-1] % group_size == 0
+
+    assert group_size == 128
+    BLOCK_N = triton.next_power_of_2(group_size)
+    # heuristics for number of warps
+    num_warps = min(max(BLOCK_N // 256, 1), 8)
+    num_stages = 1
+
+    config = {
+        "num_warps": num_warps,
+        "num_stages": num_stages,
+        "num_experts": recv_expert_count.shape[0],
+    }
+
+    op_name = "per_token_group_quant_fp8_api_masked"
+    op_name += f"{get_dtype_str(x.dtype)}"
+    op_name += f"_{group_size}"
+    op_name += f"_{recv_expert_count.shape[0]}"
+
+    prepare_attr_for_triton_kernel = """
+    int flatten_num_blocks = x.shape()[1] * x.shape()[2] / group_size;
+    int num_rows = x.shape()[1];
+    float fp8_max = 448.0;
+    float fp8_min = -448.0;
+    """
+
+    if op_name not in OpProtoHolder.instance().op_proto_map.keys():
+        x_q = paddle.empty(x.shape, dtype=paddle.float8_e4m3fn)
+        x_s = paddle.empty(
+            [x.shape[0], x.shape[-1] // group_size],
+            dtype=paddle.float32,
+        )
+
+        prepare_ptr_for_triton_kernel = """
+        auto x_q = paddle::empty(x.shape(), paddle::DataType::FLOAT8_E4M3FN, x.place());
+        std::vector<int64_t> scale_shape = {x.shape()[0], x.shape()[2] / group_size, x.shape()[1]};
+        //std::vector<int64_t> scale_shape = {x.shape()[0], x.shape()[2] / group_size, x.shape()[1]};
+        auto x_s = paddle::empty(
+            scale_shape,
+            paddle::DataType::FLOAT32,
+            x.place());
+        x_s = paddle::experimental::transpose(x_s, std::vector<int>{0, 2, 1});
+
+        CUdeviceptr input_ptrs[4] = {
+            get_tensor_ptr(x),
+            get_tensor_ptr(recv_expert_count),
+            get_tensor_ptr(x_q),
+            get_tensor_ptr(x_s),
+        };
+        """
+        return_tensor_names = "x_q, x_s"
+        template_used = rendering_common_template(
+            per_token_group_quant_fp8_api_masked,
+            prepare_attr_for_triton_kernel,
+            prepare_ptr_for_triton_kernel,
+            return_tensor_names,
+        )
+        grid = ("(flatten_num_blocks + BLOCK_M - 1)/BLOCK_M", "num_experts")
+        BLOCK_M = 8
+
+        _per_token_group_quant_fp8_kernel_masked[(op_name, template_used, grid, [config])](
+            x,
+            recv_expert_count,
+            x_q,
+            x_s,
+            -1,
+            -1,
+            eps,
+            fp8_min=fp8_min,
+            fp8_max=fp8_max,
+            BLOCK_M=BLOCK_M,
+            BLOCK_N=BLOCK_N,
+        )
+    if in_dynamic_or_pir_mode():
+        outs = _C_ops._run_custom_op(op_name, x, recv_expert_count, group_size, eps)
+        return outs[0], outs[1]
+    else:
+        pass
+
+
+@paddle_use_triton(
+    key=["1"],
+)
 def fused_moe_kernel_paddle(
     # Pointers to matrices
     a_ptr,

@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,8 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import paddle
+try:
+    from .fused_moe import (
+        per_token_group_quant_fp8_api,
+        per_token_group_quant_fp8_api_masked,
+    )
 
-from . import optimizer, triton_ops
-from .distributed import *
-from .einsum import *
+    __all__ = +["per_token_group_quant_fp8_api_masked", "per_token_group_quant_fp8_api"]
+except:
+    pass
