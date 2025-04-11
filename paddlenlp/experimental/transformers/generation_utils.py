@@ -778,6 +778,12 @@ class GenerationBlockInferenceModel(GenerationMixin):
             temperature,
             model_kwargs,
         )
+        if self.config.dynamic_insert:
+            from paddlenlp_ops import save_output_dygraph
+
+            save_output_dygraph(
+                model_kwargs["all_token_ids"], next_tokens, model_kwargs["result_id"], model_kwargs["step_idx"]
+            )
 
         return next_tokens
 

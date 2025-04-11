@@ -118,6 +118,7 @@ sources = [
     "./gpu/speculate_decoding_kernels/ngram_match.cc",
     "./gpu/speculate_decoding_kernels/speculate_save_output.cc",
     "./gpu/speculate_decoding_kernels/speculate_get_output.cc",
+    "./gpu/save_output_dygraph.cu",
     "./gpu/ops_pybind.cu",
 ]
 sources += find_end_files("./gpu/speculate_decoding_kernels", ".cu")
