@@ -19,8 +19,8 @@ from typing import Optional
 
 import paddle
 
-from paddlenlp.trainer import IntervalStrategy
-from paddlenlp.trainer.trainer import ShardingOption, TrainingArguments, logger
+from ...trainer.trainer import ShardingOption, TrainingArguments, logger
+from ...trainer.trainer_utils import IntervalStrategy
 
 
 @dataclass

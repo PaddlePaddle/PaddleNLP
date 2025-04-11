@@ -16,7 +16,8 @@ from typing import Tuple
 
 import numpy as np
 import paddle
-from utils.comm_utils import masked_whiten
+
+from ..utils.comm_utils import masked_whiten
 
 
 @paddle.no_grad()
