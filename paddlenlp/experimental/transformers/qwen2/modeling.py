@@ -69,6 +69,7 @@ __all__ = [
     "Qwen2ForCausalLMInferenceModel",
     "Qwen2ForCausalLMBlockInferenceModel",
     "Qwen2VLForConditionalGenerationBlockInferenceModel",
+    "Qwen2_5_VLForConditionalGenerationBlockInferenceModel",
 ]
 
 
