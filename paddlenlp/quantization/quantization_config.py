@@ -64,7 +64,8 @@ class QuantizationConfig:
         if weight_quantize_algo is not None:
             if isinstance(self.weight_quantize_algo, dict):
                 if any(
-                    algo not in ["weight_only_int8", "weight_only_int4", "llm.int8", "a8w8", "nf4", "fp4"]
+                    algo
+                    not in ["weight_only_int8", "weight_only_int4", "llm.int8", "a8w8", "nf4", "fp4", "a8w8linear"]
                     for algo in weight_quantize_algo
                 ):
                     raise ValueError(
@@ -77,6 +78,7 @@ class QuantizationConfig:
                 "a8w8",
                 "nf4",
                 "fp4",
+                "a8w8linear",
             ]:
                 raise ValueError(
                     f"weight_quantize_algo:{weight_quantize_algo} not in supported list ['weight_only_int8', 'weight_only_int4', 'llm.int8', 'a8w8', 'nf4', 'fp4']"
@@ -116,7 +118,15 @@ class QuantizationConfig:
     def is_weight_quantize(self):
         if isinstance(self.weight_quantize_algo, dict):
             return True
-        elif self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8", "nf4", "fp4", "a8w8"]:
+        elif self.weight_quantize_algo in [
+            "weight_only_int8",
+            "weight_only_int4",
+            "llm.int8",
+            "nf4",
+            "fp4",
+            "a8w8",
+            "a8w8linear",
+        ]:
             return True
         else:
             return False

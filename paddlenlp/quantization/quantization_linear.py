@@ -34,7 +34,42 @@ QuantMapping = {
     "llm.int8": ("int8", 8),
     "fp4": ("fp4", 4),
     "nf4": ("nf4", 4),
+    "a8w8linear": ("int8", 8),
 }
+
+
+def quantize_tensorwise(x, qmax=127, qmin=-128):
+    scale = paddle.max(paddle.abs(x)) / qmax
+    x_int8 = paddle.clip((x / scale).round(), qmin, qmax).astype("int8")
+    return x_int8, scale
+
+
+def dequantize_tensorwise(x_int8, scale):
+    x = x_int8.astype(scale.dtype) * scale
+    return x
+
+
+def quantize_channelwise(w, qmax=127, qmin=-128):
+    scale = paddle.max(paddle.abs(w), axis=0, keepdim=True) / qmax  # [1, out_dim]
+    w_int8 = paddle.clip((w / scale).round(), qmin, qmax).astype("int8")
+    return w_int8.T, scale.squeeze(0)
+
+
+def dequantize_channelwise(w_int8, scale):
+    w = w_int8.astype(scale.dtype) * scale
+    return w
+
+
+def a8w8_linear(x, w_int8, w_scale=None, bias=None, dtype=None):
+    if w_int8.dtype != paddle.int8:
+        w_int8, w_scale = quantize_channelwise(w_int8)
+    if dtype is None:
+        dtype = x.dtype
+    x_int8, x_scale = quantize_tensorwise(x)
+    out = paddle.matmul(x_int8, w_int8.T).astype(dtype) * x_scale * w_scale.unsqueeze(0)
+    if bias is not None:
+        out += bias
+    return out
 
 
 def quant_weight_linear(
@@ -71,6 +106,8 @@ def quant_weight_linear(
             double_quant_block_size=quantization_config.qlora_weight_double_quant_block_size,
             bias=bias,
         )
+    elif weight_quantize_algo in ["a8w8linear"]:
+        output = a8w8_linear(x, quant_weight, w_scale=quant_scale, bias=bias, dtype=dtype)
     return output
 
 
@@ -96,7 +133,7 @@ class QuantizationLinear(nn.Layer):
 
         # PaddlePaddle dosen't support 4bit data type, one 8bit data represents two 4bit data.
         # paddle.nn.quant.weight_quantize will transpose in_features and out_features.
-        if self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8"]:
+        if self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8", "a8w8linear"]:
             self.quant_weight = self.create_parameter(
                 shape=[out_features // 2, in_features] if self.quant_weight_bit == 4 else [out_features, in_features],
                 dtype="int8",
@@ -228,7 +265,7 @@ class ColumnParallelQuantizationLinear(nn.Layer):
             raise ValueError("Sequence parallel does not support gather_output")
 
         # PaddlePaddle dosen't support Int4 data type, one Int8 data represents two Int4 data.
-        if self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8"]:
+        if self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8", "a8w8linear"]:
             self.quant_weight = self.create_parameter(
                 shape=[self.output_size_per_partition // 2, in_features]
                 if self.quant_dtype == "int4"
@@ -270,7 +307,6 @@ class ColumnParallelQuantizationLinear(nn.Layer):
     def forward(self, x):
         if self.is_mp:
             if self.sequence_parallel:
-                print("self.sequence_parallel", self.sequence_parallel)
                 input_parallel = AllGatherOp.apply(x)
             else:
                 input_parallel = mp_ops._c_identity(
@@ -348,7 +384,7 @@ class RowParallelQuantizationLinear(nn.Layer):
 
         # PaddlePaddle dosen't support Int4 data type, one Int8 data represents two Int4 data.
         # paddle.nn.quant.weight_quantize will transpose in_features and out_features.
-        if self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8"]:
+        if self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8", "a8w8linear"]:
             self.quant_weight = self.create_parameter(
                 shape=[out_features // 2, self.input_size_per_partition]
                 if self.quant_dtype == "int4"
