@@ -49,16 +49,18 @@ class MuteDefaultFlowCallback(TrainerCallback):
         **kwargs,
     ):
         """
-        在一个步骤结束时调用，可以用来更新控制流程。
+        Called at the end of a step, can be used to update the control flow.
 
         Args:
-            args (TrainingArguments): 训练参数对象。
-            state (TrainerState): 训练器状态对象。
-            control (TrainerControl): 训练控制对象，包含了训练过程中的控制信息，如是否保存模型、是否进行评估和是否记录日志等。
-            kwargs (dict, optional): 其他关键字参数，默认为None，没有使用。
+            args (TrainingArguments): The training arguments object.
+            state (TrainerState): The trainer state object.
+            control (TrainerControl): The trainer control object, containing control information during training,
+                such as whether to save the model, whether to evaluate, and whether to log.
+            kwargs (dict, optional): Other keyword arguments, default is None, not used.
 
         Returns:
-            TrainerControl: 返回一个TrainerControl对象，包含了训练过程中的控制信息，如是否保存模型、是否进行评估和是否记录日志等。
+            TrainerControl: Returns a TrainerControl object containing control information during training,
+                such as whether to save the model, whether to evaluate, and whether to log.
 
         Raises:
             None
@@ -72,22 +74,22 @@ class MuteDefaultFlowCallback(TrainerCallback):
 @contextmanager
 def guard_set_args(args, arg_name_values):
     """
-    在一个上下文中，设置给定的参数名称和值，并在上下文结束后将其还原。
+    Temporarily set given argument names and values within a context, restoring them after the context ends.
 
     Args:
-        args (object): 需要修改参数的对象，通常是命令行解析器的实例。
-        arg_name_values (dict[str, Any]): 包含参数名称和新值的字典，该函数会在上下文中修改这些参数。
-            key (str): 参数名称。
-            value (Any): 参数的新值。
+        args (object): The object whose attributes need to be modified, typically an instance of a command-line parser.
+        arg_name_values (dict[str, Any]): A dictionary containing argument names and their new values. These arguments will be modified within the context.
+            key (str): The name of the argument.
+            value (Any): The new value for the argument.
 
     Yields:
-        None: 无返回值，只是用于上下文管理。
+        None: No return value, used for context management.
 
     Returns:
-        None: 无返回值，只是用于上下文管理。
+        None: No return value, used for context management.
 
     Raises:
-        None: 不会引发任何异常。
+        None: Does not raise any exceptions.
     """
     for k, v in arg_name_values.items():
         old_value = getattr(args, k, None)
@@ -124,44 +126,45 @@ class PipeEvalModel(GenerationMixin):
     @property
     def pp_group(self):
         """
-        获取当前模型的属性分组，返回值为str类型。
-        如果模型没有设置属性分组，则返回None。
+        Get the property group of the current model. The return value is of type str.
+        If no property group is set for the model, return None.
 
         Returns:
-            str, optional: 当前模型的属性分组，默认为None。
+            str, optional: The property group of the current model, default is None.
         """
         return self.model.pp_group
 
     def eval(self):
         """
-        将模型置于评估模式，禁用梯度计算和 dropout。
-        返回：None
+        Put the model in evaluation mode, disabling gradient computation and dropout.
+        Returns:
+            None
         """
         self.model.eval()
 
     def train(self):
         """
-        将模型设置为训练模式。
-        在调用任何前向传播函数之前，必须先调用此函数。
+        Set the model to training mode.
+        This function must be called before any forward pass functions are invoked.
 
         Returns:
-            None, 无返回值。
+            None: No return value.
         """
         self.model.train()
 
     def __getattr__(self, name):
         """
-        如果在当前类中没有找到对应的属性，则尝试从模型中获取。
-        如果在模型中也没有找到对应的属性，则会引发AttributeError异常。
+        If the attribute is not found in the current class, try to get it from the model.
+        If the attribute is not found in the model either, an AttributeError exception will be raised.
 
         Args:
-            name (str): 要查询的属性名称。
+            name (str): The name of the attribute to query.
 
         Returns:
-            Any: 返回属性值，如果在当前类和模型中都没有找到该属性，则会引发AttributeError异常。
+            Any: The value of the attribute. If the attribute is not found in the current class or the model, an AttributeError exception will be raised.
 
         Raises:
-            AttributeError: 如果在当前类和模型中都没有找到对应的属性。
+            AttributeError: If the attribute is not found in the current class or the model.
         """
         try:
             return super().__getattr__(name)
@@ -170,14 +173,14 @@ class PipeEvalModel(GenerationMixin):
 
     def _broadcast_outputs(self, outputs):
         """
-        将输出广播到所有进程中，如果不是最后一个阶段则返回元组，否则返回ModelOutput或者paddle.Tensor。
-        如果不是最后一个阶段，会对输入的每个张量创建一个与其形状、类型相同但内容为空的新张量，并广播这些张量。
+        Broadcast the outputs to all processes. If it is not the last stage, return a tuple; otherwise, return ModelOutput or paddle.Tensor.
+        If it is not the last stage, create a new empty tensor with the same shape and type as the input tensor for each input tensor and broadcast these tensors.
 
         Args:
-            outputs (Union[paddle.Tensor, Tuple[paddle.Tensor], ModelOutput]): 模型的输出，可以是单个张量或张量元组，也可以是ModelOutput。
+            outputs (Union[paddle.Tensor, Tuple[paddle.Tensor], ModelOutput]): The output of the model, which can be a single tensor, a tuple of tensors, or ModelOutput.
 
         Returns:
-            Union[paddle.Tensor, Tuple[paddle.Tensor], ModelOutput]: 如果不是最后一个阶段，返回元组；否则返回ModelOutput或者paddle.Tensor。
+            Union[paddle.Tensor, Tuple[paddle.Tensor], ModelOutput]: If it is not the last stage, return a tuple; otherwise, return ModelOutput or paddle.Tensor.
         """
         # outputs is PipelineParallel.eval_batch which is a list of batches.
         out = []
@@ -204,8 +207,7 @@ class PipeEvalModel(GenerationMixin):
                     for meta in head_out_meta
                 )
             else:
-                # Currently use tuple instead of ModelOutput and require the
-                # caller use the return result as tuple.
+                # Currently use tuple instead of ModelOutput and require the caller to use the return result as a tuple.
                 tensors = (
                     (tensors,)
                     if isinstance(tensors, paddle.Tensor)
@@ -276,20 +278,20 @@ class PipeEvalModel(GenerationMixin):
 
     def generate(self, *args, **kwargs):
         """
-            重写父类的方法，在生成文本时使用缓存。
-        首先将self._is_gen设置为True，然后修改DecoderLayerPipe以使用缓存。
-        接下来，调用super().generate(*args, **kwargs)进行文本生成。
-        最后，清除所有层中的缓存（包括子层），并将self._has_cache设置为False。
+        Override the parent class method to use caching during text generation.
+        First, set self._is_gen to True and modify DecoderLayerPipe to use caching.
+        Next, call super().generate(*args, **kwargs) to perform text generation.
+        Finally, clear the cache in all layers (including sublayers) and set self._has_cache to False.
 
         Args:
-            args (Tuple[Any], optional): 可变参数列表，默认为空元组。
-            kwargs (Dict[str, Any], optional): 关键字参数字典，默认为空字典。
+            args (Tuple[Any], optional): A variable argument list, default is an empty tuple.
+            kwargs (Dict[str, Any], optional): A dictionary of keyword arguments, default is an empty dictionary.
 
         Returns:
-            Tuple[Any]: 返回一个元组，其中包含了生成的文本和相应的概率分布。
+            Tuple[Any]: Returns a tuple containing the generated text and the corresponding probability distribution.
 
         Raises:
-            无。
+            None
         """
         self._is_gen = True
         # patch DecoderLayerPipe to use cache, DecoderLayerPipe is subclass of
@@ -443,25 +445,25 @@ def batch_retokenize(
 
 def process_row(row, remove_value=0, remove_side="both"):
     """
-    从张量中去除前导/尾随的特定值。
+    Remove leading/trailing specific values from a tensor.
 
     Args:
-        row (paddle.Tensor): 待处理的张量，一维。
-        remove_value (int, optional): 要去除的值，默认为0。
-        remove_side (str, optional): 去除的位置，可选"left"（只去除前导）、"right"（只去除尾随）、"both"（去除前导和尾随），默认为"both"。
+        row (paddle.Tensor): The 1D tensor to be processed.
+        remove_value (int, optional): The value to be removed, default is 0.
+        remove_side (str, optional): The side to remove values from, can be "left" (remove leading only), "right" (remove trailing only),
+            or "both" (remove both leading and trailing), default is "both".
 
     Returns:
-        paddle.Tensor: 处理后的张量，一维。
-
+        paddle.Tensor: The processed 1D tensor.
     """
     non_zero_indices = paddle.nonzero(row != remove_value).flatten()
     if non_zero_indices.shape[0] == 0:
-        # 行全为0，警告，不处理
+        # If the row is all zeros, log a warning and return the original row.
         logger.warning("Row is all zeros, no trimming will be performed.")
         return row
     start_index = non_zero_indices[0]
     end_index = non_zero_indices[-1]
-    # 切取中间的非零部分
+    # Slice the middle non-zero part.
     if remove_side == "left":
         trimmed_row = row[start_index:]
     elif remove_side == "right":
@@ -469,7 +471,8 @@ def process_row(row, remove_value=0, remove_side="both"):
     elif remove_side == "both":
         trimmed_row = row[start_index : end_index + 1]
     else:
-        logger.warning("unknown remove_side, using both remove_side.")
+        # If an unknown remove_side is provided, log a warning and use "both".
+        logger.warning("Unknown remove_side, using 'both' remove_side.")
         trimmed_row = row[start_index : end_index + 1]
 
     return trimmed_row

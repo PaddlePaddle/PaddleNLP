@@ -85,12 +85,13 @@ from .trainer_utils import (
 class PPOMetric:
     def set_metric_meta(self):
         """
-        设置指标的元信息，包括指标名称和运算方式。
+        Set the meta-information of metrics, including metric names and operations.
 
         Args:
+            None.
 
         Returns:
-            None: 无返回值，直接修改了类属性。
+            None: Directly modifies class attributes.
         """
         self.metric_names = [
             "train_" + name
@@ -539,22 +540,24 @@ class PPOTrainer(Trainer):
     @property
     def reference_model(self):
         """
-        获取参考模型，如果没有则返回None。
-        该方法只能在初始化后使用，否则会引发异常。
+        Get the reference model, return None if it doesn't exist.
+        This method can only be used after initialization, otherwise an exception will be raised.
 
         Returns:
-            torch.nn.Module, optional - 参考模型，如果没有则返回None。
+            paddle.nn.Layer, optional - The reference model, return None if it doesn't exist.
 
         Raises:
-            Exception - 当调用此方法前未初始化reference_trainer时，将引发异常。
+            Exception - An exception will be raised if the reference_trainer is not initialized before calling this method.
         """
         return self.reference_trainer.get_model(train=False)
 
     @property
     def reward_model(self):
         """
-        获取奖励模型，如果没有则创建一个。
-        返回值：tf.keras.models.Model，奖励模型。
+        Get the reward model, create one if it doesn't exist.
+
+        Returns:
+            paddle.nn.Layer: The reward model.
         """
         if self.args.use_rm_server:
             return self.reward_server
@@ -564,20 +567,20 @@ class PPOTrainer(Trainer):
     @property
     def actor_model(self):
         """
-        获取当前的actor模型，如果在训练中则返回训练后的模型，否则返回eval时使用的模型。
+        Get the current actor model. If in training mode, return the trained model; otherwise, return the model for evaluation.
 
         Returns:
-            torch.nn.Module, torch.jit.ScriptModule: Actor模型，可以是torch.nn.Module或者torch.jit.ScriptModule类型。
+            paddle.nn.Layer: The actor model.
         """
         return self.actor_trainer.get_model(train=self.training)
 
     @property
     def critic_model(self):
         """
-        获取 critic model，仅在使用 value-based 策略时有效。
+        Get the critic model, which is only valid when using value-based strategies.
 
         Returns:
-            tf.keras.Model, optional: critic model，如果没有设置则返回 None。
+            paddle.nn.Layer, optional: The critic model, return None if not set.
         """
         return self.critic_trainer.get_model(train=self.training)
 
@@ -600,14 +603,14 @@ class PPOTrainer(Trainer):
 
     def get_scheduler(self, args):
         """
-        获取学习率调度器，如果没有设置最小学习率则返回None。
-        支持两种类型的学习率调度器："cosine"和"linear"。
+        Get the learning rate scheduler, return None if the minimum learning rate is not set.
+        Supports two types of learning rate schedulers: "cosine" and "linear".
 
         Args:
-            args (argparse.Namespace): 命令行参数，包含了学习率相关的参数。
+            args (argparse.Namespace): Command-line arguments containing parameters related to the learning rate.
 
         Returns:
-            torch.optim.lr_scheduler._LRScheduler or None, optional: 学习率调度器或者None，默认为None。
+            paddle.optimizer.lr.LRScheduler or None, optional: The learning rate scheduler or None, default is None.
         """
         if args.decay_steps is None:
             args.decay_steps = args.max_steps
@@ -644,26 +647,26 @@ class PPOTrainer(Trainer):
         ignore_keys: Optional[List[str]] = None,
     ) -> Tuple[Optional[paddle.Tensor], Optional[paddle.Tensor], Optional[paddle.Tensor]]:
         """
-        预测步骤，用于生成下一个输入序列。
+        Prediction step to generate the next input sequence.
 
         Args:
-            model (nn.Layer): 模型实例，需要是 `paddle.nn.Layer` 的子类。
-            inputs (Dict[str, Union[paddle.Tensor, Any]]): 包含输入数据的字典，其中包含以下键：
-                - "input_ids" (paddle.Tensor, optional): 输入序列的编号 ID，默认为None。
-                - "attention_mask" (paddle.Tensor, optional): 输入序列的注意力掩码，默认为None。
-                - "position_ids" (paddle.Tensor, optional): 输入序列的位置ID，默认为None。
-            prediction_loss_only (bool): 仅返回预测损失，不返回其他任何值。
-            ignore_keys (Optional[List[str]], optional): 忽略的键列表，默认为None。
+            model (nn.Layer): The model instance, which should be a subclass of `paddle.nn.Layer`.
+            inputs (Dict[str, Union[paddle.Tensor, Any]]): A dictionary containing input data, with the following keys:
+                - "input_ids" (paddle.Tensor, optional): IDs of the input sequences, default is None.
+                - "attention_mask" (paddle.Tensor, optional): Attention mask for the input sequences, default is None.
+                - "position_ids" (paddle.Tensor, optional): Position IDs of the input sequences, default is None.
+            prediction_loss_only (bool): Only return the prediction loss and not any other values.
+            ignore_keys (Optional[List[str]], optional): A list of keys to ignore, default is None.
 
         Returns:
             Tuple[Optional[paddle.Tensor], Optional[paddle.Tensor], Optional[paddle.Tensor]]:
-            三元组，包含以下元素：
-                - Optional[paddle.Tensor]: 如果 `prediction_loss_only` 为False，则为预测得分，否则为None。
-                - Optional[paddle.Tensor]: 当前未定义，始终为None。
-                - Optional[paddle.Tensor]: 当前未定义，始终为None。
+            A tuple containing the following elements:
+                - Optional[paddle.Tensor]: Prediction scores if `prediction_loss_only` is False, otherwise None.
+                - Optional[paddle.Tensor]: Currently undefined, always None.
+                - Optional[paddle.Tensor]: Currently undefined, always None.
 
         Raises:
-            ValueError: 如果 `ignore_keys` 不是可选参数或者不是一个列表。
+            ValueError: If `ignore_keys` is not an optional parameter or is not a list.
         """
         inputs = self._prepare_inputs(inputs)
         with reload_and_offload_scope(self, self.actor_model, self.reference_model, self.actor_trainer):
@@ -753,21 +756,21 @@ class PPOTrainer(Trainer):
         max_eval_iters: Optional[int] = -1,
     ) -> EvalLoopOutput:
         """
-        循环访问数据集，并对模型进行评估。
+        Iterate over the dataset and evaluate the model.
 
         Args:
-            dataloader (DataLoader, optional): 用于评估的数据加载器。默认为None。
-            description (str, optional): 描述评估过程的字符串。默认为''.
-            prediction_loss_only (Optional[bool], optional): 是否只计算预测损失。默认为None。
-            ignore_keys (Optional[List[str]], optional): 要忽略的键列表。默认为None。
-            metric_key_prefix (str, optional): 指标键前缀。默认为'eval'.
-            max_eval_iters (Optional[int], optional): 最大评估次数。默认为-1，表示无限制。
+            dataloader (DataLoader): The data loader used for evaluation.
+            description (str): A string describing the evaluation process.
+            prediction_loss_only (Optional[bool]): Whether to only compute the prediction loss. Default is None.
+            ignore_keys (Optional[List[str]]): A list of keys to ignore. Default is None.
+            metric_key_prefix (str): The prefix for metric keys. Default is 'eval'.
+            max_eval_iters (Optional[int]): The maximum number of evaluation iterations. Default is -1, which means no limit.
 
         Returns:
-            EvalLoopOutput: 包含评估结果和指标的类实例。
+            EvalLoopOutput: An instance of the class containing evaluation results and metrics.
 
         Raises:
-            ValueError: 如果`prediction_loss_only`不是布尔值，则引发ValueError异常。
+            ValueError: If `prediction_loss_only` is not a boolean value, a ValueError exception will be raised.
         """
         # to save eval generated sequence
         eval_out_file = os.path.join(
@@ -815,27 +818,27 @@ class PPOTrainer(Trainer):
 
     def get_eval_dataloader(self, eval_dataset: Optional[Dataset] = None) -> DataLoader:
         """
-        获取用于评估模型的数据加载器。如果未提供`eval_dataset`，则使用`self.eval_dataset`。
-            该函数会设置一个名为"data_collator"的参数，并将其传递给`super().get_eval_dataloader()`。
+        Get the DataLoader for evaluating the model. If `eval_dataset` is not provided, `self.eval_dataset` will be used.
+        This function sets a parameter named "data_collator" and passes it to `super().get_eval_dataloader()`.
 
-            Args:
-                eval_dataset (Optional[Dataset], optional): 用于评估的数据集. Defaults to None.
+        Args:
+            eval_dataset (Optional[Dataset], optional): The dataset used for evaluation. Defaults to None.
 
-            Returns:
-                DataLoader: 包含用于评估的数据的DataLoader实例。
+        Returns:
+            DataLoader: An instance of DataLoader containing the data for evaluation.
         """
         with guard_set_args(self, {"data_collator": self.data_collator}):
             return super().get_eval_dataloader(eval_dataset)
 
     def _save_checkpoint(self, model, metrics=None):
         """
-        保存模型和指标到两个不同的 checkpoint，一个是 policy 模型，另一个是 value 模型。
-        这里使用了 `guard_set_args` 来防止在调用 `_save_checkpoint` 时修改了原始参数。
+        Save the model and metrics to two separate checkpoints, one for the policy model and one for the value model.
+        This method uses `guard_set_args` to prevent modifying the original parameters when `_save_checkpoint` is called.
 
         Args:
-            model (nn.Module): 需要保存的模型。
-            metrics (Optional[Dict], optional): 可选的指标字典，默认为 None。
-                key 是指标名称，value 是对应的指标值。
+            model (nn.Module): The model to be saved.
+            metrics (Optional[Dict], optional): An optional dictionary of metrics, default is None.
+                The key is the metric name, and the value is the corresponding metric value.
 
         Returns:
             None.
@@ -900,14 +903,16 @@ class PPOTrainer(Trainer):
         merge_tensor_parallel: Optional[bool] = False,
     ):
         """
-            保存模型。
+        Save the model.
 
         Args:
-            output_dir (Optional[str], optional): 输出目录，默认为None，使用命令行参数--output-dir。 Defaults to None.
-            merge_tensor_parallel (Optional[bool], optional): 是否合并tensor parallel，默认为False。 Defaults to False.
+            output_dir (Optional[str], optional): The output directory to save the model. Defaults to None,
+                which uses the command-line argument '--output-dir'.
+            merge_tensor_parallel (Optional[bool], optional): Whether to merge tensor parallel parameters.
+                Defaults to False.
 
         Raises:
-            ValueError: 如果output_dir不在当前工作目录下，则会引发ValueError异常。
+            ValueError: If `output_dir` is not within the current working directory, a ValueError exception will be raised.
         """
         if output_dir is None:
             output_dir = self.args.output_dir
@@ -923,22 +928,26 @@ class PPOTrainer(Trainer):
     def init_train_model_opt(
         self: Trainer,
         max_steps: int,
-        resume_from_checkpoint: bool = False,
+        resume_from_checkpoint: Union[bool, str] = False,
         clear_master_weight: bool = False,
-    ) -> PretrainedModel:
+    ) -> Tuple[PretrainedModel, PretrainedModel]:
         """
-            初始化训练模型和优化器。
-        如果`resume_from_checkpoint`为字符串，则将其作为路径，并在该路径下恢复模型和优化器状态；否则，将其视为布尔值，表示是否从最后一个保存的检查点中恢复。
-        如果`clear_master_weight`为True，则清除主要权重。
+        Initialize the training model and optimizer.
+
+        If `resume_from_checkpoint` is a string, it will be treated as a path to resume the model and optimizer states
+        from that location; otherwise, it will be treated as a boolean indicating whether to resume from the last saved
+        checkpoint.
+
+        If `clear_master_weight` is True, the master weights will be cleared.
 
         Args:
-            max_steps (int): 最大训练步数。
-            resume_from_checkpoint (bool, optional): 是否从检查点中恢复模型和优化器状态（默认为False）。
-                如果为字符串，则将其作为路径，并在该路径下恢复模型和优化器状态。
-            clear_master_weight (bool, optional): 是否清除主要权重（默认为False）。
+            max_steps (int): The maximum number of training steps.
+            resume_from_checkpoint (Union[bool, str], optional): Whether to resume the model and optimizer states from
+                a checkpoint (default is False). If it is a string, it will be treated as the path to resume from.
+            clear_master_weight (bool, optional): Whether to clear the master weights (default is False).
 
         Returns:
-            Tuple[PretrainedModel, PretrainedModel]: 返回两个元组，分别包含策略模型和价值函数模型。
+            Tuple[PretrainedModel, PretrainedModel]: A tuple containing the policy model and the value function model.
         """
         # resume should be triggered here
         # maybe change args.output_dir of actor_trainer/critic_trainer directly
@@ -971,24 +980,26 @@ class PPOTrainer(Trainer):
             critic_model = None
         return actor_model, critic_model
 
-    def init_train_num(self: Trainer, train_dataloader: DataLoader):
+    def init_train_num(
+        self: Trainer, train_dataloader: DataLoader
+    ) -> Tuple[int, Optional[int], int, int, int, int, int]:
         """
-            初始化训练数据的批次大小，以及相关参数。
+        Initialize the batch size for training data and related parameters.
 
         Args:
-            self (Trainer): Trainer实例。
-            train_dataloader (DataLoader): 用于训练的DataLoader对象。
+            self (Trainer): The instance of the Trainer class.
+            train_dataloader (DataLoader): The DataLoader object used for training.
 
         Returns:
             tuple (int, Optional[int], int, int, int, int, int):
-                返回一个元组，包含：
-                1. total_train_batch_size (int) - 总训练批次大小。
-                2. len_dataloader (Optional[int]) - 如果不是可迭代的数据集，则为DataLoader长度；否则为None。
-                3. max_steps (int) - 最大训练步数。
-                4. num_train_epochs (int) - 训练的最大轮数。
-                5. num_update_steps_per_epoch (int) - 每个epoch中更新模型的次数。
-                6. num_examples (int) - 训练数据的样本数量。
-                7. num_train_samples (int) - 训练数据的样本总数。
+                A tuple containing:
+                1. total_train_batch_size (int) - The total batch size for training.
+                2. len_dataloader (Optional[int]) - The length of the DataLoader if it is not an iterable dataset; otherwise, None.
+                3. max_steps (int) - The maximum number of training steps.
+                4. num_train_epochs (int) - The maximum number of training epochs.
+                5. num_update_steps_per_epoch (int) - The number of model updates per epoch.
+                6. num_examples (int) - The number of samples in the training data.
+                7. num_train_samples (int) - The total number of samples in the training data.
         """
         args = self.args
 
@@ -1034,8 +1045,11 @@ class PPOTrainer(Trainer):
 
     def is_step_end(self):
         """
-            判断是否到达了步数结尾，当累加步数等于args.gradient_accumulation_steps时返回True。
-        返回值：bool，如果到达了步数结尾则返回True，否则返回False。
+        Determine if the end of the step has been reached.
+        Return True when the accumulated steps equal to args.gradient_accumulation_steps.
+
+        Returns:
+            bool: Return True if the end of the step is reached, otherwise False.
         """
         # reach accumulation_steps, value trainer has the same step_control and
         # gradient_accumulation_steps as PPO trainer.
@@ -1046,14 +1060,15 @@ class PPOTrainer(Trainer):
 
     def get_step_loss(self, loss_prefix: str = "") -> Dict:
         """
-            获取当前步骤的损失，包括策略训练和价值函数训练的损失。
-        如果提供了loss_prefix参数，则将损失名称加上该前缀。
+        Get the current step's losses, including the policy training loss and the value function training loss.
+        If the `loss_prefix` parameter is provided, it will be added to the loss names.
 
         Args:
-            loss_prefix (str, optional): 损失名称的前缀字符串，默认为"".
+            loss_prefix (str, optional): A prefix string for the loss names, defaults to "".
 
         Returns:
-            Dict[str, float]: 返回一个字典，包含两个损失项：rl_loss（策略训练的损失）和value_loss（价值函数训练的损失）。
+            Dict[str, float]: A dictionary containing two loss items: `rl_loss` (the policy training loss)
+                and `value_loss` (the value function training loss).
         """
         rl_loss = self.actor_trainer.get_step_loss(loss_prefix)
         if self.args.rl_algorithm == "ppo":
@@ -1516,23 +1531,24 @@ class PPOTrainer(Trainer):
 
     def _maybe_log_save_evaluate(self, tr_loss, model, epoch, ignore_keys_for_eval, **kwargs):
         """
-        记录、保存和评估，如果需要。
-            如果控制变量指示应该记录，则记录损失，并将模型保存到磁盘上。
-            如果控制变量指示应该评估，则评估模型并将结果保存到磁盘上。
+        Log, save, and evaluate if needed.
 
-            Args:
-                tr_loss (Optional[Dict[str, float]]): 字典形式的训练损失，包含键'train_policy_loss'和'train_ptx_loss'。
-                    如果为None，则不记录任何内容。默认为None。
-                model (Model): 用于评估的模型。
-                epoch (int): 当前迭代次数。
-                ignore_keys_for_eval (List[str]): 在评估时要忽略的键列表。默认为空列表。
-                kwargs (Any, optional): 其他可选参数，将被传递给`log()`和`save()`方法。默认为空字典。
+        If the control variables indicate logging is required, log the losses and save the model to disk.
+        If the control variables indicate evaluation is required, evaluate the model and save the results to disk.
 
-            Returns:
-                None.
+        Args:
+            tr_loss (Optional[Dict[str, float]], optional): Training losses in dictionary form, with keys 'train_policy_loss' and 'train_ptx_loss'.
+                If None, nothing will be logged. Defaults to None.
+            model (Model): The model to be evaluated.
+            epoch (int): The current epoch number.
+            ignore_keys_for_eval (List[str]): A list of keys to ignore during evaluation. Defaults to an empty list.
+            kwargs (Any, optional): Additional optional parameters that will be passed to the `log()` and `save()` methods. Defaults to an empty dictionary.
 
-            Raises:
-                None.
+        Returns:
+            None.
+
+        Raises:
+            None.
         """
         if self.control.should_log and tr_loss is not None:
             logs: Dict[str, float] = {}
@@ -1576,15 +1592,17 @@ class PPOTrainer(Trainer):
         sequence_mask: paddle.Tensor,  # size = (B, L)
     ) -> paddle.Tensor:
         """
-            计算KL散度迭代增益，并将其添加到回报中。
-        参数：
-            prompt (paddle.Tensor, shape=(B, S)): 输入序列的prompt，未使用。
-            log_probs (paddle.Tensor, shape=(B, L)): 当前预测的log概率分布。
-            ref_log_probs (paddle.Tensor, shape=(B, L)): 基线预测的log概率分布。
-            reward_score (paddle.Tensor, shape=(B,)): 基于prompt和输出序列的基本奖励得分。
-            sequence_mask (paddle.Tensor, shape=(B, L)): 序列的mask，用于确定序列的长度。
-        返回值（paddle.Tensor, shape=(B, L)}：
-            包含KL散度迭代增益的向量。
+        Calculate the KL divergence regularization gain and add it to the reward.
+
+        Args:
+            prompt (paddle.Tensor, shape=(B, S)): The prompt of the input sequence, not used.
+            log_probs (paddle.Tensor, shape=(B, L)): The log probability distribution of the current predictions.
+            ref_log_probs (paddle.Tensor, shape=(B, L)): The log probability distribution of the baseline predictions.
+            reward_score (paddle.Tensor, shape=(B,)): The base reward score based on the prompt and output sequence.
+            sequence_mask (paddle.Tensor, shape=(B, L)): The mask of the sequence, used to determine the length of the sequence.
+
+        Returns:
+            paddle.Tensor, shape=(B, L): A vector containing the KL divergence regularization gain.
         """
 
         kl_divergence_estimate = -self.kl_coeff * (log_probs - ref_log_probs)  # size = (B, L)
