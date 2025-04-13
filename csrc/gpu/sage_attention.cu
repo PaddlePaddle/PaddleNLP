@@ -129,6 +129,8 @@ std::vector<paddle::Tensor> SageAttentionKernel(
         qkv.place());
   }
 
+  std::vector<paddle::Tensor> sa_results;
+
   if (max_enc_len_this_time_data > 0) {
     if (max_dec_len_this_time_data > 0) {
       cudaEventRecord(main_event, main_stream);
@@ -169,12 +171,12 @@ std::vector<paddle::Tensor> SageAttentionKernel(
 
     const int num_kv_head = meta_data.kv_num_heads;
     const int head_dim_v = meta_data.head_dims_v;
-    const int total_seqlen_v_padded = v_padded.shape()[0];
+    const int total_seqlen_v_padded = cu_seqlen_v_padded.shape()[batch_size];  // cu_seqlen_v_padded[-1]
 
     // use varlen API
     paddle::optional<paddle::Tensor> vm = paddle::optional<paddle::Tensor>(paddle::empty({1}, paddle::DataType::FLOAT32, paddle::GPUPlace()));
 
-    fmha_out = sage_attention_varlen_fwd(q, 
+    sa_results = sage_attention_varlen_fwd(q, 
                                         k, 
                                         v, 
                                         v_padded,
@@ -183,8 +185,8 @@ std::vector<paddle::Tensor> SageAttentionKernel(
                                         cu_seqlen_v_padded,
                                         km, 
                                         vm, 
-                                        max_enc_len_this_time_data,
-                                        max_enc_len_this_time_data,
+                                        max_enc_len_this_time_data, // max_seqlen_q
+                                        max_enc_len_this_time_data, // max_seqlen_k
                                         total_seqlen_v_padded,
                                         softmax_scale, 
                                         std::string("per_warp"), 
@@ -193,11 +195,12 @@ std::vector<paddle::Tensor> SageAttentionKernel(
                                         causal, 
                                         true, 
                                         false, 
-                                        false)[0];
+                                        false);
+    fmha_out = sa_results[0];
     fmha_out = paddle::reshape(fmha_out, {-1, num_q_head * head_dim_qk});
   }
 
-  return {fmha_out, qkv_out};
+  return {fmha_out, qkv_out, sa_results[1], sa_results[2], sa_results[3]};
 }
 
 std::vector<paddle::Tensor> SageAttention(
@@ -435,7 +438,7 @@ std::vector<std::vector<int64_t>> SageAttentionInferShape(
   const int q_hidden_size =
       qkv_shape[qkv_shape.size() - 1] - kv_num_heads * (head_dim_qk + head_dim_v);
   const int num_heads = q_hidden_size / head_dim_qk;
-  return {{token_num, num_heads * head_dim_v}, qkv_shape};
+  return {{token_num, num_heads * head_dim_v}, qkv_shape, q_shape, k_shape, v_padded_shape};
 }
 
 std::vector<paddle::DataType> SageAttentionInferDtype(
@@ -493,26 +496,26 @@ std::vector<paddle::DataType> SageAttentionInferDtype(
   if (compute_dtype == "bf16") {
     if (out_linear_in_scale > 0.0) {
       if (fabs(quant_max_bound - 127.0f) < 0.000001) {
-        return {paddle::DataType::INT8, paddle::DataType::BFLOAT16};
+        return {paddle::DataType::INT8, paddle::DataType::BFLOAT16, paddle::DataType::INT8, paddle::DataType::INT8, paddle::DataType::FLOAT8_E4M3FN};
       } else if (fabs(quant_max_bound - 448.0f) < 0.000001) {
-        return {paddle::DataType::FLOAT8_E4M3FN, paddle::DataType::BFLOAT16};
+        return {paddle::DataType::FLOAT8_E4M3FN, paddle::DataType::BFLOAT16, paddle::DataType::INT8, paddle::DataType::INT8, paddle::DataType::FLOAT8_E4M3FN};
       }else{
         PD_THROW("Only supported attr of quant_max_bound in ['127.0', '448.0'].");
       }
     } else {
-      return {paddle::DataType::BFLOAT16, paddle::DataType::BFLOAT16};
+      return {paddle::DataType::BFLOAT16, paddle::DataType::BFLOAT16, paddle::DataType::INT8, paddle::DataType::INT8, paddle::DataType::FLOAT8_E4M3FN};
     }
   } else if (compute_dtype == "fp16") {
     if (out_linear_in_scale > 0.0) {
       if (fabs(quant_max_bound - 127.0f) < 0.000001) {
-        return {paddle::DataType::INT8, paddle::DataType::FLOAT16};
+        return {paddle::DataType::INT8, paddle::DataType::FLOAT16, paddle::DataType::INT8, paddle::DataType::INT8, paddle::DataType::FLOAT8_E4M3FN};
       } else if (fabs(quant_max_bound - 448.0f) < 0.000001) {
-        return {paddle::DataType::FLOAT8_E4M3FN, paddle::DataType::FLOAT16};
+        return {paddle::DataType::FLOAT8_E4M3FN, paddle::DataType::FLOAT16, paddle::DataType::INT8, paddle::DataType::INT8, paddle::DataType::FLOAT8_E4M3FN};
       }else{
         PD_THROW("Only supported attr of quant_max_bound in ['127.0', '448.0'].");
       }
     } else {
-      return {paddle::DataType::FLOAT16, paddle::DataType::FLOAT16};
+      return {paddle::DataType::FLOAT16, paddle::DataType::FLOAT16, paddle::DataType::INT8, paddle::DataType::INT8, paddle::DataType::FLOAT8_E4M3FN};
     }
   } else {
     PD_THROW("Only supported attr of compute_dtype in ['fp16', 'bf16'].");
@@ -560,7 +563,7 @@ PD_BUILD_OP(sage_attention)
              paddle::Optional("cache_v_zp"),
              paddle::Optional("out_linear_shifts"),
              paddle::Optional("out_linear_smooths")})
-    .Outputs({"fmha_out", "qkv_out", "key_cache_out", "value_cache_out"})
+    .Outputs({"fmha_out", "qkv_out", "key_cache_out", "value_cache_out", "qint8", "kint8", "vfp8"})
     .SetInplaceMap({{"key_cache", "key_cache_out"},
                     {"value_cache", "value_cache_out"}})
     .Attrs({"compute_type: std::string",

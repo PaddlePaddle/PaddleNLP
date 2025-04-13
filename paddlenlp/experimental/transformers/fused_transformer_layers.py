@@ -3334,7 +3334,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
 
                 km = segment_mean(k, kwargs.get("cu_seqlens_k", None))
 
-                fmha_out = sage_attention(
+                sa_results = sage_attention(
                     qkv_out,  # [total_seqlen, mixed_dim]
                     q,
                     k,
@@ -3386,7 +3386,10 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                     self.config.speculate_config.speculate_max_draft_token_num,
                     True,  # causal
                     self.config.speculate_config.speculate_method is not None,  # speculate_decoder
-                )[0]
+                )
+
+                fmha_out = sa_results[0]
+                breakpoint()
             else:
                 from paddlenlp_ops import append_attention
 

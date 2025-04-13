@@ -513,6 +513,20 @@ std::vector<paddle::Tensor> qk_int8_sv_f8_accum_f32_fuse_v_scale_attn_inst_buf_s
   CHECK_DIMS(value, 3);
   CHECK_DIMS(output, 3);
 
+  // what about we do some check here
+  paddle::Tensor nan_mask, nan_indices;
+  nan_mask = paddle::isnan(query);
+  nan_indices = paddle::experimental::nonzero(nan_mask);
+  printf("q nan len: %d\n", nan_indices.shape()[0]);
+
+  nan_mask = paddle::isnan(key);
+  nan_indices = paddle::experimental::nonzero(nan_mask);
+  printf("k nan len: %d\n", nan_indices.shape()[0]);
+
+  nan_mask = paddle::isnan(value);
+  nan_indices = paddle::experimental::nonzero(nan_mask);
+  printf("v nan len: %d\n", nan_indices.shape()[0]);
+
   CHECK_DIMS(query_scale, 3);
   CHECK_DIMS(key_scale, 3);
   CHECK_DIMS(value_scale, 3);
@@ -686,5 +700,5 @@ std::vector<paddle::Tensor> sage_attention_varlen_fwd(paddle::Tensor& q,        
     sm_scale, 
     _return_lse);
 
-  return {o};
+  return {o, quant_qk_results[0], quant_qk_results[2], quant_vfp8_results[0]};  // debug: return qkv
 }
