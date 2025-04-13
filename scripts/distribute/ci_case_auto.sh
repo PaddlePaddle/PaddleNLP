@@ -210,7 +210,7 @@ function llm_qwen_case_list_auto() {
 function llama_dygraph_auto_bs4_bf16_SD2() {
     # Only A100 support this case.
     echo IS_A100 is $IS_A100
-    if [ $IS_A100 -ne 1 ]; then
+    if [ $IS_A100 -ne 0 ]; then
         echo "=========== $FUNCNAME run begin ==========="
         export PYTHONPATH=$root_path/:$PYTHONPATH
         export FLAGS_call_stack_level=3
@@ -220,9 +220,6 @@ function llama_dygraph_auto_bs4_bf16_SD2() {
         export FLAGS_embedding_deterministic=1 
         
         export CUDA_DEVICE_MAX_CONNECTIONS=1
-        export PARALLEL_CROSS_ENTROPY=true
-
-        export PYTHONPATH=/root/paddlejob/workspace/env_run/xuexixi/tmp/Paddle_new/build/python/:$PYTHONPATH
 
         flags=("" "FLAGS_fuse_allreduce_in_opt" "FLAGS_fuse_reducescatter_in_opt")
         # expected_results=("res_a" "res_b" "res_c")
@@ -244,11 +241,10 @@ function llama_dygraph_auto_bs4_bf16_SD2() {
                 --gpus "0,1" \
                 --log_dir  "output/$task_name""_log" \
                 ./run_pretrain_auto.py \
-                --model_name_or_path "facebook/llama-7b" \
-                --tokenizer_name_or_path "facebook/llama-7b" \
+                --model_name_or_path "meta-llama/Llama-2-7b", \
+                --tokenizer_name_or_path "meta-llama/Llama-2-7b", \
                 --input_dir "./data" \
                 --output_dir "./output" \
-                --split 949,50,1 \
                 --weight_decay 0.01 \
                 --warmup_ratio 0.01 \
                 --max_grad_norm 1.0 \
@@ -264,15 +260,11 @@ function llama_dygraph_auto_bs4_bf16_SD2() {
                 --do_predict false \
                 --disable_tqdm true \
                 --skip_profile_timer true \
-                --save_total_limit 2 \
                 --device gpu \
-                --disable_tqdm true \
-                --dataloader_num_workers 1 \
-                --distributed_dataloader 0 \
                 --enable_auto_parallel 1 \
                 --per_device_train_batch_size 1 \
-                --gradient_accumulation_steps 4 \
-                --per_device_eval_batch_size 1 \
+                --gradient_accumulation_steps 1 \
+                --per_device_eval_batch_size 2 \
                 --recompute false \
                 --recompute_use_reentrant true \
                 --recompute_granularity full \
@@ -280,18 +272,15 @@ function llama_dygraph_auto_bs4_bf16_SD2() {
                 --bf16 true \
                 --fp16_opt_level "O2"  \
                 --amp_master_grad true \
-                --fuse_attention_ffn false \
+                --fuse_attention_ffn true \
                 --fuse_attention_qkv true \
                 --fused_linear_param_grad_add 1 \
-                --fuse_sequence_parallel_allreduce false \
                 --use_flash_attention true \
                 --use_fused_rope true \
                 --use_fused_rms_norm true \
                 --max_seq_length 4096 \
-                --sep_parallel_degree 1 \
                 --sequence_parallel false \
                 --pipeline_parallel_degree 1 \
-                --sharding_parallel_degree 1 \
                 --tensor_parallel_degree 1 \
                 --sharding "stage1" \
                 --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate" \
