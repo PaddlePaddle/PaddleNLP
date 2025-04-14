@@ -708,8 +708,11 @@ class FusedMultiTransformerBase(Layer):
                 from paddlenlp.ops.custom_all_reduce import custom_all_reduce
             except:
                 pass
-            self.custom_all_reduce_max_bytes = 2 * 8192 * 1024
+            self.custom_all_reduce_max_bytes = 1024 * self.embed_dim
             self.fa = custom_all_reduce.CustomAllreduce(self.custom_all_reduce_max_bytes)
+            self.use_custom_allreduce = True
+        else:
+            self.use_custom_allreduce = False
 
     def init_weight(self):
         self.qkv_weights = []
@@ -1743,10 +1746,7 @@ class FusedMultiTransformerBase(Layer):
 
             # all_reduce
             if self.tp_degree > 1:
-                if (
-                    use_custom_allreduce()
-                    and out_linear_out.numel() * out_linear_out.element_size() < self.custom_all_reduce_max_bytes
-                ):
+                if self.use_custom_allreduce and out_linear_out.shape[0] <= 128:
                     self.fa.all_reduce(out_linear_out, out_linear_out)
                 else:
                     dist.all_reduce(out_linear_out)
@@ -1772,10 +1772,7 @@ class FusedMultiTransformerBase(Layer):
 
             # all_reduce
             if self.tp_degree > 1:
-                if (
-                    use_custom_allreduce()
-                    and ffn2_out.numel() * ffn2_out.element_size() < self.custom_all_reduce_max_bytes
-                ):
+                if self.use_custom_allreduce and ffn2_out.shape[0] <= 128:
                     self.fa.all_reduce(ffn2_out, ffn2_out)
                 else:
                     dist.all_reduce(ffn2_out)
