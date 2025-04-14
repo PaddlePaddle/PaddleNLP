@@ -712,9 +712,13 @@ class FusedMultiTransformerBase(Layer):
             try:
                 from paddlenlp.ops.custom_all_reduce import custom_all_reduce
             except:
-                pass
+                assert False, "please install paddlenlp.ops"
             self.custom_all_reduce_max_bytes = 1024 * self.embed_dim
-            self.fa = custom_all_reduce.CustomAllreduce(self.custom_all_reduce_max_bytes)
+            from paddle.distributed import fleet
+
+            hcg = fleet.get_hybrid_communicate_group()
+            model_parallel_group = hcg.get_model_parallel_group()
+            self.fa = custom_all_reduce.CustomAllreduce(model_parallel_group, self.custom_all_reduce_max_bytes)
             self.use_custom_allreduce = True
         else:
             self.use_custom_allreduce = False
