@@ -146,7 +146,7 @@ def convert_to_weight_quantize_state_dict(state_dict, name, quantization_config,
         # gpu weight_quantize will fix in future
         target_weight = state_dict.pop(weight_name).cast(dtype).cuda()
         if weight_quantize_algo in ["a8w8linear"]:
-            quant_weight, quant_scale = quantize_channelwise(target_weight)
+            quant_weight, quant_scale = quantize_channelwise(target_weight, quantization_config.apply_hadamard)
         else:
             quant_weight, quant_scale = weight_quantize(
                 x=target_weight,

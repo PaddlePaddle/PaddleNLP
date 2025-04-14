@@ -22,6 +22,8 @@ from paddle.distributed.fleet.utils.sequence_parallel_utils import (
 )
 from paddle.nn.quant import llm_int8_linear, weight_only_linear
 
+from paddlenlp.utils import infohub
+
 try:
     from .qlora import qlora_weight_linear
 except:
@@ -38,7 +40,15 @@ QuantMapping = {
 }
 
 
-def quantize_tensorwise(x, qmax=127, qmin=-128):
+def random_hadamard(n, dtype):
+    A = paddle.randint(low=0, high=2, shape=[n, n]).astype("float32") * 2 - 1
+    Q, _ = paddle.linalg.qr(A)
+    return Q.astype(dtype)
+
+
+def quantize_tensorwise(x, apply_hadamard=False, qmax=127, qmin=-128):
+    if apply_hadamard:
+        x = x @ infohub.hadamard[x.shape[-1]]
     scale = paddle.max(paddle.abs(x)) / qmax
     x_int8 = paddle.clip((x / scale).round(), qmin, qmax).astype("int8")
     return x_int8, scale
@@ -49,8 +59,17 @@ def dequantize_tensorwise(x_int8, scale):
     return x
 
 
-def quantize_channelwise(w, qmax=127, qmin=-128):
-    scale = paddle.max(paddle.abs(w), axis=0, keepdim=True) / qmax  # [1, out_dim]
+def quantize_channelwise(w, apply_hadamard=False, qmax=127, qmin=-128):
+    if apply_hadamard:
+        if getattr(infohub, "hadamard") is None:
+            setattr(infohub, "hadamard", {})
+        if w.shape[0] in infohub.hadamard:
+            hadamard_matrix = infohub.hadamard[w.shape[0]]
+        else:
+            hadamard_matrix = random_hadamard(w.shape[0], w.dtype)
+            infohub.hadamard[w.shape[0]] = hadamard_matrix
+        w = hadamard_matrix.T @ w
+    scale = paddle.max(paddle.abs(w), axis=0, keepdim=True) / qmax
     w_int8 = paddle.clip((w / scale).round(), qmin, qmax).astype("int8")
     return w_int8.T, scale.squeeze(0)
 
@@ -60,12 +79,12 @@ def dequantize_channelwise(w_int8, scale):
     return w
 
 
-def a8w8_linear(x, w_int8, w_scale=None, bias=None, dtype=None):
+def a8w8_linear(x, w_int8, w_scale=None, bias=None, dtype=None, apply_hadamard=False):
     if w_int8.dtype != paddle.int8:
-        w_int8, w_scale = quantize_channelwise(w_int8)
+        w_int8, w_scale = quantize_channelwise(w_int8, apply_hadamard)
     if dtype is None:
         dtype = x.dtype
-    x_int8, x_scale = quantize_tensorwise(x)
+    x_int8, x_scale = quantize_tensorwise(x, apply_hadamard)
     out = paddle.matmul(x_int8, w_int8.T).astype(dtype) * x_scale * w_scale.unsqueeze(0)
     if bias is not None:
         out += bias
@@ -107,7 +126,14 @@ def quant_weight_linear(
             bias=bias,
         )
     elif weight_quantize_algo in ["a8w8linear"]:
-        output = a8w8_linear(x, quant_weight, w_scale=quant_scale, bias=bias, dtype=dtype)
+        output = a8w8_linear(
+            x,
+            quant_weight,
+            w_scale=quant_scale,
+            bias=bias,
+            dtype=dtype,
+            apply_hadamard=quantization_config.apply_hadamard,
+        )
     return output
 
 

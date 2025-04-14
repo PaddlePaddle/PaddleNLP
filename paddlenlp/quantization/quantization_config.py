@@ -59,6 +59,7 @@ class QuantizationConfig:
         dtype=None,
         ignore_modules=None,
         group_size=-1,
+        apply_hadamard=True,
         **kwargs,
     ):
         if weight_quantize_algo is not None:
@@ -114,6 +115,7 @@ class QuantizationConfig:
         self.dtype = dtype
         self.ignore_modules = ignore_modules
         self.group_size = group_size
+        self.apply_hadamard = apply_hadamard
 
     def is_weight_quantize(self):
         if isinstance(self.weight_quantize_algo, dict):
