@@ -20,6 +20,9 @@ param+="nnodes=4 "
 param+="model_type=llama2_7b "
 param+='dynamic_auto=_dynamic_auto '
 
+# This optimization currently only runs in the dynamic automatic parallelism of Llama7B.
+export FLAGS_fuse_reducescatter_in_opt=1
+
 cd ./tests
 bash ./test_tipc/static/auto_parallel/llama2/benchmark_common/prepare.sh
 

@@ -3,6 +3,7 @@
     "logging_dir": "vdl_log",
     "train_datasets": "ppo-kk/34567ppl/train.jsonl",
     "eval_datasets": "ppo-kk/5ppl/test.jsonl",
+    "label_key": "tgt",
     "actor_model_name_or_path": "meta-llama/Meta-Llama-3.1-8B",
     "reward_model_name_or_path": "",
     "use_rm_server": true,

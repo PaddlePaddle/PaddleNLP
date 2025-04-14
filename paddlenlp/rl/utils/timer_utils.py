@@ -15,9 +15,8 @@
 from contextlib import contextmanager
 from typing import List, Union
 
-from paddlenlp.trainer.plugins.timer import RuntimeTimer
-from paddlenlp.utils.log import logger
-
+from ...trainer.plugins.timer import RuntimeTimer
+from ...utils.log import logger
 from .comm_utils import get_timer_label
 
 
