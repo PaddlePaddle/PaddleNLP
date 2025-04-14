@@ -74,8 +74,7 @@ std::vector<paddle::Tensor> MoeExpertReduce(
   auto output = GetEmptyTensor({num_rows, hidden_size}, input_type, place);
 
   // Avoids ‘invalid configuration argument’ when we launch the kernel.
-  if(ffn_out.dims()[0] == 0 )
-    return {output};
+  if (ffn_out.dims()[0] == 0) return {output};
 
   switch (input_type) {
     case paddle::DataType::BFLOAT16:
@@ -117,7 +116,11 @@ std::vector<std::vector<int64_t>> MoeExpertReduceInferShape(
     const std::vector<int64_t>& permute_indices_per_token_shape,
     const std::vector<int64_t>& top_k_indices_shape,
     const paddle::optional<std::vector<int64_t>>& ffn2_bias_shape) {
-  return {ffn_out_shape};
+  const int topk = top_k_indices_shape[1];
+  std::vector<int64_t> fused_moe_out_shape = {ffn_out_shape[0] / topk,
+                                              ffn_out_shape[1]};
+
+  return {fused_moe_out_shape};
 }
 
 std::vector<paddle::DataType> MoeExpertReduceInferDtype(
