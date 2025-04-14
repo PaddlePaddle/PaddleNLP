@@ -133,11 +133,11 @@ class DeepseekScalingRotaryEmbedding(nn.Layer):
     ) -> Tuple[paddle.Tensor, paddle.Tensor]:
         import os
 
-        from paddlenlp_ops import fused_rotary_position_encoding
+        from paddlenlp_ops import f_fused_rotary_position_encoding
 
         # In-place operations that update the query and key tensors.
         os.environ["stride_in_no_check_dy2st_diff"] = "1"
-        fused_rotary_position_encoding(query, key, position_ids, self.cos_sin_cache, self.rotary_dim, False)
+        f_fused_rotary_position_encoding(query, key, position_ids, self.cos_sin_cache, self.rotary_dim, False)
 
         return query, key
 
@@ -1285,9 +1285,9 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
     def remove_padding(self, input_ids, seq_lens_this_time, draft_tokens=None, seq_lens_encoder=None):
         cum_offsets_now = paddle.cumsum(self.max_seq_len - seq_lens_this_time)
         token_num = paddle.sum(seq_lens_this_time)
-        from paddlenlp_ops import get_padding_offset_v2
+        from paddlenlp_ops import f_get_padding_offset_v2
 
-        ids_remove_padding, cum_offsets, padding_offset, cu_seqlens_q, cu_seqlens_k = get_padding_offset_v2(
+        ids_remove_padding, cum_offsets, padding_offset, cu_seqlens_q, cu_seqlens_k = f_get_padding_offset_v2(
             input_ids, cum_offsets_now, token_num, seq_lens_this_time, draft_tokens, seq_lens_encoder
         )
         return ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k
@@ -1656,11 +1656,11 @@ class DeepseekV2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, De
             output_padding_offset=output_padding_offset,
         )
         if self.return_full_hidden_states:
-            from paddlenlp_ops import rebuild_padding_v2
+            from paddlenlp_ops import f_rebuild_padding_v2
 
             full_hidden_states = outputs[0]
             cum_offsets = outputs[1]
-            hidden_states = rebuild_padding_v2(
+            hidden_states = f_rebuild_padding_v2(
                 full_hidden_states,
                 cum_offsets,
                 seq_lens_decoder,

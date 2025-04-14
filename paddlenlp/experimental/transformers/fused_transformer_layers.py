@@ -44,7 +44,7 @@ if not is_paddlenlp_ops_available():
 if (
     paddle.device.get_all_custom_device_type() is not None and len(paddle.device.get_all_custom_device_type()) > 0
 ) or paddle.is_compiled_with_cuda():
-    from paddlenlp_ops import rebuild_padding_v2
+    from paddlenlp_ops import f_rebuild_padding_v2
 
 
 def use_cutlass_fp8_gemm():
@@ -1120,9 +1120,9 @@ class FusedMultiTransformerBase(Layer):
             query_pe, key_pe = self.config.rotary_emb(self.position_ids, query_pe, key_pe)
 
             if self.config.mla_config.use_absorb():
-                from paddlenlp_ops import prefill_mla_write_cache
+                from paddlenlp_ops import f_prefill_mla_write_cache
 
-                prefill_mla_write_cache(
+                f_prefill_mla_write_cache(
                     compressed_kv,
                     key_pe,
                     latent_cache,
@@ -1464,9 +1464,9 @@ class FusedMultiTransformerBase(Layer):
                 raise ValueError(
                     f"Unsupported topk_method: {config.topk_method}. Please choose 'group_limited_greedy' or 'noaux_tc'."
                 )
-            from paddlenlp_ops import noaux_tc
+            from paddlenlp_ops import f_noaux_tc
 
-            scores = noaux_tc(
+            scores = f_noaux_tc(
                 scores,
                 scores_with_bias,
                 config.num_expert_group,
@@ -1575,9 +1575,9 @@ class FusedMultiTransformerBase(Layer):
             seq_lens_decoder = kwargs.get("seq_lens_decoder", None)
             seq_lens_this_time = kwargs.get("seq_lens_this_time", None)
             if paddle.is_compiled_with_xpu():
-                from paddlenlp_ops import get_position_ids_v2
+                from paddlenlp_ops import f_get_position_ids_v2
 
-                self.position_ids = get_position_ids_v2(seq_lens_encoder, seq_lens_decoder, seq_lens_this_time)
+                self.position_ids = f_get_position_ids_v2(seq_lens_encoder, seq_lens_decoder, seq_lens_this_time)
             else:
                 position_ids_shape = paddle.sum(seq_lens_this_time)
                 self.position_ids = paddle.empty(shape=position_ids_shape, dtype=seq_lens_encoder.dtype)
@@ -1585,11 +1585,11 @@ class FusedMultiTransformerBase(Layer):
                     shape=position_ids_shape, dtype=seq_lens_encoder.dtype
                 ).unsqueeze(1)
 
-                from paddlenlp_ops import get_position_ids_and_mask_encoder_batch
+                from paddlenlp_ops import f_get_position_ids_and_mask_encoder_batch
 
                 # In-place operations that compute the position_ids.
                 os.environ["stride_in_no_check_dy2st_diff"] = "1"
-                get_position_ids_and_mask_encoder_batch(
+                f_get_position_ids_and_mask_encoder_batch(
                     seq_lens_encoder, seq_lens_decoder, seq_lens_this_time, self.position_ids, self.mask_encoder_batch
                 )
 
@@ -1674,7 +1674,7 @@ class FusedMultiTransformerBase(Layer):
 
         if self.config.append_attn:
 
-            from paddlenlp_ops import get_block_shape_and_split_kv_block
+            from paddlenlp_ops import f_get_block_shape_and_split_kv_block
 
             (
                 kwargs["encoder_batch_ids"],
@@ -1689,7 +1689,7 @@ class FusedMultiTransformerBase(Layer):
                 kwargs["decoder_num_blocks_cpu"],
                 kwargs["decoder_chunk_size_cpu"],
                 kwargs["max_len_kv"],
-            ) = get_block_shape_and_split_kv_block(
+            ) = f_get_block_shape_and_split_kv_block(
                 kwargs.get("seq_lens_encoder", None),
                 kwargs.get("seq_lens_decoder", None),
                 max_enc_len_this_time,
@@ -2243,9 +2243,9 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             query_pe, key_pe = self.config.rotary_emb(self.position_ids, query_pe, key_pe)
 
             if self.config.mla_config.use_absorb():
-                from paddlenlp_ops import prefill_mla_write_cache
+                from paddlenlp_ops import f_prefill_mla_write_cache
 
-                prefill_mla_write_cache(
+                f_prefill_mla_write_cache(
                     compressed_kv,
                     key_pe,
                     latent_cache,
@@ -3095,7 +3095,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
         i,
         **kwargs,
     ):
-        from paddlenlp_ops import decode_mla_write_cache, multi_head_latent_attention
+        from paddlenlp_ops import f_decode_mla_write_cache, f_multi_head_latent_attention
 
         ln_out = qkv_out
         latent_cache = caches[i]
@@ -3110,7 +3110,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
             from paddlenlp.utils.env import PREFILL_USE_SAGE_ATTN
 
             if PREFILL_USE_SAGE_ATTN:
-                from paddlenlp_ops import sage_attention_dsk
+                from paddlenlp_ops import f_sage_attention_dsk
 
                 query_256 = paddle.nn.functional.pad(paddle.unsqueeze(query, axis=0), (0, 256 - 192))
                 key_256 = paddle.nn.functional.pad(paddle.unsqueeze(key, axis=0), (0, 256 - 192))
@@ -3121,7 +3121,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 km = paddle.mean(key_256, axis=1, keepdim=True)
                 km = km.squeeze(1)
 
-                fmha_out_prefill = sage_attention_dsk(
+                fmha_out_prefill = f_sage_attention_dsk(
                     query_256,
                     key_256,
                     value_128,
@@ -3197,7 +3197,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
             )
             query_pe, key_pe = self.config.rotary_emb(self.position_ids, query_pe, key_pe)
 
-            decode_mla_write_cache(
+            f_decode_mla_write_cache(
                 compressed_kv,
                 key_pe,
                 latent_cache,
@@ -3224,7 +3224,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 ]
             )
 
-            fmha_out_decode = multi_head_latent_attention(
+            fmha_out_decode = f_multi_head_latent_attention(
                 q_input,
                 latent_cache,
                 latent_cache,
@@ -3305,9 +3305,9 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
             return self.compute_mla_absorb(qkv_out, caches, i, **kwargs)
 
         if self.config.append_attn:
-            from paddlenlp_ops import append_attention
+            from paddlenlp_ops import f_append_attention
 
-            fmha_out = append_attention(
+            fmha_out = f_append_attention(
                 qkv_out,
                 caches[2 * i],
                 caches[2 * i + 1],
@@ -3473,9 +3473,9 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
             return multi_block_output
         else:
             if paddle.is_compiled_with_xpu():
-                from paddlenlp_ops import gather_next_token
+                from paddlenlp_ops import f_gather_next_token
 
-                out = gather_next_token(
+                out = f_gather_next_token(
                     multi_block_output,
                     cum_offsets,
                     seq_lens_decoder,
@@ -3484,7 +3484,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                     max_input_length,
                 )
             else:
-                out = rebuild_padding_v2(
+                out = f_rebuild_padding_v2(
                     multi_block_output,
                     cum_offsets,
                     seq_lens_decoder,
@@ -3506,7 +3506,7 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
         i,
         **kwargs,
     ):
-        from paddlenlp_ops import decode_mla_write_cache, multi_head_latent_attention
+        from paddlenlp_ops import f_decode_mla_write_cache, f_multi_head_latent_attention
 
         ln_out = qkv_out
         latent_cache = caches[i]
@@ -3521,7 +3521,7 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
             from paddlenlp.utils.env import PREFILL_USE_SAGE_ATTN
 
             if PREFILL_USE_SAGE_ATTN:
-                from paddlenlp_ops import sage_attention_dsk
+                from paddlenlp_ops import f_sage_attention_dsk
 
                 query_256 = paddle.nn.functional.pad(paddle.unsqueeze(query, axis=0), (0, 256 - 192))
                 key_256 = paddle.nn.functional.pad(paddle.unsqueeze(key, axis=0), (0, 256 - 192))
@@ -3632,7 +3632,7 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
             )
             query_pe, key_pe = self.config.rotary_emb(self.position_ids, query_pe, key_pe)
 
-            decode_mla_write_cache(
+            f_decode_mla_write_cache(
                 compressed_kv,
                 key_pe,
                 latent_cache,
@@ -3659,7 +3659,7 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
                 ]
             )
 
-            fmha_out_decode = multi_head_latent_attention(
+            fmha_out_decode = f_multi_head_latent_attention(
                 q_input,
                 latent_cache,
                 latent_cache,
@@ -3758,9 +3758,9 @@ class FusedBlockMultiTransformerA8W8(FusedBlockMultiTransformer, FusedMultiTrans
             cache_quant_type_str = "cache_int8"
 
         if self.config.append_attn:
-            from paddlenlp_ops import append_attention
+            from paddlenlp_ops import f_append_attention
 
-            fmha_out = append_attention(
+            fmha_out = f_append_attention(
                 qkv_out,
                 caches[2 * i],
                 caches[2 * i + 1],
@@ -4116,9 +4116,9 @@ class FusedBlockMultiTransformerFP8(FusedBlockMultiTransformer):
             cache_quant_type_str = "cache_int8"
 
         if self.config.append_attn:
-            from paddlenlp_ops import append_attention
+            from paddlenlp_ops import f_append_attention
 
-            fmha_out = append_attention(
+            fmha_out = f_append_attention(
                 qkv_out,
                 caches[2 * i],
                 caches[2 * i + 1],
@@ -5103,9 +5103,9 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
             query_pe, key_pe = self.config.rotary_emb(self.position_ids, query_pe, key_pe)
 
             if self.config.mla_config.use_absorb():
-                from paddlenlp_ops import prefill_mla_write_cache
+                from paddlenlp_ops import f_prefill_mla_write_cache
 
-                prefill_mla_write_cache(
+                f_prefill_mla_write_cache(
                     compressed_kv,
                     key_pe,
                     latent_cache,
@@ -5183,7 +5183,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
         i,
         **kwargs,
     ):
-        from paddlenlp_ops import decode_mla_write_cache, multi_head_latent_attention
+        from paddlenlp_ops import f_decode_mla_write_cache, f_multi_head_latent_attention
 
         ln_out = qkv_out
         latent_cache = caches[i]
@@ -5198,7 +5198,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
             from paddlenlp.utils.env import PREFILL_USE_SAGE_ATTN
 
             if PREFILL_USE_SAGE_ATTN:
-                from paddlenlp_ops import sage_attention_dsk
+                from paddlenlp_ops import f_sage_attention_dsk
 
                 query_256 = paddle.nn.functional.pad(paddle.unsqueeze(query, axis=0), (0, 256 - 192))
                 key_256 = paddle.nn.functional.pad(paddle.unsqueeze(key, axis=0), (0, 256 - 192))
@@ -5319,7 +5319,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
             )
             query_pe, key_pe = self.config.rotary_emb(self.position_ids, query_pe, key_pe)
 
-            decode_mla_write_cache(
+            f_decode_mla_write_cache(
                 compressed_kv,
                 key_pe,
                 latent_cache,
@@ -5347,7 +5347,7 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                 ]
             )
 
-            fmha_out_decode = multi_head_latent_attention(
+            fmha_out_decode = f_multi_head_latent_attention(
                 q_input,
                 latent_cache,
                 latent_cache,
@@ -5454,9 +5454,9 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
                 raise ValueError(
                     f"Unsupported topk_method: {config.topk_method}. Please choose 'group_limited_greedy' or 'noaux_tc'."
                 )
-            from paddlenlp_ops import noaux_tc
+            from paddlenlp_ops import f_noaux_tc
 
-            scores = noaux_tc(
+            scores = f_noaux_tc(
                 scores,
                 scores_with_bias,
                 config.num_expert_group,
