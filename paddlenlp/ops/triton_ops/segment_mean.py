@@ -102,14 +102,15 @@ def segment_mean(
     """
     Examples:
         import paddle
-        import paddlemix
+        from paddlenlp.ops.triton_ops.segment_mean import segment_mean
+
         cu_seqlens = [0, 1024, 2048, 4096]
         total_seqlen = 4096
         num_head = 24
         head_dim = 128
         k = paddle.randn([total_seqlen, num_head, head_dim], dtype="float16")
         cu_seqlen = paddle.to_tensor(cu_seqlens, paddle.int32)
-        km = paddlemix.triton_ops.segment_mean(k, cu_seqlen)
+        km = segment_mean(k, cu_seqlen)
     """
     num_batches = cu_seqlen.shape[0] - 1
 
