@@ -95,6 +95,7 @@ std::vector<paddle::Tensor> MultiHeadLatentAttention(
     const paddle::Tensor& decoder_tile_ids_per_batch,
     const paddle::Tensor& decoder_num_blocks,
     const paddle::Tensor& decoder_num_blocks_cpu,
+    const paddle::Tensor& decoder_chunk_size_cpu,
     const paddle::Tensor& max_enc_len_this_time,
     const paddle::Tensor& max_dec_len_this_time,
     const paddle::Tensor& max_len_kv,
@@ -117,7 +118,7 @@ std::vector<paddle::Tensor> MultiHeadLatentAttention(
     const float quant_max_bound,
     const float quant_min_bound,
     const float out_linear_in_scale,
-    const int speculate_max_draft_token_num,
+    const int speculate_draft_total_token_num,
     const bool causal,
     const bool speculate_decoder);
 
