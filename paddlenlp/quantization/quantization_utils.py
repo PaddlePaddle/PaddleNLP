@@ -23,6 +23,7 @@ from paddle.distributed.fleet.utils.sequence_parallel_utils import (
     ColumnSequenceParallelLinear,
     RowSequenceParallelLinear,
 )
+from paddle.incubate.nn.layer.fused_linear import FusedLinear
 from paddle.nn.quant import weight_quantize
 
 try:
@@ -41,6 +42,7 @@ from .quantization_linear import (
 
 LINEAR_CLASSES = [
     nn.Linear,
+    FusedLinear,
     ColumnParallelLinear,
     RowParallelLinear,
     ColumnSequenceParallelLinear,
@@ -81,6 +83,19 @@ def replace_with_quantization_linear(model, quantization_config, llm_int8_thresh
                 quant_linear = QuantizationLinear(
                     in_features=child.weight.shape[0],
                     out_features=child.weight.shape[1],
+                    quantization_config=quantization_config,
+                    weight_quantize_algo=weight_quantize_algo,
+                    dtype=child._dtype,
+                    bias_attr=bias_attr,
+                )
+            elif isinstance(child, FusedLinear):
+                if child.transpose_weight:
+                    out_feature, in_features = child.weight.shape[0], child.weight.shape[1]
+                else:
+                    in_features, out_feature = child.weight.shape[0], child.weight.shape[1]
+                quant_linear = QuantizationLinear(
+                    in_features=in_features,
+                    out_features=out_feature,
                     quantization_config=quantization_config,
                     weight_quantize_algo=weight_quantize_algo,
                     dtype=child._dtype,
