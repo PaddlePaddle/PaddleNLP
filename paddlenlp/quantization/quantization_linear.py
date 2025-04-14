@@ -14,20 +14,22 @@
 
 import paddle
 import paddle.nn as nn
+from paddle.autograd import PyLayer
 from paddle.distributed.fleet.base import topology as tp
 from paddle.distributed.fleet.layers.mpu import mp_ops
 from paddle.distributed.fleet.utils.sequence_parallel_utils import (
     AllGatherOp,
     ReduceScatterOp,
 )
-from paddle.nn.quant import llm_int8_linear, weight_only_linear
+from paddle.nn.quant import llm_int8_linear, weight_dequantize, weight_only_linear
 
 from paddlenlp.utils import infohub
 
 try:
-    from .qlora import qlora_weight_linear
+    from .qlora import qlora_weight_dequantize, qlora_weight_linear
 except:
     qlora_weight_linear = None
+    qlora_weight_dequantize = None
 
 QuantMapping = {
     # (quant_dtype, quant_weight_bit)
@@ -48,14 +50,18 @@ def random_hadamard(n, dtype):
 
 def quantize_tensorwise(x, apply_hadamard=False, qmax=127, qmin=-128):
     if apply_hadamard:
-        x = x @ infohub.hadamard[x.shape[-1]]
-    scale = paddle.max(paddle.abs(x)) / qmax
-    x_int8 = paddle.clip((x / scale).round(), qmin, qmax).astype("int8")
+        target_x = x @ infohub.hadamard[x.shape[-1]]
+    else:
+        target_x = x.clone()
+    scale = paddle.max(paddle.abs(target_x)) / qmax
+    x_int8 = paddle.clip((target_x / scale).round(), qmin, qmax).astype("int8")
     return x_int8, scale
 
 
-def dequantize_tensorwise(x_int8, scale):
+def dequantize_tensorwise(x_int8, scale, apply_hadamard=False):
     x = x_int8.astype(scale.dtype) * scale
+    if apply_hadamard:
+        x = x @ infohub.hadamard[x.shape[-1]].T
     return x
 
 
@@ -74,16 +80,18 @@ def quantize_channelwise(w, apply_hadamard=False, qmax=127, qmin=-128):
     return w_int8.T, scale.squeeze(0)
 
 
-def dequantize_channelwise(w_int8, scale):
-    w = w_int8.astype(scale.dtype) * scale
+def dequantize_channelwise(w_int8, scale, apply_hadamard=False):
+    w = w_int8.T.astype(scale.dtype) * scale
+    if apply_hadamard:
+        w = infohub.hadamard[w_int8.shape[1]] @ w
     return w
 
 
 def a8w8_linear(x, w_int8, w_scale=None, bias=None, dtype=None, apply_hadamard=False):
-    if w_int8.dtype != paddle.int8:
-        w_int8, w_scale = quantize_channelwise(w_int8, apply_hadamard)
-    if dtype is None:
-        dtype = x.dtype
+    # if w_int8.dtype != paddle.int8:
+    #     w_int8, w_scale = quantize_channelwise(w_int8, apply_hadamard)
+    # if dtype is None:
+    #     dtype = x.dtype
     x_int8, x_scale = quantize_tensorwise(x, apply_hadamard)
     out = paddle.matmul(x_int8, w_int8.T).astype(dtype) * x_scale * w_scale.unsqueeze(0)
     if bias is not None:
@@ -91,16 +99,16 @@ def a8w8_linear(x, w_int8, w_scale=None, bias=None, dtype=None, apply_hadamard=F
     return out
 
 
-def quant_weight_linear(
+def quant_weight_forward(
     x,
     quant_weight,
+    bias,
+    quant_scale,
+    quant_state,
     quant_dtype,
     quantization_config,
     weight_quantize_algo,
     dtype,
-    quant_scale=None,
-    quant_state=None,
-    bias=None,
 ):
     if weight_quantize_algo in ["weight_only_int8", "weight_only_int4"]:
         output = weight_only_linear(
@@ -135,6 +143,134 @@ def quant_weight_linear(
             apply_hadamard=quantization_config.apply_hadamard,
         )
     return output
+
+
+def dequant_weight(
+    quant_weight,
+    quantization_config,
+    weight_quantize_algo,
+    dtype,
+    quant_scale,
+    quant_state,
+    input_shape,
+):
+    if weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8"]:
+        quant_dequant_weight = weight_dequantize(
+            x=quant_weight,
+            scale=quant_scale,
+            algo=weight_quantize_algo,
+            out_dtype=dtype,
+            group_size=quantization_config.group_size,
+        )
+    elif weight_quantize_algo in ["fp4", "nf4"]:
+        quant_dequant_weight = (
+            qlora_weight_dequantize(
+                quant_weight=quant_weight,
+                quant_algo=weight_quantize_algo,
+                state=quant_state if quantization_config.qlora_weight_double_quant else quant_scale,
+                double_quant=quantization_config.qlora_weight_double_quant,
+                block_size=quantization_config.qlora_weight_blocksize,
+                double_quant_block_size=quantization_config.qlora_weight_double_quant_block_size,
+            )
+            .reshape([input_shape[-1], -1])
+            .cast(dtype)
+        )
+    elif weight_quantize_algo in ["a8w8linear"]:
+        quant_dequant_weight = dequantize_channelwise(
+            quant_weight, quant_scale, apply_hadamard=quantization_config.apply_hadamard
+        )
+    return quant_dequant_weight
+
+
+class QuantizationLinearFunc(PyLayer):
+    @staticmethod
+    def forward(
+        ctx,
+        x,
+        quant_weight,
+        bias,
+        quant_scale,
+        quant_state,
+        quant_dtype,
+        quantization_config,
+        weight_quantize_algo,
+        dtype,
+    ):
+
+        output = quant_weight_forward(
+            x=x,
+            quant_weight=quant_weight,
+            bias=bias,
+            quant_scale=quant_scale,
+            quant_state=quant_state,
+            quant_dtype=quant_dtype,
+            quantization_config=quantization_config,
+            weight_quantize_algo=weight_quantize_algo,
+            dtype=dtype,
+        )
+        ctx.quant_dtype = quant_dtype
+        ctx.quantization_config = quantization_config
+        ctx.weight_quantize_algo = weight_quantize_algo
+        ctx.dtype = dtype
+        if ctx.weight_quantize_algo in ["fp4", "nf4"] and ctx.quantization_config.qlora_weight_double_quant:
+            qquant_scale, double_quant_scale, quant_scale_offset = quant_state
+            ctx.save_for_backward(x, quant_weight, bias, qquant_scale, double_quant_scale, quant_scale_offset)
+        else:
+            ctx.save_for_backward(x, quant_weight, bias, quant_scale)
+        return output
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        if ctx.weight_quantize_algo in ["fp4", "nf4"] and ctx.quantization_config.qlora_weight_double_quant:
+            x, quant_weight, bias, qquant_scale, double_quant_scale, quant_scale_offset = ctx.saved_tensor()
+            quant_state = (qquant_scale, double_quant_scale, quant_scale_offset)
+            quant_scale = None
+        else:
+            x, quant_weight, bias, quant_scale = ctx.saved_tensor()
+            quant_state = None
+
+        qdq_weight = dequant_weight(
+            quant_weight=quant_weight,
+            quantization_config=ctx.quantization_config,
+            weight_quantize_algo=ctx.weight_quantize_algo,
+            dtype=ctx.dtype,
+            quant_scale=quant_scale,
+            quant_state=quant_state,
+            input_shape=x.shape,
+        )
+
+        if not x.stop_gradient:
+            input_grad = paddle.matmul(grad_output, qdq_weight.T)
+        else:
+            input_grad = None
+
+        if not quant_weight.stop_gradient:
+            weight_grad = paddle.einsum("bsh,bsd->hd", x, grad_output)
+        else:
+            weight_grad = None
+
+        if bias is not None and not bias.stop_gradient:
+            bias_grad = grad_output.sum(axis=[0, 1])
+        else:
+            bias_grad = None
+
+        return input_grad, weight_grad, bias_grad
+
+
+def quant_weight_linear(
+    x,
+    quant_weight,
+    quant_dtype,
+    quantization_config,
+    weight_quantize_algo,
+    dtype,
+    quant_scale=None,
+    quant_state=None,
+    bias=None,
+):
+    return QuantizationLinearFunc.apply(
+        x, quant_weight, bias, quant_scale, quant_state, quant_dtype, quantization_config, weight_quantize_algo, dtype
+    )
 
 
 class QuantizationLinear(nn.Layer):
