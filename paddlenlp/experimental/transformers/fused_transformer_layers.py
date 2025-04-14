@@ -3389,7 +3389,9 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 )
 
                 fmha_out = sa_results[0]
-                breakpoint()
+                nan_mask = paddle.isnan(fmha_out)
+                nan_indices = paddle.nonzero(nan_mask)
+                print(f"layer: {i} ", nan_indices)
             else:
                 from paddlenlp_ops import append_attention
 

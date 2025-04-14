@@ -164,14 +164,13 @@ std::vector<paddle::Tensor> SageAttentionKernel(
 
     // qkv_out: [token_num, (q_num_head + 2 x kv_num_head) x head_dim]
     int batch_size = seq_lens_this_time.shape()[0];
-    PD_CHECK(batch_size == 1, "Sage Attention Only support batch_size = 1");
 
     const int num_q_head = meta_data.q_num_heads;
     const int head_dim_qk = meta_data.head_dims;
 
     const int num_kv_head = meta_data.kv_num_heads;
     const int head_dim_v = meta_data.head_dims_v;
-    const int total_seqlen_v_padded = cu_seqlen_v_padded.shape()[batch_size];  // cu_seqlen_v_padded[-1]
+    const int total_seqlen_v_padded = v_padded.shape()[0];  // v_padded shape: total_seqlen_v_padded x num_head x head_dim
 
     // use varlen API
     paddle::optional<paddle::Tensor> vm = paddle::optional<paddle::Tensor>(paddle::empty({1}, paddle::DataType::FLOAT32, paddle::GPUPlace()));

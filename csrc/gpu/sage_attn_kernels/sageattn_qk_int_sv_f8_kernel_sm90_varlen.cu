@@ -515,17 +515,20 @@ std::vector<paddle::Tensor> qk_int8_sv_f8_accum_f32_fuse_v_scale_attn_inst_buf_s
 
   // what about we do some check here
   paddle::Tensor nan_mask, nan_indices;
-  nan_mask = paddle::isnan(query);
-  nan_indices = paddle::experimental::nonzero(nan_mask);
-  printf("q nan len: %d\n", nan_indices.shape()[0]);
+  // auto q_fp16 = paddle::experimental::cast(query, paddle::DataType::FLOAT16);
+  // nan_mask = paddle::isnan(q_fp16);
+  // nan_indices = paddle::experimental::nonzero(nan_mask);
+  // printf("q nan len: %d\n", nan_indices.shape()[0]);
 
-  nan_mask = paddle::isnan(key);
-  nan_indices = paddle::experimental::nonzero(nan_mask);
-  printf("k nan len: %d\n", nan_indices.shape()[0]);
+  // auto k_fp16 = paddle::experimental::cast(key, paddle::DataType::FLOAT16);
+  // nan_mask = paddle::isnan(k_fp16);
+  // nan_indices = paddle::experimental::nonzero(nan_mask);
+  // printf("k nan len: %d\n", nan_indices.shape()[0]);
 
-  nan_mask = paddle::isnan(value);
-  nan_indices = paddle::experimental::nonzero(nan_mask);
-  printf("v nan len: %d\n", nan_indices.shape()[0]);
+  // auto v_fp16 = paddle::experimental::cast(value, paddle::DataType::FLOAT16);
+  // nan_mask = paddle::isnan(v_fp16);
+  // nan_indices = paddle::experimental::nonzero(nan_mask);
+  // printf("v nan len: %d\n\n", nan_indices.shape()[0]);
 
   CHECK_DIMS(query_scale, 3);
   CHECK_DIMS(key_scale, 3);
@@ -675,6 +678,12 @@ std::vector<paddle::Tensor> sage_attention_varlen_fwd(paddle::Tensor& q,        
 
   // v was padded, so we cannot use v for output shape
   paddle::Tensor o = paddle::empty(q.shape(), q.dtype(), paddle::GPUPlace()); // so far, the shape of v is not permutted and transposed. Still [total_seqlen, num_head, head_dim]
+
+  // paddle::Tensor nan_mask, nan_indices;
+  // auto v_fp16 = paddle::experimental::cast(v_padded, paddle::DataType::FLOAT16);
+  // nan_mask = paddle::isnan(v_fp16);
+  // nan_indices = paddle::experimental::nonzero(nan_mask);
+  // printf("v input before quant nan len: %d\n", nan_indices.shape()[0]);
 
   std::vector<paddle::Tensor>&& quant_vfp8_results = per_channel_varlen_fp8(v_padded, 
       cu_seqlen_v, 
