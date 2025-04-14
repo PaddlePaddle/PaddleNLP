@@ -118,6 +118,7 @@ sources = [
     "./gpu/speculate_decoding_kernels/ngram_match.cc",
     "./gpu/speculate_decoding_kernels/speculate_save_output.cc",
     "./gpu/speculate_decoding_kernels/speculate_get_output.cc",
+    "./gpu/cache_kernels.cu",
 ]
 sources += find_end_files("./gpu/speculate_decoding_kernels", ".cu")
 sources += find_end_files("./gpu/moe/fused_moe/cutlass_kernels/moe_gemm/", ".cu")
@@ -126,7 +127,7 @@ sources += find_end_files("./gpu/moe/fused_moe/", ".cu")
 nvcc_compile_args = gencode_flags
 update_git_submodule()
 nvcc_compile_args += [
-    "-O3",
+    "-O1",
     "-DNDEBUG",
     "-U__CUDA_NO_HALF_OPERATORS__",
     "-U__CUDA_NO_HALF_CONVERSIONS__",

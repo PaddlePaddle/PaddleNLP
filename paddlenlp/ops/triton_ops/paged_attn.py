@@ -180,3 +180,21 @@ def compute_slot_mapping(
             slot_mapping.extend(slots.astype(np.int64).tolist())
     
     return slot_mapping
+
+def generate_slot_mapping(
+    block_tables: paddle.Tensor,  # [bsz, max_blocks_per_seq]
+    seq_lens: List[int],  
+    block_size: int
+) -> paddle.Tensor:
+    bsz, max_blocks_per_seq = block_tables.shape
+    slot_mapping = []
+    for bi in range(bsz):
+        seq_len = seq_lens[bi]
+        blocks = block_tables[bi]  
+        for pos in range(seq_len):
+            block_idx = pos // block_size
+            physical_block = blocks[block_idx] if block_idx < len(blocks) else -1
+            offset = pos % block_size
+            slot = physical_block * block_size + offset if physical_block >=0 else -1
+            slot_mapping.append(slot)
+    return paddle.to_tensor(slot_mapping, dtype=paddle.int64)
