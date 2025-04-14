@@ -55,6 +55,9 @@ setup(
             "./gpu/flash_attn_bwd.cc",
             "./gpu/update_inputs_v2.cu",
             "./gpu/set_preids_token_penalty_multi_scores.cu",
+            "./gpu/get_position_ids_and_mask_encoder_batch.cu",
+            "./gpu/fused_rotary_position_encoding.cu",
+            "./gpu/cache_kernels.cu",
         ],
         extra_compile_args={
             "cxx": ["-O3"],
@@ -67,6 +70,7 @@ setup(
                 "-U__HIP_NO_BFLOAT16_CONVERSIONS__",
                 "-U__HIP_NO_BFLOAT162_OPERATORS__",
                 "-U__HIP_NO_BFLOAT162_CONVERSIONS__",
+                "-Igpu",
                 "-Ithird_party/cutlass/include",
                 "-Ithird_party/nlohmann_json/single_include",
             ],

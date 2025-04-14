@@ -3551,18 +3551,131 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
                 fmha_out_prefill = paddle.nn.functional.pad(fmha_out_prefill, (0, 192 - 128))
                 fmha_out_prefill = paddle.squeeze(fmha_out_prefill, axis=0)
             else:
-                fmha_out_prefill = paddle.nn.functional.flash_attention.flash_attn_unpadded(
-                    query,
-                    key,
-                    value,
-                    kwargs.get("cu_seqlens_q", None),
-                    kwargs.get("cu_seqlens_k", None),
-                    kwargs.get("max_enc_len_this_time", -1),
-                    kwargs.get("max_enc_len_this_time", -1),
-                    self.softmax_scale,
-                    causal=True,
-                    training=False,
-                )[0]
+                # if paddle.is_compiled_with_rocm():
+                if True
+                    from paddlenlp.ops.triton_ops.paged_attn import PagedAttention, compute_slot_mapping, generate_slot_mapping
+                    """
+                    query: shape = [num_tokens, num_heads * head_size]
+                    key: shape = [num_tokens, num_kv_heads * head_size]
+                    value: shape = [num_tokens, num_kv_heads * head_size]
+                    kv_cache = [2, num_blocks, block_size * num_kv_heads * head_size]
+                    block_tables = [batch_size, max_blocks_per_seq]
+                    """
+                    query_lens = kwargs.get("seq_lens_this_time", None).numpy().tolist()
+                    query_lens = [item for sublist in query_lens for item in sublist]
+                    # seq_lens = kwargs.get("seq_lens", None)
+                    seq_lens = kwargs.get("seq_lens_this_time", None).numpy().tolist()   # seq_lens_this_time
+                    seq_lens = [item for sublist in seq_lens for item in sublist]   
+                    seq_lens_tensor = kwargs.get("seq_lens_this_time", None)
+                    
+                    block_tables = kwargs.get("block_tables", None)
+                    batch_size = block_tables.shape[0]
+                    block_size = kwargs.get("block_size", 64)
+                    
+                    # max_query_len = max(query_lens) 
+                    max_query_len = kwargs.get("max_input_length", None)
+                    query_start_loc = kwargs.get("cu_seqlens_q", None)
+                    # query_start_loc = paddle.to_tensor(list(accumulate(query_lens, initial=0)), dtype=paddle.int64)
+                    # seq_start_loc = paddle.to_tensor(list(accumulate(seq_lens, initial=0)), dtype=paddle.int64)
+                    # seq_lens_tensor = paddle.to_tensor(seq_lens, dtype=paddle.int64)
+                    # context_lens_tensor = paddle.zeros([batch_size], dtype='int64')
+                    context_lens_tensor = paddle.full([batch_size], seq_lens[0] - 1, dtype='int64')
+                    alibi_slopes = None
+                    sliding_window = None
+                    kv_cache_dtype = "auto"
+                    k_scale = paddle.to_tensor(1.0, dtype="bfloat16")
+                    v_scale = paddle.to_tensor(1.0, dtype="bfloat16")
+
+                    # slot_mapping = compute_slot_mapping(
+                    #     seq_lens=seq_lens,
+                    #     query_lens=query_lens,
+                    #     context_lens=context_lens_tensor.cpu().numpy().tolist(),
+                    #     block_tables=block_tables,
+                    #     block_size=block_size,     
+                    #     sliding_window=sliding_window 
+                    # )
+                    # slot_mapping_tensor = paddle.to_tensor(slot_mapping, dtype=paddle.int64)
+                    # print(f"slot_mapping:{slot_mapping_tensor}")
+                    
+                    slot_mapping_test = generate_slot_mapping(block_tables, seq_lens, block_size)
+                
+                    # query = query.reshape([-1, self.num_heads, self.head_dim])
+                    # if key is not None:
+                    #     key = key.reshape([-1, self.num_heads, self.head_dim])
+                    #     value = value.reshape([-1, self.num_heads, self.head_dim])
+                    # else:
+                    #     assert value is None
+
+                    # if isinstance(caches, list):
+                    #     kv_cache_tensor = paddle.concat(caches)
+                    # key_cache, value_cache = PagedAttention.split_kv_cache(kv_cache_tensor, self.kv_num_heads, self.head_dim)
+                    # print(f"latent_cache:{latent_cache}")
+                    num_blocks = kwargs.get("kv_num_blocks", None)
+                    block_total_size = block_size * self.kv_num_heads * self.head_dim
+                    kv_cache_tensor = paddle.zeros([2, num_blocks, block_total_size], dtype='bfloat16')
+                    key_cache, value_cache = PagedAttention.split_kv_cache(kv_cache_tensor, self.kv_num_heads, self.head_dim)
+                    # print(f"before key_cache:{key_cache}")
+                    # print(f"before value_cache:{value_cache}")
+
+                    PagedAttention.write_to_paged_cache(
+                        key,
+                        value,
+                        key_cache,
+                        value_cache,
+                        slot_mapping_test,
+                        kv_cache_dtype,
+                        k_scale,
+                        v_scale,
+                    ) 
+                    fmha_out_prefill = PagedAttention.forward_prefix(
+                        query=query,
+                        key=key,
+                        value=value,
+                        kv_cache_dtype=kv_cache_dtype,  
+                        key_cache=key_cache,
+                        value_cache=value_cache,
+                        block_tables=block_tables,
+                        query_start_loc=query_start_loc,
+                        seq_lens_tensor=seq_lens_tensor,
+                        context_lens=context_lens_tensor,
+                        max_query_len=max_query_len,
+                        alibi_slopes=alibi_slopes,
+                        sliding_window=sliding_window,
+                        k_scale=k_scale,
+                        v_scale=v_scale,
+                    )
+                # else:    
+                    fmha_out_prefill_test = paddle.nn.functional.flash_attention.flash_attn_unpadded(
+                        query,
+                        key,
+                        value,
+                        kwargs.get("cu_seqlens_q", None),
+                        kwargs.get("cu_seqlens_k", None),
+                        kwargs.get("max_enc_len_this_time", -1),
+                        kwargs.get("max_enc_len_this_time", -1),
+                        self.softmax_scale,
+                        causal=True,
+                        training=False,
+                    )[0]
+                    
+                    print(f"fmha_out_prefill shape:{fmha_out_prefill.shape}")
+                    print(f"fmha_out_prefill_test shape:{fmha_out_prefill_test.shape}")
+                    
+                    tolerance = 1e-5  
+                    total_elements = paddle.numel(fmha_out_prefill)
+
+                    diff_prefill_test = paddle.abs(fmha_out_prefill - fmha_out_prefill_test)
+
+                    percent_diff_test = (paddle.sum(diff_prefill_test > tolerance) / total_elements) * 100
+
+                    max_diff_test = paddle.max(diff_prefill_test)
+                    min_diff_test = paddle.min(diff_prefill_test)
+
+                    print(f"fmha_out_prefill  fmha_out_prefill_test diff: {percent_diff_test.numpy()}%")
+
+                    print(f"fmha_out_prefill  fmha_out_prefill_test max diff: {max_diff_test.numpy()}")
+                    print(f"fmha_out_prefill  fmha_out_prefill_test min diff: {min_diff_test.numpy()}")
+                    print("-" * 50)  
 
             fmha_out_prefill = fmha_out_prefill.reshape([-1, self.num_heads, self.config.mla_config.qk_head_dim])
             fmha_out_prefill = fmha_out_prefill[:, :, : self.config.mla_config.v_head_dim]
