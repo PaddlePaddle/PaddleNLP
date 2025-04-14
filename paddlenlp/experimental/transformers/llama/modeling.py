@@ -51,6 +51,7 @@ from paddlenlp.experimental.transformers.utils import (
     EmptyActScale,
     EmptyCacheScale,
     EmptyWeightScale,
+    infererence_model_from_config,
     infererence_model_from_pretrained,
 )
 from paddlenlp.transformers import LlamaConfig, LlamaPretrainedModel
@@ -223,7 +224,7 @@ class LlamaAvxInferenceModel(LlamaPretrainedModel):
         batch_size = 1
         seq_len = 1
         if bos_token_id is None:
-            raise ValueError("`bos_token_id` should be defined when no " "`input_ids` are provided.")
+            raise ValueError("`bos_token_id` should be defined when no `input_ids` are provided.")
         if encoder_output is not None:
             batch_size = encoder_output.shape[0]
             seq_len = encoder_output.shape[1]
@@ -708,7 +709,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         batch_size = 1
         seq_len = 1
         if bos_token_id is None:
-            raise ValueError("`bos_token_id` should be defined when no " "`input_ids` are provided.")
+            raise ValueError("`bos_token_id` should be defined when no `input_ids` are provided.")
         if encoder_output is not None:
             batch_size = encoder_output.shape[0]
             seq_len = encoder_output.shape[1]
@@ -1420,7 +1421,6 @@ class LlamaBlockInferenceModel(LlamaInferenceModel):
         return_dict=False,
         **kwargs,
     ):
-
         seq_lens_this_time = kwargs.get("seq_lens_this_time", None)
         rope_emb = kwargs.get("rope_emb", None)
         draft_tokens = kwargs.get("draft_tokens", None)
@@ -1535,7 +1535,6 @@ class EagleForLlamaInferenceModel(LlamaBlockInferenceModel):
 
 
 class LlamaForCausalLMAvxInferenceModel(GenerationAvxInferenceModel, LlamaPretrainedModel):
-
     _keys_to_ignore_on_load_missing = [r"lm_head.weight"]
 
     def __init__(self, config):
@@ -1546,6 +1545,10 @@ class LlamaForCausalLMAvxInferenceModel(GenerationAvxInferenceModel, LlamaPretra
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
         return infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs)
+
+    @classmethod
+    def from_config(cls, config, *args, **kwargs):
+        return infererence_model_from_config(cls, config, args, kwargs)
 
     @classmethod
     def get_cache_kvs_shape(
@@ -1642,6 +1645,10 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
         return infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs)
+
+    @classmethod
+    def from_config(cls, config, *args, **kwargs):
+        return infererence_model_from_config(cls, config, args, kwargs)
 
     @classmethod
     def get_cache_kvs_shape(
@@ -1824,7 +1831,6 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
 
     @classmethod
     def _get_tensor_parallel_mappings(cls, config: LlamaConfig, is_split=True):
-
         logger.info("llama inference model _get_tensor_parallel_mappings")
 
         from paddlenlp.transformers.conversion_utils import split_or_merge_func
@@ -1907,6 +1913,10 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
         return infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs)
+
+    @classmethod
+    def from_config(cls, config, *args, **kwargs):
+        return infererence_model_from_config(cls, config, args, kwargs)
 
     @classmethod
     def get_cache_kvs_shape(
@@ -2200,9 +2210,8 @@ class LlamaForMiniGPT4InferenceModel(LlamaForCausalLMInferenceModel):
         stop_nums=None,
         cache_kvs=[],
         inputs_embeds=None,
-        **generate_kwargs
+        **generate_kwargs,
     ) -> paddle.Tensor:
-
         first_embeds = self.llama.embed_tokens(first_input_ids)
         second_embeds = self.llama.embed_tokens(second_input_ids)
         image_features = paddle.cast(image_features, dtype=first_embeds.dtype)

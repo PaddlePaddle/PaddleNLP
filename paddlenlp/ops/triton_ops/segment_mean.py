@@ -86,7 +86,7 @@ def segmented_mean_reduce_kernel(
 
         acc += tl.sum(x, axis=0)  # reduce over seq axis
 
-    mean = acc / tl.maximum(seq_len, 1)
+    mean = acc / seq_len
 
     # 构造输出地址
     output_ptrs = (
@@ -116,8 +116,7 @@ def segment_mean(
     num_heads = x.shape[1]
     head_dim = x.shape[2]
 
-    # 计算每个batch的最大序列长度
-    max_seqlen = (cu_seqlen[1:] - cu_seqlen[:-1]).max().item()
+    # 计算必要的strides
     input_stride_seq = num_heads * head_dim
     input_stride_head = head_dim
 

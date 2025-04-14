@@ -16,14 +16,9 @@ import paddle
 import paddle.nn as nn
 from paddle.distributed.fleet.meta_parallel import LayerDesc
 
-from paddlenlp.transformers import LlamaForCausalLM, LlamaForCausalLMPipe
-from paddlenlp.transformers.llama.modeling import LlamaDecoderLayer
-from paddlenlp.transformers.llama.modeling_pp import (
-    LlamaRMSNormPipe,
-    parse_args,
-    return_args,
-)
-
+from ...transformers import LlamaForCausalLM, LlamaForCausalLMPipe
+from ...transformers.llama.modeling import LlamaDecoderLayer
+from ...transformers.llama.modeling_pp import LlamaRMSNormPipe, parse_args, return_args
 from .pp_model_utils import fwd_args_to_dict, get_expected_keys, pad_batches_inputs
 from .ppo_model_utils import (
     RLHFPPOMixedLoss,

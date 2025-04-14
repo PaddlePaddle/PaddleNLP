@@ -529,7 +529,7 @@ class MixtralSparseMoeBlock(nn.Layer):
                 continue
 
             current_state = paddle.gather(hidden_states, top_x.squeeze())
-            current_hidden_states = expert_layer(current_state) * routing_weights[top_x, idx]
+            current_hidden_states = expert_layer(current_state) * routing_weights[top_x, idx].unsqueeze(-1)
 
             top_x = top_x.squeeze()
             if top_x.shape == []:

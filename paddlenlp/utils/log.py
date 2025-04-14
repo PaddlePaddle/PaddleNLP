@@ -185,7 +185,7 @@ class MetricsDumper(object):
         :param sig: Signal number.
         :param frame: Current stack frame.
         """
-        self.shutdown_event.set()  # Signal the background process to stop
+        print(f"Received signal {sig}. Shutting down...")
         self.close()
 
     def close(self):
