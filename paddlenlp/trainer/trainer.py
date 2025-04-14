@@ -2297,7 +2297,11 @@ class Trainer:
                 assert (
                     ShardingOption.SHARD_GRAD_OP in self.args.sharding or ShardingOption.SHARD_OP in self.args.sharding
                 ), "Only support tensor parallel + sharding stage1/stage2 hybrid parallel now."
-                model = paddle.distributed.fleet.meta_parallel.TensorParallel(model, hcg, strategy=None)
+                # NOTE: TensorParallel will be called in distributed_model when sharding stage1, so no need to call here
+                if ShardingOption.SHARD_GRAD_OP in self.args.sharding:
+                    model = paddle.distributed.fleet.meta_parallel.TensorParallel(
+                        model, hcg, strategy=fleet.fleet._user_defined_strategy
+                    )
 
             if ShardingOption.SHARD_OP in self.args.sharding:
                 if self.args.amp_master_grad:
