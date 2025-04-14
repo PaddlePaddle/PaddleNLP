@@ -41,6 +41,7 @@ from paddlenlp.experimental.transformers import (
 )
 from paddlenlp.trl import llm_utils
 from paddlenlp.trl.llm_utils import get_rotary_position_embedding
+from paddlenlp.utils.env import PADDLE_INFERENCE_MODEL_SUFFIX, PADDLE_INFERENCE_WEIGHTS_SUFFIX
 
 File_Path = os.path.realpath(sys.argv[0])
 Dir_Path = os.path.dirname(File_Path)
@@ -726,12 +727,8 @@ class InferenceEngine(object):
         predictor init
         """
         device_id = self.rank % self.config.mp_num_per_node
-        if use_pir_api():
-            self.model_file = os.path.join(self.model_dir, "model.json")
-            self.param_file = os.path.join(self.model_dir, "model.pdiparams")
-        else:
-            self.model_file = os.path.join(self.model_dir, "model.pdmodel")
-            self.param_file = os.path.join(self.model_dir, "model.pdiparams")
+        self.model_file = os.path.join(self.model_dir, f"model{PADDLE_INFERENCE_MODEL_SUFFIX}")
+        self.param_file = os.path.join(self.model_dir, f"model{PADDLE_INFERENCE_WEIGHTS_SUFFIX}")
         config = paddle.inference.Config(self.model_file, self.param_file)
 
         if paddle.is_compiled_with_xpu():

@@ -47,6 +47,7 @@ from paddlenlp.experimental.transformers.utils import (
     EmptyActScale,
     EmptyCacheScale,
     EmptyWeightScale,
+    infererence_model_from_config,
     infererence_model_from_pretrained,
 )
 from paddlenlp.transformers import Qwen2Config, Qwen2PretrainedModel
@@ -68,6 +69,7 @@ __all__ = [
     "Qwen2ForCausalLMInferenceModel",
     "Qwen2ForCausalLMBlockInferenceModel",
     "Qwen2VLForConditionalGenerationBlockInferenceModel",
+    "Qwen2_5_VLForConditionalGenerationBlockInferenceModel",
 ]
 
 
@@ -1082,6 +1084,10 @@ class Qwen2ForCausalLMInferenceModel(GenerationInferenceModel, Qwen2PretrainedMo
         return infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs)
 
     @classmethod
+    def from_config(cls, config, *args, **kwargs):
+        return infererence_model_from_config(cls, config, args, kwargs)
+
+    @classmethod
     def get_cache_kvs_shape(
         cls, config: Qwen2Config, max_batch_size: int = None, max_length: int = None
     ) -> list[list[int]]:
@@ -1282,14 +1288,13 @@ class Qwen2BlockInferenceModel(Qwen2InferenceModel):
         kwargs["padding_offsets"] = padding_offset
         kwargs["max_input_length"] = self.max_seq_len
 
+        # NOTE: (changwenbin) , When using multimodal prediction, the input is required to be inputs_embeds,
+        # input_ids -> inputs_embeds is processed before the language model.
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(ids_remove_padding)
         else:
-            assert len(inputs_embeds.shape) == 3
-            # This is the case in the image-to-text model such as qwen2-vl,
-            # In the prefill phase, the language model is first fed with inputs_embeds instead of input_ids
-            # but in decoder phase, the language model is fed with input_ids just like normal text-to-text model.
-            inputs_embeds = inputs_embeds.reshape([-1, inputs_embeds.shape[2]])
+            if len(inputs_embeds.shape) == 3:
+                inputs_embeds = inputs_embeds.reshape([-1, inputs_embeds.shape[2]])
 
         with dy2st_nocheck_guard_context():
             hidden_states, _ = self.transformer_block(
@@ -1420,6 +1425,10 @@ class Qwen2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen2Pr
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
         return infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs)
+
+    @classmethod
+    def from_config(cls, config, *args, **kwargs):
+        return infererence_model_from_config(cls, config, args, kwargs)
 
     @classmethod
     def get_cache_kvs_shape(

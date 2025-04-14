@@ -182,14 +182,15 @@ Recall@K 召回率是指预测的前 topK（top-k 是指从最后的按得分排
 
 如果使用 CPU 进行训练，则需要吧`--gpus`参数去除，然后吧`device`设置成 cpu 即可，详细请参考 train_batch_neg.sh 文件的训练设置
 
+如果不存在```checkpoints/inbatch```, 需要在命令行运行```mkdir -p checkpoints/inbatch```创建相关目录（如果运行脚本进行训练则不需要）。
+
 然后运行下面的命令使用 GPU 训练，得到语义索引模型：
 
 ```
-root_path=inbatch
 python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
     train_batch_neg.py \
     --device gpu \
-    --save_dir ./checkpoints/${root_path} \
+    --save_dir ./checkpoints/inbatch \
     --batch_size 64 \
     --learning_rate 5E-5 \
     --epochs 3 \
@@ -464,7 +465,7 @@ python deploy/python/predict.py \
 也可以运行下面的 bash 脚本：
 
 ```
-sh deploy.sh
+sh deploy/python/deploy.sh
 ```
 最终输出的是256维度的特征向量和句子对的预测概率：
 
