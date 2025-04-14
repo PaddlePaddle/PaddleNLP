@@ -1299,6 +1299,7 @@ class PPOTrainer(Trainer):
                             indices.extend(micro_indices)
                             label_ids_batches.extend(micro_label_ids_batches)
                         indices = np.concatenate(indices)
+                    self.timers and (dist.get_world_size() > 1) and dist.barrier()
                     timer_scope_rollout.stop()
 
                     # step 2-1: compute logprob for rollout data
