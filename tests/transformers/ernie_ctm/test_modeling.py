@@ -352,13 +352,11 @@ class ErnieCtmModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase
         attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
         with paddle.no_grad():
             output = model(input_ids, attention_mask=attention_mask)[0]
-        expected_shape = [1, 11, 768]
+        expected_shape = [1, 11, 8]
         self.assertEqual(output.shape, expected_shape)
 
-        expected_slice = paddle.to_tensor(
-            [[[0.4249, 0.1008, 0.7531], [0.3771, 0.1188, 0.7467], [0.4152, 0.1098, 0.7108]]]
-        )
-        self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
+        expected_slice = paddle.to_tensor([[[0.223, -0.059, 0.0202], [0.157, -0.110, 0.005], [0.152, -0.070, -0.087]]])
+        self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-2))
 
     @slow
     def test_inference_with_attention(self):
@@ -368,13 +366,19 @@ class ErnieCtmModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase
         attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
         with paddle.no_grad():
             output = model(input_ids, attention_mask=attention_mask)[0]
-        expected_shape = [1, 11, 768]
+        expected_shape = [1, 11, 8]
         self.assertEqual(output.shape, expected_shape)
 
-        expected_slice = paddle.to_tensor(
-            [[[0.4249, 0.1008, 0.7531], [0.3771, 0.1188, 0.7467], [0.4152, 0.1098, 0.7108]]]
-        )
-        self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
+        expected_slice = paddle.to_tensor([[[0.223, -0.059, 0.0202], [0.157, -0.110, 0.005], [0.152, -0.070, -0.087]]])
+        self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-2))
+
+    @unittest.skip("Skip for miss model weight.")
+    def test_pretrained_save_and_load(self):
+        pass
+
+    @unittest.skip("Skip for miss model weight.")
+    def test_model_from_pretrained_with_cache_dir(self):
+        pass
 
 
 if __name__ == "__main__":

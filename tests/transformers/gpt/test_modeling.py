@@ -42,6 +42,8 @@ from tests.transformers.test_modeling_common import (
     random_attention_mask,
 )
 
+from ...testing_utils import require_gpu
+
 GPT2_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "gpt2-en",
     "gpt2-medium-en",
@@ -501,7 +503,7 @@ class GPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
 
             self.assertTrue(paddle.allclose(ids_output, embeds_output, rtol=1e-4, atol=1e-4))
 
-    @slow
+    @require_gpu(1)
     def test_batch_generation(self):
         model = GPTForCausalLM.from_pretrained("gpt2-en")
         model.eval()
@@ -511,7 +513,7 @@ class GPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
 
         # Define PAD Token = EOS Token = 50256
         tokenizer.pad_token = tokenizer.eos_token
-        model.pad_token_id = model.eos_token_id
+        model.pad_token_id = tokenizer.eos_token_id
         getattr(model, model.base_model_prefix).config["pad_token_id"] = getattr(
             model, model.base_model_prefix
         ).config["eos_token_id"]
@@ -523,7 +525,12 @@ class GPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
         ]
 
         inputs = tokenizer(
-            sentences, return_tensors="pd", padding=True, return_attention_mask=True, return_position_ids=True
+            sentences,
+            return_tensors="pd",
+            padding=True,
+            return_attention_mask=True,
+            return_position_ids=True,
+            left_padding=True,
         )
         input_ids = inputs["input_ids"]
 
@@ -550,8 +557,8 @@ class GPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
             " bit of a mess. I'm not sure if he's going to be able to walk or not",
             "'m going to be doing a lot of research on this. I'm going to be doing a lot",
         ]
-        self.assertListEqual(expected_output_sentence, batch_out_sentence)
         self.assertListEqual(expected_output_sentence, [non_padded_sentence, padded_sentence])
+        self.assertListEqual(expected_output_sentence, batch_out_sentence)
 
     @slow
     def test_model_from_pretrained(self):
@@ -662,8 +669,8 @@ class GPTModelLanguageGenerationTest(PaddleNLPModelTest):
 
     @slow
     def test_gpt_sample(self):
-        tokenizer = GPTTokenizer.from_pretrained("gpt2-en")
-        model = GPTForCausalLM.from_pretrained("gpt2-en")
+        tokenizer = GPTTokenizer.from_pretrained("gpt2-medium-en")
+        model = GPTForCausalLM.from_pretrained("gpt2-medium-en")
         model.eval()
 
         paddle.seed(128)
@@ -694,16 +701,15 @@ class GPTModelLanguageGenerationTest(PaddleNLPModelTest):
         )
         output_seq_strs = tokenizer.batch_decode(output_seq, skip_special_tokens=True)
 
-        EXPECTED_OUTPUT_STR = " I'm glad I'm here. I'm glad I'm here. I'm glad I'm here"
-
+        EXPECTED_OUTPUT_STR = " I'm going to go out and do some shopping. I'm going to go to the mall and"
         self.assertEqual(output_seq_strs[0], EXPECTED_OUTPUT_STR)
         self.assertEqual(output_str, EXPECTED_OUTPUT_STR)
 
     @slow
     def test_gpt_sample_max_time(self):
         # NOTE: duration changed sharply and can not be limit in a range for now.
-        tokenizer = GPTTokenizer.from_pretrained("gpt2-en")
-        model = GPTForCausalLM.from_pretrained("gpt2-en")
+        tokenizer = GPTTokenizer.from_pretrained("gpt2-medium-en")
+        model = GPTForCausalLM.from_pretrained("gpt2-medium-en")
         model.eval()
 
         paddle.seed(0)
