@@ -95,7 +95,7 @@ class AdamWMini(AdamW):
 
     def _add_moments_pows(self, p):
         """Add moment accumulators with shapes based on block type."""
-        name = next((n for n in self._already_create_accumulator if p.name in n), "")
+        name = p.name
 
         # Get accumulator data type
         acc_dtype = p.dtype
@@ -129,11 +129,38 @@ class AdamWMini(AdamW):
                 type=core.VarDesc.VarType.DENSE_TENSOR,
                 device="cpu",
             )
-        else:
+        elif (
+            any(embd_name in name.lower() for embd_name in self.embd_names)
+            or any(output_name in name.lower() for output_name in self.output_names)
+            or any(wv_name in name.lower() for wv_name in self.wv_names)
+            or any(mlp_name in name.lower() for mlp_name in self.mlp_names)
+            or any(attn_proj_name in name.lower() for attn_proj_name in self.attn_proj_names)
+        ):
             # One accumulator per neuron for other blocks
             shape = [p.shape[0], 1] if len(p.shape) > 1 else [1]
             self._add_accumulator(self._moment1_acc_str, p, dtype=acc_dtype)
             self._add_accumulator(self._moment2_acc_str, p, dtype=acc_dtype, shape=shape)
+            self._add_accumulator(
+                name=self._beta1_pow_acc_str,
+                param=p,
+                dtype=acc_dtype,
+                fill_value=0.9 if isinstance(self._beta1, (Variable, Value)) else self._beta1,
+                shape=[1],
+                type=core.VarDesc.VarType.DENSE_TENSOR,
+                device="cpu",
+            )
+            self._add_accumulator(
+                name=self._beta2_pow_acc_str,
+                param=p,
+                dtype=acc_dtype,
+                fill_value=0.999 if isinstance(self._beta2, (Variable, Value)) else self._beta2,
+                shape=[1],
+                type=core.VarDesc.VarType.DENSE_TENSOR,
+                device="cpu",
+            )
+        else:
+            self._add_accumulator(self._moment1_acc_str, p, dtype=acc_dtype)
+            self._add_accumulator(self._moment2_acc_str, p, dtype=acc_dtype, shape=[1])
             self._add_accumulator(
                 name=self._beta1_pow_acc_str,
                 param=p,
@@ -160,7 +187,7 @@ class AdamWMini(AdamW):
             param_and_grad = self._update_param_group(param_and_grad)
 
         param = param_and_grad[0]
-        name = next((n for n in self._already_create_accumulator if param.name in n), "")
+        name = param.name
 
         with_decay = True
         if self._apply_decay_param_fun is not None and not self._apply_decay_param_fun(param.name):
