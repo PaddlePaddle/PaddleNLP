@@ -63,18 +63,16 @@ def init_train_model_opt(
     clear_master_weight: bool = False,
 ) -> PretrainedModel:
     """
-    初始化训练模型和优化器，并返回已包装的模型。
+    Initialize the training model and optimizer, and return the wrapped model.
 
     Args:
-        self (Trainer): Trainer实例对象。
-        max_steps (int): 最大训练步数。
-        resume_from_checkpoint (bool, optional, default=False): 是否从保存点中恢复训练，默认为False。
-            Defaults to False.
-        clear_master_weight (bool, optional, default=False): 在使用Trainer的分布式硬件加速时，清除主参数权重，默认为False。
-            Defaults to False.
+        self (Trainer): The instance of the Trainer class.
+        max_steps (int): The maximum number of training steps.
+        resume_from_checkpoint (bool, optional): Whether to resume training from a checkpoint, defaults to False.
+        clear_master_weight (bool, optional): When using Trainer's distributed hardware acceleration, clear the master parameter weights, defaults to False.
 
     Returns:
-        PretrainedModel: 已经包装好的模型。
+        PretrainedModel: The wrapped model ready for training.
     """
     # Copy of model/optimizer init and resuming related code in `Trainer.train`.
     # NOTE: this `_load_from_checkpoint` is indeed to load model states in the
@@ -139,21 +137,21 @@ def init_train_state(
     num_update_steps_per_epoch: int,
 ):
     """
-    初始化训练状态。
+    Initialize the training state.
 
     Args:
-        self (Trainer): Trainer实例，用于记录训练状态。
-        resume_from_checkpoint (bool, optional): 是否从检查点继续训练，默认为None。
-        train_dataloader (DataLoader, optional): 训练数据加载器，默认为None。
-        max_steps (int, optional): 最大训练步数，默认为-1。
-        num_train_epochs (int, optional): 训练的最大轮数，默认为3。
-        num_update_steps_per_epoch (int, optional): 每个轮次更新模型的步数，默认为1。
+        self (Trainer): The instance of the Trainer class to record the training state.
+        resume_from_checkpoint (bool, optional): Whether to resume training from a checkpoint, defaults to False.
+        train_dataloader (DataLoader, optional): The data loader for training, defaults to None.
+        max_steps (int, optional): The maximum number of training steps, defaults to -1.
+        num_train_epochs (int, optional): The maximum number of training epochs, defaults to 3.
+        num_update_steps_per_epoch (int, optional): The number of steps to update the model per epoch, defaults to 1.
 
     Returns:
         Tuple[int, int, Optional[tqdm]]:
-            - epochs_trained (int): 已经训练了多少个epoch。
-            - steps_trained_in_current_epoch (int): 如果不忽略数据跳过，则为当前epoch中已经训练了多少个批次；否则为0。
-            - steps_trained_progress_bar (Optional[tqdm]): 如果不忽略数据跳过，则为一个tqdm进度条，用于显示正在跳过第一个批次；否则为None。
+            - epochs_trained (int): The number of epochs already trained.
+            - steps_trained_in_current_epoch (int): The number of batches trained in the current epoch if not skipping data; otherwise, 0.
+            - steps_trained_progress_bar (Optional[tqdm]): A tqdm progress bar to show the progress of skipping the first batch if not skipping data; otherwise, None.
     """
     args = self.args
 
@@ -224,19 +222,19 @@ def init_train_log(
     model: PretrainedModel,
 ):
     """
-    初始化训练日志。
+    Initialize the training log.
 
     Args:
-        self (Trainer): Trainer实例，包含了训练所需的参数和信息。
-        num_examples (int): 训练集中样本的总数。
-        num_train_epochs (int): 训练的 epoch 数量。
-        total_train_batch_size (int): 单个设备上的训练 batch 大小之和。
-        max_steps (int): 最大训练步数。
-        num_train_samples (int): 训练集中样本的总数。
-        model (PretrainedModel): 被训练的模型。
+        self (Trainer): The instance of the Trainer class containing parameters and information required for training.
+        num_examples (int): The total number of samples in the training set.
+        num_train_epochs (int): The number of training epochs.
+        total_train_batch_size (int): The sum of the training batch sizes on a single device.
+        max_steps (int): The maximum number of training steps.
+        num_train_samples (int): The total number of samples in the training set.
+        model (PretrainedModel): The model being trained.
 
     Returns:
-        None, 该函数不返回任何值。
+        None, this function does not return any value.
     """
     args = self.args
 
@@ -686,11 +684,11 @@ class RLTrainer(Trainer):
     @property
     def loss_names(self):
         """
-        返回所有损失项的名称列表，只在第一次调用时计算。
-        如果没有损失项，则返回空列表。
+        Return a list of names of all loss terms, computed only on the first call.
+        If there are no loss terms, return an empty list.
 
         Returns:
-            List[str]: 损失项的名称列表，每个名称以"_loss"结尾。
+            List[str]: A list of names of loss terms, each ending with "_loss".
         """
         if not hasattr(self, "_loss_names"):
             self._loss_names = [var_name for var_name in self.get_train_step_vars() if var_name.endswith("_loss")]
@@ -863,16 +861,18 @@ class RLTrainer(Trainer):
 
     def get_sharding_master_weight_structured_names(self, model, optimizer):
         """
-        获取分片主机权重的结构化名称列表。
-        参数：
-            model (torch.nn.Module) - 模型对象，包含需要进行权重分片的参数。
-            optimizer (torch.optim.Optimizer) - 优化器对象，包含需要进行权重分片的参数。
-        返回值（list[str]）- 一个包含所有参数的结构化名称列表，这些参数在当前分片主机上被训练。
+        Get a list of structured names for the sharding master weights.
+
+        Args:
+            model (paddle.nn.Layer): The model object containing parameters that need to be sharded.
+            optimizer (paddle.optimizer.Optimizer): The optimizer object containing parameters that need to be sharded.
+
+        Returns:
+            list[str]: A list of structured names for all parameters that are being trained on the current sharding master.
         """
         rank_param_names = [p.name for p in optimizer._rank2params[optimizer._sharding_rank]]
         structured_names = []
-        # for pipeline model, use `model.state_dict()` would auto map param name
-        # for name, p in model.named_parameters():
+        # For pipeline model, using `model.state_dict()` would automatically map parameter names
         for name, p in model.state_dict().items():
             if p.name in rank_param_names:
                 structured_names.append(name)
@@ -880,22 +880,22 @@ class RLTrainer(Trainer):
 
     def get_master_weight_state_dict(self, model, optimizer):
         """
-        获取模型的权重状态字典，如果使用了AMP且支持pipeline并且存在master weights，则返回master weights。
-        否则返回model.state_dict()。
+        Retrieve the state dictionary of model weights. If AMP is used, pipeline is supported,
+        and master weights exist, return the master weights. Otherwise, return model.state_dict().
 
         Args:
-            model (nn.Module): 待获取权重状态字典的模型。
-            optimizer (Optimizer): 与模型关联的优化器，可选参数，默认为None。
+            model (nn.Module): The model from which to retrieve the state dictionary of weights.
+            optimizer (Optimizer): The optimizer associated with the model, optional, defaults to None.
 
         Returns:
-            Union[Dict[str, Tensor], Dict[str, Any]]: 返回一个包含模型权重状态的字典，字典中的键是参数名称，值是对应的Tensor或Any类型的值。
-            如果使用了AMP且支持pipeline并且存在master weights，则返回的字典只包含master weights。
+            Union[Dict[str, Tensor], Dict[str, Any]]: A dictionary containing the state of the model weights.
+            The keys in the dictionary are parameter names, and the values are corresponding Tensors or values of Any type.
+            If AMP is used, pipeline is supported, and master weights exist, the returned dictionary only contains the master weights.
         """
         if self.amp_dtype in ["float16", "bfloat16"] and hasattr(optimizer, "_master_weights"):
             master_weights = dict(optimizer._master_weights)
             result = {}
-            # for pipeline model, use `model.state_dict()` would auto map param name
-            # for name, p in model.named_parameters():
+            # For pipeline models, using `model.state_dict()` automatically maps parameter names
             for name, p in model.state_dict().items():
                 if p.name in master_weights:
                     result[name] = master_weights[p.name]

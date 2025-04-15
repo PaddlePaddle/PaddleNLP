@@ -14,7 +14,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
 
 import paddle
 from paddle import nn
@@ -45,13 +45,13 @@ class AutoModelForScore(ScoreModelMixin, PretrainedModel):
         # config.architectures = [self.__class__.__name__]
         self.init_score_head(config, hidden_size=config.hidden_size, **kwargs)
 
-    def get_input_embeddings(self) -> nn.Embedding:
+    def get_input_embeddings(self) -> Optional[nn.Embedding]:
         """
-        返回输入嵌入的nn.Embedding对象，该对象用于将输入序列转换为嵌入向量。
-        如果模型没有使用嵌入，则返回None。
+        Returns the nn.Embedding object for input embeddings, which converts input sequences into embedding vectors.
+        If the model does not use embeddings, it returns None.
 
         Returns:
-            Optional[nn.Embedding]: 输入嵌入的nn.Embedding对象，或者None（如果没有使用嵌入）。
+            Optional[nn.Embedding]: The nn.Embedding object for input embeddings, or None if embeddings are not used.
         """
         return self.model.embed_tokens
 
@@ -69,26 +69,26 @@ class AutoModelForScore(ScoreModelMixin, PretrainedModel):
 
     def get_decoder(self) -> PretrainedModel:
         """
-        获取解码器模型。
+        Retrieve the decoder model.
 
         Returns:
-            PretrainedModel (Pytorch): 返回解码器模型，类型为Pytorch的PretrainedModel。
+            PretrainedModel: The decoder model, which is an instance of PaddlePaddle's PretrainedModel class.
         """
         return self.model
 
     def set_decoder(self, decoder: PretrainedModel) -> None:
         """
-        设置解码器，用于进行文本生成。
+        Sets the decoder for text generation.
 
         Args:
-            decoder (PretrainedModel): 预训练的模型对象，需要是一个有效的解码器。
+            decoder (PretrainedModel): A pre-trained model object that serves as a valid decoder.
 
         Returns:
-            None; 无返回值。
+            None: No return value.
         """
         self.model = decoder
 
-    def forward(  # pylint: disable=too-many-arguments
+    def forward(
         self,
         input_ids: paddle.Tensor,
         attention_mask: paddle.Tensor,
@@ -101,34 +101,34 @@ class AutoModelForScore(ScoreModelMixin, PretrainedModel):
         return_dict: bool | None = None,
     ) -> tuple[paddle.Tensor, paddle.Tensor] | ScoreModelOutput:
         """
-        句子的前向传播过程。
+        Forward pass of the sentence.
 
         Args:
             input_ids (paddle.Tensor):
-                输入序列的ID，形状为（batch_size, sequence_length）。
+                IDs of the input sequences, with shape (batch_size, sequence_length).
             attention_mask (paddle.Tensor):
-                用于区分padding和非padding元素的mask，形状为（batch_size, sequence_length），值为0或1。
+                Mask used to distinguish padding and non-padding elements, with shape (batch_size, sequence_length), values are 0 or 1.
             position_ids (paddle.Tensor, optional):
-                input_ids对应的位置ID，形状为（batch_size, sequence_length），默认为None。
+                Position IDs corresponding to input_ids, with shape (batch_size, sequence_length), default is None.
             past_key_values (list[paddle.Tensor], optional):
-                包含所有预处理器的键和值，默认为None。
+                Contains all preprocessed keys and values, default is None.
             inputs_embeds (paddle.Tensor, optional):
-                输入序列的嵌入，形状为（batch_size, sequence_length, embedding_dimension），默认为None。
+                Embeddings of the input sequences, with shape (batch_size, sequence_length, embedding_dimension), default is None.
             use_cache (bool, optional):
-                是否使用缓存，默认为None。
+                Whether to use caching, default is None.
             output_attentions (bool, optional):
-                是否返回注意力张量，默认为None。
+                Whether to return attention tensors, default is None.
             output_hidden_states (bool, optional):
-                是否返回隐藏状态，默认为None。
+                Whether to return hidden states, default is None.
             return_dict (bool, optional):
-                是否返回字典格式的结果，默认为None。
+                Whether to return results in dictionary format, default is None.
 
         Returns:
             tuple[paddle.Tensor, paddle.Tensor] or ScoreModelOutput:
-                如果`return_dict`为True，则返回一个ScoreModelOutput类型的元组，其中包含两个元素：得分和附加信息；否则，返回一个tuple，其中包含得分和附加信息。
+                If `return_dict` is True, returns a tuple of ScoreModelOutput type containing two elements: score and additional information; otherwise, returns a tuple containing the score and additional information.
         Raises:
             AssertionError:
-                当`attention_mask`不为None时引发。
+                Raised when `attention_mask` is not None.
         """
         assert attention_mask is not None
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions

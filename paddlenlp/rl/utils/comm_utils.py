@@ -64,16 +64,16 @@ class RolloutStages(Enum):
 
 def get_timer_label(stage: Enum) -> str:
     """
-    获取计时器标签。
+    Get the timer label.
 
     Args:
         stage (Enum): RolloutStages/CriticStages/RolloutStages.
 
     Returns:
-        str: 打印Timer时的前缀。格式为 "[prefix] stage number.description"。
-            - prefix: 阶段前缀，如"actor-step"、"critic-step"等。
-            - stage number: 从1开始编号。
-            - description: 阶段描述，小写形式。
+        str: The prefix when printing the Timer. Format is "[prefix] stage number.description".
+            - prefix: Stage prefix, e.g., "actor-step", "critic-step".
+            - stage number: Numbered from 1.
+            - description: Stage description in lowercase.
     """
     step_prefix = {
         ActorStages.MODEL_ENABLE_DISABLE: "actor-step",
@@ -103,13 +103,16 @@ def get_timer_label(stage: Enum) -> str:
 
 def cleanup_tensor_space(tensors):
     """
-    释放张量所占的空间，包括内存和磁盘空间。如果输入是字典类型，则递归处理其中的值；如果是paddle.Tensor类型，则清除数据；否则返回原始对象。
+    Release the space occupied by tensors, including memory and disk space.
+    If the input is a dictionary, recursively process its values;
+    if it is a paddle.Tensor, clear the data; otherwise, return the original object.
 
     Args:
-        tensors (Union[dict, paddle.Tensor]): 需要释放空间的张量或字典，其中字典的值为张量。
+        tensors (Union[dict, paddle.Tensor]): Tensors or dictionary to release space, where the values of the dictionary are tensors.
 
     Returns:
-        Union[dict, paddle.Tensor]: 如果输入是字典，则返回一个新的字典，其中值已经被释放空间；如果输入是paddle.Tensor，则返回一个清除了数据的paddle.Tensor。否则返回原始对象。
+        Union[dict, paddle.Tensor]: If the input is a dictionary, return a new dictionary with values having their space released;
+        if the input is a paddle.Tensor, return a paddle.Tensor with data cleared. Otherwise, return the original object.
     """
     if isinstance(tensors, dict):
         for _, v in tensors.items():
@@ -123,16 +126,16 @@ def cleanup_tensor_space(tensors):
 
 def data_group_split(tensors, group):
     """
-    将数据按照给定的分组进行切分，如果没有给定分组则直接返回原始数据。
-    支持列表、元组、字典和paddle.Tensor类型的数据。
+    Split data according to the given group. If no group is given, return the original data.
+    Supports list, tuple, dictionary, and paddle.Tensor types of data.
 
     Args:
-        tensors (Union[List[Any], Tuple[Any], Dict[str, Any], paddle.Tensor]): 待切分的数据，可以是任意类型。
-        group (Optional[distributed.Group]): 指定要切分的分组，如果为None则直接返回原始数据。默认为None。
+        tensors (Union[List[Any], Tuple[Any], Dict[str, Any], paddle.Tensor]): Data to be split, can be any type.
+        group (Optional[distributed.Group]): The group to split by, if None, return the original data. Default is None.
 
     Returns:
-        Union[List[Any], Tuple[Any], Dict[str, Any], paddle.Tensor]: 切分后的数据，与输入数据类型一致。
-        如果输入数据为字典，则返回的新字典中的值也会被切分。
+        Union[List[Any], Tuple[Any], Dict[str, Any], paddle.Tensor]: Split data, consistent with the input data type.
+        If the input data is a dictionary, the values in the returned new dictionary will also be split.
     """
     if group is None:
         return tensors
@@ -152,16 +155,16 @@ def data_group_split(tensors, group):
 
 def data_group_merge(tensors, group):
     """
-    将数据组合成一个新的列表或字典，如果不是None则在指定的分组中进行all_gather_nd操作。
+    Combine data into a new list or dictionary, or perform all_gather_nd operation in the specified group if not None.
 
     Args:
-        tensors (Union[List[Any], Tuple[Any], Dict[str, Any], paddle.Tensor]): 需要组合的数据，可以是列表、元组、字典或张量。
-            如果是张量，则会在指定的分组中进行all_gather_nd操作，并返回一个张量。
-        group (Optional[int]): 指定的分组，如果为None，则直接返回原始数据。默认为None。
+        tensors (Union[List[Any], Tuple[Any], Dict[str, Any], paddle.Tensor]): Data to be combined, can be list, tuple, dictionary, or tensor.
+            If it is a tensor, an all_gather_nd operation will be performed in the specified group, and a tensor will be returned.
+        group (Optional[int]): The specified group, if None, return the original data. Default is None.
 
     Returns:
-        Union[List[Any], Tuple[Any], Dict[str, Any], paddle.Tensor]: 返回一个新的列表或字典，或者一个张量，取决于传入的数据类型。
-        如果是张量，则是在指定的分组中进行all_gather_nd操作后的结果。
+        Union[List[Any], Tuple[Any], Dict[str, Any], paddle.Tensor]: Return a new list or dictionary, or a tensor, depending on the input data type.
+        If it is a tensor, it is the result of the all_gather_nd operation in the specified group.
 
     Raises:
         None
@@ -187,18 +190,18 @@ def data_group_merge(tensors, group):
 
 def group_rank_guard(group, rank=0):
     """
-    用于控制某个进程组中的某个进程是否参与函数调用，并在所有进程完成后进行通信。
-    如果该进程组中的某个进程不是指定的rank，则不会调用该函数。
+    Control whether a process in a process group participates in a function call and communicate after all processes are done.
+    If a process in the process group is not the specified rank, the function will not be called.
 
     Args:
-        group (distributed.ProcessGroup): 进程组对象。
-        rank (int, optional, default=0): 需要参与函数调用的进程的rank，默认为0。
-            rank为-1时表示所有进程都参与。
+        group (distributed.ProcessGroup): Process group object.
+        rank (int, optional, default=0): The rank of the process that needs to participate in the function call, default is 0.
+            When rank is -1, all processes participate.
 
     Returns:
-        function: 返回一个装饰器，该装饰器接受一个函数作为参数，返回一个包装后的函数。
-                  被装饰的函数将在指定的rank的进程中被调用，其他进程不会被调用。
-                  在所有进程完成后，将进行通信，并广播结果到所有进程。
+        function: Returns a decorator that accepts a function as an argument and returns a wrapped function.
+                  The decorated function will be called in the specified rank process, and other processes will not be called.
+                  After all processes are done, communication will be performed, and the results will be broadcast to all processes.
     """
 
     def decorator(func):
@@ -219,18 +222,18 @@ def group_rank_guard(group, rank=0):
 
 def repad_rl_batches(batches, input_lengths):
     """
-    对输入的批次进行重新填充，使得每个批次的长度都是最大长度。
-    如果批次中包含了位置ID，则在未被访问到的部分填充为1。
+    Repad the input batches so that the length of each batch is the maximum length.
+    If the batch contains position IDs, fill the unaccessed parts with 1.
 
     Args:
-        batches (dict): 包含输入数据和其他信息的字典，格式为{"input_ids": Tensor, "attention_mask": Tensor, ...}。
-            其中Tensor的形状应该是（batch_size, sequence_length）。
-        input_lengths (Tensor): 一个长度为batch_size的张量，表示每个批次的实际长度。
-            形状为（batch_size,）。
+        batches (dict): A dictionary containing input data and other information, formatted as {"input_ids": Tensor, "attention_mask": Tensor, ...}.
+            The shape of the Tensor should be (batch_size, sequence_length).
+        input_lengths (Tensor): A tensor of length batch_size, indicating the actual length of each batch.
+            Shape is (batch_size,).
 
     Returns:
-        dict: 返回一个更新后的字典，包含了重新填充后的输入数据和其他信息。
-            如果原始批次中没有包含位置ID，那么这个字段将不会出现在返回值中。
+        dict: Returns an updated dictionary containing the repadded input data and other information.
+            If the original batch does not contain position IDs, this field will not appear in the return value.
 
     Raises:
         None
@@ -249,14 +252,14 @@ def repad_rl_batches(batches, input_lengths):
 
 def remove_input_padding(input_ids, pad_id):
     """
-    从输入ID中移除填充，返回一个列表，每个元素是一个不包含pad_id的paddle.Tensor。
+    Remove padding from input IDs and return a list, where each element is a paddle.Tensor without pad_id.
 
     Args:
-        input_ids (List[paddle.Tensor]): 包含输入ID的列表，每个元素是一个1维的paddle.Tensor，dtype为int64。
-        pad_id (int): 需要移除的填充ID。
+        input_ids (List[paddle.Tensor]): A list containing input IDs, each element is a 1D paddle.Tensor with dtype int64.
+        pad_id (int): The padding ID to be removed.
 
     Returns:
-        List[paddle.Tensor]: 包含不包含pad_id的输入ID的列表，每个元素是一个1维的paddle.Tensor，dtype为int64。
+        List[paddle.Tensor]: A list containing input IDs without pad_id, each element is a 1D paddle.Tensor with dtype int64.
     """
     result = []
     for ids in input_ids:
@@ -268,16 +271,17 @@ def remove_input_padding(input_ids, pad_id):
 
 def concat_input_response_and_padding(input_ids_wo_padding, response, pad_id):
     """
-    将输入和响应进行拼接，并添加适当的填充。
+    Concatenate input and response with appropriate padding.
 
     Args:
-        input_ids_wo_padding (List[Tensor]): 不包含填充的输入ID列表，形状为（batch_size，seq_len）。
-        response (Tensor): 响应矩阵，形状为（num_return_index，batch_size，seq_len）。
-        pad_id (int): 用于填充的ID。
+        input_ids_wo_padding (List[Tensor]): List of input IDs without padding, shape (batch_size, seq_len).
+        response (Tensor): Response matrix, shape (num_return_index, batch_size, seq_len).
+        pad_id (int): ID used for padding.
 
     Returns:
-        Tensor: 返回一个形状为（num_return_index，batch_size，max_seq_len）的Tensor，其中max_seq_len是所有输入和响应的最大长度。
-        每个元素都是由input_ids_wo_padding和response的对应元素拼接而成的。如果拼接后的长度小于max_seq_len，则会在末尾追加pad_id。
+        Tensor: Returns a Tensor of shape (num_return_index, batch_size, max_seq_len), where max_seq_len is the maximum length of all inputs and responses.
+        Each element is concatenated from input_ids_wo_padding and the corresponding element of response.
+        If the concatenated length is less than max_seq_len, pad_id will be appended at the end.
     """
     concat_results = []
     max_seq_len = 0
@@ -311,7 +315,7 @@ class SkipWithBlock(Exception):
 class SkipContextManager:
     def __init__(self, skip):
         """
-            Initializes the class with the given skip value.
+        Initializes the class with the given skip value.
 
         Args:
             skip (int): The number of rows to skip in the input data.
@@ -323,11 +327,11 @@ class SkipContextManager:
 
     def __enter__(self):
         """
-            在进入上下文管理器时调用，返回自身。
-        如果需要执行一些初始化操作，可以重写此方法。
+        Called when entering the context manager, returns self.
+        If initialization operations are needed, this method can be overridden.
 
         Returns:
-            TraceContextManager: 当前实例对象自身。
+            SkipContextManager: The current instance of the object.
         """
         if self.skip:
             sys.settrace(lambda *args, **keys: None)
@@ -336,31 +340,30 @@ class SkipContextManager:
 
     def trace(self, frame, event, arg):
         """
-        跟踪函数执行，并在遇到指定的代码块时抛出SkipWithBlock异常。
-            当前实现只支持单个代码块，不支持多个。
+        Traces function execution and raises a SkipWithBlock exception when encountering the specified code block.
+        Current implementation only supports a single code block, not multiple.
 
         Args:
-            frame (types.FrameType): 当前执行的frame对象。
-            event (str): 事件类型，包括'call', 'return', 'exception_raised', 'yield'.
-            arg (Any): 可选参数，用于传递给event_handler函数。
+            frame (types.FrameType): The current executing frame object.
+            event (str): The event type, including 'call', 'return', 'exception_raised', 'yield'.
+            arg (Any): Optional argument passed to the event_handler function.
 
         Raises:
-            SkipWithBlock: 当遇到指定的代码块时抛出此异常，表示需要跳过后续的测试执行。
+            SkipWithBlock: Raised when encountering the specified code block, indicating that subsequent test execution should be skipped.
         """
         raise SkipWithBlock
 
     def __exit__(self, type, value, traceback):
         """
-            如果退出时没有异常，则返回True。如果退出时是SkipWithBlock的子类，则返回True以抑制该异常。否则返回False。
-        如果没有异常，则返回True。如果退出时是SkipWithBlock的子类，则返回True以抑制该异常。否则返回False。
+        If no exception is present when exiting, returns True. If the exception is a subclass of SkipWithBlock, returns True to suppress the exception. Otherwise, returns False.
 
         Args:
-            type (Optional[Type[BaseException]]): 可选，异常类型，如果为None，则表示没有异常。默认为None。
-            value (Optional[BaseException]): 可选，异常对象，如果type不为None，则必须提供value参数。默认为None。
-            traceback (Optional[traceback]): 可选，追踪信息，如果type不为None，则必须提供traceback参数。默认为None。
+            type (Optional[Type[BaseException]]): Optional, the exception type. If None, indicates no exception. Default is None.
+            value (Optional[BaseException]): Optional, the exception object. If type is not None, value must be provided. Default is None.
+            traceback (Optional[traceback]): Optional, traceback information. If type is not None, traceback must be provided. Default is None.
 
         Returns:
-            bool: 如果没有异常或者异常是SkipWithBlock的子类，则返回True；否则返回False。
+            bool: Returns True if no exception is present or the exception is a subclass of SkipWithBlock; otherwise, returns False.
         """
         if type is None:
             return  # No exception
@@ -421,33 +424,33 @@ def all_gather_nd(tensor_list, tensor, group=None, padded=False):
 
 def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
     """
-    导出评估模型。
+    Export the evaluation model.
 
     Args:
         self (Trainer, required):
-            Trainer 对象的引用。
+            Reference to the Trainer object.
 
         train_model (nn.Layer, required):
-            Train 模型，需要在训练过程中使用。
+            The training model to be used during training.
 
         eval_model (Optional[nn.Layer], optional):
-            评估模型，如果没有提供，则返回 None。默认为 None。
+            The evaluation model. If not provided, returns None. Default is None.
 
         with_offload (bool, optional):
-            是否将训练模型的张量转换到 CPU 上，默认为 False。
+            Whether to offload the tensors of the training model to CPU. Default is False.
 
         kwargs (Dict, optional):
-            可选参数字典，包括：
+            A dictionary of optional parameters, including:
             - with_offload (bool, optional):
-                是否将训练模型的张量转换到 CPU 上，默认为 False。
+                Whether to offload the tensors of the training model to CPU. Default is False.
 
     Returns:
         Optional[None]:
-            如果 eval_model 不存在，则返回 None；否则返回 None。
+            Returns None if eval_model does not exist; otherwise, returns None.
 
     Raises:
         ValueError:
-            当 eval_model 的 tensor_parallel_degree 与 train_model 的 tensor_parallel_degree 不相同时，会引发此错误。
+            Raised when the tensor_parallel_degree of eval_model is different from that of train_model.
     """
     if eval_model is None:
         return None
@@ -635,15 +638,16 @@ def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
 
 def create_data_trans_group(global_rank, group_nums):
     """
-    创建一个数据传输组，该组将根据给定的全局排名和组数分割。
-    该函数使用了paddle.distributed.all_gather_object进行通信，并返回一个新的分布式组对象。
+    Create a data transfer group that is partitioned based on the given global rank and number of groups.
+    This function uses paddle.distributed.all_gather_object for communication and returns a new distributed group object.
 
     Args:
-        global_rank (int): 当前全局排名。
-        group_nums (List[int]): 需要分割的组数列表。
+        global_rank (int): The current global rank.
+        group_nums (List[int]): A list of group numbers to partition.
 
     Returns:
-        paddle.distributed.Group: 返回一个新的分布式组对象，包含所有参与分割的全局排名。如果当前全局排名在任何一个组中，则返回该组。如果当前全局排名不在任何一个组中，则返回None。
+        paddle.distributed.Group: Returns a new distributed group object containing all global ranks participating in the partition.
+            If the current global rank is in any of the groups, it returns that group. If the current global rank is not in any of the groups, it returns None.
     """
     all_split_table = []
     paddle.distributed.all_gather_object(all_split_table, [(global_rank, group_nums)])
