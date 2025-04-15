@@ -669,6 +669,8 @@ class PPOTrainer(Trainer):
             ValueError: If `ignore_keys` is not an optional parameter or is not a list.
         """
         inputs = self._prepare_inputs(inputs)
+        data_trans_group = getattr(self.actor_trainer, "_data_trans_group", None)
+        inputs = data_group_split(inputs, group=data_trans_group)
         with reload_and_offload_scope(self, self.actor_model, self.reference_model, self.actor_trainer):
             with infer_guard(self.actor_trainer):
                 prompt_only_batch = {
@@ -1288,6 +1290,12 @@ class PPOTrainer(Trainer):
                 cleanup_batches, indices, label_ids_batches = [], [], []
                 total_batch_size = prompt_only_batch["input_ids"].shape[0]
                 per_device_rollout_batch_size = self.args.per_device_rollout_batch_size
+                if self.args.num_return_sequences > 1:
+                    expand_prompt = prompt_only_batch["input_ids"].repeat_interleave(
+                        self.args.num_return_sequences, axis=0
+                    )
+                else:
+                    expand_prompt = prompt_only_batch["input_ids"]
 
                 timer_scope_actor_model = TimerScope(
                     self.timers,
@@ -1336,7 +1344,7 @@ class PPOTrainer(Trainer):
                             input_ids, position_ids = self.pad_batch_data(
                                 cur_batch, pad_to_multiple_of=pad_to_multiple_of
                             )
-                            prompt = prompt_only_batch["input_ids"][i : i + per_device_train_batch_size]
+                            prompt = expand_prompt[i : i + per_device_train_batch_size]
 
                             micro_batch = {
                                 "prompt": prompt,
