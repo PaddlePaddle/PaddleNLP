@@ -284,6 +284,8 @@ class QuantizationLinear(nn.Layer):
         weight_quantize_algo,
         dtype,
         bias_attr=None,
+        mp_moe=False,
+        is_distributed=False,
     ):
         super().__init__()
         self.in_features = in_features
@@ -364,6 +366,10 @@ class QuantizationLinear(nn.Layer):
                 dtype=self._dtype,
                 is_bias=True,
             )
+        if mp_moe or is_distributed:
+            for p in self.parameters():
+                p.is_distributed = is_distributed
+                p.mp_moe = mp_moe
 
     def forward(self, x):
         output = quant_weight_linear(

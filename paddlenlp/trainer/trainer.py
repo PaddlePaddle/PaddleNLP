@@ -83,11 +83,12 @@ from ..data import (
     init_dataloader_comm_group,
 )
 from ..peft import LoKrModel, LoRAModel, PrefixModelForCausalLM, ReFTModel, VeRAModel
+from ..quantization.quantization_linear import (
+    ColumnParallelQuantizationLinear,
+    QuantizationLinear,
+    RowParallelQuantizationLinear,
+)
 
-try:
-    from ..quantization.quantization_linear import QuantizationLinear
-except:
-    QuantizationLinear = None
 try:
     from paddle.distributed.fleet.utils.sequence_parallel_utils import (
         register_sequence_parallel_allreduce_hooks,
@@ -518,7 +519,8 @@ class Trainer:
                 models=model,
                 level=self.args.fp16_opt_level,
                 dtype=self.amp_dtype,
-                excluded_layers=[QuantizationLinear] + self._decorate_exclude_layers(model),
+                excluded_layers=[QuantizationLinear, ColumnParallelQuantizationLinear, RowParallelQuantizationLinear]
+                + self._decorate_exclude_layers(model),
             )
         # for pipeline mode and pure tensor parallel
         if self.args.pipeline_parallel_degree > 1 or (self.args.tensor_parallel_degree > 1 and self.sharding is None):
@@ -2166,6 +2168,7 @@ class Trainer:
         return exclude_layers
 
     def _wrap_model(self, model, training=True):
+        return model
 
         # train/eval could be run multiple-times - if already wrapped, don't re-wrap it again
         if unwrap_model(model) is not model:
@@ -2184,7 +2187,8 @@ class Trainer:
                 optimizers=self.optimizer,
                 level=self.args.fp16_opt_level,
                 dtype=self.amp_dtype,
-                excluded_layers=[QuantizationLinear] + self._decorate_exclude_layers(model),
+                excluded_layers=[QuantizationLinear, ColumnParallelQuantizationLinear, RowParallelQuantizationLinear]
+                + self._decorate_exclude_layers(model),
             )
 
             if self.optimizer is None:

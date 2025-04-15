@@ -79,17 +79,8 @@ def replace_with_quantization_linear(model, quantization_config, llm_int8_thresh
             *path, last = name.split(".")
             for attr in path:
                 parent = getattr(parent, attr)
-            if isinstance(child, nn.Linear):
-                quant_linear = QuantizationLinear(
-                    in_features=child.weight.shape[0],
-                    out_features=child.weight.shape[1],
-                    quantization_config=quantization_config,
-                    weight_quantize_algo=weight_quantize_algo,
-                    dtype=child._dtype,
-                    bias_attr=bias_attr,
-                )
-            elif isinstance(child, FusedLinear):
-                if child.transpose_weight:
+            if isinstance(child, nn.Linear) or isinstance(child, FusedLinear):
+                if getattr(child.weight, "transpose_weight", False):
                     out_feature, in_features = child.weight.shape[0], child.weight.shape[1]
                 else:
                     in_features, out_feature = child.weight.shape[0], child.weight.shape[1]
@@ -100,6 +91,8 @@ def replace_with_quantization_linear(model, quantization_config, llm_int8_thresh
                     weight_quantize_algo=weight_quantize_algo,
                     dtype=child._dtype,
                     bias_attr=bias_attr,
+                    mp_moe=getattr(child.weight, "mp_moe", False),
+                    is_distributed=getattr(child.weight, "is_distributed", False),
                 )
             elif isinstance(child, ColumnParallelLinear):
                 quant_linear = ColumnParallelQuantizationLinear(

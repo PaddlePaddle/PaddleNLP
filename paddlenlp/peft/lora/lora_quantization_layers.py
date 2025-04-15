@@ -111,6 +111,12 @@ class QuantizationLoRALinear(QuantizationLoRABaseLinear):
             is_bias=False,
             default_initializer=nn.initializer.Constant(value=0.0),
         )
+        mp_moe = getattr(self.quant_weight, "mp_moe", False)
+        is_distributed = getattr(self.quant_weight, "is_distributed", False)
+        if mp_moe or is_distributed:
+            for p in self.parameters():
+                p.is_distributed = is_distributed
+                p.mp_moe = mp_moe
 
     def forward(self, x):
         result = super().forward(x)
