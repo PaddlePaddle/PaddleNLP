@@ -165,7 +165,7 @@ std::vector<paddle::Tensor> DecodeMLAWriteCacheKernel(
     const int max_seq_len,
     const bool speculate_decoder);
 
-std::vector<paddle::Tensor> cutlass_fp8_fp8_half_block_gemm_fused(
+paddle::Tensor cutlass_fp8_fp8_half_block_gemm_fused_func(
     const paddle::Tensor& x,
     const paddle::Tensor& y,
     const paddle::Tensor& x_scale,
@@ -293,7 +293,8 @@ PYBIND11_MODULE(paddlenlp_ops, m) {
   m.def("f_get_output", &GetOutput, "GetOutput");
   m.def("f_step_paddle", &StepPaddle, "StepPaddle");
   m.def("f_save_output_dygraph", &SaveOutputDygraph, "SaveOutputDygraph");
-  if (GetSMVersion() >= 90){
-    m.def("f_cutlass_fp8_fp8_half_block_gemm_fused", &cutlass_fp8_fp8_half_block_gemm_fused, "cutlass_fp8_fp8_half_block_gemm_fused");
-  }
+}
+
+PYBIND11_MODULE(paddlenlp_ops_sm90, m) {
+  m.def("f_cutlass_fp8_fp8_half_block_gemm_fused", &cutlass_fp8_fp8_half_block_gemm_fused_func, "cutlass_fp8_fp8_half_block_gemm_fused_func");
 }
