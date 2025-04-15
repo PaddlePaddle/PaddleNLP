@@ -1223,7 +1223,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
     @paddle.no_grad()
     def predict(self, input_texts: list[str], return_tokens=False):
         # pybind
-        # builtins.__import__ = custom_import
+        builtins.__import__ = custom_import
         if self.dynamic_insert:
             return self.predict_dy_insert(input_texts, return_tokens)
         if self.config.output_via_mq:
@@ -1325,9 +1325,6 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
 
     @paddle.no_grad()
     def predict_dy_insert(self, input_texts: list[str], return_tokens=False, **kwargs):
-        # pybind
-        # builtins.__import__ = custom_import
-
         # text2ids
         if self.tokenizer.chat_template is not None:
             if not isinstance(input_texts, list) or not isinstance(input_texts[0], str):
