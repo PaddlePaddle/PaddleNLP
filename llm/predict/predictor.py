@@ -28,6 +28,21 @@ import paddle.incubate.multiprocessing as mp
 from paddle.base.framework import in_cinn_mode, in_pir_executor_mode
 from paddle.distributed import fleet
 
+import builtins
+_original_import = builtins.__import__
+
+def custom_import(name, *args, **kwargs):
+    module = _original_import(name, *args, **kwargs)
+    if name == 'paddlenlp_ops':
+        module.update_inputs_v2 = module.f_update_inputs_v2
+        module.save_output = module.f_save_output
+        module.set_preids_token_penalty_multi_scores = module.f_set_preids_token_penalty_multi_scores
+        module.rebuild_padding_v2 = module.f_rebuild_padding_v2
+        module.append_attention = module.f_append_attention
+    return module
+
+builtins.__import__ = custom_import
+
 try:
     from paddlenlp.experimental.transformers import (
         EagleProposer,
