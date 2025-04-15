@@ -213,12 +213,12 @@ void UpdateInputesV2(const paddle::Tensor& stop_flags,
                const paddle::Tensor& end_ids,
                const paddle::Tensor& kwargs_next_tokens);
 
-std::vector<paddle::Tensor> RebuildPaddingV2(const paddle::Tensor& tmp_out, // [token_num, dim_embed]
-                                             const paddle::Tensor& cum_offsets, // [bsz, 1]
-                                             const paddle::Tensor& seq_lens_decoder,
-                                             const paddle::Tensor& seq_lens_encoder,
-                                             const paddle::optional<paddle::Tensor>& output_padding_offset,
-                                             int max_input_length);
+paddle::Tensor RebuildPaddingV2Func(const paddle::Tensor& tmp_out, // [token_num, dim_embed]
+                                    const paddle::Tensor& cum_offsets, // [bsz, 1]
+                                    const paddle::Tensor& seq_lens_decoder,
+                                    const paddle::Tensor& seq_lens_encoder,
+                                    const paddle::optional<paddle::Tensor>& output_padding_offset,
+                                    int max_input_length);
 
 std::vector<paddle::Tensor> GroupQuant(const paddle::Tensor& x,
                                         const int group_size,
@@ -281,15 +281,17 @@ PYBIND11_MODULE(paddlenlp_ops, m) {
   m.def("f_get_block_shape_and_split_kv_block", &GetBlockShapeAndSplitKVBlock, "GetBlockShapeAndSplitKVBlock");
   m.def("f_prefill_mla_write_cache", &PrefillMLAWriteCacheKernel, "PrefillMLAWriteCacheKernel");
   m.def("f_decode_mla_write_cache", &DecodeMLAWriteCacheKernel, "DecodeMLAWriteCacheKernel");
-  m.def("f_cutlass_fp8_fp8_half_block_gemm_fused", &cutlass_fp8_fp8_half_block_gemm_fused, "cutlass_fp8_fp8_half_block_gemm_fused");
   m.def("f_get_position_ids_and_mask_encoder_batch", &GetPositionIdsAndMaskEncoderBatch, "GetPositionIdsAndMaskEncoderBatch");
   m.def("f_set_preids_token_penalty_multi_scores", &SetPreidsTokenPenaltyMultiScores, "SetPreidsTokenPenaltyMultiScores");
   m.def("f_update_inputs_v2", &UpdateInputesV2, "UpdateInputesV2");
-  m.def("f_rebuild_padding_v2", &RebuildPaddingV2, "RebuildPaddingV2");
+  m.def("f_rebuild_padding_v2", &RebuildPaddingV2Func, "RebuildPaddingV2Func");
   m.def("f_group_quant", &GroupQuant, "GroupQuant");
   m.def("f_get_padding_offset_v2", &GetPaddingOffsetV2, "GetPaddingOffsetV2");
   m.def("f_save_output", &SaveOutMmsg, "SaveOutMmsg");
   m.def("f_get_output", &GetOutput, "GetOutput");
   m.def("f_step_paddle", &StepPaddle, "StepPaddle");
   m.def("f_save_output_dygraph", &SaveOutputDygraph, "SaveOutputDygraph");
+  if (GetSMVersion() >= 90){
+    m.def("f_cutlass_fp8_fp8_half_block_gemm_fused", &cutlass_fp8_fp8_half_block_gemm_fused, "cutlass_fp8_fp8_half_block_gemm_fused");
+  }
 }

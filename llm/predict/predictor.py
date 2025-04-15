@@ -207,7 +207,7 @@ class PredictorArgument:
         metadata={"help": "Controls whether the message queue is enabled for output"},
     )
     dynamic_insert: bool = field(default=False, metadata={"help": "whether use dynamic insert"})
-    total_request_num: int = field(default=1, metadata={"help": "The total number of request data"})
+    total_request_num: int = field(default=None, metadata={"help": "The total number of request data"})
     init_cache_kvs: bool = field(default=True, metadata={"help": "whether init cache_kvs"})
 
     def __post_init__(self):
@@ -224,6 +224,8 @@ class PredictorArgument:
         if self.decode_strategy == "greedy_search":
             self.top_p = 0.0
             self.temperature = 1.0
+        if self.total_request_num is None:
+            self.total_request_num = self.batch_size
 
 
 @dataclass
@@ -1216,6 +1218,8 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
 
     @paddle.no_grad()
     def predict(self, input_texts: list[str], return_tokens=False):
+        # pybind
+        builtins.__import__ = custom_import
         if self.dynamic_insert:
             return self.predict_dy_insert(input_texts, return_tokens)
         if self.config.output_via_mq:
@@ -1318,7 +1322,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
     @paddle.no_grad()
     def predict_dy_insert(self, input_texts: list[str], return_tokens=False, **kwargs):
         # pybind
-        builtins.__import__ = custom_import
+        # builtins.__import__ = custom_import
 
         # text2ids
         if self.tokenizer.chat_template is not None:
@@ -1910,7 +1914,7 @@ def predict():
 
     else:
         source_texts = [
-            'Given a word, you need to judge whether the usage of capitals in it is right or not.\n\n\n\nWe define the usage of capitals in a word to be right when one of the following cases holds:\n\nAll letters in this word are capitals, like "USA".\nAll letters in this word are not capitals, like "leetcode".\nOnly the first letter in this word is capital if it has more than one letter, like "Google".\n\nOtherwise, we define that this word doesn\'t use capitals in a right way.\n\n\n\nExample 1:\n\nInput: "USA"\nOutput: True\n\n\n\nExample 2:\n\nInput: "FlaG"\nOutput: False\n\n\n\nNote:\nThe input will be a non-empty word consisting of uppercase and lowercase latin letters.\n\n\nEnsure that when the python program runs, it reads the self.model_inputs, runs the algorithm and writes output to STDOUT.'
+            "2014年3月，大范围雾霾天气长时间影响我国东部地区，严重危害人体健康。造成雾霾天气的人为原因有____\r\n①工业生产中使用矿物作为燃料，大量排放污染物     ②汽车尾气的大量排放     \r\n③风力小，空气流动不畅     ④冬季取暖排放粉尘\nA. ①②③\nB. ②③④\nC. ①③④\nD. ①②④"
         ] * predictor_args.total_request_num
         target_texts = [""] * predictor_args.total_request_num
 

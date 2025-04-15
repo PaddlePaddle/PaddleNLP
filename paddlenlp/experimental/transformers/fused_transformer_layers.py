@@ -3488,7 +3488,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                     seq_lens_encoder,
                     output_padding_offset,
                     max_input_length,
-                )[0]
+                )
             return out
 
 
