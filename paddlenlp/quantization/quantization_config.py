@@ -62,7 +62,7 @@ class QuantizationConfig:
         **kwargs,
     ):
         if weight_quantize_algo is not None:
-            if isinstance(self.weight_quantize_algo, dict):
+            if isinstance(weight_quantize_algo, dict):
                 if any(
                     algo not in ["weight_only_int8", "weight_only_int4", "llm.int8", "a8w8", "nf4", "fp4"]
                     for algo in weight_quantize_algo

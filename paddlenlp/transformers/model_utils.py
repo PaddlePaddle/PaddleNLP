@@ -860,14 +860,14 @@ def faster_set_state_dict(model, state_dict, strict_dtype=True):
 
 def _load_state_dict_into_model(model_to_load, state_dict, start_prefix):
     # torch will cast dtype in load_state_dict, but paddle strictly check dtype
-    _convert_state_dict_dtype_and_shape(state_dict, model_to_load)
-
-    error_msgs = []
-
     if len(start_prefix) > 0:
         for key in list(state_dict.keys()):
             if key.startswith(start_prefix):
                 state_dict[key.replace(start_prefix, "")] = state_dict.pop(key)
+
+    _convert_state_dict_dtype_and_shape(state_dict, model_to_load)
+
+    error_msgs = []
 
     # TODO: add return status to state_dict
     with warnings.catch_warnings(record=True) as w:
@@ -913,6 +913,7 @@ def _load_state_dict_into_meta_model(
     dtype=None,
     is_safetensors=False,
     keep_in_fp32_modules=None,
+    model_state_dict=None,
 ):
     """
     This is somewhat similar to `_load_state_dict_into_model`, but deals with a model that has some or all of its
@@ -927,7 +928,8 @@ def _load_state_dict_into_meta_model(
 
     dtype = convert_np_dtype_to_dtype_(dtype)
     error_msgs = []
-    model_state_dict = model.state_dict()
+    if model_state_dict is None:
+        model_state_dict = model.state_dict()
     for param_name, param in state_dict.items():
         # First part of the test is always true as loaded_state_dict_keys always contains state_dict keys.
         if param_name not in loaded_state_dict_keys or param_name not in expected_keys:
@@ -2153,7 +2155,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             resume_state_dict = {}
             if len(resolved_archive_file) > 1:
                 resolved_archive_file = tqdm(resolved_archive_file, desc="Loading checkpoint shards")
-
+            if low_cpu_mem_usage or quantization_linear_list is not None:
+                # model.state_dict() takes a long time
+                model_to_load_state_dict = model_to_load.state_dict()
             for shard_file in resolved_archive_file:
                 pre_tensor_parallel_split = False
                 if quantization_linear_list is not None:
@@ -2261,6 +2265,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         dtype=dtype,
                         is_safetensors=is_safetensors,
                         keep_in_fp32_modules=keep_in_fp32_modules,
+                        model_state_dict=model_to_load_state_dict,
                     )
                     error_msgs += new_error_msgs
                 else:

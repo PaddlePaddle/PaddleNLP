@@ -19,8 +19,8 @@ from typing import Optional
 
 import paddle
 
-from paddlenlp.trainer import IntervalStrategy
-from paddlenlp.trainer.trainer import ShardingOption, TrainingArguments, logger
+from ...trainer.trainer import ShardingOption, TrainingArguments, logger
+from ...trainer.trainer_utils import IntervalStrategy
 
 
 @dataclass
@@ -270,8 +270,8 @@ class TrainingArguments(TrainingArguments):
 
     def __post_init__(self):
         """
-            在初始化后执行的函数，用于设置一些默认值和验证参数。
-        如果 autotuner_benchmark 为 True，则将相关参数设置为默认值，并禁止其他任何操作。
+        Function executed after initialization, used to set some default values and validate parameters.
+        If autotuner_benchmark is True, set related parameters to default values and prohibit any other operations.
 
         Args:
             None.

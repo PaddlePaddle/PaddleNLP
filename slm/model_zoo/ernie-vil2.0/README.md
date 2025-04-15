@@ -388,7 +388,7 @@ python deploy/python/infer.py --model_dir ./infer_model/
 
 ## Taskflow 一键预测
 
-可以使用 PaddleNLP 提供的 Taskflow 工具来使用 ERNIE Vil2.0，具体使用可以参考文档[模型特征提取](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/model_zoo/taskflow.md#%E6%A8%A1%E5%9E%8B%E7%89%B9%E5%BE%81%E6%8F%90%E5%8F%96)，下面是使用加载微调的模型的示例：
+可以使用 PaddleNLP 提供的 Taskflow 工具来使用 ERNIE Vil2.0，具体使用可以参考文档[模型特征提取](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/zh/model_zoo/taskflow.md#%E6%A8%A1%E5%9E%8B%E7%89%B9%E5%BE%81%E6%8F%90%E5%8F%96)，下面是使用加载微调的模型的示例：
 
 ```
 vision_language = Taskflow("feature_extraction",model="PaddlePaddle/ernie_vil-2.0-base-zh"", task_path="/path/to/checkpoint-4000")

@@ -22,18 +22,28 @@ from typing import Dict
 import paddle
 
 from paddlenlp.datasets.rlhf_datasets import RLHFDataset, collate_fn
-from paddlenlp.trainer import EarlyStoppingCallback, PdArgumentParser, get_last_checkpoint
-from paddlenlp.transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, PretrainedConfig
+from paddlenlp.rl.models.score_model import AutoModelForScore
+from paddlenlp.rl.trainer.ppo_trainer import PPOTrainer
+from paddlenlp.rl.utils.config_utils import (
+    DataArgument,
+    ModelArgument,
+    TrainingArguments,
+)
+from paddlenlp.rl.utils.offload_utils import offload_tensor_to_cpu
+from paddlenlp.rl.utils.timer_utils import timers_scope_runtimer
+from paddlenlp.trainer import (
+    EarlyStoppingCallback,
+    PdArgumentParser,
+    get_last_checkpoint,
+)
+from paddlenlp.transformers import (
+    AutoConfig,
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    PretrainedConfig,
+)
 from paddlenlp.trl import llm_utils
 from paddlenlp.utils.log import logger
-
-# isort: off
-from models.score_model import AutoModelForScore
-from trainer.ppo_trainer import PPOTrainer
-from utils.config_utils import DataArgument, ModelArgument, TrainingArguments
-from utils.offload_utils import offload_tensor_to_cpu
-from utils.timer_utils import timers_scope_runtimer
-# isort: on
 
 
 def process_args(model_args: ModelArgument, data_args: DataArgument, training_args: TrainingArguments):

@@ -551,13 +551,13 @@ RoBERTa-wwm-ext-large | 24L1024H | 76.61 |    76.00 |    59.33 |    62.02 |    8
 <a name="预训练模型贡献"></a>
 
 ### 预训练模型贡献
-PaddleNLP 为开发者提供了[community](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/community/contribute_models/contribute_awesome_pretrained_models.rst)模块，用户可以上传自己训练的模型，开源给其他用户使用。
+PaddleNLP 为开发者提供了[community](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/zh/community/contribute_models/contribute_awesome_pretrained_models.rst)模块，用户可以上传自己训练的模型，开源给其他用户使用。
 使用本文档给出的参数配置，在 CLUECorpusSmall 数据集上训练，可以得到`zhui/ernie-1.0-cluecorpussmall`参数，可直接使用。
 ```python
 model = AutoModelForMaskedLM.from_pretrained('zhui/ernie-1.0-cluecorpussmall')
 ```
 
-贡献预训练模型的方法，可以参考[贡献预训练模型权重](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/community/contribute_models/contribute_awesome_pretrained_models.rst)教程。
+贡献预训练模型的方法，可以参考[贡献预训练模型权重](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/zh/community/contribute_models/contribute_awesome_pretrained_models.rst)教程。
 
 <a name="下游任务微调"></a>
 
