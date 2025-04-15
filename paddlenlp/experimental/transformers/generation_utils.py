@@ -500,6 +500,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
 
         input_spec = [
             paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),  # input_ids
+            paddle.static.InputSpec(shape=[1], dtype="int32", name="queue_id"),  # stop_nums
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="temperature"),  # temperature
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="top_p"),  # top_p
             paddle.static.InputSpec(shape=[None], dtype="int64", name="eos_token_id"),  # eos_token_id
@@ -579,6 +580,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
     def generate(
         self,
         input_ids=None,
+        queue_id=None,
         temperature=None,
         top_p=None,
         eos_token_id=None,
@@ -616,6 +618,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
     ):
 
         model_kwargs["input_ids"] = input_ids
+        model_kwargs["queue_id"] = queue_id
         model_kwargs["penalty_score"] = penalty_score
         model_kwargs["frequency_score"] = frequency_score
         model_kwargs["presence_score"] = presence_score
@@ -761,6 +764,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
                 save_output(
                     next_tokens,
                     model_kwargs["not_need_stop"],
+                    model_kwargs["queue_id"],
                     self.config.tensor_parallel_rank,
                 )
             return next_tokens

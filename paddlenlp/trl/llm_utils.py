@@ -614,7 +614,13 @@ def get_model_max_position_embeddings(config: PretrainedConfig) -> Optional[int]
     return None
 
 
-def read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Queue, done_event: mp.Event):
+def read_res(
+    model_name_or_path: str,
+    tensor_queue: mp.Queue,
+    result_queue: mp.Queue,
+    done_event: mp.Event,
+    queue_id: paddle.Tensor,
+):
     from paddlenlp.utils.env import USE_FAST_TOKENIZER
 
     tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, padding_side="left", use_fast=USE_FAST_TOKENIZER)
@@ -630,7 +636,7 @@ def read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Q
     from paddlenlp_ops import get_output
 
     while True:
-        get_output(output_tensor, 0, True)
+        get_output(output_tensor, queue_id, 0, True)
         if int(output_tensor[0, 0]) == -2:  # read none
             continue
         bsz = int(output_tensor[1, 0])
@@ -647,7 +653,13 @@ def read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Q
     logger.info("Finish read result message")
 
 
-def speculate_read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Queue, done_event: mp.Event):
+def speculate_read_res(
+    model_name_or_path: str,
+    tensor_queue: mp.Queue,
+    result_queue: mp.Queue,
+    done_event: mp.Event,
+    queue_id: paddle.Tensor,
+):
     from paddlenlp.utils.env import USE_FAST_TOKENIZER
 
     tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, padding_side="left", use_fast=USE_FAST_TOKENIZER)

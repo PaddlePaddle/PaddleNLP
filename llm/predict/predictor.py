@@ -842,6 +842,8 @@ class BlockInferencePredictorMixin(BasePredictor):
 
         self.pre_cache_length = 0
 
+        self.queue_id = os.getpid()
+
         if config.export_precache:
             pre_cache_npy = np.load(config.prefix_path)
             self.pre_cache_length = pre_cache_npy.shape[-2]
@@ -940,6 +942,7 @@ class BlockInferencePredictorMixin(BasePredictor):
         )
         self.model_inputs["bad_tokens"] = paddle.to_tensor([-1], dtype="int64")
         self.model_inputs["is_block_step"] = paddle.full(shape=[config.batch_size], fill_value=False, dtype="bool")
+        self.model_inputs["queue_id"] = paddle.full(shape=[1], fill_value=self.queue_id, dtype="int32").cpu()
 
         # bloom model needs src_mask and tgt_mask!
         if "bloom" in self.architectures:
@@ -1175,7 +1178,8 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
             output_tensor_shape = [SPECULATE_MAX_BSZ * MAX_DRAFT_TOKENS + SPECULATE_MAX_BSZ + 2, 1]
 
         read_res_process = mp.Process(
-            target=read_res_func, args=[self.model_name_or_path, tensor_queue, result_queue, done_event]
+            target=read_res_func,
+            args=[self.model_name_or_path, tensor_queue, result_queue, done_event, self.model_inputs["queue_id"]],
         )
         if self.tensor_parallel_rank == 0:
             read_res_process.start()
@@ -1219,7 +1223,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
     @paddle.no_grad()
     def predict(self, input_texts: list[str], return_tokens=False):
         # pybind
-        builtins.__import__ = custom_import
+        # builtins.__import__ = custom_import
         if self.dynamic_insert:
             return self.predict_dy_insert(input_texts, return_tokens)
         if self.config.output_via_mq:
@@ -1627,7 +1631,8 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
             output_tensor_shape = [SPECULATE_MAX_BSZ * MAX_DRAFT_TOKENS + SPECULATE_MAX_BSZ + 2, 1]
 
         read_res_process = mp.Process(
-            target=read_res_func, args=[self.model_name_or_path, tensor_queue, result_queue, done_event]
+            target=read_res_func,
+            args=[self.model_name_or_path, tensor_queue, result_queue, done_event, self.model_inputs["queue_id"]],
         )
         if self.tensor_parallel_rank == 0:
             read_res_process.start()
