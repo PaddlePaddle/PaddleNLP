@@ -267,6 +267,10 @@ class TrainingArguments(TrainingArguments):
     use_fp32_compute: bool = field(
         default=False, metadata={"help": "Use fp32 to compute xx_log_prob,rewards, advantages and loss."}
     )
+    rollout_tensor_parallel_degree: int = field(
+        default=-1,
+        metadata={"help": ("Tensor parallelism for rollout.")},
+    )
 
     def __post_init__(self):
         """
@@ -355,6 +359,12 @@ class TrainingArguments(TrainingArguments):
 
         if self.decay_steps is None:
             self.decay_steps = self.max_steps
+
+        if self.rollout_tensor_parallel_degree == -1:
+            self.rollout_tensor_parallel_degree = self.tensor_parallel_degree
+            logger.info(
+                f"Set rollout_tensor_parallel_degree to tensor_parallel_degree: {self.tensor_parallel_degree}."
+            )
 
     @property
     def model_dtype(self):

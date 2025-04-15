@@ -50,6 +50,7 @@ from ...utils.env import TRAINER_STATE_NAME
 from ..models.ppo_model_utils import create_loss
 from ..utils.comm_utils import ActorStages, create_data_trans_group
 from ..utils.infer_utils import InferEvalModel
+from ..utils.reshard_utils import init_rollout_env
 from ..utils.timer_utils import TimerScope
 from .trainer_utils import PipeEvalModel
 
@@ -615,9 +616,13 @@ class RLTrainer(Trainer):
         sd_group = hcg.get_sharding_parallel_group()
         dp_group = hcg.get_data_parallel_group()
         global_rank = dist.get_rank()
-        eval_tp_size = max(model.config.tensor_parallel_degree, 1)
-        eval_tp_rank = max(model.config.tensor_parallel_rank, 0)
         old_dp_workers = self.args.world_size // (max(sd_group.nranks, 1) * max(dp_group.nranks, 1))
+        with init_rollout_env(self.args.rollout_tensor_parallel_degree):
+            hcg = fleet.get_hybrid_communicate_group()
+            tensor_parallel_degree = hcg.get_model_parallel_world_size()
+            tensor_parallel_rank = hcg.get_model_parallel_rank()
+            eval_tp_size = max(tensor_parallel_degree, 1)
+            eval_tp_rank = max(tensor_parallel_rank, 0)
         group_nums = self.args.logical_process_index // old_dp_workers * eval_tp_size + eval_tp_rank
         self._data_trans_group = create_data_trans_group(global_rank, group_nums)
         # just for compatiable with old code
