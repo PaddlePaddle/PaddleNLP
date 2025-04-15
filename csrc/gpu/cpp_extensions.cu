@@ -301,8 +301,5 @@ PYBIND11_MODULE(paddlenlp_ops, m) {
   m.def("f_get_output", &GetOutput, "GetOutput");
   m.def("f_step_paddle", &StepPaddle, "StepPaddle");
   m.def("f_save_output_dygraph", &SaveOutputDygraph, "SaveOutputDygraph");
-}
-
-PYBIND11_MODULE(paddlenlp_ops_sm90, m) {
-  m.def("f_cutlass_fp8_fp8_half_block_gemm_fused", &cutlass_fp8_fp8_half_block_gemm_fused_func, "cutlass_fp8_fp8_half_block_gemm_fused_func");
+//   m.def("f_cutlass_fp8_fp8_half_block_gemm_fused", &cutlass_fp8_fp8_half_block_gemm_fused_func, "cutlass_fp8_fp8_half_block_gemm_fused_func");
 }

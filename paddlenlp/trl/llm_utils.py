@@ -653,6 +653,52 @@ def read_res(
     logger.info("Finish read result message")
 
 
+def read_res_dynamic_insert(
+    model_name_or_path: str,
+    task_queue: mp.Queue,
+    result_queue: mp.Queue,
+    done_event: mp.Event,
+    queue_id: paddle.Tensor,
+    total_request_num: int,
+):
+    from paddlenlp.utils.env import USE_FAST_TOKENIZER
+
+    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, padding_side="left", use_fast=USE_FAST_TOKENIZER)
+
+    paddle.device.set_device("gpu")
+    paddle.disable_static()
+
+    outputs = [[] for _ in range(total_request_num)]
+    count = 0
+
+    done_event.set()
+    logger.info("Start read result dynamic insert")
+
+    while count < total_request_num:
+        try:
+            task_id, token_ids = task_queue.get(block=True, timeout=None)
+
+            if task_id < 0 or task_id >= total_request_num:
+                logger.warning(f"Invalid task ID received: {task_id}")
+                continue
+
+            if len(outputs[task_id]) == 0:
+                output_numpy = token_ids.reshape([1, -1])
+                output_numpy[output_numpy == -1] = tokenizer.eos_token_id
+                outputs[task_id] = output_numpy
+                count += 1
+                logger.info(f"Processed task {task_id} ({count}/{total_request_num})")
+
+        except Exception as e:
+            logger.error(f"Error processing task: {str(e)}")
+            continue
+    output = np.concatenate(outputs, axis=0).tolist()
+    seqs = tokenizer.batch_decode(output, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+    for i, (out, seq) in enumerate(zip(output, seqs)):
+        result_queue.put([i, out, seq])
+    logger.info("Finish read result message")
+
+
 def speculate_read_res(
     model_name_or_path: str,
     tensor_queue: mp.Queue,

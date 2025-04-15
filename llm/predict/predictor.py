@@ -1442,6 +1442,11 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         #     dtype='float32',
         # )
 
+        result_queue = mp.Queue()
+        task_queue = mp.Queue()
+        done_event = mp.Event()
+        read_res_func = llm_utils.read_res_dynamic_insert
+
         s_time = time.time()
         with self.update_predictor_params(**kwargs):
             for i, inst in enumerate(self.input_ids):
@@ -1473,27 +1478,71 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                 task_id = unfinished_ids.pop()
                 self.insert(cur_bs, task_id)
 
+            if self.config.output_via_mq:
+                read_res_process = mp.Process(
+                    target=read_res_func,
+                    args=[
+                        self.model_name_or_path,
+                        task_queue,
+                        result_queue,
+                        done_event,
+                        self.model_inputs["queue_id"],
+                        len(self.input_ids),
+                    ],
+                )
+                if self.tensor_parallel_rank == 0:
+                    read_res_process.start()
+
             if kwargs.pop("max_length", self.config.max_length) > 1:
                 while self.model_inputs["not_need_stop"] or len(unfinished_ids) > 0:
                     no_stop_num = max_batch_size - paddle.sum(self.model_inputs["stop_flags"]).item()
                     if no_stop_num < max_batch_size:
                         for i in range(max_batch_size):
-                            if self.model_inputs["stop_flags"][i] and len(unfinished_ids) > 0:
-                                task_id = unfinished_ids.pop()
-                                self.insert(i, task_id)
+                            if self.model_inputs["stop_flags"][i]:
+                                if self.config.output_via_mq:
+                                    task_id = self.model_inputs["result_id"][i][0].item()
+                                    task_token = (
+                                        self.model_inputs["all_token_ids"][task_id : task_id + 1, :].cpu().numpy()
+                                    )
+                                    task_queue.put([task_id, task_token])
+                                if len(unfinished_ids) > 0:
+                                    task_id = unfinished_ids.pop()
+                                    self.insert(i, task_id)
                     next_tokens = self._infer(self.model_inputs)
+                for i in range(max_batch_size):
+                    if self.model_inputs["stop_flags"][i]:
+                        if self.config.output_via_mq:
+                            task_id = self.model_inputs["result_id"][i][0].item()
+                            task_token = self.model_inputs["all_token_ids"][task_id : task_id + 1, :].cpu().numpy()
+                            task_queue.put([task_id, task_token])
+            elif self.config.output_via_mq:
+                for task_id in range(len(self.input_ids)):
+                    task_id = self.model_inputs["result_id"][i][0].item()
+                    task_token = self.model_inputs["all_token_ids"][task_id : task_id + 1, :].cpu().numpy()
+                    task_queue.put([task_id, task_token])
+
         logger.info(f"running spend {time.time() - s_time}")
 
         if self.tensor_parallel_rank == 0:
-            output_tokens = self.model_inputs["all_token_ids"]
-            output_tokens = paddle.where(
-                output_tokens < 0,
-                paddle.to_tensor(self.tokenizer.pad_token_id, dtype=output_tokens.dtype),
-                output_tokens,
-            )
-            outputs = self.tokenizer.batch_decode(
-                output_tokens, skip_special_tokens=True, clean_up_tokenization_spaces=False
-            )
+            if self.config.output_via_mq:
+                outputs = []
+                output_tokens = []
+                while len(outputs) < len(input_texts):
+                    result = result_queue.get(timeout=1)
+                    outputs.append(result[-1])
+                    output_tokens.append(result[-2])
+
+                read_res_process.terminate()
+            else:
+                output_tokens = self.model_inputs["all_token_ids"]
+                output_tokens = paddle.where(
+                    output_tokens < 0,
+                    paddle.to_tensor(self.tokenizer.pad_token_id, dtype=output_tokens.dtype),
+                    output_tokens,
+                )
+                outputs = self.tokenizer.batch_decode(
+                    output_tokens, skip_special_tokens=True, clean_up_tokenization_spaces=False
+                )
 
             if return_tokens:
                 return outputs, output_tokens
