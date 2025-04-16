@@ -2910,6 +2910,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                     return_attention_mask=return_attention_mask,
                 )
             else:
+                padding_side = padding_side if padding_side is not None else self.padding_side
+
                 original_padding_side = self.padding_side
                 self.padding_side = padding_side
                 encoded_inputs = self._pad(
@@ -2945,6 +2947,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                     return_attention_mask=return_attention_mask,
                 )
             else:
+                padding_side = padding_side if padding_side is not None else self.padding_side
+
                 original_padding_side = self.padding_side
                 self.padding_side = padding_side
                 outputs = self._pad(
