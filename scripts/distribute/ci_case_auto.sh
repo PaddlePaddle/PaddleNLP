@@ -3771,31 +3771,31 @@ function before_hook_for_llama() {
     python -m pip install -r $root_path/requirements-dev.txt
     unset http_proxy && unset https_proxy
     if [[ ! $FLAGS_download_data =~ "llama" ]];then
-    echo -e "\033[31m ---- Download LLaMA data  \033[0m"
-    rm -rf data
-    if [[ -e ${llama_data_path}/data ]]; then
-    echo "LLaMA data downloaded"
+        echo -e "\033[31m ---- Download LLaMA data  \033[0m"
+        rm -rf data
+        if [[ -e ${llama_data_path}/data ]]; then
+            echo "LLaMA data downloaded"
+        else
+            # download data for llama
+            mkdir ${llama_data_path};
+            mkdir ${llama_data_path}/data;
+            wget -O ${llama_data_path}/data/llama_openwebtext_100k_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy;
+            wget -O ${llama_data_path}/data/llama_openwebtext_100k_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz;
+            # download data for llama finetune
+            wget -O ${llama_data_path}/AdvertiseGen.tar.gz https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz
+            tar -xvf ${llama_data_path}/AdvertiseGen.tar.gz -C ${llama_data_path}
+        fi
+        if [[ -e ${llama_data_path}/data_dpo ]]; then
+            echo "LLaMA DPO data downloaded"
+        else
+            # download data for llama dpo
+            wget -O ${llama_data_path}/ultrafeedback_binarized.tar.gz https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized.tar.gz
+            mkdir ${llama_data_path}/data_dpo;
+            tar -xvf ${llama_data_path}/ultrafeedback_binarized.tar.gz -C ${llama_data_path}/data_dpo
+        fi
+        cp -r ${llama_data_path}/data ${llama_case_path}/
     else
-    # download data for llama
-    mkdir ${llama_data_path};
-    mkdir ${llama_data_path}/data;
-    wget -O ${llama_data_path}/data/llama_openwebtext_100k_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy;
-    wget -O ${llama_data_path}/data/llama_openwebtext_100k_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz;
-    # download data for llama finetune
-    wget -O ${llama_data_path}/AdvertiseGen.tar.gz https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz
-    tar -xvf ${llama_data_path}/AdvertiseGen.tar.gz -C ${llama_data_path}
-    fi
-    if [[ -e ${llama_data_path}/data_dpo ]]; then
-    echo "LLaMA DPO data downloaded"
-    else
-    # download data for llama dpo
-    wget -O ${llama_data_path}/ultrafeedback_binarized.tar.gz https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized.tar.gz
-    mkdir ${llama_data_path}/data_dpo;
-    tar -xvf ${llama_data_path}/ultrafeedback_binarized.tar.gz -C ${llama_data_path}/data_dpo
-    fi
-    cp -r ${llama_data_path}/data ${llama_case_path}/
-    else
-    echo -e "\033[31m ---- Skip download LLaMA data \033[0m"
+        echo -e "\033[31m ---- Skip download LLaMA data \033[0m"
     fi
 }
 
