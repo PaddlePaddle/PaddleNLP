@@ -479,17 +479,18 @@ class ExpertsGroupGemmNode:
 
         # o2
         o2 = self.fwd_swiglu(o1)
+
         unzipped_probs = unzipped_probs.unsqueeze(-1).reshape([expert_w_count, -1, 1])
-        o2 = o2 * unzipped_probs
+        o2_s = o2 * unzipped_probs
 
         # o3
-        o3 = self.fwd_down(o2, expert_w2, expert_w_count, tokens_per_expert)
+        o3 = self.fwd_down(o2_s, expert_w2, expert_w_count, tokens_per_expert)
+        self.o3 = o3  # 临时
 
         # save for bwd
         self.unzipped_probs = unzipped_probs
         self.unzipped_tokens = hs_out
         self.unzipped_scale = hs_scale_out
-
         return o3
 
     @paddle.no_grad()
