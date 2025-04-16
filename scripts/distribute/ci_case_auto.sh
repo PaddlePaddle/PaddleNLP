@@ -292,17 +292,17 @@ function llama_dygraph_auto_bs4_bf16_SD2() {
             ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'interval_tokens_per_second_per_device: ' '{print $2}' | awk -F ',' '{print $1}'`
             mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
             echo "result: loss=$loss ips=$ips mem=$mem"
-            case "$flag" in
-                "")
-                    loss_base = 9.23502579
-                    ;;
-                "FLAGS_fuse_allreduce_in_opt")
-                    loss_base = 9.23502579
-                    ;;
-                "FLAGS_fuse_reducescatter_in_opt")
-                    loss_base = 9.23504105
-                    ;;
-            esac
+            
+            if [ -z "$flag" ]; then
+                loss_base=9.23502579
+            elif [ "$flag" = "FLAGS_fuse_allreduce_in_opt" ]; then
+                loss_base=9.23502579
+            elif [ "$flag" = "FLAGS_fuse_reducescatter_in_opt" ]; then
+                loss_base=9.23504105
+            else
+                loss_base=-1
+            fi
+
             ips_base=-1
             mem_base=-1
             check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
