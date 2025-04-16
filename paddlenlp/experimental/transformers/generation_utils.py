@@ -500,7 +500,6 @@ class GenerationBlockInferenceModel(GenerationMixin):
 
         input_spec = [
             paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),  # input_ids
-            paddle.static.InputSpec(shape=[1], dtype="int32", name="queue_id"),  # stop_nums
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="temperature"),  # temperature
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="top_p"),  # top_p
             paddle.static.InputSpec(shape=[None], dtype="int64", name="eos_token_id"),  # eos_token_id
@@ -533,6 +532,9 @@ class GenerationBlockInferenceModel(GenerationMixin):
             cache_v_dequant_scales,
             tgt_mask_spec,
         ]
+        input_spec.extend(
+            [paddle.static.InputSpec(shape=[1], dtype="int32", name="queue_id")]
+        )  # queue_id for save_output
         if config.get("speculate_method", None) is not None:
             speculate_spec = [
                 paddle.static.InputSpec(shape=[None, None], dtype="int64", name="draft_tokens"),
@@ -580,7 +582,6 @@ class GenerationBlockInferenceModel(GenerationMixin):
     def generate(
         self,
         input_ids=None,
-        queue_id=None,
         temperature=None,
         top_p=None,
         eos_token_id=None,
@@ -610,6 +611,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
         k_dequant_scales=None,
         v_dequant_scales=None,
         tgt_mask=None,
+        queue_id=None,
         draft_tokens=None,
         accept_tokens=None,
         accept_num=None,
