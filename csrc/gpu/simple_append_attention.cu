@@ -182,6 +182,56 @@ std::vector<paddle::Tensor> SimpleAppendAttentionKernel(
         &fmha_out);
   }
 
+  if (max_dec_len_this_time_data > 0) {
+    cudaStream_t exec_stream;
+    if (max_enc_len_this_time_data > 0) {
+      cudaStreamWaitEvent(decoder_stream, main_event);
+      exec_stream = decoder_stream;
+    } else {
+      exec_stream = main_stream;
+    }
+    CascadeAppendAttentionKernel<data_t, data_t>(
+        meta_data,
+        qkv_out,
+        key_cache,
+        value_cache,
+        attn_mask,
+        cache_k_dequant_scales,
+        cache_v_dequant_scales,
+        cache_k_zp,
+        cache_v_zp,
+        out_linear_shifts,
+        out_linear_smooths,
+        seq_lens_this_time,
+        seq_lens_decoder,
+        seq_lens_encoder,
+        padding_offsets,
+        cum_offsets,
+        block_tables,
+        decoder_batch_ids,
+        decoder_tile_ids_per_batch,
+        cache_quant_type_str,
+        decoder_num_blocks_data,
+        decoder_block_shape_q,
+        max_input_length,
+        max_len_kv_data,
+        softmax_scale,
+        quant_max_bound,
+        quant_min_bound,
+        out_linear_in_scale,
+        speculate_max_draft_token_num,
+        causal,
+        !speculate_decoder,
+        !speculate_decoder,
+        exec_stream,
+        &fmha_out);
+    
+    if (max_enc_len_this_time_data > 0) {
+      cudaEventRecord(decoder_event, exec_stream);
+      cudaStreamWaitEvent(main_stream, decoder_event);
+    }
+  }
+
   return {fmha_out, qkv_out};
 }
 
