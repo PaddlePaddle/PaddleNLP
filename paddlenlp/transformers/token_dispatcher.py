@@ -227,6 +227,12 @@ class PreDispatchNode:
         self.token_dispatcher = token_dispatcher
         self.probs_origin_shape = None
 
+    def reset_status(self):
+        self.probs = None
+        self.reshaped_probs = None
+        self.token_indices = None
+
+    @paddle.no_grad()
     def forward(self, routing_map, probs):
         num_tokens = routing_map.shape[0]
         self.probs_origin_shape = probs.shape
@@ -238,8 +244,10 @@ class PreDispatchNode:
             reshaped_probs, self.token_dispatcher._comm_manager.router_topk, axis=-1
         )
         self.token_indices = token_indices
+        token_probs.stop_gradient = False
         return token_indices, token_probs
 
+    @paddle.no_grad()
     def backward(self, token_probs_g):
         probs_grad = paddle._C_ops.topk_grad(
             self.reshaped_probs,
@@ -251,4 +259,5 @@ class PreDispatchNode:
             True,
         )
         probs_reshape_g = paddle._C_ops.reshape_grad(probs_grad, self.probs)
+        self.reset_status()
         return probs_reshape_g

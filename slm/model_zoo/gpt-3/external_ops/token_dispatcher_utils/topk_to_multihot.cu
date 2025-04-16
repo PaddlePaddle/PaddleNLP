@@ -55,7 +55,7 @@ __global__ void convert_to_multihot_specialized_kernel(
       }
     }
 
-    //连续访存结果写入，拆两个for以获取更好的写入带宽
+    // 连续访存结果写入，拆两个for以获取更好的写入带宽
 #pragma unroll
     for (int i = 0; i < expert; i++) {
       routemap_multihot[row_idx * expert + i] = local_routemap_multihot[i];

@@ -32,6 +32,8 @@ from ..linear_utils import RowSequenceParallelLinear as PD_RowSequenceParallelLi
 from .configuration import DeepseekV2Config
 
 try:
+    import kitchen
+
     from .kernel import act_quant, fp8_gemm, weight_dequant
 except:
     pass
@@ -48,7 +50,6 @@ except ImportError:
 
 try:
     import deep_gemm
-    import kitchen
     import kitchen.quantization_subchannel_block_hybrid
     from kitchen.quantization import QParams, ScalingType
 except:
@@ -187,18 +188,21 @@ def kitchen_quant(x, backend=None, is_1d_scaled=True, return_transpose=False):
 
 
 def kitchen_fp8_gemm(x_fp8, x_scale, w_fp8, w_scale, is_a_1d_scaled, is_b_1d_scaled):
-    y = kitchen.ops.fp8_gemm_blockwise(
-        a=x_fp8,
-        a_decode_scale=x_scale,
-        b=w_fp8,
-        b_decode_scale=w_scale,
-        out_dtype=paddle.bfloat16,
-        out=None,
-        accumulate=False,
-        use_split_accumulator=True,
-        is_a_1d_scaled=is_a_1d_scaled,
-        is_b_1d_scaled=is_b_1d_scaled,
-    )
+    if numpy.prod(x_fp8.shape) != 0 and numpy.prod(w_fp8.shape) != 0:
+        y = kitchen.ops.fp8_gemm_blockwise(
+            a=x_fp8,
+            a_decode_scale=x_scale,
+            b=w_fp8,
+            b_decode_scale=w_scale,
+            out_dtype=paddle.bfloat16,
+            out=None,
+            accumulate=False,
+            use_split_accumulator=True,
+            is_a_1d_scaled=is_a_1d_scaled,
+            is_b_1d_scaled=is_b_1d_scaled,
+        )
+    else:
+        y = paddle.zeros([x_fp8.shape[0], w_fp8.shape[0]], paddle.bfloat16)
     return y
 
 
@@ -209,6 +213,8 @@ class LinearFP8Func(paddle.autograd.PyLayer):
         # deep_gemm only support 2D
         x = x.reshape([-1, x_orig_shape[-1]])
         # quant
+        if not x.is_contiguous():
+            x = x.contiguous()
         x_quant, x_scale = kitchen_quant(
             x, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
         )
@@ -226,8 +232,15 @@ class LinearFP8Func(paddle.autograd.PyLayer):
         x_t = x.T
         # padding
         x_t_shape = x_t.shape
-        if x_t.shape[-1] % 8 != 0:
-            x_t = paddle.concat([x_t, paddle.zeros([x_t.shape[0], 8 - (x_t.shape[-1] % 8)], dtype=x_t.dtype)], axis=-1)
+        if x_t.shape[-1] % 128 != 0 or x_t.shape[-1] % 512 != 0:
+            if (x_t.shape[-1] + 128 - (x_t.shape[-1] % 128)) % 512 != 0:
+                padding_size = 512
+            else:
+                padding_size = 128
+            x_t = paddle.concat(
+                [x_t, paddle.zeros([x_t.shape[0], padding_size - (x_t.shape[-1] % padding_size)], dtype=x_t.dtype)],
+                axis=1,
+            )
         x_t_quant, x_t_scale = kitchen_quant(
             x_t.contiguous(), backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
         )
@@ -259,9 +272,20 @@ class LinearFP8Func(paddle.autograd.PyLayer):
         # compute dw = mm(x_t, dout_t)
         dout_t = dout.reshape([-1, dout.shape[-1]]).T.contiguous()
         # padding
-        if dout_t.shape[-1] % 8 != 0:
-            pad_size = 8 - (dout_t.shape[-1] % 8)
-            dout_t = paddle.concat([dout_t, paddle.zeros([dout_t.shape[0], pad_size], dtype=dout_t.dtype)], axis=-1)
+        if dout_t.shape[-1] % 128 != 0 or dout_t.shape[-1] % 512 != 0:
+            if (dout_t.shape[-1] + 128 - (dout_t.shape[-1] % 128)) % 512 != 0:
+                padding_size = 512
+            else:
+                padding_size = 128
+            dout_t = paddle.concat(
+                [
+                    dout_t,
+                    paddle.zeros(
+                        [dout_t.shape[0], padding_size - (dout_t.shape[-1] % padding_size)], dtype=dout_t.dtype
+                    ),
+                ],
+                axis=1,
+            )
 
         dout_t_quant, dout_t_scale = kitchen_quant(
             dout_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
@@ -280,9 +304,8 @@ class LinearFP8KeepXFunc(paddle.autograd.PyLayer):
         x_quant, x_scale = kitchen_quant(
             x, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
         )
-        weight_t = weight.T.contiguous()
-        w_quant, w_scale = kitchen_quant(
-            weight_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
+        _, _, w_quant, w_scale = kitchen_quant(
+            weight, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
         )
 
         # compute out = mm(x, w_t)
@@ -296,18 +319,25 @@ class LinearFP8KeepXFunc(paddle.autograd.PyLayer):
     @staticmethod
     def backward(ctx, dout):
         x, weight = ctx.saved_tensor()
-
+        dx_orig_shape = x.shape
         # padding
-        x_t = x.T.contiguous()
-        if x_t.shape[-1] % 8 != 0:
-            x_t = paddle.concat([x_t, paddle.zeros([x_t.shape[0], 8 - (x_t.shape[-1] % 8)], dtype=x_t.dtype)], axis=-1)
-        x_t_quant, x_t_scale = kitchen_quant(
-            x_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
+        x = x.reshape([-1, x.shape[-1]])
+        if x.shape[0] % 128 != 0 or x.shape[0] % 512 != 0:
+            if (x.shape[0] + 128 - (x.shape[0] % 128)) % 512 != 0:
+                padding_size = 512
+            else:
+                padding_size = 128
+            x = paddle.concat(
+                [x, paddle.zeros([padding_size - (x.shape[0] % padding_size), x.shape[-1]], dtype=x.dtype)],
+                axis=0,
+            )
+
+        _, _, x_t_quant, x_t_scale = kitchen_quant(
+            x, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=True
         )
 
         # compute dx = mm(dout, w)
         dx = paddle.empty(x.shape, dout.dtype)
-        dx_orig_shape = x.shape
 
         dout_quant, dout_scale = kitchen_quant(
             dout.reshape([-1, dout.shape[-1]]),
@@ -322,14 +352,24 @@ class LinearFP8KeepXFunc(paddle.autograd.PyLayer):
         dx = dx.reshape(dx_orig_shape)
 
         # compute dw = mm(x_t, dout_t)
-        dout_t = dout.reshape([-1, dout.shape[-1]]).T.contiguous()
-        # padding
-        if dout_t.shape[-1] % 8 != 0:
-            pad_size = 8 - (dout_t.shape[-1] % 8)
-            dout_t = paddle.concat([dout_t, paddle.zeros([dout_t.shape[0], pad_size], dtype=dout_t.dtype)], axis=-1)
+        dout_t = dout.reshape([-1, dout.shape[-1]])
+        if dout_t.shape[0] % 128 != 0 or dout_t.shape[0] % 512 != 0:
+            if (dout_t.shape[0] + 128 - (dout_t.shape[0] % 128)) % 512 != 0:
+                padding_size = 512
+            else:
+                padding_size = 128
+            dout_t = paddle.concat(
+                [
+                    dout_t,
+                    paddle.zeros(
+                        [padding_size - (dout_t.shape[0] % padding_size), dout_t.shape[-1]], dtype=dout_t.dtype
+                    ),
+                ],
+                axis=0,
+            )
 
-        dout_t_quant, dout_t_scale = kitchen_quant(
-            dout_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
+        _, _, dout_t_quant, dout_t_scale = kitchen_quant(
+            dout_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=True
         )
         dweight = kitchen_fp8_gemm(x_t_quant, x_t_scale, dout_t_quant, dout_t_scale, True, True)
         return dx, dweight
@@ -393,7 +433,7 @@ class Fuse_FFN_FP8_Func(paddle.autograd.PyLayer):
         )
 
         # ===== o3 = deep_gemm(o2_fp8, w2_t_fp8) =====
-        w2_fp8, w2_sacle, w2_t_fp8, w2_t_scale = kitchen_quant(
+        _, _, w2_t_fp8, w2_t_scale = kitchen_quant(
             w2, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=True
         )
         o3 = paddle.empty([o2_fp8.shape[0], w2_t_fp8.shape[0]], dtype=o2.dtype)
@@ -424,8 +464,7 @@ class Fuse_FFN_FP8_Func(paddle.autograd.PyLayer):
             # w1_fp8,
             # w1_sacle,
             o1,
-            w2_fp8,
-            w2_sacle,
+            w2,
             paddle.to_tensor(x_orig_shape, dtype="int64", place=paddle.CPUPlace()),
         )
         return o3
@@ -436,8 +475,12 @@ class Fuse_FFN_FP8_Func(paddle.autograd.PyLayer):
         do3_orig_shape = do3.shape
         do3 = do3.reshape([-1, do3_orig_shape[-1]])
 
-        x_t_fp8, x_t_scale, w1, o1, w2_fp8, w2_sacle, x_orig_shape = ctx.saved_tensor()
+        x_t_fp8, x_t_scale, w1, o1, w2, x_orig_shape = ctx.saved_tensor()
         x_orig_shape = x_orig_shape.numpy()
+
+        w2_fp8, w2_scale = kitchen_quant(
+            w2, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=False, return_transpose=False
+        )
 
         # ===== [recompute] o2 = swiglu(o1) =====
         # TODO: [Fusion] swiglu + transpose + quant
@@ -452,7 +495,7 @@ class Fuse_FFN_FP8_Func(paddle.autograd.PyLayer):
             do3, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
         )
         do2 = paddle.empty([do3_fp8.shape[0], w2_fp8.shape[0]], do3.dtype)
-        deep_gemm.gemm_fp8_fp8_bf16_nt((do3_fp8, do3_scale), (w2_fp8, w2_sacle), do2)
+        deep_gemm.gemm_fp8_fp8_bf16_nt((do3_fp8, do3_scale), (w2_fp8, w2_scale), do2)
 
         # ===== dw2 = deep_gemm(o2_t_fp8, do3_t_fp8)
         if o2_t.shape[-1] % 128 != 0 or o2_t.shape[-1] % 512 != 0:
@@ -541,6 +584,28 @@ class FP8DeepseekV2MLP(paddle.nn.Layer):
         )
         self.w2 = self.create_parameter(
             shape=[self.intermediate_size, self.hidden_size],
+            dtype="bfloat16",
+            is_bias=False,
+        )
+
+    def forward(self, x):
+        return Fuse_FFN_FP8_Func.apply(x, self.w1, self.w2)
+
+
+class FusedFP8DeepseekV2MLP(paddle.nn.Layer):
+    def __init__(self, config: DeepseekV2Config, hidden_size=None, intermediate_size=None, is_moe=False):
+        super().__init__()
+        self.config = config
+        self.hidden_size = config.hidden_size if hidden_size is None else hidden_size
+        self.intermediate_size = config.intermediate_size if intermediate_size is None else intermediate_size
+
+        self.w1 = self.create_parameter(
+            shape=[4 * self.hidden_size, self.intermediate_size * 2],
+            dtype="bfloat16",
+            is_bias=False,
+        )
+        self.w2 = self.create_parameter(
+            shape=[4 * self.intermediate_size, self.hidden_size],
             dtype="bfloat16",
             is_bias=False,
         )

@@ -17,6 +17,7 @@
 # Licensed under the MIT License - https://github.com/deepseek-ai/DeepEP/blob/main/LICENSE
 
 import functools
+from functools import reduce
 from typing import Tuple
 
 import paddle
@@ -56,6 +57,8 @@ GemmType::run(out, rhs_scales, grouped_layout,
 @functools.lru_cache()
 def auto_tuning_with_compilation_grouped_gemm_contiguous(m, n, k, num_groups, num_sms):
     global includes, template
+    if num_sms is None:
+        num_sms = get_num_sms()
     block_m, block_n, num_stages, num_tma_multicast, smem_size = get_best_configs(
         m, n, k, 1, num_sms, is_grouped_contiguous=True
     )
@@ -95,7 +98,7 @@ def auto_tuning_with_compilation_grouped_gemm_contiguous(m, n, k, num_groups, nu
 
 
 def m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
-    lhs: Tuple[Tensor, Tensor], rhs: Tuple[Tensor, Tensor], out: Tensor, m_indices: Tensor
+    lhs: Tuple[Tensor, Tensor], rhs: Tuple[Tensor, Tensor], out: Tensor, m_indices: Tensor, num_sms=112
 ) -> None:
     """
     Do a grouped GEMM (contiguous format) with FP8 inputs and BF16 output, with 1x128 LHS scaling and 128x128 RHS scaling.
@@ -123,7 +126,8 @@ def m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
     m, k = lhs.shape
     num_groups, n, k_ = rhs.shape
     m_, n_ = out.shape
-    m__ = m_indices.numel()
+    m_shape = m_indices.shape
+    m__ = reduce(lambda x, y: x * y, m_shape)
     # Type and shape checks
     assert m == m_ == m__ and k == k_ and n == n_
     assert lhs_scales.shape == [m, (k + 127) // 128]
@@ -144,7 +148,6 @@ def m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
         return
     # Auto-tuning with compilation
     global includes, template
-    num_sms = get_num_sms()
     runtime, num_sms, smem_size = auto_tuning_with_compilation_grouped_gemm_contiguous(m, n, k, num_groups, num_sms)
 
     args = (
@@ -156,63 +159,19 @@ def m_grouped_gemm_fp8_fp8_bf16_nt_contiguous(
         m_indices,
         m,
         num_groups,
-        paddle.device.cuda.current_stream(),
+        paddle.device.current_stream().stream_base,
         num_sms,
         smem_size,
     )
     runtime(*args)
 
 
-def m_grouped_gemm_fp8_fp8_bf16_nt_masked(
-    lhs: Tuple[Tensor, Tensor], rhs: Tuple[Tensor, Tensor], out: Tensor, masked_m: Tensor, expected_m: int
-) -> None:
-    """
-    Do a grouped GEMM (masked format) with FP8 inputs and BF16 output, with 1x128 LHS scaling and 128x128 RHS scaling.
-    LHS, RHS, RHS scaling factors, and output tensors must be in contiguous format.
-    RHS and RHS scaling factors are required to be transposed.
-    The LHS scaling tensor requires TMA-aligned transposed format, if your input does not match the requirement,
-        this function will do a transposing with a set of slow Paddle operations.
-    Moreover, this alignment requirement is different with the contiguous-format kernel, as we require that each batch
-        should be separately transposed.
-
-    Arguments:
-        lhs: the first element is an FP8 tensor (typed `paddle.float8_e4m3fn`) of shape `[num_groups, m_max, k]`,
-             the second element is an FP32 1x128 scaling tensor for LHS of shape `[num_groups, m_max, ⌈k / 128⌉]`.
-        rhs: the first element is an FP8 tensor (typed `paddle.float8_e4m3fn`) of shape `[num_groups, n, k]`.
-             the second element is an FP32 128x128 scaling tensor for RHS of shape `[num_groups, ⌈n / 128⌉, ⌈k / 128⌉]`.
-        out: the BF16 output tensor of shape `[num_groups, m_max, n]`, representing the result.
-        masked_m: a tensor of shape `[num_groups]`, `masked_m[i]` records actual rows of the `lhs[i]` matrix to compute
-            in the i-th group.
-        expected_m: a value hint (which is a value on CPU) for the M expectation of each batch,
-            correctly setting this value may lead to better performance.
-    """
-    lhs, lhs_scales = lhs
-    rhs, rhs_scales = rhs
-    num_groups, m, k = lhs.shape
-    num_groups_, n, k_ = rhs.shape
-    num_groups__, m_, n_ = out.shape
-    num_groups___ = masked_m.numel()
-
-    # Type and shape checks
-    assert num_groups == num_groups_ == num_groups__ == num_groups___
-    assert m == m_ and n == n_ and k == k_
-    assert expected_m > 0 and m > 0 and n > 0 and k > 0 and num_groups > 0
-    assert lhs_scales.shape == [num_groups, m, (k + 127) // 128]
-    assert rhs_scales.shape == [num_groups, (n + 127) // 128, (k + 127) // 128]
-    assert lhs.dtype == paddle.float8_e4m3fn and lhs_scales.dtype == paddle.float32
-    assert rhs.dtype == paddle.float8_e4m3fn and rhs_scales.dtype == paddle.float32
-    assert out.dtype == paddle.bfloat16
-    assert masked_m.dtype == paddle.int32
-    assert lhs.is_contiguous() and rhs.is_contiguous()
-    assert out.is_contiguous() and masked_m.is_contiguous()
-
-    # LHS scales must be transposed for TMA load, but not for RHS scales
-    lhs_scales = get_col_major_tma_aligned_tensor(lhs_scales)
-    assert rhs_scales.is_contiguous()
-
+@functools.lru_cache()
+def auto_tuning_with_compilation_grouped_gemm_masked(m, expected_m, n, k, num_groups, num_sms):
     # Auto-tuning with compilation
     global includes, template
-    num_sms = get_num_sms()
+    if num_sms is None:
+        num_sms = get_num_sms()
     block_m, block_n, num_stages, num_tma_multicast, smem_size = get_best_configs(
         expected_m, n, k, num_groups, num_sms
     )
@@ -223,18 +182,6 @@ def m_grouped_gemm_fp8_fp8_bf16_nt_masked(
             m % block_m == 0
         ), f"For masked grouped GEMM, shape M should be multiple of the block M (current block M: {block_m})"
 
-    args = (
-        lhs,
-        lhs_scales,
-        rhs,
-        rhs_scales,
-        out,
-        masked_m,
-        m,
-        paddle.device.cuda.current_stream(),
-        num_sms,
-        smem_size,
-    )
     runtime = jit_tuner.compile_and_tune_group_gemm_masked(
         name="m_grouped_gemm_fp8_fp8_bf16_nt",
         keys={
@@ -262,7 +209,74 @@ def m_grouped_gemm_fp8_fp8_bf16_nt_masked(
             ("smem_size", int),
         ),
         template=template,
-        args=args,
+    )
+
+    return runtime, num_sms, smem_size
+
+
+def m_grouped_gemm_fp8_fp8_bf16_nt_masked(
+    lhs: Tuple[Tensor, Tensor], rhs: Tuple[Tensor, Tensor], out: Tensor, masked_m: Tensor, expected_m: int, num_sms=112
+) -> None:
+    """
+    Do a grouped GEMM (masked format) with FP8 inputs and BF16 output, with 1x128 LHS scaling and 128x128 RHS scaling.
+    LHS, RHS, RHS scaling factors, and output tensors must be in contiguous format.
+    RHS and RHS scaling factors are required to be transposed.
+    The LHS scaling tensor requires TMA-aligned transposed format, if your input does not match the requirement,
+        this function will do a transposing with a set of slow Paddle operations.
+    Moreover, this alignment requirement is different with the contiguous-format kernel, as we require that each batch
+        should be separately transposed.
+
+    Arguments:
+        lhs: the first element is an FP8 tensor (typed `paddle.float8_e4m3fn`) of shape `[num_groups, m_max, k]`,
+             the second element is an FP32 1x128 scaling tensor for LHS of shape `[num_groups, m_max, ⌈k / 128⌉]`.
+        rhs: the first element is an FP8 tensor (typed `paddle.float8_e4m3fn`) of shape `[num_groups, n, k]`.
+             the second element is an FP32 128x128 scaling tensor for RHS of shape `[num_groups, ⌈n / 128⌉, ⌈k / 128⌉]`.
+        out: the BF16 output tensor of shape `[num_groups, m_max, n]`, representing the result.
+        masked_m: a tensor of shape `[num_groups]`, `masked_m[i]` records actual rows of the `lhs[i]` matrix to compute
+            in the i-th group.
+        expected_m: a value hint (which is a value on CPU) for the M expectation of each batch,
+            correctly setting this value may lead to better performance.
+    """
+    lhs, lhs_scales = lhs
+    rhs, rhs_scales = rhs
+    num_groups, m, k = lhs.shape
+    num_groups_, n, k_ = rhs.shape
+    num_groups__, m_, n_ = out.shape
+    masked_m_shape = masked_m.shape
+    num_groups___ = reduce(lambda x, y: x * y, masked_m_shape)
+
+    # Type and shape checks
+    assert num_groups == num_groups_ == num_groups__ == num_groups___
+    assert m == m_ and n == n_ and k == k_
+    assert expected_m > 0 and m > 0 and n > 0 and k > 0 and num_groups > 0
+    assert lhs_scales.shape == [num_groups, m, (k + 127) // 128]
+    assert rhs_scales.shape == [num_groups, (n + 127) // 128, (k + 127) // 128]
+    assert lhs.dtype == paddle.float8_e4m3fn and lhs_scales.dtype == paddle.float32
+    assert rhs.dtype == paddle.float8_e4m3fn and rhs_scales.dtype == paddle.float32
+    assert out.dtype == paddle.bfloat16
+    assert masked_m.dtype == paddle.int32
+    assert lhs.is_contiguous() and rhs.is_contiguous()
+    assert out.is_contiguous() and masked_m.is_contiguous()
+
+    # LHS scales must be transposed for TMA load, but not for RHS scales
+    lhs_scales = get_col_major_tma_aligned_tensor(lhs_scales)
+    assert rhs_scales.is_contiguous()
+
+    runtime, num_sms, smem_size = auto_tuning_with_compilation_grouped_gemm_masked(
+        m, expected_m, n, k, num_groups, num_sms
+    )
+
+    args = (
+        lhs,
+        lhs_scales,
+        rhs,
+        rhs_scales,
+        out,
+        masked_m,
+        m,
+        paddle.device.current_stream().stream_base,
+        num_sms,
+        smem_size,
     )
 
     # Run the kernel

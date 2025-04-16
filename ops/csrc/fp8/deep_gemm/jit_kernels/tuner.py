@@ -20,8 +20,6 @@ import copy
 import os
 from typing import Any, Dict
 
-import paddle
-
 from ..jit import Runtime, build, cpp_format, generate
 
 
@@ -37,7 +35,6 @@ class JITTuner:
         includes: tuple,
         arg_defs: tuple,
         template: str,
-        args: tuple,
     ) -> Runtime:
         # NOTES: we always assume the space and template will not change
         # We also assume the GPU device will not be changed
@@ -53,7 +50,6 @@ class JITTuner:
             print(f"Auto-tuning JIT kernel {name} with keys {keys}")
 
         assert signature not in self.tuned
-        assert args is not None
         space = (dict(),) if len(space) == 0 else space
 
         kernels = []
@@ -68,32 +64,7 @@ class JITTuner:
 
         best_runtime, best_time, best_keys = None, None, None
         for runtime, tuned_keys in kernels:
-            if len(space) > 1:
-                # Check kernel validity
-                return_code = runtime(*args)
-                if return_code != 0:
-                    # Pass illegal kernels, e.g. insufficient shared memory capacity
-                    if os.getenv("DG_JIT_DEBUG", None):
-                        print(
-                            f"Illegal JIT kernel {name} with keys {keys} and tuned keys {tuned_keys}: error code {return_code}"
-                        )
-                    continue
-
-                # Measure performance with L2 flush and a large GEMM kernel before to reduce overhead between kernels
-                start_event = paddle.device.cuda.Event(enable_timing=True)
-                end_event = paddle.device.cuda.Event(enable_timing=True)
-                paddle.empty(int(256e6 // 4), dtype=paddle.int32).zero_()
-                paddle.randn((8192, 8192), dtype=paddle.float32, device="cuda") @ paddle.randn(
-                    (8192, 8192), dtype=paddle.float32
-                )
-                start_event.record()
-                for i in range(20):
-                    assert runtime(*args) == 0
-                end_event.record()
-                end_event.synchronize()
-                elapsed_time = start_event.elapsed_time(end_event)
-            else:
-                elapsed_time = 0
+            elapsed_time = 0
 
             # Compare if better
             if best_time is None or elapsed_time < best_time:
@@ -119,7 +90,6 @@ class JITTuner:
         includes: tuple,
         arg_defs: tuple,
         template: str,
-        # args: tuple,
     ) -> Runtime:
         # NOTES: we always assume the space and template will not change
         # We also assume the GPU device will not be changed
