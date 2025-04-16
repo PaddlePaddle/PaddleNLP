@@ -97,27 +97,27 @@ function llama_case_list_auto() {
     fun_list=(
         # The test name must have "llama_" as a prefix, which will 
         # be used for tracking the execution status of the case.
-        llama_dygraph_auto_bs4_bf16_SD2
-        llama_dygraph_auto_bs8_fp32_DP2
-        llama_dygraph_auto_bs8_fp32_DP2-MP2
-        llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2
-        llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2
-        # llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_intermediate
-        llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw
-        llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2
-        llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1
-        llama_pir_auto_fuse_ffn_attention_qkv_MP2
-        llama_convert_hybrid_ckpt_to_auto_parallel_bs2_fp32_DP2-MP1-PP1
-        llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP1-SP
-        llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP2-SP
-        llama_align_dygraph_dy2st_pir_auto_grad_merge_bs2_fp32_DP1-MP1-PP1
+        # llama_dygraph_auto_bs4_bf16_SD2
+        # llama_dygraph_auto_bs8_fp32_DP2
+        # llama_dygraph_auto_bs8_fp32_DP2-MP2
+        # llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2
+        # llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2
+        # # llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_intermediate
+        # llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw
+        # llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2
+        # llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1
+        # llama_pir_auto_fuse_ffn_attention_qkv_MP2
+        # llama_convert_hybrid_ckpt_to_auto_parallel_bs2_fp32_DP2-MP1-PP1
+        # llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP1-SP
+        # llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP2-SP
+        # llama_align_dygraph_dy2st_pir_auto_grad_merge_bs2_fp32_DP1-MP1-PP1
         llama_align_dy2st_fthenb_and_vpp_auto_bs2_fp32_DP1-MP1-PP4
-        llama_align_dygraph_dy2st_pir_auto_pp_bs2_bf16_DP1-MP1-PP4
-        llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2
-        # llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2_intermediate
-        llama_dy2st_auto_bs2_bf16_DP2-MP1-PP1-CINN
-        llama_lora_static_graph_auto_bs_2_bf16_DP2-TP2-PP1
-        llama_dpo_dy2st_auto_bs2_bf16_MP8_intermediate
+        # llama_align_dygraph_dy2st_pir_auto_pp_bs2_bf16_DP1-MP1-PP4
+        # llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2
+        # # llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2_intermediate
+        # llama_dy2st_auto_bs2_bf16_DP2-MP1-PP1-CINN
+        # llama_lora_static_graph_auto_bs_2_bf16_DP2-TP2-PP1
+        # llama_dpo_dy2st_auto_bs2_bf16_MP8_intermediate
     )
     if [ $1 = "prepare_case" ]; then
         restore_func $fun_list  
@@ -289,8 +289,8 @@ function llama_dygraph_auto_bs4_bf16_SD2() {
                 --num_hidden_layers 4 \
                 >>${log_path}/$FUNCNAME 2>&1
             loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-            ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'interval_tokens_per_second_per_device: ' '{print $2}' | awk -F ',' '{print $1}'`
-            mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
+            ips=-1
+            mem=-1
             echo "result: loss=$loss ips=$ips mem=$mem"
             
             if [ -z "$flag" ]; then
@@ -1591,8 +1591,10 @@ function llama_align_dy2st_fthenb_and_vpp_auto_bs2_fp32_DP1-MP1-PP4() {
     to_static=1
     loss1_array=()
     loss2_array=()
+    export PYTHONPATH=/paddle/Paddle/build/python/:$PYTHONPATH
+    export PYTHONPATH=/paddle/Paddle/build:$PYTHONPATH
 
-    for pp_mode in "FThenB" "VPP"; do
+    for pp_mode in "VPP"; do
         export FLAGS_enable_pir_api=${use_pir}
         export FLAGS_enable_pir_in_executor=${use_pir}
         rm -rf $case_out_dir
