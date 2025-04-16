@@ -100,7 +100,7 @@ def offload_tensor_to_cpu(tensors):
         if src._is_initialized() and not isinstance(src.place, paddle.CUDAPinnedPlace):
             _move_param(src, pin_device)
     else:
-        logger.debug(f"Can't parse for type {tensors[1]}")
+        logger.debug(f"[offload_tensor_to_cpu]Can't parse for type {tensors[1]}")
 
 
 def reload_tensor_to_gpu(tensors):
@@ -147,7 +147,7 @@ def reload_tensor_to_gpu(tensors):
             if src._is_initialized() and not isinstance(src.place, paddle.CUDAPlace):
                 _move_param(src, device)
     else:
-        logger.debug(f"Can't parse for type {tensors[1]}")
+        logger.debug(f"[reload_tensor_to_gpu]Can't parse for type {tensors[1]}")
 
 
 class OffloadController:
@@ -195,11 +195,14 @@ def reload_and_offload_scope(trainer, *args):
             }
         )
 
-    if getattr(trainer.actor_trainer, "_inner_eval_model", None) is not None:
-        offload_map.update({trainer.actor_trainer._inner_eval_model: "freeze_model"})
-
-    if trainer.args.rl_algorithm == "ppo" and getattr(trainer.critic_trainer, "_inner_eval_model", None) is not None:
-        offload_map.update({trainer.critic_trainer._inner_eval_model: "freeze_model"})
-
     objs = [(arg, offload_map.get(arg, "")) for arg in args if offload_map.get(arg, "") in trainer.args.offload_level]
+    if trainer.actor_model not in [i for i, _ in objs]:
+        if getattr(trainer.actor_trainer, "_inner_eval_model", None) is not None:
+            # NOTE(gongenlei): for export_evaluate_model
+            objs.append((trainer.actor_model, offload_map.get(trainer.actor_model, "")))
+    if trainer.args.rl_algorithm == "ppo":
+        if trainer.reward_critic_model not in [i for i, _ in objs]:
+            if getattr(trainer.critic_trainer, "_inner_eval_model", None) is not None:
+                # NOTE(gongenlei): for export_evaluate_model
+                objs.append((trainer.reward_critic_model, offload_map.get(trainer.reward_critic_model, "")))
     return OffloadController(objs)

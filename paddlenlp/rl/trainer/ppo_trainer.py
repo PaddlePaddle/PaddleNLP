@@ -675,6 +675,8 @@ class PPOTrainer(Trainer):
             ValueError: If `ignore_keys` is not an optional parameter or is not a list.
         """
         inputs = self._prepare_inputs(inputs)
+        data_trans_group = getattr(self.actor_trainer, "_data_trans_group", None)
+        inputs = data_group_split(inputs, group=data_trans_group)
         with reload_and_offload_scope(self, self.actor_model, self.reference_model, self.actor_trainer):
             with infer_guard(self.actor_trainer):
                 prompt_only_batch = {
