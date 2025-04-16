@@ -12,20 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# PIR disable
-python export_to_serving.py \
-    --dirname "output" \
-    --model_filename "inference.pdmodel" \
-    --params_filename "inference.pdiparams" \
-    --server_path "serving_server" \
-    --client_path "serving_client" \
-    --fetch_alias_names "predict"
+param="model_item=baichuan-inc-baichuan-2-13b_pretrain_dynamic_auto "
+param+="run_mode=DP1_MP4_PP1_Sharding8_Stage1 "
+param+="device_num=N4C32 "
+param+="global_batch_size=32 "
+param+="nnodes=4 "
+param+="model_type=baichuan2_13b "
+param+='dynamic_auto=_dynamic_auto '
 
-# PIR enable
-# python export_to_serving.py \
-#     --dirname "output" \
-#     --model_filename "inference.json" \
-#     --params_filename "inference.pdiparams" \
-#     --server_path "serving_server" \
-#     --client_path "serving_client" \
-#     --fetch_alias_names "predict"
+export FLAGS_fuse_reducescatter_in_opt=1
+
+cd ./tests
+bash ./test_tipc/static/auto_parallel/baichuan2/benchmark_common/prepare.sh
+
+bash -c "${param} bash ./test_tipc/static/auto_parallel/baichuan2/benchmark_common/run_benchmark.sh"
