@@ -1311,9 +1311,6 @@ class PPOTrainer(Trainer):
                 cleanup_batches, indices, label_ids_batches = [], [], []
                 total_batch_size = prompt_only_batch["input_ids"].shape[0]
                 # expand input_ids and raw_prompt_len for all sequences
-                prompt_only_batch["input_ids_expand"] = paddle.repeat_interleave(
-                    prompt_only_batch["input_ids"], repeats=self.args.num_return_sequences, axis=0
-                )
                 prompt_only_batch["raw_prompt_len_expand"] = paddle.repeat_interleave(
                     prompt_only_batch["raw_prompt_len"], repeats=self.args.num_return_sequences, axis=0
                 )
@@ -1323,6 +1320,12 @@ class PPOTrainer(Trainer):
                     )
 
                 per_device_rollout_batch_size = self.args.per_device_rollout_batch_size
+                if self.args.num_return_sequences > 1:
+                    expand_prompt = prompt_only_batch["input_ids"].repeat_interleave(
+                        self.args.num_return_sequences, axis=0
+                    )
+                else:
+                    expand_prompt = prompt_only_batch["input_ids"]
 
                 timer_scope_actor_model = TimerScope(
                     self.timers,
@@ -1373,7 +1376,7 @@ class PPOTrainer(Trainer):
                                 cur_batch, pad_to_multiple_of=pad_to_multiple_of
                             )
 
-                            prompt = prompt_only_batch["input_ids_expand"][i : i + per_device_train_batch_size]
+                            prompt = expand_prompt[i : i + per_device_train_batch_size]
                             prompt_len_without_pad = prompt_only_batch["raw_prompt_len_expand"][
                                 i : i + per_device_train_batch_size
                             ]
