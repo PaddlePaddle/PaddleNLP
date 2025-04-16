@@ -241,8 +241,8 @@ function llama_dygraph_auto_bs4_bf16_SD2() {
                 --gpus "0,1" \
                 --log_dir  "output/$task_name""_log" \
                 ./run_pretrain_auto.py \
-                --model_name_or_path "meta-llama/Llama-2-7b", \
-                --tokenizer_name_or_path "meta-llama/Llama-2-7b", \
+                --model_name_or_path "meta-llama/Llama-2-7b" \
+                --tokenizer_name_or_path "meta-llama/Llama-2-7b" \
                 --input_dir "./data" \
                 --output_dir "./output" \
                 --weight_decay 0.01 \
@@ -293,7 +293,7 @@ function llama_dygraph_auto_bs4_bf16_SD2() {
             loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
             ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'interval_tokens_per_second_per_device: ' '{print $2}' | awk -F ',' '{print $1}'`
             mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
-            echo "$flag"
+            echo "xxx $flag"
             echo "result: loss=$loss ips=$ips mem=$mem"
             # loss_base=7.57775269
             # ips_base=5442.5208
