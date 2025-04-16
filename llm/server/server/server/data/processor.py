@@ -14,6 +14,7 @@
 
 import os
 from abc import ABC, abstractmethod
+import numpy as np
 
 from paddlenlp.transformers import Llama3Tokenizer, LlamaTokenizer
 from paddlenlp.trl.llm_utils import get_eos_token_id
@@ -231,7 +232,7 @@ class DataProcessor(BaseDataProcessor):
             List[int]: ID sequences
         """
         message_result = self.tokenizer.apply_chat_template(messages, return_tensors="pd")
-        return message_result["input_ids"][0]
+        return np.array(message_result["input_ids"][0])
 
     def ids2tokens(self, token_id, task_id):
         """
