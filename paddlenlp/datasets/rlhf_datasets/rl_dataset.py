@@ -47,6 +47,7 @@ def padding_batch_data(samples: list[dict], pad_token_id: int, requires_label: b
     if requires_label:
         label_ids = [sample["label_ids"] for sample in samples]
         input_dict["label_ids"] = left_padding(label_ids, padding_value=pad_token_id)
+        input_dict["raw_label_ids_len"] = paddle.to_tensor([len(sample["label_ids"]) for sample in samples])
 
     return input_dict
 

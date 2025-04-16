@@ -20,12 +20,12 @@ from enum import Enum, auto
 import numpy as np
 import paddle
 import paddle.distributed as dist
-from models.ppo_model_utils import make_position_ids_from_input_ids
 from paddle import nn
 
 from ...trainer.trainer import Trainer, logger
 from ...utils.distributed import distributed_gather
 from ...utils.nested import flatten_list, nested_broadcast_tensor_with_empty
+from ..models.ppo_model_utils import make_position_ids_from_input_ids
 from .offload_utils import offload_tensor_to_cpu
 
 global_dev_id = 0 if paddle.get_device() == "cpu" else int(paddle.get_device().split(":")[1])
@@ -835,6 +835,8 @@ def combine_micro_batches(micro_batches, pad_token_id=0):
         for key, value in micro_batch.items():
             if isinstance(value, list):
                 if isinstance(value[0], paddle.Tensor):
+                    if key == "label_ids":
+                        value = [paddle.unsqueeze(v, axis=0) for v in value]
                     concat_value = paddle.concat(value, axis=0)
                 elif isinstance(value[0], np.ndarray):
                     concat_value = np.concatenate(value, axis=0)
@@ -845,7 +847,7 @@ def combine_micro_batches(micro_batches, pad_token_id=0):
     for key, values in combined_batch.items():
         if len(combined_batch[key][0].shape) > 1:
             pad_index = pad_token_id
-            padding_side = "left" if "prompt" in key else "right"
+            padding_side = "left" if (key == "prompt" or key == "label_ids") else "right"
             combined_batch[key] = gather_and_pad(values, pad_index=pad_index, padding_side=padding_side)
         elif isinstance(values[0], paddle.Tensor):
             combined_batch[key] = paddle.concat(values, axis=0)
@@ -973,58 +975,68 @@ def split_batch_by_rank(
     return total_batch
 
 
-def process_prompt_and_response(total_batch, pad_token_id=0):
+def process_prompt_and_response(micro_batch, pad_token_id=0):
     """
     Processes prompt and response from the total batch: slices prompt, extracts and pads responses,
     updates input_ids, position_ids, and log_probs accordingly.
 
     Args:
-        total_batch (dict): Dictionary containing batched tensors.
+        micro_batch (dict): Dictionary containing batched tensors.
         tokenizer: Tokenizer object with `pad_token_id`.
 
     Returns:
-        dict: Updated total_batch with processed input_ids and aligned log_probs.
+        dict: Updated micro_batch with processed input_ids and aligned log_probs.
     """
-    max_prompt_len = total_batch["prompt_len_without_pad"].max().item()
-    total_batch["prompt"] = paddle.slice(
-        total_batch["prompt"],
+    max_prompt_len = micro_batch["prompt_len_without_pad"].max().item()
+    micro_batch["prompt"] = paddle.slice(
+        micro_batch["prompt"],
         axes=[1],
-        starts=[total_batch["prompt"].shape[1] - max_prompt_len],
-        ends=[total_batch["prompt"].shape[1]],
+        starts=[micro_batch["prompt"].shape[1] - max_prompt_len],
+        ends=[micro_batch["prompt"].shape[1]],
     )
+    if "label_ids" in micro_batch:
+        max_label_len = micro_batch["raw_label_ids_len"].max().item()
+        label_ids = paddle.slice(
+            micro_batch["label_ids"],
+            axes=[1],
+            starts=[micro_batch["label_ids"].shape[1] - max_label_len],
+            ends=[micro_batch["label_ids"].shape[1]],
+        )
+        split_label_ids = [paddle.squeeze(x, axis=0) for x in paddle.split(label_ids, label_ids.shape[0], axis=0)]
+        micro_batch["label_ids"] = split_label_ids
 
     response_tensors = []
-    for i in range(total_batch["input_ids"].shape[0]):
-        start_idx = total_batch["prompt_len"][i]
-        end_idx = start_idx + total_batch["response_len_without_pad"][i]
-        response_tensors.append(total_batch["input_ids"][i, start_idx:end_idx])
+    for i in range(micro_batch["input_ids"].shape[0]):
+        start_idx = micro_batch["prompt_len"][i]
+        end_idx = start_idx + micro_batch["response_len_without_pad"][i]
+        response_tensors.append(micro_batch["input_ids"][i, start_idx:end_idx])
 
-    max_response_len = total_batch["response_len_without_pad"].max().item()
+    max_response_len = micro_batch["response_len_without_pad"].max().item()
     padded_response_tensors = [
         paddle.nn.functional.pad(t, [0, max_response_len - t.shape[0]], value=pad_token_id) for t in response_tensors
     ]
     response = paddle.stack(padded_response_tensors, axis=0)
 
-    total_batch["input_ids"] = paddle.concat([total_batch["prompt"], response], axis=1)
-    total_batch["position_ids"] = make_position_ids_from_input_ids(total_batch["input_ids"])
+    micro_batch["input_ids"] = paddle.concat([micro_batch["prompt"], response], axis=1)
+    micro_batch["position_ids"] = make_position_ids_from_input_ids(micro_batch["input_ids"])
 
-    total_batch["log_probs"] = paddle.slice(
-        total_batch["log_probs"],
+    micro_batch["log_probs"] = paddle.slice(
+        micro_batch["log_probs"],
         axes=[1],
-        starts=[total_batch["log_probs"].shape[1] - max_response_len],
-        ends=[total_batch["log_probs"].shape[1]],
+        starts=[0],
+        ends=[max_response_len],
     )
-    total_batch["ref_log_probs"] = paddle.slice(
-        total_batch["ref_log_probs"],
+    micro_batch["ref_log_probs"] = paddle.slice(
+        micro_batch["ref_log_probs"],
         axes=[1],
-        starts=[total_batch["ref_log_probs"].shape[1] - max_response_len],
-        ends=[total_batch["ref_log_probs"].shape[1]],
+        starts=[0],
+        ends=[max_response_len],
     )
 
-    return total_batch
+    return micro_batch
 
 
-def split_into_micro_batches(total_batch, per_device_train_batch_size):
+def split_into_micro_batches(total_batch, per_device_train_batch_size, pad_token_id=0):
     """
     Splits total_batch into micro-batches of size `per_device_train_batch_size`.
 
@@ -1048,9 +1060,8 @@ def split_into_micro_batches(total_batch, per_device_train_batch_size):
             else:
                 raise TypeError(f"Unsupported data type for key {key}: {type(data)}")
 
-        micro_batch["label_ids"] = list(
-            paddle.split(micro_batch["label_ids"], num_or_sections=micro_batch["label_ids"].shape[0], axis=0)
-        )
+        micro_batch = process_prompt_and_response(micro_batch=micro_batch, pad_token_id=pad_token_id)
+
         micro_batches.append(micro_batch)
 
     return micro_batches
