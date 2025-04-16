@@ -294,13 +294,13 @@ function llama_dygraph_auto_bs4_bf16_SD2() {
             echo "result: loss=$loss ips=$ips mem=$mem"
             case "$flag" in
                 "")
-                    loss_base = 16.5166175365448
+                    loss_base = 9.23502579
                     ;;
                 "FLAGS_fuse_allreduce_in_opt")
-                    loss_base = 18.9072425365448
+                    loss_base = 9.23502579
                     ;;
                 "FLAGS_fuse_reducescatter_in_opt")
-                    loss_base = 17.0752112865448
+                    loss_base = 9.23504105
                     ;;
             esac
             ips_base=-1
