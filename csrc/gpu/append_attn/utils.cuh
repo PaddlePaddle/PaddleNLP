@@ -284,6 +284,16 @@ __forceinline__ __host__ __device__ void vec_cast<nv_bfloat16, float>(
       __VA_ARGS__                                       \
       break;                                            \
     }                                                   \
+    case 256: {                                         \
+      constexpr size_t HEAD_DIM = 256;                  \
+      __VA_ARGS__                                       \
+      break;                                            \
+    }                                                   \
+    case 512: {                                         \
+      constexpr size_t HEAD_DIM = 512;                  \
+      __VA_ARGS__                                       \
+      break;                                            \
+    }                                                   \
     default: {                                          \
       PD_THROW("not support the head_dim: ", head_dim); \
     }                                                   \
@@ -376,6 +386,9 @@ __forceinline__ __host__ __device__ void vec_cast<nv_bfloat16, float>(
     __VA_ARGS__                                              \
   } else if (group_size == 8) {                              \
     constexpr size_t GROUP_SIZE = 8;                         \
+    __VA_ARGS__                                              \
+  } else if (group_size == 64) {                             \
+    constexpr size_t GROUP_SIZE = 64;                        \
     __VA_ARGS__                                              \
   } else if (group_size == 16) {                             \
     constexpr size_t GROUP_SIZE = 16;                        \
