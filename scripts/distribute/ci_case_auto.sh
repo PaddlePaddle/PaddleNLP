@@ -222,10 +222,8 @@ function llama_dygraph_auto_bs4_bf16_SD2() {
         export CUDA_DEVICE_MAX_CONNECTIONS=1
 
         flags=("" "FLAGS_fuse_allreduce_in_opt" "FLAGS_fuse_reducescatter_in_opt")
-        # expected_results=("res_a" "res_b" "res_c")
         for i in "${!flags[@]}"; do
             flag="${flags[$i]}"
-            # expected_result="${expected_results[$i]}"
 
             if [ -n "$flag" ]; then
                 export "$flag=true"
@@ -293,12 +291,21 @@ function llama_dygraph_auto_bs4_bf16_SD2() {
             loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
             ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'interval_tokens_per_second_per_device: ' '{print $2}' | awk -F ',' '{print $1}'`
             mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
-            echo "xxx $flag"
             echo "result: loss=$loss ips=$ips mem=$mem"
-            # loss_base=7.57775269
-            # ips_base=5442.5208
-            # mem_base=25.066193342208862
-            # check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
+            case "$flag" in
+                "")
+                    loss_base = 16.5166175365448
+                    ;;
+                "FLAGS_fuse_allreduce_in_opt")
+                    loss_base = 18.9072425365448
+                    ;;
+                "FLAGS_fuse_reducescatter_in_opt")
+                    loss_base = 17.0752112865448
+                    ;;
+            esac
+            ips_base=-1
+            mem_base=-1
+            check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
 
             if [ -n "$flag" ]; then
                 export "$flag=false"
