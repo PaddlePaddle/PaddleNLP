@@ -514,6 +514,7 @@ class XLNetModelTest(ModelTesterMixin, unittest.TestCase):
                 )
 
     @slow
+    @unittest.skip("Skip for missing model weight.")
     def test_model_from_pretrained(self):
         for model_name in list(XLNetPretrainedModel.pretrained_init_configuration)[:1]:
             model = XLNetModel.from_pretrained(model_name)
@@ -522,6 +523,7 @@ class XLNetModelTest(ModelTesterMixin, unittest.TestCase):
 
 class XLNetModelLanguageGenerationTest(unittest.TestCase):
     @slow
+    @unittest.skip("Skip for missing model weight.")
     def test_lm_generate_xlnet_base_cased(self):
 
         model = XLNetLMHeadModel.from_pretrained("xlnet-base-cased")

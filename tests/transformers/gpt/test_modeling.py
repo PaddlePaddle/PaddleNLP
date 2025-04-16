@@ -468,6 +468,20 @@ class GPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_gpt_weight_initialization(*config_and_inputs)
 
+    def _get_input_ids_and_config(self):
+        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
+
+        input_ids = inputs_dict[self.input_name]
+        attention_mask = paddle.ones_like(input_ids, dtype=paddle.int64)
+
+        max_batch_size = 2
+        sequence_length = input_ids.shape[-1] // 2
+        input_ids = input_ids[:max_batch_size, :sequence_length]
+        attention_mask = attention_mask[:max_batch_size, :sequence_length]
+        max_length = 3
+
+        return config, input_ids, attention_mask, max_length
+
     def test_inputs_embeds(self):
         # NOTE: rewrite test inputs embeds for gpt model since couldn't detect eos token id from inputs_embeds
         # get config for model and inputs_dict for model forward

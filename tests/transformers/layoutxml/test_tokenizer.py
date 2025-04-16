@@ -115,6 +115,9 @@ class LayoutXLMTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         self.assertEqual(encoding_tokenizer_slow_1, encoding_tokenizer_slow_2)
         self.assertEqual(encoding_tokenizer_slow_1, encoding_tokenizer_slow_3)
 
+    def test_offsets_mapping(self):
+        pass
+
     def test_internal_consistency(self):
         tokenizers = self.get_tokenizers()
         for tokenizer in tokenizers:

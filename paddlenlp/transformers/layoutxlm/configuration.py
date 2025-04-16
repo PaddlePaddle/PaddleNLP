@@ -21,7 +21,7 @@ from paddlenlp.transformers.configuration_utils import PretrainedConfig
 __all__ = ["LAYOUTXLM_PRETRAINED_INIT_CONFIGURATION", "LayoutXLMConfig", "LAYOUTXLM_PRETRAINED_RESOURCE_FILES_MAP"]
 
 LAYOUTXLM_PRETRAINED_INIT_CONFIGURATION = {
-    "vi-layoutxlm-base-uncased": {
+    "layoutxlm-base-uncased": {
         "attention_probs_dropout_prob": 0.1,
         "bos_token_id": 0,
         "coordinate_size": 128,
@@ -31,7 +31,6 @@ LAYOUTXLM_PRETRAINED_INIT_CONFIGURATION = {
         "has_relative_attention_bias": False,
         "has_spatial_attention_bias": False,
         "has_visual_segment_embedding": True,
-        "use_visual_backbone": False,
         "hidden_act": "gelu",
         "hidden_dropout_prob": 0.1,
         "hidden_size": 768,
@@ -54,7 +53,7 @@ LAYOUTXLM_PRETRAINED_INIT_CONFIGURATION = {
         "type_vocab_size": 1,
         "vocab_size": 250002,
     },
-    "layoutxlm-base-uncased": {
+    "vi-layoutxlm-base-uncased": {
         "attention_probs_dropout_prob": 0.1,
         "bos_token_id": 0,
         "coordinate_size": 128,
@@ -64,6 +63,7 @@ LAYOUTXLM_PRETRAINED_INIT_CONFIGURATION = {
         "has_relative_attention_bias": False,
         "has_spatial_attention_bias": False,
         "has_visual_segment_embedding": True,
+        "use_visual_backbone": False,
         "hidden_act": "gelu",
         "hidden_dropout_prob": 0.1,
         "hidden_size": 768,
