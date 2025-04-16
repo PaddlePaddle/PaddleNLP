@@ -23,7 +23,7 @@ from paddle.distributed.fleet.utils.sequence_parallel_utils import (
 )
 from paddle.nn.quant import llm_int8_linear, weight_dequantize, weight_only_linear
 
-from paddlenlp.utils import infohub
+from .qat_utils import QATFunc
 
 try:
     from .qlora import qlora_weight_dequantize, qlora_weight_linear
@@ -39,64 +39,8 @@ QuantMapping = {
     "fp4": ("fp4", 4),
     "nf4": ("nf4", 4),
     "a8w8linear": ("int8", 8),
+    "a8w4linear": ("int8", 8),
 }
-
-
-def random_hadamard(n, dtype):
-    A = paddle.randint(low=0, high=2, shape=[n, n]).astype("float32") * 2 - 1
-    Q, _ = paddle.linalg.qr(A)
-    return Q.astype(dtype)
-
-
-def quantize_tensorwise(x, apply_hadamard=False, qmax=127, qmin=-128):
-    if apply_hadamard:
-        target_x = x @ infohub.hadamard[x.shape[-1]]
-    else:
-        target_x = x.clone()
-    scale = paddle.max(paddle.abs(target_x)) / qmax
-    x_int8 = paddle.clip((target_x / scale).round(), qmin, qmax).astype("int8")
-    return x_int8, scale
-
-
-def dequantize_tensorwise(x_int8, scale, apply_hadamard=False):
-    x = x_int8.astype(scale.dtype) * scale
-    if apply_hadamard:
-        x = x @ infohub.hadamard[x.shape[-1]].T
-    return x
-
-
-def quantize_channelwise(w, apply_hadamard=False, qmax=127, qmin=-128):
-    if apply_hadamard:
-        if getattr(infohub, "hadamard") is None:
-            setattr(infohub, "hadamard", {})
-        if w.shape[0] in infohub.hadamard:
-            hadamard_matrix = infohub.hadamard[w.shape[0]]
-        else:
-            hadamard_matrix = random_hadamard(w.shape[0], w.dtype)
-            infohub.hadamard[w.shape[0]] = hadamard_matrix
-        w = hadamard_matrix.T @ w
-    scale = paddle.max(paddle.abs(w), axis=0, keepdim=True) / qmax
-    w_int8 = paddle.clip((w / scale).round(), qmin, qmax).astype("int8")
-    return w_int8.T, scale.squeeze(0)
-
-
-def dequantize_channelwise(w_int8, scale, apply_hadamard=False):
-    w = w_int8.T.astype(scale.dtype) * scale
-    if apply_hadamard:
-        w = infohub.hadamard[w_int8.shape[1]] @ w
-    return w
-
-
-def a8w8_linear(x, w_int8, w_scale=None, bias=None, dtype=None, apply_hadamard=False):
-    # if w_int8.dtype != paddle.int8:
-    #     w_int8, w_scale = quantize_channelwise(w_int8, apply_hadamard)
-    # if dtype is None:
-    #     dtype = x.dtype
-    x_int8, x_scale = quantize_tensorwise(x, apply_hadamard)
-    out = paddle.matmul(x_int8, w_int8.T).astype(dtype) * x_scale * w_scale.unsqueeze(0)
-    if bias is not None:
-        out += bias
-    return out
 
 
 def quant_weight_forward(
@@ -133,15 +77,7 @@ def quant_weight_forward(
             double_quant_block_size=quantization_config.qlora_weight_double_quant_block_size,
             bias=bias,
         )
-    elif weight_quantize_algo in ["a8w8linear"]:
-        output = a8w8_linear(
-            x,
-            quant_weight,
-            w_scale=quant_scale,
-            bias=bias,
-            dtype=dtype,
-            apply_hadamard=quantization_config.apply_hadamard,
-        )
+
     return output
 
 
@@ -174,10 +110,6 @@ def dequant_weight(
             )
             .reshape([input_shape[-1], -1])
             .cast(dtype)
-        )
-    elif weight_quantize_algo in ["a8w8linear"]:
-        quant_dequant_weight = dequantize_channelwise(
-            quant_weight, quant_scale, apply_hadamard=quantization_config.apply_hadamard
         )
     return quant_dequant_weight
 
@@ -268,9 +200,20 @@ def quant_weight_linear(
     quant_state=None,
     bias=None,
 ):
-    return QuantizationLinearFunc.apply(
-        x, quant_weight, bias, quant_scale, quant_state, quant_dtype, quantization_config, weight_quantize_algo, dtype
-    )
+    if weight_quantize_algo in ["a8w8linear", "a8w4linear"]:
+        return QATFunc.apply(x, quant_weight, bias, quant_scale, quantization_config, dtype)
+    else:
+        return QuantizationLinearFunc.apply(
+            x,
+            quant_weight,
+            bias,
+            quant_scale,
+            quant_state,
+            quant_dtype,
+            quantization_config,
+            weight_quantize_algo,
+            dtype,
+        )
 
 
 class QuantizationLinear(nn.Layer):
@@ -297,7 +240,13 @@ class QuantizationLinear(nn.Layer):
 
         # PaddlePaddle dosen't support 4bit data type, one 8bit data represents two 4bit data.
         # paddle.nn.quant.weight_quantize will transpose in_features and out_features.
-        if self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8", "a8w8linear"]:
+        if self.weight_quantize_algo in [
+            "weight_only_int8",
+            "weight_only_int4",
+            "llm.int8",
+            "a8w8linear",
+            "a8w4linear",
+        ]:
             self.quant_weight = self.create_parameter(
                 shape=[out_features // 2, in_features] if self.quant_weight_bit == 4 else [out_features, in_features],
                 dtype="int8",
@@ -433,7 +382,13 @@ class ColumnParallelQuantizationLinear(nn.Layer):
             raise ValueError("Sequence parallel does not support gather_output")
 
         # PaddlePaddle dosen't support Int4 data type, one Int8 data represents two Int4 data.
-        if self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8", "a8w8linear"]:
+        if self.weight_quantize_algo in [
+            "weight_only_int8",
+            "weight_only_int4",
+            "llm.int8",
+            "a8w8linear",
+            "a8w4linear",
+        ]:
             self.quant_weight = self.create_parameter(
                 shape=[self.output_size_per_partition // 2, in_features]
                 if self.quant_dtype == "int4"
@@ -552,7 +507,13 @@ class RowParallelQuantizationLinear(nn.Layer):
 
         # PaddlePaddle dosen't support Int4 data type, one Int8 data represents two Int4 data.
         # paddle.nn.quant.weight_quantize will transpose in_features and out_features.
-        if self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8", "a8w8linear"]:
+        if self.weight_quantize_algo in [
+            "weight_only_int8",
+            "weight_only_int4",
+            "llm.int8",
+            "a8w8linear",
+            "a8w4linear",
+        ]:
             self.quant_weight = self.create_parameter(
                 shape=[out_features // 2, self.input_size_per_partition]
                 if self.quant_dtype == "int4"

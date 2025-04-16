@@ -33,11 +33,11 @@ except:
     qlora_weight_quantize = None
 
 from ..utils.log import logger
+from .qat_utils import quantize_channelwise
 from .quantization_linear import (
     ColumnParallelQuantizationLinear,
     QuantizationLinear,
     RowParallelQuantizationLinear,
-    quantize_channelwise,
 )
 
 LINEAR_CLASSES = [
@@ -154,7 +154,13 @@ def convert_to_weight_quantize_state_dict(state_dict, name, quantization_config,
         # gpu weight_quantize will fix in future
         target_weight = state_dict.pop(weight_name).cast(dtype).cuda()
         if weight_quantize_algo in ["a8w8linear"]:
-            quant_weight, quant_scale = quantize_channelwise(target_weight, quantization_config.apply_hadamard)
+            quant_weight, quant_scale = quantize_channelwise(
+                target_weight, quantization_config.apply_hadamard, bit_length=8
+            )
+        elif weight_quantize_algo in ["a8w4linear"]:
+            quant_weight, quant_scale = quantize_channelwise(
+                target_weight, quantization_config.apply_hadamard, bit_length=4
+            )
         else:
             quant_weight, quant_scale = weight_quantize(
                 x=target_weight,
@@ -213,7 +219,7 @@ def convert_to_quantize_state_dict(state_dict, quantization_linear_list, quantiz
         if weight_quantize_algo is None:
             continue
         # Convert state dict
-        if weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8", "a8w8linear"]:
+        if weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8", "a8w8linear", "a8w4linear"]:
             convert_to_weight_quantize_state_dict(state_dict, name, quantization_config, dtype, weight_quantize_algo)
         elif weight_quantize_algo in ["fp4", "nf4"]:
             convert_to_qlora_state_dict(state_dict, name, quantization_config, dtype, weight_quantize_algo)
