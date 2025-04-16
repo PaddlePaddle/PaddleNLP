@@ -257,7 +257,7 @@ class ExpertsGroupGemmNode:
             )
             # recomput o2
             o2 = self.fwd_swiglu(self.o1)
-            o2_s = (o2 * self.unzipped_probs).cast(paddle.bfloat16)
+            o2_s = (o2.cast(paddle.float32) * self.unzipped_probs).cast(paddle.bfloat16)
 
             # probs_grad = do2_s * o2
             probs_grad = do2_s.cast(paddle.float32) * o2.cast(paddle.float32)
