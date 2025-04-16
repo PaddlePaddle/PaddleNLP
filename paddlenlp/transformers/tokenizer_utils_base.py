@@ -2947,8 +2947,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             else:
                 original_padding_side = self.padding_side
                 self.padding_side = padding_side
-                encoded_inputs = self._pad(
-                    encoded_inputs,
+                outputs = self._pad(
+                    inputs,
                     max_length=max_length,
                     padding_strategy=padding_strategy,
                     pad_to_multiple_of=pad_to_multiple_of,
