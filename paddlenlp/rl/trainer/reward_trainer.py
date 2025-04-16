@@ -20,21 +20,20 @@ from typing import Callable, Dict, List, Optional, Tuple, Union
 
 import paddle
 import requests
-from models.ppo_model_utils import create_startend_row_indices
 from paddle import nn
 from paddle.distributed import fleet
 from paddle.io import Dataset
 
-from paddlenlp.data import DataCollator
-from paddlenlp.trainer.trainer import (
+from ...data import DataCollator
+from ...trainer.trainer import (
     EvalPrediction,
     TrainerCallback,
     TrainingArguments,
     logger,
 )
-from paddlenlp.transformers import PretrainedModel, PretrainedTokenizer
-from trainer.rl_trainer import RLTrainer
-
+from ...transformers import PretrainedModel, PretrainedTokenizer
+from ..models.ppo_model_utils import create_startend_row_indices
+from .rl_trainer import RLTrainer
 from .trainer_utils import batch_retokenize
 
 

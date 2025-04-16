@@ -4,7 +4,7 @@
 
 ## 算法简介
 
-P-tuning 引入可学习的连续型提示向量 prompt embeddings 参数, 让模型自己去学习最优的 prompt embedding, 而不再依赖人工去设置自然语言形式的提示（Prompt）信息。P-Tuning 算法的数据和模型定义如下图所示，对应于数据预处理模块 `SoftTemplate` 和标签词映射模块 `MaskedLMVerbalizer`，详细介绍及定义方法参见 [Prompt API 文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/advanced_guide/prompt.md)。
+P-tuning 引入可学习的连续型提示向量 prompt embeddings 参数, 让模型自己去学习最优的 prompt embedding, 而不再依赖人工去设置自然语言形式的提示（Prompt）信息。P-Tuning 算法的数据和模型定义如下图所示，对应于数据预处理模块 `SoftTemplate` 和标签词映射模块 `MaskedLMVerbalizer`，详细介绍及定义方法参见 [Prompt API 文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/zh/advanced_guide/prompt.md)。
 
 ![p-tuning](https://user-images.githubusercontent.com/25607475/204214359-3036c6c6-f101-4a5f-958c-abe0e40c243a.png)
 
@@ -75,7 +75,7 @@ python -u -m paddle.distributed.launch --gpus "0" run_train.py \
 - `alpha_rdrop`: R-Drop 损失值权重，默认为 0.5
 - `dropout`: 预训练模型的 dropout 参数值，用于 R-Drop 策略中参数配置
 - `export_type`: 模型导出格式，默认为 `paddle`，动态图转静态图
-- 更多配置参考 [Trainer 参数文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/trainer.md#trainingarguments-%E5%8F%82%E6%95%B0%E4%BB%8B%E7%BB%8D) 和 [PromptTrainer 参数文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/advanced_guide/prompt.md#prompttrainer%E5%8F%82%E6%95%B0%E5%88%97%E8%A1%A8)
+- 更多配置参考 [Trainer 参数文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/zh/trainer.md#trainingarguments-%E5%8F%82%E6%95%B0%E4%BB%8B%E7%BB%8D) 和 [PromptTrainer 参数文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/zh/advanced_guide/prompt.md#prompttrainer%E5%8F%82%E6%95%B0%E5%88%97%E8%A1%A8)
 
 ### 模型部署
 

@@ -30,8 +30,10 @@ from paddle.distributed import fleet
 from paddle.distributed.fleet.layers.mpu import mp_ops
 from paddle.distributed.fleet.meta_parallel import ParallelCrossEntropy
 
-from paddlenlp.transformers import LlamaPretrainingCriterion as PretrainingCriterion
-from paddlenlp.transformers.model_outputs import ModelOutput
+from ...transformers.llama.modeling import (
+    LlamaPretrainingCriterion as PretrainingCriterion,
+)
+from ...transformers.model_outputs import ModelOutput
 
 
 @dataclass
