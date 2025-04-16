@@ -506,6 +506,7 @@ class Fp8DispatchNode:
             self.token_dispatcher._comm_manager.group,
             previous_event=previous_event,
             async_finish=async_finish,
+            allocate_on_comm_stream=allocate_on_comm_stream,
         )
         self.token_dispatcher._comm_manager.handle = states["handle"]
         self.token_dispatcher._comm_manager.tokens_per_expert = states["tokens_per_expert"]
@@ -681,6 +682,7 @@ class MlpNode:
             expert_out = self.experts_node.forward(
                 hs_out, hs_scale_out, self.token_dispatcher._comm_manager.tokens_per_expert
             )
+
             # unpermute
             hidden_states_out = self.unpermute_node.forward(
                 expert_out, token_permuted_indices, prob_permuted_indices, dispatched_probs
@@ -768,7 +770,6 @@ class FusionMoeNode:
         hidden_states_out = self.mlp_node.forward(
             hs_fp8_dispatched, hs_scale_dispatched, dispatched_indices, dispatched_probs
         )
-
         output_combie = self.combine_node.forward(hidden_states_out)
         output = self.combine_quant_node.forward(output_combie)
         output.stop_gradient = False
