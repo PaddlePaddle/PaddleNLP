@@ -304,7 +304,7 @@ PYBIND11_MODULE(paddlenlp_ops, m) {
 //   m.def("f_cutlass_fp8_fp8_half_block_gemm_fused", &cutlass_fp8_fp8_half_block_gemm_fused_func, "cutlass_fp8_fp8_half_block_gemm_fused_func");
 }
 
-PYBIND11_MODULE(paddlenlp_ops_sm80, m) {
+PYBIND11_MODULE(paddlenlp_ops_80, m) {
   /**
    * all_reduce.cu
    */
@@ -332,7 +332,7 @@ PYBIND11_MODULE(paddlenlp_ops_sm80, m) {
   m.def("f_save_output_dygraph", &SaveOutputDygraph, "SaveOutputDygraph");
 }
 
-PYBIND11_MODULE(paddlenlp_ops_sm90, m) {
+PYBIND11_MODULE(paddlenlp_ops_90, m) {
   /**
    * all_reduce.cu
    */
@@ -358,5 +358,4 @@ PYBIND11_MODULE(paddlenlp_ops_sm90, m) {
   m.def("f_get_output", &GetOutput, "GetOutput");
   m.def("f_step_paddle", &StepPaddle, "StepPaddle");
   m.def("f_save_output_dygraph", &SaveOutputDygraph, "SaveOutputDygraph");
-//   m.def("f_cutlass_fp8_fp8_half_block_gemm_fused", &cutlass_fp8_fp8_half_block_gemm_fused_func, "cutlass_fp8_fp8_half_block_gemm_fused_func");
 }
