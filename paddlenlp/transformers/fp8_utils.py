@@ -79,7 +79,7 @@ def kitchen_fp8_gemm(x_fp8, x_scale, w_fp8, w_scale, is_a_1d_scaled, is_b_1d_sca
         out_dtype = out.dtype
     else:
         accumulate = False
-        out_dtype = paddle.bfloat16
+        out_dtype = paddle.float32
     if numpy.prod(x_fp8.shape) != 0 and numpy.prod(w_fp8.shape) != 0:
         y = kitchen.ops.fp8_gemm_blockwise(
             a=x_fp8,
@@ -94,7 +94,7 @@ def kitchen_fp8_gemm(x_fp8, x_scale, w_fp8, w_scale, is_a_1d_scaled, is_b_1d_sca
             is_b_1d_scaled=is_b_1d_scaled,
         )
     else:
-        y = paddle.zeros([x_fp8.shape[0], w_fp8.shape[0]], out_dtype)
+        y = paddle.zeros([x_fp8.shape[0], w_fp8.shape[0]], paddle.float32)
         if out is not None:
             out = out + y
             return out
@@ -247,25 +247,26 @@ class ExpertsGroupGemmNode:
 
         # do2 = paddle.empty([len(expert_w2), unzipped_grad.shape[1], bw_w2_quant.shape[1]], dtype="bfloat16")
         if IF_USE_GROUP_GEMM_MASK:
-            do2 = paddle.zeros([len(expert_w2), unzipped_grad.shape[1], bw_w2_quant.shape[1]], dtype="bfloat16")
+            do2_s = paddle.zeros([len(expert_w2), unzipped_grad.shape[1], bw_w2_quant.shape[1]], dtype="bfloat16")
             deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_masked(
                 (unzipped_grad, unzipped_scale),
                 (bw_w2_quant, bw_w2_scale),
-                do2,
+                do2_s,
                 tokens_per_expert,
                 expected_m,
             )
-            # do2 = do2 * self.unzipped_probs.unsqueeze(-1)
-            do2 = do2 * (self.unzipped_probs.cast(paddle.bfloat16))
-
             # recomput o2
             o2 = self.fwd_swiglu(self.o1)
-            o2 = o2 * self.unzipped_probs.cast(paddle.bfloat16)
+            o2_s = (o2 * self.unzipped_probs).cast(paddle.bfloat16)
 
-            # probs_grad = (do2 * o2).sum(axis=-1)
-            probs_grad = ((do2.reshape([-1, do2.shape[-1]])) * (o2.reshape([-1, o2.shape[-1]]))).sum(axis=-1)
+            # probs_grad = do2_s * o2
+            probs_grad = do2_s.cast(paddle.float32) * o2.cast(paddle.float32)
+            probs_grad = probs_grad.reshape([-1, probs_grad.shape[-1]]).sum(axis=-1)
 
-            return do2, probs_grad, o2
+            # do2
+            do2 = (do2_s * self.unzipped_probs).cast(paddle.bfloat16)
+
+            return do2, probs_grad, o2_s
         else:
             _, seq_len, H1 = unzipped_grad.shape
             _, H2, _ = bw_w2_quant.shape

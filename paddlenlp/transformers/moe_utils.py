@@ -123,13 +123,12 @@ class UnZipNode:
         max_tokens,
     ):
 
-        hs_fp8_dispatched_copy = hs_fp8_dispatched.cast(paddle.float32)
         unzipped_tokens, zipped_expertwise_rowmap, unzipped_probs, unzipped_scale = TDU.tokens_unzip_stable(
-            hs_fp8_dispatched_copy.cast(paddle.float8_e4m3fn),
+            hs_fp8_dispatched,
             hs_scale_dispatched,
             dispatched_indices,
             dispatched_probs,
-            topk=self.token_dispatcher._comm_manager.router_topk,  # int32
+            topk=topk,  # int32
             num_experts=num_experts,
             max_tokens_per_expert=max_tokens,
         )
