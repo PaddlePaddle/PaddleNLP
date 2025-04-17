@@ -43,4 +43,4 @@ PaddleNLP 提供了多种环境变量，用于优化推理性能和资源使用�
 - `FLAGS_custom_allreduce`：多卡推理计算时是否使用高性能自定义 allreduce 实现，默认为 False。
 
 **自定义算子通用 优化**
-- `USE_PYBIND_CUSTOM_OPS`：动态图推理时自定义算子是否采用 pybind 调用方式，默认为 True。
+- `DYNAMIC_INFERENCE_MODE`：动态图推理时自定义算子是否采用 pybind 调用方式，默认为 True。
