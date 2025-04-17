@@ -92,6 +92,10 @@ PaddleNLP 提供了多种参数，用于配置推理模型和优化推理性能�
 
 - `mla_use_matrix_absorption`: 跑 DeepSeek-V3/R1 模型时，是否使用 MLA 模块性能更优的矩阵吸收实现，默认为 True。
 
+- `dynamic_insert`: 离线推理时是否支持动态插入（当前仅支持 Block/Append Attention 推理），默认为 True。开启该选项后，将`batch_size`作为运行时最大批处理大小。
+
+- `total_request_num`: 自动生成的输入请求数量，仅配合`dynamic_insert`测试使用，默认为 None，和`batch_size`保持一致。
+
 
 ### 3.2 性能优化参数
 
@@ -166,6 +170,9 @@ PaddleNLP 提供了多种投机解码方法，具体细节请查阅[投机解码
 ```shell
 # 动态图模型推理命令参考
 python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16 --block_attn
+
+# 动态图模型推理开启动态插入命令参考
+python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16 --block_attn --batch_size 2 --total_request_num 5 --dynamic_insert
 
 # XPU设备动态图模型推理命令参考
 python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16 --block_attn --device xpu
