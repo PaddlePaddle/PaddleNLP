@@ -40,6 +40,7 @@ __all__ = [
     "ProgressCallback",
     "PrinterCallback",
     "EarlyStoppingCallback",
+    "StepFlexToken",
 ]
 
 
@@ -542,14 +543,14 @@ class PrinterCallback(TrainerCallback):
 
     def on_log(self, args, state, control, logs=None, **kwargs):
         _ = logs.pop("total_flos", None)
-        if state.is_local_process_zero:
-            if type(logs) is dict:
-                logger.info(", ".join(f"{k}: {v}" for k, v in logs.items()))
-                metrics_dumper = kwargs.get("metrics_dumper", None)
-                if metrics_dumper is not None:
-                    metrics_dumper.append(logs)
-            else:
-                logger.info(logs)
+        # if state.is_local_process_zero:
+        if type(logs) is dict:
+            logger.info(", ".join(f"{k}: {v}" for k, v in logs.items()))
+            metrics_dumper = kwargs.get("metrics_dumper", None)
+            if metrics_dumper is not None:
+                metrics_dumper.append(logs)
+        else:
+            logger.info(logs)
 
 
 class EarlyStoppingCallback(TrainerCallback):
@@ -609,3 +610,16 @@ class EarlyStoppingCallback(TrainerCallback):
         self.check_metric_value(args, state, control, metric_value)
         if self.early_stopping_patience_counter >= self.early_stopping_patience:
             control.should_training_stop = True
+
+
+class StepFlexToken(TrainerCallback):
+    def on_step_begin(
+        self,
+        args: TrainingArguments,
+        state: TrainerState,
+        control: TrainerControl,
+        **kwargs,
+    ):
+        model = kwargs.pop("model")
+        if hasattr(model, "step_flex_token"):
+            model.step_flex_token(state.global_step)

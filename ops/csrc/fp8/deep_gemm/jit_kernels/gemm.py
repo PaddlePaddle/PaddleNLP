@@ -211,6 +211,6 @@ def gemm_fp8_fp8_bf16_nt(lhs: Tuple[Tensor, Tensor], rhs: Tuple[Tensor, Tensor],
     if m == 0:
         return
     runtime, num_sms, smem_size = auto_tuning_with_compilation(m, n, k)
-    args = (lhs, lhs_scales, rhs, rhs_scales, out, m, paddle.device.cuda.current_stream(), num_sms, smem_size)
+    args = (lhs, lhs_scales, rhs, rhs_scales, out, m, paddle.device.current_stream().stream_base, num_sms, smem_size)
     # Run the kernel.
     runtime(*args)

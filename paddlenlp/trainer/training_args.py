@@ -2263,6 +2263,7 @@ class TrainingArguments:
         """
         Whether or not the current process should produce log.
         """
+        return True
         if self.enable_auto_parallel:
             return True
         elif self.log_on_each_node:
