@@ -389,13 +389,17 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
     if dp_master_grad:
         is_no_sync = True
 
-    for inputs_tmp in inputs:
+    for index, inputs_tmp in enumerate(inputs):
         if is_no_sync:
             # Avoid unnecessary DDP synchronization since there will be no backward pass on this example.
             with model.no_sync():
                 tr_loss_step = self.training_step(model, inputs_tmp)
         else:
-            tr_loss_step = self.training_step(model, inputs_tmp)
+            if len(inputs) > 1 and index != (len(inputs) - 1):
+                with model.no_sync():
+                    tr_loss_step = self.training_step(model, inputs_tmp)
+            else:
+                tr_loss_step = self.training_step(model, inputs_tmp)
 
         tr_loss += tr_loss_step
 

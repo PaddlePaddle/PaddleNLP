@@ -1138,6 +1138,8 @@ class PPOTrainer(Trainer):
         return input_ids, position_ids
 
     def distribute_gather_and_pad_data(self, micro_batches):
+        # group index for grpo
+        index = [micro_batch["index"] for micro_batch in micro_batches]
         old_log_probs = [micro_batch["log_probs"] for micro_batch in micro_batches]
         ref_log_probs = [micro_batch["ref_log_probs"] for micro_batch in micro_batches]
         rewards = [micro_batch["rewards"] for micro_batch in micro_batches]
@@ -1154,6 +1156,7 @@ class PPOTrainer(Trainer):
         except AttributeError:
             pass
         new_batch = {
+            "index": gather_and_pad(index, dp_group, sd_group, pad=False),
             "rewards": gather_and_pad(rewards, dp_group, sd_group, pad=False),
             "log_probs": gather_and_pad(old_log_probs, dp_group, sd_group),
             "ref_log_probs": gather_and_pad(ref_log_probs, dp_group, sd_group),
@@ -1546,8 +1549,8 @@ class PPOTrainer(Trainer):
                             )
                             continue
 
-                # prepare data for reinforce_plus_plus
-                if self.args.rl_algorithm == "reinforce_plus_plus":
+                # prepare data for reinforce_plus_plus & grpo
+                if self.args.rl_algorithm in ["reinforce_plus_plus", "grpo"]:
                     rl_batches = self.distribute_gather_and_pad_data(micro_batches)
                 else:
                     rl_batches = micro_batches
@@ -1567,8 +1570,8 @@ class PPOTrainer(Trainer):
                     if self.args.normalize_advantage:
                         rl_batches = self.compute_advantage_normalization(rl_batches)
 
-                # prepare data for reinforce_plus_plus
-                if self.args.rl_algorithm == "reinforce_plus_plus":
+                # prepare data for reinforce_plus_plus & grpo
+                if self.args.rl_algorithm in ["reinforce_plus_plus", "grpo"]:
                     train_batch = self.distribute_get_rank_data(micro_batches, rl_batches)
                 else:
                     train_batch = rl_batches

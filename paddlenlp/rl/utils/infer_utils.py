@@ -216,54 +216,48 @@ class PolicyPredictor(DygraphBlockInferencePredictor):
             fill_value=llm_utils.get_eos_token_id(self.tokenizer, self.generation_config)[0],
             dtype="int64",
         )
-
-        s_time = time.time()
-        with self.update_predictor_params(**kwargs):
-            for i, inst in enumerate(self.input_ids):
-                length = len(inst)
-                self.model_inputs["input_ids"][0, :length] = np.array(inst)
-                self.model_inputs["seq_lens_this_time"][0] = length
-                self.model_inputs["seq_lens_encoder"][0] = length
-                self.model_inputs["stop_flags"][0] = False
-
-                num_prefill_blocks = (length + self.block_size - 1) // self.block_size
-                self.model_inputs["block_tables"][0, :num_prefill_blocks] = np.array(self.prefill_blocks[i])
-                self.model_inputs["block_tables"][0, num_prefill_blocks] = np.array(self.tail_blocks[i])
-                self.model_inputs["result_id"][0][:1] = np.arange(i, i + 1)
-
-                next_tokens = self._infer(self.model_inputs)
-                self.model_inputs["all_token_ids"][i, 0] = next_tokens[0, 0]
-                self.model_inputs["seq_lens_this_time"][0] = 0
-                self.model_inputs["seq_lens_encoder"][0] = 0
-                self.model_inputs["seq_lens_decoder"][0] = 0
-                self.model_inputs["stop_flags"][0] = True
-                self.model_inputs["step_idx"][0, 0] = 0
-                self.model_inputs["block_tables"][0] = -1
-                self.model_inputs["result_id"][0] = -1
-
-            unfinished_ids = list(range(total_request_num - 1, -1, -1))
-            for cur_bs in range(max_batch_size):
-                if len(unfinished_ids) == 0:
-                    break
-                task_id = unfinished_ids.pop()
-                self.insert(cur_bs, task_id)
-
-            if kwargs.pop("max_length", self.config.max_length) > 1:
-                while self.model_inputs["not_need_stop"] or len(unfinished_ids) > 0:
-                    no_stop_num = max_batch_size - paddle.sum(self.model_inputs["stop_flags"]).item()
-                    if no_stop_num < max_batch_size:
-                        for i in range(max_batch_size):
-                            if self.model_inputs["stop_flags"][i] and len(unfinished_ids) > 0:
-                                task_id = unfinished_ids.pop()
-                                self.insert(i, task_id)
-                    next_tokens = self._infer(self.model_inputs)
-        logger.info(f"running spend {time.time() - s_time}")
-
-        self.cache_kvs = None
-        self.model_inputs["cache_kvs"] = None
-        paddle.device.cuda.empty_cache()
-
         if not self.rollout_use_fake_outputs:
+            s_time = time.time()
+            with self.update_predictor_params(**kwargs):
+                for i, inst in enumerate(self.input_ids):
+                    length = len(inst)
+                    self.model_inputs["input_ids"][0, :length] = np.array(inst)
+                    self.model_inputs["seq_lens_this_time"][0] = length
+                    self.model_inputs["seq_lens_encoder"][0] = length
+                    self.model_inputs["stop_flags"][0] = False
+
+                    num_prefill_blocks = (length + self.block_size - 1) // self.block_size
+                    self.model_inputs["block_tables"][0, :num_prefill_blocks] = np.array(self.prefill_blocks[i])
+                    self.model_inputs["block_tables"][0, num_prefill_blocks] = np.array(self.tail_blocks[i])
+                    self.model_inputs["result_id"][0][:1] = np.arange(i, i + 1)
+
+                    next_tokens = self._infer(self.model_inputs)
+                    self.model_inputs["all_token_ids"][i, 0] = next_tokens[0, 0]
+                    self.model_inputs["seq_lens_this_time"][0] = 0
+                    self.model_inputs["seq_lens_encoder"][0] = 0
+                    self.model_inputs["seq_lens_decoder"][0] = 0
+                    self.model_inputs["stop_flags"][0] = True
+                    self.model_inputs["step_idx"][0, 0] = 0
+                    self.model_inputs["block_tables"][0] = -1
+                    self.model_inputs["result_id"][0] = -1
+
+                unfinished_ids = list(range(total_request_num - 1, -1, -1))
+                for cur_bs in range(max_batch_size):
+                    if len(unfinished_ids) == 0:
+                        break
+                    task_id = unfinished_ids.pop()
+                    self.insert(cur_bs, task_id)
+
+                if kwargs.pop("max_length", self.config.max_length) > 1:
+                    while self.model_inputs["not_need_stop"] or len(unfinished_ids) > 0:
+                        no_stop_num = max_batch_size - paddle.sum(self.model_inputs["stop_flags"]).item()
+                        if no_stop_num < max_batch_size:
+                            for i in range(max_batch_size):
+                                if self.model_inputs["stop_flags"][i] and len(unfinished_ids) > 0:
+                                    task_id = unfinished_ids.pop()
+                                    self.insert(i, task_id)
+                        next_tokens = self._infer(self.model_inputs)
+            logger.info(f"running spend {time.time() - s_time}")
             output_tokens = self.model_inputs["all_token_ids"]
             output_tokens = paddle.where(
                 output_tokens < 0,
@@ -272,6 +266,9 @@ class PolicyPredictor(DygraphBlockInferencePredictor):
             )
         else:
             output_tokens = (paddle.ones([total_request_num, self.config.max_length]) * 1000).cast("int64")
+        self.cache_kvs = None
+        self.model_inputs["cache_kvs"] = None
+        paddle.device.cuda.empty_cache()
         return output_tokens
 
     @paddle.no_grad()
@@ -326,7 +323,6 @@ class PolicyPredictor(DygraphBlockInferencePredictor):
 
     @paddle.no_grad()
     def set_state_dict(self, model, offload_model=True):
-        self.model.set_state_dict(model.state_dict())
         if offload_model:
             offload_place = paddle.CUDAPinnedPlace()
             state_dict = model.state_dict()
@@ -334,6 +330,7 @@ class PolicyPredictor(DygraphBlockInferencePredictor):
                 cpu_arg = v._copy_to(offload_place, blocking=False)
                 cpu_arg._share_buffer_to(v)
         paddle.device.synchronize()
+        self.model.set_state_dict(model.state_dict())
 
 
 policy_predictor: PolicyPredictor = None
