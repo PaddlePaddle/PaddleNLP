@@ -1447,7 +1447,6 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
                 output_tokens, skip_special_tokens=True, clean_up_tokenization_spaces=False
             )
             assert len(outputs) == self.batch_size
-
             if return_tokens:
                 return outputs, output_tokens
             else:
