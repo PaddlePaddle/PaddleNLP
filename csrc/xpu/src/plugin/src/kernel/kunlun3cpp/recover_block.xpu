@@ -1,0 +1,154 @@
+#include "xpu/kernel/cluster.h"
+#include "xpu/kernel/cluster_partition.h"
+#include "xpu/kernel/cluster_primitive.h"
+
+namespace xpu3 {
+namespace plugin {
+
+static __device__ inline int loada_float(_shared_ptr_ const int* ptr) {
+  int ret;
+  __asm__ __volatile__("loada.w %0,%1" : "=&r"(ret) : "r"(ptr));
+  return ret;
+}
+
+static __device__ inline bool storea_float(_shared_ptr_ int* ptr, int value) {
+  bool ret;
+  __asm__ __volatile__("storea.w %0,%1,%2" : "=&r"(ret) : "r"(value), "r"(ptr));
+  return ret;
+}
+
+static __device__ int atomic_add(_shared_ptr_ int* ptr, int value) {
+  bool fail = true;
+  int old_value;
+  while (fail) {
+    old_value = loada_float(ptr);
+    int new_value = old_value + value;
+    fail = storea_float(ptr, new_value);
+  }
+  return old_value;
+}
+
+__global__ void recover_block(int* recover_block_list,  // [bsz]
+                              int* recover_len,
+                              bool* stop_flags,
+                              int* seq_lens_this_time,
+                              const int* ori_seq_lens_encoder,
+                              int* seq_lens_encoder,
+                              const int* seq_lens_decoder,
+                              int* block_tables,
+                              int* free_list,
+                              int* free_list_len,
+                              int64_t* input_ids,
+                              const int64_t* pre_ids,
+                              const int64_t* step_idx,
+                              const int* encoder_block_lens,
+                              const int* used_list_len,
+                              const int64_t* next_tokens,
+                              const int64_t* first_token_ids,
+                              const int bsz,
+                              const int block_num_per_seq,
+                              const int length,
+                              const int pre_id_length) {
+  int cid = core_id();
+  int ncores = core_num();
+  int clusterid = cluster_id();
+  if (clusterid != 0) return;
+
+  // 128 = seq_len(8192) / block_size(64)
+  // 每次最多处理block_table数量为128
+  const int block_table_now_len = 128;
+  int block_table_now[block_table_now_len];
+  // max_seq_len == length
+  // max_seq_len == pre_id_length
+
+  // 32k local memory per 4 core on kl2.
+  // No enough memory for 16382 input_ids.
+  const int buf_len = 256;
+  int64_t input_ids_now[buf_len];
+
+  bool flag_false = false;
+
+  __shared__ int free_list_len_sm;
+  // 每次最多处理free_list数量为block_table_now_len
+  int free_list_now[block_table_now_len];
+  if (cid == 0) {
+    GM2SM(free_list_len, &free_list_len_sm, sizeof(int));
+  }
+  sync_cluster();
+
+  int recover_len_lm;
+  GM2LM(recover_len, &recover_len_lm, sizeof(int));
+
+  for (int bid = cid; bid < recover_len_lm; bid += ncores) {
+    int recover_id;
+    int ori_seq_len_encoder;
+    int step_idx_now;
+    int encoder_block_len;
+    int decoder_used_len;
+    int64_t next_token;
+    GM2LM(recover_block_list + bid, &recover_id, sizeof(int));
+    GM2LM_ASYNC(
+        ori_seq_lens_encoder + recover_id, &ori_seq_len_encoder, sizeof(int));
+    GM2LM_ASYNC(step_idx + recover_id, &step_idx_now, sizeof(int));
+    GM2LM_ASYNC(
+        encoder_block_lens + recover_id, &encoder_block_len, sizeof(int));
+    GM2LM_ASYNC(used_list_len + recover_id, &decoder_used_len, sizeof(int));
+    GM2LM_ASYNC(next_tokens + recover_id, &next_token, sizeof(int64_t));
+    mfence();
+
+    int seq_len = ori_seq_len_encoder + step_idx_now;
+    mfence();
+    LM2GM_ASYNC(&seq_len, seq_lens_this_time + recover_id, sizeof(int));
+    LM2GM_ASYNC(&seq_len, seq_lens_encoder + recover_id, sizeof(int));
+    LM2GM_ASYNC(&flag_false, stop_flags + recover_id, sizeof(bool));
+    mfence();
+    // next tokens
+    LM2GM_ASYNC(&next_token,
+                input_ids + recover_id * length + seq_len - 1,
+                sizeof(int64_t));
+    // set first prompt token
+    int64_t first_token_id;
+    GM2LM(first_token_ids + recover_id, &first_token_id, sizeof(int64_t));
+    LM2GM_ASYNC(
+        &first_token_id, input_ids + recover_id * length, sizeof(int64_t));
+
+    int ori_free_list_len = atomic_add(&free_list_len_sm, -decoder_used_len);
+    // 恢复block table
+    for (int i = 0; i < decoder_used_len; i += block_table_now_len) {
+      int process_len = min(block_table_now_len, decoder_used_len - i);
+      GM2LM(free_list + ori_free_list_len - i - process_len,
+            free_list_now,
+            process_len * sizeof(int));
+      for (int j = 0; j < process_len; j++) {
+        block_table_now[j] = free_list_now[process_len - 1 - j];
+      }
+      mfence();
+      LM2GM(
+          block_table_now,
+          block_tables + recover_id * block_num_per_seq + encoder_block_len + i,
+          process_len * sizeof(int));
+    }
+    // 恢复input_ids
+    for (int i = 0; i < step_idx_now - 1; i += buf_len) {
+      int real_len = min(buf_len, step_idx_now - 1 - i);
+      GM2LM(pre_ids + recover_id * pre_id_length + i + 1,
+            input_ids_now,
+            sizeof(int64_t) * real_len);
+      LM2GM(input_ids_now,
+            input_ids + recover_id * length + ori_seq_len_encoder + i,
+            sizeof(int64_t) * real_len);
+    }
+    mfence();
+  }
+
+  if (cid == 0) {
+    recover_len_lm = 0;
+    mfence();
+    LM2GM_ASYNC(&recover_len_lm, recover_len, sizeof(int));
+    SM2GM_ASYNC(&free_list_len_sm, free_list_len, sizeof(int));
+    mfence();
+  }
+}
+
+}  // namespace plugin
+}  // namespace xpu3

@@ -1,0 +1,21 @@
+# model server
+sentencepiece
+pycryptodome
+tritonclient[all]==2.41.1
+opencv-python
+patchify
+transformers
+
+# http server
+fastapi
+httpx
+openai==1.44.1
+asyncio
+uvicorn
+shortuuid
+
+# parameter search
+pynvml
+
+# paddlenlp
+tiktoken

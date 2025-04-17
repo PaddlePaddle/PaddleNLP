@@ -225,6 +225,7 @@ class ArtistTokenizer(BertTokenizer):
         return_offsets_mapping=False,
         add_special_tokens=True,
         pad_to_multiple_of=None,
+        padding_side=None,
         return_tensors=None,
         verbose: bool = True,
         **kwargs
@@ -247,6 +248,7 @@ class ArtistTokenizer(BertTokenizer):
             return_offsets_mapping,
             add_special_tokens,
             pad_to_multiple_of,
+            padding_side,
             return_tensors,
             verbose,
             **kwargs,

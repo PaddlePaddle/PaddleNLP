@@ -46,8 +46,8 @@ class ZeroPadding:
         "labels",
         "attention_mask",
         "position_ids",
-        "chosen_labels",
-        "rejected_labels",
+        "response_0_labels",
+        "response_1_labels",
         "response_indexs",
         "attn_mask_startend_row_indices",
     ]
@@ -64,17 +64,17 @@ class ZeroPadding:
             batched_features["input_ids"].extend(record["input_ids"])
             if "labels" in record:
                 batched_features["labels"].extend(record["labels"])
-            elif "rejected_labels" in input_keys and "chosen_labels" in input_keys:
-                batched_features["rejected_labels"].extend(record["rejected_labels"])
-                batched_features["chosen_labels"].extend(record["chosen_labels"])
-                response_indexs = []
-                for ii in range(len(record["response_indexs"])):
-                    response_indexs.append(record["response_indexs"][ii] + sequence_sum)
+            elif "response_1_labels" in input_keys and "response_0_labels" in input_keys:
+                batched_features["response_1_labels"].extend(record["response_1_labels"])
+                batched_features["response_0_labels"].extend(record["response_0_labels"])
+                response_indexs = [
+                    ri + sequence_sum if i < 3 else ri for i, ri in enumerate(record["response_indexs"])
+                ]
                 batched_features["response_indexs"].append(response_indexs)
             elif "response_indexs" in input_keys:
-                response_indexs = []
-                for ii in range(len(record["response_indexs"])):
-                    response_indexs.append(record["response_indexs"][ii] + sequence_sum)
+                response_indexs = [
+                    ri + sequence_sum if i < 3 else ri for i, ri in enumerate(record["response_indexs"])
+                ]
                 batched_features["response_indexs"].append(response_indexs)
             else:
                 raise ValueError("labels is required for ZeroPadding Dataset")

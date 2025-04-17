@@ -14,7 +14,7 @@
 """ MBart model configuration"""
 from __future__ import annotations
 
-from paddlenlp.transformers import GPTConfig
+from ..gpt.configuration import GPTConfig
 
 __all__ = ["ARTIST_PRETRAINED_INIT_CONFIGURATION", "ARTIST_PRETRAINED_RESOURCE_FILES_MAP", "ArtistConfig"]
 

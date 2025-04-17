@@ -18,19 +18,12 @@ from typing import Optional
 
 from paddlenlp.trainer import TrainingArguments
 from paddlenlp.trainer.trainer_utils import IntervalStrategy
-
-
-def add_start_docstrings(*docstr):
-    """Adds docstrings for a function."""
-
-    def docstring_decorator(fn):
-        fn.__doc__ = "".join(docstr) + (fn.__doc__ if fn.__doc__ is not None else "")
-        return fn
-
-    return docstring_decorator
+from paddlenlp.trainer.utils.doc import add_start_docstrings
+from paddlenlp.transformers.configuration_utils import llmmetaclass
 
 
 @dataclass
+@llmmetaclass
 @add_start_docstrings(TrainingArguments.__doc__)
 class DPOTrainingArguments(TrainingArguments):
     """DPOTrainingArguments"""
@@ -51,6 +44,11 @@ class DPOTrainingArguments(TrainingArguments):
         default=False,
         metadata={"help": "Whether to run benchmark by autotuner. True for from_scratch."},
     )
+    use_intermediate_api: bool = field(
+        default=False,
+        metadata={"help": "Flag indicating whether to use the intermediate API for model."},
+    )
+    num_hidden_layers: int = field(default=2, metadata={"help": "The number of hidden layers in the network model."})
 
     def __post_init__(self):
         super().__post_init__()
@@ -91,15 +89,11 @@ class DPOConfig:
 
     beta: float = field(default=0.1, metadata={"help": "the beta parameter for DPO loss"})
     simpo_gamma: float = field(default=0.5, metadata={"help": "the gamma parameter for SimPO loss"})
-    normalize_logps: bool = field(
-        default=True,
-        metadata={"help": "Apply logprobs normalization."},
-    )
     label_smoothing: float = field(default=0.0, metadata={"help": "label_smoothing ratio"})
     loss_type: str = field(default="sigmoid", metadata={"help": "DPO loss type"})
     pref_loss_ratio: float = field(default=1.0, metadata={"help": "DPO loss ratio"})
     sft_loss_ratio: float = field(default=0.0, metadata={"help": "SFT loss ratio"})
-    dpop_lambda: float = field(default=50, metadata={"help": "SFT loss ratio"})
+    dpop_lambda: float = field(default=50, metadata={"help": "dpop_lambda"})
     ref_model_update_steps: int = field(default=-1, metadata={"help": "Update ref model state dict "})
     reference_free: bool = field(default=False, metadata={"help": "No reference model."})
     lora: bool = field(default=False, metadata={"help": "Use LoRA model."})
@@ -135,29 +129,18 @@ class DPOModelArgument:
     tokenizer_name_or_path: Optional[str] = field(
         default=None, metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}
     )
-    use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
-    recompute_granularity: str = field(
-        default="full",
-        metadata={
-            "help": "The granularity of recompute training can be selected as `full` or `full_attn` or `core_attn`."
-        },
-    )
     flash_mask: bool = field(default=False, metadata={"help": "Whether to use flash mask in flash attention."})
-    virtual_pp_degree: int = field(
-        default=1,
-        metadata={"help": "virtual_pp_degree"},
-    )
-    sequence_parallel: bool = field(
-        default=False,
-        metadata={"help": "whether to use sequence parallel"},
-    )
-    tensor_parallel_output: bool = field(
-        default=True,
-        metadata={"help": "whether to use tensor_parallel_output"},
-    )
     weight_quantize_algo: str = field(
         default=None,
         metadata={"help": "Model weight quantization algorithm including 'nf4'(qlora), 'weight_only_int8'."},
+    )
+    fuse_attention_qkv: bool = field(
+        default=None,
+        metadata={"help": "whether to fuse attention qkv"},
+    )
+    fuse_attention_ffn: bool = field(
+        default=None,
+        metadata={"help": "whether to fuse first up and gate proj in mlp block"},
     )
     # LoRA
     lora_rank: int = field(default=8, metadata={"help": "Lora rank."})

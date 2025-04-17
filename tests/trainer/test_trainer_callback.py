@@ -206,10 +206,24 @@ class TrainerCallbackTest(unittest.TestCase):
         self.assertEqual(events, self.get_expected_events(trainer))
 
         # Independent log/save/eval
-        trainer = self.get_trainer(callbacks=[MyTestTrainerCallback], logging_steps=5)
+        trainer = self.get_trainer(
+            callbacks=[MyTestTrainerCallback],
+            logging_steps=5,
+        )
         trainer.train()
         events = trainer.callback_handler.callbacks[-2].events
         self.assertEqual(events, self.get_expected_events(trainer))
+
+        # TrainingArguments.disable_tqdm controls if use ProgressCallback or PrinterCallback
+        trainer = self.get_trainer(
+            callbacks=[MyTestTrainerCallback],
+            logging_steps=5,
+            metrics_output_path="./output/paddle_distributed_logs",
+            disable_tqdm=True,
+        )
+        trainer.train()
+        expected_callbacks = DEFAULT_CALLBACKS.copy() + [PrinterCallback] + [MyTestTrainerCallback]
+        self.check_callbacks_equality(trainer.callback_handler.callbacks, expected_callbacks)
 
         trainer = self.get_trainer(callbacks=[MyTestTrainerCallback], save_steps=5)
         trainer.train()

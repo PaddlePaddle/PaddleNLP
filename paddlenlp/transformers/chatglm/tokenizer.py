@@ -14,7 +14,7 @@
 
 """Tokenization classes for ChatGLM."""
 import os
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Literal, Optional, Union
 
 import numpy as np
 import sentencepiece as spm
@@ -218,13 +218,15 @@ class ChatGLMTokenizer(PretrainedTokenizer):
         max_length: Optional[int] = None,
         padding_strategy=PaddingStrategy.DO_NOT_PAD,
         pad_to_multiple_of: Optional[int] = None,
+        padding_side: Optional[Literal["right", "left"]] = None,
         return_attention_mask: Optional[bool] = None,
     ) -> dict:
         # Load from model defaults
         if return_attention_mask is None:
             return_attention_mask = "attention_mask" in self.model_input_names or "attention_mask" in encoded_inputs
 
-        assert self.padding_side == "left"
+        padding_side = padding_side if padding_side is not None else self.padding_side
+        assert padding_side == "left"
         required_input = encoded_inputs[self.model_input_names[0]]
         seq_length = len(required_input)
 

@@ -20,9 +20,9 @@ from shutil import copyfile
 
 import sentencepiece as spm
 
-from .. import PretrainedTokenizer, BertTokenizer, AddedToken
+from .. import AddedToken, BertTokenizer, PretrainedTokenizer
 
-__all__ = ["AlbertTokenizer"]
+__all__ = ["AlbertTokenizer", "AlbertChineseTokenizer", "AlbertEnglishTokenizer"]
 
 SPIECE_UNDERLINE = "▁"
 

@@ -18,6 +18,7 @@
 
 import dataclasses
 import json
+import os
 import sys
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, ArgumentTypeError
 from copy import copy
@@ -35,6 +36,10 @@ from typing import (
     get_args,
     get_type_hints,
 )
+
+from omegaconf import DictConfig, OmegaConf
+
+from ..utils.log import logger
 
 DataClass = NewType("DataClass", Any)
 DataClassType = NewType("DataClassType", Any)
@@ -270,6 +275,25 @@ class PdArgumentParser(ArgumentParser):
         else:
             raise FileNotFoundError(f"The argument file {json_file} does not exist.")
 
+    def read_yaml(self, yaml_file: str) -> list:
+        import yaml
+
+        yaml_file = Path(yaml_file)
+        if yaml_file.exists():
+            with open(yaml_file, "r") as file:
+                data = yaml.safe_load(file)
+            yaml_args = []
+            for key, value in data.items():
+                if isinstance(value, list):
+                    yaml_args.extend([f"--{key}", *[str(v) for v in value]])
+                elif isinstance(value, dict):
+                    yaml_args.extend([f"--{key}", json.dumps(value)])
+                else:
+                    yaml_args.extend([f"--{key}", str(value)])
+            return yaml_args
+        else:
+            raise FileNotFoundError(f"The argument file {yaml_file} does not exist.")
+
     def parse_json_file(self, json_file: str, return_remaining_strings=False) -> Tuple[DataClass, ...]:
         """
         Alternative helper method that does not use `argparse` at all, instead loading a json file and populating the
@@ -298,11 +322,86 @@ class PdArgumentParser(ArgumentParser):
         args = json_args + sys.argv[2:]
         return self.common_parse(args, return_remaining_strings)
 
+    def parse_yaml_file_and_cmd_lines(self, return_remaining_strings=False) -> Tuple[DataClass, ...]:
+        """
+        Extend the functionality of `parse_yaml_file` to handle command line arguments in addition to loading a YAML
+        file.
+
+        When there is a conflict between the command line arguments and the YAML file configuration,
+        the command line arguments will take precedence.
+
+        Returns:
+            Tuple consisting of:
+
+                - the dataclass instances in the same order as they were passed to the initializer.abspath
+        """
+        if not sys.argv[1].endswith(".yaml"):
+            raise ValueError(f"The first argument should be a YAML file, but it is {sys.argv[1]}")
+        yaml_args = self.read_yaml(sys.argv[1])
+        # In case of conflict, command line arguments take precedence
+        args = yaml_args + sys.argv[2:]
+        return self.common_parse(args, return_remaining_strings)
+
     def parse_dict(self, args: dict) -> Tuple[DataClass, ...]:
         """
         Alternative helper method that does not use `argparse` at all, instead uses a dict and populating the dataclass
         types.
         """
+
+        def to_regular_dict(obj):
+            if isinstance(obj, DictConfig):
+                obj = OmegaConf.to_container(obj, resolve=True)
+            if isinstance(obj, dict):
+                return {k: to_regular_dict(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [to_regular_dict(v) for v in obj]
+            return obj
+
+        def get_resume_checkpoint_path(args):
+            """
+            get resume checkpoint path from mpirun env
+            """
+            pdc_init_step = os.getenv("PDC_INIT_STEP")
+            # user defined resume_from_checkpoint
+            user_defined_resume_from_checkpoint = args.get("resume_from_checkpoint", None)
+            if pdc_init_step is None:
+                logger.info(f"user has defined resume_from_checkpoint: {user_defined_resume_from_checkpoint}")
+                return user_defined_resume_from_checkpoint
+            else:
+                if pdc_init_step == "0":
+                    # from_scratch train process launched by pdc longjob
+                    if user_defined_resume_from_checkpoint is None:
+                        logger.info("resume training process from scratch (step 0)")
+                        return None
+                    else:
+                        # Launching the sft_base training process using an initial checkpoint with the starting step set to 0.
+                        # For instance, resume training from the checkpoint located at ‘./output/eb/checkpoint-init’.
+                        logger.info(
+                            f"init_step == 0 and user has defined resume_from_checkpoint: {user_defined_resume_from_checkpoint}"
+                        )
+                        return user_defined_resume_from_checkpoint
+                else:
+                    # pdc_init_step > 0
+                    logger.info(f"resume training process by pdc longjob with resume step: {pdc_init_step}")
+                    resume_checkpoint = os.path.join(args.get("output_dir", None), f"checkpoint-{pdc_init_step}")
+                    if user_defined_resume_from_checkpoint is not None:
+                        logger.warning(
+                            f"pdc_init_step:{pdc_init_step} and resume_ckpt:{user_defined_resume_from_checkpoint} exist together, use resume_checkpoint:{resume_checkpoint}"
+                        )
+                    return resume_checkpoint
+
+        args["resume_from_checkpoint"] = get_resume_checkpoint_path(args)
+        args_for_json = to_regular_dict(args)
+
+        json_filename = args_for_json.get("args_output_to_local")
+        if json_filename:
+            try:
+                with open(json_filename, "w") as json_file:
+                    json.dump(args_for_json, json_file, indent=4)
+            except Exception as e:
+                logger.error(f"Failed to write args output JSON file: {e}")
+                # Optionally handle the error or log it, then continue
+
         outputs = []
         for dtype in self.dataclass_types:
             keys = {f.name for f in dataclasses.fields(dtype) if f.init}

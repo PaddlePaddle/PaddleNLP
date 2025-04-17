@@ -20,6 +20,9 @@ import warnings
 from collections import namedtuple
 from itertools import islice
 
+# Add this for extremely slow connection to hf sever even for local dataset.
+os.environ["HF_UPDATE_DOWNLOAD_COUNTS"] = "False"
+
 import datasets
 from multiprocess import Pool, RLock
 
@@ -113,7 +116,11 @@ def load_from_hf(path, name=None, splits=None, **kwargs):
     from datasets.features import ClassLabel
 
     try:
-        hf_datasets = load_hf_dataset(path, name=name, split=splits, **kwargs)
+        if "split" in kwargs:
+            hf_datasets = load_hf_dataset(path, name=name, **kwargs)
+        else:
+            hf_datasets = load_hf_dataset(path, name=name, split=splits, **kwargs)
+
     except FileNotFoundError:
         raise FileNotFoundError("Couldn't find the dataset script for '" + path + "' on PaddleNLP or HuggingFace")
     else:
@@ -605,7 +612,7 @@ class DatasetBuilder:
                 datasets = DatasetTuple(splits)
                 assert len(splits) == len(
                     data_files
-                ), "Number of `splits` and number of `data_files` should be the same if you want to specify the split of loacl data file."
+                ), "Number of `splits` and number of `data_files` should be the same if you want to specify the split of local data file."
                 for i in range(len(data_files)):
                     datasets[splits[i]] = self.read(filename=data_files[i], split=splits[i])
             else:

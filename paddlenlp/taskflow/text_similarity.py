@@ -196,7 +196,7 @@ class TextSimilarityTask(Task):
         """
 
         if "rocketqav2-en" in model or "ernie-search" in model:
-            self._model = ErnieCrossEncoder(self._task_path, num_classes=1, reinitialize=True)
+            self._model = ErnieCrossEncoder(self._task_path, num_classes=2, reinitialize=True)
         elif "rocketqa" in model:
             self._model = ErnieCrossEncoder(self._task_path, num_classes=2)
         else:
@@ -274,7 +274,6 @@ class TextSimilarityTask(Task):
         if "rocketqa" in self.model_name or "ernie-search" in self.model_name:
             with static_mode_guard():
                 for batch in inputs["data_loader"]:
-
                     if self._predictor_type == "paddle-inference":
                         input_ids, segment_ids = self._batchify_fn(batch)
                         self.input_handles[0].copy_from_cpu(input_ids)

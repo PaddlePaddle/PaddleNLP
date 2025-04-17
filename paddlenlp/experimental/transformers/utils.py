@@ -78,6 +78,30 @@ def infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, 
     return model
 
 
+def infererence_model_from_config(cls, config, args, kwargs):
+    r"""
+    Instantiate a pretrained model configuration from a pre-trained model name or path.
+    """
+    dtype = kwargs.pop("dtype", None)
+    if dtype is None:
+        dtype = config.dtype
+    low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", False)
+
+    init_contexts = []
+    if low_cpu_mem_usage or config.quantization_config.is_weight_quantize():
+        # Instantiate model.
+        init_contexts.append(no_init_weights(_enable=True))
+        if is_paddle_support_lazy_init():
+            init_contexts.append(paddle.LazyGuard())
+    if dtype:
+        init_contexts.append(dtype_guard(dtype))
+
+    # init the model
+    with ContextManagers(init_contexts):
+        model = cls(config)
+    return model
+
+
 class EmptyActScale:
     """
     For fake parameter
@@ -103,7 +127,7 @@ class EmptyWeightScale:
         self,
         key_map_dict,
         num_of_layers,
-        num_head,
+        num_heads,
         dim_head,
         ffn_hidden_size,
         num_key_value_heads=-1,
@@ -114,9 +138,8 @@ class EmptyWeightScale:
         self.key_map = key_map_dict
         self.scale = {}
 
-        num_key_value_heads = num_key_value_heads
         qkv_out_size = (
-            3 * num_head * dim_head if num_key_value_heads <= 0 else (num_head + 2 * num_key_value_heads) * dim_head
+            3 * num_heads * dim_head if num_key_value_heads <= 0 else (num_heads + 2 * num_key_value_heads) * dim_head
         )
 
         for scale_type, key_template in self.key_map.items():
@@ -125,7 +148,7 @@ class EmptyWeightScale:
             elif "ffn1" in scale_type:
                 n = ffn_hidden_size * 2 // mp_size
             else:
-                n = num_head * dim_head
+                n = num_heads * dim_head
             self.scale[scale_type] = np.full([num_of_layers, n], fill_value=0.1, dtype="float32")
 
         # concat qkv and ffn1

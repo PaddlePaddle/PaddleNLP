@@ -19,14 +19,15 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import paddle
-import paddle.nn as nn
 import paddle.nn.functional as F
+from paddle import Tensor, nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
 from paddle.utils import map_structure
 
 from paddlenlp.transformers.long_sequence_strategies import LongSequenceStrategies
+from paddlenlp.utils.log import logger
 
 from ...utils.converter import StateDictNameMapping, init_name_mappings
 from .. import PretrainedModel, linear_utils, register_base_model
@@ -72,35 +73,46 @@ def seed_guard_context(name=None):
         return contextlib.nullcontext()
 
 
-def parallel_matmul(lm_output, logit_weights, parallel_output):
-    hcg = fleet.get_hybrid_communicate_group()
-    model_parallel_group = hcg.get_model_parallel_group()
-    world_size = hcg.get_model_parallel_world_size()
+def parallel_matmul(x: Tensor, y: Tensor, tensor_parallel_output):
 
-    if world_size > 1:
-        # _c_identity is backwards is reduce
-        input_parallel = paddle.distributed.collective._c_identity(lm_output, group=model_parallel_group)
+    is_fleet_init = True
+    tensor_parallel_degree = 1
+    try:
+        hcg = fleet.get_hybrid_communicate_group()
+        model_parallel_group = hcg.get_model_parallel_group()
+        tensor_parallel_degree = hcg.get_model_parallel_world_size()
+    except:
+        is_fleet_init = False
 
-        logits = paddle.matmul(input_parallel, logit_weights, transpose_y=False)
+    if paddle.in_dynamic_mode():
+        y_is_distributed = y.is_distributed
+    else:
+        y_is_distributed = tensor_parallel_degree > 1
 
-        if parallel_output:
+    if is_fleet_init and tensor_parallel_degree > 1 and y_is_distributed:
+        # if not running under distributed.launch, it will raise AttributeError: 'Fleet' object has no attribute '_hcg'
+        input_parallel = paddle.distributed.collective._c_identity(x, group=model_parallel_group)
+        logits = paddle.matmul(input_parallel, y, transpose_y=False)
+
+        if tensor_parallel_output:
             return logits
 
-        # _c_concat has not grad backwards
         return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
+
     else:
-        logits = paddle.matmul(lm_output, logit_weights, transpose_y=False)
+        logits = paddle.matmul(x, y, transpose_y=False)
         return logits
 
 
 class RotaryEmbedding(nn.Layer):
-    def __init__(self, dim, original_impl=False):
+    def __init__(self, dim, rope_ratio=1, original_impl=False):
         super().__init__()
         self.default_dtype = paddle.get_default_dtype()
-        inv_freq = 1.0 / (10000 ** (paddle.arange(0, dim, 2, dtype="float32") / dim))
+        inv_freq = 1.0 / (10000 ** (paddle.arange(0, dim, 2, dtype=self.default_dtype) / dim))
         self.register_buffer("inv_freq", inv_freq)
         self.dim = dim
         self.original_impl = original_impl
+        self.rope_ratio = rope_ratio
 
     def forward_impl(self, seq_len: int, n_elem: int, base: int = 10000):
         """Enhanced Transformer with Rotary Position Embedding.
@@ -109,19 +121,20 @@ class RotaryEmbedding(nn.Layer):
         https://github.com/labmlai/annotated_deep_learning_paper_implementations/blob/master/license.
         """
         # $\Theta = {\theta_i = 10000^{\frac{2(i-1)}{d}}, i \in [1, 2, ..., \frac{d}{2}]}$
+        base = base * self.rope_ratio
         theta = 1.0 / (base ** (paddle.arange(0, n_elem, 2, dtype="float32") / n_elem))
 
         # Create position indexes `[0, 1, ..., seq_len - 1]`
-        seq_idx = paddle.arange(0, seq_len, dtype=theta.dtype)
+        seq_idx = paddle.arange(0, seq_len, dtype="float32")
 
         # Calculate the product of position index and $\theta_i$
-        idx_theta = paddle.outer(seq_idx, theta).astype(self.default_dtype)
+        idx_theta = paddle.outer(seq_idx, theta).astype("float32")
 
         cache = paddle.stack([paddle.cos(idx_theta), paddle.sin(idx_theta)], axis=-1)
 
         # this is to mimic the behaviour of complex32, else we will get different results
-        if self.default_dtype in (paddle.float16, paddle.bfloat16, paddle.int8):
-            cache = cache.astype(self.default_dtype)
+        if self.default_dtype in ("float16", "bfloat16", "int8"):
+            cache = cache.astype("bfloat16") if self.default_dtype == "bfloat16" else cache.astype("float16")
             # cache = cache.bfloat16() if dtype == paddle.bfloat16 else cache.astype("float16")
         return cache
 
@@ -150,16 +163,25 @@ def apply_rotary_pos_emb(x: paddle.Tensor, rope_cache: paddle.Tensor) -> paddle.
     return paddle.concat((x_out2, x_pass.cast(x_out2.dtype)), axis=-1)
 
 
+class LayerNorm(nn.LayerNorm):
+    def __init__(self, config):
+        self.config = config
+        super().__init__(config.hidde_size, epsilon=config.layernorm_epsilon)
+
+
 class RMSNorm(nn.Layer):
-    def __init__(self, hidden_size, config: ChatGLMv2Config, epsilon=None):
+    def __init__(self, config: ChatGLMv2Config):
         super().__init__()
-        self.hidden_size = hidden_size
+        self.hidden_size = config.hidden_size
         self.weight = paddle.create_parameter(
             shape=[self.hidden_size],
             dtype=paddle.get_default_dtype(),
             default_initializer=nn.initializer.Constant(1.0),
         )
-        self.epsilon = 1e-5 if epsilon is None else epsilon
+        self.epsilon = 1e-5 if config.layernorm_epsilon is None else config.layernorm_epsilon
+
+        if config.sequence_parallel:
+            mark_as_sequence_parallel_parameter(self.weight)
 
         if config.sequence_parallel:
             mark_as_sequence_parallel_parameter(self.weight)
@@ -395,25 +417,56 @@ class SelfAttention(nn.Layer):
         # ==================================
         # core attention computation
         # ==================================
-        attention_fuc = self._core_attention
-
-        has_gradient = (
-            (not query_layer.stop_gradient) or (not key_layer.stop_gradient) or (not value_layer.stop_gradient)
-        )
-        if self.enable_recompute and self.config.recompute_granularity == "core_attn" and has_gradient:
-            context_layer = recompute(
-                attention_fuc,
+        version = paddle.version.full_version
+        version_check = True
+        if self.config.use_flash_attention and version != "0.0.0" and version <= "2.5.2":
+            logger.warning(
+                "PaddlePaddle version 2.5.3 or higher is required, please upgrade your PaddlePaddle to 2.5.3 or other higher version."
+            )
+            version_check = False
+        if self.config.use_flash_attention and version_check:
+            query_layer = query_layer.transpose([1, 0, 2, 3])
+            key_layer = key_layer.transpose([1, 0, 2, 3])
+            value_layer = value_layer.transpose([1, 0, 2, 3])
+            # attention_mask = attention_mask
+            attn_output = F.scaled_dot_product_attention(
                 query_layer,
                 key_layer,
                 value_layer,
-                attention_mask,
-                output_attentions,
-                use_reentrant=False,
+                attn_mask=attention_mask,
+                dropout_p=self.config.attention_dropout,
+                training=self.training,
+                is_causal=False,
             )
+            batch_size, q_length, _, _ = query_layer.shape
+            if self.config.sequence_parallel:
+                context_layer = attn_output.reshape([batch_size * q_length, -1])
+            else:
+                context_layer = attn_output.reshape([q_length, batch_size, -1])
         else:
-            context_layer = attention_fuc(
-                query_layer, key_layer, value_layer, attention_mask=attention_mask, output_attentions=output_attentions
+            attention_fuc = self._core_attention
+
+            has_gradient = (
+                (not query_layer.stop_gradient) or (not key_layer.stop_gradient) or (not value_layer.stop_gradient)
             )
+            if self.enable_recompute and self.config.recompute_granularity == "core_attn" and has_gradient:
+                context_layer = recompute(
+                    attention_fuc,
+                    query_layer,
+                    key_layer,
+                    value_layer,
+                    attention_mask,
+                    output_attentions,
+                    use_reentrant=False,
+                )
+            else:
+                context_layer = attention_fuc(
+                    query_layer,
+                    key_layer,
+                    value_layer,
+                    attention_mask=attention_mask,
+                    output_attentions=output_attentions,
+                )
         # =================
         # Output. [seq_length, b, h]
         # =================
@@ -487,18 +540,16 @@ class GLMBlock(nn.Layer):
         self.config = config
         self.fp32_residual_connection = config.fp32_residual_connection
 
-        LayerNormFunc = RMSNorm if config.rmsnorm else nn.LayerNorm
+        LayerNormFunc = RMSNorm if config.rmsnorm else LayerNorm
         # Layernorm on the input data.
-        self.input_layernorm = LayerNormFunc(config.hidden_size, epsilon=config.layernorm_epsilon, config=config)
+        self.input_layernorm = LayerNormFunc(config)
 
         # Self attention.
         self.self_attention = SelfAttention(config, layer_number)
         self.hidden_dropout = config.hidden_dropout
 
         # Layernorm on the attention output
-        self.post_attention_layernorm = LayerNormFunc(
-            config.hidden_size, epsilon=config.layernorm_epsilon, config=config
-        )
+        self.post_attention_layernorm = LayerNormFunc(config)
 
         # MLP
         self.mlp = MLP(config)
@@ -585,9 +636,9 @@ class GLMTransformer(nn.Layer):
         self.layers = nn.LayerList([build_layer(i + 1) for i in range(self.num_hidden_layers)])
 
         if self.post_layer_norm:
-            LayerNormFunc = RMSNorm if config.rmsnorm else nn.LayerNorm
+            LayerNormFunc = RMSNorm if config.rmsnorm else LayerNorm
             # Final layer norm before output.
-            self.final_layernorm = LayerNormFunc(config.hidden_size, epsilon=config.layernorm_epsilon, config=config)
+            self.final_layernorm = LayerNormFunc(config)
 
     def _get_layer(self, layer_number):
         return self.layers[layer_number]
@@ -925,6 +976,11 @@ class ChatGLMv2PretrainedModel(PretrainedModel):
 
         return mappings
 
+    @classmethod
+    def set_inference_config(cls, config, predictor_args, **kwargs):
+        super().set_inference_config(config, predictor_args, **kwargs)
+        predictor_args.total_max_length = config.seq_length
+
 
 class Embedding(nn.Layer):
     """Language model embeddings."""
@@ -944,7 +1000,7 @@ class Embedding(nn.Layer):
     def forward(self, input_ids):
         # Embeddings.
         embeddings = self.word_embeddings(input_ids)
-        # Data format change to avoid explicit tranposes
+        # Data format change to avoid explicit transposes
         # [batch_size, seq_length, hidden_size] --> [seq_length, batch_size, hidden_size].
         embeddings = embeddings.transpose([1, 0, 2])
         # If the input flag for fp32 residual connection is set, convert for float.
@@ -973,14 +1029,9 @@ class ChatGLMv2Model(ChatGLMv2PretrainedModel):
                 **config.long_sequence_init_args,
             )
         else:
-            self.rotary_pos_emb = RotaryEmbedding(rotary_dim // 2)
+            self.rotary_pos_emb = RotaryEmbedding(rotary_dim // 2, rope_ratio=config.rope_ratio)
         self.encoder = GLMTransformer(config)
-        if config.tensor_parallel_degree > 1:
-            self.output_layer = nn.Linear(
-                config.hidden_size, config.padded_vocab_size // config.tensor_parallel_degree, bias_attr=False
-            )
-        else:
-            self.output_layer = nn.Linear(config.hidden_size, config.padded_vocab_size, bias_attr=False)
+        self.output_layer = Chatglmv2LMHead(config)
         self.apply(self.init_weights)
 
     def get_input_embeddings(self):
@@ -1101,7 +1152,7 @@ class Chatglmv2LMHead(nn.Layer):
     def __init__(self, config: ChatGLMv2Config, embedding_weights=None):
         super(Chatglmv2LMHead, self).__init__()
         if embedding_weights is not None:
-            self.decoder_weight = embedding_weights
+            self.weight = embedding_weights
         else:
             if config.tensor_parallel_degree > 1:
                 vocab_size = config.vocab_size // config.tensor_parallel_degree
@@ -1110,23 +1161,27 @@ class Chatglmv2LMHead(nn.Layer):
 
             if vocab_size != config.vocab_size:
                 with get_rng_state_tracker().rng_state():
-                    self.decoder_weight = self.create_parameter(
+                    self.weight = self.create_parameter(
                         shape=[config.hidden_size, vocab_size],
                         dtype=paddle.get_default_dtype(),
                     )
             else:
-                self.decoder_weight = self.create_parameter(
+                self.weight = self.create_parameter(
                     shape=[config.hidden_size, vocab_size], dtype=paddle.get_default_dtype()
                 )
+            # Must set distributed attr for Tensor Parallel !
+            self.weight.is_distributed = True if (vocab_size != config.vocab_size) else False
+            if self.weight.is_distributed:
+                self.weight.split_axis = 1
         self.config = config
 
-    def forward(self, hidden_states, return_last_logit=False):
-        if return_last_logit:
-            hidden_states = hidden_states[-1:]
+    def forward(self, hidden_states):
         if self.config.sequence_parallel:
             hidden_states = GatherOp.apply(hidden_states)
             hidden_states = paddle.reshape_(hidden_states, [self.config.seq_length, -1, self.config.hidden_size])
-        logits = parallel_matmul(hidden_states, self.decoder_weight, self.config.tensor_parallel_output)
+
+        logits = parallel_matmul(hidden_states, self.weight, self.config.tensor_parallel_output)
+        # shape = [batch_size, seq_length, vocab_size]
         return logits.transpose([1, 0, 2])
 
 
@@ -1228,20 +1283,8 @@ class ChatGLMv2ForCausalLM(ChatGLMv2PretrainedModel):
 
         hidden_states = transformer_outputs[0]
 
-        if self.config.sequence_parallel:
-            hidden_states = GatherOp.apply(hidden_states)
-            seq_length = self.config.seq_length
-            hidden_states = hidden_states.reshape([seq_length, -1, self.config.hidden_size])
-        if return_last_logit:
-            hidden_states = hidden_states[-1:]
-        if self.config.tensor_parallel_degree > 1:
-            lm_logits = parallel_matmul(
-                hidden_states, self.chatglm_v2.output_layer.weight, self.config.tensor_parallel_output
-            )
-        else:
-            lm_logits = self.chatglm_v2.output_layer(hidden_states)
-        lm_logits = lm_logits.transpose([1, 0, 2])
         # shape = [batch_size, seq_length, vocab_size]
+        lm_logits = self.chatglm_v2.output_layer(hidden_states)
         loss = None
         if labels is not None:
             loss = self.criterion(lm_logits, labels)

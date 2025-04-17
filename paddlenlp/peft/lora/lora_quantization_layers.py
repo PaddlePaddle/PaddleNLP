@@ -25,6 +25,7 @@ from ...quantization.quantization_linear import (
     QuantizationLinear,
     RowParallelQuantizationLinear,
 )
+from .utils import rng_ctx
 
 
 class QuantizationLoRALinear(QuantizationLinear):
@@ -241,12 +242,13 @@ class ColumnParallelQuantizationLoRALinear(ColumnParallelQuantizationLinear):
             attr=lora_A_weight_attr,
         )
         self.lora_A.is_distributed = False
-        self.lora_B = self.create_parameter(
-            shape=[r, self.output_size_per_partition],
-            dtype=self._dtype,
-            is_bias=False,
-            default_initializer=nn.initializer.Constant(value=0.0),
-        )
+        with rng_ctx(self.is_mp, paddle.in_dynamic_mode()):
+            self.lora_B = self.create_parameter(
+                shape=[r, self.output_size_per_partition],
+                dtype=self._dtype,
+                is_bias=False,
+                default_initializer=nn.initializer.Constant(value=0.0),
+            )
         self.lora_B.is_distributed = True
         self.lora_B.split_axis = 1
         self.scaling = self.lora_alpha / self.r
@@ -386,14 +388,15 @@ class RowParallelQuantizationLoRALinear(RowParallelQuantizationLinear):
             self.lora_dropout = lambda x: x
 
         # Actual trainable parameters
-        self.lora_A = self.create_parameter(
-            shape=[self.input_size_per_partition, r],
-            dtype=self._dtype,
-            is_bias=False,
-            attr=paddle.ParamAttr(
-                initializer=nn.initializer.KaimingUniform(negative_slope=math.sqrt(5), nonlinearity="leaky_relu")
-            ),
-        )
+        with rng_ctx(self.is_mp, paddle.in_dynamic_mode()):
+            self.lora_A = self.create_parameter(
+                shape=[self.input_size_per_partition, r],
+                dtype=self._dtype,
+                is_bias=False,
+                attr=paddle.ParamAttr(
+                    initializer=nn.initializer.KaimingUniform(negative_slope=math.sqrt(5), nonlinearity="leaky_relu")
+                ),
+            )
         self.lora_B = self.create_parameter(
             shape=[r, self.out_features],
             dtype=self._dtype,

@@ -67,7 +67,7 @@ public:
         if(!file.good()){
             throw std::runtime_error("cutlass gemm_best_config can not be found, please set gemm_best_config'path as FLAGS_use_cutlass_device_best_config_path, or unset FLAGS_use_cutlass_device_best_config_path to tune gemm_best_config");
         }
-        json_ = readJsonFromFile(config_file_path);
+        json_ = ReadJsonFromFile(config_file_path);
         load_initialized_ = true;
         save_initialized_ = false;
       } 
@@ -82,7 +82,7 @@ private:
         new_file << json_.dump(4);
         new_file.close();
       } else {
-        nlohmann::json old_json = readJsonFromFile(config_file_path);
+        nlohmann::json old_json = ReadJsonFromFile(config_file_path);
         for (auto it = json_.begin(); it != json_.end(); ++it) {
             old_json[it.key()] = it.value();
         }

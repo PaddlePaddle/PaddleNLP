@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "paddle/extension.h"
+#include "helper.h"
 #include<stdlib.h>
 #include<string.h>
 #include<sys/types.h>
@@ -30,16 +30,6 @@ void set_flags_multi_ends(char *str_flags, bool *res, int length) {
             res[i] = true;
         }
     }
-}
-
-__device__ bool is_in_end(const int64_t id, const int64_t *end_ids, int length) {
-    bool flag = false;
-    for (int i = 0; i < length; i++) {
-        if (id == end_ids[i]) {
-            return true;
-        }
-    }
-    return flag;
 }
 
 __global__ void set_value_by_flags(const bool *stop_flags, const int64_t *end_ids, int64_t *topk_ids, bool *stop_flags_out, const int bs, int end_length) {

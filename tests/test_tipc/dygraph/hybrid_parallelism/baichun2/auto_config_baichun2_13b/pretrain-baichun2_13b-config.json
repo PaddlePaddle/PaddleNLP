@@ -9,7 +9,7 @@
   "tensor_parallel_degree": 4,
   "pipeline_parallel_degree": 1,
   "virtual_pp_degree": 1,
-  "sequence_parallel": 1,   
+  "sequence_parallel": 1,
   "sharding_parallel_degree": 8,
   "sharding": "stage1",
   "pipeline_parallel_config": "enable_sharding_comm_overlap enable_release_grads ",

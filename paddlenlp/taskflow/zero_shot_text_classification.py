@@ -259,6 +259,7 @@ class ZeroShotTextClassificationTask(Task):
     def __init__(self, task: str, model: str, schema: list = None, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
 
+        self._static_mode = False
         self._set_utc_schema(schema)
         self._max_seq_len = kwargs.get("max_seq_len", 512)
         self._batch_size = kwargs.get("batch_size", 1)
@@ -269,7 +270,10 @@ class ZeroShotTextClassificationTask(Task):
         self._check_task_files()
         self._construct_tokenizer()
         self._check_predictor_type()
-        self._get_inference_model()
+        if self._static_mode:
+            self._get_inference_model()
+        else:
+            self._construct_model(model)
 
     def _set_utc_schema(self, schema):
         if schema is None:
@@ -293,7 +297,7 @@ class ZeroShotTextClassificationTask(Task):
             InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
             InputSpec(shape=[None, None], dtype="int64", name="token_type_ids"),
             InputSpec(shape=[None, None], dtype="int64", name="position_ids"),
-            InputSpec(shape=[None, None, None, None], dtype="float32", name="attention_mask"),
+            InputSpec(shape=[None, None], dtype="float32", name="attention_mask"),
             InputSpec(shape=[None, None], dtype="int64", name="omask_positions"),
             InputSpec(shape=[None], dtype="int64", name="cls_positions"),
         ]
@@ -311,7 +315,10 @@ class ZeroShotTextClassificationTask(Task):
         Construct the tokenizer for the predictor.
         """
         self._tokenizer = AutoTokenizer.from_pretrained(self._task_path, from_hf_hub=self.from_hf_hub)
-        self._collator = PromptDataCollatorWithPadding(self._tokenizer, return_tensors="np")
+        if self._static_mode:
+            self._collator = PromptDataCollatorWithPadding(self._tokenizer, return_tensors="np")
+        else:
+            self._collator = PromptDataCollatorWithPadding(self._tokenizer, return_tensors="pd")
         self._template = UTCTemplate(self._tokenizer, self._max_seq_len)
 
     def _check_input_text(self, inputs):
@@ -381,19 +388,26 @@ class ZeroShotTextClassificationTask(Task):
             "omask_positions": "int64",
             "cls_positions": "int64",
         }
-        with static_mode_guard():
+        if self._static_mode:
+            with static_mode_guard():
+                for batch in inputs["batches"]:
+                    if self._predictor_type == "paddle-inference":
+                        for i, input_name in enumerate(self.input_names):
+                            self.input_handles[i].copy_from_cpu(batch[input_name].astype(dtype_dict[input_name]))
+                        self.predictor.run()
+                        logits = self.output_handle[0].copy_to_cpu().tolist()
+                    else:
+                        input_dict = {}
+                        for input_name in dtype_dict:
+                            input_dict[input_name] = batch[input_name].astype(dtype_dict[input_name])
+                        logits = self.predictor.run(None, input_dict)[0].tolist()
+                    outputs["batch_logits"].append(logits)
+        else:
             for batch in inputs["batches"]:
-                if self._predictor_type == "paddle-inference":
-                    for i, input_name in enumerate(self.input_names):
-                        self.input_handles[i].copy_from_cpu(batch[input_name].astype(dtype_dict[input_name]))
-                    self.predictor.run()
-                    logits = self.output_handle[0].copy_to_cpu().tolist()
-                else:
-                    input_dict = {}
-                    for input_name in dtype_dict:
-                        input_dict[input_name] = batch[input_name].astype(dtype_dict[input_name])
-                    logits = self.predictor.run(None, input_dict)[0].tolist()
-                outputs["batch_logits"].append(logits)
+                if batch["soft_token_ids"] is not None:
+                    del batch["soft_token_ids"]
+                logits = self._model(**batch)
+                outputs["batch_logits"].append(np.array(logits))
 
         return outputs
 

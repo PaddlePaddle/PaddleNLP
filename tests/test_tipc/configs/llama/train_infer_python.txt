@@ -13,7 +13,7 @@ null:null
 null:null
 ##
 trainer:norm_train
-norm_train:../legacy/examples/benchmark/llm/llama_single_gpu/benchmark.py --model_name_or_path facebook/llama-7b-2l --do_train --max_steps 500 --recompute False --overwrite_output_dir --output_dir ./checkpoints/ --fp16_opt_level O2 --learning_rate 3e-5 --warmup_steps 0 --seed 23 --logging_steps 1 --dataloader_num_workers 1
+norm_train:../slm/examples/benchmark/llm/llama_single_gpu/benchmark.py --model_name_or_path facebook/llama-7b-2l --do_train --max_steps 500 --recompute False --overwrite_output_dir --output_dir ./checkpoints/ --fp16_opt_level O2 --learning_rate 3e-5 --warmup_steps 0 --seed 23 --logging_steps 1 --dataloader_num_workers 1
 pact_train:null
 fpgm_train:null
 distill_train:null

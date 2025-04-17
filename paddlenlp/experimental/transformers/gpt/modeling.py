@@ -26,7 +26,10 @@ from paddlenlp.experimental.transformers.fused_transformer_layers import (
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationInferenceModel,
 )
-from paddlenlp.experimental.transformers.utils import infererence_model_from_pretrained
+from paddlenlp.experimental.transformers.utils import (
+    infererence_model_from_config,
+    infererence_model_from_pretrained,
+)
 from paddlenlp.transformers import GPTConfig, GPTPretrainedModel
 from paddlenlp.transformers.gpt.modeling import GPTEmbeddings, parallel_matmul
 from paddlenlp.transformers.model_outputs import (
@@ -162,7 +165,7 @@ class GPTInferenceModel(GPTPretrainedModel):
             quant_type=config.quant_type,
             activation="gelu",
             num_layers=self.num_layers,
-            nranks=config.tensor_parallel_degree,
+            tp_degree=config.tensor_parallel_degree,
             ring_id=ring_id,
             ln_scale_attrs=ln_scale_attrs,
             ln_bias_attrs=ln_bias_attrs,
@@ -444,6 +447,10 @@ class GPTForCausalLMInferenceModel(GenerationInferenceModel, GPTPretrainedModel)
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
         return infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs)
+
+    @classmethod
+    def from_config(cls, config, *args, **kwargs):
+        return infererence_model_from_config(cls, config, args, kwargs)
 
     @classmethod
     def get_cache_kvs_shape(

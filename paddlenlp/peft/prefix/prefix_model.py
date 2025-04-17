@@ -333,7 +333,9 @@ class PrefixModelForCausalLM(paddle.nn.Layer):
                     pre_tensor_parallel_split = True
                     tp_actions = prefix_model._get_tensor_parallel_convert_actions(is_split=True)
                 state_dict = load_state_dict(
-                    shard_file, tp_actions if pre_tensor_parallel_split else None, expected_keys
+                    shard_file,
+                    tp_actions if pre_tensor_parallel_split else None,
+                    expected_keys,
                 )
                 error_msgs += _load_state_dict_into_model(prefix_model.prefix_encoder, state_dict, "")
                 del state_dict

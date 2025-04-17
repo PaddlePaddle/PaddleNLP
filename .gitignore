@@ -129,3 +129,15 @@ FETCH_HEAD
 csrc/third_party/
 dataset/
 output/
+
+# gen codes
+autogen/
+
+# cutlass kernel
+!csrc/gpu/cutlass_kernels/gemm/collective/builders
+
+
+#fp8
+ops/csrc/fp8/deep_gemm/include/cutlass
+ops/csrc/fp8/deep_gemm/include/cute
+

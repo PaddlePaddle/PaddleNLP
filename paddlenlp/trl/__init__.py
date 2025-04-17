@@ -12,7 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .dpo_criterion import DPOCriterion
+from ..transformers.dpo_criterion import AutoDPOCriterion, DPOCriterion
+from ..transformers.kto_criterion import KTOCriterion
+from .dpo_auto_trainer import DPOAutoTrainer
 from .dpo_trainer import DPOTrainer
+from .embedding_trainer import EmbeddingTrainer
+from .kto_trainer import KTOTrainer
+from .model_config import *
+from .quant_config import *
+from .sft_auto_trainer import *
+from .sft_config import *
+from .sft_trainer import *
+from .sftdata_config import *
 from .trl_data import *
 from .trl_utils import *

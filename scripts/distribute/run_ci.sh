@@ -20,21 +20,34 @@ mkdir -p /workspace/case_logs
 export log_path=/workspace/case_logs
 export case_list=()
 
+global_total_count=0
+global_success_count=0
+global_exit_250_arr=()
+global_runtime_fail_arr=()
+global_verification_fail_arr=()
+
 target_lists_for_gpt=(
-    "legacy/model_zoo/gpt-3"
+    "slm/model_zoo/gpt-3"
     "llm/auto_parallel/gpt-3"
-    "paddlenlp/transformers/gpt/modeling.py"
-    "paddlenlp/transformers/gpt/modeling_pp.py"
-    "paddlenlp/transformers/gpt/modeling_auto.py"
+    "paddlenlp/transformers/gpt"
     "scripts/distribute"
 )
 
 target_lists_for_llama=(
     "llm/auto_parallel/llama"
     "paddlenlp/trainer/auto_trainer.py"
-    "paddlenlp/transformers/llama/modeling_auto_static.py"
-    "paddlenlp/transformers/llama/modeling_auto.py"
-    "paddlenlp/transformers/llama/modeling.py"
+    "paddlenlp/transformers/llama"
+    "scripts/distribute"
+)
+
+target_lists_for_deepseek=(
+    "llm/auto_parallel/deepseek-v3"
+    "paddlenlp/trainer/auto_trainer.py"
+    "paddlenlp/transformers/deepseek_v2/modeling_auto.py"
+    "paddlenlp/transformers/deepseek_v2/modeling.py"
+    "paddlenlp/transformers/deepseek_v3/modeling_auto.py"
+    "paddlenlp/transformers/moe_layer_auto.py"
+    "paddlenlp/transformers/moe_gate_auto.py"
     "scripts/distribute"
 )
 
@@ -67,56 +80,81 @@ install_paddlenlp(){
 install_external_ops(){
     echo -e "\033[31m ---- Install extern_ops  \033"
     export PYTHONPATH=${nlp_dir}:$PYTHONPATH
-    cd ${nlp_dir}/legacy/model_zoo/gpt-3/external_ops
+    cd ${nlp_dir}/slm/model_zoo/gpt-3/external_ops
     python setup.py install
     python -c "import fused_ln;";
 }
+
+function is_a100() {
+    if [ $(nvidia-smi|grep A100|wc -l)  -ne 0 ];then
+        echo 1
+    else
+        echo 0
+    fi
+}
+
+IS_A100=$(is_a100) 
+
 ####################################
 get_diff_TO_case(){
-cd ${nlp_dir}
-for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
-    arr_file_name=(${file_name//// })
-    dir1=${arr_file_name[0]}
-    dir2=${arr_file_name[1]}
-    dir3=${arr_file_name[2]}
-    dir4=${arr_file_name[3]}
-    file_item=$dir1/$dir2/$dir3/$dir4
-    echo "file_name:"${file_name}, "path:"${file_item}
-    if [ ! -f ${file_name} ];then # 针对pr删掉文件
-        continue
-    elif [[ ${file_name##*.} == "md" ]] || [[ ${file_name##*.} == "rst" ]] || [[ ${dir1} == "docs" ]];then
-        continue
-    else
-        for ((i=0; i<${#target_lists_for_gpt[@]}; i++)); do
-            if [[ ! ${dir3} =~ "benchmarks" ]] && [[ ${file_item} == *${target_lists_for_gpt[i]}* ]];then
-                case_list[${#case_list[*]}]=gpt-3_auto
-                case_list[${#case_list[*]}]=gpt-3_dygraph
+    cd ${nlp_dir}
+    if [ $IS_A100 -ne 0 ];then
+        for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
+            arr_file_name=(${file_name//// })
+            dir1=${arr_file_name[0]}
+            dir2=${arr_file_name[1]}
+            dir3=${arr_file_name[2]}
+            dir4=${arr_file_name[3]}
+            file_item=$dir1/$dir2/$dir3/$dir4
+            echo "file_name:"${file_name}, "path:"${file_item}
+            if [ ! -f ${file_name} ];then # 针对pr删掉文件
+                continue
+            elif [[ ${file_name##*.} == "md" ]] || [[ ${file_name##*.} == "rst" ]] || [[ ${dir1} == "docs" ]];then
+                continue
+            else
+                for ((i=0; i<${#target_lists_for_gpt[@]}; i++)); do
+                    if [[ ! ${dir3} =~ "benchmarks" ]] && [[ ${file_item} == *${target_lists_for_gpt[i]}* ]];then
+                        case_list[${#case_list[*]}]=gpt-3_auto
+                        case_list[${#case_list[*]}]=gpt-3_dygraph
+                    fi
+                done
+                for ((i=0; i<${#target_lists_for_llama[@]}; i++)); do
+                    if [[ ${file_item} == *${target_lists_for_llama[i]}* ]];then
+                        case_list[${#case_list[*]}]=llama_auto
+                    fi
+                done
+                for ((i=0; i<${#target_lists_for_deepseek[@]}; i++)); do
+                    if [[ ${file_item} == *${target_lists_for_deepseek[i]}* ]];then
+                        case_list[${#case_list[*]}]=deepseek_auto
+                    fi
+                done
             fi
         done
-        for ((i=0; i<${#target_lists_for_llama[@]}; i++)); do
-            if [[ ${file_item} == *${target_lists_for_llama[i]}* ]];then
-                case_list[${#case_list[*]}]=llama_auto
+    else
+        case_list[${#case_list[*]}]=gpt-3_auto
+        case_list[${#case_list[*]}]=llama_auto
+        case_list[${#case_list[*]}]=deepseek_auto
+        for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
+            arr_file_name=(${file_name//// })
+            dir1=${arr_file_name[0]}
+            dir2=${arr_file_name[1]}
+            dir3=${arr_file_name[2]}
+            dir4=${arr_file_name[3]}
+            file_item=$dir1/$dir2/$dir3/$dir4
+            echo "file_name:"${file_name}, "path:"${file_item}
+            if [ ! -f ${file_name} ];then # 针对pr删掉文件
+                continue
+            elif [[ ${file_name##*.} == "md" ]] || [[ ${file_name##*.} == "rst" ]] || [[ ${dir1} == "docs" ]];then
+                continue
+            else
+                for ((i=0; i<${#target_lists_for_gpt[@]}; i++)); do
+                    if [[ ! ${dir3} =~ "benchmarks" ]] && [[ ${file_item} == *${target_lists_for_gpt[i]}* ]];then
+                        case_list[${#case_list[*]}]=gpt-3_dygraph
+                    fi
+                done
             fi
         done
     fi
-done
-}
-####################################
-print_info(){
-#解决异常退出-6的问题，CI中的偶现问题，无法复现
-if [[ $1 -ne 0 ]] && [[ $1 -ne 250 ]];then
-    EXCODE=2
-    if [ ! -f ${log_path}/$2 ];then
-        echo -e "\033[31m run $2 CI FAIL \033"
-    else
-        mv ${log_path}/$2 ${log_path}/$2_FAIL.log
-        echo -e "\033[31m ${log_path}/$2_FAIL \033"
-        tail -10 ${log_path}/$2_FAIL.log
-    fi
-    exit $EXCODE
-else
-    echo -e "\033[32m run $3 CI SUCCESS \033"
-fi
 }
 ####################################
 function contain_case(){
@@ -128,6 +166,101 @@ function contain_case(){
     done
     return 0
 }
+####################################
+function execute_func_list(){
+    cd ${log_path} || { echo "Failed to enter log_path: $log_path"; return 1; } 
+    total_count=0
+    success_count=0
+    runtime_fail_count=0
+    verification_fail_count=0
+    exit_250_count=0
+    while IFS= read -r func_name; do
+        let total_count++
+        let global_total_count++
+        execute_num=1
+        while true; do
+            bash $1 exec_case $func_name $FLAGS_install_deps $FLAGS_download_data  
+            result=$?
+            if [ $result -eq 0 ]; then
+                echo -e "\033[32m test success!"
+                let success_count++
+                let global_success_count++
+            elif [ $result -eq 1 ]; then
+                if [ $execute_num -eq 1 ]; then
+                    echo -e "\033[31m first time execute failed, try again!"
+                    let execute_num++
+                    continue
+                else
+                    echo -e "\033[31m second time execute failed, exit!"
+                    mv ${log_path}/$func_name ${log_path}/${func_name}_FAIL.log
+                    echo -e "\033[31m ${log_path}/$func_name_FAIL \033"
+                    tail -15 ${log_path}/${func_name}_FAIL.log
+                    let runtime_fail_count++ 
+                    global_runtime_fail_arr+=("$func_name") 
+                fi
+            elif [ $result -eq 2 ]; then
+                echo -e "\033[31m verification failed!"
+                let verification_fail_count++
+                global_verification_fail_arr+=("$func_name")
+            elif [ $result -eq 250 ]; then
+                if [ $execute_num -eq 1 ]; then
+                    echo -e "\033[31m first time execute failed, try again!"
+                    let execute_num++
+                    continue
+                else
+                    echo -e "\033[31m second time execute failed, exit!"
+                    mv ${log_path}/$func_name ${log_path}/${func_name}_FAIL.log
+                    echo -e "\033[31m ${log_path}/$func_name_FAIL \033"
+                    tail -15 ${log_path}/${func_name}_FAIL.log
+                    let exit_250_count++
+                    global_exit_250_arr+=("$func_name")
+                fi
+            else
+                echo "test failed!"
+                mv ${log_path}/$func_name ${log_path}/${func_name}_FAIL.log
+                echo -e "\033[31m ${log_path}/$func_name_FAIL \033"
+                tail -15 ${log_path}/${func_name}_FAIL.log
+                let runtime_fail_count++ 
+                global_runtime_fail_arr+=("$func_name") 
+            fi
+            break
+        done
+    done < functions.txt
+    echo -e "\033[31m $2 test case has complicated \033"
+    echo -e "\033[31m $(printf '\t')  total tests :  $total_count \033"
+    echo -e "\033[31m $(printf '\t')  success tests :  $success_count \033"
+    echo -e "\033[31m $(printf '\t')  runtime fail tests :  $runtime_fail_count \033"
+    echo -e "\033[31m $(printf '\t')  verification fail tests :  $verification_fail_count \033"
+    echo -e "\033[31m $(printf '\t')  exit 250 tests(intermittent issue) :  $exit_250_count \033"
+}
+
+function clean_file(){
+    target_path=$1
+    matching_data_dirs=$(find "$target_path" -maxdepth 1 -type d -name "*data*")
+    if [ -n "$matching_data_dirs" ]; then
+        echo "cleaning data dirs:"
+        echo $matching_data_dirs        
+        for dir in $matching_data_dirs; do
+            rm -rf "$dir"
+            echo "deleted $dir"
+        done
+    else
+        echo "$target_path no data dirs found"
+    fi
+
+    matching_output_dirs=$(find "$target_path" -maxdepth 1 -type d -name "*output*")
+    if [ -n "$matching_output_dirs" ]; then
+        echo "cleaning output dirs:"
+        echo $matching_output_dirs
+        for dir in $matching_output_dirs; do
+            rm -rf "$dir"
+            echo "deleted $dir"
+        done
+    else
+        echo "$target_path no output dirs found"
+    fi
+}
+
 ####################################
 get_diff_TO_case # 获取待执行case列表
 case_list=($(awk -v RS=' ' '!a[$1]++' <<< ${case_list[*]}))  # 去重并将结果存储回原列表
@@ -142,45 +275,73 @@ if [[ ${#case_list[*]} -ne 0 ]];then
     # Install paddlenlp
     install_paddlenlp
     # Install external_ops
-    install_external_ops
-    
+    install_external_ops   
     case_num=1
     export FLAGS_install_deps=0
     export FLAGS_download_data=""
     if [[ $(contain_case llama_auto ${case_list[@]}; echo $?) -eq 1 ]];then
         echo -e "\033[31m ---- running case $case_num/${#case_list[*]}: llama_auto \033"
-        bash /workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh llama_case_list_auto $FLAGS_install_deps $FLAGS_download_data
-        print_info $? `ls -lt ${log_path} | grep llama | head -n 1 | awk '{print $9}'` llama_auto
+        cmd=/workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh
+        bash  $cmd prepare_case llama_case_list_auto $FLAGS_install_deps $FLAGS_download_data
+        execute_func_list $cmd llama_auto
         export FLAGS_download_data="llama ""$FLAGS_download_data"
         let case_num++
+        clean_file $nlp_dir/llm/auto_parallel/llama
     fi
     if [[ $(contain_case gpt-3_auto ${case_list[@]}; echo $?) -eq 1 ]];then
         echo -e "\033[31m ---- running case $case_num/${#case_list[*]}: gpt-3_auto \033"
-        bash /workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh llm_gpt_case_list_auto $FLAGS_install_deps $FLAGS_download_data
-        print_info $? `ls -lt ${log_path} | grep gpt | head -n 1 | awk '{print $9}'` gpt-3_auto
+        cmd=/workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh 
+        bash $cmd prepare_case llm_gpt_case_list_auto $FLAGS_install_deps $FLAGS_download_data
+        execute_func_list $cmd gpt-3_auto
         export FLAGS_install_deps=1
         export FLAGS_download_data="gpt ""$FLAGS_download_data"
         let case_num++        
+        clean_file $nlp_dir/llm/auto_parallel/gpt-3
     fi
+    if [[ $(contain_case deepseek_auto ${case_list[@]}; echo $?) -eq 1 ]];then
+        echo -e "\033[31m ---- running case $case_num/${#case_list[*]}: deepseek_auto \033"
+        cmd=/workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh 
+        bash $cmd prepare_case deepseek_case_list_auto $FLAGS_install_deps $FLAGS_download_data
+        execute_func_list $cmd deepseek_auto
+        export FLAGS_install_deps=1
+        export FLAGS_download_data="deepseek ""$FLAGS_download_data"
+        let case_num++        
+        clean_file $nlp_dir/llm/auto_parallel/deepseek-v3
+    fi
+    
     if [[ $(contain_case gpt-3_dygraph ${case_list[@]}; echo $?) -eq 1 ]];then
         echo -e "\033[31m ---- running case $case_num/${#case_list[*]}: gpt-3_dygraph \033"
-        bash /workspace/PaddleNLP/scripts/distribute/ci_case_dy.sh gpt_case_list_dygraph $FLAGS_install_deps $FLAGS_download_data
-        print_info $? `ls -lt ${log_path} | grep gpt | head -n 1 | awk '{print $9}'` gpt-3_dygraph
+        cmd=/workspace/PaddleNLP/scripts/distribute/ci_case_dy.sh
+        bash $cmd prepare_case gpt_case_list_dygraph $FLAGS_install_deps $FLAGS_download_data
+        execute_func_list $cmd gpt-3_dygraph
         export FLAGS_install_deps=1
         export FLAGS_download_data="gpt ""$FLAGS_download_data"
         let case_num++
+        clean_file $nlp_dir/slm/model_zoo/gpt-3
     fi
     echo -e "\033[31m ---- end run case  \033"
-    cd ${log_path}
-    if [ ! -f *FAIL* ];then
-        FF=0
+
+    echo -e "\033[31m ---- total tests :  $global_total_count \033"
+    if [ ${#global_exit_250_arr[@]} -ne 0 ]; then
+        echo -e "\033[32m ---- exit 250 test  :  ${#global_exit_250_arr[@]} \033"
+        for case in "${global_exit_250_arr[@]}"; do
+            echo -e "\t$case(exit 250)"
+        done
+    fi
+
+    if [ ${#global_runtime_fail_arr[@]} -eq 0 ] && [ ${#global_verification_fail_arr[@]} -eq 0 ]; then
+        echo -e "\033[32m ---- all cases Success  \033"
         EXCODE=0
-        echo -e "\033[32m ---- all case Success \033"
-    else
-        FF=`ls *FAIL*|wc -l`
-        EXCODE=2
-        echo -e "\033[31m ---- case Failed number: ${FF} \033"
-        ls *_FAIL*
+    else 
+        echo -e "\033[32m ---- runtime failed test  :  ${#global_runtime_fail_arr[@]} \033"
+        for case in "${global_runtime_fail_arr[@]}"; do
+            echo -e "\t$case(failed)"
+        done
+        echo -e "\033[32m ---- verification failed test  :  ${#global_verification_fail_arr[@]} \033"
+        for case in "${global_verification_fail_arr[@]}"; do
+            echo -e "\t$case(failed)"
+        done
+        EXCODE=1
     fi
 else
     echo -e "\033[32m Changed Not CI case, Skips \033"

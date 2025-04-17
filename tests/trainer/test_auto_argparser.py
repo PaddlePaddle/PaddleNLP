@@ -66,6 +66,7 @@ class AutoArgparserTest(unittest.TestCase):
         "num_cycles": 0.5,
         "num_train_epochs": 3.0,
         "output_dir": "./checkpoints/llama2_pretrain_ckpts",
+        "tensor_parallel_config": "replace_with_parallel_cross_entropy",
     }
 
     def test_parse_cmd_lines(self):

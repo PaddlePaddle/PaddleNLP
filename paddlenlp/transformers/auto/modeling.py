@@ -17,6 +17,7 @@ import io
 import json
 import os
 from collections import OrderedDict
+from copy import deepcopy
 
 from ...utils.download import resolve_file_path
 from ...utils.log import logger
@@ -33,6 +34,7 @@ __all__ = [
     "AutoModelForMultipleChoice",
     "AutoModelForMaskedLM",
     "AutoModelForCausalLM",
+    "AutoInferenceModelForCausalLM",
     "AutoModelForCausalLMPipe",
     "AutoEncoder",
     "AutoDecoder",
@@ -56,6 +58,8 @@ MAPPING_NAMES = OrderedDict(
         ("CTRL", "ctrl"),
         ("DistilBert", "distilbert"),
         ("DalleBart", "dallebart"),
+        ("DeepseekV2", "deepseek_v2"),
+        ("DeepseekV3", "deepseek_v3"),
         ("Electra", "electra"),
         ("ErnieViL", "ernie_vil"),
         ("ErnieCtm", "ernie_ctm"),
@@ -93,13 +97,13 @@ MAPPING_NAMES = OrderedDict(
         ("UNIMO", "unimo"),
         ("XLNet", "xlnet"),
         ("XLM", "xlm"),
+        ("XLMRoberta", "xlm_roberta"),
         ("GPT", "gpt"),
         ("GLM", "glm"),
         ("MT5", "mt5"),
         ("T5", "t5"),
         ("Bert", "bert"),
         ("Bart", "bart"),
-        ("GAUAlpha", "gau_alpha"),
         ("CodeGen", "codegen"),
         ("CLIPVision", "clip"),
         ("CLIPText", "clip"),
@@ -153,6 +157,10 @@ MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = OrderedDict(
         # Model for Causal LM mapping
         ("opt", "OPTForCausalLM"),
     ]
+)
+
+MODEL_FOR_CAUSAL_LM_INFERENCE_MAPPING_NAMES = OrderedDict(
+    [("llama-img2txt", "LlamaForMiniGPT4"), ("qwen-img2txt", "QWenForQWenVL"), ("opt-img2txt", "OPTForBlip2")]
 )
 
 
@@ -216,7 +224,7 @@ class _BaseAutoModelClass:
 
         # Get class name corresponds to this configuration
         if is_standard_config(config):
-            architectures = config["architectures"]
+            architectures = deepcopy(config["architectures"])
             init_class = architectures.pop() if len(architectures) > 0 else None
         else:
             init_class = config.pop("init_class", None)
@@ -787,6 +795,160 @@ class AutoModelForCausalLM(_BaseAutoModelClass):
                 # <class 'paddlenlp.transformers.gpt.modeling.GPTLMHeadModel'>
         """
         return cls._from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
+
+
+class AutoInferenceModelForCausalLM(_BaseAutoModelClass):
+    """
+    AutoInferenceModelForCausalLM.
+    """
+
+    @classmethod
+    def from_pretrained(cls, pretrained_model_name_or_path, *model_args, **kwargs):
+        """
+        Creates an instance of `AutoInferenceModelForCausalLM`. Model weights are loaded
+        by specifying name of a community contributed model, or a local file directory path.
+
+        Args:
+            pretrained_model_name_or_path (str): See :class:`AutoModel`.
+            *args (tuple): See :class:`AutoModel`.
+            **kwargs (dict): See :class:`AutoModel`.
+
+        Returns:
+            PretrainedModel (dynamic graph): An instance of `AutoInferenceModelForCausalLM` in dynamic graph mode
+        """
+        config = kwargs.get("config", None)
+        predictor_args = kwargs.get("predictor_args", None)
+        dtype = kwargs.get("dtype", "float16")
+        tensor_parallel_degree = kwargs.pop("tensor_parallel_degree", 1)
+        tensor_parallel_rank = kwargs.pop("tensor_parallel_rank", 0)
+        model_arg = kwargs.pop("model_args", None)
+        spec_model_type = kwargs.pop("spec_model_type", "None")
+        spec_flag = ""
+
+        # Check whether the model_type is img2txt in inference mode
+        if spec_model_type == "eagle":
+            spec_flag = "Eagle"
+            attn_type = "Block"
+            model_name = f"{config.architectures[0]}{attn_type}"
+        elif spec_model_type == "mtp":
+            spec_flag = "MTP"
+            attn_type = "Block"
+            model_name = f"{config.architectures[0]}{attn_type}"
+        else:
+            if model_arg.model_type is not None and predictor_args.mode == "dynamic":
+                model_name = MODEL_FOR_CAUSAL_LM_INFERENCE_MAPPING_NAMES[model_arg.model_type]
+                predictor_args.block_attn = 0
+                if model_name is None:
+                    raise ValueError(
+                        f"Model type {model_arg.model_type} is not supported for {config.architectures[0]} inference."
+                    )
+            else:
+                # Check whether the model use block attention
+                if predictor_args.block_attn or predictor_args.speculate_method is not None:
+                    attn_type = "Block"
+                else:
+                    attn_type = ""
+                model_name = f"{config.architectures[0]}{attn_type}"
+
+        # Import the InferenceModel
+        import_class = importlib.import_module(f"paddlenlp.experimental.transformers.{config.model_type}.modeling")
+
+        model_class_name = f"{spec_flag}{model_name}InferenceModel"
+        model_class = getattr(import_class, model_class_name)
+
+        # It may return a new model class, like LlamaForCausalLMAvxInferenceModel
+        # Some model have different inference model class in deifferent execution divice
+        # LlamaForCausalLMAvxInferenceModel is used in cpu execution device with avx instruction set
+        model_class = model_class.confirm_inference_model(predictor_args=predictor_args)
+
+        # Set the inference config.
+        model_class.set_inference_config(
+            config=config,
+            predictor_args=predictor_args,
+            tensor_parallel_degree=tensor_parallel_degree,
+            tensor_parallel_rank=tensor_parallel_rank,
+        )
+
+        if predictor_args.mode == "dynamic":
+            model = model_class.from_pretrained(predictor_args.model_name_or_path, config=config, dtype=dtype)
+            model.eval()
+            return model
+
+        return model_class
+
+    @classmethod
+    def from_config(cls, config, *model_args, **kwargs):
+        """
+        Creates an instance of `AutoInferenceModelForCausalLM`. Model weights are loaded
+        by specifying name of a community contributed model, or a local file directory path.
+
+        Args:
+            pretrained_model_name_or_path (str): See :class:`AutoModel`.
+            *args (tuple): See :class:`AutoModel`.
+            **kwargs (dict): See :class:`AutoModel`.
+
+        Returns:
+            PretrainedModel (dynamic graph): An instance of `AutoInferenceModelForCausalLM` in dynamic graph mode
+        """
+        predictor_args = kwargs.get("predictor_args", None)
+        dtype = kwargs.pop("dtype", "float16")
+        low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", False)
+        tensor_parallel_degree = kwargs.pop("tensor_parallel_degree", 1)
+        tensor_parallel_rank = kwargs.pop("tensor_parallel_rank", 0)
+        model_arg = kwargs.pop("model_args", None)
+        spec_model_type = kwargs.pop("spec_model_type", "None")
+        spec_flag = ""
+
+        # Check whether the model_type is img2txt in inference mode
+        if spec_model_type == "eagle":
+            spec_flag = "Eagle"
+            attn_type = "Block"
+            model_name = f"{config.architectures[0]}{attn_type}"
+        elif spec_model_type == "mtp":
+            spec_flag = "MTP"
+            attn_type = "Block"
+            model_name = f"{config.architectures[0]}{attn_type}"
+        else:
+            if model_arg.model_type is not None and predictor_args.mode == "dynamic":
+                model_name = MODEL_FOR_CAUSAL_LM_INFERENCE_MAPPING_NAMES[model_arg.model_type]
+                predictor_args.block_attn = 0
+                if model_name is None:
+                    raise ValueError(
+                        f"Model type {model_arg.model_type} is not supported for {config.architectures[0]} inference."
+                    )
+            else:
+                # Check whether the model use block attention
+                if predictor_args.block_attn or predictor_args.speculate_method is not None:
+                    attn_type = "Block"
+                else:
+                    attn_type = ""
+                model_name = f"{config.architectures[0]}{attn_type}"
+
+        # Import the InferenceModel
+        import_class = importlib.import_module(f"paddlenlp.experimental.transformers.{config.model_type}.modeling")
+
+        model_class_name = f"{spec_flag}{model_name}InferenceModel"
+        model_class = getattr(import_class, model_class_name)
+
+        # It may return a new model class, like LlamaForCausalLMAvxInferenceModel
+        # Some model have different inference model class in deifferent execution divice
+        # LlamaForCausalLMAvxInferenceModel is used in cpu execution device with avx instruction set
+        model_class = model_class.confirm_inference_model(predictor_args=predictor_args)
+
+        # Set the inference config.
+        model_class.set_inference_config(
+            config=config,
+            predictor_args=predictor_args,
+            tensor_parallel_degree=tensor_parallel_degree,
+            tensor_parallel_rank=tensor_parallel_rank,
+        )
+
+        if predictor_args.mode == "dynamic":
+            model = model_class.from_config(config=config, dtype=dtype, low_cpu_mem_usage=low_cpu_mem_usage, **kwargs)
+            model.eval()
+            return model
+
+        return model_class
 
 
 class AutoModelForCausalLMPipe(_BaseAutoModelClass):

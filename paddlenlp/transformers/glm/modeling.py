@@ -766,7 +766,7 @@ class GLMForMultipleChoice(GLMPretrainedModel):
             if self.glm.config.tensor_parallel_degree > 1:
                 assert (
                     self.glm.config.tensor_parallel_output is False
-                ), "GLMForMultipleChoice not avaliable for tensor_parallel_output!"
+                ), "GLMForMultipleChoice not available for tensor_parallel_output!"
 
             loss = F.cross_entropy(log_probs, labels)
 
@@ -869,6 +869,7 @@ class GLMForConditionalGeneration(GLMPretrainedModel):
                 loss = (1 - label_smoothing) * loss + label_smoothing * smooth_loss
             if loss_mask is not None:
                 loss_mask = loss_mask.reshape([-1])
+                loss_mask = paddle.cast(loss_mask, dtype="float32")
                 loss = paddle.sum(loss.reshape([-1]) * loss_mask) / paddle.sum(loss_mask)
 
         if not return_dict:

@@ -19,6 +19,14 @@ PPNLP_HOME              -->  the root directory for storing PaddleNLP related da
 └─ DATA_HOME         -->  Store automatically downloaded datasets.
 """
 import os
+import re
+
+try:
+    from paddle.base.framework import use_pir_api
+
+    pir_enabled = use_pir_api()
+except ImportError:
+    pir_enabled = False
 
 
 def _get_user_home():
@@ -72,9 +80,23 @@ CONFIG_NAME = "config.json"
 TOKENIZER_CONFIG_NAME = "tokenizer_config.json"
 CHAT_TEMPLATE_CONFIG_NAME = "chat_template.json"
 GENERATION_CONFIG_NAME = "generation_config.json"
+
+# Name of the files used for checkpointing
+TRAINING_ARGS_NAME = "training_args.bin"
+TRAINER_STATE_NAME = "trainer_state.json"
+MODEL_META_NAME = "model_meta.json"
+SCHEDULER_NAME = "scheduler.pdparams"
+SCALER_NAME = "scaler.pdparams"
+SHARDING_META_NAME = "shard_meta.json"
+
+# checkpoint dir name and regex
+PREFIX_CHECKPOINT_DIR = "checkpoint"
+_re_checkpoint = re.compile(r"^" + PREFIX_CHECKPOINT_DIR + r"\-(\d+)$")
+
 # Fast tokenizers (provided by HuggingFace tokenizer's library) can be saved in a single file
 FULL_TOKENIZER_NAME = "tokenizer.json"
-
+TIKTOKEN_VOCAB_FILE = "tokenizer.model"
+MERGE_CONFIG_NAME = "merge_config.json"
 
 LORA_CONFIG_NAME = "lora_config.json"
 LORA_WEIGHTS_NAME = "lora_model_state.pdparams"
@@ -85,6 +107,9 @@ VERA_WEIGHTS_NAME = "vera_model_state.pdparams"
 PREFIX_CONFIG_NAME = "prefix_config.json"
 PREFIX_WEIGHTS_NAME = "prefix_model_state.pdparams"
 PADDLE_PEFT_WEIGHTS_INDEX_NAME = "peft_model.pdparams.index.json"
+
+LOKR_WEIGHTS_NAME = "lokr_model_state.pdparams"
+LOKR_CONFIG_NAME = "lokr_config.json"
 
 PAST_KEY_VALUES_FILE_NAME = "pre_caches.npy"
 
@@ -111,3 +136,30 @@ SAFE_MASTER_WEIGHTS_INDEX_NAME = "master_weights.safetensors.index.json"
 
 SAFE_PEFT_WEIGHTS_NAME = "peft_model.safetensors"
 SAFE_PEFT_WEIGHTS_INDEX_NAME = "peft_model.safetensors.index.json"
+
+# Checkpoint quantization
+MOMENT1_KEYNAME = "moment1_0"
+MOMENT2_KEYNAME = "moment2_0"
+BETA1_KEYNAME = "beta1_pow_acc_0"
+BETA2_KEYNAME = "beta2_pow_acc_0"
+SYMMETRY_QUANT_SCALE = "@scales"
+ASYMMETRY_QUANT_SCALE_MIN = "@min_scales"
+ASYMMETRY_QUANT_SCALE_MAX = "@max_scales"
+MAX_QUANTIZATION_TIMES = 1
+
+# LLM Inference related environment variables
+# Note(@Wanglongzhi2001): MAX_BSZ must be the same as definition in get_output / save_output
+# SPECULATE_MAX_BSZ, MAX_DRAFT_TOKENS must be the same as definition in speculate_get_output / speculate_save_output
+MAX_BSZ = 512
+SPECULATE_MAX_BSZ = 256
+MAX_DRAFT_TOKENS = 6
+
+if pir_enabled:
+    PADDLE_INFERENCE_MODEL_SUFFIX = ".json"
+    PADDLE_INFERENCE_WEIGHTS_SUFFIX = ".pdiparams"
+else:
+    PADDLE_INFERENCE_MODEL_SUFFIX = ".pdmodel"
+    PADDLE_INFERENCE_WEIGHTS_SUFFIX = ".pdiparams"
+
+USE_FAST_TOKENIZER: bool = _get_bool_env("USE_FAST_TOKENIZER", "false")
+PREFILL_USE_SAGE_ATTN: bool = _get_bool_env("PREFILL_USE_SAGE_ATTN", "false")

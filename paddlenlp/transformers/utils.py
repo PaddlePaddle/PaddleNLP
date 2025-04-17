@@ -167,10 +167,12 @@ def adapt_stale_fwd_patch(self, name, value):
             "StaticFunction"
         ):
             return value
+        if type(value).__name__.endswith("WeakMethod") or self.forward.__class__.__name__.endswith("WeakMethod"):
+            return value
 
         # NOTE(changwenbin & zhoukangkang):
         # When use model = paddle.incubate.jit.inference(model), it reportes errors, we fix it here.
-        # is_inference_mode API is only avaliable in PaddlePaddle develop，so we add a try except.
+        # is_inference_mode API is only available in PaddlePaddle develop，so we add a try except.
         try:
             from paddle.incubate.jit import is_inference_mode
 
@@ -960,12 +962,11 @@ class CaptureStd:
         return msg
 
 
-def caculate_llm_flops(
+def caculate_llm_per_token_flops(
     hidden_size,
     intermediate_size,
     layer_num,
     vocab_size,
-    batch_size=1,
     seq_length=None,
     recompute=False,
     recompute_granularity=None,
@@ -1000,4 +1001,4 @@ def caculate_llm_flops(
 
     # 2 for mul + add in matmul
     # 1 for forward, 2 for backwards since we caluate gradients for input_x and input_y
-    return 2 * batch_size * (layer_num * (flops_per_transformer * 3 + flops_recompute_transformer) + 3 * flops_loggits)
+    return 2 * (layer_num * (flops_per_transformer * 3 + flops_recompute_transformer) + 3 * flops_loggits) / seq_length

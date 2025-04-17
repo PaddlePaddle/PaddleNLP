@@ -14,7 +14,6 @@
 
 #pragma once
 
-#include "paddle/extension.h"
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
@@ -34,17 +33,35 @@ namespace cub = hipcub;
 #else
 #include <cub/cub.cuh>
 #include <curand_kernel.h>
+#include <cuda_fp8.h>
 #endif
 #include <iostream>
 #include <fstream>
+
+#include "env.h"
+#include "paddle/extension.h"
+#include "paddle/phi/core/dense_tensor.h"
+#include "paddle/phi/core/allocator.h"
+#include "paddle/phi/backends/gpu/gpu_info.h"
 #include "nlohmann/json.hpp"
+
 
 using json = nlohmann::json;
 
-constexpr int kBlockSize = 256; 
-constexpr int kNumWaves = 16; 
+#define CUDA_CHECK(call)                           \
+  do {                                             \
+    const cudaError_t error_code = call;           \
+    if (error_code != cudaSuccess) {               \
+      std::printf("at %s:%d - %s.\n",              \
+                  __FILE__,                        \
+                  __LINE__,                        \
+                  cudaGetErrorString(error_code)); \
+      exit(1);                                     \
+    }                                              \
+  } while (0)
 
 #ifdef PADDLE_WITH_HIP
+template<size_t kBlockSize = 256, size_t kNumWaves = 16>
 inline hipError_t GetNumBlocks(int64_t n, int* num_blocks) {
   int dev;
   {
@@ -66,6 +83,7 @@ inline hipError_t GetNumBlocks(int64_t n, int* num_blocks) {
   return hipSuccess;
 }
 #else
+template<size_t kBlockSize = 256, size_t kNumWaves = 16>
 inline cudaError_t GetNumBlocks(int64_t n, int* num_blocks) {
   int dev;
   {
@@ -137,6 +155,13 @@ public:
   typedef paddle::bfloat16 data_t;
 };
 
+template <>
+class PDTraits<paddle::DataType::FLOAT8_E4M3FN> {
+public:
+  typedef __nv_fp8_e4m3 DataType;
+  typedef paddle::float8_e4m3fn data_t;
+};
+
 template <typename T, int Size>
 struct alignas(sizeof(T) * Size) AlignedVector {
   T val[Size];
@@ -159,9 +184,26 @@ HOSTDEVICE inline void Store(const AlignedVector<T, Size>& vec, T* addr) {
   *addr_vec = vec;
 }
 
+#ifdef PADDLE_WITH_HIP
+template <int Size>
+HOSTDEVICE inline void Store(const AlignedVector<hip_bfloat16, Size>& vec, int8_t* addr) {
+  printf("Error: Store hip_bfloat16 to int8_t is not supported!");
+}
+#else
+template <int Size>
+HOSTDEVICE inline void Store(const AlignedVector<__nv_bfloat16, Size>& vec, int8_t* addr) {
+  printf("Error: Store __nv_bfloat16 to int8_t is not supported!");
+}
+#endif
+
+template <int Size>
+HOSTDEVICE inline void Store(const AlignedVector<half, Size>& vec, int8_t* addr) {
+  printf("Error: Store half to int8_t is not supported!");
+}
+
 constexpr int VEC_16B = 16;
 
-inline json readJsonFromFile(const std::string& filePath) {
+inline json ReadJsonFromFile(const std::string& filePath) {
     std::ifstream file(filePath);
     if (!file.is_open()) {
         throw std::runtime_error("Unable to open file: " + filePath);
@@ -170,4 +212,36 @@ inline json readJsonFromFile(const std::string& filePath) {
     json j;
     file >> j;
     return j;
+}
+
+// place must be an existing place object and cannot use paddle::CPUPlace() or paddle::GPUPlace()
+inline paddle::Tensor GetEmptyTensor(const common::DDim& dims, const paddle::DataType& dtype, const paddle::Place& place){
+  auto* allocator = paddle::GetAllocator(place);
+  phi::DenseTensor dense_tensor;
+  dense_tensor.Resize(dims);
+  dense_tensor.AllocateFrom(allocator, dtype, dense_tensor.numel() * phi::SizeOf(dtype));
+  return paddle::Tensor(std::make_shared<phi::DenseTensor>(dense_tensor));
+}
+
+__device__ inline bool is_in_end(const int64_t id, const int64_t *end_ids, int length) {
+    bool flag = false;
+    for (int i = 0; i < length; i++) {
+        if (id == end_ids[i]) {
+            return true;
+        }
+    }
+    return flag;
+}
+
+inline int GetSMVersion() {
+  static int sm_version = phi::backends::gpu::GetGPUComputeCapability(
+      phi::backends::gpu::GetCurrentDeviceId());
+  return sm_version;
+}
+
+inline bool GetMlaUseTensorcore() {
+  static const bool flags_mla_use_tensorcore = get_flags_mla_use_tensorcore();
+  static const bool enable_mla_tensorcore = GetSMVersion() >= 90 ? true : false;
+  const bool mla_use_tensorcore = flags_mla_use_tensorcore && enable_mla_tensorcore;
+  return mla_use_tensorcore;
 }

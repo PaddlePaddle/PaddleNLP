@@ -1,0 +1,7 @@
+faiss-gpu==1.7.2
+paddlenlp==3.0.0b2
+tqdm
+numpy
+fitz
+frontend
+paddleocr==2.7.3

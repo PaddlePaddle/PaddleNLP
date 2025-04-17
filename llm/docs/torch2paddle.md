@@ -1,4 +1,4 @@
-# torch2paddle
+# Torch2Paddle 权重转换教程
 
 ## 转化 Pytorch 权重
 PaddleNLP 提供了可自动将 PyTorch 相关的权重转化为 Paddle 权重的接口，代码如下：
@@ -15,7 +15,7 @@ AutoModelForCausalLM.from_pretrained("/path/to/pytorch/model", convert_from_torc
 
 ## 合并 Pytorch 分片权重
 
-当前 PaddleNLP 仅支持转化单个 Pytorch 权重：`pytorch_model.bin`文件。所以当Pytorch 权重为分片权重时，需要将其合并，合并脚本如下所示：
+当前 PaddleNLP 仅支持转化单个 Pytorch 权重：`pytorch_model.bin`文件。所以当 Pytorch 权重为分片权重时，需要将其合并，合并脚本如下所示：
 
 ```python
 import torch, os

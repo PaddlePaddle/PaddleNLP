@@ -1,4 +1,4 @@
 protobuf==3.20.2 
-pydantic==1.10.11
+pydantic
 ray[tune]==2.5.1
 hyperopt>=0.2.5

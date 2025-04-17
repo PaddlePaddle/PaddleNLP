@@ -24,19 +24,27 @@ class RewardTrainer(Trainer):
     Initialize RewardTrainer.
     """
 
-    def __init__(self, model, data_collator, **kwargs):
+    def __init__(self, model, data_collator, process_reward=False, **kwargs):
         super().__init__(model, data_collator=data_collator, **kwargs)
         self._stored_metrics = defaultdict(lambda: defaultdict(list))
         if self.compute_metrics is not None:
             raise NotImplementedError("compute_metrics is not supported for RewardTrainer")
+        self.process_reward = process_reward
 
     def get_batch_metrics(self, model, batch, train_eval="train"):
         """Compute the RM loss and other metrics for the given batch of inputs for train or test."""
-        rm_inputs = {
-            "input_ids": batch["input_ids"],
-            "position_ids": batch["position_ids"],
-            "response_indexs": batch["response_indexs"],
-        }
+        if not self.process_reward:
+            rm_inputs = {
+                "input_ids": batch["input_ids"],
+                "position_ids": batch["position_ids"],
+                "response_indexs": batch["response_indexs"],
+            }
+        else:
+            rm_inputs = {
+                "input_ids": batch["input_ids"],
+                "position_ids": batch["position_ids"],
+                "labels": batch["labels"],
+            }
 
         if "attention_mask" in batch:
             rm_inputs["attention_mask"] = batch["attention_mask"]
@@ -45,10 +53,16 @@ class RewardTrainer(Trainer):
         elif "attn_mask_startend_row_indices" in batch:
             rm_inputs["attn_mask_startend_row_indices"] = batch["attn_mask_startend_row_indices"]
 
-        loss, chosen_scores, rejected_scores = model(**rm_inputs)
         prefix = "eval_" if train_eval == "eval" else ""
         metrics = {}
-        metrics[f"{prefix}accuracy"] = (chosen_scores > rejected_scores).astype("float32").mean()
+        if not self.process_reward:
+            loss, chosen_scores, rejected_scores = model(**rm_inputs)
+            metrics[f"{prefix}accuracy"] = (chosen_scores > rejected_scores).astype("float32").mean()
+        else:
+            # PRM Loss
+            loss, accs = model(**rm_inputs)
+            metrics[f"{prefix}accuracy"] = accs.astype("float32").mean()
+
         for key in metrics:
             metrics[key] = self._nested_gather(paddle.tile(metrics[key], repeat_times=[1, 1])).mean().cpu()
         if self.args.should_save:

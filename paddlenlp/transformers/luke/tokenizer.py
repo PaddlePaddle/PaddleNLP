@@ -27,7 +27,7 @@ import sys
 import warnings
 from itertools import repeat
 
-from .. import RobertaBPETokenizer
+from ..roberta.tokenizer import RobertaBPETokenizer
 
 try:
     from functools import lru_cache

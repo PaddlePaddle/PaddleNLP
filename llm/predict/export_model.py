@@ -19,10 +19,9 @@ from dataclasses import dataclass, field
 import paddle
 from paddle.distributed import fleet
 
+from llm.predict.predictor import ModelArgument, PredictorArgument, create_predictor
 from paddlenlp.trainer import PdArgumentParser
-from paddlenlp.utils import llm_utils
-
-from .predictor import ModelArgument, PredictorArgument, create_predictor
+from paddlenlp.trl import llm_utils
 
 
 @dataclass
@@ -37,11 +36,21 @@ def add_inference_args_to_config(model_config, args):
     model_config.infer_model_cachekv_int8_type = args.cachekv_int8_type
     model_config.infer_model_dtype = args.dtype
     model_config.infer_model_paddle_commit = paddle.version.commit
+    model_config.mla_use_matrix_absorption = args.mla_use_matrix_absorption
 
 
 def main():
     parser = PdArgumentParser((PredictorArgument, ModelArgument, ExportArgument))
     predictor_args, model_args, export_args = parser.parse_args_into_dataclasses()
+
+    llm_utils.set_triton_cache(export_args.output_path, "export")
+    try:
+        from paddle.utils import try_import
+
+        try_import("paddlenlp_ops")
+    except ImportError:
+        print("paddlenlp_ops does not exist, please install paddlenlp_ops.")
+        return
 
     paddle.set_default_dtype(predictor_args.dtype)
     tensor_parallel_degree = paddle.distributed.get_world_size()
@@ -59,7 +68,7 @@ def main():
         tensor_parallel_rank = hcg.get_model_parallel_rank()
 
     # set predictor type
-    predictor = create_predictor(predictor_args, model_args, tensor_parallel_degree, tensor_parallel_rank)
+    predictor = create_predictor(predictor_args, model_args)
     predictor.model.eval()
 
     predictor.model.to_static(
@@ -68,6 +77,7 @@ def main():
             "dtype": predictor_args.dtype,
             "export_precache": predictor_args.export_precache,
             "cachekv_int8_type": predictor_args.cachekv_int8_type,
+            "speculate_method": predictor_args.speculate_method,
         },
     )
     add_inference_args_to_config(predictor.model.config, predictor_args)
@@ -78,7 +88,6 @@ def main():
         predictor.model.generation_config.save_pretrained(export_args.output_path)
 
     predictor.tokenizer.save_pretrained(export_args.output_path)
-    llm_utils.generate_rank_mapping(os.path.join(export_args.output_path, "rank_mapping.csv"))
 
     if tensor_parallel_degree > 1:
         export_args.output_path = os.path.join(export_args.output_path, f"rank_{tensor_parallel_rank}")

@@ -13,6 +13,7 @@
 
 from .configuration import *
 from .modeling import *
-from .modeling_3D_auto import *
+from .modeling_auto import *
+from .modeling_network import *
 from .modeling_pp import *
 from .tokenizer import *

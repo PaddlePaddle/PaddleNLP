@@ -85,6 +85,7 @@ class TrainerState:
 
     epoch: Optional[float] = None
     global_step: int = 0
+    consumed_samples: int = 0
     max_steps: int = 0
     num_train_epochs: int = 0
     total_flos: float = 0
@@ -363,8 +364,8 @@ class CallbackHandler(TrainerCallback):
         control.should_training_stop = False
         return self.call_event("on_train_begin", args, state, control)
 
-    def on_train_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl):
-        return self.call_event("on_train_end", args, state, control)
+    def on_train_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
+        return self.call_event("on_train_end", args, state, control, **kwargs)
 
     def on_epoch_begin(self, args: TrainingArguments, state: TrainerState, control: TrainerControl):
         control.should_epoch_stop = False
@@ -453,6 +454,14 @@ class DefaultFlowCallback(TrainerCallback):
         ):
             control.should_save = True
 
+        # For Flash save
+        if (
+            args.save_strategy == IntervalStrategy.STEPS
+            and args.flash_device_save_steps > 0
+            and state.global_step % args.flash_device_save_steps == 0
+        ):
+            control.should_save = True
+
         # End training
         if state.global_step >= state.max_steps:
             control.should_training_stop = True
@@ -518,6 +527,9 @@ class ProgressCallback(TrainerCallback):
             logger.info(logs_str)
 
     def on_train_end(self, args, state, control, **kwargs):
+        metrics_dumper = kwargs.get("metrics_dumper", None)
+        if metrics_dumper is not None:
+            metrics_dumper.close()
         if state.is_local_process_zero:
             self.training_bar.close()
             self.training_bar = None
@@ -533,6 +545,9 @@ class PrinterCallback(TrainerCallback):
         if state.is_local_process_zero:
             if type(logs) is dict:
                 logger.info(", ".join(f"{k}: {v}" for k, v in logs.items()))
+                metrics_dumper = kwargs.get("metrics_dumper", None)
+                if metrics_dumper is not None:
+                    metrics_dumper.append(logs)
             else:
                 logger.info(logs)
 

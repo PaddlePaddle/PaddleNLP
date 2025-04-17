@@ -46,7 +46,7 @@ from ...utils.distributed import distributed_allgather, distributed_gather
 from ...utils.env import LORA_WEIGHTS_NAME, SAFE_PEFT_WEIGHTS_INDEX_NAME
 from ...utils.log import logger
 from ...utils.tools import get_env_device
-from .lora_config import LoRAConfig
+from .lora_config import LoRAAutoConfig, LoRAConfig
 
 
 def get_lora_layers():
@@ -154,12 +154,20 @@ class LoRAModel(nn.Layer):
         if issubclass(type(self.model), PipelineLayer):
             self.is_pipelinemodel = True
             self.model._single_to_pp_mapping = None
+        if (self.lora_config.tensor_parallel_degree > 1 or self.is_pipelinemodel) and (
+            self.lora_config.lora_use_mixer or self.lora_config.use_mora
+        ):
+            raise NotImplementedError("lora_use_mixer or mora is not supported in tensor parallel mode.")
         if self.lora_config.tensor_parallel_degree != self.model.config.tensor_parallel_degree:
             self.lora_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
             logger.warning(
                 f"Reset tensor_parallel_degree of lora_config to {self.model.config.tensor_parallel_degree}."
             )
+
         self.forward = self.model.forward
+        if lora_config.loraga:
+            self.loraga_init_dict = {}
+            self.reinit_base_model = False
 
         logger.info("Mark only lora and trainable_module as trainable.")
         self.mark_only_lora_as_trainable()
@@ -250,7 +258,6 @@ class LoRAModel(nn.Layer):
             )
             loaded_keys = sharded_metadata["all_checkpoint_keys"]
             expected_keys = set(lora_model.get_trainable_state_dict().keys())
-
             missing_keys = expected_keys - set(loaded_keys)
             if len(missing_keys) > 0:
                 raise ValueError(f"missing_keys: {missing_keys}")
@@ -262,9 +269,11 @@ class LoRAModel(nn.Layer):
                     pre_tensor_parallel_split = True
                     tp_actions = lora_model._get_tensor_parallel_convert_actions(loaded_keys, is_split=True)
                 state_dict = load_state_dict(
-                    shard_file, tp_actions if pre_tensor_parallel_split else None, expected_keys
+                    shard_file,
+                    tp_actions if pre_tensor_parallel_split else None,
+                    expected_keys,
                 )
-                error_msgs += _load_state_dict_into_model(lora_model.model, state_dict, "")
+                error_msgs += _load_state_dict_into_model(lora_model, state_dict, "")
                 del state_dict
                 gc.collect()
 
@@ -314,6 +323,49 @@ class LoRAModel(nn.Layer):
         warnings.filterwarnings(
             action="ignore", message=".*Skip loading for.*", category=Warning, lineno=0, append=False
         )
+
+        model_state_dict = self.model.state_dict()
+        if self.lora_config.loraga:
+
+            def process_split_and_assign(name, concat_tensor, init_dict, state_dict):
+                if "lora_A" in name:
+                    axis = 1
+                else:
+                    axis = 0
+                if isinstance(concat_tensor, np.ndarray):
+                    final_lora, init_lora = np.split(concat_tensor, 2, axis=axis)
+                    init_lora = paddle.to_tensor(init_lora)
+                else:
+                    final_lora, init_lora = paddle.split(concat_tensor, 2, axis=axis)
+                if "lora_B" in name:
+                    init_lora *= -1
+                init_dict[name] = init_lora
+                state_dict[name] = final_lora
+                return init_lora
+
+            for name in state_dict.keys():
+                if "lora_A" in name:
+                    concat_lora_A = state_dict[name]
+                    init_loraA = process_split_and_assign(
+                        name, concat_lora_A, init_dict=self.loraga_init_dict, state_dict=state_dict
+                    )
+
+                    loraB_name = name.replace("lora_A", "lora_B")
+                    concat_lora_B = state_dict[loraB_name]
+                    init_loraB = process_split_and_assign(
+                        loraB_name, concat_lora_B, init_dict=self.loraga_init_dict, state_dict=state_dict
+                    )
+
+                    base_name = name.replace("lora_A", "weight")
+                    if not self.reinit_base_model:
+                        # Reinit base model
+                        offset = init_loraA._copy_to(
+                            paddle.framework._current_expected_place(), False
+                        ) @ init_loraB._copy_to(paddle.framework._current_expected_place(), False)
+                        ori_weight = model_state_dict[base_name]
+                        model_state_dict[base_name].set_value(ori_weight - self.lora_config.scaling * offset)
+        del model_state_dict
+        gc.collect()
         self.model.set_state_dict(state_dict)
         logger.info("Load lora weight successfully")
 
@@ -393,10 +445,14 @@ class LoRAModel(nn.Layer):
         ), f"Saving directory ({save_directory}) should be a directory, not a file"
         os.makedirs(save_directory, exist_ok=True)
 
-        lora_config_to_save = LoRAConfig(**self.lora_config.to_dict())
+        if isinstance(self.lora_config, LoRAConfig):
+            lora_config_to_save = LoRAConfig(**self.lora_config.to_dict())
+        else:
+            lora_config_to_save = LoRAAutoConfig(**self.lora_config.to_dict())
+
+        trainable_state_dict = self.get_trainable_state_dict(concat_init_lora=lora_config_to_save.loraga)
 
         if merge_tensor_parallel and lora_config_to_save.tensor_parallel_degree > 1:
-            trainable_state_dict = self.get_trainable_state_dict()
             trainable_state_dict = self._merge_trainable_tensor_parallel(trainable_state_dict)
             if not is_main_process:
                 logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
@@ -405,7 +461,6 @@ class LoRAModel(nn.Layer):
                 variant = "_".join([x for x in variant.split("_") if "tp" not in x])
             lora_config_to_save.tensor_parallel_degree = -1
         else:
-            trainable_state_dict = self.get_trainable_state_dict()
             if lora_config_to_save.tensor_parallel_degree > 1:
                 if variant is None:
                     variant = weight_name_suffix()
@@ -443,7 +498,15 @@ class LoRAModel(nn.Layer):
                 pissa=lora_config.pissa,
                 bias_attr=False if module.bias is None else None,
                 use_quick_lora=lora_config.use_quick_lora,
+                lora_use_mixer=lora_config.lora_use_mixer,
+                use_mora=lora_config.use_mora,
             )
+            # Hack for mp group moe, need to find a better solution.
+            if getattr(module.weight, "mp_moe", False):
+                lora_module.lora_A.mp_moe = True
+                lora_module.lora_B.mp_moe = True
+                lora_module.lora_A.is_distributed = True
+                lora_module.lora_B.is_distributed = True
         if isinstance(module, nn.Conv2D):
             lora_module = LoRAConv2D(
                 in_channels=module._in_channels,
@@ -635,12 +698,19 @@ class LoRAModel(nn.Layer):
             original_module.bias = module.bias
         setattr(parent_module, attribute_chain[-1], original_module)
 
-    def get_trainable_state_dict(self):
+    def get_trainable_state_dict(self, concat_init_lora=False):
         trainable_state_dict = OrderedDict()
         for name, weight in self.model.state_dict().items():
             # get lora parameter & QAT scale parameter
             if not weight.stop_gradient or "activation_quanter" in name or "weight_quanter" in name:
-                trainable_state_dict[name] = weight
+                if concat_init_lora:
+                    if "lora_A" in name:
+                        trainable_state_dict[name] = paddle.concat([weight, self.loraga_init_dict[name]], axis=1)
+                    else:
+                        trainable_state_dict[name] = paddle.concat([weight, -self.loraga_init_dict[name]], axis=0)
+                else:
+                    trainable_state_dict[name] = weight
+
         return trainable_state_dict
 
     def print_trainable_parameters(self) -> None:
@@ -652,7 +722,7 @@ class LoRAModel(nn.Layer):
             else:
                 trainable_numel += np.prod(weight.shape)
         logger.debug(
-            f"Frozen parameters: {freeze_numel:.2e} || Trainable parameters:{trainable_numel:.2e} || Total parameters:{freeze_numel+trainable_numel:.2e}|| Trainable:{trainable_numel / (freeze_numel+trainable_numel):.2%}"
+            f"Frozen parameters: {freeze_numel:.2e} || Trainable parameters:{trainable_numel:.2e} || Total parameters:{freeze_numel + trainable_numel:.2e}|| Trainable:{trainable_numel / (freeze_numel + trainable_numel):.2%}"
         )
 
     def mark_only_lora_as_trainable(self) -> None:

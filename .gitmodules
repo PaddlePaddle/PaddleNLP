@@ -1,0 +1,6 @@
+[submodule "csrc/third_party/cutlass"]
+	path = csrc/third_party/cutlass
+	url = https://github.com/NVIDIA/cutlass.git
+[submodule "csrc/third_party/nlohmann_json"]
+	path = csrc/third_party/nlohmann_json
+	url = https://github.com/nlohmann/json.git

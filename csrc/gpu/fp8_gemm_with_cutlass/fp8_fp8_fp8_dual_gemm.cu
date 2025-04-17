@@ -127,16 +127,18 @@ std::vector<paddle::Tensor> cutlass_fp8_fp8_fp8_dual_gemm(
   paddle::Tensor out1;
   void* out0_ptr = nullptr;
   void* out1_ptr = nullptr;
-  if (bias_dtype == "float16") {
-    out0 = paddle::empty(out_shape, phi::DataType::FLOAT16, x.place());
-    out0_ptr = reinterpret_cast<void*>(out0.data<phi::dtype::float16>());
-    out1 = paddle::empty(out_shape, phi::DataType::FLOAT16, x.place());
-    out1_ptr = reinterpret_cast<void*>(out1.data<phi::dtype::float16>());
-  } else {
-    out0 = paddle::empty(out_shape, phi::DataType::BFLOAT16, x.place());
-    out0_ptr = reinterpret_cast<void*>(out0.data<phi::dtype::bfloat16>());
-    out1 = paddle::empty(out_shape, phi::DataType::BFLOAT16, x.place());
-    out1_ptr = reinterpret_cast<void*>(out1.data<phi::dtype::bfloat16>());
+  if (bias0 && bias1) {
+    if (bias_dtype == "float16") {
+      out0 = paddle::empty(out_shape, phi::DataType::FLOAT16, x.place());
+      out0_ptr = reinterpret_cast<void*>(out0.data<phi::dtype::float16>());
+      out1 = paddle::empty(out_shape, phi::DataType::FLOAT16, x.place());
+      out1_ptr = reinterpret_cast<void*>(out1.data<phi::dtype::float16>());
+    } else {
+      out0 = paddle::empty(out_shape, phi::DataType::BFLOAT16, x.place());
+      out0_ptr = reinterpret_cast<void*>(out0.data<phi::dtype::bfloat16>());
+      out1 = paddle::empty(out_shape, phi::DataType::BFLOAT16, x.place());
+      out1_ptr = reinterpret_cast<void*>(out1.data<phi::dtype::bfloat16>());
+    }
   }
 
   std::string act = (activation_type == "") ? "swiglu" : activation_type;
@@ -169,8 +171,9 @@ std::vector<paddle::Tensor> cutlass_fp8_fp8_fp8_dual_gemm(
       bias_dims0,
       bias_dims1,
       fuse_gemm_config};
-
+  
   fp8_fp8_dual_gemm_scale_bias_act(params);
+  
   return {out};
 }
 

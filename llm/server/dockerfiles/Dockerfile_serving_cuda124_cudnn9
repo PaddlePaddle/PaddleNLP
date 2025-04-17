@@ -1,0 +1,33 @@
+FROM registry.baidubce.com/paddlepaddle/fastdeploy:llm-base-gcc12.3-cuda12.4-cudnn9-nccl2.15.5
+
+WORKDIR /opt/output/
+ENV LD_LIBRARY_PATH="/usr/local/cuda-12.4/lib64:/usr/lib64:/usr/local/cuda-12.4/targets/x86_64-linux/lib/:/opt/nccl-2.15.5-1/build/lib/:/usr/local/nvidia/lib:/usr/local/nvidia/lib64"
+
+# 安装 paddlepaddle & paddlenlp & paddlenlp_ops
+RUN python3 -m pip install --pre paddlepaddle-gpu -i https://www.paddlepaddle.org.cn/packages/nightly/cu123/ \
+    && python3 -m pip install --no-cache-dir --force-reinstall https://paddle-qa.bj.bcebos.com/paddlenlp/wheel/2f85a64edd4aa9911c94ccb5ce53e83ac41ce22b/paddlenlp-3.0.0b3.post20250123-py3-none-any.whl \
+    && python3 -m pip install --no-cache-dir --force-reinstall https://paddlepaddle-inference-banchmark.bj.bcebos.com/paddlenlp_ops-0.0.0-py3-none-any.whl \
+    && python3 -m pip install --no-cache-dir sentencepiece pycryptodome tritonclient[all]==2.41.1 \
+    && apt update && apt install net-tools \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# clone paddle & paddlenlp 源码（代码版本应与上述安装版本对齐）
+RUN mkdir -p /opt/source/ && cd /opt/source/ \
+    && git clone https://github.com/PaddlePaddle/Paddle.git \
+    && git clone -b release/3.0-beta4 https://github.com/PaddlePaddle/PaddleNLP.git \
+    && python3 -m pip install --no-cache-dir -r PaddleNLP/requirements.txt \
+    && python3 -m pip install --no-cache-dir -r PaddleNLP/llm/server/server/requirements.txt
+
+RUN cp /opt/source/PaddleNLP/llm/server/server/scripts/start_server.sh start_server \
+    && chmod +x start_server \
+    && mv start_server /usr/local/bin/ \
+    && cp /opt/source/PaddleNLP/llm/server/server/scripts/stop_server.sh stop_server \
+    && chmod +x stop_server \
+    && mv stop_server /usr/local/bin/ 
+    
+RUN cp /opt/source/PaddleNLP/llm/server/server/server/download_model.py download_model.py
+
+ENV PYTHONPATH="/opt/source/PaddleNLP/llm/server/server:/opt/source/PaddleNLP"
+
+ENV http_proxy=""
+ENV https_proxy=""

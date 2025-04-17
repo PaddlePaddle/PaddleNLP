@@ -21,16 +21,13 @@ import six
 from paddle import nn
 from paddle.nn import functional as F
 
-from paddlenlp.transformers import (
-    BertPretrainedModel,
-    ElectraPretrainedModel,
-    ErniePretrainedModel,
-    RobertaPretrainedModel,
-)
-from paddlenlp.utils.download import resolve_file_path
-from paddlenlp.utils.log import logger
-
+from ...utils.download import resolve_file_path
+from ...utils.log import logger
 from .. import PretrainedModel, register_base_model
+from ..bert.modeling import BertPretrainedModel
+from ..electra.modeling import ElectraPretrainedModel
+from ..ernie.modeling import ErniePretrainedModel
+from ..roberta.modeling import RobertaPretrainedModel
 from ..utils import InitTrackerMeta, fn_args_to_dict
 
 __all__ = ["ErnieGenPretrainedModel", "ErnieForGeneration", "ErnieGenModel"]

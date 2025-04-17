@@ -16,7 +16,8 @@
 
 from paddle.utils import try_import
 
-from .. import AddedToken, GPTTokenizer
+from ..gpt.tokenizer import GPTTokenizer
+from ..tokenizer_utils import AddedToken
 
 __all__ = ["BlenderbotTokenizer"]
 

@@ -49,12 +49,7 @@ MODEL_CLASSES = {
 }
 
 
-def add_start_docstrings(*docstr):
-    def docstring_decorator(fn):
-        fn.__doc__ = "".join(docstr) + (fn.__doc__ if fn.__doc__ is not None else "")
-        return fn
-
-    return docstring_decorator
+from paddlenlp.trainer.utils.doc import add_start_docstrings
 
 
 @dataclass
@@ -144,7 +139,7 @@ class ModelArguments:
     continue_training: bool = field(
         default=False,
         metadata={
-            "help": "Pre-training from existing paddlenlp model weights. Default Fasle and model will train from scratch. If set True, the model_name_or_path argument must exist in the paddlenlp models."
+            "help": "Pre-training from existing paddlenlp model weights. Default False and model will train from scratch. If set True, the model_name_or_path argument must exist in the paddlenlp models."
         },
     )
 
@@ -367,7 +362,7 @@ def main():
     config.max_position_embeddings = max(config.max_position_embeddings, data_args.max_seq_length)
     if not model_args.continue_training:
         config.vocab_size = max(config.vocab_size, ((tokenizer.vocab_size - 1) // 128 + 1) * 128)
-        logger.info(f"Reset vocab size to {config.vocab_size} for batter amp peformance.")
+        logger.info(f"Reset vocab size to {config.vocab_size} for batter amp performance.")
 
     config.use_flash_attention = model_args.use_flash_attention
     config.fuse_ln = model_args.use_fused_ln
@@ -399,7 +394,7 @@ def main():
     else:
         model = model_class.from_config(config, dtype=dtype)
 
-    # Create the learning_rate sheduler and optimizer
+    # Create the learning_rate scheduler and optimizer
     if training_args.decay_steps is None:
         training_args.decay_steps = training_args.max_steps
     if training_args.warmup_steps > 0:

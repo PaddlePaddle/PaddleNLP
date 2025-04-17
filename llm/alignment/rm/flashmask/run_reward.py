@@ -19,9 +19,15 @@ import sys
 from functools import partial
 
 import paddle
-from data import preference_collate_fn, preprocess_preference_data
+from data import (
+    preference_collate_fn,
+    preprocess_preference_data,
+    preprocess_process_data,
+    process_collate_fn,
+    zero_padding_process_collate_fn,
+)
 from reward_argument import DataArgument, ModelArgument, TrainingArguments
-from reward_model import LlamaModelForScore
+from reward_model import LlamaModelForPRM, LlamaModelForScore, MistralModelForPRM
 from reward_trainer import RewardTrainer
 
 from paddlenlp.datasets import (
@@ -35,21 +41,19 @@ from paddlenlp.trainer import (
     get_last_checkpoint,
     set_seed,
 )
-from paddlenlp.transformers import (
-    AutoConfig,
-    AutoTokenizer,
-    register_sequence_parallel_allreduce_hooks,
-)
+from paddlenlp.transformers import AutoConfig, AutoTokenizer
 from paddlenlp.utils.log import logger
 
 
 def main():
     """main"""
     parser = PdArgumentParser((ModelArgument, DataArgument, TrainingArguments))
-    if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
+    if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
         model_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    if model_args.reward_tokens is not None:
+        model_args.reward_tokens = model_args.reward_tokens.split(",")
 
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
@@ -103,7 +107,18 @@ def main():
         if training_args.bf16:
             dtype = "bfloat16"
 
-    logger.info("Start to load model & tokenizer.")
+    logger.info("Start to load tokenizer & model.")
+    if model_args.tokenizer_name_or_path is not None:
+        tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
+    else:
+        tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
+    if tokenizer.pad_token is None:
+        if tokenizer.eos_token is not None:
+            tokenizer.pad_token = tokenizer.eos_token
+            tokenizer.pad_token_id = tokenizer.eos_token_id
+        else:
+            tokenizer.add_special_tokens({"pad_token": "[PAD]"})
+
     model_kwargs = dict(
         pretrained_model_name_or_path=model_args.model_name_or_path,
         dtype=dtype,
@@ -111,56 +126,89 @@ def main():
         tensor_parallel_rank=training_args.tensor_parallel_rank,
         recompute_granularity=model_args.recompute_granularity,
         use_flash_attention=model_args.use_flash_attention,
-        seq_length = data_args.max_seq_len
+        seq_length=data_args.max_seq_len,
     )
+    if training_args.process_reward:
+        placeholder_token_id = tokenizer(model_args.placeholder_token, add_special_tokens=False)["input_ids"]
+        if len(placeholder_token_id) != 1:
+            print(
+                f"Warning: The length of placeholder_token_id should be 1, but got {len(placeholder_token_id)}. Using {placeholder_token_id[-1]}: {tokenizer.convert_ids_to_tokens([placeholder_token_id[-1]])} instead."
+            )
+        model_kwargs["placeholder_token_id"] = placeholder_token_id[-1]
+        for local_tk in model_args.reward_tokens:
+            if len(tokenizer(local_tk, add_special_tokens=False)["input_ids"]) != 1:
+                print(
+                    f"Warning: The length of reward_token_id should be 1, but got {len(tokenizer(local_tk)['input_ids'])}. Using {tokenizer(local_tk)['input_ids'][-1]}: {tokenizer.convert_ids_to_tokens([tokenizer(local_tk)['input_ids'][-1]])} instead."
+                )
+        model_kwargs["reward_token_ids"] = [
+            tokenizer(local_tk)["input_ids"][-1] for local_tk in model_args.reward_tokens
+        ]
     if training_args.pipeline_parallel_degree > 1:
         raise ValueError("RM does not support pipeline parallelism yet.")
 
     if not data_args.autotuner_benchmark:
-        model = LlamaModelForScore.from_pretrained(**model_kwargs)
+        if training_args.process_reward:
+            if "llama" in model_args.model_name_or_path.lower():
+                model = LlamaModelForPRM.from_pretrained(**model_kwargs)
+            elif "mistral" in model_args.model_name_or_path.lower():
+                model = MistralModelForPRM.from_pretrained(**model_kwargs)
+            else:
+                raise ValueError("PRM currently only supports Llama & Mistral models.")
+        else:
+            model = LlamaModelForScore.from_pretrained(**model_kwargs)
     else:
         config = AutoConfig.from_pretrained(**model_kwargs)
-        model = LlamaModelForScore.from_config(config)
+        if training_args.process_reward:
+            if "llama" in model_args.model_name_or_path.lower():
+                model = LlamaModelForPRM.from_config(config)
+            elif "mistral" in model_args.model_name_or_path.lower():
+                model = MistralModelForPRM.from_config(config)
+            else:
+                raise ValueError("PRM currently only supports Llama & Mistral models.")
+        else:
+            model = LlamaModelForScore.from_config(config)
 
     if model_args.flash_mask and not model.config.use_flash_attention:
         logger.warning("`flash_mask` must use with zero padding and flash attention.")
         model.config.use_flash_attention = True
 
-    if model_args.sequence_parallel:
-        register_sequence_parallel_allreduce_hooks(
-            model, training_args.gradient_accumulation_steps, training_args.fuse_sequence_parallel_allreduce
-        )
-    if model_args.tokenizer_name_or_path is not None:
-        tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
-    else:
-        tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     # TODO: support chat template in next pr
     # tokenizer.chat_template = None
-    logger.info("Loading model & tokenizer successfully !")
+    logger.info("Loading tokenizer & model successfully !")
 
     logger.info("Start to create dataset")
-    trans_func = partial(preprocess_preference_data, tokenizer=tokenizer, data_args=data_args, model_args=model_args)
-    if data_args.lazy:
-        zero_padding_dataset = ZeroPaddingIterableDataset
+    if training_args.process_reward:
+        trans_func = partial(preprocess_process_data, tokenizer=tokenizer, data_args=data_args, model_args=model_args)
     else:
-        zero_padding_dataset = ZeroPaddingMapDataset
+        trans_func = partial(
+            preprocess_preference_data, tokenizer=tokenizer, data_args=data_args, model_args=model_args
+        )
+
+    if data_args.zero_padding:
+        if data_args.lazy:
+            zero_padding_dataset = ZeroPaddingIterableDataset
+        else:
+            zero_padding_dataset = ZeroPaddingMapDataset
+
     if training_args.do_train and training_args.should_load_dataset:
         train_ds = load_dataset(
             "json",
             data_files=data_args.train_dataset_path,
             lazy=data_args.lazy,
         )[0]
-        logger.info("Creating train Zero Padding Data Stream. This may take a few minutes.")
-        train_ds = (
-            zero_padding_dataset(
-                train_ds.map(trans_func),
-                tokenizer=tokenizer,
-                max_length=data_args.max_seq_len,
-                greedy_zero_padding=data_args.greedy_zero_padding,
+        train_ds = train_ds.map(trans_func)
+        if data_args.zero_padding:
+            logger.info("Creating train Zero Padding Data Stream. This may take a few minutes.")
+            train_ds = (
+                zero_padding_dataset(
+                    train_ds,
+                    tokenizer=tokenizer,
+                    max_length=data_args.max_seq_len,
+                    greedy_zero_padding=data_args.greedy_zero_padding,
+                )
+                if train_ds is not None
+                else None
             )
-            if train_ds is not None
-            else None
-        )
     else:
         train_ds = None
 
@@ -170,19 +218,30 @@ def main():
             data_files=data_args.dev_dataset_path,
             lazy=data_args.lazy,
         )[0]
-        logger.info("Creating dev Zero Padding Data Stream. This may take a few minutes.")
-        eval_ds = (
-            zero_padding_dataset(
-                eval_ds.map(trans_func),
-                tokenizer=tokenizer,
-                max_length=data_args.max_seq_len,
+        eval_ds = eval_ds.map(trans_func)
+        if data_args.zero_padding:
+            logger.info("Creating dev Zero Padding Data Stream. This may take a few minutes.")
+            eval_ds = (
+                zero_padding_dataset(
+                    eval_ds,
+                    tokenizer=tokenizer,
+                    max_length=data_args.max_seq_len,
+                )
+                if eval_ds is not None
+                else None
             )
-            if eval_ds is not None
-            else None
-        )
     else:
         eval_ds = None
     logger.info("Creating dataset successfully ...")
+
+    if data_args.zero_padding:
+        data_collator = partial(
+            preference_collate_fn if not training_args.process_reward else zero_padding_process_collate_fn,
+            max_seq_len=data_args.max_seq_len,
+            pad_token_id=tokenizer.pad_token_id,
+        )
+    else:
+        data_collator = partial(process_collate_fn, pad_token_id=tokenizer.pad_token_id)
 
     trainer = RewardTrainer(
         model=model,
@@ -190,10 +249,8 @@ def main():
         train_dataset=train_ds,
         eval_dataset=eval_ds,
         tokenizer=tokenizer,
-        data_collator=partial(
-            preference_collate_fn,
-            max_seq_len=data_args.max_seq_len,
-        ),
+        data_collator=data_collator,
+        process_reward=training_args.process_reward,
     )
 
     if training_args.do_train:

@@ -32,7 +32,7 @@ parser.add_argument("--init_checkpoint", type=str, default=None, help="Path to i
 parser.add_argument("--model_save_dir", type=str, default=None, help="The model will be saved in this path.")
 parser.add_argument("--epochs", type=int, default=10, help="Corpus iteration num.")
 parser.add_argument("--batch_size", type=int, default=300, help="The number of sequences contained in a mini-batch.")
-parser.add_argument("--max_seq_len", type=int, default=64, help="Number of words of the longest seqence.")
+parser.add_argument("--max_seq_len", type=int, default=64, help="Number of words of the longest sequence.")
 parser.add_argument(
     "--device",
     default="gpu",

@@ -95,7 +95,7 @@ optional arguments:
                         Spliter between documents. We will strip the line, if you use blank line to split doc, leave it blank.
                         根据实际情况修改，默认空行作为文章换行符。
   --min_doc_length MIN_DOC_LENGTH
-                        Minimal char of a documment.
+                        Minimal char of a document.
                         可选。过滤掉长度多短的文章，默认值10
   --workers WORKERS     Number of worker processes to launch
                         可选。多进程转化文件，适用于 input_path 中包含的文件数据较多的情况。每个文件，分配给不同worker处理
@@ -126,12 +126,9 @@ head -1 baike_sample.jsonl
 ```
 optional arguments:
   -h, --help            show this help message and exit
-  --model_name MODEL_NAME
+  --model_name_or_path MODEL_NAME_OR_PATH
                         What model to use.
                         必须设置，如：idea-ccnl/ziya-llama-13b-v1, 可以参考已有的模型名称 https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm
-  --tokenizer_name {LlamaTokenizer}
-                        What type of tokenizer to use.
-                        模型对应的tokenizer, Llama模型需使用LlamaTokenizer
 data input/output:
   --input_path INPUT_PATH
                         Path to input JSON files.
@@ -160,7 +157,7 @@ chinese words:
   --cn_seg_func {lac,seg,jieba}
                         Words segment function for chinese words.
                         默认jieba，jieba速度较快，lac模型更准确，计算量高。
-  --cn_splited          Is chinese corpus is splited in to words.
+  --cn_splited          Is chinese corpus is split into words.
                         分词后的文本，可选。设置此选项则，cn_seg_func不起作用。
                         例如分词后文本串 "中国 效仿 西方 发展 工业 的过 程"
   --cn_split_dimer CN_SPLIT_DIMER
@@ -169,7 +166,7 @@ chinese words:
 
 common config:
   --append_eos          Append an <eos> token to the end of a document.
-                        gpt类模型专用，gpt设置此选项，表示doc结束。针对tokenier中不包含eos_token情况，输出提示warning并且不添加<eos>。
+                        gpt类模型专用，gpt设置此选项，表示doc结束。针对tokenizer中不包含eos_token情况，输出提示warning并且不添加<eos>。
   --log_interval LOG_INTERVAL
                         Interval between progress updates
                         打印日志间隔，interval表示处理 文本行数/doc数的 间隔。
@@ -183,8 +180,7 @@ common config:
 * 针对 llama 模型
 ```shell
 python -u  create_pretraining_data.py \
-    --model_name "idea-ccnl/ziya-llama-13b-v1" \
-    --tokenizer_name "LlamaTokenizer" \
+    --model_name_or_path "idea-ccnl/ziya-llama-13b-v1" \
     --input_path "baike_sample.jsonl" \
     --output_prefix "baike_sample"  \
     --data_format "JSON" \
@@ -199,8 +195,7 @@ python -u  create_pretraining_data.py \
 * 针对 ernie 模型
 ```shell
 python -u  create_pretraining_data.py \
-    --model_name "ernie-3.0-base-zh" \
-    --tokenizer_name "ErnieTokenizer" \
+    --model_name_or_path "ernie-3.0-base-zh" \
     --input_path "baike_sample.jsonl" \
     --output_prefix "baike_sample"  \
     --data_format "JSON" \
@@ -246,7 +241,7 @@ mv ./preprocess/baike_sample* ./data
 ```
 
 * llama 预训练请参考[预训练](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm)。
-* ernie 预训练请参考[预训练](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/legacy/model_zoo/ernie-1.0/pretraining_introduction.md)。
+* ernie 预训练请参考[预训练](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/slm/model_zoo/ernie-1.0/pretraining_introduction.md)。
 
 
 代码说明：

@@ -21,6 +21,7 @@ from paddlenlp.transformers.ernie.tokenizer import (
     ErnieTokenizer,
     WordpieceTokenizer,
 )
+from paddlenlp.transformers.ernie.tokenizer_fast import ErnieTokenizerFast
 
 from ...testing_utils import slow
 from ...transformers.test_tokenizer_common import (
@@ -32,6 +33,7 @@ from ...transformers.test_tokenizer_common import (
 class ErnieTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     tokenizer_class = ErnieTokenizer
+    rust_tokenizer_class = ErnieTokenizerFast
     space_between_special_tokens = True
     from_pretrained_filter = filter_non_english
     test_seq2seq = True

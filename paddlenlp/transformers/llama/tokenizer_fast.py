@@ -24,7 +24,7 @@ from .tokenizer import LlamaTokenizer
 
 __all__ = ["LlamaTokenizerFast"]
 
-VOCAB_FILES_NAMES = {"vocab_file": "spiece.bpe.model", "tokenizer_file": "tokenizer.json"}
+VOCAB_FILES_NAMES = {"vocab_file": "tokenizer.model", "tokenizer_file": "tokenizer.json"}
 
 B_INST, E_INST = "[INST]", "[/INST]"
 B_SYS, E_SYS = "<<SYS>>\n", "\n<</SYS>>\n\n"

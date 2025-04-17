@@ -30,7 +30,6 @@ from paddlenlp.experimental.model_utils import (
 )
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedBlockMultiTransformer,
-    FusedBlockMultiTransformerA8W8,
     FusedBlockMultiTransformerWeightOnly,
     FusedMultiTransformerA8W8,
     FusedMultiTransformerBase,
@@ -42,7 +41,10 @@ from paddlenlp.experimental.transformers.generation_utils import (
     GenerationBlockInferenceModel,
     GenerationInferenceModel,
 )
-from paddlenlp.experimental.transformers.utils import infererence_model_from_pretrained
+from paddlenlp.experimental.transformers.utils import (
+    infererence_model_from_config,
+    infererence_model_from_pretrained,
+)
 from paddlenlp.transformers import MixtralConfig, MixtralPretrainedModel
 from paddlenlp.transformers.conversion_utils import split_param_func
 from paddlenlp.transformers.mixtral.modeling import MixtralLMHead
@@ -78,12 +80,9 @@ class FusedMixtralRMSNorm(nn.Layer):
         self.config = config
 
     def forward(self, hidden_states):
-        result = paddle.incubate.nn.functional.fused_rms_norm(
+        return paddle.incubate.nn.functional.fused_rms_norm(
             hidden_states, self.weight, None, self.variance_epsilon, begin_norm_axis=1
-        )
-        if isinstance(result, tuple):
-            return result[0]
-        return result
+        )[0]
 
 
 @register_base_model
@@ -293,17 +292,18 @@ class MixtralInferenceModel(MixtralPretrainedModel):
             top_k=self.moe_topk,
             norm_topk_prob=True,
             moe_every2=self.moe_every2,
+            moe_intermediate_size=self.intermediate_size,
         )
 
         transformer_config = FusedMultiTransformerConfig(
             embed_dim=self.hidden_size,
             num_heads=self.num_attention_heads,
             kv_num_heads=self.num_key_value_heads,
-            dim_feedforward=self.intermediate_size,
+            intermediate_size=self.intermediate_size,
             quant_type=self.quant_type,
             activation="swiglu",
             num_layers=config.num_hidden_layers,
-            nranks=config.tensor_parallel_degree,
+            tp_degree=config.tensor_parallel_degree,
             ring_id=ring_id,
             ln_scale_attrs=ln_scale_attrs,
             qkv_weight_attrs=qkv_weight_attrs,
@@ -335,12 +335,14 @@ class MixtralInferenceModel(MixtralPretrainedModel):
             cache_k_out_scale_attrs=cache_k_out_scale_attrs,
             cache_v_out_scale_attrs=cache_v_out_scale_attrs,
             epsilon=self.epsilon,
+            rope_theta=self.rope_theta,
             norm_type="rmsnorm",
             use_neox_rotary_style=self.use_neox,
             cachekv_int8_type=config.cachekv_int8_type,
             rank_id=config.tensor_parallel_rank,
             trans_qkvw=(False if paddle.is_compiled_with_rocm() and "a8w8" in self.quant_type else True),
             moe_config=moe_config,
+            append_attn=config.append_attn,
         )
 
         self.set_transformer_block(transformer_config)
@@ -414,7 +416,7 @@ class MixtralInferenceModel(MixtralPretrainedModel):
         elif input_ids is None and inputs_embeds is None:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
 
-        # genereate a fake input_ids according to inputs_embeds
+        # generate a fake input_ids according to inputs_embeds
         # this is usually occurred in img2txt multimodal model when first enter into this forward function.
         if input_ids is None and inputs_embeds is not None:
             input_ids = self.prepare_input_ids_for_generation(self.config.bos_token_id, inputs_embeds)
@@ -494,6 +496,7 @@ class MixtralInferenceModel(MixtralPretrainedModel):
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
+        self.transformer_block.init_weight()
         unfused_state_dict = {}
         head_size = self.hidden_size // self.num_attention_heads
         split_fn = split_param_func()
@@ -644,9 +647,9 @@ class MixtralInferenceModel(MixtralPretrainedModel):
                     )
                     ffn1_quanted_weight_list.append(
                         ffn1_quanted_weight_list_i.reshape(
-                            [self.transformer_block.embed_dim, self.transformer_block.dim_feedforward * 2]
+                            [self.transformer_block.embed_dim, self.transformer_block.intermediate_size * 2]
                             if self.quant_type == "weight_only_int8"
-                            else [self.transformer_block.embed_dim, self.transformer_block.dim_feedforward]
+                            else [self.transformer_block.embed_dim, self.transformer_block.intermediate_size]
                         )
                     )
                     ffn1_quanted_weight_scale.append(ffn1_quanted_weight_scale_i)
@@ -683,9 +686,9 @@ class MixtralInferenceModel(MixtralPretrainedModel):
                     )
                     ffn2_quanted_weight_list.append(
                         ffn2_quanted_weight_list_i.reshape(
-                            [self.transformer_block.dim_feedforward, self.transformer_block.embed_dim]
+                            [self.transformer_block.intermediate_size, self.transformer_block.embed_dim]
                             if self.quant_type == "weight_only_int8"
-                            else [self.transformer_block.dim_feedforward, self.transformer_block.embed_dim // 2]
+                            else [self.transformer_block.intermediate_size, self.transformer_block.embed_dim // 2]
                         )
                     )
                     ffn2_quanted_weight_scale.append(ffn2_quanted_weight_scale_i)
@@ -848,7 +851,10 @@ class MixtralInferenceModel(MixtralPretrainedModel):
                     )
                     for k, v in cache_scales_loader.scale.items():
                         for i_layer, weight_scale in enumerate(v):
-                            weight_scale = weight_scale.astype("float32")
+                            if self.config.append_attn:
+                                weight_scale = paddle.to_tensor(weight_scale).cast(paddle.get_default_dtype())
+                            else:
+                                weight_scale = weight_scale.astype("float32")
                             if k == "cache_k_scale":
                                 self.transformer_block.cache_k_scales[i_layer].set_value(weight_scale)
                             elif k == "cache_v_scale":
@@ -923,6 +929,10 @@ class MixtralForCausalLMInferenceModel(GenerationInferenceModel, MixtralPretrain
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
         return infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs)
+
+    @classmethod
+    def from_config(cls, config, *args, **kwargs):
+        return infererence_model_from_config(cls, config, args, kwargs)
 
     @classmethod
     def get_cache_kvs_shape(
@@ -1070,6 +1080,7 @@ class MixtralForCausalLMInferenceModel(GenerationInferenceModel, MixtralPretrain
 @register_base_model
 class MixtralBlockInferenceModel(MixtralInferenceModel):
     def __init__(self, config: MixtralConfig):
+        self.append_attn = config.append_attn
         super().__init__(config)
         self.max_seq_len = config.max_seq_len
         self.block_size = config.block_size
@@ -1077,18 +1088,16 @@ class MixtralBlockInferenceModel(MixtralInferenceModel):
     def set_transformer_block(self, transformer_config):
         if self.use_weight_only:
             self.transformer_block = FusedBlockMultiTransformerWeightOnly(transformer_config)
-        elif "a8w8" in self.quant_type:
-            self.transformer_block = FusedBlockMultiTransformerA8W8(transformer_config)
         else:
             self.transformer_block = FusedBlockMultiTransformer(transformer_config)
 
-    def remove_padding(self, input_ids, seq_lens_this_time):
+    def remove_padding(self, input_ids, seq_lens_this_time, draft_tokens=None, seq_lens_encoder=None):
         cum_offsets_now = paddle.cumsum(self.max_seq_len - seq_lens_this_time)
         token_num = paddle.sum(seq_lens_this_time)
         from paddlenlp_ops import get_padding_offset_v2
 
         ids_remove_padding, cum_offsets, padding_offset, cu_seqlens_q, cu_seqlens_k = get_padding_offset_v2(
-            input_ids, cum_offsets_now, token_num, seq_lens_this_time
+            input_ids, cum_offsets_now, token_num, seq_lens_this_time, draft_tokens, seq_lens_encoder
         )
         return ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k
 
@@ -1107,9 +1116,19 @@ class MixtralBlockInferenceModel(MixtralInferenceModel):
 
         seq_lens_this_time = kwargs.get("seq_lens_this_time", None)
         rope_emb = kwargs.get("rope_emb", None)
-        ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k = self.remove_padding(
-            input_ids, seq_lens_this_time
-        )
+        draft_tokens = kwargs.get("draft_tokens", None)
+        seq_lens_encoder = kwargs.get("seq_lens_encoder", None)
+
+        # whether speculative decoding or not
+        if draft_tokens is None:
+            ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k = self.remove_padding(
+                input_ids, seq_lens_this_time
+            )
+        else:
+            ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k = self.remove_padding(
+                input_ids, seq_lens_this_time, draft_tokens, seq_lens_encoder
+            )
+
         kwargs["cu_seqlens_q"] = cu_seqlens_q
         kwargs["cu_seqlens_k"] = cu_seqlens_k
         kwargs["padding_offsets"] = padding_offset
@@ -1147,6 +1166,10 @@ class MixtralForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Mixtr
 
     def __init__(self, config):
         super().__init__(config)
+        self.max_candidate_len = config.get("speculate_max_candidate_len", 5)
+        self.verify_window = config.get("speculate_verify_window", 2)
+        self.max_seq_len = config.max_seq_len
+
         self.mixtral = MixtralBlockInferenceModel(config)
         self.lm_head = MixtralLMHead(config)
 
@@ -1237,6 +1260,10 @@ class MixtralForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Mixtr
         return infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs)
 
     @classmethod
+    def from_config(cls, config, *args, **kwargs):
+        return infererence_model_from_config(cls, config, args, kwargs)
+
+    @classmethod
     def get_cache_kvs_shape(
         cls, config: MixtralConfig, max_batch_size: int = None, max_length: int = None
     ) -> list[list[int]]:
@@ -1255,7 +1282,8 @@ class MixtralForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Mixtr
         else:
             max_block_nums = max_batch_size * max_block_per_seq
 
-        cache_kvs = []
+        cache_k_shapes = []
+        cache_v_shapes = []
         for _ in range(config.num_hidden_layers):
             cache_kv_shape = [
                 max_block_nums,
@@ -1263,9 +1291,9 @@ class MixtralForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Mixtr
                 config.block_size,
                 config.hidden_size // config.num_attention_heads,
             ]
-            cache_kvs.append(cache_kv_shape)
-            cache_kvs.append(cache_kv_shape)
-        return cache_kvs
+            cache_k_shapes.append(cache_kv_shape)
+            cache_v_shapes.append(cache_kv_shape)
+        return cache_k_shapes, cache_v_shapes
 
     def prepare_inputs_for_generation(self, **kwargs):
         # only last token for inputs_ids if cache is defined in kwargs
@@ -1284,6 +1312,11 @@ class MixtralForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Mixtr
         v_quant_scales = kwargs.get("v_quant_scales", None)
         k_dequant_scales = kwargs.get("k_dequant_scales", None)
         v_dequant_scales = kwargs.get("v_dequant_scales", None)
+
+        # speculative decoding related parameters
+        draft_tokens = kwargs.get("draft_tokens", None)
+        output_padding_offset = kwargs.get("output_padding_offset", None)
+
         model_inputs = {
             "input_ids": input_ids,
             "src_mask": src_mask,
@@ -1298,6 +1331,8 @@ class MixtralForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Mixtr
             "v_quant_scales": v_quant_scales,
             "k_dequant_scales": k_dequant_scales,
             "v_dequant_scales": v_dequant_scales,
+            "draft_tokens": draft_tokens,
+            "output_padding_offset": output_padding_offset,
         }
         return model_inputs
 
@@ -1316,6 +1351,8 @@ class MixtralForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Mixtr
         v_quant_scales=None,
         k_dequant_scales=None,
         v_dequant_scales=None,
+        draft_tokens=None,
+        output_padding_offset=None,
     ):
         outputs = self.mixtral(
             input_ids,
@@ -1331,6 +1368,8 @@ class MixtralForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Mixtr
             v_quant_scales=v_quant_scales,
             k_dequant_scales=k_dequant_scales,
             v_dequant_scales=v_dequant_scales,
+            draft_tokens=draft_tokens,
+            output_padding_offset=output_padding_offset,
         )
 
         hidden_states = outputs[0]

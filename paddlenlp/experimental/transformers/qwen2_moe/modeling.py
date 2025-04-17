@@ -33,7 +33,10 @@ from paddlenlp.experimental.transformers.generation_utils import (
     GenerationBlockInferenceModel,
     GenerationInferenceModel,
 )
-from paddlenlp.experimental.transformers.utils import infererence_model_from_pretrained
+from paddlenlp.experimental.transformers.utils import (
+    infererence_model_from_config,
+    infererence_model_from_pretrained,
+)
 from paddlenlp.transformers import Qwen2MoeConfig, Qwen2MoePretrainedModel
 from paddlenlp.transformers.conversion_utils import split_param_func
 from paddlenlp.transformers.model_outputs import (  # CausalLMOutputWithCrossAttentions,
@@ -65,10 +68,7 @@ class FusedQwen2MoeRMSNorm(nn.Layer):
         )
 
     def forward(self, x):
-        result = paddle.incubate.nn.functional.fused_rms_norm(x, self.weight, None, self.eps, begin_norm_axis=1)
-        if isinstance(result, tuple):
-            return result[0]
-        return result
+        return paddle.incubate.nn.functional.fused_rms_norm(x, self.weight, None, self.eps, begin_norm_axis=1)[0]
 
 
 @register_base_model
@@ -81,7 +81,6 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
         self.num_key_value_heads = config.num_key_value_heads
         self.num_layers = config.num_hidden_layers
         self.rms_norm_eps = config.rms_norm_eps
-        self.max_position_embeddings = config.max_position_embeddings
         self.quant_type = config.quant_type
         self.rope_theta = config.rope_theta
 
@@ -220,7 +219,7 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
             num_experts=self.num_experts,
             top_k=self.moe_topk,
             norm_topk_prob=self.norm_topk_prob,
-            moe_every2=False,
+            moe_intermediate_size=self.moe_intermediate_size,
             shared_expert_intermediate_size=self.shared_expert_intermediate_size,
             shared_expert_ffn1_weight_attrs=shared_expert_ffn1_weight_attrs,
             shared_expert_ffn1_weight_scale_attrs=shared_expert_ffn1_weight_scale_attrs,
@@ -233,11 +232,11 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
             embed_dim=self.hidden_size,
             num_heads=self.num_attention_heads,
             kv_num_heads=self.num_key_value_heads,
-            dim_feedforward=self.moe_intermediate_size,
+            intermediate_size=self.moe_intermediate_size,
             quant_type=self.quant_type,
             activation="swiglu",
             num_layers=config.num_hidden_layers,
-            nranks=config.tensor_parallel_degree,
+            tp_degree=config.tensor_parallel_degree,
             ring_id=ring_id,
             ln_scale_attrs=ln_scale_attrs,
             qkv_weight_attrs=qkv_weight_attrs,
@@ -252,10 +251,12 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
             ffn2_weight_scale_attrs=ffn2_weight_scale_attrs,
             qkv_bias_attrs=qkv_bias_attrs,
             epsilon=self.rms_norm_eps,
+            rope_theta=self.rope_theta,
             norm_type="rmsnorm",
             use_neox_rotary_style=self.use_neox,
             rank_id=config.tensor_parallel_rank,
             moe_config=moe_config,
+            append_attn=config.append_attn,
         )
 
         self.set_transformer_block(transformer_config)
@@ -290,7 +291,10 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
         self.embed_tokens.weight.set_value(embed_tokens_weight)
         self.norm.weight.set_value(norm_weight)
 
+        if self.use_weight_only:
+            logger.info("weight only is enabled")
         for idx in range(self.num_layers):
+            logger.info(f"set state for layer {idx}")
             unfused_state_dict = {}
             ln_scale = paddle.to_tensor(state_dict["qwen2_moe.layers.{}.input_layernorm.weight".format(idx)]).cast(
                 self.transformer_block.ln_scales[idx].dtype
@@ -618,6 +622,10 @@ class Qwen2MoeForCausalLMInferenceModel(GenerationInferenceModel, Qwen2MoePretra
         return infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs)
 
     @classmethod
+    def from_config(cls, config, *args, **kwargs):
+        return infererence_model_from_config(cls, config, args, kwargs)
+
+    @classmethod
     def get_cache_kvs_shape(
         cls, config: Qwen2MoeConfig, max_batch_size: int = None, max_length: int = None
     ) -> list[list[int]]:
@@ -761,6 +769,7 @@ class Qwen2MoeForCausalLMInferenceModel(GenerationInferenceModel, Qwen2MoePretra
 @register_base_model
 class Qwen2MoeBlockInferenceModel(Qwen2MoeInferenceModel):
     def __init__(self, config: Qwen2MoeConfig):
+        self.append_attn = config.append_attn
         super().__init__(config)
         self.max_seq_len = config.max_seq_len
         self.block_size = config.block_size
@@ -771,13 +780,13 @@ class Qwen2MoeBlockInferenceModel(Qwen2MoeInferenceModel):
         else:
             self.transformer_block = FusedBlockMultiTransformer(transformer_config)
 
-    def remove_padding(self, input_ids, seq_lens_this_time):
+    def remove_padding(self, input_ids, seq_lens_this_time, draft_tokens=None, seq_lens_encoder=None):
         cum_offsets_now = paddle.cumsum(self.max_seq_len - seq_lens_this_time)
         token_num = paddle.sum(seq_lens_this_time)
         from paddlenlp_ops import get_padding_offset_v2
 
         ids_remove_padding, cum_offsets, padding_offset, cu_seqlens_q, cu_seqlens_k = get_padding_offset_v2(
-            input_ids, cum_offsets_now, token_num, seq_lens_this_time
+            input_ids, cum_offsets_now, token_num, seq_lens_this_time, draft_tokens, seq_lens_encoder
         )
         return ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k
 
@@ -796,9 +805,18 @@ class Qwen2MoeBlockInferenceModel(Qwen2MoeInferenceModel):
 
         seq_lens_this_time = kwargs.get("seq_lens_this_time", None)
         rope_emb = kwargs.get("rope_emb", None)
-        ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k = self.remove_padding(
-            input_ids, seq_lens_this_time
-        )
+        draft_tokens = kwargs.get("draft_tokens", None)
+        seq_lens_encoder = kwargs.get("seq_lens_encoder", None)
+
+        # whether speculative decoding or not
+        if draft_tokens is None:
+            ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k = self.remove_padding(
+                input_ids, seq_lens_this_time
+            )
+        else:
+            ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k = self.remove_padding(
+                input_ids, seq_lens_this_time, draft_tokens, seq_lens_encoder
+            )
         kwargs["cu_seqlens_q"] = cu_seqlens_q
         kwargs["cu_seqlens_k"] = cu_seqlens_k
         kwargs["padding_offsets"] = padding_offset
@@ -836,6 +854,10 @@ class Qwen2MoeForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen
 
     def __init__(self, config):
         super().__init__(config)
+        self.max_candidate_len = config.get("speculate_max_candidate_len", 5)
+        self.verify_window = config.get("speculate_verify_window", 2)
+        self.max_seq_len = config.max_seq_len
+
         self.qwen2_moe = Qwen2MoeBlockInferenceModel(config)
         if config.tie_word_embeddings:
             self.lm_head = Qwen2MoeLMHead(
@@ -912,6 +934,10 @@ class Qwen2MoeForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen
         return infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs)
 
     @classmethod
+    def from_config(cls, config, *args, **kwargs):
+        return infererence_model_from_config(cls, config, args, kwargs)
+
+    @classmethod
     def get_cache_kvs_shape(
         cls, config: Qwen2MoeConfig, max_batch_size: int = None, max_length: int = None
     ) -> list[list[int]]:
@@ -930,7 +956,8 @@ class Qwen2MoeForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen
         else:
             max_block_nums = max_batch_size * max_block_per_seq
 
-        cache_kvs = []
+        cache_k_shapes = []
+        cache_v_shapes = []
         for _ in range(config.num_hidden_layers):
             cache_kv_shape = [
                 max_block_nums,
@@ -938,9 +965,9 @@ class Qwen2MoeForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen
                 config.block_size,
                 config.hidden_size // config.num_attention_heads,
             ]
-            cache_kvs.append(cache_kv_shape)
-            cache_kvs.append(cache_kv_shape)
-        return cache_kvs
+            cache_k_shapes.append(cache_kv_shape)
+            cache_v_shapes.append(cache_kv_shape)
+        return cache_k_shapes, cache_v_shapes
 
     def prepare_inputs_for_generation(self, **kwargs):
         # only last token for inputs_ids if cache is defined in kwargs
@@ -959,6 +986,11 @@ class Qwen2MoeForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen
         v_quant_scales = kwargs.get("v_quant_scales", None)
         k_dequant_scales = kwargs.get("k_dequant_scales", None)
         v_dequant_scales = kwargs.get("v_dequant_scales", None)
+
+        # speculative decoding related parameters
+        draft_tokens = kwargs.get("draft_tokens", None)
+        output_padding_offset = kwargs.get("output_padding_offset", None)
+
         model_inputs = {
             "input_ids": input_ids,
             "src_mask": src_mask,
@@ -973,6 +1005,8 @@ class Qwen2MoeForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen
             "v_quant_scales": v_quant_scales,
             "k_dequant_scales": k_dequant_scales,
             "v_dequant_scales": v_dequant_scales,
+            "draft_tokens": draft_tokens,
+            "output_padding_offset": output_padding_offset,
         }
         return model_inputs
 
@@ -991,6 +1025,8 @@ class Qwen2MoeForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen
         v_quant_scales=None,
         k_dequant_scales=None,
         v_dequant_scales=None,
+        draft_tokens=None,
+        output_padding_offset=None,
     ):
         outputs = self.qwen2_moe(
             input_ids,
@@ -1006,6 +1042,8 @@ class Qwen2MoeForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen
             v_quant_scales=v_quant_scales,
             k_dequant_scales=k_dequant_scales,
             v_dequant_scales=v_dequant_scales,
+            draft_tokens=draft_tokens,
+            output_padding_offset=output_padding_offset,
         )
 
         hidden_states = outputs[0]

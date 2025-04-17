@@ -20,6 +20,7 @@ from .gpt import *
 from .llama import *
 from .mixtral import *
 from .opt import *
+from .proposers import *
 from .qwen import *
 from .qwen2 import *
 from .qwen2_moe import *

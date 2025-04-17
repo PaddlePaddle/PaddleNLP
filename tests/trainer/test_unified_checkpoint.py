@@ -18,7 +18,7 @@ import shutil
 import numpy as np
 import pytest
 
-from paddlenlp.trainer.plugins.unified_checkpoint import UnifiedCheckpointOption
+from paddlenlp.trainer.unified_checkpoint.utils import UnifiedCheckpointOption
 from tests.parallel_launch import TestMultipleGpus
 from tests.testing_utils import (
     require_paddle_at_least_2_gpu,
@@ -502,7 +502,7 @@ class TestUnifiedCheckpointOnN2C4Dynamic(TestUnifiedCheckpointBase):
             np.testing.assert_allclose(res[0], res[-1], rtol=self.rtol)
 
 
-# Test Unified Checkpoint Hybrid Parallel Strategy and Deivces Convert Betweeen N1C8 and N2C4
+# Test Unified Checkpoint Hybrid Parallel Strategy and Devices Convert Between N1C8 and N2C4
 @pytest.mark.skipif(True, reason="Skip for failed")
 class TestUnifiedCheckpointOnN1C8ToN2C4(TestUnifiedCheckpointBase):
     def setUp(self):
@@ -902,7 +902,7 @@ class TestUnifiedCheckpointOnN2C4AsyncSaveToDisk(TestUnifiedCheckpointBase):
         self.run_n2c4(self.run_pretrain_file, **train_args)
 
 
-# Test Unified Checkpoint Hybrid Parallel Strategy and Deivces Convert Betweeen N1C8 and N2C4
+# Test Unified Checkpoint Hybrid Parallel Strategy and Devices Convert Between N1C8 and N2C4
 # With Unified Checkpoint Config
 @pytest.mark.skipif(True, reason="Skip for failed, hang")
 class TestUnifiedCheckpointOnN1C8ToN2C4SkipSaveModelWeight(TestUnifiedCheckpointBase):

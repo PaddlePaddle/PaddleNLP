@@ -38,6 +38,27 @@ __attribute__((global)) void remove_padding(int64_t *x_remove_padding,
 }  // namespace plugin
 }  // namespace xpu2
 
+namespace xpu3 {
+namespace plugin {
+
+__attribute__((global)) void get_padding_offset(int *padding_offset,
+                                                int *cum_offsets_out,
+                                                int *cu_seqlens_q,
+                                                int *cu_seqlens_k,
+                                                const int *cum_offsets,
+                                                const int *seq_lens,
+                                                const int max_seq_len,
+                                                const int bs);
+__attribute__((global)) void remove_padding(int64_t *x_remove_padding,
+                                            const int64_t *input_data,
+                                            const int *seq_lens,
+                                            const int *cum_offsets,
+                                            const int sequence_length,
+                                            const int bs);
+
+}  // namespace plugin
+}  // namespace xpu3
+
 namespace baidu {
 namespace xpu {
 namespace api {
@@ -116,8 +137,11 @@ static int xpu2or3_wrapper(Context *ctx,
                         const int max_seq_len,
                         const int bs) {
   using XPU_INT64 = typename XPUIndexType<int64_t>::type;
-  auto get_padding_offset = xpu2::plugin::get_padding_offset;
-  auto remove_padding = xpu2::plugin::remove_padding;
+  bool is_xpu2 = ctx->dev().type() == api::kXPU2;
+ auto get_padding_offset = is_xpu2 ? xpu2::plugin::get_padding_offset
+                                    : xpu3::plugin::get_padding_offset;
+  auto remove_padding =
+      is_xpu2 ? xpu2::plugin::remove_padding : xpu3::plugin::remove_padding;
   get_padding_offset<<<ctx->ncluster(), 64, ctx->xpu_stream>>>(padding_offset,
                                                                cum_offsets_out,
                                                                cu_seqlens_q,

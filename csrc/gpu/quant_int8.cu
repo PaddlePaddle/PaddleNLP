@@ -65,7 +65,11 @@ __forceinline__ __device__ hip_bfloat16 add_mul<hip_bfloat16>(hip_bfloat16 a, hi
 #else
 template<>
 __forceinline__ __device__ __nv_bfloat16 add_mul<__nv_bfloat16>(__nv_bfloat16 a, __nv_bfloat16 b, __nv_bfloat16 c) {
+  #if __CUDA_ARCH__ >= 800
     return __hmul(__hadd(a, b), c);
+  #else
+    return (static_cast<float>(a) + static_cast<float>(b)) * static_cast<float>(c);
+  #endif
 }
 #endif
 
@@ -267,7 +271,7 @@ std::vector<paddle::DataType> QuantInt8Dtype(const paddle::DataType& input_dtype
 }
 
 PD_BUILD_OP(quant_int8)
-    .Inputs({"intput", paddle::Optional("shift"),paddle::Optional("smooth") })
+    .Inputs({"input", paddle::Optional("shift"),paddle::Optional("smooth") })
     .Outputs({"output"})
     .Attrs({"scale: float","round_type: int","max_bound: float", "min_bound: float"})
     .SetKernelFn(PD_KERNEL(QuantInt8))

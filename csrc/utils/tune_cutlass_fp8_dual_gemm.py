@@ -60,8 +60,11 @@ if __name__ == "__main__":
     ns = args.n
     ks = args.k
 
-    for m in range(m_min, m_max, 32):
-        for n in ns:
-            for k in ks:
-                gemm(m, n, k)
-                paddle.device.cuda.empty_cache()
+    for m in range(m_min, m_max + 32, 32):
+        if m > m_max:
+            break
+        for idx in range(len(ns)):
+            n = ns[idx]
+            k = ks[idx]
+            gemm(m, n, k)
+            paddle.device.cuda.empty_cache()
