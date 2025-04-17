@@ -16,12 +16,11 @@ git clone https://github.com/PaddlePaddle/PaddleNLP.git && cd PaddleNLP/llm # �
 python >= 3.9
 gradio
 flask
-paddlenlp_ops (可选，高性能自定义加速算子， 安装参考这里)
+paddlenlp_ops (可选，高性能自定义加速算子， 安装参考 https://paddlenlp.readthedocs.io/zh/latest/llm/docs/predict/installation.html)
 ```
 
 服务化部署,单卡脚本如下:
 ```bash
-
 python  ./predict/flask_server.py \
     --model_name_or_path Qwen/Qwen2.5-0.5B-Instruct \
     --port 8010 \
@@ -36,19 +35,19 @@ python  ./predict/flask_server.py \
 
 其他参数请参见推理文档中推理参数配置。
 
-图形化界面:
-- 打开 http://127.0.0.1:8010 即可使用 gradio 图形化界面，即可开启对话。 API 访问: 您也可用通过 flask 服务化 API 的形式
 
-访问服务:
+**使用模型**：
+1. 图形化界面:
+- 打开 http://127.0.0.1:8010 即可使用 gradio 图形化界面，即可开启对话。 API 访问: 您也可用通过 flask 服务化 API 的形式访问服务:
 
-1. 您可以直接使用 curl, 调用开始对话
+2. 您可以直接使用 curl, 调用开始对话
 ```
 curl 127.0.0.1:8011/v1/chat/completions \
 -H 'Content-Type: application/json' \
 -d '{"message": [{"role": "user", "content": "你好"}]}'
 ```
 
-2. 可以使用 OpenAI 客户端调用：
+3. 可以使用 OpenAI 客户端调用：
 ```python
 from openai import OpenAI
 
@@ -76,7 +75,7 @@ else:
 ```
 
 
-3. 还可可参考：./predict/request_flask_server.py 文件使用脚本调用。
+4. 还可可参考：`./predict/request_flask_server.py` 文件使用脚本调用。
 ```bash
 # 在 PaddleNLP/llm 目录下
 python predict/request_flask_server.py

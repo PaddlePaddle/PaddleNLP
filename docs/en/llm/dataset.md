@@ -151,7 +151,6 @@ We can obtain the processed pre-training data through the following training scr
 ```bash
 python -u  create_pretraining_data.py \
     --model_name "idea-ccnl/ziya-llama-13b-v1" \
-    --tokenizer_name "LlamaTokenizer" \
     --data_format "JSON" \
     --input_path "/home/data/baike_sample.jsonl" \
     --append_eos \

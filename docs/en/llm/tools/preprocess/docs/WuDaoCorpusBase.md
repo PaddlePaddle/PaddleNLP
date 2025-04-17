@@ -10,7 +10,7 @@ WuDaoCorpora is a large-scale Chinese corpus collected by WuDao. The total data 
 
 **1. Download and Decompress**
 
-Users can log in via WeChat on the [official website](https://resource.wudaoai.cn/home) to directly download the data. The downloaded compressed data is approximately 64GB. Decompress using:
+Users can log in via WeChat on the [official website](https://www.scidb.cn/en/detail?dataSetId=c6a3fe684227415a9db8e21bac4a15ab) to directly download the data. The downloaded compressed data is approximately 64GB. Decompress using:
 ```
 unrar x WuDaoCorpus2.0_base_200G.rar
 ```
@@ -59,7 +59,6 @@ Then use the following script to convert jsonl files to .bin & .idx files:
 ```shell
 python -u create_pretraining_data.py \
     --model_name "idea-ccnl/ziya-llama-13b-v1" \
-    --tokenizer_name "LlamaTokenizer" \
     --input_path "wudao_corpus_200g.jsonl" \
     --output_prefix "wudao_corpus_200g" \
     --data_format "JSON" \
