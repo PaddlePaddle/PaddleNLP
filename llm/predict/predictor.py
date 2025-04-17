@@ -38,8 +38,6 @@ try:
     )
 except:
     pass
-import builtins
-import functools
 
 from paddlenlp.generation import GenerationConfig, TextIteratorStreamer
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
@@ -66,80 +64,11 @@ from paddlenlp.utils.env import (
     PADDLE_INFERENCE_WEIGHTS_SUFFIX,
     SPECULATE_MAX_BSZ,
 )
-from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
+from paddlenlp.utils.import_utils import (
+    auto_dynamic_graph_pybind,
+    is_paddlenlp_ops_available,
+)
 from paddlenlp.utils.log import logger
-
-_original_import = builtins.__import__
-_imported_modules = {}
-_paddlenlp_ops_updated = False
-_original_attributes = {}
-pybind_ops_list = [
-    "update_inputs_v2",
-    "save_output",
-    "set_preids_token_penalty_multi_scores",
-    "rebuild_padding_v2",
-    "append_attention",
-    "save_output_dygraph",
-]
-
-
-def custom_import(name, *args, **kwargs):
-    global _paddlenlp_ops_updated, _imported_modules, _original_attributes
-    global pybind_ops_list
-
-    if _paddlenlp_ops_updated:
-        if name in _imported_modules:
-            return _imported_modules[name]
-
-    module = _original_import(name, *args, **kwargs)
-
-    if not _paddlenlp_ops_updated and os.getenv("USE_PYBIND", "1").lower() in ["1", "true", "t", "yes", "y"]:
-        if name == "paddlenlp_ops":
-            logger.info("Using Pybind paddlenlp_ops!")
-
-            if name not in _original_attributes:
-                bak_dict = {}
-                for ops_name in pybind_ops_list:
-                    bak_dict[ops_name] = getattr(module, ops_name, None)
-                _original_attributes[name] = bak_dict
-
-            for ops_name in pybind_ops_list:
-                pybind_ops_name = f"f_{ops_name}"
-                if hasattr(module, pybind_ops_name):
-                    setattr(module, ops_name, getattr(module, pybind_ops_name))
-
-            _paddlenlp_ops_updated = True
-
-    _imported_modules[name] = module
-    return module
-
-
-@contextmanager
-def dynamic_graph_pybind_context():
-    global _original_import, _paddlenlp_ops_updated
-    original_import = builtins.__import__
-
-    try:
-        builtins.__import__ = custom_import
-        yield
-    finally:
-        builtins.__import__ = original_import
-
-        if "paddlenlp_ops" in _original_attributes:
-            paddlenlp_ops_module = sys.modules.get("paddlenlp_ops")
-            if paddlenlp_ops_module:
-                for attr, value in _original_attributes["paddlenlp_ops"].items():
-                    setattr(paddlenlp_ops_module, attr, value)
-                _paddlenlp_ops_updated = False
-
-
-def auto_dynamic_graph_pybind(func):
-    @functools.wraps(func)
-    def wrapper(self, *args, **kwargs):
-        with dynamic_graph_pybind_context():
-            return func(self, *args, **kwargs)
-
-    return wrapper
 
 
 @dataclass
@@ -267,7 +196,6 @@ class PredictorArgument:
     )
     dynamic_insert: bool = field(default=False, metadata={"help": "whether use dynamic insert"})
     total_request_num: int = field(default=None, metadata={"help": "The total number of request data"})
-    init_cache_kvs: bool = field(default=True, metadata={"help": "whether init cache_kvs"})
 
     def __post_init__(self):
         if self.speculate_method is not None:
@@ -1181,7 +1109,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
             self.model_inputs["k_dequant_scales"] = self.k_dequant_scales
             self.model_inputs["v_dequant_scales"] = self.v_dequant_scales
 
-        if config.init_cache_kvs:
+        if kwargs.get("init_cache_kvs", True):
             self.init_cache_kvs()
 
         # init speculate components
@@ -1356,12 +1284,10 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
             self.update_model_inputs("temperature", old_config.temperature)
         self.config = old_config
 
-    def insert(self, pos, task_id):
-        # s = time.time()
-        # insert = nvtx.start_range(message="insert", color="blue")
+    def insert_task(self, pos, task_id):
         query_id = task_id
         length = len(self.input_ids[query_id])
-        print(f"Insert task {task_id} while query id is {query_id} inserting pos {pos}")
+        logger.info(f"Insert task {task_id} while query id is {query_id} inserting pos {pos}")
         self.model_inputs["input_ids"][pos, 0] = self.model_inputs["all_token_ids"][query_id, 0]
         self.model_inputs["seq_lens_this_time"][pos] = 1
         self.model_inputs["seq_lens_decoder"][pos] = length
@@ -1377,9 +1303,6 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         self.model_inputs["block_tables"][
             pos, num_prefill_blocks + 1 : num_prefill_blocks + 1 + num_decoder_blocks
         ] = np.array(self.decoder_blocks[pos])
-        # print(f'insert time(s): {time.time() - s}')
-        # paddle.device.synchronize()
-        # nvtx.end_range(insert)
 
     @paddle.no_grad()
     def predict_dy_insert(self, input_texts: list[str], return_tokens=False, **kwargs):
@@ -1534,7 +1457,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                 if len(unfinished_ids) == 0:
                     break
                 task_id = unfinished_ids.pop()
-                self.insert(cur_bs, task_id)
+                self.insert_task(cur_bs, task_id)
 
             if self.config.output_via_mq:
                 read_res_process = mp.Process(
@@ -1565,7 +1488,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                                     task_queue.put([task_id, task_token])
                                 if len(unfinished_ids) > 0:
                                     task_id = unfinished_ids.pop()
-                                    self.insert(i, task_id)
+                                    self.insert_task(i, task_id)
                     next_tokens = self._infer(self.model_inputs)
                 for i in range(max_batch_size):
                     if self.model_inputs["stop_flags"][i]:
