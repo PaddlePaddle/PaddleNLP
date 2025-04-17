@@ -14,15 +14,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional
-
 import paddle
+
+from .fp8_utils import dequantize_fp8_to_fp32
+
+try:
+    import TokenDispatcherUtils as TDU
+except:
+    pass
+
+
+def topk_to_permuted_indices(x, num_tokens_per_expert_list, topk):
+    x = paddle.flatten(x)
+    prob_permuted_indices = paddle.concat(
+        [
+            paddle.tensor.search._restrict_nonzero(x == i, total_true_num)
+            for i, total_true_num in enumerate(num_tokens_per_expert_list)
+        ]
+    ).flatten()
+    token_permuted_indices = prob_permuted_indices // topk
+    return token_permuted_indices, prob_permuted_indices
 
 
 def permute(
     tokens,
-    routing_map,
-    num_out_tokens: Optional[int] = None,
+    token_permuted_indices,
     drop_and_pad: bool = False,
 ):
     """Permute the tokens and probs based on the mask.
@@ -32,35 +48,21 @@ def permute(
 
     Args:
         tokens (paddle.Tensor): The input token tensor, [num_tokens, hidden].
-        routing_map (paddle.Tensor): The sparse token to expert mapping, [num_tokens, num_experts].
-        num_out_tokens (int, optional): The number of output tokens. If None, it's set to
-                                        the number of input tokens.
         drop_and_pad (bool, optional): Whether or not the token dispatcher uses token-drop
                                        and pads the number of tokens to the expert capacity.
     """
     assert not drop_and_pad, "token-drop and pads is not supported"
-    num_tokens, hidden = tokens.shape
-    num_experts = routing_map.shape[1]
-
-    # mask [num_tokens, num_experts] -> [num_experts, num_tokens]
-    routing_map = routing_map.cast(paddle.bool).T.contiguous()
-
-    # Create a dense expert-to-token mapping from the sparse token-to-expert mapping
-    token_indices = paddle.arange(num_tokens).unsqueeze(0).expand([num_experts, -1])
-    sorted_indices = token_indices.masked_select(routing_map)
-
-    # use the mapping to permute the tokens
-    permuted_input = tokens.index_select(axis=0, index=sorted_indices)
-
-    return permuted_input, sorted_indices
+    # permuted_input = paddle.gather(tokens, token_permuted_indices)
+    permuted_input = tokens.index_select(axis=0, index=token_permuted_indices)
+    return permuted_input
 
 
 def unpermute(
     permuted_tokens: paddle.Tensor,
-    sorted_indices: paddle.Tensor,
+    token_permuted_indices: paddle.Tensor,
+    prob_permuted_indices: paddle.Tensor,
     restore_shape: paddle.shape,
     probs: paddle.Tensor = None,
-    routing_map: paddle.Tensor = None,
     drop_and_pad: bool = False,
 ):
     """
@@ -69,11 +71,9 @@ def unpermute(
 
     Args:
         permuted_tokens (paddle.Tensor): The permuted token tensor.
-        sorted_indices (paddle.Tensor): The indices used to sort the tokens.
+        token_permuted_indices (paddle.Tensor): The indices used to sort the tokens.
         restore_shape (paddle.shape): The shape of the unpermuted tensor.
         probs (paddle.Tensor, optional): The unpermuted probs tensor,
-        routing_map (paddle.Tensor, optional): Token to expert mapping, shape
-            [num_tokens, num_experts].
         drop_and_pad (bool, optional): Whether or not the token dispatcher uses token-drop
                                        and pads the number of tokens to the expert capacity.
 
@@ -84,8 +84,7 @@ def unpermute(
     _, hidden = restore_shape
 
     if probs is not None:
-        assert routing_map is not None, "Mask must be provided to permute the probs."
-        permuted_probs = probs.T.contiguous().masked_select(routing_map.T.contiguous())
+        permuted_probs = paddle.gather(probs.flatten(), prob_permuted_indices)
         permuted_tokens = permuted_tokens * permuted_probs.unsqueeze(-1)
 
     # Create an output tensor filled with zeros
@@ -93,9 +92,223 @@ def unpermute(
     # Scatter add the permuted_input back to the original positions
     output_tokens.put_along_axis_(
         axis=0,
-        indices=sorted_indices.unsqueeze(1).expand([-1, hidden]),
+        indices=token_permuted_indices.unsqueeze(1).expand([-1, hidden]),
         values=permuted_tokens,
         reduce="add",
         include_self=True,
     )
     return output_tokens
+
+
+class UnZipNode:
+    def __init__(self, token_dispatcher, name="unzip"):
+        self.token_dispatcher = token_dispatcher
+        self.name = name
+        self.unzipped_probs = None
+        self.zipped_expertwise_rowmap = None
+
+    def reset_statue(self):
+        self.unzipped_probs = None
+        self.zipped_expertwise_rowmap = None
+
+    @paddle.no_grad()
+    def forward(
+        self,
+        hs_fp8_dispatched,
+        hs_scale_dispatched,
+        dispatched_indices,
+        dispatched_probs,
+        topk,
+        num_experts,
+        max_tokens,
+    ):
+
+        hs_fp8_dispatched_copy = hs_fp8_dispatched.cast(paddle.float32)
+        unzipped_tokens, zipped_expertwise_rowmap, unzipped_probs, unzipped_scale = TDU.tokens_unzip_stable(
+            hs_fp8_dispatched_copy.cast(paddle.float8_e4m3fn),
+            hs_scale_dispatched,
+            dispatched_indices,
+            dispatched_probs,
+            topk=self.token_dispatcher._comm_manager.router_topk,  # int32
+            num_experts=num_experts,
+            max_tokens_per_expert=max_tokens,
+        )
+        self.unzipped_probs = unzipped_probs
+        self.zipped_expertwise_rowmap = zipped_expertwise_rowmap
+        return (
+            unzipped_tokens,
+            unzipped_scale,
+            zipped_expertwise_rowmap,
+            unzipped_probs,
+        )
+
+    @paddle.no_grad()
+    def backward(self, dx, hidden_states_out_grad, probs_grad, dispatched_indices):
+        probs_grad_copy = probs_grad.unsqueeze(-1).cast(paddle.float32)
+        weighted_zipped_tokens, probs_grad_zipped = TDU.tokens_zip(
+            # dx_copy.cast(paddle.bfloat16),
+            dx,
+            self.zipped_expertwise_rowmap,
+            dispatched_indices,
+            probs_grad_copy,
+            total_zipped_tokens=hidden_states_out_grad.shape[0],
+            num_experts=4,
+        )
+        self.reset_statue()
+        return weighted_zipped_tokens, probs_grad_zipped
+
+
+class ZipNode:
+    def __init__(self, token_dispatcher, name="zip"):
+        self.token_dispatcher = token_dispatcher
+        self.name = name
+
+    @paddle.no_grad()
+    def forward(
+        self, expert_out, zipped_expertwise_rowmap, routemap_topk, unzipped_probs, total_zipped_tokens, num_experts
+    ):
+        expert_out_zipped, zipped_probs_topk = TDU.tokens_zip(
+            expert_out, zipped_expertwise_rowmap, routemap_topk, unzipped_probs, total_zipped_tokens, num_experts
+        )
+        return expert_out_zipped
+
+    @paddle.no_grad()
+    def backward(
+        self,
+        grad_output,
+        grad_output_scale,
+        dispatched_indices,
+        dispatched_probs,
+        top_k,
+        num_experts,
+        max_tokens,
+    ):
+        (
+            unzipped_grad,
+            zipped_expertwise_rowmap_grad,
+            unzipped_probs_grad,
+            unzipped_scale_grad,
+        ) = TDU.tokens_unzip_stable(
+            grad_output, grad_output_scale, dispatched_indices, dispatched_probs, top_k, num_experts, max_tokens
+        )
+
+        return unzipped_grad, unzipped_scale_grad
+
+
+class PermuteNode:
+    def __init__(self, token_dispatcher, name="permute"):
+        self.token_dispatcher = token_dispatcher
+        self.name = name
+
+    def reset_status(self):
+        self.token_permuted_indices = None
+        self.prob_permuted_indices = None
+
+    def forward(self, hidden_states, hidden_states_scale, dispatched_indices):
+        self.token_dispatcher._comm_manager.hidden_shape_before_permute = hidden_states.shape
+        self.hidden_shape_before_permute = hidden_states.shape
+        self.token_permuted_indices, self.prob_permuted_indices = topk_to_permuted_indices(
+            dispatched_indices,
+            self.token_dispatcher._comm_manager.tokens_per_expert,
+            self.token_dispatcher._comm_manager.router_topk,
+        )
+        hidden_states = permute(hidden_states, self.token_permuted_indices)
+        # permute scale
+        hidden_states_scale = permute(hidden_states_scale, self.token_permuted_indices)
+
+        return hidden_states, hidden_states_scale, self.token_permuted_indices, self.prob_permuted_indices
+
+    def backward(self, out_grad, dispatched_probs):
+        input_dtype = out_grad.dtype
+        hidden_states_grad = unpermute(
+            permuted_tokens=out_grad,
+            token_permuted_indices=self.token_permuted_indices,
+            prob_permuted_indices=self.prob_permuted_indices,
+            restore_shape=self.hidden_shape_before_permute,
+            probs=dispatched_probs,
+        )
+        self.reset_status()
+        return hidden_states_grad.to(input_dtype)
+
+
+class UnPermuteNode:
+    def __init__(self, token_dispatcher, name="unpermute"):
+        self.token_dispatcher = token_dispatcher
+        self.name = name
+
+    def reset_status(self):
+        self.token_permuted_indices = None
+        self.hidden_states = None
+        self.prob_permuted_indices = None
+        self.faltten_dispatched_probs = None
+        self.hidden = None
+        self.permuted_tokens = None
+        self.output_tokens = None
+
+    def forward(
+        self,
+        hidden_states,
+        token_permuted_indices,
+        prob_permuted_indices,
+        dispatched_probs,
+    ):
+        self.token_permuted_indices = token_permuted_indices
+        self.input_dtype = hidden_states.dtype
+        self.hidden_states = hidden_states
+        self.prob_permuted_indices = prob_permuted_indices
+        self.dispatched_probs_shape = dispatched_probs.shape
+        # permute
+        _, self.hidden = self.token_dispatcher._comm_manager.hidden_shape_before_permute
+
+        self.faltten_dispatched_probs = dispatched_probs.flatten()
+
+        self.permuted_probs = paddle.gather(self.faltten_dispatched_probs, self.prob_permuted_indices)
+        permuted_tokens = self.hidden_states * self.permuted_probs.unsqueeze(-1)
+        permuted_tokens = permuted_tokens.cast(self.hidden_states.dtype)
+
+        # Create an output tensor filled with zeros
+        output_tokens = paddle.zeros(
+            self.token_dispatcher._comm_manager.hidden_shape_before_permute, dtype=self.hidden_states.dtype
+        )
+        # Scatter add the permuted_input back to the original positions
+        output_tokens.put_along_axis_(
+            axis=0,
+            indices=self.token_permuted_indices.cast("int32").unsqueeze(1).expand([-1, self.hidden]),
+            values=permuted_tokens,
+            reduce="add",
+            include_self=True,
+        )
+        with paddle.base.device_guard("cpu"):
+            self.output_tokens = paddle.empty(shape=output_tokens.shape, dtype=output_tokens.dtype)
+
+        return output_tokens.to(self.input_dtype)
+
+    def backward(self, out_grad, out_grad_scale):
+        hidden_states_grad = paddle.gather(out_grad, self.token_permuted_indices)
+
+        output_tokens_grad = dequantize_fp8_to_fp32(out_grad, out_grad_scale)
+        permuted_tokens = self.hidden_states * self.permuted_probs.unsqueeze(-1)
+        permuted_tokens = permuted_tokens.cast(self.hidden_states.dtype)
+
+        _, permuted_tokens_grad = paddle._C_ops.put_along_axis_grad(
+            self.output_tokens,
+            self.token_permuted_indices.cast("int32").unsqueeze(1).expand([-1, self.hidden]),
+            permuted_tokens,
+            self.output_tokens,
+            output_tokens_grad,
+            0,
+            "add",
+            True,
+        )
+
+        permuted_probs_grad = (permuted_tokens_grad * self.hidden_states).sum(axis=-1)
+
+        faltten_dispatched_probs_grad = paddle._C_ops.gather_grad(
+            self.faltten_dispatched_probs, self.prob_permuted_indices, permuted_probs_grad, 0
+        )
+
+        # dispatched_probs_grad = paddle._C_ops.flatten_grad(self.dispatched_probs, faltten_dispatched_probs_grad)
+        dispatched_probs_grad = faltten_dispatched_probs_grad.reshape(self.dispatched_probs_shape)
+
+        self.reset_status()
+        return hidden_states_grad, dispatched_probs_grad
