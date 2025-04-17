@@ -118,32 +118,32 @@ std::vector<paddle::Tensor> SimpleAppendAttentionKernel(
   }
 
   if (max_enc_len_this_time_data > 0) {
-    // EncoderWriteCacheWithRopeKernel<data_t, data_t>(
-    //     meta_data,
-    //     qkv_out,
-    //     seq_lens_this_time,
-    //     seq_lens_encoder,
-    //     seq_lens_decoder,
-    //     padding_offsets,
-    //     cum_offsets,
-    //     block_tables,
-    //     kv_batch_ids,
-    //     kv_tile_ids_per_batch,
-    //     rotary_embs,
-    //     qkv_out_scales,
-    //     qkv_bias,
-    //     cache_k_quant_scales,
-    //     cache_v_quant_scales,
-    //     cache_k_zp,
-    //     cache_v_zp,
-    //     cache_quant_type_str,
-    //     kv_num_blocks_data,
-    //     max_input_length,
-    //     use_neox_rotary_style,
-    //     main_stream,
-    //     &qkv_out,
-    //     const_cast<paddle::Tensor*>(&key_cache),
-    //     const_cast<paddle::Tensor*>(&value_cache));
+    EncoderWriteCacheWithRopeKernel<data_t, data_t>(
+        meta_data,
+        qkv_out,
+        seq_lens_this_time,
+        seq_lens_encoder,
+        seq_lens_decoder,
+        padding_offsets,
+        cum_offsets,
+        block_tables,
+        kv_batch_ids,
+        kv_tile_ids_per_batch,
+        rotary_embs,
+        qkv_out_scales,
+        qkv_bias,
+        cache_k_quant_scales,
+        cache_v_quant_scales,
+        cache_k_zp,
+        cache_v_zp,
+        cache_quant_type_str,
+        kv_num_blocks_data,
+        max_input_length,
+        use_neox_rotary_style,
+        main_stream,
+        &qkv_out,
+        const_cast<paddle::Tensor*>(&key_cache),
+        const_cast<paddle::Tensor*>(&value_cache));
     
     CascadeAppendAttentionKernel<data_t, data_t>(
         meta_data,
@@ -190,6 +190,28 @@ std::vector<paddle::Tensor> SimpleAppendAttentionKernel(
     } else {
       exec_stream = main_stream;
     }
+    DecoderWriteCacheWithRoPEKernel<data_t, data_t>(
+        meta_data,
+        qkv_out,  // [token_num, num_heads, head_dim]
+        seq_lens_decoder,
+        seq_lens_encoder,
+        padding_offsets,
+        cum_offsets,
+        block_tables,
+        rotary_embs,
+        qkv_out_scales,
+        qkv_bias,
+        cache_k_quant_scales,
+        cache_v_quant_scales,
+        cache_k_zp,
+        cache_v_zp,
+        cache_quant_type_str,
+        use_neox_rotary_style,
+        max_input_length,
+        exec_stream,
+        &qkv_out,
+        const_cast<paddle::Tensor*>(&key_cache),
+        const_cast<paddle::Tensor*>(&value_cache));
     CascadeAppendAttentionKernel<data_t, data_t>(
         meta_data,
         qkv_out,
