@@ -210,6 +210,8 @@ class ActorReferenceTrainer(RLTrainer):
                     rollout_logprob_batch_size = batch_size
             else:
                 rollout_logprob_batch_size = int(self.args.rollout_logprob_batch_size)
+                if rollout_logprob_batch_size < 0:
+                    rollout_logprob_batch_size = batch_size
 
         num_batches = (batch_size + rollout_logprob_batch_size - 1) // rollout_logprob_batch_size
 

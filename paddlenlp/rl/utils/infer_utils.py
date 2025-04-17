@@ -106,8 +106,9 @@ class PolicyPredictor(DygraphBlockInferencePredictor):
     def __init__(
         self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None, model: PretrainedModel = None, **kwargs
     ):
+        self.args = kwargs.pop("training_args", None)
+        self.is_available = kwargs.pop("is_available", False)
         super().__init__(config, tokenizer, model, **kwargs)
-        self.args = kwargs["training_args"]
 
     def enable(self, model, offload_model=True):
         if self.is_available:
@@ -216,7 +217,7 @@ class PolicyPredictor(DygraphBlockInferencePredictor):
             fill_value=llm_utils.get_eos_token_id(self.tokenizer, self.generation_config)[0],
             dtype="int64",
         )
-        if not self.rollout_use_fake_outputs:
+        if not self.args.rollout_use_fake_outputs:
             s_time = time.time()
             with self.update_predictor_params(**kwargs):
                 for i, inst in enumerate(self.input_ids):
@@ -391,8 +392,8 @@ def create_predictor(trainer: Trainer):
                 model_args=model_args,
                 init_cache_kvs=False,
                 training_args=trainer.args,
+                is_available=False,
             )
-            predictor.is_available = False
     return predictor
 
 

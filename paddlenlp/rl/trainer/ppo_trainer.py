@@ -1163,7 +1163,7 @@ class PPOTrainer(Trainer):
             "eos_mask": gather_and_pad(eos_mask, dp_group, sd_group),
         }
 
-        return new_batch
+        return [new_batch]
 
     def get_rank_data(self, tensor):
         return tensor.split(self.args.dataset_world_size)[self.args.dataset_rank]
@@ -1174,11 +1174,13 @@ class PPOTrainer(Trainer):
             "reward_advantages": self.get_rank_data(new_batches[0]["reward_advantages"]),
             "rewards": self.get_rank_data(new_batches[0]["rewards"]),
             "ori_rewards": self.get_rank_data(new_batches[0]["ori_rewards"]),
-            "reward_returns": self.get_rank_data(new_batches[0]["reward_returns"]),
-            "kl_rewards": self.get_rank_data(new_batches[0]["kl_rewards"]),
-            "rewards_with_kl": self.get_rank_data(new_batches[0]["rewards_with_kl"]),
             "eos_mask": self.get_rank_data(new_batches[0]["eos_mask"]),
         }
+        if self.args.rl_algorithm == "reinforce_plus_plus":
+            local_data["reward_returns"] = self.get_rank_data(new_batches[0]["reward_returns"])
+            local_data["kl_rewards"] = self.get_rank_data(new_batches[0]["kl_rewards"])
+            local_data["rewards_with_kl"] = self.get_rank_data(new_batches[0]["rewards_with_kl"])
+
         offset = 0
         for idx, batch in enumerate(micro_batches):
             for k, v in local_data.items():
@@ -1191,6 +1193,7 @@ class PPOTrainer(Trainer):
                         {k: local_data[k][offset : offset + len(batch["log_probs"])][:, : shapes[idx][-1]]}
                     )
             offset += len(batch["log_probs"])
+        return micro_batches
 
     def train(
         self,
@@ -1903,8 +1906,8 @@ class PPOTrainer(Trainer):
                 old_reward_values = rl_batch["reward_values"]  # length: src + tgt -1
 
             if self.args.rl_algorithm == "grpo":
-                eos_mask = (rl_batch["input_ids"] != self.tokenizer.pad_token_id)[:, 1:].to(old_log_probs.dtype)
-                start = rl_batch["prompt"].shape[-1] - 1
+                eos_mask = rl_batch["eos_mask"]
+                start = 0
                 reward_advantages = compute_grpo_advantages(
                     rewards, rl_batch["index"], eos_mask[:, start:], old_log_probs.shape[-1]
                 )
