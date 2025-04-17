@@ -860,14 +860,14 @@ def faster_set_state_dict(model, state_dict, strict_dtype=True):
 
 def _load_state_dict_into_model(model_to_load, state_dict, start_prefix):
     # torch will cast dtype in load_state_dict, but paddle strictly check dtype
-    _convert_state_dict_dtype_and_shape(state_dict, model_to_load)
-
-    error_msgs = []
-
     if len(start_prefix) > 0:
         for key in list(state_dict.keys()):
             if key.startswith(start_prefix):
                 state_dict[key.replace(start_prefix, "")] = state_dict.pop(key)
+
+    _convert_state_dict_dtype_and_shape(state_dict, model_to_load)
+
+    error_msgs = []
 
     # TODO: add return status to state_dict
     with warnings.catch_warnings(record=True) as w:

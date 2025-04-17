@@ -12,17 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import random
 import sys
+from collections import defaultdict
 from enum import Enum, auto
 
+import numpy as np
 import paddle
 import paddle.distributed as dist
 from paddle import nn
+from paddle.distributed import fleet
 
 from ...trainer.trainer import Trainer, logger
-from ...utils.distributed import distributed_gather
 from ...utils.nested import flatten_list, nested_broadcast_tensor_with_empty
-from .offload_utils import offload_tensor_to_cpu
+from ..models.ppo_model_utils import make_position_ids_from_input_ids
+from .reshard_utils import init_reshard_mappings, init_rollout_env, reshard_to_rollout
 
 global_dev_id = 0 if paddle.get_device() == "cpu" else int(paddle.get_device().split(":")[1])
 
@@ -64,16 +68,16 @@ class RolloutStages(Enum):
 
 def get_timer_label(stage: Enum) -> str:
     """
-    获取计时器标签。
+    Get the timer label.
 
     Args:
         stage (Enum): RolloutStages/CriticStages/RolloutStages.
 
     Returns:
-        str: 打印Timer时的前缀。格式为 "[prefix] stage number.description"。
-            - prefix: 阶段前缀，如"actor-step"、"critic-step"等。
-            - stage number: 从1开始编号。
-            - description: 阶段描述，小写形式。
+        str: The prefix when printing the Timer. Format is "[prefix] stage number.description".
+            - prefix: Stage prefix, e.g., "actor-step", "critic-step".
+            - stage number: Numbered from 1.
+            - description: Stage description in lowercase.
     """
     step_prefix = {
         ActorStages.MODEL_ENABLE_DISABLE: "actor-step",
@@ -103,13 +107,16 @@ def get_timer_label(stage: Enum) -> str:
 
 def cleanup_tensor_space(tensors):
     """
-    释放张量所占的空间，包括内存和磁盘空间。如果输入是字典类型，则递归处理其中的值；如果是paddle.Tensor类型，则清除数据；否则返回原始对象。
+    Release the space occupied by tensors, including memory and disk space.
+    If the input is a dictionary, recursively process its values;
+    if it is a paddle.Tensor, clear the data; otherwise, return the original object.
 
     Args:
-        tensors (Union[dict, paddle.Tensor]): 需要释放空间的张量或字典，其中字典的值为张量。
+        tensors (Union[dict, paddle.Tensor]): Tensors or dictionary to release space, where the values of the dictionary are tensors.
 
     Returns:
-        Union[dict, paddle.Tensor]: 如果输入是字典，则返回一个新的字典，其中值已经被释放空间；如果输入是paddle.Tensor，则返回一个清除了数据的paddle.Tensor。否则返回原始对象。
+        Union[dict, paddle.Tensor]: If the input is a dictionary, return a new dictionary with values having their space released;
+        if the input is a paddle.Tensor, return a paddle.Tensor with data cleared. Otherwise, return the original object.
     """
     if isinstance(tensors, dict):
         for _, v in tensors.items():
@@ -117,22 +124,22 @@ def cleanup_tensor_space(tensors):
     elif isinstance(tensors, paddle.Tensor):
         tensors._clear_data()
     else:
-        logger.debug(f"Can't parse for type {type(tensors)}")
+        logger.debug(f"[cleanup_tensor_space]Can't parse for type {type(tensors)}")
         return tensors
 
 
 def data_group_split(tensors, group):
     """
-    将数据按照给定的分组进行切分，如果没有给定分组则直接返回原始数据。
-    支持列表、元组、字典和paddle.Tensor类型的数据。
+    Split data according to the given group. If no group is given, return the original data.
+    Supports list, tuple, dictionary, and paddle.Tensor types of data.
 
     Args:
-        tensors (Union[List[Any], Tuple[Any], Dict[str, Any], paddle.Tensor]): 待切分的数据，可以是任意类型。
-        group (Optional[distributed.Group]): 指定要切分的分组，如果为None则直接返回原始数据。默认为None。
+        tensors (Union[List[Any], Tuple[Any], Dict[str, Any], paddle.Tensor]): Data to be split, can be any type.
+        group (Optional[distributed.Group]): The group to split by, if None, return the original data. Default is None.
 
     Returns:
-        Union[List[Any], Tuple[Any], Dict[str, Any], paddle.Tensor]: 切分后的数据，与输入数据类型一致。
-        如果输入数据为字典，则返回的新字典中的值也会被切分。
+        Union[List[Any], Tuple[Any], Dict[str, Any], paddle.Tensor]: Split data, consistent with the input data type.
+        If the input data is a dictionary, the values in the returned new dictionary will also be split.
     """
     if group is None:
         return tensors
@@ -146,22 +153,22 @@ def data_group_split(tensors, group):
     elif isinstance(tensors, paddle.Tensor):
         return tensors.split(group.nranks)[group.rank]
     else:
-        logger.debug(f"Can't parse for type {type(tensors)}")
+        logger.debug(f"[data_group_split]Can't parse for type {type(tensors)}")
         return tensors
 
 
 def data_group_merge(tensors, group):
     """
-    将数据组合成一个新的列表或字典，如果不是None则在指定的分组中进行all_gather_nd操作。
+    Combine data into a new list or dictionary, or perform all_gather_nd operation in the specified group if not None.
 
     Args:
-        tensors (Union[List[Any], Tuple[Any], Dict[str, Any], paddle.Tensor]): 需要组合的数据，可以是列表、元组、字典或张量。
-            如果是张量，则会在指定的分组中进行all_gather_nd操作，并返回一个张量。
-        group (Optional[int]): 指定的分组，如果为None，则直接返回原始数据。默认为None。
+        tensors (Union[List[Any], Tuple[Any], Dict[str, Any], paddle.Tensor]): Data to be combined, can be list, tuple, dictionary, or tensor.
+            If it is a tensor, an all_gather_nd operation will be performed in the specified group, and a tensor will be returned.
+        group (Optional[int]): The specified group, if None, return the original data. Default is None.
 
     Returns:
-        Union[List[Any], Tuple[Any], Dict[str, Any], paddle.Tensor]: 返回一个新的列表或字典，或者一个张量，取决于传入的数据类型。
-        如果是张量，则是在指定的分组中进行all_gather_nd操作后的结果。
+        Union[List[Any], Tuple[Any], Dict[str, Any], paddle.Tensor]: Return a new list or dictionary, or a tensor, depending on the input data type.
+        If it is a tensor, it is the result of the all_gather_nd operation in the specified group.
 
     Raises:
         None
@@ -180,25 +187,29 @@ def data_group_merge(tensors, group):
         tensor_list = []
         all_gather_nd(tensor_list, tensors, group=group, padded=True)
         return paddle.concat(tensor_list)
+    elif isinstance(tensors, np.ndarray):
+        tensor_list = []
+        all_gather_nd(tensor_list, tensors, group=group, padded=True)
+        return np.concatenate(tensor_list)
     else:
-        logger.debug(f"Can't parse for type {type(tensors)}")
+        logger.debug(f"[data_group_merge]Can't parse for type {type(tensors)}")
         return tensors
 
 
 def group_rank_guard(group, rank=0):
     """
-    用于控制某个进程组中的某个进程是否参与函数调用，并在所有进程完成后进行通信。
-    如果该进程组中的某个进程不是指定的rank，则不会调用该函数。
+    Control whether a process in a process group participates in a function call and communicate after all processes are done.
+    If a process in the process group is not the specified rank, the function will not be called.
 
     Args:
-        group (distributed.ProcessGroup): 进程组对象。
-        rank (int, optional, default=0): 需要参与函数调用的进程的rank，默认为0。
-            rank为-1时表示所有进程都参与。
+        group (distributed.ProcessGroup): Process group object.
+        rank (int, optional, default=0): The rank of the process that needs to participate in the function call, default is 0.
+            When rank is -1, all processes participate.
 
     Returns:
-        function: 返回一个装饰器，该装饰器接受一个函数作为参数，返回一个包装后的函数。
-                  被装饰的函数将在指定的rank的进程中被调用，其他进程不会被调用。
-                  在所有进程完成后，将进行通信，并广播结果到所有进程。
+        function: Returns a decorator that accepts a function as an argument and returns a wrapped function.
+                  The decorated function will be called in the specified rank process, and other processes will not be called.
+                  After all processes are done, communication will be performed, and the results will be broadcast to all processes.
     """
 
     def decorator(func):
@@ -219,18 +230,18 @@ def group_rank_guard(group, rank=0):
 
 def repad_rl_batches(batches, input_lengths):
     """
-    对输入的批次进行重新填充，使得每个批次的长度都是最大长度。
-    如果批次中包含了位置ID，则在未被访问到的部分填充为1。
+    Repad the input batches so that the length of each batch is the maximum length.
+    If the batch contains position IDs, fill the unaccessed parts with 1.
 
     Args:
-        batches (dict): 包含输入数据和其他信息的字典，格式为{"input_ids": Tensor, "attention_mask": Tensor, ...}。
-            其中Tensor的形状应该是（batch_size, sequence_length）。
-        input_lengths (Tensor): 一个长度为batch_size的张量，表示每个批次的实际长度。
-            形状为（batch_size,）。
+        batches (dict): A dictionary containing input data and other information, formatted as {"input_ids": Tensor, "attention_mask": Tensor, ...}.
+            The shape of the Tensor should be (batch_size, sequence_length).
+        input_lengths (Tensor): A tensor of length batch_size, indicating the actual length of each batch.
+            Shape is (batch_size,).
 
     Returns:
-        dict: 返回一个更新后的字典，包含了重新填充后的输入数据和其他信息。
-            如果原始批次中没有包含位置ID，那么这个字段将不会出现在返回值中。
+        dict: Returns an updated dictionary containing the repadded input data and other information.
+            If the original batch does not contain position IDs, this field will not appear in the return value.
 
     Raises:
         None
@@ -249,14 +260,14 @@ def repad_rl_batches(batches, input_lengths):
 
 def remove_input_padding(input_ids, pad_id):
     """
-    从输入ID中移除填充，返回一个列表，每个元素是一个不包含pad_id的paddle.Tensor。
+    Remove padding from input IDs and return a list, where each element is a paddle.Tensor without pad_id.
 
     Args:
-        input_ids (List[paddle.Tensor]): 包含输入ID的列表，每个元素是一个1维的paddle.Tensor，dtype为int64。
-        pad_id (int): 需要移除的填充ID。
+        input_ids (List[paddle.Tensor]): A list containing input IDs, each element is a 1D paddle.Tensor with dtype int64.
+        pad_id (int): The padding ID to be removed.
 
     Returns:
-        List[paddle.Tensor]: 包含不包含pad_id的输入ID的列表，每个元素是一个1维的paddle.Tensor，dtype为int64。
+        List[paddle.Tensor]: A list containing input IDs without pad_id, each element is a 1D paddle.Tensor with dtype int64.
     """
     result = []
     for ids in input_ids:
@@ -268,16 +279,17 @@ def remove_input_padding(input_ids, pad_id):
 
 def concat_input_response_and_padding(input_ids_wo_padding, response, pad_id):
     """
-    将输入和响应进行拼接，并添加适当的填充。
+    Concatenate input and response with appropriate padding.
 
     Args:
-        input_ids_wo_padding (List[Tensor]): 不包含填充的输入ID列表，形状为（batch_size，seq_len）。
-        response (Tensor): 响应矩阵，形状为（num_return_index，batch_size，seq_len）。
-        pad_id (int): 用于填充的ID。
+        input_ids_wo_padding (List[Tensor]): List of input IDs without padding, shape (batch_size, seq_len).
+        response (Tensor): Response matrix, shape (num_return_index, batch_size, seq_len).
+        pad_id (int): ID used for padding.
 
     Returns:
-        Tensor: 返回一个形状为（num_return_index，batch_size，max_seq_len）的Tensor，其中max_seq_len是所有输入和响应的最大长度。
-        每个元素都是由input_ids_wo_padding和response的对应元素拼接而成的。如果拼接后的长度小于max_seq_len，则会在末尾追加pad_id。
+        Tensor: Returns a Tensor of shape (num_return_index, batch_size, max_seq_len), where max_seq_len is the maximum length of all inputs and responses.
+        Each element is concatenated from input_ids_wo_padding and the corresponding element of response.
+        If the concatenated length is less than max_seq_len, pad_id will be appended at the end.
     """
     concat_results = []
     max_seq_len = 0
@@ -311,7 +323,7 @@ class SkipWithBlock(Exception):
 class SkipContextManager:
     def __init__(self, skip):
         """
-            Initializes the class with the given skip value.
+        Initializes the class with the given skip value.
 
         Args:
             skip (int): The number of rows to skip in the input data.
@@ -323,11 +335,11 @@ class SkipContextManager:
 
     def __enter__(self):
         """
-            在进入上下文管理器时调用，返回自身。
-        如果需要执行一些初始化操作，可以重写此方法。
+        Called when entering the context manager, returns self.
+        If initialization operations are needed, this method can be overridden.
 
         Returns:
-            TraceContextManager: 当前实例对象自身。
+            SkipContextManager: The current instance of the object.
         """
         if self.skip:
             sys.settrace(lambda *args, **keys: None)
@@ -336,31 +348,30 @@ class SkipContextManager:
 
     def trace(self, frame, event, arg):
         """
-        跟踪函数执行，并在遇到指定的代码块时抛出SkipWithBlock异常。
-            当前实现只支持单个代码块，不支持多个。
+        Traces function execution and raises a SkipWithBlock exception when encountering the specified code block.
+        Current implementation only supports a single code block, not multiple.
 
         Args:
-            frame (types.FrameType): 当前执行的frame对象。
-            event (str): 事件类型，包括'call', 'return', 'exception_raised', 'yield'.
-            arg (Any): 可选参数，用于传递给event_handler函数。
+            frame (types.FrameType): The current executing frame object.
+            event (str): The event type, including 'call', 'return', 'exception_raised', 'yield'.
+            arg (Any): Optional argument passed to the event_handler function.
 
         Raises:
-            SkipWithBlock: 当遇到指定的代码块时抛出此异常，表示需要跳过后续的测试执行。
+            SkipWithBlock: Raised when encountering the specified code block, indicating that subsequent test execution should be skipped.
         """
         raise SkipWithBlock
 
     def __exit__(self, type, value, traceback):
         """
-            如果退出时没有异常，则返回True。如果退出时是SkipWithBlock的子类，则返回True以抑制该异常。否则返回False。
-        如果没有异常，则返回True。如果退出时是SkipWithBlock的子类，则返回True以抑制该异常。否则返回False。
+        If no exception is present when exiting, returns True. If the exception is a subclass of SkipWithBlock, returns True to suppress the exception. Otherwise, returns False.
 
         Args:
-            type (Optional[Type[BaseException]]): 可选，异常类型，如果为None，则表示没有异常。默认为None。
-            value (Optional[BaseException]): 可选，异常对象，如果type不为None，则必须提供value参数。默认为None。
-            traceback (Optional[traceback]): 可选，追踪信息，如果type不为None，则必须提供traceback参数。默认为None。
+            type (Optional[Type[BaseException]]): Optional, the exception type. If None, indicates no exception. Default is None.
+            value (Optional[BaseException]): Optional, the exception object. If type is not None, value must be provided. Default is None.
+            traceback (Optional[traceback]): Optional, traceback information. If type is not None, traceback must be provided. Default is None.
 
         Returns:
-            bool: 如果没有异常或者异常是SkipWithBlock的子类，则返回True；否则返回False。
+            bool: Returns True if no exception is present or the exception is a subclass of SkipWithBlock; otherwise, returns False.
         """
         if type is None:
             return  # No exception
@@ -380,270 +391,128 @@ def all_gather_nd(tensor_list, tensor, group=None, padded=False):
     Returns:
         (Tensor): output list of tensors that can be of different sizes
     """
-    tensor_dim = tensor.dim()
-    if tensor_dim == 0:
-        tensor = tensor.reshape([1])
-        dist.all_gather(tensor_list, tensor, group=group)
+    if isinstance(tensor, paddle.Tensor):
+        tensor_dim = tensor.dim()
+        if tensor_dim == 0:
+            tensor = tensor.reshape([1])
+            dist.all_gather(tensor_list, tensor, group=group)
+            return tensor_list
+
+        world_size = group.nranks
+        local_size = paddle.to_tensor(tensor.shape, place=tensor.place)
+        all_sizes = [paddle.zeros_like(local_size) for _ in range(world_size)]
+        dist.all_gather(all_sizes, local_size, group=group)
+
+        max_length = max(size[-1] for size in all_sizes)
+
+        length_diff = max_length.item() - local_size[-1].item()
+        if length_diff:
+            if tensor_dim == 1:
+                tensor = paddle.concat([tensor, paddle.zeros([length_diff], dtype=tensor.dtype)])
+            elif tensor_dim == 2:
+                pad_size = (*tensor.shape[:-1], length_diff)
+                padding = paddle.zeros(pad_size, dtype=tensor.dtype)
+                tensor = paddle.concat([tensor, padding], axis=-1)
+            elif tensor_dim == 4:
+                # Note(gongenlei): support attention mask(not used)
+                tensor = nn.Pad2D([0, length_diff, 0, length_diff], mode="constant", value=0.0)(tensor)
+
+        all_tensors_padded = []
+        tensor = tensor.contiguous()
+        dist.all_gather(all_tensors_padded, tensor, group=group)
+        # all_tensors = []
+        if padded:
+            tensor_list.extend(all_tensors_padded)
+            return all_tensors_padded
+
+        for tensor_, size in zip(all_tensors_padded, all_sizes):
+            if tensor_dim == 1:
+                tensor_list.append(tensor_[: size[-1]])
+            elif tensor_dim == 2:
+                tensor_list.append(tensor_[..., : size[-1]])
+            elif tensor_dim == 4:
+                tensor_list.append(tensor_[..., : size[-1], : size[-1]])
         return tensor_list
-
-    world_size = group.nranks
-    local_size = paddle.to_tensor(tensor.shape, place=tensor.place)
-    all_sizes = [paddle.zeros_like(local_size) for _ in range(world_size)]
-    dist.all_gather(all_sizes, local_size, group=group)
-
-    max_length = max(size[-1] for size in all_sizes)
-
-    length_diff = max_length.item() - local_size[-1].item()
-    if length_diff:
-        if tensor_dim == 2:
-            pad_size = (*tensor.shape[:-1], length_diff)
-            padding = paddle.zeros(pad_size, dtype=tensor.dtype)
-            tensor = paddle.concat([tensor, padding], axis=-1)
-        elif tensor_dim == 4:
-            # Note(gongenlei): support attention mask
-            tensor = nn.Pad2D([0, length_diff, 0, length_diff], mode="constant", value=0.0)(tensor)
-
-    all_tensors_padded = []
-    tensor = tensor.contiguous()
-    dist.all_gather(all_tensors_padded, tensor, group=group)
-    # all_tensors = []
-    if padded:
-        tensor_list.extend(all_tensors_padded)
-        return all_tensors_padded
-
-    for tensor_, size in zip(all_tensors_padded, all_sizes):
-        if tensor_dim == 2:
-            tensor_list.append(tensor_[..., : size[-1]])
-        elif tensor_dim == 4:
-            tensor_list.append(tensor_[..., : size[-1], : size[-1]])
-    return tensor_list
+    elif isinstance(tensor, np.ndarray):
+        dist.all_gather_object(tensor_list, tensor, group=group)
+    else:
+        logger.debug(f"[all_gather_nd]Can't parse for type {type(tensor)}")
 
 
 def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
     """
-    导出评估模型。
+    Export the evaluation model.
 
     Args:
         self (Trainer, required):
-            Trainer 对象的引用。
+            Reference to the Trainer object.
 
         train_model (nn.Layer, required):
-            Train 模型，需要在训练过程中使用。
+            The training model to be used during training.
 
         eval_model (Optional[nn.Layer], optional):
-            评估模型，如果没有提供，则返回 None。默认为 None。
+            The evaluation model. If not provided, returns None. Default is None.
 
         with_offload (bool, optional):
-            是否将训练模型的张量转换到 CPU 上，默认为 False。
+            Whether to offload the tensors of the training model to CPU. Default is False.
 
         kwargs (Dict, optional):
-            可选参数字典，包括：
+            A dictionary of optional parameters, including:
             - with_offload (bool, optional):
-                是否将训练模型的张量转换到 CPU 上，默认为 False。
+                Whether to offload the tensors of the training model to CPU. Default is False.
 
     Returns:
         Optional[None]:
-            如果 eval_model 不存在，则返回 None；否则返回 None。
+            Returns None if eval_model does not exist; otherwise, returns None.
 
     Raises:
         ValueError:
-            当 eval_model 的 tensor_parallel_degree 与 train_model 的 tensor_parallel_degree 不相同时，会引发此错误。
+            Raised when the tensor_parallel_degree of eval_model is different from that of train_model.
     """
     if eval_model is None:
         return None
 
-    with_offload = kwargs.pop("with_offload", False)
-    train_tp_size = max(train_model.config.tensor_parallel_degree, 1)
-    eval_tp_size = max(eval_model.config.tensor_parallel_degree, 1)
-    eval_tp_rank = max(eval_model.config.tensor_parallel_rank, 0)
-
-    hcg = dist.fleet.get_hybrid_communicate_group()
-    tp_group = hcg.get_model_parallel_group()
+    hcg = fleet.get_hybrid_communicate_group()
     pp_group = hcg.get_pipe_parallel_group()
+    tp_group = hcg.get_model_parallel_group()
     sd_group = hcg.get_sharding_parallel_group()
     dp_group = hcg.get_data_parallel_group()
+    pp_rank = hcg.get_stage_id()
 
-    global_rank = paddle.distributed.get_rank()
+    if not hasattr(self, "global_meta_dict") or self.global_meta_dict is None:
+        self.global_meta_dict = init_reshard_mappings(train_model, self.args, pp_rank, pp_group)
 
-    train_state_dict = train_model.state_dict()
-    eval_state_dict = eval_model.state_dict()
-
-    if dp_group.rank <= 0 and sd_group.rank <= 0:
-        train_pp_size = pp_group.nranks
-        if eval_tp_size > 1 and train_tp_size != eval_tp_size:
-            raise ValueError("Only support for the same tensor_parallel_degree for train and eval model for now.")
-
-        # 单卡情况
-        # tp->single
-        # tp+pp -> single
-        if eval_tp_size == 1:
-            if train_pp_size == 1 and train_tp_size > 1:
-                # tp ->single
-                logger.error("using tp to single eval model.")
-                # state = train_model.merge_tensor_parallel()
-                tp_actions = train_model.get_tensor_parallel_convert_actions(
-                    train_model.config,
-                    loaded_state_dict_keys=eval_state_dict.keys(),
-                    is_split=False,
-                    ignore_error=False,
-                )
-
-                is_dst = global_rank == 0
-                for key in eval_state_dict.keys():
-                    tensor = train_state_dict[key]
-                    if key in tp_actions:
-                        ret = distributed_gather(tensor, dst=0, group=tp_group, offload=False)
-                        action = tp_actions.pop(key)
-                        tensor = action(ret) if is_dst else None
-                    else:
-                        tensor = tensor._copy_to(paddle.CPUPlace(), False) if is_dst else None
-
-                    if tensor is not None:
-                        eval_state_dict[key].set_value(tensor)
-
-                    if not eval_state_dict[key]._is_initialized():
-                        v = eval_state_dict[key]
-                        t = paddle._C_ops.full_like(v, 0, v.dtype, paddle.CUDAPlace(global_dev_id))
-                        v.get_tensor()._share_data_with(t.get_tensor())
-
-                    if with_offload:
-                        offload_tensor_to_cpu((train_state_dict[key], "tensor"))
-            else:
-                # single to single
-                # tp+pp -> single
-                raise ValueError("Not support yet.")
-
-        def create_send_recv_table(train_keys, eval_keys, is_value_trainer):
-            recv_table = []
-            send_table = []
-            if pp_group.rank == 0:
-                for key in eval_keys:
-                    if (not eval_model.config.weight_sharing) and is_value_trainer:
-                        if "output_linear.out_linear" in key:
-                            logger.debug(f"Skip: {key}")
-                            continue
-                    recv_table.append((key, global_rank))
-
-            for key in train_keys:
-                send_table.append((key, global_rank))
-
-            all_recv, all_send = [], []
-            paddle.distributed.all_gather_object(all_recv, [recv_table], group=pp_group)
-            paddle.distributed.all_gather_object(all_send, [send_table], group=pp_group)
-            all_recv = flatten_list(all_recv)
-            all_send = flatten_list(all_send)
-
-            send_dict = {}
-            for k, v in all_send:
-                send_dict[k] = v
-
-            table = []
-            for k, v in all_recv:
-                # key, send, recv
-                table.append([k, send_dict.pop(k), v])
-            assert len(send_dict) == 0, f"Some key can't be recv {send_dict.keys()}"
-            return table
-
-            # pp0tp0 -> pp0tp0
-            # pp0tp1 -> pp0tp1
-            # pp1tp0 -> pp0tp0
-            # pp1tp1 -> pp0tp1
-
-        # tp情况
-        # tp+pp->tp
-        # self.timers and self.timers("export-merge-pp").start()
-        if eval_tp_size > 1 and train_pp_size > 1:
-            table = create_send_recv_table(
-                train_state_dict.keys(),
-                eval_state_dict.keys(),
-                self.trainer_type == "value",
-            )
-
-            for key, src_rank, dst_rank in table:
-                # Init tensor for model is cleaned
-                if not eval_state_dict[key]._is_initialized():
-                    v = eval_state_dict[key]
-                    t = paddle._C_ops.full_like(v, 0, v.dtype, paddle.CUDAPlace(global_dev_id))
-                    v.get_tensor()._share_data_with(t.get_tensor())
-
-                if src_rank == dst_rank and global_rank == src_rank:
-                    eval_state_dict[key].copy_(train_state_dict[key], True)
-                else:
-                    if global_rank == src_rank:
-                        dist.stream.send(train_state_dict[key], dst=dst_rank)
-
-                    if global_rank == dst_rank:
-                        dist.stream.recv(eval_state_dict[key], src=src_rank)
-
-                # Offload train model if need
-                if global_rank == src_rank and with_offload:
-                    offload_tensor_to_cpu((train_state_dict[key], "tensor"))
-
-        # self.timers and self.timers("export-merge-pp").stop()
-        # self.timers and self.timers("export-broadcast-pp").start()
-        if pp_group.nranks > 1:
-            paddle.distributed.parallel.sync_params_buffers(
-                eval_model,
-                comm_group=pp_group,
-                src_rank=pp_group.ranks[0],
-                fuse_params=False,
-            )
-        # self.timers and self.timers("export-broadcast-pp").stop()
-    else:
-        # 其他 DP rank 的state dict, 适配 offload 和初始化
-        # self.timers and self.timers("export-offload-and-init").start()
-        if with_offload:
-            for key in list(train_state_dict.keys()):
-                offload_tensor_to_cpu((train_state_dict[key], "tensor"))
-        for k, v in eval_state_dict.items():
-            if not v._is_initialized():
-                t = paddle._C_ops.full_like(v, 0, v.dtype, paddle.CUDAPlace(global_dev_id))
-                v.get_tensor()._share_data_with(t.get_tensor())
-        # self.timers and self.timers("export-offload-and-init").stop()
-
-    paddle.distributed.barrier()
-    # self.timers and self.timers("export-broadcast-sd-dp").start()
-    if eval_tp_size == 1:
-        for _, tensor in eval_state_dict.items():
-            paddle.distributed.broadcast(tensor, src=0, group=None, sync_op=True)
-    else:
-        if sd_group.nranks > 1:
-            if dp_group.rank <= 0:
-                paddle.distributed.parallel.sync_params_buffers(
-                    eval_model,
-                    comm_group=sd_group,
-                    src_rank=sd_group.ranks[0],
-                    fuse_params=False,
-                )
-        if dp_group.nranks > 1:
-            paddle.distributed.parallel.sync_params_buffers(
-                eval_model,
-                comm_group=dp_group,
-                src_rank=dp_group.ranks[0],
-                fuse_params=False,
-            )
-    # self.timers and self.timers("export-broadcast-sd-dp").stop()
+    with init_rollout_env(self.args.rollout_tensor_parallel_degree):
+        hcg = fleet.get_hybrid_communicate_group()
+        tensor_parallel_degree = hcg.get_model_parallel_world_size()
+        tensor_parallel_rank = hcg.get_model_parallel_rank()
+        eval_tp_size = max(tensor_parallel_degree, 1)
+        eval_tp_rank = max(tensor_parallel_rank, 0)
+        reshard_to_rollout(
+            train_model, eval_model, self.global_meta_dict, pp_rank, pp_group, hcg.get_model_parallel_group(), tp_group
+        )
 
     old_dp_workers = self.args.world_size // (max(sd_group.nranks, 1) * max(dp_group.nranks, 1))
     group_nums = self.args.logical_process_index // old_dp_workers * eval_tp_size + eval_tp_rank
 
     if not hasattr(self, "_policy_model_eval_group") or self._policy_model_eval_group is None:
-        self._policy_model_eval_group = create_data_trans_group(global_rank, group_nums)
+        self._policy_model_eval_group = create_data_trans_group(paddle.distributed.get_rank(), group_nums)
 
     return None
 
 
 def create_data_trans_group(global_rank, group_nums):
     """
-    创建一个数据传输组，该组将根据给定的全局排名和组数分割。
-    该函数使用了paddle.distributed.all_gather_object进行通信，并返回一个新的分布式组对象。
+    Create a data transfer group that is partitioned based on the given global rank and number of groups.
+    This function uses paddle.distributed.all_gather_object for communication and returns a new distributed group object.
 
     Args:
-        global_rank (int): 当前全局排名。
-        group_nums (List[int]): 需要分割的组数列表。
+        global_rank (int): The current global rank.
+        group_nums (List[int]): A list of group numbers to partition.
 
     Returns:
-        paddle.distributed.Group: 返回一个新的分布式组对象，包含所有参与分割的全局排名。如果当前全局排名在任何一个组中，则返回该组。如果当前全局排名不在任何一个组中，则返回None。
+        paddle.distributed.Group: Returns a new distributed group object containing all global ranks participating in the partition.
+            If the current global rank is in any of the groups, it returns that group. If the current global rank is not in any of the groups, it returns None.
     """
     all_split_table = []
     paddle.distributed.all_gather_object(all_split_table, [(global_rank, group_nums)])
@@ -737,27 +606,52 @@ def masked_whiten(values, mask, shift_mean=True):
     return whitened
 
 
-def gather_and_pad(tensor, dp_group, sd_group, pad_index=0.0, pad=True):
+def pad_tensor(tensor_list, pad_index=0.0, dtype="bfloat16", padding_side="right"):
+    max_size = max([i.shape[-1] for i in tensor_list])
+    data_num = sum([i.shape[0] for i in tensor_list])
+    if isinstance(tensor_list[0], paddle.Tensor):
+        new_tensor = paddle.full((data_num, max_size), pad_index, dtype=dtype)
+    elif isinstance(tensor_list[0], np.ndarray):
+        new_tensor = np.full((data_num, max_size), pad_index, dtype=dtype)
+
+    offset = 0
+    for idx, i in enumerate(tensor_list):
+        # new_tensor[offset : offset + i.shape[0], : i.shape[-1]] = i
+        data_length = i.shape[-1]
+
+        if padding_side == "right":
+            new_tensor[offset : offset + i.shape[0], :data_length] = i
+        elif padding_side == "left":
+            new_tensor[offset : offset + i.shape[0], -data_length:] = i
+        else:
+            raise ValueError("padding_side must be 'right' or 'left'")
+        offset += i.shape[0]
+    return new_tensor
+
+
+def gather_and_pad(tensor, dp_group=None, sd_group=None, pad_index=0.0, pad=True, padding_side="right"):
     """Gather tensor from all devices."""
+
     if not isinstance(tensor, list):
         tensor = [tensor]
+
+    if isinstance(tensor[0], paddle.Tensor):
+        type = "tensor"
+    elif isinstance(tensor[0], np.ndarray):
+        type = "numpy"
+    else:
+        raise TypeError(f"{type(tensor[0])} is not supported for gather and pad")
+
     dtype = tensor[0].dtype
 
-    def pad_tensor(tensor_list):
-        max_size = max([i.shape[-1] for i in tensor_list])
-        data_num = sum([i.shape[0] for i in tensor_list])
-        new_tensor = paddle.full((data_num, max_size), pad_index, dtype=dtype)
-        offset = 0
-        for idx, i in enumerate(tensor_list):
-            new_tensor[offset : offset + i.shape[0], : i.shape[-1]] = i
-            offset += i.shape[0]
-        return new_tensor
-
-    if dp_group.nranks == 1 and sd_group.nranks == 1:
+    if (dp_group is None and sd_group is None) or (dp_group.nranks == 1 and sd_group.nranks == 1):
         if not pad:
-            return paddle.concat(tensor, axis=0)
+            if isinstance(tensor[0], paddle.Tensor):
+                return paddle.concat(tensor, axis=0)
+            else:
+                return np.concatenate(tensor, axis=0)
         else:
-            return pad_tensor(tensor)
+            return pad_tensor(tensor, pad_index=pad_index, dtype=dtype, padding_side=padding_side)
 
     def map_func(weight):
         if isinstance(weight, paddle.Tensor):
@@ -781,9 +675,254 @@ def gather_and_pad(tensor, dp_group, sd_group, pad_index=0.0, pad=True):
     else:
         gathered_tensor = sd_gathered_tensor
 
-    gathered_tensor = [paddle.to_tensor(i, dtype=dtype) for i in flatten_list(gathered_tensor)]
+    if type == "tensor":
+        gathered_tensor = [paddle.to_tensor(i, dtype=dtype) for i in flatten_list(gathered_tensor)]
 
     if not pad:
-        return paddle.concat(gathered_tensor, axis=0)
+        if type == "tensor":
+            return paddle.concat(gathered_tensor, axis=0)
+        else:
+            return np.concatenate(flatten_list(gathered_tensor), axis=0)
     else:
-        return pad_tensor(gathered_tensor)
+        return pad_tensor(gathered_tensor, pad_index=pad_index, dtype=dtype)
+
+
+def combine_micro_batches(micro_batches, pad_token_id=0):
+    """combine micro batches to get a complete batch"""
+
+    combined_batch = {}
+
+    for micro_batch in micro_batches:
+        for key, value in micro_batch.items():
+            if isinstance(value, list):
+                if isinstance(value[0], paddle.Tensor):
+                    if key == "label_ids":
+                        value = [paddle.unsqueeze(v, axis=0) for v in value]
+                    concat_value = paddle.concat(value, axis=0)
+                elif isinstance(value[0], np.ndarray):
+                    concat_value = np.concatenate(value, axis=0)
+                combined_batch.setdefault(key, []).append(concat_value)
+            else:
+                combined_batch.setdefault(key, []).append(value)
+
+    for key, values in combined_batch.items():
+        if len(combined_batch[key][0].shape) > 1:
+            pad_index = pad_token_id
+            padding_side = "left" if (key == "prompt" or key == "label_ids") else "right"
+            combined_batch[key] = gather_and_pad(values, pad_index=pad_index, padding_side=padding_side)
+        elif isinstance(values[0], paddle.Tensor):
+            combined_batch[key] = paddle.concat(values, axis=0)
+        elif isinstance(values[0], np.ndarray):
+            combined_batch[key] = np.concatenate(values, axis=0)
+
+    return combined_batch
+
+
+def filter_valid_reward_groups(combined_batch, total_batch, num_return_sequences, variance_threshold=1e-6):
+    """
+    Filters out invalid prompt groups based on reward variance, and appends the valid samples to total_batch.
+
+    Args:
+        combined_batch (dict): A batch of generated samples. Should contain 'rewards' or
+                               'rewards_before_length_penalty', and 'index'.
+        total_batch (defaultdict): The cumulative container to append filtered results into.
+                            Each value should be a list of tensors or arrays.
+        num_return_sequences (int): Number of sequences generated per prompt.
+        variance_threshold (float): Minimum reward variance for a group to be considered valid.
+
+    Returns:
+        total_batch (dict): Updated total_batch containing valid samples from this batch.
+        num_valid_prompts (int): Number of valid prompt groups retained.
+    """
+
+    # Choose the reward key to filter by
+    select_key = "rewards_before_length_penalty" if "rewards_before_length_penalty" in combined_batch else "rewards"
+
+    rewards = combined_batch[select_key].flatten()  # paddle.Tensor
+    indices = combined_batch["index"].flatten()  # numpy.ndarray
+
+    # Group by prompt index
+    group_map = defaultdict(list)
+    rewards_list = rewards.tolist()
+    indices_list = indices.tolist()
+    for idx, (grp_idx, reward) in enumerate(zip(indices_list, rewards_list)):
+        group_map[grp_idx].append((idx, reward))
+
+    # Filter valid groups based on count and reward variance
+    valid_indices = []
+    num_valid_prompts = 0
+    for members in group_map.values():
+        if len(members) != num_return_sequences:
+            continue
+        reward_values = np.array([m[1] for m in members])
+        if np.var(reward_values) > variance_threshold:
+            num_valid_prompts += 1
+            valid_indices.extend([m[0] for m in members])
+
+    # Select only valid samples for each key and append to total_batch
+    valid_indices = np.array(valid_indices, dtype=int)
+    for key in combined_batch:
+        filtered = combined_batch[key][valid_indices]
+        total_batch[key].append(filtered)
+
+    return total_batch, num_valid_prompts
+
+
+def split_batch_by_rank(
+    total_batch,
+    dp_rank,
+    sharding_rank,
+    dp_degree,
+    sharding_degree,
+    num_return_sequences,
+    balance_batch_across_dp_group=False,
+):
+    """
+    Splits the total batch across distributed ranks for data parallel and sharding groups.
+
+    Args:
+        total_batch (dict): The full dataset to be distributed.
+        hcg: HybridCommunicateGroup from paddle.distributed.fleet.
+        dp_degree (int): Data parallel degree.
+        sharding_degree (int): Sharding parallel degree.
+        num_return_sequences (int): Number of generated sequences per prompt.
+        balance_batch_across_dp_group (bool): Whether to balance the batch based on token count.
+
+    Returns:
+        total_batch (dict): The updated batch sliced per-rank.
+    """
+    dataset_world_size = dp_degree * sharding_degree
+    global_rank = dp_rank * sharding_degree + sharding_rank
+
+    if not balance_batch_across_dp_group:
+        for key in total_batch.keys():
+            total_size = total_batch[key].shape[0]
+            chunk_size = total_size // dataset_world_size
+            start = global_rank * chunk_size
+            end = start + chunk_size
+            total_batch[key] = total_batch[key][start:end]
+    else:
+        num_prompt = total_batch["input_ids"].shape[0] // num_return_sequences
+        num_prompt_per_rank = num_prompt // dataset_world_size
+
+        # Compute total valid tokens per prompt
+        valid_tokens = total_batch["prompt_len_without_pad"] + total_batch["raw_response_len"]
+        valid_tokens = paddle.to_tensor(
+            [valid_tokens[i * num_return_sequences : (i + 1) * num_return_sequences].sum() for i in range(num_prompt)]
+        )
+
+        # Sort prompts by valid token count
+        sorted_indices = paddle.argsort(valid_tokens)
+        grouped_shuffled_indices = []
+        for i in range(dataset_world_size):
+            start = i * num_prompt_per_rank
+            end = (i + 1) * num_prompt_per_rank
+            group = sorted_indices[start:end].tolist()
+            random.shuffle(group)
+            grouped_shuffled_indices.extend(group)
+
+        shuffled_indices = paddle.to_tensor(grouped_shuffled_indices, dtype="int32")
+
+        selected_queries = [shuffled_indices[i * dataset_world_size + global_rank] for i in range(num_prompt_per_rank)]
+
+        selected_indices = []
+        for query_index in selected_queries:
+            base = int(query_index) * num_return_sequences
+            selected_indices.extend(range(base, base + num_return_sequences))
+
+        for key in total_batch.keys():
+            total_batch[key] = total_batch[key][selected_indices]
+
+    return total_batch
+
+
+def process_prompt_and_response(micro_batch, pad_token_id=0):
+    """
+    Processes prompt and response from the total batch: slices prompt, extracts and pads responses,
+    updates input_ids, position_ids, and log_probs accordingly.
+
+    Args:
+        micro_batch (dict): Dictionary containing batched tensors.
+        tokenizer: Tokenizer object with `pad_token_id`.
+
+    Returns:
+        dict: Updated micro_batch with processed input_ids and aligned log_probs.
+    """
+    max_prompt_len = micro_batch["prompt_len_without_pad"].max().item()
+    micro_batch["prompt"] = paddle.slice(
+        micro_batch["prompt"],
+        axes=[1],
+        starts=[micro_batch["prompt"].shape[1] - max_prompt_len],
+        ends=[micro_batch["prompt"].shape[1]],
+    )
+    if "label_ids" in micro_batch:
+        max_label_len = micro_batch["raw_label_ids_len"].max().item()
+        label_ids = paddle.slice(
+            micro_batch["label_ids"],
+            axes=[1],
+            starts=[micro_batch["label_ids"].shape[1] - max_label_len],
+            ends=[micro_batch["label_ids"].shape[1]],
+        )
+        split_label_ids = [paddle.squeeze(x, axis=0) for x in paddle.split(label_ids, label_ids.shape[0], axis=0)]
+        micro_batch["label_ids"] = split_label_ids
+
+    response_tensors = []
+    for i in range(micro_batch["input_ids"].shape[0]):
+        start_idx = micro_batch["prompt_len"][i]
+        end_idx = start_idx + micro_batch["response_len_without_pad"][i]
+        response_tensors.append(micro_batch["input_ids"][i, start_idx:end_idx])
+
+    max_response_len = micro_batch["response_len_without_pad"].max().item()
+    padded_response_tensors = [
+        paddle.nn.functional.pad(t, [0, max_response_len - t.shape[0]], value=pad_token_id) for t in response_tensors
+    ]
+    response = paddle.stack(padded_response_tensors, axis=0)
+
+    micro_batch["input_ids"] = paddle.concat([micro_batch["prompt"], response], axis=1)
+    micro_batch["position_ids"] = make_position_ids_from_input_ids(micro_batch["input_ids"])
+
+    micro_batch["log_probs"] = paddle.slice(
+        micro_batch["log_probs"],
+        axes=[1],
+        starts=[0],
+        ends=[max_response_len],
+    )
+    micro_batch["ref_log_probs"] = paddle.slice(
+        micro_batch["ref_log_probs"],
+        axes=[1],
+        starts=[0],
+        ends=[max_response_len],
+    )
+
+    return micro_batch
+
+
+def split_into_micro_batches(total_batch, per_device_train_batch_size, pad_token_id=0):
+    """
+    Splits total_batch into micro-batches of size `per_device_train_batch_size`.
+
+    Args:
+        total_batch (dict): Dictionary containing full batched tensors.
+        per_device_train_batch_size (int): Micro batch size per device.
+
+    Returns:
+        list of dict: A list of micro-batches.
+    """
+    micro_batches = []
+    num_micro_batches = total_batch["input_ids"].shape[0] // per_device_train_batch_size
+
+    for i in range(num_micro_batches):
+        micro_batch = {}
+        for key, data in total_batch.items():
+            if isinstance(data, paddle.Tensor):
+                micro_batch[key] = data[i * per_device_train_batch_size : (i + 1) * per_device_train_batch_size]
+            elif isinstance(data, np.ndarray):
+                micro_batch[key] = data[i * per_device_train_batch_size : (i + 1) * per_device_train_batch_size]
+            else:
+                raise TypeError(f"Unsupported data type for key {key}: {type(data)}")
+
+        micro_batch = process_prompt_and_response(micro_batch=micro_batch, pad_token_id=pad_token_id)
+
+        micro_batches.append(micro_batch)
+
+    return micro_batches

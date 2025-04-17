@@ -14,12 +14,14 @@
 
 from __future__ import annotations
 
+import contextlib
 import copy
 import inspect
 from contextlib import contextmanager
 
 import paddle
 import paddle.distributed as dist
+from paddle.distributed import fleet
 from paddle.utils import try_import
 
 from ...trainer.trainer import Trainer, logger
@@ -32,6 +34,7 @@ from ...transformers.model_utils import dtype_guard
 from ...trl.llm_utils import init_dist_env
 from ..trainer.trainer_utils import process_row
 from .offload_utils import offload_tensor_to_cpu, reload_tensor_to_gpu
+from .reshard_utils import init_rollout_env
 
 try:
     from llm.predict.predictor import (
@@ -67,6 +70,12 @@ except ImportError:
 
 
 class PolicyPredictor(DygraphBlockInferencePredictor):
+    def __init__(
+        self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None, model: PretrainedModel = None, **kwargs
+    ):
+        super().__init__(config, tokenizer, model, **kwargs)
+        self.args = kwargs["training_args"]
+
     def enable(self, model, offload_model=True):
         if self.is_available:
             return
@@ -120,9 +129,28 @@ class PolicyPredictor(DygraphBlockInferencePredictor):
             self._preprocess(input_text=None, input_ids=input_ids_list)
             self.init_cache_kvs()
             all_tokens = []
-            while self.model_inputs["not_need_stop"]:
-                next_tokens = self._infer(self.model_inputs)[:bs]
-                all_tokens.append(next_tokens)
+            if (
+                self.args.rollout_tensor_parallel_degree != self.args.tensor_parallel_degree
+                or self.args.pipeline_parallel_degree > 1
+            ):
+                ori_all_reduce = dist.all_reduce
+                ori_broadcast = dist.broadcast
+                with init_rollout_env(self.args.rollout_tensor_parallel_degree):
+                    hcg = fleet.get_hybrid_communicate_group()
+                    tp_group = hcg.get_model_parallel_group()
+                    dist.all_reduce = lambda x: ori_all_reduce(x, group=tp_group)
+                    dist.broadcast = lambda x, rank: ori_broadcast(
+                        x, src=tp_group.ranks[0], group=hcg.get_model_parallel_group()
+                    )
+                    while self.model_inputs["not_need_stop"]:
+                        next_tokens = self._infer(self.model_inputs)[:bs]
+                        all_tokens.append(next_tokens)
+                dist.all_reduce = ori_all_reduce
+                dist.broadcast = ori_broadcast
+            else:
+                while self.model_inputs["not_need_stop"]:
+                    next_tokens = self._infer(self.model_inputs)[:bs]
+                    all_tokens.append(next_tokens)
 
         # remove cache kvs
         self.cache_kvs = None
@@ -151,10 +179,6 @@ policy_predictor: PolicyPredictor = None
 
 
 def create_predictor(trainer: Trainer):
-    eval_model = getattr(trainer, "_inner_eval_model", None)
-    if eval_model is not None:
-        raise NotImplementedError("Currently do not support _inner_eval_model!")
-
     predictor_args = PredictorArgument(
         model_name_or_path=trainer.args.actor_model_name_or_path,
         src_length=trainer.args.max_src_len,
@@ -175,26 +199,40 @@ def create_predictor(trainer: Trainer):
     config.sequence_parallel = False
     config.use_fused_head_and_loss_fn = False
     config.use_fused_rms_norm = False
-    tensor_parallel_rank, tensor_parallel_degree = init_dist_env()
-    with dtype_guard(predictor_args.dtype):
-        model = AutoInferenceModelForCausalLM.from_config(
-            config=config,
-            predictor_args=predictor_args,
-            model_args=model_args,
-            dtype=predictor_args.dtype,
-            tensor_parallel_degree=tensor_parallel_degree,
-            tensor_parallel_rank=tensor_parallel_rank,
-            low_cpu_mem_usage=True,
-        )
-        model.save_output = False
-        predictor = PolicyPredictor(
-            predictor_args,
-            tokenizer=trainer.tokenizer,
-            model=model,
-            model_args=model_args,
-            init_cache_kvs=False,
-        )
-        predictor.is_available = False
+    need_reshard = (
+        trainer.args.rollout_tensor_parallel_degree != trainer.args.tensor_parallel_degree
+        or trainer.args.pipeline_parallel_degree > 1
+    )
+    if need_reshard:
+        init_context = init_rollout_env(trainer.args.rollout_tensor_parallel_degree)
+    else:
+        tensor_parallel_rank, tensor_parallel_degree = init_dist_env()
+        init_context = contextlib.nullcontext()
+    with init_context:
+        if need_reshard:
+            hcg = fleet.get_hybrid_communicate_group()
+            tensor_parallel_degree = hcg.get_model_parallel_world_size()
+            tensor_parallel_rank = hcg.get_model_parallel_rank()
+        with dtype_guard(predictor_args.dtype):
+            model = AutoInferenceModelForCausalLM.from_config(
+                config=config,
+                predictor_args=predictor_args,
+                model_args=model_args,
+                dtype=predictor_args.dtype,
+                tensor_parallel_degree=tensor_parallel_degree,
+                tensor_parallel_rank=tensor_parallel_rank,
+                low_cpu_mem_usage=True,
+            )
+            model.save_output = False
+            predictor = PolicyPredictor(
+                predictor_args,
+                tokenizer=trainer.tokenizer,
+                model=model,
+                model_args=model_args,
+                init_cache_kvs=False,
+                training_args=trainer.args,
+            )
+            predictor.is_available = False
     return predictor
 
 
@@ -225,24 +263,30 @@ def infer_guard(trainer, offload_model=True):
         if not policy_predictor.is_available:
             policy_predictor.enable(model, offload_model=offload_model)
 
-    # TODO(guosheng): patch for dist.all_recude to use tp group, fix it later
-    is_distributed = True
-    try:
-        hcg = dist.fleet.get_hybrid_communicate_group()
-    except Exception:
-        is_distributed = False
+    need_reshard = (
+        trainer.args.rollout_tensor_parallel_degree != trainer.args.tensor_parallel_degree
+        or trainer.args.pipeline_parallel_degree > 1
+    )
+    if not need_reshard:
+        is_distributed = True
+        try:
+            hcg = dist.fleet.get_hybrid_communicate_group()
+        except Exception:
+            is_distributed = False
 
-    if is_distributed:
-        ori_all_reduce = dist.all_reduce
-        ori_broadcast = dist.broadcast
+        if is_distributed:
+            ori_all_reduce = dist.all_reduce
+            ori_broadcast = dist.broadcast
 
-        dist.all_reduce = lambda x: ori_all_reduce(x, group=hcg.get_model_parallel_group())
-        dist.broadcast = lambda x, rank: ori_broadcast(
-            x, src=hcg.get_model_parallel_group_src_rank(), group=hcg.get_model_parallel_group()
-        )
-        yield
-        dist.all_reduce = ori_all_reduce
-        dist.broadcast = ori_broadcast
+            dist.all_reduce = lambda x: ori_all_reduce(x, group=hcg.get_model_parallel_group())
+            dist.broadcast = lambda x, rank: ori_broadcast(
+                x, src=hcg.get_model_parallel_group_src_rank(), group=hcg.get_model_parallel_group()
+            )
+            yield
+            dist.all_reduce = ori_all_reduce
+            dist.broadcast = ori_broadcast
+        else:
+            yield
     else:
         yield
     policy_predictor.disable(model, onload_model=offload_model)
@@ -268,6 +312,8 @@ class InferEvalModel:
                 self.model,
                 with_offload="train_model" in trainer.args.offload_level,
             )
+            # NOTE(gongenlei): Add offload
+            offload_tensor_to_cpu((trainer.model, "train_model"))
         else:
             reload_tensor_to_gpu((self.model, "train_model"))
 

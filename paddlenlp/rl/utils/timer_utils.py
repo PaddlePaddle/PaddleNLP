@@ -22,6 +22,14 @@ from .comm_utils import get_timer_label
 
 class TimerScope:
     def __init__(self, timers, name: str, minus_names: Union[List[str], str] = None):
+        """
+        Initialize the TimerScope.
+
+        Args:
+            timers (Callable): A function that returns a timer object based on a given label.
+            name (str): The name of the timer scope.
+            minus_names (Union[List[str], str], optional): A list of timer names or a single timer name to subtract their elapsed time from the current timer. Defaults to None.
+        """
         self.timers = timers
         self.name = name
         self.minus_names = minus_names
@@ -31,16 +39,20 @@ class TimerScope:
                 for name in (self.minus_names if isinstance(self.minus_names, list) else [self.minus_names])
             ]
         self.label = self._get_timer_label(name)
-        self._started = False  # 跟踪计时器状态
+        self._started = False  # Track the timer status
 
     def start(self) -> None:
-        """显式启动计时器"""
+        """
+        Explicitly start the timer.
+        """
         if self.timers:
             self.timers(self.label).start()
             self._started = True
 
     def stop(self) -> None:
-        """显式停止计时器并处理减法逻辑"""
+        """
+        Explicitly stop the timer and handle subtraction logic.
+        """
         if self.timers and self._started:
             timer = self.timers(self.label)
             timer.stop()

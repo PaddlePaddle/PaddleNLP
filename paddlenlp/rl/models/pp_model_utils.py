@@ -14,27 +14,28 @@
 
 import importlib
 import inspect
+from typing import Any, Union
 
 import paddle
 
 
 def fwd_step_patch(func, output, self, *args, **kwargs):
     """
-    前向步骤补丁函数，用于处理模型在训练过程中的梯度计算和损失记录。
-    如果当前模型是最后一个阶段并且正在进行训练，则会将输出的梯度记录到self._step_losses列表中。
-    否则，不会对输出进行任何操作。
+    Forward step patch function to handle gradient computation and loss recording during model training.
+    If the current model is the last stage and in training mode, it will record the gradient of the output
+    to the self._step_losses list. Otherwise, it will not perform any operations on the output.
 
     Args:
-        func (Callable): 被调用的函数，应该是forward函数或者其他需要执行的函数。
-        output (Tensor): 模型的输出，应该是一个张量。
-        self (Any): 模型实例，可以是nn.Module类型或其他自定义模型类型。
-        args (Tuple[Any], optional): 传递给func的可选参数，默认为None。
-        kwargs (Dict[str, Any], optional): 传递给func的可选关键字参数，默认为None。
+        func (Callable): The function being called, should be the forward function or any other function that needs to be executed.
+        output (Tensor): The output of the model, which should be a tensor.
+        self (Any): The model instance, which can be of type nn.Module or other custom model types.
+        args (Tuple[Any], optional): Optional arguments passed to func, default is None.
+        kwargs (Dict[str, Any], optional): Optional keyword arguments passed to func, default is None.
 
     Returns:
-        None, 无返回值，直接修改了self._step_losses属性。
+        None, no return value, directly modifies the self._step_losses attribute.
     """
-    # training patch
+    # Training patch
     if self.training and self.is_pipeline_last_stage():
         if getattr(self, "_step_losses", None):
             self._step_losses.append(output.detach())
@@ -44,17 +45,17 @@ def fwd_step_patch(func, output, self, *args, **kwargs):
 
 def make_wrapper(func, pre_patch=None, post_patch=None):
     """
-    创建一个包装函数，可以在调用原始函数前后执行额外的操作。
+    Creates a wrapper function that allows executing additional operations before and after calling the original function.
 
     Args:
-        func (function): 需要被包装的函数。
-        pre_patch (Optional[function], optional): 在调用原始函数前执行的函数，默认为None。
-            函数签名应该是 `pre_patch(func, None, *args, **kwargs)`。
-        post_patch (Optional[function], optional): 在调用原始函数后执行的函数，默认为None。
-            函数签名应该是 `post_patch(func, output, *args, **kwargs)`，其中output是原始函数的返回值。
+        func (function): The function to be wrapped.
+        pre_patch (Optional[function], optional): The function to be executed before calling the original function, defaults to None.
+            The function signature should be `pre_patch(func, None, *args, **kwargs)`.
+        post_patch (Optional[function], optional): The function to be executed after calling the original function, defaults to None.
+            The function signature should be `post_patch(func, output, *args, **kwargs)`, where `output` is the return value of the original function.
 
     Returns:
-        function: 包装后的函数，具有与原始函数相同的功能，但会在调用前后执行额外的操作。
+        function: The wrapped function, which has the same functionality as the original function but executes additional operations before and after the call.
     """
 
     def wrapper(*args, **kwargs):
@@ -86,13 +87,25 @@ for func in funcs:
 
 @paddle.no_grad()
 def pad_batches_inputs(inputs, padding_value=0, max_len=None, pad_len=None):
-    """Pad length for tensors shaped [bs, seq_len] to [bs, max(seq_lens)]"""
+    """
+    Pads the length of tensors shaped [bs, seq_len] to [bs, max(seq_lens)].
+
+    Args:
+        inputs (list of paddle.Tensor or None): List of input tensors or None values.
+        padding_value (int or float, optional): The value to pad with, defaults to 0.
+        max_len (int, optional): The maximum length to pad to, if not provided it will be calculated.
+        pad_len (int or list of int, optional): The length to pad each tensor by, if not provided it will be calculated.
+
+    Returns:
+        list of paddle.Tensor: List of padded input tensors.
+    """
     if pad_len is not None:
         pad_len = [pad_len] * len(inputs) if isinstance(pad_len, int) else pad_len
     elif max_len is None:
         # max_len = max([x.shape[-1] for x in inputs if x is not None])
         max_len = max([x.shape[-1] if isinstance(x, paddle.Tensor) else 0 for x in inputs])
         pad_len = [max_len - x.shape[-1] if isinstance(x, paddle.Tensor) else 0 for x in inputs]
+
     for i in range(len(inputs)):
         x = inputs[i]
         # if x is None or x.shape[-1] == max_len:
@@ -103,22 +116,25 @@ def pad_batches_inputs(inputs, padding_value=0, max_len=None, pad_len=None):
                 x,
                 paddle.full([x.shape[0], pad_len[i]], padding_value, dtype=x.dtype),
             ],
-            -1,
+            axis=-1,
         )
+
     return inputs
 
 
-def get_expected_keys(inputs, keys):
+def get_expected_keys(inputs: dict, keys: list[str]) -> Union[tuple, Any]:
     """
-    获取预期的键值对，如果输入中存在则返回该键值对，否则返回None。
-    如果键值对只有一个，则将其转换为单个元素。
+    Retrieve the expected key-value pairs from the inputs. If the key exists in the inputs,
+    return the corresponding value; otherwise, return None. If there is only one key-value pair,
+    convert it to a single element.
 
     Args:
-        inputs (dict): 包含多个键值对的字典，用于查找预期的键值对。
-        keys (list[str]): 需要查找的键列表。
+        inputs (dict): A dictionary containing multiple key-value pairs to search for the expected ones.
+        keys (list[str]): A list of keys to be searched for.
 
     Returns:
-        Union[tuple, Any]: 如果键值对只有一个，则返回单个元素；否则返回包含所有键值对的元组。如果任何键不存在，则返回None。
+        Union[tuple, Any]: If there is only one key-value pair, return the single element;
+        otherwise, return a tuple containing all key-value pairs. If any key does not exist, return None.
     """
     ret = tuple([inputs.get(k, None) for k in keys if k in inputs])
     if len(ret) == 1:
@@ -128,14 +144,16 @@ def get_expected_keys(inputs, keys):
 
 def fwd_args_to_dict(fun):
     """
-    将函数的参数转换为字典，用于支持更多的参数格式在预测流程步骤中。
-    假设没有参数是inspect.Parameter.VAR_KEYWORD。
+    Converts the function's arguments into a dictionary to support more argument formats in the prediction pipeline step.
+    Assumes that no argument is of type inspect.Parameter.VAR_KEYWORD.
 
     Args:
-        fun (Callable[[Any, Dict[str, Any]], Any]): 需要转换的函数，其第一个参数是非管道模型类实例，后续参数可以是任意格式的非管道模型前向传输参数，返回值是任意类型。
+        fun (Callable[[Any, Dict[str, Any]], Any]): The function to be converted. Its first argument is an instance of a non-pipeline model class,
+            and subsequent arguments can be any format of non-pipeline model forward arguments. The return value is of any type.
 
     Returns:
-        Callable[[Any, *Any, **Any], Any]: 返回一个新的函数，接收与原函数相同的参数，但是将所有非self参数转换为字典形式，并作为第二个参数传入原函数。
+        Callable[[Any, *Any, **Any], Any]: A new function that accepts the same arguments as the original function, but converts all non-self arguments
+            into a dictionary and passes it as the second argument to the original function.
     """
 
     def _impl(self, *args, **kwargs):

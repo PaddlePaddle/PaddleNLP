@@ -33,8 +33,8 @@ class VerbalizerTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/tiny-random-ernie")
-        cls.model = AutoModelForMaskedLM.from_pretrained("__internal_testing__/tiny-random-ernie")
+        cls.tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-tiny-nano-v2-zh")
+        cls.model = AutoModelForMaskedLM.from_pretrained("ernie-3.0-tiny-nano-v2-zh")
         cls.default_label_words = {"正向": "很", "负向": "不"}
         cls.kwargs = {
             "token_aggregate_type": "first",
@@ -218,7 +218,7 @@ class VerbalizerTest(unittest.TestCase):
 
     def test_soft_process_outputs(self):
         verb = SoftVerbalizer(self.default_label_words, self.tokenizer, copy.deepcopy(self.model))
-        outputs = paddle.rand([3, 2, 8])
+        outputs = paddle.rand([3, 2, 312])
         masked_positions = paddle.to_tensor([0, 2, 5])
         outputs = verb.process_outputs(outputs, masked_positions)
 

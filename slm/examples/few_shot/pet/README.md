@@ -4,7 +4,7 @@
 
 ## 算法简介
 
-自然语言处理任务可以通过给预训练模型提供“任务描述”等方式来进行无监督学习，但效果一般低于有监督训练。而 Pattern-Exploiting Training (PET) 是一种半监督方法，通过将输入转换为完形填空形式的短语来帮助语言模型理解任务。然后用这些短语来给无标注数据打软标签。最后在得到的标注数据集上用有监督方法进行训练。在小样本设置下，PET 在部分任务上远超有监督学习和强半监督学习方法。以 PET 为代表的提示学习与微调学习的区别如下图所示，包括数据预处理模块 `Template` 和标签词映射模块 `Verbalizer`。详细介绍及定义方法参见 [Prompt API 文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/advanced_guide/prompt.md)。
+自然语言处理任务可以通过给预训练模型提供“任务描述”等方式来进行无监督学习，但效果一般低于有监督训练。而 Pattern-Exploiting Training (PET) 是一种半监督方法，通过将输入转换为完形填空形式的短语来帮助语言模型理解任务。然后用这些短语来给无标注数据打软标签。最后在得到的标注数据集上用有监督方法进行训练。在小样本设置下，PET 在部分任务上远超有监督学习和强半监督学习方法。以 PET 为代表的提示学习与微调学习的区别如下图所示，包括数据预处理模块 `Template` 和标签词映射模块 `Verbalizer`。详细介绍及定义方法参见 [Prompt API 文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/zh/advanced_guide/prompt.md)。
 
 ![PET_and_FT](https://user-images.githubusercontent.com/25607475/192727706-0a17b5ef-db6b-46be-894d-0ee315306776.png)
 
@@ -74,7 +74,7 @@ python -u -m paddle.distributed.launch --gpus "0" run_train.py \
 - `alpha_rdrop`: R-Drop 损失值权重，默认为 0.5
 - `dropout`: 预训练模型的 dropout 参数值，用于 R-Drop 策略中参数配置
 - `export_type`: 模型导出格式，默认为 `paddle`，动态图转静态图
-- 更多配置参考 [Trainer 参数文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/trainer.md#trainingarguments-%E5%8F%82%E6%95%B0%E4%BB%8B%E7%BB%8D) 和 [PromptTrainer 参数文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/advanced_guide/prompt.md#prompttrainer%E5%8F%82%E6%95%B0%E5%88%97%E8%A1%A8)
+- 更多配置参考 [Trainer 参数文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/zh/trainer.md#trainingarguments-%E5%8F%82%E6%95%B0%E4%BB%8B%E7%BB%8D) 和 [PromptTrainer 参数文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/zh/advanced_guide/prompt.md#prompttrainer%E5%8F%82%E6%95%B0%E5%88%97%E8%A1%A8)
 
 ### 模型部署
 
