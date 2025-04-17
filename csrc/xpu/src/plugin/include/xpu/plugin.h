@@ -93,20 +93,6 @@ DLL_EXPORT int get_position_ids(Context *ctx,
                        int *position_ids,
                        const int bs);
 
-DLL_EXPORT int update_inputs(Context* ctx,
-                             bool* not_need_stop,
-                             int* seq_lens_this_time,
-                             int* seq_lens_encoder,
-                             int* seq_lens_decoder,
-                             int64_t* input_ids,
-                             const int64_t* stop_nums,
-                             const bool* stop_flags,
-                             const bool* is_block_step,
-                             const int64_t* next_tokens,
-                             const int bsz,
-                             const int max_bsz,
-                             const int input_ids_stride);
-
 template <typename T>
 DLL_EXPORT int rebuild_padding(Context *ctx,
                     T *output_data, // [bs, dim_embed]
