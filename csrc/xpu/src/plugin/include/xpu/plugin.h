@@ -17,11 +17,20 @@
 
 #pragma once
 #include "xpu/xdnn.h"
-
+#include <chrono>
 namespace baidu {
 namespace xpu {
 namespace api {
 namespace plugin {
+static std::string print_times(std::string str){
+#ifdef XPU_PRINT_OP_TIME
+  auto now = std::chrono::system_clock::now();
+  auto duration = now.time_since_epoch();
+  auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+  std::cout<<str<<":" <<milliseconds<<std::endl;
+#endif
+  return "";
+} 
 
 template <typename T>
 DLL_EXPORT int set_stop_value_multi_ends(Context* ctx,

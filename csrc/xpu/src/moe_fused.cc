@@ -39,6 +39,9 @@ std::vector<paddle::Tensor> MoeFusedKernel(
     int moe_top_k,
     int expert_group_num,
     int moe_topk_group) { // 256
+
+  baidu::xpu::api::plugin::print_times("[TIME BEGIN] MoeFusedKernel");
+
   phi::XPUPlace place(phi::backends::xpu::GetXPUCurrentDeviceId());
   auto dev_ctx = paddle::experimental::DeviceContextPool::Instance().Get(place);
   auto xpu_ctx = static_cast<const phi::XPUContext*>(dev_ctx);
@@ -106,6 +109,10 @@ std::vector<paddle::Tensor> MoeFusedKernel(
   };
   xft::xft_moe_ffn_block_sorted<XPUType, int8_t, XPUType, float>(
       xpu_ctx->x_context(), &input_tensor, &output_tensor, moe_weight, moe_param);
+
+ 
+  baidu::xpu::api::plugin::print_times("[TIME END] MoeFusedKernel");
+
   return {
       output,
   };

@@ -41,6 +41,9 @@ void StepPaddle(const paddle::Tensor& stop_flags,
                 const paddle::Tensor& first_token_ids,
                 const int block_size,
                 const int encoder_decoder_block_num) {
+
+   baidu::xpu::api::plugin::print_times("[TIME BEGIN] StepPaddle");
+
       phi::XPUPlace place(phi::backends::xpu::GetXPUCurrentDeviceId());
   auto dev_ctx = paddle::experimental::DeviceContextPool::Instance().Get(place);
   auto xpu_ctx = static_cast<const phi::XPUContext*>(dev_ctx);
@@ -105,7 +108,8 @@ void StepPaddle(const paddle::Tensor& stop_flags,
         length,
         pre_id_length);
     PD_CHECK(r == 0, "recover_block failed.");
-  }
+    }
+  baidu::xpu::api::plugin::print_times("[TIME END] StepPaddle");
 }
 
 PD_BUILD_OP(step_paddle)

@@ -25,6 +25,7 @@
 #include <xft/operation/page_attn.h>
 #include <xft/operation/fmha.h>
 #include <flash_api.h> // link xfa
+#include "ops.h"
 
 namespace xftkernel = baidu::xpu::xftkernel;
 
@@ -47,46 +48,14 @@ std::vector<paddle::Tensor> MlaDeAttn(
     const paddle::Tensor& padding_offsets,
     const paddle::Tensor& cum_offsets,
     const paddle::Tensor& block_tables,
-    const paddle::Tensor& encoder_batch_ids,
-    const paddle::Tensor& encoder_tile_ids_per_batch,
-    const paddle::Tensor& encoder_num_blocks,
-    const paddle::Tensor& kv_batch_ids,
-    const paddle::Tensor& kv_tile_ids_per_batch,
-    const paddle::Tensor& kv_num_blocks,
-    const paddle::Tensor& decoder_batch_ids,
-    const paddle::Tensor& decoder_tile_ids_per_batch,
-    const paddle::Tensor& decoder_num_blocks,
-    const paddle::Tensor& max_enc_len_this_time,
-    const paddle::Tensor& max_dec_len_this_time,
-    const paddle::Tensor& max_len_kv,
-    const paddle::optional<paddle::Tensor>& rotary_embs,
-    const paddle::optional<paddle::Tensor>& attn_mask,
-    const paddle::optional<paddle::Tensor>& qkv_bias,
-    const paddle::optional<paddle::Tensor>& qkv_out_scales,
-    const paddle::optional<paddle::Tensor>& cache_k_quant_scales,
-    const paddle::optional<paddle::Tensor>& cache_v_quant_scales,
-    const paddle::optional<paddle::Tensor>& cache_k_dequant_scales,
-    const paddle::optional<paddle::Tensor>& cache_v_dequant_scales,
-    const paddle::optional<paddle::Tensor>& cache_k_zp,
-    const paddle::optional<paddle::Tensor>& cache_v_zp,
-    const paddle::optional<paddle::Tensor>& out_linear_shifts,
-    const paddle::optional<paddle::Tensor>& out_linear_smooths,
-    const std::string& cache_quant_type_str,
-    const bool use_neox_rotary_style,
-    const int max_input_length,
     const float softmax_scale,
-    const float quant_max_bound,
-    const float quant_min_bound,
-    const float out_linear_in_scale,
-    const int speculate_max_draft_token_num,
     const int block_size,
     const int num_head,
     const int kv_lora_rank, 
     const int rope_head_dim,
     const int dim_qk,
-    const int dim_v,
-    const bool causal,
-    const bool speculate_decoder) {
+    const int dim_v) {  
+  baidu::xpu::api::plugin::print_times("[TIME BEGIN] MlaDeAttn" );
   phi::XPUPlace place(phi::backends::xpu::GetXPUCurrentDeviceId());
   auto dev_ctx = paddle::experimental::DeviceContextPool::Instance().Get(place);
   auto xpu_ctx = static_cast<const phi::XPUContext*>(dev_ctx);
@@ -128,7 +97,7 @@ std::vector<paddle::Tensor> MlaDeAttn(
                              fmha_out.shape()[1]});
 
   // decoder
-  if(max_dec_len_this_time.data<int>()[0] > 0){
+  if(dec_batch > 0){
     // context_len
     baidu::xpu::api::VectorParam<int32_t> context_len_vp{const_cast<int32_t*>(decoder_context_len_cpu.data<int32_t>()), dec_batch, const_cast<int32_t*>(decoder_context_len.data<int32_t>())};
     // real batch     
@@ -171,8 +140,8 @@ std::vector<paddle::Tensor> MlaDeAttn(
             nullptr,
             nullptr,
             nullptr);
-  }
-
+  } 
+    baidu::xpu::api::plugin::print_times("[TIME END] MlaDeAttn");
     return {fmha_out};   
 }
 
@@ -187,46 +156,13 @@ std::vector<std::vector<int64_t>> MlaDeAttnInferShape(
     const std::vector<int64_t>& padding_offsets_shape,
     const std::vector<int64_t>& cum_offsets_shape,
     const std::vector<int64_t>& block_tables_shape,
-    const std::vector<int64_t>& encoder_batch_ids_shape,
-    const std::vector<int64_t>& encoder_tile_ids_per_batch_shape,
-    const std::vector<int64_t>& encoder_num_blocks_shape,
-    const std::vector<int64_t>& kv_batch_ids_shape,
-    const std::vector<int64_t>& kv_tile_ids_per_batch_shape,
-    const std::vector<int64_t>& kv_num_blocks_shape,
-    const std::vector<int64_t>& decoder_batch_ids_shape,
-    const std::vector<int64_t>& decoder_tile_ids_per_batch_shape,
-    const std::vector<int64_t>& decoder_num_blocks_shape,
-    const std::vector<int64_t>& max_enc_len_this_time_shape,
-    const std::vector<int64_t>& max_dec_len_this_time_shape,
-    const std::vector<int64_t>& max_len_kv_shape,
-    const paddle::optional<std::vector<int64_t>>& rotary_embs_shape,
-    const paddle::optional<std::vector<int64_t>>& attn_mask_shape,
-    const paddle::optional<std::vector<int64_t>>& qkv_bias_shape,
-    const paddle::optional<std::vector<int64_t>>& qkv_out_scales_shape,
-    const paddle::optional<std::vector<int64_t>>& cache_k_quant_scales_shape,
-    const paddle::optional<std::vector<int64_t>>& cache_v_quant_scales_shape,
-    const paddle::optional<std::vector<int64_t>>& cache_k_dequant_scales_shape,
-    const paddle::optional<std::vector<int64_t>>& cache_v_dequant_scales_shape,
-    const paddle::optional<std::vector<int64_t>>& cache_k_zp_shape,
-    const paddle::optional<std::vector<int64_t>>& cache_v_zp_shape,
-    const paddle::optional<std::vector<int64_t>>& out_linear_shifts_shape,
-    const paddle::optional<std::vector<int64_t>>& out_linear_smooths_shape,    
-    const std::string& cache_quant_type_str,
-    const bool use_neox_rotary_style,
-    const int max_input_length,
     const float softmax_scale,
-    const float quant_max_bound,
-    const float quant_min_bound,
-    const float out_linear_in_scale,
-    const int speculate_max_draft_token_num,
     const int block_size,
     const int num_head,
     const int kv_lora_rank, 
     const int rope_head_dim,
     const int dim_qk,
-    const int dim_v,
-    const bool causal,
-    const bool speculate_decoder) {
+    const int dim_v) {  
   return {{q_shape[0], num_head * kv_lora_rank}};
 }
 
@@ -241,46 +177,13 @@ std::vector<paddle::DataType> MlaDeAttnInferDtype(
     const paddle::DataType& padding_offsets_dtype,
     const paddle::DataType& cum_offsets_dtype,
     const paddle::DataType& block_tables_dtype,
-    const paddle::DataType& encoder_batch_ids_dtype,
-    const paddle::DataType& encoder_tile_ids_per_batch_dtype,
-    const paddle::DataType& encoder_num_blocks_dtype,
-    const paddle::DataType& kv_batch_ids_dtype,
-    const paddle::DataType& kv_tile_ids_per_batch_dtype,
-    const paddle::DataType& kv_num_blocks_dtype,
-    const paddle::DataType& decoder_batch_ids_dtype,
-    const paddle::DataType& decoder_tile_ids_per_batch_dtype,
-    const paddle::DataType& decoder_num_blocks_dtype,
-    const paddle::DataType& max_enc_len_this_time_dtype,
-    const paddle::DataType& max_dec_len_this_time_dtype,
-    const paddle::DataType& max_len_kv_dtype,
-    const paddle::optional<paddle::DataType>& rotary_embs_dtype,
-    const paddle::optional<paddle::DataType>& attn_mask_dtype,
-    const paddle::optional<paddle::DataType>& qkv_bias_dtype,
-    const paddle::optional<paddle::DataType>& qkv_out_scales_dtype,
-    const paddle::optional<paddle::DataType>& cache_k_quant_scales_dtype,
-    const paddle::optional<paddle::DataType>& cache_v_quant_scales_dtype,
-    const paddle::optional<paddle::DataType>& cache_k_dequant_scales_dtype,
-    const paddle::optional<paddle::DataType>& cache_v_dequant_scales_dtype,
-    const paddle::optional<paddle::DataType>& cache_k_zp_dtype,
-    const paddle::optional<paddle::DataType>& cache_v_zp_dtype,
-    const paddle::optional<paddle::DataType>& out_linear_shifts_dtype,
-    const paddle::optional<paddle::DataType>& out_linear_smooths_dtype,
-    const std::string& cache_quant_type_str,
-    const bool use_neox_rotary_style,
-    const int max_input_length,
     const float softmax_scale,
-    const float quant_max_bound,
-    const float quant_min_bound,
-    const float out_linear_in_scale,
-    const int speculate_max_draft_token_num,
     const int block_size,
     const int num_head,
     const int kv_lora_rank, 
     const int rope_head_dim,
     const int dim_qk,
-    const int dim_v,
-    const bool causal,
-    const bool speculate_decoder) {
+    const int dim_v) {  
     if (q_dtype == paddle::DataType::FLOAT16) {
         return {paddle::DataType::FLOAT16};
     } else if(q_dtype == paddle::DataType::BFLOAT16){
@@ -301,48 +204,15 @@ PD_BUILD_OP(absorb_mla_block_mha_decoder_xpu)
              "dec_batch_tensor",
              "padding_offsets",
              "cum_offsets",
-             "block_tables",
-             "encoder_batch_ids",
-             "encoder_tile_ids_per_batch",
-             "encoder_num_blocks",
-             "kv_batch_ids",
-             "kv_tile_ids_per_batch",
-             "kv_num_blocks",
-             "decoder_batch_ids",
-             "decoder_tile_ids_per_batch",
-             "decoder_num_blocks",
-             "max_enc_len_this_time",
-             "max_dec_len_this_time",
-             "max_len_kv",
-             paddle::Optional("rotary_embs"),
-             paddle::Optional("attn_mask"),
-             paddle::Optional("qkv_bias"),
-             paddle::Optional("qkv_out_scales"),
-             paddle::Optional("cache_k_quant_scales"),
-             paddle::Optional("cache_v_quant_scales"),
-             paddle::Optional("cache_k_dequant_scales"),
-             paddle::Optional("cache_v_dequant_scales"),
-             paddle::Optional("cache_k_zp"),
-             paddle::Optional("cache_v_zp"),
-             paddle::Optional("out_linear_shifts"),
-             paddle::Optional("out_linear_smooths")})
+             "block_tables"})
     .Outputs({"fmha_out"})
-    .Attrs({"cache_quant_type: std::string",
-            "use_neox_rotary_style: bool",
-            "max_input_length: int",
-            "softmax_scale: float",
-            "quant_max_bound: float",
-            "quant_min_bound: float",
-            "out_linear_in_scale: float",
-            "speculate_max_draft_token_num: int",
+    .Attrs({"softmax_scale: float",
             "block_size: int",
             "num_head: int",
             "kv_lora_rank: int",
             "rope_head_dim: int",
             "dim_qk: int",
-            "dim_v: int",
-            "causal: bool",
-            "speculate_decoder: bool"})
+            "dim_v: int"})
     .SetKernelFn(PD_KERNEL(MlaDeAttn))
     .SetInferShapeFn(PD_INFER_SHAPE(MlaDeAttnInferShape))
     .SetInferDtypeFn(PD_INFER_DTYPE(MlaDeAttnInferDtype));

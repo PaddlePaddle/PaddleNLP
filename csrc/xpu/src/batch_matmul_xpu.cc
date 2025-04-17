@@ -17,6 +17,8 @@
 #include "xpu/plugin.h"
 #include <xft/xdnn_plugin.h>
 #include "cublasLt.h"
+#include "ops.h"
+
 namespace xftkernel = baidu::xpu::xftkernel;
 std::vector<paddle::Tensor> Bmm(const paddle::Tensor& input, 
                                              const paddle::Tensor& weight) {

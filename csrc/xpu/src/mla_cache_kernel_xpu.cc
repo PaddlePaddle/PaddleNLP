@@ -22,6 +22,7 @@
 #include "paddle/extension.h"
 #include "paddle/phi/core/enforce.h"
 #include "xpu/plugin.h"
+#include "ops.h"
 
 namespace xftkernel = baidu::xpu::xftkernel;
 
@@ -67,6 +68,8 @@ std::vector<paddle::Tensor> PrefillMLAWriteCache(
                     const int max_seq_len,
                     const int kv_num_heads,
                     paddle::Tensor* kv_cache) {
+  baidu::xpu::api::plugin::print_times("[TIME BEGIN] PrefillMLAWriteCache");
+
   phi::XPUPlace place(phi::backends::xpu::GetXPUCurrentDeviceId());
   auto dev_ctx = paddle::experimental::DeviceContextPool::Instance().Get(place);
   auto xpu_ctx = static_cast<const phi::XPUContext*>(dev_ctx);
@@ -147,6 +150,9 @@ std::vector<paddle::Tensor> PrefillMLAWriteCache(
           nullptr, // scale,
           nullptr, // batch_max_ptrs, 
           nullptr); // max_ptrs
+
+  baidu::xpu::api::plugin::print_times("[TIME END] PrefillMLAWriteCache");
+
   return {};
 }
 
@@ -231,6 +237,9 @@ std::vector<paddle::Tensor> DecodeMLAWriteCache(
                     const int kv_num_heads,
                     const bool speculate_decoder,
                     paddle::Tensor* kv_cache) {
+ 
+  baidu::xpu::api::plugin::print_times("[TIME BEGIN] DecodeMLAWriteCache");
+                       
   phi::XPUPlace place(phi::backends::xpu::GetXPUCurrentDeviceId());
   auto dev_ctx = paddle::experimental::DeviceContextPool::Instance().Get(place);
   auto xpu_ctx = static_cast<const phi::XPUContext*>(dev_ctx);
@@ -350,6 +359,9 @@ std::vector<paddle::Tensor> DecodeMLAWriteCache(
           nullptr, // scale,
           nullptr, // batch_max_ptrs, 
           nullptr); // max_ptrs
+
+ 
+  baidu::xpu::api::plugin::print_times("[TIME END] DecodeMLAWriteCache");
 
   return {};
 }

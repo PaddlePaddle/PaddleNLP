@@ -18,6 +18,7 @@
 #include <sys/msg.h>
 #include <sys/types.h>
 #include "paddle/extension.h"
+#include "xpu/plugin.h"
 
 #define MAX_BSZ 512
 
@@ -29,6 +30,8 @@ struct msgdata {
 void SaveOutMmsg(const paddle::Tensor& x,
                  const paddle::Tensor& not_need_stop,
                  int64_t rank_id) {
+
+  baidu::xpu::api::plugin::print_times("[TIME BEGIN] SaveOutMmsg");
   if (rank_id > 0) return;
   auto x_cpu = x.copy_to(paddle::CPUPlace(), false);
   int64_t* x_data = x_cpu.data<int64_t>();
@@ -48,6 +51,8 @@ void SaveOutMmsg(const paddle::Tensor& x,
   if ((msgsnd(msgid, &msg_sed, (MAX_BSZ + 2) * 4, 0)) == -1) {
     printf("full msg buffer\n");
   }
+
+  baidu::xpu::api::plugin::print_times("[TIME END] SaveOutMmsg");
   return;
 }
 

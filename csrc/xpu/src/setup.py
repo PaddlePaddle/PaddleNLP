@@ -29,9 +29,15 @@ PADDLE_PATH = os.path.dirname(paddle.__file__)
 PADDLE_INCLUDE_PATH = os.path.join(PADDLE_PATH, "include")
 PADDLE_LIB_PATH = os.path.join(PADDLE_PATH, "libs")
 
-XPU_LIB = os.getenv("XPU_LIB")
+BKCL_PATH = os.getenv("BKCL_PATH")
+if BKCL_PATH is None:
+    BKCL_INC_PATH = os.path.join(PADDLE_INCLUDE_PATH, "xpu")
+    BKCL_LIB_PATH = os.path.join(PADDLE_LIB_PATH, "libbkcl.so")
+else:
+    BKCL_INC_PATH = os.path.join(BKCL_PATH, "include")
+    BKCL_LIB_PATH = os.path.join(BKCL_PATH, "so", "libbkcl.so")
 
-XFT_PATH = f"{XPU_LIB}/xft_output"
+XFT_PATH = os.getenv("XFT_PATH")
 if XFT_PATH is None:
     XFT_INC_PATH = os.path.join(PADDLE_INCLUDE_PATH, "xft")
     XFT_LIB_PATH = os.path.join(PADDLE_LIB_PATH, "libxft.so")
@@ -39,18 +45,29 @@ else:
     XFT_INC_PATH = os.path.join(XFT_PATH, "include")
     XFT_LIB_PATH = os.path.join(XFT_PATH, "so", "libxft.so")
 
+XRE_PATH = os.getenv("XRE_PATH")
+if XRE_PATH is None:
+    XRE_INC_PATH = os.path.join(PADDLE_INCLUDE_PATH, "xre")
+    XRE_LIB_PATH = os.path.join(PADDLE_LIB_PATH, "libxpucuda.so")
+else:
+    XRE_INC_PATH = os.path.join(XRE_PATH, "include")
+    XRE_LIB_PATH = os.path.join(XRE_PATH, "so", "libxpucuda.so")
 
-XRE_PATH = f"{XPU_LIB}/xre"
-XRE_INC_PATH = os.path.join(XRE_PATH, "include")
-XRE_LIB_PATH = os.path.join(XRE_PATH, "so", "libcudart.so")
+XFA_PATH = os.getenv("XFA_PATH")
+if XFA_PATH is None:
+    XFA_INC_PATH = os.path.join(PADDLE_INCLUDE_PATH, "xhpc", "xfa")
+    XFA_LIB_PATH = os.path.join(PADDLE_LIB_PATH, "libxpu_flash_attention.so")
+else:
+    XFA_INC_PATH = os.path.join(XFA_PATH, "include")
+    XFA_LIB_PATH = os.path.join(XFA_PATH, "so", "libxpu_flash_attention.so")
 
-XFA_PATH = f"{XPU_LIB}/xhpc/xfa"
-XFA_INC_PATH = os.path.join(XFA_PATH, "include")
-XFA_LIB_PATH = os.path.join(XFA_PATH, "so", "libxpu_flash_attention.so")
-
-XBLAS_PATH = f"{XPU_LIB}/xhpc/xblas"
-XBLAS_INC_PATH = os.path.join(XBLAS_PATH, "include")
-XBLAS_LIB_PATH = os.path.join(XBLAS_PATH, "so", "libxpu_blas.so")
+XBLAS_PATH = os.getenv("XBLAS_PATH")
+if XBLAS_PATH is None:
+    XBLAS_INC_PATH = os.path.join(PADDLE_INCLUDE_PATH, "xhpc", "xblas")
+    XBLAS_LIB_PATH = os.path.join(PADDLE_LIB_PATH, "libxpu_blas.so")
+else:
+    XBLAS_INC_PATH = os.path.join(XBLAS_PATH, "include")
+    XBLAS_LIB_PATH = os.path.join(XBLAS_PATH, "so", "libxpu_blas.so")
 
 setup(
     name="paddlenlp_ops",
@@ -86,6 +103,8 @@ setup(
                 "./mla_cache_kernel_xpu.cc",
                 "./batch_matmul_xpu.cc",
                 "./get_infer_param.cc",
+                "./block_attn.cc",
+                # "./dynamic_set_split_value.cc"
             ],
             include_dirs=[".", "./plugin/include", XRE_INC_PATH, XFT_INC_PATH, XFA_INC_PATH, XBLAS_INC_PATH],
             extra_objects=["./plugin/build/libxpuplugin.a", XRE_LIB_PATH, XFT_LIB_PATH, XFA_LIB_PATH, XBLAS_LIB_PATH],

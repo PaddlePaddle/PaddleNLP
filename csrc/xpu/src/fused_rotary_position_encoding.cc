@@ -15,7 +15,9 @@
 #include <paddle/phi/backends/xpu/xpu_context.h>
 #include "paddle/extension.h"
 #include "xpu/plugin.h"
+#include "ops.h"
 #include <xft/xdnn_plugin.h>
+
 
 
 void FusedRotaryPositionEncoding(
@@ -29,6 +31,8 @@ void FusedRotaryPositionEncoding(
     int head_size,
     bool is_neox) {
 
+  baidu::xpu::api::plugin::print_times("[TIME BEGIN] FusedRotaryPositionEncoding" );
+
   phi::XPUPlace place(phi::backends::xpu::GetXPUCurrentDeviceId());
   auto dev_ctx = paddle::experimental::DeviceContextPool::Instance().Get(place);
   auto xpu_ctx = static_cast<const phi::XPUContext*>(dev_ctx);
@@ -36,9 +40,6 @@ void FusedRotaryPositionEncoding(
 
   typedef paddle::bfloat16 data_t;
   using XPUType = typename XPUTypeTrait<data_t>::Type;
-
-  
-
 
   int64_t num_tokens = query.dims()[0];
   int num_heads = query.numel() / num_tokens / head_size;
@@ -57,6 +58,8 @@ void FusedRotaryPositionEncoding(
   num_kv_heads,
   head_size,
   num_tokens);
+  baidu::xpu::api::plugin::print_times("[TIME END] FusedRotaryPositionEncoding" );
+
 }
 
 
