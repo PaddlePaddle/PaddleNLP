@@ -616,7 +616,7 @@ python run_qa.py \
 <a name="预测部署"></a>
 
 ## 4. 预测部署
-以中文文本情感分类问题为例，介绍一下从模型 finetune 到部署的过程。
+以中文文本情感分类问题为例，介绍一下从模型 finetune 到部署的过程（已经在 PaddlePaddle 3.0.0版本验证）。
 
 与之前的 finetune 参数配置稍有区别，此处加入了一些配置选项。
 
@@ -644,20 +644,24 @@ python run_seq_cls.py \
     --save_total_limit 3 \
 
 ```
-训练完导出模型之后，可以用于部署，`deploy/seq_cls_infer.py`文件提供了 python 部署预测示例。可执行以下命令运行部署示例：
+训练完导出模型之后，可以用于部署，`deploy/infer.py`文件提供了 python 部署预测示例。可执行以下命令运行部署示例：
 
 ```shell
-python deploy/seq_cls_infer.py --model_dir tmp/chnsenticorp_v2/export/ --device cpu --backend paddle
+python deploy/infer.py --model_dir tmp/chnsenticorp_v2/export/ --device gpu
 ```
 
 运行后预测结果打印如下：
 ```text
-WARNING: Logging before InitGoogleLogging() is written to STDERR
-W0301 08:25:37.617117 58742 analysis_config.cc:958] It is detected that mkldnn and memory_optimize_pass are enabled at the same time, but they are not supported yet. Currently, memory_optimize_pass is explicitly disabled
-[INFO] fastdeploy/runtime/runtime.cc(266)::CreatePaddleBackend    Runtime initialized with Backend::PDINFER in Device::CPU.
-Batch id: 0, example id: 0, sentence: 这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般, label: negative, negative prob: 0.9999, positive prob: 0.0001.
-Batch id: 1, example id: 0, sentence: 怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片！开始还怀疑是不是赠送的个别现象，可是后来发现每张DVD后面都有！真不知道生产商怎么想的，我想看的是猫和老鼠，不是米老鼠！如果厂家是想赠送的话，那就全套米老鼠和唐老鸭都赠送，只在每张DVD后面添加一集算什么？？简直是画蛇添足！！, label: negative, negative prob: 0.9998, positive prob: 0.0002.
-Batch id: 2, example id: 0, sentence: 还稍微重了点，可能是硬盘大的原故，还要再轻半斤就好了。其他要进一步验证。贴的几种膜气泡较多，用不了多久就要更换了，屏幕膜稍好点，但比没有要强多了。建议配赠几张膜让用用户自己贴。, label: negative, negative prob: 0.9999, positive prob: 0.0001.
+Batch id: 1189, example id: 0, sentence: 作为五星级 酒店的硬件是差了点 装修很久 电视很小 只是位置很好 楼下是DFS 对面是海港城 但性价比不高, label: positive, negative prob: 0.0001, positive prob: 0.9999.
+Batch id: 1190, example id: 0, sentence: 最好别去,很差,看完很差想换酒店,他们竟跟我要服务费.也没待那房间2分种,居然解决了问题,可觉的下次不能去的,, label: negative, negative prob: 1.0000, positive prob: 0.0000.
+Batch id: 1191, example id: 0, sentence: 看了一半就看不下去了，后半本犹豫几次都放下没有继续看的激情，故事平淡的连个波折起伏都没有，职场里那点事儿也学得太模糊，没有具体描述，而且杜拉拉就做一个行政而已，是个人都会做的没有技术含量的工作 也能描写的这么有技术含量 真是为难作者了本来冲着畅销排行第一买来看看，觉得总不至于大部分人都没品味吧？结果证明这个残酷的事实，一本让人如同嚼蜡的“畅销书”......, label: negative, negative prob: 0.9999, positive prob: 0.0001.
+Batch id: 1192, example id: 0, sentence: 酒店环境很好 就是有一点点偏 交通不是很便利 去哪都需要达车 关键是不好打 酒店应该想办法解决一下, label: positive, negative prob: 0.0003, positive prob: 0.9997.
+Batch id: 1193, example id: 0, sentence: 价格在这个地段属于适中, 附近有早餐店,小饭店, 比较方便,无早也无所, label: positive, negative prob: 0.1121, positive prob: 0.8879.
+Batch id: 1194, example id: 0, sentence: 酒店的位置不错，附近都靠近购物中心和写字楼区。以前来大连一直都住，但感觉比较陈旧了。住的期间，酒店在进行装修，翻新和升级房间设备。好是好，希望到时房价别涨太多了。, label: positive, negative prob: 0.0000, positive prob: 1.0000.
+Batch id: 1195, example id: 0, sentence: 位置不很方便，周围乱哄哄的，卫生条件也不如其他如家的店。以后绝不会再住在这里。, label: negative, negative prob: 1.0000, positive prob: 0.0000.
+Batch id: 1196, example id: 0, sentence: 抱着很大兴趣买的，买来粗粗一翻排版很不错，姐姐还说快看吧，如果好我也买一本。可是真的看了，实在不怎么样。就是中文里夹英文单词说话，才翻了2页实在不想勉强自己了。我想说的是，练习英文单词，靠这本书肯定没有效果，其它好的方法比这强多了。, label: negative, negative prob: 1.0000, positive prob: 0.0000.
+Batch id: 1197, example id: 0, sentence: 东西不错，不过有人不太喜欢镜面的，我个人比较喜欢，总之还算满意。, label: positive, negative prob: 0.0001, positive prob: 0.9999.
+Batch id: 1198, example id: 0, sentence: 房间不错,只是上网速度慢得无法忍受,打开一个网页要等半小时,连邮件都无法收。另前台工作人员服务态度是很好，只是效率有得改善。, label: positive, negative prob: 0.0001, positive prob: 0.9999.
 ......
 ```
 

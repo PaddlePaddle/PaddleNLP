@@ -443,7 +443,7 @@ def batch_retokenize(
     return output
 
 
-def process_row(row, remove_value=0, remove_side="both"):
+def process_row(row, remove_value=0, remove_side="both", eos_token_id=None):
     """
     Remove leading/trailing specific values from a tensor.
 
@@ -456,7 +456,17 @@ def process_row(row, remove_value=0, remove_side="both"):
     Returns:
         paddle.Tensor: The processed 1D tensor.
     """
-    non_zero_indices = paddle.nonzero(row != remove_value).flatten()
+    if eos_token_id is not None and remove_value == eos_token_id:
+        # 特殊处理：保留最后一个 eos_token_id 的 index
+        is_not_remove_value = row != remove_value
+        last_eos_idx = paddle.nonzero(row == eos_token_id).flatten()
+        if last_eos_idx.shape[0] > 0:
+            last_eos_idx = last_eos_idx[-1]
+            is_not_remove_value[last_eos_idx] = True  # 保留 eos
+    else:
+        is_not_remove_value = row != remove_value
+
+    non_zero_indices = paddle.nonzero(is_not_remove_value).flatten()
     if non_zero_indices.shape[0] == 0:
         # If the row is all zeros, log a warning and return the original row.
         logger.warning("Row is all zeros, no trimming will be performed.")
