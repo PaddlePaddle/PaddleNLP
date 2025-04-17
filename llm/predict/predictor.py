@@ -39,6 +39,7 @@ try:
 except:
     pass
 import builtins
+import functools
 
 from paddlenlp.generation import GenerationConfig, TextIteratorStreamer
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
@@ -71,29 +72,74 @@ from paddlenlp.utils.log import logger
 _original_import = builtins.__import__
 _imported_modules = {}
 _paddlenlp_ops_updated = False
+_original_attributes = {}
+pybind_ops_list = [
+    "update_inputs_v2",
+    "save_output",
+    "set_preids_token_penalty_multi_scores",
+    "rebuild_padding_v2",
+    "append_attention",
+    "save_output_dygraph",
+]
 
 
 def custom_import(name, *args, **kwargs):
-    global _paddlenlp_ops_updated
+    global _paddlenlp_ops_updated, _imported_modules, _original_attributes
+    global pybind_ops_list
 
-    if name in _imported_modules:
-        return _imported_modules[name]
+    if _paddlenlp_ops_updated:
+        if name in _imported_modules:
+            return _imported_modules[name]
 
     module = _original_import(name, *args, **kwargs)
 
-    if not _paddlenlp_ops_updated and os.getenv("USE_PYBIND", "False").lower() in ["1", "true", "t", "yes", "y"]:
+    if not _paddlenlp_ops_updated and os.getenv("USE_PYBIND", "1").lower() in ["1", "true", "t", "yes", "y"]:
         if name == "paddlenlp_ops":
             logger.info("Using Pybind paddlenlp_ops!")
-            module.update_inputs_v2 = module.f_update_inputs_v2
-            module.save_output = module.f_save_output
-            module.set_preids_token_penalty_multi_scores = module.f_set_preids_token_penalty_multi_scores
-            module.rebuild_padding_v2 = module.f_rebuild_padding_v2
-            module.append_attention = module.f_append_attention
-            module.save_output_dygraph = module.f_save_output_dygraph
+
+            if name not in _original_attributes:
+                bak_dict = {}
+                for ops_name in pybind_ops_list:
+                    bak_dict[ops_name] = getattr(module, ops_name, None)
+                _original_attributes[name] = bak_dict
+
+            for ops_name in pybind_ops_list:
+                pybind_ops_name = f"f_{ops_name}"
+                if hasattr(module, pybind_ops_name):
+                    setattr(module, ops_name, getattr(module, pybind_ops_name))
+
             _paddlenlp_ops_updated = True
 
     _imported_modules[name] = module
     return module
+
+
+@contextmanager
+def dynamic_graph_pybind_context():
+    global _original_import, _paddlenlp_ops_updated
+    original_import = builtins.__import__
+
+    try:
+        builtins.__import__ = custom_import
+        yield
+    finally:
+        builtins.__import__ = original_import
+
+        if "paddlenlp_ops" in _original_attributes:
+            paddlenlp_ops_module = sys.modules.get("paddlenlp_ops")
+            if paddlenlp_ops_module:
+                for attr, value in _original_attributes["paddlenlp_ops"].items():
+                    setattr(paddlenlp_ops_module, attr, value)
+                _paddlenlp_ops_updated = False
+
+
+def auto_dynamic_graph_pybind(func):
+    @functools.wraps(func)
+    def wrapper(self, *args, **kwargs):
+        with dynamic_graph_pybind_context():
+            return func(self, *args, **kwargs)
+
+    return wrapper
 
 
 @dataclass
@@ -1234,9 +1280,8 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                 return outputs
 
     @paddle.no_grad()
+    @auto_dynamic_graph_pybind
     def predict(self, input_texts: list[str], return_tokens=False):
-        # pybind
-        builtins.__import__ = custom_import
         if self.dynamic_insert:
             return self.predict_dy_insert(input_texts, return_tokens)
         if self.config.output_via_mq:
