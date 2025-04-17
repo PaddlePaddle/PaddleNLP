@@ -1354,9 +1354,6 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
             block_id += num_blocks
         # print("self.decoder_blocks: ", self.decoder_blocks)
 
-        self.cache_k_shapes = []
-        self.cache_v_shapes = []
-
         max_num_blocks_per_row_per_decoding = (self.config.max_length + self.block_size - 1) // self.block_size
 
         # For decoder_blocks
@@ -1369,15 +1366,13 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         # For tail_blocks
         max_num_blocks += max_batch_size
 
-        for i in range(self.model.config.num_hidden_layers):
-            cache_kv_shape = [
-                max_num_blocks,
-                self.model.config.num_key_value_heads // max(self.model.config.tensor_parallel_degree, 1),
-                self.model.config.block_size,
-                self.model.config.hidden_size // self.model.config.num_attention_heads,
-            ]
-            self.cache_k_shapes.append(cache_kv_shape)
-            self.cache_v_shapes.append(cache_kv_shape)
+        if self.cache_k_shapes is not None:
+            for i in range(len(self.cache_k_shapes)):
+                self.cache_k_shapes[i][0] = max_num_blocks
+        if self.cache_v_shapes is not None:
+            for i in range(len(self.cache_v_shapes)):
+                self.cache_v_shapes[i][0] = max_num_blocks
+
         self.init_cache_kvs()
 
         self.model_inputs["input_ids"] = paddle.full(
@@ -1414,7 +1409,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         # output buffers for all inputs
         self.model_inputs["all_token_ids"] = paddle.full(
             shape=[total_request_num, self.config.max_length],
-            fill_value=llm_utils.get_eos_token_id(self.tokenizer, self.generation_config)[0],
+            fill_value=self.tokenizer.pad_token_id,
             dtype="int64",
         )
         # self.model_inputs["all_scores"] = paddle.full(
@@ -1503,7 +1498,9 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                     task_queue.put([task_id, task_token])
 
         logger.info(f"running spend {time.time() - s_time}")
-
+        self.cache_kvs = None
+        self.model_inputs["cache_kvs"] = None
+        paddle.device.cuda.empty_cache()
         if self.tensor_parallel_rank == 0:
             if self.config.output_via_mq:
                 outputs = []
