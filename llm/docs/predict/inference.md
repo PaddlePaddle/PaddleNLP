@@ -94,7 +94,7 @@ PaddleNLP 提供了多种参数，用于配置推理模型和优化推理性能�
 
 - `dynamic_insert`: 离线推理时是否支持动态插入（当前仅支持 Block/Append Attention 推理），默认为 True。开启该选项后，将`batch_size`作为运行时最大批处理大小。
 
-- `total_request_num`: 自动生成的输入请求数量，仅配合`dynamic_insert`测试使用，默认为 None，和`batch_size`保持一致。
+- `total_request_num`: 自动生成的输入请求数量，仅配合`dynamic_insert`测试使用，默认为 None，即与`batch_size`保持一致。
 
 
 ### 3.2 性能优化参数
