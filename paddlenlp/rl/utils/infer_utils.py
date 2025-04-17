@@ -35,7 +35,6 @@ from ...transformers import (
     PretrainedTokenizer,
 )
 from ...transformers.model_utils import dtype_guard
-from ...trl import llm_utils
 from ...trl.llm_utils import init_dist_env
 from ..trainer.trainer_utils import process_row
 from .offload_utils import offload_tensor_to_cpu, reload_tensor_to_gpu
@@ -214,7 +213,7 @@ class PolicyPredictor(DygraphBlockInferencePredictor):
         # output buffers for all inputs
         self.model_inputs["all_token_ids"] = paddle.full(
             shape=[total_request_num, self.config.max_length],
-            fill_value=llm_utils.get_eos_token_id(self.tokenizer, self.generation_config)[0],
+            fill_value=-1,
             dtype="int64",
         )
         if not self.args.rollout_use_fake_outputs:

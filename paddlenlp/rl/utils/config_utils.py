@@ -334,6 +334,10 @@ class TrainingArguments(TrainingArguments):
         default=-1,
         metadata={"help": ("Tensor parallelism for rollout.")},
     )
+    balance_batch: bool = field(
+        default=False,
+        metadata={"help": "Balance batch for model training."},
+    )
 
     def __post_init__(self):
         """

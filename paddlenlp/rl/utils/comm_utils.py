@@ -806,7 +806,7 @@ def split_batch_by_rank(
         num_prompt_per_rank = num_prompt // dataset_world_size
 
         # Compute total valid tokens per prompt
-        valid_tokens = total_batch["prompt_len_without_pad"] + total_batch["raw_response_len"]
+        valid_tokens = total_batch["prompt_len_without_pad"] + total_batch["response_len_without_pad"]
         valid_tokens = paddle.to_tensor(
             [valid_tokens[i * num_return_sequences : (i + 1) * num_return_sequences].sum() for i in range(num_prompt)]
         )
@@ -881,18 +881,20 @@ def process_prompt_and_response(micro_batch, pad_token_id=0):
     micro_batch["input_ids"] = paddle.concat([micro_batch["prompt"], response], axis=1)
     micro_batch["position_ids"] = make_position_ids_from_input_ids(micro_batch["input_ids"])
 
-    micro_batch["log_probs"] = paddle.slice(
-        micro_batch["log_probs"],
-        axes=[1],
-        starts=[0],
-        ends=[max_response_len],
-    )
-    micro_batch["ref_log_probs"] = paddle.slice(
-        micro_batch["ref_log_probs"],
-        axes=[1],
-        starts=[0],
-        ends=[max_response_len],
-    )
+    if "log_probs" in micro_batch:
+        micro_batch["log_probs"] = paddle.slice(
+            micro_batch["log_probs"],
+            axes=[1],
+            starts=[0],
+            ends=[max_response_len],
+        )
+    if "ref_log_probs" in micro_batch:
+        micro_batch["ref_log_probs"] = paddle.slice(
+            micro_batch["ref_log_probs"],
+            axes=[1],
+            starts=[0],
+            ends=[max_response_len],
+        )
 
     return micro_batch
 
