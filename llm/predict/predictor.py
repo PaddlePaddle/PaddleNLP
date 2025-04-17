@@ -69,17 +69,30 @@ from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
 
 _original_import = builtins.__import__
+_imported_modules = {}
+_paddlenlp_ops_updated = False
 
 
 def custom_import(name, *args, **kwargs):
+    global _paddlenlp_ops_updated
+
+    if name in _imported_modules:
+        return _imported_modules[name]
+
     module = _original_import(name, *args, **kwargs)
-    if name == "paddlenlp_ops":
-        module.update_inputs_v2 = module.f_update_inputs_v2
-        module.save_output = module.f_save_output
-        module.set_preids_token_penalty_multi_scores = module.f_set_preids_token_penalty_multi_scores
-        module.rebuild_padding_v2 = module.f_rebuild_padding_v2
-        module.append_attention = module.f_append_attention
-        module.save_output_dygraph = module.f_save_output_dygraph
+
+    if not _paddlenlp_ops_updated and os.getenv("USE_PYBIND", "False").lower() in ["1", "true", "t", "yes", "y"]:
+        if name == "paddlenlp_ops":
+            logger.info("Using Pybind paddlenlp_ops!")
+            module.update_inputs_v2 = module.f_update_inputs_v2
+            module.save_output = module.f_save_output
+            module.set_preids_token_penalty_multi_scores = module.f_set_preids_token_penalty_multi_scores
+            module.rebuild_padding_v2 = module.f_rebuild_padding_v2
+            module.append_attention = module.f_append_attention
+            module.save_output_dygraph = module.f_save_output_dygraph
+            _paddlenlp_ops_updated = True
+
+    _imported_modules[name] = module
     return module
 
 
