@@ -69,6 +69,8 @@ from paddlenlp.utils.log import logger
 class PredictorArgument:
     model_name_or_path: str = field(default=None, metadata={"help": "The directory of model."})
     model_prefix: str = field(default="model", metadata={"help": "the prefix name of static model"})
+    data_parallel_degree: int = field(default=1, metadata={"help": "The data parallel degree."})
+    use_ep_parallel: bool = field(default=False, metadata={"help": "Whether to use ep parallel"})
     src_length: int = field(default=None, metadata={"help": "The max length of source text."})
     min_length: int = field(default=1, metadata={"help": "the min length for decoding."})
     max_length: int = field(default=1024, metadata={"help": "the max length for decoding."})
@@ -1611,6 +1613,10 @@ def predict():
     parser = PdArgumentParser((PredictorArgument, ModelArgument))
     predictor_args, model_args = parser.parse_args_into_dataclasses()
 
+    world_size = paddle.distributed.get_world_size()
+    data_parallel_degree = predictor_args.data_parallel_degree
+    tensor_parallel_degree = world_size // data_parallel_degree
+
     llm_utils.set_triton_cache(predictor_args.model_name_or_path, predictor_args.mode)
     try:
         from paddle.utils import try_import
@@ -1619,11 +1625,11 @@ def predict():
     except ImportError:
         logger.warning("paddlenlp_ops does not exist, please install paddlenlp_ops.")
         return
-    tensor_parallel_degree = paddle.distributed.get_world_size()
-    if tensor_parallel_degree > 1:
+
+    if world_size > 1 :
         strategy = fleet.DistributedStrategy()
         strategy.hybrid_configs = {
-            "dp_degree": 1,
+            "dp_degree": data_parallel_degree,
             "mp_degree": tensor_parallel_degree,
             "pp_degree": 1,
             "sharding_degree": 1,
@@ -1651,16 +1657,46 @@ def predict():
                     target_texts.append("")
 
     else:
+        # source_texts = [
+        #     "请问南非的首都是哪里呢？"
+        # ] * 16
+        # target_texts = [""] * 16
+
         source_texts = [
-            "2014年3月，大范围雾霾天气长时间影响我国东部地区，严重危害人体健康。造成雾霾天气的人为原因有____\r\n①工业生产中使用矿物作为燃料，大量排放污染物     ②汽车尾气的大量排放     \r\n③风力小，空气流动不畅     ④冬季取暖排放粉尘\nA. ①②③\nB. ②③④\nC. ①③④\nD. ①②④"
+            "请问南非的首都是哪里呢？",
+            "请问美国的首都是哪里呢？",
+            "请问英国的首都是哪里呢？",
+            "请问西班牙的首都是哪里呢？",
+            "请问俄罗斯的首都是哪里呢？",
+            "请问加拿大的首都是哪里呢？",
+            "请问匈牙利的首都是哪里呢？",
+            "请问日本的首都是哪里呢？",
+            "请问南非在哪里呢？",
+            "请问美国在哪里呢？",
+            "请问英国在哪里呢？",
+            "请问西班牙在哪里呢？",
+            "请问俄罗斯在哪里呢？",
+            "请问加拿大在哪里呢？",
+            "请问匈牙利在哪里呢？",
+            "请问日本在哪里呢？",
         ] * predictor_args.batch_size
-        target_texts = [""] * predictor_args.batch_size
+        target_texts = [""] * len(source_texts) * predictor_args.batch_size
 
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
     batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
 
+    if predictor_args.data_parallel_degree > 1:
+        hcg = fleet.get_hybrid_communicate_group()
+        data_parallel_degree = hcg.get_data_parallel_world_size()
+        dp_rank_id = hcg.get_data_parallel_rank()
+    else:
+        data_parallel_degree = 1
+        dp_rank_id = 0
+
     with open(model_args.output_file, "w", encoding="utf-8") as f:
         for bs, batch_source_text in enumerate(batch_source_texts):
+            if bs % data_parallel_degree != dp_rank_id:
+                continue
             logger.info("Start predict")
             outputs = predictor.predict(batch_source_text)
             logger.info("End predict")

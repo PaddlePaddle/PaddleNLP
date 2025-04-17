@@ -630,7 +630,7 @@ def read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Q
     from paddlenlp_ops import get_output
 
     while True:
-        get_output(output_tensor, 0, True)
+        get_output(output_tensor, 0, fleet.get_hybrid_communicate_group().get_data_parallel_rank(), True)
         if int(output_tensor[0, 0]) == -2:  # read none
             continue
         bsz = int(output_tensor[1, 0])

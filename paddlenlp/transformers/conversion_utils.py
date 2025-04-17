@@ -667,6 +667,20 @@ def get_tensor_parallel_split_func(tensor_parallel_degree, tensor_parallel_rank,
     return fn
 
 
+def get_ep_func(tensor_parallel_degree, tensor_parallel_rank, expert_num=-1):
+    def fn(x, expert_idx):
+        assert "PySafeSlice" in str(type(x))
+        size = x.get_shape()
+        if expert_idx // (expert_num // tensor_parallel_degree) == tensor_parallel_rank:
+            return x[:]
+        else:
+            # return a small tensor.
+            size = [1, 1]
+            return np.zeros(size).astype("float32")
+
+    return fn
+
+
 def split_or_merge_func(is_split, tensor_parallel_degree, tensor_parallel_rank, num_attention_heads=None):
     if is_split:
         return get_tensor_parallel_split_func(tensor_parallel_degree, tensor_parallel_rank, num_attention_heads)

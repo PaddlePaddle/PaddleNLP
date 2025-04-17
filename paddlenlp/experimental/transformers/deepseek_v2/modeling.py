@@ -318,6 +318,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                 self.vocab_size,
                 self.hidden_size,
                 weight_attr=paddle.ParamAttr(initializer=nn.initializer.XavierNormal()),
+                mp_group=fleet.get_hybrid_communicate_group().get_model_parallel_group(),
             )
         else:
             self.embed_tokens = nn.Embedding(
@@ -616,6 +617,8 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
             return_full_hidden_states=config.get("return_full_hidden_states", False),
         )
 
+        self.moe_config = moe_config
+
         transformer_config = FusedMultiTransformerConfig(
             embed_dim=self.hidden_size,
             num_heads=self.num_attention_heads,
@@ -647,6 +650,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
             moe_config=moe_config,
             mla_config=mla_config,
             append_attn=config.append_attn,
+            use_ep_parallel=config.use_ep_parallel,
             speculate_config=speculate_config,
         )
 
@@ -985,6 +989,14 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                 ffn2_scales = []
 
                 for expert_idx in range(self.n_routed_experts):
+                    if self.config.use_ep_parallel:
+                        rank_id = paddle.distributed.get_rank()
+                        total_cards = paddle.distributed.get_world_size()
+                        experts_per_gpu = self.n_routed_experts // total_cards
+                        start_exper_id = rank_id * experts_per_gpu
+                        end_exper_id = (rank_id + 1) * experts_per_gpu
+                        if expert_idx < start_exper_id or expert_idx >= end_exper_id:
+                            continue
                     concated_gate_up_weight = np.concatenate(
                         [
                             state_dict[
@@ -1455,6 +1467,19 @@ class DeepseekV2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, De
             num_attention_heads=config.num_attention_heads,
         )
 
+        from paddlenlp.transformers.conversion_utils import (
+            get_ep_func,
+            split_or_merge_func,
+        )
+
+        fn_expert = get_ep_func(
+            tensor_parallel_degree=paddle.distributed.get_world_size(),
+            tensor_parallel_rank=paddle.distributed.get_rank(),
+            expert_num=config.n_routed_experts,
+        )
+        if config.use_ep_parallel is False:
+            fn_expert = fn
+
         def get_tensor_parallel_split_mappings(num_layers):
             final_actions = {}
 
@@ -1495,6 +1520,26 @@ class DeepseekV2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, De
                 base_actions[f"layers.0.mlp.experts.{expert_idx}.down_proj.weight_scale_inv"] = partial(
                     fn, is_column=False
                 )
+                if config.use_ep_parallel:
+                    base_actions[f"layers.3.mlp.experts.{expert_idx}.up_proj.weight"] = partial(
+                        fn_expert, expert_idx=expert_idx
+                    )
+                    base_actions[f"layers.3.mlp.experts.{expert_idx}.gate_proj.weight"] = partial(
+                        fn_expert, expert_idx=expert_idx
+                    )
+                    base_actions[f"layers.3.mlp.experts.{expert_idx}.down_proj.weight"] = partial(
+                        fn_expert, expert_idx=expert_idx
+                    )
+                    base_actions[f"layers.3.mlp.experts.{expert_idx}.up_proj.weight_scale_inv"] = partial(
+                        fn_expert, expert_idx=expert_idx
+                    )
+                    base_actions[f"layers.3.mlp.experts.{expert_idx}.gate_proj.weight_scale_inv"] = partial(
+                        fn_expert, expert_idx=expert_idx
+                    )
+                    base_actions[f"layers.3.mlp.experts.{expert_idx}.down_proj.weight_scale_inv"] = partial(
+                        fn_expert, expert_idx=expert_idx
+                    )
+
             base_actions["layers.0.mlp.shared_experts.up_proj.weight"] = partial(fn, is_column=True)
             base_actions["layers.0.mlp.shared_experts.gate_proj.weight"] = partial(fn, is_column=True)
             base_actions["layers.0.mlp.shared_experts.down_proj.weight"] = partial(fn, is_column=False)
@@ -1511,6 +1556,10 @@ class DeepseekV2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, De
                 if "layers.0." in key:
                     for i in range(num_layers):
                         final_actions[key.replace("layers.0.", f"layers.{i}.")] = action
+                if "layers.3." in key:
+                    for i in range(3, num_layers):
+                        final_actions[key.replace("layers.3.", f"layers.{i}.")] = action
+
                 final_actions[key] = action
 
             return final_actions

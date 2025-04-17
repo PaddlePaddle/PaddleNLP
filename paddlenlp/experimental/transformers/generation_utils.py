@@ -18,6 +18,7 @@ from typing import List, Union
 
 import paddle
 import paddle.nn.functional as F
+from paddle.distributed import fleet
 
 from paddlenlp.generation import GenerationMixin, LogitsProcessor, LogitsProcessorList
 
@@ -735,7 +736,12 @@ class GenerationBlockInferenceModel(GenerationMixin):
                 _, next_tokens = paddle.tensor.top_p_sampling(probs, top_p)
 
             if self.config.tensor_parallel_degree > 1:
-                paddle.distributed.broadcast(next_tokens, 0)
+                rank = (
+                    fleet.get_hybrid_communicate_group().get_data_parallel_rank() * self.config.tensor_parallel_degree
+                )
+                paddle.distributed.broadcast(
+                    next_tokens, rank, group=fleet.get_hybrid_communicate_group().get_model_parallel_group()
+                )
 
             with paddle.base.framework._stride_in_no_check_dy2st_diff():
                 from paddlenlp_ops import update_inputs_v2
@@ -757,11 +763,11 @@ class GenerationBlockInferenceModel(GenerationMixin):
                 )
             if self.config.output_via_mq:
                 from paddlenlp_ops import save_output
-
                 save_output(
                     next_tokens,
                     model_kwargs["not_need_stop"],
                     self.config.tensor_parallel_rank,
+                    fleet.get_hybrid_communicate_group().get_data_parallel_rank(),
                 )
             return next_tokens
 

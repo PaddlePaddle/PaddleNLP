@@ -1181,6 +1181,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             config.cachekv_int8_type = predictor_args.cachekv_int8_type
             config.use_fake_parameter = predictor_args.use_fake_parameter
             config.single_card_ptq = not predictor_args.use_fake_parameter
+        config.use_ep_parallel = predictor_args.use_ep_parallel
         config.append_attn = predictor_args.append_attn
         config.decode_strategy = predictor_args.decode_strategy
         config.mla_use_matrix_absorption = predictor_args.mla_use_matrix_absorption
