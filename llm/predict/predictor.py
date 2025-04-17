@@ -1978,9 +1978,11 @@ def predict():
 def benchmark(predictor, predictor_args, model_args):
     # Just construct a simple benchmark input. We pad input to the src_length.
     test_texts = "hello world, how are you?"
-    benchmark_texts = [test_texts + "<pad>" * predictor_args.src_length for _ in range(predictor_args.batch_size)]
+    benchmark_texts = [
+        test_texts + "<pad>" * predictor_args.src_length for _ in range(predictor_args.total_request_num)
+    ]
 
-    batch_benchmark_texts = batchfy_text(benchmark_texts, predictor_args.batch_size)
+    batch_benchmark_texts = batchfy_text(benchmark_texts, predictor_args.total_request_num)
     print("***********Start Benchmark**********")
 
     warmup_time = 5
@@ -2007,9 +2009,9 @@ def benchmark(predictor, predictor_args, model_args):
             "Input length is: {}, Output length is: {}, bs is: {}, IPS: {:.3f} tokens/s, QPS: {:.3f} requests/s. ".format(
                 predictor_args.src_length,
                 predictor_args.max_length,
-                predictor_args.batch_size,
+                predictor_args.total_request_num,
                 (output_tokens / (end - start)),
-                (predictor_args.batch_size * test_time / (end - start)),
+                (predictor_args.total_request_num * test_time / (end - start)),
             )
         )
 

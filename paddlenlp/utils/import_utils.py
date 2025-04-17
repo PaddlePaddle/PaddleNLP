@@ -51,7 +51,7 @@ def custom_import(name, *args, **kwargs):
 
     module = _original_import(name, *args, **kwargs)
 
-    if not _paddlenlp_ops_updated and os.getenv("USE_PYBIND_CUSTOM_OPS", "1").lower() in [
+    if not _paddlenlp_ops_updated and os.getenv("DYNAMIC_INFERENCE_MODE", "1").lower() in [
         "1",
         "true",
         "t",
