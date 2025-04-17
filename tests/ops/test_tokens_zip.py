@@ -113,7 +113,7 @@ def verify_tokens_unzip():
     unzipped_tokens, zipped_expertwise_rowmap, unzipped_probs, unzipped_expert_idx = TDU.tokens_unzip(tokens_zipped,routemap_topk, probs_topk,total_unzipped_tokens_num=total_unzipped_tokens_num, topk=topk, num_experts=expert_num)
 
     # 本算子
-    zipped_tokens, zipped_probs_topk = TDU.tokens_zip(unzipped_tokens, zipped_expertwise_rowmap, routemap_topk, unzipped_probs, total_zipped_tokens=seqlen, num_experts=expert_num)
+    zipped_tokens, zipped_probs_topk = TDU.tokens_zip(unzipped_tokens.astype("float32"), zipped_expertwise_rowmap, routemap_topk, unzipped_probs, total_zipped_tokens=seqlen, num_experts=expert_num)
     # ------------------------- 前向验证 ------------------------
     print("-------- Tokens unzipped by customed op: ------------")
     print(unzipped_tokens)

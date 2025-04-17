@@ -292,36 +292,43 @@ __global__ void tokens_zip_kernel(
          x_offset < num_full_vec * vecSize;
          x_offset += thread_stride) {
       float2 sum = {0.0f, 0.0f};
+      __nv_bfloat162 raw = {0,0};
+      int aggreg_cnt = 0;
       __nv_bfloat162 *out_ptr = reinterpret_cast<__nv_bfloat162 *>(
           &zipped_tokens[this_row * token_length + x_offset]);
 #pragma unroll
       for (int expert = 0; expert < num_experts; ++expert) {
         const int fetch_row = local_row_fetchlist[expert];
         if (fetch_row < 0) continue;
+        aggreg_cnt ++;
         // 手动类型提升
+        raw = *reinterpret_cast<const __nv_bfloat162 *>(
+            &unzipped_tokens[fetch_row * token_length + x_offset]);
         float2 token_vec =
-            __bfloat1622float2(*reinterpret_cast<const __nv_bfloat162 *>(
-                &unzipped_tokens[fetch_row * token_length + x_offset]));
+            __bfloat1622float2(raw);
         sum.x = __fadd_rn(token_vec.x, sum.x);
         sum.y = __fadd_rn(token_vec.y, sum.y);
       }
-      // 类型下降为原有精度
-      *out_ptr = __float22bfloat162_rn(sum);
+      // 选择性类型下降为原有精度
+      *out_ptr = (aggreg_cnt > 1) ? __float22bfloat162_rn(sum) : raw;
     }
 
     // 剩余元素处理
     for (int i = num_full_vec * vecSize + threadIdx.x; i < token_length;
          i += blockDim.x) {
       float sum = 0.0f;
+      __nv_bfloat16 raw = 0;
+      int aggreg_cnt = 0;
 #pragma unroll
       for (int expert = 0; expert < num_experts; ++expert) {
         int fetch_row = local_row_fetchlist[expert];
         if (fetch_row < 0) continue;
-        float token_val =
-            __bfloat162float(unzipped_tokens[fetch_row * token_length + i]);
+        aggreg_cnt ++;
+        raw = unzipped_tokens[fetch_row * token_length + i];
+        float token_val = __bfloat162float(raw);
         sum = __fadd_rn(token_val, sum);
       }
-      zipped_tokens[this_row * token_length + i] = __float2bfloat16_rn(sum);
+      zipped_tokens[this_row * token_length + i] = (aggreg_cnt > 1)? __float2bfloat16_rn(sum) : raw;
     }
   } else {
     // ------------------------ BF16 intrinsics 加权累加 -----------------------
@@ -356,6 +363,55 @@ __global__ void tokens_zip_kernel(
       }
       zipped_tokens[this_row * token_length + i] = sum;
     }
+  }
+}
+template <int topk, int num_experts>
+__global__ void tokens_zip_kernel(
+    const float*__restrict__ unzipped_tokens,
+    const int *__restrict__ zipped_expertwise_rowmap,
+    const int *__restrict__ expert_routemap_topk,
+    const float *__restrict__ unzipped_token_probs,
+    float *__restrict__ zipped_tokens,
+    float *__restrict__ zipped_probs_topk,
+    const int total_zipped_tokens_num,
+    const int token_length) {
+  const int this_row = blockIdx.x;
+  if (this_row >= total_zipped_tokens_num) return;
+  int local_row_fetchlist[num_experts];
+
+// -------------------------初始化任务表 ------------------------
+#pragma unroll
+  for (int expert = 0; expert < num_experts; ++expert) {
+    const int fetch_row =
+        zipped_expertwise_rowmap[this_row * num_experts + expert];
+    local_row_fetchlist[expert] = fetch_row;
+  }
+
+#pragma unroll
+  for (int k = 0; k < topk; ++k) {
+    const int expert_idx = expert_routemap_topk[this_row * topk + k];
+    if (expert_idx < 0) [[likely]]
+      continue;
+    const int expert_fetch_row = local_row_fetchlist[expert_idx];
+    zipped_probs_topk[this_row * topk + k] =
+        unzipped_token_probs[expert_fetch_row];
+  }
+
+  const int thread_stride = blockDim.x;
+
+  // ------------------------ 手动混合精度 ---------------------------------
+  // 齐整区域向量化搬移
+  for (int x_offset = threadIdx.x; x_offset < token_length;
+        x_offset += thread_stride) {
+    float sum = 0.0f;
+#pragma unroll
+    for (int expert = 0; expert < num_experts; ++expert) {
+      const int fetch_row = local_row_fetchlist[expert];
+      if (fetch_row < 0) continue;
+      // 手动类型提升
+      sum += unzipped_tokens[fetch_row * token_length + x_offset];
+    }
+    zipped_tokens[this_row * token_length + x_offset] = sum;
   }
 }
 
@@ -435,17 +491,6 @@ void dispatch_tokens_unzip(const paddle::Tensor &X,
 #undef HANDLE_PROB_TYPE
 }
 
-/*
-  dispatch_tokens_zip(unzipped_tokens,
-                      zipped_expertwise_rowmap,
-                      expert_routemap_topk,
-                      unzipped_token_probs,
-                      zipped_tokens,
-                      zipped_probs_topk,
-                      total_zipped_tokens_num,
-                      num_experts,
-                      cols);
-*/
 void dispatch_tokens_zip(const paddle::Tensor &unzipped_tokens,
                          const paddle::Tensor &zipped_expertwise_rowmap,
                          const paddle::Tensor &expert_routemap_topk,
@@ -462,15 +507,27 @@ void dispatch_tokens_zip(const paddle::Tensor &unzipped_tokens,
 
   // Map data types to C++ types
   if (topk == 8 && num_experts == 4) {
-    tokens_zip_kernel<8, 4><<<grid, block, 0, unzipped_tokens.stream()>>>(
-        unzipped_tokens.data<phi::bfloat16>(),
-        zipped_expertwise_rowmap.data<int>(),
-        expert_routemap_topk.data<int>(),
-        unzipped_token_probs.data<float>(),
-        zipped_tokens.data<phi::bfloat16>(),
-        zipped_probs_topk.data<float>(),
-        total_zipped_tokens_num,
-        token_length);
+    if (unzipped_tokens.dtype() == paddle::DataType::BFLOAT16){
+      tokens_zip_kernel<8, 4><<<grid, block, 0, unzipped_tokens.stream()>>>(
+          unzipped_tokens.data<phi::bfloat16>(),
+          zipped_expertwise_rowmap.data<int>(),
+          expert_routemap_topk.data<int>(),
+          unzipped_token_probs.data<float>(),
+          zipped_tokens.data<phi::bfloat16>(),
+          zipped_probs_topk.data<float>(),
+          total_zipped_tokens_num,
+          token_length);
+    }else if (unzipped_tokens.dtype() == paddle::DataType::FLOAT32){
+      tokens_zip_kernel<8, 4><<<grid, block, 0, unzipped_tokens.stream()>>>(
+          unzipped_tokens.data<float>(),
+          zipped_expertwise_rowmap.data<int>(),
+          expert_routemap_topk.data<int>(),
+          unzipped_token_probs.data<float>(),
+          zipped_tokens.data<float>(),
+          zipped_probs_topk.data<float>(),
+          total_zipped_tokens_num,
+          token_length);
+    }
   }
 }
 
@@ -538,7 +595,7 @@ std::vector<paddle::Tensor> tokens_zip(
     const paddle::Tensor &unzipped_token_probs,
     const int &total_zipped_tokens_num,
     const int &num_experts) {
-  PD_CHECK(unzipped_tokens.dtype() == paddle::DataType::BFLOAT16);
+  PD_CHECK(unzipped_tokens.dtype() == paddle::DataType::BFLOAT16 || unzipped_tokens.dtype() == paddle::DataType::FLOAT32);
   const int rows = unzipped_tokens.shape()[0];       // seqlen
   const int cols = unzipped_tokens.shape()[1];       // 一般为7168
   const int topk = expert_routemap_topk.shape()[1];  // 一般为8
