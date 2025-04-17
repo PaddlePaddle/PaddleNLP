@@ -56,11 +56,40 @@ class TrainingArguments(TrainingArguments):
             "This is the epsilon parameter in the PPO algorithm."
         },
     )
+    clip_range_ratio_low: float = field(
+        default=None,
+        metadata={
+            "help": "The clipping range for ratio between the old and new policy. "
+            "This is the epsilon parameter in the PPO algorithm."
+        },
+    )
+    clip_range_ratio_high: float = field(
+        default=None,
+        metadata={
+            "help": "The clipping range for ratio between the old and new policy. "
+            "This is the epsilon parameter in the PPO algorithm."
+        },
+    )
     clip_range_score: float = field(
         default=10.0,
         metadata={
             "help": "The clipping range for the output of the score model. "
             "The reward is clipped into [-clip_range_score, clip_range_score]."
+        },
+    )
+    enable_overlong_reward_buffer: bool = field(
+        default=False,
+        metadata={},
+    )
+    overlong_reward_buffer: int = field(
+        default=256,
+        metadata={"help": "The allowed buffer before applying penalty."},
+    )
+    overlong_penalty_factor: float = field(
+        default=1.0,
+        metadata={
+            "help": "The penalty factor for the overlong reward buffer. "
+            "The penalty is deleted to the reward when the buffer is full."
         },
     )
     clip_range_value: float = field(
@@ -128,6 +157,18 @@ class TrainingArguments(TrainingArguments):
     per_device_prompt_batch_size: int = field(
         default=16,
         metadata={"help": "Batch size (per device) for the training dataloader."},
+    )
+    dynamic_sampling: bool = field(
+        default=False,
+        metadata={"help": "whether enable dynamic sample https://arxiv.org/abs/2503.14476"},
+    )
+    per_device_sample_batch_size: int = field(
+        default=16,
+        metadata={"help": "required valid prompt per device for dynamic sampling"},
+    )
+    max_gen_batches: int = field(
+        default=32,
+        metadata={"help": "max gen batches for dynamic sampling"},
     )
     eval_mode: str = field(
         default=None,
@@ -267,11 +308,15 @@ class TrainingArguments(TrainingArguments):
     use_fp32_compute: bool = field(
         default=False, metadata={"help": "Use fp32 to compute xx_log_prob,rewards, advantages and loss."}
     )
+    rollout_tensor_parallel_degree: int = field(
+        default=-1,
+        metadata={"help": ("Tensor parallelism for rollout.")},
+    )
 
     def __post_init__(self):
         """
-            在初始化后执行的函数，用于设置一些默认值和验证参数。
-        如果 autotuner_benchmark 为 True，则将相关参数设置为默认值，并禁止其他任何操作。
+        Function executed after initialization, used to set some default values and validate parameters.
+        If autotuner_benchmark is True, set related parameters to default values and prohibit any other operations.
 
         Args:
             None.
@@ -355,6 +400,12 @@ class TrainingArguments(TrainingArguments):
 
         if self.decay_steps is None:
             self.decay_steps = self.max_steps
+
+        if self.rollout_tensor_parallel_degree == -1:
+            self.rollout_tensor_parallel_degree = self.tensor_parallel_degree
+            logger.info(
+                f"Set rollout_tensor_parallel_degree to tensor_parallel_degree: {self.tensor_parallel_degree}."
+            )
 
     @property
     def model_dtype(self):

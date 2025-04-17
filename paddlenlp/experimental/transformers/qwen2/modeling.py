@@ -69,6 +69,7 @@ __all__ = [
     "Qwen2ForCausalLMInferenceModel",
     "Qwen2ForCausalLMBlockInferenceModel",
     "Qwen2VLForConditionalGenerationBlockInferenceModel",
+    "Qwen2_5_VLForConditionalGenerationBlockInferenceModel",
 ]
 
 
@@ -1287,14 +1288,13 @@ class Qwen2BlockInferenceModel(Qwen2InferenceModel):
         kwargs["padding_offsets"] = padding_offset
         kwargs["max_input_length"] = self.max_seq_len
 
+        # NOTE: (changwenbin) , When using multimodal prediction, the input is required to be inputs_embeds,
+        # input_ids -> inputs_embeds is processed before the language model.
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(ids_remove_padding)
         else:
-            assert len(inputs_embeds.shape) == 3
-            # This is the case in the image-to-text model such as qwen2-vl,
-            # In the prefill phase, the language model is first fed with inputs_embeds instead of input_ids
-            # but in decoder phase, the language model is fed with input_ids just like normal text-to-text model.
-            inputs_embeds = inputs_embeds.reshape([-1, inputs_embeds.shape[2]])
+            if len(inputs_embeds.shape) == 3:
+                inputs_embeds = inputs_embeds.reshape([-1, inputs_embeds.shape[2]])
 
         with dy2st_nocheck_guard_context():
             hidden_states, _ = self.transformer_block(

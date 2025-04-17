@@ -122,6 +122,12 @@ ernie_matching/
 
 <a name="模型训练"></a>
 
+下载数据集并解压到当前目录：
+```shell
+wget https://bj.bcebos.com/v1/paddlenlp/data/literature_search_data.zip
+unzip literature_search_data.zip
+```
+
 ## 5. 模型训练
 
 **排序模型下载链接：**
@@ -303,7 +309,7 @@ python export_to_serving.py \
 
 参数含义说明
 * `dirname`: 需要转换的模型文件存储路径，Program 结构文件和参数文件均保存在此目录。
-* `model_filename`： 存储需要转换的模型 Inference Program 结构的文件名称。如果设置为 None ，则使用 `__model__` 作为默认的文件名
+* `model_filename`： 存储需要转换的模型 Inference Program 结构的文件名称。如果设置为 None ，则使用 `__model__` 作为默认的文件名。如果启用了 PIR ，则有可能为 ```.json``` 文件，请注意鉴别
 * `params_filename`: 存储需要转换的模型所有参数的文件名称。当且仅当所有模型参数被保>存在一个单独的二进制文件中，它才需要被指定。如果模型参数是存储在各自分离的文件中，设置它的值为 None
 * `server_path`: 转换后的模型文件和配置文件的存储路径。默认值为 serving_server
 * `client_path`: 转换后的客户端配置文件存储路径。默认值为 serving_client

@@ -88,10 +88,16 @@ class ActorReferenceTrainer(RLTrainer):
 
     def loss_identifier(self, inputs: Dict) -> str:
         """
-        根据输入的字典，判断是否使用ptx损失函数和演员损失函数。如果有标签（labels），则返回"ptx_loss"；否则返回"actor_loss"。
-        参数：
-            inputs (Dict): 包含两个键值对，分别为"inputs"和"labels"，其中"inputs"是模型的输入，"labels"是可选的，表示是否使用ptx损失函数。默认值为None。
-            返回值 (str): 返回一个字符串，分别为"ptx_loss"或"actor_loss"，表示是否使用ptx损失函数和演员损失函数。
+        Identify whether to use the ptx loss function or the actor loss function based on the input dictionary.
+        If labels are present, return "ptx_loss"; otherwise, return "actor_loss".
+
+        Args:
+            inputs (Dict): A dictionary containing two key-value pairs, "inputs" and "labels".
+                           "inputs" represents the model's input, while "labels" is optional and indicates whether to use the ptx loss function.
+                           The default value for "labels" is None.
+
+        Returns:
+            str: A string indicating whether to use the ptx loss function or the actor loss function, either "ptx_loss" or "actor_loss".
         """
         return "actor_loss"
 
@@ -167,24 +173,24 @@ class ActorReferenceTrainer(RLTrainer):
     @paddle.no_grad()
     def compute_logprob(self, input_ids: paddle.Tensor, position_ids: paddle.Tensor = None, **kwargs) -> paddle.Tensor:
         """
-        计算rollout过程中每个token的log probability。
+        Computes the log probability of each token during the rollout process.
 
         Args:
             input_ids (paddle.Tensor, shape [batch_size, sequence_length]):
-                输入序列，其中每个元素都是一个int，表示各自token的ID。
+                Input sequences where each element is an int representing the ID of the respective token.
             attention_mask (paddle.Tensor, shape [batch_size, sequence_length]):
-                输入序列的attention mask，其中每个元素为0或1，用于指示哪些tokens应该被模型考虑。
+                Attention mask for the input sequences where each element is 0 or 1, indicating which tokens should be considered by the model.
             position_ids (paddle.Tensor, optional, shape [batch_size, sequence_length], defaults to None):
-                输入序列中每个token的位置ID，默认为None。
+                Position IDs for each token in the input sequences, defaults to None.
             kwargs (Dict[str, Any], optional, defaults to {}):
-                可选参数，目前未使用。
+                Optional arguments, currently not used.
 
         Returns:
             Dict[str, paddle.Tensor]:
                 - log_probs (paddle.Tensor, shape [batch_size, sequence_length - 1]):
-                    每个token在rollout过程中的log probability。
+                    Log probability of each token during the rollout process.
                 - ref_log_probs (paddle.Tensor, shape [batch_size, sequence_length - 1]):
-                    每个token在rollout过程中的reference log probability。
+                    Reference log probability of each token during the rollout process.
 
         Raises:
             None.
@@ -195,7 +201,7 @@ class ActorReferenceTrainer(RLTrainer):
             rollout_logprob_batch_size = batch_size
         else:
             if str(self.args.rollout_logprob_batch_size).lower() == "auto":
-                # auto compute
+                # Auto compute
                 if sequence_length > 4096 - 128:
                     rollout_logprob_batch_size = 2
                 elif sequence_length > 2048 - 128:
@@ -207,7 +213,7 @@ class ActorReferenceTrainer(RLTrainer):
 
         num_batches = (batch_size + rollout_logprob_batch_size - 1) // rollout_logprob_batch_size
 
-        # pipe model outputs a logits tensor with LMHead, while non-pipe model
+        # Pipe model outputs a logits tensor with LMHead, while non-pipe model
         # outputs a tuple with logits tensor as the only one element.
         startend_row_indices = create_startend_row_indices(input_ids, self.tokenizer.pad_token_id)
         response_start = kwargs["prompt"].shape[-1] - 1 if "prompt" in kwargs else 0
@@ -250,7 +256,7 @@ class ActorReferenceTrainer(RLTrainer):
                 )
 
             log_probs_list.append(log_probs)
-            # set logits to none, save memory
+            # Set logits to None to save memory
             logits = None
             paddle.device.cuda.empty_cache()
 

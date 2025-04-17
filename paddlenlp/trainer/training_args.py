@@ -162,6 +162,8 @@ class TrainingArguments:
             The end LR used in the polynomial scheduler.
         power (`float`, *optional*, defaults to 1.0):
             The power factor used in the polynomial scheduler.
+        min_lr (`float`, *optional*, defaults to 0.0):
+            The minimum learning rate used in the cosine scheduler.
 
         log_on_each_node (`bool`, *optional*, defaults to `True`):
             In multinode distributed training, whether to log using `log_level` once per node, or only on the main
@@ -465,6 +467,7 @@ class TrainingArguments:
     num_cycles: float = field(default=0.5, metadata={"help": "The number of waves in the cosine scheduler."})
     lr_end: float = field(default=1e-7, metadata={"help": "The end LR in the polynomial scheduler."})
     power: float = field(default=1.0, metadata={"help": "The power factor in the polynomial scheduler."})
+    min_lr: float = field(default=0.0, metadata={"help": "The minimum learning rate in cosine scheduler."})
 
     log_on_each_node: bool = field(
         default=True,
