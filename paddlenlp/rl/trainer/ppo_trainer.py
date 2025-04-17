@@ -104,7 +104,6 @@ class PPOMetric:
             for name in (
                 [
                     "policy_loss",
-                    "ptx_loss",
                     *(["value_loss"] if self.args.rl_algorithm == "ppo" else []),
                     "reward",
                     "norm_reward",
@@ -134,12 +133,7 @@ class PPOMetric:
             )
         ]
 
-        if self.args.rl_algorithm == "ppo":
-            self.metric_ops = ["mean"] * 13 + ["max", "min"]
-        elif self.args.rl_algorithm == "reinforce_plus_plus":
-            self.metric_ops = ["mean"] * 11 + ["max", "min"]
-        else:
-            self.metric_ops = ["mean"] * 8 + ["max", "min"]
+        self.metric_ops = ["mean"] * (len(self.metric_names) - 2) + ["max", "min"]
 
     def __init__(self, freq, args, use_stack=True):
         """
