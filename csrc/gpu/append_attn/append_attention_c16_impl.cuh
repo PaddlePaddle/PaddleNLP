@@ -1429,7 +1429,6 @@ void MultiQueryAppendAttention(
           static_cast<float *>(tmp_d->ptr()),
           reinterpret_cast<OUT_NV_TYPE *>(out->data<OutT>()),
           speculate_max_draft_token_num);
-
       // merge
       constexpr int vec_size = num_elems_per_128b<NV_TYPE>();
       if (is_decoder) {

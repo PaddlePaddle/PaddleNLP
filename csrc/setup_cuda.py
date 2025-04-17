@@ -155,7 +155,7 @@ cuda_version = float(paddle.version.cuda())
 if cc >= 80:
     sources += ["gpu/int8_gemm_with_cutlass/gemm_dequant.cu"]
 
-    sources += ["./gpu/append_attention.cu", "./gpu/multi_head_latent_attention.cu"]
+    sources += ["./gpu/append_attention.cu", "./gpu/multi_head_latent_attention.cu", "./gpu/simple_append_attention.cu"]    # add this kernel
 
     sources += find_end_files("./gpu/append_attn", ".cu")
     sources += find_end_files("./gpu/append_attn/template_instantiation", ".cu")
