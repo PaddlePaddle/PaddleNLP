@@ -12,7 +12,6 @@ This example uses the cleaned [OpenWebText2 data](https://openwebtext2.readthedo
 After downloading, decompress with the following command:
 
 ```shell
-# wget https://mystic.the-eye.eu/public/AI/pile_preliminary_components/openwebtext2.jsonl.zst.tar
 wget https://paddlenlp.bj.bcebos.com/models/transformers/gpt/openwebtext2.jsonl.zst.tar
 tar -xvf openwebtext2.json.zst.tar -C /path/to/openwebtext
 ```

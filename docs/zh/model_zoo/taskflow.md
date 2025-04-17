@@ -1894,7 +1894,7 @@ seg_accurate(texts)
 
 <details><summary><b>Q：</b>后续会增加更多任务支持吗？</summary><div>
 
-**A:** Taskflow 支持任务持续丰富中，我们将根据开发者反馈，灵活调整功能建设优先级，可通过 Issue 或[问卷](https://wenjuan.baidu-int.com/manage/?r=survey/pageEdit&sid=85827)反馈给我们。
+**A:** Taskflow 支持任务持续丰富中，我们将根据开发者反馈，灵活调整功能建设优先级，可通过 Issue 反馈给我们。
 
 </div></details>
 
