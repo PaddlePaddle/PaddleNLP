@@ -324,6 +324,12 @@ class TrainingArguments(TrainingArguments):
         default=1,
         metadata={"help": "Batch size to rollout using continue batching."},
     )
+    rollout_quant_type: str = field(
+        default="",
+        metadata={
+            "help": "Quantization type. Supported values: a8w8, a8w8c8, a8w8_fp8, a8w8c8_fp8, weight_only_int4, weight_only_int8"
+        },
+    )
     rollout_tensor_parallel_degree: int = field(
         default=-1,
         metadata={"help": ("Tensor parallelism for rollout.")},

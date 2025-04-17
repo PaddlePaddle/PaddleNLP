@@ -353,6 +353,7 @@ def create_predictor(trainer: Trainer):
         output_via_mq=False,
         init_cache_kvs=False,
         dynamic_insert=trainer.args.rollout_use_dynamic_insert,
+        quant_type=trainer.args.rollout_quant_type,
     )
     model_args = ModelArgument()
     config = copy.deepcopy(trainer.model.config)
@@ -383,7 +384,6 @@ def create_predictor(trainer: Trainer):
                 tensor_parallel_rank=tensor_parallel_rank,
                 low_cpu_mem_usage=True,
             )
-            model.save_output = False
             predictor = PolicyPredictor(
                 predictor_args,
                 tokenizer=trainer.tokenizer,
