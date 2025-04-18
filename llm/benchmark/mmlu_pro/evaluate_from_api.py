@@ -217,7 +217,7 @@ def call_generate(prompt, **kwargs):
     if kwargs['backend'] == 'paddle':
         data = {
             "text": prompt,
-            "max_dec_len": 2048,
+            "max_dec_len": 8192,
             # "min_dec_len": 1,
             "topp": 0.95,
             "temperature": 0.6,
