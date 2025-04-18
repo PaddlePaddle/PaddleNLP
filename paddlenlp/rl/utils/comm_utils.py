@@ -697,8 +697,15 @@ def combine_micro_batches(micro_batches, pad_token_id=0):
             if isinstance(value, list):
                 if isinstance(value[0], paddle.Tensor):
                     if key == "label_ids":
-                        value = [paddle.unsqueeze(v, axis=0) for v in value]
-                    concat_value = paddle.concat(value, axis=0)
+                        value = [paddle.unsqueeze(v, axis=0) if v.ndim == 1 else v for v in value]
+                        concat_value = pad_tensor(
+                            value,
+                            pad_index=pad_token_id,
+                            dtype=value[0].dtype,
+                            padding_side="left",
+                        )
+                    else:
+                        concat_value = paddle.concat(value, axis=0)
                 elif isinstance(value[0], np.ndarray):
                     concat_value = np.concatenate(value, axis=0)
                 combined_batch.setdefault(key, []).append(concat_value)

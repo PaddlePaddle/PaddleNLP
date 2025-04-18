@@ -1189,6 +1189,61 @@ class PPOTrainer(Trainer):
             offset += len(batch["log_probs"])
         return micro_batches
 
+    def _balance_batch(self, micro_batches):
+        """Reorder the data such that each dp/sharding rank gets similar total tokens"""
+        dp_degree, sharding_degree = max(self.args.data_parallel_degree, 1), max(self.args.sharding_parallel_degree, 1)
+        # dp or sharding degree = 1, no need to balance batch
+        if dp_degree * sharding_degree == 1:
+            return micro_batches
+
+        # otherwise, need to balance batch accross DP and Sharding groups
+        try:
+            hcg = fleet.get_hybrid_communicate_group()
+            sharding_parallel_group = hcg.get_sharding_parallel_group()
+            data_parallel_group = hcg.get_data_parallel_group()
+        except:
+            sharding_parallel_group = None
+            data_parallel_group = None
+
+        total_unbalance_batch = defaultdict(list)
+        unbalance_micro_batch = combine_micro_batches(micro_batches, pad_token_id=self.tokenizer.pad_token_id)
+        for key in unbalance_micro_batch:
+            total_unbalance_batch[key].append(unbalance_micro_batch[key])
+
+        # Collect and pad tensors from all workers (across DP and Sharding groups)
+        for key in total_unbalance_batch.keys():
+            tensor_list = total_unbalance_batch[key]
+            # Do not need to pad 1-D Tensors
+            pad = False if len(tensor_list[0].shape) == 1 else True
+            pad_index = self.tokenizer.pad_token_id
+            padding_side = "left" if (key == "prompt" or key == "label_ids") else "right"
+            total_unbalance_batch[key] = gather_and_pad(
+                tensor_list,
+                data_parallel_group,
+                sharding_parallel_group,
+                pad_index=pad_index,
+                pad=pad,
+                padding_side=padding_side,
+            )
+        # Truncate total_batch to match expected total batch size
+        # Split total_batch evenly across all DP × Sharding ranks
+        combined_balance_batch = split_batch_by_rank(
+            total_batch=total_unbalance_batch,
+            dp_rank=hcg.get_data_parallel_rank(),
+            sharding_rank=hcg.get_sharding_parallel_rank(),
+            dp_degree=dp_degree,
+            sharding_degree=sharding_degree,
+            num_return_sequences=self.args.num_return_sequences,
+            balance_batch_across_dp_group=True,
+        )
+        # split into micro-batches
+        micro_batches = split_into_micro_batches(
+            total_batch=combined_balance_batch,
+            per_device_train_batch_size=self.args.per_device_train_batch_size,
+            pad_token_id=self.tokenizer.pad_token_id,
+        )
+        return micro_batches
+
     def train(
         self,
         resume_from_checkpoint: Optional[Union[str, bool]] = None,
@@ -1336,18 +1391,6 @@ class PPOTrainer(Trainer):
                 )
                 timer_scope_actor_model.start()
 
-                is_fleet_init = True
-                try:
-                    hcg = fleet.get_hybrid_communicate_group()
-                    sharding_parallel_group = hcg.get_sharding_parallel_group()
-                    data_parallel_group = hcg.get_data_parallel_group()
-                except:
-                    is_fleet_init = False
-                    sharding_parallel_group = None
-                    data_parallel_group = None
-                dp_degree, sharding_degree = max(self.args.data_parallel_degree, 1), max(
-                    self.args.sharding_parallel_degree, 1
-                )
                 with reload_and_offload_scope(self, self.actor_model, self.reference_model):
                     timer_scope_rollout = TimerScope(self.timers, RolloutStages.GENERATE)
                     timer_scope_rollout.start()
@@ -1424,47 +1467,8 @@ class PPOTrainer(Trainer):
                         micro_batches.append(micro_batch)
 
                     # step 2-2: balance micro_batches based on batch tokens
-                    if self.args.balance_batch and (dp_degree * sharding_degree > 1):
-                        total_unbalance_batch = defaultdict(list)
-                        unbalance_micro_batch = combine_micro_batches(
-                            micro_batches, pad_token_id=self.tokenizer.pad_token_id
-                        )
-                        for key in unbalance_micro_batch:
-                            total_unbalance_batch[key].append(unbalance_micro_batch[key])
-
-                        # Collect and pad tensors from all workers (across DP and Sharding groups)
-                        for key in total_unbalance_batch.keys():
-                            tensor_list = total_unbalance_batch[key]
-                            # Do not need to pad 1-D Tensors
-                            pad = False if len(tensor_list[0].shape) == 1 else True
-                            pad_index = self.tokenizer.pad_token_id
-                            padding_side = "left" if (key == "prompt" or key == "label_ids") else "right"
-                            total_unbalance_batch[key] = gather_and_pad(
-                                tensor_list,
-                                data_parallel_group,
-                                sharding_parallel_group,
-                                pad_index=pad_index,
-                                pad=pad,
-                                padding_side=padding_side,
-                            )
-                        # Truncate total_batch to match expected total batch size
-                        # Split total_batch evenly across all DP × Sharding ranks
-                        combined_balance_batch = split_batch_by_rank(
-                            total_batch=total_unbalance_batch,
-                            dp_rank=hcg.get_data_parallel_rank(),
-                            sharding_rank=hcg.get_sharding_parallel_rank(),
-                            dp_degree=dp_degree,
-                            sharding_degree=sharding_degree,
-                            num_return_sequences=self.args.num_return_sequences,
-                            balance_batch_across_dp_group=True,
-                        )
-                        # split into micro-batches
-                        micro_batches = split_into_micro_batches(
-                            total_batch=combined_balance_batch,
-                            per_device_train_batch_size=self.args.per_device_train_batch_size,
-                            pad_token_id=self.tokenizer.pad_token_id,
-                        )
-                        combined_balance_batch = None
+                    if self.args.balance_batch:
+                        micro_batches = self._balance_batch(micro_batches)
 
                     # step 2-3: compute logprob for rollout data
                     with TimerScope(self.timers, RolloutStages.ROLLOUT_LOGPROB):
@@ -1516,6 +1520,19 @@ class PPOTrainer(Trainer):
                         variance_threshold=1e-6,
                     )
 
+                    is_fleet_init = True
+                    try:
+                        hcg = fleet.get_hybrid_communicate_group()
+                        sharding_parallel_group = hcg.get_sharding_parallel_group()
+                        data_parallel_group = hcg.get_data_parallel_group()
+                    except:
+                        is_fleet_init = False
+                        sharding_parallel_group = None
+                        data_parallel_group = None
+
+                    dp_degree, sharding_degree = max(self.args.data_parallel_degree, 1), max(
+                        self.args.sharding_parallel_degree, 1
+                    )
                     local_valid_prompt = paddle.to_tensor(local_valid_prompt, dtype="int32")
                     if sharding_degree > 1:
                         dist.all_reduce(local_valid_prompt, op=dist.ReduceOp.SUM, group=sharding_parallel_group)
