@@ -697,8 +697,15 @@ def combine_micro_batches(micro_batches, pad_token_id=0):
             if isinstance(value, list):
                 if isinstance(value[0], paddle.Tensor):
                     if key == "label_ids":
-                        value = [paddle.unsqueeze(v, axis=0) for v in value]
-                    concat_value = paddle.concat(value, axis=0)
+                        value = [paddle.unsqueeze(v, axis=0) if v.ndim == 1 else v for v in value]
+                        concat_value = pad_tensor(
+                            value,
+                            pad_index=pad_token_id,
+                            dtype=value[0].dtype,
+                            padding_side="left",
+                        )
+                    else:
+                        concat_value = paddle.concat(value, axis=0)
                 elif isinstance(value[0], np.ndarray):
                     concat_value = np.concatenate(value, axis=0)
                 combined_batch.setdefault(key, []).append(concat_value)
@@ -806,7 +813,7 @@ def split_batch_by_rank(
         num_prompt_per_rank = num_prompt // dataset_world_size
 
         # Compute total valid tokens per prompt
-        valid_tokens = total_batch["prompt_len_without_pad"] + total_batch["raw_response_len"]
+        valid_tokens = total_batch["prompt_len_without_pad"] + total_batch["response_len_without_pad"]
         valid_tokens = paddle.to_tensor(
             [valid_tokens[i * num_return_sequences : (i + 1) * num_return_sequences].sum() for i in range(num_prompt)]
         )
@@ -881,18 +888,20 @@ def process_prompt_and_response(micro_batch, pad_token_id=0):
     micro_batch["input_ids"] = paddle.concat([micro_batch["prompt"], response], axis=1)
     micro_batch["position_ids"] = make_position_ids_from_input_ids(micro_batch["input_ids"])
 
-    micro_batch["log_probs"] = paddle.slice(
-        micro_batch["log_probs"],
-        axes=[1],
-        starts=[0],
-        ends=[max_response_len],
-    )
-    micro_batch["ref_log_probs"] = paddle.slice(
-        micro_batch["ref_log_probs"],
-        axes=[1],
-        starts=[0],
-        ends=[max_response_len],
-    )
+    if "log_probs" in micro_batch:
+        micro_batch["log_probs"] = paddle.slice(
+            micro_batch["log_probs"],
+            axes=[1],
+            starts=[0],
+            ends=[max_response_len],
+        )
+    if "ref_log_probs" in micro_batch:
+        micro_batch["ref_log_probs"] = paddle.slice(
+            micro_batch["ref_log_probs"],
+            axes=[1],
+            starts=[0],
+            ends=[max_response_len],
+        )
 
     return micro_batch
 

@@ -312,6 +312,10 @@ class TrainingArguments(TrainingArguments):
         default=-1,
         metadata={"help": ("Tensor parallelism for rollout.")},
     )
+    balance_batch: bool = field(
+        default=False,
+        metadata={"help": "Whether to balance the number of valid tokens on each dp/sharding rank."},
+    )
 
     def __post_init__(self):
         """
