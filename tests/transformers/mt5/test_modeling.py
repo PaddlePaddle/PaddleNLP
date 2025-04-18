@@ -795,7 +795,7 @@ class MT5CompatibilityTest(unittest.TestCase):
             # 2. forward the paddle model
             from paddlenlp.transformers import MT5ForConditionalGeneration
 
-            paddle_model = MT5ForConditionalGeneration.from_pretrained(tempdir)
+            paddle_model = MT5ForConditionalGeneration.from_pretrained(tempdir, convert_from_torch=True)
             paddle_model.eval()
             paddle_logit = paddle_model(
                 input_ids=paddle.to_tensor(input_ids), decoder_input_ids=paddle.to_tensor(input_ids)

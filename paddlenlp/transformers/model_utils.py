@@ -62,7 +62,6 @@ from paddlenlp.utils.env import (
     ASYMMETRY_QUANT_SCALE_MAX,
     ASYMMETRY_QUANT_SCALE_MIN,
     CONFIG_NAME,
-    LEGACY_CONFIG_NAME,
     PADDLE_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_NAME,
     PYTORCH_WEIGHTS_INDEX_NAME,
@@ -1008,10 +1007,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
     by which subclasses can track arguments for initialization automatically.
     """
 
-    # Deprecated(wj-Mcat): after 2.6.* version
-    # save the old-school `LEGACY_CONFIG_NAME`, and will be changed to `CONFIG_NAME` after 2.6.* version
-    model_config_file = LEGACY_CONFIG_NAME
-
+    model_config_file = CONFIG_NAME
     pretrained_init_configuration = {}
     # TODO: more flexible resource handle, namedtuple with fields as:
     # resource_name, saved_file, handle_name_for_load(None for used as __init__

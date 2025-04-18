@@ -1226,11 +1226,11 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
 
         if self.tensor_parallel_rank == 0:
             outputs = []
-            while len(outputs) < len(input_texts):
-                output_tokens = np.concatenate(output_token, axis=1).tolist()
-                outputs = self.tokenizer.batch_decode(
-                    output_tokens, skip_special_tokens=True, clean_up_tokenization_spaces=False
-                )
+            output_tokens = np.concatenate(output_token, axis=1).tolist()
+            outputs = self.tokenizer.batch_decode(
+                output_tokens, skip_special_tokens=True, clean_up_tokenization_spaces=False
+            )
+            assert len(outputs) == len(input_texts)
 
             if return_tokens:
                 return outputs, output_tokens
@@ -1442,11 +1442,11 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
         if self.tensor_parallel_rank == 0:
             outputs = []
             output_tokens = []
-            while len(outputs) < self.batch_size:
-                output_tokens = np.concatenate(output_token, axis=1).tolist()
-                outputs = self.tokenizer.batch_decode(
-                    output_tokens, skip_special_tokens=True, clean_up_tokenization_spaces=False
-                )
+            output_tokens = np.concatenate(output_token, axis=1).tolist()
+            outputs = self.tokenizer.batch_decode(
+                output_tokens, skip_special_tokens=True, clean_up_tokenization_spaces=False
+            )
+            assert len(outputs) == self.batch_size
             if return_tokens:
                 return outputs, output_tokens
             else:
@@ -1601,7 +1601,6 @@ def create_predictor(
                     tensor_parallel_rank=tensor_parallel_rank,
                     tensor_parallel_output=False,
                 )
-
     predictor = AutoPredictor.create_predictor(predictor_args, config, model_args, tokenizer, model=model)
 
     return predictor
