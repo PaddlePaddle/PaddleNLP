@@ -30,6 +30,8 @@ from .reshard_utils import init_reshard_mappings, init_rollout_env, reshard_to_r
 
 global_dev_id = 0 if paddle.get_device() == "cpu" else int(paddle.get_device().split(":")[1])
 
+rng = random.Random(42)
+
 
 class ActorStages(Enum):
     """
@@ -825,7 +827,7 @@ def split_batch_by_rank(
             start = i * num_prompt_per_rank
             end = (i + 1) * num_prompt_per_rank
             group = sorted_indices[start:end].tolist()
-            random.shuffle(group)
+            rng.shuffle(group)
             grouped_shuffled_indices.extend(group)
 
         shuffled_indices = paddle.to_tensor(grouped_shuffled_indices, dtype="int32")
