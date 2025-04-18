@@ -1436,6 +1436,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
             )
             if self.tensor_parallel_rank == 0:
                 read_res_process.start()
+                done_event.wait()
 
         s_time = time.time()
         with self.update_predictor_params(**kwargs):
@@ -1468,6 +1469,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                 task_id = unfinished_ids.pop()
                 self.insert_task(cur_bs, task_id)
 
+            done_task_id_set = set()
             if kwargs.pop("max_length", self.config.max_length) > 1:
                 while self.model_inputs["not_need_stop"] or len(unfinished_ids) > 0:
                     no_stop_num = max_batch_size - paddle.sum(self.model_inputs["stop_flags"]).item()
@@ -1476,10 +1478,12 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                             if self.model_inputs["stop_flags"][i]:
                                 if self.config.output_via_mq:
                                     task_id = self.model_inputs["result_id"][i][0].item()
-                                    task_token = (
-                                        self.model_inputs["all_token_ids"][task_id : task_id + 1, :].cpu().numpy()
-                                    )
-                                    task_queue.put([task_id, task_token])
+                                    if task_id not in done_task_id_set:
+                                        task_token = (
+                                            self.model_inputs["all_token_ids"][task_id : task_id + 1, :].cpu().numpy()
+                                        )
+                                        task_queue.put([task_id, task_token])
+                                        done_task_id_set.add(task_id)
                                 if len(unfinished_ids) > 0:
                                     task_id = unfinished_ids.pop()
                                     self.insert_task(i, task_id)
@@ -1969,6 +1973,8 @@ def predict():
 
     if predictor_args.benchmark:
         benchmark(predictor, predictor_args, model_args)
+
+    # import pdb;pdb.set_trace()
 
 
 def benchmark(predictor, predictor_args, model_args):

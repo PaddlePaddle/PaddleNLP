@@ -665,7 +665,7 @@ def read_res_dynamic_insert(
 
     tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, padding_side="left", use_fast=USE_FAST_TOKENIZER)
 
-    paddle.device.set_device("gpu")
+    paddle.device.set_device("cpu")
     paddle.disable_static()
 
     outputs = [[] for _ in range(total_request_num)]
