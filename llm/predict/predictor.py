@@ -1466,6 +1466,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         with self.update_predictor_params(**kwargs):
             for i, inst in enumerate(self.input_ids):
                 length = len(inst)
+                print(f"run prefile {i}")
                 self.model_inputs["input_ids"][0, :length] = np.array(inst)
                 self.model_inputs["seq_lens_this_time"][0] = length
                 self.model_inputs["seq_lens_encoder"][0] = length
@@ -1477,7 +1478,6 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                 self.model_inputs["result_id"][0][:1] = np.arange(i, i + 1)
 
                 next_tokens = self._infer(self.model_inputs)
-                self.model_inputs["all_token_ids"][i, 0] = next_tokens[0, 0]
                 self.model_inputs["seq_lens_this_time"][0] = 0
                 self.model_inputs["seq_lens_encoder"][0] = 0
                 self.model_inputs["seq_lens_decoder"][0] = 0
@@ -1536,12 +1536,8 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
             result_queue.close()
         else:
             if flag_current_rank_run:
-                output_tokens = self.model_inputs["all_token_ids"]
-                output_tokens = paddle.where(
-                    output_tokens < 0,
-                    paddle.to_tensor(self.tokenizer.pad_token_id, dtype=output_tokens.dtype),
-                    output_tokens,
-                )
+                output_tokens = self.model_inputs["all_token_ids"].numpy()
+                output_tokens[output_tokens < 0] = self.tokenizer.pad_token_id
                 outputs = self.tokenizer.batch_decode(
                     output_tokens, skip_special_tokens=True, clean_up_tokenization_spaces=False
                 )
