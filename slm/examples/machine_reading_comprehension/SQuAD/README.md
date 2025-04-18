@@ -228,7 +228,7 @@ python -u deploy/python/predict.py \
 
 >  File "/home/aistudio/.cache/huggingface/modules/datasets_modules/datasets/squad_v2/dca5ba0e483a42ca20ec41a13e9fb630541d6fcb0ba646da3e8ff9a1f21fcb81/squad_v2.py", line 19, in <module>
 >    from datasets.tasks import QuestionAnsweringExtractive
-ModuleNotFoundError: No module named 'datasets.tasks'
+> ModuleNotFoundError: No module named 'datasets.tasks'
 
 那么需要对 datasets 进行版本更换。运行：
 ```shell
