@@ -532,6 +532,9 @@ class GenerationBlockInferenceModel(GenerationMixin):
             cache_v_dequant_scales,
             tgt_mask_spec,
         ]
+        input_spec.extend(
+            [paddle.static.InputSpec(shape=[1], dtype="int32", name="queue_id")]
+        )  # queue_id for save_output
         if config.get("speculate_method", None) is not None:
             speculate_spec = [
                 paddle.static.InputSpec(shape=[None, None], dtype="int64", name="draft_tokens"),
@@ -608,6 +611,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
         k_dequant_scales=None,
         v_dequant_scales=None,
         tgt_mask=None,
+        queue_id=None,
         draft_tokens=None,
         accept_tokens=None,
         accept_num=None,
@@ -616,6 +620,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
     ):
 
         model_kwargs["input_ids"] = input_ids
+        model_kwargs["queue_id"] = queue_id
         model_kwargs["penalty_score"] = penalty_score
         model_kwargs["frequency_score"] = frequency_score
         model_kwargs["presence_score"] = presence_score
@@ -755,12 +760,20 @@ class GenerationBlockInferenceModel(GenerationMixin):
                     eos_token_id,
                     model_kwargs["next_tokens"],
                 )
-            if self.config.output_via_mq:
+
+            if self.config.dynamic_insert:
+                from paddlenlp_ops import save_output_dygraph
+
+                save_output_dygraph(
+                    model_kwargs["all_token_ids"], next_tokens, model_kwargs["result_id"], model_kwargs["step_idx"]
+                )
+            elif self.config.output_via_mq:
                 from paddlenlp_ops import save_output
 
                 save_output(
                     next_tokens,
                     model_kwargs["not_need_stop"],
+                    model_kwargs["queue_id"],
                     self.config.tensor_parallel_rank,
                 )
             return next_tokens

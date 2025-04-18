@@ -1184,6 +1184,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         config.weight_block_size = predictor_args.weight_block_size
         config.moe_quant_type = predictor_args.moe_quant_type
         config.output_via_mq = predictor_args.output_via_mq
+        config.dynamic_insert = predictor_args.dynamic_insert
         if config.quantization_config.quant_method is not None:
             predictor_args.weight_block_size = config.quantization_config.weight_block_size
             config.weight_block_size = predictor_args.weight_block_size

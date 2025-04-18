@@ -41,11 +41,6 @@ if not is_paddlenlp_ops_available():
         "you can refer to: https://github.com/PaddlePaddle/PaddleNLP/blob/develop/csrc/README.md"
     )
 
-if (
-    paddle.device.get_all_custom_device_type() is not None and len(paddle.device.get_all_custom_device_type()) > 0
-) or paddle.is_compiled_with_cuda():
-    from paddlenlp_ops import rebuild_padding_v2
-
 
 def use_cutlass_fp8_gemm():
     return os.getenv("FLAGS_CUTLASS_FP8_GEMM", "False") in ["True", "1", "true"]
@@ -3508,6 +3503,8 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                     max_input_length,
                 )
             else:
+                from paddlenlp_ops import rebuild_padding_v2
+
                 out = rebuild_padding_v2(
                     multi_block_output,
                     cum_offsets,
