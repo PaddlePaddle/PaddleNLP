@@ -1492,8 +1492,10 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                     if self.model_inputs["stop_flags"][i]:
                         if self.config.output_via_mq:
                             task_id = self.model_inputs["result_id"][i][0].item()
-                            task_token = self.model_inputs["all_token_ids"][task_id : task_id + 1, :].cpu().numpy()
-                            task_queue.put([task_id, task_token])
+                            if task_id not in done_task_id_set:
+                                task_token = self.model_inputs["all_token_ids"][task_id : task_id + 1, :].cpu().numpy()
+                                task_queue.put([task_id, task_token])
+                                done_task_id_set.add(task_id)
             elif self.config.output_via_mq:
                 for task_id in range(len(self.input_ids)):
                     task_id = self.model_inputs["result_id"][i][0].item()
@@ -1504,17 +1506,19 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         self.cache_kvs = None
         self.model_inputs["cache_kvs"] = None
         paddle.device.cuda.empty_cache()
-        if self.tensor_parallel_rank == 0:
-            if self.config.output_via_mq:
+        if self.config.output_via_mq:
+            if self.tensor_parallel_rank == 0:
                 outputs = []
                 output_tokens = []
                 while len(outputs) < len(input_texts):
                     result = result_queue.get(timeout=1)
                     outputs.append(result[-1])
                     output_tokens.append(result[-2])
-
                 read_res_process.terminate()
-            else:
+            while not task_queue.empty():
+                task_queue.get_nowait()
+        else:
+            if self.tensor_parallel_rank == 0:
                 output_tokens = self.model_inputs["all_token_ids"]
                 output_tokens = paddle.where(
                     output_tokens < 0,
@@ -1524,7 +1528,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                 outputs = self.tokenizer.batch_decode(
                     output_tokens, skip_special_tokens=True, clean_up_tokenization_spaces=False
                 )
-
+        if self.tensor_parallel_rank == 0:
             if return_tokens:
                 return outputs, output_tokens
             else:
