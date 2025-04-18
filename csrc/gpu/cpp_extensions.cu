@@ -220,11 +220,13 @@ paddle::Tensor RebuildPaddingV2Func(const paddle::Tensor& tmp_out, // [token_num
                                     const paddle::optional<paddle::Tensor>& output_padding_offset,
                                     int max_input_length);
 
-std::vector<paddle::Tensor> GroupQuant(const paddle::Tensor& x,
+std::vector<paddle::Tensor> PerTokenGroupQuant(const paddle::Tensor& x,
                                         const int group_size,
                                         const bool transpose_scale,
                                         const float quant_max_bound,
                                         const float quant_min_bound);
+
+std::vector<paddle::Tensor> PerTensorQuantFp8(const paddle::Tensor& x, const paddle::optional<paddle::Tensor>& scale);
 
 std::vector<paddle::Tensor> GetPaddingOffsetV2(const paddle::Tensor& input_ids,
                                                const paddle::Tensor& cum_offsets,
@@ -295,7 +297,8 @@ PYBIND11_MODULE(paddlenlp_ops, m) {
   m.def("f_set_preids_token_penalty_multi_scores", &SetPreidsTokenPenaltyMultiScores, "SetPreidsTokenPenaltyMultiScores");
   m.def("f_update_inputs_v2", &UpdateInputesV2, "UpdateInputesV2");
   m.def("f_rebuild_padding_v2", &RebuildPaddingV2Func, "RebuildPaddingV2Func");
-  m.def("f_group_quant", &GroupQuant, "GroupQuant");
+  m.def("f_per_token_group_quant", &PerTokenGroupQuant, "PerTokenGroupQuant");
+  m.def("f_per_tensor_quant_fp8", &PerTensorQuantFp8, "PerTensorQuantFp8");
   m.def("f_get_padding_offset_v2", &GetPaddingOffsetV2, "GetPaddingOffsetV2");
   m.def("f_save_output", &SaveOutMmsg, "SaveOutMmsg");
   m.def("f_get_output", &GetOutput, "GetOutput");
@@ -324,7 +327,8 @@ PYBIND11_MODULE(paddlenlp_ops_80, m) {
   m.def("f_set_preids_token_penalty_multi_scores", &SetPreidsTokenPenaltyMultiScores, "SetPreidsTokenPenaltyMultiScores");
   m.def("f_update_inputs_v2", &UpdateInputesV2, "UpdateInputesV2");
   m.def("f_rebuild_padding_v2", &RebuildPaddingV2Func, "RebuildPaddingV2Func");
-  m.def("f_group_quant", &GroupQuant, "GroupQuant");
+  m.def("f_per_token_group_quant", &PerTokenGroupQuant, "PerTokenGroupQuant");
+  m.def("f_per_tensor_quant_fp8", &PerTensorQuantFp8, "PerTensorQuantFp8");
   m.def("f_get_padding_offset_v2", &GetPaddingOffsetV2, "GetPaddingOffsetV2");
   m.def("f_save_output", &SaveOutMmsg, "SaveOutMmsg");
   m.def("f_get_output", &GetOutput, "GetOutput");
@@ -352,7 +356,8 @@ PYBIND11_MODULE(paddlenlp_ops_90, m) {
   m.def("f_set_preids_token_penalty_multi_scores", &SetPreidsTokenPenaltyMultiScores, "SetPreidsTokenPenaltyMultiScores");
   m.def("f_update_inputs_v2", &UpdateInputesV2, "UpdateInputesV2");
   m.def("f_rebuild_padding_v2", &RebuildPaddingV2Func, "RebuildPaddingV2Func");
-  m.def("f_group_quant", &GroupQuant, "GroupQuant");
+  m.def("f_per_token_group_quant", &PerTokenGroupQuant, "PerTokenGroupQuant");
+  m.def("f_per_tensor_quant_fp8", &PerTensorQuantFp8, "PerTensorQuantFp8");
   m.def("f_get_padding_offset_v2", &GetPaddingOffsetV2, "GetPaddingOffsetV2");
   m.def("f_save_output", &SaveOutMmsg, "SaveOutMmsg");
   m.def("f_get_output", &GetOutput, "GetOutput");
