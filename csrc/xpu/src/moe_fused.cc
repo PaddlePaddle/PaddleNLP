@@ -28,6 +28,8 @@
 namespace xftkernel = baidu::xpu::xftkernel;
 namespace xft = baidu::xpu::xft;
 
+static int i = 0;
+
 std::vector<paddle::Tensor> MoeFusedKernel(
     const paddle::Tensor& input, //[980. 7168]
     const paddle::Tensor& gate_weight,//[7168. 256] ->[256,7168]
@@ -48,8 +50,6 @@ std::vector<paddle::Tensor> MoeFusedKernel(
 
   using XPUType = typename XPUTypeTrait<bfloat16>::Type;
   typedef paddle::bfloat16 data_t;
-
-//   xpu_ctx->x_context()->set_debug_level(0x1);
 
   const int64_t m = input.shape()[0];
   const int64_t hidden_size = input.shape()[1];
@@ -107,10 +107,16 @@ std::vector<paddle::Tensor> MoeFusedKernel(
     0,
     "sigmoid"
   };
-  xft::xft_moe_ffn_block_sorted<XPUType, int8_t, XPUType, float>(
-      xpu_ctx->x_context(), &input_tensor, &output_tensor, moe_weight, moe_param);
 
- 
+    if (i < 56) {
+        xft::xft_moe_ffn_block_sorted<XPUType, int8_t, XPUType, int8_wo_t>(
+            xpu_ctx->x_context(), &input_tensor, &output_tensor, moe_weight, moe_param);
+    } else {
+        xft::xft_moe_ffn_block_sorted<XPUType, int8_t, XPUType, float>(
+            xpu_ctx->x_context(), &input_tensor, &output_tensor, moe_weight, moe_param);
+    }
+  
+  i = (i + 1) % 58;
   baidu::xpu::api::plugin::print_times("[TIME END] MoeFusedKernel");
 
   return {

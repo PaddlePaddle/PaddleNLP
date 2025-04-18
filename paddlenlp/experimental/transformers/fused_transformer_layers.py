@@ -3518,7 +3518,7 @@ class FusedMultiTransformerXPU(Layer):
                         if config.activation.endswith("glu")
                         else [self.config.moe_config.num_experts, self.config.moe_config.moe_intermediate_size],
                         attr=ffn1_weight_scale_attr,
-                        dtype="bfloat16",
+                        dtype="float32",
                         is_bias=False,
                     )
                 else:
@@ -3528,7 +3528,7 @@ class FusedMultiTransformerXPU(Layer):
                     ffn1_weight_scale = self.create_parameter(
                         shape=base_shape,
                         attr=ffn1_weight_scale_attr,
-                        dtype="bfloat16",
+                        dtype="float32",
                         is_bias=False,
                     )
 
@@ -3536,14 +3536,14 @@ class FusedMultiTransformerXPU(Layer):
                     ffn2_weight_scale = self.create_parameter(
                         shape=[self.config.moe_config.num_experts, self.embed_dim],
                         attr=ffn2_weight_scale_attr,
-                        dtype="bfloat16",
+                        dtype="float32",
                         is_bias=False,
                     )
                 else:
                     ffn2_weight_scale = self.create_parameter(
                         shape=[self.embed_dim],
                         attr=ffn2_weight_scale_attr,
-                        dtype="bfloat16",
+                        dtype="float32",
                         is_bias=False,
                     )
 

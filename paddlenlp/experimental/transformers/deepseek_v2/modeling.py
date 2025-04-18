@@ -1854,8 +1854,8 @@ class DeepseekV2BlockInferenceModelXPU(DeepseekV2BlockInferenceModel):
                     ffn2_quanted_weight, ffn2_weight_scale = weight_quantize(
                         ffn2_weight, algo=self.moe_quant_type, group_size=-1, arch=70
                     )
-                    ffn1_weight_scale = ffn1_weight_scale.cast("bfloat16")
-                    ffn2_weight_scale = ffn2_weight_scale.cast("bfloat16")
+                    ffn1_weight_scale = ffn1_weight_scale
+                    ffn2_weight_scale = ffn2_weight_scale
                     ffn1_weights.append(
                         ffn1_quanted_weight.transpose((1, 0)).reshape([self.transformer_block.config.embed_dim, -1])
                     )
@@ -1869,8 +1869,8 @@ class DeepseekV2BlockInferenceModelXPU(DeepseekV2BlockInferenceModel):
                 fused_moe_ffn2_weight = paddle.to_tensor(ffn2_weights)
 
                 # 这里的 paddle.to_tensor，默认转为 bf16，而不是 ffn1_scales.dtype
-                fused_moe_ffn1_weight_scale = paddle.to_tensor(ffn1_scales)
-                fused_moe_ffn2_weight_scale = paddle.to_tensor(ffn2_scales)
+                fused_moe_ffn1_weight_scale = paddle.to_tensor(ffn1_scales).cast("float32")
+                fused_moe_ffn2_weight_scale = paddle.to_tensor(ffn2_scales).cast("float32")
                 gate_weight = paddle.to_tensor(
                     state_dict[f"{self.base_model_prefix}.layers.{idx}.mlp.gate.weight"]
                 ).cast("float32")
