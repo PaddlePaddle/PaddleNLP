@@ -21,6 +21,10 @@ from datasets import load_dataset
 
 from paddlenlp.data import Dict, Pad
 from paddlenlp.metrics.squad import compute_prediction, squad_evaluate
+from paddlenlp.utils.env import (
+    PADDLE_INFERENCE_MODEL_SUFFIX,
+    PADDLE_INFERENCE_WEIGHTS_SUFFIX,
+)
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir)))
 from args import parse_args  # noqa: E402
@@ -35,7 +39,10 @@ class Predictor(object):
 
     @classmethod
     def create_predictor(cls, args):
-        config = paddle.inference.Config(args.model_name_or_path + ".pdmodel", args.model_name_or_path + ".pdiparams")
+        config = paddle.inference.Config(
+            args.model_name_or_path + f"{PADDLE_INFERENCE_MODEL_SUFFIX}",
+            args.model_name_or_path + f"{PADDLE_INFERENCE_WEIGHTS_SUFFIX}",
+        )
         if args.device == "gpu":
             # set GPU configs accordingly
             config.enable_use_gpu(100, 0)
