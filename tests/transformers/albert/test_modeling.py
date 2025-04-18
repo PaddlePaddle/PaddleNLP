@@ -30,7 +30,6 @@ from paddlenlp.transformers import (
     AlbertForSequenceClassification,
     AlbertForTokenClassification,
     AlbertModel,
-    AlbertPretrainedModel,
 )
 
 from ...testing_utils import require_package, slow
@@ -335,8 +334,9 @@ class AlbertModelTest(ModelTesterMixin, unittest.TestCase):
 
     @slow
     def test_model_from_pretrained(self):
-        for model_name in list(AlbertPretrainedModel.pretrained_init_configuration.keys())[:1]:
-            model = AlbertModel.from_pretrained(model_name)
+        # for model_name in list(AlbertPretrainedModel.pretrained_init_configuration.keys())[:1]:
+        for model_name in ["albert/albert-base-v1"]:
+            model = AlbertModel.from_pretrained(model_name, from_hf_hub=True, convert_from_torch=True)
             self.assertIsNotNone(model)
 
 
