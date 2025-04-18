@@ -501,6 +501,12 @@ class LoRAModel(nn.Layer):
                 lora_use_mixer=lora_config.lora_use_mixer,
                 use_mora=lora_config.use_mora,
             )
+            # Hack for mp group moe, need to find a better solution.
+            if getattr(module.weight, "mp_moe", False):
+                lora_module.lora_A.mp_moe = True
+                lora_module.lora_B.mp_moe = True
+                lora_module.lora_A.is_distributed = True
+                lora_module.lora_B.is_distributed = True
         if isinstance(module, nn.Conv2D):
             lora_module = LoRAConv2D(
                 in_channels=module._in_channels,

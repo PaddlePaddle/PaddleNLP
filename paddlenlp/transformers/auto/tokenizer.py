@@ -145,7 +145,6 @@ else:
                     "GPTTokenizerFast" if is_tokenizers_available() else None,
                 ),
             ),
-            ("gau_alpha", "GAUAlphaTokenizer"),
             ("artist", "ArtistTokenizer"),
             ("chineseclip", "ChineseCLIPTokenizer"),
             ("ernie_vil", "ErnieViLTokenizer"),

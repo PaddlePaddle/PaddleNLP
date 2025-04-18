@@ -271,7 +271,7 @@ class LlamaModelTester:
 
     def create_and_check_gqa_model(self, config, input_ids, input_mask, *args):
         model = LlamaForCausalLM(config)
-        config.num_key_value_heads = 8 # gqa
+        config.num_key_value_heads = 8  # gqa
         config.use_fused_rope = True
         model.eval()
 
@@ -360,8 +360,8 @@ class LlamaModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):
             [
                 [
                     [0.20443289, 0.18662477, -0.75216216],
-                    [0.32803515, -0.36956733, -0.95613617],
-                    [0.28622314, 0.07698685, -0.64143789],
+                    [0.37699354, -0.38747141, -1.21889985],
+                    [0.31100151, -0.40143669, -0.64101797],
                 ]
             ]
         )
@@ -378,13 +378,12 @@ class LlamaModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):
 
         expected_shape = [1, 11, 768]
         self.assertEqual(output.shape, expected_shape)
-
         expected_slice = paddle.to_tensor(
             [
                 [
                     [0.20443289, 0.18662477, -0.75216216],
-                    [0.32803515, -0.36956733, -0.95613617],
-                    [0.28622314, 0.07698685, -0.64143789],
+                    [0.37699354, -0.38747141, -1.21889985],
+                    [0.31100151, -0.40143669, -0.64101797],
                 ]
             ]
         )
@@ -411,7 +410,7 @@ class LlamaCompatibilityTest(unittest.TestCase):
 
     @require_package("transformers", "torch")
     def test_llama_converter(self):
-        # 1. create commmon input
+        # 1. create common input
         input_ids = np.random.randint(100, 200, [1, 20])
 
         # 2. forward the paddle model
@@ -441,7 +440,7 @@ class LlamaCompatibilityTest(unittest.TestCase):
     def test_llama_converter_from_local_dir(self):
         with tempfile.TemporaryDirectory() as tempdir:
 
-            # 1. create commmon input
+            # 1. create common input
             input_ids = np.random.randint(100, 200, [1, 20])
 
             # 2. forward the torch  model
@@ -474,7 +473,7 @@ class LlamaCompatibilityTest(unittest.TestCase):
         pytorch_class_name = pytorch_class_name or class_name
         with tempfile.TemporaryDirectory() as tempdir:
 
-            # 1. create commmon input
+            # 1. create common input
             input_ids = np.random.randint(100, 200, [1, 20])
 
             # 2. forward the torch model

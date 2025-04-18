@@ -425,7 +425,7 @@ def normal_fuse_split_tp(weight, tensor_parallel_degree, tensor_parallel_rank=No
     size = weight.shape[dim]
     assert (
         size % tensor_parallel_degree == 0
-    ), f"The choosen size {size} is not compatible with sharding on {tensor_parallel_degree} shards. for tensor shape {weight.shape}"
+    ), f"The chosen size {size} is not compatible with sharding on {tensor_parallel_degree} shards. for tensor shape {weight.shape}"
 
     if is_column:
         splited_weights = np.split(weight, tensor_parallel_degree, axis=-1)

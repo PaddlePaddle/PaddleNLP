@@ -17,6 +17,8 @@ PaddleNLP 提供了多种环境变量，用于优化推理性能和资源使用�
 
 - `FLAGS_cuda_core_fp8_gemm`：是否开启小 Batch FP8 Gemm 优化，默认值不开启。设为1可开启，推理 FP8模型时，平均性能会加速约30%左右，适用于 SM>=89的显卡。
 
+- `FLAGS_blha_use_fp32_qk_sum`：在fp16精度下，blha计算qkGemm时是否用fp32进行累加，默认为0，表示不开启，如果出现乱码可以开启防止精度溢出。
+
 **GQA 优化**
 
 - `FLAGS_use_xqa_optim`：gpa 是否开启 xqa 优化，默认值为0，表示不开启。gqa 模型（如 llama3/3.1、qwen2）设为1性能会更好。
@@ -36,3 +38,6 @@ PaddleNLP 提供了多种环境变量，用于优化推理性能和资源使用�
 **MLA 相关优化**
 - `FLAGS_mla_use_tensorcore`：MLA 计算时是否使用 tensor core 实现，默认为 True，仅支持 Hoppers 架构显卡。为 False 时则采用 cuda core 实现，同时支持 Ampper 和
  Hopper 架构。
+
+**allreduce 优化**
+- `FLAGS_custom_allreduce`：多卡推理计算时是否使用高性能自定义allreduce实现，默认为 False。

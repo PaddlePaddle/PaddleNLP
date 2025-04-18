@@ -114,7 +114,7 @@ def do_task(task):
     device_id = get_availble(est, is_mrc)
     retry = 5
     while device_id is None and retry > 0:
-        print("> No device avaliable, wait 120 seconds.")
+        print("> No device available, wait 120 seconds.")
         time.sleep(120)
         device_id = get_availble(est, is_mrc)
         retry -= 1

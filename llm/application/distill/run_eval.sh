@@ -17,8 +17,11 @@ export PYTHONPATH=../../:$PYTHONPATH # PaddleNLP/llm dir
 export USE_FAST_TOKENIZER=true
 export NCCL_ALGO=Tree
 
-MODEL_PATH="Qwen/Qwen2.5-Math-7B"
-DTYPE="float32"
+# MODEL_PATH="Qwen/Qwen2.5-Math-7B"
+# MODEL_PATH="deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"
+MODEL_PATH=checkpoints/Qwen2.5-Math-7B/gsm8k_distilled
+
+DTYPE="bfloat16"
 DECODE_STRATEGY="greedy_search"
 TEMPERATURE=0.95
 TOP_P=0.6
@@ -26,44 +29,26 @@ SRC_LENGTH=1024
 MAX_LENGTH=3072
 TOTAL_MAX_LENGTH=4096
 
-# MODEL_PATH="deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"
-# DTYPE="float32"
-# DECODE_STRATEGY="greedy_search"
-# TEMPERATURE=0.95
-# TOP_P=0.6
-# SRC_LENGTH=1024
-# MAX_LENGTH=15360
-# TOTAL_MAX_LENGTH=16384
-
-# MODEL_PATH=Checkpoint/Qwen2.5-Math-7B
-# DTYPE="bfloat16"
-# DECODE_STRATEGY="greedy_search"
-# TEMPERATURE=0.95
-# TOP_P=0.6
-# SRC_LENGTH=1024
-# MAX_LENGTH=3072
-# TOTAL_MAX_LENGTH=4096
+# EVAL_PROMPT_EN="\nPlease reason step by step, and put your final answer within \\boxed{}."
+# EVAL_PROMPT_ZH="\n请一步一步地推理，并将你的最终答案放在\boxed{}中。"
+EVAL_PROMPT_EN=""
+EVAL_PROMPT_ZH=""
 
 INPUT_FILE="./data/gsm8k_distilled_zh/GSM8K_distilled_zh-test.json"
 OUTPUT_DIR="results-gsm8k/${MODEL_PATH}"
 
-# INPUT_FILE="./data/aime2024/dev.json"
-# OUTPUT_DIR="results-aime2024/${MODEL_PATH}"
-
-# INPUT_FILE="./data/math500/dev.json"
-# OUTPUT_DIR="results-math500/${MODEL_PATH}"
-
 EVAL_RESULTS="${OUTPUT_DIR}/output_zh.json"
 mkdir -p ${OUTPUT_DIR} && touch ${EVAL_RESULTS}
-nohup python -u -m paddle.distributed.launch \
+python -u -m paddle.distributed.launch \
     --devices "0,1,2,3" \
     distill_eval.py \
     --eval_file ${INPUT_FILE} \
     --eval_question_key "question_zh" \
     --eval_answer_key "answer_only" \
-    --eval_prompt "\n请一步一步地推理，并将你的最终答案放在\boxed{}中。" \
+    --eval_prompt "${EVAL_PROMPT_ZH}" \
     --model_name_or_path ${MODEL_PATH} \
     --inference_model true \
+    --append_attn true \
     --dtype ${DTYPE} \
     --batch_size 32 \
     --use_flash_attention true \
@@ -74,28 +59,29 @@ nohup python -u -m paddle.distributed.launch \
     --temperature ${TEMPERATURE} \
     --top_p ${TOP_P} \
     --data_file ${INPUT_FILE} \
-    --eval_results ${EVAL_RESULTS} > log_zh.txt &
+    --eval_results ${EVAL_RESULTS}
 
 
-# EVAL_RESULTS="${OUTPUT_DIR}/output_en.json"
-# mkdir -p ${OUTPUT_DIR} && touch ${EVAL_RESULTS}
-# nohup python -u -m paddle.distributed.launch \
-#     --devices "4,5,6,7" \
-#     distill_eval.py \
-#     --eval_file ${INPUT_FILE} \
-#     --eval_question_key "question" \
-#     --eval_answer_key "answer_only" \
-#     --eval_prompt "\nPlease reason step by step, and put your final answer within \\boxed{}." \
-#     --model_name_or_path ${MODEL_PATH} \
-#     --inference_model true \
-#     --dtype ${DTYPE} \
-#     --batch_size 32 \
-#     --use_flash_attention true \
-#     --src_length ${SRC_LENGTH} \
-#     --max_length ${MAX_LENGTH} \
-#     --total_max_length ${TOTAL_MAX_LENGTH} \
-#     --decode_strategy ${DECODE_STRATEGY} \
-#     --temperature ${TEMPERATURE} \
-#     --top_p ${TOP_P} \
-#     --data_file ${INPUT_FILE} \
-#     --eval_results ${EVAL_RESULTS} > log_en.txt &
+EVAL_RESULTS="${OUTPUT_DIR}/output_en.json"
+mkdir -p ${OUTPUT_DIR} && touch ${EVAL_RESULTS}
+python -u -m paddle.distributed.launch \
+    --devices "0,1,2,3" \
+    distill_eval.py \
+    --eval_file ${INPUT_FILE} \
+    --eval_question_key "question" \
+    --eval_answer_key "answer_only" \
+    --eval_prompt "${EVAL_PROMPT_EN}" \
+    --model_name_or_path ${MODEL_PATH} \
+    --inference_model true \
+    --append_attn true \
+    --dtype ${DTYPE} \
+    --batch_size 32 \
+    --use_flash_attention true \
+    --src_length ${SRC_LENGTH} \
+    --max_length ${MAX_LENGTH} \
+    --total_max_length ${TOTAL_MAX_LENGTH} \
+    --decode_strategy ${DECODE_STRATEGY} \
+    --temperature ${TEMPERATURE} \
+    --top_p ${TOP_P} \
+    --data_file ${INPUT_FILE} \
+    --eval_results ${EVAL_RESULTS}

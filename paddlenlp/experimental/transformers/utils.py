@@ -78,6 +78,30 @@ def infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, 
     return model
 
 
+def infererence_model_from_config(cls, config, args, kwargs):
+    r"""
+    Instantiate a pretrained model configuration from a pre-trained model name or path.
+    """
+    dtype = kwargs.pop("dtype", None)
+    if dtype is None:
+        dtype = config.dtype
+    low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", False)
+
+    init_contexts = []
+    if low_cpu_mem_usage or config.quantization_config.is_weight_quantize():
+        # Instantiate model.
+        init_contexts.append(no_init_weights(_enable=True))
+        if is_paddle_support_lazy_init():
+            init_contexts.append(paddle.LazyGuard())
+    if dtype:
+        init_contexts.append(dtype_guard(dtype))
+
+    # init the model
+    with ContextManagers(init_contexts):
+        model = cls(config)
+    return model
+
+
 class EmptyActScale:
     """
     For fake parameter
