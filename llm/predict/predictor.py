@@ -1211,7 +1211,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
     @auto_dynamic_graph_pybind
     def predict(self, input_texts: list[str], return_tokens=False):
         if self.dynamic_insert:
-            return self.predict_dy_insert(input_texts, return_tokens)
+            return self.predict_dy_insert(input_texts, return_tokens=return_tokens)
         if self.config.output_via_mq:
             return self.predict_via_mq(input_texts, return_tokens)
         self._preprocess(input_texts)
@@ -1305,26 +1305,41 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         ] = np.array(self.decoder_blocks[pos])
 
     @paddle.no_grad()
-    def predict_dy_insert(self, input_texts: list[str], return_tokens=False, **kwargs):
-        # text2ids
-        if self.tokenizer.chat_template is not None:
-            if not isinstance(input_texts, list) or not isinstance(input_texts[0], str):
-                input_texts = [input_texts]
-            input_texts = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in input_texts]
-
+    @auto_dynamic_graph_pybind
+    def predict_dy_insert(
+        self,
+        input_texts: list[str] = None,
+        input_ids: list = None,
+        return_tokens=False,
+        all_rank_return=True,
+        **kwargs
+    ):
+        flag_current_rank_run = self.tensor_parallel_rank == 0 or all_rank_return
         self.input_ids = []
-        for text in input_texts:
-            tokens = self.tokenizer(
-                text,
-                return_tensors="np",
-                padding=True,
-                truncation=True,
-                max_length=self.config.src_length,
-                # if use chat_template, it will not add special_tokens
-                add_special_tokens=self.tokenizer.chat_template is None
-                or isinstance(self.tokenizer, (ChatGLMv2Tokenizer, ChatGLMTokenizer)),
-            )
-            self.input_ids.append(tokens["input_ids"][0])
+        if input_ids is not None:
+            assert isinstance(input_ids, list) and isinstance(input_ids[0], list), "input_ids must be a list of list"
+            self.input_ids = copy.deepcopy(input_ids)
+        else:
+            assert input_texts is not None, "input_texts can't be None, when input_ids is None."
+            if self.tokenizer.chat_template is not None:
+                if not isinstance(input_texts, list) or not isinstance(input_texts[0], str):
+                    input_texts = [input_texts]
+                input_texts = [
+                    self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in input_texts
+                ]
+
+            for text in input_texts:
+                tokens = self.tokenizer(
+                    text,
+                    return_tensors="np",
+                    padding=True,
+                    truncation=True,
+                    max_length=self.config.src_length,
+                    # if use chat_template, it will not add special_tokens
+                    add_special_tokens=self.tokenizer.chat_template is None
+                    or isinstance(self.tokenizer, (ChatGLMv2Tokenizer, ChatGLMTokenizer)),
+                )
+                self.input_ids.append(tokens["input_ids"][0])
 
         assert self.proposer is None, "dynamic insert don't support proposer."
 
@@ -1342,7 +1357,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         # print("prefill_blocks", self.prefill_blocks)
 
         self.tail_blocks = []
-        for _ in range(len(self.input_ids)):
+        for _ in range(total_request_num):
             self.tail_blocks.append(block_id)
             block_id += 1
         # print("tail_blocks", self.tail_blocks)
@@ -1434,9 +1449,18 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                     len(self.input_ids),
                 ],
             )
-            if self.tensor_parallel_rank == 0:
+
+            if flag_current_rank_run:
                 read_res_process.start()
                 done_event.wait()
+
+        done_task_id_set = set()
+
+        def send_task_to_queue(task_id):
+            if task_id not in done_task_id_set:
+                task_token = self.model_inputs["all_token_ids"][task_id : task_id + 1, :].cpu().numpy()
+                task_queue.put([task_id, task_token])
+                done_task_id_set.add(task_id)
 
         s_time = time.time()
         with self.update_predictor_params(**kwargs):
@@ -1469,7 +1493,6 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                 task_id = unfinished_ids.pop()
                 self.insert_task(cur_bs, task_id)
 
-            done_task_id_set = set()
             if kwargs.pop("max_length", self.config.max_length) > 1:
                 while self.model_inputs["not_need_stop"] or len(unfinished_ids) > 0:
                     no_stop_num = max_batch_size - paddle.sum(self.model_inputs["stop_flags"]).item()
@@ -1478,12 +1501,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                             if self.model_inputs["stop_flags"][i]:
                                 if self.config.output_via_mq:
                                     task_id = self.model_inputs["result_id"][i][0].item()
-                                    if task_id not in done_task_id_set:
-                                        task_token = (
-                                            self.model_inputs["all_token_ids"][task_id : task_id + 1, :].cpu().numpy()
-                                        )
-                                        task_queue.put([task_id, task_token])
-                                        done_task_id_set.add(task_id)
+                                    send_task_to_queue(task_id)
                                 if len(unfinished_ids) > 0:
                                     task_id = unfinished_ids.pop()
                                     self.insert_task(i, task_id)
@@ -1492,33 +1510,32 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                     if self.model_inputs["stop_flags"][i]:
                         if self.config.output_via_mq:
                             task_id = self.model_inputs["result_id"][i][0].item()
-                            if task_id not in done_task_id_set:
-                                task_token = self.model_inputs["all_token_ids"][task_id : task_id + 1, :].cpu().numpy()
-                                task_queue.put([task_id, task_token])
-                                done_task_id_set.add(task_id)
+                            send_task_to_queue(task_id)
             elif self.config.output_via_mq:
                 for task_id in range(len(self.input_ids)):
-                    task_id = self.model_inputs["result_id"][i][0].item()
-                    task_token = self.model_inputs["all_token_ids"][task_id : task_id + 1, :].cpu().numpy()
-                    task_queue.put([task_id, task_token])
+                    send_task_to_queue(task_id)
 
         logger.debug(f"running spend {time.time() - s_time}")
         self.cache_kvs = None
         self.model_inputs["cache_kvs"] = None
         paddle.device.cuda.empty_cache()
         if self.config.output_via_mq:
-            if self.tensor_parallel_rank == 0:
+            if flag_current_rank_run:
                 outputs = []
                 output_tokens = []
-                while len(outputs) < len(input_texts):
+                while len(outputs) < total_request_num:
                     result = result_queue.get(timeout=1)
                     outputs.append(result[-1])
                     output_tokens.append(result[-2])
                 read_res_process.terminate()
             while not task_queue.empty():
                 task_queue.get_nowait()
+            while not result_queue.empty():
+                result_queue.get_nowait()
+            task_queue.close()
+            result_queue.close()
         else:
-            if self.tensor_parallel_rank == 0:
+            if flag_current_rank_run:
                 output_tokens = self.model_inputs["all_token_ids"]
                 output_tokens = paddle.where(
                     output_tokens < 0,
@@ -1528,7 +1545,8 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                 outputs = self.tokenizer.batch_decode(
                     output_tokens, skip_special_tokens=True, clean_up_tokenization_spaces=False
                 )
-        if self.tensor_parallel_rank == 0:
+
+        if flag_current_rank_run:
             if return_tokens:
                 return outputs, output_tokens
             else:
@@ -1822,6 +1840,7 @@ class AutoPredictor:
             cache_v_shapes=cache_v_shapes,
             cache_kvs_shape=cache_kvs_shape,
             model_args=model_args,
+            **kwargs,
         )
         return predictor
 
@@ -1829,6 +1848,7 @@ class AutoPredictor:
 def create_predictor(
     predictor_args: PredictorArgument,
     model_args: ModelArgument,
+    **kwargs,
 ):
     paddle.set_device(predictor_args.device)
     paddle.set_default_dtype(predictor_args.dtype)
@@ -1899,7 +1919,7 @@ def create_predictor(
                     tensor_parallel_rank=tensor_parallel_rank,
                     tensor_parallel_output=False,
                 )
-    predictor = AutoPredictor.create_predictor(predictor_args, config, model_args, tokenizer, model=model)
+    predictor = AutoPredictor.create_predictor(predictor_args, config, model_args, tokenizer, model=model, **kwargs)
 
     return predictor
 
