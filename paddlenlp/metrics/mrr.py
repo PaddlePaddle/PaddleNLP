@@ -21,8 +21,8 @@ __all__ = ["MRR"]
 class MRR:
     """
     MRR - Mean Reciprocal Rank, is a popular metric for recommend system
-    and other retrival task. The higher mrr is, the better performance of
-    model in retrival task.
+    and other retrieval task. The higher mrr is, the better performance of
+    model in retrieval task.
 
     Args:
         distance: which algorithm to use to get distance of embeddings, for example: "cosine", "euclidean"

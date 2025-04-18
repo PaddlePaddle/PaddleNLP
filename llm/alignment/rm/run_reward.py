@@ -48,7 +48,7 @@ class TrainingArguments(TrainingArguments):
 @dataclass
 class ModelArgument:
     model_name_or_path: str = field(
-        default=None, metadata={"help": "Build-in pretrained model name or the path to local model."}
+        default=None, metadata={"help": "Built-in pretrained model name or the path to local model."}
     )
     normalize_score_during_training: bool = field(
         default=False, metadata={"help": "Whether to normalize score during training."}

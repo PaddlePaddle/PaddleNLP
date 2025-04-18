@@ -482,7 +482,7 @@ class OPTCompatibilityTest(unittest.TestCase):
 
     @require_package("transformers", "torch")
     def test_model_config_mapping(self):
-        # 1. create commmon input
+        # 1. create common input
         input_ids = np.random.randint(100, 200, [1, 20])
 
         # 2. forward the torch model
