@@ -138,7 +138,7 @@ std::vector<paddle::Tensor> rebuild_padding_v2(const paddle::Tensor& tmp_out, //
     return {out};
 }
 
-std::vector<paddle::Tensor> RebuildPaddingV2(const paddle::Tensor& tmp_out, // [token_num, dim_embed]
+paddle::Tensor RebuildPaddingV2Func(const paddle::Tensor& tmp_out, // [token_num, dim_embed]
                                              const paddle::Tensor& cum_offsets, // [bsz, 1]
                                              const paddle::Tensor& seq_lens_decoder,
                                              const paddle::Tensor& seq_lens_encoder,
@@ -153,7 +153,7 @@ std::vector<paddle::Tensor> RebuildPaddingV2(const paddle::Tensor& tmp_out, // [
                 seq_lens_encoder,
                 output_padding_offset,
                 max_input_length
-            );
+            )[0];
         }
         case paddle::DataType::FLOAT16: {
             return rebuild_padding_v2<paddle::DataType::FLOAT16>(
@@ -163,7 +163,7 @@ std::vector<paddle::Tensor> RebuildPaddingV2(const paddle::Tensor& tmp_out, // [
                 seq_lens_encoder,
                 output_padding_offset,
                 max_input_length
-            );
+            )[0];
         }
         case paddle::DataType::FLOAT32: {
             return rebuild_padding_v2<paddle::DataType::FLOAT32>(
@@ -173,7 +173,7 @@ std::vector<paddle::Tensor> RebuildPaddingV2(const paddle::Tensor& tmp_out, // [
                 seq_lens_encoder,
                 output_padding_offset,
                 max_input_length
-            );
+            )[0];
         }
         default: {
             PD_THROW(
@@ -184,6 +184,22 @@ std::vector<paddle::Tensor> RebuildPaddingV2(const paddle::Tensor& tmp_out, // [
     }
 }
 
+std::vector<paddle::Tensor> RebuildPaddingV2(const paddle::Tensor& tmp_out, // [token_num, dim_embed]
+                                             const paddle::Tensor& cum_offsets, // [bsz, 1]
+                                             const paddle::Tensor& seq_lens_decoder,
+                                             const paddle::Tensor& seq_lens_encoder,
+                                             const paddle::optional<paddle::Tensor>& output_padding_offset,
+                                             int max_input_length) {
+    
+    return {RebuildPaddingV2Func(
+                tmp_out,
+                cum_offsets,
+                seq_lens_decoder,
+                seq_lens_encoder,
+                output_padding_offset,
+                max_input_length
+            )};
+}
 std::vector<std::vector<int64_t>> RebuildPaddingV2InferShape(const std::vector<int64_t>& tmp_out_shape,
                                                              const std::vector<int64_t>& cum_offsets_shape,
                                                              const std::vector<int64_t>& seq_lens_decoder_shape,

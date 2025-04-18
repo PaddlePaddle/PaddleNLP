@@ -18,13 +18,19 @@ from dataclasses import dataclass, field
 import numpy
 import paddle
 from paddle.distributed import fleet
-from ppo_trainer import Trainer, data_group_merge, data_group_split, group_rank_guard
 
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments
 from paddlenlp.transformers import (
     AutoConfig,
     AutoModelForCausalLM,
     AutoModelForCausalLMPipe,
+)
+
+from ..trainer.ppo_trainer import (
+    Trainer,
+    data_group_merge,
+    data_group_split,
+    group_rank_guard,
 )
 
 

@@ -117,6 +117,9 @@ sources = [
     "./gpu/speculate_decoding_kernels/ngram_match.cc",
     "./gpu/speculate_decoding_kernels/speculate_save_output.cc",
     "./gpu/speculate_decoding_kernels/speculate_get_output.cc",
+    "./gpu/save_output_dygraph.cu",
+    "./gpu/cpp_extensions.cu",
+    "./gpu/all_reduce.cu",
     "./gpu/quantization/per_token_group_quant.cu",
     "./gpu/quantization/per_tensor_quant_fp8.cu",
 ]

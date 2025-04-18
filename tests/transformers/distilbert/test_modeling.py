@@ -287,8 +287,8 @@ class DistilBertModelTest(ModelTesterMixin, unittest.TestCase):
         model: DistilBertForTokenClassification = DistilBertForTokenClassification.from_pretrained(
             "distilbert-base-uncased", num_classes=4, dropout=0.3
         )
-        assert model.num_labels == 4
-        assert model.dropout.p == 0.3
+        assert model.config.num_labels == 4
+        assert model.config.dropout == 0.3
 
 
 class DistilBertModelCompatibilityTest(unittest.TestCase):

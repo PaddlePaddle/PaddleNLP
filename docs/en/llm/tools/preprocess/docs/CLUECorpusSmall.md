@@ -46,7 +46,6 @@ Below are dataset applications for training tasks.
 ```shell
 python -u  create_pretraining_data.py \
     --model_name "idea-ccnl/ziya-llama-13b-v1" \
-    --tokenizer_name "LlamaTokenizer" \
     --input_path "clue_corpus_small_14g.jsonl" \
     --output_prefix "clue_corpus_small_14g" \
     --data_format "JSON" \

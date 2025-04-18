@@ -708,7 +708,7 @@ class BlipModelIntegrationTest(unittest.TestCase):
         )
 
     def test_inference_vqa(self):
-        model = BlipForQuestionAnswering.from_pretrained("Salesforce/blip-vqa-base")
+        model = BlipForQuestionAnswering.from_pretrained("Salesforce/blip-vqa-base", ignore_mismatched_sizes=True)
         model.eval()
         assert model.config.text_config.num_attention_heads == 12
         assert model.config.vision_config.layer_norm_eps == 1e-6

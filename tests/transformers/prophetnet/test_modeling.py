@@ -197,6 +197,7 @@ class ProphetNetModelTest(ModelTesterMixin, unittest.TestCase):
         self.model_tester.create_and_check_conditional_generation_model(*config_and_inputs)
 
     @slow
+    @unittest.skip("Skip for missing model weight.")
     def test_model_from_pretrained(self):
         for model_name in list(ProphetNetPretrainedModel.pretrained_init_configuration)[:1]:
             model = ProphetNetModel.from_pretrained(model_name)
