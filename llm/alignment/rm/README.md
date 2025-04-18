@@ -39,4 +39,6 @@ tar -zxvf ultrafeedback_binarized.tar.gz
 
 ```bash
 # RM 启动命令参考
-python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/rm/flashmask/run_reward.py ./config/llama/rm_flashmask_argument.json
+cd llm/alignment/rm
+export PYTHONPATH=../../../:$PYTHONPATH
+python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_reward.py  ../../config/llama/rm_flashmask_argument.json
