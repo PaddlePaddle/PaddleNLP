@@ -687,7 +687,7 @@ def read_res_dynamic_insert(
                 output_numpy[output_numpy == -1] = tokenizer.eos_token_id
                 outputs[task_id] = output_numpy
                 count += 1
-                logger.info(f"Processed task {task_id} ({count}/{total_request_num})")
+                logger.info(f"Post-processing task {task_id} ({count}/{total_request_num})")
 
         except Exception as e:
             logger.error(f"Error processing task: {str(e)}")

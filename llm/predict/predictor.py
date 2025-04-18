@@ -1287,7 +1287,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
     def insert_task(self, pos, task_id):
         query_id = task_id
         length = len(self.input_ids[query_id])
-        logger.info(f"Insert task {task_id} while query id is {query_id} inserting pos {pos}")
+        logger.debug(f"Insert task {task_id} while query id is {query_id} inserting pos {pos}")
         self.model_inputs["input_ids"][pos, 0] = self.model_inputs["all_token_ids"][query_id, 0]
         self.model_inputs["seq_lens_this_time"][pos] = 1
         self.model_inputs["seq_lens_decoder"][pos] = length
@@ -1418,10 +1418,24 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         #     dtype='float32',
         # )
 
-        result_queue = mp.Queue()
-        task_queue = mp.Queue()
-        done_event = mp.Event()
-        read_res_func = llm_utils.read_res_dynamic_insert
+        if self.config.output_via_mq:
+            result_queue = mp.Queue()
+            task_queue = mp.Queue()
+            done_event = mp.Event()
+            read_res_func = llm_utils.read_res_dynamic_insert
+            read_res_process = mp.Process(
+                target=read_res_func,
+                args=[
+                    self.model_name_or_path,
+                    task_queue,
+                    result_queue,
+                    done_event,
+                    self.model_inputs["queue_id"],
+                    len(self.input_ids),
+                ],
+            )
+            if self.tensor_parallel_rank == 0:
+                read_res_process.start()
 
         s_time = time.time()
         with self.update_predictor_params(**kwargs):
@@ -1454,21 +1468,6 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                 task_id = unfinished_ids.pop()
                 self.insert_task(cur_bs, task_id)
 
-            if self.config.output_via_mq:
-                read_res_process = mp.Process(
-                    target=read_res_func,
-                    args=[
-                        self.model_name_or_path,
-                        task_queue,
-                        result_queue,
-                        done_event,
-                        self.model_inputs["queue_id"],
-                        len(self.input_ids),
-                    ],
-                )
-                if self.tensor_parallel_rank == 0:
-                    read_res_process.start()
-
             if kwargs.pop("max_length", self.config.max_length) > 1:
                 while self.model_inputs["not_need_stop"] or len(unfinished_ids) > 0:
                     no_stop_num = max_batch_size - paddle.sum(self.model_inputs["stop_flags"]).item()
@@ -1497,7 +1496,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                     task_token = self.model_inputs["all_token_ids"][task_id : task_id + 1, :].cpu().numpy()
                     task_queue.put([task_id, task_token])
 
-        logger.info(f"running spend {time.time() - s_time}")
+        logger.debug(f"running spend {time.time() - s_time}")
         self.cache_kvs = None
         self.model_inputs["cache_kvs"] = None
         paddle.device.cuda.empty_cache()
