@@ -10,7 +10,7 @@ ppo:
     min_dec_len: 1
     top_p: 0.8
     temperature: 1.0
-    num_return_sequences: 1
+    rollout_n: 1
     repetition_penalty: 1.0
     num_train_epochs: 1
     max_steps: 5

@@ -43,7 +43,7 @@
     "min_dec_len": 1,
     "normalize_advantage": 1,
     "normalize_reward": 1,
-    "num_return_sequences": 8,
+    "rollout_n": 8,
     "per_device_prompt_batch_size": 32,
     "repetition_penalty": 1.0,
     "temperature": 0.7,
