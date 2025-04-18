@@ -57,6 +57,35 @@ from .trainer_utils import PipeEvalModel
 # ########## patches for Trianer ##########
 
 
+def calculate_chunk_sizes(total_length, split_size):
+    chunk_sizes = []
+    full_chunks = total_length // split_size
+    remainder = total_length % split_size
+    for _ in range(full_chunks):
+        chunk_sizes.append(split_size)
+    if remainder > 0:
+        chunk_sizes.append(remainder)
+    return chunk_sizes
+
+
+def inputs_split(inputs, split_size, axis=0):
+    for k, v in inputs.items():
+        if paddle.is_tensor(v):
+            num_or_sections = calculate_chunk_sizes(v.shape[axis], split_size)
+    split_inputs_list = [{} for _ in range(len(num_or_sections))]
+
+    for k, v in inputs.items():
+        if paddle.is_tensor(v):
+            chunks = paddle.split(v, num_or_sections=num_or_sections, axis=axis)
+            for i, chunk in enumerate(chunks):
+                split_inputs_list[i][k] = chunk
+        else:
+            for split_dict in split_inputs_list:
+                split_dict[k] = v
+
+    return split_inputs_list
+
+
 def init_train_model_opt(
     self: Trainer,
     max_steps: int,
@@ -360,14 +389,19 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
     if dp_master_grad:
         is_no_sync = True
 
-    if is_no_sync:
-        # Avoid unnecessary DDP synchronization since there will be no backward pass on this example.
-        with model.no_sync():
-            tr_loss_step = self.training_step(model, inputs)
-    else:
-        tr_loss_step = self.training_step(model, inputs)
+    for index, inputs_tmp in enumerate(inputs):
+        if is_no_sync:
+            # Avoid unnecessary DDP synchronization since there will be no backward pass on this example.
+            with model.no_sync():
+                tr_loss_step = self.training_step(model, inputs_tmp)
+        else:
+            if len(inputs) > 1 and index != (len(inputs) - 1):
+                with model.no_sync():
+                    tr_loss_step = self.training_step(model, inputs_tmp)
+            else:
+                tr_loss_step = self.training_step(model, inputs_tmp)
 
-    tr_loss += tr_loss_step
+        tr_loss += tr_loss_step
 
     if (step_control + 1) % args.gradient_accumulation_steps == 0 or (
         # last step in epoch but step is always smaller than gradient_accumulation_steps
@@ -733,7 +767,13 @@ class RLTrainer(Trainer):
 
         train_step_vars["tr_loss"] = loss_var
         # train_step_vars["timer_name"] = self.__class__.__name__
-
+        if (
+            self.args.per_device_train_split_batch_size > 0
+            and self.args.per_device_train_split_batch_size < self.args.per_device_train_batch_size
+        ):
+            inputs = inputs_split(inputs, split_size=self.args.per_device_train_split_batch_size, axis=0)
+        else:
+            inputs = [inputs]
         new_train_step_vars = super().full_training_step(inputs, **train_step_vars)
 
         # minimally update
