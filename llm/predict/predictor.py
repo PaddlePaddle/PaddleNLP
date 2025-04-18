@@ -1466,7 +1466,6 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         with self.update_predictor_params(**kwargs):
             for i, inst in enumerate(self.input_ids):
                 length = len(inst)
-                print(f"run prefile {i}")
                 self.model_inputs["input_ids"][0, :length] = np.array(inst)
                 self.model_inputs["seq_lens_this_time"][0] = length
                 self.model_inputs["seq_lens_encoder"][0] = length
@@ -1477,7 +1476,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                 self.model_inputs["block_tables"][0, num_prefill_blocks] = np.array(self.tail_blocks[i])
                 self.model_inputs["result_id"][0][:1] = np.arange(i, i + 1)
 
-                next_tokens = self._infer(self.model_inputs)
+                self._infer(self.model_inputs)
                 self.model_inputs["seq_lens_this_time"][0] = 0
                 self.model_inputs["seq_lens_encoder"][0] = 0
                 self.model_inputs["seq_lens_decoder"][0] = 0
@@ -1505,7 +1504,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                                 if len(unfinished_ids) > 0:
                                     task_id = unfinished_ids.pop()
                                     self.insert_task(i, task_id)
-                    next_tokens = self._infer(self.model_inputs)
+                    self._infer(self.model_inputs)
                 for i in range(max_batch_size):
                     if self.model_inputs["stop_flags"][i]:
                         if self.config.output_via_mq:
