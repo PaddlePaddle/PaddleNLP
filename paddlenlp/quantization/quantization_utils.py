@@ -14,6 +14,7 @@
 
 import re
 
+import paddle
 import paddle.nn as nn
 from paddle.distributed.fleet.meta_parallel import (
     ColumnParallelLinear,
@@ -147,6 +148,7 @@ def convert_to_weight_quantize_state_dict(state_dict, name, quantization_config,
     weight_name = name + ".weight"
     quant_weight_name = name + ".quant_weight"
     quant_scale_name = name + ".quant_scale"
+    act_scale_name = name + ".act_scale"
 
     if quant_weight_name in state_dict and quant_scale_name in state_dict:
         return state_dict
@@ -157,10 +159,12 @@ def convert_to_weight_quantize_state_dict(state_dict, name, quantization_config,
             quant_weight, quant_scale = quantize_channelwise(
                 target_weight, quantization_config.apply_hadamard, bit_length=8
             )
+            state_dict[act_scale_name] = paddle.zeros([], dtype="bfloat16").cuda()
         elif weight_quantize_algo in ["a8w4linear"]:
             quant_weight, quant_scale = quantize_channelwise(
                 target_weight, quantization_config.apply_hadamard, bit_length=4
             )
+            state_dict[act_scale_name] = paddle.zeros([], dtype="bfloat16").cuda()
         else:
             quant_weight, quant_scale = weight_quantize(
                 x=target_weight,

@@ -17,21 +17,28 @@ from paddle.autograd import PyLayer
 
 from paddlenlp.utils import infohub
 
-
-def random_hadamard(n, dtype):
-    A = paddle.randint(low=0, high=2, shape=[n, n]).astype("float32") * 2 - 1
-    Q, _ = paddle.linalg.qr(A)
-    return Q.astype(dtype)
+from .hadamard_utils import random_hadamard_matrix
 
 
-def quantize_tensorwise(x, apply_hadamard=False, bit_length=8):
+def quantize_tensorwise(x, quantization_config=None, bit_length=8, state=0, training=False, act_scale=None):
     qmax = (1 << (bit_length - 1)) - 1
     qmin = -1 * qmax - 1
-    if apply_hadamard:
-        target_x = x @ infohub.hadamard[x.shape[-1]]
+    if quantization_config.apply_hadamard:
+        target_x = x @ infohub.hadamard[x.shape[-1]][0]
     else:
         target_x = x.clone()
-    scale = paddle.max(paddle.abs(target_x)) / qmax
+
+    if act_scale is not None:
+        if training:
+            scale = paddle.max(paddle.abs(target_x)) / qmax
+            act_scale[:] = (state * act_scale + scale) / (state + 1)
+            if state > quantization_config.skip_first_act_scale_step:
+                scale = act_scale
+        else:
+            scale = act_scale
+    else:
+        scale = paddle.max(paddle.abs(target_x)) / qmax
+
     x_int8 = paddle.clip((target_x / scale).round(), qmin, qmax).astype("int8")
     return x_int8, scale
 
@@ -39,7 +46,7 @@ def quantize_tensorwise(x, apply_hadamard=False, bit_length=8):
 def dequantize_tensorwise(x_int8, scale, apply_hadamard=False):
     x = x_int8.astype(scale.dtype) * scale
     if apply_hadamard:
-        x = x @ infohub.hadamard[x.shape[-1]].T
+        x = x @ infohub.hadamard[x.shape[-1]][0].T
     return x
 
 
@@ -50,26 +57,32 @@ def quantize_channelwise(w, apply_hadamard=False, bit_length=8):
         if getattr(infohub, "hadamard") is None:
             setattr(infohub, "hadamard", {})
         if w.shape[0] in infohub.hadamard:
-            hadamard_matrix = infohub.hadamard[w.shape[0]]
+            hadamard_matrix, block_size = infohub.hadamard[w.shape[0]]
         else:
-            hadamard_matrix = random_hadamard(w.shape[0], w.dtype)
-            infohub.hadamard[w.shape[0]] = hadamard_matrix
+            hadamard_matrix, block_size = random_hadamard_matrix(w.shape[0], w.dtype, is_block=True)
+            infohub.hadamard[w.shape[0]] = (hadamard_matrix, block_size)
         w = hadamard_matrix.T @ w
+    else:
+        block_size = 1
     scale = paddle.max(paddle.abs(w), axis=0, keepdim=True) / qmax
     w_int8 = paddle.clip((w / scale).round(), qmin, qmax).astype("int8")
-    return w_int8.T, scale.squeeze(0)
+    return w_int8.T, scale.squeeze(0) / block_size
 
 
 def dequantize_channelwise(w_int8, scale, apply_hadamard=False):
     w = w_int8.T.astype(scale.dtype) * scale
     if apply_hadamard:
-        w = infohub.hadamard[w_int8.shape[1]] @ w
+        w = infohub.hadamard[w_int8.shape[1]][0] @ w
     return w
 
 
-def a8w8_linear(x, w_int8, w_scale=None, bias=None, dtype=None, apply_hadamard=False):
-    x_int8, x_scale = quantize_tensorwise(x, apply_hadamard, bit_length=8)
-    out = paddle.matmul(x_int8, w_int8.T).astype(dtype) * x_scale * w_scale.unsqueeze(0)
+def a8w8_linear(
+    x, w_int8, w_scale=None, bias=None, dtype=None, quantization_config=None, state=0, training=False, act_scale=None
+):
+    x_int8, x_scale = quantize_tensorwise(
+        x, quantization_config, bit_length=8, state=state, training=training, act_scale=act_scale
+    )
+    out = paddle.matmul(x_int8, w_int8.T).astype(dtype) * (x_scale * w_scale.unsqueeze(0))
     if bias is not None:
         out += bias
     return out
@@ -85,15 +98,20 @@ class QATFunc(PyLayer):
         quant_scale,
         quantization_config,
         dtype,
+        state,
+        training,
+        act_scale,
     ):
-
         output = a8w8_linear(
             x,
             quant_weight,
             w_scale=quant_scale,
             bias=bias,
             dtype=dtype,
-            apply_hadamard=quantization_config.apply_hadamard,
+            quantization_config=quantization_config,
+            state=state,
+            training=training,
+            act_scale=act_scale,
         )
         ctx.quantization_config = quantization_config
         ctx.dtype = dtype
@@ -105,16 +123,13 @@ class QATFunc(PyLayer):
         x, quant_weight, bias, quant_scale = ctx.saved_tensor()
 
         if not x.stop_gradient:
-            print("1")
             if ctx.quantization_config.quant_input_grad:
-                print("grad_output, quant_scale", grad_output.shape, quant_scale.shape)
-                print("grad_output*quant_scale", grad_output * quant_scale)
-                x_int8, x_scale = quantize_tensorwise(
-                    grad_output * quant_scale, ctx.quantization_config.apply_hadamard, bit_length=8
+                x_int8, x_scale = quantize_tensorwise(grad_output * quant_scale)
+                input_grad = (
+                    paddle.matmul(x_int8, quant_weight).astype(ctx.dtype)
+                    @ infohub.hadamard[quant_weight.shape[-1]][0].T
+                    * x_scale
                 )
-                print("x_int8, x_scale", x_int8.shape, x_scale.shape, x_int8.dtype, x_scale.dtype)
-                input_grad = paddle.matmul(x_int8, quant_weight).astype(ctx.dtype) * x_scale
-                print(input_grad.dtype, input_grad.shape)
             else:
                 qdq_weight = dequantize_channelwise(
                     quant_weight, quant_scale, apply_hadamard=ctx.quantization_config.apply_hadamard
@@ -124,16 +139,16 @@ class QATFunc(PyLayer):
             input_grad = None
 
         if not quant_weight.stop_gradient:
-            print("2")
-            weight_grad = paddle.einsum("bsh,bsd->hd", x, grad_output)
+            if len(x.shape) == 2:
+                weight_grad = paddle.einsum("sh,sd->hd", x, grad_output)
+            else:
+                weight_grad = paddle.einsum("bsh,bsd->hd", x, grad_output)
         else:
             weight_grad = None
 
         if bias is not None and not bias.stop_gradient:
-            print("3")
             bias_grad = grad_output.sum(axis=[0, 1])
         else:
             bias_grad = None
-        print("4")
 
         return input_grad, weight_grad, bias_grad

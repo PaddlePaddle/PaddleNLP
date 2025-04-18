@@ -199,9 +199,14 @@ def quant_weight_linear(
     quant_scale=None,
     quant_state=None,
     bias=None,
+    act_state=None,
 ):
     if weight_quantize_algo in ["a8w8linear", "a8w4linear"]:
-        return QATFunc.apply(x, quant_weight, bias, quant_scale, quantization_config, dtype)
+        state, training, act_scale = act_state
+
+        return QATFunc.apply(
+            x, quant_weight, bias, quant_scale, quantization_config, dtype, state, training, act_scale
+        )
     else:
         return QuantizationLinearFunc.apply(
             x,
@@ -237,6 +242,7 @@ class QuantizationLinear(nn.Layer):
         self.weight_quantize_algo = weight_quantize_algo
         self._dtype = dtype
         self.quant_dtype, self.quant_weight_bit = QuantMapping[self.weight_quantize_algo]
+        self.state = 0
 
         # PaddlePaddle dosen't support 4bit data type, one 8bit data represents two 4bit data.
         # paddle.nn.quant.weight_quantize will transpose in_features and out_features.
@@ -261,6 +267,12 @@ class QuantizationLinear(nn.Layer):
             else:
                 # TODO(lugimzzz): support groupwise in next PR
                 raise NotImplementedError("Not yet support grouwise weightonly quantization.")
+            if self.weight_quantize_algo in ["a8w8linear", "a8w4linear"]:
+                self.act_scale = self.create_parameter(
+                    shape=[1], dtype=self._dtype, is_bias=False, default_initializer=nn.initializer.Constant(value=0.0)
+                )
+                self.act_scale.stop_gradient = True
+
         elif self.weight_quantize_algo in ["fp4", "nf4"]:
             if qlora_weight_linear is None:
                 raise ImportError(
@@ -333,7 +345,12 @@ class QuantizationLinear(nn.Layer):
             if (self.weight_quantize_algo in ["fp4", "nf4"] and self.quantization_config.qlora_weight_double_quant)
             else None,
             bias=self.bias,
+            act_state=(self.state, self.training, self.act_scale)
+            if self.weight_quantize_algo in ["a8w8linear", "a8w4linear"]
+            else None,
         )
+        if self.training:
+            self.state += 1
         return output
 
 
@@ -368,7 +385,7 @@ class ColumnParallelQuantizationLinear(nn.Layer):
         self._dtype = dtype
         self.mp_skip_c_identity = mp_skip_c_identity
         self.quant_dtype, self.quant_weight_bit = QuantMapping[self.weight_quantize_algo]
-
+        self.state = 0
         self.model_parallel_group = (
             tp._HYBRID_PARALLEL_GROUP.get_model_parallel_group() if mp_group is None else mp_group
         )
@@ -412,6 +429,10 @@ class ColumnParallelQuantizationLinear(nn.Layer):
             else:
                 # TODO(lugimzzz): support groupwise in next PR
                 raise NotImplementedError("Not yet support grouwise weightonly quantization.")
+            if self.weight_quantize_algo in ["a8w8linear", "a8w4linear"]:
+                self.act_scale = self.create_parameter(
+                    shape=[1], dtype=self._dtype, is_bias=False, default_initializer=nn.initializer.Constant(value=0.0)
+                )
         else:
             raise NotImplementedError(f"Not yet support weight_quantize_algo: {self.weight_quantize_algo}")
         if bias_attr is False:
@@ -452,7 +473,10 @@ class ColumnParallelQuantizationLinear(nn.Layer):
             if (self.weight_quantize_algo in ["fp4", "nf4"] and self.quantization_config.qlora_weight_double_quant)
             else None,
             bias=self.bias,
+            state=self.state,
         )
+        if self.training:
+            self.state += 1
 
         if self.gather_output and self.is_mp:
             output = mp_ops._c_concat(output_parallel, group=self.model_parallel_group)
@@ -492,6 +516,7 @@ class RowParallelQuantizationLinear(nn.Layer):
         self._dtype = dtype
         self.mp_skip_c_identity = mp_skip_c_identity
         self.quant_dtype, self.quant_weight_bit = QuantMapping[self.weight_quantize_algo]
+        self.state = 0
 
         self.model_parallel_group = (
             tp._HYBRID_PARALLEL_GROUP.get_model_parallel_group() if mp_group is None else mp_group
@@ -537,6 +562,10 @@ class RowParallelQuantizationLinear(nn.Layer):
             else:
                 # TODO(lugimzzz): support groupwise in next PR
                 raise NotImplementedError("Not yet support grouwise weightonly quantization.")
+            if self.weight_quantize_algo in ["a8w8linear", "a8w4linear"]:
+                self.act_scale = self.create_parameter(
+                    shape=[1], dtype=self._dtype, is_bias=False, default_initializer=nn.initializer.Constant(value=0.0)
+                )
         else:
             raise NotImplementedError(f"Not yet support weight_quantize_algo: {self.weight_quantize_algo}")
 
@@ -571,6 +600,7 @@ class RowParallelQuantizationLinear(nn.Layer):
                 if (self.weight_quantize_algo in ["fp4", "nf4"] and self.quantization_config.qlora_weight_double_quant)
                 else None,
                 bias=None,
+                state=self.state,
             )
             if self.sequence_parallel:
                 output_ = ReduceScatterOp.apply(output_parallel)
@@ -596,6 +626,9 @@ class RowParallelQuantizationLinear(nn.Layer):
                 if (self.weight_quantize_algo in ["fp4", "nf4"] and self.quantization_config.qlora_weight_double_quant)
                 else None,
                 bias=self.bias,
+                state=self.state,
             )
+        if self.training:
+            self.state += 1
 
         return output

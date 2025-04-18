@@ -60,7 +60,8 @@ class QuantizationConfig:
         ignore_modules=None,
         group_size=-1,
         apply_hadamard=True,
-        quant_input_grad=True,
+        quant_input_grad=False,
+        skip_first_act_scale_step=-1,
         **kwargs,
     ):
         if weight_quantize_algo is not None:
@@ -128,6 +129,7 @@ class QuantizationConfig:
         self.group_size = group_size
         self.apply_hadamard = apply_hadamard
         self.quant_input_grad = quant_input_grad
+        self.skip_first_act_scale_step = skip_first_act_scale_step
 
     def is_weight_quantize(self):
         if isinstance(self.weight_quantize_algo, dict):

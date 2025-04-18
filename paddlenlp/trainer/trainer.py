@@ -1324,28 +1324,28 @@ class Trainer:
                     if self.args.offload_optim:
                         self._reload_optimizer()
 
-                    if self.do_grad_scaling:
-                        if args.pipeline_parallel_degree > 1:
-                            assert not self.args.use_expert_parallel, "pipeline moe not work under fp16"
-                        scale_before = paddle.assign(self.scaler._scale)
-                        self.scaler.step(self.optimizer)
-                        self.scaler.update()
-                        scale_after = self.scaler._scale
-                        # Compatible with paddlepaddle 2.6.0 using typo word.
-                        if hasattr(self.scaler, "_cache_founf_inf"):
-                            optimizer_was_run = not self.scaler._cache_founf_inf
-                        else:
-                            optimizer_was_run = not self.scaler._cache_found_inf
-                        if not optimizer_was_run:
-                            scale_before_value = scale_before.cpu().numpy()
-                            scale_after_value = scale_after.cpu().numpy()
-                            logger.warning(
-                                f"optimizer not run, scale_before: {scale_before_value[0]}, scale_after: {scale_after_value[0]}"
-                            )
-                    elif isinstance(self.optimizer, HybridParallelOptimizer):
-                        self.optimizer._step(parameters_list)
-                    else:
-                        self.optimizer.step()
+                    # if self.do_grad_scaling:
+                    #     if args.pipeline_parallel_degree > 1:
+                    #         assert not self.args.use_expert_parallel, "pipeline moe not work under fp16"
+                    #     scale_before = paddle.assign(self.scaler._scale)
+                    #     self.scaler.step(self.optimizer)
+                    #     self.scaler.update()
+                    #     scale_after = self.scaler._scale
+                    #     # Compatible with paddlepaddle 2.6.0 using typo word.
+                    #     if hasattr(self.scaler, "_cache_founf_inf"):
+                    #         optimizer_was_run = not self.scaler._cache_founf_inf
+                    #     else:
+                    #         optimizer_was_run = not self.scaler._cache_found_inf
+                    #     if not optimizer_was_run:
+                    #         scale_before_value = scale_before.cpu().numpy()
+                    #         scale_after_value = scale_after.cpu().numpy()
+                    #         logger.warning(
+                    #             f"optimizer not run, scale_before: {scale_before_value[0]}, scale_after: {scale_after_value[0]}"
+                    #         )
+                    # elif isinstance(self.optimizer, HybridParallelOptimizer):
+                    #     self.optimizer._step(parameters_list)
+                    # else:
+                    #     self.optimizer.step()
 
                     if self.args.offload_optim:
                         self._offload_optimizer()
@@ -1953,6 +1953,9 @@ class Trainer:
                     return x in decay_parameters
 
             optimizer_cls, optimizer_kwargs = Trainer.get_optimizer_cls_and_kwargs(self.args)
+            if self.args.optim == OptimizerNames.AdamW_Qweight:
+                optimizer_kwargs["quantization_config"] = self.model.config.quantization_config
+
             if hasattr(optimizer_cls, "_create_master_weight") and self.args.fp16_opt_level == "O2":
                 optimizer_kwargs["multi_precision"] = True
 
@@ -2109,6 +2112,11 @@ class Trainer:
             from ..utils import AdamW_16Bit
 
             optimizer_cls = AdamW_16Bit
+            optimizer_kwargs.update(adam_kwargs)
+        elif args.optim == OptimizerNames.AdamW_Qweight:
+            from ..utils import AdamWQweight
+
+            optimizer_cls = AdamWQweight
             optimizer_kwargs.update(adam_kwargs)
         else:
             raise ValueError(f"Trainer cannot instantiate unsupported optimizer: {args.optim}")
