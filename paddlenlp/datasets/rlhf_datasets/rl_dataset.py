@@ -34,13 +34,15 @@ def left_padding(sequences, padding_value=0):
     return data
 
 
-def padding_batch_data(samples: list[dict], pad_token_id: int, requires_label: bool) -> list[dict]:
+def padding_batch_data(
+    samples: list[dict], pad_token_id: int, requires_label: bool, max_prompt_len: int
+) -> list[dict]:
     input_dict = {}
 
     input_ids = [sample["input_ids"] for sample in samples]
     # TODO(drownfish19): confim if this is correct
     # attention_mask = [np.ones(input_id.shape, dtype=bool) for input_id in input_ids]
-    input_dict["input_ids"] = left_padding(input_ids, padding_value=pad_token_id)
+    input_dict["input_ids"] = left_padding(input_ids, padding_value=pad_token_id, max_length=max_prompt_len)
     # input_dict["attention_mask"] = left_padding(attention_mask, padding_value=0)
     input_dict["raw_prompt_len"] = paddle.to_tensor([len(sample["input_ids"]) for sample in samples])
 
@@ -52,8 +54,8 @@ def padding_batch_data(samples: list[dict], pad_token_id: int, requires_label: b
     return input_dict
 
 
-def collate_fn(data_list: list[dict], pad_token_id: int, requires_label: bool) -> dict:
-    input_dict = padding_batch_data(data_list, pad_token_id, requires_label)
+def collate_fn(data_list: list[dict], pad_token_id: int, requires_label: bool, max_prompt_len: int) -> dict:
+    input_dict = padding_batch_data(data_list, pad_token_id, requires_label, max_prompt_len)
 
     tensors = {}
     non_tensors = {}

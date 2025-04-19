@@ -372,7 +372,8 @@ def main():
             collate_fn,
             pad_token_id=actor_tokenizer.pad_token_id,
             requires_label=True if training_args.use_rm_server else False,
-        ),
+            max_prompt_len=data_args.max_prompt_len if training_args.balance_batch else None,
+        ),  # NOTE: enforce prompt padding to max_prompt_len when using balance_batch
         compute_metrics=compute_metrics,  # TODO: only used for grpo (kk datasets)
     )
 
