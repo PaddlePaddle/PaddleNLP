@@ -660,6 +660,7 @@ def read_res_dynamic_insert(
     done_event: mp.Event,
     queue_id: paddle.Tensor,
     total_request_num: int,
+    detokenize: bool,
 ):
     from paddlenlp.utils.env import USE_FAST_TOKENIZER
 
@@ -693,7 +694,10 @@ def read_res_dynamic_insert(
             logger.error(f"Error processing task: {str(e)}")
             continue
     output = np.concatenate(outputs, axis=0).tolist()
-    seqs = tokenizer.batch_decode(output, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+    if detokenize:
+        seqs = tokenizer.batch_decode(output, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+    else:
+        seqs = [None] * len(output)
     for i, (out, seq) in enumerate(zip(output, seqs)):
         result_queue.put([i, out, seq])
     logger.info("Finish read result message")
