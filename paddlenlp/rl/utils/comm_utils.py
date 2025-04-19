@@ -687,45 +687,7 @@ def gather_and_pad(tensor, dp_group=None, sd_group=None, pad_index=0.0, pad=True
         return pad_tensor(gathered_tensor, pad_index=pad_index, dtype=dtype)
 
 
-def combine_micro_batches(micro_batches, pad_token_id=0):
-    """combine micro batches to get a complete batch"""
-
-    combined_batch = {}
-
-    for micro_batch in micro_batches:
-        for key, value in micro_batch.items():
-            if isinstance(value, list):
-                if isinstance(value[0], paddle.Tensor):
-                    if key == "label_ids":
-                        value = [paddle.unsqueeze(v, axis=0) if v.ndim == 1 else v for v in value]
-                        concat_value = pad_tensor(
-                            value,
-                            pad_index=pad_token_id,
-                            dtype=value[0].dtype,
-                            padding_side="left",
-                        )
-                    else:
-                        concat_value = paddle.concat(value, axis=0)
-                elif isinstance(value[0], np.ndarray):
-                    concat_value = np.concatenate(value, axis=0)
-                combined_batch.setdefault(key, []).append(concat_value)
-            else:
-                combined_batch.setdefault(key, []).append(value)
-
-    for key, values in combined_batch.items():
-        if len(combined_batch[key][0].shape) > 1:
-            pad_index = pad_token_id
-            padding_side = "left" if (key == "prompt" or key == "label_ids") else "right"
-            combined_batch[key] = gather_and_pad(values, pad_index=pad_index, padding_side=padding_side)
-        elif isinstance(values[0], paddle.Tensor):
-            combined_batch[key] = paddle.concat(values, axis=0)
-        elif isinstance(values[0], np.ndarray):
-            combined_batch[key] = np.concatenate(values, axis=0)
-
-    return combined_batch
-
-
-def filter_valid_reward_groups(combined_batch, total_batch, num_return_sequences, variance_threshold=1e-6):
+def filter_valid_reward_groups(combined_batch, total_batch, rollout_n, variance_threshold=1e-6):
     """
     Filters out invalid prompt groups based on reward variance, and appends the valid samples to total_batch.
 
@@ -734,7 +696,7 @@ def filter_valid_reward_groups(combined_batch, total_batch, num_return_sequences
                                'rewards_before_length_penalty', and 'index'.
         total_batch (defaultdict): The cumulative container to append filtered results into.
                             Each value should be a list of tensors or arrays.
-        num_return_sequences (int): Number of sequences generated per prompt.
+        rollout_n (int): Number of sequences generated per prompt.
         variance_threshold (float): Minimum reward variance for a group to be considered valid.
 
     Returns:
@@ -759,7 +721,7 @@ def filter_valid_reward_groups(combined_batch, total_batch, num_return_sequences
     valid_indices = []
     num_valid_prompts = 0
     for members in group_map.values():
-        if len(members) != num_return_sequences:
+        if len(members) != rollout_n:
             continue
         reward_values = np.array([m[1] for m in members])
         if np.var(reward_values) > variance_threshold:
@@ -781,7 +743,7 @@ def split_batch_by_rank(
     sharding_rank,
     dp_degree,
     sharding_degree,
-    num_return_sequences,
+    rollout_n,
     balance_batch_across_dp_group=False,
 ):
     """
@@ -792,7 +754,7 @@ def split_batch_by_rank(
         hcg: HybridCommunicateGroup from paddle.distributed.fleet.
         dp_degree (int): Data parallel degree.
         sharding_degree (int): Sharding parallel degree.
-        num_return_sequences (int): Number of generated sequences per prompt.
+        rollout_n (int): Number of generated sequences per prompt.
         balance_batch_across_dp_group (bool): Whether to balance the batch based on token count.
 
     Returns:
@@ -809,13 +771,13 @@ def split_batch_by_rank(
             end = start + chunk_size
             total_batch[key] = total_batch[key][start:end]
     else:
-        num_prompt = total_batch["input_ids"].shape[0] // num_return_sequences
+        num_prompt = total_batch["input_ids"].shape[0] // rollout_n
         num_prompt_per_rank = num_prompt // dataset_world_size
 
         # Compute total valid tokens per prompt
         valid_tokens = total_batch["prompt_len_without_pad"] + total_batch["response_len_without_pad"]
         valid_tokens = paddle.to_tensor(
-            [valid_tokens[i * num_return_sequences : (i + 1) * num_return_sequences].sum() for i in range(num_prompt)]
+            [valid_tokens[i * rollout_n : (i + 1) * rollout_n].sum() for i in range(num_prompt)]
         )
 
         # Sort prompts by valid token count
@@ -834,8 +796,8 @@ def split_batch_by_rank(
 
         selected_indices = []
         for query_index in selected_queries:
-            base = int(query_index) * num_return_sequences
-            selected_indices.extend(range(base, base + num_return_sequences))
+            base = int(query_index) * rollout_n
+            selected_indices.extend(range(base, base + rollout_n))
 
         for key in total_batch.keys():
             total_batch[key] = total_batch[key][selected_indices]
@@ -887,7 +849,9 @@ def process_prompt_and_response(micro_batch, pad_token_id=0):
 
     micro_batch["input_ids"] = paddle.concat([micro_batch["prompt"], response], axis=1)
     micro_batch["position_ids"] = make_position_ids_from_input_ids(micro_batch["input_ids"])
-
+    micro_batch["eos_mask"] = paddle.slice(
+        micro_batch["eos_mask"], axes=[1], starts=[0], ends=[micro_batch["eos_mask"].shape[1]]
+    )
     if "log_probs" in micro_batch:
         micro_batch["log_probs"] = paddle.slice(
             micro_batch["log_probs"],
@@ -906,27 +870,67 @@ def process_prompt_and_response(micro_batch, pad_token_id=0):
     return micro_batch
 
 
-def split_into_micro_batches(total_batch, per_device_train_batch_size, pad_token_id=0):
+def combine_micro_batches_into_batch(micro_batches, pad_token_id=0):
+    """combine micro batches to get a complete batch"""
+
+    combined_batch = {}
+
+    for micro_batch in micro_batches:
+        for key, value in micro_batch.items():
+            if isinstance(value, list):
+                if isinstance(value[0], paddle.Tensor):
+                    if key == "label_ids":
+                        value = [paddle.unsqueeze(v, axis=0) if v.ndim == 1 else v for v in value]
+                        concat_value = pad_tensor(
+                            value,
+                            pad_index=pad_token_id,
+                            dtype=value[0].dtype,
+                            padding_side="left",
+                        )
+                    else:
+                        concat_value = paddle.concat(value, axis=0)
+                elif isinstance(value[0], np.ndarray):
+                    concat_value = np.concatenate(value, axis=0)
+                combined_batch.setdefault(key, []).append(concat_value)
+            else:
+                combined_batch.setdefault(key, []).append(value)
+
+    for key, values in combined_batch.items():
+        if len(combined_batch[key][0].shape) > 1:
+            pad_index = pad_token_id
+            padding_side = "left" if (key == "prompt" or key == "label_ids") else "right"
+            combined_batch[key] = gather_and_pad(values, pad_index=pad_index, padding_side=padding_side)
+        elif isinstance(values[0], paddle.Tensor):
+            combined_batch[key] = paddle.concat(values, axis=0)
+        elif isinstance(values[0], np.ndarray):
+            combined_batch[key] = np.concatenate(values, axis=0)
+
+    return combined_batch
+
+
+def split_batch_into_micro_batches(total_batch, batch_size, pad_token_id=0):
     """
-    Splits total_batch into micro-batches of size `per_device_train_batch_size`.
+    Splits total_batch into micro-batches of size `batch_size`.
 
     Args:
         total_batch (dict): Dictionary containing full batched tensors.
-        per_device_train_batch_size (int): Micro batch size per device.
+        batch_size (int): Micro batch size per device.
 
     Returns:
         list of dict: A list of micro-batches.
     """
     micro_batches = []
-    num_micro_batches = total_batch["input_ids"].shape[0] // per_device_train_batch_size
+    num_micro_batches = total_batch["input_ids"].shape[0] // batch_size
 
     for i in range(num_micro_batches):
         micro_batch = {}
         for key, data in total_batch.items():
             if isinstance(data, paddle.Tensor):
-                micro_batch[key] = data[i * per_device_train_batch_size : (i + 1) * per_device_train_batch_size]
+                micro_batch[key] = data[i * batch_size : (i + 1) * batch_size]
             elif isinstance(data, np.ndarray):
-                micro_batch[key] = data[i * per_device_train_batch_size : (i + 1) * per_device_train_batch_size]
+                micro_batch[key] = data[i * batch_size : (i + 1) * batch_size]
+            elif isinstance(data, list):
+                micro_batch[key] = data[i * batch_size : (i + 1) * batch_size]
             else:
                 raise TypeError(f"Unsupported data type for key {key}: {type(data)}")
 
