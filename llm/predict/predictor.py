@@ -1320,6 +1320,13 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         if input_ids is not None:
             assert isinstance(input_ids, list) and isinstance(input_ids[0], list), "input_ids must be a list of list"
             self.input_ids = copy.deepcopy(input_ids)
+            current_src_length = kwargs.get("src_length", self.config.src_length)
+            for i, inst in enumerate(self.input_ids):
+                if len(inst) > current_src_length:
+                    logger.warning(
+                        f"The input_id[{i}] will be truncated due to its length exceeding the src_length({current_src_length}) !"
+                    )
+                    self.input_ids[i] = inst[:current_src_length]
         else:
             assert input_texts is not None, "input_texts can't be None, when input_ids is None."
             if self.tokenizer.chat_template is not None:
