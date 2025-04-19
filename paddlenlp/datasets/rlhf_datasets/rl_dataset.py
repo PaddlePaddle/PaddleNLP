@@ -24,9 +24,9 @@ from paddlenlp.transformers import PretrainedTokenizer
 from paddlenlp.transformers.tokenizer_utils import PaddingStrategy
 
 
-def left_padding(sequences, padding_value=0):
+def left_padding(sequences, padding_value=0, max_length=None):
     arrs = [np.asarray(seq) for seq in sequences]
-    max_length = max([len(seq) for seq in sequences])
+    max_length = max_length or max([len(seq) for seq in sequences])
     bs = len(sequences)
     data = np.full([bs, max_length], padding_value, dtype=arrs[0].dtype)
     for i, arr in enumerate(arrs):
