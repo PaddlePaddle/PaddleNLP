@@ -109,8 +109,8 @@ class _DeepepManager:
         token_permuted_indices, prob_permuted_indices = topk_to_permuted_indices(
             dispatched_indices, self.tokens_per_expert_list, self.router_topk
         )
-        hidden_states = permute(hidden_states, token_permuted_indices)
-        return hidden_states, token_permuted_indices, prob_permuted_indices
+        hidden_states1 = permute(hidden_states, token_permuted_indices)
+        return hidden_states1, token_permuted_indices, prob_permuted_indices
 
     def get_restored_hidden_states_by_experts(
         self,
@@ -193,6 +193,7 @@ class MoEFlexTokenDispatcher:
         hidden_states, dispatched_indices, dispatched_probs = self._comm_manager.dispatch(
             hidden_states, token_indices, token_probs
         )
+
         (global_input_tokens, token_permuted_indices, prob_permuted_indices) = self.post_dispatch(
             hidden_states, dispatched_indices
         )
@@ -236,7 +237,7 @@ class PreDispatchNode:
     def forward(self, routing_map, probs):
         num_tokens = routing_map.shape[0]
         self.probs_origin_shape = probs.shape
-        # routing_map = routing_map.reshape([num_tokens, token_dispatcher._comm_manager.num_experts])
+        routing_map = routing_map.reshape([num_tokens, self.token_dispatcher._comm_manager.num_experts])
         self.probs = probs
         reshaped_probs = probs.reshape([num_tokens, self.token_dispatcher._comm_manager.num_experts])
         self.reshaped_probs = reshaped_probs
@@ -258,6 +259,8 @@ class PreDispatchNode:
             True,
             True,
         )
-        probs_reshape_g = paddle._C_ops.reshape_grad(probs_grad, self.probs)
+
+        probs_reshape_g = paddle.reshape(probs_grad, self.probs_origin_shape)
+
         self.reset_status()
         return probs_reshape_g

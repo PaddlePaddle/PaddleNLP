@@ -138,7 +138,6 @@ def fused_dispatch_backward_func(
 ):
     """Backward pass of fused dispatch."""
     buffer = get_buffer(group, get_hidden_bytes(grad_output))
-
     grad_x, grad_token_probs, event = buffer.combine(
         grad_output.contiguous(),
         handle,
@@ -147,6 +146,8 @@ def fused_dispatch_backward_func(
         async_finish=async_finish,
         allocate_on_comm_stream=allocate_on_comm_stream,
     )
+    # print("grad_x:", grad_x)
+    # print("grad_token_probs:", grad_token_probs)
     return grad_x, None, grad_token_probs
 
 
@@ -198,7 +199,12 @@ class FusedDispatch(PyLayer):
     def forward(ctx, x, token_indices, token_probs, num_experts, group, previous_event=None):
         """Forward pass of fused dispatch."""
         recv_x, recv_token_probs, states, event = fused_dispatch_forward_func(
-            x, token_indices, token_probs, num_experts, group, previous_event
+            x,
+            token_indices,
+            token_probs,
+            num_experts,
+            group,
+            previous_event,
         )
 
         ctx.group = group
@@ -298,8 +304,6 @@ class DispatchNode:
             num_experts,
             group,
             previous_event=previous_event,
-            async_finish=async_finish,
-            allocate_on_comm_stream=allocate_on_comm_stream,
         )
 
         self.group = group
