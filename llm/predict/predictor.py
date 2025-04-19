@@ -1324,7 +1324,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
             for i, inst in enumerate(self.input_ids):
                 if len(inst) > current_src_length:
                     logger.warning(
-                        f"The input_id[{i}] will be truncated due to its length exceeding the src_length({current_src_length}) !"
+                        f"The input_id[{i}] will be truncated due to its length({len(inst)}) exceeding the src_length({current_src_length})!"
                     )
                     self.input_ids[i] = inst[:current_src_length]
         else:
