@@ -1924,7 +1924,10 @@ class TrainingArguments:
             self.sharding_parallel_degree = max(self.sharding_degree, self.sharding_parallel_degree)
         self.data_parallel_degree = 1
 
-        delattr(self, "sharding_degree")
+        try:
+            delattr(self, "sharding_degree")
+        except AttributeError:
+            pass
 
         if len(self.sharding) == 0 and self.sharding_parallel_degree > 0:
             warnings.warn("`--sharding_parallel_degree` is useful only when `--sharding` is specified.")

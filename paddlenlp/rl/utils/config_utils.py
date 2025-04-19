@@ -350,6 +350,14 @@ class TrainingArguments(TrainingArguments):
             // self.per_device_train_batch_size
             // self.dataset_world_size
         )
+        if self.gradient_accumulation_steps <= 0:
+            logger.warning(
+                f"gradient_accumulation_steps: {self.gradient_accumulation_steps} must be greater than zero!"
+                " Please check your configuration, gradient_accumulation_steps = mini_batch_size * rollout_n * update_iters / per_device_train_batch_size / dataset_world_size."
+                " dataset_world_size = {self.dataset_world_size} = data_parallel_degree * sharding_parallel_degree."
+                " We will set it to 1!"
+            )
+            self.gradient_accumulation_steps = 1
 
         super().__post_init__()
         if self.autotuner_benchmark:
