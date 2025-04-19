@@ -711,10 +711,13 @@ class FusedMultiTransformerBase(Layer):
             self.custom_all_reduce_max_bytes = 1024 * self.embed_dim
             from paddle.distributed import fleet
 
-            hcg = fleet.get_hybrid_communicate_group()
-            model_parallel_group = hcg.get_model_parallel_group()
-            self.fa = custom_all_reduce.CustomAllreduce(model_parallel_group, self.custom_all_reduce_max_bytes)
-            self.use_custom_allreduce = True
+            try:
+                hcg = fleet.get_hybrid_communicate_group()
+                model_parallel_group = hcg.get_model_parallel_group()
+                self.fa = custom_all_reduce.CustomAllreduce(model_parallel_group, self.custom_all_reduce_max_bytes)
+                self.use_custom_allreduce = True
+            except Exception:
+                self.use_custom_allreduce = False
         else:
             self.use_custom_allreduce = False
 
