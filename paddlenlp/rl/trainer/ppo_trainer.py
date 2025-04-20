@@ -1108,14 +1108,14 @@ class PPOTrainer(Trainer):
 
         return cleanup_batches, indices, label_ids_batches
 
-    def truncate_batch_data(self, item, truncate_max_len):
-        if len(item) > truncate_max_len:
-            item = self.tokenizer.truncate_sequences(
-                item,
-                num_tokens_to_remove=len(item) - truncate_max_len,
+    def truncate_batch_data(self, batch, truncate_max_len):
+        if len(batch) > truncate_max_len:
+            batch = self.tokenizer.truncate_sequences(
+                batch,
+                num_tokens_to_remove=len(batch) - truncate_max_len,
                 truncation_strategy="longest_first",
             )[0]
-        return item
+        return batch
 
     def pad_batch_data(
         self,
@@ -1125,9 +1125,8 @@ class PPOTrainer(Trainer):
         padding_max_len=None,
         pad_to_multiple_of=None,
     ):
-        batch_data = {"input_ids": input_ids}
         input_ids = self.tokenizer.pad(
-            batch_data,
+            {"input_ids": input_ids},
             padding=padding_strategy,
             padding_side="right",
             max_length=padding_max_len,
@@ -1215,14 +1214,12 @@ class PPOTrainer(Trainer):
             hcg = fleet.get_hybrid_communicate_group()
             sharding_parallel_group = hcg.get_sharding_parallel_group()
             data_parallel_group = hcg.get_data_parallel_group()
-        except Exception:
+        except:
             sharding_parallel_group = None
             data_parallel_group = None
 
         total_unbalance_batch = defaultdict(list)
-        unbalance_micro_batch = combine_micro_batches_into_batch(
-            micro_batches, pad_token_id=self.tokenizer.pad_token_id
-        )
+        unbalance_micro_batch = combine_micro_batches_into_batch(micro_batches, pad_token_id=self.tokenizer.pad_token_id)  # fmt:skip
         for key in unbalance_micro_batch:
             total_unbalance_batch[key].append(unbalance_micro_batch[key])
 
@@ -1381,47 +1378,55 @@ class PPOTrainer(Trainer):
                 data_trans_group = getattr(self.actor_trainer, "_data_trans_group", None)
                 prompt_only_batch = data_group_split(prompt_only_batch, group=data_trans_group)
 
-                total_batch_size = prompt_only_batch["input_ids"].shape[0]
-                timer_scope_actor_model = TimerScope(
-                    self.timers, RolloutStages.ACTOR_MODEL_ENABLE_DISABLE, minus_names=[RolloutStages.GENERATE]
-                )
-                timer_scope_actor_model.start()
                 cleanup_batches, indices, label_ids_batches = [], [], []
-                with reload_and_offload_scope(self, self.actor_model, self.reference_model):
-                    with TimerScope(self.timers, RolloutStages.GENERATE):
-                        with infer_guard(self.actor_trainer):
-                            for i in range(0, total_batch_size, self.args.per_device_rollout_batch_size):
-                                micro_batch = map_structure(
-                                    lambda tensor: tensor[i : i + self.args.per_device_rollout_batch_size],
-                                    prompt_only_batch,
-                                )
-                                # generate for multi batches and then disable FuseMT model
-                                generated_batches = self.actor_trainer.generate_sequences(micro_batch)
-                                # NOTE(drownfish19): do process for each micro_batch, prepare for split mode
-                                micro_ret = self.remove_pad_tokens_after_generate(generated_batches)
-                                micro_cleanup_batches, micro_indices, micro_label_ids_batches = micro_ret
-                                cleanup_batches.extend(micro_cleanup_batches)
-                                indices.extend(micro_indices)
-                                label_ids_batches.extend(micro_label_ids_batches)
-                            indices = np.concatenate(indices)
-                    self.timers and (dist.get_world_size() > 1) and dist.barrier()
-                timer_scope_actor_model.stop()
-
-                # step 2-1: split micro_batches
+                total_batch_size = prompt_only_batch["input_ids"].shape[0]
                 # expand input_ids and raw_prompt_len for all sequences
                 prompt_only_batch["raw_prompt_len_expand"] = paddle.repeat_interleave(
                     prompt_only_batch["raw_prompt_len"], repeats=self.args.rollout_n, axis=0
-                )  # fmt: off
+                )
                 if self.args.use_rm_server:
-                    prompt_only_batch["raw_label_ids_len_expand"] = paddle.repeat_interleave(
+                    prompt_only_batch["raw_label_ids_len"] = paddle.repeat_interleave(
                         prompt_only_batch["raw_label_ids_len"], repeats=self.args.rollout_n, axis=0
-                    )  # fmt: off
+                    )
 
+                per_device_rollout_batch_size = self.args.per_device_rollout_batch_size
                 if self.args.rollout_n > 1:
-                    expand_prompt = prompt_only_batch["input_ids"].repeat_interleave(self.args.rollout_n, axis=0)
+                    expand_prompt = prompt_only_batch["input_ids"].repeat_interleave(
+                        self.args.rollout_n,
+                        axis=0,
+                    )
                 else:
                     expand_prompt = prompt_only_batch["input_ids"]
 
+                timer_scope_actor_model = TimerScope(
+                    self.timers,
+                    RolloutStages.ACTOR_MODEL_ENABLE_DISABLE,
+                    minus_names=[RolloutStages.GENERATE, RolloutStages.ROLLOUT_LOGPROB],
+                )
+                timer_scope_actor_model.start()
+                with reload_and_offload_scope(self, self.actor_model, self.reference_model):
+                    timer_scope_rollout = TimerScope(self.timers, RolloutStages.GENERATE)
+                    timer_scope_rollout.start()
+                    with infer_guard(self.actor_trainer):
+                        for i in range(0, total_batch_size, per_device_rollout_batch_size):
+                            micro_batch = map_structure(
+                                lambda tensor: tensor[i : i + per_device_rollout_batch_size],
+                                prompt_only_batch,
+                            )
+
+                            # generate for multi batches and then disable FuseMT model
+                            generated_batches = self.actor_trainer.generate_sequences(micro_batch)
+                            # NOTE(drownfish19): do process for each micro_batch, prepare for split mode
+                            micro_ret = self.remove_pad_tokens_after_generate(generated_batches)
+                            micro_cleanup_batches, micro_indices, micro_label_ids_batches = micro_ret
+                            cleanup_batches.extend(micro_cleanup_batches)
+                            indices.extend(micro_indices)
+                            label_ids_batches.extend(micro_label_ids_batches)
+                        indices = np.concatenate(indices)
+                    self.timers and (dist.get_world_size() > 1) and dist.barrier()
+                    timer_scope_rollout.stop()
+
+                # step 2-1: split micro_batches
                 #  truncate data
                 truncate_input_ids = [
                     self.truncate_batch_data(batch, truncate_max_len=self._model_config.max_position_embeddings)
@@ -1450,11 +1455,23 @@ class PPOTrainer(Trainer):
                     "index": indices,
                     **({"label_ids": label_ids} if self.args.use_rm_server else {}),
                     **(
-                        {"raw_label_ids_len": prompt_only_batch["raw_label_ids_len_expand"]}
+                        {"raw_label_ids_len": prompt_only_batch["raw_label_ids_len"]}
                         if self.args.use_rm_server
                         else {}
                     ),
                 }
+
+                # step 2-2: balance micro_batches based on batch tokens
+                if self.args.balance_batch:
+                    micro_batches = self._balance_batch(batch)
+
+                # step 2-3: compute logprob for rollout data
+                with TimerScope(self.timers, RolloutStages.ROLLOUT_LOGPROB):
+                    with TimerScope(self.timers, RolloutStages.ROLLOUT_OLD_LOGPROB):
+                        batch["log_probs"] = self.actor_trainer.compute_logprob(**batch)
+                    with TimerScope(self.timers, RolloutStages.ROLLOUT_REF_LOGPROB):
+                        batch["ref_log_probs"] = self.reference_trainer.compute_logprob(**batch)
+                timer_scope_actor_model.stop()
 
                 # step 2-2: compute reward for rollout data
                 with TimerScope(
@@ -1580,20 +1597,6 @@ class PPOTrainer(Trainer):
                             )
                             continue
 
-                # only for ppo and reinforce_plus_plus
-                # if self.args.use_kl_in_reward:
-                if self.args.use_kl_in_reward:
-                    # step 2-2: balance micro_batches based on batch tokens
-                    if self.args.balance_batch:
-                        batch = self._balance_batch(batch)
-
-                    # step 2-3: compute logprob for rollout data
-                    with TimerScope(self.timers, RolloutStages.ROLLOUT_LOGPROB):
-                        with TimerScope(self.timers, RolloutStages.ROLLOUT_OLD_LOGPROB):
-                            batch["log_probs"] = self.actor_trainer.compute_logprob(**batch)
-                        with TimerScope(self.timers, RolloutStages.ROLLOUT_REF_LOGPROB):
-                            batch["ref_log_probs"] = self.reference_trainer.compute_logprob(**batch)
-
                 # prepare data for reinforce_plus_plus & grpo
                 if self.args.rl_algorithm in ["reinforce_plus_plus", "grpo"]:
                     local_batch = batch
@@ -1624,19 +1627,6 @@ class PPOTrainer(Trainer):
                     batch = batch
 
                 batch = data_group_merge(batch, group=data_trans_group)
-
-                # for ppo and reinforce_plus_plus
-                if not self.args.use_kl_in_reward:
-                    # step 2-2: balance micro_batches based on batch tokens
-                    if self.args.balance_batch:
-                        batch = self._balance_batch(batch)
-
-                    # step 2-3: compute logprob for rollout data
-                    with TimerScope(self.timers, RolloutStages.ROLLOUT_LOGPROB):
-                        with TimerScope(self.timers, RolloutStages.ROLLOUT_OLD_LOGPROB):
-                            batch["log_probs"] = self.actor_trainer.compute_logprob(**batch)
-                        with TimerScope(self.timers, RolloutStages.ROLLOUT_REF_LOGPROB):
-                            batch["ref_log_probs"] = self.reference_trainer.compute_logprob(**batch)
 
                 # step 3: train actor model and critic model with rollout data
                 self.set_train()

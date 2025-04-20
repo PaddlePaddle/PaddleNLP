@@ -83,7 +83,6 @@ class RewardTrainer(RLTrainer):
         position_ids: paddle.Tensor = None,
         input_ids_tokenizer: PretrainedTokenizer = None,
         label_ids: paddle.Tensor = None,
-        prompt: paddle.Tensor = None,
         **kwargs,
     ) -> Dict[str, paddle.Tensor]:
         if not self.args.use_rm_server:
@@ -108,8 +107,7 @@ class RewardTrainer(RLTrainer):
                 position_ids=reward_position_ids,
             )[1]
         else:
-            assert prompt is not None, "prompt is required when use_rm_server is True"
-            prompt_len = prompt.shape[-1]
+            prompt_len = kwargs["prompt"].shape[-1]
             if label_ids is None:
                 raise ValueError("Rule-based reward needs labels.")
             src = input_ids_tokenizer.batch_decode(input_ids[:, :prompt_len], skip_special_tokens=False)
