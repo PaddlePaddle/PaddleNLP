@@ -18,22 +18,20 @@ Tokenizer classes for fast tokenizers (provided by HuggingFace's tokenizers libr
 see tokenizer_utils.py
 """
 
+from __future__ import annotations
+
 import copy
 import json
 import os
 from collections import defaultdict
-from typing import Any, Dict, List, Literal, Optional, Tuple, Union
+from collections.abc import Iterable
+from typing import Any, Literal, Optional, Tuple, Union
 
 import tokenizers.pre_tokenizers as pre_tokenizers_fast
 from tokenizers import Encoding as EncodingFast
 from tokenizers import Tokenizer as TokenizerFast
 from tokenizers.decoders import Decoder as DecoderFast
-from tokenizers.trainers import (
-    BpeTrainer,
-    UnigramTrainer,
-    WordLevelTrainer,
-    WordPieceTrainer,
-)
+from tokenizers.trainers import BpeTrainer, UnigramTrainer, WordLevelTrainer, WordPieceTrainer
 
 from ..utils.env import ADDED_TOKENS_NAME, FULL_TOKENIZER_NAME, TIKTOKEN_VOCAB_FILE
 from .convert_slow_tokenizer import convert_slow_tokenizer
@@ -63,7 +61,7 @@ MODEL_TO_TRAINER_MAPPING = {
 VOCAB_FILES_NAMES = {"tokenizer_file": FULL_TOKENIZER_NAME, "vocab_file": TIKTOKEN_VOCAB_FILE}
 
 
-class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
+class PretrainedTokenizerFast(PretrainedTokenizerBase):
     """
     Base class for all fast tokenizers (wrapping HuggingFace tokenizers library).
 
@@ -77,6 +75,7 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
     """
 
     resource_files_names = VOCAB_FILES_NAMES
+    vocab_files_names = VOCAB_FILES_NAMES
     slow_tokenizer_class: PretrainedTokenizer = None
 
     def __init__(self, *args, **kwargs):
@@ -85,6 +84,7 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
         fast_tokenizer_file = kwargs.pop("tokenizer_file", None)
         from_slow = kwargs.pop("from_slow", False)
         added_tokens_decoder = kwargs.pop("added_tokens_decoder", {})
+        self.add_prefix_space = kwargs.get("add_prefix_space", False)
 
         if from_slow and slow_tokenizer is None and self.slow_tokenizer_class is None:
             raise ValueError(
@@ -105,7 +105,7 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
             slow_tokenizer = self.slow_tokenizer_class(*args, **kwargs)
             fast_tokenizer = convert_slow_tokenizer(slow_tokenizer)
         elif not slow_tokenizer:
-            # We try to load with tiktoken
+            # We tried loading a slow_tokenizer with spm and failed, try to load with tiktoken
             self.vocab_file = kwargs.get("vocab_file", None)
             self.additional_special_tokens = kwargs.get("additional_special_tokens", [])
             fast_tokenizer = convert_slow_tokenizer(self, from_tiktoken=True)
@@ -116,7 +116,7 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
                 "(1) a `tokenizers` library serialization file, \n"
                 "(2) a slow tokenizer instance to convert or \n"
                 "(3) an equivalent slow tokenizer class to instantiate and convert. \n"
-                "You need to have sentencepiece installed to convert a slow tokenizer to a fast one."
+                "You need to have sentencepiece or tiktoken installed to convert a slow tokenizer to a fast one."
             )
 
         self._tokenizer = fast_tokenizer
@@ -148,15 +148,8 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
 
         # We call this after having initialized the backend tokenizer because we update it.
         super().__init__(**kwargs)
-
-        # Set the splitting mode for special tokens for the tokenizer to be used throughout the class.
         self._tokenizer.encode_special_tokens = self.split_special_tokens
 
-        # The following logic will be replace with a single add_tokens once a fix is pushed to tokenizers
-        # allows converting a slow -> fast, non-legacy: if the `tokenizer.json` does not have all the added tokens
-        # uses the information stored in `added_tokens_decoder`.
-        # this is costly for fast tokenizers as we re-compute the regex again. But not all tokens are added tokens
-        # Use hash to speed up the very slow operation `token not in added_tokens_decoder`.
         added_tokens_decoder_hash = {hash(repr(token)) for token in self.added_tokens_decoder}
         tokens_to_add = [
             token
@@ -182,14 +175,25 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
                     if isinstance(token, AddedToken)
                     else str(token) in special_tokens
                 )
-                if is_last_special is None or is_last_special == is_special:
-                    tokens.append(token)
+                if isinstance(token, str):
+                    token = AddedToken(token, special=is_special)
                 else:
-                    self._add_tokens(tokens, special_tokens=is_last_special)
-                    tokens = [token]
-                is_last_special = is_special
+                    token.special = is_special
+                tokens.append(token)
             if tokens:
-                self._add_tokens(tokens, special_tokens=is_last_special)
+                self.add_tokens(tokens)
+
+        try:
+            pre_tok_state = json.loads(self.backend_tokenizer.pre_tokenizer.__getstate__())
+            if pre_tok_state.get("add_prefix_space", self.add_prefix_space) != self.add_prefix_space:
+                pre_tok_class = getattr(pre_tokenizers_fast, pre_tok_state.pop("type"))
+                pre_tok_state["add_prefix_space"] = self.add_prefix_space
+                self.backend_tokenizer.pre_tokenizer = pre_tok_class(**pre_tok_state)
+        except Exception:
+            # We'll get an error if there is no pre_tokenizer, or if it's a custom pre_tokenizer that can
+            # not be serialized. In those cases, we just ignore the error as there's no pre_tokenizer
+            # for which we need to update the `add_prefix_space` attribute.
+            pass
 
     @property
     def is_fast(self) -> bool:
@@ -210,23 +214,23 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
         """
         return self._tokenizer.get_vocab_size(with_added_tokens=False)
 
-    def get_vocab(self) -> Dict[str, int]:
+    def get_vocab(self) -> dict[str, int]:
         return self._tokenizer.get_vocab(with_added_tokens=True)
 
     @property
-    def vocab(self) -> Dict[str, int]:
+    def vocab(self) -> dict[str, int]:
         return self.get_vocab()
 
     @property
-    def added_tokens_encoder(self) -> Dict[str, int]:
+    def added_tokens_encoder(self) -> dict[str, int]:
         """
         Returns the sorted mapping from string to index. The added tokens encoder is cached for performance
-        optimization in `self._added_tokens_encoder` for the slow tokenizers.
+        optimisation in `self._added_tokens_encoder` for the slow tokenizers.
         """
         return {k.content: v for v, k in sorted(self.added_tokens_decoder.items(), key=lambda item: item[0])}
 
     @property
-    def added_tokens_decoder(self) -> Dict[int, AddedToken]:
+    def added_tokens_decoder(self) -> dict[int, AddedToken]:
         """
         Returns the added tokens in the vocabulary as a dictionary of index to AddedToken.
 
@@ -235,7 +239,7 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
         """
         return self._tokenizer.get_added_tokens_decoder()
 
-    def get_added_vocab(self) -> Dict[str, int]:
+    def get_added_vocab(self) -> dict[str, int]:
         """
         Returns the added tokens in the vocabulary as a dictionary of token to index.
 
@@ -275,7 +279,7 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
         return_length: bool = False,
         return_position_ids: bool = False,
         verbose: bool = True,
-    ) -> Tuple[Dict[str, Any], List[EncodingFast]]:
+    ) -> tuple[dict[str, Any], list[EncodingFast]]:
         """
         Convert the encoding representation (from low-level PaddleNLP TokenizerFast output) to a python Dict and a list
         of encodings, take care of building a batch from overflowing tokens.
@@ -313,20 +317,17 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
                 encoding_dict["position_ids"].append(list(range(len(e.ids))))
         return encoding_dict, encodings
 
-    def convert_tokens_to_ids(self, tokens: Union[str, List[str]]) -> Union[int, List[int]]:
+    def convert_tokens_to_ids(self, tokens: Union[str, Iterable[str]]) -> Union[int, list[int]]:
         """
-        Converts a token string (or a sequence of tokens) in a single integer id (or a sequence of ids), using the
+        Converts a token string (or a sequence of tokens) in a single integer id (or a Iterable of ids), using the
         vocabulary.
 
         Args:
-            tokens (`str` or `List[str]`): One or several token(s) to convert to token id(s).
+            tokens (`str` or `Iterable[str]`): One or several token(s) to convert to token id(s).
 
         Returns:
             `int` or `List[int]`: The token id or list of token ids.
         """
-        if tokens is None:
-            return None
-
         if isinstance(tokens, str):
             return self._convert_token_to_id_with_added_voc(tokens)
 
@@ -341,7 +342,7 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
     def _convert_id_to_token(self, index: int) -> Optional[str]:
         return self._tokenizer.id_to_token(int(index))
 
-    def _add_tokens(self, new_tokens: List[Union[str, AddedToken]], special_tokens=False) -> int:
+    def _add_tokens(self, new_tokens: list[Union[str, AddedToken]], special_tokens=False) -> int:
         if special_tokens:
             return self._tokenizer.add_special_tokens(new_tokens)
 
@@ -369,8 +370,8 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
         return self._tokenizer.num_special_tokens_to_add(pair)
 
     def convert_ids_to_tokens(
-        self, ids: Union[int, List[int]], skip_special_tokens: bool = False
-    ) -> Union[str, List[str]]:
+        self, ids: Union[int, list[int]], skip_special_tokens: bool = False
+    ) -> Union[str, list[str]]:
         """
         Converts a single index or a sequence of indices in a token or a sequence of tokens, using the vocabulary and
         added tokens.
@@ -394,7 +395,7 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
             tokens.append(self._tokenizer.id_to_token(index))
         return tokens
 
-    def tokenize(self, text: str, pair: Optional[str] = None, add_special_tokens: bool = False, **kwargs) -> List[str]:
+    def tokenize(self, text: str, pair: Optional[str] = None, add_special_tokens: bool = False, **kwargs) -> list[str]:
         return self.encode_plus(text=text, text_pair=pair, add_special_tokens=add_special_tokens, **kwargs).tokens()
 
     def set_truncation_and_padding(
@@ -404,7 +405,7 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
         max_length: int,
         stride: int,
         pad_to_multiple_of: Optional[int],
-        padding_side: Optional[Literal["right", "left"]],
+        padding_side: Optional[str],
     ):
         """
         Define the truncation and the padding strategies for fast tokenizers (provided by PaddleNLP's fast_tokenizer
@@ -475,12 +476,7 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
     def _batch_encode_plus(
         self,
         batch_text_or_text_pairs: Union[
-            List[TextInput],
-            List[TextInputPair],
-            List[PreTokenizedInput],
-            List[PreTokenizedInputPair],
-            List[EncodedInput],
-            List[EncodedInputPair],
+            list[TextInput], list[TextInputPair], list[PreTokenizedInput], list[PreTokenizedInputPair]
         ],
         add_special_tokens: bool = True,
         padding_strategy: PaddingStrategy = PaddingStrategy.DO_NOT_PAD,
@@ -489,7 +485,7 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
         stride: int = 0,
         is_split_into_words: bool = False,
         pad_to_multiple_of: Optional[int] = None,
-        padding_side: Optional[bool] = None,
+        padding_side: Optional[str] = None,
         return_tensors: Optional[str] = None,
         return_token_type_ids: Optional[bool] = None,
         return_attention_mask: Optional[bool] = None,
@@ -501,7 +497,7 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
         return_length: bool = False,
         verbose: bool = True,
         split_special_tokens: bool = False,
-        **kwargs
+        **kwargs,
     ) -> BatchEncoding:
         if not isinstance(batch_text_or_text_pairs, (tuple, list)):
             raise TypeError(
@@ -574,8 +570,8 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
 
     def _encode_plus(
         self,
-        text: Union[TextInput, PreTokenizedInput, EncodedInput],
-        text_pair: Optional[Union[TextInput, PreTokenizedInput, EncodedInput]] = None,
+        text: Union[TextInput, PreTokenizedInput],
+        text_pair: Optional[Union[TextInput, PreTokenizedInput]] = None,
         add_special_tokens: bool = True,
         padding_strategy: PaddingStrategy = PaddingStrategy.DO_NOT_PAD,
         truncation_strategy: TruncationStrategy = TruncationStrategy.DO_NOT_TRUNCATE,
@@ -583,8 +579,7 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
         stride: int = 0,
         is_split_into_words: bool = False,
         pad_to_multiple_of: Optional[int] = None,
-        padding_side: Optional[Literal["right", "left"]] = None,
-        return_position_ids: Optional[bool] = None,
+        padding_side: Optional[str] = None,
         return_tensors: Optional[bool] = None,
         return_token_type_ids: Optional[bool] = None,
         return_attention_mask: Optional[bool] = None,
@@ -592,6 +587,7 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
         return_special_tokens_mask: bool = False,
         return_offsets_mapping: bool = False,
         return_length: bool = False,
+        return_position_ids: Optional[bool] = None,
         verbose: bool = True,
         split_special_tokens: bool = False,
         **kwargs,
@@ -607,7 +603,6 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
             stride=stride,
             pad_to_multiple_of=pad_to_multiple_of,
             padding_side=padding_side,
-            return_position_ids=return_position_ids,
             return_tensors=return_tensors,
             return_token_type_ids=return_token_type_ids,
             return_attention_mask=return_attention_mask,
@@ -615,6 +610,7 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
             return_special_tokens_mask=return_special_tokens_mask,
             return_offsets_mapping=return_offsets_mapping,
             return_length=return_length,
+            return_position_ids=return_position_ids,
             verbose=verbose,
             split_special_tokens=split_special_tokens,
             **kwargs,
@@ -625,33 +621,28 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
         if return_tensors is None and not return_overflowing_tokens:
             batched_output = BatchEncoding(
                 {
-                    key: value[0] if len(value) > 0 and isinstance(value[0], list) else value
+                    key: (value[0] if len(value) > 0 and isinstance(value[0], list) else value)
                     for key, value in batched_output.items()
                 },
                 batched_output.encodings,
             )
 
         self._eventual_warn_about_too_long_sequence(batched_output["input_ids"], max_length, verbose)
+
         return batched_output
 
-    def convert_tokens_to_string(self, tokens: List[str]) -> str:
-        """
-        Converts a sequence of tokens in a single string. The most simple way to do it is `" ".join(tokens)` but we
-        often want to remove sub-word tokenization artifacts at the same time.
-
-        Args:
-            tokens (`List[str]`): The token to join in a string.
-
-        Returns:
-            `str`: The joined tokens.
-        """
-        return self.backend_tokenizer.decoder.decode(tokens)
+    def convert_tokens_to_string(self, tokens: list[str]) -> str:
+        return (
+            self.backend_tokenizer.decoder.decode(tokens)
+            if self.backend_tokenizer.decoder is not None
+            else " ".join(tokens)
+        )
 
     def _decode(
         self,
-        token_ids: Union[int, List[int]],
+        token_ids: Union[int, list[int]],
         skip_special_tokens: bool = False,
-        clean_up_tokenization_spaces: bool = None,
+        clean_up_tokenization_spaces: Optional[bool] = None,
         **kwargs,
     ) -> str:
         self._decode_use_source_tokenizer = kwargs.pop("use_source_tokenizer", False)
@@ -674,10 +665,10 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
     def _save_pretrained(
         self,
         save_directory: Union[str, os.PathLike],
-        file_names: Tuple[str],
+        file_names: tuple[str],
         legacy_format: Optional[bool] = None,
         filename_prefix: Optional[str] = None,
-    ) -> Tuple[str]:
+    ) -> tuple[str]:
         """
         Save a tokenizer using the slow-tokenizer/legacy format: vocabulary + added tokens as well as in a unique JSON
         file containing {config + vocab + added-tokens}.
@@ -819,8 +810,17 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
             kwargs["end_of_word_suffix"] = tokenizer_json["model"]["end_of_word_suffix"]
         if tokenizer_json["model"]["type"] == "Unigram" and unk_token is not None:
             kwargs["unk_token"] = unk_token
-        if tokenizer_json["pre_tokenizer"] is not None and tokenizer_json["pre_tokenizer"]["type"] == "ByteLevel":
-            kwargs["initial_alphabet"] = pre_tokenizers_fast.ByteLevel.alphabet()
+        if tokenizer_json["pre_tokenizer"] is not None:
+            if (
+                tokenizer_json["pre_tokenizer"]["type"] == "ByteLevel"
+                or tokenizer_json["pre_tokenizer"]["type"] == "Sequence"
+                and "pretokenizers" in tokenizer_json["pre_tokenizer"]
+                and any(
+                    pretokenizer["type"] == "ByteLevel"
+                    for pretokenizer in tokenizer_json["pre_tokenizer"]["pretokenizers"]
+                )
+            ):
+                kwargs["initial_alphabet"] = pre_tokenizers_fast.ByteLevel.alphabet()
 
         trainer_class = MODEL_TO_TRAINER_MAPPING[tokenizer_json["model"]["type"]]
         trainer = trainer_class(vocab_size=vocab_size, special_tokens=special_tokens, **kwargs)
@@ -835,6 +835,13 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
                     if special_tokens_map is not None:
                         tokens = [special_tokens_map.get(token, token) for token in tokens]
                     post_processor["special_tokens"][key]["tokens"] = tokens
+                    for token in tokens:
+                        token_id = tokenizer.token_to_id(token)
+                        if token_id is None:
+                            raise ValueError(
+                                "Attempted to set a token in the post processor that does not exist in the mapping"
+                            )
+
                     post_processor["special_tokens"][key]["ids"] = [tokenizer.token_to_id(token) for token in tokens]
 
             for special_token in ["cls", "sep"]:
@@ -843,6 +850,10 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
                     if special_tokens_map is not None and token in special_tokens_map:
                         token = special_tokens_map[token]
                     token_id = tokenizer.token_to_id(token)
+                    if token_id is None:
+                        raise ValueError(
+                            "Attempted to set a token in the post processor that does not exist in the mapping"
+                        )
                     post_processor[special_token] = [token, token_id]
 
             trained_tokenizer_json["post_processor"] = post_processor
@@ -853,13 +864,12 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
         special_tokens_list = SpecialTokensMixin.SPECIAL_TOKENS_ATTRIBUTES.copy()
         special_tokens_list.remove("additional_special_tokens")
         for token in special_tokens_list:
-            # Get the private one to avoid unnecessary warnings.
-            if getattr(self, f"_{token}") is not None:
+            if getattr(self, token) is not None:
                 special_token = getattr(self, token)
                 if special_tokens_map is not None and special_token in special_tokens_map:
                     special_token = special_tokens_map[special_token]
 
-                special_token_full = getattr(self, f"_{token}")
+                special_token_full = self._special_tokens_map.get(token, None)
                 if isinstance(special_token_full, AddedToken):
                     # Create an added token with the same parameters except the content
                     kwargs[token] = AddedToken(

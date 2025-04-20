@@ -15,7 +15,50 @@
 Generic utilities
 """
 
+import copy
+import inspect
+import io
+import json
+import os
+import shutil
+import tempfile
+import warnings
+from collections import UserDict
+from dataclasses import dataclass
 from enum import Enum
+from typing import Any, Dict, List, Literal, NamedTuple, Optional, Sequence, Tuple, Union
+
+import aistudio_sdk
+import numpy as np
+import paddle
+from huggingface_hub import (
+    create_repo,
+    get_hf_file_metadata,
+    hf_hub_url,
+    repo_type_and_id_from_hf_id,
+    upload_folder,
+)
+from enum import Enum
+
+
+def to_py_obj(obj):
+    """
+    Convert a Paddle tensor, Numpy array or python list to a python list.
+    """
+    if isinstance(obj, (dict, UserDict)):
+        return {k: to_py_obj(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [to_py_obj(o) for o in obj]
+    elif isinstance(obj, paddle.Tensor):
+        return obj.numpy().tolist()
+    elif isinstance(obj, (np.ndarray, np.number)):  # tolist also works on 0d np arrays
+        return obj.tolist()
+    else:
+        return obj
+
+
+def _is_numpy(x):
+    return isinstance(x, np.ndarray)
 
 
 class ExplicitEnum(Enum):

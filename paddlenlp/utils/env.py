@@ -18,6 +18,7 @@ PPNLP_HOME              -->  the root directory for storing PaddleNLP related da
 ├─ MODEL_HOME              -->  Store model files.
 └─ DATA_HOME         -->  Store automatically downloaded datasets.
 """
+
 import os
 import re
 
@@ -80,6 +81,9 @@ CONFIG_NAME = "config.json"
 TOKENIZER_CONFIG_NAME = "tokenizer_config.json"
 CHAT_TEMPLATE_CONFIG_NAME = "chat_template.json"
 GENERATION_CONFIG_NAME = "generation_config.json"
+LEGACY_PROCESSOR_CHAT_TEMPLATE_FILE = "chat_template.json"
+CHAT_TEMPLATE_FILE = "chat_template.jinja"
+CHAT_TEMPLATE_DIR = "additional_chat_templates"
 
 # Name of the files used for checkpointing
 TRAINING_ARGS_NAME = "training_args.bin"

@@ -331,7 +331,7 @@ class Trie:
             ref = ref[char]
         ref[self._termination_char] = 1
 
-    def split(self, text: str) -> List[str]:
+    def split(self, text: str) -> list[str]:
         """
         Will look for the words added to the trie within `text`. Output is the original string splitted along the
         boundaries of the words found.
@@ -494,7 +494,8 @@ class Trie:
         for end in offsets:
             if start > end:
                 logger.error(
-                    "There was a bug in Trie algorithm in tokenization. Attempting to recover. Please report it anyway."
+                    "There was a bug in Trie algorithm in tokenization. Attempting to recover. Please report it"
+                    " anyway."
                 )
                 continue
             elif start == end:
@@ -631,534 +632,8 @@ def _insert_one_token_to_ordered_list(token_list: List[str], new_token: str):
         token_list.insert(insertion_idx, new_token)
 
 
-def convert_to_unicode(text):
-    """
-    Converts `text` to Unicode (if it's not already), assuming utf-8 input.
-    Args:
-        text (str|bytes): Text to be converted to unicode.
-    Returns:
-        str: converted text.
-    """
-    if isinstance(text, str):
-        return text
-    elif isinstance(text, bytes):
-        return text.decode("utf-8", "ignore")
-    else:
-        raise ValueError("Unsupported string type: %s" % (type(text)))
-
-
-def whitespace_tokenize(text):
-    """
-    Runs basic whitespace cleaning and splitting on a peice of text.
-    Args:
-        text (str): Text to be tokenized.
-    Returns:
-        list(str): Token list.
-    """
-    text = text.strip()
-    if not text:
-        return []
-    tokens = text.split()
-    return tokens
-
-
-def is_chinese_char(cp):
-    """Checks whether CP is the codepoint of a CJK character."""
-    # This defines a "chinese character" as anything in the CJK Unicode block:
-    #     https://en.wikipedia.org/wiki/CJK_Unified_Ideographs_(Unicode_block)
-    #
-    # Note that the CJK Unicode block is NOT all Japanese and Korean characters,
-    # despite its name. The modern Korean Hangul alphabet is a different block,
-    # as is Japanese Hiragana and Katakana. Those alphabets are used to write
-    # space-separated words, so they are not treated specially and handled
-    # like the all of the other languages.
-    if (
-        (cp >= 0x4E00 and cp <= 0x9FFF)
-        or (cp >= 0x3400 and cp <= 0x4DBF)  #
-        or (cp >= 0x20000 and cp <= 0x2A6DF)  #
-        or (cp >= 0x2A700 and cp <= 0x2B73F)  #
-        or (cp >= 0x2B740 and cp <= 0x2B81F)  #
-        or (cp >= 0x2B820 and cp <= 0x2CEAF)  #
-        or (cp >= 0xF900 and cp <= 0xFAFF)
-        or (cp >= 0x2F800 and cp <= 0x2FA1F)  #
-    ):  #
-        return True
-
-    return False
-
-
-def _is_nonnormalized_char(char):
-    """Check whther `chars` is a non-normalized character."""
-    cp = ord(char)
-    if (
-        (0xFF00 <= cp <= 0xFFEF)
-        or (0xFE50 <= cp <= 0xFE6B)  # Halfwidth and Fullwidth Forms
-        or (0x3358 <= cp <= 0x33FF)  # Small Form Variants
-        or (0x249C <= cp <= 0x24E9)  # CJK Compatibility
-        or (0x3200 <= cp <= 0x32FF)  # Enclosed Alphanumerics: Ⓛ ⒰
-    ):  # Enclosed CJK Letters and Months
-        return True
-
-    return False
-
-
-def _is_nonnormalized_numeric(char):
-    """Check whether `chars` is a non-normalized numeric character."""
-    cp = ord(char)
-    if (
-        (0x2460 <= cp <= 0x249B)
-        or (0x24EA <= cp <= 0x24FF)  #
-        or (0x2776 <= cp <= 0x2793)  #
-        or (0x2160 <= cp <= 0x217F)  # Enclosed Alphanumerics
-    ):  # Number Forms
-        return True
-
-    return False
-
-
-def normalize_chars(text):
-    """
-    Normalize the text for multiligual and chinese models. Unicode range:
-    https://www.ling.upenn.edu/courses/Spring_2003/ling538/UnicodeRanges.html
-    """
-    output = []
-    for char in text:
-        if _is_nonnormalized_char(char):
-            for c in unicodedata.normalize("NFKC", char):
-                output.append(c)
-        elif _is_nonnormalized_numeric(char):
-            output.append(" ")
-            for c in str(int(unicodedata.numeric(char))):
-                output.append(c)
-            output.append(" ")
-        elif ord(char) == 0xF979:  # https://www.zhihu.com/question/20697984
-            output.append("凉")
-        else:
-            output.append(char)
-    return "".join(output)
-
-
-def _is_symbol(char):
-    """Check whether CP is the codepoint of a Symbol character."""
-    cp = ord(char)
-    if unicodedata.category(char).startswith("S") or (
-        cp in [0x00AD, 0x00B2, 0x00BA, 0x3007, 0x00B5, 0x00D8, 0x014B, 0x01B1]
-    ):
-        return True
-    return False
-
-
-def tokenize_special_chars(text):
-    """Adds whitespace around any special character."""
-    output = []
-    for char in text:
-        cp = ord(char)
-        if (
-            (0x3040 <= cp <= 0x30FF)
-            or (0x0370 <= cp <= 0x04FF)  # Japanese
-            or (0x0250 <= cp <= 0x02AF)  # Greek/Coptic & Cyrillic
-            or _is_symbol(char)  # IPA
-        ):
-            output.append(" ")
-            output.append(char)
-            output.append(" ")
-        else:
-            output.append(char)
-    return "".join(output)
-
-
-def tokenize_chinese_chars(text):
-    """Adds whitespace around any CJK character."""
-    output = []
-    buff = ""
-    for char in text:
-        cp = ord(char)
-        if is_chinese_char(cp):
-            if buff != "":
-                output.append(buff)
-                buff = ""
-            output.append(char)
-        else:
-            buff += char
-
-    if buff != "":
-        output.append(buff)
-
-    return output
-
-
-@dataclass
-class ChatTemplate:
-    conversation: list[str] | None = None
-    system: str | None = None
-    query: str = None
-
-    @staticmethod
-    @lru_cache()
-    def _compile_jinja_template(chat_template) -> Template:
-        def raise_exception(message):
-            raise TemplateError(message)
-
-        jinja_env = ImmutableSandboxedEnvironment(trim_blocks=True, lstrip_blocks=True, keep_trailing_newline=True)
-        jinja_env.globals["raise_exception"] = raise_exception
-        return jinja_env.from_string(chat_template)
-
-    def render_conversation(
-        self, conversation_data: list[str] | dict[str, str], index: int = 0, context_data: Dict[str, Any] = {}
-    ) -> list[str]:
-        """
-        Args:
-            conversation_data (list[str]): the conversation data which must be two parts
-            index (int): the index of current conversation
-
-        Returns:
-            list[str]: the rendered conversation data
-        """
-        if self.conversation is None:
-            raise ValueError(
-                "The template for multi-turns is invalid, please check `conversation` filed in your chat-template."
-            )
-
-        if isinstance(conversation_data, (list, tuple)):
-            assert (
-                len(conversation_data) == 2
-            ), "Each round/turn of conversation must be two participants, eg: [user-query, bot-query]"
-
-            conversation_data = {"user": conversation_data[0], "bot": conversation_data[1], "index": index}
-        conversation_data.update(context_data)
-
-        one_turn_conversation = []
-        for conversation in self.conversation:
-            template = self._compile_jinja_template(conversation)
-            result = template.render(conversation_data)
-            one_turn_conversation.append(result)
-        return one_turn_conversation
-
-    def render_query(self, query: str, index: int = 0, context_data: Dict[str, Union[int, str]] = {}):
-        if self.query is None:
-            return query
-
-        template = self._compile_jinja_template(self.query)
-        return template.render(query=query, index=index, **context_data)
-
-    def _init_context_data(self, context_data: Dict[str, Union[int, str]] = {}) -> Dict[str, Union[int, str]]:
-        """init the context data for chat-template"""
-        context_data["is_training"] = context_data.get("is_training", False)
-        return context_data
-
-    def render_system(self, context_data: Dict[str, Union[int, str]] = {}) -> str:
-        if self.system is None:
-            return ""
-
-        template = self._compile_jinja_template(self.system)
-        return template.render(**context_data)
-
-    def __call__(self, conversations: list[list[str]] | str, context_data: Dict[str, Union[int, str]] = {}) -> str:
-        """render the conversations by chat-template
-
-        Args:
-            conversations (list[list[str]]): the conversations of use and bot
-
-        Returns:
-            str: the result of conversation
-        """
-        if isinstance(conversations, str):
-            conversations = [[conversations]]
-
-        # [1 ... n-1] conversation
-        final_query = self.render_system(context_data=context_data)
-        context_data["length"] = len(conversations)
-        for index, conversation in enumerate(conversations[:-1]):
-            context_data["is_first"] = index == 0
-            context_data["is_last"] = False
-            final_query += "".join(self.render_conversation(conversation, index=index, context_data=context_data))
-
-        if not isinstance(conversations[-1], list) and not len(conversations[-1]) != 1:
-            raise ValueError(
-                "The length of last conversation must be one, eg: [[user-query, bot-answer], [user-query, bot-answer], ..., [user-query]]"
-            )
-        if len(conversations[-1]) > 1:
-            logger.warning(
-                f"The last conversation is not a single-round, chat-template will skip the conversation: {conversations[-1][1:]}"
-            )
-
-        final_query += self.render_query(conversations[-1][0], index=len(conversations) - 1, context_data=context_data)
-        return final_query
-
-    @classmethod
-    def from_dict(cls, config: dict):
-        return cls(**config)
-
-    @classmethod
-    def from_file(cls, file: str):
-        with open(file, "r", encoding="utf-8") as f:
-            config = json.load(f)
-        return cls.from_dict(config)
-
-
-class ChatTemplateMixin:
-    chat_template: Optional[ChatTemplate] = None
-
-    def apply_chat_template(
-        self,
-        conversation: List[List[str, str] | Dict[str, str]] | str,
-        tokenize: bool = True,
-        context_data: Dict[str, Any] = {},
-        **tokenizer_kwargs
-    ) -> str | dict[str, numpy.ndarray | paddle.Tensor]:
-        """apply chat_template rules to conversation which should not be batched data
-
-        Args:
-            conversation (List[List[str, str]] | str): the conversation messages between user and bot
-            context_data (Dict[str, Any]): the context data for chat_template.json
-            tokenize (bool, optional): whether do tokenization. Defaults to True.
-
-        Returns:
-            str | dict[str, numpy.ndarray | paddle.Tensor]: return the result of applied data
-        """
-        if not self.chat_template:
-            raise ValueError("chat_template is not set, please set chat_template first.")
-        elif isinstance(self.chat_template, Template):
-            add_generation_prompt = tokenizer_kwargs.pop("add_generation_prompt", True)
-            query = self._apply_chat_template(conversation, add_generation_prompt=add_generation_prompt)
-        elif isinstance(self.chat_template, ChatTemplate):
-            query = self._apply_chat_template_paddle(conversation, context_data)
-
-        if not tokenize:
-            return query
-
-        # chat_template should not add special tokens
-        tokenizer_kwargs["add_special_tokens"] = False
-        return self(query, **tokenizer_kwargs)
-
-    def _apply_chat_template_paddle(
-        self,
-        conversation: List[List[str, str]] | str,
-        context_data: Dict[str, Any] = {},
-    ) -> str | dict[str, numpy.ndarray | paddle.Tensor]:
-        context_data = self.chat_template._init_context_data(context_data)
-
-        if isinstance(conversation, str):
-            conversation = [[conversation]]
-        elif isinstance(conversation, list) and isinstance(conversation[0], str):
-            raise ValueError(
-                "apply_chat_template do not support appling batch conversations, "
-                "so you should apply the conversation one by one."
-            )
-
-        query = self.chat_template(conversation, context_data=context_data)
-        return query
-
-    def _apply_chat_template(
-        self,
-        conversation: List[List[str, str] | Dict[str, str]] | str,
-        add_generation_prompt=True,
-    ) -> str | dict[str, numpy.ndarray | paddle.Tensor]:
-        if isinstance(conversation, str):
-            conversations = [{"role": "user", "content": conversation}]
-        elif isinstance(conversation, list):
-            assert len(conversation) > 0, "empty conversation is not allowed"
-            if isinstance(conversation[0], list):
-                conversations = convert_to_dict_message(conversation)
-            elif isinstance(conversation[0], dict):
-                conversations = conversation
-            else:
-                raise ValueError(
-                    "apply_chat_template do not support appling batch conversations, "
-                    "so you should apply the conversation one by one."
-                )
-        query = self.chat_template.render(
-            messages=conversations, **self.special_tokens_map, add_generation_prompt=add_generation_prompt
-        )
-        return query
-
-    def encode_chat_inputs(self, conversations: List[List[str, str]], context_data: Dict[str, Any] = {}, **kwargs):
-        """Encodes conversation to pairs of token ids.
-        Turn 0: bos + system + sep + user     bot + eos
-        Turn t: sep + bot + query             bot + eos
-
-        Args:
-            conversation (List[List[str, str]]): the conversation of data
-            context_data (Dict[str, Any]): the context data of conversation
-
-        Returns:
-            List[list[int], list[int]]: the pair of input_ids and target_ids
-        """
-        if not self.chat_template:
-            raise ValueError("chat_template is not set, please set chat_template first.")
-        elif isinstance(self.chat_template, Template):
-            add_generation_prompt = kwargs.pop("add_generation_prompt", True)
-            query = self._encode_chat_inputs(conversations, context_data, add_generation_prompt=add_generation_prompt)
-        elif isinstance(self.chat_template, ChatTemplate):
-            query = self._encode_chat_inputs_paddle(conversations, context_data)
-        return query
-
-    def _encode_chat_inputs_paddle(self, conversations: List[List[str, str]], context_data: Dict[str, Any] = {}):
-        context_data = self.chat_template._init_context_data(context_data)
-        # encode system
-        result = {}
-        if self.chat_template.system:
-            system = self.chat_template.render_system(context_data)
-            result["system"] = self.encode(system, add_special_tokens=False)["input_ids"]
-
-        # encode conversation
-        conversation_ids = []
-        for index, conversation in enumerate(conversations):
-            # give more control to chat_template
-            context_data["is_first"] = index == 0
-            context_data["is_last"] = index == len(conversations) - 1
-
-            user_input, bot_output = self.chat_template.render_conversation(
-                conversation, index=index, context_data=context_data
-            )
-            user_ids = self.encode(user_input, add_special_tokens=False)["input_ids"]
-            bot_ids = self.encode(bot_output, add_special_tokens=False)["input_ids"]
-            conversation_ids.append([user_ids, bot_ids])
-
-        result["conversations"] = conversation_ids
-        return result
-
-    def _encode_chat_inputs(
-        self,
-        conversations: List[List[str, str]],
-        context_data: Dict[str, Any] = {},
-        system: str = None,
-        add_generation_prompt=True,
-    ):
-        result = {}
-
-        # Some template do not support system msg, so we need to check it first.
-        if system:
-            try:
-                self.chat_template.render(messages={"role": "system", "content": system})
-            except Exception as e:
-                raise ValueError("System is not supported in this tokenizer.", e)
-
-        # convert list msg to role dict msg
-        conversation_dict = []
-        origin_msg = []
-        for round in conversations:
-            round_role = [
-                {"role": "user", "content": round[0]},
-                {"role": "assistant", "content": round[1]},
-            ]
-            origin_msg.extend(round_role)
-            conversation_dict.append(round_role)
-        ans = []
-
-        # get answer in single round, then compile the chat entirely and split by single round ans
-        # attention: answer should include end token!
-        for conv in conversation_dict:
-            roundi = [system] + conv if system else conv
-            roundi_str = self.chat_template.render(
-                messages=roundi, add_generation_prompt=False, **self.special_tokens_map
-            )
-            roundi_no_ans = [system] + [conv[0]] if system else [conv[0]]
-            roundi_no_ans_str = self.chat_template.render(
-                messages=roundi_no_ans, add_generation_prompt=add_generation_prompt, **self.special_tokens_map
-            )
-            ans_roundi = roundi_str[len(roundi_no_ans_str) :]
-            ans.append(ans_roundi)
-
-        non_learnable_parts = self._extract_non_learnable_parts(origin_msg, ans)
-        assert len(non_learnable_parts) == len(
-            ans
-        ), f"Get non_learnable_parts len: {len(non_learnable_parts)}, but ans len: {len(ans)}."
-
-        conversation_ids = []
-        for i in range(len(non_learnable_parts)):
-            conversation_ids.append(
-                self.batch_encode(
-                    [non_learnable_parts[i], ans[i]],
-                    add_special_tokens=False,
-                    padding=False,
-                )["input_ids"]
-            )
-
-        result["conversations"] = conversation_ids
-        return result
-
-    def _extract_non_learnable_parts(self, origin_msg: List[Dict[str, str]], split_s: List[str]):
-        """Split the entire chat by specified words. Extract the non-learnable parts."""
-        # distingish and replace the special words in original string to an uncompiled form: Like | -> \|
-        regex_pattern = "|".join(map(re.escape, split_s))
-        # splited by replaced specified words
-        non_learnable_parts = re.split(
-            r"(?:%s)" % regex_pattern,
-            self.chat_template.render(messages=origin_msg, add_generation_prompt=False, **self.special_tokens_map),
-        )
-        if non_learnable_parts[-1] == "":
-            non_learnable_parts.pop()
-        return non_learnable_parts
-
-    @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
-        cache_dir = kwargs.pop("cache_dir", None)
-        from_hf_hub = kwargs.pop("from_hf_hub", False)
-        from_aistudio = kwargs.pop("from_aistudio", False)
-        subfolder = kwargs.pop("subfolder", "")
-        if subfolder is None:
-            subfolder = ""
-
-        kwargs["subfolder"] = subfolder
-        kwargs["cache_dir"] = cache_dir
-        kwargs["from_hf_hub"] = from_hf_hub
-        kwargs["from_aistudio"] = from_aistudio
-        kwargs["return_tokenizer_file_dir"] = True
-        tokenizer, tokenizer_config_file_dir = super().from_pretrained(pretrained_model_name_or_path, *args, **kwargs)
-
-        # load chat-template
-        chat_template_file = os.path.join(tokenizer_config_file_dir, CHAT_TEMPLATE_CONFIG_NAME)
-        if not os.path.exists(chat_template_file):
-            return tokenizer
-
-        if tokenizer.chat_template is not None:
-            logger.warning(
-                "Chat-template already exists in config file, it will be overwritten by chat_template.json file."
-            )
-            logger.warning(
-                "`chat_template.json` will be deprecated in the future! Please set it in `tokenizer_config.json`."
-            )
-        tokenizer.init_chat_template(chat_template_file)
-        return tokenizer
-
-    def init_chat_template(self, chat_template: str | dict):
-        """init chat_tempalte by file_path or template dict data
-
-        Args:
-            chat_template (str | dict): file_path or template dict data
-        """
-        if isinstance(chat_template, str):
-            if not os.path.exists(chat_template):
-                try:
-                    self.chat_template: Template = ChatTemplate._compile_jinja_template(chat_template)
-                except TemplateSyntaxError:
-                    # It is neither jinjia string nor path string
-                    raise TemplateSyntaxError(
-                        "The chat-template in json is not valid jinja string: {}".format(chat_template),
-                        lineno=0,  # fake lineno, useless required msg
-                    )
-            else:
-                self.chat_template = ChatTemplate.from_file(chat_template)
-        elif isinstance(chat_template, dict):
-            self.chat_template = ChatTemplate.from_dict(chat_template)
-        elif isinstance(chat_template, ChatTemplate):
-            self.chat_template = chat_template
-        else:
-            raise ValueError("Receive error chat_template data: ", chat_template)
-
-    def save_resources(self, save_directory):
-        super().save_resources(save_directory)
-
-        if isinstance(self.chat_template, ChatTemplate):  # Future remove if ChatTemplate is deprecated
-            chat_template_file = os.path.join(save_directory, CHAT_TEMPLATE_CONFIG_NAME)
-            with open(chat_template_file, "w", encoding="utf-8") as f:
-                json.dump(asdict(self.chat_template), f, ensure_ascii=False, indent=4)
-            logger.info("Chat-template config file saved in " + chat_template_file)
-
-
 @six.add_metaclass(InitTrackerMeta)
-class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
+class PretrainedTokenizer(PretrainedTokenizerBase):
     """
     Base class for all slow tokenizers.
 
@@ -1198,25 +673,21 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
     and expose special tokens initialization used as attributes.
     """
 
-    unique_no_split_tokens: List[str] = []
-    tokens_trie = Trie()
-
-    _decode_use_source_tokenizer = False
-
     def __init__(self, **kwargs):
         # 1. Init the parent class
+
         self.tokens_trie = Trie()
 
         # 2. init `_added_tokens_decoder` if child class did not
         if not hasattr(self, "_added_tokens_decoder"):
-            self._added_tokens_decoder: Dict[int, AddedToken] = {}
+            self._added_tokens_decoder: dict[int, AddedToken] = {}
 
         # 3. if a `added_tokens_decoder` is passed, we are loading from a saved tokenizer, we overwrite
         self._added_tokens_decoder.update(kwargs.pop("added_tokens_decoder", {}))
-        self._added_tokens_encoder: Dict[str, int] = {k.content: v for v, k in self._added_tokens_decoder.items()}
+        self._added_tokens_encoder: dict[str, int] = {k.content: v for v, k in self._added_tokens_decoder.items()}
 
         # 4 init the parent class
-        super(PretrainedTokenizer, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # 4. If some of the special tokens are not part of the vocab, we add them, at the end.
         # the order of addition is the same as self.SPECIAL_TOKENS_ATTRIBUTES following `tokenizers`
@@ -1238,9 +709,9 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
             if key in self.SPECIAL_TOKENS_ATTRIBUTES:
                 if key == "additional_special_tokens":
                     assert isinstance(value, (list, tuple)), f"Value {value} is not a list or tuple"
-                    assert all(
-                        isinstance(t, (str, AddedToken)) for t in value
-                    ), "One of the tokens is not a string or an AddedToken"
+                    assert all(isinstance(t, (str, AddedToken)) for t in value), (
+                        "One of the tokens is not a string or an AddedToken"
+                    )
                     setattr(self, key, value)
                 elif isinstance(value, (str, AddedToken)):
                     setattr(self, key, value)
@@ -1255,15 +726,15 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
         raise NotImplementedError
 
     @property
-    def added_tokens_encoder(self) -> Dict[str, int]:
+    def added_tokens_encoder(self) -> dict[str, int]:
         """
         Returns the sorted mapping from string to index. The added tokens encoder is cached for performance
-        optimization in `self._added_tokens_encoder` for the slow tokenizers.
+        optimisation in `self._added_tokens_encoder` for the slow tokenizers.
         """
         return {k.content: v for v, k in sorted(self._added_tokens_decoder.items(), key=lambda item: item[0])}
 
     @property
-    def added_tokens_decoder(self) -> Dict[int, AddedToken]:
+    def added_tokens_decoder(self) -> dict[int, AddedToken]:
         """
         Returns the added tokens in the vocabulary as a dictionary of index to AddedToken.
 
@@ -1273,7 +744,7 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
         return dict(sorted(self._added_tokens_decoder.items(), key=lambda item: item[0]))
 
     @added_tokens_decoder.setter
-    def added_tokens_decoder(self, value: Dict[int, Union[AddedToken, str]]) -> Dict[int, AddedToken]:
+    def added_tokens_decoder(self, value: dict[int, Union[AddedToken, str]]) -> dict[int, AddedToken]:
         # Always raise an error if string because users should define the behavior
         for index, token in value.items():
             if not isinstance(token, (str, AddedToken)) or not isinstance(index, int):
@@ -1285,7 +756,7 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
             self._added_tokens_encoder[str(token)] = index
         self._update_total_vocab_size()
 
-    def get_added_vocab(self) -> Dict[str, int]:
+    def get_added_vocab(self) -> dict[str, int]:
         """
         Returns the added tokens in the vocabulary as a dictionary of token to index. Results might be different from
         the fast call because for now we always add the tokens even if they are already in the vocabulary. This is
@@ -1310,7 +781,7 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
         """
         self.total_vocab_size = len(self.get_vocab())
 
-    def _add_tokens(self, new_tokens: Union[List[str], List[AddedToken]], special_tokens: bool = False) -> int:
+    def _add_tokens(self, new_tokens: Union[list[str], list[AddedToken]], special_tokens: bool = False) -> int:
         """
         Add a list of new tokens to the tokenizer class. If the new tokens are not in the vocabulary, they are added to
         it with indices starting from length of the current vocabulary. Special tokens are sometimes already in the
@@ -1337,6 +808,8 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
 
         num_added_toks = tokenizer.add_tokens(["new_tok1", "my_new-tok2"])
         print("We have added", num_added_toks, "tokens")
+        # Note: resize_token_embeddings expects to receive the full size of the new vocabulary, i.e. the length of the tokenizer.
+        model.resize_token_embeddings(len(tokenizer))
         ```"""
         added_tokens = 0
         if new_tokens is None:
@@ -1417,7 +890,7 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
         token_ids_1 = []
         return len(self.build_inputs_with_special_tokens(token_ids_0, token_ids_1 if pair else None))
 
-    def tokenize(self, text: TextInput, **kwargs) -> List[str]:
+    def tokenize(self, text: TextInput, **kwargs) -> list[str]:
         """
         Converts a string into a sequence of tokens, using the tokenizer.
 
@@ -1576,7 +1049,7 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
         """
         raise NotImplementedError
 
-    def convert_tokens_to_ids(self, tokens: Union[str, List[str]]) -> Union[int, List[int]]:
+    def convert_tokens_to_ids(self, tokens: Union[str, list[str]]) -> Union[int, list[int]]:
         """
         Converts a token string (or a sequence of tokens) in a single integer id (or a sequence of ids), using the
         vocabulary.
@@ -1670,15 +1143,15 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
         stride: int = 0,
         is_split_into_words: bool = False,
         pad_to_multiple_of: Optional[int] = None,
-        padding_side: Optional[Literal["right", "left"]] = None,
+        padding_side: Optional[str] = None,
         return_tensors: Optional[Union[str, TensorType]] = None,
-        return_position_ids: Optional[bool] = None,
         return_token_type_ids: Optional[bool] = None,
         return_attention_mask: Optional[bool] = None,
         return_overflowing_tokens: bool = False,
         return_special_tokens_mask: bool = False,
         return_offsets_mapping: bool = False,
         return_length: bool = False,
+        return_position_ids: Optional[bool] = None,
         verbose: bool = True,
         **kwargs,
     ) -> BatchEncoding:
@@ -1708,14 +1181,14 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
                         " integers."
                     )
 
-        # if return_offsets_mapping:
-        #     raise NotImplementedError(
-        #         "return_offset_mapping is not available when using Python tokenizers. "
-        #         "To use this feature, change your tokenizer to one deriving from "
-        #         "transformers.PreTrainedTokenizerFast. "
-        #         "More information on available tokenizers at "
-        #         "https://github.com/huggingface/transformers/pull/2674"
-        #     )
+        if return_offsets_mapping:
+            raise NotImplementedError(
+                "return_offset_mapping is not available when using Python tokenizers. "
+                "To use this feature, change your tokenizer to one deriving from "
+                "paddlenlp.transformers.PretrainedTokenizerFast. "
+                "More information on available tokenizers at "
+                "https://github.com/huggingface/transformers/pull/2674"
+            )
 
         if return_offsets_mapping:
             kwargs["text"] = text
@@ -1736,13 +1209,13 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
             padding_side=padding_side,
             return_tensors=return_tensors,
             prepend_batch_axis=True,
-            return_position_ids=return_position_ids,
             return_attention_mask=return_attention_mask,
             return_token_type_ids=return_token_type_ids,
             return_overflowing_tokens=return_overflowing_tokens,
             return_special_tokens_mask=return_special_tokens_mask,
             return_offsets_mapping=return_offsets_mapping,
             return_length=return_length,
+            return_position_ids=return_position_ids,
             verbose=verbose,
             **kwargs,
         )
@@ -1750,12 +1223,12 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
     def _batch_encode_plus(
         self,
         batch_text_or_text_pairs: Union[
-            List[TextInput],
-            List[TextInputPair],
-            List[PreTokenizedInput],
-            List[PreTokenizedInputPair],
-            List[EncodedInput],
-            List[EncodedInputPair],
+            list[TextInput],
+            list[TextInputPair],
+            list[PreTokenizedInput],
+            list[PreTokenizedInputPair],
+            list[EncodedInput],
+            list[EncodedInputPair],
         ],
         add_special_tokens: bool = True,
         padding_strategy: PaddingStrategy = PaddingStrategy.DO_NOT_PAD,
@@ -1764,16 +1237,16 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
         stride: int = 0,
         is_split_into_words: bool = False,
         pad_to_multiple_of: Optional[int] = None,
-        padding_side: Optional[Literal["right", "left"]] = None,
-        return_position_ids: Optional[bool] = None,
+        padding_side: Optional[str] = None,
         return_tensors: Optional[Union[str, TensorType]] = None,
         return_token_type_ids: Optional[bool] = None,
         return_attention_mask: Optional[bool] = None,
         return_overflowing_tokens: bool = False,
         return_special_tokens_mask: bool = False,
-        return_dict: bool = True,
         return_offsets_mapping: bool = False,
         return_length: bool = False,
+        return_position_ids: Optional[bool] = None,
+        return_dict: bool = True,
         verbose: bool = True,
         split_special_tokens: bool = False,
         **kwargs,
@@ -1797,12 +1270,12 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
                     "Input is not valid. Should be a string, a list/tuple of strings or a list/tuple of integers."
                 )
 
-        # if return_offsets_mapping:
-        #     raise NotImplementedError(
-        #         "return_offset_mapping is not available when using Python tokenizers. "
-        #         "To use this feature, change your tokenizer to one deriving from "
-        #         "transformers.PreTrainedTokenizerFast."
-        #     )
+        if return_offsets_mapping:
+            raise NotImplementedError(
+                "return_offset_mapping is not available when using Python tokenizers. "
+                "To use this feature, change your tokenizer to one deriving from "
+                "transformers.PreTrainedTokenizerFast."
+            )
 
         input_ids = []
         for ids_or_pair_ids in batch_text_or_text_pairs:
@@ -1842,15 +1315,15 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
             stride=stride,
             pad_to_multiple_of=pad_to_multiple_of,
             padding_side=padding_side,
-            return_position_ids=return_position_ids,
             return_attention_mask=return_attention_mask,
             return_token_type_ids=return_token_type_ids,
             return_overflowing_tokens=return_overflowing_tokens,
             return_special_tokens_mask=return_special_tokens_mask,
-            return_dict=return_dict,
             return_offsets_mapping=return_offsets_mapping,
             return_length=return_length,
             return_tensors=return_tensors,
+            return_position_ids=return_position_ids,
+            return_dict=return_dict,
             verbose=verbose,
             split_special_tokens=split_special_tokens,
             **kwargs,
@@ -1862,26 +1335,26 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
 
     def _batch_prepare_for_model(
         self,
-        batch_ids_pairs: List[Union[PreTokenizedInputPair, Tuple[List[int], None]]],
+        batch_ids_pairs: list[Union[PreTokenizedInputPair, tuple[list[int], None]]],
         add_special_tokens: bool = True,
         padding_strategy: PaddingStrategy = PaddingStrategy.DO_NOT_PAD,
         truncation_strategy: TruncationStrategy = TruncationStrategy.DO_NOT_TRUNCATE,
         max_length: Optional[int] = None,
         stride: int = 0,
         pad_to_multiple_of: Optional[int] = None,
-        padding_side: Optional[Literal["right", "left"]] = None,
-        return_position_ids: Optional[bool] = None,
+        padding_side: Optional[str] = None,
         return_tensors: Optional[str] = None,
         return_token_type_ids: Optional[bool] = None,
         return_attention_mask: Optional[bool] = None,
         return_overflowing_tokens: bool = False,
         return_special_tokens_mask: bool = False,
-        return_dict: bool = True,
         return_offsets_mapping: bool = False,
         return_length: bool = False,
+        return_position_ids: Optional[bool] = None,
+        return_dict: bool = True,
         verbose: bool = True,
         split_special_tokens: bool = False,
-        **kwargs
+        **kwargs,
     ) -> BatchEncoding:
         """
         Prepares a sequence of input id, or a pair of sequences of inputs ids so that it can be used by the model. It
@@ -1891,116 +1364,36 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
         Args:
             batch_ids_pairs: list of tokenized input ids or input ids pairs
         """
-        if return_token_type_ids and not add_special_tokens:
-            raise ValueError(
-                "Asking to return token_type_ids while setting add_special_tokens to False "
-                "results in an undefined behavior. Please set add_special_tokens to True or "
-                "set return_token_type_ids to None."
-            )
 
         batch_outputs = {}
-        batch_outputs_list = []
-        for example_id, (first_ids, second_ids) in enumerate(batch_ids_pairs):
-            if stride > 0 and second_ids is not None:
-                if return_token_type_ids is None:
-                    return_token_type_ids = "token_type_ids" in self.model_input_names
-                if return_attention_mask is None:
-                    return_attention_mask = "attention_mask" in self.model_input_names
+        for first_ids, second_ids in batch_ids_pairs:
+            outputs = self.prepare_for_model(
+                first_ids,
+                second_ids,
+                add_special_tokens=add_special_tokens,
+                padding=PaddingStrategy.DO_NOT_PAD.value,  # we pad in batch afterward
+                truncation=truncation_strategy.value,
+                max_length=max_length,
+                stride=stride,
+                pad_to_multiple_of=None,  # we pad in batch afterward
+                padding_side=None,  # we pad in batch afterward
+                return_attention_mask=False,  # we pad in batch afterward
+                return_token_type_ids=return_token_type_ids,
+                return_overflowing_tokens=return_overflowing_tokens,
+                return_special_tokens_mask=return_special_tokens_mask,
+                return_length=return_length,
+                return_tensors=None,  # We convert the whole batch to tensors at the end
+                prepend_batch_axis=False,
+                return_position_ids=return_position_ids,  # we pad in batch afterward
+                verbose=verbose,
+                split_special_tokens=split_special_tokens,
+                **kwargs,
+            )
 
-                max_len_for_pair = (
-                    max_length
-                    - len(first_ids)
-                    - (self.num_special_tokens_to_add(pair=True) if add_special_tokens else 0)
-                )
-
-                text, text_pair = kwargs["batch_text_or_text_pairs"][example_id]
-                token_offset_mapping = self.get_offset_mapping(text)
-                token_pair_offset_mapping = self.get_offset_mapping(text_pair)
-
-                offset = 0
-                while offset < len(second_ids):
-                    encoded_inputs = {}
-                    length = len(second_ids) - offset
-                    if length > max_len_for_pair:
-                        length = max_len_for_pair
-
-                    ids = first_ids
-                    pair_ids = second_ids[offset : offset + length]
-                    pair = bool(pair_ids is not None)
-                    mapping = token_offset_mapping
-                    pair_mapping = token_pair_offset_mapping[offset : offset + length]
-                    if add_special_tokens:
-                        offset_mapping = self.build_offset_mapping_with_special_tokens(mapping, pair_mapping)
-                        sequence = self.build_inputs_with_special_tokens(ids, pair_ids)
-                        token_type_ids = self.create_token_type_ids_from_sequences(ids, pair_ids)
-                    else:
-                        offset_mapping = mapping + pair_mapping
-                        sequence = ids + pair_ids if pair else ids
-                        token_type_ids = [0] * len(ids) + ([0] * len(pair_ids) if pair else [])
-                    encoded_inputs["offset_mapping"] = offset_mapping
-                    # Build output dictionnary
-                    encoded_inputs["input_ids"] = sequence
-                    if return_token_type_ids:
-                        encoded_inputs["token_type_ids"] = token_type_ids
-                    if return_special_tokens_mask:
-                        if add_special_tokens:
-                            encoded_inputs["special_tokens_mask"] = self.get_special_tokens_mask(ids, pair_ids)
-                        else:
-                            encoded_inputs["special_tokens_mask"] = [0] * len(sequence)
-
-                    # Check lengths
-                    self._eventual_warn_about_too_long_sequence(encoded_inputs["input_ids"], max_length, verbose)
-                    if return_position_ids:
-                        encoded_inputs["position_ids"] = list(range(len(encoded_inputs["input_ids"])))
-
-                    if return_length:
-                        encoded_inputs["length"] = len(encoded_inputs["input_ids"])
-                        encoded_inputs["seq_len"] = encoded_inputs["length"]
-
-                    encoded_inputs["overflow_to_sample"] = example_id
-
-                    for key, value in encoded_inputs.items():
-                        if key not in batch_outputs:
-                            batch_outputs[key] = []
-                        batch_outputs[key].append(value)
-
-                    if offset + length == len(second_ids):
-                        break
-                    offset += min(length, stride)
-            else:
-                if return_offsets_mapping:
-                    kwargs["text"] = kwargs["texts"][example_id]
-                    kwargs["text_pair"] = None
-                    if kwargs["text_pairs"] is not None:
-                        kwargs["text_pair"] = kwargs["text_pairs"][example_id]
-
-                encoded_inputs = self.prepare_for_model(
-                    first_ids,
-                    second_ids,
-                    add_special_tokens=add_special_tokens,
-                    padding=PaddingStrategy.DO_NOT_PAD.value,  # we pad in batch afterward
-                    truncation=truncation_strategy.value,
-                    max_length=max_length,
-                    stride=stride,
-                    pad_to_multiple_of=None,  # we pad in batch afterward
-                    padding_side=padding_side,  # we pad in batch afterward
-                    return_position_ids=return_position_ids,  # we pad in batch afterward
-                    return_attention_mask=False,  # we pad in batch afterward
-                    return_token_type_ids=return_token_type_ids,
-                    return_overflowing_tokens=return_overflowing_tokens,
-                    return_special_tokens_mask=return_special_tokens_mask,
-                    return_offsets_mapping=return_offsets_mapping,
-                    return_length=return_length,
-                    return_tensors=None,  # We convert the whole batch to tensors at the end
-                    prepend_batch_axis=False,
-                    verbose=verbose,
-                    split_special_tokens=split_special_tokens,
-                    **kwargs,
-                )
-                for key, value in encoded_inputs.items():
-                    if key not in batch_outputs:
-                        batch_outputs[key] = []
-                    batch_outputs[key].append(value)
+            for key, value in outputs.items():
+                if key not in batch_outputs:
+                    batch_outputs[key] = []
+                batch_outputs[key].append(value)
 
         batch_outputs = self.pad(
             batch_outputs,
@@ -2010,21 +1403,14 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
             padding_side=padding_side,
             return_attention_mask=return_attention_mask,
         )
-        if return_dict:
-            batch_outputs = BatchEncoding(batch_outputs, tensor_type=return_tensors)
-            return batch_outputs
-        else:
-            for k, v in batch_outputs.items():
-                for i in range(len(v)):
-                    if i >= len(batch_outputs_list):
-                        batch_outputs_list.append({k: v[i]})
-                    else:
-                        batch_outputs_list[i][k] = v[i]
-            return batch_outputs_list
+
+        batch_outputs = BatchEncoding(batch_outputs, tensor_type=return_tensors)
+
+        return batch_outputs
 
     def prepare_for_tokenization(
         self, text: str, is_split_into_words: bool = False, **kwargs
-    ) -> Tuple[str, Dict[str, Any]]:
+    ) -> tuple[str, dict[str, Any]]:
         """
         Performs any necessary transformations before tokenization.
 
@@ -2047,8 +1433,8 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
         return (text, kwargs)
 
     def get_special_tokens_mask(
-        self, token_ids_0: List, token_ids_1: Optional[List] = None, already_has_special_tokens: bool = False
-    ) -> List[int]:
+        self, token_ids_0: list, token_ids_1: Optional[list] = None, already_has_special_tokens: bool = False
+    ) -> list[int]:
         """
         Retrieves sequence ids from a token list that has no special tokens added. This method is called when adding
         special tokens using the tokenizer `prepare_for_model` or `encode_plus` methods.
@@ -2077,16 +1463,14 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
         return [0] * ((len(token_ids_1) if token_ids_1 else 0) + len(token_ids_0))
 
     @overload
-    def convert_ids_to_tokens(self, ids: int, skip_special_tokens: bool = False) -> str:
-        ...
+    def convert_ids_to_tokens(self, ids: int, skip_special_tokens: bool = False) -> str: ...
 
     @overload
-    def convert_ids_to_tokens(self, ids: List[int], skip_special_tokens: bool = False) -> List[str]:
-        ...
+    def convert_ids_to_tokens(self, ids: list[int], skip_special_tokens: bool = False) -> list[str]: ...
 
     def convert_ids_to_tokens(
-        self, ids: Union[int, List[int]], skip_special_tokens: bool = False
-    ) -> Union[str, List[str]]:
+        self, ids: Union[int, list[int]], skip_special_tokens: bool = False
+    ) -> Union[str, list[str]]:
         """
         Converts a single index or a sequence of indices in a token or a sequence of tokens, using the vocabulary and
         added tokens.
@@ -2116,12 +1500,10 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
                 tokens.append(self._convert_id_to_token(index))
         return tokens
 
-    # def _convert_id_to_token(self, index: int) -> str:
-    #     return self.vocab.to_tokens(index)
     def _convert_id_to_token(self, index: int) -> str:
         raise NotImplementedError
 
-    def convert_tokens_to_string(self, tokens: List[str]) -> str:
+    def convert_tokens_to_string(self, tokens: list[str]) -> str:
         return " ".join(tokens)
 
     def _get_bert_like_offset_mapping(self, text: str):
@@ -2169,7 +1551,6 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
             if "σ" in token or "ς" in token:
                 start = text[offset:].replace("ς", "σ").index(token.replace("ς", "σ")) + offset
             else:
-
                 # try to fix: https://github.com/PaddlePaddle/PaddleNLP/issues/3985
                 if token not in text[offset:]:
                     # check whether there are consecutive UNK tokens, eg: ['好', '[UNK]', '[UNK]', 'good']
@@ -2248,7 +1629,6 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
 
         char_mapping_indexes = []
         for token in split_tokens:
-
             # convert tokens into original string
             token: str = self.convert_tokens_to_string(token).strip()
 
@@ -2262,7 +1642,6 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
             if "σ" in token or "ς" in token:
                 start = text[offset:].replace("ς", "σ").index(token.replace("ς", "σ")) + offset
             else:
-
                 # try to fix: https://github.com/PaddlePaddle/PaddleNLP/issues/3985
                 if token not in text[offset:]:
                     start = -1
@@ -2297,9 +1676,9 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
 
     def _decode(
         self,
-        token_ids: Union[int, List[int]],
+        token_ids: Union[int, list[int]],
         skip_special_tokens: bool = False,
-        clean_up_tokenization_spaces: bool = None,
+        clean_up_tokenization_spaces: Optional[bool] = None,
         spaces_between_special_tokens: bool = True,
         **kwargs,
     ) -> str:
@@ -2513,11 +1892,9 @@ class BPETokenizer(PretrainedTokenizer):
             return res
 
         def tokenize_bpe(self, token):
-
             if self.is_special_token(token):
                 return [token.strip()]  # remove space for convert_to_ids
             else:
-
                 token = "".join(self.byte_encoder[b] for b in token.encode("utf-8"))
                 return [self.encoder[bpe_token] for bpe_token in self.bpe(token).split(" ")]
 
