@@ -433,6 +433,7 @@ class QWenForCausalLMInferenceModel(GenerationInferenceModel, QWenPretrainedMode
         cache = kwargs.get("cache", None)
         pre_caches = kwargs.get("pre_caches", None)
         inputs_embeds = kwargs.get("inputs_embeds", None)
+        excess_blocks = kwargs.get("excess_blocks", None)
         if cache is not None:
             input_ids = tgt_ids
             position_ids = tgt_pos
@@ -452,6 +453,7 @@ class QWenForCausalLMInferenceModel(GenerationInferenceModel, QWenPretrainedMode
             "seq_len_decoder": seq_len_decoder,
             "cache": cache,
             "pre_caches": pre_caches,
+            "excess_blocks": excess_blocks,
         }
         return model_inputs
 

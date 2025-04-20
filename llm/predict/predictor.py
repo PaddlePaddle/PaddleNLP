@@ -1284,15 +1284,15 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
             self.update_model_inputs("temperature", old_config.temperature)
         self.config = old_config
 
-    def insert_task(self, pos, task_id):
-        query_id = task_id
+    def insert_task(self, pos, task_id, repeat_num):
+        query_id = task_id // repeat_num
         length = len(self.input_ids[query_id])
         logger.debug(f"Insert task {task_id} while query id is {query_id} inserting pos {pos}")
-        self.model_inputs["input_ids"][pos, 0] = self.model_inputs["all_token_ids"][query_id, 0]
+        self.model_inputs["input_ids"][pos, 0] = self.model_inputs["all_token_ids"][task_id, 0]
         self.model_inputs["seq_lens_this_time"][pos] = 1
         self.model_inputs["seq_lens_decoder"][pos] = length
         self.model_inputs["stop_flags"][pos] = False
-        self.model_inputs["result_id"][pos][0] = query_id
+        self.model_inputs["result_id"][pos][0] = task_id
         self.model_inputs["step_idx"][pos, 0] = 1
         self.model_inputs["not_need_stop"][0] = True
 
@@ -1313,8 +1313,10 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         return_tokens=False,
         all_rank_return=True,
         detokenize=True,
+        repeat_num=1,
         **kwargs
     ):
+        assert repeat_num >= 1
         flag_current_rank_run = self.tensor_parallel_rank == 0 or all_rank_return
         self.input_ids = []
         if input_ids is not None:
@@ -1352,6 +1354,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         assert self.proposer is None, "dynamic insert don't support proposer."
 
         total_request_num = len(self.input_ids)
+        decoder_bs = total_request_num * repeat_num
         max_batch_size = self.config.batch_size
         self.block_size = self.config.block_size
 
@@ -1365,7 +1368,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         # print("prefill_blocks", self.prefill_blocks)
 
         self.tail_blocks = []
-        for _ in range(total_request_num):
+        for _ in range(decoder_bs):
             self.tail_blocks.append(block_id)
             block_id += 1
         # print("tail_blocks", self.tail_blocks)
@@ -1379,6 +1382,9 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
 
         max_num_blocks_per_row_per_decoding = (self.config.max_length + self.block_size - 1) // self.block_size
 
+        # one more for tail blocks
+        max_num_blocks_per_row = (self.config.total_max_length + self.block_size - 1) // self.block_size + 1
+
         # For decoder_blocks
         max_num_blocks = max_batch_size * max_num_blocks_per_row_per_decoding
 
@@ -1387,7 +1393,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
             max_num_blocks += len(prefill_block)
 
         # For tail_blocks
-        max_num_blocks += max_batch_size
+        max_num_blocks += decoder_bs
 
         if self.cache_k_shapes is not None:
             for i in range(len(self.cache_k_shapes)):
@@ -1403,15 +1409,14 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         )
 
         self.model_inputs["block_tables"] = paddle.full(
-            shape=[
-                max_batch_size,
-                (self.config.total_max_length + self.config.block_size - 1) // self.config.block_size + 1,
-            ],
+            shape=[max_batch_size, max_num_blocks_per_row],
             fill_value=-1,
             dtype="int32",
         )
 
-        # self.model_inputs["excess_blocks"] = paddle.full(shape=[max_batch_size, 1], fill_value=-1, dtype="int32") # train
+        self.model_inputs["excess_blocks"] = paddle.full(
+            shape=[max_batch_size, repeat_num], fill_value=-1, dtype="int32"
+        )
 
         self.model_inputs["seq_lens_this_time"] = paddle.zeros(shape=[max_batch_size, 1], dtype="int32")
         self.model_inputs["seq_lens_encoder"] = paddle.zeros(shape=[max_batch_size, 1], dtype="int32")
@@ -1426,17 +1431,17 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         self.model_inputs["not_need_stop"] = paddle.full(shape=[1], fill_value=True, dtype="bool").cpu()  # cpu
         self.model_inputs["stop_flags"] = paddle.ones(shape=[max_batch_size, 1], dtype="bool")
         self.model_inputs["stop_nums"] = paddle.full(shape=[1], fill_value=max_batch_size, dtype="int64")
-        self.model_inputs["result_id"] = paddle.full(shape=[max_batch_size, 1], fill_value=-1).astype("int32")
+        self.model_inputs["result_id"] = paddle.full(shape=[max_batch_size, repeat_num], fill_value=-1).astype("int32")
         self.model_inputs["next_tokens"] = paddle.full(shape=[max_batch_size, 1], fill_value=-1, dtype="int64")
 
         # output buffers for all inputs
         self.model_inputs["all_token_ids"] = paddle.full(
-            shape=[total_request_num, self.config.max_length],
+            shape=[decoder_bs, self.config.max_length],
             fill_value=self.tokenizer.pad_token_id,
             dtype="int64",
         )
         # self.model_inputs["all_scores"] = paddle.full(
-        #     shape=[total_request_num, self.config.max_length],
+        #     shape=[decoder_bs, self.config.max_length],
         #     fill_value=-1,
         #     dtype='float32',
         # )
@@ -1482,8 +1487,11 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
 
                 num_prefill_blocks = length // self.block_size
                 self.model_inputs["block_tables"][0, :num_prefill_blocks] = np.array(self.prefill_blocks[i])
-                self.model_inputs["block_tables"][0, num_prefill_blocks] = np.array(self.tail_blocks[i])
-                self.model_inputs["result_id"][0][:1] = np.arange(i, i + 1)
+                self.model_inputs["block_tables"][0, num_prefill_blocks] = np.array(self.tail_blocks[i * repeat_num])
+                self.model_inputs["excess_blocks"][0, :] = np.array(
+                    self.tail_blocks[i * repeat_num : i * repeat_num + repeat_num]
+                )
+                self.model_inputs["result_id"][0][:repeat_num] = np.arange(i * repeat_num, i * repeat_num + repeat_num)
 
                 self._infer(self.model_inputs)
                 self.model_inputs["seq_lens_this_time"][0] = 0
@@ -1494,12 +1502,12 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                 self.model_inputs["block_tables"][0] = -1
                 self.model_inputs["result_id"][0] = -1
 
-            unfinished_ids = list(range(total_request_num - 1, -1, -1))
+            unfinished_ids = list(range(decoder_bs - 1, -1, -1))
             for cur_bs in range(max_batch_size):
                 if len(unfinished_ids) == 0:
                     break
                 task_id = unfinished_ids.pop()
-                self.insert_task(cur_bs, task_id)
+                self.insert_task(cur_bs, task_id, repeat_num)
 
             if kwargs.pop("max_length", self.config.max_length) > 1:
                 while self.model_inputs["not_need_stop"] or len(unfinished_ids) > 0:
@@ -1512,7 +1520,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                                     send_task_to_queue(task_id)
                                 if len(unfinished_ids) > 0:
                                     task_id = unfinished_ids.pop()
-                                    self.insert_task(i, task_id)
+                                    self.insert_task(i, task_id, repeat_num)
                     self._infer(self.model_inputs)
                 for i in range(max_batch_size):
                     if self.model_inputs["stop_flags"][i]:

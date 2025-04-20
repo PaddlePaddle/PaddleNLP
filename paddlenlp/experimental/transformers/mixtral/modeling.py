@@ -1312,6 +1312,7 @@ class MixtralForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Mixtr
         v_quant_scales = kwargs.get("v_quant_scales", None)
         k_dequant_scales = kwargs.get("k_dequant_scales", None)
         v_dequant_scales = kwargs.get("v_dequant_scales", None)
+        excess_blocks = kwargs.get("excess_blocks", None)
 
         # speculative decoding related parameters
         draft_tokens = kwargs.get("draft_tokens", None)
@@ -1333,6 +1334,7 @@ class MixtralForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Mixtr
             "v_dequant_scales": v_dequant_scales,
             "draft_tokens": draft_tokens,
             "output_padding_offset": output_padding_offset,
+            "excess_blocks": excess_blocks,
         }
         return model_inputs
 

@@ -3360,6 +3360,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 None,  # cache_v_zp
                 None,  # out_shifts
                 None,  # out_smooths
+                kwargs.get("excess_blocks", None),
                 self._fuse_kernel_compute_dtype,
                 "none",  # cache_quant_type
                 self.use_neox_rotary_style,
@@ -3815,6 +3816,7 @@ class FusedBlockMultiTransformerA8W8(FusedBlockMultiTransformer, FusedMultiTrans
                 cache_v_zps[i] if cache_v_zps is not None else None,
                 self.linear_shifts[i] if len(self.linear_shifts) > 0 else None,
                 self.linear_smooths[i] if len(self.linear_smooths) > 0 else None,
+                kwargs.get("excess_blocks", None),
                 self._fuse_kernel_compute_dtype,
                 cache_quant_type_str,
                 self.use_neox_rotary_style,
@@ -4173,6 +4175,7 @@ class FusedBlockMultiTransformerFP8(FusedBlockMultiTransformer):
                 cache_v_zps[i] if cache_v_zps is not None else None,
                 None,  # linear_shifts
                 None,  # linear_smooths
+                kwargs.get("excess_blocks", None),
                 self._fuse_kernel_compute_dtype,
                 cache_quant_type_str,
                 self.use_neox_rotary_style,
