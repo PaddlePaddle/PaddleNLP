@@ -1430,12 +1430,8 @@ class PPOTrainer(Trainer):
 
                 # padding data
                 pad_to_multiple_of = self.args.tensor_parallel_degree if self._model_config.sequence_parallel else None
-                input_ids, label_ids, position_ids = self.pad_batch_data(
-                    truncate_input_ids, label_ids_batches, pad_to_multiple_of=pad_to_multiple_of
-                )  # fmt: off
-                prompt_len = paddle.full(
-                    shape=[expand_prompt.shape[0]], fill_value=expand_prompt.shape[1], dtype=expand_prompt.dtype
-                )  # fmt: off
+                input_ids, label_ids, position_ids = self.pad_batch_data(truncate_input_ids, label_ids_batches, pad_to_multiple_of=pad_to_multiple_of)  # fmt: skip
+                prompt_len = paddle.full(shape=[expand_prompt.shape[0]], fill_value=expand_prompt.shape[1], dtype=expand_prompt.dtype)  # fmt: skip
                 prompt_len_without_pad = prompt_only_batch["raw_prompt_len_expand"]
                 response_len_without_pad = input_ids_len - prompt_len
 
