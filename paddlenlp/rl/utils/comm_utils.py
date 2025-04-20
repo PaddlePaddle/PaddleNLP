@@ -687,6 +687,44 @@ def gather_and_pad(tensor, dp_group=None, sd_group=None, pad_index=0.0, pad=True
         return pad_tensor(gathered_tensor, pad_index=pad_index, dtype=dtype)
 
 
+def combine_micro_batches_into_batch(micro_batches, pad_token_id=0):
+    """combine micro batches to get a complete batch"""
+
+    combined_batch = {}
+
+    for micro_batch in micro_batches:
+        for key, value in micro_batch.items():
+            if isinstance(value, list):
+                if isinstance(value[0], paddle.Tensor):
+                    if key == "label_ids":
+                        value = [paddle.unsqueeze(v, axis=0) if v.ndim == 1 else v for v in value]
+                        concat_value = pad_tensor(
+                            value,
+                            pad_index=pad_token_id,
+                            dtype=value[0].dtype,
+                            padding_side="left",
+                        )
+                    else:
+                        concat_value = paddle.concat(value, axis=0)
+                elif isinstance(value[0], np.ndarray):
+                    concat_value = np.concatenate(value, axis=0)
+                combined_batch.setdefault(key, []).append(concat_value)
+            else:
+                combined_batch.setdefault(key, []).append(value)
+
+    for key, values in combined_batch.items():
+        if len(combined_batch[key][0].shape) > 1:
+            pad_index = pad_token_id
+            padding_side = "left" if (key == "prompt" or key == "label_ids") else "right"
+            combined_batch[key] = gather_and_pad(values, pad_index=pad_index, padding_side=padding_side)
+        elif isinstance(values[0], paddle.Tensor):
+            combined_batch[key] = paddle.concat(values, axis=0)
+        elif isinstance(values[0], np.ndarray):
+            combined_batch[key] = np.concatenate(values, axis=0)
+
+    return combined_batch
+
+
 def filter_valid_reward_groups(combined_batch, total_batch, rollout_n, variance_threshold=1e-6):
     """
     Filters out invalid prompt groups based on reward variance, and appends the valid samples to total_batch.
@@ -868,44 +906,6 @@ def process_prompt_and_response(micro_batch, pad_token_id=0):
         )
 
     return micro_batch
-
-
-def combine_micro_batches_into_batch(micro_batches, pad_token_id=0):
-    """combine micro batches to get a complete batch"""
-
-    combined_batch = {}
-
-    for micro_batch in micro_batches:
-        for key, value in micro_batch.items():
-            if isinstance(value, list):
-                if isinstance(value[0], paddle.Tensor):
-                    if key == "label_ids":
-                        value = [paddle.unsqueeze(v, axis=0) if v.ndim == 1 else v for v in value]
-                        concat_value = pad_tensor(
-                            value,
-                            pad_index=pad_token_id,
-                            dtype=value[0].dtype,
-                            padding_side="left",
-                        )
-                    else:
-                        concat_value = paddle.concat(value, axis=0)
-                elif isinstance(value[0], np.ndarray):
-                    concat_value = np.concatenate(value, axis=0)
-                combined_batch.setdefault(key, []).append(concat_value)
-            else:
-                combined_batch.setdefault(key, []).append(value)
-
-    for key, values in combined_batch.items():
-        if len(combined_batch[key][0].shape) > 1:
-            pad_index = pad_token_id
-            padding_side = "left" if (key == "prompt" or key == "label_ids") else "right"
-            combined_batch[key] = gather_and_pad(values, pad_index=pad_index, padding_side=padding_side)
-        elif isinstance(values[0], paddle.Tensor):
-            combined_batch[key] = paddle.concat(values, axis=0)
-        elif isinstance(values[0], np.ndarray):
-            combined_batch[key] = np.concatenate(values, axis=0)
-
-    return combined_batch
 
 
 def split_batch_into_micro_batches(total_batch, batch_size, pad_token_id=0):
