@@ -13,11 +13,13 @@
 # limitations under the License.
 from __future__ import annotations
 
+import copy
 import json
 import os
 import sys
 import time
 from abc import abstractmethod
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from threading import Thread
 from typing import List
@@ -36,6 +38,7 @@ try:
     )
 except:
     pass
+
 from paddlenlp.generation import GenerationConfig, TextIteratorStreamer
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.taskflow.utils import static_mode_guard
@@ -61,7 +64,10 @@ from paddlenlp.utils.env import (
     PADDLE_INFERENCE_WEIGHTS_SUFFIX,
     SPECULATE_MAX_BSZ,
 )
-from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
+from paddlenlp.utils.import_utils import (
+    auto_dynamic_graph_pybind,
+    is_paddlenlp_ops_available,
+)
 from paddlenlp.utils.log import logger
 
 
@@ -184,6 +190,12 @@ class PredictorArgument:
         default="",
         metadata={"help": "Quantization type of moe. Supported values: weight_only_int4, weight_only_int8"},
     )
+    output_via_mq: bool = field(
+        default=True,
+        metadata={"help": "Controls whether the message queue is enabled for output"},
+    )
+    dynamic_insert: bool = field(default=False, metadata={"help": "whether use dynamic insert"})
+    total_request_num: int = field(default=None, metadata={"help": "The total number of request data"})
 
     def __post_init__(self):
         if self.speculate_method is not None:
@@ -199,6 +211,8 @@ class PredictorArgument:
         if self.decode_strategy == "greedy_search":
             self.top_p = 0.0
             self.temperature = 1.0
+        if self.total_request_num is None:
+            self.total_request_num = self.batch_size
 
 
 @dataclass
@@ -251,7 +265,6 @@ class BasePredictor:
             self.generation_config = None
 
     def _preprocess(self, source):
-
         if self.tokenizer.chat_template is not None:
             # for str -> List[str] eg. "hello"
             # for List[str] -> List[str]  eg. ["hello", "hello new"]
@@ -816,6 +829,8 @@ class BlockInferencePredictorMixin(BasePredictor):
 
         self.pre_cache_length = 0
 
+        self.queue_id = os.getpid()
+
         if config.export_precache:
             pre_cache_npy = np.load(config.prefix_path)
             self.pre_cache_length = pre_cache_npy.shape[-2]
@@ -914,6 +929,7 @@ class BlockInferencePredictorMixin(BasePredictor):
         )
         self.model_inputs["bad_tokens"] = paddle.to_tensor([-1], dtype="int64")
         self.model_inputs["is_block_step"] = paddle.full(shape=[config.batch_size], fill_value=False, dtype="bool")
+        self.model_inputs["queue_id"] = paddle.full(shape=[1], fill_value=self.queue_id, dtype="int32").cpu()
 
         # bloom model needs src_mask and tgt_mask!
         if "bloom" in self.architectures:
@@ -970,31 +986,42 @@ class BlockInferencePredictorMixin(BasePredictor):
             tgt_mask = (alibi_decoder + (1 - tgt_mask) * paddle.finfo(self.dtype).min).cast(self.dtype)
             self.model_inputs["rope_emb"] = paddle.concat([src_mask.reshape([-1]), tgt_mask.reshape([-1])])
 
-    def _preprocess(self, input_text: list[str]):
-        len_input_text = len(input_text)
-        if len_input_text < self.batch_size:
-            padding_len = self.batch_size - len_input_text
-            input_text += [""] * padding_len
-            assert len(input_text) == self.batch_size
+    def _preprocess(self, input_text: list[str] = None, input_ids: list[list[int]] = None):
+        if input_ids is None:
+            len_input_text = len(input_text)
+            if len_input_text < self.batch_size:
+                padding_len = self.batch_size - len_input_text
+                input_text += [""] * padding_len
+                assert len(input_text) == self.batch_size
 
-        if self.tokenizer.chat_template is not None:
-            if not isinstance(input_text, list) or not isinstance(input_text[0], str):
-                input_text = [input_text]
-            input_text = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in input_text]
+            if self.tokenizer.chat_template is not None:
+                if not isinstance(input_text, list) or not isinstance(input_text[0], str):
+                    input_text = [input_text]
+                input_text = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in input_text]
 
-        input_ids = []
-        for text in input_text:
-            tokens = self.tokenizer(
-                text,
-                return_tensors="np",
-                padding=True,
-                truncation=True,
-                max_length=self.config.src_length,
-                # if use chat_template, it will not add special_tokens
-                add_special_tokens=self.tokenizer.chat_template is None
-                or isinstance(self.tokenizer, (ChatGLMv2Tokenizer, ChatGLMTokenizer)),
-            )
-            input_ids.append(tokens["input_ids"][0])
+            input_ids = []
+            for text in input_text:
+                tokens = self.tokenizer(
+                    text,
+                    return_tensors="np",
+                    padding=True,
+                    truncation=True,
+                    max_length=self.config.src_length,
+                    # if use chat_template, it will not add special_tokens
+                    add_special_tokens=self.tokenizer.chat_template is None
+                    or isinstance(self.tokenizer, (ChatGLMv2Tokenizer, ChatGLMTokenizer)),
+                )
+                input_ids.append(tokens["input_ids"][0])
+        else:
+            assert isinstance(input_ids, list) and isinstance(input_ids[0], list), "input_ids must be a list of list"
+            assert (
+                input_text is None and input_ids is not None
+            ), "Only one of 'input_text' and 'input_ids' can be provided"
+            len_input_ids = len(input_ids)
+            if len_input_ids < self.batch_size:
+                padding_len = self.batch_size - len_input_ids
+                input_ids += [[self.tokenizer.pad_token_id]] * padding_len
+                assert len(input_ids) == self.batch_size
 
         self.seq_lens = self.pad_batch_data(input_ids)
         self.model_inputs["input_ids"] = self.input_ids
@@ -1064,22 +1091,12 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
     ):
         self.return_full_hidden_states = config.return_full_hidden_states
         self.full_hidden_states = None
+        self.tokenizer = tokenizer
+        self.dynamic_insert = config.dynamic_insert
         if model is None:
             raise ValueError("model should be provided for DygraphBlockInferencePredictor")
         self.cache_k_shapes, self.cache_v_shapes = model.get_cache_kvs_shape(model.config, config.batch_size)
         BlockInferencePredictorMixin.__init__(self, config, tokenizer, model)
-
-        cachekv_dtype = self.dtype if config.cachekv_int8_type is None else "uint8"
-
-        self.cache_kvs = []
-        if self.cache_k_shapes and self.cache_v_shapes:
-            for cache_k_shape, cache_v_shape in zip(self.cache_k_shapes, self.cache_v_shapes):
-                self.cache_kvs.append(paddle.zeros(cache_k_shape, dtype=cachekv_dtype))
-                self.cache_kvs.append(paddle.zeros(cache_v_shape, dtype=cachekv_dtype))
-        else:
-            # for mla's absorption
-            assert self.cache_v_shapes is None
-            self.cache_kvs = [paddle.zeros(shape, dtype=cachekv_dtype) for shape in self.cache_k_shapes]
 
         self.model = model
 
@@ -1092,7 +1109,8 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
             self.model_inputs["k_dequant_scales"] = self.k_dequant_scales
             self.model_inputs["v_dequant_scales"] = self.v_dequant_scales
 
-        self.model_inputs["cache_kvs"] = self.cache_kvs
+        if kwargs.get("init_cache_kvs", True):
+            self.init_cache_kvs()
 
         # init speculate components
         if config.speculate_method == "inference_with_reference":
@@ -1108,6 +1126,19 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         else:
             self.proposer = None
 
+    def init_cache_kvs(self):
+        cachekv_dtype = self.dtype if self.config.cachekv_int8_type is None else "uint8"
+        self.cache_kvs = []
+        if self.cache_k_shapes and self.cache_v_shapes:
+            for cache_k_shape, cache_v_shape in zip(self.cache_k_shapes, self.cache_v_shapes):
+                self.cache_kvs.append(paddle.zeros(cache_k_shape, dtype=cachekv_dtype))
+                self.cache_kvs.append(paddle.zeros(cache_v_shape, dtype=cachekv_dtype))
+        else:
+            # for mla's absorption
+            assert self.cache_v_shapes is None
+            self.cache_kvs = [paddle.zeros(shape, dtype=cachekv_dtype) for shape in self.cache_k_shapes]
+        self.model_inputs["cache_kvs"] = self.cache_kvs
+
     @paddle.no_grad()
     def _infer(self, inputs: dict[str, paddle.Tensor]):
         return self.model.generate(
@@ -1115,7 +1146,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         )
 
     @paddle.no_grad()
-    def predict(self, input_texts: list[str], return_tokens=False):
+    def predict_via_mq(self, input_texts: list[str], return_tokens=False):
         self._preprocess(input_texts)
         if self.proposer is not None:
             self.proposer.insert_query(
@@ -1134,7 +1165,8 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
             output_tensor_shape = [SPECULATE_MAX_BSZ * MAX_DRAFT_TOKENS + SPECULATE_MAX_BSZ + 2, 1]
 
         read_res_process = mp.Process(
-            target=read_res_func, args=[self.model_name_or_path, tensor_queue, result_queue, done_event]
+            target=read_res_func,
+            args=[self.model_name_or_path, tensor_queue, result_queue, done_event, self.model_inputs["queue_id"]],
         )
         if self.tensor_parallel_rank == 0:
             read_res_process.start()
@@ -1175,6 +1207,333 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
             else:
                 return outputs
 
+    @paddle.no_grad()
+    @auto_dynamic_graph_pybind
+    def predict(self, input_texts: list[str], return_tokens=False):
+        if self.dynamic_insert:
+            return self.predict_dy_insert(input_texts, return_tokens)
+        if self.config.output_via_mq:
+            return self.predict_via_mq(input_texts, return_tokens)
+        self._preprocess(input_texts)
+
+        if self.proposer is not None:
+            self.proposer.insert_query(
+                base_model_inputs=self.model_inputs, real_bs=len(input_texts), seq_lens=self.seq_lens
+            )
+
+        output_tokens = []
+        output_token = []
+        s_time = time.time()
+        while self.model_inputs["not_need_stop"]:
+            # whether speculative decoding
+            if self.proposer is not None:
+                self.proposer.run(
+                    self.model_inputs,
+                    real_batch_size=self.batch_size,
+                    seq_lens_this_time=self.model_inputs["seq_lens_this_time"],
+                    base_model_full_hidden_states=self.full_hidden_states,
+                )
+            if self.return_full_hidden_states:
+                self.full_hidden_states = self._infer(self.model_inputs)
+            else:
+                outputs = self._infer(self.model_inputs)
+                outputs = outputs.numpy()
+                outputs[outputs == -1] = self.tokenizer.eos_token_id
+                output_token.append(outputs)
+        logger.info(f"running spend {time.time() - s_time}")
+
+        if self.tensor_parallel_rank == 0:
+            outputs = []
+            output_tokens = np.concatenate(output_token, axis=1).tolist()
+            outputs = self.tokenizer.batch_decode(
+                output_tokens, skip_special_tokens=True, clean_up_tokenization_spaces=False
+            )
+            assert len(outputs) == len(input_texts)
+
+            if return_tokens:
+                return outputs, output_tokens
+            else:
+                return outputs
+
+    @contextmanager
+    def update_predictor_params(self, **kwargs):
+        if kwargs:
+            old_predictor_config = copy.deepcopy(self.config)
+            for key, new_value in kwargs.items():
+                if hasattr(self.config, key):
+                    old_value = getattr(self.config, key)
+                    if old_value != new_value:
+                        setattr(self.config, key, new_value)
+                        if key == "top_p":
+                            self.update_model_inputs("top_p", new_value)
+                        if key == "temperature":
+                            self.update_model_inputs("temperature", new_value)
+        yield
+        if kwargs:
+            self.restore_predictor_config(old_predictor_config)
+
+    def update_model_inputs(self, key, value):
+        assert key in self.model_inputs, f"{key} is not in model_inputs!"
+        old_value = self.model_inputs.pop(key)
+        self.model_inputs[key] = paddle.full(shape=old_value.shape, fill_value=value, dtype=old_value.dtype)
+
+    def restore_predictor_config(self, old_config):
+        if self.config.top_p != old_config.top_p:
+            self.update_model_inputs("top_p", old_config.top_p)
+        if self.config.temperature != old_config.temperature:
+            self.update_model_inputs("temperature", old_config.temperature)
+        self.config = old_config
+
+    def insert_task(self, pos, task_id):
+        query_id = task_id
+        length = len(self.input_ids[query_id])
+        logger.debug(f"Insert task {task_id} while query id is {query_id} inserting pos {pos}")
+        self.model_inputs["input_ids"][pos, 0] = self.model_inputs["all_token_ids"][query_id, 0]
+        self.model_inputs["seq_lens_this_time"][pos] = 1
+        self.model_inputs["seq_lens_decoder"][pos] = length
+        self.model_inputs["stop_flags"][pos] = False
+        self.model_inputs["result_id"][pos][0] = query_id
+        self.model_inputs["step_idx"][pos, 0] = 1
+        self.model_inputs["not_need_stop"][0] = True
+
+        num_prefill_blocks = (length + self.block_size - 1) // self.block_size
+        num_decoder_blocks = (self.config.max_length + self.block_size - 1) // self.block_size
+        self.model_inputs["block_tables"][pos, :num_prefill_blocks] = np.array(self.prefill_blocks[query_id])
+        self.model_inputs["block_tables"][pos, num_prefill_blocks] = np.array(self.tail_blocks[task_id])
+        self.model_inputs["block_tables"][
+            pos, num_prefill_blocks + 1 : num_prefill_blocks + 1 + num_decoder_blocks
+        ] = np.array(self.decoder_blocks[pos])
+
+    @paddle.no_grad()
+    def predict_dy_insert(self, input_texts: list[str], return_tokens=False, **kwargs):
+        # text2ids
+        if self.tokenizer.chat_template is not None:
+            if not isinstance(input_texts, list) or not isinstance(input_texts[0], str):
+                input_texts = [input_texts]
+            input_texts = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in input_texts]
+
+        self.input_ids = []
+        for text in input_texts:
+            tokens = self.tokenizer(
+                text,
+                return_tensors="np",
+                padding=True,
+                truncation=True,
+                max_length=self.config.src_length,
+                # if use chat_template, it will not add special_tokens
+                add_special_tokens=self.tokenizer.chat_template is None
+                or isinstance(self.tokenizer, (ChatGLMv2Tokenizer, ChatGLMTokenizer)),
+            )
+            self.input_ids.append(tokens["input_ids"][0])
+
+        assert self.proposer is None, "dynamic insert don't support proposer."
+
+        total_request_num = len(self.input_ids)
+        max_batch_size = self.config.batch_size
+        self.block_size = self.config.block_size
+
+        self.prefill_blocks = []
+        block_id = 0
+        for inst in self.input_ids:
+            length = len(inst)
+            num_blocks = (length + self.block_size - 1) // self.block_size
+            self.prefill_blocks.append(list(range(block_id, block_id + num_blocks)))
+            block_id += num_blocks
+        # print("prefill_blocks", self.prefill_blocks)
+
+        self.tail_blocks = []
+        for _ in range(len(self.input_ids)):
+            self.tail_blocks.append(block_id)
+            block_id += 1
+        # print("tail_blocks", self.tail_blocks)
+
+        self.decoder_blocks = []
+        for _ in range(max_batch_size):
+            num_blocks = (self.config.max_length + self.block_size - 1) // self.block_size
+            self.decoder_blocks.append(list(range(block_id, block_id + num_blocks)))
+            block_id += num_blocks
+        # print("self.decoder_blocks: ", self.decoder_blocks)
+
+        max_num_blocks_per_row_per_decoding = (self.config.max_length + self.block_size - 1) // self.block_size
+
+        # For decoder_blocks
+        max_num_blocks = max_batch_size * max_num_blocks_per_row_per_decoding
+
+        # For prefill_blocks
+        for prefill_block in self.prefill_blocks:
+            max_num_blocks += len(prefill_block)
+
+        # For tail_blocks
+        max_num_blocks += max_batch_size
+
+        if self.cache_k_shapes is not None:
+            for i in range(len(self.cache_k_shapes)):
+                self.cache_k_shapes[i][0] = max_num_blocks
+        if self.cache_v_shapes is not None:
+            for i in range(len(self.cache_v_shapes)):
+                self.cache_v_shapes[i][0] = max_num_blocks
+
+        self.init_cache_kvs()
+
+        self.model_inputs["input_ids"] = paddle.full(
+            shape=[max_batch_size, self.config.total_max_length], fill_value=0, dtype="int64"
+        )
+
+        self.model_inputs["block_tables"] = paddle.full(
+            shape=[
+                max_batch_size,
+                (self.config.total_max_length + self.config.block_size - 1) // self.config.block_size + 1,
+            ],
+            fill_value=-1,
+            dtype="int32",
+        )
+
+        # self.model_inputs["excess_blocks"] = paddle.full(shape=[max_batch_size, 1], fill_value=-1, dtype="int32") # train
+
+        self.model_inputs["seq_lens_this_time"] = paddle.zeros(shape=[max_batch_size, 1], dtype="int32")
+        self.model_inputs["seq_lens_encoder"] = paddle.zeros(shape=[max_batch_size, 1], dtype="int32")
+        self.model_inputs["seq_lens_decoder"] = paddle.zeros(shape=[max_batch_size, 1], dtype="int32")
+
+        self.model_inputs["pre_ids"] = paddle.full(
+            shape=[max_batch_size, self.config.max_length], fill_value=-1, dtype="int64"
+        )
+
+        # Construct loop cvars
+        self.model_inputs["step_idx"] = paddle.full(shape=[max_batch_size, 1], fill_value=0, dtype="int64")
+        self.model_inputs["not_need_stop"] = paddle.full(shape=[1], fill_value=True, dtype="bool").cpu()  # cpu
+        self.model_inputs["stop_flags"] = paddle.ones(shape=[max_batch_size, 1], dtype="bool")
+        self.model_inputs["stop_nums"] = paddle.full(shape=[1], fill_value=max_batch_size, dtype="int64")
+        self.model_inputs["result_id"] = paddle.full(shape=[max_batch_size, 1], fill_value=-1).astype("int32")
+        self.model_inputs["next_tokens"] = paddle.full(shape=[max_batch_size, 1], fill_value=-1, dtype="int64")
+
+        # output buffers for all inputs
+        self.model_inputs["all_token_ids"] = paddle.full(
+            shape=[total_request_num, self.config.max_length],
+            fill_value=self.tokenizer.pad_token_id,
+            dtype="int64",
+        )
+        # self.model_inputs["all_scores"] = paddle.full(
+        #     shape=[total_request_num, self.config.max_length],
+        #     fill_value=-1,
+        #     dtype='float32',
+        # )
+
+        if self.config.output_via_mq:
+            result_queue = mp.Queue()
+            task_queue = mp.Queue()
+            done_event = mp.Event()
+            read_res_func = llm_utils.read_res_dynamic_insert
+            read_res_process = mp.Process(
+                target=read_res_func,
+                args=[
+                    self.model_name_or_path,
+                    task_queue,
+                    result_queue,
+                    done_event,
+                    self.model_inputs["queue_id"],
+                    len(self.input_ids),
+                ],
+            )
+            if self.tensor_parallel_rank == 0:
+                read_res_process.start()
+                done_event.wait()
+
+        s_time = time.time()
+        with self.update_predictor_params(**kwargs):
+            for i, inst in enumerate(self.input_ids):
+                length = len(inst)
+                self.model_inputs["input_ids"][0, :length] = np.array(inst)
+                self.model_inputs["seq_lens_this_time"][0] = length
+                self.model_inputs["seq_lens_encoder"][0] = length
+                self.model_inputs["stop_flags"][0] = False
+
+                num_prefill_blocks = (length + self.block_size - 1) // self.block_size
+                self.model_inputs["block_tables"][0, :num_prefill_blocks] = np.array(self.prefill_blocks[i])
+                self.model_inputs["block_tables"][0, num_prefill_blocks] = np.array(self.tail_blocks[i])
+                self.model_inputs["result_id"][0][:1] = np.arange(i, i + 1)
+
+                next_tokens = self._infer(self.model_inputs)
+                self.model_inputs["all_token_ids"][i, 0] = next_tokens[0, 0]
+                self.model_inputs["seq_lens_this_time"][0] = 0
+                self.model_inputs["seq_lens_encoder"][0] = 0
+                self.model_inputs["seq_lens_decoder"][0] = 0
+                self.model_inputs["stop_flags"][0] = True
+                self.model_inputs["step_idx"][0, 0] = 0
+                self.model_inputs["block_tables"][0] = -1
+                self.model_inputs["result_id"][0] = -1
+
+            unfinished_ids = list(range(total_request_num - 1, -1, -1))
+            for cur_bs in range(max_batch_size):
+                if len(unfinished_ids) == 0:
+                    break
+                task_id = unfinished_ids.pop()
+                self.insert_task(cur_bs, task_id)
+
+            done_task_id_set = set()
+            if kwargs.pop("max_length", self.config.max_length) > 1:
+                while self.model_inputs["not_need_stop"] or len(unfinished_ids) > 0:
+                    no_stop_num = max_batch_size - paddle.sum(self.model_inputs["stop_flags"]).item()
+                    if no_stop_num < max_batch_size:
+                        for i in range(max_batch_size):
+                            if self.model_inputs["stop_flags"][i]:
+                                if self.config.output_via_mq:
+                                    task_id = self.model_inputs["result_id"][i][0].item()
+                                    if task_id not in done_task_id_set:
+                                        task_token = (
+                                            self.model_inputs["all_token_ids"][task_id : task_id + 1, :].cpu().numpy()
+                                        )
+                                        task_queue.put([task_id, task_token])
+                                        done_task_id_set.add(task_id)
+                                if len(unfinished_ids) > 0:
+                                    task_id = unfinished_ids.pop()
+                                    self.insert_task(i, task_id)
+                    next_tokens = self._infer(self.model_inputs)
+                for i in range(max_batch_size):
+                    if self.model_inputs["stop_flags"][i]:
+                        if self.config.output_via_mq:
+                            task_id = self.model_inputs["result_id"][i][0].item()
+                            if task_id not in done_task_id_set:
+                                task_token = self.model_inputs["all_token_ids"][task_id : task_id + 1, :].cpu().numpy()
+                                task_queue.put([task_id, task_token])
+                                done_task_id_set.add(task_id)
+            elif self.config.output_via_mq:
+                for task_id in range(len(self.input_ids)):
+                    task_id = self.model_inputs["result_id"][i][0].item()
+                    task_token = self.model_inputs["all_token_ids"][task_id : task_id + 1, :].cpu().numpy()
+                    task_queue.put([task_id, task_token])
+
+        logger.debug(f"running spend {time.time() - s_time}")
+        self.cache_kvs = None
+        self.model_inputs["cache_kvs"] = None
+        paddle.device.cuda.empty_cache()
+        if self.config.output_via_mq:
+            if self.tensor_parallel_rank == 0:
+                outputs = []
+                output_tokens = []
+                while len(outputs) < len(input_texts):
+                    result = result_queue.get(timeout=1)
+                    outputs.append(result[-1])
+                    output_tokens.append(result[-2])
+                read_res_process.terminate()
+            while not task_queue.empty():
+                task_queue.get_nowait()
+        else:
+            if self.tensor_parallel_rank == 0:
+                output_tokens = self.model_inputs["all_token_ids"]
+                output_tokens = paddle.where(
+                    output_tokens < 0,
+                    paddle.to_tensor(self.tokenizer.pad_token_id, dtype=output_tokens.dtype),
+                    output_tokens,
+                )
+                outputs = self.tokenizer.batch_decode(
+                    output_tokens, skip_special_tokens=True, clean_up_tokenization_spaces=False
+                )
+        if self.tensor_parallel_rank == 0:
+            if return_tokens:
+                return outputs, output_tokens
+            else:
+                return outputs
+
 
 class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
     def __init__(
@@ -1188,6 +1547,7 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
         self.cache_v_shapes = kwargs.get("cache_v_shapes", None)
         self.model_args = kwargs.get("model_args", None)
         self.return_full_hidden_states = config.return_full_hidden_states
+        self.tokenizer = tokenizer
         self.full_hidden_states = None
         if self.cache_k_shapes is None:
             raise ValueError(
@@ -1280,7 +1640,7 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
 
         self.predictor = paddle.inference.create_predictor(config)
 
-    def predict(self, input_texts: list[str], return_tokens=False):
+    def predict_via_mq(self, input_texts: list[str], return_tokens=False):
         s_time = time.time()
         self._preprocess(input_texts)
         if self.proposer is not None:
@@ -1302,7 +1662,8 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
             output_tensor_shape = [SPECULATE_MAX_BSZ * MAX_DRAFT_TOKENS + SPECULATE_MAX_BSZ + 2, 1]
 
         read_res_process = mp.Process(
-            target=read_res_func, args=[self.model_name_or_path, tensor_queue, result_queue, done_event]
+            target=read_res_func,
+            args=[self.model_name_or_path, tensor_queue, result_queue, done_event, self.model_inputs["queue_id"]],
         )
         if self.tensor_parallel_rank == 0:
             read_res_process.start()
@@ -1338,6 +1699,52 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
 
             read_res_process.terminate()
 
+            if return_tokens:
+                return outputs, output_tokens
+            else:
+                return outputs
+
+    def predict(self, input_texts: list[str], return_tokens=False):
+        if self.config.output_via_mq:
+            return self.predict_via_mq(input_texts, return_tokens)
+
+        s_time = time.time()
+        self._preprocess(input_texts)
+        if self.proposer is not None:
+            self.proposer.insert_query(
+                base_model_inputs=self.model_inputs, real_bs=len(input_texts), seq_lens=self.seq_lens
+            )
+        logger.info(f"preprocess spend {time.time() - s_time}")
+
+        output_tokens = []
+        output_token = []
+        s_time = time.time()
+        while self.model_inputs["not_need_stop"]:
+            # whether speculative decoding
+            if self.proposer is not None:
+                self.proposer.run(
+                    self.model_inputs,
+                    real_batch_size=self.batch_size,
+                    seq_lens_this_time=self.model_inputs["seq_lens_this_time"],
+                    base_model_full_hidden_states=self.full_hidden_states,
+                )
+            if self.return_full_hidden_states:
+                self.full_hidden_states = self.predictor.run(list(self.model_inputs.values()))[0]
+            else:
+                outputs = self.predictor.run(list(self.model_inputs.values()))[0]
+                outputs = outputs.numpy()
+                outputs[outputs == -1] = self.tokenizer.eos_token_id
+                output_token.append(outputs)
+        logger.info(f"running spend {time.time() - s_time}")
+
+        if self.tensor_parallel_rank == 0:
+            outputs = []
+            output_tokens = []
+            output_tokens = np.concatenate(output_token, axis=1).tolist()
+            outputs = self.tokenizer.batch_decode(
+                output_tokens, skip_special_tokens=True, clean_up_tokenization_spaces=False
+            )
+            assert len(outputs) == self.batch_size
             if return_tokens:
                 return outputs, output_tokens
             else:
@@ -1423,7 +1830,6 @@ def create_predictor(
     predictor_args: PredictorArgument,
     model_args: ModelArgument,
 ):
-
     paddle.set_device(predictor_args.device)
     paddle.set_default_dtype(predictor_args.dtype)
 
@@ -1493,7 +1899,6 @@ def create_predictor(
                     tensor_parallel_rank=tensor_parallel_rank,
                     tensor_parallel_output=False,
                 )
-
     predictor = AutoPredictor.create_predictor(predictor_args, config, model_args, tokenizer, model=model)
 
     return predictor
@@ -1545,11 +1950,11 @@ def predict():
     else:
         source_texts = [
             "2014年3月，大范围雾霾天气长时间影响我国东部地区，严重危害人体健康。造成雾霾天气的人为原因有____\r\n①工业生产中使用矿物作为燃料，大量排放污染物     ②汽车尾气的大量排放     \r\n③风力小，空气流动不畅     ④冬季取暖排放粉尘\nA. ①②③\nB. ②③④\nC. ①③④\nD. ①②④"
-        ] * predictor_args.batch_size
-        target_texts = [""] * predictor_args.batch_size
+        ] * predictor_args.total_request_num
+        target_texts = [""] * predictor_args.total_request_num
 
-    batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
-    batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
+    batch_source_texts = batchfy_text(source_texts, predictor_args.total_request_num)
+    batch_target_texts = batchfy_text(target_texts, predictor_args.total_request_num)
 
     with open(model_args.output_file, "w", encoding="utf-8") as f:
         for bs, batch_source_text in enumerate(batch_source_texts):
@@ -1572,13 +1977,17 @@ def predict():
     if predictor_args.benchmark:
         benchmark(predictor, predictor_args, model_args)
 
+    # import pdb;pdb.set_trace()
+
 
 def benchmark(predictor, predictor_args, model_args):
     # Just construct a simple benchmark input. We pad input to the src_length.
     test_texts = "hello world, how are you?"
-    benchmark_texts = [test_texts + "<pad>" * predictor_args.src_length for _ in range(predictor_args.batch_size)]
+    benchmark_texts = [
+        test_texts + "<pad>" * predictor_args.src_length for _ in range(predictor_args.total_request_num)
+    ]
 
-    batch_benchmark_texts = batchfy_text(benchmark_texts, predictor_args.batch_size)
+    batch_benchmark_texts = batchfy_text(benchmark_texts, predictor_args.total_request_num)
     print("***********Start Benchmark**********")
 
     warmup_time = 5
@@ -1605,9 +2014,9 @@ def benchmark(predictor, predictor_args, model_args):
             "Input length is: {}, Output length is: {}, bs is: {}, IPS: {:.3f} tokens/s, QPS: {:.3f} requests/s. ".format(
                 predictor_args.src_length,
                 predictor_args.max_length,
-                predictor_args.batch_size,
+                predictor_args.total_request_num,
                 (output_tokens / (end - start)),
-                (predictor_args.batch_size * test_time / (end - start)),
+                (predictor_args.total_request_num * test_time / (end - start)),
             )
         )
 

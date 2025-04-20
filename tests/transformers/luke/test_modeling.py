@@ -357,6 +357,7 @@ class LukeModelTest(ModelTesterMixin, unittest.TestCase):
                 self.assertListEqual(arg_names[:1], expected_arg_names)
 
     @slow
+    @unittest.skip("Skip for miss model weight.")
     def test_model_from_pretrained(self):
         for model_name in list(LukePretrainedModel.pretrained_init_configuration)[:1]:
             model = LukeModel.from_pretrained(model_name)

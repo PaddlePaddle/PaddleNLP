@@ -536,7 +536,7 @@ class SpeechT5FeatureEncoder(nn.Layer):
 
         # make sure hidden_states require grad for gradient_checkpointing
         if self._requires_grad and self.training:
-            hidden_states.stop_gradiet = False
+            hidden_states.stop_gradient = False
 
         for conv_layer in self.conv_layers:
             if self._requires_grad and self.gradient_checkpointing and self.training:
@@ -582,7 +582,7 @@ class SpeechT5SpeechEncoderPrenet(nn.Layer):
 
         # model only needs masking vector if mask prob is > 0.0
         if config.mask_time_prob > 0.0 or config.mask_feature_prob > 0.0:
-            self.masked_spec_embed = Parameter(uniform_(paddle.to_tensor([config.hidden_size], dtype="float32"), 0, 1))
+            self.masked_spec_embed = Parameter(uniform_(paddle.zeros([config.hidden_size], dtype="float32"), 0, 1))
 
         self.pos_conv_embed = SpeechT5PositionalConvEmbedding(config)
         self.pos_sinusoidal_embed = SpeechT5SinusoidalPositionalEmbedding(

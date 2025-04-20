@@ -15,7 +15,7 @@
 
 def calculate_effective_tokens(training_args, train_dataset, max_seq_len):
     """
-    Caculate the effective tokens during training.
+    Calculate the effective tokens during training.
     """
     total_effective_tokens = 0
 

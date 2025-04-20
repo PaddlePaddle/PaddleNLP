@@ -140,6 +140,9 @@ from .dallebart.tokenizer import *
 from .deberta.configuration import *
 from .deberta.modeling import *
 from .deberta.tokenizer import *
+from .nezha.configuration import *
+from .nezha.modeling import *
+from .nezha.tokenizer import *
 from .deberta_v2.configuration import *
 from .deberta_v2.modeling import *
 from .deberta_v2.tokenizer import *
@@ -188,9 +191,6 @@ from .fnet.tokenizer import *
 from .funnel.configuration import *
 from .funnel.modeling import *
 from .funnel.tokenizer import *
-from .gau_alpha.configuration import *
-from .gau_alpha.modeling import *
-from .gau_alpha.tokenizer import *
 from .gemma import *
 from .glm.configuration import *
 from .glm.modeling import *
@@ -243,9 +243,6 @@ from .mpnet.modeling import *
 from .mpnet.tokenizer import *
 from .mt5.configuration import *
 from .mt5.modeling import *
-from .nezha.configuration import *
-from .nezha.modeling import *
-from .nezha.tokenizer import *
 from .nv_embed.modeling import *
 from .nystromformer.configuration import *
 from .nystromformer.modeling import *

@@ -87,7 +87,7 @@ python ../label_studio.py \
 
 ### 2.3 模型微调
 
-推荐使用 [Trainer API ](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/trainer.md) 对模型进行微调。只需输入模型、数据集等就可以使用 Trainer API 高效快速地进行预训练、微调和模型压缩等任务，可以一键启动多卡训练、混合精度训练、梯度累积、断点重启、日志显示等功能，Trainer API 还针对训练过程的通用训练配置做了封装，比如：优化器、学习率调度等。
+推荐使用 [Trainer API ](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/zh/trainer.md) 对模型进行微调。只需输入模型、数据集等就可以使用 Trainer API 高效快速地进行预训练、微调和模型压缩等任务，可以一键启动多卡训练、混合精度训练、梯度累积、断点重启、日志显示等功能，Trainer API 还针对训练过程的通用训练配置做了封装，比如：优化器、学习率调度等。
 
 使用下面的命令，使用 `uie-x-base` 作为预训练模型进行模型微调，将微调后的模型保存至`./checkpoint/model_best`：
 

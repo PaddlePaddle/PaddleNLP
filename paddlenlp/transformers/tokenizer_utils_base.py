@@ -2910,6 +2910,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                     return_attention_mask=return_attention_mask,
                 )
             else:
+                padding_side = padding_side if padding_side is not None else self.padding_side
+
                 original_padding_side = self.padding_side
                 self.padding_side = padding_side
                 encoded_inputs = self._pad(
@@ -2935,14 +2937,28 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         batch_outputs = {}
         for i in range(batch_size):
             inputs = dict((k, v[i]) for k, v in encoded_inputs.items())
-            outputs = self._pad(
-                inputs,
-                max_length=max_length,
-                padding_strategy=padding_strategy,
-                padding_side=padding_side,
-                pad_to_multiple_of=pad_to_multiple_of,
-                return_attention_mask=return_attention_mask,
-            )
+            if "padding_side" in set(inspect.signature(self._pad).parameters.keys()):
+                outputs = self._pad(
+                    inputs,
+                    max_length=max_length,
+                    padding_strategy=padding_strategy,
+                    padding_side=padding_side,
+                    pad_to_multiple_of=pad_to_multiple_of,
+                    return_attention_mask=return_attention_mask,
+                )
+            else:
+                padding_side = padding_side if padding_side is not None else self.padding_side
+
+                original_padding_side = self.padding_side
+                self.padding_side = padding_side
+                outputs = self._pad(
+                    inputs,
+                    max_length=max_length,
+                    padding_strategy=padding_strategy,
+                    pad_to_multiple_of=pad_to_multiple_of,
+                    return_attention_mask=return_attention_mask,
+                )
+                self.padding_side = original_padding_side
 
             for key, value in outputs.items():
                 if key not in batch_outputs:

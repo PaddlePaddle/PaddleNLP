@@ -15,6 +15,7 @@
 
 import copy
 import tempfile
+import unittest
 
 import paddle
 from parameterized import parameterized_class
@@ -321,6 +322,7 @@ class MBartEnroIntegrationTest(AbstractSeq2SeqIntegrationTest):
     return_dict = False
 
     @slow
+    @unittest.skip("Skip for miss model weight.")
     def test_enro_generate_one(self):
         batch = self.tokenizer(
             ["UN Chief Says There Is No Military Solution in Syria"], return_tensors="pd", return_token_type_ids=False
@@ -331,6 +333,7 @@ class MBartEnroIntegrationTest(AbstractSeq2SeqIntegrationTest):
         self.assertEqual(self.tgt_text[0], decoded[0])
 
     @slow
+    @unittest.skip("Skip for miss model weight.")
     def test_enro_generate_batch(self):
         batch = self.tokenizer(
             self.src_text, return_tensors="pd", padding=True, truncation=True, return_token_type_ids=False
@@ -374,6 +377,7 @@ class MBartCC25IntegrationTest(AbstractSeq2SeqIntegrationTest):
     tgt_text = ["Şeful ONU declară că nu există o soluţie militară în Siria", "to be padded"]
 
     @slow
+    @unittest.skip("Skip for miss model weight.")
     def test_fill_mask(self):
         inputs = self.tokenizer(["One of the best <mask> I ever read!"], return_tensors="pd")
         model = self.model()

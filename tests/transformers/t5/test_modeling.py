@@ -709,7 +709,7 @@ class T5CompatibilityTest(unittest.TestCase):
     def test_t5_converter(self):
         with tempfile.TemporaryDirectory() as tempdir:
             model_id = "hf-internal-testing/tiny-random-T5Model"
-            # 1. create commmon input
+            # 1. create common input
             input_ids = np.random.randint(100, 200, [1, 20])
 
             # 2. forward the paddle model
@@ -740,7 +740,7 @@ class T5CompatibilityTest(unittest.TestCase):
     def test_t5_converter_from_local_dir(self):
         with tempfile.TemporaryDirectory() as tempdir:
             model_id = "hf-internal-testing/tiny-random-T5Model"
-            # 1. create commmon input
+            # 1. create common input
             input_ids = np.random.randint(100, 200, [1, 20])
 
             # 2. forward the torch  model
@@ -775,7 +775,7 @@ class T5CompatibilityTest(unittest.TestCase):
     def test_t5_for_conditional_generation(self):
         with tempfile.TemporaryDirectory() as tempdir:
             model_id = "hf-internal-testing/tiny-random-T5Model"
-            # 1. create commmon input
+            # 1. create common input
             input_ids = np.random.randint(100, 200, [1, 20])
 
             # 2. forward the torch  model

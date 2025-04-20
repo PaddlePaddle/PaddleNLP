@@ -30,7 +30,6 @@ from paddlenlp.transformers import (
     AlbertForSequenceClassification,
     AlbertForTokenClassification,
     AlbertModel,
-    AlbertPretrainedModel,
 )
 
 from ...testing_utils import require_package, slow
@@ -335,8 +334,9 @@ class AlbertModelTest(ModelTesterMixin, unittest.TestCase):
 
     @slow
     def test_model_from_pretrained(self):
-        for model_name in list(AlbertPretrainedModel.pretrained_init_configuration.keys())[:1]:
-            model = AlbertModel.from_pretrained(model_name)
+        # for model_name in list(AlbertPretrainedModel.pretrained_init_configuration.keys())[:1]:
+        for model_name in ["albert/albert-base-v1"]:
+            model = AlbertModel.from_pretrained(model_name, from_hf_hub=True, convert_from_torch=True)
             self.assertIsNotNone(model)
 
 
@@ -377,7 +377,7 @@ class AlbertModelCompatibilityTest(unittest.TestCase):
     def test_albert_converter_from_local_dir(self):
         with tempfile.TemporaryDirectory() as tempdir:
 
-            # 1. create commmon input
+            # 1. create common input
             input_ids = np.random.randint(100, 200, [1, 20])
 
             # 2. forward the torch  model
@@ -420,7 +420,7 @@ class AlbertModelCompatibilityTest(unittest.TestCase):
         pytorch_class_name = pytorch_class_name or class_name
         with tempfile.TemporaryDirectory() as tempdir:
 
-            # 1. create commmon input
+            # 1. create common input
             input_ids = np.random.randint(100, 200, [1, 20])
 
             # 2. forward the torch model

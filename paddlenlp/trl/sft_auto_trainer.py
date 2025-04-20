@@ -29,12 +29,6 @@ from paddle.distributed.auto_parallel.intermediate.parallelize import (
 
 from ..data import DataCollatorForSeq2Seq
 from ..trainer.argparser import strtobool
-from ..trainer.trainer import (
-    SCALER_NAME,
-    SCHEDULER_NAME,
-    TRAINER_STATE_NAME,
-    TRAINING_ARGS_NAME,
-)
 from ..trainer.trainer_callback import TrainerState
 from ..trainer.trainer_utils import (  # set_hyrbid_parallel_seed,
     PREFIX_CHECKPOINT_DIR,
@@ -51,6 +45,12 @@ from ..trainer.utils.helper import (  # nested_truncate,
     distributed_isfile,
 )
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
+from ..utils.env import (
+    SCALER_NAME,
+    SCHEDULER_NAME,
+    TRAINER_STATE_NAME,
+    TRAINING_ARGS_NAME,
+)
 from ..utils.log import logger
 from .sft_trainer import SFTTrainer
 
@@ -88,7 +88,7 @@ class SFTAutoTrainer(SFTTrainer):
         if kwargs.get("args", None) is not None and kwargs["args"].use_intermediate_api:
             model = kwargs.get("model", None)
             assert model is not None
-            # NOTE(zhangwl): some param_init_func is not suuport lazy init
+            # NOTE(zhangwl): some param_init_func is not support lazy init
             auto_dist_degree = {
                 "tensor_parallel": kwargs["args"].tensor_parallel_degree > 1,
                 "sequence_parallel": sequence_parallel,

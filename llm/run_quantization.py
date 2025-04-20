@@ -62,6 +62,8 @@ def main():
     parser = PdArgumentParser((GenerateArgument, QuantConfig, ModelConfig, DataConfig, SFTConfig))
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
         gen_args, quant_args, model_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
+    elif len(sys.argv) >= 2 and sys.argv[1].endswith(".yaml"):
+        gen_args, quant_args, model_args, data_args, training_args = parser.parse_yaml_file_and_cmd_lines()
     else:
         gen_args, quant_args, model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
@@ -104,9 +106,9 @@ def main():
         dtype = "float32"
     quantization_config = dict(
         weight_quantize_algo=model_args.weight_quantize_algo,
-        weight_blocksize=model_args.weight_blocksize,
-        weight_double_quant=model_args.weight_double_quant,
-        weight_double_quant_block_size=model_args.weight_double_quant_block_size,
+        qlora_weight_blocksize=model_args.qlora_weight_blocksize,
+        qlora_weight_double_quant=model_args.qlora_weight_double_quant,
+        qlora_weight_double_quant_block_size=model_args.qlora_weight_double_quant_block_size,
     )
 
     model_config = AutoConfig.from_pretrained(

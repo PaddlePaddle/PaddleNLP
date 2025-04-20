@@ -64,5 +64,5 @@ class DataConfig:
         default=False,
         metadata={"help": "Whether to use autoregressive mode."},
     )
-    # Pose ralated parameters
+    # Pose related parameters
     use_pose_convert: bool = field(default=False, metadata={"help": "Whether to use PoSE data conversion function"})

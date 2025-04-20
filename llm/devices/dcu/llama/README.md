@@ -112,7 +112,7 @@ PYTHONPATH=.. python run_finetune.py dcu/llama/sft_argument.json
 ```
 ## 3.预训练：
 ### 数据准备
-数据详细制作流程可参考[此处](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/tools/preprocess/README.md)，例：OpenWebText2预训练数据制作参考[此处](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/data/OpenWebText2.html)
+数据详细制作流程可参考[此处](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/tools/preprocess/README.md)，例：OpenWebText2预训练数据制作参考[此处](https://paddlenlp.readthedocs.io/zh/latest/llm/tools/preprocess/docs/OpenWebText2.html)
 
 为了方便用户运行测试本模型，本项目提供了处理好的100k 条 doc 的训练样本：
 
