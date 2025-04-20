@@ -1495,6 +1495,7 @@ class PPOTrainer(Trainer):
                 # danamic sampling: filter generated samples by rewards, keep generating until valid samples are enough
                 if self.args.dynamic_sampling:
                     local_valid_prompt = 0
+                    # combined_batch = combine_micro_batches_into_batch(micro_batches, pad_token_id=self.tokenizer.pad_token_id)
                     combined_batch = batch
                     total_batch, local_valid_prompt = filter_valid_reward_groups(
                         combined_batch=combined_batch,
@@ -1565,11 +1566,12 @@ class PPOTrainer(Trainer):
                             )
 
                         # split into micro-batches
-                        micro_batches = split_batch_into_micro_batches(
-                            total_batch=total_batch,
-                            per_device_train_batch_size=self.args.per_device_train_batch_size,
-                            pad_token_id=self.tokenizer.pad_token_id,
-                        )
+                        # micro_batches = split_batch_into_micro_batches(
+                        #     total_batch=total_batch,
+                        #     per_device_train_batch_size=self.args.per_device_train_batch_size,
+                        #     pad_token_id=self.tokenizer.pad_token_id,
+                        # )
+                        batch = total_batch
 
                         # Reset for next accumulation
                         total_batch = defaultdict(list)
@@ -1583,7 +1585,7 @@ class PPOTrainer(Trainer):
                         else:
                             logger.info(
                                 f"Collected {total_valid_prompt} valid prompts, "
-                                f"need {per_device_sample_batch_size * self.args.dataset_world_size}. Continue Danamic Sampling..."
+                                f"need {per_device_sample_batch_size * self.args.dataset_world_size}. Continue Dynamic Sampling..."
                             )
                             continue
 
