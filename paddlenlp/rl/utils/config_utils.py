@@ -335,13 +335,23 @@ class TrainingArguments(TrainingArguments):
         if self.mini_batch_size < 0:
             self.mini_batch_size = self.global_batch_size
 
-        if self.per_device_rollout_batch_size < 0:
+        if (
+            self.global_batch_size % self.dataset_world_size != 0
+            or self.mini_batch_size % self.dataset_world_size != 0
+        ):
+            raise ValueError(
+                "global_batch_size(mini_batch_size) must be divisible by dataset_world_size! "
+                f"Hint: global_batch_size={self.global_batch_size}, mini_batch_size={self.mini_batch_size}, dataset_world_size={self.dataset_world_size}. "
+                f"dataset_world_size({self.dataset_world_size})=data_parallel_degree({self.data_parallel_degree})*sharding_parallel_degree({self.sharding_parallel_degree})."
+            )
+
+        if self.per_device_rollout_batch_size <= 0:
             self.per_device_train_batch_size = self.per_device_train_batch_size
-        if self.per_device_logprob_batch_size < 0:
+        if self.per_device_logprob_batch_size <= 0:
             self.per_device_logprob_batch_size = self.per_device_train_batch_size
-        if self.per_device_reward_batch_size < 0:
+        if self.per_device_reward_batch_size <= 0:
             self.per_device_reward_batch_size = self.per_device_train_batch_size
-        if self.per_device_value_batch_size < 0:
+        if self.per_device_value_batch_size <= 0:
             self.per_device_value_batch_size = self.per_device_train_batch_size
 
         # `gradient_accumulation_steps` specifies the number of mini-batches per gradient update.
@@ -362,6 +372,22 @@ class TrainingArguments(TrainingArguments):
                 " We will set it to 1!"
             )
             self.gradient_accumulation_steps = 1
+
+        train_batch_size_info = {
+            "global_batch_size": self.global_batch_size,
+            "mini_batch_size": self.mini_batch_size,
+            "per_device_train_batch_size": self.per_device_train_batch_size,
+            "per_device_rollout_batch_size": self.per_device_rollout_batch_size,
+            "per_device_logprob_batch_size": self.per_device_logprob_batch_size,
+            "per_device_reward_batch_size": self.per_device_reward_batch_size,
+            "per_device_value_batch_size": self.per_device_value_batch_size,
+            "gradient_accumulation_steps": self.gradient_accumulation_steps,
+        }
+
+        logger.info("{:^40}".format("{} Configuration Arguments".format("Train Batch Size")))
+        for key, value in train_batch_size_info.items():
+            logger.info("{:30}: {}".format(key, value))
+        logger.info("===========================================")
 
         super().__post_init__()
         if self.autotuner_benchmark:
