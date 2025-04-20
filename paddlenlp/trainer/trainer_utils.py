@@ -19,6 +19,7 @@
 """
 Utilities for the Trainer class.
 """
+
 import datetime
 import gc
 import inspect
@@ -29,7 +30,6 @@ import random
 import threading
 import time
 from contextlib import contextmanager
-from enum import Enum
 from typing import Dict, List, NamedTuple, Optional, Tuple, Union
 
 import numpy as np
@@ -46,6 +46,7 @@ from ..trainer.argparser import strtobool
 from ..transformers.tokenizer_utils_base import BatchEncoding
 from ..utils.env import PREFIX_CHECKPOINT_DIR, _re_checkpoint  # noqa for compatibility
 from ..utils.fault_tolerance import PDC_DOWNLOAD_ERROR
+from ..utils.generic import ExplicitEnum
 from ..utils.import_utils import is_paddle_cuda_available, is_psutil_available
 from ..utils.log import logger
 from ..utils.pdc_sdk import PDCErrorCode, PDCErrorMessageMap, pdc_tool
@@ -172,8 +173,9 @@ def set_seed(seed: int = 1234, topo=None):
     np.random.seed(random_seed)
 
     logger.info(
-        "The global seed is set to {}, local seed is set to {} and "
-        "random seed is set to {}.".format(global_seed, local_seed, random_seed)
+        "The global seed is set to {}, local seed is set to {} and random seed is set to {}.".format(
+            global_seed, local_seed, random_seed
+        )
     )
 
 
@@ -193,18 +195,6 @@ def _exec_mode_guard(mode="dynamic"):
         yield
     finally:
         _switch_mode(origin_mode)
-
-
-class ExplicitEnum(Enum):
-    """
-    Enum with more explicit error message for missing values.
-    """
-
-    @classmethod
-    def _missing_(cls, value):
-        raise ValueError(
-            f"{value} is not a valid {cls.__name__}, please select one of {list(cls._value2member_map_.keys())}"
-        )
 
 
 class EvalPrediction(NamedTuple):
@@ -654,11 +644,11 @@ def metrics_format(self, metrics: Dict[str, float]) -> Dict[str, float]:
     metrics_copy = metrics.copy()
     for k, v in metrics_copy.items():
         if "_mem_" in k:
-            metrics_copy[k] = f"{ v >> 20 }MB"
+            metrics_copy[k] = f"{v >> 20}MB"
         elif "_runtime" in k:
             metrics_copy[k] = _secs2timedelta(v)
         elif k == "total_flos":
-            metrics_copy[k] = f"{ int(v) >> 30 }GF"
+            metrics_copy[k] = f"{int(v) >> 30}GF"
         elif isinstance(metrics_copy[k], float):
             metrics_copy[k] = round(v, 4)
 
@@ -776,7 +766,6 @@ class TrainerMemoryTracker:
     }
 
     def __init__(self, skip_memory_metrics=False):
-
         self.skip_memory_metrics = skip_memory_metrics
 
         if not is_psutil_available():
