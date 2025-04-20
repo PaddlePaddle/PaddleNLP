@@ -324,6 +324,10 @@ class TrainingArguments(TrainingArguments):
         Raises:
             None.
         """
+        # set the unified_checkpoint to True, it will change two cases:
+        # 1. use unified_checkpoint
+        # 2. data_parallel use hybrid group
+        self.unified_checkpoint = True
         # obtain the parallrl degree from the training arguments
         # for auto config the accumulation steps
         self._post_init_parallel_degree()

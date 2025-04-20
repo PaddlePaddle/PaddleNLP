@@ -1173,7 +1173,6 @@ class PPOTrainer(Trainer):
         return tensor.split(self.args.dataset_world_size)[self.args.dataset_rank]
 
     def distribute_get_rank_data(self, local_batch, global_batch):
-        # shapes = local_batch["log_probs"].shape
         local_data = {
             "reward_advantages": self.get_rank_data(global_batch["reward_advantages"]),
             "rewards": self.get_rank_data(global_batch["rewards"]),
@@ -1185,21 +1184,16 @@ class PPOTrainer(Trainer):
             local_data["kl_rewards"] = self.get_rank_data(global_batch["kl_rewards"])
             local_data["rewards_with_kl"] = self.get_rank_data(global_batch["rewards_with_kl"])
 
-        # offset = 0
-        # for idx, batch in enumerate(micro_batches):
-        #     for k, v in local_data.items():
-        #         if local_data[k][offset].ndim < 1:
-        #             micro_batches[idx].update(
-        #                 {k: local_data[k][offset : offset + len(batch["log_probs"])][: shapes[idx][-1]]}
-        #             )
-        #         else:
-        #             micro_batches[idx].update(
-        #                 {k: local_data[k][offset : offset + len(batch["log_probs"])][:, : shapes[idx][-1]]}
-        #             )
-        #     offset += len(batch["log_probs"])
-
+        shape = local_batch["log_probs"].shape
         for k, v in local_data.items():
-            local_batch.update({k: local_data[k]})
+            if local_data[k].ndim <= 1:
+                local_batch.update({k: local_data[k][: shape[-1]]})
+            else:
+                local_batch.update({k: local_data[k][:, : shape[-1]]})
+
+        # TODO(downfish19): test following code instead of above without any error
+        # for k, v in local_data.items():
+        #     local_batch.update({k: local_data[k]})
         return local_batch
 
     def _balance_batch(self, micro_batches):
