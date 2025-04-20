@@ -924,7 +924,9 @@ def split_batch_into_micro_batches(total_batch, batch_size, pad_token_id=0):
     if total_batch["input_ids"].shape[0] % batch_size != 0:
         num_micro_batches += 1
     if num_micro_batches <= 0:
-        logger.warning
+        logger.warning(
+            "The total batch size is smaller than the batch size, please consider using a smaller batch size or a larger global_batch_size."
+        )
         num_micro_batches = 1
 
     for i in range(num_micro_batches):
