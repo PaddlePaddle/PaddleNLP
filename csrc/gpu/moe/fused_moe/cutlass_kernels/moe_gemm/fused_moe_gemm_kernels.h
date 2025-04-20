@@ -37,6 +37,7 @@ class MoeGemmRunner {
                          int64_t gemm_k,
                          int num_experts,
                          std::string activation_type,
+                         const int32_t weightonly_group_size,
                          cudaStream_t stream);
 
   void moe_gemm(const T* A,
@@ -48,6 +49,7 @@ class MoeGemmRunner {
                 int64_t gemm_n,
                 int64_t gemm_k,
                 int num_experts,
+                int group_size,
                 cudaStream_t stream);
 
  private:
@@ -62,6 +64,7 @@ class MoeGemmRunner {
                         int64_t gemm_n,
                         int64_t gemm_k,
                         int num_experts,
+                        int group_size,
                         CutlassGemmConfig gemm_config,
                         cudaStream_t stream,
                         int* occupancy = nullptr);
@@ -77,6 +80,7 @@ class MoeGemmRunner {
                 int64_t gemm_n,
                 int64_t gemm_k,
                 int num_experts,
+                int group_size,
                 cudaStream_t stream);
 
  private:

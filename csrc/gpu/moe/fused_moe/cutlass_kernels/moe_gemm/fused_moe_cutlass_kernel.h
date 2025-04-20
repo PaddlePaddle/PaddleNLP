@@ -211,6 +211,8 @@ struct MoeFCGemm {
     // Only used by device-level operator
     GemmCoord* host_problem_sizes;
 
+    int group_size;
+
     //
     // Methods
     //
@@ -220,6 +222,7 @@ struct MoeFCGemm {
     Arguments()
         : problem_count(0),
           threadblock_count(0),
+          group_size(-1),
           ptr_A(nullptr),
           ptr_B(nullptr),
           weight_scales(nullptr),
@@ -243,10 +246,12 @@ struct MoeFCGemm {
               int64_t* total_rows_before_expert,
               int64_t gemm_n,
               int64_t gemm_k,
+              int group_size,
               GemmCoord* host_problem_sizes = nullptr)
         : problem_count(problem_count),
           threadblock_count(threadblock_count),
           output_op(output_op),
+          group_size(group_size),
           ptr_A(const_cast<ElementA*>(ptr_A)),
           ptr_B(const_cast<ElementB*>(ptr_B)),
           weight_scales(const_cast<ElementScale*>(weight_scales)),
@@ -280,6 +285,8 @@ struct MoeFCGemm {
     ElementC* ptr_C;
     ElementC* ptr_D;
 
+    int group_size;
+
     //
     // Methods
     //
@@ -290,7 +297,8 @@ struct MoeFCGemm {
           ptr_B(nullptr),
           weight_scales(nullptr),
           ptr_C(nullptr),
-          ptr_D(nullptr) {}
+          ptr_D(nullptr),
+          group_size(-1) {}
 
     CUTLASS_HOST_DEVICE
     Params(Arguments const& args,
@@ -308,7 +316,8 @@ struct MoeFCGemm {
           ptr_B(args.ptr_B),
           weight_scales(args.weight_scales),
           ptr_C(args.ptr_C),
-          ptr_D(args.ptr_D) {}
+          ptr_D(args.ptr_D),
+          group_size(args.group_size) {}
 
     CUTLASS_HOST_DEVICE
     void update(Arguments const& args,
@@ -498,7 +507,7 @@ struct MoeFCGemm {
         auto CreateMMA = [&]() {
           if constexpr (use_dq_gemm<Mma>::value)
             return Mma(
-                shared_storage.main_loop, -1, thread_idx, warp_idx, lane_idx);
+                shared_storage.main_loop, params.group_size, thread_idx, warp_idx, lane_idx);
           else
             return Mma(
                 shared_storage.main_loop, thread_idx, warp_idx, lane_idx);

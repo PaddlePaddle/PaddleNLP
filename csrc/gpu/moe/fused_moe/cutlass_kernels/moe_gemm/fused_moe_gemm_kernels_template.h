@@ -64,6 +64,7 @@ void generic_moe_gemm_kernelLauncher(const T* A,
                                      int64_t gemm_n,
                                      int64_t gemm_k,
                                      int num_experts,
+                                     int group_size,
                                      CutlassGemmConfig gemm_config,
                                      const int multi_processor_count,
                                      cudaStream_t stream,
@@ -189,7 +190,8 @@ void generic_moe_gemm_kernelLauncher(const T* A,
       reinterpret_cast<ElementType*>(C),
       total_rows_before_expert,
       gemm_n,
-      gemm_k);
+      gemm_k,
+      group_size);
 
   GemmGrouped gemm;
 
@@ -235,6 +237,7 @@ struct dispatch_stages {
                        int64_t gemm_n,
                        int64_t gemm_k,
                        int num_experts,
+                       int group_size,
                        CutlassGemmConfig gemm_config,
                        int multi_processor_count,
                        cudaStream_t stream,
@@ -269,6 +272,7 @@ struct dispatch_stages<T,
                        int64_t gemm_n,
                        int64_t gemm_k,
                        int num_experts,
+                       int group_size,
                        CutlassGemmConfig gemm_config,
                        int multi_processor_count,
                        cudaStream_t stream,
@@ -288,6 +292,7 @@ struct dispatch_stages<T,
                                        gemm_n,
                                        gemm_k,
                                        num_experts,
+                                       group_size,
                                        gemm_config,
                                        multi_processor_count,
                                        stream,
@@ -318,6 +323,7 @@ struct dispatch_stages<T,
                        int64_t gemm_n,
                        int64_t gemm_k,
                        int num_experts,
+                       int group_size,
                        CutlassGemmConfig gemm_config,
                        int multi_processor_count,
                        cudaStream_t stream,
@@ -337,6 +343,7 @@ struct dispatch_stages<T,
                                             gemm_n,
                                             gemm_k,
                                             num_experts,
+                                            group_size,
                                             gemm_config,
                                             multi_processor_count,
                                             stream,
@@ -359,6 +366,7 @@ void dispatch_gemm_config(const T* A,
                           int64_t gemm_n,
                           int64_t gemm_k,
                           int num_experts,
+                          int group_size,
                           CutlassGemmConfig gemm_config,
                           int multi_processor_count,
                           cudaStream_t stream,
@@ -380,6 +388,7 @@ void dispatch_gemm_config(const T* A,
                                      gemm_n,                   \
                                      gemm_k,                   \
                                      num_experts,              \
+                                     group_size,               \
                                      gemm_config,              \
                                      multi_processor_count,    \
                                      stream,                   \
@@ -417,6 +426,7 @@ void dispatch_gemm_config(const T* A,
         gemm_n,                                                 \
         gemm_k,                                                 \
         num_experts,                                            \
+        group_size,                                             \
         gemm_config,                                            \
         multi_processor_count,                                  \
         stream,                                                 \
@@ -442,6 +452,7 @@ void dispatch_moe_gemm_to_cutlass(const T* A,
                                   int64_t gemm_n,
                                   int64_t gemm_k,
                                   int num_experts,
+                                  int group_size,
                                   CutlassGemmConfig gemm_config,
                                   int sm_version,
                                   int multi_processor_count,
@@ -487,6 +498,7 @@ void dispatch_moe_gemm_to_cutlass(const T* A,
                                   int64_t gemm_n,
                                   int64_t gemm_k,
                                   int num_experts,
+                                  int group_size,
                                   CutlassGemmConfig gemm_config,
                                   int sm_version,
                                   int multi_processor_count,
@@ -553,6 +565,7 @@ void dispatch_moe_gemm_to_cutlass(const T* A,
                                   int64_t gemm_n,
                                   int64_t gemm_k,
                                   int num_experts,
+                                  int group_size,
                                   CutlassGemmConfig gemm_config,
                                   int sm_version,
                                   int multi_processor_count,
@@ -600,6 +613,7 @@ void MoeGemmRunner<T, WeightType>::dispatch_to_arch<EpilogueTag>(
     int64_t gemm_n,
     int64_t gemm_k,
     int num_experts,
+    int group_size,
     CutlassGemmConfig gemm_config,
     cudaStream_t stream,
     int* occupancy) {
@@ -615,6 +629,7 @@ void MoeGemmRunner<T, WeightType>::dispatch_to_arch<EpilogueTag>(
       gemm_n,                                                     \
       gemm_k,                                                     \
       num_experts,                                                \
+      group_size,                                                 \
       gemm_config,                                                \
       sm_,                                                        \
       multi_processor_count_,                                     \
@@ -645,11 +660,12 @@ void MoeGemmRunner<T, WeightType>::run_gemm<EpilogueTag>(
     int64_t gemm_n,
     int64_t gemm_k,
     int num_experts,
+    int group_size,
     cudaStream_t stream) {
   static constexpr bool is_weight_only = !std::is_same<T, WeightType>::value;
   static constexpr bool only_simt_configs = std::is_same<T, float>::value;
   std::vector<CutlassGemmConfig> candidate_configs =
-      get_candidate_configs(sm_, -1, is_weight_only, only_simt_configs, true);
+      get_candidate_configs(sm_, group_size, is_weight_only, only_simt_configs, true);
   static constexpr int warm_time = 5;
   static constexpr int test_time = 10;
   auto& gemmConfigManager = GemmConfigManager::Instance();
@@ -668,78 +684,85 @@ void MoeGemmRunner<T, WeightType>::run_gemm<EpilogueTag>(
     int profile_total_rows =
         std::min(gemmConfigManager.nextPowerOfTwo(total_rows),
                  gemmConfigManager.getMaxProfileM());
-    bool find_one = false;
-    for (size_t ii = 0; ii < candidate_configs.size(); ++ii) {
-      try {
-        for (int i = 0; i < warm_time; i++) {
-          dispatch_to_arch<EpilogueTag>(A,
-                                        B,
-                                        weight_scales,
-                                        biases,
-                                        C,
-                                        total_rows_before_expert,
-                                        total_rows,
-                                        gemm_n,
-                                        gemm_k,
-                                        num_experts,
-                                        candidate_configs[ii],
-                                        stream);
-        }
-        cudaEvent_t start;
-        cudaEvent_t stop;
-        check_cuda_error(cudaEventCreate(&start));
-        check_cuda_error(cudaEventCreate(&stop));
-        check_cuda_error(cudaStreamSynchronize(stream));
-        check_cuda_error(cudaEventRecord(start, stream));
-        for (int i = 0; i < test_time; i++) {
-          dispatch_to_arch<EpilogueTag>(A,
-                                        B,
-                                        weight_scales,
-                                        biases,
-                                        C,
-                                        total_rows_before_expert,
-                                        total_rows,
-                                        gemm_n,
-                                        gemm_k,
-                                        num_experts,
-                                        candidate_configs[ii],
-                                        stream);
-        }
-        check_cuda_error(cudaEventRecord(stop, stream));
-        check_cuda_error(cudaEventSynchronize(stop));
-        float elapsed;
-        check_cuda_error(cudaEventElapsedTime(&elapsed, start, stop));
-        check_cuda_error(cudaEventDestroy(start));
-        check_cuda_error(cudaEventDestroy(stop));
-        if (elapsed < best_time) {
-          best_time = elapsed;
-          best_config = candidate_configs[ii];
-        }
-        find_one = true;
-      } catch (const std::exception& e) {
-        std::cerr << "MOE config[" << ii << "]  Caught exception: " << e.what()
-                  << std::endl;
-      }
-    }
-    if (find_one) {
-      gemmConfigManager.addBestConfig(gemmId, profile_total_rows, best_config);
-      chosen_config = best_config;
-    } else {
-      PADDLE_FATAL("[MoE Configure Search] find no one avaliable config.");
-    }
+    chosen_config = candidate_configs[0];
+    //   bool find_one = false;
+    //   for (size_t ii = 0; ii < candidate_configs.size(); ++ii) {
+    //     try {
+    //       for (int i = 0; i < warm_time; i++) {
+    //         dispatch_to_arch<EpilogueTag>(A,
+    //                                       B,
+    //                                       weight_scales,
+    //                                       biases,
+    //                                       C,
+    //                                       total_rows_before_expert,
+    //                                       total_rows,
+    //                                       gemm_n,
+    //                                       gemm_k,
+    //                                       num_experts,
+    //                                       candidate_configs[ii],
+    //                                       stream);
+    //       }
+    //       cudaEvent_t start;
+    //       cudaEvent_t stop;
+    //       check_cuda_error(cudaEventCreate(&start));
+    //       check_cuda_error(cudaEventCreate(&stop));
+    //       check_cuda_error(cudaStreamSynchronize(stream));
+    //       check_cuda_error(cudaEventRecord(start, stream));
+    //       for (int i = 0; i < test_time; i++) {
+    //         dispatch_to_arch<EpilogueTag>(A,
+    //                                       B,
+    //                                       weight_scales,
+    //                                       biases,
+    //                                       C,
+    //                                       total_rows_before_expert,
+    //                                       total_rows,
+    //                                       gemm_n,
+    //                                       gemm_k,
+    //                                       num_experts,
+    //                                       candidate_configs[ii],
+    //                                       stream);
+    //       }
+    //       check_cuda_error(cudaEventRecord(stop, stream));
+    //       check_cuda_error(cudaEventSynchronize(stop));
+    //       float elapsed;
+    //       check_cuda_error(cudaEventElapsedTime(&elapsed, start, stop));
+    //       check_cuda_error(cudaEventDestroy(start));
+    //       check_cuda_error(cudaEventDestroy(stop));
+    //       if (elapsed < best_time) {
+    //         best_time = elapsed;
+    //         best_config = candidate_configs[ii];
+    //       }
+    //       find_one = true;
+    //     } catch (const std::exception& e) {
+    //       std::cerr << "MOE config[" << ii << "]  Caught exception: " <<
+    //       e.what()
+    //                 << std::endl;
+    //     }
+    //   }
+    //   if (find_one) {
+    //     gemmConfigManager.addBestConfig(gemmId, profile_total_rows,
+    //     best_config); chosen_config = best_config;
+    //   } else {
+    //     PADDLE_FATAL("[MoE Configure Search] find no one avaliable config.");
+    //   }
   }
-  dispatch_to_arch<EpilogueTag>(A,
-                                B,
-                                weight_scales,
-                                biases,
-                                C,
-                                total_rows_before_expert,
-                                total_rows,
-                                gemm_n,
-                                gemm_k,
-                                num_experts,
-                                chosen_config,
-                                stream);
+  try {
+    dispatch_to_arch<EpilogueTag>(A,
+                                  B,
+                                  weight_scales,
+                                  biases,
+                                  C,
+                                  total_rows_before_expert,
+                                  total_rows,
+                                  gemm_n,
+                                  gemm_k,
+                                  num_experts,
+                                  group_size,
+                                  chosen_config,
+                                  stream);
+  } catch (const std::exception& e) {
+    std::cerr << "MOE best config  Caught exception: " << e.what() << std::endl;
+  }
 }
 
 template <typename T, typename WeightType>
@@ -755,6 +778,7 @@ void MoeGemmRunner<T, WeightType>::moe_gemm_bias_act(
     int64_t gemm_k,
     int num_experts,
     std::string activation_type,
+    const int32_t weightonly_group_size,
     cudaStream_t stream) {
   if (activation_type == "none") {
     if (biases) {
@@ -768,6 +792,7 @@ void MoeGemmRunner<T, WeightType>::moe_gemm_bias_act(
                                gemm_n,
                                gemm_k,
                                num_experts,
+                               weightonly_group_size,
                                stream);
     } else {
       run_gemm<EpilogueOpNoBias>(A,
@@ -780,6 +805,7 @@ void MoeGemmRunner<T, WeightType>::moe_gemm_bias_act(
                                  gemm_n,
                                  gemm_k,
                                  num_experts,
+                                 weightonly_group_size,
                                  stream);
     }
   }
@@ -795,6 +821,7 @@ void MoeGemmRunner<T, WeightType>::moe_gemm(const T* A,
                                             int64_t gemm_n,
                                             int64_t gemm_k,
                                             int num_experts,
+                                            int group_size,
                                             cudaStream_t stream) {
   run_gemm<EpilogueOpNoBias>(A,
                              B,
@@ -806,5 +833,6 @@ void MoeGemmRunner<T, WeightType>::moe_gemm(const T* A,
                              gemm_n,
                              gemm_k,
                              num_experts,
+                             group_size,
                              stream);
 }
