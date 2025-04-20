@@ -684,7 +684,7 @@ def gather_and_pad(tensor, dp_group=None, sd_group=None, pad_index=0.0, pad=True
         else:
             return np.concatenate(flatten_list(gathered_tensor), axis=0)
     else:
-        return pad_tensor(gathered_tensor, pad_index=pad_index, dtype=dtype)
+        return pad_tensor(gathered_tensor, pad_index=pad_index, dtype=dtype, padding_side=padding_side)
 
 
 def combine_micro_batches(micro_batches, pad_token_id=0):
