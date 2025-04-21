@@ -20,6 +20,9 @@ import inspect
 import queue
 import uuid
 import weakref
+import random
+
+import numpy as np
 
 import paddle
 import paddle.autograd
@@ -314,6 +317,8 @@ def _recompute_without_reentrant(function, preserve_rng_state=True, *args, **kwa
         else:
             raise RuntimeError(f"Recompute with RNG preserve is not support current device: {cur_device}.")
         fwd_cuda_rng_state_tracker = get_rng_state_tracker().get_states_tracker()
+        fwd_numpy_state = np.random.get_state()
+        fwd_random_state = random.getstate()
     tracer = framework._dygraph_tracer()
     is_fw_autocast = False if tracer._amp_level == core.AmpLevel.O0 else True
     if tracer._amp_level == core.AmpLevel.O2:
@@ -382,7 +387,12 @@ def _recompute_without_reentrant(function, preserve_rng_state=True, *args, **kwa
             rng_cxt_manager = (
                 contextlib.nullcontext()
                 if not preserve_rng_state
-                else switch_rng_state_tracker(fw_cuda_rng_state, fwd_cuda_rng_state_tracker)
+                else switch_rng_state_tracker(
+                    fw_cuda_rng_state,
+                    fwd_cuda_rng_state_tracker,
+                    fwd_numpy_state,
+                    fwd_random_state
+                )
             )
             with rng_cxt_manager:
                 with paddle.set_grad_enabled(True):
