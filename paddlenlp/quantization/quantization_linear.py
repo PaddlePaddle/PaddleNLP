@@ -17,7 +17,7 @@ import paddle.nn as nn
 from paddle.distributed.fleet.base import topology as tp
 from paddle.distributed.fleet.layers.mpu import mp_ops
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
-
+from .int8_kernel import int8_linear
 try:
     from paddle.nn.quant import llm_int8_linear, weight_only_linear
 except:
@@ -86,6 +86,24 @@ class QuantizationLinear(nn.Layer):
                 dtype=self._dtype,
                 is_bias=False,
             )
+        if self.quant_algo in ["int8_train"]:
+            block_n, block_k = self.quantization_config.block_size
+
+            self.quant_weight = self.create_parameter(
+                shape=[out_features, in_features],
+                attr=paddle.nn.initializer.Constant(value=0),
+                dtype=self.quant_dtype,
+                is_bias=False,
+            )
+
+            self.quant_scale = self.create_parameter(
+                shape=[
+                    (out_features + block_n - 1) // block_n,
+                    (in_features + block_k - 1) // block_k
+                ],
+                dtype=self._dtype,
+                is_bias=False,
+            )
         if self.quant_algo in ["fp4", "nf4"]:
             if qlora_weight_linear is None:
                 raise ImportError(
@@ -145,6 +163,15 @@ class QuantizationLinear(nn.Layer):
                 out = weight_only_linear(x, self.quant_weight, self.bias, self.quant_scale, self.quant_dtype)
             elif self.quant_algo in ["llm.int8"]:
                 out = llm_int8_linear(x, self.quant_weight, self.bias, self.quant_scale, self.llm_int8_threshold)
+            elif self.quant_algo in ["int8_train"]:
+                out = int8_linear(
+                    input=x,
+                    weight=self.quant_weight,
+                    bias=self.bias,
+                    weight_scale=self.quant_scale,
+                    weight_dtype=self.quant_dtype,
+                    block_size=self.quantization_config.block_size
+                )
             elif self.quant_algo in ["fp4", "nf4"]:
                 out = qlora_weight_linear(
                     x=x,
