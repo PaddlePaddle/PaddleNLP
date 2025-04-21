@@ -20,6 +20,10 @@ from scipy.special import softmax
 
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.transformers import SkepTokenizer
+from paddlenlp.utils.env import (
+    PADDLE_INFERENCE_MODEL_SUFFIX,
+    PADDLE_INFERENCE_WEIGHTS_SUFFIX,
+)
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -32,14 +36,14 @@ parser.add_argument(
     "--model_file",
     type=str,
     required=True,
-    default="./static_graph_params.pdmodel",
+    default=f"./static/static_graph_params{PADDLE_INFERENCE_MODEL_SUFFIX}",
     help="The path to model info in static graph.",
 )
 parser.add_argument(
     "--params_file",
     type=str,
     required=True,
-    default="./static_graph_params.pdiparams",
+    default=f"./static/static_graph_params{PADDLE_INFERENCE_WEIGHTS_SUFFIX}",
     help="The path to parameters in static graph.",
 )
 parser.add_argument(
