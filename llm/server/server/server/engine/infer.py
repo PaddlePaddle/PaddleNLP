@@ -28,8 +28,10 @@ import paddle.distributed as dist
 import paddle.distributed.fleet as fleet
 from paddle.base.framework import use_pir_api
 from paddlenlp_ops import step_paddle
+
 if not paddle.is_compiled_with_xpu():
     from paddlenlp_ops import speculate_step_paddle
+
 from server.data.processor import DataProcessor
 from server.engine.config import global_config
 from server.utils import get_logger
@@ -41,6 +43,10 @@ from paddlenlp.experimental.transformers import (
 )
 from paddlenlp.trl import llm_utils
 from paddlenlp.trl.llm_utils import get_rotary_position_embedding
+from paddlenlp.utils.env import (
+    PADDLE_INFERENCE_MODEL_SUFFIX,
+    PADDLE_INFERENCE_WEIGHTS_SUFFIX,
+)
 
 File_Path = os.path.realpath(sys.argv[0])
 Dir_Path = os.path.dirname(File_Path)
@@ -273,6 +279,7 @@ class ModelRunner:
         self.share_inputs["input_ids"] = paddle.full(
             shape=[self.args.max_batch_size, self.args.max_seq_len], fill_value=self.pad_token_id, dtype="int64"
         )
+        self.share_inputs["queue_id"] = paddle.full(shape=[1], fill_value=-1, dtype="int32")
         self.share_inputs["top_p"] = paddle.full(
             shape=[self.args.max_batch_size, 1], fill_value=self.top_p, dtype="float32"
         )
@@ -726,12 +733,8 @@ class InferenceEngine(object):
         predictor init
         """
         device_id = self.rank % self.config.mp_num_per_node
-        if use_pir_api():
-            self.model_file = os.path.join(self.model_dir, "model.json")
-            self.param_file = os.path.join(self.model_dir, "model.pdiparams")
-        else:
-            self.model_file = os.path.join(self.model_dir, "model.pdmodel")
-            self.param_file = os.path.join(self.model_dir, "model.pdiparams")
+        self.model_file = os.path.join(self.model_dir, f"model{PADDLE_INFERENCE_MODEL_SUFFIX}")
+        self.param_file = os.path.join(self.model_dir, f"model{PADDLE_INFERENCE_WEIGHTS_SUFFIX}")
         config = paddle.inference.Config(self.model_file, self.param_file)
 
         if paddle.is_compiled_with_xpu():
@@ -747,7 +750,7 @@ class InferenceEngine(object):
             config.delete_pass("fc_xpu_fuse_pass")
         else:
             config.enable_use_gpu(100, device_id)
-        
+
         if use_pir_api():
             config.enable_new_executor()
             config.enable_new_ir()

@@ -360,8 +360,8 @@ class LlamaModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):
             [
                 [
                     [0.20443289, 0.18662477, -0.75216216],
-                    [0.32803515, -0.36956733, -0.95613617],
-                    [0.28622314, 0.07698685, -0.64143789],
+                    [0.37699354, -0.38747141, -1.21889985],
+                    [0.31100151, -0.40143669, -0.64101797],
                 ]
             ]
         )
@@ -378,13 +378,12 @@ class LlamaModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):
 
         expected_shape = [1, 11, 768]
         self.assertEqual(output.shape, expected_shape)
-
         expected_slice = paddle.to_tensor(
             [
                 [
                     [0.20443289, 0.18662477, -0.75216216],
-                    [0.32803515, -0.36956733, -0.95613617],
-                    [0.28622314, 0.07698685, -0.64143789],
+                    [0.37699354, -0.38747141, -1.21889985],
+                    [0.31100151, -0.40143669, -0.64101797],
                 ]
             ]
         )

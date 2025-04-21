@@ -1,4 +1,4 @@
-# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,189 +12,260 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+""" Training Reward """
+
 import os
 import sys
-from dataclasses import dataclass, field
-from typing import Any, Dict, Tuple
+from functools import partial
 
 import paddle
-
-from data import PreferenceDataset, parse_dataset
-from models import AutoModelForScore
+from data import (
+    preference_collate_fn,
+    preprocess_preference_data,
+    preprocess_process_data,
+    process_collate_fn,
+    zero_padding_process_collate_fn,
+)
+from reward_argument import DataArgument, ModelArgument, TrainingArguments
+from reward_model import LlamaModelForPRM, LlamaModelForScore, MistralModelForPRM
 from reward_trainer import RewardTrainer
 
-from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
-from paddlenlp.transformers import AutoConfig, AutoTokenizer, LlamaTokenizer
+from paddlenlp.datasets import (
+    ZeroPaddingIterableDataset,
+    ZeroPaddingMapDataset,
+    load_dataset,
+)
+from paddlenlp.trainer import (
+    IntervalStrategy,
+    PdArgumentParser,
+    get_last_checkpoint,
+    set_seed,
+)
+from paddlenlp.transformers import AutoConfig, AutoTokenizer
 from paddlenlp.utils.log import logger
 
 
-@dataclass
-class TrainingArguments(TrainingArguments):
-    loss_type: str = field(
-        default="sequence-wise",
-        metadata={
-            "help": "Calculate ranking loss using either 'token-wise' (all token-wise reward outputs in the sequence) "
-                    "or 'sequence-wise' (reward of the last token in each sequence). "
-                    "Allowed values: ['token-wise', 'sequence-wise']."
-        },
-    )
-    # regularization
-    regularization: float = field(
-        default=0.0,
-        metadata={"help": "The regularization strength for the L2 regularization for score outputs."},
-    )
-
-
-@dataclass
-class ModelArgument:
-    model_name_or_path: str = field(
-        default=None, metadata={"help": "Built-in pretrained model name or the path to local model."}
-    )
-    normalize_score_during_training: bool = field(
-        default=False, metadata={"help": "Whether to normalize score during training."}
-    )
-    normalizer_type: str = field(
-        default="ExponentialMovingAverage",
-        metadata={
-            "help": "The type of the reward normalizer. Allowed values: ['RunningMeanStd', 'ExponentialMovingAverage']."
-        },
-    )
-    normalizer_momentum: float = field(
-        default=None,
-        metadata={
-            "help": "The momentum use in ExponentialMovingAverage, EMA_{t+1} = momentum * x + (1 - momentum) * EMA_t."
-        },
-    )
-    use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
-
-    @property
-    def extra_model_kwargs(self):
-        """Extra keyword arguments for initializing the model."""
-        return {
-            "score_type": "reward",
-            "do_normalize": self.normalize_score_during_training,
-            "normalizer_type": self.normalizer_type,
-            "momentum": self.normalizer_momentum,
-        }
-
-
-@dataclass
-class DataArgument:
-    dataset_name_or_path: str = field(default=None, metadata={"help": "Name or path for dataset"})
-    task_name: str = field(default=None, metadata={"help": "Additional name to select a more specific task."})
-    train_datasets: str = field(default=None, metadata={"help": "Dataset name(s) registered in the raw dataset."})
-    eval_datasets: str = field(default=None, metadata={"help": "Dataset name(s) registered in the raw dataset."})
-    max_length: int = field(
-        default=2048,
-        metadata={"help": "The maximum length that model input tokens can ."},
-    )
-    eval_with_do_generation: bool = field(default=False, metadata={"help": "Whether to do generation for evaluation"})
-    save_generation_output: bool = field(
-        default=False,
-        metadata={"help": "Whether to save generated text to file when eval_with_do_generation set to True."},
-    )
-    lazy: bool = field(
-        default=False,
-        metadata={
-            "help": "Weather to return `MapDataset` or an `IterDataset`.True for `IterDataset`. False for `MapDataset`."
-        },
-    )
-
-    @property
-    def parsed_train_datasets(self) -> Tuple[str, Dict[str, Any]]:
-        """Parse dataset path and its proportion and optionally additional arguments from `train_datasets`."""
-        return [parse_dataset(string) for string in self.train_datasets.split(",")]
-
-    @property
-    def parsed_eval_datasets(self) -> Tuple[str, Dict[str, Any]]:
-        """Parse dataset path and its proportion and optionally additional arguments from `eval_datasets`."""
-        return [parse_dataset(string) for string in self.eval_datasets.split(",")]
-
-
 def main():
-    # Arguments
+    """main"""
     parser = PdArgumentParser((ModelArgument, DataArgument, TrainingArguments))
-    if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
-        model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
+    if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
+        model_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    if model_args.reward_tokens is not None:
+        model_args.reward_tokens = model_args.reward_tokens.split(",")
+
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
+    if training_args.max_steps > 0:
+        training_args.num_train_epochs = 1
+    if data_args.autotuner_benchmark:
+        training_args.num_train_epochs = 1
+        training_args.max_steps = 5
+        training_args.do_train = True
+        training_args.do_export = False
+        training_args.do_predict = False
+        training_args.do_eval = False
+        training_args.overwrite_output_dir = True
+        training_args.load_best_model_at_end = False
+        training_args.report_to = []
+        training_args.save_strategy = IntervalStrategy.NO
+        training_args.evaluation_strategy = IntervalStrategy.NO
+    if data_args.benchmark:
+        training_args.do_train = True
+        training_args.do_export = False
+        training_args.do_predict = False
+        training_args.do_eval = False
+        training_args.overwrite_output_dir = True
+        training_args.load_best_model_at_end = False
+        training_args.save_strategy = IntervalStrategy.NO
+        training_args.evaluation_strategy = IntervalStrategy.NO
 
-    # Setup GPU & distributed training
     paddle.set_device(training_args.device)
+    set_seed(training_args.seed)
+
     logger.warning(
-        f"Process rank: {training_args.local_rank}, device: {training_args.device}, world_size: {training_args.world_size}, "
-        + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16 or training_args.bf16}"
+        f"Process rank: {training_args.local_rank}, device: {training_args.device}, world_size: "
+        f"{training_args.world_size}, distributed training: {bool(training_args.local_rank != -1)}, "
+        f"16-bits training: {training_args.fp16 or training_args.bf16}"
     )
 
-    # Detecting last checkpoint.
     last_checkpoint = None
     if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
         last_checkpoint = get_last_checkpoint(training_args.output_dir)
-        if last_checkpoint is None and len(os.listdir(training_args.output_dir)) > 1:
-            raise ValueError(
-                f"Output directory ({training_args.output_dir}) already exists and is not empty. "
-                "Use --overwrite_output_dir to overcome."
-            )
         if last_checkpoint is not None and training_args.resume_from_checkpoint is None:
             logger.info(
                 f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
-    # Load model
+    # Set the dtype for loading model
+    dtype = paddle.get_default_dtype()
     if training_args.fp16_opt_level == "O2":
         if training_args.fp16:
             dtype = "float16"
-        elif training_args.bf16:
+        if training_args.bf16:
             dtype = "bfloat16"
+
+    logger.info("Start to load tokenizer & model.")
+    if model_args.tokenizer_name_or_path is not None:
+        tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
+    else:
+        tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
+    if tokenizer.pad_token is None:
+        if tokenizer.eos_token is not None:
+            tokenizer.pad_token = tokenizer.eos_token
+            tokenizer.pad_token_id = tokenizer.eos_token_id
         else:
-            raise ValueError("Please specific dtype: --fp16 or --bf16")
-    else:
-        dtype = "float32"
+            tokenizer.add_special_tokens({"pad_token": "[PAD]"})
 
-    if training_args.pipeline_parallel_degree > 1:
-        raise ValueError("Not support pipeline parallel mode.")
-    else:
-        model_config = AutoConfig.from_pretrained(
-            model_args.model_name_or_path,
-            tensor_parallel_output=False,
-            tensor_parallel_degree=training_args.tensor_parallel_degree,
-            tensor_parallel_rank=training_args.tensor_parallel_rank,
-            dtype=dtype,
-        )
-        if hasattr(model_config, "use_flash_attention"):
-            model_config.use_flash_attention = model_args.use_flash_attention
-        model = AutoModelForScore.from_pretrained(
-            model_args.model_name_or_path, config=model_config, **model_args.extra_model_kwargs
-        )
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_args.model_name_or_path, model_max_length=data_args.max_length, padding_side="right"
+    model_kwargs = dict(
+        pretrained_model_name_or_path=model_args.model_name_or_path,
+        dtype=dtype,
+        tensor_parallel_degree=training_args.tensor_parallel_degree,
+        tensor_parallel_rank=training_args.tensor_parallel_rank,
+        recompute_granularity=model_args.recompute_granularity,
+        use_flash_attention=model_args.use_flash_attention,
+        seq_length=data_args.max_seq_len,
     )
-    if isinstance(tokenizer, LlamaTokenizer) and tokenizer.pad_token_id is None:
-        # tokenizer.pad_token_id = tokenizer.eos_token_id
-        # to be consistent with PKU-Alignment/alpaca-7b-reproduced
-        tokenizer.pad_token_id = tokenizer.eos_token_id
+    if training_args.process_reward:
+        placeholder_token_id = tokenizer(model_args.placeholder_token, add_special_tokens=False)["input_ids"]
+        if len(placeholder_token_id) != 1:
+            print(
+                f"Warning: The length of placeholder_token_id should be 1, but got {len(placeholder_token_id)}. Using {placeholder_token_id[-1]}: {tokenizer.convert_ids_to_tokens([placeholder_token_id[-1]])} instead."
+            )
+        model_kwargs["placeholder_token_id"] = placeholder_token_id[-1]
+        for local_tk in model_args.reward_tokens:
+            if len(tokenizer(local_tk, add_special_tokens=False)["input_ids"]) != 1:
+                print(
+                    f"Warning: The length of reward_token_id should be 1, but got {len(tokenizer(local_tk)['input_ids'])}. Using {tokenizer(local_tk)['input_ids'][-1]}: {tokenizer.convert_ids_to_tokens([tokenizer(local_tk)['input_ids'][-1]])} instead."
+                )
+        model_kwargs["reward_token_ids"] = [
+            tokenizer(local_tk)["input_ids"][-1] for local_tk in model_args.reward_tokens
+        ]
+    if training_args.pipeline_parallel_degree > 1:
+        raise ValueError("RM does not support pipeline parallelism yet.")
 
-    train_ds = PreferenceDataset(data_args.parsed_train_datasets, tokenizer=tokenizer)
+    if not data_args.autotuner_benchmark:
+        if training_args.process_reward:
+            if "llama" in model_args.model_name_or_path.lower():
+                model = LlamaModelForPRM.from_pretrained(**model_kwargs)
+            elif "mistral" in model_args.model_name_or_path.lower():
+                model = MistralModelForPRM.from_pretrained(**model_kwargs)
+            else:
+                raise ValueError("PRM currently only supports Llama & Mistral models.")
+        else:
+            model = LlamaModelForScore.from_pretrained(**model_kwargs)
+    else:
+        config = AutoConfig.from_pretrained(**model_kwargs)
+        if training_args.process_reward:
+            if "llama" in model_args.model_name_or_path.lower():
+                model = LlamaModelForPRM.from_config(config)
+            elif "mistral" in model_args.model_name_or_path.lower():
+                model = MistralModelForPRM.from_config(config)
+            else:
+                raise ValueError("PRM currently only supports Llama & Mistral models.")
+        else:
+            model = LlamaModelForScore.from_config(config)
 
-    dev_ds = PreferenceDataset(data_args.parsed_eval_datasets, tokenizer=tokenizer)
+    if model_args.flash_mask and not model.config.use_flash_attention:
+        logger.warning("`flash_mask` must use with zero padding and flash attention.")
+        model.config.use_flash_attention = True
+
+    # TODO: support chat template in next pr
+    # tokenizer.chat_template = None
+    logger.info("Loading tokenizer & model successfully !")
+
+    logger.info("Start to create dataset")
+    if training_args.process_reward:
+        trans_func = partial(preprocess_process_data, tokenizer=tokenizer, data_args=data_args, model_args=model_args)
+    else:
+        trans_func = partial(
+            preprocess_preference_data, tokenizer=tokenizer, data_args=data_args, model_args=model_args
+        )
+
+    if data_args.zero_padding:
+        if data_args.lazy:
+            zero_padding_dataset = ZeroPaddingIterableDataset
+        else:
+            zero_padding_dataset = ZeroPaddingMapDataset
+
+    if training_args.do_train and training_args.should_load_dataset:
+        train_ds = load_dataset(
+            "json",
+            data_files=data_args.train_dataset_path,
+            lazy=data_args.lazy,
+        )[0]
+        train_ds = train_ds.map(trans_func)
+        if data_args.zero_padding:
+            logger.info("Creating train Zero Padding Data Stream. This may take a few minutes.")
+            train_ds = (
+                zero_padding_dataset(
+                    train_ds,
+                    tokenizer=tokenizer,
+                    max_length=data_args.max_seq_len,
+                    greedy_zero_padding=data_args.greedy_zero_padding,
+                )
+                if train_ds is not None
+                else None
+            )
+    else:
+        train_ds = None
+
+    if training_args.do_eval and training_args.should_load_dataset:
+        eval_ds = load_dataset(
+            "json",
+            data_files=data_args.dev_dataset_path,
+            lazy=data_args.lazy,
+        )[0]
+        eval_ds = eval_ds.map(trans_func)
+        if data_args.zero_padding:
+            logger.info("Creating dev Zero Padding Data Stream. This may take a few minutes.")
+            eval_ds = (
+                zero_padding_dataset(
+                    eval_ds,
+                    tokenizer=tokenizer,
+                    max_length=data_args.max_seq_len,
+                )
+                if eval_ds is not None
+                else None
+            )
+    else:
+        eval_ds = None
+    logger.info("Creating dataset successfully ...")
+
+    if data_args.zero_padding:
+        data_collator = partial(
+            preference_collate_fn if not training_args.process_reward else zero_padding_process_collate_fn,
+            max_seq_len=data_args.max_seq_len,
+            pad_token_id=tokenizer.pad_token_id,
+        )
+    else:
+        data_collator = partial(process_collate_fn, pad_token_id=tokenizer.pad_token_id)
 
     trainer = RewardTrainer(
         model=model,
         args=training_args,
         train_dataset=train_ds,
-        eval_dataset=dev_ds,
+        eval_dataset=eval_ds,
         tokenizer=tokenizer,
-        data_collator=train_ds.get_collator(),
+        data_collator=data_collator,
+        process_reward=training_args.process_reward,
     )
-    checkpoint = None
-    if training_args.resume_from_checkpoint is not None:
-        checkpoint = training_args.resume_from_checkpoint
-    elif last_checkpoint is not None:
-        checkpoint = last_checkpoint
-    trainer.train(resume_from_checkpoint=checkpoint)
+
+    if training_args.do_train:
+        train_result = trainer.train(resume_from_checkpoint=last_checkpoint)
+
+        if not data_args.autotuner_benchmark and not data_args.benchmark:
+            trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
+            trainer.log_metrics("train", train_result.metrics)
+            trainer.save_metrics("train", train_result.metrics)
+            trainer.save_state()
+
+    if training_args.do_eval:
+        eval_result = trainer.evaluate()
+        trainer.log_metrics("eval", eval_result)
+        trainer.save_metrics("eval", eval_result)
 
 
 if __name__ == "__main__":

@@ -30,7 +30,6 @@ from paddlenlp.transformers import (
     RobertaForSequenceClassification,
     RobertaForTokenClassification,
     RobertaModel,
-    RobertaPretrainedModel,
 )
 
 from ...testing_utils import require_package, slow
@@ -397,7 +396,8 @@ class RobertaModelTest(ModelTesterMixin, unittest.TestCase):
 
     @slow
     def test_model_from_pretrained(self):
-        for model_name in list(RobertaPretrainedModel.pretrained_init_configuration.keys())[:1]:
+        names = ["roberta-base"]
+        for model_name in names:
             model = RobertaModel.from_pretrained(model_name)
             self.assertIsNotNone(model)
 
@@ -490,7 +490,8 @@ class RobertaCompatibilityTest(unittest.TestCase):
 class RobertaModelIntegrationTest(unittest.TestCase):
     @slow
     def test_inference_masked_lm(self):
-        model = RobertaForMaskedLM.from_pretrained("roberta-base")
+        # TODO: Fix for the bug https://github.com/PaddlePaddle/PaddleNLP/pull/5623/files
+        model = RobertaForMaskedLM.from_pretrained("roberta-base", ignore_mismatched_sizes=True)
         model.eval()
         input_ids = paddle.to_tensor([[0, 31414, 232, 328, 740, 1140, 12695, 69, 46078, 1588, 2]])
         with paddle.no_grad():
