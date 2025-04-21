@@ -29,28 +29,31 @@ def compute_grpo_advantages(
     epsilon: float = 1e-6,
 ):
     """
-    计算每个prompt的GRPO优势。
+    Computes the GRPO advantage for each prompt.
 
     Args:
-        rewards (paddle.Tensor, shape=[batch_size]): 回报，单位为float。
-        index (np.ndarray, shape=[batch_size]): 每个样本对应的prompt索引，类型为int。
-        sequence_mask (paddle.Tensor, shape=[batch_size, response_length]): 序列掩码，用于标记每个时间步是否有效，类型为bool。
-        response_length (int): 每个样本的响应长度。
-        epsilon (float, optional, default=1e-6): 避免除以0的值，默认为1e-6。
+        rewards (paddle.Tensor): Rewards tensor with shape [batch_size].
+        index (np.ndarray): Array of prompt indices with shape [batch_size].
+        sequence_mask (paddle.Tensor): Sequence mask tensor with shape [batch_size, response_length].
+        response_length (int): Length of each response.
+        epsilon (float): Small value to avoid division by zero, default is 1e-6.
 
     Returns:
-        rewards (paddle.Tensor, shape=[batch_size, response_length]): GRPO优势，单位为float。
+        paddle.Tensor: GRPO advantage tensor with shape [batch_size, response_length].
 
     Raises:
-        ValueError (ValueError): 如果没有在给定的prompt索引中有分数。
+        ValueError: If there are no scores for a given prompt index.
     """
     id2score = defaultdict(list)
     id2mean = {}
     id2std = {}
     batch_size = rewards.shape[0]
 
+    # Populate the scores for each prompt index.
     for i in range(batch_size):
         id2score[index[i]].append(rewards[i])
+
+    # Compute mean and standard deviation for each prompt index.
     for idx in id2score:
         if len(id2score[idx]) == 1:
             id2mean[idx] = paddle.to_tensor(0.0, dtype=rewards.dtype)
@@ -60,19 +63,33 @@ def compute_grpo_advantages(
             id2std[idx] = paddle.std(paddle.stack(id2score[idx]))
         else:
             raise ValueError(f"No score in prompt index: {idx}")
+
+    # Compute the GRPO advantage for each sample.
     for i in range(batch_size):
         rewards[i] = (rewards[i] - id2mean[index[i]]) / (id2std[index[i]] + epsilon)
+
+    # Reshape and apply the sequence mask.
     rewards = rewards.unsqueeze(-1).tile([1, response_length]) * sequence_mask
     return rewards
 
 
 @paddle.no_grad()
 def compute_reinforce_plus_plus_advantages_and_returns(
-    rewards: paddle.Tensor,
-    eos_mask: paddle.Tensor,
-    gamma: float,
+    rewards: paddle.Tensor,  # Rewards tensor.
+    eos_mask: paddle.Tensor,  # End-of-sequence mask tensor.
+    gamma: float,  # Discount factor.
 ) -> Tuple[paddle.Tensor, paddle.Tensor]:
-    """Compute reinforce_plus_plus_advantages_and_returns."""
+    """
+    Computes the Reinforce++ advantages and returns.
+
+    Args:
+        rewards (paddle.Tensor): Rewards tensor.
+        eos_mask (paddle.Tensor): End-of-sequence mask tensor.
+        gamma (float): Discount factor.
+
+    Returns:
+        Tuple[paddle.Tensor, paddle.Tensor]: Reinforce++ advantages and returns tensors.
+    """
     length = rewards.shape[-1]
     returns = paddle.zeros_like(rewards)
     running_return = 0

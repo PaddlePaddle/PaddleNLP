@@ -120,7 +120,7 @@ PYTHONPATH=.. python run_finetune.py dcu/llama/sft_argument.json
 
 ## 3. Pre-training
 ### Data Preparation
-For detailed data preparation workflow, please refer to [here](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/tools/preprocess/README.md). Example: OpenWebText2 pre-training data preparation refers to [here](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/data/OpenWebText2.html).
+For detailed data preparation workflow, please refer to [here](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/tools/preprocess/README.md). Example: OpenWebText2 pre-training data preparation refers to [here](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/data/).
 
 For user convenience in testing, this project provides processed 100k doc training samples:
 

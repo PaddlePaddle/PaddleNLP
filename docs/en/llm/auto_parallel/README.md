@@ -48,7 +48,7 @@ print(paddle.utils.run_check())
 
 3. Install PaddleNLP and Custom Operators
 
-Please refer to [PaddleNLP Installation Guide](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/get_started/installation.rst) for installation instructions.
+Please refer to [PaddleNLP Installation Guide](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/zh/get_started/installation.rst) for installation instructions.
 
 ## Pretraining
 

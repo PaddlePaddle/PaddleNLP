@@ -182,17 +182,17 @@ class ScoreModelMixin:
 
     def set_normalize(self, mode: bool = True) -> None:
         """
-        设置是否对输入数据进行归一化处理，默认为True。
-        如果mode为True，则对输入数据进行归一化处理；如果mode为False，则不对输入数据进行归一化处理。
+        Set whether to normalize the input data, default is True.
+        If mode is True, normalize the input data; if mode is False, do not normalize the input data.
 
         Args:
-            mode (bool, optional): 是否对输入数据进行归一化处理，默认为True. Defaults to True.
+            mode (bool, optional): Whether to normalize the input data, default is True. Defaults to True.
 
         Returns:
-            None: 无返回值，直接修改了实例的do_normalize属性和config中的do_normalize属性。
+            None: No return value, directly modifies the instance's do_normalize attribute and the do_normalize attribute in config.
 
         Raises:
-            None: 没有异常抛出。
+            None: No exceptions are raised.
         """
         if self.do_normalize == mode:
             return

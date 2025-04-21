@@ -69,6 +69,7 @@ __all__ = [
     "Qwen2ForCausalLMInferenceModel",
     "Qwen2ForCausalLMBlockInferenceModel",
     "Qwen2VLForConditionalGenerationBlockInferenceModel",
+    "Qwen2_5_VLForConditionalGenerationBlockInferenceModel",
 ]
 
 
@@ -674,12 +675,24 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
             else:
                 self.transformer_block.qkv_weights[idx].set_value(qkv_weight)
 
-            q_bias = state_dict[f"{model_prefix}.self_attn.q_proj.bias"]
-            k_bias = state_dict[f"{model_prefix}.self_attn.k_proj.bias"]
-            v_bias = state_dict[f"{model_prefix}.self_attn.v_proj.bias"]
-
-            concated_qkv_biases = np.concatenate([q_bias, k_bias, v_bias], axis=-1)
-            qkv_bias = paddle.to_tensor(concated_qkv_biases)
+            if f"{model_prefix}.self_attn.qkv_proj.bias" in state_dict.keys():
+                qkv_bias = paddle.to_tensor(
+                    np.concatenate(
+                        split_fn(
+                            state_dict[f"{model_prefix}.self_attn.qkv_proj.bias"],
+                            is_qkv=True,
+                            num_heads=self.num_attention_heads // self.config.tensor_parallel_degree,
+                            num_key_value_heads=self.num_key_value_heads // self.config.tensor_parallel_degree,
+                        ),
+                        axis=-1,
+                    )
+                )
+            else:
+                q_bias = state_dict[f"{model_prefix}.self_attn.q_proj.bias"]
+                k_bias = state_dict[f"{model_prefix}.self_attn.k_proj.bias"]
+                v_bias = state_dict[f"{model_prefix}.self_attn.v_proj.bias"]
+                concated_qkv_biases = np.concatenate([q_bias, k_bias, v_bias], axis=-1)
+                qkv_bias = paddle.to_tensor(concated_qkv_biases)
             self.transformer_block.qkv_biases[idx].set_value(
                 qkv_bias.cast(self.transformer_block.qkv_biases[idx].dtype)
             )
@@ -1287,14 +1300,13 @@ class Qwen2BlockInferenceModel(Qwen2InferenceModel):
         kwargs["padding_offsets"] = padding_offset
         kwargs["max_input_length"] = self.max_seq_len
 
+        # NOTE: (changwenbin) , When using multimodal prediction, the input is required to be inputs_embeds,
+        # input_ids -> inputs_embeds is processed before the language model.
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(ids_remove_padding)
         else:
-            assert len(inputs_embeds.shape) == 3
-            # This is the case in the image-to-text model such as qwen2-vl,
-            # In the prefill phase, the language model is first fed with inputs_embeds instead of input_ids
-            # but in decoder phase, the language model is fed with input_ids just like normal text-to-text model.
-            inputs_embeds = inputs_embeds.reshape([-1, inputs_embeds.shape[2]])
+            if len(inputs_embeds.shape) == 3:
+                inputs_embeds = inputs_embeds.reshape([-1, inputs_embeds.shape[2]])
 
         with dy2st_nocheck_guard_context():
             hidden_states, _ = self.transformer_block(

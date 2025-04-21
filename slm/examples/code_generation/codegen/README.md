@@ -262,7 +262,7 @@ python -m paddle.distributed.launch --gpus 0,1 run_clm.py \
 
 
 ## TaskFlow 调用
-参考[TaskFlow 文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/model_zoo/taskflow.md)
+参考[TaskFlow 文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/zh/model_zoo/taskflow.md)
 
 ## 更多使用案例
 

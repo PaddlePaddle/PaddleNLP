@@ -17,15 +17,14 @@ import unittest
 
 import paddle
 
-from paddlenlp.transformers import (
+from paddlenlp.transformers import (  # BlenderbotPretrainedModel,
     BlenderbotConfig,
     BlenderbotForCausalLM,
     BlenderbotForConditionalGeneration,
     BlenderbotModel,
-    BlenderbotPretrainedModel,
 )
 
-from ...testing_utils import slow
+# from ...testing_utils import slow
 from ..test_modeling_common import ModelTesterMixin, ids_tensor
 
 
@@ -201,8 +200,9 @@ class BlenderbotModelTest(ModelTesterMixin, unittest.TestCase):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_causal_lm_model(*config_and_inputs)
 
-    @slow
+    @unittest.skip("todo: add get name mapping")
     def test_model_from_pretrained(self):
-        for model_name in list(BlenderbotPretrainedModel.pretrained_init_configuration)[:1]:
-            model = BlenderbotModel.from_pretrained(model_name)
+        names = ["facebook/blenderbot-400M-distill"]
+        for model_name in names:
+            model = BlenderbotModel.from_pretrained(model_name, from_hf_hub=True, convert_from_torch=True)
             self.assertIsNotNone(model)

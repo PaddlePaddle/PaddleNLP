@@ -62,7 +62,6 @@ from paddlenlp.utils.env import (
     ASYMMETRY_QUANT_SCALE_MAX,
     ASYMMETRY_QUANT_SCALE_MIN,
     CONFIG_NAME,
-    LEGACY_CONFIG_NAME,
     PADDLE_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_NAME,
     PYTORCH_WEIGHTS_INDEX_NAME,
@@ -860,14 +859,14 @@ def faster_set_state_dict(model, state_dict, strict_dtype=True):
 
 def _load_state_dict_into_model(model_to_load, state_dict, start_prefix):
     # torch will cast dtype in load_state_dict, but paddle strictly check dtype
-    _convert_state_dict_dtype_and_shape(state_dict, model_to_load)
-
-    error_msgs = []
-
     if len(start_prefix) > 0:
         for key in list(state_dict.keys()):
             if key.startswith(start_prefix):
                 state_dict[key.replace(start_prefix, "")] = state_dict.pop(key)
+
+    _convert_state_dict_dtype_and_shape(state_dict, model_to_load)
+
+    error_msgs = []
 
     # TODO: add return status to state_dict
     with warnings.catch_warnings(record=True) as w:
@@ -1008,10 +1007,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
     by which subclasses can track arguments for initialization automatically.
     """
 
-    # Deprecated(wj-Mcat): after 2.6.* version
-    # save the old-school `LEGACY_CONFIG_NAME`, and will be changed to `CONFIG_NAME` after 2.6.* version
-    model_config_file = LEGACY_CONFIG_NAME
-
+    model_config_file = CONFIG_NAME
     pretrained_init_configuration = {}
     # TODO: more flexible resource handle, namedtuple with fields as:
     # resource_name, saved_file, handle_name_for_load(None for used as __init__
@@ -1188,6 +1184,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         config.weight_block_size = predictor_args.weight_block_size
         config.moe_quant_type = predictor_args.moe_quant_type
         config.output_via_mq = predictor_args.output_via_mq
+        config.dynamic_insert = predictor_args.dynamic_insert
         if config.quantization_config.quant_method is not None:
             predictor_args.weight_block_size = config.quantization_config.weight_block_size
             config.weight_block_size = predictor_args.weight_block_size

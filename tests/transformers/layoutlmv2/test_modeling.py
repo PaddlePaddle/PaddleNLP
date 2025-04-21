@@ -215,6 +215,7 @@ class LayoutLMv2ModelModelTest(ModelTesterMixin, unittest.TestCase):
         self.model_tester.create_and_check_for_token_classification(*config_and_inputs)
 
     @slow
+    @unittest.skip("Skip for miss model weight.")
     def test_model_from_pretrained(self):
         for model_name in list(LayoutLMv2PretrainedModel.pretrained_init_configuration)[:1]:
             model = LayoutLMv2Model.from_pretrained(model_name)

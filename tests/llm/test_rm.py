@@ -33,7 +33,7 @@ class FinetuneTest(LLMTest, unittest.TestCase):
 
     def setUp(self) -> None:
         LLMTest.setUp(self)
-        sys.path.insert(0, "./llm/alignment/rm/flashmask")
+        sys.path.insert(0, "./llm/alignment/rm")
 
     def tearDown(self) -> None:
         LLMTest.tearDown(self)
@@ -44,6 +44,6 @@ class FinetuneTest(LLMTest, unittest.TestCase):
         rm_config["output_dir"] = self.output_dir
 
         with argv_context_guard(rm_config):
-            from alignment.rm.flashmask.run_reward import main
+            from alignment.rm.run_reward import main
 
             main()

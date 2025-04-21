@@ -54,25 +54,28 @@ class CriticTrainer(RLTrainer):
 
         return reward_value
 
-    def update_critc(self, rl_batch: Dict[str, paddle.Tensor]) -> Dict[str, Any]:
+    def update_critic(self, rl_batch: Dict[str, paddle.Tensor]) -> Dict[str, Any]:
         """
-        更新评价函数（奖励函数）的参数。
-            该函数需要接收一个字典类型的参数，包括以下键值对：
-                - input_ids (paddle.Tensor): 输入序列的ID，形状为（src+tgt, batch）。
-                - attention_mask (paddle.Tensor): 输入序列的注意力掩码，形状为（src+tgt, batch）。
-                - position_ids (paddle.Tensor): 输入序列的位置ID，形状为（src+tgt, batch）。
-                - old_reward_values (paddle.Tensor): 上一时间步的奖励值，形状为（src+tgt-1, batch）。
-                - reward_returns (paddle.Tensor): 回报返回值，形状为（src+tgt-1, batch）。
-                - sequence_mask (paddle.Tensor): 序列掩码，形状为（src+tgt-1, batch）。
-        返回值（Dict[str, Any]）：
-            - train_value_loss (float): 评价函数（奖励函数）的训练损失。
+        Update the parameters of the critic (reward function).
+
+        This function takes a dictionary as input, containing the following key-value pairs:
+            - input_ids (paddle.Tensor): IDs of the input sequences, shape (src+tgt, batch).
+            - attention_mask (paddle.Tensor): Attention mask for the input sequences, shape (src+tgt, batch).
+            - position_ids (paddle.Tensor): Position IDs of the input sequences, shape (src+tgt, batch).
+            - old_reward_values (paddle.Tensor): Reward values from the previous time step, shape (src+tgt-1, batch).
+            - reward_returns (paddle.Tensor): Reward returns, shape (src+tgt-1, batch).
+            - sequence_mask (paddle.Tensor): Sequence mask, shape (src+tgt-1, batch).
+
+        Returns (Dict[str, Any]):
+            - train_value_loss (float): Training loss of the critic (reward function).
         """
-        # inputs shared by policy and value trainer
+        # Inputs shared by policy and value trainer
         input_ids = rl_batch["input_ids"].contiguous()  # length: src+tgt
         attention_mask = rl_batch["attention_mask"]  # length: src+tgt
         position_ids = rl_batch["position_ids"]  # length: src+tgt
         sequence_mask = rl_batch["sequence_mask"]  # length: src+tgt(-1)
-        # inputs used by value trainer
+
+        # Inputs used by value trainer
         old_reward_values = rl_batch["reward_values"]  # length: src+tgt(-1)
         reward_returns = rl_batch["reward_returns"]  # length: src+tgt(-1)
 

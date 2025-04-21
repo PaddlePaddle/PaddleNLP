@@ -20,6 +20,7 @@ from functools import partial
 from typing import Dict
 
 import paddle
+from paddle.distributed import fleet
 
 from paddlenlp.datasets.rlhf_datasets import RLHFDataset, collate_fn
 from paddlenlp.rl.models.score_model import AutoModelForScore
@@ -30,6 +31,7 @@ from paddlenlp.rl.utils.config_utils import (
     TrainingArguments,
 )
 from paddlenlp.rl.utils.offload_utils import offload_tensor_to_cpu
+from paddlenlp.rl.utils.reshard_utils import init_rollout_env
 from paddlenlp.rl.utils.timer_utils import timers_scope_runtimer
 from paddlenlp.trainer import (
     EarlyStoppingCallback,
@@ -110,42 +112,28 @@ def create_actor_models(
             actor_model = AutoModelForCausalLM.from_config(actor_model_config)
 
     with timers_scope_runtimer("Actor eval model loading time"):
-        if training_args.eval_mode is not None:
+        if (
+            training_args.rollout_tensor_parallel_degree != training_args.tensor_parallel_degree
+            or training_args.pipeline_parallel_degree > 1
+        ):
             actor_eval_model_config = copy.deepcopy(actor_model_config)
             actor_eval_model_config.use_fused_head_and_loss_fn = False
-            if training_args.eval_mode == "single":
-                actor_eval_model_config.tensor_parallel_degree = -1
-                actor_eval_model_config.tensor_parallel_rank = 0
-            actor_eval_model = AutoModelForCausalLM.from_config(actor_eval_model_config)
+            with init_rollout_env(training_args.rollout_tensor_parallel_degree):
+                hcg = fleet.get_hybrid_communicate_group()
+                actor_eval_model_config.tensor_parallel_degree = hcg.get_model_parallel_world_size()
+                actor_eval_model_config.tensor_parallel_rank = hcg.get_model_parallel_rank()
+                # TODO(gongenlei): lazy load lazy guard
+                actor_eval_model = AutoModelForCausalLM.from_config(actor_eval_model_config)
         else:
             actor_eval_model = None
 
     with timers_scope_runtimer("Reference model loading time"):
-        if training_args.eval_mode is not None:
-            reference_model_config = copy.deepcopy(actor_model_config)
-            if training_args.eval_mode is not None:
-                reference_model_config.use_fused_head_and_loss_fn = False
-                if training_args.eval_mode == "single":
-                    reference_model_config.tensor_parallel_degree = -1
-                    reference_model_config.tensor_parallel_rank = 0
-
-            if not training_args.autotuner_benchmark:
-                reference_model = AutoModelForCausalLM.from_pretrained(
-                    model_args.actor_model_name_or_path,
-                    config=reference_model_config,
-                )
-            else:
-                reference_model = AutoModelForCausalLM.from_config(
-                    reference_model_config,
-                    dtype=training_args.model_dtype,
-                )
-        else:
-            reference_model = AutoModelForCausalLM.from_config(
-                actor_model_config,
-                dtype=training_args.model_dtype,
-            )
-            if not training_args.autotuner_benchmark:
-                reference_model.set_state_dict(actor_model.state_dict())
+        reference_model = AutoModelForCausalLM.from_config(
+            actor_model_config,
+            dtype=training_args.model_dtype,
+        )
+        if not training_args.autotuner_benchmark:
+            reference_model.set_state_dict(actor_model.state_dict())
 
     actor_tokenizer = AutoTokenizer.from_pretrained(
         model_args.actor_model_name_or_path,

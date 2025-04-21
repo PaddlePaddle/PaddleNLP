@@ -23,15 +23,17 @@ from ...trainer.trainer import logger
 @paddle.no_grad()
 def _move_param(src, device=None, blocking=True):
     """
-    将参数从源设备移动到目标设备，并返回目标设备上的参数。如果目标设备未指定，则使用当前设备。
+    Move parameters from the source device to the target device and return the parameters on the target device.
+    If the target device is not specified, the current device is used.
 
     Args:
-        src (Tensor): 需要移动的参数张量。
-        device (Optional[Union[str, paddle.Device]], optional): 目标设备，默认为None，表示使用当前设备。可以是字符串或paddle.Device对象。默认为None。
-        blocking (bool, optional): 是否阻塞等待操作完成，默认为True。
+        src (Tensor): The tensor of parameters to be moved.
+        device (Optional[Union[str, paddle.Device]], optional): The target device. Can be a string or paddle.Device object.
+            Defaults to None, which means using the current device.
+        blocking (bool, optional): Whether to block until the operation is complete. Defaults to True.
 
     Returns:
-        Tensor: 在目标设备上的参数张量。
+        Tensor: The tensor of parameters on the target device.
     """
     if isinstance(device, str):
         device = paddle.device._convert_to_place(device)
@@ -44,16 +46,17 @@ def _move_param(src, device=None, blocking=True):
 
 def offload_tensor_to_cpu(tensors):
     """
-    将给定的张量迁移到CPU上。如果使用了CUDA管理内存，则该函数无效。
+    Migrate the given tensors to CPU. This function has no effect if CUDA managed memory is used.
 
     Args:
-        tensors (tuple, list): tuple或list，包含两个元素，第一个元素是模型或优化器，第二个元素是字符串，表示是否为模型或优化器。
+        tensors (tuple, list): A tuple or list containing two elements. The first element is the model or optimizer,
+            and the second element is a string indicating whether it is a model or optimizer.
 
     Returns:
-        None, 无返回值，直接修改原有张量。
+        None: No return value, modifies the original tensors directly.
 
     Raises:
-        None, 没有引发任何异常。
+        None: Does not raise any exceptions.
     """
     if strtobool(os.getenv("FLAGS_use_cuda_managed_memory", "False")):
         logger.warning("FLAGS_use_cuda_managed_memory has been set to True, offloading strategy is ineffective.")
@@ -97,18 +100,20 @@ def offload_tensor_to_cpu(tensors):
         if src._is_initialized() and not isinstance(src.place, paddle.CUDAPinnedPlace):
             _move_param(src, pin_device)
     else:
-        logger.debug(f"Can't parse for type {tensors[1]}")
+        logger.debug(f"[offload_tensor_to_cpu]Can't parse for type {tensors[1]}")
 
 
 def reload_tensor_to_gpu(tensors):
     """
-    将给定的张量从CPU转移到GPU中，并返回新的张量。如果没有设置环境变量FLAGS_use_cuda_managed_memory为True，则此函数无效。
+    Transfer the given tensors from CPU to GPU and return new tensors. This function has no effect if the environment variable
+    FLAGS_use_cuda_managed_memory is not set to True.
 
     Args:
-        tensors (List[Tuple[Any, str]]): 包含两个元素的列表，第一个元素是需要转移到GPU的张量，第二个元素是字符串，用于指示张量类型（"optimizer"或"model"）。
+        tensors (List[Tuple[Any, str]]): A list containing tuples. Each tuple has two elements: the tensor to be transferred
+            to GPU and a string indicating the tensor type ("optimizer" or "model").
 
     Returns:
-        List[Tuple[Any, str]]: 与输入相同的列表，但所有张量已经被转移到GPU中。
+        List[Tuple[Any, str]]: The same list as the input, but all tensors have been transferred to GPU.
 
     Raises:
         None.
@@ -142,7 +147,7 @@ def reload_tensor_to_gpu(tensors):
             if src._is_initialized() and not isinstance(src.place, paddle.CUDAPlace):
                 _move_param(src, device)
     else:
-        logger.debug(f"Can't parse for type {tensors[1]}")
+        logger.debug(f"[reload_tensor_to_gpu]Can't parse for type {tensors[1]}")
 
 
 class OffloadController:
@@ -190,11 +195,14 @@ def reload_and_offload_scope(trainer, *args):
             }
         )
 
-    if getattr(trainer.actor_trainer, "_inner_eval_model", None) is not None:
-        offload_map.update({trainer.actor_trainer._inner_eval_model: "freeze_model"})
-
-    if trainer.args.rl_algorithm == "ppo" and getattr(trainer.critic_trainer, "_inner_eval_model", None) is not None:
-        offload_map.update({trainer.critic_trainer._inner_eval_model: "freeze_model"})
-
     objs = [(arg, offload_map.get(arg, "")) for arg in args if offload_map.get(arg, "") in trainer.args.offload_level]
+    if trainer.actor_model not in [i for i, _ in objs]:
+        if getattr(trainer.actor_trainer, "_inner_eval_model", None) is not None:
+            # NOTE(gongenlei): for export_evaluate_model
+            objs.append((trainer.actor_model, offload_map.get(trainer.actor_model, "")))
+    if trainer.args.rl_algorithm == "ppo":
+        if trainer.reward_critic_model not in [i for i, _ in objs]:
+            if getattr(trainer.critic_trainer, "_inner_eval_model", None) is not None:
+                # NOTE(gongenlei): for export_evaluate_model
+                objs.append((trainer.reward_critic_model, offload_map.get(trainer.reward_critic_model, "")))
     return OffloadController(objs)
