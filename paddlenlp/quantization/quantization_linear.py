@@ -17,7 +17,7 @@ import paddle.nn as nn
 from paddle.distributed.fleet.base import topology as tp
 from paddle.distributed.fleet.layers.mpu import mp_ops
 
-from .int8_kernel import int8_linear
+from .int8_linear import int8_linear
 
 try:
     from paddle.nn.quant import llm_int8_linear, weight_only_linear
