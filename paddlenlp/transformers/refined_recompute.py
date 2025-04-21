@@ -18,12 +18,11 @@ import contextlib
 import copy
 import inspect
 import queue
+import random
 import uuid
 import weakref
-import random
 
 import numpy as np
-
 import paddle
 import paddle.autograd
 from paddle.distributed import fleet
@@ -388,10 +387,7 @@ def _recompute_without_reentrant(function, preserve_rng_state=True, *args, **kwa
                 contextlib.nullcontext()
                 if not preserve_rng_state
                 else switch_rng_state_tracker(
-                    fw_cuda_rng_state,
-                    fwd_cuda_rng_state_tracker,
-                    fwd_numpy_state,
-                    fwd_random_state
+                    fw_cuda_rng_state, fwd_cuda_rng_state_tracker, fwd_numpy_state, fwd_random_state
                 )
             )
             with rng_cxt_manager:
