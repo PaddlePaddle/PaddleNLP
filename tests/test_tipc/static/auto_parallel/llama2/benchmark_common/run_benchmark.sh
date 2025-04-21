@@ -253,6 +253,12 @@ export FLAGS_enable_sharding_stage1_tensor_fusion=1
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export PARALLEL_CROSS_ENTROPY=true
 
+# cinn 相关
+export FLAGS_use_cinn=1
+export FLAGS_dist_prim_all=1
+export FLAGS_prim_forward_blacklist="pd_op.stack;pd_op.squeeze;pd_op.swiglu;pd_op.squared_l2_norm"
+export FLAGS_prim_backward_blacklist="swiglu_grad"
+
 source ${BENCHMARK_ROOT}/scripts/run_model.sh   # 在该脚本中会对符合benchmark规范的log使用analysis.py 脚本进行性能数据解析;如果不联调只想要产出训练log可以注掉本行,提交时需打开
 _set_params $@
 #_train       # 如果只产出训练log,不解析,可取消注释
