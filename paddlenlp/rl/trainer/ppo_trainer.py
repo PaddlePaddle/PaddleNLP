@@ -1629,6 +1629,7 @@ class PPOTrainer(Trainer):
                             micro_batches = split_batch_into_micro_batches(
                                 total_batch=batch,
                                 batch_size=self.args.per_device_train_batch_size,
+                                pad_token_id=self.tokenizer.pad_token_id,
                             )
 
                             for micro_step, micro_batch in enumerate(micro_batches * self.args.update_iters):
