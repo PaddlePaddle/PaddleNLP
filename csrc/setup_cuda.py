@@ -15,12 +15,24 @@
 import os
 import shutil
 import subprocess
+from packaging.version import parse, Version
 
 import paddle
 from paddle.utils.cpp_extension import CUDAExtension, setup
 
 sm_version = int(os.getenv("CUDA_SM_VERSION", "0"))
 
+def get_nvcc_cuda_version(cuda_dir: str) -> Version:
+    """Get the CUDA version from nvcc.
+
+    Adapted from https://github.com/NVIDIA/apex/blob/8b7a1ff183741dd8f9b87e7bafd04cfde99cea28/setup.py
+    """
+    nvcc_output = subprocess.check_output([cuda_dir + "/bin/nvcc", "-V"],
+                                          universal_newlines=True)
+    output = nvcc_output.split()
+    release_idx = output.index("release") + 1
+    nvcc_cuda_version = parse(output[release_idx].split(",")[0])
+    return nvcc_cuda_version
 
 def update_git_submodule():
     try:
@@ -35,6 +47,15 @@ def find_end_files(directory, end_str):
     for root, dirs, files in os.walk(directory):
         for file in files:
             if file.endswith(end_str):
+                gen_files.append(os.path.join(root, file))
+    return gen_files
+
+def find_end_files_with_prefix(directory, end_str, prefix):
+    """Filter the targeted files based on their filename prefix"""
+    gen_files = []
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            if file.endswith(end_str) and file.startswith(prefix):
                 gen_files.append(os.path.join(root, file))
     return gen_files
 
@@ -149,6 +170,7 @@ include_dirs = [
 ]
 cc = get_sm_version()
 cuda_version = float(paddle.version.cuda())
+nvcc_version = get_nvcc_cuda_version(os.environ.get("CUDA_HOME", "/usr/local/cuda"))
 
 if cc >= 80:
     sources += ["gpu/int8_gemm_with_cutlass/gemm_dequant.cu"]
@@ -156,7 +178,9 @@ if cc >= 80:
     sources += ["./gpu/append_attention.cu", "./gpu/multi_head_latent_attention.cu"]
 
     sources += find_end_files("./gpu/append_attn", ".cu")
-    sources += find_end_files("./gpu/append_attn/template_instantiation", ".cu")
+    sources += find_end_files_with_prefix("./gpu/append_attn/template_instantiation", ".cu", "append_attention_c16")
+    # sources += find_end_files_with_prefix("./gpu/append_attn/template_instantiation", ".cu", "append_attention_c8")
+    # sources += find_end_files_with_prefix("./gpu/append_attn/template_instantiation", ".cu", "append_attention_c4")
 
 
 fp8_auto_gen_directory = "gpu/cutlass_kernels/fp8_gemm_fused/autogen"
@@ -164,17 +188,17 @@ if os.path.isdir(fp8_auto_gen_directory):
     shutil.rmtree(fp8_auto_gen_directory)
 
 
-if cc == 89 and cuda_version >= 12.4:
-    os.system("python utils/auto_gen_fp8_fp8_gemm_fused_kernels.py --cuda_arch 89")
-    os.system("python utils/auto_gen_fp8_fp8_dual_gemm_fused_kernels.py --cuda_arch 89")
-    sources += find_end_files(fp8_auto_gen_directory, ".cu")
-    sources += [
-        "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_gemm.cu",
-        "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_cuda_core_gemm.cu",
-        "gpu/fp8_gemm_with_cutlass/fp8_fp8_fp8_dual_gemm.cu",
-    ]
+# if cc == 89 and cuda_version >= 12.4:
+#     os.system("python utils/auto_gen_fp8_fp8_gemm_fused_kernels.py --cuda_arch 89")
+#     os.system("python utils/auto_gen_fp8_fp8_dual_gemm_fused_kernels.py --cuda_arch 89")
+#     sources += find_end_files(fp8_auto_gen_directory, ".cu")
+#     sources += [
+#         "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_gemm.cu",
+#         "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_cuda_core_gemm.cu",
+#         "gpu/fp8_gemm_with_cutlass/fp8_fp8_fp8_dual_gemm.cu",
+#     ]
 
-if cc >= 80 and cuda_version >= 12.4:
+if cc >= 80 and nvcc_version >= Version("12.4"):
     nvcc_compile_args += [
         "-std=c++17",
         "--use_fast_math",
@@ -199,6 +223,7 @@ if cc >= 80 and cuda_version >= 12.4:
         ]
         nvcc_compile_args += ["-gencode", "arch=compute_89,code=compute_89"]
     elif cc >= 90:
+        os.environ.pop('PADDLE_CUDA_ARCH_LIST', None) # forcely remove env variable, avoid using sm80, sm90, which will introduce PTX error. (Should be sm90a)
         sources += [
             # "./gpu/sage_attn_kernels/sageattn_qk_int_sv_f8_kernel_sm90.cu",
             "./gpu/sage_attn_kernels/sageattn_qk_int_sv_f8_kernel_sm90_varlen.cu",
@@ -207,18 +232,18 @@ if cc >= 80 and cuda_version >= 12.4:
         nvcc_compile_args += ["-gencode", "arch=compute_90a,code=compute_90a"]
 
 if cc >= 90 and cuda_version >= 12.0:
-    os.system("python utils/auto_gen_fp8_fp8_gemm_fused_kernels_sm90.py --cuda_arch 90")
-    os.system("python utils/auto_gen_fp8_fp8_gemm_fused_kernels_ptr_scale_sm90.py --cuda_arch 90")
-    os.system("python utils/auto_gen_fp8_fp8_dual_gemm_fused_kernels_sm90.py --cuda_arch 90")
-    os.system("python utils/auto_gen_fp8_fp8_block_gemm_fused_kernels_sm90.py --cuda_arch 90")
-    sources += find_end_files(fp8_auto_gen_directory, ".cu")
-    sources += [
-        "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_gemm.cu",
-        "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_cuda_core_gemm.cu",
-        "gpu/fp8_gemm_with_cutlass/fp8_fp8_fp8_dual_gemm.cu",
-        "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_block_gemm.cu",
-        "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_gemm_ptr_scale.cu",
-    ]
+    # os.system("python utils/auto_gen_fp8_fp8_gemm_fused_kernels_sm90.py --cuda_arch 90")
+    # os.system("python utils/auto_gen_fp8_fp8_gemm_fused_kernels_ptr_scale_sm90.py --cuda_arch 90")
+    # os.system("python utils/auto_gen_fp8_fp8_dual_gemm_fused_kernels_sm90.py --cuda_arch 90")
+    # os.system("python utils/auto_gen_fp8_fp8_block_gemm_fused_kernels_sm90.py --cuda_arch 90")
+    # sources += find_end_files(fp8_auto_gen_directory, ".cu")
+    # sources += [
+    #     "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_gemm.cu",
+    #     "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_cuda_core_gemm.cu",
+    #     "gpu/fp8_gemm_with_cutlass/fp8_fp8_fp8_dual_gemm.cu",
+    #     "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_block_gemm.cu",
+    #     "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_gemm_ptr_scale.cu",
+    # ]
     sources += find_end_files("./gpu/mla_attn", ".cu")
 
 ops_name = f"paddlenlp_ops_{sm_version}" if sm_version != 0 else "paddlenlp_ops"
