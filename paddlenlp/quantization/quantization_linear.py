@@ -88,7 +88,6 @@ class QuantizationLinear(nn.Layer):
                 dtype=self._dtype,
                 is_bias=False,
             )
-
             if self.quantization_config.group_size == -1:
                 self.quant_scale = self.create_parameter(
                     shape=[out_features],
@@ -98,7 +97,21 @@ class QuantizationLinear(nn.Layer):
             else:
                 # TODO(lugimzzz): support groupwise in next PR
                 raise NotImplementedError("Not yet support grouwise weightonly quantization.")
-        if self.quant_algo in ["int8_train"]:
+        elif self.weight_quantize_algo in ["fp4", "nf4"]:
+            if qlora_weight_linear is None:
+                raise ImportError(
+                    "Please run the following commands to install: qlora related package first\n"
+                    "1) git clone https://github.com/PaddlePaddle/PaddleSlim \n"
+                    "2) cd PaddleSlim && pip install -e .\n"
+                    "3) cd csrc &&  python ./setup_cuda.py install"
+                )
+            self.quant_weight = self.create_parameter(
+                shape=[out_features * in_features // 2, 1],
+                attr=weight_attr if weight_attr else paddle.nn.initializer.Constant(value=0),
+                dtype=self.quant_weight_dtype,
+                is_bias=False,
+            )
+        elif self.quant_algo in ["int8_train"]:
             block_n, block_k = self.quantization_config.block_size
 
             self.quant_weight = self.create_parameter(
@@ -111,20 +124,6 @@ class QuantizationLinear(nn.Layer):
             self.quant_scale = self.create_parameter(
                 shape=[(out_features + block_n - 1) // block_n, (in_features + block_k - 1) // block_k],
                 dtype=self._dtype,
-                is_bias=False,
-            )
-        if self.quant_algo in ["fp4", "nf4"]:
-            if qlora_weight_linear is None:
-                raise ImportError(
-                    "Please run the following commands to install: qlora related package first\n"
-                    "1) git clone https://github.com/PaddlePaddle/PaddleSlim \n"
-                    "2) cd PaddleSlim && pip install -e .\n"
-                    "3) cd csrc &&  python ./setup_cuda.py install"
-                )
-            self.quant_weight = self.create_parameter(
-                shape=[out_features * in_features // 2, 1],
-                attr=weight_attr if weight_attr else paddle.nn.initializer.Constant(value=0),
-                dtype=self.quant_weight_dtype,
                 is_bias=False,
             )
             if self.double_quant:
@@ -169,10 +168,19 @@ class QuantizationLinear(nn.Layer):
     def forward(self, x):
         with paddle.amp.auto_cast(enable=False):
             if self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4"]:
-                out = weight_only_linear(x, self.quant_weight, self.bias, self.quant_scale, self.quant_dtype)
-            elif self.quant_algo in ["llm.int8"]:
-                out = llm_int8_linear(x, self.quant_weight, self.bias, self.quant_scale, self.llm_int8_threshold)
-            elif self.quant_algo in ["int8_train"]:
+                out = weight_only_linear(
+                    x=x,
+                    weight=self.quant_weight,
+                    bias=self.bias,
+                    weight_scale=self.quant_scale,
+                    weight_dtype=self.quant_dtype,
+                    group_size=self.quantization_config.group_size,
+                )
+            elif self.weight_quantize_algo in ["llm.int8"]:
+                out = llm_int8_linear(
+                    x, self.quant_weight, self.bias, self.quant_scale, self.self.quantization_config.llm_int8_threshold
+                )
+            elif self.weight_quantize_algo in ["int8_train"]:
                 out = int8_linear(
                     input=x,
                     weight=self.quant_weight,
@@ -181,7 +189,7 @@ class QuantizationLinear(nn.Layer):
                     weight_dtype=self.quant_dtype,
                     block_size=self.quantization_config.block_size,
                 )
-            elif self.quant_algo in ["fp4", "nf4"]:
+            elif self.weight_quantize_algo in ["fp4", "nf4"]:
                 out = qlora_weight_linear(
                     x=x,
                     quant_weight=self.quant_weight,
