@@ -91,8 +91,7 @@ set +e
 pytest -v -n 8 \
   --dist loadgroup \
   --retries 1 --retry-delay 1 \
-  --timeout 200 --timeout-method=thread \
-  --durations 20 --alluredir=result \
+  --timeout 200 --durations 20 --alluredir=result \
   --cov paddlenlp --cov-report xml:coverage.xml > ${log_path}/unittest.log 2>&1
 exit_code=$?
 print_info $exit_code unittest
