@@ -26,12 +26,12 @@ def quantize_tensorwise(x, quantization_config=None, bit_length=8, state=0, trai
     if quantization_config.apply_hadamard:
         target_x = x @ infohub.hadamard[x.shape[-1]][0]
     else:
-        target_x = x.clone()
+        target_x = x
 
     if act_scale is not None:
         if training:
             scale = paddle.max(paddle.abs(target_x)) / qmax
-            act_scale[:] = (state * act_scale + scale) / (state + 1)
+            act_scale.set_value((state * act_scale + scale) / (state + 1))
             if state > quantization_config.skip_first_act_scale_step:
                 scale = act_scale
         else:
@@ -66,6 +66,7 @@ def quantize_channelwise(w, apply_hadamard=False, bit_length=8):
         block_size = 1
     scale = paddle.max(paddle.abs(w), axis=0, keepdim=True) / qmax
     w_int8 = paddle.clip((w / scale).round(), qmin, qmax).astype("int8")
+    scale.stop_gradient = True
     return w_int8.T, scale.squeeze(0) / block_size
 
 
@@ -140,9 +141,11 @@ class QATFunc(PyLayer):
 
         if not quant_weight.stop_gradient:
             if len(x.shape) == 2:
-                weight_grad = paddle.einsum("sh,sd->hd", x, grad_output)
+                weight_grad = paddle.matmul(x.transpose([1, 0]), grad_output)
             else:
-                weight_grad = paddle.einsum("bsh,bsd->hd", x, grad_output)
+                weight_grad = paddle.matmul(
+                    x.reshape([-1, x.shape[-1]]).transpose([1, 0]), grad_output.reshape([-1, grad_output.shape[-1]])
+                )
         else:
             weight_grad = None
 

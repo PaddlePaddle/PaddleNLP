@@ -159,12 +159,16 @@ def convert_to_weight_quantize_state_dict(state_dict, name, quantization_config,
             quant_weight, quant_scale = quantize_channelwise(
                 target_weight, quantization_config.apply_hadamard, bit_length=8
             )
-            state_dict[act_scale_name] = paddle.zeros([], dtype="bfloat16").cuda()
+            act_scale = paddle.zeros([], dtype="bfloat16").cuda()
+            act_scale.stop_gradient = True
+            state_dict[act_scale_name] = act_scale
         elif weight_quantize_algo in ["a8w4linear"]:
             quant_weight, quant_scale = quantize_channelwise(
                 target_weight, quantization_config.apply_hadamard, bit_length=4
             )
-            state_dict[act_scale_name] = paddle.zeros([], dtype="bfloat16").cuda()
+            act_scale = paddle.zeros([], dtype="bfloat16").cuda()
+            act_scale.stop_gradient = True
+            state_dict[act_scale_name] = act_scale
         else:
             quant_weight, quant_scale = weight_quantize(
                 x=target_weight,
@@ -239,6 +243,7 @@ def update_loaded_state_dict_keys(state_dict, quantization_linear_list, quantiza
         weight_name = name + ".weight"
         quant_weight_name = name + ".quant_weight"
         quant_scale_name = name + ".quant_scale"
+        act_scale_name = name + ".act_scale"
         qquant_scale_name = name + ".qquant_scale"
         double_quant_scale_name = name + ".double_quant_scale"
         quant_sacle_offset_name = name + ".quant_sacle_offset"
@@ -254,6 +259,10 @@ def update_loaded_state_dict_keys(state_dict, quantization_linear_list, quantiza
                 state_dict.append(quant_sacle_offset_name)
             else:
                 state_dict.append(quant_scale_name)
+                weight_quantize_algo = parse_weight_quantize_algo(quantization_config, name)
+                if weight_quantize_algo in ["a8w8linear", "a8w4linear"]:
+                    state_dict.append(act_scale_name)
+
         else:
             if not ignore_warning:
                 logger.warning(

@@ -177,7 +177,12 @@ class QuantizationLinearFunc(PyLayer):
             input_grad = None
 
         if not quant_weight.stop_gradient:
-            weight_grad = paddle.einsum("bsh,bsd->hd", x, grad_output)
+            if len(x.shape) == 2:
+                weight_grad = paddle.matmul(x.transpose([1, 0]), grad_output)
+            else:
+                weight_grad = paddle.matmul(
+                    x.reshape([-1, x.shape[-1]]).transpose([1, 0]), grad_output.reshape([-1, grad_output.shape[-1]])
+                )
         else:
             weight_grad = None
 
@@ -202,6 +207,7 @@ def quant_weight_linear(
     act_state=None,
 ):
     if weight_quantize_algo in ["a8w8linear", "a8w4linear"]:
+
         state, training, act_scale = act_state
 
         return QATFunc.apply(
@@ -264,12 +270,13 @@ class QuantizationLinear(nn.Layer):
                     dtype=self._dtype,
                     is_bias=False,
                 )
+                self.quant_scale.stop_gradient = True
             else:
                 # TODO(lugimzzz): support groupwise in next PR
                 raise NotImplementedError("Not yet support grouwise weightonly quantization.")
             if self.weight_quantize_algo in ["a8w8linear", "a8w4linear"]:
                 self.act_scale = self.create_parameter(
-                    shape=[1], dtype=self._dtype, is_bias=False, default_initializer=nn.initializer.Constant(value=0.0)
+                    shape=[], dtype=self._dtype, is_bias=False, default_initializer=nn.initializer.Constant(value=0.0)
                 )
                 self.act_scale.stop_gradient = True
 
@@ -423,6 +430,7 @@ class ColumnParallelQuantizationLinear(nn.Layer):
                     dtype=self._dtype,
                     is_bias=False,
                 )
+                self.quant_scale.stop_gradient = True
                 self.quant_scale.is_distributed = True if self.is_mp else False
                 if self.quant_scale.is_distributed:
                     self.quant_scale.split_axis = 0
@@ -431,8 +439,10 @@ class ColumnParallelQuantizationLinear(nn.Layer):
                 raise NotImplementedError("Not yet support grouwise weightonly quantization.")
             if self.weight_quantize_algo in ["a8w8linear", "a8w4linear"]:
                 self.act_scale = self.create_parameter(
-                    shape=[1], dtype=self._dtype, is_bias=False, default_initializer=nn.initializer.Constant(value=0.0)
+                    shape=[], dtype=self._dtype, is_bias=False, default_initializer=nn.initializer.Constant(value=0.0)
                 )
+                self.act_scale.is_distributed = True if self.is_mp else False
+                self.act_scale.stop_gradient = True
         else:
             raise NotImplementedError(f"Not yet support weight_quantize_algo: {self.weight_quantize_algo}")
         if bias_attr is False:
@@ -473,7 +483,9 @@ class ColumnParallelQuantizationLinear(nn.Layer):
             if (self.weight_quantize_algo in ["fp4", "nf4"] and self.quantization_config.qlora_weight_double_quant)
             else None,
             bias=self.bias,
-            state=self.state,
+            act_state=(self.state, self.training, self.act_scale)
+            if self.weight_quantize_algo in ["a8w8linear", "a8w4linear"]
+            else None,
         )
         if self.training:
             self.state += 1
@@ -556,6 +568,7 @@ class RowParallelQuantizationLinear(nn.Layer):
                     dtype=self._dtype,
                     is_bias=False,
                 )
+                self.quant_scale.stop_gradient = True
                 self.quant_scale.is_distributed = True if self.is_mp else False
                 if self.quant_scale.is_distributed:
                     self.quant_scale.split_axis = 0
@@ -566,6 +579,8 @@ class RowParallelQuantizationLinear(nn.Layer):
                 self.act_scale = self.create_parameter(
                     shape=[1], dtype=self._dtype, is_bias=False, default_initializer=nn.initializer.Constant(value=0.0)
                 )
+                self.act_scale.is_distributed = True if self.is_mp else False
+                self.act_scale.stop_gradient = True
         else:
             raise NotImplementedError(f"Not yet support weight_quantize_algo: {self.weight_quantize_algo}")
 
@@ -600,7 +615,9 @@ class RowParallelQuantizationLinear(nn.Layer):
                 if (self.weight_quantize_algo in ["fp4", "nf4"] and self.quantization_config.qlora_weight_double_quant)
                 else None,
                 bias=None,
-                state=self.state,
+                act_state=(self.state, self.training, self.act_scale)
+                if self.weight_quantize_algo in ["a8w8linear", "a8w4linear"]
+                else None,
             )
             if self.sequence_parallel:
                 output_ = ReduceScatterOp.apply(output_parallel)
@@ -626,7 +643,9 @@ class RowParallelQuantizationLinear(nn.Layer):
                 if (self.weight_quantize_algo in ["fp4", "nf4"] and self.quantization_config.qlora_weight_double_quant)
                 else None,
                 bias=self.bias,
-                state=self.state,
+                act_state=(self.state, self.training, self.act_scale)
+                if self.weight_quantize_algo in ["a8w8linear", "a8w4linear"]
+                else None,
             )
         if self.training:
             self.state += 1
