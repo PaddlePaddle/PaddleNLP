@@ -20,9 +20,11 @@ import paddle
 
 from ...trainer.trainer import ShardingOption, TrainingArguments, logger
 from ...trainer.trainer_utils import IntervalStrategy
+from ...transformers.configuration_utils import llmmetaclass
 
 
 @dataclass
+@llmmetaclass
 class TrainingArguments(TrainingArguments):
     global_batch_size: int = field(
         default=8,
@@ -172,6 +174,10 @@ class TrainingArguments(TrainingArguments):
     repetition_penalty: float = field(
         default=1.0,
         metadata={"help": "The parameter for repetition penalty. 1.0 means no penalty."},
+    )
+    quant_type: str = field(
+        default="",
+        metadata={"help": "Quantization dtype, optional for: weight_onlt_int8."},
     )
     per_device_prompt_batch_size: int = field(
         default=16,
@@ -512,17 +518,9 @@ class ModelArgument:
     actor_tokenizer_alpha: float = field(default=None, metadata={"help": "Tokenizer will tokenize randomly"})
     reward_tokenizer_alpha: float = field(default=None, metadata={"help": "Tokenizer will tokenize randomly"})
     reward_critic_tokenizer_alpha: float = field(default=None, metadata={"help": "Tokenizer will tokenize randomly"})
-    use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
     use_attn_mask_start_row_indices: bool = field(default=False, metadata={"help": "Should in data args"})
     stage: str = field(default="PPO", metadata={"help": "The type of training."})
     fused_linear: bool = field(default=True, metadata={"help": "Whether to use fused_gemm_epilogue"})
-    recompute_granularity: str = field(
-        default="full",
-        metadata={
-            "help": "The granularity of recompute in policy model, "
-            "can be selected as `full` or `full_attn` or `core_attn`. "
-        },
-    )
     critic_recompute_granularity: str = field(
         default="full",
         metadata={

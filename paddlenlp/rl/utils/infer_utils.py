@@ -193,6 +193,7 @@ def create_predictor(trainer: Trainer):
         inference_model=True,
         dtype=trainer.amp_dtype,
         output_via_mq=False,
+        quant_type=trainer.args.quant_type,
     )
     model_args = ModelArgument()
     config = copy.deepcopy(trainer.model.config)

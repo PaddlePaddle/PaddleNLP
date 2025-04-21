@@ -689,7 +689,8 @@ def gather_and_pad(tensor, dp_group=None, sd_group=None, pad_index=0.0, pad=True
 
 def combine_micro_batches_into_batch(micro_batches, pad_token_id=0):
     """combine micro batches to get a complete batch"""
-
+    if not isinstance(micro_batches, list):
+        return micro_batches
     combined_batch = {}
 
     for micro_batch in micro_batches:

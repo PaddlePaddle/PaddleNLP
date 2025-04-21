@@ -1198,6 +1198,11 @@ class PPOTrainer(Trainer):
 
     def _balance_batch(self, micro_batches):
         """Reorder the data such that each dp/sharding rank gets similar total tokens"""
+        if isinstance(micro_batches, list):
+            need_combine_and_split = True
+        else:
+            need_combine_and_split = False
+
         dp_degree, sharding_degree = max(self.args.data_parallel_degree, 1), max(self.args.sharding_parallel_degree, 1)
         # dp or sharding degree = 1, no need to balance batch
         if dp_degree * sharding_degree == 1:
@@ -1213,7 +1218,10 @@ class PPOTrainer(Trainer):
             data_parallel_group = None
 
         total_unbalance_batch = defaultdict(list)
-        unbalance_micro_batch = combine_micro_batches_into_batch(micro_batches, pad_token_id=self.tokenizer.pad_token_id)  # fmt:skip
+        if need_combine_and_split:
+            unbalance_micro_batch = combine_micro_batches_into_batch(micro_batches, pad_token_id=self.tokenizer.pad_token_id)  # fmt:skip
+        else:
+            unbalance_micro_batch = micro_batches
         for key in unbalance_micro_batch:
             total_unbalance_batch[key].append(unbalance_micro_batch[key])
 
@@ -1244,11 +1252,14 @@ class PPOTrainer(Trainer):
             balance_batch_across_dp_group=True,
         )
         # split into micro-batches
-        micro_batches = split_batch_into_micro_batches(
-            total_batch=combined_balance_batch,
-            per_device_train_batch_size=self.args.per_device_train_batch_size,
-            pad_token_id=self.tokenizer.pad_token_id,
-        )
+        if need_combine_and_split:
+            micro_batches = split_batch_into_micro_batches(
+                total_batch=combined_balance_batch,
+                batch_size=self.args.per_device_train_batch_size,
+                pad_token_id=self.tokenizer.pad_token_id,
+            )
+        else:
+            micro_batches = combined_balance_batch
         return micro_batches
 
     def train(
@@ -1980,7 +1991,7 @@ class PPOTrainer(Trainer):
         return batch
 
     @paddle.no_grad()
-    def compute_advantage_normalization(batch):
+    def compute_advantage_normalization(self, batch):
         all_advantages = batch["reward_advantages_clean"].cast(paddle.float32)
 
         try:
