@@ -1,4 +1,4 @@
-# 🚣‍♂️ 使用 PaddleNLP 在海光 DCU 上运行 llama2-13b 模型 🚣
+# 使用 PaddleNLP 在海光 DCU 上运行 llama2-13b 模型
 Paddle 框架与 PaddleNLP 套件在海光的 DCU 产品上进行了深度的适配和优化，实现了大模型在训练和推理上与 GPU 高度统一，在精度和性能上拥有先进水平。
 
 海光 DCU 产品在 PaddleNLP 组合套件上拥有多种技术优点：
@@ -112,7 +112,7 @@ PYTHONPATH=.. python run_finetune.py dcu/llama/sft_argument.json
 ```
 ## 3.预训练：
 ### 数据准备
-数据详细制作流程可参考[此处](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/tools/preprocess/README.md)，例：OpenWebText2预训练数据制作参考[此处](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/data/OpenWebText2.html)
+数据详细制作流程可参考[此处](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/tools/preprocess/README.md)，例：OpenWebText2预训练数据制作参考[此处](https://paddlenlp.readthedocs.io/zh/latest/llm/tools/preprocess/docs/OpenWebText2.html)
 
 为了方便用户运行测试本模型，本项目提供了处理好的100k 条 doc 的训练样本：
 

@@ -230,7 +230,7 @@ schema = {
 #### 7.1 抽取式任务数据转换
 
 - 当标注完成后，在 doccano 平台上导出 `JSONL(relation)` 形式的文件，并将其重命名为 `doccano_ext.json` 后，放入 `./data` 目录下。
-- 通过 [doccano.py](./doccano.py) 脚本进行数据形式转换，然后便可以开始进行相应模型训练。
+- 通过 [doccano.py](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/application/information_extraction/doccano.py) 脚本进行数据形式转换，然后便可以开始进行相应模型训练。
 
 ```shell
 python doccano.py \
@@ -251,8 +251,8 @@ python doccano.py \
 - ``schema_lang``: 选择 schema 的语言，可选有`ch`和`en`。默认为`ch`，英文数据集请选择`en`。
 
 备注：
-- 默认情况下 [doccano.py](./doccano.py) 脚本会按照比例将数据划分为 train/dev/test 数据集
-- 每次执行 [doccano.py](./doccano.py) 脚本，将会覆盖已有的同名数据文件
+- 默认情况下 doccano.py 脚本会按照比例将数据划分为 train/dev/test 数据集
+- 每次执行 doccano.py 脚本，将会覆盖已有的同名数据文件
 - 在模型训练阶段我们推荐构造一些负例以提升模型效果，在数据转换阶段我们内置了这一功能。可通过`negative_ratio`控制自动构造的负样本比例；负样本数量 = negative_ratio * 正样本数量。
 - 对于从 doccano 导出的文件，默认文件中的每条数据都是经过人工正确标注的。
 

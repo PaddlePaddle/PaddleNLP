@@ -53,7 +53,7 @@ class LoKrConfig:
     trainable_bias: Optional[str] = field(
         default=None, metadata={"help": "Define trainable bias parameters for the Lora model."}
     )
-    lokr_dim: int = field(default=8, metadata={"help": "Lora dimention in LoKr dimension, for adapter matrix"})
+    lokr_dim: int = field(default=8, metadata={"help": "Lora dimension in LoKr dimension, for adapter matrix"})
     factor: int = field(default=-1, metadata={"help": "Determine the decomposition size of LoKr matrices"})
     decompose_both: bool = field(
         default=False,

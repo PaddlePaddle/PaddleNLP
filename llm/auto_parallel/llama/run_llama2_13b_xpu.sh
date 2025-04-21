@@ -55,52 +55,65 @@ export PYTHONPATH=../../../:$PYTHONPATH
 # for debug
 #export GLOG_v=10
 export FLAGS_call_stack_level=2
+export GLOG_minloglevel=2
 
 rm -rf output/$task_name_or_path
 PYTHONPATH=../:$PYTHONPATH  \
 python -u  -m paddle.distributed.launch \
     --xpus "0,1,2,3,4,5,6,7" \
     --log_dir "output/$task_name_or_path/" \
-    run_pretrain_auto.py \
+    ./run_pretrain_auto.py \
     --model_name_or_path "meta-llama/Llama-2-13b" \
     --tokenizer_name_or_path "meta-llama/Llama-2-13b" \
     --input_dir "./data" \
     --output_dir "output/$task_name_or_path" \
-    --split 949,50,1 \
-    --max_seq_length 4096 \
     --per_device_train_batch_size 1 \
-    --per_device_eval_batch_size 1 \
+    --gradient_accumulation_steps 4 \
+    --per_device_eval_batch_size 4 \
+    --tensor_parallel_degree 1 \
+    --pipeline_parallel_degree 4 \
+    --sharding "stage1" \
+    --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate" \
+    --sharding_parallel_config "enable_overlap" \
+    --tensor_parallel_config "enable_mp_async_allreduce" \
+    --pipeline_parallel_config "enable_send_recv_overlap" \
+    --sequence_parallel 0 \
     --use_flash_attention 1 \
-    --use_fused_rope 1 \
+    --use_fused_rms_norm 0 \
+    --use_fast_layer_norm 1 \
     --fuse_attention_ffn 1 \
     --fuse_attention_qkv 1 \
-    --use_fused_rms_norm 0 \
-    --num_hidden_layers 4 \
+    --use_fused_rope 1 \
+    --enable_linear_fused_grad_add 0 \
+    --max_seq_length 4096 \
+    --learning_rate 3e-05 \
+    --min_learning_rate 3e-06 \
+    --warmup_steps 30 \
+    --logging_steps 1 \
+    --max_steps 1000 \
+    --save_steps 100000 \
+    --eval_steps 10000 \
+    --weight_decay 0.01 \
+    --do_train 1 \
+    --do_eval 0 \
     --bf16 \
     --fp16_opt_level "O2"  \
     --amp_master_grad true \
-    --scale_loss 1024 \
-    --learning_rate 0.00003 \
-    --min_learning_rate 0.000005 \
-    --lr_scheduler_type "cosine" \
-    --max_steps 10 \
-    --save_steps 100000 \
-    --weight_decay 0.01 \
+    --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
+    --amp_custom_white_list "lookup_table" "lookup_table_v2" \
     --warmup_ratio 0.01 \
     --max_grad_norm 1.0 \
-    --logging_steps 1 \
-    --sequence_parallel 0 \
-    --dataloader_num_workers 4 \
-    --pipeline_parallel_degree 1 \
-    --tensor_parallel_degree 1 \
-    --gradient_accumulation_steps 1 \
-    --eval_steps 1000 \
-    --report_to "visualdl" \
-    --disable_tqdm true \
+    --dataloader_num_workers 1 \
     --continue_training 0 \
+    --do_predict 0 \
+    --disable_tqdm 1 \
+    --skip_profile_timer 1 \
     --recompute 0 \
-    --do_train \
-    --seed 1026 \
+    --recompute_use_reentrant 1 \
+    --distributed_dataloader 0 \
+    --recompute_granularity "full" \
+    --save_total_limit 2 \
     --device "xpu" \
     --enable_auto_parallel 1 \
-    --to_static 1
+    --to_static 0 \
+    --hybrid_parallel_topo_order "sharding_first" \

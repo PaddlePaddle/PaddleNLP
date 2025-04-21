@@ -20,27 +20,34 @@ mkdir -p /workspace/case_logs
 export log_path=/workspace/case_logs
 export case_list=()
 
-galobal_total_count=0
-galobal_success_count=0
-galobal_exit_250_arr=()
-galobal_runtime_fail_arr=()
-galobal_verification_fail_arr=()
+global_total_count=0
+global_success_count=0
+global_exit_250_arr=()
+global_runtime_fail_arr=()
+global_verification_fail_arr=()
 
 target_lists_for_gpt=(
     "slm/model_zoo/gpt-3"
     "llm/auto_parallel/gpt-3"
-    "paddlenlp/transformers/gpt/modeling.py"
-    "paddlenlp/transformers/gpt/modeling_pp.py"
-    "paddlenlp/transformers/gpt/modeling_auto.py"
+    "paddlenlp/transformers/gpt"
     "scripts/distribute"
 )
 
 target_lists_for_llama=(
     "llm/auto_parallel/llama"
     "paddlenlp/trainer/auto_trainer.py"
-    "paddlenlp/transformers/llama/modeling_auto_static.py"
-    "paddlenlp/transformers/llama/modeling_auto.py"
-    "paddlenlp/transformers/llama/modeling.py"
+    "paddlenlp/transformers/llama"
+    "scripts/distribute"
+)
+
+target_lists_for_deepseek=(
+    "llm/auto_parallel/deepseek-v3"
+    "paddlenlp/trainer/auto_trainer.py"
+    "paddlenlp/transformers/deepseek_v2/modeling_auto.py"
+    "paddlenlp/transformers/deepseek_v2/modeling.py"
+    "paddlenlp/transformers/deepseek_v3/modeling_auto.py"
+    "paddlenlp/transformers/moe_layer_auto.py"
+    "paddlenlp/transformers/moe_gate_auto.py"
     "scripts/distribute"
 )
 
@@ -116,11 +123,17 @@ get_diff_TO_case(){
                         case_list[${#case_list[*]}]=llama_auto
                     fi
                 done
+                for ((i=0; i<${#target_lists_for_deepseek[@]}; i++)); do
+                    if [[ ${file_item} == *${target_lists_for_deepseek[i]}* ]];then
+                        case_list[${#case_list[*]}]=deepseek_auto
+                    fi
+                done
             fi
         done
     else
         case_list[${#case_list[*]}]=gpt-3_auto
         case_list[${#case_list[*]}]=llama_auto
+        case_list[${#case_list[*]}]=deepseek_auto
         for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
             arr_file_name=(${file_name//// })
             dir1=${arr_file_name[0]}
@@ -163,7 +176,7 @@ function execute_func_list(){
     exit_250_count=0
     while IFS= read -r func_name; do
         let total_count++
-        let galobal_total_count++
+        let global_total_count++
         execute_num=1
         while true; do
             bash $1 exec_case $func_name $FLAGS_install_deps $FLAGS_download_data  
@@ -171,20 +184,36 @@ function execute_func_list(){
             if [ $result -eq 0 ]; then
                 echo -e "\033[32m test success!"
                 let success_count++
-                let galobal_success_count++
-            elif [ $result -eq 2 ]; then
-                echo -e "\033[31m verification failed!"
-                let verification_fail_count++
-                galobal_verification_fail_arr+=("$func_name")
-            elif [ $result -eq 250 ] || [ $result -eq 1 ]; then
+                let global_success_count++
+            elif [ $result -eq 1 ]; then
                 if [ $execute_num -eq 1 ]; then
-                    echo -e "\033[31m fist time execute failed, try again!"
+                    echo -e "\033[31m first time execute failed, try again!"
                     let execute_num++
                     continue
                 else
                     echo -e "\033[31m second time execute failed, exit!"
+                    mv ${log_path}/$func_name ${log_path}/${func_name}_FAIL.log
+                    echo -e "\033[31m ${log_path}/$func_name_FAIL \033"
+                    tail -15 ${log_path}/${func_name}_FAIL.log
+                    let runtime_fail_count++ 
+                    global_runtime_fail_arr+=("$func_name") 
+                fi
+            elif [ $result -eq 2 ]; then
+                echo -e "\033[31m verification failed!"
+                let verification_fail_count++
+                global_verification_fail_arr+=("$func_name")
+            elif [ $result -eq 250 ]; then
+                if [ $execute_num -eq 1 ]; then
+                    echo -e "\033[31m first time execute failed, try again!"
+                    let execute_num++
+                    continue
+                else
+                    echo -e "\033[31m second time execute failed, exit!"
+                    mv ${log_path}/$func_name ${log_path}/${func_name}_FAIL.log
+                    echo -e "\033[31m ${log_path}/$func_name_FAIL \033"
+                    tail -15 ${log_path}/${func_name}_FAIL.log
                     let exit_250_count++
-                    galobal_exit_250_arr+=("$func_name")
+                    global_exit_250_arr+=("$func_name")
                 fi
             else
                 echo "test failed!"
@@ -192,7 +221,7 @@ function execute_func_list(){
                 echo -e "\033[31m ${log_path}/$func_name_FAIL \033"
                 tail -15 ${log_path}/${func_name}_FAIL.log
                 let runtime_fail_count++ 
-                galobal_runtime_fail_arr+=("$func_name") 
+                global_runtime_fail_arr+=("$func_name") 
             fi
             break
         done
@@ -269,6 +298,17 @@ if [[ ${#case_list[*]} -ne 0 ]];then
         let case_num++        
         clean_file $nlp_dir/llm/auto_parallel/gpt-3
     fi
+    if [[ $(contain_case deepseek_auto ${case_list[@]}; echo $?) -eq 1 ]];then
+        echo -e "\033[31m ---- running case $case_num/${#case_list[*]}: deepseek_auto \033"
+        cmd=/workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh 
+        bash $cmd prepare_case deepseek_case_list_auto $FLAGS_install_deps $FLAGS_download_data
+        execute_func_list $cmd deepseek_auto
+        export FLAGS_install_deps=1
+        export FLAGS_download_data="deepseek ""$FLAGS_download_data"
+        let case_num++        
+        clean_file $nlp_dir/llm/auto_parallel/deepseek-v3
+    fi
+    
     if [[ $(contain_case gpt-3_dygraph ${case_list[@]}; echo $?) -eq 1 ]];then
         echo -e "\033[31m ---- running case $case_num/${#case_list[*]}: gpt-3_dygraph \033"
         cmd=/workspace/PaddleNLP/scripts/distribute/ci_case_dy.sh
@@ -281,24 +321,24 @@ if [[ ${#case_list[*]} -ne 0 ]];then
     fi
     echo -e "\033[31m ---- end run case  \033"
 
-    echo -e "\033[31m ---- total tests :  $galobal_total_count \033"
-    if [ ${#galobal_exit_250_arr[@]} -ne 0 ]; then
-        echo -e "\033[32m ---- exit 250 test  :  ${#galobal_exit_250_arr[@]} \033"
-        for case in "${galobal_exit_250_arr[@]}"; do
+    echo -e "\033[31m ---- total tests :  $global_total_count \033"
+    if [ ${#global_exit_250_arr[@]} -ne 0 ]; then
+        echo -e "\033[32m ---- exit 250 test  :  ${#global_exit_250_arr[@]} \033"
+        for case in "${global_exit_250_arr[@]}"; do
             echo -e "\t$case(exit 250)"
         done
     fi
 
-    if [ ${#galobal_runtime_fail_arr[@]} -eq 0 ] && [ ${#galobal_verification_fail_arr[@]} -eq 0 ]; then
+    if [ ${#global_runtime_fail_arr[@]} -eq 0 ] && [ ${#global_verification_fail_arr[@]} -eq 0 ]; then
         echo -e "\033[32m ---- all cases Success  \033"
         EXCODE=0
     else 
-        echo -e "\033[32m ---- runtime failed test  :  ${#galobal_runtime_fail_arr[@]} \033"
-        for case in "${galobal_runtime_fail_arr[@]}"; do
+        echo -e "\033[32m ---- runtime failed test  :  ${#global_runtime_fail_arr[@]} \033"
+        for case in "${global_runtime_fail_arr[@]}"; do
             echo -e "\t$case(failed)"
         done
-        echo -e "\033[32m ---- verification failed test  :  ${#galobal_verification_fail_arr[@]} \033"
-        for case in "${galobal_verification_fail_arr[@]}"; do
+        echo -e "\033[32m ---- verification failed test  :  ${#global_verification_fail_arr[@]} \033"
+        for case in "${global_verification_fail_arr[@]}"; do
             echo -e "\t$case(failed)"
         done
         EXCODE=1

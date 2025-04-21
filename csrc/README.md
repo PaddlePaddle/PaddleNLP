@@ -23,5 +23,6 @@ python setup_cuda.py install
 - 对于89架构的 GPU，CUDA 版本至少为12.4
 - 对于90架构的 GPU，CUDA 版本至少为12.0
 ```shell
+cd tools
 sh tune_fp8_gemm.sh
 ```

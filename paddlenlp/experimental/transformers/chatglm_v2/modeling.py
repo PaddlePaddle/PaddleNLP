@@ -31,7 +31,10 @@ from paddlenlp.experimental.transformers.generation_utils import (
     GenerationBlockInferenceModel,
     GenerationInferenceModel,
 )
-from paddlenlp.experimental.transformers.utils import infererence_model_from_pretrained
+from paddlenlp.experimental.transformers.utils import (
+    infererence_model_from_config,
+    infererence_model_from_pretrained,
+)
 from paddlenlp.transformers import ChatGLMv2Config, ChatGLMv2PretrainedModel
 from paddlenlp.transformers.chatglm_v2.modeling import (
     Embedding,
@@ -161,7 +164,7 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
             activation="swiglu",
             normalize_before=True,
             num_layers=config.num_hidden_layers,
-            nranks=1,
+            tp_degree=1,
             ring_id=-1,
             ln_scale_attrs=ln_scale_attrs,
             qkv_weight_attrs=qkv_weight_attrs,
@@ -449,6 +452,10 @@ class ChatGLMv2ForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMv2Pret
         return infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs)
 
     @classmethod
+    def from_config(cls, config, *args, **kwargs):
+        return infererence_model_from_config(cls, config, args, kwargs)
+
+    @classmethod
     def get_cache_kvs_shape(cls, config: ChatGLMv2Config, max_batch_size: int = None, max_length: int = None):
         """get cache_kvs tensor for opt model
 
@@ -571,6 +578,10 @@ class ChatGLMv2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Cha
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
         return infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs)
+
+    @classmethod
+    def from_config(cls, config, *args, **kwargs):
+        return infererence_model_from_config(cls, config, args, kwargs)
 
     @classmethod
     def get_cache_kvs_shape(cls, config: ChatGLMv2Config, max_batch_size: int = None, max_length: int = None):

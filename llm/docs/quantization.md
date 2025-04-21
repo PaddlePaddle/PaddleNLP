@@ -54,7 +54,7 @@ git clone 代码到本地，即可开始。
 除了上述数据集，也可以使用抽取 ceval 部分训练数据集作为校准数据。通过下述命令下载数据到当前文件夹并解压
 ```shell
 mkdir dataset
-wget https://huggingface.co/datasets/ceval/ceval-exam/resolve/main/ceval-exam.zip
+wget https://modelscope.oss-cn-beijing.aliyuncs.com/open_data/c-eval/ceval-exam.zip
 unzip ceval-exam.zip -d dataset/ceval
 ```
 使用下述脚本和命令抽取 C-Eval 样本作为校准数据集：
@@ -106,7 +106,7 @@ python  run_quantization.py ./config/llama/fp8_ptq_argument.json
     - a8w8_fp8指对激活、权重进行 FP8量化
     - wint4/weight_only_int4指仅对模型权重进行 INT4量化，后续使用 WeightOnly 进行推理
     - wint8/weight_only_int8指仅对模型权重进行 INT8量化，后续使用 WeightOnly 进行推理
-- `fp8_type`: FP8量化类型，指定 activatin，weight 的 fp8类型，默认为`["e4m3","e4m3"]`。
+- `fp8_type`: FP8量化类型，指定 activation，weight 的 fp8类型，默认为`["e4m3","e4m3"]`。
 - `do_ptq`: 是否进行 PTQ 量化，默认为 False。
 - `weight_quant_method`: 权重量化方式，INT8量化可选 groupwise 或者 abs_max_channel_wise，FP8量化可选 abs_max 或 avg。
 - `act_quant_method`: 激活量化方式，INT8可选 avg 或者 abs_max，FP8量化可选 abs_max 或 avg。

@@ -398,7 +398,6 @@ class DataCollatorForSeq2Seq:
                     feature["labels"] = np.concatenate([feature["labels"], remainder]).astype(np.int64)
                 else:
                     feature["labels"] = np.concatenate([remainder, feature["labels"]]).astype(np.int64)
-
         batch = self.tokenizer.pad(
             batch,
             padding=self.padding,
@@ -415,6 +414,11 @@ class DataCollatorForSeq2Seq:
         ):
             decoder_input_ids = self.model.prepare_decoder_input_ids_from_labels(labels=batch["labels"])
             batch["decoder_input_ids"] = decoder_input_ids
+
+        if "labels" in batch.keys():
+            value = batch.pop("labels")
+            batch["labels"] = value
+
         return batch
 
 
@@ -428,6 +432,7 @@ class DataCollatorForEmbedding:
     return_tensors: str = "pd"
     return_attention_mask: Optional[bool] = None
     max_label_length: Optional[int] = None
+    return_position_ids: Optional[bool] = True
 
     max_query_len: int = 512
     max_passage_len: int = 512
@@ -482,6 +487,10 @@ class DataCollatorForEmbedding:
         queries["embedding_indices"] = paddle.to_tensor(np.array(batch_query_embedding_indices, dtype="int32"))
         passages["embedding_indices"] = paddle.to_tensor(np.array(batch_passage_embedding_indices, dtype="int32"))
 
+        if not self.return_position_ids:
+            del queries["position_ids"]
+            del passages["position_ids"]
+
         return {
             "query": queries,
             "passages": passages,
@@ -513,12 +522,12 @@ class DataCollatorForEmbedding:
     @staticmethod
     def gen_self_attn_mask(batch_token_ids: List[List[int]], max_seq_len: int):
         """Generate self attention mask for multiple sub-sequence."""
-        input_mask_data = np.zeros((1, 1, max_seq_len, max_seq_len), dtype="float32")
+        input_mask_data = np.zeros((1, max_seq_len), dtype="float32")
         offset = 0
         for index, token_ids in enumerate(batch_token_ids):
             cur_len = len(token_ids)
-            b = np.tril(np.ones([cur_len, cur_len]), 0)
-            input_mask_data[0, 0, offset : offset + cur_len, offset : offset + cur_len] = b
+            b = np.ones([cur_len])
+            input_mask_data[0, offset : offset + cur_len] = b
             offset += cur_len
         return input_mask_data
 

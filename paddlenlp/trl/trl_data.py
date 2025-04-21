@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import numpy as np
+import paddle
 
 
 def check_preference_data(data):
@@ -183,6 +184,8 @@ def preference_collate_fn(batch, max_seq_len=None, data_type="pairwise"):
         "response_0_labels": [],
         "response_1_labels": [],
         "response_indexs": [],
+        "reference_chosen_logps": paddle.to_tensor([0], dtype="float32"),
+        "reference_rejected_logps": paddle.to_tensor([0], dtype="float32"),
     }
     sequence = batch[0]
     if "attn_mask_startend_row_indices" in sequence:
@@ -237,3 +240,29 @@ def preference_collate_fn(batch, max_seq_len=None, data_type="pairwise"):
         else:
             input_dict[key] = np.array(input_dict[key])
     return input_dict
+
+
+def preference_collate_fn_auto_parallel(batch, max_seq_len=None, data_type="pairwise", enable_auto_parallel=False):
+    input_dict = preference_collate_fn(batch, max_seq_len, data_type)
+    if "attn_mask_startend_row_indices" in input_dict:
+        input_dict["attention_mask"] = np.array(paddle.to_tensor([0], dtype="float32"))
+    result = {
+        "input_ids": [
+            input_dict["input_ids"],
+            input_dict["position_ids"],
+            input_dict["response_indexs"],
+            input_dict["attention_mask"],
+            input_dict["chosen_labels"],
+            input_dict["rejected_labels"],
+        ],
+        "labels": [
+            input_dict["chosen_labels"],
+            input_dict["rejected_labels"],
+            input_dict["response_indexs"],
+            input_dict["reference_chosen_logps"],
+            input_dict["reference_rejected_logps"],
+        ],
+    }
+    if "attn_mask_startend_row_indices" in input_dict:
+        result["input_ids"].append(input_dict["attn_mask_startend_row_indices"])
+    return result

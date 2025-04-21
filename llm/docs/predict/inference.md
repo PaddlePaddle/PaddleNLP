@@ -84,9 +84,17 @@ PaddleNLP 提供了多种参数，用于配置推理模型和优化推理性能�
 
 - `avx_type`: avx 计算类型，默认为 None。可选的数值有`fp16`、 `bf16`。
 
-- `src_length`: 模型输入上下文最大 token 长度，默认为1024。
+- `src_length`: 模型输入（仅 prompt）最大 token 长度，默认为 1024。
 
-- `max_length`:模型输入（上下文+生成内容）的最大 token 长度, 默认为2048。
+- `max_length`: 模型输出（仅生成内容）的最大 token 长度,默认为 1024。
+
+- `total_max_length`: 模型输入+输出（prompt+生成内容）的最大 token 长度,默认为 4096。
+
+- `mla_use_matrix_absorption`: 跑 DeepSeek-V3/R1 模型时，是否使用 MLA 模块性能更优的矩阵吸收实现，默认为 True。
+
+- `dynamic_insert`: 离线推理时是否支持动态插入（当前仅支持 Block/Append Attention 推理），默认为 True。开启该选项后，将`batch_size`作为运行时最大批处理大小。
+
+- `total_request_num`: 自动生成的输入请求数量，仅配合`dynamic_insert`测试使用，默认为 None，即与`batch_size`保持一致。
 
 
 ### 3.2 性能优化参数
@@ -108,17 +116,31 @@ PaddleNLP 提供了多种量化策略，支持 Weight Only INT8及 INT4推理，
 
 - `cachekv_int8_type`: 是否使用 cachekv int8量化，默认值为 None。可选`dynamic`（已不再维护，不建议使用）和`static`两种，`static`需要额外的 cache kv 的 scale 校准表，传入的 `model_name_or_path` 为 PTQ 校准产出的量化模型。量化模型导出参考[大模型量化教程](../quantization.md)。
 
+- `weightonly_group_size`: `weight_only`模式下，使用`group wise`量化方式，`group size`目前支持 为 `64` 和 `128`，默认值为`-1`表示`channel wise`模式。
+
+- `weight_block_size`: FP8 权重量化粒度， 当前支持 DeepSeek-V3/R1 模型， 默认为[128 128]。
+
+- `moe_quant_type`: MoE 量化类型， 支持 DeepSeek-V3/R1-FP8 模型的 MoE 量化推理， 默认为空， 可选值`weight_only_int4`、`weight_only_int8`。
+
 ### 3.4 投机解码参数
 
-- `speculate_method`: 推理解码算法，默认值为`None`，可选的数值有`None`、`inference_with_reference`。为`None`时为正常自回归解码，为`inference_with_reference`时为基于上下文的投机解码[论文地址](https://arxiv.org/pdf/2304.04487)。
+PaddleNLP 提供了多种投机解码方法，具体细节请查阅[投机解码教程](./speculative_decoding.md).
 
-- `speculate_max_draft_token_num`: 投机解码算法中每轮产生的最大 draft tokens 数目，默认值为 1。
+- `speculate_method`: 推理解码算法，默认值为`None`，可选的数值有`None`、`inference_with_reference`、 `mtp`、 `eagle`。为`None`时为正常自回归解码，为`inference_with_reference`时为基于上下文的投机解码[论文地址](https://arxiv.org/pdf/2304.04487)。
+
+- `speculate_max_draft_token_num`: 投机解码算法中每轮产生的最大 draft tokens 数目，默认值为 1，最大支持 5。
 
 - `speculate_max_ngram_size`: n-gram 匹配 draft tokens 时的最大窗口大小，默认值为`1`。inference_with_reference 算法中会先从 prompt 中使用 ngram 窗口滑动匹配 draft tokens，窗口大小和输入输出重叠程度共同决定了产生 draft tokens 的开销从而影响 inference_with_reference 算法的加速效果。
 
-- `speculate_verify_window`: 投机解码 verify 策略默认采用 TopP + window verify 中的 window 大小，默认值为`2`。更多有关 TopP + window verify 的详细介绍参考[投机解码教程](./speculative_decoding.md)。
+- `speculate_verify_window`(暂时废弃): 投机解码 verify 策略默认采用 TopP + window verify 中的 window 大小，默认值为`2`。更多有关 TopP + window verify 的详细介绍参考[投机解码教程](./speculative_decoding.md)。
 
-- `speculate_max_candidate_len`: 产生的最大候选 tokens 数目，根据候选 tokens 与 draft tokens 比较来进行 verify(仅在 TopP + window verify 时生效)，默认值为`5`。
+- `speculate_max_candidate_len`(暂时废弃): 产生的最大候选 tokens 数目，根据候选 tokens 与 draft tokens 比较来进行 verify(仅在 TopP + window verify 时生效)，默认值为`5`。
+
+- `draft_model_name_or_path`: 在`MTP`或者`EAGLE`模式下，`Draft Model`的路径。
+
+- `draft_model_quant_type`: 在`MTP`或者`EAGLE`模式下，`Draft Model`的推理量化精度，参考`--quant_type`。
+
+- `return_full_hidden_states`: 在`MTP`或者`EAGLE`模式下，是否返回全部的隐藏层状态，默认为`False`。
 
 ### 3.5 解码策略参数
 
@@ -148,6 +170,9 @@ PaddleNLP 提供了多种量化策略，支持 Weight Only INT8及 INT4推理，
 ```shell
 # 动态图模型推理命令参考
 python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16 --block_attn
+
+# 动态图模型推理开启动态插入命令参考
+python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16 --block_attn --batch_size 2 --total_request_num 5 --dynamic_insert
 
 # XPU设备动态图模型推理命令参考
 python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16 --block_attn --device xpu
@@ -224,7 +249,7 @@ client = OpenAI(
 # Completion API
 stream = True
 completion = client.chat.completions.create(
-    model="paddlenlp",
+    model="default",
     messages=[
         {"role": "user", "content": "PaddleNLP好厉害！这句话的感情色彩是？"}
     ],
@@ -246,6 +271,7 @@ else:
 
 -  [llama](./llama.md)
 -  [qwen](./qwen.md)
+-  [deepseek](./deepseek.md)
 -  [mixtral](./mixtral.md)
 -  [投机解码](./speculative_decoding.md)
 

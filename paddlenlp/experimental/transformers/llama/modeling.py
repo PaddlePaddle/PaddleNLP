@@ -51,6 +51,7 @@ from paddlenlp.experimental.transformers.utils import (
     EmptyActScale,
     EmptyCacheScale,
     EmptyWeightScale,
+    infererence_model_from_config,
     infererence_model_from_pretrained,
 )
 from paddlenlp.transformers import LlamaConfig, LlamaPretrainedModel
@@ -208,7 +209,7 @@ class LlamaAvxInferenceModel(LlamaPretrainedModel):
             norm_type="rmsnorm",
             epsilon=self.epsilon,
             rope_theta=self.rope_theta,
-            nranks=config.tensor_parallel_degree,
+            tp_degree=config.tensor_parallel_degree,
             avx_config=avx_config,
         )
 
@@ -223,7 +224,7 @@ class LlamaAvxInferenceModel(LlamaPretrainedModel):
         batch_size = 1
         seq_len = 1
         if bos_token_id is None:
-            raise ValueError("`bos_token_id` should be defined when no " "`input_ids` are provided.")
+            raise ValueError("`bos_token_id` should be defined when no `input_ids` are provided.")
         if encoder_output is not None:
             batch_size = encoder_output.shape[0]
             seq_len = encoder_output.shape[1]
@@ -245,7 +246,7 @@ class LlamaAvxInferenceModel(LlamaPretrainedModel):
         elif input_ids is None and inputs_embeds is None:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
 
-        # genereate a fake input_ids according to inputs_embeds
+        # generate a fake input_ids according to inputs_embeds
         if input_ids is None and inputs_embeds is not None:
             input_ids = self.prepare_input_ids_for_generation(self.config.bos_token_id, inputs_embeds)
         if inputs_embeds is not None:
@@ -405,12 +406,15 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         self.use_fake_parameter = config.get("use_fake_parameter", False)
 
         self.use_weight_only = False
+        self.weightonly_group_size = -1
         if config.quant_type == "weight_only_int8":
             self.use_weight_only = True
             self.quant_algo = "weight_only_int8"
+            self.weightonly_group_size = config.weightonly_group_size
         elif config.quant_type == "weight_only_int4":
             self.use_weight_only = True
             self.quant_algo = "weight_only_int4"
+            self.weightonly_group_size = config.weightonly_group_size
         elif config.quant_type and "a8w8" in config.quant_type:
             self.quant_model_path = config.model_name_or_path
             self.shift = config.quantization_config.shift
@@ -618,9 +622,10 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             kv_num_heads=self.num_key_value_heads,
             intermediate_size=self.intermediate_size,
             quant_type=self.quant_type,
+            weightonly_group_size=self.weightonly_group_size,
             activation="swiglu",
             num_layers=config.num_hidden_layers,
-            nranks=config.tensor_parallel_degree,
+            tp_degree=config.tensor_parallel_degree,
             ring_id=ring_id,
             ln_scale_attrs=ln_scale_attrs,
             qkv_weight_attrs=qkv_weight_attrs,
@@ -704,7 +709,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         batch_size = 1
         seq_len = 1
         if bos_token_id is None:
-            raise ValueError("`bos_token_id` should be defined when no " "`input_ids` are provided.")
+            raise ValueError("`bos_token_id` should be defined when no `input_ids` are provided.")
         if encoder_output is not None:
             batch_size = encoder_output.shape[0]
             seq_len = encoder_output.shape[1]
@@ -736,7 +741,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         elif input_ids is None and inputs_embeds is None:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
 
-        # genereate a fake input_ids according to inputs_embeds
+        # generate a fake input_ids according to inputs_embeds
         # this is usually occurred in img2txt multimodal model when first enter into this forward function.
         if input_ids is None and inputs_embeds is not None:
             input_ids = self.prepare_input_ids_for_generation(self.config.bos_token_id, inputs_embeds)
@@ -1092,10 +1097,10 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             if self.use_weight_only:
                 qkv_weight_tensor = paddle.transpose(qkv_weight_tensor, perm=[1, 0])
                 qkv_quanted_weight_tensor, qkv_weight_scale_tensor = weight_quantize(
-                    qkv_weight_tensor, algo=self.quant_algo
+                    qkv_weight_tensor.cpu(), algo=self.quant_algo, group_size=self.weightonly_group_size
                 )
-                self.transformer_block.qkv_weights[idx].set_value(qkv_quanted_weight_tensor)
-                self.transformer_block.qkv_weights_scale[idx].set_value(qkv_weight_scale_tensor)
+                self.transformer_block.qkv_weights[idx].set_value(qkv_quanted_weight_tensor.cuda())
+                self.transformer_block.qkv_weights_scale[idx].set_value(qkv_weight_scale_tensor.cuda())
             elif "fp8" in self.quant_type:
                 self.transformer_block.qkv_weights[idx].copy_(paddle.cast(concated_qkv_weight, "float8_e4m3fn"), False)
             elif "a8w8" in self.quant_type and not self.transformer_block.skip_quant("qkv_weight_scale", idx):
@@ -1110,10 +1115,10 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             ).cast(paddle.get_default_dtype())
             if self.use_weight_only:
                 linear_quanted_weight_tensor, linear_weight_scale_tensor = weight_quantize(
-                    linear_weight_tensor, algo=self.quant_algo
+                    linear_weight_tensor.cpu(), algo=self.quant_algo, group_size=self.weightonly_group_size
                 )
-                self.transformer_block.linear_weights[idx].set_value(linear_quanted_weight_tensor)
-                self.transformer_block.linear_weights_scale[idx].set_value(linear_weight_scale_tensor)
+                self.transformer_block.linear_weights[idx].set_value(linear_quanted_weight_tensor.cuda())
+                self.transformer_block.linear_weights_scale[idx].set_value(linear_weight_scale_tensor.cuda())
             elif "fp8" in self.quant_type:
                 self.transformer_block.linear_weights[idx].copy_(
                     paddle.cast(
@@ -1171,10 +1176,10 @@ class LlamaInferenceModel(LlamaPretrainedModel):
 
             if self.use_weight_only:
                 ffn1_quanted_weight_tensor, ffn1_weight_scale_tensor = weight_quantize(
-                    ffn1_weight_tensor, algo=self.quant_algo
+                    ffn1_weight_tensor.cpu(), algo=self.quant_algo, group_size=self.weightonly_group_size
                 )
-                self.transformer_block.ffn1_weights[idx].set_value(ffn1_quanted_weight_tensor)
-                self.transformer_block.ffn1_weights_scale[idx].set_value(ffn1_weight_scale_tensor)
+                self.transformer_block.ffn1_weights[idx].set_value(ffn1_quanted_weight_tensor.cuda())
+                self.transformer_block.ffn1_weights_scale[idx].set_value(ffn1_weight_scale_tensor.cuda())
             elif "fp8" in self.quant_type:
                 self.transformer_block.ffn1_0_weights[idx].copy_(
                     paddle.to_tensor(unfused_state_dict["mlp.gate_proj.weight"])
@@ -1208,10 +1213,10 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             )
             if self.use_weight_only:
                 ffn2_quanted_weight_tensor, ffn2_weight_scale_tensor = weight_quantize(
-                    ffn2_weight_tensor, algo=self.quant_algo
+                    ffn2_weight_tensor.cpu(), algo=self.quant_algo, group_size=self.weightonly_group_size
                 )
-                self.transformer_block.ffn2_weights[idx].set_value(ffn2_quanted_weight_tensor)
-                self.transformer_block.ffn2_weights_scale[idx].set_value(ffn2_weight_scale_tensor)
+                self.transformer_block.ffn2_weights[idx].set_value(ffn2_quanted_weight_tensor.cuda())
+                self.transformer_block.ffn2_weights_scale[idx].set_value(ffn2_weight_scale_tensor.cuda())
             elif "fp8" in self.quant_type:
                 self.transformer_block.ffn2_weights[idx].copy_(
                     paddle.to_tensor(state_dict["llama.layers.{}.mlp.down_proj.weight".format(idx)])
@@ -1382,6 +1387,7 @@ class LlamaBlockInferenceModel(LlamaInferenceModel):
         super().__init__(config)
         self.max_seq_len = config.max_seq_len
         self.block_size = config.block_size
+        self.config = config
 
     def set_transformer_block(self, transformer_config):
         if self.use_weight_only:
@@ -1415,7 +1421,6 @@ class LlamaBlockInferenceModel(LlamaInferenceModel):
         return_dict=False,
         **kwargs,
     ):
-
         seq_lens_this_time = kwargs.get("seq_lens_this_time", None)
         rope_emb = kwargs.get("rope_emb", None)
         draft_tokens = kwargs.get("draft_tokens", None)
@@ -1530,7 +1535,6 @@ class EagleForLlamaInferenceModel(LlamaBlockInferenceModel):
 
 
 class LlamaForCausalLMAvxInferenceModel(GenerationAvxInferenceModel, LlamaPretrainedModel):
-
     _keys_to_ignore_on_load_missing = [r"lm_head.weight"]
 
     def __init__(self, config):
@@ -1541,6 +1545,10 @@ class LlamaForCausalLMAvxInferenceModel(GenerationAvxInferenceModel, LlamaPretra
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
         return infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs)
+
+    @classmethod
+    def from_config(cls, config, *args, **kwargs):
+        return infererence_model_from_config(cls, config, args, kwargs)
 
     @classmethod
     def get_cache_kvs_shape(
@@ -1637,6 +1645,10 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
         return infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs)
+
+    @classmethod
+    def from_config(cls, config, *args, **kwargs):
+        return infererence_model_from_config(cls, config, args, kwargs)
 
     @classmethod
     def get_cache_kvs_shape(
@@ -1819,7 +1831,6 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
 
     @classmethod
     def _get_tensor_parallel_mappings(cls, config: LlamaConfig, is_split=True):
-
         logger.info("llama inference model _get_tensor_parallel_mappings")
 
         from paddlenlp.transformers.conversion_utils import split_or_merge_func
@@ -1902,6 +1913,10 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
         return infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs)
+
+    @classmethod
+    def from_config(cls, config, *args, **kwargs):
+        return infererence_model_from_config(cls, config, args, kwargs)
 
     @classmethod
     def get_cache_kvs_shape(
@@ -2195,9 +2210,8 @@ class LlamaForMiniGPT4InferenceModel(LlamaForCausalLMInferenceModel):
         stop_nums=None,
         cache_kvs=[],
         inputs_embeds=None,
-        **generate_kwargs
+        **generate_kwargs,
     ) -> paddle.Tensor:
-
         first_embeds = self.llama.embed_tokens(first_input_ids)
         second_embeds = self.llama.embed_tokens(second_input_ids)
         image_features = paddle.cast(image_features, dtype=first_embeds.dtype)

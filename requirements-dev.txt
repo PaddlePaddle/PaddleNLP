@@ -1,4 +1,5 @@
 paddleocr
+simsimd==1.1.2
 pre-commit
 pytest==8.1.1
 parameterized
@@ -12,7 +13,7 @@ yacs
 unidecode
 soundfile
 librosa
-numpy==1.23.5
+numpy
 rouge
 tiktoken
 visualdl

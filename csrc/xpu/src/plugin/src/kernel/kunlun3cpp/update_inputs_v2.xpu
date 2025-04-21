@@ -1,0 +1,147 @@
+#include "xpu/kernel/xtdk_io.h"
+#include "xpu/kernel/cluster.h"
+#include "xpu/kernel/cluster_partition.h"
+#include "xpu/kernel/cluster_primitive.h"
+#include "xpu/kernel/cluster_debug.h"
+
+
+namespace xpu3 {
+namespace plugin {
+
+static inline __device__ bool is_in_end_v3(const int64_t id,
+                                        const int64_t* end_ids,
+                                        const int length) {
+  for (int i = 0; i < length; i++) {
+    if (id == end_ids[i]) {
+      return true;
+    }
+  }
+  return false;
+}
+
+__global__ void update_inputs_v2(bool *not_need_stop,
+    int64_t* step_idx,
+    bool* stop_flags,
+    int* seq_lens_this_time,
+    int* seq_lens_encoder,
+    int* seq_lens_decoder,
+    int64_t* next_tokens,
+    int64_t* kwargs_next_tokens,
+    int64_t* input_ids,
+    const int64_t* end_ids,
+    const int64_t* stop_nums,
+    const bool* is_block_step,
+    const int64_t* max_dec_len,
+    int bsz,
+    int max_bsz,
+    int input_ids_stride,
+    int end_length) {
+  int cid = core_id();
+  int ncores = core_num();
+  int clusterid = cluster_id();
+  int nclusters = cluster_num();
+  int tid = clusterid * ncores + cid;
+  if (clusterid != 0) return;
+
+  // assert bsz <= 1024
+  const int MAX_BS = 1024;
+  __shared__ bool stop_flags_sm[MAX_BS];
+  __shared__ int stop_flags_int_sm[MAX_BS];
+  // assert end_length <= 64
+  const int MAX_END_LEN = 64;
+  __simd__ int64_t end_ids_lm[64];
+  GM2LM(end_ids, end_ids_lm, end_length * sizeof(int64_t));
+  if (cid == 0) {
+    GM2SM(stop_flags, stop_flags_sm, sizeof(bool) * max_bsz);
+  }
+  sync_all();
+
+  for (int i = cid; i < max_bsz; i += ncores) {
+    int64_t step_idx_lm;
+    int64_t max_dec_len_lm;
+    GM2LM_ASYNC(step_idx + i, &step_idx_lm, sizeof(int64_t));
+    GM2LM_ASYNC(max_dec_len + i, &max_dec_len_lm, sizeof(int64_t));
+    mfence();
+    if (!stop_flags_sm[i]) {
+      step_idx_lm += 1;
+      LM2GM_ASYNC(&step_idx_lm, step_idx + i, sizeof(int64_t));
+    }
+    if (step_idx_lm >= max_dec_len_lm) {
+      stop_flags_sm[i] = true;
+      bool stop_flags_now = true;
+      LM2GM_ASYNC(&stop_flags, stop_flags + i, sizeof(bool));
+    }
+    mfence();
+  }
+  sync_all();
+
+  for (int i = cid; i < bsz; i += ncores) {
+    int64_t next_tokens_lm;
+    int seq_lens_this_time_lm;
+    GM2LM_ASYNC(next_tokens + i, &next_tokens_lm, sizeof(int64_t));
+    GM2LM_ASYNC(seq_lens_this_time + i, &seq_lens_this_time_lm, sizeof(int));
+    mfence();
+    if (stop_flags_sm[i]) {
+      if (seq_lens_this_time_lm == 0) {
+        next_tokens_lm = -1;
+      } else {
+        next_tokens_lm = end_ids_lm[0];
+        LM2GM_ASYNC(end_ids_lm, kwargs_next_tokens + i, sizeof(int64_t));
+      }
+      LM2GM(&next_tokens_lm, next_tokens + i, sizeof(int64_t));
+    } else {
+      LM2GM(&next_tokens_lm, kwargs_next_tokens + i, sizeof(int64_t));
+    }
+    // printf("next_tokens_lm %lld\n", next_tokens_lm);
+    if (is_in_end_v3(next_tokens_lm, end_ids_lm, end_length)) {
+      stop_flags_sm[i] = true;
+      bool stop_flags_now = true;
+      LM2GM(&stop_flags_now, stop_flags + i, sizeof(bool));
+    }
+  }
+  sync_all();
+
+  for (int i = cid; i < bsz; i += ncores) {
+    int seq_len_encoder;
+    int seq_len_decoder;
+    bool is_block_step_lm;
+    GM2LM_ASYNC(seq_lens_encoder + i, &seq_len_encoder, sizeof(int));
+    GM2LM_ASYNC(seq_lens_decoder + i, &seq_len_decoder, sizeof(int));
+    GM2LM_ASYNC(is_block_step + i, &is_block_step_lm, sizeof(bool));
+    mfence();
+
+    bool stop_flag_now = stop_flags_sm[i];
+    stop_flags_int_sm[i] = is_block_step_lm ? 0 : stop_flag_now;
+    int seq_len_decoder_update =
+        stop_flag_now
+            ? 0
+            : (seq_len_encoder > 0 ? (seq_len_encoder + seq_len_decoder) : seq_len_decoder + 1);
+    int seq_len_this_time_update = !stop_flag_now;
+    int seq_len_encoder_update = 0;
+    mfence_lm();
+    LM2GM_ASYNC(&seq_len_decoder_update, seq_lens_decoder + i, sizeof(int));
+    LM2GM_ASYNC(&seq_len_this_time_update, seq_lens_this_time + i, sizeof(int));
+    LM2GM(&seq_len_encoder_update, seq_lens_encoder + i, sizeof(int));
+    int64_t input_ids_update;
+    GM2LM(next_tokens + i, &input_ids_update, sizeof(int64_t));
+    LM2GM(&input_ids_update, input_ids + i * input_ids_stride, sizeof(int64_t));
+  }
+  sync_cluster();
+
+  int stop_sum = 0;
+  if (cid == 0) {
+    for (int i = 0; i < bsz; i++) {
+      stop_sum += stop_flags_int_sm[i];
+    }
+    stop_sum += (max_bsz - bsz);
+    int64_t stop_num;
+    GM2LM(stop_nums, &stop_num, sizeof(int64_t));
+    bool not_need_stop_update = stop_sum < static_cast<int>(stop_num);
+    mfence_lm();
+    // not_need_stop_update = false;
+    LM2GM(&not_need_stop_update, not_need_stop, sizeof(bool));
+  }
+}
+
+}  // namespace plugin
+}  // namespace xpu3

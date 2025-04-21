@@ -27,9 +27,13 @@ import paddle
 import paddle.distributed as dist
 import paddle.distributed.fleet as fleet
 from paddle.base.framework import use_pir_api
-from paddlenlp_ops import speculate_step_paddle, step_paddle
+from paddlenlp_ops import step_paddle
+
+if not paddle.is_compiled_with_xpu():
+    from paddlenlp_ops import speculate_step_paddle
+
 from server.data.processor import DataProcessor
-from server.engine.config import Config
+from server.engine.config import global_config
 from server.utils import get_logger
 from task_queue_manager import TaskQueueManager
 
@@ -37,7 +41,12 @@ from paddlenlp.experimental.transformers import (
     EagleProposer,
     InferenceWithReferenceProposer,
 )
+from paddlenlp.trl import llm_utils
 from paddlenlp.trl.llm_utils import get_rotary_position_embedding
+from paddlenlp.utils.env import (
+    PADDLE_INFERENCE_MODEL_SUFFIX,
+    PADDLE_INFERENCE_WEIGHTS_SUFFIX,
+)
 
 File_Path = os.path.realpath(sys.argv[0])
 Dir_Path = os.path.dirname(File_Path)
@@ -51,7 +60,7 @@ class ModelRunner:
         # 2**63 - 1
         self.MAX_INFER_SEED = 9223372036854775806
 
-        self.config = Config()
+        self.config = global_config
         self.model_cfg = self.config.get_model_config()
         self.speculate_config = self.config.get_speculate_config()
         self.is_speculate_decoding = self.speculate_config.speculate_method != "None"
@@ -270,6 +279,7 @@ class ModelRunner:
         self.share_inputs["input_ids"] = paddle.full(
             shape=[self.args.max_batch_size, self.args.max_seq_len], fill_value=self.pad_token_id, dtype="int64"
         )
+        self.share_inputs["queue_id"] = paddle.full(shape=[1], fill_value=-1, dtype="int32")
         self.share_inputs["top_p"] = paddle.full(
             shape=[self.args.max_batch_size, 1], fill_value=self.top_p, dtype="float32"
         )
@@ -337,8 +347,12 @@ class ModelRunner:
         self.share_inputs["need_block_len"] = paddle.full(shape=[1], fill_value=0, dtype="int32")
         self.share_inputs["used_list_len"] = paddle.full(shape=[self.args.max_batch_size], fill_value=0, dtype="int32")
         self.share_inputs["infer_seed"] = paddle.full(shape=[self.args.max_batch_size, 1], fill_value=0, dtype="int64")
-        free_list = list(range(int(self.args.max_block_num * self.args.block_ratio)))
+
+        free_list = list(
+            range(self.args.max_block_num - 1, int(self.args.max_block_num * self.args.block_ratio) - 1, -1)
+        )
         self.free_list_len = len(free_list)
+
         self.share_inputs["free_list"] = paddle.to_tensor(free_list, dtype="int32")
         self.share_inputs["free_list_len"] = paddle.full(shape=[1], fill_value=self.free_list_len, dtype="int32")
 
@@ -523,7 +537,6 @@ class ModelRunner:
                 self.share_inputs["first_token_ids"],
                 self.args.block_size,
                 self.args.enc_dec_block_num,
-                0,
             )
 
     def initialize_engine_ready_check_flag(self):
@@ -608,7 +621,7 @@ class ModelRunner:
                 engine_healthy_recorded_time_array,
             ) = self.initialize_engine_healthy_recorded_time_flag()
             engine_healthy_recorded_time_array[0] = time.time()
-            # infer_live_flag_shm = self.initialize_engine_live_flag()
+            infer_live_flag_shm = self.initialize_engine_live_flag()
         infer_seed_increment = paddle.full(shape=[self.args.max_batch_size, 1], fill_value=4, dtype="int64")
         # thread_executor = ThreadPoolExecutor(max_workers=1)
         real_bsz = None
@@ -720,15 +733,22 @@ class InferenceEngine(object):
         predictor init
         """
         device_id = self.rank % self.config.mp_num_per_node
-        if use_pir_api():
-            self.model_file = os.path.join(self.model_dir, "model.json")
-            self.param_file = os.path.join(self.model_dir, "model.pdiparams")
-        else:
-            self.model_file = os.path.join(self.model_dir, "model.pdmodel")
-            self.param_file = os.path.join(self.model_dir, "model.pdiparams")
+        self.model_file = os.path.join(self.model_dir, f"model{PADDLE_INFERENCE_MODEL_SUFFIX}")
+        self.param_file = os.path.join(self.model_dir, f"model{PADDLE_INFERENCE_WEIGHTS_SUFFIX}")
         config = paddle.inference.Config(self.model_file, self.param_file)
 
-        config.enable_use_gpu(100, device_id)
+        if paddle.is_compiled_with_xpu():
+            config.enable_xpu()
+            device_id = int(os.environ.get("FLAGS_selected_xpus", 0))
+            config.set_xpu_device_id(device_id)
+            xpu_config = paddle.inference.XpuConfig()
+            xpu_config.device_id = device_id
+            xpu_config.l3_size = 0
+            xpu_config.l3_autotune_size = 0
+            config.set_xpu_config(xpu_config)
+            config.switch_ir_optim(True)
+        else:
+            config.enable_use_gpu(100, device_id)
 
         if use_pir_api():
             config.enable_new_executor()
@@ -779,6 +799,14 @@ def main():
     start model runner
     """
     args = parse_args()
+    llm_utils.set_triton_cache(args.model_dir, "static")
+    try:
+        from paddle.utils import try_import
+
+        try_import("paddlenlp_ops")
+    except ImportError:
+        logger.warning("paddlenlp_ops does not exist, please install paddlenlp_ops.")
+        return
     model_runner = ModelRunner(args)
     model_runner.run()
 

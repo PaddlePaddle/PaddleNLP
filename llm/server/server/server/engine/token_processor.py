@@ -19,10 +19,15 @@ import traceback
 from collections import Counter
 from datetime import datetime
 
-from paddlenlp_ops import get_output, speculate_get_output
+import paddle
+from paddlenlp_ops import get_output
+
+if not paddle.is_compiled_with_xpu():
+    from paddlenlp_ops import speculate_get_output
+
 from server.utils import datetime_diff, model_server_logger, monitor_logger
 
-from paddlenlp.utils.env import MAX_DRAFT_TOKENS, SPECULATE_MAX_BSZ
+from paddlenlp.utils.env import MAX_BSZ, MAX_DRAFT_TOKENS, SPECULATE_MAX_BSZ
 
 
 class TokenProcessor(object):
@@ -47,7 +52,7 @@ class TokenProcessor(object):
                 shape=[SPECULATE_MAX_BSZ * MAX_DRAFT_TOKENS + SPECULATE_MAX_BSZ + 2, 1], fill_value=2, dtype="int64"
             )
         else:
-            self.output_tokens = paddle.full(shape=[self.cfg.max_batch_size + 2, 1], fill_value=2, dtype="int64")
+            self.output_tokens = paddle.full(shape=[MAX_BSZ + 2, 1], fill_value=2, dtype="int64")
         self.worker = None
 
         self.record_time_interval = int(os.getenv("RECORD_TIME_INTERVAL", "600"))
@@ -100,13 +105,12 @@ class TokenProcessor(object):
             except Exception as e:
                 model_server_logger.info("while get input_data error: {0} {1}".format(e, str(traceback.format_exc())))
 
-    def postprocess(self, batch_result, exist_finished_task=False):
+    def postprocess(self, batch_result):
         """
         single post-processing function
 
         Args:
             batch_result (list): batch results
-            exist_finished_task (bool): whether there is a finished task
         """
         result_dir = "./generate_token_results"
         if not os.path.exists(result_dir):
@@ -159,9 +163,10 @@ class TokenProcessor(object):
         # fill some extra information
         result["token_ids"] = []
         for token_id in token_ids:
+            self.number_of_output_tokens += 1
             if token_id in task["eos_token_ids"]:
                 result["is_end"] = 1
-                result["token_ids"] = []
+                result["send_idx"] = self.tokens_counter[task_id]
                 result["tokens_all_num"] = len(self.all_tokens[i]) + 1
                 result["tokens_all_ids"] = self.all_tokens[i]
 
@@ -183,6 +188,8 @@ class TokenProcessor(object):
                 monitor_logger.info(f"{info_dict}")
                 break
             else:
+                self.tokens_counter[task_id] += 1
+                self.all_tokens[i].append(token_id)
                 result["token_ids"].append(token_id)
 
         return result
@@ -210,7 +217,6 @@ class TokenProcessor(object):
             accept_num = tokens[2 : batch + 2]
 
         batch_result = list()
-        exist_finished_task = False
         for i in range(batch):
             if self.resource_manager.stop_flags[i]:
                 continue
@@ -227,7 +233,6 @@ class TokenProcessor(object):
                     + accept_num[i, 0],
                     0,
                 ].tolist()
-
             if any(token_id < 0 for token_id in token_ids):
                 continue
 
@@ -238,11 +243,6 @@ class TokenProcessor(object):
             self.total_step += 1
 
             for token_id in token_ids:
-                self.tokens_counter[task_id] += 1
-                if token_id not in task["eos_token_ids"]:
-                    self.all_tokens[i].append(token_id)
-
-                self.number_of_output_tokens += 1
                 if token_id in task["eos_token_ids"]:
                     self._recycle_resources(task_id, i, task)
                     model_server_logger.info("req_id: {0} finished".format(task_id))
@@ -251,11 +251,10 @@ class TokenProcessor(object):
                         f"Speculate accept ratio: {1 - self.total_step * 1.0 / self.number_of_output_tokens}"
                         f" total step: {self.total_step}. total_output_token_num: {self.number_of_output_tokens}"
                     )
-                    exist_finished_task = True
                     break
             batch_result.append(result)
 
-        self.postprocess(batch_result, exist_finished_task)
+        self.postprocess(batch_result)
 
 
 class WarmUpTokenProcessor(TokenProcessor):
@@ -268,7 +267,7 @@ class WarmUpTokenProcessor(TokenProcessor):
         self._is_running = True
         self._is_blocking = True
 
-    def postprocess(self, batch_result, exist_finished_task=False):
+    def postprocess(self, batch_result):
         pass
 
     def process_sampling_results(self):

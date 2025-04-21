@@ -45,7 +45,7 @@ python3 -m pip install paddlepaddle-gpu paddlenlp -i https://mirror.baidu.com/py
 
 2. 环境中 paddlepaddle-gpu 或 paddlepaddle 版本应大于或等于2.2, 请参见[飞桨快速安装](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/install/pip/linux-pip.html)根据自己需求选择合适的 PaddlePaddle 下载命令。
 
-3. 更多关于 PaddleNLP 安装的详细教程请查看[Installation](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/get_started/installation.rst)。
+3. 更多关于 PaddleNLP 安装的详细教程请查看[Installation](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/zh/get_started/installation.rst)。
 
 
 ## 模型获取和转换

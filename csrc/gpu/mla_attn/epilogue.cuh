@@ -19,6 +19,7 @@
  * Modified by the FlashInfer team.
  */
 
+#pragma once
 
 #ifndef ATTENTION_HOPPER_EPILOGUE_CUH_
 #define ATTENTION_HOPPER_EPILOGUE_CUH_
@@ -128,9 +129,12 @@ struct CollectiveEpilogue {
                             const int seq_len_now,
                             const int start_token_idx,
                             const int tile_idx,
+                            const int q_tile_idx,
                             const int kv_len,
                             const int chunk_size,
-                            const int o_stride_bsz) {
+                            const int draft_total_token_num,
+                            const int o_stride_head) {
+    const int q_group_offset = q_tile_idx * BLOCK_SHAPE_Q;
     const int num_chunks = cute::ceil_div(kv_len, chunk_size);
     Tensor sO = make_tensor(make_smem_ptr(shared_storage.smem_o.data()), SmemLayoutO{});
     auto smem_tiled_copy_O = make_tiled_copy_C(SmemCopyAtomO{}, tiled_mma);
@@ -148,7 +152,7 @@ struct CollectiveEpilogue {
     cutlass::arch::NamedBarrier::sync(NUM_MMA_THREADS,
                                       /*id=*/static_cast<int>(NamedBarriers::kValueEmpty));
     TiledCopyO gmem_tiled_copy_O;
-    auto O_ptr = num_chunks == 1 ? epilogue_params.O_ptr + start_token_idx * o_stride_bsz : epilogue_params.O_ptr_tmp + (tile_idx * bsz + bid) * o_stride_bsz;
+    auto O_ptr = num_chunks == 1 ? epilogue_params.O_ptr + (start_token_idx * Ktraits::GROUP_SIZE + q_group_offset) * o_stride_head : epilogue_params.O_ptr_tmp + (((tile_idx * bsz + bid) * draft_total_token_num) * Ktraits::GROUP_SIZE + q_group_offset) * o_stride_head;
     Tensor mO = make_tensor(make_gmem_ptr(O_ptr), epilogue_params.layout_O);
     Tensor gO = local_tile(mO, select<0, 1>(TileShape_PDV{}), make_coord(_, _0{}))(_, _, _0{});
     Tensor cO = make_identity_tensor(gO.shape());  // (O, D) -> (o_idx, d_idx)
@@ -163,7 +167,7 @@ struct CollectiveEpilogue {
     // copy if not out of bound
     auto predicate_fn = [&](auto coords) {
       auto s_coords = tOcOGroup(_0{}, coords);
-      return elem_less(get<0>(s_coords) / Ktraits::GROUP_SIZE, seq_len_now);
+      return elem_less((get<0>(s_coords) + q_group_offset) / Ktraits::GROUP_SIZE, seq_len_now);
     };
     copy_if(gmem_tiled_copy_O, predicate_fn, tOsOGroup, tOgOGroup);
   }

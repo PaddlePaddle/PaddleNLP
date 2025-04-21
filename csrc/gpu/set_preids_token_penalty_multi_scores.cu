@@ -42,17 +42,17 @@ __global__ void set_preids_token_penalty_multi_scores_kernel(const bool *stop_fl
     int tid = threadIdx.x;
 
     if (tid < bs && !stop_flags[tid]) {
-        int64_t *pre_ids_now = pre_ids + tid * length;
+        int64_t *pre_ids_now = pre_ids + tid * length_id;
         const int64_t *input_ids_now = input_ids + tid * length_input_ids;
         const int seq_len_dec = seq_lens_decoder[tid];
         const int seq_len_enc = seq_lens_encoder[tid];
-        if (seq_len_dec == 0 && seq_len_enc == 0) return; // stoped
+        if (seq_len_dec == 0 && seq_len_enc == 0) return; // stopped
 
         const int step_idx_now = step_idx[bi];
         if (tid == 0 && step_idx_now >= 0) {
             if (seq_len_enc > 0) { // encoder, get last token accord to seq_lens_encoder
                 pre_ids_now[step_idx_now] = input_ids_now[seq_len_enc - 1];
-            } else { // decoedr, get first token
+            } else { // decoder, get first token
                 pre_ids_now[step_idx_now] = input_ids_now[0];
             }
         }

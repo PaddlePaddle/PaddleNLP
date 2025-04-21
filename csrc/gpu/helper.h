@@ -33,6 +33,7 @@ namespace cub = hipcub;
 #else
 #include <cub/cub.cuh>
 #include <curand_kernel.h>
+#include <cuda_fp8.h>
 #endif
 #include <iostream>
 #include <fstream>
@@ -43,6 +44,7 @@ namespace cub = hipcub;
 #include "paddle/phi/core/allocator.h"
 #include "paddle/phi/backends/gpu/gpu_info.h"
 #include "nlohmann/json.hpp"
+
 
 using json = nlohmann::json;
 
@@ -153,6 +155,20 @@ public:
   typedef paddle::bfloat16 data_t;
 };
 
+template <>
+class PDTraits<paddle::DataType::FLOAT8_E4M3FN> {
+public:
+  typedef __nv_fp8_e4m3 DataType;
+  typedef paddle::float8_e4m3fn data_t;
+};
+
+template <>
+class PDTraits<paddle::DataType::INT8> {
+public:
+  typedef int8_t DataType;
+  typedef int8_t data_t;
+};
+
 template <typename T, int Size>
 struct alignas(sizeof(T) * Size) AlignedVector {
   T val[Size];
@@ -228,4 +244,43 @@ inline int GetSMVersion() {
   static int sm_version = phi::backends::gpu::GetGPUComputeCapability(
       phi::backends::gpu::GetCurrentDeviceId());
   return sm_version;
+}
+
+inline bool GetMlaUseTensorcore() {
+  static const bool flags_mla_use_tensorcore = get_flags_mla_use_tensorcore();
+  static const bool enable_mla_tensorcore = GetSMVersion() >= 90 ? true : false;
+  const bool mla_use_tensorcore = flags_mla_use_tensorcore && enable_mla_tensorcore;
+  return mla_use_tensorcore;
+}
+
+__device__ __forceinline__ float atomicMaxFloat(float* addr, float value) {
+    float old;
+    old = (value >= 0) ? __int_as_float(atomicMax((int*)addr, __float_as_int(value)))
+                        : __uint_as_float(atomicMin((unsigned int*)addr, __float_as_uint(value)));
+    return old;
+}
+
+__device__ __forceinline__ float warpReduceMax(float max_value) {
+    max_value = fmaxf(max_value, __shfl_xor_sync(0xffffffff, max_value, 16));
+    max_value = fmaxf(max_value, __shfl_xor_sync(0xffffffff, max_value, 8));
+    max_value = fmaxf(max_value, __shfl_xor_sync(0xffffffff, max_value, 4));
+    max_value = fmaxf(max_value, __shfl_xor_sync(0xffffffff, max_value, 2));
+    max_value = fmaxf(max_value, __shfl_xor_sync(0xffffffff, max_value, 1));
+    return max_value;
+}
+
+__device__ __forceinline__ float blockReduceMax(float max_value) {
+    static __shared__ float warpLevelMaxs[32];
+    const int laneId = threadIdx.x & 0x1f;;
+    const int warpId = threadIdx.x >> 5;
+
+    max_value = warpReduceMax(max_value);
+
+    if (laneId == 0) warpLevelMaxs[warpId] = max_value;
+        __syncthreads();
+
+    max_value = (threadIdx.x < blockDim.x / 32) ? warpLevelMaxs[laneId] : 0;
+    if (warpId == 0) max_value = warpReduceMax(max_value);
+
+    return max_value;
 }

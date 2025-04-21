@@ -21,6 +21,10 @@ from paddle.distributed.fleet.meta_parallel import (
 from paddle.distributed.fleet.utils import recompute
 
 try:
+    from paddle.distributed.fleet.meta_parallel import LocalSharedLayerDesc
+except:
+    LocalSharedLayerDesc = None
+try:
     from paddle.distributed.fleet.utils.sequence_parallel_utils import (
         mark_as_sequence_parallel_parameter,
     )
@@ -143,8 +147,8 @@ class LayerNormPipe(GPTLayerNorm):
 
 
 class GPTLMHeadPipe(GPTLMHead):
-    def __init__(self, config):
-        super(GPTLMHeadPipe, self).__init__(config)
+    def __init__(self, config, embedding_weight=None):
+        super(GPTLMHeadPipe, self).__init__(config, embedding_weights=embedding_weight)
 
     @property
     def embedding_weight(self):
@@ -180,7 +184,9 @@ class GPTForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         self.config = config
 
         virtual_pp_degree = getattr(self.config, "virtual_pp_degree", 1)
-
+        use_dualpipev = getattr(self.config, "use_dualpipev", False)
+        if use_dualpipev:
+            assert LocalSharedLayerDesc is not None, "LocalSharedLayerDesc is None, please update your paddle."
         hcg = get_hcg()
         tensor_parallel_degree = max(hcg.get_model_parallel_world_size(), 1)
         tensor_parallel_rank = max(hcg.get_model_parallel_rank(), 0)
@@ -188,10 +194,9 @@ class GPTForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         config.tensor_parallel_degree = tensor_parallel_degree
         config.tensor_parallel_rank = tensor_parallel_rank
 
+        shared_class = LocalSharedLayerDesc if use_dualpipev else SharedLayerDesc
         self.add_sequential_layer(
-            SharedLayerDesc(
-                "gpt_shared_weight", GPTEmbeddingPipe, shared_weight_attr="embedding_weight", config=config
-            ),
+            shared_class("gpt_shared_weight", GPTEmbeddingPipe, shared_weight_attr="embedding_weight", config=config),
             "gpt.embeddings",
         )
         for i in range(config.num_hidden_layers):
@@ -202,7 +207,7 @@ class GPTForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
 
         self.add_sequential_layer(LayerDesc(LayerNormPipe, config=config), "gpt.decoder.norm")
         self.add_sequential_layer(
-            SharedLayerDesc("gpt_shared_weight", GPTLMHeadPipe, shared_weight_attr="embedding_weight", config=config),
+            shared_class("gpt_shared_weight", GPTLMHeadPipe, shared_weight_attr="embedding_weight", config=config),
             "gpt.embeddings.word_embeddings",
         )
 
@@ -230,5 +235,6 @@ class GPTForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
                 "partition": False,
             },
             num_virtual_pipeline_stages=virtual_pp_degree,
+            use_dualpipev=use_dualpipev,
         )
         self.apply(self._init_weights)

@@ -1,5 +1,5 @@
 # Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2023 DeepSeek-AI and The HuggingFace Inc. team. All rights reserved.
+# Copyright (c) 2023 DeepSeek. All rights reserved.
 #
 # This code is based on EleutherAI's GPT-NeoX library and the GPT-NeoX
 # and OPT implementations in this library. It has been modified from its
@@ -24,6 +24,7 @@ from __future__ import annotations
 from typing import List, Optional, Tuple, Union
 
 import paddle
+import paddle.distributed as dist
 
 try:
     from paddle.incubate.nn.functional import fused_rotary_position_embedding
@@ -184,42 +185,25 @@ class DeepseekV3ForCausalLMAuto(DeepseekV3PretrainedModelAuto):
             assert prefix.endswith(".")
         config = {
             "dp_config": {"sharding_level": 0, "offload": False, "exclude_layer": None},
-            # "sp_config": {
-            #     "parallelize_plan": {
-            #         f"{prefix}deepseek_v3.embed_tokens": [
-            #             dist.ColWiseParallel(),
-            #             dist.SequenceParallelBegin(),
-            #         ],
-            #         f"{prefix}deepseek_v3.layers.*.self_attn.q_b_proj": dist.ColWiseParallel(),
-            #         f"{prefix}deepseek_v3.layers.*.self_attn.q_proj": dist.ColWiseParallel(),
-            #         f"{prefix}deepseek_v3.layers.*.self_attn.kv_b_proj": dist.ColWiseParallel(),
-            #         f"{prefix}deepseek_v3.layers.*.self_attn.o_proj": dist.RowWiseParallel(),
-            #         f"{prefix}deepseek_v3.layers.*.self_attn": dist.SequenceParallelDisable(),
-            #         f"{prefix}deepseek_v3.layers.*.mlp.gate_proj": dist.ColWiseParallel(),
-            #         f"{prefix}deepseek_v3.layers.*.mlp.up_proj": dist.ColWiseParallel(),
-            #         f"{prefix}deepseek_v3.layers.*.mlp.down_proj": dist.RowWiseParallel(),
-            #         f"{prefix}deepseek_v3.layers.*.mlp.shared_experts.gate_proj": dist.ColWiseParallel(),
-            #         f"{prefix}deepseek_v3.layers.*.mlp.shared_experts.up_proj": dist.ColWiseParallel(),
-            #         f"{prefix}deepseek_v3.layers.*.mlp.shared_experts.down_proj": dist.RowWiseParallel(),
-            #         f"{prefix}lm_head.weight": dist.ColWiseParallel(),
-            #         f"{prefix}lm_head": dist.SequenceParallelEnd(),
-            #     }
-            # },
-            # "mp_config": {
-            #     "parallelize_plan": {
-            #         f"{prefix}deepseek_v3.embed_tokens": dist.ColWiseParallel(gather_output=True),
-            #         f"{prefix}deepseek_v3.layers.*.self_attn.q_b_proj": dist.ColWiseParallel(),
-            #         f"{prefix}deepseek_v3.layers.*.self_attn.q_proj": dist.ColWiseParallel(),
-            #         f"{prefix}deepseek_v3.layers.*.self_attn.kv_b_proj": dist.ColWiseParallel(),
-            #         f"{prefix}deepseek_v3.layers.*.self_attn.o_proj": dist.RowWiseParallel(),
-            #         f"{prefix}deepseek_v3.layers.*.mlp.gate_proj": dist.ColWiseParallel(),
-            #         f"{prefix}deepseek_v3.layers.*.mlp.up_proj": dist.ColWiseParallel(),
-            #         f"{prefix}deepseek_v3.layers.*.mlp.down_proj": dist.RowWiseParallel(),
-            #         f"{prefix}deepseek_v3.layers.*.mlp.shared_experts.gate_proj": dist.ColWiseParallel(),
-            #         f"{prefix}deepseek_v3.layers.*.mlp.shared_experts.up_proj": dist.ColWiseParallel(),
-            #         f"{prefix}deepseek_v3.layers.*.mlp.shared_experts.down_proj": dist.RowWiseParallel(),
-            #         f"{prefix}lm_head.weight": dist.ColWiseParallel(),
-            #     }
-            # },
+            "pp_config": {
+                "split_spec": [f"{prefix}deepseek_v3.layers", f"{prefix}lm_head"],
+                "global_spec": "deepseek_v3.global_layer",
+            },
+            "mp_config": {
+                "parallelize_plan": {
+                    f"{prefix}deepseek_v3.embed_tokens": dist.ColWiseParallel(gather_output=True),
+                    f"{prefix}deepseek_v3.layers.*.self_attn.q_b_proj": dist.ColWiseParallel(),
+                    f"{prefix}deepseek_v3.layers.*.self_attn.q_proj": dist.ColWiseParallel(),
+                    f"{prefix}deepseek_v3.layers.*.self_attn.kv_b_proj": dist.ColWiseParallel(),
+                    f"{prefix}deepseek_v3.layers.*.self_attn.o_proj": dist.RowWiseParallel(),
+                    f"{prefix}deepseek_v3.layers.*.mlp.gate_proj": dist.ColWiseParallel(),
+                    f"{prefix}deepseek_v3.layers.*.mlp.up_proj": dist.ColWiseParallel(),
+                    f"{prefix}deepseek_v3.layers.*.mlp.down_proj": dist.RowWiseParallel(),
+                    f"{prefix}deepseek_v3.layers.*.mlp.shared_experts.gate_proj": dist.ColWiseParallel(),
+                    f"{prefix}deepseek_v3.layers.*.mlp.shared_experts.up_proj": dist.ColWiseParallel(),
+                    f"{prefix}deepseek_v3.layers.*.mlp.shared_experts.down_proj": dist.RowWiseParallel(),
+                    f"{prefix}lm_head.weight": dist.ColWiseParallel(),
+                }
+            },
         }
         return config

@@ -31,8 +31,8 @@ inline uint32_t get_encoder_block_shape_q() {
 inline uint32_t get_max_partition_size(int bsz) {
     static const char* max_partition_size_env = std::getenv("FLAGS_cascade_attention_max_partition_size");
     static const uint32_t max_partition_size =
-            max_partition_size_env == nullptr ? 0 : std::stoul(std::string(max_partition_size_env));
-    return (max_partition_size != 0 ? max_partition_size : (bsz == 1 ? 128 : 512));
+            max_partition_size_env == nullptr ? 32768 : std::stoul(std::string(max_partition_size_env));
+    return max_partition_size;
 }
 
 inline uint32_t get_cascade_attention_deal_each_time() {
@@ -56,11 +56,18 @@ inline uint32_t get_cascade_attention_num_threads() {
     return cascade_attention_num_threads != 0 ? cascade_attention_num_threads : 128;
 }
 
-inline bool get_mla_use_tensorcore() {
+inline bool get_flags_mla_use_tensorcore() {
     static const char* mla_use_tensorcore_env = std::getenv("FLAGS_mla_use_tensorcore");
     static const uint32_t mla_use_tensorcore =
             mla_use_tensorcore_env == nullptr ? 1 : std::stoul(std::string(mla_use_tensorcore_env));
     return mla_use_tensorcore != 0 ? true : false;
+}
+
+inline bool get_mla_use_wg4() {
+    static const char* mla_use_wg4_env = std::getenv("FLAGS_mla_use_wg4");
+    static const uint32_t mla_use_wg4 =
+            mla_use_wg4_env == nullptr ? 1 : std::stoul(std::string(mla_use_wg4_env));
+    return mla_use_wg4 != 0 ? true : false;
 }
 
 inline bool enable_cuda_core_fp8_gemm() {
@@ -68,4 +75,11 @@ inline bool enable_cuda_core_fp8_gemm() {
     static const bool enable_cuda_core_fp8_gemm =
             enable_cuda_core_fp8_env != nullptr && std::string(enable_cuda_core_fp8_env) == "1";
     return enable_cuda_core_fp8_gemm;
+}
+
+inline int get_mla_dec_chunk_size(int bsz) {
+    static const char* mla_dec_chunk_size_env = std::getenv("FLAGS_mla_dec_chunk_size");
+    static const int mla_dec_chunk_size =
+            mla_dec_chunk_size_env == nullptr ? -1 : std::stoi(std::string(mla_dec_chunk_size_env));
+    return bsz > 1 ? mla_dec_chunk_size : 64;
 }

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# PIR disable
 python export_to_serving.py \
     --dirname "output" \
     --model_filename "inference.pdmodel" \
@@ -19,3 +20,12 @@ python export_to_serving.py \
     --server_path "serving_server" \
     --client_path "serving_client" \
     --fetch_alias_names "predict"
+
+# PIR enable
+# python export_to_serving.py \
+#     --dirname "output" \
+#     --model_filename "inference.json" \
+#     --params_filename "inference.pdiparams" \
+#     --server_path "serving_server" \
+#     --client_path "serving_client" \
+#     --fetch_alias_names "predict"

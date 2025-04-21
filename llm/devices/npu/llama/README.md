@@ -1,4 +1,4 @@
-## 🚣‍♂️ 使用 PaddleNLP 在 NPU 下跑通 llama2-13b 模型 🚣
+# 使用 PaddleNLP 在 NPU 下跑通 llama2-13b 模型
 PaddleNLP 在昇腾 NPU（[了解昇腾](https://www.hiascend.com/zh/ecosystem/industry)）上对 llama2-13B 模型进行了深度适配和优化，该套件实现了昇腾 NPU 和 GPU 的训推入口基本统一，达到了『无缝切换』的效果。
 在技术领先性上：
 - **训练策略完全适配** 支持4D 混合并行，灵活适应多种训练策略。

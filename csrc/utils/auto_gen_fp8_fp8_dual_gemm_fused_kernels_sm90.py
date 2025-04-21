@@ -211,7 +211,7 @@ bool fp8_fp8_dual_gemm_scale_bias_act(DualGemmEpilogueAllParams params) {
   int K = params.K;
 
   int kernel_id;
-  std::string mnk_string = "dual_gemm<"+ std::to_string(M)+ ", " +std::to_string(N) + ", "+ std::to_string(K)+ ">";
+  std::string mnk_string = "tensor_dual_gemm_sm90<"+ std::to_string(M)+ ", " +std::to_string(N) + ", "+ std::to_string(K)+ ">";
   std::string best_config;
   CutlassGemmConfigMannager& best_config_mannager = CutlassGemmConfigMannager::getInstance();
   char *config_file_path_c_str = getenv("FLAGS_use_cutlass_device_best_config_path");

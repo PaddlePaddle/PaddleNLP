@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .lora_config import LoRAConfig
+from .auto_lora_model import LoRAAutoModel
+from .lora_config import LoRAAutoConfig, LoRAConfig
 from .lora_layers import ColumnParallelLoRALinear, LoRALinear, RowParallelLoRALinear
 from .lora_model import LoRAModel

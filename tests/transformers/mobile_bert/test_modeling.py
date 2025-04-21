@@ -229,7 +229,7 @@ class MobileBertModelTest(ModelTesterMixin, unittest.TestCase):
 
 class MobileBertModelIntegrationTest(unittest.TestCase, ModelTesterPretrainedMixin):
     base_model_class: PretrainedModel = MobileBertModel
-    hf_remote_test_model_path: str = "google/mobilebert-uncased"
+    # hf_remote_test_model_path: str = "google/mobilebert-uncased"
     paddlehub_remote_test_model_name: str = "mobilebert-uncased"
 
     @slow

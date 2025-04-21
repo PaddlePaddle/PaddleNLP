@@ -76,6 +76,14 @@ DLL_EXPORT int get_padding_offset(Context* ctx,
                                   const int max_seq_len,
                                   const int bs);
 
+
+DLL_EXPORT int get_position_ids(Context *ctx,
+                       const int *seq_lens_encoder,
+                       const int *seq_lens_decoder,
+                       const int *seq_lens_this_time,
+                       int *position_ids,
+                       const int bs);
+
 DLL_EXPORT int update_inputs(Context* ctx,
                              bool* not_need_stop,
                              int* seq_lens_this_time,
@@ -101,6 +109,69 @@ DLL_EXPORT int rebuild_padding(Context *ctx,
                     const int dim_embed,
                     const int elem_nums);
 
+DLL_EXPORT int update_inputs_v2(Context* ctx,
+                                bool* not_need_stop,
+                                int64_t* step_idx,
+                                bool* stop_flags,
+                                int* seq_lens_this_time,
+                                int* seq_lens_encoder,
+                                int* seq_lens_decoder,
+                                int64_t* next_tokens,
+                                int64_t* kwargs_next_tokens,
+                                int64_t* input_ids,
+                                const int64_t* end_ids,
+                                const int64_t* stop_nums,
+                                const bool* is_block_step,
+                                const int64_t* max_dec_len,
+                                int now_bsz,
+                                int max_bsz,
+                                int input_ids_stride,
+                                int end_length);
+
+DLL_EXPORT int recover_block(Context* ctx,
+                  int* recover_block_list,  // [bsz]
+                  int* recover_len,
+                  bool* stop_flags,
+                  int* seq_lens_this_time,
+                  const int* ori_seq_lens_encoder,
+                  int* seq_lens_encoder,
+                  const int* seq_lens_decoder,
+                  int* block_tables,
+                  int* free_list,
+                  int* free_list_len,
+                  int64_t* input_ids,
+                  const int64_t* pre_ids,
+                  const int64_t* step_idx,
+                  const int* encoder_block_lens,
+                  const int* used_list_len,
+                  const int64_t* next_tokens,
+                  const int64_t* first_token_ids,
+                  const int bsz,
+                  const int block_num_per_seq,
+                  const int length,
+                  const int pre_id_length);
+
+DLL_EXPORT int free_and_dispatch_block(Context *ctx,
+                            bool *stop_flags,
+                            int *seq_lens_this_time,
+                            int *seq_lens_decoder,
+                            int *block_tables,
+                            int *encoder_block_lens,
+                            bool *is_block_step,
+                            int *step_block_list,  // [bsz]
+                            int *step_len,
+                            int *recover_block_list,
+                            int *recover_len,
+                            int *need_block_list,
+                            int *need_block_len,
+                            int *used_list_len,
+                            int *free_list,
+                            int *free_list_len,
+                            int64_t *first_token_ids,
+                            const int bsz,
+                            const int block_size,
+                            const int block_num_per_seq,
+                            const int max_decoder_block_num);
 }  // namespace plugin
 }  // namespace api
 }  // namespace xpu

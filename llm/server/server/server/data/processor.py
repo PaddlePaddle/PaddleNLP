@@ -14,10 +14,11 @@
 
 import os
 from abc import ABC, abstractmethod
+import numpy as np
 
 from paddlenlp.transformers import Llama3Tokenizer, LlamaTokenizer
 from paddlenlp.trl.llm_utils import get_eos_token_id
-from server.engine.config import Config
+from server.engine.config import global_config
 from server.utils import data_processor_logger
 from paddlenlp.utils.env import USE_FAST_TOKENIZER
 
@@ -36,7 +37,7 @@ class BaseDataProcessor(ABC):
         self.tokenizer.sep_token_id = self.tokenizer._convert_token_to_id(self.tokenizer.sep_token)
         self.tokenizer.eos_token_id = self.tokenizer._convert_token_to_id(self.tokenizer.eos_token)
         self.tokenizer.mask_token_id = self.tokenizer._convert_token_to_id(self.tokenizer.mask_token)
-        data_processor_logger.info((f"tokenizer infomation: bos_token is {self.tokenizer.bos_token}, {self.tokenizer.bos_token_id}, ",
+        data_processor_logger.info((f"tokenizer information: bos_token is {self.tokenizer.bos_token}, {self.tokenizer.bos_token_id}, ",
                     f"cls_token is {self.tokenizer.cls_token}, {self.tokenizer.cls_token_id}, "
 					f"sep_token is {self.tokenizer.sep_token}, {self.tokenizer.sep_token_id}, "
                     f"eos_token is {self.tokenizer.eos_token}, {self.tokenizer.eos_token_id}, "
@@ -120,14 +121,11 @@ class BaseDataProcessor(ABC):
 
 class DataProcessor(BaseDataProcessor):
     def __init__(self):
-        self.config = Config()
-        max_length = self.config.get_model_config().get('max_length', 1024)
-        self.src_length = self.config.seq_len_limit - max_length
-
+        self.config = global_config
 
         self.decode_status = dict()
         self.tokenizer = self._load_tokenizer()
-        data_processor_logger.info(f"tokenizer infomation: bos_token is {self.tokenizer.bos_token}, {self.tokenizer.bos_token_id}, \
+        data_processor_logger.info(f"tokenizer information: bos_token is {self.tokenizer.bos_token}, {self.tokenizer.bos_token_id}, \
                                 eos_token is {self.tokenizer.eos_token}, {self.tokenizer.eos_token_id} ")
 
     def process_request(self, request, max_seq_len=None):
@@ -186,7 +184,9 @@ class DataProcessor(BaseDataProcessor):
         response_dict["usage"] = {"completion_tokens" : response_dict["send_idx"] + 1}
 
         if is_end:
-            response_dict["tokens_all"] = self.clear_request_status(req_id)
+            self.clear_request_status(req_id)
+            token_ids = response_dict.get("tokens_all_ids", [])
+            response_dict["tokens_all"] = self.ids2tokens(token_ids, response_dict["req_id"])
         return response_dict
 
     def text2ids(self, text):
@@ -216,7 +216,7 @@ class DataProcessor(BaseDataProcessor):
                 return_tensors="np",
                 padding=True,
                 truncation=True,
-                max_length=self.src_length,
+                max_length=self.config.seq_len_limit,
                 add_special_tokens=self.tokenizer.chat_template is None,
             )
         return tokens["input_ids"][0]
@@ -232,7 +232,7 @@ class DataProcessor(BaseDataProcessor):
             List[int]: ID sequences
         """
         message_result = self.tokenizer.apply_chat_template(messages, return_tensors="pd")
-        return message_result["input_ids"][0]
+        return np.array(message_result["input_ids"][0])
 
     def ids2tokens(self, token_id, task_id):
         """
@@ -290,7 +290,7 @@ class DataProcessor(BaseDataProcessor):
             return AutoTokenizer.from_pretrained(self.config.model_dir, use_fast=False)
         else:
             from paddlenlp.transformers import AutoTokenizer
-            return AutoTokenizer.from_pretrained(self.config.model_dir, use_fast=USE_FAST_TOKENIZER)
+            return AutoTokenizer.from_pretrained(self.config.model_dir, padding_side="left", use_fast=USE_FAST_TOKENIZER)
 
     def clear_request_status(self, task_id):
         """

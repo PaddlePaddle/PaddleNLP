@@ -205,6 +205,37 @@ def dumpy(*args, **kwarsg):
 
 
 def load_torch(path: str, **pickle_load_args):
+    if path.endswith(PYTORCH_WEIGHTS_NAME) or os.path.split(path)[-1].startswith("pytorch_model-"):
+        import torch
+
+        state_dict = torch.load(path, map_location="cpu", weights_only=False)
+
+        for key in list(state_dict.keys()):
+            if isinstance(state_dict[key], torch.Tensor):
+                t = state_dict.pop(key)
+                capsule = torch.utils.dlpack.to_dlpack(t)
+                t = paddle.utils.dlpack.from_dlpack(capsule)
+                state_dict[key] = t
+        return state_dict
+    elif path.endswith(SAFE_WEIGHTS_NAME) or os.path.split(path)[-1].startswith("model-"):
+        # torch safetensors -> numpy -> paddle.Tensor
+        with open(path, "rb") as f:
+            data = f.read()
+
+        flat = deserialize(data)
+        state_dict = {}
+        for k, v in flat:
+            dtype = _TYPES[v["dtype"]]
+            if v["dtype"] == "BF16":
+                arr = paddle.to_tensor(np.frombuffer(v["data"], dtype=dtype).reshape(v["shape"]), dtype="bfloat16")
+            else:
+                arr = paddle.to_tensor(np.frombuffer(v["data"], dtype=dtype).reshape(v["shape"]))
+            state_dict[k] = arr
+
+    return state_dict
+
+
+def load_torch_inner(path: str, **pickle_load_args):
     """
     load torch weight file with the following steps:
     1. load the structure of pytorch weight file

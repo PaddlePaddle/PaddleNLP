@@ -20,7 +20,11 @@ std::vector<paddle::Tensor> RebuildPaddingV2(const paddle::Tensor& tmp_out, // [
                                              const paddle::Tensor& cum_offsets, // [bsz, 1]
                                              const paddle::Tensor& seq_lens_decoder,
                                              const paddle::Tensor& seq_lens_encoder,
+                                             const paddle::optional<paddle::Tensor>& output_padding_offset,
                                              int max_input_length) {
+  if (output_padding_offset) {
+      PD_THROW("speculative decoding is not supported in XPU.");
+    }
   phi::XPUPlace place(phi::backends::xpu::GetXPUCurrentDeviceId());
   auto dev_ctx = paddle::experimental::DeviceContextPool::Instance().Get(place);
   auto xpu_ctx = static_cast<const phi::XPUContext*>(dev_ctx);
@@ -33,6 +37,22 @@ std::vector<paddle::Tensor> RebuildPaddingV2(const paddle::Tensor& tmp_out, // [
   switch (tmp_out.type()) {
     case paddle::DataType::FLOAT16: {
       using XPUType = typename XPUTypeTrait<float16>::Type;
+      typedef paddle::float16 data_t;
+      int r = baidu::xpu::api::plugin::rebuild_padding(
+          xpu_ctx->x_context(),
+          reinterpret_cast<XPUType*>(out.data<data_t>()),
+          reinterpret_cast<const XPUType*>(tmp_out.data<data_t>()),
+          cum_offsets.data<int>(),
+          seq_lens_decoder.data<int>(), 
+          seq_lens_encoder.data<int>(),
+          max_input_length, 
+          dim_embed, 
+          elem_nums
+          );
+      PD_CHECK(r == 0, "xpu::plugin::rebuild_padding failed.");
+    } break;
+    case paddle::DataType::BFLOAT16: {
+      using XPUType = typename XPUTypeTrait<bfloat16>::Type;
       typedef paddle::float16 data_t;
       int r = baidu::xpu::api::plugin::rebuild_padding(
           xpu_ctx->x_context(),
@@ -73,7 +93,11 @@ std::vector<paddle::Tensor> RebuildPaddingV2(const paddle::Tensor& tmp_out, // [
 std::vector<std::vector<int64_t>> RebuildPaddingV2InferShape(const std::vector<int64_t>& tmp_out_shape,
                                                              const std::vector<int64_t>& cum_offsets_shape,
                                                              const std::vector<int64_t>& seq_lens_decoder_shape,
-                                                             const std::vector<int64_t>& seq_lens_encoder_shape) {
+                                                             const std::vector<int64_t>& seq_lens_encoder_shape,
+                                                             const paddle::optional<std::vector<int64_t>>& output_padding_offset_shape) {
+    if (output_padding_offset_shape) {
+      PD_THROW("speculative decoding is not supported in XPU.");
+    }
     int64_t bsz = cum_offsets_shape[0];
     int64_t dim_embed = tmp_out_shape[1];
     return {{bsz, dim_embed}};
@@ -82,12 +106,13 @@ std::vector<std::vector<int64_t>> RebuildPaddingV2InferShape(const std::vector<i
 std::vector<paddle::DataType> RebuildPaddingV2InferDtype(const paddle::DataType& tmp_out_dtype,
                                                          const paddle::DataType& cum_offsets_dtype,
                                                          const paddle::DataType& seq_lens_decoder_dtype,
-                                                         const paddle::DataType& seq_lens_encoder_dtype) {
+                                                         const paddle::DataType& seq_lens_encoder_dtype,
+                                                         const paddle::optional<paddle::DataType>& output_padding_offset_dtype) {
     return {tmp_out_dtype};
 }
 
 PD_BUILD_OP(rebuild_padding_v2)
-    .Inputs({"tmp_out", "cum_offsets", "seq_lens_decoder", "seq_lens_encoder"})
+    .Inputs({"tmp_out", "cum_offsets", "seq_lens_decoder", "seq_lens_encoder", paddle::Optional("output_padding_offset")})
     .Outputs({"out"})
     .Attrs({"max_input_length: int"})
     .SetKernelFn(PD_KERNEL(RebuildPaddingV2))

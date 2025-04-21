@@ -1,5 +1,5 @@
 # Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2023 Mistral AI and the HuggingFace Inc. team. All rights reserved.
+# Copyright (c) 2023 DeepSeek. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -178,6 +178,7 @@ class DeepseekV2Config(PretrainedConfig):
         attention_bias=False,
         attention_dropout=0.0,
         speculate_model_type=False,
+        using_flex_token=False,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -225,6 +226,7 @@ class DeepseekV2Config(PretrainedConfig):
         self.attention_dropout = attention_dropout
         self.speculate_model_type = speculate_model_type
         self.use_fp8 = False
+        self.using_flex_token = using_flex_token
 
         super().__init__(
             pad_token_id=pad_token_id,

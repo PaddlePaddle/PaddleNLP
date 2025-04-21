@@ -20,7 +20,7 @@ import warnings
 from collections import namedtuple
 from itertools import islice
 
-# Add this for extremely slow conection to hf sever even for local dataset.
+# Add this for extremely slow connection to hf sever even for local dataset.
 os.environ["HF_UPDATE_DOWNLOAD_COUNTS"] = "False"
 
 import datasets
@@ -612,7 +612,7 @@ class DatasetBuilder:
                 datasets = DatasetTuple(splits)
                 assert len(splits) == len(
                     data_files
-                ), "Number of `splits` and number of `data_files` should be the same if you want to specify the split of loacl data file."
+                ), "Number of `splits` and number of `data_files` should be the same if you want to specify the split of local data file."
                 for i in range(len(data_files)):
                     datasets[splits[i]] = self.read(filename=data_files[i], split=splits[i])
             else:
