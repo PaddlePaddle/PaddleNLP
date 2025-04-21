@@ -57,7 +57,7 @@ print_info() {
         rm -rf upload/*
     else
         if [[ $2 =~ 'tests' ]]; then
-            tail -n 1 ${log_path}/$3.log
+            tail -n 1 ${log_path}/$3
             echo -e "\033[32m ${log_path}/$3_SUCCESS \033[0m"
         else
             tail -n 1 ${log_path}/$2.log

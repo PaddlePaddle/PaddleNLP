@@ -77,7 +77,7 @@ function restore_func() {
         echo "Deleted existing functions.txt"
     fi
     if [ ! -f "${log_path}/blacklist.csv" ]; then
-        wget -P ${log_path}/ https://paddle-qa.bj.bcebos.com/Auto-Parallel/blacklist.csv --no-proxy || exit 101
+        wget -q -P ${log_path}/ https://paddle-qa.bj.bcebos.com/Auto-Parallel/blacklist.csv --no-proxy || exit 101
         echo "\033 ---- wget blacklist.csv \033"
     fi
     blacklist_file=${log_path}/blacklist.csv
@@ -122,7 +122,7 @@ function llama_case_list_auto() {
         restore_func $fun_list  
     elif [ $1 = "exec_case" ]; then
         for fun in "${fun_list[@]}"; do
-            eval "$fun"
+            eval "timeout 20m $fun"
         done
         track_case_status $FUNCNAME "llama_"
     else 
@@ -143,7 +143,7 @@ function deepseek_case_list_auto() {
         restore_func $fun_list  
     elif [ $1 = "exec_case" ]; then
         for fun in "${fun_list[@]}"; do
-            eval "$fun"
+            eval "timeout 20m $fun"
         done
         track_case_status $FUNCNAME "deepseek_"
     else 
@@ -171,7 +171,7 @@ function llm_gpt_case_list_auto() {
         restore_func $fun_list  
     elif [ $1 = "exec_case" ]; then
         for fun in "${fun_list[@]}"; do
-            eval "$fun"
+            eval "timeout 20m $fun"
         done
         track_case_status $FUNCNAME "llm_gpt"
     else 
@@ -195,7 +195,7 @@ function llm_qwen_case_list_auto() {
         restore_func $fun_list  
     elif [ $1 = "exec_case" ]; then
         for fun in "${fun_list[@]}"; do
-            eval "$fun"
+            eval "timeout 20m $fun"
         done
         track_case_status $FUNCNAME "llm_qwen"
     else 
@@ -3631,8 +3631,8 @@ function before_hook_for_gpt() {
         else
             # download data for gpt
             mkdir -p ${gpt_data_path}/data;
-            wget -O ${gpt_data_path}/data/gpt_en_dataset_300m_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy;
-            wget -O ${gpt_data_path}/data/gpt_en_dataset_300m_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz;
+            wget -q -O ${gpt_data_path}/data/gpt_en_dataset_300m_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy;
+            wget -q -O ${gpt_data_path}/data/gpt_en_dataset_300m_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz;
         fi
         cp -r ${gpt_data_path}/data ${gpt_case_path}/
     else
@@ -3676,17 +3676,17 @@ function before_hook_for_llama() {
             # download data for llama
             mkdir ${llama_data_path};
             mkdir ${llama_data_path}/data;
-            wget -O ${llama_data_path}/data/llama_openwebtext_100k_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy;
-            wget -O ${llama_data_path}/data/llama_openwebtext_100k_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz;
+            wget -q -O ${llama_data_path}/data/llama_openwebtext_100k_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy;
+            wget -q -O ${llama_data_path}/data/llama_openwebtext_100k_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz;
             # download data for llama finetune
-            wget -O ${llama_data_path}/AdvertiseGen.tar.gz https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz
+            wget -q -O ${llama_data_path}/AdvertiseGen.tar.gz https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz
             tar -xvf ${llama_data_path}/AdvertiseGen.tar.gz -C ${llama_data_path}
         fi
         if [[ -e ${llama_data_path}/data_dpo ]]; then
             echo "LLaMA DPO data downloaded"
         else
             # download data for llama dpo
-            wget -O ${llama_data_path}/ultrafeedback_binarized.tar.gz https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized.tar.gz
+            wget -q -O ${llama_data_path}/ultrafeedback_binarized.tar.gz https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized.tar.gz
             mkdir ${llama_data_path}/data_dpo;
             tar -xvf ${llama_data_path}/ultrafeedback_binarized.tar.gz -C ${llama_data_path}/data_dpo
         fi
@@ -3720,8 +3720,8 @@ function before_hook_for_deepseek() {
         else
             # download data for llama
             mkdir ${llama_data_path}/data;
-            wget -O ${llama_data_path}/data/llama_openwebtext_100k_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy;
-            wget -O ${llama_data_path}/data/llama_openwebtext_100k_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz;
+            wget -q -O ${llama_data_path}/data/llama_openwebtext_100k_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy;
+            wget -q -O ${llama_data_path}/data/llama_openwebtext_100k_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz;
         fi
         cp -r ${llama_data_path}/data ${deepseek_case_path}/
     else
