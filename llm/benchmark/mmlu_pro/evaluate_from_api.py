@@ -8,12 +8,6 @@ from datasets import load_dataset
 import argparse
 import requests
 
-import os
-import threading
-from concurrent.futures import ThreadPoolExecutor
-from tqdm import tqdm
-from functools import partial
-
 API_KEY = ""
 random.seed(12345)
 
@@ -332,117 +326,49 @@ def merge_result(res, curr):
     return res
 
 
-# def evaluate(subjects):
-#     # client = get_client()
-#     test_df, dev_df = load_mmlu_pro()
-#     if not subjects:
-#         subjects = list(test_df.keys())
-#     print("assigned subjects", subjects)
-#     for subject in subjects:
-#         test_data = test_df[subject]
-#         output_res_path = os.path.join(args.output_dir, subject + "_result.json")
-#         output_summary_path = os.path.join(args.output_dir, subject + "_summary.json")
-#         res, category_record = update_result(output_res_path)
-
-#         k = 0
-#         for each in tqdm(test_data):
-#             # k += 1
-#             # if k % 10 != 0:
-#             #     continue
-            
-#             label = each["answer"]
-#             category = subject
-#             # import pdb;pdb.set_trace()
-#             pred, response, exist = single_request(None, each, dev_df, res)
-#             if response is not None:
-#                 res, category_record = update_result(output_res_path)
-#                 if category not in category_record:
-#                     category_record[category] = {"corr": 0.0, "wrong": 0.0}
-#                 each["pred"] = pred
-#                 each["model_outputs"] = response
-#                 merge_result(res, each)
-                
-#                 if pred is not None:
-#                     if pred == label:
-#                         category_record[category]["corr"] += 1
-#                     else:
-#                         category_record[category]["wrong"] += 1
-#                 else:
-#                     category_record[category]["wrong"] += 1
-#                 # import pdb;pdb.set_trace()
-#                 save_res(res, output_res_path)
-#                 save_summary(category_record, output_summary_path)
-#                 res, category_record = update_result(output_res_path)
-#         save_res(res, output_res_path)
-#         save_summary(category_record, output_summary_path)
-
-
 def evaluate(subjects):
+    # client = get_client()
     test_df, dev_df = load_mmlu_pro()
     if not subjects:
         subjects = list(test_df.keys())
     print("assigned subjects", subjects)
-    
     for subject in subjects:
         test_data = test_df[subject]
-        output_res_path = os.path.join(args.output_dir, f"{subject}_result.json")
-        output_summary_path = os.path.join(args.output_dir, f"{subject}_summary.json")
+        output_res_path = os.path.join(args.output_dir, subject + "_result.json")
+        output_summary_path = os.path.join(args.output_dir, subject + "_summary.json")
         res, category_record = update_result(output_res_path)
-        
-        lock = threading.Lock()
 
-        def process_each(each, subject, dev_df, output_res_path, output_summary_path, res):
+        k = 0
+        for each in tqdm(test_data):
+            # k += 1
+            # if k % 10 != 0:
+            #     continue
+            
             label = each["answer"]
             category = subject
-            
-            # 多线程执行single_request
+            # import pdb;pdb.set_trace()
             pred, response, exist = single_request(None, each, dev_df, res)
-            
-            if response is None:
-                return
-
-            with lock:  # 保证以下操作单线程访问
-                # 读取最新结果
+            if response is not None:
                 res, category_record = update_result(output_res_path)
-                
-                # # 检查是否已处理（假设each有唯一标识）
-                # if any(e['id'] == each['id'] for e in res.values()):
-                #     return
-                
-                # 更新结果数据
+                if category not in category_record:
+                    category_record[category] = {"corr": 0.0, "wrong": 0.0}
                 each["pred"] = pred
                 each["model_outputs"] = response
                 merge_result(res, each)
                 
-                # 更新统计信息
-                if category not in category_record:
-                    category_record[category] = {"corr": 0, "wrong": 0}
-                if pred == label:
-                    category_record[category]["corr"] += 1
+                if pred is not None:
+                    if pred == label:
+                        category_record[category]["corr"] += 1
+                    else:
+                        category_record[category]["wrong"] += 1
                 else:
                     category_record[category]["wrong"] += 1
-                
-                # 保存更新
+                # import pdb;pdb.set_trace()
                 save_res(res, output_res_path)
                 save_summary(category_record, output_summary_path)
                 res, category_record = update_result(output_res_path)
-
-        # 绑定固定参数
-        process_func = partial(process_each, 
-                             subject=subject,
-                             dev_df=dev_df,
-                             output_res_path=output_res_path,
-                             output_summary_path=output_summary_path,
-                             res=res)
-        
-        # 使用线程池并发处理
-        with ThreadPoolExecutor(max_workers=20) as executor:
-            tasks = list(tqdm(executor.map(process_func, test_data), total=len(test_data)))
-        
-        # 最终保存确保完整性
-        final_res, final_summary = update_result(output_res_path)
-        save_res(final_res, output_res_path)
-        save_summary(final_summary, output_summary_path)
+        save_res(res, output_res_path)
+        save_summary(category_record, output_summary_path)
 
 
 def save_res(res, output_res_path):
