@@ -28,7 +28,12 @@
 namespace xftkernel = baidu::xpu::xftkernel;
 namespace xft = baidu::xpu::xft;
 
-static int i = 0;
+inline uint32_t get_xpu_moe_speed_layers() {
+    static const char* xpu_moe_speed_layers_env = std::getenv("FLAGS_xpu_moe_speed_layers");
+    static const uint32_t xpu_moe_speed_layers =
+            xpu_moe_speed_layers_env == nullptr ? 0 : std::stoul(std::string(xpu_moe_speed_layers_env));
+    return xpu_moe_speed_layers;
+}
 
 std::vector<paddle::Tensor> MoeFusedKernel(
     const paddle::Tensor& input, //[980. 7168]
@@ -40,7 +45,8 @@ std::vector<paddle::Tensor> MoeFusedKernel(
     const paddle::Tensor& score_bias, // 256
     int moe_top_k,
     int expert_group_num,
-    int moe_topk_group) { // 256
+    int moe_topk_group,
+    int layer) {
 
   baidu::xpu::api::plugin::print_times("[TIME BEGIN] MoeFusedKernel");
 
@@ -108,15 +114,14 @@ std::vector<paddle::Tensor> MoeFusedKernel(
     "sigmoid"
   };
 
-    if (i < 56) {
-        xft::xft_moe_ffn_block_sorted<XPUType, int8_t, XPUType, int8_wo_t>(
+    if (layer >= get_xpu_moe_speed_layers()) {
+        xft::xft_moe_ffn_block_sorted<XPUType, int8_t, XPUType, float>(
             xpu_ctx->x_context(), &input_tensor, &output_tensor, moe_weight, moe_param);
     } else {
-        xft::xft_moe_ffn_block_sorted<XPUType, int8_t, XPUType, float>(
+        xft::xft_moe_ffn_block_sorted<XPUType, int8_t, XPUType, int8_wo_t>(
             xpu_ctx->x_context(), &input_tensor, &output_tensor, moe_weight, moe_param);
     }
   
-  i = (i + 1) % 58;
   baidu::xpu::api::plugin::print_times("[TIME END] MoeFusedKernel");
 
   return {
@@ -146,7 +151,8 @@ std::vector<paddle::DataType> MoeFusedInferDtype(
     const paddle::DataType& score_bias_type,
     const int moe_top_k,
     const int expert_group_num,
-    const int moe_topk_group) {
+    const int moe_topk_group,
+    const int layer) {
         return {input_type};
 }
 
@@ -161,7 +167,7 @@ PD_BUILD_OP(moe_fused_xpu)
         "score_bias",
     })
     .Outputs({"output"})
-    .Attrs({"moe_top_k: int", "expert_group_num: int", "moe_topk_group: int"})
+    .Attrs({"moe_top_k: int", "expert_group_num: int", "moe_topk_group: int", "layer: int"})
     .SetKernelFn(PD_KERNEL(MoeFusedKernel))
     .SetInferShapeFn(PD_INFER_SHAPE(MoeFusedInferShape))
     .SetInferDtypeFn(PD_INFER_DTYPE(MoeFusedInferDtype));

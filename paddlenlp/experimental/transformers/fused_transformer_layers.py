@@ -3216,6 +3216,8 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
         if self.config.speculate_config.return_full_hidden_states:
             return multi_block_output
         else:
+            from paddlenlp_ops import rebuild_padding_v2
+
             out = rebuild_padding_v2(
                 multi_block_output,
                 cum_offsets,
@@ -3949,6 +3951,7 @@ class FusedMultiTransformerXPU(Layer):
             config.top_k,
             config.num_expert_group,
             config.topk_group,
+            i,
         )
         return fused_moe_out
 
@@ -4227,10 +4230,10 @@ class FusedMultiTransformerXPU(Layer):
     ):
         return self.fused_mla_absorb(qkv_out, caches, i, **kwargs)
 
+        # For performance reasons, using the fused version of Attention, the following code is kept for reference only
         ln_out = qkv_out
         latent_cache = caches[i]
 
-        # For performance reasons, using the fused version of Attention, the following code is kept for reference only
         out_linear_out = paddle.zeros(shape=[ln_out.shape[0], ln_out.shape[1]], dtype=ln_out.dtype)
         encoder_len = kwargs.get("seq_lens_encoder", None).sum()
 
