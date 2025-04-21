@@ -1980,12 +1980,8 @@ class PPOTrainer(Trainer):
         return batch
 
     @paddle.no_grad()
-    def compute_advantage_normalization(rl_batches):
-        all_advantages_list = []
-        for rl_batch in rl_batches:
-            all_advantages_list.append(rl_batch["reward_advantages_clean"])
-        all_advantages = paddle.concat(all_advantages_list, axis=0)
-        all_advantages = all_advantages.cast(paddle.float32)
+    def compute_advantage_normalization(batch):
+        all_advantages = batch["reward_advantages_clean"].cast(paddle.float32)
 
         try:
             hcg = fleet.get_hybrid_communicate_group()
@@ -2004,12 +2000,9 @@ class PPOTrainer(Trainer):
                 all_advantages = paddle.to_tensor(flattened_data, dtype="float32")
         except AttributeError:
             pass
-        all_advantages_mean = all_advantages.mean()
-        all_advantages_std = all_advantages.std()
-        for rl_batch in rl_batches:
-            all_advantages_mean = all_advantages_mean.cast(paddle.bfloat16)
-            all_advantages_std = all_advantages_std.cast(paddle.bfloat16)
-            rl_batch["reward_advantages"] = (rl_batch["reward_advantages"] - all_advantages_mean) / (
-                all_advantages_std + 1e-8
-            )
-            rl_batch["reward_advantages"] = rl_batch["reward_advantages"] * rl_batch["eos_mask"]
+        all_advantages_mean = all_advantages.mean().cast(paddle.bfloat16)
+        all_advantages_std = all_advantages.std().cast(paddle.bfloat16)
+        batch["reward_advantages"] = (batch["reward_advantages"] - all_advantages_mean) / (all_advantages_std + 1e-8)
+        batch["reward_advantages"] = batch["reward_advantages"] * batch["eos_mask"]
+
+        return batch

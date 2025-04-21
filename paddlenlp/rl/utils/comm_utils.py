@@ -887,7 +887,9 @@ def process_prompt_and_response(micro_batch, pad_token_id=0):
 
     micro_batch["input_ids"] = paddle.concat([micro_batch["prompt"], response], axis=1)
     micro_batch["position_ids"] = make_position_ids_from_input_ids(micro_batch["input_ids"])
-    micro_batch["eos_mask"] = paddle.slice(micro_batch["eos_mask"], axes=[1], starts=[0], ends=[max_response_len])
+    if "eos_mask" in micro_batch:
+        micro_batch["eos_mask"] = paddle.slice(micro_batch["eos_mask"], axes=[1], starts=[0], ends=[max_response_len])
+
     if "log_probs" in micro_batch:
         micro_batch["log_probs"] = paddle.slice(
             micro_batch["log_probs"],
