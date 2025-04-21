@@ -376,11 +376,13 @@ class TrainingArguments(TrainingArguments):
         train_batch_size_info = {
             "global_batch_size": self.global_batch_size,
             "mini_batch_size": self.mini_batch_size,
-            "per_device_train_batch_size": self.per_device_train_batch_size,
+            "rollout_n": self.rollout_n,
+            "dataset_world_size": self.dataset_world_size,
             "per_device_rollout_batch_size": self.per_device_rollout_batch_size,
             "per_device_logprob_batch_size": self.per_device_logprob_batch_size,
             "per_device_reward_batch_size": self.per_device_reward_batch_size,
             "per_device_value_batch_size": self.per_device_value_batch_size,
+            "per_device_train_batch_size": self.per_device_train_batch_size,
             "gradient_accumulation_steps": self.gradient_accumulation_steps,
         }
 
