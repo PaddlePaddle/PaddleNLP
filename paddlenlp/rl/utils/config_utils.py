@@ -553,4 +553,5 @@ class DataArgument:
         },
     )
     max_prompt_len: int = field(default=4096, metadata={"help": "Maximum prompt length."})
-    label_key: str = field(default="label", metadata={"help": "The key of label in the dataset."})
+    prompt_key: str = field(default="src", metadata={"help": "The key of prompt(question) in the dataset."})
+    response_key: str = field(default="tgt", metadata={"help": "The key of response(answer) in the dataset."})

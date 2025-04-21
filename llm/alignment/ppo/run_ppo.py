@@ -276,7 +276,8 @@ def create_rl_dataset(data_args, training_args, tokenizer):
         tokenizer=tokenizer,
         max_prompt_len=data_args.max_prompt_len,
         requires_label=requires_label,
-        label_key=data_args.label_key,
+        prompt_key=data_args.prompt_key,
+        response_key=data_args.response_key,
         splits="train",
     )
     dev_ds = RLHFDataset(
@@ -284,7 +285,8 @@ def create_rl_dataset(data_args, training_args, tokenizer):
         tokenizer=tokenizer,
         max_prompt_len=data_args.max_prompt_len,
         requires_label=requires_label,
-        label_key=data_args.label_key,
+        prompt_key=data_args.prompt_key,
+        response_key=data_args.response_key,
         splits="dev",
     )
     return train_ds, dev_ds

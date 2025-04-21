@@ -90,7 +90,7 @@ class RLHFDataset(Dataset):
         filter_prompts=True,
         prompt_key="src",
         requires_label=False,
-        label_key=None,
+        response_key=None,
         chat_template_func=None,
         splits=None,
         filter_overlong_prompts=True,
@@ -102,7 +102,7 @@ class RLHFDataset(Dataset):
         self.filter_prompts = filter_prompts
 
         self.prompt_key = prompt_key
-        self.label_key = label_key
+        self.response_key = response_key
         self.chat_template_func = chat_template_func
         self.requires_label = requires_label
         self.splits = splits
@@ -159,7 +159,7 @@ class RLHFDataset(Dataset):
 
             data["input_ids"] = self.tokenize(text=prompt, max_length=self.max_prompt_len, truncation=True)
             if self.requires_label:
-                label = raw_sample[self.label_key]
+                label = raw_sample[self.response_key]
                 data["label_ids"] = self.tokenize(label)
             self.data[index] = data
 
