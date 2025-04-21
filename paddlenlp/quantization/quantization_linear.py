@@ -17,7 +17,9 @@ import paddle.nn as nn
 from paddle.distributed.fleet.base import topology as tp
 from paddle.distributed.fleet.layers.mpu import mp_ops
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
+
 from .int8_kernel import int8_linear
+
 try:
     from paddle.nn.quant import llm_int8_linear, weight_only_linear
 except:
@@ -86,6 +88,16 @@ class QuantizationLinear(nn.Layer):
                 dtype=self._dtype,
                 is_bias=False,
             )
+
+            if self.quantization_config.group_size == -1:
+                self.quant_scale = self.create_parameter(
+                    shape=[out_features],
+                    dtype=self._dtype,
+                    is_bias=False,
+                )
+            else:
+                # TODO(lugimzzz): support groupwise in next PR
+                raise NotImplementedError("Not yet support grouwise weightonly quantization.")
         if self.quant_algo in ["int8_train"]:
             block_n, block_k = self.quantization_config.block_size
 
@@ -97,10 +109,7 @@ class QuantizationLinear(nn.Layer):
             )
 
             self.quant_scale = self.create_parameter(
-                shape=[
-                    (out_features + block_n - 1) // block_n,
-                    (in_features + block_k - 1) // block_k
-                ],
+                shape=[(out_features + block_n - 1) // block_n, (in_features + block_k - 1) // block_k],
                 dtype=self._dtype,
                 is_bias=False,
             )
@@ -159,7 +168,7 @@ class QuantizationLinear(nn.Layer):
 
     def forward(self, x):
         with paddle.amp.auto_cast(enable=False):
-            if self.quant_algo in ["weight_only_int8", "weight_only_int4"]:
+            if self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4"]:
                 out = weight_only_linear(x, self.quant_weight, self.bias, self.quant_scale, self.quant_dtype)
             elif self.quant_algo in ["llm.int8"]:
                 out = llm_int8_linear(x, self.quant_weight, self.bias, self.quant_scale, self.llm_int8_threshold)
@@ -170,7 +179,7 @@ class QuantizationLinear(nn.Layer):
                     bias=self.bias,
                     weight_scale=self.quant_scale,
                     weight_dtype=self.quant_dtype,
-                    block_size=self.quantization_config.block_size
+                    block_size=self.quantization_config.block_size,
                 )
             elif self.quant_algo in ["fp4", "nf4"]:
                 out = qlora_weight_linear(
