@@ -29,7 +29,7 @@ struct msgdata {
 
 void SaveOutMmsg(const paddle::Tensor& x,
                  const paddle::Tensor& not_need_stop, // cpu
-                 const paddle::Tensor& queue_id,      // cpu
+                 const paddle::Tensor& msg_queue_id,      // cpu
                  int64_t rank_id) {
 
   baidu::xpu::api::plugin::print_times("[TIME BEGIN] SaveOutMmsg");
@@ -38,9 +38,14 @@ void SaveOutMmsg(const paddle::Tensor& x,
     int64_t *x_data = x_cpu.data<int64_t>();
     auto not_need_stop_data = not_need_stop.data<bool>()[0];
 
+    std::cout << "not_need_stop_data: " << not_need_stop_data << std::endl;
+
     static struct msgdata msg_sed;
-    int queue_id_val = queue_id.data<int>()[0];
-    static key_t key = ftok("./", queue_id_val);
+    int msg_queue_id_val = msg_queue_id.data<int>()[0];
+
+    std::cout << "msg_queue_id_val: " << msg_queue_id_val << std::endl;
+
+    static key_t key = ftok("./", msg_queue_id_val);
     static int msgid = msgget(key, IPC_CREAT | 0666);
 
     msg_sed.mtype = 1;
@@ -59,7 +64,7 @@ void SaveOutMmsg(const paddle::Tensor& x,
 }
 
 PD_BUILD_OP(save_output)
-    .Inputs({"x", "not_need_stop", "queue_id"})
+    .Inputs({"x", "not_need_stop", "msg_queue_id"})
     .Attrs({"rank_id: int64_t"})
     .Outputs({"x_out"})
     .SetInplaceMap({{"x", "x_out"}})
