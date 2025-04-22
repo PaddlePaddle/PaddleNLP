@@ -189,6 +189,7 @@ class AdamWMini(AdamW):
         param = param_and_grad[0]
         name = param.name
 
+        # Whether we should do weight decay for the parameter.
         with_decay = True
         if self._apply_decay_param_fun is not None and not self._apply_decay_param_fun(param.name):
             with_decay = False
@@ -199,113 +200,168 @@ class AdamWMini(AdamW):
         beta1_pow_acc = self._get_accumulator_master(self._beta1_pow_acc_str, param)
         beta2_pow_acc = self._get_accumulator_master(self._beta2_pow_acc_str, param)
         find_master = self._multi_precision and self._is_dtype_fp16_or_bf16(param.dtype)
-        master_weight = self._master_weights[param.name] if find_master else None
+        master_weight = self._master_weights[name] if find_master else None
         lr = self._create_param_lr(param_and_grad)
 
+        # create the adamw optimize op
         if in_dynamic_or_pir_mode():
-            lr_ratio_ = 1.0 if self._lr_ratio is None else self._lr_ratio(param_and_grad[0])
+            lr_ratio_ = 1.0 if self._lr_ratio is None else self._lr_ratio(param)
 
             _beta1 = self._beta1 if not isinstance(self._beta1, Variable) else self._beta1.item(0)
             _beta2 = self._beta2 if not isinstance(self._beta2, Variable) else self._beta2.item(0)
             found_inf = self._get_auxiliary_var("found_inf") if in_pir_mode() else None
 
-            if any(adam_block_name in name.lower() for adam_block_name in self.adam_block_names):
-                _, _, _, _, _, _, _ = _C_ops.adamw_(
-                    param_and_grad[0],
-                    param_and_grad[1],
-                    lr,
-                    moment1,
-                    moment2,
-                    None,
-                    beta1_pow_acc,
-                    beta2_pow_acc,
-                    master_weight,
-                    found_inf,
-                    _beta1,
-                    _beta2,
-                    self._epsilon,
-                    lr_ratio_,
-                    self._weight_decay,
-                    with_decay,
-                    self._lazy_mode,
-                    1000,
-                    find_master,
-                    False,
-                    self._amsgrad,
-                )
-
-            else:
-                # Block-specific updates with per-block learning rates
-                grad = param_and_grad[1]
-                if any(wqk_name in name.lower() for wqk_name in self.wqk_names):
-                    # Q/K blocks: reshape and compute per-head learning rates
-                    grad_reshaped = paddle.reshape(grad, [-1, self.head_numel])
-                    mom1 = paddle.reshape(moment1, [-1, self.head_numel])
-                    mom2 = moment2  # Already shaped correctly
-
-                    # Compute per-head second moment
-                    mom2_update = paddle.mean(grad_reshaped * grad_reshaped, axis=1, keepdim=True)
-                    # Update moments with correct beta values
-                    mom2_next = mom2 * _beta2 + mom2_update * (1 - _beta2)
-                    mom1_next = mom1 * _beta1 + grad_reshaped * (1 - _beta1)
-
-                    # Update accumulators in-place
-                    moment2[:] = mom2_next
-                    moment1[:] = mom1_next
-                    beta1_pow_acc[:] = beta1_pow_acc * _beta1
-                    beta2_pow_acc[:] = beta2_pow_acc * _beta2
-
-                    # Compute adaptive learning rate
-                    denom = mom2.sqrt() / ((1 - beta2_pow_acc).sqrt()) + self._epsilon
-                    step_size = lr * paddle.sqrt(1 - beta2_pow_acc) / (1 - beta1_pow_acc)
-
-                    # Apply updates
-                    update = (mom1 / denom.reshape([-1, 1])) * (-step_size)
-                    p = param
-                    if master_weight is not None:
-                        p = master_weight
-                    p += paddle.reshape(update, param.shape)
-                    if master_weight is not None:
-                        master_weight[:] = p
-                        param[:] = p.astype(param.dtype)
-                    else:
-                        param[:] = p
-
-                else:
-                    # Other blocks
-                    mom1 = moment1
-                    mom2 = moment2  # Already shaped correctly
-
-                    mom2_update = (grad * grad).mean()
-
-                    mom2_next = mom2 * _beta2 + mom2_update * (1 - _beta2)
-                    mom1_next = mom1 * _beta1 + grad * (1 - _beta1)
-
-                    # Update accumulators in-place
-                    moment2[:] = mom2_next
-                    moment1[:] = mom1_next
-                    beta1_pow_acc[:] = beta1_pow_acc * _beta1
-                    beta2_pow_acc[:] = beta2_pow_acc * _beta2
-
-                    # Compute adaptive learning rate
-                    denom = mom2.sqrt() / ((1 - beta2_pow_acc).sqrt()) + self._epsilon
-                    step_size = lr * paddle.sqrt(1 - beta2_pow_acc) / (1 - beta1_pow_acc)
-
-                    # Apply updates
-                    update = (mom1 / denom) * (-step_size)
-                    p = param
-                    if master_weight is not None:
-                        p = master_weight
-                    p += update
-                    if master_weight is not None:
-                        master_weight[:] = p
-                        param[:] = p.astype(param.dtype)
-                    else:
-                        param[:] = p
-
+            self.adamw_python(
+                param_and_grad[0],
+                param_and_grad[1],
+                lr,
+                moment1,
+                moment2,
+                beta1_pow_acc,
+                beta2_pow_acc,
+                master_weight,
+                found_inf,
+                _beta1,
+                _beta2,
+                self._epsilon,
+                lr_ratio_,
+                self._weight_decay,
+                with_decay,
+                find_master,
+                name,
+            )
             return None
         else:
-            raise NotImplementedError("Static graph mode not implemented yet.")
+            raise NotImplementedError("Not implemented yet.")
+
+    def adamw_python(
+        self,
+        param,
+        grad,
+        learning_rate,
+        moment1,
+        moment2,
+        beta1_pow,
+        beta2_pow,
+        master_weight,
+        skip_update,
+        beta1,
+        beta2,
+        epsilon,
+        lr_ratio,
+        coeff,
+        with_decay,
+        multi_precision,
+        name,
+    ):
+        if skip_update:
+            return
+        if not with_decay:
+            coeff = 0.0
+        if not multi_precision:
+            master_weight = None
+
+        if any(adam_block_name in name.lower() for adam_block_name in self.adam_block_names):
+            _, _, _, _, _, _, _ = _C_ops.adamw_(
+                param,
+                grad,
+                learning_rate,
+                moment1,
+                moment2,
+                None,
+                beta1_pow,
+                beta2_pow,
+                master_weight,
+                skip_update,
+                beta1,
+                beta2,
+                epsilon,
+                lr_ratio,
+                coeff,
+                with_decay,
+                self._lazy_mode,
+                1000,
+                multi_precision,
+                False,
+                self._amsgrad,
+            )
+
+        else:
+            lr = learning_rate * lr_ratio
+            if master_weight is not None:
+                p = master_weight
+            else:
+                p = param
+            p *= 1.0 - lr * coeff
+
+            # Block-specific updates with per-block learning rates
+            if any(wqk_name in name.lower() for wqk_name in self.wqk_names):
+                # Q/K blocks: reshape and compute per-head learning rates
+                grad_reshaped = paddle.reshape(grad, [-1, self.head_numel])
+                mom1 = paddle.reshape(moment1, [-1, self.head_numel])
+                mom2 = moment2  # Already shaped correctly
+
+                # Compute per-head second moment
+                mom2_update = paddle.mean(grad_reshaped * grad_reshaped, axis=1, keepdim=True)
+                # Update moments with correct beta values
+                mom2_next = mom2 * beta2 + mom2_update * (1 - beta2)
+                mom1_next = mom1 * beta1 + grad_reshaped * (1 - beta1)
+
+                # Update accumulators in-place
+                moment1[:] = mom1_next
+                moment2[:] = mom2_next
+                beta1_pow[:] = beta1_pow * beta1
+                beta2_pow[:] = beta2_pow * beta2
+
+                # Compute adaptive learning rate
+                denom = mom2.sqrt() / ((1 - beta2_pow).sqrt()) + self._epsilon
+                step_size = lr / (1 - beta1_pow)
+
+                # Apply updates
+                update = (mom1 / denom.reshape([-1, 1])) * (-step_size)
+                p = param
+                if master_weight is not None:
+                    p = master_weight
+                p += paddle.reshape(update, param.shape)
+                if master_weight is not None:
+                    master_weight[:] = p
+                    param[:] = p.astype(param.dtype)
+                else:
+                    param[:] = p
+
+            else:
+                # Other blocks
+                mom1 = moment1
+                mom2 = moment2  # Already shaped correctly
+
+                mom2_update = (grad * grad).mean()
+
+                mom2_next = mom2 * beta2 + mom2_update * (1 - beta2)
+                mom1_next = mom1 * beta1 + grad * (1 - beta1)
+
+                # Update accumulators in-place
+                moment1[:] = mom1_next
+                moment2[:] = mom2_next
+                beta1_pow[:] = beta1_pow * beta1
+                beta2_pow[:] = beta2_pow * beta2
+
+                # Compute adaptive learning rate
+                denom = mom2.sqrt() / ((1 - beta2_pow).sqrt()) + self._epsilon
+                step_size = lr / (1 - beta1_pow)
+
+                # Apply updates
+                update = (mom1 / denom) * (-step_size)
+                p = param
+                if master_weight is not None:
+                    p = master_weight
+                p += update
+                if master_weight is not None:
+                    master_weight[:] = p
+                    param[:] = p.astype(param.dtype)
+                else:
+                    param[:] = p
+
+        return None
 
     def _count_block(self):
         """Count the number of each block type for logging."""
