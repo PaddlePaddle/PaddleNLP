@@ -1324,28 +1324,28 @@ class Trainer:
                     if self.args.offload_optim:
                         self._reload_optimizer()
 
-                    # if self.do_grad_scaling:
-                    #     if args.pipeline_parallel_degree > 1:
-                    #         assert not self.args.use_expert_parallel, "pipeline moe not work under fp16"
-                    #     scale_before = paddle.assign(self.scaler._scale)
-                    #     self.scaler.step(self.optimizer)
-                    #     self.scaler.update()
-                    #     scale_after = self.scaler._scale
-                    #     # Compatible with paddlepaddle 2.6.0 using typo word.
-                    #     if hasattr(self.scaler, "_cache_founf_inf"):
-                    #         optimizer_was_run = not self.scaler._cache_founf_inf
-                    #     else:
-                    #         optimizer_was_run = not self.scaler._cache_found_inf
-                    #     if not optimizer_was_run:
-                    #         scale_before_value = scale_before.cpu().numpy()
-                    #         scale_after_value = scale_after.cpu().numpy()
-                    #         logger.warning(
-                    #             f"optimizer not run, scale_before: {scale_before_value[0]}, scale_after: {scale_after_value[0]}"
-                    #         )
-                    # elif isinstance(self.optimizer, HybridParallelOptimizer):
-                    #     self.optimizer._step(parameters_list)
-                    # else:
-                    #     self.optimizer.step()
+                    if self.do_grad_scaling:
+                        if args.pipeline_parallel_degree > 1:
+                            assert not self.args.use_expert_parallel, "pipeline moe not work under fp16"
+                        scale_before = paddle.assign(self.scaler._scale)
+                        self.scaler.step(self.optimizer)
+                        self.scaler.update()
+                        scale_after = self.scaler._scale
+                        # Compatible with paddlepaddle 2.6.0 using typo word.
+                        if hasattr(self.scaler, "_cache_founf_inf"):
+                            optimizer_was_run = not self.scaler._cache_founf_inf
+                        else:
+                            optimizer_was_run = not self.scaler._cache_found_inf
+                        if not optimizer_was_run:
+                            scale_before_value = scale_before.cpu().numpy()
+                            scale_after_value = scale_after.cpu().numpy()
+                            logger.warning(
+                                f"optimizer not run, scale_before: {scale_before_value[0]}, scale_after: {scale_after_value[0]}"
+                            )
+                    elif isinstance(self.optimizer, HybridParallelOptimizer):
+                        self.optimizer._step(parameters_list)
+                    else:
+                        self.optimizer.step()
 
                     if self.args.offload_optim:
                         self._offload_optimizer()
@@ -2176,7 +2176,6 @@ class Trainer:
         return exclude_layers
 
     def _wrap_model(self, model, training=True):
-        return model
 
         # train/eval could be run multiple-times - if already wrapped, don't re-wrap it again
         if unwrap_model(model) is not model:
