@@ -22,8 +22,12 @@ from paddle import inference
 from paddlenlp.data import Pad, Tuple
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import AutoTokenizer
+from paddlenlp.utils.env import (
+    PADDLE_INFERENCE_MODEL_SUFFIX,
+    PADDLE_INFERENCE_WEIGHTS_SUFFIX,
+)
 from paddlenlp.utils.log import logger
-from paddlenlp.utils.env import PADDLE_INFERENCE_MODEL_SUFFIX, PADDLE_INFERENCE_WEIGHTS_SUFFIX
+
 
 def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
 
