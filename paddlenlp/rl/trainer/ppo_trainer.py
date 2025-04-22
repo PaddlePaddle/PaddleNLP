@@ -1248,7 +1248,6 @@ class PPOTrainer(Trainer):
             sharding_rank=hcg.get_sharding_parallel_rank(),
             dp_degree=dp_degree,
             sharding_degree=sharding_degree,
-            rollout_n=self.args.rollout_n,
             balance_batch_across_dp_group=True,
         )
         # split into micro-batches
@@ -1257,6 +1256,7 @@ class PPOTrainer(Trainer):
                 total_batch=combined_balance_batch,
                 batch_size=self.args.per_device_train_batch_size,
                 pad_token_id=self.tokenizer.pad_token_id,
+                pad_to_multiple_of=self.args.tensor_parallel_degree if self._model_config.sequence_parallel else None,
             )
         else:
             micro_batches = combined_balance_batch
@@ -1295,7 +1295,7 @@ class PPOTrainer(Trainer):
         with (
             guard_set_args(
                 args,
-                {"per_device_train_batch_size": self.args.global_batch_size // self.args.dataset_world_size},
+                {"per_device_train_batch_size": self.args.global_gen_batch_size // self.args.dataset_world_size},
             ),
             guard_set_args(
                 self,
@@ -1362,7 +1362,6 @@ class PPOTrainer(Trainer):
         num_gen_batches = 0
         if self.args.dynamic_sampling:
             total_valid_prompt = 0
-            per_device_sample_batch_size = self.args.per_device_sample_batch_size
             total_batch = defaultdict(list)
 
         for epoch in range(epochs_trained, num_train_epochs):
@@ -1540,7 +1539,7 @@ class PPOTrainer(Trainer):
 
                     total_valid_prompt += int(local_valid_prompt)
 
-                    if total_valid_prompt >= per_device_sample_batch_size * self.args.dataset_world_size:
+                    if total_valid_prompt >= self.args.global_batch_size:
                         # Collect and pad tensors from all workers (across DP and Sharding groups)
                         for key in total_batch.keys():
                             tensor_list = total_batch[key]
@@ -1558,11 +1557,8 @@ class PPOTrainer(Trainer):
                             )
 
                         # Truncate total_batch to match expected total batch size
-                        global_sample_batch_size = (
-                            per_device_sample_batch_size * self.args.dataset_world_size * self.args.rollout_n
-                        )
                         for key in total_batch.keys():
-                            total_batch[key] = total_batch[key][:global_sample_batch_size]
+                            total_batch[key] = total_batch[key][: self.args.global_batch_size * self.args.rollout_n]
 
                         # Split total_batch evenly across all DP × Sharding ranks
                         if is_fleet_init and dp_degree * sharding_degree > 1:
@@ -1572,7 +1568,6 @@ class PPOTrainer(Trainer):
                                 sharding_rank=hcg.get_sharding_parallel_rank(),
                                 dp_degree=dp_degree,
                                 sharding_degree=sharding_degree,
-                                rollout_n=self.args.rollout_n,
                                 balance_batch_across_dp_group=False,
                             )
 
@@ -1596,7 +1591,7 @@ class PPOTrainer(Trainer):
                         else:
                             logger.info(
                                 f"Collected {total_valid_prompt} valid prompts, "
-                                f"need {per_device_sample_batch_size * self.args.dataset_world_size}. Continue Dynamic Sampling..."
+                                f"need {self.args.global_batch_size}. Continue Dynamic Sampling..."
                             )
                             continue
 

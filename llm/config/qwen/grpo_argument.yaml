@@ -47,6 +47,7 @@ quant_type: "" # Quantization type, e.g., "weight_only_int8"
 do_train: true # Whether to perform training
 seed: 42 # Random seed for reproducibility
 global_batch_size: 2 # Global batch size for training
+global_gen_batch_size: -1 # Global generation batch size for dynamic sampling
 mini_batch_size: 2 # Mini-batch size for training
 rollout_n: 8 # Number of rollouts
 update_iters: 1 # Number of training iterations for rollout samples
@@ -87,7 +88,6 @@ clip_range_value: 5.0 # The clipping range for the output of the value model. Th
 normalize_reward: true # Whether to normalize reward
 normalize_advantage: true # Whether to normalize advantage
 dynamic_sampling: false # Whether to use dynamic sampling, which is introcuded in DAPO algorithm https://arxiv.org/abs/2503.14476
-per_device_sample_batch_size: 1 # Sample batch size per device for dynamic sampling
 max_gen_batches: 2 # Maximum number of generation batches for dynamic sampling
 use_fp32_compute: false # Whether to use fp32 to compute xx_log_prob,rewards, advantages and loss
 

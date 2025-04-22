@@ -30,6 +30,10 @@ class TrainingArguments(TrainingArguments):
         default=8,
         metadata={"help": "Global batch size for input prompt."},
     )
+    global_gen_batch_size: int = field(
+        default=-1,
+        metadata={"help": "Global generation batch size for dynamic sampling."},
+    )
     mini_batch_size: int = field(
         default=-1,
         metadata={"help": "Mini-batch size (global) for the training dataloader."},
@@ -186,10 +190,6 @@ class TrainingArguments(TrainingArguments):
     dynamic_sampling: bool = field(
         default=False,
         metadata={"help": "whether enable dynamic sample https://arxiv.org/abs/2503.14476"},
-    )
-    per_device_sample_batch_size: int = field(
-        default=16,
-        metadata={"help": "required valid prompt per device for dynamic sampling"},
     )
     max_gen_batches: int = field(
         default=32,
@@ -351,8 +351,11 @@ class TrainingArguments(TrainingArguments):
                 f"dataset_world_size({self.dataset_world_size})=data_parallel_degree({self.data_parallel_degree})*sharding_parallel_degree({self.sharding_parallel_degree})."
             )
 
+        if not self.dynamic_sampling or self.global_gen_batch_size <= 0:
+            self.global_gen_batch_size = self.global_batch_size
+
         if self.per_device_rollout_batch_size <= 0:
-            self.per_device_train_batch_size = self.per_device_train_batch_size
+            self.per_device_rollout_batch_size = self.per_device_train_batch_size
         if self.per_device_logprob_batch_size <= 0:
             self.per_device_logprob_batch_size = self.per_device_train_batch_size
         if self.per_device_reward_batch_size <= 0:
