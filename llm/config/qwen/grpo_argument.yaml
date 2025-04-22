@@ -99,7 +99,7 @@ eval_steps: 20 # Number of steps between evaluations
 
 # device memory optimization args
 use_flash_attention: true # Whether to use fused attention operations
-use_fused_rms_norm: true # Whether to use fused RMS norm operations
+use_fused_rms_norm: false # Whether to use fused RMS norm operations, which needs to install fused_ln in slm/model_zoo/gpt-3/external_ops
 use_fused_rope: true # Whether to use fused rope operations
 use_fused_head_and_loss_fn: false # Whether to use fused head and loss function
 use_fused_linear: false # Whether to use fused linear operations, which needs to install fused_ln in slm/model_zoo/gpt-3/external_ops
