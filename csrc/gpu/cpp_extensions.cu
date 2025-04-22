@@ -237,11 +237,11 @@ std::vector<paddle::Tensor> GetPaddingOffsetV2(const paddle::Tensor& input_ids,
 
 void SaveOutMmsg(const paddle::Tensor& x,
                  const paddle::Tensor& not_need_stop, // cpu
-                 const paddle::Tensor& queue_id,      // cpu
+                 const paddle::Tensor& msg_queue_id,      // cpu
                  int64_t rank_id);
 
 void GetOutput(const paddle::Tensor& x,
-               const paddle::Tensor& queue_id, // cpu
+               const paddle::Tensor& msg_queue_id, // cpu
                int64_t rank_id,
                bool wait_flag);
 
