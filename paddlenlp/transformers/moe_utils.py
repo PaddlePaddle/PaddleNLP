@@ -166,6 +166,7 @@ class ZipNode:
         self, expert_out, zipped_expertwise_rowmap, routemap_topk, unzipped_probs, total_zipped_tokens, num_experts
     ):
         self.expert_out = expert_out
+        self.unzipped_probs = unzipped_probs
         expert_out_s = expert_out * unzipped_probs.unsqueeze(-1)
         expert_out_zipped, zipped_probs_topk = TDU.tokens_zip(
             expert_out_s, zipped_expertwise_rowmap, routemap_topk, unzipped_probs, total_zipped_tokens, num_experts
@@ -186,6 +187,7 @@ class ZipNode:
             grad_output, None, dispatched_indices, dispatched_probs, top_k, num_experts, max_tokens
         )
         probs_grad = (unzipped_grad.cast(paddle.float32) * self.expert_out.cast(paddle.float32)).sum(axis=-1)
+        unzipped_grad = unzipped_grad * self.unzipped_probs.unsqueeze(-1)
 
         self.reset_status()
         return unzipped_grad, probs_grad
