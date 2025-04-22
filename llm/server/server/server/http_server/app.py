@@ -14,19 +14,24 @@
 
 import argparse
 import os
+from typing import Dict
 
 import uvicorn
-from typing import Dict
-from fastapi import FastAPI, Request
-from fastapi.responses import StreamingResponse
-from server.http_server.api import (Req, chat_completion_generator,
-                                    chat_completion_result)
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse, StreamingResponse
 from server.http_server.adapter_openai import (
-    openai_chat_commpletion_generator, openai_chat_completion_result
+    ErrorResponse,
+    openai_chat_commpletion_generator,
+    openai_chat_completion_result,
+)
+from server.http_server.api import (
+    Req,
+    chat_completion_generator,
+    chat_completion_result,
 )
 from server.utils import http_server_logger
 
-http_server_logger.info(f"create fastapi app...")
+http_server_logger.info("create fastapi app...")
 app = FastAPI()
 
 
@@ -46,8 +51,7 @@ def create_chat_completion(req: Req):
         http_server_logger.info(f"receive request: {req.req_id}")
         grpc_port = int(os.getenv("SERVICE_GRPC_PORT", 0))
         if grpc_port == 0:
-            return {"error_msg": f"SERVICE_GRPC_PORT ({grpc_port}) for infer service is invalid",
-                    "error_code": 400}
+            return {"error_msg": f"SERVICE_GRPC_PORT ({grpc_port}) for infer service is invalid", "error_code": 400}
         grpc_url = f"localhost:{grpc_port}"
 
         if req.stream:
@@ -56,7 +60,7 @@ def create_chat_completion(req: Req):
         else:
             resp = chat_completion_result(infer_grpc_url=grpc_url, req=req)
     except Exception as e:
-        resp = {'error_msg': str(e), 'error_code': 501}
+        resp = {"error_msg": str(e), "error_code": 501}
     finally:
         http_server_logger.info(f"finish request: {req.req_id}")
         return resp
@@ -77,28 +81,40 @@ def create_openai_completion(request: Dict, chat_interface: bool):
         req = Req()
         req.load_openai_request(request)
     except Exception as e:
-        return {"error_msg": "request body is not a valid json format", "error_code": 400, "result": ''}
+        error_resp = ErrorResponse(message=f"request body is not a valid json format, {str(e)}", code=400)
+        return JSONResponse(error_resp.dict(), status_code=400)
 
     try:
         http_server_logger.info(f"receive request: {req.req_id}")
 
         grpc_port = int(os.getenv("SERVICE_GRPC_PORT", 0))
         if grpc_port == 0:
-            return {"error_msg": f"SERVICE_GRPC_PORT ({grpc_port}) for infer service is invalid",
-                    "error_code": 400}
+            error_resp = ErrorResponse(
+                message=f"SERVICE_GRPC_PORT ({grpc_port}) for infer service is invalid", code=400
+            )
+            return JSONResponse(error_resp.dict(), status_code=400)
         grpc_url = f"localhost:{grpc_port}"
 
         if req.stream:
             generator = openai_chat_commpletion_generator(
-                                infer_grpc_url=grpc_url,
-                                req=req,
-                                chat_interface=chat_interface,
-                            )
-            resp = StreamingResponse(generator, media_type="text/event-stream")
+                infer_grpc_url=grpc_url,
+                req=req,
+                chat_interface=chat_interface,
+            )
+            if isinstance(generator, ErrorResponse):
+                resp = JSONResponse(generator.dict(), status_code=400)
+            else:
+                resp = StreamingResponse(generator, media_type="text/event-stream")
         else:
-            resp = openai_chat_completion_result(infer_grpc_url=grpc_url, req=req, chat_interface=chat_interface)
+            response_obj = openai_chat_completion_result(
+                infer_grpc_url=grpc_url, req=req, chat_interface=chat_interface
+            )
+            if isinstance(response_obj, ErrorResponse):
+                resp = JSONResponse(response_obj.dict(), status_code=400)
+            else:
+                resp = response_obj
     except Exception as e:
-        resp = {'error_msg': str(e), 'error_code': 501}
+        resp = JSONResponse(ErrorResponse(message=str(e), code=501).dict(), status_code=400)
     finally:
         http_server_logger.info(f"finish request: {req.req_id}")
         return resp
@@ -110,11 +126,7 @@ def launch_http_server(port: int, workers: int) -> None:
     """
     http_server_logger.info(f"launch http server with port: {port}, workers: {workers}")
     try:
-        uvicorn.run(app="server.http_server.app:app",
-                    host='0.0.0.0',
-                    port=port,
-                    workers=workers,
-                    log_level="error")
+        uvicorn.run(app="server.http_server.app:app", host="0.0.0.0", port=port, workers=workers, log_level="error")
     except Exception as e:
         http_server_logger.error(f"launch http server error, {e}")
 
