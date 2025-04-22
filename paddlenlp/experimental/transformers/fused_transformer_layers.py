@@ -51,6 +51,27 @@ def use_cutlass_fp8_gemm():
     return os.getenv("FLAGS_CUTLASS_FP8_GEMM", "False") in ["True", "1", "true"]
 
 
+def precision_cmp_paddle(t1: paddle.Tensor, t2: paddle.Tensor):
+    
+    x, xx = paddle.cast(t1, dtype='float32'), paddle.cast(t2, dtype='float32')
+    # 重塑张量并计算余弦相似度
+    x_reshaped = paddle.reshape(x, [1, -1])
+    xx_reshaped = paddle.reshape(xx, [1, -1])
+    sim = paddle.nn.functional.cosine_similarity(x_reshaped, xx_reshaped).item()
+    
+    # 计算 L1 误差
+    l1 = (paddle.abs(x - xx).sum() / paddle.abs(xx).sum()).item()
+    max_diff = paddle.max(x - xx)
+    
+    return sim, l1, max_diff
+
+
+def check_nan(t) -> int:
+    nan_mask = paddle.isnan(t)
+    nan_indices = paddle.nonzero(nan_mask)
+    return nan_indices.shape[0]
+
+
 if paddle.is_compiled_with_cuda():
     if use_cutlass_fp8_gemm():
         logger.info("cutlass fp8 gemm is used. you can turn it off by setting FLAGS_CUTLASS_FP8_GEMM to False.")
@@ -3314,6 +3335,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                     pad_sequences_to_aligned_chunks,
                 )
                 from paddlenlp.ops.triton_ops.segment_mean import segment_mean
+                import sageattn_custom_ops
 
                 # split qkv
                 q, k, v = paddle.split(
@@ -3389,9 +3411,41 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 )
 
                 fmha_out = sa_results[0]
-                nan_mask = paddle.isnan(fmha_out)
-                nan_indices = paddle.nonzero(nan_mask)
-                print(f"layer: {i} ", nan_indices)
+                o_sdpa = paddle.nn.functional.scaled_dot_product_attention(q.unsqueeze(0), k.unsqueeze(0), v.unsqueeze(0), is_causal=True)
+                o_sdpa = o_sdpa.reshape(fmha_out.shape)
+
+                sim, l1, diff = precision_cmp_paddle(fmha_out, o_sdpa)
+                print(f"fmha vs sdpa: {sim}, {diff}")
+
+                o_custom_ops, _, _ = sageattn_custom_ops.sage_attention_varlen2(q, 
+                                                    k, 
+                                                    padded_v, 
+                                                    kwargs.get("cu_seqlens_q", None),
+                                                    kwargs.get("cu_seqlens_q", None),
+                                                    cu_seqlen_v_padded,
+                                                    km,
+                                                    None,
+                                                    131,
+                                                    131,
+                                                    256,
+                                                    128**-0.5,
+                                                    "per_warp",
+                                                    "fp16",
+                                                    tensor_layout=0,
+                                                    is_causal=True,
+                                                    smooth_k=True, 
+                                                    smooth_v=False, 
+                                                    return_lse=False)
+                sim, l1, diff = precision_cmp_paddle(o_custom_ops.reshape(o_sdpa.shape), o_sdpa)
+                print(f"costom ops vs sdpa: {sim}, {diff}")
+
+                # o_sdpa_nan = check_nan(o_sdpa)
+                # o_fmha_nan = check_nan(fmha_out)
+                # o_custom_ops_nan = check_nan(o_custom_ops)
+                # q_nan, k_nan, v_nan = check_nan(q), check_nan(k), check_nan(v)
+                print(f"layer: {i} q nan:{check_nan(q)}, k nan:{check_nan(k)}, v nan:{check_nan(v)}, fmha nan:{check_nan(fmha_out)}, custom ops nan:{check_nan(o_custom_ops)}, sdpa nan:{check_nan(o_sdpa)}")
+                print("============================================")
+                fmha_out = o_custom_ops.reshape(fmha_out.shape)
             else:
                 from paddlenlp_ops import append_attention
 
