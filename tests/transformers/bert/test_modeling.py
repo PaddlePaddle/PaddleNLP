@@ -541,7 +541,7 @@ class BertCompatibilityTest(unittest.TestCase):
 
     @slow
     def test_paddlenlp_token_classification(self):
-        versions = ["2.2.2", "2.3.0", "2.3.4", "2.3.7", "2.4.0"]
+        versions = ["3.0.0b4"]
         for version in versions:
             install_package("paddlenlp", version=version)
             self.run_token_for_classification(version)

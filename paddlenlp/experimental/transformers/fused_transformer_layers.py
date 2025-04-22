@@ -41,14 +41,13 @@ if not is_paddlenlp_ops_available():
         "you can refer to: https://github.com/PaddlePaddle/PaddleNLP/blob/develop/csrc/README.md"
     )
 
-if (
-    paddle.device.get_all_custom_device_type() is not None and len(paddle.device.get_all_custom_device_type()) > 0
-) or paddle.is_compiled_with_cuda():
-    from paddlenlp_ops import rebuild_padding_v2
-
 
 def use_cutlass_fp8_gemm():
     return os.getenv("FLAGS_CUTLASS_FP8_GEMM", "False") in ["True", "1", "true"]
+
+
+def use_custom_allreduce():
+    return os.getenv("FLAGS_custom_allreduce", "False") in ["True", "1", "true"]
 
 
 if paddle.is_compiled_with_cuda():
@@ -704,6 +703,20 @@ class FusedMultiTransformerBase(Layer):
 
                 self._add_parameter(ffn1_weight_scale)
                 self._add_parameter(ffn2_weight_scale)
+        if use_custom_allreduce():
+            try:
+                from paddlenlp.ops.custom_all_reduce import custom_all_reduce
+            except:
+                assert False, "please install paddlenlp.ops"
+            self.custom_all_reduce_max_bytes = 1024 * self.embed_dim
+            from paddle.distributed import fleet
+
+            hcg = fleet.get_hybrid_communicate_group()
+            model_parallel_group = hcg.get_model_parallel_group()
+            self.fa = custom_all_reduce.CustomAllreduce(model_parallel_group, self.custom_all_reduce_max_bytes)
+            self.use_custom_allreduce = True
+        else:
+            self.use_custom_allreduce = False
 
     def init_weight(self):
         self.qkv_weights = []
@@ -1737,7 +1750,10 @@ class FusedMultiTransformerBase(Layer):
 
             # all_reduce
             if self.tp_degree > 1:
-                dist.all_reduce(out_linear_out)
+                if self.use_custom_allreduce and out_linear_out.shape[0] <= 128:
+                    self.fa.all_reduce(out_linear_out, out_linear_out)
+                else:
+                    dist.all_reduce(out_linear_out)
 
             # ffn layernorm
             tmp_out, residual_input = self.compute_ffn_layernorm(out_linear_out, residual_input, i)
@@ -1760,7 +1776,10 @@ class FusedMultiTransformerBase(Layer):
 
             # all_reduce
             if self.tp_degree > 1:
-                dist.all_reduce(ffn2_out)
+                if self.use_custom_allreduce and ffn2_out.shape[0] <= 128:
+                    self.fa.all_reduce(ffn2_out, ffn2_out)
+                else:
+                    dist.all_reduce(ffn2_out)
 
             # norm + residual_add_bias
             tmp_out, residual_input = self.compute_bias_residual_layernorm(
@@ -3484,6 +3503,8 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                     max_input_length,
                 )
             else:
+                from paddlenlp_ops import rebuild_padding_v2
+
                 out = rebuild_padding_v2(
                     multi_block_output,
                     cum_offsets,
@@ -4934,11 +4955,9 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
         return "float8_e4m3fn"
 
     def per_tensor_quant_fp8(self, x):
-        x_fp32 = x.cast("float32")
-        x_s = x_fp32.abs().max().clip(min=0.000001) / 448.0
-        x_q = x_fp32 / x_s
-        x_q = x_q.clip(min=-448.0, max=448.0)
-        return x_q.cast("float8_e4m3fn"), x_s
+        from paddlenlp_ops import per_tensor_quant_fp8
+
+        return per_tensor_quant_fp8(x, scale=None)
 
     def dynamic_quant(self, x):
         if self.weight_block_size[0] == 0 and self.weight_block_size[1] == 0:
@@ -4947,9 +4966,6 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
             from paddlenlp.ops.triton_ops.fused_moe import per_token_group_quant_fp8_api
 
             x_q, x_s = per_token_group_quant_fp8_api(x, 128, True)
-            # x_q, x_s = group_quant(
-            #     x, group_size=128, transpose_scale=True, quant_max_bound=448.0, quant_min_bound=-448.0
-            # )
         return x_q, x_s
 
     def cutlass_fp8_gemm(

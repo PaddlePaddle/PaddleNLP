@@ -130,7 +130,7 @@ def preference_collate_fn(batch, max_seq_len=None, pad_token_id=0):
         difference = max_seq_len - len(sequence["input_ids"])
 
         input_dict["input_ids"].append(sequence["input_ids"] + [pad_token_id] * difference)
-        input_dict["position_ids"].append(sequence["position_ids"] + [pad_token_id] * difference)
+        input_dict["position_ids"].append(sequence["position_ids"] + [0] * difference)
         if use_attn_mask_startend_row_indices:
             input_dict["attn_mask_startend_row_indices"].append(
                 [
@@ -281,7 +281,7 @@ def zero_padding_process_collate_fn(batch, max_seq_len=None, pad_token_id=0):
         difference = max_seq_len - len(sequence["input_ids"])
 
         input_dict["input_ids"].append(sequence["input_ids"] + [pad_token_id] * difference)
-        input_dict["position_ids"].append(sequence["position_ids"] + [pad_token_id] * difference)
+        input_dict["position_ids"].append(sequence["position_ids"] + [0] * difference)
         input_dict["labels"].append(sequence["labels"] + [-100] * difference)
         if use_attn_mask_startend_row_indices:
             input_dict["attn_mask_startend_row_indices"].append(
@@ -334,7 +334,7 @@ def process_collate_fn(batch, pad_token_id=0):
 
         # input_ids: Tensor(seqL, ); position_ids: list, len(seqL); labels: Tensor(seqL, )
         input_dict["input_ids"].append(sequence["input_ids"].tolist() + [pad_token_id] * difference)
-        input_dict["position_ids"].append(sequence["position_ids"] + [pad_token_id] * difference)
+        input_dict["position_ids"].append(sequence["position_ids"] + [0] * difference)
         input_dict["labels"].append(sequence["labels"].tolist() + [-100] * difference)
         if use_attn_mask_startend_row_indices:
             input_dict["attn_mask_startend_row_indices"].append(

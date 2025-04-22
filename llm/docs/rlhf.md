@@ -47,7 +47,7 @@
 - PaddlePaddle >= 2.6.0
 - PaddleNLP 最新版本
 
-如需使用生成加速功能，需要安装 [paddlenlp_ops](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/csrc) ，请使用 `git clone https://github.com/PaddlePaddle/PaddleNLP.git` 克隆 PaddleNLP 代码库并且将 PaddleNLP/llm 与PaddleNLP/llm/alignment/ppo 目录的路径加入 PYTHONPATH（后续将进行完善）。安装 paddlenlp_ops 后训练时将直接开启生成加速（开启流水线并行时不支持生成加速），否则使用原生动态图进行生成。
+如需使用生成加速功能，需要安装 [paddlenlp_ops](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/csrc) ，请使用 `git clone https://github.com/PaddlePaddle/PaddleNLP.git` 克隆 PaddleNLP 代码库并且将 PaddleNLP/llm 与 PaddleNLP/llm/alignment/ppo 目录的路径加入 PYTHONPATH（后续将进行完善）。安装 paddlenlp_ops 后训练时将直接开启生成加速（开启流水线并行时不支持生成加速），否则使用原生动态图进行生成。
 
 ### 数据准备
 
@@ -173,11 +173,11 @@ PPO 完整的训练过程包括以下 3 个阶段，如下图所示（来自[Dee
   <img src="https://github.com/microsoft/DeepSpeedExamples/blob/master/applications/DeepSpeed-Chat/assets/image/ppo_trainer.png?raw=true" align="middle" width = "600" />
 </p>
 
-1. Supervised Fine-Tuning (SFT)
+**1. Supervised Fine-Tuning (SFT)**
 
 同[LLM 精调](finetune.md)，可以直接参考对应内容进行训练并使用其产出模型。
 
-2. Reward Model Fine-Tuning
+**2. Reward Model Fine-Tuning**
 
 使用 `run_reward.py` 脚本根据 `rm_argument.json` 训练奖励模型
 
@@ -194,7 +194,7 @@ python -u -m paddle.distributed.launch run_reward.py ../../config/llama/rm_argum
 - `loss_type`：使用 token 级或是 sequence 级 loss 进行奖励模型训练，可选`"token-wise", "sequence-wise"`，默认为 `"sequence-wise"`。
 - `regularization`：奖励模型训练目标中对奖励的正则化系数，默认为 `0.001`。
 
-3. RLHF：
+**3. RLHF：**
 
 RLHF 阶段需要 actor model、reference model、critic model、reward model 四个模型；actor-model/reference-model 使用 SFT 模型进行 initialize/frozen；critic-model/reward-model 使用 reward 模型进行 initialize/frozen (另外注意若 SFT 使用 LoRA 请先将 LoRA 权重合并)。这里使用 PKU-Alignment/PKU-SafeRLHF 提供的 SFT 模型（[PKU-Alignment/alpaca-7b-reproduced](https://huggingface.co/PKU-Alignment/alpaca-7b-reproduced)）和 reward 模型（[PKU-Alignment/beaver-7b-v1.0-reward](https://huggingface.co/PKU-Alignment/beaver-7b-v1.0-reward)，注意该模型只关注 helpful 未考量 harmless）作为示例，使用 `run_ppo.py` 脚本根据 `ppo_argument.json` 进行 RLHF 训练。
 

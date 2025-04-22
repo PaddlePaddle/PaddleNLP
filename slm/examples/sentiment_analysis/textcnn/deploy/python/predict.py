@@ -19,20 +19,24 @@ import paddle
 import paddle.nn.functional as F
 
 from paddlenlp.data import JiebaTokenizer, Pad, Vocab
+from paddlenlp.utils.env import (
+    PADDLE_INFERENCE_MODEL_SUFFIX,
+    PADDLE_INFERENCE_WEIGHTS_SUFFIX,
+)
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "--model_file",
     type=str,
     required=True,
-    default="./static_graph_params.pdmodel",
+    default=f"./static_graph_params{PADDLE_INFERENCE_MODEL_SUFFIX}",
     help="The path to model info in static graph.",
 )
 parser.add_argument(
     "--params_file",
     type=str,
     required=True,
-    default="./static_graph_params.pdiparams",
+    default=f"./static_graph_params{PADDLE_INFERENCE_WEIGHTS_SUFFIX}",
     help="The path to parameters in static graph.",
 )
 parser.add_argument("--vocab_path", type=str, default="./robot_chat_word_dict.txt", help="The path to vocabulary.")

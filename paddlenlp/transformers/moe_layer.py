@@ -176,7 +176,11 @@ class MoELayer(nn.Layer):
         except AttributeError:
             is_fleet_init = False
 
-        if is_fleet_init and dist.get_world_size() > 1 and moe_group == "data":
+        if (
+            is_fleet_init
+            and dist.fleet.get_hybrid_communicate_group().get_data_parallel_world_size() > 1
+            and moe_group == "data"
+        ):
             self.moe_group = dist.fleet.get_hybrid_communicate_group().get_data_parallel_group()
             self.moe_rank = dist.get_rank(self.moe_group)
             self.moe_rank = 0 if self.moe_rank < 0 else self.moe_rank
