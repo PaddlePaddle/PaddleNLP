@@ -163,7 +163,7 @@ class DeepseekScalingRotaryEmbeddingXPU(nn.Layer):
         mscale_all_dim: float = 0,
     ) -> None:
         ori_device = paddle.device.get_device()
-        paddle.device.set_device("xpu")
+        paddle.device.set_device("cpu")
         super().__init__()
         self._dtype = paddle.get_default_dtype()
 
