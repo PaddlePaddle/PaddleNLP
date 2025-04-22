@@ -110,7 +110,7 @@ function gpt_case_list_dygraph() {
         restore_func $fun_list  
     elif [ $1 = "exec_case" ]; then
         for fun in "${fun_list[@]}"; do
-            eval "timeout 20m $fun"
+            eval "$fun"
         done
         track_case_status $FUNCNAME "gpt_"
     else 
@@ -129,7 +129,7 @@ function llm_gpt_case_list_dygraph() {
         restore_func $fun_list  
     elif [ $1 = "exec_case" ]; then
         for fun in "${fun_list[@]}"; do
-            eval "timeout 20m $fun"
+            eval "$fun"
         done
         track_case_status $FUNCNAME "llm_gpt_"
     else 

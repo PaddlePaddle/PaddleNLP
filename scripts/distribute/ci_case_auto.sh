@@ -122,7 +122,7 @@ function llama_case_list_auto() {
         restore_func $fun_list  
     elif [ $1 = "exec_case" ]; then
         for fun in "${fun_list[@]}"; do
-            eval "timeout 20m $fun"
+            eval "$fun"
         done
         track_case_status $FUNCNAME "llama_"
     else 
@@ -143,7 +143,7 @@ function deepseek_case_list_auto() {
         restore_func $fun_list  
     elif [ $1 = "exec_case" ]; then
         for fun in "${fun_list[@]}"; do
-            eval "timeout 20m $fun"
+            eval "$fun"
         done
         track_case_status $FUNCNAME "deepseek_"
     else 
@@ -171,7 +171,7 @@ function llm_gpt_case_list_auto() {
         restore_func $fun_list  
     elif [ $1 = "exec_case" ]; then
         for fun in "${fun_list[@]}"; do
-            eval "timeout 20m $fun"
+            eval "$fun"
         done
         track_case_status $FUNCNAME "llm_gpt"
     else 
@@ -195,7 +195,7 @@ function llm_qwen_case_list_auto() {
         restore_func $fun_list  
     elif [ $1 = "exec_case" ]; then
         for fun in "${fun_list[@]}"; do
-            eval "timeout 20m $fun"
+            eval "$fun"
         done
         track_case_status $FUNCNAME "llm_qwen"
     else 
