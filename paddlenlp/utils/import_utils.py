@@ -38,6 +38,8 @@ pybind_ops_list = [
     "rebuild_padding_v2",
     "append_attention",
     "save_output_dygraph",
+    "per_token_group_quant",
+    "per_tensor_quant_fp8",
 ]
 
 

@@ -279,7 +279,7 @@ class ModelRunner:
         self.share_inputs["input_ids"] = paddle.full(
             shape=[self.args.max_batch_size, self.args.max_seq_len], fill_value=self.pad_token_id, dtype="int64"
         )
-        self.share_inputs["queue_id"] = paddle.full(shape=[1], fill_value=-1, dtype="int32")
+        self.share_inputs["msg_queue_id"] = paddle.full(shape=[1], fill_value=1, dtype="int32")
         self.share_inputs["top_p"] = paddle.full(
             shape=[self.args.max_batch_size, 1], fill_value=self.top_p, dtype="float32"
         )
