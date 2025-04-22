@@ -39,6 +39,7 @@ from paddlenlp.transformers import (  # import gpt model
     PretrainedConfig,
     PretrainedTokenizer,
 )
+
 # from paddlenlp.utils.env import (
 #     PADDLE_INFERENCE_MODEL_SUFFIX,
 #     PADDLE_INFERENCE_WEIGHTS_SUFFIX,

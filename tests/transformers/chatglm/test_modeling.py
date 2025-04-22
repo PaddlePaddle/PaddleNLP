@@ -19,6 +19,7 @@ import numpy as np
 import paddle
 
 from paddlenlp.transformers import ChatGLMConfig, ChatGLMForCausalLM, ChatGLMModel
+
 # from paddlenlp.utils.env import (
 #     PADDLE_INFERENCE_MODEL_SUFFIX,
 #     PADDLE_INFERENCE_WEIGHTS_SUFFIX,
