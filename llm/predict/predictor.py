@@ -1260,14 +1260,12 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         if kwargs:
             old_predictor_config = copy.deepcopy(self.config)
             for key, new_value in kwargs.items():
-                if hasattr(self.config, key):
-                    old_value = getattr(self.config, key)
-                    if old_value != new_value:
-                        setattr(self.config, key, new_value)
-                        if key == "top_p":
-                            self.update_model_inputs("top_p", new_value)
-                        if key == "temperature":
-                            self.update_model_inputs("temperature", new_value)
+                if key in ["top_p", "temperature"]:
+                    if hasattr(self.config, key):
+                        old_value = getattr(self.config, key)
+                        if old_value != new_value:
+                            setattr(self.config, key, new_value)
+                            self.update_model_inputs(key, new_value)
         yield
         if kwargs:
             self.restore_predictor_config(old_predictor_config)
@@ -1522,19 +1520,15 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                                     task_id = unfinished_ids.pop()
                                     self.insert_task(i, task_id, repeat_num)
                     self._infer(self.model_inputs)
-                for i in range(max_batch_size):
-                    if self.model_inputs["stop_flags"][i]:
-                        if self.config.output_via_mq:
+                if self.config.output_via_mq:
+                    for i in range(max_batch_size):
+                        if self.model_inputs["stop_flags"][i]:
                             task_id = self.model_inputs["result_id"][i][0].item()
                             send_task_to_queue(task_id)
             elif self.config.output_via_mq:
                 for task_id in range(len(self.input_ids)):
                     send_task_to_queue(task_id)
 
-        logger.debug(f"running spend {time.time() - s_time}")
-        self.cache_kvs = None
-        self.model_inputs["cache_kvs"] = None
-        paddle.device.cuda.empty_cache()
         if self.config.output_via_mq:
             if flag_current_rank_run:
                 outputs = []
@@ -1560,6 +1554,10 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                     )
                 else:
                     outputs = None
+        logger.debug(f"running spend {time.time() - s_time}")
+        self.cache_kvs = None
+        self.model_inputs["cache_kvs"] = None
+        paddle.device.cuda.empty_cache()
 
         if flag_current_rank_run:
             if return_tokens:
