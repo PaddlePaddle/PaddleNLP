@@ -1,17 +1,47 @@
 #include "quant_utils.h"
 
-#define LAUNCH_FUSED_SPAQ(__using_pow2_scaling)                     \
-  do {                                                              \
-    auto kernel = FusedSPAQKernel<__using_pow2_scaling, with_prob>; \
-    kernel<<<grid, block, 0, X.stream()>>>(                         \
-        X.data<phi::bfloat16>(),                                    \
-        prob ? prob->data<float>() : nullptr,            \
-        out.data<phi::float8_e4m3fn>(),                             \
-        scale.data<float>(),                                        \
-        rows,                                                       \
-        cols);                                                      \
+#define LAUNCH_FUSED_SPAQ(__using_pow2_scaling, __with_prob)          \
+  do {                                                                \
+    auto kernel = FusedSPAQKernel<__using_pow2_scaling, __with_prob>; \
+    kernel<<<grid, block, 0, X.stream()>>>(                           \
+        X.data<phi::bfloat16>(),                                      \
+        prob ? prob->data<float>() : nullptr,                         \
+        out.data<phi::float8_e4m3fn>(),                               \
+        scale.data<float>(),                                          \
+        rows,                                                         \
+        cols);                                                        \
   } while (0)
 
+#define LAUNCH_FUSED_SPAQ_VEC4(__using_pow2_scaling, __with_prob) \
+  do {                                                            \
+    auto kernel = FusedSPAQKernelVec4<__using_pow2_scaling,       \
+                                      __with_prob,                \
+                                      thread_per_block>;          \
+    kernel<<<grid, block, 0, X.stream()>>>(                       \
+        X.data<phi::bfloat16>(),                                  \
+        prob ? prob->data<float>() : nullptr,                     \
+        out.data<phi::float8_e4m3fn>(),                           \
+        scale.data<float>(),                                      \
+        rows,                                                     \
+        cols);                                                    \
+  } while (0)
+
+
+typedef struct __align__(8) {
+  __nv_bfloat16 x;
+  __nv_bfloat16 y;
+  __nv_bfloat16 z;
+  __nv_bfloat16 w;
+}
+bfloat16x4_t;
+
+typedef struct __align__(4) {
+  __nv_fp8_e4m3 x;
+  __nv_fp8_e4m3 y;
+  __nv_fp8_e4m3 z;
+  __nv_fp8_e4m3 w;
+}
+fp8_e4m3x4_t;
 
 __device__ __forceinline__ float fast_swiglu(const __nv_bfloat16 x,
                                              const __nv_bfloat16 y) {
@@ -20,6 +50,107 @@ __device__ __forceinline__ float fast_swiglu(const __nv_bfloat16 x,
   const float silu = x_f * __frcp_rn(1.0f + __expf(-x_f));
   const float result = silu * y_f;
   return result;
+}
+__device__ __forceinline__ float4 fast_swiglu_vec4(const bfloat16x4_t &lhs,
+                                                   const bfloat16x4_t &rhs) {
+  const float x_f_x = __bfloat162float(lhs.x);
+  const float x_f_y = __bfloat162float(lhs.y);
+  const float x_f_z = __bfloat162float(lhs.z);
+  const float x_f_w = __bfloat162float(lhs.w);
+
+  const float y_f_x = __bfloat162float(rhs.x);
+  const float y_f_y = __bfloat162float(rhs.y);
+  const float y_f_z = __bfloat162float(rhs.z);
+  const float y_f_w = __bfloat162float(rhs.w);
+
+  const float silu_x = x_f_x * __frcp_rn(1.0f + __expf(-x_f_x));
+  const float silu_y = x_f_y * __frcp_rn(1.0f + __expf(-x_f_y));
+  const float silu_z = x_f_z * __frcp_rn(1.0f + __expf(-x_f_z));
+  const float silu_w = x_f_w * __frcp_rn(1.0f + __expf(-x_f_w));
+
+  return {silu_x * y_f_x, silu_y * y_f_y, silu_z * y_f_z, silu_w * y_f_w};
+}
+__device__ __forceinline__ float amax_float4(const float4 &vec) {
+  return fmaxf(fmaxf(fabsf(vec.x), fabsf(vec.y)),
+               fmaxf(fabsf(vec.z), fabsf(vec.w)));
+}
+
+__device__ __forceinline__ fp8_e4m3x4_t
+scale_fp32x4_to_fp8x4(const float4 &vec, const float scale) {
+  return {static_cast<__nv_fp8_e4m3>(vec.x * scale),
+          static_cast<__nv_fp8_e4m3>(vec.y * scale),
+          static_cast<__nv_fp8_e4m3>(vec.z * scale),
+          static_cast<__nv_fp8_e4m3>(vec.w * scale)};
+}
+
+
+template <bool using_pow2_scaling, bool with_prob, int thread_per_block>
+__global__ void FusedSPAQKernelVec4(const phi::bfloat16 *__restrict__ Xin,
+                                    const float *__restrict__ prob,
+                                    phi::float8_e4m3fn *__restrict__ out,
+                                    float *__restrict__ scales,
+                                    const int rows,
+                                    const int cols) {
+  constexpr int elements_per_thread = 4;
+  constexpr int warp_size = 32;
+  constexpr int warp_num = thread_per_block / warp_size;
+  const int scale_stride = (cols / 2 + 127) / 128;
+  const int lane = threadIdx.x % warp_size;
+  const int x_offset = threadIdx.x * elements_per_thread;
+  const int quant_block_idx = threadIdx.x / warp_size;  // warp==quant_block
+  const int in_y_idx = blockIdx.y;
+  const int in_x_idx = blockIdx.x * blockDim.x * elements_per_thread + x_offset;
+  const int src_idx = in_y_idx * cols + in_x_idx;
+  if (in_x_idx >= cols / 2 || in_y_idx > rows) [[unlikely]]
+    return;
+
+  const __nv_bfloat16 *X = reinterpret_cast<const __nv_bfloat16 *>(Xin);
+
+  // Initialize activation storage
+  float4 act_f32x4;
+  bfloat16x4_t lhs_bf16x4, rhs_bf16x4;
+
+  // Reinterpret input pointer as bfloat162* for vectorized loading
+  const bfloat16x4_t *X_lhs_vec =
+      reinterpret_cast<const bfloat16x4_t *>(X + src_idx);
+  const bfloat16x4_t *X_rhs_vec =
+      reinterpret_cast<const bfloat16x4_t *>(X + src_idx + cols / 2);
+
+  lhs_bf16x4 = *X_lhs_vec;
+  rhs_bf16x4 = *X_rhs_vec;
+
+  act_f32x4 = fast_swiglu_vec4(lhs_bf16x4, rhs_bf16x4);
+
+  if constexpr (with_prob) {
+    const float p = prob[in_y_idx];
+    act_f32x4.x *= p;
+    act_f32x4.y *= p;
+    act_f32x4.z *= p;
+    act_f32x4.w *= p;
+  }
+
+  // Phase 2: Block Reduction to find per-quant block absolute maxima
+  // Compute absolute values
+  float thread_amax = amax_float4(act_f32x4);
+  unsigned int mask = 0xffffffff;
+
+  // All-Reduce within the warp
+  for (int offset = 16; offset > 0; offset /= 2) {
+    float val = __shfl_down_sync(mask, thread_amax, offset);
+    thread_amax = fmaxf(thread_amax, val);
+  }
+  const float final_amax = __shfl_sync(mask, thread_amax, 0);
+
+  // Phase 3: Compute scales and quantize the outputs
+  float scale =
+      ComputeScale<float, __nv_fp8_e4m3, using_pow2_scaling>(final_amax, 0.0f);
+  float inv_scale = __frcp_rn(scale);
+
+  fp8_e4m3x4_t act_fp8x4 = scale_fp32x4_to_fp8x4(act_f32x4, scale);
+  fp8_e4m3x4_t *out_vec_addr =
+      reinterpret_cast<fp8_e4m3x4_t *>(out + in_y_idx * cols / 2 + in_x_idx);
+  *out_vec_addr = act_fp8x4;
+  if (lane == 0) scales[in_y_idx * scale_stride + in_x_idx / 128] = inv_scale;
 }
 
 template <bool using_pow2_scaling, bool with_prob>
@@ -124,30 +255,48 @@ __global__ void FusedSPAQKernel(const phi::bfloat16 *__restrict__ Xin,
   }
 }
 
-template <bool with_prob>
+
 void dispatch_fused_spaq(const paddle::Tensor &X,
                          const paddle::optional<paddle::Tensor> &prob,
                          paddle::Tensor &out,
                          paddle::Tensor &scale,
                          const int rows,
                          const int cols,
-                         const bool &using_pow2_scaling) {
+                         const bool &using_pow2_scaling,
+                         const bool &with_prob) {
+  constexpr int thread_per_block = 256;
   dim3 grid;
   dim3 block;
-  // parallel strategy:
-  // each block processing a row of the input tensor.
-  block.x = 256;
-  DISPATCH_BOOL(using_pow2_scaling, k_using_pow2_scaling, grid.y = rows;
-                grid.x = ((cols / 2) + block.x - 1) / block.x;
-                LAUNCH_FUSED_SPAQ(k_using_pow2_scaling);)
+  if (cols % 8 == 0) {
+    // Use mixed vectorizing strategy, while cols size be 8x (4x2)
+    // Each thread process 4 bfloat16 element in same row, each warp handles
+    // 1x128 vector Each block handles several sub-row (numel = 4 x blockDim.x)
+    // of input vector
+    block.x = thread_per_block;
+    constexpr int vec_numel = 4;
+    DISPATCH_BOOL(
+        using_pow2_scaling,
+        k_using_pow2_scaling,
+        DISPATCH_BOOL(
+            with_prob, k_with_prob, grid.y = rows;
+            grid.x =
+                ((cols / 2) + block.x * vec_numel - 1) / (block.x * vec_numel);
+            LAUNCH_FUSED_SPAQ_VEC4(k_using_pow2_scaling, k_with_prob);))
+
+  } else {
+    // Plain elementwise strategy:
+    // Each block processing a sub-row (numel = blockDim.x) of the input tensor.
+    block.x = thread_per_block;
+    DISPATCH_BOOL(
+        using_pow2_scaling,
+        k_using_pow2_scaling,
+        DISPATCH_BOOL(with_prob, k_with_prob, grid.y = rows;
+                      grid.x = ((cols / 2) + block.x - 1) / block.x;
+                      LAUNCH_FUSED_SPAQ(k_using_pow2_scaling, k_with_prob);))
+  }
 }
-/*
-PD_BUILD_OP(fused_spaq)
-    .Inputs({"X", "prob"})
-    .Outputs({"output", "scale"})
-    .Attrs({"using_pow2_scaling: bool"})
-    .SetKernelFn(PD_KERNEL(fused_spaq));
-*/
+
+
 std::vector<paddle::Tensor> fused_spaq(
     const paddle::Tensor &X,
     const paddle::optional<paddle::Tensor> &prob,
@@ -163,15 +312,15 @@ std::vector<paddle::Tensor> fused_spaq(
                         "The last dim of Input(X) should be exactly divided "
                         "by 2 , but got %d",
                         cols));
-  if(prob){
-  PADDLE_ENFORCE_EQ(
-      prob.get().shape()[0],
-      rows,
-      common::errors::InvalidArgument(
-          "The first dim of Input(X) should be equal to the "
-          "first dim of Input(prob) but got X.shape[0]: %d, prob.shape[0]: %d",
-          rows,
-          prob.get().shape()[0]));
+  if (prob) {
+    PADDLE_ENFORCE_EQ(prob.get().shape()[0],
+                      rows,
+                      common::errors::InvalidArgument(
+                          "The first dim of Input(X) should be equal to the "
+                          "first dim of Input(prob) but got X.shape[0]: %d, "
+                          "prob.shape[0]: %d",
+                          rows,
+                          prob.get().shape()[0]));
   }
 
   paddle::Tensor out;
@@ -182,19 +331,13 @@ std::vector<paddle::Tensor> fused_spaq(
   scale = paddle::empty(
       {rows, ((cols / 2) + 127) / 128}, paddle::DataType::FLOAT32, X.place());
 
-  if (prob) {
-    dispatch_fused_spaq<true>(
-        X, prob, out, scale, rows, cols, using_pow2_scaling);
-  }
-  else {
-    dispatch_fused_spaq<false>(
-        X, prob, out, scale, rows, cols, using_pow2_scaling);
-  }
-    return {out, scale};
-  }
+  dispatch_fused_spaq(
+      X, prob, out, scale, rows, cols, using_pow2_scaling, !!prob);
+  return {out, scale};
+}
 
-  PD_BUILD_OP(fused_spaq)
-      .Inputs({"X", paddle::Optional("prob")})
-      .Outputs({"output", "scale"})
-      .Attrs({"using_pow2_scaling: bool"})
-      .SetKernelFn(PD_KERNEL(fused_spaq));
+PD_BUILD_OP(fused_spaq)
+    .Inputs({"X", paddle::Optional("prob")})
+    .Outputs({"output", "scale"})
+    .Attrs({"using_pow2_scaling: bool"})
+    .SetKernelFn(PD_KERNEL(fused_spaq));

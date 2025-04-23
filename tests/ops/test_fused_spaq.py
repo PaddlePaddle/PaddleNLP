@@ -79,8 +79,8 @@ def printany(te):
     print("-"*20)
 
 def verify_swiglu_quant_result():
-    for width in [4096, 7168]:
-        for height in [32768, 16384, 8192]:
+    for width in [4096,7168]:
+        for height in [8192, 16384, 32768]:
             print("#"*60 + f" Testing width:{width}, height:{height} " + "#"*60)
             x= paddle.clip(paddle.randn([height, width]).astype("bfloat16"), min=-50, max=50)
             prob = paddle.randn([height, 1]).astype("float32")
