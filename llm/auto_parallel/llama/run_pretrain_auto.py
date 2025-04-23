@@ -454,6 +454,11 @@ def main():
 
         mock_layers()
 
+    if "replace_with_parallel_cross_entropy" in training_args.tensor_parallel_config:
+        from replace_ops import replace_cross_entropy
+
+        replace_cross_entropy()
+
     if model_args.tokenizer_name_or_path is None:
         model_args.tokenizer_name_or_path = model_args.model_name_or_path
 
