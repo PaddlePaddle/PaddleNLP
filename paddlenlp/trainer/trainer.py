@@ -93,6 +93,8 @@ try:
     )
 except:
     pass
+from paperf import profile_paddle
+
 from ..transformers.context_parallel_utils import split_inputs_sequence_dim_load_balance
 from ..transformers.model_utils import (
     PretrainedModel,
@@ -1009,6 +1011,8 @@ class Trainer:
         if self.args.ignore_data_skip:
             self.timers and self.timers("read-data").start()
 
+        print(self.model)
+
         for epoch in range(epochs_trained, num_train_epochs):
             if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
                 train_dataloader.batch_sampler, DistributedBatchSampler
@@ -1108,6 +1112,7 @@ class Trainer:
                     continue
 
                 if step_control % args.gradient_accumulation_steps == 0:
+                    profile_paddle.switch_profile(self.state.global_step, 1, 2, enable_layerwise_event=True)
                     self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
                     self.timers and self.timers("forward-backward").start()
 
@@ -2424,16 +2429,21 @@ class Trainer:
 
         model.train()
         inputs = self._prepare_inputs(inputs)
+
+        profile_paddle.push_record_event("forward")
         with self.autocast_smart_context_manager():
             loss = self.compute_loss(model, inputs)
 
         if self.args.gradient_accumulation_steps > 1 and not self._enable_delay_scale_loss():
             loss = loss / self.args.gradient_accumulation_steps
+        profile_paddle.pop_record_event()
 
+        profile_paddle.push_record_event("backward")
         if self.do_grad_scaling:
             self.scaler.scale(loss).backward()
         else:
             loss.backward()
+        profile_paddle.pop_record_event()
         return loss.detach()
 
     def training_pipeline_step(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:

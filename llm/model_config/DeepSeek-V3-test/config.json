@@ -24,7 +24,7 @@
     "moe_intermediate_size": 2048,
     "moe_layer_freq": 1,
     "n_group": 8,
-    "n_routed_experts": 256,
+    "n_routed_experts": 16,
     "n_shared_experts": 1,
     "norm_topk_prob": true,
     "num_attention_heads": 128,
@@ -58,10 +58,10 @@
     "use_cache": true,
     "v_head_dim": 128,
     "vocab_size": 129280,
-    "using_flex_token": true,
+    "using_flex_token": false,
     "using_fake_gate": true,
     "use_fused_rms_norm": true,
     "fuse_attention_ffn": true,
     "use_fused_rope": true,
-    "token_drop_steps": true
+    "token_drop_steps": 1
   }

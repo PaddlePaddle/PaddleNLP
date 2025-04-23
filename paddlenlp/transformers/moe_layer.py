@@ -343,7 +343,9 @@ class MoELayer(nn.Layer):
 
         outputs = []
         start_idx = 0
-        for i, num_tokens in enumerate(tokens_per_expert):
+        # tokens_per_expert is a tensor, the value likes [8113, 8113, 8276, 8276].
+        tokens_per_expert_array = tokens_per_expert.numpy()
+        for i, num_tokens in enumerate(tokens_per_expert_array):
             end_idx = start_idx + num_tokens
             if num_tokens == 0:
                 continue

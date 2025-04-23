@@ -58,8 +58,8 @@ class _DeepepManager:
 
         self.handle = None
 
-        if fused_dispatch is None:
-            raise ImportError("DeepEP is not supported in your paddlepaddle whl package.")
+        # if fused_dispatch is None:
+        #    raise ImportError("DeepEP is not supported in your paddlepaddle whl package.")
 
     def dispatch(
         self, hidden_states: paddle.Tensor, token_indices: paddle.Tensor, token_probs: paddle.Tensor

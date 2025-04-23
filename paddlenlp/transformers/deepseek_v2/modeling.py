@@ -54,14 +54,16 @@ except:
     pass
 
 try:
-    from paddle.nn.functional import flash_attn_v3
+    # from paddle.nn.functional import flash_attn_v3
     from paddle.nn.functional.flash_attention import flash_attention
 except:
     flash_attention = None
 
 
 from paddle import _C_ops
+from paperf import profile_paddle
 
+from paddlenlp.transformers import pcc_util
 from paddlenlp.transformers.model_utils import dtype_guard
 
 from ...utils.initializer import kaiming_uniform_
@@ -242,6 +244,7 @@ def scaled_dot_product_attention(
     training=True,
     sequence_parallel=False,
 ):
+    profile_paddle.push_record_event("scaled_dot_product_attention")
     bsz, q_len, num_heads, head_dim = query_states.shape
     _, kv_seq_len, v_num_heads, v_head_dim = value_states.shape
 
@@ -282,8 +285,8 @@ def scaled_dot_product_attention(
         if sequence_parallel:
             outputs = outputs.reshape([bsz * q_len, v_head_dim * num_heads])
 
+        profile_paddle.pop_record_event()
         return outputs
-
     else:
         #  [ bz, seqlen, nhead, head_dim] -> [bs, nhead, seq_len, head_dim]
         query_states = paddle.transpose(query_states, [0, 2, 1, 3])
@@ -321,6 +324,7 @@ def scaled_dot_product_attention(
             attn_output = attn_output.reshape([bsz * q_len, v_head_dim * num_heads])
         else:
             attn_output = attn_output.reshape([bsz, q_len, v_head_dim * num_heads])
+        profile_paddle.pop_record_event()
         return (attn_output, attn_weights) if output_attentions else attn_output
 
 
@@ -687,6 +691,7 @@ class DeepseekV2MLP(nn.Layer):
         self.hidden_size = config.hidden_size if hidden_size is None else hidden_size
         self.intermediate_size = config.intermediate_size if intermediate_size is None else intermediate_size
         self.fuse_attention_ffn = config.fuse_attention_ffn
+        self.is_moe = is_moe
 
         def linear_dtype_gaurd():
             if config.use_fp8:
@@ -727,16 +732,28 @@ class DeepseekV2MLP(nn.Layer):
                 else:
                     self.gate_proj = Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
                     self.up_proj = Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
-                self.down_proj = Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
+                if not self.is_moe and pcc_util.is_enabled():
+                    self.down_proj = pcc_util.PccLinearAdd(self.intermediate_size, self.hidden_size, bias_attr=False)
+                else:
+                    self.down_proj = Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
 
         self.act_fn = ACT2FN[config.hidden_act]
 
-    def forward(self, x):
+    def forward(self, x, residual=None):
+        x_origin = x if not self.is_moe else None
         if self.fuse_attention_ffn:
             x = swiglu(self.gate_up_fused_proj(x))
         else:
             x = swiglu(self.gate_proj(x), self.up_proj(x))
-        out = self.down_proj(x)
+
+        if not self.is_moe and pcc_util.is_enabled():
+            out = self.down_proj(x, x_origin, residual)
+        else:
+            out = self.down_proj(x)
+            if not self.is_moe:
+                out = x_origin + out
+            if residual is not None:
+                out = residual + out
         return out
 
 
@@ -877,8 +894,10 @@ class DeepseekV2MoE(MoELayer):
             self.shared_experts = DeepseekV2MLPClass(config=config, intermediate_size=intermediate_size, is_moe=False)
 
     def forward(self, hidden_states):
+        # residual = hidden_states
         final_hidden_states, l_aux, l_zloss = super().forward(hidden_states)
         final_hidden_states = self.post_process(hidden_states, final_hidden_states, l_aux)
+        # final_hidden_states = residual + final_hidden_states
         return final_hidden_states
 
     def post_process(self, hidden_states, final_hidden_states, l_aux):
@@ -887,8 +906,8 @@ class DeepseekV2MoE(MoELayer):
             final_hidden_states = AddAuxiliaryLoss.apply(final_hidden_states, l_aux)
 
         if self.config.n_shared_experts is not None:
-            shared_expert_output = self.shared_experts(hidden_states)
-            final_hidden_states = final_hidden_states + shared_expert_output
+            shared_expert_output = self.shared_experts(hidden_states, residual=final_hidden_states)
+            # final_hidden_states = final_hidden_states + shared_expert_output
         return final_hidden_states
 
 
@@ -1551,7 +1570,10 @@ class DeepseekV2Attention(nn.Layer):
                 with linear_dtype_gaurd():
                     self.kv_a_proj_with_mqa = paddle.nn.Linear(self.hidden_size, config.kv_lora_rank + config.qk_rope_head_dim, bias_attr=config.attention_bias)
                     self.kv_b_proj = Linear(config.kv_lora_rank, self.num_heads * (self.q_head_dim - self.qk_rope_head_dim + self.v_head_dim), bias_attr=False)
-                    self.o_proj = Linear(self.num_heads * self.v_head_dim, self.hidden_size, bias_attr=config.attention_bias)
+                    if pcc_util.is_enabled():
+                        self.o_proj = pcc_util.PccLinearAdd(self.num_heads * self.v_head_dim, self.hidden_size, bias_attr=config.attention_bias)
+                    else:
+                        self.o_proj = Linear(self.num_heads * self.v_head_dim, self.hidden_size, bias_attr=config.attention_bias)
                 self.kv_a_layernorm = DeepseekV2RMSNorm(config=config, hidden_size=config.kv_lora_rank)
 
         # fmt: on
@@ -1629,6 +1651,9 @@ class DeepseekV2Attention(nn.Layer):
             warnings.warn(
                 "Passing `padding_mask` is deprecated and will be removed in v4.37. Please make sure use `attention_mask` instead.`"
             )
+
+        residual = hidden_states
+
         bsz, q_len, _ = hidden_states.shape
 
         # DeepSeekV2 q_lora_rank=1536
@@ -1733,7 +1758,11 @@ class DeepseekV2Attention(nn.Layer):
 
         # if sequence_parallel is true, out shape are [q_len / n, bs, num_head * head_dim]
         # else their shape are [bs, q_len, num_head * head_dim], n is mp parallelism.
-        attn_output = self.o_proj(attn_output)
+        if not pcc_util.is_enabled():
+            attn_output = self.o_proj(attn_output)
+            attn_output = residual + attn_output
+        else:
+            attn_output = self.o_proj(attn_output, residual)
 
         if not output_attentions:
             attn_weights = None
@@ -1808,7 +1837,7 @@ class DeepseekV2DecoderLayer(nn.Layer):
             warnings.warn(
                 "Passing `padding_mask` is deprecated and will be removed in v4.37. Please make sure use `attention_mask` instead.`"
             )
-        residual = hidden_states
+        # residual = hidden_states
 
         # Self Attention
         has_gradient = not hidden_states.stop_gradient
@@ -1852,14 +1881,14 @@ class DeepseekV2DecoderLayer(nn.Layer):
         if use_cache:
             present_key_value = outputs[2 if output_attentions else 1]
 
-        hidden_states = residual + hidden_states
+        # hidden_states = residual + hidden_states
 
         # Fully Connected
         residual = hidden_states
 
         hidden_states = self.post_attention_layernorm(hidden_states)
         hidden_states = self.mlp(hidden_states)
-        hidden_states = residual + hidden_states
+        # hidden_states = residual + hidden_states
 
         outputs = (hidden_states,)
 
