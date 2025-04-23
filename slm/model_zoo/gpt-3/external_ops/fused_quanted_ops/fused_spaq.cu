@@ -110,7 +110,7 @@ __global__ void FusedSPAQKernelVec4(const phi::bfloat16 *__restrict__ Xin,
   float4 act_f32x4;
   bfloat16x4_t lhs_bf16x4, rhs_bf16x4;
 
-  // Reinterpret input pointer as bfloat162* for vectorized loading
+  // Reinterpret input pointer as bfloat16x4_t* for vectorized loading
   const bfloat16x4_t *X_lhs_vec =
       reinterpret_cast<const bfloat16x4_t *>(X + src_idx);
   const bfloat16x4_t *X_rhs_vec =
