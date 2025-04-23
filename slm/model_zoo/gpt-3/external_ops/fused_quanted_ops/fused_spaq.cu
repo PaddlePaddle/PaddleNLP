@@ -23,7 +23,8 @@
         out.data<phi::float8_e4m3fn>(),                           \
         scale.data<float>(),                                      \
         rows,                                                     \
-        cols);                                                    \
+        cols,\
+        scale_cols);                                                    \
   } while (0)
 
 
@@ -90,11 +91,12 @@ __global__ void FusedSPAQKernelVec4(const phi::bfloat16 *__restrict__ Xin,
                                     phi::float8_e4m3fn *__restrict__ out,
                                     float *__restrict__ scales,
                                     const int rows,
-                                    const int cols) {
+                                    const int cols,
+                                    const int scale_cols) {
   constexpr int elements_per_thread = 4;
   constexpr int warp_size = 32;
   constexpr int warp_num = thread_per_block / warp_size;
-  const int scale_stride = (cols / 2 + 127) / 128;
+  const int scale_stride = scale_cols;
   const int lane = threadIdx.x % warp_size;
   const int x_offset = threadIdx.x * elements_per_thread;
   const int in_y_idx = blockIdx.y;
@@ -281,6 +283,7 @@ void dispatch_fused_spaq(const paddle::Tensor &X,
     // of input vector
     block.x = thread_per_block;
     constexpr int vec_numel = 4;
+    const int scale_cols = scale.shape().back();
     DISPATCH_BOOL(
         using_pow2_scaling,
         k_using_pow2_scaling,
