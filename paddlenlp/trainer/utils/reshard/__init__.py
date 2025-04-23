@@ -18,6 +18,7 @@ from .common import (
     SHARDING_STRATEGY_V2,
     NodeModelState,
     all_gather_state_dict,
+    convert_opt_name_to_tname,
     get_sharding_strategy,
     is_sharding_opt,
 )
