@@ -162,6 +162,8 @@ class TrainingArguments:
             The end LR used in the polynomial scheduler.
         power (`float`, *optional*, defaults to 1.0):
             The power factor used in the polynomial scheduler.
+        min_lr (`float`, *optional*, defaults to 0.0):
+            The minimum learning rate used in the cosine scheduler.
 
         log_on_each_node (`bool`, *optional*, defaults to `True`):
             In multinode distributed training, whether to log using `log_level` once per node, or only on the main
@@ -465,6 +467,7 @@ class TrainingArguments:
     num_cycles: float = field(default=0.5, metadata={"help": "The number of waves in the cosine scheduler."})
     lr_end: float = field(default=1e-7, metadata={"help": "The end LR in the polynomial scheduler."})
     power: float = field(default=1.0, metadata={"help": "The power factor in the polynomial scheduler."})
+    min_lr: float = field(default=0.0, metadata={"help": "The minimum learning rate in cosine scheduler."})
 
     log_on_each_node: bool = field(
         default=True,
@@ -1050,6 +1053,10 @@ class TrainingArguments:
         default=0,
         metadata={"help": "Save checkpoints on flash device every this many steps. Default is 0 which disables it"},
     )
+    split_norm_comm: Optional[bool] = field(
+        default=False,
+        metadata={"help": "是否开启单路sharding时global norm通信拆分全局通信组为pp通信和mp通信分别做"},
+    )
 
     def __post_init__(self):
         if in_auto_parallel_align_mode():
@@ -1493,6 +1500,15 @@ class TrainingArguments:
                         "sharding_degree": self.sharding_parallel_degree,
                         "order": order,
                     }
+
+                try:
+                    if self.split_norm_comm:
+                        hybrid_configs["split_norm_comm"] = True
+                except (KeyError, AttributeError):
+                    warnings.warn(
+                        "The split_norm_comm is not supported "
+                        "by current version of Paddle. Please try latest develop Paddle."
+                    )
 
                 if self.pipeline_parallel_degree > 1:
                     hybrid_configs["pp_configs"] = dygraph_pp_configs

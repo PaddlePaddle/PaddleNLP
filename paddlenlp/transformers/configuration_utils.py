@@ -868,6 +868,17 @@ class PretrainedConfig:
             pretrained_model_name_or_path_ = cls.pretrained_init_configuration[pretrained_model_name_or_path]
 
             if isinstance(pretrained_model_name_or_path_, dict):
+                # save config file
+                if cache_dir is not None:
+                    config_path = os.path.join(cache_dir, pretrained_model_name_or_path, "config.json")
+                else:
+                    from paddlenlp.utils.env import MODEL_HOME
+
+                    config_path = os.path.join(MODEL_HOME, pretrained_model_name_or_path, "config.json")
+                if not os.path.exists(config_path):
+                    os.makedirs(os.path.dirname(config_path), exist_ok=True)
+                    json.dump(pretrained_model_name_or_path_, open(config_path, "w"), indent=2)
+
                 return pretrained_model_name_or_path_, kwargs
 
         configuration_file = kwargs.pop("_configuration_file", CONFIG_NAME)

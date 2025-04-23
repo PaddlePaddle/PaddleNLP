@@ -140,7 +140,7 @@ Type of DPO loss function, which can be one of:
 - `sigmoid`([DPO](https://arxiv.org/abs/2305.18290)),
 - `hinge`([RSO](https://arxiv.org/abs/2309.06657)),
 - `ipo`([IPO](https://arxiv.org/abs/2310.12036)),
-- `kto_pair` (implementation for preference pairs [KTO](https://github.com/ContextualAI/HALOs/blob/main/assets/report.pdf)),
+- `kto_pair` (implementation for preference pairs [KTO](https://github.com/ContextualAI/HALOs/blob/winnie/research/assets/report.pdf)),
 - `sppo_hard`([SPPO](https://arxiv.org/pdf/2405.00675)),
 - `nca_pair`([NCA](https://arxiv.org/abs/2402.05369)),
 - `dpop`([DPOP](https://arxiv.org/pdf/2402.13228.pdf)),

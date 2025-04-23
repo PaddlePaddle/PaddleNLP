@@ -581,7 +581,7 @@ class ClapModelIntegrationTest(unittest.TestCase):
             expected_mean = EXPECTED_MEANS_UNFUSED[padding]
 
             self.assertTrue(
-                paddle.allclose(audio_embed.cpu().mean(), paddle.to_tensor([expected_mean]), atol=1e-3, rtol=1e-3)
+                paddle.allclose(audio_embed.cpu().mean(), paddle.to_tensor(expected_mean), atol=1e-3, rtol=1e-3)
             )
 
     def test_integration_fused(self):
@@ -609,7 +609,7 @@ class ClapModelIntegrationTest(unittest.TestCase):
             expected_mean = EXPECTED_MEANS_FUSED[padding]
 
             self.assertTrue(
-                paddle.allclose(audio_embed.cpu().mean(), paddle.to_tensor([expected_mean]), atol=1e-3, rtol=1e-3)
+                paddle.allclose(audio_embed.cpu().mean(), paddle.to_tensor(expected_mean), atol=1e-3, rtol=1e-3)
             )
 
     def test_batched_fused(self):
@@ -634,7 +634,7 @@ class ClapModelIntegrationTest(unittest.TestCase):
             audio_embed = model.get_audio_features(**inputs)
             expected_mean = EXPECTED_MEANS_FUSED[padding]
             self.assertTrue(
-                paddle.allclose(audio_embed.cpu().mean(), paddle.to_tensor([expected_mean]), atol=1e-3, rtol=1e-3)
+                paddle.allclose(audio_embed.cpu().mean(), paddle.to_tensor(expected_mean), atol=1e-3, rtol=1e-3)
             )
 
     def test_batched_unfused(self):
@@ -660,5 +660,5 @@ class ClapModelIntegrationTest(unittest.TestCase):
             expected_mean = EXPECTED_MEANS_FUSED[padding]
 
             self.assertTrue(
-                paddle.allclose(audio_embed.cpu().mean(), paddle.to_tensor([expected_mean]), atol=1e-3, rtol=1e-3)
+                paddle.allclose(audio_embed.cpu().mean(), paddle.to_tensor(expected_mean), atol=1e-3, rtol=1e-3)
             )

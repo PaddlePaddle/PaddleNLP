@@ -54,7 +54,7 @@ git clone 代码到本地，即可开始。
 除了上述数据集，也可以使用抽取 ceval 部分训练数据集作为校准数据。通过下述命令下载数据到当前文件夹并解压
 ```shell
 mkdir dataset
-wget https://huggingface.co/datasets/ceval/ceval-exam/resolve/main/ceval-exam.zip
+wget https://modelscope.oss-cn-beijing.aliyuncs.com/open_data/c-eval/ceval-exam.zip
 unzip ceval-exam.zip -d dataset/ceval
 ```
 使用下述脚本和命令抽取 C-Eval 样本作为校准数据集：

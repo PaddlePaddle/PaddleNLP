@@ -53,7 +53,7 @@ Sample data:
 In addition to the above dataset, you can also extract part of the C-Eval training dataset as calibration data. Use the following commands to download the data to the current folder and unzip it:
 ```shell
 mkdir dataset
-wget https://huggingface.co/datasets/ceval/ceval-exam/resolve/main/ceval-exam.zip
+wget https://modelscope.oss-cn-beijing.aliyuncs.com/open_data/c-eval/ceval-exam.zip
 unzip ceval-exam.zip -d dataset/ceval
 ```
 Use the following script and commands to extract C-Eval samples as calibration dataset:

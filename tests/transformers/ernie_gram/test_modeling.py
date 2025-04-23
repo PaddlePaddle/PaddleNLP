@@ -303,6 +303,7 @@ class ErnieGramModelTest(ModelTesterMixin, unittest.TestCase):
         self.model_tester.create_and_check_model_cache(*config_and_inputs)
 
     @slow
+    @unittest.skip("Skip for miss model weight.")
     def test_model_from_pretrained(self):
         for model_name in list(ErnieGramPretrainedModel.pretrained_init_configuration)[:1]:
             model = ErnieGramModel.from_pretrained(model_name)
@@ -311,6 +312,7 @@ class ErnieGramModelTest(ModelTesterMixin, unittest.TestCase):
 
 class ErnieGramModelIntegrationTest(unittest.TestCase):
     @slow
+    @unittest.skip("Skip for miss model weight.")
     def test_inference_no_attention(self):
         model = ErnieGramModel.from_pretrained("ernie-gram-zh")
         model.eval()
@@ -332,6 +334,7 @@ class ErnieGramModelIntegrationTest(unittest.TestCase):
         self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-5))
 
     @slow
+    @unittest.skip("Skip for miss model weight.")
     def test_inference_with_attention(self):
         model = ErnieGramModel.from_pretrained("ernie-gram-zh-finetuned-dureader-robust")
         model.eval()
@@ -354,6 +357,7 @@ class ErnieGramModelIntegrationTest(unittest.TestCase):
         self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
 
     @slow
+    @unittest.skip("Skip for miss model weight.")
     def test_inference_with_past_key_value(self):
         model = ErnieGramModel.from_pretrained("ernie-gram-zh")
         model.eval()

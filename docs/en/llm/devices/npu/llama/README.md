@@ -195,7 +195,7 @@ By setting `FLAGS_NPU_MC2=1`, the communication-computation fusion pass is activ
 <!-- Placeholder for profiling chart -->
 
 - **Unified Abstraction for Custom Operators**
-In practice, we observe that fusion operators significantly impact large model training performance. To comprehensively support high-performance operators on Ascend and other hardware while maintaining concise network code, we provide a unified [custom operator interface implementation](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenap/transformers/llama/fusion_ops.py). Current implementations cover common `fusion_rope`, `fusion_rms_norm`, and `fusion_flash_attention` for NPU, GPU, XPU, and GCU.
+In practice, we observe that fusion operators significantly impact large model training performance. To comprehensively support high-performance operators on Ascend and other hardware while maintaining concise network code, we provide a unified [custom operator interface implementation](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/transformers/llama/fusion_ops.py). Current implementations cover common `fusion_rope`, `fusion_rms_norm`, and `fusion_flash_attention` for NPU, GPU, XPU, and GCU.
 
 - **Layer-level Operator Fusion**
 Layer-level operator fusion significantly enhances computational efficiency. The fused operators support dynamic insertion. During inference execution, the following logs can be observed:

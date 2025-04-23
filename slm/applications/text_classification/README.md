@@ -25,7 +25,7 @@
 
 - **方案全面🎓：** 涵盖多分类、多标签、层次分类等高频分类场景，提供预训练模型微调、提示学习（小样本学习）、语义索引三种端到端全流程分类方案，满足开发者多样文本分类落地需求。
 - **效果领先🏃：** 使用在中文领域内模型效果和模型计算效率有突出效果的 ERNIE 3.0 轻量级系列模型作为训练基座，ERNIE 3.0 轻量级系列提供多种尺寸的预训练模型满足不同需求，具有广泛成熟的实践应用性。
-- **高效调优✊：** 文本分类应用依托[TrustAI](https://github.com/PaddlePaddle/TrustAI)可信增强能力和[数据增强 API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/dataaug.md)，提供模型分析模块助力开发者实现模型分析，并提供稀疏数据筛选、脏数据清洗、数据增强等多种解决方案。
+- **高效调优✊：** 文本分类应用依托[TrustAI](https://github.com/PaddlePaddle/TrustAI)可信增强能力和[数据增强 API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/zh/dataaug.md)，提供模型分析模块助力开发者实现模型分析，并提供稀疏数据筛选、脏数据清洗、数据增强等多种解决方案。
 - **简单易用👶：** 开发者**无需机器学习背景知识**，仅需提供指定格式的标注分类数据，一行命令即可开启文本分类训练，轻松完成上线部署，不再让技术成为文本分类的门槛。
 
 <a name="技术特色介绍"></a>
@@ -138,7 +138,7 @@
 
 ### 2.3 高效模型调优方案
 
-有这么一句话在业界广泛流传，"数据决定了机器学习的上限，而模型和算法只是逼近这个上限"，可见数据质量的重要性。文本分类应用依托[TrustAI](https://github.com/PaddlePaddle/TrustAI)可信增强能力和[数据增强 API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/dataaug.md)开源了模型分析模块，针对标注数据质量不高、训练数据覆盖不足、样本数量少等文本分类常见数据痛点，提供稀疏数据筛选、脏数据清洗、数据增强三种数据优化方案，解决训练数据缺陷问题，用低成本方式获得大幅度的效果提升。
+有这么一句话在业界广泛流传，"数据决定了机器学习的上限，而模型和算法只是逼近这个上限"，可见数据质量的重要性。文本分类应用依托[TrustAI](https://github.com/PaddlePaddle/TrustAI)可信增强能力和[数据增强 API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/zh/dataaug.md)开源了模型分析模块，针对标注数据质量不高、训练数据覆盖不足、样本数量少等文本分类常见数据痛点，提供稀疏数据筛选、脏数据清洗、数据增强三种数据优化方案，解决训练数据缺陷问题，用低成本方式获得大幅度的效果提升。
 
 
 - **稀疏数据筛选**基于特征相似度的实例级证据分析方法挖掘待预测数据中缺乏证据支持的数据（也即稀疏数据），并进行有选择的训练集数据增强或针对性筛选未标注数据进行标注来解决稀疏数据问题，有效提升模型表现。
@@ -166,7 +166,7 @@
 </div>
 
 
-- **数据增强**在数据量较少的情况下能够通过增加数据集多样性，提升模型效果。PaddleNLP 内置[数据增强 API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/dataaug.md)，支持词替换、词删除、词插入、词置换、基于上下文生成词（MLM 预测）、TF-IDF 等多种数据增强策略。数据增强方案提供一行命令，快速完成数据集增强。以 CAIL2019—婚姻家庭要素提取数据子集（500条）为例，我们在数据集应用多种数据增强策略，策略效果如下表。
+- **数据增强**在数据量较少的情况下能够通过增加数据集多样性，提升模型效果。PaddleNLP 内置[数据增强 API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/zh/dataaug.md)，支持词替换、词删除、词插入、词置换、基于上下文生成词（MLM 预测）、TF-IDF 等多种数据增强策略。数据增强方案提供一行命令，快速完成数据集增强。以 CAIL2019—婚姻家庭要素提取数据子集（500条）为例，我们在数据集应用多种数据增强策略，策略效果如下表。
 
 <div align="center">
     <img width="600" alt="文本分类落地难点" src="https://user-images.githubusercontent.com/63761690/189115071-40152f7c-7c90-41b3-a70b-4d4aabc5b715.png">
@@ -208,7 +208,7 @@
 
 - 数据准备完成后，开始进行预训练模型微调训练。可以根据实际数据调整可配置参数，选择使用 GPU 或 CPU 进行模型训练，脚本默认保存在开发集最佳表现模型参数。
 
-- 训练结束后，使用模型分析(analysis)模块对分析模型表现，同时模型分析(analysis)模块依托[TrustAI](https://github.com/PaddlePaddle/TrustAI)可信增强能力和[数据增强 API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/dataaug.md)提供稀疏数据筛选、脏数据清洗、数据增强三种优化方案帮助提升模型效果。
+- 训练结束后，使用模型分析(analysis)模块对分析模型表现，同时模型分析(analysis)模块依托[TrustAI](https://github.com/PaddlePaddle/TrustAI)可信增强能力和[数据增强 API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/zh/dataaug.md)提供稀疏数据筛选、脏数据清洗、数据增强三种优化方案帮助提升模型效果。
 
 - 模型训练、调优完成后，可以通过预测脚本加载最佳模型参数，打印模型预测结果。
 

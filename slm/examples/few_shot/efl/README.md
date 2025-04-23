@@ -6,7 +6,7 @@
 
 ## 算法简介
 
-Entailment as Few-Shot Learner（EFL）提出将 NLP Fine-tune 任务转换统一转换为 Entailment 二分类任务，为小样本场景下的任务求解提供了新的视角。EFL 的主要思想如下图所示，该算法也可以使用 `Template` 实现标签描述与数据文本的拼接，定义方式详见[Prompt API 文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/advanced_guide/prompt.md)。
+Entailment as Few-Shot Learner（EFL）提出将 NLP Fine-tune 任务转换统一转换为 Entailment 二分类任务，为小样本场景下的任务求解提供了新的视角。EFL 的主要思想如下图所示，该算法也可以使用 `Template` 实现标签描述与数据文本的拼接，定义方式详见[Prompt API 文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/zh/advanced_guide/prompt.md)。
 
 ![EFL](https://user-images.githubusercontent.com/25607475/204245126-bd94e87c-f25f-471e-af1c-d1e05f7a2897.png)
 
@@ -75,7 +75,7 @@ python -u -m paddle.distributed.launch --gpus "0" run_train.py \
 - `alpha_rdrop`: R-Drop 损失值权重，默认为 0.5
 - `dropout`: 预训练模型的 dropout 参数值，用于 R-Drop 策略中参数配置
 - `export_type`: 模型导出格式，默认为 `paddle`，动态图转静态图
-- 更多配置参考 [Trainer 参数文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/trainer.md#trainingarguments-%E5%8F%82%E6%95%B0%E4%BB%8B%E7%BB%8D) 和 [PromptTrainer 参数文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/advanced_guide/prompt.md#prompttrainer%E5%8F%82%E6%95%B0%E5%88%97%E8%A1%A8)
+- 更多配置参考 [Trainer 参数文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/zh/trainer.md#trainingarguments-%E5%8F%82%E6%95%B0%E4%BB%8B%E7%BB%8D) 和 [PromptTrainer 参数文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/zh/advanced_guide/prompt.md#prompttrainer%E5%8F%82%E6%95%B0%E5%88%97%E8%A1%A8)
 
 ### 模型部署
 
