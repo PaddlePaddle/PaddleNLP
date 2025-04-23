@@ -75,6 +75,7 @@ from ..utils.comm_utils import (
 )
 from ..utils.infer_utils import infer_guard
 from ..utils.offload_utils import reload_and_offload_scope, reload_tensor_to_gpu
+from ..utils.reshard_utils import ReshardController
 from ..utils.timer_utils import TimerScope, TimerScopeManualLabel
 from .actor_trainer import ActorReferenceTrainer
 from .critic_trainer import CriticTrainer
@@ -224,6 +225,7 @@ class PPOTrainer(Trainer):
         callbacks: Optional[List[TrainerCallback]] = None,
         optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
         preprocess_logits_for_metrics: Optional[Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor]] = None,
+        reshard_controller: Optional[ReshardController] = None,
     ):
         """
         Args:
@@ -274,6 +276,7 @@ class PPOTrainer(Trainer):
                 preprocess_logits_for_metrics,
             )
 
+        self.reshard_controller = reshard_controller
         trainer_agrs = {
             # "model": None,
             "criterion": criterion,
@@ -385,6 +388,7 @@ class PPOTrainer(Trainer):
             callbacks,
             [None, lr_scheduler],
             preprocess_logits_for_metrics,
+            reshard_controller=self.reshard_controller,
         )
         actor_trainer.set_eval_model(model_eval)
         actor_trainer.timers = self.timers
@@ -678,7 +682,8 @@ class PPOTrainer(Trainer):
                     **({"label_ids": inputs["label_ids"]} if self.args.use_rm_server else {}),
                 }
                 generated_seq = self.actor_trainer.generate_sequences(prompt_only_batch, do_eval=True)[0]["input_ids"]
-
+            if self.reshard_controller is not None:
+                self.reshard_controller.set_train_env("[after prediction_step]")
             if not self.args.use_rm_server:
                 if self._model_config.sequence_parallel:
                     # pad to max_sequence_length
@@ -1411,6 +1416,8 @@ class PPOTrainer(Trainer):
                         indices = np.concatenate(indices)
                     self.timers and (dist.get_world_size() > 1) and dist.barrier()
                     timer_scope_rollout.stop()
+                    if self.reshard_controller is not None:
+                        self.reshard_controller.set_train_env("[after rollout]")
 
                     # step 2-1: split micro_batches
                     per_device_train_batch_size = self.args.per_device_train_batch_size
@@ -1465,10 +1472,11 @@ class PPOTrainer(Trainer):
                         }
                         micro_batches.append(micro_batch)
 
+                    micro_batches = data_group_merge(micro_batches, group=data_trans_group)
+
                     # step 2-2: balance micro_batches based on batch tokens
                     if self.args.balance_batch:
                         micro_batches = self._balance_batch(micro_batches)
-
                     # step 2-3: compute logprob for rollout data
                     with TimerScope(self.timers, RolloutStages.ROLLOUT_LOGPROB):
                         for micro_batch in micro_batches:
@@ -1631,7 +1639,7 @@ class PPOTrainer(Trainer):
                 else:
                     train_batch = rl_batches
 
-                train_batch = data_group_merge(train_batch, group=data_trans_group)
+                # train_batch = data_group_merge(train_batch, group=data_trans_group)
 
                 # step 3: train actor model and critic model with rollout data
                 self.set_train()

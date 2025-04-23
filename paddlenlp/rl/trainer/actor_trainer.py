@@ -34,6 +34,7 @@ from ..models.ppo_model_utils import (
     create_startend_row_indices,
     gather_log_probabilities,
 )
+from ..utils.reshard_utils import ReshardController
 from .rl_trainer import RLTrainer
 from .trainer_utils import guard_set_args
 
@@ -55,6 +56,7 @@ class ActorReferenceTrainer(RLTrainer):
         callbacks: Optional[List[TrainerCallback]] = None,
         optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
         preprocess_logits_for_metrics: Optional[Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor]] = None,
+        reshard_controller: Optional[ReshardController] = None,
     ):
         super().__init__(
             model,
@@ -69,6 +71,7 @@ class ActorReferenceTrainer(RLTrainer):
             optimizers,
             preprocess_logits_for_metrics,
         )
+        self.reshard_controller = reshard_controller
 
         self.generation_config = GenerationConfig(
             max_new_tokens=self.args.max_dec_len,
@@ -133,7 +136,6 @@ class ActorReferenceTrainer(RLTrainer):
                 synced_gpus=ShardingOption.FULL_SHARD in self.args.sharding,
                 do_eval=do_eval,
             )[0]
-
         if self.args.use_rm_server:
             label_ids = prompt_only_batch["label_ids"]
             if self.args.num_return_sequences > 1:
@@ -254,7 +256,6 @@ class ActorReferenceTrainer(RLTrainer):
                 log_probs = gather_log_probabilities(
                     logits[:, response_start:-1], current_input_ids[:, response_start + 1 :]
                 )
-
             log_probs_list.append(log_probs)
             # Set logits to None to save memory
             logits = None
