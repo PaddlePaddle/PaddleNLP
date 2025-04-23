@@ -39,6 +39,11 @@ from paddlenlp.transformers import (  # import gpt model
     PretrainedConfig,
     PretrainedTokenizer,
 )
+
+# from paddlenlp.utils.env import (
+#     PADDLE_INFERENCE_MODEL_SUFFIX,
+#     PADDLE_INFERENCE_WEIGHTS_SUFFIX,
+# )
 from tests.testing_utils import slow
 
 
@@ -1199,8 +1204,8 @@ class TinyRandomGenerationTest(unittest.TestCase):
 #                 ),
 #             )
 
-#             model_path = os.path.join(tempdir, "model.pdmodel")
-#             params_path = os.path.join(tempdir, "model.pdiparams")
+#             model_path = os.path.join(tempdir, f"model{PADDLE_INFERENCE_MODEL_SUFFIX}")
+#             params_path = os.path.join(tempdir, f"model{PADDLE_INFERENCE_WEIGHTS_SUFFIX}")
 #             config = paddle.inference.Config(model_path, params_path)
 
 #             config.disable_gpu()
@@ -1265,8 +1270,8 @@ class TinyRandomGenerationTest(unittest.TestCase):
 #                 ),
 #             )
 
-#             model_path = os.path.join(tempdir, "model.pdmodel")
-#             params_path = os.path.join(tempdir, "model.pdiparams")
+#             model_path = os.path.join(tempdir, f"model{PADDLE_INFERENCE_MODEL_SUFFIX}")
+#             params_path = os.path.join(tempdir, f"model{PADDLE_INFERENCE_WEIGHTS_SUFFIX}")
 #             config = paddle.inference.Config(model_path, params_path)
 
 #             config.disable_gpu()
