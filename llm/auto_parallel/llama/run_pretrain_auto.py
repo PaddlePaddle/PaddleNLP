@@ -455,6 +455,9 @@ def main():
         mock_layers()
 
     if "replace_with_parallel_cross_entropy" in training_args.tensor_parallel_config:
+        utils_path = "/workspace/PaddleNLP/llm/utils"
+        sys.path.append(utils_path)
+
         from replace_ops import replace_cross_entropy
 
         replace_cross_entropy()
