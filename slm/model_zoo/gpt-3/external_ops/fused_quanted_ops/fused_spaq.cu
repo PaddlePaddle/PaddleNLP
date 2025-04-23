@@ -97,12 +97,18 @@ __global__ void FusedSPAQKernelVec4(const phi::bfloat16 *__restrict__ Xin,
   const int scale_stride = (cols / 2 + 127) / 128;
   const int lane = threadIdx.x % warp_size;
   const int x_offset = threadIdx.x * elements_per_thread;
-  const int quant_block_idx = threadIdx.x / warp_size;  // warp==quant_block
   const int in_y_idx = blockIdx.y;
   const int in_x_idx = blockIdx.x * blockDim.x * elements_per_thread + x_offset;
   const int src_idx = in_y_idx * cols + in_x_idx;
+  const unsigned int mask = 0xffffffff; // whole warp mask
+  float p_t0;
   if (in_x_idx >= cols / 2 || in_y_idx > rows) [[unlikely]]
     return;
+  
+  if constexpr(with_prob){
+    // Prefetch prob
+    if(lane==0) p_t0 = prob[in_y_idx];
+  }
 
   const __nv_bfloat16 *X = reinterpret_cast<const __nv_bfloat16 *>(Xin);
 
@@ -122,7 +128,8 @@ __global__ void FusedSPAQKernelVec4(const phi::bfloat16 *__restrict__ Xin,
   act_f32x4 = fast_swiglu_vec4(lhs_bf16x4, rhs_bf16x4);
 
   if constexpr (with_prob) {
-    const float p = prob[in_y_idx];
+    // Warp level sync to avoid syncthreads
+    const float p = __shfl_sync(mask, p_t0, 0);
     act_f32x4.x *= p;
     act_f32x4.y *= p;
     act_f32x4.z *= p;
@@ -132,22 +139,22 @@ __global__ void FusedSPAQKernelVec4(const phi::bfloat16 *__restrict__ Xin,
   // Phase 2: Block Reduction to find per-quant block absolute maxima
   // Compute absolute values
   float thread_amax = amax_float4(act_f32x4);
-  unsigned int mask = 0xffffffff;
 
   // All-Reduce within the warp
+  #pragma unroll
   for (int offset = 16; offset > 0; offset /= 2) {
-    float val = __shfl_down_sync(mask, thread_amax, offset);
+    const float val = __shfl_down_sync(mask, thread_amax, offset);
     thread_amax = fmaxf(thread_amax, val);
   }
   const float final_amax = __shfl_sync(mask, thread_amax, 0);
 
   // Phase 3: Compute scales and quantize the outputs
-  float scale =
+  const float scale =
       ComputeScale<float, __nv_fp8_e4m3, using_pow2_scaling>(final_amax, 0.0f);
-  float inv_scale = __frcp_rn(scale);
+  const float inv_scale = __frcp_rn(scale);
 
-  fp8_e4m3x4_t act_fp8x4 = scale_fp32x4_to_fp8x4(act_f32x4, scale);
-  fp8_e4m3x4_t *out_vec_addr =
+  const fp8_e4m3x4_t act_fp8x4 = scale_fp32x4_to_fp8x4(act_f32x4, scale);
+  fp8_e4m3x4_t *const out_vec_addr =
       reinterpret_cast<fp8_e4m3x4_t *>(out + in_y_idx * cols / 2 + in_x_idx);
   *out_vec_addr = act_fp8x4;
   if (lane == 0) scales[in_y_idx * scale_stride + in_x_idx / 128] = inv_scale;
