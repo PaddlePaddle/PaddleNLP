@@ -742,6 +742,7 @@ class BloomForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, BloomPr
         v_quant_scales=None,
         k_dequant_scales=None,
         v_dequant_scales=None,
+        excess_blocks=None,
     ):
         outputs = self.bloom(
             input_ids,
@@ -759,6 +760,7 @@ class BloomForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, BloomPr
             v_quant_scales=v_quant_scales,
             k_dequant_scales=k_dequant_scales,
             v_dequant_scales=v_dequant_scales,
+            excess_blocks=excess_blocks,
         )
 
         hidden_states = outputs[0]
