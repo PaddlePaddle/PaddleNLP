@@ -204,7 +204,7 @@ export PYTHONPATH=../../../:$PYTHONPATH
 python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_reward.py  ../../config/llama/rm_flashmask_argument.json
 ```
 
-`rm_argument.json` 中的绝大部分参数释义同[LLM 精调](finetune.md)，不再赘述。
+`rm_flashmask_argument.json` 中的绝大部分参数释义同[LLM 精调](finetune.md)，不再赘述。
 
 **3. RLHF：**
 
