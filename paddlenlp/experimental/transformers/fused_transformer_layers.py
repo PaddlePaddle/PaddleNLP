@@ -2687,7 +2687,7 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
 
         return ln_out
 
-    def compute_qkv_linear(self, ln_out, i):
+    def compute_qkv_linear(self, ln_out, i, **kwargs):
         if self.config.mla_config.use_mla():
             raise NotImplementedError("Not support MLA yet.")
         else:
@@ -5138,7 +5138,7 @@ class FusedBlockMultiTransformerFP8(FusedBlockMultiTransformer):
 
         return ln_out
 
-    def compute_qkv_linear(self, ln_out, i):
+    def compute_qkv_linear(self, ln_out, i, **kwargs):
         if self.config.mla_config.use_mla():
             raise NotImplementedError("Not support MLA yet.")
         else:
