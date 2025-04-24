@@ -15,6 +15,8 @@ from paddle.nn.layer.layers import Layer
 _ReduceMode: TypeAlias = Literal['mean', 'sum', 'none']
 
 
+# TODO: this function is rewrited from paddle.nn.functional.cross_entropy,
+# but better to merge into only one.
 def parallel_cross_entropy(
     input: Tensor,
     label: Tensor,
@@ -211,6 +213,7 @@ def parallel_cross_entropy(
         return out
 
 
+# TODO: placement[1] may not be mp axis.
 def is_tensor_sharded(tensor):
     if not tensor.is_dist():
         return False

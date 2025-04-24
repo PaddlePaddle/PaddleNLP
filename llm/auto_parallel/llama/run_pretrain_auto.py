@@ -558,10 +558,7 @@ def main():
     print("Final pre-training config:", config)
 
     if "replace_with_parallel_cross_entropy" in training_args.tensor_parallel_config and config.tensor_parallel_degree > 1 and in_dynamic_mode():
-        utils_path = "/workspace/PaddleNLP/llm/utils"
-        sys.path.append(utils_path)
-
-        from replace_ops import replace_cross_entropy
+        from llm.utils.replace_ops import replace_cross_entropy
 
         replace_cross_entropy()
 
