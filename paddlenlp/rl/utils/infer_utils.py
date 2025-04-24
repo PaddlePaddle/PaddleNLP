@@ -159,7 +159,7 @@ def create_predictor(trainer: Trainer):
         min_length=trainer.args.min_dec_len,
         max_length=trainer.args.max_dec_len,
         total_max_length=trainer.args.max_src_len + trainer.args.max_dec_len,
-        batch_size=trainer.args.rollout_continue_batching_batch_size,
+        batch_size=trainer.args.rollout_max_num_seqs,
         top_p=trainer.args.top_p,
         temperature=trainer.args.temperature,
         repetition_penalty=trainer.args.repetition_penalty,
@@ -168,7 +168,7 @@ def create_predictor(trainer: Trainer):
         dtype=trainer.amp_dtype,
         output_via_mq=False,
         dynamic_insert=True,
-        quant_type=trainer.args.quant_type,
+        quant_type=trainer.args.rollout_quant_type,
     )
     model_args = ModelArgument()
     config = copy.deepcopy(trainer.model.config)

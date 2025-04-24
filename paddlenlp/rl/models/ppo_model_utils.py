@@ -439,7 +439,11 @@ class RLHFPPOMixedLoss(nn.Layer):
             logits = logits if isinstance(logits, paddle.Tensor) else logits[0]
             if self.use_fp32_compute and logits.dtype != paddle.float32:
                 logits = logits.cast(paddle.float32)
-            logits = logits / self.temperature if self.temperature > 0.0 else logits
+
+            if self.temperature > 0.0:
+                # use inplace method to save gpu memory
+                logits.scale_(1.0 / self.temperature)
+
         else:
             hidden_states, weight, bias, transpose_y = logits
             if use_remove_padding:
@@ -481,7 +485,7 @@ class RLHFPPOMixedLoss(nn.Layer):
                 kl_loss_coeff=self.kl_loss_coeff,
                 loop_chunk_size=1024,
                 response_start=response_start,
-                use_actor_fused_loss=True,  # TODO, currently only support kunbo's fused head loss
+                use_actor_fused_loss=self.entropy_coeff <= 0,  # currently only support kunbo's fused head loss
                 temperature=self.temperature,
             )
             with paddle.no_grad():

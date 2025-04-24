@@ -161,6 +161,7 @@ class ActorReferenceTrainer(RLTrainer):
                 logits = logits.cast(paddle.float32)
 
             if self.args.temperature > 0.0:
+                # use inplace method to save gpu memory
                 logits.scale_(1 / self.args.temperature)
 
             if self.args.use_remove_padding:

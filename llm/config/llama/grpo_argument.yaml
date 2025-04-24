@@ -39,8 +39,8 @@ min_dec_len: 32 # Minimum length of the response
 top_p: 1.0 # Top-p sampling parameter
 temperature: 0.7 # Temperature parameter for sampling
 repetition_penalty: 1.0 # Repetition penalty parameter
-# rollout_continue_batching_batch_size: 32 # Base batch size for dynamic insert
-quant_type: "" # Quantization type, e.g., "weight_only_int8"
+rollout_max_num_seqs: 16 # The maximum number of sequences that can be processed in a single inference
+rollout_quant_type: "" # Quantization type, e.g., "weight_only_int8"
 
 # training args
 do_train: true # Whether to perform training
@@ -49,7 +49,6 @@ global_batch_size: 2 # Global batch size for training
 mini_batch_size: 2 # Mini-batch size for training
 rollout_n: 8 # Number of rollouts
 update_iters: 1 # Number of training iterations for rollout samples
-per_device_rollout_batch_size: 1 # Rollout batch size per device
 per_device_logprob_batch_size: 8 # Log probability batch size per device
 per_device_reward_batch_size: 8 # Reward batch size per device
 per_device_value_batch_size: 8 # Value batch size per device

@@ -179,7 +179,7 @@ class TrainingArguments(TrainingArguments):
         default=1.0,
         metadata={"help": "The parameter for repetition penalty. 1.0 means no penalty."},
     )
-    quant_type: str = field(
+    rollout_quant_type: str = field(
         default="",
         metadata={"help": "Quantization dtype, optional for: weight_onlt_int8."},
     )
@@ -319,9 +319,11 @@ class TrainingArguments(TrainingArguments):
         default=False,
         metadata={"help": "Whether to remove paddings before computing transformer."},
     )
-    rollout_continue_batching_batch_size: int = field(
-        default=1,
-        metadata={"help": "Batch size to rollout using continue batching."},
+    rollout_max_num_seqs: int = field(
+        default=8,
+        metadata={
+            "help": "The maximum number of sequences that can be processed in a single inference. Default is 8."
+        },
     )
 
     def __post_init__(self):
@@ -363,13 +365,16 @@ class TrainingArguments(TrainingArguments):
             self.global_gen_batch_size = self.global_batch_size
 
         if self.per_device_rollout_batch_size <= 0:
-            self.per_device_rollout_batch_size = self.per_device_train_batch_size
+            self.per_device_rollout_batch_size = self.global_batch_size // self.dataset_world_size
         if self.per_device_logprob_batch_size <= 0:
             self.per_device_logprob_batch_size = self.per_device_train_batch_size
         if self.per_device_reward_batch_size <= 0:
             self.per_device_reward_batch_size = self.per_device_train_batch_size
         if self.per_device_value_batch_size <= 0:
             self.per_device_value_batch_size = self.per_device_train_batch_size
+
+        # conserve kv cache, select the minimum value as the rollout max num seqs for the inference engine
+        self.rollout_max_num_seqs = min(self.per_device_rollout_batch_size, self.rollout_max_num_seqs)
 
         # `gradient_accumulation_steps` specifies the number of mini-batches per gradient update.
         # This value must be set prior to calling `super().__post_init__()`.
@@ -394,6 +399,7 @@ class TrainingArguments(TrainingArguments):
             "global_batch_size": self.global_batch_size,
             "mini_batch_size": self.mini_batch_size,
             "rollout_n": self.rollout_n,
+            "rollout_max_num_seqs": self.rollout_max_num_seqs,
             "dataset_world_size": self.dataset_world_size,
             "per_device_rollout_batch_size": self.per_device_rollout_batch_size,
             "per_device_logprob_batch_size": self.per_device_logprob_batch_size,
