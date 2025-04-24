@@ -26,6 +26,7 @@ import numpy as np
 import paddle
 import paddle.distributed as dist
 from paddle.distributed import fleet
+from paddle import in_dynamic_mode
 
 from paddlenlp.ops import Topology
 from paddlenlp.trainer import (
@@ -450,17 +451,12 @@ def main():
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     if training_args.enable_linear_fused_grad_add:
+        utils_path = "/root/paddlejob/workspace/env_run/shenfangjian/PaddleNLP/llm/utils"
+        sys.path.append(utils_path)
+
         from fused_layers import mock_layers
 
         mock_layers()
-
-    if "replace_with_parallel_cross_entropy" in training_args.tensor_parallel_config:
-        utils_path = "/workspace/PaddleNLP/llm/utils"
-        sys.path.append(utils_path)
-
-        from replace_ops import replace_cross_entropy
-
-        replace_cross_entropy()
 
     if model_args.tokenizer_name_or_path is None:
         model_args.tokenizer_name_or_path = model_args.model_name_or_path
@@ -563,6 +559,14 @@ def main():
             pass
 
     print("Final pre-training config:", config)
+
+    if "replace_with_parallel_cross_entropy" in training_args.tensor_parallel_config and config.tensor_parallel_degree > 1 and in_dynamic_mode():
+        utils_path = "/root/paddlejob/workspace/env_run/shenfangjian/PaddleNLP/llm/utils"
+        sys.path.append(utils_path)
+
+        from replace_ops import replace_cross_entropy
+
+        replace_cross_entropy()
 
     # # Set the dtype for loading model
     # dtype = "float32"
