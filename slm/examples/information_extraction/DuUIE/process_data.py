@@ -40,7 +40,7 @@ def load_jsonlines_file(filename):
 
 
 def convert_entity_schema(entity_schema):
-    """Convert entity schmea to record schema"""
+    """Convert entity schema to record schema"""
     spots = list()
     asocs = list()
     spot_asoc_map = dict()
@@ -69,7 +69,7 @@ def convert_entity_relation_schema(entity_schema, relation_schema):
 
 
 def convert_event_schema(schema):
-    """Convert event schmea to record schema"""
+    """Convert event schema to record schema"""
     spots = list()
     asocs = set()
     spot_asoc_map = dict()
@@ -277,8 +277,8 @@ def merge_test(options):
 
 
 def annonote_graph(entities: List[Dict] = [], relations: List[Dict] = [], events: List[Dict] = []):
-    """Convert Entity Relation Event to Spot-Assocation Graph
-    将实体、关系和事件的标注信息转换成需要生成的 Spot-Assocation 结构
+    """Convert Entity Relation Event to Spot-Association Graph
+    将实体、关系和事件的标注信息转换成需要生成的 Spot-Association 结构
 
     Args:
         tokens (List[str]): Token List

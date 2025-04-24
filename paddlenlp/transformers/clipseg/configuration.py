@@ -327,7 +327,7 @@ class CLIPSegConfig(PretrainedConfig):
                     else:
                         message = (
                             f"`text_config_dict` is provided which will be used to initialize `CLIPSegTextConfig`. The "
-                            f'value `text_config["{key}"]` will be overriden.'
+                            f'value `text_config["{key}"]` will be overridden.'
                         )
                     logger.warning(message)
 
@@ -359,7 +359,7 @@ class CLIPSegConfig(PretrainedConfig):
                     else:
                         message = (
                             f"`vision_config_dict` is provided which will be used to initialize `CLIPSegVisionConfig`. "
-                            f'The value `vision_config["{key}"]` will be overriden.'
+                            f'The value `vision_config["{key}"]` will be overridden.'
                         )
                     logger.warning(message)
 

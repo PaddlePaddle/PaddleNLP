@@ -607,7 +607,7 @@ class DPOAutoTrainer(Trainer):
                 )
                 assert (
                     paddle.sum(paddle.stack(global_step_list) - global_step_list[0]) == 0
-                ), f"Error, get different globel step, please check! step list: {[x.item() for x in global_step_list]}"
+                ), f"Error, get different global step, please check! step list: {[x.item() for x in global_step_list]}"
 
             epochs_trained = self.state.global_step // num_update_steps_per_epoch
             if not args.ignore_data_skip:

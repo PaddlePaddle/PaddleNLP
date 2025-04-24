@@ -105,7 +105,7 @@ class TestQuantedLoRAModel(unittest.TestCase):
         cls.model = AutoModel.from_pretrained("__internal_testing__/tiny-random-bert")
         cls.lora_model = LoRAModel(cls.model, lora_config)
         cls.lora_model.mark_only_lora_as_trainable()
-        # lora_B parameter is initalized to 0, therefore AB = 0 and W + AB = W
+        # lora_B parameter is initialized to 0, therefore AB = 0 and W + AB = W
         # Since we want to test W + AB logic, we set lora_B to random values.
         lora_b_state_dict = {}
         for name, state in cls.lora_model.state_dict().items():

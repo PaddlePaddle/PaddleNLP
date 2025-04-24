@@ -40,7 +40,7 @@ def padding_batch_data(
     input_dict = {}
 
     input_ids = [sample["input_ids"] for sample in samples]
-    # TODO(drownfish19): confim if this is correct
+    # TODO(drownfish19): confirm if this is correct
     # attention_mask = [np.ones(input_id.shape, dtype=bool) for input_id in input_ids]
     input_dict["input_ids"] = left_padding(input_ids, padding_value=pad_token_id, max_length=max_prompt_len)
     # input_dict["attention_mask"] = left_padding(attention_mask, padding_value=0)

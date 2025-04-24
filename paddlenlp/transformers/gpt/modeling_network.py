@@ -1057,7 +1057,7 @@ class GPTForCausalLMNet(GPTPretrainedModelNet):
             to ordered and not None (depending on the input arguments) fields of
             :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions`.
 
-            Especialy, when `return_dict=use_cache=output_attentions=output_hidden_states=False`,
+            Especially, when `return_dict=use_cache=output_attentions=output_hidden_states=False`,
             returns a tensor `logits` which is the output of the gpt model.
         """
         input_type = type(input_ids) if input_ids is not None else type(inputs_embeds)

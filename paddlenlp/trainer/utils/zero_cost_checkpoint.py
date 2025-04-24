@@ -173,11 +173,11 @@ class ZeroCostCheckpointEMAProcessor:
     def ema_accumulate(self):
         """
         perform ema update : ` \alpha * EMA + (1-\alpha) + model`
-        buid `self.ema_buffer` if necessary
+        build `self.ema_buffer` if necessary
         """
         # logger.info(f'[ZCC EMA] wait all done, doing EMA w/ coef: {self.ema_coef}, status:{self.status()}')
         # do update: ema = alpha * ema + (1-alpha) * model
-        logger.info(f"[ZCC EMA] accmulating, buffer type:{self.ema_buffer.place} {self.ema_buffer.dtype}")
+        logger.info(f"[ZCC EMA] accumulating, buffer type:{self.ema_buffer.place} {self.ema_buffer.dtype}")
         with device_guard("cpu"):
             cpu_master_weights = self.optimizer_fusion_storage_helper.cpu_buffer._slice(
                 self.master_min_offset, self.master_max_offset
@@ -189,7 +189,7 @@ class ZeroCostCheckpointEMAProcessor:
                 updated_ema = self.ema_coef * ema_buf + (1 - self.ema_coef) * cpu_buf
                 self.ema_buffer_model_params[index] = updated_ema
 
-        logger.info(f"[ZCC EMA] accmulating, buffer type:{self.ema_buffer.place} {self.ema_buffer.dtype}, done")
+        logger.info(f"[ZCC EMA] accumulating, buffer type:{self.ema_buffer.place} {self.ema_buffer.dtype}, done")
 
     @imperative_base.no_grad()
     def ema_state_dict(self):
@@ -575,7 +575,7 @@ class ZeroCostCheckpointManager:
             if found_worker:
                 break
             logger.info(
-                "[ZCC manager] Waiting for idle worker..., consider increse `save-step` or `global-batch-size`"
+                "[ZCC manager] Waiting for idle worker..., consider increase `save-step` or `global-batch-size`"
             )
             time.sleep(1)
         task = (ZCCTaskType.PREPARE, save_infos_and_non_cached_objects)
@@ -878,7 +878,7 @@ class ZeroCostCheckpointWorker:
             if self.dp_rank > 0:  # ep
                 opt_state_dict = self._filter_moe_no_sync_optimizer_params(self.model_meta_content, opt_state_dict)
                 if self.ema_coef is not None:
-                    # non master-weights in `ema-state-dict` when dp >1 will be filterd, which is acceptable
+                    # non master-weights in `ema-state-dict` when dp >1 will be filtered, which is acceptable
                     ema_state_dict = self._filter_moe_no_sync_optimizer_params(self.model_meta_content, ema_state_dict)
             paddle.save(state_dict, model_states_name_path)
             paddle.save(opt_state_dict, optimizer_state_name_path)
@@ -920,7 +920,7 @@ class ZeroCostCheckpointWorker:
                 elif task_type == ZCCTaskType.UPDATE:
                     self.process_update_task(task_body)
                     if self.ema_coef is not None:
-                        self.zcc_ema_processor = ZeroCostCheckpointEMAProcessor(  # 在 updte task 后刷新 EMA buffer
+                        self.zcc_ema_processor = ZeroCostCheckpointEMAProcessor(  # 在 update task 后刷新 EMA buffer
                             self.optimizer_fusion_storage_helper, self.param_fusion_storage_helper, self.ema_coef
                         )
                         if ema_ckpt_path is not None:  # update ema if needed

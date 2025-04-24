@@ -100,7 +100,7 @@ exit_code=$?
 print_info $exit_code unittest
 
 cd ${nlp_dir}
-echo -e "\033[35m ---- Genrate Allure Report  \033[0m"
+echo -e "\033[35m ---- Generate Allure Report  \033[0m"
 unset http_proxy && unset https_proxy
 cp scripts/regression/gen_allure_report.py ./
 python gen_allure_report.py > ${nlp_dir}/coverage_report/gen_allure_report.log 2>&1

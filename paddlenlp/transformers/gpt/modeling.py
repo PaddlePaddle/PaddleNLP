@@ -1571,7 +1571,7 @@ class GPTForCausalLM(GPTPretrainedModel):
             to ordered and not None (depending on the input arguments) fields of
             :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions`.
 
-            Especialy, when `return_dict=use_cache=output_attentions=output_hidden_states=False`,
+            Especially, when `return_dict=use_cache=output_attentions=output_hidden_states=False`,
             returns a tensor `logits` which is the output of the gpt model.
         """
         input_type = type(input_ids) if input_ids is not None else type(inputs_embeds)
@@ -1737,7 +1737,7 @@ class GPTForTokenClassification(GPTPretrainedModel):
             to ordered and not None (depending on the input arguments) fields of
             :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput`.
 
-            Especialy, when `return_dict=output_attentions=output_hidden_states=False`,
+            Especially, when `return_dict=output_attentions=output_hidden_states=False`,
             returns tensor `logits`, a tensor of the input token classification logits.
             Shape as `[batch_size, sequence_length, num_labels]` and dtype as `float32`.
 
@@ -1854,7 +1854,7 @@ class GPTForSequenceClassification(GPTPretrainedModel):
             to ordered and not None (depending on the input arguments) fields of
             :class:`~paddlenlp.transformers.model_outputs.SequenceClassifierOutputWithPast`.
 
-            Especialy, when `return_dict=output_attentions=output_hidden_states=False`,
+            Especially, when `return_dict=output_attentions=output_hidden_states=False`,
             returns tensor `logits`, a tensor of the input text classification logits.
             Shape as `[batch_size, num_labels]` and dtype as float32.
 

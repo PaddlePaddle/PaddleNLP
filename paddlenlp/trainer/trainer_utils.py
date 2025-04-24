@@ -1218,7 +1218,7 @@ def split_parallel_config(parallel_config):
 
 
 def download_recovery_ckpt_from_pdc(recovery_checkpoint_path, timeout):
-    """Download checkpoint from PDC for resuming training after failover. Longjob envrionment is necessary.
+    """Download checkpoint from PDC for resuming training after failover. Longjob environment is necessary.
 
     Args:
         recovery_checkpoint_path (`str`):

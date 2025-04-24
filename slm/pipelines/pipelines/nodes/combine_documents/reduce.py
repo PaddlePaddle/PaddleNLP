@@ -75,7 +75,7 @@ class ReduceDocuments(BaseCombineDocuments):
         """
         The ReduceDocuments class is a subclass of the BaseCombineDocuments class,
         which is designed to collapse multi document summary.
-        Fisrt,the number of tokens for multiple output documents is greater than the token_max.
+        First,the number of tokens for multiple output documents is greater than the token_max.
         Then, the ReduceDocuments collapses multiple documents  (the number of tokens for collapsing documents should not exceed the token_max).
         Ultimately, it ensures that the total number of tokens for all documents does not exceed the token_max and implements multi document summary generation.
 

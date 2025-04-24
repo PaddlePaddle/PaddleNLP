@@ -89,7 +89,7 @@ def parse_args():
         "--gradient_accumulation_steps",
         type=int,
         default=4,
-        help="Number of updates steps to accumualte before performing a backward/update pass.",
+        help="Number of updates steps to accumulate before performing a backward/update pass.",
     )
     parser.add_argument("--do_train", action="store_true", help="Whether to train.")
     parser.add_argument("--do_predict", action="store_true", help="Whether to predict.")
@@ -155,7 +155,7 @@ def run(args):
     if args.do_train:
         assert (
             args.batch_size % args.gradient_accumulation_steps == 0
-        ), "Please make sure argmument `batch_size` must be divisible by `gradient_accumulation_steps`."
+        ), "Please make sure argument `batch_size` must be divisible by `gradient_accumulation_steps`."
     max_seq_length = args.max_seq_length
     max_num_choices = 4
 
@@ -367,7 +367,7 @@ def run(args):
             remove_columns=column_names,
             num_proc=args.num_proc,
         )
-        # Serveral samples have more than four choices.
+        # Several samples have more than four choices.
         test_batch_sampler = paddle.io.BatchSampler(test_ds, batch_size=1, shuffle=False)
 
         batchify_fn = lambda samples, fn=Dict(  # noqa: E731

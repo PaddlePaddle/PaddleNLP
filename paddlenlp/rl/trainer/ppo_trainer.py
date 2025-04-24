@@ -260,7 +260,7 @@ class PPOTrainer(Trainer):
                 "pipeline_parallel_degree": 1,  # workaround for pipeline parallel model check
             },
         ):
-            # just used to create trival attrs might be used in the training
+            # just used to create trivial attrs might be used in the training
             # process of trainer, while changing some args to avoid model usage
             # in __init__ such as recompute and AMP-O2
             super().__init__(

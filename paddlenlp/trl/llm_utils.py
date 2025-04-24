@@ -270,7 +270,7 @@ class ZeroPaddingIterDatasetCallback(TrainerCallback):
             dataset = train_dataloader.dataset.dataset
         else:
             raise ValueError(
-                "Unexpected dataset format: ZeroPaddingIterDatasetCallback expectes `paddlenlp.datasets.ZeroPaddingIterableDataset`"
+                "Unexpected dataset format: ZeroPaddingIterDatasetCallback expects `paddlenlp.datasets.ZeroPaddingIterableDataset`"
             )
         if state.trial_params is None:
             state.trial_params = {}

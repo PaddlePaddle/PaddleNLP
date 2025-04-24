@@ -128,7 +128,7 @@ class PdArgumentParser(ArgumentParser):
                 kwargs["required"] = True
         # fix https://github.com/huggingface/transformers/pull/16946
         elif field.type is bool or field.type == Optional[bool]:
-            # Copy the currect kwargs to use to instantiate a `no_*` complement argument below.
+            # Copy the current kwargs to use to instantiate a `no_*` complement argument below.
             # We do not initialize it here because the `no_*` alternative must be instantiated after the real argument
             bool_kwargs = copy(kwargs)
 
@@ -144,7 +144,7 @@ class PdArgumentParser(ArgumentParser):
                 # This is the value that will get picked if we do --field_name (without value)
                 kwargs["const"] = True
         elif isclass(origin_type) and issubclass(origin_type, list):
-            # supprt one dimension list and two dimension list
+            # support one dimension list and two dimension list
             if hasattr(get_args(field.type)[0], "__args__"):
                 kwargs["type"] = field.type.__args__[0].__args__[0]
                 kwargs["action"] = "append"
