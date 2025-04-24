@@ -15,12 +15,24 @@
 import os
 import shutil
 import subprocess
+from packaging.version import parse, Version
 
 import paddle
 from paddle.utils.cpp_extension import CUDAExtension, setup
 
 sm_version = int(os.getenv("CUDA_SM_VERSION", "0"))
 
+def get_nvcc_cuda_version(cuda_dir: str) -> Version:
+    """Get the CUDA version from nvcc.
+
+    Adapted from https://github.com/NVIDIA/apex/blob/8b7a1ff183741dd8f9b87e7bafd04cfde99cea28/setup.py
+    """
+    nvcc_output = subprocess.check_output([cuda_dir + "/bin/nvcc", "-V"],
+                                          universal_newlines=True)
+    output = nvcc_output.split()
+    release_idx = output.index("release") + 1
+    nvcc_cuda_version = parse(output[release_idx].split(",")[0])
+    return nvcc_cuda_version
 
 def update_git_submodule():
     try:
@@ -153,6 +165,7 @@ include_dirs = [
 ]
 cc = get_sm_version()
 cuda_version = float(paddle.version.cuda())
+nvcc_version = get_nvcc_cuda_version(os.environ.get("CUDA_HOME", "/usr/local/cuda"))
 
 if cc >= 80:
     sources += ["gpu/int8_gemm_with_cutlass/gemm_dequant.cu"]
@@ -178,7 +191,8 @@ if cc == 89 and cuda_version >= 12.4:
         "gpu/fp8_gemm_with_cutlass/fp8_fp8_fp8_dual_gemm.cu",
     ]
 
-if cc >= 80 and cuda_version >= 12.4:
+if cc >= 80 and nvcc_version >= Version("12.4"):
+    os.environ.pop('PADDLE_CUDA_ARCH_LIST', None)
     nvcc_compile_args += [
         "-std=c++17",
         "--use_fast_math",
