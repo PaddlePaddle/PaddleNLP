@@ -48,10 +48,9 @@ from ...trainer.trainer import (
 from ...transformers import PretrainedModel, PretrainedTokenizer
 from ...utils.env import TRAINER_STATE_NAME
 from ..models.ppo_model_utils import create_loss
-from ..utils.comm_utils import ActorStages, create_data_trans_group
+from ..utils.comm_utils import create_data_trans_group
 from ..utils.infer_utils import InferEvalModel
 from ..utils.reshard_utils import init_rollout_env
-from ..utils.timer_utils import TimerScope
 from .trainer_utils import PipeEvalModel
 
 # ########## patches for Trianer ##########
@@ -433,8 +432,8 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
             self.control,
             scaler=self.scaler if self.do_grad_scaling else None,
         )
-        optimizer_time_scope = TimerScope(self.timers, ActorStages.OPTIMIZE_STEP)
-        optimizer_time_scope.start()
+        # optimizer_time_scope = TimerScope(self.timers, ActorStages.OPTIMIZE_STEP)
+        # optimizer_time_scope.start()
 
         optimizer_was_run = True
 
@@ -478,7 +477,7 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
         else:
             self.optimizer.clear_grad()
 
-        optimizer_time_scope.stop()
+        # optimizer_time_scope.stop()
 
         self.callback_handler.on_optimizer_end(
             args,

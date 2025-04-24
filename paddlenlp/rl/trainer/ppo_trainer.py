@@ -1637,9 +1637,7 @@ class PPOTrainer(Trainer):
                             for micro_step, micro_batch in enumerate(micro_batches * self.args.update_iters):
                                 step = 0 if step == -1 else step
                                 with TimerScopeManualLabel(
-                                    self.timers,
-                                    get_timer_label(ActorStages.MICRO_STEPS) + f"_{micro_step}",
-                                    minus_names=[get_timer_label(ActorStages.OPTIMIZE_STEP)],
+                                    self.timers, get_timer_label(ActorStages.MICRO_STEPS) + f"_{micro_step}"
                                 ):
                                     rl_info = self.actor_trainer.update_actor(micro_batch)
 

@@ -504,7 +504,7 @@ class RLHFPPOMixedLoss(nn.Layer):
             if use_remove_padding:
                 from ..utils.bert_padding import pad_input
 
-                if self.model.config.tensor_parallel_degree > 1 and self.model.config.tensor_parallel_output:
+                if self.config.tensor_parallel_degree > 1 and self.config.tensor_parallel_output:
                     log_probs = (
                         -ParallelCrossEntropy()(logits.astype("float32"), input_ids_rmpad_rolled)
                         .squeeze(axis=-1)

@@ -659,7 +659,7 @@ class Qwen2Attention(nn.Layer):
             key_states = key_states.reshape(shape=target_key_value_shape)
             value_states = value_states.reshape(shape=target_key_value_shape)
 
-        if position_ids is not None:
+        if position_ids is not None and not self.use_fused_rope:
             kv_seq_len = position_ids.max().item() + 1
         else:
             kv_seq_len = key_states.shape[-3]

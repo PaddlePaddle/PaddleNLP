@@ -39,7 +39,6 @@ min_dec_len: 32 # Minimum length of the response
 top_p: 1.0 # Top-p sampling parameter
 temperature: 0.7 # Temperature parameter for sampling
 repetition_penalty: 1.0 # Repetition penalty parameter
-# rollout_use_dynamic_insert: 1 # Whether to use dynamic insert for rollout
 # rollout_continue_batching_batch_size: 32 # Base batch size for dynamic insert
 quant_type: "" # Quantization type, e.g., "weight_only_int8"
 
@@ -100,7 +99,7 @@ eval_steps: 20 # Number of steps between evaluations
 # device memory optimization args
 use_flash_attention: true # Whether to use fused attention operations
 use_fused_rms_norm: true # Whether to use fused RMS norm operations
-use_fused_rope: true # Whether to use fused rope operations
+use_fused_rope: false # Whether to use fused rope operations
 use_fused_head_and_loss_fn: false # Whether to use fused head and loss function
 use_fused_linear: false # Whether to use fused linear operations, which needs to install fused_ln in slm/model_zoo/gpt-3/external_ops
 fused_linear: false # Whether to use fused_gemm_epilogue
