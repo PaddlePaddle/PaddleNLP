@@ -16,14 +16,11 @@
 import paddle
 import paddle.nn.functional as F
 
-from paddlenlp.utils.log import logger
-
 try:
     from einops import rearrange, repeat
 except ImportError:
-    logger.warning_once("`einops` is not installed. Please run `pip install einops`")
-    rearrange = None
-    repeat = None
+    raise ImportError("`einops` is not installed. Please run `pip install einops`")
+
 
 import operator
 from functools import reduce
