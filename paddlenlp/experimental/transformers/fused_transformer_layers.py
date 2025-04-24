@@ -3409,6 +3409,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                     True,  # causal
                     self.config.speculate_config.speculate_method is not None,  # speculate_decoder
                 )
+                paddle.device.synchronize()
 
                 fmha_out = sa_results[0]
                 o_sdpa = paddle.nn.functional.scaled_dot_product_attention(q.unsqueeze(0), k.unsqueeze(0), v.unsqueeze(0), is_causal=True)
@@ -3417,12 +3418,14 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 sim, l1, diff = precision_cmp_paddle(fmha_out, o_sdpa)
                 print(f"fmha vs sdpa: {sim}, {diff}")
 
-                o_custom_ops, _, _ = sageattn_custom_ops.sage_attention_varlen2(q, 
+                # try custom ops
+                paddle.device.synchronize()
+                o_custom_ops, q_int8, k_int8, vfp8_fused, v_transposed = sageattn_custom_ops.sage_attention_varlen2(q, 
                                                     k, 
                                                     padded_v, 
-                                                    kwargs.get("cu_seqlens_q", None),
-                                                    kwargs.get("cu_seqlens_q", None),
-                                                    cu_seqlen_v_padded,
+                                                    kwargs.get("cu_seqlens_q", None).astype(paddle.int32),
+                                                    kwargs.get("cu_seqlens_k", None).astype(paddle.int32),
+                                                    cu_seqlen_v_padded.astype(paddle.int32),
                                                     km,
                                                     None,
                                                     131,
@@ -3436,13 +3439,9 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                                                     smooth_k=True, 
                                                     smooth_v=False, 
                                                     return_lse=False)
+                paddle.device.synchronize()
                 sim, l1, diff = precision_cmp_paddle(o_custom_ops.reshape(o_sdpa.shape), o_sdpa)
                 print(f"costom ops vs sdpa: {sim}, {diff}")
-
-                # o_sdpa_nan = check_nan(o_sdpa)
-                # o_fmha_nan = check_nan(fmha_out)
-                # o_custom_ops_nan = check_nan(o_custom_ops)
-                # q_nan, k_nan, v_nan = check_nan(q), check_nan(k), check_nan(v)
                 print(f"layer: {i} q nan:{check_nan(q)}, k nan:{check_nan(k)}, v nan:{check_nan(v)}, fmha nan:{check_nan(fmha_out)}, custom ops nan:{check_nan(o_custom_ops)}, sdpa nan:{check_nan(o_sdpa)}")
                 print("============================================")
                 fmha_out = o_custom_ops.reshape(fmha_out.shape)
