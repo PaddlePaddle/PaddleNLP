@@ -539,7 +539,7 @@ class ZeroCostCheckpointManager:
         self.global_step = global_step
         assert self.current_worker is None, "[ZCC manager] current_worker must be None"
         task = (ZCCTaskType.UPDATE, [self.cache_version, dynamic_objecs, static_object])
-        logger.info(f"[ZCC manager] updating zcc workers, verison: {self.cache_version}")
+        logger.info(f"[ZCC manager] updating zcc workers, version: {self.cache_version}")
         for worker in self.workers:
             worker.task_queue.put(task)
         logger.info("[ZCC manager] waiting workers update done")

@@ -87,7 +87,7 @@ def custom_object_save(obj, folder, config=None):
     shutil.copy(object_file, dest_file)
 
     # Gather all relative imports recursively and make sure they are copied as well.
-    # TODO(wujingjing): `get_relative_import_files` havn't supported yet.
+    # TODO(wujingjing): `get_relative_import_files` haven't supported yet.
     # for needed_file in get_relative_import_files(object_file):
     #     dest_file = Path(folder) / (Path(needed_file).name)
     #     shutil.copy(needed_file, dest_file)
@@ -607,7 +607,7 @@ class PretrainedConfig:
             if num_labels is not None and len(self.id2label) != num_labels:
                 logger.warning(
                     f"You passed along `num_labels={num_labels}` with an incompatible id to label map: "
-                    f"{self.id2label}. The number of labels wil be overwritten to {self.num_labels}."
+                    f"{self.id2label}. The number of labels will be overwritten to {self.num_labels}."
                 )
             self.id2label = dict((int(key), value) for key, value in self.id2label.items())
             # Keys are always strings in JSON so convert ids to int here.

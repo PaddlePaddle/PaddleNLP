@@ -674,7 +674,7 @@ class RLTrainer(Trainer):
             if paddle.distributed.get_world_size() > 1:
                 assert self.model is not self.model_wrapped
             self.train_step_vars = {
-                # meaningless vars can pass from outter, dummy value is enough
+                # meaningless vars can pass from outer, dummy value is enough
                 "epoch": 0,  # meaningless for step training
                 "step": 0,  # meaningless for step training
                 "steps_in_epoch": 100000,  # meaningless for step training
@@ -718,15 +718,15 @@ class RLTrainer(Trainer):
         # trainer.train use `tr_loss` as loss var to accumulate loss.
         # NOTE: `tr_loss` in trainer.train not only accumulate mean loss for
         # steps in one `gradient_accumulation_steps`, but also accumulate for
-        # one logging intervel which may contains more than one accumulated steps.
+        # one logging interval which may contains more than one accumulated steps.
         # However, in RLTrainer we only want to use `tr_loss` to accumulate
         # mean loss for steps in a `gradient_accumulation_steps` range. As for
-        # logging intervel loss accumulation is not take into account here and
-        # should be considered in outter.
+        # logging interval loss accumulation is not take into account here and
+        # should be considered in outer.
         if loss_var is None:  # the first step of current loss type
             loss_var = paddle.to_tensor(0.0)
             train_step_vars[loss_name] = loss_var
-        elif self.is_accumulation_step:  # begin a new accumulation step intervel
+        elif self.is_accumulation_step:  # begin a new accumulation step interval
             for name in self.loss_names:
                 train_step_vars[name] = paddle.to_tensor(0.0)
             loss_var = train_step_vars[loss_name]

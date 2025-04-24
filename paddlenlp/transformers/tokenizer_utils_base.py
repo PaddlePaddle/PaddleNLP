@@ -1700,7 +1700,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         # Set max length if needed
         if pretrained_model_name_or_path in cls.max_model_input_sizes:
             # if we're using a pretrained model, ensure the tokenizer
-            # wont index sequences longer than the number of positional embeddings
+            # won't index sequences longer than the number of positional embeddings
             model_max_length = cls.max_model_input_sizes[pretrained_model_name_or_path]
             if model_max_length is not None and isinstance(model_max_length, (int, float)):
                 init_kwargs["model_max_length"] = min(init_kwargs.get("model_max_length", int(1e30)), model_max_length)

@@ -253,8 +253,8 @@ class InitTrackerMeta(type(Layer)):
 
     def __init__(cls, name, bases, attrs):
         init_func = cls.__init__
-        # If attrs has `__init__`, wrap it using accessable `_pre_init, _post_init`.
-        # Otherwise, no need to wrap again since the super cls has been wraped.
+        # If attrs has `__init__`, wrap it using accessible `_pre_init, _post_init`.
+        # Otherwise, no need to wrap again since the super cls has been wrapped.
         # TODO: remove reduplicated tracker if using super cls `__init__`
         pre_init_func = getattr(cls, "_pre_init", None) if "__init__" in attrs else None
         post_init_func = getattr(cls, "_post_init", None) if "__init__" in attrs else None
@@ -450,7 +450,7 @@ def paddlenlp_hub_download(
 
     # Download from custom model url
     if is_url(repo_id):
-        # check wether the target file exist in the community bos server
+        # check whether the target file exist in the community bos server
         if url_file_exists(repo_id):
             logger.info(f"Downloading {repo_id}")
             weight_file_path = get_path_from_url_with_filelock(repo_id, cache_dir)
@@ -483,7 +483,7 @@ def paddlenlp_hub_download(
     community_model_file_path = "/".join(url_list)
     assert is_url(community_model_file_path)
 
-    # check wether the target file exist in the community bos server
+    # check whether the target file exist in the community bos server
     if url_file_exists(community_model_file_path):
         logger.info(f"Downloading {community_model_file_path}")
         weight_file_path = get_path_from_url_with_filelock(community_model_file_path, cache_dir)

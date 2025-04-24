@@ -46,7 +46,7 @@ def to_vocab_buffer(vocab_dict, name):
     NOTICE: The value will be held in the cpu place.
 
     Args:
-        vocab_dict(dict): The value will be setted to the tensor.
+        vocab_dict(dict): The value will be set to the tensor.
             The key is token and the value is the token index.
         name(string): The name of the tensor.
     """
