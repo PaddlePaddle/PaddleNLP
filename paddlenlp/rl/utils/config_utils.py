@@ -370,7 +370,7 @@ class TrainingArguments(TrainingArguments):
             self.per_device_value_batch_size = self.per_device_train_batch_size
 
         # conserve kv cache, select the minimum value as the rollout max num seqs for the inference engine
-        self.rollout_max_num_seqs = min(self.per_device_rollout_batch_size, self.rollout_max_num_seqs)
+        # self.rollout_max_num_seqs = min(self.per_device_rollout_batch_size * self.rollout_n, self.rollout_max_num_seqs)
 
         # `gradient_accumulation_steps` specifies the number of mini-batches per gradient update.
         # This value must be set prior to calling `super().__post_init__()`.
