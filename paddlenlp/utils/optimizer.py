@@ -304,62 +304,39 @@ class AdamWMini(AdamW):
                 # Compute per-head second moment
                 mom2_update = paddle.mean(grad_reshaped * grad_reshaped, axis=1, keepdim=True)
                 # Update moments with correct beta values
-                mom2_next = mom2 * beta2 + mom2_update * (1 - beta2)
-                mom1_next = mom1 * beta1 + grad_reshaped * (1 - beta1)
-
-                # Update accumulators in-place
-                moment1[:] = mom1_next
-                moment2[:] = mom2_next
-                beta1_pow[:] = beta1_pow * beta1
-                beta2_pow[:] = beta2_pow * beta2
+                mom1 = mom1 * beta1 + (1.0 - beta1) * grad_reshaped
+                mom2 = mom2 * beta2 + (1.0 - beta2) * mom2_update
 
                 # Compute adaptive learning rate
-                denom = mom2.sqrt() / ((1 - beta2_pow).sqrt()) + self._epsilon
-                step_size = lr / (1 - beta1_pow)
+                denom = mom2.sqrt() / ((1.0 - beta2_pow).sqrt()) + epsilon
 
                 # Apply updates
-                update = (mom1 / denom.reshape([-1, 1])) * (-step_size)
-                p = param
-                if master_weight is not None:
-                    p = master_weight
+                update = (mom1 / denom.reshape([-1, 1])) * (-(lr / (1.0 - beta1_pow)))
                 p += paddle.reshape(update, param.shape)
-                if master_weight is not None:
-                    master_weight[:] = p
-                    param[:] = p.astype(param.dtype)
-                else:
-                    param[:] = p
 
             else:
                 # Other blocks
                 mom1 = moment1
                 mom2 = moment2  # Already shaped correctly
 
-                mom2_update = (grad * grad).mean()
+                mom1 = mom1 * beta1 + (1.0 - beta1) * grad
+                mom2 = mom2 * beta2 + (1.0 - beta2) * (grad * grad).mean()
 
-                mom2_next = mom2 * beta2 + mom2_update * (1 - beta2)
-                mom1_next = mom1 * beta1 + grad * (1 - beta1)
+                denom = mom2.sqrt() / ((1.0 - beta2_pow).sqrt()) + epsilon
+                p += (mom1 / denom) * (-(lr / (1.0 - beta1_pow)))
 
-                # Update accumulators in-place
-                moment1[:] = mom1_next
-                moment2[:] = mom2_next
-                beta1_pow[:] = beta1_pow * beta1
-                beta2_pow[:] = beta2_pow * beta2
+            # Update param in-place
+            if master_weight is not None:
+                master_weight[:] = p
+                param[:] = p.astype(param.dtype)
+            else:
+                param[:] = p
 
-                # Compute adaptive learning rate
-                denom = mom2.sqrt() / ((1 - beta2_pow).sqrt()) + self._epsilon
-                step_size = lr / (1 - beta1_pow)
-
-                # Apply updates
-                update = (mom1 / denom) * (-step_size)
-                p = param
-                if master_weight is not None:
-                    p = master_weight
-                p += update
-                if master_weight is not None:
-                    master_weight[:] = p
-                    param[:] = p.astype(param.dtype)
-                else:
-                    param[:] = p
+            # Update accumulators in-place
+            moment1[:] = mom1
+            moment2[:] = mom2
+            beta1_pow[:] = beta1 * beta1_pow[:]
+            beta2_pow[:] = beta2 * beta2_pow[:]
 
         return None
 
