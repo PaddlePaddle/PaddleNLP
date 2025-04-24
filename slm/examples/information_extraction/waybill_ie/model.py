@@ -15,7 +15,6 @@
 import paddle
 import paddle.nn as nn
 
-from paddlenlp.embeddings import TokenEmbedding
 from paddlenlp.layers.crf import LinearChainCrf, LinearChainCrfLoss
 from paddlenlp.utils.tools import compare_version
 
@@ -30,7 +29,7 @@ class BiGRUWithCRF(nn.Layer):
     def __init__(self, emb_size, hidden_size, word_num, label_num, use_w2v_emb=False):
         super(BiGRUWithCRF, self).__init__()
         if use_w2v_emb:
-            self.word_emb = TokenEmbedding(extended_vocab_path="./data/word.dic", unknown_token="OOV")
+            raise ValueError("Please set use_w2v_emb=False")
         else:
             self.word_emb = nn.Embedding(word_num, emb_size)
         self.gru = nn.GRU(emb_size, hidden_size, num_layers=2, direction="bidirect")

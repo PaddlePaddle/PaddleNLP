@@ -118,7 +118,8 @@ class SFTAutoConfig(SFTConfig):
         default=None, metadata={"help": "The pattern of refined recompute."}
     )
     virtual_pipeline_seg_method: str = field(
-        default="LlamaDecoderLayerAuto", metadata={"help": "The seg method of spliting pp layer for virtual pipeline."}
+        default="LlamaDecoderLayerAuto",
+        metadata={"help": "The seg method of splitting pp layer for virtual pipeline."},
     )
     # NOTE(gongenlei): new add autotuner_benchmark
     autotuner_benchmark: bool = field(
@@ -213,9 +214,9 @@ def main():
         dtype = "float32"
     quantization_config = dict(
         weight_quantize_algo=model_args.weight_quantize_algo,
-        weight_blocksize=model_args.weight_blocksize,
-        weight_double_quant=model_args.weight_double_quant,
-        weight_double_quant_block_size=model_args.weight_double_quant_block_size,
+        qlora_weight_blocksize=model_args.qlora_weight_blocksize,
+        qlora_weight_double_quant=model_args.qlora_weight_double_quant,
+        qlora_weight_double_quant_block_size=model_args.qlora_weight_double_quant_block_size,
     )
     config_class, model_class, criterion_class = MODEL_CLASSES[model_args.model_type]
     model_config = config_class.from_pretrained(

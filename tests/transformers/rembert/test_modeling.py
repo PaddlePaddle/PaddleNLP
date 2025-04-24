@@ -244,6 +244,7 @@ class RemBertModelTest(ModelTesterMixin, unittest.TestCase):
         self.model_tester.create_and_check_token_classification_model(*config_and_inputs)
 
     @slow
+    @unittest.skip("Skip for miss model weight.")
     def test_model_from_pretrained(self):
         for model_name in list(RemBertPretrainedModel.pretrained_init_configuration)[:1]:
             model = RemBertModel.from_pretrained(model_name)

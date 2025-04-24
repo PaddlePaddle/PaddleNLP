@@ -26,7 +26,6 @@ import json
 import math
 import os
 import random
-import re
 import threading
 import time
 from contextlib import contextmanager
@@ -45,6 +44,7 @@ from paddlenlp.ops import Topology
 
 from ..trainer.argparser import strtobool
 from ..transformers.tokenizer_utils_base import BatchEncoding
+from ..utils.env import PREFIX_CHECKPOINT_DIR, _re_checkpoint  # noqa for compatibility
 from ..utils.fault_tolerance import PDC_DOWNLOAD_ERROR
 from ..utils.import_utils import is_paddle_cuda_available, is_psutil_available
 from ..utils.log import logger
@@ -239,10 +239,6 @@ class TrainOutput(NamedTuple):
     metrics: Dict[str, float]
 
 
-PREFIX_CHECKPOINT_DIR = "checkpoint"
-_re_checkpoint = re.compile(r"^" + PREFIX_CHECKPOINT_DIR + r"\-(\d+)$")
-
-
 def _check_checkpoint_files(
     folder_path, world_size, ignore_save_lr_and_optim, skip_save_model_weight, remove_master_weight
 ):
@@ -323,6 +319,7 @@ class OptimizerNames(ExplicitEnum):
     ADAMW_MINI = "adamw_mini"
     ADAMW_CUSTOM = "adamw_custom"
     ADAMW_16BIT_MOMENT = "adamw_16bit_moment"
+    AdamW_Qweight = "adamw_qweight"
 
 
 class ShardingOption(ExplicitEnum):
@@ -466,7 +463,12 @@ def get_linear_schedule_with_warmup(learning_rate: float, num_warmup_steps, num_
 
 
 def get_cosine_schedule_with_warmup(
-    learning_rate: float, num_warmup_steps: int, num_training_steps: int, num_cycles: float = 0.5, last_epoch: int = -1
+    learning_rate: float,
+    num_warmup_steps: int,
+    num_training_steps: int,
+    num_cycles: float = 0.5,
+    last_epoch: int = -1,
+    min_lr: float = 0.0,
 ):
     """
     Create a schedule with a learning rate that decreases following the values of the cosine function between the
@@ -492,7 +494,8 @@ def get_cosine_schedule_with_warmup(
         if current_step < num_warmup_steps:
             return float(current_step) / float(max(1, num_warmup_steps))
         progress = float(current_step - num_warmup_steps) / float(max(1, num_training_steps - num_warmup_steps))
-        return max(0.0, 0.5 * (1.0 + math.cos(math.pi * float(num_cycles) * 2.0 * progress)))
+        ratio = max(0.0, 0.5 * (1.0 + math.cos(math.pi * float(num_cycles) * 2.0 * progress)))
+        return ratio * (1 - min_lr / learning_rate) + min_lr / learning_rate
 
     return LambdaDecay(learning_rate, lr_lambda, last_epoch)
 
@@ -565,6 +568,7 @@ def get_scheduler(
     num_cycles: Optional[float] = 0.5,
     lr_end: Optional[float] = 1e-7,
     power: Optional[float] = 1.0,
+    min_lr: Optional[float] = 0.0,
 ):
     """
     Unified API to get any scheduler from its name.
@@ -587,6 +591,9 @@ def get_scheduler(
             being optional).
         power (``float``, *optional*):
             The power factor in the polynomial scheduler. This is not required by all schedulers (hence the argument
+            being optional).
+        min_lr (``float``, *optional*):
+            The minimum LR in the cosine scheduler. This is not required by all schedulers (hence the argument
             being optional).
     """
     name = SchedulerType(name)
@@ -611,6 +618,7 @@ def get_scheduler(
             num_warmup_steps=num_warmup_steps,
             num_training_steps=num_training_steps,
             num_cycles=num_cycles,
+            min_lr=min_lr,
         )
 
     if name == SchedulerType.POLYNOMIAL:

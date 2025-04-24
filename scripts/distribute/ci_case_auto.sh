@@ -77,7 +77,7 @@ function restore_func() {
         echo "Deleted existing functions.txt"
     fi
     if [ ! -f "${log_path}/blacklist.csv" ]; then
-        wget -P ${log_path}/ https://paddle-qa.bj.bcebos.com/Auto-Parallel/blacklist.csv --no-proxy || exit 101
+        wget -q -P ${log_path}/ https://paddle-qa.bj.bcebos.com/Auto-Parallel/blacklist.csv --no-proxy || exit 101
         echo "\033 ---- wget blacklist.csv \033"
     fi
     blacklist_file=${log_path}/blacklist.csv
@@ -97,6 +97,7 @@ function llama_case_list_auto() {
     fun_list=(
         # The test name must have "llama_" as a prefix, which will 
         # be used for tracking the execution status of the case.
+        llama_dygraph_auto_bs4_bf16_SD2
         llama_dygraph_auto_bs8_fp32_DP2
         llama_dygraph_auto_bs8_fp32_DP2-MP2
         llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2
@@ -206,6 +207,115 @@ function llm_qwen_case_list_auto() {
 
 ############ case start ############
 
+function llama_dygraph_auto_bs4_bf16_SD2() {
+    # Only A100 support this case.
+    echo IS_A100 is $IS_A100
+    if [ $IS_A100 -ne 0 ]; then
+        echo "=========== $FUNCNAME run begin ==========="
+        export PYTHONPATH=$root_path/:$PYTHONPATH
+        export FLAGS_call_stack_level=3
+        export NVIDIA_TF32_OVERRIDE=0
+
+        export FLAGS_cudnn_deterministic=1
+        export FLAGS_embedding_deterministic=1 
+        
+        export CUDA_DEVICE_MAX_CONNECTIONS=1
+
+        flags=("" "FLAGS_fuse_allreduce_in_opt" "FLAGS_fuse_reducescatter_in_opt")
+        for i in "${!flags[@]}"; do
+            flag="${flags[$i]}"
+
+            if [ -n "$flag" ]; then
+                export "$flag=true"
+            fi
+
+            task_name="llama_dygraph_auto_bs4_bf16_SD2_$flag"
+            case_out_dir="output/$task_name"
+            case_log_dir="output/$task_name""_log"
+            rm -rf $case_out_dir
+            rm -rf $case_log_dir
+
+            python -u  -m paddle.distributed.launch \
+                --gpus "0,1" \
+                --log_dir  "output/$task_name""_log" \
+                ./run_pretrain_auto.py \
+                --model_name_or_path "meta-llama/Llama-2-7b" \
+                --tokenizer_name_or_path "meta-llama/Llama-2-7b" \
+                --input_dir "./data" \
+                --output_dir "./output" \
+                --weight_decay 0.01 \
+                --warmup_ratio 0.01 \
+                --max_grad_norm 1.0 \
+                --learning_rate 3e-05 \
+                --min_learning_rate 3e-06 \
+                --max_steps 10 \
+                --logging_steps 10 \
+                --eval_steps 1000 \
+                --save_steps 50000 \
+                --continue_training 0 \
+                --do_train true \
+                --do_eval false \
+                --do_predict false \
+                --disable_tqdm true \
+                --skip_profile_timer true \
+                --device gpu \
+                --enable_auto_parallel 1 \
+                --per_device_train_batch_size 1 \
+                --gradient_accumulation_steps 1 \
+                --per_device_eval_batch_size 2 \
+                --recompute false \
+                --recompute_use_reentrant true \
+                --recompute_granularity full \
+                --pp_recompute_interval 0 \
+                --bf16 true \
+                --fp16_opt_level "O2"  \
+                --amp_master_grad true \
+                --fuse_attention_ffn true \
+                --fuse_attention_qkv true \
+                --fused_linear_param_grad_add 1 \
+                --use_flash_attention true \
+                --use_fused_rope true \
+                --use_fused_rms_norm true \
+                --max_seq_length 4096 \
+                --sequence_parallel false \
+                --pipeline_parallel_degree 1 \
+                --tensor_parallel_degree 1 \
+                --sharding "stage1" \
+                --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate" \
+                --sharding_parallel_config "" \
+                --to_static 0 \
+                --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
+                --amp_custom_white_list "lookup_table" "lookup_table_v2" \
+                --num_hidden_layers 4 \
+                >>${log_path}/$FUNCNAME 2>&1
+            loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+            ips=-1
+            mem=-1
+            echo "result: loss=$loss ips=$ips mem=$mem"
+            
+            if [ -z "$flag" ]; then
+                loss_base=9.23502579
+            elif [ "$flag" = "FLAGS_fuse_allreduce_in_opt" ]; then
+                loss_base=9.23502579
+            elif [ "$flag" = "FLAGS_fuse_reducescatter_in_opt" ]; then
+                loss_base=9.23504105
+            else
+                loss_base=-1
+            fi
+
+            ips_base=-1
+            mem_base=-1
+            check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
+
+            if [ -n "$flag" ]; then
+                export "$flag=false"
+            fi
+        done
+        echo "=========== $FUNCNAME run  end ==========="
+    fi
+}
+
+
 function llama_dygraph_auto_bs8_fp32_DP2() {
     echo "=========== $FUNCNAME run begin ==========="
     export PYTHONPATH=$root_path/:$PYTHONPATH
@@ -264,14 +374,14 @@ function llama_dygraph_auto_bs8_fp32_DP2() {
         >>${log_path}/$FUNCNAME 2>&1
     loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
     ips=-1
-    mem=-1
+    mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
     echo "result: loss=$loss ips=$ips mem=$mem"
     loss_base=9.4992733
     if [ $IS_A100 -ne 0 ];then
         loss_base=9.50651741
     fi
     ips_base=-1
-    mem_base=-1
+    mem_base=9.381539106369019
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -334,14 +444,14 @@ function llama_dygraph_auto_bs8_fp32_DP2-MP2() {
         >>${log_path}/$FUNCNAME 2>&1
     loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
     ips=-1
-    mem=-1
+    mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
     echo "result: loss=$loss ips=$ips mem=$mem"
     loss_base=9.3507843
     if [ $IS_A100 -ne 0 ];then
         loss_base=9.38577747
     fi
     ips_base=-1
-    mem_base=-1
+    mem_base=5.1569297313690186
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -3631,8 +3741,8 @@ function before_hook_for_gpt() {
         else
             # download data for gpt
             mkdir -p ${gpt_data_path}/data;
-            wget -O ${gpt_data_path}/data/gpt_en_dataset_300m_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy;
-            wget -O ${gpt_data_path}/data/gpt_en_dataset_300m_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz;
+            wget -q -O ${gpt_data_path}/data/gpt_en_dataset_300m_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy;
+            wget -q -O ${gpt_data_path}/data/gpt_en_dataset_300m_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz;
         fi
         cp -r ${gpt_data_path}/data ${gpt_case_path}/
     else
@@ -3676,17 +3786,17 @@ function before_hook_for_llama() {
             # download data for llama
             mkdir ${llama_data_path};
             mkdir ${llama_data_path}/data;
-            wget -O ${llama_data_path}/data/llama_openwebtext_100k_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy;
-            wget -O ${llama_data_path}/data/llama_openwebtext_100k_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz;
+            wget -q -O ${llama_data_path}/data/llama_openwebtext_100k_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy;
+            wget -q -O ${llama_data_path}/data/llama_openwebtext_100k_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz;
             # download data for llama finetune
-            wget -O ${llama_data_path}/AdvertiseGen.tar.gz https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz
+            wget -q -O ${llama_data_path}/AdvertiseGen.tar.gz https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz
             tar -xvf ${llama_data_path}/AdvertiseGen.tar.gz -C ${llama_data_path}
         fi
         if [[ -e ${llama_data_path}/data_dpo ]]; then
             echo "LLaMA DPO data downloaded"
         else
             # download data for llama dpo
-            wget -O ${llama_data_path}/ultrafeedback_binarized.tar.gz https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized.tar.gz
+            wget -q -O ${llama_data_path}/ultrafeedback_binarized.tar.gz https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized.tar.gz
             mkdir ${llama_data_path}/data_dpo;
             tar -xvf ${llama_data_path}/ultrafeedback_binarized.tar.gz -C ${llama_data_path}/data_dpo
         fi
@@ -3720,8 +3830,8 @@ function before_hook_for_deepseek() {
         else
             # download data for llama
             mkdir ${llama_data_path}/data;
-            wget -O ${llama_data_path}/data/llama_openwebtext_100k_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy;
-            wget -O ${llama_data_path}/data/llama_openwebtext_100k_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz;
+            wget -q -O ${llama_data_path}/data/llama_openwebtext_100k_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy;
+            wget -q -O ${llama_data_path}/data/llama_openwebtext_100k_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz;
         fi
         cp -r ${llama_data_path}/data ${deepseek_case_path}/
     else

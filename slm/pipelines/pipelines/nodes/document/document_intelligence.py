@@ -29,7 +29,11 @@ from paddlenlp.taskflow.utils import (
     sort_res,
 )
 from paddlenlp.transformers import AutoTokenizer
-from paddlenlp.utils.env import PPNLP_HOME
+from paddlenlp.utils.env import (
+    PADDLE_INFERENCE_MODEL_SUFFIX,
+    PADDLE_INFERENCE_WEIGHTS_SUFFIX,
+    PPNLP_HOME,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -94,8 +98,8 @@ class DocPrompter(BaseComponent):
 
     def _get_inference_model(self):
         inference_model_path = os.path.join(self._task_path, "static", "inference")
-        self._static_model_file = inference_model_path + ".pdmodel"
-        self._static_params_file = inference_model_path + ".pdiparams"
+        self._static_model_file = inference_model_path + f"{PADDLE_INFERENCE_MODEL_SUFFIX}"
+        self._static_params_file = inference_model_path + f"{PADDLE_INFERENCE_WEIGHTS_SUFFIX}"
         self._config = paddle.inference.Config(self._static_model_file, self._static_params_file)
         self._prepare_static_mode()
 

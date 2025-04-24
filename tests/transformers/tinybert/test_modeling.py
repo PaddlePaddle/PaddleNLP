@@ -119,6 +119,7 @@ class TinyBertModelTest(ModelTesterMixin, unittest.TestCase):
         self.model_tester.create_and_check_model_cache(*config_and_inputs)
 
     @slow
+    @unittest.skip("Skip for missing model weight.")
     def test_model_from_pretrained(self):
         for model_name in list(TinyBertPretrainedModel.pretrained_init_configuration)[:1]:
             model = TinyBertModel.from_pretrained(model_name)
@@ -418,6 +419,7 @@ class TinyBertModelTester:
 )
 class TinyBertModelIntegrationTest(unittest.TestCase):
     @slow
+    @unittest.skip("Skip for missing model weight.")
     def test_inference_no_attention(self):
         model = TinyBertModel.from_pretrained("tinybert-4l-312d")
         model.eval()
@@ -440,6 +442,7 @@ class TinyBertModelIntegrationTest(unittest.TestCase):
         self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
 
     @slow
+    @unittest.skip("Skip for missing model weight.")
     def test_inference_with_attention(self):
         model = TinyBertModel.from_pretrained("tinybert-4l-312d")
         model.eval()
@@ -462,6 +465,7 @@ class TinyBertModelIntegrationTest(unittest.TestCase):
         self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
 
     @slow
+    @unittest.skip("Skip for missing model weight.")
     def test_inference_with_past_key_value(self):
         model = TinyBertModel.from_pretrained("tinybert-4l-312d")
         model.eval()

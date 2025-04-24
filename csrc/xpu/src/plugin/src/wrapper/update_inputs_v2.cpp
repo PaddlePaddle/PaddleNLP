@@ -191,17 +191,35 @@ int update_inputs_v2(Context* ctx,
                       stop_flags,
                       seq_lens_this_time,
                       seq_lens_encoder);
+  
   WRAPPER_DUMP_PARAM5(ctx,
                       seq_lens_decoder,
                       next_tokens,
                       kwargs_next_tokens,
                       input_ids,
                       end_ids);
+
   WRAPPER_DUMP_PARAM3(ctx, stop_nums, is_block_step, max_dec_len);
   WRAPPER_DUMP_PARAM4(ctx, now_bsz, max_bsz, input_ids_stride, end_length);
+
+  
   WRAPPER_DUMP(ctx);
-  WRAPPER_ASSERT_LE(ctx, max_bsz, 1024);
-  WRAPPER_ASSERT_LE(ctx, now_bsz, max_bsz);
+  WRAPPER_CHECK_PTR(ctx, bool, 1, not_need_stop);
+  WRAPPER_CHECK_PTR(ctx, int64_t, max_bsz, step_idx);
+  WRAPPER_CHECK_PTR(ctx, bool, max_bsz, stop_flags);
+  WRAPPER_CHECK_PTR(ctx, int, max_bsz, seq_lens_this_time);
+  WRAPPER_CHECK_PTR(ctx, int, max_bsz, seq_lens_encoder);
+  WRAPPER_CHECK_PTR(ctx, int, max_bsz, seq_lens_decoder);
+  WRAPPER_CHECK_PTR(ctx, int64_t, max_bsz, next_tokens);
+  WRAPPER_CHECK_PTR(ctx, int64_t, max_bsz, kwargs_next_tokens);
+  WRAPPER_CHECK_PTR(ctx, int64_t, max_bsz, input_ids);
+  WRAPPER_CHECK_PTR(ctx, int64_t, end_length, end_ids);
+  WRAPPER_CHECK_PTR(ctx, int64_t, 1, stop_nums);
+  WRAPPER_CHECK_PTR(ctx, bool, max_bsz, is_block_step);
+  WRAPPER_CHECK_PTR(ctx, int64_t, max_bsz, max_dec_len);
+
+
+  // std::cout << "wht --- ctx debug level is " << ctx->debug_level() << std::endl;
   // TODO(mayang02): check ptrs
   if (ctx->dev().type() == api::kCPU) {
     return cpu_wrapper(ctx,

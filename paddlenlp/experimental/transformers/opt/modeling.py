@@ -26,7 +26,10 @@ from paddlenlp.experimental.transformers.fused_transformer_layers import (
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationInferenceModel,
 )
-from paddlenlp.experimental.transformers.utils import infererence_model_from_pretrained
+from paddlenlp.experimental.transformers.utils import (
+    infererence_model_from_config,
+    infererence_model_from_pretrained,
+)
 from paddlenlp.transformers import OPTPretrainedModel
 from paddlenlp.transformers.model_utils import (
     dy2st_nocheck_guard_context,
@@ -332,6 +335,10 @@ class OPTForCausalLMInferenceModel(GenerationInferenceModel, OPTPretrainedModel)
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
         return infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs)
+
+    @classmethod
+    def from_config(cls, config, *args, **kwargs):
+        return infererence_model_from_config(cls, config, args, kwargs)
 
     @classmethod
     def get_cache_kvs_shape(

@@ -28,7 +28,7 @@
 ## 简介
 问答（QA）系统中最关键的挑战之一是标记数据的稀缺性，这是因为对目标领域获取问答对或常见问答对（FAQ）的成本很高，需要消耗大量的人力和时间。由于上述制约，这导致检索式问答系统落地困难，解决此问题的一种方法是依据问题上下文或大量非结构化文本自动生成的 QA 问答对。
 
-在此背景下，无监督检索式问答系统（即问答对自动生成智能检索式问答），基于 PaddleNLP[问题生成](../../../examples/question_generation/README.md)、[UIE](../../../model_zoo/uie/README.md)、[检索式问答](https://github.com/PaddlePaddle/PaddleNLP/blob/release/2.8/applications/question_answering/supervised_qa/faq_finance/README.md)，支持以非结构化文本形式为上下文自动生成 QA 问答对，生成的问答对语料可以通过无监督的方式构建检索式问答系统。
+在此背景下，无监督检索式问答系统（即问答对自动生成智能检索式问答），基于 PaddleNLP[问题生成](https://github.com/PaddlePaddle/PaddleNLP/tree/release/2.8/examples/question_generation/README.md)、[UIE](../../../model_zoo/uie/README.md)、[检索式问答](https://github.com/PaddlePaddle/PaddleNLP/blob/release/2.8/applications/question_answering/supervised_qa/faq_finance/README.md)，支持以非结构化文本形式为上下文自动生成 QA 问答对，生成的问答对语料可以通过无监督的方式构建检索式问答系统。
 
 若开发者已有 FAQ 语料，请参考[supervised_qa](https://github.com/PaddlePaddle/PaddleNLP/blob/release/2.8/applications/question_answering/supervised_qa)。
 

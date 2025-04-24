@@ -31,8 +31,8 @@ def register_pp_reshard_information(num_hidden_layers):
     register_layername_prefix("create_parameter")
     register_layername_prefix("llama_lm_head")
 
-    # register func to extract layer from stuctural param name
-    # register func to extract layer index  from stuctural param name
+    # register func to extract layer from structural param name
+    # register func to extract layer index  from structural param name
 
     def extract_layer_name(param_name):
         patterns = [r"^llama\.embed_tokens", "^llama\.norm", r"^lm_head", r"^llama\.layers((\.\d+))"]

@@ -181,7 +181,16 @@ python export_model.py \
 ```
 
 可以将导出的静态图模型进行部署，deploy/python/predict.py 展示了 python 部署预测示例。运行方式如下：
+开启 PIR 机制（3.0.0默认）：
+```shell
+export CUDA_VISIBLE_DEVICES=0
+python deploy/python/predict.py \
+    --model_name="skep_ernie_1.0_large_ch" \
+    --model_file="./static/static_graph_params.json" \
+    --params_file="./static/static_graph_params.pdiparams"
+```
 
+未开启 PIR 机制：
 ```shell
 export CUDA_VISIBLE_DEVICES=0
 python deploy/python/predict.py \

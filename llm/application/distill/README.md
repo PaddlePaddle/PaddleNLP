@@ -22,7 +22,7 @@ docker run --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_P
 -e "model_name=${model_name}" \
 -e "MP_NUM=8" \
 -e "CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7" \
--dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.2 /bin/bash \
+-dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.3 /bin/bash \
 -c -ex 'start_server $model_name && tail -f /dev/null'&& docker logs -f $(docker ps -lq)
 ```
 
@@ -195,26 +195,26 @@ def process_data_en(example):
     return {"src": src, "tgt": tgt}
 
 # construct Chinese sft dataset
-paddlenlp_datatset = deepcopy(dataset)
-paddlenlp_datatset["train"] = paddlenlp_datatset["train"].map(
-    process_data_zh, remove_columns=paddlenlp_datatset["train"].column_names
+paddlenlp_dataset = deepcopy(dataset)
+paddlenlp_dataset["train"] = paddlenlp_dataset["train"].map(
+    process_data_zh, remove_columns=paddlenlp_dataset["train"].column_names
 )
-paddlenlp_datatset["test"] = paddlenlp_datatset["test"].map(
-    process_data_zh, remove_columns=paddlenlp_datatset["test"].column_names
+paddlenlp_dataset["test"] = paddlenlp_dataset["test"].map(
+    process_data_zh, remove_columns=paddlenlp_dataset["test"].column_names
 )
-paddlenlp_datatset["train"].to_json("data/gsm8k_distilled_zh_sft/train.json", force_ascii=False)
-paddlenlp_datatset["test"].to_json("data/gsm8k_distilled_zh_sft/dev.json", force_ascii=False)
+paddlenlp_dataset["train"].to_json("data/gsm8k_distilled_zh_sft/train.json", force_ascii=False)
+paddlenlp_dataset["test"].to_json("data/gsm8k_distilled_zh_sft/dev.json", force_ascii=False)
 
 # construct English sft dataset
-paddlenlp_datatset = deepcopy(dataset)
-paddlenlp_datatset["train"] = paddlenlp_datatset["train"].map(
-    process_data_en, remove_columns=paddlenlp_datatset["train"].column_names
+paddlenlp_dataset = deepcopy(dataset)
+paddlenlp_dataset["train"] = paddlenlp_dataset["train"].map(
+    process_data_en, remove_columns=paddlenlp_dataset["train"].column_names
 )
-paddlenlp_datatset["test"] = paddlenlp_datatset["test"].map(
-    process_data_en, remove_columns=paddlenlp_datatset["test"].column_names
+paddlenlp_dataset["test"] = paddlenlp_dataset["test"].map(
+    process_data_en, remove_columns=paddlenlp_dataset["test"].column_names
 )
-paddlenlp_datatset["train"].to_json("data/gsm8k_distilled_en_sft/train.json", force_ascii=False)
-paddlenlp_datatset["test"].to_json("data/gsm8k_distilled_en_sft/dev.json", force_ascii=False)
+paddlenlp_dataset["train"].to_json("data/gsm8k_distilled_en_sft/train.json", force_ascii=False)
+paddlenlp_dataset["test"].to_json("data/gsm8k_distilled_en_sft/dev.json", force_ascii=False)
 
 ```
 最终我们将会得到如下字段的数据集

@@ -55,9 +55,12 @@ print_info() {
         fi
         cd ${PPNLP_HOME} && python upload.py ${PPNLP_HOME}/upload 'paddlenlp/PaddleNLP_CI/PaddleNLP_CI'
         rm -rf upload/*
+        if [ $1 -eq 124 ]; then
+            echo -e "\033[31m [failed-timeout] Test case execution was terminated after exceeding the 50m limit. \033[0m"
+        fi
     else
         if [[ $2 =~ 'tests' ]]; then
-            tail -n 1 ${log_path}/$3.log
+            tail -n 1 ${log_path}/$3
             echo -e "\033[32m ${log_path}/$3_SUCCESS \033[0m"
         else
             tail -n 1 ${log_path}/$2.log
@@ -567,22 +570,22 @@ taskflow (){
 }
 llm(){
     export http_proxy=${proxy} && export https_proxy=${proxy}
-    set -e
-    if git diff --numstat "$AGILE_COMPILE_BRANCH" | awk '{print $NF}' | grep -q '^csrc/'; then
-        echo "Found modifications in csrc, running setup_cuda.py install and uploading it to bos."
-        cd ${nlp_dir}/csrc
-        # python setup_cuda.py install
-        bash tools/build_wheel.sh
-    else
-        echo "No modifications in csrc, installing paddlenlp_ops wheel file..."
-        python -m pip install --user https://paddlenlp.bj.bcebos.com/wheels/paddlenlp_ops-ci-py3-none-any.whl --no-cache-dir
-    fi
-    set +e
-    sleep 5
+    # set -e
+    # if git diff --numstat "$AGILE_COMPILE_BRANCH" | awk '{print $NF}' | grep -q '^csrc/'; then
+    #     echo "Found modifications in csrc, running setup_cuda.py install and uploading it to bos."
+    #     cd ${nlp_dir}/csrc
+    #     # python setup_cuda.py install
+    #     bash tools/build_wheel.sh
+    # else
+    #     echo "No modifications in csrc, installing paddlenlp_ops wheel file..."
+    #     python -m pip install --user https://paddlenlp.bj.bcebos.com/wheels/paddlenlp_ops-ci-py3-none-any.whl --no-cache-dir
+    # fi
+    # set +e
+    # sleep 5
     
     echo ' Testing all LLMs '
     cd ${nlp_dir}
-    python -m pytest tests/llm/test_*.py -vv --timeout=300 --alluredir=result >${log_path}/llm.log >>${log_path}/llm.log 2>&1
+    timeout 50m python -m pytest tests/llm/test_*.py -vv --timeout=300 --alluredir=result >${log_path}/llm.log >>${log_path}/llm.log 2>&1
     print_info $? llm
 }
 

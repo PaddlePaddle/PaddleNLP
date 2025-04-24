@@ -76,6 +76,9 @@ print_info() {
         cp ${log_path}/unittest_FAIL.log ${PPNLP_HOME}/upload/unittest_FAIL.log.${AGILE_PIPELINE_BUILD_ID}.${AGILE_JOB_BUILD_ID}
         cd ${PPNLP_HOME} && python upload.py ${PPNLP_HOME}/upload 'paddlenlp/PaddleNLP_CI/PaddleNLP-CI-Unittest-GPU'
         rm -rf upload/*
+        if [ $1 -eq 124 ]; then
+            echo "\033[32m [failed-timeout] Test case execution was terminated after exceeding the 30m limit."
+        fi
     else
         tail -n 1 ${log_path}/unittest.log
         echo -e "\033[32m ${log_path}/unittest_SUCCESS \033[0m"
@@ -88,7 +91,7 @@ cd ${nlp_dir}
 echo ' Testing all unittest cases '
 export http_proxy=${proxy} && export https_proxy=${proxy}
 set +e
-pytest -v -n 8 \
+timeout 30m python -m pytest -v -n 8 \
   --dist loadgroup \
   --retries 1 --retry-delay 1 \
   --timeout 200 --durations 20 --alluredir=result \

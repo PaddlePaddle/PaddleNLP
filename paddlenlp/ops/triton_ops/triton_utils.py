@@ -98,7 +98,7 @@ def extract_triton_kernel(kernel, file_name):
     elif type(kernel) == triton.runtime.autotuner.Autotuner:
         fn = kernel.fn.fn
     else:
-        AssertionError("error occures")
+        AssertionError("error occurs")
     py_script = textwrap.dedent(inspect.getsource(fn))
 
     # @triton.jit must only appear once

@@ -59,8 +59,8 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         eval_dataset (Dataset, required): Evaluation dataset, must contains the 'text_column' and 'label_column' specified below
         text_column (string, required): Name of the column that contains the input text.
         label_column (string, required): Name of the column that contains the target variable to predict.
-        metric_for_best_model (string, optional): the name of the metrc for selecting the best model. Default to 'eval_accuracy'.
-        greater_is_better (bool, optional): Whether better models should have a greater metric or not. Use in conjuction with `metric_for_best_model`.
+        metric_for_best_model (string, optional): the name of the metric for selecting the best model. Default to 'eval_accuracy'.
+        greater_is_better (bool, optional): Whether better models should have a greater metric or not. Use in conjunction with `metric_for_best_model`.
         problem_type (str, optional): Select among ["multi_class", "multi_label"] based on the nature of your problem
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
             language (string, required): language of the text.
@@ -639,7 +639,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             f"Taskflow config saved to {export_path}. You can use the Taskflow config to create a Taskflow instance for inference"
         )
 
-        logger.info(f"Exported trial_id: {trial_id} to export_path: {export_path} sucessfully!")
+        logger.info(f"Exported trial_id: {trial_id} to export_path: {export_path} successfully!")
 
         if os.path.exists(self.training_path):
             logger.info("Removing training checkpoints to conserve disk space")
