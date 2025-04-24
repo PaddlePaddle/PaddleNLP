@@ -2055,10 +2055,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
                 epsilon=self._epsilon,
                 begin_norm_axis=1,
             )[0]
-            idx = kwargs.get("seq_lens_encoder", None).sum()
-            query_pe, key_pe = self.config.rotary_emb(
-                self.position_ids[0:idx] if idx > 0 else self.position_ids, query_pe, key_pe
-            )
+            query_pe, key_pe = self.config.rotary_emb(self.position_ids, query_pe, key_pe)
 
             if self.config.mla_config.use_absorb():
                 from paddlenlp_ops import prefill_mla_write_cache
