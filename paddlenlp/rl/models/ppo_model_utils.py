@@ -573,7 +573,20 @@ class RLHFPPOMixedLoss(nn.Layer):
             loss += self.kl_loss_coeff * kl_loss
 
         if self.entropy_coeff > 0:
-            entropy_loss_raw = entropy_from_logits(logits[:, response_start:-1], self.config.tensor_parallel_output)
+            if use_remove_padding:
+                entropy_loss_rmpad = entropy_from_logits(
+                    logits.cast("float32"), self.config.tensor_parallel_output
+                ).cast(logits.dtype)
+                if pad_size > 0:
+                    entropy_loss_rmpad = entropy_loss_rmpad[:, :-pad_size]
+                entropy_loss = pad_input(
+                    entropy_loss_rmpad.transpose([1, 0]), indices, batch=raw_input_shape[0], seqlen=raw_input_shape[1]
+                ).squeeze(-1)
+                entropy_loss_raw = entropy_loss[:, response_start:-1].contiguous()
+            else:
+                entropy_loss_raw = entropy_from_logits(
+                    logits[:, response_start:-1], self.config.tensor_parallel_output
+                )
             entropy_loss = paddle.sum(entropy_loss_raw * sequence_mask) / sequence_mask.sum()
             self.info_buffer["entropy_loss"] = entropy_loss.detach()
             loss -= self.entropy_coeff * entropy_loss
