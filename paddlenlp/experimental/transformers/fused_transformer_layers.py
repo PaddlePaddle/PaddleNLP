@@ -1596,7 +1596,7 @@ class FusedMultiTransformerPostLayernorm(FusedMultiTransformerBase):
     def __init__(self, config: FusedMultiTransformerConfig):
         super().__init__(config)
 
-    def compute_qkv(self, src, residual_input, i):
+    def compute_qkv(self, src, residual_input, i, **kwargs):
         qkv_out = self.compute_qkv_linear(src, i)
         return qkv_out, src
 
