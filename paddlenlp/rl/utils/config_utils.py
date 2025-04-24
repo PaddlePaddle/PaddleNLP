@@ -315,6 +315,14 @@ class TrainingArguments(TrainingArguments):
         default=False,
         metadata={"help": "Whether to balance the number of valid tokens on each dp/sharding rank."},
     )
+    use_remove_padding: bool = field(
+        default=False,
+        metadata={"help": "Whether to remove paddings before computing transformer."},
+    )
+    rollout_continue_batching_batch_size: int = field(
+        default=1,
+        metadata={"help": "Batch size to rollout using continue batching."},
+    )
 
     def __post_init__(self):
         """

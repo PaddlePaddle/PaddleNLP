@@ -411,6 +411,12 @@ class RLHFPPOMixedLoss(nn.Layer):
         sequence_mask,
         ref_log_probs=None,
         response_start=0,
+        # for varlen flashmask
+        pad_size=0,
+        raw_input_ids=None,
+        indices=None,
+        raw_input_shape=None,
+        input_ids_rmpad_rolled=None,
     ):
         """
         计算损失函数，包含两部分：soft target loss和PPO loss。
@@ -428,7 +434,7 @@ class RLHFPPOMixedLoss(nn.Layer):
         Returns:
             paddle.Tensor: 返回损失函数，如果labels不为None，则为soft target loss；否则为PPO loss。
         """
-
+        use_remove_padding = indices is not None
         if not self.config.use_fused_head_and_loss_fn:
             logits = logits if isinstance(logits, paddle.Tensor) else logits[0]
             if self.use_fp32_compute and logits.dtype != paddle.float32:
@@ -436,6 +442,17 @@ class RLHFPPOMixedLoss(nn.Layer):
             logits = logits / self.temperature if self.temperature > 0.0 else logits
         else:
             hidden_states, weight, bias, transpose_y = logits
+            if use_remove_padding:
+                input_ids = raw_input_ids
+                if pad_size > 0:
+                    hidden_states = hidden_states[:, :-pad_size]
+
+                from ..utils.bert_padding import pad_input
+
+                hidden_states = pad_input(
+                    hidden_states.squeeze(0), indices, batch=raw_input_shape[0], seqlen=raw_input_shape[1]
+                ).contiguous()
+
             if self.use_fp32_compute and hidden_states.dtype != paddle.float32:
                 hidden_states = hidden_states.cast(paddle.float32)
                 weight = weight.cast(paddle.float32)
@@ -484,16 +501,38 @@ class RLHFPPOMixedLoss(nn.Layer):
             loss = self.ptx_coeff * self.sft_criterion(logits, labels)
         # ppo loss
         if reward_advantages is not None:
-            if self.config.tensor_parallel_degree > 1 and self.config.tensor_parallel_output:
-                log_probs = (
-                    -ParallelCrossEntropy()(
-                        logits[:, response_start:-1].astype("float32"), input_ids[:, response_start + 1 :]
+            if use_remove_padding:
+                from ..utils.bert_padding import pad_input
+
+                if self.model.config.tensor_parallel_degree > 1 and self.model.config.tensor_parallel_output:
+                    log_probs = (
+                        -ParallelCrossEntropy()(logits.astype("float32"), input_ids_rmpad_rolled)
+                        .squeeze(axis=-1)
+                        .astype(logits.dtype)
                     )
-                    .squeeze(axis=-1)
-                    .astype(logits.dtype)
-                )
+                else:
+                    log_probs = gather_log_probabilities(logits, input_ids_rmpad_rolled)
+
+                if pad_size > 0:
+                    log_probs = log_probs[:, :-pad_size]
+                log_probs = pad_input(
+                    log_probs.transpose([1, 0]), indices, batch=raw_input_shape[0], seqlen=raw_input_shape[1]
+                ).squeeze(-1)
+                log_probs = log_probs[:, response_start:-1].contiguous()
             else:
-                log_probs = gather_log_probabilities(logits[:, response_start:-1], input_ids[:, response_start + 1 :])
+                if self.config.tensor_parallel_degree > 1 and self.config.tensor_parallel_output:
+                    log_probs = (
+                        -ParallelCrossEntropy()(
+                            logits[:, response_start:-1].astype("float32"), input_ids[:, response_start + 1 :]
+                        )
+                        .squeeze(axis=-1)
+                        .astype(logits.dtype)
+                    )
+                else:
+                    log_probs = gather_log_probabilities(
+                        logits[:, response_start:-1], input_ids[:, response_start + 1 :]
+                    )
+
             if log_probs.shape[1] == old_log_probs.shape[1]:
                 # labels (old_log_probs, reward_advantages, sequence_mask) has
                 # src+tgt-1 length, valid length is determined by sequence_mask
