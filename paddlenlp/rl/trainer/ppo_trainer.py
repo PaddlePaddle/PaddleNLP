@@ -1256,7 +1256,6 @@ class PPOTrainer(Trainer):
                 total_batch=combined_balance_batch,
                 batch_size=self.args.per_device_train_batch_size,
                 pad_token_id=self.tokenizer.pad_token_id,
-                pad_to_multiple_of=self.args.tensor_parallel_degree if self._model_config.sequence_parallel else None,
             )
         else:
             micro_batches = combined_balance_batch
@@ -1463,7 +1462,7 @@ class PPOTrainer(Trainer):
 
                 # step 2-2: balance batches based on batch tokens
                 if self.args.balance_batch:
-                    micro_batches = self._balance_batch(batch)
+                    batch = self._balance_batch(batch)
 
                 # step 2-3: compute logprob for rollout data
                 with TimerScope(self.timers, RolloutStages.ROLLOUT_LOGPROB):

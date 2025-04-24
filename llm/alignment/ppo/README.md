@@ -116,6 +116,17 @@ python reward_server.py
 ```shell
 export PYTHONPATH=your_PaddleNLP_path/:$PYTHONPATH
 export PYTHONPATH=your_PaddleNLP_path/llm:$PYTHONPATH
+
+export FLAGS_set_to_1d=False
+export NVIDIA_TF32_OVERRIDE=0
+export FLAGS_dataloader_use_file_descriptor=False
+export HF_DATASETS_DOWNLOAD_TIMEOUT=1
+export FLAGS_gemm_use_half_precision_compute_type=False
+export FLAGS_force_cublaslt_no_reduced_precision_reduction=True
+
+export FLAGS_mla_use_tensorcore=0
+export FLAGS_cascade_attention_max_partition_size=2048
+
 python -u -m paddle.distributed.launch --devices "0,1,2,3" run_ppo.py ../../config/qwen/grpo_argument.yaml
 # python -u -m paddle.distributed.launch --devices "0,1,2,3" run_ppo.py ../../config/llama/grpo_argument.yaml
 ```
