@@ -47,23 +47,23 @@ def process_data_en(example):
 
 
 # construct Chinese sft dataset
-paddlenlp_datatset = deepcopy(dataset)
-paddlenlp_datatset["train"] = paddlenlp_datatset["train"].map(
-    process_data_zh, remove_columns=paddlenlp_datatset["train"].column_names
+paddlenlp_dataset = deepcopy(dataset)
+paddlenlp_dataset["train"] = paddlenlp_dataset["train"].map(
+    process_data_zh, remove_columns=paddlenlp_dataset["train"].column_names
 )
-paddlenlp_datatset["test"] = paddlenlp_datatset["test"].map(
-    process_data_zh, remove_columns=paddlenlp_datatset["test"].column_names
+paddlenlp_dataset["test"] = paddlenlp_dataset["test"].map(
+    process_data_zh, remove_columns=paddlenlp_dataset["test"].column_names
 )
-paddlenlp_datatset["train"].to_json("data/gsm8k_distilled_zh_sft/train.json", force_ascii=False)
-paddlenlp_datatset["test"].to_json("data/gsm8k_distilled_zh_sft/dev.json", force_ascii=False)
+paddlenlp_dataset["train"].to_json("data/gsm8k_distilled_zh_sft/train.json", force_ascii=False)
+paddlenlp_dataset["test"].to_json("data/gsm8k_distilled_zh_sft/dev.json", force_ascii=False)
 
 # construct English sft dataset
-paddlenlp_datatset = deepcopy(dataset)
-paddlenlp_datatset["train"] = paddlenlp_datatset["train"].map(
-    process_data_en, remove_columns=paddlenlp_datatset["train"].column_names
+paddlenlp_dataset = deepcopy(dataset)
+paddlenlp_dataset["train"] = paddlenlp_dataset["train"].map(
+    process_data_en, remove_columns=paddlenlp_dataset["train"].column_names
 )
-paddlenlp_datatset["test"] = paddlenlp_datatset["test"].map(
-    process_data_en, remove_columns=paddlenlp_datatset["test"].column_names
+paddlenlp_dataset["test"] = paddlenlp_dataset["test"].map(
+    process_data_en, remove_columns=paddlenlp_dataset["test"].column_names
 )
-paddlenlp_datatset["train"].to_json("data/gsm8k_distilled_en_sft/train.json", force_ascii=False)
-paddlenlp_datatset["test"].to_json("data/gsm8k_distilled_en_sft/dev.json", force_ascii=False)
+paddlenlp_dataset["train"].to_json("data/gsm8k_distilled_en_sft/train.json", force_ascii=False)
+paddlenlp_dataset["test"].to_json("data/gsm8k_distilled_en_sft/dev.json", force_ascii=False)

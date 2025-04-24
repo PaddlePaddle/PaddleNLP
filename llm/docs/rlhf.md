@@ -214,7 +214,7 @@ PYTHONPATH=../../ GLOG_minloglevel=2 python -u -m paddle.distributed.launch run_
 - `reward_critic_model_name_or_path`：critic-model 的模型名称或目录，未提供时将使用`reward_model_name_or_path`进行 critic-model 的初始化。
 - `per_device_prompt_batch_size`：训练时 prompt only 数据集读取用于 rollout 生成的批次大小（每张卡）。
 - `per_device_train_batch_size`：根据 prompt 进行生成及训练使用的批次大小（每张卡）。
-- `num_return_sequences`：生成时每个 prompt 生成的回复个数，即 `GenerationConfig.num_return_sequences`，所有回复都将用来训练。
+- `rollout_n`：生成时每个 prompt 生成的回复个数，即 `GenerationConfig.num_return_sequences`，所有回复都将用来训练。
 - `temperature`：生成采样时使用的 `temperature` ，即 `GenerationConfig.temperature`。
 - `top_p`：生成采样时 top-p-filtering 阈值，即 `GenerationConfig.top_p`。
 - `repetition_penalty`：生成采样时长度惩罚系数，即 `GenerationConfig.repetition_penalty`。

@@ -28,6 +28,7 @@ from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedBlockMultiTransformerFP8DynamicQuant,
     FusedBlockMultiTransformerWeightOnly,
     FusedMultiTransformerConfig,
+    FusedMultiTransformerXPU,
     MLAConfig,
     MoeConfig,
     SpeculateConfig,
@@ -143,9 +144,8 @@ class DeepseekScalingRotaryEmbedding(nn.Layer):
 
 
 class DeepseekScalingRotaryEmbeddingXPU(nn.Layer):
-    """RotaryEmbedding extended with YaRN method.
-
-    Credits to Peng et al. github.com/jquesnelle/yarn
+    """
+    RotaryEmbedding XPU Implemention. In XPU, cos and sin must be computed in cpu.
     """
 
     def __init__(
@@ -162,9 +162,9 @@ class DeepseekScalingRotaryEmbeddingXPU(nn.Layer):
         mscale: float = 1,
         mscale_all_dim: float = 0,
     ) -> None:
-        super().__init__()
         ori_device = paddle.device.get_device()
         paddle.device.set_device("cpu")
+        super().__init__()
         self._dtype = paddle.get_default_dtype()
 
         self.rotary_dim = rotary_dim
@@ -183,13 +183,12 @@ class DeepseekScalingRotaryEmbeddingXPU(nn.Layer):
             * attn_factor
         )
 
-        cos_cache, sin_cache = self._compute_cos_sin_cache()
-
-        self.cos_cache: paddle.Tensor
-        self.register_buffer("cos_cache", cos_cache, persistable=True)
-        self.sin_cache: paddle.Tensor
-        self.register_buffer("sin_cache", sin_cache, persistable=True)
+        cache = self._compute_cos_sin_cache()
         paddle.device.set_device(ori_device)
+        cache = cache.to("xpu")
+
+        self.cos_sin_cache: paddle.Tensor
+        self.register_buffer("cos_sin_cache", cache, persistable=True)
 
     def _compute_inv_freq(self, scaling_factor: float) -> paddle.Tensor:
         pos_freqs = self.base ** (paddle.arange(0, self.rotary_dim, 2, dtype=paddle.float32) / self.rotary_dim)
@@ -208,13 +207,11 @@ class DeepseekScalingRotaryEmbeddingXPU(nn.Layer):
     def _compute_cos_sin_cache(self) -> paddle.Tensor:
         inv_freq = self._compute_inv_freq(self.scaling_factor)
         t = paddle.arange(self.max_position_embeddings * self.scaling_factor, dtype=paddle.float32)
-
-        freqs = paddle.outer(t, inv_freq)
-        emb = paddle.concat((freqs, freqs), axis=-1)
-        cos = emb.cos() * self.mscale
-        sin = emb.sin() * self.mscale
-
-        return cos.cast(self._dtype), sin.cast(self._dtype)
+        freqs = paddle.einsum("i,j->ij", t, inv_freq)
+        cos = freqs.cos() * self.mscale
+        sin = freqs.sin() * self.mscale
+        cache = paddle.concat((cos, sin), axis=-1)
+        return cache.cast(self._dtype)
 
     def forward(
         self,
@@ -222,23 +219,13 @@ class DeepseekScalingRotaryEmbeddingXPU(nn.Layer):
         query: paddle.Tensor,
         key: paddle.Tensor,
     ) -> Tuple[paddle.Tensor, paddle.Tensor]:
-        cos = self.cos_cache[position_ids].unsqueeze(1)
-        sin = self.sin_cache[position_ids].unsqueeze(1)
+        import os
 
-        def rotate_half(x):
-            """Rotates half the hidden axiss of the input."""
-            x1 = x[..., : x.shape[-1] // 2]
-            x2 = x[..., x.shape[-1] // 2 :]
-            return paddle.concat([-x2, x1], axis=-1)  # shape is the same as x
+        from paddlenlp_ops import fused_rotary_position_encoding
 
-        s, h, d = query.shape
-        query = query.reshape([s, h, d // 2, 2]).transpose([0, 1, 3, 2]).reshape([s, h, d])
-
-        s, h, d = key.shape
-        key = key.reshape([s, h, d // 2, 2]).transpose([0, 1, 3, 2]).reshape([s, h, d])
-
-        query = (query * cos) + (rotate_half(query) * sin)
-        key = (key * cos) + (rotate_half(key) * sin)
+        # In-place operations that update the query and key tensors.
+        os.environ["stride_in_no_check_dy2st_diff"] = "1"
+        fused_rotary_position_encoding(query, key, position_ids, self.cos_sin_cache, self.rotary_dim, False)
 
         return query, key
 
@@ -334,22 +321,13 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
             for k, v in config.rope_scaling.items()
             if k in ("extrapolation_factor", "attn_factor", "beta_fast", "beta_slow", "mscale", "mscale_all_dim")
         }
-        if paddle.is_compiled_with_xpu():
-            self.rotary_emb = DeepseekScalingRotaryEmbeddingXPU(
-                config.qk_rope_head_dim,
-                original_max_position,
-                config.rope_theta,
-                scaling_factor,
-                **extra_kwargs,
-            )
-        else:
-            self.rotary_emb = DeepseekScalingRotaryEmbedding(
-                config.qk_rope_head_dim,
-                original_max_position,
-                config.rope_theta,
-                scaling_factor,
-                **extra_kwargs,
-            )
+        self.rotary_emb = DeepseekScalingRotaryEmbedding(
+            config.qk_rope_head_dim,
+            original_max_position,
+            config.rope_theta,
+            scaling_factor,
+            **extra_kwargs,
+        )
 
         # get ring_id
         ring_id = -1
@@ -1129,20 +1107,6 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                             ffn2_weights.append(ffn2_quanted_weight.view(paddle.uint8))
                             ffn1_scales.append(ffn1_weight_scale)
                             ffn2_scales.append(ffn2_weight_scale)
-                    elif self.moe_quant_type in ["weight_only_int8"]:
-                        assert paddle.is_compiled_with_xpu()
-                        ffn1_quanted_weight, ffn1_weight_scale = weight_quantize(
-                            ffn1_weight.cast("float16"), algo=self.moe_quant_type, group_size=-1, arch=70
-                        )
-                        ffn2_quanted_weight, ffn2_weight_scale = weight_quantize(
-                            ffn2_weight.cast("float16"), algo=self.moe_quant_type, group_size=-1, arch=70
-                        )
-                        ffn1_weight_scale = ffn1_weight_scale.cast("float16")
-                        ffn2_weight_scale = ffn2_weight_scale.cast("float16")
-                        ffn1_weights.append(ffn1_quanted_weight.reshape([self.transformer_block.config.embed_dim, -1]))
-                        ffn2_weights.append(ffn2_quanted_weight.reshape([-1, self.transformer_block.config.embed_dim]))
-                        ffn1_scales.append(ffn1_weight_scale)
-                        ffn2_scales.append(ffn2_weight_scale)
                     else:
                         ffn1_weights.append(ffn1_weight)
                         ffn2_weights.append(ffn2_weight)
@@ -1160,7 +1124,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                     ).cast("float32")
                     self.transformer_block.e_score_correction_biases[idx].set_value(e_score_correction_bias)
 
-                if self.use_weight_only or self.moe_quant_type in ["weight_only_int8"]:
+                if self.use_weight_only:
                     self.transformer_block.ffn1_weights[idx].set_value(fused_moe_ffn1_weight)
                     self.transformer_block.ffn2_weights[idx].set_value(fused_moe_ffn2_weight)
                 elif "fp8" in self.quant_type:
@@ -1177,7 +1141,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                     self.transformer_block.ffn2_weights[idx].set_value(fused_moe_ffn2_weight)
                 self.transformer_block.gate_weights[idx].set_value(gate_weight)
 
-                if self.use_weight_only or self.moe_quant_type in ["weight_only_int8"]:
+                if self.use_weight_only:
                     self.transformer_block.ffn1_weights_scale[idx].set_value(fused_moe_ffn1_weight_scale)
                     self.transformer_block.ffn2_weights_scale[idx].set_value(fused_moe_ffn2_weight_scale)
                 elif "fp8" in self.quant_type:
@@ -1347,6 +1311,614 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
 
 
 @register_base_model
+class DeepseekV2BlockInferenceModelXPU(DeepseekV2BlockInferenceModel):
+    def __init__(self, config: DeepseekV2Config, base_model_prefix: str):
+        # super(DeepseekV2PretrainedModel, self).__init__(config)
+        DeepseekV2PretrainedModel.__init__(self, config)
+        self.base_model_prefix = base_model_prefix
+
+        self.config = config
+
+        self.max_seq_len = config.max_seq_len
+        self.block_size = config.block_size
+
+        self.vocab_size = config.vocab_size
+        self.hidden_size = config.hidden_size
+        self.intermediate_size = config.intermediate_size
+        self.num_attention_heads = config.num_attention_heads
+        self.num_key_value_heads = config.num_key_value_heads
+        self.num_layers = config.num_hidden_layers
+        self.rms_norm_eps = config.rms_norm_eps
+        self.quant_type = config.quant_type
+        self.weight_block_size = config.weight_block_size
+        self.moe_quant_type = config.moe_quant_type
+        self.rope_theta = config.rope_theta
+        self.return_full_hidden_states = config.get("return_full_hidden_states", False)
+
+        self.use_weight_only = False
+        self.weightonly_group_size = -1
+        if self.quant_type == "weight_only_int8":
+            self.use_weight_only = True
+            self.quant_algo = "weight_only_int8"
+            self.weightonly_group_size = config.weightonly_group_size
+
+        if self.use_weight_only:
+            assert (
+                self.quant_type == "weight_only_int8"
+            ), f"Expected quant_type equal to 'weight_only_int8', but received {self.quant_type}"
+
+        assert self.config.mla_use_matrix_absorption
+
+        self.first_k_dense_replace = config.first_k_dense_replace
+        self.n_routed_experts = config.n_routed_experts
+
+        if config.tensor_parallel_degree > config.n_routed_experts:
+            raise ValueError(
+                f"Tensor parallel size {config.tensor_parallel_degree} is greater than "
+                f"the number of experts {config.n_routed_experts}."
+            )
+
+        if config.tensor_parallel_degree > 1 and config.vocab_size % config.tensor_parallel_degree == 0:
+            self.embed_tokens = fleet.meta_parallel.VocabParallelEmbedding(
+                self.vocab_size,
+                self.hidden_size,
+                weight_attr=paddle.ParamAttr(initializer=nn.initializer.XavierNormal()),
+            )
+        else:
+            self.embed_tokens = nn.Embedding(
+                self.vocab_size,
+                self.hidden_size,
+            )
+
+        self.norm = DeepseekV2RMSNorm(config)
+
+        scaling_factor = config.rope_scaling.get("factor", 1)
+        original_max_position = config.rope_scaling.get("original_max_position_embeddings", 4096)
+        extra_kwargs = {
+            k: v
+            for k, v in config.rope_scaling.items()
+            if k in ("extrapolation_factor", "attn_factor", "beta_fast", "beta_slow", "mscale", "mscale_all_dim")
+        }
+
+        self.rotary_emb = DeepseekScalingRotaryEmbeddingXPU(
+            config.qk_rope_head_dim,
+            original_max_position,
+            config.rope_theta,
+            scaling_factor,
+            **extra_kwargs,
+        )
+        # get ring_id
+        ring_id = -1
+        try:
+            hcg = fleet.get_hybrid_communicate_group()
+            model_parallel_group = hcg.get_model_parallel_group()
+            ring_id = model_parallel_group.id
+        except:
+            pass
+
+        ln_scale_attrs = [
+            paddle.ParamAttr(name=f"fuse{self.base_model_prefix}.{idx}.ln_scale") for idx in range(self.num_layers)
+        ]
+
+        q_a_proj_weight_attrs = None
+        q_a_layernorm_weight_attrs = None
+        q_b_proj_weight_attrs = None
+        q_proj_weight_attrs = None
+
+        if self.config.q_lora_rank is not None:
+            q_a_proj_weight_attrs = [
+                paddle.ParamAttr(
+                    name=f"fuse{self.base_model_prefix}.{idx}.q_a_proj_weight",
+                    initializer=paddle.nn.initializer.Constant(value=0),
+                )
+                for idx in range(self.num_layers)
+            ]
+            q_a_layernorm_weight_attrs = [
+                paddle.ParamAttr(
+                    name=f"fuse{self.base_model_prefix}.{idx}.q_a_layernorm_weight",
+                    initializer=paddle.nn.initializer.Constant(value=1.0),
+                )
+                for idx in range(self.num_layers)
+            ]
+            q_b_proj_weight_attrs = [
+                paddle.ParamAttr(
+                    name=f"fuse{self.base_model_prefix}.{idx}.q_b_proj_weight",
+                    initializer=paddle.nn.initializer.Constant(value=0),
+                )
+                for idx in range(self.num_layers)
+            ]
+        else:
+            q_proj_weight_attrs = [
+                paddle.ParamAttr(
+                    name=f"fuse{self.base_model_prefix}.{idx}.q_proj_weight",
+                    initializer=paddle.nn.initializer.Constant(value=0),
+                )
+                for idx in range(self.num_layers)
+            ]
+
+        kv_a_proj_with_mqa_weight_attrs = [
+            paddle.ParamAttr(
+                name=f"fuse{self.base_model_prefix}.{idx}.kv_a_proj_with_mqa_weight",
+                initializer=paddle.nn.initializer.Constant(value=0),
+            )
+            for idx in range(self.num_layers)
+        ]
+        kv_a_layernorm_weight_attrs = [
+            paddle.ParamAttr(
+                name=f"fuse{self.base_model_prefix}.{idx}.kv_a_layernorm_weight",
+                initializer=paddle.nn.initializer.Constant(value=1.0),
+            )
+            for idx in range(self.num_layers)
+        ]
+        kv_b_proj_weight_attrs = [
+            paddle.ParamAttr(
+                name=f"fuse{self.base_model_prefix}.{idx}.kv_b_proj_weight",
+                initializer=paddle.nn.initializer.Constant(value=0),
+            )
+            for idx in range(self.num_layers)
+        ]
+        k_b_proj_weight_attrs = None
+        v_b_proj_weight_attrs = None
+        if config.mla_use_matrix_absorption:
+            k_b_proj_weight_attrs = [
+                paddle.ParamAttr(
+                    name=f"fuse{self.base_model_prefix}.{idx}.k_b_proj_weight",
+                    initializer=paddle.nn.initializer.Constant(value=0),
+                )
+                for idx in range(self.num_layers)
+            ]
+            v_b_proj_weight_attrs = [
+                paddle.ParamAttr(
+                    name=f"fuse{self.base_model_prefix}.{idx}.v_b_proj_weight",
+                    initializer=paddle.nn.initializer.Constant(value=0),
+                )
+                for idx in range(self.num_layers)
+            ]
+
+        out_proj_weight_attrs = [
+            paddle.ParamAttr(
+                name=f"fuse{self.base_model_prefix}.{idx}.out_proj_weight",
+                initializer=paddle.nn.initializer.Constant(value=0),
+            )
+            for idx in range(self.num_layers)
+        ]
+        ffn_ln_scale_attrs = [
+            paddle.ParamAttr(name=f"fuse{self.base_model_prefix}.{idx}.ffn_ln_scale") for idx in range(self.num_layers)
+        ]
+        ffn1_weight_attrs = [
+            paddle.ParamAttr(
+                name=f"fuse{self.base_model_prefix}.{idx}.ffn1_weight",
+                initializer=paddle.nn.initializer.Constant(value=0),
+            )
+            for idx in range(self.num_layers)
+        ]
+        ffn2_weight_attrs = [
+            paddle.ParamAttr(
+                name=f"fuse{self.base_model_prefix}.{idx}.ffn2_weight",
+                initializer=paddle.nn.initializer.Constant(value=0),
+            )
+            for idx in range(self.num_layers)
+        ]
+        gate_weight_attrs = [
+            paddle.ParamAttr(
+                name=f"fuse{self.base_model_prefix}.{idx}.gate_weight",
+                initializer=paddle.nn.initializer.Constant(value=0),
+            )
+            for idx in range(self.num_layers)
+        ]
+
+        e_score_correction_bias_attrs = None
+        if self.base_model_prefix.startswith("deepseek_v3"):
+            e_score_correction_bias_attrs = [
+                paddle.ParamAttr(
+                    name=f"fuse{self.base_model_prefix}.{idx}.e_score_correction_bias",
+                    initializer=paddle.nn.initializer.Constant(value=0),
+                )
+                if idx >= self.config.first_k_dense_replace
+                else None
+                for idx in range(self.num_layers)
+            ]
+
+        shared_expert_ffn1_weight_attrs = [
+            paddle.ParamAttr(
+                name=f"fuse{self.base_model_prefix}.{idx}.shared_expert_ffn1_weight",
+                initializer=paddle.nn.initializer.Constant(value=0),
+            )
+            for idx in range(self.num_layers)
+        ]
+        shared_expert_ffn2_weight_attrs = [
+            paddle.ParamAttr(
+                name=f"fuse{self.base_model_prefix}.{idx}.shared_expert_ffn2_weight",
+                initializer=paddle.nn.initializer.Constant(value=0),
+            )
+            for idx in range(self.num_layers)
+        ]
+
+        q_proj_weight_scale_attrs = None
+        q_a_proj_weight_scale_attrs = None
+        q_b_proj_weight_scale_attrs = None
+        kv_a_proj_with_mqa_weight_scale_attrs = None
+        kv_b_proj_weight_scale_attrs = None
+        k_b_proj_weight_scale_attrs = None
+        v_b_proj_weight_scale_attrs = None
+
+        out_proj_weight_scale_attrs = None
+        ffn1_weight_scale_attrs = None
+        ffn2_weight_scale_attrs = None
+        shared_expert_ffn1_weight_scale_attrs = None
+        shared_expert_ffn2_weight_scale_attrs = None
+
+        if self.use_weight_only:
+            if self.config.q_lora_rank is not None:
+                q_a_proj_weight_scale_attrs = [
+                    paddle.ParamAttr(
+                        name=f"fuse{self.base_model_prefix}.{idx}.q_a_proj_weight_scale",
+                    )
+                    for idx in range(self.num_layers)
+                ]
+                q_b_proj_weight_scale_attrs = [
+                    paddle.ParamAttr(
+                        name=f"fuse{self.base_model_prefix}.{idx}.q_b_proj_weight_scale",
+                    )
+                    for idx in range(self.num_layers)
+                ]
+            else:
+                q_proj_weight_scale_attrs = [
+                    paddle.ParamAttr(
+                        name=f"fuse{self.base_model_prefix}.{idx}.q_proj_weight_scale",
+                    )
+                    for idx in range(self.num_layers)
+                ]
+
+            if self.config.mla_use_matrix_absorption:
+                kv_a_proj_with_mqa_weight_scale_attrs = [
+                    paddle.ParamAttr(
+                        name=f"fuse{self.base_model_prefix}.{idx}.kv_a_proj_with_mqa_weight_scale",
+                    )
+                    for idx in range(self.num_layers)
+                ]
+                kv_b_proj_weight_scale_attrs = [
+                    paddle.ParamAttr(
+                        name=f"fuse{self.base_model_prefix}.{idx}.kv_b_proj_weight_scale",
+                    )
+                    for idx in range(self.num_layers)
+                ]
+
+            out_proj_weight_scale_attrs = [
+                paddle.ParamAttr(name=f"fuse{self.base_model_prefix}.{idx}.out_proj_weight_scale")
+                for idx in range(self.num_layers)
+            ]
+            ffn1_weight_scale_attrs = [
+                paddle.ParamAttr(name=f"fuse{self.base_model_prefix}.{idx}.ffn1_weight_scale")
+                for idx in range(self.num_layers)
+            ]
+            ffn2_weight_scale_attrs = [
+                paddle.ParamAttr(name=f"fuse{self.base_model_prefix}.{idx}.ffn2_weight_scale")
+                for idx in range(self.num_layers)
+            ]
+            shared_expert_ffn1_weight_scale_attrs = [
+                paddle.ParamAttr(name=f"fuse{self.base_model_prefix}.{idx}.shared_expert_ffn1_weight_scale")
+                for idx in range(self.num_layers)
+            ]
+            shared_expert_ffn2_weight_scale_attrs = [
+                paddle.ParamAttr(name=f"fuse{self.base_model_prefix}.{idx}.shared_expert_ffn2_weight_scale")
+                for idx in range(self.num_layers)
+            ]
+
+            if self.config.mla_use_matrix_absorption:
+                k_b_proj_weight_scale_attrs = [
+                    paddle.ParamAttr(name=f"fuse{self.base_model_prefix}.{idx}.k_b_proj_weight_scale")
+                    for idx in range(self.num_layers)
+                ]
+                v_b_proj_weight_scale_attrs = [
+                    paddle.ParamAttr(name=f"fuse{self.base_model_prefix}.{idx}.v_b_proj_weight_scale")
+                    for idx in range(self.num_layers)
+                ]
+
+        mla_config = MLAConfig(
+            use_matrix_absorption=self.config.mla_use_matrix_absorption,
+            q_lora_rank=self.config.q_lora_rank,
+            kv_lora_rank=self.config.kv_lora_rank,
+            qk_nope_head_dim=self.config.qk_nope_head_dim,
+            qk_rope_head_dim=self.config.qk_rope_head_dim,
+            v_head_dim=self.config.v_head_dim,
+            mscale=yarn_get_mscale(scaling_factor, float(config.rope_scaling.get("mscale_all_dim", 1.0))),
+            q_proj_weight_attrs=q_proj_weight_attrs,
+            q_proj_weight_scale_attrs=q_proj_weight_scale_attrs,
+            q_a_proj_weight_attrs=q_a_proj_weight_attrs,
+            q_a_proj_weight_scale_attrs=q_a_proj_weight_scale_attrs,
+            q_a_layernorm_weight_attrs=q_a_layernorm_weight_attrs,
+            q_b_proj_weight_attrs=q_b_proj_weight_attrs,
+            q_b_proj_weight_scale_attrs=q_b_proj_weight_scale_attrs,
+            kv_a_proj_with_mqa_weight_attrs=kv_a_proj_with_mqa_weight_attrs,
+            kv_a_proj_with_mqa_weight_scale_attrs=kv_a_proj_with_mqa_weight_scale_attrs,
+            kv_a_layernorm_weight_attrs=kv_a_layernorm_weight_attrs,
+            kv_b_proj_weight_attrs=kv_b_proj_weight_attrs,
+            kv_b_proj_weight_scale_attrs=kv_b_proj_weight_scale_attrs,
+            k_b_proj_weight_attrs=k_b_proj_weight_attrs,
+            k_b_proj_weight_scale_attrs=k_b_proj_weight_scale_attrs,
+            v_b_proj_weight_attrs=v_b_proj_weight_attrs,
+            v_b_proj_weight_scale_attrs=v_b_proj_weight_scale_attrs,
+        )
+
+        moe_config = MoeConfig(
+            num_experts=self.n_routed_experts,
+            top_k=self.config.num_experts_per_tok,
+            topk_group=self.config.topk_group,
+            norm_topk_prob=self.config.norm_topk_prob,
+            routed_scaling_factor=self.config.routed_scaling_factor,
+            num_expert_group=self.config.n_group,
+            topk_method=self.config.topk_method,
+            moe_intermediate_size=self.config.moe_intermediate_size,
+            first_k_dense_replace=self.first_k_dense_replace,
+            shared_expert_with_gate=False,
+            shared_expert_intermediate_size=self.config.moe_intermediate_size * self.config.n_shared_experts,
+            shared_expert_ffn1_weight_attrs=shared_expert_ffn1_weight_attrs,
+            shared_expert_ffn1_weight_scale_attrs=shared_expert_ffn1_weight_scale_attrs,
+            shared_expert_ffn2_weight_attrs=shared_expert_ffn2_weight_attrs,
+            shared_expert_ffn2_weight_scale_attrs=shared_expert_ffn2_weight_scale_attrs,
+        )
+
+        speculate_config = SpeculateConfig(
+            speculate_method=config.get("speculate_method", None),
+            speculate_max_draft_token_num=config.get("speculate_max_draft_token_num", 5),
+            return_full_hidden_states=config.get("return_full_hidden_states", False),
+        )
+
+        transformer_config = FusedMultiTransformerConfig(
+            embed_dim=self.hidden_size,
+            num_heads=self.num_attention_heads,
+            kv_num_heads=self.num_key_value_heads,
+            intermediate_size=self.intermediate_size,
+            quant_type=self.quant_type,
+            weight_block_size=self.weight_block_size,
+            moe_quant_type=self.moe_quant_type,
+            weightonly_group_size=self.weightonly_group_size,
+            activation="swiglu",
+            num_layers=config.num_hidden_layers,
+            tp_degree=config.tensor_parallel_degree,
+            ring_id=ring_id,
+            ln_scale_attrs=ln_scale_attrs,
+            linear_weight_attrs=out_proj_weight_attrs,
+            linear_weight_scale_attrs=out_proj_weight_scale_attrs,
+            ffn_ln_scale_attrs=ffn_ln_scale_attrs,
+            gate_weight_attrs=gate_weight_attrs,
+            ffn1_weight_attrs=ffn1_weight_attrs,
+            ffn1_weight_scale_attrs=ffn1_weight_scale_attrs,
+            ffn2_weight_attrs=ffn2_weight_attrs,
+            ffn2_weight_scale_attrs=ffn2_weight_scale_attrs,
+            e_score_correction_bias_attrs=e_score_correction_bias_attrs,
+            epsilon=self.rms_norm_eps,
+            rope_theta=self.rope_theta,
+            rotary_emb=self.rotary_emb,
+            norm_type="rmsnorm",
+            rank_id=config.tensor_parallel_rank,
+            moe_config=moe_config,
+            mla_config=mla_config,
+            append_attn=config.append_attn,
+            speculate_config=speculate_config,
+        )
+
+        self.set_transformer_block(transformer_config)
+
+    @paddle.no_grad()
+    def set_state_dict(self, state_dict):
+        self.transformer_block.init_weight()
+
+        dtype = paddle.get_default_dtype()
+        embed_tokens_weight = paddle.to_tensor(state_dict[f"{self.base_model_prefix}.embed_tokens.weight"]).cast(
+            self.embed_tokens.weight.dtype
+        )
+        norm_weight = paddle.to_tensor(state_dict[f"{self.base_model_prefix}.norm.weight"]).cast(
+            self.norm.weight.dtype
+        )
+        self.embed_tokens.weight.set_value(embed_tokens_weight)
+        self.norm.weight.set_value(norm_weight)
+
+        for idx in range(self.num_layers):
+            logger.info(f"set state for layer {idx}")
+
+            ln_scale = paddle.to_tensor(
+                state_dict[f"{self.base_model_prefix}.layers.{idx}.input_layernorm.weight"]
+            ).cast(self.transformer_block.ln_scales[idx].dtype)
+            self.transformer_block.ln_scales[idx].set_value(ln_scale)
+
+            if self.config.q_lora_rank is not None:
+                q_a_proj_weight = paddle.to_tensor(
+                    state_dict[f"{self.base_model_prefix}.layers.{idx}.self_attn.q_a_proj.weight"]
+                ).cast(dtype)
+                q_a_layernorm_weight = paddle.to_tensor(
+                    state_dict[f"{self.base_model_prefix}.layers.{idx}.self_attn.q_a_layernorm.weight"]
+                ).cast(self.transformer_block.q_a_layernorm_weights[idx].dtype)
+                q_b_proj_weight = paddle.to_tensor(
+                    state_dict[f"{self.base_model_prefix}.layers.{idx}.self_attn.q_b_proj.weight"]
+                ).cast(dtype)
+
+                self.transformer_block.q_a_proj_weights[idx].set_value(q_a_proj_weight)
+                self.transformer_block.q_a_layernorm_weights[idx].set_value(q_a_layernorm_weight)
+                self.transformer_block.q_b_proj_weights[idx].set_value(q_b_proj_weight)
+            else:
+                q_proj_weight = paddle.to_tensor(
+                    state_dict[f"{self.base_model_prefix}.layers.{idx}.self_attn.q_proj.weight"]
+                ).cast(dtype)
+
+                self.transformer_block.q_proj_weights[idx].set_value(q_proj_weight)
+
+            kv_a_proj_with_mqa_weight = paddle.to_tensor(
+                state_dict[f"{self.base_model_prefix}.layers.{idx}.self_attn.kv_a_proj_with_mqa.weight"]
+            ).cast(dtype)
+            kv_a_layernorm_weight = paddle.to_tensor(
+                state_dict[f"{self.base_model_prefix}.layers.{idx}.self_attn.kv_a_layernorm.weight"]
+            ).cast(self.transformer_block.kv_a_layernorm_weights[idx].dtype)
+            kv_b_proj_weight = paddle.to_tensor(
+                state_dict[f"{self.base_model_prefix}.layers.{idx}.self_attn.kv_b_proj.weight"]
+            ).cast(dtype)
+            linear_weight = paddle.to_tensor(
+                state_dict[f"{self.base_model_prefix}.layers.{idx}.self_attn.o_proj.weight"]
+            ).cast(dtype)
+
+            if self.config.mla_use_matrix_absorption:
+                # if self.config.q_lora_rank is None:
+                #     q_proj_weight_inner = q_proj_weight.reshape(
+                #         shape=[
+                #             -1,
+                #             self.num_attention_heads // self.config.tensor_parallel_degree,
+                #             self.config.qk_nope_head_dim + self.config.qk_rope_head_dim,
+                #         ]
+                #     )
+                # else:
+                #     q_proj_weight_inner = q_b_proj_weight.reshape(
+                #         shape=[
+                #             -1,
+                #             self.num_attention_heads // self.config.tensor_parallel_degree,
+                #             self.config.qk_nope_head_dim + self.config.qk_rope_head_dim,
+                #         ]
+                #     )
+
+                kv_b_proj_weight_inner = kv_b_proj_weight.reshape(
+                    shape=[
+                        self.config.kv_lora_rank,
+                        self.num_attention_heads // self.config.tensor_parallel_degree,
+                        -1,
+                    ]
+                )
+                # linear_weight_inner = linear_weight.T.reshape(
+                #     shape=[
+                #         -1,
+                #         self.num_attention_heads // self.config.tensor_parallel_degree,
+                #         self.config.v_head_dim,
+                #     ]
+                # )
+
+                # W_Q = q_proj_weight_inner[..., : self.config.qk_nope_head_dim]
+                # W_QR = q_proj_weight_inner[..., self.config.qk_nope_head_dim :].flatten(start_axis=1)
+                W_UK, W_UV = kv_b_proj_weight_inner.split(
+                    [self.config.qk_nope_head_dim, self.config.v_head_dim], axis=-1
+                )
+                # W_O = linear_weight_inner
+
+                if self.use_weight_only:
+                    assert False
+                    pass
+                else:
+                    self.transformer_block.k_b_proj_weights[idx].set_value(W_UK.transpose([1, 2, 0]))
+                    self.transformer_block.v_b_proj_weights[idx].set_value(W_UV.transpose([1, 0, 2]))
+
+            self.transformer_block.kv_a_proj_with_mqa_weights[idx].set_value(kv_a_proj_with_mqa_weight)
+            self.transformer_block.kv_a_layernorm_weights[idx].set_value(kv_a_layernorm_weight)
+            self.transformer_block.kv_b_proj_weights[idx].set_value(kv_b_proj_weight)
+
+            self.transformer_block.linear_weights[idx].set_value(linear_weight)
+
+            ffn_ln_scale = paddle.to_tensor(
+                state_dict[f"{self.base_model_prefix}.layers.{idx}.post_attention_layernorm.weight"],
+            ).cast(
+                self.transformer_block.ffn_ln_scales[idx].dtype,
+            )
+            self.transformer_block.ffn_ln_scales[idx].set_value(ffn_ln_scale)
+            if idx < self.first_k_dense_replace:
+                concated_ffn1_weight = np.concatenate(
+                    [
+                        state_dict[f"{self.base_model_prefix}.layers.{idx}.mlp.gate_proj.weight"],
+                        state_dict[f"{self.base_model_prefix}.layers.{idx}.mlp.up_proj.weight"],
+                    ],
+                    axis=-1,
+                )
+                ffn1_weight_tensor = paddle.to_tensor(concated_ffn1_weight).cast(paddle.get_default_dtype())
+
+                self.transformer_block.ffn1_weights[idx].set_value(ffn1_weight_tensor)
+
+                ffn2_weight_tensor = paddle.to_tensor(
+                    state_dict[f"{self.base_model_prefix}.layers.{idx}.mlp.down_proj.weight"]
+                ).cast(paddle.get_default_dtype())
+
+                self.transformer_block.ffn2_weights[idx].set_value(ffn2_weight_tensor)
+            else:
+                ffn1_weights = []
+                ffn2_weights = []
+                ffn1_scales = []
+                ffn2_scales = []
+
+                for expert_idx in range(self.n_routed_experts):
+                    concated_gate_up_weight = np.concatenate(
+                        [
+                            state_dict[
+                                f"{self.base_model_prefix}.layers.{idx}.mlp.experts.{expert_idx}.gate_proj.weight"
+                            ],
+                            state_dict[
+                                f"{self.base_model_prefix}.layers.{idx}.mlp.experts.{expert_idx}.up_proj.weight"
+                            ],
+                        ],
+                        axis=-1,
+                    )
+                    ffn1_weight = paddle.to_tensor(concated_gate_up_weight).cast(dtype)
+                    ffn2_weight = paddle.to_tensor(
+                        state_dict[f"{self.base_model_prefix}.layers.{idx}.mlp.experts.{expert_idx}.down_proj.weight"]
+                    ).cast(dtype)
+
+                    # quant moe
+                    ffn1_quanted_weight, ffn1_weight_scale = weight_quantize(
+                        ffn1_weight, algo=self.moe_quant_type, group_size=-1, arch=70
+                    )
+                    ffn2_quanted_weight, ffn2_weight_scale = weight_quantize(
+                        ffn2_weight, algo=self.moe_quant_type, group_size=-1, arch=70
+                    )
+                    ffn1_weight_scale = ffn1_weight_scale
+                    ffn2_weight_scale = ffn2_weight_scale
+                    ffn1_weights.append(
+                        ffn1_quanted_weight.transpose((1, 0)).reshape([self.transformer_block.config.embed_dim, -1])
+                    )
+                    ffn2_weights.append(
+                        ffn2_quanted_weight.transpose((1, 0)).reshape([-1, self.transformer_block.config.embed_dim])
+                    )
+                    ffn1_scales.append(ffn1_weight_scale)
+                    ffn2_scales.append(ffn2_weight_scale)
+
+                fused_moe_ffn1_weight = paddle.to_tensor(ffn1_weights)
+                fused_moe_ffn2_weight = paddle.to_tensor(ffn2_weights)
+
+                # 这里的 paddle.to_tensor，默认转为 bf16，而不是 ffn1_scales.dtype
+                fused_moe_ffn1_weight_scale = paddle.to_tensor(ffn1_scales).cast("float32")
+                fused_moe_ffn2_weight_scale = paddle.to_tensor(ffn2_scales).cast("float32")
+                gate_weight = paddle.to_tensor(
+                    state_dict[f"{self.base_model_prefix}.layers.{idx}.mlp.gate.weight"]
+                ).cast("float32")
+
+                if self.base_model_prefix.startswith("deepseek_v3"):
+                    e_score_correction_bias = paddle.to_tensor(
+                        state_dict[f"{self.base_model_prefix}.layers.{idx}.mlp.gate.e_score_correction_bias"]
+                    ).cast("float32")
+                    self.transformer_block.e_score_correction_biases[idx].set_value(e_score_correction_bias)
+
+                self.transformer_block.ffn1_weights[idx].set_value(fused_moe_ffn1_weight)
+                self.transformer_block.ffn2_weights[idx].set_value(fused_moe_ffn2_weight)
+
+                self.transformer_block.gate_weights[idx].set_value(gate_weight)
+
+                self.transformer_block.ffn1_weights_scale[idx].set_value(fused_moe_ffn1_weight_scale)
+                self.transformer_block.ffn2_weights_scale[idx].set_value(fused_moe_ffn2_weight_scale)
+
+                concated_gate_up_weight = np.concatenate(
+                    [
+                        state_dict[f"{self.base_model_prefix}.layers.{idx}.mlp.shared_experts.gate_proj.weight"],
+                        state_dict[f"{self.base_model_prefix}.layers.{idx}.mlp.shared_experts.up_proj.weight"],
+                    ],
+                    axis=-1,
+                )
+                shared_expert_ffn1_weight = paddle.to_tensor(concated_gate_up_weight).cast(dtype)
+                shared_expert_ffn2_weight = paddle.to_tensor(
+                    state_dict[f"{self.base_model_prefix}.layers.{idx}.mlp.shared_experts.down_proj.weight"]
+                ).cast(dtype)
+
+                self.transformer_block.shared_expert_ffn1_weights[idx].set_value(shared_expert_ffn1_weight)
+                self.transformer_block.shared_expert_ffn2_weights[idx].set_value(shared_expert_ffn2_weight)
+
+    def set_transformer_block(self, transformer_config):
+        assert paddle.is_compiled_with_xpu()
+        self.transformer_block = FusedMultiTransformerXPU(transformer_config)
+
+
+@register_base_model
 class MTPDeepseekV2BlockInferenceModel(DeepseekV2BlockInferenceModel):
     def __init__(self, config: DeepseekV2Config, base_model_prefix: str):
         super().__init__(config, base_model_prefix)
@@ -1432,7 +2004,10 @@ class DeepseekV2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, De
         self.max_seq_len = config.max_seq_len
         self.return_full_hidden_states = config.get("return_full_hidden_states", False)
 
-        self.deepseek_v2 = DeepseekV2BlockInferenceModel(config, base_model_prefix)
+        if paddle.is_compiled_with_xpu():
+            self.deepseek_v2 = DeepseekV2BlockInferenceModelXPU(config, base_model_prefix)
+        else:
+            self.deepseek_v2 = DeepseekV2BlockInferenceModel(config, base_model_prefix)
         if config.tie_word_embeddings:
             self.lm_head = DeepseekV2LMHead(
                 config, embedding_weights=self.deepseek_v2.embed_tokens.weight, transpose_y=True

@@ -20,7 +20,7 @@ import re
 import tempfile
 from collections import OrderedDict
 from functools import partial
-from typing import Dict, List, Union
+from typing import Dict, Union
 
 import aistudio_sdk
 import numpy as np
@@ -97,6 +97,18 @@ LoRAConv2D = lora_layers["LoRAConv2D"]
 LoRALinear = lora_layers["LoRALinear"]
 RowParallelLoRALinear = lora_layers["RowParallelLoRALinear"]
 RowSequenceParallelLoRALinear = lora_layers["RowSequenceParallelLoRALinear"]
+
+from ...quantization.quantization_linear import (
+    ColumnParallelQuantizationLinear,
+    QuantizationLinear,
+    RowParallelQuantizationLinear,
+)
+from .lora_quantization_layers import (
+    ColumnParallelQuantizationLoRALinear,
+    QuantizationLoRALinear,
+    RowParallelQuantizationLoRALinear,
+)
+
 AVAILABLE_LAYERS = [
     ColumnParallelLoRALinear,
     ColumnSequenceParallelLoRALinear,
@@ -104,31 +116,10 @@ AVAILABLE_LAYERS = [
     LoRALinear,
     RowParallelLoRALinear,
     RowSequenceParallelLoRALinear,
+    ColumnParallelQuantizationLoRALinear,
+    QuantizationLoRALinear,
+    RowParallelQuantizationLoRALinear,
 ]
-try:
-    from ...quantization.quantization_linear import (
-        ColumnParallelQuantizationLinear,
-        QuantizationLinear,
-        RowParallelQuantizationLinear,
-    )
-    from .lora_quantization_layers import (
-        ColumnParallelQuantizationLoRALinear,
-        QuantizationLoRALinear,
-        RowParallelQuantizationLoRALinear,
-    )
-
-    AVAILABLE_LAYERS += [
-        ColumnParallelQuantizationLoRALinear,
-        QuantizationLoRALinear,
-        RowParallelQuantizationLoRALinear,
-    ]
-except:
-    QuantizationLinear = None
-    ColumnParallelQuantizationLinear = None
-    RowParallelQuantizationLinear = None
-    QuantizationLoRALinear = None
-    ColumnParallelQuantizationLoRALinear = None
-    RowParallelQuantizationLoRALinear = None
 
 
 class LoRAModel(nn.Layer):
@@ -426,11 +417,6 @@ class LoRAModel(nn.Layer):
 
         if self.is_pipelinemodel:
             self.model._single_to_pp_mapping = None
-        if self.quantized and merge_tensor_parallel and self.lora_config.tensor_parallel_degree > 1:
-            merge_tensor_parallel = False
-            logger.warning(
-                "Quantized strategy does not support merge_tensor_parallel. Set merge_tensor_parallel to False."
-            )
         if self.is_pipelinemodel and merge_tensor_parallel and self.lora_config.tensor_parallel_degree > 1:
             merge_tensor_parallel = False
             logger.warning(
@@ -479,7 +465,7 @@ class LoRAModel(nn.Layer):
                     model_config_to_save.tensor_parallel_degree = -1
                 model_config_to_save.save_pretrained(save_directory)
 
-    def _find_and_replace_module(self, model, module_name, lora_config, enable_lora):
+    def _find_and_replace_module(self, model, module_name, lora_config):
         parent_module = model
         attribute_chain = module_name.split(".")
         for name in attribute_chain[:-1]:
@@ -500,14 +486,10 @@ class LoRAModel(nn.Layer):
                 use_quick_lora=lora_config.use_quick_lora,
                 lora_use_mixer=lora_config.lora_use_mixer,
                 use_mora=lora_config.use_mora,
+                mp_moe=getattr(module.weight, "mp_moe", False),
+                is_distributed=getattr(module.weight, "is_distributed", False),
             )
-            # Hack for mp group moe, need to find a better solution.
-            if getattr(module.weight, "mp_moe", False):
-                lora_module.lora_A.mp_moe = True
-                lora_module.lora_B.mp_moe = True
-                lora_module.lora_A.is_distributed = True
-                lora_module.lora_B.is_distributed = True
-        if isinstance(module, nn.Conv2D):
+        elif isinstance(module, nn.Conv2D):
             lora_module = LoRAConv2D(
                 in_channels=module._in_channels,
                 out_channels=module._out_channels,
@@ -621,68 +603,20 @@ class LoRAModel(nn.Layer):
                 self.add_lora_split_mapping(module_name + ".weight_quanter._scale", is_column=False)
                 self.add_lora_split_mapping(module_name + ".activation_quanter._scale", is_column=False)
                 self.add_lora_split_mapping(module_name + ".activation_quanter.quanter._scale", is_column=False)
-        elif QuantizationLinear is not None and isinstance(module, QuantizationLinear):
-            lora_module = QuantizationLoRALinear(
-                in_features=module.in_features,
-                out_features=module.out_features,
-                quant_algo=module.quant_algo,
-                dtype=module._dtype,
-                bias_attr=False if module.bias is None else None,
-                block_size=module.block_size,
-                double_quant_block_size=module.double_quant_block_size,
-                double_quant=module.double_quant,
-                r=lora_config.r,
-                lora_alpha=lora_config.lora_alpha,
-                lora_dropout=lora_config.lora_dropout,
-            )
-            self.quantized = True
-        elif ColumnParallelQuantizationLinear is not None and isinstance(module, ColumnParallelQuantizationLinear):
-            lora_module = ColumnParallelQuantizationLoRALinear(
-                in_features=module.in_features,
-                out_features=module.out_features,
-                quant_algo=module.quant_algo,
-                dtype=module._dtype,
-                bias_attr=False if module.bias is None else None,
-                gather_output=module.gather_output,
-                r=lora_config.r,
-                lora_alpha=lora_config.lora_alpha,
-                lora_dropout=lora_config.lora_dropout,
-                lora_A_weight_attr=paddle.ParamAttr(
-                    initializer=nn.initializer.KaimingUniform(negative_slope=math.sqrt(5), nonlinearity="leaky_relu")
-                ),
-            )
-            self.quantized = True
-        elif RowParallelQuantizationLinear is not None and isinstance(module, RowParallelQuantizationLinear):
-            lora_module = RowParallelQuantizationLoRALinear(
-                in_features=module.in_features,
-                out_features=module.out_features,
-                quant_algo=module.quant_algo,
-                dtype=module._dtype,
-                bias_attr=False if module.bias is None else None,
-                input_is_parallel=module.input_is_parallel,
-                r=lora_config.r,
-                lora_alpha=lora_config.lora_alpha,
-                lora_dropout=lora_config.lora_dropout,
-            )
-            self.quantized = True
+        elif isinstance(module, QuantizationLinear):
+            lora_module = QuantizationLoRALinear(module, lora_config)
+        elif isinstance(module, ColumnParallelQuantizationLinear):
+            lora_module = ColumnParallelQuantizationLoRALinear(module, lora_config)
+        elif isinstance(module, RowParallelQuantizationLinear):
+            lora_module = RowParallelQuantizationLoRALinear(module, lora_config)
         if lora_module is None:
             raise ValueError(
                 f"LoRA strategy only supports paddle.nn.Linear or paddle.distributed.fleet.meta_parallel.ColumnParallelLinear or paddlenlp.transformers.sequence_utils. {module}({module_name} {type(module).__name__}) is not supported。"
             )
-        if getattr(lora_module, "quant_weight", None) is not None:
-            lora_module.quant_weight = module.quant_weight
-            if getattr(lora_module, "quant_scale", None) is not None:
-                lora_module.quant_scale = module.quant_scale
-            if getattr(lora_module, "qquant_scale", None) is not None:
-                lora_module.qquant_scale = module.qquant_scale
-            if getattr(lora_module, "double_quant_scale", None) is not None:
-                lora_module.double_quant_scale = module.double_quant_scale
-            if getattr(lora_module, "quant_sacle_offset", None) is not None:
-                lora_module.quant_sacle_offset = module.quant_sacle_offset
-        else:
+        if getattr(lora_module, "weight", None) is not None:
             lora_module.weight = module.weight
-        if module.bias is not None:
-            lora_module.bias = module.bias
+            if module.bias is not None:
+                lora_module.bias = module.bias
         setattr(parent_module, attribute_chain[-1], lora_module)
 
     def _find_and_restore_module(self, module_name):
@@ -768,45 +702,14 @@ class LoRAModel(nn.Layer):
 
         if lora_config.target_modules is None:
             return model
-        elif isinstance(lora_config.target_modules, str):
-            target_modules = [lora_config.target_modules]
-            if lora_config.enable_lora_list is None or (
-                isinstance(lora_config.enable_lora_list, List)
-                and all(isinstance(item, bool) for item in lora_config.enable_lora_list)
-            ):
-                enable_lora_list = [lora_config.enable_lora_list]
-            else:
-                raise TypeError(
-                    f"Invalid `enable_lora_list` value: {lora_config.enable_lora_list}. Since `target_modules` is `str`, `enable_lora_list` must be `None` or `List[bool]`"
-                )
-        else:
-            target_modules = lora_config.target_modules
-            if lora_config.enable_lora_list is None:
-                enable_lora_list = [None for _ in range(len(target_modules))]
-            elif isinstance(lora_config.enable_lora_list, List):
-                enable_lora_list = lora_config.enable_lora_list
-                if len(enable_lora_list) != len(target_modules):
-                    raise TypeError(
-                        f"Invalid lora_config.enable_lora_list value: {lora_config.enable_lora_list}. Since lora_config.target_modules is `List[str]`, `enable_lora_list` should have the same length as `target_modules`"
-                    )
-                for enable_lora in enable_lora_list:
-                    if not (
-                        enable_lora is None
-                        or (isinstance(enable_lora, List) and all(isinstance(item, bool) for item in enable_lora))
-                    ):
-                        raise TypeError(
-                            f"Invalid `enable_lora_list` value: {lora_config.enable_lora_list}. Since `target_modules` is `List[str]`, `enable_lora_list` must be `None` or  `List[Optional[List[bool]]]`"
-                        )
-            else:
-                raise TypeError(
-                    f"Invalid `enable_lora_list` value: {lora_config.enable_lora_list}. Since `target_modules` is `List[str]`, `enable_lora_list` must be `None` or `List[Optional[List[bool]]]`"
-                )
+        if isinstance(lora_config.target_modules, str):
+            lora_config.target_modules = [lora_config.target_modules]
 
-        for target_module, enable_lora in zip(target_modules, enable_lora_list):
+        for target_module in lora_config.target_modules:
             for i in model.named_sublayers():
                 module_name = i[0]
                 if re.fullmatch(target_module, module_name):
-                    self._find_and_replace_module(model, module_name, lora_config, enable_lora)
+                    self._find_and_replace_module(model, module_name, lora_config)
         return model
 
     def restore_original_model(self):

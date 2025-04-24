@@ -59,12 +59,25 @@ class QuantizationConfig:
         dtype=None,
         ignore_modules=None,
         group_size=-1,
+        apply_hadamard=True,
+        quant_input_grad=False,
+        skip_first_act_scale_step=-1,
         **kwargs,
     ):
         if weight_quantize_algo is not None:
             if isinstance(weight_quantize_algo, dict):
                 if any(
-                    algo not in ["weight_only_int8", "weight_only_int4", "llm.int8", "a8w8", "nf4", "fp4"]
+                    algo
+                    not in [
+                        "weight_only_int8",
+                        "weight_only_int4",
+                        "llm.int8",
+                        "a8w8",
+                        "nf4",
+                        "fp4",
+                        "a8w8linear",
+                        "a8w4linear",
+                    ]
                     for algo in weight_quantize_algo
                 ):
                     raise ValueError(
@@ -77,6 +90,8 @@ class QuantizationConfig:
                 "a8w8",
                 "nf4",
                 "fp4",
+                "a8w8linear",
+                "a8w4linear",
             ]:
                 raise ValueError(
                     f"weight_quantize_algo:{weight_quantize_algo} not in supported list ['weight_only_int8', 'weight_only_int4', 'llm.int8', 'a8w8', 'nf4', 'fp4']"
@@ -112,11 +127,23 @@ class QuantizationConfig:
         self.dtype = dtype
         self.ignore_modules = ignore_modules
         self.group_size = group_size
+        self.apply_hadamard = apply_hadamard
+        self.quant_input_grad = quant_input_grad
+        self.skip_first_act_scale_step = skip_first_act_scale_step
 
     def is_weight_quantize(self):
         if isinstance(self.weight_quantize_algo, dict):
             return True
-        elif self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8", "nf4", "fp4", "a8w8"]:
+        elif self.weight_quantize_algo in [
+            "weight_only_int8",
+            "weight_only_int4",
+            "llm.int8",
+            "nf4",
+            "fp4",
+            "a8w8",
+            "a8w8linear",
+            "a8w4linear",
+        ]:
             return True
         else:
             return False

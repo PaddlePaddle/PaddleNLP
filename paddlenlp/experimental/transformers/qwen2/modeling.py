@@ -1492,6 +1492,7 @@ class Qwen2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen2Pr
         v_quant_scales = kwargs.get("v_quant_scales", None)
         k_dequant_scales = kwargs.get("k_dequant_scales", None)
         v_dequant_scales = kwargs.get("v_dequant_scales", None)
+        excess_blocks = kwargs.get("excess_blocks", None)
 
         # speculative decoding related parameters
         draft_tokens = kwargs.get("draft_tokens", None)
@@ -1512,6 +1513,7 @@ class Qwen2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen2Pr
             "v_quant_scales": v_quant_scales,
             "k_dequant_scales": k_dequant_scales,
             "v_dequant_scales": v_dequant_scales,
+            "excess_blocks": excess_blocks,
             "draft_tokens": draft_tokens,
             "output_padding_offset": output_padding_offset,
         }
@@ -1533,6 +1535,7 @@ class Qwen2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen2Pr
         v_quant_scales=None,
         k_dequant_scales=None,
         v_dequant_scales=None,
+        excess_blocks=None,
         draft_tokens=None,
         output_padding_offset=None,
     ):
@@ -1551,6 +1554,7 @@ class Qwen2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen2Pr
             v_quant_scales=v_quant_scales,
             k_dequant_scales=k_dequant_scales,
             v_dequant_scales=v_dequant_scales,
+            excess_blocks=excess_blocks,
             draft_tokens=draft_tokens,
             output_padding_offset=output_padding_offset,
         )

@@ -1980,11 +1980,16 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         unexpected_keys = list(set(loaded_keys) - set(expected_keys))
 
         # Optimize for skip unused shard files for supper large model
-        if sharded_metadata is not None and quantization_linear_list is None:
+        if sharded_metadata is not None:
             assert isinstance(resolved_archive_file, list)
             new_archive_file = []
             skip_archive_file = []
-            expected_keys_set = set(expected_keys)
+            if quantization_linear_list is None:
+                expected_keys_set = set(expected_keys)
+            else:
+                origin_expected_keys = [k.replace("quant_weight", "weight") for k in expected_keys]
+                expected_keys_set = set(expected_keys + origin_expected_keys)
+
             for file in resolved_archive_file:
                 filename = os.path.split(file)[-1]
                 if not expected_keys_set.isdisjoint(set(sharded_metadata["file_map"][filename])):
