@@ -1131,13 +1131,13 @@ class FusedMultiTransformerBase(Layer):
                 qkv_out = paddle.add(qkv_out, self.qkv_biases[i])
             return qkv_out
 
-    def compute_qkv(self, src, residual_input, i):
+    def compute_qkv(self, src, residual_input, i, **kwargs):
         ln_out = self.compute_layernorm_before_qkv(src, i)
 
         if self.config.mla_config.use_absorb():
             qkv_out = ln_out
         else:
-            qkv_out = self.compute_qkv_linear(ln_out, i)
+            qkv_out = self.compute_qkv_linear(ln_out, i, **kwargs)
 
         return qkv_out, residual_input
 
@@ -1523,7 +1523,7 @@ class FusedMultiTransformerBase(Layer):
 
         residual_input = src
         for i in range(self.num_layers):
-            qkv_out, residual_input = self.compute_qkv(src, residual_input, i)
+            qkv_out, residual_input = self.compute_qkv(src, residual_input, i, **kwargs)
             fmha_out = self.compute_attn(
                 time_step,
                 qkv_out,
