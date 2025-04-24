@@ -451,9 +451,6 @@ def main():
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     if training_args.enable_linear_fused_grad_add:
-        utils_path = "/root/paddlejob/workspace/env_run/shenfangjian/PaddleNLP/llm/utils"
-        sys.path.append(utils_path)
-
         from fused_layers import mock_layers
 
         mock_layers()
@@ -561,7 +558,7 @@ def main():
     print("Final pre-training config:", config)
 
     if "replace_with_parallel_cross_entropy" in training_args.tensor_parallel_config and config.tensor_parallel_degree > 1 and in_dynamic_mode():
-        utils_path = "/root/paddlejob/workspace/env_run/shenfangjian/PaddleNLP/llm/utils"
+        utils_path = "/workspace/PaddleNLP/llm/utils"
         sys.path.append(utils_path)
 
         from replace_ops import replace_cross_entropy
