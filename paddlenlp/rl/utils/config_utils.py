@@ -34,7 +34,7 @@ class TrainingArguments(TrainingArguments):
         default=-1,
         metadata={"help": "Global generation batch size for dynamic sampling."},
     )
-    mini_batch_size: int = field(
+    global_mini_batch_size: int = field(
         default=-1,
         metadata={"help": "Mini-batch size (global) for the training dataloader."},
     )
@@ -348,16 +348,16 @@ class TrainingArguments(TrainingArguments):
         # for auto config the accumulation steps
         self._post_init_parallel_degree()
 
-        if self.mini_batch_size < 0:
-            self.mini_batch_size = self.global_batch_size
+        if self.global_mini_batch_size < 0:
+            self.global_mini_batch_size = self.global_batch_size
 
         if (
             self.global_batch_size % self.dataset_world_size != 0
-            or self.mini_batch_size % self.dataset_world_size != 0
+            or self.global_mini_batch_size % self.dataset_world_size != 0
         ):
             raise ValueError(
-                "global_batch_size(mini_batch_size) must be divisible by dataset_world_size! "
-                f"Hint: global_batch_size={self.global_batch_size}, mini_batch_size={self.mini_batch_size}, dataset_world_size={self.dataset_world_size}. "
+                "global_batch_size(global_mini_batch_size) must be divisible by dataset_world_size! "
+                f"Hint: global_batch_size={self.global_batch_size}, global_mini_batch_size={self.global_mini_batch_size}, dataset_world_size={self.dataset_world_size}. "
                 f"dataset_world_size({self.dataset_world_size})=data_parallel_degree({self.data_parallel_degree})*sharding_parallel_degree({self.sharding_parallel_degree})."
             )
 
@@ -380,7 +380,7 @@ class TrainingArguments(TrainingArguments):
         # This value must be set prior to calling `super().__post_init__()`.
         # It is utilized within `super().__post_init__()` for configuring the DistributedStrategy.
         self.gradient_accumulation_steps = (
-            self.mini_batch_size
+            self.global_mini_batch_size
             * self.rollout_n
             * self.update_iters
             // self.per_device_train_batch_size
@@ -389,7 +389,7 @@ class TrainingArguments(TrainingArguments):
         if self.gradient_accumulation_steps <= 0:
             logger.warning(
                 f"gradient_accumulation_steps: {self.gradient_accumulation_steps} must be greater than zero!"
-                " Please check your configuration, gradient_accumulation_steps = mini_batch_size * rollout_n * update_iters / per_device_train_batch_size / dataset_world_size."
+                " Please check your configuration, gradient_accumulation_steps = global_mini_batch_size * rollout_n * update_iters / per_device_train_batch_size / dataset_world_size."
                 " dataset_world_size = {self.dataset_world_size} = data_parallel_degree * sharding_parallel_degree."
                 " We will set it to 1!"
             )
@@ -397,7 +397,7 @@ class TrainingArguments(TrainingArguments):
 
         train_batch_size_info = {
             "global_batch_size": self.global_batch_size,
-            "mini_batch_size": self.mini_batch_size,
+            "global_mini_batch_size": self.global_mini_batch_size,
             "rollout_n": self.rollout_n,
             "rollout_max_num_seqs": self.rollout_max_num_seqs,
             "dataset_world_size": self.dataset_world_size,
@@ -447,14 +447,14 @@ class TrainingArguments(TrainingArguments):
             self.normalize_advantage = False
 
         max_per_device_eval_batch_size = (
-            self.mini_batch_size * self.rollout_n * self.update_iters // self.dataset_world_size
+            self.global_mini_batch_size * self.rollout_n * self.update_iters // self.dataset_world_size
         )
         if self.per_device_eval_batch_size > max_per_device_eval_batch_size:
             logger.warning(
                 f"per_device_eval_batch_size: {self.per_device_eval_batch_size} is larger than "
-                f"mini_batch_size: {self.mini_batch_size} * rollout_n: "
+                f"global_mini_batch_size: {self.global_mini_batch_size} * rollout_n: "
                 f"{self.rollout_n} * update_iters: {self.update_iters}, which may cause infer error. "
-                f"We will set it to mini_batch_size * rollout_n * update_iters // dataset_world_size!"
+                f"We will set it to global_mini_batch_size * rollout_n * update_iters // dataset_world_size!"
             )
             self.per_device_eval_batch_size = max_per_device_eval_batch_size
 
