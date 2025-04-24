@@ -3335,33 +3335,16 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                     pad_sequences_to_aligned_chunks,
                 )
                 from paddlenlp.ops.triton_ops.segment_mean import segment_mean
-                import sageattn_custom_ops
 
                 # split qkv
-                q, k, v = paddle.split(
-                    qkv_out,
-                    [
-                        self.num_heads * self.head_dim,
-                        self.kv_num_heads * self.head_dim,
-                        self.kv_num_heads * self.head_dim,
-                    ],
-                    axis=-1,
-                )
-                q = q.reshape([-1, self.num_heads, self.head_dim])
-                k = k.reshape([-1, self.kv_num_heads, self.head_dim])
-                v = v.reshape([-1, self.kv_num_heads, self.head_dim])
-                padded_v, cu_seqlen_v_padded = pad_sequences_to_aligned_chunks(
+                _, cu_seqlen_v_padded = pad_sequences_to_aligned_chunks(
                     v, kwargs.get("cu_seqlens_k", None), align_size=128
                 )
 
                 km = segment_mean(k, kwargs.get("cu_seqlens_k", None))
 
-                sa_results = sage_attention(
+                fmha_out = sage_attention(
                     qkv_out,  # [total_seqlen, mixed_dim]
-                    q,
-                    k,
-                    v,
-                    padded_v,
                     km,
                     caches[2 * i],
                     caches[2 * i + 1],
@@ -3408,43 +3391,43 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                     self.config.speculate_config.speculate_max_draft_token_num,
                     True,  # causal
                     self.config.speculate_config.speculate_method is not None,  # speculate_decoder
-                )
+                )[0]
                 paddle.device.synchronize()
 
-                fmha_out = sa_results[0]
                 o_sdpa = paddle.nn.functional.scaled_dot_product_attention(q.unsqueeze(0), k.unsqueeze(0), v.unsqueeze(0), is_causal=True)
                 o_sdpa = o_sdpa.reshape(fmha_out.shape)
 
                 sim, l1, diff = precision_cmp_paddle(fmha_out, o_sdpa)
                 print(f"fmha vs sdpa: {sim}, {diff}")
 
-                # try custom ops
-                paddle.device.synchronize()
-                o_custom_ops, q_int8, k_int8, vfp8_fused, v_transposed = sageattn_custom_ops.sage_attention_varlen2(q, 
-                                                    k, 
-                                                    padded_v, 
-                                                    kwargs.get("cu_seqlens_q", None).astype(paddle.int32),
-                                                    kwargs.get("cu_seqlens_k", None).astype(paddle.int32),
-                                                    cu_seqlen_v_padded.astype(paddle.int32),
-                                                    km,
-                                                    None,
-                                                    131,
-                                                    131,
-                                                    256,
-                                                    128**-0.5,
-                                                    "per_warp",
-                                                    "fp16",
-                                                    tensor_layout=0,
-                                                    is_causal=True,
-                                                    smooth_k=True, 
-                                                    smooth_v=False, 
-                                                    return_lse=False)
-                paddle.device.synchronize()
-                sim, l1, diff = precision_cmp_paddle(o_custom_ops.reshape(o_sdpa.shape), o_sdpa)
-                print(f"costom ops vs sdpa: {sim}, {diff}")
-                print(f"layer: {i} q nan:{check_nan(q)}, k nan:{check_nan(k)}, v nan:{check_nan(v)}, fmha nan:{check_nan(fmha_out)}, custom ops nan:{check_nan(o_custom_ops)}, sdpa nan:{check_nan(o_sdpa)}")
+                
+
+                # # try custom ops
+                # paddle.device.synchronize()
+                # o_custom_ops, q_int8, k_int8, vfp8_fused, v_transposed = sageattn_custom_ops.sage_attention_varlen2(q, 
+                #                                     k, 
+                #                                     padded_v, 
+                #                                     kwargs.get("cu_seqlens_q", None).astype(paddle.int32),
+                #                                     kwargs.get("cu_seqlens_k", None).astype(paddle.int32),
+                #                                     cu_seqlen_v_padded.astype(paddle.int32),
+                #                                     km,
+                #                                     None,
+                #                                     131,
+                #                                     131,
+                #                                     256,
+                #                                     128**-0.5,
+                #                                     "per_warp",
+                #                                     "fp16",
+                #                                     tensor_layout=0,
+                #                                     is_causal=True,
+                #                                     smooth_k=True, 
+                #                                     smooth_v=False, 
+                #                                     return_lse=False)
+                # paddle.device.synchronize()
+                # sim, l1, diff = precision_cmp_paddle(o_custom_ops.reshape(o_sdpa.shape), o_sdpa)
+                # print(f"costom ops vs sdpa: {sim}, {diff}")
+                # print(f"layer: {i} q nan:{check_nan(q)}, k nan:{check_nan(k)}, v nan:{check_nan(v)}, fmha nan:{check_nan(fmha_out)}, custom ops nan:{check_nan(o_custom_ops)}, sdpa nan:{check_nan(o_sdpa)}")
                 print("============================================")
-                fmha_out = o_custom_ops.reshape(fmha_out.shape)
             else:
                 from paddlenlp_ops import append_attention
 

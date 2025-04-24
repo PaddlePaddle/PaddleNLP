@@ -624,26 +624,24 @@ std::vector<paddle::Tensor> qk_int8_sv_f8_accum_f32_fuse_v_scale_attn_inst_buf_s
   return {lse};
 }
 
-std::vector<paddle::Tensor> sage_attention_varlen_fwd(paddle::Tensor& q,        // total_seqlen x num_head x head_dim
-                                                    paddle::Tensor& k,          // total_seqlen x num_head x head_dim
-                                                    paddle::Tensor& v,          // total_seqlen x num_head x head_dim
-                                                    paddle::Tensor& v_padded,   // total_seqlen_padded x num_head x head_dim
-                                                    paddle::Tensor& cu_seqlen_q,
-                                                    paddle::Tensor& cu_seqlen_v,
-                                                    paddle::Tensor& cu_seqlen_v_padded,
-                                                    paddle::Tensor& km,
-                                                    paddle::optional<paddle::Tensor>& vm,
-                                                    int max_seqlen_q,
-                                                    int max_seqlen_k,
-                                                    int total_seqlen_v_padded,
-                                                    float sm_scale,
-                                                    std::string qk_quant_gran,
-                                                    std::string pv_accum_dtype,
-                                                    int tensor_layout,
-                                                    bool is_causal,
-                                                    bool smooth_k,
-                                                    bool smooth_v,
-                                                    bool return_lse)
+std::vector<paddle::Tensor> sage_attention_varlen_fwd(paddle::Tensor& q,          // total_seqlen x num_head x head_dim
+                                                      paddle::Tensor& k,          // total_seqlen x num_head x head_dim
+                                                      paddle::Tensor& v,          // total_seqlen x num_head x head_dim
+                                                      paddle::Tensor& cu_seqlen_q,
+                                                      paddle::Tensor& cu_seqlen_v_padded,
+                                                      paddle::Tensor& km,
+                                                      paddle::optional<paddle::Tensor>& vm,
+                                                      int max_seqlen_q,
+                                                      int max_seqlen_k,
+                                                      int total_seqlen_v_padded,
+                                                      float sm_scale,
+                                                      std::string qk_quant_gran,
+                                                      std::string pv_accum_dtype,
+                                                      int tensor_layout,
+                                                      bool is_causal,
+                                                      bool smooth_k,
+                                                      bool smooth_v,
+                                                      bool return_lse)
 {
   int _is_causal = int(is_causal);
   int _qk_quant_gran = (qk_quant_gran == std::string("per_thread")) ? 3 : 2;
@@ -652,7 +650,15 @@ std::vector<paddle::Tensor> sage_attention_varlen_fwd(paddle::Tensor& q,        
   PD_CHECK(q.shape()[2] == 64 || q.shape()[2] == 128, "head_dim must be either 64 or 128");
   PD_CHECK(q.strides()[2] == 1 && k.strides()[2] == 1 && v.strides()[2] == 1, "Last dim of qkv must be contiguous.");
 
-  int seq_dim = (tensor_layout == 0) ? 1 : 2;
+  // split, padding to 128-align, and concat
+  std::vector<paddle::Tensor>&& v_splited = paddle::split(v, v.shape(), {0}); // split along the total_seqlen axis.
+  for (auto& vi : v_splited) {
+    int v_pad_len = (vi.shape()[0] % 128 != 0) ? (128 - vi.shape()[0] % 128) : 0;
+    if (v_pad_len > 0) {
+      vi = paddle::concat({vi, paddle::zeros({v_pad_len, vi.shape()[1], vi.shape()[2]}, vi.dtype(), paddle::GPUPlace())}, {0}); // along the total_seqlen axis
+    }
+  }
+  paddle::Tensor v_padded = paddle::concat(v_splited, {0}); // final concat along the total_seqlen axis
 
   constexpr int BLKQ = 64;
   int WARPQ = 16;
@@ -686,5 +692,5 @@ std::vector<paddle::Tensor> sage_attention_varlen_fwd(paddle::Tensor& q,        
     sm_scale, 
     _return_lse);
 
-  return {o, quant_qk_results[0], quant_qk_results[2], quant_vfp8_results[0]};  // debug: return qkv
+  return {o};  // debug: return qkv
 }
