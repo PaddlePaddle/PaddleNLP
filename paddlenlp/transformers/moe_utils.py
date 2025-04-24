@@ -187,7 +187,7 @@ class ZipNode:
             grad_output, None, dispatched_indices, dispatched_probs, top_k, num_experts, max_tokens
         )
         probs_grad = (unzipped_grad.cast(paddle.float32) * self.expert_out.cast(paddle.float32)).sum(axis=-1)
-        unzipped_grad = unzipped_grad * self.unzipped_probs.unsqueeze(-1)
+        unzipped_grad = (unzipped_grad * self.unzipped_probs.unsqueeze(-1)).cast(paddle.bfloat16)
 
         self.reset_status()
         return unzipped_grad, probs_grad
