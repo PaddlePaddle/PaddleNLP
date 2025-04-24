@@ -24,9 +24,9 @@ from paddlenlp.transformers import PretrainedTokenizer
 from paddlenlp.transformers.tokenizer_utils import PaddingStrategy
 
 
-def left_padding(sequences, padding_value=0):
+def left_padding(sequences, padding_value=0, max_length=None):
     arrs = [np.asarray(seq) for seq in sequences]
-    max_length = max([len(seq) for seq in sequences])
+    max_length = max_length or max([len(seq) for seq in sequences])
     bs = len(sequences)
     data = np.full([bs, max_length], padding_value, dtype=arrs[0].dtype)
     for i, arr in enumerate(arrs):
@@ -34,13 +34,15 @@ def left_padding(sequences, padding_value=0):
     return data
 
 
-def padding_batch_data(samples: list[dict], pad_token_id: int, requires_label: bool) -> list[dict]:
+def padding_batch_data(
+    samples: list[dict], pad_token_id: int, requires_label: bool, max_prompt_len: int
+) -> list[dict]:
     input_dict = {}
 
     input_ids = [sample["input_ids"] for sample in samples]
     # TODO(drownfish19): confim if this is correct
     # attention_mask = [np.ones(input_id.shape, dtype=bool) for input_id in input_ids]
-    input_dict["input_ids"] = left_padding(input_ids, padding_value=pad_token_id)
+    input_dict["input_ids"] = left_padding(input_ids, padding_value=pad_token_id, max_length=max_prompt_len)
     # input_dict["attention_mask"] = left_padding(attention_mask, padding_value=0)
     input_dict["raw_prompt_len"] = paddle.to_tensor([len(sample["input_ids"]) for sample in samples])
 
@@ -52,8 +54,8 @@ def padding_batch_data(samples: list[dict], pad_token_id: int, requires_label: b
     return input_dict
 
 
-def collate_fn(data_list: list[dict], pad_token_id: int, requires_label: bool) -> dict:
-    input_dict = padding_batch_data(data_list, pad_token_id, requires_label)
+def collate_fn(data_list: list[dict], pad_token_id: int, requires_label: bool, max_prompt_len: int) -> dict:
+    input_dict = padding_batch_data(data_list, pad_token_id, requires_label, max_prompt_len)
 
     tensors = {}
     non_tensors = {}
@@ -88,7 +90,7 @@ class RLHFDataset(Dataset):
         filter_prompts=True,
         prompt_key="src",
         requires_label=False,
-        label_key=None,
+        response_key=None,
         chat_template_func=None,
         splits=None,
         filter_overlong_prompts=True,
@@ -100,7 +102,7 @@ class RLHFDataset(Dataset):
         self.filter_prompts = filter_prompts
 
         self.prompt_key = prompt_key
-        self.label_key = label_key
+        self.response_key = response_key
         self.chat_template_func = chat_template_func
         self.requires_label = requires_label
         self.splits = splits
@@ -157,7 +159,7 @@ class RLHFDataset(Dataset):
 
             data["input_ids"] = self.tokenize(text=prompt, max_length=self.max_prompt_len, truncation=True)
             if self.requires_label:
-                label = raw_sample[self.label_key]
+                label = raw_sample[self.response_key]
                 data["label_ids"] = self.tokenize(label)
             self.data[index] = data
 

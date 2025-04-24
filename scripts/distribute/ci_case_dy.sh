@@ -65,7 +65,7 @@ function restore_func() {
         echo "Deleted existing functions.txt"
     fi
     if [ ! -f "${log_path}/blacklist.csv" ]; then
-        wget -P ${log_path}/ https://paddle-qa.bj.bcebos.com/Auto-Parallel/blacklist.csv --no-proxy || exit 101
+        wget -q -P ${log_path}/ https://paddle-qa.bj.bcebos.com/Auto-Parallel/blacklist.csv --no-proxy || exit 101
         echo "\033 ---- wget blacklist.csv \033"
     fi
     blacklist_file=${log_path}/blacklist.csv
@@ -623,8 +623,8 @@ function before_hook_for_gpt() {
         else
             # download data for gpt
             mkdir ${gpt_data_path}/data;
-            wget -O ${gpt_data_path}/data/gpt_en_dataset_300m_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy;
-            wget -O ${gpt_data_path}/data/gpt_en_dataset_300m_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz;
+            wget -q -O ${gpt_data_path}/data/gpt_en_dataset_300m_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy;
+            wget -q -O ${gpt_data_path}/data/gpt_en_dataset_300m_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz;
         fi
         cp -r ${gpt_data_path}/data ${gpt_case_path}/
     else
@@ -638,7 +638,7 @@ function before_hook_for_gpt() {
     else
         # download ckpt for gpt
         mkdir -p ${gpt_data_path}/ckpt
-        wget -O ${gpt_data_path}/ckpt/GPT_345M.tar.gz \
+        wget -q -O ${gpt_data_path}/ckpt/GPT_345M.tar.gz \
             https://paddlefleetx.bj.bcebos.com/model/nlp/gpt/GPT_345M.tar.gz
         tar -xzf ${gpt_data_path}/ckpt/GPT_345M.tar.gz -C ${gpt_data_path}/ckpt
         rm -rf ${gpt_data_path}/ckpt/GPT_345M.tar.gz
@@ -650,7 +650,7 @@ function before_hook_for_gpt() {
     else
         # download dataset/wikitext_103_en
         mkdir -p ${gpt_data_path}/dataset/wikitext_103_en;
-        wget -O ${gpt_data_path}/dataset/wikitext_103_en/wikitext-103-en.txt http://fleet.bj.bcebos.com/datasets/gpt/wikitext-103-en.txt
+        wget -q -O ${gpt_data_path}/dataset/wikitext_103_en/wikitext-103-en.txt http://fleet.bj.bcebos.com/datasets/gpt/wikitext-103-en.txt
     fi
 
     rm -rf wikitext-103
@@ -658,7 +658,7 @@ function before_hook_for_gpt() {
         echo "wikitext-103 downloaded"
     else
         # download wikitext-103 for gpt eval
-        wget -O ${gpt_data_path}/wikitext-103.zip https://paddlefleetx.bj.bcebos.com/data/wikitext-103.zip
+        wget -q -O ${gpt_data_path}/wikitext-103.zip https://paddlefleetx.bj.bcebos.com/data/wikitext-103.zip
         unzip -q ${gpt_data_path}/wikitext-103.zip -d ${gpt_data_path}/
         rm -rf ${gpt_data_path}/wikitext-103.zip
     fi
@@ -668,7 +668,7 @@ function before_hook_for_gpt() {
         echo "lambada_test.jsonl downloaded"
     else
         # download lambada_test.jsonl for gpt eval
-        wget -O ${gpt_data_path}/lambada_test.jsonl https://raw.githubusercontent.com/cybertronai/bflm/master/lambada_test.jsonl
+        wget -q -O ${gpt_data_path}/lambada_test.jsonl https://raw.githubusercontent.com/cybertronai/bflm/master/lambada_test.jsonl
     fi
 
     rm -rf pretrained
@@ -676,7 +676,7 @@ function before_hook_for_gpt() {
         echo "GPT_345M_FP16 downloaded"
     else
         # download GPT_345M_FP16 for gpt export
-        wget -O ${gpt_data_path}/GPT_345M_FP16.tar.gz https://paddlefleetx.bj.bcebos.com/model/nlp/gpt/GPT_345M_FP16.tar.gz
+        wget -q -O ${gpt_data_path}/GPT_345M_FP16.tar.gz https://paddlefleetx.bj.bcebos.com/model/nlp/gpt/GPT_345M_FP16.tar.gz
         tar -zxvf ${gpt_data_path}/GPT_345M_FP16.tar.gz -C ${gpt_data_path}/
         rm -rf ${gpt_data_path}/GPT_345M_FP16.tar.gz
     fi
@@ -686,7 +686,7 @@ function before_hook_for_gpt() {
         echo "GPT_345M_QAT_wo_analysis downloaded"
     else
         # download GPT_345M_QAT_wo_analysis for gpt qat
-        wget -O ${gpt_data_path}/GPT_345M_QAT_wo_analysis.tar https://paddlefleetx.bj.bcebos.com/model/nlp/gpt/GPT_345M_QAT_wo_analysis.tar
+        wget -q -O ${gpt_data_path}/GPT_345M_QAT_wo_analysis.tar https://paddlefleetx.bj.bcebos.com/model/nlp/gpt/GPT_345M_QAT_wo_analysis.tar
         tar xf ${gpt_data_path}/GPT_345M_QAT_wo_analysis.tar -C ${gpt_data_path}/
         rm -rf ${gpt_data_path}/GPT_345M_QAT_wo_analysis.tar
     fi
@@ -719,8 +719,8 @@ function before_hook_for_llm_gpt() {
         else
             # download data for llm GPT
             mkdir ${llm_gpt_data_path}/data;
-            wget -O ${llm_gpt_data_path}/data/gpt2-en-mmap.bin https://paddlenlp.bj.bcebos.com/datasets/PDC_DATASETS/PRETRAIN/openwebtext2/gpt/mmap/gpt2-en-mmap.bin
-            wget -O ${llm_gpt_data_path}/data/gpt2-en-mmap.idx https://paddlenlp.bj.bcebos.com/datasets/PDC_DATASETS/PRETRAIN/openwebtext2/gpt/mmap/gpt2-en-mmap.idx
+            wget -q -O ${llm_gpt_data_path}/data/gpt2-en-mmap.bin https://paddlenlp.bj.bcebos.com/datasets/PDC_DATASETS/PRETRAIN/openwebtext2/gpt/mmap/gpt2-en-mmap.bin
+            wget -q -O ${llm_gpt_data_path}/data/gpt2-en-mmap.idx https://paddlenlp.bj.bcebos.com/datasets/PDC_DATASETS/PRETRAIN/openwebtext2/gpt/mmap/gpt2-en-mmap.idx
         fi
         cp -r ${llm_gpt_data_path}/data ${llm_gpt_case_path}/
     else

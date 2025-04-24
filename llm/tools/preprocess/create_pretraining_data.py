@@ -81,7 +81,7 @@ def get_args():
         choices=["lac", "seg", "jieba"],
         help="Words segment function for chinese words.",
     )
-    group.add_argument("--cn_splited", action="store_true", help="Is chinese corpus is splited in to words.")
+    group.add_argument("--cn_splited", action="store_true", help="Is chinese corpus is split in to words.")
     group.add_argument("--cn_split_dimer", type=str, default=" ", help="Split dimer between chinese words.")
 
     group = parser.add_argument_group(title="common config")
@@ -344,7 +344,7 @@ def main():
         elif file_path.endswith(".jsonl"):
             text = open(file_path, "r", encoding="utf-8")
         else:
-            print("Unexpected data format, skiped %s" % file_path)
+            print("Unexpected data format, skipped %s" % file_path)
             continue
 
         encoded_docs = pool.imap(convert.encode, text, 256)

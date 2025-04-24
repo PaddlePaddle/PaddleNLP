@@ -436,7 +436,7 @@ class CharInsert(BaseAugment):
         return sentences
 
     def _generate_sequence(self, output_seq_tokens, aug_tokens, p):
-        """Genearte the sequences according to the mapping list"""
+        """Generate the sequences according to the mapping list"""
         for aug_token in aug_tokens:
             idx, token = aug_token
             if p == 0:

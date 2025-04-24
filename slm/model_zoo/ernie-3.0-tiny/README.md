@@ -525,7 +525,7 @@ python run_eval.py  \
 ```
 
 * `model_name_or_path`：动态图模型的目录，主要用于加载 tokenizer。
-* `infer_prefix`：预测模型的路径（目录+前缀）。例如当 `infer_prefix` 为 `output/infer_model` 时，代表预测模型和参数文件分别为 `output/infer_model.pdmodel` 和 `output/infer_model.pdiparams`。
+* `infer_prefix`：预测模型的路径（目录+前缀）。例如当 `infer_prefix` 为 `output/infer_model` 时，代表预测模型和参数文件分别为 `output/infer_model.json`（paddle3.0.0 默认开启 PIR）`output/infer_model.pdmodel`（未开启 PIR） 和 `output/infer_model.pdiparams`。
 * `test_path` ：评估所用文件路径名；
 * `do_eval`，是否输出评价指标的结果。如果设置，脚本会开启评估模式，最终会输出精度评价指标的值。如果不设置，则会输出模型后处理后的结果。例如：
 

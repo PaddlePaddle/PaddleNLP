@@ -1223,7 +1223,7 @@ class GenerationMixin(object):
             next_tokens = paddle.multinomial(probs)
 
             if self.config.tensor_parallel_degree > 1:
-                # Maybe no need to broadcast if seed is set correclty.
+                # Maybe no need to broadcast if seed is set correctly.
                 from paddle.distributed import fleet
 
                 try:
