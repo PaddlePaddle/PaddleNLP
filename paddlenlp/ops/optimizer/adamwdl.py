@@ -188,7 +188,7 @@ class AdamWDL(AdamW):
         ratio = self.set_param_lr_fun(param_and_grad[0])
         param_and_grad[0].optimize_attr["learning_rate"] *= ratio
 
-        # excute Adam op
+        # execute Adam op
         res = super(AdamWDL, self)._append_optimize_op(block, param_and_grad)
         param_and_grad[0].optimize_attr["learning_rate"] = prev_lr
         return res

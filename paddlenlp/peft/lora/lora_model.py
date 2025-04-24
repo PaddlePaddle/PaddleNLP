@@ -420,7 +420,7 @@ class LoRAModel(nn.Layer):
         if self.is_pipelinemodel and merge_tensor_parallel and self.lora_config.tensor_parallel_degree > 1:
             merge_tensor_parallel = False
             logger.warning(
-                "Pipeline parallism does not support merge_tensor_parallel. Set merge_tensor_parallel to False."
+                "Pipeline parallelism does not support merge_tensor_parallel. Set merge_tensor_parallel to False."
             )
 
         variant = kwargs.get("variant", None)

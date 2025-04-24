@@ -1208,7 +1208,7 @@ class PPOTrainer(Trainer):
         if dp_degree * sharding_degree == 1:
             return micro_batches
 
-        # otherwise, need to balance batch accross DP and Sharding groups
+        # otherwise, need to balance batch across DP and Sharding groups
         try:
             hcg = fleet.get_hybrid_communicate_group()
             sharding_parallel_group = hcg.get_sharding_parallel_group()

@@ -392,7 +392,7 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
                 elif k.endswith("mlp.dense_4h_to_h.bias"):
                     self.transformer_block.ffn2_biases[idx].set_value(paddle.to_tensor(v))
                 else:
-                    raise ValueError("Unknow weight {}".format(k))
+                    raise ValueError("Unknown weight {}".format(k))
 
 
 class BloomLMHead(nn.Layer):

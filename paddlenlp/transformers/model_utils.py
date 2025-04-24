@@ -591,19 +591,19 @@ def _partion_for_pipeline_mode(keys):
     keys = list(keys)
     start_idx = -1
     prefix_str = None
-    parttion_map = {}
+    partition_map = {}
     for k in keys:
         prefix = layer_prefix(k)
         if prefix != prefix_str:
             prefix_str = prefix
             start_idx += 1
-        parttion_map[k] = start_idx
+        partition_map[k] = start_idx
 
-    # if only one parttion, we don't parttion it
+    # if only one partition, we don't partition it
     if start_idx < 1:
         return {keys[i]: i for i in range(len(keys))}
 
-    return parttion_map
+    return partition_map
 
 
 def shard_checkpoint(
@@ -808,7 +808,7 @@ def load_sharded_checkpoint(model, folder, variant=None, strict=True, prefer_saf
 
 
 def faster_set_state_dict(model, state_dict, strict_dtype=True):
-    # the state_dict will be destroied.
+    # the state_dict will be destroyed.
     unused_keys = set(state_dict.keys())
     unset_keys = set(model.state_dict().keys())
     with paddle.no_grad():
@@ -891,7 +891,7 @@ def _convert_state_dict_dtype_and_shape(state_dict, model_to_load):
         if key in list(state_dict.keys()):
             if isinstance(state_dict[key], np.ndarray):
                 raise ValueError(
-                    "convert_state_dict_dtype expected paddle.Tensor not numpy.ndarray, plase convert numpy.ndarray to paddle.Tensor"
+                    "convert_state_dict_dtype expected paddle.Tensor not numpy.ndarray, please convert numpy.ndarray to paddle.Tensor"
                 )
             # confirm parameter cast is executed on the same device as model
             # TODO: cast(FP32 -> FP16) has diff on different devices, need to fix it
@@ -1879,7 +1879,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 elif "pytorch_model.bin" in str(resolved_archive_file):
                     if not from_hf_hub and not convert_from_torch:
                         raise ValueError(
-                            f"Download pytorch wight in "
+                            f"Download pytorch weight in "
                             f" {resolved_archive_file}. Please set convert_from_torch=True in from_pretrained. eg, Model.from_pretrained(model_name, convert_from_torch=True) "
                         )
 
@@ -2832,7 +2832,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     for k, v in config["mp_config"]["parallelize_plan"].items():
                         assert (
                             k not in final_config["mp_config"]["parallelize_plan"].keys()
-                        ), f"sublayer mp_config shuld be a subset of model but got sublayer config {config['mp_config']} and model config {final_config['mp_config']}."
+                        ), f"sublayer mp_config should be a subset of model but got sublayer config {config['mp_config']} and model config {final_config['mp_config']}."
                         final_config["mp_config"]["parallelize_plan"][k] = v
             if "sp_config" in config and config["sp_config"] is not None:
                 if final_config["sp_config"] is None:
@@ -2841,7 +2841,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     for k, v in config["sp_config"]["parallelize_plan"].items():
                         assert (
                             k not in final_config["sp_config"]["parallelize_plan"].keys()
-                        ), f"sublayer sp_config shuld be a subset of model but got sublayer config {config['sp_config']} and model config {final_config['sp_config']}."
+                        ), f"sublayer sp_config should be a subset of model but got sublayer config {config['sp_config']} and model config {final_config['sp_config']}."
                         final_config["sp_config"]["parallelize_plan"][k] = v
             if "pp_config" in config and config["pp_config"] is not None:
                 if isinstance(config["pp_config"]["split_spec"], str):

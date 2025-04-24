@@ -145,7 +145,7 @@ class DeepseekScalingRotaryEmbedding(nn.Layer):
 
 class DeepseekScalingRotaryEmbeddingXPU(nn.Layer):
     """
-    RotaryEmbedding XPU Implemention. In XPU, cos and sin must be computed in cpu.
+    RotaryEmbedding XPU Implementation. In XPU, cos and sin must be computed in cpu.
     """
 
     def __init__(

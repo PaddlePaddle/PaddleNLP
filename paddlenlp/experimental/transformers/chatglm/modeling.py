@@ -481,7 +481,7 @@ class ChatGLMStackDyBatch(nn.Layer):
             elif k.endswith("mlp.dense_4h_to_h.bias"):
                 self.transformer_block.ffn2_biases[idx].set_value(v.astype(dtype))
             else:
-                print("Unknow weight {}".format(k))
+                print("Unknown weight {}".format(k))
 
 
 @register_base_model
