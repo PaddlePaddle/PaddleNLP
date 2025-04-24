@@ -460,7 +460,6 @@ class Fp8DispatchQuantNode:
     def backward(self, hs_bf16_grad, token_probs_grad):  #
         # predispatch grad
         probs_grad = self.pre_dispatch_node.backward(token_probs_grad)
-        print("probs_grad_md5:", probs_grad._md5sum())
         token_probs_grad._record_stream()
 
         # reshape_grad

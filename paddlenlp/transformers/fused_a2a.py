@@ -146,8 +146,6 @@ def fused_dispatch_backward_func(
         async_finish=async_finish,
         allocate_on_comm_stream=allocate_on_comm_stream,
     )
-    # print("grad_x:", grad_x)
-    # print("grad_token_probs:", grad_token_probs)
     return grad_x, None, grad_token_probs
 
 
