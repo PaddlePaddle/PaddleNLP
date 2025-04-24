@@ -58,10 +58,6 @@ class TrainingArguments(TrainingArguments):
         default=1,
         metadata={"help": "Batch size (per device) for the training dataloader."},
     )
-    use_fused_rms_norm: bool = field(
-        default=False,
-        metadata={"help": "qwen, use_fused_rms_norm"},
-    )
     kl_coeff: float = field(
         default=0.02,
         metadata={"help": "The coefficient for the KL divergence between the reference and actor policy."},
@@ -535,9 +531,7 @@ class ModelArgument:
     actor_tokenizer_alpha: float = field(default=None, metadata={"help": "Tokenizer will tokenize randomly"})
     reward_tokenizer_alpha: float = field(default=None, metadata={"help": "Tokenizer will tokenize randomly"})
     reward_critic_tokenizer_alpha: float = field(default=None, metadata={"help": "Tokenizer will tokenize randomly"})
-    use_attn_mask_start_row_indices: bool = field(default=False, metadata={"help": "Should in data args"})
     stage: str = field(default="PPO", metadata={"help": "The type of training."})
-    fused_linear: bool = field(default=True, metadata={"help": "Whether to use fused_gemm_epilogue"})
     critic_recompute_granularity: str = field(
         default="full",
         metadata={

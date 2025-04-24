@@ -36,26 +36,21 @@ python setup_cuda.py install
 
 ### 字段说明
 
-- src (list(str)): 用户对话内容，可能会包含 markup 内容，如 [<search-res>]；
-- tgt (list(str)): 除了最后一轮的系统多轮回复内容，以对话轮次排列，可能会包含 markup 内容，如 [<search>]；注意：len(tgt)==len(src)-1
+- src (list(str)): 经过 chat_template 处理后的 prompt 输入；
+- tgt (list(str)): 标签内容；
 
 ### 数据示例
 
 ```json
 {
-    "src": [
-        "需要你帮我写几个有创意的广告语来打开市场。",
-        "目标用户是年轻人，追求时尚、个性和自我。"
-    ],
-    "tgt": [
-        "当然！我很乐意帮助你创作几个有创意的广告语来推广你的新洗发露。请告诉我一些关于你的产品的特点，目标受众以及你希望传达的核心信息，我会根据这些信息为你提供几个创意的广告语。"
-    ]
+    "src": ["<|im_start|>system\nYou are a helpful assistant. The assistant first thinks about the reasoning process in the mind and then provides the user with the answer. The reasoning process and answer are enclosed within <think> </think> and<answer> </answer> tags, respectively, i.e., <think> reasoning process here </think><answer> answer here </answer>.  Now the user asks you to solve a logical reasoning problem. After thinking, when you finally reach a conclusion, clearly state the identity of each character within <answer> </answer> tags. i.e., <answer> (1) Zoey is a knight\n(2) ... </answer>.\n<|im_end|>\n<|im_start|>user\nA very special island is inhabited only by knights and knaves. Knights always tell the truth, and knaves always lie. You meet 3 inhabitants: Michael, Zoey, and Ethan. Michael was heard saying, \"Ethan is a knight if and only if Michael is a knight\". \"Zoey is a knight or Ethan is a knight,\" Zoey mentioned. Ethan asserted: \"Michael is a knave if and only if Zoey is a knave\". So who is a knight and who is a knave?\n<|im_end|>\n<|im_start|>assistant\n<think>"],
+    "tgt": ["(1) Michael is a knight\n(2) Zoey is a knight\n(3) Ethan is a knight"]
 }
 ```
 
 
 ### PPO & GRPO 数据准备
-
+我们提供了一版使用 `Qwen/Qwen2.5-7B-Instruct-1M` 的`chat template`预处理后的[KK 数据集](https://hf-mirror.com/datasets/K-and-K/knights-and-knaves)。
 ```
 wget https://paddlenlp.bj.bcebos.com/datasets/examples/ppo-kk.tgz && tar zxf ppo-kk.tgz
 ```
@@ -66,9 +61,6 @@ wget https://paddlenlp.bj.bcebos.com/datasets/examples/ppo-kk.tgz && tar zxf ppo
 
 我们采用的配置文件在放置在`llm/config/llama/ppo_argument.json`和`llm/config/llama/grpo_argument.json`中，同时我们提供了详细参数释义如下：
 
-- `train_task_config`: 训练数据 config, 请以`config/task_ppo.json`为例
-- `eval_task_config`: 评估数据 config, 请以`config/task_ppo.json`为例
-- `ptx_task_config`: SFT 辅助数据, 请以`config/task_sft.json`为例，默认为""
 - `actor_model_name_or_path`: PPO 中 actor-model 和 reference-model 模型本地的模型路径
 - `reward_model_name_or_path`: PPO 中 reward-model 和 critic-model 模型本地的模型路径
 - `use_fusemt`: 是否通过 FustMT 加速生成，默认为 True
@@ -95,8 +87,7 @@ wget https://paddlenlp.bj.bcebos.com/datasets/examples/ppo-kk.tgz && tar zxf ppo
 - `critic_weight_decay`: Critic 模型除了所有 bias 和 LayerNorm 权重之外，应用于所有层的权重衰减数值。（`float`，可选，默认为 0.0）
 - `max_prompt_len`: 生成样本时的最大生成长度， max_length 调大会增加生成时间，并且增加显存占用。注意：
 max_dec_len + max_prompt_len 应当小于 max_seq_len。
-- `per_device_prompt_batch_size`: PPO 生成样本时的批处理大小，同 micro batch size，即满足 global_batch_size = dp（data parallel）* sharding * micro batch size。batch_size 调大会增加生成时间，并且增加显存占用
-- `per_device_train_batch_size`: 训练 batch 大小, 当前为了优化性能设为1，请避免更改
+- `per_device_train_batch_size`: 训练 batch 大小
 - `per_device_eval_batch_size`: 评估 batch 大小。
 - `max_steps`: 总的训练步数
 - `eval_steps`: 模型评估的间隔步数
@@ -109,13 +100,8 @@ max_dec_len + max_prompt_len 应当小于 max_seq_len。
 - `fp16`: 使用 float16 精度进行模型训练和推理。
 - `bf16`: 使用 bfloat16 精度进行模型训练和推理。
 - `fp16_opt_level`: float16 精度训练模式，`O2`表示纯 float16 训练
-
-
-<!-- ### PPO 训练命令
-
-```shell
-python -u -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7"  run_ppo.py llm/config/llama/ppo_argument.json
-``` -->
+- `balance_batch`：该参数用于指定是否在数据并行场景下，对批次内的 token 数量进行均衡分配。若设置为 True，系统将尝试在不同并行设备间平衡 token 的分布；若设置为 False（默认值），则不进行此类均衡操作。
+- `use_remove_padding`：此参数决定是否在训练过程中去除输入数据中的 padding 部分。启用该选项（设置为 True）可有效提高训练过程中有效 token 的占比，从而提升训练效率；若设置为 False（默认值），则保留输入数据中的 padding。
 
 ### GRPO 训练命令
 ```shell
@@ -130,8 +116,8 @@ python reward_server.py
 ```shell
 export PYTHONPATH=your_PaddleNLP_path/:$PYTHONPATH
 export PYTHONPATH=your_PaddleNLP_path/llm:$PYTHONPATH
-python -u -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" run_ppo.py ../../config/qwen/grpo_argument.json
-# python -u -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" run_ppo.py ../../config/llama/grpo_argument.json
+python -u -m paddle.distributed.launch --devices "0,1,2,3" run_ppo.py ../../config/qwen/grpo_argument.yaml
+# python -u -m paddle.distributed.launch --devices "0,1,2,3" run_ppo.py ../../config/llama/grpo_argument.yaml
 ```
 
 ### 在线监控
