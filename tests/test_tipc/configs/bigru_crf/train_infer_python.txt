@@ -1,6 +1,6 @@
 ===========================train_params===========================
 model_name:bigru_crf
-python:python3.7
+python:python
 gpu_list:0|0,1
 --device:gpu|gpu
 null:null

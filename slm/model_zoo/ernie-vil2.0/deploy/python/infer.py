@@ -20,6 +20,10 @@ import numpy as np
 from PIL import Image
 
 from paddlenlp.transformers import ErnieViLProcessor
+from paddlenlp.utils.env import (
+    PADDLE_INFERENCE_MODEL_SUFFIX,
+    PADDLE_INFERENCE_WEIGHTS_SUFFIX,
+)
 
 
 def parse_arguments():
@@ -76,11 +80,11 @@ class ErnieVil2Predictor(object):
     def create_fd_runtime(self, args):
         option = fd.RuntimeOption()
         if args.encode_type == "text":
-            model_path = os.path.join(args.model_dir, "get_text_features.pdmodel")
-            params_path = os.path.join(args.model_dir, "get_text_features.pdiparams")
+            model_path = os.path.join(args.model_dir, f"get_text_features{PADDLE_INFERENCE_MODEL_SUFFIX}")
+            params_path = os.path.join(args.model_dir, f"get_text_features{PADDLE_INFERENCE_WEIGHTS_SUFFIX}")
         else:
-            model_path = os.path.join(args.model_dir, "get_image_features.pdmodel")
-            params_path = os.path.join(args.model_dir, "get_image_features.pdiparams")
+            model_path = os.path.join(args.model_dir, f"get_image_features{PADDLE_INFERENCE_MODEL_SUFFIX}")
+            params_path = os.path.join(args.model_dir, f"get_image_features{PADDLE_INFERENCE_WEIGHTS_SUFFIX}")
         option.set_model_path(model_path, params_path)
         if args.device == "kunlunxin":
             option.use_kunlunxin()

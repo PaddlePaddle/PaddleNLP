@@ -19,11 +19,15 @@ import time
 import paddle
 
 from paddlenlp.data import Pad, Stack, Tuple
+from paddlenlp.utils.env import (
+    PADDLE_INFERENCE_MODEL_SUFFIX,
+    PADDLE_INFERENCE_WEIGHTS_SUFFIX,
+)
 
 # yapf: disable
 parser = argparse.ArgumentParser(__doc__)
-parser.add_argument("--model_file", type=str, required=True, default='./static_graph_params.pdmodel', help="The path to model info in static graph.")
-parser.add_argument("--params_file", type=str, required=True, default='./static_graph_params.pdiparams', help="The path to parameters in static graph.")
+parser.add_argument("--model_file", type=str, required=True, default=f'./static_graph_params{PADDLE_INFERENCE_MODEL_SUFFIX}', help="The path to model info in static graph.")
+parser.add_argument("--params_file", type=str, required=True, default=f'./static_graph_params{PADDLE_INFERENCE_WEIGHTS_SUFFIX}', help="The path to parameters in static graph.")
 parser.add_argument("--data_dir", type=str, default=None, help="The folder where the dataset is located.")
 parser.add_argument("--init_checkpoint", type=str, default=None, help="Path to init model.")
 parser.add_argument("--batch_size", type=int, default=2, help="The number of sequences contained in a mini-batch.")

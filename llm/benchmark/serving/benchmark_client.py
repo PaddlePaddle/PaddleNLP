@@ -89,6 +89,12 @@ def infer(
                 is_first = False
 
         total_token_latency = time.time() - start
+        inference_first_token_latency = float(
+                    json.loads(chunks[0])["inference_time_cost"]
+                        )
+        inference_total_token_latency = float(
+                    json.loads(chunks[-1])["inference_time_cost"]
+                        )
 
         if backend == "vllm":
             try:
@@ -108,7 +114,7 @@ def infer(
             token_num = len(chunks)
 
         stats.append(
-            [first_token_latency, total_token_latency, input_seqlen, output_seqlen, token_num]
+            [first_token_latency, total_token_latency, input_seqlen, output_seqlen, token_num, inference_first_token_latency, inference_total_token_latency]
         )
         print(f"Request queue size: {req_que.qsize()}, Real return tokens: {token_num}, Request Chunks: {len(chunks)}, Label out_seq_len: {output_seqlen}")
 
@@ -276,6 +282,16 @@ def save_results_to_file(stats: np.ndarray, output_file: str):
             "max": stats[:, 4].max(),
             "avg": stats[:, 4].mean(),
         },
+        "inference_first_token_latency": {
+            "min": stats[:, 5].min(),
+            "max": stats[:, 5].max(),
+            "avg": stats[:, 5].mean(),
+        },
+        "inference_total_token_latency": {
+            "min": stats[:, 6].min(),
+            "max": stats[:, 6].max(),
+            "avg": stats[:, 6].mean(),
+        },
         "qps": len(stats) / (stats[:, 1].sum() / len(stats)),
         "real_output_tokens_per_second": len(stats) / (stats[:, 1].sum() / len(stats)) * stats[:, 4].mean(),
     }
@@ -347,7 +363,7 @@ def main(
         if len(stats[i + 1]) > 0:
             all_stat.append(stats[i + 1])
 
-    all_stat = np.concatenate(all_stat).reshape(-1, 5)
+    all_stat = np.concatenate(all_stat).reshape(-1, 7)
 
     print(f"Processed {len(all_stat)} requests in {elapsed_time:.2f} seconds.")
     print(
@@ -364,6 +380,12 @@ def main(
     )
     print(
         f"Real Output Sequence Length (min, max, avg): {all_stat[:, 4].min():.2f}, {all_stat[:, 4].max():.2f}, {all_stat[:, 4].mean():.2f}"
+    )
+    print(
+        f"Inference First Token Latency (min, max, avg): {all_stat[:, 5].min():.2f}, {all_stat[:, 5].max():.2f}, {all_stat[:, 5].mean():.2f}"
+    )
+    print(
+        f"Inference Total Token Latency (min, max, avg): {all_stat[:, 6].min():.2f}, {all_stat[:, 6].max():.2f}, {all_stat[:, 6].mean():.2f}"
     )
     print(f"QPS: {len(all_stat) / elapsed_time:.2f}")
     print(f"Real Output Tokens/s: {len(all_stat) / elapsed_time * all_stat[:, 4].mean():.2f}")

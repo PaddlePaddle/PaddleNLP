@@ -452,7 +452,7 @@ def center_to_corners_format(bboxes_center: TensorType) -> TensorType:
 
     center format: contains the coordinate for the center of the box and its width, height dimensions
         (center_x, center_y, width, height)
-    corners format: contains the coodinates for the top-left and bottom-right corners of the box
+    corners format: contains the coordinates for the top-left and bottom-right corners of the box
         (top_left_x, top_left_y, bottom_right_x, bottom_right_y)
     """
     # Function is used during model forward pass, so we use the input framework if possible, without
@@ -494,7 +494,7 @@ def corners_to_center_format(bboxes_corners: TensorType) -> TensorType:
     """
     Converts bounding boxes from corners format to center format.
 
-    corners format: contains the coodinates for the top-left and bottom-right corners of the box
+    corners format: contains the coordinates for the top-left and bottom-right corners of the box
         (top_left_x, top_left_y, bottom_right_x, bottom_right_y)
     center format: contains the coordinate for the center of the box and its the width, height dimensions
         (center_x, center_y, width, height)

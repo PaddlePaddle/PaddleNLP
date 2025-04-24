@@ -1561,7 +1561,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         # From HF Hub or AI Studio
         if from_hf_hub or from_aistudio:
             # Only include the necessary resource files specified by the tokenizer cls
-            # Deep copy to avoid modifiying the class attributes
+            # Deep copy to avoid modifying the class attributes
             vocab_files = copy.deepcopy(cls.resource_files_names)
             vocab_files["tokenizer_config_file"] = cls.tokenizer_config_file
 
@@ -3119,7 +3119,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             sequence = ids + pair_ids if pair else ids
             token_type_ids = [0] * len(ids) + ([0] * len(pair_ids) if pair else [])
 
-        # Build output dictionnary
+        # Build output dictionary
         encoded_inputs["input_ids"] = sequence
         if return_token_type_ids:
             encoded_inputs["token_type_ids"] = token_type_ids

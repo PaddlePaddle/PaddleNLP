@@ -17,6 +17,7 @@ try:
         per_token_group_quant_fp8_api,
         per_token_group_quant_fp8_api_masked,
     )
+    from .segment_mean import segment_mean
 
     __all__ = +["per_token_group_quant_fp8_api_masked", "per_token_group_quant_fp8_api"]
 except:

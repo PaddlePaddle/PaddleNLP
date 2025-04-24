@@ -72,7 +72,7 @@ class ActorReferenceTrainer(RLTrainer):
 
         self.generation_config = GenerationConfig(
             max_new_tokens=self.args.max_dec_len,
-            num_return_sequences=self.args.num_return_sequences,
+            rollout_n=self.args.rollout_n,
             temperature=self.args.temperature,
             top_p=self.args.top_p,
             top_k=0,  # to disable top_k sampling, default is 50
@@ -107,8 +107,8 @@ class ActorReferenceTrainer(RLTrainer):
         input_ids = prompt_only_batch["input_ids"]
         # attention_mask = prompt_only_batch["attention_mask"]
         if do_eval:
-            train_num_return_sequences = self.args.num_return_sequences
-            self.args.num_return_sequences = 1
+            train_rollout_n = self.args.rollout_n
+            self.args.rollout_n = 1
 
         # position_ids = (
         #     prompt_only_batch["position_ids"]
@@ -116,13 +116,13 @@ class ActorReferenceTrainer(RLTrainer):
         #     else make_position_ids(attention_mask)
         # )
 
-        if self.args.num_return_sequences > 1:
-            input_ids = input_ids.repeat_interleave(self.args.num_return_sequences, axis=0)
+        if self.args.rollout_n > 1:
+            input_ids = input_ids.repeat_interleave(self.args.rollout_n, axis=0)
             # raw_dtype = attention_mask.dtype
             # attention_mask = (
-            #     attention_mask.cast("int32").repeat_interleave(self.args.num_return_sequences, axis=0).cast(raw_dtype)
+            #     attention_mask.cast("int32").repeat_interleave(self.args.rollout_n, axis=0).cast(raw_dtype)
             # )
-            # position_ids = position_ids.repeat_interleave(self.args.num_return_sequences, axis=0)
+            # position_ids = position_ids.repeat_interleave(self.args.rollout_n, axis=0)
 
         with guard_set_args(self.model.config, {"use_fused_head_and_loss_fn": False}):
             sequences = self.get_model(False).generate(
@@ -136,14 +136,12 @@ class ActorReferenceTrainer(RLTrainer):
 
         if self.args.use_rm_server:
             label_ids = prompt_only_batch["label_ids"]
-            if self.args.num_return_sequences > 1:
-                label_ids = label_ids.repeat_interleave(self.args.num_return_sequences, axis=0)
+            if self.args.rollout_n > 1:
+                label_ids = label_ids.repeat_interleave(self.args.rollout_n, axis=0)
 
-        sequences = sequences.reshape(
-            [input_ids.shape[0] // self.args.num_return_sequences, self.args.num_return_sequences, -1]
-        )
+        sequences = sequences.reshape([input_ids.shape[0] // self.args.rollout_n, self.args.rollout_n, -1])
         if do_eval:
-            self.args.num_return_sequences = train_num_return_sequences
+            self.args.rollout_n = train_rollout_n
             sequences = sequences.transpose([1, 0, 2])
         # prompt, sequence, attention_mask
         return [
@@ -197,21 +195,8 @@ class ActorReferenceTrainer(RLTrainer):
         """
         log_probs_list = []
         batch_size, sequence_length = input_ids.shape
-        if self.args.rollout_logprob_batch_size is None:
-            rollout_logprob_batch_size = batch_size
-        else:
-            if str(self.args.rollout_logprob_batch_size).lower() == "auto":
-                # Auto compute
-                if sequence_length > 4096 - 128:
-                    rollout_logprob_batch_size = 2
-                elif sequence_length > 2048 - 128:
-                    rollout_logprob_batch_size = 4
-                else:
-                    rollout_logprob_batch_size = batch_size
-            else:
-                rollout_logprob_batch_size = int(self.args.rollout_logprob_batch_size)
-
-        num_batches = (batch_size + rollout_logprob_batch_size - 1) // rollout_logprob_batch_size
+        per_device_logprob_batch_size = self.args.per_device_logprob_batch_size
+        num_batches = (batch_size + per_device_logprob_batch_size - 1) // per_device_logprob_batch_size
 
         # Pipe model outputs a logits tensor with LMHead, while non-pipe model
         # outputs a tuple with logits tensor as the only one element.
@@ -220,8 +205,8 @@ class ActorReferenceTrainer(RLTrainer):
 
         for i in range(num_batches):
             # Calculate the start and end indices for the current batch
-            start_index = i * rollout_logprob_batch_size
-            end_index = min(start_index + rollout_logprob_batch_size, batch_size)
+            start_index = i * per_device_logprob_batch_size
+            end_index = min(start_index + per_device_logprob_batch_size, batch_size)
 
             # Extract the current batch
             current_input_ids = input_ids[start_index:end_index]

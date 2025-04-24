@@ -23,6 +23,10 @@ import fastdeploy as fd
 import six
 
 from paddlenlp.transformers import AutoTokenizer
+from paddlenlp.utils.env import (
+    PADDLE_INFERENCE_MODEL_SUFFIX,
+    PADDLE_INFERENCE_WEIGHTS_SUFFIX,
+)
 from paddlenlp.utils.tools import get_bool_ids_greater_than, get_span
 
 
@@ -85,8 +89,8 @@ class UIEPredictor(object):
 
     def create_fd_runtime(self, args):
         option = fd.RuntimeOption()
-        model_path = os.path.join(args.model_dir, args.model_prefix + ".pdmodel")
-        params_path = os.path.join(args.model_dir, args.model_prefix + ".pdiparams")
+        model_path = os.path.join(args.model_dir, args.model_prefix + f"{PADDLE_INFERENCE_MODEL_SUFFIX}")
+        params_path = os.path.join(args.model_dir, args.model_prefix + f"{PADDLE_INFERENCE_WEIGHTS_SUFFIX}")
         option.set_model_path(model_path, params_path)
         # Set device
         if args.device == "cpu":

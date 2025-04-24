@@ -14,7 +14,7 @@
 
 /* Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved. */
 
-/*This code is copied fron NVIDIA apex:
+/*This code is copied from NVIDIA apex:
  *     https://github.com/NVIDIA/apex
  *     with minor changes. */
 
@@ -79,7 +79,7 @@ struct KernelTraitsFinalize : public Base {
 
   // Shared memory size to transpose the CTA result.
   enum { SMEM_BYTES_TRANSPOSE = Base::THREADS_PER_CTA * BYTES_PER_LDG };
-  // Shared memory size to coalsece the CTA result.
+  // Shared memory size to coalesce the CTA result.
   enum { SMEM_BYTES_OUTPUT = Base::THREADS_PER_WARP * BYTES_PER_LDG };
   // Shared memory requirement per CTA.
   enum {

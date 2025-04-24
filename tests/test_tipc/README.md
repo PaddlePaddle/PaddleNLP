@@ -2,7 +2,7 @@
 
 ## 1. 简介
 
-飞桨除了基本的模型训练和预测，还提供了支持多端多平台的高性能推理部署工具。本文档提供了PaddleNLP中部分模型的飞桨训推一体认证 (Training and Inference Pipeline Certification(TIPC)) 信息和测试工具，方便用户查阅每种模型的训练推理部署打通情况，并可以进行一键测试。
+飞桨除了基本的模型训练和预测，还提供了支持多端多平台的高性能推理部署工具。本文档提供了 PaddleNLP 中部分模型的飞桨训推一体认证 (Training and Inference Pipeline Certification(TIPC)) 信息和测试工具，方便用户查阅每种模型的训练推理部署打通情况，并可以进行一键测试。
 
 
 ## 2. 汇总信息
@@ -10,10 +10,10 @@
 打通情况汇总如下，已填写的部分表示可以使用本工具进行一键测试，未填写的表示正在支持中。
 
 **字段说明：**
-- 基础训练预测：包括模型单机单卡训练、单机多卡训练以及Paddle Inference Python预测。
+- 基础训练预测：包括模型单机单卡训练、单机多卡训练以及 Paddle Inference Python 预测。
 - 更多训练方式：包括多机多卡、混合精度。
 
-更详细的MKLDNN、TensorRT等预测加速相关功能的支持情况可以查看各测试工具的[更多教程](#more)。
+更详细的 MKLDNN、TensorRT 等预测加速相关功能的支持情况可以查看各测试工具的[更多教程](#more)。
 
 | 模型名称 | 模型类型 | 基础<br>训练预测 | 更多<br>训练方式 | 模型压缩 |
 | :--- |  :----:  | :--------: |  :----  |   :----  |
@@ -55,19 +55,20 @@ test_tipc/
 
 使用本工具，可以测试不同功能的支持情况，以及预测结果是否对齐，测试流程概括如下：
 
-1. 运行prepare.sh准备测试所需数据和模型；
-2. 运行要测试的功能对应的测试脚本`test_train_inference_python.sh`，产出log，由log可以看到不同配置是否运行成功；
-3. 用`compare_results.py`对比log中的预测结果和预存在results目录下的结果，判断预测精度是否符合预期（在误差范围内）。
+1. 运行 prepare.sh 准备测试所需数据和模型；
+2. 运行要测试的功能对应的测试脚本`test_train_inference_python.sh`，产出 log，由 log 可以看到不同配置是否运行成功；
+3. 用`compare_results.py`对比 log 中的预测结果和预存在 results 目录下的结果，判断预测精度是否符合预期（在误差范围内）。
 
-测试单项功能仅需两行命令，**如需测试不同模型/功能，替换配置文件即可**，命令格式如下：
+测试前需要根据[基础训练预测使用文档](docs/test_train_inference_python.md)安装依赖。
+测试单项功能仅需两行命令，**如需测试不同模型/功能，替换配置文件即可**，需要在 ```tests```目录下运行，命令格式如下：
 ```shell
 # 功能：准备数据
 # 格式：bash + 运行脚本 + 参数1: 配置文件选择 + 参数2: 模式选择
-bash test_tipc/prepare.sh  configs/[model_name]/[params_file_name]  [Mode]
+bash ./test_tipc/prepare.sh  ./test_tipc/configs/[model_name]/[params_file_name]  [Mode]
 
 # 功能：运行测试
 # 格式：bash + 运行脚本 + 参数1: 配置文件选择 + 参数2: 模式选择
-bash test_tipc/test_train_inference_python.sh configs/[model_name]/[params_file_name]  [Mode]
+bash ./test_tipc/test_train_inference_python.sh ./test_tipc/configs/[model_name]/[params_file_name]  [Mode]
 ```
 
 例如，测试基本训练预测功能的`lite_train_lite_infer`模式，运行：
@@ -82,5 +83,5 @@ bash test_tipc/test_train_inference_python.sh ./test_tipc/configs/bigru_crf/trai
 
 <a name="more"></a>
 ## 4. 开始测试
-各功能测试中涉及MKLDNN、TensorRT等多种预测相关参数配置，请点击下方相应链接了解更多细节和使用教程：
-- [test_train_inference_python 使用](docs/test_train_inference_python.md) ：测试基于Python的模型训练、推理等基本功能。
+各功能测试中涉及 MKLDNN、TensorRT 等多种预测相关参数配置，请点击下方相应链接了解更多细节和使用教程：
+- [test_train_inference_python 使用](docs/test_train_inference_python.md) ：测试基于 Python 的模型训练、推理等基本功能。
