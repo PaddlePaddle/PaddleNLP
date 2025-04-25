@@ -16,9 +16,9 @@
 
 # Lint as: python3
 
-import os
-import json
 import hashlib
+import json
+import os
 
 import datasets
 

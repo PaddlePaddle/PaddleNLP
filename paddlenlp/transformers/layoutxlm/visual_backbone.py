@@ -20,9 +20,9 @@ from collections import namedtuple
 
 import numpy as np
 import paddle
-from paddle import ParamAttr
 import paddle.nn as nn
 import paddle.nn.functional as F
+from paddle import ParamAttr
 from paddle.nn import Layer
 from paddle.utils import try_import
 
