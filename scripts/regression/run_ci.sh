@@ -154,6 +154,7 @@ P0case_list=($(awk -v RS=' ' '!a[$1]++' <<< ${P0case_list[*]}))
 ####################################
 # build latest paddlenlp/paddlenlp_ops whl and install
 if [[ ${#Build_list[*]} -ne 0 ]];then
+    install_paddle
     echo -e "\033[32m start build ${Build_list[*]} whl \033[0m"
     for build_pkg in ${Build_list[*]};do
         if [[ ${build_pkg} == "paddlenlp" ]];then
@@ -174,9 +175,13 @@ else
 fi
 ###################################
 if [[ ${#P0case_list[*]} -ne 0 ]];then
-    install_paddle
-
     cd ${nlp_dir}
+    # Install paddle
+    if [[ ${#Build_list[*]} -eq 0 ]];then
+        install_paddle
+    else
+        echo "install_paddle done"
+    fi
     # Install paddlenlp
     if [ ! -f ./dist/p****.whl ];then
         echo "install_nlp_develop"
