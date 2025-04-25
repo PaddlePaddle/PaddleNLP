@@ -150,7 +150,6 @@ P0case_list=($(awk -v RS=' ' '!a[$1]++' <<< ${P0case_list[*]}))
 # build latest paddlenlp/paddlenlp_ops whl and install
 if [[ ${#Build_list[*]} -ne 0 ]];then
     echo -e "\033[32m start build ${Build_list[*]} whl \033[0m"
-    install_paddle
     for build_pkg in ${Build_list[*]};do
         if [[ ${build_pkg} == "paddlenlp" ]];then
             echo -e "\033[35m ---- build ${GIT_PR_ID} paddlenlp  \033[0m"
@@ -170,10 +169,11 @@ else
 fi
 ###################################
 if [[ ${#P0case_list[*]} -ne 0 ]];then
+    install_paddle
+
     cd ${nlp_dir}
     # Install paddlenlp
     if [ ! -f ./dist/p****.whl ];then
-        install_paddle
         echo "install_nlp_develop"
         python -m pip install --user https://paddlenlp.bj.bcebos.com/wheels/paddlenlp-ci-py3-none-any.whl --no-cache-dir
     else
@@ -189,6 +189,7 @@ if [[ ${#P0case_list[*]} -ne 0 ]];then
     python -c "from paddlenlp import __version__; print('paddlenlp version:', __version__)" >> ${log_path}/commit_info.txt
     python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)" >> ${log_path}/commit_info.txt
     python -m pip list >> ${log_path}/commit_info.txt
+
     echo -e "\033[35m =======CI Check P0case========= \033[0m"
     echo -e "\033[35m ---- P0case_list length: ${#P0case_list[*]}, cases: ${P0case_list[*]} \033[0m"
     set +e
