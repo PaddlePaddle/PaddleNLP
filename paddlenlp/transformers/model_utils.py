@@ -857,14 +857,14 @@ def faster_set_state_dict(model, state_dict, strict_dtype=True):
     return error_msgs
 
 
-def _load_state_dict_into_model(model_to_load, state_dict, start_prefix):
+def _load_state_dict_into_model(model_to_load, state_dict, start_prefix, model_to_load_state_dict=None):
     # torch will cast dtype in load_state_dict, but paddle strictly check dtype
     if len(start_prefix) > 0:
         for key in list(state_dict.keys()):
             if key.startswith(start_prefix):
                 state_dict[key.replace(start_prefix, "")] = state_dict.pop(key)
 
-    _convert_state_dict_dtype_and_shape(state_dict, model_to_load)
+    _convert_state_dict_dtype_and_shape(state_dict, model_to_load, model_to_load_state_dict)
 
     error_msgs = []
 
@@ -882,12 +882,15 @@ def _load_state_dict_into_model(model_to_load, state_dict, start_prefix):
     return error_msgs
 
 
-def _convert_state_dict_dtype_and_shape(state_dict, model_to_load):
+def _convert_state_dict_dtype_and_shape(state_dict, model_to_load, model_to_load_state_dict=None):
     # convert the dtype of state dict
     def is_0d_or_1d(tensor):
         return len(tensor.shape) == 0 or list(tensor.shape) == [1]
 
-    for key, value in model_to_load.state_dict().items():
+    if model_to_load_state_dict is None:
+        model_to_load_state_dict = model_to_load.state_dict()
+
+    for key, value in model_to_load_state_dict.items():
         if key in list(state_dict.keys()):
             if isinstance(state_dict[key], np.ndarray):
                 raise ValueError(
@@ -2156,9 +2159,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             resume_state_dict = {}
             if len(resolved_archive_file) > 1:
                 resolved_archive_file = tqdm(resolved_archive_file, desc="Loading checkpoint shards")
-            if low_cpu_mem_usage or quantization_linear_list is not None:
-                # model.state_dict() takes a long time
-                model_to_load_state_dict = model_to_load.state_dict()
+            # model.state_dict() takes a long time
+            model_to_load_state_dict = model_to_load.state_dict()
             for shard_file in resolved_archive_file:
                 pre_tensor_parallel_split = False
                 if quantization_linear_list is not None:
@@ -2270,7 +2272,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     )
                     error_msgs += new_error_msgs
                 else:
-                    error_msgs += _load_state_dict_into_model(model_to_load, state_dict, start_prefix)
+                    error_msgs += _load_state_dict_into_model(
+                        model_to_load, state_dict, start_prefix, model_to_load_state_dict=model_to_load_state_dict
+                    )
 
                 # force memory release
                 del state_dict
