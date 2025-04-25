@@ -122,23 +122,23 @@ for file_name in `git diff --numstat ${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`
             Build_list[${dir1}]="paddlenlp" # 影响编包
             if [[ ${dir2} =~ "__init__" ]];then # 针对发版mini test
                 P0case_list[${#P0case_list[*]}]=bert
-            elif [[ ${!all_P0case_dic[*]} =~ ${dir2} ]]; then
+            elif [[ -n "${all_P0case_dic[$dir2]}" ]]; then
                 P0case_list[${#P0case_list[*]}]=${dir2}
             elif [[ ${dir2} =~ "transformers" ]];then
-                if [[ ${!all_P0case_dic[*]} =~ ${dir2} ]];then
+                if [[ -n "${all_P0case_dic[$dir3]}" ]];then
                     P0case_list[${#P0case_list[*]}]=${dir3}
                 fi
             elif [[ ${dir2} =~ "taskflow" ]];then # ce case
                 P0case_list[${#P0case_list[*]}]=taskflow
             fi
         elif [[ "${dir1}" =~ "slm" && "${dir2}" =~ "examples" ]];then # 模型升级
-            if [[ ${!all_P0case_dic[*]} =~ ${dir2} ]];then
+            if [[ -n "${all_P0case_dic[$dir2]}" ]];then
                 P0case_list[${#P0case_list[*]}]=${dir2}
-            elif [[ ${!all_P0case_dic[*]} =~ ${dir3} ]];then
+            elif [[ -n "${all_P0case_dic[$dir3]}" ]];then
                 P0case_list[${#P0case_list[*]}]=${dir3}
             fi
         elif [[ "${dir1}" =~ "slm" && "${dir2}" =~ "model_zoo" ]];then # 模型升级
-            if [[ ${!all_P0case_dic[*]} =~ ${dir2} ]];then
+            if [[ -n "${all_P0case_dic[$dir2]}" ]];then
                 P0case_list[${#P0case_list[*]}]=${dir2}
             fi
         elif [[ ${dir1} =~ "csrc" ]];then # 推理改动
