@@ -146,7 +146,6 @@ done
 }
 get_diff_TO_case
 P0case_list=($(awk -v RS=' ' '!a[$1]++' <<< ${P0case_list[*]}))
-Build_list=($(awk -v RS=' ' '!a[$1]++' <<< ${Build_list[*]}))
 ####################################
 # build latest paddlenlp/paddlenlp_ops whl and install
 if [[ ${#Build_list[*]} -ne 0 ]];then
