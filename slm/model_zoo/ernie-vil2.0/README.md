@@ -356,10 +356,8 @@ Label probs: Tensor(shape=[1, 2], dtype=float32, place=Place(gpu:0), stop_gradie
 
 ## 模型导出预测
 
-上一节是动态图的示例，下面提供了简单的导出静态图预测的示例，帮助用户将预训练模型导出成预测部署的参数。首先安装[FastDeploy](https://github.com/PaddlePaddle/FastDeploy):
+上一节是动态图的示例，下面提供了简单的导出静态图预测的示例，帮助用户将预训练模型导出成预测部署的参数。
 
-```
-pip install fastdeploy-gpu-python -f https://www.paddlepaddle.org.cn/whl/fastdeploy.html
 ```
 然后运行下面的命令：
 
