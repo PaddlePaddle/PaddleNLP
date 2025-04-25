@@ -37,4 +37,4 @@ std::vector<paddle::Tensor> sage_attention_varlen_fwd(paddle::Tensor& q,        
                                                       bool is_causal,
                                                       bool smooth_k,
                                                       bool smooth_v,
-                                                      bool return_lse)
+                                                      bool return_lse);

@@ -3330,16 +3330,16 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
 
             if PREFILL_USE_SAGE_ATTN:
                 from paddlenlp_ops import sage_attention
-
-                from paddlenlp.experimental.transformers.utils import (
-                    pad_sequences_to_aligned_chunks,
-                )
                 from paddlenlp.ops.triton_ops.segment_mean import segment_mean
-
-                # split qkv
-                _, cu_seqlen_v_padded = pad_sequences_to_aligned_chunks(
-                    v, kwargs.get("cu_seqlens_k", None), align_size=128
-                )
+                
+                def align_padding(cu_seqlen: paddle.Tensor, align_size: int=64):
+                    cu_seqlen_padded = paddle.zeros(cu_seqlen.shape, dtype='int32')
+                    for i, length in enumerate(cu_seqlen):
+                        cu_seqlen_padded[i] = length + (align_size - length % align_size) % align_size
+                    return cu_seqlen_padded
+                
+                cu_seqlen_q = kwargs.get("cu_seqlens_q", None)
+                cu_seqlen_v_padded = align_padding(cu_seqlen_q, 128)
 
                 km = segment_mean(k, kwargs.get("cu_seqlens_k", None))
 
@@ -3351,7 +3351,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                     kwargs.get("seq_lens_encoder", None),
                     kwargs.get("seq_lens_decoder", None),
                     kwargs.get("seq_lens_this_time", None),
-                    kwargs.get("cu_seqlens_q", None),
+                    cu_seqlen_q,
                     cu_seqlen_v_padded,
                     kwargs.get("padding_offsets", None),
                     kwargs.get("cum_offsets", None),

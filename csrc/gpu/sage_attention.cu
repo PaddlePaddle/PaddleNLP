@@ -170,7 +170,6 @@ std::vector<paddle::Tensor> SageAttentionKernel(
     paddle::Tensor k = paddle::reshape(qkv_with_rope[1], {-1, num_kv_head, head_dim_qk});
     paddle::Tensor v = paddle::reshape(qkv_with_rope[2], {-1, num_kv_head, head_dim_v});
     const int total_seqlen_v_padded = cu_seqlen_v_padded.data<int>()[batch_size - 1];  // v_padded shape: total_seqlen_v_padded x num_head x head_dim
-    printf("total_seqlen_v_padded: %d\n", total_seqlen_v_padded);
 
     // use varlen API
     paddle::optional<paddle::Tensor> vm = paddle::optional<paddle::Tensor>(paddle::empty({1}, paddle::DataType::FLOAT32, paddle::GPUPlace()));
