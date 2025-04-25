@@ -540,6 +540,7 @@ def main():
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
     config.sharding_parallel_degree = training_args.sharding_parallel_degree
+    config.to_static = training_args.to_static
 
     if training_args.strategy.pipeline.enable and config.virtual_pp_degree > 1:
         pipeline = training_args.strategy.pipeline
@@ -557,10 +558,7 @@ def main():
 
     print("Final pre-training config:", config)
 
-    if "replace_with_parallel_cross_entropy" in training_args.tensor_parallel_config and config.tensor_parallel_degree > 1 and in_dynamic_mode():
-        utils_path = "/workspace/PaddleNLP/llm/utils"
-        sys.path.append(utils_path)
-
+    if "replace_with_parallel_cross_entropy" in training_args.tensor_parallel_config and config.tensor_parallel_degree > 1 and config.to_static is False:
         from llm.utils.replace_ops import replace_cross_entropy
 
         replace_cross_entropy()
