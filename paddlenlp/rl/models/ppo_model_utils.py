@@ -520,7 +520,7 @@ class RLHFPPOMixedLoss(nn.Layer):
                 if pad_size > 0:
                     log_probs = log_probs[:, :-pad_size]
                 log_probs = pad_input(
-                    log_probs.transpose([1, 0]), indices, batch=raw_input_shape[0], seqlen=raw_input_shape[1]
+                    log_probs.squeeze(0).unsqueeze(-1), indices, batch=raw_input_shape[0], seqlen=raw_input_shape[1]
                 ).squeeze(-1)
                 log_probs = log_probs[:, response_start:-1].contiguous()
             else:
@@ -580,7 +580,10 @@ class RLHFPPOMixedLoss(nn.Layer):
                 if pad_size > 0:
                     entropy_loss_rmpad = entropy_loss_rmpad[:, :-pad_size]
                 entropy_loss = pad_input(
-                    entropy_loss_rmpad.transpose([1, 0]), indices, batch=raw_input_shape[0], seqlen=raw_input_shape[1]
+                    entropy_loss_rmpad.squeeze(0).unsqueeze(-1),
+                    indices,
+                    batch=raw_input_shape[0],
+                    seqlen=raw_input_shape[1],
                 ).squeeze(-1)
                 entropy_loss_raw = entropy_loss[:, response_start:-1].contiguous()
             else:
