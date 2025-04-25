@@ -559,7 +559,7 @@ clue() {
 #33 taskflow
 taskflow (){
     cd ${nlp_dir}
-    time (python -m pytest scripts/regression/test_taskflow.py >${log_path}/taskflow.log) >>${log_path}/taskflow.log 2>&1
+    timeout 10m python -m pytest scripts/regression/test_taskflow.py >${log_path}/taskflow.log 2>&1
     print_info $? taskflow
 }
 ernie-3.0(){
