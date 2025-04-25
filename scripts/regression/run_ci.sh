@@ -106,41 +106,46 @@ for file_name in `git diff --numstat ${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`
         continue
     elif [[ "${AGILE_COMPILE_BRANCH}" == "refactor-training-loop" ]];then # 针对特定分支
         P0case_list[${#P0case_list[*]}]=gpt
-    elif [[ ${dir1} =~ "scripts" ]];then # API 升级
-        if [[ ${dir2} =~ "should_deploy" ]];then # 针对发版mini test
-            P0case_list[${#P0case_list[*]}]=transformer
-        fi  
-    elif [[ ${dir1} =~ "paddlenlp" ]];then # API 升级
-        Build_list[${dir1}]="paddlenlp" # 影响编包
-        if [[ ${dir2} =~ "__init__" ]];then # 针对发版mini test
-            P0case_list[${#P0case_list[*]}]=bert
-        elif [[ ${!all_P0case_dic[*]} =~ ${dir2} ]]; then
-            P0case_list[${#P0case_list[*]}]=${dir2}
-        elif [[ ${dir2} =~ "transformers" ]];then
-            if [[ ${!all_P0case_dic[*]} =~ ${dir2} ]];then
-                P0case_list[${#P0case_list[*]}]=${dir3}
-            fi
-        elif [[ ${dir2} =~ "taskflow" ]];then # ce case
-            P0case_list[${#P0case_list[*]}]=taskflow
-        fi
-    elif [[ "${dir1}" =~ "slm" && "${dir2}" =~ "examples" ]];then # 模型升级
-        if [[ ${!all_P0case_dic[*]} =~ ${dir2} ]];then
-            P0case_list[${#P0case_list[*]}]=${dir2}
-        elif [[ ${!all_P0case_dic[*]} =~ ${dir3} ]];then
-            P0case_list[${#P0case_list[*]}]=${dir3}
-        fi
-    elif [[ "${dir1}" =~ "slm" && "${dir2}" =~ "model_zoo" ]];then # 模型升级
-        if [[ ${!all_P0case_dic[*]} =~ ${dir2} ]];then
-            P0case_list[${#P0case_list[*]}]=${dir2}
-        fi
-    elif [[ ${dir1} =~ "csrc" ]];then # 推理改动
-        Build_list[${dir1}]="paddlenlp_ops" # 影响推理编包
     else
-        for ((i=0; i<${#target_lists_for_llm[@]}; i++)); do  # 命中指定路径执行llm
+         # 判断是否命中 target_lists_for_llm 列表-执行llm
+        for ((i=0; i<${#target_lists_for_llm[@]}; i++)); do 
             if [[ "${file_item}" == *"${target_lists_for_llm[i]}"* ]];then
                 P0case_list[${#P0case_list[*]}]=llm
             fi
         done
+        # 其他 case 判断
+        if [[ ${dir1} =~ "scripts" ]];then # API 升级
+            if [[ ${dir2} =~ "should_deploy" ]];then # 针对发版mini test
+                P0case_list[${#P0case_list[*]}]=transformer
+            fi  
+        elif [[ ${dir1} =~ "paddlenlp" ]];then # API 升级
+            Build_list[${dir1}]="paddlenlp" # 影响编包
+            if [[ ${dir2} =~ "__init__" ]];then # 针对发版mini test
+                P0case_list[${#P0case_list[*]}]=bert
+            elif [[ ${!all_P0case_dic[*]} =~ ${dir2} ]]; then
+                P0case_list[${#P0case_list[*]}]=${dir2}
+            elif [[ ${dir2} =~ "transformers" ]];then
+                if [[ ${!all_P0case_dic[*]} =~ ${dir2} ]];then
+                    P0case_list[${#P0case_list[*]}]=${dir3}
+                fi
+            elif [[ ${dir2} =~ "taskflow" ]];then # ce case
+                P0case_list[${#P0case_list[*]}]=taskflow
+            fi
+        elif [[ "${dir1}" =~ "slm" && "${dir2}" =~ "examples" ]];then # 模型升级
+            if [[ ${!all_P0case_dic[*]} =~ ${dir2} ]];then
+                P0case_list[${#P0case_list[*]}]=${dir2}
+            elif [[ ${!all_P0case_dic[*]} =~ ${dir3} ]];then
+                P0case_list[${#P0case_list[*]}]=${dir3}
+            fi
+        elif [[ "${dir1}" =~ "slm" && "${dir2}" =~ "model_zoo" ]];then # 模型升级
+            if [[ ${!all_P0case_dic[*]} =~ ${dir2} ]];then
+                P0case_list[${#P0case_list[*]}]=${dir2}
+            fi
+        elif [[ ${dir1} =~ "csrc" ]];then # 推理改动
+            Build_list[${dir1}]="paddlenlp_ops" # 影响推理编包
+        else
+            continue
+        fi
     fi
 done
 }
