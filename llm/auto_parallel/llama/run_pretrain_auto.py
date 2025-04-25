@@ -26,7 +26,6 @@ import numpy as np
 import paddle
 import paddle.distributed as dist
 from paddle.distributed import fleet
-from paddle import in_dynamic_mode
 
 from paddlenlp.ops import Topology
 from paddlenlp.trainer import (
