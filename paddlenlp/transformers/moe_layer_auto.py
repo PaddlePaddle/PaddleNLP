@@ -206,7 +206,7 @@ class MoELayer(nn.Layer):
         if out_shape is not None:
             if dist.get_rank() in self.mesh.process_ids:
                 out_shape = dist.auto_parallel.moe_utils._cal_local_shape(
-                    out_shape, self.local_combine_out_dist_attrs[0][0], self.local_combine_out_dist_attrs[0][1]
+                    out_shape, self.mesh, self.local_combine_out_dist_attrs[0]
                 )
             combined_output = combined_output.reshape(out_shape)
         return combined_output
