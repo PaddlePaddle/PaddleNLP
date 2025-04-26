@@ -1131,13 +1131,13 @@ class FusedMultiTransformerBase(Layer):
                 qkv_out = paddle.add(qkv_out, self.qkv_biases[i])
             return qkv_out
 
-    def compute_qkv(self, src, residual_input, i):
+    def compute_qkv(self, src, residual_input, i, **kwargs):
         ln_out = self.compute_layernorm_before_qkv(src, i)
 
         if self.config.mla_config.use_absorb():
             qkv_out = ln_out
         else:
-            qkv_out = self.compute_qkv_linear(ln_out, i)
+            qkv_out = self.compute_qkv_linear(ln_out, i, **kwargs)
 
         return qkv_out, residual_input
 
@@ -1523,7 +1523,7 @@ class FusedMultiTransformerBase(Layer):
 
         residual_input = src
         for i in range(self.num_layers):
-            qkv_out, residual_input = self.compute_qkv(src, residual_input, i)
+            qkv_out, residual_input = self.compute_qkv(src, residual_input, i, **kwargs)
             fmha_out = self.compute_attn(
                 time_step,
                 qkv_out,
@@ -1596,7 +1596,7 @@ class FusedMultiTransformerPostLayernorm(FusedMultiTransformerBase):
     def __init__(self, config: FusedMultiTransformerConfig):
         super().__init__(config)
 
-    def compute_qkv(self, src, residual_input, i):
+    def compute_qkv(self, src, residual_input, i, **kwargs):
         qkv_out = self.compute_qkv_linear(src, i)
         return qkv_out, src
 
@@ -2055,9 +2055,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
                 epsilon=self._epsilon,
                 begin_norm_axis=1,
             )[0]
-            query_pe, key_pe = self.config.rotary_emb(
-                self.position_ids[0 : kwargs.get("seq_lens_encoder", None).sum()], query_pe, key_pe
-            )
+            query_pe, key_pe = self.config.rotary_emb(self.position_ids, query_pe, key_pe)
 
             if self.config.mla_config.use_absorb():
                 from paddlenlp_ops import prefill_mla_write_cache
@@ -2689,7 +2687,7 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
 
         return ln_out
 
-    def compute_qkv_linear(self, ln_out, i):
+    def compute_qkv_linear(self, ln_out, i, **kwargs):
         if self.config.mla_config.use_mla():
             raise NotImplementedError("Not support MLA yet.")
         else:
@@ -5140,7 +5138,7 @@ class FusedBlockMultiTransformerFP8(FusedBlockMultiTransformer):
 
         return ln_out
 
-    def compute_qkv_linear(self, ln_out, i):
+    def compute_qkv_linear(self, ln_out, i, **kwargs):
         if self.config.mla_config.use_mla():
             raise NotImplementedError("Not support MLA yet.")
         else:
