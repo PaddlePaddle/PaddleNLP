@@ -132,40 +132,52 @@ class MoELayer(nn.Layer):
         self.mesh = get_mesh(self.ipp)
 
         # local_gate_part1
-        out_dist_attrs = [
+        self.local_gate_part1_out_dist_attrs = [
             [dist.Shard(0)],  # reshaped_input [b*s, h]
             [dist.Shard(0)],  # scores [b*s, e]
             [dist.Partial(dist.ReduceType.kRedMax)],  # expert_counts [e]
             [dist.Partial(dist.ReduceType.kRedAvg)],  # l_aux, scalar
             [dist.Partial(dist.ReduceType.kRedAvg)],  # l_zloss, scalar
         ]
-        grad_dist_attrs = [
+        self.local_gate_part1_grad_dist_attrs = [
             None,
             [dist.Partial(dist.ReduceType.kRedAvg)],  # gate_weights.grad
             [dist.Partial(dist.ReduceType.kRedAvg)],  # e_score_correction_bias.grad
         ]
         self.local_gate_part1 = dist.local_map(
-            self.local_gate_part1_compute, out_dist_attrs, grad_dist_attrs, self.mesh, reshard_inputs=True
+            self.local_gate_part1_compute,
+            self.local_gate_part1_out_dist_attrs,
+            self.local_gate_part1_grad_dist_attrs,
+            self.mesh,
+            reshard_inputs=True,
         )
 
         # local_gate_and_dispatch
-        out_dist_attrs = [
+        self.local_gate_and_dispatch_out_dist_attrs = [
             [dist.Shard(1)],  # dispatched_input [e,c,h]
             [dist.Shard(0)],  # combine_weights [s,e,c]
         ]
-        grad_dist_attrs = [
+        self.local_gate_and_dispatch_grad_dist_attrs = [
             None,
             None,
         ]
         self.local_gate_and_dispatch = dist.local_map(
-            self.local_gate_and_dispatch_compute, out_dist_attrs, grad_dist_attrs, self.mesh, reshard_inputs=True
+            self.local_gate_and_dispatch_compute,
+            self.local_gate_and_dispatch_out_dist_attrs,
+            self.local_gate_and_dispatch_grad_dist_attrs,
+            self.mesh,
+            reshard_inputs=True,
         )
 
         # local_combine
-        out_dist_attrs = [[dist.Shard(0)]]
-        grad_dist_attrs = [None, None]
+        self.local_combine_out_dist_attrs = [[dist.Shard(0)]]
+        self.local_combine_grad_dist_attrs = [None, None]
         self.local_combine = dist.local_map(
-            self.local_combine_compute, out_dist_attrs, grad_dist_attrs, self.mesh, reshard_inputs=True
+            self.local_combine_compute,
+            self.local_combine_out_dist_attrs,
+            self.local_combine_grad_dist_attrs,
+            self.mesh,
+            reshard_inputs=True,
         )
 
     def local_gate_part1_compute(self, hidden_state, gate_weight, e_score_correction_bias, used_token=None):
@@ -194,7 +206,7 @@ class MoELayer(nn.Layer):
         if out_shape is not None:
             if dist.get_rank() in self.mesh.process_ids:
                 out_shape = dist.auto_parallel.moe_utils._cal_local_shape(
-                    out_shape, self.out_dist_attrs[0][0], self.out_dist_attrs[0][1]
+                    out_shape, self.local_combine_out_dist_attrs[0][0], self.local_combine_out_dist_attrs[0][1]
                 )
             combined_output = combined_output.reshape(out_shape)
         return combined_output
