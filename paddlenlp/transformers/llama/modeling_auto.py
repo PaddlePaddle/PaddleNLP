@@ -1193,7 +1193,9 @@ class LlamaPretrainingCriterion3DAuto(paddle.nn.Layer):
                     [dist.Shard(0), dist.Replicate()],
                     None,
                 ]
-                loss_func = dist.local_map(coculate_loss, out_dist_attrs, grad_dist_attrs, masked_lm_loss.process_mesh)
+                loss_func = dist.local_map(
+                    coculate_loss, out_dist_attrs, grad_dist_attrs, masked_lm_loss.process_mesh, reshard_inputs=True
+                )
 
                 loss = loss_func(masked_lm_loss, masked_lm_loss > 0)
                 loss = loss.mean()
