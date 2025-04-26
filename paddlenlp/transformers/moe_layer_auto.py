@@ -145,7 +145,7 @@ class MoELayer(nn.Layer):
             [dist.Partial(dist.ReduceType.kRedAvg)],  # e_score_correction_bias.grad
         ]
         self.local_gate_part1 = dist.local_map(
-            self.local_gate_part1_compute, out_dist_attrs, grad_dist_attrs, self.mesh
+            self.local_gate_part1_compute, out_dist_attrs, grad_dist_attrs, self.mesh, reshard_inputs=True
         )
 
         # local_gate_and_dispatch
@@ -158,13 +158,15 @@ class MoELayer(nn.Layer):
             None,
         ]
         self.local_gate_and_dispatch = dist.local_map(
-            self.local_gate_and_dispatch_compute, out_dist_attrs, grad_dist_attrs, self.mesh
+            self.local_gate_and_dispatch_compute, out_dist_attrs, grad_dist_attrs, self.mesh, reshard_inputs=True
         )
 
         # local_combine
         out_dist_attrs = [[dist.Shard(0)]]
         grad_dist_attrs = [None, None]
-        self.local_combine = dist.local_map(self.local_combine_compute, out_dist_attrs, grad_dist_attrs, self.mesh)
+        self.local_combine = dist.local_map(
+            self.local_combine_compute, out_dist_attrs, grad_dist_attrs, self.mesh, reshard_inputs=True
+        )
 
     def local_gate_part1_compute(self, hidden_state, gate_weight, e_score_correction_bias, used_token=None):
         # Implement Algorithm 2 from GShard paper.
