@@ -21,20 +21,6 @@ import copy
 import paddle
 import paddle.distributed as dist
 import paddle.nn.functional as F
-
-try:
-    from paddle.distributed.auto_parallel.local_layer import LocalLayer
-except:
-
-    class LocalLayer(object):
-        """
-        A dummy class for LocalLayer, used when the actual class
-        cannot be imported.
-        """
-
-        pass
-
-
 from paddle import nn
 
 from .auto_utils import einsum, get_mesh
@@ -105,80 +91,6 @@ def combining(x, combine_weights, scatter_index):
     return paddle.matmul(combine_weights, x).squeeze(1)  # [seq,1,2] @ [seq,2,dim] -> [seq,1,dim]
 
 
-class LocalGatePart1(LocalLayer):
-    def __init__(self, config, gate: PretrainedMoEGate, ipp=None):
-        mesh = get_mesh(ipp)
-        out_dist_attrs = [
-            (mesh, [dist.Shard(0)]),  # reshaped_input [b*s, h]
-            (mesh, [dist.Shard(0)]),  # scores [b*s, e]
-            (mesh, [dist.Partial(dist.ReduceType.kRedMax)]),  # expert_counts [e]
-            (mesh, [dist.Partial(dist.ReduceType.kRedAvg)]),  # l_aux, scalar
-            (mesh, [dist.Partial(dist.ReduceType.kRedAvg)]),  # l_zloss, scalar
-        ]
-        grad_dist_attrs = [
-            None,
-            (mesh, [dist.Partial(dist.ReduceType.kRedAvg)]),  # gate_weights.grad
-            (mesh, [dist.Partial(dist.ReduceType.kRedAvg)]),  # e_score_correction_bias.grad
-        ]
-        super().__init__(out_dist_attrs, grad_dist_attrs)
-        self.config = config
-        self.gate = gate
-
-    def forward(self, hidden_state, gate_weight, e_score_correction_bias, used_token=None):
-        # Implement Algorithm 2 from GShard paper.
-        batch_size, seq_len, d_model = hidden_state.shape
-        reshaped_input = hidden_state.reshape([-1, d_model])
-
-        # compute gating score
-        logits = F.linear(hidden_state, gate_weight, None)
-        with paddle.amp.auto_cast(False):
-            scores = self.gate.gate_score_func(logits=logits)
-            scores = scores.cast(paddle.get_default_dtype())
-
-        exp_counts, l_aux, l_zloss = self.gate.topkgating_part1(scores, e_score_correction_bias)
-
-        reshaped_scores = scores.reshape([-1, scores.shape[-1]])
-        return reshaped_input, reshaped_scores, exp_counts, l_aux, l_zloss
-
-
-class LocalGateAndDispatch(LocalLayer):
-    def __init__(self, gate: PretrainedMoEGate, ipp=None):
-        mesh = get_mesh(ipp)
-        out_dist_attrs = [
-            (mesh, [dist.Shard(1)]),  # dispatched_input [e,c,h]
-            (mesh, [dist.Shard(0)]),  # combine_weights [s,e,c]
-        ]
-        grad_dist_attrs = [
-            None,
-            None,
-        ]
-        super().__init__(out_dist_attrs, grad_dist_attrs)
-        self.gate = gate
-
-    def forward(self, reshaped_input, scores):
-        combine_weights, dispatch_mask = self.gate.topkgating_part2(scores)
-        dispatched_input = einsum("sec,sm->ecm", paddle.cast(dispatch_mask, reshaped_input.dtype), reshaped_input)
-        return dispatched_input, combine_weights
-
-
-class LocalCombine(LocalLayer):
-    def __init__(self, ipp=None):
-        self.mesh = get_mesh(ipp)
-        out_dist_attrs = [(self.mesh, [dist.Shard(0)])]
-        grad_dist_attrs = [None, None]
-        super().__init__(out_dist_attrs, grad_dist_attrs)
-
-    def forward(self, combine_weights, expert_output, dtype="float32", out_shape=None):
-        combined_output = einsum("sec,ecm->sm", combine_weights.cast(dtype), expert_output)
-        if out_shape is not None:
-            if dist.get_rank() in self.mesh.process_ids:
-                out_shape = dist.auto_parallel.moe_utils._cal_local_shape(
-                    out_shape, self.out_dist_attrs[0][0], self.out_dist_attrs[0][1]
-                )
-            combined_output = combined_output.reshape(out_shape)
-        return combined_output
-
-
 class MoELayer(nn.Layer):
     def __init__(
         self,
@@ -217,10 +129,88 @@ class MoELayer(nn.Layer):
         self.gate.group = self.moe_group
         self.is_dummy_moe = True
         self._post_init()
+        self.mesh = get_mesh(self.ipp)
 
-        self.local_gate_part1 = LocalGatePart1(config, gate, ipp)
-        self.local_gate_and_dispatch = LocalGateAndDispatch(gate, ipp)
-        self.local_combine = LocalCombine(ipp)
+        # local_gate_part1
+        self.local_gate_part1_out_dist_attrs = [
+            [dist.Shard(0)],  # reshaped_input [b*s, h]
+            [dist.Shard(0)],  # scores [b*s, e]
+            [dist.Partial(dist.ReduceType.kRedMax)],  # expert_counts [e]
+            [dist.Partial(dist.ReduceType.kRedAvg)],  # l_aux, scalar
+            [dist.Partial(dist.ReduceType.kRedAvg)],  # l_zloss, scalar
+        ]
+        self.local_gate_part1_grad_dist_attrs = [
+            None,
+            [dist.Partial(dist.ReduceType.kRedAvg)],  # gate_weights.grad
+            [dist.Partial(dist.ReduceType.kRedAvg)],  # e_score_correction_bias.grad
+            None,
+        ]
+        self.local_gate_part1 = dist.local_map(
+            self.local_gate_part1_compute,
+            self.local_gate_part1_out_dist_attrs,
+            self.local_gate_part1_grad_dist_attrs,
+            self.mesh,
+            reshard_inputs=True,
+        )
+
+        # local_gate_and_dispatch
+        self.local_gate_and_dispatch_out_dist_attrs = [
+            [dist.Shard(1)],  # dispatched_input [e,c,h]
+            [dist.Shard(0)],  # combine_weights [s,e,c]
+        ]
+        self.local_gate_and_dispatch_grad_dist_attrs = [
+            None,
+            None,
+        ]
+        self.local_gate_and_dispatch = dist.local_map(
+            self.local_gate_and_dispatch_compute,
+            self.local_gate_and_dispatch_out_dist_attrs,
+            self.local_gate_and_dispatch_grad_dist_attrs,
+            self.mesh,
+            reshard_inputs=True,
+        )
+
+        # local_combine
+        self.local_combine_out_dist_attrs = [[dist.Shard(0)]]
+        self.local_combine_grad_dist_attrs = [None, None, None, None]
+        self.local_combine = dist.local_map(
+            self.local_combine_compute,
+            self.local_combine_out_dist_attrs,
+            self.local_combine_grad_dist_attrs,
+            self.mesh,
+            reshard_inputs=True,
+        )
+
+    def local_gate_part1_compute(self, hidden_state, gate_weight, e_score_correction_bias, used_token=None):
+        # Implement Algorithm 2 from GShard paper.
+        batch_size, seq_len, d_model = hidden_state.shape
+        reshaped_input = hidden_state.reshape([-1, d_model])
+
+        # compute gating score
+        logits = F.linear(hidden_state, gate_weight, None)
+        with paddle.amp.auto_cast(False):
+            scores = self.gate.gate_score_func(logits=logits)
+            scores = scores.cast(paddle.get_default_dtype())
+
+        exp_counts, l_aux, l_zloss = self.gate.topkgating_part1(scores, e_score_correction_bias)
+
+        reshaped_scores = scores.reshape([-1, scores.shape[-1]])
+        return reshaped_input, reshaped_scores, exp_counts, l_aux, l_zloss
+
+    def local_gate_and_dispatch_compute(self, reshaped_input, scores):
+        combine_weights, dispatch_mask = self.gate.topkgating_part2(scores)
+        dispatched_input = einsum("sec,sm->ecm", paddle.cast(dispatch_mask, reshaped_input.dtype), reshaped_input)
+        return dispatched_input, combine_weights
+
+    def local_combine_compute(self, combine_weights, expert_output, dtype="float32", out_shape=None):
+        combined_output = einsum("sec,ecm->sm", combine_weights.cast(dtype), expert_output)
+        if out_shape is not None:
+            if dist.get_rank() in self.mesh.process_ids:
+                out_shape = dist.auto_parallel.moe_utils._cal_local_shape(
+                    out_shape, self.mesh, self.local_combine_out_dist_attrs[0]
+                )
+            combined_output = combined_output.reshape(out_shape)
+        return combined_output
 
     def _redistribute_experts(self, experts, moe_group: str):
         if moe_group != "None":
