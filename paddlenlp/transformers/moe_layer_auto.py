@@ -143,7 +143,6 @@ class MoELayer(nn.Layer):
             None,
             [dist.Partial(dist.ReduceType.kRedAvg)],  # gate_weights.grad
             [dist.Partial(dist.ReduceType.kRedAvg)],  # e_score_correction_bias.grad
-            None,
         ]
         self.local_gate_part1 = dist.local_map(
             self.local_gate_part1_compute,
@@ -172,7 +171,7 @@ class MoELayer(nn.Layer):
 
         # local_combine
         self.local_combine_out_dist_attrs = [[dist.Shard(0)]]
-        self.local_combine_grad_dist_attrs = [None, None, None, None]
+        self.local_combine_grad_dist_attrs = [None, None]
         self.local_combine = dist.local_map(
             self.local_combine_compute,
             self.local_combine_out_dist_attrs,
