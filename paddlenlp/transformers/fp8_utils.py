@@ -11,9 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-import os
-
 import numpy
 import paddle
 import paddle.nn.functional as F
@@ -30,7 +27,6 @@ except ImportError:
 
 try:
     import deep_gemm
-    import FusedQuantOps as FQO
     import kitchen
     import kitchen.quantization_subchannel_block_hybrid
     from kitchen.quantization import QParams, ScalingType
@@ -45,8 +41,6 @@ __all__ = [
     "ExpertsNode",
     "ExpertsGroupGemmNode",
 ]
-
-IF_USE_GROUP_GEMM_MASK = os.getenv("IF_USE_GROUP_GEMM_MASK", "False").lower() == "true"
 
 
 def kitchen_quant(x, backend=None, is_1d_scaled=True, return_transpose=False):
@@ -79,7 +73,7 @@ def kitchen_fp8_gemm(x_fp8, x_scale, w_fp8, w_scale, is_a_1d_scaled, is_b_1d_sca
         out_dtype = out.dtype
     else:
         accumulate = False
-        out_dtype = paddle.bfloat16
+        out_dtype = paddle.float32
     if numpy.prod(x_fp8.shape) != 0 and numpy.prod(w_fp8.shape) != 0:
         y = kitchen.ops.fp8_gemm_blockwise(
             a=x_fp8,
@@ -94,7 +88,7 @@ def kitchen_fp8_gemm(x_fp8, x_scale, w_fp8, w_scale, is_a_1d_scaled, is_b_1d_sca
             is_b_1d_scaled=is_b_1d_scaled,
         )
     else:
-        y = paddle.zeros([x_fp8.shape[0], w_fp8.shape[0]], out_dtype)
+        y = paddle.zeros([x_fp8.shape[0], w_fp8.shape[0]], paddle.float32)
         if out is not None:
             out = out + y
             return out
@@ -125,7 +119,7 @@ class ExpertsGroupGemmNode:
         self.unzipped_probs = None
         self.tokens_per_expert = None
 
-    def fwd_gate_up(self, x_fp8, x_scale, expert_w1, expert_w_count, tokens_per_expert):
+    def fwd_gate_up(self, x_bf16, expert_w1, expert_w_count, tokens_per_expert):
         # concat w1
         stacked_w1 = paddle.stack(expert_w1, axis=0)
         stacked_w1_t = paddle.transpose(stacked_w1, [0, 2, 1]).contiguous()
@@ -142,35 +136,20 @@ class ExpertsGroupGemmNode:
         w1_t_quant = w1_t_quant.reshape([expert_w_count, -1, w1_t_quant.shape[-1]])
         w1_t_scale = w1_t_scale.reshape([expert_w_count, -1, w1_t_scale.shape[-1]])
 
+        # quant x_bf16
+        x_fp8, x_scale = kitchen_quant(
+            x_bf16, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+        )
+
         # mask group gemm需要输入x是[group,m,n]
         x_fp8 = x_fp8.reshape([expert_w_count, -1, x_fp8.shape[-1]])
         x_scale = x_scale.reshape([expert_w_count, -1, x_scale.shape[-1]])
 
-        if IF_USE_GROUP_GEMM_MASK:
-            o1 = paddle.zeros([expert_w_count, x_fp8.shape[1], w1_t_quant.shape[1]], dtype="bfloat16")
-            deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_masked(
-                (x_fp8, x_scale), (w1_t_quant, w1_t_scale), o1, tokens_per_expert, x_fp8.shape[1]
-            )
-            return o1
-        else:
-            group_num, seq_len, H1 = x_fp8.shape
-            _, H2, _ = w1_t_quant.shape
-
-            out_0 = paddle.empty([seq_len, H2], dtype=paddle.bfloat16)
-            deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8[0], x_scale[0]), (w1_t_quant[0], w1_t_scale[0]), out_0)
-
-            out_1 = paddle.empty([seq_len, H2], dtype=paddle.bfloat16)
-            deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8[1], x_scale[1]), (w1_t_quant[1], w1_t_scale[1]), out_1)
-
-            out_2 = paddle.empty([seq_len, H2], dtype=paddle.bfloat16)
-            deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8[2], x_scale[2]), (w1_t_quant[2], w1_t_scale[2]), out_2)
-
-            out_3 = paddle.empty([seq_len, H2], dtype=paddle.bfloat16)
-            deep_gemm.gemm_fp8_fp8_bf16_nt((x_fp8[3], x_scale[3]), (w1_t_quant[3], w1_t_scale[3]), out_3)
-
-            o1 = paddle.stack([out_0, out_1, out_2, out_3])
-
-            return o1
+        o1 = paddle.zeros([expert_w_count, x_fp8.shape[1], w1_t_quant.shape[1]], dtype="bfloat16")
+        deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_masked(
+            (x_fp8, x_scale), (w1_t_quant, w1_t_scale), o1, tokens_per_expert, x_fp8.shape[1]
+        )
+        return o1
 
     def fwd_swiglu(self, o1):
         o2 = swiglu(o1)
@@ -201,35 +180,19 @@ class ExpertsGroupGemmNode:
         o2_scale = o2_scale.reshape([expert_w_count, -1, o2_scale.shape[-1]])
 
         # group gemm masked
-        if IF_USE_GROUP_GEMM_MASK:
-            o3 = paddle.zeros([expert_w_count, o2_quant.shape[1], w2_quant.shape[1]], dtype=paddle.bfloat16)
+        o3 = paddle.zeros([expert_w_count, o2_quant.shape[1], w2_quant.shape[1]], dtype=paddle.bfloat16)
 
-            deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_masked(
-                (o2_quant, o2_scale), (w2_quant, w2_sacle), o3, tokens_per_expert, o2_quant.shape[1]
-            )
-            return o3
-        else:
-            _, seq_len, H1 = o2_quant.shape
-            _, H2, _ = w2_quant.shape
-
-            out_0 = paddle.empty([seq_len, H2], dtype=paddle.bfloat16)
-            deep_gemm.gemm_fp8_fp8_bf16_nt((o2_quant[0], o2_scale[0]), (w2_quant[0], w2_sacle[0]), out_0)
-
-            out_1 = paddle.empty([seq_len, H2], dtype=paddle.bfloat16)
-            deep_gemm.gemm_fp8_fp8_bf16_nt((o2_quant[1], o2_scale[1]), (w2_quant[1], w2_sacle[1]), out_1)
-
-            out_2 = paddle.empty([seq_len, H2], dtype=paddle.bfloat16)
-            deep_gemm.gemm_fp8_fp8_bf16_nt((o2_quant[2], o2_scale[2]), (w2_quant[2], w2_sacle[2]), out_2)
-
-            out_3 = paddle.empty([seq_len, H2], dtype=paddle.bfloat16)
-            deep_gemm.gemm_fp8_fp8_bf16_nt((o2_quant[3], o2_scale[3]), (w2_quant[3], w2_sacle[3]), out_3)
-
-            o3 = paddle.stack([out_0, out_1, out_2, out_3])
-
-            return o3
+        deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_masked(
+            (o2_quant, o2_scale), (w2_quant, w2_sacle), o3, tokens_per_expert, o2_quant.shape[1]
+        )
+        return o3
 
     # ===== do2 = deep_gemm(do3_fp8, w2_fp8)
-    def bwd_dowm_input(self, expert_w2, unzipped_grad, unzipped_scale, tokens_per_expert, expected_m):
+    def bwd_dowm_input(self, expert_w2, unzipped_grad, tokens_per_expert, expected_m):
+        # recomput o2
+        o2 = self.fwd_swiglu(self.o1)
+        o2_s = (o2 * self.unzipped_probs).cast(paddle.bfloat16)
+
         # recompute concated_w2_2d
         stacked_w2 = paddle.stack(expert_w2, axis=0)
         concated_w2 = stacked_w2.reshape([-1, stacked_w2.shape[-1]])
@@ -241,71 +204,30 @@ class ExpertsGroupGemmNode:
         bw_w2_quant = bw_w2_quant.reshape([len(expert_w2), -1, bw_w2_quant.shape[-1]])
         bw_w2_scale = bw_w2_scale.reshape([len(expert_w2), -1, bw_w2_scale.shape[-1]])
 
-        # do2
-        unzipped_grad = unzipped_grad.reshape([len(expert_w2), -1, unzipped_grad.shape[-1]])
-        unzipped_scale = unzipped_scale.reshape([len(expert_w2), -1, unzipped_scale.shape[-1]])
+        unzipped_grad_fp8, unzipped_grad_scale = kitchen_quant(
+            unzipped_grad, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
+        )
+        unzipped_grad_fp8 = unzipped_grad_fp8.reshape([len(expert_w2), -1, unzipped_grad_fp8.shape[-1]])
+        unzipped_grad_scale = unzipped_grad_scale.reshape([len(expert_w2), -1, unzipped_grad_scale.shape[-1]])
+        do2_s = paddle.zeros([len(expert_w2), unzipped_grad_fp8.shape[1], bw_w2_quant.shape[1]], dtype="bfloat16")
+        deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_masked(
+            (unzipped_grad_fp8, unzipped_grad_scale),
+            (bw_w2_quant, bw_w2_scale),
+            do2_s,
+            tokens_per_expert,
+            expected_m,
+        )
+        # do2: 前向从bfloat16-->float32，反向从float32-->bfloat16,do2 需要保持 bfloat16（因为 o2 是 bfloat16)
+        do2 = (do2_s.cast(paddle.float32) * self.unzipped_probs).cast(paddle.bfloat16)
 
-        # do2 = paddle.empty([len(expert_w2), unzipped_grad.shape[1], bw_w2_quant.shape[1]], dtype="bfloat16")
-        if IF_USE_GROUP_GEMM_MASK:
-            do2 = paddle.zeros([len(expert_w2), unzipped_grad.shape[1], bw_w2_quant.shape[1]], dtype="bfloat16")
-            deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_masked(
-                (unzipped_grad, unzipped_scale),
-                (bw_w2_quant, bw_w2_scale),
-                do2,
-                tokens_per_expert,
-                expected_m,
-            )
-            # do2 = do2 * self.unzipped_probs.unsqueeze(-1)
-            do2 = do2 * (self.unzipped_probs.cast(paddle.bfloat16))
+        # probs_grad: probs_grad 需要保持 float32（因为 unzipped_probs 是 float32）
+        probs_grad = (do2_s.cast(paddle.float32) * (o2.cast(paddle.float32))).sum(axis=-1)
 
-            # recomput o2
-            o2 = self.fwd_swiglu(self.o1)
-            o2 = o2 * self.unzipped_probs.cast(paddle.bfloat16)
-
-            # probs_grad = (do2 * o2).sum(axis=-1)
-            probs_grad = ((do2.reshape([-1, do2.shape[-1]])) * (o2.reshape([-1, o2.shape[-1]]))).sum(axis=-1)
-
-            return do2, probs_grad, o2
-        else:
-            _, seq_len, H1 = unzipped_grad.shape
-            _, H2, _ = bw_w2_quant.shape
-
-            dx_0 = paddle.empty([seq_len, H2], dtype=paddle.bfloat16)
-            deep_gemm.gemm_fp8_fp8_bf16_nt(
-                (unzipped_grad[0], unzipped_scale[0]), (bw_w2_quant[0], bw_w2_scale[0]), dx_0
-            )
-
-            dx_1 = paddle.empty([seq_len, H2], dtype=paddle.bfloat16)
-            deep_gemm.gemm_fp8_fp8_bf16_nt(
-                (unzipped_grad[1], unzipped_scale[1]), (bw_w2_quant[1], bw_w2_scale[1]), dx_1
-            )
-
-            dx_2 = paddle.empty([seq_len, H2], dtype=paddle.bfloat16)
-            deep_gemm.gemm_fp8_fp8_bf16_nt(
-                (unzipped_grad[2], unzipped_scale[2]), (bw_w2_quant[2], bw_w2_scale[2]), dx_2
-            )
-
-            dx_3 = paddle.empty([seq_len, H2], dtype=paddle.bfloat16)
-            deep_gemm.gemm_fp8_fp8_bf16_nt(
-                (unzipped_grad[3], unzipped_scale[3]), (bw_w2_quant[3], bw_w2_scale[3]), dx_3
-            )
-
-            do2 = paddle.stack([dx_0, dx_1, dx_2, dx_3])
-            # do2 = do2 * self.unzipped_probs.unsqueeze(-1)
-            do2 = do2 * (self.unzipped_probs.cast(paddle.bfloat16))
-
-            # recomput o2
-            o2 = self.fwd_swiglu(self.o1)
-            o2 = o2 * self.unzipped_probs.cast(paddle.bfloat16)
-
-            # probs_grad = (do2 * o2).sum(axis=-1)
-            probs_grad = ((do2.reshape([-1, do2.shape[-1]])) * (o2.reshape([-1, o2.shape[-1]]))).sum(axis=-1)
-
-            return do2, probs_grad, o2
+        return do2, o2_s, probs_grad
 
     # ===== do1 = swiglu_grad(o1, None, do2) =====
-    def bwd_swiglu(self, o1, do2):
-        do1, _ = paddle._C_ops.swiglu_grad(self.o1, None, do2)
+    def bwd_swiglu(self, o1, do2, tokens_per_expert):
+        do1, _ = paddle._C_ops.swiglu_grad(o1, None, do2)
         return do1
 
     # ===== dx = deep_gemm(do1_fp8, w1_fp8)
@@ -327,38 +249,18 @@ class ExpertsGroupGemmNode:
         do1_fp8, do1_scale = kitchen_quant(
             do1_fp8_reshape, backend=kitchen.ops.Backend.CUTLASS, is_1d_scaled=True, return_transpose=False
         )
-        do1_fp8 = do1_fp8.reshape([len(expert_w1), -1, do1_fp8.shape[-1]])
-        do1_scale = do1_scale.reshape([len(expert_w1), -1, do1_scale.shape[-1]])
+
+        do1_fp8 = (do1_fp8.reshape([len(expert_w1), -1, do1_fp8.shape[-1]])).contiguous()
+        do1_scale = do1_scale.reshape([len(expert_w1), -1, do1_scale.shape[-1]]).contiguous()
 
         # group gemm
-        if IF_USE_GROUP_GEMM_MASK:
-            dx = paddle.zeros(shape=[len(expert_w1), do1_fp8.shape[1], bw_w1_quant.shape[1]], dtype=paddle.bfloat16)
-            deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_masked(
-                (do1_fp8, do1_scale), (bw_w1_quant, bw_w1_scale), dx, tokens_per_expert, expected_m
-            )
-            return dx
-        else:
-            group_num, seq_len, H1 = do1_fp8.shape
-            _, H2, _ = bw_w1_quant.shape
-
-            dx_0 = paddle.empty([seq_len, H2], dtype=paddle.bfloat16)
-            deep_gemm.gemm_fp8_fp8_bf16_nt((do1_fp8[0], do1_scale[0]), (bw_w1_quant[0], bw_w1_scale[0]), dx_0)
-
-            dx_1 = paddle.empty([seq_len, H2], dtype=paddle.bfloat16)
-            deep_gemm.gemm_fp8_fp8_bf16_nt((do1_fp8[1], do1_scale[1]), (bw_w1_quant[1], bw_w1_scale[1]), dx_1)
-
-            dx_2 = paddle.empty([seq_len, H2], dtype=paddle.bfloat16)
-            deep_gemm.gemm_fp8_fp8_bf16_nt((do1_fp8[2], do1_scale[2]), (bw_w1_quant[2], bw_w1_scale[2]), dx_2)
-
-            dx_3 = paddle.empty([seq_len, H2], dtype=paddle.bfloat16)
-            deep_gemm.gemm_fp8_fp8_bf16_nt((do1_fp8[3], do1_scale[3]), (bw_w1_quant[3], bw_w1_scale[3]), dx_3)
-
-            dx = paddle.stack([dx_0, dx_1, dx_2, dx_3])
-
-            return dx
+        dx = paddle.zeros(shape=[len(expert_w1), do1_fp8.shape[1], bw_w1_quant.shape[1]], dtype=paddle.bfloat16)
+        deep_gemm.m_grouped_gemm_fp8_fp8_bf16_nt_masked(
+            (do1_fp8, do1_scale), (bw_w1_quant, bw_w1_scale), dx, tokens_per_expert, expected_m
+        )
+        return dx
 
     # ===== dw2 = deep_gemm(o2_t_fp8, do3_t_fp8)
-
     def bwd_down_weight(self, out_grad, o2, expert_w2):
         # transpose o2
         group_num = len(expert_w2)
@@ -370,9 +272,8 @@ class ExpertsGroupGemmNode:
             o2_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
         )
 
-        o2_t_fp8 = o2_t_fp8.reshape([group_num, H2, -1])
-
-        o2_t_scale = o2_t_scale.reshape([group_num, H2, -1])
+        o2_t_fp8 = paddle.split(o2_t_fp8, num_or_sections=group_num, axis=0)
+        o2_t_scale = paddle.split(o2_t_scale, num_or_sections=group_num, axis=-1)
 
         # quant out_grad
         H1 = out_grad.shape[-1]
@@ -386,8 +287,6 @@ class ExpertsGroupGemmNode:
 
         out_grad_fp8 = out_grad_fp8.reshape([group_num, H1, -1])  # [4, 8448, 7196]
         out_grad_scale = paddle.split(out_grad_scale, num_or_sections=group_num, axis=-1)
-        # out_grad_scale = out_grad_scale.T.contiguous().reshape([group_num, H1, -1])
-        # out_grad_scale = out_grad_scale.reshape([group_num, H1, -1])
 
         for i in range(len(expert_w2)):
             if hasattr(expert_w2[i], "main_grad"):
@@ -417,15 +316,13 @@ class ExpertsGroupGemmNode:
 
         group_num = len(expert_w1)
         H1 = input_x.shape[-1]
-
         input_x = input_x.reshape([group_num, -1, H1]).transpose([0, 2, 1]).contiguous().reshape([group_num * H1, -1])
-        # input_x = input_x.reshape([group_num, -1, H1]).transpose([0, 2, 1]).reshape([group_num * H1, -1]).contiguous()
 
         input_x_fp8, input_x_scale = kitchen_quant(
             input_x, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
         )
-        input_x_fp8 = input_x_fp8.reshape([group_num, H1, -1])
-        input_x_scale = input_x_scale.reshape([group_num, H1, -1])
+        input_x_fp8 = paddle.split(input_x_fp8, num_or_sections=group_num, axis=0)
+        input_x_scale = paddle.split(input_x_scale, num_or_sections=group_num, axis=-1)
 
         # transpose do1 and quant do1
         H2 = do1.shape[-1]
@@ -433,10 +330,8 @@ class ExpertsGroupGemmNode:
         do1_fp8, do1_scale = kitchen_quant(
             do1, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
         )
-        do1_fp8 = do1_fp8.reshape([group_num, H2, -1])
-        # do1_scale = do1_scale.T.contiguous().reshape([group_num, H2, -1])
+        do1_fp8 = paddle.split(do1_fp8, num_or_sections=group_num, axis=0)
         do1_scale = paddle.split(do1_scale, num_or_sections=group_num, axis=-1)
-        # do1_scale = do1_scale.reshape([group_num, H2, -1])
 
         # dw1
         for i in range(len(expert_w1)):
@@ -462,8 +357,7 @@ class ExpertsGroupGemmNode:
                 )
 
     @paddle.no_grad()
-    def forward(self, hs_out, hs_scale_out, unzipped_probs, tokens_per_expert):
-        # self.tokens_per_expert = tokens_per_expert
+    def forward(self, hs_out, unzipped_probs, tokens_per_expert):
         # get w1
         expert_w1 = [x.w1 for x in self.custom_map.experts if x is not None]
 
@@ -473,51 +367,47 @@ class ExpertsGroupGemmNode:
         expert_w2 = [x.w2 for x in self.custom_map.experts if x is not None]
 
         # o1
-        o1 = self.fwd_gate_up(hs_out, hs_scale_out, expert_w1, expert_w_count, tokens_per_expert)
+        o1 = self.fwd_gate_up(hs_out, expert_w1, expert_w_count, tokens_per_expert)
         self.o1 = o1
 
         # o2
         o2 = self.fwd_swiglu(o1)
+
         unzipped_probs = unzipped_probs.unsqueeze(-1).reshape([expert_w_count, -1, 1])
-        o2 = o2 * unzipped_probs
+
+        o2_s = (o2 * unzipped_probs).cast(paddle.bfloat16)
 
         # o3
-        o3 = self.fwd_down(o2, expert_w2, expert_w_count, tokens_per_expert)
+        o3 = self.fwd_down(o2_s, expert_w2, expert_w_count, tokens_per_expert)
 
         # save for bwd
         self.unzipped_probs = unzipped_probs
         self.unzipped_tokens = hs_out
-        self.unzipped_scale = hs_scale_out
-
         return o3
 
     @paddle.no_grad()
-    def backward(self, out_grad, out_grad_scale, tokens_per_expert, dispatched_indices, expected_m):
+    def backward(self, out_grad, tokens_per_expert, dispatched_indices, expected_m):
         # recompute expert_w2 and expert_w1
         expert_w2 = [x.w2 for x in self.custom_map.experts if x is not None]
         expert_w1 = [x.w1 for x in self.custom_map.experts if x is not None]
 
         # do2
-        do2, probs_grad, o2 = self.bwd_dowm_input(expert_w2, out_grad, out_grad_scale, tokens_per_expert, expected_m)
+        do2, o2_s, probs_grad = self.bwd_dowm_input(expert_w2, out_grad, tokens_per_expert, expected_m)
+
         # do1
-        do1 = self.bwd_swiglu(self.o1, do2)
+        do1 = self.bwd_swiglu(self.o1, do2, tokens_per_expert)
 
         # dx
         dx = self.bwd_gate_up_input(do1, expert_w1, tokens_per_expert, expected_m)
         dx = dx.reshape([-1, dx.shape[-1]])
 
-        # dequant dout
-        out_grad_dequant_fp16 = FQO.fused_act_dequant(out_grad, out_grad_scale)
-
         # dw2
-        self.bwd_down_weight(out_grad_dequant_fp16, o2, expert_w2)
-        input_x = FQO.fused_act_dequant(self.unzipped_tokens, self.unzipped_scale)
+        self.bwd_down_weight(out_grad, o2_s, expert_w2)
 
         # dw1
-        self.bwd_gate_up_weight(do1, input_x, expert_w1)
+        self.bwd_gate_up_weight(do1, self.unzipped_tokens, expert_w1)
 
         self.reset_statue()
-
         return dx, probs_grad
 
 

@@ -194,7 +194,7 @@ def kitchen_fp8_gemm(x_fp8, x_scale, w_fp8, w_scale, is_a_1d_scaled, is_b_1d_sca
             a_decode_scale=x_scale,
             b=w_fp8,
             b_decode_scale=w_scale,
-            out_dtype=paddle.bfloat16,
+            out_dtype=paddle.float32,
             out=None,
             accumulate=False,
             use_split_accumulator=True,
@@ -202,7 +202,7 @@ def kitchen_fp8_gemm(x_fp8, x_scale, w_fp8, w_scale, is_a_1d_scaled, is_b_1d_sca
             is_b_1d_scaled=is_b_1d_scaled,
         )
     else:
-        y = paddle.zeros([x_fp8.shape[0], w_fp8.shape[0]], paddle.bfloat16)
+        y = paddle.zeros([x_fp8.shape[0], w_fp8.shape[0]], paddle.float32)
     return y
 
 
