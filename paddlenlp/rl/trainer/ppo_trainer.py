@@ -1147,7 +1147,7 @@ class PPOTrainer(Trainer):
     def distribute_gather_and_pad_data(self, batch):
         # group index for grpo
         eos_mask = (batch["input_ids"] != self.tokenizer.pad_token_id)[:, batch["prompt"].shape[-1] :].to(
-            self.args.model_dtype
+            batch["log_probs"].dtype  # fix dtype
         )
         try:
             hcg = fleet.get_hybrid_communicate_group()
@@ -1592,7 +1592,7 @@ class PPOTrainer(Trainer):
 
                 # prepare data for reinforce_plus_plus & grpo
                 if self.args.rl_algorithm in ["reinforce_plus_plus", "grpo"]:
-                    local_batch = batch
+                    local_batch = copy.deepcopy(batch)
                     batch = self.distribute_gather_and_pad_data(batch)
                 else:
                     local_batch = batch

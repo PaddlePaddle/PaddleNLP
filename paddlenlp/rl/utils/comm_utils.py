@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import sys
 from collections import defaultdict
 from enum import Enum, auto
@@ -1066,7 +1067,8 @@ def split_batch_into_micro_batches(total_batch, batch_size, pad_token_id=0):
             else:
                 raise TypeError(f"Unsupported data type for key {key}: {type(data)}")
 
-        micro_batch = process_prompt_and_response(micro_batch=micro_batch, pad_token_id=pad_token_id)
+        if os.getenv("PROCESS_PROMPT_AND_RESPONSE", "1").lower() in ["1", "t", "true", "yes", "y"]:
+            micro_batch = process_prompt_and_response(micro_batch=micro_batch, pad_token_id=pad_token_id)
 
         micro_batches.append(micro_batch)
 
