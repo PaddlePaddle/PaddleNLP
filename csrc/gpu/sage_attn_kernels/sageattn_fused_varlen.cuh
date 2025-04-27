@@ -20,6 +20,10 @@ std::vector<paddle::Tensor> per_channel_varlen_fp8(paddle::Tensor& v, // total_s
                                                   float scale_max,
                                                   bool smooth_v);
 
+std::vector<paddle::Tensor> chunked_segment_mean_fwd(paddle::Tensor& input,         // [total_seqlen, num_head, head_dim]
+                                                     paddle::Tensor& cu_seqlens,    // [batch_size + 1], prefix-sum array of sequence lengths
+                                                     const int max_seqlen);
+
 std::vector<paddle::Tensor> sage_attention_varlen_fwd(paddle::Tensor& q,          // total_seqlen x num_head x head_dim
                                                       paddle::Tensor& k,          // total_seqlen x num_head x head_dim
                                                       paddle::Tensor& v,          // total_seqlen x num_head x head_dim
@@ -27,6 +31,7 @@ std::vector<paddle::Tensor> sage_attention_varlen_fwd(paddle::Tensor& q,        
                                                       paddle::Tensor& cu_seqlen_v_padded,
                                                       paddle::Tensor& km,
                                                       paddle::optional<paddle::Tensor>& vm,
+                                                      const std::vector<int64_t>& split_vec,
                                                       int max_seqlen_q,
                                                       int max_seqlen_k,
                                                       int total_seqlen_v_padded,

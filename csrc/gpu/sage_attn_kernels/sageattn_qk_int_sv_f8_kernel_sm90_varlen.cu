@@ -631,6 +631,7 @@ std::vector<paddle::Tensor> sage_attention_varlen_fwd(paddle::Tensor& q,        
                                                       paddle::Tensor& cu_seqlen_v_padded,
                                                       paddle::Tensor& km,
                                                       paddle::optional<paddle::Tensor>& vm,
+                                                      const std::vector<int64_t>& split_vec,
                                                       int max_seqlen_q,
                                                       int max_seqlen_k,
                                                       int total_seqlen_v_padded,
@@ -651,7 +652,7 @@ std::vector<paddle::Tensor> sage_attention_varlen_fwd(paddle::Tensor& q,        
   PD_CHECK(q.strides()[2] == 1 && k.strides()[2] == 1 && v.strides()[2] == 1, "Last dim of qkv must be contiguous.");
 
   // split, padding to 128-align, and concat
-  std::vector<paddle::Tensor> v_splited = paddle::split(v, v.shape(), {0}); // split along the total_seqlen axis.
+  std::vector<paddle::Tensor> v_splited = paddle::split(v, split_vec, {0}); // split along the total_seqlen axis.
   for (auto& vi : v_splited) {
     int v_pad_len = (vi.shape()[0] % 128 != 0) ? (128 - vi.shape()[0] % 128) : 0;
     if (v_pad_len > 0) {

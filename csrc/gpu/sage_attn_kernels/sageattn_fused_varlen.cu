@@ -850,6 +850,7 @@ std::vector<paddle::Tensor> per_channel_varlen_fp8(paddle::Tensor& v,           
     // int padded_len = (kv_len + 63) / 64 * 64;
     PD_CHECK(padded_total_seq_len % 128 == 0 || padded_total_seq_len % 64 == 0, "v must be 64 or 128 padded");
 
+    // note: there may be a bug. We use zeros method instead of empty method.
     paddle::Tensor v_transposed_permutted = paddle::zeros({head_dim, h_kv, padded_total_seq_len}, v.dtype(), paddle::GPUPlace());
     
     transpose_pad_permute_varlen_cuda_fwd(v, v_transposed_permutted, 

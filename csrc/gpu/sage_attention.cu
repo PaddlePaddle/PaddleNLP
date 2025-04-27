@@ -24,7 +24,6 @@ template <paddle::DataType D>
 std::vector<paddle::Tensor> SageAttentionKernel(
     const AppendAttnMetaData& meta_data,
     const paddle::Tensor& qkv,  // write kv
-    paddle::Tensor& km,   // sage attn
     const paddle::Tensor& key_cache,          // write kv
     const paddle::Tensor& value_cache,        // write kv
     const paddle::Tensor& seq_lens_encoder,   // write kv
@@ -59,9 +58,11 @@ std::vector<paddle::Tensor> SageAttentionKernel(
     const paddle::optional<paddle::Tensor>& cache_v_zp,   // write kv
     const paddle::optional<paddle::Tensor>& out_linear_shifts,  // CascadeAppendAttention
     const paddle::optional<paddle::Tensor>& out_linear_smooths, // CascadeAppendAttention
+    const std::vector<int64_t>& split_vec,    // sage attn
     const std::string& cache_quant_type_str,  // write kv
     const bool use_neox_rotary_style, // write kv
     const int max_input_length, // write kv
+    const int total_seqlen_v_padded, // sage attn
     const float softmax_scale,  // sage attn
     const float quant_max_bound,  // CascadeAppendAttention
     const float quant_min_bound,  // CascadeAppendAttention
@@ -157,7 +158,7 @@ std::vector<paddle::Tensor> SageAttentionKernel(
         const_cast<paddle::Tensor*>(&value_cache));
 
     // qkv_out: [token_num, (q_num_head + 2 x kv_num_head) x head_dim]
-    int batch_size = seq_lens_this_time.shape()[0];
+    int batch_size = cu_seqlen.shape()[0] - 1;
 
     const int num_q_head = meta_data.q_num_heads;
     const int head_dim_qk = meta_data.head_dims;
@@ -169,7 +170,8 @@ std::vector<paddle::Tensor> SageAttentionKernel(
     paddle::Tensor q = paddle::reshape(qkv_with_rope[0], {-1, num_q_head, head_dim_qk});
     paddle::Tensor k = paddle::reshape(qkv_with_rope[1], {-1, num_kv_head, head_dim_qk});
     paddle::Tensor v = paddle::reshape(qkv_with_rope[2], {-1, num_kv_head, head_dim_v});
-    const int total_seqlen_v_padded = cu_seqlen_v_padded.data<int>()[batch_size - 1];  // v_padded shape: total_seqlen_v_padded x num_head x head_dim
+
+    paddle::Tensor km = chunked_segment_mean_fwd(k, cu_seqlen, max_enc_len_this_time_data)[0];
 
     // use varlen API
     paddle::optional<paddle::Tensor> vm = paddle::optional<paddle::Tensor>(paddle::empty({1}, paddle::DataType::FLOAT32, paddle::GPUPlace()));
@@ -181,6 +183,7 @@ std::vector<paddle::Tensor> SageAttentionKernel(
                                         cu_seqlen_v_padded,
                                         km, 
                                         vm, 
+                                        split_vec,
                                         max_enc_len_this_time_data, // max_seqlen_q
                                         max_enc_len_this_time_data, // max_seqlen_k
                                         total_seqlen_v_padded,
@@ -298,11 +301,6 @@ std::vector<paddle::Tensor> SageAttentionKernel(
 
 std::vector<paddle::Tensor> SageAttention(
     const paddle::Tensor& qkv,
-    paddle::Tensor& q,
-    paddle::Tensor& k,
-    paddle::Tensor& v,
-    paddle::Tensor& v_padded,
-    paddle::Tensor& km,
     const paddle::Tensor& key_cache,
     const paddle::Tensor& value_cache,
     const paddle::Tensor& seq_lens_encoder,
@@ -337,10 +335,12 @@ std::vector<paddle::Tensor> SageAttention(
     const paddle::optional<paddle::Tensor>& cache_v_zp,
     const paddle::optional<paddle::Tensor>& out_linear_shifts,
     const paddle::optional<paddle::Tensor>& out_linear_smooths,
+    const std::vector<int64_t>& split_vec,
     const std::string& compute_dtype,
     const std::string& cache_quant_type_str,
     const bool use_neox_rotary_style,
     const int max_input_length,
+    const int total_seqlen_v_padded,
     const float softmax_scale,
     const float quant_max_bound,
     const float quant_min_bound,
@@ -369,7 +369,6 @@ std::vector<paddle::Tensor> SageAttention(
       return SageAttentionKernel<paddle::DataType::FLOAT16>(
           meta_data,
           qkv,
-          km,
           key_cache,
           value_cache,
           seq_lens_encoder,
@@ -404,9 +403,11 @@ std::vector<paddle::Tensor> SageAttention(
           cache_v_zp,
           out_linear_shifts,
           out_linear_smooths,
+          split_vec,
           cache_quant_type_str,
           use_neox_rotary_style,
           max_input_length,
+          total_seqlen_v_padded,
           softmax_scale,
           quant_max_bound,
           quant_min_bound,
@@ -419,7 +420,6 @@ std::vector<paddle::Tensor> SageAttention(
       return SageAttentionKernel<paddle::DataType::BFLOAT16>(
           meta_data,
           qkv,
-          km,
           key_cache,
           value_cache,
           seq_lens_encoder,
@@ -454,9 +454,11 @@ std::vector<paddle::Tensor> SageAttention(
           cache_v_zp,
           out_linear_shifts,
           out_linear_smooths,
+          split_vec,
           cache_quant_type_str,
           use_neox_rotary_style,
           max_input_length,
+          total_seqlen_v_padded,
           softmax_scale,
           quant_max_bound,
           quant_min_bound,
@@ -477,7 +479,6 @@ std::vector<paddle::Tensor> SageAttention(
 
 std::vector<std::vector<int64_t>> SageAttentionInferShape(
     const std::vector<int64_t>& qkv_shape,
-    const std::vector<int64_t>& km_shape,
     const std::vector<int64_t>& key_cache_shape,
     const std::vector<int64_t>& value_cache_shape,
     const std::vector<int64_t>& seq_lens_encoder_shape,
@@ -524,7 +525,6 @@ std::vector<std::vector<int64_t>> SageAttentionInferShape(
 
 std::vector<paddle::DataType> SageAttentionInferDtype(
     const paddle::DataType& qkv_dtype,
-    const paddle::DataType& km_dtype,
     const paddle::DataType& key_cache_dtype,
     const paddle::DataType& value_cache_dtype,
     const paddle::DataType& seq_lens_encoder_dtype,
@@ -559,10 +559,12 @@ std::vector<paddle::DataType> SageAttentionInferDtype(
     const paddle::optional<paddle::DataType>& cache_v_zp_dtype,
     const paddle::optional<paddle::DataType>& out_linear_shifts_dtype,
     const paddle::optional<paddle::DataType>& out_linear_smooths_dtype,
+    const std::vector<int64_t>& split_vec,
     const std::string& compute_dtype,
     const std::string& cache_quant_type_str,
     const bool use_neox_rotary_style,
     const int max_input_length,
+    const int total_seqlen_v_padded,
     const float softmax_scale,
     const float quant_max_bound,
     const float quant_min_bound,
@@ -601,7 +603,6 @@ std::vector<paddle::DataType> SageAttentionInferDtype(
 
 PD_BUILD_OP(sage_attention)
     .Inputs({"qkv",
-             "km",
              "key_cache",
              "value_cache",
              "seq_lens_encoder",
@@ -639,10 +640,12 @@ PD_BUILD_OP(sage_attention)
     .Outputs({"fmha_out", "qkv_out", "key_cache_out", "value_cache_out"})
     .SetInplaceMap({{"key_cache", "key_cache_out"},
                     {"value_cache", "value_cache_out"}})
-    .Attrs({"compute_type: std::string",
+    .Attrs({"split_vec: std::vector<int64_t>",
+            "compute_type: std::string",
             "cache_quant_type: std::string",
             "use_neox_rotary_style: bool",
             "max_input_length: int",
+            "total_seqlen_v_padded: int",
             "softmax_scale: float",
             "quant_max_bound: float",
             "quant_min_bound: float",

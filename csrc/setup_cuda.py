@@ -179,8 +179,8 @@ if cc >= 80:
 
     sources += find_end_files("./gpu/append_attn", ".cu")
     sources += find_end_files_with_prefix("./gpu/append_attn/template_instantiation", ".cu", "append_attention_c16")
-    # sources += find_end_files_with_prefix("./gpu/append_attn/template_instantiation", ".cu", "append_attention_c8")
-    # sources += find_end_files_with_prefix("./gpu/append_attn/template_instantiation", ".cu", "append_attention_c4")
+    sources += find_end_files_with_prefix("./gpu/append_attn/template_instantiation", ".cu", "append_attention_c8")
+    sources += find_end_files_with_prefix("./gpu/append_attn/template_instantiation", ".cu", "append_attention_c4")
 
 
 fp8_auto_gen_directory = "gpu/cutlass_kernels/fp8_gemm_fused/autogen"
@@ -188,15 +188,15 @@ if os.path.isdir(fp8_auto_gen_directory):
     shutil.rmtree(fp8_auto_gen_directory)
 
 
-# if cc == 89 and cuda_version >= 12.4:
-#     os.system("python utils/auto_gen_fp8_fp8_gemm_fused_kernels.py --cuda_arch 89")
-#     os.system("python utils/auto_gen_fp8_fp8_dual_gemm_fused_kernels.py --cuda_arch 89")
-#     sources += find_end_files(fp8_auto_gen_directory, ".cu")
-#     sources += [
-#         "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_gemm.cu",
-#         "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_cuda_core_gemm.cu",
-#         "gpu/fp8_gemm_with_cutlass/fp8_fp8_fp8_dual_gemm.cu",
-#     ]
+if cc == 89 and cuda_version >= 12.4:
+    os.system("python utils/auto_gen_fp8_fp8_gemm_fused_kernels.py --cuda_arch 89")
+    os.system("python utils/auto_gen_fp8_fp8_dual_gemm_fused_kernels.py --cuda_arch 89")
+    sources += find_end_files(fp8_auto_gen_directory, ".cu")
+    sources += [
+        "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_gemm.cu",
+        "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_cuda_core_gemm.cu",
+        "gpu/fp8_gemm_with_cutlass/fp8_fp8_fp8_dual_gemm.cu",
+    ]
 
 if cc >= 80 and nvcc_version >= Version("12.4"):
     nvcc_compile_args += [
@@ -208,6 +208,7 @@ if cc >= 80 and nvcc_version >= Version("12.4"):
     sources += [
         "./gpu/sage_attn_kernels/sageattn_fused.cu",
         "./gpu/sage_attn_kernels/sageattn_fused_varlen.cu",
+        "./gpu/sage_attn_kernels/segment_mean.cu",
         "./gpu/sage_attention.cu",
     ]
     if cc >= 80 and cc < 89:
@@ -232,18 +233,18 @@ if cc >= 80 and nvcc_version >= Version("12.4"):
         nvcc_compile_args += ["-gencode", "arch=compute_90a,code=compute_90a"]
 
 if cc >= 90 and cuda_version >= 12.0:
-    # os.system("python utils/auto_gen_fp8_fp8_gemm_fused_kernels_sm90.py --cuda_arch 90")
-    # os.system("python utils/auto_gen_fp8_fp8_gemm_fused_kernels_ptr_scale_sm90.py --cuda_arch 90")
-    # os.system("python utils/auto_gen_fp8_fp8_dual_gemm_fused_kernels_sm90.py --cuda_arch 90")
-    # os.system("python utils/auto_gen_fp8_fp8_block_gemm_fused_kernels_sm90.py --cuda_arch 90")
-    # sources += find_end_files(fp8_auto_gen_directory, ".cu")
-    # sources += [
-    #     "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_gemm.cu",
-    #     "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_cuda_core_gemm.cu",
-    #     "gpu/fp8_gemm_with_cutlass/fp8_fp8_fp8_dual_gemm.cu",
-    #     "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_block_gemm.cu",
-    #     "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_gemm_ptr_scale.cu",
-    # ]
+    os.system("python utils/auto_gen_fp8_fp8_gemm_fused_kernels_sm90.py --cuda_arch 90")
+    os.system("python utils/auto_gen_fp8_fp8_gemm_fused_kernels_ptr_scale_sm90.py --cuda_arch 90")
+    os.system("python utils/auto_gen_fp8_fp8_dual_gemm_fused_kernels_sm90.py --cuda_arch 90")
+    os.system("python utils/auto_gen_fp8_fp8_block_gemm_fused_kernels_sm90.py --cuda_arch 90")
+    sources += find_end_files(fp8_auto_gen_directory, ".cu")
+    sources += [
+        "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_gemm.cu",
+        "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_cuda_core_gemm.cu",
+        "gpu/fp8_gemm_with_cutlass/fp8_fp8_fp8_dual_gemm.cu",
+        "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_block_gemm.cu",
+        "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_gemm_ptr_scale.cu",
+    ]
     sources += find_end_files("./gpu/mla_attn", ".cu")
 
 ops_name = f"paddlenlp_ops_{sm_version}" if sm_version != 0 else "paddlenlp_ops"
