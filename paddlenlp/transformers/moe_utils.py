@@ -156,17 +156,11 @@ class ZipNode:
     def __init__(self, token_dispatcher, name="zip"):
         self.token_dispatcher = token_dispatcher
         self.name = name
-        self.expert_out = None
-
-    def reset_status(self):
-        self.expert_out = None
 
     @paddle.no_grad()
     def forward(
         self, expert_out, zipped_expertwise_rowmap, routemap_topk, unzipped_probs, total_zipped_tokens, num_experts
     ):
-        self.expert_out = expert_out
-        self.unzipped_probs = unzipped_probs
         expert_out_zipped, zipped_probs_topk = TDU.tokens_zip(
             expert_out, zipped_expertwise_rowmap, routemap_topk, unzipped_probs, total_zipped_tokens, num_experts
         )

@@ -187,14 +187,14 @@ def kitchen_quant(x, backend=None, is_1d_scaled=True, return_transpose=False):
         return (qresult_ref.data, qresult_ref.scale)
 
 
-def kitchen_fp8_gemm(x_fp8, x_scale, w_fp8, w_scale, is_a_1d_scaled, is_b_1d_scaled):
+def kitchen_fp8_gemm(x_fp8, x_scale, w_fp8, w_scale, is_a_1d_scaled, is_b_1d_scaled, rtn_dtype=paddle.float32):
     if numpy.prod(x_fp8.shape) != 0 and numpy.prod(w_fp8.shape) != 0:
         y = kitchen.ops.fp8_gemm_blockwise(
             a=x_fp8,
             a_decode_scale=x_scale,
             b=w_fp8,
             b_decode_scale=w_scale,
-            out_dtype=paddle.float32,
+            out_dtype=rtn_dtype,
             out=None,
             accumulate=False,
             use_split_accumulator=True,
@@ -202,7 +202,7 @@ def kitchen_fp8_gemm(x_fp8, x_scale, w_fp8, w_scale, is_a_1d_scaled, is_b_1d_sca
             is_b_1d_scaled=is_b_1d_scaled,
         )
     else:
-        y = paddle.zeros([x_fp8.shape[0], w_fp8.shape[0]], paddle.float32)
+        y = paddle.zeros([x_fp8.shape[0], w_fp8.shape[0]], rtn_dtype)
     return y
 
 

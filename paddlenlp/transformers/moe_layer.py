@@ -688,9 +688,7 @@ class FusionMoeNode:
 
     @paddle.no_grad()
     def forward(self, hidden_states, probs, routing_map):
-        hs_2d, token_indices, token_probs = self.dispatch_quant_node.forward(  # bf16 dispatch
-            hidden_states, probs, routing_map
-        )
+        hs_2d, token_indices, token_probs = self.dispatch_quant_node.forward(hidden_states, probs, routing_map)
         hs_2d_dispatched, dispatched_indices, dispatched_probs = self.dispatch_node.forward(
             hs_2d, token_indices, token_probs
         )
