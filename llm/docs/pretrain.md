@@ -45,7 +45,7 @@ cd PaddleNLP/llm
 
 ## 开始训练
 
-为了方便用户运行测试本模型，本项目提供了处理好的100k 条doc 的训练样本：
+为了方便用户运行测试本模型，本项目提供了处理好的100k 条 doc 的训练样本：
 
 ```bash
 # llama 模型数据下载
@@ -89,7 +89,9 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py 
 预训练成功后，打印信息如下（以 Qwen 为例）：
 
 ```bash
+# 最终的预训练模型配置
 Final pre-training config: Qwen2Config {
+  # 模型架构：Qwen2
   "architectures": [
     "Qwen2ForCausalLM"
   ],
@@ -97,6 +99,8 @@ Final pre-training config: Qwen2Config {
   ...
   "vocab_size": 152064
 }
+
+# 下载进度为 25%，当前正在下载第 1 个分片，总共有 4 个分片
 Downloading shards:  25%|█████████████████████▎                                                               | 1/4 [00:43<02:11, 43.73s/it]
 Downloading shards:  50%|██████████████████████████████████████████▌                                          | 2/4 [01:27<01:27, 43.84s/it]
 Downloading shards:  75%|█████████████████████████████████████████████████████████▍                           | 3/4 [02:10<01:05, 43.92s/it]
@@ -115,7 +119,7 @@ Downloading shards: 100%|██████████████████�
 6. 多机训练时，若各机器使用的训练数据文件位置相同（例如挂载共享硬盘情况），请指定`--share_folder true`使全局0号卡制作缓存数据。否则默认各台机器的0号卡独立制作缓存数据。
 7. 若数据集文件夹中存在默认缓存文件夹`index-cache/`，则额外指定的`--data_cache`不生效，训练时优先加载默认缓存文件夹中的内容。
 
-预训练使用了 PaddleNLP 的Trainer 模块，相关分布式策略使用，请参考[大模型 Trainer 混合并行训练教程](./llm_trainer.rst)。
+预训练使用了 PaddleNLP 的 Trainer 模块，相关分布式策略使用，请参考[大模型 Trainer 混合并行训练教程](./llm_trainer.rst)。
 
 
 
