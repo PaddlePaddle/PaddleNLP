@@ -98,12 +98,11 @@ for file_name in `git diff --numstat ${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`
     fi
 done
 }
-
-install_requirements
-set_env
 get_diff_TO_case
-cd ${nlp_dir}
 if [[ ${FLAGS_enable_run} == "true" ]];then
+    install_requirements
+    set_env
+    cd ${nlp_dir}
     echo ' Testing all unittest cases '
     export http_proxy=${proxy} && export https_proxy=${proxy}
     set +e
