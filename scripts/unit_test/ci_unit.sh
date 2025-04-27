@@ -16,6 +16,7 @@
 
 set -e
 export paddle=$1
+export FLAGS_enable_CE=${2-false}
 export nlp_dir=/workspace/PaddleNLP
 export log_path=/workspace/PaddleNLP/unittest_logs
 cd $nlp_dir
@@ -49,10 +50,15 @@ set_env() {
     export FLAGS_cudnn_deterministic=1
     export HF_ENDPOINT=https://hf-mirror.com
     export FLAGS_use_cuda_managed_memory=true
+    export FLAGS_enable_run=false
     # for CE
-    # export CE_TEST_ENV=1
-    # export RUN_SLOW_TEST=1
-    # export PYTHONPATH=${nlp_dir}:${nlp_dir/llm/
+    if [[ ${FLAGS_enable_CE} == "true" ]];then
+        export CE_TEST_ENV=1
+        export RUN_SLOW_TEST=1
+        export PYTHONPATH=${nlp_dir}:${nlp_dir}/llm:${PYTHONPATH}
+    else
+        continue
+    fi
 }
 
 print_info() {
@@ -74,25 +80,49 @@ print_info() {
     fi
 }
 
+get_diff_TO_case(){
+for file_name in `git diff --numstat ${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
+    arr_file_name=(${file_name//// })
+    dir1=${arr_file_name[0]}
+    dir2=${arr_file_name[1]}
+    dir3=${arr_file_name[2]}
+    dir4=${arr_file_name[3]}
+    file_item=$dir1/$dir2/$dir3/$dir4
+    echo "file_name:"${file_name}, "dir1:"${dir1}, "dir2:"${dir2},"dir3:"${dir3},".xx:" ${file_name##*.}
+    if [ ! -f ${file_name} ];then # 针对pr删掉文件
+        continue
+    elif [[ ${file_name##*.} == "md" ]] || [[ ${file_name##*.} == "rst" ]] || [[ ${dir1} == "docs" ]];then
+        continue
+    else
+        FLAGS_enable_run=true
+    fi
+done
+}
+
 install_requirements
 set_env
+get_diff_TO_case
 cd ${nlp_dir}
-echo ' Testing all unittest cases '
-export http_proxy=${proxy} && export https_proxy=${proxy}
-set +e
-timeout 30m python -m pytest -v -n 8 \
-  --dist loadgroup \
-  --retries 1 --retry-delay 1 \
-  --timeout 200 --durations 20 --alluredir=result \
-  --cov paddlenlp --cov-report xml:coverage.xml > ${log_path}/unittest.log 2>&1
-exit_code=$?
-print_info $exit_code unittest
+if [[ ${FLAGS_enable_run} == "true" ]];then
+    echo ' Testing all unittest cases '
+    export http_proxy=${proxy} && export https_proxy=${proxy}
+    set +e
+    timeout 30m python -m pytest -v -n 8 \
+    --dist loadgroup \
+    --retries 1 --retry-delay 1 \
+    --timeout 200 --durations 20 --alluredir=result \
+    --cov paddlenlp --cov-report xml:coverage.xml > ${log_path}/unittest.log 2>&1
+    exit_code=$?
+    print_info $exit_code unittest
 
-cd ${nlp_dir}
-echo -e "\033[35m ---- Genrate Allure Report  \033[0m"
-unset http_proxy && unset https_proxy
-cp scripts/regression/gen_allure_report.py ./
-python gen_allure_report.py > /dev/null
-echo -e "\033[35m ---- Report: https://xly.bce.baidu.com/ipipe/ipipe-report/report/${AGILE_JOB_BUILD_ID}/report/  \033[0m"
-
+    cd ${nlp_dir}
+    echo -e "\033[35m ---- Genrate Allure Report  \033[0m"
+    unset http_proxy && unset https_proxy
+    cp scripts/regression/gen_allure_report.py ./
+    python gen_allure_report.py > /dev/null
+    echo -e "\033[35m ---- Report: https://xly.bce.baidu.com/ipipe/ipipe-report/report/${AGILE_JOB_BUILD_ID}/report/  \033[0m"
+else
+    echo -e "\033[32m Changed Not CI case, Skips \033[0m"
+    exit_code=0
+fi
 exit $exit_code
