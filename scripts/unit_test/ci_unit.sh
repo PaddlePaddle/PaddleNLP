@@ -50,7 +50,7 @@ set_env() {
     export FLAGS_cudnn_deterministic=1
     export HF_ENDPOINT=https://hf-mirror.com
     export FLAGS_use_cuda_managed_memory=true
-    export FLAGS_enable_run=false
+
     # for CE
     if [[ ${FLAGS_enable_CE} == "true" ]];then
         export CE_TEST_ENV=1
@@ -81,6 +81,7 @@ print_info() {
 }
 
 get_diff_TO_case(){
+export FLAGS_enable_run=false
 for file_name in `git diff --numstat ${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
     arr_file_name=(${file_name//// })
     dir1=${arr_file_name[0]}
