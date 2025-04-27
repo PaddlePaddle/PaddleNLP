@@ -50,12 +50,14 @@ set_env() {
     export FLAGS_cudnn_deterministic=1
     export HF_ENDPOINT=https://hf-mirror.com
     export FLAGS_use_cuda_managed_memory=true
+    export running_time=30m
 
     # for CE
     if [[ ${FLAGS_enable_CE} == "true" ]];then
         export CE_TEST_ENV=1
         export RUN_SLOW_TEST=1
         export PYTHONPATH=${nlp_dir}:${nlp_dir}/llm:${PYTHONPATH}
+        export running_time=5h
     else
         continue
     fi
@@ -81,7 +83,7 @@ print_info() {
 }
 
 get_diff_TO_case(){
-export FLAGS_enable_run=false
+export FLAGS_enable_ci=false
 for file_name in `git diff --numstat ${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
     arr_file_name=(${file_name//// })
     dir1=${arr_file_name[0]}
@@ -95,19 +97,19 @@ for file_name in `git diff --numstat ${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`
     elif [[ ${file_name##*.} == "md" ]] || [[ ${file_name##*.} == "rst" ]] || [[ ${dir1} == "docs" ]];then
         continue
     else
-        FLAGS_enable_run=true
+        FLAGS_enable_ci=true
     fi
 done
 }
 get_diff_TO_case
-if [[ ${FLAGS_enable_run} == "true" ]];then
+set_env
+if [[ ${FLAGS_enable_ci} == "true" ]] || [[ ${FLAGS_enable_CE} == "true" ]];then
     install_requirements
-    set_env
     cd ${nlp_dir}
     echo ' Testing all unittest cases '
     export http_proxy=${proxy} && export https_proxy=${proxy}
     set +e
-    timeout 30m python -m pytest -v -n 8 \
+    timeout ${running_time} python -m pytest -v -n 8 \
     --dist loadgroup \
     --retries 1 --retry-delay 1 \
     --timeout 200 --durations 20 --alluredir=result \
