@@ -46,7 +46,7 @@ print_info() {
         cd ${PPNLP_HOME} && python upload.py ${PPNLP_HOME}/upload 'paddlenlp/PaddleNLP_CI/PaddleNLP_CI'
         rm -rf upload/* && cd -
         if [ $1 -eq 124 ]; then
-            echo -e "\033[31m [failed-timeout] Test case execution was terminated after exceeding the 50m limit. \033[0m"
+            echo -e "\033[31m [failed-timeout] Test case execution was terminated after exceeding the time limit. \033[0m"
         fi
     else
         tail -n 1 ${log_path}/$2.log
