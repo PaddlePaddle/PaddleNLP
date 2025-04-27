@@ -83,7 +83,7 @@ print_info() {
 }
 
 get_diff_TO_case(){
-export FLAGS_enable_ci=false
+export FLAGS_enable_CI=false
 for file_name in `git diff --numstat ${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
     arr_file_name=(${file_name//// })
     dir1=${arr_file_name[0]}
@@ -97,13 +97,13 @@ for file_name in `git diff --numstat ${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`
     elif [[ ${file_name##*.} == "md" ]] || [[ ${file_name##*.} == "rst" ]] || [[ ${dir1} == "docs" ]];then
         continue
     else
-        FLAGS_enable_ci=true
+        FLAGS_enable_CI=true
     fi
 done
 }
 get_diff_TO_case
 set_env
-if [[ ${FLAGS_enable_ci} == "true" ]] || [[ ${FLAGS_enable_CE} == "true" ]];then
+if [[ ${FLAGS_enable_CI} == "true" ]] || [[ ${FLAGS_enable_CE} == "true" ]];then
     install_requirements
     cd ${nlp_dir}
     echo ' Testing all unittest cases '
