@@ -118,7 +118,8 @@ class SFTAutoConfig(SFTConfig):
         default=None, metadata={"help": "The pattern of refined recompute."}
     )
     virtual_pipeline_seg_method: str = field(
-        default="LlamaDecoderLayerAuto", metadata={"help": "The seg method of spliting pp layer for virtual pipeline."}
+        default="LlamaDecoderLayerAuto",
+        metadata={"help": "The seg method of splitting pp layer for virtual pipeline."},
     )
     # NOTE(gongenlei): new add autotuner_benchmark
     autotuner_benchmark: bool = field(

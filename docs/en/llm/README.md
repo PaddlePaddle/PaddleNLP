@@ -274,7 +274,7 @@ For testing convenience, we also provide a preference dataset that can be used d
 
 ```bash
 wget https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized_pointwise.tar.gz
-tar -zxvf ultrafeedback_binarized.tar.gz
+tar -zxvf ultrafeedback_binarized_pointwise.tar.gz
 ```
 
 ##### Full-parameter KTO

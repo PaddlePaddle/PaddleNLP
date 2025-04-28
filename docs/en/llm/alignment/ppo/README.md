@@ -91,7 +91,7 @@ The configuration files we use are located in `llm/config/llama/ppo_argument.jso
 - `top_p`: Generation decoding hyperparameter
 - `temperature`: Generation decoding hyperparameter
 - `repetition_penalty`: Generation decoding hyperparameter
-- `num_return_sequences`: Generation decoding hyperparameter
+- `rollout_n`: Generation decoding hyperparameter
 - `min_learning_rate`: Minimum learning rate for Actor model
 - `critic_learning_rate`: Minimum learning rate for Critic model
 - `recompute`: Whether to use recomputation strategy for Actor model, enables training memory saving

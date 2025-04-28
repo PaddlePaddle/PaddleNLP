@@ -173,7 +173,7 @@ class CosineDecayWithWarmup(LambdaDecay):
     Creates a learning rate scheduler, which increases learning rate linearly
     from 0 to given `learning_rate`, after this warmup period learning rate
     would be decreased following the values of the cosine function. If
-    `with_hard_restarts` is True, the cosine function could have serveral hard
+    `with_hard_restarts` is True, the cosine function could have several hard
     restarts.
 
     Args:

@@ -306,7 +306,7 @@ def convert_example_for_reft(
         last_position = get_src_last_position(features["labels"])
     else:
         last_position = len(features["input_ids"])
-    # add positons
+    # add positions
     intervention_locations = get_intervention_locations(positions, last_position, num_interventions)
     features["intervention_locations"] = intervention_locations
     return features

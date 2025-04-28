@@ -20,6 +20,7 @@ from functools import partial
 from typing import Dict
 
 import paddle
+from paddle.distributed import fleet
 
 from paddlenlp.datasets.rlhf_datasets import RLHFDataset, collate_fn
 from paddlenlp.rl.models.score_model import AutoModelForScore
@@ -30,6 +31,7 @@ from paddlenlp.rl.utils.config_utils import (
     TrainingArguments,
 )
 from paddlenlp.rl.utils.offload_utils import offload_tensor_to_cpu
+from paddlenlp.rl.utils.reshard_utils import init_rollout_env
 from paddlenlp.rl.utils.timer_utils import timers_scope_runtimer
 from paddlenlp.trainer import (
     EarlyStoppingCallback,
@@ -42,6 +44,7 @@ from paddlenlp.transformers import (
     AutoTokenizer,
     PretrainedConfig,
 )
+from paddlenlp.transformers.configuration_utils import LlmMetaConfig
 from paddlenlp.trl import llm_utils
 from paddlenlp.utils.log import logger
 
@@ -85,12 +88,13 @@ def create_actor_models(
             tensor_parallel_output=training_args.tensor_parallel_output,
             tensor_parallel_degree=training_args.tensor_parallel_degree,
             tensor_parallel_rank=training_args.tensor_parallel_rank,
-            recompute_granularity=model_args.recompute_granularity,
+            recompute_granularity=training_args.recompute_granularity,
             dtype=training_args.model_dtype,
             recompute=training_args.recompute,
             recompute_use_reentrant=training_args.recompute_use_reentrant,
             **common_config,
         )
+        LlmMetaConfig.set_llm_config(actor_model_config, training_args)
 
         actor_model_config.use_fused_head_and_loss_fn = training_args.use_fused_head_and_loss_fn
         actor_model_config.set_attn_func = True
@@ -110,42 +114,28 @@ def create_actor_models(
             actor_model = AutoModelForCausalLM.from_config(actor_model_config)
 
     with timers_scope_runtimer("Actor eval model loading time"):
-        if training_args.eval_mode is not None:
+        if (
+            training_args.rollout_tensor_parallel_degree != training_args.tensor_parallel_degree
+            or training_args.pipeline_parallel_degree > 1
+        ):
             actor_eval_model_config = copy.deepcopy(actor_model_config)
             actor_eval_model_config.use_fused_head_and_loss_fn = False
-            if training_args.eval_mode == "single":
-                actor_eval_model_config.tensor_parallel_degree = -1
-                actor_eval_model_config.tensor_parallel_rank = 0
-            actor_eval_model = AutoModelForCausalLM.from_config(actor_eval_model_config)
+            with init_rollout_env(training_args.rollout_tensor_parallel_degree):
+                hcg = fleet.get_hybrid_communicate_group()
+                actor_eval_model_config.tensor_parallel_degree = hcg.get_model_parallel_world_size()
+                actor_eval_model_config.tensor_parallel_rank = hcg.get_model_parallel_rank()
+                # TODO(gongenlei): lazy load lazy guard
+                actor_eval_model = AutoModelForCausalLM.from_config(actor_eval_model_config)
         else:
             actor_eval_model = None
 
     with timers_scope_runtimer("Reference model loading time"):
-        if training_args.eval_mode is not None:
-            reference_model_config = copy.deepcopy(actor_model_config)
-            if training_args.eval_mode is not None:
-                reference_model_config.use_fused_head_and_loss_fn = False
-                if training_args.eval_mode == "single":
-                    reference_model_config.tensor_parallel_degree = -1
-                    reference_model_config.tensor_parallel_rank = 0
-
-            if not training_args.autotuner_benchmark:
-                reference_model = AutoModelForCausalLM.from_pretrained(
-                    model_args.actor_model_name_or_path,
-                    config=reference_model_config,
-                )
-            else:
-                reference_model = AutoModelForCausalLM.from_config(
-                    reference_model_config,
-                    dtype=training_args.model_dtype,
-                )
-        else:
-            reference_model = AutoModelForCausalLM.from_config(
-                actor_model_config,
-                dtype=training_args.model_dtype,
-            )
-            if not training_args.autotuner_benchmark:
-                reference_model.set_state_dict(actor_model.state_dict())
+        reference_model = AutoModelForCausalLM.from_config(
+            actor_model_config,
+            dtype=training_args.model_dtype,
+        )
+        if not training_args.autotuner_benchmark:
+            reference_model.set_state_dict(actor_model.state_dict())
 
     actor_tokenizer = AutoTokenizer.from_pretrained(
         model_args.actor_model_name_or_path,
@@ -179,6 +169,7 @@ def create_reward_models(
             recompute_use_reentrant=training_args.recompute_use_reentrant,
             **common_config,
         )
+        LlmMetaConfig.set_llm_config(reward_model_config, training_args)
         reward_model_config.max_position_embeddings = data_args.max_length
         reward_model_config.use_sparse_head_and_loss_fn = False
         reward_model_config.fused_linear = model_args.fused_linear
@@ -288,7 +279,8 @@ def create_rl_dataset(data_args, training_args, tokenizer):
         tokenizer=tokenizer,
         max_prompt_len=data_args.max_prompt_len,
         requires_label=requires_label,
-        label_key=data_args.label_key,
+        prompt_key=data_args.prompt_key,
+        response_key=data_args.response_key,
         splits="train",
     )
     dev_ds = RLHFDataset(
@@ -296,7 +288,8 @@ def create_rl_dataset(data_args, training_args, tokenizer):
         tokenizer=tokenizer,
         max_prompt_len=data_args.max_prompt_len,
         requires_label=requires_label,
-        label_key=data_args.label_key,
+        prompt_key=data_args.prompt_key,
+        response_key=data_args.response_key,
         splits="dev",
     )
     return train_ds, dev_ds
@@ -307,6 +300,8 @@ def main():
     parser = PdArgumentParser((ModelArgument, DataArgument, TrainingArguments))
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
         model_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
+    elif len(sys.argv) >= 2 and sys.argv[1].endswith(".yaml"):
+        model_args, data_args, training_args = parser.parse_yaml_file_and_cmd_lines()
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
@@ -324,7 +319,7 @@ def main():
             )
 
     common_config = dict(
-        use_flash_attention=model_args.use_flash_attention,
+        use_flash_attention=training_args.use_flash_attention,
         sequence_parallel=training_args.sequence_parallel,
         fused_rotary=False,
         max_sequence_length=data_args.max_length,
@@ -384,7 +379,8 @@ def main():
             collate_fn,
             pad_token_id=actor_tokenizer.pad_token_id,
             requires_label=True if training_args.use_rm_server else False,
-        ),
+            max_prompt_len=data_args.max_prompt_len if training_args.balance_batch else None,
+        ),  # NOTE: enforce prompt padding to max_prompt_len when using balance_batch
         compute_metrics=compute_metrics,  # TODO: only used for grpo (kk datasets)
     )
 

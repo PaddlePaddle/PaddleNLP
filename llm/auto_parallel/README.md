@@ -9,10 +9,10 @@
   - [预训练](#预训练)
     - [数据准备](#数据准备)
     - [启动预训练](#启动预训练)
-  - [监督微调(SFT)](#监督微调sft)
+  - [监督微调(SFT)](#监督微调 sft)
     - [数据准备](#数据准备-1)
     - [启动微调](#启动微调)
-  - [低秩适应（LoRA）](#低秩适应lora)
+  - [低秩适应（LoRA）](#低秩适应 lora)
   - [DPO](#dpo)
   - [推理](#推理)
     - [动态图推理](#动态图推理)
@@ -29,8 +29,8 @@
 
 - ✅: Supported
 - 🚧: In Progress
-  
-注：当前提供的DeepSeek-v3模型配置脚本为一个规模较小的示例demo（调小了网络层数），以支持在单机8卡的环境下运行，如果你想运行完整671B规模的DeepSeek-v3，需要将层数配置为61层，并对应地调整并行策略。当前自动并行提供的deepseek-v3版本中，暂未集成FP8、DeepEP等优化策略。
+
+注：当前提供的 DeepSeek-v3模型配置脚本为一个规模较小的示例 demo（调小了网络层数），以支持在单机8卡的环境下运行，如果你想运行完整671B 规模的 DeepSeek-v3，需要将层数配置为61层，并对应地调整并行策略。当前自动并行提供的 deepseek-v3版本中，暂未集成 FP8、DeepEP 等优化策略。
 
 ## 环境准备
 
@@ -38,15 +38,15 @@
 
 首先，您需要安装最新的`Paddle`， 推荐使用`Nightly`版本。访问 [Paddle 官网](https://www.paddlepaddle.org.cn/install/quick?docurl=undefined) 获取安装指导。
 
-2.Paddle安装验证
+2.Paddle 安装验证
 
 ```python
 import paddle
 print(paddle.utils.run_check())
 ```
-3.安装 PaddleNLP及自定义算子
+3.安装 PaddleNLP 及自定义算子
 
-请访问[PaddleNLP 安装教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/get_started/installation.rst)获取安装指导。
+请访问[PaddleNLP 安装教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/zh/get_started/installation.rst)获取安装指导。
 
 
 ## 预训练
@@ -76,7 +76,7 @@ python -u  -m paddle.distributed.launch \
     ./llama/run_pretrain_auto.py ./llama/pretrain_argument.json
 ```
 
-该配置下运行`facebook/llama-7b`预训练任务，并行策略为MP2-PP2-DP2，分片策略为Stage1。
+该配置下运行`facebook/llama-7b`预训练任务，并行策略为 MP2-PP2-DP2，分片策略为 Stage1。
 更多可配置参数，请参考`ModelArguments`, `DataArguments`, `PreTrainingArguments`。
 
 - 动转静模式
@@ -119,7 +119,7 @@ python -u -m paddle.distributed.launch \
   --gpus "0,1,2,3,4,5,6,7" \
   ./run_finetune_auto.py ./llama/finetune_argument.json
 ```
-该配置下运行`Meta-Llama-3.1-8B-Instruct`任务，并行策略为MP2-PP2-DP2，分片策略为Stage2。
+该配置下运行`Meta-Llama-3.1-8B-Instruct`任务，并行策略为 MP2-PP2-DP2，分片策略为 Stage2。
 更多可配置参数，请参考`GenerateArgument`, `ModelAutoConfig`, `ReftArgument`, `DataConfig`, `SFTAutoConfig`。
 
 - 动转静模式

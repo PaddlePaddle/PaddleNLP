@@ -17,7 +17,7 @@ import copy
 class InfoHub(dict):
     def __getattr__(self, key):
         if key not in self:
-            raise ValueError(f"`{key}` not in InfoHub.")
+            return None
         return self[key]
 
     def __setattr__(self, key, value):

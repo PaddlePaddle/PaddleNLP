@@ -473,7 +473,7 @@ def get_dequant_weight(w, w_s=None, dtype=None, weight_block_size=[128, 128]):
         return w
 
     assert weight_block_size == [128, 128]
-    from paddlenlp_ops import group_quant
+    from paddlenlp_ops import per_token_group_quant
 
     try:
         from paddlenlp_ops import (
@@ -483,7 +483,7 @@ def get_dequant_weight(w, w_s=None, dtype=None, weight_block_size=[128, 128]):
         assert False, "fp8_block_gemm_fused only supported on sm90"
 
     eye = paddle.eye(w.shape[0], dtype=paddle.float32)
-    x_q, x_s = group_quant(
+    x_q, x_s = per_token_group_quant(
         eye, group_size=weight_block_size[1], transpose_scale=True, quant_max_bound=448.0, quant_min_bound=-448.0
     )
     out = fp8_block_gemm_fused(

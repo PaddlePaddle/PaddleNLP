@@ -4,7 +4,7 @@
 
 [BERT](https://arxiv.org/abs/1810.04805) （Bidirectional Encoder Representations from Transformers）以[Transformer](https://arxiv.org/abs/1706.03762) 编码器为网络基本组件，使用掩码语言模型（Masked Language Model）和邻接句子预测（Next Sentence Prediction）两个任务在大规模无标注文本语料上进行预训练（pre-train），得到融合了双向内容的通用语义表示模型。以预训练产生的通用语义表示模型为基础，结合任务适配的简单输出层，微调（fine-tune）后即可应用到下游的 NLP 任务，效果通常也较直接在下游的任务上训练的模型更优。此前 BERT 即在[GLUE 评测任务](https://gluebenchmark.com/tasks)上取得了 SOTA 的结果。
 
-本项目是 BERT 在 Paddle 2.0上的开源实现，包含了预训练和[GLUE 评测任务](https://gluebenchmark.com/tasks)上的微调代码。
+本项目是 BERT 在 Paddle 2.0上的开源实现，并在 PaddlePaddle 3.0.0版本进行了适配与验证，包含了预训练和[GLUE 评测任务](https://gluebenchmark.com/tasks)上的微调代码。
 
 ## 快速开始
 
@@ -262,23 +262,22 @@ python -u ./export_model.py \
 其中参数释义如下：
 - `model_type` 指示了模型类型，使用 BERT 模型时设置为 bert 即可。
 - `model_path` 表示训练模型的保存路径，与训练时的`output_dir`一致。
-- `output_path` 表示导出预测模型文件的前缀。保存时会添加后缀（`pdiparams`，`pdiparams.info`，`pdmodel`）；除此之外，还会在`output_path`包含的目录下保存 tokenizer 相关内容。
+- `output_path` 表示导出预测模型文件的前缀。保存时会添加后缀（`pdiparams`，`pdiparams.info`，`pdmodel`/`json`）；除此之外，还会在`output_path`包含的目录下保存 tokenizer 相关内容。
 
-完成模型导出后，可以开始部署。`deploy/python/seq_cls_infer.py` 文件提供了 python 部署预测示例。可执行以下命令运行部署示例：
+完成模型导出后，可以开始部署。`deploy/python/infer.py` 文件提供了 python 部署预测示例。可执行以下命令运行部署示例：
 
 ```shell
-python deploy/python/seq_cls_infer.py --model_dir infer_model/ --device gpu --backend paddle
+python deploy/python/infer.py --model_dir infer_model/ --device gpu
 ```
 
 运行后预测结果打印如下：
 
 ```bash
-[INFO] fastdeploy/runtime/runtime.cc(266)::CreatePaddleBackend	Runtime initialized with Backend::PDINFER in Device::GPU.
-Batch id: 0, example id: 0, sentence1: against shimmering cinematography that lends the setting the ethereal beauty of an asian landscape painting, label: positive, negative prob: 0.0003, positive prob: 0.9997.
-Batch id: 1, example id: 0, sentence1: the situation in a well-balanced fashion, label: positive, negative prob: 0.0002, positive prob: 0.9998.
-Batch id: 2, example id: 0, sentence1: at achieving the modest , crowd-pleasing goals it sets for itself, label: positive, negative prob: 0.0017, positive prob: 0.9983.
-Batch id: 3, example id: 0, sentence1: so pat it makes your teeth hurt, label: negative, negative prob: 0.9986, positive prob: 0.0014.
-Batch id: 4, example id: 0, sentence1: this new jangle of noise , mayhem and stupidity must be a serious contender for the title ., label: negative, negative prob: 0.9806, positive prob: 0.0194.
+Batch id: 0, example id: 0, sentence: against shimmering cinematography that lends the setting the ethereal beauty of an asian landscape painting, label: positive, negative prob: 0.4623, positive prob: 0.5377.
+Batch id: 0, example id: 1, sentence: the situation in a well-balanced fashion, label: positive, negative prob: 0.3500, positive prob: 0.6500.
+Batch id: 1, example id: 0, sentence: at achieving the modest , crowd-pleasing goals it sets for itself, label: positive, negative prob: 0.4530, positive prob: 0.5470.
+Batch id: 1, example id: 1, sentence: so pat it makes your teeth hurt, label: positive, negative prob: 0.3816, positive prob: 0.6184.
+Batch id: 2, example id: 0, sentence: this new jangle of noise , mayhem and stupidity must be a serious contender for the title ., label: positive, negative prob: 0.3650, positive prob: 0.6350.
 ```
 
 更多详细用法可参考 [Python 部署](deploy/python/README.md)。

@@ -54,9 +54,9 @@ PaddleNLP provides easy-to-use APIs for the following datasets. Please add **spl
 | [HYP](https://pan.webis.de/semeval19/semeval19-web/) | English political news sentiment classification corpus |
 | Dataset Name | Description | How to Use |
 | ---- | --------- | ------ |
-| [ChnSentiCorp](https://github.com/zhangyics/Chinese-sentiment-analysis-datasets) | Chinese sentiment analysis dataset | `paddlenlp.datasets.load_dataset('chnsenticorp')` |
+| [ChnSentiCorp](https://paddlehub-dataset.bj.bcebos.com/chnsenticorp.tar.gz) | Chinese sentiment analysis dataset | `paddlenlp.datasets.load_dataset('chnsenticorp')` |
 | [LCQMC](http://icrc.hitsz.edu.cn/info/1037/1146.htm) | Chinese question matching corpus, binary classification task | `paddlenlp.datasets.load_dataset('lcqmc', splits=['test', 'dev'])` |
-| [NLPCC-DBQA](http://tcci.ccf.org.cn/conference/2016/pages/page05_eva.html) | Chinese database question answering dataset, binary classification task | `paddlenlp.datasets.load_dataset('nlpcc_dbqa')` |
+| [NLPCC-DBQA](https://github.com/shuishen112/NLPCCDBQA) | Chinese database question answering dataset, binary classification task | `paddlenlp.datasets.load_dataset('nlpcc_dbqa')` |
 
 ## Natural Language Inference
 

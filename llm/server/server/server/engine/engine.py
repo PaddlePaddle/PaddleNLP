@@ -57,7 +57,7 @@ class Engine(object):
         
         self.token_processor.tasks_queue = self.tasks_queue
         self.infer_proc = self._start_infer_service()
-        model_server_logger.info("Waitting infer processes ready...")
+        model_server_logger.info("Waiting infer processes ready...")
         while not self._infer_processes_ready():
             time.sleep(1)
         self.is_started = True

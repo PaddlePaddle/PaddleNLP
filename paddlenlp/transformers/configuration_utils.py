@@ -868,6 +868,17 @@ class PretrainedConfig:
             pretrained_model_name_or_path_ = cls.pretrained_init_configuration[pretrained_model_name_or_path]
 
             if isinstance(pretrained_model_name_or_path_, dict):
+                # save config file
+                if cache_dir is not None:
+                    config_path = os.path.join(cache_dir, pretrained_model_name_or_path, "config.json")
+                else:
+                    from paddlenlp.utils.env import MODEL_HOME
+
+                    config_path = os.path.join(MODEL_HOME, pretrained_model_name_or_path, "config.json")
+                if not os.path.exists(config_path):
+                    os.makedirs(os.path.dirname(config_path), exist_ok=True)
+                    json.dump(pretrained_model_name_or_path_, open(config_path, "w"), indent=2)
+
                 return pretrained_model_name_or_path_, kwargs
 
         configuration_file = kwargs.pop("_configuration_file", CONFIG_NAME)
@@ -1225,7 +1236,7 @@ def get_configuration_file(configuration_files: List[str]) -> str:
     configuration_file = CONFIG_NAME
 
     # FIXME: (wj-Mcat) remove the hard dependency of `packaging` which can compare
-    # the version of package, also be uesed in `transfromer`.
+    # the version of package, also be used in `transformer`.
     # **But**, we don't support version compare function now. so remove the hard dependency.
     from packaging import version
 

@@ -80,7 +80,7 @@ wget https://paddlenlp.bj.bcebos.com/datasets/examples/ppo-kk.tgz && tar zxf ppo
 - `top_p`: 生成解码超参数
 - `temperature`: 生成解码超参数
 - `repetition_penalty`: 生成解码超参数
-- `num_return_sequences`: 生成解码超参数
+- `rollout_n`: 生成 response 的数量
 - `min_learning_rate`: Actor 模型的最小学习率
 - `critic_learning_rate`: Critic 模型的最小学习率
 - `recompute`: Actor 模型是否使用重计算策略，开启后可节省训练显存

@@ -15,19 +15,48 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
 
 import paddle
 
 from ...trainer.trainer import ShardingOption, TrainingArguments, logger
 from ...trainer.trainer_utils import IntervalStrategy
+from ...transformers.configuration_utils import llmmetaclass
 
 
 @dataclass
+@llmmetaclass
 class TrainingArguments(TrainingArguments):
-    rollout_logprob_batch_size: str = field(
-        default=None,
-        metadata={"help": "The log prob batch size."},
+    global_batch_size: int = field(
+        default=8,
+        metadata={"help": "Global batch size for input prompt."},
+    )
+    global_gen_batch_size: int = field(
+        default=-1,
+        metadata={"help": "Global generation batch size for dynamic sampling."},
+    )
+    mini_batch_size: int = field(
+        default=-1,
+        metadata={"help": "Mini-batch size (global) for the training dataloader."},
+    )
+    per_device_rollout_batch_size: int = field(
+        default=-1,
+        metadata={"help": "Batch size (per device) for the training dataloader."},
+    )
+    per_device_logprob_batch_size: int = field(
+        default=-1,
+        metadata={"help": "Batch size (per device) for the training dataloader."},
+    )
+    per_device_reward_batch_size: int = field(
+        default=-1,
+        metadata={"help": "Batch size (per device) for the training dataloader."},
+    )
+    per_device_value_batch_size: int = field(
+        default=-1,
+        metadata={"help": "Batch size (per device) for the training dataloader."},
+    )
+    per_device_train_batch_size: int = field(
+        default=1,
+        metadata={"help": "Batch size (per device) for the training dataloader."},
     )
     use_fused_rms_norm: bool = field(
         default=False,
@@ -56,11 +85,40 @@ class TrainingArguments(TrainingArguments):
             "This is the epsilon parameter in the PPO algorithm."
         },
     )
+    clip_range_ratio_low: float = field(
+        default=None,
+        metadata={
+            "help": "The clipping range for ratio between the old and new policy. "
+            "This is the epsilon parameter in the PPO algorithm."
+        },
+    )
+    clip_range_ratio_high: float = field(
+        default=None,
+        metadata={
+            "help": "The clipping range for ratio between the old and new policy. "
+            "This is the epsilon parameter in the PPO algorithm."
+        },
+    )
     clip_range_score: float = field(
         default=10.0,
         metadata={
             "help": "The clipping range for the output of the score model. "
             "The reward is clipped into [-clip_range_score, clip_range_score]."
+        },
+    )
+    enable_overlong_reward_buffer: bool = field(
+        default=False,
+        metadata={},
+    )
+    overlong_reward_buffer: int = field(
+        default=256,
+        metadata={"help": "The allowed buffer before applying penalty."},
+    )
+    overlong_penalty_factor: float = field(
+        default=1.0,
+        metadata={
+            "help": "The penalty factor for the overlong reward buffer. "
+            "The penalty is deleted to the reward when the buffer is full."
         },
     )
     clip_range_value: float = field(
@@ -69,10 +127,6 @@ class TrainingArguments(TrainingArguments):
             "help": "The clipping range for the value function. The value is clipped into [value_estimate - "
             "clip_range_value, value_estimate + clip_range_value] during training."
         },
-    )
-    ptx_coeff: float = field(
-        default=0.0,
-        metadata={"help": "The coefficient for the ptx loss."},
     )
     update_iters: int = field(
         default=1,
@@ -117,7 +171,7 @@ class TrainingArguments(TrainingArguments):
             "with probabilities that add up to`top_p` or higher are kept for generation."
         },
     )
-    num_return_sequences: int = field(
+    rollout_n: int = field(
         default=1,
         metadata={"help": "The number of independently computed returned sequences for each element in the batch."},
     )
@@ -125,9 +179,21 @@ class TrainingArguments(TrainingArguments):
         default=1.0,
         metadata={"help": "The parameter for repetition penalty. 1.0 means no penalty."},
     )
+    quant_type: str = field(
+        default="",
+        metadata={"help": "Quantization dtype, optional for: weight_onlt_int8."},
+    )
     per_device_prompt_batch_size: int = field(
         default=16,
         metadata={"help": "Batch size (per device) for the training dataloader."},
+    )
+    dynamic_sampling: bool = field(
+        default=False,
+        metadata={"help": "whether enable dynamic sample https://arxiv.org/abs/2503.14476"},
+    )
+    max_gen_batches: int = field(
+        default=32,
+        metadata={"help": "max gen batches for dynamic sampling"},
     )
     eval_mode: str = field(
         default=None,
@@ -187,28 +253,6 @@ class TrainingArguments(TrainingArguments):
             "will use the min_learning_rate."
         },
     )
-    unified_checkpoint: bool = field(
-        default=True,
-        metadata={
-            "help": "Enable fused linear grad add strategy, which will reduce elementwise "
-            "add for grad accumulation in the backward of nn.Linear ."
-        },
-    )
-    unified_checkpoint_config: Optional[str] = field(
-        default="",
-        metadata={
-            "help": (
-                "Configs to unify hybrid parallel checkpoint.\n"
-                "Following options are supports:\n"
-                "- skip_save_model_weight: do not save model weights when the masters weight exist\n"
-                "- master_weight_compatible: 1. if the master weights exist, only load when needed\n"
-                "                            2. if master weights does not exist, convert model weights"
-                " to master weights when needed\n"
-                "- async_save: enable asynchronous saving checkpoints to disk\n"
-                "- enable_all_options: enable all optimization configurations\n"
-            )
-        },
-    )
     autotuner_benchmark: bool = field(
         default=False,
         metadata={"help": "Whether to run benchmark by autotuner. True for from_scratch."},
@@ -234,10 +278,6 @@ class TrainingArguments(TrainingArguments):
     tensor_parallel_output: bool = field(
         default=True,
         metadata={"help": "use tensor_parallel_output."},
-    )
-    per_device_rollout_batch_size: int = field(
-        default=-1,
-        metadata={"help": "Batch size per GPU core/CPU for rollout."},
     )
     # save_generation_output: bool = field(
     #     default=False,
@@ -267,11 +307,19 @@ class TrainingArguments(TrainingArguments):
     use_fp32_compute: bool = field(
         default=False, metadata={"help": "Use fp32 to compute xx_log_prob,rewards, advantages and loss."}
     )
+    rollout_tensor_parallel_degree: int = field(
+        default=-1,
+        metadata={"help": ("Tensor parallelism for rollout.")},
+    )
+    balance_batch: bool = field(
+        default=False,
+        metadata={"help": "Whether to balance the number of valid tokens on each dp/sharding rank."},
+    )
 
     def __post_init__(self):
         """
-            在初始化后执行的函数，用于设置一些默认值和验证参数。
-        如果 autotuner_benchmark 为 True，则将相关参数设置为默认值，并禁止其他任何操作。
+        Function executed after initialization, used to set some default values and validate parameters.
+        If autotuner_benchmark is True, set related parameters to default values and prohibit any other operations.
 
         Args:
             None.
@@ -282,6 +330,76 @@ class TrainingArguments(TrainingArguments):
         Raises:
             None.
         """
+        # set the unified_checkpoint to True, it will change two cases:
+        # 1. use unified_checkpoint
+        # 2. data_parallel use hybrid group
+        self.unified_checkpoint = True
+        # obtain the parallrl degree from the training arguments
+        # for auto config the accumulation steps
+        self._post_init_parallel_degree()
+
+        if self.mini_batch_size < 0:
+            self.mini_batch_size = self.global_batch_size
+
+        if (
+            self.global_batch_size % self.dataset_world_size != 0
+            or self.mini_batch_size % self.dataset_world_size != 0
+        ):
+            raise ValueError(
+                "global_batch_size(mini_batch_size) must be divisible by dataset_world_size! "
+                f"Hint: global_batch_size={self.global_batch_size}, mini_batch_size={self.mini_batch_size}, dataset_world_size={self.dataset_world_size}. "
+                f"dataset_world_size({self.dataset_world_size})=data_parallel_degree({self.data_parallel_degree})*sharding_parallel_degree({self.sharding_parallel_degree})."
+            )
+
+        if not self.dynamic_sampling or self.global_gen_batch_size <= 0:
+            self.global_gen_batch_size = self.global_batch_size
+
+        if self.per_device_rollout_batch_size <= 0:
+            self.per_device_rollout_batch_size = self.per_device_train_batch_size
+        if self.per_device_logprob_batch_size <= 0:
+            self.per_device_logprob_batch_size = self.per_device_train_batch_size
+        if self.per_device_reward_batch_size <= 0:
+            self.per_device_reward_batch_size = self.per_device_train_batch_size
+        if self.per_device_value_batch_size <= 0:
+            self.per_device_value_batch_size = self.per_device_train_batch_size
+
+        # `gradient_accumulation_steps` specifies the number of mini-batches per gradient update.
+        # This value must be set prior to calling `super().__post_init__()`.
+        # It is utilized within `super().__post_init__()` for configuring the DistributedStrategy.
+        self.gradient_accumulation_steps = (
+            self.mini_batch_size
+            * self.rollout_n
+            * self.update_iters
+            // self.per_device_train_batch_size
+            // self.dataset_world_size
+        )
+        if self.gradient_accumulation_steps <= 0:
+            logger.warning(
+                f"gradient_accumulation_steps: {self.gradient_accumulation_steps} must be greater than zero!"
+                " Please check your configuration, gradient_accumulation_steps = mini_batch_size * rollout_n * update_iters / per_device_train_batch_size / dataset_world_size."
+                " dataset_world_size = {self.dataset_world_size} = data_parallel_degree * sharding_parallel_degree."
+                " We will set it to 1!"
+            )
+            self.gradient_accumulation_steps = 1
+
+        train_batch_size_info = {
+            "global_batch_size": self.global_batch_size,
+            "mini_batch_size": self.mini_batch_size,
+            "rollout_n": self.rollout_n,
+            "dataset_world_size": self.dataset_world_size,
+            "per_device_rollout_batch_size": self.per_device_rollout_batch_size,
+            "per_device_logprob_batch_size": self.per_device_logprob_batch_size,
+            "per_device_reward_batch_size": self.per_device_reward_batch_size,
+            "per_device_value_batch_size": self.per_device_value_batch_size,
+            "per_device_train_batch_size": self.per_device_train_batch_size,
+            "gradient_accumulation_steps": self.gradient_accumulation_steps,
+        }
+
+        logger.info("{:^40}".format("{} Configuration Arguments".format("Train Batch Size")))
+        for key, value in train_batch_size_info.items():
+            logger.info("{:30}: {}".format(key, value))
+        logger.info("===========================================")
+
         super().__post_init__()
         if self.autotuner_benchmark:
             self.num_train_epochs = 1
@@ -305,8 +423,6 @@ class TrainingArguments(TrainingArguments):
 
         paddle.set_device(self.device)
 
-        if self.per_device_rollout_batch_size < 0:
-            self.per_device_rollout_batch_size = self.per_device_train_batch_size
         assert self.rl_algorithm in [
             "ppo",
             "grpo",
@@ -316,14 +432,17 @@ class TrainingArguments(TrainingArguments):
             self.normalize_reward = False
             self.normalize_advantage = False
 
-        if self.per_device_eval_batch_size > self.per_device_rollout_batch_size * self.num_return_sequences:
+        max_per_device_eval_batch_size = (
+            self.mini_batch_size * self.rollout_n * self.update_iters // self.dataset_world_size
+        )
+        if self.per_device_eval_batch_size > max_per_device_eval_batch_size:
             logger.warning(
                 f"per_device_eval_batch_size: {self.per_device_eval_batch_size} is larger than "
-                f"per_device_rollout_batch_size: {self.per_device_rollout_batch_size} * num_return_sequences: "
-                f"{self.num_return_sequences}, which may cause infer error. "
-                f"We will set it to per_device_rollout_batch_size * num_return_sequences!"
+                f"mini_batch_size: {self.mini_batch_size} * rollout_n: "
+                f"{self.rollout_n} * update_iters: {self.update_iters}, which may cause infer error. "
+                f"We will set it to mini_batch_size * rollout_n * update_iters // dataset_world_size!"
             )
-            self.per_device_eval_batch_size = self.per_device_rollout_batch_size * self.num_return_sequences
+            self.per_device_eval_batch_size = max_per_device_eval_batch_size
 
         self.offload_level = self.offload_level.split()
 
@@ -356,6 +475,12 @@ class TrainingArguments(TrainingArguments):
         if self.decay_steps is None:
             self.decay_steps = self.max_steps
 
+        if self.rollout_tensor_parallel_degree == -1:
+            self.rollout_tensor_parallel_degree = self.tensor_parallel_degree
+            logger.info(
+                f"Set rollout_tensor_parallel_degree to tensor_parallel_degree: {self.tensor_parallel_degree}."
+            )
+
     @property
     def model_dtype(self):
         # Load model
@@ -369,6 +494,13 @@ class TrainingArguments(TrainingArguments):
         else:
             dtype = "float32"
         return dtype
+
+    @property
+    def use_kl_in_reward(self):
+        if self.rl_algorithm in ["ppo", "reinforce_plus_plus"]:
+            return True
+        else:
+            return False
 
 
 @dataclass
@@ -389,17 +521,9 @@ class ModelArgument:
     actor_tokenizer_alpha: float = field(default=None, metadata={"help": "Tokenizer will tokenize randomly"})
     reward_tokenizer_alpha: float = field(default=None, metadata={"help": "Tokenizer will tokenize randomly"})
     reward_critic_tokenizer_alpha: float = field(default=None, metadata={"help": "Tokenizer will tokenize randomly"})
-    use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
     use_attn_mask_start_row_indices: bool = field(default=False, metadata={"help": "Should in data args"})
     stage: str = field(default="PPO", metadata={"help": "The type of training."})
     fused_linear: bool = field(default=True, metadata={"help": "Whether to use fused_gemm_epilogue"})
-    recompute_granularity: str = field(
-        default="full",
-        metadata={
-            "help": "The granularity of recompute in policy model, "
-            "can be selected as `full` or `full_attn` or `core_attn`. "
-        },
-    )
     critic_recompute_granularity: str = field(
         default="full",
         metadata={
@@ -430,4 +554,5 @@ class DataArgument:
         },
     )
     max_prompt_len: int = field(default=4096, metadata={"help": "Maximum prompt length."})
-    label_key: str = field(default="label", metadata={"help": "The key of label in the dataset."})
+    prompt_key: str = field(default="src", metadata={"help": "The key of prompt(question) in the dataset."})
+    response_key: str = field(default="tgt", metadata={"help": "The key of response(answer) in the dataset."})

@@ -83,11 +83,12 @@ from ..data import (
     init_dataloader_comm_group,
 )
 from ..peft import LoKrModel, LoRAModel, PrefixModelForCausalLM, ReFTModel, VeRAModel
+from ..quantization.quantization_linear import (
+    ColumnParallelQuantizationLinear,
+    QuantizationLinear,
+    RowParallelQuantizationLinear,
+)
 
-try:
-    from ..quantization.quantization_linear import QuantizationLinear
-except:
-    QuantizationLinear = None
 try:
     from paddle.distributed.fleet.utils.sequence_parallel_utils import (
         register_sequence_parallel_allreduce_hooks,
@@ -518,7 +519,8 @@ class Trainer:
                 models=model,
                 level=self.args.fp16_opt_level,
                 dtype=self.amp_dtype,
-                excluded_layers=[QuantizationLinear] + self._decorate_exclude_layers(model),
+                excluded_layers=[QuantizationLinear, ColumnParallelQuantizationLinear, RowParallelQuantizationLinear]
+                + self._decorate_exclude_layers(model),
             )
         # for pipeline mode and pure tensor parallel
         if self.args.pipeline_parallel_degree > 1 or (self.args.tensor_parallel_degree > 1 and self.sharding is None):
@@ -1951,6 +1953,9 @@ class Trainer:
                     return x in decay_parameters
 
             optimizer_cls, optimizer_kwargs = Trainer.get_optimizer_cls_and_kwargs(self.args)
+            if self.args.optim == OptimizerNames.AdamW_Qweight:
+                optimizer_kwargs["quantization_config"] = self.model.config.quantization_config
+
             if hasattr(optimizer_cls, "_create_master_weight") and self.args.fp16_opt_level == "O2":
                 optimizer_kwargs["multi_precision"] = True
 
@@ -2108,6 +2113,11 @@ class Trainer:
 
             optimizer_cls = AdamW_16Bit
             optimizer_kwargs.update(adam_kwargs)
+        elif args.optim == OptimizerNames.AdamW_Qweight:
+            from ..utils import AdamWQweight
+
+            optimizer_cls = AdamWQweight
+            optimizer_kwargs.update(adam_kwargs)
         else:
             raise ValueError(f"Trainer cannot instantiate unsupported optimizer: {args.optim}")
         return optimizer_cls, optimizer_kwargs
@@ -2136,6 +2146,7 @@ class Trainer:
                 num_cycles=self.args.num_cycles,
                 lr_end=self.args.lr_end,
                 power=self.args.power,
+                min_lr=self.args.min_lr,
             )
 
         return self.lr_scheduler
@@ -2184,7 +2195,8 @@ class Trainer:
                 optimizers=self.optimizer,
                 level=self.args.fp16_opt_level,
                 dtype=self.amp_dtype,
-                excluded_layers=[QuantizationLinear] + self._decorate_exclude_layers(model),
+                excluded_layers=[QuantizationLinear, ColumnParallelQuantizationLinear, RowParallelQuantizationLinear]
+                + self._decorate_exclude_layers(model),
             )
 
             if self.optimizer is None:
@@ -2297,7 +2309,11 @@ class Trainer:
                 assert (
                     ShardingOption.SHARD_GRAD_OP in self.args.sharding or ShardingOption.SHARD_OP in self.args.sharding
                 ), "Only support tensor parallel + sharding stage1/stage2 hybrid parallel now."
-                model = paddle.distributed.fleet.meta_parallel.TensorParallel(model, hcg, strategy=None)
+                # NOTE: TensorParallel will be called in distributed_model when sharding stage1, so no need to call here
+                if ShardingOption.SHARD_GRAD_OP in self.args.sharding:
+                    model = paddle.distributed.fleet.meta_parallel.TensorParallel(
+                        model, hcg, strategy=fleet.fleet._user_defined_strategy
+                    )
 
             if ShardingOption.SHARD_OP in self.args.sharding:
                 if self.args.amp_master_grad:

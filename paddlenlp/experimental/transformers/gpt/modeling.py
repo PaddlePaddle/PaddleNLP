@@ -432,7 +432,7 @@ class GPTInferenceModel(GPTPretrainedModel):
                 elif k.endswith("linear2.bias"):
                     self.transformer_block.ffn2_biases[idx].set_value(v.astype(dtype))
                 else:
-                    raise ValueError("Unknow weight {}".format(k))
+                    raise ValueError("Unknown weight {}".format(k))
 
 
 class GPTForCausalLMInferenceModel(GenerationInferenceModel, GPTPretrainedModel):

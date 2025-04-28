@@ -630,6 +630,7 @@ class ChatGLMv2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Cha
         v_quant_scales = kwargs.get("v_quant_scales", None)
         k_dequant_scales = kwargs.get("k_dequant_scales", None)
         v_dequant_scales = kwargs.get("v_dequant_scales", None)
+        excess_blocks = kwargs.get("excess_blocks", None)
         model_inputs = {
             "input_ids": input_ids,
             "src_mask": src_mask,
@@ -644,6 +645,7 @@ class ChatGLMv2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Cha
             "v_quant_scales": v_quant_scales,
             "k_dequant_scales": k_dequant_scales,
             "v_dequant_scales": v_dequant_scales,
+            "excess_blocks": excess_blocks,
         }
         return model_inputs
 
@@ -662,6 +664,7 @@ class ChatGLMv2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Cha
         v_quant_scales=None,
         k_dequant_scales=None,
         v_dequant_scales=None,
+        excess_blocks=None,
     ):
         outputs = self.chatglm_v2(
             input_ids,
@@ -677,6 +680,7 @@ class ChatGLMv2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Cha
             v_quant_scales=v_quant_scales,
             k_dequant_scales=k_dequant_scales,
             v_dequant_scales=v_dequant_scales,
+            excess_blocks=excess_blocks,
         )
 
         hidden_states = outputs[0]
