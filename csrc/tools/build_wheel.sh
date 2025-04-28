@@ -93,6 +93,7 @@ function create_directories(){
 
 import os
 from datetime import datetime
+import paddle
 
 from setuptools import find_packages, setup
 
@@ -109,12 +110,20 @@ def read(file: str):
         content = f.read().strip()
     return content
 
+def get_sm_version():
+    prop = paddle.device.cuda.get_device_properties()
+    cc = prop.major * 10 + prop.minor
+    return cc
 
 def read_version():
     """
     read version and return content
     """
-    __version__ = "3.0.0b4.post"
+    cuda_version = float(paddle.version.cuda())
+    sm_version = get_sm_version()
+    paddle_commit = paddle.__git_commit__[:7]
+    paddlenlp_version= "3.0.0b4.post"
+    __version__ = "cuda{}-sm{}-paddle_{}-paddlenlp_{}".format(cuda_version, sm_version, paddle_commit, paddlenlp_version)
     formatted_date = datetime.now().date().strftime("%Y%m%d")
     __version__ = __version__.replace(".post", ".post{}".format(formatted_date))
     
