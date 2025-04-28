@@ -1,7 +1,7 @@
-# PPO && GRPO
+# GRPO && REINFORCE++
 
-PPO（Proximal Policy Optimization，近端策略优化）是一种强化学习算法，旨在通过优化策略来最大化累积奖励。PPO 算法结合了 Policy Gradient 和‌TRPO 的优点，通过使用随机梯度上升优化一个“替代”目标函数，实现小批量更新，而不是每个数据样本只进行一次梯度更新。
 GRPO（Group Relative Policy Optimization，组相对策略优化）是 PPO（Proximal Policy Optimization，近端策略优化）算法的一种变体。与 PPO 不同，GRPO 省略了价值函数估计器。在 GRPO 中，对于每个状态 \(s\)，算法会从当前策略 \(\pi_{\theta_{t}}\) 中采样多个动作 \(a_{1}, \dots, a_{G}\)。然后，GRPO 计算这些动作相对于组内其他动作的“组相对优势”（group-relative advantage），以此作为优化策略的依据。
+REINFORCE++ 是经典 REINFORCE 算法的改进版本，通过融合 PPO 的关键优化技术并移除 Critic Model，实现了更加简洁高效的策略优化。相比于传统的 REINFORCE，REINFORCE++ 在 Token-Level KL 惩罚、PPO-Clip、优势标准化、奖励裁剪和奖励标准化等关键技术上进行了改进，从而提高了训练过程的效率和稳定性。
 
 以下是详细的使用文档和示例：
 
@@ -49,7 +49,7 @@ python setup_cuda.py install
 ```
 
 
-### PPO & GRPO 数据准备
+### GRPO & REINFORCE++ 数据准备
 我们提供了一版使用 `Qwen/Qwen2.5-7B-Instruct-1M` 的`chat template`预处理后的[KK 数据集](https://hf-mirror.com/datasets/K-and-K/knights-and-knaves)。
 ```
 wget https://paddlenlp.bj.bcebos.com/datasets/examples/ppo-kk.tgz && tar zxf ppo-kk.tgz
@@ -57,51 +57,90 @@ wget https://paddlenlp.bj.bcebos.com/datasets/examples/ppo-kk.tgz && tar zxf ppo
 
 ## 训练
 
-### 训练配置
+### GRPO && REINFORCE++ 训练配置
 
-我们采用的配置文件在放置在`llm/config/llama/ppo_argument.json`和`llm/config/llama/grpo_argument.json`中，同时我们提供了详细参数释义如下：
-
-- `actor_model_name_or_path`: PPO 中 actor-model 和 reference-model 模型本地的模型路径
-- `reward_model_name_or_path`: PPO 中 reward-model 和 critic-model 模型本地的模型路径
-- `use_fusemt`: 是否通过 FustMT 加速生成，默认为 True
-- `use_flash_attention`: 是否启用 FlashAttention-2，默认为 False
+我们采用的配置文件放置在`llm/config/llama/grpo_argument.yaml`中，同时我们提供了详细参数释义如下：
+- `rl_algorithm`: 使用的强化学习算法，支持`grpo`、`reinforce_plus_plus`
+- `actor_model_name_or_path`: actor-model 和 reference-model 模型本地的模型路径
+- `reward_model_name_or_path`: reward 模型的名称或本地路径
+- `use_rm_server`: 是否使用 reward model server，设置为`False`时需要提供`reward_model_name_or_path`
+- `reward_server`: reward model server 的 URL 地址, 比如`http://127.0.0.1:8731`
+- `logging_dir`: 日志保存的文件夹
+- `logging_steps`: 训练日志打印的间隔步数
 - `output_dir`: 模型参数保存目录
-- `max_seq_len`: 输入数据的最大长度，默认为 4096
+- `report_to`: 训练可视化工具，支持 "all"、"wandb"、"tensorboard"、"visualdl"、"none"
+- `wandb_http_proxy`: 连接 wandb 使用的 HTTP 代理
+- `run_name`: 实验名称
+- `train_datasets`: 训练集路径
+- `eval_datasets`: 验证集路径
+- `prompt_key`: 数据集中 query 对应的字段名
+- `response_key`: 数据集中 response 对应的字段名
+- `dataloader_drop_last`: dataloader 是否丢弃最后不完整的 batch
+- `balance_batch`: 该参数用于指定是否在数据并行场景下，对批次内的 token 数量进行均衡分配。若设置为 True，系统将尝试在不同并行设备间平衡 token 的分布；若设置为 False（默认值），则不进行此类均衡操作。
+- `use_remove_padding`: 此参数决定是否在训练过程中去除输入数据中的 padding 部分。启用该选项（设置为 True）可有效提高训练过程中有效 token 的占比，从而提升训练效率；若设置为 False（默认值），则保留输入数据中的 padding。
+- `tensor_parallel_degree`: 张量并行度
+- `sequence_parallel`: 是否启用序列并行
+- `sharding_parallel_degree`: sharding 并行度
+- `sharding`: 分片策略，支持 "stage1" 或 "stage2"
+- `sharding_parallel_config`: sharding 并行配置
+- `pipeline_parallel_degree`: 流水线并行度
+- `virtual_pp_degree`: 虚拟流水线并行度
+- `max_prompt_len`: 生成样本时的最大生成长度， max_length 调大会增加生成时间，并且增加显存占用。注意：
+max_dec_len + max_prompt_len 应当小于 max_seq_len。
 - `max_dec_len`: 最大生成长度
 - `min_dec_len`: 最小生成长度
 - `top_p`: 生成解码超参数
 - `temperature`: 生成解码超参数
 - `repetition_penalty`: 生成解码超参数
-- `rollout_n`: 生成 response 的数量
-- `min_learning_rate`: Actor 模型的最小学习率
-- `critic_learning_rate`: Critic 模型的最小学习率
-- `recompute`: Actor 模型是否使用重计算策略，开启后可节省训练显存
-- `critic_recompute`: Critic 模型是否使用重计算策略，开启后可节省训练显存
-- `recompute_granularity` Actor 模型的重计算的粒度，可选项为`core_attn`和`full`. `core_attn`速度快但是显存占用，`full`速度慢但是显存占用低
-- `critic_recompute_granularity` Critic 模型重计算的粒度，可选项为`core_attn`和`full`. `core_attn`速度快但是显存占用，`full`速度慢但是显存占用低
-- `warmup_ratio`: Actor 模型用于从 0 到 `learning_rate` 的线性 warmup 的总训练步骤的比例
-- `critic_warmup_ratio`: Critic 模型用于从 0 到 `critic_learning_rate` 的线性 warmup 的总训练步骤的比例
-- `lr_scheduler_type`: Actor 模型要使用的学习率调度策略。 (`str`, 可选, 默认为 `"linear"`)
-- `critic_lr_scheduler_type`: Critic 模型要使用的学习率调度策略。 (`str`, 可选, 默认为 `"linear"`)
-- `weight_decay`: Actor 模型除了所有 bias 和 LayerNorm 权重之外，应用于所有层的权重衰减数值。（`float`，可选，默认为 0.0）
-- `critic_weight_decay`: Critic 模型除了所有 bias 和 LayerNorm 权重之外，应用于所有层的权重衰减数值。（`float`，可选，默认为 0.0）
-- `max_prompt_len`: 生成样本时的最大生成长度， max_length 调大会增加生成时间，并且增加显存占用。注意：
-max_dec_len + max_prompt_len 应当小于 max_seq_len。
-- `per_device_train_batch_size`: 训练 batch 大小
-- `per_device_eval_batch_size`: 评估 batch 大小。
+- `rollout_max_num_seqs`: 单次推理可以处理的最大序列数
+- `rollout_quant_type`: 量化类型，例如 "weight_only_int8"
+- `seed`: 随机种子
+- `global_batch_size`: 一次（一个 step）推理（rollout)采样的 prompt 数量
+- `global_mini_batch_size`: actor model 更新一次参数训练的 prompt 数量
+- `rollout_n`: 一个 prompt 采样的 response 数量
+- `update_iters`: 同一批数据训练次数
+- `per_device_logprob_batch_size`: 计算 log_probs 时，一个 batch 的样本数量
+- `per_device_reward_batch_size`: critic model 计算 loss 与反向传播时，一个 batch 的的样本数量
+- `per_device_value_batch_size`: critic model 前向计算 values 时，一个 batch 的的样本数量
+- `per_device_train_batch_size`: actor model 计算 loss 与反向传播时，一个 batch 的样本数量
+- `num_train_epochs`: 训练的 epoch 数
+- `max_length`: 训练时的最大长度，应大于 `max_prompt_len` 和 `max_dec_len` 之和
+- `learning_rate`: 学习率
+- `lr_scheduler_type`: Actor 模型要使用的学习率调度策略。 (`str`, 可选, 默认为`linear`)
+- `weight_decay`: AdamW 优化器的权重衰减
+- `adam_beta1`: AdamW 优化器的 beta1
+- `adam_beta2`: AdamW 优化器的 beta2
+- `adam_epsilon`: AdamW 优化器的 epsilon
+- `max_grad_norm`: 梯度裁剪的最大值
 - `max_steps`: 总的训练步数
-- `eval_steps`: 模型评估的间隔步数
-- `max_evaluate_steps`: 模型单次评估的最大步数
-- `logging_steps`: 训练日志打印的间隔步数
 - `save_steps`: 模型参数保存的间隔步数
-- `weight_decay`: 权重衰减数值
-- `do_train`: 是否进行训练任务
-- `do_eval`: 是否进行评估任务
-- `fp16`: 使用 float16 精度进行模型训练和推理。
+- `ignore_save_lr_and_optim`: 是否忽略保存学习率和优化器状态
+- `kl_coeff`: KL 惩罚系数
+- `kl_loss_coeff`: KL Loss 系数
+- `pg_loss_coeff`: 策略梯度损失系数
+- `entropy_coeff`: entropy loss 系数
+- `clip_range_ratio`: PPO-Clip 裁剪阈值
+- `clip_range_ratio_low`: PPO-Clip 裁剪下限阈值
+- `clip_range_ratio_high`: PPO-Clip 裁剪上限阈值
+- `clip_range_score`: reward 的剪切范围，reward 会被限制在 [-clip_range_score, clip_range_score] 范围内
+- `clip_range_value`: value 模型输出的剪切范围，value 会被限制在 [-clip_range_value, clip_range_value] 范围内
+- `normalize_reward`: 是否使用 reward 标准化
+- `normalize_advantage`: 是否使用 advantage 标准化
+- `use_fp32_compute`: 是否使用 fp32 来计算 log_prob、reward、advantage 和 loss
+- `do_eval`: 是否进行评估
+- `per_device_eval_batch_size`: 估 batch 大小
+- `evaluation_strategy`: 评估策略，例如 `steps`
+- `eval_steps`: 模型评估的间隔步数
+- `use_flash_attention`: 是否启用 FlashAttention-2，默认为 False
+- `use_fused_rms_norm`: 是否使用融合的 RMSNorm 算子，需安装 fused_ln
+- `recompute`: Actor 模型是否使用重计算策略，开启后可节省训练显存
+- `recompute_granularity`: Actor 模型的重计算的粒度，可选项为`core_attn`和`full`. `core_attn`速度快但是显存占用，`full`速度慢但是显存占用低
 - `bf16`: 使用 bfloat16 精度进行模型训练和推理。
 - `fp16_opt_level`: float16 精度训练模式，`O2`表示纯 float16 训练
-- `balance_batch`：该参数用于指定是否在数据并行场景下，对批次内的 token 数量进行均衡分配。若设置为 True，系统将尝试在不同并行设备间平衡 token 的分布；若设置为 False（默认值），则不进行此类均衡操作。
-- `use_remove_padding`：此参数决定是否在训练过程中去除输入数据中的 padding 部分。启用该选项（设置为 True）可有效提高训练过程中有效 token 的占比，从而提升训练效率；若设置为 False（默认值），则保留输入数据中的 padding。
+- `amp_custom_black_list`: 自定义 AMP 黑名单
+- `amp_custom_white_list`: 自定义 AMP 白名单
+
+
 
 ### GRPO 训练命令
 ```shell
@@ -132,7 +171,7 @@ python -u -m paddle.distributed.launch --devices "0,1,2,3" run_ppo.py ../../conf
 ```
 
 ### 在线监控
-在`grpo_argument.json`中设置的输出目录为`"logging_dir": "vdl_log"`, 可以通过以下命令查看训练过程
+在`grpo_argument.yaml`中设置的输出目录为`"logging_dir": "vdl_log"`, 可以通过以下命令查看训练过程
 ```shell
 visualdl --logdir vdl_log --host 0.0.0.0
 ```
