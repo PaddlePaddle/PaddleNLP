@@ -672,8 +672,8 @@ std::vector<paddle::Tensor> sage_attention_varlen_fwd(paddle::Tensor& q,        
   std::vector<paddle::Tensor>&& quant_vfp8_results = per_channel_varlen_fp8(v_padded, 
       cu_seqlen_q, 
       cu_seqlen_v_padded, 
-      total_seqlen_v_padded, 
       max_seqlen_k, 
+      total_seqlen_v_padded, 
       tensor_layout, 448.0, smooth_v);
 
   qk_int8_sv_f8_accum_f32_fuse_v_scale_attn_inst_buf_sm90_varlen_fwd(quant_qk_results[0], // q
