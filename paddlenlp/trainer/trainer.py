@@ -1517,11 +1517,10 @@ class Trainer:
     def _get_train_sampler(self) -> Optional[paddle.io.Sampler]:
         if self.train_dataset is None or not has_length(self.train_dataset):
             return None
-        shuffle = os.getenv("DATALOADER_SHUFFLE", "1").lower() in ["1", "y", "t", "true", "yes"]
         if self.args.world_size <= 1:
             return paddle.io.BatchSampler(
                 dataset=self.train_dataset,
-                shuffle=shuffle,
+                shuffle=self.args.dataloader_shuffle,
                 batch_size=self.args.per_device_train_batch_size,
                 drop_last=self.args.dataloader_drop_last,
             )
@@ -1529,7 +1528,7 @@ class Trainer:
         return DistributedBatchSampler(
             self.train_dataset,
             batch_size=self.args.per_device_train_batch_size,
-            shuffle=shuffle,
+            shuffle=self.args.dataloader_shuffle,
             num_replicas=self.args.dataset_world_size,
             rank=self.args.dataset_rank,
             drop_last=self.args.dataloader_drop_last,
