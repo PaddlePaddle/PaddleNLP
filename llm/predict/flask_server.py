@@ -17,10 +17,15 @@ from __future__ import annotations
 import json
 import os
 import socket
+import sys
 import time
 from contextlib import closing
 from dataclasses import asdict, dataclass, field
+from pathlib import Path
 from time import sleep
+
+sys.path.append(str(Path(__file__).parent))
+sys.path.append(str(Path(__file__).parent.parent))
 
 import requests
 from filelock import FileLock

@@ -2164,6 +2164,7 @@ class TokenizerTesterMixin:
         for tokenizer, pretrained_name, kwargs in self.tokenizers_list:
             with self.subTest(f"{tokenizer.__class__.__name__} ({pretrained_name})"):
 
+                print(pretrained_name)
                 tokenizer = self.tokenizer_class.from_pretrained(pretrained_name, **kwargs)
 
                 text = "Wonderful no inspiration example with subtoken"
@@ -2174,6 +2175,7 @@ class TokenizerTesterMixin:
                     text, return_special_tokens_mask=True, return_offsets_mapping=True, add_special_tokens=True
                 )
                 added_tokens = tokenizer.num_special_tokens_to_add(False)
+                print(tokens_with_offsets)
                 offsets = tokens_with_offsets["offset_mapping"]
 
                 # Assert there is the same number of tokens and offsets

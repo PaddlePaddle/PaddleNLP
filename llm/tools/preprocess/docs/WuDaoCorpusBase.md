@@ -5,19 +5,19 @@
 |-|-|-|
 | WuDaoCorpus2.0 Base| 中文 | 200GB |
 
-WuDaoCorpora是悟道爬取的中文大规模语料。整体数量为3TB，目前开源的部分为WuDaoCorpus2.0 bases数据集，大小为200GB。
+WuDaoCorpora 是悟道爬取的中文大规模语料。整体数量为3TB，目前开源的部分为 WuDaoCorpus2.0 bases 数据集，大小为200GB。
 
 ## 数据获取
 
 **1. 下载解压**
 
-用户微信登录[官网](https://resource.wudaoai.cn/home)，即可直接下载数据。下载好的压缩数据约 64GB。解压
+用户[此处下载](https://www.scidb.cn/en/detail?dataSetId=c6a3fe684227415a9db8e21bac4a15ab)，即可直接下载数据。下载好的压缩数据约 64GB。解压
 ```
 unrar x WuDaoCorpus2.0_base_200G.rar
 ```
 **2. 语料分词**
 
-由于WuDao数据集比较大，分词比较耗时，这里先进行了语料分词：
+由于 WuDao 数据集比较大，分词比较耗时，这里先进行了语料分词：
 ```shell
 python words_segmentation.py \
     --input_path ./WuDaoCorpus2.0_base_200G \
@@ -27,11 +27,11 @@ python words_segmentation.py \
     --output_path ./wudao_lac_cut \
 ```
 
-注：预训练需要实现 SOP( Sentence Order Predict) 任务，在分词的同时，我们使用 简单规则 进行了文本断句。如果语料只有一句话，建议去除SOP loss，训练时设置 `binary_head=False`。
+注：预训练需要实现 SOP( Sentence Order Predict) 任务，在分词的同时，我们使用 简单规则 进行了文本断句。如果语料只有一句话，建议去除 SOP loss，训练时设置 `binary_head=False`。
 
-**3. 转换为jsonl格式**
+**3. 转换为 jsonl 格式**
 
-文本转化完成后。我们使用 `../data_tools/trans_to_json.py`重新转换为jsonl格式（分词完毕）。
+文本转化完成后。我们使用 `../data_tools/trans_to_json.py`重新转换为 jsonl 格式（分词完毕）。
 ```shell
 python ./trans_to_json.py  \
     --input_path ./wudao_lac_cut \
@@ -48,19 +48,18 @@ python ./trans_to_json.py  \
 
 下面是针对训练任务的数据集应用。
 
-* llama为例
+* llama 为例
 
-注：若使用llama模型，则不需要提前进行分词，请将WuDaoCorpus2.0_base_200G中的json文件预处理为如下格式的jsonl文件：
+注：若使用 llama 模型，则不需要提前进行分词，请将 WuDaoCorpus2.0_base_200G 中的 json 文件预处理为如下格式的 jsonl 文件：
 ```
 {"text": "飞桨是功能完备、开源开放的产业级深度学习平台。飞桨拥有..."}
 {"text": "PaddleNLP是自然语言..."}
 ```
 
-之后利用如下脚本将对应的jsonl文件转化为.bin & .idx文件。
+之后利用如下脚本将对应的 jsonl 文件转化为.bin & .idx 文件。
 ```shell
 python -u  create_pretraining_data.py \
     --model_name "idea-ccnl/ziya-llama-13b-v1" \
-    --tokenizer_name "LlamaTokenizer" \
     --input_path "wudao_corpus_200g.jsonl" \
     --output_prefix "wudao_corpus_200g" \
     --data_format "JSON" \
@@ -71,11 +70,10 @@ python -u  create_pretraining_data.py \
     --workers 48
 ```
 
-* ernie为例
+* ernie 为例
 ```shell
 python -u  create_pretraining_data.py \
     --model_name "ernie-3.0-base-zh" \
-    --tokenizer_name "ErnieTokenizer" \
     --input_path "wudao_corpus_200g.jsonl" \
     --output_prefix "wudao_corpus_200g"  \
     --data_format "JSON" \

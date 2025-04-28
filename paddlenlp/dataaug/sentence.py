@@ -33,9 +33,9 @@ __all__ = [
 class SentenceGenerate:
     """
     SentenceGenerate is a sentence-level data augmentation strategy
-    that generates simialr sentences according to the input sequence.
-    The strattegy first generates several sentences, and then chooses
-    the top n simialr sentences by the model.
+    that generates similar sentences according to the input sequence.
+    The strategy first generates several sentences, and then chooses
+    the top n similar sentences by the model.
 
     Args:
         model_name (str):
@@ -82,7 +82,7 @@ class SentenceGenerate:
 
     @paddle.no_grad()
     def _generate_similar_sentence(self, sequence, model, tokenizer):
-        """Generates generate_n similar sentences from the provided sequence, and chooose the best create_n similar sentences."""
+        """Generates generate_n similar sentences from the provided sequence, and choose the best create_n similar sentences."""
 
         # Generate generate_n similar sentences
         generated_sequences = [sequence]
@@ -134,7 +134,7 @@ class SentenceSummarize:
             token probabilities in the "sampling" strategy. Default to 1.0,
             which means no effect.
         use_fp16_decoding: (bool): Whether to use fp16 for decoding.
-            Only works when faster entry is avalible. Default to False.
+            Only works when faster entry is available. Default to False.
         kwargs (dict): Additional keyword arguments refer to ..taskflow.text_summarization.TextSummarization
     """
 
@@ -337,8 +337,8 @@ class SentenceBackTranslate:
 class SentenceBackTranslateAPI:
     """
     SentenceBackTranslateAPI is a sentence-level data augmentation strategy
-    that translates the input sequence into one langugage, and backtranslate
-    back into the sourche language by baidu translate api.
+    that translates the input sequence into one language, and back-translate
+    back into the source language by baidu translate api.
 
     Args:
         src_lang (str):

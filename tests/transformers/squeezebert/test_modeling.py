@@ -210,6 +210,7 @@ class SqueezeBertModelTest(ModelTesterMixin, unittest.TestCase):
         self.model_tester.create_and_check_squeezebert_for_token_classification(*config_and_inputs)
 
     @slow
+    @unittest.skip("Skip for missing model weight.")
     def test_model_from_pretrained(self):
         for model_name in list(SqueezeBertPreTrainedModel.pretrained_init_configuration)[:1]:
             model = SqueezeBertModel.from_pretrained(model_name)
@@ -218,6 +219,7 @@ class SqueezeBertModelTest(ModelTesterMixin, unittest.TestCase):
 
 class SqueezeBertModelIntegrationTest(unittest.TestCase):
     @slow
+    @unittest.skip("Skip for missing model weight.")
     def test_inference_classification_head(self):
         model = SqueezeBertForSequenceClassification.from_pretrained("squeezebert-mnli")
 

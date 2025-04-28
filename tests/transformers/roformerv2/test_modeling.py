@@ -297,6 +297,7 @@ class RoFormerv2ModelTest(ModelTesterMixin, unittest.TestCase):
         self.model_tester.create_and_check_for_token_classification(*config_and_inputs)
 
     @slow
+    @unittest.skip("Skip for missing model weight.")
     def test_model_from_pretrained(self):
         for model_name in list(RoFormerv2PretrainedModel.pretrained_init_configuration)[:1]:
             model = RoFormerv2Model.from_pretrained(model_name)

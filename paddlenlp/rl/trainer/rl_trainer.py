@@ -625,12 +625,12 @@ class RLTrainer(Trainer):
             eval_tp_rank = max(tensor_parallel_rank, 0)
         group_nums = self.args.logical_process_index // old_dp_workers * eval_tp_size + eval_tp_rank
         self._data_trans_group = create_data_trans_group(global_rank, group_nums)
-        # just for compatiable with old code
+        # just for compatible with old code
         self._policy_model_eval_group = self._data_trans_group
 
     def get_model(self, train=False):
         """
-        model visitor wrapps PipelineParalle and Inference model to do evaulation
+        model visitor wraps PipelineParallel and Inference model to do evaluation
         and generation.
         """
         if train:
@@ -785,10 +785,10 @@ class RLTrainer(Trainer):
         NOTE: This is transparent to users.
         When using a mixed loss we often want to get the separated loss metrics,
         thus we mark loss type of each training step to separate them. This is
-        not necessary since the loss would be returnd after each training step.
-        However when using PipelienParallel, the loss returned is 0 when not reach
+        not necessary since the loss would be returned after each training step.
+        However when using PipelineParallel, the loss returned is 0 when not reach
         accumulated step and the loss returned at accumulated step is a mixed loss.
-        To separate loss metrics in PipelienParallel:
+        To separate loss metrics in PipelineParallel:
         1. We hack PipelineParallel._forward_step to record actual loss for each
            step in a list (only in training and not in evaluation currently).
         2. We mark the loss type only once for each step using `loss_step_indice`
@@ -805,7 +805,7 @@ class RLTrainer(Trainer):
         """
         Return a dict mapping loss name to value of current training step. This
         is mainly to get loss for metric logging, and it would not affect the
-        training. This is mostly helpful to PipelienParallel with a mixed loss
+        training. This is mostly helpful to PipelineParallel with a mixed loss
         in which the loss returned is 0 when not reach accumulated step and the
         loss returned at accumulated step is a mixed loss.
         NOTE: 1. Only when reaching accumulated step the losses returned are
@@ -830,7 +830,7 @@ class RLTrainer(Trainer):
                     mix_loss = paddle.stack(model._step_losses)
                     model._step_losses = None
                 else:
-                    # The tessor shape is not actor_model.accumulate_steps
+                    # The tensor shape is not actor_model.accumulate_steps
                     # (args.accu_steps) but actor_trainer.args.accu_steps,
                     # since actor_model is created with global pp_config
                     # using global args.accu_steps which is only half of

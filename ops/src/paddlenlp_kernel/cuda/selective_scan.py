@@ -245,7 +245,7 @@ class MambaInnerFn(paddle.autograd.PyLayer):
         if xz.strides[-1] != 1:
             xz = xz.contiguous()
         conv1d_weight = rearrange(conv1d_weight, "d 1 w -> d w")
-        # chunk donot share memory, so we can't use it here.
+        # chunk do not share memory, so we can't use it here.
         # x, z = xz.chunk(2, axis=1)
         half_xz = xz.shape[1] // 2
         x = xz[:, :half_xz]

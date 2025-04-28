@@ -27,6 +27,7 @@ void TokenPenaltyMultiScores(const paddle::Tensor& pre_ids,
                              const paddle::Tensor& cur_len,
                              const paddle::Tensor& min_len,
                              const paddle::Tensor& eos_token_id) {
+  baidu::xpu::api::plugin::print_times("[TIME BEGIN] TokenPenaltyMultiScores");
   phi::XPUPlace place(phi::backends::xpu::GetXPUCurrentDeviceId());
   auto dev_ctx = paddle::experimental::DeviceContextPool::Instance().Get(place);
   auto xpu_ctx = static_cast<const phi::XPUContext*>(dev_ctx);
@@ -90,7 +91,10 @@ void TokenPenaltyMultiScores(const paddle::Tensor& pre_ids,
           "Only float16 and float32 are supported. ");
       break;
   }
+
+  baidu::xpu::api::plugin::print_times("[TIME END] TokenPenaltyMultiScores");
 }
+
 
 PD_BUILD_OP(get_token_penalty_multi_scores_v2)
     .Inputs({"pre_ids",

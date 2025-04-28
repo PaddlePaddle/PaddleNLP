@@ -28,6 +28,8 @@ std::vector<paddle::Tensor> GetPositionIdsKernelV2(
     const paddle::Tensor& seq_lens_decoder,
     const paddle::Tensor& seq_lens_this_time) {
 
+  baidu::xpu::api::plugin::print_times("[TIME BEGIN] GetPositionIdsKernelV2" );
+
   phi::XPUPlace place(phi::backends::xpu::GetXPUCurrentDeviceId());
   auto dev_ctx = paddle::experimental::DeviceContextPool::Instance().Get(place);
   auto xpu_ctx = static_cast<const phi::XPUContext*>(dev_ctx);
@@ -54,7 +56,9 @@ std::vector<paddle::Tensor> GetPositionIdsKernelV2(
         const_cast<int32_t*>(position_ids_out.data<int32_t>()),
         bs
   );
-  PD_CHECK(ret == 0, "api::plugin::get_position_ids failed");
+  PD_CHECK(ret == 0, "api::plugin::get_position_ids failed"); 
+  
+  baidu::xpu::api::plugin::print_times("[TIME END] GetPositionIdsKernelV2" );
   return {position_ids_out};
 }
 

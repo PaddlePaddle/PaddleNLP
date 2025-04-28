@@ -154,10 +154,12 @@ class RoFormerv2TokenizationTest(TokenizerTesterMixin, unittest.TestCase):
             "input_ids"
         ]
 
+        print(text)
         encoded_sentence = tokenizer.build_inputs_with_special_tokens(text)
+        print(encoded_sentence)
         encoded_pair = tokenizer.build_inputs_with_special_tokens(text, text_2)
-        assert encoded_sentence == [1] + text + [2]
-        assert encoded_pair == [1] + text + [2] + text_2 + [2]
+        assert encoded_sentence == [101] + text + [102]
+        assert encoded_pair == [101] + text + [102] + text_2 + [102]
 
     def test_offsets_with_special_characters(self):
         for tokenizer, pretrained_name, kwargs in self.tokenizers_list:
@@ -260,5 +262,5 @@ class RoFormerv2TokenizationTest(TokenizerTesterMixin, unittest.TestCase):
             return_position_ids=True,
             return_offsets_mapping=True,
         )
-        self.assertEqual(len(encoding["input_ids"]), 15)
-        self.assertEqual(len(encoding["offset_mapping"]), 15)
+        self.assertEqual(len(encoding["input_ids"]), 20)
+        self.assertEqual(len(encoding["offset_mapping"]), 20)

@@ -24,6 +24,7 @@ from parameterized import parameterized
 
 from paddlenlp.datasets import load_dataset
 from paddlenlp.experimental.autonlp import AutoTrainerForTextClassification
+from paddlenlp.utils.env import PADDLE_INFERENCE_MODEL_SUFFIX
 from tests.testing_utils import get_tests_dir, slow
 
 finetune_model_candidate = {
@@ -175,13 +176,13 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
             # test export
             temp_export_path = os.path.join(temp_dir_path, "test_export")
             auto_trainer.export(export_path=temp_export_path)
-            self.assertTrue(os.path.exists(os.path.join(temp_export_path, "model.pdmodel")))
+            self.assertTrue(os.path.exists(os.path.join(temp_export_path, f"model{PADDLE_INFERENCE_MODEL_SUFFIX}")))
             self.assertTrue(os.path.exists(os.path.join(temp_export_path, "taskflow_config.json")))
             self.assertTrue(os.path.exists(os.path.join(temp_export_path, "tokenizer_config.json")))
 
             # test export compress model
             auto_trainer.export(export_path=temp_export_path, compress=True)
-            self.assertTrue(os.path.exists(os.path.join(temp_export_path, "model.pdmodel")))
+            self.assertTrue(os.path.exists(os.path.join(temp_export_path, f"model{PADDLE_INFERENCE_MODEL_SUFFIX}")))
             self.assertTrue(os.path.exists(os.path.join(temp_export_path, "taskflow_config.json")))
             self.assertTrue(os.path.exists(os.path.join(temp_export_path, "tokenizer_config.json")))
 
@@ -400,13 +401,13 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
             # test export
             temp_export_path = os.path.join(temp_dir_path, "test_export")
             auto_trainer.export(export_path=temp_export_path)
-            self.assertTrue(os.path.exists(os.path.join(temp_export_path, "model.pdmodel")))
+            self.assertTrue(os.path.exists(os.path.join(temp_export_path, f"model{PADDLE_INFERENCE_MODEL_SUFFIX}")))
             self.assertTrue(os.path.exists(os.path.join(temp_export_path, "taskflow_config.json")))
             self.assertTrue(os.path.exists(os.path.join(temp_export_path, "tokenizer_config.json")))
 
             # test export compress model
             auto_trainer.export(export_path=temp_export_path, compress=True)
-            self.assertTrue(os.path.exists(os.path.join(temp_export_path, "model.pdmodel")))
+            self.assertTrue(os.path.exists(os.path.join(temp_export_path, f"model{PADDLE_INFERENCE_MODEL_SUFFIX}")))
             self.assertTrue(os.path.exists(os.path.join(temp_export_path, "taskflow_config.json")))
             self.assertTrue(os.path.exists(os.path.join(temp_export_path, "tokenizer_config.json")))
 

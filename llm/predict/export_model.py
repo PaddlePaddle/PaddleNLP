@@ -14,12 +14,16 @@
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import paddle
 from paddle.distributed import fleet
 
-from llm.predict.predictor import ModelArgument, PredictorArgument, create_predictor
+sys.path.append(str(Path(__file__).parent.parent))
+from predict.predictor import ModelArgument, PredictorArgument, create_predictor
+
 from paddlenlp.trainer import PdArgumentParser
 from paddlenlp.trl import llm_utils
 

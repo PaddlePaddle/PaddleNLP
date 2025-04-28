@@ -725,7 +725,7 @@ void MoeGemmRunner<T, WeightType>::run_gemm<EpilogueTag>(
       gemmConfigManager.addBestConfig(gemmId, profile_total_rows, best_config);
       chosen_config = best_config;
     } else {
-      PADDLE_FATAL("[MoE Configure Search] find no one avaliable config.");
+      PADDLE_FATAL("[MoE Configure Search] find no one available config.");
     }
   }
   dispatch_to_arch<EpilogueTag>(A,

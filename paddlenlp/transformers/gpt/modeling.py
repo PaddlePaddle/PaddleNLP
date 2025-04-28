@@ -307,7 +307,9 @@ class MultiHeadAttention(nn.Layer):
             # [bs, seq_len, num_head * head_dim] -> [bs/n, seq_len, num_head * head_dim] (n is model parallelism)
             target_shape = [-1, self.config.seq_length, self.num_attention_heads, self.head_dim]
         else:
-            target_shape = [0, 0, self.num_attention_heads, self.head_dim]
+            query_shape = query.shape
+            # bs seq_len, nhead, headdim
+            target_shape = [query_shape[0], query_shape[1], self.num_attention_heads, self.head_dim]
 
         query_states = self.q_proj(query)
         # [bs, seq_len, num_head, head_dim]
@@ -1643,7 +1645,7 @@ class GPTForCausalLM(GPTPretrainedModel):
     def prepare_inputs_for_generation(self, input_ids, use_cache=False, past_key_values=None, **kwargs):
         # only last token for inputs_ids if cache is defined in kwargs
         position_ids = kwargs.get("position_ids", None)
-        # attention_mask = kwargs.get("attention_mask", None)
+        attention_mask = kwargs.get("attention_mask", None)
         if past_key_values is not None:
             input_ids = input_ids[:, -1].unsqueeze(-1)
             if position_ids is not None:
@@ -1651,7 +1653,7 @@ class GPTForCausalLM(GPTPretrainedModel):
         return {
             "input_ids": input_ids,
             "position_ids": position_ids,
-            "attention_mask": None,
+            "attention_mask": attention_mask,
             "use_cache": use_cache,
             "past_key_values": past_key_values,
         }
@@ -1666,7 +1668,8 @@ class GPTForCausalLM(GPTPretrainedModel):
             attention_mask = (input_ids != pad_token_id).astype("int64")
         else:
             attention_mask = paddle.ones_like(input_ids, dtype="int64")
-        return paddle.unsqueeze(attention_mask, axis=[1, 2])
+
+        return attention_mask
 
 
 class GPTForTokenClassification(GPTPretrainedModel):

@@ -14,19 +14,22 @@
 
 import paddle
 import paddle.nn as nn
+from paddle.autograd import PyLayer
 from paddle.distributed.fleet.base import topology as tp
 from paddle.distributed.fleet.layers.mpu import mp_ops
+from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+    AllGatherOp,
+    ReduceScatterOp,
+)
+from paddle.nn.quant import llm_int8_linear, weight_dequantize, weight_only_linear
+
+from .qat_utils import QATFunc
 
 try:
-    from paddle.nn.quant import llm_int8_linear, weight_only_linear
-except:
-    llm_int8_linear = None
-    weight_only_linear = None
-try:
-    from .qlora import qlora_weight_linear
+    from .qlora import qlora_weight_dequantize, qlora_weight_linear
 except:
     qlora_weight_linear = None
-
+    qlora_weight_dequantize = None
 
 QuantMapping = {
     # (quant_dtype, quant_weight_bit)
@@ -35,7 +38,193 @@ QuantMapping = {
     "llm.int8": ("int8", 8),
     "fp4": ("fp4", 4),
     "nf4": ("nf4", 4),
+    "a8w8linear": ("int8", 8),
+    "a8w4linear": ("int8", 8),
 }
+
+
+def quant_weight_forward(
+    x,
+    quant_weight,
+    bias,
+    quant_scale,
+    quant_state,
+    quant_dtype,
+    quantization_config,
+    weight_quantize_algo,
+    dtype,
+):
+    if weight_quantize_algo in ["weight_only_int8", "weight_only_int4"]:
+        output = weight_only_linear(
+            x=x,
+            weight=quant_weight,
+            bias=bias,
+            weight_scale=quant_scale,
+            weight_dtype=quant_dtype,
+            group_size=quantization_config.group_size,
+        )
+    elif weight_quantize_algo in ["llm.int8"]:
+        output = llm_int8_linear(x, quant_weight, bias, quant_scale, quantization_config.llm_int8_threshold)
+    elif weight_quantize_algo in ["fp4", "nf4"]:
+        output = qlora_weight_linear(
+            x=x,
+            quant_weight=quant_weight,
+            dtype=dtype,
+            state=quant_state if quantization_config.qlora_weight_double_quant else quant_scale,
+            quant_algo=weight_quantize_algo,
+            double_quant=quantization_config.qlora_weight_double_quant,
+            block_size=quantization_config.qlora_weight_blocksize,
+            double_quant_block_size=quantization_config.qlora_weight_double_quant_block_size,
+            bias=bias,
+        )
+
+    return output
+
+
+def dequant_weight(
+    quant_weight,
+    quantization_config,
+    weight_quantize_algo,
+    dtype,
+    quant_scale,
+    quant_state,
+    input_shape,
+):
+    if weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8"]:
+        quant_dequant_weight = weight_dequantize(
+            x=quant_weight,
+            scale=quant_scale,
+            algo=weight_quantize_algo,
+            out_dtype=dtype,
+            group_size=quantization_config.group_size,
+        )
+    elif weight_quantize_algo in ["fp4", "nf4"]:
+        quant_dequant_weight = (
+            qlora_weight_dequantize(
+                quant_weight=quant_weight,
+                quant_algo=weight_quantize_algo,
+                state=quant_state if quantization_config.qlora_weight_double_quant else quant_scale,
+                double_quant=quantization_config.qlora_weight_double_quant,
+                block_size=quantization_config.qlora_weight_blocksize,
+                double_quant_block_size=quantization_config.qlora_weight_double_quant_block_size,
+            )
+            .reshape([input_shape[-1], -1])
+            .cast(dtype)
+        )
+    return quant_dequant_weight
+
+
+class QuantizationLinearFunc(PyLayer):
+    @staticmethod
+    def forward(
+        ctx,
+        x,
+        quant_weight,
+        bias,
+        quant_scale,
+        quant_state,
+        quant_dtype,
+        quantization_config,
+        weight_quantize_algo,
+        dtype,
+    ):
+
+        output = quant_weight_forward(
+            x=x,
+            quant_weight=quant_weight,
+            bias=bias,
+            quant_scale=quant_scale,
+            quant_state=quant_state,
+            quant_dtype=quant_dtype,
+            quantization_config=quantization_config,
+            weight_quantize_algo=weight_quantize_algo,
+            dtype=dtype,
+        )
+        ctx.quant_dtype = quant_dtype
+        ctx.quantization_config = quantization_config
+        ctx.weight_quantize_algo = weight_quantize_algo
+        ctx.dtype = dtype
+        if ctx.weight_quantize_algo in ["fp4", "nf4"] and ctx.quantization_config.qlora_weight_double_quant:
+            qquant_scale, double_quant_scale, quant_scale_offset = quant_state
+            ctx.save_for_backward(x, quant_weight, bias, qquant_scale, double_quant_scale, quant_scale_offset)
+        else:
+            ctx.save_for_backward(x, quant_weight, bias, quant_scale)
+        return output
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        if ctx.weight_quantize_algo in ["fp4", "nf4"] and ctx.quantization_config.qlora_weight_double_quant:
+            x, quant_weight, bias, qquant_scale, double_quant_scale, quant_scale_offset = ctx.saved_tensor()
+            quant_state = (qquant_scale, double_quant_scale, quant_scale_offset)
+            quant_scale = None
+        else:
+            x, quant_weight, bias, quant_scale = ctx.saved_tensor()
+            quant_state = None
+
+        qdq_weight = dequant_weight(
+            quant_weight=quant_weight,
+            quantization_config=ctx.quantization_config,
+            weight_quantize_algo=ctx.weight_quantize_algo,
+            dtype=ctx.dtype,
+            quant_scale=quant_scale,
+            quant_state=quant_state,
+            input_shape=x.shape,
+        )
+
+        if not x.stop_gradient:
+            input_grad = paddle.matmul(grad_output, qdq_weight.T)
+        else:
+            input_grad = None
+
+        if not quant_weight.stop_gradient:
+            if len(x.shape) == 2:
+                weight_grad = paddle.matmul(x.transpose([1, 0]), grad_output)
+            else:
+                weight_grad = paddle.matmul(
+                    x.reshape([-1, x.shape[-1]]).transpose([1, 0]), grad_output.reshape([-1, grad_output.shape[-1]])
+                )
+        else:
+            weight_grad = None
+
+        if bias is not None and not bias.stop_gradient:
+            bias_grad = grad_output.sum(axis=[0, 1])
+        else:
+            bias_grad = None
+
+        return input_grad, weight_grad, bias_grad
+
+
+def quant_weight_linear(
+    x,
+    quant_weight,
+    quant_dtype,
+    quantization_config,
+    weight_quantize_algo,
+    dtype,
+    quant_scale=None,
+    quant_state=None,
+    bias=None,
+    act_state=None,
+):
+    if weight_quantize_algo in ["a8w8linear", "a8w4linear"]:
+
+        state, training, act_scale = act_state
+
+        return QATFunc.apply(
+            x, quant_weight, bias, quant_scale, quantization_config, dtype, state, training, act_scale
+        )
+    else:
+        return QuantizationLinearFunc.apply(
+            x,
+            quant_weight,
+            bias,
+            quant_scale,
+            quant_state,
+            quant_dtype,
+            quantization_config,
+            weight_quantize_algo,
+            dtype,
+        )
 
 
 class QuantizationLinear(nn.Layer):
@@ -49,6 +238,8 @@ class QuantizationLinear(nn.Layer):
         weight_quantize_algo,
         dtype,
         bias_attr=None,
+        mp_moe=False,
+        is_distributed=False,
     ):
         super().__init__()
         self.in_features = in_features
@@ -57,10 +248,17 @@ class QuantizationLinear(nn.Layer):
         self.weight_quantize_algo = weight_quantize_algo
         self._dtype = dtype
         self.quant_dtype, self.quant_weight_bit = QuantMapping[self.weight_quantize_algo]
+        self.state = 0
 
         # PaddlePaddle dosen't support 4bit data type, one 8bit data represents two 4bit data.
         # paddle.nn.quant.weight_quantize will transpose in_features and out_features.
-        if self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8"]:
+        if self.weight_quantize_algo in [
+            "weight_only_int8",
+            "weight_only_int4",
+            "llm.int8",
+            "a8w8linear",
+            "a8w4linear",
+        ]:
             self.quant_weight = self.create_parameter(
                 shape=[out_features // 2, in_features] if self.quant_weight_bit == 4 else [out_features, in_features],
                 dtype="int8",
@@ -72,9 +270,16 @@ class QuantizationLinear(nn.Layer):
                     dtype=self._dtype,
                     is_bias=False,
                 )
+                self.quant_scale.stop_gradient = True
             else:
                 # TODO(lugimzzz): support groupwise in next PR
                 raise NotImplementedError("Not yet support grouwise weightonly quantization.")
+            if self.weight_quantize_algo in ["a8w8linear", "a8w4linear"]:
+                self.act_scale = self.create_parameter(
+                    shape=[], dtype=self._dtype, is_bias=False, default_initializer=nn.initializer.Constant(value=0.0)
+                )
+                self.act_scale.stop_gradient = True
+
         elif self.weight_quantize_algo in ["fp4", "nf4"]:
             if qlora_weight_linear is None:
                 raise ImportError(
@@ -129,37 +334,31 @@ class QuantizationLinear(nn.Layer):
                 dtype=self._dtype,
                 is_bias=True,
             )
+        if mp_moe or is_distributed:
+            for p in self.parameters():
+                p.is_distributed = is_distributed
+                p.mp_moe = mp_moe
 
     def forward(self, x):
-        with paddle.amp.auto_cast(enable=False):
-            if self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4"]:
-                out = weight_only_linear(
-                    x=x,
-                    weight=self.quant_weight,
-                    bias=self.bias,
-                    weight_scale=self.quant_scale,
-                    weight_dtype=self.quant_dtype,
-                    group_size=self.quantization_config.group_size,
-                )
-            elif self.weight_quantize_algo in ["llm.int8"]:
-                out = llm_int8_linear(
-                    x, self.quant_weight, self.bias, self.quant_scale, self.self.quantization_config.llm_int8_threshold
-                )
-            elif self.weight_quantize_algo in ["fp4", "nf4"]:
-                out = qlora_weight_linear(
-                    x=x,
-                    quant_weight=self.quant_weight,
-                    dtype=self._dtype,
-                    state=(self.qquant_scale, self.double_quant_scale, self.quant_scale_offset)
-                    if self.quantization_config.qlora_weight_double_quant
-                    else self.quant_scale,
-                    quant_algo=self.weight_quantize_algo,
-                    double_quant=self.quantization_config.qlora_weight_double_quant,
-                    block_size=self.quantization_config.qlora_weight_blocksize,
-                    double_quant_block_size=self.quantization_config.qlora_weight_double_quant_block_size,
-                    bias=self.bias,
-                )
-        return out
+        output = quant_weight_linear(
+            x=x,
+            quant_weight=self.quant_weight,
+            quant_dtype=self.quant_dtype,
+            quantization_config=self.quantization_config,
+            weight_quantize_algo=self.weight_quantize_algo,
+            dtype=self._dtype,
+            quant_scale=self.quant_scale,
+            quant_state=(self.qquant_scale, self.double_quant_scale, self.quant_scale_offset)
+            if (self.weight_quantize_algo in ["fp4", "nf4"] and self.quantization_config.qlora_weight_double_quant)
+            else None,
+            bias=self.bias,
+            act_state=(self.state, self.training, self.act_scale)
+            if self.weight_quantize_algo in ["a8w8linear", "a8w4linear"]
+            else None,
+        )
+        if self.training:
+            self.state += 1
+        return output
 
 
 class ColumnParallelQuantizationLinear(nn.Layer):
@@ -183,6 +382,7 @@ class ColumnParallelQuantizationLinear(nn.Layer):
         gather_output=True,
         mp_skip_c_identity=False,
         mp_group=None,
+        sequence_parallel=False,
     ):
         super().__init__()
         self.in_features = in_features
@@ -192,7 +392,7 @@ class ColumnParallelQuantizationLinear(nn.Layer):
         self._dtype = dtype
         self.mp_skip_c_identity = mp_skip_c_identity
         self.quant_dtype, self.quant_weight_bit = QuantMapping[self.weight_quantize_algo]
-
+        self.state = 0
         self.model_parallel_group = (
             tp._HYBRID_PARALLEL_GROUP.get_model_parallel_group() if mp_group is None else mp_group
         )
@@ -201,9 +401,18 @@ class ColumnParallelQuantizationLinear(nn.Layer):
         )
         self.is_mp = self.world_size > 1
         self.gather_output = gather_output
+        self.sequence_parallel = sequence_parallel
+        if self.sequence_parallel and self.gather_output:
+            raise ValueError("Sequence parallel does not support gather_output")
 
         # PaddlePaddle dosen't support Int4 data type, one Int8 data represents two Int4 data.
-        if self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8"]:
+        if self.weight_quantize_algo in [
+            "weight_only_int8",
+            "weight_only_int4",
+            "llm.int8",
+            "a8w8linear",
+            "a8w4linear",
+        ]:
             self.quant_weight = self.create_parameter(
                 shape=[self.output_size_per_partition // 2, in_features]
                 if self.quant_dtype == "int4"
@@ -221,12 +430,19 @@ class ColumnParallelQuantizationLinear(nn.Layer):
                     dtype=self._dtype,
                     is_bias=False,
                 )
+                self.quant_scale.stop_gradient = True
                 self.quant_scale.is_distributed = True if self.is_mp else False
                 if self.quant_scale.is_distributed:
                     self.quant_scale.split_axis = 0
             else:
                 # TODO(lugimzzz): support groupwise in next PR
                 raise NotImplementedError("Not yet support grouwise weightonly quantization.")
+            if self.weight_quantize_algo in ["a8w8linear", "a8w4linear"]:
+                self.act_scale = self.create_parameter(
+                    shape=[], dtype=self._dtype, is_bias=False, default_initializer=nn.initializer.Constant(value=0.0)
+                )
+                self.act_scale.is_distributed = True if self.is_mp else False
+                self.act_scale.stop_gradient = True
         else:
             raise NotImplementedError(f"Not yet support weight_quantize_algo: {self.weight_quantize_algo}")
         if bias_attr is False:
@@ -244,32 +460,35 @@ class ColumnParallelQuantizationLinear(nn.Layer):
 
     def forward(self, x):
         if self.is_mp:
-            input_parallel = mp_ops._c_identity(
-                x,
-                group=self.model_parallel_group,
-                skip_c_identity_dynamic=self.mp_skip_c_identity,
-            )
+            if self.sequence_parallel:
+                input_parallel = AllGatherOp.apply(x)
+            else:
+                input_parallel = mp_ops._c_identity(
+                    x,
+                    group=self.model_parallel_group,
+                    skip_c_identity_dynamic=self.mp_skip_c_identity,
+                )
         else:
             input_parallel = x
 
-        # with paddle.amp.auto_cast(enable=False):
-        if self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4"]:
-            output_parallel = weight_only_linear(
-                x=input_parallel,
-                weight=self.quant_weight,
-                bias=self.bias,
-                weight_scale=self.quant_scale,
-                weight_dtype=self.quant_dtype,
-                group_size=self.quantization_config.group_size,
-            )
-        elif self.weight_quantize_algo in ["llm.int8"]:
-            output_parallel = llm_int8_linear(
-                input_parallel,
-                self.quant_weight,
-                self.bias,
-                self.quant_scale,
-                self.self.quantization_config.llm_int8_threshold,
-            )
+        output_parallel = quant_weight_linear(
+            x=input_parallel,
+            quant_weight=self.quant_weight,
+            quant_dtype=self.quant_dtype,
+            quantization_config=self.quantization_config,
+            weight_quantize_algo=self.weight_quantize_algo,
+            dtype=self._dtype,
+            quant_scale=self.quant_scale,
+            quant_state=(self.qquant_scale, self.double_quant_scale, self.quant_scale_offset)
+            if (self.weight_quantize_algo in ["fp4", "nf4"] and self.quantization_config.qlora_weight_double_quant)
+            else None,
+            bias=self.bias,
+            act_state=(self.state, self.training, self.act_scale)
+            if self.weight_quantize_algo in ["a8w8linear", "a8w4linear"]
+            else None,
+        )
+        if self.training:
+            self.state += 1
 
         if self.gather_output and self.is_mp:
             output = mp_ops._c_concat(output_parallel, group=self.model_parallel_group)
@@ -299,6 +518,7 @@ class RowParallelQuantizationLinear(nn.Layer):
         input_is_parallel=False,
         mp_skip_c_identity=False,
         mp_group=None,
+        sequence_parallel=False,
     ):
         super().__init__()
         self.input_size_per_partition = input_size_per_partition
@@ -308,6 +528,7 @@ class RowParallelQuantizationLinear(nn.Layer):
         self._dtype = dtype
         self.mp_skip_c_identity = mp_skip_c_identity
         self.quant_dtype, self.quant_weight_bit = QuantMapping[self.weight_quantize_algo]
+        self.state = 0
 
         self.model_parallel_group = (
             tp._HYBRID_PARALLEL_GROUP.get_model_parallel_group() if mp_group is None else mp_group
@@ -317,10 +538,19 @@ class RowParallelQuantizationLinear(nn.Layer):
         )
         self.is_mp = self.world_size > 1
         self.input_is_parallel = input_is_parallel
+        self.sequence_parallel = sequence_parallel
+        if not self.input_is_parallel and self.sequence_parallel:
+            raise ValueError("Sequence parallel only support input_is_parallel.")
 
         # PaddlePaddle dosen't support Int4 data type, one Int8 data represents two Int4 data.
         # paddle.nn.quant.weight_quantize will transpose in_features and out_features.
-        if self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8"]:
+        if self.weight_quantize_algo in [
+            "weight_only_int8",
+            "weight_only_int4",
+            "llm.int8",
+            "a8w8linear",
+            "a8w4linear",
+        ]:
             self.quant_weight = self.create_parameter(
                 shape=[out_features // 2, self.input_size_per_partition]
                 if self.quant_dtype == "int4"
@@ -338,12 +568,19 @@ class RowParallelQuantizationLinear(nn.Layer):
                     dtype=self._dtype,
                     is_bias=False,
                 )
+                self.quant_scale.stop_gradient = True
                 self.quant_scale.is_distributed = True if self.is_mp else False
                 if self.quant_scale.is_distributed:
                     self.quant_scale.split_axis = 0
             else:
                 # TODO(lugimzzz): support groupwise in next PR
                 raise NotImplementedError("Not yet support grouwise weightonly quantization.")
+            if self.weight_quantize_algo in ["a8w8linear", "a8w4linear"]:
+                self.act_scale = self.create_parameter(
+                    shape=[1], dtype=self._dtype, is_bias=False, default_initializer=nn.initializer.Constant(value=0.0)
+                )
+                self.act_scale.is_distributed = True if self.is_mp else False
+                self.act_scale.stop_gradient = True
         else:
             raise NotImplementedError(f"Not yet support weight_quantize_algo: {self.weight_quantize_algo}")
 
@@ -366,44 +603,51 @@ class RowParallelQuantizationLinear(nn.Layer):
 
         # with paddle.amp.auto_cast(enable=False):
         if self.is_mp:
-            if self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4"]:
-                output_parallel = weight_only_linear(
-                    x=input_parallel,
-                    weight=self.quant_weight,
-                    bias=None,
-                    weight_scale=self.quant_scale,
-                    weight_dtype=self.quant_dtype,
-                    group_size=self.quantization_config.group_size,
-                )
-            elif self.weight_quantize_algo in ["llm.int8"]:
-                output_parallel = llm_int8_linear(
-                    input_parallel,
-                    self.quant_weight,
-                    None,
-                    self.quant_scale,
-                    self.quantization_config.llm_int8_threshold,
-                )
-            output_ = mp_ops._mp_allreduce(
-                output_parallel,
-                group=self.model_parallel_group,
-                use_calc_stream=True,
-                use_model_parallel=True,
-                skip_c_identity_dynamic=self.mp_skip_c_identity,
+            output_parallel = quant_weight_linear(
+                x=input_parallel,
+                quant_weight=self.quant_weight,
+                quant_dtype=self.quant_dtype,
+                quantization_config=self.quantization_config,
+                weight_quantize_algo=self.weight_quantize_algo,
+                dtype=self._dtype,
+                quant_scale=self.quant_scale,
+                quant_state=(self.qquant_scale, self.double_quant_scale, self.quant_scale_offset)
+                if (self.weight_quantize_algo in ["fp4", "nf4"] and self.quantization_config.qlora_weight_double_quant)
+                else None,
+                bias=None,
+                act_state=(self.state, self.training, self.act_scale)
+                if self.weight_quantize_algo in ["a8w8linear", "a8w4linear"]
+                else None,
             )
+            if self.sequence_parallel:
+                output_ = ReduceScatterOp.apply(output_parallel)
+            else:
+                output_ = mp_ops._mp_allreduce(
+                    output_parallel,
+                    group=self.model_parallel_group,
+                    use_calc_stream=True,
+                    use_model_parallel=True,
+                    skip_c_identity_dynamic=self.mp_skip_c_identity,
+                )
             output = output_ + self.bias if self.bias is not None else output_
         else:
-            if self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4"]:
-                output = weight_only_linear(
-                    x=input_parallel,
-                    weight=self.quant_weight,
-                    bias=self.bias,
-                    weight_scale=self.quant_scale,
-                    weight_dtype=self.quant_dtype,
-                    group_size=self.quantization_config.group_size,
-                )
-            elif self.weight_quantize_algo in ["llm.int8"]:
-                output = llm_int8_linear(
-                    input_parallel, self.quant_weight, self.bias, self.quant_scale, self.llm_int8_threshold
-                )
+            output = quant_weight_linear(
+                x=input_parallel,
+                quant_weight=self.quant_weight,
+                quant_dtype=self.quant_dtype,
+                quantization_config=self.quantization_config,
+                weight_quantize_algo=self.weight_quantize_algo,
+                dtype=self._dtype,
+                quant_scale=self.quant_scale,
+                quant_state=(self.qquant_scale, self.double_quant_scale, self.quant_scale_offset)
+                if (self.weight_quantize_algo in ["fp4", "nf4"] and self.quantization_config.qlora_weight_double_quant)
+                else None,
+                bias=self.bias,
+                act_state=(self.state, self.training, self.act_scale)
+                if self.weight_quantize_algo in ["a8w8linear", "a8w4linear"]
+                else None,
+            )
+        if self.training:
+            self.state += 1
 
         return output
