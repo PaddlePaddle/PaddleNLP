@@ -1,5 +1,5 @@
 {
-  "model_name_or_path": "facebook/llama-7b",
+  "model_name_or_path": "meta-llama/Llama-3.2-1B",
   "dataset_name_or_path": "./data",
   "output_dir": "./checkpoints/llama_lora_ckpts",
   "per_device_train_batch_size": 4,
@@ -29,7 +29,6 @@
   "lora": true,
   "zero_padding": false,
   "use_flash_attention": false,
-  "weight_quantize_algo": "lqlora",
-  "lqlora_quantize_cfg": "path of lqlora quantize config",
-  "lqlora_state_dict": "path of lqlora state dict"
+  "weight_quantize_algo": "nf4",
+  "hqlora_quantize_cfg": "/home/zc/data/pr/paddle_lqlora/PaddleNLP/llm/tools/hqlora_quantize_cfg"
 }

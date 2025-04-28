@@ -86,6 +86,7 @@ class ModelConfig:
     use_mora: bool = field(
         default=False, metadata={"help": "Whether to use MoRA: https://arxiv.org/pdf/2405.12130.pdf"}
     )
+    hqlora_quantize_cfg: str = field(default=None, metadata={"help": "Whether to use hybrid quant"})
 
     # vera related parameters
     vera: bool = field(default=False, metadata={"help": "Whether to use vera technique"})

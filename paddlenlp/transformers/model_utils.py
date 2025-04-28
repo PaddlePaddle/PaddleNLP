@@ -78,6 +78,7 @@ from paddlenlp.utils.log import logger
 from ..generation import GenerationConfig, GenerationMixin
 from ..quantization.quantization_utils import (
     convert_to_quantize_state_dict,
+    convert_to_quantize_state_dict_hqlora,
     replace_with_quantization_linear,
     update_loaded_state_dict_keys,
 )
@@ -913,11 +914,8 @@ def _load_state_dict_into_meta_model(
     dtype=None,
     is_safetensors=False,
     keep_in_fp32_modules=None,
-<<<<<<< HEAD
-    lqlora_quantize_cfg=None,
-=======
+    hqlora_quantize_cfg=None,
     model_state_dict=None,
->>>>>>> develop
 ):
     """
     This is somewhat similar to `_load_state_dict_into_model`, but deals with a model that has some or all of its
@@ -948,9 +946,9 @@ def _load_state_dict_into_meta_model(
         # # We convert floating dtypes to the `dtype` passed. We want to keep the buffers/params
         # # in int/uint/bool and not cast them.
         if dtype is not None and paddle.is_floating_point(param):
-            if lqlora_quantize_cfg is not None:
+            if hqlora_quantize_cfg is not None:
                 layer_name = param_name[: param_name.rfind(".")]
-                if layer_name in lqlora_quantize_cfg.keys() and lqlora_quantize_cfg[layer_name] not in [
+                if layer_name in hqlora_quantize_cfg.keys() and hqlora_quantize_cfg[layer_name] not in [
                     "nf4",
                     "fp4",
                 ]:
@@ -1937,11 +1935,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         dtype=None,
         keep_in_fp32_modules=None,
         quantization_linear_list=None,
-<<<<<<< HEAD
-        lqlora_quantize_cfg=None,
-=======
+        hqlora_quantize_cfg=None,
         sharded_metadata=None,
->>>>>>> develop
     ) -> Tuple[List[str]]:
         """load the state_dict into model, and do the following things:
 
@@ -1989,47 +1984,11 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 quantization_linear_list = [".".join([prefix, s]) for s in quantization_linear_list]
 
         # Weight quantization if not yet quantized & update loaded_keys
-<<<<<<< HEAD
-        if hasattr(config, "quantization_config") and config.quantization_config.is_weight_quantize():
-            try:
-                from ..quantization.quantization_utils import (
-                    convert_to_quantize_state_dict,
-                    convert_to_quantize_state_dict_lqlora,
-                    update_loaded_state_dict_keys,
-                )
-            except ImportError:
-                raise ImportError("Quantization features require `paddlepaddle >= 2.5.2`")
-            if state_dict is not None:
-                state_dict = convert_to_quantize_state_dict(
-                    state_dict,
-                    quantization_linear_list,
-                    config.quantization_config,
-                    dtype,
-                )
-                loaded_keys = [k for k in state_dict.keys()]
-            else:
-                loaded_keys = update_loaded_state_dict_keys(
-                    loaded_keys, quantization_linear_list, config.quantization_config
-                )
-            if keep_in_fp32_modules is None:
-                keep_in_fp32_modules = (
-                    ["quant_scale"]
-                    if config.quantization_config.weight_quantize_algo in ["nf4", "fp4", "lqlora"]
-                    else None
-                )
-            else:
-                keep_in_fp32_modules = (
-                    keep_in_fp32_modules + ["quant_scale"]
-                    if config.quantization_config.weight_quantize_algo in ["nf4", "fp4", "lqlora"]
-                    else keep_in_fp32_modules
-                )
-=======
         if quantization_linear_list is not None:
             origin_loaded_keys = copy.deepcopy(loaded_keys)
             loaded_keys = update_loaded_state_dict_keys(
                 loaded_keys, quantization_linear_list, config.quantization_config
             )
->>>>>>> develop
 
         missing_keys = list(set(expected_keys) - set(loaded_keys))
         unexpected_keys = list(set(loaded_keys) - set(expected_keys))
@@ -2064,9 +2023,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # Set some modules to fp32 if any
         if keep_in_fp32_modules is not None and quantization_linear_list is None:
             for name, param in model.named_parameters():
-                if lqlora_quantize_cfg is not None:
+                if hqlora_quantize_cfg is not None:
                     layer_name = name[: name.rfind(".")]
-                    if layer_name in lqlora_quantize_cfg.keys() and lqlora_quantize_cfg[layer_name] not in [
+                    if layer_name in hqlora_quantize_cfg.keys() and hqlora_quantize_cfg[layer_name] not in [
                         "nf4",
                         "fp4",
                     ]:
@@ -2160,12 +2119,20 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if state_dict is not None:
             if quantization_linear_list is not None:
                 # Quantize state dict
-                state_dict = convert_to_quantize_state_dict(
-                    state_dict,
-                    quantization_linear_list,
-                    config.quantization_config,
-                    dtype,
-                )
+                if hqlora_quantize_cfg is None:
+                    state_dict = convert_to_quantize_state_dict(
+                        state_dict,
+                        quantization_linear_list,
+                        config.quantization_config,
+                        dtype,
+                    )
+                else:
+                    state_dict = convert_to_quantize_state_dict_hqlora(
+                        state_dict,
+                        config.quantization_config,
+                        dtype,
+                        hqlora_quantize_cfg,
+                    )
             else:
                 # Have loaded all state_dict, no resume state_dict
                 state_dict, _, fused_keys, new_keys = _fuse_or_split_keys(
@@ -2198,7 +2165,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     dtype=dtype,
                     is_safetensors=is_safetensors,
                     keep_in_fp32_modules=keep_in_fp32_modules,
-                    lqlora_quantize_cfg=lqlora_quantize_cfg,
+                    hqlora_quantize_cfg=hqlora_quantize_cfg,
                 )
             else:
                 error_msgs = _load_state_dict_into_model(model_to_load, state_dict, start_prefix)
@@ -2219,76 +2186,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 model_to_load_state_dict = model_to_load.state_dict()
             for shard_file in resolved_archive_file:
                 pre_tensor_parallel_split = False
-<<<<<<< HEAD
-                if (
-                    shard_file.endswith(".safetensors")
-                    and config.tensor_parallel_degree > 1
-                    and "tp" not in os.path.split(shard_file)[-1]
-                ):
-                    pre_tensor_parallel_split = True
-                    assert loaded_keys is not None, "loaded_keys is not None."
-                    tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys, ignore_error=True)
-                # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
-                filter_dict_keys = set(expected_keys)
-                fuse_actions, _ = cls.get_fuse_or_split_param_convert_actions(config, loaded_keys, is_fuse=True)
-                split_actions, _ = cls.get_fuse_or_split_param_convert_actions(config, loaded_keys, is_fuse=False)
-                for k in list(fuse_actions.keys()):
-                    need_add_except_key = k[-1] in expected_keys
-                    if need_add_except_key:
-                        filter_dict_keys |= set(k[:-1])
-                    # remove pre_tensor_parallel_split function from tp_actions
-                    if pre_tensor_parallel_split:
-                        for item in k[:-1]:
-                            if item in tp_actions:
-                                tp_actions.pop(item, None)
-
-                for k in list(split_actions.keys()):
-                    need_add_except_key = False
-                    for item in k[:-1]:
-                        if item in expected_keys:
-                            need_add_except_key = True
-                            break
-                    if need_add_except_key:
-                        filter_dict_keys.add(k[-1])
-                    # remove pre_tensor_parallel_split function from tp_actions
-                    if pre_tensor_parallel_split:
-                        if k[-1] in tp_actions:
-                            fuse_actions.pop(k[-1], None)
-
-                if config.quantization_config.is_weight_quantize():
-                    filter_dict_keys = None
-
-                state_dict = load_state_dict(
-                    shard_file, tp_actions if pre_tensor_parallel_split else None, filter_dict_keys
-                )
-
-                # convert for fusing or splitting weights
-                state_dict, resume_state_dict, fused_keys, new_keys = _fuse_or_split_keys(
-                    state_dict,
-                    config,
-                    loaded_keys,
-                    pre_tensor_parallel_split=pre_tensor_parallel_split,
-                    resume_state_dict=resume_state_dict,
-                )
-                missing_keys = list(set(missing_keys) - set(new_keys))
-                unexpected_keys = list(set(unexpected_keys) - set(fused_keys))
-
-                if config.quantization_config.is_weight_quantize():
-                    if lqlora_quantize_cfg is None:
-                        state_dict = convert_to_quantize_state_dict(
-                            state_dict,
-                            quantization_linear_list,
-                            config.quantization_config,
-                            dtype,
-                        )
-                    else:
-                        state_dict = convert_to_quantize_state_dict_lqlora(
-                            state_dict,
-                            config.quantization_config,
-                            dtype,
-                            lqlora_quantize_cfg,
-                        )
-=======
                 if quantization_linear_list is not None:
                     if (
                         shard_file.endswith(".safetensors")
@@ -2305,12 +2202,20 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         tp_actions if pre_tensor_parallel_split else None,
                         None,
                     )
-                    state_dict = convert_to_quantize_state_dict(
-                        state_dict,
-                        quantization_linear_list,
-                        config.quantization_config,
-                        dtype,
-                    )
+                    if hqlora_quantize_cfg is None:
+                        state_dict = convert_to_quantize_state_dict(
+                            state_dict,
+                            quantization_linear_list,
+                            config.quantization_config,
+                            dtype,
+                        )
+                    else:
+                        state_dict = convert_to_quantize_state_dict_hqlora(
+                            state_dict,
+                            config.quantization_config,
+                            dtype,
+                            hqlora_quantize_cfg,
+                        )
                 else:
                     if (
                         shard_file.endswith(".safetensors")
@@ -2364,7 +2269,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     )
                     missing_keys = list(set(missing_keys) - set(new_keys))
                     unexpected_keys = list(set(unexpected_keys) - set(fused_keys))
->>>>>>> develop
 
                 # Mistmatched keys contains tuples key/shape1/shape2 of weights in the checkpoint that have a shape not
                 # matching the weights in the model.
@@ -2395,11 +2299,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         dtype=dtype,
                         is_safetensors=is_safetensors,
                         keep_in_fp32_modules=keep_in_fp32_modules,
-<<<<<<< HEAD
-                        lqlora_quantize_cfg=lqlora_quantize_cfg,
-=======
+                        hqlora_quantize_cfg=hqlora_quantize_cfg,
                         model_state_dict=model_to_load_state_dict,
->>>>>>> develop
                     )
                     error_msgs += new_error_msgs
                 else:
@@ -2702,9 +2603,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         else:
             keep_in_fp32_modules = []
 
-        lqlora_quantize_cfg = None
-        if config.lqlora_quantize_cfg is not None:
-            lqlora_quantize_cfg = paddle.load(config.lqlora_quantize_cfg)
+        hqlora_quantize_cfg = None
+        if config.hqlora_quantize_cfg is not None:
+            hqlora_quantize_cfg = paddle.load(config.hqlora_quantize_cfg)
 
         quantization_linear_list = None
         if config.quantization_config.is_weight_quantize():
@@ -2713,7 +2614,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     model=model,
                     quantization_config=config.quantization_config,
                     llm_int8_threshold=config.quantization_config.llm_int8_threshold,
-                    lqlora_quantize_cfg=lqlora_quantize_cfg,
+                    hqlora_quantize_cfg=hqlora_quantize_cfg,
                 )
                 quantization_linear_list = []
                 for key in model.state_dict().keys():
@@ -2731,11 +2632,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             dtype=dtype,
             keep_in_fp32_modules=keep_in_fp32_modules,
             quantization_linear_list=quantization_linear_list,
-<<<<<<< HEAD
-            lqlora_quantize_cfg=lqlora_quantize_cfg,
-=======
+            hqlora_quantize_cfg=hqlora_quantize_cfg,
             sharded_metadata=sharded_metadata if is_sharded else None,
->>>>>>> develop
         )
 
         # load generation_config.json

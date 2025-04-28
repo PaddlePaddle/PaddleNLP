@@ -21,7 +21,7 @@ sys.path.append(os.path.dirname(os.getcwd()))
 import paddle
 
 from paddlenlp.peft import LoRAConfig, LoRAModel
-from paddlenlp.peft.lora.lqlora_utils import transform_lora_layers
+from PaddleNLP.paddlenlp.peft.lora.hqlora_utils import transform_lora_layers
 from paddlenlp.transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 from paddlenlp.utils.llm_utils import get_lora_target_modules
 

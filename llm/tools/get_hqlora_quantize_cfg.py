@@ -22,7 +22,7 @@ import paddle
 import paddle.nn as nn
 import scipy.optimize._optimize as scipy_optimize
 
-from paddlenlp.peft.lora.lqlora_utils import lowrand_quantized_sparse_decomposition
+from paddlenlp.peft.lora.hqlora_utils import lowrand_quantized_sparse_decomposition
 from paddlenlp.transformers import AutoModelForCausalLM
 
 
@@ -65,7 +65,7 @@ def prepare_data_for_qconfig(
 
             costs[i0, i1] = error
             weights[i0, i1] = estimate_storage_from_config(param, quant_algo=qconfig)
-            del param_
+            del param_, Q, L1, L2
     return costs, weights
 
 
@@ -127,6 +127,7 @@ def get_ilp_data(args):
     num_ranks = args.ranks
 
     model = AutoModelForCausalLM.from_pretrained(args.model_name_or_path)
+    # model = AutoModelForCausalLM.from_pretrained(args.model_name_or_path, dtype="float32")
     for name, submodule in model.named_sublayers():
         if isinstance(submodule, nn.Linear):
             names.append(name)
@@ -145,7 +146,7 @@ def get_ilp_data(args):
     return ilp_data
 
 
-def get_lqlora_quantize_cfg():
+def get_hqlora_quantize_cfg():
     args = parse_arguments()
     GIGABYTES = 1024.0**3
 
@@ -182,8 +183,8 @@ def get_lqlora_quantize_cfg():
         key0 = names[i1]
         qconfig_dict[key0] = qconfigs[qconfig_index]
 
-    paddle.save(qconfig_dict, os.path.join(args.output_path, "lqlora_quantize_cfg"))
+    paddle.save(qconfig_dict, os.path.join(args.output_path, "hqlora_quantize_cfg"))
 
 
 if __name__ == "__main__":
-    get_lqlora_quantize_cfg()
+    get_hqlora_quantize_cfg()

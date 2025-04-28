@@ -206,8 +206,8 @@ def main():
     if model_args.fuse_attention_ffn is not None:
         model_config.fuse_attention_ffn = model_args.fuse_attention_ffn
 
-    if model_args.lqlora_quantize_cfg is not None:
-        model_config.lqlora_quantize_cfg = model_args.lqlora_quantize_cfg
+    if model_args.hqlora_quantize_cfg is not None:
+        model_config.hqlora_quantize_cfg = model_args.hqlora_quantize_cfg
 
     model_config.seq_length = data_args.max_length
 
@@ -252,6 +252,8 @@ def main():
     else:
         # NOTE(gongenlei): new add autotuner_benchmark
         model = model_class.from_config(model_config, dtype=dtype)
+
+    print(model)
 
     if model_args.flash_mask and (not data_args.zero_padding or not model.config.use_flash_attention):
         logger.warning("`flash_mask` must use with zero padding and flash attention.")

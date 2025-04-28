@@ -81,9 +81,11 @@ def lowrand_quantized_sparse_decomposition(
     sensitivity: paddle.Tensor = None,
     double_quant: bool = True,
 ):
+    W = paddle.cast(W, paddle.float32)
     Q = paddle.zeros_like(W)
     last_error = paddle.to_tensor(float("inf"), dtype=W.dtype)
-    for i in range(num_iterations):
+    # for i in range(num_iterations):
+    for i in range(1):
         A = W - Q
         if sensitivity is None:
             lora_A, lora_B = svd_decomposition(A, num_ranks)
