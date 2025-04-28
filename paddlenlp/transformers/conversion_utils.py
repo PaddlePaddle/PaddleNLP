@@ -19,6 +19,7 @@ import json
 import os
 from copy import deepcopy
 from dataclasses import dataclass
+from functools import partial
 from typing import (
     TYPE_CHECKING,
     Callable,
@@ -56,6 +57,17 @@ from ..utils import device_guard
 # the type hinting for pytorch model & layer & tensor
 Module = TypeVar("Module")
 PytorchTensor = TypeVar("PytorchTensor")
+
+
+def add_quant_mapping(name_action_mappings):
+    mapping_keys = name_action_mappings.keys()
+    for key in mapping_keys:
+        quant_key = key.replace("weight", "quant_weight")
+        fn = name_action_mappings[key]
+        old_value = fn.keywords["is_column"]
+        new_value = not old_value
+        name_action_mappings[quant_key] = partial(fn.func, *fn.args, **{**fn.keywords, "is_column": new_value})
+    return name_action_mappings
 
 
 def tensor_summary(tensor: Union[str, Tensor, PytorchTensor, tuple, list, ndarray]):
@@ -1213,6 +1225,9 @@ class ConversionMixin:
         base_model_prefix=None,
     ):
         name_action_mappings = cls._get_tensor_parallel_mappings(config, is_split=is_split)
+        if config.quantization_config.is_weight_quantize():
+            name_action_mappings = add_quant_mapping(name_action_mappings)
+
         state_keys_map = cls._resolve_prefix_keys(
             name_action_mappings.keys(), loaded_state_dict_keys, ignore_error, base_model_prefix=base_model_prefix
         )
@@ -1234,6 +1249,8 @@ class ConversionMixin:
         """
 
         name_action_mappings = cls._get_tensor_parallel_mappings(config)
+        if config.quantization_config.is_weight_quantize():
+            name_action_mappings = add_quant_mapping(name_action_mappings)
         if state_dict is None:
             with device_guard("cpu"):
                 state_dict = paddle.load(weight_file, return_numpy=False)
@@ -1265,6 +1282,8 @@ class ConversionMixin:
             config (PretrainedConfig): the PretrainedConfig instance of model
         """
         name_action_mappings = cls._get_tensor_parallel_mappings(config, is_split=False)
+        if config.quantization_config.is_weight_quantize():
+            name_action_mappings = add_quant_mapping(name_action_mappings)
         state_keys_map = cls._resolve_prefix_keys(name_action_mappings.keys(), state_dict.keys())
 
         for k, v in state_keys_map.items():

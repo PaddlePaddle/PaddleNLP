@@ -32,7 +32,8 @@ def adamw_kernel(
     master_weight_ptr,
     dtype,
     N,
-    BLOCK_SIZE: tl.constexpr,
+    BLOCK_SIZE,
+    skip_update_param,
 ):
     pid = tl.program_id(0)
     offsets = pid * BLOCK_SIZE + tl.arange(0, BLOCK_SIZE)
@@ -43,8 +44,12 @@ def adamw_kernel(
     else:
         param = tl.load(param_ptr + offsets, mask=mask).to(tl.float32)
     grad = tl.load(grad_ptr + offsets, mask=mask).to(tl.float32)
-    moment1 = tl.load(moment1_ptr + offsets, mask=mask).to(tl.float32)
-    moment2 = tl.load(moment2_ptr + offsets, mask=mask).to(tl.float32)
+
+    moment1 = tl.load(moment1_ptr + offsets, mask=mask)
+    moment2 = tl.load(moment2_ptr + offsets, mask=mask)
+    moment_dtype = moment1.dtype
+    moment1 = moment1.to(tl.float32)
+    moment2 = moment2.to(tl.float32)
     lr = tl.load(lr_ptr)
     beta1_pow = tl.load(beta1_pow_ptr)
     beta2_pow = tl.load(beta2_pow_ptr)
@@ -58,24 +63,24 @@ def adamw_kernel(
     denom = tl.sqrt(moment2) / tl.sqrt(1.0 - beta2_pow) + epsilon
     param += (moment1 / denom) * (-lr / (1 - beta1_pow))
     if dtype == 0:
-        target_dtype = tl.float16
+        param_dtype = tl.float16
     elif dtype == 1:
-        target_dtype = tl.bfloat16
+        param_dtype = tl.bfloat16
     else:
-        target_dtype = tl.float32
-    target_dtype = tl.bfloat16
+        param_dtype = tl.float32
 
     # Update param
     if master_weight_ptr is not None:
         tl.store(master_weight_ptr + offsets, param, mask=mask)
-        tl.store(param_ptr + offsets, param.to(target_dtype), mask=mask)
+        if not skip_update_param:
+            tl.store(param_ptr + offsets, param.to(param_dtype), mask=mask)
     else:
-        tl.store(param_ptr + offsets, param.to(target_dtype), mask=mask)
-    tl.store(moment1_ptr + offsets, moment1.to(target_dtype), mask=mask)
-    tl.store(moment2_ptr + offsets, moment2.to(target_dtype), mask=mask)
+        tl.store(param_ptr + offsets, param.to(param_dtype), mask=mask)
+    tl.store(moment1_ptr + offsets, moment1.to(moment_dtype), mask=mask)
+    tl.store(moment2_ptr + offsets, moment2.to(moment_dtype), mask=mask)
 
 
-def adamw_16bit_moment(
+def adamw_triton(
     param,
     grad,
     learning_rate,
@@ -92,6 +97,7 @@ def adamw_16bit_moment(
     coeff,
     with_decay,
     multi_precision,
+    skip_update_param=False,
 ):
     if skip_update:
         return
@@ -126,5 +132,6 @@ def adamw_16bit_moment(
         dtype,
         N,
         BLOCK_SIZE,
+        skip_update_param,
     )
     beta1_pow[:], beta2_pow[:] = beta1 * beta1_pow[:], beta2 * beta2_pow[:]

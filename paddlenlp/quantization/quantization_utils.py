@@ -66,7 +66,7 @@ def parse_weight_quantize_algo(quantization_config, name):
     return weight_quantize_algo
 
 
-def replace_with_quantization_linear(model, quantization_config, llm_int8_threshold=6.0):
+def replace_with_quantization_linear(model, quantization_config):
     for name, child in model.named_sublayers():
         weight_quantize_algo = parse_weight_quantize_algo(quantization_config, name)
         if weight_quantize_algo is None:

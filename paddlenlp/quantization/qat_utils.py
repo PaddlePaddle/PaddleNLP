@@ -32,6 +32,7 @@ def quantize_tensorwise(x, quantization_config=None, bit_length=8, state=0, trai
         if training:
             scale = paddle.max(paddle.abs(target_x)) / qmax
             act_scale.set_value((state * act_scale + scale) / (state + 1))
+            # paddle.distributed.all_reduce(act_scale, op=paddle.distributed.ReduceOp.MAX, group=group, sync_op=False)
             if state > quantization_config.skip_first_act_scale_step:
                 scale = act_scale
         else:
@@ -50,7 +51,7 @@ def dequantize_tensorwise(x_int8, scale, apply_hadamard=False):
     return x
 
 
-def quantize_channelwise(w, apply_hadamard=False, bit_length=8):
+def quantize_channelwise(w, apply_hadamard=False, bit_length=8, group=None):
     qmax = (1 << (bit_length - 1)) - 1
     qmin = -1 * qmax - 1
     if apply_hadamard:
@@ -65,6 +66,8 @@ def quantize_channelwise(w, apply_hadamard=False, bit_length=8):
     else:
         block_size = 1
     scale = paddle.max(paddle.abs(w), axis=0, keepdim=True) / qmax
+    if group is not None:
+        paddle.distributed.all_reduce(scale, op=paddle.distributed.ReduceOp.MAX, group=group, sync_op=True)
     w_int8 = paddle.clip((w / scale).round(), qmin, qmax).astype("int8")
     scale.stop_gradient = True
     return w_int8.T, scale.squeeze(0) / block_size

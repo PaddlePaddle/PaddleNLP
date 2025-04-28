@@ -77,6 +77,8 @@ from paddlenlp.utils.log import logger
 from ..generation import GenerationConfig, GenerationMixin
 from ..quantization.quantization_utils import (
     convert_to_quantize_state_dict,
+    convert_to_weight_quantize_state_dict,
+    parse_weight_quantize_algo,
     replace_with_quantization_linear,
     update_loaded_state_dict_keys,
 )
@@ -360,7 +362,14 @@ def _split_keys_evenly(keys: list, n: int) -> list:
 
 
 def _load_part_state_dict(
-    keys, checkpoint_file: Union[str, os.PathLike], tensor_parallel_split_mapping, fliter_dict_keys, device
+    keys,
+    checkpoint_file: Union[str, os.PathLike],
+    tensor_parallel_split_mapping,
+    fliter_dict_keys,
+    device,
+    quantization_linear_list,
+    quantization_config,
+    dtype,
 ):
     """load part state dict from checkpoint file.
 
@@ -391,15 +400,31 @@ def _load_part_state_dict(
                 continue
 
             py_safe_slice_ = f.get_slice(key)
-            if key in tensor_parallel_split_mapping:
-                weight = tensor_parallel_split_mapping[key](py_safe_slice_)
+            if quantization_linear_list is not None and key.split(".weight")[0] in quantization_linear_list:
+                key_name = key.split(".weight")[0]
+                quant_key_name = key_name + ".quant_weight"
+                quant_state_dict = convert_to_weight_quantize_state_dict(
+                    state_dict={key_name: py_safe_slice_},
+                    name=key_name,
+                    quantization_config=quantization_config,
+                    dtype=dtype,
+                    weight_quantize_algo=parse_weight_quantize_algo(quantization_config, quant_key_name),
+                )
+                if quant_key_name in tensor_parallel_split_mapping:
+                    quant_state_dict[quant_key_name] = tensor_parallel_split_mapping[quant_key_name](
+                        quant_state_dict[quant_key_name]
+                    )
+                part_state_dict.update(quant_state_dict)
             else:
-                weight = py_safe_slice_[:]
-            if device == "expected":
-                with device_guard():
-                    weight = paddle.Tensor.__call__(weight, zero_copy=True)
-                weight = weight._copy_to(paddle.framework._current_expected_place(), False)
-            part_state_dict[key] = weight
+                if key in tensor_parallel_split_mapping:
+                    weight = tensor_parallel_split_mapping[key](py_safe_slice_)
+                else:
+                    weight = py_safe_slice_[:]
+                if device == "expected":
+                    with device_guard():
+                        weight = paddle.Tensor.__call__(weight, zero_copy=True)
+                    weight = weight._copy_to(paddle.framework._current_expected_place(), False)
+                part_state_dict[key] = weight
         for key in keys:
             if (
                 key.endswith(SYMMETRY_QUANT_SCALE)
@@ -420,6 +445,9 @@ def load_state_dict(
     fliter_dict_keys=None,
     device="cpu",
     ckpt_quant_stage="O0",
+    quantization_linear_list=None,
+    quantization_config=None,
+    dtype=None,
 ):
     """
     Reads a PaddlePaddle checkpoint file, returning properly formatted errors if they arise.
@@ -455,6 +483,9 @@ def load_state_dict(
                         tensor_parallel_split_mapping,
                         fliter_dict_keys,
                         device,
+                        quantization_linear_list,
+                        quantization_config,
+                        dtype,
                     )
             else:
                 # Load state dict in multi-thread to speed up loading
@@ -469,6 +500,9 @@ def load_state_dict(
                             tensor_parallel_split_mapping,
                             fliter_dict_keys,
                             device,
+                            quantization_linear_list,
+                            quantization_config,
+                            dtype,
                         ): keys
                         for keys in keys_groups
                     }
@@ -1142,6 +1176,11 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         with dtype_guard(dtype):
             model = cls(config, **kwargs)
+            if config.quantization_config.is_weight_quantize():
+                replace_with_quantization_linear(
+                    model=model,
+                    quantization_config=config.quantization_config,
+                )
 
         return model
 
@@ -2176,6 +2215,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         shard_file,
                         tp_actions if pre_tensor_parallel_split else None,
                         None,
+                        quantization_linear_list=quantization_linear_list,
+                        quantization_config=config.quantization_config,
+                        dtype=dtype,
                     )
                     state_dict = convert_to_quantize_state_dict(
                         state_dict,
@@ -2575,7 +2617,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 replace_with_quantization_linear(
                     model=model,
                     quantization_config=config.quantization_config,
-                    llm_int8_threshold=config.quantization_config.llm_int8_threshold,
                 )
                 quantization_linear_list = []
                 for key in model.state_dict().keys():

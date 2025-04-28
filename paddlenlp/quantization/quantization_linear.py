@@ -263,6 +263,7 @@ class QuantizationLinear(nn.Layer):
                 shape=[out_features // 2, in_features] if self.quant_weight_bit == 4 else [out_features, in_features],
                 dtype="int8",
                 is_bias=False,
+                attr=paddle.nn.initializer.Constant(value=0),
             )
             if self.quantization_config.group_size == -1:
                 self.quant_scale = self.create_parameter(
@@ -419,6 +420,7 @@ class ColumnParallelQuantizationLinear(nn.Layer):
                 else [self.output_size_per_partition, in_features],
                 dtype="int8",
                 is_bias=False,
+                attr=paddle.nn.initializer.Constant(value=0),
             )
             self.quant_weight.is_distributed = True if self.is_mp else False
             if self.quant_weight.is_distributed:
@@ -557,6 +559,7 @@ class RowParallelQuantizationLinear(nn.Layer):
                 else [out_features, self.input_size_per_partition],
                 dtype="int8",
                 is_bias=False,
+                attr=paddle.nn.initializer.Constant(value=0),
             )
             self.quant_weight.is_distributed = True if self.is_mp else False
             if self.quant_weight.is_distributed:

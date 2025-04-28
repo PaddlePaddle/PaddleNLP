@@ -12,4 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .adamw_16bit_moment import adamw_16bit_moment
+from .adamw_triton import adamw_triton

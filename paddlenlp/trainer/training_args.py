@@ -868,6 +868,10 @@ class TrainingArguments:
         default="adamw",
         metadata={"help": "The optimizer to use."},
     )
+    use_lowprecision_moment: bool = field(
+        default=False,
+        metadata={"help": "AdamW use lowbit moment as parameter."},
+    )
     report_to: Optional[List[str]] = field(
         default=None, metadata={"help": "The list of integrations to report the results and logs to."}
     )

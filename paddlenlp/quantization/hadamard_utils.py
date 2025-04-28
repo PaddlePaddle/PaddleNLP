@@ -31,22 +31,46 @@ def matmul_hadU(X):
     return input.reshape(X.shape)
 
 
-def random_hadamard_matrix(size, dtype, is_block=False):
-    if not is_block:
+def random_hadamard_matrix(size, dtype, quantization_config):
+    if not quantization_config.hadamard_is_block:
         A = paddle.randint(low=0, high=2, shape=[size, size]).astype("float32") * 2 - 1
         Q, _ = paddle.linalg.qr(A)
         return Q.astype(dtype), 1
     else:
-        num_blocks = size
-        while not (num_blocks % 2):
-            num_blocks = num_blocks // 2
-        block_size = size // num_blocks
-        Q = paddle.diag(paddle.ones((block_size,), dtype="float32"))
-        block = matmul_hadU(Q)
-        large_matrix = paddle.zeros([size, size])
+        if quantization_config.hadamard_block_size != -1:
+            assert size % quantization_config.hadamard_block_size == 0, "Please choose a correct block_size"
+            num_blocks = size // quantization_config.hadamard_block_size
+            Q = paddle.diag(paddle.ones((quantization_config.hadamard_block_size,), dtype="float32"))
+            block = matmul_hadU(Q)
+            return block, quantization_config.hadamard_block_size
+        else:
+            num_blocks = size
+            while not (num_blocks % 2):
+                num_blocks = num_blocks // 2
+            block_size = size // num_blocks
+            Q = paddle.diag(paddle.ones((block_size,), dtype="float32"))
+            block = matmul_hadU(Q)
+            large_matrix = paddle.zeros([size, size])
 
-        for i in range(num_blocks):
-            start_row = i * block_size
-            start_col = i * block_size
-            large_matrix[start_row : start_row + block_size, start_col : start_col + block_size] = block
-    return large_matrix.cast(dtype), block_size
+            for i in range(num_blocks):
+                start_row = i * block_size
+                start_col = i * block_size
+                large_matrix[start_row : start_row + block_size, start_col : start_col + block_size] = block
+            return large_matrix.cast(dtype), block_size
+
+
+def hadamard_matmul(input, side, hadamard_maxtrix, block_size):
+    # left -> H.T@input right -> input@H
+    origin_shape = input.shape
+    input = input.reshape([-1, origin_shape[-1]])
+    if side == "left":
+        # H.T@input -> (input.T@H).T
+        input = input.transpose([1, 0])
+    block_num = input.shape[-1] // block_size
+    output = input.reshape([-1, block_num, block_size]) @ hadamard_maxtrix
+    output = output.reshape([-1, block_num * block_size])
+    if side == "left":
+        output = output.transpose([1, 0])
+    output = output.reshape(origin_shape)
+
+    return output
