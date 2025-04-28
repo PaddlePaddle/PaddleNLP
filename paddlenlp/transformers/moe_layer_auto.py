@@ -135,14 +135,17 @@ class MoELayer(nn.Layer):
         self.local_gate_part1_out_dist_attrs = [
             [dist.Shard(0)],  # reshaped_input [b*s, h]
             [dist.Shard(0)],  # scores [b*s, e]
-            [dist.Partial(dist.ReduceType.kRedMax)],  # expert_counts [e]
-            [dist.Partial(dist.ReduceType.kRedAvg)],  # l_aux, scalar
-            [dist.Partial(dist.ReduceType.kRedAvg)],  # l_zloss, scalar
+            [dist.Partial(dist.ReduceType.kRedMax), dist.Partial(dist.ReduceType.kRedMax)],  # expert_counts [e]
+            [dist.Partial(dist.ReduceType.kRedAvg), dist.Partial(dist.ReduceType.kRedAvg)],  # l_aux, scalar
+            [dist.Partial(dist.ReduceType.kRedAvg), dist.Partial(dist.ReduceType.kRedAvg)],  # l_zloss, scalar
         ]
         self.local_gate_part1_grad_dist_attrs = [
             None,
-            [dist.Partial(dist.ReduceType.kRedAvg)],  # gate_weights.grad
-            [dist.Partial(dist.ReduceType.kRedAvg)],  # e_score_correction_bias.grad
+            [dist.Partial(dist.ReduceType.kRedAvg), dist.Partial(dist.ReduceType.kRedAvg)],  # gate_weights.grad
+            [
+                dist.Partial(dist.ReduceType.kRedAvg),
+                dist.Partial(dist.ReduceType.kRedAvg),
+            ],  # e_score_correction_bias.grad
         ]
         self.local_gate_part1 = dist.local_map(
             self.local_gate_part1_compute,
