@@ -3190,6 +3190,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                     None,  # cache_v_zp
                     None,  # out_shifts
                     None,  # out_smooths,
+                    kwargs.get("excess_blocks", None),
                     split_vec,
                     self._fuse_kernel_compute_dtype,
                     "none",  # cache_quant_type

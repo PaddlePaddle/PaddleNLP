@@ -58,6 +58,7 @@ std::vector<paddle::Tensor> SageAttentionKernel(
     const paddle::optional<paddle::Tensor>& cache_v_zp,   // write kv
     const paddle::optional<paddle::Tensor>& out_linear_shifts,  // CascadeAppendAttention
     const paddle::optional<paddle::Tensor>& out_linear_smooths, // CascadeAppendAttention
+    const paddle::optional<paddle::Tensor>& excess_blocks,
     const std::vector<int64_t>& split_vec,    // sage attn
     const std::string& cache_quant_type_str,  // write kv
     const bool use_neox_rotary_style, // write kv
@@ -148,6 +149,7 @@ std::vector<paddle::Tensor> SageAttentionKernel(
         cache_v_quant_scales,
         cache_k_zp,
         cache_v_zp,
+        excess_blocks,
         cache_quant_type_str,
         kv_num_blocks_data,
         max_input_length,
@@ -335,6 +337,7 @@ std::vector<paddle::Tensor> SageAttention(
     const paddle::optional<paddle::Tensor>& cache_v_zp,
     const paddle::optional<paddle::Tensor>& out_linear_shifts,
     const paddle::optional<paddle::Tensor>& out_linear_smooths,
+    const paddle::optional<paddle::Tensor>& excess_blocks,
     const std::vector<int64_t>& split_vec,
     const std::string& compute_dtype,
     const std::string& cache_quant_type_str,
@@ -403,6 +406,7 @@ std::vector<paddle::Tensor> SageAttention(
           cache_v_zp,
           out_linear_shifts,
           out_linear_smooths,
+          excess_blocks,
           split_vec,
           cache_quant_type_str,
           use_neox_rotary_style,
@@ -454,6 +458,7 @@ std::vector<paddle::Tensor> SageAttention(
           cache_v_zp,
           out_linear_shifts,
           out_linear_smooths,
+          excess_blocks,
           split_vec,
           cache_quant_type_str,
           use_neox_rotary_style,
@@ -512,7 +517,8 @@ std::vector<std::vector<int64_t>> SageAttentionInferShape(
     const paddle::optional<std::vector<int64_t>>& cache_k_zp_shape,
     const paddle::optional<std::vector<int64_t>>& cache_v_zp_shape,
     const paddle::optional<std::vector<int64_t>>& out_linear_shifts_shape,
-    const paddle::optional<std::vector<int64_t>>& out_linear_smooths_shape) {
+    const paddle::optional<std::vector<int64_t>>& out_linear_smooths_shape,
+    const paddle::optional<std::vector<int64_t>>& excess_blocks_shape) {
   const int token_num = qkv_shape[0];
   const int kv_num_heads = key_cache_shape[1];
   const int head_dim_qk = key_cache_shape[3];
@@ -559,6 +565,7 @@ std::vector<paddle::DataType> SageAttentionInferDtype(
     const paddle::optional<paddle::DataType>& cache_v_zp_dtype,
     const paddle::optional<paddle::DataType>& out_linear_shifts_dtype,
     const paddle::optional<paddle::DataType>& out_linear_smooths_dtype,
+    const paddle::optional<paddle::DataType>& excess_blocks_dtype,
     const std::vector<int64_t>& split_vec,
     const std::string& compute_dtype,
     const std::string& cache_quant_type_str,
@@ -636,7 +643,8 @@ PD_BUILD_OP(sage_attention)
              paddle::Optional("cache_k_zp"),
              paddle::Optional("cache_v_zp"),
              paddle::Optional("out_linear_shifts"),
-             paddle::Optional("out_linear_smooths")})
+             paddle::Optional("out_linear_smooths"),
+             paddle::Optional("excess_blocks")})
     .Outputs({"fmha_out", "qkv_out", "key_cache_out", "value_cache_out"})
     .SetInplaceMap({{"key_cache", "key_cache_out"},
                     {"value_cache", "value_cache_out"}})
