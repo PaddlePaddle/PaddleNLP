@@ -170,6 +170,7 @@ def prepare_flashmask_inputs(
     valid_cum_sum = (attn_mask * cum_sum).flatten()
     attn_mask_startend_row_indices_rmpad = paddle.index_select(valid_cum_sum, indices).unsqueeze(0)
 
+    pad_size = 0
     # For SP
     if sequence_parallel and sp_size > 1:
         input_ids_rmpad, position_ids_rmpad, pad_size = sequence_parallel_pad_inputs(
