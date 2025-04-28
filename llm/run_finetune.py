@@ -255,8 +255,6 @@ def main():
         # NOTE(gongenlei): new add autotuner_benchmark
         model = model_class.from_config(model_config, dtype=dtype)
 
-    print(model)
-
     if model_args.flash_mask and (not data_args.zero_padding or not model.config.use_flash_attention):
         logger.warning("`flash_mask` must use with zero padding and flash attention.")
         data_args.zero_padding = True

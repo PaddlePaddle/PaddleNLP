@@ -712,7 +712,8 @@ class LoRAModel(nn.Layer):
             for i in model.named_sublayers():
                 module_name = i[0]
                 if re.fullmatch(target_module, module_name):
-                    self._find_and_replace_module(model, module_name, lora_config, enable_lora)
+                    self._find_and_replace_module(model, module_name, lora_config)
+        return model
 
     def restore_original_model(self):
         # make sure W and lora weights are not merged before we restore the original model
