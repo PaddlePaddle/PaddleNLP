@@ -62,15 +62,6 @@ def find_end_files(directory, end_str):
                 gen_files.append(os.path.join(root, file))
     return gen_files
 
-def find_end_files_with_prefix(directory, end_str, prefix):
-    """Filter the targeted files based on their filename prefix"""
-    gen_files = []
-    for root, dirs, files in os.walk(directory):
-        for file in files:
-            if file.endswith(end_str) and file.startswith(prefix):
-                gen_files.append(os.path.join(root, file))
-    return gen_files
-
 
 def get_sm_version():
     if sm_version > 0:
@@ -195,9 +186,7 @@ if cc >= 80:
     sources += ["./gpu/append_attention.cu", "./gpu/multi_head_latent_attention.cu"]
 
     sources += find_end_files("./gpu/append_attn", ".cu")
-    sources += find_end_files_with_prefix("./gpu/append_attn/template_instantiation", ".cu", "append_attention_c16")
-    sources += find_end_files_with_prefix("./gpu/append_attn/template_instantiation", ".cu", "append_attention_c8")
-    sources += find_end_files_with_prefix("./gpu/append_attn/template_instantiation", ".cu", "append_attention_c4")
+    sources += find_end_files("./gpu/append_attn/template_instantiation", ".cu")
 
 
 fp8_auto_gen_directory = "gpu/cutlass_kernels/fp8_gemm_fused/autogen"
