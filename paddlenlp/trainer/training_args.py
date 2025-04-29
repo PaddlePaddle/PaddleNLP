@@ -1241,8 +1241,8 @@ class TrainingArguments:
 
             if sharding_parallel_degree > 1 and moe_sharding_parallel_degree > 1:
                 assert (
-                    moe_sharding_parallel_degree % sharding_parallel_degree == 0
-                ), f"moe_sharding_parallel_degree should be divided by sharding_parallel_degree, current sharding_parallel_degree: {moe_sharding_parallel_degree}, expert_parallel_degree: {sharding_parallel_degree}."
+                    sharding_parallel_degree % moe_sharding_parallel_degree == 0
+                ), f"sharding_parallel_degree should be divided by moe_sharding_parallel_degree, current sharding_parallel_degree: {sharding_parallel_degree}, moe_sharding_parallel_degree: {moe_sharding_parallel_degree}."
 
             assert not (
                 self.data_parallel_degree > 1 and expert_parallel_degree > 1
