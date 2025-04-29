@@ -274,7 +274,7 @@ class ExpertsGroupGemmNode:
             o2_t, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
         )
 
-        o2_t_fp8 = paddle.split(o2_t_fp8, num_or_sections=group_num, axis=0)
+        o2_t_fp8 = o2_t_fp8.reshape([group_num, -1, o2_t_fp8.shape[-1]])
         o2_t_scale = paddle.split(o2_t_scale, num_or_sections=group_num, axis=-1)
 
         # quant out_grad
@@ -323,7 +323,7 @@ class ExpertsGroupGemmNode:
         input_x_fp8, input_x_scale = kitchen_quant(
             input_x, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
         )
-        input_x_fp8 = paddle.split(input_x_fp8, num_or_sections=group_num, axis=0)
+        input_x_fp8 = input_x_fp8.reshape([group_num, -1, input_x_fp8.shape[-1]])
         input_x_scale = paddle.split(input_x_scale, num_or_sections=group_num, axis=-1)
 
         # transpose do1 and quant do1
@@ -332,7 +332,7 @@ class ExpertsGroupGemmNode:
         do1_fp8, do1_scale = kitchen_quant(
             do1, backend=kitchen.ops.Backend.CUBLAS, is_1d_scaled=True, return_transpose=False
         )
-        do1_fp8 = paddle.split(do1_fp8, num_or_sections=group_num, axis=0)
+        do1_fp8 = do1_fp8.reshape([group_num, -1, do1_fp8.shape[-1]])
         do1_scale = paddle.split(do1_scale, num_or_sections=group_num, axis=-1)
 
         # dw1
