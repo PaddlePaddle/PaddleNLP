@@ -272,8 +272,8 @@ python -u  ./alignment/dpo/run_dpo.py ./config/llama/dpo_lora_argument.json
 为了方便测试，我们也提供了偏好数据集可以直接使用：
 
 ```bash
-wget https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized_pointwise.tar.gz
-tar -zxvf ultrafeedback_binarized_pointwise.tar.gz
+wget https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized_pointwise.tar
+tar -xvf ultrafeedback_binarized_pointwise.tar.gz
 ```
 
 ##### 全参 KTO
@@ -297,12 +297,10 @@ python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" ./alignment/
 PadlleNLP 支持多种模型融合方法，包括**Linear、Slerp、Ties、DARE、DELLA**，并支持模型参数稀疏化方法与模型融合算法的灵活组合使用。
 ```shell
 # 模型融合启动命令参考
-# cd PaddleNLP/llm/tools
-python mergekit.py \
-    --tensor_type np \
-    --n_process 2 \
+python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" ./llm/tools/mergekit.py \
+    --tensor_type pd \
     --merge_method linear \
-    --model_path_list ../checkpoints/model1 ../checkpoints/model \
+    --model_path_str "../checkpoints/model1,../checkpoints/model2" \
     --output_path ../checkpoints/model_merge
 
 ```
