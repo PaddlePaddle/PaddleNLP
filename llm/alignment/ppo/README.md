@@ -59,7 +59,7 @@ wget https://paddlenlp.bj.bcebos.com/datasets/examples/ppo-kk.tgz && tar zxf ppo
 
 ### GRPO && REINFORCE++ 训练配置
 
-我们采用的配置文件放置在`llm/config/llama/grpo_argument.yaml`中，同时我们提供了详细参数释义如下：
+我们采用的配置文件放置在`llm/config/llama/grpo_argument.yaml`和`llm/config/qwen/grpo_argument.yaml`中，同时我们提供了详细参数释义如下：
 - `rl_algorithm`: 使用的强化学习算法，支持`grpo`、`reinforce_plus_plus`
 - `actor_model_name_or_path`: actor-model 和 reference-model 模型本地的模型路径
 - `reward_model_name_or_path`: reward 模型的名称或本地路径
@@ -169,6 +169,10 @@ export FLAGS_cascade_attention_max_partition_size=2048
 python -u -m paddle.distributed.launch --devices "0,1,2,3" run_ppo.py ../../config/qwen/grpo_argument.yaml
 # python -u -m paddle.distributed.launch --devices "0,1,2,3" run_ppo.py ../../config/llama/grpo_argument.yaml
 ```
+
+### REINFORCE++ 训练命令
+将配置文件`grpo_argument.yaml`中的`rl_algorithm`改为`reinforce_plus_plus`即可, 其它命令同 GRPO
+
 
 ### 在线监控
 在`grpo_argument.yaml`中设置的输出目录为`"logging_dir": "vdl_log"`, 可以通过以下命令查看训练过程
