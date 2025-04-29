@@ -124,6 +124,7 @@ MAPPING_NAMES = OrderedDict(
         ("Mistral", "mistral"),
         ("Mixtral", "mixtral"),
         ("Qwen2", "qwen2"),
+        ("Qwen3", "qwen3"),
         ("Qwen2Moe", "qwen2_moe"),
         ("Gemma", "gemma"),
         ("Yuan", "yuan"),

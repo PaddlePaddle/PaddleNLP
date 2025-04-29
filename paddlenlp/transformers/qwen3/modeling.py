@@ -59,7 +59,7 @@ from ..model_outputs import (
     TokenClassifierOutput,
 )
 from ..model_utils import PretrainedModel, register_base_model
-from ..qwen2 import Qwen2Attention
+from ..qwen2.modeling import Qwen2Attention
 from ..utils import caculate_llm_per_token_flops, logger
 from .configuration import Qwen3Config
 
@@ -295,20 +295,18 @@ def _expand_2d_mask(mask, dtype, tgt_length):
 
 
 class Qwen3RMSNorm(nn.Layer):
-    def __init__(self, config: Qwen3Config):
+    def __init__(self, config: Qwen3Config, hidden_size=None, rms_norm_eps=None):
         """
-        Qwen3RMSNorm is eq
-
-        uivalent to T5LayerNorm
+        Qwen3RMSNorm is equivalent to T5LayerNorm
         """
         super().__init__()
-        self.hidden_size = config.hidden_size
+        self.hidden_size = config.hidden_size if hidden_size is None else hidden_size
+        self.variance_epsilon = config.rms_norm_eps if rms_norm_eps is None else rms_norm_eps
         self.weight = paddle.create_parameter(
             shape=[self.hidden_size],
             dtype=paddle.get_default_dtype(),
             default_initializer=nn.initializer.Constant(1.0),
         )
-        self.variance_epsilon = config.rms_norm_eps
         self.config = config
 
         if config.sequence_parallel:
@@ -506,8 +504,12 @@ class Qwen3Attention(Qwen2Attention):
 
     def __init__(self, config: Qwen3Config, layerwise_recompute: bool = True, skip_recompute_ops=None):
         super().__init__(config, layerwise_recompute, skip_recompute_ops)
-        self.q_norm = Qwen3RMSNorm(self.head_dim, eps=config.rms_norm_eps)  # unlike olmo, only on the head dim!
-        self.k_norm = Qwen3RMSNorm(self.head_dim, eps=config.rms_norm_eps)  # thus post q_norm does not need reshape
+        self.q_norm = Qwen3RMSNorm(
+            config, hidden_size=self.head_dim, rms_norm_eps=config.rms_norm_eps
+        )  # unlike olmo, only on the head dim!
+        self.k_norm = Qwen3RMSNorm(
+            config, hidden_size=self.head_dim, rms_norm_eps=config.rms_norm_eps
+        )  # thus post q_norm does not need reshape
         self.sliding_window = config.sliding_window
         if not (
             self.config.use_sliding_window
@@ -557,14 +559,6 @@ class Qwen3Attention(Qwen2Attention):
             query_states = self.q_proj(hidden_states)
             key_states = self.k_proj(hidden_states)
             value_states = self.v_proj(hidden_states)
-
-            # [bs,seq, hidden]
-            # input_shape = hidden_states.shape[:-1]
-            # [bs,seq, nhead, head_dim]
-            # hidden_shape = (*input_shape, -1, self.head_dim)
-            # query_states = self.q_norm(self.q_proj(hidden_states).view(hidden_shape)).transpose(1, 2)
-            # key_states = self.k_norm(self.k_proj(hidden_states).view(hidden_shape)).transpose(1, 2)
-            # value_states = self.v_proj(hidden_states).view(hidden_shape).transpose(1, 2)
 
             if self.sequence_parallel:
                 target_query_shape = [batch_size, -1, self.num_heads, self.head_dim]
@@ -806,9 +800,9 @@ class Qwen3PretrainedModel(PretrainedModel):
                 [f"layers.{layer_index}.self_attn.q_proj.weight", None, "transpose"],
                 [f"layers.{layer_index}.self_attn.k_proj.weight", None, "transpose"],
                 [f"layers.{layer_index}.self_attn.v_proj.weight", None, "transpose"],
-                [f"layers.{layer_index}.self_attn.q_proj.bias", None],
-                [f"layers.{layer_index}.self_attn.k_proj.bias", None],
-                [f"layers.{layer_index}.self_attn.v_proj.bias", None],
+                # [f"layers.{layer_index}.self_attn.q_proj.bias", None],
+                # [f"layers.{layer_index}.self_attn.k_proj.bias", None],
+                # [f"layers.{layer_index}.self_attn.v_proj.bias", None],
                 [f"layers.{layer_index}.self_attn.o_proj.weight", None, "transpose"],
                 [f"layers.{layer_index}.mlp.up_proj.weight", None, "transpose"],
                 [f"layers.{layer_index}.mlp.gate_proj.weight", None, "transpose"],
@@ -816,6 +810,8 @@ class Qwen3PretrainedModel(PretrainedModel):
                 [f"layers.{layer_index}.self_attn.rotary_emb.inv_freq"],
                 [f"layers.{layer_index}.input_layernorm.weight"],
                 [f"layers.{layer_index}.post_attention_layernorm.weight"],
+                [f"layers.{layer_index}.self_attn.q_norm.weight"],
+                [f"layers.{layer_index}.self_attn.k_norm.weight"],
             ]
             model_mappings.extend(layer_mappings)
 
