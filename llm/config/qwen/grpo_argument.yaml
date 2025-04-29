@@ -21,6 +21,7 @@ eval_datasets: "ppo-kk/5ppl/test.jsonl" # Path to the evaluation dataset
 prompt_key: "src" # Key for the prompt in the dataset
 response_key: "tgt" # Key for the response in the dataset
 dataloader_drop_last: true # Whether to drop the last incomplete batch in the DataLoader
+dataloader_shuffle: false # Whether to shuffle the train dataset
 balance_batch: true # Whether to balance batch size across dataset_world_size
 use_remove_padding: true # Whether to remove padding tokens in the input
 
@@ -46,7 +47,7 @@ rollout_quant_type: "" # Quantization type, e.g., "weight_only_int8"
 # training args
 do_train: true # Whether to perform training
 seed: 42 # Random seed for reproducibility
-global_batch_size: 4 # Global batch size for training
+global_batch_size: 8 # Global batch size for training
 global_gen_batch_size: -1 # Global generation batch size for dynamic sampling
 global_mini_batch_size: -1 # Mini-batch size for training
 rollout_n: 8 # Number of rollouts
@@ -65,7 +66,7 @@ adam_beta1: 0.9 # AdamW optimizer beta1
 adam_beta2: 0.999 # AdamW optimizer beta2
 adam_epsilon: 1e-8 # AdamW optimizer epsilon
 max_grad_norm: 1.0 # Maximum gradient norm for clipping
-max_steps: -1 # Maximum number of training steps
+max_steps: 3600 # Maximum number of training steps
 save_steps: 300 # Number of steps between model saves
 save_strategy: "steps" # Strategy for saving models
 ignore_save_lr_and_optim: true # Whether to ignore saving learning rate and optimizer state (leave empty if not specified)
@@ -98,7 +99,7 @@ eval_steps: 20 # Number of steps between evaluations
 
 # device memory optimization args
 use_flash_attention: true # Whether to use fused attention operations
-use_fused_rms_norm: true # Whether to use fused RMS norm operations, which needs to install fused_ln in slm/model_zoo/gpt-3/external_ops
+use_fused_rms_norm: false # Whether to use fused RMS norm operations, which needs to install fused_ln in slm/model_zoo/gpt-3/external_ops
 use_fused_rope: false # Whether to use fused rope operations
 use_fused_head_and_loss_fn: true # Whether to use fused head and loss function
 use_fused_linear: true # Whether to use fused linear operations
