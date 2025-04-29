@@ -1109,8 +1109,13 @@ function llama_pir_auto_fuse_ffn_attention_qkv_MP2() {
                 ips_base=-1
                 mem_base=-1
                 if [ $IS_A100 -ne 0 ];then
-                    loss_base_2=10.58283806
-                    loss_base_10=9.4387331
+                    if [[ $tp_config =~ "replace_with_parallel_cross_entropy" ]];then
+                        loss_base_2=10.58283806
+                        loss_base_10=9.43873215
+                    else
+                        loss_base_2=10.58283806
+                        loss_base_10=9.4387331
+                    fi
                 fi
                 check_result $FUNCNAME ${loss_base_2} ${auto_loss_2} ${ips_base} ${auto_ips} ${mem_base} ${auto_mem}
                 check_result $FUNCNAME ${loss_base_10} ${auto_loss_10} ${ips_base} ${auto_ips} ${mem_base} ${auto_mem}
