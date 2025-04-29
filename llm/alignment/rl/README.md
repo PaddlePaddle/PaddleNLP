@@ -164,7 +164,7 @@ export FLAGS_force_cublaslt_no_reduced_precision_reduction=True
 export FLAGS_mla_use_tensorcore=0
 export FLAGS_cascade_attention_max_partition_size=2048
 
-python -u -m paddle.distributed.launch --devices "0,1,2,3" run_ppo.py ../../config/qwen/grpo_argument.yaml
+python -u -m paddle.distributed.launch --devices "0,1,2,3" run_rl.py ../../config/qwen/grpo_argument.yaml
 ```
 我们提供根据上述脚本可复现的[wandb 日志](https://api.wandb.ai/links/junyu/5jiulhem)。
 
@@ -193,10 +193,8 @@ export FLAGS_force_cublaslt_no_reduced_precision_reduction=True
 export FLAGS_mla_use_tensorcore=0
 export FLAGS_cascade_attention_max_partition_size=2048
 
-python -u -m paddle.distributed.launch --devices "0,1,2,3" run_ppo.py ../../config/qwen/reinforce_plus_plus_argument.yaml
+python -u -m paddle.distributed.launch --devices "0,1,2,3" run_rl.py ../../config/qwen/reinforce_plus_plus_argument.yaml
 ```
-
-我们提供根据上述脚本可复现的[wandb 日志](https://api.wandb.ai/links/ainlp66-netflix/ps1dpaxm)。
 
 ### 在线监控
 在`grpo_argument.yaml`和`reinforce_plus_plus_argument.yaml`中设置的输出目录为`"logging_dir": "vdl_log"`, 可以通过以下命令查看训练过程
