@@ -52,8 +52,8 @@ def permute(
                                        and pads the number of tokens to the expert capacity.
     """
     assert not drop_and_pad, "token-drop and pads is not supported"
-    # permuted_input = paddle.gather(tokens, token_permuted_indices)
-    permuted_input = tokens.index_select(axis=0, index=token_permuted_indices)
+    permuted_input = paddle.gather(tokens, token_permuted_indices)
+    # permuted_input = tokens.index_select(axis=0, index=token_permuted_indices)
     return permuted_input
 
 

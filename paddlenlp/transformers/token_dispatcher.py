@@ -64,14 +64,14 @@ class _DeepepManager:
     def dispatch(
         self, hidden_states: paddle.Tensor, token_indices: paddle.Tensor, token_probs: paddle.Tensor
     ) -> paddle.Tensor:
-        hidden_states, dispatched_probs, states = fused_dispatch(
+        hidden_states1, dispatched_probs, states = fused_dispatch(
             hidden_states, token_indices, token_probs, self.num_experts, self.group
         )
         self.handle = states["handle"]
         self.tokens_per_expert_list = states["tokens_per_expert"]
         dispatched_indices = states["dispatched_indices"]
 
-        return hidden_states, dispatched_indices, dispatched_probs
+        return hidden_states1, dispatched_indices, dispatched_probs
 
     def _indices_to_multihot(self, indices, probs):
         """
@@ -160,13 +160,13 @@ class MoEFlexTokenDispatcher:
 
     def pre_dispatch(self, hidden_states, probs, routing_map):
         self.hidden_shape = hidden_states.shape
-        hidden_states = hidden_states.view([-1, self.hidden_shape[-1]])
+        hidden_states1 = hidden_states.view([-1, self.hidden_shape[-1]])
         num_tokens = routing_map.shape[0]
         routing_map = routing_map.reshape([num_tokens, self._comm_manager.num_experts])
         probs = probs.reshape([num_tokens, self._comm_manager.num_experts])
         # Convert the format of routing map from multihot to indices.
         token_probs, token_indices = paddle.topk(probs, self._comm_manager.router_topk, axis=-1)
-        return hidden_states, token_indices, token_probs
+        return hidden_states1, token_indices, token_probs
 
     def post_dispatch(self, hidden_states, dispatched_indices):
         (
@@ -190,12 +190,12 @@ class MoEFlexTokenDispatcher:
         self, hidden_states: paddle.Tensor, probs: paddle.Tensor, routing_map: paddle.Tensor
     ) -> Tuple[paddle.Tensor, paddle.Tensor]:
         hidden_states, token_indices, token_probs = self.pre_dispatch(hidden_states, probs, routing_map)
-        hidden_states, dispatched_indices, dispatched_probs = self._comm_manager.dispatch(
+        hidden_states1, dispatched_indices, dispatched_probs = self._comm_manager.dispatch(
             hidden_states, token_indices, token_probs
         )
 
         (global_input_tokens, token_permuted_indices, prob_permuted_indices) = self.post_dispatch(
-            hidden_states, dispatched_indices
+            hidden_states1, dispatched_indices
         )
 
         return (
@@ -261,6 +261,5 @@ class PreDispatchNode:
         )
 
         probs_reshape_g = paddle.reshape(probs_grad, self.probs_origin_shape)
-
         self.reset_status()
         return probs_reshape_g
