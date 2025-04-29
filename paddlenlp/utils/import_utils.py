@@ -61,7 +61,7 @@ def custom_import(name, *args, **kwargs):
         "y",
     ]:
         if name == "paddlenlp_ops":
-            logger.info("Using Pybind paddlenlp_ops!")
+            # logger.debug("Using Pybind paddlenlp_ops!")
             if name not in _original_attributes:
                 bak_dict = {}
                 for ops_name in pybind_ops_list:

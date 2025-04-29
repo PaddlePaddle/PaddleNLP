@@ -63,6 +63,7 @@ install_paddle(){
 install_paddlenlp(){
     echo -e "\033[31m ---- Install paddlenlp by set PYTHONPATH  \033"
     export PYTHONPATH=${nlp_dir}:$PYTHONPATH
+    # python -m pip install -r ${nlp_dir}/requirements.txt
     sed -i -e "s/paddlenlp/#paddlenlp/g" model_zoo/gpt-3/requirements.txt
     # export http_proxy=${proxy} && export https_proxy=${proxy}
     # python -m pip uninstall paddlenlp -y
@@ -87,9 +88,9 @@ install_external_ops(){
 
 function is_a100() {
     if [ $(nvidia-smi|grep A100|wc -l)  -ne 0 ];then
-        echo 1
+        echo 1 # A100
     else
-        echo 0
+        echo 0 # not A100
     fi
 }
 
@@ -131,9 +132,6 @@ get_diff_TO_case(){
             fi
         done
     else
-        case_list[${#case_list[*]}]=gpt-3_auto
-        case_list[${#case_list[*]}]=llama_auto
-        case_list[${#case_list[*]}]=deepseek_auto
         for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
             arr_file_name=(${file_name//// })
             dir1=${arr_file_name[0]}
@@ -147,6 +145,9 @@ get_diff_TO_case(){
             elif [[ ${file_name##*.} == "md" ]] || [[ ${file_name##*.} == "rst" ]] || [[ ${dir1} == "docs" ]];then
                 continue
             else
+                case_list[${#case_list[*]}]=gpt-3_auto
+                case_list[${#case_list[*]}]=llama_auto
+                case_list[${#case_list[*]}]=deepseek_auto
                 for ((i=0; i<${#target_lists_for_gpt[@]}; i++)); do
                     if [[ ! ${dir3} =~ "benchmarks" ]] && [[ ${file_item} == *${target_lists_for_gpt[i]}* ]];then
                         case_list[${#case_list[*]}]=gpt-3_dygraph

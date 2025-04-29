@@ -1,5 +1,5 @@
 # RL algorithms
-rl_algorithm: "grpo" # The reinforcement learning algorithm used, supported: "ppo", "grpo", "reinforce_plus_plus"
+rl_algorithm: "reinforce_plus_plus" # The reinforcement learning algorithm used, supported: "ppo", "grpo", "reinforce_plus_plus"
 
 # models
 actor_model_name_or_path: "Qwen/Qwen2.5-7B-Instruct-1M" # The name or path of the actor model
@@ -74,7 +74,7 @@ disable_tqdm: true # Whether to disable tqdm progress bar
 
 # RL args
 kl_coeff: 0.0 # KL coefficient
-kl_loss_coeff: 0.001 # KL loss coefficient
+kl_loss_coeff: 0.000 # KL loss coefficient
 pg_loss_coeff: 1.0 # Policy gradient loss coefficient
 entropy_coeff: 0.0 # Entropy coefficient
 clip_range_ratio: 0.2 # The clipping range for ratio between the old and new policy. (PPO algorithm)

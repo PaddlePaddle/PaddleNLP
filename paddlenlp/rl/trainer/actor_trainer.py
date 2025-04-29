@@ -12,23 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import uuid
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List
 
 import numpy as np
 import paddle
-from paddle import nn
 from paddle.distributed.fleet.meta_parallel import ParallelCrossEntropy
-from paddle.io import Dataset
 
-from ...data import DataCollator
-from ...generation import GenerationConfig
-from ...trainer.trainer import (
-    EvalPrediction,
-    ShardingOption,
-    TrainerCallback,
-    TrainingArguments,
-)
-from ...transformers import PretrainedModel, PretrainedTokenizer
 from ..models.ppo_model_utils import (
     RLHFPPOMixedLoss,
     create_startend_row_indices,
@@ -41,50 +30,6 @@ from .trainer_utils import guard_set_args
 class ActorReferenceTrainer(RLTrainer):
     loss_cls = RLHFPPOMixedLoss
     trainer_type = "policy"
-
-    def __init__(
-        self,
-        model: Union[PretrainedModel, nn.Layer] = None,
-        criterion: nn.Layer = None,
-        args: TrainingArguments = None,
-        data_collator: Optional[DataCollator] = None,  # type: ignore
-        train_dataset: Optional[Dataset] = None,
-        eval_dataset: Union[Dataset, Dict[str, Dataset]] = None,
-        tokenizer: Optional[PretrainedTokenizer] = None,
-        compute_metrics: Optional[Callable[[EvalPrediction], Dict]] = None,
-        callbacks: Optional[List[TrainerCallback]] = None,
-        optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
-        preprocess_logits_for_metrics: Optional[Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor]] = None,
-    ):
-        super().__init__(
-            model,
-            criterion,
-            args,
-            data_collator,
-            train_dataset,
-            eval_dataset,
-            tokenizer,
-            compute_metrics,
-            callbacks,
-            optimizers,
-            preprocess_logits_for_metrics,
-        )
-
-        self.generation_config = GenerationConfig(
-            max_new_tokens=self.args.max_dec_len,
-            rollout_n=self.args.rollout_n,
-            temperature=self.args.temperature,
-            top_p=self.args.top_p,
-            top_k=0,  # to disable top_k sampling, default is 50
-            repetition_penalty=self.args.repetition_penalty,
-            min_length=self.args.min_dec_len,
-            do_sample=True,
-            # allow generation output to contain input
-            trunc_input=False,
-            bos_token_id=self.tokenizer.bos_token_id,
-            eos_token_id=self.tokenizer.cls_token_id,
-            pad_token_id=self.tokenizer.pad_token_id,
-        )
 
     def loss_identifier(self, inputs: Dict) -> str:
         """
@@ -105,43 +50,28 @@ class ActorReferenceTrainer(RLTrainer):
     def generate_sequences(self, prompt_only_batch: Dict, do_eval=False) -> List[Dict[str, Any]]:
         """Rollout a batch of experiences."""
         input_ids = prompt_only_batch["input_ids"]
-        # attention_mask = prompt_only_batch["attention_mask"]
-        if do_eval:
-            train_rollout_n = self.args.rollout_n
-            self.args.rollout_n = 1
 
-        # position_ids = (
-        #     prompt_only_batch["position_ids"]
-        #     if "position_ids" in prompt_only_batch
-        #     else make_position_ids(attention_mask)
-        # )
-
-        if self.args.rollout_n > 1:
-            input_ids = input_ids.repeat_interleave(self.args.rollout_n, axis=0)
-            # raw_dtype = attention_mask.dtype
-            # attention_mask = (
-            #     attention_mask.cast("int32").repeat_interleave(self.args.rollout_n, axis=0).cast(raw_dtype)
-            # )
-            # position_ids = position_ids.repeat_interleave(self.args.rollout_n, axis=0)
+        repeat_num = 1 if do_eval else self.args.rollout_n
 
         with guard_set_args(self.model.config, {"use_fused_head_and_loss_fn": False}):
             sequences = self.get_model(False).generate(
                 input_ids=input_ids,
                 attention_mask=None,
                 position_ids=None,
-                generation_config=self.generation_config,
-                synced_gpus=ShardingOption.FULL_SHARD in self.args.sharding,
                 do_eval=do_eval,
+                repeat_num=repeat_num,
             )[0]
+
+        if repeat_num > 1:
+            input_ids = input_ids.repeat_interleave(repeat_num, axis=0)
 
         if self.args.use_rm_server:
             label_ids = prompt_only_batch["label_ids"]
-            if self.args.rollout_n > 1:
-                label_ids = label_ids.repeat_interleave(self.args.rollout_n, axis=0)
+            if repeat_num > 1:
+                label_ids = label_ids.repeat_interleave(repeat_num, axis=0)
 
-        sequences = sequences.reshape([input_ids.shape[0] // self.args.rollout_n, self.args.rollout_n, -1])
+        sequences = sequences.reshape([input_ids.shape[0] // repeat_num, repeat_num, -1])
         if do_eval:
-            self.args.rollout_n = train_rollout_n
             sequences = sequences.transpose([1, 0, 2])
         # prompt, sequence, attention_mask
         return [
@@ -150,20 +80,6 @@ class ActorReferenceTrainer(RLTrainer):
                 "input_ids": seq,
                 **({"label_ids": label_ids[idx * len(seq) : (idx + 1) * len(seq)]} if self.args.use_rm_server else {}),
                 "index": np.array([str(uuid.uuid4())] * len(seq), dtype=object),
-                # "attention_mask": make_attention_mask(
-                #     seq,
-                #     pad_id=self.tokenizer.pad_token_id,
-                #     eos_id=None,
-                #     unk_id=self.tokenizer.unk_token_id,
-                #     causal_mask=True,
-                # ).cast(self._model_config.dtype),
-                # "sequence_mask": make_attention_mask(
-                #     seq,
-                #     pad_id=self.tokenizer.pad_token_id,
-                #     eos_id=None,
-                #     unk_id=self.tokenizer.unk_token_id,
-                #     causal_mask=False,
-                # ).cast(self._model_config.dtype),
             }
             for idx, seq in enumerate(sequences)
         ]
@@ -214,6 +130,24 @@ class ActorReferenceTrainer(RLTrainer):
                 startend_row_indices[start_index:end_index] if startend_row_indices is not None else None
             )
             current_position_ids = position_ids[start_index:end_index] if position_ids is not None else None
+            current_labels = current_input_ids[:, response_start + 1 :]
+            if self.args.use_remove_padding:
+                from ..utils.bert_padding import prepare_flashmask_inputs
+
+                update_inputs = prepare_flashmask_inputs(
+                    current_input_ids,
+                    current_position_ids,
+                    self.tokenizer.pad_token_id,
+                    self.model.config.sequence_parallel,
+                    self.model.config.tensor_parallel_degree,
+                )
+                current_input_ids = update_inputs["input_ids"]
+                current_position_ids = update_inputs["position_ids"]
+                current_startend_row_indices = update_inputs["attn_mask_startend_row_indices"]
+                current_input_ids_rmpad_rolled = update_inputs["input_ids_rmpad_rolled"]
+                indices = update_inputs["indices"]
+                raw_input_shape = update_inputs["raw_input_shape"]
+                pad_size = update_inputs["pad_size"]
 
             logits = self.model(
                 current_input_ids,
@@ -221,24 +155,42 @@ class ActorReferenceTrainer(RLTrainer):
                 attn_mask_startend_row_indices=current_startend_row_indices,
             )
             if not isinstance(logits, paddle.Tensor):
-                logits = logits[0]  # [2, 355, 12544]
+                logits = logits[0]
 
             if self.args.use_fp32_compute and logits.dtype != paddle.float32:
                 logits = logits.cast(paddle.float32)
-            logits = logits / self.args.temperature if self.args.temperature > 0.0 else logits
 
-            if self.model.config.tensor_parallel_degree > 1 and self.model.config.tensor_parallel_output:
-                log_probs = (
-                    -ParallelCrossEntropy()(
-                        logits[:, response_start:-1].astype("float32"), current_input_ids[:, response_start + 1 :]
+            if self.args.temperature > 0.0:
+                # use inplace method to save gpu memory
+                logits.scale_(1 / self.args.temperature)
+
+            if self.args.use_remove_padding:
+                from ..utils.bert_padding import pad_input
+
+                if self.model.config.tensor_parallel_degree > 1 and self.model.config.tensor_parallel_output:
+                    log_probs = (
+                        -ParallelCrossEntropy()(logits.astype("float32"), current_input_ids_rmpad_rolled)
+                        .squeeze(axis=-1)
+                        .astype(logits.dtype)
                     )
-                    .squeeze(axis=-1)
-                    .astype(logits.dtype)
-                )
+                else:
+                    log_probs = gather_log_probabilities(logits, current_input_ids_rmpad_rolled)
+
+                if pad_size > 0:
+                    log_probs = log_probs[:, :-pad_size]
+                log_probs = pad_input(
+                    log_probs.squeeze(0).unsqueeze(-1), indices, batch=raw_input_shape[0], seqlen=raw_input_shape[1]
+                ).squeeze(-1)
+                log_probs = log_probs[:, response_start:-1].contiguous()
             else:
-                log_probs = gather_log_probabilities(
-                    logits[:, response_start:-1], current_input_ids[:, response_start + 1 :]
-                )
+                if self.model.config.tensor_parallel_degree > 1 and self.model.config.tensor_parallel_output:
+                    log_probs = (
+                        -ParallelCrossEntropy()(logits[:, response_start:-1].astype("float32"), current_labels)
+                        .squeeze(axis=-1)
+                        .astype(logits.dtype)
+                    )
+                else:
+                    log_probs = gather_log_probabilities(logits[:, response_start:-1], current_labels)
 
             log_probs_list.append(log_probs)
             # Set logits to None to save memory
