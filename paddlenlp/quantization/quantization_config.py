@@ -59,9 +59,13 @@ class QuantizationConfig:
         dtype=None,
         ignore_modules=None,
         group_size=-1,
-        apply_hadamard=True,
+        apply_hadamard=False,
+        hadamard_is_block=True,
+        hadamard_block_size=-1,
         quant_input_grad=False,
-        skip_first_act_scale_step=-1,
+        skip_first_act_scale_step=200,
+        epsilon=0,
+        moving_rate=0.01,
         **kwargs,
     ):
         if weight_quantize_algo is not None:
@@ -130,6 +134,10 @@ class QuantizationConfig:
         self.apply_hadamard = apply_hadamard
         self.quant_input_grad = quant_input_grad
         self.skip_first_act_scale_step = skip_first_act_scale_step
+        self.epsilon = epsilon
+        self.hadamard_is_block = hadamard_is_block
+        self.moving_rate = moving_rate
+        self.hadamard_block_size = hadamard_block_size
 
     def is_weight_quantize(self):
         if isinstance(self.weight_quantize_algo, dict):

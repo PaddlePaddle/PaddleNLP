@@ -156,17 +156,13 @@ def convert_to_weight_quantize_state_dict(state_dict, name, quantization_config,
         # gpu weight_quantize will fix in future
         target_weight = state_dict.pop(weight_name).cast(dtype).cuda()
         if weight_quantize_algo in ["a8w8linear"]:
-            quant_weight, quant_scale = quantize_channelwise(
-                target_weight, quantization_config.apply_hadamard, bit_length=8
-            )
-            act_scale = paddle.zeros([], dtype="bfloat16").cuda()
+            quant_weight, quant_scale = quantize_channelwise(target_weight, quantization_config, bit_length=8)
+            act_scale = paddle.ones([], dtype=dtype).cuda()
             act_scale.stop_gradient = True
             state_dict[act_scale_name] = act_scale
         elif weight_quantize_algo in ["a8w4linear"]:
-            quant_weight, quant_scale = quantize_channelwise(
-                target_weight, quantization_config.apply_hadamard, bit_length=4
-            )
-            act_scale = paddle.zeros([], dtype="bfloat16").cuda()
+            quant_weight, quant_scale = quantize_channelwise(target_weight, quantization_config, bit_length=4)
+            act_scale = paddle.zeros([], dtype=dtype).cuda()
             act_scale.stop_gradient = True
             state_dict[act_scale_name] = act_scale
         else:
