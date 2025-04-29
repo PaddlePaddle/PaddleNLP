@@ -186,7 +186,7 @@ python run_finetune.py ./config/qwen/pt_argument.json
 
 ### 3. 对齐
 
-我们支持 DPO、KTO、RLHF 等偏好对齐策略。DPO、KTO 策略采用 zero_padding 策略，结合 FlashMask 策略，有效提升模型训练效率。
+我们支持 DPO、KTO、RL 等偏好对齐策略。DPO、KTO 策略采用 zero_padding 策略，结合 FlashMask 策略，有效提升模型训练效率。
 
 #### 3.1 DPO
 
@@ -289,9 +289,9 @@ python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" ./alignment/
 python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" ./alignment/kto/run_kto.py ./config/llama/kto_lora_argument.json
 ```
 
-#### 3.3 RLHF
+#### 3.3 RL
 
-飞桨大模型套件提供了提供了基于强化学习 PPO 算法对 LLM 进行人类偏好对齐的代码及完整使用示例，支持**3D 分布式并行训练以及 rollout 阶段使用预测优化进行生成加速**。详细使用教程详见[RLHF 文档](./docs/rlhf.md)。
+飞桨大模型套件提供了提供了基于强化学习 GRPO、Reinforce++、PPO 等 算法对 LLM 进行人类偏好对齐的代码及完整使用示例，支持**3D 分布式并行训练以及 rollout 阶段使用预测优化进行生成加速**。详细使用教程详见[RL 文档](./alignment/rl/README.md)。
 
 ### 4. 模型融合
 PadlleNLP 支持多种模型融合方法，包括**Linear、Slerp、Ties、DARE、DELLA**，并支持模型参数稀疏化方法与模型融合算法的灵活组合使用。
