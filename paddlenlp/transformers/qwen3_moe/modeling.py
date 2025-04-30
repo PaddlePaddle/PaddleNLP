@@ -22,6 +22,7 @@ from typing import List, Optional, Tuple, Union
 
 import paddle
 import paddle.distributed.fleet.meta_parallel as mpu
+import paddle.nn.functional as F
 from paddle import Tensor, nn
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
@@ -75,7 +76,7 @@ class Qwen3MoeGate(Qwen2MoeGate):
     pass
 
 
-class Qwen3MoeSparseMoeBlock(MoELayer):
+class ExpertParallelQwen3MoeSparseMoeBlock(MoELayer):
     def __init__(self, config: Qwen3MoeConfig):
         gate = Qwen3MoeGate(
             config,
@@ -101,6 +102,59 @@ class Qwen3MoeSparseMoeBlock(MoELayer):
         final_hidden_states, l_aux, l_zloss = super().forward(hidden_states)
 
         return final_hidden_states, l_aux
+
+
+class Qwen3MoeSparseMoeBlock(nn.Layer):
+    def __init__(self, config):
+        super().__init__()
+        self.num_experts = config.num_experts
+        self.top_k = config.num_experts_per_tok
+        self.norm_topk_prob = config.norm_topk_prob
+
+        # gating
+        self.gate = nn.Linear(config.hidden_size, config.num_experts, bias_attr=False)
+        self.experts = nn.LayerList([Qwen3MoeMLP(config) for _ in range(self.num_experts)])
+
+    def forward(self, hidden_states: paddle.Tensor) -> paddle.Tensor:
+        """ """
+        batch_size, sequence_length, hidden_dim = hidden_states.shape
+        hidden_states = hidden_states.view([-1, hidden_dim])
+        # router_logits: (batch * sequence_length, n_experts)
+        router_logits = self.gate(hidden_states)
+
+        routing_weights = F.softmax(router_logits, axis=1, dtype=paddle.float32)
+        # (batch * sequence_length, topk)
+        routing_weights, selected_experts = paddle.topk(routing_weights, self.top_k, axis=-1)
+        if self.norm_topk_prob:  # only diff with mixtral sparse moe block!
+            routing_weights /= routing_weights.sum(axis=-1, keepdim=True)
+        # we cast back to the input dtype
+        routing_weights = routing_weights.to(hidden_states.dtype)
+
+        final_hidden_states = paddle.zeros((batch_size * sequence_length, hidden_dim), dtype=hidden_states.dtype)
+
+        # One hot encode the selected experts to create an expert mask
+        # this will be used to easily index which expert is going to be sollicitated
+        expert_mask = paddle.nn.functional.one_hot(selected_experts, num_classes=self.num_experts).transpose([2, 1, 0])
+        # [num_experts, topk, bs*seq]
+        tokens_per_expert = expert_mask.reshape([expert_mask.shape[0], -1]).sum(axis=-1)
+        # Loop over all available experts in the model and perform the computation on each expert
+        for expert_idx in range(self.num_experts):
+            if tokens_per_expert[expert_idx] <= 0.1:
+                continue
+            expert_layer = self.experts[expert_idx]
+            top_x, idx = paddle.where(expert_mask[expert_idx])
+            # Index the correct hidden states and compute the expert hidden state for
+            # the current expert. We need to make sure to multiply the output hidden
+            # states by `routing_weights` on the corresponding tokens (top-1 and top-2)
+
+            current_state = hidden_states[idx, None].reshape([-1, hidden_dim])
+            current_hidden_states = expert_layer(current_state) * routing_weights[idx, top_x]
+            final_hidden_states.index_add_(
+                index=idx.reshape([-1]), axis=0, value=current_hidden_states.to(hidden_states.dtype)
+            )
+
+        final_hidden_states = final_hidden_states.reshape([batch_size, sequence_length, hidden_dim])
+        return final_hidden_states, router_logits
 
 
 class Qwen3MoeDecoderLayer(nn.Layer):
