@@ -31,8 +31,10 @@ import paddle
 import paddle.distributed as dist
 from paddle.distributed import fleet
 
+from ..utils.env import PREFIX_CHECKPOINT_DIR
 from ..utils.fault_tolerance import is_ft_env
 from ..utils.log import logger
+from ..utils.pdc_sdk import FLASH_DEVICE
 from .trainer_utils import (
     IntervalStrategy,
     OptimizerNames,
@@ -160,6 +162,8 @@ class TrainingArguments:
             The end LR used in the polynomial scheduler.
         power (`float`, *optional*, defaults to 1.0):
             The power factor used in the polynomial scheduler.
+        min_lr (`float`, *optional*, defaults to 0.0):
+            The minimum learning rate used in the cosine scheduler.
 
         log_on_each_node (`bool`, *optional*, defaults to `True`):
             In multinode distributed training, whether to log using `log_level` once per node, or only on the main
@@ -463,6 +467,7 @@ class TrainingArguments:
     num_cycles: float = field(default=0.5, metadata={"help": "The number of waves in the cosine scheduler."})
     lr_end: float = field(default=1e-7, metadata={"help": "The end LR in the polynomial scheduler."})
     power: float = field(default=1.0, metadata={"help": "The power factor in the polynomial scheduler."})
+    min_lr: float = field(default=0.0, metadata={"help": "The minimum learning rate in cosine scheduler."})
 
     log_on_each_node: bool = field(
         default=True,
@@ -808,6 +813,7 @@ class TrainingArguments:
 
     local_rank: int = field(default=-1, metadata={"help": "For distributed training: local_rank"})
 
+    dataloader_shuffle: bool = field(default=True, metadata={"help": "Whether to shuffle the train dataloder."})
     dataloader_drop_last: bool = field(
         default=False, metadata={"help": "Drop the last incomplete batch if it is not divisible by the batch size."}
     )
@@ -994,6 +1000,40 @@ class TrainingArguments:
     save_sharding_stage1_model_include_freeze_params: Optional[bool] = field(
         default=False, metadata={"help": "Save Sharding Stage1 Model Exclude Freeze Params"}
     )
+    enable_zero_cost_checkpoint: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Enable Flash Save Mode"},
+    )
+    zcc_workers_num: Optional[int] = field(
+        default=3,
+        metadata={
+            "help": "The workers num for zero cost checkpoint save mode. Increase to gain performance but cost more memory and cpu usage."
+        },
+    )
+    zcc_pipeline_hooks_capacity_usage: Optional[float] = field(
+        default=0.6,
+        metadata={
+            "help": "Set pipeline hook capacity usage ratio. Lower value brings faster save speed but may effect calculation speed."
+        },
+    )
+    zcc_save_ema_coef: Optional[float] = field(
+        default=None,
+        metadata={
+            "help": "The coefficient of EMA parameters in zero cost checkpoint save mode. if set to 0, skip EMA process"
+        },
+    )
+    zcc_ema_interval: Optional[int] = field(
+        default=1,
+        metadata={"help": "Interval between updating EMA parameters."},
+    )
+    save_tokenizer: Optional[bool] = field(
+        default=True,
+        metadata={"help": "Save tokenizer to output_dir."},
+    )
+    save_rng_states: Optional[bool] = field(
+        default=True,
+        metadata={"help": "Save rng states to output_dir."},
+    )
     pdc_download_ckpt: Optional[bool] = field(
         default=False,
         metadata={"help": "Download checkpoint in paddlecloud longjob environment"},
@@ -1010,8 +1050,17 @@ class TrainingArguments:
         default=0,
         metadata={"help": "The id of the padding token."},
     )
+    flash_device_save_steps: Optional[int] = field(
+        default=0,
+        metadata={"help": "Save checkpoints on flash device every this many steps. Default is 0 which disables it"},
+    )
+    split_norm_comm: Optional[bool] = field(
+        default=False,
+        metadata={"help": "是否开启单路sharding时global norm通信拆分全局通信组为pp通信和mp通信分别做"},
+    )
 
     def __post_init__(self):
+        world_size = paddle.distributed.get_world_size()
         if in_auto_parallel_align_mode():
             self.max_grad_norm = 0.0
             os.environ["FLAGS_max_inplace_grad_add"] = "65536"
@@ -1108,118 +1157,7 @@ class TrainingArguments:
         if self.optim == OptimizerNames.ADAMW_MINI and self.tensor_parallel_degree > 1:
             raise ValueError("AdamW Mini currently doesn't support tensor parallelism.")
 
-        self.use_hybrid_parallel = False
-
-        if isinstance(self.sharding, bool):
-            self.sharding = "stage1" if self.sharding else ""
-        if isinstance(self.sharding, str):
-            self.sharding = [ShardingOption(s) for s in self.sharding.split()]
-        if self.sharding == [ShardingOption.OFFLOAD]:
-            raise ValueError(
-                "`--sharding offload` can't work on its own. It needs to be added to `--sharding stage2` or "
-                '`--sharding stage3`. For example, `--sharding "stage2 offload"`.'
-            )
-        elif len(self.sharding) > (ShardingOption.OFFLOAD in self.sharding) + 1:
-            raise ValueError("`--sharding` recived too many arguments.")
-
-        if self.sharding_degree > 0:
-            warnings.warn("`sharding_degree` is deprecated, please use `sharding_parallel_degree`")
-            self.sharding_parallel_degree = max(self.sharding_degree, self.sharding_parallel_degree)
-        self.data_parallel_degree = 1
-
-        delattr(self, "sharding_degree")
-
-        if len(self.sharding) == 0 and self.sharding_parallel_degree > 0:
-            warnings.warn("`--sharding_parallel_degree` is useful only when `--sharding` is specified.")
-
-        world_size = paddle.distributed.get_world_size()
-
-        if world_size > 1:
-            tensor_parallel_degree = max(self.tensor_parallel_degree, 1)
-            sep_parallel_degree = max(self.sep_parallel_degree, 1)
-            context_parallel_degree = max(self.context_parallel_degree, 1)
-            pipeline_parallel_degree = max(self.pipeline_parallel_degree, 1)
-            expert_parallel_degree = max(self.expert_parallel_degree, 1)
-            expert_tensor_parallel_degree = max(self.expert_tensor_parallel_degree, 1)
-
-            # TODO(@gexiao): support expert_tensor_parallel_degree > 1 in the future
-            assert (
-                expert_tensor_parallel_degree == 1
-            ), f"Currently only support expert_tensor_parallel_degree=1, but got expert_tensor_parallel_degree of {expert_tensor_parallel_degree}"
-
-            assert (
-                world_size % (self.tensor_parallel_degree * self.pipeline_parallel_degree) == 0
-            ), f"Total world_size:{world_size} shoule be devided by tensor_parallel_degree: {self.tensor_parallel_degree} and pipeline_parallel_degree: {self.pipeline_parallel_degree}."
-
-            assert not (
-                sep_parallel_degree > 1 and context_parallel_degree > 1
-            ), f"sep parallel and context parallel cannot be used together, sep_parallel_degree:{sep_parallel_degree}, context_parallel_degree:{context_parallel_degree}."
-
-            if self.sharding_parallel_degree == -1:
-                if len(self.sharding) > 0:
-                    self.sharding_parallel_degree = world_size // (
-                        tensor_parallel_degree
-                        * sep_parallel_degree
-                        * context_parallel_degree
-                        * pipeline_parallel_degree
-                    )
-
-            sharding_parallel_degree = max(self.sharding_parallel_degree, 1)
-            if sharding_parallel_degree == 1 and len(self.sharding) > 0:
-                logger.warning("sharding_parallel_degree=1 means no sharding, please set sharding to empty!")
-                self.sharding = []
-
-            if sharding_parallel_degree > 1:
-                assert (
-                    sharding_parallel_degree % expert_parallel_degree == 0
-                ), f"sharding_parallel_degree should be divided by expert_parallel_degree, current sharding_parallel_degree: {sharding_parallel_degree}, expert_parallel_degree: {expert_parallel_degree}."
-
-            self.data_parallel_degree = world_size // (
-                sharding_parallel_degree
-                * tensor_parallel_degree
-                * sep_parallel_degree
-                * context_parallel_degree
-                * pipeline_parallel_degree
-            )
-
-            assert not (
-                self.data_parallel_degree > 1 and expert_parallel_degree > 1
-            ), f"Currently only support use expert_data_parallel strategy together with sharding_parallel strategy, but not with data_parallel strategy. Currently data_parallel_degree is {self.data_parallel_degree}."
-
-            if (
-                sharding_parallel_degree > 1
-                or tensor_parallel_degree > 1
-                or pipeline_parallel_degree > 1
-                or self.sep_parallel_degree > 1
-                or self.context_parallel_degree > 1
-                or expert_parallel_degree > 1
-                or expert_tensor_parallel_degree > 1
-            ):
-                self.use_hybrid_parallel = True
-                self.sharding_parallel_degree = sharding_parallel_degree
-                self.tensor_parallel_degree = tensor_parallel_degree
-                self.pipeline_parallel_degree = pipeline_parallel_degree
-                self.sep_parallel_degree = sep_parallel_degree
-                self.context_parallel_degree = context_parallel_degree
-                self.expert_parallel_degree = expert_parallel_degree
-                self.expert_tensor_parallel_degree = expert_tensor_parallel_degree
-
-            if not self.use_hybrid_parallel:
-                self.sharding = []
-                self.sharding_parallel_degree = -1
-                self.tensor_parallel_degree = -1
-                self.pipeline_parallel_degree = -1
-                self.sep_parallel_degree = -1
-                self.context_parallel_degree = -1
-                self.expert_parallel_degree = -1
-                self.expert_tensor_parallel_degree = -1
-
-        if self.hybrid_parallel_topo_order is None:
-            self.hybrid_parallel_topo_order = "pp_first"
-        assert self.hybrid_parallel_topo_order in ["pp_first", "sharding_first"]
-
-        if self.use_hybrid_parallel and self.enable_auto_parallel:
-            self.use_hybrid_parallel = False
+        self._post_init_parallel_degree()
 
         if self.to_static:
             assert world_size == 1 or self.enable_auto_parallel, (
@@ -1272,6 +1210,8 @@ class TrainingArguments:
                                 "best_unbalanced_scheduler",
                                 "enable_offload_queue",
                                 "use_dualpipev",
+                                "forward_backward_overlap_scheduler",
+                                "enable_dynamic_shape",
                             ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
@@ -1320,6 +1260,9 @@ class TrainingArguments:
                         "best_unbalanced_scheduler": "best_unbalanced_scheduler" in pipeline_parallel_config,
                         "enable_offload_queue": "enable_offload_queue" in pipeline_parallel_config,
                         "use_dualpipev": "use_dualpipev" in pipeline_parallel_config,
+                        "forward_backward_overlap_scheduler": "forward_backward_overlap_scheduler"
+                        in pipeline_parallel_config,
+                        "enable_dynamic_shape": "enable_dynamic_shape" in pipeline_parallel_config,
                     }
                     if dygraph_pp_configs["dp_comm_overlap"]:
                         raise ValueError("overlap has accuracy issue")  # TODO: fix `overalap` + `delay_scale` issue
@@ -1449,6 +1392,15 @@ class TrainingArguments:
                         "sharding_degree": self.sharding_parallel_degree,
                         "order": order,
                     }
+
+                try:
+                    if self.split_norm_comm:
+                        hybrid_configs["split_norm_comm"] = True
+                except (KeyError, AttributeError):
+                    warnings.warn(
+                        "The split_norm_comm is not supported "
+                        "by current version of Paddle. Please try latest develop Paddle."
+                    )
 
                 if self.pipeline_parallel_degree > 1:
                     hybrid_configs["pp_configs"] = dygraph_pp_configs
@@ -1920,12 +1872,158 @@ class TrainingArguments:
             self.refined_recompute = refined_recompute_dict
 
         # process fault tolerance settings
-        if not is_ft_env():
+        if is_ft_env():
+            pdc_zcc_init_step = os.getenv("PDC_FC_INIT_STEP")
+            if pdc_zcc_init_step is not None and int(pdc_zcc_init_step) > 0:
+                self.resume_from_checkpoint = os.path.join(
+                    FLASH_DEVICE, f"{PREFIX_CHECKPOINT_DIR}-{pdc_zcc_init_step}"
+                )
+                logger.warning(
+                    f"PDC_FC_INIT_STEP {pdc_zcc_init_step} has been specified, automatically resume from FLASH_DEVICE: {self.resume_from_checkpoint}"
+                )
+            if self.flash_device_save_steps > 0:
+                assert (
+                    self.enable_zero_cost_checkpoint
+                ), "flash_device_save_steps should only be set in zero cost checkpoint save mode with flash device mounted."
+        else:
             if self.pdc_download_ckpt:
                 logger.warning(
                     "pdc_download_ckpt can only be set as true inside FT environment. Automatically disable it now."
                 )
                 self.pdc_download_ckpt = False
+            if self.flash_device_save_steps > 0:
+                logger.warning(
+                    "flash_device_save_steps is only recommended to be set inside FT environment. Automatically disable it now."
+                )
+                self.flash_device_save_steps = 0
+
+        assert (
+            self.flash_device_save_steps % self.zcc_ema_interval == 0
+        ), f"flash_device_save_steps[{self.flash_device_save_steps}] must be divisible by zcc_ema_interval[{self.zcc_ema_interval}]"
+        assert (
+            self.save_steps % self.zcc_ema_interval == 0
+        ), f"save_steps[{self.save_steps}] must be divisible by zcc_ema_interval[{self.zcc_ema_interval}]"
+        if self.zcc_save_ema_coef is not None:
+            assert (
+                self.zcc_workers_num == 1
+            ), "EMA function in zero cost checkpoint mode does not support zcc_workers_num > 1 for now."
+
+    def _post_init_parallel_degree(self):
+        self.use_hybrid_parallel = False
+
+        if isinstance(self.sharding, bool):
+            self.sharding = "stage1" if self.sharding else ""
+        if isinstance(self.sharding, str):
+            self.sharding = [ShardingOption(s) for s in self.sharding.split()]
+        if self.sharding == [ShardingOption.OFFLOAD]:
+            raise ValueError(
+                "`--sharding offload` can't work on its own. It needs to be added to `--sharding stage2` or "
+                '`--sharding stage3`. For example, `--sharding "stage2 offload"`.'
+            )
+        elif len(self.sharding) > (ShardingOption.OFFLOAD in self.sharding) + 1:
+            raise ValueError("`--sharding` recived too many arguments.")
+
+        if self.sharding_degree > 0:
+            warnings.warn("`sharding_degree` is deprecated, please use `sharding_parallel_degree`")
+            self.sharding_parallel_degree = max(self.sharding_degree, self.sharding_parallel_degree)
+        self.data_parallel_degree = 1
+
+        try:
+            delattr(self, "sharding_degree")
+        except AttributeError:
+            pass
+
+        if len(self.sharding) == 0 and self.sharding_parallel_degree > 0:
+            warnings.warn("`--sharding_parallel_degree` is useful only when `--sharding` is specified.")
+
+        world_size = paddle.distributed.get_world_size()
+
+        if world_size > 1:
+            tensor_parallel_degree = max(self.tensor_parallel_degree, 1)
+            sep_parallel_degree = max(self.sep_parallel_degree, 1)
+            context_parallel_degree = max(self.context_parallel_degree, 1)
+            pipeline_parallel_degree = max(self.pipeline_parallel_degree, 1)
+            expert_parallel_degree = max(self.expert_parallel_degree, 1)
+            expert_tensor_parallel_degree = max(self.expert_tensor_parallel_degree, 1)
+
+            # TODO(@gexiao): support expert_tensor_parallel_degree > 1 in the future
+            assert (
+                expert_tensor_parallel_degree == 1
+            ), f"Currently only support expert_tensor_parallel_degree=1, but got expert_tensor_parallel_degree of {expert_tensor_parallel_degree}"
+
+            assert (
+                world_size % (self.tensor_parallel_degree * self.pipeline_parallel_degree) == 0
+            ), f"Total world_size:{world_size} shoule be devided by tensor_parallel_degree: {self.tensor_parallel_degree} and pipeline_parallel_degree: {self.pipeline_parallel_degree}."
+
+            assert not (
+                sep_parallel_degree > 1 and context_parallel_degree > 1
+            ), f"sep parallel and context parallel cannot be used together, sep_parallel_degree:{sep_parallel_degree}, context_parallel_degree:{context_parallel_degree}."
+
+            if self.sharding_parallel_degree == -1:
+                if len(self.sharding) > 0:
+                    self.sharding_parallel_degree = world_size // (
+                        tensor_parallel_degree
+                        * sep_parallel_degree
+                        * context_parallel_degree
+                        * pipeline_parallel_degree
+                    )
+
+            sharding_parallel_degree = max(self.sharding_parallel_degree, 1)
+            if sharding_parallel_degree == 1 and len(self.sharding) > 0:
+                logger.warning("sharding_parallel_degree=1 means no sharding, please set sharding to empty!")
+                self.sharding = []
+
+            if sharding_parallel_degree > 1:
+                assert (
+                    sharding_parallel_degree % expert_parallel_degree == 0
+                ), f"sharding_parallel_degree should be divided by expert_parallel_degree, current sharding_parallel_degree: {sharding_parallel_degree}, expert_parallel_degree: {expert_parallel_degree}."
+
+            self.data_parallel_degree = world_size // (
+                sharding_parallel_degree
+                * tensor_parallel_degree
+                * sep_parallel_degree
+                * context_parallel_degree
+                * pipeline_parallel_degree
+            )
+
+            assert not (
+                self.data_parallel_degree > 1 and expert_parallel_degree > 1
+            ), f"Currently only support use expert_data_parallel strategy together with sharding_parallel strategy, but not with data_parallel strategy. Currently data_parallel_degree is {self.data_parallel_degree}."
+
+            if (
+                sharding_parallel_degree > 1
+                or tensor_parallel_degree > 1
+                or pipeline_parallel_degree > 1
+                or self.sep_parallel_degree > 1
+                or self.context_parallel_degree > 1
+                or expert_parallel_degree > 1
+                or expert_tensor_parallel_degree > 1
+            ):
+                self.use_hybrid_parallel = True
+                self.sharding_parallel_degree = sharding_parallel_degree
+                self.tensor_parallel_degree = tensor_parallel_degree
+                self.pipeline_parallel_degree = pipeline_parallel_degree
+                self.sep_parallel_degree = sep_parallel_degree
+                self.context_parallel_degree = context_parallel_degree
+                self.expert_parallel_degree = expert_parallel_degree
+                self.expert_tensor_parallel_degree = expert_tensor_parallel_degree
+
+            if not self.use_hybrid_parallel:
+                self.sharding = []
+                self.sharding_parallel_degree = -1
+                self.tensor_parallel_degree = -1
+                self.pipeline_parallel_degree = -1
+                self.sep_parallel_degree = -1
+                self.context_parallel_degree = -1
+                self.expert_parallel_degree = -1
+                self.expert_tensor_parallel_degree = -1
+
+        if self.hybrid_parallel_topo_order is None:
+            self.hybrid_parallel_topo_order = "pp_first"
+        assert self.hybrid_parallel_topo_order in ["pp_first", "sharding_first"]
+
+        if self.use_hybrid_parallel and self.enable_auto_parallel:
+            self.use_hybrid_parallel = False
 
     def add_moe_comm_group(self):
         hcg = fleet.get_hybrid_communicate_group()

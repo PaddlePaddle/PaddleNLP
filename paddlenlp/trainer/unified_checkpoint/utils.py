@@ -374,7 +374,8 @@ def merge_tensor_parallel_with_shard(state_dict, tp_actions, all_filter_keys):
             if key not in state_dict:
                 continue
             tensor = state_dict[key]
-            if key in tp_actions:
+            mp_moe = getattr(tensor, "mp_moe", False)
+            if key in tp_actions and not mp_moe:
                 # Get tensor size
                 tensor_bytes = tensor.numel().item() * dtype_byte_size(tensor.dtype) * tp_group.nranks
                 if tensor_bytes >= 5 * 1024 * 1024 * 1024:  # temporarily set 5GB as threshold
@@ -402,7 +403,7 @@ def merge_tensor_parallel_with_shard(state_dict, tp_actions, all_filter_keys):
     return state_dict_to_save
 
 
-def merge_tensor_parallel_for_optimizer(state_dict, tp_actions, all_filter_keys):
+def merge_tensor_parallel_for_optimizer(state_dict, model_state_dict, tp_actions, all_filter_keys):
     """
     Merge tensor parallel according to tp_actions, used for master_weight and optimizer weight.
     """
@@ -422,7 +423,8 @@ def merge_tensor_parallel_for_optimizer(state_dict, tp_actions, all_filter_keys)
             if filter_keys[i] not in state_dict:
                 continue
             tensor = state_dict[filter_keys[i]]
-            if model_key in tp_actions:
+            mp_moe = getattr(model_state_dict[model_key], "mp_moe", False)
+            if model_key in tp_actions and not mp_moe:
                 # for example: beta1, beta2
                 if tensor.numel().item() == 1:
                     if is_dst:
@@ -471,12 +473,12 @@ def filter_params(model_to_save, state_dict, args, is_optimizer=False):
     filter_tensor_list = [[] for _ in range(tp_size)]
     is_master_weights = False
 
+    model_state_dict = get_expected_state_dict(model_to_save)
     if tp_rank == 0:
         quant = False
         if args.ckpt_quant_stage != "O0":
             quant = True
         tensor_bytes_dict = {}
-        model_state_dict = get_expected_state_dict(model_to_save)
         for (k, v) in state_dict.items():
             # master weight has same key as model weight
             if not is_master_weights and k in model_state_dict:
@@ -484,19 +486,21 @@ def filter_params(model_to_save, state_dict, args, is_optimizer=False):
 
             weight_key = k.split("/")[0]
             model_v = model_state_dict[weight_key] if is_optimizer else v
-            if not quant or not is_optimizer:
-                if hasattr(model_v, "is_distributed") and model_v.is_distributed:
-                    tensor_bytes_dict[k] = v.numel().item() * tp_size * dtype_byte_size(v.dtype)
+            mp_moe = getattr(model_v, "mp_moe", False)
+            if not mp_moe:
+                if not quant or not is_optimizer:
+                    if hasattr(model_v, "is_distributed") and model_v.is_distributed:
+                        tensor_bytes_dict[k] = v.numel().item() * tp_size * dtype_byte_size(v.dtype)
+                    else:
+                        tensor_bytes_dict[k] = v.numel().item() * dtype_byte_size(v.dtype)
                 else:
-                    tensor_bytes_dict[k] = v.numel().item() * dtype_byte_size(v.dtype)
-            else:
-                if weight_key not in tensor_bytes_dict:
-                    tensor_bytes_dict[weight_key] = 0
+                    if weight_key not in tensor_bytes_dict:
+                        tensor_bytes_dict[weight_key] = 0
 
-                if hasattr(model_v, "is_distributed") and model_v.is_distributed:
-                    tensor_bytes_dict[weight_key] += v.numel().item() * tp_size * dtype_byte_size(v.dtype)
-                else:
-                    tensor_bytes_dict[weight_key] += v.numel().item() * dtype_byte_size(v.dtype)
+                    if hasattr(model_v, "is_distributed") and model_v.is_distributed:
+                        tensor_bytes_dict[weight_key] += v.numel().item() * tp_size * dtype_byte_size(v.dtype)
+                    else:
+                        tensor_bytes_dict[weight_key] += v.numel().item() * dtype_byte_size(v.dtype)
 
         filter_tensor_list = []
         current_block = []
@@ -538,7 +542,18 @@ def filter_params(model_to_save, state_dict, args, is_optimizer=False):
         group=tp_group,
     )
 
-    return filter_tensor_list
+    # deal with expert parameters in model parallel group.
+    for (k, v) in state_dict.items():
+        weight_key = k.split("/")[0]
+        model_v = model_state_dict[weight_key] if is_optimizer else v
+        mp_moe = getattr(model_v, "mp_moe", False)
+        if mp_moe:
+            filter_tensor_list[tp_rank].append(k)
+
+    final_filter_tensor_list = []
+    dist.all_gather_object(final_filter_tensor_list, filter_tensor_list[tp_rank], group=tp_group)
+
+    return final_filter_tensor_list
 
 
 def get_sharded_file_name(args, file_name, is_optimizer=False):

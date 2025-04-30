@@ -37,25 +37,7 @@ Here we use the ziya-llama-13b-v1 model as an example to illustrate the complete
 **2.2.1 Raw Data**
 
 First download sample data:
-```shell
-wget https://paddlenlp.bj.bcebos.com/datasets/PDC_DATASETS/PRETRAIN/zh_sample.txt
-```
 
-Convert to jsonl format:
-```shell
-python trans_to_json.py \
-    --input zh_sample.txt \
-    --output zh_sample.json \
-    --workers 8
-```
-
-For large files (recommended processing method):
-```shell
-split -l 10000 zh_sample.txt -d -a 3 zh_part_
-ls zh_part_* | xargs -I {} -P 8 python trans_to_json.py --input {} --output {}.json
-cat *.json > zh_sample_all.json
-rm zh_part_*
-```
 ```
 mkdir data && cd data
 wget https://bj.bcebos.com/paddlenlp/models/transformers/data_tools/baike.txt
@@ -151,7 +133,6 @@ We can obtain the processed pre-training data through the following training scr
 ```bash
 python -u  create_pretraining_data.py \
     --model_name "idea-ccnl/ziya-llama-13b-v1" \
-    --tokenizer_name "LlamaTokenizer" \
     --data_format "JSON" \
     --input_path "/home/data/baike_sample.jsonl" \
     --append_eos \

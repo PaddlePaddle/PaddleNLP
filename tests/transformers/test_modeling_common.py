@@ -38,10 +38,9 @@ from paddlenlp.taskflow.utils import static_mode_guard
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 from paddlenlp.transformers.model_utils import PretrainedModel
-from paddlenlp.utils.env import (
+from paddlenlp.utils.env import (  # MODEL_HOME,
     CONFIG_NAME,
     LEGACY_CONFIG_NAME,
-    MODEL_HOME,
     PADDLE_INFERENCE_MODEL_SUFFIX,
     PADDLE_INFERENCE_WEIGHTS_SUFFIX,
 )
@@ -846,33 +845,6 @@ class ModelTesterPretrainedMixin:
                 loaded_model = self.base_model_class.from_pretrained(tempdirname)
 
                 check_two_model_parameter(model, loaded_model)
-
-            # 2. convert the weight file name
-            with tempfile.TemporaryDirectory() as tempdir:
-                tempdirname = str(tempdir) + "_old"
-
-                shutil.copytree(
-                    os.path.join(MODEL_HOME, model_name),
-                    tempdirname,
-                )
-
-                saved_model_state_file = os.path.join(
-                    tempdirname, self.base_model_class.resource_files_names["model_state"]
-                )
-
-                self.assertTrue(os.path.isfile(saved_model_state_file))
-
-                # rename it to the old style: name of url, eg: model_state.pdparams -> bert-base-uncased.pdparams
-                url = self.base_model_class.pretrained_resource_files_map["model_state"][model_name]
-                pretrained_resource_file_name = os.path.split(url)[-1]
-                target_file_path = os.path.join(tempdirname, pretrained_resource_file_name)
-
-                shutil.copyfile(saved_model_state_file, target_file_path)
-                os.remove(saved_model_state_file)
-
-                new_model = self.base_model_class.from_pretrained(tempdirname)
-
-                check_two_model_parameter(model, new_model)
 
 
 class DistributedTest(unittest.TestCase):

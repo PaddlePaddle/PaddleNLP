@@ -33,7 +33,10 @@ from paddlenlp.experimental.transformers.generation_utils import (
     GenerationBlockInferenceModel,
     GenerationInferenceModel,
 )
-from paddlenlp.experimental.transformers.utils import infererence_model_from_pretrained
+from paddlenlp.experimental.transformers.utils import (
+    infererence_model_from_config,
+    infererence_model_from_pretrained,
+)
 from paddlenlp.transformers import Qwen2MoeConfig, Qwen2MoePretrainedModel
 from paddlenlp.transformers.conversion_utils import split_param_func
 from paddlenlp.transformers.model_outputs import (  # CausalLMOutputWithCrossAttentions,
@@ -619,6 +622,10 @@ class Qwen2MoeForCausalLMInferenceModel(GenerationInferenceModel, Qwen2MoePretra
         return infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs)
 
     @classmethod
+    def from_config(cls, config, *args, **kwargs):
+        return infererence_model_from_config(cls, config, args, kwargs)
+
+    @classmethod
     def get_cache_kvs_shape(
         cls, config: Qwen2MoeConfig, max_batch_size: int = None, max_length: int = None
     ) -> list[list[int]]:
@@ -927,6 +934,10 @@ class Qwen2MoeForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen
         return infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs)
 
     @classmethod
+    def from_config(cls, config, *args, **kwargs):
+        return infererence_model_from_config(cls, config, args, kwargs)
+
+    @classmethod
     def get_cache_kvs_shape(
         cls, config: Qwen2MoeConfig, max_batch_size: int = None, max_length: int = None
     ) -> list[list[int]]:
@@ -975,6 +986,7 @@ class Qwen2MoeForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen
         v_quant_scales = kwargs.get("v_quant_scales", None)
         k_dequant_scales = kwargs.get("k_dequant_scales", None)
         v_dequant_scales = kwargs.get("v_dequant_scales", None)
+        excess_blocks = kwargs.get("excess_blocks", None)
 
         # speculative decoding related parameters
         draft_tokens = kwargs.get("draft_tokens", None)
@@ -996,6 +1008,7 @@ class Qwen2MoeForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen
             "v_dequant_scales": v_dequant_scales,
             "draft_tokens": draft_tokens,
             "output_padding_offset": output_padding_offset,
+            "excess_blocks": excess_blocks,
         }
         return model_inputs
 
@@ -1014,6 +1027,7 @@ class Qwen2MoeForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen
         v_quant_scales=None,
         k_dequant_scales=None,
         v_dequant_scales=None,
+        excess_blocks=None,
         draft_tokens=None,
         output_padding_offset=None,
     ):
@@ -1031,6 +1045,7 @@ class Qwen2MoeForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen
             v_quant_scales=v_quant_scales,
             k_dequant_scales=k_dequant_scales,
             v_dequant_scales=v_dequant_scales,
+            excess_blocks=excess_blocks,
             draft_tokens=draft_tokens,
             output_padding_offset=output_padding_offset,
         )

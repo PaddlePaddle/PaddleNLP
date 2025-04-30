@@ -33,6 +33,7 @@ template void EncoderWriteCacheWithRopeKernel<paddle::bfloat16, int>(
     const paddle::optional<paddle::Tensor>& cache_v_scale,
     const paddle::optional<paddle::Tensor>& cache_k_zp,
     const paddle::optional<paddle::Tensor>& cache_v_zp,
+    const paddle::optional<paddle::Tensor>& excess_blocks,
     const std::string& cache_quant_type_str,
     const int num_blocks,
     const int max_seq_len,

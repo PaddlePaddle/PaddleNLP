@@ -28,7 +28,6 @@ from paddlenlp.transformers import (
     ErnieForSequenceClassification,
     ErnieForTokenClassification,
     ErnieModel,
-    ErniePretrainedModel,
 )
 
 from ...testing_utils import slow
@@ -433,13 +432,13 @@ class ErnieModelTest(ModelTesterMixin, unittest.TestCase):
 
     @slow
     def test_model_from_pretrained(self):
-        for model_name in list(ErniePretrainedModel.pretrained_init_configuration)[:1]:
+        for model_name in list(ErnieModel.pretrained_init_configuration)[:1]:
             model = ErnieModel.from_pretrained(model_name)
             self.assertIsNotNone(model)
 
 
 class ErnieModelIntegrationTest(unittest.TestCase, ModelTesterPretrainedMixin):
-    base_model_class = ErniePretrainedModel
+    base_model_class = ErnieModel
     hf_remote_test_model_path = "PaddleCI/tiny-random-ernie"
     paddlehub_remote_test_model_path = "__internal_testing__/tiny-random-ernie"
 

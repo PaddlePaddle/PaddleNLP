@@ -41,6 +41,7 @@ import paddle.distributed as dist
 import paddle.nn as nn
 from packaging import version
 from paddle import framework
+from paddle.distributed.fleet.meta_parallel import PipelineLayer
 
 try:
     from paddle.base import core
@@ -82,17 +83,19 @@ from ..data import (
     init_dataloader_comm_group,
 )
 from ..peft import LoKrModel, LoRAModel, PrefixModelForCausalLM, ReFTModel, VeRAModel
+from ..quantization.quantization_linear import (
+    ColumnParallelQuantizationLinear,
+    QuantizationLinear,
+    RowParallelQuantizationLinear,
+)
 
-try:
-    from ..quantization.quantization_linear import QuantizationLinear
-except:
-    QuantizationLinear = None
 try:
     from paddle.distributed.fleet.utils.sequence_parallel_utils import (
         register_sequence_parallel_allreduce_hooks,
     )
 except:
     pass
+
 from ..transformers.context_parallel_utils import split_inputs_sequence_dim_load_balance
 from ..transformers.model_utils import (
     PretrainedModel,
@@ -106,19 +109,27 @@ from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatch
 from ..utils.env import (
     LOKR_WEIGHTS_NAME,
     LORA_WEIGHTS_NAME,
+    MODEL_META_NAME,
     PADDLE_MASTER_WEIGHTS_INDEX_NAME,
+    PADDLE_OPTIMIZER_NAME,
     PADDLE_PEFT_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_NAME,
+    PREFIX_CHECKPOINT_DIR,
     PREFIX_WEIGHTS_NAME,
     SAFE_MASTER_WEIGHTS_INDEX_NAME,
     SAFE_PEFT_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_INDEX_NAME,
+    SCALER_NAME,
+    SCHEDULER_NAME,
+    TRAINER_STATE_NAME,
+    TRAINING_ARGS_NAME,
     VERA_WEIGHTS_NAME,
 )
 from ..utils.fault_tolerance import LOSS_INF_ERROR, LOSS_NAN_ERROR
 from ..utils.import_utils import is_datasets_available, is_paddle_cuda_available
 from ..utils.log import MetricsDumper, logger
+from ..utils.pdc_sdk import FLASH_DEVICE
 from ..utils.tools import get_env_device
 from .argparser import strtobool
 from .integrations import get_reporting_integration_callbacks
@@ -133,7 +144,6 @@ from .trainer_callback import (
     TrainerState,
 )
 from .trainer_utils import (  # set_hyrbid_parallel_seed,
-    PREFIX_CHECKPOINT_DIR,
     EvalLoopOutput,
     EvalPrediction,
     IntervalStrategy,
@@ -158,6 +168,15 @@ from .training_args import TrainingArguments
 from .unified_checkpoint import UnifiedCheckpointHandler
 from .utils import reshard as reshard_util
 from .utils.async_save import AsyncSaver
+
+try:
+    from .utils.zero_cost_checkpoint import (
+        ZeroCostCheckpointCallback,
+        ZeroCostCheckpointManager,
+        get_fused_param_mappings,
+    )
+except (ImportError, ModuleNotFoundError):
+    ZeroCostCheckpointManager, get_fused_param_mappings = None, None
 from .utils.helper import (  # nested_truncate,
     broadcast_dataset_rank0_model,
     broadcast_dp_optimizer,
@@ -174,15 +193,6 @@ from .utils.sharding_io import ShardingIO
 
 DEFAULT_CALLBACKS = [DefaultFlowCallback]
 DEFAULT_PROGRESS_CALLBACK = ProgressCallback
-
-# Name of the files used for checkpointing
-TRAINING_ARGS_NAME = "training_args.bin"
-TRAINER_STATE_NAME = "trainer_state.json"
-
-OPTIMIZER_NAME = "optimizer.pdopt"
-SCHEDULER_NAME = "scheduler.pdparams"
-SCALER_NAME = "scaler.pdparams"
-
 
 if is_datasets_available():
     import datasets
@@ -372,8 +382,6 @@ class Trainer:
             )
 
         if self.args.pipeline_parallel_degree > 1 and self.args.use_hybrid_parallel:
-            from paddle.distributed.fleet.meta_parallel import PipelineLayer
-
             assert (isinstance(model, LoRAModel) and isinstance(model.model, PipelineLayer)) or isinstance(
                 model, PipelineLayer
             ), "Only support pipeline parallel mode when model is PipelineLayer!!!"
@@ -405,6 +413,36 @@ class Trainer:
 
         self._save_ckpt_func = _save_ckpt_func
         self._load_ckpt_func = dist.load_state_dict if self.args.enable_auto_parallel else paddle.load
+
+        if ZeroCostCheckpointManager is None and self.args.enable_zero_cost_checkpoint:
+            logger.warning(
+                "enable_zero_cost_checkpoint has been set as True, but paddle version is too old to support this function, please upgrade it."
+            )
+            self.args.enable_zero_cost_checkpoint = False
+
+        if self.args.enable_zero_cost_checkpoint:
+            # Currently, zero cost checkpoint only support pretraining mode with hybrid parallel enabled
+            assert (
+                not self.args.ignore_save_lr_and_optim
+            ), "ignore_save_lr_and_optim should be False when using zero cost checkpoint"
+            assert self.args.use_hybrid_parallel, "use_hybrid_parallel must be True when using zero cost checkpoint"
+            assert (
+                not self.args.unified_checkpoint
+            ), "use_unified_checkpoint should be False when using zero cost checkpoint"
+            assert not strtobool(
+                os.getenv("FLAG_LLM_PDC", "False")
+            ), "Dont support FLAG_LLM_PDC when using zero cost checkpoint"
+            assert (
+                self.args.should_save_sharding_stage1_model
+            ), "should_save_sharding_stage1_model should be True when using zero cost checkpoint"
+            assert (
+                ShardingOption.FULL_SHARD not in self.args.sharding
+            ), "FULL_SHARD is not supported when using zero cost checkpoint"
+            assert not self.args.save_tokenizer, "save_tokenizer is not supported when using zero cost checkpoint"
+            assert not self.args.save_rng_states, "save_rng_states is not supported when using zero cost checkpoint"
+
+            # init attributes for zero cost checkpoint mode
+            self.zcc_manager = None
 
         if self.args.ordered_save_group_size > 0:
             logger.info(f"using save in order, its group size is {self.args.ordered_save_group_size}")
@@ -481,7 +519,8 @@ class Trainer:
                 models=model,
                 level=self.args.fp16_opt_level,
                 dtype=self.amp_dtype,
-                excluded_layers=[QuantizationLinear] + self._decorate_exclude_layers(model),
+                excluded_layers=[QuantizationLinear, ColumnParallelQuantizationLinear, RowParallelQuantizationLinear]
+                + self._decorate_exclude_layers(model),
             )
         # for pipeline mode and pure tensor parallel
         if self.args.pipeline_parallel_degree > 1 or (self.args.tensor_parallel_degree > 1 and self.sharding is None):
@@ -720,6 +759,59 @@ class Trainer:
             self._load_from_checkpoint(resume_from_checkpoint)
         return model
 
+    def create_zcc_manager(self, unwrapped_model, resume_from_checkpoint=None):
+        """
+        Create zero cost checkpoint manager.
+        Has to be called after pipeline model is created.
+        resume_from_checkpoint: if use Flash checkpoing EMA, load previous checkpoint status
+        """
+        assert isinstance(
+            self.model, PretrainedModel
+        ), "model should be a PretrainedModel when using zero cost checkpoint"
+        logger.info("Create zero cost checkpoint manager...")
+        if isinstance(self.model, PipelineLayer):
+            pipeline_hooks_capacity = (
+                unwrapped_model.forward_pipeline_parallel_hook_capacity
+                + unwrapped_model.backward_pipeline_parallel_hook_capacity
+            )
+            self.zcc_manager = ZeroCostCheckpointManager(
+                worker_num=self.args.zcc_workers_num,
+                pipeline_hooks_capacity=pipeline_hooks_capacity,
+                capacity_usage=self.args.zcc_pipeline_hooks_capacity_usage,
+                use_expert_parallel=self.args.use_expert_parallel,
+                ema_coef=self.args.zcc_save_ema_coef,
+            )
+            for i in range(unwrapped_model.forward_pipeline_parallel_hook_capacity):
+                unwrapped_model.register_forward_pipeline_parallel_hook(
+                    location=i, hook=self.zcc_manager.zcc_pipeline_hook
+                )
+            for i in range(unwrapped_model.backward_pipeline_parallel_hook_capacity):
+                unwrapped_model.register_backward_pipeline_parallel_hook(
+                    location=i, hook=self.zcc_manager.zcc_pipeline_hook
+                )
+        else:
+            pipeline_hooks_capacity = self.args.gradient_accumulation_steps
+            self.zcc_manager = ZeroCostCheckpointManager(
+                worker_num=self.args.zcc_workers_num,
+                pipeline_hooks_capacity=pipeline_hooks_capacity,
+                capacity_usage=self.args.zcc_pipeline_hooks_capacity_usage,
+                use_expert_parallel=self.args.use_expert_parallel,
+                ema_coef=self.args.zcc_save_ema_coef,
+            )
+        _callback = ZeroCostCheckpointCallback(self.args, self.zcc_manager, self.runtime_timer, self.sharding_io)
+        self.add_callback(_callback)
+
+        if resume_from_checkpoint is not None:
+            path = _add_variant(PADDLE_OPTIMIZER_NAME, self.args.optimizer_name_suffix)
+            path = os.path.join(resume_from_checkpoint, path).replace("optimizer", "ema")
+            if os.path.exists(path):
+                logger.info(f"ZCC EMA load from {path}")
+                self.zcc_manager.set_ema_state_dict(path)
+            else:
+                logger.info(f"ZCC EMA state dict not found, in: {path}")
+
+        logger.info("Create zero cost checkpoint manager done.")
+
     def train(
         self,
         resume_from_checkpoint: Optional[Union[str, bool]] = None,
@@ -756,7 +848,11 @@ class Trainer:
                     os.makedirs(resume_from_checkpoint, exist_ok=True)
                     logger.info(f"Reset resume_from_checkpoint to temp directory : {resume_from_checkpoint}")
 
-        if resume_from_checkpoint is not None and self.args.pdc_download_ckpt:
+        if (
+            resume_from_checkpoint is not None
+            and self.args.pdc_download_ckpt
+            and FLASH_DEVICE not in resume_from_checkpoint
+        ):
             if self.is_local_process_zero():
                 download_recovery_ckpt_from_pdc(resume_from_checkpoint, self.args.pdc_download_timeout)
             if self.args.world_size > 1:
@@ -850,6 +946,9 @@ class Trainer:
             model = self.model_wrapped
             if delay_optimizer_creation:
                 self.create_optimizer_and_scheduler(num_training_steps=max_steps)
+
+        if self.args.enable_zero_cost_checkpoint:
+            self.create_zcc_manager(model, resume_from_checkpoint)
 
         logger.info(f"{self.runtime_timer.log()}")
         logger.info("***** Running training *****")
@@ -1309,6 +1408,8 @@ class Trainer:
             # Clean the state at the end of training
             delattr(self, "_past")
 
+        if self.args.enable_zero_cost_checkpoint:
+            self.zcc_manager.finalize()
         logger.info("\nTraining completed. \n")
 
         # unlink shared_memory if used.
@@ -1416,11 +1517,10 @@ class Trainer:
     def _get_train_sampler(self) -> Optional[paddle.io.Sampler]:
         if self.train_dataset is None or not has_length(self.train_dataset):
             return None
-
         if self.args.world_size <= 1:
             return paddle.io.BatchSampler(
                 dataset=self.train_dataset,
-                shuffle=True,
+                shuffle=self.args.dataloader_shuffle,
                 batch_size=self.args.per_device_train_batch_size,
                 drop_last=self.args.dataloader_drop_last,
             )
@@ -1428,7 +1528,7 @@ class Trainer:
         return DistributedBatchSampler(
             self.train_dataset,
             batch_size=self.args.per_device_train_batch_size,
-            shuffle=True,
+            shuffle=self.args.dataloader_shuffle,
             num_replicas=self.args.dataset_world_size,
             rank=self.args.dataset_rank,
             drop_last=self.args.dataloader_drop_last,
@@ -1852,6 +1952,9 @@ class Trainer:
                     return x in decay_parameters
 
             optimizer_cls, optimizer_kwargs = Trainer.get_optimizer_cls_and_kwargs(self.args)
+            if self.args.optim == OptimizerNames.AdamW_Qweight:
+                optimizer_kwargs["quantization_config"] = self.model.config.quantization_config
+
             if hasattr(optimizer_cls, "_create_master_weight") and self.args.fp16_opt_level == "O2":
                 optimizer_kwargs["multi_precision"] = True
 
@@ -1873,7 +1976,6 @@ class Trainer:
             ("_master_weights",),
             ("_accumulators_holder",),
         ]
-
         for attr in attributes:
             if all(hasattr(self.optimizer, a) for a in attr):
                 target_attr = getattr(self.optimizer, attr[0])
@@ -2010,6 +2112,11 @@ class Trainer:
 
             optimizer_cls = AdamW_16Bit
             optimizer_kwargs.update(adam_kwargs)
+        elif args.optim == OptimizerNames.AdamW_Qweight:
+            from ..utils import AdamWQweight
+
+            optimizer_cls = AdamWQweight
+            optimizer_kwargs.update(adam_kwargs)
         else:
             raise ValueError(f"Trainer cannot instantiate unsupported optimizer: {args.optim}")
         return optimizer_cls, optimizer_kwargs
@@ -2038,6 +2145,7 @@ class Trainer:
                 num_cycles=self.args.num_cycles,
                 lr_end=self.args.lr_end,
                 power=self.args.power,
+                min_lr=self.args.min_lr,
             )
 
         return self.lr_scheduler
@@ -2086,7 +2194,8 @@ class Trainer:
                 optimizers=self.optimizer,
                 level=self.args.fp16_opt_level,
                 dtype=self.amp_dtype,
-                excluded_layers=[QuantizationLinear] + self._decorate_exclude_layers(model),
+                excluded_layers=[QuantizationLinear, ColumnParallelQuantizationLinear, RowParallelQuantizationLinear]
+                + self._decorate_exclude_layers(model),
             )
 
             if self.optimizer is None:
@@ -2199,7 +2308,11 @@ class Trainer:
                 assert (
                     ShardingOption.SHARD_GRAD_OP in self.args.sharding or ShardingOption.SHARD_OP in self.args.sharding
                 ), "Only support tensor parallel + sharding stage1/stage2 hybrid parallel now."
-                model = paddle.distributed.fleet.meta_parallel.TensorParallel(model, hcg, strategy=None)
+                # NOTE: TensorParallel will be called in distributed_model when sharding stage1, so no need to call here
+                if ShardingOption.SHARD_GRAD_OP in self.args.sharding:
+                    model = paddle.distributed.fleet.meta_parallel.TensorParallel(
+                        model, hcg, strategy=fleet.fleet._user_defined_strategy
+                    )
 
             if ShardingOption.SHARD_OP in self.args.sharding:
                 if self.args.amp_master_grad:
@@ -2573,6 +2686,9 @@ class Trainer:
 
     def _save_checkpoint(self, model, metrics=None):
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
+        if self.args.enable_zero_cost_checkpoint:
+            return
+
         self.runtime_timer.start("checkpoint saving time")
 
         # Save model checkpoint
@@ -2623,20 +2739,24 @@ class Trainer:
                 "hybrid_parallel_rng_state_tracker"
             ] = fleet.meta_parallel.get_rng_state_tracker().get_states_tracker()
 
-        if self.args.world_size > 1:
-            rng_states_list = []
-            paddle.distributed.all_gather_object(rng_states_list, rng_states)
-            if self.args.should_save:
+        if self.args.save_rng_states:
+            if self.args.world_size > 1:
+                rng_states_list = []
+                paddle.distributed.all_gather_object(rng_states_list, rng_states)
+                if self.args.should_save:
+                    os.makedirs(output_dir, exist_ok=True)
+                    paddle.save(rng_states_list, os.path.join(output_dir, f"rng_state_{self.args.world_size}.pth"))
+            else:
                 os.makedirs(output_dir, exist_ok=True)
-                paddle.save(rng_states_list, os.path.join(output_dir, f"rng_state_{self.args.world_size}.pth"))
-        else:
-            os.makedirs(output_dir, exist_ok=True)
-            paddle.save(rng_states, os.path.join(output_dir, "rng_state.pth"))
+                paddle.save(rng_states, os.path.join(output_dir, "rng_state.pth"))
 
-            # only save model state dict, ignore optimizer and scheduler
+        # only save model state dict, ignore optimizer and scheduler
         if not self.args.ignore_save_lr_and_optim:
-            optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
+            optimizer_name = _add_variant(PADDLE_OPTIMIZER_NAME, self.args.optimizer_name_suffix)
             saved_signal_path = os.path.join(output_dir, f"saved_signal_{dist.get_rank()}")
+
+            if self.args.unified_checkpoint and self.args.offload_optim:
+                self._reload_optimizer()
 
             if self.args.use_hybrid_parallel:
                 if self.dp_group.rank <= 0 or self.args.use_expert_parallel:
@@ -2717,6 +2837,9 @@ class Trainer:
                             or "remove_master_weight" not in self.args.unified_checkpoint_config
                         ):
                             paddle.save(global_rank, os.path.join(signal_dir, f".master_weight.done.{global_rank}"))
+
+            if self.args.unified_checkpoint and self.args.offload_optim:
+                self._offload_optimizer()
 
         self.runtime_timer.stop()
 
@@ -2850,7 +2973,7 @@ class Trainer:
                 json.dump(save_info, f)
 
         if self.args.should_save:
-            if self.tokenizer is not None:
+            if self.tokenizer is not None and self.args.save_tokenizer:
                 self.tokenizer.save_pretrained(output_dir)
             # Good practice: save your training arguments together with the trained model
             paddle.save(self.args, os.path.join(output_dir, TRAINING_ARGS_NAME))
@@ -2955,7 +3078,11 @@ class Trainer:
                     max_shard_size="1024GB",
                 )
         if self.args.should_save_sharding_stage1_model:
-            self.sharding_io.save_distributed_model_meta(output_dir)
+            model_meta = self.sharding_io.gather_distributed_model_meta()
+            if self.args.should_save:
+                path = os.path.join(output_dir, MODEL_META_NAME)
+                with open(path, "w") as f:
+                    json.dump(model_meta, f)
 
     def _load_optimizer_and_scheduler(self, checkpoint):
         """If optimizer and scheduler states exist, load them."""
@@ -2972,7 +3099,7 @@ class Trainer:
         opt_state_dict = None
         if self.args.should_load_sharding_stage1_model:
             opt_state_dict = self.sharding_io.load_optimizer_state_with_reshard(
-                checkpoint, OPTIMIZER_NAME, self.model_wrapped
+                checkpoint, PADDLE_OPTIMIZER_NAME, self.model_wrapped
             )
         else:
             use_unified_checkpoint = False
@@ -2984,7 +3111,7 @@ class Trainer:
 
             if not use_unified_checkpoint:
                 if self.args.data_parallel_rank == 0 or self.args.use_expert_parallel:
-                    optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
+                    optimizer_name = _add_variant(PADDLE_OPTIMIZER_NAME, self.args.optimizer_name_suffix)
                     path = os.path.join(checkpoint, optimizer_name)
                     if os.path.isfile(path):
                         opt_state_dict = paddle.load(path)
@@ -3026,7 +3153,7 @@ class Trainer:
             # Load in optimizer and scheduler states
             self.optimizer.set_state_dict(opt_state_dict)
         else:
-            optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
+            optimizer_name = _add_variant(PADDLE_OPTIMIZER_NAME, self.args.optimizer_name_suffix)
             raise ValueError(f"optimizer-state-dict not found, opt: {os.path.join(checkpoint, optimizer_name)}.")
 
         if not self.args.ignore_load_lr_and_optim:

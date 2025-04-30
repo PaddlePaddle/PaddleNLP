@@ -163,7 +163,7 @@ int set_value_by_flags_and_idx(Context* ctx,
   WRAPPER_CHECK_SHAPE(ctx, &seq_lens_encoder_len, {bs});
   WRAPPER_CHECK_SHAPE(ctx, &seq_lens_decoder_len, {bs});
   WRAPPER_CHECK_SHAPE(ctx, &step_idx_len, {bs});
-  WRAPPER_CHECK_PTR(ctx, int64_t, stop_flags_len, stop_flags);
+  WRAPPER_CHECK_PTR(ctx, bool, stop_flags_len, stop_flags);
   WRAPPER_CHECK_PTR(ctx, int64_t, pre_ids_all_len, pre_ids_all);
   WRAPPER_CHECK_PTR(ctx, int64_t, input_ids_len, input_ids);
   WRAPPER_CHECK_PTR(ctx, int, seq_lens_encoder_len, seq_lens_encoder);

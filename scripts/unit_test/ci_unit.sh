@@ -16,9 +16,9 @@
 
 set -e
 export paddle=$1
+export FLAGS_enable_CE=${2-false}
 export nlp_dir=/workspace/PaddleNLP
 export log_path=/workspace/PaddleNLP/unittest_logs
-mkdir -p /workspace/PaddleNLP/coverage_report
 cd $nlp_dir
 
 if [ ! -d "unittest_logs" ];then
@@ -40,23 +40,9 @@ install_requirements() {
 
     python setup.py bdist_wheel > /dev/null
     python -m pip install  dist/p****.whl
+    python -c "from paddlenlp import __version__; print('paddlenlp version:', __version__)" >> ${log_path}/commit_info.txt
     python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)" >> ${log_path}/commit_info.txt
-    
-    # if git diff --numstat "$AGILE_COMPILE_BRANCH" | awk '{print $NF}' | grep -q '^csrc/'; then
-    #     echo "Found modifications in csrc, running setup_cuda.py install and uploading it to bos."
-    #     cd ${nlp_dir}/csrc
-    #     # python setup_cuda.py install
-    #     bash tools/build_wheel.sh
-    #     # cp ./gpu_dist/p****.whl ${PPNLP_HOME}/upload/
-    #     # cd ${PPNLP_HOME}
-    #     # python upload.py ${PPNLP_HOME}/upload 'paddlenlp/wheels'
-    #     # rm -rf upload/*
-    # else
-    #     echo "No modifications in csrc, installing paddlenlp_ops wheel file..."
-    #     python -m pip install https://paddlenlp.bj.bcebos.com/wheels/paddlenlp_ops-0.0.0-py3-none-any.whl --no-cache-dir
-    # fi
-
-    pip list 
+    python -m pip list >> ${log_path}/commit_info.txt
 }
 
 set_env() {
@@ -64,6 +50,17 @@ set_env() {
     export FLAGS_cudnn_deterministic=1
     export HF_ENDPOINT=https://hf-mirror.com
     export FLAGS_use_cuda_managed_memory=true
+    export running_time=30m
+
+    # for CE
+    if [[ ${FLAGS_enable_CE} == "true" ]];then
+        export CE_TEST_ENV=1
+        export RUN_SLOW_TEST=1
+        export PYTHONPATH=${nlp_dir}:${nlp_dir}/llm:${PYTHONPATH}
+        export running_time=5h
+    else
+        continue
+    fi
 }
 
 print_info() {
@@ -75,32 +72,59 @@ print_info() {
         cat ${log_path}/unittest_FAIL.log
         cp ${log_path}/unittest_FAIL.log ${PPNLP_HOME}/upload/unittest_FAIL.log.${AGILE_PIPELINE_BUILD_ID}.${AGILE_JOB_BUILD_ID}
         cd ${PPNLP_HOME} && python upload.py ${PPNLP_HOME}/upload 'paddlenlp/PaddleNLP_CI/PaddleNLP-CI-Unittest-GPU'
-        rm -rf upload/*
+        rm -rf upload/* && cd -
+        if [ $1 -eq 124 ]; then
+            echo "\033[32m [failed-timeout] Test case execution was terminated after exceeding the 30m limit."
+        fi
     else
         tail -n 1 ${log_path}/unittest.log
         echo -e "\033[32m ${log_path}/unittest_SUCCESS \033[0m"
     fi
 }
 
-install_requirements
+get_diff_TO_case(){
+export FLAGS_enable_CI=false
+for file_name in `git diff --numstat ${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
+    arr_file_name=(${file_name//// })
+    dir1=${arr_file_name[0]}
+    dir2=${arr_file_name[1]}
+    dir3=${arr_file_name[2]}
+    dir4=${arr_file_name[3]}
+    file_item=$dir1/$dir2/$dir3/$dir4
+    echo "file_name:"${file_name}, "dir1:"${dir1}, "dir2:"${dir2},"dir3:"${dir3},".xx:" ${file_name##*.}
+    if [ ! -f ${file_name} ];then # 针对pr删掉文件
+        continue
+    elif [[ ${file_name##*.} == "md" ]] || [[ ${file_name##*.} == "rst" ]] || [[ ${dir1} == "docs" ]];then
+        continue
+    else
+        FLAGS_enable_CI=true
+    fi
+done
+}
+get_diff_TO_case
 set_env
-cd ${nlp_dir}
-echo ' Testing all unittest cases '
-export http_proxy=${proxy} && export https_proxy=${proxy}
-set +e
-pytest -v -n 8 \
-  --dist loadgroup \
-  --retries 1 --retry-delay 1 \
-  --timeout 200 --durations 20 --alluredir=result \
-  --cov paddlenlp --cov-report xml:coverage.xml > ${log_path}/unittest.log 2>&1
-exit_code=$?
-print_info $exit_code unittest
+if [[ ${FLAGS_enable_CI} == "true" ]] || [[ ${FLAGS_enable_CE} == "true" ]];then
+    install_requirements
+    cd ${nlp_dir}
+    echo ' Testing all unittest cases '
+    export http_proxy=${proxy} && export https_proxy=${proxy}
+    set +e
+    timeout ${running_time} python -m pytest -v -n 8 \
+    --dist loadgroup \
+    --retries 1 --retry-delay 1 \
+    --timeout 200 --durations 20 --alluredir=result \
+    --cov paddlenlp --cov-report xml:coverage.xml > ${log_path}/unittest.log 2>&1
+    exit_code=$?
+    print_info $exit_code unittest
 
-cd ${nlp_dir}
-echo -e "\033[35m ---- Genrate Allure Report  \033[0m"
-unset http_proxy && unset https_proxy
-cp scripts/regression/gen_allure_report.py ./
-python gen_allure_report.py > ${nlp_dir}/coverage_report/gen_allure_report.log 2>&1
-echo -e "\033[35m ---- Report: https://xly.bce.baidu.com/ipipe/ipipe-report/report/${AGILE_JOB_BUILD_ID}/report/  \033[0m"
-
+    cd ${nlp_dir}
+    echo -e "\033[35m ---- Genrate Allure Report  \033[0m"
+    unset http_proxy && unset https_proxy
+    cp scripts/regression/gen_allure_report.py ./
+    python gen_allure_report.py > /dev/null
+    echo -e "\033[35m ---- Report: https://xly.bce.baidu.com/ipipe/ipipe-report/report/${AGILE_JOB_BUILD_ID}/report/  \033[0m"
+else
+    echo -e "\033[32m Changed Not CI case, Skips \033[0m"
+    exit_code=0
+fi
 exit $exit_code

@@ -27,7 +27,7 @@
 **方案亮点：**
 
 - **效果领先🏃：** 使用在中文领域内模型效果和模型计算效率有突出效果的 ERNIE 3.0 轻量级系列模型作为训练基座，ERNIE 3.0 轻量级系列提供多种尺寸的预训练模型满足不同需求，具有广泛成熟的实践应用性。
-- **高效调优✊：** 文本分类应用依托[TrustAI](https://github.com/PaddlePaddle/TrustAI)可信增强能力和[数据增强 API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/dataaug.md)，提供模型分析模块助力开发者实现模型分析，并提供稀疏数据筛选、脏数据清洗、数据增强等多种解决方案。
+- **高效调优✊：** 文本分类应用依托[TrustAI](https://github.com/PaddlePaddle/TrustAI)可信增强能力和[数据增强 API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/zh/dataaug.md)，提供模型分析模块助力开发者实现模型分析，并提供稀疏数据筛选、脏数据清洗、数据增强等多种解决方案。
 - **简单易用👶：** 开发者**无需机器学习背景知识**，仅需提供指定格式的标注分类数据，一行命令即可开启文本分类训练，轻松完成上线部署，不再让技术成为文本分类的门槛。
 
 **更多选择：**
@@ -73,7 +73,7 @@ rm divorce.tar.gz
 
 **安装 PaddleNLP：**
 
-安装 PaddleNLP 默认开启百度镜像源来加速下载，如果您使用 HTTP 代理可以关闭(删去 -i https://mirror.baidu.com/pypi/simple)，更多关于 PaddleNLP 安装的详细教程请查见[PaddleNLP 快速安装](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/get_started/installation.rst)。
+安装 PaddleNLP 默认开启百度镜像源来加速下载，如果您使用 HTTP 代理可以关闭(删去 -i https://mirror.baidu.com/pypi/simple)，更多关于 PaddleNLP 安装的详细教程请查见[PaddleNLP 快速安装](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/zh/get_started/installation.rst)。
 ```shell
 python3 -m pip install --upgrade paddlenlp -i https://mirror.baidu.com/pypi/simple
 ```
@@ -301,7 +301,7 @@ support3 text: 2014年4月，被告外出务工，双方分居至今。    label
 ...
 ```
 
-**数据优化：** 结合[TrustAI](https://github.com/PaddlePaddle/TrustAI)和[数据增强 API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/dataaug.md)提供了**稀疏数据筛选、脏数据清洗、数据增强**三种优化策略，从多角度优化训练数据提升模型效果，策略细节详见[训练评估与模型优化指南](analysis/README.md)。
+**数据优化：** 结合[TrustAI](https://github.com/PaddlePaddle/TrustAI)和[数据增强 API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/zh/dataaug.md)提供了**稀疏数据筛选、脏数据清洗、数据增强**三种优化策略，从多角度优化训练数据提升模型效果，策略细节详见[训练评估与模型优化指南](analysis/README.md)。
 
 - 稀疏数据筛选主要是解决数据不均衡、训练数据覆盖不足的问题，通过数据增强和数据标注两种方式解决这一问题。
 - 脏数据清洗可以帮助开发者筛选训练集中错误标注的数据，对这些数据重新进行人工标注，得到标注正确的数据再重新进行训练。
@@ -361,7 +361,7 @@ export/
 
 #### 2.5.2 模型裁剪
 
-如果有模型部署上线的需求，需要进一步压缩模型体积，可以使用 PaddleNLP 的 [压缩 API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/compression.md), 一行命令即可启动模型裁剪。
+如果有模型部署上线的需求，需要进一步压缩模型体积，可以使用 PaddleNLP 的 [压缩 API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/zh/compression.md), 一行命令即可启动模型裁剪。
 
 使用裁剪功能需要安装 paddleslim：
 

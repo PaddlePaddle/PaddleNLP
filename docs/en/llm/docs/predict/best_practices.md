@@ -35,3 +35,6 @@ PaddleNLP provides multiple environment variables to optimize inference performa
 
 **MLA-related Optimizations**
 - `FLAGS_mla_use_tensorcore`: Whether to use tensor core implementation for MLA computation, default is True (only supported on Hopper architecture GPUs). When False, uses CUDA core implementation (supports both Ampere and Hopper architectures).
+
+**allreduce Optimizations**
+- `FLAGS_custom_allreduce`：Whether to use high-performance custom allreduce implementation for multi-card inference calculations. The default value is False.

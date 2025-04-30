@@ -279,10 +279,11 @@ class GLMModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
         for model_name in GLM_PRETRAINED_MODEL_ARCHIVE_LIST[:1]:
             model = GLMModel.from_pretrained(model_name)
             tokenizer = GLMTokenizer.from_pretrained(model_name)
-            tokens = tokenizer._encode("hello world [MASK]")
-            input_ids, _, _, position_ids, attention_mask, _, _ = tokenizer.build_input_from_ids(
-                text_a_ids=tokens, tokenizer=tokenizer
-            )
+            tokens = tokenizer("hello world [MASK]")
+            input_ids = tokens["input_ids"]
+            position_ids = tokens["position_ids"]
+            attention_mask = tokens["attention_mask"]
+
             input_ids = paddle.to_tensor([input_ids])
             position_ids = paddle.to_tensor([position_ids])
             attention_mask = paddle.to_tensor([attention_mask])

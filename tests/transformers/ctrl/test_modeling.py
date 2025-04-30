@@ -15,7 +15,6 @@
 
 import unittest
 
-import paddle
 from parameterized import parameterized_class
 
 from paddlenlp.transformers import (
@@ -23,7 +22,6 @@ from paddlenlp.transformers import (
     CTRLForSequenceClassification,
     CTRLLMHeadModel,
     CTRLModel,
-    CTRLPreTrainedModel,
 )
 
 from ...testing_utils import slow
@@ -216,40 +214,7 @@ class CTRLModelTest(ModelTesterMixin, unittest.TestCase):
 
     @slow
     def test_model_from_pretrained(self):
-        for model_name in list(CTRLPreTrainedModel.pretrained_init_configuration)[:1]:
+        names = ["sshleifer-tiny-ctrl"]
+        for model_name in names:
             model = CTRLModel.from_pretrained(model_name)
             self.assertIsNotNone(model)
-
-
-class CTRLModelLanguageGenerationTest(unittest.TestCase):
-    @slow
-    def test_lm_generate_ctrl(self):
-        model = CTRLLMHeadModel.from_pretrained("ctrl")
-        input_ids = paddle.to_tensor(
-            [[11859, 0, 1611, 8]],
-        )  # Legal the president is
-        expected_output_ids = [
-            11859,
-            0,
-            1611,
-            8,
-            5,
-            150,
-            26449,
-            2,
-            19,
-            348,
-            469,
-            3,
-            2595,
-            48,
-            20740,
-            246533,
-            246533,
-            19,
-            30,
-            5,
-        ]  # Legal the president is a good guy and I don't want to lose my job. \n \n I have a
-
-        output_ids = model.generate(input_ids, do_sample=False)
-        self.assertListEqual(output_ids[0].tolist(), expected_output_ids)

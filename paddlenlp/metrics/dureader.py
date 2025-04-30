@@ -127,7 +127,7 @@ def compute_predictions(
 
             nbest.append(_NbestPrediction(text=final_text, start_logit=pred.start_logit, end_logit=pred.end_logit))
 
-        # if we didn't inlude the empty option in the n-best, inlcude it
+        # if we didn't include the empty option in the n-best, include it
 
         # In very rare edge cases we could have no valid predictions. So we
         # just create a nonce prediction in this case to avoid failure.

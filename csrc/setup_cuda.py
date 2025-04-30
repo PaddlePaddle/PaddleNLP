@@ -15,12 +15,24 @@
 import os
 import shutil
 import subprocess
+from packaging.version import parse, Version
 
 import paddle
 from paddle.utils.cpp_extension import CUDAExtension, setup
 
 sm_version = int(os.getenv("CUDA_SM_VERSION", "0"))
 
+def get_nvcc_cuda_version(cuda_dir: str) -> Version:
+    """Get the CUDA version from nvcc.
+
+    Adapted from https://github.com/NVIDIA/apex/blob/8b7a1ff183741dd8f9b87e7bafd04cfde99cea28/setup.py
+    """
+    nvcc_output = subprocess.check_output([cuda_dir + "/bin/nvcc", "-V"],
+                                          universal_newlines=True)
+    output = nvcc_output.split()
+    release_idx = output.index("release") + 1
+    nvcc_cuda_version = parse(output[release_idx].split(",")[0])
+    return nvcc_cuda_version
 
 def update_git_submodule():
     try:
@@ -105,7 +117,6 @@ sources = [
     "./gpu/step.cu",
     "./gpu/quant_int8.cu",
     "./gpu/dequant_int8.cu",
-    "./gpu/group_quant.cu",
     "./gpu/moe/preprocess_for_moe.cu",
     "./gpu/get_position_ids_and_mask_encoder_batch.cu",
     "./gpu/fused_rotary_position_encoding.cu",
@@ -118,6 +129,11 @@ sources = [
     "./gpu/speculate_decoding_kernels/ngram_match.cc",
     "./gpu/speculate_decoding_kernels/speculate_save_output.cc",
     "./gpu/speculate_decoding_kernels/speculate_get_output.cc",
+    "./gpu/save_output_dygraph.cu",
+    "./gpu/cpp_extensions.cu",
+    "./gpu/all_reduce.cu",
+    "./gpu/quantization/per_token_group_quant.cu",
+    "./gpu/quantization/per_tensor_quant_fp8.cu",
 ]
 sources += find_end_files("./gpu/speculate_decoding_kernels", ".cu")
 sources += find_end_files("./gpu/moe/fused_moe/cutlass_kernels/moe_gemm/", ".cu")
@@ -149,6 +165,7 @@ include_dirs = [
 ]
 cc = get_sm_version()
 cuda_version = float(paddle.version.cuda())
+nvcc_version = get_nvcc_cuda_version(os.environ.get("CUDA_HOME", "/usr/local/cuda"))
 
 if cc >= 80:
     sources += ["gpu/int8_gemm_with_cutlass/gemm_dequant.cu"]
@@ -174,7 +191,8 @@ if cc == 89 and cuda_version >= 12.4:
         "gpu/fp8_gemm_with_cutlass/fp8_fp8_fp8_dual_gemm.cu",
     ]
 
-if cc >= 80 and cuda_version >= 12.4:
+if cc >= 80 and nvcc_version >= Version("12.4"):
+    os.environ.pop('PADDLE_CUDA_ARCH_LIST', None)
     nvcc_compile_args += [
         "-std=c++17",
         "--use_fast_math",
@@ -183,21 +201,17 @@ if cc >= 80 and cuda_version >= 12.4:
     ]
     sources += ["./gpu/sage_attn_kernels/sageattn_fused.cu"]
     if cc >= 80 and cc < 89:
-        sources += [
-            "./gpu/sage_attn_kernels/sageattn_qk_int_sv_f16_kernel_sm80.cu"
-        ]
-        nvcc_compile_args += ["-gencode", f"arch=compute_80,code=compute_80"]
+        sources += ["./gpu/sage_attn_kernels/sageattn_qk_int_sv_f16_kernel_sm80.cu"]
+        nvcc_compile_args += ["-gencode", "arch=compute_80,code=compute_80"]
     elif cc >= 89 and cc < 90:
-        sources += [
-            "./gpu/sage_attn_kernels/sageattn_qk_int_sv_f8_kernel_sm89.cu"
-        ]
-        nvcc_compile_args += ["-gencode", f"arch=compute_89,code=compute_89"]
+        sources += ["./gpu/sage_attn_kernels/sageattn_qk_int_sv_f8_kernel_sm89.cu"]
+        nvcc_compile_args += ["-gencode", "arch=compute_89,code=compute_89"]
     elif cc >= 90:
         sources += [
             "./gpu/sage_attn_kernels/sageattn_qk_int_sv_f8_kernel_sm90.cu",
-            "./gpu/sage_attn_kernels/sageattn_qk_int_sv_f8_dsk_kernel_sm90.cu"
+            "./gpu/sage_attn_kernels/sageattn_qk_int_sv_f8_dsk_kernel_sm90.cu",
         ]
-        nvcc_compile_args += ["-gencode", f"arch=compute_90a,code=compute_90a"]
+        nvcc_compile_args += ["-gencode", "arch=compute_90a,code=compute_90a"]
 
 if cc >= 90 and cuda_version >= 12.0:
     os.system("python utils/auto_gen_fp8_fp8_gemm_fused_kernels_sm90.py --cuda_arch 90")
@@ -220,7 +234,10 @@ setup(
     name=ops_name,
     ext_modules=CUDAExtension(
         sources=sources,
-        extra_compile_args={"cxx": ["-O3", "-fopenmp", "-lgomp", "-std=c++17", "-DENABLE_BF16"], "nvcc": nvcc_compile_args},
+        extra_compile_args={
+            "cxx": ["-O3", "-fopenmp", "-lgomp", "-std=c++17", "-DENABLE_BF16"],
+            "nvcc": nvcc_compile_args,
+        },
         libraries=["cublasLt"],
         library_dirs=library_path,
         include_dirs=include_dirs,

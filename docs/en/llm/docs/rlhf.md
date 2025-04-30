@@ -239,7 +239,7 @@ Most parameters in `ppo_argument.json` share the same definitions as [LLM Fine-t
 - `reward_critic_model_name_or_path`: Model name or path for the critic-model. If not provided, `reward_model_name_or_path` will be used to initialize the critic-model.
 - `per_device_prompt_batch_size`: Batch size per device for prompt-only dataset loading during rollout generation in training.
 - `per_device_train_batch_size`: Batch size per device for generation and training based on prompts.
-- `num_return_sequences`: Number of responses generated per prompt during generation.
+- `rollout_n`: Number of responses generated per prompt during generation.
 `GenerationConfig.num_return_sequences`, all responses will be used for training.
 - `temperature`: The `temperature` used in generation sampling, i.e., `GenerationConfig.temperature`.
 - `top_p`: The top-p-filtering threshold used in generation sampling, i.e., `GenerationConfig.top_p`.

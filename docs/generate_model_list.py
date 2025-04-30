@@ -21,42 +21,34 @@ MODEL_ROOT = "/xx/bos/community/"
 URL_BASE = "https://paddlenlp.bj.bcebos.com/models/community/"
 OUTPUT_DIR = "./website"
 
+# Markdown templates
 MAIN_TEMPLATE = """
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Model Downloads</title>
-</head>
-<body>
-    <h1>Available Models</h1>
-    <ul>
-        {% for model in models %}
-        <li><a href="{{ model }}/index.html">{{ model }}</a></li>
-        {% endfor %}
-    </ul>
-</body>
-</html>
+# Model Downloads
+
+## Available Models
+
+{% for model in models %}
+- [{{ model }}]({{ model }}/index.md)
+{% endfor %}
 """
 
 MODEL_TEMPLATE = """
-<!DOCTYPE html>
-<html>
-<head>
-    <title>{{ model_name }}</title>
-</head>
-<body>
-    <h1>{{ model_name }} Files</h1>
-    <ul>
-        {% for file in files %}
-        <li>
-            <a href="{{ model_path }}/{{ file.name }}" download>{{ file.name }}</a>
-            <span>({{ file.size }})</span>
-        </li>
-        {% endfor %}
-    </ul>
-    <p><a href="../../">Back to Main</a></p>
-</body>
-</html>
+# {{ model_name }}
+---
+
+{% if readme_content %}
+## README([From Huggingface]({{ huggingface_url }}))
+
+{{ readme_content }}
+
+{% endif %}
+
+## Model Files
+{% for file in files %}
+- [{{ file.name }}]({{ model_path }}/{{ file.name }}) ({{ file.size }})
+{% endfor %}
+
+[Back to Main]({{back_to_main_path}})
 """
 
 
@@ -69,16 +61,54 @@ def convert_size(size_bytes):
     return f"{size_bytes:.1f} {units[unit_index]}"
 
 
+def process_image_links(text, model_path):
+    image_link_pattern = re.compile(r"!\[.*?\]\((.*?)\)")
+
+    image_links = image_link_pattern.findall(text)
+    for i, link in enumerate(image_links):
+        if not link.startswith(("http://", "https://", "/")):
+            prefix = f"https://huggingface.co/{model_path}/resolve/main/"
+            image_links[i] = prefix + link
+
+    def replace_link(match):
+        original_link = match.group(1)
+        new_link = next((new_link for new_link in image_links if original_link in new_link), original_link)
+        return f'![{match.group(0).split("](")[0]}]({new_link})'
+
+    processed_text = image_link_pattern.sub(replace_link, text)
+    return processed_text
+
+
+def process_license(text):
+    license_pattern = re.compile(r"---\nlicense:.*?---", re.DOTALL)
+    processed_text = license_pattern.sub("", text)
+    return processed_text
+
+
+def get_back_to_main_path(model_path):
+    # calculate the level by counting the number of slashes
+    level = model_path.count("/") + 1
+
+    # back_to_main_path = '../' * (level - 1)
+    back_to_main_path = "../" * level
+    return back_to_main_path
+
+
 def generate_model_page(model_path, model_name):
     full_path = os.path.join(MODEL_ROOT, model_path)
     files = []
+    readme_content = False
 
     for root, _, filenames in os.walk(full_path):
         for f in filenames:
-            if f.endswith("index.html"):
+            if f.endswith("index.md"):
                 continue
             file_path = os.path.join(root, f)
             rel_path = os.path.relpath(file_path, full_path)
+
+            if f == "README.md":
+                with open(file_path, "r", encoding="utf-8") as rf:
+                    readme_content = rf.read()
 
             size = os.path.getsize(file_path)
             files.append({"name": rel_path, "size": convert_size(size)})
@@ -86,21 +116,31 @@ def generate_model_page(model_path, model_name):
     output_path = os.path.join(OUTPUT_DIR, model_path)
     os.makedirs(output_path, exist_ok=True)
 
+    if readme_content:
+        readme_content = process_image_links(readme_content, model_path)
+        readme_content = process_license(readme_content)
+    huggingface_url = os.path.join("https://huggingface.co", model_path)
+    back_to_main_path = get_back_to_main_path(model_path)
     template = Template(MODEL_TEMPLATE)
-    html = template.render(
-        model_name=model_name, model_path=URL_BASE + model_path, files=sorted(files, key=lambda x: x["name"])
+    markdown_content = template.render(
+        model_name=model_name,
+        huggingface_url=huggingface_url,
+        model_path=URL_BASE + model_path,
+        files=sorted(files, key=lambda x: x["name"]),
+        readme_content=readme_content,
+        back_to_main_path=back_to_main_path,
     )
 
-    with open(os.path.join(output_path, "index.html"), "w") as f:
-        f.write(html)
+    with open(os.path.join(output_path, "index.md"), "w") as f:
+        f.write(markdown_content)
 
 
 def generate_main_page(models):
     template = Template(MAIN_TEMPLATE)
-    html = template.render(models=sorted(models))
+    markdown_content = template.render(models=sorted(models))
 
-    with open(os.path.join(OUTPUT_DIR, "index.html"), "w") as f:
-        f.write(html)
+    with open(os.path.join(OUTPUT_DIR, "index.md"), "w") as f:
+        f.write(markdown_content)
 
 
 def is_model_directory(path):
@@ -120,7 +160,17 @@ def is_model_directory(path):
     return len(model_files) > 0 or len(sharded_files) > 0
 
 
-ommit_paths = ["_internal_", "hf-internal", "zhuweiguo"]
+ommit_paths = [
+    "_internal_",
+    "hf-internal",
+    "zhuweiguo",
+    "ziqingyang",
+    "yuhuili",
+    "westfish",
+    "junnyu",
+    "Yang-Changhui",
+    "baicai",
+]
 
 
 def find_models():

@@ -146,6 +146,15 @@ class Timers:
             string += " | {} : {:.2f}".format(name, value)
         return string
 
+    def info(self, names, normalizer=1.0, reset=False):
+        """Return a dict of timers."""
+        assert normalizer > 0.0
+        time_dict = {}
+        for name in names:
+            time_dict[name] = self.timers[name].elapsed(reset=reset) * 1000.0 / normalizer
+        time_dict = dict(sorted(time_dict.items(), key=lambda x: x[0], reverse=False))
+        return time_dict
+
 
 _GLOBAL_TIMERS = None
 
