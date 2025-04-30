@@ -73,7 +73,7 @@ ignore_save_lr_and_optim: true # Whether to ignore saving learning rate and opti
 disable_tqdm: true # Whether to disable tqdm progress bar
 
 # RL args
-kl_coeff: 0.0 # KL coefficient
+kl_coeff: 0.001 # KL coefficient for PPO and Reinforce++
 kl_loss_coeff: 0.001 # KL loss coefficient
 pg_loss_coeff: 1.0 # Policy gradient loss coefficient
 entropy_coeff: 0.0 # Entropy coefficient
