@@ -22,7 +22,6 @@ from typing import List, Optional, Tuple, Union
 
 import paddle
 import paddle.distributed.fleet.meta_parallel as mpu
-import paddle.nn.functional as F
 from paddle import Tensor, nn
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
@@ -76,7 +75,7 @@ class Qwen3MoeGate(Qwen2MoeGate):
     pass
 
 
-class Qwen3MoeSparseMoEBlock(MoELayer):
+class Qwen3MoeSparseMoeBlock(MoELayer):
     def __init__(self, config: Qwen3MoeConfig):
         gate = Qwen3MoeGate(
             config,
@@ -98,15 +97,8 @@ class Qwen3MoeSparseMoEBlock(MoELayer):
         self.top_k = config.num_experts_per_tok
         self.norm_topk_prob = config.norm_topk_prob
 
-        self.shared_expert = Qwen3MoeMLP(config, is_shared=True)
-        self.shared_expert_gate = nn.Linear(config.hidden_size, 1, bias_attr=False)
-
     def forward(self, hidden_states):
         final_hidden_states, l_aux, l_zloss = super().forward(hidden_states)
-
-        shared_expert_output = self.shared_expert(hidden_states)
-        shared_expert_output = F.sigmoid(self.shared_expert_gate(hidden_states)) * shared_expert_output
-        final_hidden_states = final_hidden_states + shared_expert_output
 
         return final_hidden_states, l_aux
 
@@ -119,7 +111,7 @@ class Qwen3MoeDecoderLayer(nn.Layer):
         self.self_attn = Qwen3MoeAttention(config, layerwise_recompute)
 
         if config.num_experts > 0:
-            self.mlp = Qwen3MoeSparseMoEBlock(config)
+            self.mlp = Qwen3MoeSparseMoeBlock(config)
         else:
             # num_experts == 0 or this layer is not sparse layer
             self.mlp = Qwen3MoeMLP(config)
@@ -274,11 +266,6 @@ class Qwen3MoePretrainedModel(PretrainedModel):
                 model_mappings.extend(expert_mappings)
             model_mappings.append([f"layers.{layer_index}.mlp.gate.weight", None, "transpose"])
 
-            model_mappings.append([f"layers.{layer_index}.mlp.shared_expert.gate_proj.weight", None, "transpose"])
-            model_mappings.append([f"layers.{layer_index}.mlp.shared_expert.down_proj.weight", None, "transpose"])
-            model_mappings.append([f"layers.{layer_index}.mlp.shared_expert.up_proj.weight", None, "transpose"])
-            model_mappings.append([f"layers.{layer_index}.mlp.shared_expert_gate.weight", None, "transpose"])
-
         init_name_mappings(mappings=model_mappings)
         # base-model prefix "Qwen3MoeModel"
         if "Qwen3MoeModel" not in config.architectures:
@@ -342,11 +329,7 @@ class Qwen3MoePretrainedModel(PretrainedModel):
                         final_actions[newkey2] = action
 
             # Add tp split for shared expert params.
-            base_actions = {
-                "layers.0.mlp.shared_expert.gate_proj.weight": partial(fn, is_column=True),
-                "layers.0.mlp.shared_expert.up_proj.weight": partial(fn, is_column=True),
-                "layers.0.mlp.shared_expert.down_proj.weight": partial(fn, is_column=False),
-            }
+            base_actions = {}
             for key, action in base_actions.items():
                 if "layers.0." in key:
                     for i in range(num_layers):
@@ -415,6 +398,7 @@ class Qwen3MoePretrainedModel(PretrainedModel):
 
     def _init_weights(self, layer):
         """Initialization hook"""
+        return None
         if self.config.tensor_parallel_degree > 1:
             rng_tracker = get_rng_state_tracker().rng_state
         if isinstance(
