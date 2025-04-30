@@ -1171,7 +1171,7 @@ class ConversionMixin:
         all_layer_names = set(state_dict.keys())
         for name_mapping in name_mappings:
             if name_mapping.source_name not in state_dict:
-                # logger.warning(f"key<{name_mapping.source_name}> not in the pytorch weight file.")
+                logger.warning(f"key<{name_mapping.source_name}> not in the pytorch weight file.")
                 continue
 
             state_dict[name_mapping.target_name] = name_mapping.run(state_dict, name_mapping.source_name)
