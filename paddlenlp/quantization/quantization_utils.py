@@ -14,26 +14,41 @@
 
 import re
 
+import paddle
 import paddle.nn as nn
 from paddle.distributed.fleet.meta_parallel import (
     ColumnParallelLinear,
     RowParallelLinear,
 )
+from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+    ColumnSequenceParallelLinear,
+    RowSequenceParallelLinear,
+)
+from paddle.incubate.nn.layer.fused_linear import FusedLinear
 from paddle.nn.quant import weight_quantize
 
+try:
+    from .qlora import qlora_weight_linear, qlora_weight_quantize
+except:
+    qlora_weight_linear = None
+    qlora_weight_quantize = None
+
 from ..utils.log import logger
+from .qat_utils import quantize_channelwise
 from .quantization_linear import (
     ColumnParallelQuantizationLinear,
     QuantizationLinear,
     RowParallelQuantizationLinear,
 )
 
-try:
-    from .qlora import qlora_weight_quantize
-except:
-    qlora_weight_quantize = None
-
-LINEAR_CLASSES = [nn.Linear, ColumnParallelLinear, RowParallelLinear]
+LINEAR_CLASSES = [
+    nn.Linear,
+    FusedLinear,
+    ColumnParallelLinear,
+    RowParallelLinear,
+    ColumnSequenceParallelLinear,
+    RowSequenceParallelLinear,
+]
 
 
 def parse_weight_quantize_algo(quantization_config, name):
@@ -65,14 +80,20 @@ def replace_with_quantization_linear(model, quantization_config, llm_int8_thresh
             *path, last = name.split(".")
             for attr in path:
                 parent = getattr(parent, attr)
-            if isinstance(child, nn.Linear):
+            if isinstance(child, nn.Linear) or isinstance(child, FusedLinear):
+                if getattr(child.weight, "transpose_weight", False):
+                    out_feature, in_features = child.weight.shape[0], child.weight.shape[1]
+                else:
+                    in_features, out_feature = child.weight.shape[0], child.weight.shape[1]
                 quant_linear = QuantizationLinear(
-                    in_features=child.weight.shape[0],
-                    out_features=child.weight.shape[1],
+                    in_features=in_features,
+                    out_features=out_feature,
                     quantization_config=quantization_config,
                     weight_quantize_algo=weight_quantize_algo,
                     dtype=child._dtype,
                     bias_attr=bias_attr,
+                    mp_moe=getattr(child.weight, "mp_moe", False),
+                    is_distributed=getattr(child.weight, "is_distributed", False),
                 )
             elif isinstance(child, ColumnParallelLinear):
                 quant_linear = ColumnParallelQuantizationLinear(
@@ -96,6 +117,28 @@ def replace_with_quantization_linear(model, quantization_config, llm_int8_thresh
                     input_is_parallel=child.input_is_parallel,
                     mp_skip_c_identity=child.mp_skip_c_identity,
                 )
+            elif isinstance(child, ColumnSequenceParallelLinear):
+                quant_linear = ColumnParallelQuantizationLinear(
+                    in_features=child.weight.shape[0],
+                    output_size_per_partition=child.weight.shape[1],
+                    quantization_config=quantization_config,
+                    weight_quantize_algo=weight_quantize_algo,
+                    dtype=child._dtype,
+                    bias_attr=bias_attr,
+                    gather_output=False,
+                    sequence_parallel=True,
+                )
+            elif isinstance(child, RowSequenceParallelLinear):
+                quant_linear = RowParallelQuantizationLinear(
+                    input_size_per_partition=child.weight.shape[0],
+                    out_features=child.weight.shape[1],
+                    quantization_config=quantization_config,
+                    weight_quantize_algo=weight_quantize_algo,
+                    dtype=child._dtype,
+                    bias_attr=bias_attr,
+                    input_is_parallel=True,
+                    sequence_parallel=True,
+                )
             setattr(parent, last, quant_linear)
             del child
 
@@ -105,17 +148,33 @@ def convert_to_weight_quantize_state_dict(state_dict, name, quantization_config,
     weight_name = name + ".weight"
     quant_weight_name = name + ".quant_weight"
     quant_scale_name = name + ".quant_scale"
+    act_scale_name = name + ".act_scale"
 
     if quant_weight_name in state_dict and quant_scale_name in state_dict:
         return state_dict
     if weight_name in state_dict:
         # gpu weight_quantize will fix in future
         target_weight = state_dict.pop(weight_name).cast(dtype).cuda()
-        quant_weight, quant_scale = weight_quantize(
-            x=target_weight,
-            algo=weight_quantize_algo,
-            group_size=quantization_config.group_size,
-        )
+        if weight_quantize_algo in ["a8w8linear"]:
+            quant_weight, quant_scale = quantize_channelwise(
+                target_weight, quantization_config.apply_hadamard, bit_length=8
+            )
+            act_scale = paddle.zeros([], dtype="bfloat16").cuda()
+            act_scale.stop_gradient = True
+            state_dict[act_scale_name] = act_scale
+        elif weight_quantize_algo in ["a8w4linear"]:
+            quant_weight, quant_scale = quantize_channelwise(
+                target_weight, quantization_config.apply_hadamard, bit_length=4
+            )
+            act_scale = paddle.zeros([], dtype="bfloat16").cuda()
+            act_scale.stop_gradient = True
+            state_dict[act_scale_name] = act_scale
+        else:
+            quant_weight, quant_scale = weight_quantize(
+                x=target_weight,
+                algo=weight_quantize_algo,
+                group_size=quantization_config.group_size,
+            )
         state_dict[quant_weight_name] = quant_weight
         state_dict[quant_scale_name] = quant_scale
         del target_weight
@@ -168,7 +227,7 @@ def convert_to_quantize_state_dict(state_dict, quantization_linear_list, quantiz
         if weight_quantize_algo is None:
             continue
         # Convert state dict
-        if weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8"]:
+        if weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8", "a8w8linear", "a8w4linear"]:
             convert_to_weight_quantize_state_dict(state_dict, name, quantization_config, dtype, weight_quantize_algo)
         elif weight_quantize_algo in ["fp4", "nf4"]:
             convert_to_qlora_state_dict(state_dict, name, quantization_config, dtype, weight_quantize_algo)
@@ -184,6 +243,7 @@ def update_loaded_state_dict_keys(state_dict, quantization_linear_list, quantiza
         weight_name = name + ".weight"
         quant_weight_name = name + ".quant_weight"
         quant_scale_name = name + ".quant_scale"
+        act_scale_name = name + ".act_scale"
         qquant_scale_name = name + ".qquant_scale"
         double_quant_scale_name = name + ".double_quant_scale"
         quant_sacle_offset_name = name + ".quant_sacle_offset"
@@ -199,6 +259,10 @@ def update_loaded_state_dict_keys(state_dict, quantization_linear_list, quantiza
                 state_dict.append(quant_sacle_offset_name)
             else:
                 state_dict.append(quant_scale_name)
+                weight_quantize_algo = parse_weight_quantize_algo(quantization_config, name)
+                if weight_quantize_algo in ["a8w8linear", "a8w4linear"]:
+                    state_dict.append(act_scale_name)
+
         else:
             if not ignore_warning:
                 logger.warning(

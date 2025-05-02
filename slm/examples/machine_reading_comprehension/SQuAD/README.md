@@ -164,10 +164,19 @@ python -m paddle.distributed.launch --gpus "0" run_squad.py \
 
 在 Fine-tune 完成后，我们可以使用如下方式导出希望用来预测的模型：
 
+默认模型：
 ```shell
 python -u ./export_model.py \
     --model_type bert \
     --model_path bert-base-uncased \
+    --output_path ./infer_model/model
+```
+
+微调模型：
+```shell
+python -u ./export_model.py \
+    --model_type bert \
+    --model_path tmp/squad/model_5000 \
     --output_path ./infer_model/model
 ```
 
@@ -192,4 +201,83 @@ python -u deploy/python/predict.py \
 - `batch_size` 表示每个预测批次的样本数目。
 - `max_seq_length` 表示最大句子长度，超过该长度将被截断，和训练时一致。
 
+运行结果示例：
+```
+{
+  "exact": 37.74109323675567,
+  "f1": 42.348199704946815,
+  "total": 11873,
+  "HasAns_exact": 75.59041835357625,
+  "HasAns_f1": 84.81784330243481,
+  "HasAns_total": 5928,
+  "NoAns_exact": 0.0,
+  "NoAns_f1": 0.0,
+  "NoAns_total": 5945,
+  "best_exact": 50.11370336056599,
+  "best_exact_thresh": 0.0,
+  "best_f1": 50.11370336056599,
+  "best_f1_thresh": 0.0
+}
+```
+
 以上命令将在 SQuAD v1.1的验证集上进行预测。此外，同训练时一样，用户可以通过命令行传入`--version_2_with_negative`控制所需要的 SQuAD 数据集版本。
+
+### 其他问题
+#### Q1: 适配 python 3.8的 datasets 3.1.0无法支持当前任务
+如果运行时出现如下问题：
+
+>  File "/home/aistudio/.cache/huggingface/modules/datasets_modules/datasets/squad_v2/dca5ba0e483a42ca20ec41a13e9fb630541d6fcb0ba646da3e8ff9a1f21fcb81/squad_v2.py", line 19, in <module>
+>    from datasets.tasks import QuestionAnsweringExtractive
+> ModuleNotFoundError: No module named 'datasets.tasks'
+
+那么需要对 datasets 进行版本更换。运行：
+```shell
+pip install -U "datasets>=2.14.6,<3.0.0"
+```
+安装 ```datasets-2.21.0```等版本可以正常运行。
+
+
+#### Q2: 无法通过运行命令连接 huggingface 获取 SQuAD 数据集
+1. 手动从[数据集官网](https://rajpurkar.github.io/SQuAD-explorer/)下载 training/dev set 并放在当前目录。
+
+2. 将 ```run_squad.py```中的
+```python
+if args.version_2_with_negative:
+    train_examples = load_dataset("squad_v2", split="train", trust_remote_code=True)
+    dev_examples = load_dataset("squad_v2", split="validation", trust_remote_code=True)
+else:
+    train_examples = load_dataset("squad", split="train", trust_remote_code=True)
+    dev_examples = load_dataset("squad", split="validation", trust_remote_code=True)
+```
+替换为
+```python
+datasets = load_dataset(
+    "squad_v2",
+    data_files={
+        "train": "train-v2.0.json",
+        "validation": "dev-v2.0.json"
+    }
+)
+train_examples = datasets["train"]
+dev_examples = datasets["validation"]
+```
+
+3. 将 ```deploy/python/predict.py```中的
+```python
+if args.version_2_with_negative:
+    raw_dataset = load_dataset("squad_v2", split="validation")
+else:
+    raw_dataset = load_dataset("squad", split="validation")
+```
+替换为
+```python
+datasets = load_dataset(
+    "squad_v2",
+    data_files={
+        "train": "train-v2.0.json",
+        "validation": "dev-v2.0.json"
+    }
+)
+raw_dataset = datasets["validation"]
+```
+正常运行命令即可。

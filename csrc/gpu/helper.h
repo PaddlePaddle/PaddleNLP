@@ -162,6 +162,13 @@ public:
   typedef paddle::float8_e4m3fn data_t;
 };
 
+template <>
+class PDTraits<paddle::DataType::INT8> {
+public:
+  typedef int8_t DataType;
+  typedef int8_t data_t;
+};
+
 template <typename T, int Size>
 struct alignas(sizeof(T) * Size) AlignedVector {
   T val[Size];
@@ -244,4 +251,36 @@ inline bool GetMlaUseTensorcore() {
   static const bool enable_mla_tensorcore = GetSMVersion() >= 90 ? true : false;
   const bool mla_use_tensorcore = flags_mla_use_tensorcore && enable_mla_tensorcore;
   return mla_use_tensorcore;
+}
+
+__device__ __forceinline__ float atomicMaxFloat(float* addr, float value) {
+    float old;
+    old = (value >= 0) ? __int_as_float(atomicMax((int*)addr, __float_as_int(value)))
+                        : __uint_as_float(atomicMin((unsigned int*)addr, __float_as_uint(value)));
+    return old;
+}
+
+__device__ __forceinline__ float warpReduceMax(float max_value) {
+    max_value = fmaxf(max_value, __shfl_xor_sync(0xffffffff, max_value, 16));
+    max_value = fmaxf(max_value, __shfl_xor_sync(0xffffffff, max_value, 8));
+    max_value = fmaxf(max_value, __shfl_xor_sync(0xffffffff, max_value, 4));
+    max_value = fmaxf(max_value, __shfl_xor_sync(0xffffffff, max_value, 2));
+    max_value = fmaxf(max_value, __shfl_xor_sync(0xffffffff, max_value, 1));
+    return max_value;
+}
+
+__device__ __forceinline__ float blockReduceMax(float max_value) {
+    static __shared__ float warpLevelMaxs[32];
+    const int laneId = threadIdx.x & 0x1f;;
+    const int warpId = threadIdx.x >> 5;
+
+    max_value = warpReduceMax(max_value);
+
+    if (laneId == 0) warpLevelMaxs[warpId] = max_value;
+        __syncthreads();
+
+    max_value = (threadIdx.x < blockDim.x / 32) ? warpLevelMaxs[laneId] : 0;
+    if (warpId == 0) max_value = warpReduceMax(max_value);
+
+    return max_value;
 }

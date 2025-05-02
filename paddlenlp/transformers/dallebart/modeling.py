@@ -922,7 +922,7 @@ class DalleBartForConditionalGeneration(DalleBartPretrainedModel):
             use_fast: (bool, optional): Whether to use fast entry of model
                 for FastGeneration. Default to False.
             use_fp16_decoding: (bool, optional): Whether to use fp16 for decoding.
-                Only works when fast entry is avalible. Default to False.
+                Only works when fast entry is available. Default to False.
             condition_scale (float, optional): The scale of super conditioning. See
                 `this twitter <https://twitter.com/RiversHaveWings/status/1478093658716966912>`__
                 Default to 1.0.

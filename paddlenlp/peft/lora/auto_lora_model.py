@@ -318,7 +318,7 @@ class LoRAAutoModel(nn.Layer):
         if self.is_pipelinemodel and merge_tensor_parallel and self.lora_config.tensor_parallel_degree > 1:
             merge_tensor_parallel = False
             logger.warning(
-                "Pipeline parallism does not support merge_tensor_parallel. Set merge_tensor_parallel to False."
+                "Pipeline parallelism does not support merge_tensor_parallel. Set merge_tensor_parallel to False."
             )
 
         variant = kwargs.get("variant", None)
@@ -580,7 +580,7 @@ class LoRAAutoModel(nn.Layer):
                     for k, v in config["mp_config"]["parallelize_plan"].items():
                         assert (
                             k not in final_config["mp_config"]["parallelize_plan"].keys()
-                        ), f"sublayer mp_config shuld be a subset of model but got sublayer config {config['mp_config']} and model config {final_config['mp_config']}."
+                        ), f"sublayer mp_config should be a subset of model but got sublayer config {config['mp_config']} and model config {final_config['mp_config']}."
                         final_config["mp_config"]["parallelize_plan"][k] = v
             if "sp_config" in config and config["sp_config"] is not None:
                 if final_config["sp_config"] is None:
@@ -589,7 +589,7 @@ class LoRAAutoModel(nn.Layer):
                     for k, v in config["sp_config"]["parallelize_plan"].items():
                         assert (
                             k not in final_config["sp_config"]["parallelize_plan"].keys()
-                        ), f"sublayer sp_config shuld be a subset of model but got sublayer config {config['sp_config']} and model config {final_config['sp_config']}."
+                        ), f"sublayer sp_config should be a subset of model but got sublayer config {config['sp_config']} and model config {final_config['sp_config']}."
                         final_config["sp_config"]["parallelize_plan"][k] = v
             if "pp_config" in config and config["pp_config"] is not None:
 

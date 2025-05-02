@@ -86,7 +86,7 @@ class PreTrainingArguments(AutoTrainingArguments):
     )
     sr: Optional[int] = field(default=0, metadata={"help": "The count of chunks without recompute."})
     virtual_pipeline_seg_method: str = field(
-        default="LlamaDecoderLayerAuto", metadata={"help": "The seg method of spliting pp layer for virtual pipeline."}
+        default="LlamaDecoderLayerAuto", metadata={"help": "The seg method of splitting pp layer for virtual pipeline."}
     )
     # NOTE(gongenlei): new add autotuner_benchmark
     autotuner_benchmark: bool = field(
@@ -539,6 +539,7 @@ def main():
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
     config.sharding_parallel_degree = training_args.sharding_parallel_degree
+    config.to_static = training_args.to_static
 
     if training_args.strategy.pipeline.enable and config.virtual_pp_degree > 1:
         pipeline = training_args.strategy.pipeline
@@ -555,6 +556,11 @@ def main():
             pass
 
     print("Final pre-training config:", config)
+
+    if "replace_with_parallel_cross_entropy" in training_args.tensor_parallel_config and config.tensor_parallel_degree > 1 and config.to_static is False:
+        from llm.utils.replace_ops import replace_cross_entropy
+
+        replace_cross_entropy()
 
     # # Set the dtype for loading model
     # dtype = "float32"

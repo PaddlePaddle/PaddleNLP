@@ -45,7 +45,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
         eval_dataset (Dataset, required): Evaluation dataset, must contains the 'text_column' and 'label_column' specified below
         language (string, required): language of the text
         metric_for_best_model (string, optional): the name of the metric for selecting the best model.
-        greater_is_better (bool, required): Whether better models should have a greater metric or not. Use in conjuction with `metric_for_best_model`.
+        greater_is_better (bool, required): Whether better models should have a greater metric or not. Use in conjunction with `metric_for_best_model`.
         output_dir (str, optional): Output directory for the experiments, defaults to "autpnlp_results"
         verbosity: (int, optional): controls the verbosity of the run. Defaults to 1, which let the workers log to the driver.To reduce the amount of logs,
                 use verbosity > 0 to set stop the workers from logging to the driver.

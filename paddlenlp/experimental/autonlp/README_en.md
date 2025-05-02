@@ -50,8 +50,8 @@ Args:
 - text_column (string, required): Name of the column that contains the input text.
 - label_column (string, required): Name of the column that contains the target variable to predict.
 - language (string, required): language of the text
-- metric_for_best_model (string, optional): the name of the metrc for selecting the best model.
-- greater_is_better (bool, optional): Whether better models should have a greater metric or not. Use in conjuction with `metric_for_best_model`.
+- metric_for_best_model (string, optional): the name of the metric for selecting the best model.
+- greater_is_better (bool, optional): Whether better models should have a greater metric or not. Use in conjunction with `metric_for_best_model`.
 - problem_type (str, optional): Select among ["multi_class", "multi_label"] based on the nature of your problem
 - output_dir (str, optional): Output directory for the experiments, defaults to "autpnlp_results"
 - verbosity: (int, optional): controls the verbosity of the run. Defaults to 1, which let the workers log to the driver.To reduce the amount of logs, use verbosity > 0 to set stop the workers from logging to the driver.

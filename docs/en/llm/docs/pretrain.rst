@@ -72,7 +72,7 @@ pip install fast_dataindex visualdl==2.5.3`` and other missing whl packages.
 6. During multi-machine training, if all machines use training data files from the same location (e.g., mounted shared storage), specify ``--share_folder true`` to have global rank 0 create cached data. Otherwise, rank 0 on each machine will create cached data independently by default.
 7. If the default cache folder ``index-cache/`` exists in the dataset directory, the additionally specified ``--data_cache`` will not take effect, and training will prioritize loading content from the default cache folder.
 
-The pre-training uses PaddleNLP's Trainer module. For related distributed strategy usage, please refer to the `Large Model Trainer Hybrid Parallel Training Tutorial <./llm_trainer.rst>`.
+The pre-training uses PaddleNLP's Trainer module. For related distributed strategy usage, please refer to the `Large Model Trainer Hybrid Parallel Training Tutorial <./llm_trainer.rst>`_.
 
 .. _model_capability:
 Overview of Distributed Capabilities Supported in Model Pre-training

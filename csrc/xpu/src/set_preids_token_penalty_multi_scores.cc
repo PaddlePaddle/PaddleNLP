@@ -56,7 +56,7 @@ void SetPreidsTokenPenaltyMultiScores(const paddle::Tensor& pre_ids,
       seq_lens_decoder.data<int>(),
       step_idx.data<int64_t>(),
       bs,
-      length,
+      length_id,
       length_input_ids);
   PD_CHECK(r == 0, "xpu::plugin::set_value_by_flags_and_idx failed.");
 
