@@ -275,7 +275,9 @@ class ShardingIO:
                 structure_name_map = cur_sharding_meta["structure_name_mapping"]
                 for i in range(self.args.sharding_parallel_rank, sharding_degree, cur_sharding_degree):
                     tmp = self._load_one_state_dict_from_checkpoint(
-                        checkpoint, base_weight_name, self.args.sharded_name_suffix(i, j)
+                        checkpoint,
+                        base_weight_name,
+                        self.args.sharded_name_suffix(i, j, sharding_parallel_degree=sharding_degree),
                     )
                     node_model_state_tmp = reshard_util.NodeModelState()
                     node_model_state_tmp.add_weights(tmp)
@@ -358,9 +360,12 @@ class ShardingIO:
         if sharding_strategy == SHARDING_STRATEGY_V1:
             param2rank = sharding_meta["param2rank"]
             optimizer = unwrap_optimizer(self.optimizer, DygraphShardingOptimizer)
-            assert optimizer
-            if len(param2rank) == 0:
-                logger.warning("The param2rank is empty. Force reshard would be performed.")
+            if self.args.sharding_parallel_degree > 1:
+                assert optimizer is not None
+            else:
+                assert optimizer is None
+            if len(param2rank) == 0 or optimizer is None:
+                logger.warning("The param2rank is empty or sharding degree is 1. Force reshard would be performed.")
                 return True
             assert len(param2rank) == len(optimizer._param2rank)
             for (k, v) in param2rank.items():
@@ -395,6 +400,7 @@ class ShardingIO:
         pp_degree = parallel_config["pp_degree"]
         mp_degree = parallel_config["mp_degree"]
         sharding_degree = parallel_config["sharding_degree"]
+        assert sharding_degree > 1, "sharding degree of the checkpoint should be larger than 1"
         sharding_strategy = SHARDING_STRATEGY_V1
         if "sharding_strategy" in sharding_meta:
             sharding_strategy = sharding_meta["sharding_strategy"]
@@ -411,7 +417,7 @@ class ShardingIO:
 
         if not self._need_reshard(checkpoint):
             one_shard_opt_state_dict = self._load_optimizer_state_of_one_shard(
-                checkpoint, base_opt_name, self.args.optimizer_name_suffix
+                checkpoint, base_opt_name, self.args.sharded_name_suffix(sharding_parallel_degree=sharding_degree)
             )
 
             if sharding_strategy == SHARDING_STRATEGY_V2 and cur_sharding_strategy == SHARDING_STRATEGY_V2:
@@ -436,7 +442,7 @@ class ShardingIO:
                 assert "structure_name_mapping" in cur_sharding_meta
                 structure_name_map = cur_sharding_meta["structure_name_mapping"]
                 for i in range(self.args.sharding_parallel_rank, sharding_degree, cur_sharding_degree):
-                    sharded_name_suffix = self.args.sharded_name_suffix(i, j)
+                    sharded_name_suffix = self.args.sharded_name_suffix(i, j, sharding_parallel_degree=sharding_degree)
                     if one_shard_opt_state_dict is None:
                         tmp = self._load_optimizer_state_of_one_shard(checkpoint, base_opt_name, sharded_name_suffix)
                     else:
@@ -582,7 +588,6 @@ class ShardingIO:
         node_model_state_tmp.pack_keys(structure_name_map)
         node_model_state.merge_from(node_model_state_tmp, self.sharding_group.rank)
         del node_model_state_tmp
-        assert reshard_util.is_sharding_opt(self.optimizer)
         sharding_strategy = reshard_util.get_sharding_strategy(self.optimizer)
         restore_func = (
             reshard_util.sharding_v1.restore
