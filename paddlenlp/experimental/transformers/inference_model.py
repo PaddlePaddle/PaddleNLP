@@ -1,5 +1,5 @@
 """
-# Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -120,21 +120,22 @@ class InferenceModel:
         Args:
             ipc_state_dict: Dictionary containing new parameters in IPC format
         """
-        # model_path = "/shared_ipc_meta"
-        # current_device_id = int(os.getenv("FLAGS_selected_gpus"))
-        # ipc_state_dict_path = os.path.join(model_path, f"ipc_metas_{current_device_id}")
-        # ipc_state_dict = paddle.load(ipc_state_dict_path)
-        # state_dict = self.load_tensor_from_ipc_meta(ipc_state_dict)
+        local_test = False
+        if local_test:
+            state_dict = paddle.load("/root/paddlejob/workspace/env_run/output/can_run_paddlenlp/model_local_qwen/parammeters")
+        else:
+            model_path = "/shared_ipc_meta"
+            current_device_id = int(os.getenv("FLAGS_selected_gpus"))
+            ipc_state_dict_path = os.path.join(model_path, f"ipc_metas_{current_device_id}")
+            ipc_state_dict = paddle.load(ipc_state_dict_path)
+            state_dict = self.load_tensor_from_ipc_meta(ipc_state_dict)
         
-        # test
-        state_dict = paddle.load("/root/paddlejob/workspace/env_run/output/can_run_paddlenlp/model_local_qwen/parammeters")
-
-        model_state_dict = self.model.state_dict()
+        infer_model_state_dict = self.model.state_dict()
 
         for name, param in state_dict.items():
-            if name in model_state_dict:
+            if name in infer_model_state_dict:
                 logger.info(f"Updating model parameter: {name}")
-                update_param = model_state_dict[name]
+                update_param = infer_model_state_dict[name]
                 assert (
                     update_param.dtype == param.dtype
                 ), f"Type mismatch for {name}: {param.dtype} vs {update_param.dtype}"
