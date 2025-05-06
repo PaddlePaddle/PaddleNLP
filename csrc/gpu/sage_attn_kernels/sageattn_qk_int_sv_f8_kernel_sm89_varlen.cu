@@ -1079,9 +1079,13 @@ std::vector<paddle::Tensor> sage_attention_varlen_fwd(paddle::Tensor& q,        
   }
   paddle::Tensor v_padded = paddle::concat(v_splited, {0}); // final concat along the total_seqlen axis
 
-  std::vector<paddle::Tensor>&& quant_vfp8_results = per_channel_varlen_fp8(v_padded, cu_seqlen_q, cu_seqlen_v_padded, 
-                                                                            max_seqlen_k, total_seqlen_v_padded,
-                                                                            tensor_layout, 448.0, smooth_v);
+  std::vector<paddle::Tensor>&& quant_vfp8_results = per_channel_varlen_fp8(
+    v_padded, 
+    cu_seqlen_q, 
+    cu_seqlen_v_padded, 
+    max_seqlen_k, 
+    total_seqlen_v_padded,
+    tensor_layout, 448.0, smooth_v);
 
   switch (pv_accum_dtype_const) {
     case paddle::DataType::FLOAT32: {
