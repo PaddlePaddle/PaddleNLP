@@ -28,10 +28,23 @@ from .rl_trainer import RLTrainer
 
 
 class CriticTrainer(RLTrainer):
+    """Critic Trainer"""
+
     loss_cls = RLHFValueLoss
     trainer_type = "value"
-    # define loss name for logging
-    loss_identifier = lambda self, inputs: "reward_critic_loss"
+
+    def loss_identifier(self, inputs: Dict) -> str:
+        """
+        Identify the critic loss function based on the input dictionary.
+
+        Args:
+            inputs (Dict): A dictionary containing two key-value pairs, "inputs" and "labels".
+
+        Returns:
+            str: A string indicating whether to use the ptx loss function or the actor loss function,
+                "reward_critic_loss".
+        """
+        return "reward_critic_loss"
 
     def compute_value(
         self,
@@ -40,6 +53,24 @@ class CriticTrainer(RLTrainer):
         input_ids_tokenizer: PretrainedTokenizer = None,
         **kwargs,
     ) -> Dict[str, paddle.Tensor]:
+        """
+        Compute the reward value for the input sequence.
+
+        Args:
+            input_ids (paddle.Tensor): The token ids of the input sequence, with shape `[batch_size, seq_len]`.
+            position_ids (paddle.Tensor, optional): The position ids of the input sequence, with shape `[batch_size,
+                                                    seq_len]`. Defaults to `None`.
+            input_ids_tokenizer (PretrainedTokenizer, optional): The tokenizer used to convert strings to token ids.
+                Defaults to `None`. If not provided, the tokenizer defined in the model will be used.
+            kwargs (Dict[str, Any], optional): Additional optional parameters. Defaults to `{}`.
+
+        Returns:
+            Dict[str, paddle.Tensor]: A dictionary containing a single tensor with shape `[batch_size, seq_len - 1]`,
+                representing the reward value for each input sequence. The key is "reward_value".
+
+        Raises:
+            ValueError: If no tokenizer is provided and the model does not have a defined tokenizer.
+        """
         # TODO: confirm actor_tokenizer or reward_tokenizer or critic_tokenizer
         # need retokenize?
         attn_mask_startend_row_indices = create_startend_row_indices(input_ids, self.tokenizer.pad_token_id)

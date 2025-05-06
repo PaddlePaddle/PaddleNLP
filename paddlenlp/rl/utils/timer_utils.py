@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from contextlib import contextmanager
-from typing import List, Union
+from typing import List, Optional, Union
 
 from ...trainer.plugins.timer import RuntimeTimer
 from ...utils.log import logger
@@ -21,14 +21,19 @@ from .comm_utils import get_timer_label
 
 
 class TimerScope:
-    def __init__(self, timers, name: str, minus_names: Union[List[str], str] = None):
+    """
+    A context manager that provides a timer scope for timing events.
+    """
+
+    def __init__(self, timers, name: str, minus_names: Optional[Union[List[str], str]] = None):
         """
         Initialize the TimerScope.
 
         Args:
             timers (Callable): A function that returns a timer object based on a given label.
             name (str): The name of the timer scope.
-            minus_names (Union[List[str], str], optional): A list of timer names or a single timer name to subtract their elapsed time from the current timer. Defaults to None.
+            minus_names (Union[List[str], str], optional): A list of timer names or a single timer name to subtract
+                their elapsed time from the current timer. Defaults to None.
         """
         self.timers = timers
         self.name = name
@@ -64,21 +69,67 @@ class TimerScope:
 
     @staticmethod
     def _get_timer_label(name: str) -> str:
-        # 根据实际标签生成逻辑修改
+        """
+        Get the timer label and apply logical modifications.
+
+        Args:
+            name (str): The name of the timer.
+
+        Returns:
+            str: The modified timer label after applying logical changes.
+        """
+        # Modify the label based on actual logic
         return get_timer_label(name)
 
     def __enter__(self):
+        """
+        Start the timer and return itself.
+        This method is called when using the with statement for context management.
+
+        Returns:
+            TimeCounter: Returns itself to allow subsequent operations.
+        """
         self.start()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        Stop the timer and release resources.
+        This method is automatically called when using the with statement.
+
+        Args:
+            exc_type (Optional[Type[BaseException]]): Optional, the type of the exception, defaults to None.
+                If not None, it indicates an exception occurred during execution, and this parameter will be the type of that exception.
+            exc_val (Optional[BaseException]): Optional, the value of the exception, defaults to None.
+                If not None, it indicates an exception occurred during execution, and this parameter will be the instance of that exception.
+            exc_tb (Optional[TracebackType]): Optional, the traceback information, defaults to None.
+                If not None, it indicates an exception occurred during execution, and this parameter will be a Traceback object containing the traceback information.
+
+        Returns:
+            None: No return value.
+        """
         self.stop()
 
 
 class TimerScopeManualLabel(TimerScope):
+    """
+    TimerScopeManualLabel is a subclass of TimerScope that overrides the _get_timer_label method.
+    It is specifically designed for testing and debugging purposes.
+    """
+
     @staticmethod
     def _get_timer_label(name: str) -> str:
-        # 根据实际标签生成逻辑修改
+        """
+        Generate a logically distinct label based on the given name.
+        This function is primarily used for testing and debugging purposes, and can be modified as needed.
+
+        Args:
+            name (str): The input name.
+
+        Returns:
+            str: A logically distinct name.
+        """
+        # Apply logical modifications to the label based on actual requirements
         return name
 
 

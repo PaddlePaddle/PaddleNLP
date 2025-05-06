@@ -12,9 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import heapq
 import sys
 from collections import defaultdict
 from enum import Enum, auto
+from typing import List, Tuple
 
 import numpy as np
 import paddle
@@ -29,44 +31,109 @@ from .reshard_utils import init_reshard_mappings, init_rollout_env, reshard_to_r
 
 global_dev_id = 0 if paddle.get_device() == "cpu" else int(paddle.get_device().split(":")[1])
 
-import heapq
-from typing import List, Tuple
-
 
 def karmarkar_karp(seqlen_list: List[int], k_partitions: int, equal_size: bool):
-    # see: https://en.wikipedia.org/wiki/Largest_differencing_method
+    """
+    Use the Karmarkar-Karp algorithm to partition the sequence lengths into k parts, each with equal or
+    nearly equal size.
+
+    Args:
+        seqlen_list (List[int]): A list of sequence lengths that need to be partitioned into k parts.
+        k_partitions (int, optional): The number of partitions to divide the sequence lengths into, defaults to 5.
+        equal_size (bool, optional): Whether to ensure that each partition has an equal size, defaults to False.
+            If set to True, it will attempt to distribute the sequence lengths evenly across each partition.
+
+    Returns:
+        List[List[int]]: A list containing k partitions, where each partition is a list of sequence indices.
+            If equal_size is True, each partition should have an equal length, summing to
+            len(seqlen_list) / k_partitions.
+            If equal_size is False, each partition can have a different length, but their sum should be
+            len(seqlen_list).
+
+    Raises:
+        AssertionError: When equal_size is True and len(seqlen_list) % k_partitions != 0.
+
+        see: https://en.wikipedia.org/wiki/Largest_differencing_method
+    """
+
     class Set:
+        """A simple data structure used to represent a set of elements."""
+
         def __init__(self) -> None:
-            self.sum = 0
-            self.items = []
+            """
+            Initialize the Set class.
+            """
+            self.sum = 0  # The sum of all values in the set.
+            self.items = []  # A list of tuples, where each tuple contains an index and a value.
 
         def add(self, idx: int, val: int):
-            self.items.append((idx, val))
-            self.sum += val
+            """
+            Add a new item to the set.
+
+            Args:
+                idx (int): The index of the item.
+                val (int): The value of the item.
+            """
+            self.items.append((idx, val))  # Append the new item to the items list.
+            self.sum += val  # Update the sum of all values.
 
         def merge(self, other):
+            """
+            Merge another set into the current set.
+
+            Args:
+                other (Set): The set to be merged into the current set.
+            """
             for idx, val in other.items:
-                self.items.append((idx, val))
-                self.sum += val
+                self.items.append((idx, val))  # Append each item from the other set.
+                self.sum += val  # Update the sum of all values.
 
         def __lt__(self, other):
+            """
+            Compare the current set with another set.
+
+            Args:
+                other (Set): The set to compare with.
+
+            Returns:
+                bool: True if the current set is less than the other set, False otherwise.
+            """
             if self.sum != other.sum:
-                return self.sum < other.sum
+                return self.sum < other.sum  # Compare by sum if sums are different.
             if len(self.items) != len(other.items):
-                return len(self.items) < len(other.items)
-            return self.items < other.items
+                return len(self.items) < len(
+                    other.items
+                )  # Compare by length if sums are equal but lengths are different.
+            return self.items < other.items  # Compare by items if sums and lengths are equal.
 
     class State:
+        """A class representing the state of the Largest Differencing Method algorithm."""
+
         def __init__(self, items: List[Tuple[int, int]], k: int) -> None:
+            """
+            Initialize the State class.
+
+            Args:
+                items (List[Tuple[int, int]]): A list of tuples, where each tuple contains an index and a sequence
+                    length.
+                k (int): The number of sets to create.
+            """
             self.k = k
-            # sets should always be decreasing order
+            # Initialize k sets, ensuring they are always in decreasing order.
             self.sets = [Set() for _ in range(k)]
             assert len(items) in [1, k], f"{len(items)} not in [1, {k}]"
             for i, (idx, seqlen) in enumerate(items):
                 self.sets[i].add(idx=idx, val=seqlen)
             self.sets = sorted(self.sets, reverse=True)
 
-        def get_partitions(self):
+        def get_partitions(self) -> List[List[int]]:
+            """
+            Get the partitions of indices from the sets.
+
+            Returns:
+                List[List[int]]: A list of partitions, where each partition contains indices from the corresponding
+                    set.
+            """
             partitions = []
             for i in range(len(self.sets)):
                 cur_partition = []
@@ -76,23 +143,47 @@ def karmarkar_karp(seqlen_list: List[int], k_partitions: int, equal_size: bool):
             return partitions
 
         def merge(self, other):
+            """
+            Merge another state into the current state.
+
+            Args:
+                other (State): The state to be merged into the current state.
+            """
             for i in range(self.k):
                 self.sets[i].merge(other.sets[self.k - 1 - i])
             self.sets = sorted(self.sets, reverse=True)
 
         @property
         def spread(self) -> int:
+            """
+            Get the spread between the sums of the largest and smallest sets.
+
+            Returns:
+                int: The spread value.
+            """
             return self.sets[0].sum - self.sets[-1].sum
 
         def __lt__(self, other):
-            # least heap, let the state with largest spread to be popped first,
-            # if the spread is the same, let the state who has the largest set
-            # to be popped first.
+            """
+            Compare the current state with another state.
+
+            Args:
+                other (State): The state to compare with.
+
+            Returns:
+                bool: True if the current state should be considered less than the other state, False otherwise.
+            """
             if self.spread != other.spread:
                 return self.spread > other.spread
             return self.sets[0] > other.sets[0]
 
         def __repr__(self) -> str:
+            """
+            Get a string representation of the state.
+
+            Returns:
+                str: The string representation.
+            """
             repr_str = "["
             for i in range(self.k):
                 if i > 0:
@@ -252,11 +343,13 @@ def cleanup_tensor_space(tensors):
     if it is a paddle.Tensor, clear the data; otherwise, return the original object.
 
     Args:
-        tensors (Union[dict, paddle.Tensor]): Tensors or dictionary to release space, where the values of the dictionary are tensors.
+        tensors (Union[dict, paddle.Tensor]): Tensors or dictionary to release space, where the values of the
+        dictionary are tensors.
 
     Returns:
-        Union[dict, paddle.Tensor]: If the input is a dictionary, return a new dictionary with values having their space released;
-        if the input is a paddle.Tensor, return a paddle.Tensor with data cleared. Otherwise, return the original object.
+        Union[dict, paddle.Tensor]: If the input is a dictionary, return a new dictionary with values having their
+            space released; if the input is a paddle.Tensor, return a paddle.Tensor with data cleared. Otherwise,
+            return the original object.
     """
     if isinstance(tensors, dict):
         for _, v in tensors.items():
@@ -275,7 +368,8 @@ def data_group_split(tensors, group):
 
     Args:
         tensors (Union[List[Any], Tuple[Any], Dict[str, Any], paddle.Tensor]): Data to be split, can be any type.
-        group (Optional[distributed.Group]): The group to split by, if None, return the original data. Default is None.
+        group (Optional[distributed.Group]): The group to split by, if None, return the original data.
+                                             Default is None.
 
     Returns:
         Union[List[Any], Tuple[Any], Dict[str, Any], paddle.Tensor]: Split data, consistent with the input data type.
@@ -302,13 +396,16 @@ def data_group_merge(tensors, group):
     Combine data into a new list or dictionary, or perform all_gather_nd operation in the specified group if not None.
 
     Args:
-        tensors (Union[List[Any], Tuple[Any], Dict[str, Any], paddle.Tensor]): Data to be combined, can be list, tuple, dictionary, or tensor.
-            If it is a tensor, an all_gather_nd operation will be performed in the specified group, and a tensor will be returned.
-        group (Optional[int]): The specified group, if None, return the original data. Default is None.
+        tensors (Union[List[Any], Tuple[Any], Dict[str, Any], paddle.Tensor]): Data to be combined, can be list,
+        tuple, dictionary, or tensor.
+            If it is a tensor, an all_gather_nd operation will be performed in the specified group, and a tensor
+            will be returned. group (Optional[int]): The specified group, if None, return the original data.
+            Default is None.
 
     Returns:
-        Union[List[Any], Tuple[Any], Dict[str, Any], paddle.Tensor]: Return a new list or dictionary, or a tensor, depending on the input data type.
-        If it is a tensor, it is the result of the all_gather_nd operation in the specified group.
+        Union[List[Any], Tuple[Any], Dict[str, Any], paddle.Tensor]: Return a new list or dictionary, or a tensor,
+        depending on the input data type. If it is a tensor, it is the result of the all_gather_nd operation
+        in the specified group.
 
     Raises:
         None
@@ -338,18 +435,20 @@ def data_group_merge(tensors, group):
 
 def group_rank_guard(group, rank=0):
     """
-    Control whether a process in a process group participates in a function call and communicate after all processes are done.
-    If a process in the process group is not the specified rank, the function will not be called.
+    Control whether a process in a process group participates in a function call and communicate after
+    all processes are done. If a process in the process group is not the specified rank, the function
+    will not be called.
 
     Args:
         group (distributed.ProcessGroup): Process group object.
-        rank (int, optional, default=0): The rank of the process that needs to participate in the function call, default is 0.
-            When rank is -1, all processes participate.
+        rank (int, optional, default=0): The rank of the process that needs to participate in the function call,
+                                        default is 0. When rank is -1, all processes participate.
 
     Returns:
-        function: Returns a decorator that accepts a function as an argument and returns a wrapped function.
-                  The decorated function will be called in the specified rank process, and other processes will not be called.
-                  After all processes are done, communication will be performed, and the results will be broadcast to all processes.
+        function: Returns a decorator that accepts a function as an argument and returns a wrapped function. The
+                decorated function will be called in the specified rank process, and other processes will not be
+                called. After all processes are done, communication will be performed, and the results will be
+                broadcast to all processes.
     """
 
     def decorator(func):
@@ -374,8 +473,8 @@ def repad_rl_batches(batches, input_lengths):
     If the batch contains position IDs, fill the unaccessed parts with 1.
 
     Args:
-        batches (dict): A dictionary containing input data and other information, formatted as {"input_ids": Tensor, "attention_mask": Tensor, ...}.
-            The shape of the Tensor should be (batch_size, sequence_length).
+        batches (dict): A dictionary containing input data and other information, formatted as {"input_ids": Tensor,
+        "attention_mask": Tensor, ...}. The shape of the Tensor should be (batch_size, sequence_length).
         input_lengths (Tensor): A tensor of length batch_size, indicating the actual length of each batch.
             Shape is (batch_size,).
 
@@ -403,11 +502,13 @@ def remove_input_padding(input_ids, pad_id):
     Remove padding from input IDs and return a list, where each element is a paddle.Tensor without pad_id.
 
     Args:
-        input_ids (List[paddle.Tensor]): A list containing input IDs, each element is a 1D paddle.Tensor with dtype int64.
+        input_ids (List[paddle.Tensor]): A list containing input IDs, each element is a 1D paddle.Tensor with dtype
+                                        int64.
         pad_id (int): The padding ID to be removed.
 
     Returns:
-        List[paddle.Tensor]: A list containing input IDs without pad_id, each element is a 1D paddle.Tensor with dtype int64.
+        List[paddle.Tensor]: A list containing input IDs without pad_id, each element is a 1D paddle.Tensor with dtype
+                            int64.
     """
     result = []
     for ids in input_ids:
@@ -427,9 +528,10 @@ def concat_input_response_and_padding(input_ids_wo_padding, response, pad_id):
         pad_id (int): ID used for padding.
 
     Returns:
-        Tensor: Returns a Tensor of shape (num_return_index, batch_size, max_seq_len), where max_seq_len is the maximum length of all inputs and responses.
-        Each element is concatenated from input_ids_wo_padding and the corresponding element of response.
-        If the concatenated length is less than max_seq_len, pad_id will be appended at the end.
+        Tensor: Returns a Tensor of shape (num_return_index, batch_size, max_seq_len), where max_seq_len is the
+        maximum length of all inputs and responses. Each element is concatenated from input_ids_wo_padding and the
+        corresponding element of response. If the concatenated length is less than max_seq_len, pad_id will be
+        appended at the end.
     """
     concat_results = []
     max_seq_len = 0
@@ -457,10 +559,16 @@ def concat_input_response_and_padding(input_ids_wo_padding, response, pad_id):
 
 # https://stackoverflow.com/questions/12594148/skipping-execution-of-with-block
 class SkipWithBlock(Exception):
+    """
+    Custom exception class to be raised when a block should be skipped.
+    """
+
     pass
 
 
 class SkipContextManager:
+    """A context manager that allows skipping certain blocks."""
+
     def __init__(self, skip):
         """
         Initializes the class with the given skip value.
@@ -497,21 +605,27 @@ class SkipContextManager:
             arg (Any): Optional argument passed to the event_handler function.
 
         Raises:
-            SkipWithBlock: Raised when encountering the specified code block, indicating that subsequent test execution should be skipped.
+            SkipWithBlock: Raised when encountering the specified code block, indicating that subsequent test
+            execution should be skipped.
         """
         raise SkipWithBlock
 
     def __exit__(self, type, value, traceback):
         """
-        If no exception is present when exiting, returns True. If the exception is a subclass of SkipWithBlock, returns True to suppress the exception. Otherwise, returns False.
+        If no exception is present when exiting, returns True. If the exception is a subclass of SkipWithBlock,
+        returns True to suppress the exception. Otherwise, returns False.
 
         Args:
-            type (Optional[Type[BaseException]]): Optional, the exception type. If None, indicates no exception. Default is None.
-            value (Optional[BaseException]): Optional, the exception object. If type is not None, value must be provided. Default is None.
-            traceback (Optional[traceback]): Optional, traceback information. If type is not None, traceback must be provided. Default is None.
+            type (Optional[Type[BaseException]]): Optional, the exception type. If None, indicates no exception.
+                                                Default is None.
+            value (Optional[BaseException]): Optional, the exception object. If type is not None, value must be
+                                            provided. Default is None.
+            traceback (Optional[traceback]): Optional, traceback information. If type is not None, traceback must be
+                                            provided. Default is None.
 
         Returns:
-            bool: Returns True if no exception is present or the exception is a subclass of SkipWithBlock; otherwise, returns False.
+            bool: Returns True if no exception is present or the exception is a subclass of SkipWithBlock; otherwise,
+                returns False.
         """
         if type is None:
             return  # No exception
@@ -644,15 +758,17 @@ def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
 def create_data_trans_group(global_rank, group_nums):
     """
     Create a data transfer group that is partitioned based on the given global rank and number of groups.
-    This function uses paddle.distributed.all_gather_object for communication and returns a new distributed group object.
+    This function uses paddle.distributed.all_gather_object for communication and returns a new distributed group
+    object.
 
     Args:
         global_rank (int): The current global rank.
         group_nums (List[int]): A list of group numbers to partition.
 
     Returns:
-        paddle.distributed.Group: Returns a new distributed group object containing all global ranks participating in the partition.
-            If the current global rank is in any of the groups, it returns that group. If the current global rank is not in any of the groups, it returns None.
+        paddle.distributed.Group: Returns a new distributed group object containing all global ranks participating in
+        the partition. If the current global rank is in any of the groups, it returns that group. If the current
+        global rank is not in any of the groups, it returns None.
     """
     all_split_table = []
     paddle.distributed.all_gather_object(all_split_table, [(global_rank, group_nums)])
@@ -747,6 +863,24 @@ def masked_whiten(values, mask, shift_mean=True):
 
 
 def pad_tensor(tensor_list, pad_index=0.0, dtype="bfloat16", padding_side="right"):
+    """
+    Pad tensors in a list to ensure they have the same last dimension. If tensors have different lengths, pad them
+    with pad_index.
+
+    Args:
+        tensor_list (List[Union[paddle.Tensor, np.ndarray]]): A list of tensors, which can be either paddle.Tensor or
+        np.ndarray.
+        pad_index (float, optional): The value used for padding, defaults to 0.0.
+        dtype (str, optional): The data type of the output tensor, defaults to 'bfloat16'.
+        padding_side (str, optional): The padding direction, either 'right' or 'left', defaults to 'right'.
+
+    Returns:
+        Union[paddle.Tensor, np.ndarray]: The padded tensor, which has the same shape as the input tensors but with
+        potentially adjusted last dimension.
+
+    Raises:
+        ValueError: If padding_side is neither 'right' nor 'left'.
+    """
     max_size = max([i.shape[-1] for i in tensor_list])
     data_num = sum([i.shape[0] for i in tensor_list])
     if isinstance(tensor_list[0], paddle.Tensor):
@@ -962,6 +1096,22 @@ def split_batch_by_rank(
 
 
 def get_pad_to_multiple_of(n, multiple_of):
+    """
+    Get the integer that needs to be padded to a specified multiple.
+    If the integer is already a multiple, no padding is required.
+
+    Args:
+        n (int): The integer that needs to be padded.
+        multiple_of (int, optional): The multiple to which the integer needs to be padded.
+            Defaults to 1 (i.e., no padding is performed). Should be a positive integer.
+
+    Raises:
+        ValueError: Raised when multiple_of is less than or equal to 0.
+
+    Returns:
+        int: The integer padded to the specified multiple.
+            If it is already a multiple, no padding is performed.
+    """
     if multiple_of <= 0:
         raise ValueError("multiple_of must be positive integer.")
 
@@ -1050,7 +1200,8 @@ def split_batch_into_micro_batches(total_batch, batch_size, pad_token_id=0):
         num_micro_batches += 1
     if num_micro_batches <= 0:
         logger.warning(
-            "The total batch size is smaller than the batch size, please consider using a smaller batch size or a larger global_batch_size."
+            "The total batch size is smaller than the batch size, please consider using a smaller batch size or a "
+            "larger global_batch_size."
         )
         num_micro_batches = 1
 

@@ -28,7 +28,8 @@ def _move_param(src, device=None, blocking=True):
 
     Args:
         src (Tensor): The tensor of parameters to be moved.
-        device (Optional[Union[str, paddle.Device]], optional): The target device. Can be a string or paddle.Device object.
+        device (Optional[Union[str, paddle.Device]], optional): The target device. Can be a string or paddle.Device
+        object.
             Defaults to None, which means using the current device.
         blocking (bool, optional): Whether to block until the operation is complete. Defaults to True.
 
@@ -105,12 +106,12 @@ def offload_tensor_to_cpu(tensors):
 
 def reload_tensor_to_gpu(tensors):
     """
-    Transfer the given tensors from CPU to GPU and return new tensors. This function has no effect if the environment variable
-    FLAGS_use_cuda_managed_memory is not set to True.
+    Transfer the given tensors from CPU to GPU and return new tensors. This function has no effect if the environment
+    variable FLAGS_use_cuda_managed_memory is not set to True.
 
     Args:
-        tensors (List[Tuple[Any, str]]): A list containing tuples. Each tuple has two elements: the tensor to be transferred
-            to GPU and a string indicating the tensor type ("optimizer" or "model").
+        tensors (List[Tuple[Any, str]]): A list containing tuples. Each tuple has two elements: the tensor to be
+        transferred to GPU and a string indicating the tensor type ("optimizer" or "model").
 
     Returns:
         List[Tuple[Any, str]]: The same list as the input, but all tensors have been transferred to GPU.
@@ -151,10 +152,26 @@ def reload_tensor_to_gpu(tensors):
 
 
 class OffloadController:
+    """
+    Offload Controller
+    """
+
     def __init__(self, objs):
+        """
+        Initializes the object with a list of objects.
+
+        Args:
+            objs (list): A list of objects to be managed by the controller.
+        """
         self.objs = objs
 
     def __enter__(self):
+        """
+        Called when entering the context manager. Copies all tensors that need to be synchronized to the GPU.
+
+        Returns:
+            self: The current instance of OffloadController.
+        """
         for obj in self.objs:
             if hasattr(obj[0], "enable"):
                 obj[0].enable()
@@ -167,6 +184,16 @@ class OffloadController:
             paddle.device.synchronize()
 
     def __exit__(self, *args):
+        """
+        Called when exiting the with statement. Releases resources.
+        If an error occurs, it is passed to the caller.
+
+        Args:
+            args (tuple, optional): Optional arguments, default is an empty tuple, indicating no arguments are received.
+
+        Returns:
+            None: No return value, directly releases resources.
+        """
         for obj in self.objs:
             if hasattr(obj[0], "disable"):
                 obj[0].disable()
@@ -180,6 +207,20 @@ class OffloadController:
 
 
 def reload_and_offload_scope(trainer, *args):
+    """
+    Reload the model and offload it, returning an OffloadController object.
+    If the model is not in the specified offload_level, it will not be offloaded.
+
+    Args:
+        trainer (Trainer): The Trainer instance.
+        *args (Any, optional): A variable-length argument list containing objects such as models or optimizers that
+            need to be offloaded. Defaults to None.
+
+    Returns:
+        OffloadController, tuple: An OffloadController instance and a tuple containing each object and its
+            corresponding offload_map value. If the object is not in the offload_level, the element will be
+            an empty string.
+    """
     offload_map = {
         trainer.actor_model: "train_model",
         trainer.reference_model: "freeze_model",

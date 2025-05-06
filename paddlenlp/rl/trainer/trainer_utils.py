@@ -78,7 +78,8 @@ def guard_set_args(args, arg_name_values):
 
     Args:
         args (object): The object whose attributes need to be modified, typically an instance of a command-line parser.
-        arg_name_values (dict[str, Any]): A dictionary containing argument names and their new values. These arguments will be modified within the context.
+        arg_name_values (dict[str, Any]): A dictionary containing argument names and their new values. These arguments
+            will be modified within the context.
             key (str): The name of the argument.
             value (Any): The new value for the argument.
 
@@ -161,7 +162,8 @@ class PipeEvalModel(GenerationMixin):
             name (str): The name of the attribute to query.
 
         Returns:
-            Any: The value of the attribute. If the attribute is not found in the current class or the model, an AttributeError exception will be raised.
+            Any: The value of the attribute. If the attribute is not found in the current class or the model, an
+                AttributeError exception will be raised.
 
         Raises:
             AttributeError: If the attribute is not found in the current class or the model.
@@ -173,14 +175,17 @@ class PipeEvalModel(GenerationMixin):
 
     def _broadcast_outputs(self, outputs):
         """
-        Broadcast the outputs to all processes. If it is not the last stage, return a tuple; otherwise, return ModelOutput or paddle.Tensor.
-        If it is not the last stage, create a new empty tensor with the same shape and type as the input tensor for each input tensor and broadcast these tensors.
+        Broadcast the outputs to all processes. If it is not the last stage, return a tuple; otherwise, return
+        ModelOutput or paddle.Tensor. If it is not the last stage, create a new empty tensor with the same shape and
+        type as the input tensor for each input tensor and broadcast these tensors.
 
         Args:
-            outputs (Union[paddle.Tensor, Tuple[paddle.Tensor], ModelOutput]): The output of the model, which can be a single tensor, a tuple of tensors, or ModelOutput.
+            outputs (Union[paddle.Tensor, Tuple[paddle.Tensor], ModelOutput]): The output of the model, which can be a
+                single tensor, a tuple of tensors, or ModelOutput.
 
         Returns:
-            Union[paddle.Tensor, Tuple[paddle.Tensor], ModelOutput]: If it is not the last stage, return a tuple; otherwise, return ModelOutput or paddle.Tensor.
+            Union[paddle.Tensor, Tuple[paddle.Tensor], ModelOutput]: If it is not the last stage, return a tuple;
+                otherwise, return ModelOutput or paddle.Tensor.
         """
         # outputs is PipelineParallel.eval_batch which is a list of batches.
         out = []
@@ -450,7 +455,8 @@ def process_row(row, remove_value=0, remove_side="both", eos_token_id=None):
     Args:
         row (paddle.Tensor): The 1D tensor to be processed.
         remove_value (int, optional): The value to be removed, default is 0.
-        remove_side (str, optional): The side to remove values from, can be "left" (remove leading only), "right" (remove trailing only),
+        remove_side (str, optional): The side to remove values from, can be "left" (remove leading only), "right"
+        (remove trailing only),
             or "both" (remove both leading and trailing), default is "both".
 
     Returns:

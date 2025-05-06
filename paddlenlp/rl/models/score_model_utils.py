@@ -189,7 +189,8 @@ class ScoreModelMixin:
             mode (bool, optional): Whether to normalize the input data, default is True. Defaults to True.
 
         Returns:
-            None: No return value, directly modifies the instance's do_normalize attribute and the do_normalize attribute in config.
+            None: No return value, directly modifies the instance's do_normalize attribute and the do_normalize
+                attribute in config.
 
         Raises:
             None: No exceptions are raised.
