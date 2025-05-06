@@ -20,6 +20,19 @@ from paddlenlp.utils import infohub
 
 from .hadamard_utils import random_hadamard_matrix
 
+try:
+    from transformer_engine.paddle.cpp_extensions import fp8_gemm
+    from transformer_engine import transformer_engine_paddle as tex 
+    from transformer_engine.paddle.layer.base import get_workspace
+    from transformer_engine.paddle.constants import FP8FwdTensors, FP8BwdTensors
+    TE_DType = {
+        paddle.float8_e4m3fn: tex.DType.kFloat8E4M3,
+        paddle.float8_e5m2: tex.DType.kFloat8E5M2,
+    }
+    USE_FP8_GEMM = True
+except ImportError:
+    USE_FP8_GEMM = False
+    
 
 def quantize_tensorwise(x, quantization_config=None, bit_length=8, state=0, training=False, act_scale=None):
     qmax = (1 << (bit_length - 1)) - 1
@@ -76,14 +89,16 @@ def fp8_quantize_tensorwise(
     
     if act_scale is not None:
         if training:
-            scale = paddle.max(paddle.abs(target_x)) / qmax
-            act_scale.set_value((state * act_scale + scale) / (state + 1))
-            if state > quantization_config.skip_first_act_scale_step:
-                scale = act_scale
+            scale = paddle.max(paddle.abs(target_x)) / qmax + quantization_config.epsilon
+            if state < quantization_config.skip_first_act_scale_step:
+                act_scale.set_value((state * act_scale + scale) / (state + 1))
+            else:
+                act_scale.set_value((1 - quantization_config.moving_rate) * act_scale + quantization_config.moving_rate * scale)
+                # scale = act_scale
         else:
             scale = act_scale
     else:
-        scale = paddle.max(paddle.abs(target_x)) / qmax
+        scale = paddle.max(paddle.abs(target_x)) / qmax + quantization_config.epsilon
 
     x_fp8 = target_x / scale
     x_fp8 = x_fp8.astype(fp8_format).view("int8")
@@ -180,14 +195,37 @@ def fp8_forward(
     x_fp8, x_scale = fp8_quantize_tensorwise(
         x, tensor_type="activation", quantization_config=quantization_config, state=state, training=training, act_scale=act_scale
     )
-    # TODO(wanderHZ): support real fp8 gemm
     x_fp8 = x_fp8.view(quantization_config.fp8_format["activation"])
     w_fp8 = w_fp8.view(quantization_config.fp8_format["weight"])
-    x = x_fp8.astype(dtype) * x_scale
-    w = w_fp8.astype(dtype) * w_scale
-    out = paddle.matmul(x, w.T).astype(dtype)
-    if bias is not None:
-        out += bias
+
+    if USE_FP8_GEMM:
+        x_shape = x_fp8.shape
+        x_fp8 = x_fp8.view((-1, x_fp8.shape[-1]))
+        fwd_scales = paddle.stack([x_scale.astype("float32"), w_scale.astype("float32")])
+        out, _ = fp8_gemm(
+            A=w_fp8,
+            A_scale_inv=fwd_scales,
+            A_fp8_tensor=FP8FwdTensors.GEMM1_WEIGHT,
+            A_dtype=TE_DType[w_fp8.dtype],
+            B=x_fp8,
+            B_scale_inv=fwd_scales,
+            B_fp8_tensor=FP8FwdTensors.GEMM1_INPUT,
+            B_dtype=TE_DType[x_fp8.dtype],
+            out_dtype=dtype,
+            workspace=get_workspace(),
+            bias=bias,
+            use_bias=True if bias is not None else False,
+            use_split_accumulator=True,
+        )
+        x_fp8 = x_fp8.view(x_shape)
+        out = out.view((*x_shape[:-1], -1))
+    else:
+        x = x_fp8.astype(dtype) * x_scale
+        w = w_fp8.astype(dtype) * w_scale
+        out = paddle.matmul(x, w.T).astype(dtype)
+        if bias is not None:
+            out += bias
+
     return out, x_fp8, x_scale
 
 
@@ -199,12 +237,31 @@ def fp8_backward(ctx, x, grad_output, quant_weight, quant_scale, quant_x, x_scal
                 tensor_type="grad_output",
                 quantization_config=ctx.quantization_config,
             )
-            # TODO(wanderHZ): support real fp8 gemm
             grad_output_fp8 = grad_output_fp8.view(ctx.quantization_config.fp8_format["grad_output"])
             quant_weight = quant_weight.view(ctx.quantization_config.fp8_format["weight"])
-            grad_output_ = grad_output_fp8.astype(ctx.dtype) * grad_output_scale
-            weight_ = quant_weight.astype(ctx.dtype) * quant_scale
-            input_grad = paddle.matmul(grad_output_, weight_).astype(ctx.dtype)
+            if USE_FP8_GEMM:
+                grad_output_shape = grad_output_fp8.shape
+                grad_output_fp8 = grad_output_fp8.view((-1, grad_output_fp8.shape[-1]))
+                fwd_scales = paddle.stack([x_scale.astype("float32"), quant_scale.astype("float32")])
+                bwd_scales = grad_output_scale[None].astype("float32")
+                input_grad, _ = fp8_gemm(
+                    A=quant_weight.T,
+                    A_scale_inv=fwd_scales,
+                    A_fp8_tensor=FP8FwdTensors.GEMM1_WEIGHT,
+                    A_dtype=TE_DType[quant_weight.dtype],
+                    B=grad_output_fp8,
+                    B_scale_inv=bwd_scales,
+                    B_fp8_tensor=FP8BwdTensors.GRAD_OUTPUT1,
+                    B_dtype=TE_DType[grad_output_fp8.dtype],
+                    out_dtype=ctx.dtype,
+                    workspace=get_workspace(),
+                    use_split_accumulator=True,
+                )
+                input_grad = input_grad.view((*grad_output_shape[:-1], -1))
+            else:
+                grad_output_ = grad_output_fp8.astype(ctx.dtype) * grad_output_scale
+                weight_ = quant_weight.astype(ctx.dtype) * quant_scale
+                input_grad = paddle.matmul(grad_output_, weight_).astype(ctx.dtype)
             if ctx.quantization_config.apply_hadamard:
                 input_grad = infohub.hadamard[grad_output.shape[-2]][0] @ input_grad
                 input_grad = input_grad @ infohub.hadamard[quant_weight.shape[-1]][0].T
@@ -225,17 +282,35 @@ def fp8_backward(ctx, x, grad_output, quant_weight, quant_scale, quant_x, x_scal
                 tensor_type="grad_output",
                 quantization_config=quantization_config_,
             )
-            # TODO(wanderHZ): support real fp8 gemm
             grad_output_fp8 = grad_output_fp8.view(ctx.quantization_config.fp8_format["grad_output"])
             quant_x = quant_x.view(ctx.quantization_config.fp8_format["activation"])
-            grad_output_ = grad_output_fp8.astype(ctx.dtype) * grad_output_scale
-            x_ = quant_x.astype(ctx.dtype) * x_scale
-            if len(x_.shape) == 2:
-                weight_grad = paddle.matmul(x_.transpose([1, 0]), grad_output_).astype(ctx.dtype)
+            if USE_FP8_GEMM:
+                quant_x = quant_x.view((-1, quant_x.shape[-1]))
+                grad_output_fp8 = grad_output_fp8.view((-1, grad_output_fp8.shape[-1]))
+                fwd_scales = paddle.stack([x_scale.astype("float32"), quant_scale.astype("float32")])
+                bwd_scales = grad_output_scale[None].astype("float32")
+                weight_grad, _ = fp8_gemm(
+                    A=grad_output_fp8.T,
+                    A_scale_inv=bwd_scales,
+                    A_fp8_tensor=FP8BwdTensors.GRAD_OUTPUT1,
+                    A_dtype=TE_DType[grad_output_fp8.dtype],
+                    B=quant_x.T,
+                    B_scale_inv=fwd_scales,
+                    B_fp8_tensor=FP8FwdTensors.GEMM1_INPUT,
+                    B_dtype=TE_DType[quant_x.dtype],
+                    out_dtype=ctx.dtype,
+                    workspace=get_workspace(),
+                    use_split_accumulator=True,
+                )
             else:
-                weight_grad = paddle.matmul(
-                    x_.reshape([-1, x_.shape[-1]]).transpose([1, 0]), grad_output_.reshape([-1, grad_output_.shape[-1]])
-                ).astype(ctx.dtype)
+                grad_output_ = grad_output_fp8.astype(ctx.dtype) * grad_output_scale
+                x_ = quant_x.astype(ctx.dtype) * x_scale
+                if len(x_.shape) == 2:
+                    weight_grad = paddle.matmul(x_.transpose([1, 0]), grad_output_).astype(ctx.dtype)
+                else:
+                    weight_grad = paddle.matmul(
+                        x_.reshape([-1, x_.shape[-1]]).transpose([1, 0]), grad_output_.reshape([-1, grad_output_.shape[-1]])
+                    ).astype(ctx.dtype)
             if ctx.quantization_config.apply_hadamard:
                 hadamard_matrix, block_size = infohub.hadamard[quant_x.shape[-1]]
                 weight_grad = weight_grad / block_size

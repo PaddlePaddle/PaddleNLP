@@ -67,7 +67,9 @@ class QuantizationConfig:
         apply_hadamard=True,
         quant_input_grad=False,
         quant_weight_grad=False,
-        skip_first_act_scale_step=-1,
+        skip_first_act_scale_step=20,
+        moving_rate=0.01,
+        epsilon=1e-8,
         fp8_format="hybrid",
         **kwargs,
     ):
@@ -140,6 +142,8 @@ class QuantizationConfig:
         self.quant_input_grad = quant_input_grad
         self.quant_weight_grad = quant_weight_grad
         self.skip_first_act_scale_step = skip_first_act_scale_step
+        self.moving_rate = moving_rate
+        self.epsilon = epsilon
         self.fp8_format = fp8_format_mapping[fp8_format]
 
     def is_weight_quantize(self):
