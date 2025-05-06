@@ -823,6 +823,7 @@ class AutoInferenceModelForCausalLM(_BaseAutoModelClass):
         tensor_parallel_rank = kwargs.pop("tensor_parallel_rank", 0)
         model_arg = kwargs.pop("model_args", None)
         spec_model_type = kwargs.pop("spec_model_type", "None")
+        load_model_from_ipc = kwargs.pop("load_model_from_ipc", False)
         spec_flag = ""
 
         # Check whether the model_type is img2txt in inference mode
@@ -867,6 +868,7 @@ class AutoInferenceModelForCausalLM(_BaseAutoModelClass):
             predictor_args=predictor_args,
             tensor_parallel_degree=tensor_parallel_degree,
             tensor_parallel_rank=tensor_parallel_rank,
+            load_model_from_ipc=load_model_from_ipc,
         )
 
         if predictor_args.mode == "dynamic":

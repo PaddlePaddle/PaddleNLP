@@ -365,7 +365,9 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
         self.cache_kvs = None
         self.head_dim_shape_tensor = paddle.ones((self.hidden_size // self.num_attention_heads), dtype="int8")
 
-        self._weights_initialized = False
+        self._weights_initialized = True
+        self.transformer_block.init_weight()
+        
 
     def set_transformer_block(self, transformer_config):
         if self.use_weight_only:

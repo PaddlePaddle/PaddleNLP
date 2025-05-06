@@ -14,7 +14,6 @@
 from __future__ import annotations
 
 import os
-
 import numpy as np
 import paddle
 
@@ -47,7 +46,8 @@ def infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, 
     low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", False)
 
     init_contexts = []
-    if low_cpu_mem_usage or config.quantization_config.is_weight_quantize():
+
+    if low_cpu_mem_usage or config.quantization_config.is_weight_quantize() or config.load_model_from_ipc:
         # Instantiate model.
         init_contexts.append(no_init_weights(_enable=True))
         if is_paddle_support_lazy_init():
@@ -58,6 +58,8 @@ def infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, 
     # init the model
     with ContextManagers(init_contexts):
         model = cls(config)
+        if config.load_model_from_ipc:
+            return model
 
     resolved_archive_file, _, _, _ = cls._resolve_model_file_path(
         pretrained_model_name_or_path,
@@ -69,12 +71,10 @@ def infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, 
         convert_from_torch=False,
         use_safetensors=use_safetensors,
         variant=variant,
-    )
-
+        )
     model_path = os.path.dirname(resolved_archive_file)
     state_dict = load_tp_checkpoint(model_path, cls, config, return_numpy=return_numpy)
     model.set_state_dict(state_dict)
-
     return model
 
 
