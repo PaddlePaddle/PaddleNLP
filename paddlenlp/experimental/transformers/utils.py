@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import os
+
 import numpy as np
 import paddle
 
@@ -71,7 +72,7 @@ def infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, 
         convert_from_torch=False,
         use_safetensors=use_safetensors,
         variant=variant,
-        )
+    )
     model_path = os.path.dirname(resolved_archive_file)
     state_dict = load_tp_checkpoint(model_path, cls, config, return_numpy=return_numpy)
     model.set_state_dict(state_dict)

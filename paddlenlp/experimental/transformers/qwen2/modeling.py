@@ -367,7 +367,6 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
 
         self._weights_initialized = True
         self.transformer_block.init_weight()
-        
 
     def set_transformer_block(self, transformer_config):
         if self.use_weight_only:
@@ -1347,6 +1346,8 @@ class Qwen2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen2Pr
         self.max_seq_len = config.max_seq_len
 
         self.qwen2 = Qwen2BlockInferenceModel(config, base_model_prefix)
+        self.config = config
+
         if config.tie_word_embeddings:
             self.lm_head = Qwen2LMHead(config, embedding_weights=self.qwen2.embed_tokens.weight, transpose_y=True)
             self.tie_weights()
@@ -1475,6 +1476,65 @@ class Qwen2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen2Pr
             cache_k_shapes.append(cache_kv_shape)
             cache_v_shapes.append(cache_kv_shape)
         return cache_k_shapes, cache_v_shapes
+
+    def get_name_mappings_to_training(self):
+        """Generate parameter name mappings from inference to training format for Qwen2 model.
+
+        Returns:
+            dict: A dictionary mapping inference parameter names to training parameter names
+        """
+        # Initialize mapping
+        infer_to_train = {}
+
+        # Cache config to avoid repeated access
+        num_hidden_layers = self.config.num_hidden_layers
+        place_holders = ["weight"]
+
+        # Define mapping patterns as tuples of (train_pattern, infer_pattern, placeholders)
+        mapping_patterns = [
+            # Static mappings
+            ("qwen2.embed_tokens.weight", "qwen2.embed_tokens.weight", None),
+            ("qwen2.norm.weight", "qwen2.norm.weight", None),
+            ("lm_head.weight", "lm_head.weight", None),
+            # Layer-wise mappings
+            ("qwen2.layers.{}.input_layernorm.{}", "qwen2.transformer_block.fuseqwen2.{}.ln_scale", place_holders),
+            (
+                "qwen2.layers.{}.self_attn.qkv_proj.{}",
+                "qwen2.transformer_block.fuseqwen2.{}.qkv_{}",
+                ["weight", "bias"],
+            ),
+            ("qwen2.layers.{}.self_attn.o_proj.{}", "qwen2.transformer_block.fuseqwen2.{}.out_proj_{}", place_holders),
+            (
+                "qwen2.layers.{}.post_attention_layernorm.{}",
+                "qwen2.transformer_block.fuseqwen2.{}.ffn_ln_scale",
+                place_holders,
+            ),
+            (
+                "qwen2.layers.{}.mlp.gate_up_fused_proj.{}",
+                "qwen2.transformer_block.fuseqwen2.{}.ffn1_{}",
+                place_holders,
+            ),
+            ("qwen2.layers.{}.mlp.down_proj.{}", "qwen2.transformer_block.fuseqwen2.{}.ffn2_{}", place_holders),
+        ]
+
+        # 量化scale_name
+        # qkv_weight_scale/ffn1_weight_scale/ffn2_weight_scale/out_proj_weight_scale
+
+        # Process each mapping pattern to build infer_to_train directly
+        for train_pattern, infer_pattern, phs in mapping_patterns:
+            if phs is None:  # Static mapping
+                infer_to_train[infer_pattern] = train_pattern
+                continue
+
+            for i in range(num_hidden_layers):
+                for ph in phs:
+                    train_key = train_pattern.format(i, ph)
+                    infer_key = infer_pattern.format(i, ph)
+                    infer_to_train[infer_key] = train_key
+
+        self.infer_to_train_name_map = infer_to_train
+
+        return infer_to_train
 
     def prepare_inputs_for_generation(self, **kwargs):
         # only last token for inputs_ids if cache is defined in kwargs

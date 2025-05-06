@@ -15,17 +15,20 @@
 """
 
 
-import paddle
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict
+
+import paddle
+
 from paddlenlp.transformers import AutoConfig, AutoInferenceModelForCausalLM
 from paddlenlp.utils.log import logger
+
 
 class InferenceModel:
     def __init__(self, predictor_args, model_args, nranks=1, rank=0, load_model_from_ipc=False, cold_start=False):
         """
         Initialize the Causal Language Model Loader.
-        
+
         Args:
             predictor_args: Predictor arguments object
             model_args: Model arguments object
@@ -43,26 +46,26 @@ class InferenceModel:
         # (TODO:gaoziyuan)当前启动服务后直接加载参数，后续进行热启动
         if load_model_from_ipc and not cold_start:
             self.update_parameters()
-        
+
     def _setup_environment(self):
         """Setup paddle device and default dtype."""
         paddle.set_device(self.predictor_args.device)
         paddle.set_default_dtype(self.predictor_args.dtype)
-    
+
     def _load_config(self):
         """Load model configuration."""
         return AutoConfig.from_pretrained(self.predictor_args.model_name_or_path)
-    
+
     def _build_model(self):
         """
         Load the causal language model with the configured parameters.
-        
+
         Returns:
             The loaded model
         """
         self._setup_environment()
         self.config = self._load_config()
-        
+
         self.model = AutoInferenceModelForCausalLM.from_pretrained(
             self.predictor_args.model_name_or_path,
             config=self.config,
@@ -74,7 +77,7 @@ class InferenceModel:
             load_model_from_ipc=self.load_model_from_ipc,
         )
         return self.model
-    
+
     def clear_parameters(self) -> None:
         """Clear all model parameters."""
         for name, param in self.model.state_dict().items():
@@ -93,9 +96,7 @@ class InferenceModel:
             logger.info(f"model key name is :{k}, shape : {v.shape}, dtype : {v.dtype}")
 
     @staticmethod
-    def load_tensor_from_ipc_meta(
-        ipc_state_dict: Dict[str, Any]
-    ) -> Dict[str, paddle.Tensor]:
+    def load_tensor_from_ipc_meta(ipc_state_dict: Dict[str, Any]) -> Dict[str, paddle.Tensor]:
         """
         Convert ipc_meta to tensor while keeping keys unchanged.
 
@@ -107,29 +108,27 @@ class InferenceModel:
         """
         result = {}
         for k, v in ipc_state_dict.items():
-            v[0] = v[0].encode('latin-1')
+            v[0] = v[0].encode("latin-1")
             tensor = paddle.base.core.LoDTensor._new_shared_cuda(tuple(v))
             result[k] = paddle.to_tensor(tensor)
-        
+
         return result
 
-    def update_parameters(self,) -> None:
+    def update_parameters(
+        self,
+    ) -> None:
         """
         Update model parameters from IPC state dictionary.
 
         Args:
             ipc_state_dict: Dictionary containing new parameters in IPC format
         """
-        local_test = False
-        if local_test:
-            state_dict = paddle.load("/root/paddlejob/workspace/env_run/output/can_run_paddlenlp/model_local_qwen/parammeters")
-        else:
-            model_path = "/shared_ipc_meta"
-            current_device_id = int(os.getenv("FLAGS_selected_gpus"))
-            ipc_state_dict_path = os.path.join(model_path, f"ipc_metas_{current_device_id}")
-            ipc_state_dict = paddle.load(ipc_state_dict_path)
-            state_dict = self.load_tensor_from_ipc_meta(ipc_state_dict)
-        
+        model_path = "/shared_ipc_meta"
+        current_device_id = int(os.getenv("FLAGS_selected_gpus"))
+        ipc_state_dict_path = os.path.join(model_path, f"ipc_metas_{current_device_id}")
+        ipc_state_dict = paddle.load(ipc_state_dict_path)
+        state_dict = self.load_tensor_from_ipc_meta(ipc_state_dict)
+
         infer_model_state_dict = self.model.state_dict()
 
         for name, param in state_dict.items():
@@ -145,51 +144,3 @@ class InferenceModel:
                 param._share_buffer_to(update_param)
 
         logger.info("Model parameters updated successfully")
-    
-    def get_name_mappings_to_training(self):
-        """Generate parameter name mappings from inference to training format for Qwen2 model.
-        
-        Returns:
-            dict: A dictionary mapping inference parameter names to training parameter names
-        """
-        # Initialize mapping
-        infer_to_train = {}
-
-        config = self.config  # Cache config to avoid repeated access
-        num_hidden_layers = config.num_hidden_layers
-        place_holders = ["weight"]
-
-        # Define mapping patterns as tuples of (train_pattern, infer_pattern, placeholders)
-        mapping_patterns = [
-            # Static mappings
-            ("qwen2.embed_tokens.weight", "qwen2.embed_tokens.weight", None),
-            ("qwen2.norm.weight", "qwen2.norm.weight", None),
-            ("lm_head.weight", "lm_head.weight", None),
-            
-            # Layer-wise mappings
-            ("qwen2.layers.{}.input_layernorm.{}", "qwen2.transformer_block.fuseqwen2.{}.ln_scale", place_holders),
-            ("qwen2.layers.{}.self_attn.qkv_proj.{}", "qwen2.transformer_block.fuseqwen2.{}.qkv_{}", ["weight", "bias"]),
-            ("qwen2.layers.{}.self_attn.o_proj.{}", "qwen2.transformer_block.fuseqwen2.{}.out_proj_{}", place_holders),
-            ("qwen2.layers.{}.post_attention_layernorm.{}", "qwen2.transformer_block.fuseqwen2.{}.ffn_ln_scale", place_holders),
-            ("qwen2.layers.{}.mlp.gate_up_fused_proj.{}", "qwen2.transformer_block.fuseqwen2.{}.ffn1_{}", place_holders),
-            ("qwen2.layers.{}.mlp.down_proj.{}", "qwen2.transformer_block.fuseqwen2.{}.ffn2_{}", place_holders),
-        ]
-        # 量化scale_name
-        # qkv_weight_scale/ffn1_weight_scale/ffn2_weight_scale/out_proj_weight_scale
-
-        # Process each mapping pattern to build infer_to_train directly
-        for train_pattern, infer_pattern, phs in mapping_patterns:
-            if phs is None:  # Static mapping
-                infer_to_train[infer_pattern] = train_pattern
-                continue
-                
-            for i in range(num_hidden_layers):
-                for ph in phs:
-                    train_key = train_pattern.format(i, ph)
-                    infer_key = infer_pattern.format(i, ph)
-                    infer_to_train[infer_key] = train_key
-
-        self.infer_to_train_name_map = infer_to_train
-        
-        return infer_to_train
-
