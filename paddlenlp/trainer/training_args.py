@@ -1504,8 +1504,6 @@ class TrainingArguments:
                         "mp_degree": self.tensor_parallel_degree,
                         "pp_degree": self.pipeline_parallel_degree,
                         "sharding_degree": self.sharding_parallel_degree,
-                        "moe_sharding_degree": self.moe_sharding_parallel_degree,
-                        "ep_degree": self.expert_parallel_degree,
                         "sep_degree": self.sep_parallel_degree
                         if self.sep_parallel_degree > 1
                         else self.context_parallel_degree,
@@ -1517,10 +1515,15 @@ class TrainingArguments:
                         "mp_degree": self.tensor_parallel_degree,
                         "pp_degree": self.pipeline_parallel_degree,
                         "sharding_degree": self.sharding_parallel_degree,
-                        "moe_sharding_degree": self.moe_sharding_parallel_degree,
-                        "ep_degree": self.expert_parallel_degree,
                         "order": order,
                     }
+
+                if self.expert_parallel_degree > 1:
+                    assert (
+                        self.use_expert_parallel is True and self.moe_sharding_parallel_degree >= 0
+                    ), f"invalid expert_parallel_degree {self.expert_parallel_degree} and use_expert_paralle:{self.use_expert_parallel}."
+                    hybrid_configs["ep_degree"] = self.expert_parallel_degree
+                    hybrid_configs["moe_sharding_degree"] = self.moe_sharding_parallel_degree
 
                 try:
                     if self.split_norm_comm:
