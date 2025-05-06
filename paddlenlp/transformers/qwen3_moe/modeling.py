@@ -84,6 +84,7 @@ class ExpertParallelQwen3MoeSparseMoeBlock(MoELayer):
             config.hidden_size,
             top_k=config.num_experts_per_tok,
             drop_tokens=False,
+            norm_topk_prob=config.norm_topk_prob,
         )
 
         super().__init__(
@@ -148,7 +149,7 @@ class Qwen3MoeSparseMoeBlock(nn.Layer):
             # states by `routing_weights` on the corresponding tokens (top-1 and top-2)
 
             current_state = hidden_states[idx, None].reshape([-1, hidden_dim])
-            current_hidden_states = expert_layer(current_state) * routing_weights[idx, top_x]
+            current_hidden_states = expert_layer(current_state) * routing_weights[idx, top_x].unsqueeze(-1)
             final_hidden_states.index_add_(
                 index=idx.reshape([-1]), axis=0, value=current_hidden_states.to(hidden_states.dtype)
             )
@@ -165,7 +166,7 @@ class Qwen3MoeDecoderLayer(nn.Layer):
         self.self_attn = Qwen3MoeAttention(config, layerwise_recompute)
 
         if config.num_experts > 0:
-            self.mlp = Qwen3MoeSparseMoeBlock(config)
+            self.mlp = ExpertParallelQwen3MoeSparseMoeBlock(config)
         else:
             # num_experts == 0 or this layer is not sparse layer
             self.mlp = Qwen3MoeMLP(config)
@@ -828,7 +829,7 @@ class Qwen3MoeForCausalLM(Qwen3MoePretrainedModel):
         attention_mask=None,
         inputs_embeds=None,
         output_router_logits=False,
-        **kwargs
+        **kwargs,
     ):
         batch_size, seq_length = input_ids.shape
         position_ids = kwargs.get("position_ids", paddle.arange(seq_length).expand((batch_size, seq_length)))
