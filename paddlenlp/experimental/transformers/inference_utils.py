@@ -14,7 +14,7 @@ class PredictorArgument:
     temperature: float = field(default=0.95, metadata={"help": "temperature parameter for generation"})
     repetition_penalty: float = field(default=1.0, metadata={"help": "repetition penalty parameter for generation"})
     device: str = field(default="gpu", metadata={"help": "Device"})
-    dtype: str = field(default=None, metadata={"help": "Model dtype"})
+    dtype: str = field(default="bfloat16", metadata={"help": "Model dtype"})
     lora_path: str = field(default=None, metadata={"help": "The directory of LoRA parameters. Default to None"})
     export_precache: bool = field(default=False, metadata={"help": "whether use prefix weight to do infer"})
     prefix_path: str = field(
@@ -36,7 +36,7 @@ class PredictorArgument:
     mode: str = field(
         default="dynamic", metadata={"help": "the type of predictor, it should be one of [dynamic, static]"}
     )
-    inference_model: bool = field(default=False, metadata={"help": "whether use InferenceModel to do generation"})
+    inference_model: bool = field(default=True, metadata={"help": "whether use InferenceModel to do generation"})
     quant_type: str = field(
         default="",
         metadata={
@@ -75,7 +75,7 @@ class PredictorArgument:
         },
     )
 
-    append_attn: bool = field(default=False, metadata={"help": "whether use append attention"})
+    append_attn: bool = field(default=True, metadata={"help": "whether use append attention"})
 
     chat_template: str = field(
         default=None,

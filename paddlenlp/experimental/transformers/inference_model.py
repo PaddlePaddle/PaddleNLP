@@ -22,7 +22,7 @@ from paddlenlp.transformers import AutoConfig, AutoInferenceModelForCausalLM
 from paddlenlp.utils.log import logger
 
 class InferenceModel:
-    def __init__(self, predictor_args, model_args, nranks=None, rank=None, load_model_from_ipc=False):
+    def __init__(self, predictor_args, model_args, nranks=1, rank=0, load_model_from_ipc=False, cold_start=False):
         """
         Initialize the Causal Language Model Loader.
         
@@ -41,7 +41,7 @@ class InferenceModel:
         self.model = self._build_model()
 
         # (TODO:gaoziyuan)当前启动服务后直接加载参数，后续进行热启动
-        if load_model_from_ipc:
+        if load_model_from_ipc and not cold_start:
             self.update_parameters()
         
     def _setup_environment(self):
@@ -146,10 +146,13 @@ class InferenceModel:
 
         logger.info("Model parameters updated successfully")
     
-    def get_qwen2_train_infer_keys_map(self):
-
-        # Initialize mappings
-        train_to_infer = {}
+    def get_name_mappings_to_training(self):
+        """Generate parameter name mappings from inference to training format for Qwen2 model.
+        
+        Returns:
+            dict: A dictionary mapping inference parameter names to training parameter names
+        """
+        # Initialize mapping
         infer_to_train = {}
 
         config = self.config  # Cache config to avoid repeated access
@@ -171,25 +174,22 @@ class InferenceModel:
             ("qwen2.layers.{}.mlp.gate_up_fused_proj.{}", "qwen2.transformer_block.fuseqwen2.{}.ffn1_{}", place_holders),
             ("qwen2.layers.{}.mlp.down_proj.{}", "qwen2.transformer_block.fuseqwen2.{}.ffn2_{}", place_holders),
         ]
+        # 量化scale_name
+        # qkv_weight_scale/ffn1_weight_scale/ffn2_weight_scale/out_proj_weight_scale
 
-        # Process each mapping pattern
+        # Process each mapping pattern to build infer_to_train directly
         for train_pattern, infer_pattern, phs in mapping_patterns:
             if phs is None:  # Static mapping
-                train_to_infer[train_pattern] = infer_pattern
+                infer_to_train[infer_pattern] = train_pattern
                 continue
                 
             for i in range(num_hidden_layers):
                 for ph in phs:
                     train_key = train_pattern.format(i, ph)
                     infer_key = infer_pattern.format(i, ph)
-                    train_to_infer[train_key] = infer_key
+                    infer_to_train[infer_key] = train_key
 
-        # Create reverse mapping
-        infer_to_train = {v: k for k, v in train_to_infer.items()}
-
-        # Store as instance variables if needed
-        self.train_to_infer_name_map = train_to_infer
         self.infer_to_train_name_map = infer_to_train
         
-        return train_to_infer, infer_to_train
+        return infer_to_train
 
