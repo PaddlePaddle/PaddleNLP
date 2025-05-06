@@ -1,17 +1,3 @@
-// Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
-// 
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-// 
-//     http://www.apache.org/licenses/LICENSE-2.0
-// 
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 #include <type_traits>
 
 #include "paddle/extension.h"
@@ -41,6 +27,7 @@ template<uint32_t CTA_Q, uint32_t CTA_K, uint32_t WARP_Q, uint32_t WARP_K, uint3
 __global__ void qk_int_sv_f8_attn_varlen_kernel(int8_t *__restrict__ Q, int8_t *__restrict__ K, int8_t *__restrict__ V, DTypeOut *__restrict__ O, float *__restrict__ Lse,
                       float *__restrict__ Q_scale, float *__restrict__ K_scale, float *__restrict__ V_scale, float *__restrict__ V_mean,
                       uint32_t *__restrict__ cu_seqlen,
+                      uint32_t *__restrict__ cu_seqlen_v_padded,
                       const uint32_t qo_len, const uint32_t kv_len, // notice: this is max_seqlen
                       const uint32_t num_kv_groups,
                       const uint32_t stride_seq_q, const uint32_t stride_h_q, // no stride bz
@@ -83,6 +70,11 @@ __global__ void qk_int_sv_f8_attn_varlen_kernel(int8_t *__restrict__ Q, int8_t *
   const uint32_t num_qo_heads = gridDim.y;
   const uint32_t head_id = blockIdx.y;
 
+  // return this kernel, in block-level
+  const uint32_t bz_seqlen = cu_seqlen[batch_id + 1] - cu_seqlen[batch_id];
+  const uint32_t thread_base_token = bx * CTA_Q;
+  if (thread_base_token >= bz_seqlen) return;
+
   // transfer to base 2 instead of base e with better numerical efficiency
   sm_scale *= math::log2e;
 
@@ -112,17 +104,17 @@ __global__ void qk_int_sv_f8_attn_varlen_kernel(int8_t *__restrict__ Q, int8_t *
 
   if constexpr (K_GRAN == QuantGranularity::kPerBlock)
   {
-    const uint32_t num_block_k = div_ceil(kv_len, CTA_K);
+    const uint32_t num_block_k = div_ceil(kv_len, CTA_K);  // do not replace kv_len -> bz_seqlen here! Scale shape is determinated by former quant code.
     k_scale_idx = batch_id * (num_qo_heads / num_kv_groups) * num_block_k + (head_id / num_kv_groups) * num_block_k;
   }
   else if constexpr (K_GRAN == QuantGranularity::kPerWarp)
   {
-    const uint32_t num_warp_block_k = div_ceil(kv_len, CTA_K) * (CTA_K / WARP_K);
+    const uint32_t num_warp_block_k = div_ceil(kv_len, CTA_K) * (CTA_K / WARP_K);  // do not replace kv_len -> bz_seqlen here!
     k_scale_idx = batch_id * (num_qo_heads / num_kv_groups) * num_warp_block_k + (head_id / num_kv_groups) * num_warp_block_k + get_warp_idx_k<num_warps_q, num_warps_k>();
   }
   else if constexpr (K_GRAN == QuantGranularity::kPerThread)
   {
-    const uint32_t num_warp_block_k = div_ceil(kv_len, CTA_K) * (CTA_K / WARP_K);
+    const uint32_t num_warp_block_k = div_ceil(kv_len, CTA_K) * (CTA_K / WARP_K);  // do not replace kv_len -> bz_seqlen here!
     k_scale_idx = batch_id * (num_qo_heads / num_kv_groups) * (num_warp_block_k * 4) + (head_id / num_kv_groups) * (num_warp_block_k * 4) + get_warp_idx_k<num_warps_q, num_warps_k>() * 4 + lane_id % 4;
   }
 
@@ -194,10 +186,24 @@ __global__ void qk_int_sv_f8_attn_varlen_kernel(int8_t *__restrict__ Q, int8_t *
   constexpr uint32_t O_smem_iters_row = O_SMEM_STRIDE / (global_to_shared_line_lanes_O * PACK_SIZE_O);
   constexpr uint32_t O_smem_iters_col = CTA_Q / (num_warps * global_to_shared_copy_lines_per_warp_O);
 
-  int8_t *Q_lane_base_ptr = Q + batch_id * stride_bz_q + head_id * stride_h_q + (bx * CTA_Q + CTA_Q / num_warps * warp_id + lane_id / global_to_shared_line_lanes_QK) * stride_seq_q + (lane_id % global_to_shared_line_lanes_QK) * PACK_SIZE_QK;
-  int8_t *K_lane_base_ptr = K + batch_id * stride_bz_k + (head_id / num_kv_groups) * stride_h_k + (CTA_K / num_warps * warp_id + lane_id / global_to_shared_line_lanes_QK) * stride_seq_k + (lane_id % global_to_shared_line_lanes_QK) * PACK_SIZE_QK;
-  //                                                                for fp16: CTA_K / num_warps * warp_id * stride_seq_v + lane_id / global_to_shared_line_lanes_V * stride_seq_v
-  int8_t *V_lane_base_ptr = V + batch_id * stride_bz_v + (head_id / num_kv_groups) * stride_h_v + head_dim / num_warps * warp_id * stride_d_v + lane_id / global_to_shared_line_lanes_V * stride_d_v + (lane_id % global_to_shared_line_lanes_V) * PACK_SIZE_V;
+  int8_t *Q_lane_base_ptr = Q + 
+                            cu_seqlen[batch_id] * stride_seq_q + 
+                            head_id * stride_h_q + 
+                            (bx * CTA_Q + CTA_Q / num_warps * warp_id + lane_id / global_to_shared_line_lanes_QK) * stride_seq_q + 
+                            (lane_id % global_to_shared_line_lanes_QK) * PACK_SIZE_QK;
+  int8_t *K_lane_base_ptr = K + 
+                            cu_seqlen[batch_id] * stride_seq_k + 
+                            (head_id / num_kv_groups) * stride_h_k + 
+                            (CTA_K / num_warps * warp_id + lane_id / global_to_shared_line_lanes_QK) * stride_seq_k + 
+                            (lane_id % global_to_shared_line_lanes_QK) * PACK_SIZE_QK;
+  // for fp16: CTA_K / num_warps * warp_id * stride_seq_v + lane_id / global_to_shared_line_lanes_V * stride_seq_v
+  int8_t *V_lane_base_ptr = V + 
+                            cu_seqlen_v_padded[batch_id] + 
+                            (head_id / num_kv_groups) * stride_h_v + 
+                            head_dim / num_warps * warp_id * stride_d_v + 
+                            lane_id / global_to_shared_line_lanes_V * stride_d_v + 
+                            (lane_id % global_to_shared_line_lanes_V) * PACK_SIZE_V;
+
   uint32_t Q_smem_offset_load = smem_Q.get_permuted_offset(warp_id * global_to_shared_copy_lines_per_warp_QK * Q_smem_iters_col + lane_id / global_to_shared_line_lanes_QK, lane_id % global_to_shared_line_lanes_QK);
   uint32_t K_smem_offset_load = smem_K.get_permuted_offset(warp_id * global_to_shared_copy_lines_per_warp_QK * K_smem_iters_col + lane_id / global_to_shared_line_lanes_QK, lane_id % global_to_shared_line_lanes_QK);
   uint32_t V_smem_offset_load = smem_V.get_permuted_offset(warp_id * global_to_shared_copy_lines_per_warp_V * V_smem_iters_col + lane_id / global_to_shared_line_lanes_V, lane_id % global_to_shared_line_lanes_V);
@@ -216,15 +222,16 @@ __global__ void qk_int_sv_f8_attn_varlen_kernel(int8_t *__restrict__ Q, int8_t *
   uint32_t Q_load_idx_lane_base = bx * CTA_Q + CTA_Q / num_warps * warp_id + lane_id / global_to_shared_line_lanes_QK;
   uint32_t K_load_idx_lane_base = CTA_K / num_warps * warp_id + lane_id / global_to_shared_line_lanes_QK;
 
+  // do we need to replace this kv_len -> bz_seqlen?
   const uint32_t num_iterations = div_ceil(
       mask_mode == MaskMode::kCausal
-          ? min(kv_len, (bx + 1) * CTA_Q)
-          : kv_len,
+          ? min(bz_seqlen, (bx + 1) * CTA_Q)
+          : bz_seqlen,
       CTA_K);
 
   // load Q with predicate
   load_global_to_share<global_to_shared_line_lanes_QK, global_to_shared_copy_lines_per_warp_QK, QK_smem_iters_row, Q_smem_iters_col, swizzle_mode_QK, QK_SMEM_STRIDE / PACK_SIZE_QK, CTA_Q>(
-    &Q_lane_base_ptr, Q_smem_offset_load, stride_seq_q, smem_Q, Q_load_idx_lane_base, qo_len);
+    &Q_lane_base_ptr, Q_smem_offset_load, stride_seq_q, smem_Q, Q_load_idx_lane_base, bz_seqlen); // notice: replace qo_len -> bz_seqlen
   cp_async::commit_group();
   cp_async::wait_group<0>();
   __syncthreads();
@@ -243,7 +250,7 @@ __global__ void qk_int_sv_f8_attn_varlen_kernel(int8_t *__restrict__ Q, int8_t *
 
   // load K with predicate
   load_global_to_share<global_to_shared_line_lanes_QK, global_to_shared_copy_lines_per_warp_QK, QK_smem_iters_row, K_smem_iters_col, swizzle_mode_QK, QK_SMEM_STRIDE / PACK_SIZE_QK, CTA_K>(
-    &K_lane_base_ptr, K_smem_offset_load, stride_seq_k, smem_K, K_load_idx_lane_base, kv_len);
+    &K_lane_base_ptr, K_smem_offset_load, stride_seq_k, smem_K, K_load_idx_lane_base, bz_seqlen); // notice: replace kv_len -> bz_seqlen
   cp_async::commit_group();
 
   float q_scale = Q_scale[q_scale_idx];
@@ -427,7 +434,7 @@ __global__ void qk_int_sv_f8_attn_varlen_kernel(int8_t *__restrict__ Q, int8_t *
 
     // load K with predicate
     load_global_to_share<global_to_shared_line_lanes_QK, global_to_shared_copy_lines_per_warp_QK, QK_smem_iters_row, K_smem_iters_col, swizzle_mode_QK, QK_SMEM_STRIDE / PACK_SIZE_QK, CTA_K>(
-      &K_lane_base_ptr, K_smem_offset_load, stride_seq_k, smem_K, K_load_idx_lane_base, kv_len);
+      &K_lane_base_ptr, K_smem_offset_load, stride_seq_k, smem_K, K_load_idx_lane_base, bz_seqlen); // replace kv_len -> bz_seqlen
     cp_async::commit_group();
 
     dequant_scale = q_scale * K_scale[k_scale_idx + (num_iterations - 1) * k_scale_advance_offset];
@@ -499,7 +506,7 @@ __global__ void qk_int_sv_f8_attn_varlen_kernel(int8_t *__restrict__ Q, int8_t *
     {
       apply_causal_mask<num_tiles_q, num_tiles_k>(Q_idx_lane_base, K_idx_lane_base, RS_f32);
     }
-    apply_out_of_bound_mask<num_tiles_q, num_tiles_k>(K_idx_lane_base, RS_f32, kv_len);
+    apply_out_of_bound_mask<num_tiles_q, num_tiles_k>(K_idx_lane_base, RS_f32, bz_seqlen);  // replace kv_len -> bz_seqlen
     K_idx_lane_base += CTA_K;
 
     if constexpr (std::is_same<DTypeSVAccum, float>::value)
@@ -560,6 +567,7 @@ __global__ void qk_int_sv_f8_attn_varlen_kernel(int8_t *__restrict__ Q, int8_t *
     {
       ((float2*)v_scale)[0] = *((float2*)(V_scale_base_ptr + fv * 16));
       ((float2*)v_scale)[1] = *((float2*)(V_scale_base_ptr + fv * 16 + 8));
+      // ((float4*)v_scale)[0] = *((float4*)(V_scale_base_ptr + fv * 16));
 #pragma unroll
       for (uint32_t fq = 0; fq < num_tiles_q; fq++)
       {
@@ -650,8 +658,14 @@ __global__ void qk_int_sv_f8_attn_varlen_kernel(int8_t *__restrict__ Q, int8_t *
   __syncwarp();
 
   // shared memory to global memory
-  DTypeOut *O_lane_ptr = O + batch_id * stride_bz_o + head_id * stride_h_o + (bx * CTA_Q + WARP_Q * get_warp_idx_q<num_warps_q, num_warps_k>() + lane_id / global_to_shared_line_lanes_O) * stride_seq_o + lane_id % global_to_shared_line_lanes_O * PACK_SIZE_O;
+  DTypeOut *O_lane_ptr = O + 
+                         cu_seqlen[batch_id] * stride_seq_o + 
+                         head_id * stride_h_o + 
+                         (bx * CTA_Q + WARP_Q * get_warp_idx_q<num_warps_q, num_warps_k>() + lane_id / global_to_shared_line_lanes_O) * stride_seq_o + 
+                         lane_id % global_to_shared_line_lanes_O * PACK_SIZE_O;
+
   uint32_t offset_O = smem_O.get_permuted_offset(get_warp_idx_q<num_warps_q, num_warps_k>() * WARP_Q + lane_id / global_to_shared_line_lanes_O, lane_id % global_to_shared_line_lanes_O);
+
   uint32_t O_load_idx_lane_base = bx * CTA_Q + CTA_Q / num_warps * warp_id + lane_id / global_to_shared_line_lanes_O;
 
 #pragma unroll
@@ -660,7 +674,7 @@ __global__ void qk_int_sv_f8_attn_varlen_kernel(int8_t *__restrict__ Q, int8_t *
 #pragma unroll
     for (uint32_t j = 0; j < O_smem_iters_row; j++)
     {
-      if (O_load_idx_lane_base < qo_len)
+      if (O_load_idx_lane_base < bz_seqlen)
       {
         smem_O.store_128b(offset_O, O_lane_ptr);
       }
@@ -674,56 +688,374 @@ __global__ void qk_int_sv_f8_attn_varlen_kernel(int8_t *__restrict__ Q, int8_t *
   }
 
   if constexpr (return_lse)
-  { 
+  {
     // ! this only works for num_tiles_q = 2
     uint32_t lse_idx = bx * CTA_Q + lane_id / 4 + 8 * (lane_id % 4) + WARP_Q * get_warp_idx_q<num_warps_q, num_warps_k>();
-    float *lse_lane_ptr = Lse + batch_id * (qo_len * num_qo_heads) + head_id * qo_len + lse_idx;
+    float *lse_lane_ptr = Lse + batch_id * (bz_seqlen * num_qo_heads) + head_id * bz_seqlen + lse_idx;
     uint32_t fq = (lane_id % 4) / 2;
     uint32_t k = (lane_id % 4) % 2;
 
-    if (lse_idx < qo_len)
+    if (lse_idx < bz_seqlen)
     {
       lse_lane_ptr[0] = (math::ptx_log2(d[fq][k]) + m[fq][k] - S_FP8_OFFSET);
     }
   }
 } // kernel impl end
 
+std::vector<paddle::Tensor> qk_int8_sv_f8_accum_f32_fuse_v_scale_attn_varlen_fwd(
+                    paddle::Tensor& query,    // total_seqlen x num_head x head_dim
+                    paddle::Tensor& key,      // total_seqlen x num_head x head_dim
+                    paddle::Tensor& value,    // head_dim x num_head x total_seqlen (padded), fp8
+                    paddle::Tensor& output,
+                    paddle::Tensor& query_scale,
+                    paddle::Tensor& key_scale,
+                    paddle::Tensor& value_scale,
+                    paddle::Tensor& cu_seqlen_q,
+                    paddle::Tensor& cu_seqlen_v_padded,
+                    int max_seqlen_q,
+                    int max_seqlen_k,
+                    int tensor_layout,
+                    int is_causal,
+                    int qk_quant_gran,
+                    float sm_scale,
+                    int return_lse)
+{
+  CHECK_CUDA(query);
+  CHECK_CUDA(key);
+  CHECK_CUDA(value);
+  CHECK_CUDA(output);
+  CHECK_CUDA(query_scale);
+  CHECK_CUDA(key_scale);
+  CHECK_CUDA(value_scale);
+
+  CHECK_LASTDIM_CONTIGUOUS(query);
+  CHECK_LASTDIM_CONTIGUOUS(key);
+  CHECK_CONTIGUOUS(value); // ensure value is contiguous to prevent troubles in the kernel
+  CHECK_LASTDIM_CONTIGUOUS(output);
+  CHECK_CONTIGUOUS(query_scale);
+  CHECK_CONTIGUOUS(key_scale);
+  CHECK_CONTIGUOUS(value_scale);
+
+  CHECK_DTYPE(query, paddle::DataType::INT8);
+  CHECK_DTYPE(key, paddle::DataType::INT8);
+  // TODO: how to check fp8 data type?
+  CHECK_DTYPE(query_scale, paddle::DataType::FLOAT32);
+  CHECK_DTYPE(key_scale, paddle::DataType::FLOAT32);
+  CHECK_DTYPE(value_scale, paddle::DataType::FLOAT32);
+
+  CHECK_DIMS(query, 3);
+  CHECK_DIMS(key, 3);
+  CHECK_DIMS(value, 3);
+  CHECK_DIMS(output, 3);
+  CHECK_DIMS(query_scale, 3);
+  CHECK_DIMS(key_scale, 3);
+  CHECK_DIMS(value_scale, 3);
+
+  const int batch_size = cu_seqlen_q.shape()[0] - 1;
+  const int head_dim = query.shape()[2];
+
+  int qo_len, kv_len, num_qo_heads, num_kv_heads;
+  int stride_seq_q, stride_h_q, stride_seq_k, stride_h_k, stride_h_v, stride_d_v, stride_seq_o, stride_h_o;
+
+  qo_len = max_seqlen_q;
+  kv_len = max_seqlen_k;
+
+  num_qo_heads = query.shape()[1];
+  num_kv_heads = key.shape()[1];
+
+  stride_seq_q = query.strides()[0];
+  stride_h_q = query.strides()[1];
+
+  stride_seq_k = key.strides()[0];
+  stride_h_k = key.strides()[1];
+
+  stride_h_v = value.strides()[1];
+  stride_d_v = value.strides()[0];
+
+  stride_seq_o = output.strides()[0];
+  stride_h_o = output.strides()[1];
+
+  if (num_qo_heads % num_kv_heads != 0) {
+    std::ostringstream err_msg;
+    err_msg << "num_qo_heads (" << num_qo_heads << ") must be divisible by num_kv_heads (" << num_kv_heads << ")";
+    throw std::invalid_argument(err_msg.str());  
+  }
+
+  paddle::Tensor lse = paddle::empty({1}, paddle::DataType::FLOAT32);
+  if (return_lse)
+  {
+    lse = paddle::empty({batch_size, num_qo_heads, qo_len}, paddle::DataType::FLOAT32);
+  }
+
+  const int num_kv_groups = num_qo_heads / num_kv_heads;
+
+  auto output_dtype = output.dtype();
+
+  DISPATCH_HEAD_DIM(head_dim, HEAD_DIM, {
+    DISPATCH_CAUSAL(is_causal, IS_CAUSAL, {
+      DISPATCH_QK_QUANT_GRAN(qk_quant_gran, QK_QUANT_GRAN, {
+        DISPATCH_RETURN_LSE(return_lse, RETURN_LSE, {  
+          DISPATCH_PADDLE_DTYPE_TO_CTYPE_FP16(output_dtype, DTypeOut, {
+              
+            constexpr int CTA_Q = 128;
+            constexpr int CTA_K = 64;
+            constexpr int WARP_Q = 32;
+            constexpr int WARP_K = 64;
+
+            assert(value.shape()[2] >= div_ceil(kv_len, CTA_K) * CTA_K);
+
+            constexpr MaskMode mask_mode = IS_CAUSAL ? MaskMode::kCausal : MaskMode::kNone;
+
+            if constexpr (QK_QUANT_GRAN == static_cast<int>(QuantGranularity::kPerWarp))
+            {
+              CHECK_SHAPE(query_scale, batch_size, num_qo_heads, div_ceil(qo_len, CTA_Q) * (CTA_Q / WARP_Q));
+              CHECK_SHAPE(key_scale, batch_size, num_kv_heads, div_ceil(kv_len, CTA_K) * (CTA_K / WARP_K));
+            }
+            else if constexpr (QK_QUANT_GRAN == static_cast<int>(QuantGranularity::kPerThread))
+            {
+              CHECK_SHAPE(query_scale, batch_size, num_qo_heads, div_ceil(qo_len, CTA_Q) * (CTA_Q / WARP_Q) * 8);
+              CHECK_SHAPE(key_scale, batch_size, num_kv_heads, div_ceil(kv_len, CTA_K) * (CTA_K / WARP_K) * 4);    
+            }
+            else
+            {
+              static_assert(QK_QUANT_GRAN == static_cast<int>(QuantGranularity::kPerWarp) || QK_QUANT_GRAN == static_cast<int>(QuantGranularity::kPerThread), "Unsupported quantization granularity");
+            }
+
+            CHECK_SHAPE(value_scale, batch_size, num_kv_heads, head_dim);
+
+            //                                     smem_Q                                     smem_K                            smem_V                     smem_O
+            size_t smem_max = std::max(CTA_Q * HEAD_DIM * sizeof(int8_t) + CTA_K * HEAD_DIM * sizeof(int8_t) + CTA_K * HEAD_DIM * sizeof(int8_t), CTA_Q * HEAD_DIM * sizeof(half));
+            
+            auto kernel_func = qk_int_sv_f8_attn_varlen_kernel<CTA_Q, CTA_K, WARP_Q, WARP_K, HEAD_DIM, SADataType::kInt8, static_cast<QuantGranularity>(QK_QUANT_GRAN), static_cast<QuantGranularity>(QK_QUANT_GRAN),
+                                                        float, false, DTypeOut, ComputeUnit::kCudaCore, mask_mode, RETURN_LSE, true, false>;
+
+            cudaFuncSetAttribute(kernel_func, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_max);
+
+            dim3 grid(div_ceil(qo_len, CTA_Q), num_qo_heads, batch_size);
+            dim3 block(32, (CTA_Q / WARP_Q) * (CTA_K / WARP_K));
+
+            kernel_func<<<grid, block, smem_max>>>(
+              query.data<int8_t>(), 
+              key.data<int8_t>(),
+              reinterpret_cast<int8_t*>(value.data()),
+              reinterpret_cast<DTypeOut*>(output.data()),
+              (RETURN_LSE) ? reinterpret_cast<float*>(lse.data()) : nullptr,
+              reinterpret_cast<float*>(query_scale.data()),
+              reinterpret_cast<float*>(key_scale.data()),
+              reinterpret_cast<float*>(value_scale.data()),
+              nullptr,
+              reinterpret_cast<uint32_t*>(cu_seqlen_q.data()),
+              reinterpret_cast<uint32_t*>(cu_seqlen_v_padded.data()),
+              qo_len,
+              kv_len,
+              num_kv_groups,
+              stride_seq_q, stride_h_q,
+              stride_seq_k, stride_h_k,
+              stride_h_v, stride_d_v,
+              stride_seq_o, stride_h_o,
+              sm_scale);
+          });
+        });
+      });
+    });
+  });
+
+  return {lse};
+}
+
+std::vector<paddle::Tensor> qk_int8_sv_f8_accum_f32_fuse_v_scale_attn_inst_buf_sm89_varlen_fwd(
+                    paddle::Tensor& query,
+                    paddle::Tensor& key,
+                    paddle::Tensor& value,
+                    paddle::Tensor& output,
+                    paddle::Tensor& query_scale,
+                    paddle::Tensor& key_scale,
+                    paddle::Tensor& value_scale,
+                    paddle::Tensor& cu_seqlen_q,
+                    paddle::Tensor& cu_seqlen_v_padded,
+                    int max_seqlen_q,
+                    int max_seqlen_k,
+                    int tensor_layout,
+                    int is_causal,
+                    int qk_quant_gran,
+                    float sm_scale,
+                    int return_lse)
+{
+  CHECK_CUDA(query);
+  CHECK_CUDA(key);
+  CHECK_CUDA(value);
+  CHECK_CUDA(output);
+  CHECK_CUDA(query_scale);
+  CHECK_CUDA(key_scale);
+  CHECK_CUDA(value_scale);
+
+  CHECK_LASTDIM_CONTIGUOUS(query);
+  CHECK_LASTDIM_CONTIGUOUS(key);
+  CHECK_CONTIGUOUS(value); // ensure value is contiguous to prevent troubles in the kernel
+  CHECK_LASTDIM_CONTIGUOUS(output);
+  CHECK_CONTIGUOUS(query_scale);
+  CHECK_CONTIGUOUS(key_scale);
+  CHECK_CONTIGUOUS(value_scale);
+
+  CHECK_DTYPE(query, paddle::DataType::INT8);
+  CHECK_DTYPE(key, paddle::DataType::INT8);
+  // TODO: how to check fp8 data type?
+  CHECK_DTYPE(query_scale, paddle::DataType::FLOAT32);
+  CHECK_DTYPE(key_scale, paddle::DataType::FLOAT32);
+  CHECK_DTYPE(value_scale, paddle::DataType::FLOAT32);
+
+  CHECK_DIMS(query, 3); // total_seqlen, num_heads, head_dim
+  CHECK_DIMS(key, 3);
+  CHECK_DIMS(value, 3);
+  CHECK_DIMS(output, 3);
+  CHECK_DIMS(query_scale, 3);
+  CHECK_DIMS(key_scale, 3);
+  CHECK_DIMS(value_scale, 3);
+
+  const int batch_size = cu_seqlen_q.shape()[0] - 1;
+  const int head_dim = query.shape()[2];
+
+  int qo_len, kv_len, num_qo_heads, num_kv_heads;
+  int stride_seq_q, stride_h_q, stride_seq_k, stride_h_k, stride_h_v, stride_d_v, stride_seq_o, stride_h_o;
+
+  qo_len = max_seqlen_q;
+  kv_len = max_seqlen_k;
+
+  num_qo_heads = query.shape()[1];
+  num_kv_heads = key.shape()[1];
+
+  stride_seq_q = query.strides()[0];
+  stride_h_q = query.strides()[1];
+
+  stride_seq_k = key.strides()[0];
+  stride_h_k = key.strides()[1];
+
+  stride_h_v = value.strides()[1];
+  stride_d_v = value.strides()[0];  // [head_dim, num_head, total_seqlen]
+
+  stride_seq_o = output.strides()[0];
+  stride_h_o = output.strides()[1];
+
+  if (num_qo_heads % num_kv_heads != 0) {
+    std::ostringstream err_msg;
+    err_msg << "num_qo_heads (" << num_qo_heads << ") must be divisible by num_kv_heads (" << num_kv_heads << ")";
+    throw std::invalid_argument(err_msg.str());  
+  }
+
+  paddle::Tensor lse = paddle::empty({1});
+  if (return_lse)
+  {
+    lse = paddle::empty({batch_size, num_qo_heads, qo_len}, paddle::DataType::FLOAT32);
+  }
+
+  const int num_kv_groups = num_qo_heads / num_kv_heads;
+
+  auto output_dtype = output.dtype();
+
+  DISPATCH_HEAD_DIM(head_dim, HEAD_DIM, {
+    DISPATCH_CAUSAL(is_causal, IS_CAUSAL, {
+      DISPATCH_QK_QUANT_GRAN(qk_quant_gran, QK_QUANT_GRAN, {
+        DISPATCH_RETURN_LSE(return_lse, RETURN_LSE, {  
+          DISPATCH_PADDLE_DTYPE_TO_CTYPE_FP16(output_dtype, DTypeOut, {
+              
+            constexpr int CTA_Q = 128;
+            constexpr int CTA_K = 64;
+            constexpr int WARP_Q = 32;
+            constexpr int WARP_K = 64;
+
+            assert(value.shape()[2] >= div_ceil(kv_len, CTA_K) * CTA_K);
+
+            constexpr MaskMode mask_mode = IS_CAUSAL ? MaskMode::kCausal : MaskMode::kNone;
+
+            if constexpr (QK_QUANT_GRAN == static_cast<int>(QuantGranularity::kPerWarp))
+            {
+              CHECK_SHAPE(query_scale, batch_size, num_qo_heads, div_ceil(qo_len, CTA_Q) * (CTA_Q / WARP_Q));
+              CHECK_SHAPE(key_scale, batch_size, num_kv_heads, div_ceil(kv_len, CTA_K) * (CTA_K / WARP_K));
+            }
+            else if constexpr (QK_QUANT_GRAN == static_cast<int>(QuantGranularity::kPerThread))
+            {
+              CHECK_SHAPE(query_scale, batch_size, num_qo_heads, div_ceil(qo_len, CTA_Q) * (CTA_Q / WARP_Q) * 8);
+              CHECK_SHAPE(key_scale, batch_size, num_kv_heads, div_ceil(kv_len, CTA_K) * (CTA_K / WARP_K) * 4);    
+            }
+            else
+            {
+              static_assert(QK_QUANT_GRAN == static_cast<int>(QuantGranularity::kPerWarp) || QK_QUANT_GRAN == static_cast<int>(QuantGranularity::kPerThread), "Unsupported quantization granularity");
+            }
+
+            CHECK_SHAPE(value_scale, batch_size, num_kv_heads, head_dim);
+
+            //                                     smem_Q                                     smem_K                            smem_V                     smem_O
+            size_t smem_max = std::max(CTA_Q * HEAD_DIM * sizeof(int8_t) + CTA_K * HEAD_DIM * sizeof(int8_t) + CTA_K * HEAD_DIM * sizeof(int8_t), CTA_Q * HEAD_DIM * sizeof(half));
+            
+            auto kernel_func = qk_int_sv_f8_attn_varlen_kernel<CTA_Q, CTA_K, WARP_Q, WARP_K, HEAD_DIM, SADataType::kInt8, static_cast<QuantGranularity>(QK_QUANT_GRAN), static_cast<QuantGranularity>(QK_QUANT_GRAN), float, true, DTypeOut, ComputeUnit::kCudaCore, mask_mode, RETURN_LSE, true, false>;
+
+            cudaFuncSetAttribute(kernel_func, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_max);
+
+            dim3 grid(div_ceil(qo_len, CTA_Q), num_qo_heads, batch_size); // block
+            dim3 block(32, (CTA_Q / WARP_Q) * (CTA_K / WARP_K));  // thread
+
+            kernel_func<<<grid, block, smem_max>>>(
+              query.data<int8_t>(), 
+              key.data<int8_t>(),
+              reinterpret_cast<int8_t*>(value.data()),
+              reinterpret_cast<DTypeOut*>(output.data()),
+              (RETURN_LSE) ? reinterpret_cast<float*>(lse.data()) : nullptr,
+              reinterpret_cast<float*>(query_scale.data()),
+              reinterpret_cast<float*>(key_scale.data()),
+              reinterpret_cast<float*>(value_scale.data()),
+              nullptr,
+              reinterpret_cast<uint32_t*>(cu_seqlen_q.data()),
+              reinterpret_cast<uint32_t*>(cu_seqlen_v_padded.data()),
+              qo_len,
+              kv_len,
+              num_kv_groups,
+              stride_seq_q, stride_h_q,
+              stride_seq_k, stride_h_k,
+              stride_h_v, stride_d_v,
+              stride_seq_o, stride_h_o,
+              sm_scale);
+          });
+        });
+      });
+    });
+  });
+
+  return {lse};
+}
+
 //
 //  =========== Exposed to Outside API - ARCH: SM89 ===========
 //
 
-std::vector<paddle::Tensor> sage_attention_varlen_fwd(paddle::Tensor& q,        // total_seqlen x num_head x head_dim
-                                                    paddle::Tensor& k,          // total_seqlen x num_head x head_dim
-                                                    paddle::Tensor& v,          // total_seqlen x num_head x head_dim
-                                                    paddle::Tensor& v_padded,   // total_seqlen_padded x num_head x head_dim
-                                                    paddle::Tensor& cu_seqlen_q,
-                                                    paddle::Tensor& cu_seqlen_v,
-                                                    paddle::Tensor& cu_seqlen_v_padded,
-                                                    paddle::Tensor& km,
-                                                    paddle::optional<paddle::Tensor>& vm,
-                                                    int max_seqlen_q,
-                                                    int max_seqlen_k,
-                                                    int total_seqlen_v_padded,
-                                                    float sm_scale,
-                                                    std::string qk_quant_gran,
-                                                    std::string pv_accum_dtype,
-                                                    int tensor_layout,
-                                                    bool is_causal,
-                                                    bool smooth_k,
-                                                    bool smooth_v,
-                                                    bool return_lse)
+std::vector<paddle::Tensor> sage_attention_varlen_fwd(paddle::Tensor& q,          // total_seqlen x num_head x head_dim
+                                                      paddle::Tensor& k,          // total_seqlen x num_head x head_dim
+                                                      paddle::Tensor& v,          // total_seqlen x num_head x head_dim
+                                                      paddle::Tensor& cu_seqlen_q,
+                                                      paddle::Tensor& cu_seqlen_v_padded,
+                                                      paddle::Tensor& km,
+                                                      paddle::optional<paddle::Tensor>& vm,
+                                                      const std::vector<int64_t>& split_vec,
+                                                      int max_seqlen_q,
+                                                      int max_seqlen_k,
+                                                      int total_seqlen_v_padded,
+                                                      float sm_scale,
+                                                      std::string qk_quant_gran,
+                                                      std::string pv_accum_dtype,
+                                                      int tensor_layout,
+                                                      bool is_causal,
+                                                      bool smooth_k,
+                                                      bool smooth_v,
+                                                      bool return_lse)
 {
   int _is_causal = int(is_causal);
   int _qk_quant_gran = (qk_quant_gran == std::string("per_thread")) ? 3 : 2;
   int _return_lse = int(return_lse);
 
-  PD_CHECK(pv_accum_dtype == std::string("fp32+fp32") || pv_accum_dtype == std::string("fp32"), "pv_accum_dtype must be either fp32 or fp32+fp32");
+  PD_CHECK(pv_accum_dtype == std::string("fp32+fp32") || pv_accum_dtype == std::string("fp32") || pv_accum_dtype == std::string("any"), "pv_accum_dtype must be either fp32 or fp32+fp32");
   auto pv_accum_dtype_const = (pv_accum_dtype == std::string("fp32+fp32")) ? paddle::DataType::UNDEFINED : paddle::DataType::FLOAT32;
 
   PD_CHECK(q.shape()[2] == 64 || q.shape()[2] == 128, "head_dim must be either 64 or 128");
   PD_CHECK(q.strides()[2] == 1 && k.strides()[2] == 1 && v.strides()[2] == 1, "Last dim of qkv must be contiguous.");
-
-  int seq_dim = (tensor_layout == 0) ? 1 : 2;
 
   // quant q, k -> q_int8, k_int8
   constexpr int BLKQ = 128;
@@ -731,25 +1063,31 @@ std::vector<paddle::Tensor> sage_attention_varlen_fwd(paddle::Tensor& q,        
   constexpr int BLKK = 64;
   std::vector<paddle::Tensor>&& quant_qk_results = per_warp_int8_varlen_cuda_fwd(q, k, cu_seqlen_q, km, max_seqlen_q, max_seqlen_k, BLKQ, WARPQ, BLKK); // q_int8, q_scale, k_int8, k_scale
 
-  paddle::Tensor o = paddle::empty(v.shape(), v.dtype(), paddle::GPUPlace());
+  paddle::Tensor o = paddle::empty(q.shape(), q.dtype(), paddle::GPUPlace());
 
   if (pv_accum_dtype_const == paddle::DataType::UNDEFINED) {
     if (smooth_v) smooth_v = false;
   }
 
-  std::vector<paddle::Tensor>&& quant_vfp8_results = per_channel_varlen_fp8(v, tensor_layout, 448.0, smooth_v);
+  std::vector<paddle::Tensor>&& quant_vfp8_results = per_channel_varlen_fp8(v, cu_seqlen_v, cu_seqlen_v_padded, 
+                                                                            max_seqlen_k, total_seqlen_v_padded,
+                                                                            tensor_layout, 448.0, smooth_v);
 
   switch (pv_accum_dtype_const) {
     case paddle::DataType::FLOAT32: {
-      if (smooth_v) {
-        qk_int8_sv_f8_accum_f32_fuse_v_scale_fuse_v_mean_attn_fwd(quant_qk_results[0], quant_qk_results[2], quant_vfp8_results[0], o, quant_qk_results[1], quant_qk_results[3], quant_vfp8_results[1], quant_vfp8_results[2], tensor_layout, _is_causal, _qk_quant_gran, sm_scale, _return_lse);
-      } else {
-        qk_int8_sv_f8_accum_f32_fuse_v_scale_attn_fwd(quant_qk_results[0], quant_qk_results[2], quant_vfp8_results[0], o, quant_qk_results[1], quant_qk_results[3], quant_vfp8_results[1], tensor_layout, _is_causal, _qk_quant_gran, sm_scale, _return_lse);
-      }
+      qk_int8_sv_f8_accum_f32_fuse_v_scale_attn_varlen_fwd(quant_qk_results[0], quant_qk_results[2], quant_vfp8_results[0], o, 
+                                                           quant_qk_results[1], quant_qk_results[3], quant_vfp8_results[1], 
+                                                           cu_seqlen_q, cu_seqlen_v_padded,
+                                                           max_seqlen_q, max_seqlen_k,
+                                                           tensor_layout, _is_causal, _qk_quant_gran, sm_scale, _return_lse);
       break;
     }
     case paddle::DataType::UNDEFINED: {
-      qk_int8_sv_f8_accum_f32_fuse_v_scale_attn_inst_buf_sm89_fwd(quant_qk_results[0], quant_qk_results[2], quant_vfp8_results[0], o, quant_qk_results[1], quant_qk_results[3], quant_vfp8_results[1], tensor_layout, _is_causal, _qk_quant_gran, sm_scale, _return_lse);
+      qk_int8_sv_f8_accum_f32_fuse_v_scale_attn_inst_buf_sm89_varlen_fwd(quant_qk_results[0], quant_qk_results[2], quant_vfp8_results[0], o, 
+                                                                         quant_qk_results[1], quant_qk_results[3], quant_vfp8_results[1], 
+                                                                         cu_seqlen_q, cu_seqlen_v_padded,
+                                                                         max_seqlen_q, max_seqlen_k,
+                                                                         tensor_layout, _is_causal, _qk_quant_gran, sm_scale, _return_lse);
       break;
     }
     default: {
