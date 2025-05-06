@@ -2149,7 +2149,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     keep_in_fp32_modules=keep_in_fp32_modules,
                 )
             else:
-                error_msgs = _load_state_dict_into_model(model_to_load, state_dict, start_prefix)
+                error_msgs = _load_state_dict_into_model(
+                    model_to_load,
+                    state_dict,
+                    start_prefix,
+                    model_to_load_state_dict,
+                )
         else:
             # Sharded checkpoint or whole but low_cpu_mem_usage==True
 
