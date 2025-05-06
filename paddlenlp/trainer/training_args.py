@@ -1493,7 +1493,7 @@ class TrainingArguments:
                     else:
                         order = ["dp", "sharding", "pp", "mp"]
                 if self.use_expert_parallel:
-                    if self.moe_sharding_parallel_degree > 1 and self.expert_parallel_degree > 1:
+                    if self.moe_sharding_parallel_degree >= 1 and self.expert_parallel_degree > 1:
                         order = ["sharding", "moe_sharding", "pp", "sep", "dp", "ep", "mp"]
                     else:
                         order = ["sharding", "pp", "sep", "dp", "mp"]
