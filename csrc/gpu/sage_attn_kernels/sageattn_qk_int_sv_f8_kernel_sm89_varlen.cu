@@ -1069,7 +1069,17 @@ std::vector<paddle::Tensor> sage_attention_varlen_fwd(paddle::Tensor& q,        
     if (smooth_v) smooth_v = false;
   }
 
-  std::vector<paddle::Tensor>&& quant_vfp8_results = per_channel_varlen_fp8(v, cu_seqlen_v, cu_seqlen_v_padded, 
+  // split, padding to 64-align, and concat
+  std::vector<paddle::Tensor> v_splited = paddle::split(v, split_vec, {0}); // split along the total_seqlen axis.
+  for (auto& vi : v_splited) {
+    int v_pad_len = (vi.shape()[0] % 64 != 0) ? (64 - vi.shape()[0] % 64) : 0;
+    if (v_pad_len > 0) {
+      vi = paddle::concat({vi, paddle::zeros({v_pad_len, vi.shape()[1], vi.shape()[2]}, vi.dtype(), paddle::GPUPlace())}, {0}); // along the total_seqlen axis
+    }
+  }
+  paddle::Tensor v_padded = paddle::concat(v_splited, {0}); // final concat along the total_seqlen axis
+
+  std::vector<paddle::Tensor>&& quant_vfp8_results = per_channel_varlen_fp8(v_padded, cu_seqlen_q, cu_seqlen_v_padded, 
                                                                             max_seqlen_k, total_seqlen_v_padded,
                                                                             tensor_layout, 448.0, smooth_v);
 

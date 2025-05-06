@@ -1159,26 +1159,25 @@ std::vector<paddle::Tensor>  qk_int8_sv_f16_accum_f32_attn_varlen_fwd(paddle::Te
 
 // VARLEN
 
-std::vector<paddle::Tensor> sage_attention_varlen_fwd(paddle::Tensor& q,        // total_seqlen x num_head x head_dim
-                                                    paddle::Tensor& k,          // total_seqlen x num_head x head_dim
-                                                    paddle::Tensor& v,          // total_seqlen x num_head x head_dim
-                                                    paddle::Tensor& v_padded,
-                                                    paddle::Tensor& cu_seqlen_q,
-                                                    paddle::Tensor& cu_seqlen_v,
-                                                    paddle::Tensor& cu_seqlen_v_padded,
-                                                    paddle::Tensor& km,
-                                                    paddle::optional<paddle::Tensor>& vm,
-                                                    int max_seqlen_q,
-                                                    int max_seqlen_k,
-                                                    int total_seqlen_v_padded,
-                                                    float sm_scale,
-                                                    std::string qk_quant_gran,
-                                                    std::string pv_accum_dtype,
-                                                    int tensor_layout,
-                                                    bool is_causal,
-                                                    bool smooth_k,
-                                                    bool smooth_v,
-                                                    bool return_lse)
+std::vector<paddle::Tensor> sage_attention_varlen_fwd(paddle::Tensor& q,          // total_seqlen x num_head x head_dim
+                                                      paddle::Tensor& k,          // total_seqlen x num_head x head_dim
+                                                      paddle::Tensor& v,          // total_seqlen x num_head x head_dim
+                                                      paddle::Tensor& cu_seqlen_q,
+                                                      paddle::Tensor& cu_seqlen_v_padded,
+                                                      paddle::Tensor& km,
+                                                      paddle::optional<paddle::Tensor>& vm,
+                                                      const std::vector<int64_t>& split_vec,
+                                                      int max_seqlen_q,
+                                                      int max_seqlen_k,
+                                                      int total_seqlen_v_padded,
+                                                      float sm_scale,
+                                                      std::string qk_quant_gran,
+                                                      std::string pv_accum_dtype,
+                                                      int tensor_layout,
+                                                      bool is_causal,
+                                                      bool smooth_k,
+                                                      bool smooth_v,
+                                                      bool return_lse)
 {
   int _is_causal = int(is_causal);
   int _qk_quant_gran = (qk_quant_gran == std::string("per_thread")) ? 3 : 2;
