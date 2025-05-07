@@ -49,6 +49,20 @@ def use_cutlass_fp8_gemm():
 def use_custom_allreduce():
     return os.getenv("FLAGS_custom_allreduce", "False") in ["True", "1", "true"]
 
+def precision_cmp_paddle(t1: paddle.Tensor, t2: paddle.Tensor):
+    
+    x, xx = paddle.cast(t1, dtype='float32'), paddle.cast(t2, dtype='float32')
+    # 重塑张量并计算余弦相似度
+    x_reshaped = paddle.reshape(x, [1, -1])
+    xx_reshaped = paddle.reshape(xx, [1, -1])
+    sim = paddle.nn.functional.cosine_similarity(x_reshaped, xx_reshaped).item()
+    
+    # 计算 L1 误差
+    l1 = (paddle.abs(x - xx).sum() / paddle.abs(xx).sum()).item()
+    max_diff = paddle.max(x - xx)
+    
+    return sim, l1, max_diff
+
 
 if paddle.is_compiled_with_cuda():
     if use_cutlass_fp8_gemm():
@@ -3120,9 +3134,9 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
             from paddlenlp.utils.env import PREFILL_USE_SAGE_ATTN
 
             if PREFILL_USE_SAGE_ATTN:
-                from paddlenlp_ops import sage_attention
+                from paddlenlp_ops import sage_attention, append_attention
                 
-                def align_padding(cu_seqlen: paddle.Tensor, align_size: int = 64):
+                def align_padding(cu_seqlen: paddle.Tensor):
                     """
                     Align the sequence lengths to the nearest multiple of `align_size` and return padding information.
                     
@@ -3136,6 +3150,10 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                             - total_seqlen_padded: Total padded sequence length, e.g., 384.
                             - split_vec: List of tuples (original_length, padding_length) for each sequence, e.g., [(131, 125), (24, 232)].
                     """
+                    prop = paddle.device.cuda.get_device_properties()
+                    cc = prop.major * 10 + prop.minor
+                    align_size = 64 if cc == 89 else 128
+
                     # Convert to numpy for easier manipulation
                     cu_seqlen_padded = paddle.zeros(shape=cu_seqlen.shape, dtype=paddle.int32)
                     split_vec = []
@@ -3151,8 +3169,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                     
                     return cu_seqlen_padded, total_seqlen_padded, split_vec
                 
-                cu_seqlen_v_padded, total_seqlen_padded, split_vec = align_padding(kwargs.get("cu_seqlens_q", None), 128)
-                # print(cu_seqlen_v_padded, total_seqlen_padded, split_vec)
+                cu_seqlen_v_padded, total_seqlen_padded, split_vec = align_padding(kwargs.get("cu_seqlens_q", None))    # here. we should figure out a way
 
                 fmha_out = sage_attention(
                     qkv_out,  # [total_seqlen, mixed_dim]
