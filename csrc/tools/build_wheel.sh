@@ -61,7 +61,7 @@ function generate_sm_version(){
         sm_versions=($SM_VERSION )
     elif [ "$ARCHITECTURE" = "all" ]; then
         if awk -v version="$cuda_version" 'BEGIN { exit !(version >= 12.0) }'; then
-          sm_versions=(70 75 80 80 86 89 90 )
+          sm_versions=(70 75 80 86 89 90 )
         else
           sm_versions=(70 75 80 86 89 ) 
         fi 
@@ -119,13 +119,15 @@ def read_version():
     """
     read version and return content
     """
+    __version__ = "3.0.0b4.post"
+
+    formatted_date = datetime.now().date().strftime("%Y%m%d")
     cuda_version = float(paddle.version.cuda())
     sm_version = get_sm_version()
     paddle_commit = paddle.__git_commit__[:7]
-    paddlenlp_version= "3.0.0b4.post"
-    __version__ = "cuda{}-sm{}-paddle_{}-paddlenlp_{}".format(cuda_version, sm_version, paddle_commit, paddlenlp_version)
-    formatted_date = datetime.now().date().strftime("%Y%m%d")
-    __version__ = __version__.replace(".post", ".post{}".format(formatted_date))
+    build_tag = "{}-cuda{}_sm{}_paddle_{}".format(formatted_date, cuda_version, sm_version, paddle_commit)
+
+    __version__ = __version__.replace(".post", ".post{}".format(build_tag))
     
     return __version__
 
