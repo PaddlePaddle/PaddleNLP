@@ -340,6 +340,10 @@ class Qwen2RotaryEmbedding(nn.Layer):
 
     def _set_cos_sin_cache(self, seq_len):
         self.max_seq_len_cached = seq_len
+        if self.inv_freq.dtype != paddle.float32:
+            self.inv_freq = 1.0 / (
+                self.base ** (paddle.cast(paddle.arange(0, self.dim, 2), dtype="float32") / self.dim)
+            )
         # [seq_len]
         t = paddle.arange(seq_len, dtype="float32")
         # [seq_len, dim/2]
@@ -655,9 +659,12 @@ class Qwen2Attention(nn.Layer):
             key_states = key_states.reshape(shape=target_key_value_shape)
             value_states = value_states.reshape(shape=target_key_value_shape)
 
-        kv_seq_len = key_states.shape[-3]
-        if past_key_value is not None:
-            kv_seq_len += past_key_value[0].shape[-3]
+        if position_ids is not None and not self.use_fused_rope:
+            kv_seq_len = position_ids.max().item() + 1
+        else:
+            kv_seq_len = key_states.shape[-3]
+            if past_key_value is not None:
+                kv_seq_len += past_key_value[0].shape[-3]
         if self.use_fused_rope:
             assert past_key_value is None, "fuse rotary not support cache kv for now"
             cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)

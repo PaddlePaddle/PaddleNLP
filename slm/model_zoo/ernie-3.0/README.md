@@ -1293,6 +1293,7 @@ batch_size=32 和 1，预测精度为 FP16 时，GPU 下的效果-时延图：
 ├── compress_token_cls.py        # 序列标注任务的压缩脚本
 ├── compress_qa.py               # 阅读理解任务的压缩脚本
 ├── utils.py                     # 训练工具脚本
+├── infer.py                     # 推理脚本
 ├── configs                      # 压缩配置文件夹
 │ └── default.yml                # 默认配置文件
 ├── deploy                       # 部署目录
@@ -1374,6 +1375,9 @@ python run_seq_cls.py  --model_name_or_path ernie-3.0-medium-zh  --dataset afqmc
 
 # 序列标注任务
 python run_token_cls.py --model_name_or_path ernie-3.0-medium-zh --dataset msra_ner --output_dir ./best_models --export_model_dir best_models/ --do_train --do_eval --do_export --config=configs/default.yml
+
+# 如果无法连接huggingface
+python run_token_cls_without_hf.py --model_name_or_path ernie-3.0-medium-zh --dataset msra_ner --output_dir ./best_models --export_model_dir best_models/ --do_train --do_eval --do_export --config=configs/default.yml
 
 # 阅读理解任务
 python run_qa.py --model_name_or_path ernie-3.0-medium-zh --dataset cmrc2018  --output_dir ./best_models --export_model_dir best_models/ --do_train --do_eval --do_export --config=configs/default.yml
@@ -1527,6 +1531,14 @@ python compress_qa.py --model_name_or_path best_models/cmrc2018/ --dataset cmrc2
 
 三类任务（分类、序列标注、阅读理解）经过裁剪 + 量化后加速比均达到 3 倍左右，所有任务上平均精度损失可控制在 0.5 以内（0.46）。
 
+<a name="推理"></a>
+
+## 推理
+目录中的 ```infer.py```提供了使用导出模型进行推理的样例。运行命令：
+```shell
+python infer.py  --model_name_or_path ernie-3.0-medium-zh --model_path ./best_models/afqmc/export/
+```
+
 <a name="部署"></a>
 
 ## 部署
@@ -1549,7 +1561,7 @@ python compress_qa.py --model_name_or_path best_models/cmrc2018/ --dataset cmrc2
 
 <a name="Python 部署"></a>
 
-#### Python 部署
+### Python 部署
 
 Python 部署请参考：[Python 部署指南](./deploy/python/README.md)
 
