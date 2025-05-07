@@ -577,7 +577,7 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
             if isinstance(tensor_list[0], paddle.Tensor):
                 return paddle.concat(tensor_list, axis=axis)
             elif isinstance(tensor_list[0], np.ndarray):
-                return np.concatenate(tensor_list, dim=axis)
+                return np.concatenate(tensor_list, axis=axis)
             else:
                 raise ValueError(f"Unsupported type of tensor list: {type(tensor_list[0])}")
 
