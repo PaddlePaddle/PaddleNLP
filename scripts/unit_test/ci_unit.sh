@@ -58,8 +58,6 @@ set_env() {
         export RUN_SLOW_TEST=1
         export PYTHONPATH=${nlp_dir}:${nlp_dir}/llm:${PYTHONPATH}
         export running_time=5h
-    else
-        continue
     fi
 }
 
@@ -85,16 +83,12 @@ print_info() {
 get_diff_TO_case(){
 export FLAGS_enable_CI=false
 for file_name in `git diff --numstat ${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
-    arr_file_name=(${file_name//// })
-    dir1=${arr_file_name[0]}
-    dir2=${arr_file_name[1]}
-    dir3=${arr_file_name[2]}
-    dir4=${arr_file_name[3]}
-    file_item=$dir1/$dir2/$dir3/$dir4
-    echo "file_name:"${file_name}, "dir1:"${dir1}, "dir2:"${dir2},"dir3:"${dir3},".xx:" ${file_name##*.}
+    ext="${file_name##*.}"
+    echo "file_name: ${file_name}, ext: ${file_name##*.}"
+    
     if [ ! -f ${file_name} ];then # 针对pr删掉文件
         continue
-    elif [[ ${file_name##*.} == "md" ]] || [[ ${file_name##*.} == "rst" ]] || [[ ${dir1} == "docs" ]];then
+    elif [[ "$ext" == "md" || "$ext" == "rst" || "$file_name" == docs/* ]]; then
         continue
     else
         FLAGS_enable_CI=true

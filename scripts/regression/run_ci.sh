@@ -99,10 +99,12 @@ for file_name in `git diff --numstat ${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`
     dir3=${arr_file_name[2]}
     dir4=${arr_file_name[3]}
     file_item=$dir1/$dir2/$dir3/$dir4
+    ext="${file_name##*.}"
     echo "file_name:"${file_name}, "dir1:"${dir1}, "dir2:"${dir2},"dir3:"${dir3},".xx:" ${file_name##*.}
+    echo "ext: ${file_name##*.}"
     if [ ! -f ${file_name} ];then # 针对pr删掉文件
         continue
-    elif [[ ${file_name##*.} == "md" ]] || [[ ${file_name##*.} == "rst" ]] || [[ ${dir1} == "docs" ]];then
+    elif [[ "$ext" == "md" || "$ext" == "rst" || "$file_name" == docs/* ]]; then
         continue
     elif [[ "${AGILE_COMPILE_BRANCH}" == "refactor-training-loop" ]];then # 针对特定分支
         P0case_list[${#P0case_list[*]}]=gpt
