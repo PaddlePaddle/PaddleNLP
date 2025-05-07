@@ -192,19 +192,26 @@ def mp_reshard(
 
 def init_reshard_mappings(model, training_args, pp_rank, pp_group):
     """
-    初始化重新分片映射，并返回全局的元数据字典。如果模型是在多个水平并行度下训练，则会设置管道名称映射。
-    如果训练模型是单个水平并行度，则将所有参数名称替换为不包含'_layers.'前缀的名称。
-    然后，对于每个参数，创建一个元组，其中包含参数名称、管道键、源排序号、形状和是否分布等信息。
-    最后，如果训练模型是多个水平并行度，则使用`dist.all_gather_object`函数将本地元数据字典与其他进程的元数据字典合并到一起。
+    Initialize reshard mappings and return a global metadata dictionary.
+    If the model is trained with multiple pipeline parallelism degrees,
+    it will set pipeline name mappings. If the training model is single pipeline parallelism,
+    it will replace all parameter names with names without the '_layers.' prefix.
+    Then, for each parameter, create a tuple containing the parameter name, pipeline key,
+    source rank, shape, and whether it is distributed.
+    Finally, if the training model has multiple pipeline parallelism degrees,
+    use the `dist.all_gather_object` function to merge the local metadata dictionary
+    with the metadata dictionaries of other processes.
 
     Args:
-        model (torch.nn.Module): 模型实例。
-        training_args (obj:`TrainingArguments`): 训练配置类的实例，包括水平并行度。
-        pp_rank (int, optional): 当前进程的水平并行排名（默认：0）。
-        pp_group (obj:`dist.ProcessGroup`, optional): 当前进程的水平并行进程组（默认：None）。
+        model (paddle.nn.Layer): Model instance.
+        training_args (obj:`TrainingArguments`): Training configuration instance, including pipeline parallelism.
+        pp_rank (int, optional): Horizontal parallelism rank of the current process (default: 0).
+        pp_group (obj:`dist.ProcessGroup`, optional): Horizontal parallelism process group of the current process
+            (default: None).
 
     Returns:
-        dict: 全局的元数据字典，包括每个参数的管道键、源排序号、形状、是否分布等信息。
+        dict: Global metadata dictionary, including pipeline key, source rank, shape, and distribution status for each
+            parameter.
     """
     hcg = fleet.get_hybrid_communicate_group()
     pp_rank = hcg.get_stage_id()
