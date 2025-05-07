@@ -1183,9 +1183,8 @@ std::vector<paddle::Tensor> sage_attention_varlen_fwd(paddle::Tensor& q,        
   int _qk_quant_gran = (qk_quant_gran == std::string("per_thread")) ? 3 : 2;
   int _return_lse = int(return_lse);
 
-  PD_CHECK(pv_accum_dtype == std::string("fp16+fp32") || pv_accum_dtype == std::string("fp32") || pv_accum_dtype == std::string("fp16"), 
-            "pv_accum_dtype must be either fp16, fp32 or fp16+fp32");
-  auto pv_accum_dtype_const = (pv_accum_dtype == std::string("fp16+fp32")) ? paddle::DataType::UNDEFINED : 
+  PD_CHECK(pv_accum_dtype == std::string("fp16+fp32") || pv_accum_dtype == std::string("fp32") || pv_accum_dtype == std::string("fp16") || pv_accum_dtype == std::string("any"), "pv_accum_dtype must be either fp16, fp32 or fp16+fp32");
+  auto pv_accum_dtype_const = (pv_accum_dtype == std::string("fp16+fp32") || pv_accum_dtype == std::string("any")) ? paddle::DataType::UNDEFINED : 
                                 (pv_accum_dtype == std::string("fp16")) ? paddle::DataType::FLOAT16 : paddle::DataType::FLOAT32;
 
   PD_CHECK(q.shape()[2] == 64 || q.shape()[2] == 128, "head_dim must be either 64 or 128");
