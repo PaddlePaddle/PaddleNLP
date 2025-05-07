@@ -44,7 +44,7 @@ def openai_v1_completions(request: Dict):
     return create_openai_completion(request, chat_interface=False)
 
 @app.post("/v1/chat/completions")
-def openai_v1_chat_completions(request: Dict, Req):
+def openai_v1_chat_completions(request: Dict):
     return create_openai_completion(request, chat_interface=True)
 
 def create_completion(req: Req):
