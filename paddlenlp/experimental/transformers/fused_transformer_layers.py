@@ -49,20 +49,6 @@ def use_cutlass_fp8_gemm():
 def use_custom_allreduce():
     return os.getenv("FLAGS_custom_allreduce", "False") in ["True", "1", "true"]
 
-def precision_cmp_paddle(t1: paddle.Tensor, t2: paddle.Tensor):
-    
-    x, xx = paddle.cast(t1, dtype='float32'), paddle.cast(t2, dtype='float32')
-    # 重塑张量并计算余弦相似度
-    x_reshaped = paddle.reshape(x, [1, -1])
-    xx_reshaped = paddle.reshape(xx, [1, -1])
-    sim = paddle.nn.functional.cosine_similarity(x_reshaped, xx_reshaped).item()
-    
-    # 计算 L1 误差
-    l1 = (paddle.abs(x - xx).sum() / paddle.abs(xx).sum()).item()
-    max_diff = paddle.max(x - xx)
-    
-    return sim, l1, max_diff
-
 
 if paddle.is_compiled_with_cuda():
     if use_cutlass_fp8_gemm():
