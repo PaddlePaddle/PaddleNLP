@@ -37,6 +37,8 @@ cd PaddleNLP/llm
 
 在开始预训练之前，您需要准备训练数据。PaddleNLP 提供了多种内置数据集，并支持自定义数据的制作，您可以参考以下文档来准备数据：
 
+- [内置预练数据集及自定义数据制作](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/zh/llm/dataset.md)
+
 - [CLUECorpus2020 语料制作](../tools/preprocess/docs/CLUECorpus2020.md)
 - [CLUECorpusSmall 语料制作](../tools/preprocess/docs/CLUECorpusSmall.md)
 - [OpenWebText2 语料制作](../tools/preprocess/docs/OpenWebText2.md)
@@ -101,7 +103,7 @@ Final pre-training config: Qwen2Config {
   "vocab_size": 152064
 }
 
-# 下载进度为 25%，当前正在下载第 1 个分片，总共有 4 个分片
+# 下载进度为 25%，当前正在下载第 1 个分片，总共有 4 个分片；100%即代表分片下载完成
 Downloading shards:  25%|█████████████████████▎                                                               | 1/4 [00:43<02:11, 43.73s/it]
 Downloading shards:  50%|██████████████████████████████████████████▌                                          | 2/4 [01:27<01:27, 43.84s/it]
 Downloading shards:  75%|█████████████████████████████████████████████████████████▍                           | 3/4 [02:10<01:05, 43.92s/it]
