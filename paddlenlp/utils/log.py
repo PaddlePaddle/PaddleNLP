@@ -88,7 +88,7 @@ class Logger(object):
         if not self.is_enable:
             return
 
-        self.logger.log(log_level, msg)
+        self.logger.log(log_level, msg, stacklevel=2)
 
     @contextlib.contextmanager
     def use_terminator(self, terminator: str):

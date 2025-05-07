@@ -100,8 +100,6 @@ def create_actor_models(
         actor_model_config.set_attn_func = True
         actor_model_config.max_position_embeddings = data_args.max_length
         actor_model_config.use_sparse_head_and_loss_fn = False
-        actor_model_config.fused_linear = model_args.fused_linear
-        actor_model_config.use_fused_rms_norm = training_args.use_fused_rms_norm
         actor_model_config.seq_length = data_args.max_length
         actor_model_config.max_sequence_length = data_args.max_length
         print(f"Loading Actor model with config:\n\t{actor_model_config}\n")
@@ -172,7 +170,6 @@ def create_reward_models(
         LlmMetaConfig.set_llm_config(reward_model_config, training_args)
         reward_model_config.max_position_embeddings = data_args.max_length
         reward_model_config.use_sparse_head_and_loss_fn = False
-        reward_model_config.fused_linear = model_args.fused_linear
         print(f"Loading Reward model with config:\n\t{reward_model_config}\n")
 
         config = copy.deepcopy(reward_model_config)

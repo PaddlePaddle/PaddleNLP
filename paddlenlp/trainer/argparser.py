@@ -342,6 +342,64 @@ class PdArgumentParser(ArgumentParser):
         args = yaml_args + sys.argv[2:]
         return self.common_parse(args, return_remaining_strings)
 
+    def read_python(self, python_file: str) -> list:
+
+        python_file = Path(python_file)
+
+        def get_variables_exec(file_path):
+            def flatten(config):
+                ret = {}
+                for k, v in config.items():
+                    if type(v) is dict:
+                        sub = flatten(v)
+                        for sk, sv in sub.items():
+                            ret[sk] = sv
+                    else:
+                        ret[k] = v
+                return ret
+
+            with open(file_path, "r", encoding="utf-8") as f:
+                code = compile(f.read(), file_path, "exec")
+                globals_dict = {}
+                exec(code, globals_dict)
+                ret_dict = {k: globals_dict[k] for k in globals_dict if not k.startswith("__")}
+                return flatten(ret_dict)
+
+        if python_file.exists():
+            data = get_variables_exec(python_file)
+
+            python_args = []
+            for key, value in data.items():
+                if isinstance(value, list):
+                    python_args.extend([f"--{key}", *[str(v) for v in value]])
+                elif isinstance(value, dict):
+                    python_args.extend([f"--{key}", json.dumps(value)])
+                else:
+                    python_args.extend([f"--{key}", str(value)])
+            return python_args
+        else:
+            raise FileNotFoundError(f"The argument file {python_file} does not exist.")
+
+    def parse_python_file_and_cmd_lines(self, return_remaining_strings=False) -> Tuple[DataClass, ...]:
+        """
+        Extend the functionality of `parse_python_file` to handle command line arguments in addition to loading a python
+        file.
+
+        When there is a conflict between the command line arguments and the YAML file configuration,
+        the command line arguments will take precedence.
+
+        Returns:
+            Tuple consisting of:
+
+                - the dataclass instances in the same order as they were passed to the initializer.abspath
+        """
+        if not sys.argv[1].endswith(".py"):
+            raise ValueError(f"The first argument should be a PYTHON file, but it is {sys.argv[1]}")
+        python_args = self.read_python(sys.argv[1])
+        # In case of conflict, command line arguments take precedence
+        args = python_args + sys.argv[2:]
+        return self.common_parse(args, return_remaining_strings)
+
     def parse_dict(self, args: dict) -> Tuple[DataClass, ...]:
         """
         Alternative helper method that does not use `argparse` at all, instead uses a dict and populating the dataclass
