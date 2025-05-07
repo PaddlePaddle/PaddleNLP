@@ -120,7 +120,9 @@ class CriticTrainer(RLTrainer):
         }
 
         with TimerScope(
-            self.timers, CriticStages.MODEL_ENABLE_DISABLE, minus_names=[CriticStages.CRITIC_TRAINING_STEP]
+            self.timers,
+            CriticStages.MODEL_ENABLE_DISABLE,
+            minus_names=[CriticStages.CRITIC_TRAINING_STEP],
         ):
             with reload_and_offload_scope(self, self.model, self.optimizer):
                 with TimerScope(self.timers, CriticStages.CRITIC_TRAINING_STEP):

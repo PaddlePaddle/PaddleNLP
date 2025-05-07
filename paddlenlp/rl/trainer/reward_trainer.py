@@ -55,7 +55,7 @@ class RewardTrainer(RLTrainer):
         callbacks: Optional[List[TrainerCallback]] = None,
         optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
         preprocess_logits_for_metrics: Optional[Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor]] = None,
-        reward_server: str = None,
+        reward_server: Optional[str] = None,
     ):
         """
         Initialize the RewardTrainer class.
@@ -203,12 +203,14 @@ class RewardTrainer(RLTrainer):
                 res = requests.post(self.model, json=data)
                 result = json.loads(res.text)
                 reward_score = paddle.to_tensor(
-                    result["score"], dtype=dtype if not self.args.use_fp32_compute else "float32"
+                    result["score"],
+                    dtype=dtype if not self.args.use_fp32_compute else "float32",
                 )
             except Exception as e:
                 logger.warning(f"Request reward server failed({e}) and rewards_score will be set zero.")
                 reward_score = paddle.zeros(
-                    len(response), dtype=dtype if not self.args.use_fp32_compute else "float32"
+                    len(response),
+                    dtype=dtype if not self.args.use_fp32_compute else "float32",
                 )
             return reward_score
 

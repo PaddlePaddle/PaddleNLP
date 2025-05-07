@@ -92,15 +92,25 @@ def guard_set_args(args, arg_name_values):
     Raises:
         None: Does not raise any exceptions.
     """
-    for k, v in arg_name_values.items():
-        old_value = getattr(args, k, None)
-        setattr(args, k, v)
-        arg_name_values[k] = old_value
+    if not isinstance(arg_name_values, list) and not isinstance(args, list):
+        arg_name_values = [arg_name_values]
+        args = [args]
+    elif isinstance(arg_name_values, list) and isinstance(args, list):
+        pass
+    else:
+        raise ValueError("args and arg_name_values should be both list or both not list")
+
+    for i in range(len(args)):
+        for k, v in arg_name_values[i].items():
+            old_value = getattr(args[i], k, None)
+            setattr(args[i], k, v)
+            arg_name_values[i][k] = old_value
     yield
-    for k, v in arg_name_values.items():
-        old_value = getattr(args, k)
-        setattr(args, k, v)
-        arg_name_values[k] = old_value
+    for i in range(len(args)):
+        for k, v in arg_name_values[i].items():
+            old_value = getattr(args[i], k)
+            setattr(args[i], k, v)
+            arg_name_values[i][k] = old_value
 
 
 class PipeEvalModel(GenerationMixin):

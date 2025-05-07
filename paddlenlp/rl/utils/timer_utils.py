@@ -145,4 +145,3 @@ def timers_scope_runtimer(name):
     timer.start(name)
     yield
     logger.info(f"{timer.log()}")
-    return

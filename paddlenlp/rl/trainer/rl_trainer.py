@@ -607,7 +607,13 @@ class RLTrainer(Trainer):
         whose label arguments are merged into one argument, this is useful to
         PipelineParallel and trainer.criterion which limit loss format.
         """
-        criterion = create_loss(self.loss_cls, self.model.config, self.args, self.info_buffer, merge_labels=True)
+        criterion = create_loss(
+            self.loss_cls,
+            self.model.config,
+            self.args,
+            self.info_buffer,
+            merge_labels=True,
+        )
         return criterion
 
     def loss_identifier(self, inputs: Dict) -> str:
@@ -839,7 +845,11 @@ class RLTrainer(Trainer):
             self.loss_step_indice[loss_name] = len(self.loss_step_indice)
 
     @paddle.no_grad()
-    def get_step_loss(self, loss_prefix: str = "", loss_accumulator: Dict = {}) -> Dict[str, paddle.Tensor]:
+    def get_step_loss(
+        self,
+        loss_prefix: str = "",
+        loss_accumulator: Optional[Dict] = None,
+    ) -> Dict[str, paddle.Tensor]:
         """
         Return a dict mapping loss name to value of current training step. This
         is mainly to get loss for metric logging, and it would not affect the
@@ -854,7 +864,7 @@ class RLTrainer(Trainer):
             msg = "The loss returned may not be accurate when not reaching accumulated step."
             logger.error(msg)
         model = self.get_model(train=True)
-        loss_dict = loss_accumulator if loss_accumulator else {}
+        loss_dict = loss_accumulator if loss_accumulator is not None else {}
         if isinstance(model, fleet.model.PipelineParallel) and len(self.loss_names) > 1:
             # NOTE: PipelineParallel only returns a accumulated loss after
             # accumulated steps, which is a mixed loss of ppo-loss and

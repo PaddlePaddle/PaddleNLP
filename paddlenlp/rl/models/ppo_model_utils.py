@@ -301,7 +301,13 @@ class RLHFPPOLoss(nn.Layer):
     RLHFPPOLoss is a class that implements the actor loss function.
     """
 
-    def __init__(self, config, clip_range_ratio=0.2, clip_range_ratio_low=None, clip_range_ratio_high=None):
+    def __init__(
+        self,
+        config,
+        clip_range_ratio=0.2,
+        clip_range_ratio_low=None,
+        clip_range_ratio_high=None,
+    ):
         """
         Initialize the `ClipRewardRange` object.
 
@@ -406,7 +412,7 @@ class VocabParallelEntropy(paddle.autograd.PyLayer):
             hcg = fleet.get_hybrid_communicate_group()
             model_parallel_group = hcg.get_model_parallel_group()
             tensor_parallel_degree = hcg.get_model_parallel_world_size()
-        except:
+        except Exception:
             tensor_parallel_degree = 1
         logits_max = vocab_parallel_logits.max(axis=-1, keepdim=True)
 
@@ -492,7 +498,10 @@ class RLHFPPOMixedLoss(nn.Layer):
         self.clip_range_ratio_low = clip_range_ratio_low if clip_range_ratio_low is not None else clip_range_ratio
         self.clip_range_ratio_high = clip_range_ratio_high if clip_range_ratio_high is not None else clip_range_ratio
         self.ppo_criterion = RLHFPPOLoss(
-            config, clip_range_ratio, self.clip_range_ratio_low, self.clip_range_ratio_high
+            config,
+            clip_range_ratio,
+            self.clip_range_ratio_low,
+            self.clip_range_ratio_high,
         )
         self.sft_criterion = PretrainingCriterion(config)
         self.kl_loss_coeff = kl_loss_coeff
@@ -968,7 +977,9 @@ class ActorFusedLoss(paddle.autograd.PyLayer):
             # ratio
             ratio_chunk = paddle.exp(log_probs_chunk - old_log_probs_chunk)
             clipped_ratio_chunk = paddle.clip(
-                ratio_chunk, min=1.0 - clip_range_ratio_low, max=1.0 + clip_range_ratio_high
+                ratio_chunk,
+                min=1.0 - clip_range_ratio_low,
+                max=1.0 + clip_range_ratio_high,
             )
 
             # final loss
@@ -1034,7 +1045,9 @@ class ActorFusedLoss(paddle.autograd.PyLayer):
             # grads
             if grad_hidden_states is not None:
                 grad_hidden_states[token_start_idx:token_end_idx] = paddle.matmul(
-                    d_loss_d_logits_chunk, lm_head_weight_cast, transpose_y=not transpose_y
+                    d_loss_d_logits_chunk,
+                    lm_head_weight_cast,
+                    transpose_y=not transpose_y,
                 )
             if grad_lm_head_weight is not None:
                 if transpose_y:
@@ -1105,7 +1118,13 @@ class ActorFusedLoss(paddle.autograd.PyLayer):
 class FusedPPOLoss(nn.Layer):
     """Fused PPOLoss"""
 
-    def __init__(self, config, clip_range_ratio=0.2, clip_range_ratio_low=None, clip_range_ratio_high=None):
+    def __init__(
+        self,
+        config,
+        clip_range_ratio=0.2,
+        clip_range_ratio_low=None,
+        clip_range_ratio_high=None,
+    ):
         """Initialize FusedPPOLoss class."""
         super().__init__()
         self.clip_range_ratio = clip_range_ratio
@@ -1298,16 +1317,25 @@ class ActorFusedPGEntropyKLLoss(paddle.autograd.PyLayer):
 
             if fused_linear:
                 logits_chunk = PF.fused_linear(
-                    hidden_chunk, maybe_transpose(lm_head_weight_cast), bias=lm_head_bias_cast
+                    hidden_chunk,
+                    maybe_transpose(lm_head_weight_cast),
+                    bias=lm_head_bias_cast,
                 )
             else:
-                logits_chunk = F.linear(hidden_chunk, maybe_transpose(lm_head_weight_cast), bias=lm_head_bias_cast)
+                logits_chunk = F.linear(
+                    hidden_chunk,
+                    maybe_transpose(lm_head_weight_cast),
+                    bias=lm_head_bias_cast,
+                )
             logits_chunk = logits_chunk.astype("float32")
             logits_chunk = logits_chunk / temperature
             # 计算交叉熵和softmax
             if tensor_parallel_degree > 1 and tensor_parallel_output:
                 ce_loss_chunk, softmax_out_chunk = mp_ops._c_softmax_with_cross_entropy(
-                    logits_chunk, labels_chunk, group=model_parallel_group, return_softmax=True
+                    logits_chunk,
+                    labels_chunk,
+                    group=model_parallel_group,
+                    return_softmax=True,
                 )
             else:
                 ce_loss_chunk = F.cross_entropy(logits_chunk, labels_chunk, reduction="none")
@@ -1357,7 +1385,9 @@ class ActorFusedPGEntropyKLLoss(paddle.autograd.PyLayer):
                 # here
                 if tensor_parallel_degree > 1 and tensor_parallel_output:
                     paddle.distributed.all_reduce(
-                        entropy_loss_chunk, op=paddle.distributed.ReduceOp.SUM, group=model_parallel_group
+                        entropy_loss_chunk,
+                        op=paddle.distributed.ReduceOp.SUM,
+                        group=model_parallel_group,
                     )
                 total_entropy_loss += entropy_loss_chunk.sum() * entropy_coeff / divisor
 
@@ -1406,7 +1436,9 @@ class ActorFusedPGEntropyKLLoss(paddle.autograd.PyLayer):
 
             if grad_hidden_states is not None:
                 grad_hidden_states[chunk_slice] = paddle.matmul(
-                    d_total_logits_chunk, lm_head_weight_cast, transpose_y=not transpose_y
+                    d_total_logits_chunk,
+                    lm_head_weight_cast,
+                    transpose_y=not transpose_y,
                 )
             if grad_lm_head_weight is not None:
                 if transpose_y:
@@ -1429,15 +1461,25 @@ class ActorFusedPGEntropyKLLoss(paddle.autograd.PyLayer):
         if ctx.hidden_states_has_grad:
             if tensor_parallel_degree > 1:
                 paddle.distributed.all_reduce(
-                    grad_hidden_states, op=paddle.distributed.ReduceOp.SUM, group=model_parallel_group
+                    grad_hidden_states,
+                    op=paddle.distributed.ReduceOp.SUM,
+                    group=model_parallel_group,
                 )
             grad_hidden_states = grad_hidden_states.reshape(original_shape)
 
         ctx.save_for_backward(
-            *filter(lambda x: x is not None, [grad_hidden_states, grad_lm_head_weight, grad_lm_head_bias])
+            *filter(
+                lambda x: x is not None,
+                [grad_hidden_states, grad_lm_head_weight, grad_lm_head_bias],
+            )
         )
 
-        return final_loss, total_pg_loss.detach(), total_entropy_loss.detach(), total_kl_loss.detach()
+        return (
+            final_loss,
+            total_pg_loss.detach(),
+            total_entropy_loss.detach(),
+            total_kl_loss.detach(),
+        )
 
     @staticmethod
     def backward(ctx, grad_output, *args):
@@ -1493,8 +1535,8 @@ def actor_fused_pg_entropy_kl_loss(
     tensor_parallel_output: bool = False,
     pg_loss_coeff: float = 1.0,
     clip_range_ratio: float = 0.2,
-    clip_range_ratio_low: float = None,
-    clip_range_ratio_high: float = None,
+    clip_range_ratio_low: Optional[float] = None,
+    clip_range_ratio_high: Optional[float] = None,
     entropy_coeff: float = 0.001,
     clip_range_score: float = 10.0,
     kl_loss_coeff: float = 0.001,

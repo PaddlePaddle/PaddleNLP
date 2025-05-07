@@ -91,6 +91,52 @@ from .trainer_utils import (
 )
 
 
+def save_paddle_dict(save_path, global_steps, batch_dict):
+    """
+    aadiff function.
+    save_paddle_dict for paddlenlp rl.
+
+    step1: save paddle.Tensor to np.ndarray using save_paddle_dict
+    step2: load paddle.Tensor from np.ndarray using load_paddle_dict
+    """
+
+    save_dict = {}
+    for dict_name, dict_obj in batch_dict.items():
+        if isinstance(dict_obj, paddle.Tensor):
+            dict_obj = dict_obj.numpy()
+        elif isinstance(dict_obj, np.ndarray):
+            pass
+        else:
+            raise TypeError(f"{dict_name} must be a paddle.Tensor or np.ndarray.")
+
+        save_dict[dict_name] = dict_obj
+
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+    np.savez(os.path.join(save_path, f"{global_steps}.npz"), **save_dict)
+
+
+def load_paddle_dict(load_path, global_steps):
+    """
+    aadiff function.
+    load_paddle_dict for paddlenlp rl.
+
+    step1: save paddle.Tensor to np.ndarray using save_paddle_dict
+    step2: load paddle.Tensor from np.ndarray using load_paddle_dict
+    """
+
+    batch_dict = {}
+    loaded_dict = np.load(os.path.join(load_path, f"{global_steps}.npz"), allow_pickle=True)
+    for dict_name, dict_obj in loaded_dict.items():
+        if dict_name in ["log_probs", "ref_log_probs"]:
+            continue
+        try:
+            batch_dict[dict_name] = paddle.to_tensor(dict_obj)
+        except Exception:
+            batch_dict[dict_name] = dict_obj
+    return batch_dict
+
+
 class PPOMetric:
     """Metrics used during training"""
 
@@ -268,13 +314,25 @@ class PPOTrainer(Trainer):
             # process of trainer, while changing some args to avoid model usage
             # in __init__ such as recompute and AMP-O2
             super().__init__(
-                (actor_model, reference_model, reward_model, critic_model, actor_model_eval, critic_model_eval),
+                (
+                    actor_model,
+                    reference_model,
+                    reward_model,
+                    critic_model,
+                    actor_model_eval,
+                    critic_model_eval,
+                ),
                 criterion,
                 args,
                 data_collator,
                 train_dataset,
                 eval_dataset,
-                (actor_tokenizer, reference_tokenizer, reward_tokenizer, critic_tokenizer),
+                (
+                    actor_tokenizer,
+                    reference_tokenizer,
+                    reward_tokenizer,
+                    critic_tokenizer,
+                ),
                 compute_metrics,
                 callbacks,
                 optimizers,
@@ -1199,7 +1257,7 @@ class PPOTrainer(Trainer):
     def pad_batch_data(
         self,
         input_ids: List[paddle.Tensor],
-        label_ids: List[paddle.Tensor] = None,
+        label_ids: Optional[List[paddle.Tensor]] = None,
         padding_strategy="longest",
         padding_max_len=None,
         pad_to_multiple_of=None,
@@ -1223,7 +1281,7 @@ class PPOTrainer(Trainer):
                 - label_ids (Optional[paddle.Tensor]): Optionally, the padded label IDs tensor.
                 - position_ids (paddle.Tensor): The position IDs tensor corresponding to the input token IDs.
         """
-        logger.debug(f"pad_batch_data {input_ids}")
+        # logger.debug(f"pad_batch_data {input_ids}")
         input_ids = self.tokenizer.pad(
             {"input_ids": input_ids},
             padding=padding_strategy,
@@ -1354,13 +1412,16 @@ class PPOTrainer(Trainer):
             hcg = fleet.get_hybrid_communicate_group()
             sharding_parallel_group = hcg.get_sharding_parallel_group()
             data_parallel_group = hcg.get_data_parallel_group()
-        except:
+        except Exception:
             sharding_parallel_group = None
             data_parallel_group = None
 
         total_unbalance_batch = defaultdict(list)
         if need_combine_and_split:
-            unbalance_micro_batch = combine_micro_batches_into_batch(micro_batches, pad_token_id=self.tokenizer.pad_token_id)  # fmt:skip
+            unbalance_micro_batch = combine_micro_batches_into_batch(
+                micro_batches,
+                pad_token_id=self.tokenizer.pad_token_id,
+            )
         else:
             unbalance_micro_batch = micro_batches
         for key in unbalance_micro_batch:
@@ -1580,8 +1641,16 @@ class PPOTrainer(Trainer):
 
                 # padding data
                 pad_to_multiple_of = self.args.tensor_parallel_degree if self._model_config.sequence_parallel else None
-                input_ids, label_ids, position_ids = self.pad_batch_data(truncate_input_ids, label_ids_batches, pad_to_multiple_of=pad_to_multiple_of)  # fmt: skip
-                prompt_len = paddle.full(shape=[expand_prompt.shape[0]], fill_value=expand_prompt.shape[1], dtype=expand_prompt.dtype)  # fmt: skip
+                input_ids, label_ids, position_ids = self.pad_batch_data(
+                    truncate_input_ids,
+                    label_ids_batches,
+                    pad_to_multiple_of=pad_to_multiple_of,
+                )
+                prompt_len = paddle.full(
+                    shape=[expand_prompt.shape[0]],
+                    fill_value=expand_prompt.shape[1],
+                    dtype=expand_prompt.dtype,
+                )
                 prompt_len_without_pad = prompt_only_batch["raw_prompt_len_expand"]
                 response_len_without_pad = input_ids_len - prompt_len
 
@@ -1643,8 +1712,10 @@ class PPOTrainer(Trainer):
 
                             if self.args.rl_algorithm == "ppo":
                                 batch["reward_values"] = self.critic_trainer.compute_value(**batch)
+                # when aadiff, open the blow line
+                # save_paddle_dict(f"rank{dist.get_rank()}/save_paddle_dict", self.state.global_step, batch)
 
-                # danamic sampling: filter generated samples by rewards, keep generating until valid samples are enough
+                # dynamic sampling: filter generated samples by rewards, keep generating until valid samples are enough
                 if self.args.dynamic_sampling:
                     local_valid_prompt = 0
                     # combined_batch = combine_micro_batches_into_batch(micro_batches, pad_token_id=self.tokenizer.pad_token_id)
@@ -1661,7 +1732,7 @@ class PPOTrainer(Trainer):
                         hcg = fleet.get_hybrid_communicate_group()
                         sharding_parallel_group = hcg.get_sharding_parallel_group()
                         data_parallel_group = hcg.get_data_parallel_group()
-                    except:
+                    except Exception:
                         is_fleet_init = False
                         sharding_parallel_group = None
                         data_parallel_group = None
@@ -1764,7 +1835,11 @@ class PPOTrainer(Trainer):
 
                 # step 3: train actor model and critic model with rollout data
                 self.set_train()
-                with TimerScope(self.timers, ActorStages.MODEL_ENABLE_DISABLE, minus_names=[ActorStages.RL_STEP]):
+                with TimerScope(
+                    self.timers,
+                    ActorStages.MODEL_ENABLE_DISABLE,
+                    minus_names=[ActorStages.RL_STEP],
+                ):
                     with reload_and_offload_scope(self, self.actor_model, self.actor_trainer.optimizer):
                         with TimerScope(self.timers, ActorStages.RL_STEP):
                             # timer_info = {} # prepare for each micro_step

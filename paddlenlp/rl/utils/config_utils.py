@@ -309,7 +309,8 @@ class TrainingArguments(TrainingArguments):
     )
     use_rm_server: bool = field(default=False, metadata={"help": "Use reward server instead of reward model."})
     use_fp32_compute: bool = field(
-        default=False, metadata={"help": "Use fp32 to compute xx_log_prob,rewards, advantages and loss."}
+        default=False,
+        metadata={"help": "Use fp32 to compute xx_log_prob,rewards, advantages and loss."},
     )
     rollout_tensor_parallel_degree: int = field(
         default=-1,

@@ -81,6 +81,22 @@ def create_actor_models(
     training_args: TrainingArguments,
     common_config: Dict,
 ):
+    """
+    Create actor models, including the main model, evaluation model, reference model, and tokenizer.
+
+    Args:
+        model_args (ModelArgument): A namespace object containing model-related parameters.
+        data_args (DataArgument): A namespace object containing data-related parameters.
+        training_args (TrainingArguments): A namespace object containing training-related parameters.
+        common_config (Dict): A dictionary of common configurations.
+
+    Returns:
+        Tuple[AutoModelForCausalLM, Optional[AutoModelForCausalLM], AutoModelForCausalLM, AutoTokenizer]:
+            - actor_model (AutoModelForCausalLM): The main actor model.
+            - actor_eval_model (Optional[AutoModelForCausalLM]): The evaluation model (if needed).
+            - reference_model (AutoModelForCausalLM): The reference model.
+            - actor_tokenizer (AutoTokenizer): The tokenizer.
+    """
     with timers_scope_runtimer("Actor model loading time"):
         # actor model
         actor_model_config: PretrainedConfig = AutoConfig.from_pretrained(
@@ -293,6 +309,9 @@ def create_rl_dataset(data_args, training_args, tokenizer):
 
 
 def main():
+    """
+    main function for training a reinforcement learning model.
+    """
     # Arguments
     parser = PdArgumentParser((ModelArgument, DataArgument, TrainingArguments))
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):

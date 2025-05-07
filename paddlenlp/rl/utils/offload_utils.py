@@ -245,5 +245,10 @@ def reload_and_offload_scope(trainer, *args):
         if trainer.reward_critic_model not in [i for i, _ in objs]:
             if getattr(trainer.critic_trainer, "_inner_eval_model", None) is not None:
                 # NOTE(gongenlei): for export_evaluate_model
-                objs.append((trainer.reward_critic_model, offload_map.get(trainer.reward_critic_model, "")))
+                objs.append(
+                    (
+                        trainer.reward_critic_model,
+                        offload_map.get(trainer.reward_critic_model, ""),
+                    )
+                )
     return OffloadController(objs)

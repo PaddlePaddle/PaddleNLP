@@ -133,7 +133,12 @@ def pp_reshard(tgt_tensor, src_model_state_dict, src_tensor_meta_info, pp_rank, 
         resharded_tensor = paddle.empty(src_tensor_shape)
 
     resharded_tensor = resharded_tensor.astype(tgt_tensor.dtype)
-    dist.broadcast(resharded_tensor, src=pp_group.ranks[src_tensor_pp_rank], group=pp_group, sync_op=True)
+    dist.broadcast(
+        resharded_tensor,
+        src=pp_group.ranks[src_tensor_pp_rank],
+        group=pp_group,
+        sync_op=True,
+    )
     return resharded_tensor
 
 
@@ -242,7 +247,13 @@ def init_reshard_mappings(model, training_args, pp_rank, pp_group):
 
 @paddle.no_grad()
 def reshard_to_rollout(
-    train_model, rollout_model, global_meta_dict, pp_rank, pp_group, rollout_tp_group, train_tp_group
+    train_model,
+    rollout_model,
+    global_meta_dict,
+    pp_rank,
+    pp_group,
+    rollout_tp_group,
+    train_tp_group,
 ):
     """
     Convert the model from training mode to inference mode and redistribute its parameters to meet the requirements of distributed and
