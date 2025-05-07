@@ -50,7 +50,7 @@ set_env() {
     export FLAGS_cudnn_deterministic=1
     export HF_ENDPOINT=https://hf-mirror.com
     export FLAGS_use_cuda_managed_memory=true
-    export running_time=30m
+    export running_time=40m
 
     # for CE
     if [[ ${FLAGS_enable_CE} == "true" ]];then
@@ -72,7 +72,7 @@ print_info() {
         cd ${PPNLP_HOME} && python upload.py ${PPNLP_HOME}/upload 'paddlenlp/PaddleNLP_CI/PaddleNLP-CI-Unittest-GPU'
         rm -rf upload/* && cd -
         if [ $1 -eq 124 ]; then
-            echo "\033[32m [failed-timeout] Test case execution was terminated after exceeding the 30m limit."
+            echo "\033[32m [failed-timeout] Test case execution was terminated after exceeding the ${running_time} min limit."
         fi
     else
         tail -n 1 ${log_path}/unittest.log
