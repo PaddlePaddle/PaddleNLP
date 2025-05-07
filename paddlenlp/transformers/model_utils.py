@@ -876,7 +876,6 @@ def _load_state_dict_into_model(model_to_load, state_dict, start_prefix, model_t
         # paddlenlp hold  missing_keys , just ignore not found warnings.
         warnings.filterwarnings("ignore", message=r".*is not found in the provided dict.*")
         warnings.filterwarnings("ignore", message=r".*paddle.to_tensor.*")
-        # model_to_load.set_state_dict(state_dict)
         if len(model_to_load_state_dict) > 4000 and os.getenv("DISABLE_FASTER_SET_STATE_DICT", None) is None:
             logger.warning_once(
                 "The model contains an excessive number of tensors, so we utilize the faster_set_state_dict method to load tensors into the model efficiently."
@@ -885,6 +884,7 @@ def _load_state_dict_into_model(model_to_load, state_dict, start_prefix, model_t
             faster_set_state_dict(model_to_load, state_dict, model_to_load_state_dict)
         else:
             model_to_load.set_state_dict(state_dict)
+
         error_msgs.extend([str(x.message) for x in w])
 
     del state_dict
@@ -2156,7 +2156,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     keep_in_fp32_modules=keep_in_fp32_modules,
                 )
             else:
-                error_msgs = _load_state_dict_into_model(model_to_load, state_dict, start_prefix)
+                error_msgs = _load_state_dict_into_model(
+                    model_to_load,
+                    state_dict,
+                    start_prefix,
+                    model_to_load_state_dict,
+                )
         else:
             # Sharded checkpoint or whole but low_cpu_mem_usage==True
 
