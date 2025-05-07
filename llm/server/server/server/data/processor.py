@@ -143,9 +143,9 @@ class DataProcessor(BaseDataProcessor):
             request["eos_token_ids"] = []
         request["eos_token_ids"].extend(get_eos_token_id(self.tokenizer, self.config.generation_config))
 
-		for i in range(len(request["eos_token_ids"]):
-			if isinstance(request["eos_token_ids"][i], str) and not request["eos_token_ids"][i].isdigit():
-				raise ValueError(f"The eos token id should be integer.")
+        for i in range(len(request["eos_token_ids"])):
+            if isinstance(request["eos_token_ids"][i], str) and not request["eos_token_ids"][i].isdigit():
+                raise ValueError(f"The eos token id should be integer.")
 	
 
         if "stop_seqs" not in request or (isinstance(request["stop_seqs"], (list, tuple)) and len(request["stop_seqs"]) == 0):
