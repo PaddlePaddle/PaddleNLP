@@ -804,10 +804,11 @@ def get_id_and_prob(span_set, offset_mapping):
     sentence_id = []
     prob = []
     for start, end in span_set:
-        prob.append(start[1] * end[1])
         start_id = offset_mapping[start[0]][0]
         end_id = offset_mapping[end[0]][1]
-        sentence_id.append((start_id, end_id))
+        if start_id>=0:
+            prob.append(start[1] * end[1])
+            sentence_id.append((start_id, end_id))
     return sentence_id, prob
 
 
