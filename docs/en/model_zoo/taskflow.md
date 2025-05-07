@@ -1891,7 +1891,7 @@ Word segmentation via this approach can significantly improve prediction speed.
 
 <details><summary><b>Q:</b> Will more tasks be supported in the future?</summary><div>
 
-**A:** Taskflow will continue to expand supported tasks. We'll adjust development priorities based on developer feedback. Please submit your requests via Issues or our [questionnaire](https://wenjuan.baidu-int.com/manage/?r=survey/pageEdit&sid=85827).
+**A:** Taskflow will continue to expand supported tasks. We'll adjust development priorities based on developer feedback.
 
 </div></details>
 

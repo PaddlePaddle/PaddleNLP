@@ -353,7 +353,7 @@ class AlbertTokenizer(PretrainedTokenizer):
         Args:
             ids (list): A list of ids to be converted.
             skip_special_tokens (bool, optional):
-                Whether or not to skip specical tokens. Defaults to `False`.
+                Whether or not to skip special tokens. Defaults to `False`.
 
         Returns:
             list: A list of converted tokens.

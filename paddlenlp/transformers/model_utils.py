@@ -62,7 +62,6 @@ from paddlenlp.utils.env import (
     ASYMMETRY_QUANT_SCALE_MAX,
     ASYMMETRY_QUANT_SCALE_MIN,
     CONFIG_NAME,
-    LEGACY_CONFIG_NAME,
     PADDLE_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_NAME,
     PYTORCH_WEIGHTS_INDEX_NAME,
@@ -592,19 +591,19 @@ def _partion_for_pipeline_mode(keys):
     keys = list(keys)
     start_idx = -1
     prefix_str = None
-    parttion_map = {}
+    partition_map = {}
     for k in keys:
         prefix = layer_prefix(k)
         if prefix != prefix_str:
             prefix_str = prefix
             start_idx += 1
-        parttion_map[k] = start_idx
+        partition_map[k] = start_idx
 
-    # if only one parttion, we don't parttion it
+    # if only one partition, we don't partition it
     if start_idx < 1:
         return {keys[i]: i for i in range(len(keys))}
 
-    return parttion_map
+    return partition_map
 
 
 def shard_checkpoint(
@@ -809,7 +808,7 @@ def load_sharded_checkpoint(model, folder, variant=None, strict=True, prefer_saf
 
 
 def faster_set_state_dict(model, state_dict, strict_dtype=True):
-    # the state_dict will be destroied.
+    # the state_dict will be destroyed.
     unused_keys = set(state_dict.keys())
     unset_keys = set(model.state_dict().keys())
     with paddle.no_grad():
@@ -892,7 +891,7 @@ def _convert_state_dict_dtype_and_shape(state_dict, model_to_load):
         if key in list(state_dict.keys()):
             if isinstance(state_dict[key], np.ndarray):
                 raise ValueError(
-                    "convert_state_dict_dtype expected paddle.Tensor not numpy.ndarray, plase convert numpy.ndarray to paddle.Tensor"
+                    "convert_state_dict_dtype expected paddle.Tensor not numpy.ndarray, please convert numpy.ndarray to paddle.Tensor"
                 )
             # confirm parameter cast is executed on the same device as model
             # TODO: cast(FP32 -> FP16) has diff on different devices, need to fix it
@@ -1008,10 +1007,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
     by which subclasses can track arguments for initialization automatically.
     """
 
-    # Deprecated(wj-Mcat): after 2.6.* version
-    # save the old-school `LEGACY_CONFIG_NAME`, and will be changed to `CONFIG_NAME` after 2.6.* version
-    model_config_file = LEGACY_CONFIG_NAME
-
+    model_config_file = CONFIG_NAME
     pretrained_init_configuration = {}
     # TODO: more flexible resource handle, namedtuple with fields as:
     # resource_name, saved_file, handle_name_for_load(None for used as __init__
@@ -1188,6 +1184,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         config.weight_block_size = predictor_args.weight_block_size
         config.moe_quant_type = predictor_args.moe_quant_type
         config.output_via_mq = predictor_args.output_via_mq
+        config.dynamic_insert = predictor_args.dynamic_insert
         if config.quantization_config.quant_method is not None:
             predictor_args.weight_block_size = config.quantization_config.weight_block_size
             config.weight_block_size = predictor_args.weight_block_size
@@ -1882,7 +1879,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 elif "pytorch_model.bin" in str(resolved_archive_file):
                     if not from_hf_hub and not convert_from_torch:
                         raise ValueError(
-                            f"Download pytorch wight in "
+                            f"Download pytorch weight in "
                             f" {resolved_archive_file}. Please set convert_from_torch=True in from_pretrained. eg, Model.from_pretrained(model_name, convert_from_torch=True) "
                         )
 
@@ -1983,11 +1980,16 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         unexpected_keys = list(set(loaded_keys) - set(expected_keys))
 
         # Optimize for skip unused shard files for supper large model
-        if sharded_metadata is not None and quantization_linear_list is None:
+        if sharded_metadata is not None:
             assert isinstance(resolved_archive_file, list)
             new_archive_file = []
             skip_archive_file = []
-            expected_keys_set = set(expected_keys)
+            if quantization_linear_list is None:
+                expected_keys_set = set(expected_keys)
+            else:
+                origin_expected_keys = [k.replace("quant_weight", "weight") for k in expected_keys]
+                expected_keys_set = set(expected_keys + origin_expected_keys)
+
             for file in resolved_archive_file:
                 filename = os.path.split(file)[-1]
                 if not expected_keys_set.isdisjoint(set(sharded_metadata["file_map"][filename])):
@@ -2830,7 +2832,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     for k, v in config["mp_config"]["parallelize_plan"].items():
                         assert (
                             k not in final_config["mp_config"]["parallelize_plan"].keys()
-                        ), f"sublayer mp_config shuld be a subset of model but got sublayer config {config['mp_config']} and model config {final_config['mp_config']}."
+                        ), f"sublayer mp_config should be a subset of model but got sublayer config {config['mp_config']} and model config {final_config['mp_config']}."
                         final_config["mp_config"]["parallelize_plan"][k] = v
             if "sp_config" in config and config["sp_config"] is not None:
                 if final_config["sp_config"] is None:
@@ -2839,7 +2841,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     for k, v in config["sp_config"]["parallelize_plan"].items():
                         assert (
                             k not in final_config["sp_config"]["parallelize_plan"].keys()
-                        ), f"sublayer sp_config shuld be a subset of model but got sublayer config {config['sp_config']} and model config {final_config['sp_config']}."
+                        ), f"sublayer sp_config should be a subset of model but got sublayer config {config['sp_config']} and model config {final_config['sp_config']}."
                         final_config["sp_config"]["parallelize_plan"][k] = v
             if "pp_config" in config and config["pp_config"] is not None:
                 if isinstance(config["pp_config"]["split_spec"], str):

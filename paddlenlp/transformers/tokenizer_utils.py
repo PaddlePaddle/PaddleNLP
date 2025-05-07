@@ -200,7 +200,7 @@ def is_chinese_char(cp):
 
 
 def _is_nonnormalized_char(char):
-    """Check whther `chars` is a non-normalized character."""
+    """Check whether `chars` is a non-normalized character."""
     cp = ord(char)
     if (
         (0xFF00 <= cp <= 0xFFEF)
@@ -807,7 +807,7 @@ class ChatTemplateMixin:
 
     def _extract_non_learnable_parts(self, origin_msg: List[Dict[str, str]], split_s: List[str]):
         """Split the entire chat by specified words. Extract the non-learnable parts."""
-        # distingish and replace the special words in original string to an uncompiled form: Like | -> \|
+        # distinguish and replace the special words in original string to an uncompiled form: Like | -> \|
         regex_pattern = "|".join(map(re.escape, split_s))
         # splited by replaced specified words
         non_learnable_parts = re.split(
@@ -1585,7 +1585,7 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
                         sequence = ids + pair_ids if pair else ids
                         token_type_ids = [0] * len(ids) + ([0] * len(pair_ids) if pair else [])
                     encoded_inputs["offset_mapping"] = offset_mapping
-                    # Build output dictionnary
+                    # Build output dictionary
                     encoded_inputs["input_ids"] = sequence
                     if return_token_type_ids:
                         encoded_inputs["token_type_ids"] = token_type_ids

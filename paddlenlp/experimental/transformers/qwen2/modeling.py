@@ -675,12 +675,24 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
             else:
                 self.transformer_block.qkv_weights[idx].set_value(qkv_weight)
 
-            q_bias = state_dict[f"{model_prefix}.self_attn.q_proj.bias"]
-            k_bias = state_dict[f"{model_prefix}.self_attn.k_proj.bias"]
-            v_bias = state_dict[f"{model_prefix}.self_attn.v_proj.bias"]
-
-            concated_qkv_biases = np.concatenate([q_bias, k_bias, v_bias], axis=-1)
-            qkv_bias = paddle.to_tensor(concated_qkv_biases)
+            if f"{model_prefix}.self_attn.qkv_proj.bias" in state_dict.keys():
+                qkv_bias = paddle.to_tensor(
+                    np.concatenate(
+                        split_fn(
+                            state_dict[f"{model_prefix}.self_attn.qkv_proj.bias"],
+                            is_qkv=True,
+                            num_heads=self.num_attention_heads // self.config.tensor_parallel_degree,
+                            num_key_value_heads=self.num_key_value_heads // self.config.tensor_parallel_degree,
+                        ),
+                        axis=-1,
+                    )
+                )
+            else:
+                q_bias = state_dict[f"{model_prefix}.self_attn.q_proj.bias"]
+                k_bias = state_dict[f"{model_prefix}.self_attn.k_proj.bias"]
+                v_bias = state_dict[f"{model_prefix}.self_attn.v_proj.bias"]
+                concated_qkv_biases = np.concatenate([q_bias, k_bias, v_bias], axis=-1)
+                qkv_bias = paddle.to_tensor(concated_qkv_biases)
             self.transformer_block.qkv_biases[idx].set_value(
                 qkv_bias.cast(self.transformer_block.qkv_biases[idx].dtype)
             )
@@ -1480,6 +1492,7 @@ class Qwen2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen2Pr
         v_quant_scales = kwargs.get("v_quant_scales", None)
         k_dequant_scales = kwargs.get("k_dequant_scales", None)
         v_dequant_scales = kwargs.get("v_dequant_scales", None)
+        excess_blocks = kwargs.get("excess_blocks", None)
 
         # speculative decoding related parameters
         draft_tokens = kwargs.get("draft_tokens", None)
@@ -1500,6 +1513,7 @@ class Qwen2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen2Pr
             "v_quant_scales": v_quant_scales,
             "k_dequant_scales": k_dequant_scales,
             "v_dequant_scales": v_dequant_scales,
+            "excess_blocks": excess_blocks,
             "draft_tokens": draft_tokens,
             "output_padding_offset": output_padding_offset,
         }
@@ -1521,6 +1535,7 @@ class Qwen2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen2Pr
         v_quant_scales=None,
         k_dequant_scales=None,
         v_dequant_scales=None,
+        excess_blocks=None,
         draft_tokens=None,
         output_padding_offset=None,
     ):
@@ -1539,6 +1554,7 @@ class Qwen2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen2Pr
             v_quant_scales=v_quant_scales,
             k_dequant_scales=k_dequant_scales,
             v_dequant_scales=v_dequant_scales,
+            excess_blocks=excess_blocks,
             draft_tokens=draft_tokens,
             output_padding_offset=output_padding_offset,
         )

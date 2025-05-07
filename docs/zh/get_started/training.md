@@ -22,9 +22,7 @@ trainer.train()
 
 ```bash
 git clone https://github.com/PaddlePaddle/PaddleNLP.git && cd PaddleNLP # 如已clone或下载PaddleNLP可跳过
-mkdir -p llm/data && cd llm/data
-wget https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz && tar -zxvf AdvertiseGen.tar.gz
-cd .. # change folder to PaddleNLP/llm
+cd llm && wget https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz && tar -zxvf AdvertiseGen.tar.gz
 python -u run_finetune.py ./config/qwen/sft_argument_0p5b.json
 ```
 

@@ -1236,7 +1236,7 @@ def get_configuration_file(configuration_files: List[str]) -> str:
     configuration_file = CONFIG_NAME
 
     # FIXME: (wj-Mcat) remove the hard dependency of `packaging` which can compare
-    # the version of package, also be uesed in `transfromer`.
+    # the version of package, also be used in `transformer`.
     # **But**, we don't support version compare function now. so remove the hard dependency.
     from packaging import version
 

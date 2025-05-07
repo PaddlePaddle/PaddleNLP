@@ -140,6 +140,13 @@ function _train(){
     if [[ "${MODEL_TYPE}" =~ "70b" || "${MODEL_TYPE}" =~ "7b" ]]; then
         unset CUDA_DEVICE_MAX_CONNECTIONS
     fi
+
+    # 13b暂时关闭cinn，待性能有提升后再打开
+    if [[ "${MODEL_TYPE}" =~ "13b" ]]; then
+        unset FLAGS_use_cinn
+        unset FLAGS_dist_prim_all
+    fi
+
     # Disable for hanging bug
     # if [ "${tensor_parallel_degree}" != "1" ]; then
     #     export CUDA_DEVICE_MAX_CONNECTIONS=1
@@ -249,9 +256,15 @@ export PYTHONPATH=$(dirname "$PWD"):$PYTHONPATH
 # 如不设置参数为1,则默认选择不带tensor fusion的sharding stage1版本
 export FLAGS_enable_sharding_stage1_tensor_fusion=1
 
-# 只有13b的任务需要打开CUDA_DEVICE_MAX_CONNECTIONS,7b与13b关闭
+# 只有13b的任务需要打开CUDA_DEVICE_MAX_CONNECTIONS,7b与70b关闭
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export PARALLEL_CROSS_ENTROPY=true
+
+# cinn相关
+export FLAGS_use_cinn=1
+export FLAGS_dist_prim_all=1
+export FLAGS_prim_forward_blacklist="pd_op.stack;pd_op.squeeze;pd_op.swiglu;pd_op.squared_l2_norm"
+export FLAGS_prim_backward_blacklist="swiglu_grad"
 
 source ${BENCHMARK_ROOT}/scripts/run_model.sh   # 在该脚本中会对符合benchmark规范的log使用analysis.py 脚本进行性能数据解析;如果不联调只想要产出训练log可以注掉本行,提交时需打开
 _set_params $@

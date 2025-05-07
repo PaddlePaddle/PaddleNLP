@@ -110,24 +110,31 @@ html_css_files = [
 html_static_path = ["_static"]
 html_logo = "paddle.png"
 
-import tarfile
-from io import BytesIO
-
-import requests
+import shutil
+import subprocess
 
 
 def extract_tar(app, config):
     try:
-        url = "https://paddlenlp.bj.bcebos.com/datasets/website.tar"
-        response = requests.get(url)
-        response.raise_for_status()  # 检查请求是否成功
+        repo_url = "https://github.com/ZHUI/paddlenlp_model_readme.git"
+        clone_dir = "./paddlenlp_model_readme"
 
-        file_stream = BytesIO(response.content)
+        # 清理已存在的目录
+        if os.path.exists(clone_dir):
+            shutil.rmtree(clone_dir)
 
-        with tarfile.open(fileobj=file_stream, mode="r") as tar:
-            tar.extractall("_static/")
-    except:
-        pass
+        # 执行克隆
+        subprocess.run(["git", "clone", "--depth=1", repo_url], check=True)
+        if os.path.exists("./website"):
+            shutil.rmtree("./website")
+        shutil.move(clone_dir, "./website")
+        print("Repository cloned successfully!")
+    except subprocess.CalledProcessError as e:
+        print(f"Git操作失败: {e}")
+    except FileNotFoundError:
+        print("未找到git命令，请确保已安装Git并配置环境变量")
+    except Exception as e:
+        print(f"发生未知错误: {e}")
 
 
 def setup(app):

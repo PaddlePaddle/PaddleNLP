@@ -315,6 +315,7 @@ class XLMModelTest(ModelTesterMixin, unittest.TestCase):
         self.model_tester.create_and_check_for_lm_head(*config_and_inputs)
 
     @slow
+    @unittest.skip("Skip for missing model weight.")
     def test_model_from_pretrained(self):
         for model_name in list(XLMPretrainedModel.pretrained_init_configuration)[:1]:
             model = XLMModel.from_pretrained(model_name)

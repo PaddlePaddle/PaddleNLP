@@ -18,18 +18,18 @@
 
 | Model                                  | Pretrain | SFT | LoRA | Prefix Tuning | DPO/SimPO/ORPO/KTO | RLHF | Mergekit | Quantization | Torch convert |
 |----------------------------------------|----------|-----|------|---------------|----------------|------|-------|--------------|---------------|
-| [LLaMA](./config/llama)                | ✅        | ✅   | ✅    | ✅             | ✅             | ✅    | ✅    | ✅            | ✅             |
-| [Qwen](./config/qwen)                  | ✅        | ✅   | ✅    | ✅             | ✅             | 🚧   | ✅    | 🚧           | ✅             |
-| [Mixtral](./config/mixtral)            | ✅        | ✅   | ✅    | ❌             | ✅             | 🚧   | ✅    | 🚧           | 🚧            |
-| [Mistral](./config/mistral)            | ✅         | ✅   | ✅    | ✅             | ✅             | 🚧   | ✅    | 🚧           | ✅             |
-| [Baichuan/Baichuan2](./config/llama)   | ✅        | ✅   | ✅    | ✅             | ✅             | 🚧   | ✅    | ✅            | ✅             |
-| [ChatGLM-6B](./config/chatglm)         | ✅        | ✅   | ✅    | ✅             | 🚧            | 🚧   | ✅    | ✅            | ❌             |
-| [ChatGLM2/ChatGLM3](./config/chatglm2) | ✅        | ✅   | ✅    | ✅             | ✅             | 🚧   | ✅    | ✅            | ✅             |
-| [Bloom](./config/bloom)                | ✅        | ✅   | ✅    | ✅             | 🚧            | 🚧   | ✅    | ✅            | ✅             |
-| [GPT-3](./config/gpt-3)                | ✅        | ✅   | 🚧   | 🚧            | 🚧            | 🚧   | ✅    | 🚧           | ✅             |
-| [OPT](./config/opt)                    | ✅       | ✅   | ✅    | 🚧            | 🚧            | 🚧   | ✅    | 🚧           | ✅             |
-| [Gemma](./config/gemma)                | ✅       | ✅   | ✅    | 🚧            | ✅            | 🚧   | ✅    | 🚧           | 🚧             |
-| [Yuan](./config/yuan)                  | ✅       | ✅   | ✅    | 🚧            | ✅            | 🚧   | ✅    | 🚧           | 🚧             |
+| [LLaMA](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/llama)                | ✅        | ✅   | ✅    | ✅             | ✅             | ✅    | ✅    | ✅            | ✅             |
+| [Qwen](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/qwen)                  | ✅        | ✅   | ✅    | ✅             | ✅             | 🚧   | ✅    | 🚧           | ✅             |
+| [Mixtral](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/mixtral)            | ✅        | ✅   | ✅    | ❌             | ✅             | 🚧   | ✅    | 🚧           | 🚧            |
+| [Mistral](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/mistral)            | ✅         | ✅   | ✅    | ✅             | ✅             | 🚧   | ✅    | 🚧           | ✅             |
+| [Baichuan/Baichuan2](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/llama)   | ✅        | ✅   | ✅    | ✅             | ✅             | 🚧   | ✅    | ✅            | ✅             |
+| [ChatGLM-6B](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/chatglm)         | ✅        | ✅   | ✅    | ✅             | 🚧            | 🚧   | ✅    | ✅            | ❌             |
+| [ChatGLM2/ChatGLM3](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/chatglm2) | ✅        | ✅   | ✅    | ✅             | ✅             | 🚧   | ✅    | ✅            | ✅             |
+| [Bloom](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/bloom)                | ✅        | ✅   | ✅    | ✅             | 🚧            | 🚧   | ✅    | ✅            | ✅             |
+| [GPT-3](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/gpt-3)                | ✅        | ✅   | 🚧   | 🚧            | 🚧            | 🚧   | ✅    | 🚧           | ✅             |
+| [OPT](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/opt)                    | ✅       | ✅   | ✅    | 🚧            | 🚧            | 🚧   | ✅    | 🚧           | ✅             |
+| [Gemma](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/gemma)                | ✅       | ✅   | ✅    | 🚧            | ✅            | 🚧   | ✅    | 🚧           | 🚧             |
+| [Yuan](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/yuan)                  | ✅       | ✅   | ✅    | 🚧            | ✅            | 🚧   | ✅    | 🚧           | 🚧             |
 
 - ✅: Supported
 - 🚧: In Progress
@@ -44,7 +44,7 @@ pip install --pre --upgrade paddlenlp -f https://www.paddlepaddle.org.cn/whl/pad
 
 ### 1. 预训练
 
-PaddleNLP 将飞桨4D 并行策略加入到 Trainer API 中， 用户只需修改 Trainer 配置即可使用不同的分布式策略。目前大模型套件提供[LLaMA/LLaMA2/LLaMA3](./config/llama)、[GPT-3](./config/gpt-3)、[Qwen](./config/qwen)、[Baichuan/Baichuan2](./config/baichuan)、[Mixtral](./config/mixtral) 等模型预训练功能，更多模型支持持续更新中。
+PaddleNLP 将飞桨4D 并行策略加入到 Trainer API 中， 用户只需修改 Trainer 配置即可使用不同的分布式策略。目前大模型套件提供[LLaMA/LLaMA2/LLaMA3](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/llama)、[GPT-3](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/gpt-3)、[Qwen](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/qwen)、[Baichuan/Baichuan2](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/baichuan)、[Mixtral](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/mixtral) 等模型预训练功能，更多模型支持持续更新中。
 
 <div align="center">
     <img width="500" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/37530985/a2f0261d-7f76-4faf-ae01-cc9d37d5fcc0">
@@ -55,7 +55,7 @@ PaddleNLP 将飞桨4D 并行策略加入到 Trainer API 中， 用户只需修�
      </font>
 </div>
 
-我们在此处提供了更详细的[预训练数据制作](./tools/preprocess)，[Pretrain 和自定义数据集](https://paddlenlp.readthedocs.io/zh/latest/llm/dataset.html)，[分布式策略支持情况](https://paddlenlp.readthedocs.io/zh/latest/llm/docs/pretrain.html#model-capability)，[性能测试报告文档](https://paddlenlp.readthedocs.io/zh/latest/llm/docs/pretrain.html#model-performance)，参见: [大模型预训练介绍](https://paddlenlp.readthedocs.io/zh/latest/llm/docs/pretrain.html), [大模型权重列表](https://paddlenlp.readthedocs.io/zh/latest/llm/docs/pretrain.html#model-weight)。
+我们在此处提供了更详细的[预训练数据制作](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/tools/preprocess)，[Pretrain 和自定义数据集](https://paddlenlp.readthedocs.io/zh/latest/llm/dataset.html)，[分布式策略支持情况](https://paddlenlp.readthedocs.io/zh/latest/llm/docs/pretrain.html#model-capability)，[性能测试报告文档](https://paddlenlp.readthedocs.io/zh/latest/llm/docs/pretrain.html#model-performance)，参见: [大模型预训练介绍](https://paddlenlp.readthedocs.io/zh/latest/llm/docs/pretrain.html), [大模型权重列表](https://paddlenlp.readthedocs.io/zh/latest/llm/docs/pretrain.html#model-weight)。
 
 此项目支持了 LLaMA、GPT-3、BaiChuan、Qwen 和 Mixtral 等大模型的预训练。用户切换配置 config 文件，即可一键运行。
 
@@ -186,7 +186,7 @@ python run_finetune.py ./config/qwen/pt_argument.json
 
 ### 3. 对齐
 
-我们支持 DPO、KTO、RLHF 等偏好对齐策略。DPO、KTO 策略采用 zero_padding 策略，结合 FlashMask 策略，有效提升模型训练效率。
+我们支持 DPO、KTO、RL 等偏好对齐策略。DPO、KTO 策略采用 zero_padding 策略，结合 FlashMask 策略，有效提升模型训练效率。
 
 #### 3.1 DPO
 
@@ -241,7 +241,7 @@ python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" ./alignment/
 ```
 更多 DPO 技术细节和使用说明详见[DPO 文档](./docs/dpo.md)。
 ```bash
-# 需要52G左右显存
+# 单卡执行, 需要52G左右显存
 python -u  ./alignment/dpo/run_dpo.py ./config/llama/dpo_lora_argument.json
 ```
 
@@ -272,8 +272,8 @@ python -u  ./alignment/dpo/run_dpo.py ./config/llama/dpo_lora_argument.json
 为了方便测试，我们也提供了偏好数据集可以直接使用：
 
 ```bash
-wget https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized_pointwise.tar.gz
-tar -zxvf ultrafeedback_binarized.tar.gz
+wget https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized_pointwise.tar
+tar -xvf ultrafeedback_binarized_pointwise.tar.gz
 ```
 
 ##### 全参 KTO
@@ -289,20 +289,18 @@ python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" ./alignment/
 python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" ./alignment/kto/run_kto.py ./config/llama/kto_lora_argument.json
 ```
 
-#### 3.3 RLHF
+#### 3.3 RL
 
-飞桨大模型套件提供了提供了基于强化学习 PPO 算法对 LLM 进行人类偏好对齐的代码及完整使用示例，支持**3D 分布式并行训练以及 rollout 阶段使用预测优化进行生成加速**。详细使用教程详见[RLHF 文档](./docs/rlhf.md)。
+飞桨大模型套件提供了提供了基于强化学习 GRPO、Reinforce++、PPO 等 算法对 LLM 进行人类偏好对齐的代码及完整使用示例，支持**3D 分布式并行训练以及 rollout 阶段使用预测优化进行生成加速**。详细使用教程详见[RL 文档](./alignment/rl/README.md)。
 
 ### 4. 模型融合
 PadlleNLP 支持多种模型融合方法，包括**Linear、Slerp、Ties、DARE、DELLA**，并支持模型参数稀疏化方法与模型融合算法的灵活组合使用。
 ```shell
 # 模型融合启动命令参考
-python mergekit.py \
-    --device cpu \
-    --tensor_type np \
-    --n_process 2 \
+python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" ./llm/tools/mergekit.py \
+    --tensor_type pd \
     --merge_method linear \
-    --model_path_list ../checkpoints/model1 ../checkpoints/model \
+    --model_path_str "../checkpoints/model1,../checkpoints/model2" \
     --output_path ../checkpoints/model_merge
 
 ```

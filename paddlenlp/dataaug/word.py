@@ -170,7 +170,7 @@ class WordSubstitute(BaseAugment):
         return substitute_dict
 
     def _generate_sequence(self, output_seq_tokens, aug_tokens):
-        """Genearte the sequences according to the mapping list"""
+        """Generate the sequences according to the mapping list"""
         for aug_token in aug_tokens:
             idx, token = aug_token
             output_seq_tokens[int(idx)] = token
@@ -503,7 +503,7 @@ class WordInsert(BaseAugment):
         return sentences
 
     def _generate_sequence(self, output_seq_tokens, aug_tokens, p):
-        """Genearte the sequences according to the mapping list"""
+        """Generate the sequences according to the mapping list"""
         for aug_token in aug_tokens:
             idx, token = aug_token
             if p == 0:

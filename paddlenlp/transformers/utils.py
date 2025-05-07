@@ -205,10 +205,10 @@ def adapt_stale_fwd_patch(self, name, value):
             if self.__module__.startswith("paddlenlp"):
                 warnings.warn(
                     f"The `forward` method of {self.__class__ if isinstance(self, Layer) else self} is patched and the patch "
-                    "might be based on an old oversion which missing some "
+                    "might be based on an old version which missing some "
                     f"arguments compared with the latest, such as {new_args}. "
                     "We automatically add compatibility on the patch for "
-                    "these arguemnts, and maybe the patch should be updated."
+                    "these arguments, and maybe the patch should be updated."
                 )
             else:
                 warnings.warn(
@@ -216,7 +216,7 @@ def adapt_stale_fwd_patch(self, name, value):
                     "is patched and the patch might be conflict with patches made "
                     f"by paddlenlp which seems have more arguments such as {new_args}. "
                     "We automatically add compatibility on the patch for "
-                    "these arguemnts, and maybe the patch should be updated."
+                    "these arguments, and maybe the patch should be updated."
                 )
             if isinstance(self, Layer) and inspect.isfunction(value):
 
@@ -450,7 +450,7 @@ def paddlenlp_hub_download(
 
     # Download from custom model url
     if is_url(repo_id):
-        # check wether the target file exist in the comunity bos server
+        # check wether the target file exist in the community bos server
         if url_file_exists(repo_id):
             logger.info(f"Downloading {repo_id}")
             weight_file_path = get_path_from_url_with_filelock(repo_id, cache_dir)
@@ -483,7 +483,7 @@ def paddlenlp_hub_download(
     community_model_file_path = "/".join(url_list)
     assert is_url(community_model_file_path)
 
-    # check wether the target file exist in the comunity bos server
+    # check wether the target file exist in the community bos server
     if url_file_exists(community_model_file_path):
         logger.info(f"Downloading {community_model_file_path}")
         weight_file_path = get_path_from_url_with_filelock(community_model_file_path, cache_dir)

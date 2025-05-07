@@ -17,11 +17,20 @@
 
 #pragma once
 #include "xpu/xdnn.h"
-
+#include <chrono>
 namespace baidu {
 namespace xpu {
 namespace api {
 namespace plugin {
+static std::string print_times(std::string str){
+#ifdef XPU_PRINT_OP_TIME
+  auto now = std::chrono::system_clock::now();
+  auto duration = now.time_since_epoch();
+  auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+  std::cout<<str<<":" <<milliseconds<<std::endl;
+#endif
+  return "";
+} 
 
 template <typename T>
 DLL_EXPORT int set_stop_value_multi_ends(Context* ctx,
@@ -83,20 +92,6 @@ DLL_EXPORT int get_position_ids(Context *ctx,
                        const int *seq_lens_this_time,
                        int *position_ids,
                        const int bs);
-
-DLL_EXPORT int update_inputs(Context* ctx,
-                             bool* not_need_stop,
-                             int* seq_lens_this_time,
-                             int* seq_lens_encoder,
-                             int* seq_lens_decoder,
-                             int64_t* input_ids,
-                             const int64_t* stop_nums,
-                             const bool* stop_flags,
-                             const bool* is_block_step,
-                             const int64_t* next_tokens,
-                             const int bsz,
-                             const int max_bsz,
-                             const int input_ids_stride);
 
 template <typename T>
 DLL_EXPORT int rebuild_padding(Context *ctx,
@@ -172,6 +167,19 @@ DLL_EXPORT int free_and_dispatch_block(Context *ctx,
                             const int block_size,
                             const int block_num_per_seq,
                             const int max_decoder_block_num);
+
+template <typename T, typename TR>
+DLL_EXPORT int rotary_embedding_neox(
+        Context* ctx,
+        const int* positions,  // [num_tokens]
+        T* query,                  // [num_tokens, num_heads, head_size]
+        T* key,                    // [num_tokens, num_kv_heads, head_size]
+        const TR* cos_sin_cache,   // [max_position, 2, rot_dim // 2]
+        const int rot_dim,
+        const int num_heads,
+        const int num_kv_heads,
+        const int head_size,
+        const int32_t num_tokens);
 }  // namespace plugin
 }  // namespace api
 }  // namespace xpu

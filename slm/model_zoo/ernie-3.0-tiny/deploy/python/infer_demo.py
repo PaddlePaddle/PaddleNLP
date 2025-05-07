@@ -1,4 +1,4 @@
-# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,196 +14,139 @@
 
 import os
 
-import fastdeploy as fd
 import numpy as np
+import paddle.inference as paddle_infer
 
-from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.transformers import AutoTokenizer
+from paddlenlp.utils.env import (
+    PADDLE_INFERENCE_MODEL_SUFFIX,
+    PADDLE_INFERENCE_WEIGHTS_SUFFIX,
+)
 
 
 def parse_arguments():
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_dir", required=True, help="The directory of model.")
-    parser.add_argument("--slot_label_path", type=str, default="", help="Path of the slot label file.")
-    parser.add_argument("--intent_label_path", type=str, default="", help="Path of the intent label file.")
-    parser.add_argument("--model_prefix", type=str, default="infer_model", help="The model and params file prefix.")
-    parser.add_argument(
-        "--device",
-        type=str,
-        default="cpu",
-        choices=["gpu", "cpu"],
-        help="Type of inference device, support 'cpu' or 'gpu'.",
-    )
-    parser.add_argument(
-        "--backend",
-        type=str,
-        default="paddle",
-        choices=["onnx_runtime", "paddle", "openvino", "tensorrt", "paddle_tensorrt"],
-        help="The inference runtime backend.",
-    )
-    parser.add_argument("--batch_size", type=int, default=1, help="The batch size of data.")
-    parser.add_argument("--max_length", type=int, default=16, help="The max length of sequence.")
-    parser.add_argument("--cpu_num_threads", type=int, default=1, help="The number of threads when inferring on cpu.")
-    parser.add_argument("--use_trt_fp16", type=strtobool, default=False, help="Wheter to use FP16 mode")
+    parser.add_argument("--model_dir", required=True, help="Directory containing model and tokenizer files.")
+    parser.add_argument("--slot_label_path", type=str, default="", help="Slot label file path.")
+    parser.add_argument("--intent_label_path", type=str, default="", help="Intent label file path.")
+    parser.add_argument("--model_prefix", type=str, default="infer_model", help="Model prefix (default: infer_model).")
+    parser.add_argument("--batch_size", type=int, default=1, help="Batch size for inference.")
+    parser.add_argument("--max_length", type=int, default=16, help="Max sequence length.")
+    parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu"], help="Device for inference.")
     return parser.parse_args()
 
 
 def batchify_text(texts, batch_size):
-    batch_texts = []
-    batch_start = 0
-    while batch_start < len(texts):
-        batch_texts += [texts[batch_start : min(batch_start + batch_size, len(texts))]]
-        batch_start += batch_size
-    return batch_texts
+    return [texts[i : i + batch_size] for i in range(0, len(texts), batch_size)]
 
 
-class Predictor(object):
+class PaddlePredictor:
     def __init__(self, args):
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_dir)
-        self.runtime = self.create_fd_runtime(args)
         self.batch_size = args.batch_size
         self.max_length = args.max_length
-        self.slot_label_map = {}
-        self.intent_label_map = {}
+        self.config = self._create_config(args)
+        self.predictor = paddle_infer.create_predictor(self.config)
+        self.input_handle = self.predictor.get_input_handle(self.predictor.get_input_names()[0])
+        self.intent_output = self.predictor.get_output_handle(self.predictor.get_output_names()[0])
+        self.slot_output = self.predictor.get_output_handle(self.predictor.get_output_names()[1])
 
-        slot_label_path = self.get_actual_path(args.slot_label_path, "slots_label.txt", args)
-        if not os.path.exists(slot_label_path):
-            raise ValueError("Slot label path doesn't exist")
-        with open(slot_label_path, "r") as f:
-            for i, label in enumerate(f):
-                self.slot_label_map[i] = label.rstrip("\n")
+        self.slot_label_map = self._load_label_map(self._resolve_path(args.slot_label_path, "slots_label.txt", args))
+        self.intent_label_map = self._load_label_map(
+            self._resolve_path(args.intent_label_path, "intent_label.txt", args)
+        )
 
-        intent_label_path = self.get_actual_path(args.intent_label_path, "intent_label.txt", args)
-        if not os.path.exists(intent_label_path):
-            raise ValueError("Intent label path doesn't exist")
-        with open(intent_label_path, "r") as f:
-            for i, label in enumerate(f):
-                self.intent_label_map[i] = label.rstrip("\n")
+    def _resolve_path(self, path, default_filename, args):
+        return path if os.path.exists(path) else os.path.join(args.model_dir, default_filename)
 
-    def get_actual_path(self, path, default_path, args):
-        if os.path.exists(path):
-            return path
-        return os.path.join(args.model_dir, default_path)
+    def _load_label_map(self, filepath):
+        with open(filepath, "r") as f:
+            return {i: line.strip() for i, line in enumerate(f)}
 
-    def create_fd_runtime(self, args):
-        option = fd.RuntimeOption()
-        model_path = os.path.join(args.model_dir, args.model_prefix + ".pdmodel")
-        params_path = os.path.join(args.model_dir, args.model_prefix + ".pdiparams")
-        option.set_model_path(model_path, params_path)
-        if args.device == "cpu":
-            option.use_cpu()
-            option.set_cpu_thread_num(args.cpu_num_threads)
+    def _create_config(self, args):
+        model_path = os.path.join(args.model_dir, f"{args.model_prefix}{PADDLE_INFERENCE_MODEL_SUFFIX}")
+        params_path = os.path.join(args.model_dir, f"{args.model_prefix}{PADDLE_INFERENCE_WEIGHTS_SUFFIX}")
+        config = paddle_infer.Config(model_path, params_path)
+
+        if args.device == "gpu":
+            config.enable_use_gpu(100, 0)
         else:
-            option.use_gpu()
-        if args.backend == "paddle":
-            option.use_paddle_infer_backend()
-        elif args.backend == "onnx_runtime":
-            option.use_ort_backend()
-        elif args.backend == "openvino":
-            option.use_openvino_backend()
-        else:
-            option.use_trt_backend()
-            if args.backend == "paddle_tensorrt":
-                option.enable_paddle_to_trt()
-                option.enable_paddle_trt_collect_shape()
-            trt_file = os.path.join(args.model_dir, "infer.trt")
-            option.set_trt_input_shape(
-                "input_ids",
-                min_shape=[1, 1],
-                opt_shape=[args.batch_size, args.max_length],
-                max_shape=[args.batch_size, args.max_length],
-            )
-            if args.use_trt_fp16:
-                option.enable_trt_fp16()
-                trt_file = trt_file + ".fp16"
-            option.set_trt_cache_file(trt_file)
-        return fd.Runtime(option)
+            config.disable_gpu()
+            config.set_cpu_math_library_num_threads(2)
 
-    def preprocess(self, data):
-        data = self.tokenizer(data, max_length=self.max_length, padding=True, truncation=True)
-        input_ids_name = self.runtime.get_input_info(0).name
-        input_map = {
-            input_ids_name: np.array(data["input_ids"], dtype="int32"),
-        }
-        return input_map
+        config.switch_ir_optim(True)
+        config.enable_memory_optim()
+        return config
 
-    def infer(self, input_map):
-        results = self.runtime.infer(input_map)
-        return results
+    def preprocess(self, texts):
+        encoded = self.tokenizer(texts, max_length=self.max_length, padding=True, truncation=True)
+        return np.array(encoded["input_ids"]).astype("int32"), texts
+
+    def infer(self, input_ids):
+        self.input_handle.copy_from_cpu(input_ids)
+        self.predictor.run()
+        intent_result = self.intent_output.copy_to_cpu()
+        slot_result = self.slot_output.copy_to_cpu()
+        return intent_result, slot_result
 
     def intent_cls_postprocess(self, intent_logits):
-        max_value = np.max(intent_logits, axis=1, keepdims=True)
-        exp_data = np.exp(intent_logits - max_value)
-        probs = exp_data / np.sum(exp_data, axis=1, keepdims=True)
-        out_dict = {"intent": probs.argmax(axis=-1), "confidence": probs.max(axis=-1)}
-        return out_dict
+        probs = np.exp(intent_logits - np.max(intent_logits, axis=1, keepdims=True))
+        probs = probs / np.sum(probs, axis=1, keepdims=True)
+        return {
+            "intent": np.argmax(probs, axis=-1),
+            "confidence": np.max(probs, axis=-1),
+        }
 
-    def slot_cls_postprocess(self, slot_logits, input_data):
-        batch_preds = slot_logits.argmax(axis=-1).tolist()
-        value = []
-        for batch, preds in enumerate(batch_preds):
-            start = -1
-            label_name = ""
+    def slot_cls_postprocess(self, slot_logits, raw_texts):
+        preds = slot_logits.argmax(axis=-1)
+        results = []
+        for i, pred_seq in enumerate(preds):
             items = []
-            text_length = len(input_data[batch])
-            for i, pred in enumerate(preds):
-                if (
-                    self.slot_label_map[pred] == "O" or "B-" in self.slot_label_map[pred] or i - 1 >= text_length
-                ) and start >= 0:
-                    entity = input_data[batch][start : i - 1]
-
-                    if isinstance(entity, list):
-                        entity = "".join(entity)
-                    items.append(
-                        {
-                            "slot": label_name,
-                            "entity": entity,
-                            "pos": [start, i - 2],
-                        }
-                    )
+            start, label_name = -1, ""
+            for j, label_id in enumerate(pred_seq):
+                label = self.slot_label_map.get(label_id, "O")
+                if label.startswith("B-"):
+                    if start != -1:
+                        items.append({"slot": label_name, "entity": "".join(raw_texts[i][start:j])})
+                    start = j
+                    label_name = label[2:]
+                elif label == "O" and start != -1:
+                    items.append({"slot": label_name, "entity": "".join(raw_texts[i][start:j])})
                     start = -1
-                    if i - 1 >= text_length:
-                        break
-                if "B-" in self.slot_label_map[pred]:
-                    start = i - 1
-                    label_name = self.slot_label_map[pred][2:]
-            value.append(items)
-        out_dict = {"value": value}
-        return out_dict
+            if start != -1:
+                items.append({"slot": label_name, "entity": "".join(raw_texts[i][start:])})
+            results.append(items)
+        return results
 
-    def postprocess(self, infer_data, data):
-        intent_logits = np.array(infer_data[0])
-        intent_out = self.intent_cls_postprocess(intent_logits)
-        slot_logits = np.array(infer_data[1])
-        slot_out = self.slot_cls_postprocess(slot_logits, data)
-        out_list = [
+    def predict(self, texts):
+        input_ids, raw_texts = self.preprocess(texts)
+        intent_logits, slot_logits = self.infer(input_ids)
+        intent_result = self.intent_cls_postprocess(intent_logits)
+        slot_result = self.slot_cls_postprocess(slot_logits, raw_texts)
+        return [
             {
-                "intent": self.intent_label_map[intent_out["intent"][i]],
-                "confidence": intent_out["confidence"][i],
-                "slot": slot_out["value"][i],
+                "intent": self.intent_label_map[intent_result["intent"][i]],
+                "confidence": float(intent_result["confidence"][i]),
+                "slot": slot_result[i],
             }
-            for i in range(len(data))
+            for i in range(len(texts))
         ]
-        return out_list
-
-    def predict(self, data):
-        input_map = self.preprocess(data)
-        infer_result = self.infer(input_map)
-        output = self.postprocess(infer_result, data)
-        return output
 
 
 if __name__ == "__main__":
     args = parse_arguments()
-    predictor = Predictor(args)
+    predictor = PaddlePredictor(args)
+
+    # 示例输入
     data = ["来一首周华健的花心", "播放我们都一样", "到信阳市汽车配件城"]
-    batch_data = batchify_text(data, args.batch_size)
-    j = 0
-    for batch in batch_data:
-        output = predictor.predict(batch)
-        for out in output:
-            print(f"No. {j} text = {data[j]}")
-            print(out)
-            j += 1
+    batches = batchify_text(data, args.batch_size)
+
+    idx = 0
+    for batch in batches:
+        result = predictor.predict(batch)
+        for r in result:
+            print(f"No. {idx} text = {data[idx]}")
+            print(r)
+            idx += 1

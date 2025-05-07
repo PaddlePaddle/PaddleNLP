@@ -91,6 +91,12 @@
 
 ```
 
+下载数据集并解压到当前目录：
+```shell
+wget https://bj.bcebos.com/v1/paddlenlp/data/literature_search_data.zip
+unzip literature_search_data.zip
+```
+
 <a name="向量检索"></a>
 
 ## 5. 向量检索
@@ -141,6 +147,10 @@ python milvus_ann_search.py --data_path milvus/milvus_data.csv \
 * `search`: 是否检索向量
 * `batch_size`: 表示的是一次性插入的向量的数量
 
+也可以运行脚本：
+```
+sh scripts/feature_extract.sh
+```
 
 |  数据量 |  时间 |
 | ------------ | ------------ |
