@@ -2244,7 +2244,9 @@ class TrainingArguments:
                 return self._format_name("moe", self.data_parallel_rank, self.data_parallel_degree)
             return None
 
-    def sharded_name_suffix(self, shard_id=None, pp_id=None, moe_id=None):
+    def sharded_name_suffix(self, shard_id=None, pp_id=None, moe_id=None, sharding_parallel_degree=None):
+        if sharding_parallel_degree is None:
+            sharding_parallel_degree = self.sharding_parallel_degree
         if self.use_hybrid_parallel:
             name = []
             if self.tensor_parallel_degree > 1:
@@ -2254,11 +2256,11 @@ class TrainingArguments:
                     pp_id = self.pipeline_parallel_rank
                 assert isinstance(pp_id, int)
                 name.append(self._format_name("pp", pp_id, self.pipeline_parallel_degree))
-            if self.sharding_parallel_degree > 1:
+            if sharding_parallel_degree > 1:
                 if shard_id is None:
                     shard_id = self.sharding_parallel_rank
                 assert isinstance(shard_id, int)
-                name.append(self._format_name("shard", shard_id, self.sharding_parallel_degree))
+                name.append(self._format_name("shard", shard_id, sharding_parallel_degree))
             if self.use_expert_parallel:
                 if moe_id is None:
                     moe_id = self.data_parallel_rank
@@ -2385,9 +2387,7 @@ class TrainingArguments:
     def should_load_sharding_stage1_model(self):
         if self.enable_auto_parallel:
             return False
-        return (
-            ShardingOption.SHARD_OP in self.sharding and self.sharding_parallel_degree > 1 and self.load_sharded_model
-        )
+        return self.load_sharded_model
 
     @property
     def should_load_dataset(self):
