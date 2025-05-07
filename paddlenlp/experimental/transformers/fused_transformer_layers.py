@@ -3134,7 +3134,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
             from paddlenlp.utils.env import PREFILL_USE_SAGE_ATTN
 
             if PREFILL_USE_SAGE_ATTN:
-                from paddlenlp_ops import sage_attention, append_attention
+                from paddlenlp_ops import sage_attention
                 
                 def align_padding(cu_seqlen: paddle.Tensor):
                     """
