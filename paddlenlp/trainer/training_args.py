@@ -813,6 +813,7 @@ class TrainingArguments:
 
     local_rank: int = field(default=-1, metadata={"help": "For distributed training: local_rank"})
 
+    dataloader_shuffle: bool = field(default=True, metadata={"help": "Whether to shuffle the train dataloder."})
     dataloader_drop_last: bool = field(
         default=False, metadata={"help": "Drop the last incomplete batch if it is not divisible by the batch size."}
     )

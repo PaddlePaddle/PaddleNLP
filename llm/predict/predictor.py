@@ -1304,7 +1304,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
     def insert_task(self, pos, task_id, repeat_num):
         query_id = task_id // repeat_num
         length = len(self.input_ids[query_id])
-        logger.debug(f"Insert task {task_id} while query id is {query_id} inserting pos {pos}")
+        # logger.debug(f"Insert task {task_id} while query id is {query_id} inserting pos {pos}")
         self.model_inputs["input_ids"][pos, 0] = self.model_inputs["all_token_ids"][task_id, 0]
         self.model_inputs["seq_lens_this_time"][pos] = 1
         self.model_inputs["seq_lens_decoder"][pos] = length

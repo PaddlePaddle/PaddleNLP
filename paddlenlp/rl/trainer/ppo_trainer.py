@@ -1147,7 +1147,7 @@ class PPOTrainer(Trainer):
     def distribute_gather_and_pad_data(self, batch):
         # group index for grpo
         eos_mask = (batch["input_ids"] != self.tokenizer.pad_token_id)[:, batch["prompt"].shape[-1] :].to(
-            self.args.model_dtype
+            batch["log_probs"].dtype  # fix dtype
         )
         try:
             hcg = fleet.get_hybrid_communicate_group()
@@ -1256,7 +1256,6 @@ class PPOTrainer(Trainer):
                 total_batch=combined_balance_batch,
                 batch_size=self.args.per_device_train_batch_size,
                 pad_token_id=self.tokenizer.pad_token_id,
-                pad_to_multiple_of=self.args.tensor_parallel_degree if self._model_config.sequence_parallel else None,
             )
         else:
             micro_batches = combined_balance_batch
@@ -1405,10 +1404,10 @@ class PPOTrainer(Trainer):
                 timer_scope_actor_model = TimerScope(
                     self.timers,
                     RolloutStages.ACTOR_MODEL_ENABLE_DISABLE,
-                    minus_names=[RolloutStages.GENERATE, RolloutStages.ROLLOUT_LOGPROB],
+                    minus_names=[RolloutStages.GENERATE],
                 )
                 timer_scope_actor_model.start()
-                with reload_and_offload_scope(self, self.actor_model, self.reference_model):
+                with reload_and_offload_scope(self, self.actor_model):
                     timer_scope_rollout = TimerScope(self.timers, RolloutStages.GENERATE)
                     timer_scope_rollout.start()
                     with infer_guard(self.actor_trainer):
@@ -1429,9 +1428,9 @@ class PPOTrainer(Trainer):
                         indices = np.concatenate(indices)
                     self.timers and (dist.get_world_size() > 1) and dist.barrier()
                     timer_scope_rollout.stop()
+                timer_scope_actor_model.stop()
 
-                # step 2-1: split micro_batches
-                #  truncate data
+                # step 2-1: truncate data
                 truncate_input_ids = [
                     self.truncate_batch_data(batch, truncate_max_len=self._model_config.max_position_embeddings)
                     for batch in cleanup_batches
@@ -1461,17 +1460,19 @@ class PPOTrainer(Trainer):
                     ),
                 }
 
-                # step 2-2: balance micro_batches based on batch tokens
+                # step 2-2: balance batches based on batch tokens
                 if self.args.balance_batch:
-                    micro_batches = self._balance_batch(batch)
+                    batch = self._balance_batch(batch)
 
                 # step 2-3: compute logprob for rollout data
                 with TimerScope(self.timers, RolloutStages.ROLLOUT_LOGPROB):
-                    with TimerScope(self.timers, RolloutStages.ROLLOUT_OLD_LOGPROB):
-                        batch["log_probs"] = self.actor_trainer.compute_logprob(**batch)
-                    with TimerScope(self.timers, RolloutStages.ROLLOUT_REF_LOGPROB):
-                        batch["ref_log_probs"] = self.reference_trainer.compute_logprob(**batch)
-                timer_scope_actor_model.stop()
+                    with reload_and_offload_scope(self, self.reference_model):
+                        with TimerScope(self.timers, RolloutStages.ROLLOUT_REF_LOGPROB):
+                            batch["ref_log_probs"] = self.reference_trainer.compute_logprob(**batch)
+
+                    with reload_and_offload_scope(self, self.actor_model):
+                        with TimerScope(self.timers, RolloutStages.ROLLOUT_OLD_LOGPROB):
+                            batch["log_probs"] = self.actor_trainer.compute_logprob(**batch)
 
                 # step 2-2: compute reward for rollout data
                 with TimerScope(
@@ -1571,12 +1572,6 @@ class PPOTrainer(Trainer):
                                 balance_batch_across_dp_group=False,
                             )
 
-                        # split into micro-batches
-                        # micro_batches = split_batch_into_micro_batches(
-                        #     total_batch=total_batch,
-                        #     per_device_train_batch_size=self.args.per_device_train_batch_size,
-                        #     pad_token_id=self.tokenizer.pad_token_id,
-                        # )
                         batch = total_batch
 
                         # Reset for next accumulation
@@ -1597,7 +1592,7 @@ class PPOTrainer(Trainer):
 
                 # prepare data for reinforce_plus_plus & grpo
                 if self.args.rl_algorithm in ["reinforce_plus_plus", "grpo"]:
-                    local_batch = batch
+                    local_batch = copy.deepcopy(batch)
                     batch = self.distribute_gather_and_pad_data(batch)
                 else:
                     local_batch = batch
@@ -1641,9 +1636,7 @@ class PPOTrainer(Trainer):
                             for micro_step, micro_batch in enumerate(micro_batches * self.args.update_iters):
                                 step = 0 if step == -1 else step
                                 with TimerScopeManualLabel(
-                                    self.timers,
-                                    get_timer_label(ActorStages.MICRO_STEPS) + f"_{micro_step}",
-                                    minus_names=[get_timer_label(ActorStages.OPTIMIZE_STEP)],
+                                    self.timers, get_timer_label(ActorStages.MICRO_STEPS) + f"_{micro_step}"
                                 ):
                                     rl_info = self.actor_trainer.update_actor(micro_batch)
 

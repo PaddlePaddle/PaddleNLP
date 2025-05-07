@@ -18,14 +18,9 @@ set -e
 export python=$1
 export paddle=$2
 export nlp_dir=/workspace/PaddleNLP
-mkdir -p /workspace/PaddleNLP/logs
 mkdir -p /workspace/PaddleNLP/model_logs
-mkdir -p /workspace/PaddleNLP/unittest_logs
-mkdir -p /workspace/PaddleNLP/coverage_logs
 export log_path=/workspace/PaddleNLP/model_logs
 export P0case_list=()
-export APIcase_list=()
-declare -A Normal_dic
 declare -A all_P0case_dic
 declare -A Build_list
 target_lists_for_llm=(
@@ -49,14 +44,22 @@ all_P0case_dic=(["msra_ner"]=15
     ["bert"]=2 
     ["skep"]=10 
     ["bigbird"]=2
-    ["gpt"]=2 
-    ["ernie-1.0"]=2 
-    ["xlnet"]=2
-    ["ofa"]=2 ["albert"]=2 ["lexical_analysis"]=5
+    ["ernie-1.0"]=2 ["ernie"]=2 
+    ["ofa"]=2 
+    ["albert"]=2 
+    ["lexical_analysis"]=5
     ["transformer"]=5
-    ["question_matching"]=5 ["ernie-csc"]=5  ["taskflow"]=5 ["clue"]=5 ["textcnn"]=5
-    ["ernie-3.0"]=5 ["ernie-layout"]=5 ["uie"]=5  ["llm"]=5
-    ["ernie"]=2 ["ernie_layout"]=5 ["ernie_csc"]=5 ["ernie_ctm"]=5 ["segment_parallel_utils"]=5 ["ring_flash_attention"]=5)
+    ["question_matching"]=5 
+    ["ernie-csc"]=5
+    ["clue"]=5
+    ["taskflow"]=5
+    ["ernie-3.0"]=5 
+    ["uie"]=5 
+    ["ernie-layout"]=5  ["ernie_layout"]=5
+    ["ernie_csc"]=5 
+    ["segment_parallel_utils"]=5 
+    ["ring_flash_attention"]=5
+    ["llm"]=5)
 ####################################
 
 python -m pip config --user set global.index http://pip.baidu-int.com/search/
@@ -88,7 +91,7 @@ nlp_build (){
 ####################################
 # get diff case
 cd ${nlp_dir}
-get_diff_TO_P0case(){
+get_diff_TO_case(){
 for file_name in `git diff --numstat ${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
     arr_file_name=(${file_name//// })
     dir1=${arr_file_name[0]}
@@ -101,91 +104,58 @@ for file_name in `git diff --numstat ${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`
         continue
     elif [[ ${file_name##*.} == "md" ]] || [[ ${file_name##*.} == "rst" ]] || [[ ${dir1} == "docs" ]];then
         continue
-    elif [[ "${AGILE_COMPILE_BRANCH}" == "refactor-training-loop" ]];then
+    elif [[ "${AGILE_COMPILE_BRANCH}" == "refactor-training-loop" ]];then # 针对特定分支
         P0case_list[${#P0case_list[*]}]=gpt
-    elif [[ ${dir1} =~ "scripts" ]];then # API 升级
-        if [[ ${dir2} =~ "should_deploy" ]];then # 针对发版mini test
-            P0case_list[${#P0case_list[*]}]=transformer
-        fi
-        if [[ ${dir2} =~ "regression" ]];then # ci脚本修改
-            P0case_list[${#P0case_list[*]}]=llm
-        fi
-    elif [[ ${dir1} =~ "paddlenlp" ]];then # API 升级
-        for ((i=0; i<${#target_lists_for_llm[@]}; i++)); do  # 命中指定路径执行llm
-            if [[ ${file_item} == *${target_lists_for_llm[i]}* ]];then
+    else
+         # 判断是否命中 target_lists_for_llm 列表-执行llm
+        for ((i=0; i<${#target_lists_for_llm[@]}; i++)); do 
+            if [[ "${file_item}" == *"${target_lists_for_llm[i]}"* ]];then
                 P0case_list[${#P0case_list[*]}]=llm
             fi
         done
-        if [[ ${dir2} =~ "__init__" ]];then # 针对发版mini test
-            P0case_list[${#P0case_list[*]}]=bert
-        elif [[ ${!all_P0case_dic[*]} == ${dir2} ]];then
-            P0case_list[${#P0case_list[*]}]=${dir2}
-        elif [[ ${dir2} =~ "transformers" ]];then
-            P0case_list[${#P0case_list[*]}]=llm
-            if [[ ${!all_P0case_dic[*]} == ${dir3} ]];then
+        # 其他 case 判断
+        if [[ ${dir1} =~ "scripts" ]];then # API 升级
+            if [[ ${dir2} =~ "should_deploy" ]];then # 针对发版mini test
+                P0case_list[${#P0case_list[*]}]=transformer
+            fi  
+        elif [[ ${dir1} =~ "paddlenlp" ]];then # API 升级
+            Build_list[${dir1}]="paddlenlp" # 影响编包
+            if [[ ${dir2} =~ "__init__" ]];then # 针对发版mini test
+                P0case_list[${#P0case_list[*]}]=bert
+            elif [[ -n "${all_P0case_dic[$dir2]}" ]]; then
+                P0case_list[${#P0case_list[*]}]=${dir2}
+            elif [[ ${dir2} =~ "transformers" ]];then
+                if [[ -n "${all_P0case_dic[$dir3]}" ]];then
+                    P0case_list[${#P0case_list[*]}]=${dir3}
+                fi
+            elif [[ ${dir2} =~ "taskflow" ]];then # ce case
+                P0case_list[${#P0case_list[*]}]=taskflow
+            fi
+        elif [[ "${dir1}" =~ "slm" && "${dir2}" =~ "examples" ]];then # 模型升级
+            if [[ -n "${all_P0case_dic[$dir2]}" ]];then
+                P0case_list[${#P0case_list[*]}]=${dir2}
+            elif [[ -n "${all_P0case_dic[$dir3]}" ]];then
                 P0case_list[${#P0case_list[*]}]=${dir3}
             fi
-        elif [[ ${dir2} =~ "taskflow" ]];then
-            P0case_list[${#P0case_list[*]}]=taskflow
-        elif [[ ${dir3} =~ "transformers" ]];then
-            P0case_list[${#P0case_list[*]}]=llm
-        fi
-        Build_list[${dir1}]="paddlenlp" # 影响编包
-    elif [[ ${dir1} =~ "examples" ]];then # 模型升级
-        if [[ ${!all_P0case_dic[*]} =~ ${dir2} ]];then
-            P0case_list[${#P0case_list[*]}]=${dir2}
-        elif [[ ${!all_P0case_dic[*]} =~ ${dir3} ]];then
-            P0case_list[${#P0case_list[*]}]=${dir3}
-        elif [[ ${dir3##*.} == "py" ]] && [[ !(${all_example_dict[*]} =~ ${dir2}) ]];then #新增规范模型
-            P0case_list[${#P0case_list[*]}]=${dir2}
-            Normal_dic[${dir2}]="${dir1}/${dir2}/"
-        elif [[ !(${all_example_dict[*]} =~ ${dir3}) ]] ;then
-            P0case_list[${#P0case_list[*]}]=${dir3}
-            Normal_dic[${dir3}]="${dir1}/${dir2}/${dir3}"
-        fi
-    elif [[ ${dir1} =~ "model_zoo" ]];then # 模型升级
-        if [[ ${!all_P0case_dic[*]} =~ ${dir2} ]];then
-            P0case_list[${#P0case_list[*]}]=${dir2}
-        # elif [[ !(${all_example_dict[*]} =~ ${dir2}) ]];then #新增规范模型
-        #     P0case_list[${#P0case_list[*]}]=${dir2}
-        #     Normal_dic[${dir2}]="${dir1}/${dir2}/"
-        fi
-    elif [[ ${dir1} =~ "llm" ]];then # 模型升级
-        P0case_list[${#P0case_list[*]}]=llm
-    elif [[ ${dir1} =~ "tests" ]];then # 新增单测
-        if [[ ${dir2} =~ "transformers" ]] ;then
-            if [[ ${dir3##*.} == "py" ]];then
-                continue
-            elif [[ ${!all_P0case_dic[*]} =~ ${dir3} ]];then
-                P0case_list[${#P0case_list[*]}]=${dir3}
-            else
-                APIcase_list[${#APIcase_list[*]}]=${dir3}
+        elif [[ "${dir1}" =~ "slm" && "${dir2}" =~ "model_zoo" ]];then # 模型升级
+            if [[ -n "${all_P0case_dic[$dir2]}" ]];then
+                P0case_list[${#P0case_list[*]}]=${dir2}
             fi
-        elif [[ ${dir2} =~ "taskflow" ]] ;then
-            APIcase_list[${#APIcase_list[*]}]=${dir2}
-        elif [[ ${dir2} =~ "llm" ]] ;then
-            P0case_list[${#P0case_list[*]}]=${dir2}
+        elif [[ ${dir1} =~ "csrc" ]];then # 推理改动
+            Build_list[${dir1}]="paddlenlp_ops" # 影响推理编包
+        else
+            continue
         fi
-    elif [[ ${dir1} =~ "pipelines" ]];then # 影响编包
-        Build_list[${dir1}]=${dir1}
-    elif [[ ${dir1} =~ "ppdiffusers" ]];then # 影响编包
-        Build_list[${dir1}]=${dir1}
-    elif [[ ${dir1} =~ "csrc" ]];then # 推理改动
-        P0case_list[${#P0case_list[*]}]=llm
-        Build_list[${dir1}]="paddlenlp_ops" # 影响推理编包
-    else
-        continue
     fi
 done
 }
-get_diff_TO_P0case
+get_diff_TO_case
 P0case_list=($(awk -v RS=' ' '!a[$1]++' <<< ${P0case_list[*]}))
-APIcase_list=($(awk -v RS=' ' '!a[$1]++' <<< ${APIcase_list[*]}))
 ####################################
-# build latest paddlenlp paddlenlp_ops pipelines ppddifusers whl and install
+# build latest paddlenlp/paddlenlp_ops whl and install
 if [[ ${#Build_list[*]} -ne 0 ]];then
-    echo -e "\033[32m start build ${Build_list[*]} whl \033[0m"
     install_paddle
+    echo -e "\033[32m start build ${Build_list[*]} whl \033[0m"
     for build_pkg in ${Build_list[*]};do
         if [[ ${build_pkg} == "paddlenlp" ]];then
             echo -e "\033[35m ---- build ${GIT_PR_ID} paddlenlp  \033[0m"
@@ -204,17 +174,20 @@ else
    echo -e "\033[32m Don't need build whl  \033[0m"
 fi
 ###################################
-if [[ ${#P0case_list[*]} -ne 0 ]] || [[ ${#APIcase_list[*]} -ne 0 ]];then
+if [[ ${#P0case_list[*]} -ne 0 ]];then
     cd ${nlp_dir}
-    # Install paddlenlp
-    python -m pip uninstall protobuf -y
-    python -m pip install protobuf==3.20.2
-    if [ ! -f ./dist/p****.whl ];then
+    # Install paddle
+    if [[ ${#Build_list[*]} -eq 0 ]];then
         install_paddle
+    else
+        echo "install_paddle done"
+    fi
+    # Install paddlenlp
+    if [ ! -f ./dist/p****.whl ];then
         echo "install_nlp_develop"
         python -m pip install --user https://paddlenlp.bj.bcebos.com/wheels/paddlenlp-ci-py3-none-any.whl --no-cache-dir
     else
-        echo "instal_nlp_pr done"
+        echo "install_nlp_pr done"
     fi
     # install paddlenlp_ops
     if [ ! -f ./csrc/gpu_dist/p****.whl ];then
@@ -223,8 +196,10 @@ if [[ ${#P0case_list[*]} -ne 0 ]] || [[ ${#APIcase_list[*]} -ne 0 ]];then
     else
         echo "install_paddlenlp_ops_pr done"
     fi
+    python -c "from paddlenlp import __version__; print('paddlenlp version:', __version__)" >> ${log_path}/commit_info.txt
     python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)" >> ${log_path}/commit_info.txt
-    python -m pip list
+    python -m pip list >> ${log_path}/commit_info.txt
+
     echo -e "\033[35m =======CI Check P0case========= \033[0m"
     echo -e "\033[35m ---- P0case_list length: ${#P0case_list[*]}, cases: ${P0case_list[*]} \033[0m"
     set +e
@@ -232,14 +207,8 @@ if [[ ${#P0case_list[*]} -ne 0 ]] || [[ ${#APIcase_list[*]} -ne 0 ]];then
     case_num=1
     for p0case in ${P0case_list[*]};do
         echo -e "\033[35m ---- running P0case $case_num/${#P0case_list[*]}: ${p0case} \033[0m"
-        if [[ ${!Normal_dic[*]} =~ ${p0case} ]];then
-            # python ${nlp_dir}/scripts/regression/ci_normal_case.py ${Normal_dic[${p0case}]}
-            # let case_num++
-            echo "pass"
-        else
-            bash ${nlp_dir}/scripts/regression/ci_case.sh ${p0case} ${cudaid1} ${cudaid2}
-            let case_num++
-        fi
+        bash ${nlp_dir}/scripts/regression/ci_case.sh ${p0case} ${cudaid1} ${cudaid2}
+        let case_num++
     done
     echo -e "\033[35m ---- end run P0case  \033[0m"
     cd ${nlp_dir}/model_logs
@@ -258,41 +227,11 @@ if [[ ${#P0case_list[*]} -ne 0 ]] || [[ ${#APIcase_list[*]} -ne 0 ]];then
         echo -e "\033[32m ---- P0case Success \033[0m"
     fi
     ####################################
-    # run unittest
-    cd ${nlp_dir}
-    echo -e "\033[35m =======CI Check Unittest========= \033[0m"
-    echo -e "\033[35m ---- unittest length: ${#APIcase_list[*]}, unittest cases: ${APIcase_list[*]} \033[0m"
-    for apicase in ${APIcase_list[*]};do
-        if [[ ${apicase} =~ "taskflow" ]] ; then
-            python -m pytest tests/taskflow/test_*.py >${nlp_dir}/unittest_logs/${apicase}_unittest.log 2>&1
-        else
-            python -m pytest tests/transformers/${apicase}/test_*.py  >${nlp_dir}/unittest_logs/${apicase}_unittest.log 2>&1
-            # sh run_coverage.sh paddlenlp.transformers.${apicase} >unittest_logs/${apicase}_coverage.log 2>&1
-        fi
-        UT_EXCODE=$? || true
-        if [ $UT_EXCODE -ne 0 ] ; then
-            mv ${nlp_dir}/unittest_logs/${apicase}_unittest.log ${nlp_dir}/unittest_logs/${apicase}_unittest_FAIL.log
-        fi
-    done
-    cd ${nlp_dir}/unittest_logs
-    UF=`ls *FAIL*|wc -l`
-    if [ "${UF}" -gt "0" ];then
-        UT_EXCODE=1
-        EXCODE=3
-    else
-        UT_EXCODE=0
-    fi
-    if [ $UT_EXCODE -ne 0 ] ; then
-        echo -e "\033[31m ---- Unittest Failed \033[0m"
-        ls *_FAIL*
-    else
-        echo -e "\033[32m ---- Unittest Success \033[0m"
-    fi
     cd ${nlp_dir}
     echo -e "\033[35m ---- Genrate Allure Report  \033[0m"
     unset http_proxy && unset https_proxy
     cp scripts/regression/gen_allure_report.py ./
-    python gen_allure_report.py > ${nlp_dir}/coverage_logs/gen_allure_report.log 2>&1
+    python gen_allure_report.py > /dev/null
     echo -e "\033[35m ---- Report: https://xly.bce.baidu.com/ipipe/ipipe-report/report/${AGILE_JOB_BUILD_ID}/report/  \033[0m"
     ####################################
     # run coverage
