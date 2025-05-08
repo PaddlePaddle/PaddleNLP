@@ -522,6 +522,7 @@ class RLTrainer(RLTrainerBase):
     # used to create criterion for trainer, please refer to `create_criterion`
     # for details.
     loss_cls: type
+    loss_identifier = lambda self, inputs: "tr_loss"
 
     def __init__(
         self,
@@ -573,17 +574,6 @@ class RLTrainer(RLTrainerBase):
         """
         criterion = create_loss(self.loss_cls, self.model.config, self.args, self.info_buffer, merge_labels=True)
         return criterion
-
-    def loss_identifier(self, inputs: Dict) -> str:
-        """
-        Moreover, a model/RLTrainer instance may use a mixed loss which uses a
-        different loss for different step and inputs, while we often want to get
-        the separated loss metric. We use a callable discriminator using inputs
-        (dict) as arguments and returning corresponding loss name to identify
-        current loss. NOTE: please make the loss name ends with "_loss". `tr_loss`
-        is the default loss name used in trainer.train.
-        """
-        return "tr_loss"
 
     def set_eval_model(self, model):
         """

@@ -27,62 +27,10 @@ from .rl_trainer import RLTrainer
 from .trainer_utils import guard_set_args
 
 
-class ActorReferenceTrainer(RLTrainer):
+class ActorReferenceTrainerBase(RLTrainer):
     loss_cls = RLHFPPOMixedLoss
     trainer_type = "policy"
-
-    def loss_identifier(self, inputs: Dict) -> str:
-        """
-        Identify whether to use the ptx loss function or the actor loss function based on the input dictionary.
-        If labels are present, return "ptx_loss"; otherwise, return "actor_loss".
-
-        Args:
-            inputs (Dict): A dictionary containing two key-value pairs, "inputs" and "labels".
-                           "inputs" represents the model's input, while "labels" is optional and indicates whether to use the ptx loss function.
-                           The default value for "labels" is None.
-
-        Returns:
-            str: A string indicating whether to use the ptx loss function or the actor loss function, either "ptx_loss" or "actor_loss".
-        """
-        return "actor_loss"
-
-    @paddle.no_grad()
-    def generate_sequences(self, prompt_only_batch: Dict, do_eval=False) -> List[Dict[str, Any]]:
-        """Rollout a batch of experiences."""
-        input_ids = prompt_only_batch["input_ids"]
-
-        repeat_num = 1 if do_eval else self.args.rollout_n
-
-        with guard_set_args(self.model.config, {"use_fused_head_and_loss_fn": False}):
-            sequences = self.get_model(False).generate(
-                input_ids=input_ids,
-                attention_mask=None,
-                position_ids=None,
-                do_eval=do_eval,
-                repeat_num=repeat_num,
-            )[0]
-
-        if repeat_num > 1:
-            input_ids = input_ids.repeat_interleave(repeat_num, axis=0)
-
-        if self.args.use_rm_server:
-            label_ids = prompt_only_batch["label_ids"]
-            if repeat_num > 1:
-                label_ids = label_ids.repeat_interleave(repeat_num, axis=0)
-
-        sequences = sequences.reshape([input_ids.shape[0] // repeat_num, repeat_num, -1])
-        if do_eval:
-            sequences = sequences.transpose([1, 0, 2])
-        # prompt, sequence, attention_mask
-        return [
-            {
-                "prompt": input_ids,
-                "input_ids": seq,
-                **({"label_ids": label_ids[idx * len(seq) : (idx + 1) * len(seq)]} if self.args.use_rm_server else {}),
-                "index": np.array([str(uuid.uuid4())] * len(seq), dtype=object),
-            }
-            for idx, seq in enumerate(sequences)
-        ]
+    loss_identifier = lambda self, inputs: "actor_loss"
 
     @paddle.no_grad()
     def compute_logprob(self, input_ids: paddle.Tensor, position_ids: paddle.Tensor = None, **kwargs) -> paddle.Tensor:
@@ -280,3 +228,43 @@ class ActorReferenceTrainer(RLTrainer):
             "train_max_generated_length": max_generated_length,
             "train_min_generated_length": min_generated_length,
         }
+
+
+class ActorReferenceTrainer(ActorReferenceTrainerBase):
+    @paddle.no_grad()
+    def generate_sequences(self, prompt_only_batch: Dict, do_eval=False) -> List[Dict[str, Any]]:
+        """Rollout a batch of experiences."""
+        input_ids = prompt_only_batch["input_ids"]
+
+        repeat_num = 1 if do_eval else self.args.rollout_n
+
+        with guard_set_args(self.model.config, {"use_fused_head_and_loss_fn": False}):
+            sequences = self.get_model(False).generate(
+                input_ids=input_ids,
+                attention_mask=None,
+                position_ids=None,
+                do_eval=do_eval,
+                repeat_num=repeat_num,
+            )[0]
+
+        if repeat_num > 1:
+            input_ids = input_ids.repeat_interleave(repeat_num, axis=0)
+
+        if self.args.use_rm_server:
+            label_ids = prompt_only_batch["label_ids"]
+            if repeat_num > 1:
+                label_ids = label_ids.repeat_interleave(repeat_num, axis=0)
+
+        sequences = sequences.reshape([input_ids.shape[0] // repeat_num, repeat_num, -1])
+        if do_eval:
+            sequences = sequences.transpose([1, 0, 2])
+        # prompt, sequence, attention_mask
+        return [
+            {
+                "prompt": input_ids,
+                "input_ids": seq,
+                **({"label_ids": label_ids[idx * len(seq) : (idx + 1) * len(seq)]} if self.args.use_rm_server else {}),
+                "index": np.array([str(uuid.uuid4())] * len(seq), dtype=object),
+            }
+            for idx, seq in enumerate(sequences)
+        ]
