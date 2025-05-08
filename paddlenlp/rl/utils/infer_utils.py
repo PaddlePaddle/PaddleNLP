@@ -268,6 +268,11 @@ def infer_guard(trainer, offload_model=True):
     policy_predictor.disable(model, onload_model=offload_model)
 
 
+def get_policy_predictor():
+    global policy_predictor
+    return policy_predictor
+
+
 class InferEvalModel:
     """For faster generation, not support PipelineParallel yet."""
 
