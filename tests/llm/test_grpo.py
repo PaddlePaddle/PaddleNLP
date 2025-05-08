@@ -47,7 +47,7 @@ class FinetuneTest(LLMTest, unittest.TestCase):
 
     def test_finetune(self):
         # 启动 reward server
-        reward_dir = os.path.join(os.getcwd(), "reward")
+        reward_dir = os.path.join(os.getcwd(), "./llm/alignment/rl/reward")
         reward_log = os.path.join(reward_dir, "reward_server.log")
         reward_server_script = os.path.join(reward_dir, "reward_server.py")
 
