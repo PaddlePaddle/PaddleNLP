@@ -70,7 +70,7 @@ class QuantizationConfig:
         skip_first_act_scale_step=20,
         moving_rate=0.01,
         epsilon=1e-8,
-        fp8_format="hybrid",
+        fp8_format_type="hybrid",
         **kwargs,
     ):
         if weight_quantize_algo is not None:
@@ -144,7 +144,7 @@ class QuantizationConfig:
         self.skip_first_act_scale_step = skip_first_act_scale_step
         self.moving_rate = moving_rate
         self.epsilon = epsilon
-        self.fp8_format = fp8_format_mapping[fp8_format]
+        self.fp8_format = fp8_format_mapping[fp8_format_type]
 
     def is_weight_quantize(self):
         if isinstance(self.weight_quantize_algo, dict):
