@@ -82,6 +82,7 @@ from ..utils.timer_utils import TimerScope, TimerScopeManualLabel
 from .actor_trainer import ActorReferenceTrainer
 from .critic_trainer import CriticTrainer
 from .reward_trainer import RewardTrainer
+from .rl_trainer import RLTrainerBase
 from .trainer_utils import (
     MuteDefaultFlowCallback,
     batch_retokenize,
@@ -205,7 +206,7 @@ class PPOMetric:
             return out_metrics
 
 
-class PPOTrainer(Trainer):
+class PPOTrainer(RLTrainerBase):
     def __init__(
         self,
         actor_model: Union[PretrainedModel, nn.Layer],
