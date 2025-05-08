@@ -46,6 +46,22 @@ class FinetuneTest(LLMTest, unittest.TestCase):
         LLMTest.tearDown(self)
 
     def test_finetune(self):
+        # 设置必要的环境变量
+        env_vars = {
+            "PYTHONPATH": f"{os.path.abspath('./')}:{os.path.abspath('./llm')}:" + os.environ.get("PYTHONPATH", ""),
+            "FLAGS_set_to_1d": "False",
+            "NVIDIA_TF32_OVERRIDE": "0",
+            "FLAGS_dataloader_use_file_descriptor": "False",
+            "HF_DATASETS_DOWNLOAD_TIMEOUT": "1",
+            "FLAGS_gemm_use_half_precision_compute_type": "False",
+            "FLAGS_force_cublaslt_no_reduced_precision_reduction": "True",
+            "FLAGS_mla_use_tensorcore": "0",
+            "FLAGS_cascade_attention_max_partition_size": "2048",
+        }
+
+        case_env = os.environ.copy()
+        case_env.update(env_vars)
+        
         # 启动 reward server
         reward_dir = os.path.join(os.getcwd(), "./llm/alignment/rl/reward")
         reward_log = os.path.join(reward_dir, "reward_server.log")
@@ -65,7 +81,7 @@ class FinetuneTest(LLMTest, unittest.TestCase):
             time.sleep(3)
 
             # 运行主逻辑
-            grpo_config = load_test_config(self.config_path, "grpo", self.model_dir)
+            grpo_config = load_test_config(self.config_path, "reinforce_plus_plus", self.model_dir)
             grpo_config["output_dir"] = self.output_dir
 
             with argv_context_guard(grpo_config):
