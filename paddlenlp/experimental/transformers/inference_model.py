@@ -42,6 +42,8 @@ class InferenceModel:
         self.rank = rank
         self.load_model_from_ipc = load_model_from_ipc
         self.model = self._build_model()
+        self.shared_buffer_to = False
+        self.local_test = False
 
         # (TODO:gaoziyuan)当前启动服务后直接加载参数，后续进行热启动
         if load_model_from_ipc and not cold_start:
@@ -65,9 +67,7 @@ class InferenceModel:
         """
         self._setup_environment()
         self.config = self._load_config()
-
-        self.model = AutoInferenceModelForCausalLM.from_pretrained(
-            self.predictor_args.model_name_or_path,
+        self.model = AutoInferenceModelForCausalLM.from_config(
             config=self.config,
             predictor_args=self.predictor_args,
             model_args=self.model_args,
@@ -76,6 +76,7 @@ class InferenceModel:
             tensor_parallel_rank=self.rank,
             load_model_from_ipc=self.load_model_from_ipc,
         )
+        print("gaoziyuan test load from config:", self.model.state_dict())
         return self.model
 
     def clear_parameters(self) -> None:
@@ -123,18 +124,24 @@ class InferenceModel:
         Args:
             ipc_state_dict: Dictionary containing new parameters in IPC format
         """
-        local_test = False
-        if local_test:
+        if self.local_test:
             state_dict = paddle.load("/root/paddlejob/workspace/env_run/output/model_local_qwen")
+            if not self.shared_buffer_to:
+                print("通过set_state_dict更新参数")
+                self.model.set_state_dict(state_dict)
         else:
             model_path = "/shared_ipc_meta"
             current_device_id = int(os.getenv("FLAGS_selected_gpus"))
             ipc_state_dict_path = os.path.join(model_path, f"ipc_metas_{current_device_id}")
             ipc_state_dict = paddle.load(ipc_state_dict_path)
             state_dict = self.load_tensor_from_ipc_meta(ipc_state_dict)
+            if not self.shared_buffer_to:
+                print("通过set_state_dict更新参数")
+                self.model.set_state_dict(state_dict)
 
         infer_model_state_dict = self.model.state_dict()
 
+        print("通过shared_buffer_to更新参数")
         for name, param in state_dict.items():
             if name in infer_model_state_dict:
                 logger.info(f"Updating model parameter: {name}")

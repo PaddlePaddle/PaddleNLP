@@ -738,8 +738,6 @@ class GenerationBlockInferenceModel(GenerationMixin):
 
                 next_tokens = top_p_sampling_reject(probs, top_p, 0)
             else:
-                print("gaoziyuan test", top_p)
-                print("gaoziyuan test____________")
                 _, next_tokens = paddle.tensor.top_p_sampling(probs, top_p)
 
             if self.config.tensor_parallel_degree > 1:

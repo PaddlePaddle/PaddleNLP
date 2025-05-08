@@ -47,7 +47,7 @@ def infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, 
 
     init_contexts = []
 
-    if low_cpu_mem_usage or config.quantization_config.is_weight_quantize() or config.load_model_from_ipc:
+    if low_cpu_mem_usage or config.quantization_config.is_weight_quantize():
         # Instantiate model.
         init_contexts.append(no_init_weights(_enable=True))
         if is_paddle_support_lazy_init():
@@ -58,8 +58,8 @@ def infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, 
     # init the model
     with ContextManagers(init_contexts):
         model = cls(config)
-        if config.load_model_from_ipc:
-            return model
+        # if config.load_model_from_ipc:
+        #     return model
 
     resolved_archive_file, _, _, _ = cls._resolve_model_file_path(
         pretrained_model_name_or_path,
@@ -88,7 +88,7 @@ def infererence_model_from_config(cls, config, args, kwargs):
     low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", False)
 
     init_contexts = []
-    if low_cpu_mem_usage or config.quantization_config.is_weight_quantize():
+    if low_cpu_mem_usage or config.quantization_config.is_weight_quantize() or kwargs.pop("load_model_from_ipc", False):
         # Instantiate model.
         init_contexts.append(no_init_weights(_enable=True))
         if is_paddle_support_lazy_init():

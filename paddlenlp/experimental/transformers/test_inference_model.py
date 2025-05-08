@@ -25,20 +25,20 @@ predictor_args.model_name_or_path = (
 )
 
 # 如果需要
-predictor_args.quant_type = "weight_only_int8"
+# predictor_args.quant_type = "weight_only_int8"
 
-inference_model = InferenceModel(predictor_args, model_args, load_model_from_ipc=True, cold_start=True)
+inference_model = InferenceModel(predictor_args, model_args, load_model_from_ipc=True, cold_start=False)
 
 model = inference_model.model
-print(model.get_name_mappings_to_training())
+# print(model.get_name_mappings_to_training())
 
 # 获取inference model 的 key\shape\type
-inference_model.get_model_static_info()
+# inference_model.get_model_static_info()
 
-# 获取qwen2 训练和推理的key映射关系
-infer_to_train = model.get_name_mappings_to_training()
+# # 获取qwen2 训练和推理的key映射关系
+# infer_to_train = model.get_name_mappings_to_training()
 
-print(infer_to_train)
+# print(infer_to_train)
 
 # keys_all = model.state_dict().keys()
 # for k, v in infer_to_train.items():
