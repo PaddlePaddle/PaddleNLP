@@ -1,0 +1,30 @@
+name: Distribute
+
+on:
+  push:
+    branches:
+      - develop
+    paths:
+      - "llm/**"
+      - "paddlenlp/**"
+      - "scripts/distribute/**"
+      - ".github/**"
+    repository_dispatch:
+
+jobs:
+  Distribute:
+    names: Distribute
+    runs-on: ubuntu-24.04
+    steps:
+      -
+        name: Check out code
+        uses: actions/checkout@v4
+      - name: Print git log
+        working-directory: /PaddleNLP
+        run: |
+          echo "log = $(git log -n 1)"
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+      
