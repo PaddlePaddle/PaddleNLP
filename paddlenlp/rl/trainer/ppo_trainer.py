@@ -1713,7 +1713,14 @@ class PPOTrainer(Trainer):
                             if self.args.rl_algorithm == "ppo":
                                 batch["reward_values"] = self.critic_trainer.compute_value(**batch)
                 # when aadiff, open the blow line
-                # save_paddle_dict(f"rank{dist.get_rank()}/save_paddle_dict", self.state.global_step, batch)
+                AA_DIFF = os.environ.get("AA_DIFF", "0")
+                BASE_PATH = os.environ.get("AA_DIFF_PATH", "")
+                if AA_DIFF == "1":
+                    save_paddle_dict(
+                        os.path.join(BASE_PATH, "save_paddle_dict", f"rank{dist.get_rank()}"),
+                        self.state.global_step,
+                        batch,
+                    )
 
                 # dynamic sampling: filter generated samples by rewards, keep generating until valid samples are enough
                 if self.args.dynamic_sampling:
