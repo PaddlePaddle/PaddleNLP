@@ -509,6 +509,7 @@ class Qwen2Attention(nn.Layer):
         self.skip_recompute_ops = skip_recompute_ops
         self.hidden_size = config.hidden_size
         self.num_heads = config.num_attention_heads
+        self.num_attention_heads = config.num_attention_heads
 
         self.head_dim = getattr(config, "head_dim", config.hidden_size // config.num_attention_heads)
 
@@ -576,13 +577,16 @@ class Qwen2Attention(nn.Layer):
             if self.fuse_attention_qkv:
                 self.qkv_proj = ColumnParallelLinear(
                     self.hidden_size,
-                    self.num_heads * self.head_dim + 2 * self.config.num_key_value_heads * self.head_dim,
+                    self.num_attention_heads * self.head_dim + 2 * self.config.num_key_value_heads * self.head_dim,
                     has_bias=self.has_bias,
                     gather_output=False,
                 )
             else:
                 self.q_proj = ColumnParallelLinear(
-                    self.hidden_size, self.num_heads * self.head_dim, has_bias=self.has_bias, gather_output=False
+                    self.hidden_size,
+                    self.num_attention_heads * self.head_dim,
+                    has_bias=self.has_bias,
+                    gather_output=False,
                 )
                 self.k_proj = ColumnParallelLinear(self.hidden_size, self.config.num_key_value_heads * self.head_dim, has_bias=self.has_bias, gather_output=False)  # fmt:skip
                 self.v_proj = ColumnParallelLinear(self.hidden_size, self.config.num_key_value_heads * self.head_dim, has_bias=self.has_bias, gather_output=False)  # fmt:skip
@@ -591,17 +595,19 @@ class Qwen2Attention(nn.Layer):
             if self.fuse_attention_qkv:
                 self.qkv_proj = Linear(
                     self.hidden_size,
-                    self.num_heads * self.head_dim + 2 * self.config.num_key_value_heads * self.head_dim,
+                    self.num_attention_heads * self.head_dim + 2 * self.config.num_key_value_heads * self.head_dim,
                 )
             else:
-                self.q_proj = Linear(self.hidden_size, self.num_heads * self.head_dim, bias_attr=self.has_bias)
+                self.q_proj = Linear(
+                    self.hidden_size, self.num_attention_heads * self.head_dim, bias_attr=self.has_bias
+                )
                 self.k_proj = Linear(
                     self.hidden_size, self.config.num_key_value_heads * self.head_dim, bias_attr=self.has_bias
                 )
                 self.v_proj = Linear(
                     self.hidden_size, self.config.num_key_value_heads * self.head_dim, bias_attr=self.has_bias
                 )
-            self.o_proj = Linear(self.num_heads * self.head_dim, self.hidden_size, bias_attr=False)
+            self.o_proj = Linear(self.num_attention_heads * self.head_dim, self.hidden_size, bias_attr=False)
 
         self.rotary_emb = Qwen2RotaryEmbedding(
             self.head_dim,
