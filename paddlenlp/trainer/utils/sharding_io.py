@@ -61,7 +61,7 @@ def to_device(tensor, place=None):
     return tensor
 
 
-def filter_sharded_params(state_dict, optimizer, sharding_group):
+def filter_sharded_params(state_dict, optimizer, sharding_group, include_freeze_params=False):
 
     sharding_rank = sharding_group.rank
     sharding_world_size = sharding_group.nranks
@@ -80,7 +80,7 @@ def filter_sharded_params(state_dict, optimizer, sharding_group):
                 if sharded_rank != sharding_rank:
                     continue
                 filtered_state_dict[k] = v
-            else:
+            elif include_freeze_params:
                 if sharding_rank == 0:
                     filtered_state_dict[k] = v
     else:
@@ -91,7 +91,7 @@ def filter_sharded_params(state_dict, optimizer, sharding_group):
         for (k, v) in state_dict.items():
             if v.name in filtered_parameters:
                 filtered_state_dict[k] = v
-            elif v.name not in [p.name for p in parameters]:
+            elif include_freeze_params and (v.name not in [p.name for p in parameters]):
                 if sharding_rank == 0:
                     filtered_state_dict[k] = v
     return filtered_state_dict
@@ -375,7 +375,12 @@ class ShardingIO:
         if state_dict is None:
             state_dict = model_to_save.state_dict()
             if self.args.should_save_sharding_stage1_model:
-                state_dict = filter_sharded_params(state_dict, self.optimizer, self.sharding_group)
+                state_dict = filter_sharded_params(
+                    state_dict,
+                    self.optimizer,
+                    self.sharding_group,
+                    self.args.save_sharding_stage1_model_include_freeze_params,
+                )
 
         config_to_save = None
         merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
