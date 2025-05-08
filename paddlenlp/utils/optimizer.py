@@ -27,10 +27,10 @@ except:
     adamw_16bit_moment = None
 
 from ..quantization.qat_utils import (
-    dequantize_channelwise, 
-    quantize_channelwise,
+    dequantize_channelwise,
     fp8_dequantize_tensorwise,
     fp8_quantize_tensorwise,
+    quantize_channelwise,
 )
 
 
@@ -573,7 +573,9 @@ class AdamWQweight(AdamW):
                     elif p.shape[1] / 2 == param.shape[0]:
                         bit_length = 4
                     param[:], quant_scale[:] = quantize_channelwise(
-                        p.astype("bfloat16"), apply_hadamard=self.quantization_config.apply_hadamard, bit_length=bit_length
+                        p.astype("bfloat16"),
+                        apply_hadamard=self.quantization_config.apply_hadamard,
+                        bit_length=bit_length,
                     )
         else:
             param[:] = p

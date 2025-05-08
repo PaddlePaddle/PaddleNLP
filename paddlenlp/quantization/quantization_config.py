@@ -20,7 +20,7 @@ quant_inference_mapping = {"avg": "abs_max", "abs_max_channel_wise": "abs_max_ch
 fp8_format_mapping = {
     "hybrid": {"weight": "float8_e4m3fn", "activation": "float8_e4m3fn", "grad_output": "float8_e5m2"},
     "e4m3": {"weight": "float8_e4m3fn", "activation": "float8_e4m3fn", "grad_output": "float8_e4m3fn"},
-    "e5m2": {"weight": "float8_e5m2", "activation": "float8_e5m2", "grad_output": "float8_e5m2"}
+    "e5m2": {"weight": "float8_e5m2", "activation": "float8_e5m2", "grad_output": "float8_e5m2"},
 }
 
 
@@ -86,7 +86,7 @@ class QuantizationConfig:
                         "fp4",
                         "a8w8linear",
                         "a8w4linear",
-                        "fp8linear"
+                        "fp8linear",
                     ]
                     for algo in weight_quantize_algo
                 ):
@@ -102,7 +102,7 @@ class QuantizationConfig:
                 "fp4",
                 "a8w8linear",
                 "a8w4linear",
-                "fp8linear"
+                "fp8linear",
             ]:
                 raise ValueError(
                     f"weight_quantize_algo:{weight_quantize_algo} not in supported list ['weight_only_int8', 'weight_only_int4', 'llm.int8', 'a8w8', 'nf4', 'fp4']"

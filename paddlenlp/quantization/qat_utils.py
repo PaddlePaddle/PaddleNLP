@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from copy import deepcopy
+
 import paddle
 from paddle.autograd import PyLayer
 
@@ -21,10 +22,11 @@ from paddlenlp.utils import infohub
 from .hadamard_utils import random_hadamard_matrix
 
 try:
+    from transformer_engine import transformer_engine_paddle as tex
+    from transformer_engine.paddle.constants import FP8BwdTensors, FP8FwdTensors
     from transformer_engine.paddle.cpp_extensions import fp8_gemm
-    from transformer_engine import transformer_engine_paddle as tex 
     from transformer_engine.paddle.layer.base import get_workspace
-    from transformer_engine.paddle.constants import FP8FwdTensors, FP8BwdTensors
+
     TE_DType = {
         paddle.float8_e4m3fn: tex.DType.kFloat8E4M3,
         paddle.float8_e5m2: tex.DType.kFloat8E5M2,
@@ -32,7 +34,7 @@ try:
     USE_FP8_GEMM = True
 except ImportError:
     USE_FP8_GEMM = False
-    
+
 
 def quantize_tensorwise(x, quantization_config=None, bit_length=8, state=0, training=False, act_scale=None):
     qmax = (1 << (bit_length - 1)) - 1
@@ -44,14 +46,18 @@ def quantize_tensorwise(x, quantization_config=None, bit_length=8, state=0, trai
 
     if act_scale is not None:
         if training:
-            scale = paddle.max(paddle.abs(target_x)) / qmax
-            act_scale.set_value((state * act_scale + scale) / (state + 1))
-            if state > quantization_config.skip_first_act_scale_step:
+            scale = paddle.max(paddle.abs(target_x)) / qmax + quantization_config.epsilon
+            if state < quantization_config.skip_first_act_scale_step:
+                act_scale.set_value((state * act_scale + scale) / (state + 1))
+            else:
+                act_scale.set_value(
+                    (1 - quantization_config.moving_rate) * act_scale + quantization_config.moving_rate * scale
+                )
                 scale = act_scale
         else:
             scale = act_scale
     else:
-        scale = paddle.max(paddle.abs(target_x)) / qmax
+        scale = paddle.max(paddle.abs(target_x)) / qmax + quantization_config.epsilon
 
     x_int8 = paddle.clip((target_x / scale).round(), qmin, qmax).astype("int8")
     return x_int8, scale
@@ -64,12 +70,10 @@ def dequantize_tensorwise(x_int8, scale, apply_hadamard=False):
     return x
 
 
-def fp8_quantize_tensorwise(
-    x, tensor_type, quantization_config=None, state=0, training=False, act_scale=None
-):
+def fp8_quantize_tensorwise(x, tensor_type, quantization_config=None, state=0, training=False, act_scale=None):
     assert tensor_type in ["weight", "activation", "grad_output"], "Only support weight, activation and grad_output"
     fp8_format = quantization_config.fp8_format[tensor_type]
-    qmin, qmax = (-448, 448) if fp8_format == "float8_e4m3fn" else (-57344, 57344)  
+    qmin, qmax = (-448, 448) if fp8_format == "float8_e4m3fn" else (-57344, 57344)
     tensor_type_to_shape_index = {"weight": 0, "activation": -1, "grad_output": -2}
 
     if quantization_config is not None and quantization_config.apply_hadamard:
@@ -86,14 +90,16 @@ def fp8_quantize_tensorwise(
     else:
         target_x = x
         block_size = 1
-    
+
     if act_scale is not None:
         if training:
             scale = paddle.max(paddle.abs(target_x)) / qmax + quantization_config.epsilon
             if state < quantization_config.skip_first_act_scale_step:
                 act_scale.set_value((state * act_scale + scale) / (state + 1))
             else:
-                act_scale.set_value((1 - quantization_config.moving_rate) * act_scale + quantization_config.moving_rate * scale)
+                act_scale.set_value(
+                    (1 - quantization_config.moving_rate) * act_scale + quantization_config.moving_rate * scale
+                )
                 # scale = act_scale
         else:
             scale = act_scale
@@ -162,10 +168,7 @@ def a8w8_backward(ctx, x, grad_output, quant_weight, quant_scale, quant_x, x_sca
     if not ctx.x_stop_gradient:
         if ctx.quantization_config.quant_input_grad:
             grad_output_int8, grad_output_scale = quantize_tensorwise(grad_output * quant_scale)
-            input_grad = (
-                paddle.matmul(grad_output_int8, quant_weight).astype(ctx.dtype)
-                * grad_output_scale
-            )
+            input_grad = paddle.matmul(grad_output_int8, quant_weight).astype(ctx.dtype) * grad_output_scale
             if ctx.quantization_config.apply_hadamard:
                 input_grad = input_grad @ infohub.hadamard[quant_weight.shape[-1]][0].T
         else:
@@ -193,7 +196,12 @@ def fp8_forward(
     x, w_fp8, w_scale=None, bias=None, dtype=None, quantization_config=None, state=0, training=False, act_scale=None
 ):
     x_fp8, x_scale = fp8_quantize_tensorwise(
-        x, tensor_type="activation", quantization_config=quantization_config, state=state, training=training, act_scale=act_scale
+        x,
+        tensor_type="activation",
+        quantization_config=quantization_config,
+        state=state,
+        training=training,
+        act_scale=act_scale,
     )
     x_fp8 = x_fp8.view(quantization_config.fp8_format["activation"])
     w_fp8 = w_fp8.view(quantization_config.fp8_format["weight"])
@@ -309,7 +317,8 @@ def fp8_backward(ctx, x, grad_output, quant_weight, quant_scale, quant_x, x_scal
                     weight_grad = paddle.matmul(x_.transpose([1, 0]), grad_output_).astype(ctx.dtype)
                 else:
                     weight_grad = paddle.matmul(
-                        x_.reshape([-1, x_.shape[-1]]).transpose([1, 0]), grad_output_.reshape([-1, grad_output_.shape[-1]])
+                        x_.reshape([-1, x_.shape[-1]]).transpose([1, 0]),
+                        grad_output_.reshape([-1, grad_output_.shape[-1]]),
                     ).astype(ctx.dtype)
             if ctx.quantization_config.apply_hadamard:
                 hadamard_matrix, block_size = infohub.hadamard[quant_x.shape[-1]]
@@ -324,7 +333,7 @@ def fp8_backward(ctx, x, grad_output, quant_weight, quant_scale, quant_x, x_scal
                 )
     else:
         weight_grad = None
-    
+
     return input_grad, weight_grad
 
 

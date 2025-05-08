@@ -34,7 +34,7 @@ except:
     qlora_weight_quantize = None
 
 from ..utils.log import logger
-from .qat_utils import quantize_channelwise, fp8_quantize_tensorwise
+from .qat_utils import fp8_quantize_tensorwise, quantize_channelwise
 from .quantization_linear import (
     ColumnParallelQuantizationLinear,
     QuantizationLinear,
@@ -234,7 +234,14 @@ def convert_to_quantize_state_dict(state_dict, quantization_linear_list, quantiz
         if weight_quantize_algo is None:
             continue
         # Convert state dict
-        if weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8", "a8w8linear", "a8w4linear", "fp8linear"]:
+        if weight_quantize_algo in [
+            "weight_only_int8",
+            "weight_only_int4",
+            "llm.int8",
+            "a8w8linear",
+            "a8w4linear",
+            "fp8linear",
+        ]:
             convert_to_weight_quantize_state_dict(state_dict, name, quantization_config, dtype, weight_quantize_algo)
         elif weight_quantize_algo in ["fp4", "nf4"]:
             convert_to_qlora_state_dict(state_dict, name, quantization_config, dtype, weight_quantize_algo)
