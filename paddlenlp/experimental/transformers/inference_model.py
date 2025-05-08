@@ -138,6 +138,7 @@ class InferenceModel:
             if not self.shared_buffer_to:
                 print("通过set_state_dict更新参数")
                 self.model.set_state_dict(state_dict)
+                return
 
         infer_model_state_dict = self.model.state_dict()
 
