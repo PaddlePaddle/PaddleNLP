@@ -209,9 +209,8 @@ def quant_weight_linear(
     if weight_quantize_algo in ["a8w8linear", "a8w4linear"]:
 
         state, training, act_scale = act_state
-
         return QATFunc.apply(
-            x, quant_weight, bias, quant_scale, quantization_config, dtype, state, training, act_scale
+            x, quant_weight, bias, quant_scale, quantization_config, state, training, act_scale, weight_quantize_algo
         )
     else:
         return QuantizationLinearFunc.apply(

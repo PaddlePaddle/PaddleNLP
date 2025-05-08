@@ -47,25 +47,6 @@ class ModelConfig:
             "help": "Whether to train from existing paddlenlp model weights. If set True, the model_name_or_path argument must exist in the paddlenlp models."
         },
     )
-    weight_quantize_algo: str = field(
-        default=None,
-        metadata={
-            "help": "Model weight quantization algorithm including 'nf4', 'fp4','weight_only_int4', 'weight_only_int8'."
-        },
-    )
-    qlora_weight_blocksize: int = field(
-        default=64,
-        metadata={"help": "Block size for weight quantization(Only available for nf4 or fp4 quant_scale.)."},
-    )
-    qlora_weight_double_quant: bool = field(
-        default=False, metadata={"help": "Whether apply double quant(Only available for nf4 or fp4 quant_scale.)."}
-    )
-    qlora_weight_double_quant_block_size: int = field(
-        default=256,
-        metadata={
-            "help": "Block size for quant_scale of weight quant_scale(Only available for nf4 or fp4 quant_scale.)"
-        },
-    )
 
     # LoRA related parameters
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
@@ -123,3 +104,33 @@ class ModelConfig:
     rope_scaling_factor: float = field(default=1.0, metadata={"help": "Rope extension scaling factor"})
     strategy_type: str = field(default=None, metadata={"help": "Long sequence strategy type"})
     strategy_name: str = field(default=None, metadata={"help": "Long sequence strategy name"})
+
+    # Quantization Training Related
+    weight_quantize_algo: str = field(
+        default=None,
+        metadata={
+            "help": "Model weight quantization algorithm including 'nf4', 'fp4','weight_only_int4', 'weight_only_int8'."
+        },
+    )
+    qlora_weight_blocksize: int = field(
+        default=64,
+        metadata={"help": "Block size for weight quantization(Only available for nf4 or fp4 quant_scale.)."},
+    )
+    qlora_weight_double_quant: bool = field(
+        default=False, metadata={"help": "Whether apply double quant(Only available for nf4 or fp4 quant_scale.)."}
+    )
+    qlora_weight_double_quant_block_size: int = field(
+        default=256,
+        metadata={
+            "help": "Block size for quant_scale of weight quant_scale(Only available for nf4 or fp4 quant_scale.)"
+        },
+    )
+    apply_hadamard: bool = field(default=True, metadata={"help": "Whether to apply hadamard"})
+    hadamard_is_block: bool = field(default=True, metadata={"help": "Whether to apply blockwise hadamard"})
+    hadamard_block_size: int = field(default=64, metadata={"help": "hadamard block size"})
+    quant_input_grad: bool = field(default=True, metadata={"help": "Whether to quantize input grad"})
+    apply_online_actscale_step: int = field(
+        default=100, metadata={"help": "Use online activation scale for first N step to keep stable training."}
+    )
+    scale_epsilon: float = field(default=0, metadata={"help": "scale epsilon "})
+    moving_rate: float = field(default=0.01, metadata={"help": "EMA moving_rate for activation scale"})

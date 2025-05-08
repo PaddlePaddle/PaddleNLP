@@ -162,6 +162,13 @@ def main():
         qlora_weight_blocksize=model_args.qlora_weight_blocksize,
         qlora_weight_double_quant=model_args.qlora_weight_double_quant,
         qlora_weight_double_quant_block_size=model_args.qlora_weight_double_quant_block_size,
+        apply_hadamard=model_args.apply_hadamard,
+        hadamard_is_block=model_args.hadamard_is_block,
+        hadamard_block_size=model_args.hadamard_block_size,
+        quant_input_grad=model_args.quant_input_grad,
+        apply_online_actscale_step=model_args.apply_online_actscale_step,
+        scale_epsilon=model_args.scale_epsilon,
+        moving_rate=model_args.moving_rate,
     )
 
     model_config = AutoConfig.from_pretrained(
@@ -291,7 +298,7 @@ def main():
         logging.info("Using ReFT with layers: ", reft_layers)
     # init chat_template for tokenizer
     init_chat_template(tokenizer, model_args.model_name_or_path, data_args.chat_template)
-
+    tokenizer.chat_template = None
     # if using chat_template, data_args.eval_with_do_generation must be false
     if tokenizer.chat_template is not None:
         data_args.eval_with_do_generation = False

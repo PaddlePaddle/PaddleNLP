@@ -63,8 +63,8 @@ class QuantizationConfig:
         hadamard_is_block=True,
         hadamard_block_size=-1,
         quant_input_grad=False,
-        skip_first_act_scale_step=200,
-        epsilon=0,
+        apply_online_actscale_step=200,
+        scale_epsilon=0,
         moving_rate=0.01,
         **kwargs,
     ):
@@ -133,8 +133,8 @@ class QuantizationConfig:
         self.group_size = group_size
         self.apply_hadamard = apply_hadamard
         self.quant_input_grad = quant_input_grad
-        self.skip_first_act_scale_step = skip_first_act_scale_step
-        self.epsilon = epsilon
+        self.apply_online_actscale_step = apply_online_actscale_step
+        self.scale_epsilon = scale_epsilon
         self.hadamard_is_block = hadamard_is_block
         self.moving_rate = moving_rate
         self.hadamard_block_size = hadamard_block_size

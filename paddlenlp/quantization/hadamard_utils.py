@@ -14,6 +14,8 @@
 
 import paddle
 
+from paddlenlp.utils import infohub
+
 
 def matmul_hadU(X):
 
@@ -74,3 +76,28 @@ def hadamard_matmul(input, side, hadamard_maxtrix, block_size):
     output = output.reshape(origin_shape)
 
     return output
+
+
+def apply_hadamard_matmul(x, side, quantization_config=None, dequant=False):
+    if getattr(infohub, "hadamard") is None:
+        setattr(infohub, "hadamard", {})
+    if side == "left":
+        x_shape = x.shape[0]
+    else:
+        x_shape = x.shape[-1]
+    if x_shape in infohub.hadamard:
+        hadamard_maxtrix, block_size = infohub.hadamard[x_shape]
+    else:
+        hadamard_matrix, block_size = random_hadamard_matrix(x_shape, x.dtype, quantization_config)
+        infohub.hadamard[x_shape] = (hadamard_matrix, block_size)
+    if block_size > 1:
+        target_x = hadamard_matmul(x, side, hadamard_maxtrix, block_size)
+    else:
+        if dequant:
+            hadamard_matrix = hadamard_matrix.T
+        if side == "right":
+            target_x = x @ hadamard_matrix
+        else:
+            target_x = hadamard_matrix.T @ x
+
+    return target_x, block_size

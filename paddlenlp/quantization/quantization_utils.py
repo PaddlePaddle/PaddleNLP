@@ -34,7 +34,7 @@ except:
     qlora_weight_quantize = None
 
 from ..utils.log import logger
-from .qat_utils import quantize_channelwise
+from .qat_utils import quantize
 from .quantization_linear import (
     ColumnParallelQuantizationLinear,
     QuantizationLinear,
@@ -155,14 +155,16 @@ def convert_to_weight_quantize_state_dict(state_dict, name, quantization_config,
     if weight_name in state_dict:
         # gpu weight_quantize will fix in future
         target_weight = state_dict.pop(weight_name).cast(dtype).cuda()
-        if weight_quantize_algo in ["a8w8linear"]:
-            quant_weight, quant_scale = quantize_channelwise(target_weight, quantization_config, bit_length=8)
+        if weight_quantize_algo in ["a8w8linear", "a8w4linear"]:
+            quant_weight, quant_scale = quantize(
+                target_weight,
+                weight_quantize_algo,
+                "weight",
+                quantization_config,
+                apply_hadamard=quantization_config.apply_hadamard,
+                side="left",
+            )
             act_scale = paddle.ones([], dtype=dtype).cuda()
-            act_scale.stop_gradient = True
-            state_dict[act_scale_name] = act_scale
-        elif weight_quantize_algo in ["a8w4linear"]:
-            quant_weight, quant_scale = quantize_channelwise(target_weight, quantization_config, bit_length=4)
-            act_scale = paddle.zeros([], dtype=dtype).cuda()
             act_scale.stop_gradient = True
             state_dict[act_scale_name] = act_scale
         else:

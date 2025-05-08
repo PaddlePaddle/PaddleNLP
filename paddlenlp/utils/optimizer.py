@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import warnings
 
 import paddle
 from paddle import pir
@@ -23,11 +22,13 @@ from paddle.optimizer.adamw import AdamW
 from paddle.pir import Value
 
 try:
-    from paddlenlp_kernel.triton.optimizer import adamw_triton
+    # from paddlenlp_kernel.triton.optimizer import adamw_triton
+    from .adamw_triton import adamw_triton
 except:
     adamw_triton = None
 
-from ..quantization.qat_utils import dequantize_channelwise, quantize_channelwise
+
+from ..quantization.qat_utils import dequantize, quantize
 
 
 class AdamWMini(AdamW):
@@ -166,15 +167,13 @@ class AdamWCustom(AdamW):
         for p in self._param_groups:
             if "quantization_linear" in p.name and "w_1" in p.name:
                 self.quant_scale_mapping[p.name.replace("w_1", "w_0")] = p
-
+        print("self.quant_scale_mapping", self.quant_scale_mapping)
         self.quantization_config = quantization_config
         self._hcg = fleet.get_hybrid_communicate_group()
         self.mp_group = self._hcg.get_model_parallel_group()
 
     def _add_moments_pows(self, p, moment_dtype=core.VarDesc.VarType.FP32):
         acc_dtype = p.dtype
-        if self._is_dtype_fp16_or_bf16(acc_dtype):
-            acc_dtype = DataType.FLOAT32 if in_pir_mode() else core.VarDesc.VarType.FP32
 
         self._add_accumulator(self._moment1_acc_str, p, dtype=moment_dtype)
         self._add_accumulator(self._moment2_acc_str, p, dtype=moment_dtype)
@@ -222,17 +221,15 @@ class AdamWCustom(AdamW):
                             moment_dtype = core.VarDesc.VarType.FP16
                         elif str(p.dtype) == "paddle.bfloat16":
                             moment_dtype = core.VarDesc.VarType.BF16
+                else:
+                    moment_dtype = core.VarDesc.VarType.FP32
 
                 self._add_moments_pows(master_p, moment_dtype)
                 self._already_create_accumulator.add(p.name)
+                print(p.name, p.dtype, master_p.dtype, moment_dtype)
                 continue
-            if self._is_dtype_fp16_or_bf16(p.dtype) and not self._multi_precision:
-                warnings.warn(
-                    "Accumulating with FP16 or BF16 in optimizer can lead to poor accuracy or slow convergence."
-                    "Consider using multi_precision=True option of the Adam optimizer."
-                )
-            self._add_moments_pows(p)
-            self._already_create_accumulator.add(p.name)
+            else:
+                raise NotImplementedError("AdamWCustom only support AMP training")
 
     def _create_master_weight(self, param):
         if param.name in self._master_weights:
@@ -241,9 +238,9 @@ class AdamWCustom(AdamW):
             var_name = self._gen_master_weight_var_name(param)
             if param.name in self.quant_scale_mapping:
                 quant_scale = self.quant_scale_mapping[param.name]
-                var = dequantize_channelwise(
-                    param, quant_scale, apply_hadamard=self.quantization_config.apply_hadamard
-                ).astype("float32")
+                var = dequantize(param, quant_scale, "weight", self.quantization_config.apply_hadamard, "left").astype(
+                    "float32"
+                )
             else:
                 var = paddle.cast(param, "float32")
             var.name = var_name
@@ -319,16 +316,23 @@ class AdamWCustom(AdamW):
             )
             if skip_update_param:
                 print("check here")
-                if "rowparallelquantiztaionlinear" in param_and_grad[0].name:
-                    group = self.mp_group
+                if self.quantization_config.weight_quantize_algo in ["a8w8linear"]:
+                    # if "row_parallel_quantiztaion_linear" in param_and_grad[0].name:
+                    #     group = self.mp_group
+                    # else:
+                    #     group = None
+                    param[:], quant_scale[:] = quantize(
+                        param_and_grad[0],
+                        self.quantization_config.weight_quantize_algo,
+                        "weight",
+                        self.quantization_config,
+                        self.quantization_config.apply_hadamard,
+                        "left",
+                    )
                 else:
-                    group = None
-                param[:], quant_scale[:] = quantize_channelwise(
-                    param_and_grad[0].astype("bfloat16"),
-                    apply_hadamard=self.quantization_config.apply_hadamard,
-                    bit_length=8,
-                    group=group,
-                )
+                    raise NotImplementedError(
+                        f"Please check your weight_quantize_algo {self.quantization_config.weight_quantize_algo}."
+                    )
             return None
         else:
             raise NotImplementedError("Not implemented yet.")
