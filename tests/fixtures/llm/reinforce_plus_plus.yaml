@@ -18,8 +18,8 @@ reinforce_plus_plus:
     run_name: "qwen2.5-7b-kk-dataset-grpo" # Name of the run
 
     # data
-    train_datasets: "./tests/fixtures/llm/ppo_data/train.jsonl" # Path to the training dataset
-    eval_datasets: "./tests/fixtures/llm/ppo_data/ptx.jsonl" # Path to the evaluation dataset
+    train_datasets: "ppo-kk/34567ppl/train.jsonl" # Path to the training dataset
+    eval_datasets: "ppo-kk/5ppl/test.jsonl" # Path to the evaluation dataset
     prompt_key: "src" # Key for the prompt in the dataset
     response_key: "tgt" # Key for the response in the dataset
     dataloader_drop_last: true # Whether to drop the last incomplete batch in the DataLoader

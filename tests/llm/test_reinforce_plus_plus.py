@@ -61,6 +61,13 @@ class FinetuneTest(LLMTest, unittest.TestCase):
 
         case_env = os.environ.copy()
         case_env.update(env_vars)
+
+        # 下载并解压数据
+        subprocess.run(
+            "wget https://paddlenlp.bj.bcebos.com/datasets/examples/ppo-kk.tgz && tar zxf ppo-kk.tgz",
+            shell=True,
+            check=True
+        )
         
         # 启动 reward server
         reward_dir = os.path.join(os.getcwd(), "./llm/alignment/rl/reward")
