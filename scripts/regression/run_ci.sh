@@ -88,6 +88,13 @@ nlp_build (){
     python setup.py bdist_wheel
     python -m pip install --ignore-installed  dist/p****.whl
 }
+install_external_ops(){
+    echo -e "\033[31m ---- Install extern_ops  \033"
+    export PYTHONPATH=${nlp_dir}:$PYTHONPATH
+    cd ${nlp_dir}/slm/model_zoo/gpt-3/external_ops
+    python setup.py install
+    python -c "import fused_ln;";
+}
 ####################################
 # get diff case
 cd ${nlp_dir}
@@ -172,6 +179,7 @@ if [[ ${#Build_list[*]} -ne 0 ]];then
             echo -e "\033[35m ---- build ${GIT_PR_ID} ${build_pkg}  \033[0m"
         fi  
     done
+    install_external_ops
 else
    echo -e "\033[32m Don't need build whl  \033[0m"
 fi
