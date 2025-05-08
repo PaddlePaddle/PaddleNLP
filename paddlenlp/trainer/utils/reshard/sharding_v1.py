@@ -20,9 +20,8 @@ from ....transformers.model_utils import unwrap_optimizer
 from .common import is_sharding_opt
 
 
-def shard(node_model_state, model, optimizer, hcg):
-    group = hcg.get_sharding_parallel_group()
-    cur_rank = group.rank
+def shard(node_model_state, model, optimizer):
+    cur_rank = max(node_model_state.group.rank, 0)
     unwrapped_optimizer = unwrap_optimizer(optimizer, DygraphShardingOptimizer)
     if unwrapped_optimizer is not None:
         optimizer = unwrapped_optimizer
@@ -40,10 +39,10 @@ def shard(node_model_state, model, optimizer, hcg):
         assert not is_sharding_opt(optimizer)
         filter_func = lambda key: True
 
-    node_model_state.reshard(group, filter_func)
+    node_model_state.reshard(filter_func)
     return node_model_state
 
 
-def restore(node_model_state, model, optimizer, hcg):
+def restore(node_model_state, model, optimizer):
     node_model_state.drop_rank()
     return node_model_state
