@@ -110,11 +110,6 @@ def read(file: str):
         content = f.read().strip()
     return content
 
-def get_sm_version():
-    prop = paddle.device.cuda.get_device_properties()
-    cc = prop.major * 10 + prop.minor
-    return cc
-
 def read_version():
     """
     read version and return content
@@ -123,7 +118,7 @@ def read_version():
 
     formatted_date = datetime.now().date().strftime("%Y%m%d")
     cuda_version = float(paddle.version.cuda())
-    sm_version = get_sm_version()
+    sm_version=80
     paddle_commit = paddle.__git_commit__[:7]
     build_tag = "{}+cuda{}sm{}paddle{}".format(formatted_date, cuda_version, sm_version, paddle_commit)
 
@@ -242,6 +237,7 @@ function build_ops() {
     for sm_version in "${sm_versions[@]}"; do
         echo "Building and installing for sm_version: $sm_version"
         build_and_install_ops $sm_version
+        build_and_install_whl
     done
     return 
 }
@@ -280,6 +276,7 @@ function build_and_install_whl() {
   echo -e "${BLUE}[build]${NONE} building paddlenlp_ops wheel..."
   rm -rf ./dist
   cd ${TMP_DIR}
+  sed -i "s/sm_version=80/sm_version=${sm_version}/g" setup.py
   ${python} setup.py bdist_wheel --dist-dir ./$DIST_DIR
   if [ $? -ne 0 ]; then
     echo -e "${RED}[FAIL]${NONE} build paddlenlp_ops wheel failed !"
@@ -297,7 +294,8 @@ function build_and_install_whl() {
   fi
   echo -e "${BLUE}[install]${NONE} ${GREEN}paddlenlp_ops install success\n"
   cd ..
-  mv $DIST_DIR ../
+  mkdir -p ../$DIST_DIR
+  mv $DIST_DIR/* ../$DIST_DIR/
   cd ..
 }
 
@@ -333,7 +331,6 @@ set -e
 
 init
 build_ops
-build_and_install_whl
 unittest
 cleanup
 
