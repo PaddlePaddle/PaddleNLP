@@ -91,7 +91,7 @@ class PreTrainingArguments(AutoTrainingArguments):
     )
     sr: Optional[int] = field(default=0, metadata={"help": "The count of chunks without recompute."})
     virtual_pipeline_seg_method: str = field(
-        default="LlamaDecoderLayerAuto", metadata={"help": "The seg method of spliting pp layer for virtual pipeline."}
+        default="LlamaDecoderLayerAuto", metadata={"help": "The seg method of splitting pp layer for virtual pipeline."}
     )
     # NOTE(gongenlei): new add autotuner_benchmark
     autotuner_benchmark: bool = field(
@@ -482,7 +482,7 @@ def main():
 
     if not model_args.continue_training:
         config.vocab_size = max(config.vocab_size, ((tokenizer.vocab_size - 1) // 128 + 1) * 128)
-        logger.info(f"Reset vocab size to {config.vocab_size} for batter amp peformance.")
+        logger.info(f"Reset vocab size to {config.vocab_size} for batter amp performance.")
 
     if model_args.no_recompute_layers is not None:
         model_args.no_recompute_layers.sort()
@@ -530,6 +530,11 @@ def main():
 
     print("Final pre-training config:", config)
 
+    if "replace_with_parallel_cross_entropy" in training_args.tensor_parallel_config and config.tensor_parallel_degree > 1 and config.to_static is False:
+        from llm.utils.replace_ops import replace_cross_entropy
+
+        replace_cross_entropy()
+        
     # Set the dtype for loading model
     dtype = "float32"
     if training_args.fp16_opt_level == "O2":
@@ -545,7 +550,7 @@ def main():
     # load_model(model)
     # shard_model(model)
 
-    # Create the learning_rate sheduler and optimizer
+    # Create the learning_rate scheduler and optimizer
     if training_args.decay_steps is None:
         training_args.decay_steps = training_args.max_steps
 

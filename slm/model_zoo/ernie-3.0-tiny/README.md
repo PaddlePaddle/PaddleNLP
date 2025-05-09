@@ -525,7 +525,7 @@ python run_eval.py  \
 ```
 
 * `model_name_or_path`：动态图模型的目录，主要用于加载 tokenizer。
-* `infer_prefix`：预测模型的路径（目录+前缀）。例如当 `infer_prefix` 为 `output/infer_model` 时，代表预测模型和参数文件分别为 `output/infer_model.pdmodel` 和 `output/infer_model.pdiparams`。
+* `infer_prefix`：预测模型的路径（目录+前缀）。例如当 `infer_prefix` 为 `output/infer_model` 时，代表预测模型和参数文件分别为 `output/infer_model.json`（paddle3.0.0 默认开启 PIR）`output/infer_model.pdmodel`（未开启 PIR） 和 `output/infer_model.pdiparams`。
 * `test_path` ：评估所用文件路径名；
 * `do_eval`，是否输出评价指标的结果。如果设置，脚本会开启评估模式，最终会输出精度评价指标的值。如果不设置，则会输出模型后处理后的结果。例如：
 
@@ -542,7 +542,7 @@ python run_eval.py  \
 
 尽管 ERNIE 3.0 Tiny 已提供了效果不错的轻量级模型可以微调后直接使用，但在本项目中，微调后的模型体积是 69.0 MB，内存占用达到 115.72MB，部署至端侧还是存在一定困难。因此当模型有部署上线的需求，想要进一步压缩模型体积，降低推理时延，可使用本项目的 **端上语义理解压缩方案** 对上一步微调后的模型进行压缩。
 
-为了方便实现，[PaddleNLP 模型压缩 API](../../../docs/compression.md) 已提供了以下压缩功能，模型压缩 API 主要是基于 [PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim) 模型压缩能力，PaddleSlim 是一个专注于深度学习模型压缩的工具库，提供低比特量化、知识蒸馏、稀疏化和模型结构搜索等模型压缩策略，帮助开发者快速实现模型的小型化，欢迎大家使用。
+为了方便实现，[PaddleNLP 模型压缩 API](../../../docs/zh/compression.md) 已提供了以下压缩功能，模型压缩 API 主要是基于 [PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim) 模型压缩能力，PaddleSlim 是一个专注于深度学习模型压缩的工具库，提供低比特量化、知识蒸馏、稀疏化和模型结构搜索等模型压缩策略，帮助开发者快速实现模型的小型化，欢迎大家使用。
 
 端上模型压缩流程如下图所示：
 

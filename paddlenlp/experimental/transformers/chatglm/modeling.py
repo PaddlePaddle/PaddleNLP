@@ -27,7 +27,10 @@ from paddlenlp.experimental.transformers.fused_transformer_layers import (
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationInferenceModel,
 )
-from paddlenlp.experimental.transformers.utils import infererence_model_from_pretrained
+from paddlenlp.experimental.transformers.utils import (
+    infererence_model_from_config,
+    infererence_model_from_pretrained,
+)
 from paddlenlp.transformers import ChatGLMConfig, ChatGLMPretrainedModel
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
@@ -236,7 +239,7 @@ class ChatGLMStackDyBatch(nn.Layer):
             quant_type=config.quant_type,
             activation="gelu",
             num_layers=config.num_layers,
-            nranks=config.tensor_parallel_degree,
+            tp_degree=config.tensor_parallel_degree,
             ring_id=ring_id,
             ln_scale_attrs=ln_scale_attrs,
             ln_bias_attrs=ln_bias_attrs,
@@ -478,7 +481,7 @@ class ChatGLMStackDyBatch(nn.Layer):
             elif k.endswith("mlp.dense_4h_to_h.bias"):
                 self.transformer_block.ffn2_biases[idx].set_value(v.astype(dtype))
             else:
-                print("Unknow weight {}".format(k))
+                print("Unknown weight {}".format(k))
 
 
 @register_base_model
@@ -581,6 +584,10 @@ class ChatGLMForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMPretrain
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
         return infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs, return_numpy=False)
+
+    @classmethod
+    def from_config(cls, config, *args, **kwargs):
+        return infererence_model_from_config(cls, config, args, kwargs)
 
     @classmethod
     def get_cache_kvs_shape(

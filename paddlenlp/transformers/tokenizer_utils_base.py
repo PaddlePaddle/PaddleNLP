@@ -1561,7 +1561,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         # From HF Hub or AI Studio
         if from_hf_hub or from_aistudio:
             # Only include the necessary resource files specified by the tokenizer cls
-            # Deep copy to avoid modifiying the class attributes
+            # Deep copy to avoid modifying the class attributes
             vocab_files = copy.deepcopy(cls.resource_files_names)
             vocab_files["tokenizer_config_file"] = cls.tokenizer_config_file
 
@@ -2910,6 +2910,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                     return_attention_mask=return_attention_mask,
                 )
             else:
+                padding_side = padding_side if padding_side is not None else self.padding_side
+
                 original_padding_side = self.padding_side
                 self.padding_side = padding_side
                 encoded_inputs = self._pad(
@@ -2935,14 +2937,28 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         batch_outputs = {}
         for i in range(batch_size):
             inputs = dict((k, v[i]) for k, v in encoded_inputs.items())
-            outputs = self._pad(
-                inputs,
-                max_length=max_length,
-                padding_strategy=padding_strategy,
-                padding_side=padding_side,
-                pad_to_multiple_of=pad_to_multiple_of,
-                return_attention_mask=return_attention_mask,
-            )
+            if "padding_side" in set(inspect.signature(self._pad).parameters.keys()):
+                outputs = self._pad(
+                    inputs,
+                    max_length=max_length,
+                    padding_strategy=padding_strategy,
+                    padding_side=padding_side,
+                    pad_to_multiple_of=pad_to_multiple_of,
+                    return_attention_mask=return_attention_mask,
+                )
+            else:
+                padding_side = padding_side if padding_side is not None else self.padding_side
+
+                original_padding_side = self.padding_side
+                self.padding_side = padding_side
+                outputs = self._pad(
+                    inputs,
+                    max_length=max_length,
+                    padding_strategy=padding_strategy,
+                    pad_to_multiple_of=pad_to_multiple_of,
+                    return_attention_mask=return_attention_mask,
+                )
+                self.padding_side = original_padding_side
 
             for key, value in outputs.items():
                 if key not in batch_outputs:
@@ -3103,7 +3119,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             sequence = ids + pair_ids if pair else ids
             token_type_ids = [0] * len(ids) + ([0] * len(pair_ids) if pair else [])
 
-        # Build output dictionnary
+        # Build output dictionary
         encoded_inputs["input_ids"] = sequence
         if return_token_type_ids:
             encoded_inputs["token_type_ids"] = token_type_ids

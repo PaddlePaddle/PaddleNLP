@@ -21,12 +21,12 @@ from paddlenlp.transformers.configuration_utils import PretrainedConfig
 __all__ = ["GPT_PRETRAINED_INIT_CONFIGURATION", "GPTConfig", "GPT_PRETRAINED_RESOURCE_FILES_MAP"]
 
 GPT_PRETRAINED_INIT_CONFIGURATION = {
-    "gpt-cpm-large-cn": {  # 2.6B
+    "gpt-cpm-small-cn-distill": {  # 109M
         "vocab_size": 30000,
-        "hidden_size": 2560,
-        "num_hidden_layers": 32,
-        "num_attention_heads": 32,
-        "intermediate_size": 10240,
+        "hidden_size": 768,
+        "num_hidden_layers": 12,
+        "num_attention_heads": 12,
+        "intermediate_size": 3072,
         "hidden_act": "gelu",
         "hidden_dropout_prob": 0.1,
         "attention_probs_dropout_prob": 0.1,
@@ -38,12 +38,12 @@ GPT_PRETRAINED_INIT_CONFIGURATION = {
         "bos_token_id": 0,
         "eol_token_id": 3,
     },
-    "gpt-cpm-small-cn-distill": {  # 109M
+    "gpt-cpm-large-cn": {  # 2.6B
         "vocab_size": 30000,
-        "hidden_size": 768,
-        "num_hidden_layers": 12,
-        "num_attention_heads": 12,
-        "intermediate_size": 3072,
+        "hidden_size": 2560,
+        "num_hidden_layers": 32,
+        "num_attention_heads": 32,
+        "intermediate_size": 10240,
         "hidden_act": "gelu",
         "hidden_dropout_prob": 0.1,
         "attention_probs_dropout_prob": 0.1,

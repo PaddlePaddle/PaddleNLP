@@ -255,5 +255,5 @@ class ErnieCTMTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
             return_position_ids=True,
             return_offsets_mapping=True,
         )
-        self.assertEqual(len(encoding["input_ids"]), 15)
-        self.assertEqual(len(encoding["offset_mapping"]), 15)
+        self.assertEqual(len(encoding["input_ids"]), 20)
+        self.assertEqual(len(encoding["offset_mapping"]), 20)

@@ -29,18 +29,25 @@ global_verification_fail_arr=()
 target_lists_for_gpt=(
     "slm/model_zoo/gpt-3"
     "llm/auto_parallel/gpt-3"
-    "paddlenlp/transformers/gpt/modeling.py"
-    "paddlenlp/transformers/gpt/modeling_pp.py"
-    "paddlenlp/transformers/gpt/modeling_auto.py"
+    "paddlenlp/transformers/gpt"
     "scripts/distribute"
 )
 
 target_lists_for_llama=(
     "llm/auto_parallel/llama"
     "paddlenlp/trainer/auto_trainer.py"
-    "paddlenlp/transformers/llama/modeling_auto_static.py"
-    "paddlenlp/transformers/llama/modeling_auto.py"
-    "paddlenlp/transformers/llama/modeling.py"
+    "paddlenlp/transformers/llama"
+    "scripts/distribute"
+)
+
+target_lists_for_deepseek=(
+    "llm/auto_parallel/deepseek-v3"
+    "paddlenlp/trainer/auto_trainer.py"
+    "paddlenlp/transformers/deepseek_v2/modeling_auto.py"
+    "paddlenlp/transformers/deepseek_v2/modeling.py"
+    "paddlenlp/transformers/deepseek_v3/modeling_auto.py"
+    "paddlenlp/transformers/moe_layer_auto.py"
+    "paddlenlp/transformers/moe_gate_auto.py"
     "scripts/distribute"
 )
 
@@ -56,6 +63,7 @@ install_paddle(){
 install_paddlenlp(){
     echo -e "\033[31m ---- Install paddlenlp by set PYTHONPATH  \033"
     export PYTHONPATH=${nlp_dir}:$PYTHONPATH
+    # python -m pip install -r ${nlp_dir}/requirements.txt
     sed -i -e "s/paddlenlp/#paddlenlp/g" model_zoo/gpt-3/requirements.txt
     # export http_proxy=${proxy} && export https_proxy=${proxy}
     # python -m pip uninstall paddlenlp -y
@@ -80,9 +88,9 @@ install_external_ops(){
 
 function is_a100() {
     if [ $(nvidia-smi|grep A100|wc -l)  -ne 0 ];then
-        echo 1
+        echo 1 # A100
     else
-        echo 0
+        echo 0 # not A100
     fi
 }
 
@@ -116,11 +124,14 @@ get_diff_TO_case(){
                         case_list[${#case_list[*]}]=llama_auto
                     fi
                 done
+                for ((i=0; i<${#target_lists_for_deepseek[@]}; i++)); do
+                    if [[ ${file_item} == *${target_lists_for_deepseek[i]}* ]];then
+                        case_list[${#case_list[*]}]=deepseek_auto
+                    fi
+                done
             fi
         done
     else
-        case_list[${#case_list[*]}]=gpt-3_auto
-        case_list[${#case_list[*]}]=llama_auto
         for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
             arr_file_name=(${file_name//// })
             dir1=${arr_file_name[0]}
@@ -134,6 +145,9 @@ get_diff_TO_case(){
             elif [[ ${file_name##*.} == "md" ]] || [[ ${file_name##*.} == "rst" ]] || [[ ${dir1} == "docs" ]];then
                 continue
             else
+                case_list[${#case_list[*]}]=gpt-3_auto
+                case_list[${#case_list[*]}]=llama_auto
+                case_list[${#case_list[*]}]=deepseek_auto
                 for ((i=0; i<${#target_lists_for_gpt[@]}; i++)); do
                     if [[ ! ${dir3} =~ "benchmarks" ]] && [[ ${file_item} == *${target_lists_for_gpt[i]}* ]];then
                         case_list[${#case_list[*]}]=gpt-3_dygraph
@@ -166,7 +180,7 @@ function execute_func_list(){
         let global_total_count++
         execute_num=1
         while true; do
-            bash $1 exec_case $func_name $FLAGS_install_deps $FLAGS_download_data  
+            timeout 10m bash $1 exec_case $func_name $FLAGS_install_deps $FLAGS_download_data  
             result=$?
             if [ $result -eq 0 ]; then
                 echo -e "\033[32m test success!"
@@ -202,6 +216,13 @@ function execute_func_list(){
                     let exit_250_count++
                     global_exit_250_arr+=("$func_name")
                 fi
+            elif [ $result -eq 124 ]; then
+                echo "\033[31m [failed-timeout] Test case execution was terminated after exceeding the 10m limit."
+                mv ${log_path}/$func_name ${log_path}/${func_name}_FAIL.log
+                echo -e "\033[31m ${log_path}/$func_name_FAIL \033"
+                tail -15 ${log_path}/${func_name}_FAIL.log
+                let runtime_fail_count++ 
+                global_runtime_fail_arr+=("$func_name") 
             else
                 echo "test failed!"
                 mv ${log_path}/$func_name ${log_path}/${func_name}_FAIL.log
@@ -285,6 +306,17 @@ if [[ ${#case_list[*]} -ne 0 ]];then
         let case_num++        
         clean_file $nlp_dir/llm/auto_parallel/gpt-3
     fi
+    if [[ $(contain_case deepseek_auto ${case_list[@]}; echo $?) -eq 1 ]];then
+        echo -e "\033[31m ---- running case $case_num/${#case_list[*]}: deepseek_auto \033"
+        cmd=/workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh 
+        bash $cmd prepare_case deepseek_case_list_auto $FLAGS_install_deps $FLAGS_download_data
+        execute_func_list $cmd deepseek_auto
+        export FLAGS_install_deps=1
+        export FLAGS_download_data="deepseek ""$FLAGS_download_data"
+        let case_num++        
+        clean_file $nlp_dir/llm/auto_parallel/deepseek-v3
+    fi
+    
     if [[ $(contain_case gpt-3_dygraph ${case_list[@]}; echo $?) -eq 1 ]];then
         echo -e "\033[31m ---- running case $case_num/${#case_list[*]}: gpt-3_dygraph \033"
         cmd=/workspace/PaddleNLP/scripts/distribute/ci_case_dy.sh

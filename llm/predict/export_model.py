@@ -14,12 +14,16 @@
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import paddle
 from paddle.distributed import fleet
 
-from llm.predict.predictor import ModelArgument, PredictorArgument, create_predictor
+sys.path.append(str(Path(__file__).parent.parent))
+from predict.predictor import ModelArgument, PredictorArgument, create_predictor
+
 from paddlenlp.trainer import PdArgumentParser
 from paddlenlp.trl import llm_utils
 
@@ -44,6 +48,13 @@ def main():
     predictor_args, model_args, export_args = parser.parse_args_into_dataclasses()
 
     llm_utils.set_triton_cache(export_args.output_path, "export")
+    try:
+        from paddle.utils import try_import
+
+        try_import("paddlenlp_ops")
+    except ImportError:
+        print("paddlenlp_ops does not exist, please install paddlenlp_ops.")
+        return
 
     paddle.set_default_dtype(predictor_args.dtype)
     tensor_parallel_degree = paddle.distributed.get_world_size()

@@ -53,7 +53,7 @@ class MergeMethod:
                 tensor_output += tensor * weight_list[i]
             return tensor_output
         else:
-            raise ValueError(f"Unkonwn tensor type {self.merge_config.tensor_type}")
+            raise ValueError(f"Unknown tensor type {self.merge_config.tensor_type}")
 
     def slerp(self, tensor_list):
         """
@@ -122,7 +122,7 @@ class MergeMethod:
 
             return s0 * t0_copy + s1 * t1_copy
         else:
-            raise ValueError(f"Unkonwn tensor type {self.merge_config.tensor_type}")
+            raise ValueError(f"Unknown tensor type {self.merge_config.tensor_type}")
 
     def ties(self, tensor_list):
         if self.merge_config.tensor_type == "np":
@@ -187,7 +187,7 @@ class MergeMethod:
 
             return merge_tensor
         else:
-            raise ValueError(f"Unkonwn tensor type {self.merge_config.tensor_type}")
+            raise ValueError(f"Unknown tensor type {self.merge_config.tensor_type}")
 
     def normalize(self, t):
         """
@@ -204,4 +204,4 @@ class MergeMethod:
                 t = t / norm_t
             return t
         else:
-            raise ValueError(f"Unkonwn tensor type {self.merge_config.tensor_type}")
+            raise ValueError(f"Unknown tensor type {self.merge_config.tensor_type}")

@@ -19,13 +19,17 @@ import paddle
 from paddle import inference
 
 from paddlenlp.data import Pad, Stack, Tuple
+from paddlenlp.utils.env import (
+    PADDLE_INFERENCE_MODEL_SUFFIX,
+    PADDLE_INFERENCE_WEIGHTS_SUFFIX,
+)
 from paddlenlp.utils.log import logger
 
 parser = argparse.ArgumentParser(__doc__)
 parser.add_argument("--model_dir", type=str, default="./output", help="The path to parameters in static graph.")
 parser.add_argument("--data_dir", type=str, default=None, help="The folder where the dataset is located.")
 parser.add_argument("--batch_size", type=int, default=2, help="The number of sequences contained in a mini-batch.")
-parser.add_argument("--max_seq_len", type=int, default=128, help="Number of words of the longest seqence.")
+parser.add_argument("--max_seq_len", type=int, default=128, help="Number of words of the longest sequence.")
 parser.add_argument(
     "--device",
     default="gpu",
@@ -153,8 +157,8 @@ class Predictor(object):
     ):
         self.max_seq_length = max_seq_length
         self.batch_size = batch_size
-        model_file = os.path.join(model_dir, "inference.pdmodel")
-        params_file = os.path.join(model_dir, "inference.pdiparams")
+        model_file = os.path.join(model_dir, f"inference{PADDLE_INFERENCE_MODEL_SUFFIX}")
+        params_file = os.path.join(model_dir, f"inference{PADDLE_INFERENCE_WEIGHTS_SUFFIX}")
         if not os.path.exists(model_file):
             raise ValueError("not find model file path {}".format(model_file))
         if not os.path.exists(params_file):

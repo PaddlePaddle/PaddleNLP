@@ -82,7 +82,7 @@ class PreTrainingArguments(AutoTrainingArguments):
     sr: Optional[int] = field(default=0, metadata={"help": "The count of chunks without recompute."})
     virtual_pipeline_seg_method: str = field(
         default="DeepseekV2DecoderLayerAuto",
-        metadata={"help": "The seg method of spliting pp layer for virtual pipeline."},
+        metadata={"help": "The seg method of splitting pp layer for virtual pipeline."},
     )
     # NOTE(gongenlei): new add autotuner_benchmark
     autotuner_benchmark: bool = field(
@@ -512,7 +512,7 @@ def main():
 
     if not model_args.continue_training:
         config.vocab_size = max(config.vocab_size, ((tokenizer.vocab_size - 1) // 128 + 1) * 128)
-        logger.info(f"Reset vocab size to {config.vocab_size} for batter amp peformance.")
+        logger.info(f"Reset vocab size to {config.vocab_size} for batter amp performance.")
 
     if model_args.no_recompute_layers is not None:
         model_args.no_recompute_layers.sort()
@@ -583,7 +583,7 @@ def main():
 
         model.apply(fn)
 
-    # Create the learning_rate sheduler and optimizer
+    # Create the learning_rate scheduler and optimizer
     if training_args.decay_steps is None:
         training_args.decay_steps = training_args.max_steps
 

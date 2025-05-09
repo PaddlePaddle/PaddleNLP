@@ -19,7 +19,12 @@ import traceback
 from collections import Counter
 from datetime import datetime
 
-from paddlenlp_ops import get_output, speculate_get_output
+import paddle
+from paddlenlp_ops import get_output
+
+if not paddle.is_compiled_with_xpu():
+    from paddlenlp_ops import speculate_get_output
+
 from server.utils import datetime_diff, model_server_logger, monitor_logger
 
 from paddlenlp.utils.env import MAX_BSZ, MAX_DRAFT_TOKENS, SPECULATE_MAX_BSZ
@@ -42,6 +47,7 @@ class TokenProcessor(object):
         self.tokens_counter = Counter()
 
         self.is_speculate_decoding = self.cfg.get_speculate_config().speculate_method != "None"
+        self.msg_queue_id = paddle.full(shape=[1], fill_value=1, dtype="int32")
         if self.is_speculate_decoding:
             self.output_tokens = paddle.full(
                 shape=[SPECULATE_MAX_BSZ * MAX_DRAFT_TOKENS + SPECULATE_MAX_BSZ + 2, 1], fill_value=2, dtype="int64"
@@ -91,7 +97,7 @@ class TokenProcessor(object):
                 if self.is_speculate_decoding:
                     speculate_get_output(self.output_tokens, rank_id, is_blocking)
                 else:
-                    get_output(self.output_tokens, rank_id, is_blocking)
+                    get_output(self.output_tokens, self.msg_queue_id, rank_id, is_blocking)
 
                 if self.output_tokens[0, 0] == -2:
                     continue
@@ -100,13 +106,12 @@ class TokenProcessor(object):
             except Exception as e:
                 model_server_logger.info("while get input_data error: {0} {1}".format(e, str(traceback.format_exc())))
 
-    def postprocess(self, batch_result, exist_finished_task=False):
+    def postprocess(self, batch_result):
         """
         single post-processing function
 
         Args:
             batch_result (list): batch results
-            exist_finished_task (bool): whether there is a finished task
         """
         result_dir = "./generate_token_results"
         if not os.path.exists(result_dir):
@@ -213,7 +218,6 @@ class TokenProcessor(object):
             accept_num = tokens[2 : batch + 2]
 
         batch_result = list()
-        exist_finished_task = False
         for i in range(batch):
             if self.resource_manager.stop_flags[i]:
                 continue
@@ -248,11 +252,10 @@ class TokenProcessor(object):
                         f"Speculate accept ratio: {1 - self.total_step * 1.0 / self.number_of_output_tokens}"
                         f" total step: {self.total_step}. total_output_token_num: {self.number_of_output_tokens}"
                     )
-                    exist_finished_task = True
                     break
             batch_result.append(result)
 
-        self.postprocess(batch_result, exist_finished_task)
+        self.postprocess(batch_result)
 
 
 class WarmUpTokenProcessor(TokenProcessor):
@@ -265,7 +268,7 @@ class WarmUpTokenProcessor(TokenProcessor):
         self._is_running = True
         self._is_blocking = True
 
-    def postprocess(self, batch_result, exist_finished_task=False):
+    def postprocess(self, batch_result):
         pass
 
     def process_sampling_results(self):
@@ -278,7 +281,7 @@ class WarmUpTokenProcessor(TokenProcessor):
                 if self.is_speculate_decoding:
                     speculate_get_output(self.output_tokens, rank_id, self._is_blocking)
                 else:
-                    get_output(self.output_tokens, rank_id, self._is_blocking)
+                    get_output(self.output_tokens, self.msg_queue_id, rank_id, self._is_blocking)
 
                 if self.output_tokens[0, 0] == -2:
                     continue

@@ -503,7 +503,7 @@ class SoftTemplate(Template):
         continuous token id sequence for each part in template.
 
         Returns:
-            `List[Dict[str, str]]`: Template with continuous prompt formated as {"soft": "xxx"}.
+            `List[Dict[str, str]]`: Template with continuous prompt formatted as {"soft": "xxx"}.
             `Tuple[Dict[int, int], List[List[int]], int]`:
                 - Mapping from continuous ids to word ids for initialization.
                 - Continuous ids for each part. Id 0 denotes none-continuous part.
@@ -710,7 +710,7 @@ class PrefixTemplate(SoftTemplate):
 
         for index, part in enumerate(prompt):
             if "soft" in part:
-                raise ValueError("Keyward `soft` should not be used in PrefixTemplate.")
+                raise ValueError("Keyword `soft` should not be used in PrefixTemplate.")
             if "prefix" not in part:
                 continue
             if index != 0:

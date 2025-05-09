@@ -27,6 +27,9 @@ function _set_params(){
     # for intermediate api
     intermediate_api=${intermediate_api:-""}
 
+    # for dynamic suffix
+    dynamic_auto=${dynamic_auto:-""}
+
     ip_lists=($(echo $TRAINER_INSTANCES | tr ',' ' '))
     master_ip=${ip_lists[0]}
     nnodes=${nnodes:-1}
@@ -173,17 +176,17 @@ function _train(){
         train_cmd="python -u -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
             --nnodes 1 --nproc_per_node 8 \
             --log_dir mylog run_pretrain_auto.py \
-            ./pretrain_config_${MODEL_TYPE}/${intermediate_api}pretrain-${MODEL_TYPE}.json"
+            ./pretrain_config_${MODEL_TYPE}/${intermediate_api}pretrain-${MODEL_TYPE}${dynamic_auto}.json"
         ;;
     N4C32) echo "Run with: device_num=${device_num} run_mode=${run_mode}"
         train_cmd="python -u -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
             --log_dir mylog run_pretrain_auto.py \
-            ./pretrain_config_${MODEL_TYPE}/${intermediate_api}pretrain-${MODEL_TYPE}.json"
+            ./pretrain_config_${MODEL_TYPE}/${intermediate_api}pretrain-${MODEL_TYPE}${dynamic_auto}.json"
         ;;
     *) echo "Run with: device_num=${device_num}, run_mode=${run_mode}"
         train_cmd="python -u -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
             --log_dir mylog run_pretrain_auto.py \
-            ./pretrain_config_${MODEL_TYPE}/${intermediate_api}pretrain-${MODEL_TYPE}.json"
+            ./pretrain_config_${MODEL_TYPE}/${intermediate_api}pretrain-${MODEL_TYPE}${dynamic_auto}.json"
         ;;
     esac
     cd ../llm/auto_parallel/llama

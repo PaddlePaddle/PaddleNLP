@@ -292,6 +292,7 @@ class ErnieDocModelTest(ModelTesterMixin, unittest.TestCase):
         self.skipTest("Direct input embedding tokens is currently not supported")
 
     @slow
+    @unittest.skip("Skip for missing model weight.")
     def test_model_from_pretrained(self):
         for model_name in list(ErnieDocPretrainedModel.pretrained_init_configuration)[:1]:
             model = ErnieDocModel.from_pretrained(model_name)

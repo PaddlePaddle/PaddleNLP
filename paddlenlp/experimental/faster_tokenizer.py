@@ -29,10 +29,10 @@ __all__ = ["to_tensor", "to_vocab_buffer", "FasterTokenizer"]
 def to_tensor(string_values, name="text"):
     """
     Create the tensor that the value holds the list of string.
-    NOTICE: The value will be holded in the cpu place.
+    NOTICE: The value will be held in the cpu place.
 
     Args:
-        string_values(list[string]): The value will be setted to the tensor.
+        string_values(list[string]): The value will be set to the tensor.
         name(string): The name of the tensor.
     """
     tensor = paddle.Tensor(core.VarDesc.VarType.STRING, [], name, core.VarDesc.VarType.STRINGS, False)
@@ -43,7 +43,7 @@ def to_tensor(string_values, name="text"):
 def to_vocab_buffer(vocab_dict, name):
     """
     Create the tensor that the value holds the map, the type of key is the string.
-    NOTICE: The value will be holded in the cpu place.
+    NOTICE: The value will be held in the cpu place.
 
     Args:
         vocab_dict(dict): The value will be setted to the tensor.
@@ -149,4 +149,4 @@ class FasterTokenizer(nn.Layer):
             faster_tokenizer = cls(tokenizer.vocab.token_to_idx, tokenizer.do_lower_case)
             return faster_tokenizer
         else:
-            raise ValueError("Unknown name %s. Now %s surports  %s" % (name, cls.__name__, list(cls.name_map.keys())))
+            raise ValueError("Unknown name %s. Now %s supports  %s" % (name, cls.__name__, list(cls.name_map.keys())))

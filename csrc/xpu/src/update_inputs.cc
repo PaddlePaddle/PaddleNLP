@@ -26,6 +26,9 @@ void UpdateInputes(const paddle::Tensor& stop_flags,
                    const paddle::Tensor& stop_nums,
                    const paddle::Tensor& next_tokens,
                    const paddle::Tensor& is_block_step) {
+  baidu::xpu::api::plugin::print_times("[TIME BEGIN] UpdateInputes");
+
+
   phi::XPUPlace place(phi::backends::xpu::GetXPUCurrentDeviceId());
   auto dev_ctx = paddle::experimental::DeviceContextPool::Instance().Get(place);
   auto xpu_ctx = static_cast<const phi::XPUContext*>(dev_ctx);
@@ -53,7 +56,11 @@ void UpdateInputes(const paddle::Tensor& stop_flags,
       max_bsz,
       input_ids_stride);
   PD_CHECK(r == 0, "baidu::xpu::api::plugin::update_inputs failed.");
-}
+
+
+  baidu::xpu::api::plugin::print_times("[TIME END] UpdateInputes");
+  }
+
 
 PD_BUILD_OP(update_inputs)
     .Inputs({"stop_flags",

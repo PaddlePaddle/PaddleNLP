@@ -7,7 +7,7 @@
 从 C-Eval 官方指定路径下载评测数据集，并解压至 data 文件夹：
 
 ```
-wget https://huggingface.co/datasets/ceval/ceval-exam/resolve/main/ceval-exam.zip
+wget https://modelscope.oss-cn-beijing.aliyuncs.com/open_data/c-eval/ceval-exam.zip
 unzip ceval-exam.zip -d data
 ```
 将 data 文件夹放置于本项目的 scripts/ceval 目录下。

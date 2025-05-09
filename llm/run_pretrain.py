@@ -47,7 +47,7 @@ from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.tools import get_env_device
 
-# Pretaining Environment Variables to support sharding stage1 overlap optimization.
+# Pretraining Environment Variables to support sharding stage1 overlap optimization.
 os.environ["USE_CASUAL_MASK"] = "True"
 
 
@@ -352,6 +352,10 @@ def main():
     # In case of conflict, command line arguments take precedence.
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
         model_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
+    elif len(sys.argv) >= 2 and sys.argv[1].endswith(".yaml"):
+        model_args, data_args, training_args = parser.parse_yaml_file_and_cmd_lines()
+    elif len(sys.argv) >= 2 and sys.argv[1].endswith(".py"):
+        model_args, data_args, training_args = parser.parse_python_file_and_cmd_lines()
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
@@ -413,7 +417,7 @@ def main():
 
     if not model_args.continue_training:
         config.vocab_size = max(config.vocab_size, ((tokenizer.vocab_size - 1) // 128 + 1) * 128)
-        logger.info(f"Reset vocab size to {config.vocab_size} for batter amp peformance.")
+        logger.info(f"Reset vocab size to {config.vocab_size} for batter amp performance.")
 
     config.num_hidden_layers = (
         model_args.num_hidden_layers if model_args.num_hidden_layers is not None else config.num_hidden_layers
@@ -507,7 +511,7 @@ def main():
     if training_args.recompute:
         model.recompute_enable()
 
-    # Create the learning_rate sheduler and optimizer
+    # Create the learning_rate scheduler and optimizer
     if training_args.decay_steps is None:
         training_args.decay_steps = training_args.max_steps
 

@@ -39,6 +39,11 @@ from paddlenlp.transformers import (  # import gpt model
     PretrainedConfig,
     PretrainedTokenizer,
 )
+
+# from paddlenlp.utils.env import (
+#     PADDLE_INFERENCE_MODEL_SUFFIX,
+#     PADDLE_INFERENCE_WEIGHTS_SUFFIX,
+# )
 from tests.testing_utils import slow
 
 
@@ -497,6 +502,8 @@ class GenerationTesterMixin:
     def test_beam_search_generate(self):
         for model_class in self.all_generative_model_classes.keys():
             config, input_ids, attention_mask, max_length = self._get_input_ids_and_config()
+            print(input_ids)
+            print(attention_mask)
             paddle.seed(128)
             model = self._make_model_instance(config, model_class)
             model.eval()
@@ -513,6 +520,9 @@ class GenerationTesterMixin:
             beam_kwargs, beam_scorer = self._get_beam_scorer_and_kwargs(
                 input_ids.shape[0], max_length + 1 if self.is_encoder_decoder else max_length + input_ids.shape[-1]
             )
+
+            print(input_ids)
+            print(attention_mask)
 
             # check `generate()` and `beam_search()` are equal
             output_generate, output_beam_search = self._beam_search_generate(
@@ -1158,7 +1168,7 @@ class TinyRandomGenerationTest(unittest.TestCase):
 
 #         model.eval()
 
-#         # Llama model do not contians ``
+#         # Llama model do not contains ``
 #         model.is_encoder_decoder = False
 
 #         max_length = 25
@@ -1194,8 +1204,8 @@ class TinyRandomGenerationTest(unittest.TestCase):
 #                 ),
 #             )
 
-#             model_path = os.path.join(tempdir, "model.pdmodel")
-#             params_path = os.path.join(tempdir, "model.pdiparams")
+#             model_path = os.path.join(tempdir, f"model{PADDLE_INFERENCE_MODEL_SUFFIX}")
+#             params_path = os.path.join(tempdir, f"model{PADDLE_INFERENCE_WEIGHTS_SUFFIX}")
 #             config = paddle.inference.Config(model_path, params_path)
 
 #             config.disable_gpu()
@@ -1234,7 +1244,7 @@ class TinyRandomGenerationTest(unittest.TestCase):
 
 #         model.eval()
 
-#         # Llama model do not contians ``
+#         # Llama model do not contains ``
 #         model.is_encoder_decoder = False
 
 #         max_length = 25
@@ -1260,8 +1270,8 @@ class TinyRandomGenerationTest(unittest.TestCase):
 #                 ),
 #             )
 
-#             model_path = os.path.join(tempdir, "model.pdmodel")
-#             params_path = os.path.join(tempdir, "model.pdiparams")
+#             model_path = os.path.join(tempdir, f"model{PADDLE_INFERENCE_MODEL_SUFFIX}")
+#             params_path = os.path.join(tempdir, f"model{PADDLE_INFERENCE_WEIGHTS_SUFFIX}")
 #             config = paddle.inference.Config(model_path, params_path)
 
 #             config.disable_gpu()

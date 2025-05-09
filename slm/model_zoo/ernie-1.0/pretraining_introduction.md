@@ -68,7 +68,7 @@ CLUECorpus2020 是通过 Common Crawl 中文部分语料清洗得到。开源部
 **WuDaoCorpus2.0 Base 语料**
 
 WuDaoCorpora 是悟道爬取的中文大规模语料。整体数量为3TB，目前开源的部分为 WuDaoCorpus2.0 bases 数据集，大小为200GB。
-用户微信登录[官网](https://resource.wudaoai.cn/home)，即可直接下载数据。下载好的压缩数据约 64GB。
+用户微信登录[此处下载](https://www.scidb.cn/en/detail?dataSetId=c6a3fe684227415a9db8e21bac4a15ab)，即可直接下载数据。下载好的压缩数据约 64GB。
 
 
 为了方便用户测试，我们提供了少量 part 的 WuDao 数据供大家使用，（如有侵权，请联系我们删除）

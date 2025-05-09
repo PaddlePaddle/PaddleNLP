@@ -72,7 +72,7 @@ PaddleNLP 使用 [Git 分支模型](http://nvie.com/posts/a-successful-git-branc
    类似于以下内容：
 
    ```text
-    ➜  (my-virtual-env) git commit -m "commiting my cool feature"
+    ➜  (my-virtual-env) git commit -m "committing my cool feature"
     black....................................................................Passed
     isort....................................................................Passed
     flake8...................................................................Passed
@@ -91,7 +91,7 @@ PaddleNLP 使用 [Git 分支模型](http://nvie.com/posts/a-successful-git-branc
    但大多数时候事情并没有那么顺利。当您的代码或文档不符合标准时，`pre-commit` 检查将失败。
 
    ```text
-    ➜  (my-virtual-env) git commit -m "commiting my cool feature"
+    ➜  (my-virtual-env) git commit -m "committing my cool feature"
     black....................................................................Passed
     isort....................................................................Failed
     - hook id: isort

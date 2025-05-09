@@ -86,7 +86,7 @@ class TritonTokenProcessor(engine.TokenProcessor):
                             del self.triton_server.task_info[req_id]
                             self.triton_server._update_metrics()
             except Exception as e:
-                    model_server_logger.error("Unexcepted error happend: {}, {}".format(e, str(traceback.format_exc())))
+                    model_server_logger.error("Unexcepted error happened: {}, {}".format(e, str(traceback.format_exc())))
 
     def _cache_special_tokens(self, batch_result):
         for i in range(len(batch_result)):
@@ -111,16 +111,16 @@ class TritonTokenProcessor(engine.TokenProcessor):
                             ["req_id"]] + batch_result[i]["token_scores"]
                     del self.score_buffer[batch_result[i]["req_id"]]
 
-    def postprocess(self, batch_result, exist_finished_task=False):
+    def postprocess(self, batch_result):
         """
         single postprocess for triton
         """
         try:
-            self._cache_special_tokens(batch_result)
+            # self._cache_special_tokens(batch_result)
             self.cached_generated_tokens.put(batch_result)
         except Exception as e:
             model_server_logger.info(
-                "Unexcepted problem happend while process output token: {}, {}"
+                "Unexcepted problem happened while process output token: {}, {}"
                 .format(e, str(traceback.format_exc())))
 
 
@@ -356,7 +356,7 @@ class TritonServer(object):
                                      f"cost time: {tok-tik}s, cached_task_num: {len(self.cached_task_deque)}.")
             model_server_logger.debug(f"cache task: {task}")
         except Exception as e:
-            error_msg = "Unexcepted promblem happend while insert new task to server task queue: {}, {}".format(
+            error_msg = "Unexcepted promblem happened while insert new task to server task queue: {}, {}".format(
                 e, str(traceback.format_exc()))
             _send_error(error_msg, current_response_sender)
 
@@ -399,7 +399,7 @@ class TritonServer(object):
                     try:
                         self.engine.insert_tasks([task])
                     except Exception as e:
-                        err_msg = "Error happend while insert task to engine: {}, {}.".format(
+                        err_msg = "Error happened while insert task to engine: {}, {}.".format(
                             e, str(traceback.format_exc()))
                         with self.thread_lock:
                             _send_result({"error_msg": err_msg},

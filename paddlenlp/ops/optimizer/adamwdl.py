@@ -79,8 +79,8 @@ class AdamWDL(AdamW):
             only tensors that makes apply_decay_param_fun(Tensor.name)==True
             will be updated. It only works when we want to specify tensors.
             Default: None.
-        grad_clip (GradientClipBase, optional): Gradient cliping strategy, it's an instance of
-            some derived class of ``GradientClipBase`` . There are three cliping strategies
+        grad_clip (GradientClipBase, optional): Gradient clipping strategy, it's an instance of
+            some derived class of ``GradientClipBase`` . There are three clipping strategies
             ( :ref:`api_paddle_nn_GradientClipByGlobalNorm` , :ref:`api_paddle_nn_GradientClipByNorm` ,
             :ref:`api_paddle_nn_GradientClipByValue` ). Default None, meaning there is no gradient clipping.
         lazy_mode (bool, optional): The official Adam algorithm has two moving-average accumulators.
@@ -188,7 +188,7 @@ class AdamWDL(AdamW):
         ratio = self.set_param_lr_fun(param_and_grad[0])
         param_and_grad[0].optimize_attr["learning_rate"] *= ratio
 
-        # excute Adam op
+        # execute Adam op
         res = super(AdamWDL, self)._append_optimize_op(block, param_and_grad)
         param_and_grad[0].optimize_attr["learning_rate"] = prev_lr
         return res

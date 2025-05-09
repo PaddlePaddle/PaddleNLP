@@ -127,7 +127,7 @@ def compute_predictions(
 
             nbest.append(_NbestPrediction(text=final_text, start_logit=pred.start_logit, end_logit=pred.end_logit))
 
-        # if we didn't inlude the empty option in the n-best, inlcude it
+        # if we didn't include the empty option in the n-best, include it
 
         # In very rare edge cases we could have no valid predictions. So we
         # just create a nonce prediction in this case to avoid failure.
@@ -185,8 +185,8 @@ def get_final_text(pred_text, orig_text, tokenizer, verbose):
     #
     # What we really want to return is "Steve Smith".
     #
-    # Therefore, we have to apply a semi-complicated alignment heruistic between
-    # `pred_text` and `orig_text` to get a character-to-charcter alignment. This
+    # Therefore, we have to apply a semi-complicated alignment heuristic between
+    # `pred_text` and `orig_text` to get a character-to-character alignment. This
     # can fail in certain cases in which case we just return `orig_text`.
 
     def _strip_spaces(text):

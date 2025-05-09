@@ -287,8 +287,8 @@ class DistilBertModelTest(ModelTesterMixin, unittest.TestCase):
         model: DistilBertForTokenClassification = DistilBertForTokenClassification.from_pretrained(
             "distilbert-base-uncased", num_classes=4, dropout=0.3
         )
-        assert model.num_labels == 4
-        assert model.dropout.p == 0.3
+        assert model.config.num_labels == 4
+        assert model.config.dropout == 0.3
 
 
 class DistilBertModelCompatibilityTest(unittest.TestCase):
@@ -328,7 +328,7 @@ class DistilBertModelCompatibilityTest(unittest.TestCase):
     def test_distilBert_converter_from_local_dir(self):
         with tempfile.TemporaryDirectory() as tempdir:
 
-            # 1. create commmon input
+            # 1. create common input
             input_ids = np.random.randint(100, 200, [1, 20])
 
             # 2. forward the torch  model
@@ -368,7 +368,7 @@ class DistilBertModelCompatibilityTest(unittest.TestCase):
         pytorch_class_name = pytorch_class_name or class_name
         with tempfile.TemporaryDirectory() as tempdir:
 
-            # 1. create commmon input
+            # 1. create common input
             input_ids = np.random.randint(100, 200, [1, 20])
 
             # 2. forward the torch model
