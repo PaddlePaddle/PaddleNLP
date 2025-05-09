@@ -109,8 +109,8 @@ recompute_granularity: "full" # Granularity of recompute
 bf16: true # Whether to use mixed precision with bfloat16
 fp16_opt_level: "O2" # Optimization level for fp16 and bf16 training
 amp_master_grad: false # Whether to use float32 weight gradients for master weights in amp opt level=’O2’
-amp_custom_black_list: "reduce_sum softmax_with_cross_entropy c_softmax_with_cross_entropy elementwise_div sin cos" # Custom black list for amp
-amp_custom_white_list: "lookup_table lookup_table_v2 flash_attn matmul matmul_v2 fused_gemm_epilogue" # Custom white list for amp
+amp_custom_black_list: ["reduce_sum", "softmax_with_cross_entropy", "c_softmax_with_cross_entropy", "elementwise_div", "sin", "cos"] # Custom black list for amp
+amp_custom_white_list: ["lookup_table", "lookup_table_v2", "flash_attn", "matmul", "matmul_v2", "fused_gemm_epilogue"] # Custom white list for amp
 offload_level: "freeze_model" # Level of model offloading to pinned memory, supported values: freeze_model, train_model, optimizer
 release_grads: true # Whether to release gradients
 offload_optim: false # Whether to offload optimizer to pinned memory
