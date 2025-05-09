@@ -379,7 +379,10 @@ class MoELayer(nn.Layer):
         # reshaped_input = hidden_states.reshape([-1, d_model])
         probs, routing_map, l_aux, l_zloss = self.router(hidden_states)
         if DSV3_USE_FP8_GEMM:
-            output = FusionMoe.apply(hidden_states, probs, routing_map, self)
+            hidden_states, token_indices, token_probs = self.token_dispatcher.pre_dispatch(
+                hidden_states, probs, routing_map
+            )
+            output = FusionMoe.apply(hidden_states, token_indices, token_probs, self)
         else:
             (
                 dispatched_input,
@@ -392,7 +395,6 @@ class MoELayer(nn.Layer):
             output, _ = self.token_dispatcher.token_unpermutation(
                 expert_output, token_permuted_indices, prob_permuted_indices, dispatched_probs, None
             )
-
         return output, l_aux, l_zloss
 
     def get_tokens_per_expert(self):
@@ -687,10 +689,9 @@ class FusionMoeNode:
         self.name = name
 
     @paddle.no_grad()
-    def forward(self, hidden_states, probs, routing_map):
-        hs_2d, token_indices, token_probs = self.dispatch_quant_node.forward(hidden_states, probs, routing_map)
+    def forward(self, hidden_states, token_indices, token_probs):
         hs_2d_dispatched, dispatched_indices, dispatched_probs = self.dispatch_node.forward(
-            hs_2d, token_indices, token_probs
+            hidden_states, token_indices, token_probs
         )
         hidden_states_out = self.mlp_node.forward(hs_2d_dispatched, dispatched_indices, dispatched_probs)
         output_combie = self.combine_node.forward(hidden_states_out)
@@ -707,9 +708,7 @@ class FusionMoeNode:
         hs_bf16_dispatched_grad, dispatched_probs_grad = self.mlp_node.backward(hidden_states_out_grad_bf16)
 
         hs_bf16_grad, token_probs_grad = self.dispatch_node.backward(hs_bf16_dispatched_grad, dispatched_probs_grad)
-
-        hs_grad, probs_grad, routing_map_grad = self.dispatch_quant_node.backward(hs_bf16_grad, token_probs_grad)
-        return hs_grad, probs_grad, routing_map_grad
+        return hs_bf16_grad, None, token_probs_grad
 
 
 class FusionMoe(paddle.autograd.PyLayer):
