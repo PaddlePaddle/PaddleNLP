@@ -15,12 +15,12 @@
 from __future__ import annotations
 
 import sys
+import unittest
+
 import os
 import subprocess
 import time
 import signal
-import unittest
-from unittest import skip
 
 from parameterized import parameterized_class
 
@@ -58,17 +58,16 @@ class FinetuneTest(LLMTest, unittest.TestCase):
             "FLAGS_mla_use_tensorcore": "0",
             "FLAGS_cascade_attention_max_partition_size": "2048",
         }
-
         case_env = os.environ.copy()
         case_env.update(env_vars)
 
         # 下载并解压数据
-        subprocess.run(
-            "wget https://paddlenlp.bj.bcebos.com/datasets/examples/ppo-kk.tgz && tar zxf ppo-kk.tgz",
-            shell=True,
-            check=True
-        )
-
+        if not os.path.exists("ppo-kk.tgz"):
+            subprocess.run(
+                f"wget -q https://paddlenlp.bj.bcebos.com/datasets/examples/ppo-kk.tgz && tar zxf ppo-kk.tgz",
+                shell=True,
+                check=True
+            )
 
         # 启动 reward server
         reward_dir = os.path.join(os.getcwd(), "./llm/alignment/rl/reward")
@@ -86,15 +85,18 @@ class FinetuneTest(LLMTest, unittest.TestCase):
 
         try:
             # 等待 reward server 启动
-            time.sleep(3)
+            time.sleep(30)
 
             # 运行主逻辑
-            grpo_config = load_test_config(self.config_path, "grpo", self.model_dir)
-            # grpo_config["output_dir"] = self.output_dir
+            cmd = "python -u -m paddle.distributed.launch --devices \"$CUDA_VISIBLE_DEVICES\" run_rl.py ./tests/fixtures/llm/grpo.yaml"
+            pro = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            out, err = pro.communicate()
+            print(out)
+            pro.wait()
+            pro.returncode == 0
+            assert str(out).find("Error") == -1
+            assert str(err).find("Error") == -1
 
-            with argv_context_guard(grpo_config):
-                from alignment.rl.run_rl import main
-                main()
         finally:
             # main 执行完毕，关闭 reward server
             if reward_proc.poll() is None:  # 确保进程还在
