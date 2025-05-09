@@ -94,6 +94,7 @@ install_external_ops(){
     cd ${nlp_dir}/slm/model_zoo/gpt-3/external_ops
     python setup.py install
     python -c "import fused_ln;";
+    cd ${nlp_dir}
 }
 ####################################
 # get diff case
