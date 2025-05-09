@@ -130,8 +130,8 @@ def _get_distributed_seeds(seed: int = 1234, topo: Topology = None):
         pp_rank, pp_size = 0, 1
         dp_rank, dp_size = 0, 1
         sharding_rank, _ = 0, 1
-
-    seed_offset = seed
+    # in mpu/random.py , local_seed = seed + 1 + mp_rank * pp_size + pp_rank , so here add a offset to avoid same with local_seed
+    seed_offset = seed + 2 + mp_size * pp_size + pp_size
     global_seed = (
         seed_offset
         + sep_rank * (mp_size)
