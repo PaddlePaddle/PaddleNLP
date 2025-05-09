@@ -15,13 +15,13 @@
 import multiprocessing
 import os
 
+# def get_gencode_flags():
+#     import paddle
 
-def get_gencode_flags():
-    import paddle
+#     prop = paddle.device.cuda.get_device_properties()
+#     cc = prop.major * 10 + prop.minor
+#     return ["-gencode", "arch=compute_{0},code=sm_{0}".format(cc)]
 
-    prop = paddle.device.cuda.get_device_properties()
-    cc = prop.major * 10 + prop.minor
-    return ["-gencode", "arch=compute_{0},code=sm_{0}".format(cc)]
 
 def run(func):
     p = multiprocessing.Process(target=func)
@@ -36,13 +36,13 @@ def change_pwd():
 
 
 def setup_fast_ln():
-    from paddle.utils.cpp_extension import CUDAExtension, setup
     from paddle.device import is_compiled_with_rocm
+    from paddle.utils.cpp_extension import CUDAExtension, setup
 
-    if(is_compiled_with_rocm()):
+    if is_compiled_with_rocm():
         print("The 'fasl_ln' feature  is temporarily not supported on the ROCm platform !!!")
     else:
-        gencode_flags = get_gencode_flags()
+        # gencode_flags = get_gencode_flags()
         change_pwd()
         setup(
             name="fast_ln",
@@ -66,20 +66,19 @@ def setup_fast_ln():
                         "--expt-relaxed-constexpr",
                         "--expt-extended-lambda",
                         "--use_fast_math",
-                    ]
-                    + gencode_flags,
+                    ],
                 },
             ),
         )
 
 
 def setup_fused_ln():
-    from paddle.utils.cpp_extension import CUDAExtension, setup
     from paddle.device import is_compiled_with_rocm
+    from paddle.utils.cpp_extension import CUDAExtension, setup
 
-    gencode_flags = get_gencode_flags()
+    # gencode_flags = get_gencode_flags()
     change_pwd()
-    if(is_compiled_with_rocm()):
+    if is_compiled_with_rocm():
         setup(
             name="fused_ln",
             ext_modules=CUDAExtension(
@@ -97,7 +96,7 @@ def setup_fused_ln():
                         "-U__CUDA_NO_BFLOAT162_OPERATORS__",
                         "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
                         "-DPADDLE_WITH_HIP",
-                    ]
+                    ],
                 },
             ),
         )
@@ -123,17 +122,17 @@ def setup_fused_ln():
                         "--expt-extended-lambda",
                         "--use_fast_math",
                         "-maxrregcount=50",
-                    ]
-                    + gencode_flags,
+                    ],
                 },
             ),
         )
+
 
 def setup_fused_quant_ops():
     """setup_fused_fp8_ops"""
     from paddle.utils.cpp_extension import CUDAExtension, setup
 
-    gencode_flags = get_gencode_flags()
+    # gencode_flags = get_gencode_flags()
     change_pwd()
     setup(
         name="FusedQuantOps",
@@ -145,13 +144,7 @@ def setup_fused_quant_ops():
                 "fused_quanted_ops/fused_act_dequant_transpose_act_quant.cu",
             ],
             extra_compile_args={
-                "cxx": [
-                    "-O3",
-                    "-w",
-                    "-Wno-abi",
-                    "-fPIC",
-                    "-std=c++17"
-                ],
+                "cxx": ["-O3", "-w", "-Wno-abi", "-fPIC", "-std=c++17"],
                 "nvcc": [
                     "-O3",
                     "-U__CUDA_NO_HALF_OPERATORS__",
@@ -168,11 +161,12 @@ def setup_fused_quant_ops():
                     "-DCUTLASS_DEBUG_TRACE_LEVEL=0",
                     "-maxrregcount=50",
                     "-gencode=arch=compute_90a,code=sm_90a",
-                    "-DNDEBUG"
-                ] + gencode_flags,
+                    "-DNDEBUG",
+                ],
             },
         ),
     )
+
 
 def setup_token_dispatcher_utils():
     from paddle.utils.cpp_extension import CUDAExtension, setup
@@ -190,34 +184,29 @@ def setup_token_dispatcher_utils():
                 "token_dispatcher_utils/regroup_tokens.cu",
             ],
             extra_compile_args={
-                "cxx": [
+                "cxx": ["-O3", "-w", "-Wno-abi", "-fPIC", "-std=c++17"],
+                "nvcc": [
                     "-O3",
-                    "-w",
-                    "-Wno-abi",
-                    "-fPIC",
-                    "-std=c++17"
+                    "-U__CUDA_NO_HALF_OPERATORS__",
+                    "-U__CUDA_NO_HALF_CONVERSIONS__",
+                    "-U__CUDA_NO_BFLOAT16_OPERATORS__",
+                    "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
+                    "-U__CUDA_NO_BFLOAT162_OPERATORS__",
+                    "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
+                    "-DCUTE_ARCH_MMA_SM90A_ENABLE",
+                    "--expt-relaxed-constexpr",
+                    "--expt-extended-lambda",
+                    "--use_fast_math",
+                    "-maxrregcount=80",
+                    "-lineinfo",
+                    "-DCUTLASS_DEBUG_TRACE_LEVEL=0",
+                    "-gencode=arch=compute_90a,code=sm_90a",
+                    "-DNDEBUG",
                 ],
-            "nvcc": [
-                "-O3",
-                "-U__CUDA_NO_HALF_OPERATORS__",
-                "-U__CUDA_NO_HALF_CONVERSIONS__",
-                "-U__CUDA_NO_BFLOAT16_OPERATORS__",
-                "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
-                "-U__CUDA_NO_BFLOAT162_OPERATORS__",
-                "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
-                "-DCUTE_ARCH_MMA_SM90A_ENABLE",
-                "--expt-relaxed-constexpr",
-                "--expt-extended-lambda",
-                "--use_fast_math",
-                "-maxrregcount=80",
-                "-lineinfo",
-                "-DCUTLASS_DEBUG_TRACE_LEVEL=0",
-                "-gencode=arch=compute_90a,code=sm_90a",
-                "-DNDEBUG"
-            ]
             },
         ),
     )
+
 
 run(setup_token_dispatcher_utils)
 run(setup_fused_quant_ops)
