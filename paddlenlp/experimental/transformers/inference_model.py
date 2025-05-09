@@ -44,7 +44,7 @@ class InferenceModel:
         self.load_model_from_ipc = load_model_from_ipc
         self.model = self._build_model()
         self.shared_buffer_to = False
-        self.local_test = True
+        self.local_test = False
         self.first_load = True
         self.hot_start = hot_start
 
