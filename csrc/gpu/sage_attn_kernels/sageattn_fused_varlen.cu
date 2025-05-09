@@ -216,7 +216,6 @@ __global__ void QuantInt8Kernel_Varlen(T *__restrict__ input, T *__restrict__ me
 template <uint32_t head_dim, uint32_t CTA_SIZE, bool pad_zero=false, typename T>
 __global__ void TransposePadPermuteVarlenKernel(T *__restrict__ input,  // total_seqlen (not padded) x h_kv x head_dim
                             T *__restrict__ output,                     // head_dim x h_kv x padded_total_seqlen
-                            uint32_t *__restrict__ cu_seqlen,
                             uint32_t *__restrict__ padded_cu_seqlen,
                             const uint32_t stride_seq_input, const uint32_t stride_h_input,
                             const uint32_t stride_d_output, const uint32_t stride_h_output)
@@ -584,7 +583,6 @@ void quant_per_warp_int8_varlen_cuda_fwd(
 void transpose_pad_permute_varlen_cuda_fwd(
                 paddle::Tensor& input,        // total_seqlen (not padded) x h_kv x head_dim
                 paddle::Tensor& output,       // head_dim x h_kv x padded_total_seq_len
-                paddle::Tensor& cu_seqlen,
                 paddle::Tensor& padded_cu_seqlen,
                 int max_seq_len_v,
                 int tensor_layout)
@@ -600,7 +598,7 @@ void transpose_pad_permute_varlen_cuda_fwd(
 
   constexpr int CTA_SIZE = 64;
 
-  const int batch_size = cu_seqlen.shape()[0] - 1;
+  const int batch_size = padded_cu_seqlen.shape()[0] - 1;
   const int head_dim = input.shape()[2];
 
   int num_tokens = max_seq_len_v;
@@ -630,7 +628,6 @@ void transpose_pad_permute_varlen_cuda_fwd(
       TransposePadPermuteVarlenKernel<HEAD_DIM, CTA_SIZE, true, c_type><<<grid, block>>>(
         reinterpret_cast<c_type*>(input.data()),
         reinterpret_cast<c_type*>(output.data()),
-        reinterpret_cast<uint32_t*>(cu_seqlen.data()), 
         reinterpret_cast<uint32_t*>(padded_cu_seqlen.data()), 
         stride_seq_input, stride_h_input,
         stride_d_output, stride_h_output
@@ -833,7 +830,6 @@ std::vector<paddle::Tensor> per_warp_int8_varlen_cuda_fwd(paddle::Tensor& q,  //
 }
 
 std::vector<paddle::Tensor> per_channel_varlen_fp8(paddle::Tensor& v,                 // total_seqlen x num_head x head_dim
-                                                  paddle::Tensor& cu_seqlen_v,        // not padded
                                                   paddle::Tensor& padded_cu_seqlen,   // padded
                                                   int max_seq_len_v,
                                                   int padded_total_seq_len,
@@ -842,7 +838,7 @@ std::vector<paddle::Tensor> per_channel_varlen_fp8(paddle::Tensor& v,           
                                                   bool smooth_v)
 {
     // Notice: this function will pad v to 64-aligned. SM90 arch need to pad 128-align manually.
-    int b = cu_seqlen_v.shape()[0] - 1;
+    int b = padded_cu_seqlen.shape()[0] - 1;
     int head_dim = v.shape()[2];
     int h_kv = v.shape()[1];
 
@@ -854,7 +850,7 @@ std::vector<paddle::Tensor> per_channel_varlen_fp8(paddle::Tensor& v,           
     paddle::Tensor v_transposed_permutted = paddle::zeros({head_dim, h_kv, padded_total_seq_len}, v.dtype(), paddle::GPUPlace());
     
     transpose_pad_permute_varlen_cuda_fwd(v, v_transposed_permutted, 
-                                          cu_seqlen_v, padded_cu_seqlen,
+                                          padded_cu_seqlen,
                                           max_seq_len_v, tensor_layout);
 
     paddle::Tensor v_fp8 = paddle::empty(v_transposed_permutted.shape(), paddle::DataType::FLOAT8_E4M3FN, paddle::GPUPlace());

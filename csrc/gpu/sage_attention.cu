@@ -59,11 +59,9 @@ std::vector<paddle::Tensor> SageAttentionKernel(
     const paddle::optional<paddle::Tensor>& out_linear_shifts,  // CascadeAppendAttention
     const paddle::optional<paddle::Tensor>& out_linear_smooths, // CascadeAppendAttention
     const paddle::optional<paddle::Tensor>& excess_blocks,
-    const std::vector<int64_t>& split_vec,    // sage attn
     const std::string& cache_quant_type_str,  // write kv
     const bool use_neox_rotary_style, // write kv
     const int max_input_length, // write kv
-    const int total_seqlen_v_padded, // sage attn
     const float softmax_scale,  // sage attn
     const float quant_max_bound,  // CascadeAppendAttention
     const float quant_min_bound,  // CascadeAppendAttention
@@ -183,12 +181,11 @@ std::vector<paddle::Tensor> SageAttentionKernel(
                                         v, 
                                         cu_seqlen,
                                         cu_seqlen_v_padded,
+                                        seq_lens_encoder,
                                         km, 
                                         vm, 
-                                        split_vec,
                                         max_enc_len_this_time_data, // max_seqlen_q
                                         max_enc_len_this_time_data, // max_seqlen_k
-                                        total_seqlen_v_padded,
                                         softmax_scale, 
                                         std::string("per_warp"), 
                                         std::string("any"), 
@@ -338,12 +335,10 @@ std::vector<paddle::Tensor> SageAttention(
     const paddle::optional<paddle::Tensor>& out_linear_shifts,
     const paddle::optional<paddle::Tensor>& out_linear_smooths,
     const paddle::optional<paddle::Tensor>& excess_blocks,
-    const std::vector<int64_t>& split_vec,
     const std::string& compute_dtype,
     const std::string& cache_quant_type_str,
     const bool use_neox_rotary_style,
     const int max_input_length,
-    const int total_seqlen_v_padded,
     const float softmax_scale,
     const float quant_max_bound,
     const float quant_min_bound,
@@ -407,11 +402,9 @@ std::vector<paddle::Tensor> SageAttention(
           out_linear_shifts,
           out_linear_smooths,
           excess_blocks,
-          split_vec,
           cache_quant_type_str,
           use_neox_rotary_style,
           max_input_length,
-          total_seqlen_v_padded,
           softmax_scale,
           quant_max_bound,
           quant_min_bound,
@@ -459,11 +452,9 @@ std::vector<paddle::Tensor> SageAttention(
           out_linear_shifts,
           out_linear_smooths,
           excess_blocks,
-          split_vec,
           cache_quant_type_str,
           use_neox_rotary_style,
           max_input_length,
-          total_seqlen_v_padded,
           softmax_scale,
           quant_max_bound,
           quant_min_bound,
@@ -566,12 +557,10 @@ std::vector<paddle::DataType> SageAttentionInferDtype(
     const paddle::optional<paddle::DataType>& out_linear_shifts_dtype,
     const paddle::optional<paddle::DataType>& out_linear_smooths_dtype,
     const paddle::optional<paddle::DataType>& excess_blocks_dtype,
-    const std::vector<int64_t>& split_vec,
     const std::string& compute_dtype,
     const std::string& cache_quant_type_str,
     const bool use_neox_rotary_style,
     const int max_input_length,
-    const int total_seqlen_v_padded,
     const float softmax_scale,
     const float quant_max_bound,
     const float quant_min_bound,
@@ -648,12 +637,10 @@ PD_BUILD_OP(sage_attention)
     .Outputs({"fmha_out", "qkv_out", "key_cache_out", "value_cache_out"})
     .SetInplaceMap({{"key_cache", "key_cache_out"},
                     {"value_cache", "value_cache_out"}})
-    .Attrs({"split_vec: std::vector<int64_t>",
-            "compute_type: std::string",
+    .Attrs({"compute_type: std::string",
             "cache_quant_type: std::string",
             "use_neox_rotary_style: bool",
             "max_input_length: int",
-            "total_seqlen_v_padded: int",
             "softmax_scale: float",
             "quant_max_bound: float",
             "quant_min_bound: float",

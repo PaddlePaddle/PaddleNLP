@@ -3194,12 +3194,10 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                     None,  # out_shifts
                     None,  # out_smooths,
                     kwargs.get("excess_blocks", None),
-                    split_vec,
                     self._fuse_kernel_compute_dtype,
                     "none",  # cache_quant_type
                     self.use_neox_rotary_style,
                     kwargs.get("max_input_length", -1),
-                    total_seqlen_padded,
                     self.softmax_scale,  # softmax_scale
                     0.0,  # quant_max_bound
                     0.0,  # quant_min_bound
