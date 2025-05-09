@@ -53,7 +53,7 @@ class MoeGemmRunner {
                 cudaStream_t stream);
 
  private:
-  template <typename EpilogueTag>
+  template <typename EpilogueTag, bool FineGrained>
   void dispatch_to_arch(const T* A,
                         const WeightType* B,
                         const T* weight_scales,
@@ -69,7 +69,7 @@ class MoeGemmRunner {
                         cudaStream_t stream,
                         int* occupancy = nullptr);
 
-  template <typename EpilogueTag>
+  template <typename EpilogueTag, bool FineGrained>
   void run_gemm(const T* A,
                 const WeightType* B,
                 const T* weight_scales,

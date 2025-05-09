@@ -44,8 +44,8 @@ void MoeFFNKernel(const paddle::Tensor& permute_input,
 
   const int64_t expanded_active_expert_rows = permute_input.dims()[0];
   const int num_experts = ffn1_weight.dims()[0];
-  const int hidden_size = ffn1_weight.dims()[2];
-  int inter_dim = ffn1_weight.dims()[1];
+  const int hidden_size = ffn1_weight.dims()[1];
+  int inter_dim = ffn1_weight.dims()[2];
 
   if (quant_method == "weight_only_int4") {
     inter_dim = inter_dim * 2;
@@ -63,8 +63,16 @@ void MoeFFNKernel(const paddle::Tensor& permute_input,
       ffn1_bias
           ? const_cast<paddle::Tensor*>(ffn1_bias.get_ptr())->data<data_t>()
           : nullptr;
-
+  /*
+  group size
+  different quant and no quant, no quant and quant channel wise have same group
+  size no quant : group_size = -1
+  quant channel wise : group_size = -1
+  quant group wise : group_size = 64 || 128
+  */
+  int group_size = weightonly_group_size;
   if (quant_method == "weight_only_int8") {
+    group_size = group_size == -1 ? hidden_size : group_size;
     int8_moe_gemm_runner.moe_gemm_bias_act(
         reinterpret_cast<const NvType*>(permuted_data),
         reinterpret_cast<const uint8_t*>(ffn1_weight.data<int8_t>()),
@@ -78,9 +86,10 @@ void MoeFFNKernel(const paddle::Tensor& permute_input,
         hidden_size,
         num_experts,
         "none",
-        weightonly_group_size,
+        group_size,
         stream);
   } else if (quant_method == "weight_only_int4") {
+    group_size = group_size == -1 ? hidden_size : group_size;
     int4_moe_gemm_runner.moe_gemm_bias_act(
         reinterpret_cast<const NvType*>(permuted_data),
         reinterpret_cast<const cutlass::uint4b_t*>(ffn1_weight.data<int8_t>()),
@@ -94,7 +103,7 @@ void MoeFFNKernel(const paddle::Tensor& permute_input,
         hidden_size,
         num_experts,
         "none",
-        weightonly_group_size,
+        group_size,
         stream);
   } else {
     fp16_moe_gemm_runner.moe_gemm_bias_act(
@@ -109,14 +118,16 @@ void MoeFFNKernel(const paddle::Tensor& permute_input,
         hidden_size,
         num_experts,
         "none",
-        weightonly_group_size,
+        -1,
         stream);
   }
 
   auto act_out_tensor = paddle::experimental::swiglu(fc1_out_tensor, nullptr);
   auto act_out = act_out_tensor.data<data_t>();
-
+  // reset group_size
+  group_size = weightonly_group_size;
   if (quant_method == "weight_only_int8") {
+    group_size = group_size == -1 ? inter_size / 2 : group_size;
     int8_moe_gemm_runner.moe_gemm(
         reinterpret_cast<const NvType*>(act_out),
         reinterpret_cast<const uint8_t*>(ffn2_weight.data<int8_t>()),
@@ -128,10 +139,11 @@ void MoeFFNKernel(const paddle::Tensor& permute_input,
         hidden_size,
         inter_size / 2,
         num_experts,
-        weightonly_group_size,
+        group_size,
         stream);
 
   } else if (quant_method == "weight_only_int4") {
+    group_size = group_size == -1 ? inter_size / 2 : group_size;
     int4_moe_gemm_runner.moe_gemm(
         reinterpret_cast<const NvType*>(act_out),
         reinterpret_cast<const cutlass::uint4b_t*>(ffn2_weight.data<int8_t>()),
@@ -143,7 +155,7 @@ void MoeFFNKernel(const paddle::Tensor& permute_input,
         hidden_size,
         inter_size / 2,
         num_experts,
-        weightonly_group_size,
+        group_size,
         stream);
   } else {
     fp16_moe_gemm_runner.moe_gemm(
@@ -156,7 +168,7 @@ void MoeFFNKernel(const paddle::Tensor& permute_input,
         hidden_size,
         inter_size / 2,
         num_experts,
-        weightonly_group_size,
+        -1,
         stream);
   }
 }

@@ -35,13 +35,11 @@
 #include "cutlass/cutlass.h"
 #include "cutlass/fast_math.h"
 #include "cutlass/gemm/gemm.h"
-#include "cutlass/matrix_coord.h"
-#include "cutlass/semaphore.h"
-
 #include "cutlass/gemm/kernel/gemm_transpose_operands.h"
 #include "cutlass/layout/matrix.h"
+#include "cutlass/matrix_coord.h"
+#include "cutlass/semaphore.h"
 #include "cutlass/trace.h"
-
 #include "cutlass_extensions/gemm/kernel/gemm_moe_problem_visitor.h"
 #include "paddle/phi/kernels/fusion/cutlass/cutlass_extensions/tile_interleaved_layout.h"
 /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -58,58 +56,22 @@ template <typename...>
 using void_t = void;
 
 template <typename Mma, typename = void>
-struct use_dq_gemm : platform::false_type {};
+struct use_dq_gemm : platform::false_type {
+  using LayoutScaleZero = void;
+};
 
 template <typename Mma>
 struct use_dq_gemm<Mma, void_t<typename Mma::IteratorScale>>
-    : platform::true_type {};
+    : platform::true_type {
+  using LayoutScaleZero = typename Mma::IteratorScale::Layout;
+};
 
-// SFINAE overload for dequantizing gemm
-template <
-    typename Mma,
-    typename ElementScale,
-    typename platform::enable_if<use_dq_gemm<Mma>::value, bool>::type = true>
-CUTLASS_DEVICE static void run_mma(Mma mma,
-                                   int gemm_k_iterations,
-                                   typename Mma::FragmentC& accum,  // NOLINT
-                                   typename Mma::IteratorA iterator_A,
-                                   typename Mma::IteratorB iterator_B,
-                                   typename Mma::FragmentC const& src_accum,
-                                   ElementScale* weight_scale_ptr,
-                                   MatrixCoord scale_extent,
-                                   const int thread_idx,
-                                   MatrixCoord tb_offset_scale) {
-  typename Mma::IteratorScale iterator_scale(
-      Mma::IteratorScale::Layout(scale_extent.column()),
-      weight_scale_ptr,
-      scale_extent,
-      thread_idx,
-      tb_offset_scale);
-
-  mma(gemm_k_iterations,
-      accum,
-      iterator_A,
-      iterator_B,
-      iterator_scale,
-      src_accum);
-}
-
-// SFINAE overload for normal gemm. This completely ignores the scale parameters
-template <
-    typename Mma,
-    typename ElementScale,
-    typename platform::enable_if<!use_dq_gemm<Mma>::value, bool>::type = true>
-CUTLASS_DEVICE static void run_mma(Mma mma,
-                                   int gemm_k_iterations,
-                                   typename Mma::FragmentC& accum,  // NOLINT
-                                   typename Mma::IteratorA iterator_A,
-                                   typename Mma::IteratorB iterator_B,
-                                   typename Mma::FragmentC const& src_accum,
-                                   ElementScale* weight_scale_ptr,
-                                   MatrixCoord scale_extent,
-                                   const int thread_idx,
-                                   MatrixCoord tb_offset_scale) {
-  mma(gemm_k_iterations, accum, iterator_A, iterator_B, src_accum);
+template <typename Element>
+CUTLASS_HOST_DEVICE bool tensor_aligned(Element const* ref,
+                                        int stride,
+                                        int alignment) {
+  return (reinterpret_cast<uintptr_t>(ref) % alignment == 0) &&
+         (stride % alignment == 0);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -120,11 +82,13 @@ template <typename Mma_,  ///! Threadblock-scoped matrix multiply-accumulate
           typename KernelArch,  ///! The Architecture this kernel is compiled
                                 /// for. Used since SIMT kernels lose top-level
                                 /// arch.
-          GroupScheduleMode GroupScheduleMode_  ///! Type of scheduling to //
-                                                /// NOLINT perform
+          GroupScheduleMode GroupScheduleMode_,  ///! Type of scheduling to //
+                                                 /// NOLINT perform
+          bool FineGrained  ///! If true, finegrained mode is enabled.
+                            /// Currently only support groupwise.
           >
 struct MoeFCGemm {
- public:
+public:
   using Mma = Mma_;
   using Epilogue = Epilogue_;
   using EpilogueOutputOp = typename Epilogue::OutputOp;
@@ -195,6 +159,7 @@ struct MoeFCGemm {
 
     int problem_count;
     int threadblock_count;
+    int group_size;
 
     typename EpilogueOutputOp::Params output_op;
 
@@ -210,8 +175,6 @@ struct MoeFCGemm {
 
     // Only used by device-level operator
     GemmCoord* host_problem_sizes;
-
-    int group_size;
 
     //
     // Methods
@@ -276,6 +239,7 @@ struct MoeFCGemm {
   struct Params {
     typename ProblemVisitor::Params problem_visitor;
     int threadblock_count;
+    int group_size;
 
     typename EpilogueOutputOp::Params output_op;
 
@@ -285,7 +249,6 @@ struct MoeFCGemm {
     ElementC* ptr_C;
     ElementC* ptr_D;
 
-    int group_size;
 
     //
     // Methods
@@ -297,8 +260,7 @@ struct MoeFCGemm {
           ptr_B(nullptr),
           weight_scales(nullptr),
           ptr_C(nullptr),
-          ptr_D(nullptr),
-          group_size(-1) {}
+          ptr_D(nullptr) {}
 
     CUTLASS_HOST_DEVICE
     Params(Arguments const& args,
@@ -311,13 +273,13 @@ struct MoeFCGemm {
                           workspace,
                           tile_count),
           threadblock_count(args.threadblock_count),
+          group_size(args.group_size),
           output_op(args.output_op),
           ptr_A(args.ptr_A),
           ptr_B(args.ptr_B),
           weight_scales(args.weight_scales),
           ptr_C(args.ptr_C),
-          ptr_D(args.ptr_D),
-          group_size(args.group_size) {}
+          ptr_D(args.ptr_D) {}
 
     CUTLASS_HOST_DEVICE
     void update(Arguments const& args,
@@ -347,7 +309,7 @@ struct MoeFCGemm {
     typename Epilogue::SharedStorage epilogue;
   };
 
- public:
+public:
   //
   // Methods
   //
@@ -359,7 +321,7 @@ struct MoeFCGemm {
   static Status can_implement(cutlass::gemm::GemmCoord const& problem_size) {
     return Status::kSuccess;
   }
-
+  CUTLASS_HOST_DEVICE
   static Status can_implement(Arguments const& args) {
     if (platform::is_same<uint8_t, ElementB>::value ||
         platform::is_same<uint4b_t, ElementB>::value) {
@@ -369,10 +331,66 @@ struct MoeFCGemm {
             "uint8_t and uint4b_t");
         return Status::kInvalid;
       }
+      static int const kAlignmentA =
+          (platform::is_same<typename Mma::IteratorA::Layout,
+                             layout::ColumnMajorInterleaved<32>>::value)
+              ? 32
+          : (platform::is_same<typename Mma::IteratorA::Layout,
+                               layout::ColumnMajorInterleaved<64>>::value)
+              ? 64
+              : Mma::IteratorA::AccessType::kElements;
+      static int const kAlignmentB =
+          (platform::is_same<typename Mma::IteratorB::Layout,
+                             layout::RowMajorInterleaved<32>>::value)
+              ? 32
+          : (platform::is_same<typename Mma::IteratorB::Layout,
+                               layout::RowMajorInterleaved<64>>::value)
+              ? 64
+              : Mma::IteratorB::AccessType::kElements;
+      static int const kAlignmentScale = 128 / sizeof_bits<float>::value;
+      static int const kAlignmentC =
+          (platform::is_same<typename Epilogue::OutputTileIterator::Layout,
+                             layout::ColumnMajorInterleaved<32>>::value)
+              ? 32
+          : (platform::is_same<typename Epilogue::OutputTileIterator::Layout,
+                               layout::ColumnMajorInterleaved<64>>::value)
+              ? 64
+              : Epilogue::OutputTileIterator::kElementsPerAccess;
+      if (!tensor_aligned(args.ptr_A, args.gemm_k, kAlignmentA)) {
+        return Status::kErrorMisalignedOperand;
+      }
+      // TODO: stride is gemm_n or gemm_n / 2 ?
+      if (!tensor_aligned(args.ptr_B, args.gemm_n, kAlignmentB)) {
+        return Status::kErrorMisalignedOperand;
+      }
+
+      if (!tensor_aligned(args.weight_scales, args.gemm_n, kAlignmentScale)) {
+        return Status::kErrorMisalignedOperand;
+      }
+
+
+      if (!tensor_aligned(args.ptr_C, args.gemm_n, kAlignmentC)) {
+        return Status::kErrorMisalignedOperand;
+      }
+
+      if (!tensor_aligned(args.ptr_D, args.gemm_n, kAlignmentC)) {
+        return Status::kErrorMisalignedOperand;
+      }
+
+      if (args.weight_scales == nullptr) {
+        return Status::kErrorNotSupported;
+      }
     } else if (args.weight_scales != nullptr) {
       CUTLASS_TRACE_HOST(
           "MoeFCGemm::can_implement() - weight scales are ignored for all "
           "types except uint8_t and uint4b_t");
+      return Status::kInvalid;
+    }
+    // Handle the case the input is too short
+    else if (args.gemm_n < Mma::IteratorB::AccessType::kElements) {
+      CUTLASS_TRACE_HOST(
+          "MoeFCGemm::can_implement() - gemm_n is smaller than the input "
+          "alignment");
       return Status::kInvalid;
     }
     return Status::kSuccess;
@@ -382,6 +400,52 @@ struct MoeFCGemm {
       Arguments const& args, cutlass::gemm::GemmCoord const& grid_tiled_shape) {
     return 0;
   }
+  // Initializes the fine grained scale+bias iterator. Needed since the fine
+  // grained iterator has a different constructor signature than a regular
+  // cutlass iterator
+
+  template <typename IteratorScale, bool Finegrained>
+  struct initialize_scale {
+    CUTLASS_DEVICE static IteratorScale apply(
+        typename IteratorScale::Params const& params,
+        typename IteratorScale::Pointer pointer_scale,
+        typename IteratorScale::TensorCoord extent,
+        int thread_id,
+        typename IteratorScale::TensorCoord const& threadblock_offset,
+        int group_size);
+  };
+
+  template <typename IteratorScale>
+  struct initialize_scale<IteratorScale, true> {
+    CUTLASS_DEVICE static IteratorScale apply(
+        typename IteratorScale::Params const& params,
+        typename IteratorScale::Pointer pointer_scale,
+        typename IteratorScale::TensorCoord extent,
+        int thread_id,
+        typename IteratorScale::TensorCoord const& threadblock_offset,
+        int group_size) {
+      return IteratorScale(params,
+                           pointer_scale,
+                           extent,
+                           thread_id,
+                           threadblock_offset,
+                           group_size);
+    }
+  };
+
+  template <typename IteratorScale>
+  struct initialize_scale<IteratorScale, false> {
+    CUTLASS_DEVICE static IteratorScale apply(
+        typename IteratorScale::Params const& params,
+        typename IteratorScale::Pointer pointer_scale,
+        typename IteratorScale::TensorCoord extent,
+        int thread_id,
+        typename IteratorScale::TensorCoord const& threadblock_offset,
+        int group_size) {
+      return IteratorScale(
+          params, pointer_scale, extent, thread_id, threadblock_offset);
+    }
+  };
 
   // The dummy template parameter is not used and exists so that we can compile
   // this code using a standard earlier than C++17. Prior to C++17, fully
@@ -431,7 +495,9 @@ struct MoeFCGemm {
           (gemm_k * gemm_n / 8) * cutlass::sizeof_bits<ElementB>::value;
 
       // Outer 'persistent' loop to iterate over tiles
+      int loop = 0;
       while (problem_visitor.next_tile()) {
+        loop++;
         GemmCoord problem_size = problem_visitor.problem_size();
         int32_t problem_idx = problem_visitor.problem_index();
         int32_t cta_idx = int32_t(problem_visitor.threadblock_idx());
@@ -460,7 +526,12 @@ struct MoeFCGemm {
             platform::is_same<layout::RowMajor, LayoutB>::value
                 ? gemm_n
                 : gemm_k * kInterleave;
-
+        ElementScale* ptr_Scale =
+            use_dq_gemm<Mma>::value
+                ? params.weight_scales +
+                      problem_idx * gemm_k / params.group_size * gemm_n
+                : nullptr;
+        long ldm_Scale = gemm_n;
         // Compute initial location in logical coordinates
         cutlass::MatrixCoord tb_offset_A{
             threadblock_offset.m(),
@@ -506,8 +577,11 @@ struct MoeFCGemm {
         // Construct thread-scoped matrix multiply
         auto CreateMMA = [&]() {
           if constexpr (use_dq_gemm<Mma>::value)
-            return Mma(
-                shared_storage.main_loop, params.group_size, thread_idx, warp_idx, lane_idx);
+            return Mma(shared_storage.main_loop,
+                       params.group_size,
+                       thread_idx,
+                       warp_idx,
+                       lane_idx);
           else
             return Mma(
                 shared_storage.main_loop, thread_idx, warp_idx, lane_idx);
@@ -523,27 +597,40 @@ struct MoeFCGemm {
         __syncthreads();
 
         // Compute threadblock-scoped matrix multiply-add
-        ElementScale* weight_scale_ptr =
-            params.weight_scales + problem_idx * problem_size.n();
-        run_mma<Mma>(mma,
-                     gemm_k_iterations,
-                     accumulators,
-                     iterator_A,
-                     iterator_B,
-                     accumulators,
-                     weight_scale_ptr,
-                     {1, problem_size.n()},
-                     thread_idx,
-                     tb_offset_scale);
+        if constexpr (use_dq_gemm<Mma>::value) {
+          typename MatrixCoord::Index scale_row_extent =
+              FineGrained == true ? gemm_k / 64 : 1;
+          typename Mma::IteratorScale iterator_scale =
+              initialize_scale<typename Mma::IteratorScale, FineGrained>::apply(
+                  use_dq_gemm<Mma>::LayoutScaleZero(ldm_Scale),
+                  reinterpret_cast<typename Mma::IteratorScale::Pointer>(
+                      ptr_Scale),
+                  {scale_row_extent, problem_size.n()},
+                  thread_idx,
+                  tb_offset_scale,
+                  params.group_size);
+
+          mma(gemm_k_iterations,
+              accumulators,
+              iterator_A,
+              iterator_B,
+              iterator_scale,
+              accumulators);
+        } else {
+          mma(gemm_k_iterations,
+              accumulators,
+              iterator_A,
+              iterator_B,
+              accumulators);
+        }
 
         //
         // Epilogue
         //
-
-        EpilogueOutputOp output_op(params.output_op);
-
-        ElementC* ptr_C =
-            reinterpret_cast<ElementC*>(params.ptr_C) + problem_idx * gemm_n;
+        ElementC* ptr_C = (params.ptr_C == nullptr)
+                              ? nullptr
+                              : reinterpret_cast<ElementC*>(params.ptr_C) +
+                                    problem_idx * gemm_n;
         ElementC* ptr_D =
             reinterpret_cast<ElementC*>(params.ptr_D) + rows_to_jump * gemm_n;
 
@@ -559,7 +646,8 @@ struct MoeFCGemm {
             ptr_C,
             problem_size.mn(),
             thread_idx,
-            threadblock_offset.mn());
+            threadblock_offset.mn(),
+            nullptr);
 
         // Tile iterator writing to destination tensor.
         typename Epilogue::OutputTileIterator iterator_D(
@@ -567,13 +655,28 @@ struct MoeFCGemm {
             ptr_D,
             problem_size.mn(),
             thread_idx,
-            threadblock_offset.mn());
+            threadblock_offset.mn(),
+            nullptr);
 
         Epilogue epilogue(
             shared_storage.epilogue, thread_idx, warp_idx, lane_idx);
 
         // Execute the epilogue operator to update the destination tensor.
-        epilogue(output_op, iterator_D, accumulators, iterator_C);
+        if constexpr (platform::is_same<
+                          EpilogueOutputOp,
+                          cutlass::epilogue::thread::LinearCombination<
+                              typename EpilogueOutputOp::ElementOutput,
+                              EpilogueOutputOp::kCount,
+                              typename EpilogueOutputOp::ElementAccumulator,
+                              typename EpilogueOutputOp::ElementCompute,
+                              EpilogueOutputOp::kScale,
+                              EpilogueOutputOp::kRound>>::value) {
+          EpilogueOutputOp output_op(params.output_op, problem_idx);
+          epilogue(output_op, iterator_D, accumulators, iterator_C);
+        } else {
+          EpilogueOutputOp output_op(params.output_op);
+          epilogue(output_op, iterator_D, accumulators, iterator_C);
+        }
 
         // Next tile
         problem_visitor.advance(gridDim.x);

@@ -1992,19 +1992,19 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
 
         if self.config.moe_config.has_moe():
             self.moe_ffn1_weight_shape = (
-                [self.config.moe_config.num_experts, self.config.moe_config.moe_intermediate_size * 2, self.embed_dim]
+                [self.config.moe_config.num_experts, self.embed_dim, self.config.moe_config.moe_intermediate_size * 2]
                 if self.activation.endswith("glu")
-                else [self.config.moe_config.num_experts, self.config.moe_config.moe_intermediate_size, self.embed_dim]
+                else [self.config.moe_config.num_experts, self.embed_dim, self.config.moe_config.moe_intermediate_size]
             )
             self.moe_ffn2_weight_shape = [
                 self.config.moe_config.num_experts,
-                self.embed_dim,
                 self.config.moe_config.moe_intermediate_size,
+                self.embed_dim,
             ]
 
             if config.quant_type == "weight_only_int4":
                 if config.moe_config.has_shared_expert():
-                    self.moe_ffn1_weight_shape[1] //= 2
+                    self.moe_ffn1_weight_shape[2] //= 2
                     self.moe_ffn2_weight_shape[1] //= 2
                 else:
                     self.moe_ffn1_weight_shape[2] //= 2

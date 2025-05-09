@@ -977,10 +977,10 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
 
                     if self.use_weight_only:
                         ffn1_quanted_weight, ffn1_weight_scale = weight_quantize(
-                            ffn1_weight, algo=self.quant_algo, group_size=-1
+                            ffn1_weight, algo=self.quant_algo, group_size=self.weightonly_group_size
                         )
                         ffn2_quanted_weight, ffn2_weight_scale = weight_quantize(
-                            ffn2_weight, algo=self.quant_algo, group_size=-1
+                            ffn2_weight, algo=self.quant_algo, group_size=self.weightonly_group_size
                         )
                         ffn1_weights.append(ffn1_quanted_weight.reshape([self.transformer_block.config.embed_dim, -1]))
                         ffn2_weights.append(ffn2_quanted_weight.reshape([-1, self.transformer_block.config.embed_dim]))
@@ -1038,10 +1038,10 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                                 weight_block_size=self.weight_block_size,
                             )
                             ffn1_quanted_weight, ffn1_weight_scale = weight_quantize(
-                                ffn1_weight, algo=self.moe_quant_type, group_size=-1
+                                ffn1_weight, algo=self.moe_quant_type, group_size=self.weightonly_group_size
                             )
                             ffn2_quanted_weight, ffn2_weight_scale = weight_quantize(
-                                ffn2_weight, algo=self.moe_quant_type, group_size=-1
+                                ffn2_weight, algo=self.moe_quant_type, group_size=self.weightonly_group_size
                             )
                             ffn1_weights.append(
                                 ffn1_quanted_weight.reshape([self.transformer_block.config.embed_dim, -1])
