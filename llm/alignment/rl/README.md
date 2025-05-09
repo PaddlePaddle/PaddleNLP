@@ -8,23 +8,26 @@ REINFORCE++ 是经典 REINFORCE 算法的改进版本，通过融合 PPO 的关�
 ## 环境依赖
 
 * 训练环境：
-1. 参考 Paddle 官网安装 PaddlePaddle-GPU
+1. 参考 [Paddle 官网](https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/develop/install/pip/linux-pip.html)安装 PaddlePaddle-GPU, 要求 PaddlePaddle>=3.0
 2. clone 并安装 PaddleNLP
 ```shell
 git clone https://github.com/PaddlePaddle/PaddleNLP.git
 ```
-3. 安装 paddlenlp_ops，参考 PaddleNLP/csrc 进行安装（必需）
+3. 安装 paddlenlp_ops 推理算子，参考 PaddleNLP/csrc 进行安装（必需）
 ```shell
 cd your_PaddleNLP_path/csrc
 python setup_cuda.py install
+```
+4. 安装 fused_ln 和 fast_ln 训练算子，参考 PaddleNLP/slm/model_zoo/gpt-3/external_ops (必须)
+```shell
+cd your_PaddleNLP_path/slm/model_zoo/gpt-3/external_ops
+python setup.py install
 ```
 
 ## 支持模型
 
 |   模型系列    | 模型名称                                                                                                                                                                                                                                                                      |
 |:-------------:|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-|   Llama3.1    | meta-llama/Meta-Llama-3.1-8B, meta-llama/Meta-Llama-3.1-8B-Instruct, meta-llama/Meta-Llama-3.1-70B, meta-llama/Meta-Llama-3.1-70B-Instruct, meta-llama/Meta-Llama-3.1-405B, meta-llama/Meta-Llama-3.1-405B-Instruct, meta-llama/Llama-Guard-3-8B                              |
-|   Llama3.2    | meta-llama/Llama-3.2-1B, meta-llama/Llama-3.2-1B-Instruct, meta-llama/Llama-3.2-3B, meta-llama/Llama-3.2-3B-Instruct                                                                                                                                                          |
 |    Qwen1.5    | Qwen/Qwen1.5-0.5B, Qwen/Qwen1.5-0.5B-Chat, Qwen/Qwen1.5-1.8B, Qwen/Qwen1.5-1.8B-Chat, Qwen/Qwen1.5-4B, Qwen/Qwen1.5-4B-Chat, Qwen/Qwen1.5-7B, Qwen/Qwen1.5-7B-Chat, Qwen/Qwen1.5-14B, Qwen/Qwen1.5-14B-Chat, Qwen/Qwen1.5-32B, Qwen/Qwen1.5-32B-Chat                          |
 |     Qwen2     | Qwen/Qwen2-0.5B, Qwen/Qwen2-0.5B-Instruct, Qwen/Qwen2-1.5B, Qwen/Qwen2-1.5B-Instruct, Qwen/Qwen2-7B, Qwen/Qwen2-7B-Instruct, Qwen/Qwen2-72B, Qwen/Qwen2-72B-Instruct, Qwen/Qwen2-57B-A14B, Qwen/Qwen2-57B-A14B-Instruct                                                       |
 |  Qwen2-Math   | Qwen/Qwen2-Math-1.5B, Qwen/Qwen2-Math-1.5B-Instruct, Qwen/Qwen2-Math-7B, Qwen/Qwen2-Math-7B-Instruct                                                                                                                                                                          |
@@ -36,7 +39,7 @@ python setup_cuda.py install
 
 ### 字段说明
 
-- src (list(str)): 经过 chat_template 处理后的 prompt 输入；
+- src (list(str)): 经过 chat_template 处理后的 prompt 输入；或者根据需要自己拼接构造 prompt；
 - tgt (list(str)): 标签内容；
 
 ### 数据示例
@@ -59,7 +62,7 @@ wget https://paddlenlp.bj.bcebos.com/datasets/examples/ppo-kk.tgz && tar zxf ppo
 
 ### GRPO && REINFORCE++ 训练配置
 
-我们采用的配置文件放置在`llm/config/llama/grpo_argument.yaml`和`llm/config/qwen/grpo_argument.yaml`中，同时我们提供了详细参数释义如下：
+我们采用的配置文件放置在`llm/config/qwen/grpo_argument.yaml`中，同时我们提供了详细参数释义如下：
 - `rl_algorithm`: 使用的强化学习算法，支持`grpo`、`reinforce_plus_plus`
 - `actor_model_name_or_path`: actor-model 和 reference-model 模型本地的模型路径
 - `reward_model_name_or_path`: reward 模型的名称或本地路径
@@ -144,7 +147,7 @@ max_dec_len + max_prompt_len 应当小于 max_seq_len。
 
 ### GRPO 训练命令
 ```shell
-cd your_PaddleNLP_path/llm/alignment/ppo
+cd your_PaddleNLP_path/llm/alignment/rl
 ```
 
 ```shell
@@ -166,16 +169,45 @@ export FLAGS_force_cublaslt_no_reduced_precision_reduction=True
 export FLAGS_mla_use_tensorcore=0
 export FLAGS_cascade_attention_max_partition_size=2048
 
-python -u -m paddle.distributed.launch --devices "0,1,2,3" run_ppo.py ../../config/qwen/grpo_argument.yaml
-# python -u -m paddle.distributed.launch --devices "0,1,2,3" run_ppo.py ../../config/llama/grpo_argument.yaml
+python -u -m paddle.distributed.launch --devices "0,1,2,3" run_rl.py ../../config/qwen/grpo_argument.yaml
+
+# QWEN32B 2k prompt + 30k response 9台8x80G 显卡训练命令如下：
+# python -u -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" run_rl.py ../../config/qwen/grpo_32b_argument.yaml
+```
+我们提供根据上述脚本可复现的[wandb 日志](https://api.wandb.ai/links/junyu/5jiulhem)。
+
+
+### Reinforce++ 训练命令
+```shell
+cd your_PaddleNLP_path/llm/alignment/rl
 ```
 
-### REINFORCE++ 训练命令
-将配置文件`grpo_argument.yaml`中的`rl_algorithm`改为`reinforce_plus_plus`即可, 其它命令同 GRPO
+```shell
+# 启动 reward server
+python reward_server.py
+```
 
+```shell
+export PYTHONPATH=your_PaddleNLP_path/:$PYTHONPATH
+export PYTHONPATH=your_PaddleNLP_path/llm:$PYTHONPATH
+
+export FLAGS_set_to_1d=False
+export NVIDIA_TF32_OVERRIDE=0
+export FLAGS_dataloader_use_file_descriptor=False
+export HF_DATASETS_DOWNLOAD_TIMEOUT=1
+export FLAGS_gemm_use_half_precision_compute_type=False
+export FLAGS_force_cublaslt_no_reduced_precision_reduction=True
+
+export FLAGS_mla_use_tensorcore=0
+export FLAGS_cascade_attention_max_partition_size=2048
+
+python -u -m paddle.distributed.launch --devices "0,1,2,3" run_rl.py ../../config/qwen/reinforce_plus_plus_argument.yaml
+```
 
 ### 在线监控
-在`grpo_argument.yaml`中设置的输出目录为`"logging_dir": "vdl_log"`, 可以通过以下命令查看训练过程
+在`grpo_argument.yaml`和`reinforce_plus_plus_argument.yaml`中设置的输出目录为`"logging_dir": "vdl_log"`, 可以通过以下命令查看训练过程
 ```shell
 visualdl --logdir vdl_log --host 0.0.0.0
 ```
+
+也支持 wandb 等多种监控，可设置`"logging_dir": "wandb"`，需要提前安装好 wandb 依赖并登录。

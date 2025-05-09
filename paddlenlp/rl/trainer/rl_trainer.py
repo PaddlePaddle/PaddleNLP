@@ -49,9 +49,7 @@ from ...transformers import PretrainedModel, PretrainedTokenizer
 from ...utils.env import TRAINER_STATE_NAME
 from ..models.ppo_model_utils import create_loss
 from ..utils.comm_utils import create_data_trans_group
-from ..utils.infer_utils import InferEvalModel
 from ..utils.reshard_utils import init_rollout_env
-from .trainer_utils import PipeEvalModel
 
 # ########## patches for Trianer ##########
 
@@ -641,10 +639,14 @@ class RLTrainer(Trainer):
         if (self.args.pipeline_parallel_degree > 1 and inner_eval_model is None) or isinstance(
             inner_eval_model, fleet.model.PipelineParallel
         ):
+            from .trainer_utils import PipeEvalModel
+
             # Only accept wrapped model for pipeline_parallel mode
             model = PipeEvalModel(self)
             self._eval_model = model
         else:
+            from ..utils.infer_utils import InferEvalModel
+
             model = InferEvalModel(self)
             self._eval_model = model
         return model
