@@ -179,7 +179,6 @@ if [[ ${#Build_list[*]} -ne 0 ]];then
             echo -e "\033[35m ---- build ${GIT_PR_ID} ${build_pkg}  \033[0m"
         fi  
     done
-    install_external_ops
 else
    echo -e "\033[32m Don't need build whl  \033[0m"
 fi
@@ -206,6 +205,8 @@ if [[ ${#P0case_list[*]} -ne 0 ]];then
     else
         echo "install_paddlenlp_ops_pr done"
     fi
+    # install fused_ln
+    install_external_ops
     python -c "from paddlenlp import __version__; print('paddlenlp version:', __version__)" >> ${log_path}/commit_info.txt
     python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)" >> ${log_path}/commit_info.txt
     python -m pip list >> ${log_path}/commit_info.txt
