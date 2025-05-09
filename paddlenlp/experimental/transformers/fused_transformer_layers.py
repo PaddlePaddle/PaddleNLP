@@ -3123,39 +3123,21 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 from paddlenlp_ops import sage_attention
                 
                 def align_padding(cu_seqlen: paddle.Tensor):
-                    """
-                    Align the sequence lengths to the nearest multiple of `align_size` and return padding information.
-                    
-                    Args:
-                        cu_seqlen (paddle.Tensor): Cumulative sequence lengths, e.g., [0, 131, 155].
-                        align_size (int): Alignment size (default: 64).
-                    
-                    Returns:
-                        tuple: (cu_seqlen_padded, total_seqlen_padded, split_vec)
-                            - cu_seqlen_padded: Padded cumulative sequence lengths, e.g., [0, 256, 384].
-                            - total_seqlen_padded: Total padded sequence length, e.g., 384.
-                            - split_vec: List of tuples (original_length, padding_length) for each sequence, e.g., [(131, 125), (24, 232)].
-                    """
                     prop = paddle.device.cuda.get_device_properties()
                     cc = prop.major * 10 + prop.minor
                     align_size = 64 if cc == 89 else 128
 
                     # Convert to numpy for easier manipulation
                     cu_seqlen_padded = paddle.zeros(shape=cu_seqlen.shape, dtype=paddle.int32)
-                    split_vec = []
                     
                     for i in range(1, cu_seqlen.shape[0]):
                         original_length = cu_seqlen[i] - cu_seqlen[i - 1]
                         padded_length = ((original_length + align_size - 1) // align_size) * align_size
-                        
-                        split_vec.append(original_length.item())
                         cu_seqlen_padded[i] = cu_seqlen_padded[i - 1] + padded_length
                     
-                    total_seqlen_padded = cu_seqlen_padded[-1].item()
-                    
-                    return cu_seqlen_padded, total_seqlen_padded, split_vec
+                    return cu_seqlen_padded
                 
-                cu_seqlen_v_padded, total_seqlen_padded, split_vec = align_padding(kwargs.get("cu_seqlens_q", None))    # here. we should figure out a way
+                cu_seqlen_v_padded = align_padding(kwargs.get("cu_seqlens_q", None))    # here. we should figure out a way
 
                 fmha_out = sage_attention(
                     qkv_out,  # [total_seqlen, mixed_dim]
