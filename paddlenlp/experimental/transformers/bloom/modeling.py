@@ -177,7 +177,7 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
             quant_type=config.quant_type,
             activation="gelu",
             num_layers=config.n_layer,
-            nranks=config.tensor_parallel_degree,
+            tp_degree=config.tensor_parallel_degree,
             ring_id=ring_id,
             ln_scale_attrs=ln_scale_attrs,
             ln_bias_attrs=ln_bias_attrs,

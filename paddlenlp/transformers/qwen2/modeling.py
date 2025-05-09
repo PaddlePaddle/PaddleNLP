@@ -615,6 +615,7 @@ class Qwen2Attention(nn.Layer):
         output_attentions: bool = False,
         use_cache: bool = False,
         attn_mask_startend_row_indices: Optional[paddle.Tensor] = None,
+        batch_size: Optional[int] = None,
         **kwargs,
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
@@ -624,8 +625,8 @@ class Qwen2Attention(nn.Layer):
             mix_layer = self.qkv_proj(hidden_states)
             if self.sequence_parallel:
                 target_shape = [
+                    batch_size,
                     -1,
-                    self.seq_length,
                     self.num_key_value_heads,
                     (self.num_key_value_groups + 2) * self.head_dim,
                 ]
@@ -645,8 +646,8 @@ class Qwen2Attention(nn.Layer):
             value_states = self.v_proj(hidden_states)
 
             if self.sequence_parallel:
-                target_query_shape = [-1, self.seq_length, self.num_heads, self.head_dim]
-                target_key_value_shape = [-1, self.seq_length, self.num_key_value_heads, self.head_dim]
+                target_query_shape = [batch_size, -1, self.num_heads, self.head_dim]
+                target_key_value_shape = [batch_size, -1, self.num_key_value_heads, self.head_dim]
             else:
                 target_query_shape = [0, 0, self.num_heads, self.head_dim]
                 target_key_value_shape = [0, 0, self.num_key_value_heads, self.head_dim]
@@ -774,6 +775,7 @@ class Qwen2DecoderLayer(nn.Layer):
         past_key_value: Optional[Tuple[paddle.Tensor]] = None,
         use_cache: Optional[bool] = False,
         attn_mask_startend_row_indices: Optional[paddle.Tensor] = None,
+        batch_size: Optional[int] = None,
         **kwargs,
     ) -> Tuple[paddle.Tensor, Optional[Tuple[paddle.Tensor, paddle.Tensor]]]:
         """
@@ -813,6 +815,7 @@ class Qwen2DecoderLayer(nn.Layer):
                 output_attentions,
                 use_cache,
                 attn_mask_startend_row_indices,
+                batch_size,
                 use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
@@ -824,6 +827,7 @@ class Qwen2DecoderLayer(nn.Layer):
                 output_attentions,
                 use_cache,
                 attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+                batch_size=batch_size,
             )
 
         if type(outputs) is tuple:
@@ -1209,6 +1213,7 @@ class Qwen2Model(Qwen2PretrainedModel):
         past_key_value: Tensor,
         use_cache: bool,
         attn_mask_startend_row_indices=None,
+        batch_size: int = None,
     ):
         def create_custom_forward(module):
             def custom_forward(*inputs):
@@ -1226,6 +1231,7 @@ class Qwen2Model(Qwen2PretrainedModel):
             past_key_value,
             use_cache,
             attn_mask_startend_row_indices,
+            batch_size,
             use_reentrant=self.config.recompute_use_reentrant,
         )
 
@@ -1328,6 +1334,7 @@ class Qwen2Model(Qwen2PretrainedModel):
                     past_key_value,
                     use_cache,
                     attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+                    batch_size=batch_size,
                 )
             else:
                 layer_outputs = decoder_layer(
@@ -1338,6 +1345,7 @@ class Qwen2Model(Qwen2PretrainedModel):
                     past_key_value,
                     use_cache,
                     attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+                    batch_size=batch_size,
                 )
 
             # NOTE: clear outdate cache after it has been used for memory saving
@@ -1451,11 +1459,10 @@ class Qwen2LMHead(nn.Layer):
             # for tie_word_embeddings
             self.weight.split_axis = 0 if self.transpose_y else 1
 
-    def forward(self, hidden_states, tensor_parallel_output=None):
+    def forward(self, hidden_states, tensor_parallel_output=None, batch_size=None):
         if self.config.sequence_parallel:
             hidden_states = GatherOp.apply(hidden_states)
-            seq_length = self.config.seq_length
-            hidden_states = paddle.reshape_(hidden_states, [-1, seq_length, self.config.hidden_size])
+            hidden_states = paddle.reshape_(hidden_states, [batch_size, -1, self.config.hidden_size])
 
         if tensor_parallel_output is None:
             tensor_parallel_output = self.config.tensor_parallel_output
@@ -1614,6 +1621,15 @@ class Qwen2ForCausalLM(Qwen2PretrainedModel):
             )
             attention_mask = None
 
+        if input_ids is not None and inputs_embeds is not None:
+            raise ValueError("You cannot specify both decoder_input_ids and decoder_inputs_embeds at the same time")
+        elif input_ids is not None:
+            batch_size = input_ids.shape[0]
+        elif inputs_embeds is not None:
+            batch_size = inputs_embeds.shape[0]
+        else:
+            raise ValueError("You have to specify either decoder_input_ids or decoder_inputs_embeds")
+
         # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
         outputs = self.qwen2(
             input_ids=input_ids,
@@ -1629,6 +1645,19 @@ class Qwen2ForCausalLM(Qwen2PretrainedModel):
         )
 
         hidden_states = outputs[0]
+
+        # add this for fused_head_and_loss_fn
+        if self.config.use_fused_head_and_loss_fn and self.training:
+            if self.config.tensor_parallel_degree > 1 and self.config.sequence_parallel:
+                hidden_states = GatherOp.apply(hidden_states)
+                hidden_states = hidden_states.reshape(
+                    [
+                        batch_size,
+                        -1,
+                        hidden_states.shape[-1],
+                    ]
+                )
+            return hidden_states, self.lm_head.weight, None, self.lm_head.transpose_y
 
         # if labels is None，means we need full output, instead of tensor_parallel_output
         # tensor_parallel_output is together with ParallelCrossEntropy
@@ -1653,7 +1682,7 @@ class Qwen2ForCausalLM(Qwen2PretrainedModel):
                 loss = paddle.sum(masked_lm_loss * binary_sequence) / count
             logits = None
         else:
-            logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
+            logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output, batch_size=batch_size)
 
             loss = None
             if labels is not None:

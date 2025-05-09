@@ -14,6 +14,6 @@
 
 import paddle
 
-from . import optimizer
+from . import optimizer, triton_ops
 from .distributed import *
 from .einsum import *

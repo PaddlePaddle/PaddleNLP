@@ -174,7 +174,7 @@ class Task(metaclass=abc.ABCMeta):
             logger.warning("The inference precision is change to 'fp32', 'fp16' inference only takes effect on gpu.")
         elif paddle.get_device().split(":", 1)[0] == "npu":
             if self._infer_precision == "fp16":
-                logger.info("Inference on npu with fp16 precison")
+                logger.info("Inference on npu with fp16 precision")
         else:
             if self._infer_precision == "fp16":
                 self._predictor_type = "onnxruntime"
@@ -391,7 +391,7 @@ class Task(metaclass=abc.ABCMeta):
                     black_list={"sigmoid"},
                 )
                 logger.info(
-                    "The inference model in fp16 precison save in the path:{}".format(self._static_fp16_model_file)
+                    "The inference model in fp16 precision save in the path:{}".format(self._static_fp16_model_file)
                 )
             self._static_model_file = self._static_fp16_model_file
             self._static_params_file = self._static_fp16_params_file

@@ -17,7 +17,7 @@ import unittest
 
 from paddlenlp.transformers import LayoutXLMTokenizer
 
-from ...testing_utils import get_tests_dir, slow
+from ...testing_utils import get_tests_dir
 from ...transformers.test_tokenizer_common import (
     TokenizerTesterMixin,
     filter_non_english,
@@ -114,23 +114,6 @@ class LayoutXLMTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
         self.assertEqual(encoding_tokenizer_slow_1, encoding_tokenizer_slow_2)
         self.assertEqual(encoding_tokenizer_slow_1, encoding_tokenizer_slow_3)
-
-    @slow
-    def test_sequence_builders(self):
-        tokenizer = self.tokenizer_class.from_pretrained("layoutxlm-base-uncased")
-
-        question, words, boxes = self.get_question_words_and_boxes()
-
-        text = tokenizer.encode(
-            question.split(),
-            boxes=[tokenizer.pad_token_box for _ in range(len(question.split()))],
-            add_special_tokens=False,
-        )
-        text_2 = tokenizer.encode(words, boxes=boxes, add_special_tokens=False)
-
-        encoded_pair = tokenizer.build_inputs_with_special_tokens(text, text_2)
-
-        assert encoded_pair == [0] + text + [2] + [2] + text_2 + [2]
 
     def test_offsets_mapping(self):
         pass

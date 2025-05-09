@@ -110,6 +110,8 @@ def main():
     parser = PdArgumentParser((GenerateArgument, ModelConfig, ReftArgument, DataConfig, SFTConfig))
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
         gen_args, model_args, reft_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
+    elif len(sys.argv) >= 2 and sys.argv[1].endswith(".yaml"):
+        gen_args, model_args, reft_args, data_args, training_arg = parser.parse_yaml_file_and_cmd_lines()
     else:
         gen_args, model_args, reft_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
@@ -157,9 +159,9 @@ def main():
         dtype = "float32"
     quantization_config = dict(
         weight_quantize_algo=model_args.weight_quantize_algo,
-        weight_blocksize=model_args.weight_blocksize,
-        weight_double_quant=model_args.weight_double_quant,
-        weight_double_quant_block_size=model_args.weight_double_quant_block_size,
+        qlora_weight_blocksize=model_args.qlora_weight_blocksize,
+        qlora_weight_double_quant=model_args.qlora_weight_double_quant,
+        qlora_weight_double_quant_block_size=model_args.qlora_weight_double_quant_block_size,
     )
 
     model_config = AutoConfig.from_pretrained(
@@ -182,7 +184,7 @@ def main():
         and training_args.data_parallel_degree > 1
         and not training_args.use_expert_parallel
     ):
-        raise ValueError("Plese set use_expert_parallel to true in expert parallel mode.")
+        raise ValueError("Please set use_expert_parallel to true in expert parallel mode.")
 
     # (Liuting) Not support acc calculation now due to MTP.
     if "DeepseekV3" in str(model_config.architectures):
@@ -206,7 +208,7 @@ def main():
 
     model_config.seq_length = data_args.max_length
 
-    # Config for model useing long sequence strategy
+    # Config for model using long sequence strategy
     if model_args.use_long_sequence_strategies:
         scaled_max_length = (
             int(data_args.max_length * model_args.rope_scaling_factor)
@@ -234,7 +236,7 @@ def main():
     model_class = AutoModelForCausalLM
     if training_args.pipeline_parallel_degree > 1:
         if data_args.eval_with_do_generation and training_args.do_eval:
-            raise ValueError("Plese set eval_with_do_generation to false in pipeline parallel mode.")
+            raise ValueError("Please set eval_with_do_generation to false in pipeline parallel mode.")
 
         model_class = AutoModelForCausalLMPipe
 
@@ -601,7 +603,7 @@ def create_peft_model(model_args, reft_args, training_args, dtype, model_config,
         )
         # get reft model
         model = ReFTModel(reft_config, model)
-        # disable origianl model gradients
+        # disable original model gradients
         model.disable_model_gradients()
         model.print_trainable_parameters()
 

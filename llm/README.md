@@ -18,18 +18,18 @@
 
 | Model                                  | Pretrain | SFT | LoRA | Prefix Tuning | DPO/SimPO/ORPO/KTO | RLHF | Mergekit | Quantization | Torch convert |
 |----------------------------------------|----------|-----|------|---------------|----------------|------|-------|--------------|---------------|
-| [LLaMA](./config/llama)                | ✅        | ✅   | ✅    | ✅             | ✅             | ✅    | ✅    | ✅            | ✅             |
-| [Qwen](./config/qwen)                  | ✅        | ✅   | ✅    | ✅             | ✅             | 🚧   | ✅    | 🚧           | ✅             |
-| [Mixtral](./config/mixtral)            | ✅        | ✅   | ✅    | ❌             | ✅             | 🚧   | ✅    | 🚧           | 🚧            |
-| [Mistral](./config/mistral)            | ✅         | ✅   | ✅    | ✅             | ✅             | 🚧   | ✅    | 🚧           | ✅             |
-| [Baichuan/Baichuan2](./config/llama)   | ✅        | ✅   | ✅    | ✅             | ✅             | 🚧   | ✅    | ✅            | ✅             |
-| [ChatGLM-6B](./config/chatglm)         | ✅        | ✅   | ✅    | ✅             | 🚧            | 🚧   | ✅    | ✅            | ❌             |
-| [ChatGLM2/ChatGLM3](./config/chatglm2) | ✅        | ✅   | ✅    | ✅             | ✅             | 🚧   | ✅    | ✅            | ✅             |
-| [Bloom](./config/bloom)                | ✅        | ✅   | ✅    | ✅             | 🚧            | 🚧   | ✅    | ✅            | ✅             |
-| [GPT-3](./config/gpt-3)                | ✅        | ✅   | 🚧   | 🚧            | 🚧            | 🚧   | ✅    | 🚧           | ✅             |
-| [OPT](./config/opt)                    | ✅       | ✅   | ✅    | 🚧            | 🚧            | 🚧   | ✅    | 🚧           | ✅             |
-| [Gemma](./config/gemma)                | ✅       | ✅   | ✅    | 🚧            | ✅            | 🚧   | ✅    | 🚧           | 🚧             |
-| [Yuan](./config/yuan)                  | ✅       | ✅   | ✅    | 🚧            | ✅            | 🚧   | ✅    | 🚧           | 🚧             |
+| [LLaMA](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/llama)                | ✅        | ✅   | ✅    | ✅             | ✅             | ✅    | ✅    | ✅            | ✅             |
+| [Qwen](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/qwen)                  | ✅        | ✅   | ✅    | ✅             | ✅             | 🚧   | ✅    | 🚧           | ✅             |
+| [Mixtral](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/mixtral)            | ✅        | ✅   | ✅    | ❌             | ✅             | 🚧   | ✅    | 🚧           | 🚧            |
+| [Mistral](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/mistral)            | ✅         | ✅   | ✅    | ✅             | ✅             | 🚧   | ✅    | 🚧           | ✅             |
+| [Baichuan/Baichuan2](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/llama)   | ✅        | ✅   | ✅    | ✅             | ✅             | 🚧   | ✅    | ✅            | ✅             |
+| [ChatGLM-6B](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/chatglm)         | ✅        | ✅   | ✅    | ✅             | 🚧            | 🚧   | ✅    | ✅            | ❌             |
+| [ChatGLM2/ChatGLM3](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/chatglm2) | ✅        | ✅   | ✅    | ✅             | ✅             | 🚧   | ✅    | ✅            | ✅             |
+| [Bloom](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/bloom)                | ✅        | ✅   | ✅    | ✅             | 🚧            | 🚧   | ✅    | ✅            | ✅             |
+| [GPT-3](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/gpt-3)                | ✅        | ✅   | 🚧   | 🚧            | 🚧            | 🚧   | ✅    | 🚧           | ✅             |
+| [OPT](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/opt)                    | ✅       | ✅   | ✅    | 🚧            | 🚧            | 🚧   | ✅    | 🚧           | ✅             |
+| [Gemma](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/gemma)                | ✅       | ✅   | ✅    | 🚧            | ✅            | 🚧   | ✅    | 🚧           | 🚧             |
+| [Yuan](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/yuan)                  | ✅       | ✅   | ✅    | 🚧            | ✅            | 🚧   | ✅    | 🚧           | 🚧             |
 
 - ✅: Supported
 - 🚧: In Progress
@@ -44,7 +44,7 @@ pip install --pre --upgrade paddlenlp -f https://www.paddlepaddle.org.cn/whl/pad
 
 ### 1. 预训练
 
-PaddleNLP 将飞桨4D 并行策略加入到 Trainer API 中， 用户只需修改 Trainer 配置即可使用不同的分布式策略。目前大模型套件提供[LLaMA/LLaMA2/LLaMA3](./config/llama)、[GPT-3](./config/gpt-3)、[Qwen](./config/qwen)、[Baichuan/Baichuan2](./config/baichuan)、[Mixtral](./config/mixtral) 等模型预训练功能，更多模型支持持续更新中。
+PaddleNLP 将飞桨4D 并行策略加入到 Trainer API 中， 用户只需修改 Trainer 配置即可使用不同的分布式策略。目前大模型套件提供[LLaMA/LLaMA2/LLaMA3](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/llama)、[GPT-3](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/gpt-3)、[Qwen](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/qwen)、[Baichuan/Baichuan2](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/baichuan)、[Mixtral](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/mixtral) 等模型预训练功能，更多模型支持持续更新中。
 
 <div align="center">
     <img width="500" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/37530985/a2f0261d-7f76-4faf-ae01-cc9d37d5fcc0">
@@ -55,7 +55,7 @@ PaddleNLP 将飞桨4D 并行策略加入到 Trainer API 中， 用户只需修�
      </font>
 </div>
 
-我们在此处提供了更详细的[预训练数据制作](./tools/preprocess)，[Pretrain 和自定义数据集](https://paddlenlp.readthedocs.io/zh/latest/llm/dataset.html)，[分布式策略支持情况](https://paddlenlp.readthedocs.io/zh/latest/llm/docs/pretrain.html#model-capability)，[性能测试报告文档](https://paddlenlp.readthedocs.io/zh/latest/llm/docs/pretrain.html#model-performance)，参见: [大模型预训练介绍](https://paddlenlp.readthedocs.io/zh/latest/llm/docs/pretrain.html), [大模型权重列表](https://paddlenlp.readthedocs.io/zh/latest/llm/docs/pretrain.html#model-weight)。
+我们在此处提供了更详细的[预训练数据制作](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/tools/preprocess)，[Pretrain 和自定义数据集](https://paddlenlp.readthedocs.io/zh/latest/llm/dataset.html)，[分布式策略支持情况](https://paddlenlp.readthedocs.io/zh/latest/llm/docs/pretrain.html#model-capability)，[性能测试报告文档](https://paddlenlp.readthedocs.io/zh/latest/llm/docs/pretrain.html#model-performance)，参见: [大模型预训练介绍](https://paddlenlp.readthedocs.io/zh/latest/llm/docs/pretrain.html), [大模型权重列表](https://paddlenlp.readthedocs.io/zh/latest/llm/docs/pretrain.html#model-weight)。
 
 此项目支持了 LLaMA、GPT-3、BaiChuan、Qwen 和 Mixtral 等大模型的预训练。用户切换配置 config 文件，即可一键运行。
 
@@ -241,7 +241,7 @@ python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" ./alignment/
 ```
 更多 DPO 技术细节和使用说明详见[DPO 文档](./docs/dpo.md)。
 ```bash
-# 需要52G左右显存
+# 单卡执行, 需要52G左右显存
 python -u  ./alignment/dpo/run_dpo.py ./config/llama/dpo_lora_argument.json
 ```
 
@@ -273,7 +273,7 @@ python -u  ./alignment/dpo/run_dpo.py ./config/llama/dpo_lora_argument.json
 
 ```bash
 wget https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized_pointwise.tar.gz
-tar -zxvf ultrafeedback_binarized.tar.gz
+tar -zxvf ultrafeedback_binarized_pointwise.tar.gz
 ```
 
 ##### 全参 KTO
@@ -297,8 +297,8 @@ python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" ./alignment/
 PadlleNLP 支持多种模型融合方法，包括**Linear、Slerp、Ties、DARE、DELLA**，并支持模型参数稀疏化方法与模型融合算法的灵活组合使用。
 ```shell
 # 模型融合启动命令参考
+# cd PaddleNLP/llm/tools
 python mergekit.py \
-    --device cpu \
     --tensor_type np \
     --n_process 2 \
     --merge_method linear \
@@ -476,7 +476,7 @@ export MODEL_PATH=${MODEL_PATH:-$PWD}
 export model_name=${model_name:-"deepseek-ai/DeepSeek-R1-Distill-Llama-8B/weight_only_int8"}
 docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
 -v $MODEL_PATH:/models -e "model_name=${model_name}" \
--dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.1 /bin/bash \
+-dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.3 /bin/bash \
 -c -ex 'start_server $model_name && tail -f /dev/null'
 ```
 

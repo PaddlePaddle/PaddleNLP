@@ -18,7 +18,6 @@ from dataclasses import dataclass, field
 import numpy
 import paddle
 from paddle.distributed import fleet
-from ppo_trainer import Trainer, data_group_merge, data_group_split, group_rank_guard
 
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments
 from paddlenlp.transformers import (
@@ -27,11 +26,18 @@ from paddlenlp.transformers import (
     AutoModelForCausalLMPipe,
 )
 
+from ..trainer.ppo_trainer import (
+    Trainer,
+    data_group_merge,
+    data_group_split,
+    group_rank_guard,
+)
+
 
 @dataclass
 class ModelArgument:
     model_name_or_path: str = field(
-        default=None, metadata={"help": "Build-in pretrained model name or the path to local model."}
+        default=None, metadata={"help": "Built-in pretrained model name or the path to local model."}
     )
     test_mode: str = field(default="export", metadata={"help": "export data_split or rank_guard."})
 

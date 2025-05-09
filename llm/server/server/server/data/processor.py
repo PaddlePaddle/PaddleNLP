@@ -14,6 +14,7 @@
 
 import os
 from abc import ABC, abstractmethod
+import numpy as np
 
 from paddlenlp.transformers import Llama3Tokenizer, LlamaTokenizer
 from paddlenlp.trl.llm_utils import get_eos_token_id
@@ -36,7 +37,7 @@ class BaseDataProcessor(ABC):
         self.tokenizer.sep_token_id = self.tokenizer._convert_token_to_id(self.tokenizer.sep_token)
         self.tokenizer.eos_token_id = self.tokenizer._convert_token_to_id(self.tokenizer.eos_token)
         self.tokenizer.mask_token_id = self.tokenizer._convert_token_to_id(self.tokenizer.mask_token)
-        data_processor_logger.info((f"tokenizer infomation: bos_token is {self.tokenizer.bos_token}, {self.tokenizer.bos_token_id}, ",
+        data_processor_logger.info((f"tokenizer information: bos_token is {self.tokenizer.bos_token}, {self.tokenizer.bos_token_id}, ",
                     f"cls_token is {self.tokenizer.cls_token}, {self.tokenizer.cls_token_id}, "
 					f"sep_token is {self.tokenizer.sep_token}, {self.tokenizer.sep_token_id}, "
                     f"eos_token is {self.tokenizer.eos_token}, {self.tokenizer.eos_token_id}, "
@@ -124,7 +125,7 @@ class DataProcessor(BaseDataProcessor):
 
         self.decode_status = dict()
         self.tokenizer = self._load_tokenizer()
-        data_processor_logger.info(f"tokenizer infomation: bos_token is {self.tokenizer.bos_token}, {self.tokenizer.bos_token_id}, \
+        data_processor_logger.info(f"tokenizer information: bos_token is {self.tokenizer.bos_token}, {self.tokenizer.bos_token_id}, \
                                 eos_token is {self.tokenizer.eos_token}, {self.tokenizer.eos_token_id} ")
 
     def process_request(self, request, max_seq_len=None):
@@ -231,7 +232,7 @@ class DataProcessor(BaseDataProcessor):
             List[int]: ID sequences
         """
         message_result = self.tokenizer.apply_chat_template(messages, return_tensors="pd")
-        return message_result["input_ids"][0]
+        return np.array(message_result["input_ids"][0])
 
     def ids2tokens(self, token_id, task_id):
         """

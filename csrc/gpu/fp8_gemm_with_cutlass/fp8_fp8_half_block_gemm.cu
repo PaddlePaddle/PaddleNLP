@@ -18,7 +18,7 @@
 #include "fp8_gemm_fused/fuse_block_gemm_act_template_3x.h"
 #include "fp8_gemm_fused/fp8_fp8_gemm_scale_bias_act.h"
 
-std::vector<paddle::Tensor> cutlass_fp8_fp8_half_block_gemm_fused(
+paddle::Tensor cutlass_fp8_fp8_half_block_gemm_fused_func(
     const paddle::Tensor& x,
     const paddle::Tensor& y,
     const paddle::Tensor& x_scale,
@@ -145,29 +145,20 @@ std::vector<paddle::Tensor> cutlass_fp8_fp8_half_block_gemm_fused(
                                     x_scale_ptr,
                                     y_scale_ptr};
     fp8_fp8_block_gemm_scale_bias_act(params);
-  // if(output_dtype == "bfloat16"){
-  //   dispatch_fuse_block_gemm_c3x<phi::dtype::float8_e4m3fn,
-  //                             phi::dtype::bfloat16,
-  //                             false,
-  //                             cutlass::epilogue::thread::Identity,
-  //                             cute::Shape<_128, _128, _128>,
-  //                             cute::Shape<_1, _2, _1>,
-  //                             cutlass::gemm::KernelTmaWarpSpecializedCooperativeFP8GroupBlockScaledAccum<1>,
-  //                             cutlass::epilogue::TmaWarpSpecializedCooperative,
-  //                             cutlass::arch::Sm90>(params);
-  // }else{
-  //   dispatch_fuse_block_gemm_c3x<phi::dtype::float8_e4m3fn,
-  //                             phi::dtype::float16,
-  //                             false,
-  //                             cutlass::epilogue::thread::Identity,
-  //                             cute::Shape<_128, _128, _128>,
-  //                             cute::Shape<_1, _2, _1>,
-  //                             cutlass::gemm::KernelTmaWarpSpecializedCooperativeFP8GroupBlockScaledAccum<1>,
-  //                             cutlass::epilogue::TmaWarpSpecializedCooperative,
-  //                             cutlass::arch::Sm90>(params);
-  // }
-  
-  return {out};
+  return out;
+}
+
+std::vector<paddle::Tensor> cutlass_fp8_fp8_half_block_gemm_fused(
+    const paddle::Tensor& x,
+    const paddle::Tensor& y,
+    const paddle::Tensor& x_scale,
+    const paddle::Tensor& y_scale,
+    const paddle::optional<paddle::Tensor>& bias,
+    bool trans_x,
+    bool trans_y,
+    std::string output_dtype,
+    std::string activation_type) {
+  return {cutlass_fp8_fp8_half_block_gemm_fused_func(x,y,x_scale,y_scale,bias,trans_x,trans_y,output_dtype,activation_type)};
 }
 
 std::vector<std::vector<int64_t>> CutlassFp8Fp8HalfBlockGemmFusedInferShape(

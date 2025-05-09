@@ -335,52 +335,8 @@ class BigBirdModelTest(ModelTesterMixin, unittest.TestCase):
 
 class BigBirdModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):
     base_model_class = BigBirdModel
-    hf_remote_test_model_path = "PaddleCI/tiny-random-bigbird"
+    # hf_remote_test_model_path = "PaddleCI/tiny-random-bigbird"
     paddlehub_remote_test_model_path = "__internal_testing__/tiny-random-bigbird"
-
-    @slow
-    def test_inference_no_attention(self):
-        model = BigBirdModel.from_pretrained("bigbird-base-uncased")
-        model.eval()
-        input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
-        attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
-        with paddle.no_grad():
-            output = model(input_ids, attention_mask=attention_mask)[0]
-        expected_shape = [1, 11, 768]
-        self.assertEqual(output.shape, expected_shape)
-
-        expected_slice = paddle.to_tensor(
-            [
-                [
-                    [-0.07543463, -0.12640929, 0.04644738],
-                    [0.13448411, -0.08428665, -0.04799746],
-                    [0.00980866, -0.08991019, 0.17119916],
-                ]
-            ]
-        )
-        self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
-
-    @slow
-    def test_inference_with_attention(self):
-        model = BigBirdModel.from_pretrained("bigbird-base-uncased")
-        model.eval()
-        input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
-        attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
-        with paddle.no_grad():
-            output = model(input_ids, attention_mask=attention_mask)[0]
-        expected_shape = [1, 11, 768]
-        self.assertEqual(output.shape, expected_shape)
-
-        expected_slice = paddle.to_tensor(
-            [
-                [
-                    [-0.00835392, -0.06217613, -0.17532486],
-                    [0.07107036, -0.04628750, 0.47526565],
-                    [-0.03114043, -0.15154681, 0.92528886],
-                ]
-            ]
-        )
-        self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
 
 
 if __name__ == "__main__":

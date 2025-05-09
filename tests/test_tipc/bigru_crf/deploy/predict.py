@@ -25,7 +25,7 @@ parser = argparse.ArgumentParser(__doc__)
 parser.add_argument("--model_dir", type=str, default="./output", help="The path to parameters in static graph.")
 parser.add_argument("--data_dir", type=str, default=None, help="The folder where the dataset is located.")
 parser.add_argument("--batch_size", type=int, default=2, help="The number of sequences contained in a mini-batch.")
-parser.add_argument("--max_seq_len", type=int, default=128, help="Number of words of the longest seqence.")
+parser.add_argument("--max_seq_len", type=int, default=128, help="Number of words of the longest sequence.")
 parser.add_argument(
     "--device",
     default="gpu",

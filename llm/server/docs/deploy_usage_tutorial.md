@@ -22,7 +22,7 @@ export MODEL_PATH=${MODEL_PATH:-$PWD}
 export model_name=${model_name:-"deepseek-ai/DeepSeek-R1-Distill-Llama-8B/weight_only_int8"}
 docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap-add=SYS_PTRACE \
 -v $MODEL_PATH:/models -e "model_name=${model_name}" \
--dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.1 /bin/bash \
+-dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.3 /bin/bash \
 -c -ex 'start_server $model_name && tail -f /dev/null'
 ```
 
@@ -47,8 +47,8 @@ docker run  -i --rm  --gpus all --shm-size 32G --network=host --privileged --cap
 
 |cuda版本| 支持硬件架构|镜像地址|支持的典型设备|
 |:------|:-:|:-:|:-:|
-| cuda11.8 | 70 75 80 86 |ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda118-cudnn8-v2.1 |V100，T4，A100，A30，A10 |
-| cuda12.4 | 80 86 89 90 |ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.1 |A100，A30，A10,L20，H20，H100 |
+| cuda11.8 | 70 75 80 86 |ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda118-cudnn8-v2.3 |V100，T4，A100，A30，A10 |
+| cuda12.4 | 80 86 89 90 |ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.3 |A100，A30，A10,L20，H20，H100 |
 
 
 ### 准备模型
@@ -74,7 +74,9 @@ cd /home/workspace/models_dir
 
 除了支持通过设置`model_name` 在启动时进行自动下载，服务提供脚本可以进行自行下载。**部署时需指定环境变量`MODEL_DIR` 为模型下载存储路径**
 
-脚本所在路径`/opt/output/download_model.py`
+脚本所在路径`/opt/output/download_model.py` (当前路径为镜像内路径)
+
+**注**：模型下载依赖当前镜像的版本号，若在镜像内启动下载脚本无需配置，若直接从代码仓库拉取需配置环境变量`tag`，当前默认下载的版本为3.0.0.b4
 
 ```
 python download_model.py \
@@ -132,7 +134,7 @@ docker run --gpus all \
     --network=host \
     --shm-size=5G \
     -v /home/workspace/models_dir:/models/ \
-    -dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.1 bash
+    -dit ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddlenlp:llm-serving-cuda124-cudnn9-v2.3 bash
 
 # 进入容器，检查GPU环境和模型挂载是否正常
 docker exec -it paddlenlp_serving /bin/bash
@@ -175,7 +177,7 @@ export MAX_SEQ_LEN=8192
 export MAX_DEC_LEN=1024
 
 export BATCH_SIZE="48"                          # 设置最大Batch Size，模型可同时并发处理的最大输入数量，不能高于128
-export BLOCK_BS="5"                             # 缓存Block支持的最大Query Batch Size，如果出现out of memeory 错误，尝试减少该数值
+export BLOCK_BS="5"                             # 缓存Block支持的最大Query Batch Size，如果出现out of memory 错误，尝试减少该数值
 export BLOCK_RATIO="0.75"                       # 一般可以设置成 输入平均Token数/（输入+输出平均Token数)
 
 export MAX_CACHED_TASK_NUM="128"  # 服务缓存队列最大长度，队列达到上限后，会拒绝新的请求，默认128
@@ -405,9 +407,9 @@ docker build --network=host -f ./dockerfiles/Dockerfile_serving_cuda124_cudnn9 -
 | SERVICE_HTTP_PORT | int | 服务请求 HTTP 端口号 | 否 | 9965 | (3.0.0版本前镜像使用PUSH_MODE_HTTP_PORT)  |
 | DISABLE_STREAMING | int | 是否使用流式返回 | 否 | 0 |  |
 | MAX_SEQ_LEN | int | 最大输入序列长度 | 否 | 8192 | 服务会拒绝 input token 数量超过 MAX_SEQ_LEN 的请求，并返回错误提示 |
-| MAX_DEC_LEN | int | 最大 decoer 序列长度 | 否 | 1024 | 服务会拒绝请求中 max_dec_len/min_dec_len 超过此参数的请求，并返回错误提示 |
+| MAX_DEC_LEN | int | 最大 decoder 序列长度 | 否 | 1024 | 服务会拒绝请求中 max_dec_len/min_dec_len 超过此参数的请求，并返回错误提示 |
 | BATCH_SIZE | int | 最大 Batch Size | 否 | 50 | 模型可同时并发处理的最大输入数量，不能高于128 |
-| BLOCK_BS | int | 缓存 Block 支持的最大 Query Batch Size | 否 | 50 | 如果出现 out of memeory 错误，尝试减少该数值 |
+| BLOCK_BS | int | 缓存 Block 支持的最大 Query Batch Size | 否 | 50 | 如果出现 out of memory 错误，尝试减少该数值 |
 | BLOCK_RATIO | float |  | 否 | 0.75 | 建议设为输入长度占总长度的比例 |
 | MAX_CACHED_TASK_NUM | int | 服务缓存队列最大长度 | 否 | 128 | 队列达到上限后，会拒绝新的请求 |
 | PUSH_MODE_HTTP_WORKERS | int | HTTP 服务进程数 | 否 | 1 | 在  配置的情况下有效，高并发下提高该数值，建议最高配置为8 |

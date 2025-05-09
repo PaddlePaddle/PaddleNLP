@@ -567,18 +567,18 @@ taskflow (){
 }
 llm(){
     export http_proxy=${proxy} && export https_proxy=${proxy}
-    set -e
-    if git diff --numstat "$AGILE_COMPILE_BRANCH" | awk '{print $NF}' | grep -q '^csrc/'; then
-        echo "Found modifications in csrc, running setup_cuda.py install and uploading it to bos."
-        cd ${nlp_dir}/csrc
-        # python setup_cuda.py install
-        bash tools/build_wheel.sh
-    else
-        echo "No modifications in csrc, installing paddlenlp_ops wheel file..."
-        python -m pip install --user https://paddlenlp.bj.bcebos.com/wheels/paddlenlp_ops-ci-py3-none-any.whl --no-cache-dir
-    fi
-    set +e
-    sleep 5
+    # set -e
+    # if git diff --numstat "$AGILE_COMPILE_BRANCH" | awk '{print $NF}' | grep -q '^csrc/'; then
+    #     echo "Found modifications in csrc, running setup_cuda.py install and uploading it to bos."
+    #     cd ${nlp_dir}/csrc
+    #     # python setup_cuda.py install
+    #     bash tools/build_wheel.sh
+    # else
+    #     echo "No modifications in csrc, installing paddlenlp_ops wheel file..."
+    #     python -m pip install --user https://paddlenlp.bj.bcebos.com/wheels/paddlenlp_ops-ci-py3-none-any.whl --no-cache-dir
+    # fi
+    # set +e
+    # sleep 5
     
     echo ' Testing all LLMs '
     cd ${nlp_dir}

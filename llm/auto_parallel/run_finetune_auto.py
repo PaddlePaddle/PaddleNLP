@@ -213,9 +213,9 @@ def main():
         dtype = "float32"
     quantization_config = dict(
         weight_quantize_algo=model_args.weight_quantize_algo,
-        weight_blocksize=model_args.weight_blocksize,
-        weight_double_quant=model_args.weight_double_quant,
-        weight_double_quant_block_size=model_args.weight_double_quant_block_size,
+        qlora_weight_blocksize=model_args.qlora_weight_blocksize,
+        qlora_weight_double_quant=model_args.qlora_weight_double_quant,
+        qlora_weight_double_quant_block_size=model_args.qlora_weight_double_quant_block_size,
     )
     config_class, model_class, criterion_class = MODEL_CLASSES[model_args.model_type]
     model_config = config_class.from_pretrained(
@@ -243,7 +243,7 @@ def main():
         model_config.fuse_attention_ffn = model_args.fuse_attention_ffn
     model_config.seq_length = data_args.max_length
 
-    # Config for model useing long sequence strategy
+    # Config for model using long sequence strategy
     if model_args.use_long_sequence_strategies:
         data_args.scaled_max_length = int(data_args.max_length * model_args.rope_scaling_factor)
         model_config.use_long_sequence_strategies = True
@@ -630,7 +630,7 @@ def create_peft_model(model_args, reft_args, training_args, dtype, model_config,
         )
         # get reft model
         model = ReFTModel(reft_config, model)
-        # disable origianl model gradients
+        # disable original model gradients
         model.disable_model_gradients()
         model.print_trainable_parameters()
 
