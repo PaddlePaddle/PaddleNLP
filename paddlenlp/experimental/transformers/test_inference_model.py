@@ -13,8 +13,7 @@
 # limitations under the License.
 
 # 后面会删掉，仅提供示例
-from inference_utils import ModelArgument, PredictorArgument
-
+from paddlenlp.experimental.transformers.inference_utils import ModelArgument, PredictorArgument
 from paddlenlp.experimental.transformers.inference_model import InferenceModel
 
 predictor_args = PredictorArgument()
@@ -27,9 +26,15 @@ predictor_args.model_name_or_path = (
 # 如果需要
 # predictor_args.quant_type = "weight_only_int8"
 
-inference_model = InferenceModel(predictor_args, model_args, load_model_from_ipc=True, cold_start=False)
+inference_model = InferenceModel(predictor_args, model_args, load_model_from_ipc=True, cold_start=True)
 
 model = inference_model.model
+
+print(inference_model.verify_parameters_cleared())
+
+print(inference_model.verify_parameters_updated())
+
+
 # print(model.get_name_mappings_to_training())
 
 # 获取inference model 的 key\shape\type
