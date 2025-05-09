@@ -90,7 +90,9 @@ class FinetuneTest(LLMTest, unittest.TestCase):
             time.sleep(30)
 
             # 运行主逻辑
-            cmd = "python -u -m paddle.distributed.launch --devices \"$CUDA_VISIBLE_DEVICES\" run_rl.py ./tests/fixtures/llm/grpo.yaml"
+            rl_dir = os.path.join(os.getcwd(), "./llm/alignment/rl")
+            os.chdir(rl_dir)
+            cmd = "python -u -m paddle.distributed.launch --devices \"$CUDA_VISIBLE_DEVICES\" run_rl.py ./tests/fixtures/llm/reinforce_plus_plus.yaml"
             pro = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             out, err = pro.communicate()
             print(out)
