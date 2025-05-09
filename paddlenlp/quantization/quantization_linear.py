@@ -442,7 +442,7 @@ class ColumnParallelQuantizationLinear(nn.Layer):
                 self.act_scale = self.create_parameter(
                     shape=[], dtype=self._dtype, is_bias=False, default_initializer=nn.initializer.Constant(value=0.0)
                 )
-                self.act_scale.is_distributed = True if self.is_mp else False
+                self.act_scale.is_distributed = False
                 self.act_scale.stop_gradient = True
         else:
             raise NotImplementedError(f"Not yet support weight_quantize_algo: {self.weight_quantize_algo}")

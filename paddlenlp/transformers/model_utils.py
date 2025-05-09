@@ -400,21 +400,23 @@ def _load_part_state_dict(
                 continue
 
             py_safe_slice_ = f.get_slice(key)
-            if quantization_linear_list is not None and key.split(".weight")[0] in quantization_linear_list:
-                key_name = key.split(".weight")[0]
-                quant_key_name = key_name + ".quant_weight"
-                quant_state_dict = convert_to_weight_quantize_state_dict(
-                    state_dict={key_name: py_safe_slice_},
-                    name=key_name,
-                    quantization_config=quantization_config,
-                    dtype=dtype,
-                    weight_quantize_algo=parse_weight_quantize_algo(quantization_config, quant_key_name),
-                )
-                if quant_key_name in tensor_parallel_split_mapping:
-                    quant_state_dict[quant_key_name] = tensor_parallel_split_mapping[quant_key_name](
-                        quant_state_dict[quant_key_name]
+            if quantization_linear_list is not None:
+                if key.split(".weight")[0] in quantization_linear_list:
+                    weight = paddle.Tensor.__call__(py_safe_slice_[:], zero_copy=True)
+                    key_name = key.split(".weight")[0]
+                    quant_key_name = key_name + ".quant_weight"
+                    quant_state_dict = convert_to_weight_quantize_state_dict(
+                        state_dict={key_name: weight},
+                        name=key_name,
+                        quantization_config=quantization_config,
+                        dtype=dtype,
+                        weight_quantize_algo=parse_weight_quantize_algo(quantization_config, quant_key_name),
                     )
-                part_state_dict.update(quant_state_dict)
+                    if quant_key_name in tensor_parallel_split_mapping:
+                        quant_state_dict[quant_key_name] = tensor_parallel_split_mapping[quant_key_name](
+                            quant_state_dict[quant_key_name]
+                        )
+                    part_state_dict.update(quant_state_dict)
             else:
                 if key in tensor_parallel_split_mapping:
                     weight = tensor_parallel_split_mapping[key](py_safe_slice_)
@@ -512,9 +514,12 @@ def load_state_dict(
                         scale_dict.update(res_scale_dict)
 
             if device == "cpu":
-                for k in list(state_dict.keys()):
-                    with device_guard():
-                        state_dict[k] = paddle.Tensor.__call__(state_dict.pop(k), zero_copy=True)
+                with device_guard():
+                    for k in list(state_dict.keys()):
+                        if "quant" not in k:
+                            state_dict[k] = paddle.Tensor.__call__(state_dict.pop(k), zero_copy=True)
+                        else:
+                            print("aaaaaaa", k)
 
             if len(scale_dict) != 0:
                 if ckpt_quant_stage == "O0":
@@ -2561,6 +2566,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             # load pt weights early so that we know which dtype to init the model under
         if not is_sharded and state_dict is None:
             # 4. loading non-sharded ckpt from the state dict
+            # Quantization: Loading non-sharded ckpt does not support saving with merge_tensor_parallel
             if config.tensor_parallel_degree > 1 and resolved_archive_file.endswith("model_state.pdparams"):
                 state_dict = cls.convert_tensor_parallel(resolved_archive_file, config)
             elif config.tensor_parallel_degree > 1 and resolved_archive_file.endswith("model.safetensors"):

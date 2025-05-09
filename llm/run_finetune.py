@@ -463,6 +463,7 @@ def main():
         elif last_checkpoint is not None:
             checkpoint = last_checkpoint
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
+        # trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
         if model_args.neftune:
             neft_post_hook_handle.remove()
         if training_args.benchmark:
