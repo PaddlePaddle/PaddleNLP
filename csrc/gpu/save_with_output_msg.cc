@@ -20,6 +20,7 @@
 #include "paddle/extension.h"
 
 #define MAX_BSZ 512
+// #define SAVE_WITH_OUTPUT_DEBUG
 
 struct msgdata {
     long mtype;
@@ -28,7 +29,6 @@ struct msgdata {
 
 void SaveOutMmsg(const paddle::Tensor& x,
                  const paddle::Tensor& not_need_stop, // cpu
-                 const paddle::Tensor& msg_queue_id,      // cpu
                  int64_t rank_id) {
     if (rank_id > 0) return;
     auto x_cpu = x.copy_to(paddle::CPUPlace(), false);
@@ -36,8 +36,25 @@ void SaveOutMmsg(const paddle::Tensor& x,
     auto not_need_stop_data = not_need_stop.data<bool>()[0];
 
     static struct msgdata msg_sed;
-    int queue_id_val = msg_queue_id.data<int>()[0];
-    static key_t key = ftok("./", queue_id_val);
+    int msg_queue_id = 1;
+    if (const char* inference_msg_queue_id_env_p =
+            std::getenv("INFERENCE_MSG_QUEUE_ID")) {
+        std::string inference_msg_queue_id_env_str(
+            inference_msg_queue_id_env_p);
+        int inference_msg_queue_id_from_env =
+            std::stoi(inference_msg_queue_id_env_str);
+        msg_queue_id = inference_msg_queue_id_from_env;
+#ifdef SAVE_WITH_OUTPUT_DEBUG
+        std::cout << "Your INFERENCE_MSG_QUEUE_ID is: "
+                  << inference_msg_queue_id_from_env << std::endl;
+#endif
+    } else {
+#ifdef SAVE_WITH_OUTPUT_DEBUG
+        std::cout << "Failed to got INFERENCE_MSG_QUEUE_ID at env, use default."
+                  << std::endl;
+#endif
+    }
+    static key_t key = ftok("./", msg_queue_id);
     static int msgid = msgget(key, IPC_CREAT | 0666);
 
     msg_sed.mtype = 1;
@@ -54,7 +71,7 @@ void SaveOutMmsg(const paddle::Tensor& x,
 }
 
 PD_BUILD_OP(save_output)
-    .Inputs({"x", "not_need_stop", "msg_queue_id"})
+    .Inputs({"x", "not_need_stop"})
     .Attrs({"rank_id: int64_t"})
     .Outputs({"x_out"})
     .SetInplaceMap({{"x", "x_out"}})
