@@ -278,11 +278,11 @@ def _transformer_encoder_fwd(
     # MultiHeadAttention not so efficiently, and maybe optimize it later.
     if cache is None and getattr(self, "_use_cache", False):
         cache = [tuple(self.layers[0].gen_cache(src))] * len(self.layers)
-    # To be compatible with `TransformerEncoder.forward`, `_use_cache` defualts
+    # To be compatible with `TransformerEncoder.forward`, `_use_cache` defaults
     # to True when cache is not None.
     new_caches = [] if cache is not None and getattr(self, "_use_cache", True) else None
     all_attentions = [] if output_attentions else None
-    # NOTE: Also includes embeding output which is same as HF.
+    # NOTE: Also includes embedding output which is same as HF.
     all_hidden_states = [output] if output_hidden_states else None
     for i, mod in enumerate(self.layers):
         # if output has no gradient, recompute is unnecessary

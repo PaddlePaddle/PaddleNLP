@@ -691,6 +691,99 @@ __global__ void cache_kernel(
   }
 }
 
+template <typename T, int VecSize = 1>
+__global__ void cache_use_excess_kernel(
+    const T *__restrict__ qkv,    // [num_tokens, num_heads + 2 * kv_num_heads,
+                                  // head_size]
+    T *__restrict__ key_cache,    // [num_blocks, kv_num_heads, block_size,
+                                  // head_size]
+    T *__restrict__ value_cache,  // [num_blocks, kv_num_heads, block_size,
+                                  // head_size]
+    const int *__restrict__ block_tables,      // [bsz, max_blocks_per_seq]
+    const int *__restrict__ padding_offsets,   // [num_tokens]
+    const int *__restrict__ cum_offsets,
+    const int *__restrict__ seq_lens,          // [bsz]
+    const int *__restrict__ seq_lens_decoder,  // [bsz]
+    const int *__restrict__ excess_blocks,  // [bsz, excess_num]
+    const int max_seq_len,
+    const int max_blocks_per_seq,
+    const int num_heads,
+    const int head_size,
+    const int block_size,
+    const uint32_t elem_cnt,
+    const int kv_num_heads,
+    const int token_num,
+    const int excess_num) {
+  using LoadT = AlignedVector<T, VecSize>;
+  LoadT src_vec;
+
+  uint32_t global_thread_idx = blockDim.x * blockIdx.x + threadIdx.x;
+  const uint32_t hidden_size = kv_num_heads * head_size;
+  const uint32_t offset = 2 * hidden_size;
+  for (uint32_t linear_index = global_thread_idx * VecSize,
+                step = gridDim.x * blockDim.x * VecSize;
+       linear_index < elem_cnt;
+       linear_index += step) {
+    uint32_t token_idx = linear_index / offset;
+    const uint32_t bias = linear_index % offset;
+    const uint32_t qkv_id = bias / hidden_size;  // skip q
+    const uint32_t qkv_bias = bias % hidden_size;
+    const uint32_t hi = qkv_bias / head_size;
+    const uint32_t h_bias = qkv_bias % head_size;
+
+    uint32_t block_idx, block_offset;
+
+    if (token_idx < token_num) {
+      const uint32_t ori_token_idx = token_idx + padding_offsets[token_idx];
+      const uint32_t ori_bi = ori_token_idx / max_seq_len;
+      const uint32_t last_offset = seq_lens[ori_bi] % block_size;
+      if (seq_lens[ori_bi] == 0) continue;
+
+      const int32_t *block_table_now = nullptr;
+      block_table_now = block_tables + ori_bi * max_blocks_per_seq;
+      const uint32_t ori_seq_id =
+          ori_token_idx % max_seq_len + seq_lens_decoder[ori_bi];
+      if (ori_seq_id >= seq_lens[ori_bi] - last_offset) continue;
+
+      block_idx = block_table_now[ori_seq_id / block_size];
+      block_offset = ori_seq_id % block_size;
+    } else {
+      const uint32_t excess_token_id = token_idx - token_num;
+      const uint32_t ori_bi = excess_token_id / (excess_num * block_size);
+      const uint32_t last_offset = seq_lens[ori_bi] % block_size;
+      if (seq_lens[ori_bi] == 0) continue;
+
+      const uint32_t excess_id =
+          (excess_token_id % (excess_num * block_size)) / block_size;
+      const uint32_t excess_token_offset = excess_token_id % block_size;
+
+      if (excess_token_offset < last_offset) {
+        token_idx = ori_bi * max_seq_len - cum_offsets[ori_bi] +
+                    seq_lens[ori_bi] - last_offset + excess_token_offset;
+      } else {
+        continue;
+      }
+
+      block_idx = excess_blocks[ori_bi * excess_num + excess_id];
+      block_offset = excess_token_offset;
+    }
+
+    const uint32_t tgt_idx =
+        block_idx * kv_num_heads * block_size * head_size +
+        hi * block_size * head_size + block_offset * head_size + h_bias;
+
+    const uint32_t ori_idx =
+        token_idx * (num_heads + 2 * kv_num_heads) * head_size +
+        num_heads * head_size + qkv_id * hidden_size + hi * head_size + h_bias;
+
+    Load<T, VecSize>(&qkv[ori_idx], &src_vec);
+    if (qkv_id == 0) {
+      Store<T, VecSize>(src_vec, &key_cache[tgt_idx]);
+    } else {
+      Store<T, VecSize>(src_vec, &value_cache[tgt_idx]);
+    }
+  }
+}
 
 template <typename T,
           uint32_t num_frags_y,
@@ -1463,9 +1556,12 @@ void CascadeAppendWriteCacheKVQKV(
                // kv_num_heads, head_dim] if GQA)
     const paddle::Tensor &block_table,
     const paddle::Tensor &padding_offsets,
+    const paddle::Tensor &cum_offsets,
     const paddle::Tensor &seq_lens_encoder,
     const paddle::Tensor &seq_lens_decoder,
     const int max_seq_len,
+    const int bsz,
+    const paddle::optional<paddle::Tensor>& excess_blocks,
     cudaStream_t &stream,
     paddle::Tensor *key_cache_out,
     paddle::Tensor *value_cache_out) {
@@ -1477,29 +1573,58 @@ void CascadeAppendWriteCacheKVQKV(
   auto head_dim_v = meta_data.head_dims_v;
   auto block_size = meta_data.block_size;
 
-  const uint32_t elem_nums =
-      num_tokens * kv_num_heads * (head_dim_qk + head_dim_v);
+  int excess_block_num = 0;
+  int *excess_blocks_ptr = nullptr;
+  if (excess_blocks) {
+    excess_block_num = excess_blocks.get().dims()[1];
+    excess_blocks_ptr =const_cast<int*>(excess_blocks.get().data<int>());
+  }
+  uint32_t elem_nums = (num_tokens + bsz * excess_block_num * block_size) * kv_num_heads * (head_dim_qk + head_dim_v);
+  // 额外每个bid 多分配excess_block_num * block_size 个
+
   constexpr int PackSize = 16 / sizeof(T);
   const int pack_num = elem_nums / PackSize;
   const int blocksize = 128;
   int grid_size = 1;
   GetNumBlocks<128>(pack_num, &grid_size);
-  cache_kernel<T, PackSize><<<grid_size, blocksize, 0, stream>>>(
-      reinterpret_cast<T *>(const_cast<T *>(qkv.data<T>())),
-      reinterpret_cast<T *>(key_cache_out->data<T>()),
-      reinterpret_cast<T *>(value_cache_out->data<T>()),
-      block_table.data<int>(),
-      padding_offsets.data<int>(),
-      seq_lens_encoder.data<int>(),
-      seq_lens_decoder.data<int>(),
-      max_seq_len,
-      max_blocks_per_seq,
-      num_heads,
-      head_dim_qk,
-      head_dim_v,
-      block_size,
-      elem_nums,
-      kv_num_heads);
+  if (excess_blocks_ptr) {
+      cache_use_excess_kernel<T, PackSize><<<grid_size, blocksize, 0, stream>>>(
+        reinterpret_cast<T *>(const_cast<T *>(qkv.data<T>())),
+        reinterpret_cast<T *>(key_cache_out->data<T>()),
+        reinterpret_cast<T *>(value_cache_out->data<T>()),
+        block_table.data<int>(),
+        padding_offsets.data<int>(),
+        cum_offsets.data<int>(),
+        seq_lens_encoder.data<int>(),
+        seq_lens_decoder.data<int>(),
+        excess_blocks_ptr,
+        max_seq_len,
+        max_blocks_per_seq,
+        num_heads,
+        head_dim_qk,
+        block_size,
+        elem_nums,
+        kv_num_heads,
+        num_tokens,
+        excess_block_num);
+  } else {
+    cache_kernel<T, PackSize><<<grid_size, blocksize, 0, stream>>>(
+        reinterpret_cast<T *>(const_cast<T *>(qkv.data<T>())),
+        reinterpret_cast<T *>(key_cache_out->data<T>()),
+        reinterpret_cast<T *>(value_cache_out->data<T>()),
+        block_table.data<int>(),
+        padding_offsets.data<int>(),
+        seq_lens_encoder.data<int>(),
+        seq_lens_decoder.data<int>(),
+        max_seq_len,
+        max_blocks_per_seq,
+        num_heads,
+        head_dim_qk,
+        head_dim_v,
+        block_size,
+        elem_nums,
+        kv_num_heads);
+  }
 }
 
 template <typename T, uint32_t HEAD_DIM, uint32_t BLOCK_SIZE>

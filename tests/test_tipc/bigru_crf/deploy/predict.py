@@ -19,6 +19,10 @@ import paddle
 from paddle import inference
 
 from paddlenlp.data import Pad, Stack, Tuple
+from paddlenlp.utils.env import (
+    PADDLE_INFERENCE_MODEL_SUFFIX,
+    PADDLE_INFERENCE_WEIGHTS_SUFFIX,
+)
 from paddlenlp.utils.log import logger
 
 parser = argparse.ArgumentParser(__doc__)
@@ -153,8 +157,8 @@ class Predictor(object):
     ):
         self.max_seq_length = max_seq_length
         self.batch_size = batch_size
-        model_file = os.path.join(model_dir, "inference.pdmodel")
-        params_file = os.path.join(model_dir, "inference.pdiparams")
+        model_file = os.path.join(model_dir, f"inference{PADDLE_INFERENCE_MODEL_SUFFIX}")
+        params_file = os.path.join(model_dir, f"inference{PADDLE_INFERENCE_WEIGHTS_SUFFIX}")
         if not os.path.exists(model_file):
             raise ValueError("not find model file path {}".format(model_file))
         if not os.path.exists(params_file):

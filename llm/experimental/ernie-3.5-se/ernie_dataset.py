@@ -115,7 +115,7 @@ class BlendableDataset(paddle.io.Dataset):
         assert sum_weights > 0.0
         weights /= sum_weights
 
-        # Build indicies.
+        # Build indices.
         def _build_indices():
             start_time = time.time()
             assert num_datasets < 255

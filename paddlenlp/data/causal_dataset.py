@@ -461,10 +461,10 @@ def _build_index_mappings(
         for f in idx_path.values():
             if not os.path.isfile(f):
                 break
-        else:
-            # Found our files!
-            build_indices = False
-            break
+            else:
+                # Found our files!
+                build_indices = False
+                break
     data_cache_dir = os.path.dirname(idx_path["desc"])
     # data_cache_success = True
     # Build the indexed mapping if not exist.

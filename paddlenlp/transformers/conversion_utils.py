@@ -439,7 +439,7 @@ def normal_fuse_split_tp(weight, tensor_parallel_degree, tensor_parallel_rank=No
 
 
 """
-There're three types of MultiHeadAttention QKV Layout in Transfomers
+There're three types of MultiHeadAttention QKV Layout in Transformers
 
 tensor_parallel_qkv = [q1, k1, v1, q2, k2, v2]
 naive_merged_qkv    = [q1, q1, k1, k2, v1, v2]
@@ -692,7 +692,7 @@ class StateDictNameMapping:
         return self.action == "transpose"
 
     def should_merge_last_two_dim(self) -> bool:
-        """check that wether merge last two dim"""
+        """check that whether merge last two dim"""
         return self.action == "merge_last_two_dim"
 
     def run(self, state_dict: dict[str, ndarray], name: str) -> ndarray:
@@ -764,7 +764,7 @@ class TensorInfoSaver:
         """output the summary info into different terminal
 
         Args:
-            output_path (Optional[str], optional): the dir/file of sumamry file. Defaults to None.
+            output_path (Optional[str], optional): the dir/file of summary file. Defaults to None.
         """
         if output_path and os.path.isdir(output_path):
             output_path = os.path.join(output_path, "tensor_summary.xlsx")
@@ -800,10 +800,10 @@ class TensorInfoSaver:
 
 
 class LogitHooker:
-    """hooks for pytorch model and paddle model, used to generate the logits of elment layers"""
+    """hooks for pytorch model and paddle model, used to generate the logits of element layers"""
 
     def __init__(self, mappings: List[StateDictNameMapping], tensor_info_saver: Optional[TensorInfoSaver] = None):
-        """registe the logit hooks to compare the inputs * outputs model
+        """register the logit hooks to compare the inputs * outputs model
 
         Args:
             mappings (List[StateDictNameMapping]): the mappings between paddle & pytorch model
@@ -1006,7 +1006,7 @@ class LogitComparer:
         pytorch_model: Union[Module, Dict[str, ndarray]],
         name_mappings: List[StateDictNameMapping],
     ):
-        """compare the pytorch and paddle mdoel state with name mappings
+        """compare the pytorch and paddle model state with name mappings
 
         Args:
             paddle_model (Union[Layer, Dict[str, ndarray]]): paddle model instance
@@ -1045,7 +1045,7 @@ class LogitComparer:
         """compare the logit of pytorch & paddle model
 
         Returns:
-            bool: if the logits is absolutly same
+            bool: if the logits is absolutely same
         """
         PaddleModel, PytorchModel = self.get_paddle_pytorch_model_classes()
         paddle_model = PaddleModel.from_pretrained(self.input_dir)
@@ -1120,7 +1120,7 @@ class LogitComparer:
         if is_torch_available() and is_transformers_available():
             result = self.compare_logits()
             if result is True:
-                logger.info("the logits between pytorch model and paddle model is absolutly same")
+                logger.info("the logits between pytorch model and paddle model is absolutely same")
             else:
                 logger.error(
                     "the logits between pytorch model and paddle model is not same, please check it out more carefully."
@@ -1237,7 +1237,7 @@ class ConversionMixin:
         if state_dict is None:
             with device_guard("cpu"):
                 state_dict = paddle.load(weight_file, return_numpy=False)
-            logger.info("Starting to convert orignal state_dict to tensor parallel state_dict.")
+            logger.info("Starting to convert original state_dict to tensor parallel state_dict.")
 
         state_keys_map = cls._resolve_prefix_keys(name_action_mappings.keys(), state_dict.keys(), ignore_error)
 

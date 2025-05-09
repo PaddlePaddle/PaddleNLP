@@ -77,7 +77,7 @@ function restore_func() {
         echo "Deleted existing functions.txt"
     fi
     if [ ! -f "${log_path}/blacklist.csv" ]; then
-        wget -P ${log_path}/ https://paddle-qa.bj.bcebos.com/Auto-Parallel/blacklist.csv --no-proxy || exit 101
+        wget -q -P ${log_path}/ https://paddle-qa.bj.bcebos.com/Auto-Parallel/blacklist.csv --no-proxy || exit 101
         echo "\033 ---- wget blacklist.csv \033"
     fi
     blacklist_file=${log_path}/blacklist.csv
@@ -1002,98 +1002,125 @@ function llama_pir_auto_fuse_ffn_attention_qkv_MP2() {
         "--tensor_parallel_config replace_with_c_embedding"
         "--tensor_parallel_config replace_with_parallel_cross_entropy"
     )
-    for tp_config in "${tp_configs[@]}"; do
-        rm -rf $auto_case_out_dir
-        rm -rf $auto_case_log_dir
-        python -u -m paddle.distributed.launch \
-            --gpus "0,1" \
-            --log_dir $auto_case_log_dir \
-            run_pretrain_auto.py \
-            --model_name_or_path "facebook/llama-7b" \
-            --tokenizer_name_or_path "facebook/llama-7b" \
-            --input_dir "./data" \
-            --output_dir $auto_case_out_dir \
-            --split 949,50,1 \
-            --weight_decay 0.01 \
-            --warmup_ratio 0.01 \
-            --warmup_steps 30 \
-            --max_grad_norm 0.0 \
-            --learning_rate 3e-05 \
-            --min_learning_rate 3e-06 \
-            --max_steps 10 \
-            --logging_steps 1 \
-            --eval_steps 1000 \
-            --save_steps 3 \
-            --continue_training 0 \
-            --do_train true \
-            --do_eval false \
-            --do_predict false \
-            --disable_tqdm true \
-            --skip_profile_timer true \
-            --save_total_limit 2 \
-            --device gpu \
-            --disable_tqdm true \
-            --dataloader_num_workers 1 \
-            --distributed_dataloader 0 \
-            --enable_auto_parallel 1 \
-            --per_device_train_batch_size 1 \
-            --gradient_accumulation_steps 1 \
-            --per_device_eval_batch_size 2 \
-            --recompute false \
-            --recompute_use_reentrant true \
-            --recompute_granularity full \
-            --pp_recompute_interval 0 \
-            --bf16 0 \
-            --fp16_opt_level "O2"  \
-            --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
-            --amp_custom_white_list "lookup_table" "lookup_table_v2" \
-            --amp_master_grad false \
-            --fuse_attention_ffn false \
-            --fuse_attention_qkv false \
-            --use_flash_attention false \
-            --use_fused_rope true \
-            --use_fused_rms_norm true \
-            --max_seq_length 4096 \
-            --sequence_parallel false \
-            --pipeline_parallel_degree 1 \
-            --sharding_parallel_degree 1 \
-            --tensor_parallel_degree 2 \
-            ${tp_config} \
-            --virtual_pp_degree 1 \
-            --pipeline_schedule_mode "VPP" \
-            --sharding "" \
-            --to_static 1 \
-            --num_hidden_layers 2 \
-            >>${log_path}/$FUNCNAME 2>&1
+    for to_static in "0" "1"; do
+        for tp_config in "${tp_configs[@]}"; do
+            rm -rf $auto_case_out_dir
+            rm -rf $auto_case_log_dir
+            python -u -m paddle.distributed.launch \
+                --gpus "0,1" \
+                --log_dir $auto_case_log_dir \
+                run_pretrain_auto.py \
+                --model_name_or_path "facebook/llama-7b" \
+                --tokenizer_name_or_path "facebook/llama-7b" \
+                --input_dir "./data" \
+                --output_dir $auto_case_out_dir \
+                --split 949,50,1 \
+                --weight_decay 0.01 \
+                --warmup_ratio 0.01 \
+                --warmup_steps 30 \
+                --max_grad_norm 0.0 \
+                --learning_rate 3e-05 \
+                --min_learning_rate 3e-06 \
+                --max_steps 10 \
+                --logging_steps 1 \
+                --eval_steps 1000 \
+                --save_steps 3 \
+                --continue_training 0 \
+                --do_train true \
+                --do_eval false \
+                --do_predict false \
+                --disable_tqdm true \
+                --skip_profile_timer true \
+                --save_total_limit 2 \
+                --device gpu \
+                --disable_tqdm true \
+                --dataloader_num_workers 1 \
+                --distributed_dataloader 0 \
+                --enable_auto_parallel 1 \
+                --per_device_train_batch_size 1 \
+                --gradient_accumulation_steps 1 \
+                --per_device_eval_batch_size 2 \
+                --recompute false \
+                --recompute_use_reentrant true \
+                --recompute_granularity full \
+                --pp_recompute_interval 0 \
+                --bf16 0 \
+                --fp16_opt_level "O2"  \
+                --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
+                --amp_custom_white_list "lookup_table" "lookup_table_v2" \
+                --amp_master_grad false \
+                --fuse_attention_ffn false \
+                --fuse_attention_qkv false \
+                --use_flash_attention false \
+                --use_fused_rope true \
+                --use_fused_rms_norm true \
+                --max_seq_length 4096 \
+                --sequence_parallel false \
+                --pipeline_parallel_degree 1 \
+                --sharding_parallel_degree 1 \
+                --tensor_parallel_degree 2 \
+                ${tp_config} \
+                --virtual_pp_degree 1 \
+                --pipeline_schedule_mode "VPP" \
+                --sharding "" \
+                --to_static ${to_static} \
+                --num_hidden_layers 2 \
+                >>${log_path}/$FUNCNAME 2>&1
 
-        auto_loss_2=`cat $auto_case_log_dir/workerlog.0 | grep 'global_step: 2' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-        loss_md5_2=`cat $auto_case_log_dir/workerlog.0 | grep 'global_step: 2' | awk -F 'loss_md5: ' '{print $2}' | awk -F ',' '{print $1}'`
-        auto_ips_2=`cat $auto_case_log_dir/workerlog.0 | grep 'global_step: 2' | awk -F 'interval_tokens_per_second_per_device: ' '{print $2}' | awk -F ',' '{print $1}'`
-        auto_mem_2=`cat $auto_case_log_dir/workerlog.0 | grep 'global_step: 2' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
-        echo "auto result: step 2 loss=$auto_loss_2 ips=$auto_ips_2 mem=$auto_mem_2"
-        auto_loss_10=`cat $auto_case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-        loss_md5_10=`cat $auto_case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss_md5: ' '{print $2}' | awk -F ',' '{print $1}'`
-        auto_ips_10=`cat $auto_case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'interval_tokens_per_second_per_device: ' '{print $2}' | awk -F ',' '{print $1}'`
-        auto_mem_10=`cat $auto_case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
-        echo "auto result: step 10 loss=$auto_loss_10 ips=$auto_ips_10 mem=$auto_mem_10"
-        if [[ $tp_config =~ "replace_with_parallel_cross_entropy" ]];then
-            # This optimization may result in a discrepancy in accuracy.
-            loss_base_2=10.53477287
-            loss_base_10=9.4961338
-        else
-            loss_base_2=10.53477192
-            loss_base_10=9.4961338
-        fi
-        auto_ips=-1
-        auto_mem=-1
-        ips_base=-1
-        mem_base=-1
-        if [ $IS_A100 -ne 0 ];then
-            loss_base_2=10.58283806
-            loss_base_10=9.43873405
-        fi
-        check_result $FUNCNAME ${loss_base_2} ${auto_loss_2} ${ips_base} ${auto_ips} ${mem_base} ${auto_mem}
-        check_result $FUNCNAME ${loss_base_10} ${auto_loss_10} ${ips_base} ${auto_ips} ${mem_base} ${auto_mem}
+            auto_loss_2=`cat $auto_case_log_dir/workerlog.0 | grep 'global_step: 2' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+            loss_md5_2=`cat $auto_case_log_dir/workerlog.0 | grep 'global_step: 2' | awk -F 'loss_md5: ' '{print $2}' | awk -F ',' '{print $1}'`
+            auto_ips_2=`cat $auto_case_log_dir/workerlog.0 | grep 'global_step: 2' | awk -F 'interval_tokens_per_second_per_device: ' '{print $2}' | awk -F ',' '{print $1}'`
+            auto_mem_2=`cat $auto_case_log_dir/workerlog.0 | grep 'global_step: 2' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
+            echo "auto result: step 2 loss=$auto_loss_2 ips=$auto_ips_2 mem=$auto_mem_2"
+            auto_loss_10=`cat $auto_case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+            loss_md5_10=`cat $auto_case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss_md5: ' '{print $2}' | awk -F ',' '{print $1}'`
+            auto_ips_10=`cat $auto_case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'interval_tokens_per_second_per_device: ' '{print $2}' | awk -F ',' '{print $1}'`
+            auto_mem_10=`cat $auto_case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
+            echo "auto result: step 10 loss=$auto_loss_10 ips=$auto_ips_10 mem=$auto_mem_10"
+            if [ $to_static -ne 0 ];then
+                if [[ $tp_config =~ "replace_with_parallel_cross_entropy" ]];then
+                    # This optimization may result in a discrepancy in accuracy.
+                    loss_base_2=10.53477287
+                    loss_base_10=9.4961338
+                else
+                    loss_base_2=10.53477192
+                    loss_base_10=9.4961338
+                fi
+                auto_ips=-1
+                auto_mem=-1
+                ips_base=-1
+                mem_base=-1
+                if [ $IS_A100 -ne 0 ];then
+                    loss_base_2=10.58283806
+                    loss_base_10=9.43873405
+                fi
+                check_result $FUNCNAME ${loss_base_2} ${auto_loss_2} ${ips_base} ${auto_ips} ${mem_base} ${auto_mem}
+                check_result $FUNCNAME ${loss_base_10} ${auto_loss_10} ${ips_base} ${auto_ips} ${mem_base} ${auto_mem}
+            else
+                if [[ $tp_config =~ "replace_with_parallel_cross_entropy" ]];then
+                    loss_base_2=10.53477287
+                    loss_base_10=9.4961319
+                else
+                    loss_base_2=10.53477287
+                    loss_base_10=9.49613285
+                fi
+                auto_ips=-1
+                auto_mem=-1
+                ips_base=-1
+                mem_base=-1
+                if [ $IS_A100 -ne 0 ];then
+                    if [[ $tp_config =~ "replace_with_parallel_cross_entropy" ]];then
+                        loss_base_2=10.58283806
+                        loss_base_10=9.43873215
+                    else
+                        loss_base_2=10.58283806
+                        loss_base_10=9.4387331
+                    fi
+                fi
+                check_result $FUNCNAME ${loss_base_2} ${auto_loss_2} ${ips_base} ${auto_ips} ${mem_base} ${auto_mem}
+                check_result $FUNCNAME ${loss_base_10} ${auto_loss_10} ${ips_base} ${auto_ips} ${mem_base} ${auto_mem}
+            fi
+        done
     done
     export FLAGS_enable_fused_ffn_qkv_pass=0
     echo "=========== $FUNCNAME run  end ==========="
@@ -3741,8 +3768,8 @@ function before_hook_for_gpt() {
         else
             # download data for gpt
             mkdir -p ${gpt_data_path}/data;
-            wget -O ${gpt_data_path}/data/gpt_en_dataset_300m_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy;
-            wget -O ${gpt_data_path}/data/gpt_en_dataset_300m_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz;
+            wget -q -O ${gpt_data_path}/data/gpt_en_dataset_300m_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy;
+            wget -q -O ${gpt_data_path}/data/gpt_en_dataset_300m_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz;
         fi
         cp -r ${gpt_data_path}/data ${gpt_case_path}/
     else
@@ -3786,17 +3813,17 @@ function before_hook_for_llama() {
             # download data for llama
             mkdir ${llama_data_path};
             mkdir ${llama_data_path}/data;
-            wget -O ${llama_data_path}/data/llama_openwebtext_100k_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy;
-            wget -O ${llama_data_path}/data/llama_openwebtext_100k_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz;
+            wget -q -O ${llama_data_path}/data/llama_openwebtext_100k_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy;
+            wget -q -O ${llama_data_path}/data/llama_openwebtext_100k_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz;
             # download data for llama finetune
-            wget -O ${llama_data_path}/AdvertiseGen.tar.gz https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz
+            wget -q -O ${llama_data_path}/AdvertiseGen.tar.gz https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz
             tar -xvf ${llama_data_path}/AdvertiseGen.tar.gz -C ${llama_data_path}
         fi
         if [[ -e ${llama_data_path}/data_dpo ]]; then
             echo "LLaMA DPO data downloaded"
         else
             # download data for llama dpo
-            wget -O ${llama_data_path}/ultrafeedback_binarized.tar.gz https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized.tar.gz
+            wget -q -O ${llama_data_path}/ultrafeedback_binarized.tar.gz https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized.tar.gz
             mkdir ${llama_data_path}/data_dpo;
             tar -xvf ${llama_data_path}/ultrafeedback_binarized.tar.gz -C ${llama_data_path}/data_dpo
         fi
@@ -3830,8 +3857,8 @@ function before_hook_for_deepseek() {
         else
             # download data for llama
             mkdir ${llama_data_path}/data;
-            wget -O ${llama_data_path}/data/llama_openwebtext_100k_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy;
-            wget -O ${llama_data_path}/data/llama_openwebtext_100k_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz;
+            wget -q -O ${llama_data_path}/data/llama_openwebtext_100k_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy;
+            wget -q -O ${llama_data_path}/data/llama_openwebtext_100k_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz;
         fi
         cp -r ${llama_data_path}/data ${deepseek_case_path}/
     else

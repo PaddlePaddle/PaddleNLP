@@ -173,7 +173,7 @@ def cce_lse_forward_kernel(
     locks = paddle.full(
         (triton.cdiv(B, 128),),
         0,
-        dtype="int32",  # paddle donot support uint32, so we use int32
+        dtype="int32",  # paddle do not support uint32, so we use int32
     )
     if return_logit_avg:
         logit_avg = paddle.full((V,), 0.0, dtype=paddle.float32)

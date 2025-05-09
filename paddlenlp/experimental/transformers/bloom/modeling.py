@@ -392,7 +392,7 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
                 elif k.endswith("mlp.dense_4h_to_h.bias"):
                     self.transformer_block.ffn2_biases[idx].set_value(paddle.to_tensor(v))
                 else:
-                    raise ValueError("Unknow weight {}".format(k))
+                    raise ValueError("Unknown weight {}".format(k))
 
 
 class BloomLMHead(nn.Layer):
@@ -701,6 +701,7 @@ class BloomForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, BloomPr
         v_quant_scales = kwargs.get("v_quant_scales", None)
         k_dequant_scales = kwargs.get("k_dequant_scales", None)
         v_dequant_scales = kwargs.get("v_dequant_scales", None)
+        excess_blocks = kwargs.get("excess_blocks", None)
 
         # only slice a part of src_mask, because of phi::FlashAttnUnpaddedKernel.
         valid_max_encoder_len = paddle.max(seq_lens_encoder)
@@ -721,6 +722,7 @@ class BloomForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, BloomPr
             "v_quant_scales": v_quant_scales,
             "k_dequant_scales": k_dequant_scales,
             "v_dequant_scales": v_dequant_scales,
+            "excess_blocks": excess_blocks,
         }
         return model_inputs
 
@@ -740,6 +742,7 @@ class BloomForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, BloomPr
         v_quant_scales=None,
         k_dequant_scales=None,
         v_dequant_scales=None,
+        excess_blocks=None,
     ):
         outputs = self.bloom(
             input_ids,
@@ -757,6 +760,7 @@ class BloomForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, BloomPr
             v_quant_scales=v_quant_scales,
             k_dequant_scales=k_dequant_scales,
             v_dequant_scales=v_dequant_scales,
+            excess_blocks=excess_blocks,
         )
 
         hidden_states = outputs[0]
