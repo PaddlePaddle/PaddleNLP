@@ -125,7 +125,7 @@ def read_version():
     cuda_version = float(paddle.version.cuda())
     sm_version = get_sm_version()
     paddle_commit = paddle.__git_commit__[:7]
-    build_tag = "{}-cuda{}_sm{}_paddle_{}".format(formatted_date, cuda_version, sm_version, paddle_commit)
+    build_tag = "{}+cuda{}sm{}paddle{}".format(formatted_date, cuda_version, sm_version, paddle_commit)
 
     __version__ = __version__.replace(".post", ".post{}".format(build_tag))
     
