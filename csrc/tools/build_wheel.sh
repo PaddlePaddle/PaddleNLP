@@ -72,10 +72,12 @@ function generate_sm_version(){
 }
 
 function create_directories(){
-  mkdir -p $OPS_SRC_DIR/tmp/paddlenlp_ops
-  touch $OPS_SRC_DIR/tmp/setup.py
-  touch $OPS_SRC_DIR/tmp/paddlenlp_ops/__init__.py
-  echo '# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+  for sm_version in "${sm_versions[@]}"; do
+    echo "create sm$sm_version"
+    mkdir -p $OPS_SRC_DIR/tmp/paddlenlp_ops
+    touch $OPS_SRC_DIR/tmp/setup.py
+    touch $OPS_SRC_DIR/tmp/paddlenlp_ops/__init__.py
+    echo '# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -190,12 +192,9 @@ try:
 except ImportError:
     logger.WARNING(f"No {module_name} ")
 ' > $OPS_SRC_DIR/tmp/paddlenlp_ops/__init__.py
-
-  for sm_version in "${sm_versions[@]}"; do
-        echo "create sm$sm_version"
-        mkdir -p $OPS_SRC_DIR/tmp/paddlenlp_ops/sm${sm_version}
-        touch $OPS_SRC_DIR/tmp/paddlenlp_ops/sm${sm_version}/__init__.py
-        echo '# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+    mkdir -p $OPS_SRC_DIR/tmp/paddlenlp_ops/sm${sm_version}
+    touch $OPS_SRC_DIR/tmp/paddlenlp_ops/sm${sm_version}/__init__.py
+    echo '# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -216,6 +215,7 @@ try:
 except ImportError:
     logger.WARNING("No paddlenlp_ops_'${sm_version}' ops")
 ' > $OPS_SRC_DIR/tmp/paddlenlp_ops/sm${sm_version}/__init__.py
+    build_ops
   done
 }
 
@@ -234,12 +234,11 @@ function init() {
 }
 
 function build_ops() {
-    for sm_version in "${sm_versions[@]}"; do
-        echo "Building and installing for sm_version: $sm_version"
-        build_and_install_ops $sm_version
-        build_and_install_whl
-    done
-    return 
+    echo "Building and installing for sm_version: $sm_version"
+    build_and_install_ops $sm_version
+    build_and_install_whl
+    unittest
+    cleanup
 }
 
 function copy_ops(){
@@ -330,9 +329,6 @@ trap 'abort' 0
 set -e
 
 init
-build_ops
-unittest
-cleanup
 
 # get Paddle version
 PADDLE_VERSION=`${python} -c "import paddle; print(paddle.version.full_version)"`
