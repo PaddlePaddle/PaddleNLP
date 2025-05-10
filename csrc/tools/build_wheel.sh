@@ -61,7 +61,7 @@ function generate_sm_version(){
         sm_versions=($SM_VERSION )
     elif [ "$ARCHITECTURE" = "all" ]; then
         if awk -v version="$cuda_version" 'BEGIN { exit !(version >= 12.0) }'; then
-          sm_versions=(70 75 80 80 86 89 90 )
+          sm_versions=(70 75 80 86 89 90 )
         else
           sm_versions=(70 75 80 86 89 ) 
         fi 
@@ -93,6 +93,7 @@ function create_directories(){
 
 import os
 from datetime import datetime
+import paddle
 
 from setuptools import find_packages, setup
 
@@ -109,14 +110,24 @@ def read(file: str):
         content = f.read().strip()
     return content
 
+def get_sm_version():
+    prop = paddle.device.cuda.get_device_properties()
+    cc = prop.major * 10 + prop.minor
+    return cc
 
 def read_version():
     """
     read version and return content
     """
     __version__ = "3.0.0b4.post"
+
     formatted_date = datetime.now().date().strftime("%Y%m%d")
-    __version__ = __version__.replace(".post", ".post{}".format(formatted_date))
+    cuda_version = float(paddle.version.cuda())
+    sm_version = get_sm_version()
+    paddle_commit = paddle.__git_commit__[:7]
+    build_tag = "{}+cuda{}sm{}paddle{}".format(formatted_date, cuda_version, sm_version, paddle_commit)
+
+    __version__ = __version__.replace(".post", ".post{}".format(build_tag))
     
     return __version__
 
