@@ -34,7 +34,7 @@ from .testing_utils import LLMTest
     [["qwen"]],
 )
 class FinetuneTest(LLMTest, unittest.TestCase):
-    config_path: str = "./tests/fixtures/llm/grpo.yaml"
+    config_path: str = None
     model_dir: str = None
 
     def setUp(self) -> None:
@@ -88,9 +88,18 @@ class FinetuneTest(LLMTest, unittest.TestCase):
             time.sleep(30)
 
             # 运行主逻辑
+            repo_path = os.getcwd()
             rl_dir = os.path.join(os.getcwd(), "./llm/alignment/rl")
             os.chdir(rl_dir)
-            cmd = "python -u -m paddle.distributed.launch --devices \"$CUDA_VISIBLE_DEVICES\" run_rl.py ./tests/fixtures/llm/grpo.yaml"
+            cmd = "python -u -m paddle.distributed.launch \
+                    --devices \"$CUDA_VISIBLE_DEVICES\" run_rl.py \
+                    ../../config/qwen/reinforce_plus_plus_argument.yaml \
+                    --actor_model_name_or_path \"Qwen/Qwen2-1.5B\" \
+                    --max_dec_len 128 \
+                    --max_steps 3 \
+                    --kl_coeff 0.000 \
+                    --kl_loss_coeff 0.000 \
+                    --use_fused_rms_norm true "
             pro = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             out, err = pro.communicate()
             print(out)
@@ -98,7 +107,7 @@ class FinetuneTest(LLMTest, unittest.TestCase):
             pro.returncode == 0
             assert str(out).find("Error") == -1
             assert str(err).find("Error") == -1
-
+            os.chdir(repo_path)
         finally:
             # main 执行完毕，关闭 reward server
             if reward_proc.poll() is None:  # 确保进程还在
