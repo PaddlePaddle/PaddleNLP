@@ -61,6 +61,11 @@ class FinetuneTest(LLMTest, unittest.TestCase):
         case_env = os.environ.copy()
         case_env.update(env_vars)
 
+        # 修改执行路径
+        repo_path = os.getcwd()
+        rl_dir = os.path.join(os.getcwd(), "./llm/alignment/rl")
+        os.chdir(rl_dir)
+
         # 下载并解压数据
         if not os.path.exists("ppo-kk.tgz"):
             subprocess.run(
@@ -70,7 +75,7 @@ class FinetuneTest(LLMTest, unittest.TestCase):
             )
 
         # 启动 reward server
-        reward_dir = os.path.join(os.getcwd(), "./llm/alignment/rl/reward")
+        reward_dir = os.path.join(os.getcwd(), "./reward")
         reward_log = os.path.join(reward_dir, "reward_server.log")
         reward_server_script = os.path.join(reward_dir, "reward_server.py")
 
@@ -88,9 +93,6 @@ class FinetuneTest(LLMTest, unittest.TestCase):
             time.sleep(30)
 
             # 运行主逻辑
-            repo_path = os.getcwd()
-            rl_dir = os.path.join(os.getcwd(), "./llm/alignment/rl")
-            os.chdir(rl_dir)
             cmd = "python -u -m paddle.distributed.launch \
                     --devices \"$CUDA_VISIBLE_DEVICES\" run_rl.py \
                     ../../config/qwen/reinforce_plus_plus_argument.yaml \
@@ -108,6 +110,7 @@ class FinetuneTest(LLMTest, unittest.TestCase):
             assert str(out).find("Error") == -1
             assert str(err).find("Error") == -1
             os.chdir(repo_path)
+            
         finally:
             # main 执行完毕，关闭 reward server
             if reward_proc.poll() is None:  # 确保进程还在
