@@ -13,18 +13,14 @@
 # limitations under the License.
 import re
 import warnings
-from collections import defaultdict
-from typing import Callable, Sequence
 
 import paddle
-from paddle import Tensor, pir
+from paddle import pir
 from paddle.base import core, framework
 from paddle.base.dygraph import base as imperative_base
 from paddle.base.framework import Variable, in_dynamic_or_pir_mode, in_pir_mode
 from paddle.base.libpaddle import DataType
-from paddle.nn.clip import GradientClipBase
 from paddle.optimizer.adamw import AdamW
-from paddle.optimizer.lr import LRScheduler
 from paddle.pir import Value
 
 try:
@@ -592,21 +588,8 @@ class AdamWQweight(AdamW):
 
 
 class AdamWLoRAPro(AdamW):
-    def __init__(
-        self,
-        learning_rate: float | LRScheduler = 0.001,
-        beta1: float | Tensor = 0.9,
-        beta2: float | Tensor = 0.999,
-        epsilon: float | Tensor = 1e-8,
-        parameters: Sequence[Tensor] | None = None,
-        weight_decay: float = 0.01,
-        apply_decay_param_fun: Callable | None = None,
-        grad_clip: GradientClipBase | None = None,
-        multi_precision: bool = False,
-        scaling_factor: float = 2.0,
-        x_mode: str = "zero",
-        name: str | None = None,
-    ):
+    def __init__(self, scaling_factor=2.0, x_mode="zero", *args, **kwargs):
+        super().__init__(*args, **kwargs)
         assert scaling_factor is not None
         if x_mode not in ["zero", "sylvester", "symmetry"]:
             raise ValueError(
@@ -614,19 +597,6 @@ class AdamWLoRAPro(AdamW):
             )
         self.scaling_factor = scaling_factor
         self.x_mode = x_mode
-
-        super(AdamWLoRAPro, self).__init__(
-            learning_rate=learning_rate,
-            parameters=parameters,
-            beta1=beta1,
-            beta2=beta2,
-            epsilon=epsilon,
-            grad_clip=grad_clip,
-            name=name,
-            apply_decay_param_fun=apply_decay_param_fun,
-            weight_decay=weight_decay,
-            multi_precision=multi_precision,
-        )
 
     def _solve_sylvester(self, A, B, C, X=None):
         if A.dtype in [paddle.bfloat16, paddle.float16]:
@@ -782,32 +752,4 @@ class AdamWLoRAPro(AdamW):
 
                     self._apply_optimize(loss=None, startup_program=None, params_grads=params_grads)
         else:
-            # optimize parameters in groups
-            for param_group in self._param_groups:
-                params_grads = defaultdict(lambda: [])
-                for param in param_group["params"]:
-                    if param.stop_gradient:
-                        continue
-                    if param._grad_ivar() is not None:
-                        grad_var = param._grad_ivar()
-                        if framework.in_dygraph_mode():
-                            if (
-                                hasattr(grad_var, "is_selected_rows")
-                                and grad_var.is_selected_rows()
-                                and self.regularization is not None
-                            ):
-                                raise RuntimeError(
-                                    "AdamW don't support weight_decay with sparse parameters, please set it to None."
-                                )
-                        else:
-                            if (
-                                hasattr(grad_var, "_is_sparse")
-                                and grad_var._is_sparse()
-                                and self.regularization is not None
-                            ):
-                                raise RuntimeError(
-                                    "AdamW don't support weight_decay with sparse parameters, please set it to None."
-                                )
-                        params_grads["params"].append((param, grad_var))
-                params_grads.update({k: v for k, v in param_group.items() if k != "params"})
-                self._apply_optimize(loss=None, startup_program=None, params_grads=params_grads)
+            raise NotImplementedError("AdamWLoRAPro does not support parameter groups")

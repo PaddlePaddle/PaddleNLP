@@ -401,12 +401,6 @@ class TrainingArguments:
             Whether to release gradients during training. Default is `False`.
         ckpt_quant_stage (`str`, *optional*):
             Whether activate checkpoint quantization. O0: deactivate, O1: Int8 compression, O2: Int4 compression. (default: O0).
-        use_lorapro (`bool`, *optional*):
-            Whether to use AdamWLoRAPro optimizer for finetuning. Default is `False`.
-        lorapro_x_mode (`str`, *optional*):
-            X mode for AdamWLoRAPro optimizer (zero, sylvester, symmetry). Default is `zero`.
-        lorapro_scaling_factor (`float`, *optional*):
-            Scaling factor for AdamWLoRAPro optimizer. Default is 2.0.
     """
 
     output_dir: str = field(
@@ -1062,19 +1056,6 @@ class TrainingArguments:
     split_norm_comm: Optional[bool] = field(
         default=False,
         metadata={"help": "是否开启单路sharding时global norm通信拆分全局通信组为pp通信和mp通信分别做"},
-    )
-
-    use_lorapro: bool = field(
-        default=False,
-        metadata={"help": "Whether to use AdamWLoRAPro optimizer for finetuning."},
-    )
-    lorapro_x_mode: str = field(
-        default="zero",
-        metadata={"help": "X mode for AdamWLoRAPro optimizer (zero, sylvester, symmetry)."},
-    )
-    lorapro_scaling_factor: float = field(
-        default=2.0,
-        metadata={"help": "Scaling factor for AdamWLoRAPro optimizer."},
     )
 
     def __post_init__(self):

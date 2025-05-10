@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import copy
+import math
 import os
 import re
 import shutil
@@ -25,9 +26,8 @@ import paddle
 from parameterized import parameterized
 
 from paddlenlp.peft.lora import LoRAConfig, LoRALinear, LoRAModel
-from paddlenlp.trainer import Trainer, TrainingArguments
 from paddlenlp.transformers import AutoModel, BertModel
-from paddlenlp.utils import AdamWLoRAPro
+from paddlenlp.utils.optimizer import AdamWLoRAPro
 
 
 class TestLoRAProLayer(unittest.TestCase):
@@ -192,22 +192,13 @@ class TestLoRAProModel(unittest.TestCase):
 
         lorapro_model.train()
 
-        training_args = TrainingArguments(
-            output_dir=self.output_dir,
-            per_device_train_batch_size=2,
-            num_train_epochs=1,
+        scaling_factor = lorapro_config.lora_alpha / lorapro_config.r
+        if lorapro_config.rslora:
+            scaling_factor = lorapro_config.lora_alpha / math.sqrt(lorapro_config.r)
+
+        optimizer = AdamWLoRAPro(
+            learning_rate=1e-4, parameters=lorapro_model.parameters(), scaling_factor=scaling_factor, x_mode=x_mode
         )
-
-        training_args.use_lorapro = lorapro_config.lorapro
-        training_args.lorapro_x_mode = x_mode
-
-        optimizer_cls, optimizer_kwargs = Trainer.get_optimizer_cls_and_kwargs(training_args)
-
-        self.assertIs(optimizer_cls, AdamWLoRAPro)
-
-        self.assertEqual(optimizer_kwargs["x_mode"], x_mode)
-
-        optimizer = optimizer_cls(learning_rate=1e-4, parameters=lorapro_model.parameters(), **optimizer_kwargs)
 
         outputs = lorapro_model(input_ids)
         loss = outputs[0].mean()
@@ -218,49 +209,8 @@ class TestLoRAProModel(unittest.TestCase):
 
         train_forward_results = lorapro_model(input_ids)
         self.assertIsNotNone(train_forward_results)
-
-    def test_lorapro_with_param_groups(self):
-        lorapro_config = LoRAConfig(
-            target_modules=[".*q_proj.*", ".*v_proj.*"],
-            r=4,
-            lora_alpha=8,
-            enable_lora_list=[None, [True, False]],
-            head_dim=2,
-            lorapro=True,
-        )
-
-        model = AutoModel.from_pretrained("__internal_testing__/tiny-random-bert")
-        lorapro_model = LoRAModel(model, lorapro_config)
-        lorapro_model.mark_only_lora_as_trainable()
-
-        all_params = list(lorapro_model.parameters())
-        half = len(all_params) // 2
-        param_groups = [
-            {
-                "params": all_params[:half],
-                "lr": 2e-4,
-            },
-            {
-                "params": all_params[half:],
-                "lr": 1e-4,
-            },
-        ]
-
-        optimizer = AdamWLoRAPro(parameters=param_groups, scaling_factor=2.0, x_mode="zero")
-
-        input_ids = paddle.to_tensor(np.random.randint(100, 200, [2, 20]))
-
-        lorapro_model.train()
-
-        outputs = lorapro_model(input_ids)
-        loss = outputs[0].mean()
-
-        loss.backward()
-
-        optimizer.step()
-
-        train_forward_results = lorapro_model(input_ids)
-        self.assertIsNotNone(train_forward_results)
+        self.assertIsInstance(optimizer, AdamWLoRAPro)
+        self.assertEqual(optimizer.x_mode, x_mode)
 
     def test_lorapro_module_raise_exception(self):
         lorapro_config = LoRAConfig(
