@@ -15,7 +15,7 @@
 
 ## 🛠️ 支持模型列表 🛠️
 
-参考 [PaddleNLP 模型支持](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/README.md#模型支持)
+参考 [PaddleNLP 支持模型列表](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/README.md#模型支持)
 
 ## 🚀 快速开始 🚀
 
