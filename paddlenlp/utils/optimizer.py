@@ -26,7 +26,12 @@ try:
 except:
     adamw_16bit_moment = None
 
-from ..quantization.qat_utils import dequantize_channelwise, quantize_channelwise
+from ..quantization.qat_utils import (
+    dequantize_channelwise,
+    fp8_dequantize_tensorwise,
+    fp8_quantize_tensorwise,
+    quantize_channelwise,
+)
 
 
 class AdamWMini(AdamW):
@@ -428,9 +433,14 @@ class AdamWQweight(AdamW):
             var_name = self._gen_master_weight_var_name(param)
             if param.name in self.quant_scale_mapping:
                 quant_scale = self.quant_scale_mapping[param.name]
-                var = dequantize_channelwise(
-                    param, quant_scale, apply_hadamard=self.quantization_config.apply_hadamard
-                ).astype("float32")
+                if self.quantization_config.weight_quantize_algo in ["fp8linear"]:
+                    var = fp8_dequantize_tensorwise(
+                        param, quant_scale, tensor_type="weight", quantization_config=self.quantization_config
+                    ).astype("float32")
+                else:
+                    var = dequantize_channelwise(
+                        param, quant_scale, apply_hadamard=self.quantization_config.apply_hadamard
+                    ).astype("float32")
             else:
                 var = paddle.cast(param, "float32")
             var.name = var_name
@@ -443,7 +453,7 @@ class AdamWQweight(AdamW):
         :param dtype: instance of core.VarDesc.VarType
         :return: True if dtype is one of fp16 or bf16, False otherwise
         """
-        if dtype == paddle.int8:
+        if dtype == paddle.int8 or dtype == paddle.float8_e4m3fn:
             return True
         assert isinstance(
             dtype, (core.VarDesc.VarType, core.DataType)
@@ -552,13 +562,21 @@ class AdamWQweight(AdamW):
             if quant_scale is None:
                 param[:] = p.astype(param.dtype)
             else:
-                if p.shape[1] == param.shape[0]:
-                    bit_length = 8
-                elif p.shape[1] / 2 == param.shape[0]:
-                    bit_length = 4
-                param[:], quant_scale[:] = quantize_channelwise(
-                    p.astype("bfloat16"), apply_hadamard=self.quantization_config.apply_hadamard, bit_length=bit_length
-                )
+                if self.quantization_config.weight_quantize_algo in ["fp8linear"]:
+                    param[:], new_quant_scale = fp8_quantize_tensorwise(
+                        p.astype("bfloat16"), tensor_type="weight", quantization_config=self.quantization_config
+                    )
+                    quant_scale.set_value(new_quant_scale)
+                else:
+                    if p.shape[1] == param.shape[0]:
+                        bit_length = 8
+                    elif p.shape[1] / 2 == param.shape[0]:
+                        bit_length = 4
+                    param[:], quant_scale[:] = quantize_channelwise(
+                        p.astype("bfloat16"),
+                        apply_hadamard=self.quantization_config.apply_hadamard,
+                        bit_length=bit_length,
+                    )
         else:
             param[:] = p
         moment1[:] = mom1
