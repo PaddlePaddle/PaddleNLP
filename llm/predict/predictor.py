@@ -1311,7 +1311,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         self.model_inputs["stop_flags"][pos] = False
         self.model_inputs["result_id"][pos][0] = task_id
         self.model_inputs["step_idx"][pos, 0] = 1
-        self.model_inputs["pre_ids"][pos][0] = self.input_ids[query_id][-1]
+        self.model_inputs["pre_ids"][pos][0] = np.array(self.input_ids[query_id][-1])
         self.model_inputs["pre_ids"][pos][1:] = -1
         self.model_inputs["not_need_stop"][0] = True
 
