@@ -14,17 +14,14 @@
 
 from __future__ import annotations
 
+import os
+import signal
+import subprocess
 import sys
+import time
 import unittest
 
-import os
-import subprocess
-import time
-import signal
-
 from parameterized import parameterized_class
-
-from tests.testing_utils import argv_context_guard, load_test_config
 
 from .testing_utils import LLMTest
 
@@ -69,9 +66,9 @@ class FinetuneTest(LLMTest, unittest.TestCase):
         # 下载并解压数据
         if not os.path.exists("ppo-kk.tgz"):
             subprocess.run(
-                f"wget -q https://paddlenlp.bj.bcebos.com/datasets/examples/ppo-kk.tgz && tar zxf ppo-kk.tgz",
+                "wget -q https://paddlenlp.bj.bcebos.com/datasets/examples/ppo-kk.tgz && tar zxf ppo-kk.tgz",
                 shell=True,
-                check=True
+                check=True,
             )
 
         # 启动 reward server
@@ -85,7 +82,7 @@ class FinetuneTest(LLMTest, unittest.TestCase):
                 cwd=reward_dir,
                 stdout=log_file,
                 stderr=subprocess.STDOUT,
-                preexec_fn=os.setsid  # 便于后续 kill 整个进程组
+                preexec_fn=os.setsid,  # 便于后续 kill 整个进程组
             )
 
         try:
@@ -93,15 +90,15 @@ class FinetuneTest(LLMTest, unittest.TestCase):
             time.sleep(30)
 
             # 运行主逻辑
-            cmd = "python -u -m paddle.distributed.launch \
-                    --devices \"$CUDA_VISIBLE_DEVICES\" run_rl.py \
+            cmd = 'python -u -m paddle.distributed.launch \
+                    --devices "$CUDA_VISIBLE_DEVICES" run_rl.py \
                     ../../config/qwen/reinforce_plus_plus_argument.yaml \
-                    --actor_model_name_or_path \"Qwen/Qwen2-1.5B\" \
+                    --actor_model_name_or_path "Qwen/Qwen2-1.5B" \
                     --max_dec_len 128 \
                     --max_steps 3 \
                     --kl_coeff 0.000 \
                     --kl_loss_coeff 0.000 \
-                    --use_fused_rms_norm true "
+                    --use_fused_rms_norm true '
             pro = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             out, err = pro.communicate()
             print(out)
@@ -110,7 +107,7 @@ class FinetuneTest(LLMTest, unittest.TestCase):
             assert str(out).find("Error") == -1
             assert str(err).find("Error") == -1
             os.chdir(repo_path)
-            
+
         finally:
             # main 执行完毕，关闭 reward server
             if reward_proc.poll() is None:  # 确保进程还在
