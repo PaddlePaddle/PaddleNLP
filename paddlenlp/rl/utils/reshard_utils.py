@@ -213,9 +213,6 @@ def init_reshard_mappings(model, training_args, pp_rank, pp_group):
         dict: Global metadata dictionary, including pipeline key, source rank, shape, and distribution status for each
             parameter.
     """
-    hcg = fleet.get_hybrid_communicate_group()
-    pp_rank = hcg.get_stage_id()
-    pp_group = hcg.get_pipe_parallel_group()
     global_meta_dict = {}
     if training_args.pipeline_parallel_degree > 1:
         model._layers._set_pipeline_name_mapping()
