@@ -23,7 +23,11 @@ constexpr int64_t TILE_SIZE = 128;  // 每个 block 处理 128x128 的元素块
 
 
 #define BLOCK_SIZE 128
-template <typename OutT, bool using_pow2_scaling, bool padding_last_dim_to_8x>
+template <typename OutT,
+          bool using_pow2_scaling,
+          bool padding_last_dim_to_8x,
+          bool input_scale_transpose = true,
+          bool output_scale_transpose = true>
 __global__ void FusedActDequantTransposeActQuant(
     const phi::float8_e4m3fn *__restrict__ Xin,
     const float *__restrict__ Xscale,
@@ -46,10 +50,23 @@ __global__ void FusedActDequantTransposeActQuant(
   // 原始fp8 scale读入smem_max，用于后续dequant
   // ------------------------------
   if (threadIdx.y == 0) {
-    for (int i = threadIdx.x; i < BLOCK_SIZE; i += blockDim.x) {
-      smem_max[i] = Xscale[i];
+    for (int y_offset = threadIdx.x; y_offset < BLOCK_SIZE;
+         y_offset += blockDim.x) {
     }
   }
+  if (threadIdx.y == 0) {
+    for (int y_offset = threadIdx.x; y_offset < BLOCK_SIZE;
+         y_offset += blockDim.x) {
+      if constexpr (input_scale_transpose) {
+        smem_max[y_offset] =
+            Xscale[blockIdx.x * gridDim.y + g_block_y_offset + y_offset];
+      } else {
+        smem_max[y_offset] =
+            Xscale[(g_block_y_offset + y_offset) * gridDim.x + blockIdx.x];
+      }
+    }
+  }
+
   __syncthreads();  // smem_tile中的Xscale数据已ready
 
   // 阶段1:
@@ -101,6 +118,7 @@ __global__ void FusedActDequantTransposeActQuant(
     if (threadIdx.x == 0)
       smem_max[y_offset] = local_max;  // x0 顺序写，复用，无conflict
   }
+  __syncthreads();
 
   // 阶段3:
   // Output放缩强转 + Scale写回‌
@@ -129,8 +147,13 @@ __global__ void FusedActDequantTransposeActQuant(
           g_output_x_offset < g_output_inner_stride) {
         out[g_output_y_offset * g_output_inner_stride + g_output_x_offset] =
             (g_output_x_offset < rows) ? output_scaled_fp8 : (OutT)0;
-        scales[g_output_y_offset * g_scale_inner_stride +
-               g_output_x_offset / 128] = scale_on_fp8_to_inputT;
+        if constexpr (output_scale_transpose) {
+          scales[g_output_x_offset / 128 * cols + g_output_y_offset] =
+              scale_on_fp8_to_inputT;
+        } else {
+          scales[g_output_y_offset * g_scale_inner_stride +
+                 g_output_x_offset / 128] = scale_on_fp8_to_inputT;
+        }
       }
     }
   }
@@ -179,8 +202,10 @@ std::vector<paddle::Tensor> fused_act_dequant_transpose_act_quant(
            8;  // 向上padding到8的倍数, 因为128为8的倍数，不影响scale shape
   }
   out = paddle::empty({cols, rows}, paddle::DataType::FLOAT8_E4M3FN, X.place());
+  // scale = paddle::empty(
+  //    {cols, (rows + 127) / 128}, paddle::DataType::FLOAT32, X.place());
   scale = paddle::empty(
-      {cols, (rows + 127) / 128}, paddle::DataType::FLOAT32, X.place());
+      {(rows + 127) / 128, cols}, paddle::DataType::FLOAT32, X.place());
 
   dispatch_fused_act_dequant_transpose_act_quant<phi::float8_e4m3fn>(
       X,
