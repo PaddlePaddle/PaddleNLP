@@ -34,7 +34,7 @@ except:
     qlora_weight_quantize = None
 
 from ..utils.log import logger
-from .qat_utils import quantize_channelwise
+from .qat_utils import fp8_quantize_tensorwise, quantize_channelwise
 from .quantization_linear import (
     ColumnParallelQuantizationLinear,
     QuantizationLinear,
@@ -169,6 +169,13 @@ def convert_to_weight_quantize_state_dict(state_dict, name, quantization_config,
             act_scale = paddle.zeros([], dtype="bfloat16").cuda()
             act_scale.stop_gradient = True
             state_dict[act_scale_name] = act_scale
+        elif weight_quantize_algo in ["fp8linear"]:
+            quant_weight, quant_scale = fp8_quantize_tensorwise(
+                target_weight, tensor_type="weight", quantization_config=quantization_config
+            )
+            act_scale = paddle.zeros([], dtype="bfloat16").cuda()
+            act_scale.stop_gradient = True
+            state_dict[act_scale_name] = act_scale
         else:
             quant_weight, quant_scale = weight_quantize(
                 x=target_weight,
@@ -227,7 +234,14 @@ def convert_to_quantize_state_dict(state_dict, quantization_linear_list, quantiz
         if weight_quantize_algo is None:
             continue
         # Convert state dict
-        if weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8", "a8w8linear", "a8w4linear"]:
+        if weight_quantize_algo in [
+            "weight_only_int8",
+            "weight_only_int4",
+            "llm.int8",
+            "a8w8linear",
+            "a8w4linear",
+            "fp8linear",
+        ]:
             convert_to_weight_quantize_state_dict(state_dict, name, quantization_config, dtype, weight_quantize_algo)
         elif weight_quantize_algo in ["fp4", "nf4"]:
             convert_to_qlora_state_dict(state_dict, name, quantization_config, dtype, weight_quantize_algo)
@@ -260,7 +274,7 @@ def update_loaded_state_dict_keys(state_dict, quantization_linear_list, quantiza
             else:
                 state_dict.append(quant_scale_name)
                 weight_quantize_algo = parse_weight_quantize_algo(quantization_config, name)
-                if weight_quantize_algo in ["a8w8linear", "a8w4linear"]:
+                if weight_quantize_algo in ["a8w8linear", "a8w4linear", "fp8linear"]:
                     state_dict.append(act_scale_name)
 
         else:
