@@ -30,7 +30,7 @@ from .testing_utils import LLMTest
     ["model_dir"],
     [["qwen"]],
 )
-class RLTest(LLMTest, unittest.TestCase):
+class ReinforcePlusPlusTest(LLMTest, unittest.TestCase):
     config_path: str = None
     model_dir: str = None
 
@@ -42,7 +42,7 @@ class RLTest(LLMTest, unittest.TestCase):
     def tearDown(self) -> None:
         LLMTest.tearDown(self)
 
-    def test_finetune(self):
+    def test_reinforce_plus_plus(self):
         # 设置必要的环境变量
         env_vars = {
             "PYTHONPATH": f"{os.path.abspath('./')}:{os.path.abspath('./llm')}:" + os.environ.get("PYTHONPATH", ""),
