@@ -13,112 +13,174 @@
 # limitations under the License.
 
 import paddle
-import triton
 import triton.language as tl
+from paddle import _C_ops
+from paddle.base.framework import OpProtoHolder
+from paddle.framework import in_dynamic_or_pir_mode
+
+from paddlenlp.ops.triton_ops.triton_utils import (
+    get_dtype_str,
+    paddle_use_triton,
+    rendering_common_template,
+)
 
 __all__ = ["fused_moe_wintx_decode_wint2_75", "fused_moe_wintx_decode_wint2_5"]
 BLOCK_SIZE_M = 16
-
-
-def get_default_config():
-    # 4090: default
-    config = triton.Config(
-        {
-            "BLOCK_SIZE_M": BLOCK_SIZE_M,
-            "BLOCK_SIZE_N": 128,
-            "GROUP_SIZE_M": 4,
-        },
-        num_warps=8,
-        num_stages=1,
-    )
-
-    return [config]
 
 
 def invoke_fused_moe_kernel(
     A,
     B,
     C,
-    # A_scale: Optional[torch.Tensor],
     B_scale,
     topk_weights,
     topk_ids,
     sorted_token_ids,
     expert_ids,
     num_tokens_post_padded,
-    mul_routed_weight: bool,
-    top_k: int,
-    group_size: int,
-    bit="wint2.75",
+    bit_shift,
+    mul_routed_weight=False,
+    top_k=-1,
+    group_size=-1,
+    ppack_num=3,
+    ww_mask=0xF,
+    ss_mask=0xF,
+    bbzp=8,
 ):
 
-    K = A.shape[-1]
-    N = B.shape[-1]
-    EM = sorted_token_ids.shape[0]
-    stride_am, stride_ak = A.shape[1], 1
-    stride_be, stride_bk, stride_bn = B.shape[1] * B.shape[2], B.shape[2], 1
-    stride_cm, stride_cn = C.shape[-1], 1
-    stride_bse, stride_bsk, stride_bsn = B_scale.shape[1], 1, 1
-    num_valid_tokens = topk_ids.numel().tolist()
-    grid = lambda META: (
-        (EM + META["BLOCK_SIZE_M"] - 1)
-        // META["BLOCK_SIZE_M"]
-        * ((N + META["BLOCK_SIZE_N"] - 1) // META["BLOCK_SIZE_N"]),
-    )
+    # bit_shift = paddle.to_tensor([4,2,0],dtype='int8')
 
-    if bit == "wint2.75":
-        pack_num = 3
-        w_mask = 0xF
-        s_mask = 0xF
-        bzp = 8
-        bit_shift = paddle.to_tensor([4, 2, 0], dtype="int8")
-    elif bit == "wint2.5":
-        pack_num = 7
-        w_mask = 0x7
-        s_mask = 0x1FFF
-        bzp = 4
-        bit_shift = paddle.to_tensor([13, 11, 9, 6, 4, 2, 0], dtype="int16")
-    fused_moe_decodev3_kernel_paddle[grid](
-        A,
-        B,
-        C,
-        # A_scale,
-        B_scale,
-        topk_weights,
-        sorted_token_ids,
-        expert_ids,
-        num_tokens_post_padded,
-        N,
-        K,
-        EM,
-        num_valid_tokens,
-        stride_am,
-        stride_ak,
-        stride_be,
-        stride_bk,
-        stride_bn,
-        stride_cm,
-        stride_cn,
-        stride_bse,
-        stride_bsk,
-        stride_bsn,
-        MUL_ROUTED_WEIGHT=mul_routed_weight,
-        top_k=top_k,
-        bit_shift_ptr=bit_shift,
-        BLOCK_SIZE_K=group_size,
-        pack_num=pack_num,
-        w_mask=w_mask,
-        s_mask=s_mask,
-        bzp=bzp,
-    )
+    KK = A.shape[-1]
+    NN = B.shape[-1]
+    EEM = sorted_token_ids.shape[0]
+    sstride_am, sstride_ak = A.shape[1], 1
+    sstride_be, sstride_bk, sstride_bn = B.shape[1] * B.shape[2], B.shape[2], 1
+    sstride_cm, sstride_cn = C.shape[-1], 1
+    sstride_bse, sstride_bsk, sstride_bsn = B_scale.shape[1], 1, 1
+    nnum_valid_tokens = topk_ids.numel().tolist()
+
+    prepare_attr_for_triton_kernel = """
+        auto N = B.shape()[2];
+        auto K = A.shape()[1];
+        auto EM = sorted_token_ids.shape()[0];
+        auto num_valid_tokens = (topk_ids.shape()[0]) * (topk_ids.shape()[1]);
+        auto stride_am = A.strides()[0];
+        auto stride_ak = A.strides()[1];
+        auto stride_be = B.strides()[0];
+        auto stride_bk = B.strides()[1];
+        auto stride_bn = B.strides()[2];
+        auto stride_cm = C.strides()[1];
+        auto stride_cn = C.strides()[2];
+
+        auto stride_bse = B_scale.strides()[0];
+        auto stride_bsk = B_scale.strides()[1];
+        auto stride_bsn = 1;
+
+        auto pack_num = ppack_num;
+        auto w_mask = ww_mask;
+        auto s_mask = ss_mask;
+        auto bzp = bbzp;
+    """
+
+    config = {
+        "BLOCK_SIZE_M": 16,
+        "BLOCK_SIZE_N": 256,
+        "BLOCK_SIZE_K": 64,
+        "GROUP_SIZE_M": 8,
+        "num_warps": 4,
+        "num_stages": 4,
+    }
+    configs = []
+
+    configs.append(dict(config))
+
+    op_name = f"fused_moe_paddle_wintx_{ppack_num}_{ww_mask}_{ss_mask}_{bbzp}"
+    op_name += f"{get_dtype_str(A.dtype)}"
+    op_name += f"{B.shape[0]}"
+    op_name += f"{B.shape[1]}"
+    op_name += f"{B.shape[2]}"
+
+    if op_name not in OpProtoHolder.instance().op_proto_map.keys():
+        prepare_ptr_for_triton_kernel = """
+            CUdeviceptr input_ptrs[9] = {
+                get_tensor_ptr(A),
+                get_tensor_ptr(B),
+                get_tensor_ptr(C),
+                get_tensor_ptr(B_scale),
+                get_tensor_ptr(topk_weights),
+                get_tensor_ptr(sorted_token_ids),
+                get_tensor_ptr(expert_ids),
+                get_tensor_ptr(num_tokens_post_padded),
+                get_tensor_ptr(bit_shift),
+            };
+            """
+        template_used = rendering_common_template(
+            invoke_fused_moe_kernel,
+            prepare_attr_for_triton_kernel,
+            prepare_ptr_for_triton_kernel,
+        )
+        grid = ("(EM+BLOCK_SIZE_M-1)/BLOCK_SIZE_M * ((N+BLOCK_SIZE_N-1)/BLOCK_SIZE_N)",)
+
+        fused_moe_decode_kernel_paddle[(op_name, template_used, grid, configs)](
+            A,
+            B,
+            C,
+            B_scale,
+            topk_weights,
+            sorted_token_ids,
+            expert_ids,
+            num_tokens_post_padded,
+            bit_shift,
+            NN,
+            KK,
+            EEM,
+            nnum_valid_tokens,
+            sstride_am,
+            sstride_ak,
+            sstride_be,
+            sstride_bk,
+            sstride_bn,
+            sstride_cm,
+            sstride_cn,
+            sstride_bse,
+            sstride_bsk,
+            sstride_bsn,
+            MUL_ROUTED_WEIGHT=(int)(mul_routed_weight),
+            top_k=top_k,
+            BLOCK_SIZE_K=group_size,
+            pack_num=ppack_num,
+            w_mask=ww_mask,
+            s_mask=ss_mask,
+            bzp=bbzp,
+        )
+    if in_dynamic_or_pir_mode():
+        outs = _C_ops._run_custom_op(
+            op_name,
+            A,
+            B,
+            C,
+            B_scale,
+            topk_weights,
+            topk_ids,
+            sorted_token_ids,
+            expert_ids,
+            num_tokens_post_padded,
+            bit_shift,
+            mul_routed_weight,
+            top_k,
+            group_size,
+            ppack_num,
+            ww_mask,
+            ss_mask,
+            bbzp,
+        )
+        return outs[0]
 
 
-@triton.autotune(
-    configs=get_default_config(),
-    key=["EM", "N", "K"],
+@paddle_use_triton(
+    key=["1"],
 )
-@triton.jit
-def fused_moe_decodev3_kernel_paddle(
+def fused_moe_decode_kernel_paddle(
     # Pointers to matrices
     a_ptr,
     b_ptr,
@@ -128,6 +190,7 @@ def fused_moe_decodev3_kernel_paddle(
     sorted_token_ids_ptr,
     expert_ids_ptr,
     num_tokens_post_padded_ptr,
+    bit_shift_ptr,
     # Matrix dimensions
     N,
     K,
@@ -147,7 +210,9 @@ def fused_moe_decodev3_kernel_paddle(
     stride_bse,
     stride_bsk,
     stride_bsn,
-    bit_shift_ptr,
+    # Block size for block-wise quantization
+    # group_n: tl.constexpr,
+    # group_size: tl.constexpr, # forced equal to BK
     # Meta-parameters
     BLOCK_SIZE_M: tl.constexpr,
     BLOCK_SIZE_N: tl.constexpr,
@@ -272,10 +337,7 @@ def fused_moe_wintx_decode_impl(
     group_size=64,
     bit="wint2.75",
 ):
-    # Check constraints.
-    # A: [M, K]
-    # B: [E, K, N]
-    # assert hidden_states.shape[1] == w1_scale.shape[1], f"Hidden size mismatch, {hidden_states.shape[1]} != {w1.shape[1]}"
+
     assert topk_weights.shape == topk_ids.shape, "topk shape mismatch"
     assert hidden_states.is_contiguous(), "Hidden_states must be contiguous"
     assert w1.is_contiguous(), "Expert weights1 must be contiguous"
@@ -304,12 +366,22 @@ def fused_moe_wintx_decode_impl(
         dtype=hidden_states.dtype,
     )
 
-    config = get_default_config()
-    config = config[0]
-
     from paddlenlp_ops import preprocess_for_moe
 
     sorted_token_ids, expert_ids, num_tokens_post_padded = preprocess_for_moe(topk_ids, E, BLOCK_SIZE_M)
+
+    if bit == "wint2.75":
+        bit_shift = paddle.to_tensor([4, 2, 0], dtype="int8")
+        ppack_num = 3
+        ww_mask = 0xF
+        ss_mask = 0xF
+        bbzp = 8
+    elif bit == "wint2.5":
+        ppack_num = 7
+        ww_mask = 0x7
+        ss_mask = 0x1FFF
+        bbzp = 4
+        bit_shift = paddle.to_tensor([13, 11, 9, 6, 4, 2, 0], dtype="int16")
 
     invoke_fused_moe_kernel(
         A=hidden_states,
@@ -321,10 +393,14 @@ def fused_moe_wintx_decode_impl(
         sorted_token_ids=sorted_token_ids,
         expert_ids=expert_ids,
         num_tokens_post_padded=num_tokens_post_padded,
+        bit_shift=bit_shift,
         mul_routed_weight=False,
         top_k=top_k,
         group_size=group_size,
-        bit=bit,
+        ppack_num=ppack_num,
+        ww_mask=ww_mask,
+        ss_mask=ss_mask,
+        bbzp=bbzp,
     )
 
     intermediate_cache2 = paddle.incubate.nn.functional.swiglu(intermediate_cache1.reshape([-1, N]))
@@ -339,13 +415,16 @@ def fused_moe_wintx_decode_impl(
         sorted_token_ids=sorted_token_ids,
         expert_ids=expert_ids,
         num_tokens_post_padded=num_tokens_post_padded,
+        bit_shift=bit_shift,
         mul_routed_weight=True,
         top_k=1,
         group_size=group_size,
-        bit=bit,
+        ppack_num=ppack_num,
+        ww_mask=ww_mask,
+        ss_mask=ss_mask,
+        bbzp=bbzp,
     )
 
-    # return out_hidden_states
     out_hidden_states = paddle.sum(intermediate_cache3, axis=1)
 
     del intermediate_cache1, intermediate_cache2, intermediate_cache3
@@ -367,7 +446,15 @@ def fused_moe_wintx_decode_wint2_75(
     topk_weights, topk_ids = paddle.topk(scores, k=topk, axis=-1, sorted=False)
 
     return fused_moe_wintx_decode_impl(
-        hidden_states, w1, w2, topk_weights, topk_ids, w1_scale, w2_scale, bit="wint2.75"
+        hidden_states,
+        w1,
+        w2,
+        topk_weights,
+        topk_ids,
+        # inplace: bool = False,
+        w1_scale,
+        w2_scale,
+        bit="wint2.75",
     )
 
 
@@ -384,5 +471,13 @@ def fused_moe_wintx_decode_wint2_5(
     topk_weights, topk_ids = paddle.topk(scores, k=topk, axis=-1, sorted=False)
 
     return fused_moe_wintx_decode_impl(
-        hidden_states, w1, w2, topk_weights, topk_ids, w1_scale, w2_scale, bit="wint2.5"
+        hidden_states,
+        w1,
+        w2,
+        topk_weights,
+        topk_ids,
+        # inplace: bool = False,
+        w1_scale,
+        w2_scale,
+        bit="wint2.5",
     )

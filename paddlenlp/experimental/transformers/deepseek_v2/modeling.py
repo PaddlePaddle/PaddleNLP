@@ -602,12 +602,28 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
             return_full_hidden_states=config.get("return_full_hidden_states", False),
         )
 
-        mix_bit_pth = config.get("mix_bit_config", None)
-        if mix_bit_pth is not None:
-            logger.info(f"load mixbit config from {mix_bit_pth}")
+        mix_bit_path = config.get("mix_bit_config", None)
+        if mix_bit_path is not None:
+            logger.info(f"load mixbit config from {mix_bit_path}")
             mixbit_config = MixBitConfig(
-                mix_bit_path=mix_bit_pth,
+                mix_bit_path=mix_bit_path,
             )
+            import json
+
+            with open(mix_bit_path, "r") as f:
+                self.mix_bit = json.load(f)
+
+        elif self.quant_type == "weight_only_intx":
+            import os
+
+            mix_bit_path = os.path.join(self.config.name_or_path, "mix_bits_config.json")
+            mixbit_config = MixBitConfig(
+                mix_bit_path=mix_bit_path,
+            )
+            import json
+
+            with open(mix_bit_path, "r") as f:
+                self.mix_bit = json.load(f)
         else:
             mixbit_config = MixBitConfig()
 
@@ -1258,6 +1274,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
 
     @paddle.no_grad()
     def set_wintx_state_dict(self, state_dict):
+
         self.transformer_block.init_weight()
 
         dtype = paddle.get_default_dtype()
@@ -1384,14 +1401,18 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
             self.transformer_block.ffn_ln_scales[idx].set_value(ffn_ln_scale)
 
             if idx < self.first_k_dense_replace:
-
-                # ffn1
+                # NOTE: for support wint4 cutlass, to set axis=0
+                method = self.mix_bit[idx].get("ffn1", None)
+                if method in ["weight_only_int4", "weight_only_int4_g64"]:
+                    concat_axis = 0
+                else:
+                    concat_axis = -1
                 concated_ffn1_weight = np.concatenate(
                     [
                         state_dict[f"{self.base_model_prefix}.layers.{idx}.mlp.gate_proj.quant_weight"],
                         state_dict[f"{self.base_model_prefix}.layers.{idx}.mlp.up_proj.quant_weight"],
                     ],
-                    axis=-1,
+                    axis=concat_axis,
                 )
                 ffn1_quanted_weight_tensor = paddle.to_tensor(concated_ffn1_weight)
                 ffn1_weight_scale_tensor = np.concatenate(
@@ -1424,6 +1445,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                 ffn2_scales = []
 
                 for expert_idx in range(self.n_routed_experts):
+
                     concated_gate_up_weight = np.concatenate(
                         [
                             state_dict[
@@ -1491,12 +1513,18 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
                 self.transformer_block.ffn2_weights_scale[idx].set_value(fused_moe_ffn2_weight_scale)
 
                 # shared_expert
+                method = self.mix_bit[idx].get("shared_expert_ffn1", None)
+                if method in ["weight_only_int4", "weight_only_int4_g64"]:
+                    concat_axis = 0
+                else:
+                    concat_axis = -1
+
                 concated_gate_up_weight = np.concatenate(
                     [
                         state_dict[f"{self.base_model_prefix}.layers.{idx}.mlp.shared_experts.gate_proj.quant_weight"],
                         state_dict[f"{self.base_model_prefix}.layers.{idx}.mlp.shared_experts.up_proj.quant_weight"],
                     ],
-                    axis=-1,
+                    axis=concat_axis,
                 )
                 shared_expert_ffn1_quanted_weight = paddle.to_tensor(concated_gate_up_weight)
 

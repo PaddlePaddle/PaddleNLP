@@ -34,6 +34,7 @@ from paddle.nn.initializer import Constant
 from paddle.nn.quant import weight_only_linear
 
 from paddlenlp.experimental.wintx import (
+    weight_only_int4_moe,
     weight_only_linear_int3_decode_superbs_moe_symm,
     weight_only_linear_int4_decode_superbs_moe_symm,
     weight_only_linear_int4_moe_symm,
@@ -100,25 +101,17 @@ __all__ = [
 
 
 # for wintx(mix quantization)
-# config function
-def get_bit_from_matmul(matmul):
-
-    if matmul == "weight_only_int4_symm":
-        return 4
-    if matmul == "weight_only_linear_int4_decode_superbs_symm":
-        return 3  # fake
-    if matmul == "weight_only_linear_int3_decode_superbs_symm":
-        return 7  # fake
-    return None
-
-
 def get_pack_dtype_from_matmul(matmul):
-    if matmul == "weight_only_int4_symm":
-        return "int32"
     if matmul == "weight_only_linear_int4_decode_superbs_symm":
         return "int8"
     if matmul == "weight_only_linear_int3_decode_superbs_symm":
         return "int16"
+    if matmul == "weight_only_int4_g64":
+        return "int8"
+    if matmul == "weight_only_int4":
+        return "int8"
+    if matmul == "weight_only_int4_symm":
+        return "int32"
     raise NotImplementedError(f"{matmul} is not implemented")
 
 
@@ -129,25 +122,68 @@ def get_group_size_from_matmul(matmul):
         return -1
     if matmul == "weight_only_linear_int3_decode_superbs_symm":
         return -1
+    if matmul == "weight_only_int4_g64":
+        return 64
+    if matmul == "weight_only_int4":
+        return -1
+
     raise NotImplementedError(f"{matmul} is not implemented")
 
 
-def get_shrink_wdim_from_matmul(dim, matmul):
+def get_shrink_wdim_from_matmul(dim, matmul, moe_wint4_ffn2=False):
+    """
+    get shrink dim from matmul, moe_wint4_ffn2 is a special case for wint4 moe cutlass
+    """
+
     if matmul == "weight_only_int4_symm":
         return dim // (32 // 4)
     if matmul == "weight_only_linear_int4_decode_superbs_symm":
         return (dim + dim // 64 * 2) // 3
     if matmul == "weight_only_linear_int3_decode_superbs_symm":
         return (dim + dim // 64 * 6) // 7
-    raise NotImplementedError(f"{matmul} is not implemented")
+    if matmul == "weight_only_int4" and moe_wint4_ffn2:
+        return dim // 2
+    return dim
+
+
+def get_shrink_wout_dim_from_matmul(dim, matmul, moe_wint4_ffn2=False):
+    """
+    get shrink dim from matmul, moe_wint4_ffn2 is a special case for wint4 moe cutlass
+    """
+
+    if matmul == "weight_only_int4_g64":
+        return dim // 2
+    if matmul == "weight_only_int4":
+        if moe_wint4_ffn2:
+            return dim
+        return dim // 2
+
+    return dim
 
 
 # linear function
-def weight_only_linear_wintx(x, weight, weight_scale, bias=None, method="weight_only_int2_symm"):
-
+def weight_only_linear_wintx(x, weight, weight_scale, bias=None, method="weight_only_int4_g64"):
     with paddle.no_grad():
         if method == "weight_only_int4_symm":
             out = weight_only_linear_int4_symm(x, weight, bias, weight_scale)
+        elif method == "weight_only_int4_g64":
+            out = weight_only_linear(
+                x,
+                weight=weight,  # shape: [inp, out//2]
+                weight_scale=weight_scale,  # shape [inp//64, out]
+                weight_dtype="int4",
+                group_size=64,
+                bias=bias,
+            )
+        elif method == "weight_only_int4":
+            out = weight_only_linear(
+                x,
+                weight=weight,  # shape: [inp, out//2]
+                weight_scale=weight_scale,  # shape [inp//64, out]
+                weight_dtype="int4",
+                group_size=-1,
+                bias=bias,
+            )
         else:
             raise ValueError(f"method {method} is not supported")
         return out
@@ -165,12 +201,31 @@ def wintx_fused_moe(x, w1, w2, b1, b2, scores, topk, w1_scale, w2_scale, ffn1_ma
             fused_moe = weight_only_linear_int4_moe_symm
         elif ffn1_matmul == "weight_only_linear_int3_decode_superbs_symm":
             fused_moe = weight_only_linear_int3_decode_superbs_moe_symm
+        elif ffn1_matmul == "weight_only_int4_g64":
+            fused_moe = weight_only_int4_moe
+        elif ffn1_matmul == "weight_only_int4":
+            fused_moe = weight_only_int4_moe
         else:
             raise NotImplementedError(f"{ffn1_matmul} is not implemented")
 
         out = fused_moe(x, w1, w2, scores, topk, w1_scale, w2_scale)
 
         return out
+
+
+def transpose_w_shape(shape, method):
+    """
+    wint4 cutlass need weight shape [out, inp], so we need to transpose the shape for this case
+    """
+    if method in ["weight_only_int4_g64", "weight_only_int4"]:
+        if len(shape) == 2:
+            return [shape[1], shape[0]]
+        if len(shape) == 3:
+            return [shape[0], shape[2], shape[1]]
+
+        raise NotImplementedError(f"shape {shape} is not supported")
+    else:
+        return shape
 
 
 # for distributed tensor model parallel
@@ -2620,9 +2675,11 @@ class FusedMultiTransformerWINTX(FusedMultiTransformerBase):
                         if q_proj_matmul is None
                         else [
                             get_shrink_wdim_from_matmul(self.q_proj_weight_shape[0], q_proj_matmul),
-                            self.q_proj_weight_shape[1],
+                            get_shrink_wout_dim_from_matmul(self.q_proj_weight_shape[1], q_proj_matmul),
                         ]
                     )
+                    q_proj_weight_shape = transpose_w_shape(q_proj_weight_shape, q_proj_matmul)
+
                     q_proj_weight = self.create_parameter(
                         shape=q_proj_weight_shape,
                         attr=q_proj_weight_attr,
@@ -2635,9 +2692,11 @@ class FusedMultiTransformerWINTX(FusedMultiTransformerBase):
                         if q_a_matmul is None
                         else [
                             get_shrink_wdim_from_matmul(self.q_a_proj_weight_shape[0], q_a_matmul),
-                            self.q_a_proj_weight_shape[1],
+                            get_shrink_wout_dim_from_matmul(self.q_a_proj_weight_shape[1], q_a_matmul),
                         ]
                     )
+                    q_a_proj_weight_shape = transpose_w_shape(q_a_proj_weight_shape, q_a_matmul)
+
                     q_a_proj_weight = self.create_parameter(
                         shape=q_a_proj_weight_shape,
                         attr=q_a_proj_weight_attr,
@@ -2657,9 +2716,11 @@ class FusedMultiTransformerWINTX(FusedMultiTransformerBase):
                         if q_b_matmul is None
                         else [
                             get_shrink_wdim_from_matmul(self.q_b_proj_weight_shape[0], q_b_matmul),
-                            self.q_b_proj_weight_shape[1],
+                            get_shrink_wout_dim_from_matmul(self.q_b_proj_weight_shape[1], q_b_matmul),
                         ]
                     )
+                    q_b_proj_weight_shape = transpose_w_shape(q_b_proj_weight_shape, q_b_matmul)
+
                     q_b_proj_weight = self.create_parameter(
                         shape=q_b_proj_weight_shape,
                         attr=q_b_proj_weight_attr,
@@ -2682,18 +2743,20 @@ class FusedMultiTransformerWINTX(FusedMultiTransformerBase):
                     if kv_a_proj_matmul is None
                     else [
                         get_shrink_wdim_from_matmul(self.kv_a_proj_with_mqa_weight_shape[0], kv_a_proj_matmul),
-                        self.kv_a_proj_with_mqa_weight_shape[1],
+                        get_shrink_wout_dim_from_matmul(self.kv_a_proj_with_mqa_weight_shape[1], kv_a_proj_matmul),
                     ]
                 )
+                kv_a_proj_with_mqa_weight_shape = transpose_w_shape(kv_a_proj_with_mqa_weight_shape, kv_a_proj_matmul)
 
                 kv_b_proj_weight_shape = (
                     self.kv_b_proj_weight_shape
                     if kv_b_proj_matmul is None
                     else [
                         get_shrink_wdim_from_matmul(self.kv_b_proj_weight_shape[0], kv_b_proj_matmul),
-                        self.kv_b_proj_weight_shape[1],
+                        get_shrink_wout_dim_from_matmul(self.kv_b_proj_weight_shape[1], kv_b_proj_matmul),
                     ]
                 )
+                kv_b_proj_weight_shape = transpose_w_shape(kv_b_proj_weight_shape, kv_b_proj_matmul)
 
                 if kv_a_proj_with_mqa_weight_attr:
                     kv_a_proj_with_mqa_weight = self.create_parameter(
@@ -2744,8 +2807,13 @@ class FusedMultiTransformerWINTX(FusedMultiTransformerBase):
                 qkv_weight_shape = (
                     self.qkv_weight_shape
                     if qkv_matmul is None
-                    else [get_shrink_wdim_from_matmul(self.qkv_weight_shape[0], qkv_matmul), self.qkv_weight_shape[1]]
+                    else [
+                        get_shrink_wdim_from_matmul(self.qkv_weight_shape[0], qkv_matmul),
+                        get_shrink_wout_dim_from_matmul(self.qkv_weight_shape[1], qkv_matmul),
+                    ]
                 )
+                qkv_weight_shape = transpose_w_shape(qkv_weight_shape, qkv_matmul)
+
                 qkv_weight = self.create_parameter(
                     shape=qkv_weight_shape,
                     attr=qkv_weight_attr,
@@ -2765,9 +2833,11 @@ class FusedMultiTransformerWINTX(FusedMultiTransformerBase):
                     if linear_matmul is None
                     else [
                         get_shrink_wdim_from_matmul(self.linear_weight_shape[0], linear_matmul),
-                        self.linear_weight_shape[1],
+                        get_shrink_wout_dim_from_matmul(self.linear_weight_shape[1], linear_matmul),
                     ]
                 )
+                linear_weight_shape = transpose_w_shape(linear_weight_shape, linear_matmul)
+
                 linear_weight = self.create_parameter(
                     shape=linear_weight_shape,
                     attr=linear_weight_attr,
@@ -2802,19 +2872,25 @@ class FusedMultiTransformerWINTX(FusedMultiTransformerBase):
                     else [
                         self.moe_ffn1_weight_shape[0],
                         get_shrink_wdim_from_matmul(self.moe_ffn1_weight_shape[1], ffn1_matmul),
-                        self.moe_ffn1_weight_shape[2],
+                        get_shrink_wout_dim_from_matmul(self.moe_ffn1_weight_shape[2], ffn1_matmul),
                     ]
                 )
+                # wint4 moe cutlass DONOT transpose the ffn1
+                # moe_ffn1_weight_shape = transpose_w_shape(moe_ffn1_weight_shape, ffn1_matmul)
 
                 moe_ffn2_weight_shape = (
                     self.moe_ffn2_weight_shape
                     if ffn2_matmul is None
                     else [
                         self.moe_ffn2_weight_shape[0],
-                        get_shrink_wdim_from_matmul(self.moe_ffn2_weight_shape[1], ffn2_matmul),
-                        self.moe_ffn2_weight_shape[2],
+                        get_shrink_wdim_from_matmul(self.moe_ffn2_weight_shape[1], ffn2_matmul, moe_wint4_ffn2=True),
+                        get_shrink_wout_dim_from_matmul(
+                            self.moe_ffn2_weight_shape[2], ffn2_matmul, moe_wint4_ffn2=True
+                        ),
                     ]
                 )
+                # wint4 moe cutlass DONOT transpose the ffn2
+                # moe_ffn2_weight_shape = transpose_w_shape(moe_ffn2_weight_shape, ffn2_matmul)
 
                 ffn1_weight = self.create_parameter(
                     shape=moe_ffn1_weight_shape,
@@ -2835,18 +2911,20 @@ class FusedMultiTransformerWINTX(FusedMultiTransformerBase):
                     if ffn1_matmul is None
                     else [
                         get_shrink_wdim_from_matmul(self.ffn1_weight_shape[0], ffn1_matmul),
-                        self.ffn1_weight_shape[1],
+                        get_shrink_wout_dim_from_matmul(self.ffn1_weight_shape[1], ffn1_matmul),
                     ]
                 )
+                ffn1_weight_shape = transpose_w_shape(ffn1_weight_shape, ffn1_matmul)
 
                 ffn2_weight_shape = (
                     self.ffn2_weight_shape
                     if ffn2_matmul is None
                     else [
                         get_shrink_wdim_from_matmul(self.ffn2_weight_shape[0], ffn2_matmul),
-                        self.ffn2_weight_shape[1],
+                        get_shrink_wout_dim_from_matmul(self.ffn2_weight_shape[1], ffn2_matmul),
                     ]
                 )
+                ffn2_weight_shape = transpose_w_shape(ffn2_weight_shape, ffn2_matmul)
 
                 ffn1_weight = self.create_parameter(
                     shape=ffn1_weight_shape,
@@ -2888,8 +2966,13 @@ class FusedMultiTransformerWINTX(FusedMultiTransformerBase):
                         get_shrink_wdim_from_matmul(
                             self.shared_expert_ffn1_weight_shape[0], shared_expert_ffn1_matmul
                         ),
-                        self.shared_expert_ffn1_weight_shape[1],
+                        get_shrink_wout_dim_from_matmul(
+                            self.shared_expert_ffn1_weight_shape[1], shared_expert_ffn1_matmul
+                        ),
                     ]
+                )
+                shared_expert_ffn1_weight_shape = transpose_w_shape(
+                    shared_expert_ffn1_weight_shape, shared_expert_ffn1_matmul
                 )
 
                 shared_expert_ffn2_weight_shape = (
@@ -2899,8 +2982,13 @@ class FusedMultiTransformerWINTX(FusedMultiTransformerBase):
                         get_shrink_wdim_from_matmul(
                             self.shared_expert_ffn2_weight_shape[0], shared_expert_ffn2_matmul
                         ),
-                        self.shared_expert_ffn2_weight_shape[1],
+                        get_shrink_wout_dim_from_matmul(
+                            self.shared_expert_ffn2_weight_shape[1], shared_expert_ffn2_matmul
+                        ),
                     ]
+                )
+                shared_expert_ffn2_weight_shape = transpose_w_shape(
+                    shared_expert_ffn2_weight_shape, shared_expert_ffn2_matmul
                 )
 
                 shared_expert_ffn1_weight = self.create_parameter(

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from .wint4_fused_moe import wint4_moe_pp
 from .wintx_fused_moe import fused_moe_wint4
 from .wintx_fused_moe_decode import (
     fused_moe_wintx_decode_wint2_5,
@@ -71,4 +72,17 @@ def weight_only_linear_int4_moe_symm(
     w2_scale=None,
 ):
     fused_moe = fused_moe_wint4
+    return fused_moe(hidden_states, w1, w2, scores, topk, w1_scale, w2_scale)
+
+
+def weight_only_int4_moe(
+    hidden_states,
+    w1,
+    w2,
+    scores,
+    topk: int,
+    w1_scale=None,
+    w2_scale=None,
+):
+    fused_moe = wint4_moe_pp
     return fused_moe(hidden_states, w1, w2, scores, topk, w1_scale, w2_scale)
