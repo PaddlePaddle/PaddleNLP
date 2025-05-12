@@ -52,11 +52,6 @@ __global__ void FusedActDequantTransposeActQuant(
   if (threadIdx.y == 0) {
     for (int y_offset = threadIdx.x; y_offset < BLOCK_SIZE;
          y_offset += blockDim.x) {
-    }
-  }
-  if (threadIdx.y == 0) {
-    for (int y_offset = threadIdx.x; y_offset < BLOCK_SIZE;
-         y_offset += blockDim.x) {
       if constexpr (input_scale_transpose) {
         smem_max[y_offset] =
             Xscale[blockIdx.x * gridDim.y + g_block_y_offset + y_offset];
