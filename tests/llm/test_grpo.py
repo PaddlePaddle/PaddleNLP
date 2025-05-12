@@ -30,7 +30,7 @@ from .testing_utils import LLMTest
     ["model_dir"],
     [["qwen"]],
 )
-class FinetuneTest(LLMTest, unittest.TestCase):
+class RLTest(LLMTest, unittest.TestCase):
     config_path: str = None
     model_dir: str = None
 
