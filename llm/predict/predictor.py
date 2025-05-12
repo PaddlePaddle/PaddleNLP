@@ -848,7 +848,7 @@ class BlockInferencePredictorMixin(BasePredictor):
 
         self.pre_cache_length = 0
 
-        msg_queue_id_str = os.getenv("MAX_STOP_SEQS_NUM", str(os.getpid()))
+        msg_queue_id_str = os.getenv("INFERENCE_MSG_QUEUE_ID", str(os.getpid()))
         os.environ["INFERENCE_MSG_QUEUE_ID"] = msg_queue_id_str
 
         if config.export_precache:
