@@ -138,7 +138,6 @@ sources += find_end_files("./gpu/speculate_decoding_kernels", ".cu")
 
 nvcc_compile_args = gencode_flags
 update_git_submodule()
-os.environ.pop('PADDLE_CUDA_ARCH_LIST', None)
 nvcc_compile_args += [
     "-O3",
     "-DNDEBUG",
@@ -193,6 +192,7 @@ if cc == 89 and cuda_version >= 12.4:
     ]
 
 if cc >= 80 and nvcc_version >= Version("12.4"):
+    os.environ.pop('PADDLE_CUDA_ARCH_LIST', None)
     nvcc_compile_args += [
         "--use_fast_math",
         "-D_GLIBCXX_USE_CXX11_ABI=1",
