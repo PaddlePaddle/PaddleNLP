@@ -774,7 +774,6 @@ class GenerationBlockInferenceModel(GenerationMixin):
                 save_output(
                     next_tokens,
                     model_kwargs["not_need_stop"],
-                    model_kwargs["msg_queue_id"],
                     self.config.tensor_parallel_rank,
                 )
             return next_tokens

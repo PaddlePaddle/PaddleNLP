@@ -236,13 +236,11 @@ std::vector<paddle::Tensor> GetPaddingOffsetV2(const paddle::Tensor& input_ids,
                                                const paddle::optional<paddle::Tensor>& draft_tokens,
                                                const paddle::optional<paddle::Tensor>& seq_lens_encoder);
 
-void SaveOutMmsg(const paddle::Tensor& x,
+void SaveOutMmsgStatic(const paddle::Tensor& x,
                  const paddle::Tensor& not_need_stop, // cpu
-                 const paddle::Tensor& msg_queue_id,      // cpu
                  int64_t rank_id);
 
-void GetOutput(const paddle::Tensor& x,
-               const paddle::Tensor& msg_queue_id, // cpu
+void GetOutputStatic(const paddle::Tensor& x,
                int64_t rank_id,
                bool wait_flag);
 
@@ -301,8 +299,8 @@ PYBIND11_MODULE(paddlenlp_ops, m) {
   m.def("f_per_token_group_quant", &PerTokenGroupQuant, "PerTokenGroupQuant");
   m.def("f_per_tensor_quant_fp8", &PerTensorQuantFp8, "PerTensorQuantFp8");
   m.def("f_get_padding_offset_v2", &GetPaddingOffsetV2, "GetPaddingOffsetV2");
-  m.def("f_save_output", &SaveOutMmsg, "SaveOutMmsg");
-  m.def("f_get_output", &GetOutput, "GetOutput");
+  m.def("f_save_output", &SaveOutMmsgStatic, "SaveOutMmsgStatic");
+  m.def("f_get_output", &GetOutputStatic, "GetOutputStatic");
   m.def("f_step_paddle", &StepPaddle, "StepPaddle");
   m.def("f_save_output_dygraph", &SaveOutputDygraph, "SaveOutputDygraph");
 //   m.def("f_cutlass_fp8_fp8_half_block_gemm_fused", &cutlass_fp8_fp8_half_block_gemm_fused_func, "cutlass_fp8_fp8_half_block_gemm_fused_func");
@@ -331,8 +329,8 @@ PYBIND11_MODULE(paddlenlp_ops_80, m) {
   m.def("f_per_token_group_quant", &PerTokenGroupQuant, "PerTokenGroupQuant");
   m.def("f_per_tensor_quant_fp8", &PerTensorQuantFp8, "PerTensorQuantFp8");
   m.def("f_get_padding_offset_v2", &GetPaddingOffsetV2, "GetPaddingOffsetV2");
-  m.def("f_save_output", &SaveOutMmsg, "SaveOutMmsg");
-  m.def("f_get_output", &GetOutput, "GetOutput");
+  m.def("f_save_output", &SaveOutMmsgStatic, "SaveOutMmsgStatic");
+  m.def("f_get_output", &GetOutputStatic, "GetOutputStatic");
   m.def("f_step_paddle", &StepPaddle, "StepPaddle");
   m.def("f_save_output_dygraph", &SaveOutputDygraph, "SaveOutputDygraph");
 }
@@ -360,8 +358,8 @@ PYBIND11_MODULE(paddlenlp_ops_90, m) {
   m.def("f_per_token_group_quant", &PerTokenGroupQuant, "PerTokenGroupQuant");
   m.def("f_per_tensor_quant_fp8", &PerTensorQuantFp8, "PerTensorQuantFp8");
   m.def("f_get_padding_offset_v2", &GetPaddingOffsetV2, "GetPaddingOffsetV2");
-  m.def("f_save_output", &SaveOutMmsg, "SaveOutMmsg");
-  m.def("f_get_output", &GetOutput, "GetOutput");
+  m.def("f_save_output", &SaveOutMmsgStatic, "SaveOutMmsgStatic");
+  m.def("f_get_output", &GetOutputStatic, "GetOutputStatic");
   m.def("f_step_paddle", &StepPaddle, "StepPaddle");
   m.def("f_save_output_dygraph", &SaveOutputDygraph, "SaveOutputDygraph");
 }
