@@ -35,7 +35,6 @@ class InferenceModel:
         nranks=1,
         rank=0,
         load_model_from_ipc=False,
-        hot_start=False,
         local_test=False,
     ):
         """
@@ -57,10 +56,8 @@ class InferenceModel:
         self.shared_buffer_to = False
         self.local_test = local_test
         self.first_load = True
-        self.hot_start = hot_start
 
-        # (TODO:gaoziyuan)当前启动服务后直接加载参数，后续进行热启动
-        if load_model_from_ipc and not hot_start:
+        if load_model_from_ipc:
             self.update_parameters()
 
     def _setup_environment(self):
@@ -144,17 +141,17 @@ class InferenceModel:
         array = np.zeros([self.nranks], dtype=np.int32)
         shm = SharedMemory(create=False, size=array.nbytes, name=f"model_weights_status.{pid}")
         value = np.ndarray(array.shape, dtype=array.dtype, buffer=shm.buf)
-        value[self.rank] = status
+        if self.rank == 0:
+            value[self.rank] = status
 
     def update_parameters(self, pid: int = 0) -> None:
         """Update model parameters from IPC state dictionary."""
-        if self.verify_parameters_updated(False) and not self.first_load:
-            logger.info("Parameters already updated.")
-            self._update_shared_status(pid, 2)
-            return
+        self.log_memory_usage("start update parameters")
 
         paddle.device.cuda.empty_cache()
-        self.log_memory_usage("start update parameters")
+        if not self.first_load:
+            paddle.distributed.restart_process_group()
+            logger.info("Paddle distributed restart_process_group.")
 
         if self.local_test:
             current_device_id = int(os.getenv("FLAGS_selected_gpus"))
@@ -168,9 +165,13 @@ class InferenceModel:
             self.verify_parameters_updated()
             self.log_memory_usage("update parameters end")
 
+            if self.nranks > 1:
+                paddle.distributed.barrier()
+
             if not self.first_load:
                 logger.info("send update signal")
-                self._update_shared_status(pid, 2)
+                self._update_shared_status(pid, 0)
+
             self.first_load = False
             return
 
@@ -210,7 +211,9 @@ class InferenceModel:
 
         if not self.first_load:
             logger.info("send update signal")
-            self._update_shared_status(pid, 2)
+            if self.nranks > 1:
+                paddle.distributed.barrier()
+            self._update_shared_status(pid, 0)
 
         self.first_load = False
         self.verify_parameters_updated()
@@ -219,14 +222,10 @@ class InferenceModel:
 
     def clear_parameters(self, pid: int = 0) -> None:
         """Clear all model parameters."""
-        if self.verify_parameters_cleared(False):
-            logger.info("Parameters already cleared!")
-            self._update_shared_status(pid, -2)
-            return
+        self.log_memory_usage("start clear parameters")
 
         start_time = time.time()
         paddle.device.cuda.empty_cache()
-        self.log_memory_usage("start clear parameters")
 
         for name, param in self.model.state_dict().items():
             logger.info(f"Clearing model parameter: {name}")
@@ -237,6 +236,12 @@ class InferenceModel:
 
         self.verify_parameters_cleared()
         logger.info("Model parameters cleared successfully")
+
+        if self.nranks > 1:
+            paddle.distributed.barrier()
+
+        paddle.distributed.shutdown_process_group()
+        logger.info("Paddle distributed shutdown_process_group.")
 
         self._update_shared_status(pid, -2)
         paddle.device.cuda.empty_cache()
@@ -276,7 +281,6 @@ class InferenceModel:
         Returns:
             bool: True if all parameters match, False otherwise
         """
-        logger.info("Verifying parameters are cleared...")
         all_update = True
         for name, param in self.model.state_dict().items():
             if not param._is_initialized():
