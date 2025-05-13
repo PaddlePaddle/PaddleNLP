@@ -88,6 +88,14 @@ nlp_build (){
     python setup.py bdist_wheel
     python -m pip install --ignore-installed  dist/p****.whl
 }
+install_external_ops(){
+    echo -e "\033[31m ---- Install extern_ops  \033"
+    export PYTHONPATH=${nlp_dir}:$PYTHONPATH
+    cd ${nlp_dir}/slm/model_zoo/gpt-3/external_ops
+    python setup.py install
+    python -c "import fused_ln;";
+    cd ${nlp_dir}
+}
 ####################################
 # get diff case
 cd ${nlp_dir}
@@ -99,10 +107,12 @@ for file_name in `git diff --numstat ${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`
     dir3=${arr_file_name[2]}
     dir4=${arr_file_name[3]}
     file_item=$dir1/$dir2/$dir3/$dir4
+    ext="${file_name##*.}"
     echo "file_name:"${file_name}, "dir1:"${dir1}, "dir2:"${dir2},"dir3:"${dir3},".xx:" ${file_name##*.}
+    echo "ext: ${file_name##*.}"
     if [ ! -f ${file_name} ];then # 针对pr删掉文件
         continue
-    elif [[ ${file_name##*.} == "md" ]] || [[ ${file_name##*.} == "rst" ]] || [[ ${dir1} == "docs" ]];then
+    elif [[ "$ext" == "md" || "$ext" == "rst" || "$file_name" == docs/* ]]; then
         continue
     elif [[ "${AGILE_COMPILE_BRANCH}" == "refactor-training-loop" ]];then # 针对特定分支
         P0case_list[${#P0case_list[*]}]=gpt
@@ -196,6 +206,8 @@ if [[ ${#P0case_list[*]} -ne 0 ]];then
     else
         echo "install_paddlenlp_ops_pr done"
     fi
+    # install fused_ln
+    install_external_ops
     python -c "from paddlenlp import __version__; print('paddlenlp version:', __version__)" >> ${log_path}/commit_info.txt
     python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)" >> ${log_path}/commit_info.txt
     python -m pip list >> ${log_path}/commit_info.txt

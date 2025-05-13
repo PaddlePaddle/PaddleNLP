@@ -848,7 +848,8 @@ class BlockInferencePredictorMixin(BasePredictor):
 
         self.pre_cache_length = 0
 
-        self.msg_queue_id = os.getpid()
+        msg_queue_id_str = os.getenv("INFERENCE_MSG_QUEUE_ID", str(os.getpid()))
+        os.environ["INFERENCE_MSG_QUEUE_ID"] = msg_queue_id_str
 
         if config.export_precache:
             pre_cache_npy = np.load(config.prefix_path)
@@ -948,7 +949,6 @@ class BlockInferencePredictorMixin(BasePredictor):
         )
         self.model_inputs["bad_tokens"] = paddle.to_tensor([-1], dtype="int64")
         self.model_inputs["is_block_step"] = paddle.full(shape=[config.batch_size], fill_value=False, dtype="bool")
-        self.model_inputs["msg_queue_id"] = paddle.full(shape=[1], fill_value=self.msg_queue_id, dtype="int32").cpu()
 
         # bloom model needs src_mask and tgt_mask!
         if "bloom" in self.architectures:
@@ -1185,7 +1185,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
 
         read_res_process = mp.Process(
             target=read_res_func,
-            args=[self.model_name_or_path, tensor_queue, result_queue, done_event, self.model_inputs["msg_queue_id"]],
+            args=[self.model_name_or_path, tensor_queue, result_queue, done_event],
         )
         if self.tensor_parallel_rank == 0:
             read_res_process.start()
@@ -1311,7 +1311,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         self.model_inputs["stop_flags"][pos] = False
         self.model_inputs["result_id"][pos][0] = task_id
         self.model_inputs["step_idx"][pos, 0] = 1
-        self.model_inputs["pre_ids"][pos][0] = self.input_ids[query_id][-1]
+        self.model_inputs["pre_ids"][pos][0] = np.array(self.input_ids[query_id][-1])
         self.model_inputs["pre_ids"][pos][1:] = -1
         self.model_inputs["not_need_stop"][0] = True
 
@@ -1477,7 +1477,6 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                     task_queue,
                     result_queue,
                     done_event,
-                    self.model_inputs["msg_queue_id"],
                     len(self.input_ids),
                     detokenize,
                 ],
@@ -1716,7 +1715,7 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
 
         read_res_process = mp.Process(
             target=read_res_func,
-            args=[self.model_name_or_path, tensor_queue, result_queue, done_event, self.model_inputs["msg_queue_id"]],
+            args=[self.model_name_or_path, tensor_queue, result_queue, done_event],
         )
         if self.tensor_parallel_rank == 0:
             read_res_process.start()
