@@ -40,7 +40,6 @@ QuantMapping = {
     "nf4": ("nf4", 4),
     "a8w8linear": ("int8", 8),
     "a8w4linear": ("int8", 8),
-    "fp8linear": ("fp8", 8),
 }
 
 
@@ -207,7 +206,7 @@ def quant_weight_linear(
     bias=None,
     act_state=None,
 ):
-    if weight_quantize_algo in ["a8w8linear", "a8w4linear", "fp8linear"]:
+    if weight_quantize_algo in ["a8w8linear", "a8w4linear"]:
 
         state, training, act_scale = act_state
 
@@ -259,7 +258,6 @@ class QuantizationLinear(nn.Layer):
             "llm.int8",
             "a8w8linear",
             "a8w4linear",
-            "fp8linear",
         ]:
             self.quant_weight = self.create_parameter(
                 shape=[out_features // 2, in_features] if self.quant_weight_bit == 4 else [out_features, in_features],
@@ -268,7 +266,7 @@ class QuantizationLinear(nn.Layer):
             )
             if self.quantization_config.group_size == -1:
                 self.quant_scale = self.create_parameter(
-                    shape=[out_features] if self.weight_quantize_algo not in ["fp8linear"] else [1],
+                    shape=[out_features],
                     dtype=self._dtype,
                     is_bias=False,
                 )
@@ -276,7 +274,7 @@ class QuantizationLinear(nn.Layer):
             else:
                 # TODO(lugimzzz): support groupwise in next PR
                 raise NotImplementedError("Not yet support grouwise weightonly quantization.")
-            if self.weight_quantize_algo in ["a8w8linear", "a8w4linear", "fp8linear"]:
+            if self.weight_quantize_algo in ["a8w8linear", "a8w4linear"]:
                 self.act_scale = self.create_parameter(
                     shape=[], dtype=self._dtype, is_bias=False, default_initializer=nn.initializer.Constant(value=0.0)
                 )
@@ -355,7 +353,7 @@ class QuantizationLinear(nn.Layer):
             else None,
             bias=self.bias,
             act_state=(self.state, self.training, self.act_scale)
-            if self.weight_quantize_algo in ["a8w8linear", "a8w4linear", "fp8linear"]
+            if self.weight_quantize_algo in ["a8w8linear", "a8w4linear"]
             else None,
         )
         if self.training:
@@ -414,7 +412,6 @@ class ColumnParallelQuantizationLinear(nn.Layer):
             "llm.int8",
             "a8w8linear",
             "a8w4linear",
-            "fp8linear",
         ]:
             self.quant_weight = self.create_parameter(
                 shape=[self.output_size_per_partition // 2, in_features]
@@ -429,7 +426,7 @@ class ColumnParallelQuantizationLinear(nn.Layer):
 
             if self.quantization_config.group_size == -1:
                 self.quant_scale = self.create_parameter(
-                    shape=[self.output_size_per_partition] if self.weight_quantize_algo not in ["fp8linear"] else [1],
+                    shape=[self.output_size_per_partition],
                     dtype=self._dtype,
                     is_bias=False,
                 )
@@ -440,7 +437,7 @@ class ColumnParallelQuantizationLinear(nn.Layer):
             else:
                 # TODO(lugimzzz): support groupwise in next PR
                 raise NotImplementedError("Not yet support grouwise weightonly quantization.")
-            if self.weight_quantize_algo in ["a8w8linear", "a8w4linear", "fp8linear"]:
+            if self.weight_quantize_algo in ["a8w8linear", "a8w4linear"]:
                 self.act_scale = self.create_parameter(
                     shape=[], dtype=self._dtype, is_bias=False, default_initializer=nn.initializer.Constant(value=0.0)
                 )
@@ -487,7 +484,7 @@ class ColumnParallelQuantizationLinear(nn.Layer):
             else None,
             bias=self.bias,
             act_state=(self.state, self.training, self.act_scale)
-            if self.weight_quantize_algo in ["a8w8linear", "a8w4linear", "fp8linear"]
+            if self.weight_quantize_algo in ["a8w8linear", "a8w4linear"]
             else None,
         )
         if self.training:
@@ -553,7 +550,6 @@ class RowParallelQuantizationLinear(nn.Layer):
             "llm.int8",
             "a8w8linear",
             "a8w4linear",
-            "fp8linear",
         ]:
             self.quant_weight = self.create_parameter(
                 shape=[out_features // 2, self.input_size_per_partition]
@@ -568,7 +564,7 @@ class RowParallelQuantizationLinear(nn.Layer):
 
             if self.quantization_config.group_size == -1:
                 self.quant_scale = self.create_parameter(
-                    shape=[out_features] if self.weight_quantize_algo not in ["fp8linear"] else [1],
+                    shape=[out_features],
                     dtype=self._dtype,
                     is_bias=False,
                 )
@@ -579,7 +575,7 @@ class RowParallelQuantizationLinear(nn.Layer):
             else:
                 # TODO(lugimzzz): support groupwise in next PR
                 raise NotImplementedError("Not yet support grouwise weightonly quantization.")
-            if self.weight_quantize_algo in ["a8w8linear", "a8w4linear", "fp8linear"]:
+            if self.weight_quantize_algo in ["a8w8linear", "a8w4linear"]:
                 self.act_scale = self.create_parameter(
                     shape=[1], dtype=self._dtype, is_bias=False, default_initializer=nn.initializer.Constant(value=0.0)
                 )
@@ -620,7 +616,7 @@ class RowParallelQuantizationLinear(nn.Layer):
                 else None,
                 bias=None,
                 act_state=(self.state, self.training, self.act_scale)
-                if self.weight_quantize_algo in ["a8w8linear", "a8w4linear", "fp8linear"]
+                if self.weight_quantize_algo in ["a8w8linear", "a8w4linear"]
                 else None,
             )
             if self.sequence_parallel:
@@ -648,7 +644,7 @@ class RowParallelQuantizationLinear(nn.Layer):
                 else None,
                 bias=self.bias,
                 act_state=(self.state, self.training, self.act_scale)
-                if self.weight_quantize_algo in ["a8w8linear", "a8w4linear", "fp8linear"]
+                if self.weight_quantize_algo in ["a8w8linear", "a8w4linear"]
                 else None,
             )
         if self.training:
