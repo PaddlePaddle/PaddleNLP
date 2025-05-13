@@ -159,7 +159,7 @@ class ScoreModelMixin:
                     hcg = dist.fleet.get_hybrid_communicate_group()
                     group = hcg.get_sharding_parallel_group()
                     dist.all_gather(gathered_end_score_list, end_score, group)
-                except:
+                except Exception:
                     dist.all_gather(gathered_end_score_list, end_score)
                 gathered_end_score = paddle.concat(gathered_end_score_list, axis=0)
                 self.normalizer.update(gathered_end_score)
@@ -189,7 +189,8 @@ class ScoreModelMixin:
             mode (bool, optional): Whether to normalize the input data, default is True. Defaults to True.
 
         Returns:
-            None: No return value, directly modifies the instance's do_normalize attribute and the do_normalize attribute in config.
+            None: No return value, directly modifies the instance's do_normalize attribute and the do_normalize
+                attribute in config.
 
         Raises:
             None: No exceptions are raised.

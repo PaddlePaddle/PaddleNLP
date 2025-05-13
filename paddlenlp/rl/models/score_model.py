@@ -25,6 +25,8 @@ from .score_model_utils import ScoreModelMixin, ScoreModelOutput
 
 
 class AutoModelForScore(ScoreModelMixin, PretrainedModel):
+    """AutoModelForScore class"""
+
     _keys_to_ignore_on_load_missing = ["lm_head.weight"]
 
     def __init__(self, config: PretrainedConfig, **kwargs: Any) -> None:
@@ -107,13 +109,15 @@ class AutoModelForScore(ScoreModelMixin, PretrainedModel):
             input_ids (paddle.Tensor):
                 IDs of the input sequences, with shape (batch_size, sequence_length).
             attention_mask (paddle.Tensor):
-                Mask used to distinguish padding and non-padding elements, with shape (batch_size, sequence_length), values are 0 or 1.
+                Mask used to distinguish padding and non-padding elements, with shape (batch_size, sequence_length),
+                values are 0 or 1.
             position_ids (paddle.Tensor, optional):
                 Position IDs corresponding to input_ids, with shape (batch_size, sequence_length), default is None.
             past_key_values (list[paddle.Tensor], optional):
                 Contains all preprocessed keys and values, default is None.
             inputs_embeds (paddle.Tensor, optional):
-                Embeddings of the input sequences, with shape (batch_size, sequence_length, embedding_dimension), default is None.
+                Embeddings of the input sequences, with shape (batch_size, sequence_length, embedding_dimension),
+                default is None.
             use_cache (bool, optional):
                 Whether to use caching, default is None.
             output_attentions (bool, optional):
@@ -125,7 +129,8 @@ class AutoModelForScore(ScoreModelMixin, PretrainedModel):
 
         Returns:
             tuple[paddle.Tensor, paddle.Tensor] or ScoreModelOutput:
-                If `return_dict` is True, returns a tuple of ScoreModelOutput type containing two elements: score and additional information; otherwise, returns a tuple containing the score and additional information.
+                If `return_dict` is True, returns a tuple of ScoreModelOutput type containing two elements: score and
+                additional information; otherwise, returns a tuple containing the score and additional information.
         Raises:
             AssertionError:
                 Raised when `attention_mask` is not None.

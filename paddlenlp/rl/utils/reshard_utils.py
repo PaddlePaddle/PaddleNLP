@@ -31,6 +31,16 @@ from paddlenlp.utils.log import logger
 
 @contextmanager
 def init_rollout_env(tensor_parallel_degree, seed=100):
+    """
+    Initialize the rollout environment for parallel training.
+
+    Args:
+        tensor_parallel_degree (int): Tensor parallel degree, indicating how many GPUs the model is distributed across.
+        seed (int, optional): Random seed, defaults to 100.
+
+    Returns:
+        ContextManager: A context manager for controlling the initialization and cleanup of the rollout environment.
+    """
     hcg = fleet.get_hybrid_communicate_group()
     hcg_mp_group_func = hcg.get_model_parallel_group
     hcg_mp_size_func = hcg.get_model_parallel_world_size
@@ -93,6 +103,23 @@ def init_rollout_env(tensor_parallel_degree, seed=100):
 
 @paddle.no_grad()
 def pp_reshard(tgt_tensor, src_model_state_dict, src_tensor_meta_info, pp_rank, pp_group):
+    """
+    Redistribute tensors from the source model state dictionary to match the target batch size and return the
+        redistributed tensor.
+
+    Args:
+        tgt_tensor (paddle.Tensor): The target tensor, used to determine the data type and shape of the redistributed tensor.
+        src_model_state_dict (dict): The source model state dictionary, containing tensors that need to be redistributed.
+        src_tensor_meta_info (dict): Metadata of the source tensor, containing the following key-value pairs:
+            - "pipeline_key" (str): The key name of the source tensor in the source model state dictionary.
+            - "pipeline_src_rank" (int): The source batch size rank to which the source tensor belongs.
+            - "shape" (tuple): The shape of the source tensor.
+        pp_rank (int): The rank of the current process in the pipeline group.
+        pp_group (paddle.distributed.ProcessGroup): The pipeline group used for broadcast operations.
+
+    Returns:
+        paddle.Tensor: The redistributed tensor, with the same data type and shape as the target tensor.
+    """
     src_tensor_key = src_tensor_meta_info["pipeline_key"]
     src_tensor_pp_rank = src_tensor_meta_info["pipeline_src_rank"]
     src_tensor_shape = src_tensor_meta_info["shape"]
@@ -106,7 +133,12 @@ def pp_reshard(tgt_tensor, src_model_state_dict, src_tensor_meta_info, pp_rank, 
         resharded_tensor = paddle.empty(src_tensor_shape)
 
     resharded_tensor = resharded_tensor.astype(tgt_tensor.dtype)
-    dist.broadcast(resharded_tensor, src=pp_group.ranks[src_tensor_pp_rank], group=pp_group, sync_op=True)
+    dist.broadcast(
+        resharded_tensor,
+        src=pp_group.ranks[src_tensor_pp_rank],
+        group=pp_group,
+        sync_op=True,
+    )
     return resharded_tensor
 
 
@@ -118,6 +150,25 @@ def mp_reshard(
     train_tp_group,
     rollout_tp_group,
 ):
+    """
+    Convert the model parameters from the training TP distribution to the rollout TP distribution and return the new tensor.
+    If the distributions of the two TP groups are the same, the original tensor is returned directly.
+
+    Args:
+        src_tensor (paddle.Tensor, optional): The tensor to be converted, defaults to None.
+        tgt_tensor (paddle.Tensor, optional): The target tensor to store the converted tensor, defaults to None.
+        meta_dict (dict, optional): A dictionary containing meta-information such as whether it is distributed and the split_axis,
+            defaults to None.
+        train_tp_group (paddle.distributed.DistributedGroup, optional): The distribution of the training TP group, defaults to None.
+        rollout_tp_group (paddle.distributed.DistributedGroup, optional): The distribution of the rollout TP group, defaults to None.
+
+    Returns:
+        paddle.Tensor, optional: The converted tensor. If the distributions of the two TP groups are the same, the original tensor is
+            returned directly.
+
+    Raises:
+        None
+    """
     if rollout_tp_group.nranks == train_tp_group.nranks:
         return src_tensor
 
@@ -140,6 +191,28 @@ def mp_reshard(
 
 
 def init_reshard_mappings(model, training_args, pp_rank, pp_group):
+    """
+    Initialize reshard mappings and return a global metadata dictionary.
+    If the model is trained with multiple pipeline parallelism degrees,
+    it will set pipeline name mappings. If the training model is single pipeline parallelism,
+    it will replace all parameter names with names without the '_layers.' prefix.
+    Then, for each parameter, create a tuple containing the parameter name, pipeline key,
+    source rank, shape, and whether it is distributed.
+    Finally, if the training model has multiple pipeline parallelism degrees,
+    use the `dist.all_gather_object` function to merge the local metadata dictionary
+    with the metadata dictionaries of other processes.
+
+    Args:
+        model (paddle.nn.Layer): Model instance.
+        training_args (obj:`TrainingArguments`): Training configuration instance, including pipeline parallelism.
+        pp_rank (int, optional): Horizontal parallelism rank of the current process (default: 0).
+        pp_group (obj:`dist.ProcessGroup`, optional): Horizontal parallelism process group of the current process
+            (default: None).
+
+    Returns:
+        dict: Global metadata dictionary, including pipeline key, source rank, shape, and distribution status for each
+            parameter.
+    """
     global_meta_dict = {}
     if training_args.pipeline_parallel_degree > 1:
         model._layers._set_pipeline_name_mapping()
@@ -178,8 +251,33 @@ def init_reshard_mappings(model, training_args, pp_rank, pp_group):
 
 @paddle.no_grad()
 def reshard_to_rollout(
-    train_model, rollout_model, global_meta_dict, pp_rank, pp_group, rollout_tp_group, train_tp_group
+    train_model,
+    rollout_model,
+    global_meta_dict,
+    pp_rank,
+    pp_group,
+    rollout_tp_group,
+    train_tp_group,
 ):
+    """
+    Convert the model from training mode to inference mode and redistribute its parameters to meet the requirements of distributed and
+        parallel computing.
+
+    Args:
+        train_model (paddle.nn.Layer): The original model, which should be in training mode.
+        rollout_model (paddle.nn.Layer): The target model, which should be in inference mode.
+        global_meta_dict (dict): A dictionary containing meta-information about each parameter, including names, sizes, etc.
+        pp_rank (int): The global process ID of the current process (prediction process).
+        pp_group (paddle.distributed.ProcessGroup): The prediction process group.
+        rollout_tp_group (paddle.distributed.ProcessGroup): The inference process group.
+        train_tp_group (paddle.distributed.ProcessGroup): The training process group.
+
+    Returns:
+        None: This function does not return any value.
+
+    Raises:
+        None: This function does not raise any exceptions.
+    """
     train_model_state_dict = train_model.state_dict()
     rollout_model_state_dict = rollout_model.state_dict()
     param_numel = [(k, np.prod(v.shape)) for k, v in rollout_model_state_dict.items()]

@@ -91,7 +91,55 @@ from .trainer_utils import (
 )
 
 
+def save_paddle_dict(save_path, global_steps, batch_dict):
+    """
+    aadiff function.
+    save_paddle_dict for paddlenlp rl.
+
+    step1: save paddle.Tensor to np.ndarray using save_paddle_dict
+    step2: load paddle.Tensor from np.ndarray using load_paddle_dict
+    """
+
+    save_dict = {}
+    for dict_name, dict_obj in batch_dict.items():
+        if isinstance(dict_obj, paddle.Tensor):
+            dict_obj = dict_obj.numpy()
+        elif isinstance(dict_obj, np.ndarray):
+            pass
+        else:
+            raise TypeError(f"{dict_name} must be a paddle.Tensor or np.ndarray.")
+
+        save_dict[dict_name] = dict_obj
+
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+    np.savez(os.path.join(save_path, f"{global_steps}.npz"), **save_dict)
+
+
+def load_paddle_dict(load_path, global_steps):
+    """
+    aadiff function.
+    load_paddle_dict for paddlenlp rl.
+
+    step1: save paddle.Tensor to np.ndarray using save_paddle_dict
+    step2: load paddle.Tensor from np.ndarray using load_paddle_dict
+    """
+
+    batch_dict = {}
+    loaded_dict = np.load(os.path.join(load_path, f"{global_steps}.npz"), allow_pickle=True)
+    for dict_name, dict_obj in loaded_dict.items():
+        if dict_name in ["log_probs", "ref_log_probs"]:
+            continue
+        try:
+            batch_dict[dict_name] = paddle.to_tensor(dict_obj)
+        except Exception:
+            batch_dict[dict_name] = dict_obj
+    return batch_dict
+
+
 class PPOMetric:
+    """Metrics used during training"""
+
     def set_metric_meta(self):
         """
         Set the meta-information of metrics, including metric names and operations.
@@ -206,6 +254,8 @@ class PPOMetric:
 
 
 class PPOTrainer(Trainer):
+    """PPO trainer"""
+
     def __init__(
         self,
         actor_model: Union[PretrainedModel, nn.Layer],
@@ -264,13 +314,25 @@ class PPOTrainer(Trainer):
             # process of trainer, while changing some args to avoid model usage
             # in __init__ such as recompute and AMP-O2
             super().__init__(
-                (actor_model, reference_model, reward_model, critic_model, actor_model_eval, critic_model_eval),
+                (
+                    actor_model,
+                    reference_model,
+                    reward_model,
+                    critic_model,
+                    actor_model_eval,
+                    critic_model_eval,
+                ),
                 criterion,
                 args,
                 data_collator,
                 train_dataset,
                 eval_dataset,
-                (actor_tokenizer, reference_tokenizer, reward_tokenizer, critic_tokenizer),
+                (
+                    actor_tokenizer,
+                    reference_tokenizer,
+                    reward_tokenizer,
+                    critic_tokenizer,
+                ),
                 compute_metrics,
                 callbacks,
                 optimizers,
@@ -374,6 +436,15 @@ class PPOTrainer(Trainer):
         optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
         preprocess_logits_for_metrics: Optional[Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor]] = None,
     ):
+        """
+        Create an actor trainer for policy gradient training.
+
+        This method initializes an actor trainer with the provided model, loss function, training arguments,
+        datasets, tokenizer, metrics computation function, callbacks, optimizers, and logits preprocessing function.
+
+        Returns:
+            ActorReferenceTrainer: The initialized actor trainer.
+        """
         policy_training_args = copy.deepcopy(args)
         lr_scheduler = self.get_scheduler(policy_training_args)
         actor_trainer = ActorReferenceTrainer(
@@ -412,6 +483,15 @@ class PPOTrainer(Trainer):
         optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
         preprocess_logits_for_metrics: Optional[Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor]] = None,
     ):
+        """
+        Create a critic trainer for value function training.
+
+        This method initializes a critic trainer with the provided model, loss function, training arguments,
+        datasets, tokenizer, metrics computation function, callbacks, optimizers, and logits preprocessing function.
+
+        Returns:
+            CriticTrainer: The initialized critic trainer.
+        """
         value_training_args = copy.deepcopy(args)
         for attr_name in [
             "critic_learning_rate",
@@ -463,6 +543,15 @@ class PPOTrainer(Trainer):
         optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
         preprocess_logits_for_metrics: Optional[Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor]] = None,
     ):
+        """
+        Create a reference trainer for the actor-critic method.
+
+        This method initializes a reference trainer with the provided model, loss function, training arguments,
+        datasets, tokenizer, metrics computation function, callbacks, optimizers, and logits preprocessing function.
+
+        Returns:
+            ActorReferenceTrainer: The initialized reference trainer.
+        """
         with guard_set_args(
             args,
             {
@@ -507,6 +596,16 @@ class PPOTrainer(Trainer):
         optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
         preprocess_logits_for_metrics: Optional[Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor]] = None,
     ):
+        """
+        Create a reward trainer for training the reward model.
+
+        This method initializes a reward trainer with the provided model, loss function, training arguments,
+        datasets, tokenizer, metrics computation function, callbacks, optimizers, logits preprocessing function,
+        and optionally sets the reward server.
+
+        Returns:
+            RewardTrainer: The initialized reward trainer.
+        """
         with guard_set_args(
             args,
             {
@@ -550,7 +649,8 @@ class PPOTrainer(Trainer):
             paddle.nn.Layer, optional - The reference model, return None if it doesn't exist.
 
         Raises:
-            Exception - An exception will be raised if the reference_trainer is not initialized before calling this method.
+            Exception - An exception will be raised if the reference_trainer is not initialized before calling this
+            method.
         """
         return self.reference_trainer.get_model(train=False)
 
@@ -570,7 +670,8 @@ class PPOTrainer(Trainer):
     @property
     def actor_model(self):
         """
-        Get the current actor model. If in training mode, return the trained model; otherwise, return the model for evaluation.
+        Get the current actor model. If in training mode, return the trained model; otherwise, return the model for
+        evaluation.
 
         Returns:
             paddle.nn.Layer: The actor model.
@@ -588,7 +689,9 @@ class PPOTrainer(Trainer):
         return self.critic_trainer.get_model(train=self.training)
 
     def set_train(self, mode: bool = True) -> None:
-        """Set training mode for all models."""
+        """
+        Set training mode for all models.
+        """
         if mode:
             self.training = True
             self.actor_model.train()
@@ -601,7 +704,9 @@ class PPOTrainer(Trainer):
                 self.critic_model.eval()
 
     def set_eval(self) -> None:
-        """Set model to evaluation mode."""
+        """
+        Set model to evaluation mode.
+        """
         self.set_train(mode=False)
 
     def get_scheduler(self, args):
@@ -769,7 +874,8 @@ class PPOTrainer(Trainer):
             prediction_loss_only (Optional[bool]): Whether to only compute the prediction loss. Default is None.
             ignore_keys (Optional[List[str]]): A list of keys to ignore. Default is None.
             metric_key_prefix (str): The prefix for metric keys. Default is 'eval'.
-            max_eval_iters (Optional[int]): The maximum number of evaluation iterations. Default is -1, which means no limit.
+            max_eval_iters (Optional[int]): The maximum number of evaluation iterations. Default is -1, which means no
+                limit.
 
         Returns:
             EvalLoopOutput: An instance of the class containing evaluation results and metrics.
@@ -823,8 +929,8 @@ class PPOTrainer(Trainer):
 
     def get_eval_dataloader(self, eval_dataset: Optional[Dataset] = None) -> DataLoader:
         """
-        Get the DataLoader for evaluating the model. If `eval_dataset` is not provided, `self.eval_dataset` will be used.
-        This function sets a parameter named "data_collator" and passes it to `super().get_eval_dataloader()`.
+        Get the DataLoader for evaluating the model. If `eval_dataset` is not provided, `self.eval_dataset` will be
+        used. This function sets a parameter named "data_collator" and passes it to `super().get_eval_dataloader()`.
 
         Args:
             eval_dataset (Optional[Dataset], optional): The dataset used for evaluation. Defaults to None.
@@ -838,7 +944,8 @@ class PPOTrainer(Trainer):
     def _save_checkpoint(self, model, metrics=None):
         """
         Save the model and metrics to two separate checkpoints, one for the policy model and one for the value model.
-        This method uses `guard_set_args` to prevent modifying the original parameters when `_save_checkpoint` is called.
+        This method uses `guard_set_args` to prevent modifying the original parameters when `_save_checkpoint` is
+        called.
 
         Args:
             model (nn.Module): The model to be saved.
@@ -917,7 +1024,8 @@ class PPOTrainer(Trainer):
                 Defaults to False.
 
         Raises:
-            ValueError: If `output_dir` is not within the current working directory, a ValueError exception will be raised.
+            ValueError: If `output_dir` is not within the current working directory, a ValueError exception will be
+            raised.
         """
         if output_dir is None:
             output_dir = self.args.output_dir
@@ -999,7 +1107,8 @@ class PPOTrainer(Trainer):
             tuple (int, Optional[int], int, int, int, int, int):
                 A tuple containing:
                 1. total_train_batch_size (int) - The total batch size for training.
-                2. len_dataloader (Optional[int]) - The length of the DataLoader if it is not an iterable dataset; otherwise, None.
+                2. len_dataloader (Optional[int]) - The length of the DataLoader if it is not an iterable dataset;
+                    otherwise, None.
                 3. max_steps (int) - The maximum number of training steps.
                 4. num_train_epochs (int) - The maximum number of training epochs.
                 5. num_update_steps_per_epoch (int) - The number of model updates per epoch.
@@ -1078,6 +1187,21 @@ class PPOTrainer(Trainer):
         return rl_loss
 
     def remove_pad_tokens_after_generate(self, generated_batches):
+        """
+        Remove padding tokens from each generated sequence. If `use_rm_server` is enabled,
+        also remove padding tokens from label IDs.
+
+        Args:
+            generated_batches (List[Dict]): A list of dictionaries containing "input_ids" and optionally "label_ids".
+
+        Returns:
+            Tuple[List[List], List[int], Optional[List[List]]]:
+                - cleanup_batches (List[List]): A list of cleaned up sequences, where each element is a list of token
+                IDs.
+                - indices (List[int]): The original indices of the batches.
+                - label_ids_batches (Optional[List[List]]): If `use_rm_server` is enabled, a list of cleaned up label
+                IDs. Otherwise, None.
+        """
         cleanup_batches, indices, label_ids_batches = [], [], []
 
         for batch in generated_batches:
@@ -1109,6 +1233,19 @@ class PPOTrainer(Trainer):
         return cleanup_batches, indices, label_ids_batches
 
     def truncate_batch_data(self, batch, truncate_max_len):
+        """
+        Truncate batch data to the specified maximum length.
+        This method reduces the size of the batch by removing elements from the beginning or end,
+        until the batch size reaches the specified maximum length.
+
+        Args:
+            batch (List[Dict]): A list of dictionaries, where each dictionary contains batch data
+                such as token_ids and attention_mask.
+            truncate_max_len (int): The maximum length to truncate the batch to.
+
+        Returns:
+            List[Dict]: The truncated batch data, in the same format as the original batch.
+        """
         if len(batch) > truncate_max_len:
             batch = self.tokenizer.truncate_sequences(
                 batch,
@@ -1120,11 +1257,31 @@ class PPOTrainer(Trainer):
     def pad_batch_data(
         self,
         input_ids: List[paddle.Tensor],
-        label_ids: List[paddle.Tensor] = None,
+        label_ids: Optional[List[paddle.Tensor]] = None,
         padding_strategy="longest",
         padding_max_len=None,
         pad_to_multiple_of=None,
     ):
+        """
+        Pad the batch data to ensure uniform dimensions.
+
+        This method pads the input token IDs and optionally the label IDs to ensure they have uniform dimensions.
+        It uses the tokenizer's padding method and a custom padding function for label IDs.
+
+        Args:
+            input_ids (List[paddle.Tensor]): A list of input token IDs tensors.
+            label_ids (Optional[List[paddle.Tensor]]): Optionally, a list of label IDs tensors.
+            padding_strategy (str): The padding strategy to use.
+            padding_max_len (Optional[int]): Optionally, the maximum length to pad to.
+            pad_to_multiple_of (Optional[int]): Optionally, pad the input to be a multiple of this value.
+
+        Returns:
+            Tuple[paddle.Tensor, Optional[paddle.Tensor], paddle.Tensor]:
+                - input_ids (paddle.Tensor): The padded input token IDs tensor.
+                - label_ids (Optional[paddle.Tensor]): Optionally, the padded label IDs tensor.
+                - position_ids (paddle.Tensor): The position IDs tensor corresponding to the input token IDs.
+        """
+        # logger.debug(f"pad_batch_data {input_ids}")
         input_ids = self.tokenizer.pad(
             {"input_ids": input_ids},
             padding=padding_strategy,
@@ -1145,7 +1302,18 @@ class PPOTrainer(Trainer):
         return input_ids, label_ids, position_ids
 
     def distribute_gather_and_pad_data(self, batch):
-        # group index for grpo
+        """
+        Distribute, gather, and pad the batch data for distributed training.
+
+        This method processes the batch data to ensure it is properly distributed, gathered,
+        and padded for distributed training. It handles data parallel and sharding parallel groups.
+
+        Args:
+            batch (Dict): A dictionary containing the batch data.
+
+        Returns:
+            Dict: A new dictionary with the processed batch data.
+        """
         eos_mask = (batch["input_ids"] != self.tokenizer.pad_token_id)[:, batch["prompt"].shape[-1] :].to(
             batch["log_probs"].dtype  # fix dtype
         )
@@ -1170,9 +1338,31 @@ class PPOTrainer(Trainer):
         return new_batch
 
     def get_rank_data(self, tensor):
+        """
+        Get the data corresponding to the current rank from the split tensor.
+
+        Args:
+            tensor (Tensor, tuple[int]): The tensor to be split, in the form of (tensor, num_splits).
+
+        Returns:
+            Tensor: The data corresponding to the current rank.
+        """
         return tensor.split(self.args.dataset_world_size)[self.args.dataset_rank]
 
     def distribute_get_rank_data(self, local_batch, global_batch):
+        """
+        Distribute the global batch data to each rank and retrieve the corresponding local data.
+        This is used in algorithms like REINFORCE++, where global data needs to be accessed.
+
+        Args:
+            local_batch (dict): The local batch data, containing keys like "log_probs".
+            global_batch (dict): The global batch data, containing keys like "reward_advantages".
+
+        Returns:
+            dict: The updated local batch data, containing keys like "reward_advantages".
+            For algorithms like REINFORCE++, additional keys like "reward_returns", "kl_rewards", and
+            "rewards_with_kl" are included.
+        """
         local_data = {
             "reward_advantages": self.get_rank_data(global_batch["reward_advantages"]),
             "rewards": self.get_rank_data(global_batch["rewards"]),
@@ -1197,7 +1387,16 @@ class PPOTrainer(Trainer):
         return local_batch
 
     def _balance_batch(self, micro_batches):
-        """Reorder the data such that each dp/sharding rank gets similar total tokens"""
+        """
+        Reorder the data such that each data parallel/sharding rank gets a similar total number of tokens.
+
+        Args:
+            micro_batches (list|dict): The input micro-batches, which can be a list of tensors or a dictionary of
+            tensors.
+
+        Returns:
+            list|dict: The balanced micro-batches, in the same format as the input.
+        """
         if isinstance(micro_batches, list):
             need_combine_and_split = True
         else:
@@ -1213,13 +1412,16 @@ class PPOTrainer(Trainer):
             hcg = fleet.get_hybrid_communicate_group()
             sharding_parallel_group = hcg.get_sharding_parallel_group()
             data_parallel_group = hcg.get_data_parallel_group()
-        except:
+        except Exception:
             sharding_parallel_group = None
             data_parallel_group = None
 
         total_unbalance_batch = defaultdict(list)
         if need_combine_and_split:
-            unbalance_micro_batch = combine_micro_batches_into_batch(micro_batches, pad_token_id=self.tokenizer.pad_token_id)  # fmt:skip
+            unbalance_micro_batch = combine_micro_batches_into_batch(
+                micro_batches,
+                pad_token_id=self.tokenizer.pad_token_id,
+            )
         else:
             unbalance_micro_batch = micro_batches
         for key in unbalance_micro_batch:
@@ -1439,8 +1641,16 @@ class PPOTrainer(Trainer):
 
                 # padding data
                 pad_to_multiple_of = self.args.tensor_parallel_degree if self._model_config.sequence_parallel else None
-                input_ids, label_ids, position_ids = self.pad_batch_data(truncate_input_ids, label_ids_batches, pad_to_multiple_of=pad_to_multiple_of)  # fmt: skip
-                prompt_len = paddle.full(shape=[expand_prompt.shape[0]], fill_value=expand_prompt.shape[1], dtype=expand_prompt.dtype)  # fmt: skip
+                input_ids, label_ids, position_ids = self.pad_batch_data(
+                    truncate_input_ids,
+                    label_ids_batches,
+                    pad_to_multiple_of=pad_to_multiple_of,
+                )
+                prompt_len = paddle.full(
+                    shape=[expand_prompt.shape[0]],
+                    fill_value=expand_prompt.shape[1],
+                    dtype=expand_prompt.dtype,
+                )
                 prompt_len_without_pad = prompt_only_batch["raw_prompt_len_expand"]
                 response_len_without_pad = input_ids_len - prompt_len
 
@@ -1502,8 +1712,17 @@ class PPOTrainer(Trainer):
 
                             if self.args.rl_algorithm == "ppo":
                                 batch["reward_values"] = self.critic_trainer.compute_value(**batch)
+                # when aadiff, open the blow line
+                AA_DIFF = os.environ.get("AA_DIFF", "0")
+                BASE_PATH = os.environ.get("AA_DIFF_PATH", "")
+                if AA_DIFF == "1":
+                    save_paddle_dict(
+                        os.path.join(BASE_PATH, "save_paddle_dict", f"rank{dist.get_rank()}"),
+                        self.state.global_step,
+                        batch,
+                    )
 
-                # danamic sampling: filter generated samples by rewards, keep generating until valid samples are enough
+                # dynamic sampling: filter generated samples by rewards, keep generating until valid samples are enough
                 if self.args.dynamic_sampling:
                     local_valid_prompt = 0
                     # combined_batch = combine_micro_batches_into_batch(micro_batches, pad_token_id=self.tokenizer.pad_token_id)
@@ -1520,7 +1739,7 @@ class PPOTrainer(Trainer):
                         hcg = fleet.get_hybrid_communicate_group()
                         sharding_parallel_group = hcg.get_sharding_parallel_group()
                         data_parallel_group = hcg.get_data_parallel_group()
-                    except:
+                    except Exception:
                         is_fleet_init = False
                         sharding_parallel_group = None
                         data_parallel_group = None
@@ -1623,7 +1842,11 @@ class PPOTrainer(Trainer):
 
                 # step 3: train actor model and critic model with rollout data
                 self.set_train()
-                with TimerScope(self.timers, ActorStages.MODEL_ENABLE_DISABLE, minus_names=[ActorStages.RL_STEP]):
+                with TimerScope(
+                    self.timers,
+                    ActorStages.MODEL_ENABLE_DISABLE,
+                    minus_names=[ActorStages.RL_STEP],
+                ):
                     with reload_and_offload_scope(self, self.actor_model, self.actor_trainer.optimizer):
                         with TimerScope(self.timers, ActorStages.RL_STEP):
                             # timer_info = {} # prepare for each micro_step
@@ -1754,12 +1977,13 @@ class PPOTrainer(Trainer):
         If the control variables indicate evaluation is required, evaluate the model and save the results to disk.
 
         Args:
-            tr_loss (Optional[Dict[str, float]], optional): Training losses in dictionary form, with keys 'train_policy_loss' and 'train_ptx_loss'.
-                If None, nothing will be logged. Defaults to None.
+            tr_loss (Optional[Dict[str, float]], optional): Training losses in dictionary form, with keys
+            'train_policy_loss' and 'train_ptx_loss'. If None, nothing will be logged. Defaults to None.
             model (Model): The model to be evaluated.
             epoch (int): The current epoch number.
             ignore_keys_for_eval (List[str]): A list of keys to ignore during evaluation. Defaults to an empty list.
-            kwargs (Any, optional): Additional optional parameters that will be passed to the `log()` and `save()` methods. Defaults to an empty dictionary.
+            kwargs (Any, optional): Additional optional parameters that will be passed to the `log()` and `save()`
+            methods. Defaults to an empty dictionary.
 
         Returns:
             None.
@@ -1808,7 +2032,9 @@ class PPOTrainer(Trainer):
         start: int,
         use_tgt_len_return: bool = True,
     ) -> Tuple[paddle.Tensor, paddle.Tensor]:
-        """Compute advantages and returns using Generalized Advantage Estimation (GAE)."""
+        """
+        Compute advantages and returns using Generalized Advantage Estimation (GAE).
+        """
         # Modified from https://github.com/CarperAI/trlx/blob/main/trlx/models/modeling_ppo.py
         last_gae_lambda = 0.0
         advantages_reversed = []
@@ -1853,6 +2079,20 @@ class PPOTrainer(Trainer):
 
     @paddle.no_grad()
     def compute_reward_normalization(self, batch):
+        """
+        Compute reward normalization.
+        This method normalizes the rewards using the all_gather function to aggregate data across ranks.
+
+        Args:
+            batch (dict): A dictionary containing the "rewards" key, which is a tensor of rewards with dtype float32,
+                representing the reward for each token.
+
+        Returns:
+            dict: A new dictionary with the normalized rewards.
+
+        Raises:
+            AttributeError: If the hybrid communicate group is not available.
+        """
         batch_rewards = batch["rewards"].cast(paddle.float32)
 
         try:
@@ -1896,6 +2136,9 @@ class PPOTrainer(Trainer):
 
     @paddle.no_grad()
     def compute_advantage(self, batch, use_tgt_len_value):
+        """
+        Compute the advantage and return for the given batch.
+        """
         if "log_probs" in batch:
             old_log_probs = batch["log_probs"]  # length: src + tgt -1
         if "ref_log_probs" in batch:
@@ -1980,6 +2223,19 @@ class PPOTrainer(Trainer):
 
     @paddle.no_grad()
     def compute_advantage_normalization(self, batch):
+        """
+        Compute the advantage function for reinforcement learning.
+
+        Args:
+            batch (dict): A dictionary containing the batch data.
+            use_tgt_len_value (bool): A flag indicating whether to use the target length value.
+
+        Returns:
+            dict: A new dictionary with the computed advantages and other relevant data.
+
+        Raises:
+            ValueError: If an unknown RL algorithm is specified.
+        """
         all_advantages = batch["reward_advantages_clean"].cast(paddle.float32)
 
         try:

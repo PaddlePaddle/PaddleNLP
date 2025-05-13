@@ -26,6 +26,10 @@ from ...transformers.configuration_utils import llmmetaclass
 @dataclass
 @llmmetaclass
 class TrainingArguments(TrainingArguments):
+    """
+    Training arguments for the LLM model.
+    """
+
     global_batch_size: int = field(
         default=8,
         metadata={"help": "Global batch size for input prompt."},
@@ -57,6 +61,10 @@ class TrainingArguments(TrainingArguments):
     per_device_train_batch_size: int = field(
         default=1,
         metadata={"help": "Batch size (per device) for the training dataloader."},
+    )
+    use_fused_rms_norm: bool = field(
+        default=False,
+        metadata={"help": "qwen, use_fused_rms_norm"},
     )
     kl_coeff: float = field(
         default=0.02,
@@ -301,7 +309,8 @@ class TrainingArguments(TrainingArguments):
     )
     use_rm_server: bool = field(default=False, metadata={"help": "Use reward server instead of reward model."})
     use_fp32_compute: bool = field(
-        default=False, metadata={"help": "Use fp32 to compute xx_log_prob,rewards, advantages and loss."}
+        default=False,
+        metadata={"help": "Use fp32 to compute xx_log_prob,rewards, advantages and loss."},
     )
     rollout_tensor_parallel_degree: int = field(
         default=-1,
@@ -353,8 +362,11 @@ class TrainingArguments(TrainingArguments):
         ):
             raise ValueError(
                 "global_batch_size(global_mini_batch_size) must be divisible by dataset_world_size! "
-                f"Hint: global_batch_size={self.global_batch_size}, global_mini_batch_size={self.global_mini_batch_size}, dataset_world_size={self.dataset_world_size}. "
-                f"dataset_world_size({self.dataset_world_size})=data_parallel_degree({self.data_parallel_degree})*sharding_parallel_degree({self.sharding_parallel_degree})."
+                f"Hint: global_batch_size={self.global_batch_size}, "
+                f"global_mini_batch_size={self.global_mini_batch_size}, "
+                f"dataset_world_size={self.dataset_world_size}. "
+                f"dataset_world_size({self.dataset_world_size})=data_parallel_degree({self.data_parallel_degree})"
+                f"*sharding_parallel_degree({self.sharding_parallel_degree})."
             )
 
         if not self.dynamic_sampling or self.global_gen_batch_size <= 0:
@@ -384,8 +396,9 @@ class TrainingArguments(TrainingArguments):
         )
         if self.gradient_accumulation_steps <= 0:
             logger.warning(
-                f"gradient_accumulation_steps: {self.gradient_accumulation_steps} must be greater than zero!"
-                " Please check your configuration, gradient_accumulation_steps = global_mini_batch_size * rollout_n * update_iters / per_device_train_batch_size / dataset_world_size."
+                f"gradient_accumulation_steps: {self.gradient_accumulation_steps} must be greater than zero! "
+                "Please check your configuration, gradient_accumulation_steps = global_mini_batch_size * rollout_n * "
+                "update_iters / per_device_train_batch_size / dataset_world_size."
                 " dataset_world_size = {self.dataset_world_size} = data_parallel_degree * sharding_parallel_degree."
                 " We will set it to 1!"
             )
@@ -493,6 +506,18 @@ class TrainingArguments(TrainingArguments):
 
     @property
     def model_dtype(self):
+        """
+        Get the data type of the model. If the fp16 optimization level is O2,
+        return float16 or bfloat16; otherwise, return float32.
+
+        Returns:
+            str:
+                - 'float16' - If the --fp16 option is specified;
+                - 'bfloat16' - If the --bf16 option is specified;
+                - 'float32' - Otherwise, return float32.
+        Raises:
+            ValueError: If neither --fp16 nor --bf16 option is specified.
+        """
         # Load model
         if self.fp16_opt_level == "O2":
             if self.fp16:
@@ -507,6 +532,14 @@ class TrainingArguments(TrainingArguments):
 
     @property
     def use_kl_in_reward(self):
+        """
+        Determine whether to use the KL divergence value in the reward.
+        Return True if the algorithm is PPO or Reinforce Plus Plus; otherwise, return False.
+        This property is only defined in the RLAlgorithm class.
+
+        Returns:
+            bool: True if the algorithm is PPO or Reinforce Plus Plus; False otherwise.
+        """
         if self.rl_algorithm in ["ppo", "reinforce_plus_plus"]:
             return True
         else:
@@ -515,6 +548,10 @@ class TrainingArguments(TrainingArguments):
 
 @dataclass
 class ModelArgument:
+    """
+    Model arguments.
+    """
+
     actor_model_name_or_path: str = field(
         default=None,
         metadata={"help": "Built-in pretrained model name or the path to local model."},
@@ -553,12 +590,17 @@ class ModelArgument:
 
 @dataclass
 class DataArgument:
+    """
+    Data arguments.
+    """
+
     train_datasets: str = field(default=None, metadata={"help": "Dataset name(s) registered in the raw dataset."})
     eval_datasets: str = field(default=None, metadata={"help": "Dataset name(s) registered in the raw dataset."})
     max_length: int = field(
         default=2048,
         metadata={
-            "help": "The maximum length that model input tokens can have. When intokens is set to True, it's also the maximum length for InTokens data stream"
+            "help": "The maximum length that model input tokens can have. When intokens is set to True, it's also the "
+            "maximum length for InTokens data stream"
         },
     )
     max_prompt_len: int = field(default=4096, metadata={"help": "Maximum prompt length."})

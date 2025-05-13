@@ -29,7 +29,21 @@ def compute_gae_advantage_return(
     lam: paddle.Tensor,
     use_tgt_len_return: bool = True,
 ) -> Tuple[paddle.Tensor, paddle.Tensor]:
-    """Compute advantages and returns using Generalized Advantage Estimation (GAE)."""
+    """
+    Compute advantages and returns using Generalized Advantage Estimation (GAE).
+
+    Args:
+        token_level_rewards (paddle.Tensor): Tensor of token-level rewards.
+        values (paddle.Tensor): Tensor of state values.
+        sequence_mask (paddle.Tensor): Tensor of sequence masks.
+        start (int): The start index for computing returns.
+        gamma (paddle.Tensor): Discount factor for future rewards.
+        lam (paddle.Tensor): Lambda parameter for GAE.
+        use_tgt_len_return (bool, optional): Whether to use target length for return computation. Defaults to True.
+
+    Returns:
+        Tuple[paddle.Tensor, paddle.Tensor]: A tuple containing the advantages and returns.
+    """
     # Modified from https://github.com/CarperAI/trlx/blob/main/trlx/models/modeling_ppo.py
     lastgaelam = 0.0
     advantages_reversed = []
@@ -175,7 +189,8 @@ def add_kl_divergence_regularization(
         log_probs (paddle.Tensor, shape=(B, L)): The log probability distribution of the current predictions.
         ref_log_probs (paddle.Tensor, shape=(B, L)): The log probability distribution of the baseline predictions.
         reward_score (paddle.Tensor, shape=(B,)): The base reward score based on the prompt and output sequence.
-        sequence_mask (paddle.Tensor, shape=(B, L)): The mask of the sequence, used to determine the length of the sequence.
+        sequence_mask (paddle.Tensor, shape=(B, L)): The mask of the sequence, used to determine the length of the
+            sequence.
 
     Returns:
         paddle.Tensor, shape=(B, L): A vector containing the KL divergence regularization gain.

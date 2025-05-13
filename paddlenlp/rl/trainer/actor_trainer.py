@@ -28,6 +28,8 @@ from .trainer_utils import guard_set_args
 
 
 class ActorReferenceTrainer(RLTrainer):
+    """Actor Reference Trainer Class"""
+
     loss_cls = RLHFPPOMixedLoss
     trainer_type = "policy"
 
@@ -38,11 +40,12 @@ class ActorReferenceTrainer(RLTrainer):
 
         Args:
             inputs (Dict): A dictionary containing two key-value pairs, "inputs" and "labels".
-                           "inputs" represents the model's input, while "labels" is optional and indicates whether to use the ptx loss function.
-                           The default value for "labels" is None.
+                           "inputs" represents the model's input, while "labels" is optional and indicates whether to
+                           use the ptx loss function. The default value for "labels" is None.
 
         Returns:
-            str: A string indicating whether to use the ptx loss function or the actor loss function, either "ptx_loss" or "actor_loss".
+            str: A string indicating whether to use the ptx loss function or the actor loss function, either
+            "ptx_loss" or "actor_loss".
         """
         return "actor_loss"
 
@@ -93,7 +96,8 @@ class ActorReferenceTrainer(RLTrainer):
             input_ids (paddle.Tensor, shape [batch_size, sequence_length]):
                 Input sequences where each element is an int representing the ID of the respective token.
             attention_mask (paddle.Tensor, shape [batch_size, sequence_length]):
-                Attention mask for the input sequences where each element is 0 or 1, indicating which tokens should be considered by the model.
+                Attention mask for the input sequences where each element is 0 or 1, indicating which tokens should be
+                considered by the model.
             position_ids (paddle.Tensor, optional, shape [batch_size, sequence_length], defaults to None):
                 Position IDs for each token in the input sequences, defaults to None.
             kwargs (Dict[str, Any], optional, defaults to {}):
@@ -200,6 +204,15 @@ class ActorReferenceTrainer(RLTrainer):
         return paddle.concat(log_probs_list, axis=0)
 
     def update_actor(self, rl_batch: Dict[str, paddle.Tensor]) -> Dict[str, Any]:
+        """
+        Update the actor network based on the given reinforcement learning batch data.
+        Args:
+            rl_batch (Dict[str, paddle.Tensor]): A dictionary containing the following keys and their corresponding
+
+        Returns:
+            Dict[str, Any]: A dictionary containing the following keys and their corresponding values:
+                - 'train_policy_loss': The training loss for the policy network.
+        """
         # inputs shared by policy and value trainer
         input_ids = rl_batch["input_ids"].contiguous()  # length: src+tgt
         position_ids = rl_batch["position_ids"]  # length: src+tgt

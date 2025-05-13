@@ -38,6 +38,19 @@ from ...transformers.model_outputs import ModelOutput
 
 @dataclass
 class PolicyOutput(ModelOutput):
+    """
+    Output type of the policy model.
+
+    Attributes:
+        loss (Optional[paddle.Tensor]): The loss computed by the model.
+        logits (paddle.Tensor): The logits output by the model.
+        past_key_values (Optional[Tuple[Tuple[paddle.Tensor]]]): The past key and values which can be used for fast
+            auto-regressive decoding.
+        hidden_states (Optional[Tuple[paddle.Tensor]]): Hidden states of the model at each layer.
+        attentions (Optional[Tuple[paddle.Tensor]]): Attention weights at each layer.
+        cross_attentions (Optional[Tuple[paddle.Tensor]]): Cross attention weights at each layer.
+    """
+
     loss: Optional[paddle.Tensor] = None
     logits: paddle.Tensor = None
     # logits_entropy: Optional[paddle.Tensor] = None
@@ -49,6 +62,20 @@ class PolicyOutput(ModelOutput):
 
 @dataclass
 class ValueOutput(ModelOutput):
+    """
+    Output type of the value model.
+
+    Attributes:
+        loss (Optional[paddle.Tensor]): The loss computed by the model.
+        value (paddle.Tensor): The value output by the model.
+        reward (paddle.Tensor): The reward predicted by the model.
+        past_key_values (Optional[Tuple[Tuple[paddle.Tensor]]]): The past key and values which can be used for fast
+            auto-regressive decoding.
+        hidden_states (Optional[Tuple[paddle.Tensor]]): Hidden states of the model at each layer.
+        attentions (Optional[Tuple[paddle.Tensor]]): Attention weights at each layer.
+        cross_attentions (Optional[Tuple[paddle.Tensor]]): Cross attention weights at each layer.
+    """
+
     loss: Optional[paddle.Tensor] = None
     value: paddle.Tensor = None
     reward: paddle.Tensor = None
@@ -108,6 +135,16 @@ def create_loss(loss_cls, config, extra_args, info_buffer, merge_labels=None):
 
 
 def make_position_ids_from_input_ids(input_ids, pad_token_id=0):
+    """
+    Generate position IDs from input IDs.
+
+    Args:
+        input_ids (paddle.Tensor): Tensor of input IDs. Its shape must be 2D.
+        pad_token_id (int, optional): The ID of the padding token. Defaults to 0.
+
+    Returns:
+        paddle.Tensor: Tensor of position IDs.
+    """
     assert input_ids.ndim == 2, "input_ids's shape must be 2d"
     position_ids = paddle.zeros_like(input_ids)
     for index, row in enumerate(input_ids):
@@ -125,18 +162,24 @@ def make_position_ids_from_input_ids(input_ids, pad_token_id=0):
 @paddle.no_grad()
 def make_position_ids(attention_mask, source=None):
     """
-    根据attention_mask生成位置id，如果source不为空则将源端padding部分设置为0。
-    当attention_mask的形状是[B, L, H, W]时，表示causal mask，返回的position_ids是[B, H, W]；
-    当attention_mask的形状是[B, L]时，表示padding mask，返回的position_ids是[B, L]。
+    Generate position IDs based on the attention mask. If source is provided, set padding positions in the source to 0.
+
+    When the shape of attention_mask is [B, L, H, W], it represents a causal mask, and the returned position_ids will
+    be [B, H, W];
+    When the shape of attention_mask is [B, L], it represents a padding mask, and the returned position_ids will be
+    [B, L].
 
     Args:
-        attention_mask (Tensor, numpy.ndarray): 形状为[B, L, H, W]或者[B, L]的Tensor/numpy数组，其中L是序列长度，H是头数，W是宽度（可选）。
-            每个元素为0表示该位置未被mask，非0表示该位置被mask。
-        source (Tensor, numpy.ndarray, optional): 形状为[B, S]的Tensor/numpy数组，其中S是源端序列长度（可选）。默认值为None。
+        attention_mask (Tensor, numpy.ndarray): A Tensor/numpy array with shape [B, L, H, W] or [B, L], where L is the
+        sequence length, H is the number of heads, and W is the width (optional). Each element is 0 if the position is
+        not masked, otherwise non-zero.
+        source (Tensor, numpy.ndarray, optional): A Tensor/numpy array with shape [B, S], where S is the source
+        sequence length. Defaults to None.
 
     Returns:
-        Tensor: 形状为[B, H, W]或者[B, L]的Tensor，其中H是头数，W是宽度（可选）。每个元素为对应位置的位置id。
-        如果source不为空，则在源端padding部分设置为0。
+        Tensor: A Tensor with shape [B, H, W] or [B, L], where H is the number of heads and W is the width (optional).
+            Each element is the position ID of the corresponding position. If source is provided, padding positions in
+            the source are set to 0.
     """
     if len(attention_mask.shape) == 4:  # causal mask
         position_ids_p1 = attention_mask.cast(paddle.int64).sum(-1)
@@ -175,19 +218,22 @@ def make_attention_mask(
     causal_mask=True,
 ):
     """
-    根据输入的`input_ids`，生成一个注意力掩码。如果`pad_id`不是`unk_id`和`eos_id`中的任何一个，则该位置将被忽略。
-    如果`causal_mask`为`False`，则返回全部为`True`的注意力掩码。否则，返回一个三角形掩码，其中每个元素都小于或等于相应位置的元素。
+    Generate an attention mask based on the input `input_ids`. Positions where `pad_id` is not `unk_id` or `eos_id`
+    will be ignored. If `causal_mask` is `False`, return an attention mask filled with `True`. Otherwise, return a
+    triangular mask where each element is less than or equal to the corresponding position element.
 
     Args:
-        input_ids (Tensor): 输入序列的ID，形状为（batch_size, seq_len）。
-        pad_id (int): 用于padding的ID。
-        eos_id (int, optional): 用于表示结束的ID，默认为None。如果设置了，则会从注意力掩码中删除对应位置。
-        unk_id (int, optional): 用于表示未知的ID，默认为None。如果设置了，则会从注意力掩码中删除对应位置。
-        past_key_values_length (int, optional): 预先存在的键值对的长度，默认为0。
-        causal_mask (bool, optional): 是否使用因果掩码，默认为True。
+        input_ids (paddle.Tensor): IDs of the input sequence with shape (batch_size, seq_len).
+        pad_id (int): The ID used for padding.
+        eos_id (int, optional): The ID used to indicate the end of the sequence. Defaults to None. If set, the
+        corresponding positions will be removed from the attention mask.
+        unk_id (int, optional): The ID used to indicate unknown tokens. Defaults to None. If set, the corresponding
+        positions will be removed from the attention mask.
+        past_key_values_length (int, optional): The length of pre-existing key-value pairs. Defaults to 0.
+        causal_mask (bool, optional): Whether to use a causal mask. Defaults to True.
 
     Returns:
-        Tensor: 注意力掩码，形状为（batch_size, 1, seq_len, seq_len + past_len）。
+        paddle.Tensor: The attention mask with shape (batch_size, 1, seq_len, seq_len + past_len).
     """
     unk_id = None
 
@@ -233,13 +279,35 @@ def gather_log_probabilities(logits: paddle.Tensor, labels: paddle.Tensor) -> pa
 
 
 def create_startend_row_indices(input_ids, pad_token_id=0):
+    """
+    Create start and end row indices for each token in the input_ids.
+
+    Args:
+        input_ids (paddle.Tensor): Tensor of input IDs with shape (batch_size, seq_len).
+        pad_token_id (int, optional): The ID of the padding token. Defaults to 0.
+
+    Returns:
+        paddle.Tensor: Tensor of start and end row indices with shape (batch_size, seq_len).
+            For each token, the start row index is 0 and the end row index is the sequence length.
+            Padding positions are set to 0.
+    """
     startend_row_indices = paddle.full(input_ids.shape, input_ids.shape[-1], dtype="int32")
     mask = (input_ids != pad_token_id).cast("int32").cumsum(-1) == 0
     return startend_row_indices.masked_fill(mask, 0)
 
 
 class RLHFPPOLoss(nn.Layer):
-    def __init__(self, config, clip_range_ratio=0.2, clip_range_ratio_low=None, clip_range_ratio_high=None):
+    """
+    RLHFPPOLoss is a class that implements the actor loss function.
+    """
+
+    def __init__(
+        self,
+        config,
+        clip_range_ratio=0.2,
+        clip_range_ratio_low=None,
+        clip_range_ratio_high=None,
+    ):
         """
         Initialize the `ClipRewardRange` object.
 
@@ -269,15 +337,20 @@ class RLHFPPOLoss(nn.Layer):
         mask: paddle.Tensor,
     ) -> paddle.Tensor:
         """
-        计算演员的策略损失函数。该函数接受以下参数：
+        Compute the actor's policy loss function.
+
         Args:
-            log_probs (paddle.Tensor): 当前状态下每个演员的对数产生概率，形状为[B, A]，其中B是批量大小，A是演员数量。
-            old_log_probs (paddle.Tensor): 上一时间步骤的每个演员的对数产生概率，形状与log_probs相同。
-            advantages (paddle.Tensor): 每个演员在当前状态下获得的价值函数估计值，形状为[B, A]。
-            mask (paddle.Tensor): 用于过滤已完成或无效的轨迹，形状为[B, A]，其中B是批量大小，A是演员数量。
-                如果轨迹已经完成（即reward不为None），则mask为1；否则为0。
-        返回值 (paddle.Tensor):
-            PG_loss (paddle.Tensor): 演员的策略损失，形状为[1]。
+            log_probs (paddle.Tensor): Log probabilities of each action taken by the actor in the current state,
+                with shape [B, A], where B is the batch size and A is the number of actions.
+            old_log_probs (paddle.Tensor): Log probabilities of each action taken by the actor in the previous time
+            step, with the same shape as log_probs.
+            advantages (paddle.Tensor): Advantage estimates for each action taken by the actor in the current state,
+                with shape [B, A].
+            mask (paddle.Tensor): A mask used to filter out completed or invalid trajectories, with shape [B, A].
+                If a trajectory is completed (i.e., reward is not None), the mask is 1; otherwise, it is 0.
+
+        Returns:
+            paddle.Tensor: PG_loss (paddle.Tensor): The actor's policy loss, with shape [1].
         """
         # policy gradient loss
 
@@ -318,13 +391,28 @@ class RLHFPPOLoss(nn.Layer):
 
 
 class VocabParallelEntropy(paddle.autograd.PyLayer):
+    """
+    VocabParallelEntropy is a PyLayer that computes the entropy of a vocabulary parallel logits tensor.
+    """
+
     @staticmethod
     def forward(ctx, vocab_parallel_logits: paddle.Tensor, tensor_parallel_output=False) -> paddle.Tensor:
+        """
+        Forward pass of the VocabParallelEntropy layer.
+
+        Args:
+            ctx (paddle.autograd.PyLayerContext): The context object to save intermediate results for backward pass.
+            vocab_parallel_logits (paddle.Tensor): The logits tensor with shape (batch_size, vocab_size).
+            tensor_parallel_output (bool, optional): Whether to enable tensor parallel output. Defaults to False.
+
+        Returns:
+            paddle.Tensor: The entropy tensor with shape (batch_size,).
+        """
         try:
             hcg = fleet.get_hybrid_communicate_group()
             model_parallel_group = hcg.get_model_parallel_group()
             tensor_parallel_degree = hcg.get_model_parallel_world_size()
-        except:
+        except Exception:
             tensor_parallel_degree = 1
         logits_max = vocab_parallel_logits.max(axis=-1, keepdim=True)
 
@@ -347,10 +435,31 @@ class VocabParallelEntropy(paddle.autograd.PyLayer):
 
     @staticmethod
     def backward(ctx, grad_output: paddle.Tensor) -> paddle.Tensor:
+        """
+        Backward pass of the VocabParallelEntropy layer.
+
+        Args:
+            ctx (paddle.autograd.PyLayerContext): The context object containing saved intermediate results from
+            forward pass.
+            grad_output (paddle.Tensor): The gradient tensor with shape (batch_size,).
+
+        Returns:
+            paddle.Tensor: The gradient tensor with respect to the input logits, with shape (batch_size, vocab_size).
+        """
         return grad_output.unsqueeze(axis=-1) * ctx.saved_tensor()[0]
 
 
 def entropy_from_logits(logits: paddle.Tensor, tensor_parallel_output=False):
+    """
+    Compute the entropy from logits using the VocabParallelEntropy layer.
+
+    Args:
+        logits (paddle.Tensor): The input logits tensor with shape (batch_size, vocab_size).
+        tensor_parallel_output (bool, optional): Whether to enable tensor parallel output. Defaults to False.
+
+    Returns:
+        paddle.Tensor: The computed entropy tensor with shape (batch_size,).
+    """
     return VocabParallelEntropy.apply(logits, tensor_parallel_output)
 
 
@@ -389,7 +498,10 @@ class RLHFPPOMixedLoss(nn.Layer):
         self.clip_range_ratio_low = clip_range_ratio_low if clip_range_ratio_low is not None else clip_range_ratio
         self.clip_range_ratio_high = clip_range_ratio_high if clip_range_ratio_high is not None else clip_range_ratio
         self.ppo_criterion = RLHFPPOLoss(
-            config, clip_range_ratio, self.clip_range_ratio_low, self.clip_range_ratio_high
+            config,
+            clip_range_ratio,
+            self.clip_range_ratio_low,
+            self.clip_range_ratio_high,
         )
         self.sft_criterion = PretrainingCriterion(config)
         self.kl_loss_coeff = kl_loss_coeff
@@ -419,20 +531,28 @@ class RLHFPPOMixedLoss(nn.Layer):
         input_ids_rmpad_rolled=None,
     ):
         """
-        计算损失函数，包含两部分：soft target loss和PPO loss。
-        如果labels不为None，则计算soft target loss；否则计算PPO loss。
+        Compute the loss function, which consists of two parts: soft target loss and PPO loss.
+        If labels are provided, the soft target loss is computed; otherwise, the PPO loss is computed.
 
         Args:
-            logits (paddle.Tensor or List[paddle.Tensor]): 输入的预测结果，可以是单个tensor或list中的多个tensor。
-                如果是单个tensor，表示对应的输出logits；如果是list，表示每个时间步的logits。
-            labels (paddle.Tensor, optional): 真实标签，shape与logits相同。默认为None。
-            input_ids (paddle.Tensor, optional): 输入序列的id，shape为(batch_size, max_len)。默认为None。
-            old_log_probs (paddle.Tensor, optional): 上一个时间步的log probabilities，shape为(batch_size, max_len)。默认为None。
-            reward_advantages (paddle.Tensor, optional): 回报优势，shape为(batch_size, max_len)。默认为None。
-            sequence_mask (paddle.Tensor, optional): 序列掩码，shape为(batch_size, max_len)。默认为None。
+            logits (paddle.Tensor or List[paddle.Tensor]): The predicted logits, which can be a single tensor or a
+                                                        list of tensors. If it is a single tensor, it represents the
+                                                        corresponding output logits; if it is a list,
+                                                        it represents the logits at each time step.
+            labels (paddle.Tensor, optional): The ground truth labels, with the same shape as logits. Defaults to None.
+            input_ids (paddle.Tensor, optional): The IDs of the input sequence, with shape (batch_size, max_len).
+                                                Defaults to None.
+            reward_advantages (paddle.Tensor, optional): The reward advantages, with shape (batch_size, max_len).
+                                                        Defaults to None.
+            sequence_mask (paddle.Tensor, optional): The sequence mask, with shape (batch_size, max_len). Defaults to
+                                                    None.
+            ref_log_probs (paddle.Tensor, optional): The reference log probabilities, used for calculating the KL
+                                                    divergence. Defaults to None.
+            response_start (int, optional): The starting index of the response sequence. Defaults to 0.
 
         Returns:
-            paddle.Tensor: 返回损失函数，如果labels不为None，则为soft target loss；否则为PPO loss。
+            paddle.Tensor: The computed loss, which is the soft target loss if labels are provided; otherwise, it is
+            the PPO loss.
         """
         use_remove_padding = indices is not None
         if not self.config.use_fused_head_and_loss_fn:
@@ -601,6 +721,10 @@ class RLHFPPOMixedLoss(nn.Layer):
 
 @merge_fwd_labels
 class RLHFValueLoss(nn.Layer):
+    """
+    RLHFValueLoss is a loss function for value estimation in reinforcement learning.
+    """
+
     def __init__(self, config, clip_range_value=5.0):
         """
         Initializes the `ClipRewardRange` object.
@@ -640,22 +764,26 @@ class RLHFValueLoss(nn.Layer):
 
     def forward(self, reward_values, old_reward_values, reward_returns, sequence_mask):
         """
-        计算奖励值的损失函数。
-        如果输入的奖励值和旧奖励值的长度相同，则使用给定的序列掩码来确定有效长度。
-        如果输入的奖励值的长度比旧奖励值少一个，则将最后一个元素视为与输入IDs一致的填充，并删除它。
-        否则，奖励值只有tgt长度。
+        Compute the loss function for reward values.
+
+        If the length of the input reward values is the same as that of the old reward values,
+        the given sequence mask is used to determine the valid length.
+        If the length of the input reward values is one less than that of the old reward values,
+        the last element is considered as padding consistent with the input IDs and is removed.
+        Otherwise, the reward values only have the tgt length.
 
         Args:
-            reward_values (paddle.Tensor, list of paddle.Tensor or None, optional): 奖励值，可以是单个张量或列表中的多个张量。默认为None。
-            old_reward_values (paddle.Tensor, optional): 旧奖励值。
-            reward_returns (paddle.Tensor, optional): 奖励返回值。
-            sequence_mask (paddle.Tensor, optional): 序列掩码。
+            reward_values (paddle.Tensor, list of paddle.Tensor or None, optional):
+                Reward values, which can be a single tensor or multiple tensors in a list. Defaults to None.
+            old_reward_values (paddle.Tensor, optional): Old reward values.
+            reward_returns (paddle.Tensor, optional): Reward returns.
+            sequence_mask (paddle.Tensor, optional): Sequence mask.
 
         Returns:
-            paddle.Tensor, float32: 奖励值的损失函数。
+            paddle.Tensor, float32: The loss function for reward values.
 
         Raises:
-            ValueError: 当奖励值和旧奖励值的长度不匹配时引发。
+            ValueError: Raised when the lengths of reward values and old reward values do not match.
         """
         reward_values = reward_values if isinstance(reward_values, paddle.Tensor) else reward_values[0]
         reward_values = reward_values.squeeze(axis=-1)[:, :-1]
@@ -849,7 +977,9 @@ class ActorFusedLoss(paddle.autograd.PyLayer):
             # ratio
             ratio_chunk = paddle.exp(log_probs_chunk - old_log_probs_chunk)
             clipped_ratio_chunk = paddle.clip(
-                ratio_chunk, min=1.0 - clip_range_ratio_low, max=1.0 + clip_range_ratio_high
+                ratio_chunk,
+                min=1.0 - clip_range_ratio_low,
+                max=1.0 + clip_range_ratio_high,
             )
 
             # final loss
@@ -915,7 +1045,9 @@ class ActorFusedLoss(paddle.autograd.PyLayer):
             # grads
             if grad_hidden_states is not None:
                 grad_hidden_states[token_start_idx:token_end_idx] = paddle.matmul(
-                    d_loss_d_logits_chunk, lm_head_weight_cast, transpose_y=not transpose_y
+                    d_loss_d_logits_chunk,
+                    lm_head_weight_cast,
+                    transpose_y=not transpose_y,
                 )
             if grad_lm_head_weight is not None:
                 if transpose_y:
@@ -986,7 +1118,13 @@ class ActorFusedLoss(paddle.autograd.PyLayer):
 class FusedPPOLoss(nn.Layer):
     """Fused PPOLoss"""
 
-    def __init__(self, config, clip_range_ratio=0.2, clip_range_ratio_low=None, clip_range_ratio_high=None):
+    def __init__(
+        self,
+        config,
+        clip_range_ratio=0.2,
+        clip_range_ratio_low=None,
+        clip_range_ratio_high=None,
+    ):
         """Initialize FusedPPOLoss class."""
         super().__init__()
         self.clip_range_ratio = clip_range_ratio
@@ -1080,6 +1218,38 @@ class ActorFusedPGEntropyKLLoss(paddle.autograd.PyLayer):
         loop_chunk_size: int,
         temperature: float,
     ):
+        """
+        Forward pass of the ActorFusedPGEntropyKLLoss layer.
+
+        Args:
+            ctx (paddle.autograd.PyLayerContext): The context object to save intermediate results for backward pass.
+            hidden_states (paddle.Tensor): The hidden states of the model.
+            weight (paddle.Tensor): The weights of the linear layer.
+            bias (paddle.Tensor): The biases of the linear layer.
+            sequence_mask (paddle.Tensor): The sequence mask to filter out padding tokens.
+            labels (paddle.Tensor): The ground truth labels.
+            old_log_probs (paddle.Tensor): The old log probabilities from the previous time step.
+            advantages (paddle.Tensor): The advantage estimates.
+            ref_log_probs (paddle.Tensor): The reference log probabilities for KL divergence calculation.
+            transpose_y (bool): Whether to transpose the weights.
+            vocab_size (int): The size of the vocabulary.
+            tensor_parallel_degree (int): The degree of tensor parallelism.
+            tensor_parallel_output (bool): Whether to enable tensor parallel output.
+            pg_loss_coeff (float): The coefficient for policy gradient loss.
+            clip_range_ratio (float): The clipping range for policy gradient loss.
+            clip_range_ratio_low (float): The lower bound for clipping ratio.
+            clip_range_ratio_high (float): The upper bound for clipping ratio.
+            entropy_coeff (float): The coefficient for entropy loss.
+            clip_range_score (float): The clipping range for KL divergence loss.
+            kl_loss_coeff (float): The coefficient for KL divergence loss.
+            fused_linear (bool): Whether to use fused linear operation.
+            loop_chunk_size (int): The chunk size for loop processing.
+            temperature (float): The temperature scaling factor.
+
+        Returns:
+            tuple: A tuple containing the final loss, total policy gradient loss, total entropy loss, and total KL
+            divergence loss.
+        """
         if ref_log_probs is None:
             kl_loss_coeff = 0.0
         if tensor_parallel_degree > 1:
@@ -1147,16 +1317,25 @@ class ActorFusedPGEntropyKLLoss(paddle.autograd.PyLayer):
 
             if fused_linear:
                 logits_chunk = PF.fused_linear(
-                    hidden_chunk, maybe_transpose(lm_head_weight_cast), bias=lm_head_bias_cast
+                    hidden_chunk,
+                    maybe_transpose(lm_head_weight_cast),
+                    bias=lm_head_bias_cast,
                 )
             else:
-                logits_chunk = F.linear(hidden_chunk, maybe_transpose(lm_head_weight_cast), bias=lm_head_bias_cast)
+                logits_chunk = F.linear(
+                    hidden_chunk,
+                    maybe_transpose(lm_head_weight_cast),
+                    bias=lm_head_bias_cast,
+                )
             logits_chunk = logits_chunk.astype("float32")
             logits_chunk = logits_chunk / temperature
             # 计算交叉熵和softmax
             if tensor_parallel_degree > 1 and tensor_parallel_output:
                 ce_loss_chunk, softmax_out_chunk = mp_ops._c_softmax_with_cross_entropy(
-                    logits_chunk, labels_chunk, group=model_parallel_group, return_softmax=True
+                    logits_chunk,
+                    labels_chunk,
+                    group=model_parallel_group,
+                    return_softmax=True,
                 )
             else:
                 ce_loss_chunk = F.cross_entropy(logits_chunk, labels_chunk, reduction="none")
@@ -1202,10 +1381,13 @@ class ActorFusedPGEntropyKLLoss(paddle.autograd.PyLayer):
                 # [2] entropy loss
                 log_prob_chunk = paddle.log(paddle.clip(softmax_out_chunk, min=1e-12))
                 entropy_loss_chunk = -(softmax_out_chunk * log_prob_chunk).sum(axis=-1) * mask_chunk
-                # entropy_loss_chunk shape is [bs, seqlen, vocab_size // tensor_parallel_degree], do all_reduce sum here
+                # entropy_loss_chunk shape is [bs, seqlen, vocab_size // tensor_parallel_degree], do all_reduce sum
+                # here
                 if tensor_parallel_degree > 1 and tensor_parallel_output:
                     paddle.distributed.all_reduce(
-                        entropy_loss_chunk, op=paddle.distributed.ReduceOp.SUM, group=model_parallel_group
+                        entropy_loss_chunk,
+                        op=paddle.distributed.ReduceOp.SUM,
+                        group=model_parallel_group,
                     )
                 total_entropy_loss += entropy_loss_chunk.sum() * entropy_coeff / divisor
 
@@ -1254,7 +1436,9 @@ class ActorFusedPGEntropyKLLoss(paddle.autograd.PyLayer):
 
             if grad_hidden_states is not None:
                 grad_hidden_states[chunk_slice] = paddle.matmul(
-                    d_total_logits_chunk, lm_head_weight_cast, transpose_y=not transpose_y
+                    d_total_logits_chunk,
+                    lm_head_weight_cast,
+                    transpose_y=not transpose_y,
                 )
             if grad_lm_head_weight is not None:
                 if transpose_y:
@@ -1277,18 +1461,41 @@ class ActorFusedPGEntropyKLLoss(paddle.autograd.PyLayer):
         if ctx.hidden_states_has_grad:
             if tensor_parallel_degree > 1:
                 paddle.distributed.all_reduce(
-                    grad_hidden_states, op=paddle.distributed.ReduceOp.SUM, group=model_parallel_group
+                    grad_hidden_states,
+                    op=paddle.distributed.ReduceOp.SUM,
+                    group=model_parallel_group,
                 )
             grad_hidden_states = grad_hidden_states.reshape(original_shape)
 
         ctx.save_for_backward(
-            *filter(lambda x: x is not None, [grad_hidden_states, grad_lm_head_weight, grad_lm_head_bias])
+            *filter(
+                lambda x: x is not None,
+                [grad_hidden_states, grad_lm_head_weight, grad_lm_head_bias],
+            )
         )
 
-        return final_loss, total_pg_loss.detach(), total_entropy_loss.detach(), total_kl_loss.detach()
+        return (
+            final_loss,
+            total_pg_loss.detach(),
+            total_entropy_loss.detach(),
+            total_kl_loss.detach(),
+        )
 
     @staticmethod
     def backward(ctx, grad_output, *args):
+        """
+        Backward pass of the ActorFusedPGEntropyKLLoss layer.
+
+        Args:
+            ctx (paddle.autograd.PyLayerContext): The context object containing saved intermediate results from the
+                                                    forward pass.
+            grad_output (paddle.Tensor): The gradient of the output loss with respect to the input.
+            *args: Additional arguments passed from the forward pass.
+
+        Returns:
+            tuple: A tuple containing the gradients with respect to the hidden states, lm_head_weight, and
+            lm_head_bias.
+        """
         grad_args = ctx.saved_tensor()
         idx = 0
         if ctx.hidden_states_has_grad:
@@ -1328,8 +1535,8 @@ def actor_fused_pg_entropy_kl_loss(
     tensor_parallel_output: bool = False,
     pg_loss_coeff: float = 1.0,
     clip_range_ratio: float = 0.2,
-    clip_range_ratio_low: float = None,
-    clip_range_ratio_high: float = None,
+    clip_range_ratio_low: Optional[float] = None,
+    clip_range_ratio_high: Optional[float] = None,
     entropy_coeff: float = 0.001,
     clip_range_score: float = 10.0,
     kl_loss_coeff: float = 0.001,
@@ -1338,6 +1545,38 @@ def actor_fused_pg_entropy_kl_loss(
     use_actor_fused_loss: bool = True,
     temperature: float = 1.0,
 ):
+    """
+    Compute the combined loss of policy gradient, entropy, and KL divergence for the actor network.
+
+    Args:
+        hidden_states (paddle.Tensor): The hidden states of the model.
+        weight (paddle.Tensor): The weights of the linear layer.
+        input_ids (paddle.Tensor): The IDs of the input sequence.
+        old_log_probs (paddle.Tensor): The old log probabilities from the previous time step.
+        ref_log_probs (paddle.Tensor): The reference log probabilities for KL divergence calculation.
+        advantages (paddle.Tensor): The advantage estimates.
+        sequence_mask (paddle.Tensor): The sequence mask to filter out padding tokens.
+        bias (paddle.Tensor, optional): The biases of the linear layer. Defaults to None.
+        transpose_y (bool, optional): Whether to transpose the weights. Defaults to False.
+        fused_linear (bool, optional): Whether to use fused linear operation. Defaults to False.
+        vocab_size (int, optional): The size of the vocabulary. Defaults to 1024.
+        tensor_parallel_degree (int, optional): The degree of tensor parallelism. Defaults to 1.
+        tensor_parallel_output (bool, optional): Whether to enable tensor parallel output. Defaults to False.
+        pg_loss_coeff (float, optional): The coefficient for policy gradient loss. Defaults to 1.0.
+        clip_range_ratio (float, optional): The clipping range for policy gradient loss. Defaults to 0.2.
+        clip_range_ratio_low (float, optional): The lower bound for clipping ratio. Defaults to None.
+        clip_range_ratio_high (float, optional): The upper bound for clipping ratio. Defaults to None.
+        entropy_coeff (float, optional): The coefficient for entropy loss. Defaults to 0.001.
+        clip_range_score (float, optional): The clipping range for KL divergence loss. Defaults to 10.0.
+        kl_loss_coeff (float, optional): The coefficient for KL divergence loss. Defaults to 0.001.
+        response_start (int, optional): The starting index of the response sequence. Defaults to 0.
+        loop_chunk_size (int, optional): The chunk size for loop processing. Defaults to 1024.
+        use_actor_fused_loss (bool, optional): Whether to use the fused loss for the actor network. Defaults to True.
+        temperature (float, optional): The temperature scaling factor. Defaults to 1.0.
+
+    Returns:
+        tuple: A tuple containing the computed losses.
+    """
     hidden_next = hidden_states[:, response_start:-1, :]
     labels_next = input_ids[:, response_start + 1 :]
 

@@ -67,7 +67,8 @@ def init_train_model_opt(
         self (Trainer): The instance of the Trainer class.
         max_steps (int): The maximum number of training steps.
         resume_from_checkpoint (bool, optional): Whether to resume training from a checkpoint, defaults to False.
-        clear_master_weight (bool, optional): When using Trainer's distributed hardware acceleration, clear the master parameter weights, defaults to False.
+        clear_master_weight (bool, optional): When using Trainer's distributed hardware acceleration, clear the master
+            parameter weights, defaults to False.
 
     Returns:
         PretrainedModel: The wrapped model ready for training.
@@ -148,8 +149,10 @@ def init_train_state(
     Returns:
         Tuple[int, int, Optional[tqdm]]:
             - epochs_trained (int): The number of epochs already trained.
-            - steps_trained_in_current_epoch (int): The number of batches trained in the current epoch if not skipping data; otherwise, 0.
-            - steps_trained_progress_bar (Optional[tqdm]): A tqdm progress bar to show the progress of skipping the first batch if not skipping data; otherwise, None.
+            - steps_trained_in_current_epoch (int): The number of batches trained in the current epoch if not skipping
+                                                    data; otherwise, 0.
+            - steps_trained_progress_bar (Optional[tqdm]): A tqdm progress bar to show the progress of skipping the
+                                                           first batch if not skipping data; otherwise, None.
     """
     args = self.args
 
@@ -259,7 +262,8 @@ def init_train_log(
             trainable_numel_tensor = paddle.to_tensor(per_device_trainable_numel, dtype=all_reduce_dtype)
             paddle.distributed.all_reduce(trainable_numel_tensor)
             trainable_numel = int(trainable_numel_tensor.item()) // self.args.dataset_world_size
-            # the numel is roughly, because the tensor parallel still hold own bias or layer_norm weight without splited
+            # the numel is roughly, because the tensor parallel still hold own bias
+            # or layer_norm weight without splited
             # so, the trainable numel is a little bigger than real.
             logger.debug(f"  Number of trainable parameters = {trainable_numel:,} (all devices, roughly)")
 
@@ -546,6 +550,27 @@ class RLTrainer(Trainer):
         optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
         preprocess_logits_for_metrics: Optional[Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor]] = None,
     ):
+        """
+        Args:
+        model (Union[PretrainedModel, nn.Layer], optional): The model to be trained by this trainer. If not
+            provided, it will be instantiated via the `model_init` function. Defaults to None.
+        criterion (nn.Layer, optional): The loss function used for training. Defaults to None.
+        args (TrainingArguments, optional): Training arguments. Defaults to None.
+        data_collator (Optional[DataCollator], optional): Data collator. Defaults to None.
+        train_dataset (Optional[Dataset], optional): Training dataset. Defaults to None.
+        eval_dataset (Union[Dataset, Dict[str, Dataset]], optional): Evaluation dataset or a dictionary of
+            evaluation datasets. Defaults to None.
+        tokenizer (Optional[PretrainedTokenizer], optional): Tokenizer. Defaults to None.
+        compute_metrics (Optional[Callable[[EvalPrediction], Dict]], optional): Function that computes metrics
+            during evaluation. Defaults to None.
+        callbacks (Optional[List[TrainerCallback]], optional): A list of callbacks to customize the training
+            procedure. Defaults to None.
+        optimizers (Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler], optional): A tuple of
+            optimizer and lr scheduler. Defaults to (None, None).
+        preprocess_logits_for_metrics (Optional[Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor]], optional):
+            Function that takes logits and labels as input and returns the preprocessed logits for computing
+            metrics. Defaults to None.
+        """
         super().__init__(
             model,
             criterion,
@@ -580,7 +605,13 @@ class RLTrainer(Trainer):
         whose label arguments are merged into one argument, this is useful to
         PipelineParallel and trainer.criterion which limit loss format.
         """
-        criterion = create_loss(self.loss_cls, self.model.config, self.args, self.info_buffer, merge_labels=True)
+        criterion = create_loss(
+            self.loss_cls,
+            self.model.config,
+            self.args,
+            self.info_buffer,
+            merge_labels=True,
+        )
         return criterion
 
     def loss_identifier(self, inputs: Dict) -> str:
@@ -816,7 +847,11 @@ class RLTrainer(Trainer):
             self.loss_step_indice[loss_name] = len(self.loss_step_indice)
 
     @paddle.no_grad()
-    def get_step_loss(self, loss_prefix: str = "", loss_accumulator: Dict = {}) -> Dict[str, paddle.Tensor]:
+    def get_step_loss(
+        self,
+        loss_prefix: str = "",
+        loss_accumulator: Optional[Dict] = None,
+    ) -> Dict[str, paddle.Tensor]:
         """
         Return a dict mapping loss name to value of current training step. This
         is mainly to get loss for metric logging, and it would not affect the
@@ -831,7 +866,7 @@ class RLTrainer(Trainer):
             msg = "The loss returned may not be accurate when not reaching accumulated step."
             logger.error(msg)
         model = self.get_model(train=True)
-        loss_dict = loss_accumulator if loss_accumulator else {}
+        loss_dict = loss_accumulator if loss_accumulator is not None else {}
         if isinstance(model, fleet.model.PipelineParallel) and len(self.loss_names) > 1:
             # NOTE: PipelineParallel only returns a accumulated loss after
             # accumulated steps, which is a mixed loss of ppo-loss and
@@ -885,10 +920,12 @@ class RLTrainer(Trainer):
 
         Args:
             model (paddle.nn.Layer): The model object containing parameters that need to be sharded.
-            optimizer (paddle.optimizer.Optimizer): The optimizer object containing parameters that need to be sharded.
+            optimizer (paddle.optimizer.Optimizer): The optimizer object containing parameters
+                                                    that need to be sharded.
 
         Returns:
-            list[str]: A list of structured names for all parameters that are being trained on the current sharding master.
+            list[str]: A list of structured names for all parameters that are being trained
+                       on the current sharding master.
         """
         rank_param_names = [p.name for p in optimizer._rank2params[optimizer._sharding_rank]]
         structured_names = []
@@ -909,8 +946,9 @@ class RLTrainer(Trainer):
 
         Returns:
             Union[Dict[str, Tensor], Dict[str, Any]]: A dictionary containing the state of the model weights.
-            The keys in the dictionary are parameter names, and the values are corresponding Tensors or values of Any type.
-            If AMP is used, pipeline is supported, and master weights exist, the returned dictionary only contains the master weights.
+            The keys in the dictionary are parameter names, and the values are corresponding Tensors or
+            values of Any type. If AMP is used, pipeline is supported, and master weights exist, the returned
+            dictionary only contains the master weights.
         """
         if self.amp_dtype in ["float16", "bfloat16"] and hasattr(optimizer, "_master_weights"):
             master_weights = dict(optimizer._master_weights)

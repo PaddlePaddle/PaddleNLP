@@ -38,6 +38,8 @@ from .trainer_utils import batch_retokenize
 
 
 class RewardTrainer(RLTrainer):
+    """Reward trainer"""
+
     trainer_type = "reward"
 
     def __init__(
@@ -53,8 +55,41 @@ class RewardTrainer(RLTrainer):
         callbacks: Optional[List[TrainerCallback]] = None,
         optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
         preprocess_logits_for_metrics: Optional[Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor]] = None,
-        reward_server: str = None,
+        reward_server: Optional[str] = None,
     ):
+        """
+        Initialize the RewardTrainer class.
+
+        This class extends the functionality of the RLTrainer class by adding support for reward functions. It allows
+        users to train models based on reward functions instead of loss values.
+
+        Args:
+            model (Union[PretrainedModel, nn.Layer], optional): The model to be trained. Can be either a
+                PretrainedModel instance or a custom nn.Layer object. Defaults to None.
+            criterion (nn.Layer, optional): The criterion used for calculating losses during training. Defaults to
+                                            None.
+            args (TrainingArguments, optional): The arguments used for configuring the training process. Defaults
+            to None.
+            data_collator (Optional[DataCollator], optional): The collator used for preparing batches of data.
+                                                            Defaults to None.
+            train_dataset (Optional[Dataset], optional): The dataset used for training. Defaults to None.
+            eval_dataset (Union[Dataset, Dict[str, Dataset]], optional): The evaluation dataset(s). Can be either
+                a single Dataset instance or a dictionary mapping string keys to Dataset instances. Defaults to
+                None.
+            tokenizer (Optional[PretrainedTokenizer], optional): The tokenizer used for processing the input text.
+                Defaults to None.
+            compute_metrics (Optional[Callable[[EvalPrediction], Dict]], optional): The function used for computing
+                metrics during evaluation. Defaults to None.
+            callbacks (Optional[List[TrainerCallback]], optional): A list of TrainerCallback objects that will be
+                called during the training process. Defaults to None.
+            optimizers (Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler], optional): A tuple
+                containing the optimizer and learning rate scheduler used for training. Defaults to (None, None).
+            preprocess_logits_for_metrics (Optional[Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor]],
+                optional): A function used for preprocessing logits before passing them to the `compute_metrics`
+                function. Defaults to None.
+            reward_server (Optional[str], optional): The URL of the reward server. Must be in the format
+                'http://xxx:port'. Defaults to None.
+        """
         if args.use_rm_server:
             assert isinstance(model, str), "reward trainer need a str (http://xxx:port) for request"
             self.args = args
@@ -85,6 +120,28 @@ class RewardTrainer(RLTrainer):
         label_ids: paddle.Tensor = None,
         **kwargs,
     ) -> Dict[str, paddle.Tensor]:
+        """
+        Compute the reward function value for training the model. If using an RM server, `label_ids` must be provided.
+        If `input_ids_tokenizer` is not the current `tokenizer`, the input will be retokenized.
+
+        Args:
+            input_ids (paddle.Tensor, shape [B, L]): The IDs of the input sequences, including prompt and response
+                                                    parts.
+            position_ids (paddle.Tensor, optional, shape [B, L], defaults to None): The position IDs for each token in
+                                                                                    the input sequences.
+            input_ids_tokenizer (PretrainedTokenizer, optional, defaults to None): The tokenizer used to process the
+                                                                                    input sequences.
+            label_ids (paddle.Tensor, optional, shape [B, L], defaults to None): The label IDs, required only when
+                                                                                using an RM server.
+            **kwargs (dict, optional): Other optional parameters, including `prompt` (string), defaults to None.
+
+        Returns:
+            Dict[str, paddle.Tensor]: A dictionary containing the following key:
+                - rewards (paddle.Tensor, shape [B]): The values of the reward function.
+
+        Raises:
+            ValueError: If using an RM server and `label_ids` are not provided.
+        """
         if not self.args.use_rm_server:
             if self.tokenizer is not input_ids_tokenizer:
                 # right padding
@@ -126,6 +183,18 @@ class RewardTrainer(RLTrainer):
         #     return {"rewards": reward_score}
 
     def request_reward_server(self, src, tgt, response):
+        """
+        Request the reward server to get the score for the response. If the request fails, the score will be set to
+        zero.
+
+        Args:
+            src (str): The source language text.
+            tgt (str): The target language text.
+            response (List[str]): A list of user responses.
+
+        Returns:
+            paddle.Tensor: A tensor of shape [batch_size, 1] containing the score for each sample.
+        """
         data = {"src": src, "tgt": tgt, "response": response}
         dtype = self.args.model_dtype
 
@@ -134,12 +203,14 @@ class RewardTrainer(RLTrainer):
                 res = requests.post(self.model, json=data)
                 result = json.loads(res.text)
                 reward_score = paddle.to_tensor(
-                    result["score"], dtype=dtype if not self.args.use_fp32_compute else "float32"
+                    result["score"],
+                    dtype=dtype if not self.args.use_fp32_compute else "float32",
                 )
             except Exception as e:
                 logger.warning(f"Request reward server failed({e}) and rewards_score will be set zero.")
                 reward_score = paddle.zeros(
-                    len(response), dtype=dtype if not self.args.use_fp32_compute else "float32"
+                    len(response),
+                    dtype=dtype if not self.args.use_fp32_compute else "float32",
                 )
             return reward_score
 
