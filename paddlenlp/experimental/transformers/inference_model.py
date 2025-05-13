@@ -16,17 +16,28 @@
 
 
 import os
-from typing import Any, Dict
 import time
-import paddle
+from multiprocessing.shared_memory import SharedMemory
+from typing import Any, Dict
+
 import numpy as np
+import paddle
+
 from paddlenlp.transformers import AutoConfig, AutoInferenceModelForCausalLM
 from paddlenlp.utils.log import logger
-from multiprocessing.shared_memory import SharedMemory
 
 
 class InferenceModel:
-    def __init__(self, predictor_args, model_args, nranks=1, rank=0, load_model_from_ipc=False, hot_start=False):
+    def __init__(
+        self,
+        predictor_args,
+        model_args,
+        nranks=1,
+        rank=0,
+        load_model_from_ipc=False,
+        hot_start=False,
+        local_test=False,
+    ):
         """
         Initialize the Causal Language Model Loader.
 
@@ -44,7 +55,7 @@ class InferenceModel:
         self.load_model_from_ipc = load_model_from_ipc
         self.model = self._build_model()
         self.shared_buffer_to = False
-        self.local_test = False
+        self.local_test = local_test
         self.first_load = True
         self.hot_start = hot_start
 
@@ -109,14 +120,14 @@ class InferenceModel:
             result[k] = paddle.to_tensor(tensor)
 
         return result
-    
-    def _log_memory_usage(self, context: str = "") -> None:
+
+    def log_memory_usage(self, context: str = "") -> None:
         """Log current GPU memory usage."""
-        max_alloc = paddle.device.cuda.max_memory_allocated() / (1024 ** 3)
-        max_reserved = paddle.device.cuda.max_memory_reserved() / (1024 ** 3)
-        curr_alloc = paddle.device.cuda.memory_allocated() / (1024 ** 3)
-        curr_reserved = paddle.device.cuda.memory_reserved() / (1024 ** 3)
-        
+        max_alloc = paddle.device.cuda.max_memory_allocated() / (1024**3)
+        max_reserved = paddle.device.cuda.max_memory_reserved() / (1024**3)
+        curr_alloc = paddle.device.cuda.memory_allocated() / (1024**3)
+        curr_reserved = paddle.device.cuda.memory_reserved() / (1024**3)
+
         logger.info(f"GPU memory usage {context}:")
         logger.warning(
             f"max_allocated: {max_alloc:.2f}GB\n"
@@ -127,7 +138,7 @@ class InferenceModel:
 
     def generate(self, **kwargs):
         self.model.generate(**kwargs)
-    
+
     def _update_shared_status(self, pid: int, status: int) -> None:
         """Update shared memory status flag."""
         array = np.zeros([self.nranks], dtype=np.int32)
@@ -143,33 +154,32 @@ class InferenceModel:
             return
 
         paddle.device.cuda.empty_cache()
-        self._log_memory_usage("start update parameters")
-        
+        self.log_memory_usage("start update parameters")
+
         if self.local_test:
             current_device_id = int(os.getenv("FLAGS_selected_gpus"))
             model_path = f"/shared_ipc_meta/model_state.tp0{current_device_id}.pdparams"
             logger.info(f"Loading model from: {model_path}")
-            
+
             set_start = time.time()
             self.model.set_state_dict(paddle.load(model_path))
             logger.info(f"set_state_dict completed in {time.time() - set_start:.2f} seconds")
-            
+
             self.verify_parameters_updated()
-            self._log_memory_usage("update parameters end")
-            
+            self.log_memory_usage("update parameters end")
+
             if not self.first_load:
                 logger.info("send update signal")
                 self._update_shared_status(pid, 2)
             self.first_load = False
             return
 
-        start_time = time.time()
         logger.info("Starting parameter update process...")
-        
+
         current_device_id = int(os.getenv("FLAGS_selected_gpus"))
         ipc_state_dict_path = f"/shared_ipc_meta/ipc_metas_{current_device_id}"
         logger.info(f"Loading IPC state dict from: {ipc_state_dict_path}")
-        
+
         convert_start = time.time()
         state_dict = self.load_tensor_from_ipc_meta(paddle.load(ipc_state_dict_path))
         logger.info(f"IPC meta converted to tensors in {time.time() - convert_start:.2f} seconds")
@@ -183,30 +193,30 @@ class InferenceModel:
             logger.info("Updating parameters via shared_buffer_to...")
             share_start = time.time()
             infer_model_state_dict = self.model.state_dict()
-            
+
             for name, param in state_dict.items():
                 if name in infer_model_state_dict:
                     logger.info(f"Updating model parameter: {name}")
                     update_param = infer_model_state_dict[name]
-                    
+
                     if update_param.dtype != param.dtype:
                         raise TypeError(f"Type mismatch for {name}: {param.dtype} vs {update_param.dtype}")
                     if update_param.shape != param.shape:
                         raise ValueError(f"Shape mismatch for {name}: {param.shape} vs {update_param.shape}")
-                    
+
                     param._share_buffer_to(update_param)
-            
+
             logger.info(f"Parameter sharing completed in {time.time() - share_start:.2f} seconds")
 
         if not self.first_load:
             logger.info("send update signal")
             self._update_shared_status(pid, 2)
-        
+
         self.first_load = False
         self.verify_parameters_updated()
         paddle.device.cuda.empty_cache()
-        self._log_memory_usage("update parameters end")
-    
+        self.log_memory_usage("update parameters end")
+
     def clear_parameters(self, pid: int = 0) -> None:
         """Clear all model parameters."""
         if self.verify_parameters_cleared(False):
@@ -216,8 +226,8 @@ class InferenceModel:
 
         start_time = time.time()
         paddle.device.cuda.empty_cache()
-        self._log_memory_usage("start clear parameters")
-        
+        self.log_memory_usage("start clear parameters")
+
         for name, param in self.model.state_dict().items():
             logger.info(f"Clearing model parameter: {name}")
             param._clear_data()
@@ -227,17 +237,16 @@ class InferenceModel:
 
         self.verify_parameters_cleared()
         logger.info("Model parameters cleared successfully")
-        
+
         self._update_shared_status(pid, -2)
         paddle.device.cuda.empty_cache()
-        self._log_memory_usage("clear parameters end")
+        self.log_memory_usage("clear parameters end")
         logger.info("send clear signal!")
 
-    
-    def verify_parameters_cleared(self, erro_log:bool = True) -> bool:
+    def verify_parameters_cleared(self, erro_log: bool = True) -> bool:
         """
         Verify that all model parameters have been cleared.
-        
+
         Returns:
             bool: True if all parameters are cleared, False otherwise
         """
@@ -248,22 +257,22 @@ class InferenceModel:
                 if erro_log:
                     logger.error(f"Parameter {name} was not properly cleared!")
                 all_cleared = False
-        
+
         if all_cleared:
             logger.info("All parameters verified as cleared successfully")
         else:
             if erro_log:
                 logger.error("Some parameters were not properly cleared!")
-        
+
         return all_cleared
 
-    def verify_parameters_updated(self, erro_log:bool = True) -> bool:
+    def verify_parameters_updated(self, erro_log: bool = True) -> bool:
         """
         Verify that model parameters match the source state dictionary.
-        
+
         Args:
             source_state_dict: Dictionary containing the expected parameters
-            
+
         Returns:
             bool: True if all parameters match, False otherwise
         """
@@ -274,11 +283,11 @@ class InferenceModel:
                 if erro_log:
                     logger.error(f"Parameter {name} was not properly cleared!")
                 all_update = False
-        
+
         if all_update:
             logger.info("All parameters verified as updated successfully")
         else:
             if erro_log:
                 logger.error("Some parameters were not properly updated!")
-        
+
         return all_update
