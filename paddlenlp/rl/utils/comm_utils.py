@@ -1015,7 +1015,7 @@ def process_prompt_and_response(micro_batch, pad_token_id=0):
     response = paddle.stack(padded_response_tensors, axis=0)
 
     micro_batch["input_ids"] = paddle.concat([micro_batch["prompt"], response], axis=1)
-    micro_batch["position_ids"] = make_position_ids_from_input_ids(micro_batch["input_ids"])
+    micro_batch["position_ids"] = make_position_ids_from_input_ids(micro_batch["input_ids"], pad_token_id=pad_token_id)
     key_to_slice = [
         "eos_mask",
         "kl_rewards",
@@ -1072,3 +1072,23 @@ def split_batch_into_micro_batches(total_batch, batch_size, pad_token_id=0):
         micro_batches.append(micro_batch)
 
     return micro_batches
+
+
+def make_eos_mask(response_id, eos_token_ids=0, dtype=paddle.int64):
+    """
+    end of sentence token can be int or list: 1 or [1, 2]
+    e.g. eos_token=1
+    response_id: [0, 0, 2, 42, 3, 5, 1, 0, 0]
+    eos_mask:     [1, 1, 1, 1,  1, 1, 1, 0, 0]
+    """
+    if isinstance(eos_token_ids, int):
+        eos_token_ids = [eos_token_ids]
+
+    eos_mask = paddle.zeros_like(response_id, dtype=paddle.bool)
+    for token_id in eos_token_ids:
+        eos_mask |= response_id == token_id
+
+    eos_mask = eos_mask.to("int64")
+    eos_mask = (paddle.cumsum(eos_mask, axis=1) - eos_mask).to("bool")
+    eos_mask = paddle.logical_not(eos_mask).to(dtype)
+    return eos_mask
