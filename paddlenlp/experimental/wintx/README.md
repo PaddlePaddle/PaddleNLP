@@ -14,3 +14,6 @@ python -c "import use_triton_in_paddle; use_triton_in_paddle.make_triton_compati
 
 > wint2.75/wint2.5 moe kernel 是共用同一 kernel，并使用静态导入的方式，第一次推理会编译，后续推理会直接使用编译好的 kernel。
 > 默认编译好的 kernel 会存放在`~/.paddlenlp/triton_ops_rank_*`目录下
+
+## 使用要求
+细粒度推理组网中使用 wintx kernel，需要设置环境变量`FLAGS_use_wintx_gemm=True`

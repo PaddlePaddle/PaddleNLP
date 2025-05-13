@@ -33,13 +33,6 @@ from paddle.nn import Layer
 from paddle.nn.initializer import Constant
 from paddle.nn.quant import weight_only_linear
 
-from paddlenlp.experimental.wintx import (
-    weight_only_int4_moe,
-    weight_only_linear_int3_decode_superbs_moe_symm,
-    weight_only_linear_int4_decode_superbs_moe_symm,
-    weight_only_linear_int4_moe_symm,
-    weight_only_linear_int4_symm,
-)
 from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
 
@@ -58,6 +51,10 @@ def use_custom_allreduce():
     return os.getenv("FLAGS_custom_allreduce", "False") in ["True", "1", "true"]
 
 
+def use_wintx_gemm():
+    return os.getenv("FLAGS_use_wintx_gemm", "False") in ["True", "1", "true"]
+
+
 if paddle.is_compiled_with_cuda():
     if use_cutlass_fp8_gemm():
         logger.info("cutlass fp8 gemm is used. you can turn it off by setting FLAGS_CUTLASS_FP8_GEMM to False.")
@@ -67,6 +64,17 @@ if paddle.is_compiled_with_cuda():
         from paddlenlp_ops import cutlass_fp8_fp8_half_gemm_fused as fp8_gemm_fused
     else:
         from paddle.linalg import fp8_fp8_half_gemm_fused as fp8_gemm_fused
+
+    if use_wintx_gemm():
+        logger.info("wintx gemm is used. you can turn it off by setting FLAGS_use_wintx_gemm to False.")
+        from paddlenlp.experimental.wintx import (
+            weight_only_int4_moe,
+            weight_only_linear_int3_decode_superbs_moe_symm,
+            weight_only_linear_int4_decode_superbs_moe_symm,
+            weight_only_linear_int4_moe_symm,
+            weight_only_linear_int4_symm,
+        )
+
     try:
         from paddlenlp_ops import (
             dequant_int8,
