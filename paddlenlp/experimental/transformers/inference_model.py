@@ -209,10 +209,11 @@ class InferenceModel:
 
             logger.info(f"Parameter sharing completed in {time.time() - share_start:.2f} seconds")
 
+        if self.nranks > 1:
+            paddle.distributed.barrier()
+
         if not self.first_load:
             logger.info("send update signal")
-            if self.nranks > 1:
-                paddle.distributed.barrier()
             self._update_shared_status(pid, 0)
 
         self.first_load = False
@@ -246,7 +247,7 @@ class InferenceModel:
         self._update_shared_status(pid, -2)
         paddle.device.cuda.empty_cache()
         self.log_memory_usage("clear parameters end")
-        logger.info("send clear signal!")
+        logger.info("send clear signal done!")
 
     def verify_parameters_cleared(self, erro_log: bool = True) -> bool:
         """
