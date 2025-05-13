@@ -85,7 +85,6 @@ def invoke_fused_moe_kernel(
     config = {
         "BLOCK_SIZE_M": 16,
         "BLOCK_SIZE_N": 256,
-        "BLOCK_SIZE_K": 64,
         "GROUP_SIZE_M": 8,
         "num_warps": 4,
         "num_stages": 4,
@@ -147,7 +146,7 @@ def invoke_fused_moe_kernel(
             sstride_bsn,
             MUL_ROUTED_WEIGHT=(int)(mul_routed_weight),
             top_k=top_k,
-            BLOCK_SIZE_K=group_size,
+            BLOCK_SIZE_K=group_size,  # must equal to group_size for this kernel
             pack_num=ppack_num,
             w_mask=ww_mask,
             s_mask=ss_mask,
