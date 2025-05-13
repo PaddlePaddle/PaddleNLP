@@ -130,14 +130,11 @@ sources = [
     "./gpu/speculate_decoding_kernels/speculate_save_output.cc",
     "./gpu/speculate_decoding_kernels/speculate_get_output.cc",
     "./gpu/save_output_dygraph.cu",
-    "./gpu/cpp_extensions.cu",
     "./gpu/all_reduce.cu",
     "./gpu/quantization/per_token_group_quant.cu",
     "./gpu/quantization/per_tensor_quant_fp8.cu",
 ]
 sources += find_end_files("./gpu/speculate_decoding_kernels", ".cu")
-sources += find_end_files("./gpu/moe/fused_moe/cutlass_kernels/moe_gemm/", ".cu")
-sources += find_end_files("./gpu/moe/fused_moe/", ".cu")
 
 nvcc_compile_args = gencode_flags
 update_git_submodule()
@@ -174,6 +171,9 @@ if cc >= 80:
 
     sources += find_end_files("./gpu/append_attn", ".cu")
     sources += find_end_files("./gpu/append_attn/template_instantiation", ".cu")
+    sources += find_end_files("./gpu/moe/fused_moe/cutlass_kernels/moe_gemm/", ".cu")
+    sources += find_end_files("./gpu/moe/fused_moe/", ".cu")
+    sources += "./gpu/cpp_extensions.cu",
 
 
 fp8_auto_gen_directory = "gpu/cutlass_kernels/fp8_gemm_fused/autogen"

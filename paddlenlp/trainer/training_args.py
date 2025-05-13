@@ -32,7 +32,6 @@ import paddle.distributed as dist
 from paddle.distributed import fleet
 
 from ..utils.env import PREFIX_CHECKPOINT_DIR
-from ..utils.fault_tolerance import is_ft_env
 from ..utils.log import logger
 from ..utils.pdc_sdk import FLASH_DEVICE
 from .trainer_utils import (
@@ -1872,30 +1871,21 @@ class TrainingArguments:
             self.refined_recompute = refined_recompute_dict
 
         # process fault tolerance settings
-        if is_ft_env():
-            pdc_zcc_init_step = os.getenv("PDC_FC_INIT_STEP")
-            if pdc_zcc_init_step is not None and int(pdc_zcc_init_step) > 0:
-                self.resume_from_checkpoint = os.path.join(
-                    FLASH_DEVICE, f"{PREFIX_CHECKPOINT_DIR}-{pdc_zcc_init_step}"
-                )
-                logger.warning(
-                    f"PDC_FC_INIT_STEP {pdc_zcc_init_step} has been specified, automatically resume from FLASH_DEVICE: {self.resume_from_checkpoint}"
-                )
-            if self.flash_device_save_steps > 0:
-                assert (
-                    self.enable_zero_cost_checkpoint
-                ), "flash_device_save_steps should only be set in zero cost checkpoint save mode with flash device mounted."
-        else:
-            if self.pdc_download_ckpt:
-                logger.warning(
-                    "pdc_download_ckpt can only be set as true inside FT environment. Automatically disable it now."
-                )
-                self.pdc_download_ckpt = False
-            if self.flash_device_save_steps > 0:
-                logger.warning(
-                    "flash_device_save_steps is only recommended to be set inside FT environment. Automatically disable it now."
-                )
-                self.flash_device_save_steps = 0
+        pdc_zcc_init_step = os.getenv("PDC_FC_INIT_STEP")
+        if pdc_zcc_init_step is not None and int(pdc_zcc_init_step) > 0:
+            self.resume_from_checkpoint = os.path.join(FLASH_DEVICE, f"{PREFIX_CHECKPOINT_DIR}-{pdc_zcc_init_step}")
+            logger.warning(
+                f"PDC_FC_INIT_STEP {pdc_zcc_init_step} has been specified, automatically resume from FLASH_DEVICE: {self.resume_from_checkpoint}"
+            )
+        if self.flash_device_save_steps > 0:
+            assert (
+                self.enable_zero_cost_checkpoint
+            ), "flash_device_save_steps should only be set in zero cost checkpoint save mode with flash device mounted."
+
+        if self.enable_zero_cost_checkpoint:
+            assert (
+                "enable_fuse_optimizer_states" in sharding_parallel_config
+            ), "zero cost checkpoint must be used when enable_fuse_optimizer_states is enabled in sharding parallel config"
 
         assert (
             self.flash_device_save_steps % self.zcc_ema_interval == 0

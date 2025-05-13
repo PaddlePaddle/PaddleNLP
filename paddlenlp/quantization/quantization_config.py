@@ -17,6 +17,11 @@ import json
 from dataclasses import dataclass
 
 quant_inference_mapping = {"avg": "abs_max", "abs_max_channel_wise": "abs_max_channel_wise", "abs_max": "abs_max"}
+fp8_format_mapping = {
+    "hybrid": {"weight": "float8_e4m3fn", "activation": "float8_e4m3fn", "grad_output": "float8_e5m2"},
+    "e4m3": {"weight": "float8_e4m3fn", "activation": "float8_e4m3fn", "grad_output": "float8_e4m3fn"},
+    "e5m2": {"weight": "float8_e5m2", "activation": "float8_e5m2", "grad_output": "float8_e5m2"},
+}
 
 
 @dataclass
@@ -61,7 +66,11 @@ class QuantizationConfig:
         group_size=-1,
         apply_hadamard=True,
         quant_input_grad=False,
-        skip_first_act_scale_step=-1,
+        quant_weight_grad=False,
+        skip_first_act_scale_step=20,
+        moving_rate=0.01,
+        epsilon=1e-8,
+        fp8_format_type="hybrid",
         **kwargs,
     ):
         if weight_quantize_algo is not None:
@@ -77,6 +86,7 @@ class QuantizationConfig:
                         "fp4",
                         "a8w8linear",
                         "a8w4linear",
+                        "fp8linear",
                     ]
                     for algo in weight_quantize_algo
                 ):
@@ -92,6 +102,7 @@ class QuantizationConfig:
                 "fp4",
                 "a8w8linear",
                 "a8w4linear",
+                "fp8linear",
             ]:
                 raise ValueError(
                     f"weight_quantize_algo:{weight_quantize_algo} not in supported list ['weight_only_int8', 'weight_only_int4', 'llm.int8', 'a8w8', 'nf4', 'fp4']"
@@ -129,7 +140,11 @@ class QuantizationConfig:
         self.group_size = group_size
         self.apply_hadamard = apply_hadamard
         self.quant_input_grad = quant_input_grad
+        self.quant_weight_grad = quant_weight_grad
         self.skip_first_act_scale_step = skip_first_act_scale_step
+        self.moving_rate = moving_rate
+        self.epsilon = epsilon
+        self.fp8_format = fp8_format_mapping[fp8_format_type]
 
     def is_weight_quantize(self):
         if isinstance(self.weight_quantize_algo, dict):
@@ -143,6 +158,7 @@ class QuantizationConfig:
             "a8w8",
             "a8w8linear",
             "a8w4linear",
+            "fp8linear",
         ]:
             return True
         else:
