@@ -321,10 +321,10 @@ class Config:
             self._get_download_model()
 
         config = self.get_model_config()
-        # check paddle nlp version
-        tag = os.getenv("tag")
-        if tag not in config["paddlenlp_version"]:
-            logger.warning(f"Current image paddlenlp version {tag} doesn't match the model paddlenlp version {config['paddlenlp_version']} ")
+        # # check paddle nlp version
+        # tag = os.getenv("tag")
+        # if tag not in config["paddlenlp_version"]:
+        #     logger.warning(f"Current image paddlenlp version {tag} doesn't match the model paddlenlp version {config['paddlenlp_version']} ")
 
         def reset_value(self, value_name, key, config):
             if key in config:
@@ -336,11 +336,11 @@ class Config:
         reset_value(self, "max_seq_len", "infer_model_max_seq_len", config)
         reset_value(self, "return_full_hidden_states", "return_full_hidden_states", config)
         reset_value(self, "dtype", "infer_model_dtype", config)
-        reset_value(self, "use_cache_kv_int8", "infer_model_cachekv_int8_type", config)
-        if self.use_cache_kv_int8 == None:
-            self.use_cache_kv_int8 = 0
-        else:
-            self.use_cache_kv_int8 = 1
+        # reset_value(self, "use_cache_kv_int8", "infer_model_cachekv_int8_type", config)
+        # if self.use_cache_kv_int8 == None:
+        #     self.use_cache_kv_int8 = 0
+        # else:
+        #     self.use_cache_kv_int8 = 1
         if self.seq_len_limit > self.max_seq_len:
             self.seq_len_limit = self.max_seq_len
             logger.warning(f"The loading model requires len(input_ids) <= {self.max_seq_len}, now reset MAX_SEQ_LEN.")
