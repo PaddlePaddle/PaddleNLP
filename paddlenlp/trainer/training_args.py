@@ -376,7 +376,7 @@ class TrainingArguments:
             instance of `Dataset`.
         report_to (`str` or `List[str]`, *optional*, defaults to `"visualdl"`):
             The list of integrations to report the results and logs to.
-            Supported platforms are `"visualdl"`/`"wandb"`/`"tensorboard"`.
+            Supported platforms are `"visualdl"`/`"wandb"`/`"tensorboard"`/`"swanlab"`.
             `"none"` for no integrations.
         ddp_find_unused_parameters (`bool`, *optional*):
             When using distributed training, the value of the flag `find_unused_parameters` passed to
@@ -385,6 +385,8 @@ class TrainingArguments:
             Weights & Biases (WandB) API key(s) for authentication with the WandB service.
         wandb_http_proxy (`str`, *optional*):
             Weights & Biases (WandB) http proxy for connecting with the WandB service.
+        swanlab_api_key (`str`, *optional*):
+            Swanlab API key for authentication with the Swanlab service.
         resume_from_checkpoint (`str`, *optional*):
             The path to a folder with a valid checkpoint for your model. This argument is not directly used by
             [`Trainer`], it's intended to be used by your training/evaluation scripts instead. See the [example
@@ -887,6 +889,10 @@ class TrainingArguments:
     wandb_http_proxy: Optional[str] = field(
         default=None,
         metadata={"help": "Weights & Biases (WandB) http proxy for connecting with the WandB service."},
+    )
+    swanlab_api_key: Optional[str] = field(
+        default=None,
+        metadata={"help": "Swanlab API key for authentication with the Swanlab service."},
     )
     resume_from_checkpoint: Optional[str] = field(
         default=None,
