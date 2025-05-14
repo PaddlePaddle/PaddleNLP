@@ -138,7 +138,7 @@ class InferenceModel:
 
     def _update_shared_status(self, pid: int, status: int) -> None:
         """Update shared memory status flag."""
-        array = np.zeros([self.nranks], dtype=np.int32)
+        array = np.zeros([1], dtype=np.int32)
         shm = SharedMemory(create=False, size=array.nbytes, name=f"model_weights_status.{pid}")
         value = np.ndarray(array.shape, dtype=array.dtype, buffer=shm.buf)
         if self.rank == 0:
