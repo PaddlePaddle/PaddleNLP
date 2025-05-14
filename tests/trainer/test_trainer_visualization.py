@@ -22,10 +22,10 @@ from visualdl import LogReader
 
 from paddlenlp.trainer import TrainerControl, TrainerState, TrainingArguments
 from paddlenlp.trainer.integrations import (
+    SwanLabCallback,
     TensorBoardCallback,
     VisualDLCallback,
     WandbCallback,
-    SwanLabCallback,
 )
 from tests.trainer.trainer_utils import RegressionModelConfig, RegressionPretrainedModel
 
@@ -66,6 +66,7 @@ class TestWandbCallback(unittest.TestCase):
         os.environ.pop("WANDB_MODE", None)
         shutil.rmtree(output_dir)
 
+
 class TestSwanlabCallback(unittest.TestCase):
     def test_swanlabcallback(self):
         output_dir = tempfile.mkdtemp()
@@ -94,6 +95,7 @@ class TestSwanlabCallback(unittest.TestCase):
         swanlabcallback._swanlab.finish()
         os.environ.pop("SWANLAB_MODE", None)
         shutil.rmtree(output_dir)
+
 
 class TestTensorboardCallback(unittest.TestCase):
     def test_tbcallback(self):

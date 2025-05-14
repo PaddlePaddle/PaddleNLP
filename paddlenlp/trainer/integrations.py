@@ -42,8 +42,10 @@ def is_wandb_available():
         return False
     return importlib.util.find_spec("wandb") is not None
 
+
 def is_swanlab_available():
     return importlib.util.find_spec("swanlab") is not None
+
 
 def is_ray_available():
     return importlib.util.find_spec("ray.air") is not None
@@ -410,15 +412,15 @@ class SwanLabCallback(TrainerCallback):
             raise RuntimeError("SwanlabCallback requires swanlab to be installed. Run `pip install swanlab`.")
         if has_swanlab:
             import swanlab
-            
+
             self._swanlab = swanlab
-        
+
         self._initialized = False
-    
+
     def setup(self, args, state, model, **kwargs):
         """
         Setup the optional Swanlab integration.
-        
+
         One can subclass and override this method to customize the setup if needed.
         variables:
         Environment:
@@ -427,26 +429,24 @@ class SwanLabCallback(TrainerCallback):
         - **SWANLAB_PROJECT** (`str`, *optional*, defaults to `"PaddleNLP"`):
             Set this to a custom string to store results in a different project.
         """
-        
+
         if self._swanlab is None:
             return
-        
+
         if args.swanlab_api_key:
             self._swanlab.login(api_key=args.swanlab_api_key)
-        
+
         self._initialized = True
-        
+
         if state.is_world_process_zero:
-            logger.info(
-                'Automatic Swanlab logging enabled, to disable set os.environ["SWANLAB_MODE"] = "disabled"'
-            )
-            
+            logger.info('Automatic Swanlab logging enabled, to disable set os.environ["SWANLAB_MODE"] = "disabled"')
+
             combined_dict = {**args.to_dict()}
-            
+
             if hasattr(model, "config") and model.config is not None:
                 model_config = model.config.to_dict()
                 combined_dict = {**model_config, **combined_dict}
-            
+
             trial_name = state.trial_name
             init_args = {}
             if trial_name is not None:
@@ -462,17 +462,17 @@ class SwanLabCallback(TrainerCallback):
                     **init_args,
                 )
             self._swanlab.config.update(combined_dict, allow_val_change=True)
-            
+
     def on_train_begin(self, args, state, control, model=None, **kwargs):
         if self._swanlab is None:
             return
         if not self._initialized:
             self.setup(args, state, model, **kwargs)
-    
+
     def on_train_end(self, args, state, control, model=None, tokenizer=None, **kwargs):
         if self._swanlab is None:
             return
-            
+
     def on_log(self, args, state, control, model=None, logs=None, **kwargs):
         if self._swanlab is None:
             return
@@ -481,7 +481,7 @@ class SwanLabCallback(TrainerCallback):
         if state.is_world_process_zero:
             logs = rewrite_logs(logs)
             self._swanlab.log({**logs, "train/global_step": state.global_step}, step=state.global_step)
-            
+
 
 class AutoNLPCallback(TrainerCallback):
     """
