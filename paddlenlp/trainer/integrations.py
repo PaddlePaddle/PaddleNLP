@@ -456,7 +456,7 @@ class SwanLabCallback(TrainerCallback):
                 if not (args.run_name is None or args.run_name == args.output_dir):
                     init_args["name"] = args.run_name
             init_args["dir"] = args.logging_dir
-            if self._swanlab.run is None:
+            if self._swanlab.get_run() is None:
                 self._swanlab.init(
                     project=os.getenv("SWANLAB_PROJECT", "PaddleNLP"),
                     **init_args,
