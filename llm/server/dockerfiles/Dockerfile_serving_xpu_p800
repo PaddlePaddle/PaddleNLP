@@ -1,0 +1,42 @@
+FROM registry.baidubce.com/paddlepaddle/fastdeploy:llm-base-gcc12.3-cuda12.4-cudnn9-nccl2.15.5
+
+ENV http_proxy=http://agent.baidu.com:8891
+ENV https_proxy=http://agent.baidu.com:8891
+ENV no_proxy=localhost,bj.bcebos.com,su.bcebos.com,pypi.tuna.tsinghua.edu.cn,paddle-ci.gz.bcebos.com
+
+WORKDIR /opt/output/
+
+# 安装 paddlepaddle & paddlenlp & paddlenlp_ops
+RUN pip config set global.index-url https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple \
+    && python3 -m pip install -U --no-deps --force-reinstall https://paddle-whl.bj.bcebos.com/nightly/xpu-p800/paddlepaddle-xpu/paddlepaddle_xpu-3.0.0.dev20250426-cp310-cp310-linux_x86_64.whl \
+    && python3 -m pip install --no-cache-dir sentencepiece pycryptodome tritonclient[all]==2.41.1 \
+    && apt update && apt install net-tools \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# clone paddle & paddlenlp 源码（代码版本应与上述安装版本对齐）
+RUN mkdir -p /opt/source/ && cd /opt/source/ \
+    && git clone https://github.com/PaddlePaddle/Paddle.git \
+    && python3 -m pip install --no-cache-dir -r Paddle/python/requirements.txt \
+    && git clone https://github.com/PaddlePaddle/PaddleNLP.git && cd PaddleNLP && git checkout 323ffec4fad74b5df9b8f6c2ec37d6855f6e62ca && cd ..\
+    && python3 -m pip install --no-cache-dir -r PaddleNLP/requirements.txt \
+    && python3 -m pip install --no-cache-dir -r PaddleNLP/llm/server/server/requirements.txt
+
+# 安装 paddlenlp_ops
+RUN cd /opt/source/ && wget https://paddlenlp.bj.bcebos.com/xpu_release/xpu_release/paddlenlp_ops_xpu.tar.gz \
+    && mkdir -p paddlenlp_ops_xpu && tar zxf paddlenlp_ops_xpu.tar.gz -C paddlenlp_ops_xpu \
+    && cd paddlenlp_ops_xpu/src && python3 setup.py install \
+    && rm -f paddlenlp_ops_xpu.tar.gz
+
+RUN cp /opt/source/PaddleNLP/llm/server/server/scripts/start_server.sh start_server \
+    && chmod +x start_server \
+    && mv start_server /usr/local/bin/ \
+    && cp /opt/source/PaddleNLP/llm/server/server/scripts/stop_server.sh stop_server \
+    && chmod +x stop_server \
+    && mv stop_server /usr/local/bin/ 
+    
+# RUN cp /opt/source/PaddleNLP/llm/server/server/server/download_model.py download_model.py
+
+ENV PYTHONPATH="/opt/source/PaddleNLP/llm/server/server:/opt/source/PaddleNLP"
+
+ENV http_proxy=""
+ENV https_proxy=""

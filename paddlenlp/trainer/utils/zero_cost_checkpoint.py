@@ -51,7 +51,7 @@ from paddlenlp.utils.env import (
     TRAINER_STATE_NAME,
     TRAINING_ARGS_NAME,
 )
-from paddlenlp.utils.fault_tolerance import PC_DUMP_ERROR, ZCC_DUMP_ERROR
+from paddlenlp.utils.fault_tolerance import FC_DUMP_ERROR, PC_DUMP_ERROR
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.pdc_sdk import FLASH_DEVICE
 
@@ -796,7 +796,7 @@ class ZeroCostCheckpointWorker:
                 self.process_dump_task_impl(self.flash_device_save_dir)
                 logger.info(f"[ZCC Worker{self.worker_id}] Dumping to flash device done: {self.flash_device_save_dir}")
             except Exception as e:
-                logger.error(f"{ZCC_DUMP_ERROR} [ZCC Worker{self.worker_id}] Failed to dump to flash device: {e}")
+                logger.error(f"{FC_DUMP_ERROR} [ZCC Worker{self.worker_id}] Failed to dump to flash device: {e}")
         if self.persistent_save_dir:
             try:
                 self.process_dump_task_impl(self.persistent_save_dir)

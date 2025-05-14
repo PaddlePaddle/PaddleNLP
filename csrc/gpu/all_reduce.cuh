@@ -98,7 +98,7 @@ DINLINE half& assign_add(half& a, half b) {
 }
 DINLINE float& assign_add(float& a, float b) { return a += b; }
 
-#if (__CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__))
+#if (!defined(__CUDA_ARCH__) || __CUDA_ARCH__ >= 800)
 DINLINE float upcast_s(nv_bfloat16 val) { return __bfloat162float(val); }
 template <>
 DINLINE nv_bfloat16 downcast_s(float val) {

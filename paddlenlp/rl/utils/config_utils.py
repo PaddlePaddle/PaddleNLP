@@ -34,7 +34,7 @@ class TrainingArguments(TrainingArguments):
         default=-1,
         metadata={"help": "Global generation batch size for dynamic sampling."},
     )
-    mini_batch_size: int = field(
+    global_mini_batch_size: int = field(
         default=-1,
         metadata={"help": "Mini-batch size (global) for the training dataloader."},
     )
@@ -57,10 +57,6 @@ class TrainingArguments(TrainingArguments):
     per_device_train_batch_size: int = field(
         default=1,
         metadata={"help": "Batch size (per device) for the training dataloader."},
-    )
-    use_fused_rms_norm: bool = field(
-        default=False,
-        metadata={"help": "qwen, use_fused_rms_norm"},
     )
     kl_coeff: float = field(
         default=0.02,
@@ -179,7 +175,7 @@ class TrainingArguments(TrainingArguments):
         default=1.0,
         metadata={"help": "The parameter for repetition penalty. 1.0 means no penalty."},
     )
-    quant_type: str = field(
+    rollout_quant_type: str = field(
         default="",
         metadata={"help": "Quantization dtype, optional for: weight_onlt_int8."},
     )
@@ -315,6 +311,16 @@ class TrainingArguments(TrainingArguments):
         default=False,
         metadata={"help": "Whether to balance the number of valid tokens on each dp/sharding rank."},
     )
+    use_remove_padding: bool = field(
+        default=False,
+        metadata={"help": "Whether to remove paddings before computing transformer."},
+    )
+    rollout_max_num_seqs: int = field(
+        default=8,
+        metadata={
+            "help": "The maximum number of sequences that can be processed in a single inference. Default is 8."
+        },
+    )
 
     def __post_init__(self):
         """
@@ -338,16 +344,16 @@ class TrainingArguments(TrainingArguments):
         # for auto config the accumulation steps
         self._post_init_parallel_degree()
 
-        if self.mini_batch_size < 0:
-            self.mini_batch_size = self.global_batch_size
+        if self.global_mini_batch_size < 0:
+            self.global_mini_batch_size = self.global_batch_size
 
         if (
             self.global_batch_size % self.dataset_world_size != 0
-            or self.mini_batch_size % self.dataset_world_size != 0
+            or self.global_mini_batch_size % self.dataset_world_size != 0
         ):
             raise ValueError(
-                "global_batch_size(mini_batch_size) must be divisible by dataset_world_size! "
-                f"Hint: global_batch_size={self.global_batch_size}, mini_batch_size={self.mini_batch_size}, dataset_world_size={self.dataset_world_size}. "
+                "global_batch_size(global_mini_batch_size) must be divisible by dataset_world_size! "
+                f"Hint: global_batch_size={self.global_batch_size}, global_mini_batch_size={self.global_mini_batch_size}, dataset_world_size={self.dataset_world_size}. "
                 f"dataset_world_size({self.dataset_world_size})=data_parallel_degree({self.data_parallel_degree})*sharding_parallel_degree({self.sharding_parallel_degree})."
             )
 
@@ -355,7 +361,7 @@ class TrainingArguments(TrainingArguments):
             self.global_gen_batch_size = self.global_batch_size
 
         if self.per_device_rollout_batch_size <= 0:
-            self.per_device_rollout_batch_size = self.per_device_train_batch_size
+            self.per_device_rollout_batch_size = self.global_batch_size // self.dataset_world_size
         if self.per_device_logprob_batch_size <= 0:
             self.per_device_logprob_batch_size = self.per_device_train_batch_size
         if self.per_device_reward_batch_size <= 0:
@@ -363,11 +369,14 @@ class TrainingArguments(TrainingArguments):
         if self.per_device_value_batch_size <= 0:
             self.per_device_value_batch_size = self.per_device_train_batch_size
 
+        # conserve kv cache, select the minimum value as the rollout max num seqs for the inference engine
+        # self.rollout_max_num_seqs = min(self.per_device_rollout_batch_size * self.rollout_n, self.rollout_max_num_seqs)
+
         # `gradient_accumulation_steps` specifies the number of mini-batches per gradient update.
         # This value must be set prior to calling `super().__post_init__()`.
         # It is utilized within `super().__post_init__()` for configuring the DistributedStrategy.
         self.gradient_accumulation_steps = (
-            self.mini_batch_size
+            self.global_mini_batch_size
             * self.rollout_n
             * self.update_iters
             // self.per_device_train_batch_size
@@ -376,7 +385,7 @@ class TrainingArguments(TrainingArguments):
         if self.gradient_accumulation_steps <= 0:
             logger.warning(
                 f"gradient_accumulation_steps: {self.gradient_accumulation_steps} must be greater than zero!"
-                " Please check your configuration, gradient_accumulation_steps = mini_batch_size * rollout_n * update_iters / per_device_train_batch_size / dataset_world_size."
+                " Please check your configuration, gradient_accumulation_steps = global_mini_batch_size * rollout_n * update_iters / per_device_train_batch_size / dataset_world_size."
                 " dataset_world_size = {self.dataset_world_size} = data_parallel_degree * sharding_parallel_degree."
                 " We will set it to 1!"
             )
@@ -384,8 +393,9 @@ class TrainingArguments(TrainingArguments):
 
         train_batch_size_info = {
             "global_batch_size": self.global_batch_size,
-            "mini_batch_size": self.mini_batch_size,
+            "global_mini_batch_size": self.global_mini_batch_size,
             "rollout_n": self.rollout_n,
+            "rollout_max_num_seqs": self.rollout_max_num_seqs,
             "dataset_world_size": self.dataset_world_size,
             "per_device_rollout_batch_size": self.per_device_rollout_batch_size,
             "per_device_logprob_batch_size": self.per_device_logprob_batch_size,
@@ -433,14 +443,14 @@ class TrainingArguments(TrainingArguments):
             self.normalize_advantage = False
 
         max_per_device_eval_batch_size = (
-            self.mini_batch_size * self.rollout_n * self.update_iters // self.dataset_world_size
+            self.global_mini_batch_size * self.rollout_n * self.update_iters // self.dataset_world_size
         )
         if self.per_device_eval_batch_size > max_per_device_eval_batch_size:
             logger.warning(
                 f"per_device_eval_batch_size: {self.per_device_eval_batch_size} is larger than "
-                f"mini_batch_size: {self.mini_batch_size} * rollout_n: "
+                f"global_mini_batch_size: {self.global_mini_batch_size} * rollout_n: "
                 f"{self.rollout_n} * update_iters: {self.update_iters}, which may cause infer error. "
-                f"We will set it to mini_batch_size * rollout_n * update_iters // dataset_world_size!"
+                f"We will set it to global_mini_batch_size * rollout_n * update_iters // dataset_world_size!"
             )
             self.per_device_eval_batch_size = max_per_device_eval_batch_size
 
@@ -521,9 +531,7 @@ class ModelArgument:
     actor_tokenizer_alpha: float = field(default=None, metadata={"help": "Tokenizer will tokenize randomly"})
     reward_tokenizer_alpha: float = field(default=None, metadata={"help": "Tokenizer will tokenize randomly"})
     reward_critic_tokenizer_alpha: float = field(default=None, metadata={"help": "Tokenizer will tokenize randomly"})
-    use_attn_mask_start_row_indices: bool = field(default=False, metadata={"help": "Should in data args"})
     stage: str = field(default="PPO", metadata={"help": "The type of training."})
-    fused_linear: bool = field(default=True, metadata={"help": "Whether to use fused_gemm_epilogue"})
     critic_recompute_granularity: str = field(
         default="full",
         metadata={

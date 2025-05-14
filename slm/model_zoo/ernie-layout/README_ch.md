@@ -410,7 +410,7 @@ python export_model.py --task_type cls --model_path ./ernie-layoutx-base-uncased
 export/
 ├── inference.pdiparams
 ├── inference.pdiparams.info
-└── inference.pdmodel
+└── inference.json (在未开启PIR时为inference.pdmodel)
 ```
 
 <a name="52"></a>

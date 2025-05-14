@@ -226,7 +226,7 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         chosen_expert = topk_idx.reshape([-1])
         # Shape: [seq_len * k, num_experts].
         token_priority = F.one_hot(chosen_expert, self.num_experts).cast(paddle.int32)
-        token_priority = paddle.logical_and(token_priority > 0, token_priority.cumsum(axis=0) < capacity)
+        token_priority = paddle.logical_and(token_priority > 0, token_priority.cumsum(axis=0) <= capacity)
         # Shape: [seq_len, num_experts].
         token_priority = token_priority.reshape([-1, k, self.num_experts]).sum(axis=1)
 
@@ -532,12 +532,14 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
             token_priority = self._priority(top_idx, capacity)
 
         # normalize gates
+        # gates_masked is equal to top_gate.
         gates_masked = gates * mask
-        if self.training:
-            gates_s = paddle.sum(gates_masked, axis=-1, keepdim=True)
-            denom_s = paddle.clip(gates_s, min=paddle.finfo(gates_masked.dtype).eps)
-            if self.norm_topk_prob:
-                gates_masked = gates_masked / denom_s
+        # if self.training:
+        gates_s = paddle.sum(gates_masked, axis=-1, keepdim=True)
+        denom_s = paddle.clip(gates_s, min=paddle.finfo(gates_masked.dtype).eps)
+        if self.norm_topk_prob:
+            gates_masked = gates_masked / denom_s
+        gates_masked *= self.routed_scaling_factor
 
         return (
             capacity,
