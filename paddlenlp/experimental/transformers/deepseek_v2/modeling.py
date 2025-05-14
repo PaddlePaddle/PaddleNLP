@@ -616,7 +616,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
         elif self.quant_type == "weight_only_intx":
             import os
 
-            mix_bit_path = os.path.join(self.config.name_or_path, "mix_bits_config.json")
+            mix_bit_path = os.path.join(self.config.model_name_or_path, "mix_bits_config.json")
             mixbit_config = MixBitConfig(
                 mix_bit_path=mix_bit_path,
             )
