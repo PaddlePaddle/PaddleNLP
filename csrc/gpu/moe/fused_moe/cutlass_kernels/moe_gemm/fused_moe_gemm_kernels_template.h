@@ -706,7 +706,7 @@ void MoeGemmRunner<T, WeightType>::run_gemm<EpilogueTag, FineGrained>(
     for (size_t ii = 0; ii < candidate_configs.size(); ++ii) {
       try {
         for (int i = 0; i < warm_time; i++) {
-          dispatch_to_arch<EpilogueTag>(A,
+          dispatch_to_arch<EpilogueTag, FineGrained>(A,
                                         B,
                                         weight_scales,
                                         biases,
@@ -727,7 +727,7 @@ void MoeGemmRunner<T, WeightType>::run_gemm<EpilogueTag, FineGrained>(
         check_cuda_error(cudaStreamSynchronize(stream));
         check_cuda_error(cudaEventRecord(start, stream));
         for (int i = 0; i < test_time; i++) {
-          dispatch_to_arch<EpilogueTag>(A,
+          dispatch_to_arch<EpilogueTag, FineGrained>(A,
                                         B,
                                         weight_scales,
                                         biases,
