@@ -617,6 +617,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
             import os
 
             mix_bit_path = os.path.join(self.config.model_name_or_path, "mix_bits_config.json")
+            logger.info(f"load mixbit config from {mix_bit_path}")
             mixbit_config = MixBitConfig(
                 mix_bit_path=mix_bit_path,
             )
@@ -1360,23 +1361,16 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
             )
 
             if self.config.mla_use_matrix_absorption:
-                # TODO, not support in wintx yet
-                assert False, "not support in wintx yet"
-                kv_b_proj_weight = paddle.to_tensor(
-                    state_dict[f"{self.base_model_prefix}.layers.{idx}.self_attn.kv_b_proj.weight"]
-                ).cast(dtype)
 
-                w = kv_b_proj_weight.reshape(
-                    shape=[
-                        self.config.kv_lora_rank,
-                        self.num_attention_heads // self.config.tensor_parallel_degree,
-                        -1,
-                    ]
-                ).transpose(perm=[1, 2, 0])
-                # wk_b: [num_heads, qk_nope_head_dim, kv_lora_rank]
-                # wv_b: [num_heads, kv_lora_rank, v_head_dim]
-                wk_b = w[:, : self.config.qk_nope_head_dim, :]
-                wv_b = w[:, -self.config.v_head_dim :, :].transpose(perm=[0, 2, 1])
+                k_b_key = f"{self.base_model_prefix}.layers.{idx}.self_attn.k_b_proj.weight"
+                v_b_key = f"{self.base_model_prefix}.layers.{idx}.self_attn.v_b_proj.weight"
+
+                assert (
+                    k_b_key in state_dict and v_b_key in state_dict
+                ), f"{k_b_key} or {v_b_key} not in state_dict, please check your checkpoint file"
+                wk_b = paddle.to_tensor(state_dict[k_b_key]).cast(dtype)
+                wv_b = paddle.to_tensor(state_dict[v_b_key]).cast(dtype)
+
                 self.transformer_block.k_b_proj_weights[idx].set_value(wk_b)
                 self.transformer_block.v_b_proj_weights[idx].set_value(wv_b)
 
@@ -1552,8 +1546,9 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
     def set_transformer_block(self, transformer_config):
         if self.use_weight_only:
             if self.quant_type.endswith("intx"):
-                logger.info("Use WINTX quantization, note that you must load a prequantization state dict")
-                assert self.config.mla_use_matrix_absorption is False, "mla_use_matrix_absorption not support yet"
+                logger.info(
+                    "Use WINTX quantization, note that you must load a prequantization state dict and check if there is mix_bits_config.json"
+                )
                 self.transformer_block = FusedBlockMultiTransformerWINTX(transformer_config)
                 self.set_state_dict = self.set_wintx_state_dict
             else:
