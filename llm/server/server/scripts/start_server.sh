@@ -19,8 +19,8 @@ export PYTHONPATH=/root/paddlejob/workspace/env_run/output/changwenbin/PaddleNLP
 export PYTHONPATH=/root/paddlejob/workspace/env_run/output/changwenbin/PaddleNLP/llm/:$PYTHONPATH
 export PATH=/opt/tritonserver/bin/:$PATH
 
-export FLAGS_cascade_attention_max_partition_size=131072
-# export FLAGS_mla_use_tensorcore=1
+export FLAGS_cascade_attention_max_partition_size=163840
+export FLAGS_mla_use_tensorcore=0
 export USE_DYNAMIC_GRAPH=1
 
 export GLOG_v=0
@@ -32,14 +32,18 @@ export LC_ALL=C.UTF-8
 export FLAGS_gemm_use_half_precision_compute_type=0
 export NVIDIA_TF32_OVERRIDE=0
 
+export NCCL_ALGO=Tree
+export FLAGS_use_wintx_gemm=True
+
+
 # Model hyperparameters
-export MP_NUM=${MP_NUM:-"1"}                                # number of model parallelism
+export MP_NUM=${MP_NUM:-"4"}                                # number of model parallelism
 export MP_NNODE=${MP_NNODE:-"1"}                            # number of nodes
-export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-"0"}    # GPU ids
-export MAX_SEQ_LEN=${MAX_SEQ_LEN:-"2048"}
-export MAX_DEC_LEN=${MAX_DEC_LEN:-"1024"}
-export BATCH_SIZE=${BATCH_SIZE:-"20"}
-export BLOCK_BS=${BLOCK_BS:-"4"}
+export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-"0,1,2,3"}    # GPU ids
+export MAX_SEQ_LEN=${MAX_SEQ_LEN:-"8192"}
+export MAX_DEC_LEN=${MAX_DEC_LEN:-"4096"}
+export BATCH_SIZE=${BATCH_SIZE:-"128"}
+export BLOCK_BS=${BLOCK_BS:-"1"}
 export BLOCK_RATIO=${BLOCK_RATIO:-"0.75"}
 export ENC_DEC_BLOCK_NUM=${ENC_DEC_BLOCK_NUM:-"4"}
 export MAX_PREFILL_BATCH=${MAX_PREFILL_BATCH:-"4"}
@@ -47,7 +51,8 @@ export STOP_THRESHOLD=${STOP_THRESHOLD:-"0"}
 
 export tag=${tag:-"3.0.0.b4"}
 export model_name=$1
-export MODEL_DIR=/root/paddlejob/workspace/env_run/output/bos_model/community/deepseek-ai/DeepSeek-V3-0324
+export MODEL_DIR=/root/paddlejob/workspace/env_run/output/model/dsv3_w2_tq2.75_w4_channel_tp4_new
+# export MODEL_DIR=/root/paddlejob/workspace/env_run/output/bos_model/community/deepseek-ai/DeepSeek-V3-0324
 # export MODEL_DIR=/root/.paddlenlp/models/Qwen/Qwen1.5-MoE-A2.7B-Chat
 # export MODEL_DIR=/root/paddlejob/workspace/env_run/output/changwenbin/PaddleNLP/llm/predict/static/Qwen/Qwen1.5-MoE-A2.7B-Chat
 # ${MODEL_DIR:-"/models"}
@@ -96,41 +101,41 @@ if [ "$MP_NNODE" -gt 1 ]; then
     POD_0_IP=$POD_0_IP
     export HOST_IP=$FED_POD_IP
 else
-    # POD_0_IP="127.0.0.1"
-    # HOST_IP="127.0.0.1"
+    POD_0_IP="127.0.0.1"
+    HOST_IP="127.0.0.1"
     # 屏蔽平台预设的环境变量，因为框架采用兼容升级，检测到这些配置会使用原方式启动
-    unset PADDLE_ELASTIC_JOB_ID
-    unset PADDLE_TRAINER_ENDPOINTS
-    unset DISTRIBUTED_TRAINER_ENDPOINTS
-    unset FLAGS_START_PORT
-    unset PADDLE_ELASTIC_TIMEOUT
-    nnodes=$PADDLE_TRAINERS_NUM
-    rank=$PADDLE_TRAINER_ID
+    # unset PADDLE_ELASTIC_JOB_ID
+    # unset PADDLE_TRAINER_ENDPOINTS
+    # unset DISTRIBUTED_TRAINER_ENDPOINTS
+    # unset FLAGS_START_PORT
+    # unset PADDLE_ELASTIC_TIMEOUT
+    # nnodes=$PADDLE_TRAINERS_NUM
+    # rank=$PADDLE_TRAINER_ID
 
-    for name in `env | grep -E 'PADDLE|ENDPOINT' | awk -F'=' '{print $1}'`; do
-    unset ${name}
-    done
+    # for name in `env | grep -E 'PADDLE|ENDPOINT' | awk -F'=' '{print $1}'`; do
+    # unset ${name}
+    # done
 
-    START_RANK=0
-    END_RANK=$nnodes
-    END_RANK=1
+    # START_RANK=0
+    # END_RANK=$nnodes
+    # END_RANK=1
 
-    if [[ $rank -lt $START_RANK ]]; then
-        echo "rank exit"
-        exit 0
-    fi
+    # if [[ $rank -lt $START_RANK ]]; then
+    #     echo "rank exit"
+    #     exit 0
+    # fi
 
-    if [[ $rank -ge $END_RANK ]]; then
-        echo "rank exit"
-        exit 0
-    fi
+    # if [[ $rank -ge $END_RANK ]]; then
+    #     echo "rank exit"
+    #     exit 0
+    # fi
 
-    rank=$(($rank-$START_RANK))
-    nnodes=$(($END_RANK-$START_RANK))
-    master=`cat /root/paddlejob/workspace/hostfile | head -n $(($START_RANK+1)) | tail -n 1 | awk '{print $1}'`
-    port=36677
+    # rank=$(($rank-$START_RANK))
+    # nnodes=$(($END_RANK-$START_RANK))
+    # master=`cat /root/paddlejob/workspace/hostfile | head -n $(($START_RANK+1)) | tail -n 1 | awk '{print $1}'`
+    # port=36677
 
-    set -ex
+    # set -ex
 fi
 
 echo "POD_0_IP: $POD_0_IP HOST_IP: $HOST_IP"

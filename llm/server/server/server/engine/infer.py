@@ -80,7 +80,7 @@ class ModelRunner:
             self.qk_rope_head_dim = int(self.model_cfg["qk_rope_head_dim"])
             self.v_head_dim = int(self.model_cfg["v_head_dim"])
             self.kv_lora_rank = int(self.model_cfg["kv_lora_rank"])
-            self.mla_use_absorb = bool(self.model_cfg["mla_use_matrix_absorption"])
+            self.mla_use_absorb = False #bool(self.model_cfg["mla_use_matrix_absorption"])
 
         self.max_stop_seqs_num = int(os.getenv("MAX_STOP_SEQS_NUM", 5))
         self.stop_seqs_max_len = int(os.getenv("STOP_SEQS_MAX_LEN", 8))
@@ -787,8 +787,8 @@ class InferenceEngine(object):
         predictor_args.mode = "dynamic"
         predictor_args.block_attn = True
         predictor_args.append_attn = True
-        predictor_args.quant_type = "weight_only_int4"
-        # predictor_args.mla_use_matrix_absorption = True
+        predictor_args.quant_type = "weight_only_intx"
+        predictor_args.mla_use_matrix_absorption = False
 
         paddle.set_device(predictor_args.device)
         paddle.set_default_dtype(predictor_args.dtype)
