@@ -157,7 +157,9 @@ class ActorReferenceTrainerBase(RLTrainer):
 
         return paddle.concat(log_probs_list, axis=0)
 
-    def compute_fused_logprob(self, input_ids: paddle.Tensor, position_ids: paddle.Tensor = None, **kwargs):
+    def compute_fused_logprob(
+        self, input_ids: paddle.Tensor, position_ids: paddle.Tensor = None, loop_chunk_size=1024, **kwargs
+    ):
         log_probs_list = []
         batch_size, sequence_length = input_ids.shape
         per_device_logprob_batch_size = self.args.per_device_logprob_batch_size
@@ -167,6 +169,10 @@ class ActorReferenceTrainerBase(RLTrainer):
         # outputs a tuple with logits tensor as the only one element.
         startend_row_indices = create_startend_row_indices(input_ids, self.tokenizer.pad_token_id)
         response_start = kwargs["prompt"].shape[-1] - 1 if "prompt" in kwargs else 0
+
+        num_embeddings = self.model.config.vocab_size
+        tensor_parallel_degree = self.model.config.tensor_parallel_degree
+        tensor_parallel_output = self.model.config.tensor_parallel_output
 
         for i in range(num_batches):
             # Calculate the start and end indices for the current batch
@@ -227,10 +233,6 @@ class ActorReferenceTrainerBase(RLTrainer):
             hidden_states = hidden_states[:, response_start:-1, :]
             dtype = hidden_states.dtype
             original_shape = hidden_states.shape
-            num_embeddings = self.model.config.vocab_size
-            loop_chunk_size = 1024
-            tensor_parallel_degree = self.model.config.tensor_parallel_degree
-            tensor_parallel_output = self.model.config.tensor_parallel_output
             if tensor_parallel_degree > 1:
                 assert tensor_parallel_output, (
                     "When tensor_parallel_degree > 1 and use_fused_head_and_loss_fn, "
