@@ -205,6 +205,7 @@ std::vector<paddle::Tensor> MultiHeadLatentAttention(
   meta_data.batch_size = cum_offsets.dims()[0];
 
   switch (query.dtype()) {
+#if (!defined(__CUDA_ARCH__) || __CUDA_ARCH__ >= 800)
     case paddle::DataType::BFLOAT16: {
       return MultiHeadLatentAttentionKernel<paddle::DataType::BFLOAT16>(
           meta_data,
@@ -253,6 +254,7 @@ std::vector<paddle::Tensor> MultiHeadLatentAttention(
           causal,
           speculate_decoder);
     }
+#endif
     case paddle::DataType::FLOAT16: {
       return MultiHeadLatentAttentionKernel<paddle::DataType::FLOAT16>(
           meta_data,

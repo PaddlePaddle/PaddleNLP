@@ -2898,9 +2898,10 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         )
 
         required_input = encoded_inputs[self.model_input_names[0]]
+        support_padding_side = "padding_side" in set(inspect.signature(self._pad).parameters.keys())
         if required_input and not isinstance(required_input[0], (list, tuple)):
             # some tokenizers might not have the padding_side attribute
-            if "padding_side" in set(inspect.signature(self._pad).parameters.keys()):
+            if support_padding_side:
                 encoded_inputs = self._pad(
                     encoded_inputs,
                     max_length=max_length,
@@ -2937,7 +2938,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         batch_outputs = {}
         for i in range(batch_size):
             inputs = dict((k, v[i]) for k, v in encoded_inputs.items())
-            if "padding_side" in set(inspect.signature(self._pad).parameters.keys()):
+            if support_padding_side:
                 outputs = self._pad(
                     inputs,
                     max_length=max_length,

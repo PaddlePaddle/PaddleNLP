@@ -23,6 +23,7 @@ import paddle
 from paddle.distributed import fleet
 
 from paddlenlp.datasets.rlhf_datasets import RLHFDataset, collate_fn
+from paddlenlp.generation import GenerationConfig
 from paddlenlp.rl.models.score_model import AutoModelForScore
 from paddlenlp.rl.trainer.ppo_trainer import PPOTrainer
 from paddlenlp.rl.utils.config_utils import (
@@ -358,6 +359,12 @@ def main():
         accuracy = (eval_preds.predictions == 3).astype("float32").mean().item()
         return {"accuracy": accuracy}
 
+    try:
+        generation_config = GenerationConfig.from_pretrained(model_args.actor_model_name_or_path)
+    except:
+        logger.warning("Can't find generation config, so it will not use generation_config field in the model config")
+        generation_config = None
+
     trainer = PPOTrainer(
         actor_model=actor_model,
         reference_model=reference_model,
@@ -379,6 +386,7 @@ def main():
             max_prompt_len=data_args.max_prompt_len if training_args.balance_batch else None,
         ),  # NOTE: enforce prompt padding to max_prompt_len when using balance_batch
         compute_metrics=compute_metrics,  # TODO: only used for grpo (kk datasets)
+        generation_config=generation_config,
     )
 
     # TODO(gongenlei) resume_from_checkpoint is not ready

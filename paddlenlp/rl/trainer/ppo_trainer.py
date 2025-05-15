@@ -35,6 +35,7 @@ from rich.table import Table
 from ...data import DataCollator
 from ...datasets.rlhf_datasets.protocol import DataProto
 from ...datasets.rlhf_datasets.protocol import TensorDict
+from ...generation import GenerationConfig
 from ...trainer.trainer import (
     EvalLoopOutput,
     EvalPrediction,
@@ -55,6 +56,7 @@ from ...transformers import (
     PretrainedTokenizer,
 )
 from ...transformers.model_utils import _add_variant
+from ...trl import llm_utils
 from ...utils.env import PADDLE_WEIGHTS_NAME
 from ..algos.advantage import (
     add_kl_divergence_regularization,
@@ -73,6 +75,7 @@ from ..utils.comm_utils import (
     filter_valid_reward_groups,
     gather_and_pad,
     get_timer_label,
+    make_eos_mask,
     new_timer_log,
     pad_tensor,
     split_batch_by_rank,
@@ -84,6 +87,7 @@ from ..utils.timer_utils import TimerScope, TimerScopeManualLabel
 from .actor_trainer import ActorReferenceTrainer
 from .critic_trainer import CriticTrainer
 from .reward_trainer import RewardTrainer
+from .rl_trainer import RLTrainerBase
 from .trainer_utils import (
     MuteDefaultFlowCallback,
     batch_retokenize,
@@ -210,7 +214,7 @@ class PPOMetric:
             return DataProto.from_single_dict(out_metrics)
 
 
-class PPOTrainer(Trainer):
+class PPOTrainer(RLTrainerBase):
     def __init__(
         self,
         actor_model: Union[PretrainedModel, nn.Layer],
@@ -232,6 +236,7 @@ class PPOTrainer(Trainer):
         callbacks: Optional[List[TrainerCallback]] = None,
         optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
         preprocess_logits_for_metrics: Optional[Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor]] = None,
+        generation_config: Optional[GenerationConfig] = None,
     ):
         """
         Args:
@@ -363,6 +368,7 @@ class PPOTrainer(Trainer):
         self.model = self.model_wrapped = self.DummyPPOModel()
         if self.timers:
             self.timers.log = types.MethodType(new_timer_log, self.timers)
+        self.generation_config = generation_config
 
     def create_actor_trainer(
         self,
@@ -1150,13 +1156,16 @@ class PPOTrainer(Trainer):
             dtype=label_ids[0].dtype,
             padding_side="right",
         )
-        position_ids = make_position_ids_from_input_ids(input_ids)
+        position_ids = make_position_ids_from_input_ids(input_ids, pad_token_id=self.tokenizer.pad_token_id)
         return input_ids, label_ids, position_ids
 
     # 这里到时也许可以作为 DataProto 的方法
     def distribute_gather_and_pad_data(self, batch:DataProto):
         # group index for grpo
-        eos_mask = (batch.batch["input_ids"] != self.tokenizer.pad_token_id)[:, batch.batch["prompt"].shape[-1] :].to(
+        eos_mask = make_eos_mask(
+            batch.batch["input_ids"][:, batch.batch["prompt"].shape[-1] :],
+            eos_token_ids=llm_utils.get_eos_token_id(self.tokenizer, self.generation_config),
+        ).to(
             batch.batch["log_probs"].dtype  # fix dtype
         )
         try:
