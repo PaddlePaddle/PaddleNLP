@@ -26,6 +26,8 @@ from ..models.ppo_model_utils import (
 from .rl_trainer import RLTrainer
 from .trainer_utils import guard_set_args
 
+from ...datasets.rlhf_datasets.protocol import DataProto
+
 
 class ActorReferenceTrainer(RLTrainer):
     loss_cls = RLHFPPOMixedLoss
@@ -47,9 +49,9 @@ class ActorReferenceTrainer(RLTrainer):
         return "actor_loss"
 
     @paddle.no_grad()
-    def generate_sequences(self, prompt_only_batch: Dict, do_eval=False) -> List[Dict[str, Any]]:
+    def generate_sequences(self, prompt_only_batch: DataProto, do_eval=False) -> List[DataProto]:
         """Rollout a batch of experiences."""
-        input_ids = prompt_only_batch["input_ids"]
+        input_ids = prompt_only_batch.batch["input_ids"]
 
         repeat_num = 1 if do_eval else self.args.rollout_n
 
@@ -66,7 +68,7 @@ class ActorReferenceTrainer(RLTrainer):
             input_ids = input_ids.repeat_interleave(repeat_num, axis=0)
 
         if self.args.use_rm_server:
-            label_ids = prompt_only_batch["label_ids"]
+            label_ids = prompt_only_batch.batch["label_ids"]
             if repeat_num > 1:
                 label_ids = label_ids.repeat_interleave(repeat_num, axis=0)
 
@@ -75,12 +77,12 @@ class ActorReferenceTrainer(RLTrainer):
             sequences = sequences.transpose([1, 0, 2])
         # prompt, sequence, attention_mask
         return [
-            {
-                "prompt": input_ids,
-                "input_ids": seq,
-                **({"label_ids": label_ids[idx * len(seq) : (idx + 1) * len(seq)]} if self.args.use_rm_server else {}),
-                "index": np.array([str(uuid.uuid4())] * len(seq), dtype=object),
-            }
+            DataProto.from_single_dict({
+                "prompt": input_ids[idx * len(seq) : (idx + 1) * len(seq)],         # src prompt
+                "input_ids": seq,                                                   # 该 prompt 输入 Actor 生成的所有 response
+                **({"label_ids": label_ids[idx * len(seq) : (idx + 1) * len(seq)]} if self.args.use_rm_server else {}), # tgt response
+                "index": np.array([str(uuid.uuid4())] * len(seq), dtype=object),    # 每个 response 的唯一标识，这个存储到 non_tensor_batch 里了
+            })
             for idx, seq in enumerate(sequences)
         ]
 
@@ -199,18 +201,18 @@ class ActorReferenceTrainer(RLTrainer):
 
         return paddle.concat(log_probs_list, axis=0)
 
-    def update_actor(self, rl_batch: Dict[str, paddle.Tensor]) -> Dict[str, Any]:
+    def update_actor(self, rl_batch: DataProto) -> Dict[str, Any]:
         # inputs shared by policy and value trainer
-        input_ids = rl_batch["input_ids"].contiguous()  # length: src+tgt
-        position_ids = rl_batch["position_ids"]  # length: src+tgt
-        sequence_mask = rl_batch["eos_mask"]  # length: tgt(-1)
+        input_ids = rl_batch.batch["input_ids"].contiguous()  # length: src+tgt
+        position_ids = rl_batch.batch["position_ids"]  # length: src+tgt
+        sequence_mask = rl_batch.batch["eos_mask"]  # length: tgt(-1)
         if self.args.use_fp32_compute and sequence_mask.dtype != paddle.float32:
             sequence_mask = sequence_mask.cast(paddle.float32)
         # inputs used by policy trainer
-        old_log_probs = rl_batch["log_probs"]  # length: tgt(-1)
-        reward_advantages = rl_batch["reward_advantages"]  # length: tgt(-1)
+        old_log_probs = rl_batch.batch["log_probs"]  # length: tgt(-1)
+        reward_advantages = rl_batch.batch["reward_advantages"]  # length: tgt(-1)
 
-        response_start = rl_batch["prompt"].shape[-1] - 1
+        response_start = rl_batch.batch["prompt"].shape[-1] - 1
 
         attn_mask_startend_row_indices = create_startend_row_indices(input_ids, self.tokenizer.pad_token_id)
         policy_trainer_inputs = {
@@ -224,7 +226,7 @@ class ActorReferenceTrainer(RLTrainer):
         }
 
         if self.args.rl_algorithm == "grpo":
-            policy_trainer_inputs.update({"ref_log_probs": rl_batch["ref_log_probs"]})
+            policy_trainer_inputs.update({"ref_log_probs": rl_batch.batch["ref_log_probs"]})
         else:
             policy_trainer_inputs.update({"ref_log_probs": None})
 
@@ -232,22 +234,23 @@ class ActorReferenceTrainer(RLTrainer):
 
         # metric
         with paddle.no_grad():
-            rewards = rl_batch["rewards"].mean()
-            ori_rewards = rl_batch["ori_rewards"].mean()
+            rewards = rl_batch.batch["rewards"].mean()
+            ori_rewards = rl_batch.batch["ori_rewards"].mean()
             mask_cast = sequence_mask.cast(paddle.float32)
             if self.args.rl_algorithm in ["ppo", "reinforce_plus_plus"]:
-                kl_rewards = (rl_batch["kl_rewards"] * mask_cast).sum() / mask_cast.sum()
-                rewards_with_kl = (rl_batch["rewards_with_kl"] * mask_cast).sum() / mask_cast.sum()
+                kl_rewards = (rl_batch.batch["kl_rewards"] * mask_cast).sum() / mask_cast.sum()
+                rewards_with_kl = (rl_batch.batch["rewards_with_kl"] * mask_cast).sum() / mask_cast.sum()
                 if self.args.rl_algorithm == "ppo":
-                    values = (rl_batch["reward_values"] * mask_cast).sum() / mask_cast.sum()
-                returns = (rl_batch["reward_returns"] * mask_cast).sum() / mask_cast.sum()
-            ref_log_probs = rl_batch["ref_log_probs"]
+                    values = (rl_batch.batch["reward_values"] * mask_cast).sum() / mask_cast.sum()
+                returns = (rl_batch.batch["reward_returns"] * mask_cast).sum() / mask_cast.sum()
+            ref_log_probs = rl_batch.batch["ref_log_probs"]
             kl_divergence = ((old_log_probs - ref_log_probs) * mask_cast).sum() / mask_cast.sum()
             mean_generated_length = mask_cast.sum(axis=-1).mean()
             max_generated_length = mask_cast.sum(axis=-1).max()
             min_generated_length = mask_cast.sum(axis=-1).min()
 
-        return {
+        # [1] 一维张量 和 [] 标量也不能放在一起
+        return DataProto.from_single_dict({
             # when using PipelienParallel, the loss returned is 0 when not reach
             # accumulated step and the loss returned at accumulated step is a
             # mixed loss.
@@ -261,7 +264,7 @@ class ActorReferenceTrainer(RLTrainer):
                 if self.args.rl_algorithm == "grpo"
                 else {}
             ),
-            "train_reward": ori_rewards,  # use original reward to log
+            "train_reward": ori_rewards.reshape([1]),  # use original reward to log
             **(
                 {
                     "train_norm_reward": rewards,
@@ -275,8 +278,8 @@ class ActorReferenceTrainer(RLTrainer):
                 if self.args.rl_algorithm in ["ppo", "reinforce_plus_plus"]
                 else {}
             ),
-            "train_kl_divergence": kl_divergence,
-            "train_mean_generated_length": mean_generated_length,
-            "train_max_generated_length": max_generated_length,
-            "train_min_generated_length": min_generated_length,
-        }
+            "train_kl_divergence": kl_divergence.reshape([1]),
+            "train_mean_generated_length": mean_generated_length.reshape([1]),
+            "train_max_generated_length": max_generated_length.reshape([1]),
+            "train_min_generated_length": min_generated_length.reshape([1]),
+        })

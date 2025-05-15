@@ -82,6 +82,7 @@ from ..data import (
     default_data_collator,
     init_dataloader_comm_group,
 )
+from ..datasets.rlhf_datasets.protocol import DataProto
 from ..peft import LoKrModel, LoRAModel, PrefixModelForCausalLM, ReFTModel, VeRAModel
 from ..quantization.quantization_linear import (
     ColumnParallelQuantizationLinear,
@@ -3242,6 +3243,7 @@ class Trainer:
         eval_dataloader = self.get_eval_dataloader(eval_dataset)
         start_time = time.time()
 
+        # 就是这有问题，eval_dataloader 取出的是dict，但是不知道在哪包装成 DataProto
         output = self.evaluation_loop(
             eval_dataloader,
             description="Evaluation",
@@ -3373,9 +3375,10 @@ class Trainer:
         observed_num_examples = 0
         # Main evaluation loop
         losses = []
-        for step, inputs in enumerate(dataloader):
+        for step, inputs_dict in enumerate(dataloader):
+            inputs = DataProto.from_single_dict(inputs_dict)
             # Update the observed num examples
-            observed_batch_size = find_batch_size(inputs)
+            observed_batch_size = find_batch_size(inputs.batch)
             if observed_batch_size is not None:
                 observed_num_examples += observed_batch_size
                 # For batch samplers, batch_size is not known by the dataloader in advance.
@@ -3541,7 +3544,8 @@ class Trainer:
     def prediction_pipeline_step(
         self,
         model: nn.Layer,
-        inputs: Dict[str, Union[paddle.Tensor, Any]],
+        # inputs: Dict[str, Union[paddle.Tensor, Any]],
+        inputs: DataProto,
         prediction_loss_only: bool,
         ignore_keys: Optional[List[str]] = None,
     ) -> Tuple[Optional[paddle.Tensor], Optional[paddle.Tensor], Optional[paddle.Tensor]]:
@@ -3581,7 +3585,8 @@ class Trainer:
     def prediction_step(
         self,
         model: nn.Layer,
-        inputs: Dict[str, Union[paddle.Tensor, Any]],
+        # inputs: Dict[str, Union[paddle.Tensor, Any]],
+        inputs: DataProto,
         prediction_loss_only: bool,
         ignore_keys: Optional[List[str]] = None,
     ) -> Tuple[Optional[paddle.Tensor], Optional[paddle.Tensor], Optional[paddle.Tensor]]:
@@ -3610,11 +3615,11 @@ class Trainer:
         """
         if self.args.pipeline_parallel_degree > 1:
             # hack for pipeline mode
-            inputs = self._prepare_inputs(inputs)
-            return self.prediction_pipeline_step(model, inputs, prediction_loss_only, ignore_keys)
+            inputs.batch = self._prepare_inputs(inputs.batch)
+            return self.prediction_pipeline_step(model, inputs.batch, prediction_loss_only, ignore_keys)
 
-        has_labels = all(inputs.get(k) is not None for k in self.label_names)
-        inputs = self._prepare_inputs(inputs)
+        has_labels = all(inputs.batch.get(k) is not None for k in self.label_names)
+        inputs.batch = self._prepare_inputs(inputs.batch)
         if ignore_keys is None:
             if hasattr(self.model, "config"):
                 ignore_keys = getattr(self.model.config, "keys_to_ignore_at_inference", [])
@@ -3623,7 +3628,7 @@ class Trainer:
 
         # labels may be popped when computing the loss (label smoothing for instance) so we grab them first.
         if has_labels:
-            labels = nested_detach(tuple(inputs.get(name) for name in self.label_names))
+            labels = nested_detach(tuple(inputs.batch.get(name) for name in self.label_names))
             if len(labels) == 1:
                 labels = labels[0]
         else:
@@ -3632,7 +3637,7 @@ class Trainer:
         with paddle.no_grad():
             if has_labels:
                 with self.autocast_smart_context_manager():
-                    loss, outputs = self.compute_loss(model, inputs, return_outputs=True)
+                    loss, outputs = self.compute_loss(model, inputs.batch, return_outputs=True)
                 loss = loss.mean().detach()
 
                 if isinstance(outputs, dict):
@@ -3642,7 +3647,7 @@ class Trainer:
             else:
                 loss = None
                 with self.autocast_smart_context_manager():
-                    outputs = model(**inputs)
+                    outputs = model(**inputs.batch)
                 if isinstance(outputs, dict):
                     logits = tuple(v for k, v in outputs.items() if k not in ignore_keys)
                 else:

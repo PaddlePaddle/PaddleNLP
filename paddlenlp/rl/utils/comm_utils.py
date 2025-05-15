@@ -22,6 +22,7 @@ import paddle.distributed as dist
 from paddle import nn
 from paddle.distributed import fleet
 
+from ...datasets.rlhf_datasets.protocol import DataProto
 from ...trainer.trainer import Trainer, logger
 from ...utils.nested import flatten_list, nested_broadcast_tensor_with_empty
 from ..models.ppo_model_utils import make_position_ids_from_input_ids
@@ -1033,7 +1034,7 @@ def process_prompt_and_response(micro_batch, pad_token_id=0):
     return micro_batch
 
 
-def split_batch_into_micro_batches(total_batch, batch_size, pad_token_id=0):
+def split_batch_into_micro_batches(total_batch: DataProto, batch_size, pad_token_id=0):
     """
     Splits total_batch into micro-batches of size `batch_size`.
 
@@ -1045,8 +1046,8 @@ def split_batch_into_micro_batches(total_batch, batch_size, pad_token_id=0):
         list of dict: A list of micro-batches.
     """
     micro_batches = []
-    num_micro_batches = total_batch["input_ids"].shape[0] // batch_size
-    if total_batch["input_ids"].shape[0] % batch_size != 0:
+    num_micro_batches = total_batch.batch["input_ids"].shape[0] // batch_size
+    if total_batch.batch["input_ids"].shape[0] % batch_size != 0:
         num_micro_batches += 1
     if num_micro_batches <= 0:
         logger.warning(
@@ -1056,7 +1057,7 @@ def split_batch_into_micro_batches(total_batch, batch_size, pad_token_id=0):
 
     for i in range(num_micro_batches):
         micro_batch = {}
-        for key, data in total_batch.items():
+        for key, data in total_batch.batch.items():
             if isinstance(data, paddle.Tensor):
                 micro_batch[key] = data[i * batch_size : (i + 1) * batch_size]
             elif isinstance(data, np.ndarray):
@@ -1069,6 +1070,6 @@ def split_batch_into_micro_batches(total_batch, batch_size, pad_token_id=0):
         # if os.getenv("PROCESS_PROMPT_AND_RESPONSE", "1").lower() in ["1", "t", "true", "yes", "y"]:
         #     micro_batch = process_prompt_and_response(micro_batch=micro_batch, pad_token_id=pad_token_id)
 
-        micro_batches.append(micro_batch)
+        micro_batches.append(DataProto.from_single_dict(micro_batch))
 
     return micro_batches
