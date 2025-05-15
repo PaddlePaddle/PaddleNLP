@@ -37,10 +37,10 @@ def change_pwd():
 
 
 def setup_fast_ln():
-    from paddle.device import is_compiled_with_rocm
     from paddle.utils.cpp_extension import CUDAExtension, setup
+    from paddle.device import is_compiled_with_rocm
 
-    if is_compiled_with_rocm():
+    if(is_compiled_with_rocm()):
         print("The 'fasl_ln' feature  is temporarily not supported on the ROCm platform !!!")
     else:
         gencode_flags = get_gencode_flags()
@@ -75,12 +75,12 @@ def setup_fast_ln():
 
 
 def setup_fused_ln():
-    from paddle.device import is_compiled_with_rocm
     from paddle.utils.cpp_extension import CUDAExtension, setup
+    from paddle.device import is_compiled_with_rocm
 
     gencode_flags = get_gencode_flags()
     change_pwd()
-    if is_compiled_with_rocm():
+    if(is_compiled_with_rocm()):
         setup(
             name="fused_ln",
             ext_modules=CUDAExtension(
@@ -98,7 +98,7 @@ def setup_fused_ln():
                         "-U__CUDA_NO_BFLOAT162_OPERATORS__",
                         "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
                         "-DPADDLE_WITH_HIP",
-                    ],
+                    ]
                 },
             ),
         )

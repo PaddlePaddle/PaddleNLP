@@ -15,15 +15,6 @@
 import multiprocessing
 import os
 
-
-def get_gencode_flags():
-    import paddle
-
-    prop = paddle.device.cuda.get_device_properties()
-    cc = prop.major * 10 + prop.minor
-    return ["-gencode", "arch=compute_{0},code=sm_{0}".format(cc)]
-
-
 def run(func):
     p = multiprocessing.Process(target=func)
     p.start()
@@ -40,7 +31,6 @@ def setup_fused_quant_ops():
     """setup_fused_fp8_ops"""
     from paddle.utils.cpp_extension import CUDAExtension, setup
 
-    gencode_flags = get_gencode_flags()
     change_pwd()
     setup(
         name="FusedQuantOps",
@@ -72,7 +62,6 @@ def setup_fused_quant_ops():
                     "-gencode=arch=compute_90a,code=sm_90a",
                     "-DNDEBUG",
                 ]
-                + gencode_flags,
             },
         ),
     )
