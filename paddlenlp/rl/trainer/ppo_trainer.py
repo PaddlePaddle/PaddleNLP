@@ -19,7 +19,7 @@ import sys
 import time
 import types
 from collections import defaultdict
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import paddle
@@ -33,8 +33,7 @@ from rich.console import Console
 from rich.table import Table
 
 from ...data import DataCollator
-from ...datasets.rlhf_datasets.protocol import DataProto
-from ...datasets.rlhf_datasets.protocol import TensorDict
+from ...datasets.rlhf_datasets.protocol import DataProto, TensorDict
 from ...generation import GenerationConfig
 from ...trainer.trainer import (
     EvalLoopOutput,
@@ -173,7 +172,12 @@ class PPOMetric:
         all worker) and reset metric states, otherwise return `None`.
         """
         # PipelineParallel broadcast loss with shape [1]
-        metrics = TensorDict({k: (v.squeeze() if isinstance(v, paddle.Tensor) and v.shape == [1] else v) for k, v in metrics.batch.items()})
+        metrics = TensorDict(
+            {
+                k: (v.squeeze() if isinstance(v, paddle.Tensor) and v.shape == [1] else v)
+                for k, v in metrics.batch.items()
+            }
+        )
         for name in self.metric_names:
             # if len(metrics[name].shape) != 0:
             #     metrics[name] = metrics[name].squeeze()
@@ -688,12 +692,16 @@ class PPOTrainer(RLTrainerBase):
         inputs.batch = data_group_split(inputs.batch, group=data_trans_group)
         with reload_and_offload_scope(self, self.actor_model, self.reference_model, self.actor_trainer):
             with infer_guard(self.actor_trainer):
-                prompt_only_batch = DataProto.from_single_dict({
-                    "input_ids": inputs.batch["input_ids"],
-                    # 这里应该是 label_ids 吧
-                    **({"label_ids": inputs.batch["label_ids"]} if self.args.use_rm_server else {}),
-                })
-                generated_seq = self.actor_trainer.generate_sequences(prompt_only_batch, do_eval=True)[0].batch["input_ids"]
+                prompt_only_batch = DataProto.from_single_dict(
+                    {
+                        "input_ids": inputs.batch["input_ids"],
+                        # 这里应该是 label_ids 吧
+                        **({"label_ids": inputs.batch["label_ids"]} if self.args.use_rm_server else {}),
+                    }
+                )
+                generated_seq = self.actor_trainer.generate_sequences(prompt_only_batch, do_eval=True)[0].batch[
+                    "input_ids"
+                ]
 
             if not self.args.use_rm_server:
                 if self._model_config.sequence_parallel:
@@ -1160,7 +1168,7 @@ class PPOTrainer(RLTrainerBase):
         return input_ids, label_ids, position_ids
 
     # 这里到时也许可以作为 DataProto 的方法
-    def distribute_gather_and_pad_data(self, batch:DataProto):
+    def distribute_gather_and_pad_data(self, batch: DataProto):
         # group index for grpo
         eos_mask = make_eos_mask(
             batch.batch["input_ids"][:, batch.batch["prompt"].shape[-1] :],
@@ -1421,7 +1429,7 @@ class PPOTrainer(RLTrainerBase):
                 #     prompt_only_batch.batch["raw_label_ids_len"] = paddle.repeat_interleave(
                 #         prompt_only_batch.batch["raw_label_ids_len"], repeats=self.args.rollout_n, axis=0
                 #     )
-                
+
                 batch_keys_to_pop = ["raw_label_ids_len", "raw_prompt_len"]
                 # 后续改成 pop
                 prompt_only_batch2 = prompt_only_batch.select(
@@ -1430,7 +1438,6 @@ class PPOTrainer(RLTrainerBase):
                 # 不是原地修改
                 prompt_only_batch2 = prompt_only_batch2.repeat(repeat_times=self.args.rollout_n, interleave=True)
                 prompt_only_batch2.rename("raw_prompt_len", "raw_prompt_len_expand")
-
 
                 per_device_rollout_batch_size = self.args.per_device_rollout_batch_size
 
@@ -1487,22 +1494,24 @@ class PPOTrainer(RLTrainerBase):
                 response_len_without_pad = input_ids_len - prompt_len
 
                 # 这里后面看看能不能直接从DataProto创建，
-                batch = DataProto.from_single_dict({
-                    "prompt": expand_prompt,
-                    "input_ids": input_ids,
-                    "position_ids": position_ids,
-                    "prompt_len": prompt_len,
-                    "prompt_len_without_pad": prompt_len_without_pad,
-                    "response_len_without_pad": response_len_without_pad,
-                    "index": indices,
-                    **({"label_ids": label_ids} if self.args.use_rm_server else {}),
-                    # 这个 raw_label_ids_len 为什么没 repeat 就往里放，而且和 prompt_len_without_pad 是冗余的呀
-                    **(
-                        {"raw_prompt_len_expand": prompt_only_batch2.batch["raw_prompt_len_expand"]}
-                        if self.args.use_rm_server
-                        else {}
-                    ),
-                })
+                batch = DataProto.from_single_dict(
+                    {
+                        "prompt": expand_prompt,
+                        "input_ids": input_ids,
+                        "position_ids": position_ids,
+                        "prompt_len": prompt_len,
+                        "prompt_len_without_pad": prompt_len_without_pad,
+                        "response_len_without_pad": response_len_without_pad,
+                        "index": indices,
+                        **({"label_ids": label_ids} if self.args.use_rm_server else {}),
+                        # 这个 raw_label_ids_len 为什么没 repeat 就往里放，而且和 prompt_len_without_pad 是冗余的呀
+                        **(
+                            {"raw_prompt_len_expand": prompt_only_batch2.batch["raw_prompt_len_expand"]}
+                            if self.args.use_rm_server
+                            else {}
+                        ),
+                    }
+                )
 
                 # step 2-2: balance batches based on batch tokens
                 if self.args.balance_batch:
@@ -2047,7 +2056,9 @@ class PPOTrainer(RLTrainerBase):
             pass
         all_advantages_mean = all_advantages.mean().cast(paddle.bfloat16)
         all_advantages_std = all_advantages.std().cast(paddle.bfloat16)
-        batch.batch["reward_advantages"] = (batch.batch["reward_advantages"] - all_advantages_mean) / (all_advantages_std + 1e-8)
+        batch.batch["reward_advantages"] = (batch.batch["reward_advantages"] - all_advantages_mean) / (
+            all_advantages_std + 1e-8
+        )
         batch.batch["reward_advantages"] = batch.batch["reward_advantages"] * batch.batch["eos_mask"]
 
         return batch

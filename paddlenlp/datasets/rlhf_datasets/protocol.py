@@ -25,7 +25,6 @@ import numpy as np
 import paddle
 import pandas as pd
 from paddle.io import DataLoader
-from paddle.utils import map_structure
 
 original_concat = paddle.concat
 __all__ = [
@@ -64,7 +63,7 @@ class TensorDict:
             return TensorDict(tensor_dict_slice, batch_size=batch_size, num_batch_dims=self.num_batch_dims)
         else:
             raise KeyError(f"Unsupported key type: {type(key)}")
-    
+
     def __contains__(self, key):
         return key in self._tensors
 
@@ -78,7 +77,6 @@ class TensorDict:
             other = other._tensors
         for key, value in other.items():
             self._tensors[key] = value
-
 
     def keys(self):
         return self._tensors.keys()
@@ -105,7 +103,7 @@ class TensorDict:
     def select(self, *keys, default=None):
         """
         从 _tensors 中选择对应的键，并返回一个新的 TensorDict。
-        
+
         :param keys: 可变数量的键。
         :param default: 如果某个键不在 _tensors 中，使用默认值。
         :return: 一个 TensorDict，其中包含请求的键及其对应的值。
@@ -120,9 +118,13 @@ class TensorDict:
                 raise KeyError(f"Key '{key}' not found in TensorDict and no default value provided.")
 
         # 创建一个新的 TensorDict 实例，并将选定的张量作为其源
-        batch_size = list(selected_tensors[list(selected_tensors.keys())[0]].shape[:self.num_batch_dims]) if selected_tensors else None
+        batch_size = (
+            list(selected_tensors[list(selected_tensors.keys())[0]].shape[: self.num_batch_dims])
+            if selected_tensors
+            else None
+        )
         return TensorDict(selected_tensors, batch_size=batch_size, num_batch_dims=self.num_batch_dims)
-    
+
     def rename_key_(self, old_keys, new_keys):
         """
         原地重命名key（支持批量）。
@@ -145,7 +147,6 @@ class TensorDict:
                 raise KeyError(f"Key '{new_key}' already exists in TensorDict.")
             self._tensors[new_key] = self._tensors.pop(old_key)
         return self
-
 
     @classmethod
     def concat(cls, tensordict_list, axis=0):
@@ -826,7 +827,8 @@ class DataProto:
             if interleave:
                 # Interleave the data
                 repeated_tensors = {
-                    key: paddle.repeat_interleave(tensor, repeats=repeat_times, axis=0) for key, tensor in self.batch.items()
+                    key: paddle.repeat_interleave(tensor, repeats=repeat_times, axis=0)
+                    for key, tensor in self.batch.items()
                 }
             else:
                 # Stack the data
