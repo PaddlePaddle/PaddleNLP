@@ -38,11 +38,12 @@ def quantize(
     group=None,
 ):
     if apply_hadamard:
-        target_x, block_size = apply_hadamard_matmul(x, side, quantization_config)
+        target_x, hadamard_scale = apply_hadamard_matmul(x, side, quantization_config)
     else:
         target_x = x
-        block_size = 1
+        hadamard_scale = 1
     qmin, qmax = QMAX_QMIN_MAPPING[weight_quantize_algo + "_" + tensor_type]
+    print("apply_hadamard", apply_hadamard, qmin, qmax, tensor_type, hadamard_scale)
     if tensor_type == "activation":
         if act_scale is not None:
             if training:
@@ -51,7 +52,8 @@ def quantize(
                 if state > quantization_config.apply_online_actscale_step:
                     scale = act_scale
             else:
-                scale = act_scale
+                # scale = act_scale
+                scale = paddle.max(paddle.abs(target_x)) / qmax
         else:
             scale = paddle.max(paddle.abs(target_x)) / qmax
         if weight_quantize_algo in ["a8w8linear", "a8w4linear"]:
@@ -66,7 +68,7 @@ def quantize(
                 paddle.distributed.all_reduce(scale, op=paddle.distributed.ReduceOp.MAX, group=group, sync_op=True)
             quant_x = paddle.clip((target_x / scale).round(), qmin, qmax).astype("int8").T
             scale.stop_gradient = True
-            scale = scale.squeeze(0) / block_size
+            scale = scale.squeeze(0) / hadamard_scale
         else:
             raise NotImplementedError(f"Unknown {weight_quantize_algo}.")
     else:
@@ -79,8 +81,8 @@ def dequantize(quant_x, scale, tensor_type, weight_quantize_algo, apply_hadamard
         if weight_quantize_algo in ["a8w8linear", "a8w4linear"]:
             x = quant_x.T.astype(scale.dtype)
             if apply_hadamard:
-                x, block_size = apply_hadamard_matmul(x, side, dequant=True)
-                x *= scale / block_size
+                x, hadamard_scale = apply_hadamard_matmul(x, side, dequant=True)
+                x *= scale / hadamard_scale
             else:
                 x *= scale
     else:
@@ -112,6 +114,7 @@ def int8_forward(
     )
 
     out = paddle.matmul(quant_x, quant_w.T).astype(scale_w.dtype) * (scale_x * scale_w)
+    # out = paddle.matmul(x, quant_w.T.astype("bfloat16")*scale_w)
     if bias is not None:
         out += bias
     return out

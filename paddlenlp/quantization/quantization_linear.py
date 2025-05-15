@@ -471,6 +471,7 @@ class ColumnParallelQuantizationLinear(nn.Layer):
                 )
         else:
             input_parallel = x
+        print("input_parallel", input_parallel.shape, self.quant_weight.shape, self.quant_scale.shape)
 
         output_parallel = quant_weight_linear(
             x=input_parallel,
@@ -490,11 +491,13 @@ class ColumnParallelQuantizationLinear(nn.Layer):
         )
         if self.training:
             self.state += 1
-
+        print("output_parallel", output_parallel.shape)
+        print(self.gather_output, self.is_mp, self.gather_output and self.is_mp)
         if self.gather_output and self.is_mp:
             output = mp_ops._c_concat(output_parallel, group=self.model_parallel_group)
         else:
             output = output_parallel
+        print("output", output.shape)
         return output
 
 

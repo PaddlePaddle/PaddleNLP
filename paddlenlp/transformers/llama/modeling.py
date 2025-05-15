@@ -933,7 +933,6 @@ class LlamaAttention(nn.Layer):
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
         # [bs, seq_len, num_head * head_dim] -> [seq_len / n, bs, num_head * head_dim] (n is model parallelism)
-
         if self.fuse_attention_qkv:
             mix_layer = self.qkv_proj(hidden_states)
             # NOTE for GQA attention fusion (compatible with MHA and MQA):
@@ -987,6 +986,7 @@ class LlamaAttention(nn.Layer):
                 query_states = paddle.reshape_(query_states, [0, 0, self.num_heads, self.head_dim])
         else:
             query_states = self.q_proj(hidden_states)
+
             key_states = self.k_proj(hidden_states)
             value_states = self.v_proj(hidden_states)
 

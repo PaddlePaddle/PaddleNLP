@@ -62,7 +62,7 @@ PytorchTensor = TypeVar("PytorchTensor")
 
 def add_quant_mapping(name_action_mappings, quantization_config):
     mapping_keys = list(name_action_mappings.keys())
-    pattern = r"(?:^|\.)layers(\.[a-zA-Z0-9_]+)+\.weight$"
+    pattern = r"^(?:.*\.)?layers(\.[a-zA-Z0-9_]+)*\.weight$"
     for key in mapping_keys:
         if re.match(pattern, key):
             quant_key = key.replace("weight", "quant_weight")
@@ -1233,9 +1233,6 @@ class ConversionMixin:
         base_model_prefix=None,
     ):
         name_action_mappings = cls._get_tensor_parallel_mappings(config, is_split=is_split)
-        if config.quantization_config.is_weight_quantize():
-            name_action_mappings = add_quant_mapping(name_action_mappings, config.quantization_config)
-
         state_keys_map = cls._resolve_prefix_keys(
             name_action_mappings.keys(), loaded_state_dict_keys, ignore_error, base_model_prefix=base_model_prefix
         )
@@ -1243,6 +1240,8 @@ class ConversionMixin:
             if k not in name_action_mappings:
                 continue
             name_action_mappings[v] = name_action_mappings.pop(k)
+        if config.quantization_config.is_weight_quantize():
+            name_action_mappings = add_quant_mapping(name_action_mappings, config.quantization_config)
         return name_action_mappings
 
     @classmethod

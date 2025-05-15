@@ -125,9 +125,8 @@ class ModelConfig:
             "help": "Block size for quant_scale of weight quant_scale(Only available for nf4 or fp4 quant_scale.)"
         },
     )
-    apply_hadamard: bool = field(default=True, metadata={"help": "Whether to apply hadamard"})
-    hadamard_is_block: bool = field(default=True, metadata={"help": "Whether to apply blockwise hadamard"})
-    hadamard_block_size: int = field(default=64, metadata={"help": "hadamard block size"})
+    apply_hadamard: bool = field(default=False, metadata={"help": "Whether to apply hadamard"})
+    hadamard_block_size: int = field(default=32, metadata={"help": "hadamard block size"})
     quant_input_grad: bool = field(default=True, metadata={"help": "Whether to quantize input grad"})
     apply_online_actscale_step: int = field(
         default=100, metadata={"help": "Use online activation scale for first N step to keep stable training."}

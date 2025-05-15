@@ -60,8 +60,7 @@ class QuantizationConfig:
         ignore_modules=None,
         group_size=-1,
         apply_hadamard=False,
-        hadamard_is_block=True,
-        hadamard_block_size=-1,
+        hadamard_block_size=32,
         quant_input_grad=False,
         apply_online_actscale_step=200,
         scale_epsilon=0,
@@ -135,7 +134,6 @@ class QuantizationConfig:
         self.quant_input_grad = quant_input_grad
         self.apply_online_actscale_step = apply_online_actscale_step
         self.scale_epsilon = scale_epsilon
-        self.hadamard_is_block = hadamard_is_block
         self.moving_rate = moving_rate
         self.hadamard_block_size = hadamard_block_size
 
