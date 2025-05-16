@@ -222,7 +222,9 @@ function llama_dygraph_auto_bs4_bf16_SD2() {
         export CUDA_DEVICE_MAX_CONNECTIONS=1
 
         flags=("" "FLAGS_fuse_allreduce_in_opt" "FLAGS_fuse_reducescatter_in_opt" "FLAGS_enable_tensor_fusion FLAGS_enable_sharding_overlap")
-        for flag in "${flags[@]}"; do
+        for i in "${!flags[@]}"; do
+            flag="${flags[$i]}"
+
             if [ -n "$flag" ]; then
                 for f in $flag; do
                     export "$f=true"
