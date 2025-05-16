@@ -1391,7 +1391,6 @@ class PPOTrainer(RLTrainerBase):
 
             step = -1
             for prompt_only_batch in self.prompt_only_dataloader:
-                # if step>0: break # Fu to test predict
                 self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
                 # step 1-1: rollout data with actor model (eval) and reward model
                 self.set_eval()
@@ -1641,8 +1640,6 @@ class PPOTrainer(RLTrainerBase):
                     batch = self.distribute_get_rank_data(local_batch, batch)
                 else:
                     batch = batch
-
-                # batch = data_group_merge(batch, group=data_trans_group)
                 
                 # step 3: train actor model and critic model with rollout data
                 self.set_train()

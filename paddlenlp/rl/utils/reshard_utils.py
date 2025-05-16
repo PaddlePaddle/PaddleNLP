@@ -131,68 +131,6 @@ class ReshardController:
                 f"Set rollout env done {msg}. [Global TP]: {fleet.get_hybrid_communicate_group().get_model_parallel_world_size()}, [Train TP]: {self.train_tp_group.nranks}"
             )
 
-@contextmanager
-def init_rollout_env(tensor_parallel_degree, seed=100):
-    hcg = fleet.get_hybrid_communicate_group()
-    hcg_mp_group_func = hcg.get_model_parallel_group
-    hcg_mp_size_func = hcg.get_model_parallel_world_size
-    hcg_mp_rank_func = hcg.get_model_parallel_rank
-    hcg_sdp_group_func = hcg.get_sharding_parallel_group
-    hcg_dp_group_func = hcg.get_data_parallel_group
-
-    tp_mp_group_func = topology._HYBRID_PARALLEL_GROUP.get_model_parallel_group
-    tp_mp_size_func = topology._HYBRID_PARALLEL_GROUP.get_model_parallel_world_size
-    tp_mp_rank_func = topology._HYBRID_PARALLEL_GROUP.get_model_parallel_rank
-
-    world_size = dist.get_world_size()
-    infer_topo = CommunicateTopology(
-        hybrid_group_names=["data", "pipe", "sharding", "sep", "model"],
-        dims=[world_size // tensor_parallel_degree, 1, 1, 1, tensor_parallel_degree],
-    )
-    infer_hcg = HybridCommunicateGroup(infer_topo)
-
-    tp_group = infer_hcg.get_model_parallel_group()
-    sdp_group = infer_hcg.get_sharding_parallel_group()
-    dp_group = infer_hcg.get_data_parallel_group()
-    hcg.get_model_parallel_group = lambda: tp_group
-    hcg.get_model_parallel_world_size = lambda: tp_group.nranks
-    hcg.get_model_parallel_rank = lambda: tp_group.rank
-    hcg.get_sharding_parallel_group = lambda: sdp_group
-    hcg.get_data_parallel_group = lambda: dp_group
-
-    topology._HYBRID_PARALLEL_GROUP.get_model_parallel_group = lambda: tp_group
-    topology._HYBRID_PARALLEL_GROUP.get_model_parallel_world_size = lambda: tp_group.nranks
-    topology._HYBRID_PARALLEL_GROUP.get_model_parallel_rank = lambda: tp_group.rank
-
-    def _get_rng_state(seed=0):
-        """get_rng_state"""
-        origin_rng_state = paddle.get_cuda_rng_state()
-        paddle.seed(seed)
-        rng_state = paddle.get_cuda_rng_state()
-        paddle.set_cuda_rng_state(origin_rng_state)
-        return rng_state
-
-    if "model_parallel_rng" not in get_rng_state_tracker().states_:
-        local_seed = 2023 + 1 + tp_group.rank
-        get_rng_state_tracker().add("model_parallel_rng", local_seed)
-
-    orig_rng_state = paddle.get_rng_state()
-    rng_state = _get_rng_state(seed)
-    paddle.set_rng_state(rng_state)
-    yield
-    hcg.get_model_parallel_group = hcg_mp_group_func
-    hcg.get_model_parallel_world_size = hcg_mp_size_func
-    hcg.get_model_parallel_rank = hcg_mp_rank_func
-    hcg.get_model_parallel_group = hcg_mp_group_func
-    hcg.get_sharding_parallel_group = hcg_sdp_group_func
-    hcg.get_data_parallel_group = hcg_dp_group_func
-
-    topology._HYBRID_PARALLEL_GROUP.get_model_parallel_group = tp_mp_group_func
-    topology._HYBRID_PARALLEL_GROUP.get_model_parallel_world_size = tp_mp_size_func
-    topology._HYBRID_PARALLEL_GROUP.get_model_parallel_rank = tp_mp_rank_func
-    paddle.set_rng_state(orig_rng_state)
-
-
 @paddle.no_grad()
 def pp_reshard(tgt_tensor, src_model_state_dict, src_tensor_meta_info, pp_rank, pp_group):
     src_tensor_key = src_tensor_meta_info["pipeline_key"]
