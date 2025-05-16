@@ -221,7 +221,7 @@ function llama_dygraph_auto_bs4_bf16_SD2() {
         
         export CUDA_DEVICE_MAX_CONNECTIONS=1
 
-        flags=("" "FLAGS_fuse_allreduce_in_opt" "FLAGS_fuse_reducescatter_in_opt" "FLAGS_enable_tensor_fusion FLAGS_enable_sharding_overlap")
+        flags=("" "FLAGS_fuse_allreduce_in_opt" "FLAGS_fuse_reducescatter_in_opt")
         for i in "${!flags[@]}"; do
             flag="${flags[$i]}"
 
@@ -231,7 +231,7 @@ function llama_dygraph_auto_bs4_bf16_SD2() {
                 done
             fi
 
-            task_name="llama_dygraph_auto_bs4_bf16_SD2_$flag"
+            task_name="llama_dygraph_auto_bs4_bf16_SD2_$f"
             case_out_dir="output/$task_name"
             case_log_dir="output/$task_name""_log"
             rm -rf $case_out_dir
@@ -312,7 +312,9 @@ function llama_dygraph_auto_bs4_bf16_SD2() {
             check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
 
             if [ -n "$flag" ]; then
-                export "$flag=false"
+                for f in $flag; do
+                    export "$f=false"
+                done
             fi
         done
         echo "=========== $FUNCNAME run  end ==========="
