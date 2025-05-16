@@ -21,6 +21,7 @@ from paddle.distributed import fleet
 from paddle.distributed.fleet.layers.mpu import mp_ops
 from paddle.distributed.fleet.meta_parallel import ParallelCrossEntropy
 
+from ...datasets.rlhf_datasets.protocol import DataProto
 from ..models.ppo_model_utils import (
     RLHFPPOMixedLoss,
     create_startend_row_indices,
@@ -28,8 +29,6 @@ from ..models.ppo_model_utils import (
 )
 from .rl_trainer import RLTrainer
 from .trainer_utils import guard_set_args
-
-from ...datasets.rlhf_datasets.protocol import DataProto
 
 
 class ActorReferenceTrainerBase(RLTrainer):
@@ -355,39 +354,41 @@ class ActorReferenceTrainerBase(RLTrainer):
             min_generated_length = mask_cast.sum(axis=-1).min()
 
         # [1] 一维张量 和 [] 标量也不能放在一起
-        return DataProto.from_single_dict({
-            # when using PipelienParallel, the loss returned is 0 when not reach
-            # accumulated step and the loss returned at accumulated step is a
-            # mixed loss.
-            "train_policy_loss": actor_loss,
-            **(
-                {
-                    "train_pure_policy_loss": self.info_buffer.get("pure_policy_loss"),
-                    "train_kl_loss": self.info_buffer.get("kl_loss"),
-                    "train_entropy_loss": self.info_buffer.get("entropy_loss"),
-                }
-                if self.args.rl_algorithm == "grpo"
-                else {}
-            ),
-            "train_reward": ori_rewards.reshape([1]),  # use original reward to log
-            **(
-                {
-                    "train_norm_reward": rewards,
-                    "train_kl_reward": kl_rewards,
-                    "train_norm_reward_with_kl": rewards_with_kl,
-                    "train_pure_policy_loss": self.info_buffer.get("pure_policy_loss"),
-                    "train_entropy_loss": self.info_buffer.get("entropy_loss"),
-                    **({"train_values": values} if self.args.rl_algorithm == "ppo" else {}),
-                    "train_returns": returns,
-                }
-                if self.args.rl_algorithm in ["ppo", "reinforce_plus_plus"]
-                else {}
-            ),
-            "train_kl_divergence": kl_divergence.reshape([1]),
-            "train_mean_generated_length": mean_generated_length.reshape([1]),
-            "train_max_generated_length": max_generated_length.reshape([1]),
-            "train_min_generated_length": min_generated_length.reshape([1]),
-        })
+        return DataProto.from_single_dict(
+            {
+                # when using PipelienParallel, the loss returned is 0 when not reach
+                # accumulated step and the loss returned at accumulated step is a
+                # mixed loss.
+                "train_policy_loss": actor_loss,
+                **(
+                    {
+                        "train_pure_policy_loss": self.info_buffer.get("pure_policy_loss"),
+                        "train_kl_loss": self.info_buffer.get("kl_loss"),
+                        "train_entropy_loss": self.info_buffer.get("entropy_loss"),
+                    }
+                    if self.args.rl_algorithm == "grpo"
+                    else {}
+                ),
+                "train_reward": ori_rewards.reshape([1]),  # use original reward to log
+                **(
+                    {
+                        "train_norm_reward": rewards,
+                        "train_kl_reward": kl_rewards,
+                        "train_norm_reward_with_kl": rewards_with_kl,
+                        "train_pure_policy_loss": self.info_buffer.get("pure_policy_loss"),
+                        "train_entropy_loss": self.info_buffer.get("entropy_loss"),
+                        **({"train_values": values} if self.args.rl_algorithm == "ppo" else {}),
+                        "train_returns": returns,
+                    }
+                    if self.args.rl_algorithm in ["ppo", "reinforce_plus_plus"]
+                    else {}
+                ),
+                "train_kl_divergence": kl_divergence.reshape([1]),
+                "train_mean_generated_length": mean_generated_length.reshape([1]),
+                "train_max_generated_length": max_generated_length.reshape([1]),
+                "train_min_generated_length": min_generated_length.reshape([1]),
+            }
+        )
 
 
 class ActorReferenceTrainer(ActorReferenceTrainerBase):
@@ -420,11 +421,19 @@ class ActorReferenceTrainer(ActorReferenceTrainerBase):
             sequences = sequences.transpose([1, 0, 2])
         # prompt, sequence, attention_mask
         return [
-            DataProto.from_single_dict({
-                "prompt": input_ids[idx * len(seq) : (idx + 1) * len(seq)],         # src prompt
-                "input_ids": seq,                                                   # 该 prompt 输入 Actor 生成的所有 response
-                **({"label_ids": label_ids[idx * len(seq) : (idx + 1) * len(seq)]} if self.args.use_rm_server else {}), # tgt response
-                "index": np.array([str(uuid.uuid4())] * len(seq), dtype=object),    # 每个 response 的唯一标识，这个存储到 non_tensor_batch 里了
-            })
+            DataProto.from_single_dict(
+                {
+                    "prompt": input_ids[idx * len(seq) : (idx + 1) * len(seq)],  # src prompt
+                    "input_ids": seq,  # 该 prompt 输入 Actor 生成的所有 response
+                    **(
+                        {"label_ids": label_ids[idx * len(seq) : (idx + 1) * len(seq)]}
+                        if self.args.use_rm_server
+                        else {}
+                    ),  # tgt response
+                    "index": np.array(
+                        [str(uuid.uuid4())] * len(seq), dtype=object
+                    ),  # 每个 response 的唯一标识，这个存储到 non_tensor_batch 里了
+                }
+            )
             for idx, seq in enumerate(sequences)
         ]
