@@ -29,6 +29,108 @@ from paddlenlp.transformers.model_utils import unwrap_model
 from paddlenlp.utils.log import logger
 
 
+class ReshardController:
+    def __init__(
+        self,
+        tensor_parallel_degree,
+        pipeline_parallel_degree=1,
+        sharding_parallel_degree=1,
+        sep_parallel_degree=1,
+        seed=100,
+    ):
+        self.tensor_parallel_degree = tensor_parallel_degree
+        self.pipeline_parallel_degree = pipeline_parallel_degree
+        self.sharding_parallel_degree = sharding_parallel_degree
+        self.sep_parallel_degree = sep_parallel_degree
+        self.seed = seed
+        self.orig_rng_state = paddle.get_rng_state()
+        self.orig_cuda_rng_state = self._get_rng_state()
+        self.train_hcg = fleet.get_hybrid_communicate_group()
+        self.train_tp_group, self.train_dp_group, self.train_sdp_group = (
+            self.train_hcg.get_model_parallel_group(),
+            self.train_hcg.get_data_parallel_group(),
+            self.train_hcg.get_sharding_parallel_group(),
+        )
+        self.infer_tp_group, self.infer_dp_group, self.infer_sdp_group = self.init_rollout_env()
+        self.set_train_env()
+
+        self.is_train = True
+    
+    def init_rollout_env(self):
+        world_size = dist.get_world_size()
+        infer_topo = CommunicateTopology(
+            hybrid_group_names=["data", "pipe", "sharding", "sep", "model"],
+            dims=[
+                world_size
+                // self.tensor_parallel_degree
+                // self.pipeline_parallel_degree
+                // self.sharding_parallel_degree
+                // self.sep_parallel_degree,
+                self.pipeline_parallel_degree,
+                self.sharding_parallel_degree,
+                self.sep_parallel_degree,
+                self.tensor_parallel_degree,
+            ],
+        )
+        infer_hcg = HybridCommunicateGroup(infer_topo)
+        infer_tp_group = infer_hcg.get_model_parallel_group()
+        infer_dp_group = infer_hcg.get_data_parallel_group()
+        infer_sdp_group = infer_hcg.get_sharding_parallel_group()
+        return (infer_tp_group, infer_dp_group, infer_sdp_group)
+    
+    def _get_rng_state(self):
+        """get_rng_state"""
+        origin_rng_state = paddle.get_cuda_rng_state()
+        paddle.seed(self.seed)
+        rng_state = paddle.get_cuda_rng_state()
+        paddle.set_cuda_rng_state(origin_rng_state)
+        return rng_state
+
+    def set_rollout_env(self,msg=""):
+        if "model_parallel_rng" not in get_rng_state_tracker().states_:
+            local_seed = 2025 + 1 + self.train_hcg.get_model_parallel_rank()
+            get_rng_state_tracker().add("model_parallel_rng", local_seed)
+
+        paddle.set_rng_state(self.orig_cuda_rng_state)
+
+        hcg = fleet.get_hybrid_communicate_group()
+        hcg.get_model_parallel_group = lambda: self.infer_tp_group
+        hcg.get_model_parallel_world_size = lambda: self.infer_tp_group.nranks
+        hcg.get_model_parallel_rank = lambda: self.infer_tp_group.rank
+        hcg.get_sharding_parallel_group = lambda: self.infer_sdp_group
+        hcg.get_data_parallel_group = lambda: self.infer_dp_group
+        topology._HYBRID_PARALLEL_GROUP.get_model_parallel_group = lambda: self.infer_tp_group
+        topology._HYBRID_PARALLEL_GROUP.get_model_parallel_world_size = lambda: self.infer_tp_group.nranks
+        topology._HYBRID_PARALLEL_GROUP.get_model_parallel_rank = lambda: self.infer_tp_group.rank
+        self.log(msg, False)
+        # self.is_train = False
+    
+    def set_train_env(self, msg=""):
+        hcg = fleet.get_hybrid_communicate_group()
+        hcg.get_model_parallel_group = lambda: self.train_tp_group
+        hcg.get_model_parallel_world_size = lambda: self.train_tp_group.nranks
+        hcg.get_model_parallel_rank = lambda: self.train_tp_group.rank
+        hcg.get_sharding_parallel_group = lambda: self.train_sdp_group
+        hcg.get_data_parallel_group = lambda: self.train_dp_group
+        topology._HYBRID_PARALLEL_GROUP.get_model_parallel_group = lambda: self.train_tp_group
+        topology._HYBRID_PARALLEL_GROUP.get_model_parallel_world_size = lambda: self.train_tp_group.nranks
+        topology._HYBRID_PARALLEL_GROUP.get_model_parallel_rank = lambda: self.train_tp_group.rank
+
+        paddle.set_rng_state(self.orig_rng_state)
+        self.log(msg, True)
+        # self.is_train = True
+
+    def log(self, msg, is_train=False):
+        msg = f"for {msg}" if len(msg) > 0 else ""
+        if is_train:
+            logger.warning(
+                f"Recover train env done {msg}. [Global TP]: {fleet.get_hybrid_communicate_group().get_model_parallel_world_size()}, [Train TP]: {self.train_tp_group.nranks}, [Infer TP]: {self.infer_tp_group.nranks}"
+            )
+        else:
+            logger.warning(
+                f"Set rollout env done {msg}. [Global TP]: {fleet.get_hybrid_communicate_group().get_model_parallel_world_size()}, [Train TP]: {self.train_tp_group.nranks}"
+            )
+
 @contextmanager
 def init_rollout_env(tensor_parallel_degree, seed=100):
     hcg = fleet.get_hybrid_communicate_group()
@@ -203,4 +305,4 @@ def reshard_to_rollout(
     missing_keys = train_model_state_dict.keys()
     num_missing_keys = len(missing_keys)
     assert num_missing_keys == 0, f"missing {num_missing_keys} keys after reshard policy: {missing_keys}"
-    logger.info("[Reshard] Done")
+    logger.warning("[Reshard] Done")

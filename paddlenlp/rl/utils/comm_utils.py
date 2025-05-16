@@ -622,15 +622,27 @@ def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
     if not hasattr(self, "global_meta_dict") or self.global_meta_dict is None:
         self.global_meta_dict = init_reshard_mappings(train_model, self.args, pp_rank, pp_group)
 
-    with init_rollout_env(self.args.rollout_tensor_parallel_degree):
-        hcg = fleet.get_hybrid_communicate_group()
-        tensor_parallel_degree = hcg.get_model_parallel_world_size()
-        tensor_parallel_rank = hcg.get_model_parallel_rank()
-        eval_tp_size = max(tensor_parallel_degree, 1)
-        eval_tp_rank = max(tensor_parallel_rank, 0)
-        reshard_to_rollout(
-            train_model, eval_model, self.global_meta_dict, pp_rank, pp_group, hcg.get_model_parallel_group(), tp_group
-        )
+    # with init_rollout_env(self.args.rollout_tensor_parallel_degree):
+    #     hcg = fleet.get_hybrid_communicate_group()
+    #     tensor_parallel_degree = hcg.get_model_parallel_world_size()
+    #     tensor_parallel_rank = hcg.get_model_parallel_rank()
+    #     eval_tp_size = max(tensor_parallel_degree, 1)
+    #     eval_tp_rank = max(tensor_parallel_rank, 0)
+    #     reshard_to_rollout(
+    #         train_model, eval_model, self.global_meta_dict, pp_rank, pp_group, hcg.get_model_parallel_group(), tp_group
+    #     )
+    if getattr(self, "reshard_controller", None) is not None:
+        self.reshard_controller.set_rollout_env("[export_evaluate_model]")
+    hcg = fleet.get_hybrid_communicate_group()
+    tensor_parallel_degree = hcg.get_model_parallel_world_size()
+    tensor_parallel_rank = hcg.get_model_parallel_rank()
+    eval_tp_size = max(tensor_parallel_degree, 1)
+    eval_tp_rank = max(tensor_parallel_rank, 0)
+    reshard_to_rollout(
+        train_model, eval_model, self.global_meta_dict, pp_rank, pp_group, hcg.get_model_parallel_group(), tp_group
+    )
+    if getattr(self, "reshard_controller", None) is not None:
+        self.reshard_controller.set_train_env("[after export_evaluate_model]")
 
     old_dp_workers = self.args.world_size // (max(sd_group.nranks, 1) * max(dp_group.nranks, 1))
     group_nums = self.args.logical_process_index // old_dp_workers * eval_tp_size + eval_tp_rank
