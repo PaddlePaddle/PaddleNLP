@@ -40,6 +40,7 @@ def setup_fused_quant_ops():
                 "fused_quanted_ops/fused_act_quant.cu",
                 "fused_quanted_ops/fused_act_dequant.cu",
                 "fused_quanted_ops/fused_act_dequant_transpose_act_quant.cu",
+                "fused_quanted_ops/fused_swiglu_probs_bwd.cu",
                 "fused_quanted_ops/fused_spaq.cu",
             ],
             extra_compile_args={
