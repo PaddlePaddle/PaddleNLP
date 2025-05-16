@@ -12,7 +12,48 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# import paddle
+
+
+# def matmul_hadU(X):
+
+#     input = X.clone().reshape((-1, X.shape[-1], 1))
+#     output = input.clone()
+#     while input.shape[1] > 1:
+#         input = input.reshape((input.shape[0], input.shape[1] // 2, 2, input.shape[2]))
+#         output = output.reshape(input.shape)
+#         output[:, :, 0, :] = input[:, :, 0, :] + input[:, :, 1, :]
+#         output[:, :, 1, :] = input[:, :, 0, :] - input[:, :, 1, :]
+#         output = output.reshape((input.shape[0], input.shape[1], -1))
+#         (input, output) = (output, input)
+#     del output
+
+#     return input.reshape(X.shape)
+
+
+# def random_hadamard_matrix(size, dtype, is_block=False):
+#     if not is_block:
+#         A = paddle.randint(low=0, high=2, shape=[size, size]).astype("float32") * 2 - 1
+#         Q, _ = paddle.linalg.qr(A)
+#         return Q.astype(dtype), 1
+#     else:
+#         num_blocks = size
+#         while not (num_blocks % 2):
+#             num_blocks = num_blocks // 2
+#         block_size = size // num_blocks
+#         Q = paddle.diag(paddle.ones((block_size,), dtype="float32"))
+#         block = matmul_hadU(Q)
+#         large_matrix = paddle.zeros([size, size])
+
+#         for i in range(num_blocks):
+#             start_row = i * block_size
+#             start_col = i * block_size
+#             large_matrix[start_row : start_row + block_size, start_col : start_col + block_size] = block
+#     return large_matrix.cast(dtype), block_size
+
 import paddle
+
+from paddlenlp.utils import infohub
 
 
 def matmul_hadU(X):
@@ -31,22 +72,43 @@ def matmul_hadU(X):
     return input.reshape(X.shape)
 
 
-def random_hadamard_matrix(size, dtype, is_block=False):
-    if not is_block:
-        A = paddle.randint(low=0, high=2, shape=[size, size]).astype("float32") * 2 - 1
-        Q, _ = paddle.linalg.qr(A)
-        return Q.astype(dtype), 1
-    else:
-        num_blocks = size
-        while not (num_blocks % 2):
-            num_blocks = num_blocks // 2
-        block_size = size // num_blocks
-        Q = paddle.diag(paddle.ones((block_size,), dtype="float32"))
-        block = matmul_hadU(Q)
-        large_matrix = paddle.zeros([size, size])
+def random_hadamard_matrix(block_size, dtype):
+    Q = paddle.diag(paddle.ones((block_size), dtype=dtype))
+    block = matmul_hadU(Q)
+    return block
 
-        for i in range(num_blocks):
-            start_row = i * block_size
-            start_col = i * block_size
-            large_matrix[start_row : start_row + block_size, start_col : start_col + block_size] = block
-    return large_matrix.cast(dtype), block_size
+
+def create_hadamard_matrix(block_size, dtype):
+    Q = paddle.diag(paddle.ones((block_size), dtype=dtype))
+    block = matmul_hadU(Q)
+    return block
+
+
+def hadamard_matmul(input, side, hadamard_matrix, block_size):
+    # left -> H.T@input right -> input@H
+    origin_shape = input.shape
+    input = input.reshape([-1, origin_shape[-1]])
+    if side == "left":
+        # H.T@input -> (input.T@H).T
+        input = input.transpose([1, 0])
+    block_num = input.shape[-1] // block_size
+    output = input.reshape([-1, block_num, block_size]) @ hadamard_matrix
+    output = output.reshape([-1, block_num * block_size])
+    if side == "left":
+        output = output.transpose([1, 0])
+    output = output.reshape(origin_shape)
+
+    return output
+
+
+def apply_hadamard_matmul(x, side, block_size):
+    if getattr(infohub, "hadamard") is None:
+        setattr(infohub, "hadamard", {})
+
+    if block_size in infohub.hadamard:
+        hadamard_matrix = infohub.hadamard[block_size]
+    else:
+        hadamard_matrix = create_hadamard_matrix(block_size, x.dtype)
+        infohub.hadamard[block_size] = hadamard_matrix
+    target_x = hadamard_matmul(x, side, hadamard_matrix, block_size)
+    return target_x, block_size
