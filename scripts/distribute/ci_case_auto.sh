@@ -222,10 +222,10 @@ function llama_dygraph_auto_bs4_bf16_SD2() {
         export CUDA_DEVICE_MAX_CONNECTIONS=1
 
         flags=("" "FLAGS_fuse_allreduce_in_opt" "FLAGS_fuse_reducescatter_in_opt" "FLAGS_enable_tensor_fusion FLAGS_enable_sharding_overlap")
-        for flag_group in "${flags[@]}"; do
-            if [ -n "$flag_group" ]; then
-                for flag in $flag_group; do
-                    export "$flag=true"
+        for flag in "${flags[@]}"; do
+            if [ -n "$flag" ]; then
+                for f in $flag; do
+                    export "$f=true"
                 done
             fi
 
@@ -293,13 +293,13 @@ function llama_dygraph_auto_bs4_bf16_SD2() {
             mem=-1
             echo "result: loss=$loss ips=$ips mem=$mem"
             
-            if [ -z "$flags" ]; then
+            if [ -z "$flag" ]; then
                 loss_base=9.23502579
-            elif [ "$flags" = "FLAGS_fuse_allreduce_in_opt" ]; then
+            elif [ "$flag" = "FLAGS_fuse_allreduce_in_opt" ]; then
                 loss_base=9.23502579
-            elif [ "$flags" = "FLAGS_fuse_reducescatter_in_opt" ]; then
+            elif [ "$flag" = "FLAGS_fuse_reducescatter_in_opt" ]; then
                 loss_base=9.23504105
-            elif [ "$flags" = "FLAGS_enable_tensor_fusion FLAGS_enable_sharding_overlap" ]; then
+            elif [ "$flag" = "FLAGS_enable_tensor_fusion FLAGS_enable_sharding_overlap" ]; then
                 loss_base=9.23504868
             else
                 loss_base=-1
