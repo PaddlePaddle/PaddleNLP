@@ -403,7 +403,7 @@ class WandbCallback(TrainerCallback):
 
 class SwanLabCallback(TrainerCallback):
     """
-    A [`TrainerCallback`] that logs metrics, media to [Swanlab](https://swanlab.com/).
+    A [`TrainerCallback`] that logs metrics, media to [Swanlab](https://swanlab.cn/).
     """
 
     def __init__(self):
@@ -432,9 +432,6 @@ class SwanLabCallback(TrainerCallback):
 
         if self._swanlab is None:
             return
-
-        if args.swanlab_api_key:
-            self._swanlab.login(api_key=args.swanlab_api_key)
 
         self._initialized = True
 
