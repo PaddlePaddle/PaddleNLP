@@ -56,6 +56,7 @@ def quantize_tensorwise(x, quantization_config=None, bit_length=8, state=0, trai
                 scale = act_scale
         else:
             scale = act_scale
+            scale = paddle.max(paddle.abs(target_x)) / qmax + quantization_config.epsilon
     else:
         scale = paddle.max(paddle.abs(target_x)) / qmax + quantization_config.epsilon
 
@@ -100,9 +101,10 @@ def fp8_quantize_tensorwise(x, tensor_type, quantization_config=None, state=0, t
                 act_scale.set_value(
                     (1 - quantization_config.moving_rate) * act_scale + quantization_config.moving_rate * scale
                 )
-                # scale = act_scale
+                scale = act_scale
         else:
             scale = act_scale
+            scale = paddle.max(paddle.abs(target_x)) / qmax + quantization_config.epsilon
     else:
         scale = paddle.max(paddle.abs(target_x)) / qmax + quantization_config.epsilon
 

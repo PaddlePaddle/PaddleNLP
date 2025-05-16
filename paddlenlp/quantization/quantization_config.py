@@ -64,7 +64,7 @@ class QuantizationConfig:
         dtype=None,
         ignore_modules=None,
         group_size=-1,
-        apply_hadamard=True,
+        apply_hadamard=False,
         quant_input_grad=False,
         quant_weight_grad=False,
         skip_first_act_scale_step=20,
