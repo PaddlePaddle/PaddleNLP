@@ -51,7 +51,7 @@ def fn_gold():
     do1 = paddle.concat([x0_grad, x1_grad], axis=-1)
     
     probs_grad = (do2_s.cast(paddle.float32) * (o2.cast(paddle.float32))).sum(axis=-1)
-    return do1, probs_grad
+    return do1, probs_grad, o2_s
 def fn_fused():
     return FQO.fused_swiglu_probs_bwd(o1, do2_s, unzipped_probs)
 
@@ -67,9 +67,11 @@ def fn():
     return do1, probs_grad
 
 
-do1_gold, pg_gold = fn_gold()
-do1, pg= fn_fused()
+do1_gold, pg_gold, o2_s_gold = fn_gold()
+do1, pg, o2_s = fn_fused()
 print("do1_gold", do1_gold.astype("float32").numpy())
 print("pg_gold", pg_gold.astype("float32").numpy())
+print("o2_s_gold", o2_s_gold.astype("float32").numpy())
 print("do1", do1.astype("float32").numpy())
 print("pg", pg.astype("float32").numpy())
+print("o2_s", o2_s.astype("float32").numpy())

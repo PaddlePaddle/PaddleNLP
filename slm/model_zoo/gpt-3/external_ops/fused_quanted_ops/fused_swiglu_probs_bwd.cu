@@ -32,6 +32,7 @@ __global__ void SwigluProbsGradKernel(
     const float* unzipped_probs,      // [seq_len*topk, 1]
     BFloat16* do1,                    // [seq_len*topk, moe_intermediate_size*2]
     float* probs_grad,                // [seq_len*topk, 1]
+    BFloat16* o2_s,                   // [seq_len*topk, moe_intermediate_size]
     int seq_len_topk,                 // seq_len * topk
     int moe_intermediate_size         
 ) {
@@ -41,6 +42,7 @@ __global__ void SwigluProbsGradKernel(
     const BFloat16* o1_row = o1 + row_idx * moe_intermediate_size * 2;
     const BFloat16* do2_s_row = do2_s + row_idx * moe_intermediate_size;
     BFloat16* do1_row = do1 + row_idx * moe_intermediate_size * 2;
+    BFloat16* o2s_row = o2_s + row_idx * moe_intermediate_size;
     
     float prob = unzipped_probs[row_idx];
     
@@ -64,6 +66,7 @@ __global__ void SwigluProbsGradKernel(
         
         do1_row[i] = BFloat16(x0_grad);
         do1_row[i + moe_intermediate_size] = BFloat16(x1_grad);
+        o2s_row[i] = BFloat16(o2_val * prob);
         
         local_probs_grad += do2_s_val * o2_val;
     }
@@ -95,24 +98,26 @@ std::vector<paddle::Tensor> SwigluProbsGradCUDABackward(
     
     auto do1 = paddle::empty_like(o1);
     auto probs_grad = paddle::empty({seq_len_topk, 1}, paddle::DataType::FLOAT32, o1.place());
+    auto o2_s = paddle::empty_like(do2_s);
     
     const BFloat16* o1_ptr = reinterpret_cast<const BFloat16*>(o1.data<phi::bfloat16>());
     const BFloat16* do2_s_ptr = reinterpret_cast<const BFloat16*>(do2_s.data<phi::bfloat16>());
     const float* unzipped_probs_ptr = unzipped_probs.data<float>();
     BFloat16* do1_ptr = reinterpret_cast<BFloat16*>(do1.data<phi::bfloat16>());
     float* probs_grad_ptr = probs_grad.data<float>();
+    BFloat16* o2_s_ptr = reinterpret_cast<BFloat16*>(o2_s.data<phi::bfloat16>());
     
     int block_size = 256; 
     
     SwigluProbsGradKernel<<<seq_len_topk, block_size, 0, o1.stream()>>>(
-        o1_ptr, do2_s_ptr, unzipped_probs_ptr, do1_ptr, probs_grad_ptr,
+        o1_ptr, do2_s_ptr, unzipped_probs_ptr, do1_ptr, probs_grad_ptr, o2_s_ptr,
         seq_len_topk, moe_intermediate_size);
         
     
-    return {do1, probs_grad};
+    return {do1, probs_grad, o2_s};
 }
 
 PD_BUILD_OP(fused_swiglu_probs_bwd)
     .Inputs({"o1", "do2_s", "unzipped_probs"})
-    .Outputs({"do1", "probs_grad"})
+    .Outputs({"do1", "probs_grad", "o2_s"})
     .SetKernelFn(PD_KERNEL(SwigluProbsGradCUDABackward));
