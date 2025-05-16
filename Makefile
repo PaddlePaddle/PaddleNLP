@@ -35,6 +35,7 @@ lint:
 test: unit-test
 
 unit-test:
+	export no_proxy=bcebos.com
 	PYTHONPATH=$(shell pwd) pytest -v \
 		-n auto \
 		--retries 1 --retry-delay 1 \
