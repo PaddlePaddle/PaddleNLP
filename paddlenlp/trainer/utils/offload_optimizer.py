@@ -43,7 +43,8 @@ def hack_offload_optimizer():
 
     def new_add_accumulator(self, *args, **kwargs):
         x = origin_add_accumulator(self, *args, **kwargs)
-        return offload(x)
+        offload(x)
+        return x
 
     setattr(Optimizer, "_add_accumulator", new_add_accumulator)
 
