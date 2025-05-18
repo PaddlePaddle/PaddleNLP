@@ -25,7 +25,7 @@ def shard(node_model_state, model, optimizer):
     unwrapped_optimizer = unwrap_optimizer(optimizer, DygraphShardingOptimizer)
     if unwrapped_optimizer is not None:
         optimizer = unwrapped_optimizer
-        assert not is_sharding_opt(optimizer)
+        assert is_sharding_opt(optimizer)
         param2rank = optimizer._param2rank
 
         def filter_func(key):
