@@ -57,6 +57,10 @@ try:
     from ..quantization.quantization_linear import QuantizationLinear
 except:
     QuantizationLinear = None
+    
+from paddle.distributed.auto_parallel.pipelining.schedules import ScheduleGPipe, Schedule1F1B, ScheduleInterleaved1F1B
+from paddle.distributed.auto_parallel.pipelining.stage import PipelineStage
+
 
 MODEL_NAME = "model"
 OPTIMIZER_NAME = "optimizer"
@@ -64,10 +68,112 @@ DIST_CKPT_PATH = "dist_ckpt"
 DIST_MODEL_PATH = "dist_model"
 FREE_SVAE_LOAD_KEY_PATTERNS = ["learning_rate_", "gradient_merge_", "@GRAD@MERG", "eager_tmp"]
 
+is_split_model = False
+local_stages = None
+local_schedule = None
+
+
+class _Pipeline_model_chunk(nn.Layer):
+    def __init__(self, layers):
+        super(_Pipeline_model_chunk, self).__init__()
+        self.layers = layers
+    def forward(self, *args, **kwargs):
+        for layer in self.layers:
+            x = layer(kwargs["input_ids"])
+        return x
+
+def helper_func(message):
+    rank = dist.get_rank()
+    print("---------------------------------------------------------------------------")
+    print(f"{message} [Allocated]:", paddle.device.cuda.memory_allocated(rank)/1024/1024/1024)
+    print(f"{message} [Reserved]:", paddle.device.cuda.memory_reserved(rank)/1024/1024/1024)
+    print(f"{message} [Max Allocated]:", paddle.device.cuda.max_memory_allocated(rank)/1024/1024/1024)
+    print(f"{message} [Max Reserved]:", paddle.device.cuda.max_memory_reserved(rank)/1024/1024/1024)
+    
+    
+def manual_model_split(model, stage_idx, group, mode, pp_degree):
+    global is_split_model
+    global local_stages
+
+    if is_split_model:
+        return local_stages
+    num_hidden_layers = model.config.num_hidden_layers
+    virtual_pp_degree = model.config.virtual_pp_degree if mode == "VPP" else 1
+    chunk_size = num_hidden_layers // virtual_pp_degree // pp_degree
+    chunk_num = virtual_pp_degree * pp_degree
+    layer_lists = None
+    # 删除不在本卡上的layer
+    for i in range(num_hidden_layers):
+        if model.layers[num_hidden_layers - i - 1].ipp != group.rank:
+            del model.layers[num_hidden_layers - i - 1]
+
+    layer_lists = model.layers
+    # 构建stages
+    def _build_stage(model, stage_idx, group):
+        new_model = None
+        local_chunk_id = stage_idx // pp_degree
+        if stage_idx == 0: # 第一个model_chunk输入特殊处理
+            new_model = _Pipeline_model_chunk(layer_lists[:chunk_size])
+            def forward0(
+                self,
+                input_ids=None,
+                labels=None,
+                position_ids=None,
+                attention_mask=None,
+                inputs_embeds=None,
+                use_cache=False,
+                past_key_values=None,
+                output_attentions=None,
+                output_hidden_states=None,
+                return_dict=None,
+            ):
+                outputs = tuple([input_ids, attention_mask, position_ids])
+                # decoder layers
+                for idx, (decoder_layer) in enumerate(self.layers):
+                    outputs = decoder_layer(outputs)
+                return outputs
+            new_model.forward = forward0.__get__(new_model)
+        else:
+            new_model = _Pipeline_model_chunk(layer_lists[local_chunk_id * chunk_size : (local_chunk_id + 1) * chunk_size])
+            def forward1(self, *args, **kwargs):
+                outputs = args
+                # decoder layers
+                for idx, (decoder_layer) in enumerate(self.layers):
+                    outputs = decoder_layer(outputs)
+                return outputs
+            new_model.forward = forward1.__get__(new_model)
+        stage = PipelineStage(
+            new_model,
+            stage_idx,
+            chunk_num,
+            group=group
+        )
+        return stage
+    stages = []
+    for i in range(virtual_pp_degree):  
+        stage = _build_stage(model, stage_idx+i*pp_degree, group)
+        stages.append(stage)
+    is_split_model = True
+    local_stages = stages
+    return local_stages
+
+def get_pp_schedule(model, n_microbatches, loss_fn, mode, pp_degree, group):
+    assert mode in ["VPP", "1F1B", "GPipe"]
+    global local_schedule
+    if local_schedule is not None:
+        return local_schedule
+    stages = manual_model_split(model, group.rank, group, mode, pp_degree)
+    if mode == "VPP":
+        schedule = ScheduleInterleaved1F1B(stages, n_microbatches = n_microbatches, loss_fn = loss_fn)
+    elif mode == "1F1B":
+        schedule = Schedule1F1B(stages[0], n_microbatches = n_microbatches, loss_fn = loss_fn)
+    else:
+        schedule = ScheduleGPipe(stages[0], n_microbatches = n_microbatches, loss_fn = loss_fn)
+    local_schedule = schedule
+    return schedule
 
 class AutoTrainer(Trainer):
     def __init__(self, *args, **kwargs):
-
         if kwargs.get("args", None) is not None and kwargs["args"].to_static:
             if kwargs.get("criterion", None) is None:
 
@@ -92,13 +198,13 @@ class AutoTrainer(Trainer):
             # NOTE(zhangwl):in pipeline mode , param may be initialized before while delete init_func, but param is still not is_initialized
             if not param._is_initialized() and param._init_func is not None:
                 param.initialize()
-        kwargs["model"] = model
 
+        kwargs["model"] = model
         super().__init__(*args, **kwargs)
         assert self.args.enable_auto_parallel
-
         self.global_mesh = fleet.auto.get_mesh()
         self.comm_group_in_pp = fleet.get_hybrid_communicate_group().get_pipe_parallel_group()
+        self.pp_schedule = get_pp_schedule(model, 4, self.criterion, self.args.pipeline_schedule_mode, self.args.pipeline_parallel_degree, self.comm_group_in_pp)
         self._in_pir_mode = paddle.base.framework.get_flags("FLAGS_enable_pir_api")["FLAGS_enable_pir_api"]
 
     @classmethod
@@ -234,6 +340,7 @@ class AutoTrainer(Trainer):
         return model, dist_loader
 
     def _wrap_amp_model(self, args, model):
+
         logger.info("Using half precision")
         self.amp_dtype = "float16" if self.args.fp16 else "bfloat16"
         if self.args.fp16_opt_level == "O2":
@@ -671,49 +778,30 @@ class AutoTrainer(Trainer):
         else:
             labels = None
 
-        outputs = model(**inputs)
-
-        if self.criterion is not None:
-
-            def to_list(value):
-                if value is None:
-                    return value
-                if isinstance(value, (list, tuple)):
-                    return list(value)
-                return [value]
-
-            criterion_inputs = to_list(outputs)
-            criterion_labels = to_list(labels)
-            loss = self.criterion(*(criterion_inputs + criterion_labels))
-            outputs = (loss, outputs)
-
-        # Save past state if it exists
-        # TODO: this needs to be fixed and made cleaner later.
-        if self.args.past_index >= 0:
-            self._past = outputs[self.args.past_index]
-
-        # We don't use .loss here since the model may return tuples instead of ModelOutput.
-        loss = outputs["loss"] if isinstance(outputs, dict) else outputs
-        if isinstance(outputs, dict):
-            loss = outputs["loss"]
-        elif isinstance(outputs, tuple):
-            loss = outputs[0]
+        pp_rank = self.comm_group_in_pp.rank
+        if pp_rank == 0:        # 第一个pp_stage，参数传入数据流
+            self.pp_schedule.step(**inputs) # 最后的pp_stage，参数传入label, 并输出loss
+        elif pp_rank == self.args.pipeline_parallel_degree - 1:
+            losses = []
+            self.pp_schedule.step(target=labels, losses = losses)
+            print("losses: ", losses) # loss在此处记录
         else:
-            loss = outputs
+            self.pp_schedule.step()
 
-        return (loss, outputs) if return_outputs else loss
+        return 0
 
     def dynamic_training(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
+
         with self.autocast_smart_context_manager():
             loss = self.compute_loss(model, inputs)
+        
+        # if loss is not None and self.args.gradient_accumulation_steps > 1 and not self._enable_delay_scale_loss():
+        #     loss = loss / self.args.gradient_accumulation_steps
 
-        if loss is not None and self.args.gradient_accumulation_steps > 1 and not self._enable_delay_scale_loss():
-            loss = loss / self.args.gradient_accumulation_steps
-
-        if self.do_grad_scaling:
-            self.scaler.scale(loss).backward()
-        else:
-            loss.backward()
+        # if self.do_grad_scaling:
+        #     self.scaler.scale(loss).backward()
+        # else:
+        #     loss.backward()
 
         return loss
 
