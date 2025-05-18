@@ -41,6 +41,7 @@ from paddlenlp.transformers import (
     LinearAnnealingWithWarmupDecay,
     LlamaConfig,
     LlamaForCausalLM3DAuto,
+    LlamaForCausalLM3DAutoPP,
     LlamaForCausalLMNet,
     LlamaPretrainingCriterion3DAuto,
     LlamaPretrainingCriterionNet,

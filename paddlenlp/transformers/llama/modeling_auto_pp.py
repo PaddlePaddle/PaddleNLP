@@ -1,0 +1,535 @@
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2022 EleutherAI and the HuggingFace Inc. team. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""Paddle Llama model"""
+from __future__ import annotations
+
+import math
+import os
+import warnings
+from functools import partial
+from typing import Optional, Tuple
+
+import paddle
+import paddle.distributed as dist
+import paddle.nn.functional as F
+from paddle import nn
+from paddle.distributed import fleet
+from paddle.distributed.fleet.utils import recompute
+
+try:
+    from paddle.incubate.nn.functional import fused_rotary_position_embedding
+except ImportError:
+    fused_rotary_position_embedding = None
+
+try:
+    from paddle.incubate.nn.functional import swiglu
+except ImportError:
+
+    def swiglu(x, y=None):
+        if y is None:
+            x, y = paddle.chunk(x, chunks=2, axis=-1)
+        return F.silu(x) * y
+
+
+from paddlenlp.transformers.conversion_utils import (
+    StateDictNameMapping,
+    init_name_mappings,
+)
+from paddlenlp.transformers.model_outputs import (
+    BaseModelOutputWithPastAndCrossAttentions,
+    CausalLMOutputWithCrossAttentions,
+)
+from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
+from paddlenlp.utils.tools import get_env_device
+
+from . import fusion_ops
+from .configuration import (
+    LLAMA_PRETRAINED_INIT_CONFIGURATION,
+    LLAMA_PRETRAINED_RESOURCE_FILES_MAP,
+    LlamaConfig,
+)
+from .modeling import (
+    LlamaDynamicNTKScalingRotaryEmbedding,
+    LlamaLinearScalingRotaryEmbedding,
+    LlamaNTKScalingRotaryEmbedding,
+    LlamaRotaryEmbedding,
+    _expand_2d_mask,
+    _make_causal_mask,
+    apply_rotary_pos_emb,
+    build_alibi_tensor,
+    get_triangle_upper_mask,
+    repeat_kv,
+)
+
+from .modeling_auto import (
+    LlamaMLPAuto, 
+    LlamaAttentionAuto, 
+    LlamaPretrainedModelAuto, 
+    LlamaDecoderLayerAuto, 
+    LlamaModelAuto,
+    LlamaForCausalLM3DAuto,
+)
+
+try:
+    from paddle.nn.functional.flash_attention import flash_attention
+except:
+    flash_attention = None
+
+__all__ = [
+    "LlamaForCausalLM3DAutoPP",
+]
+
+
+def enable_fuse_ffn_qkv_pass():
+    if os.getenv("FLAGS_enable_fused_ffn_qkv_pass") in [
+        "True",
+        "true",
+        "1",
+    ]:
+        return True
+    else:
+        return False
+
+
+def is_pp_enable():
+    mesh = fleet.auto.get_mesh()
+    return "pp" in mesh.dim_names
+
+
+def get_mesh(pp_idx=0):
+    mesh = fleet.auto.get_mesh()
+    if "pp" in mesh.dim_names:
+        mesh = mesh.get_mesh_with_dim("pp", pp_idx)
+    return mesh
+
+
+def global_mesh_starts_with_pp():
+    mesh = fleet.auto.get_mesh()
+    if is_pp_enable():
+        return mesh.get_mesh_with_dim("pp")
+    else:
+        return mesh
+
+def parse_args(args, kwargs):
+    if isinstance(args, tuple):
+        if len(args) == 8:
+            hidden_states, position_ids, inputs_embeds, attention_mask, output_attentions, past_key_values, use_cache, alibi = args
+    else:
+        assert False, "args should have length of 8"
+
+
+    if position_ids is not None:
+        position_ids.stop_gradient = True
+
+    if attention_mask is not None:
+        attention_mask.stop_gradient = True
+
+    if alibi is not None:
+        alibi.stop_gradient = True
+
+    return hidden_states, position_ids, inputs_embeds, attention_mask, output_attentions, past_key_values, use_cache, alibi
+
+
+def return_args(
+    hidden_states, position_ids = None, inputs_embeds = None, attention_mask = None, output_attentions = None, past_key_values=None, use_cache = False, alibi=None
+):
+    ret = (hidden_states, position_ids, inputs_embeds, attention_mask, output_attentions, past_key_values, use_cache, alibi)
+
+    return ret
+
+
+colwise_placements = [dist.Replicate(), dist.Shard(1)]
+rowise_placement = [dist.Replicate(), dist.Shard(0)]
+
+
+class LlamaRMSNormAutoPP(nn.Layer):
+    def __init__(self, config, ipp):
+        super().__init__()
+        self.hidden_size = config.hidden_size
+        self.weight = paddle.create_parameter(
+            shape=[self.hidden_size],
+            dtype=paddle.get_default_dtype(),
+            default_initializer=nn.initializer.Constant(1.0),
+        )
+        self.ipp = ipp
+        self.weight = dist.shard_tensor(
+            self.weight,
+            get_mesh(self.ipp),
+            [dist.Replicate(), dist.Replicate()],
+        )
+        self.variance_epsilon = config.rms_norm_eps
+        self.config = config
+
+    def forward(self, args):
+        hidden_states, position_ids, inputs_embeds, attention_mask, output_attentions, past_key_values, use_cache, alibi = parse_args(args)
+        if self.config.use_fused_rms_norm:
+            return fusion_ops.fusion_rms_norm(
+                hidden_states, self.weight, self.variance_epsilon, self.config.use_fast_layer_norm
+            )
+
+        with paddle.amp.auto_cast(False):
+            variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
+            hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
+
+        if self.weight.dtype in [paddle.float16, paddle.bfloat16]:
+            hidden_states = paddle.cast(hidden_states, self.weight.dtype)
+
+        
+        return return_args(hidden_states * self.weight, position_ids, inputs_embeds, attention_mask, output_attentions, past_key_values, use_cache, alibi)
+
+class LlamaEmbeddingAutoPP(nn.Layer):
+    """Extends LlamaEmbeddings to forward attention_mask through the pipeline."""
+
+    def __init__(self, config):
+        super(LlamaEmbeddingAutoPP, self).__init__()
+        self.config = config
+
+        self.vocab_size = config.vocab_size
+        self.hidden_size = config.hidden_size
+        self.embed_tokens = nn.Embedding(
+            self.vocab_size,
+            self.hidden_size,
+        )
+
+        embedding_placements = (
+            [dist.Replicate(), dist.Shard(1)]
+            if self.config.tensor_parallel_degree > 1
+            else [dist.Replicate(), dist.Replicate()]
+        )
+        self.embed_tokens.weight = dist.shard_tensor(
+            self.embed_tokens.weight,
+            get_mesh(),
+            embedding_placements,
+        )
+        self.placements = (
+            [dist.Shard(1), dist.Shard(0)] if self.config.sequence_parallel else [dist.Shard(0), dist.Replicate()]
+        )
+
+    @property
+    def embedding_weight(self):
+        return get_attr(self.embed_tokens, "weight")
+
+    @staticmethod
+    def _prepare_decoder_attention_mask(attention_mask, input_shape, past_key_values_length, dtype):
+        if attention_mask is not None:
+            # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
+            if len(attention_mask.shape) == 2:
+                expanded_attn_mask = _expand_2d_mask(attention_mask, dtype, tgt_length=input_shape[-1])
+                # For decoding phase in generation, seq_length = 1, we don't need to add causal mask
+                if input_shape[-1] > 1:
+                    combined_attention_mask = _make_causal_mask(
+                        input_shape, past_key_values_length=past_key_values_length
+                    )
+                    expanded_attn_mask = expanded_attn_mask & combined_attention_mask
+            # [bsz, seq_len, seq_len] -> [bsz, 1, seq_len, seq_len]
+            elif len(attention_mask.shape) == 3:
+                expanded_attn_mask = attention_mask.unsqueeze(1).astype("bool")
+            # if attention_mask is already 4-D, do nothing
+            else:
+                expanded_attn_mask = attention_mask
+        else:
+            expanded_attn_mask = _make_causal_mask(input_shape, past_key_values_length=past_key_values_length)
+        # Convert bool attention_mask to float attention mask, which will be added to attention_scores later
+        if get_env_device() in ["npu", "mlu", "intel_hpu"]:
+            x = paddle.to_tensor(0.0, dtype="float32")
+            y = paddle.to_tensor(paddle.finfo(dtype).min, dtype="float32")
+            expanded_attn_mask = paddle.where(expanded_attn_mask.cast("bool"), x, y).astype(dtype)
+        elif get_env_device() == "xpu":
+            x = paddle.to_tensor(0.0, dtype="float32")
+            y = paddle.to_tensor(-1.7005809656952787e38, dtype="float32")
+            expanded_attn_mask = paddle.where(expanded_attn_mask.cast("bool"), x, y)
+        elif get_env_device() == "gcu":
+            min_val = paddle.finfo(dtype).min
+            x = paddle.to_tensor(0.0, dtype=dtype)
+            y = paddle.to_tensor(min_val, dtype=dtype)
+            expanded_attn_mask = paddle.where(expanded_attn_mask.cast("bool"), x, y).astype(dtype)
+        else:
+            expanded_attn_mask = paddle.where(expanded_attn_mask, 0.0, paddle.finfo(dtype).min)
+            expanded_attn_mask = expanded_attn_mask.astype(dtype)
+        return expanded_attn_mask
+
+    def forward(self, args):
+        input_ids, position_ids, inputs_embeds, attention_mask, output_attentions, past_key_values, use_cache, alibi = parse_args(args)
+        
+        input_ids.stop_gradient = True
+        
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_hidden_states = (
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        )
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_hidden_states = (
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        )
+
+        use_cache = use_cache if use_cache is not None else self.config.use_cache
+
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        # retrieve input_ids and inputs_embeds
+        if input_ids is not None and inputs_embeds is not None:
+            raise ValueError("You cannot specify both decoder_input_ids and decoder_inputs_embeds at the same time")
+        elif input_ids is not None:
+            batch_size, seq_length = input_ids.shape
+        elif inputs_embeds is not None:
+            batch_size, seq_length, _ = inputs_embeds.shape
+        else:
+            raise ValueError("You have to specify either decoder_input_ids or decoder_inputs_embeds")
+
+        if past_key_values is None:
+            past_key_values = tuple([None] * len(self.layers))
+
+        seq_length_with_past = seq_length
+        cache_length = 0
+        if past_key_values[0] is not None:
+            cache_length = past_key_values[0][0].shape[1]
+            seq_length_with_past += cache_length
+
+        if inputs_embeds is None:
+            with paddle.amp.auto_cast(False):
+                inputs_embeds = self.embed_tokens(input_ids)
+
+        if self.config.sequence_parallel:
+            # [B, S, H] -> [S, B, H]
+            inputs_embeds = paddle.transpose(inputs_embeds, [1, 0, 2])
+
+        global_mesh = global_mesh_starts_with_pp()
+        if position_ids is None and self.config.sep_parallel_degree > 1:
+            position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
+        if position_ids is not None:
+            position_ids = dist.shard_tensor(
+                position_ids,
+                global_mesh,
+                [dist.Replicate() for _ in range(len(global_mesh._shape))],
+            )
+        # embed positions
+        if not self.config.use_flash_attention and attention_mask is None:
+            # [bs, seq_len]
+            attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
+
+        if self.config.alibi:
+            if attention_mask is None:
+                attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
+            alibi_place = [dist.Replicate() for _ in range(len(global_mesh._shape))]
+            alibi = build_alibi_tensor(attention_mask, self.config.num_attention_heads, dtype=inputs_embeds.dtype)
+            alibi = dist.shard_tensor(alibi, global_mesh, alibi_place)
+        else:
+            alibi = None
+        if self.config.use_flash_attention and not self.config.alibi:
+            # attention_mask in flash_attn is always None for pretrain
+            # atttenton_mask is used in scaled_dot_product_attention with alibi_tensor
+            attention_mask = None
+        else:
+            attention_mask = self._prepare_decoder_attention_mask(
+                attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
+            )  # [bs, 1, seq_len, seq_len]
+            attention_mask = dist.shard_tensor(
+                attention_mask,
+                global_mesh,
+                [dist.Replicate() for _ in range(len(global_mesh._shape))],
+            )
+        hidden_states = inputs_embeds
+        hidden_states = dist.reshard(hidden_states, get_mesh(), self.placements)
+        
+        return return_args(
+            hidden_states,
+            position_ids,
+            inputs_embeds,
+            attention_mask,
+            output_attentions,
+            past_key_values,
+            use_cache,
+            alibi,
+        )
+
+class LlamaDecoderLayerAutoPP(nn.Layer):
+    def __init__(self, config, idx, layerwise_recompute: bool = False, ipp: Optional[int] = None):
+        super(LlamaDecoderLayerAutoPP, self).__init__()
+        self.layer_id = idx
+        self.layer = LlamaDecoderLayerAuto(config, layerwise_recompute, ipp)
+        self.enable_recompute = False
+        self.recompute_granularity = config.recompute_granularity
+        self.no_recompute_layers = config.no_recompute_layers if config.no_recompute_layers is not None else []
+
+    def forward(self, args):
+        hidden_states_states, position_ids, inputs_embeds, attention_mask, output_attentions, past_key_values, use_cache, alibi = parse_args(args)
+                
+        past_key_value = past_key_values[self.layer_id] if past_key_values is not None else None
+
+        has_gradient = not hidden_states.stop_gradient
+        # ipp暂时都设置为0        
+        if position_ids is not None:
+            position_ids_input = dist.reshard(
+                position_ids,
+                get_mesh(0),
+                [dist.Replicate(), dist.Replicate()],
+            )
+        else:
+            position_ids_input = position_ids
+        attention_mask_input = (
+            dist.reshard(
+                attention_mask,
+                get_mesh(0),
+                [dist.Replicate(), dist.Replicate()],
+            )
+            if attention_mask is not None
+            else None
+        )
+        alibi_input = (
+            dist.reshard(
+                alibi,
+                get_mesh(0),
+                [dist.Replicate(), dist.Replicate()],
+            )
+            if alibi is not None
+            else None
+        )
+        if (
+            self.enable_recompute
+            and self.layer_id not in self.no_recompute_layers
+            and has_gradient
+            and self.recompute_granularity == "full"
+        ):
+            layer_outputs = recompute(
+                self.layer,
+                hidden_states,
+                position_ids_input,
+                attention_mask_input,
+                output_attentions,
+                past_key_value,
+                use_cache,
+                alibi_input,
+            )
+        else:
+            layer_outputs = self.layer(
+                hidden_states,
+                position_ids_input,
+                attention_mask_input,
+                output_attentions,
+                past_key_value,
+                use_cache,
+                alibi_input,
+            )
+
+        if type(layer_outputs) is tuple:
+            hidden_states = layer_outputs[0]
+        else:
+            hidden_states = layer_outputs
+
+        return return_args(
+            hidden_states,
+            position_ids,
+            inputs_embeds,
+            attention_mask,
+            output_attentions,
+            past_key_values,
+            use_cache,
+            alibi,
+        )
+
+
+@register_base_model
+class LlamaModelAutoPP(LlamaModelAuto):
+    """
+    Transformer decoder consisting of *config.num_hidden_layers* layers. Each layer is a [`LlamaDecoderLayerAuto`]
+    Args:
+        config: LlamaConfig
+    """
+
+    def __init__(self, config: LlamaConfig):
+        super().__init__(config)
+        self.embed_tokens = LlamaEmbeddingAutoPP(config)
+        ## 暂时先不考虑PP，后面再加
+        decoder_layers = []
+        # self.next_pp_stage_indexes = []
+        for i in range(config.num_hidden_layers):
+            # pp_stage_id, input_need_reshard = get_layer_pp_info(i)
+            decoder_layers.append(LlamaDecoderLayerAutoPP(config, i not in self.no_recompute_layers, 0))
+            # if input_need_reshard:
+            #     self.next_pp_stage_indexes.append(i)
+        self.layers = nn.LayerList(decoder_layers)
+        self.norm = LlamaRMSNormAutoPP(config, 0)
+
+    def forward(self, args):
+        outputs = self.embed_tokens(args)
+        # decoder layers
+        for idx, (decoder_layer) in enumerate(self.layers):
+            outputs = decoder_layer(outputs)
+        # 第一个是hidden_states
+        outputs = self.norm(outputs)
+        return outputs
+
+
+class LlamaLMHeadAutoPP(nn.Layer):
+    def __init__(self, config: LlamaConfig):
+        super(LlamaLMHeadAutoPP, self).__init__()
+        self.config = config
+
+        vocab_size = config.vocab_size
+        self.weight = self.create_parameter(
+            shape=[config.hidden_size, vocab_size],
+            dtype=paddle.get_default_dtype(),
+        )
+        self.weight = dist.shard_tensor(
+            self.weight,
+            get_mesh(-1),
+            colwise_placements,
+        )
+
+    def forward(self, args):
+        hidden_states, position_ids, attention_mask, output_attentions, past_key_values, use_cache, alibi = parse_args(args)
+        
+        if self.config.sequence_parallel:
+            hidden_states = dist.reshard(
+                hidden_states,
+                get_mesh(-1),
+                [dist.Shard(1), dist.Replicate()],
+            )
+            hidden_states = paddle.transpose(hidden_states, [1, 0, 2])
+        logits = paddle.matmul(hidden_states, self.weight, transpose_y=False)
+        return return_args(logits, position_ids, inputs_embeds, attention_mask, output_attentions, past_key_values, use_cache, alibi)
+
+
+class LlamaForCausalLM3DAutoPP(LlamaForCausalLM3DAuto):
+    enable_to_static_method = True
+
+    def __init__(self, config):
+        super().__init__(config)
+        self.config = config
+        self.llama = LlamaModelAutoPP(config)
+        self.lm_head = LlamaLMHeadAutoPP(config)
+
+    def forward(
+        self,
+        input_ids=None,
+        labels=None,
+        position_ids=None,
+        attention_mask=None,
+        inputs_embeds=None,
+        use_cache=False,
+        past_key_values=None,
+        output_attentions=None,
+        output_hidden_states=None,
+        return_dict=None,
+    ):
+        
+        args = return_args(input_ids, position_ids, attention_mask, output_attentions, past_key_values, use_cache, None)
+        
+        outputs = self.llama(args)
+
+        outputs = self.lm_head(args)
+
+        return outputs[0]
