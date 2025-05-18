@@ -2737,15 +2737,9 @@ class Trainer:
             ] = fleet.meta_parallel.get_rng_state_tracker().get_states_tracker()
 
         if self.args.save_rng_states:
-            if self.args.world_size > 1:
-                rng_states_list = []
-                paddle.distributed.all_gather_object(rng_states_list, rng_states)
-                if self.args.should_save:
-                    os.makedirs(output_dir, exist_ok=True)
-                    paddle.save(rng_states_list, os.path.join(output_dir, f"rng_state_{self.args.world_size}.pth"))
-            else:
-                os.makedirs(output_dir, exist_ok=True)
-                paddle.save(rng_states, os.path.join(output_dir, "rng_state.pth"))
+            rng_state_file = os.path.join(output_dir, f"rng_state_{dist.get_rank()}.pth")
+            os.makedirs(output_dir, exist_ok=True)
+            paddle.save(rng_states, rng_state_file)
 
         # only save model state dict, ignore optimizer and scheduler
         if not self.args.ignore_save_lr_and_optim:
