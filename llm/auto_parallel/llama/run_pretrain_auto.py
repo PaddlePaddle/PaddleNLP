@@ -41,14 +41,16 @@ from paddlenlp.transformers import (
     LinearAnnealingWithWarmupDecay,
     LlamaConfig,
     LlamaForCausalLM3DAuto,
+    LlamaForCausalLM3DAutoPP,
     LlamaForCausalLMNet,
     LlamaPretrainingCriterion3DAuto,
     LlamaPretrainingCriterionNet,
 )
 from paddlenlp.utils.log import logger
+from paddle.distributed.auto_parallel.pipelining.schedules import ScheduleGPipe
 
 MODEL_CLASSES = {
-    "llama": (LlamaConfig, LlamaForCausalLM3DAuto, LlamaPretrainingCriterion3DAuto),
+    "llama": (LlamaConfig, LlamaForCausalLM3DAutoPP, LlamaPretrainingCriterion3DAuto),
     "llama_network": (LlamaConfig, LlamaForCausalLMNet, LlamaPretrainingCriterionNet),
 }
 
