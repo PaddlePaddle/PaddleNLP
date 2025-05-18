@@ -2722,7 +2722,7 @@ class Trainer:
                 ] = fleet.meta_parallel.get_rng_state_tracker().get_states_tracker()
 
         if self.args.save_rng_states:
-            rng_state_file = f"rng_state_{dist.get_rank()}.pth"
+            rng_state_file = os.path.join(output_dir, f"rng_state_{dist.get_rank()}.pth")
             os.makedirs(output_dir, exist_ok=True)
             paddle.save(rng_states, rng_state_file)
 
