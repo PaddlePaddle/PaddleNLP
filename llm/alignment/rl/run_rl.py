@@ -32,7 +32,7 @@ from paddlenlp.rl.utils.config_utils import (
     TrainingArguments,
 )
 from paddlenlp.rl.utils.offload_utils import offload_tensor_to_cpu
-from paddlenlp.rl.utils.reshard_utils import init_rollout_env
+from paddlenlp.rl.utils.reshard_utils import ReshardController
 from paddlenlp.rl.utils.timer_utils import timers_scope_runtimer
 from paddlenlp.trainer import (
     EarlyStoppingCallback,
@@ -81,6 +81,7 @@ def create_actor_models(
     data_args: DataArgument,
     training_args: TrainingArguments,
     common_config: Dict,
+    reshard_controller: ReshardController = None,
 ):
     with timers_scope_runtimer("Actor model loading time"):
         # actor model
@@ -103,7 +104,7 @@ def create_actor_models(
         actor_model_config.use_sparse_head_and_loss_fn = False
         actor_model_config.seq_length = data_args.max_length
         actor_model_config.max_sequence_length = data_args.max_length
-        print(f"Loading Actor model with config:\n\t{actor_model_config}\n")
+        logger.info(f"Loading Actor model with config:\n\t{actor_model_config}\n")
 
         if not training_args.autotuner_benchmark:
             actor_model = AutoModelForCausalLM.from_pretrained(
@@ -113,18 +114,16 @@ def create_actor_models(
             actor_model = AutoModelForCausalLM.from_config(actor_model_config)
 
     with timers_scope_runtimer("Actor eval model loading time"):
-        if (
-            training_args.rollout_tensor_parallel_degree != training_args.tensor_parallel_degree
-            or training_args.pipeline_parallel_degree > 1
-        ):
+        if reshard_controller is not None:
+            reshard_controller.set_rollout_env("[create actor eval model]")
             actor_eval_model_config = copy.deepcopy(actor_model_config)
             actor_eval_model_config.use_fused_head_and_loss_fn = False
-            with init_rollout_env(training_args.rollout_tensor_parallel_degree):
-                hcg = fleet.get_hybrid_communicate_group()
-                actor_eval_model_config.tensor_parallel_degree = hcg.get_model_parallel_world_size()
-                actor_eval_model_config.tensor_parallel_rank = hcg.get_model_parallel_rank()
-                # TODO(gongenlei): lazy load lazy guard
-                actor_eval_model = AutoModelForCausalLM.from_config(actor_eval_model_config)
+            hcg = fleet.get_hybrid_communicate_group()
+            actor_eval_model_config.tensor_parallel_degree = hcg.get_model_parallel_world_size()
+            actor_eval_model_config.tensor_parallel_rank = hcg.get_model_parallel_rank()
+            # TODO(gongenlei): lazy load lazy guard
+            actor_eval_model = AutoModelForCausalLM.from_config(actor_eval_model_config)
+            reshard_controller.set_train_env("[after create actor eval model]")
         else:
             actor_eval_model = None
 
@@ -171,7 +170,7 @@ def create_reward_models(
         LlmMetaConfig.set_llm_config(reward_model_config, training_args)
         reward_model_config.max_position_embeddings = data_args.max_length
         reward_model_config.use_sparse_head_and_loss_fn = False
-        print(f"Loading Reward model with config:\n\t{reward_model_config}\n")
+        logger.info(f"Loading Reward model with config:\n\t{reward_model_config}\n")
 
         config = copy.deepcopy(reward_model_config)
         if training_args.eval_mode is not None:
@@ -323,8 +322,16 @@ def main():
         max_sequence_length=data_args.max_length,
     )
 
+    if (
+        training_args.rollout_tensor_parallel_degree != training_args.tensor_parallel_degree
+        or training_args.pipeline_parallel_degree > 1
+    ):
+        reshard_controller = ReshardController(tensor_parallel_degree=training_args.rollout_tensor_parallel_degree)
+    else:
+        reshard_controller = None
+
     actor_model, actor_eval_model, reference_model, actor_tokenizer = create_actor_models(
-        model_args, data_args, training_args, common_config
+        model_args, data_args, training_args, common_config, reshard_controller
     )
 
     if not training_args.use_rm_server and model_args.reward_model_name_or_path is not None:
@@ -387,6 +394,7 @@ def main():
         ),  # NOTE: enforce prompt padding to max_prompt_len when using balance_batch
         compute_metrics=compute_metrics,  # TODO: only used for grpo (kk datasets)
         generation_config=generation_config,
+        reshard_controller=reshard_controller,
     )
 
     # TODO(gongenlei) resume_from_checkpoint is not ready
