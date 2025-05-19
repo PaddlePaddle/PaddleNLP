@@ -49,7 +49,7 @@ from ...transformers import PretrainedModel, PretrainedTokenizer
 from ...utils.env import TRAINER_STATE_NAME
 from ..models.ppo_model_utils import create_loss
 from ..utils.comm_utils import create_data_trans_group
-from ..utils.reshard_utils import init_rollout_env
+from ..utils.reshard_utils import ReshardController
 
 # ########## patches for Trianer ##########
 
@@ -537,6 +537,7 @@ class RLTrainer(RLTrainerBase):
         callbacks: Optional[List[TrainerCallback]] = None,
         optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
         preprocess_logits_for_metrics: Optional[Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor]] = None,
+        reshard_controller: Optional[ReshardController] = None,
     ):
         super().__init__(
             model,
@@ -565,6 +566,7 @@ class RLTrainer(RLTrainerBase):
         self.ema_beta = getattr(args, "ema_beta", 0.992)
         # if self.timers:
         #     self.timers.log = types.MethodType(new_timer_log, self.timers)
+        self.reshard_controller = reshard_controller
 
     def create_criterion(self):
         """
@@ -595,12 +597,15 @@ class RLTrainer(RLTrainerBase):
         dp_group = hcg.get_data_parallel_group()
         global_rank = dist.get_rank()
         old_dp_workers = self.args.world_size // (max(sd_group.nranks, 1) * max(dp_group.nranks, 1))
-        with init_rollout_env(self.args.rollout_tensor_parallel_degree):
-            hcg = fleet.get_hybrid_communicate_group()
-            tensor_parallel_degree = hcg.get_model_parallel_world_size()
-            tensor_parallel_rank = hcg.get_model_parallel_rank()
-            eval_tp_size = max(tensor_parallel_degree, 1)
-            eval_tp_rank = max(tensor_parallel_rank, 0)
+        if self.reshard_controller is not None:
+            self.reshard_controller.set_rollout_env("[set eval model]")
+        hcg = fleet.get_hybrid_communicate_group()
+        tensor_parallel_degree = hcg.get_model_parallel_world_size()
+        tensor_parallel_rank = hcg.get_model_parallel_rank()
+        if self.reshard_controller is not None:
+            self.reshard_controller.set_train_env("[after set eval model]")
+        eval_tp_size = max(tensor_parallel_degree, 1)
+        eval_tp_rank = max(tensor_parallel_rank, 0)
         group_nums = self.args.logical_process_index // old_dp_workers * eval_tp_size + eval_tp_rank
         self._data_trans_group = create_data_trans_group(global_rank, group_nums)
         # just for compatible with old code
