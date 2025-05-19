@@ -131,10 +131,10 @@ __device__ __forceinline__ float4 f4_sub(const float4& x_f, const float4& y_f) {
   return {x_f.x - y_f.x, x_f.y - y_f.y, x_f.z - y_f.z, x_f.w - y_f.w};
 }
 __device__ __forceinline__ float4 fast_sig_vec4(const float4& x_vec4) {
-  const float sig_x =  __frcp_rn(1.0f + __expf(-x_vec4.x));
-  const float sig_y =  __frcp_rn(1.0f + __expf(-x_vec4.y));
-  const float sig_z =  __frcp_rn(1.0f + __expf(-x_vec4.z));
-  const float sig_w =  __frcp_rn(1.0f + __expf(-x_vec4.w));
+  const float sig_x = __frcp_rn(1.0f + __expf(-x_vec4.x));
+  const float sig_y = __frcp_rn(1.0f + __expf(-x_vec4.y));
+  const float sig_z = __frcp_rn(1.0f + __expf(-x_vec4.z));
+  const float sig_w = __frcp_rn(1.0f + __expf(-x_vec4.w));
   return {sig_x, sig_y, sig_z, sig_w};
 }
 __device__ __forceinline__ float4
@@ -173,6 +173,7 @@ __global__ void SwigluProbsGradKernelVec4(
     BFloat16* o2_s,               // [seq_len*topk, moe_intermediate_size]
     int moe_intermediate_size) {
   constexpr int numel_per_thread = 4;
+  constexpr int k_warp_size = 32;
   const int row_idx = blockIdx.x;
   const int tid = threadIdx.x;
 
@@ -199,26 +200,11 @@ __global__ void SwigluProbsGradKernelVec4(
     float4 lhs_vec4 = load_and_cast_float4(o1_row_left_half_vec4 + i);
     float4 rhs_vec4 = load_and_cast_float4(o1_row_right_half_vec4 + i);
     float4 do2_s_val_vec4 = load_and_cast_float4(do2_s_row_vec4 + i);
-    // ------------ developing ----------------
-    /*
-    float sig = 1.0f / (1.0f + expf(-lhs));
-    float tmp = sig * lhs;
-    float o2_val = tmp * rhs;
-    float do2_val = do2_s_val * prob;
-    */
     float4 sig_vec4 = fast_sig_vec4(lhs_vec4);
     float4 tmp_vec4 = f4_prod(sig_vec4, lhs_vec4);
     float4 o2_val_vec4 = f4_prod(tmp_vec4, rhs_vec4);
     float4 o2s_val_vec4 = f4_prod(o2_val_vec4, prob);
     float4 do2_val_vec4 = f4_prod(do2_s_val_vec4, prob);
-    /*
-    float x0_grad = do2_val * rhs * sig * (1.0f + lhs - tmp);
-    float x1_grad = do2_val * tmp;
-    do1_row[i] = BFloat16(x0_grad);
-    do1_row[i + moe_intermediate_size] = BFloat16(x1_grad);
-    o2s_row[i] = BFloat16(o2_val * prob);
-    local_probs_grad += do2_s_val * o2_val;
-    */
     float4 x0_grad_vec4 = f4_prod(
         do2_val_vec4,
         f4_prod(rhs_vec4,
@@ -233,17 +219,26 @@ __global__ void SwigluProbsGradKernelVec4(
   sum_buffer[tid] = local_probs_grad;
   __syncthreads();
 
-  for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
+#pragma unroll
+  for (int stride = blockDim.x / 2; stride >= k_warp_size; stride >>= 1) {
     if (tid < stride) {
       sum_buffer[tid] += sum_buffer[tid + stride];
     }
     __syncthreads();
   }
 
-  if (tid == 0) {
-    probs_grad[row_idx] = sum_buffer[0];
+  if (tid < k_warp_size) {
+    local_probs_grad = sum_buffer[tid];
+#pragma unroll
+    for (int offset = k_warp_size / 2; offset > 0; offset >>= 1) {
+      local_probs_grad +=
+          __shfl_down_sync(0xFFFFFFFF, local_probs_grad, offset);
+    }
   }
-  // ------------ developing ----------------
+
+  if (tid == 0) {
+    probs_grad[row_idx] = local_probs_grad;
+  }
 }
 
 std::vector<paddle::Tensor> SwigluProbsGradCUDABackward(
