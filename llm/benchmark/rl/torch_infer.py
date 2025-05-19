@@ -1,25 +1,42 @@
+# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import argparse
 import csv
 import json
 import math
-import pandas as pd
-from typing import List
-from dataclasses import dataclass
-from contextlib import contextmanager
-from pathlib import Path
 import time
-import tqdm
-from vllm import LLM, SamplingParams
-from transformers import AutoTokenizer
-from paddlenlp.rl.trainer import process_row
-import paddle
+from contextlib import contextmanager
+from dataclasses import dataclass
+from pathlib import Path
+from typing import List
 
+import paddle
+import pandas as pd
+import tqdm
+from transformers import AutoTokenizer
+from vllm import LLM, SamplingParams
+
+from paddlenlp.rl.trainer import process_row
 from paddlenlp.utils.log import logger
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--actor_model_name_or_path", type=str, default="Qwen/Qwen2.5-7B-Instruct-1M", help="预训练模型名称或路径")
+    parser.add_argument(
+        "--actor_model_name_or_path", type=str, default="Qwen/Qwen2.5-7B-Instruct-1M", help="预训练模型名称或路径"
+    )
     parser.add_argument("--input_file", type=str, default="./combined.parquet", help="输入parquet文件路径")
     parser.add_argument("--output_dir", type=str, default="./pt_inference_results", help="输出目录路径")
     parser.add_argument("--rollout_input_batch_size", type=int, default=2, help="一次性输入给推理引擎的大小")
@@ -37,10 +54,12 @@ def parse_args():
 
     return args
 
+
 def chunk(all_input_ids, size):
     if size <= 0:
         raise ValueError("Size must be greater than 0")
     return [all_input_ids[i : i + size] for i in range(0, len(all_input_ids), size)]
+
 
 @contextmanager
 def switch_level_context(level="ERROR"):
@@ -51,6 +70,7 @@ def switch_level_context(level="ERROR"):
         yield
     finally:
         logger.set_level(original_level)
+
 
 @dataclass
 class RangeSet:
@@ -126,6 +146,7 @@ class RangeSet:
         """Total number of processed items"""
         return sum(end - start + 1 for start, end in self.ranges)
 
+
 class DumpyInferenceTask:
     def __init__(self, args):
         self.args = args
@@ -142,7 +163,6 @@ class DumpyInferenceTask:
         self._load_model()
         self._prepare_tokenizer()
 
-    
     def _load_status(self):
         """Load processing status from file"""
         try:
@@ -170,7 +190,7 @@ class DumpyInferenceTask:
             gpu_memory_utilization=0.9,
             tensor_parallel_size=self.args.tensor_parallel_size,
             max_seq_len_to_capture=self.args.max_prompt_length + self.args.max_response_length,
-            max_num_batched_tokens=self.args.max_prompt_length + self.args.max_response_length, 
+            max_num_batched_tokens=self.args.max_prompt_length + self.args.max_response_length,
         )
         self.sampling_params = SamplingParams(
             top_p=self.args.top_p,
@@ -192,17 +212,15 @@ class DumpyInferenceTask:
         df = pd.read_parquet(file_path)
         logger.info(f"Loaded {len(df)} samples in {time.time() - start_time:.2f}s")
         return df
-    
+
     def run_inference(self, prompts, batch_index=0):
         start_time = time.time()
-        request_outputs = self.model.generate(prompts=prompts,
-                                        sampling_params=self.sampling_params,
-                                        use_tqdm=True)
+        request_outputs = self.model.generate(prompts=prompts, sampling_params=self.sampling_params, use_tqdm=True)
         end_time = time.time()
-        
+
         # 获取对应的token ids用于后续处理
         input_ids = [self.tokenizer(prompt, add_special_tokens=False)["input_ids"] for prompt in prompts]
-        
+
         batch_token_ids = []
         for output in request_outputs:
             for each_output in output.outputs:
@@ -290,7 +308,7 @@ class DumpyInferenceTask:
         dataframe = self.process_data(self.args.input_file)
         # 创建输出目录
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        
+
         with open(self.global_stats_path, "a", newline="") as global_f, open(
             self.dispersed_stats_path, "a", newline=""
         ) as dispersed_f, open(self.rollout_details_path, "a", encoding="utf-8") as jsonl_f:
@@ -387,7 +405,7 @@ class DumpyInferenceTask:
                     self._save_status(batch_index)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = parse_args()
     print(args)
     task = DumpyInferenceTask(args)

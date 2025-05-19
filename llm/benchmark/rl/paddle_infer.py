@@ -415,5 +415,6 @@ def main():
     task = DumpyInferenceTask(args)
     task.execute()
 
+
 if __name__ == "__main__":
     main()

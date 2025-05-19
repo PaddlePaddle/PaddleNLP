@@ -12,17 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
 import asyncio
 import csv
 import json
 import logging
 import os
-from pathlib import Path
 import time
 from dataclasses import dataclass, field
 from itertools import cycle
+from pathlib import Path
 from typing import List, Tuple
-import argparse
 
 import pandas as pd
 from openai import AsyncOpenAI
@@ -343,20 +343,29 @@ class ResponseLengthCalculator:
 
 
 def parse_args():
-     # 初始化 ArgumentParser
+    # 初始化 ArgumentParser
     parser = argparse.ArgumentParser(description="Process prompts with OpenAI clients.")
     # 添加参数
     parser.add_argument("--openai_services", type=str, nargs="+", required=True, help="List of OpenAI service URLs")
-    parser.add_argument("--api_keys", type=str, nargs="+", default=None, help="List of API keys (default: 'NONE' for each service)")
+    parser.add_argument(
+        "--api_keys", type=str, nargs="+", default=None, help="List of API keys (default: 'NONE' for each service)"
+    )
     parser.add_argument("--model", type=str, required=True, help="Model name (e.g., Qwen2.5-7B-Instruct-1M)")
-    parser.add_argument("--tokenizer", type=str, required=True, help="Tokenizer name (e.g., Qwen/Qwen2.5-7B-Instruct-1M)")
+    parser.add_argument(
+        "--tokenizer", type=str, required=True, help="Tokenizer name (e.g., Qwen/Qwen2.5-7B-Instruct-1M)"
+    )
     parser.add_argument("--batch_size", type=int, default=4, help="Batch size for requests")
     parser.add_argument("--response_num", type=int, default=8, help="Number of responses per request")
-    parser.add_argument("--prompt_key", type=str, default="prompt", help="Key in the DataFrame for prompts (default: 'prompt')")
+    parser.add_argument(
+        "--prompt_key", type=str, default="prompt", help="Key in the DataFrame for prompts (default: 'prompt')"
+    )
     parser.add_argument("--data_path", type=str, required=True, help="Path to the input Parquet file")
-    parser.add_argument("--output_dir", type=str, default="./output", help="Directory for output CSV files (default: './output')")
+    parser.add_argument(
+        "--output_dir", type=str, default="./output", help="Directory for output CSV files (default: './output')"
+    )
     # 解析参数
     return parser.parse_args()
+
 
 def main():
     args = parse_args()
