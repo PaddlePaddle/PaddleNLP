@@ -1647,6 +1647,7 @@ class TrainingArguments:
                             "replace_with_c_embedding",
                             # "enable_mp_fused_linear_param_grad_add",
                             "replace_with_parallel_cross_entropy",
+                            "enable_sp_async_reduce_scatter",
                         ]:
                             raise ValueError(
                                 f"Found unknown tensor parallell config {x}, "
