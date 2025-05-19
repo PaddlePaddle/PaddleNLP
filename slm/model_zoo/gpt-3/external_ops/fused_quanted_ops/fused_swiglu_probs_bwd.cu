@@ -130,12 +130,12 @@ __device__ __forceinline__ float4 f4_add(const float4& x_f, const float4& y_f) {
 __device__ __forceinline__ float4 f4_sub(const float4& x_f, const float4& y_f) {
   return {x_f.x - y_f.x, x_f.y - y_f.y, x_f.z - y_f.z, x_f.w - y_f.w};
 }
-__device__ __forceinline__ float4 fast_silu_vec4(const float4& x_vec4) {
-  const float silu_x = x_vec4.x * __frcp_rn(1.0f + __expf(x_vec4.x));
-  const float silu_y = x_vec4.y * __frcp_rn(1.0f + __expf(x_vec4.y));
-  const float silu_z = x_vec4.z * __frcp_rn(1.0f + __expf(x_vec4.z));
-  const float silu_w = x_vec4.w * __frcp_rn(1.0f + __expf(x_vec4.w));
-  return {silu_x, silu_y, silu_z, silu_w};
+__device__ __forceinline__ float4 fast_sig_vec4(const float4& x_vec4) {
+  const float sig_x =  __frcp_rn(1.0f + __expf(-x_vec4.x));
+  const float sig_y =  __frcp_rn(1.0f + __expf(-x_vec4.y));
+  const float sig_z =  __frcp_rn(1.0f + __expf(-x_vec4.z));
+  const float sig_w =  __frcp_rn(1.0f + __expf(-x_vec4.w));
+  return {sig_x, sig_y, sig_z, sig_w};
 }
 __device__ __forceinline__ float4
 load_and_cast_float4(const bfloat16x4_t* x_vec4_ptr) {
@@ -206,7 +206,7 @@ __global__ void SwigluProbsGradKernelVec4(
     float o2_val = tmp * rhs;
     float do2_val = do2_s_val * prob;
     */
-    float4 sig_vec4 = fast_silu_vec4(lhs_vec4);
+    float4 sig_vec4 = fast_sig_vec4(lhs_vec4);
     float4 tmp_vec4 = f4_prod(sig_vec4, lhs_vec4);
     float4 o2_val_vec4 = f4_prod(tmp_vec4, rhs_vec4);
     float4 o2s_val_vec4 = f4_prod(o2_val_vec4, prob);

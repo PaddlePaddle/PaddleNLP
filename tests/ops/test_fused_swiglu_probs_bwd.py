@@ -1,16 +1,19 @@
 import paddle
 import FusedQuantOps as FQO
+from paddle.base import core
 
+REP=100
 
 from paddle.incubate.nn.functional import swiglu
 
+paddle.seed(42)
 # o1.shape = [ 8 * 4096, 2048 * 2], dtype = "bfloat16"
 # prob.shape = [8 * 4096, 1], dtype = "float32"
 # do2_p.shape = [8 * 4096, 2048], 
 
 seq_len = 4096
 topk = 8
-moe_intermediate_size = 2025
+moe_intermediate_size = 2048
 
 '''
 o1 = paddle.rand( [seq_len * topk, moe_intermediate_size * 2], dtype="bfloat16")
@@ -69,20 +72,31 @@ def fn_gold():
     probs_grad = (do2_s.cast(paddle.float32) * (o2.cast(paddle.float32))).sum(axis=-1)
     return do1, probs_grad, o2_s
 
+core.nvprof_start()
 
-do1_gold, pg_gold, o2_s_gold= fn_gold()
+for i in range(REP):
+    core.nvprof_nvtx_push("original")
+    do1_gold, pg_gold, o2_s_gold= fn_gold()
+    core.nvprof_nvtx_pop()
+for i in range(REP):
+    core.nvprof_nvtx_push("fused")
+    do1, pg, o2_s = fn_fused()
+    core.nvprof_nvtx_pop()
+do1_splits, pg_splits, o2_s_splits= fn_splits()
+
 print(do1_gold.dtype)
 print(pg_gold.dtype)
 print(o2_s_gold.dtype)
-do1, pg, o2_s = fn_fused()
-do1_splits, pg_splits, o2_s_splits= fn_splits()
-
-print("do1_gold", do1_gold.astype("float32").numpy())
-print("do1_splits", do1_splits.astype("float32").numpy())
-print("do1", do1.astype("float32").numpy())
+print("----------")
+print(do1.dtype)
+print(pg.dtype)
+print(o2_s.dtype)
 print("pg_gold", pg_gold.astype("float32").numpy())
 print("pg_splits", pg_splits.astype("float32").numpy())
 print("pg", pg.astype("float32").numpy())
 print("o2_s_gold", o2_s_gold.astype("float32").numpy())
 print("o2_s_splits", o2_s_splits.astype("float32").numpy())
 print("o2_s", o2_s.astype("float32").numpy())
+print("do1_gold", do1_gold.astype("float32").numpy())
+print("do1_splits", do1_splits.astype("float32").numpy())
+print("do1", do1.astype("float32").numpy())
