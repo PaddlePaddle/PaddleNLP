@@ -112,6 +112,7 @@ def get_mesh(pp_idx=0):
     mesh = fleet.auto.get_mesh()
     if "pp" in mesh.dim_names:
         mesh = mesh.get_mesh_with_dim("pp", pp_idx)
+    print("Get Mesh: ", mesh)
     return mesh
 
 
@@ -122,7 +123,7 @@ def global_mesh_starts_with_pp():
     else:
         return mesh
 
-def parse_args(args, kwargs):
+def parse_args(args):
     if isinstance(args, tuple):
         if len(args) == 8:
             hidden_states, position_ids, inputs_embeds, attention_mask, output_attentions, past_key_values, use_cache, alibi = args
@@ -198,6 +199,9 @@ class LlamaEmbeddingAutoPP(nn.Layer):
 
         self.vocab_size = config.vocab_size
         self.hidden_size = config.hidden_size
+        print("hidden size:",self.hidden_size)
+        print("vocab size:", self.vocab_size)
+        print("config.intermediate_size:", config.intermediate_size)
         self.embed_tokens = nn.Embedding(
             self.vocab_size,
             self.hidden_size,
@@ -266,18 +270,13 @@ class LlamaEmbeddingAutoPP(nn.Layer):
         input_ids.stop_gradient = True
         
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
-        output_hidden_states = (
-            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
-        )
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        # output_hidden_states = (
+        #     output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        # )
+        # return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
-        output_hidden_states = (
-            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
-        )
 
         use_cache = use_cache if use_cache is not None else self.config.use_cache
-
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         # retrieve input_ids and inputs_embeds
         if input_ids is not None and inputs_embeds is not None:
@@ -290,10 +289,11 @@ class LlamaEmbeddingAutoPP(nn.Layer):
             raise ValueError("You have to specify either decoder_input_ids or decoder_inputs_embeds")
 
         if past_key_values is None:
-            past_key_values = tuple([None] * len(self.layers))
+            past_key_values = tuple([None] * self.config.num_hidden_layers)
 
         seq_length_with_past = seq_length
         cache_length = 0
+        print("past key values: ", past_key_values)
         if past_key_values[0] is not None:
             cache_length = past_key_values[0][0].shape[1]
             seq_length_with_past += cache_length
@@ -365,7 +365,7 @@ class LlamaDecoderLayerAutoPP(nn.Layer):
         self.no_recompute_layers = config.no_recompute_layers if config.no_recompute_layers is not None else []
 
     def forward(self, args):
-        hidden_states_states, position_ids, inputs_embeds, attention_mask, output_attentions, past_key_values, use_cache, alibi = parse_args(args)
+        hidden_states, position_ids, inputs_embeds, attention_mask, output_attentions, past_key_values, use_cache, alibi = parse_args(args)
                 
         past_key_value = past_key_values[self.layer_id] if past_key_values is not None else None
 
@@ -490,7 +490,7 @@ class LlamaLMHeadAutoPP(nn.Layer):
         )
 
     def forward(self, args):
-        hidden_states, position_ids, attention_mask, output_attentions, past_key_values, use_cache, alibi = parse_args(args)
+        hidden_states, position_ids, inputs_embeds, attention_mask, output_attentions, past_key_values, use_cache, alibi = parse_args(args)
         
         if self.config.sequence_parallel:
             hidden_states = dist.reshard(
@@ -526,10 +526,10 @@ class LlamaForCausalLM3DAutoPP(LlamaForCausalLM3DAuto):
         return_dict=None,
     ):
         
-        args = return_args(input_ids, position_ids, attention_mask, output_attentions, past_key_values, use_cache, None)
+        args = return_args(input_ids, position_ids, inputs_embeds, attention_mask, output_attentions, past_key_values, use_cache, None)
         
         outputs = self.llama(args)
 
-        outputs = self.lm_head(args)
+        outputs = self.lm_head(outputs)
 
         return outputs[0]

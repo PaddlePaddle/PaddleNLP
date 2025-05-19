@@ -88,9 +88,12 @@ class AutoTrainer(Trainer):
                 ), "if use AutoTrainer.parallel_model , auto_dist_config obtained from parallel_model should be passed to AutoTrainer  "
                 self.auto_dist_config = kwargs.pop("auto_dist_config")
         model = kwargs["model"]
-        for param in model.parameters():
+        for name, param in model.named_parameters():
             # NOTE(zhangwl):in pipeline mode , param my be initialized before while delte init_func ,but param is still not is_initialized
             if not param._is_initialized() and param._init_func is not None:
+                print(name)
+                print(param)
+                print(param.name)
                 param.initialize()
         kwargs["model"] = model
 

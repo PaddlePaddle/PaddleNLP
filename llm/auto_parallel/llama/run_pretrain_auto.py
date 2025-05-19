@@ -49,7 +49,7 @@ from paddlenlp.transformers import (
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
-    "llama": (LlamaConfig, LlamaForCausalLM3DAuto, LlamaPretrainingCriterion3DAuto),
+    "llama": (LlamaConfig, LlamaForCausalLM3DAutoPP, LlamaPretrainingCriterion3DAuto),
     "llama_network": (LlamaConfig, LlamaForCausalLMNet, LlamaPretrainingCriterionNet),
 }
 
