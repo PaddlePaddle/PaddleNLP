@@ -12,11 +12,14 @@ seq_len = 4096
 topk = 8
 moe_intermediate_size = 2025
 
+'''
 o1 = paddle.rand( [seq_len * topk, moe_intermediate_size * 2], dtype="bfloat16")
-
 unzipped_probs = paddle.rand( [ seq_len * topk, 1], dtype="float32")
-
 do2_s = paddle.rand( [seq_len * topk, moe_intermediate_size], dtype="bfloat16")
+'''
+o1 = paddle.rand( [topk, seq_len, moe_intermediate_size * 2], dtype="bfloat16")
+unzipped_probs = paddle.rand( [ topk, seq_len, 1], dtype="float32")
+do2_s = paddle.rand( [topk, seq_len , moe_intermediate_size], dtype="bfloat16")
 
 
 def swiglu_grad(x, dz):
@@ -33,7 +36,7 @@ def swiglu_grad(x, dz):
     
     return x_grad
 
-def fn_gold():
+def fn_splits():
     # do2: 前向从bfloat16-->float32，反向从float32-->bfloat16,do2 需要保持 bfloat16（因为 o2 是 bfloat16)
     o2 = swiglu(o1)
     o2_s = (o2 * unzipped_probs)
@@ -56,7 +59,7 @@ def fn_fused():
     return FQO.fused_swiglu_probs_bwd(o1, do2_s, unzipped_probs)
 
 #input: o1 unzipped_probs do2
-def fn(): 
+def fn_gold(): 
     # do2: 前向从bfloat16-->float32，反向从float32-->bfloat16,do2 需要保持 bfloat16（因为 o2 是 bfloat16)
     o2 = swiglu(o1)
     o2_s = (o2 * unzipped_probs)
@@ -64,14 +67,22 @@ def fn():
     do2 = do2.cast(paddle.bfloat16)
     do1, _ = paddle._C_ops.swiglu_grad(o1, None, do2)
     probs_grad = (do2_s.cast(paddle.float32) * (o2.cast(paddle.float32))).sum(axis=-1)
-    return do1, probs_grad
+    return do1, probs_grad, o2_s
 
 
-do1_gold, pg_gold, o2_s_gold = fn_gold()
+do1_gold, pg_gold, o2_s_gold= fn_gold()
+print(do1_gold.dtype)
+print(pg_gold.dtype)
+print(o2_s_gold.dtype)
 do1, pg, o2_s = fn_fused()
+do1_splits, pg_splits, o2_s_splits= fn_splits()
+
 print("do1_gold", do1_gold.astype("float32").numpy())
-print("pg_gold", pg_gold.astype("float32").numpy())
-print("o2_s_gold", o2_s_gold.astype("float32").numpy())
+print("do1_splits", do1_splits.astype("float32").numpy())
 print("do1", do1.astype("float32").numpy())
+print("pg_gold", pg_gold.astype("float32").numpy())
+print("pg_splits", pg_splits.astype("float32").numpy())
 print("pg", pg.astype("float32").numpy())
+print("o2_s_gold", o2_s_gold.astype("float32").numpy())
+print("o2_s_splits", o2_s_splits.astype("float32").numpy())
 print("o2_s", o2_s.astype("float32").numpy())
