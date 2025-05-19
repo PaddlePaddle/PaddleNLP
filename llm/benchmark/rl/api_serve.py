@@ -17,14 +17,16 @@ import asyncio
 import csv
 import json
 import logging
-import os
+import math
 import time
 from dataclasses import dataclass, field
 from itertools import cycle
+from pathlib import Path
 from typing import List, Tuple
 
 import pandas as pd
 from openai import AsyncOpenAI
+from tqdm import tqdm
 
 from paddlenlp.transformers import AutoTokenizer
 
@@ -35,6 +37,81 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
+
+@dataclass
+class RangeSet:
+    """Manage processed line ranges with efficient storage and querying"""
+
+    ranges: List[tuple]
+
+    def add(self, number: int):
+        """Add a number to the range set and merge adjacent ranges"""
+        new_ranges = []
+        added = False
+        for start, end in sorted(self.ranges):
+            if number < start - 1:
+                if not added:
+                    new_ranges.append((number, number))
+                    added = True
+                new_ranges.append((start, end))
+            elif number == start - 1:
+                new_ranges.append((number, end))
+                added = True
+            elif number <= end:
+                new_ranges.append((start, end))
+                added = True
+            else:
+                new_ranges.append((start, end))
+        if not added:
+            new_ranges.append((number, number))
+        self.ranges = self.merge_ranges(new_ranges)
+
+    @staticmethod
+    def merge_ranges(ranges: List[tuple]) -> List[tuple]:
+        """Merge overlapping or adjacent ranges"""
+        if not ranges:
+            return []
+        sorted_ranges = sorted(ranges)
+        merged = [sorted_ranges[0]]
+        for current in sorted_ranges[1:]:
+            last = merged[-1]
+            if current[0] <= last[1] + 1:
+                merged[-1] = (last[0], max(last[1], current[1]))
+            else:
+                merged.append(current)
+        return merged
+
+    def contains(self, number: int) -> bool:
+        """Check if a number exists in any range"""
+        for start, end in self.ranges:
+            if start <= number <= end:
+                return True
+        return False
+
+    def to_file_format(self) -> str:
+        """Serialize ranges to compact string format"""
+        return ",".join(f"{start}-{end}" if start != end else str(start) for start, end in self.ranges)
+
+    @classmethod
+    def from_file(cls, content: str) -> "RangeSet":
+        """Deserialize from string format"""
+        if not content:
+            return cls(ranges=[])
+        ranges = []
+        for part in content.split(","):
+            if "-" in part:
+                start, end = map(int, part.split("-"))
+                ranges.append((start, end))
+            else:
+                num = int(part)
+                ranges.append((num, num))
+        return cls(ranges=ranges)
+
+    @property
+    def processed_count(self) -> int:
+        """Total number of processed items"""
+        return sum(end - start + 1 for start, end in self.ranges)
 
 
 # 请求api的参数类
@@ -65,13 +142,9 @@ class ResponsePayload:
 
 
 class StatisticsManager:
-    def __init__(self, batch_path: str, group_path: str, res_path: str, batch_num: int, responses_num: int = 8):
-        self.batch_path = batch_path
-        self.group_path = group_path
-        self.res_path = res_path
-        self.batch_num = batch_num
+    def __init__(self, responses_num: int):
         self.responses_num = responses_num
-        self.batch_idx = 0
+        self.batch_index = 0
 
     def res_stats(self, response: List[ResponsePayload]):
         batch_group_pd = pd.DataFrame(response)
@@ -83,105 +156,64 @@ class StatisticsManager:
 
         res_batch_pd.to_json(self.res_path, orient="records", lines=True, force_ascii=False, mode="a")
 
-    def group_stats(self, responses: List[ResponsePayload]):
+    def dispersed_stats(self, responses: List[ResponsePayload], batch_elapsed_time: float):
         batch_group_pd = pd.DataFrame(responses)
 
-        batch_group_pd = batch_group_pd[["idx", "question_token_length", "elapsed_times", "token_lengths"]]
-
-        batch_group_pd["min_elapsed_time"] = batch_group_pd["elapsed_times"].apply(lambda x: min(x))
-        batch_group_pd["mean_elapsed_time"] = batch_group_pd["elapsed_times"].apply(lambda x: sum(x) / len(x))
-        batch_group_pd["max_elapsed_time"] = batch_group_pd["elapsed_times"].apply(lambda x: max(x))
-        batch_group_pd["group_token_length"] = batch_group_pd["token_lengths"].apply(lambda x: sum(x))
-
-        batch_group_pd["elapsed_times"] = batch_group_pd["elapsed_times"].apply(lambda x: [round(y, 2) for y in x])
-
-        # 将一些列移动到最前面
-        front_cols_names = [
-            "idx",
-            "question_token_length",
-            "min_elapsed_time",
-            "mean_elapsed_time",
-            "max_elapsed_time",
-            "group_token_length",
-        ]
-        cols = front_cols_names + [col for col in batch_group_pd.columns if col not in front_cols_names]
-        batch_group_pd = batch_group_pd[cols]
-
-        if not os.path.exists(self.group_path):
-            batch_group_pd.to_csv(self.group_path, mode="w", index=False, header=True, float_format="%.2f")
-        else:
-            batch_group_pd.to_csv(self.group_path, mode="a", index=False, header=False, float_format="%.2f")
-
-        return batch_group_pd
-
-    def batch_stats(self, batch_responses: List[ResponsePayload], batch_elapsed_time: float):
-        self.res_stats(batch_responses)
-        batch_group_pd = self.group_stats(batch_responses)
-
-        if "idx" not in batch_group_pd.columns:
-            raise ValueError("ResponsePayload objects must have 'idx' field set")
-
-        group_idx = batch_group_pd["idx"].to_list()
-        batch_token_length = batch_group_pd["group_token_length"].sum()
-
-        batch_data = {
-            "batch_idx": [self.batch_idx],
-            "group_idx": [group_idx],
-            "batch_elapsed_time": [batch_elapsed_time],
-            "batch_min_elapsed_time": [batch_group_pd["min_elapsed_time"].min(axis=0)],
-            "batch_mean_elapsed_time": [batch_group_pd["mean_elapsed_time"].mean(axis=0)],
-            "batch_max_elapsed_time": [batch_group_pd["max_elapsed_time"].max(axis=0)],
-            "batch_token_length": [batch_token_length],
-            "batch_group_token_length": [batch_group_pd["group_token_length"].to_list()],
-            "batch_throughput": [batch_token_length / batch_elapsed_time],
+        dispersed_stats_dict = {
+            "batch_index": self.batch_index,
+            "rollout_lengths": batch_group_pd["token_lengths"].to_list(),
+            "min_length": batch_group_pd["token_lengths"].apply(lambda x: min(x)).tolist(),
+            "max_length": batch_group_pd["token_lengths"].apply(lambda x: max(x)).tolist(),
+            "avg_length": batch_group_pd["token_lengths"].apply(lambda x: sum(x) / len(x)).tolist(),
+            "completion_time": batch_elapsed_time,
+            "throughput_tokens_per_sec": batch_group_pd["token_lengths"].apply((lambda x: sum(x))).sum()
+            / batch_elapsed_time,
         }
 
-        batch_pd = pd.DataFrame(batch_data)
+        return dispersed_stats_dict
 
-        if not os.path.exists(self.batch_path):
-            batch_pd.to_csv(self.batch_path, mode="w", index=False, header=True, float_format="%.2f")
-        else:
-            batch_pd.to_csv(self.batch_path, mode="a", index=False, header=False, float_format="%.2f")
+    def global_stats(self, responses: List[ResponsePayload], batch_elapsed_time: float):
+        dispersed_stats_dict = self.dispersed_stats(responses, batch_elapsed_time)
 
-        self.batch_idx += 1
+        total_response_tokens = 0
+        for lengths in dispersed_stats_dict["rollout_lengths"]:
+            total_response_tokens += sum(lengths)
 
-        return batch_pd
+        global_stats_dict = {}
+        global_stats_dict["batch_index"] = dispersed_stats_dict["batch_index"]
+        global_stats_dict["min_response_tokens"] = min(dispersed_stats_dict["min_length"])
+        global_stats_dict["max_response_tokens"] = max(dispersed_stats_dict["max_length"])
+        global_stats_dict["avg_response_tokens"] = total_response_tokens / len(responses)
+        global_stats_dict["total_response_tokens"] = total_response_tokens
+        global_stats_dict["group_max_response_tokens"] = dispersed_stats_dict["max_length"]
+        global_stats_dict["completion_time"] = dispersed_stats_dict["completion_time"]
+        global_stats_dict["throughput_tokens_per_sec"] = dispersed_stats_dict["throughput_tokens_per_sec"]
 
-
-class TokenizerCalculator:
-    def __init__(self, model_name: str = "Qwen/Qwen2.5-7B-Instruct-1M"):
-        self.tokenzizer = AutoTokenizer.from_pretrained(model_name, use_fast=True)
-
-    def tokenize(self, response: ResponsePayload) -> ResponsePayload:
-        question = response.question
-        responses = response.responses
-        response.question_token_length = len(self.tokenzizer(question).input_ids)
-
-        for i, resp in enumerate(responses):
-            tokens = self.tokenzizer(resp).input_ids
-            length = len(tokens)
-            response.token_lengths.append(length)
-            response.total_length += length
-
-        return response
+        return global_stats_dict, dispersed_stats_dict
 
 
-class AsyncStreamingClient:
-    def __init__(
-        self,
-        model: str,
-        stats_manager: StatisticsManager,
-        tokenizer: TokenizerCalculator,
-        clients_url: List[str],
-        api_keys: List[str],
-        max_concurrency: int,
-    ) -> None:
-        self.model = model
-        self.stats_manager = stats_manager
-        self.tokenizer = tokenizer
-        self.clients = cycle(AsyncOpenAI(base_url=url, api_key=api) for url, api in zip(clients_url, api_keys))
+class ApiTask:
+    def __init__(self, args, max_concurrency: int = 1000):
+        self.args = args
+        self.model = args.model
+        self.tokenizer = TokenizerCalculator(model_name=self.args.tokenizer)
+        self.clients = cycle(
+            AsyncOpenAI(base_url=url, api_key=api) for url, api in zip(args.openai_urls, args.api_keys)
+        )
         self.semaphore = asyncio.Semaphore(max_concurrency)
         self._max_concurrency = max_concurrency
+
+        self.output_dir = Path(self.args.output_dir)
+
+        # 初始化输出文件路径
+        self.global_stats_path = self.output_dir / "global_stats.csv"
+        self.dispersed_stats_path = self.output_dir / "dispersed_stats.csv"
+        self.rollout_details_path = self.output_dir / "rollout_details.jsonl"
+        self.status_file_path = self.output_dir / "status.txt"
+
+        self.stats_manager = StatisticsManager(args.rollout_output_num)
+
+        self._load_status()
 
     def get_active_tasks_count(self) -> int:
         return self._max_concurrency - self.semaphore._value
@@ -190,51 +222,42 @@ class AsyncStreamingClient:
         # 返回一个AsyncOpenAI客户端实例
         return next(self.clients)
 
-    async def process_dataset(self, dataset: List[RequestPayload], batch_size: int):
-        logger.info("================= PROCESS START =================")
-        start_time = time.perf_counter()
+    def _save_status(self, batch_index):
+        """Save current processing status to file"""
+        self.processed_set.add(batch_index)
+        content = self.processed_set.to_file_format()
+        with open(self.status_file_path, "w", encoding="utf-8") as f:
+            f.write(content)
 
-        for index in range(0, len(dataset), batch_size):
-            batch_data = dataset[index : index + batch_size]
-            batch_res_results, batch_elapsed_time = await self.batch_call(batch_data)
+    def _load_status(self):
+        """Load processing status from file"""
+        """从文件中加载处理状态"""
+        try:
+            with open(self.status_file_path, "r", encoding="utf-8") as f:
+                content = f.read().strip()
+                self.processed_set = RangeSet.from_file(content)
+                logger.info(f"Resumed processed ranges: {self.processed_set.to_file_format()}")
+        except FileNotFoundError:
+            self.processed_set = RangeSet([])
 
-            # token统计
-            for i in range(len(batch_res_results)):
-                batch_res_results[i] = self.tokenizer.tokenize(batch_res_results[i])
+    def process_data(self, file_path: str) -> pd.DataFrame:
+        logger.info(f"Processing data from {file_path}...")
+        start_time = time.time()
+        df = pd.read_parquet(file_path)
+        logger.info(f"Loaded {len(df)} samples in {time.time() - start_time:.2f}s")
+        return df
 
-            # 对batch相应进行统计
-            self.stats_manager.batch_stats(batch_res_results, batch_elapsed_time)
+    def batch_process(self, dataframe: pd.DataFrame):
+        batch_prompts = []
+        for idx, prompt in enumerate(dataframe[self.args.prompt_key]):
+            batch_prompts.append(
+                RequestPayload(prompt=prompt[0]["content"], idx=idx, num_responses=self.args.rollout_output_num)
+            )
+            if len(batch_prompts) == self.args.rollout_input_batch_size:
+                yield batch_prompts
+                batch_prompts = []
 
-        end_time = time.perf_counter()
-        logger.info("================== PROCESS END ==================")
-        logger.info("total processing took %.4f seconds", end_time - start_time)
-
-    async def batch_call(self, requests: List[RequestPayload]) -> Tuple[List[ResponsePayload], int]:
-        """批量执行请求"""
-        start_time = time.perf_counter()
-        batch_results = await asyncio.gather(*[self.group_call(request) for request in requests])
-        end_time = time.perf_counter()
-        batch_elapsed_time = end_time - start_time
-        logger.debug("total batch took %.4f seconds", batch_elapsed_time)
-        return batch_results, batch_elapsed_time
-
-    async def group_call(self, request: RequestPayload) -> ResponsePayload:
-        # 采用异步一次调用num_responses次 get_respose方法，并返回结果
-        tasks = [self(request) for _ in range(request.num_responses)]
-
-        result = ResponsePayload()
-        result.idx = request.idx
-        result.question = request.prompt
-        start_time = time.perf_counter()
-        for task, elapsed_time in await asyncio.gather(*tasks):
-            result.responses.append(task)
-            result.elapsed_times.append(elapsed_time)
-        end_time = time.perf_counter()
-        group_elapsed_time = end_time - start_time
-        logger.debug("total group took %.2f seconds", group_elapsed_time)
-        return result
-
-    async def __call__(self, request: RequestPayload) -> Tuple[str, float]:
+    async def call(self, request: RequestPayload) -> Tuple[str, float]:
         client = self.get_client()
         try:
             async with self.semaphore:
@@ -266,86 +289,153 @@ class AsyncStreamingClient:
             logger.error("Error while streaming: %s", e)
             raise ValueError(e)
 
+    async def group_call(self, request: RequestPayload) -> ResponsePayload:
+        # 采用异步一次调用num_responses次 get_respose方法，并返回结果
+        tasks = [self.call(request) for _ in range(request.num_responses)]
 
-class ResponseLengthCalculator:
+        result = ResponsePayload()
+        result.idx = request.idx
+        result.question = request.prompt
+        start_time = time.perf_counter()
+        for task, elapsed_time in await asyncio.gather(*tasks):
+            result.responses.append(task)
+            result.elapsed_times.append(elapsed_time)
+        end_time = time.perf_counter()
+        group_elapsed_time = end_time - start_time
+        logger.debug("total group took %.2f seconds", group_elapsed_time)
+        return result
+
+    async def batch_call(self, requests: List[RequestPayload]) -> Tuple[List[ResponsePayload], int]:
+        """批量执行请求"""
+        start_time = time.perf_counter()
+        batch_results = await asyncio.gather(*[self.group_call(request) for request in requests])
+        end_time = time.perf_counter()
+        batch_elapsed_time = end_time - start_time
+        logger.debug("total batch took %.4f seconds", batch_elapsed_time)
+        return batch_results, batch_elapsed_time
+
+    def execute(self):
+        dataframe = self.process_data(self.args.input_file)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+
+        with open(self.global_stats_path, "a", newline="") as global_f, open(
+            self.dispersed_stats_path, "a", newline=""
+        ) as dispersed_f, open(self.rollout_details_path, "a", encoding="utf-8") as jsonl_f:
+            global_writer = csv.writer(global_f)
+            dispersed_writer = csv.writer(dispersed_f)
+
+            if self.processed_set.processed_count <= 0:
+                global_writer.writerow(
+                    [
+                        "batch_index",
+                        "min_response_tokens",
+                        "max_response_tokens",
+                        "avg_response_tokens",
+                        "total_response_tokens",
+                        "group_max_response_tokens",
+                        "completion_time",
+                        "throughput_tokens_per_sec",
+                    ]
+                )
+                dispersed_writer.writerow(
+                    [
+                        "batch_index",
+                        "rollout_lengths",
+                        "min_length",
+                        "max_length",
+                        "avg_length",
+                        "completion_time",
+                        "throughput_tokens_per_sec",
+                    ]
+                )
+
+            for batch_index, input_ids in tqdm(
+                enumerate(self.batch_process(dataframe)),
+                total=math.ceil(len(dataframe) / self.args.rollout_input_batch_size),
+            ):
+                if self.processed_set.contains(batch_index):
+                    continue
+
+                self.stats_manager.batch_index = batch_index
+                batch_results, batch_elapsed_time = asyncio.run(self.batch_call(input_ids))
+
+                for i in range(len(batch_results)):
+                    batch_results[i] = self.tokenizer.tokenize(batch_results[i])
+
+                global_stats_dict, dispersed_stats_dict = self.stats_manager.global_stats(
+                    batch_results, batch_elapsed_time
+                )
+
+                global_writer.writerow(
+                    [
+                        batch_index,
+                        global_stats_dict["min_response_tokens"],
+                        global_stats_dict["max_response_tokens"],
+                        round(global_stats_dict["avg_response_tokens"], 2),
+                        global_stats_dict["total_response_tokens"],
+                        global_stats_dict["group_max_response_tokens"],
+                        round(global_stats_dict["completion_time"], 2),
+                        round(global_stats_dict["throughput_tokens_per_sec"], 2),
+                    ]
+                )
+
+                dispersed_writer.writerow(
+                    [
+                        batch_index,
+                        dispersed_stats_dict["rollout_lengths"],
+                        dispersed_stats_dict["min_length"],
+                        dispersed_stats_dict["max_length"],
+                        dispersed_stats_dict["avg_length"],
+                        round(dispersed_stats_dict["completion_time"], 2),
+                        round(dispersed_stats_dict["throughput_tokens_per_sec"], 2),
+                    ]
+                )
+
+                record = [
+                    {
+                        "batch_index": batch_index,
+                        "prompt_text": result.question,
+                        "rollouts": [
+                            {"response": res, "token_length": token_length}
+                            for res, token_length in zip(result.responses, result.token_lengths)
+                        ],
+                        "total_time": dispersed_stats_dict["completion_time"],
+                        "throughput_tokens_per_sec": dispersed_stats_dict["throughput_tokens_per_sec"],
+                    }
+                    for result in batch_results
+                ]
+
+                jsonl_f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+                global_f.flush()
+                dispersed_f.flush()
+                jsonl_f.flush()
+                self._save_status(batch_index)
+
+
+class TokenizerCalculator:
     def __init__(self, model_name: str = "Qwen/Qwen2.5-7B-Instruct-1M"):
         self.tokenzizer = AutoTokenizer.from_pretrained(model_name, use_fast=True)
 
-    @staticmethod
-    def save_to_csv_serialized(response_payloads: List[ResponsePayload], filename: str):
-        if not response_payloads:
-            print("没有数据可保存。")
-            return
+    def tokenize(self, response: ResponsePayload) -> ResponsePayload:
+        question = response.question
+        responses = response.responses
+        response.question_token_length = len(self.tokenzizer(question).input_ids)
 
-        fieldnames = [
-            "request_payload.idx",
-            "elapsed_times",
-            "lengths",
-            "mean_elapsed_time",
-            "min_elapsed_time",
-            "max_elapsed_time",
-            "total_elapsed_time",
-            "total_length",
-        ]
+        for i, resp in enumerate(responses):
+            tokens = self.tokenzizer(resp).input_ids
+            length = len(tokens)
+            response.token_lengths.append(length)
+            response.total_length += length
 
-        file_exists = os.path.exists(filename)
-        existing_columns = set()
-
-        if file_exists:
-            with open(filename, mode="r", encoding="utf-8") as f:
-                reader = csv.DictReader(f)
-                if reader.fieldnames:
-                    existing_columns = set(reader.fieldnames)
-
-        # 打开文件并写入数据
-        with open(filename, mode="a", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-
-            # 如果文件不存在或列名不匹配，写入列名
-            if not file_exists or existing_columns != set(fieldnames):
-                writer.writeheader()
-
-            for rp in response_payloads:
-                row = {
-                    "request_payload.idx": rp.request_payload.idx,
-                    "elapsed_times": json.dumps([round(t, 2) for t in rp.elapsed_times]),
-                    "lengths": json.dumps(rp.lengths),
-                    "mean_elapsed_time": round(rp.mean_elapsed_time, 2),
-                    "min_elapsed_time": round(rp.min_elapsed_time, 2),
-                    "max_elapsed_time": round(rp.max_elapsed_time, 2),
-                    "total_elapsed_time": round(rp.total_elapsed_time, 2),
-                    "total_length": rp.total_length,
-                }
-                writer.writerow(row)
-
-    def tokenize(self, texts: List[str]) -> List[int]:
-        result = []
-        input_ids = self.tokenzizer(texts, padding=False)["input_ids"]
-        for input_id in input_ids:
-            result.append(len(input_id))
-        return result
-
-    def calculate_stats(self, responses: List[ResponsePayload]) -> List[ResponsePayload]:
-        for response in responses:
-            start_time = time.perf_counter()
-            response_texts = response.responses
-            response.lengths = self.tokenize(response_texts)
-            for i, length in enumerate(response.lengths):
-                response.mean_elapsed_time += response.elapsed_times[i] / len(response.lengths)
-                response.min_elapsed_time = min(response.elapsed_times)
-                response.max_elapsed_time = max(response.elapsed_times)
-                response.total_elapsed_time += response.elapsed_times[i]
-                response.total_length += length
-            end_time = time.perf_counter()
-            logger.debug("tokenization took %.4f seconds", end_time - start_time)
-        return responses
+        return response
 
 
 def parse_args():
     # 初始化 ArgumentParser
     parser = argparse.ArgumentParser(description="Process prompts with OpenAI clients.")
     # 添加参数
-    parser.add_argument("--openai_services", type=str, nargs="+", required=True, help="List of OpenAI service URLs")
+    parser.add_argument("--openai_urls", type=str, nargs="+", required=True, help="List of OpenAI service URLs")
     parser.add_argument(
         "--api_keys", type=str, nargs="+", default=None, help="List of API keys (default: 'NONE' for each service)"
     )
@@ -353,12 +443,12 @@ def parse_args():
     parser.add_argument(
         "--tokenizer", type=str, required=True, help="Tokenizer name (e.g., Qwen/Qwen2.5-7B-Instruct-1M)"
     )
-    parser.add_argument("--batch_size", type=int, default=4, help="Batch size for requests")
-    parser.add_argument("--response_num", type=int, default=8, help="Number of responses per request")
+    parser.add_argument("--rollout_input_batch_size", type=int, default=4, help="Batch size for requests")
+    parser.add_argument("--rollout_output_num", type=int, default=8, help="Number of responses per request")
     parser.add_argument(
         "--prompt_key", type=str, default="prompt", help="Key in the DataFrame for prompts (default: 'prompt')"
     )
-    parser.add_argument("--data_path", type=str, required=True, help="Path to the input Parquet file")
+    parser.add_argument("--input_file", type=str, required=True, help="Path to the input Parquet file")
     parser.add_argument(
         "--output_dir", type=str, default="./output", help="Directory for output CSV files (default: './output')"
     )
@@ -366,43 +456,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def main():
-    args = parse_args()
-
-    # 处理 API_KEYS 的默认值
-    if args.api_keys is None:
-        args.api_keys = ["NONE"] * len(args.openai_services)
-    elif len(args.api_keys) != len(args.openai_services):
-        raise ValueError("Length of --api_keys must match --openai_services")
-
-    os.makedirs(args.output_dir, exist_ok=True)
-
-    # 构建输出文件路径
-    batch_csv = f"{args.output_dir}/batch_stats.csv"
-    group_csv = f"{args.output_dir}/group_stats.csv"
-    response_csv = f"{args.output_dir}/rollout_details.jsonl"
-
-    # 初始化组件
-    stats_manager = StatisticsManager(batch_csv, group_csv, response_csv, args.response_num)
-    token_calc = TokenizerCalculator(args.tokenizer)
-    client = AsyncStreamingClient(
-        model=args.model,
-        stats_manager=stats_manager,
-        tokenizer=token_calc,
-        clients_url=args.openai_services,
-        api_keys=args.api_keys,
-        max_concurrency=1000,
-    )
-
-    # 读取数据并处理
-    dataframe = pd.read_parquet(args.data_path)
-    all_prompts = []
-
-    for idx, prompt in enumerate(dataframe[args.prompt_key]):
-        all_prompts.append(RequestPayload(prompt=prompt[0]["content"], idx=idx))
-
-    asyncio.run(client.process_dataset(all_prompts, args.batch_size))
-
-
 if __name__ == "__main__":
-    main()
+    args = parse_args()
+    task = ApiTask(args)
+    task.execute()
