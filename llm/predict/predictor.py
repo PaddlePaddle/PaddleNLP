@@ -1567,7 +1567,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         else:
             if flag_current_rank_run:
                 output_tokens = self.model_inputs["all_token_ids"].numpy()
-                output_tokens[output_tokens < 0] = self.tokenizer.pad_token_id
+                output_tokens[output_tokens == -1] = self.tokenizer.eos_token_id
                 if detokenize:
                     outputs = self.tokenizer.batch_decode(
                         output_tokens, skip_special_tokens=True, clean_up_tokenization_spaces=False
