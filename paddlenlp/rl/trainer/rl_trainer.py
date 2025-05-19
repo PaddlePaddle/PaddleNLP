@@ -54,470 +54,461 @@ from ..utils.reshard_utils import init_rollout_env
 # ########## patches for Trianer ##########
 
 
-def init_train_model_opt(
-    self: Trainer,
-    max_steps: int,
-    resume_from_checkpoint: bool = False,
-    clear_master_weight: bool = False,
-) -> PretrainedModel:
-    """
-    Initialize the training model and optimizer, and return the wrapped model.
+class RLTrainerBase(Trainer):
+    def init_train_model_opt(
+        self: Trainer,
+        max_steps: int,
+        resume_from_checkpoint: bool = False,
+        clear_master_weight: bool = False,
+    ) -> PretrainedModel:
+        """
+        Initialize the training model and optimizer, and return the wrapped model.
 
-    Args:
-        self (Trainer): The instance of the Trainer class.
-        max_steps (int): The maximum number of training steps.
-        resume_from_checkpoint (bool, optional): Whether to resume training from a checkpoint, defaults to False.
-        clear_master_weight (bool, optional): When using Trainer's distributed hardware acceleration, clear the master parameter weights, defaults to False.
+        Args:
+            self (Trainer): The instance of the Trainer class.
+            max_steps (int): The maximum number of training steps.
+            resume_from_checkpoint (bool, optional): Whether to resume training from a checkpoint, defaults to False.
+            clear_master_weight (bool, optional): When using Trainer's distributed hardware acceleration, clear the master parameter weights, defaults to False.
 
-    Returns:
-        PretrainedModel: The wrapped model ready for training.
-    """
-    # Copy of model/optimizer init and resuming related code in `Trainer.train`.
-    # NOTE: this `_load_from_checkpoint` is indeed to load model states in the
-    # following elif-else branches, though they are apart away in `Trainer.train`.
-    if not self.args.should_load_sharding_stage1_model:
-        self._load_from_checkpoint(resume_from_checkpoint)
+        Returns:
+            PretrainedModel: The wrapped model ready for training.
+        """
+        # Copy of model/optimizer init and resuming related code in `Trainer.train`.
+        # NOTE: this `_load_from_checkpoint` is indeed to load model states in the
+        # following elif-else branches, though they are apart away in `Trainer.train`.
+        if not self.args.should_load_sharding_stage1_model:
+            self._load_from_checkpoint(resume_from_checkpoint)
 
-    # delay_optimizer_creation = (
-    #     self.sharding is not None
-    #     and ShardingOption.SHARD_OP in self.args.sharding
-    # )
-    delay_optimizer_creation = False
+        # delay_optimizer_creation = (
+        #     self.sharding is not None
+        #     and ShardingOption.SHARD_OP in self.args.sharding
+        # )
+        delay_optimizer_creation = False
 
-    if not delay_optimizer_creation:
-        self.create_optimizer_and_scheduler(num_training_steps=max_steps)
-
-    if self.args.should_load_sharding_stage1_model:
-        model = self._wrap_model_and_load_sharded_checkpoint(resume_from_checkpoint)
-    elif self.args.should_save_sharding_stage1_model:
-        # In the non-sharded mode, should invoke _load_from_checkpoint before _wrap_model.
-        # In this mode, the rank0 load all params and the _wrap_model implicitly broadcast
-        # params from rank0 to the other ranks.
-        model = self._wrap_model(self.model_wrapped)
-        if self.sharding_io is not None:
-            assert delay_optimizer_creation is False, "delay_optimizer_creation should be False"
-            # the self.optimizer should be wrapped and it is done in _wrap_model
-            self.sharding_io.set_optimizer(self.optimizer)
-        # for the rest of this function `model` is the outside model, whether it was wrapped or not
-        if model is not self.model:
-            self.model_wrapped = model
-        if delay_optimizer_creation:
+        if not delay_optimizer_creation:
             self.create_optimizer_and_scheduler(num_training_steps=max_steps)
-        self._load_optimizer_and_scheduler(resume_from_checkpoint)
-    else:
-        model = self._wrap_model(self.model_wrapped)
-        # for the rest of this function `model` is the outside model, whether it was wrapped or not
-        if model is not self.model:
-            self.model_wrapped = model
-        if delay_optimizer_creation:
-            self.create_optimizer_and_scheduler(num_training_steps=max_steps)
-        self._load_optimizer_and_scheduler(resume_from_checkpoint)
 
-    if ShardingOption.FULL_SHARD in self.args.sharding and clear_master_weight:
-        # for inference model to use Trainer sharding stage3, clear master_weight
-        # which is created in GroupShardedStage3.__init__
-        self.optimizer._master_weights = None
-
-    if self.args.device == "npu" and self.args.flatten_param_grads:
-        from .plugins.npu_plugin import npu_accelerate_plugin
-
-        npu_accelerate_plugin(self.optimizer)
-
-    return model
-
-
-def init_train_state(
-    self: Trainer,
-    resume_from_checkpoint: bool,
-    train_dataloader: DataLoader,
-    max_steps: int,
-    num_train_epochs: int,
-    num_update_steps_per_epoch: int,
-):
-    """
-    Initialize the training state.
-
-    Args:
-        self (Trainer): The instance of the Trainer class to record the training state.
-        resume_from_checkpoint (bool, optional): Whether to resume training from a checkpoint, defaults to False.
-        train_dataloader (DataLoader, optional): The data loader for training, defaults to None.
-        max_steps (int, optional): The maximum number of training steps, defaults to -1.
-        num_train_epochs (int, optional): The maximum number of training epochs, defaults to 3.
-        num_update_steps_per_epoch (int, optional): The number of steps to update the model per epoch, defaults to 1.
-
-    Returns:
-        Tuple[int, int, Optional[tqdm]]:
-            - epochs_trained (int): The number of epochs already trained.
-            - steps_trained_in_current_epoch (int): The number of batches trained in the current epoch if not skipping data; otherwise, 0.
-            - steps_trained_progress_bar (Optional[tqdm]): A tqdm progress bar to show the progress of skipping the first batch if not skipping data; otherwise, None.
-    """
-    args = self.args
-
-    self.state = TrainerState()
-    self.state.epoch = 0
-    epochs_trained = 0
-    steps_trained_in_current_epoch = 0
-    steps_trained_progress_bar = None
-
-    # Check if continuing training from a checkpoint
-    if resume_from_checkpoint is not None and distributed_isfile(
-        os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME)
-    ):
-        self.state = TrainerState.load_from_json(
-            distributed_file(os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME))
-        )
-        epochs_trained = self.state.global_step // num_update_steps_per_epoch
-        if not args.ignore_data_skip:
-            steps_trained_in_current_epoch = self.state.global_step % (num_update_steps_per_epoch)
-            steps_trained_in_current_epoch *= args.gradient_accumulation_steps
+        if self.args.should_load_sharding_stage1_model:
+            model = self._wrap_model_and_load_sharded_checkpoint(resume_from_checkpoint)
+        elif self.args.should_save_sharding_stage1_model:
+            # In the non-sharded mode, should invoke _load_from_checkpoint before _wrap_model.
+            # In this mode, the rank0 load all params and the _wrap_model implicitly broadcast
+            # params from rank0 to the other ranks.
+            model = self._wrap_model(self.model_wrapped)
+            if self.sharding_io is not None:
+                assert delay_optimizer_creation is False, "delay_optimizer_creation should be False"
+                # the self.optimizer should be wrapped and it is done in _wrap_model
+                self.sharding_io.set_optimizer(self.optimizer)
+            # for the rest of this function `model` is the outside model, whether it was wrapped or not
+            if model is not self.model:
+                self.model_wrapped = model
+            if delay_optimizer_creation:
+                self.create_optimizer_and_scheduler(num_training_steps=max_steps)
+            self._load_optimizer_and_scheduler(resume_from_checkpoint)
         else:
-            steps_trained_in_current_epoch = 0
+            model = self._wrap_model(self.model_wrapped)
+            # for the rest of this function `model` is the outside model, whether it was wrapped or not
+            if model is not self.model:
+                self.model_wrapped = model
+            if delay_optimizer_creation:
+                self.create_optimizer_and_scheduler(num_training_steps=max_steps)
+            self._load_optimizer_and_scheduler(resume_from_checkpoint)
 
-        logger.info("  Continuing training from checkpoint, will skip to saved global_step")
-        logger.info(f"  Continuing training from epoch {epochs_trained}")
-        logger.info(f"  Continuing training from global step {self.state.global_step}")
-        if not args.ignore_data_skip:
-            logger.info(
-                f"  Will skip the first {epochs_trained} epochs then the first {steps_trained_in_current_epoch} "
-                "batches in the first epoch. If this takes a lot of time, you can add the `--ignore_data_skip` "
-                "flag to your launch command, but you will resume the training on data already seen by your model."
-            )
-            if self.is_local_process_zero() and not args.disable_tqdm:
-                steps_trained_progress_bar = tqdm(total=steps_trained_in_current_epoch)
-                steps_trained_progress_bar.set_description("Skipping the first batches")
-        if not args.ignore_data_skip:
-            if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
-                train_dataloader.batch_sampler, NlpDistributedBatchSampler
-            ):
-                consumed_samples = (
-                    self.state.global_step
-                    * args.train_batch_size
-                    * args.gradient_accumulation_steps
-                    * args.dataset_world_size
-                )
-                train_dataloader.batch_sampler.set_epoch(consumed_samples=consumed_samples)
-                logger.info(f"Set DistributedBatchSampler consumed_samples to {consumed_samples}")
+        if ShardingOption.FULL_SHARD in self.args.sharding and clear_master_weight:
+            # for inference model to use Trainer sharding stage3, clear master_weight
+            # which is created in GroupShardedStage3.__init__
+            self.optimizer._master_weights = None
 
-    self.state.max_steps = int(max_steps)
-    self.state.num_train_epochs = num_train_epochs
-    self.state.is_local_process_zero = self.is_local_process_zero()
-    self.state.is_world_process_zero = self.is_world_process_zero()
+        if self.args.device == "npu" and self.args.flatten_param_grads:
+            from .plugins.npu_plugin import npu_accelerate_plugin
 
-    return (
-        epochs_trained,
-        steps_trained_in_current_epoch,
-        steps_trained_progress_bar,
-    )
+            npu_accelerate_plugin(self.optimizer)
 
+        return model
 
-def init_train_log(
-    self: Trainer,
-    num_examples: int,
-    num_train_epochs: int,
-    total_train_batch_size: int,
-    max_steps: int,
-    num_train_samples: int,
-    model: PretrainedModel,
-):
-    """
-    Initialize the training log.
-
-    Args:
-        self (Trainer): The instance of the Trainer class containing parameters and information required for training.
-        num_examples (int): The total number of samples in the training set.
-        num_train_epochs (int): The number of training epochs.
-        total_train_batch_size (int): The sum of the training batch sizes on a single device.
-        max_steps (int): The maximum number of training steps.
-        num_train_samples (int): The total number of samples in the training set.
-        model (PretrainedModel): The model being trained.
-
-    Returns:
-        None, this function does not return any value.
-    """
-    args = self.args
-
-    logger.info("***** Running training *****")
-    logger.info(f"  Num examples = {num_examples:,}")
-    logger.info(f"  Num Epochs = {num_train_epochs}")
-    logger.info(f"  Instantaneous batch size per device = {args.per_device_train_batch_size}")
-    logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_train_batch_size}")
-    logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
-    logger.info(f"  Total optimization steps = {max_steps:,}")
-    logger.info(f"  Total num train samples = {num_train_samples:,}")
-    # per_device_trainable_numel = sum(p.numel().item() for p in model.parameters() if not p.stop_gradient)
-    # TODO: Temporary fix since Tensor.numel() not supported in distributed mode
-    per_device_trainable_numel = sum(np.prod(p.shape) for p in model.parameters() if not p.stop_gradient)
-    logger.debug(f"  Number of trainable parameters = {per_device_trainable_numel:,} (per device)")
-    if self.args.use_hybrid_parallel:
-        # todo fix for pipeline_parallel_degree
-        parts_num = max(self.args.tensor_parallel_degree, 1) * max(self.args.pipeline_parallel_degree, 1)
-        if parts_num > 1:
-            all_reduce_dtype = "int64"
-            if paddle.get_device().split(":")[0] in ["npu", "xpu"]:
-                # TODO(duanyanhui): fix when NPU all_reduce supports int64
-                all_reduce_dtype = "float32"
-            trainable_numel_tensor = paddle.to_tensor(per_device_trainable_numel, dtype=all_reduce_dtype)
-            paddle.distributed.all_reduce(trainable_numel_tensor)
-            trainable_numel = int(trainable_numel_tensor.item()) // self.args.dataset_world_size
-            # the numel is roughly, because the tensor parallel still hold own bias or layer_norm weight without splited
-            # so, the trainable numel is a little bigger than real.
-            logger.debug(f"  Number of trainable parameters = {trainable_numel:,} (all devices, roughly)")
-
-
-def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs):
-    """
-    Just a copy of single training step complete code in Trainer.train while loop
-    which including forward+backward+step, while wraps the inputs and outputs to
-    make the complicated copied code no need to change. Maybe a better way is to
-    add fine-grained methods including these steps to Trainer which is similar to
-    DeepSpeed engine.
-    """
-
-    # TODO(guosheng): step, steps_trained_in_current_epoch and steps_trained_progress_bar
-    # should use reference since they would be overwrite.
-    # for state update
-    epoch = kwargs.get("epoch", 0)
-    step = kwargs.get("step", 0)
-    steps_in_epoch = kwargs.get("steps_in_epoch", 0)
-    step_control = kwargs.get("step_control", 0)
-    # for step and progress update when resuming data
-    train_dataloader = kwargs.get("train_dataloader", None)
-    resume_from_checkpoint = kwargs.get("resume_from_checkpoint", None)
-    steps_trained_in_current_epoch = kwargs.get("steps_trained_in_current_epoch", 0)
-    steps_trained_progress_bar = kwargs.get("steps_trained_progress_bar", None)
-    # for eval output ignore to gather
-    ignore_keys_for_eval = kwargs.get("ignore_keys_for_eval", None)
-    # timer_name = kwargs.get("timer_name", "")
-    tr_loss = kwargs.get("tr_loss", 0.0)
-    model = kwargs.get("model", self.model_wrapped)
-    # needed in _maybe_log_save_evaluate
-    self._globalstep_last_logged = getattr(self, "_globalstep_last_logged", 0)
-    self._globalstep_last_start_time = getattr(self, "_globalstep_last_start_time", time.time())
-
-    args = self.args
-
-    if self.args.use_hybrid_parallel and self.args.sep_parallel_degree > 1:
-        inputs = split_inputs_sequence_dim(inputs)
-    # self.timers and self.timers("read-data").stop()
-    os.environ["TRAINER_GLOBAL_STEP"] = str(self.state.global_step)
-    self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
-
-    # Skip past any already trained steps if resuming training
-    # for paddlenlp.utils.batch_sampler.DistributedBatchSampler
-    # We use consumed_samples to reset the status
-    if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
-        train_dataloader.batch_sampler, NlpDistributedBatchSampler
+    def init_train_state(
+        self: Trainer,
+        resume_from_checkpoint: bool,
+        train_dataloader: DataLoader,
+        max_steps: int,
+        num_train_epochs: int,
+        num_update_steps_per_epoch: int,
     ):
-        if step == 0:
-            if steps_trained_progress_bar is not None:
-                steps_trained_progress_bar.update(steps_trained_in_current_epoch)
-                steps_trained_progress_bar.close()
-                steps_trained_progress_bar = None
-            self._load_rng_state(resume_from_checkpoint)
-        step += steps_trained_in_current_epoch
-    elif steps_trained_in_current_epoch > 0:
-        steps_trained_in_current_epoch -= 1
-        if steps_trained_progress_bar is not None:
-            steps_trained_progress_bar.update(1)
-        if steps_trained_in_current_epoch == 0:
-            self._load_rng_state(resume_from_checkpoint)
-        # continue
-        final_local_vars = locals()
-        for k in kwargs.keys():
-            if k in final_local_vars:
-                kwargs[k] = final_local_vars[k]
-        return kwargs
-    elif steps_trained_progress_bar is not None:
-        steps_trained_progress_bar.close()
+        """
+        Initialize the training state.
+
+        Args:
+            self (Trainer): The instance of the Trainer class to record the training state.
+            resume_from_checkpoint (bool, optional): Whether to resume training from a checkpoint, defaults to False.
+            train_dataloader (DataLoader, optional): The data loader for training, defaults to None.
+            max_steps (int, optional): The maximum number of training steps, defaults to -1.
+            num_train_epochs (int, optional): The maximum number of training epochs, defaults to 3.
+            num_update_steps_per_epoch (int, optional): The number of steps to update the model per epoch, defaults to 1.
+
+        Returns:
+            Tuple[int, int, Optional[tqdm]]:
+                - epochs_trained (int): The number of epochs already trained.
+                - steps_trained_in_current_epoch (int): The number of batches trained in the current epoch if not skipping data; otherwise, 0.
+                - steps_trained_progress_bar (Optional[tqdm]): A tqdm progress bar to show the progress of skipping the first batch if not skipping data; otherwise, None.
+        """
+        args = self.args
+
+        self.state = TrainerState()
+        self.state.epoch = 0
+        epochs_trained = 0
+        steps_trained_in_current_epoch = 0
         steps_trained_progress_bar = None
 
-    if step_control % args.gradient_accumulation_steps == 0:
-        self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
-        # self.timers and self.timers(f"{timer_name}: forward-backward").start()
-
-    dp_enabled = self.args.data_parallel_degree > 1 if self.args.use_hybrid_parallel else args.local_rank != -1
-    forbidden_no_sync = False
-    # stage2 and stage3 should not no_sync, because the is no DDP wrapper and no_sync API
-    # hybrid_parallel (tp or pp or sharding stage 1) should not no_sync
-    if self.args.use_hybrid_parallel:
-        forbidden_no_sync = True
-
-    available_no_sync = dp_enabled and not forbidden_no_sync
-
-    is_no_sync = (
-        ((step_control + 1) % args.gradient_accumulation_steps != 0)
-        and available_no_sync
-        and args._no_sync_in_gradient_accumulation
-    ) or (args.recompute and available_no_sync)
-    # sharding
-    # stage1. the same as ddp
-    # stage2. manually collect gradient on dp group
-
-    dp_master_grad = self.args.world_size > 1 and self.args.amp_master_grad and not self.args.use_hybrid_parallel
-    if dp_master_grad:
-        is_no_sync = True
-
-    if is_no_sync:
-        # Avoid unnecessary DDP synchronization since there will be no backward pass on this example.
-        with model.no_sync():
-            tr_loss_step = self.training_step(model, inputs)
-    else:
-        tr_loss_step = self.training_step(model, inputs)
-
-    tr_loss += tr_loss_step
-
-    if (step_control + 1) % args.gradient_accumulation_steps == 0 or (
-        # last step in epoch but step is always smaller than gradient_accumulation_steps
-        steps_in_epoch <= args.gradient_accumulation_steps
-        and (step + 1) == steps_in_epoch
-    ):
-        if self.args.pipeline_parallel_degree <= 1 and self._enable_delay_scale_loss():
-            tr_loss /= self.args.gradient_accumulation_steps
-
-        # self.timers and self.timers(f"{timer_name}: forward-backward").stop()
-
-        # Manually collect gradients
-        # Case 1: Use recompute and dp
-        # Case 2: Hack dp with master_grad
-        # Case 3: Pipeline or sharding overlap
-        # local_rank != -1 don't means dp in networks.
-        # self.timers and self.timers(f"{timer_name}: all-reduce").start()
-
-        # Case 1: Use recompute and dp / sharding stage1,
-        # manually collect gradient for dp.
-        if args.recompute and available_no_sync:
-            fused_allreduce_gradients(list(model.parameters()), None)
-
-        # Case 2: hack dp with master_grad
-        if dp_master_grad and not (args.recompute and available_no_sync):
-            fused_allreduce_gradients(list(model.parameters()), None)
-
-        # Pipeline parallel mode,  handle gradient reduce here to overlap
-        pipeline_parallel_config = (
-            set(args.pipeline_parallel_config.split(" ")) if args.pipeline_parallel_degree > 1 else set()
-        )
-        enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
-        enable_release_grads = "enable_release_grads" in pipeline_parallel_config
-
-        # Case 3: Pipeline parallel mode, overlap with dp
-        if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
-            parameters_list = _obtain_optimizer_parameters_list(self.optimizer._inner_opt)
-
-            if not enable_dp_comm_overlap:
-                if self.optimizer._sharding_enable:
-                    assert reshard_util.is_sharding_opt(self.optimizer)
-                    self.optimizer._inner_opt.reduce_gradients(list(parameters_list), self.optimizer._hcg)
-
-                if self.optimizer._dp_enable or getattr(self.optimizer, "_sep_enable", False):
-                    fused_allreduce_gradients(list(parameters_list), self.optimizer._hcg)
-
-        # self.timers and self.timers(f"{timer_name}: all-reduce").stop()
-        # self.timers and self.timers(f"{timer_name}: optimizer-step").start()
-
-        if self.args.gradient_accumulation_steps > 1 and self._enable_delay_scale_loss():
-            for p in model._layers.parameters():
-                with paddle.no_grad():
-                    if hasattr(p, "main_grad") and p.main_grad is not None:
-                        assert p.grad is None
-                        p.main_grad.scale_(1.0 / self.args.gradient_accumulation_steps)
-                    elif p.grad is not None:
-                        p.grad.scale_(1.0 / self.args.gradient_accumulation_steps)
-
-        # Optimizer step
-        self.callback_handler.on_optimizer_begin(
-            args,
-            self.state,
-            self.control,
-            scaler=self.scaler if self.do_grad_scaling else None,
-        )
-        # optimizer_time_scope = TimerScope(self.timers, ActorStages.OPTIMIZE_STEP)
-        # optimizer_time_scope.start()
-
-        optimizer_was_run = True
-
-        if self.args.offload_optim:
-            self._reload_optimizer()
-
-        if self.do_grad_scaling:
-            scale_before = paddle.assign(self.scaler._scale)
-            self.scaler.step(self.optimizer)
-            self.scaler.update()
-            scale_after = self.scaler._scale
-            # Compatible with paddlepaddle 2.6.0 using typo word.
-            if hasattr(self.scaler, "_cache_founf_inf"):
-                optimizer_was_run = not self.scaler._cache_founf_inf
+        # Check if continuing training from a checkpoint
+        if resume_from_checkpoint is not None and distributed_isfile(
+            os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME)
+        ):
+            self.state = TrainerState.load_from_json(
+                distributed_file(os.path.join(resume_from_checkpoint, TRAINER_STATE_NAME))
+            )
+            epochs_trained = self.state.global_step // num_update_steps_per_epoch
+            if not args.ignore_data_skip:
+                steps_trained_in_current_epoch = self.state.global_step % (num_update_steps_per_epoch)
+                steps_trained_in_current_epoch *= args.gradient_accumulation_steps
             else:
-                optimizer_was_run = not self.scaler._cache_found_inf
-            if not optimizer_was_run:
-                scale_before_value = scale_before.cpu().numpy()
-                scale_after_value = scale_after.cpu().numpy()
-                logger.warning(
-                    f"optimizer not run, scale_before: {scale_before_value[0]}, scale_after: {scale_after_value[0]}"
+                steps_trained_in_current_epoch = 0
+
+            logger.info("  Continuing training from checkpoint, will skip to saved global_step")
+            logger.info(f"  Continuing training from epoch {epochs_trained}")
+            logger.info(f"  Continuing training from global step {self.state.global_step}")
+            if not args.ignore_data_skip:
+                logger.info(
+                    f"  Will skip the first {epochs_trained} epochs then the first {steps_trained_in_current_epoch} "
+                    "batches in the first epoch. If this takes a lot of time, you can add the `--ignore_data_skip` "
+                    "flag to your launch command, but you will resume the training on data already seen by your model."
                 )
-        elif isinstance(self.optimizer, HybridParallelOptimizer):
-            self.optimizer._step(parameters_list)
-        else:
-            self.optimizer.step()
+                if self.is_local_process_zero() and not args.disable_tqdm:
+                    steps_trained_progress_bar = tqdm(total=steps_trained_in_current_epoch)
+                    steps_trained_progress_bar.set_description("Skipping the first batches")
+            if not args.ignore_data_skip:
+                if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
+                    train_dataloader.batch_sampler, NlpDistributedBatchSampler
+                ):
+                    consumed_samples = (
+                        self.state.global_step
+                        * args.train_batch_size
+                        * args.gradient_accumulation_steps
+                        * args.dataset_world_size
+                    )
+                    train_dataloader.batch_sampler.set_epoch(consumed_samples=consumed_samples)
+                    logger.info(f"Set DistributedBatchSampler consumed_samples to {consumed_samples}")
 
-        # self.timers and self.timers(f"{timer_name}: optimizer-step").stop()
-        if self.args.offload_optim:
-            self._offload_optimizer()
+        self.state.max_steps = int(max_steps)
+        self.state.num_train_epochs = num_train_epochs
+        self.state.is_local_process_zero = self.is_local_process_zero()
+        self.state.is_world_process_zero = self.is_world_process_zero()
 
-        if optimizer_was_run:
-            self.lr_scheduler.step()
-
-        if args.release_grads or enable_release_grads:
-            self.optimizer.clear_grad(set_to_zero=False)
-            if args.pipeline_parallel_degree > 1:
-                for _, buffers in model._chunk_2_comm_buffers.items():
-                    for buffer in buffers:
-                        buffer._clear_grad_storage()
-        else:
-            self.optimizer.clear_grad()
-
-        # optimizer_time_scope.stop()
-
-        self.callback_handler.on_optimizer_end(
-            args,
-            self.state,
-            self.control,
-            scaler=self.scaler if self.do_grad_scaling else None,
+        return (
+            epochs_trained,
+            steps_trained_in_current_epoch,
+            steps_trained_progress_bar,
         )
 
-        self.state.global_step += 1
-        self.state.epoch = epoch + (step + 1) / steps_in_epoch
-        self.control = self.callback_handler.on_step_end(args, self.state, self.control)
-        self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
-        # self._print_timer()
-        step_control = 0
-    else:
-        self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
-        step_control += 1
+    def init_train_log(
+        self: Trainer,
+        num_examples: int,
+        num_train_epochs: int,
+        total_train_batch_size: int,
+        max_steps: int,
+        num_train_samples: int,
+        model: PretrainedModel,
+    ):
+        """
+        Initialize the training log.
 
-    if self.control.should_epoch_stop or self.control.should_training_stop:
-        # break
+        Args:
+            self (Trainer): The instance of the Trainer class containing parameters and information required for training.
+            num_examples (int): The total number of samples in the training set.
+            num_train_epochs (int): The number of training epochs.
+            total_train_batch_size (int): The sum of the training batch sizes on a single device.
+            max_steps (int): The maximum number of training steps.
+            num_train_samples (int): The total number of samples in the training set.
+            model (PretrainedModel): The model being trained.
+
+        Returns:
+            None, this function does not return any value.
+        """
+        args = self.args
+
+        logger.info("***** Running training *****")
+        logger.info(f"  Num examples = {num_examples:,}")
+        logger.info(f"  Num Epochs = {num_train_epochs}")
+        logger.info(f"  Instantaneous batch size per device = {args.per_device_train_batch_size}")
+        logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_train_batch_size}")
+        logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
+        logger.info(f"  Total optimization steps = {max_steps:,}")
+        logger.info(f"  Total num train samples = {num_train_samples:,}")
+        # per_device_trainable_numel = sum(p.numel().item() for p in model.parameters() if not p.stop_gradient)
+        # TODO: Temporary fix since Tensor.numel() not supported in distributed mode
+        per_device_trainable_numel = sum(np.prod(p.shape) for p in model.parameters() if not p.stop_gradient)
+        logger.debug(f"  Number of trainable parameters = {per_device_trainable_numel:,} (per device)")
+        if self.args.use_hybrid_parallel:
+            # todo fix for pipeline_parallel_degree
+            parts_num = max(self.args.tensor_parallel_degree, 1) * max(self.args.pipeline_parallel_degree, 1)
+            if parts_num > 1:
+                all_reduce_dtype = "int64"
+                if paddle.get_device().split(":")[0] in ["npu", "xpu"]:
+                    # TODO(duanyanhui): fix when NPU all_reduce supports int64
+                    all_reduce_dtype = "float32"
+                trainable_numel_tensor = paddle.to_tensor(per_device_trainable_numel, dtype=all_reduce_dtype)
+                paddle.distributed.all_reduce(trainable_numel_tensor)
+                trainable_numel = int(trainable_numel_tensor.item()) // self.args.dataset_world_size
+                # the numel is roughly, because the tensor parallel still hold own bias or layer_norm weight without splited
+                # so, the trainable numel is a little bigger than real.
+                logger.debug(f"  Number of trainable parameters = {trainable_numel:,} (all devices, roughly)")
+
+    def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs):
+        """
+        Just a copy of single training step complete code in Trainer.train while loop
+        which including forward+backward+step, while wraps the inputs and outputs to
+        make the complicated copied code no need to change. Maybe a better way is to
+        add fine-grained methods including these steps to Trainer which is similar to
+        DeepSpeed engine.
+        """
+
+        # TODO(guosheng): step, steps_trained_in_current_epoch and steps_trained_progress_bar
+        # should use reference since they would be overwrite.
+        # for state update
+        epoch = kwargs.get("epoch", 0)
+        step = kwargs.get("step", 0)
+        steps_in_epoch = kwargs.get("steps_in_epoch", 0)
+        step_control = kwargs.get("step_control", 0)
+        # for step and progress update when resuming data
+        train_dataloader = kwargs.get("train_dataloader", None)
+        resume_from_checkpoint = kwargs.get("resume_from_checkpoint", None)
+        steps_trained_in_current_epoch = kwargs.get("steps_trained_in_current_epoch", 0)
+        steps_trained_progress_bar = kwargs.get("steps_trained_progress_bar", None)
+        # for eval output ignore to gather
+        ignore_keys_for_eval = kwargs.get("ignore_keys_for_eval", None)
+        # timer_name = kwargs.get("timer_name", "")
+        tr_loss = kwargs.get("tr_loss", 0.0)
+        model = kwargs.get("model", self.model_wrapped)
+        # needed in _maybe_log_save_evaluate
+        self._globalstep_last_logged = getattr(self, "_globalstep_last_logged", 0)
+        self._globalstep_last_start_time = getattr(self, "_globalstep_last_start_time", time.time())
+
+        args = self.args
+
+        if self.args.use_hybrid_parallel and self.args.sep_parallel_degree > 1:
+            inputs = split_inputs_sequence_dim(inputs)
+        # self.timers and self.timers("read-data").stop()
+        os.environ["TRAINER_GLOBAL_STEP"] = str(self.state.global_step)
+        self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
+
+        # Skip past any already trained steps if resuming training
+        # for paddlenlp.utils.batch_sampler.DistributedBatchSampler
+        # We use consumed_samples to reset the status
+        if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
+            train_dataloader.batch_sampler, NlpDistributedBatchSampler
+        ):
+            if step == 0:
+                if steps_trained_progress_bar is not None:
+                    steps_trained_progress_bar.update(steps_trained_in_current_epoch)
+                    steps_trained_progress_bar.close()
+                    steps_trained_progress_bar = None
+                self._load_rng_state(resume_from_checkpoint)
+            step += steps_trained_in_current_epoch
+        elif steps_trained_in_current_epoch > 0:
+            steps_trained_in_current_epoch -= 1
+            if steps_trained_progress_bar is not None:
+                steps_trained_progress_bar.update(1)
+            if steps_trained_in_current_epoch == 0:
+                self._load_rng_state(resume_from_checkpoint)
+            # continue
+            final_local_vars = locals()
+            for k in kwargs.keys():
+                if k in final_local_vars:
+                    kwargs[k] = final_local_vars[k]
+            return kwargs
+        elif steps_trained_progress_bar is not None:
+            steps_trained_progress_bar.close()
+            steps_trained_progress_bar = None
+
+        if step_control % args.gradient_accumulation_steps == 0:
+            self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
+            # self.timers and self.timers(f"{timer_name}: forward-backward").start()
+
+        dp_enabled = self.args.data_parallel_degree > 1 if self.args.use_hybrid_parallel else args.local_rank != -1
+        forbidden_no_sync = False
+        # stage2 and stage3 should not no_sync, because the is no DDP wrapper and no_sync API
+        # hybrid_parallel (tp or pp or sharding stage 1) should not no_sync
+        if self.args.use_hybrid_parallel:
+            forbidden_no_sync = True
+
+        available_no_sync = dp_enabled and not forbidden_no_sync
+
+        is_no_sync = (
+            ((step_control + 1) % args.gradient_accumulation_steps != 0)
+            and available_no_sync
+            and args._no_sync_in_gradient_accumulation
+        ) or (args.recompute and available_no_sync)
+        # sharding
+        # stage1. the same as ddp
+        # stage2. manually collect gradient on dp group
+
+        dp_master_grad = self.args.world_size > 1 and self.args.amp_master_grad and not self.args.use_hybrid_parallel
+        if dp_master_grad:
+            is_no_sync = True
+
+        if is_no_sync:
+            # Avoid unnecessary DDP synchronization since there will be no backward pass on this example.
+            with model.no_sync():
+                tr_loss_step = self.training_step(model, inputs)
+        else:
+            tr_loss_step = self.training_step(model, inputs)
+
+        tr_loss += tr_loss_step
+
+        if (step_control + 1) % args.gradient_accumulation_steps == 0 or (
+            # last step in epoch but step is always smaller than gradient_accumulation_steps
+            steps_in_epoch <= args.gradient_accumulation_steps
+            and (step + 1) == steps_in_epoch
+        ):
+            if self.args.pipeline_parallel_degree <= 1 and self._enable_delay_scale_loss():
+                tr_loss /= self.args.gradient_accumulation_steps
+
+            # self.timers and self.timers(f"{timer_name}: forward-backward").stop()
+
+            # Manually collect gradients
+            # Case 1: Use recompute and dp
+            # Case 2: Hack dp with master_grad
+            # Case 3: Pipeline or sharding overlap
+            # local_rank != -1 don't means dp in networks.
+            # self.timers and self.timers(f"{timer_name}: all-reduce").start()
+
+            # Case 1: Use recompute and dp / sharding stage1,
+            # manually collect gradient for dp.
+            if args.recompute and available_no_sync:
+                fused_allreduce_gradients(list(model.parameters()), None)
+
+            # Case 2: hack dp with master_grad
+            if dp_master_grad and not (args.recompute and available_no_sync):
+                fused_allreduce_gradients(list(model.parameters()), None)
+
+            # Pipeline parallel mode,  handle gradient reduce here to overlap
+            pipeline_parallel_config = (
+                set(args.pipeline_parallel_config.split(" ")) if args.pipeline_parallel_degree > 1 else set()
+            )
+            enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
+            enable_release_grads = "enable_release_grads" in pipeline_parallel_config
+
+            # Case 3: Pipeline parallel mode, overlap with dp
+            if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
+                parameters_list = _obtain_optimizer_parameters_list(self.optimizer._inner_opt)
+
+                if not enable_dp_comm_overlap:
+                    if self.optimizer._sharding_enable:
+                        assert reshard_util.is_sharding_opt(self.optimizer)
+                        self.optimizer._inner_opt.reduce_gradients(list(parameters_list), self.optimizer._hcg)
+
+                    if self.optimizer._dp_enable or getattr(self.optimizer, "_sep_enable", False):
+                        fused_allreduce_gradients(list(parameters_list), self.optimizer._hcg)
+
+            # self.timers and self.timers(f"{timer_name}: all-reduce").stop()
+            # self.timers and self.timers(f"{timer_name}: optimizer-step").start()
+
+            if self.args.gradient_accumulation_steps > 1 and self._enable_delay_scale_loss():
+                for p in model._layers.parameters():
+                    with paddle.no_grad():
+                        if hasattr(p, "main_grad") and p.main_grad is not None:
+                            assert p.grad is None
+                            p.main_grad.scale_(1.0 / self.args.gradient_accumulation_steps)
+                        elif p.grad is not None:
+                            p.grad.scale_(1.0 / self.args.gradient_accumulation_steps)
+
+            # Optimizer step
+            self.callback_handler.on_optimizer_begin(
+                args,
+                self.state,
+                self.control,
+                scaler=self.scaler if self.do_grad_scaling else None,
+            )
+            # optimizer_time_scope = TimerScope(self.timers, ActorStages.OPTIMIZE_STEP)
+            # optimizer_time_scope.start()
+
+            optimizer_was_run = True
+
+            if self.args.offload_optim:
+                self._reload_optimizer()
+
+            if self.do_grad_scaling:
+                scale_before = paddle.assign(self.scaler._scale)
+                self.scaler.step(self.optimizer)
+                self.scaler.update()
+                scale_after = self.scaler._scale
+                # Compatible with paddlepaddle 2.6.0 using typo word.
+                if hasattr(self.scaler, "_cache_founf_inf"):
+                    optimizer_was_run = not self.scaler._cache_founf_inf
+                else:
+                    optimizer_was_run = not self.scaler._cache_found_inf
+                if not optimizer_was_run:
+                    scale_before_value = scale_before.cpu().numpy()
+                    scale_after_value = scale_after.cpu().numpy()
+                    logger.warning(
+                        f"optimizer not run, scale_before: {scale_before_value[0]}, scale_after: {scale_after_value[0]}"
+                    )
+            elif isinstance(self.optimizer, HybridParallelOptimizer):
+                self.optimizer._step(parameters_list)
+            else:
+                self.optimizer.step()
+
+            # self.timers and self.timers(f"{timer_name}: optimizer-step").stop()
+            if self.args.offload_optim:
+                self._offload_optimizer()
+
+            if optimizer_was_run:
+                self.lr_scheduler.step()
+
+            if args.release_grads or enable_release_grads:
+                self.optimizer.clear_grad(set_to_zero=False)
+                if args.pipeline_parallel_degree > 1:
+                    for _, buffers in model._chunk_2_comm_buffers.items():
+                        for buffer in buffers:
+                            buffer._clear_grad_storage()
+            else:
+                self.optimizer.clear_grad()
+
+            # optimizer_time_scope.stop()
+
+            self.callback_handler.on_optimizer_end(
+                args,
+                self.state,
+                self.control,
+                scaler=self.scaler if self.do_grad_scaling else None,
+            )
+
+            self.state.global_step += 1
+            self.state.epoch = epoch + (step + 1) / steps_in_epoch
+            self.control = self.callback_handler.on_step_end(args, self.state, self.control)
+            self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
+            # self._print_timer()
+            step_control = 0
+        else:
+            self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
+            step_control += 1
+
+        if self.control.should_epoch_stop or self.control.should_training_stop:
+            # break
+            final_local_vars = locals()
+            for k in kwargs.keys():
+                if k in final_local_vars:
+                    kwargs[k] = final_local_vars[k]
+            return kwargs
+        # self.timers and self.timers("read-data").start()
+
         final_local_vars = locals()
         for k in kwargs.keys():
             if k in final_local_vars:
                 kwargs[k] = final_local_vars[k]
         return kwargs
-    # self.timers and self.timers("read-data").start()
-
-    final_local_vars = locals()
-    for k in kwargs.keys():
-        if k in final_local_vars:
-            kwargs[k] = final_local_vars[k]
-    return kwargs
 
 
-Trainer.init_train_model_opt = init_train_model_opt
-Trainer.init_train_log = init_train_log
-Trainer.init_train_state = init_train_state
-Trainer.full_training_step = full_training_step
-# ########## patches for Trianer ##########
-
-
-class RLTrainer(Trainer):
+class RLTrainer(RLTrainerBase):
     """
     Features of RLTrainer:
     1. Trainer enhanced with step-level training combining with patches of
@@ -531,6 +522,7 @@ class RLTrainer(Trainer):
     # used to create criterion for trainer, please refer to `create_criterion`
     # for details.
     loss_cls: type
+    loss_identifier = lambda self, inputs: "tr_loss"
 
     def __init__(
         self,
@@ -582,17 +574,6 @@ class RLTrainer(Trainer):
         """
         criterion = create_loss(self.loss_cls, self.model.config, self.args, self.info_buffer, merge_labels=True)
         return criterion
-
-    def loss_identifier(self, inputs: Dict) -> str:
-        """
-        Moreover, a model/RLTrainer instance may use a mixed loss which uses a
-        different loss for different step and inputs, while we often want to get
-        the separated loss metric. We use a callable discriminator using inputs
-        (dict) as arguments and returning corresponding loss name to identify
-        current loss. NOTE: please make the loss name ends with "_loss". `tr_loss`
-        is the default loss name used in trainer.train.
-        """
-        return "tr_loss"
 
     def set_eval_model(self, model):
         """
