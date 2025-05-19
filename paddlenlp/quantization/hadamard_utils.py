@@ -111,4 +111,4 @@ def apply_hadamard_matmul(x, side, block_size):
         hadamard_matrix = create_hadamard_matrix(block_size, x.dtype)
         infohub.hadamard[block_size] = hadamard_matrix
     target_x = hadamard_matmul(x, side, hadamard_matrix, block_size)
-    return target_x, block_size
+    return target_x

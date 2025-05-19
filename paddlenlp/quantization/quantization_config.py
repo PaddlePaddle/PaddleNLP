@@ -68,9 +68,8 @@ class QuantizationConfig:
         hadamard_block_size=32,
         quant_input_grad=False,
         quant_weight_grad=False,
-        skip_first_act_scale_step=20,
-        moving_rate=0.01,
-        epsilon=1e-8,
+        apply_online_actscale_step=200,
+        actscale_moving_rate=0.01,
         fp8_format_type="hybrid",
         **kwargs,
     ):
@@ -143,9 +142,9 @@ class QuantizationConfig:
         self.hadamard_block_size = hadamard_block_size
         self.quant_input_grad = quant_input_grad
         self.quant_weight_grad = quant_weight_grad
-        self.skip_first_act_scale_step = skip_first_act_scale_step
-        self.moving_rate = moving_rate
-        self.epsilon = epsilon
+        self.apply_online_actscale_step = apply_online_actscale_step
+        self.actscale_moving_rate = actscale_moving_rate
+        self.fp8_format_type = fp8_format_type
         self.fp8_format = fp8_format_mapping[fp8_format_type]
 
     def is_weight_quantize(self):
@@ -216,6 +215,7 @@ class QuantizationConfig:
         config_dict = self.to_dict()
 
         # get the default config dict
+
         default_config_dict = QuantizationConfig().to_dict()
 
         serializable_config_dict = {}
