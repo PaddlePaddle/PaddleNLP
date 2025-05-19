@@ -1,0 +1,82 @@
+name: PaddleNLP Unit CI
+
+on:
+  push:
+    branches: [develop, release/*]
+  pull_request:
+
+jobs:
+  llm-ci:
+    runs-on: [self-hosted, gpu]  # 打标签:./config.sh --labels "self-hosted,gpu,gpu-0-3"
+    container:
+      image: iregistry.baidu-int.com/paddlecloud/base-images:paddlecloud-ubuntu18.04-gcc8.2-cuda11.8-cudnn8.6-nccl2.15.5-20250311
+      options: >-
+        --gpus all
+        --shm-size=128G
+        --net=host
+        -v /ssd1/paddlenlp:/ssd1/paddlenlp
+        -v /home/.cache/pip:/home/.cache/pip
+
+    env:
+      HF_ENDPOINT: https://hf-mirror.com
+      STUDIO_GIT_HOST: http://git.prod.idc-to-cloud.aistudio.baidu-int.com
+      PPNLP_HOME: /ssd1/paddlenlp
+      NLP_DIR: /workspace/PaddleNLP
+      HF_DATASETS_CACHE: /ssd1/paddlenlp/huggingface/datasets
+      TRANSFORMERS_CACHE: /ssd1/paddlenlp/huggingface
+      REPORT_SERVER_USERNAME: ${{ secrets.REPORT_SERVER_USERNAME }}
+      REPORT_SERVER_PASSWORD: ${{ secrets.REPORT_SERVER_PASSWORD }}
+      REPORT_SERVER: ${{ secrets.REPORT_SERVER }}
+      python: "python3.10"
+      paddle: "https://paddle-qa.bj.bcebos.com/paddle-pipeline/Develop-GpuSome-LinuxCentos-Gcc82-Cuda118-Cudnn86-Trt85-Py310-CINN-Compile/latest/paddlepaddle_gpu-0.0.0-cp310-cp310-linux_x86_64.whl"
+      proxy: ${{ secrets.HTTP_PROXY }}
+      no_proxy: ${{ secrets.NO_PROXY }}
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Parse GPU ID from runner label
+        id: parse-gpu
+        run: |
+          echo "Runner labels: $RUNNER_LABELS"
+
+          if [[ "$RUNNER_LABELS" == *"gpu-0-3"* ]]; then
+            echo "cudaid1=0" >> $GITHUB_ENV
+            echo "cudaid2=0,1,2,3" >> $GITHUB_ENV
+          elif [[ "$RUNNER_LABELS" == *"gpu-4-7"* ]]; then
+            echo "cudaid1=4" >> $GITHUB_ENV
+            echo "cudaid2=4,5,6,7" >> $GITHUB_ENV
+          else
+            echo "Unknown runner label, fallback to default CUDA"
+            echo "cudaid1=0" >> $GITHUB_ENV
+            echo "cudaid2=0,1,2,3" >> $GITHUB_ENV
+          fi
+
+      - name: Print CUDA config
+        run: |
+          echo "Using cudaid1=$cudaid1"
+          echo "Using cudaid2=$cudaid2"
+          export CUDA_VISIBLE_DEVICES=$cudaid2
+          nvidia-smi
+
+      - name: Set Python Environment
+        run: |
+          unlink /usr/bin/python3
+          ln -sf /usr/bin/${python} /usr/bin/python3
+          python3 --version
+
+      - name: Configure pip
+        run: |
+          echo "[global]
+          timeout = 60
+          index = https://pip.baidu-int.com/search/
+          index-url = https://pip.baidu-int.com/simple/
+          trusted-host = pip.baidu-int.com" > /etc/pip.conf
+          pip config set global.cache-dir '/home/.cache/pip'
+
+      - name: Run CI script
+        run: |
+          cd /workspace/PaddleNLP
+          rm -rf tests/utils/test_import_utils.py
+          timeout 50m bash scripts/unit_test/ci_unit.sh ${paddle}

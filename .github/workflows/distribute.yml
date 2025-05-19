@@ -1,0 +1,49 @@
+name: PaddleNLP Distributed CI
+
+on:
+  push:
+    branches: [develop, release/*]
+  pull_request:
+
+jobs:
+  distribute-ci:
+    runs-on: self-hosted  # 或者使用配置的 GPU runner label
+    container:
+      image: registry.baidubce.com/paddlepaddle/paddle:latest-dev-cuda11.8-cudnn8.6-trt8.5-gcc82
+      options: >-
+        --gpus all
+        --shm-size=32G
+        --net=host
+        -v /dev/shm:/dev/shm
+        -v /home/.cache/pip:/home/.cache/pip
+        -v /home/FleetX_CI:/fleetx_data
+        -v /home/Llama_CI:/llama_data
+        -v ${{ github.workspace }}:/workspace
+        -w /workspace
+
+      env:
+        proxy: ${{ secrets.HTTP_PROXY }}
+        paddle_whl: https://paddle-qa.bj.bcebos.com/paddle-pipeline/Develop-GpuSome-LinuxCentos-Gcc82-Cuda118-Cudnn86-Trt85-Py310-CINN-Compile/latest/paddlepaddle_gpu-0.0.0-cp310-cp310-linux_x86_64.whl
+        python_version: "3.10"
+        AK: ${{ secrets.AK }}
+        SK: ${{ secrets.SK }}
+        FLAGS_dynamic_static_unified_comm: "True"
+        no_proxy: "localhost,bj.bcebos.com,su.bcebos.com"
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Prepare Python Env
+        run: |
+          ldconfig
+          pip config set global.cache-dir "/home/.cache/pip"
+          ln -sf /usr/bin/python${python_version} /usr/bin/python
+          python -c 'import sys; print(sys.version_info[:])'
+          echo "paddle_whl=${paddle_whl}"
+
+      - name: Run Distributed Test Script
+        timeout-minutes: 80
+        run: |
+          bash PaddleNLP/scripts/distribute/run_ci.sh ${paddle_whl}
+        
