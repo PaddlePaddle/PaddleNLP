@@ -112,7 +112,6 @@ def get_mesh(pp_idx=0):
     mesh = fleet.auto.get_mesh()
     if "pp" in mesh.dim_names:
         mesh = mesh.get_mesh_with_dim("pp", pp_idx)
-    print("Get Mesh: ", mesh)
     return mesh
 
 
@@ -176,9 +175,11 @@ class LlamaRMSNormAutoPP(nn.Layer):
     def forward(self, args):
         hidden_states, position_ids, inputs_embeds, attention_mask, output_attentions, past_key_values, use_cache, alibi = parse_args(args)
         if self.config.use_fused_rms_norm:
-            return fusion_ops.fusion_rms_norm(
+            hidden_states =  fusion_ops.fusion_rms_norm(
                 hidden_states, self.weight, self.variance_epsilon, self.config.use_fast_layer_norm
             )
+            return return_args(hidden_states, position_ids, inputs_embeds, attention_mask, output_attentions, past_key_values, use_cache, alibi)
+
 
         with paddle.amp.auto_cast(False):
             variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
@@ -199,9 +200,6 @@ class LlamaEmbeddingAutoPP(nn.Layer):
 
         self.vocab_size = config.vocab_size
         self.hidden_size = config.hidden_size
-        print("hidden size:",self.hidden_size)
-        print("vocab size:", self.vocab_size)
-        print("config.intermediate_size:", config.intermediate_size)
         self.embed_tokens = nn.Embedding(
             self.vocab_size,
             self.hidden_size,
@@ -293,7 +291,6 @@ class LlamaEmbeddingAutoPP(nn.Layer):
 
         seq_length_with_past = seq_length
         cache_length = 0
-        print("past key values: ", past_key_values)
         if past_key_values[0] is not None:
             cache_length = past_key_values[0][0].shape[1]
             seq_length_with_past += cache_length
