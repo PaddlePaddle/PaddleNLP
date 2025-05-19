@@ -437,39 +437,6 @@ class LlamaDecoderLayerAutoPP(nn.Layer):
             alibi,
         )
 
-
-@register_base_model
-class LlamaModelAutoPP(LlamaModelAuto):
-    """
-    Transformer decoder consisting of *config.num_hidden_layers* layers. Each layer is a [`LlamaDecoderLayerAuto`]
-    Args:
-        config: LlamaConfig
-    """
-
-    def __init__(self, config: LlamaConfig):
-        super().__init__(config)
-        self.embed_tokens = LlamaEmbeddingAutoPP(config)
-        ## 暂时先不考虑PP，后面再加
-        decoder_layers = []
-        # self.next_pp_stage_indexes = []
-        for i in range(config.num_hidden_layers):
-            # pp_stage_id, input_need_reshard = get_layer_pp_info(i)
-            decoder_layers.append(LlamaDecoderLayerAutoPP(config, i, i not in self.no_recompute_layers, 0))
-            # if input_need_reshard:
-            #     self.next_pp_stage_indexes.append(i)
-        self.layers = nn.LayerList(decoder_layers)
-        self.norm = LlamaRMSNormAutoPP(config, 0)
-
-    def forward(self, args):
-        outputs = self.embed_tokens(args)
-        # decoder layers
-        for idx, (decoder_layer) in enumerate(self.layers):
-            outputs = decoder_layer(outputs)
-        # 第一个是hidden_states
-        outputs = self.norm(outputs)
-        return outputs
-
-
 class LlamaLMHeadAutoPP(nn.Layer):
     def __init__(self, config: LlamaConfig):
         super(LlamaLMHeadAutoPP, self).__init__()
@@ -506,7 +473,19 @@ class LlamaForCausalLM3DAutoPP(LlamaForCausalLM3DAuto):
     def __init__(self, config):
         super().__init__(config)
         self.config = config
-        self.llama = LlamaModelAutoPP(config)
+        # self.llama = LlamaModelAutoPP(config)
+        self.no_recompute_layers = config.no_recompute_layers if config.no_recompute_layers is not None else []
+        self.embed_tokens = LlamaEmbeddingAutoPP(config)
+        ## 暂时先不考虑PP，后面再加
+        decoder_layers = []
+        # self.next_pp_stage_indexes = []
+        for i in range(config.num_hidden_layers):
+            # pp_stage_id, input_need_reshard = get_layer_pp_info(i)
+            decoder_layers.append(LlamaDecoderLayerAutoPP(config, i, i not in self.no_recompute_layers, 0))
+            # if input_need_reshard:
+            #     self.next_pp_stage_indexes.append(i)
+        self.layers = nn.LayerList(decoder_layers)
+        self.norm = LlamaRMSNormAutoPP(config, 0)
         self.lm_head = LlamaLMHeadAutoPP(config)
 
     def forward(
@@ -525,7 +504,12 @@ class LlamaForCausalLM3DAutoPP(LlamaForCausalLM3DAuto):
         
         args = return_args(input_ids, position_ids, inputs_embeds, attention_mask, output_attentions, past_key_values, use_cache, None)
         
-        outputs = self.llama(args)
+        outputs = self.embed_tokens(args)
+        # decoder layers
+        for idx, (decoder_layer) in enumerate(self.layers):
+            outputs = decoder_layer(outputs)
+        # 第一个是hidden_states
+        outputs = self.norm(outputs)
 
         outputs = self.lm_head(outputs)
 
