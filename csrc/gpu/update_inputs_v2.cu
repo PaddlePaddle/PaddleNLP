@@ -60,10 +60,11 @@ __global__ void update_inputs_kernel_v2(
     if (stop_flags[thread_idx]) {
       if (seq_lens_this_time[thread_idx] == 0) {
         next_tokens[thread_idx] = -1;
-      } else {
-        next_tokens[thread_idx] = end_ids[0];
-        kwargs_next_tokens[thread_idx] = end_ids[0];
       }
+      // else {
+      //   next_tokens[thread_idx] = end_ids[0];
+      //   kwargs_next_tokens[thread_idx] = end_ids[0];
+      // }
     } else {
       kwargs_next_tokens[thread_idx] = next_tokens[thread_idx];
     }
