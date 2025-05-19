@@ -64,7 +64,8 @@ class QuantizationConfig:
         dtype=None,
         ignore_modules=None,
         group_size=-1,
-        apply_hadamard=True,
+        apply_hadamard=False,
+        hadamard_block_size=32,
         quant_input_grad=False,
         quant_weight_grad=False,
         skip_first_act_scale_step=20,
@@ -139,6 +140,7 @@ class QuantizationConfig:
         self.ignore_modules = ignore_modules
         self.group_size = group_size
         self.apply_hadamard = apply_hadamard
+        self.hadamard_block_size = hadamard_block_size
         self.quant_input_grad = quant_input_grad
         self.quant_weight_grad = quant_weight_grad
         self.skip_first_act_scale_step = skip_first_act_scale_step

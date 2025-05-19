@@ -19,7 +19,7 @@ from paddle.autograd import PyLayer
 
 from paddlenlp.utils import infohub
 
-from .hadamard_utils import random_hadamard_matrix
+from .hadamard_utils import apply_hadamard_matmul, random_hadamard_matrix
 
 try:
     from transformer_engine import transformer_engine_paddle as tex
@@ -34,6 +34,13 @@ try:
     USE_FP8_GEMM = True
 except ImportError:
     USE_FP8_GEMM = False
+
+QMIN_QMAX_MAPPING = {
+    "a8w8linear_activation": (-128, 127),
+    "a8w4linear_activation": (-128, 127),
+    "a8w8linear_weight": (-128, 127),
+    "a8w4linear_weight": (-8, 7),
+}
 
 
 def quantize_tensorwise(x, quantization_config=None, bit_length=8, state=0, training=False, act_scale=None):
@@ -56,6 +63,7 @@ def quantize_tensorwise(x, quantization_config=None, bit_length=8, state=0, trai
                 scale = act_scale
         else:
             scale = act_scale
+            scale = paddle.max(paddle.abs(target_x)) / qmax + quantization_config.epsilon
     else:
         scale = paddle.max(paddle.abs(target_x)) / qmax + quantization_config.epsilon
 
@@ -100,9 +108,10 @@ def fp8_quantize_tensorwise(x, tensor_type, quantization_config=None, state=0, t
                 act_scale.set_value(
                     (1 - quantization_config.moving_rate) * act_scale + quantization_config.moving_rate * scale
                 )
-                # scale = act_scale
+                scale = act_scale
         else:
             scale = act_scale
+            scale = paddle.max(paddle.abs(target_x)) / qmax + quantization_config.epsilon
     else:
         scale = paddle.max(paddle.abs(target_x)) / qmax + quantization_config.epsilon
 
@@ -152,16 +161,87 @@ def dequantize_channelwise(w_int8, scale, apply_hadamard=False):
     return w
 
 
-def a8w8_forward(
-    x, w_int8, w_scale=None, bias=None, dtype=None, quantization_config=None, state=0, training=False, act_scale=None
+def quantize(
+    x,
+    weight_quantize_algo,
+    tensor_type,
+    quantization_config,
+    apply_hadamard=False,
+    side="right",
+    act_scale=None,
+    state=0,
+    training=False,
+    group=None,
 ):
-    x_int8, x_scale = quantize_tensorwise(
-        x, quantization_config, bit_length=8, state=state, training=training, act_scale=act_scale
+    if apply_hadamard:
+        target_x, hadamard_scale = apply_hadamard_matmul(x, side, quantization_config.hadamard_block_size)
+    else:
+        target_x = x
+        hadamard_scale = 1
+    qmin, qmax = QMIN_QMAX_MAPPING[weight_quantize_algo + "_" + tensor_type]
+    if tensor_type == "activation":
+        if act_scale is not None:
+            if training:
+                scale = paddle.max(paddle.abs(target_x)) / qmax
+                if state < quantization_config.apply_online_actscale_step:
+                    act_scale.set_value((state * act_scale + scale) / (state + 1))
+                else:
+                    act_scale.set_value(
+                        (1 - quantization_config.moving_rate) * act_scale + quantization_config.moving_rate * scale
+                    )
+                    scale = act_scale
+            else:
+                # scale = act_scale
+                scale = paddle.max(paddle.abs(target_x)) / qmax
+        else:
+            scale = paddle.max(paddle.abs(target_x)) / qmax
+        if weight_quantize_algo in ["a8w8linear", "a8w4linear"]:
+            quant_x = paddle.clip((target_x / scale).round(), qmin, qmax).astype("int8")
+        else:
+            raise NotImplementedError(f"Unknown {weight_quantize_algo}.")
+    elif tensor_type == "weight":
+        if weight_quantize_algo in ["a8w8linear", "a8w4linear"]:
+            # channelwise
+            scale = paddle.max(paddle.abs(target_x), axis=0, keepdim=True) / qmax
+            if group is not None:
+                paddle.distributed.all_reduce(scale, op=paddle.distributed.ReduceOp.MAX, group=group, sync_op=True)
+            quant_x = paddle.clip((target_x / scale).round(), qmin, qmax).astype("int8").T
+            scale.stop_gradient = True
+            scale = scale.squeeze(0) / hadamard_scale
+        else:
+            raise NotImplementedError(f"Unknown {weight_quantize_algo}.")
+    else:
+        raise NotImplementedError(f"Unknown {tensor_type}.")
+    return quant_x, scale
+
+
+def int8_forward(
+    x,
+    quant_w,
+    scale_w,
+    weight_quantize_algo,
+    bias=None,
+    quantization_config=None,
+    state=0,
+    training=False,
+    act_scale=None,
+):
+    quant_x, scale_x = quantize(
+        x=x,
+        weight_quantize_algo=weight_quantize_algo,
+        tensor_type="activation",
+        quantization_config=quantization_config,
+        apply_hadamard=quantization_config.apply_hadamard,
+        side="right",
+        act_scale=act_scale,
+        state=state,
+        training=training,
     )
-    out = paddle.matmul(x_int8, w_int8.T).astype(dtype) * (x_scale * w_scale.unsqueeze(0))
+
+    out = paddle.matmul(quant_x, quant_w.T).astype(scale_w.dtype) * (scale_x * scale_w)
     if bias is not None:
         out += bias
-    return out, x_int8, x_scale
+    return out, quant_x, scale_x
 
 
 def a8w8_backward(ctx, x, grad_output, quant_weight, quant_scale, quant_x, x_scale):
@@ -350,6 +430,7 @@ class QATFunc(PyLayer):
         state,
         training,
         act_scale,
+        weight_quantize_algo,
     ):
         quant_x, x_scale = None, None
         if quantization_config.weight_quantize_algo in ["fp8linear"]:
@@ -365,12 +446,12 @@ class QATFunc(PyLayer):
                 act_scale=act_scale,
             )
         else:
-            output, quant_x, x_scale = a8w8_forward(
+            output, quant_x, x_scale = int8_forward(
                 x,
-                quant_weight,
-                w_scale=quant_scale,
+                quant_w=quant_weight,
+                scale_w=quant_scale,
+                weight_quantize_algo=weight_quantize_algo,
                 bias=bias,
-                dtype=dtype,
                 quantization_config=quantization_config,
                 state=state,
                 training=training,
