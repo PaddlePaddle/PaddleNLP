@@ -457,7 +457,7 @@ class LlamaModelAutoPP(LlamaModelAuto):
         # self.next_pp_stage_indexes = []
         for i in range(config.num_hidden_layers):
             # pp_stage_id, input_need_reshard = get_layer_pp_info(i)
-            decoder_layers.append(LlamaDecoderLayerAutoPP(config, i not in self.no_recompute_layers, 0))
+            decoder_layers.append(LlamaDecoderLayerAutoPP(config, i, i not in self.no_recompute_layers, 0))
             # if input_need_reshard:
             #     self.next_pp_stage_indexes.append(i)
         self.layers = nn.LayerList(decoder_layers)

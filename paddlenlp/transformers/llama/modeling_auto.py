@@ -230,12 +230,10 @@ class LlamaRMSNormAuto(nn.Layer):
 class LlamaMLPAuto(nn.Layer):
     def __init__(self, config, ipp: Optional[int] = None):
         super().__init__()
-        print("MLP Initialized")
         self.hidden_size = config.hidden_size
         self.intermediate_size = config.intermediate_size
         self.fuse_attention_ffn = config.fuse_attention_ffn
-        # self.ipp = ipp
-        self.ipp = 0
+        self.ipp = ipp
         self.config = config
 
         if config.fuse_attention_ffn and not enable_fuse_ffn_qkv_pass():
@@ -323,13 +321,9 @@ class LlamaAttentionAuto(nn.Layer):
             )
             self.qkv_proj.weight = dist.shard_tensor(
                 self.qkv_proj.weight,
-                # get_mesh(self.ipp),
-                get_mesh(0),
+                get_mesh(self.ipp),
                 colwise_placements,
             )
-            print("ipp: ", self.ipp)
-            print("get_mesh(self.ipp): ", get_mesh(self.ipp))
-            print("self.qkv_proj.weight: ", self.qkv_proj.weight)
 
         else:
             self.q_proj = nn.Linear(
@@ -372,8 +366,7 @@ class LlamaAttentionAuto(nn.Layer):
         )
         self.o_proj.weight = dist.shard_tensor(
             self.o_proj.weight,
-            # get_mesh(self.ipp),
-            get_mesh(0),
+            get_mesh(self.ipp),
             rowise_placement,
         )
 
@@ -602,7 +595,6 @@ class LlamaDecoderLayerAuto(nn.Layer):
         super().__init__()
         self.config = config
         self.hidden_size = config.hidden_size
-        ipp = 0
         self.self_attn = LlamaAttentionAuto(config, layerwise_recompute, ipp)
         self.mlp = LlamaMLPAuto(config, ipp)
         self.input_layernorm = LlamaRMSNormAuto(config, ipp)
