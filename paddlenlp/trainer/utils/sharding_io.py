@@ -123,7 +123,10 @@ def exclude_paramters_in_state_dict(
     )
     # allgather parameter names in sharding group
     tmp = []
-    paddle.distributed.all_gather_object(tmp, param_names_in_master_weights, group=sharding_group)
+    if sharding_group.nranks > 1:
+        paddle.distributed.all_gather_object(tmp, param_names_in_master_weights, group=sharding_group)
+    else:
+        tmp = [param_names_in_master_weights]
     param_names_in_master_weights = set([v for item in tmp for v in item])
     logger.info("sharding_group_param_names:{}".format(param_names_in_master_weights))
     non_parameters_state_dict = copy.copy(model_state_dict)
