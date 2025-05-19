@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-QWen auto parallel pretraining scripts.
+GPT/Llama auto parallel pretraining scripts.
 """
 import os
 import random
@@ -27,29 +27,31 @@ import paddle
 import paddle.distributed as dist
 from paddle.distributed import fleet
 
+from paddlenlp.ops import Topology
 from paddlenlp.trainer import (
     AutoTrainingArguments,
     PdArgumentParser,
     get_last_checkpoint,
 )
 from paddlenlp.trainer.auto_trainer import AutoTrainer
-from paddlenlp.trainer.trainer_utils import IntervalStrategy
+from paddlenlp.trainer.trainer_utils import IntervalStrategy, _get_distributed_seeds
 from paddlenlp.transformers import (
     AutoTokenizer,
     CosineAnnealingWithWarmupDecay,
     LinearAnnealingWithWarmupDecay,
-    QWenConfig,
-    QWenForCausalLM3DAuto,
-    QWenForCausalLMNet,
-    QWenPretrainingCriterionAuto,
-    QWenPretrainingCriterionNet,
+    LlamaConfig,
+    LlamaForCausalLM3DAuto,
+    LlamaForCausalLMNet,
+    LlamaPretrainingCriterion3DAuto,
+    LlamaPretrainingCriterionNet,
 )
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
-    "qwen": (QWenConfig, QWenForCausalLM3DAuto, QWenPretrainingCriterionAuto),
-    "qwen_network": (QWenConfig, QWenForCausalLMNet, QWenPretrainingCriterionNet),
+    "llama": (LlamaConfig, LlamaForCausalLM3DAuto, LlamaPretrainingCriterion3DAuto),
+    "llama_network": (LlamaConfig, LlamaForCausalLMNet, LlamaPretrainingCriterionNet),
 }
+
 
 from paddlenlp.data.causal_dataset import (
     build_train_valid_test_datasets,
@@ -57,6 +59,7 @@ from paddlenlp.data.causal_dataset import (
     print_rank_0,
 )
 from paddlenlp.trainer.utils.doc import add_start_docstrings
+from paddlenlp.utils.tools import get_env_device
 
 
 @dataclass
@@ -78,14 +81,6 @@ class PreTrainingArguments(AutoTrainingArguments):
             "help": "Enable fused linear grad add strategy, which will reduce elementwise add for grad accumulation in the backward of nn.Linear ."
         },
     )
-    job_schedule_profiler_start: int = field(
-        default=-1,
-        metadata={"help": "The step to start job_schedule_profiler."},
-    )
-    job_schedule_profiler_end: int = field(
-        default=-1,
-        metadata={"help": "The step to end job_schedule_profiler."},
-    )
     pipeline_schedule_mode: str = field(
         default="1F1B", metadata={"help": "The pipeline schedule mode, support FThenB, 1F1B, VPP and Eager-1F1B."}
     )
@@ -97,14 +92,6 @@ class PreTrainingArguments(AutoTrainingArguments):
     autotuner_benchmark: bool = field(
         default=False,
         metadata={"help": "Weather to run benchmark by autotuner. True for from_scratch and pad_max_length."},
-    )
-    fine_grained_log: bool = field(
-        default=False,
-        metadata={"help": "whether print find-grained performance log"},
-    )
-    lazy_init: bool = field(
-        default=False,
-        metadata={"help": "whether use lazy init for model parameters"},
     )
 
     def __post_init__(self):
@@ -166,15 +153,22 @@ class ModelArguments:
     Arguments pertaining to which model/config/tokenizer we are going to pre-train from.
     """
 
-    model_type: Optional[str] = field(default="qwen", metadata={"help": "Only support for qwen pre-training for now."})
+    model_type: Optional[str] = field(
+        default="llama", metadata={"help": "Only support for llama pre-training for now."}
+    )
     model_name_or_path: str = field(
-        default="qwen/qwen-7b",
+        default="__internal_testing__/tiny-random-llama",
         metadata={
             "help": "Path to pretrained model or model identifier from https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers.html"
         },
     )
     tokenizer_name_or_path: Optional[str] = field(
         default=None, metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}
+    )
+
+    use_fast_layer_norm: bool = field(
+        default=False,
+        metadata={"help": "GPT3 model, use fast layernorm"},
     )
 
     config_name: Optional[str] = field(
@@ -243,8 +237,6 @@ class ModelArguments:
         default=False,
         metadata={"help": "recompute_use_reentrant"},
     )
-    hidden_dropout_prob: float = field(default=0.1, metadata={"help": "The hidden dropout prob."})
-    attention_probs_dropout_prob: float = field(default=0.1, metadata={"help": "The attention hidden dropout prob."})
 
 
 def create_pretrained_dataset(
@@ -259,14 +251,14 @@ def create_pretrained_dataset(
 
     train_val_test_num_samples = [
         training_args.per_device_train_batch_size
-        * training_args.data_parallel_degree
+        * training_args.dataset_world_size
         * training_args.max_steps
         * training_args.gradient_accumulation_steps,
         training_args.per_device_eval_batch_size
-        * training_args.data_parallel_degree
+        * training_args.dataset_world_size
         * training_args.eval_iters
         * (training_args.max_steps // training_args.eval_steps + 1),
-        training_args.per_device_eval_batch_size * training_args.data_parallel_degree * training_args.test_iters,
+        training_args.per_device_eval_batch_size * training_args.dataset_world_size * training_args.test_iters,
     ]
 
     print_rank_0(" > datasets target sizes (minimum size):")
@@ -357,6 +349,24 @@ class PretrainingTrainer(AutoTrainer):
         dist_loader._input_keys = ["input_ids", "labels"]
         return dist_loader
 
+    def _get_train_sampler(self) -> Optional[paddle.io.Sampler]:
+        if self.train_dataset is None:
+            return None
+
+        total_batch_size_per_acc_step = self.args.per_device_train_batch_size * self.args.dataset_world_size
+        total_batch_size = total_batch_size_per_acc_step
+
+        # In llm/llama/run_pretrain.py, it uses paddlenlp.utils.batch_sampler.DistributedBatchSampler,
+        # which does no shuffle when shuffle is set True.
+        sampler = paddle.io.BatchSampler(
+            dataset=self.train_dataset,
+            shuffle=False,
+            batch_size=total_batch_size,
+            drop_last=self.args.dataloader_drop_last,
+        )
+        sampler._acc_steps = self.args.gradient_accumulation_steps
+        return sampler
+
 
 def print_config(args, key=""):
     """
@@ -386,24 +396,33 @@ def init_seed(seed: int = 1234, args=None):
         random.seed(seed)
         np.random.seed(seed)
         paddle.seed(seed)
+    else:
+        assert not args.use_hybrid_parallel and args.enable_auto_parallel
+        if dist.get_world_size() > 1:
+            if args.hybrid_parallel_topo_order is None or args.hybrid_parallel_topo_order == "pp_first":
+                order = ["pp", "dp", "sharding", "mp", "sep"]
+            elif args.hybrid_parallel_topo_order == "sharding_first":
+                order = ["dp", "sharding", "pp", "mp", "sep"]
+            topo = Topology(
+                dist.get_rank(),
+                dist.get_world_size(),
+                dp_degree=args.dataset_world_size,
+                pp_degree=args.pipeline_parallel_degree,
+                mp_degree=args.tensor_parallel_degree,
+                sharding_degree=1,  # auto_parallel's sharding is not orthogonal with dp, mp and pp
+                order=order,
+            )
 
-    if args is not None:
-        if args.use_hybrid_parallel:
-            from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
+            global_seed, local_seed, random_seed = _get_distributed_seeds(args.seed, topo)
 
-            random.seed(args.seed + args.dataset_rank)
-            np.random.seed(args.seed + args.dataset_rank)
-            paddle.seed(args.seed + args.dataset_rank)
+            paddle.seed(local_seed)
+            random.seed(random_seed)
+            np.random.seed(random_seed)
 
-            # local_seed/ global_seed is used to control dropout in ModelParallel
-            local_seed = args.seed + 59999 + args.tensor_parallel_rank * 10 + args.pipeline_parallel_rank * 1000
-            global_seed = args.seed + 100003 + args.dataset_rank
-            tracker = get_rng_state_tracker()
-
-            if "global_seed" not in tracker.states_:
-                tracker.add("global_seed", global_seed)
-            if "local_seed" not in tracker.states_:
-                tracker.add("local_seed", local_seed)
+            logger.info(
+                "The global seed is set to {}, local seed is set to {} and "
+                "random seed is set to {}.".format(global_seed, local_seed, random_seed)
+            )
         else:
             random.seed(args.seed)
             np.random.seed(args.seed)
@@ -430,8 +449,9 @@ def main():
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
-    if training_args.enable_linear_fused_grad_add:
-        from fused_layers import mock_layers
+    do_sp_async_reduce_scatter = ("enable_sp_async_reduce_scatter" in training_args.tensor_parallel_config and training_args.tensor_parallel_degree > 1 and training_args.sequence_parallel and training_args.to_static is False)
+    if training_args.enable_linear_fused_grad_add and not do_sp_async_reduce_scatter:
+        from llm.utils.fused_layers import mock_layers
 
         mock_layers()
 
@@ -475,6 +495,8 @@ def main():
 
     config = config_class.from_pretrained(model_args.model_name_or_path)
 
+    config.use_fast_layer_norm = model_args.use_fast_layer_norm
+
     config.seq_length = data_args.max_seq_length
     # There are some technique extend RotaryEmbedding context. so don't change max_position_embeddings
     if not model_args.continue_training:
@@ -506,7 +528,9 @@ def main():
     config.recompute_granularity = model_args.recompute_granularity
     config.virtual_pp_degree = model_args.virtual_pp_degree
     config.sequence_parallel = training_args.sequence_parallel
+
     config.fuse_sequence_parallel_allreduce = training_args.fuse_sequence_parallel_allreduce
+
     config.use_fused_rope = model_args.use_fused_rope
     config.no_recompute_layers = model_args.no_recompute_layers
     config.pp_recompute_interval = model_args.pp_recompute_interval
@@ -515,18 +539,22 @@ def main():
     config.use_recompute = training_args.recompute
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
+    config.sharding_parallel_degree = training_args.sharding_parallel_degree
+    config.to_static = training_args.to_static
 
     if training_args.strategy.pipeline.enable and config.virtual_pp_degree > 1:
         pipeline = training_args.strategy.pipeline
         pipeline.vpp_degree = config.virtual_pp_degree
         pipeline.vpp_seg_method = training_args.virtual_pipeline_seg_method
+    if get_env_device() == "xpu" and training_args.gradient_accumulation_steps > 1:
+        try:
+            from paddle_xpu.layers.nn.linear import LinearConfig  # noqa: F401
 
-    config.dp_degree = training_args.data_parallel_degree
-    config.mp_degree = training_args.tensor_parallel_degree
-    config.pp_degree = training_args.pipeline_parallel_degree
-    config.to_static = training_args.to_static
-    config.fine_grained_log = training_args.fine_grained_log
-    config.lazy_init = training_args.lazy_init
+            LinearConfig.enable_accumulate_steps_opt()
+            LinearConfig.set_accumulate_steps(training_args.gradient_accumulation_steps)
+        except ImportError:
+            # It's OK, not use accumulate_steps optimization
+            pass
 
     print("Final pre-training config:", config)
 
@@ -534,21 +562,31 @@ def main():
         from llm.utils.replace_ops import replace_cross_entropy
 
         replace_cross_entropy()
-        
-    # Set the dtype for loading model
-    dtype = "float32"
-    if training_args.fp16_opt_level == "O2":
-        if training_args.fp16:
-            dtype = "float16"
-        if training_args.bf16:
-            dtype = "bfloat16"
+
+    # # Set the dtype for loading model
+    # dtype = "float32"
+    # if training_args.fp16_opt_level == "O2":
+    #     if training_args.fp16:
+    #         dtype = "float16"
+    #     if training_args.bf16:
+    #         dtype = "bfloat16"
 
     with paddle.LazyGuard():
-        model = model_class.from_config(config, dtype=dtype)
+        model = model_class.from_config(config, dtype="float32")
         criterion = criterion_class(config)
 
-    # load_model(model)
-    # shard_model(model)
+    if training_args.recompute:
+
+        def fn(layer):
+            if hasattr(layer, "enable_recompute") and (layer.enable_recompute is False or layer.enable_recompute == 0):
+                layer.enable_recompute = True
+
+        model.apply(fn)
+
+    if do_sp_async_reduce_scatter:
+        from llm.utils.sp_async_reduce_scatter import mock_layers_with_sp_async_reduce_scatter
+
+        mock_layers_with_sp_async_reduce_scatter(model)
 
     # Create the learning_rate scheduler and optimizer
     if training_args.decay_steps is None:
@@ -585,7 +623,6 @@ def main():
         tokenizer,
         need_data=training_args.should_load_dataset,
     )
-
     trainer = PretrainingTrainer(
         model=model,
         criterion=criterion,
@@ -620,29 +657,34 @@ def main():
         test_ret = trainer.predict(test_dataset)
         trainer.log_metrics("test", test_ret.metrics)
 
+    # if training_args.should_load_dataset:
+    #     effective_tokens_per_second = total_effective_tokens / train_result.metrics["train_runtime"]
+    #     print(f"Effective Tokens per second: {effective_tokens_per_second:.2f}")
+    #     print(f"ips: {effective_tokens_per_second:.2f} tokens/s")
+
 
 def shard_model(model):
     pp_stage = 0
     for name, layer in model.named_sublayers(include_self=False):
         if hasattr(layer, "ipp"):
             pp_stage = layer.ipp
-        print(f"name {name},pp_stage {pp_stage}==>", type(layer))
-        # if "embed_tokens" in name:
-        if "wte" in name:
+        # print(f"name {name},pp_stage {pp_stage}==>", type(layer))
+        if "embed_tokens" in name:
             # embedding only support column split now. it will update in the future
             shard_fn(layer, 0, [dist.Replicate(), dist.Shard(1)])
         for n in [
-            "attn.c_attn",
-            "attn.c_attn_q",
-            "attn.c_attn_k",
-            "attn.c_attn_v",
-            "mlp.w1",
-            "mlp.w2",
+            "self_attn.q_proj",
+            "self_attn.k_proj",
+            "self_attn.v_proj",
+            "self_attn.qkv_proj",
+            "gate_proj",
+            "up_proj",
+            "gate_up_fused_proj",
         ]:
             if n in name:
                 shard_fn(layer, pp_stage, [dist.Replicate(), dist.Shard(1)])
                 break
-        for n in ["attn.c_proj", "mlp.c_proj"]:
+        for n in ["self_attn.o_proj", "down_proj"]:
             if n in name:
                 shard_fn(layer, pp_stage, [dist.Replicate(), dist.Shard(0)])
                 break
@@ -677,9 +719,7 @@ def print_grad(model):
     for p in model.parameters():
         assert p.name in name_mapping
         if p.grad is not None:
-            print(
-                f"{name_mapping[p.name]} {p.name}_grad shape: {p.grad.shape} values: {p.grad.numpy()} fp32 values: {paddle.cast(p.grad, paddle.float32).numpy()} md5sum: {p.grad._md5sum()}"
-            )
+            print(f"{name_mapping[p.name]} {p.name}_grad shape: {p.grad.shape} md5sum: {p.grad._md5sum()}")
 
 
 def print_param(model):
@@ -687,23 +727,21 @@ def print_param(model):
     name_mapping = {v.name: k for (k, v) in model_state_dict.items()}
     for p in model.parameters():
         assert p.name in name_mapping
-        # if p.grad is not None:
-        print(
-            f"{name_mapping[p.name]} {p.name} dtype: {p.dtype} shape: {p.shape} local_shape: {p._local_shape} values: {p.numpy()} fp32 values: {paddle.cast(p, paddle.float32).numpy()} md5sum: {p._md5sum()}"
-        )
+        if p.grad is not None:
+            print(f"{name_mapping[p.name]} {p.name} shape: {p.shape} md5sum: {p._md5sum()}")
 
 
 def map_structure_name(k):
     fs = k.split(".")
     idx = int(fs[1])
     if idx == 0:
-        return "qwen.wte.weight"
+        return "llama.embed_tokens.weight"
     if idx == 33:
-        return "qwen.ln_f.weight"
+        return "llama.norm.weight"
     if idx == 34:
         return "lm_head.weight"
     else:
-        return f"qwen.h.{idx-1}." + ".".join(fs[2:])
+        return f"llama.layers.{idx-1}." + ".".join(fs[2:])
 
 
 if __name__ == "__main__":

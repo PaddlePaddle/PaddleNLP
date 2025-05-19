@@ -351,7 +351,7 @@ class VocabParallelEntropy(paddle.autograd.PyLayer):
 
 
 def entropy_from_logits(logits: paddle.Tensor, tensor_parallel_output=False):
-    return VocabParallelEntropy.apply(logits, tensor_parallel_output)
+    return VocabParallelEntropy.apply(logits.astype("float32"), tensor_parallel_output)
 
 
 @merge_fwd_labels
