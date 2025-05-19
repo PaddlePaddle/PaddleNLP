@@ -22,13 +22,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List
 
-import paddle
 import pandas as pd
 import tqdm
 from transformers import AutoTokenizer
 from vllm import LLM, SamplingParams
 
-from paddlenlp.rl.trainer import process_row
 from paddlenlp.utils.log import logger
 
 
