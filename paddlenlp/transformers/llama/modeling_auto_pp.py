@@ -1,4 +1,4 @@
-# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2022 EleutherAI and the HuggingFace Inc. team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -355,15 +355,28 @@ class LlamaEmbeddingAutoPP(nn.Layer):
 class LlamaDecoderLayerAutoPP(nn.Layer):
     def __init__(self, config, idx, layerwise_recompute: bool = False, ipp: Optional[int] = None):
         super(LlamaDecoderLayerAutoPP, self).__init__()
+        self.config = config
         self.layer_id = idx
         self.layer = LlamaDecoderLayerAuto(config, layerwise_recompute, ipp)
         self.enable_recompute = False
         self.recompute_granularity = config.recompute_granularity
         self.no_recompute_layers = config.no_recompute_layers if config.no_recompute_layers is not None else []
+        self.embed_tokens = None
+        self.norm = None
+        self.lm_head = None
+        if self.layer_id == 0:
+            self.embed_tokens = LlamaEmbeddingAutoPP(config)
+        
+        if self.layer_id == self.config.num_hidden_layers - 1:
+            self.norm = LlamaRMSNormAutoPP(config, ipp)
+            self.lm_head = LlamaLMHeadAutoPP(config)
+            
 
     def forward(self, args):
+        if self.embed_tokens is not None:
+            args = self.embed_tokens(args)
         hidden_states, position_ids, inputs_embeds, attention_mask, output_attentions, past_key_values, use_cache, alibi = parse_args(args)
-                
+        
         past_key_value = past_key_values[self.layer_id] if past_key_values is not None else None
 
         has_gradient = not hidden_states.stop_gradient
@@ -425,8 +438,8 @@ class LlamaDecoderLayerAutoPP(nn.Layer):
             hidden_states = layer_outputs[0]
         else:
             hidden_states = layer_outputs
-
-        return return_args(
+            
+        ret_args = return_args(
             hidden_states,
             position_ids,
             inputs_embeds,
@@ -436,6 +449,12 @@ class LlamaDecoderLayerAutoPP(nn.Layer):
             use_cache,
             alibi,
         )
+        if self.norm is not None:
+           ret_args = self.norm(ret_args)
+
+        if self.lm_head is not None:
+            ret_args = self.lm_head(ret_args)
+        return ret_args
 
 class LlamaLMHeadAutoPP(nn.Layer):
     def __init__(self, config: LlamaConfig):
@@ -473,9 +492,7 @@ class LlamaForCausalLM3DAutoPP(LlamaForCausalLM3DAuto):
     def __init__(self, config):
         super().__init__(config)
         self.config = config
-        # self.llama = LlamaModelAutoPP(config)
         self.no_recompute_layers = config.no_recompute_layers if config.no_recompute_layers is not None else []
-        self.embed_tokens = LlamaEmbeddingAutoPP(config)
         ## 暂时先不考虑PP，后面再加
         decoder_layers = []
         # self.next_pp_stage_indexes = []
@@ -485,8 +502,6 @@ class LlamaForCausalLM3DAutoPP(LlamaForCausalLM3DAuto):
             # if input_need_reshard:
             #     self.next_pp_stage_indexes.append(i)
         self.layers = nn.LayerList(decoder_layers)
-        self.norm = LlamaRMSNormAutoPP(config, 0)
-        self.lm_head = LlamaLMHeadAutoPP(config)
 
     def forward(
         self,
@@ -502,15 +517,10 @@ class LlamaForCausalLM3DAutoPP(LlamaForCausalLM3DAuto):
         return_dict=None,
     ):
         
-        args = return_args(input_ids, position_ids, inputs_embeds, attention_mask, output_attentions, past_key_values, use_cache, None)
-        
-        outputs = self.embed_tokens(args)
+        outputs = return_args(input_ids, position_ids, inputs_embeds, attention_mask, output_attentions, past_key_values, use_cache, None)
+
         # decoder layers
         for idx, (decoder_layer) in enumerate(self.layers):
             outputs = decoder_layer(outputs)
-        # 第一个是hidden_states
-        outputs = self.norm(outputs)
-
-        outputs = self.lm_head(outputs)
 
         return outputs[0]
