@@ -1,0 +1,15 @@
+python -m paddle.distributed.launch --gpus 4,5 paddle_infer.py \
+  --actor_model_name_or_path /root/paddlejob/workspace/env_run/paddlenlp_rl/model/paddle/Qwen2.5-7B-Instruct-1M \
+  --max_src_len 512 \
+  --min_dec_len 32 \
+  --max_dec_len 8192 \
+  --top_p 1.0 \
+  --temperature 0.7 \
+  --rollout_n 8 \
+  --rollout_max_num_seqs 64 \
+  --rollout_quant_type "" \
+  --tensor_parallel_degree 2 \
+  --rollout_input_batch_size 8 \
+  --limit_rows 512 \
+    --input_file your_file \
+    --output_dir output_dir 

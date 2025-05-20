@@ -25,28 +25,46 @@ import tqdm
 from transformers import AutoTokenizer
 from utils import RangeSet
 from vllm import LLM, SamplingParams
+from vllm.inputs import TokensPrompt
 
-from paddlenlp.utils.log import logger
+from transformers import logging
+
+logging.set_verbosity_info()
+logger = logging.get_logger(__name__)
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--actor_model_name_or_path", type=str, default="Qwen/Qwen2.5-7B-Instruct-1M", help="预训练模型名称或路径"
+        "--actor_model_name_or_path",
+        type=str,
+        default="Qwen/Qwen2.5-7B-Instruct-1M",
+        help="Name or path of the pretrained model",
     )
-    parser.add_argument("--input_file", type=str, default="./combined.parquet", help="输入parquet文件路径")
-    parser.add_argument("--output_dir", type=str, default="./pt_inference_results", help="输出目录路径")
-    parser.add_argument("--rollout_input_batch_size", type=int, default=2, help="一次性输入给推理引擎的大小")
-    parser.add_argument("--rollout_n", type=int, default=2, help="重复推理次数（用于性能测试）")
-    parser.add_argument("--log_interval", type=int, default=1, help="日志记录间隔（批次）")
-    parser.add_argument("--dtype", type=str, default="bfloat16", help="数据类型")
-    parser.add_argument("--rollout_quant_type", type=str, default="", help="推理量化类型")
-    parser.add_argument("--tensor_parallel_size", type=int, default=1, help="模型并行度")
-    parser.add_argument("--top_p", type=float, default=0.9, help="生成文本的top-p采样参数")
-    parser.add_argument("--temperature", type=float, default=0.7, help="生成文本的温度参数")
-    parser.add_argument("--should_log", type=bool, default=True, help="是否打印日志信息")
-    parser.add_argument("--max_prompt_length", type=int, default=1024 * 2, help="最大prompt长度")
-    parser.add_argument("--max_response_length", type=int, default=1024 * 2, help="最大response长度")
+    parser.add_argument("--input_file", type=str, default="./combined.parquet", help="Path to input parquet file")
+    parser.add_argument("--output_dir", type=str, default="./pt_infer_results", help="Path to output directory")
+    parser.add_argument(
+        "--rollout_input_batch_size", type=int, default=2, help="Batch size for each inference engine input"
+    )
+    parser.add_argument(
+        "--rollout_n", type=int, default=2, help="Number of repeated inference runs (for performance testing)"
+    )
+    parser.add_argument("--log_interval", type=int, default=1, help="Logging interval (in batches)")
+    parser.add_argument("--dtype", type=str, default="bfloat16", help="Data type for computation")
+    parser.add_argument(
+        "--rollout_quant_type", type=str, default="", help="Quantization type for inference (e.g., int8, fp4)"
+    )
+    parser.add_argument("--tensor_parallel_degree", type=int, default=1, help="Degree of model parallelism")
+    parser.add_argument("--top_p", type=float, default=0.9, help="Top-p sampling parameter for text generation")
+    parser.add_argument("--temperature", type=float, default=0.7, help="Temperature parameter for text generation")
+    parser.add_argument("--should_log", type=bool, default=True, help="Whether to print logging information")
+    parser.add_argument("--max_prompt_length", type=int, default=1024 * 2, help="Maximum prompt length (in tokens)")
+    parser.add_argument(
+        "--max_response_length", type=int, default=1024 * 2, help="Maximum response length (in tokens)"
+    )
+    parser.add_argument("--min_response_length", type=int, default=0, help="Minimum response length (in tokens)")
+    parser.add_argument("--limit_rows", type=int, default=-1, help="Maximum number of rows to read from the dataset (-1 means all)")
+    parser.add_argument("--gpu_memory_utilization", type=float, default=0.9, help="Percentage of GPU memory usage")
     args = parser.parse_args()
 
     return args
@@ -75,7 +93,6 @@ class DumpyInferenceTask:
         self.output_dir = Path(args.output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        # 初始化输出文件路径
         self.global_stats_path = self.output_dir / "global_stats.csv"
         self.dispersed_stats_path = self.output_dir / "dispersed_stats.csv"
         self.rollout_details_path = self.output_dir / "rollout_details.jsonl"
@@ -109,16 +126,16 @@ class DumpyInferenceTask:
             model=self.args.actor_model_name_or_path,
             enforce_eager=False,
             max_model_len=self.args.max_prompt_length + self.args.max_response_length,  # 设置最大长度以支持最大测试长度
-            gpu_memory_utilization=0.9,
-            tensor_parallel_size=self.args.tensor_parallel_size,
+            gpu_memory_utilization=self.args.gpu_memory_utilization,
+            tensor_parallel_size=self.args.tensor_parallel_degree,
             max_seq_len_to_capture=self.args.max_prompt_length + self.args.max_response_length,
             max_num_batched_tokens=self.args.max_prompt_length + self.args.max_response_length,
         )
         self.sampling_params = SamplingParams(
             top_p=self.args.top_p,
             temperature=self.args.temperature,
-            min_tokens=0,
-            max_tokens=2 * 1024,
+            min_tokens=self.args.min_response_length,
+            max_tokens=self.args.max_response_length,
             n=self.args.rollout_n,
             seed=42,
         )
@@ -132,16 +149,18 @@ class DumpyInferenceTask:
         logger.info(f"Processing data from {file_path}...")
         start_time = time.time()
         df = pd.read_parquet(file_path)
+        if self.args.limit_rows != -1:
+            df = df.iloc[:self.args.limit_rows]
         logger.info(f"Loaded {len(df)} samples in {time.time() - start_time:.2f}s")
         return df
 
     def run_inference(self, prompts, batch_index=0):
-        start_time = time.time()
-        request_outputs = self.model.generate(prompts=prompts, sampling_params=self.sampling_params, use_tqdm=True)
-        end_time = time.time()
-
-        # 获取对应的token ids用于后续处理
         input_ids = [self.tokenizer(prompt, add_special_tokens=False)["input_ids"] for prompt in prompts]
+        token_prompt_ids = [TokensPrompt(prompt_token_ids=prompt) for prompt in input_ids]
+        
+        start_time = time.time()
+        request_outputs = self.model.generate(prompts=token_prompt_ids, sampling_params=self.sampling_params, use_tqdm=True)
+        end_time = time.time()
 
         batch_token_ids = []
         for output in request_outputs:
@@ -155,9 +174,6 @@ class DumpyInferenceTask:
         return None
 
     def postprocess_data(self, input_ids, output_ids, batch_index=0):
-        # batch_input_ids: List[int]
-        # batch_output_ids: List[List[List[int]]]
-        # Process prompts
         global_prompt_tokens = []
         global_prompt_tokens_len = []
         group_prompt_texts = []
@@ -226,9 +242,7 @@ class DumpyInferenceTask:
             yield all_prompts
 
     def execute(self):
-        # 数据准备
         dataframe = self.process_data(self.args.input_file)
-        # 创建输出目录
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         with open(self.global_stats_path, "a", newline="") as global_f, open(
@@ -236,7 +250,6 @@ class DumpyInferenceTask:
         ) as dispersed_f, open(self.rollout_details_path, "a", encoding="utf-8") as jsonl_f:
 
             if self.args.should_log:
-                # 初始化CSV写入器
                 global_writer = csv.writer(global_f)
                 dispersed_writer = csv.writer(dispersed_f)
                 if self.processed_set.processed_count <= 0:
@@ -264,17 +277,17 @@ class DumpyInferenceTask:
                         ]
                     )
 
-            for batch_index, input_ids in tqdm.tqdm(
+            for batch_index, prompts in tqdm.tqdm(
                 enumerate(self.batch_process(dataframe)),
                 total=math.ceil(len(dataframe) / self.args.rollout_input_batch_size),
                 disable=not self.args.should_log,
             ):
                 if self.processed_set.contains(batch_index):
                     continue
-                statistics = self.run_inference(input_ids, batch_index=batch_index)
+
+                statistics = self.run_inference(prompts, batch_index=batch_index)
 
                 if self.args.should_log:
-                    # 写入全局统计
                     total_time = round(statistics["total_time"], 2)
                     total_tokens = statistics["global_response_tokens_total"]
                     throughput = round(total_tokens / total_time if total_time > 0 else 0, 2)
@@ -304,7 +317,6 @@ class DumpyInferenceTask:
                         ]
                     )
 
-                    # 写入详细记录（每个query一行）
                     prompt_text = statistics["group_prompt_texts"]
                     response_tokens = statistics["group_response_tokens"]
                     response_texts = statistics["group_response_texts"]

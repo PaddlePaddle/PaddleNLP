@@ -19,34 +19,23 @@ import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List
-from utils import RangeSet
-
-@contextmanager
-def switch_level_context(level="INFO"):
-    """临时切换日志级别的上下文管理器"""
-    import logging
-    original_level = logging.root.level
-    logging.root.setLevel(level)
-    try:
-        yield
-    finally:
-        logging.root.setLevel(original_level)
 
 import paddle
 import pandas as pd
 from tqdm import tqdm
+from utils import RangeSet
 
 from paddlenlp.rl.trainer import process_row
 from paddlenlp.rl.utils import TrainingArguments
+from paddlenlp.trl.llm_utils import init_dist_env
 from paddlenlp.rl.utils.infer_utils import (
     get_policy_predictor,
     infer_guard,
-    init_dist_env,
 )
 from paddlenlp.trainer import PdArgumentParser, set_seed
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
 from paddlenlp.utils.log import logger
+
 
 @contextmanager
 def switch_level_context(level="ERROR"):
@@ -58,19 +47,26 @@ def switch_level_context(level="ERROR"):
     finally:
         logger.set_level(original_level)
 
+
 def chunk(all_input_ids, size):
     if size <= 0:
         raise ValueError("Size must be greater than 0")
     return [all_input_ids[i : i + size] for i in range(0, len(all_input_ids), size)]
 
+
 @dataclass
 class DumpyTrainingArguments(TrainingArguments):
-    actor_model_name_or_path: str = field(default="Qwen/Qwen2.5-7B-Instruct-1M", metadata={"help": "预训练模型名称或路径"})
-    input_file: str = field(default="kk/instruct/3-7ppl/combined.parquet", metadata={"help": "输入parquet文件路径"})
-    output_dir: str = field(default="./inference_results", metadata={"help": "输出目录路径"})
-    rollout_input_batch_size: int = field(default=32, metadata={"help": "一次性输入给推理引擎的大小"})
-    rollout_n: int = field(default=8, metadata={"help": "重复推理次数（用于性能测试）"})
-    log_interval: int = field(default=1, metadata={"help": "日志记录间隔（批次）"})
+    actor_model_name_or_path: str = field(
+        default="Qwen/Qwen2.5-7B-Instruct-1M", metadata={"help": "pretrained model name or path"}
+    )
+    input_file: str = field(
+        default="kk/instruct/3-7ppl/combined.parquet", metadata={"help": "input the Parquet file path"}
+    )
+    limit_rows: int = field(default=-1, metadata={"help": "Maximum number of rows to read from the dataset (-1 means all)"})
+    output_dir: str = field(default="./pt_infer_results", metadata={"help": "output directory path"})
+    rollout_input_batch_size: int = field(default=32, metadata={"help": "batch size for inference engine inputs"})
+    rollout_n: int = field(default=8, metadata={"help": "number of rollouts (for performance testing)"})
+    log_interval: int = field(default=1, metadata={"help": "logging interval (in batches)"})
 
     def __post_init__(self):
         super().__post_init__()
@@ -87,7 +83,7 @@ class DumpyInferenceTask:
         self.output_dir = Path(args.output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        # 初始化输出文件路径
+        # ​​Initialize output file path​
         self.global_stats_path = self.output_dir / "global_stats.csv"
         self.dispersed_stats_path = self.output_dir / "dispersed_stats.csv"
         self.rollout_details_path = self.output_dir / "rollout_details.jsonl"
@@ -141,6 +137,8 @@ class DumpyInferenceTask:
         logger.info(f"Processing data from {file_path}...")
         start_time = time.time()
         df = pd.read_parquet(file_path)
+        if self.args.limit_rows != -1:
+            df = df.iloc[:self.args.limit_rows]
         logger.info(f"Loaded {len(df)} samples in {time.time() - start_time:.2f}s")
         return df
 
@@ -237,11 +235,11 @@ class DumpyInferenceTask:
             yield _pad_batch(all_input_ids)
 
     def execute(self):
-        """主执行流程"""
-        # 数据准备
+        """Main Execution Pipeline"""
+        # Data Preparation​
         dataframe = self.process_data(self.args.input_file)
 
-        # 创建输出目录
+        # Create Output Directory
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         with open(self.global_stats_path, "a", newline="") as global_f, open(
@@ -249,7 +247,7 @@ class DumpyInferenceTask:
         ) as dispersed_f, open(self.rollout_details_path, "a", encoding="utf-8") as jsonl_f:
 
             if self.args.should_log:
-                # 初始化CSV写入器
+                # Initialize the CSV writer
                 global_writer = csv.writer(global_f)
                 dispersed_writer = csv.writer(dispersed_f)
                 if self.processed_set.processed_count <= 0:
@@ -285,10 +283,11 @@ class DumpyInferenceTask:
                 ):
                     if self.processed_set.contains(batch_index):
                         continue
+
                     statistics = self.run_inference(input_ids, batch_index=batch_index)
 
                     if self.args.should_log:
-                        # 写入全局统计
+                        # Write global statistics
                         total_time = round(statistics["total_time"], 2)
                         total_tokens = statistics["global_response_tokens_total"]
                         throughput = round(total_tokens / total_time if total_time > 0 else 0, 2)
@@ -318,7 +317,7 @@ class DumpyInferenceTask:
                             ]
                         )
 
-                        # 写入详细记录（每个query一行）
+                        # Write detailed records (one row per query)
                         prompt_text = statistics["group_prompt_texts"]
                         response_tokens = statistics["group_response_tokens"]
                         response_texts = statistics["group_response_texts"]

@@ -27,111 +27,24 @@ from typing import List, Tuple
 import pandas as pd
 from openai import AsyncOpenAI
 from tqdm import tqdm
+from utils import RangeSet
 
 from paddlenlp.transformers import AutoTokenizer
 
-# 配置根 Logger
-logging.basicConfig(
-    level=logging.WARNING, format="%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
-)
+from transformers import logging
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logging.set_verbosity_info()
+logger = logging.get_logger(__name__)
 
-
-@dataclass
-class RangeSet:
-    """Manage processed line ranges with efficient storage and querying"""
-
-    ranges: List[tuple]
-
-    def add(self, number: int):
-        """Add a number to the range set and merge adjacent ranges"""
-        new_ranges = []
-        added = False
-        for start, end in sorted(self.ranges):
-            if number < start - 1:
-                if not added:
-                    new_ranges.append((number, number))
-                    added = True
-                new_ranges.append((start, end))
-            elif number == start - 1:
-                new_ranges.append((number, end))
-                added = True
-            elif number <= end:
-                new_ranges.append((start, end))
-                added = True
-            else:
-                new_ranges.append((start, end))
-        if not added:
-            new_ranges.append((number, number))
-        self.ranges = self.merge_ranges(new_ranges)
-
-    @staticmethod
-    def merge_ranges(ranges: List[tuple]) -> List[tuple]:
-        """Merge overlapping or adjacent ranges"""
-        if not ranges:
-            return []
-        sorted_ranges = sorted(ranges)
-        merged = [sorted_ranges[0]]
-        for current in sorted_ranges[1:]:
-            last = merged[-1]
-            if current[0] <= last[1] + 1:
-                merged[-1] = (last[0], max(last[1], current[1]))
-            else:
-                merged.append(current)
-        return merged
-
-    def contains(self, number: int) -> bool:
-        """Check if a number exists in any range"""
-        for start, end in self.ranges:
-            if start <= number <= end:
-                return True
-        return False
-
-    def to_file_format(self) -> str:
-        """Serialize ranges to compact string format"""
-        return ",".join(f"{start}-{end}" if start != end else str(start) for start, end in self.ranges)
-
-    @classmethod
-    def from_file(cls, content: str) -> "RangeSet":
-        """Deserialize from string format"""
-        if not content:
-            return cls(ranges=[])
-        ranges = []
-        for part in content.split(","):
-            if "-" in part:
-                start, end = map(int, part.split("-"))
-                ranges.append((start, end))
-            else:
-                num = int(part)
-                ranges.append((num, num))
-        return cls(ranges=ranges)
-
-    @property
-    def processed_count(self) -> int:
-        """Total number of processed items"""
-        return sum(end - start + 1 for start, end in self.ranges)
-
-
-# 请求api的参数类
 @dataclass
 class RequestPayload:
-    """请求有效载荷"""
-
-    prompt: str = "你好"
+    prompt: str = ""
     num_responses: int = 8
-    temperature: float = 1.0
-    top_p: float = 1.0
-    max_tokens: int = 20 * 1024
     idx: int = 0
 
 
-# 响应api的参数类
 @dataclass
 class ResponsePayload:
-    """响应有效载荷"""
-
     idx: int = 0
     question: str = ""
     question_token_length: int = 0
@@ -142,6 +55,16 @@ class ResponsePayload:
 
 
 class StatisticsManager:
+    """Manages statistics collection and analysis for batch inference operations.
+
+    This class provides methods to compute both per-group (dispersed) and aggregated (global)
+    statistics from batch inference responses, including token lengths, processing times,
+    and throughput metrics.
+    """
+    def __init__(self, batch_size: int, rollout_n: int):
+        self.batch_size = batch_size
+        self.rollout_n = rollout_n
+
     def dispersed_stats(self, responses: List[ResponsePayload], batch_elapsed_time: float):
         batch_group_pd = pd.DataFrame(responses)
 
@@ -154,10 +77,10 @@ class StatisticsManager:
             "completion_time": batch_elapsed_time,
             "throughput_tokens_per_sec": batch_group_pd["token_lengths"].apply((lambda x: sum(x))).sum()
             / batch_elapsed_time,
-            "elapsed_times": batch_group_pd["elapsed_times"].to_list(),
-            "min_time": batch_group_pd["elapsed_times"].apply(lambda x: min(x)).tolist(),
-            "max_time": batch_group_pd["elapsed_times"].apply(lambda x: max(x)).tolist(),
-            "avg_time": batch_group_pd["elapsed_times"].apply(lambda x: sum(x) / len(x)).tolist(),
+            # "elapsed_times": batch_group_pd["elapsed_times"].to_list(),
+            # "min_time": batch_group_pd["elapsed_times"].apply(lambda x: min(x)).tolist(),
+            # "max_time": batch_group_pd["elapsed_times"].apply(lambda x: max(x)).tolist(),
+            # "avg_time": batch_group_pd["elapsed_times"].apply(lambda x: round(sum(x) / len(x), 2)).tolist(),
         }
 
         return dispersed_stats_dict
@@ -173,11 +96,11 @@ class StatisticsManager:
         global_stats_dict["batch_index"] = dispersed_stats_dict["batch_index"]
         global_stats_dict["min_response_tokens"] = min(dispersed_stats_dict["min_length"])
         global_stats_dict["max_response_tokens"] = max(dispersed_stats_dict["max_length"])
-        global_stats_dict["avg_response_tokens"] = total_response_tokens / len(responses)
+        global_stats_dict["avg_response_tokens"] = total_response_tokens / (self.batch_size * self.rollout_n)
         global_stats_dict["total_response_tokens"] = total_response_tokens
         global_stats_dict["group_max_response_tokens"] = dispersed_stats_dict["max_length"]
-        global_stats_dict["min_time"] = min(dispersed_stats_dict["min_time"])
-        global_stats_dict["avg_time"] = sum(dispersed_stats_dict["avg_time"]) / len(responses)
+        # global_stats_dict["min_time"] = min(dispersed_stats_dict["min_time"])
+        # global_stats_dict["avg_time"] = round(sum(dispersed_stats_dict["avg_time"]) / len(responses), 2)
         global_stats_dict["completion_time"] = dispersed_stats_dict["completion_time"]
         global_stats_dict["throughput_tokens_per_sec"] = dispersed_stats_dict["throughput_tokens_per_sec"]
 
@@ -197,13 +120,12 @@ class ApiTask:
 
         self.output_dir = Path(self.args.output_dir)
 
-        # 初始化输出文件路径
         self.global_stats_path = self.output_dir / "global_stats.csv"
         self.dispersed_stats_path = self.output_dir / "dispersed_stats.csv"
         self.rollout_details_path = self.output_dir / "rollout_details.jsonl"
         self.status_file_path = self.output_dir / "status.txt"
 
-        self.stats_manager = StatisticsManager()
+        self.stats_manager = StatisticsManager(self.args.rollout_input_batch_size, self.args.rollout_n)
 
         self._load_status()
 
@@ -211,7 +133,7 @@ class ApiTask:
         return self._max_concurrency - self.semaphore._value
 
     def get_client(self) -> AsyncOpenAI:
-        # 返回一个AsyncOpenAI客户端实例
+        # Returns an AsyncOpenAI client instance
         return next(self.clients)
 
     def _save_status(self, batch_index):
@@ -223,7 +145,6 @@ class ApiTask:
 
     def _load_status(self):
         """Load processing status from file"""
-        """从文件中加载处理状态"""
         try:
             with open(self.status_file_path, "r", encoding="utf-8") as f:
                 content = f.read().strip()
@@ -236,6 +157,8 @@ class ApiTask:
         logger.info(f"Processing data from {file_path}...")
         start_time = time.time()
         df = pd.read_parquet(file_path)
+        if self.args.limit_rows != -1:
+            df = df.iloc[:self.args.limit_rows]
         logger.info(f"Loaded {len(df)} samples in {time.time() - start_time:.2f}s")
         return df
 
@@ -243,7 +166,7 @@ class ApiTask:
         batch_prompts = []
         for idx, prompt in enumerate(dataframe[self.args.prompt_key]):
             batch_prompts.append(
-                RequestPayload(prompt=prompt[0]["content"], idx=idx, num_responses=self.args.rollout_output_num)
+                RequestPayload(prompt=prompt[0]["content"], idx=idx, num_responses=self.args.rollout_n)
             )
             if len(batch_prompts) == self.args.rollout_input_batch_size:
                 yield batch_prompts
@@ -253,21 +176,21 @@ class ApiTask:
         client = self.get_client()
         try:
             async with self.semaphore:
-                logger.debug("client is : %s", client.base_url)
-                logger.debug(f"当前有 {self.get_active_tasks_count()} 个异步任务正在工作")
+                # logger.debug("client is : %s", client.base_url)
+                # logger.debug(f"There are currently {self.get_active_tasks_count()} asynchronous tasks working")
                 start_time = time.perf_counter()
                 response = await client.completions.create(
                     model=self.model,
                     prompt=request.prompt,
-                    temperature=request.temperature,
-                    top_p=request.top_p,
-                    max_tokens=request.max_tokens,
+                    temperature=self.args.temperature,
+                    top_p=self.args.top_p,
+                    max_tokens=self.args.max_response_length,
                     n=1,
                     stream=True,
-                )
-                # 流式文字存储在chunks列表中
+                ) 
+                # Streaming text is stored in a list of chunks
                 chunks = []
-                # 流式处理响应
+                # Streaming responses
                 async for chunk in response:
                     if chunk.choices and chunk.choices[0].text:
                         chunks.append(chunk.choices[0].text)
@@ -282,7 +205,7 @@ class ApiTask:
             raise ValueError(e)
 
     async def group_call(self, request: RequestPayload) -> ResponsePayload:
-        # 采用异步一次调用num_responses次 get_respose方法，并返回结果
+        """Performs n complete token generation rollouts for the given query."""
         tasks = [self.call(request) for _ in range(request.num_responses)]
 
         result = ResponsePayload()
@@ -298,7 +221,7 @@ class ApiTask:
         return result
 
     async def batch_call(self, requests: List[RequestPayload]) -> Tuple[List[ResponsePayload], int]:
-        """批量执行请求"""
+        """Batch execution requests"""
         start_time = time.perf_counter()
         batch_results = await asyncio.gather(*[self.group_call(request) for request in requests])
         end_time = time.perf_counter()
@@ -325,8 +248,8 @@ class ApiTask:
                         "avg_response_tokens",
                         "total_response_tokens",
                         "group_max_response_tokens",
-                        "min_time",
-                        "avg_time",
+                        # "min_time",
+                        # "avg_time",
                         "completion_time",
                         "throughput_tokens_per_sec",
                     ]
@@ -340,10 +263,10 @@ class ApiTask:
                         "avg_length",
                         "completion_time",
                         "throughput_tokens_per_sec",
-                        "elapsed_times",
-                        "min_time",
-                        "max_time",
-                        "avg_time",
+                        # "elapsed_times",
+                        # "min_time",
+                        # "max_time",
+                        # "avg_time",
                     ]
                 )
 
@@ -372,8 +295,8 @@ class ApiTask:
                         round(global_stats_dict["avg_response_tokens"], 2),
                         global_stats_dict["total_response_tokens"],
                         global_stats_dict["group_max_response_tokens"],
-                        global_stats_dict["min_time"],
-                        global_stats_dict["avg_time"],
+                        # global_stats_dict["min_time"],
+                        # global_stats_dict["avg_time"],
                         round(global_stats_dict["completion_time"], 2),
                         round(global_stats_dict["throughput_tokens_per_sec"], 2),
                     ]
@@ -388,10 +311,10 @@ class ApiTask:
                         dispersed_stats_dict["avg_length"],
                         round(dispersed_stats_dict["completion_time"], 2),
                         round(dispersed_stats_dict["throughput_tokens_per_sec"], 2),
-                        dispersed_stats_dict["elapsed_times"],
-                        dispersed_stats_dict["min_time"],
-                        dispersed_stats_dict["max_time"],
-                        dispersed_stats_dict["avg_time"],
+                        # dispersed_stats_dict["elapsed_times"],
+                        # dispersed_stats_dict["min_time"],
+                        # dispersed_stats_dict["max_time"],
+                        # dispersed_stats_dict["avg_time"],
                     ]
                 )
 
@@ -436,9 +359,7 @@ class TokenizerCalculator:
 
 
 def parse_args():
-    # 初始化 ArgumentParser
     parser = argparse.ArgumentParser(description="Process prompts with OpenAI clients.")
-    # 添加参数
     parser.add_argument("--openai_urls", type=str, nargs="+", required=True, help="List of OpenAI service URLs")
     parser.add_argument(
         "--api_keys", type=str, nargs="+", default=None, help="List of API keys (default: 'NONE' for each service)"
@@ -448,15 +369,21 @@ def parse_args():
         "--tokenizer", type=str, required=True, help="Tokenizer name (e.g., Qwen/Qwen2.5-7B-Instruct-1M)"
     )
     parser.add_argument("--rollout_input_batch_size", type=int, default=4, help="Batch size for requests")
-    parser.add_argument("--rollout_output_num", type=int, default=8, help="Number of responses per request")
+    parser.add_argument("--rollout_n", type=int, default=8, help="Number of responses per request")
     parser.add_argument(
         "--prompt_key", type=str, default="prompt", help="Key in the DataFrame for prompts (default: 'prompt')"
     )
     parser.add_argument("--input_file", type=str, required=True, help="Path to the input Parquet file")
     parser.add_argument(
-        "--output_dir", type=str, default="./output", help="Directory for output CSV files (default: './output')"
+        "--output_dir", type=str, default="./api_infer_results", help="Directory for output CSV files (default: './api_infer_results')"
     )
-    # 解析参数
+    parser.add_argument("--top_p", type=float, default=0.9, help="Top-p sampling parameter for text generation")
+    parser.add_argument("--temperature", type=float, default=0.7, help="Temperature parameter for text generation")
+    parser.add_argument("--max_prompt_length", type=int, default=1024 * 2, help="Maximum prompt length (in tokens)")
+    parser.add_argument(
+        "--max_response_length", type=int, default=1024 * 2, help="Maximum response length (in tokens)"
+    )
+    parser.add_argument("--limit_rows", type=int, default=-1, help="Maximum number of rows to read from the dataset (-1 means all)")
     return parser.parse_args()
 
 
