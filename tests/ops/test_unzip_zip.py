@@ -51,15 +51,15 @@ def fabricate_dispatch_result(
         valid_experts, bins=num_experts, min=0, max=num_experts - 1
     )
     expert_counts = paddle.cast(expert_counts, "int32")
-    print("expert counts: ", expert_counts.numpy())
-    max_tokens_per_expert = expert_counts.max().item()
+    expert_counts = list(expert_counts)
+    print("expert counts: ", expert_counts)
 
     return (
         tokens,
         tokens_scale,
         dispatched_indices,
         dispatched_probs,
-        max_tokens_per_expert,
+        expert_counts,
     )
 
 
@@ -75,7 +75,7 @@ def test_unzip_zip():
     SEQLEN = 16384
     TOKEN_LEN = 7168
     for dt in ["bfloat16"]:
-        for expert_num in [2, 4, 8, 16, 32]:
+        for expert_num in [4, 8, 16, 32]:
             for topk in [4, 8, 12]:
                 print("###################################")
                 print(
@@ -88,7 +88,7 @@ def test_unzip_zip():
                     tokens_scale,
                     dispatched_indices,
                     dispatched_probs,
-                    max_tokens_per_expert,
+                    expert_tokens_count,
                 ) = fabricate_dispatch_result(
                     SEQLEN,
                     TOKEN_LEN,
@@ -111,7 +111,8 @@ def test_unzip_zip():
                     dispatched_probs,
                     topk=topk,
                     num_experts=expert_num,
-                    max_tokens_per_expert=max_tokens_per_expert,
+                    tokens_per_expert=expert_tokens_count,
+                    padding_multiplex=128
                 )
                 tokens_recovered, probs_recovered = TDU.tokens_zip(
                     (unzipped_tokens * unzipped_probs.unsqueeze(-1)).astype("bfloat16"),

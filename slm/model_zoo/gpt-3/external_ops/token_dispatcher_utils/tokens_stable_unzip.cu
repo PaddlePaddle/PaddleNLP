@@ -20,6 +20,11 @@
 #ifndef MAX_NUM_EXPERTS
 #define MAX_NUM_EXPERTS 32
 #endif
+
+typedef struct __align__(16){
+  int data[MAX_NUM_EXPERTS];
+}expert_base_offset;
+
 // 多阶段算法，控制每block处理的行数来权衡额外开销
 //  首先解析routemap来更新专家当前所收到的token数，然后check前一个block给的前缀和并更新给下一个block
 //  随后，目的行号的信息已获取，立即开始搬运工作，直至任务完全完成
@@ -29,20 +34,20 @@ __global__ void tokens_unzip_stable_kernel(
     const routemap_T *__restrict__ routemap_topk,
     const probs_T *__restrict__ probs_topk,
     const float *__restrict__ XScale,
+    const expert_base_offset expert_base_offset,
     X_T *__restrict__ X_unzipped,
     int *__restrict__ zipped_expertwise_rowmap,
     probs_T *__restrict__ probs_unzipped,
     float *__restrict__ XScale_unzipped,
     int *global_expertwise_block_cumsum,
     const int total_zipped_tokens_num,
-    const int max_tokens_per_expert,
     const int token_length,
     const int scale_length,
     const int num_experts,
     const int topk) {
   const int block_row_base = blockIdx.x * CUMSUM_BLOCK_SIZE;
   int cumsum_offset[MAX_NUM_EXPERTS];
-  int expert_offset[MAX_NUM_EXPERTS];
+  int local_expert_offsets[MAX_NUM_EXPERTS];
   int local_cumsum[MAX_NUM_EXPERTS];
 #pragma unroll
   for (int i = 0; i < num_experts; i++) {
@@ -50,7 +55,7 @@ __global__ void tokens_unzip_stable_kernel(
         (blockIdx.x == 0)
             ? 0
             : CUMSUM_INVALID_TAG;  // 除了第0个block，其他的都以非法值初始化,因为atomic忙等要用
-    expert_offset[i] = i * max_tokens_per_expert;
+    local_expert_offsets[i] = expert_base_offset.data[i];
     local_cumsum[i] = 0;
   }
   const int base_row_idx = blockIdx.x * CUMSUM_BLOCK_SIZE;
@@ -80,7 +85,7 @@ __global__ void tokens_unzip_stable_kernel(
         const int expert = routemap_topk[row * topk + k];
         if (expert == -1) continue;
         local_expert_rowmap[internal_row][expert] =
-            local_cumsum[expert] + expert_offset[expert];
+            local_cumsum[expert] + local_expert_offsets[expert];
         local_expert_probs[internal_row][expert] = probs_topk[row * topk + k];
         local_cumsum[expert] += 1;
       }
@@ -149,6 +154,7 @@ void dispatch_tokens_unzip_stable(
     const paddle::Tensor &expert_routemap_topk,
     const paddle::Tensor &expert_prob_topk,
     const paddle::optional<paddle::Tensor> &XScale,
+    const expert_base_offset &expert_offsets,
     paddle::Tensor &X_unzipped,
     paddle::Tensor &zipped_expertwise_rowmap,
     paddle::Tensor &token_prob_unzipped,
@@ -158,7 +164,6 @@ void dispatch_tokens_unzip_stable(
     const int token_length,
     const int topk,
     const int num_experts,
-    const int max_tokens_per_expert,
     const int scale_length) {
   dim3 grid, block;
   grid.x =
@@ -177,13 +182,13 @@ void dispatch_tokens_unzip_stable(
       GET_DATA(expert_routemap_topk, INT_T),                                   \
       GET_DATA(expert_prob_topk, PROB_T),                                      \
       XScale ? XScale->data<float>() : nullptr,                                \
+      expert_offsets, \
       GET_DATA(X_unzipped, TOKEN_T),                                           \
       GET_DATA(zipped_expertwise_rowmap, INT_T),                               \
       GET_DATA(token_prob_unzipped, PROB_T),                                   \
       XScale_unzipped.data<float>(),                                           \
       global_expertwise_block_cumsum.data<int>(),                              \
       total_zipped_tokens_num,                                                 \
-      max_tokens_per_expert,                                                   \
       token_length,                                                            \
       scale_length,                                                            \
       num_experts,                                                             \
@@ -228,7 +233,8 @@ std::vector<paddle::Tensor> tokens_unzip_stable(
     const paddle::Tensor &expert_prob_topk,
     const int &topk,
     const int &num_experts,
-    const int &max_tokens_per_expert_in) {
+    const std::vector<int> &tokens_per_expert,
+    const int padding_multiplex) {
   // --------------------- 输入检查与解析 --------------------
   PD_CHECK(X.dtype() == paddle::DataType::BFLOAT16 ||
            X.dtype() == paddle::DataType::FLOAT8_E4M3FN);
@@ -241,9 +247,23 @@ std::vector<paddle::Tensor> tokens_unzip_stable(
   const int rows = X.shape()[0];  // 一般为seqlen
   const int cols = X.shape()[1];  // 一般为7168
   const int quanted_cols = (XScale) ? XScale->shape()[1] : 0;
+  /*
   const int max_tokens_per_expert =
       ((max_tokens_per_expert_in + 127) / 128) * 128;
   const int output_rows = num_experts * max_tokens_per_expert;
+  */
+  expert_base_offset expert_offset;
+  int tokens_cumulated = 0;
+  for(int i = 0; i < MAX_NUM_EXPERTS; i++){
+    if(i < num_experts){
+      expert_offset.data[i] = tokens_cumulated;
+      tokens_cumulated += ((tokens_per_expert[i] + padding_multiplex - 1) / padding_multiplex) * padding_multiplex;
+    }else{
+      expert_offset.data[i] = 0;
+    }
+  }
+
+  const int output_rows = tokens_cumulated;
   //------------------------ 输出缓冲区分配  ------------------------
   paddle::Tensor X_unzipped, XScale_unzipped, zipped_expertwise_rowmap,
       token_prob_unzipped;
@@ -317,6 +337,7 @@ std::vector<paddle::Tensor> tokens_unzip_stable(
                                expert_routemap_topk,
                                expert_prob_topk,
                                XScale,
+                               expert_offset,
                                X_unzipped,
                                zipped_expertwise_rowmap,
                                token_prob_unzipped,
@@ -326,7 +347,6 @@ std::vector<paddle::Tensor> tokens_unzip_stable(
                                cols,
                                topk,
                                num_experts,
-                               max_tokens_per_expert,
                                quanted_cols);
   return {X_unzipped,
           zipped_expertwise_rowmap,
@@ -343,7 +363,7 @@ PD_BUILD_OP(tokens_unzip_stable)
               "zipped_expertwise_rowmap",
               "token_prob_unzipped",
               paddle::Optional("XScale_unzipped")})
-    .Attrs({"topk: int", "num_experts: int", "max_tokens_per_expert: int"})
+    .Attrs({"topk: int", "num_experts: int","tokens_per_expert: std::vector<int>","padding_multiplex: int"})
     .SetKernelFn(PD_KERNEL(tokens_unzip_stable));
 
 
