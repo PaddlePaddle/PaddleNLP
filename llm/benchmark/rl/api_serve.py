@@ -142,20 +142,6 @@ class ResponsePayload:
 
 
 class StatisticsManager:
-    def __init__(self, responses_num: int):
-        self.responses_num = responses_num
-        self.batch_index = 0
-
-    def res_stats(self, response: List[ResponsePayload]):
-        batch_group_pd = pd.DataFrame(response)
-        res_batch_pd = batch_group_pd[["idx", "question", "responses"]]
-        responses_batch_pd = pd.DataFrame(
-            res_batch_pd["responses"].to_list(), columns=[f"response_{i+1}" for i in range(self.responses_num)]
-        )
-        res_batch_pd = pd.concat([res_batch_pd[["idx", "question"]], responses_batch_pd], axis=1)
-
-        res_batch_pd.to_json(self.res_path, orient="records", lines=True, force_ascii=False, mode="a")
-
     def dispersed_stats(self, responses: List[ResponsePayload], batch_elapsed_time: float):
         batch_group_pd = pd.DataFrame(responses)
 
@@ -168,6 +154,10 @@ class StatisticsManager:
             "completion_time": batch_elapsed_time,
             "throughput_tokens_per_sec": batch_group_pd["token_lengths"].apply((lambda x: sum(x))).sum()
             / batch_elapsed_time,
+            "elapsed_times": batch_group_pd["elapsed_times"].to_list(),
+            "min_time": batch_group_pd["elapsed_times"].apply(lambda x: min(x)).tolist(),
+            "max_time": batch_group_pd["elapsed_times"].apply(lambda x: max(x)).tolist(),
+            "avg_time": batch_group_pd["elapsed_times"].apply(lambda x: sum(x) / len(x)).tolist(),
         }
 
         return dispersed_stats_dict
@@ -186,6 +176,8 @@ class StatisticsManager:
         global_stats_dict["avg_response_tokens"] = total_response_tokens / len(responses)
         global_stats_dict["total_response_tokens"] = total_response_tokens
         global_stats_dict["group_max_response_tokens"] = dispersed_stats_dict["max_length"]
+        global_stats_dict["min_time"] = min(dispersed_stats_dict["min_time"])
+        global_stats_dict["avg_time"] = sum(dispersed_stats_dict["avg_time"]) / len(responses)
         global_stats_dict["completion_time"] = dispersed_stats_dict["completion_time"]
         global_stats_dict["throughput_tokens_per_sec"] = dispersed_stats_dict["throughput_tokens_per_sec"]
 
@@ -211,7 +203,7 @@ class ApiTask:
         self.rollout_details_path = self.output_dir / "rollout_details.jsonl"
         self.status_file_path = self.output_dir / "status.txt"
 
-        self.stats_manager = StatisticsManager(args.rollout_output_num)
+        self.stats_manager = StatisticsManager()
 
         self._load_status()
 
@@ -282,8 +274,8 @@ class ApiTask:
                 text = "".join(chunks)
                 end_time = time.perf_counter()
                 elapsed_time = end_time - start_time
-                logger.debug("Streaming response took %.4f seconds", elapsed_time)
-                return text, elapsed_time
+                logger.debug("Streaming response took %.2f seconds", elapsed_time)
+                return text, round(elapsed_time, 2)
 
         except Exception as e:
             logger.error("Error while streaming: %s", e)
@@ -333,6 +325,8 @@ class ApiTask:
                         "avg_response_tokens",
                         "total_response_tokens",
                         "group_max_response_tokens",
+                        "min_time",
+                        "avg_time",
                         "completion_time",
                         "throughput_tokens_per_sec",
                     ]
@@ -346,6 +340,10 @@ class ApiTask:
                         "avg_length",
                         "completion_time",
                         "throughput_tokens_per_sec",
+                        "elapsed_times",
+                        "min_time",
+                        "max_time",
+                        "avg_time",
                     ]
                 )
 
@@ -374,6 +372,8 @@ class ApiTask:
                         round(global_stats_dict["avg_response_tokens"], 2),
                         global_stats_dict["total_response_tokens"],
                         global_stats_dict["group_max_response_tokens"],
+                        global_stats_dict["min_time"],
+                        global_stats_dict["avg_time"],
                         round(global_stats_dict["completion_time"], 2),
                         round(global_stats_dict["throughput_tokens_per_sec"], 2),
                     ]
@@ -388,6 +388,10 @@ class ApiTask:
                         dispersed_stats_dict["avg_length"],
                         round(dispersed_stats_dict["completion_time"], 2),
                         round(dispersed_stats_dict["throughput_tokens_per_sec"], 2),
+                        dispersed_stats_dict["elapsed_times"],
+                        dispersed_stats_dict["min_time"],
+                        dispersed_stats_dict["max_time"],
+                        dispersed_stats_dict["avg_time"],
                     ]
                 )
 
