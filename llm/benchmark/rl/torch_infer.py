@@ -51,9 +51,6 @@ def parse_args():
     )
     parser.add_argument("--log_interval", type=int, default=1, help="Logging interval (in batches)")
     parser.add_argument("--dtype", type=str, default="bfloat16", help="Data type for computation")
-    parser.add_argument(
-        "--rollout_quant_type", type=str, default="", help="Quantization type for inference (e.g., int8, fp4)"
-    )
     parser.add_argument("--tensor_parallel_degree", type=int, default=1, help="Degree of model parallelism")
     parser.add_argument("--top_p", type=float, default=0.9, help="Top-p sampling parameter for text generation")
     parser.add_argument("--temperature", type=float, default=0.7, help="Temperature parameter for text generation")
