@@ -22,6 +22,17 @@ from pathlib import Path
 from typing import List
 from utils import RangeSet
 
+@contextmanager
+def switch_level_context(level="INFO"):
+    """临时切换日志级别的上下文管理器"""
+    import logging
+    original_level = logging.root.level
+    logging.root.setLevel(level)
+    try:
+        yield
+    finally:
+        logging.root.setLevel(original_level)
+
 import paddle
 import pandas as pd
 from tqdm import tqdm
@@ -37,11 +48,20 @@ from paddlenlp.trainer import PdArgumentParser, set_seed
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
 from paddlenlp.utils.log import logger
 
+@contextmanager
+def switch_level_context(level="ERROR"):
+    original_level = logger.logLevel
+    logger.set_level(level)
+
+    try:
+        yield
+    finally:
+        logger.set_level(original_level)
+
 def chunk(all_input_ids, size):
     if size <= 0:
         raise ValueError("Size must be greater than 0")
     return [all_input_ids[i : i + size] for i in range(0, len(all_input_ids), size)]
-
 
 @dataclass
 class DumpyTrainingArguments(TrainingArguments):
@@ -137,8 +157,6 @@ class DumpyInferenceTask:
         if self.args.world_size > 1:
             paddle.distributed.barrier()
         end_time = time.time()
-        print(input_ids.shape)
-        print(output_ids.shape)
         if self.args.should_log:
             statistics = self.postprocess_data(input_ids, output_ids, batch_index=batch_index)
             statistics["total_time"] = end_time - start_time
