@@ -15,6 +15,7 @@
 import paddle
 import paddle.nn as nn
 from paddle.autograd import PyLayer
+from paddle.distributed import fleet
 from paddle.distributed.fleet.base import topology as tp
 from paddle.distributed.fleet.layers.mpu import mp_ops
 from paddle.distributed.fleet.utils.sequence_parallel_utils import (
@@ -22,6 +23,8 @@ from paddle.distributed.fleet.utils.sequence_parallel_utils import (
     ReduceScatterOp,
 )
 from paddle.nn.quant import llm_int8_linear, weight_dequantize, weight_only_linear
+
+from paddlenlp.utils import infohub
 
 from .qat_utils import QATFunc
 
@@ -222,6 +225,7 @@ def quant_weight_linear(
             training,
             act_scale,
             weight_quantize_algo,
+            group,
         )
     else:
         return QuantizationLinearFunc.apply(
@@ -238,10 +242,15 @@ def quant_weight_linear(
 
 
 def get_act_scale_group(is_row=False):
-    if paddle.distributed.is_initialized():
-        group = None
+    if not paddle.distributed.is_initialized() or not is_row:
+        return None
+
+    if getattr(infohub, "scale_group") is None:
+        hcg = fleet.get_hybrid_communicate_group()
+        group = hcg.get_model_parallel_group()
+        setattr(infohub, "scale_group", group)
     else:
-        group = None
+        group = infohub.scale_group
     return group
 
 
@@ -606,7 +615,7 @@ class RowParallelQuantizationLinear(nn.Layer):
                 )
                 self.act_scale.is_distributed = True if self.is_mp else False
                 self.act_scale.stop_gradient = True
-                self.group = get_act_scale_group()
+                self.group = get_act_scale_group(is_row=True)
         else:
             raise NotImplementedError(f"Not yet support weight_quantize_algo: {self.weight_quantize_algo}")
 
