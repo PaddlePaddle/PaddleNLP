@@ -122,14 +122,30 @@ def global_mesh_starts_with_pp():
     else:
         return mesh
 
+# hidden_states, position_ids, inputs_embeds, attention_mask, output_attentions, past_key_values, use_cache, alibi
+# output_attentions、use_cache 可以由config控制且有默认值， delete掉
+# inputs_embeds、past_key_values 动手PP组网没有使用，delete掉，使用默认值
+
+# attn_mask_startend_row_indices 自动并行组网没有使用，不考虑
+
+
 def parse_args(args):
+    # print("args:",args)
+    attention_mask, position_ids, alibi = None, None, None
     if isinstance(args, tuple):
-        if len(args) == 8:
-            hidden_states, position_ids, inputs_embeds, attention_mask, output_attentions, past_key_values, use_cache, alibi = args
+        if len(args) == 4:
+            hidden_states, attention_mask, position_ids, alibi = args
+        if len(args) == 3:
+            hidden_states, attention_mask, position_ids = args
+            
+        elif len(args) == 2:
+            hidden_states, attention_mask = args
+          
+        if len(args) == 1:
+            hidden_states = args[0]
     else:
-        assert False, "args should have length of 8"
-
-
+        hidden_states = args
+   
     if position_ids is not None:
         position_ids.stop_gradient = True
 
@@ -139,13 +155,22 @@ def parse_args(args):
     if alibi is not None:
         alibi.stop_gradient = True
 
-    return hidden_states, position_ids, inputs_embeds, attention_mask, output_attentions, past_key_values, use_cache, alibi
+    return  hidden_states, attention_mask, position_ids, alibi
 
 
 def return_args(
-    hidden_states, position_ids = None, inputs_embeds = None, attention_mask = None, output_attentions = None, past_key_values=None, use_cache = False, alibi=None
+    hidden_states, attention_mask = None, position_ids = None, alibi=None
 ):
-    ret = (hidden_states, position_ids, inputs_embeds, attention_mask, output_attentions, past_key_values, use_cache, alibi)
+    ret = (hidden_states,)
+
+    if attention_mask is not None:
+        ret += (attention_mask.clone(),)
+    if position_ids is not None:
+        ret += (position_ids.clone(),)
+    if alibi is not None:
+        ret += (alibi.clone(),)
+    if len(ret) == 1:
+        ret = ret[0]
 
     return ret
 
@@ -173,12 +198,12 @@ class LlamaRMSNormAutoPP(nn.Layer):
         self.config = config
 
     def forward(self, args):
-        hidden_states, position_ids, inputs_embeds, attention_mask, output_attentions, past_key_values, use_cache, alibi = parse_args(args)
+        hidden_states, attention_mask, position_ids, alibi = parse_args(args)
         if self.config.use_fused_rms_norm:
             hidden_states =  fusion_ops.fusion_rms_norm(
                 hidden_states, self.weight, self.variance_epsilon, self.config.use_fast_layer_norm
             )
-            return return_args(hidden_states, position_ids, inputs_embeds, attention_mask, output_attentions, past_key_values, use_cache, alibi)
+            return return_args(hidden_states, attention_mask, position_ids, alibi)
 
 
         with paddle.amp.auto_cast(False):
@@ -189,7 +214,7 @@ class LlamaRMSNormAutoPP(nn.Layer):
             hidden_states = paddle.cast(hidden_states, self.weight.dtype)
 
         
-        return return_args(hidden_states * self.weight, position_ids, inputs_embeds, attention_mask, output_attentions, past_key_values, use_cache, alibi)
+        return return_args(hidden_states * self.weight, attention_mask, position_ids, alibi)
 
 class LlamaEmbeddingAutoPP(nn.Layer):
     """Extends LlamaEmbeddings to forward attention_mask through the pipeline."""
@@ -210,18 +235,28 @@ class LlamaEmbeddingAutoPP(nn.Layer):
             if self.config.tensor_parallel_degree > 1
             else [dist.Replicate(), dist.Replicate()]
         )
+        # embedding_placements = (
+        #     [dist.Replicate(), dist.Replicate()]
+        # )
+        print("embedding placements: ", embedding_placements)
+        
         self.embed_tokens.weight = dist.shard_tensor(
             self.embed_tokens.weight,
             get_mesh(),
             embedding_placements,
         )
+        print("embedding weight: ", self.embed_tokens.weight)
+        print("embedding weight type: ", self.embed_tokens.weight.dtype)
+        print("embedding weight process_mesh: ", self.embed_tokens.weight.process_mesh)
+        print("embedding weight placements: ", self.embed_tokens.weight.placements)
         self.placements = (
-            [dist.Shard(1), dist.Shard(0)] if self.config.sequence_parallel else [dist.Shard(0), dist.Replicate()]
+            [dist.Shard(1), dist.Shard(0)] if self.config.sequence_parallel else [dist.Replicate(), dist.Replicate()]
         )
+        print("address 1: ", id(self.embed_tokens))
 
-    @property
-    def embedding_weight(self):
-        return get_attr(self.embed_tokens, "weight")
+    # @property
+    # def embedding_weight(self):
+    #     return get_attr(self.embed_tokens, "weight")
 
     @staticmethod
     def _prepare_decoder_attention_mask(attention_mask, input_shape, past_key_values_length, dtype):
@@ -263,42 +298,58 @@ class LlamaEmbeddingAutoPP(nn.Layer):
         return expanded_attn_mask
 
     def forward(self, args):
-        input_ids, position_ids, inputs_embeds, attention_mask, output_attentions, past_key_values, use_cache, alibi = parse_args(args)
+        #print("LlamaEmbeddingAutoPP args:", args)
+        input_ids, attention_mask, position_ids, alibi = parse_args(args)
         
         input_ids.stop_gradient = True
         
-        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        
         # output_hidden_states = (
         #     output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         # )
         # return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_attentions = self.config.output_attentions
 
-        use_cache = use_cache if use_cache is not None else self.config.use_cache
+        use_cache = self.config.use_cache
 
-        # retrieve input_ids and inputs_embeds
-        if input_ids is not None and inputs_embeds is not None:
-            raise ValueError("You cannot specify both decoder_input_ids and decoder_inputs_embeds at the same time")
-        elif input_ids is not None:
+        # retrieve input_ids
+       
+        if input_ids is not None:
             batch_size, seq_length = input_ids.shape
-        elif inputs_embeds is not None:
-            batch_size, seq_length, _ = inputs_embeds.shape
         else:
-            raise ValueError("You have to specify either decoder_input_ids or decoder_inputs_embeds")
+            raise ValueError("You have to specify either decoder_input_ids")
 
-        if past_key_values is None:
-            past_key_values = tuple([None] * self.config.num_hidden_layers)
+        
+        past_key_values = tuple([None] * self.config.num_hidden_layers)
 
         seq_length_with_past = seq_length
         cache_length = 0
-        if past_key_values[0] is not None:
-            cache_length = past_key_values[0][0].shape[1]
-            seq_length_with_past += cache_length
+       
 
-        if inputs_embeds is None:
-            with paddle.amp.auto_cast(False):
-                inputs_embeds = self.embed_tokens(input_ids)
+        # print("input_ids shape: ", input_ids.shape)
+        # print("process_mesh: ", input_ids.process_mesh)
+        # print("input_ids placements: ", input_ids.placements)
+        # print(type(self.embed_tokens.weight))
+        
+        # # self.embed_tokens.weight = dist.shard_tensor(
+        # #     self.embed_tokens.weight._local_value(),
+        # #     get_mesh(),
+        # #     [dist.Replicate(), dist.Shard(1)],
+        # # )
+        # print("address 2: ", id(self.embed_tokens))
+       
+        
+        with paddle.amp.auto_cast(False):
+            # print("self.embed_tokens weight: ", type(self.embed_tokens.weight))
+            # print("self.embed_tokens weight: ", self.embed_tokens.weight.shape)
+            # print("self.embed_tokens weight: ", self.embed_tokens.weight.placements)
 
+            inputs_embeds = self.embed_tokens(input_ids)
+        # print("inputs_embeds:" , inputs_embeds._local_value())
+        # print("inputs_embeds.shape:", inputs_embeds.shape)
+        # print("process_mesh: ", inputs_embeds.process_mesh)
+        # print("inputs_embeds.placements:", inputs_embeds.placements)
+        
         if self.config.sequence_parallel:
             # [B, S, H] -> [S, B, H]
             inputs_embeds = paddle.transpose(inputs_embeds, [1, 0, 2])
@@ -339,17 +390,20 @@ class LlamaEmbeddingAutoPP(nn.Layer):
                 [dist.Replicate() for _ in range(len(global_mesh._shape))],
             )
         hidden_states = inputs_embeds
-        hidden_states = dist.reshard(hidden_states, get_mesh(), self.placements)
+        # print("hidden_states before reshard:", hidden_states._local_value())
+        # print("hidden_states.shape:", hidden_states.shape)
+        # print("process_mesh: ", hidden_states.process_mesh)
+        # print("hidden_states.placements:", hidden_states.placements)
         
+        # print("get_mesh: ", get_mesh())
+        # print("placements: ", self.placements)
+        hidden_states = dist.reshard(hidden_states, get_mesh(), self.placements)
+        # print("hidden_states after reshard:", hidden_states._local_value())
+        # print("hidden_states.shape after reshard:", hidden_states.shape)
+        # print("hidden_states.placements after reshard:", hidden_states.placements)
+        # print("process_mesh: ", hidden_states.process_mesh)
         return return_args(
-            hidden_states,
-            position_ids,
-            inputs_embeds,
-            attention_mask,
-            output_attentions,
-            past_key_values,
-            use_cache,
-            alibi,
+            hidden_states, attention_mask, position_ids, alibi
         )
 
 class LlamaDecoderLayerAutoPP(nn.Layer):
@@ -358,6 +412,7 @@ class LlamaDecoderLayerAutoPP(nn.Layer):
         self.config = config
         self.layer_id = idx
         self.layer = LlamaDecoderLayerAuto(config, layerwise_recompute, ipp)
+        self.ipp = ipp
         self.enable_recompute = False
         self.recompute_granularity = config.recompute_granularity
         self.no_recompute_layers = config.no_recompute_layers if config.no_recompute_layers is not None else []
@@ -375,16 +430,18 @@ class LlamaDecoderLayerAutoPP(nn.Layer):
     def forward(self, args):
         if self.embed_tokens is not None:
             args = self.embed_tokens(args)
-        hidden_states, position_ids, inputs_embeds, attention_mask, output_attentions, past_key_values, use_cache, alibi = parse_args(args)
+        hidden_states, attention_mask, position_ids, alibi = parse_args(args)
+        output_attentions = self.config.output_attentions
+        use_cache = self.config.use_cache
         
-        past_key_value = past_key_values[self.layer_id] if past_key_values is not None else None
+        past_key_value = None
 
         has_gradient = not hidden_states.stop_gradient
-        # ipp暂时都设置为0        
+   
         if position_ids is not None:
             position_ids_input = dist.reshard(
                 position_ids,
-                get_mesh(0),
+                get_mesh(self.ipp),
                 [dist.Replicate(), dist.Replicate()],
             )
         else:
@@ -392,7 +449,7 @@ class LlamaDecoderLayerAutoPP(nn.Layer):
         attention_mask_input = (
             dist.reshard(
                 attention_mask,
-                get_mesh(0),
+                get_mesh(self.ipp),
                 [dist.Replicate(), dist.Replicate()],
             )
             if attention_mask is not None
@@ -401,7 +458,7 @@ class LlamaDecoderLayerAutoPP(nn.Layer):
         alibi_input = (
             dist.reshard(
                 alibi,
-                get_mesh(0),
+                get_mesh(self.ipp),
                 [dist.Replicate(), dist.Replicate()],
             )
             if alibi is not None
@@ -440,14 +497,7 @@ class LlamaDecoderLayerAutoPP(nn.Layer):
             hidden_states = layer_outputs
             
         ret_args = return_args(
-            hidden_states,
-            position_ids,
-            inputs_embeds,
-            attention_mask,
-            output_attentions,
-            past_key_values,
-            use_cache,
-            alibi,
+            hidden_states, attention_mask, position_ids, alibi,
         )
         if self.norm is not None:
            ret_args = self.norm(ret_args)
@@ -473,7 +523,7 @@ class LlamaLMHeadAutoPP(nn.Layer):
         )
 
     def forward(self, args):
-        hidden_states, position_ids, inputs_embeds, attention_mask, output_attentions, past_key_values, use_cache, alibi = parse_args(args)
+        hidden_states, attention_mask, position_ids, alibi = parse_args(args)
         
         if self.config.sequence_parallel:
             hidden_states = dist.reshard(
@@ -483,7 +533,7 @@ class LlamaLMHeadAutoPP(nn.Layer):
             )
             hidden_states = paddle.transpose(hidden_states, [1, 0, 2])
         logits = paddle.matmul(hidden_states, self.weight, transpose_y=False)
-        return return_args(logits, position_ids, inputs_embeds, attention_mask, output_attentions, past_key_values, use_cache, alibi)
+        return return_args(logits, attention_mask, position_ids, alibi)
 
 
 class LlamaForCausalLM3DAutoPP(LlamaForCausalLM3DAuto):
@@ -498,7 +548,7 @@ class LlamaForCausalLM3DAutoPP(LlamaForCausalLM3DAuto):
         # self.next_pp_stage_indexes = []
         for i in range(config.num_hidden_layers):
             # pp_stage_id, input_need_reshard = get_layer_pp_info(i)
-            decoder_layers.append(LlamaDecoderLayerAutoPP(config, i, i not in self.no_recompute_layers, 0))
+            decoder_layers.append(LlamaDecoderLayerAutoPP(config, i, i not in self.no_recompute_layers, i // 10))
             # if input_need_reshard:
             #     self.next_pp_stage_indexes.append(i)
         self.layers = nn.LayerList(decoder_layers)
@@ -517,7 +567,7 @@ class LlamaForCausalLM3DAutoPP(LlamaForCausalLM3DAuto):
         return_dict=None,
     ):
         
-        outputs = return_args(input_ids, position_ids, inputs_embeds, attention_mask, output_attentions, past_key_values, use_cache, None)
+        outputs = return_args(input_ids, attention_mask, position_ids)
 
         # decoder layers
         for idx, (decoder_layer) in enumerate(self.layers):
