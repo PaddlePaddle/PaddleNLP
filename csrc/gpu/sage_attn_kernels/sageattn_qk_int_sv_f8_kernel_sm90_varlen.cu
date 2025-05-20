@@ -629,12 +629,11 @@ std::vector<paddle::Tensor> sage_attention_varlen_fwd(paddle::Tensor& q,        
                                                       paddle::Tensor& v,          // total_seqlen x num_head x head_dim
                                                       paddle::Tensor& cu_seqlen_q,
                                                       paddle::Tensor& cu_seqlen_v_padded,
+                                                      const paddle::Tensor& seq_lens_encoder, // length of each segment this time
                                                       paddle::Tensor& km,
                                                       paddle::optional<paddle::Tensor>& vm,
-                                                      const std::vector<int64_t>& split_vec,
                                                       int max_seqlen_q,
                                                       int max_seqlen_k,
-                                                      int total_seqlen_v_padded,
                                                       float sm_scale,
                                                       std::string qk_quant_gran,
                                                       std::string pv_accum_dtype,
@@ -650,6 +649,13 @@ std::vector<paddle::Tensor> sage_attention_varlen_fwd(paddle::Tensor& q,        
 
   PD_CHECK(q.shape()[2] == 64 || q.shape()[2] == 128, "head_dim must be either 64 or 128");
   PD_CHECK(q.strides()[2] == 1 && k.strides()[2] == 1 && v.strides()[2] == 1, "Last dim of qkv must be contiguous.");
+
+  // split, pad, and concat
+  int batch_size = cu_seqlen_q.shape()[0] - 1;
+  paddle::Tensor seq_lens_encoder_cpu = paddle::experimental::copy_to(seq_lens_encoder, paddle::CPUPlace(), false);
+  seq_lens_encoder_cpu = paddle::experimental::cast(seq_lens_encoder_cpu, paddle::DataType::INT64);
+  int64_t* seq_lens_encoder_ptr = reinterpret_cast<int64_t*>(seq_lens_encoder_cpu.data());
+  std::vector<int64_t> split_vec(seq_lens_encoder_ptr, seq_lens_encoder_ptr + batch_size);
 
   // split, padding to 128-align, and concat
   std::vector<paddle::Tensor> v_splited = paddle::split(v, split_vec, {0}); // split along the total_seqlen axis.
@@ -669,8 +675,9 @@ std::vector<paddle::Tensor> sage_attention_varlen_fwd(paddle::Tensor& q,        
   // v was padded, so we cannot use v for output shape
   paddle::Tensor o = paddle::empty(q.shape(), q.dtype(), paddle::GPUPlace()); // so far, the shape of v is not permutted and transposed. Still [total_seqlen, num_head, head_dim]
 
+  int total_seqlen_v_padded = v_padded.shape()[0];
+
   std::vector<paddle::Tensor>&& quant_vfp8_results = per_channel_varlen_fp8(v_padded, 
-      cu_seqlen_q, 
       cu_seqlen_v_padded, 
       max_seqlen_k, 
       total_seqlen_v_padded, 
