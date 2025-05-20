@@ -216,7 +216,7 @@ if cc >= 80 and nvcc_version >= Version("12.4"):
         "./gpu/sage_attn_kernels/sageattn_fused.cu",
         "./gpu/sage_attn_kernels/sageattn_fused_varlen.cu",
         "./gpu/sage_attn_kernels/segment_mean.cu",
-        "./gpu/sage_attention.cu",
+        # "./gpu/sage_attention.cu",
     ]
     if cc >= 80 and cc < 89:
         sources += [

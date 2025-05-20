@@ -16,6 +16,7 @@
 #include "append_attn/decoder_write_cache_with_rope_kernel.h"
 #include "append_attn/speculate_write_cache_with_rope_kernel.h"
 #include "append_attn/encoder_write_cache_with_rope_kernel.h"
+#include "sage_attn_kernels/sageattn_kernel.h"
 
 template <paddle::DataType D>
 std::vector<paddle::Tensor> AppendAttentionKernel(
@@ -26,6 +27,7 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
     const paddle::Tensor& seq_lens_encoder,
     const paddle::Tensor& seq_lens_decoder,
     const paddle::Tensor& seq_lens_this_time,
+    const paddle::Tensor& cu_seqlen,
     const paddle::Tensor& padding_offsets,
     const paddle::Tensor& cum_offsets,
     const paddle::Tensor& block_tables,
@@ -54,6 +56,7 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
     const paddle::optional<paddle::Tensor>& out_linear_shifts,
     const paddle::optional<paddle::Tensor>& out_linear_smooths,
     const paddle::optional<paddle::Tensor>& excess_blocks,
+    const paddle::optional<paddle::Tensor>& cu_seqlen_v_padded,
     const std::string& cache_quant_type_str,
     const bool use_neox_rotary_style,
     const int max_input_length,
@@ -263,7 +266,8 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
         }
       }
     } else {
-      CascadeAppendAttentionKernel<data_t, data_t>(
+      if (cu_seqlen_v_padded) {
+        SageAttentionKernel<data_t, data_t>(
           meta_data,
           qkv_out,
           key_cache,
@@ -275,8 +279,8 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
           cache_v_zp,
           out_linear_shifts,
           out_linear_smooths,
-          seq_lens_this_time,
-          seq_lens_decoder,
+          cu_seqlen,                  // diff
+          cu_seqlen_v_padded.get(),   // diff
           seq_lens_encoder,
           padding_offsets,
           cum_offsets,
@@ -298,6 +302,43 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
           true,
           main_stream,
           &fmha_out);
+      } else {
+        CascadeAppendAttentionKernel<data_t, data_t>(
+            meta_data,
+            qkv_out,
+            key_cache,
+            value_cache,
+            attn_mask,
+            cache_k_dequant_scales,
+            cache_v_dequant_scales,
+            cache_k_zp,
+            cache_v_zp,
+            out_linear_shifts,
+            out_linear_smooths,
+            seq_lens_this_time,
+            seq_lens_decoder,
+            seq_lens_encoder,
+            padding_offsets,
+            cum_offsets,
+            block_tables,
+            encoder_batch_ids,
+            encoder_tile_ids_per_batch,
+            cache_quant_type_str,
+            encoder_num_blocks_data,
+            encoder_block_shape_q,
+            max_input_length,
+            max_enc_len_this_time_data,
+            softmax_scale,
+            quant_max_bound,
+            quant_min_bound,
+            out_linear_in_scale,
+            speculate_max_draft_token_num,
+            causal,
+            false,
+            true,
+            main_stream,
+            &fmha_out);
+      }
     }
   }
 
@@ -544,6 +585,7 @@ std::vector<paddle::Tensor> AppendAttention(
     const paddle::Tensor& seq_lens_encoder,
     const paddle::Tensor& seq_lens_decoder,
     const paddle::Tensor& seq_lens_this_time,
+    const paddle::Tensor& cu_seqlen,
     const paddle::Tensor& padding_offsets,
     const paddle::Tensor& cum_offsets,
     const paddle::Tensor& block_tables,
@@ -572,6 +614,7 @@ std::vector<paddle::Tensor> AppendAttention(
     const paddle::optional<paddle::Tensor>& out_linear_shifts,
     const paddle::optional<paddle::Tensor>& out_linear_smooths,
     const paddle::optional<paddle::Tensor>& excess_blocks,
+    const paddle::optional<paddle::Tensor>& cu_seqlen_v_padded,
     const std::string& compute_dtype,
     const std::string& cache_quant_type_str,
     const bool use_neox_rotary_style,
@@ -609,6 +652,7 @@ std::vector<paddle::Tensor> AppendAttention(
           seq_lens_encoder,
           seq_lens_decoder,
           seq_lens_this_time,
+          cu_seqlen,
           padding_offsets,
           cum_offsets,
           block_tables,
@@ -637,6 +681,7 @@ std::vector<paddle::Tensor> AppendAttention(
           out_linear_shifts,
           out_linear_smooths,
           excess_blocks,
+          cu_seqlen_v_padded,
           cache_quant_type_str,
           use_neox_rotary_style,
           max_input_length,
@@ -657,6 +702,7 @@ std::vector<paddle::Tensor> AppendAttention(
           seq_lens_encoder,
           seq_lens_decoder,
           seq_lens_this_time,
+          cu_seqlen,
           padding_offsets,
           cum_offsets,
           block_tables,
@@ -685,6 +731,7 @@ std::vector<paddle::Tensor> AppendAttention(
           out_linear_shifts,
           out_linear_smooths,
           excess_blocks,
+          cu_seqlen_v_padded,
           cache_quant_type_str,
           use_neox_rotary_style,
           max_input_length,
@@ -706,6 +753,7 @@ std::vector<paddle::Tensor> AppendAttention(
             seq_lens_encoder,
             seq_lens_decoder,
             seq_lens_this_time,
+            cu_seqlen,
             padding_offsets,
             cum_offsets,
             block_tables,
@@ -734,6 +782,7 @@ std::vector<paddle::Tensor> AppendAttention(
             out_linear_shifts,
             out_linear_smooths,
             excess_blocks,
+            cu_seqlen_v_padded,
             cache_quant_type_str,
             use_neox_rotary_style,
             max_input_length,
@@ -753,6 +802,7 @@ std::vector<paddle::Tensor> AppendAttention(
             seq_lens_encoder,
             seq_lens_decoder,
             seq_lens_this_time,
+            cu_seqlen,
             padding_offsets,
             cum_offsets,
             block_tables,
@@ -781,6 +831,7 @@ std::vector<paddle::Tensor> AppendAttention(
             out_linear_shifts,
             out_linear_smooths,
             excess_blocks,
+            cu_seqlen_v_padded,
             cache_quant_type_str,
             use_neox_rotary_style,
             max_input_length,
@@ -813,6 +864,7 @@ std::vector<std::vector<int64_t>> AppendAttentionInferShape(
     const std::vector<int64_t>& seq_lens_encoder_shape,
     const std::vector<int64_t>& seq_lens_decoder_shape,
     const std::vector<int64_t>& seq_lens_this_time_shape,
+    const std::vector<int64_t>& cu_seqlen_shape,
     const std::vector<int64_t>& padding_offsets_shape,
     const std::vector<int64_t>& cum_offsets_shape,
     const std::vector<int64_t>& block_tables_shape,
@@ -840,7 +892,8 @@ std::vector<std::vector<int64_t>> AppendAttentionInferShape(
     const paddle::optional<std::vector<int64_t>>& cache_v_zp_shape,
     const paddle::optional<std::vector<int64_t>>& out_linear_shifts_shape,
     const paddle::optional<std::vector<int64_t>>& out_linear_smooths_shape,
-    const paddle::optional<std::vector<int64_t>>& excess_blocks_shape) {
+    const paddle::optional<std::vector<int64_t>>& excess_blocks_shape,
+    const paddle::optional<std::vector<int64_t>>& cu_seqlen_v_padded_shape) {
   const int token_num = qkv_shape[0];
   const int kv_num_heads = key_cache_shape[1];
   const int head_dim_qk = key_cache_shape[3];
@@ -858,6 +911,7 @@ std::vector<paddle::DataType> AppendAttentionInferDtype(
     const paddle::DataType& seq_lens_encoder_dtype,
     const paddle::DataType& seq_lens_decoder_dtype,
     const paddle::DataType& seq_lens_this_time_dtype,
+    const paddle::DataType& cu_seqlen_dtype,
     const paddle::DataType& padding_offsets_dtype,
     const paddle::DataType& cum_offsets_dtype,
     const paddle::DataType& block_tables_dtype,
@@ -886,6 +940,7 @@ std::vector<paddle::DataType> AppendAttentionInferDtype(
     const paddle::optional<paddle::DataType>& out_linear_shifts_dtype,
     const paddle::optional<paddle::DataType>& out_linear_smooths_dtype,
     const paddle::optional<paddle::DataType>& excess_blocks_dtype,
+    const paddle::optional<paddle::DataType>& cu_seqlen_v_padded_dtype,
     const std::string& compute_dtype,
     const std::string& cache_quant_type_str,
     const bool use_neox_rotary_style,
@@ -933,6 +988,7 @@ PD_BUILD_OP(append_attention)
              "seq_lens_encoder",
              "seq_lens_decoder",
              "seq_lens_this_time",
+             "cu_seqlen",
              "padding_offsets",
              "cum_offsets",
              "block_tables",
@@ -960,7 +1016,8 @@ PD_BUILD_OP(append_attention)
              paddle::Optional("cache_v_zp"),
              paddle::Optional("out_linear_shifts"),
              paddle::Optional("out_linear_smooths"),
-             paddle::Optional("excess_blocks")})
+             paddle::Optional("excess_blocks"),
+             paddle::Optional("cu_seqlen_v_padded")})
     .Outputs({"fmha_out", "qkv_out", "key_cache_out", "value_cache_out"})
     .SetInplaceMap({{"key_cache", "key_cache_out"},
                     {"value_cache", "value_cache_out"}})
