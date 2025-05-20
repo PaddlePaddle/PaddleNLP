@@ -67,8 +67,8 @@ def quantize(
         if act_scale is not None:
             if training:
                 scale = paddle.max(paddle.abs(target_x)) / qmax
-                if paddle.distributed.is_initialized():
-                    paddle.distributed.all_reduce(scale, op=paddle.distributed.ReduceOp.MAX)
+                if group is not None:
+                    paddle.distributed.all_reduce(scale, op=paddle.distributed.ReduceOp.MAX, group=group, sync_op=True)
                 if state < quantization_config.apply_online_actscale_step:
                     act_scale.set_value((state * act_scale + scale) / (state + 1))
                 else:
@@ -97,7 +97,8 @@ def quantize(
             scale = scale.squeeze(0) / hadamard_scale
         elif weight_quantize_algo in ["fp8linear"]:
             scale = paddle.max(paddle.abs(target_x)) / qmax
-            paddle.distributed.all_reduce(scale, op=paddle.distributed.ReduceOp.MAX)
+            if group is not None:
+                paddle.distributed.all_reduce(scale, op=paddle.distributed.ReduceOp.MAX, group=group, sync_op=True)
             quant_x = (target_x / scale).astype(quantization_config.fp8_format[tensor_type]).view("int8").T
             scale = scale / hadamard_scale
         else:
@@ -143,6 +144,7 @@ def int8_forward(
     state=0,
     training=False,
     act_scale=None,
+    group=None,
 ):
     quant_x, scale_x = quantize(
         x=x,
@@ -154,6 +156,7 @@ def int8_forward(
         act_scale=act_scale,
         state=state,
         training=training,
+        group=group,
     )
 
     out = paddle.matmul(quant_x, quant_w.T).astype(scale_w.dtype) * (scale_x * scale_w)
@@ -201,6 +204,7 @@ def fp8_forward(
     state=0,
     training=False,
     act_scale=None,
+    group=None,
 ):
     x_fp8, x_scale = quantize(
         x,
@@ -212,6 +216,7 @@ def fp8_forward(
         act_scale=act_scale,
         state=state,
         training=training,
+        group=group,
     )
     x_fp8 = x_fp8.view(quantization_config.fp8_format["activation"])
     w_fp8 = w_fp8.view(quantization_config.fp8_format["weight"])
@@ -368,6 +373,7 @@ class QATFunc(PyLayer):
         training,
         act_scale,
         weight_quantize_algo,
+        group,
     ):
         quant_x, x_scale = None, None
         if weight_quantize_algo in ["fp8linear"]:
@@ -382,6 +388,7 @@ class QATFunc(PyLayer):
                 state=state,
                 training=training,
                 act_scale=act_scale,
+                group=group,
             )
         else:
             output, quant_x, x_scale = int8_forward(
@@ -394,6 +401,7 @@ class QATFunc(PyLayer):
                 state=state,
                 training=training,
                 act_scale=act_scale,
+                group=group,
             )
         ctx.quantization_config = quantization_config
         ctx.weight_quantize_algo = weight_quantize_algo

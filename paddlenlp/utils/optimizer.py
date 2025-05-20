@@ -324,7 +324,13 @@ class AdamWCustom(AdamW):
                 skip_update_param,
             )
             if skip_update_param:
-                if self.quantization_config.weight_quantize_algo in ["a8w8linear", "a8w4linear", "fp8linear"]:
+                if param.weight_quantize_algo in ["a8w8linear", "a8w4linear", "fp8linear"]:
+                    if "parallel_quantization_linear" not in param.name:
+                        group = None
+                    elif param.weight_quantize_algo in ["a8w8linear", "a8w4linear"] and "row" in param.name:
+                        group = None
+                    else:
+                        group = self.mp_group
                     param[:], new_quant_scale = quantize(
                         x=master_weight.astype(quant_scale.dtype),
                         weight_quantize_algo=self.quantization_config.weight_quantize_algo,
@@ -332,7 +338,7 @@ class AdamWCustom(AdamW):
                         quantization_config=self.quantization_config,
                         side="left",
                         apply_hadamard=self.quantization_config.apply_hadamard,
-                        group=None,
+                        group=group,
                     )
                     quant_scale.set_value(new_quant_scale)
                 else:
