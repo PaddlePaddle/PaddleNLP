@@ -1692,8 +1692,6 @@ class FusedMultiTransformerBase(Layer):
 
             out_linear_out = self.compute_out_linear(fmha_out, i)
 
-            # print(f"{i}: out_linear_out: {out_linear_out}")
-
             # all_reduce
             if self.tp_degree > 1:
                 if self.use_custom_allreduce and out_linear_out.shape[0] <= 128:
@@ -3267,8 +3265,6 @@ class FusedMultiTransformerWINTX(FusedMultiTransformerBase):
                 )
             from paddlenlp_ops import noaux_tc
 
-            # print('scores')
-            # print(scores)
             scores = noaux_tc(
                 scores,
                 scores_with_bias,
@@ -3280,8 +3276,6 @@ class FusedMultiTransformerWINTX(FusedMultiTransformerBase):
 
             return scores
 
-        # print('top_k_method')
-        # print(self.config.moe_config.topk_method)
         if self.config.moe_config.topk_method is not None:
             gate_out = paddle.matmul(tmp_out.cast("float32"), self.gate_weights[i])
             # 应用各种策略后重塑的 scores
