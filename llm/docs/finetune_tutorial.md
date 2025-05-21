@@ -32,35 +32,15 @@
 
 ```python
 # clone PaddleNLP仓库，如果之前已经操作过，可以跳过这一步
-!git clone https://github.com/PaddlePaddle/PaddleNLP.git
+git clone https://github.com/PaddlePaddle/PaddleNLP.git
 ```
-
-    Cloning into 'PaddleNLP'...
-    ^C
-
 
 
 ```python
-!cd PaddleNLP/llm
-!wget https://bj.bcebos.com/paddlenlp/datasets/examples/alpaca_demo.gz
-!tar -xvf alpaca_demo.gz
+cd PaddleNLP/llm
+wget https://bj.bcebos.com/paddlenlp/datasets/examples/alpaca_demo.gz
+tar -xvf alpaca_demo.gz
 ```
-
-    /bin/bash: line 0: cd: PaddleNLP/llm: No such file or directory
-    --2025-05-19 12:01:04--  https://bj.bcebos.com/paddlenlp/datasets/examples/alpaca_demo.gz
-    Resolving bj.bcebos.com (bj.bcebos.com)... 100.67.184.196, 100.67.184.48, 100.64.80.160
-    Connecting to bj.bcebos.com (bj.bcebos.com)|100.67.184.196|:443... connected.
-    HTTP request sent, awaiting response... 200 OK
-    Length: 215040 (210K) [application/octet-stream]
-    Saving to: 'alpaca_demo.gz'
-
-    alpaca_demo.gz      100%[===================>] 210.00K  --.-KB/s    in 0.001s
-
-    2025-05-19 12:01:04 (267 MB/s) - 'alpaca_demo.gz' saved [215040/215040]
-
-    data/
-    data/train.json
-    data/dev.json
 
 
 ## 3. 精调（Fine-tuning）
@@ -87,7 +67,7 @@
 
 ```python
 # 需要12G显存左右
-!python -u run_finetune.py ./config/qwen/sft_argument_0p5b.json
+python -u run_finetune.py ./config/qwen/sft_argument_0p5b.json
 ```
 
 
@@ -119,7 +99,7 @@ prefix + 输入句
 
 ```python
 # 需要10G左右显存
-!python run_finetune.py ./config/qwen/pt_argument_0p5b.json
+python run_finetune.py ./config/qwen/pt_argument_0p5b.json
 ```
 
 #### 3.2.2 LoRA
