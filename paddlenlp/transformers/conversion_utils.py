@@ -66,15 +66,36 @@ def add_quant_mapping(name_action_mappings, quantization_config):
     for key in mapping_keys:
         if re.match(pattern, key):
             quant_key = key.replace("weight", "quant_weight")
+            quant_scale_key = key.replace("weight", "quant_scale")
             fn = name_action_mappings.pop(key)
-            old_value = fn.keywords["is_column"]
-            new_value = not old_value
-            name_action_mappings[quant_key] = partial(fn.func, *fn.args, **{**fn.keywords, "is_column": new_value})
-            if quantization_config.weight_quantize_algo not in ["fp8linear"] and old_value:
-                quant_scale_key = key.replace("weight", "quant_scale")
-                name_action_mappings[quant_scale_key] = partial(
-                    fn.func, *fn.args, **{**fn.keywords, "is_column": new_value}
-                )
+            if isinstance(fn, partial):
+                if "is_column" in fn.keywords:
+                    old_value = fn.keywords["is_column"]
+                    new_value = not old_value
+                    name_action_mappings[quant_key] = partial(
+                        fn.func, *fn.args, **{**fn.keywords, "is_column": new_value}
+                    )
+                    if quantization_config.weight_quantize_algo not in ["fp8linear"] and old_value:
+                        name_action_mappings[quant_scale_key] = partial(
+                            fn.func, *fn.args, **{**fn.keywords, "is_column": new_value}
+                        )
+                elif "is_quant" in fn.keywords:
+                    old_value = fn.keywords["is_quant"]
+                    new_value = not old_value
+                    name_action_mappings[quant_key] = partial(
+                        fn.func, *fn.args, **{**fn.keywords, "is_quant": new_value}
+                    )
+                    if quantization_config.weight_quantize_algo not in ["fp8linear"]:
+                        name_action_mappings[quant_scale_key] = split_or_merge_func(
+                            is_split=fn.keywords["tensor_parallel_degree"],
+                            tensor_parallel_degree=fn.keywords["tensor_parallel_degree"],
+                            tensor_parallel_rank=fn.keywords["tensor_parallel_rank"],
+                            num_attention_heads=fn.keywords["num_attention_head"],
+                        )
+            # else:
+            #     name_action_mappings[quant_key] = fn
+            #     name_action_mappings[quant_scale_key] = fn
+
     return name_action_mappings
 
 

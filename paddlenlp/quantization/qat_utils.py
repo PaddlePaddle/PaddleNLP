@@ -261,7 +261,7 @@ def fp8_backward(ctx, x, grad_output, quant_weight, quant_scale, quant_x, x_scal
                 "grad_output",
                 ctx.quantization_config,
                 side="left",
-                apply_hadamard=ctx.quantization_config.apply_hadamard,
+                apply_hadamard=False,
             )
             grad_output_fp8 = grad_output_fp8.view(ctx.quantization_config.fp8_format["grad_output"])
             quant_weight = quant_weight.view(ctx.quantization_config.fp8_format["weight"])
@@ -289,7 +289,6 @@ def fp8_backward(ctx, x, grad_output, quant_weight, quant_scale, quant_x, x_scal
                 weight_ = quant_weight.astype(ctx.dtype) * quant_scale
                 input_grad = paddle.matmul(grad_output_, weight_).astype(ctx.dtype)
             if ctx.quantization_config.apply_hadamard:
-                input_grad = apply_hadamard_matmul(input_grad, "left", ctx.quantization_config.hadamard_block_size)
                 input_grad = apply_hadamard_matmul(input_grad, "right", ctx.quantization_config.hadamard_block_size)
         else:
             qdq_weight = dequantize(
