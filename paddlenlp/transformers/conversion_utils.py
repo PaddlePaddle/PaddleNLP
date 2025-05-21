@@ -38,7 +38,7 @@ from paddle import Tensor
 from paddle.nn import Layer
 
 from paddlenlp.utils.distributed import distributed_allgather, distributed_gather
-from paddlenlp.utils.env import CONFIG_NAME, PADDLE_WEIGHTS_NAME, PYTORCH_WEIGHTS_NAME
+from paddlenlp.utils.env import CONFIG_NAME, PYTORCH_WEIGHTS_NAME
 from paddlenlp.utils.import_utils import (
     is_package_available,
     is_torch_available,
@@ -1161,7 +1161,7 @@ class ConversionMixin:
                     file for file in os.listdir(os.path.dirname(weight_file)) if file.startswith("pytorch_model-")
                 ]
             state_dict = {}
-            for file in files:
+            for file in sorted(files):
                 sub_state_dict = load_torch(os.path.join(os.path.dirname(weight_file), file))
                 state_dict.update(sub_state_dict)
         else:
@@ -1179,13 +1179,9 @@ class ConversionMixin:
                 all_layer_names.remove(name_mapping.source_name)
 
         if all_layer_names:
-            logger.warning(f"there are {len(all_layer_names)} tensors not initialized:")
-            for layer_name in all_layer_names:
-                logger.warning(f"--- {layer_name}")
+            logger.warning(f"There are {len(all_layer_names)} tensors not initialized:")
+            logger.warning(f"Keys: {all_layer_names}")
 
-        model_weight_file = os.path.join(cache_dir, PADDLE_WEIGHTS_NAME)
-        if not os.path.isfile(model_weight_file):
-            paddle.save(state_dict, model_weight_file)
         return state_dict
 
     @classmethod
@@ -1553,10 +1549,7 @@ class Converter(ConversionMixin, LogitComparer):
             all_layer_names.remove(name_mapping.source_name)
 
         if all_layer_names:
-            logger.warning(f"there are {len(all_layer_names)} tensors not initialized:")
-            for layer_name in all_layer_names:
-                logger.warning(f"--- {layer_name}")
+            logger.warning(f"There are {len(all_layer_names)} tensors not initialized:")
+            logger.warning(f"Keys: {all_layer_names}")
 
-        model_weight_file = os.path.join(input_dir, PADDLE_WEIGHTS_NAME)
-        paddle.save(state_dict, model_weight_file)
         return state_dict

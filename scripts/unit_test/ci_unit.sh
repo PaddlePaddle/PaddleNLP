@@ -16,6 +16,7 @@
 
 set -e
 export paddle=$1
+export FLAGS_enable_CE=${2-false}
 export nlp_dir=/workspace/PaddleNLP
 export log_path=/workspace/PaddleNLP/unittest_logs
 cd $nlp_dir
@@ -49,10 +50,15 @@ set_env() {
     export FLAGS_cudnn_deterministic=1
     export HF_ENDPOINT=https://hf-mirror.com
     export FLAGS_use_cuda_managed_memory=true
+    export running_time=40m
+
     # for CE
-    # export CE_TEST_ENV=1
-    # export RUN_SLOW_TEST=1
-    # export PYTHONPATH=${nlp_dir}:${nlp_dir/llm/
+    if [[ ${FLAGS_enable_CE} == "true" ]];then
+        export CE_TEST_ENV=1
+        export RUN_SLOW_TEST=1
+        export PYTHONPATH=${nlp_dir}:${nlp_dir}/llm:${PYTHONPATH}
+        export running_time=5h
+    fi
 }
 
 print_info() {
@@ -66,7 +72,7 @@ print_info() {
         cd ${PPNLP_HOME} && python upload.py ${PPNLP_HOME}/upload 'paddlenlp/PaddleNLP_CI/PaddleNLP-CI-Unittest-GPU'
         rm -rf upload/* && cd -
         if [ $1 -eq 124 ]; then
-            echo "\033[32m [failed-timeout] Test case execution was terminated after exceeding the 30m limit."
+            echo "\033[32m [failed-timeout] Test case execution was terminated after exceeding the ${running_time} min limit."
         fi
     else
         tail -n 1 ${log_path}/unittest.log
@@ -74,25 +80,45 @@ print_info() {
     fi
 }
 
-install_requirements
+get_diff_TO_case(){
+export FLAGS_enable_CI=false
+for file_name in `git diff --numstat ${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
+    ext="${file_name##*.}"
+    echo "file_name: ${file_name}, ext: ${file_name##*.}"
+    
+    if [ ! -f ${file_name} ];then # 针对pr删掉文件
+        continue
+    elif [[ "$ext" == "md" || "$ext" == "rst" || "$file_name" == docs/* ]]; then
+        continue
+    else
+        FLAGS_enable_CI=true
+    fi
+done
+}
+get_diff_TO_case
 set_env
-cd ${nlp_dir}
-echo ' Testing all unittest cases '
-export http_proxy=${proxy} && export https_proxy=${proxy}
-set +e
-timeout 30m python -m pytest -v -n 8 \
-  --dist loadgroup \
-  --retries 1 --retry-delay 1 \
-  --timeout 200 --durations 20 --alluredir=result \
-  --cov paddlenlp --cov-report xml:coverage.xml > ${log_path}/unittest.log 2>&1
-exit_code=$?
-print_info $exit_code unittest
+if [[ ${FLAGS_enable_CI} == "true" ]] || [[ ${FLAGS_enable_CE} == "true" ]];then
+    install_requirements
+    cd ${nlp_dir}
+    echo ' Testing all unittest cases '
+    export http_proxy=${proxy} && export https_proxy=${proxy}
+    set +e
+    timeout ${running_time} python -m pytest -v -n 8 \
+    --dist loadgroup \
+    --retries 1 --retry-delay 1 \
+    --timeout 200 --durations 20 --alluredir=result \
+    --cov paddlenlp --cov-report xml:coverage.xml > ${log_path}/unittest.log 2>&1
+    exit_code=$?
+    print_info $exit_code unittest
 
-cd ${nlp_dir}
-echo -e "\033[35m ---- Genrate Allure Report  \033[0m"
-unset http_proxy && unset https_proxy
-cp scripts/regression/gen_allure_report.py ./
-python gen_allure_report.py > /dev/null
-echo -e "\033[35m ---- Report: https://xly.bce.baidu.com/ipipe/ipipe-report/report/${AGILE_JOB_BUILD_ID}/report/  \033[0m"
-
+    cd ${nlp_dir}
+    echo -e "\033[35m ---- Genrate Allure Report  \033[0m"
+    unset http_proxy && unset https_proxy
+    cp scripts/regression/gen_allure_report.py ./
+    python gen_allure_report.py > /dev/null
+    echo -e "\033[35m ---- Report: https://xly.bce.baidu.com/ipipe/ipipe-report/report/${AGILE_JOB_BUILD_ID}/report/  \033[0m"
+else
+    echo -e "\033[32m Changed Not CI case, Skips \033[0m"
+    exit_code=0
+fi
 exit $exit_code

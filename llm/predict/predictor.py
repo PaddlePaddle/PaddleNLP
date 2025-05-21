@@ -833,7 +833,10 @@ class BlockInferencePredictorMixin(BasePredictor):
         BasePredictor.__init__(self, config, tokenizer, model)
 
         self.num_layers = len(self.cache_k_shapes)
-        self.num_key_value_heads = self.cache_k_shapes[0][-3]
+        if paddle.is_compiled_with_custom_device("intel_hpu"):
+            self.num_key_value_heads = self.cache_k_shapes[0][-2]
+        else:
+            self.num_key_value_heads = self.cache_k_shapes[0][-3]
         self.head_dim = self.cache_k_shapes[0][-1]
         self.max_block_nums = self.cache_k_shapes[0][0]
         self.batch_size = config.batch_size
@@ -848,7 +851,8 @@ class BlockInferencePredictorMixin(BasePredictor):
 
         self.pre_cache_length = 0
 
-        self.msg_queue_id = os.getpid()
+        msg_queue_id_str = os.getenv("INFERENCE_MSG_QUEUE_ID", str(os.getpid()))
+        os.environ["INFERENCE_MSG_QUEUE_ID"] = msg_queue_id_str
 
         if config.export_precache:
             pre_cache_npy = np.load(config.prefix_path)
@@ -948,7 +952,6 @@ class BlockInferencePredictorMixin(BasePredictor):
         )
         self.model_inputs["bad_tokens"] = paddle.to_tensor([-1], dtype="int64")
         self.model_inputs["is_block_step"] = paddle.full(shape=[config.batch_size], fill_value=False, dtype="bool")
-        self.model_inputs["msg_queue_id"] = paddle.full(shape=[1], fill_value=self.msg_queue_id, dtype="int32").cpu()
 
         # bloom model needs src_mask and tgt_mask!
         if "bloom" in self.architectures:
@@ -1185,7 +1188,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
 
         read_res_process = mp.Process(
             target=read_res_func,
-            args=[self.model_name_or_path, tensor_queue, result_queue, done_event, self.model_inputs["msg_queue_id"]],
+            args=[self.model_name_or_path, tensor_queue, result_queue, done_event],
         )
         if self.tensor_parallel_rank == 0:
             read_res_process.start()
@@ -1215,7 +1218,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
             outputs = []
             output_tokens = []
             while len(outputs) < len(input_texts):
-                result = result_queue.get(timeout=1)
+                result = result_queue.get(timeout=10)
                 outputs.append(result[-1])
                 output_tokens.append(result[-2])
 
@@ -1304,14 +1307,14 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
     def insert_task(self, pos, task_id, repeat_num):
         query_id = task_id // repeat_num
         length = len(self.input_ids[query_id])
-        logger.debug(f"Insert task {task_id} while query id is {query_id} inserting pos {pos}")
+        # logger.debug(f"Insert task {task_id} while query id is {query_id} inserting pos {pos}")
         self.model_inputs["input_ids"][pos, 0] = self.model_inputs["all_token_ids"][task_id, 0]
         self.model_inputs["seq_lens_this_time"][pos] = 1
         self.model_inputs["seq_lens_decoder"][pos] = length
         self.model_inputs["stop_flags"][pos] = False
         self.model_inputs["result_id"][pos][0] = task_id
         self.model_inputs["step_idx"][pos, 0] = 1
-        self.model_inputs["pre_ids"][pos][0] = self.input_ids[query_id][-1]
+        self.model_inputs["pre_ids"][pos][0] = np.array(self.input_ids[query_id][-1])
         self.model_inputs["pre_ids"][pos][1:] = -1
         self.model_inputs["not_need_stop"][0] = True
 
@@ -1477,7 +1480,6 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                     task_queue,
                     result_queue,
                     done_event,
-                    self.model_inputs["msg_queue_id"],
                     len(self.input_ids),
                     detokenize,
                 ],
@@ -1568,7 +1570,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         else:
             if flag_current_rank_run:
                 output_tokens = self.model_inputs["all_token_ids"].numpy()
-                output_tokens[output_tokens < 0] = self.tokenizer.pad_token_id
+                output_tokens[output_tokens == -1] = self.tokenizer.eos_token_id
                 if detokenize:
                     outputs = self.tokenizer.batch_decode(
                         output_tokens, skip_special_tokens=True, clean_up_tokenization_spaces=False
@@ -1716,7 +1718,7 @@ class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
 
         read_res_process = mp.Process(
             target=read_res_func,
-            args=[self.model_name_or_path, tensor_queue, result_queue, done_event, self.model_inputs["msg_queue_id"]],
+            args=[self.model_name_or_path, tensor_queue, result_queue, done_event],
         )
         if self.tensor_parallel_rank == 0:
             read_res_process.start()

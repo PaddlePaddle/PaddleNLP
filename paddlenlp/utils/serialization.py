@@ -29,6 +29,7 @@ from paddlenlp.utils.env import PYTORCH_WEIGHTS_NAME, SAFE_WEIGHTS_NAME
 
 MZ_ZIP_LOCAL_DIR_HEADER_SIZE = 30
 
+
 _TYPES = {
     "F64": np.float64,
     "F32": np.float32,
@@ -205,6 +206,8 @@ def dumpy(*args, **kwarsg):
 
 
 def load_torch(path: str, **pickle_load_args):
+    from paddlenlp.transformers.utils import device_guard
+
     if path.endswith(PYTORCH_WEIGHTS_NAME) or os.path.split(path)[-1].startswith("pytorch_model-"):
         import torch
 
@@ -226,10 +229,14 @@ def load_torch(path: str, **pickle_load_args):
         state_dict = {}
         for k, v in flat:
             dtype = _TYPES[v["dtype"]]
-            if v["dtype"] == "BF16":
-                arr = paddle.to_tensor(np.frombuffer(v["data"], dtype=dtype).reshape(v["shape"]), dtype="bfloat16")
-            else:
-                arr = paddle.to_tensor(np.frombuffer(v["data"], dtype=dtype).reshape(v["shape"]))
+            with device_guard("cpu"):
+                if v["dtype"] == "BF16":
+                    arr = paddle.Tensor(
+                        np.frombuffer(v["data"], dtype=dtype).reshape(v["shape"]), dtype="bfloat16", zero_copy=True
+                    )
+                else:
+                    arr = paddle.Tensor(np.frombuffer(v["data"], dtype=dtype).reshape(v["shape"]), zero_copy=True)
+
             state_dict[k] = arr
 
     return state_dict

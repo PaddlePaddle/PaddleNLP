@@ -25,6 +25,10 @@ from PIL import Image
 from seqeval.metrics.sequence_labeling import get_entities
 
 from paddlenlp.transformers import AutoTokenizer
+from paddlenlp.utils.env import (
+    PADDLE_INFERENCE_MODEL_SUFFIX,
+    PADDLE_INFERENCE_WEIGHTS_SUFFIX,
+)
 from paddlenlp.utils.image_utils import ppocr2example
 from paddlenlp.utils.log import logger
 
@@ -33,8 +37,8 @@ class InferBackend(object):
     def __init__(self, model_path_prefix, device="cpu"):
         logger.info(">>> [InferBackend] Creating Engine ...")
         config = paddle.inference.Config(
-            model_path_prefix + ".pdmodel",
-            model_path_prefix + ".pdiparams",
+            model_path_prefix + f"{PADDLE_INFERENCE_MODEL_SUFFIX}",
+            model_path_prefix + f"{PADDLE_INFERENCE_WEIGHTS_SUFFIX}",
         )
         if device == "gpu":
             config.enable_use_gpu(100, 0)

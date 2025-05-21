@@ -24,8 +24,7 @@ from multiprocessing import shared_memory
 
 import numpy as np
 from server.engine.resource_manager import ResourceManager
-from server.engine.task_queue_manager import (TaskQueueManager,
-                                              launch_queue_service)
+from server.engine.task_queue_manager import TaskQueueManager, launch_queue_service
 from server.engine.token_processor import TokenProcessor, WarmUpTokenProcessor
 from server.utils import model_server_logger
 
@@ -34,10 +33,11 @@ class Engine(object):
     """
     Engine Class
     """
+
     def __init__(self, cfg, token_processor):
         self.cfg = cfg
         # Master node only
-        if self.cfg.nnode == 1 or self.cfg.host_ip == os.getenv('POD_0_IP', '127.0.0.1'):
+        if self.cfg.nnode == 1 or self.cfg.host_ip == os.getenv("POD_0_IP", "127.0.0.1"):
             self.queue_service = self._start_tasks_queue_service()
         self.tasks_queue = TaskQueueManager(mp_num=self.cfg.mp_num, port=self.cfg.infer_port)
         self.resource_manager = ResourceManager(self.cfg)
@@ -53,8 +53,10 @@ class Engine(object):
         initialize engine and start sub services
         """
         assert not self.is_started, "The engine is already started.!"
+        msg_queue_id_str = os.getenv("INFERENCE_MSG_QUEUE_ID", str(os.getpid()))
+        os.environ["INFERENCE_MSG_QUEUE_ID"] = msg_queue_id_str
         start_time = time.time()
-        
+
         self.token_processor.tasks_queue = self.tasks_queue
         self.infer_proc = self._start_infer_service()
         model_server_logger.info("Waiting infer processes ready...")
@@ -80,9 +82,10 @@ class Engine(object):
         """
         # get eos_token_id
         from server.data.processor import DataProcessor
+
         eos_token_ids = DataProcessor().get_eos_tokens()
 
-       # construct test tasks
+        # construct test tasks
         res_task = []
         for j in range(2 * self.cfg.max_batch_size):
             data = {
@@ -90,7 +93,7 @@ class Engine(object):
                 "req_id": j,
                 "max_dec_len": self.cfg.dec_len_limit,
                 "min_dec_len": int(self.cfg.dec_len_limit * 0.5) + 1,
-                "eos_token_ids": eos_token_ids
+                "eos_token_ids": eos_token_ids,
             }
             res_task.append(data)
         for j in range(2 * self.cfg.max_prefill_batch):
@@ -99,7 +102,7 @@ class Engine(object):
                 "req_id": j + 2 * self.cfg.max_batch_size,
                 "max_dec_len": 1,
                 "min_dec_len": 1,
-                "eos_token_ids": eos_token_ids
+                "eos_token_ids": eos_token_ids,
             }
             res_task.append(data)
 
@@ -130,8 +133,9 @@ class Engine(object):
 
         available_batch = np.sum(self.resource_manager.stop_flags)
         if len(tasks) > available_batch:
-            model_server_logger.error("Inserting batch:{} exceeds the available batch:{}.".format(
-                len(tasks), available_batch))
+            model_server_logger.error(
+                "Inserting batch:{} exceeds the available batch:{}.".format(len(tasks), available_batch)
+            )
             model_server_logger.error("The exceeded part will be ignored!")
             tasks = tasks[:available_batch]
 
@@ -140,21 +144,23 @@ class Engine(object):
             input_token_num = len(tasks[i]["input_ids"])
             if input_token_num >= self.cfg.max_seq_len - 1:
                 model_server_logger.warning(f"{req_id}: Input length:{input_token_num}, exceed the limits.")
-                tasks[i]["input_ids"] = tasks[i]["input_ids"][:self.cfg.max_seq_len - 1]
+                tasks[i]["input_ids"] = tasks[i]["input_ids"][: self.cfg.max_seq_len - 1]
             if "seq_len" in tasks[i] and "max_dec_len" not in tasks[i]:
                 tasks[i]["max_dec_len"] = tasks[i]["seq_len"]
 
             # max_dec_len + input_token_num > MAX_SEQ_LEN
             if input_token_num + tasks[i]["max_dec_len"] > self.cfg.max_seq_len:
                 tasks[i]["max_dec_len"] = self.cfg.max_seq_len - input_token_num
-                model_server_logger.warning("Force max_dec_len to be {} for req_id={}.".format(
-                    tasks[i]["max_dec_len"], tasks[i]["req_id"]))
+                model_server_logger.warning(
+                    "Force max_dec_len to be {} for req_id={}.".format(tasks[i]["max_dec_len"], tasks[i]["req_id"])
+                )
 
             # min_dec_len + input_token_num > MAX_SEQ_LEN
             if input_token_num + tasks[i]["min_dec_len"] > self.cfg.max_seq_len:
                 tasks[i]["min_dec_len"] = self.cfg.max_seq_len - input_token_num
-                model_server_logger.warning("Force min_dec_len to be {} for req_id={}.".format(
-                    tasks[i]["min_dec_len"], tasks[i]["req_id"]))
+                model_server_logger.warning(
+                    "Force min_dec_len to be {} for req_id={}.".format(tasks[i]["min_dec_len"], tasks[i]["req_id"])
+                )
 
         tasks = self.resource_manager.allocate_resources_for_new_tasks(tasks)
         if not tasks:
@@ -292,9 +298,7 @@ class Engine(object):
         self.shm_flag_ready = shared_memory.SharedMemory(
             create=True, size=flag_array.nbytes, name=self.cfg.get_unique_name("shm_flag_infer_ready")
         )
-        self.flag_ready_array = np.ndarray(
-            flag_array.shape, dtype=flag_array.dtype, buffer=self.shm_flag_ready.buf
-        )
+        self.flag_ready_array = np.ndarray(flag_array.shape, dtype=flag_array.dtype, buffer=self.shm_flag_ready.buf)
         self.flag_ready_array[:] = 0
 
         # broadcast flag for engine
@@ -324,7 +328,8 @@ class Engine(object):
             tmp = shared_memory.SharedMemory(
                 create=False,
                 size=has_block_step_flag_array.nbytes,
-                name=self.cfg.get_unique_name("shm_flag_has_block_step"))
+                name=self.cfg.get_unique_name("shm_flag_has_block_step"),
+            )
             tmp.close()
             tmp.unlink()
         except:
@@ -332,11 +337,13 @@ class Engine(object):
         self.shm_flag_has_block_step = shared_memory.SharedMemory(
             create=True,
             size=has_block_step_flag_array.nbytes,
-            name=self.cfg.get_unique_name("shm_flag_has_block_step"))
+            name=self.cfg.get_unique_name("shm_flag_has_block_step"),
+        )
         self.flag_has_block_step_array = np.ndarray(
             has_block_step_flag_array.shape,
             dtype=has_block_step_flag_array.dtype,
-            buffer=self.shm_flag_has_block_step.buf)
+            buffer=self.shm_flag_has_block_step.buf,
+        )
         self.flag_has_block_step_array[:] = 0
 
     def _exit_sub_services(self):
@@ -362,8 +369,9 @@ class Engine(object):
         if p.is_alive():
             model_server_logger.info("start tasks queue service successfully")
         else:
-            error_msg = "Failed to start tasks queue service, please check " \
-                        "the log/task_queue_manager.log for details"
+            error_msg = (
+                "Failed to start tasks queue service, please check " "the log/task_queue_manager.log for details"
+            )
             model_server_logger.info(error_msg)
             raise Exception(error_msg)
         return p
@@ -380,14 +388,16 @@ class Engine(object):
         pd_cmd = "python3 -m paddle.distributed.launch "
         py_script = os.path.join(current_dir_path, "infer.py")
 
-        arguments = (f" --nnodes {str(self.cfg.nnode)}"
-                    f" --devices {self.cfg.device_ids} {py_script} --model_dir {self.cfg.model_dir}"
-                    f" --max_batch_size {self.cfg.max_batch_size} --max_seq_len {self.cfg.max_seq_len}"
-                    f" --max_dec_len {self.cfg.max_dec_len}"
-                    f" --max_block_num {self.cfg.total_block_num} --block_size {self.cfg.block_size}"
-                    f" --use_cache_kv_int8 {self.cfg.use_cache_kv_int8}"
-                    f" --enc_dec_block_num {self.cfg.enc_dec_block_num}"
-                    f" --block_ratio {self.cfg.block_ratio} --dtype {self.cfg.dtype}")
+        arguments = (
+            f" --nnodes {str(self.cfg.nnode)}"
+            f" --devices {self.cfg.device_ids} {py_script} --model_dir {self.cfg.model_dir}"
+            f" --max_batch_size {self.cfg.max_batch_size} --max_seq_len {self.cfg.max_seq_len}"
+            f" --max_dec_len {self.cfg.max_dec_len}"
+            f" --max_block_num {self.cfg.total_block_num} --block_size {self.cfg.block_size}"
+            f" --use_cache_kv_int8 {self.cfg.use_cache_kv_int8}"
+            f" --enc_dec_block_num {self.cfg.enc_dec_block_num}"
+            f" --block_ratio {self.cfg.block_ratio} --dtype {self.cfg.dtype}"
+        )
         if self.cfg.nnode > 1:
             pd_cmd = pd_cmd + f" --ips {self.cfg.ips}"
         pd_cmd = pd_cmd + arguments + " >log/launch_infer.log 2>&1"

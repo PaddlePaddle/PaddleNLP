@@ -186,7 +186,7 @@ python run_finetune.py ./config/qwen/pt_argument.json
 
 ### 3. 对齐
 
-我们支持 DPO、KTO、RLHF 等偏好对齐策略。DPO、KTO 策略采用 zero_padding 策略，结合 FlashMask 策略，有效提升模型训练效率。
+我们支持 DPO、KTO、RL 等偏好对齐策略。DPO、KTO 策略采用 zero_padding 策略，结合 FlashMask 策略，有效提升模型训练效率。
 
 #### 3.1 DPO
 
@@ -272,8 +272,8 @@ python -u  ./alignment/dpo/run_dpo.py ./config/llama/dpo_lora_argument.json
 为了方便测试，我们也提供了偏好数据集可以直接使用：
 
 ```bash
-wget https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized_pointwise.tar.gz
-tar -zxvf ultrafeedback_binarized_pointwise.tar.gz
+wget https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized_pointwise.tar
+tar -xvf ultrafeedback_binarized_pointwise.tar.gz
 ```
 
 ##### 全参 KTO
@@ -289,20 +289,18 @@ python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" ./alignment/
 python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" ./alignment/kto/run_kto.py ./config/llama/kto_lora_argument.json
 ```
 
-#### 3.3 RLHF
+#### 3.3 RL
 
-飞桨大模型套件提供了提供了基于强化学习 PPO 算法对 LLM 进行人类偏好对齐的代码及完整使用示例，支持**3D 分布式并行训练以及 rollout 阶段使用预测优化进行生成加速**。详细使用教程详见[RLHF 文档](./docs/rlhf.md)。
+飞桨大模型套件提供了提供了基于强化学习 GRPO、Reinforce++、PPO 等 算法对 LLM 进行人类偏好对齐的代码及完整使用示例，支持**3D 分布式并行训练以及 rollout 阶段使用预测优化进行生成加速**。详细使用教程详见[RL 文档](./alignment/rl/README.md)。
 
 ### 4. 模型融合
 PadlleNLP 支持多种模型融合方法，包括**Linear、Slerp、Ties、DARE、DELLA**，并支持模型参数稀疏化方法与模型融合算法的灵活组合使用。
 ```shell
 # 模型融合启动命令参考
-# cd PaddleNLP/llm/tools
-python mergekit.py \
-    --tensor_type np \
-    --n_process 2 \
+python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" ./llm/tools/mergekit.py \
+    --tensor_type pd \
     --merge_method linear \
-    --model_path_list ../checkpoints/model1 ../checkpoints/model \
+    --model_path_str "../checkpoints/model1,../checkpoints/model2" \
     --output_path ../checkpoints/model_merge
 
 ```

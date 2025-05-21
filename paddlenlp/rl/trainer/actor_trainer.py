@@ -12,23 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import uuid
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List
 
 import numpy as np
 import paddle
-from paddle import nn
+import paddle.nn.functional as F
+from paddle.distributed import fleet
+from paddle.distributed.fleet.layers.mpu import mp_ops
 from paddle.distributed.fleet.meta_parallel import ParallelCrossEntropy
-from paddle.io import Dataset
 
-from ...data import DataCollator
-from ...generation import GenerationConfig
-from ...trainer.trainer import (
-    EvalPrediction,
-    ShardingOption,
-    TrainerCallback,
-    TrainingArguments,
-)
-from ...transformers import PretrainedModel, PretrainedTokenizer
 from ..models.ppo_model_utils import (
     RLHFPPOMixedLoss,
     create_startend_row_indices,
@@ -38,135 +30,10 @@ from .rl_trainer import RLTrainer
 from .trainer_utils import guard_set_args
 
 
-class ActorReferenceTrainer(RLTrainer):
+class ActorReferenceTrainerBase(RLTrainer):
     loss_cls = RLHFPPOMixedLoss
     trainer_type = "policy"
-
-    def __init__(
-        self,
-        model: Union[PretrainedModel, nn.Layer] = None,
-        criterion: nn.Layer = None,
-        args: TrainingArguments = None,
-        data_collator: Optional[DataCollator] = None,  # type: ignore
-        train_dataset: Optional[Dataset] = None,
-        eval_dataset: Union[Dataset, Dict[str, Dataset]] = None,
-        tokenizer: Optional[PretrainedTokenizer] = None,
-        compute_metrics: Optional[Callable[[EvalPrediction], Dict]] = None,
-        callbacks: Optional[List[TrainerCallback]] = None,
-        optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
-        preprocess_logits_for_metrics: Optional[Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor]] = None,
-    ):
-        super().__init__(
-            model,
-            criterion,
-            args,
-            data_collator,
-            train_dataset,
-            eval_dataset,
-            tokenizer,
-            compute_metrics,
-            callbacks,
-            optimizers,
-            preprocess_logits_for_metrics,
-        )
-
-        self.generation_config = GenerationConfig(
-            max_new_tokens=self.args.max_dec_len,
-            rollout_n=self.args.rollout_n,
-            temperature=self.args.temperature,
-            top_p=self.args.top_p,
-            top_k=0,  # to disable top_k sampling, default is 50
-            repetition_penalty=self.args.repetition_penalty,
-            min_length=self.args.min_dec_len,
-            do_sample=True,
-            # allow generation output to contain input
-            trunc_input=False,
-            bos_token_id=self.tokenizer.bos_token_id,
-            eos_token_id=self.tokenizer.cls_token_id,
-            pad_token_id=self.tokenizer.pad_token_id,
-        )
-
-    def loss_identifier(self, inputs: Dict) -> str:
-        """
-        Identify whether to use the ptx loss function or the actor loss function based on the input dictionary.
-        If labels are present, return "ptx_loss"; otherwise, return "actor_loss".
-
-        Args:
-            inputs (Dict): A dictionary containing two key-value pairs, "inputs" and "labels".
-                           "inputs" represents the model's input, while "labels" is optional and indicates whether to use the ptx loss function.
-                           The default value for "labels" is None.
-
-        Returns:
-            str: A string indicating whether to use the ptx loss function or the actor loss function, either "ptx_loss" or "actor_loss".
-        """
-        return "actor_loss"
-
-    @paddle.no_grad()
-    def generate_sequences(self, prompt_only_batch: Dict, do_eval=False) -> List[Dict[str, Any]]:
-        """Rollout a batch of experiences."""
-        input_ids = prompt_only_batch["input_ids"]
-        # attention_mask = prompt_only_batch["attention_mask"]
-        if do_eval:
-            train_rollout_n = self.args.rollout_n
-            self.args.rollout_n = 1
-
-        # position_ids = (
-        #     prompt_only_batch["position_ids"]
-        #     if "position_ids" in prompt_only_batch
-        #     else make_position_ids(attention_mask)
-        # )
-
-        if self.args.rollout_n > 1:
-            input_ids = input_ids.repeat_interleave(self.args.rollout_n, axis=0)
-            # raw_dtype = attention_mask.dtype
-            # attention_mask = (
-            #     attention_mask.cast("int32").repeat_interleave(self.args.rollout_n, axis=0).cast(raw_dtype)
-            # )
-            # position_ids = position_ids.repeat_interleave(self.args.rollout_n, axis=0)
-
-        with guard_set_args(self.model.config, {"use_fused_head_and_loss_fn": False}):
-            sequences = self.get_model(False).generate(
-                input_ids=input_ids,
-                attention_mask=None,
-                position_ids=None,
-                generation_config=self.generation_config,
-                synced_gpus=ShardingOption.FULL_SHARD in self.args.sharding,
-                do_eval=do_eval,
-            )[0]
-
-        if self.args.use_rm_server:
-            label_ids = prompt_only_batch["label_ids"]
-            if self.args.rollout_n > 1:
-                label_ids = label_ids.repeat_interleave(self.args.rollout_n, axis=0)
-
-        sequences = sequences.reshape([input_ids.shape[0] // self.args.rollout_n, self.args.rollout_n, -1])
-        if do_eval:
-            self.args.rollout_n = train_rollout_n
-            sequences = sequences.transpose([1, 0, 2])
-        # prompt, sequence, attention_mask
-        return [
-            {
-                "prompt": input_ids,
-                "input_ids": seq,
-                **({"label_ids": label_ids[idx * len(seq) : (idx + 1) * len(seq)]} if self.args.use_rm_server else {}),
-                "index": np.array([str(uuid.uuid4())] * len(seq), dtype=object),
-                # "attention_mask": make_attention_mask(
-                #     seq,
-                #     pad_id=self.tokenizer.pad_token_id,
-                #     eos_id=None,
-                #     unk_id=self.tokenizer.unk_token_id,
-                #     causal_mask=True,
-                # ).cast(self._model_config.dtype),
-                # "sequence_mask": make_attention_mask(
-                #     seq,
-                #     pad_id=self.tokenizer.pad_token_id,
-                #     eos_id=None,
-                #     unk_id=self.tokenizer.unk_token_id,
-                #     causal_mask=False,
-                # ).cast(self._model_config.dtype),
-            }
-            for idx, seq in enumerate(sequences)
-        ]
+    loss_identifier = lambda self, inputs: "actor_loss"
 
     @paddle.no_grad()
     def compute_logprob(self, input_ids: paddle.Tensor, position_ids: paddle.Tensor = None, **kwargs) -> paddle.Tensor:
@@ -193,6 +60,13 @@ class ActorReferenceTrainer(RLTrainer):
         Raises:
             None.
         """
+        if self.args.use_fused_head_and_loss_fn:
+            return self.compute_fused_logprob(
+                input_ids=input_ids,
+                position_ids=position_ids,
+                **kwargs,
+            )
+
         log_probs_list = []
         batch_size, sequence_length = input_ids.shape
         per_device_logprob_batch_size = self.args.per_device_logprob_batch_size
@@ -214,6 +88,24 @@ class ActorReferenceTrainer(RLTrainer):
                 startend_row_indices[start_index:end_index] if startend_row_indices is not None else None
             )
             current_position_ids = position_ids[start_index:end_index] if position_ids is not None else None
+            current_labels = current_input_ids[:, response_start + 1 :]
+            if self.args.use_remove_padding:
+                from ..utils.bert_padding import prepare_flashmask_inputs
+
+                update_inputs = prepare_flashmask_inputs(
+                    current_input_ids,
+                    current_position_ids,
+                    self.tokenizer.pad_token_id,
+                    self.model.config.sequence_parallel,
+                    self.model.config.tensor_parallel_degree,
+                )
+                current_input_ids = update_inputs["input_ids"]
+                current_position_ids = update_inputs["position_ids"]
+                current_startend_row_indices = update_inputs["attn_mask_startend_row_indices"]
+                current_input_ids_rmpad_rolled = update_inputs["input_ids_rmpad_rolled"]
+                indices = update_inputs["indices"]
+                raw_input_shape = update_inputs["raw_input_shape"]
+                pad_size = update_inputs["pad_size"]
 
             logits = self.model(
                 current_input_ids,
@@ -221,28 +113,193 @@ class ActorReferenceTrainer(RLTrainer):
                 attn_mask_startend_row_indices=current_startend_row_indices,
             )
             if not isinstance(logits, paddle.Tensor):
-                logits = logits[0]  # [2, 355, 12544]
+                logits = logits[0]
 
             if self.args.use_fp32_compute and logits.dtype != paddle.float32:
                 logits = logits.cast(paddle.float32)
-            logits = logits / self.args.temperature if self.args.temperature > 0.0 else logits
 
-            if self.model.config.tensor_parallel_degree > 1 and self.model.config.tensor_parallel_output:
-                log_probs = (
-                    -ParallelCrossEntropy()(
-                        logits[:, response_start:-1].astype("float32"), current_input_ids[:, response_start + 1 :]
+            if self.args.temperature > 0.0:
+                # use inplace method to save gpu memory
+                logits.scale_(1 / self.args.temperature)
+
+            if self.args.use_remove_padding:
+                from ..utils.bert_padding import pad_input
+
+                if self.model.config.tensor_parallel_degree > 1 and self.model.config.tensor_parallel_output:
+                    log_probs = (
+                        -ParallelCrossEntropy()(logits.astype("float32"), current_input_ids_rmpad_rolled)
+                        .squeeze(axis=-1)
+                        .astype(logits.dtype)
                     )
-                    .squeeze(axis=-1)
-                    .astype(logits.dtype)
-                )
+                else:
+                    log_probs = gather_log_probabilities(logits, current_input_ids_rmpad_rolled)
+
+                if pad_size > 0:
+                    log_probs = log_probs[:, :-pad_size]
+                log_probs = pad_input(
+                    log_probs.squeeze(0).unsqueeze(-1), indices, batch=raw_input_shape[0], seqlen=raw_input_shape[1]
+                ).squeeze(-1)
+                log_probs = log_probs[:, response_start:-1].contiguous()
             else:
-                log_probs = gather_log_probabilities(
-                    logits[:, response_start:-1], current_input_ids[:, response_start + 1 :]
-                )
+                if self.model.config.tensor_parallel_degree > 1 and self.model.config.tensor_parallel_output:
+                    log_probs = (
+                        -ParallelCrossEntropy()(logits[:, response_start:-1].astype("float32"), current_labels)
+                        .squeeze(axis=-1)
+                        .astype(logits.dtype)
+                    )
+                else:
+                    log_probs = gather_log_probabilities(logits[:, response_start:-1], current_labels)
 
             log_probs_list.append(log_probs)
             # Set logits to None to save memory
             logits = None
+            paddle.device.cuda.empty_cache()
+
+        return paddle.concat(log_probs_list, axis=0)
+
+    def compute_fused_logprob(
+        self, input_ids: paddle.Tensor, position_ids: paddle.Tensor = None, loop_chunk_size=1024, **kwargs
+    ):
+        log_probs_list = []
+        batch_size, sequence_length = input_ids.shape
+        per_device_logprob_batch_size = self.args.per_device_logprob_batch_size
+        num_batches = (batch_size + per_device_logprob_batch_size - 1) // per_device_logprob_batch_size
+
+        # Pipe model outputs a logits tensor with LMHead, while non-pipe model
+        # outputs a tuple with logits tensor as the only one element.
+        startend_row_indices = create_startend_row_indices(input_ids, self.tokenizer.pad_token_id)
+        response_start = kwargs["prompt"].shape[-1] - 1 if "prompt" in kwargs else 0
+
+        num_embeddings = self.model.config.vocab_size
+        tensor_parallel_degree = self.model.config.tensor_parallel_degree
+        tensor_parallel_output = self.model.config.tensor_parallel_output
+
+        for i in range(num_batches):
+            # Calculate the start and end indices for the current batch
+            start_index = i * per_device_logprob_batch_size
+            end_index = min(start_index + per_device_logprob_batch_size, batch_size)
+
+            # Extract the current batch
+            current_input_ids = input_ids[start_index:end_index]
+            current_startend_row_indices = (
+                startend_row_indices[start_index:end_index] if startend_row_indices is not None else None
+            )
+            current_position_ids = position_ids[start_index:end_index] if position_ids is not None else None
+            current_labels = current_input_ids[:, response_start + 1 :]
+
+            if self.args.use_remove_padding:
+                from ..utils.bert_padding import prepare_flashmask_inputs
+
+                update_inputs = prepare_flashmask_inputs(
+                    current_input_ids,
+                    current_position_ids,
+                    self.tokenizer.pad_token_id,
+                    self.model.config.sequence_parallel,
+                    self.model.config.tensor_parallel_degree,
+                )
+                current_input_ids = update_inputs["input_ids"]
+                current_position_ids = update_inputs["position_ids"]
+                current_startend_row_indices = update_inputs["attn_mask_startend_row_indices"]
+                indices = update_inputs["indices"]
+                raw_input_shape = update_inputs["raw_input_shape"]
+                pad_size = update_inputs["pad_size"]
+
+            # NOTE: for use_fused_head_and_loss_fn
+            self.model.training = True
+            hidden_states, lm_head_weight, lm_head_bias, transpose_y = self.model(
+                current_input_ids,
+                position_ids=current_position_ids,
+                attn_mask_startend_row_indices=current_startend_row_indices,
+            )
+            self.model.training = False
+
+            if self.args.use_remove_padding:
+                if pad_size > 0:
+                    hidden_states = hidden_states[:, :-pad_size]
+
+                from ..utils.bert_padding import pad_input
+
+                hidden_states = pad_input(
+                    hidden_states.squeeze(0), indices, batch=raw_input_shape[0], seqlen=raw_input_shape[1]
+                ).contiguous()
+
+            if self.args.use_fp32_compute and hidden_states.dtype != paddle.float32:
+                hidden_states = hidden_states.cast(paddle.float32)
+                lm_head_weight = lm_head_weight.cast(paddle.float32)
+                if lm_head_bias is not None:
+                    lm_head_bias = lm_head_bias.cast(paddle.float32)
+
+            # Recover
+            hidden_states = hidden_states[:, response_start:-1, :]
+            dtype = hidden_states.dtype
+            original_shape = hidden_states.shape
+            if tensor_parallel_degree > 1:
+                assert tensor_parallel_output, (
+                    "When tensor_parallel_degree > 1 and use_fused_head_and_loss_fn, "
+                    "tensor_parallel_output needs to be set to True."
+                )
+            # Parallel Configuration
+            if tensor_parallel_degree > 1 and tensor_parallel_output:
+                hcg = fleet.get_hybrid_communicate_group()
+                model_parallel_group = hcg.get_model_parallel_group()
+                tensor_parallel_degree = hcg.get_model_parallel_world_size()
+
+            # reshape
+            hidden_states = hidden_states.reshape([-1, original_shape[-1]])
+            labels = current_labels.reshape([-1])
+
+            n_tokens = hidden_states.shape[0]
+            n_classes = lm_head_weight.shape[0] if transpose_y else lm_head_weight.shape[1]
+
+            # convert dtype of weights and biases of lm_head
+            lm_head_weight_cast = lm_head_weight.astype(dtype)
+            if lm_head_bias is not None:
+                lm_head_bias_cast = lm_head_bias.astype(dtype)
+
+            # use indices to distinguish the devices.
+            if tensor_parallel_degree > 1 and tensor_parallel_output:
+                rank = hcg.get_model_parallel_rank()
+                per_part_size = num_embeddings // tensor_parallel_degree
+                indices = paddle.arange(
+                    rank * per_part_size,
+                    rank * per_part_size + n_classes,
+                    dtype=labels.dtype,
+                ).unsqueeze(0)
+            else:
+                indices = paddle.arange(num_embeddings, dtype=labels.dtype).unsqueeze(0)
+
+            log_prob_chunks = []
+            for ci in range(0, n_tokens, loop_chunk_size):
+                token_start_idx = ci
+                token_end_idx = min(ci + loop_chunk_size, n_tokens)
+                hidden_states_chunk = hidden_states[token_start_idx:token_end_idx]
+                labels_chunk = labels[token_start_idx:token_end_idx]
+
+                # Calculate the current logits_chunk,  not fused linear
+                logits_chunk_cast = paddle.matmul(hidden_states_chunk, lm_head_weight_cast, transpose_y=transpose_y)
+                if lm_head_bias is not None:
+                    logits_chunk_cast += lm_head_bias_cast
+
+                logits_chunk = logits_chunk_cast.astype("float32")
+                logits_chunk = logits_chunk / self.args.temperature
+
+                # rewritten as cross entropy
+                if tensor_parallel_degree > 1 and tensor_parallel_output:
+                    token_loss_chunk = mp_ops._c_softmax_with_cross_entropy(
+                        logits_chunk,
+                        labels_chunk,
+                        group=model_parallel_group,
+                        return_softmax=False,
+                    )
+                else:
+                    token_loss_chunk = F.cross_entropy(logits_chunk, labels_chunk, reduction="none")
+                log_prob_chunk = -token_loss_chunk.squeeze(axis=-1)
+                log_prob_chunks.append(log_prob_chunk)
+
+            log_probs = paddle.concat(log_prob_chunks, axis=-1).reshape(original_shape[:-1])
+            log_probs_list.append(log_probs)
+
+            log_prob_chunks = None
             paddle.device.cuda.empty_cache()
 
         return paddle.concat(log_probs_list, axis=0)
@@ -328,3 +385,43 @@ class ActorReferenceTrainer(RLTrainer):
             "train_max_generated_length": max_generated_length,
             "train_min_generated_length": min_generated_length,
         }
+
+
+class ActorReferenceTrainer(ActorReferenceTrainerBase):
+    @paddle.no_grad()
+    def generate_sequences(self, prompt_only_batch: Dict, do_eval=False) -> List[Dict[str, Any]]:
+        """Rollout a batch of experiences."""
+        input_ids = prompt_only_batch["input_ids"]
+
+        repeat_num = 1 if do_eval else self.args.rollout_n
+
+        with guard_set_args(self.model.config, {"use_fused_head_and_loss_fn": False}):
+            sequences = self.get_model(False).generate(
+                input_ids=input_ids,
+                attention_mask=None,
+                position_ids=None,
+                do_eval=do_eval,
+                repeat_num=repeat_num,
+            )[0]
+
+        if repeat_num > 1:
+            input_ids = input_ids.repeat_interleave(repeat_num, axis=0)
+
+        if self.args.use_rm_server:
+            label_ids = prompt_only_batch["label_ids"]
+            if repeat_num > 1:
+                label_ids = label_ids.repeat_interleave(repeat_num, axis=0)
+
+        sequences = sequences.reshape([input_ids.shape[0] // repeat_num, repeat_num, -1])
+        if do_eval:
+            sequences = sequences.transpose([1, 0, 2])
+        # prompt, sequence, attention_mask
+        return [
+            {
+                "prompt": input_ids,
+                "input_ids": seq,
+                **({"label_ids": label_ids[idx * len(seq) : (idx + 1) * len(seq)]} if self.args.use_rm_server else {}),
+                "index": np.array([str(uuid.uuid4())] * len(seq), dtype=object),
+            }
+            for idx, seq in enumerate(sequences)
+        ]
