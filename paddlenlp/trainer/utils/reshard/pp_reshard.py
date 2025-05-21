@@ -220,7 +220,7 @@ class PipeLineSegment:
 class PipeLineStage:
     def __init__(self):
         self._rename_mgr = LayerReNamingManager()
-        # map segement start index to segment
+        # map segment start index to segment
         self._segments = OrderedDict()
         self._layer_to_segment = OrderedDict()
         self._param_to_tname = OrderedDict()

@@ -779,7 +779,7 @@ class Qwen2MoeGate(PretrainedMoEGate):
         return capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss
 
 
-class Qwen2MoeSparseMoEBlock(MoELayer):
+class Qwen2MoeSparseMoeBlock(MoELayer):
     def __init__(self, config: Qwen2MoeConfig):
         gate = Qwen2MoeGate(
             config,
@@ -822,7 +822,7 @@ class Qwen2MoeDecoderLayer(nn.Layer):
         self.self_attn = Qwen2MoeAttention(config, layerwise_recompute)
 
         if config.num_experts > 0:
-            self.mlp = Qwen2MoeSparseMoEBlock(config)
+            self.mlp = Qwen2MoeSparseMoeBlock(config)
         else:
             # num_experts == 0 or this layer is not sparse layer
             self.mlp = Qwen2MoeMLP(config)

@@ -261,6 +261,8 @@ from .prophetnet.tokenizer import *
 from .qwen import *
 from .qwen2 import *
 from .qwen2_moe import *
+from .qwen3 import *
+from .qwen3_moe import *
 from .reformer.configuration import *
 from .reformer.modeling import *
 from .reformer.tokenizer import *

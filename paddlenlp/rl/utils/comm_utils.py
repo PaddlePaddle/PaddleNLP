@@ -25,7 +25,7 @@ from paddle.distributed import fleet
 from ...trainer.trainer import Trainer, logger
 from ...utils.nested import flatten_list, nested_broadcast_tensor_with_empty
 from ..models.ppo_model_utils import make_position_ids_from_input_ids
-from .reshard_utils import init_reshard_mappings, init_rollout_env, reshard_to_rollout
+from .reshard_utils import init_reshard_mappings, reshard_to_rollout
 
 global_dev_id = 0 if paddle.get_device() == "cpu" else int(paddle.get_device().split(":")[1])
 
@@ -622,15 +622,18 @@ def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
     if not hasattr(self, "global_meta_dict") or self.global_meta_dict is None:
         self.global_meta_dict = init_reshard_mappings(train_model, self.args, pp_rank, pp_group)
 
-    with init_rollout_env(self.args.rollout_tensor_parallel_degree):
-        hcg = fleet.get_hybrid_communicate_group()
-        tensor_parallel_degree = hcg.get_model_parallel_world_size()
-        tensor_parallel_rank = hcg.get_model_parallel_rank()
-        eval_tp_size = max(tensor_parallel_degree, 1)
-        eval_tp_rank = max(tensor_parallel_rank, 0)
-        reshard_to_rollout(
-            train_model, eval_model, self.global_meta_dict, pp_rank, pp_group, hcg.get_model_parallel_group(), tp_group
-        )
+    if getattr(self, "reshard_controller", None) is not None:
+        self.reshard_controller.set_rollout_env("[export_evaluate_model]")
+    hcg = fleet.get_hybrid_communicate_group()
+    tensor_parallel_degree = hcg.get_model_parallel_world_size()
+    tensor_parallel_rank = hcg.get_model_parallel_rank()
+    eval_tp_size = max(tensor_parallel_degree, 1)
+    eval_tp_rank = max(tensor_parallel_rank, 0)
+    reshard_to_rollout(
+        train_model, eval_model, self.global_meta_dict, pp_rank, pp_group, hcg.get_model_parallel_group(), tp_group
+    )
+    if getattr(self, "reshard_controller", None) is not None:
+        self.reshard_controller.set_train_env("[after export_evaluate_model]")
 
     old_dp_workers = self.args.world_size // (max(sd_group.nranks, 1) * max(dp_group.nranks, 1))
     group_nums = self.args.logical_process_index // old_dp_workers * eval_tp_size + eval_tp_rank
@@ -1015,7 +1018,7 @@ def process_prompt_and_response(micro_batch, pad_token_id=0):
     response = paddle.stack(padded_response_tensors, axis=0)
 
     micro_batch["input_ids"] = paddle.concat([micro_batch["prompt"], response], axis=1)
-    micro_batch["position_ids"] = make_position_ids_from_input_ids(micro_batch["input_ids"])
+    micro_batch["position_ids"] = make_position_ids_from_input_ids(micro_batch["input_ids"], pad_token_id=pad_token_id)
     key_to_slice = [
         "eos_mask",
         "kl_rewards",
@@ -1072,3 +1075,23 @@ def split_batch_into_micro_batches(total_batch, batch_size, pad_token_id=0):
         micro_batches.append(micro_batch)
 
     return micro_batches
+
+
+def make_eos_mask(response_id, eos_token_ids=0, dtype=paddle.int64):
+    """
+    end of sentence token can be int or list: 1 or [1, 2]
+    e.g. eos_token=1
+    response_id: [0, 0, 2, 42, 3, 5, 1, 0, 0]
+    eos_mask:     [1, 1, 1, 1,  1, 1, 1, 0, 0]
+    """
+    if isinstance(eos_token_ids, int):
+        eos_token_ids = [eos_token_ids]
+
+    eos_mask = paddle.zeros_like(response_id, dtype=paddle.bool)
+    for token_id in eos_token_ids:
+        eos_mask |= response_id == token_id
+
+    eos_mask = eos_mask.to("int64")
+    eos_mask = (paddle.cumsum(eos_mask, axis=1) - eos_mask).to("bool")
+    eos_mask = paddle.logical_not(eos_mask).to(dtype)
+    return eos_mask

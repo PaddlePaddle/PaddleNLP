@@ -280,9 +280,9 @@ class DalleBartTokenizer(GPTTokenizer):
         merges_file (str):
             Path to the merge file.
             The merge file is used to split the input sentence into "subword" units.
-            The vocab file is then used to encode those units as intices.
+            The vocab file is then used to encode those units as indices.
         wiki_word_frequency_file (str):
-            Path to the wiki_word_frequency file when we need normlize text.
+            Path to the wiki_word_frequency file when we need normalize text.
         errors (str):
             Paradigm to follow when decoding bytes to UTF-8.
             Defaults to `'replace'`.

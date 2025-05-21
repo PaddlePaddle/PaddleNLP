@@ -27,8 +27,8 @@ class Vocab(object):
     store/load functions.
 
     Args:
-        counter (collections.Counter, optional): A Counter intance describes
-            the tokens and their frequencies. Its keys will be indexed accroding
+        counter (collections.Counter, optional): A Counter instance describes
+            the tokens and their frequencies. Its keys will be indexed according
             to the order of frequency sorting to construct mapping relationship.
             If None, `token_to_idx` must be provided as the mapping relationship.
             Default: None.

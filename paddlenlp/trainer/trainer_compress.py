@@ -700,10 +700,10 @@ def _quant_aware_training_dynamic(self, input_dir):
     args.output_filename_prefix = "int8"
 
     quant_config = {
-        # It defauts to None, which means that no preprocessing is performed
+        # It defaults to None, which means that no preprocessing is performed
         # on the active value."
         "activation_preprocess_type": "PACT" if args.use_pact else None,
-        # It defauts to None, which means that no preprocessing is performed
+        # It defaults to None, which means that no preprocessing is performed
         # on weights.
         "weight_preprocess_type": "PACT" if args.use_pact else None,
         "weight_quantize_type": args.weight_quantize_type,

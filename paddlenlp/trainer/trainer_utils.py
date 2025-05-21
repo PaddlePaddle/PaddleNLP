@@ -84,7 +84,7 @@ def _get_distributed_seeds(seed: int = 1234, topo: Topology = None):
     """
 
     # NOTE: For parameter init seed:
-    # seed: dp/mp_undistributed_paramter/sharding is same; others is different
+    # seed: dp/mp_undistributed_parameter/sharding is same; others is different
     # For compute seed(dropout):
     # global seed: only mp group is same.
     # local seed: all groups are different

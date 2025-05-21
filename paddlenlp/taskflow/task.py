@@ -128,15 +128,28 @@ class Task(metaclass=abc.ABCMeta):
         """
 
     def _get_static_model_name(self):
-        names = []
+        model_candidates = []
         for file_name in os.listdir(self._task_path):
-            if PADDLE_INFERENCE_MODEL_SUFFIX in file_name:
-                names.append(file_name[: -len(PADDLE_INFERENCE_MODEL_SUFFIX)])
-        if len(names) == 0:
-            raise IOError(f"{self._task_path} should include '{PADDLE_INFERENCE_MODEL_SUFFIX}' file.")
-        if len(names) > 1:
-            logger.warning(f"{self._task_path} includes more than one '{PADDLE_INFERENCE_MODEL_SUFFIX}' file.")
-        return names[0]
+            if file_name.endswith(PADDLE_INFERENCE_MODEL_SUFFIX):
+                prefix = file_name[: -len(PADDLE_INFERENCE_MODEL_SUFFIX)]
+                param_file = prefix + PADDLE_INFERENCE_WEIGHTS_SUFFIX
+                if os.path.exists(os.path.join(self._task_path, param_file)):
+                    model_candidates.append(prefix)
+
+        if not model_candidates:
+            raise IOError(
+                f"{self._task_path} should include at least one valid model structure file "
+                f"({PADDLE_INFERENCE_MODEL_SUFFIX}) with corresponding {PADDLE_INFERENCE_WEIGHTS_SUFFIX}."
+            )
+
+        for preferred in ["inference", "model"]:
+            if preferred in model_candidates:
+                return preferred
+
+        if len(model_candidates) > 1:
+            logger.warning(f"{self._task_path} includes multiple model pairs. Defaulting to: {model_candidates[0]}")
+
+        return model_candidates[0]
 
     def _check_task_files(self):
         """

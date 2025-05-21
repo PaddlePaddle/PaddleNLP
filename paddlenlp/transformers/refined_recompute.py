@@ -265,7 +265,7 @@ class NoRecomputeContext:
 def share_buffer_to_tensor_or_param(inner_x):
     """share buffer to tensor or param"""
     if hasattr(inner_x, "main_grad"):
-        # donot deepcopy the `main_grad` to save memory
+        # do not deepcopy the `main_grad` to save memory
         state = copy.deepcopy({k: v for k, v in inner_x.__dict__.items() if k != "main_grad"})
         tmp_tensor = framework.EagerParamBase(
             shape=inner_x.shape, dtype=inner_x.dtype, name=inner_x.name + "cpy", **state

@@ -96,7 +96,7 @@ class ModelConfig:
     lokr_path: str = field(
         default=None, metadata={"help": "Initialize lokr state dict and apply customized lokr config"}
     )
-    lokr_dim: int = field(default=8, metadata={"help": "Lora dimention in LoKr dimension for adapter matrix"})
+    lokr_dim: int = field(default=8, metadata={"help": "Lora dimension in LoKr dimension for adapter matrix"})
 
     # prefix tuning related parameters
     prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})

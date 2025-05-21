@@ -408,7 +408,7 @@ python export_model.py --task_type cls --model_path ./ernie-layoutx-base-uncased
   export/
   ├── inference.pdiparams
   ├── inference.pdiparams.info
-  └── inference.pdmodel
+  └── inference.json(or inference.pdmodel if PIR is not enabled)
   ```
 
 <a name="52"></a>

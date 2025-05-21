@@ -177,7 +177,7 @@ class MultiHeadAttention(Layer):
 
     def _prepare_qkv(self, query, key, value, cache=None):
         r"""
-        Prapares linear projected queries, keys and values for usage of subsequnt
+        Prepares linear projected queries, keys and values for usage of subsequent
         multiple parallel attention. If `cache` is not None, using cached results
         to reduce redundant calculations.
 
