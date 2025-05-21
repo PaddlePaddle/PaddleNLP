@@ -70,17 +70,6 @@ def chunk(all_input_ids, size):
     return [all_input_ids[i : i + size] for i in range(0, len(all_input_ids), size)]
 
 
-@contextmanager
-def switch_level_context(level="ERROR"):
-    original_level = logger.logLevel
-    logger.set_level(level)
-
-    try:
-        yield
-    finally:
-        logger.set_level(original_level)
-
-
 class DumpyInferenceTask:
     def __init__(self, args):
         self.args = args

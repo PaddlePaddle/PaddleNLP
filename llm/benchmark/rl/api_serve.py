@@ -26,13 +26,10 @@ from typing import List, Tuple
 import pandas as pd
 from openai import AsyncOpenAI
 from tqdm import tqdm
-from transformers import logging
 from utils import RangeSet
 
 from paddlenlp.transformers import AutoTokenizer
-
-logging.set_verbosity_info()
-logger = logging.get_logger(__name__)
+from paddlenlp.utils.log import logger
 
 
 @dataclass
