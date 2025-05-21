@@ -194,7 +194,16 @@ def manual_model_split_multi(model,stage_idx,group):
                 return outputs
             setattr(model.__class__, "forward", forward1)
         
-        elif
+        elif stage_idx == 1:
+            for i in range(10):
+                del model.layers[0]
+            def forward1(self, *args):
+                outputs = args     
+                # decoder layers
+                for idx, (decoder_layer) in enumerate(self.layers):
+                    outputs = decoder_layer(outputs)
+                return outputs
+            setattr(model.__class__, "forward", forward1)
         else:
             raise ValueError("Invalid stage index.")
 
@@ -836,22 +845,22 @@ class AutoTrainer(Trainer):
         rank = dist.get_rank()
         if rank == 0 or rank == 1 or rank == 2 or rank == 3:
             if rank == 0:   
-                stage = manual_model_split(model, 0, group0)
+                stage = manual_model_split(model, 0, self.comm_group_in_pp)
             elif rank == 1:
-                stage = manual_model_split(model, 0, group1)
+                stage = manual_model_split(model, 0, self.comm_group_in_pp)
             elif rank == 2:
-                stage = manual_model_split(model, 0, group2)
+                stage = manual_model_split(model, 0, self.comm_group_in_pp)
             else:
-                stage = manual_model_split(model, 0, group3)
+                stage = manual_model_split(model, 0, self.comm_group_in_pp)
         else:
             if rank == 4:
-                stage = manual_model_split(model, 1, group0)
+                stage = manual_model_split(model, 1, self.comm_group_in_pp)
             elif rank == 5:
-                stage = manual_model_split(model, 1, group1)
+                stage = manual_model_split(model, 1, self.comm_group_in_pp)
             elif rank == 6:
-                stage = manual_model_split(model, 1, group2)
+                stage = manual_model_split(model, 1, self.comm_group_in_pp)
             else:
-                stage = manual_model_split(model, 1, group3)
+                stage = manual_model_split(model, 1, self.comm_group_in_pp)
 
         schedule = Schedule1F1B(stage, n_microbatches = 2, loss_fn=self.criterion)
         print("schedule inputs: ", inputs)
