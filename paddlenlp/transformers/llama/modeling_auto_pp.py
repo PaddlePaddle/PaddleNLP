@@ -543,12 +543,17 @@ class LlamaForCausalLM3DAutoPP(LlamaForCausalLM3DAuto):
         super().__init__(config)
         self.config = config
         self.no_recompute_layers = config.no_recompute_layers if config.no_recompute_layers is not None else []
-        ## 暂时先不考虑PP，后面再加
+
         decoder_layers = []
         # self.next_pp_stage_indexes = []
         for i in range(config.num_hidden_layers):
             # pp_stage_id, input_need_reshard = get_layer_pp_info(i)
-            decoder_layers.append(LlamaDecoderLayerAutoPP(config, i, i not in self.no_recompute_layers, i // 10))
+            pp_stage = i // 5
+            pp_stage = pp_stage % 2
+            print("layer_id: ", i)
+            print('pp stage: ', pp_stage)
+
+            decoder_layers.append(LlamaDecoderLayerAutoPP(config, i, i not in self.no_recompute_layers, pp_stage))
             # if input_need_reshard:
             #     self.next_pp_stage_indexes.append(i)
         self.layers = nn.LayerList(decoder_layers)

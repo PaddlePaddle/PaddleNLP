@@ -1188,6 +1188,9 @@ class LlamaPretrainingCriterion3DAuto(paddle.nn.Layer):
         # Force entropy same kernel
         print("prediction_scores shape: ", prediction_scores.shape)
         print("masked_lm_labels shape: ", masked_lm_labels.shape)
+        print("masked_lm_labels dtype: ", masked_lm_labels.dtype)
+        print("labels placements: ", masked_lm_labels.placements)
+        print("labels : ", masked_lm_labels._local_value())
         with paddle.amp.auto_cast(False):
             if isinstance(prediction_scores, paddle.Tensor):
                 masked_lm_loss = self.loss_func(
@@ -1225,6 +1228,10 @@ class LlamaPretrainingCriterion3DAuto(paddle.nn.Layer):
                 loss = loss_func(masked_lm_loss, masked_lm_loss > 0)
                 loss = loss.mean()
             else:
+                print("masked_lm_loss shape: ", masked_lm_loss.shape)
+                print("masked_lm_loss dtype: ", masked_lm_loss.dtype)
+                print("masked_lm_loss placements: ", masked_lm_loss.placements)
+                print("masked_lm_loss local value: ", masked_lm_loss._local_value())
                 masked_lm_loss = paddle.masked_select(masked_lm_loss, masked_lm_loss > 0).astype("float32")
                 loss = paddle.mean(masked_lm_loss)
 

@@ -58,7 +58,7 @@ try:
 except:
     QuantizationLinear = None
     
-from paddle.distributed.auto_parallel.pipelining.schedules import ScheduleGPipe, Schedule1F1B
+from paddle.distributed.auto_parallel.pipelining.schedules import ScheduleGPipe, Schedule1F1B, ScheduleInterleaved1F1B
 from paddle.distributed.auto_parallel.pipelining.stage import PipelineStage
 
 
@@ -76,20 +76,29 @@ group1 = None
 group2 = None
 group3 = None
 
+# class _Pipeline_model_chunk(nn.Layer):
+#     def __init__(self, layers):
+#         if not isinstance(layers, (list, tuple)):
+#             raise TypeError(
+#                 f"Expected type of `layers` to be a list|tuple but got {type(layers)}."
+#             )
+#         self.layers = layers
+#         super(_Pipeline_model_chunk, self).__init__()
+#     def forward(self, *args, **kwargs):
+        
+#         for layer in self.layers:
+#             output = layer(**args, **kwargs)
+#         return output
+
 def manual_model_split(model,stage_idx,group):
     global is_split_model
     global local_stages
 
     if is_split_model:
         return local_stages
-    # print(model)
-    print("model.llama.embed_tokens.weight.placements",model.llama.embed_tokens.weight.placements)
-    #model = copy.deepcopy(model)
-    print("model.llama.embed_tokens.weight.placements",model.llama.embed_tokens.weight.placements)
     if stage_idx == 0:
         for i in range(10):
             del model.layers[10]
-
         def forward0(
             self,
             input_ids=None,
@@ -103,37 +112,27 @@ def manual_model_split(model,stage_idx,group):
             output_hidden_states=None,
             return_dict=None,
         ):
-            print("forward0: ", input_ids.shape, flush=True)
-            print("forward0: ", input_ids.placements, flush=True)
-            print("forward0: ", input_ids.process_mesh, flush=True)
-            
             outputs = tuple([input_ids, attention_mask, position_ids])
-            outputs = tuple([input_ids, attention_mask, position_ids])
-
             # decoder layers
             for idx, (decoder_layer) in enumerate(self.layers):
                 outputs = decoder_layer(outputs)
-                print("layer id: ", decoder_layer.layer_id)
-                print("forward0 output", outputs.shape)
-                print("forward0 output", outputs.placements)
-                print("forward0 output", outputs.process_mesh)
             return outputs
         setattr(model.__class__, "forward", forward0)
 
     elif stage_idx == 1:
         for i in range(10):
             del model.layers[0]
-        def forward1(
-            self,
-            *args
-        ):
-            # outputs = tuple([input_ids, position_ids, inputs_embeds, attention_mask, output_attentions, past_key_values, use_cache, None])
-            print("forward1 input: ", args, flush=True)
+        def forward1(self, *args):
             outputs = args     
-            # assert 0
             # decoder layers
             for idx, (decoder_layer) in enumerate(self.layers):
                 outputs = decoder_layer(outputs)
+                outputs = decoder_layer(outputs)
+                print("forward1 output", outputs.shape)
+                print("forward1 output", outputs.placements)
+                print("forward1 output", outputs.process_mesh)
+                
+                outputs = decoder_layer(outputs)        
                 print("forward1 output", outputs.shape)
                 print("forward1 output", outputs.placements)
                 print("forward1 output", outputs.process_mesh)
@@ -159,10 +158,23 @@ def manual_model_split_multi(model,stage_idx,group):
 
     if is_split_model:
         return local_stages
+    layer_lists = None
+    if stage_idx == 0:
+        for i in range(5):
+            del model.layers[5]
+        for i in range(5):
+            del model.layers[10]
+    else:
+        for i in range(5):
+            del model.layers[0]
+        for i in range(5):
+            del model.layers[5]
+    layer_lists = model.layers
     def _build_stage(model, stage_idx, group):
+        new_model = []
         if stage_idx == 0:
-            for i in range(10):
-                del model.layers[10]
+            new_model = copy.deepcopy(model)
+            new_model.layers = layer_lists[:5]
             def forward0(
                 self,
                 input_ids=None,
@@ -181,41 +193,64 @@ def manual_model_split_multi(model,stage_idx,group):
                 for idx, (decoder_layer) in enumerate(self.layers):
                     outputs = decoder_layer(outputs)
                 return outputs
-            setattr(model.__class__, "forward", forward0)
+            # setattr(model.__class__, "forward", forward0)
+            new_model.forward = forward0.__get__(new_model)
 
         elif stage_idx == 1:
-            for i in range(10):
-                del model.layers[0]
-            def forward1(self, *args):
-                outputs = args     
+            new_model = copy.deepcopy(model)
+            
+            new_model.layers = layer_lists[:5]
+            def forward1(self, *args, **kwargs):
+                outputs = args if len(args) > 0 else kwargs
                 # decoder layers
                 for idx, (decoder_layer) in enumerate(self.layers):
                     outputs = decoder_layer(outputs)
                 return outputs
-            setattr(model.__class__, "forward", forward1)
+            # setattr(model.__class__, "forward", forward1)
+            new_model.forward = forward1.__get__(new_model)
         
-        elif stage_idx == 1:
-            for i in range(10):
-                del model.layers[0]
-            def forward1(self, *args):
-                outputs = args     
+        elif stage_idx == 2:
+            new_model = copy.deepcopy(model)
+            
+            new_model.layers = layer_lists[5:]
+            def forward2(self, *args, **kwargs):
+                outputs = args if len(args) > 0 else kwargs
                 # decoder layers
                 for idx, (decoder_layer) in enumerate(self.layers):
                     outputs = decoder_layer(outputs)
                 return outputs
-            setattr(model.__class__, "forward", forward1)
+            # setattr(model.__class__, "forward", forward2)
+            new_model.forward = forward2.__get__(new_model)
+        elif stage_idx == 3:
+            new_model = copy.deepcopy(model)
+            
+            new_model.layers = layer_lists[:5]
+            def forward3(self, *args, **kwargs):
+                outputs = args if len(args) > 0 else kwargs
+                # decoder layers
+                for idx, (decoder_layer) in enumerate(self.layers):
+                    outputs = decoder_layer(outputs)
+                return outputs
+            # setattr(model.__class__, "forward", forward3)
+            new_model.forward = forward3.__get__(new_model)
         else:
             raise ValueError("Invalid stage index.")
 
         stage = PipelineStage(
-            model,
+            new_model,
             stage_idx,
-            2,
+            4,
             group=group
         )
+        return stage
+    stages = []
+    stage = _build_stage(model, stage_idx, group)
+    stages.append(stage)
+    stage = _build_stage(model, stage_idx+2, group)
+    stages.append(stage)
     is_split_model = True
-    local_stages = stage
-    return stage
+    local_stages = stages
+    return local_stages
 
 
 class AutoTrainer(Trainer):
@@ -255,7 +290,8 @@ class AutoTrainer(Trainer):
 
         self.global_mesh = fleet.auto.get_mesh()
         self.comm_group_in_pp = fleet.get_hybrid_communicate_group().get_pipe_parallel_group()
-        print("self.comm_group_in_pp: ", self.comm_group_in_pp)      
+        print("self.comm_group_in_pp: ", self.comm_group_in_pp) 
+        print("get_submesh_dim: ", self.global_mesh.get_submesh_with_dim("pp").get_group())
         self._in_pir_mode = paddle.base.framework.get_flags("FLAGS_enable_pir_api")["FLAGS_enable_pir_api"]
 
     @classmethod
@@ -833,36 +869,13 @@ class AutoTrainer(Trainer):
             if "pp" in mesh.dim_names:
                 mesh = mesh.get_mesh_with_dim("pp", pp_idx)
             return mesh
-        global group0, group1, group2, group3
-        if group0 is None:
-            group0 = paddle.distributed.new_group([0, 4])
-        if group1 is None:
-            group1 = paddle.distributed.new_group([1, 5])
-        if group2 is None:
-            group2 = paddle.distributed.new_group([2, 6])
-        if group3 is None:
-            group3 = paddle.distributed.new_group([3, 7])
         rank = dist.get_rank()
-        if rank == 0 or rank == 1 or rank == 2 or rank == 3:
-            if rank == 0:   
-                stage = manual_model_split(model, 0, self.comm_group_in_pp)
-            elif rank == 1:
-                stage = manual_model_split(model, 0, self.comm_group_in_pp)
-            elif rank == 2:
-                stage = manual_model_split(model, 0, self.comm_group_in_pp)
-            else:
-                stage = manual_model_split(model, 0, self.comm_group_in_pp)
+        if rank == 0 or rank == 1 or rank == 2 or rank == 3: 
+            stages = manual_model_split_multi(model, 0, self.comm_group_in_pp)
         else:
-            if rank == 4:
-                stage = manual_model_split(model, 1, self.comm_group_in_pp)
-            elif rank == 5:
-                stage = manual_model_split(model, 1, self.comm_group_in_pp)
-            elif rank == 6:
-                stage = manual_model_split(model, 1, self.comm_group_in_pp)
-            else:
-                stage = manual_model_split(model, 1, self.comm_group_in_pp)
+            stages = manual_model_split_multi(model, 1, self.comm_group_in_pp)
 
-        schedule = Schedule1F1B(stage, n_microbatches = 2, loss_fn=self.criterion)
+        schedule = ScheduleInterleaved1F1B(stages, n_microbatches = 2, loss_fn=self.criterion)
         print("schedule inputs: ", inputs)
         print("labels: ", labels)
 
