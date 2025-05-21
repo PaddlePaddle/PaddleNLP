@@ -22,12 +22,10 @@ from pathlib import Path
 
 import pandas as pd
 import tqdm
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, logging
 from utils import RangeSet
 from vllm import LLM, SamplingParams
 from vllm.inputs import TokensPrompt
-
-from transformers import logging
 
 logging.set_verbosity_info()
 logger = logging.get_logger(__name__)
@@ -49,18 +47,17 @@ def parse_args():
     parser.add_argument(
         "--rollout_n", type=int, default=2, help="Number of repeated inference runs (for performance testing)"
     )
-    parser.add_argument("--log_interval", type=int, default=1, help="Logging interval (in batches)")
     parser.add_argument("--dtype", type=str, default="bfloat16", help="Data type for computation")
     parser.add_argument("--tensor_parallel_degree", type=int, default=1, help="Degree of model parallelism")
     parser.add_argument("--top_p", type=float, default=0.9, help="Top-p sampling parameter for text generation")
     parser.add_argument("--temperature", type=float, default=0.7, help="Temperature parameter for text generation")
     parser.add_argument("--should_log", type=bool, default=True, help="Whether to print logging information")
-    parser.add_argument("--max_prompt_length", type=int, default=1024 * 2, help="Maximum prompt length (in tokens)")
+    parser.add_argument("--max_src_len", type=int, default=1024 * 2, help="Maximum prompt length (in tokens)")
+    parser.add_argument("--max_dec_len", type=int, default=1024 * 2, help="Maximum response length (in tokens)")
+    parser.add_argument("--min_dec_len", type=int, default=0, help="Minimum response length (in tokens)")
     parser.add_argument(
-        "--max_response_length", type=int, default=1024 * 2, help="Maximum response length (in tokens)"
+        "--limit_rows", type=int, default=-1, help="Maximum number of rows to read from the dataset (-1 means all)"
     )
-    parser.add_argument("--min_response_length", type=int, default=0, help="Minimum response length (in tokens)")
-    parser.add_argument("--limit_rows", type=int, default=-1, help="Maximum number of rows to read from the dataset (-1 means all)")
     parser.add_argument("--gpu_memory_utilization", type=float, default=0.9, help="Percentage of GPU memory usage")
     args = parser.parse_args()
 
@@ -121,18 +118,26 @@ class DumpyInferenceTask:
         start_time = time.time()
         self.model = LLM(
             model=self.args.actor_model_name_or_path,
-            enforce_eager=False,
-            max_model_len=self.args.max_prompt_length + self.args.max_response_length,  # 设置最大长度以支持最大测试长度
-            gpu_memory_utilization=self.args.gpu_memory_utilization,
+            dtype=self.args.dtype,
+            enable_sleep_mode=False,
             tensor_parallel_size=self.args.tensor_parallel_degree,
-            max_seq_len_to_capture=self.args.max_prompt_length + self.args.max_response_length,
-            max_num_batched_tokens=self.args.max_prompt_length + self.args.max_response_length,
+            # distributed_executor_backend="external_launcher",
+            enforce_eager=False,
+            gpu_memory_utilization=self.args.gpu_memory_utilization,
+            disable_custom_all_reduce=True,
+            disable_mm_preprocessor_cache=True,
+            skip_tokenizer_init=False,
+            max_model_len=self.args.max_src_len + self.args.max_dec_len,
+            disable_log_stats=True,
+            max_num_batched_tokens=self.args.max_src_len + self.args.max_dec_len,
+            enable_chunked_prefill=True,
+            enable_prefix_caching=True,
         )
         self.sampling_params = SamplingParams(
             top_p=self.args.top_p,
             temperature=self.args.temperature,
-            min_tokens=self.args.min_response_length,
-            max_tokens=self.args.max_response_length,
+            min_tokens=self.args.min_dec_len,
+            max_tokens=self.args.max_dec_len,
             n=self.args.rollout_n,
             seed=42,
         )
@@ -147,16 +152,18 @@ class DumpyInferenceTask:
         start_time = time.time()
         df = pd.read_parquet(file_path)
         if self.args.limit_rows != -1:
-            df = df.iloc[:self.args.limit_rows]
+            df = df.iloc[: self.args.limit_rows]
         logger.info(f"Loaded {len(df)} samples in {time.time() - start_time:.2f}s")
         return df
 
     def run_inference(self, prompts, batch_index=0):
         input_ids = [self.tokenizer(prompt, add_special_tokens=False)["input_ids"] for prompt in prompts]
         token_prompt_ids = [TokensPrompt(prompt_token_ids=prompt) for prompt in input_ids]
-        
+
         start_time = time.time()
-        request_outputs = self.model.generate(prompts=token_prompt_ids, sampling_params=self.sampling_params, use_tqdm=True)
+        request_outputs = self.model.generate(
+            prompts=token_prompt_ids, sampling_params=self.sampling_params, use_tqdm=True
+        )
         end_time = time.time()
 
         batch_token_ids = []

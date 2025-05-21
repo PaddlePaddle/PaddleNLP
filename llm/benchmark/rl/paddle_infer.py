@@ -27,13 +27,10 @@ from utils import RangeSet
 
 from paddlenlp.rl.trainer import process_row
 from paddlenlp.rl.utils import TrainingArguments
-from paddlenlp.trl.llm_utils import init_dist_env
-from paddlenlp.rl.utils.infer_utils import (
-    get_policy_predictor,
-    infer_guard,
-)
+from paddlenlp.rl.utils.infer_utils import get_policy_predictor, infer_guard
 from paddlenlp.trainer import PdArgumentParser, set_seed
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
+from paddlenlp.trl.llm_utils import init_dist_env
 from paddlenlp.utils.log import logger
 
 
@@ -62,7 +59,9 @@ class DumpyTrainingArguments(TrainingArguments):
     input_file: str = field(
         default="kk/instruct/3-7ppl/combined.parquet", metadata={"help": "input the Parquet file path"}
     )
-    limit_rows: int = field(default=-1, metadata={"help": "Maximum number of rows to read from the dataset (-1 means all)"})
+    limit_rows: int = field(
+        default=-1, metadata={"help": "Maximum number of rows to read from the dataset (-1 means all)"}
+    )
     output_dir: str = field(default="./pt_infer_results", metadata={"help": "output directory path"})
     rollout_input_batch_size: int = field(default=32, metadata={"help": "batch size for inference engine inputs"})
     rollout_n: int = field(default=8, metadata={"help": "number of rollouts (for performance testing)"})
@@ -127,6 +126,7 @@ class DumpyInferenceTask:
             tensor_parallel_rank=self.tensor_parallel_rank,
         )
         self.model.eval()
+        self.model.to(device=paddle.CUDAPinnedPlace())
         logger.info(f"Model loaded in {time.time() - start_time:.2f}s")
 
     def _prepare_tokenizer(self):
@@ -138,7 +138,7 @@ class DumpyInferenceTask:
         start_time = time.time()
         df = pd.read_parquet(file_path)
         if self.args.limit_rows != -1:
-            df = df.iloc[:self.args.limit_rows]
+            df = df.iloc[: self.args.limit_rows]
         logger.info(f"Loaded {len(df)} samples in {time.time() - start_time:.2f}s")
         return df
 
