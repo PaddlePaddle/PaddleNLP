@@ -71,11 +71,6 @@ FREE_SVAE_LOAD_KEY_PATTERNS = ["learning_rate_", "gradient_merge_", "@GRAD@MERG"
 is_split_model = False
 local_stage = None
 
-group0 = None
-group1 = None
-group2 = None
-group3 = None
-
 def manual_model_split(model,stage_idx,group):
     global is_split_model
     global local_stage
@@ -741,34 +736,11 @@ class AutoTrainer(Trainer):
             if "pp" in mesh.dim_names:
                 mesh = mesh.get_mesh_with_dim("pp", pp_idx)
             return mesh
-        global group0, group1, group2, group3
-        if group0 is None:
-            group0 = paddle.distributed.new_group([0, 4])
-        if group1 is None:
-            group1 = paddle.distributed.new_group([1, 5])
-        if group2 is None:
-            group2 = paddle.distributed.new_group([2, 6])
-        if group3 is None:
-            group3 = paddle.distributed.new_group([3, 7])
         rank = dist.get_rank()
         if rank == 0 or rank == 1 or rank == 2 or rank == 3:
-            if rank == 0:   
-                stage = manual_model_split(model, 0, group0)
-            elif rank == 1:
-                stage = manual_model_split(model, 0, group1)
-            elif rank == 2:
-                stage = manual_model_split(model, 0, group2)
-            else:
-                stage = manual_model_split(model, 0, group3)
+            stage = manual_model_split(model, 0, self.comm_group_in_pp)
         else:
-            if rank == 4:
-                stage = manual_model_split(model, 1, group0)
-            elif rank == 5:
-                stage = manual_model_split(model, 1, group1)
-            elif rank == 6:
-                stage = manual_model_split(model, 1, group2)
-            else:
-                stage = manual_model_split(model, 1, group3)
+            stage = manual_model_split(model, 1, self.comm_group_in_pp)
 
         schedule = Schedule1F1B(stage, n_microbatches = 2, loss_fn=self.criterion)
 
