@@ -159,53 +159,51 @@ def manual_model_split_multi(model,stage_idx,group):
 
     if is_split_model:
         return local_stages
-    # print(model)
-    print("model.llama.embed_tokens.weight.placements",model.llama.embed_tokens.weight.placements)
-    #model = copy.deepcopy(model)
-    print("model.llama.embed_tokens.weight.placements",model.llama.embed_tokens.weight.placements)
-    if stage_idx == 0:
-        for i in range(10):
-            del model.layers[10]
+    def _build_stage(model, stage_idx, group):
+        if stage_idx == 0:
+            for i in range(10):
+                del model.layers[10]
+            def forward0(
+                self,
+                input_ids=None,
+                labels=None,
+                position_ids=None,
+                attention_mask=None,
+                inputs_embeds=None,
+                use_cache=False,
+                past_key_values=None,
+                output_attentions=None,
+                output_hidden_states=None,
+                return_dict=None,
+            ):
+                outputs = tuple([input_ids, attention_mask, position_ids])
+                # decoder layers
+                for idx, (decoder_layer) in enumerate(self.layers):
+                    outputs = decoder_layer(outputs)
+                return outputs
+            setattr(model.__class__, "forward", forward0)
 
-        def forward0(
-            self,
-            input_ids=None,
-            labels=None,
-            position_ids=None,
-            attention_mask=None,
-            inputs_embeds=None,
-            use_cache=False,
-            past_key_values=None,
-            output_attentions=None,
-            output_hidden_states=None,
-            return_dict=None,
-        ):
-            outputs = tuple([input_ids, attention_mask, position_ids])
-            # decoder layers
-            for idx, (decoder_layer) in enumerate(self.layers):
-                outputs = decoder_layer(outputs)
-            return outputs
-        setattr(model.__class__, "forward", forward0)
+        elif stage_idx == 1:
+            for i in range(10):
+                del model.layers[0]
+            def forward1(self, *args):
+                outputs = args     
+                # decoder layers
+                for idx, (decoder_layer) in enumerate(self.layers):
+                    outputs = decoder_layer(outputs)
+                return outputs
+            setattr(model.__class__, "forward", forward1)
+        
+        elif
+        else:
+            raise ValueError("Invalid stage index.")
 
-    elif stage_idx == 1:
-        for i in range(10):
-            del model.layers[0]
-        def forward1(self, *args):
-            outputs = args     
-            # decoder layers
-            for idx, (decoder_layer) in enumerate(self.layers):
-                outputs = decoder_layer(outputs)
-            return outputs
-        setattr(model.__class__, "forward", forward1)
-    else:
-        raise ValueError("Invalid stage index.")
-
-    stage = PipelineStage(
-        model,
-        stage_idx,
-        2,
-        group=group
-    )
+        stage = PipelineStage(
+            model,
+            stage_idx,
+            2,
+            group=group
+        )
     is_split_model = True
     local_stages = stage
     return stage
