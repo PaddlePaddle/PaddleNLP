@@ -1955,6 +1955,7 @@ class Trainer:
             if self.args.optim == OptimizerNames.ADAMW_CUSTOM:
                 optimizer_kwargs["quantization_config"] = self.model.config.quantization_config
                 optimizer_kwargs["use_lowprecision_moment"] = self.args.use_lowprecision_moment
+                optimizer_kwargs["tensorwise_offload_optimizer"] = self.args.tensorwise_offload_optimizer
 
             if hasattr(optimizer_cls, "_create_master_weight") and self.args.fp16_opt_level == "O2":
                 optimizer_kwargs["multi_precision"] = True
@@ -2746,7 +2747,7 @@ class Trainer:
             optimizer_name = _add_variant(PADDLE_OPTIMIZER_NAME, self.args.optimizer_name_suffix)
             saved_signal_path = os.path.join(output_dir, f"saved_signal_{dist.get_rank()}")
 
-            if self.args.unified_checkpoint and self.args.offload_optim:
+            if self.args.unified_checkpoint and (self.args.offload_optim or self.argd.tensorwise_offload_optimizer):
                 self._reload_optimizer()
 
             if self.args.use_hybrid_parallel:
@@ -2829,7 +2830,7 @@ class Trainer:
                         ):
                             paddle.save(global_rank, os.path.join(signal_dir, f".master_weight.done.{global_rank}"))
 
-            if self.args.unified_checkpoint and self.args.offload_optim:
+            if self.args.unified_checkpoint and (self.args.offload_optim or self.argd.tensorwise_offload_optimizer):
                 self._offload_optimizer()
 
         self.runtime_timer.stop()

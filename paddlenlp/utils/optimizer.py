@@ -161,7 +161,7 @@ class AdamWMini(AdamW):
 
 
 class AdamWCustom(AdamW):
-    def __init__(self, quantization_config, *args, **kwargs):
+    def __init__(self, quantization_config, tensorwise_offload_optimizer, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.quant_scale_mapping = {}
         for p in self._param_groups:
@@ -170,6 +170,7 @@ class AdamWCustom(AdamW):
         self.quantization_config = quantization_config
         self._hcg = fleet.get_hybrid_communicate_group()
         self.mp_group = self._hcg.get_model_parallel_group()
+        self.tensorwise_offload_optimizer = tensorwise_offload_optimizer
 
     def _add_moments_pows(self, p, moment_dtype=core.VarDesc.VarType.FP32):
         acc_dtype = p.dtype
@@ -225,9 +226,14 @@ class AdamWCustom(AdamW):
 
                 self._add_moments_pows(master_p, moment_dtype)
                 self._already_create_accumulator.add(p.name)
-                continue
-            else:
+
+            elif self._is_dtype_fp16_or_bf16(p.dtype) and not self._multi_precision:
                 raise NotImplementedError("AdamWCustom only support AMP training")
+            else:
+                self._add_moments_pows(p)
+                self._already_create_accumulator.add(p.name)
+            if self.tensorwise_offload_optimizer:
+                self.offload_optim(p)
 
     def _create_master_weight(self, param):
         if param.name in self._master_weights:
@@ -282,6 +288,9 @@ class AdamWCustom(AdamW):
         with_decay = True
         if self._apply_decay_param_fun is not None and not self._apply_decay_param_fun(param.name):
             with_decay = False
+
+        if self.tensorwise_offload_optimizer:
+            self.reload_optim(param)
 
         moment1 = self._get_accumulator_master(self._moment1_acc_str, param_and_grad[0])
         moment2 = self._get_accumulator_master(self._moment2_acc_str, param_and_grad[0])
@@ -345,6 +354,9 @@ class AdamWCustom(AdamW):
                     raise NotImplementedError(
                         f"Please check your weight_quantize_algo {self.quantization_config.weight_quantize_algo}."
                     )
+            if self.tensorwise_offload_optimizer:
+                self.offload_optim(param)
+
             return None
         else:
             raise NotImplementedError("Not implemented yet.")
@@ -401,3 +413,27 @@ class AdamWCustom(AdamW):
         moment2[:] = mom2.astype(moment_dtype)
         beta1_pow[:], beta2_pow[:] = beta1 * beta1_pow[:], beta2 * beta2_pow[:]
         return
+
+    def offload_optim(self, p):
+        find_master = self._multi_precision and self._is_dtype_fp16_or_bf16(p.dtype)
+        if find_master:
+            self._master_weights[p.name] = self._master_weights[p.name].pin_memory()
+            target_name = self._master_weights[p.name].name
+        else:
+            target_name = p.name
+        for name in [self._moment1_acc_str, self._moment2_acc_str]:
+            if self._name is not None:
+                name = self._name + "_" + name
+            self._accumulators[name][target_name] = self._accumulators[name][target_name].pin_memory()
+
+    def reload_optim(self, p):
+        find_master = self._multi_precision and self._is_dtype_fp16_or_bf16(p.dtype)
+        if find_master:
+            self._master_weights[p.name] = self._master_weights[p.name].cuda()
+            target_name = self._master_weights[p.name].name
+        else:
+            target_name = p.name
+        for name in [self._moment1_acc_str, self._moment2_acc_str]:
+            if self._name is not None:
+                name = self._name + "_" + name
+            self._accumulators[name][target_name] = self._accumulators[name][target_name].cuda()

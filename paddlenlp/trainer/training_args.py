@@ -1000,6 +1000,10 @@ class TrainingArguments:
         default=False,
         metadata={"help": "Offload optimizer after optimizer.step()"},
     )
+    tensorwise_offload_optimizer: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Offload optimizer tensor by tensor"},
+    )
     save_sharding_stage1_model_include_freeze_params: Optional[bool] = field(
         default=False, metadata={"help": "Save Sharding Stage1 Model Exclude Freeze Params"}
     )
