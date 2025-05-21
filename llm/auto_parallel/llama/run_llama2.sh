@@ -23,7 +23,7 @@ rm -rf "output/$task_name""_log"
 
 export SOT_LOG_LEVEL=4
 export PYTHONPATH=../../../:$PYTHONPATH
-export PYTHONPATH=/root/paddlejob/workspace/env_run/wangxiangzhe/Paddle/build/python:$PYTHONPATH
+
 #ulimit -c unlimited
 # export GLOG_v=6   
 export NCCL_DEBUG=INFO
@@ -39,5 +39,5 @@ python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
     --log_dir  "output/$task_name""_log" \
     ./run_pretrain_auto.py \
-    /root/paddlejob/workspace/env_run/wangxiangzhe/PaddleNLP/tests/test_tipc/static/auto_parallel/llama2/pretrain_config_llama2_13b/pretrain-llama2_13b.json
+    ../../../tests/test_tipc/static/auto_parallel/llama2/pretrain_config_llama2_13b/pretrain-llama2_13b.json
 
