@@ -130,7 +130,6 @@ def global_mesh_starts_with_pp():
 
 
 def parse_args(args):
-    # print("args:",args)
     attention_mask, position_ids, alibi = None, None, None
     if isinstance(args, tuple):
         if len(args) == 4:
@@ -235,24 +234,16 @@ class LlamaEmbeddingAutoPP(nn.Layer):
             if self.config.tensor_parallel_degree > 1
             else [dist.Replicate(), dist.Replicate()]
         )
-        # embedding_placements = (
-        #     [dist.Replicate(), dist.Replicate()]
-        # )
-        print("embedding placements: ", embedding_placements)
-        
+
         self.embed_tokens.weight = dist.shard_tensor(
             self.embed_tokens.weight,
             get_mesh(),
             embedding_placements,
         )
-        print("embedding weight: ", self.embed_tokens.weight)
-        print("embedding weight type: ", self.embed_tokens.weight.dtype)
-        print("embedding weight process_mesh: ", self.embed_tokens.weight.process_mesh)
-        print("embedding weight placements: ", self.embed_tokens.weight.placements)
+
         self.placements = (
             [dist.Shard(1), dist.Shard(0)] if self.config.sequence_parallel else [dist.Replicate(), dist.Replicate()]
         )
-        print("address 1: ", id(self.embed_tokens))
 
     # @property
     # def embedding_weight(self):
@@ -298,7 +289,6 @@ class LlamaEmbeddingAutoPP(nn.Layer):
         return expanded_attn_mask
 
     def forward(self, args):
-        #print("LlamaEmbeddingAutoPP args:", args)
         input_ids, attention_mask, position_ids, alibi = parse_args(args)
         
         input_ids.stop_gradient = True
@@ -324,31 +314,9 @@ class LlamaEmbeddingAutoPP(nn.Layer):
 
         seq_length_with_past = seq_length
         cache_length = 0
-       
-
-        # print("input_ids shape: ", input_ids.shape)
-        # print("process_mesh: ", input_ids.process_mesh)
-        # print("input_ids placements: ", input_ids.placements)
-        # print(type(self.embed_tokens.weight))
-        
-        # # self.embed_tokens.weight = dist.shard_tensor(
-        # #     self.embed_tokens.weight._local_value(),
-        # #     get_mesh(),
-        # #     [dist.Replicate(), dist.Shard(1)],
-        # # )
-        # print("address 2: ", id(self.embed_tokens))
-       
-        
+    
         with paddle.amp.auto_cast(False):
-            # print("self.embed_tokens weight: ", type(self.embed_tokens.weight))
-            # print("self.embed_tokens weight: ", self.embed_tokens.weight.shape)
-            # print("self.embed_tokens weight: ", self.embed_tokens.weight.placements)
-
             inputs_embeds = self.embed_tokens(input_ids)
-        # print("inputs_embeds:" , inputs_embeds._local_value())
-        # print("inputs_embeds.shape:", inputs_embeds.shape)
-        # print("process_mesh: ", inputs_embeds.process_mesh)
-        # print("inputs_embeds.placements:", inputs_embeds.placements)
         
         if self.config.sequence_parallel:
             # [B, S, H] -> [S, B, H]
@@ -390,18 +358,7 @@ class LlamaEmbeddingAutoPP(nn.Layer):
                 [dist.Replicate() for _ in range(len(global_mesh._shape))],
             )
         hidden_states = inputs_embeds
-        # print("hidden_states before reshard:", hidden_states._local_value())
-        # print("hidden_states.shape:", hidden_states.shape)
-        # print("process_mesh: ", hidden_states.process_mesh)
-        # print("hidden_states.placements:", hidden_states.placements)
-        
-        # print("get_mesh: ", get_mesh())
-        # print("placements: ", self.placements)
         hidden_states = dist.reshard(hidden_states, get_mesh(), self.placements)
-        # print("hidden_states after reshard:", hidden_states._local_value())
-        # print("hidden_states.shape after reshard:", hidden_states.shape)
-        # print("hidden_states.placements after reshard:", hidden_states.placements)
-        # print("process_mesh: ", hidden_states.process_mesh)
         return return_args(
             hidden_states, attention_mask, position_ids, alibi
         )

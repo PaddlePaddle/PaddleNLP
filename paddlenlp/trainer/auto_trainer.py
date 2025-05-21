@@ -82,10 +82,6 @@ def manual_model_split(model,stage_idx,group):
 
     if is_split_model:
         return local_stage
-    print(model)
-    print("model.llama.embed_tokens.weight.placements",model.llama.embed_tokens.weight.placements)
-    #model = copy.deepcopy(model)
-    print("model.llama.embed_tokens.weight.placements",model.llama.embed_tokens.weight.placements)
     if stage_idx == 0:
         for i in range(10):
             del model.layers[10]
@@ -102,42 +98,24 @@ def manual_model_split(model,stage_idx,group):
             output_attentions=None,
             output_hidden_states=None,
             return_dict=None,
-        ):
-            print("forward0: ", input_ids.shape, flush=True)
-            print("forward0: ", input_ids.placements, flush=True)
-            print("forward0: ", input_ids.process_mesh, flush=True)
-            
+        ):            
             outputs = tuple([input_ids, attention_mask, position_ids])
             outputs = tuple([input_ids, attention_mask, position_ids])
 
             # decoder layers
             for idx, (decoder_layer) in enumerate(self.layers):
                 outputs = decoder_layer(outputs)
-                print("layer id: ", decoder_layer.layer_id)
-                print("forward0 output", outputs.shape)
-                print("forward0 output", outputs.placements)
-                print("forward0 output", outputs.process_mesh)
             return outputs
         setattr(model.__class__, "forward", forward0)
 
     elif stage_idx == 1:
         for i in range(10):
             del model.layers[0]
-        def forward1(
-            self,
-            *args
-        ):
-            # outputs = tuple([input_ids, position_ids, inputs_embeds, attention_mask, output_attentions, past_key_values, use_cache, None])
-            print("forward1 input: ", args, flush=True)
+        def forward1(self, *args):
             outputs = args     
-            # assert 0
             # decoder layers
             for idx, (decoder_layer) in enumerate(self.layers):
-                outputs = decoder_layer(outputs)
-                print("forward1 output", outputs.shape)
-                print("forward1 output", outputs.placements)
-                print("forward1 output", outputs.process_mesh)
-                
+                outputs = decoder_layer(outputs)                
             return outputs
         setattr(model.__class__, "forward", forward1)
     else:
@@ -179,9 +157,6 @@ class AutoTrainer(Trainer):
         for name, param in model.named_parameters():
             # NOTE(zhangwl):in pipeline mode , param my be initialized before while delte init_func ,but param is still not is_initialized
             if not param._is_initialized() and param._init_func is not None:
-                print(name)
-                print(param)
-                print(param.name)
                 param.initialize()
         kwargs["model"] = model
 
@@ -189,8 +164,7 @@ class AutoTrainer(Trainer):
         assert self.args.enable_auto_parallel
 
         self.global_mesh = fleet.auto.get_mesh()
-        self.comm_group_in_pp = fleet.get_hybrid_communicate_group().get_pipe_parallel_group()
-        print("self.comm_group_in_pp: ", self.comm_group_in_pp)      
+        self.comm_group_in_pp = fleet.get_hybrid_communicate_group().get_pipe_parallel_group()    
         self._in_pir_mode = paddle.base.framework.get_flags("FLAGS_enable_pir_api")["FLAGS_enable_pir_api"]
 
     @classmethod
@@ -762,7 +736,6 @@ class AutoTrainer(Trainer):
                 labels = inputs["generator_labels"]
         else:
             labels = None
-        print("labels: ", labels)
         def get_mesh(pp_idx=0):
             mesh = fleet.auto.get_mesh()
             if "pp" in mesh.dim_names:
@@ -798,8 +771,6 @@ class AutoTrainer(Trainer):
                 stage = manual_model_split(model, 1, group3)
 
         schedule = Schedule1F1B(stage, n_microbatches = 2, loss_fn=self.criterion)
-        print("schedule inputs: ", inputs)
-        print("labels: ", labels)
 
         if rank == 0 or rank == 1 or rank == 2 or rank == 3:
             inputs["input_ids"] = dist.reshard(inputs["input_ids"], get_mesh(0), [dist.Replicate(), dist.Replicate()])
@@ -843,7 +814,6 @@ class AutoTrainer(Trainer):
         # return (loss, outputs) if return_outputs else loss
 
     def dynamic_training(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
-        print("inputs: ", inputs)
         with self.autocast_smart_context_manager():
             loss = self.compute_loss(model, inputs)
         
