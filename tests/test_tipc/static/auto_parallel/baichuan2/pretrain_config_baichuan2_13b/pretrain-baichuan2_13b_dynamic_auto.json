@@ -51,6 +51,5 @@
     "sharding_parallel_config": "enable_tensor_fusion enable_overlap",
     "tensor_parallel_config": "enable_mp_async_allreduce replace_with_parallel_cross_entropy",
     "data_parallel_config": "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate",
-    "pipeline_parallel_config": "enable_send_recv_overlap enable_split_backward",
-    "num_hidden_layers": 20
+    "pipeline_parallel_config": "enable_send_recv_overlap enable_split_backward"
 }
