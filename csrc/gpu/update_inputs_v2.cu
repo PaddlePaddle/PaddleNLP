@@ -67,7 +67,6 @@ __global__ void update_inputs_kernel_v2(
         if (!Flag_truncated_return_eos && output_len_truncated) {
           // output len truncated will not return eos for rl.
           kwargs_next_tokens[thread_idx] = next_tokens[thread_idx];
-          printf("flag = 0, output_len_truncated = %d\n", output_len_truncated);
         }else{
           next_tokens[thread_idx] = end_ids[0];
           kwargs_next_tokens[thread_idx] = end_ids[0];
@@ -144,7 +143,6 @@ void UpdateInputesV2(const paddle::Tensor& stop_flags,
       int inference_truncated_return_eos_from_env =
           std::stoi(inference_truncated_return_eos_env_str);
       Flag_truncated_return_eos = inference_truncated_return_eos_from_env;
-      std::cout << "Flag_truncated_return_eos = " << Flag_truncated_return_eos << std::endl;
   }
 
   update_inputs_kernel_v2<1024><<<1, 1024, 0, input_ids.stream()>>>(
