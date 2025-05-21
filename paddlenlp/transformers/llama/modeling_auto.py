@@ -223,6 +223,7 @@ class LlamaRMSNormAuto(nn.Layer):
 
         if self.weight.dtype in [paddle.float16, paddle.bfloat16]:
             hidden_states = paddle.cast(hidden_states, self.weight.dtype)
+
         return hidden_states * self.weight
 
 
@@ -989,10 +990,10 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             cache_length = past_key_values[0][0].shape[1]
             seq_length_with_past += cache_length
 
-        input_ids = dist.reshard(input_ids, get_mesh(), [dist.Replicate(), dist.Replicate()])
         if inputs_embeds is None:
             with paddle.amp.auto_cast(False):
                 inputs_embeds = self.embed_tokens(input_ids)
+
         if self.config.sequence_parallel:
             # [B, S, H] -> [S, B, H]
             inputs_embeds = paddle.transpose(inputs_embeds, [1, 0, 2])
