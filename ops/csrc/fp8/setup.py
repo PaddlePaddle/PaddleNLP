@@ -92,7 +92,7 @@ if __name__ == "__main__":
         packages=["deep_gemm", "deep_gemm/jit", "deep_gemm/jit_kernels"],
         package_data={
             "deep_gemm": [
-                "include/deep_gemm/**/*",
+                "include/deep_gemm/*",
                 "include/cute/**/*",
                 "include/cutlass/**/*",
             ]

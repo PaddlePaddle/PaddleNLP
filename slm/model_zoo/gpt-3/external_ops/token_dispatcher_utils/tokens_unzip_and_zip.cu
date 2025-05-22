@@ -14,6 +14,9 @@
 
 #include "utils.h"
 
+#ifndef MAX_NUM_EXPERTS
+#define MAX_NUM_EXPERTS 32
+#endif
 template <typename X_T,
           typename routemap_T,
           typename probs_T,
@@ -240,7 +243,8 @@ __global__ void tokens_weighted_zip_kernel(
     }
   }
 }
-template <int topk, int num_experts, bool MP = false>
+
+template <bool MP = true>
 __global__ void tokens_zip_kernel(
     const phi::bfloat16 *__restrict__ unzipped_tokens_in,
     const int *__restrict__ zipped_expertwise_rowmap,
@@ -249,7 +253,9 @@ __global__ void tokens_zip_kernel(
     phi::bfloat16 *__restrict__ zipped_tokens_out,
     phi::bfloat16 *__restrict__ zipped_probs_topk,
     const int total_zipped_tokens_num,
-    const int token_length) {
+    const int token_length,
+    const int num_experts,
+    const int topk) {
   const int this_row = blockIdx.x;
   if (this_row >= total_zipped_tokens_num) return;
 
@@ -258,7 +264,7 @@ __global__ void tokens_zip_kernel(
   __nv_bfloat16 *zipped_tokens =
       reinterpret_cast<__nv_bfloat16 *>(zipped_tokens_out);
 
-  int local_row_fetchlist[num_experts];
+  int local_row_fetchlist[MAX_NUM_EXPERTS];
 
 // -------------------------初始化任务表 ------------------------
 #pragma unroll
@@ -364,7 +370,7 @@ __global__ void tokens_zip_kernel(
   }
 }
 
-template <int topk, int num_experts, bool MP = false>
+template <bool MP = true>
 __global__ void tokens_zip_kernel(
     const phi::bfloat16 *__restrict__ unzipped_tokens_in,
     const int *__restrict__ zipped_expertwise_rowmap,
@@ -373,7 +379,9 @@ __global__ void tokens_zip_kernel(
     phi::bfloat16 *__restrict__ zipped_tokens_out,
     float *__restrict__ zipped_probs_topk,
     const int total_zipped_tokens_num,
-    const int token_length) {
+    const int token_length,
+    const int num_experts,
+    const int topk) {
   const int this_row = blockIdx.x;
   if (this_row >= total_zipped_tokens_num) return;
 
@@ -382,7 +390,7 @@ __global__ void tokens_zip_kernel(
   __nv_bfloat16 *zipped_tokens =
       reinterpret_cast<__nv_bfloat16 *>(zipped_tokens_out);
 
-  int local_row_fetchlist[num_experts];
+  int local_row_fetchlist[MAX_NUM_EXPERTS];
 
 // -------------------------初始化任务表 ------------------------
 #pragma unroll
@@ -414,7 +422,7 @@ __global__ void tokens_zip_kernel(
          x_offset < num_full_vec * vecSize;
          x_offset += thread_stride) {
       float2 sum = {0.0f, 0.0f};
-      __nv_bfloat162 raw = {0,0};
+      __nv_bfloat162 raw = {0, 0};
       int aggreg_cnt = 0;
       __nv_bfloat162 *out_ptr = reinterpret_cast<__nv_bfloat162 *>(
           &zipped_tokens[this_row * token_length + x_offset]);
@@ -422,12 +430,11 @@ __global__ void tokens_zip_kernel(
       for (int expert = 0; expert < num_experts; ++expert) {
         const int fetch_row = local_row_fetchlist[expert];
         if (fetch_row < 0) continue;
-        aggreg_cnt ++;
+        aggreg_cnt++;
         // 手动类型提升
         raw = *reinterpret_cast<const __nv_bfloat162 *>(
             &unzipped_tokens[fetch_row * token_length + x_offset]);
-        float2 token_vec =
-            __bfloat1622float2(raw);
+        float2 token_vec = __bfloat1622float2(raw);
         sum.x = __fadd_rn(token_vec.x, sum.x);
         sum.y = __fadd_rn(token_vec.y, sum.y);
       }
@@ -445,12 +452,13 @@ __global__ void tokens_zip_kernel(
       for (int expert = 0; expert < num_experts; ++expert) {
         int fetch_row = local_row_fetchlist[expert];
         if (fetch_row < 0) continue;
-        aggreg_cnt ++;
+        aggreg_cnt++;
         raw = unzipped_tokens[fetch_row * token_length + i];
         float token_val = __bfloat162float(raw);
         sum = __fadd_rn(token_val, sum);
       }
-      zipped_tokens[this_row * token_length + i] = (aggreg_cnt > 1)? __float2bfloat16_rn(sum) : raw;
+      zipped_tokens[this_row * token_length + i] =
+          (aggreg_cnt > 1) ? __float2bfloat16_rn(sum) : raw;
     }
   } else {
     // ------------------------ BF16 intrinsics 加权累加 -----------------------
@@ -487,19 +495,20 @@ __global__ void tokens_zip_kernel(
     }
   }
 }
-template <int topk, int num_experts>
 __global__ void tokens_zip_kernel(
-    const float*__restrict__ unzipped_tokens,
+    const float *__restrict__ unzipped_tokens,
     const int *__restrict__ zipped_expertwise_rowmap,
     const int *__restrict__ expert_routemap_topk,
     const float *__restrict__ unzipped_token_probs,
     float *__restrict__ zipped_tokens,
     float *__restrict__ zipped_probs_topk,
     const int total_zipped_tokens_num,
-    const int token_length) {
+    const int token_length,
+    const int num_experts,
+    const int topk) {
   const int this_row = blockIdx.x;
   if (this_row >= total_zipped_tokens_num) return;
-  int local_row_fetchlist[num_experts];
+  int local_row_fetchlist[MAX_NUM_EXPERTS];
 
 // -------------------------初始化任务表 ------------------------
 #pragma unroll
@@ -524,7 +533,7 @@ __global__ void tokens_zip_kernel(
   // ------------------------ 手动混合精度 ---------------------------------
   // 齐整区域向量化搬移
   for (int x_offset = threadIdx.x; x_offset < token_length;
-        x_offset += thread_stride) {
+       x_offset += thread_stride) {
     float sum = 0.0f;
 #pragma unroll
     for (int expert = 0; expert < num_experts; ++expert) {
@@ -628,10 +637,10 @@ void dispatch_tokens_zip(const paddle::Tensor &unzipped_tokens,
   block.x = 256;
 
   // Map data types to C++ types
-  if (topk == 8 && num_experts == 4) {
-    if (unzipped_tokens.dtype() == paddle::DataType::BFLOAT16){
-      if(zipped_probs_topk.dtype() == paddle::DataType::FLOAT32){
-      tokens_zip_kernel<8, 4><<<grid, block, 0, unzipped_tokens.stream()>>>(
+
+  if (unzipped_tokens.dtype() == paddle::DataType::BFLOAT16) {
+    if(zipped_probs_topk.dtype() == paddle::DataType::FLOAT32){
+      tokens_zip_kernel<<<grid, block, 0, unzipped_tokens.stream()>>>(
           unzipped_tokens.data<phi::bfloat16>(),
           zipped_expertwise_rowmap.data<int>(),
           expert_routemap_topk.data<int>(),
@@ -639,9 +648,11 @@ void dispatch_tokens_zip(const paddle::Tensor &unzipped_tokens,
           zipped_tokens.data<phi::bfloat16>(),
           zipped_probs_topk.data<float>(),
           total_zipped_tokens_num,
-          token_length);
+          token_length,
+          num_experts,
+          topk);
       }else if(zipped_probs_topk.dtype() == paddle::DataType::BFLOAT16){
-        tokens_zip_kernel<8, 4><<<grid, block, 0, unzipped_tokens.stream()>>>(
+        tokens_zip_kernel<<<grid, block, 0, unzipped_tokens.stream()>>>(
           unzipped_tokens.data<phi::bfloat16>(),
           zipped_expertwise_rowmap.data<int>(),
           expert_routemap_topk.data<int>(),
@@ -649,19 +660,22 @@ void dispatch_tokens_zip(const paddle::Tensor &unzipped_tokens,
           zipped_tokens.data<phi::bfloat16>(),
           zipped_probs_topk.data<phi::bfloat16>(),
           total_zipped_tokens_num,
-          token_length);
+          token_length,
+          num_experts,
+          topk);
       }
-    }else if (unzipped_tokens.dtype() == paddle::DataType::FLOAT32){
-      tokens_zip_kernel<8, 4><<<grid, block, 0, unzipped_tokens.stream()>>>(
-          unzipped_tokens.data<float>(),
-          zipped_expertwise_rowmap.data<int>(),
-          expert_routemap_topk.data<int>(),
-          unzipped_token_probs.data<float>(),
-          zipped_tokens.data<float>(),
-          zipped_probs_topk.data<float>(),
-          total_zipped_tokens_num,
-          token_length);
-    }
+  } else if (unzipped_tokens.dtype() == paddle::DataType::FLOAT32) {
+    tokens_zip_kernel<<<grid, block, 0, unzipped_tokens.stream()>>>(
+        unzipped_tokens.data<float>(),
+        zipped_expertwise_rowmap.data<int>(),
+        expert_routemap_topk.data<int>(),
+        unzipped_token_probs.data<float>(),
+        zipped_tokens.data<float>(),
+        zipped_probs_topk.data<float>(),
+        total_zipped_tokens_num,
+        token_length,
+        num_experts,
+        topk);
   }
 }
 
@@ -729,7 +743,8 @@ std::vector<paddle::Tensor> tokens_zip(
     const paddle::Tensor &unzipped_token_probs,
     const int &total_zipped_tokens_num,
     const int &num_experts) {
-  PD_CHECK(unzipped_tokens.dtype() == paddle::DataType::BFLOAT16 || unzipped_tokens.dtype() == paddle::DataType::FLOAT32);
+  PD_CHECK(unzipped_tokens.dtype() == paddle::DataType::BFLOAT16 ||
+           unzipped_tokens.dtype() == paddle::DataType::FLOAT32);
   const int rows = unzipped_tokens.shape()[0];       // seqlen
   const int cols = unzipped_tokens.shape()[1];       // 一般为7168
   const int topk = expert_routemap_topk.shape()[1];  // 一般为8
@@ -744,12 +759,12 @@ std::vector<paddle::Tensor> tokens_zip(
                                          unzipped_token_probs.place());
   // ----------------------- 0初始化 zipped_probs_topk ------------------
   if (unzipped_token_probs.dtype() == paddle::DataType::FLOAT32) {
-  void *zipped_probs_topk_ptr =
-      reinterpret_cast<void *>(zipped_probs_topk.data<float>());
-  cudaMemsetAsync(zipped_probs_topk_ptr,
-                  0,
-                  sizeof(float) * total_zipped_tokens_num * topk,
-                  unzipped_token_probs.stream());
+    void *zipped_probs_topk_ptr =
+        reinterpret_cast<void *>(zipped_probs_topk.data<float>());
+    cudaMemsetAsync(zipped_probs_topk_ptr,
+                    0,
+                    sizeof(float) * total_zipped_tokens_num * topk,
+                    unzipped_token_probs.stream());
   } else if (unzipped_token_probs.dtype() == paddle::DataType::BFLOAT16) {
     void *zipped_probs_topk_ptr =
         reinterpret_cast<void *>(zipped_probs_topk.data<phi::bfloat16>());

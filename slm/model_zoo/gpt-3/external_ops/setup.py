@@ -23,6 +23,7 @@ def get_gencode_flags():
     cc = prop.major * 10 + prop.minor
     return ["-gencode", "arch=compute_{0},code=sm_{0}".format(cc)]
 
+
 def run(func):
     p = multiprocessing.Process(target=func)
     p.start()
@@ -129,97 +130,6 @@ def setup_fused_ln():
             ),
         )
 
-def setup_fused_quant_ops():
-    """setup_fused_fp8_ops"""
-    from paddle.utils.cpp_extension import CUDAExtension, setup
 
-    gencode_flags = get_gencode_flags()
-    change_pwd()
-    setup(
-        name="FusedQuantOps",
-        ext_modules=CUDAExtension(
-            sources=[
-                "fused_quanted_ops/fused_swiglu_act_quant.cu",
-                "fused_quanted_ops/fused_act_quant.cu",
-                "fused_quanted_ops/fused_act_dequant.cu",
-                "fused_quanted_ops/fused_act_dequant_transpose_act_quant.cu",
-            ],
-            extra_compile_args={
-                "cxx": [
-                    "-O3",
-                    "-w",
-                    "-Wno-abi",
-                    "-fPIC",
-                    "-std=c++17"
-                ],
-                "nvcc": [
-                    "-O3",
-                    "-U__CUDA_NO_HALF_OPERATORS__",
-                    "-U__CUDA_NO_HALF_CONVERSIONS__",
-                    "-U__CUDA_NO_BFLOAT16_OPERATORS__",
-                    "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
-                    "-U__CUDA_NO_BFLOAT162_OPERATORS__",
-                    "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
-                    "-DCUTE_ARCH_MMA_SM90A_ENABLE",
-                    "--expt-relaxed-constexpr",
-                    "--expt-extended-lambda",
-                    "--use_fast_math",
-                    "-lineinfo",
-                    "-DCUTLASS_DEBUG_TRACE_LEVEL=0",
-                    "-maxrregcount=50",
-                    "-gencode=arch=compute_90a,code=sm_90a",
-                    "-DNDEBUG"
-                ] + gencode_flags,
-            },
-        ),
-    )
-
-def setup_token_dispatcher_utils():
-    from paddle.utils.cpp_extension import CUDAExtension, setup
-
-    change_pwd()
-    setup(
-        name="TokenDispatcherUtils",
-        ext_modules=CUDAExtension(
-            sources=[
-                "token_dispatcher_utils/topk_to_multihot.cu",
-                "token_dispatcher_utils/topk_to_multihot_grad.cu",
-                "token_dispatcher_utils/tokens_unzip_and_zip.cu",
-                "token_dispatcher_utils/tokens_stable_unzip.cu",
-                "token_dispatcher_utils/tokens_guided_unzip.cu",
-                "token_dispatcher_utils/regroup_tokens.cu",
-            ],
-            extra_compile_args={
-                "cxx": [
-                    "-O3",
-                    "-w",
-                    "-Wno-abi",
-                    "-fPIC",
-                    "-std=c++17"
-                ],
-            "nvcc": [
-                "-O3",
-                "-U__CUDA_NO_HALF_OPERATORS__",
-                "-U__CUDA_NO_HALF_CONVERSIONS__",
-                "-U__CUDA_NO_BFLOAT16_OPERATORS__",
-                "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
-                "-U__CUDA_NO_BFLOAT162_OPERATORS__",
-                "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
-                "-DCUTE_ARCH_MMA_SM90A_ENABLE",
-                "--expt-relaxed-constexpr",
-                "--expt-extended-lambda",
-                "--use_fast_math",
-                "-maxrregcount=80",
-                "-lineinfo",
-                "-DCUTLASS_DEBUG_TRACE_LEVEL=0",
-                "-gencode=arch=compute_90a,code=sm_90a",
-                "-DNDEBUG"
-            ]
-            },
-        ),
-    )
-
-run(setup_token_dispatcher_utils)
-run(setup_fused_quant_ops)
 run(setup_fast_ln)
 run(setup_fused_ln)
