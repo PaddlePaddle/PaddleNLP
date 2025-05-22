@@ -513,12 +513,16 @@ void dispatch_moe_gemm_to_cutlass(const T* A,
   } else {
     switch (gemm_config.tile_config) {
       dispatch_gemm_config_macro(16, 128, 64, 16, 32, 64);
+      dispatch_gemm_config_macro(16, 256, 64, 16, 64, 64);
       dispatch_gemm_config_macro(32, 128, 64, 32, 32, 64);
+      dispatch_gemm_config_macro(64, 64, 64, 32, 32, 64);
       dispatch_gemm_config_macro(64, 128, 64, 64, 64, 64);
+      dispatch_gemm_config_macro(64, 128, 64, 64, 32, 64);
+      dispatch_gemm_config_macro(128, 64, 64, 64, 32, 64);
       dispatch_gemm_config_macro(128, 128, 64, 64, 64, 64);
       dispatch_gemm_config_macro(128, 128, 64, 128, 32, 64);
       dispatch_gemm_config_macro(128, 256, 64, 64, 64, 64);
-      dispatch_gemm_config_macro(64, 128, 64, 64, 32, 64);
+      dispatch_gemm_config_macro(128, 128, 64, 128, 32, 64);
       case CutlassTileConfig::Undefined:
         PADDLE_FATAL("[dispatch_moe_gemm_to_cutlass] gemm config undefined.");
         break;
