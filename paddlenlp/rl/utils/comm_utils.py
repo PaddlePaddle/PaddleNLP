@@ -619,9 +619,6 @@ def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
     dp_group = hcg.get_data_parallel_group()
     pp_rank = hcg.get_stage_id()
 
-    if not hasattr(self, "global_meta_dict") or self.global_meta_dict is None:
-        self.global_meta_dict = init_reshard_mappings(train_model, self.args, pp_rank, pp_group)
-
     if getattr(self, "reshard_controller", None) is not None:
         self.reshard_controller.set_rollout_env("[export_evaluate_model]")
     hcg = fleet.get_hybrid_communicate_group()
@@ -629,6 +626,12 @@ def export_evaluate_model(self: Trainer, train_model, eval_model, **kwargs):
     tensor_parallel_rank = hcg.get_model_parallel_rank()
     eval_tp_size = max(tensor_parallel_degree, 1)
     eval_tp_rank = max(tensor_parallel_rank, 0)
+
+    if not hasattr(self, "global_meta_dict") or self.global_meta_dict is None:
+        self.global_meta_dict = init_reshard_mappings(
+            train_model, self.args, pp_rank, pp_group, hcg.get_model_parallel_group()
+        )
+
     reshard_to_rollout(
         train_model, eval_model, self.global_meta_dict, pp_rank, pp_group, hcg.get_model_parallel_group(), tp_group
     )
