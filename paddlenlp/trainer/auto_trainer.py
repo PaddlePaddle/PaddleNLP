@@ -224,7 +224,7 @@ def manual_model_split_multi(model,stage_idx,group):
         elif stage_idx == 3:
             new_model = copy.deepcopy(model)
             
-            new_model.layers = layer_lists[:5]
+            new_model.layers = layer_lists[5:]
             def forward3(self, *args, **kwargs):
                 outputs = args if len(args) > 0 else kwargs
                 # decoder layers

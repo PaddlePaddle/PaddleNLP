@@ -23,7 +23,7 @@ rm -rf "output/$task_name""_log"
 
 export SOT_LOG_LEVEL=4
 export PYTHONPATH=../../../:$PYTHONPATH
-export PYTHONPATH=/root/paddlejob/workspace/env_run/wangxiangzhe/Paddle/build/python:$PYTHONPATH
+# export PYTHONPATH=/root/paddlejob/workspace/env_run/wangxiangzhe/Paddle/build/python:$PYTHONPATH
 #ulimit -c unlimited
 # export GLOG_v=6   
 export NCCL_DEBUG=INFO
