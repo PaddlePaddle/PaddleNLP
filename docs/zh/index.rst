@@ -128,6 +128,7 @@
    :caption: 实践教程
 
    AI Studio Notebook <tutorials/overview>
+   快速入门大模型预训练 <llm/docs/quantization_tutorial.md>
 
 .. toctree::
    :maxdepth: 1
