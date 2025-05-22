@@ -867,7 +867,7 @@ def combine_micro_batches_into_batch(micro_batches, pad_token_id=0):
     return combined_batch
 
 
-def filter_valid_reward_groups(combined_batch, total_batch, rollout_n, variance_threshold=1e-6):
+def filter_valid_reward_groups(combined_batch: DataProto, total_batch, rollout_n, variance_threshold=1e-6):
     """
     Filters out invalid prompt groups based on reward variance, and appends the valid samples to total_batch.
 
@@ -885,10 +885,10 @@ def filter_valid_reward_groups(combined_batch, total_batch, rollout_n, variance_
     """
 
     # Choose the reward key to filter by
-    select_key = "rewards_before_length_penalty" if "rewards_before_length_penalty" in combined_batch else "rewards"
+    select_key = "rewards_before_length_penalty" if "rewards_before_length_penalty" in combined_batch.batch.keys() else "rewards"
 
-    rewards = combined_batch[select_key].flatten()  # paddle.Tensor
-    indices = combined_batch["index"].flatten()  # numpy.ndarray
+    rewards = combined_batch.batch[select_key].flatten()  # paddle.Tensor
+    indices = combined_batch.non_tensor_batch["index"].flatten()  # numpy.ndarray
 
     # Group by prompt index
     group_map = defaultdict(list)
@@ -910,8 +910,11 @@ def filter_valid_reward_groups(combined_batch, total_batch, rollout_n, variance_
 
     # Select only valid samples for each key and append to total_batch
     valid_indices = np.array(valid_indices, dtype=int)
-    for key in combined_batch:
-        filtered = combined_batch[key][valid_indices]
+    for key in combined_batch.batch.keys():
+        filtered = combined_batch.batch[key][valid_indices]
+        total_batch[key].append(filtered)
+    for key in combined_batch.non_tensor_batch.keys():
+        filtered = combined_batch.non_tensor_batch[key][valid_indices]
         total_batch[key].append(filtered)
 
     return total_batch, num_valid_prompts
@@ -1075,21 +1078,21 @@ def split_batch_into_micro_batches(total_batch: DataProto, batch_size, pad_token
     return micro_batches
 
 
-def make_eos_mask(response_id, eos_token_ids=0, dtype=paddle.int64):
-    """
-    end of sentence token can be int or list: 1 or [1, 2]
-    e.g. eos_token=1
-    response_id: [0, 0, 2, 42, 3, 5, 1, 0, 0]
-    eos_mask:     [1, 1, 1, 1,  1, 1, 1, 0, 0]
-    """
-    if isinstance(eos_token_ids, int):
-        eos_token_ids = [eos_token_ids]
+# def make_eos_mask(response_id, eos_token_ids=0, dtype=paddle.int64):
+#     """
+#     end of sentence token can be int or list: 1 or [1, 2]
+#     e.g. eos_token=1
+#     response_id: [0, 0, 2, 42, 3, 5, 1, 0, 0]
+#     eos_mask:     [1, 1, 1, 1,  1, 1, 1, 0, 0]
+#     """
+#     if isinstance(eos_token_ids, int):
+#         eos_token_ids = [eos_token_ids]
 
-    eos_mask = paddle.zeros_like(response_id, dtype=paddle.bool)
-    for token_id in eos_token_ids:
-        eos_mask |= response_id == token_id
+#     eos_mask = paddle.zeros_like(response_id, dtype=paddle.bool)
+#     for token_id in eos_token_ids:
+#         eos_mask |= response_id == token_id
 
-    eos_mask = eos_mask.to("int64")
-    eos_mask = (paddle.cumsum(eos_mask, axis=1) - eos_mask).to("bool")
-    eos_mask = paddle.logical_not(eos_mask).to(dtype)
-    return eos_mask
+#     eos_mask = eos_mask.to("int64")
+#     eos_mask = (paddle.cumsum(eos_mask, axis=1) - eos_mask).to("bool")
+#     eos_mask = paddle.logical_not(eos_mask).to(dtype)
+#     return eos_mask

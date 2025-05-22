@@ -74,7 +74,7 @@ from ..utils.comm_utils import (
     filter_valid_reward_groups,
     gather_and_pad,
     get_timer_label,
-    make_eos_mask,
+    # make_eos_mask,
     new_timer_log,
     pad_tensor,
     split_batch_by_rank,
@@ -92,7 +92,7 @@ from .trainer_utils import (
     batch_retokenize,
     guard_set_args,
     is_same_tokenizer,
-    process_row,
+    # process_row,
 )
 
 
@@ -1099,37 +1099,37 @@ class PPOTrainer(RLTrainerBase):
             rl_loss.update(value_loss)
         return rl_loss
 
-    def remove_pad_tokens_after_generate(self, generated_batches: DataProto):
-        cleanup_batches, indices, label_ids_batches = [], [], []
+    # def remove_pad_tokens_after_generate(self, generated_batches: DataProto):
+    #     cleanup_batches, indices, label_ids_batches = [], [], []
 
-        for batch in generated_batches:
-            cleanup_batches.extend(
-                [
-                    process_row(
-                        row,
-                        remove_value=self.tokenizer.pad_token_id,
-                        remove_side="right",
-                        eos_token_id=self.tokenizer.eos_token_id,
-                    )
-                    for row in batch.batch["input_ids"]
-                ]
-            )
-            if self.args.use_rm_server:
-                label_ids_batches.extend(
-                    [
-                        process_row(
-                            row,
-                            remove_value=self.tokenizer.pad_token_id,
-                            remove_side="left",
-                            eos_token_id=self.tokenizer.eos_token_id,
-                        )
-                        for row in batch.batch["label_ids"]
-                    ]
-                )
-            indices.append(batch.non_tensor_batch["index"])
+    #     for batch in generated_batches:
+    #         cleanup_batches.extend(
+    #             [
+    #                 process_row(
+    #                     row,
+    #                     remove_value=self.tokenizer.pad_token_id,
+    #                     remove_side="right",
+    #                     eos_token_id=self.tokenizer.eos_token_id,
+    #                 )
+    #                 for row in batch.batch["input_ids"]
+    #             ]
+    #         )
+    #         if self.args.use_rm_server:
+    #             label_ids_batches.extend(
+    #                 [
+    #                     process_row(
+    #                         row,
+    #                         remove_value=self.tokenizer.pad_token_id,
+    #                         remove_side="left",
+    #                         eos_token_id=self.tokenizer.eos_token_id,
+    #                     )
+    #                     for row in batch.batch["label_ids"]
+    #                 ]
+    #             )
+    #         indices.append(batch.non_tensor_batch["index"])
 
-        # TODO(xuwanpeng): 后续可以把这三个装在一个 DataProto 里
-        return cleanup_batches, indices, label_ids_batches
+    #     # TODO(xuwanpeng): 后续可以把这三个装在一个 DataProto 里
+    #     return cleanup_batches, indices, label_ids_batches
 
     def truncate_batch_data(self, batch, truncate_max_len):
         if len(batch) > truncate_max_len:
@@ -1140,66 +1140,39 @@ class PPOTrainer(RLTrainerBase):
             )[0]
         return batch
 
-    def pad_batch_data(
-        self,
-        input_ids: List[paddle.Tensor],
-        label_ids: List[paddle.Tensor] = None,
-        padding_strategy="longest",
-        padding_max_len=None,
-        pad_to_multiple_of=None,
-    ):
-        input_ids = self.tokenizer.pad(
-            {"input_ids": input_ids},
-            padding=padding_strategy,
-            padding_side="right",
-            max_length=padding_max_len,
-            return_attention_mask=False,
-            pad_to_multiple_of=pad_to_multiple_of,
-        )["input_ids"]
-
-        label_ids = [paddle.unsqueeze(v, axis=0) if v.ndim == 1 else v for v in label_ids]
-        label_ids = pad_tensor(
-            label_ids,
-            pad_index=self.tokenizer.pad_token_id,
-            dtype=label_ids[0].dtype,
-            padding_side="right",
-        )
-        position_ids = make_position_ids_from_input_ids(input_ids, pad_token_id=self.tokenizer.pad_token_id)
-        return input_ids, label_ids, position_ids
-
     # 这里到时也许可以作为 DataProto 的方法
-    def distribute_gather_and_pad_data(self, batch: DataProto):
-        # group index for grpo
-        eos_mask = make_eos_mask(
-            batch.batch["input_ids"][:, batch.batch["prompt"].shape[-1] :],
-            eos_token_ids=llm_utils.get_eos_token_id(self.tokenizer, self.generation_config),
-        ).to(
-            batch.batch["log_probs"].dtype  # fix dtype
-        )
-        try:
-            hcg = fleet.get_hybrid_communicate_group()
-            sd_group = hcg.get_sharding_parallel_group()
-            dp_group = hcg.get_data_parallel_group()
-        except AttributeError:
-            sd_group = None
-            dp_group = None
+    # def distribute_gather_and_pad_data(self, batch: DataProto):
+    #     # group index for grpo
+    #     eos_mask = make_eos_mask(
+    #         batch.batch["input_ids"][:, batch.batch["prompt"].shape[-1] :],
+    #         eos_token_ids=llm_utils.get_eos_token_id(self.tokenizer, self.generation_config),
+    #     ).to(
+    #         batch.batch["log_probs"].dtype  # fix dtype
+    #     )
+    #     try:
+    #         hcg = fleet.get_hybrid_communicate_group()
+    #         sd_group = hcg.get_sharding_parallel_group()
+    #         dp_group = hcg.get_data_parallel_group()
+    #     except AttributeError:
+    #         sd_group = None
+    #         dp_group = None
 
-        new_batch = {
-            "index": gather_and_pad(batch.non_tensor_batch["index"], dp_group, sd_group, pad=False),
-            "rewards": gather_and_pad(batch.batch["rewards"], dp_group, sd_group, pad=False),
-            "eos_mask": gather_and_pad(eos_mask, dp_group, sd_group),
-        }
-        if "log_probs" in batch.batch:
-            new_batch["log_probs"] = gather_and_pad(batch.batch["log_probs"], dp_group, sd_group)
-        if "ref_log_probs" in batch.batch:
-            new_batch["ref_log_probs"] = gather_and_pad(batch.batch["ref_log_probs"], dp_group, sd_group)
+    #     new_batch = {
+    #         "index": gather_and_pad(batch.non_tensor_batch["index"], dp_group, sd_group, pad=False),
+    #         "rewards": gather_and_pad(batch.batch["rewards"], dp_group, sd_group, pad=False),
+    #         "eos_mask": gather_and_pad(eos_mask, dp_group, sd_group),
+    #     }
+    #     if "log_probs" in batch.batch:
+    #         new_batch["log_probs"] = gather_and_pad(batch.batch["log_probs"], dp_group, sd_group)
+    #     if "ref_log_probs" in batch.batch:
+    #         new_batch["ref_log_probs"] = gather_and_pad(batch.batch["ref_log_probs"], dp_group, sd_group)
 
-        return DataProto.from_single_dict(new_batch)
+    #     return DataProto.from_single_dict(new_batch)
 
     def get_rank_data(self, tensor):
         return tensor.split(self.args.dataset_world_size)[self.args.dataset_rank]
 
-    def distribute_get_rank_data(self, local_batch, global_batch):
+    def distribute_get_rank_data(self, local_batch: DataProto, global_batch: DataProto):
         local_data = {
             "reward_advantages": self.get_rank_data(global_batch.batch["reward_advantages"]),
             "rewards": self.get_rank_data(global_batch.batch["rewards"]),
@@ -1211,19 +1184,19 @@ class PPOTrainer(RLTrainerBase):
             local_data["kl_rewards"] = self.get_rank_data(global_batch.batch["kl_rewards"])
             local_data["rewards_with_kl"] = self.get_rank_data(global_batch.batch["rewards_with_kl"])
 
-        shape = local_batch.batch["log_probs"].shape
-        for k, v in local_data.items():
-            if local_data[k].ndim <= 1:
-                local_batch.batch.update({k: local_data[k][: shape[-1]]})
-            else:
-                local_batch.batch.update({k: local_data[k][:, : shape[-1]]})
+        # shape = local_batch.batch["log_probs"].shape
+        # for k, v in local_data.items():
+        #     if local_data[k].ndim <= 1:
+        #         local_batch.batch.update({k: local_data[k][: shape[-1]]})
+        #     else:
+        #         local_batch.batch.update({k: local_data[k][:, : shape[-1]]})
 
         # TODO(downfish19): test following code instead of above without any error
-        # for k, v in local_data.items():
-        #     local_batch.update({k: local_data[k]})
+        for k, v in local_data.items():
+            local_batch.batch.update({k: local_data[k]})
         return local_batch
 
-    def _balance_batch(self, micro_batches):
+    def _balance_batch(self, micro_batches: Union[List[DataProto], DataProto]):
         """Reorder the data such that each dp/sharding rank gets similar total tokens"""
         if isinstance(micro_batches, list):
             need_combine_and_split = True
@@ -1249,7 +1222,7 @@ class PPOTrainer(RLTrainerBase):
             unbalance_micro_batch = combine_micro_batches_into_batch(micro_batches, pad_token_id=self.tokenizer.pad_token_id)  # fmt:skip
         else:
             unbalance_micro_batch = micro_batches
-        # 这样可能会忽略 non_tensor_batch
+
         for key in unbalance_micro_batch.batch.keys():
             total_unbalance_batch[key].append(unbalance_micro_batch.batch[key])
         for key in unbalance_micro_batch.non_tensor_batch.keys():
@@ -1392,6 +1365,8 @@ class PPOTrainer(RLTrainerBase):
         if self.args.dynamic_sampling:
             total_valid_prompt = 0
             total_batch = defaultdict(list)
+            # 这个不能改，是变长的
+            # total_batch = DataProto.from_single_dict({})
 
         for epoch in range(epochs_trained, num_train_epochs):
             if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
@@ -1432,12 +1407,12 @@ class PPOTrainer(RLTrainerBase):
 
                 batch_keys_to_pop = ["raw_label_ids_len", "raw_prompt_len"]
                 # 后续改成 pop
-                prompt_only_batch2 = prompt_only_batch.select(
+                prompt_only_batch_expand = prompt_only_batch.select(
                     batch_keys=batch_keys_to_pop,
                 )
                 # 不是原地修改
-                prompt_only_batch2 = prompt_only_batch2.repeat(repeat_times=self.args.rollout_n, interleave=True)
-                prompt_only_batch2.rename("raw_prompt_len", "raw_prompt_len_expand")
+                prompt_only_batch_expand = prompt_only_batch_expand.repeat(repeat_times=self.args.rollout_n, interleave=True)
+                prompt_only_batch_expand.rename("raw_prompt_len", "raw_prompt_len_expand")
 
                 per_device_rollout_batch_size = self.args.per_device_rollout_batch_size
 
@@ -1469,11 +1444,23 @@ class PPOTrainer(RLTrainerBase):
                             # generate for multi batches and then disable FuseMT model
                             generated_batches = self.actor_trainer.generate_sequences(micro_batch)
                             # NOTE(drownfish19): do process for each micro_batch, prepare for split mode
-                            micro_ret = self.remove_pad_tokens_after_generate(generated_batches)
-                            micro_cleanup_batches, micro_indices, micro_label_ids_batches = micro_ret
+                            # micro_ret = self.remove_pad_tokens_after_generate(generated_batches)
+                            # micro_cleanup_batches, micro_indices, micro_label_ids_batches = micro_ret
+                            # cleanup_batches.extend(micro_cleanup_batches)
+                            # indices.extend(micro_indices)
+                            # label_ids_batches.extend(micro_label_ids_batches)
+
+                            micro_ret = [generated_batch.remove_pad_tokens_after_generate(self.tokenizer, self.args) for generated_batch in generated_batches]
+                            micro_cleanup_batches, micro_indices, micro_label_ids_batches = [], [], []
+
+                            for cleanup_batch, index, label_ids_batch in micro_ret:
+                                micro_cleanup_batches.extend(cleanup_batch)
+                                micro_indices.append(index)
+                                micro_label_ids_batches.extend(label_ids_batch)
                             cleanup_batches.extend(micro_cleanup_batches)
                             indices.extend(micro_indices)
                             label_ids_batches.extend(micro_label_ids_batches)
+
                         indices = np.concatenate(indices)
                     self.timers and (dist.get_world_size() > 1) and dist.barrier()
                     timer_scope_rollout.stop()
@@ -1487,10 +1474,15 @@ class PPOTrainer(RLTrainerBase):
                 input_ids_len = paddle.to_tensor([len(item) for item in truncate_input_ids])
 
                 # padding data
-                pad_to_multiple_of = self.args.tensor_parallel_degree if self._model_config.sequence_parallel else None
-                input_ids, label_ids, position_ids = self.pad_batch_data(truncate_input_ids, label_ids_batches, pad_to_multiple_of=pad_to_multiple_of)  # fmt: skip
+                # pad_to_multiple_of = self.args.tensor_parallel_degree if self._model_config.sequence_parallel else None
+                
+                # pad_batch_data 作为静态方法，处理两个 List[paddle.Tensor]
+                input_ids = DataProto.pad_batch_data(truncate_input_ids, tokenizer = self.tokenizer)
+                label_ids = DataProto.pad_batch_data(label_ids_batches, tokenizer = self.tokenizer)
+                position_ids = make_position_ids_from_input_ids(input_ids, pad_token_id=self.tokenizer.pad_token_id)
+
                 prompt_len = paddle.full(shape=[expand_prompt.shape[0]], fill_value=expand_prompt.shape[1], dtype=expand_prompt.dtype)  # fmt: skip
-                prompt_len_without_pad = prompt_only_batch2.batch["raw_prompt_len_expand"]
+                prompt_len_without_pad = prompt_only_batch_expand.batch["raw_prompt_len_expand"]
                 response_len_without_pad = input_ids_len - prompt_len
 
                 # 这里后面看看能不能直接从DataProto创建，
@@ -1506,7 +1498,7 @@ class PPOTrainer(RLTrainerBase):
                         **({"label_ids": label_ids} if self.args.use_rm_server else {}),
                         # 这个 raw_label_ids_len 为什么没 repeat 就往里放，而且和 prompt_len_without_pad 是冗余的呀
                         **(
-                            {"raw_prompt_len_expand": prompt_only_batch2.batch["raw_prompt_len_expand"]}
+                            {"raw_prompt_len_expand": prompt_only_batch_expand.batch["raw_prompt_len_expand"]}
                             if self.args.use_rm_server
                             else {}
                         ),
@@ -1595,20 +1587,42 @@ class PPOTrainer(RLTrainerBase):
 
                     if total_valid_prompt >= self.args.global_batch_size:
                         # Collect and pad tensors from all workers (across DP and Sharding groups)
+                        # 这里把index取出来了，而它不能被pad
                         for key in total_batch.keys():
                             tensor_list = total_batch[key]
                             # Do not need to pad 1-D Tensors
                             pad = False if len(tensor_list[0].shape) == 1 else True
                             pad_index = self.tokenizer.pad_token_id
                             padding_side = "left" if (key == "prompt" or key == "label_ids") else "right"
-                            total_batch[key] = gather_and_pad(
+
+                            gathered_and_padded_tensor = DataProto.gather_tensor(
                                 tensor_list,
                                 data_parallel_group,
                                 sharding_parallel_group,
-                                pad_index=pad_index,
-                                pad=pad,
-                                padding_side=padding_side,
                             )
+
+                            # 解耦 gather 和 pad 后剩余的 concat 部分
+                            if not pad:
+                                from ...utils.nested import flatten_list
+                                if (data_parallel_group is None and sharding_parallel_group is None) or (data_parallel_group.nranks == 1 and sharding_parallel_group.nranks == 1):
+                                    if isinstance(gathered_and_padded_tensor[0], paddle.Tensor):
+                                        gathered_and_padded_tensor =  paddle.concat(gathered_and_padded_tensor, axis=0)
+                                    else:
+                                        gathered_and_padded_tensor =  np.concatenate(gathered_and_padded_tensor, axis=0)
+                                else:
+                                    if isinstance(gathered_and_padded_tensor[0], paddle.Tensor):
+                                        gathered_and_padded_tensor =  paddle.concat(gathered_and_padded_tensor, axis=0)
+                                    else:
+                                        gathered_and_padded_tensor =  np.concatenate(flatten_list(gathered_and_padded_tensor), axis=0)
+                            else:
+                                gathered_and_padded_tensor = DataProto.pad_tensor(  # 默认 dtype="bfloat16"
+                                    gathered_and_padded_tensor,
+                                    pad_index=pad_index,
+                                    dtype=gathered_and_padded_tensor[0].dtype,      # 这里可能需要加外括号
+                                    padding_side=padding_side
+                                )
+
+                            total_batch[key] = gathered_and_padded_tensor
 
                         # Truncate total_batch to match expected total batch size
                         for key in total_batch.keys():
@@ -1625,7 +1639,7 @@ class PPOTrainer(RLTrainerBase):
                                 balance_batch_across_dp_group=False,
                             )
 
-                        batch = total_batch
+                        batch = DataProto.from_single_dict(dict(total_batch))
 
                         # Reset for next accumulation
                         total_batch = defaultdict(list)
@@ -1646,7 +1660,7 @@ class PPOTrainer(RLTrainerBase):
                 # prepare data for reinforce_plus_plus & grpo
                 if self.args.rl_algorithm in ["reinforce_plus_plus", "grpo"]:
                     local_batch = copy.deepcopy(batch)
-                    batch = self.distribute_gather_and_pad_data(batch)
+                    batch = batch.distribute_gather_and_pad_data(self.tokenizer, self.generation_config)
                 else:
                     local_batch = batch
                     batch = batch
@@ -1668,6 +1682,7 @@ class PPOTrainer(RLTrainerBase):
 
                 # prepare data for reinforce_plus_plus & grpo
                 if self.args.rl_algorithm in ["reinforce_plus_plus", "grpo"]:
+                    # 这一步会让 rewards 的 shape 与 其他的 value 最后一纬度的 shape 不一样
                     batch = self.distribute_get_rank_data(local_batch, batch)
                 else:
                     batch = batch
