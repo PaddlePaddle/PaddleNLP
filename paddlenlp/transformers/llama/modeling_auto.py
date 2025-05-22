@@ -223,7 +223,6 @@ class LlamaRMSNormAuto(nn.Layer):
 
         if self.weight.dtype in [paddle.float16, paddle.bfloat16]:
             hidden_states = paddle.cast(hidden_states, self.weight.dtype)
-
         return hidden_states * self.weight
 
 
@@ -877,7 +876,6 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             get_mesh(),
             embedding_placements,
         )
-
         def get_layer_pp_info(layer_index):
             mesh = fleet.auto.get_mesh()
             if is_pp_enable() is False:
@@ -990,10 +988,22 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             cache_length = past_key_values[0][0].shape[1]
             seq_length_with_past += cache_length
 
+        print("input_ids shape: ", input_ids.shape)
+        print("process_mesh: ", input_ids.process_mesh)
+        print("input_ids placements: ", input_ids.placements)
+        input_ids = dist.reshard(input_ids, get_mesh(), [dist.Replicate(), dist.Replicate()])
+        print("after reshard input_ids")
+        print("input_ids shape: ", input_ids.shape)
+        print("process_mesh: ", input_ids.process_mesh)
+        print("input_ids placements: ", input_ids.placements)
         if inputs_embeds is None:
             with paddle.amp.auto_cast(False):
+                print("self.embed_tokens weight: ", self.embed_tokens.weight.placements)
                 inputs_embeds = self.embed_tokens(input_ids)
-
+        print("inputs_embeds:" , inputs_embeds._local_value())
+        print("inputs_embeds.shape:", inputs_embeds.shape)
+        print("process_mesh: ", inputs_embeds.process_mesh)
+        print("inputs_embeds.placements:", inputs_embeds.placements)
         if self.config.sequence_parallel:
             # [B, S, H] -> [S, B, H]
             inputs_embeds = paddle.transpose(inputs_embeds, [1, 0, 2])
@@ -1165,6 +1175,11 @@ class LlamaPretrainingCriterion3DAuto(paddle.nn.Layer):
                 self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
 
         # Force entropy same kernel
+        print("prediction_scores shape: ", prediction_scores.shape)
+        print("masked_lm_labels shape: ", masked_lm_labels.shape)
+        print("masked_lm_labels dtype: ", masked_lm_labels.dtype)
+        print("labels placements: ", masked_lm_labels.placements)
+        print("labels : ", masked_lm_labels._local_value())
         with paddle.amp.auto_cast(False):
             if isinstance(prediction_scores, paddle.Tensor):
                 masked_lm_loss = self.loss_func(
@@ -1202,6 +1217,10 @@ class LlamaPretrainingCriterion3DAuto(paddle.nn.Layer):
                 loss = loss_func(masked_lm_loss, masked_lm_loss > 0)
                 loss = loss.mean()
             else:
+                print("masked_lm_loss shape: ", masked_lm_loss.shape)
+                print("masked_lm_loss dtype: ", masked_lm_loss.dtype)
+                print("masked_lm_loss placements: ", masked_lm_loss.placements)
+                print("masked_lm_loss local value: ", masked_lm_loss._local_value())
                 masked_lm_loss = paddle.masked_select(masked_lm_loss, masked_lm_loss > 0).astype("float32")
                 loss = paddle.mean(masked_lm_loss)
 

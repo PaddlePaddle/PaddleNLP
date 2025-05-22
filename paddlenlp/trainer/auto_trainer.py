@@ -57,12 +57,190 @@ try:
     from ..quantization.quantization_linear import QuantizationLinear
 except:
     QuantizationLinear = None
+    
+from paddle.distributed.auto_parallel.pipelining.schedules import ScheduleGPipe, Schedule1F1B, ScheduleInterleaved1F1B
+from paddle.distributed.auto_parallel.pipelining.stage import PipelineStage
+
 
 MODEL_NAME = "model"
 OPTIMIZER_NAME = "optimizer"
 DIST_CKPT_PATH = "dist_ckpt"
 DIST_MODEL_PATH = "dist_model"
 FREE_SVAE_LOAD_KEY_PATTERNS = ["learning_rate_", "gradient_merge_", "@GRAD@MERG", "eager_tmp"]
+
+is_split_model = False
+local_stages = None
+
+group0 = None
+group1 = None
+group2 = None
+group3 = None
+
+# class _Pipeline_model_chunk(nn.Layer):
+#     def __init__(self, layers):
+#         if not isinstance(layers, (list, tuple)):
+#             raise TypeError(
+#                 f"Expected type of `layers` to be a list|tuple but got {type(layers)}."
+#             )
+#         self.layers = layers
+#         super(_Pipeline_model_chunk, self).__init__()
+#     def forward(self, *args, **kwargs):
+        
+#         for layer in self.layers:
+#             output = layer(**args, **kwargs)
+#         return output
+
+def manual_model_split(model,stage_idx,group):
+    global is_split_model
+    global local_stages
+
+    if is_split_model:
+        return local_stages
+    if stage_idx == 0:
+        for i in range(10):
+            del model.layers[10]
+        def forward0(
+            self,
+            input_ids=None,
+            labels=None,
+            position_ids=None,
+            attention_mask=None,
+            inputs_embeds=None,
+            use_cache=False,
+            past_key_values=None,
+            output_attentions=None,
+            output_hidden_states=None,
+            return_dict=None,
+        ):
+            outputs = tuple([input_ids, attention_mask, position_ids])
+            # decoder layers
+            for idx, (decoder_layer) in enumerate(self.layers):
+                outputs = decoder_layer(outputs)
+            return outputs
+        setattr(model.__class__, "forward", forward0)
+
+    elif stage_idx == 1:
+        for i in range(10):
+            del model.layers[0]
+        def forward1(self, *args):
+            outputs = args     
+            # decoder layers
+            for idx, (decoder_layer) in enumerate(self.layers):
+                outputs = decoder_layer(outputs)
+            return outputs
+        setattr(model.__class__, "forward", forward1)
+    else:
+        raise ValueError("Invalid stage index.")
+
+    stage = PipelineStage(
+        model,
+        stage_idx,
+        2,
+        group=group
+    )
+    is_split_model = True
+    local_stages = stage
+    return stage
+
+def manual_model_split_multi(model,stage_idx,group):
+    global is_split_model
+    global local_stages
+
+    if is_split_model:
+        return local_stages
+    layer_lists = None
+    if stage_idx == 0:
+        for i in range(5):
+            del model.layers[5]
+        for i in range(5):
+            del model.layers[10]
+    else:
+        for i in range(5):
+            del model.layers[0]
+        for i in range(5):
+            del model.layers[5]
+    layer_lists = model.layers
+    def _build_stage(model, stage_idx, group):
+        new_model = []
+        if stage_idx == 0:
+            new_model = copy.deepcopy(model)
+            new_model.layers = layer_lists[:5]
+            def forward0(
+                self,
+                input_ids=None,
+                labels=None,
+                position_ids=None,
+                attention_mask=None,
+                inputs_embeds=None,
+                use_cache=False,
+                past_key_values=None,
+                output_attentions=None,
+                output_hidden_states=None,
+                return_dict=None,
+            ):
+                outputs = tuple([input_ids, attention_mask, position_ids])
+                # decoder layers
+                for idx, (decoder_layer) in enumerate(self.layers):
+                    outputs = decoder_layer(outputs)
+                return outputs
+            # setattr(model.__class__, "forward", forward0)
+            new_model.forward = forward0.__get__(new_model)
+
+        elif stage_idx == 1:
+            new_model = copy.deepcopy(model)
+            
+            new_model.layers = layer_lists[:5]
+            def forward1(self, *args, **kwargs):
+                outputs = args if len(args) > 0 else kwargs
+                # decoder layers
+                for idx, (decoder_layer) in enumerate(self.layers):
+                    outputs = decoder_layer(outputs)
+                return outputs
+            # setattr(model.__class__, "forward", forward1)
+            new_model.forward = forward1.__get__(new_model)
+        
+        elif stage_idx == 2:
+            new_model = copy.deepcopy(model)
+            
+            new_model.layers = layer_lists[5:]
+            def forward2(self, *args, **kwargs):
+                outputs = args if len(args) > 0 else kwargs
+                # decoder layers
+                for idx, (decoder_layer) in enumerate(self.layers):
+                    outputs = decoder_layer(outputs)
+                return outputs
+            # setattr(model.__class__, "forward", forward2)
+            new_model.forward = forward2.__get__(new_model)
+        elif stage_idx == 3:
+            new_model = copy.deepcopy(model)
+            
+            new_model.layers = layer_lists[5:]
+            def forward3(self, *args, **kwargs):
+                outputs = args if len(args) > 0 else kwargs
+                # decoder layers
+                for idx, (decoder_layer) in enumerate(self.layers):
+                    outputs = decoder_layer(outputs)
+                return outputs
+            # setattr(model.__class__, "forward", forward3)
+            new_model.forward = forward3.__get__(new_model)
+        else:
+            raise ValueError("Invalid stage index.")
+
+        stage = PipelineStage(
+            new_model,
+            stage_idx,
+            4,
+            group=group
+        )
+        return stage
+    stages = []
+    stage = _build_stage(model, stage_idx, group)
+    stages.append(stage)
+    stage = _build_stage(model, stage_idx+2, group)
+    stages.append(stage)
+    is_split_model = True
+    local_stages = stages
+    return local_stages
 
 
 class AutoTrainer(Trainer):
@@ -88,7 +266,7 @@ class AutoTrainer(Trainer):
                 ), "if use AutoTrainer.parallel_model , auto_dist_config obtained from parallel_model should be passed to AutoTrainer  "
                 self.auto_dist_config = kwargs.pop("auto_dist_config")
         model = kwargs["model"]
-        for param in model.parameters():
+        for name, param in model.named_parameters():
             # NOTE(zhangwl):in pipeline mode , param my be initialized before while delte init_func ,but param is still not is_initialized
             if not param._is_initialized() and param._init_func is not None:
                 param.initialize()
@@ -99,6 +277,8 @@ class AutoTrainer(Trainer):
 
         self.global_mesh = fleet.auto.get_mesh()
         self.comm_group_in_pp = fleet.get_hybrid_communicate_group().get_pipe_parallel_group()
+        # print("self.comm_group_in_pp: ", self.comm_group_in_pp) 
+        # print("get_submesh_dim: ", self.global_mesh.get_submesh_with_dim("pp").get_group())
         self._in_pir_mode = paddle.base.framework.get_flags("FLAGS_enable_pir_api")["FLAGS_enable_pir_api"]
 
     @classmethod
@@ -670,50 +850,71 @@ class AutoTrainer(Trainer):
                 labels = inputs["generator_labels"]
         else:
             labels = None
-
-        outputs = model(**inputs)
-
-        if self.criterion is not None:
-
-            def to_list(value):
-                if value is None:
-                    return value
-                if isinstance(value, (list, tuple)):
-                    return list(value)
-                return [value]
-
-            criterion_inputs = to_list(outputs)
-            criterion_labels = to_list(labels)
-            loss = self.criterion(*(criterion_inputs + criterion_labels))
-            outputs = (loss, outputs)
-
-        # Save past state if it exists
-        # TODO: this needs to be fixed and made cleaner later.
-        if self.args.past_index >= 0:
-            self._past = outputs[self.args.past_index]
-
-        # We don't use .loss here since the model may return tuples instead of ModelOutput.
-        loss = outputs["loss"] if isinstance(outputs, dict) else outputs
-        if isinstance(outputs, dict):
-            loss = outputs["loss"]
-        elif isinstance(outputs, tuple):
-            loss = outputs[0]
+        def get_mesh(pp_idx=0):
+            mesh = fleet.auto.get_mesh()
+            if "pp" in mesh.dim_names:
+                mesh = mesh.get_mesh_with_dim("pp", pp_idx)
+            return mesh
+        rank = dist.get_rank()
+        if rank == 0 or rank == 1 or rank == 2 or rank == 3: 
+            stages = manual_model_split_multi(model, 0, self.comm_group_in_pp)
         else:
-            loss = outputs
+            stages = manual_model_split_multi(model, 1, self.comm_group_in_pp)
 
-        return (loss, outputs) if return_outputs else loss
+        schedule = ScheduleInterleaved1F1B(stages, n_microbatches = 2, loss_fn=self.criterion)
+
+        if rank == 0 or rank == 1 or rank == 2 or rank == 3:
+            inputs["input_ids"] = dist.reshard(inputs["input_ids"], get_mesh(0), [dist.Replicate(), dist.Replicate()])
+            schedule.step(**inputs)
+        else:
+            labels = dist.reshard(labels, get_mesh(1), [dist.Replicate(), dist.Replicate()])
+            losses = []
+            schedule.step(target=labels, losses = losses)
+            print("losses: ", losses)
+        return 0
+        # outputs = model(**inputs)
+
+        # if self.criterion is not None:
+
+        #     def to_list(value):
+        #         if value is None:
+        #             return value
+        #         if isinstance(value, (list, tuple)):
+        #             return list(value)
+        #         return [value]
+
+        #     criterion_inputs = to_list(outputs)
+        #     criterion_labels = to_list(labels)
+        #     loss = self.criterion(*(criterion_inputs + criterion_labels))
+        #     outputs = (loss, outputs)
+
+        # # Save past state if it exists
+        # # TODO: this needs to be fixed and made cleaner later.
+        # if self.args.past_index >= 0:
+        #     self._past = outputs[self.args.past_index]
+
+        # # We don't use .loss here since the model may return tuples instead of ModelOutput.
+        # loss = outputs["loss"] if isinstance(outputs, dict) else outputs
+        # if isinstance(outputs, dict):
+        #     loss = outputs["loss"]
+        # elif isinstance(outputs, tuple):
+        #     loss = outputs[0]
+        # else:
+        #     loss = outputs
+
+        # return (loss, outputs) if return_outputs else loss
 
     def dynamic_training(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
         with self.autocast_smart_context_manager():
             loss = self.compute_loss(model, inputs)
+        
+        # if loss is not None and self.args.gradient_accumulation_steps > 1 and not self._enable_delay_scale_loss():
+        #     loss = loss / self.args.gradient_accumulation_steps
 
-        if loss is not None and self.args.gradient_accumulation_steps > 1 and not self._enable_delay_scale_loss():
-            loss = loss / self.args.gradient_accumulation_steps
-
-        if self.do_grad_scaling:
-            self.scaler.scale(loss).backward()
-        else:
-            loss.backward()
+        # if self.do_grad_scaling:
+        #     self.scaler.scale(loss).backward()
+        # else:
+        #     loss.backward()
 
         return loss
 

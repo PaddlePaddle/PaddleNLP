@@ -1,0 +1,43 @@
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+#     http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# just for debug
+
+set -x
+unset CUDA_VISIBLE_DEVICES
+
+task_name="llama3_dp2pp4sd2"
+rm -rf output/$task_name/
+rm -rf "output/$task_name""_log"
+
+export SOT_LOG_LEVEL=4
+export PYTHONPATH=../../../:$PYTHONPATH
+# export PYTHONPATH=/root/paddlejob/workspace/env_run/wangxiangzhe/Paddle/build/python:$PYTHONPATH
+#ulimit -c unlimited
+# export GLOG_v=6   
+export NCCL_DEBUG=INFO
+
+# export FLAGS_call_stack_level=3
+# export FLAGS_use_cuda_managed_memory=true
+
+# export FLAGS_embedding_deterministic=1        
+# export FLAGS_cudnn_deterministic=1
+# export NVIDIA_TF32_OVERRIDE=0
+rm -rf core.*
+python -u  -m paddle.distributed.launch \
+    --gpus "0,1,2,3,4,5,6,7" \
+    --log_dir  "output/$task_name""_log" \
+    ./run_pretrain_auto.py \
+    /root/paddlejob/workspace/env_run/wangxiangzhe/PaddleNLP/tests/test_tipc/static/auto_parallel/llama2/pretrain_config_llama2_13b/pretrain-llama2_13b.json
+
