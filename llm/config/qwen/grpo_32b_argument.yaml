@@ -74,7 +74,7 @@ disable_tqdm: true # Whether to disable tqdm progress bar
 
 # RL args
 kl_coeff: 0.001 # KL coefficient for PPO and Reinforce++
-kl_loss_coeff: 0.001 # KL loss coefficient
+kl_loss_coeff: 0.000 # KL loss coefficient
 pg_loss_coeff: 1.0 # Policy gradient loss coefficient
 entropy_coeff: 0.0 # Entropy coefficient
 clip_range_ratio: 0.2 # The clipping range for ratio between the old and new policy. (PPO algorithm)
