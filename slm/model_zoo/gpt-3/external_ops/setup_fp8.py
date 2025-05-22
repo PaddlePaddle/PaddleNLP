@@ -60,7 +60,7 @@ def setup_fused_quant_ops():
                     "-lineinfo",
                     "-DCUTLASS_DEBUG_TRACE_LEVEL=0",
                     "-maxrregcount=50",
-                    "-gencode=arch=compute_80,code=sm_80",
+                    "-gencode=arch=compute_90a,code=sm_90a",
                     "-DNDEBUG",
                 ]
             },
