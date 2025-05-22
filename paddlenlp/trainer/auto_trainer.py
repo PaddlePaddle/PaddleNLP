@@ -127,16 +127,6 @@ def manual_model_split(model,stage_idx,group):
             # decoder layers
             for idx, (decoder_layer) in enumerate(self.layers):
                 outputs = decoder_layer(outputs)
-                outputs = decoder_layer(outputs)
-                print("forward1 output", outputs.shape)
-                print("forward1 output", outputs.placements)
-                print("forward1 output", outputs.process_mesh)
-                
-                outputs = decoder_layer(outputs)        
-                print("forward1 output", outputs.shape)
-                print("forward1 output", outputs.placements)
-                print("forward1 output", outputs.process_mesh)
-                
             return outputs
         setattr(model.__class__, "forward", forward1)
     else:
@@ -279,9 +269,6 @@ class AutoTrainer(Trainer):
         for name, param in model.named_parameters():
             # NOTE(zhangwl):in pipeline mode , param my be initialized before while delte init_func ,but param is still not is_initialized
             if not param._is_initialized() and param._init_func is not None:
-                print(name)
-                print(param)
-                print(param.name)
                 param.initialize()
         kwargs["model"] = model
 
@@ -290,8 +277,8 @@ class AutoTrainer(Trainer):
 
         self.global_mesh = fleet.auto.get_mesh()
         self.comm_group_in_pp = fleet.get_hybrid_communicate_group().get_pipe_parallel_group()
-        print("self.comm_group_in_pp: ", self.comm_group_in_pp) 
-        print("get_submesh_dim: ", self.global_mesh.get_submesh_with_dim("pp").get_group())
+        # print("self.comm_group_in_pp: ", self.comm_group_in_pp) 
+        # print("get_submesh_dim: ", self.global_mesh.get_submesh_with_dim("pp").get_group())
         self._in_pir_mode = paddle.base.framework.get_flags("FLAGS_enable_pir_api")["FLAGS_enable_pir_api"]
 
     @classmethod
@@ -863,7 +850,6 @@ class AutoTrainer(Trainer):
                 labels = inputs["generator_labels"]
         else:
             labels = None
-        print("labels: ", labels)
         def get_mesh(pp_idx=0):
             mesh = fleet.auto.get_mesh()
             if "pp" in mesh.dim_names:
@@ -876,8 +862,6 @@ class AutoTrainer(Trainer):
             stages = manual_model_split_multi(model, 1, self.comm_group_in_pp)
 
         schedule = ScheduleInterleaved1F1B(stages, n_microbatches = 2, loss_fn=self.criterion)
-        print("schedule inputs: ", inputs)
-        print("labels: ", labels)
 
         if rank == 0 or rank == 1 or rank == 2 or rank == 3:
             inputs["input_ids"] = dist.reshard(inputs["input_ids"], get_mesh(0), [dist.Replicate(), dist.Replicate()])
@@ -921,7 +905,6 @@ class AutoTrainer(Trainer):
         # return (loss, outputs) if return_outputs else loss
 
     def dynamic_training(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
-        print("inputs: ", inputs)
         with self.autocast_smart_context_manager():
             loss = self.compute_loss(model, inputs)
         
