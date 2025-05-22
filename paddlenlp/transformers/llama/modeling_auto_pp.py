@@ -242,7 +242,7 @@ class LlamaEmbeddingAutoPP(nn.Layer):
         )
 
         self.placements = (
-            [dist.Shard(1), dist.Shard(0)] if self.config.sequence_parallel else [dist.Replicate(), dist.Replicate()]
+            [dist.Shard(1), dist.Shard(0)] if self.config.sequence_parallel else [dist.Shard(0), dist.Replicate()]
         )
 
     # @property

@@ -745,10 +745,8 @@ class AutoTrainer(Trainer):
         schedule = Schedule1F1B(stage, n_microbatches = 2, loss_fn=self.criterion)
 
         if rank == 0 or rank == 1 or rank == 2 or rank == 3:
-            inputs["input_ids"] = dist.reshard(inputs["input_ids"], get_mesh(0), [dist.Replicate(), dist.Replicate()])
             schedule.step(**inputs)
         else:
-            labels = dist.reshard(labels, get_mesh(1), [dist.Replicate(), dist.Replicate()])
             losses = []
             schedule.step(target=labels, losses = losses)
             print("losses: ", losses)
