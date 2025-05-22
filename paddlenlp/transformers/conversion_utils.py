@@ -60,7 +60,7 @@ Module = TypeVar("Module")
 PytorchTensor = TypeVar("PytorchTensor")
 
 
-def add_quant_mapping(name_action_mappings, quantization_config):
+def add_quant_mapping(name_action_mappings, quantization_config, is_optim=False):
     mapping_keys = list(name_action_mappings.keys())
     pattern = r"^(?:.*\.)?layers(\.[a-zA-Z0-9_]+)*\.weight$"
     for key in mapping_keys:
@@ -68,33 +68,33 @@ def add_quant_mapping(name_action_mappings, quantization_config):
             quant_key = key.replace("weight", "quant_weight")
             quant_scale_key = key.replace("weight", "quant_scale")
             fn = name_action_mappings.pop(key)
-            if isinstance(fn, partial):
-                if "is_column" in fn.keywords:
-                    old_value = fn.keywords["is_column"]
-                    new_value = not old_value
-                    name_action_mappings[quant_key] = partial(
-                        fn.func, *fn.args, **{**fn.keywords, "is_column": new_value}
-                    )
-                    if quantization_config.weight_quantize_algo not in ["fp8linear"] and old_value:
-                        name_action_mappings[quant_scale_key] = partial(
+            if is_optim:
+                name_action_mappings[quant_key] = fn
+            else:
+                if isinstance(fn, partial):
+                    if "is_column" in fn.keywords:
+                        old_value = fn.keywords["is_column"]
+                        new_value = not old_value
+                        name_action_mappings[quant_key] = partial(
                             fn.func, *fn.args, **{**fn.keywords, "is_column": new_value}
                         )
-                elif "is_quant" in fn.keywords:
-                    old_value = fn.keywords["is_quant"]
-                    new_value = not old_value
-                    name_action_mappings[quant_key] = partial(
-                        fn.func, *fn.args, **{**fn.keywords, "is_quant": new_value}
-                    )
-                    if quantization_config.weight_quantize_algo not in ["fp8linear"]:
-                        name_action_mappings[quant_scale_key] = split_or_merge_func(
-                            is_split=fn.keywords["tensor_parallel_degree"],
-                            tensor_parallel_degree=fn.keywords["tensor_parallel_degree"],
-                            tensor_parallel_rank=fn.keywords["tensor_parallel_rank"],
-                            num_attention_heads=fn.keywords["num_attention_head"],
+                        if quantization_config.weight_quantize_algo not in ["fp8linear"] and old_value:
+                            name_action_mappings[quant_scale_key] = partial(
+                                fn.func, *fn.args, **{**fn.keywords, "is_column": new_value}
+                            )
+                    elif "is_quant" in fn.keywords:
+                        old_value = fn.keywords["is_quant"]
+                        new_value = not old_value
+                        name_action_mappings[quant_key] = partial(
+                            fn.func, *fn.args, **{**fn.keywords, "is_quant": new_value}
                         )
-            # else:
-            #     name_action_mappings[quant_key] = fn
-            #     name_action_mappings[quant_scale_key] = fn
+                        if quantization_config.weight_quantize_algo not in ["fp8linear"]:
+                            name_action_mappings[quant_scale_key] = split_or_merge_func(
+                                is_split=fn.keywords["tensor_parallel_degree"],
+                                tensor_parallel_degree=fn.keywords["tensor_parallel_degree"],
+                                tensor_parallel_rank=fn.keywords["tensor_parallel_rank"],
+                                num_attention_heads=fn.keywords["num_attention_head"],
+                            )
 
     return name_action_mappings
 
@@ -1249,10 +1249,11 @@ class ConversionMixin:
         ignore_error=False,
         base_model_prefix=None,
         post_quantize=False,
+        is_optim=False,
     ):
         name_action_mappings = cls._get_tensor_parallel_mappings(config, is_split=is_split)
         if config.quantization_config.is_weight_quantize() and not post_quantize:
-            name_action_mappings = add_quant_mapping(name_action_mappings, config.quantization_config)
+            name_action_mappings = add_quant_mapping(name_action_mappings, config.quantization_config, is_optim)
         state_keys_map = cls._resolve_prefix_keys(
             name_action_mappings.keys(), loaded_state_dict_keys, ignore_error, base_model_prefix=base_model_prefix
         )

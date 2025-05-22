@@ -340,7 +340,8 @@ class AdamWCustom(AdamW):
                         group = None
                     else:
                         group = self.mp_group
-                    param[:], new_quant_scale = quantize(
+                    print(param.name, master_weight.shape, param.shape, moment1.shape, moment2.shape)
+                    param[:], quant_scale[:] = quantize(
                         x=master_weight.astype(quant_scale.dtype),
                         weight_quantize_algo=self.quantization_config.weight_quantize_algo,
                         tensor_type="weight",
@@ -349,7 +350,6 @@ class AdamWCustom(AdamW):
                         apply_hadamard=self.quantization_config.apply_hadamard,
                         group=group,
                     )
-                    quant_scale.set_value(new_quant_scale)
                 else:
                     raise NotImplementedError(
                         f"Please check your weight_quantize_algo {self.quantization_config.weight_quantize_algo}."

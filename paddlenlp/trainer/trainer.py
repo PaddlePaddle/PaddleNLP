@@ -2747,7 +2747,7 @@ class Trainer:
             optimizer_name = _add_variant(PADDLE_OPTIMIZER_NAME, self.args.optimizer_name_suffix)
             saved_signal_path = os.path.join(output_dir, f"saved_signal_{dist.get_rank()}")
 
-            if self.args.unified_checkpoint and (self.args.offload_optim or self.argd.tensorwise_offload_optimizer):
+            if self.args.unified_checkpoint and (self.args.offload_optim or self.args.tensorwise_offload_optimizer):
                 self._reload_optimizer()
 
             if self.args.use_hybrid_parallel:
@@ -2830,7 +2830,7 @@ class Trainer:
                         ):
                             paddle.save(global_rank, os.path.join(signal_dir, f".master_weight.done.{global_rank}"))
 
-            if self.args.unified_checkpoint and (self.args.offload_optim or self.argd.tensorwise_offload_optimizer):
+            if self.args.unified_checkpoint and (self.args.offload_optim or self.args.tensorwise_offload_optimizer):
                 self._offload_optimizer()
 
         self.runtime_timer.stop()
