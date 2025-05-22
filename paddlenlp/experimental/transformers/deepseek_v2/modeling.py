@@ -1547,7 +1547,7 @@ class DeepseekV2BlockInferenceModel(DeepseekV2PretrainedModel):
         if self.use_weight_only:
             if self.quant_type.endswith("intx"):
                 logger.info(
-                    "Use WINTX quantization, note that you must load a prequantization state dict and check if there is mix_bits_config.json"
+                    "Use WINTX quantization, note that you must load a prequantization state dict with mix_bits_config.json"
                 )
                 self.transformer_block = FusedBlockMultiTransformerWINTX(transformer_config)
                 self.set_state_dict = self.set_wintx_state_dict
