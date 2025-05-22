@@ -165,7 +165,7 @@ def convert_to_weight_quantize_state_dict(state_dict, name, quantization_config,
                 side="left",
                 apply_hadamard=quantization_config.apply_hadamard,
             )
-            act_scale = paddle.ones([], dtype=dtype).cuda()
+            act_scale = paddle.ones([1], dtype=dtype).cuda()
             act_scale.stop_gradient = True
             state_dict[act_scale_name] = act_scale
         else:

@@ -70,13 +70,12 @@ def quantize(
                 if group is not None:
                     paddle.distributed.all_reduce(scale, op=paddle.distributed.ReduceOp.MAX, group=group, sync_op=True)
                 if state < quantization_config.apply_online_actscale_step:
-                    act_scale.set_value((state * act_scale + scale) / (state + 1))
+                    act_scale[...] = (state * act_scale + scale) / (state + 1)
                 else:
-                    act_scale.set_value(
-                        (1 - quantization_config.actscale_moving_rate) * act_scale
-                        + quantization_config.actscale_moving_rate * scale
-                    )
-                    scale = act_scale
+                    scale = (
+                        1 - quantization_config.actscale_moving_rate
+                    ) * act_scale + quantization_config.actscale_moving_rate * scale
+                    act_scale[...] = scale
             else:
                 scale = act_scale
         else:

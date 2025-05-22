@@ -304,7 +304,7 @@ class QuantizationLinear(nn.Layer):
                 raise NotImplementedError("Not yet support grouwise weightonly quantization.")
             if self.weight_quantize_algo in ["a8w8linear", "a8w4linear", "fp8linear"]:
                 self.act_scale = self.create_parameter(
-                    shape=[], dtype=self._dtype, is_bias=False, default_initializer=nn.initializer.Constant(value=0.0)
+                    shape=[1], dtype=self._dtype, is_bias=False, default_initializer=nn.initializer.Constant(value=0.0)
                 )
                 self.act_scale.stop_gradient = True
                 self.group = get_act_scale_group()
@@ -462,7 +462,10 @@ class ColumnParallelQuantizationLinear(nn.Layer):
                     is_bias=False,
                 )
                 self.quant_scale.stop_gradient = True
-                self.quant_scale.is_distributed = True if self.is_mp else False
+                if self.weight_quantize_algo not in ["fp8linear", "a8w4linear", "fp8linear"]:
+                    self.quant_scale.is_distributed = False
+                else:
+                    self.quant_scale.is_distributed = True if self.is_mp else False
                 if self.quant_scale.is_distributed:
                     self.quant_scale.split_axis = 0
             else:
@@ -470,9 +473,9 @@ class ColumnParallelQuantizationLinear(nn.Layer):
                 raise NotImplementedError("Not yet support grouwise weightonly quantization.")
             if self.weight_quantize_algo in ["a8w8linear", "a8w4linear", "fp8linear"]:
                 self.act_scale = self.create_parameter(
-                    shape=[], dtype=self._dtype, is_bias=False, default_initializer=nn.initializer.Constant(value=0.0)
+                    shape=[1], dtype=self._dtype, is_bias=False, default_initializer=nn.initializer.Constant(value=0.0)
                 )
-                self.act_scale.is_distributed = True if self.is_mp else False
+                self.act_scale.is_distributed = False
                 self.act_scale.stop_gradient = True
                 self.group = get_act_scale_group()
         else:
@@ -603,7 +606,10 @@ class RowParallelQuantizationLinear(nn.Layer):
                     is_bias=False,
                 )
                 self.quant_scale.stop_gradient = True
-                self.quant_scale.is_distributed = True if self.is_mp else False
+                if self.weight_quantize_algo not in ["fp8linear", "a8w4linear", "fp8linear"]:
+                    self.quant_scale.is_distributed = False
+                else:
+                    self.quant_scale.is_distributed = True if self.is_mp else False
                 if self.quant_scale.is_distributed:
                     self.quant_scale.split_axis = 0
             else:
@@ -613,7 +619,7 @@ class RowParallelQuantizationLinear(nn.Layer):
                 self.act_scale = self.create_parameter(
                     shape=[1], dtype=self._dtype, is_bias=False, default_initializer=nn.initializer.Constant(value=0.0)
                 )
-                self.act_scale.is_distributed = True if self.is_mp else False
+                self.act_scale.is_distributed = False
                 self.act_scale.stop_gradient = True
                 self.group = get_act_scale_group(is_row=True)
         else:
