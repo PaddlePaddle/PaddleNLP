@@ -8,7 +8,7 @@
 
 我们将一些让大模型更符合人类意图的处理叫做对齐。
 
-我们在 Ai Studio 上同步公开了项目，也可以点击[链接](https://aistudio.baidu.com/projectdetail/9181664)在线体验大模型精调。
+我们在 Ai Studio 上同步公开了项目，也可以点击[链接](https://aistudio.baidu.com/projectdetail/9181664)在线体验大模型对齐。
 
 ## 1. RLHF
 既然我们要让大模型符合人类意图，那么一个直观的方式就是让人类对大模型的输出进行反馈。RLHF(Reinforcement Learning from Human Feedback) 是一种让大模型通过人类的偏好反馈，不断优化自身行为，生成更符合人类预期回答的训练方法。
