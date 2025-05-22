@@ -72,10 +72,12 @@ function generate_sm_version(){
 }
 
 function create_directories(){
-  mkdir -p $OPS_SRC_DIR/tmp/paddlenlp_ops
-  touch $OPS_SRC_DIR/tmp/setup.py
-  touch $OPS_SRC_DIR/tmp/paddlenlp_ops/__init__.py
-  echo '# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+  for sm_version in "${sm_versions[@]}"; do
+    echo "create sm$sm_version"
+    mkdir -p $OPS_SRC_DIR/tmp/paddlenlp_ops
+    touch $OPS_SRC_DIR/tmp/setup.py
+    touch $OPS_SRC_DIR/tmp/paddlenlp_ops/__init__.py
+    echo '# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -110,11 +112,6 @@ def read(file: str):
         content = f.read().strip()
     return content
 
-def get_sm_version():
-    prop = paddle.device.cuda.get_device_properties()
-    cc = prop.major * 10 + prop.minor
-    return cc
-
 def read_version():
     """
     read version and return content
@@ -123,7 +120,7 @@ def read_version():
 
     formatted_date = datetime.now().date().strftime("%Y%m%d")
     cuda_version = float(paddle.version.cuda())
-    sm_version = get_sm_version()
+    sm_version=80
     paddle_commit = paddle.__git_commit__[:7]
     build_tag = "{}+cuda{}sm{}paddle{}".format(formatted_date, cuda_version, sm_version, paddle_commit)
 
@@ -195,12 +192,9 @@ try:
 except ImportError:
     logger.WARNING(f"No {module_name} ")
 ' > $OPS_SRC_DIR/tmp/paddlenlp_ops/__init__.py
-
-  for sm_version in "${sm_versions[@]}"; do
-        echo "create sm$sm_version"
-        mkdir -p $OPS_SRC_DIR/tmp/paddlenlp_ops/sm${sm_version}
-        touch $OPS_SRC_DIR/tmp/paddlenlp_ops/sm${sm_version}/__init__.py
-        echo '# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+    mkdir -p $OPS_SRC_DIR/tmp/paddlenlp_ops/sm${sm_version}
+    touch $OPS_SRC_DIR/tmp/paddlenlp_ops/sm${sm_version}/__init__.py
+    echo '# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -221,6 +215,7 @@ try:
 except ImportError:
     logger.WARNING("No paddlenlp_ops_'${sm_version}' ops")
 ' > $OPS_SRC_DIR/tmp/paddlenlp_ops/sm${sm_version}/__init__.py
+    build_ops
   done
 }
 
@@ -239,11 +234,11 @@ function init() {
 }
 
 function build_ops() {
-    for sm_version in "${sm_versions[@]}"; do
-        echo "Building and installing for sm_version: $sm_version"
-        build_and_install_ops $sm_version
-    done
-    return 
+    echo "Building and installing for sm_version: $sm_version"
+    build_and_install_ops $sm_version
+    build_and_install_whl
+    unittest
+    cleanup
 }
 
 function copy_ops(){
@@ -280,6 +275,7 @@ function build_and_install_whl() {
   echo -e "${BLUE}[build]${NONE} building paddlenlp_ops wheel..."
   rm -rf ./dist
   cd ${TMP_DIR}
+  sed -i "s/sm_version=80/sm_version=${sm_version}/g" setup.py
   ${python} setup.py bdist_wheel --dist-dir ./$DIST_DIR
   if [ $? -ne 0 ]; then
     echo -e "${RED}[FAIL]${NONE} build paddlenlp_ops wheel failed !"
@@ -297,7 +293,8 @@ function build_and_install_whl() {
   fi
   echo -e "${BLUE}[install]${NONE} ${GREEN}paddlenlp_ops install success\n"
   cd ..
-  mv $DIST_DIR ../
+  mkdir -p ../$DIST_DIR
+  mv $DIST_DIR/* ../$DIST_DIR/
   cd ..
 }
 
@@ -332,10 +329,6 @@ trap 'abort' 0
 set -e
 
 init
-build_ops
-build_and_install_whl
-unittest
-cleanup
 
 # get Paddle version
 PADDLE_VERSION=`${python} -c "import paddle; print(paddle.version.full_version)"`

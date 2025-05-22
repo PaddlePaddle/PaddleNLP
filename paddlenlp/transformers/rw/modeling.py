@@ -820,7 +820,7 @@ class RWForCausalLM(RWPreTrainedModel):
         if past:
             input_ids = input_ids[:, -1].unsqueeze(-1)
 
-            # the cache may be in the stardard format (e.g. in contrastive search), convert to our's format if needed
+            # the cache may be in the standard format (e.g. in contrastive search), convert to our's format if needed
             if past[0][0].shape[0] == input_ids.shape[0]:
                 past = self._convert_to_rw_cache(past)
 

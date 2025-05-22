@@ -279,7 +279,6 @@ class ModelRunner:
         self.share_inputs["input_ids"] = paddle.full(
             shape=[self.args.max_batch_size, self.args.max_seq_len], fill_value=self.pad_token_id, dtype="int64"
         )
-        self.share_inputs["msg_queue_id"] = paddle.full(shape=[1], fill_value=1, dtype="int32").cpu()
         self.share_inputs["top_p"] = paddle.full(
             shape=[self.args.max_batch_size, 1], fill_value=self.top_p, dtype="float32"
         )
@@ -743,7 +742,7 @@ class InferenceEngine(object):
             config.set_xpu_device_id(device_id)
             xpu_config = paddle.inference.XpuConfig()
             xpu_config.device_id = device_id
-            xpu_config.l3_size = 0 
+            xpu_config.l3_size = 0
             xpu_config.l3_autotune_size = 0
             config.set_xpu_config(xpu_config)
             config.switch_ir_optim(True)

@@ -380,7 +380,7 @@ class SkepModel(SkepPretrainedModel):
         """get skep input word embedding
 
         Returns:
-            nn.Embedding: the input word embedding of skep mdoel
+            nn.Embedding: the input word embedding of skep model
         """
         return self.embeddings.word_embeddings
 

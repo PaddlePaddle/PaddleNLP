@@ -572,14 +572,14 @@ def split_param_func():
             [gate_weight, up_weight] => [gate_weight], [up_weight]
 
         Args:
-            fused_param (_type_): len(fused_param)=1, only one weight to be splitted
+            fused_param (_type_): len(fused_param)=1, only one weight to be split
             split_nums (int, optional): split_nums. Defaults to 2.
             is_qkv (bool, optional): for attention qkv weights. Defaults to False.
             num_heads (_type_, optional): query heads. Defaults to None.
             num_key_value_heads (_type_, optional): key and value heads. Defaults to None.
 
         Returns:
-            _type_: splitted weights
+            _type_: split weights
         """
         concat_fn = np.concatenate
         split_fn = np.split
@@ -850,7 +850,7 @@ class LogitHooker:
         self.tensor_info_saver.add(state_dict_name, "pytorch-outputs", outputs)
 
     def register_paddle_model_hooks(self, model: Layer):
-        """regist post forward hook to save the inputs & outputs of paddle model
+        """register post forward hook to save the inputs & outputs of paddle model
 
         Args:
             model (Layer): paddle model
@@ -885,7 +885,7 @@ class LogitHooker:
             register_hook_by_name(model, mapping, self._paddle_hooks)
 
     def register_pytorch_model_hooks(self, model: Module):
-        """regist hook for pytorch model to save the inputs & outputs of pytorch model
+        """register hook for pytorch model to save the inputs & outputs of pytorch model
 
         Args:
             model (_type_): pytorch model
@@ -1134,7 +1134,7 @@ class LogitComparer:
 class ConversionMixin:
     @classmethod
     def support_conversion(cls, config: PretrainedConfig) -> bool:
-        """check wether the model support conversion"""
+        """check whether the model support conversion"""
         try:
             # try to get the name-mapping info
             _ = cls._get_name_mappings(config)

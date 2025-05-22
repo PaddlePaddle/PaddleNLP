@@ -68,7 +68,7 @@ def _flatten_param_grads(optimizer, params_grads):
         g.persistable = True
         if getattr(p, "need_clip", True) is False or getattr(p, "regularizer", None) is not None:
             logger.warning(
-                f"flatten_param_grads=True will be discarded since paramter {p.name}'s need_clip is False or "
+                f"flatten_param_grads=True will be discarded since parameter {p.name}'s need_clip is False or "
                 "the regularizer is set."
             )
             return params_grads

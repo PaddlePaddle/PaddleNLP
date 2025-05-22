@@ -191,8 +191,8 @@ class ColumnParallelLiner(nn.Layer):
         main_block = paddle.static.default_main_program().global_block()
         startup_block.vars[weight.name].is_distributed = True
         main_block.vars[weight.name].is_distributed = True
-        # set is_distributed for splited bias
-        # if a linear layer is splited by col, the bias would also be split into each rank as its weight
+        # set is_distributed for split bias
+        # if a linear layer is split by col, the bias would also be split into each rank as its weight
         if self.linear._bias_attr:
             startup_block.vars[self.linear.bias.name].is_distributed = True
             main_block.vars[self.linear.bias.name].is_distributed = True
@@ -285,8 +285,8 @@ class RowParallelLiner(nn.Layer):
         main_block = paddle.static.default_main_program().global_block()
         startup_block.vars[weight.name].is_distributed = True
         main_block.vars[weight.name].is_distributed = True
-        # set is_distributed for splited bias
-        # if a linear layer is splited by row, each rank would hold a complete bias
+        # set is_distributed for split bias
+        # if a linear layer is split by row, each rank would hold a complete bias
 
         if bias_attr is not False:
             self.bias = self.create_parameter(shape=[num_cols], attr=bias_attr, dtype=self._dtype, is_bias=True)

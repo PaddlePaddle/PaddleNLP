@@ -667,7 +667,6 @@ def read_res(
     tensor_queue: mp.Queue,
     result_queue: mp.Queue,
     done_event: mp.Event,
-    msg_queue_id: paddle.Tensor,
 ):
     from paddlenlp.utils.env import USE_FAST_TOKENIZER
 
@@ -684,7 +683,7 @@ def read_res(
     from paddlenlp_ops import get_output
 
     while True:
-        get_output(output_tensor, msg_queue_id, 0, True)
+        get_output(output_tensor, 0, True)
         if int(output_tensor[0, 0]) == -2:  # read none
             continue
         bsz = int(output_tensor[1, 0])
@@ -706,7 +705,6 @@ def read_res_dynamic_insert(
     task_queue: mp.Queue,
     result_queue: mp.Queue,
     done_event: mp.Event,
-    msg_queue_id: paddle.Tensor,
     total_request_num: int,
     detokenize: bool,
 ):
@@ -756,7 +754,6 @@ def speculate_read_res(
     tensor_queue: mp.Queue,
     result_queue: mp.Queue,
     done_event: mp.Event,
-    msg_queue_id: paddle.Tensor,
 ):
     from paddlenlp.utils.env import USE_FAST_TOKENIZER
 

@@ -2378,7 +2378,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 initialization. If the keyword is in `__init__` argument names of
                 base model, update argument values of the base model; else update
                 argument values of derived model.
-            load_state_as_np (bool, optional): The weights read in can be choosed
+            load_state_as_np (bool, optional): The weights read in can be chose
                 to place on CPU or GPU though the model is on the default device.
                 If `True`, load the model weights as `numpy.ndarray` on CPU.
                 Otherwise, weights would be loaded as tensors on the default
