@@ -223,7 +223,6 @@ class LlamaRMSNormAuto(nn.Layer):
 
         if self.weight.dtype in [paddle.float16, paddle.bfloat16]:
             hidden_states = paddle.cast(hidden_states, self.weight.dtype)
-        # print("hiddden states: ", hidden_states._local_value())
         return hidden_states * self.weight
 
 
@@ -430,10 +429,6 @@ class LlamaAttentionAuto(nn.Layer):
         if self.fuse_attention_qkv and not enable_fuse_ffn_qkv_pass():
             target_shape = [0, 0, self.num_key_value_heads, (self.num_key_value_groups + 2) * self.head_dim]
             mix_layer = self.qkv_proj(hidden_states)
-            print('mix layer', mix_layer.shape)
-            print('mix layer process_mesh: ', mix_layer.process_mesh)
-            print('mix layer placements: ', mix_layer.placements)
-            print('target shape', target_shape)
             mix_layer = paddle.reshape_(mix_layer, target_shape)
             query_states, key_states, value_states = paddle.split(
                 mix_layer,
@@ -881,12 +876,6 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             get_mesh(),
             embedding_placements,
         )
-        print("embedding placements: ", embedding_placements)
-        print("embedding weight: ", self.embed_tokens.weight)
-        print("embedding weight type: ", self.embed_tokens.weight.dtype)
-        print("embedding weight process_mesh: ", self.embed_tokens.weight.process_mesh)
-        print("embedding weight placements: ", self.embed_tokens.weight.placements)
-
         def get_layer_pp_info(layer_index):
             mesh = fleet.auto.get_mesh()
             if is_pp_enable() is False:
