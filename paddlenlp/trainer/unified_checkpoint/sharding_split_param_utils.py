@@ -286,9 +286,7 @@ def load_unified_optimizer_split_param(args, model, optimizer, resume_from_check
             if isinstance(model, LoRAModel) or isinstance(model, PrefixModelForCausalLM):
                 tp_actions = model._get_tensor_parallel_convert_actions(model_keys, is_split=True, ignore_error=True)
             else:
-                tp_actions = model.get_tensor_parallel_convert_actions(
-                    model.config, model_keys, ignore_error=True, is_optim=True
-                )
+                tp_actions = model.get_tensor_parallel_convert_actions(model.config, model_keys, ignore_error=True)
             if not is_master_weights:
                 tp_actions = mapping_optimizer_tp_actions(tp_actions, expected_keys)
 

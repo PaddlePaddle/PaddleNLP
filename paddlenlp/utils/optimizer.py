@@ -340,7 +340,6 @@ class AdamWCustom(AdamW):
                         group = None
                     else:
                         group = self.mp_group
-                    print(param.name, master_weight.shape, param.shape, moment1.shape, moment2.shape)
                     param[:], quant_scale[:] = quantize(
                         x=master_weight.astype(quant_scale.dtype),
                         weight_quantize_algo=self.quantization_config.weight_quantize_algo,
