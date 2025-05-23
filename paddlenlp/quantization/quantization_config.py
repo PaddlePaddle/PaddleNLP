@@ -144,7 +144,7 @@ class QuantizationConfig:
         self.quant_weight_grad = quant_weight_grad
         self.apply_online_actscale_step = apply_online_actscale_step
         self.actscale_moving_rate = actscale_moving_rate
-        self.fp8_format = fp8_format_mapping[fp8_format_type]
+        self.fp8_format_type = fp8_format_type
 
     @property
     def fp8_format(self):
