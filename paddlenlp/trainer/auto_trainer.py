@@ -204,7 +204,7 @@ class AutoTrainer(Trainer):
         assert self.args.enable_auto_parallel
         self.global_mesh = fleet.auto.get_mesh()
         self.comm_group_in_pp = fleet.get_hybrid_communicate_group().get_pipe_parallel_group()
-        self.pp_schedule = get_pp_schedule(model, 4, self.criterion, self.args.pipeline_schedule_mode, self.args.pipeline_parallel_degree, self.comm_group_in_pp)
+        self.pp_schedule = get_pp_schedule(model, self.args.n_microbatches, self.criterion, self.args.pipeline_schedule_mode, self.args.pipeline_parallel_degree, self.comm_group_in_pp)
         self._in_pir_mode = paddle.base.framework.get_flags("FLAGS_enable_pir_api")["FLAGS_enable_pir_api"]
 
     @classmethod
