@@ -41,6 +41,7 @@ def setup_fused_quant_ops():
                 "fused_quanted_ops/fused_act_dequant.cu",
                 "fused_quanted_ops/fused_act_dequant_transpose_act_quant.cu",
                 "fused_quanted_ops/fused_spaq.cu",
+                "fused_quanted_ops/fused_stack_transpose_quant.cu",
             ],
             extra_compile_args={
                 "cxx": ["-O3", "-w", "-Wno-abi", "-fPIC", "-std=c++17"],
