@@ -15,7 +15,9 @@
 import unittest
 
 from paddlenlp.utils import install_package, uninstall_package
+
 from ..testing_utils import skip_for_none_ce_case
+
 
 class ImportUntilsTest(unittest.TestCase):
     @skip_for_none_ce_case
