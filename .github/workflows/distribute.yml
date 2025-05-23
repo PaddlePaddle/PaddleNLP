@@ -23,7 +23,7 @@ defaults:
 jobs:
   distribute-ci:
     name: distribute-test
-    runs-on: Distributed-CI  # 需要挂载机器
+    runs-on: Auto-Parallel
     steps:
       - name: Download PaddleNLP
         env:
