@@ -333,7 +333,7 @@ def bos_aistudio_hf_file_exist(
             filename=filename,
             repo_type=repo_type,
             revision=revision,
-            token=token,  # donot need token
+            token=token,  # do not need token
             endpoint=endpoint,
         )
     return out

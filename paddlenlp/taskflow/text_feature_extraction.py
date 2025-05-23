@@ -424,7 +424,7 @@ class SentenceFeatureExtractionTask(Task):
             )
             return tokenized_inputs
 
-        # Seperates data into some batches.
+        # Separates data into some batches.
         one_batch = []
         self.length_sorted_idx = np.argsort([-text_length(sen) for sen in data])
         sentences_sorted = [data[idx] for idx in self.length_sorted_idx]

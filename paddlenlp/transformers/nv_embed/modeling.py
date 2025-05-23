@@ -282,7 +282,7 @@ class NVEncodeModel(MistralModel):
     def in_batch_negative_loss(self, q_reps, p_reps):
         # In batch negatives
         scores = self.compute_similarity(q_reps, p_reps)
-        # Substract margin from all positive samples cosine_sim()
+        # Subtract margin from all positive samples cosine_sim()
         margin_diag = paddle.full(shape=[q_reps.shape[0]], fill_value=self.margin, dtype=q_reps.dtype)
         scores = scores - paddle.diag(margin_diag)
         # Scale cosine to ease training converge

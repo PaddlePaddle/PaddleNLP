@@ -1380,12 +1380,12 @@ class Ernie35ForCausalLM(Ernie35PretrainedModel):
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         def progressive_seq(x, y):
-            globel_step = int(os.getenv("TRAINER_GLOBAL_STEP", "0"))
-            if globel_step < 500:
+            global_step = int(os.getenv("TRAINER_GLOBAL_STEP", "0"))
+            if global_step < 500:
                 return x[:, :512], y[:, :512]
-            if globel_step < 1000:
+            if global_step < 1000:
                 return x[:, :1024], y[:, :1024]
-            if globel_step < 1500:
+            if global_step < 1500:
                 return x[:, :2048], y[:, :2048]
             return x, y
 

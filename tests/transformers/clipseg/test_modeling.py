@@ -455,7 +455,7 @@ class CLIPSegModelTest(ModelTesterMixin, unittest.TestCase):
             model = model_class(config=configs_no_init)
             for name, param in model.named_parameters():
                 if param.stop_gradient is False:
-                    # check if `logit_scale` is initilized as per the original implementation]
+                    # check if `logit_scale` is initialized as per the original implementation]
                     if "logit_scale" in name:
                         self.assertAlmostEqual(
                             param.item(),

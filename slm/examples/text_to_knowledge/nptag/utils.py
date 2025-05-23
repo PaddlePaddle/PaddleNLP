@@ -125,7 +125,7 @@ class BurkhardKellerNode(object):
 
 
 class BurkhardKellerTree(object):
-    """Implementataion of BK-Tree"""
+    """Implementation of BK-Tree"""
 
     def __init__(self):
         self.root = None

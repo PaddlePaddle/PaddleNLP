@@ -177,7 +177,7 @@ class TestUnifiedCheckpointBase(TestMultipleGpus):
 
     def setUp(self):
         """
-        1. update runfirst and rerun to run defined diffrent config
+        1. update runfirst and rerun to run defined different config
         2. update need_allclose to True if you want to check the result
         3. update rtol to the relative value you want to check
         """

@@ -420,9 +420,9 @@ class CLIPConfig(Old2NewPretrainedConfig):
         vision_config (`dict`, *optional*):
             Dictionary of configuration options used to initialize [`CLIPVisionConfig`].
         projection_dim (`int`, *optional*, defaults to 512):
-            Dimentionality of text and vision projection layers.
+            Dimensionality of text and vision projection layers.
         logit_scale_init_value (`float`, *optional*, defaults to 2.6592):
-            The inital value of the *logit_scale* paramter. Default is used as per the original CLIP implementation.
+            The initial value of the *logit_scale* parameter. Default is used as per the original CLIP implementation.
         kwargs (*optional*):
             Dictionary of keyword arguments.
 

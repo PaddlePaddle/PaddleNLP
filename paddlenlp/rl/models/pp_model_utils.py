@@ -38,9 +38,9 @@ def fwd_step_patch(func, output, self, *args, **kwargs):
     # Training patch
     if self.training and self.is_pipeline_last_stage():
         if getattr(self, "_step_losses", None):
-            self._step_losses.append(output.detach())
+            self._step_losses.append(output[0].detach())
         else:
-            self._step_losses = [output.detach()]
+            self._step_losses = [output[0].detach()]
 
 
 def make_wrapper(func, pre_patch=None, post_patch=None):

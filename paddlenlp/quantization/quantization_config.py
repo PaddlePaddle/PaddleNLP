@@ -30,7 +30,7 @@ class QuantizationConfig:
     This is the configuration class to store quantization configuration.
     Args:
         weight_quantize_algo: Weight quantization algorithm.
-        quant_type: Quantization type appplied to weight and activation, weight may still keep in float tensor.
+        quant_type: Quantization type applied to weight and activation, weight may still keep in float tensor.
         shift: Whether the model applied the shift strategy.
         smooth: Whether the model applied the smooth strategy.
         shift_smooth_all_linears: Whether the model applied shift or smooth strategy for all linears.

@@ -1712,7 +1712,7 @@ class LlamaModel(LlamaPretrainedModel):
             inputs_embeds = ScatterOp.apply(inputs_embeds)
 
         if self.config.context_parallel_degree > 1 and (attention_mask is not None or self.config.alibi):
-            raise NotImplementedError("Ring FlashAttention dosen't support attention_mask or alibi")
+            raise NotImplementedError("Ring FlashAttention doesn't support attention_mask or alibi")
 
         # embed positions
         if self.config.use_flash_attention_for_generation:

@@ -28,7 +28,7 @@ class LongSequenceStrategies:
                        rope_scaling_factor,
                        ...
 
-        strategy_type: "None" ---------------走原始的build-in模块
+        strategy_type: "None" ---------------走原始的built-in模块
                        "embedding_strategies"、
                        "attention_strategies"
                        ...

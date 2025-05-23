@@ -42,7 +42,7 @@ class DataArguments:
 
 @dataclass
 class ModelArguments:
-    model_name_or_path: str = field(default="ernie-3.0-base-zh", metadata={"help": "The build-in pretrained model or the path to local model."})
+    model_name_or_path: str = field(default="ernie-3.0-base-zh", metadata={"help": "The built-in pretrained model or the path to local model."})
     export_type: str = field(default='paddle', metadata={"help": "The type to export. Support `paddle` and `onnx`."})
 # yapf: enable
 

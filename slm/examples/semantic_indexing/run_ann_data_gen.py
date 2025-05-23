@@ -38,7 +38,7 @@ from paddlenlp.utils.log import logger
 parser = argparse.ArgumentParser()
 
 # Required parameters
-parser.add_argument("--similar_text_pair_file", default=None, type=str, required=True, help="The train_set tsv file that each line is simialr text pair")
+parser.add_argument("--similar_text_pair_file", default=None, type=str, required=True, help="The train_set tsv file that each line is similar text pair")
 parser.add_argument("--corpus_file", default=None, type=str, required=True, help="The corpus file that each line is a text for buinding indexing")
 parser.add_argument("--save_dir", default=None, type=str, required=True, help="Saved model dir, will look for latest checkpoint dir in here")
 parser.add_argument("--ann_data_dir", default=None, type=str, required=True, help="The output directory where the training data will be written")

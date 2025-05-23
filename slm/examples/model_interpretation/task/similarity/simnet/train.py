@@ -89,7 +89,7 @@ if __name__ == "__main__":
     else:
         train_ds, dev_ds, test_ds = load_dataset("glue", "qqp", splits=["train", "dev", "test"])
 
-    # Constructs the newtork.
+    # Constructs the network.
     model = SimNet(network=args.network, vocab_size=len(vocab), num_classes=len(train_ds.label_list))
     model = paddle.Model(model)
 
