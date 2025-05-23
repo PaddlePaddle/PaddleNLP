@@ -494,10 +494,9 @@ class LlamaLMHeadAutoPP(nn.Layer):
         return return_args(logits, attention_mask, position_ids, alibi)
 
 
-class LlamaForCausalLM3DAutoPP(LlamaForCausalLM3DAuto):
-    enable_to_static_method = True
+class LlamaForCausalLM3DAutoPP(LlamaPretrainedModelAuto):
 
-    def __init__(self, config):
+    def __init__(self, config: LlamaConfig):
         super().__init__(config)
         self.config = config
         self.no_recompute_layers = config.no_recompute_layers if config.no_recompute_layers is not None else []
