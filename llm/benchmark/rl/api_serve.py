@@ -125,7 +125,43 @@ class ApiTask:
                 yield batch_prompts
                 batch_prompts = []
 
-    async def call(self, request: RequestPayload) -> Tuple[str, float]:
+    async def fastdeploy_call(self, request: RequestPayload) -> Tuple[str, float]:
+        client = self.get_client()
+        try:
+            async with self.semaphore:
+                start_time = time.time()
+                response = await client.chat.completions.create(
+                    model=self.model,
+                    messages=[{"role": "user", "content": request.prompt}],
+                    temperature=self.args.temperature,
+                    top_p=self.args.top_p,
+                    max_tokens=self.args.max_response_length,
+                    n=1,
+                    stream=True,
+                    timeout=60*60,
+                    metadata={
+                        "training": True,
+                        "raw_request": False,
+                    }
+                ) 
+                # Streaming text is stored in a list of chunks
+                chunks = []
+                # Streaming responses
+                async for chunk in response:
+                    delta = chunk.choices[0].delta
+                    if delta and delta.content:
+                        chunks.append(delta.content)
+                text = "".join(chunks)
+                end_time = time.time()
+                elapsed_time = end_time - start_time
+                logger.debug("Streaming response took %.2f seconds", elapsed_time)
+                return text, round(elapsed_time, 2)
+
+        except Exception as e:
+            logger.error("Error while streaming: %s", e)
+            raise ValueError(e)
+
+    async def vllm_call(self, request: RequestPayload) -> Tuple[str, float]:
         client = self.get_client()
         try:
             async with self.semaphore:
@@ -157,7 +193,12 @@ class ApiTask:
 
     async def group_call(self, request: RequestPayload) -> ResponsePayload:
         """Performs n complete token generation rollouts for the given query."""
-        tasks = [self.call(request) for _ in range(request.num_responses)]
+        if self.args.use_fastdeploy == "true":
+            call = self.fastdeploy_call
+        else:
+            call = self.vllm_call
+
+        tasks = [call(request) for _ in range(request.num_responses)]
 
         result = ResponsePayload()
         result.idx = request.idx
@@ -341,8 +382,8 @@ def parse_args():
     parser.add_argument(
         "--limit_rows", type=int, default=-1, help="Maximum number of rows to read from the dataset (-1 means all)"
     )
+    parser.add_argument("--use_fastdeploy", type=str.lower, choices=["true", "false"], default="true", help="Engine selection (true=FastDeploy, false=vLLM, default: true)")
     return parser.parse_args()
-
 
 if __name__ == "__main__":
     args = parse_args()

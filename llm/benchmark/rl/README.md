@@ -51,6 +51,7 @@ python api_serve.py \
     --tokenizer "Qwen/Qwen2.5-7B-Instruct-1M" \
     --input_file ./data/gsm8k/instruct/train.parquet \
     --output_dir ${output_dir} \
+    --use_fastdeploy true \
     --rollout_input_batch_size 8 \
     --rollout_n 8 \
     --top_p 1.0 \
@@ -65,6 +66,7 @@ python api_serve.py \
   * **`--tokenizer`**: Path or name of the tokenizer.
   * **`--input_file`**: Path to the input dataset file.
   * **`--output_dir`**: Directory to save output results.
+  * **`--use_fastdeploy`**: Use FastDeploy if true, otherwise use vLLM (default: true).
   * **`--rollout_input_batch_size`**: The batch size for API requests.
   * **`--rollout_n`**: Number of responses to generate for each input query.
   * **`--max_dec_len`**: Maximum decoding length for responses.

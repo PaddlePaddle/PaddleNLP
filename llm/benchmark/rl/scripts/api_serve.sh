@@ -5,6 +5,7 @@ python api_serve.py \
     --api_keys "key1" "key2" \
     --model "Qwen2.5-7B-Instruct-1M" \
     --tokenizer "Qwen/Qwen2.5-7B-Instruct-1M" \
+    --use_fastdeploy true \
     --input_file your_file \
     --output_dir ${output_dir} \
     --rollout_input_batch_size 8 \
