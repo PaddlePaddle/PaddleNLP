@@ -300,7 +300,6 @@ def main():
         logging.info("Using ReFT with layers: ", reft_layers)
     # init chat_template for tokenizer
     init_chat_template(tokenizer, model_args.model_name_or_path, data_args.chat_template)
-    tokenizer.chat_template = None
 
     # if using chat_template, data_args.eval_with_do_generation must be false
     if tokenizer.chat_template is not None:
