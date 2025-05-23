@@ -242,15 +242,18 @@ def quant_weight_linear(
 
 
 def get_act_scale_group(is_row=False):
-    if not paddle.distributed.is_initialized() or not is_row:
-        return None
+    if paddle.distributed.is_initialized():
+        if getattr(infohub, "scale_group") is None:
+            hcg = fleet.get_hybrid_communicate_group()
+            rank = hcg._dp_degree * hcg._sharding_degree
+            group_no_row = hcg.create_fuse_group(["data", "sharding"])[1] if rank > 1 else None
+            rank *= hcg._mp_degree
+            group_row = hcg.create_fuse_group(["data", "sharding", "model"])[1] if rank > 1 else None
 
-    if getattr(infohub, "scale_group") is None:
-        hcg = fleet.get_hybrid_communicate_group()
-        group = hcg.get_model_parallel_group()
-        setattr(infohub, "scale_group", group)
+            setattr(infohub, "scale_group", [group_no_row, group_row])
+        group = infohub.scale_group[1] if is_row else infohub.scale_group[0]
     else:
-        group = infohub.scale_group
+        group = None
     return group
 
 
