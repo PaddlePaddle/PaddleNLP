@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import copy
 import inspect
-import os
 from contextlib import contextmanager
 
 import paddle
@@ -94,8 +93,7 @@ class PolicyPredictor(DygraphBlockInferencePredictor):
         for row in input_ids:
             row_ids = process_row(row, remove_value=self.tokenizer.pad_token_id, remove_side="left").tolist()
             input_ids_list.append(row_ids)
-        # NOTE(gongenlei): The output of the ultra-long truncation does not return an eos_token
-        os.environ["INFERENCE_TRUNCATED_RETURN_EOS"] = "0"
+
         if self.config.dynamic_insert:
             outputs = self.predict_dy_insert(
                 input_ids=input_ids_list,
