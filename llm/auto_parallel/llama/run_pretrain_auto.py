@@ -95,7 +95,10 @@ class PreTrainingArguments(AutoTrainingArguments):
         default=False,
         metadata={"help": "Weather to run benchmark by autotuner. True for from_scratch and pad_max_length."},
     )
-
+    n_microbatches: int = field(
+        default=1,
+        metadata={"help": "Control the num of microbatches in one pp step."},
+    )
     def __post_init__(self):
         super().__post_init__()
         assert self.enable_auto_parallel
