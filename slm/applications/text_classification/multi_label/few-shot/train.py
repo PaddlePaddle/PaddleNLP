@@ -94,7 +94,7 @@ def main():
         micro_f1_score, macro_f1_score = metric.accumulate()
         return {"micro_f1_score": micro_f1_score, "macro_f1_score": macro_f1_score}
 
-    # Deine the early-stopping callback.
+    # Define the early-stopping callback.
     callbacks = [EarlyStoppingCallback(early_stopping_patience=4, early_stopping_threshold=0.0)]
 
     # Initialize the trainer.
