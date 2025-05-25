@@ -33,7 +33,7 @@ from .utils import cut_chinese_sent, download_check, download_file, dygraph_mode
 
 class Task(metaclass=abc.ABCMeta):
     """
-    The meta classs of task in Taskflow. The meta class has the five abstract function,
+    The meta class of task in Taskflow. The meta class has the five abstract function,
         the subclass need to inherit from the meta class.
     Args:
         task(string): The name of task.

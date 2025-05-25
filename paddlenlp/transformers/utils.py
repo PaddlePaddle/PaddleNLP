@@ -282,12 +282,12 @@ class InitTrackerMeta(type(Layer)):
 
         @functools.wraps(init_func)
         def __impl__(self, *args, **kwargs):
-            # registed helper by `pre_init_func`
+            # registered helper by `pre_init_func`
             if pre_init_func:
                 pre_init_func(self, init_func, *args, **kwargs)
             # keep full configuration
             init_func(self, *args, **kwargs)
-            # registed helper by `post_init_func`
+            # registered helper by `post_init_func`
             if post_init_func:
                 post_init_func(self, init_func, *args, **kwargs)
             self.init_config = kwargs

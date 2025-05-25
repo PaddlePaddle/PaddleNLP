@@ -89,7 +89,7 @@ class AutoTrainer(Trainer):
                 self.auto_dist_config = kwargs.pop("auto_dist_config")
         model = kwargs["model"]
         for param in model.parameters():
-            # NOTE(zhangwl):in pipeline mode , param my be initialized before while delte init_func ,but param is still not is_initialized
+            # NOTE(zhangwl):in pipeline mode , param may be initialized before while delete init_func, but param is still not is_initialized
             if not param._is_initialized() and param._init_func is not None:
                 param.initialize()
         kwargs["model"] = model
@@ -438,7 +438,7 @@ class AutoTrainer(Trainer):
                 )
                 assert (
                     paddle.sum(paddle.stack(global_step_list) - global_step_list[0]) == 0
-                ), f"Error, get different globel step, please check! step list: {[x.item() for x in global_step_list]}"
+                ), f"Error, get different global step, please check! step list: {[x.item() for x in global_step_list]}"
 
             epochs_trained = self.state.global_step // num_update_steps_per_epoch
             if not args.ignore_data_skip:

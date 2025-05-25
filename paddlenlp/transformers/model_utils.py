@@ -2009,7 +2009,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
             resolved_archive_file = new_archive_file
             if len(skip_archive_file) > 0:
-                logger.info(f"Skip load files for not contrains expected key, {skip_archive_file}")
+                logger.info(f"Skip load files for not contains expected key, {skip_archive_file}")
 
         # Some models may have keys that are not in the state by design, removing them before needlessly warning
         # the user.
@@ -2253,7 +2253,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     missing_keys = list(set(missing_keys) - set(new_keys))
                     unexpected_keys = list(set(unexpected_keys) - set(fused_keys))
 
-                # Mistmatched keys contains tuples key/shape1/shape2 of weights in the checkpoint that have a shape not
+                # Mismatched keys contains tuples key/shape1/shape2 of weights in the checkpoint that have a shape not
                 # matching the weights in the model.
                 mismatched_keys += _find_mismatched_keys(
                     state_dict,

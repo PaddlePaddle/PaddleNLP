@@ -143,7 +143,7 @@ def do_train(args):
 
     global_step = 0
     for epoch in range(1, args.num_train_epochs + 1):
-        logger.info(f"Epoch {epoch} beginnig")
+        logger.info(f"Epoch {epoch} beginning")
         start_time = time.time()
 
         for step, batch in enumerate(train_data_loader):

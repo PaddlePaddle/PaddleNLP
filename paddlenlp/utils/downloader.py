@@ -203,7 +203,7 @@ def _download(url, path, md5sum=None):
         if req.status_code != 200:
             raise RuntimeError("Downloading from {} failed with code " "{}!".format(url, req.status_code))
 
-        # For protecting download interupted, download to
+        # For protecting download interrupted, download to
         # tmp_fullname firstly, move tmp_fullname to fullname
         # after download finished
         tmp_fullname = fullname + "_tmp"
@@ -255,7 +255,7 @@ def _decompress(fname):
     """
     logger.info("Decompressing {}...".format(fname))
 
-    # For protecting decompressing interupted,
+    # For protecting decompressing interrupted,
     # decompress to fpath_tmp directory firstly, if decompress
     # successed, move decompress files to fpath and delete
     # fpath_tmp and remove download compress file.
@@ -566,9 +566,9 @@ def get_static_model_on_pdc(remote_path, local_path, timeout, enable_flash_devic
     else:
         logger.info("Flash device is not enabled or available, will download static model from remote.")
 
-    # step 2: download from remote if neccesary
+    # step 2: download from remote if necessary
     if need_download_from_remote:
-        logger.info("Beging download static model from remote...")
+        logger.info("Beginning download static model from remote...")
         download_from_pdc(remote_path, persistent_path, timeout)
         logger.info(f"downloaded static model from remote, path:{persistent_path}")
 

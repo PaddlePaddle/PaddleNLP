@@ -38,7 +38,7 @@ class GraphDataLoader(object):
         return self.__iter__()
 
     def __callback__(self):
-        """callback function, for recontruct a dict or graph."""
+        """callback function, for reconstruct a dict or graph."""
 
         def construct(tensors):
             """tensor list to ([graph_tensor, graph_tensor, ...],

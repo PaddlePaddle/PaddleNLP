@@ -265,7 +265,7 @@ class YuanTokenizer(PretrainedTokenizer):
 
     def _extract_non_learnable_parts(self, origin_msg: List[Dict[str, str]], split_s: List[str]):
         """Split the entire chat by specified words. Extract the non-learnable parts."""
-        # distingish and replace the special words in original string to an uncompiled form: Like | -> \|
+        # distinguish and replace the special words in original string to an uncompiled form: Like | -> \|
         split_s_with_front_token = split_s.copy()
         for idx, _ in enumerate(split_s):
             split_s_with_front_token[idx] = "<n>" + split_s_with_front_token[idx]

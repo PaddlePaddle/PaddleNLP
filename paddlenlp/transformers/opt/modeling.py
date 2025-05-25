@@ -494,7 +494,7 @@ class TransformerDecoder(Layer):
 
 
 class OPTLearnedPositionEmbedding(nn.Embedding):
-    """this module learns postional embeddings up to a fixed maximum size"""
+    """this module learns positional embeddings up to a fixed maximum size"""
 
     def __init__(self, num_embeddings: int, embedding_dim: int, initializer_range: float):
         """OPT is set up so that if padding_idx is specified then offset the embedding ids by 2

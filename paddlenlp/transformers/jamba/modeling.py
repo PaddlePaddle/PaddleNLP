@@ -618,7 +618,7 @@ class JambaMambaMixer(nn.Layer):
 
         # projection of the input hidden states
         self.in_proj = nn.Linear(self.hidden_size, self.intermediate_size * 2, bias_attr=self.use_bias)
-        # selective projection used to make dt, B and C input dependant
+        # selective projection used to make dt, B and C input dependent
         self.x_proj = nn.Linear(self.intermediate_size, self.time_step_rank + self.ssm_state_size * 2, bias_attr=False)
         # time step projection (discretization)
         self.dt_proj = nn.Linear(self.time_step_rank, self.intermediate_size, bias_attr=True)
@@ -893,7 +893,7 @@ class JambaSparseMoeBlock(nn.Layer):
     This implementation is
     strictly equivalent to standard MoE with full capacity (no
     dropped tokens). It's faster since it formulates MoE operations
-    in terms of block-sparse operations to accomodate imbalanced
+    in terms of block-sparse operations to accommodate imbalanced
     assignments of tokens to experts, whereas standard MoE either
     (1) drop tokens at the cost of reduced performance or (2) set
     capacity factor to number of experts and thus waste computation
@@ -1340,7 +1340,7 @@ class JambaModel(JambaPretrainedModel):
         self.vocab_size = config.vocab_size
         # new added
         if config.tensor_parallel_degree > 1 and config.sequence_parallel:
-            logger.warning_once("Currently we donot support sequence parallelism yet!")
+            logger.warning_once("Currently we do not support sequence parallelism yet!")
         self.recompute_granularity = config.recompute_granularity
         self.no_recompute_layers = config.no_recompute_layers if config.no_recompute_layers is not None else []
 

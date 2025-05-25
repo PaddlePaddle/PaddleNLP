@@ -16,7 +16,7 @@ import os
 
 import setuptools
 
-description = "Paddle-Pipelines: An End to End Natural Language Proceessing Development Kit Based on PaddleNLP"
+description = "Paddle-Pipelines: An End to End Natural Language Processing Development Kit Based on PaddleNLP"
 
 with open("requirements.txt") as fin:
     REQUIRED_PACKAGES = fin.read()

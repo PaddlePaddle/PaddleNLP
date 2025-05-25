@@ -28,7 +28,7 @@ from pipelines.data_handler.samples import (
     Sample,
     SampleBasket,
     get_passage_offsets,
-    offset_to_token_idx_vecorized,
+    offset_to_token_idx_vectorized,
 )
 from pipelines.utils.logger import StdoutLogger
 from pipelines.utils.tokenization import tokenize_batch_question_answering
@@ -210,7 +210,7 @@ class SquadProcessor(Processor):
         :param tokenizer: Used to split a sentence (str) into tokens.
         :param max_seq_len: Samples are truncated after this many tokens.
         :param data_dir: The directory in which the train and dev files can be found.
-                         If not available the dataset will be loaded automaticaly
+                         If not available the dataset will be loaded automatically
                          if the last directory has the same name as a predefined dataset.
                          These predefined datasets are defined as the keys in the dict at
                          `pipelines.basics.data_handler.utils.`_.
@@ -433,8 +433,8 @@ class SquadProcessor(Processor):
                         answer_end_c = answer_start_c + answer_len_c - 1
 
                         # Convert character offsets to token offsets on document level
-                        answer_start_t = offset_to_token_idx_vecorized(basket.raw["document_offsets"], answer_start_c)
-                        answer_end_t = offset_to_token_idx_vecorized(basket.raw["document_offsets"], answer_end_c)
+                        answer_start_t = offset_to_token_idx_vectorized(basket.raw["document_offsets"], answer_start_c)
+                        answer_end_t = offset_to_token_idx_vectorized(basket.raw["document_offsets"], answer_end_c)
 
                         # Adjust token offsets to be relative to the passage
                         answer_start_t -= sample.tokenized["passage_start_t"]  # type: ignore
@@ -668,7 +668,7 @@ class TextSimilarityProcessor(Processor):
         :param max_seq_len_query: Query samples are truncated after this many tokens.
         :param max_seq_len_passage: Context/Passage Samples are truncated after this many tokens.
         :param data_dir: The directory in which the train and dev files can be found.
-                         If not available the dataset will be loaded automaticaly
+                         If not available the dataset will be loaded automatically
                          if the last directory has the same name as a predefined dataset.
                          These predefined datasets are defined as the keys in the dict at
                          `pipelines.basics.data_handler.utils`_.

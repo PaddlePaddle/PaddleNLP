@@ -92,7 +92,7 @@ if __name__ == "__main__":
 
     tokenizer = CharTokenizer(vocab, args.language, "../../../punctuations")
 
-    # Constructs the newtork.
+    # Constructs the network.
     vocab_size = len(vocab)
     num_classes = len(train_ds.label_list)
     pad_token_id = 0

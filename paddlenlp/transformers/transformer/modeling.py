@@ -913,7 +913,7 @@ class InferTransformerModel(TransformerModel):
             The dropout probability used in MHA to drop some attention target.
             If None, use the value of dropout. Defaults to None.
         act_dropout (float):
-            The dropout probability used after FFN activition. If None, use
+            The dropout probability used after FFN activation. If None, use
             the value of dropout. Defaults to None.
         bos_id (int, optional):
             The start token id and also is used as padding id. Defaults to 0.

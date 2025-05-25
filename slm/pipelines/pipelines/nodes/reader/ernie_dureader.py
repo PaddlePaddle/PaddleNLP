@@ -472,7 +472,7 @@ class ErnieReader(BaseReader):
 
         # disqualify answers where end < start
         # (set the lower triangular matrix to low value, excluding diagonal)
-        # The answer positions that end position less than start position shuold be mask
+        # The answer positions that end position less than start position should be mask
         pos_mask_tensor = paddle.tensor.triu(
             (paddle.ones((max_seq_len, max_seq_len), dtype=paddle.get_default_dtype()) * -888), diagonal=1
         )

@@ -348,8 +348,8 @@ def es_index_to_document_store(
     :param port: Ports(s) of Elasticsearch nodes.
     :param username: Username (standard authentication via http_auth).
     :param password: Password (standard authentication via http_auth).
-    :param api_key_id: ID of the API key (altenative authentication mode to the above http_auth).
-    :param api_key: Secret value of the API key (altenative authentication mode to the above http_auth).
+    :param api_key_id: ID of the API key (alternative authentication mode to the above http_auth).
+    :param api_key: Secret value of the API key (alternative authentication mode to the above http_auth).
     :param aws4auth: Authentication for usage with AWS Elasticsearch
         (can be generated with the requests-aws4auth package).
     :param scheme: `"https"` or `"http"`, protocol used to connect to your Elasticsearch instance.

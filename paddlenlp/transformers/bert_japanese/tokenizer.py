@@ -13,12 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import collections
 import copy
 import os
 import unicodedata
-import collections
 
-from .. import BertTokenizer, BasicTokenizer, WordpieceTokenizer
+from .. import BasicTokenizer, BertTokenizer, WordpieceTokenizer
 
 __all__ = ["BertJapaneseTokenizer", "MecabTokenizer", "CharacterTokenizer"]
 
@@ -331,7 +331,7 @@ class CharacterTokenizer:
         """
         Tokenizes a piece of text into characters.
 
-        For example, `input = "apple""` wil return as output `["a", "p", "p", "l", "e"]`.
+        For example, `input = "apple""` will return as output `["a", "p", "p", "l", "e"]`.
 
         Args:
             text: A single token or whitespace separated tokens.

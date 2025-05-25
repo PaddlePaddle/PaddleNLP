@@ -273,10 +273,10 @@ class TrainingArguments:
               replace_with_c_embedding, it supports replacing col-sliced embedding with row-sliced c_embedding when it set True, which is used in PIR auto_parallel.
               replace_with_parallel_cross_entropy, it replaces 'cross_entropy_with_softmax' OP with 'c_softmax_with_cross_entropy' OP in PIR static graph, which can improve model parallel performance.
         pipeline_parallel_config (`str`, *optional*)(
-            Some additional config it highly affect the useage of pipeline parallel, we provide some option to config it.
+            Some additional config it highly affect the usage of pipeline parallel, we provide some option to config it.
             following config is support:
               disable_p2p_cache_shape, if you max sequence length is varying, please set disable_p2p_cache_shape.
-              disable_partial_send_recv, optmize send speed for tensor parallel.
+              disable_partial_send_recv, optimize send speed for tensor parallel.
               enable_delay_scale_loss, accumulate gradients until optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.
               enable_dp_comm_overlap, fuse data parallel gradient communication.
               enable_sharding_comm_overlap, fuse sharding stage 1 parallel gradient communication.
@@ -286,7 +286,7 @@ class TrainingArguments:
               disable_non_batch_p2p_comm, disable batched send/recv in pipeline parallel mode.
               auto_parallel_sync_shared_params, optimize the parameter sharing between two stages in a pipeline parallel scenario.
         sharding_parallel_config (`str`, *optional*)(
-            Some additional config it highly affect the useage of sharding parallel, we provide some option to config it.
+            Some additional config it highly affect the usage of sharding parallel, we provide some option to config it.
             following config is support:
               enable_stage1_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation
               enable_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation only used for semi auto mode.
@@ -390,7 +390,7 @@ class TrainingArguments:
             [`Trainer`], it's intended to be used by your training/evaluation scripts instead. See the [example
             scripts](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples) for more details.
         auto_parallel_resume_form_hybrid_parallel (`bool`, *optional*):
-            Wether hybrid paralle checkpoints be loaded in auto parallel mode.
+            Whether hybrid parallel checkpoints be loaded in auto parallel mode.
         flatten_param_grads (`bool`, *optional*):
             Whether use flatten_param_grads method in optimizer, only used on NPU devices. Default is `False`.
         skip_profile_timer (`bool`, *optional*):
@@ -457,7 +457,7 @@ class TrainingArguments:
     )
     lr_scheduler_type: str = field(
         default="linear",
-        metadata={"help": "The scheduler type to use. suppor linear, cosine, constant, constant_with_warmup"},
+        metadata={"help": "The scheduler type to use. support linear, cosine, constant, constant_with_warmup"},
     )
     warmup_ratio: float = field(
         default=0.0, metadata={"help": "Linear warmup over warmup_ratio fraction of total steps."}
@@ -632,7 +632,7 @@ class TrainingArguments:
         metadata={
             "help": (
                 "Tensor parallelism is parallel technique proposed in (https://arxiv.org/pdf/2104.04473.pdf see 2.3 Tensor Model Parallelism). "
-                "This techique splits one transformer layer into multi-cards (For examples, tensor_parallel_degree=4, will split a layer to 4-parts) "
+                "This technique splits one transformer layer into multi-cards (For examples, tensor_parallel_degree=4, will split a layer to 4-parts) "
                 "tensor_parallel_degree means split the transformer layer to how many parts."
                 "default -1 for not use tensor parallel,  Suggest tensor_parallel_degree<=8 for better proformance."
                 "Note, this need model support in source code, currently GPT/BLOOM/LLAMA/BLOOM/CLM/CHATGLM is supported. "
@@ -736,10 +736,10 @@ class TrainingArguments:
         default="",
         metadata={
             "help": (
-                "Some additional config it highly affect the useage of pipeline parallel, we provide some option to config it."
+                "Some additional config it highly affect the usage of pipeline parallel, we provide some option to config it."
                 "following config is support:\n"
                 "disable_p2p_cache_shape, if you max sequence length is varying, please set disable_p2p_cache_shape. \n"
-                "disable_partial_send_recv, optmize send speed for tensor parallel.\n"
+                "disable_partial_send_recv, optimize send speed for tensor parallel.\n"
                 "enable_delay_scale_loss, accumulate gradients until optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.\n"
                 "enable_dp_comm_overlap, fuse data parallel gradient communication. \n"
                 "enable_sharding_comm_overlap, fuse sharding stage 1 parallel gradient communication. \n"
@@ -755,7 +755,7 @@ class TrainingArguments:
         default="",
         metadata={
             "help": (
-                "Some additional config it highly affect the useage of sharding parallel, we provide some option to config it."
+                "Some additional config it highly affect the usage of sharding parallel, we provide some option to config it."
                 "following config is support: \n"
                 "enable_stage1_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation\n"
                 "enable_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation only used for semi auto mode.\n"
@@ -776,7 +776,7 @@ class TrainingArguments:
                 "Following options are supported:\n"
                 "- pp_first. the topo order is dp, pp, sharding, mp \n"
                 "- sharding_first. the topo order is dp, sharding, pp, mp \n"
-                "Defalut is None, for pp_first"
+                "Default is None, for pp_first"
             )
         },
     )
@@ -894,7 +894,7 @@ class TrainingArguments:
     )
     auto_parallel_resume_form_hybrid_parallel: Optional[bool] = field(
         default=False,
-        metadata={"help": "Wether hybrid paralle checkpoints be loaded in auto parallel mode."},
+        metadata={"help": "Whether hybrid parallel checkpoints be loaded in auto parallel mode."},
     )
     skip_memory_metrics: bool = field(
         default=True, metadata={"help": "Whether or not to skip adding of memory profiler reports to metrics."}
@@ -923,7 +923,7 @@ class TrainingArguments:
     )
     skip_profile_timer: Optional[bool] = field(
         default=True,
-        metadata={"help": "enable framework timer, will output timeline informatoin in logging and visualdl."},
+        metadata={"help": "enable framework timer, will output timeline information in logging and visualdl."},
     )
     distributed_dataloader: Optional[bool] = field(
         default=False, metadata={"help": "Whether to use distributed dataloader."}
@@ -1213,7 +1213,7 @@ class TrainingArguments:
                                 "enable_dynamic_shape",
                             ]:
                                 raise ValueError(
-                                    f"Found unknown pipeline mode config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
+                                    f"Found unknown pipeline mode config {x}, accept config is disable_p2p_cache_shape, disable_partial_send_recv."
                                 )
 
                     enable_partial_send_recv = "disable_partial_send_recv" not in pipeline_parallel_config
@@ -1298,7 +1298,7 @@ class TrainingArguments:
                                 "sync_moment",
                             ]:
                                 raise ValueError(
-                                    f"Found unknown tensor parallell config {x}, "
+                                    f"Found unknown tensor parallel config {x}, "
                                     f"accept config is enable_mp_async_allreduce, enable_mp_skip_c_identity, enable_mp_fused_linear_param_grad_add, enable_sp_async_reduce_scatter, enable_delay_scale_loss, sync_param, sync_grad and sync_moment."
                                 )
                     try:
@@ -1426,7 +1426,7 @@ class TrainingArguments:
                             ]:
                                 raise ValueError(
                                     f"Found unknown sharding mode config {x}, "
-                                    f"accpet config is enable_stage1_tensor_fusion, enable_stage1_overlap, enable_stage2_overlap, split_param, disable_stage1_reduce_avg, enable_stage1_broadcast_overlap, enable_stage1_allgather_overlap, enable_release_grads, enable_fuse_optimizer_states."
+                                    f"accept config is enable_stage1_tensor_fusion, enable_stage1_overlap, enable_stage2_overlap, split_param, disable_stage1_reduce_avg, enable_stage1_broadcast_overlap, enable_stage1_allgather_overlap, enable_release_grads, enable_fuse_optimizer_states."
                                 )
                     if "disable_stage1_reduce_avg" in sharding_parallel_config:
                         assert self.sharding == [
@@ -1534,7 +1534,7 @@ class TrainingArguments:
 
             assert (
                 world_size % (self.tensor_parallel_degree * self.pipeline_parallel_degree) == 0
-            ), f"Total world_size:{world_size} shoule be devided by tensor_parallel_degree: {self.tensor_parallel_degree} and pipeline_parallel_degree: {self.pipeline_parallel_degree}."
+            ), f"Total world_size:{world_size} should be divided by tensor_parallel_degree: {self.tensor_parallel_degree} and pipeline_parallel_degree: {self.pipeline_parallel_degree}."
 
             if self.sharding_parallel_degree == -1:
                 if len(self.sharding) > 0:
@@ -1568,7 +1568,7 @@ class TrainingArguments:
                     if len(x) > 0:
                         if x not in ["enable_allreduce_avg_in_gradinent_scale", "gradient_sync_after_accumulate"]:
                             raise ValueError(
-                                f"Found unknown data parallel config {x}, accpet config is enable_allreduce_avg_in_gradinent_scale."
+                                f"Found unknown data parallel config {x}, accept config is enable_allreduce_avg_in_gradinent_scale."
                             )
                 if "enable_allreduce_avg_in_gradinent_scale" in data_parallel_config:
                     strategy.gradient_scale_using_allreduce_avg = True
@@ -1579,7 +1579,7 @@ class TrainingArguments:
                 if len(x) > 0:
                     if x not in ["enable_allreduce_avg_in_gradinent_scale"]:
                         raise ValueError(
-                            f"Found unknown sequence parallel config {x}, accpet config is enable_allreduce_avg_in_gradinent_scale."
+                            f"Found unknown sequence parallel config {x}, accept config is enable_allreduce_avg_in_gradinent_scale."
                         )
             if "enable_allreduce_avg_in_gradinent_scale" in sequence_parallel_config:
                 strategy.gradient_scale_using_allreduce_avg = True
@@ -1592,17 +1592,17 @@ class TrainingArguments:
                         if x not in [
                             "enable_send_recv_overlap",
                             # "disable_p2p_cache_shape",      # no need for auto_parallel
-                            # "disable_partial_send_recv",    # no implemenation for auto_parallel
+                            # "disable_partial_send_recv",    # no implementation for auto_parallel
                             "enable_delay_scale_loss",
-                            # "enable_dp_comm_overlap",       # no implemenation for auto_parallel
-                            # "enable_sharding_comm_overlap", # no implemenation for auto_parallel
-                            # "enable_timer",                 # no implemenation for auto_parallel
-                            # "disable_batch_p2p_comm",       # no implemenation for auto_parallel
+                            # "enable_dp_comm_overlap",       # no implementation for auto_parallel
+                            # "enable_sharding_comm_overlap", # no implementation for auto_parallel
+                            # "enable_timer",                 # no implementation for auto_parallel
+                            # "disable_batch_p2p_comm",       # no implementation for auto_parallel
                             "enable_split_backward",
                             "auto_parallel_sync_shared_params",
                         ]:
                             raise ValueError(
-                                f"Found unknown pipeline mode config {x}, accpet config is enable_send_recv_overlap."
+                                f"Found unknown pipeline mode config {x}, accept config is enable_send_recv_overlap."
                             )
 
                 pipeline = strategy.pipeline
@@ -1650,7 +1650,7 @@ class TrainingArguments:
                             "enable_sp_async_reduce_scatter",
                         ]:
                             raise ValueError(
-                                f"Found unknown tensor parallell config {x}, "
+                                f"Found unknown tensor parallel config {x}, "
                                 f"accept config is enable_mp_async_allreduce, replace_with_c_embedding, and enable_mp_fused_linear_param_grad_add"
                             )
                 try:
@@ -1697,7 +1697,7 @@ class TrainingArguments:
                                 )
                             raise ValueError(
                                 f"Found unknown sharding mode config {x}, "
-                                f"accpet config is enable_tensor_fusion, "
+                                f"accept config is enable_tensor_fusion, "
                                 "enable_overlap, enable_release_grads."
                             )
 
@@ -1790,7 +1790,7 @@ class TrainingArguments:
                         "ignore_merge_optimizer",
                     ]:
                         raise ValueError(
-                            f"Found unknown unified_checkpoint config {x}, accpet config is skip_save_model_weight, "
+                            f"Found unknown unified_checkpoint config {x}, accept config is skip_save_model_weight, "
                             + "master_weight_compatible, async_save, enable_all_options, ignore_merge_optimizer."
                         )
             if "enable_all_options" in unified_checkpoint_config:
@@ -1912,7 +1912,7 @@ class TrainingArguments:
                 '`--sharding stage3`. For example, `--sharding "stage2 offload"`.'
             )
         elif len(self.sharding) > (ShardingOption.OFFLOAD in self.sharding) + 1:
-            raise ValueError("`--sharding` recived too many arguments.")
+            raise ValueError("`--sharding` received too many arguments.")
 
         if self.sharding_degree > 0:
             warnings.warn("`sharding_degree` is deprecated, please use `sharding_parallel_degree`")
@@ -1944,7 +1944,7 @@ class TrainingArguments:
 
             assert (
                 world_size % (self.tensor_parallel_degree * self.pipeline_parallel_degree) == 0
-            ), f"Total world_size:{world_size} shoule be devided by tensor_parallel_degree: {self.tensor_parallel_degree} and pipeline_parallel_degree: {self.pipeline_parallel_degree}."
+            ), f"Total world_size:{world_size} should be divided by tensor_parallel_degree: {self.tensor_parallel_degree} and pipeline_parallel_degree: {self.pipeline_parallel_degree}."
 
             assert not (
                 sep_parallel_degree > 1 and context_parallel_degree > 1

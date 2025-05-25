@@ -1067,7 +1067,7 @@ class PretrainedConfig:
 
             output[key] = value
 
-        # Fix for rewrited from_pretrained method, hasattr
+        # Fix for rewritten from_pretrained method, hasattr
         if saving_file and hasattr(self, "_unsavable_keys"):
             for key in list(output.keys()):
                 if key in self._unsavable_keys:

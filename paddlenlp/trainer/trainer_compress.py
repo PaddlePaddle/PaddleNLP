@@ -713,7 +713,7 @@ def _quant_aware_training_dynamic(self, input_dir):
         "weight_bits": 8,
         "activation_bits": 8,
         "dtype": "int8",
-        # window size for 'range_abs_max' quantization. defaulf is 10000
+        # window size for 'range_abs_max' quantization. default is 10000
         "window_size": 10000,
         "quantizable_layer_type": ["Linear", "Conv2D"],
         "moving_rate": args.moving_rate,

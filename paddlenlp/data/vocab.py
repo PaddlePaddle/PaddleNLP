@@ -40,7 +40,7 @@ class Vocab(object):
             between tokens and indices to be used. If provided, adjust the tokens
             and indices mapping according to it. If None, counter must be provided.
             Default: None.
-        unk_token (str, optional): Special token for unknow token. If no need,
+        unk_token (str, optional): Special token for unknown token. If no need,
             it also could be None. Default: None.
         pad_token (str, optional): Special token for padding token. If no need,
             it also could be None. Default: None.
@@ -214,7 +214,7 @@ class Vocab(object):
         for idx in indices:
             if not isinstance(idx, (int, np.integer)):
                 warnings.warn(
-                    "The type of `to_tokens()`'s input `indices` is not `int` which will be forcibly transfered to `int`. "
+                    "The type of `to_tokens()`'s input `indices` is not `int` which will be forcibly transferred to `int`. "
                 )
                 idx = int(idx)
 
@@ -382,7 +382,7 @@ class Vocab(object):
         Args:
             token_to_idx (dict): A dict describes the mapping relationship between
                 tokens and indices.
-            unk_token (str, optional): The special token for unknow token. If
+            unk_token (str, optional): The special token for unknown token. If
                 no need, it also could be None. Default: None.
             pad_token (str, optional): The special token for padding token. If
                 no need, it also could be None. Default: None.
@@ -440,7 +440,7 @@ class Vocab(object):
         **kwargs
     ):
         """
-        Builds the :class:`Vocab` accoring to given iterator and other
+        Builds the :class:`Vocab` according to given iterator and other
         information. Firstly, iterate over the `iterator` to construct a
         :class:`collections.Counter` and used to init the as  :class:`Vocab`.
 
@@ -455,7 +455,7 @@ class Vocab(object):
                 relationship between tokens and indices to be used. If provided,
                 adjust the tokens and indices mapping according to it. If None,
                 counter must be provided. Default: None.
-            unk_token (str, optional): The special token for unknow token
+            unk_token (str, optional): The special token for unknown token
                 '<unk>'. If no need, it also could be None. Default: None.
             pad_token (str, optional): The special token for padding token
                 '<pad>'. If no need, it also could be None. Default: None.

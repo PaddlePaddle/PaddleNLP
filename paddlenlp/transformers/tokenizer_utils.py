@@ -669,7 +669,7 @@ class ChatTemplateMixin:
             conversation = [[conversation]]
         elif isinstance(conversation, list) and isinstance(conversation[0], str):
             raise ValueError(
-                "apply_chat_template do not support appling batch conversations, "
+                "apply_chat_template do not support applying batch conversations, "
                 "so you should apply the conversation one by one."
             )
 
@@ -691,7 +691,7 @@ class ChatTemplateMixin:
                 conversations = conversation
             else:
                 raise ValueError(
-                    "apply_chat_template do not support appling batch conversations, "
+                    "apply_chat_template do not support applying batch conversations, "
                     "so you should apply the conversation one by one."
                 )
         query = self.chat_template.render(

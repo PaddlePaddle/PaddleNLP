@@ -448,7 +448,7 @@ class IterDataset(IterableDataset):
                 num_samples += 1
         else:
             if inspect.isgenerator(self.data):
-                warnings.warn("Reciving generator as data source, data can only be iterated once")
+                warnings.warn("Receiving generator as data source, data can only be iterated once")
             for example in self.data:
                 if (not self._filter_pipline or self._filter(self._filter_pipline)) and self._shard_filter(
                     num_samples=num_samples
@@ -580,7 +580,7 @@ class DatasetBuilder:
                 lock_files.append(lock_file)
             # Must register to all procs to make the lock file can be removed
             # when any proc breaks. Otherwise, the single registered proc may
-            # not receive proper singal send by the parent proc to exit.
+            # not receive proper signal send by the parent proc to exit.
             atexit.register(lambda: remove_if_exit(lock_files))
             for split in splits:
                 filename = self._get_data(split)

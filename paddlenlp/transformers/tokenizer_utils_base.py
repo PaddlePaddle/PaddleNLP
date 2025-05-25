@@ -1722,7 +1722,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             elif not os.path.isfile(init_kwargs[args_name] or "") and os.path.isfile(file_path):
                 init_kwargs[args_name] = file_path
 
-        # TODO(zhoushunjie): It's not supportted to load tokenizer.json of hf so far.
+        # TODO(zhoushunjie): It's not supported to load tokenizer.json of hf so far.
         if from_hf_hub and "tokenizer_file" in init_kwargs:
             init_kwargs.pop("tokenizer_file")
 
@@ -1864,7 +1864,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         # add_type_field=True to allow dicts in the kwargs / differentiate from AddedToken serialization
         tokenizer_config = convert_added_tokens(tokenizer_config, add_type_field=True)
 
-        # Process added tokens seperatly: allows previous versions to ignore it!
+        # Process added tokens separately: allows previous versions to ignore it!
         added_tokens = {}
         for key, value in self.added_tokens_decoder.items():
             if isinstance(value, AddedToken):
@@ -3467,7 +3467,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         prefix_offset: int = 0,
         read_offset: int = 0,
     ) -> Tuple[str, int, int]:
-        """tokenizer decoding for the streaming generation use case. This method can be overrided for tokenizer that doesn't follow this API"""
+        """tokenizer decoding for the streaming generation use case. This method can be overridden for tokenizer that doesn't follow this API"""
         # The prefix text is necessary only to defeat cleanup algorithms in the decode
         # which decide to add a space or not depending on the surrounding ids.
         prefix_text = self.decode(
