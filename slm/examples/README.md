@@ -31,7 +31,7 @@ PaddleNLP provides rich application examples covering mainstream NLP task to hel
 | simultaneous_translation      | [同声翻译 (Simultaneous Translation)](./simultaneous_translation/)           |
 | machine_reading_comprehension | [阅读理解 (Machine Reading Comprehension)](./machine_reading_comprehension/) |
 
-## NLP 拓展应用 (NLP Extented Applications)
+## NLP 拓展应用 (NLP Extended Applications)
 
 | 目录 Folder          | 任务 Task                                                               |
 |:---------------------|-------------------------------------------------------------------------|

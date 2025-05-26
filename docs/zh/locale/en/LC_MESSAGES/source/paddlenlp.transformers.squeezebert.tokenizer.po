@@ -50,7 +50,7 @@ msgid ""
 msgstr ""
 
 #: of paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer:11
-msgid "The special token for unkown words. Default: \"[UNK]\"."
+msgid "The special token for unknown words. Default: \"[UNK]\"."
 msgstr ""
 
 #: of paddlenlp.transformers.squeezebert.tokenizer.SqueezeBertTokenizer:13

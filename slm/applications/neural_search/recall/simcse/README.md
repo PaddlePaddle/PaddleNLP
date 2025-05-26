@@ -149,6 +149,12 @@ simcse/
 
 <a name="模型训练"></a>
 
+下载数据集并解压到当前目录：
+```shell
+wget https://bj.bcebos.com/v1/paddlenlp/data/literature_search_data.zip
+unzip literature_search_data.zip
+```
+
 ## 5. 模型训练
 
 **语义索引预训练模型下载链接：**

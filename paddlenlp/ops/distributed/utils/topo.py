@@ -49,8 +49,8 @@ class Topology:
         self.world = GroupInfo(size=world_size, rank=device_rank, world=list(range(0, world_size)))
         worlds = []
         for i in range(len(ranks)):
-            indexs = tuple(ranks[:i] + [slice(None)] + ranks[(i + 1) :])
-            worlds.append(arr[indexs])
+            indexes = tuple(ranks[:i] + [slice(None)] + ranks[(i + 1) :])
+            worlds.append(arr[indexes])
 
         for i, key in enumerate(self.order):
             if key == "dp":

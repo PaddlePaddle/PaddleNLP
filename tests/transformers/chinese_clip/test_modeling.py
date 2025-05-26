@@ -463,7 +463,7 @@ class ChineseCLIPModelTest(ModelTesterMixin, unittest.TestCase):
     def test_model_common_attributes(self):
         pass
 
-    # override as the `logit_scale` parameter initilization is different for CHINESE_CLIP
+    # override as the `logit_scale` parameter initialization is different for CHINESE_CLIP
     def test_initialization(self):
         config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
 
@@ -475,7 +475,7 @@ class ChineseCLIPModelTest(ModelTesterMixin, unittest.TestCase):
             model = model_class(config=configs_no_init)
             for name, param in model.named_parameters():
                 if not param.stop_gradient:
-                    # check if `logit_scale` is initilized as per the original implementation
+                    # check if `logit_scale` is initialized as per the original implementation
                     if name == "logit_scale":
                         self.assertAlmostEqual(
                             param.item(),

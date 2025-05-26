@@ -859,7 +859,7 @@ class AutoInferenceModelForCausalLM(_BaseAutoModelClass):
         model_class = getattr(import_class, model_class_name)
 
         # It may return a new model class, like LlamaForCausalLMAvxInferenceModel
-        # Some model have different inference model class in deifferent execution divice
+        # Some model have different inference model class in different execution device
         # LlamaForCausalLMAvxInferenceModel is used in cpu execution device with avx instruction set
         model_class = model_class.confirm_inference_model(predictor_args=predictor_args)
 
@@ -933,7 +933,7 @@ class AutoInferenceModelForCausalLM(_BaseAutoModelClass):
         model_class = getattr(import_class, model_class_name)
 
         # It may return a new model class, like LlamaForCausalLMAvxInferenceModel
-        # Some model have different inference model class in deifferent execution divice
+        # Some model have different inference model class in different execution device
         # LlamaForCausalLMAvxInferenceModel is used in cpu execution device with avx instruction set
         model_class = model_class.confirm_inference_model(predictor_args=predictor_args)
 

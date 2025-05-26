@@ -180,7 +180,7 @@ def set_seed(args):
 
 def evaluate(exe, metric, loss, correct, dev_program, data_loader, phase="eval"):
     """
-    The evaluate process, calcluate the eval loss and metric.
+    The evaluate process, calculate the eval loss and metric.
     """
     metric.reset()
     returns = [loss]

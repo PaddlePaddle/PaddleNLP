@@ -699,7 +699,7 @@ class UtilsFunctionsTest:
                     2.12662941,
                     -9.32562038,
                     2.35652522,
-                ],  # cummulative prob of 4 highest values <= 0.6
+                ],  # cumulative prob of 4 highest values <= 0.6
                 [
                     0.58425518,
                     4.53139238,
@@ -731,7 +731,7 @@ class UtilsFunctionsTest:
                     9.67702323,  # 1st highest value; idx. 27
                     -5.89478553,
                     1.85370467,
-                ],  # cummulative prob of 4 highest values <= 0.6
+                ],  # cumulative prob of 4 highest values <= 0.6
             ],
             dtype="float32",
         )

@@ -122,7 +122,7 @@ class SimCSE(nn.Layer):
 
         cosine_sim = paddle.matmul(query_cls_embedding, title_cls_embedding, transpose_y=True)
 
-        # substract margin from all positive samples cosine_sim()
+        # subtract margin from all positive samples cosine_sim()
         margin_diag = paddle.full(
             shape=[query_cls_embedding.shape[0]], fill_value=self.margin, dtype=paddle.get_default_dtype()
         )

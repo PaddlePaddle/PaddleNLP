@@ -621,7 +621,7 @@ class KernelInterface:
             op_dict = {"op_name": op_name, "reset_zero_when_tune": ""}
             op_dict["triton_kernel_args"] = ",".join(modified_arg_exclude_constexpr)
             op_dict["key"] = ",".join(self.key_args)
-            # when tunning, we need to reset the out to zero.
+            # when tuning, we need to reset the out to zero.
             if "reset_zero_when_tune" in other_config.keys():
                 op_dict["reset_zero_when_tune"] = other_config["reset_zero_when_tune"]
 

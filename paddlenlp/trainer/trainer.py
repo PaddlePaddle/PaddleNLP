@@ -526,14 +526,14 @@ class Trainer:
         if self.args.pipeline_parallel_degree > 1 or (self.args.tensor_parallel_degree > 1 and self.sharding is None):
             self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
             if self.args.amp_master_grad:
-                mix_precision_utils.MixPrecisionScaler(self.scaler)  # retun value has no use
+                mix_precision_utils.MixPrecisionScaler(self.scaler)  # return value has no use
             self.scaler = fleet.distributed_scaler(self.scaler)
         elif self.sharding is not None:
             self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
             if self.amp_dtype == "float16" or self.amp_dtype == "bfloat16":
                 if ShardingOption.SHARD_OP in self.args.sharding:
                     if self.args.amp_master_grad:
-                        mix_precision_utils.MixPrecisionScaler(self.scaler)  # retun value has no use
+                        mix_precision_utils.MixPrecisionScaler(self.scaler)  # return value has no use
                     self.scaler = fleet.distributed_scaler(self.scaler)
                 else:
                     # scaler for stage2 and stage3
@@ -763,7 +763,7 @@ class Trainer:
         """
         Create zero cost checkpoint manager.
         Has to be called after pipeline model is created.
-        resume_from_checkpoint: if use Flash checkpoing EMA, load previous checkpoint status
+        resume_from_checkpoint: if use Flash checkpoint EMA, load previous checkpoint status
         """
         assert isinstance(
             self.model, PretrainedModel
@@ -1037,7 +1037,7 @@ class Trainer:
                 )
                 assert (
                     paddle.sum(paddle.stack(global_step_list) - global_step_list[0]) == 0
-                ), f"Error, get different globel step, please check! step list: {[x.item() for x in global_step_list]}"
+                ), f"Error, get different global step, please check! step list: {[x.item() for x in global_step_list]}"
 
             epochs_trained = self.state.global_step // num_update_steps_per_epoch
             if not args.ignore_data_skip:
@@ -1212,7 +1212,7 @@ class Trainer:
 
                 # stage2 and stage3 should not no_sync, because the is no DDP wrapper and no_sync API
                 # hybrid_parallel (tp or pp or sharding stage 1) should not no_sync
-                availiable_no_sync = hasattr(model, "no_sync")
+                available_no_sync = hasattr(model, "no_sync")
                 is_no_sync = (
                     (
                         ((step_control + 1) % args.gradient_accumulation_steps != 0)
@@ -1220,10 +1220,10 @@ class Trainer:
                     )
                     or args.recompute
                     or args.use_expert_parallel
-                ) and availiable_no_sync
+                ) and available_no_sync
                 # sharding
                 # stage1. the same as ddp
-                # stage2. manualy collect gradient on dp group
+                # stage2. manually collect gradient on dp group
 
                 dp_master_grad = (
                     self.args.world_size > 1 and self.args.amp_master_grad and not self.args.use_hybrid_parallel
@@ -1263,7 +1263,7 @@ class Trainer:
                     self._check_loss_valid(tr_loss)
 
                     self.timers and self.timers("forward-backward").stop()
-                    # Maunally collect gradients
+                    # Manually collect gradients
                     # Case 1: Use recompute and dp
                     # Case 2: Hack dp with master_grad
                     # Case 3: Pipeline or sharding overlap
@@ -1271,8 +1271,8 @@ class Trainer:
                     self.timers and self.timers("all-reduce").start()
 
                     # Case 1: Use recompute and dp / sharding stage1,
-                    # manualy collect gradient for dp.
-                    if (args.recompute or args.use_expert_parallel) and availiable_no_sync:
+                    # manually collect gradient for dp.
+                    if (args.recompute or args.use_expert_parallel) and available_no_sync:
                         fused_allreduce_gradients_no_sync(list(model.parameters()), None)
 
                     # Case 2: hack dp with master_grad
@@ -2040,13 +2040,13 @@ class Trainer:
         core.default_cpu_generator().set_state(checkpoint_rng_state["cpu"])
         if core.is_compiled_with_cuda():
             if not len(checkpoint_rng_state["cuda"]) == core.get_cuda_device_count():
-                raise ValueError("Length of gpu state list shoule be equal to the gpu device count")
+                raise ValueError("Length of gpu state list should be equal to the gpu device count")
             for i in range(core.get_cuda_device_count()):
                 core.default_cuda_generator(i).set_state(checkpoint_rng_state["cuda"][i])
 
         if core.is_compiled_with_xpu():
             if not len(checkpoint_rng_state["cuda"]) == core.get_xpu_device_count():
-                raise ValueError("Length of xpu state list shoule be equal to the xpu device count")
+                raise ValueError("Length of xpu state list should be equal to the xpu device count")
             for i in range(core.get_xpu_device_count()):
                 core.default_xpu_generator(i).set_state(checkpoint_rng_state["cuda"][i])
 
@@ -2054,7 +2054,7 @@ class Trainer:
             custom_device_type = paddle.device.get_all_custom_device_type()
             for device in custom_device_type:
                 if not len(checkpoint_rng_state["cuda"]) == core.get_custom_device_count(device):
-                    raise ValueError("Length of custom device state list shoule be equal to the custom device count")
+                    raise ValueError("Length of custom device state list should be equal to the custom device count")
                 for i in range(core.get_custom_device_count(device)):
                     core.default_custom_device_generator(paddle.CustomPlace(device, i)).set_state(
                         checkpoint_rng_state["cuda"][i]
@@ -2070,7 +2070,7 @@ class Trainer:
                     )
                 except:
                     logger.warning(
-                        "Hybrid paralell rng states change when training environment differs, so we dot not set state tracker here."
+                        "Hybrid parallel rng states change when training environment differs, so we dot not set state tracker here."
                     )
             else:
                 logger.warning("Not found hybrid parallel RNG state.")
@@ -2868,7 +2868,7 @@ class Trainer:
         """
         set optimizer grouped parameters:
 
-        you can set optimizer_grouped_parameters with whatever argments on whatever parameters to train.
+        you can set optimizer_grouped_parameters with whatever arguments on whatever parameters to train.
         """
         self.optimizer_grouped_parameters = optimizer_grouped_parameters
 
@@ -3009,7 +3009,7 @@ class Trainer:
                 is_main_process=self.args.should_save,
                 max_shard_size="1024GB",
             )
-        # TODO: @ZHUI unifiy unwrap_model(self.model) and self.model
+        # TODO: @ZHUI unify unwrap_model(self.model) and self.model
         elif not isinstance(self.model, PretrainedModel):
             if isinstance(unwrap_model(self.model), PretrainedModel):
                 if self.args.should_save_sharding_stage1_model:
@@ -3039,7 +3039,7 @@ class Trainer:
             else:
                 logger.info("Trainer.model is not a `PretrainedModel`, only saving its state dict.")
                 if merge_tensor_parallel:
-                    logger.warning("Trainer.model is not a `PretrainedModel`, not suppor for merge_tensor_parallel.")
+                    logger.warning("Trainer.model is not a `PretrainedModel`, not support for merge_tensor_parallel.")
                 if state_dict is None:
                     state_dict = self.model.state_dict()
 

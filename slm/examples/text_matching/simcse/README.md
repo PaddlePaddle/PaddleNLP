@@ -61,7 +61,7 @@ python -u -m paddle.distributed.launch --gpus '0' \
 可支持配置的参数：
 
 * `infer_with_fc_pooler`：可选，在预测阶段计算文本 embedding 表示的时候网络前向是否会过训练阶段最后一层的 fc;  建议关闭模型效果最好。
-* `dup_rate`: 可选，word reptition 的比例，默认是0.32，根据论文 Word Repetition 比例采用 0.32 效果最佳。
+* `dup_rate`: 可选，word repetition 的比例，默认是0.32，根据论文 Word Repetition 比例采用 0.32 效果最佳。
 * `scale`：可选，在计算 cross_entropy loss 之前对 cosine 相似度进行缩放的因子；默认为 20。
 * `dropout`：可选，SimCSE 网络前向使用的 dropout 取值；默认 0.1。
 * `save_dir`：可选，保存训练模型的目录；默认保存在当前目录 checkpoints 文件夹下。

@@ -218,7 +218,7 @@ _run_slow_test = get_bool_from_env("RUN_SLOW_TEST")
 def slow(test):
     """
     Mark a test which spends too much time.
-    Slow tests are skipped by default. Excute the command `export RUN_SLOW_TEST=True` to run them.
+    Slow tests are skipped by default. Execute the command `export RUN_SLOW_TEST=True` to run them.
     """
     if not _run_slow_test:
         return unittest.skip("test spends too much time")(test)
@@ -416,7 +416,7 @@ class SubprocessCallException(Exception):
 def run_command(command: list[str], return_stdout=False):
     """
     Runs `command` with `subprocess.check_output` and will potentially return the `stdout`. Will also properly capture
-    if an error occured while running `command`
+    if an error occurred while running `command`
     """
     try:
         output = subprocess.check_output(command, stderr=subprocess.STDOUT, shell=True)

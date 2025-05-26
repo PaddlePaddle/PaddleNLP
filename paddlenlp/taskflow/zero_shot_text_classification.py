@@ -39,7 +39,7 @@ usage = r"""
 
 class ZeroShotTextClassificationTask(Task):
     """
-    Zero-shot Universial Text Classification Task.
+    Zero-shot Universal Text Classification Task.
 
     Args:
         task (string): The name of task.

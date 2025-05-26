@@ -263,7 +263,7 @@ class PegasusDecoder(PegasusPretrainedModel):
                 Its data type should be `float32` and it has a shape of [batch_size, sequence_length, hidden_size].
                 Defaults to `None`, which means don't use SSTIA strategy.
             mix_ratio (float, optional):
-                The mixing ratio of synthetic decoder embedding and general deocder input embedding.
+                The mixing ratio of synthetic decoder embedding and general decoder input embedding.
                 If SSTIA strategy is used, this arg should be set in (0,1).
                 Defaults to `0`, which means don't use synthetic decoder embedding.
 

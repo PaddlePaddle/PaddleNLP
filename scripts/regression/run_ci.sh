@@ -65,7 +65,7 @@ all_P0case_dic=(["msra_ner"]=15
 python -m pip config --user set global.index http://pip.baidu-int.com/search/
 python -m pip config --user set global.index-url http://pip.baidu-int.com/simple
 python -m pip config --user set global.trusted-host pip.baidu-int.com
-# Insatll paddlepaddle-gpu
+# Install paddlepaddle-gpu
 install_paddle(){
     echo -e "\033[35m ---- Install paddlepaddle-gpu  \033[0m"
     python -m pip install --user -r scripts/regression/requirements_ci.txt
@@ -240,7 +240,7 @@ if [[ ${#P0case_list[*]} -ne 0 ]];then
     fi
     ####################################
     cd ${nlp_dir}
-    echo -e "\033[35m ---- Genrate Allure Report  \033[0m"
+    echo -e "\033[35m ---- Generate Allure Report  \033[0m"
     unset http_proxy && unset https_proxy
     cp scripts/regression/gen_allure_report.py ./
     python gen_allure_report.py > /dev/null

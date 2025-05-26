@@ -682,7 +682,7 @@ def do_train(args):
                     print("save checkpoint for step_{} successfully...loss_scale = {}".format(global_step, loss_scale))
 
                 if global_step % args.eval_freq == 0:
-                    # Since the valid data broardcast to all devices, we do evaluate on all device.
+                    # Since the valid data broadcast to all devices, we do evaluate on all device.
                     run_evaluate(
                         args,
                         valid_data_loader,

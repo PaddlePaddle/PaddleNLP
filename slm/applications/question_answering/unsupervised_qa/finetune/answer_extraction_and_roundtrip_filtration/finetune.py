@@ -106,7 +106,7 @@ def do_train():
                 precision, recall, f1 = evaluate(model, metric, dev_data_loader)
                 logger.info("Evaluation precision: %.5f, recall: %.5f, F1: %.5f" % (precision, recall, f1))
                 if f1 > best_f1:
-                    logger.info(f"best F1 performence has been updated: {best_f1:.5f} --> {f1:.5f}")
+                    logger.info(f"best F1 performance has been updated: {best_f1:.5f} --> {f1:.5f}")
                     best_f1 = f1
                     save_dir = os.path.join(args.save_dir, "model_best")
                     model_to_save = model._layers if isinstance(model, paddle.DataParallel) else model

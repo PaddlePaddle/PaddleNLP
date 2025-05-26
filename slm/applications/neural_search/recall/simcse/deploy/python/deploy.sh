@@ -12,4 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-python predict.py --model_dir=../../output
+python deploy/python/predict.py --model_dir=./output

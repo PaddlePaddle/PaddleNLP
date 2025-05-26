@@ -251,7 +251,7 @@ class QuantizationLinear(nn.Layer):
         self.quant_dtype, self.quant_weight_bit = QuantMapping[self.weight_quantize_algo]
         self.state = 0
 
-        # PaddlePaddle dosen't support 4bit data type, one 8bit data represents two 4bit data.
+        # PaddlePaddle doesn't support 4bit data type, one 8bit data represents two 4bit data.
         # paddle.nn.quant.weight_quantize will transpose in_features and out_features.
         if self.weight_quantize_algo in [
             "weight_only_int8",
@@ -407,7 +407,7 @@ class ColumnParallelQuantizationLinear(nn.Layer):
         if self.sequence_parallel and self.gather_output:
             raise ValueError("Sequence parallel does not support gather_output")
 
-        # PaddlePaddle dosen't support Int4 data type, one Int8 data represents two Int4 data.
+        # PaddlePaddle doesn't support Int4 data type, one Int8 data represents two Int4 data.
         if self.weight_quantize_algo in [
             "weight_only_int8",
             "weight_only_int4",
@@ -545,7 +545,7 @@ class RowParallelQuantizationLinear(nn.Layer):
         if not self.input_is_parallel and self.sequence_parallel:
             raise ValueError("Sequence parallel only support input_is_parallel.")
 
-        # PaddlePaddle dosen't support Int4 data type, one Int8 data represents two Int4 data.
+        # PaddlePaddle doesn't support Int4 data type, one Int8 data represents two Int4 data.
         # paddle.nn.quant.weight_quantize will transpose in_features and out_features.
         if self.weight_quantize_algo in [
             "weight_only_int8",

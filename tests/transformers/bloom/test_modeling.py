@@ -605,7 +605,7 @@ class BloomModelLanguageGenerationTest(PaddleNLPModelTest):
         if verify_outputs:
             self.assertListEqual(output_ids[0].tolist(), expected_output_ids)
 
-    @pytest.mark.skip("compelte `generate` method in another pr")
+    @pytest.mark.skip("complete `generate` method in another pr")
     @slow
     def test_lm_generate_gpt(self):
         self._test_lm_generate_gpt_helper()
@@ -642,7 +642,7 @@ class BloomModelLanguageGenerationTest(PaddleNLPModelTest):
         self.assertEqual(output_seq_strs[0], EXPECTED_OUTPUT_STR)
         self.assertEqual(output_str, EXPECTED_OUTPUT_STR)
 
-    @pytest.mark.skip("compelte `generate` method in another pr")
+    @pytest.mark.skip("complete `generate` method in another pr")
     @slow
     def test_gpt_sample(self):
         tokenizer = BloomTokenizer.from_pretrained("bigscience/bloom-560m")
@@ -653,7 +653,7 @@ class BloomModelLanguageGenerationTest(PaddleNLPModelTest):
         np.random.seed(128)
         random.seed(128)
 
-        tokenized = tokenizer("where is the captial of china: ", return_tensors="pd")
+        tokenized = tokenizer("where is the capital of china: ", return_tensors="pd")
         input_ids = tokenized["input_ids"]
 
         output_ids, _ = model.generate(

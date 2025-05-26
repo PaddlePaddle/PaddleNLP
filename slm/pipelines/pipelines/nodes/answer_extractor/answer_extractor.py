@@ -171,7 +171,7 @@ class AnswerExtractor(BaseComponent):
         return result
 
     def run(self, meta):
-        print("createing synthetic answers...")
+        print("creating synthetic answers...")
         synthetic_context_answer_pairs = self.answer_generation_from_paragraphs(
             meta,
             batch_size=self.batch_size,

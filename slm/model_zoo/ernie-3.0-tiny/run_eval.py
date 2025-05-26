@@ -124,7 +124,7 @@ def main():
         accuracy = slot_right / len(test_dataset) * 100
         intent_accuracy = intent_right / len(test_dataset) * 100
 
-        print("accuray: %.2f, intent_accuracy: %.2f" % (accuracy, intent_accuracy))
+        print("accuracy: %.2f, intent_accuracy: %.2f" % (accuracy, intent_accuracy))
     else:
         test_dataset = load_dataset(
             read_test_file,

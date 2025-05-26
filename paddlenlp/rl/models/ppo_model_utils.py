@@ -351,7 +351,7 @@ class VocabParallelEntropy(paddle.autograd.PyLayer):
 
 
 def entropy_from_logits(logits: paddle.Tensor, tensor_parallel_output=False):
-    return VocabParallelEntropy.apply(logits, tensor_parallel_output)
+    return VocabParallelEntropy.apply(logits.astype("float32"), tensor_parallel_output)
 
 
 @merge_fwd_labels
@@ -476,11 +476,11 @@ class RLHFPPOMixedLoss(nn.Layer):
                 vocab_size=self.config.vocab_size,
                 tensor_parallel_degree=self.config.tensor_parallel_degree,
                 tensor_parallel_output=self.config.tensor_parallel_output,
-                pg_loss_coeff=self.pg_loss_coeff,  # donot use this
+                pg_loss_coeff=self.pg_loss_coeff,  # do not use this
                 clip_range_ratio=self.clip_range_ratio,
                 clip_range_ratio_low=self.clip_range_ratio_low,
                 clip_range_ratio_high=self.clip_range_ratio_high,
-                entropy_coeff=self.entropy_coeff,  # donot support this
+                entropy_coeff=self.entropy_coeff,  # do not support this
                 clip_range_score=self.clip_range_score,
                 kl_loss_coeff=self.kl_loss_coeff,
                 loop_chunk_size=1024,

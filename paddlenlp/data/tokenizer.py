@@ -58,7 +58,7 @@ class JiebaTokenizer(BaseTokenizer):
         The method used to cut the text to tokens.
 
         Args:
-            sentence(str): The text that needs to be cuted.
+            sentence(str): The text that needs to be cut.
             cut_all(bool, optional): Whether to use the full mode. If True,
                 using full mode that gets all the possible words from the
                 sentence, which is fast but not accurate. If False, using
@@ -97,7 +97,7 @@ class JiebaTokenizer(BaseTokenizer):
         ids using `vocab`.
 
         Args:
-            sentence(str): The text that needs to be cuted.
+            sentence(str): The text that needs to be cut.
             cut_all(bool, optional): Whether to use the full mode. If True,
                 using full mode that gets all the possible words from the
                 sentence, which is fast but not accurate. If False, using
