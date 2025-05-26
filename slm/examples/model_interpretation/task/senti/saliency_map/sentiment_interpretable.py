@@ -97,7 +97,7 @@ class Senti_data(DatasetBuilder):
 
 def create_dataloader(dataset, trans_fn=None, mode="train", batch_size=1, batchify_fn=None):
     """
-    Creats dataloader.
+    Creates dataloader.
 
     Args:
         dataset(obj:`paddle.io.Dataset`): Dataset instance.
@@ -458,7 +458,7 @@ if __name__ == "__main__":
 
             # Attention
             if args.inter_mode == "attention":
-                # extract attention scores and write resutls to file
+                # extract attention scores and write results to file
                 extract_attention_scores(args, atts, input_ids, tokens, sub_word_id_dict, result, offset, out_handle)
 
             # Integrated_gradient
@@ -496,7 +496,7 @@ if __name__ == "__main__":
                 )
 
             else:
-                raise KeyError(f"Unkonwn interpretable mode: {args.inter_mode}")
+                raise KeyError(f"Unknown interpretable mode: {args.inter_mode}")
 
         if args.inter_mode == "lime":
             log.debug(np.average(np.array(lime_relative_err_total)))
