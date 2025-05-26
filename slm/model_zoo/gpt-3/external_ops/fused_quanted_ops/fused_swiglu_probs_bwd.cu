@@ -246,15 +246,17 @@ std::vector<paddle::Tensor> SwigluProbsGradCUDABackward(
     const paddle::Tensor& do2_s,
     const paddle::Tensor& unzipped_probs) {
   auto o1_dims = o1.dims();
-  const int topk = o1_dims[0];
-  const int seqlen = o1_dims[1];
-  const int seq_len_topk = topk * seqlen;
-  const int moe_intermediate_size_2 = o1_dims[2];
+  int o1_outer_dim = 1;
+  for(int i = 0; i < o1_dims.size() - 1; i++){
+    o1_outer_dim *= o1_dims[i];
+  }
+
+  const int moe_intermediate_size_2 = o1_dims[o1_dims.size() - 1];
   const int moe_intermediate_size = moe_intermediate_size_2 / 2;
 
   auto do1 = paddle::empty_like(o1);
   auto probs_grad = paddle::empty(
-      {o1_dims[0], o1_dims[1]}, paddle::DataType::FLOAT32, o1.place());
+      {o1_outer_dim}, paddle::DataType::FLOAT32, o1.place());
   auto o2_s = paddle::empty_like(do2_s);
 
   const BFloat16* o1_ptr =
@@ -269,7 +271,7 @@ std::vector<paddle::Tensor> SwigluProbsGradCUDABackward(
   constexpr int block_size = 256;
   if (moe_intermediate_size % 4 != 0) {
     SwigluProbsGradKernel<block_size>
-        <<<seq_len_topk, block_size, 0, o1.stream()>>>(o1_ptr,
+        <<<o1_outer_dim, block_size, 0, o1.stream()>>>(o1_ptr,
                                                        do2_s_ptr,
                                                        unzipped_probs_ptr,
                                                        do1_ptr,
@@ -278,7 +280,7 @@ std::vector<paddle::Tensor> SwigluProbsGradCUDABackward(
                                                        moe_intermediate_size);
   } else {
     SwigluProbsGradKernelVec4<block_size>
-        <<<seq_len_topk, block_size, 0, o1.stream()>>>(o1_ptr,
+        <<<o1_outer_dim, block_size, 0, o1.stream()>>>(o1_ptr,
                                                        do2_s_ptr,
                                                        unzipped_probs_ptr,
                                                        do1_ptr,

@@ -1,6 +1,7 @@
 import paddle
 import FusedQuantOps as FQO
 from paddle.base import core
+import numpy as np
 
 REP=100
 
@@ -100,3 +101,8 @@ print("o2_s", o2_s.astype("float32").numpy())
 print("do1_gold", do1_gold.astype("float32").numpy())
 print("do1_splits", do1_splits.astype("float32").numpy())
 print("do1", do1.astype("float32").numpy())
+pg_gold = pg_gold.flatten()
+pg = pg.flatten()
+np.testing.assert_allclose(pg_gold.astype("float32").numpy(), pg.astype("float32").numpy())
+np.testing.assert_allclose(o2_s_gold.astype("float32").numpy(), o2_s.astype("float32").numpy())
+np.testing.assert_allclose(do1_gold.astype("float32").numpy(), do1.astype("float32").numpy())
