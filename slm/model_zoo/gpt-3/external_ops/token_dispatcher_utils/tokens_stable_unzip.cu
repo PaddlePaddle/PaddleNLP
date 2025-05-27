@@ -138,12 +138,12 @@ __global__ void tokens_unzip_stable_kernel(
             shared_expert_probmap[internal_row][expert];
       }
       if constexpr (has_scale) {
-        vectorized_memcpy(&XScale[row * scale_length],
-                          &XScale_unzipped[unzipped_row_idx * scale_length],
+        vectorized_memcpy(&XScale[(int64_t)row * (int64_t)scale_length],
+                          &XScale_unzipped[(int64_t)unzipped_row_idx * (int64_t)scale_length],
                           scale_length);
       }
-      vectorized_memcpy(&X[row * token_length],
-                        &X_unzipped[unzipped_row_idx * token_length],
+      vectorized_memcpy(&X[(int64_t)row * (int64_t)token_length],
+                        &X_unzipped[(int64_t)unzipped_row_idx * (int64_t)token_length],
                         token_length);
     }
   }

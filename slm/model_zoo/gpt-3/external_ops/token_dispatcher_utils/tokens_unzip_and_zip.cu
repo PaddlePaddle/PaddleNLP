@@ -172,7 +172,7 @@ __global__ void tokens_weighted_zip_kernel(
         // 手动类型提升
         float2 token_vec =
             __bfloat1622float2(*reinterpret_cast<const __nv_bfloat162 *>(
-                &unzipped_tokens[fetch_row_index * token_length + x_offset]));
+                &unzipped_tokens[(int64_t)fetch_row_index * (int64_t)token_length + x_offset]));
         float prob = fetch_row >= 0
                          ? __bfloat162float(local_expert_problist[expert])
                          : 0.0f;
@@ -193,7 +193,7 @@ __global__ void tokens_weighted_zip_kernel(
         int fetch_row = local_row_fetchlist[expert];
         int fetch_row_index = fetch_row >= 0 ? fetch_row : 0;
         float token_val = __bfloat162float(
-            unzipped_tokens[fetch_row_index * token_length + i]);
+            unzipped_tokens[(int64_t)fetch_row_index * (int64_t)token_length + i]);
         float prob = fetch_row >= 0
                          ? __bfloat162float(local_expert_problist[expert])
                          : 0.0f;
@@ -210,13 +210,13 @@ __global__ void tokens_weighted_zip_kernel(
          x_offset += thread_stride) {
       __nv_bfloat162 sum = {0, 0};
       __nv_bfloat162 *out_ptr = reinterpret_cast<__nv_bfloat162 *>(
-          &weighted_zipped_tokens[this_row * token_length + x_offset]);
+          &weighted_zipped_tokens[(int64_t)this_row * (int64_t)token_length + x_offset]);
 #pragma unroll
       for (int expert = 0; expert < num_experts; ++expert) {
         const int fetch_row = local_row_fetchlist[expert];
         const int fetch_row_index = fetch_row >= 0 ? fetch_row : 0;
         __nv_bfloat162 token_vec = *reinterpret_cast<const __nv_bfloat162 *>(
-            &unzipped_tokens[fetch_row_index * token_length + x_offset]);
+            &unzipped_tokens[(int64_t)fetch_row_index * (int64_t)token_length + x_offset]);
         __nv_bfloat16 prob =
             fetch_row >= 0 ? local_expert_problist[expert] : (__nv_bfloat16)0;
         __nv_bfloat162 prob_vec = {prob, prob};
@@ -234,7 +234,7 @@ __global__ void tokens_weighted_zip_kernel(
         int fetch_row = local_row_fetchlist[expert];
         int fetch_row_index = fetch_row >= 0 ? fetch_row : 0;
         __nv_bfloat16 token_val =
-            unzipped_tokens[fetch_row_index * token_length + i];
+            unzipped_tokens[(int64_t)fetch_row_index * (int64_t)token_length + i];
         __nv_bfloat16 prob =
             fetch_row >= 0 ? local_expert_problist[expert] : (__nv_bfloat16)0;
         sum += prob * token_val;
