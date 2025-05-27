@@ -41,6 +41,7 @@
     "fuse_attention_qkv": true,
     "use_flash_attention": true,
     "fused_linear": true,
+    "fused_linear_param_grad_add": 1,
     "enable_linear_fused_grad_add": true,
     "use_fused_rope": true,
     "use_fused_rms_norm": true,
