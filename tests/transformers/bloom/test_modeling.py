@@ -506,7 +506,8 @@ class BloomModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase)
             with paddle.no_grad():
                 embeds_output = model(**inputs)
 
-            self.assertTrue(paddle.allclose(ids_output, embeds_output, rtol=1e-4, atol=1e-4))
+            for ids_output_, embeds_output_ in zip(ids_output, embeds_output):
+                self.assertTrue(paddle.allclose(ids_output_, embeds_output_, rtol=1e-4, atol=1e-4))
 
 
 class BloomCompatibilityTest(unittest.TestCase):
