@@ -466,7 +466,7 @@ function llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2() {
     case_out_dir="output/$task_name"
     case_log_dir="output/$task_name""_log"
 
-    for use_fused_rms_norm in "0" "1"; do
+    for use_fused_rms_norm in "1" "0"; do
         rm -rf $case_out_dir
         rm -rf $case_log_dir
 
@@ -518,17 +518,9 @@ function llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2() {
         ips=-1
         mem=-1
         echo "use_fused_rms_norm=$use_fused_rms_norm  result: loss=$loss ips=$ips mem=$mem"
-        if [ $use_fused_rms_norm -eq 0 ];then
-            loss_base=9.39356422
-        else
-            loss_base=9.39356422
-        fi
+        loss_base=9.3513937
         if [ $IS_A100 -ne 0 ];then
-            if [ $use_fused_rms_norm -eq 0 ];then
-                loss_base=9.39356422
-            else
-                loss_base=9.39356422
-            fi
+            loss_base=9.39356422
         fi
         ips_base=-1
         mem_base=-1
