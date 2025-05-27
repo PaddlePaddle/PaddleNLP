@@ -669,7 +669,7 @@ class ChatTemplateMixin:
             conversation = [[conversation]]
         elif isinstance(conversation, list) and isinstance(conversation[0], str):
             raise ValueError(
-                "apply_chat_template do not support applying batch conversations, "
+                "apply_chat_template do not support appling batch conversations, "
                 "so you should apply the conversation one by one."
             )
 
@@ -691,7 +691,7 @@ class ChatTemplateMixin:
                 conversations = conversation
             else:
                 raise ValueError(
-                    "apply_chat_template do not support applying batch conversations, "
+                    "apply_chat_template do not support appling batch conversations, "
                     "so you should apply the conversation one by one."
                 )
         query = self.chat_template.render(
@@ -1936,7 +1936,7 @@ class BPETokenizer(PretrainedTokenizer):
             The reversible bpe codes work on unicode strings.
             This means you need a large # of unicode characters in your vocab if you want to avoid UNKs.
             When you're at something like a 10B token dataset you end up needing around 5K for decent coverage.
-            This is a significant percentage of your normal, say, 32K bpe vocab.
+            This is a signficant percentage of your normal, say, 32K bpe vocab.
             To avoid that, we want lookup tables between utf-8 bytes and unicode strings.
             And avoids mapping to whitespace/control characters the bpe code barfs on.
             """

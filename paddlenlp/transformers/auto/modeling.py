@@ -124,9 +124,7 @@ MAPPING_NAMES = OrderedDict(
         ("Mistral", "mistral"),
         ("Mixtral", "mixtral"),
         ("Qwen2", "qwen2"),
-        ("Qwen3", "qwen3"),
         ("Qwen2Moe", "qwen2_moe"),
-        ("Qwen3Moe", "qwen3_moe"),
         ("Gemma", "gemma"),
         ("Yuan", "yuan"),
         ("Mamba", "mamba"),
@@ -859,7 +857,7 @@ class AutoInferenceModelForCausalLM(_BaseAutoModelClass):
         model_class = getattr(import_class, model_class_name)
 
         # It may return a new model class, like LlamaForCausalLMAvxInferenceModel
-        # Some model have different inference model class in different execution device
+        # Some model have different inference model class in deifferent execution divice
         # LlamaForCausalLMAvxInferenceModel is used in cpu execution device with avx instruction set
         model_class = model_class.confirm_inference_model(predictor_args=predictor_args)
 
@@ -933,7 +931,7 @@ class AutoInferenceModelForCausalLM(_BaseAutoModelClass):
         model_class = getattr(import_class, model_class_name)
 
         # It may return a new model class, like LlamaForCausalLMAvxInferenceModel
-        # Some model have different inference model class in different execution device
+        # Some model have different inference model class in deifferent execution divice
         # LlamaForCausalLMAvxInferenceModel is used in cpu execution device with avx instruction set
         model_class = model_class.confirm_inference_model(predictor_args=predictor_args)
 

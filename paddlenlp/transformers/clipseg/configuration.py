@@ -239,7 +239,7 @@ class CLIPSegConfig(PretrainedConfig):
         projection_dim (`int`, *optional*, defaults to 512):
             Dimensionality of text and vision projection layers.
         logit_scale_init_value (`float`, *optional*, defaults to 2.6592):
-            The initial value of the *logit_scale* parameter. Default is used as per the original CLIPSeg implementation.
+            The inital value of the *logit_scale* paramter. Default is used as per the original CLIPSeg implementation.
         extract_layers (`List[int]`, *optional*, defaults to [3, 6, 9]):
             Layers to extract when forwarding the query image through the frozen visual backbone of CLIP.
         reduce_dim (`int`, *optional*, defaults to 64):
@@ -327,7 +327,7 @@ class CLIPSegConfig(PretrainedConfig):
                     else:
                         message = (
                             f"`text_config_dict` is provided which will be used to initialize `CLIPSegTextConfig`. The "
-                            f'value `text_config["{key}"]` will be overridden.'
+                            f'value `text_config["{key}"]` will be overriden.'
                         )
                     logger.warning(message)
 
@@ -359,7 +359,7 @@ class CLIPSegConfig(PretrainedConfig):
                     else:
                         message = (
                             f"`vision_config_dict` is provided which will be used to initialize `CLIPSegVisionConfig`. "
-                            f'The value `vision_config["{key}"]` will be overridden.'
+                            f'The value `vision_config["{key}"]` will be overriden.'
                         )
                     logger.warning(message)
 

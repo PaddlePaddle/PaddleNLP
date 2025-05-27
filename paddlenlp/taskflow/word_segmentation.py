@@ -102,7 +102,7 @@ class SegJiebaTask(Task):
 
 class SegLACTask(LacTask):
     """
-    Segment the sentences to the words using LAC mode.
+    Segement the sentences to the words using LAC mode.
     Args:
         task(string): The name of task.
         model(string): The model name in the task.
@@ -150,7 +150,7 @@ class SegLACTask(LacTask):
 
 class SegWordTagTask(NERWordTagTask):
     """
-    Segment the sentences to the words using WordTag model.
+    Segement the sentences to the words using WordTag model.
     Args:
         task(string): The name of task.
         model(string): The model name in the task.

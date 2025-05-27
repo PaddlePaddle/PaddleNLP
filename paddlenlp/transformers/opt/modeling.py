@@ -181,7 +181,7 @@ class MultiHeadAttention(nn.Layer):
 
     def _prepare_qkv(self, query, key, value, use_cache=False, cache=None):
         r"""
-        Prepares linear projected queries, keys and values for usage of subsequent
+        Prapares linear projected queries, keys and values for usage of subsequnt
         multiple parallel attention. If `cache` is not None, using cached results
         to reduce redundant calculations.
 
@@ -227,7 +227,7 @@ class MultiHeadAttention(nn.Layer):
 
     def gen_cache(self, key, value=None, type=Cache):
         """
-        Generates cache for `forward` usage in inference according to arguments.
+        Generates cache for `forward` usage in inference accroding to arguments.
         The generated cache is an instance of `MultiHeadAttention.Cache` or an
         instance of `MultiHeadAttention.StaticCache`.
         """
@@ -494,7 +494,7 @@ class TransformerDecoder(Layer):
 
 
 class OPTLearnedPositionEmbedding(nn.Embedding):
-    """this module learns positional embeddings up to a fixed maximum size"""
+    """this module learns postional embeddings up to a fixed maximum size"""
 
     def __init__(self, num_embeddings: int, embedding_dim: int, initializer_range: float):
         """OPT is set up so that if padding_idx is specified then offset the embedding ids by 2
@@ -983,7 +983,7 @@ class OPTModel(OPTPretrainedModel):
     def get_input_embeddings(self):
         """get opt input word embedding
         Returns:
-            nn.Embedding: the input word embedding of opt model
+            nn.Embedding: the input word embedding of opt mdoel
         """
         return self.embeddings.word_embeddings
 

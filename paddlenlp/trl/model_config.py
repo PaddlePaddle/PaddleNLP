@@ -86,7 +86,8 @@ class ModelConfig:
     use_mora: bool = field(
         default=False, metadata={"help": "Whether to use MoRA: https://arxiv.org/pdf/2405.12130.pdf"}
     )
-
+    nola: bool = field(default=False, metadata={"help": "Whether to use Nola: https://arxiv.org/pdf/2310.02556"})
+    nola_basis_num: int = field(default=1, metadata={"help": "When use nola, the number of basis"})
     # vera related parameters
     vera: bool = field(default=False, metadata={"help": "Whether to use vera technique"})
     vera_rank: int = field(default=8, metadata={"help": "Vera attention dimension"})
@@ -96,7 +97,7 @@ class ModelConfig:
     lokr_path: str = field(
         default=None, metadata={"help": "Initialize lokr state dict and apply customized lokr config"}
     )
-    lokr_dim: int = field(default=8, metadata={"help": "Lora dimension in LoKr dimension for adapter matrix"})
+    lokr_dim: int = field(default=8, metadata={"help": "Lora dimention in LoKr dimension for adapter matrix"})
 
     # prefix tuning related parameters
     prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})

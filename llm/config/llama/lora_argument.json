@@ -32,5 +32,7 @@
     "use_flash_attention": true,
     "unified_checkpoint": true,
     "pissa": false,
-    "use_mora": false
+    "use_mora": false,
+    "nola": false,
+    "nola_basis_num": 1
   }

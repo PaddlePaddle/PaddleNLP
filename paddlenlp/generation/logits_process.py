@@ -439,7 +439,7 @@ class SequenceBiasLogitsProcessor(LogitsProcessor):
         self._validate_arguments()
 
         # Bias variables that will be populated on the first call (for retrocompatibility purposes, the vocabulary size
-        # is inferred in the first usage, which inhibits initializing here)
+        # is infered in the first usage, which inhibits initializing here)
         self.length_1_bias = None
         self.prepared_bias_variables = False
 

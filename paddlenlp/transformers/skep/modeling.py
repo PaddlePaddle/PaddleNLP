@@ -380,7 +380,7 @@ class SkepModel(SkepPretrainedModel):
         """get skep input word embedding
 
         Returns:
-            nn.Embedding: the input word embedding of skep model
+            nn.Embedding: the input word embedding of skep mdoel
         """
         return self.embeddings.word_embeddings
 
@@ -399,7 +399,7 @@ class SkepForSequenceClassification(SkepPretrainedModel):
     designed for sequence classification/regression tasks like GLUE tasks.
 
     Args:
-        config (:class:`SkepConfig`): An instance of SkepConfig used to construct SkepForSequenceClassification.
+        config (:class:`SkepConfig`): An instance of SkepConfig used to contruct SkepForSequenceClassification.
     """
 
     def __init__(self, config: SkepConfig):

@@ -606,7 +606,7 @@ class FPN(Backbone):
 
 def make_stage(*args, **kwargs):
     """
-    Deprecated alias for backward compatibility.
+    Deprecated alias for backward compatibiltiy.
     """
     return ResNet.make_stage(*args, **kwargs)
 

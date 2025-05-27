@@ -1352,7 +1352,7 @@ class GemmaPretrainingCriterion(nn.Layer):
         if self.enable_parallel_cross_entropy:
             if prediction_scores.shape[-1] == self.config.vocab_size:
                 warnings.warn(
-                    f"enable_parallel_cross_entropy, the vocab_size should be split: {prediction_scores.shape[-1]}, {self.config.vocab_size}"
+                    f"enable_parallel_cross_entropy, the vocab_size should be splited: {prediction_scores.shape[-1]}, {self.config.vocab_size}"
                 )
                 self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
 
@@ -1555,7 +1555,7 @@ class GemmaForCausalLM(GemmaPretrainedModel):
         hidden_states = outputs[0]  # [bs, seq_len, dim]
 
         # if labels is None，means we need full output, instead of tensor_parallel_output
-        # tensor_parallel_output is together with ParallelCrossEntropy
+        # tensor_parallel_output is togather with ParallelCrossEntropy
         tensor_parallel_output = self.config.tensor_parallel_output and self.config.tensor_parallel_degree > 1
 
         if labels is not None and self.config.use_fused_linear_cross_entropy:

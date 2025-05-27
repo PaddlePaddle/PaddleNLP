@@ -913,7 +913,7 @@ class InferTransformerModel(TransformerModel):
             The dropout probability used in MHA to drop some attention target.
             If None, use the value of dropout. Defaults to None.
         act_dropout (float):
-            The dropout probability used after FFN activation. If None, use
+            The dropout probability used after FFN activition. If None, use
             the value of dropout. Defaults to None.
         bos_id (int, optional):
             The start token id and also is used as padding id. Defaults to 0.
@@ -1102,7 +1102,7 @@ class InferTransformerModel(TransformerModel):
     def beam_search_v2(self, src_word, beam_size=4, max_len=None, alpha=0.6, trg_word=None, trg_length=None):
         """
         Beam search with the alive and finished two queues, both have a beam size
-        capacity separately. It includes `grow_topk` `grow_alive` `grow_finish` as
+        capicity separately. It includes `grow_topk` `grow_alive` `grow_finish` as
         steps.
         1. `grow_topk` selects the top `2*beam_size` candidates to avoid all getting
         EOS.

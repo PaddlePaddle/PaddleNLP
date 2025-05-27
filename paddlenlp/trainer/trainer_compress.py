@@ -700,10 +700,10 @@ def _quant_aware_training_dynamic(self, input_dir):
     args.output_filename_prefix = "int8"
 
     quant_config = {
-        # It defaults to None, which means that no preprocessing is performed
+        # It defauts to None, which means that no preprocessing is performed
         # on the active value."
         "activation_preprocess_type": "PACT" if args.use_pact else None,
-        # It defaults to None, which means that no preprocessing is performed
+        # It defauts to None, which means that no preprocessing is performed
         # on weights.
         "weight_preprocess_type": "PACT" if args.use_pact else None,
         "weight_quantize_type": args.weight_quantize_type,
@@ -713,7 +713,7 @@ def _quant_aware_training_dynamic(self, input_dir):
         "weight_bits": 8,
         "activation_bits": 8,
         "dtype": "int8",
-        # window size for 'range_abs_max' quantization. default is 10000
+        # window size for 'range_abs_max' quantization. defaulf is 10000
         "window_size": 10000,
         "quantizable_layer_type": ["Linear", "Conv2D"],
         "moving_rate": args.moving_rate,

@@ -12,31 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import paddle
-from paddle import nn
 import functools
 import math
 import operator
 from typing import Literal, TypeAlias
+
+import paddle
 import paddle.distributed as dist
-
-from paddle import Tensor
-from paddle import _C_ops, base, in_dynamic_mode
-from paddle.distributed.fleet.base import topology as tp
+from paddle import Tensor, _C_ops, base, in_dynamic_mode, nn
 from paddle.distributed import collective
-from paddle.tensor.manipulation import reshape
+from paddle.distributed.fleet.base import topology as tp
 from paddle.nn.layer.layers import Layer
-_ReduceMode: TypeAlias = Literal['mean', 'sum', 'none']
+from paddle.tensor.manipulation import reshape
+
+_ReduceMode: TypeAlias = Literal["mean", "sum", "none"]
 
 
-# TODO: this function is rewrote from paddle.nn.functional.cross_entropy,
+# TODO: this function is rewrited from paddle.nn.functional.cross_entropy,
 # but better to merge into only one.
 def parallel_cross_entropy(
     input: Tensor,
     label: Tensor,
     weight: Tensor | None = None,
     ignore_index: int = -100,
-    reduction: _ReduceMode = 'mean',
+    reduction: _ReduceMode = "mean",
     soft_label: bool = False,
     axis: int = -1,
     use_softmax: bool = True,
@@ -44,7 +43,7 @@ def parallel_cross_entropy(
     name: str | None = None,
 ) -> Tensor:
 
-    if reduction not in ['sum', 'mean', 'none']:
+    if reduction not in ["sum", "mean", "none"]:
         raise ValueError(
             "The value of 'reduction' in softmax_cross_entropy"
             f"should be 'sum', 'mean' or 'none', but received {reduction}, which is not allowed."
@@ -57,7 +56,7 @@ def parallel_cross_entropy(
 
     input_dims = len(list(input.shape))
     if input_dims == 0:
-        raise ValueError('The dimension of input should be larger than zero!')
+        raise ValueError("The dimension of input should be larger than zero!")
 
     label_dims = len(list(label.shape))
     if input_dims - 1 == label_dims:
@@ -65,8 +64,8 @@ def parallel_cross_entropy(
 
     if input_dims - 1 != label_dims and input_dims != label_dims:
         raise ValueError(
-            f'Expected nput_dims - 1 = label_dims or input_dims == label_dims\
-             (got nput_dims{input_dims}, label_dims{label_dims})'
+            f"Expected nput_dims - 1 = label_dims or input_dims == label_dims\
+             (got nput_dims{input_dims}, label_dims{label_dims})"
         )
 
     if label_smoothing > 0.0:
@@ -78,26 +77,20 @@ def parallel_cross_entropy(
             label = paddle.squeeze(label, axis=axis)
             label = paddle.nn.functional.one_hot(label, input.shape[-1])
 
-        label = paddle.nn.functional.label_smooth(
-            label, epsilon=label_smoothing
-        )
+        label = paddle.nn.functional.label_smooth(label, epsilon=label_smoothing)
         label = label.astype(input.dtype)
         label_dims = len(list(label.shape))
 
     if not soft_label:
-        valid_label = (
-            paddle.cast(label != ignore_index, dtype=label.dtype) * label
-        )
-    
+        valid_label = paddle.cast(label != ignore_index, dtype=label.dtype) * label
+
     if soft_label == False and is_tensor_sharded(input):
         group = tp._HYBRID_PARALLEL_GROUP.get_model_parallel_group()
         ring_id = group.id
         nranks = group.nranks
         global_rank = collective._get_global_env().rank
         rank = group.get_group_rank(global_rank)
-        _, out = _C_ops.c_softmax_with_cross_entropy(
-            input, label, ignore_index, ring_id, rank, nranks
-        )
+        _, out = _C_ops.c_softmax_with_cross_entropy(input, label, ignore_index, ring_id, rank, nranks)
     else:
         from paddlenlp.utils.log import logger
 
@@ -105,14 +98,12 @@ def parallel_cross_entropy(
             "Failed to replace CrossEntropyLoss with ParallelCrossEntropyLoss. Please ensure: \n"
             "1. soft_label=False is set for parallel computation (current value: {}) \n"
             "2. Input tensor is properly sharded (current sharding status: {}) \n".format(
-                soft_label, 
+                soft_label,
                 input_placement,
             )
         )
 
-        _, out = _C_ops.cross_entropy_with_softmax(
-            input, label, soft_label, use_softmax, True, ignore_index, axis
-        )
+        _, out = _C_ops.cross_entropy_with_softmax(input, label, soft_label, use_softmax, True, ignore_index, axis)
 
     if weight is not None:
         # trans weight from class to sample, shape:N or [N,H,W] for 1d and 2d cases.
@@ -140,39 +131,22 @@ def parallel_cross_entropy(
                     "when weight is provided"
                 )
 
-            ignore_weight_mask = paddle.cast(
-                (label != ignore_index), out.dtype
-            )
-            if (
-                ignore_weight_mask.ndim > 1
-                and ignore_weight_mask.shape[axis] == 1
-            ):
+            ignore_weight_mask = paddle.cast((label != ignore_index), out.dtype)
+            if ignore_weight_mask.ndim > 1 and ignore_weight_mask.shape[axis] == 1:
                 # TODO: Temporarily use squeeze instead of squeeze_
-                ignore_weight_mask = paddle.squeeze(
-                    ignore_weight_mask, axis
-                )
+                ignore_weight_mask = paddle.squeeze(ignore_weight_mask, axis)
             if axis != -1 and axis != valid_label.ndim - 1:
                 temp_perm = (
                     list(range(axis % valid_label.ndim))
-                    + list(
-                        range(
-                            (axis % valid_label.ndim + 1), valid_label.ndim
-                        )
-                    )
+                    + list(range((axis % valid_label.ndim + 1), valid_label.ndim))
                     + [axis % valid_label.ndim]
                 )
-                weight_gather = _C_ops.gather_nd(
-                    weight, valid_label.transpose(temp_perm)
-                )
+                weight_gather = _C_ops.gather_nd(weight, valid_label.transpose(temp_perm))
             else:
                 weight_gather = _C_ops.gather_nd(weight, valid_label)
-            weight_gather = _C_ops.multiply(
-                weight_gather, ignore_weight_mask
-            )
+            weight_gather = _C_ops.multiply(weight_gather, ignore_weight_mask)
             input_shape = list(label.shape)
-            weight_gather_reshape = reshape(
-                weight_gather, shape=input_shape
-            )
+            weight_gather_reshape = reshape(weight_gather, shape=input_shape)
             out = paddle.cast(out, weight_gather_reshape.dtype)
             out = _C_ops.multiply(out, weight_gather_reshape)
 
@@ -200,24 +174,14 @@ def parallel_cross_entropy(
                 ret = out_sum / (count + (count == 0.0).astype(count.dtype))
             else:
                 mask = paddle.cast(mask, weight_gather_reshape.dtype)
-                weight_ignored = _C_ops.multiply(
-                    mask, weight_gather_reshape
-                )
+                weight_ignored = _C_ops.multiply(mask, weight_gather_reshape)
                 weight_sum = _C_ops.sum(weight_ignored, [], None, False)
-                ret = out_sum / (
-                    weight_sum
-                    + (weight_sum == 0.0).astype(weight_sum.dtype)
-                )
+                ret = out_sum / (weight_sum + (weight_sum == 0.0).astype(weight_sum.dtype))
             return ret
         elif weight is not None:
             out_sum = _C_ops.sum(out, [], None, False)
-            total_weight = _C_ops.sum(
-                weight_gather_reshape, [], None, False
-            )
-            return out_sum / (
-                total_weight
-                + (total_weight == 0.0).astype(total_weight.dtype)
-            )
+            total_weight = _C_ops.sum(weight_gather_reshape, [], None, False)
+            return out_sum / (total_weight + (total_weight == 0.0).astype(total_weight.dtype))
         else:
             return _C_ops.mean_all(out)
 

@@ -53,8 +53,6 @@ class Engine(object):
         initialize engine and start sub services
         """
         assert not self.is_started, "The engine is already started.!"
-        msg_queue_id_str = os.getenv("INFERENCE_MSG_QUEUE_ID", str(os.getpid()))
-        os.environ["INFERENCE_MSG_QUEUE_ID"] = msg_queue_id_str
         start_time = time.time()
 
         self.token_processor.tasks_queue = self.tasks_queue

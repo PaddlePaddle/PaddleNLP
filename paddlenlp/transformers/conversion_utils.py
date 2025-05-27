@@ -38,7 +38,7 @@ from paddle import Tensor
 from paddle.nn import Layer
 
 from paddlenlp.utils.distributed import distributed_allgather, distributed_gather
-from paddlenlp.utils.env import CONFIG_NAME, PYTORCH_WEIGHTS_NAME
+from paddlenlp.utils.env import CONFIG_NAME, PADDLE_WEIGHTS_NAME, PYTORCH_WEIGHTS_NAME
 from paddlenlp.utils.import_utils import (
     is_package_available,
     is_torch_available,
@@ -572,14 +572,14 @@ def split_param_func():
             [gate_weight, up_weight] => [gate_weight], [up_weight]
 
         Args:
-            fused_param (_type_): len(fused_param)=1, only one weight to be split
+            fused_param (_type_): len(fused_param)=1, only one weight to be splitted
             split_nums (int, optional): split_nums. Defaults to 2.
             is_qkv (bool, optional): for attention qkv weights. Defaults to False.
             num_heads (_type_, optional): query heads. Defaults to None.
             num_key_value_heads (_type_, optional): key and value heads. Defaults to None.
 
         Returns:
-            _type_: split weights
+            _type_: splitted weights
         """
         concat_fn = np.concatenate
         split_fn = np.split
@@ -850,7 +850,7 @@ class LogitHooker:
         self.tensor_info_saver.add(state_dict_name, "pytorch-outputs", outputs)
 
     def register_paddle_model_hooks(self, model: Layer):
-        """register post forward hook to save the inputs & outputs of paddle model
+        """regist post forward hook to save the inputs & outputs of paddle model
 
         Args:
             model (Layer): paddle model
@@ -885,7 +885,7 @@ class LogitHooker:
             register_hook_by_name(model, mapping, self._paddle_hooks)
 
     def register_pytorch_model_hooks(self, model: Module):
-        """register hook for pytorch model to save the inputs & outputs of pytorch model
+        """regist hook for pytorch model to save the inputs & outputs of pytorch model
 
         Args:
             model (_type_): pytorch model
@@ -1134,7 +1134,7 @@ class LogitComparer:
 class ConversionMixin:
     @classmethod
     def support_conversion(cls, config: PretrainedConfig) -> bool:
-        """check whether the model support conversion"""
+        """check wether the model support conversion"""
         try:
             # try to get the name-mapping info
             _ = cls._get_name_mappings(config)
@@ -1161,7 +1161,7 @@ class ConversionMixin:
                     file for file in os.listdir(os.path.dirname(weight_file)) if file.startswith("pytorch_model-")
                 ]
             state_dict = {}
-            for file in sorted(files):
+            for file in files:
                 sub_state_dict = load_torch(os.path.join(os.path.dirname(weight_file), file))
                 state_dict.update(sub_state_dict)
         else:
@@ -1179,9 +1179,13 @@ class ConversionMixin:
                 all_layer_names.remove(name_mapping.source_name)
 
         if all_layer_names:
-            logger.warning(f"There are {len(all_layer_names)} tensors not initialized:")
-            logger.warning(f"Keys: {all_layer_names}")
+            logger.warning(f"there are {len(all_layer_names)} tensors not initialized:")
+            for layer_name in all_layer_names:
+                logger.warning(f"--- {layer_name}")
 
+        model_weight_file = os.path.join(cache_dir, PADDLE_WEIGHTS_NAME)
+        if not os.path.isfile(model_weight_file):
+            paddle.save(state_dict, model_weight_file)
         return state_dict
 
     @classmethod
@@ -1549,7 +1553,10 @@ class Converter(ConversionMixin, LogitComparer):
             all_layer_names.remove(name_mapping.source_name)
 
         if all_layer_names:
-            logger.warning(f"There are {len(all_layer_names)} tensors not initialized:")
-            logger.warning(f"Keys: {all_layer_names}")
+            logger.warning(f"there are {len(all_layer_names)} tensors not initialized:")
+            for layer_name in all_layer_names:
+                logger.warning(f"--- {layer_name}")
 
+        model_weight_file = os.path.join(input_dir, PADDLE_WEIGHTS_NAME)
+        paddle.save(state_dict, model_weight_file)
         return state_dict

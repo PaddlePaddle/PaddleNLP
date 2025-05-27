@@ -1,6 +1,6 @@
 # GRPO && REINFORCE++
 
-GRPO（Group Relative Policy Optimization，组相对策略优化）是 PPO（Proximal Policy Optimization，近端策略优化）算法的一种变体。与 PPO 不同，GRPO 省略了价值函数估计器。在 GRPO 中，对于每个状态 $s$，算法会从当前策略 $\pi_{\theta_{t}}$ 中采样多个动作 $a_{1}, \dots, a_{G}$。然后，GRPO 计算这些动作相对于组内其他动作的“组相对优势”（group-relative advantage），以此作为优化策略的依据。
+GRPO（Group Relative Policy Optimization，组相对策略优化）是 PPO（Proximal Policy Optimization，近端策略优化）算法的一种变体。与 PPO 不同，GRPO 省略了价值函数估计器。在 GRPO 中，对于每个状态 \(s\)，算法会从当前策略 \(\pi_{\theta_{t}}\) 中采样多个动作 \(a_{1}, \dots, a_{G}\)。然后，GRPO 计算这些动作相对于组内其他动作的“组相对优势”（group-relative advantage），以此作为优化策略的依据。
 REINFORCE++ 是经典 REINFORCE 算法的改进版本，通过融合 PPO 的关键优化技术并移除 Critic Model，实现了更加简洁高效的策略优化。相比于传统的 REINFORCE，REINFORCE++ 在 Token-Level KL 惩罚、PPO-Clip、优势标准化、奖励裁剪和奖励标准化等关键技术上进行了改进，从而提高了训练过程的效率和稳定性。
 
 以下是详细的使用文档和示例：
@@ -203,7 +203,6 @@ export FLAGS_cascade_attention_max_partition_size=2048
 
 python -u -m paddle.distributed.launch --devices "0,1,2,3" run_rl.py ../../config/qwen/reinforce_plus_plus_argument.yaml
 ```
-我们提供根据上述脚本可复现的[wandb 日志](https://api.wandb.ai/links/ainlp66-netflix/injcw3ra)。
 
 ### 在线监控
 在`grpo_argument.yaml`和`reinforce_plus_plus_argument.yaml`中设置的输出目录为`"logging_dir": "vdl_log"`, 可以通过以下命令查看训练过程

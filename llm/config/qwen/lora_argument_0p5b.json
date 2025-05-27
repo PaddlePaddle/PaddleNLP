@@ -30,5 +30,7 @@
     "unified_checkpoint": true,
     "zero_padding": false,
     "use_flash_attention": false,
-    "pissa": false
+    "pissa": false,
+    "nola": false,
+    "nola_basis_num": 1
   }

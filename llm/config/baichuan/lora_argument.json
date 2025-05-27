@@ -31,5 +31,7 @@
     "lora": true,
     "zero_padding": false,
     "unified_checkpoint": true,
-    "use_flash_attention": true
+    "use_flash_attention": true,
+    "nola": false,
+    "nola_basis_num": 1
   }

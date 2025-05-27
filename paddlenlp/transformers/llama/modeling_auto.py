@@ -1178,24 +1178,26 @@ class LlamaPretrainingCriterion3DAuto(paddle.nn.Layer):
                     masked_lm_labels.unsqueeze(2),
                 )
 
-            # XPU dose not support allgather mask with bool dtype, so we use local_map here.
+            # XPU dose not support allgather mask with bool dtype, so we use LocalLayer here.
             if get_env_device() == "xpu":
 
-                def coculate_loss(x, mask):
-                    masked_lm_loss = paddle.masked_select(x, mask).astype("float32")
-                    loss = paddle.mean(masked_lm_loss).unsqueeze(0)
-                    return loss.unsqueeze(0)
+                class LocalLossLayer(paddle.distributed.LocalLayer):
+                    def __init__(self, out_dist_attrs, grad_dist_attrs):
+                        super().__init__(out_dist_attrs, grad_dist_attrs)
+
+                    def forward(self, x, mask):
+                        masked_lm_loss = paddle.masked_select(x, mask).astype("float32")
+                        loss = paddle.mean(masked_lm_loss).unsqueeze(0)
+                        return loss.unsqueeze(0)
 
                 out_dist_attrs = [
-                    [dist.Shard(0), dist.Replicate()],
+                    (masked_lm_loss.process_mesh, [dist.Shard(0), dist.Replicate()]),
                 ]
                 grad_dist_attrs = [
-                    [dist.Shard(0), dist.Replicate()],
+                    (masked_lm_loss.process_mesh, [dist.Shard(0), dist.Replicate()]),
                     None,
                 ]
-                loss_func = dist.local_map(
-                    coculate_loss, out_dist_attrs, grad_dist_attrs, masked_lm_loss.process_mesh, reshard_inputs=True
-                )
+                loss_func = LocalLossLayer(out_dist_attrs, grad_dist_attrs)
 
                 loss = loss_func(masked_lm_loss, masked_lm_loss > 0)
                 loss = loss.mean()
@@ -1354,7 +1356,7 @@ class LlamaForCausalLM3DAuto(LlamaPretrainedModelAuto):
             hidden_states = paddle.transpose(hidden_states, [1, 0, 2])
 
         # if labels is None，means we need full output, instead of tensor_parallel_output
-        # tensor_parallel_output is together with ParallelCrossEntropy
+        # tensor_parallel_output is togather with ParallelCrossEntropy
         tensor_parallel_output = (
             self.config.tensor_parallel_output and labels is not None and self.config.tensor_parallel_degree > 1
         )

@@ -292,11 +292,11 @@ class BlipConfig(PretrainedConfig):
         vision_config (`dict`, *optional*):
             Dictionary of configuration options used to initialize [`BlipVisionConfig`].
         projection_dim (`int`, *optional*, defaults to 512):
-            Dimensionality of text and vision projection layers.
+            Dimentionality of text and vision projection layers.
         logit_scale_init_value (`float`, *optional*, defaults to 2.6592):
-            The initial value of the *logit_scale* parameter. Default is used as per the original BLIP implementation.
+            The inital value of the *logit_scale* paramter. Default is used as per the original BLIP implementation.
         image_text_hidden_size (`int`, *optional*, defaults to 768):
-            Dimensionality of the hidden state of the image-text fusion layer.
+            Dimentionality of the hidden state of the image-text fusion layer.
         kwargs (*optional*):
             Dictionary of keyword arguments.
 

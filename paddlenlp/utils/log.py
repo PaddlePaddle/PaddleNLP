@@ -41,7 +41,7 @@ log_config = {
 
 class Logger(object):
     """
-    Default logger in PaddleNLP
+    Deafult logger in PaddleNLP
 
     Args:
         name(str) : Logger name, default is 'PaddleNLP'
@@ -137,7 +137,7 @@ class Logger(object):
 
 class MetricsDumper(object):
     """
-    Default JSONDumper in PaddleNLP
+    Deafult JSONDumper in PaddleNLP
 
     Args:
         name(str) : Logger name, default is 'PaddleNLP'
