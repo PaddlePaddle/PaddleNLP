@@ -53,11 +53,7 @@ try:
 except:
     pass
 
-try:
-    from paddle.nn.functional import flash_attn_v3
-    from paddle.nn.functional.flash_attention import flash_attention
-except:
-    flash_attention = None
+from paddle.nn.functional.flash_attention import flash_attention
 
 
 from paddle import _C_ops
@@ -1063,9 +1059,24 @@ class MemroyRecomputeAttnFunc(paddle.autograd.PyLayer):
             )
 
         elif FA_VERSION == 3:
-            attn_out, softmax_lse = flash_attn_v3(
-                query_states, key_states, value_states, softmax_scale=softmax_scale, causal=True
-            )
+            attn_out, softmax_lse = _C_ops.flash_attn_v3(
+                    query_states,
+                    key_states,
+                    value_states,
+                    None,  # q_v_
+                    None,  # q_descale_
+                    None,  # k_descale_
+                    None,  # v_descale_
+                    softmax_scale,
+                    True,
+                    -1,  # window_size_left
+                    -1,  # window_size_right
+                    0.0,  # softcap
+                    1,  # num_splits
+                    False,  # manual_set_pack_gqa
+                    False,  # pack_gqa_
+                    0,  # sm_margin
+                )
         else:
             assert False, f"invalid {FA_VERSION=}"
 
