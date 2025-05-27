@@ -727,6 +727,12 @@ class QWenModelAuto(QWenPretrainedModelAuto):
                         get_mesh(block.ipp),
                         [dist.Replicate(), dist.Replicate()],
                     )
+            else:
+                hidden_states = dist.reshard(
+                    hidden_states,
+                    get_mesh(block.ipp),
+                    [dist.Shard(0), dist.Shard(1)],
+                )
             if self.enable_recompute and self.training and has_gradient and self.recompute_granularity == "full":
                 outputs = self.recompute_training(
                     block,
@@ -879,7 +885,7 @@ class QWenForCausalLM3DAuto(QWenPretrainedModelAuto):
         hidden_states = transformer_outputs[0]
 
         # if labels is None，means we need full output, instead of tensor_parallel_output
-        # tensor_parallel_output is together with ParallelCrossEntropy
+        # tensor_parallel_output is togather with ParallelCrossEntropy
         tensor_parallel_output = (
             self.config.tensor_parallel_output and labels is not None and self.config.tensor_parallel_degree > 1
         )
