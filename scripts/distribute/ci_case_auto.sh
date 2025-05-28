@@ -310,7 +310,7 @@ function llama_dygraph_auto_bs4_bf16_SD2() {
                     if [ $acc_step -eq 1 ]; then
                         loss_base=9.25958862
                     else
-                        loss_base=9.25958862
+                        loss_base=9.23504868
                     fi
                 else
                     loss_base=-1
