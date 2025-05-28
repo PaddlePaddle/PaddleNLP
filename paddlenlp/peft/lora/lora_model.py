@@ -471,6 +471,9 @@ class LoRAModel(nn.Layer):
         for name in attribute_chain[:-1]:
             parent_module = getattr(parent_module, name)
         module = getattr(parent_module, attribute_chain[-1])
+        # print(f"find module {module}")
+        # for attr_name, attr_value in module.__dict__.items():
+        #     print(f"{attr_name}: {attr_value}")
         lora_module = None
         if isinstance(module, nn.Linear):
             lora_module = LoRALinear(

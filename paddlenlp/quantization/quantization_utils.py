@@ -66,9 +66,17 @@ def parse_weight_quantize_algo(quantization_config, name):
     return weight_quantize_algo
 
 
-def replace_with_quantization_linear(model, quantization_config, llm_int8_threshold=6.0):
+def replace_with_quantization_linear(model, quantization_config, llm_int8_threshold=6.0, hqlora_quantize_cfg=None):
+    name_prefix = ""
     for name, child in model.named_sublayers():
-        weight_quantize_algo = parse_weight_quantize_algo(quantization_config, name)
+        if hqlora_quantize_cfg is None:
+            weight_quantize_algo = parse_weight_quantize_algo(quantization_config, name)
+        else:
+            key = name_prefix + name
+            if key not in hqlora_quantize_cfg.keys():
+                weight_quantize_algo = None
+            else:
+                weight_quantize_algo = hqlora_quantize_cfg[key]
         if weight_quantize_algo is None:
             continue
         if any(isinstance(child, linear_class) for linear_class in LINEAR_CLASSES):
@@ -187,7 +195,6 @@ def convert_to_weight_quantize_state_dict(state_dict, name, quantization_config,
         del target_weight
     return state_dict
 
-
 def convert_to_qlora_state_dict(state_dict, name, quantization_config, dtype, weight_quantize_algo):
     if qlora_weight_quantize is None:
         raise ImportError(
@@ -226,7 +233,6 @@ def convert_to_qlora_state_dict(state_dict, name, quantization_config, dtype, we
 
     return state_dict
 
-
 def convert_to_quantize_state_dict(state_dict, quantization_linear_list, quantization_config, dtype):
     for name in quantization_linear_list:
         # Get quantization algorithm
@@ -251,6 +257,22 @@ def convert_to_quantize_state_dict(state_dict, quantization_linear_list, quantiz
             )
     return state_dict
 
+def convert_to_quantize_state_dict_hqlora(state_dict, quantization_config, dtype, hqlora_quantize_cfg):
+    for weight_quantize_algo in ["weight_only_int8", "nf4", "fp4"]:
+        quantization_linear_list = [
+            key for key in hqlora_quantize_cfg.keys() if hqlora_quantize_cfg[key] == weight_quantize_algo
+        ]
+        for name in quantization_linear_list:
+            # Convert state dict
+            if weight_quantize_algo in ["weight_only_int8"]:
+                convert_to_weight_quantize_state_dict(state_dict, name, quantization_config, dtype, weight_quantize_algo)
+            elif weight_quantize_algo in ["fp4", "nf4"]:
+                convert_to_qlora_state_dict(state_dict, name, quantization_config, dtype, weight_quantize_algo)
+            else:
+                raise NotImplementedError(
+                    f"Please check the quantization_config.weight_quantize_algo: {quantization_config.weight_quantize_algo}"
+                )
+    return state_dict
 
 def update_loaded_state_dict_keys(state_dict, quantization_linear_list, quantization_config, ignore_warning=False):
     for name in quantization_linear_list:

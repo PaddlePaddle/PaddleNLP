@@ -77,6 +77,7 @@ from paddlenlp.utils.log import logger
 from ..generation import GenerationConfig, GenerationMixin
 from ..quantization.quantization_utils import (
     convert_to_quantize_state_dict,
+    convert_to_quantize_state_dict_hqlora,
     replace_with_quantization_linear,
     update_loaded_state_dict_keys,
 )
@@ -922,6 +923,7 @@ def _load_state_dict_into_meta_model(
     dtype=None,
     is_safetensors=False,
     keep_in_fp32_modules=None,
+    hqlora_quantize_cfg=None,
     model_state_dict=None,
 ):
     """
@@ -953,14 +955,22 @@ def _load_state_dict_into_meta_model(
         # # We convert floating dtypes to the `dtype` passed. We want to keep the buffers/params
         # # in int/uint/bool and not cast them.
         if dtype is not None and paddle.is_floating_point(param):
-            if (
-                keep_in_fp32_modules is not None
-                and any(module_to_keep_in_fp32 in param_name for module_to_keep_in_fp32 in keep_in_fp32_modules)
-                and (dtype == paddle.float16 or dtype == paddle.bfloat16)
-            ):
-                param = param.astype(dtype=paddle.float32)
+            if hqlora_quantize_cfg is not None:
+                layer_name = param_name[: param_name.rfind(".")]
+                if layer_name in hqlora_quantize_cfg.keys() and hqlora_quantize_cfg[layer_name] not in [
+                    "nf4",
+                    "fp4",
+                ]:
+                    param = param.astype(dtype=dtype)
             else:
-                param = param.astype(dtype=dtype)
+                if (
+                    keep_in_fp32_modules is not None
+                    and any(module_to_keep_in_fp32 in param_name for module_to_keep_in_fp32 in keep_in_fp32_modules)
+                    and (dtype == paddle.float16 or dtype == paddle.bfloat16)
+                ):
+                    param = param.astype(dtype=paddle.float32)
+                else:
+                    param = param.astype(dtype=dtype)
 
         if dtype is None:
             old_param = model
@@ -1932,6 +1942,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         dtype=None,
         keep_in_fp32_modules=None,
         quantization_linear_list=None,
+        hqlora_quantize_cfg=None,
         sharded_metadata=None,
     ) -> Tuple[List[str]]:
         """load the state_dict into model, and do the following things:
@@ -2024,6 +2035,13 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # Set some modules to fp32 if any
         if keep_in_fp32_modules is not None and quantization_linear_list is None:
             for name, param in model.named_parameters():
+                if hqlora_quantize_cfg is not None:
+                    layer_name = name[: name.rfind(".")]
+                    if layer_name in hqlora_quantize_cfg.keys() and hqlora_quantize_cfg[layer_name] not in [
+                        "nf4",
+                        "fp4",
+                    ]:
+                        continue
                 if any(module_to_keep_in_fp32 in name for module_to_keep_in_fp32 in keep_in_fp32_modules):
                     if param.dtype != paddle.float32:
                         param_fp32 = param.cast(dtype=paddle.float32)
@@ -2116,12 +2134,20 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if state_dict is not None:
             if quantization_linear_list is not None:
                 # Quantize state dict
-                state_dict = convert_to_quantize_state_dict(
-                    state_dict,
-                    quantization_linear_list,
-                    config.quantization_config,
-                    dtype,
-                )
+                if hqlora_quantize_cfg is None:
+                    state_dict = convert_to_quantize_state_dict(
+                        state_dict,
+                        quantization_linear_list,
+                        config.quantization_config,
+                        dtype,
+                    )
+                else:
+                    state_dict = convert_to_quantize_state_dict_hqlora(
+                        state_dict,
+                        config.quantization_config,
+                        dtype,
+                        hqlora_quantize_cfg,
+                    )
             else:
                 # Have loaded all state_dict, no resume state_dict
                 state_dict, _, fused_keys, new_keys = _fuse_or_split_keys(
@@ -2154,6 +2180,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     dtype=dtype,
                     is_safetensors=is_safetensors,
                     keep_in_fp32_modules=keep_in_fp32_modules,
+                    hqlora_quantize_cfg=hqlora_quantize_cfg,
                 )
             else:
                 error_msgs = _load_state_dict_into_model(
@@ -2193,12 +2220,20 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         tp_actions if pre_tensor_parallel_split else None,
                         None,
                     )
-                    state_dict = convert_to_quantize_state_dict(
-                        state_dict,
-                        quantization_linear_list,
-                        config.quantization_config,
-                        dtype,
-                    )
+                    if hqlora_quantize_cfg is None:
+                        state_dict = convert_to_quantize_state_dict(
+                            state_dict,
+                            quantization_linear_list,
+                            config.quantization_config,
+                            dtype,
+                        )
+                    else:
+                        state_dict = convert_to_quantize_state_dict_hqlora(
+                            state_dict,
+                            config.quantization_config,
+                            dtype,
+                            hqlora_quantize_cfg,
+                        )
                 else:
                     if (
                         shard_file.endswith(".safetensors")
@@ -2282,6 +2317,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         dtype=dtype,
                         is_safetensors=is_safetensors,
                         keep_in_fp32_modules=keep_in_fp32_modules,
+                        hqlora_quantize_cfg=hqlora_quantize_cfg,
                         model_state_dict=model_to_load_state_dict,
                     )
                     error_msgs += new_error_msgs
@@ -2587,6 +2623,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         else:
             keep_in_fp32_modules = []
 
+        hqlora_quantize_cfg = None
+        if config.hqlora_quantize_cfg is not None:
+            hqlora_quantize_cfg = paddle.load(config.hqlora_quantize_cfg)
+
         quantization_linear_list = None
         if config.quantization_config.is_weight_quantize():
             with ContextManagers(quantization_init_contexts):
@@ -2594,6 +2634,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     model=model,
                     quantization_config=config.quantization_config,
                     llm_int8_threshold=config.quantization_config.llm_int8_threshold,
+                    hqlora_quantize_cfg=hqlora_quantize_cfg,
                 )
                 quantization_linear_list = []
                 for key in model.state_dict().keys():
@@ -2612,6 +2653,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             dtype=dtype,
             keep_in_fp32_modules=keep_in_fp32_modules,
             quantization_linear_list=quantization_linear_list,
+            hqlora_quantize_cfg=hqlora_quantize_cfg,
             sharded_metadata=sharded_metadata if is_sharded else None,
         )
 

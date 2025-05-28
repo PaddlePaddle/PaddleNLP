@@ -84,6 +84,7 @@ class QuantizationConfig:
                         "a8w8",
                         "nf4",
                         "fp4",
+                        "hqlora",
                         "a8w8linear",
                         "a8w4linear",
                         "fp8linear",
@@ -91,7 +92,7 @@ class QuantizationConfig:
                     for algo in weight_quantize_algo
                 ):
                     raise ValueError(
-                        f"weight_quantize_algo:{weight_quantize_algo.keys()} not in supported list ['weight_only_int8', 'weight_only_int4', 'llm.int8', 'a8w8', 'nf4', 'fp4']"
+                        f"weight_quantize_algo:{weight_quantize_algo.keys()} not in supported list ['weight_only_int8', 'weight_only_int4', 'llm.int8', 'a8w8', 'nf4', 'fp4', 'hqlora']"
                     )
             elif weight_quantize_algo not in [
                 "weight_only_int8",
@@ -100,12 +101,13 @@ class QuantizationConfig:
                 "a8w8",
                 "nf4",
                 "fp4",
+                "hqlora",
                 "a8w8linear",
                 "a8w4linear",
                 "fp8linear",
             ]:
                 raise ValueError(
-                    f"weight_quantize_algo:{weight_quantize_algo} not in supported list ['weight_only_int8', 'weight_only_int4', 'llm.int8', 'a8w8', 'nf4', 'fp4']"
+                    f"weight_quantize_algo:{weight_quantize_algo} not in supported list ['weight_only_int8', 'weight_only_int4', 'llm.int8', 'a8w8', 'nf4', 'fp4', 'hqlora']"
                 )
         if quant_type is not None and quant_type not in [
             "weight_only_int8",
@@ -156,6 +158,7 @@ class QuantizationConfig:
             "nf4",
             "fp4",
             "a8w8",
+            "hqlora",
             "a8w8linear",
             "a8w4linear",
             "fp8linear",
