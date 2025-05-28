@@ -3136,10 +3136,26 @@ def load_sharded_checkpoint_as_one(folder, variant=None, return_numpy=False):
     shard_files = list(set(index["weight_map"].values()))
     loader = safe_load_file if load_safe else partial(paddlenlp_load, map_location="np" if return_numpy else "cpu")
 
-    ret = {}
-    for shard_file in tqdm(shard_files):
-        state_dict = loader(os.path.join(folder, shard_file))
-        ret.update(state_dict)
+    try:
+        # Not use `fastsafe_open` because the end of `with` will destroy the cuda memory, tensor can not use.
+        from fastsafetensors import SafeTensorsFileLoader, SingleGroup
+
+        path = [os.path.join(folder, shard_file) for shard_file in shard_files]
+        device = "gpu" if paddle.is_compiled_with_cuda() else "cpu"
+        not_use_gds = True
+        # Check load time of files
+        for _ in tqdm(range(1)):
+            loader = SafeTensorsFileLoader(
+                SingleGroup(), device=device, nogds=not_use_gds, debug_log=False, framework="paddle"
+            )
+            loader.add_filenames({0: path})
+            bufs_pp = loader.copy_files_to_device(max_copy_block_size=256 * 1024 * 1024)
+            key_dims = {key: -1 for key in loader.get_keys()}
+            ret = bufs_pp.as_dict(key_dims)
+    except:
+        for shard_file in tqdm(shard_files):
+            state_dict = loader(os.path.join(folder, shard_file))
+            ret.update(state_dict)
 
     if not return_numpy:
         for key in list(ret.keys()):
