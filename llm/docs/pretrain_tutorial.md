@@ -80,8 +80,8 @@ python -u ~/PaddleNLP/llm/run_pretrain.py ~/PaddleNLP/llm/config/qwen/pretrain_a
 
 看到下面的提示说明已经开始进行训练了：
 ```
-[2025-05-18 10:13:15,353] [    INFO] - loss: 12.0635252, learning_rate: 2e-06, global_step: 1, current_memory_allocated: 7.549170255661011, current_memory_reserved: 7.753237724304199, max_memory_allocated: 7.549170255661011, max_memory_reserved: 7.753237724304199, interval_runtime: 1.1518, interval_samples_per_second: 0.8682, interval_tokens_per_second_per_device: 889.0448, interval_hardware_tflops_per_device: 2.77, interval_steps_per_second: 0.8682, progress_or_epoch: 0.0
-[2025-05-18 10:13:15,607] [    INFO] - loss: 12.05887604, learning_rate: 3e-06, global_step: 2, current_memory_allocated: 7.549170255661011, current_memory_reserved: 12.4834623336792, max_memory_allocated: 12.307440280914307, max_memory_reserved: 12.4834623336792, interval_runtime: 0.2556, interval_samples_per_second: 3.913, interval_tokens_per_second_per_device: 4006.9441, interval_hardware_tflops_per_device: 12.49, interval_steps_per_second: 3.913, progress_or_epoch: 0.0
+[    INFO] - loss: 12.0635252, learning_rate: 2e-06, global_step: 1, current_memory_allocated: 7.549170255661011, current_memory_reserved: 7.753237724304199, max_memory_allocated: 7.549170255661011, max_memory_reserved: 7.753237724304199, interval_runtime: 1.1518, interval_samples_per_second: 0.8682, interval_tokens_per_second_per_device: 889.0448, interval_hardware_tflops_per_device: 2.77, interval_steps_per_second: 0.8682, progress_or_epoch: 0.0
+[    INFO] - loss: 12.05887604, learning_rate: 3e-06, global_step: 2, current_memory_allocated: 7.549170255661011, current_memory_reserved: 12.4834623336792, max_memory_allocated: 12.307440280914307, max_memory_reserved: 12.4834623336792, interval_runtime: 0.2556, interval_samples_per_second: 3.913, interval_tokens_per_second_per_device: 4006.9441, interval_hardware_tflops_per_device: 12.49, interval_steps_per_second: 3.913, progress_or_epoch: 0.0
 ```
 
 ### FAQ1：显存不足
@@ -131,29 +131,29 @@ python -u -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7"  --master=192
 ### 3.3 训练结果
 当训练结束时，可以看到下面的输出：
 ```
-[2025-05-18 10:49:13,774] [    INFO] - Saving model checkpoint to ./checkpoints/pretrain_ckpts
-[2025-05-18 10:49:13,775] [    INFO] - tokenizer config file saved in ./checkpoints/pretrain_ckpts/tokenizer_config.json
-[2025-05-18 10:49:13,776] [    INFO] - Special tokens file saved in ./checkpoints/pretrain_ckpts/special_tokens_map.json
-[2025-05-18 10:49:13,776] [    INFO] - added tokens file saved in ./checkpoints/pretrain_ckpts/added_tokens.json
-[2025-05-18 10:49:13,803] [ WARNING] - Asynchronous saving is not supported for single card environment currently.
-[2025-05-18 10:49:15,691] [    INFO] - Configuration saved in ./checkpoints/pretrain_ckpts/config.json
-[2025-05-18 10:49:15,694] [    INFO] - Configuration saved in ./checkpoints/pretrain_ckpts/generation_config.json
-[2025-05-18 10:49:15,695] [    INFO] - ***** train metrics *****
-[2025-05-18 10:49:15,695] [    INFO] -   progress_or_epoch        =     0.0868
-[2025-05-18 10:49:15,695] [    INFO] -   train_loss               =     5.4334
-[2025-05-18 10:49:15,695] [    INFO] -   train_runtime            = 0:35:59.57
-[2025-05-18 10:49:15,696] [    INFO] -   train_samples_per_second =     4.6305
-[2025-05-18 10:49:15,696] [    INFO] -   train_steps_per_second   =     4.6305
-[2025-05-18 10:49:15,697] [    INFO] - ***** Running Prediction *****
-[2025-05-18 10:49:15,697] [    INFO] -   Num examples = 258
-[2025-05-18 10:49:15,697] [    INFO] -   Total prediction steps = 129
-[2025-05-18 10:49:15,697] [    INFO] -   Pre device batch size = 2
-[2025-05-18 10:49:15,697] [    INFO] -   Total Batch size = 2
-[2025-05-18 10:49:28,420] [    INFO] - ***** test metrics *****
-[2025-05-18 10:49:28,420] [    INFO] -   test_loss               =     4.8691
-[2025-05-18 10:49:28,420] [    INFO] -   test_runtime            = 0:00:12.72
-[2025-05-18 10:49:28,420] [    INFO] -   test_samples_per_second =    20.2781
-[2025-05-18 10:49:28,420] [    INFO] -   test_steps_per_second   =    10.1391
+[    INFO] - Saving model checkpoint to ./checkpoints/pretrain_ckpts
+[    INFO] - tokenizer config file saved in ./checkpoints/pretrain_ckpts/tokenizer_config.json
+[    INFO] - Special tokens file saved in ./checkpoints/pretrain_ckpts/special_tokens_map.json
+[    INFO] - added tokens file saved in ./checkpoints/pretrain_ckpts/added_tokens.json
+[ WARNING] - Asynchronous saving is not supported for single card environment currently.
+[    INFO] - Configuration saved in ./checkpoints/pretrain_ckpts/config.json
+[    INFO] - Configuration saved in ./checkpoints/pretrain_ckpts/generation_config.json
+[    INFO] - ***** train metrics *****
+[    INFO] -   progress_or_epoch        =     0.0868
+[    INFO] -   train_loss               =     5.4334
+[    INFO] -   train_runtime            = 0:35:59.57
+[    INFO] -   train_samples_per_second =     4.6305
+[    INFO] -   train_steps_per_second   =     4.6305
+[    INFO] - ***** Running Prediction *****
+[    INFO] -   Num examples = 258
+[    INFO] -   Total prediction steps = 129
+[    INFO] -   Pre device batch size = 2
+[    INFO] -   Total Batch size = 2
+[    INFO] - ***** test metrics *****
+[    INFO] -   test_loss               =     4.8691
+[    INFO] -   test_runtime            = 0:00:12.72
+[    INFO] -   test_samples_per_second =    20.2781
+[    INFO] -   test_steps_per_second   =    10.1391
 Effective Tokens per second: 4741.68
 ips: 4741.68 tokens/s
 ```
