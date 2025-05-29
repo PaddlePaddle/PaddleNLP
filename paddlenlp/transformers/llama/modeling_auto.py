@@ -191,6 +191,7 @@ def scaled_dot_product_attention(
 
 colwise_placements = [dist.Replicate(), dist.Shard(1)]
 rowise_placement = [dist.Replicate(), dist.Shard(0)]
+replicate_placements = [dist.Replicate(), dist.Replicate()]
 
 
 class LlamaRMSNormAuto(nn.Layer):
@@ -241,28 +242,28 @@ class LlamaMLPAuto(nn.Layer):
             self.gate_up_fused_proj.weight = dist.shard_tensor(
                 self.gate_up_fused_proj.weight,
                 get_mesh(self.ipp),
-                colwise_placements,
+                colwise_placements if self.config.tensor_parallel_degree > 1 else replicate_placements,
             )
         else:
             self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
             self.gate_proj.weight = dist.shard_tensor(
                 self.gate_proj.weight,
                 get_mesh(self.ipp),
-                colwise_placements,
+                colwise_placements if self.config.tensor_parallel_degree > 1 else replicate_placements,
             )
 
             self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
             self.up_proj.weight = dist.shard_tensor(
                 self.up_proj.weight,
                 get_mesh(self.ipp),
-                colwise_placements,
+                colwise_placements if self.config.tensor_parallel_degree > 1 else replicate_placements,
             )
 
         self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
         self.down_proj.weight = dist.shard_tensor(
             self.down_proj.weight,
             get_mesh(self.ipp),
-            rowise_placement,
+            rowise_placement if self.config.tensor_parallel_degree > 1 else replicate_placements,
         )
 
     def forward(self, x):
@@ -322,7 +323,7 @@ class LlamaAttentionAuto(nn.Layer):
             self.qkv_proj.weight = dist.shard_tensor(
                 self.qkv_proj.weight,
                 get_mesh(self.ipp),
-                colwise_placements,
+                colwise_placements if self.config.tensor_parallel_degree > 1 else replicate_placements,
             )
 
         else:
@@ -334,7 +335,7 @@ class LlamaAttentionAuto(nn.Layer):
             self.q_proj.weight = dist.shard_tensor(
                 self.q_proj.weight,
                 get_mesh(self.ipp),
-                colwise_placements,
+                colwise_placements if self.config.tensor_parallel_degree > 1 else replicate_placements,
             )
 
             self.k_proj = nn.Linear(
@@ -345,7 +346,7 @@ class LlamaAttentionAuto(nn.Layer):
             self.k_proj.weight = dist.shard_tensor(
                 self.k_proj.weight,
                 get_mesh(self.ipp),
-                colwise_placements,
+                colwise_placements if self.config.tensor_parallel_degree > 1 else replicate_placements,
             )
 
             self.v_proj = nn.Linear(
@@ -356,7 +357,7 @@ class LlamaAttentionAuto(nn.Layer):
             self.v_proj.weight = dist.shard_tensor(
                 self.v_proj.weight,
                 get_mesh(self.ipp),
-                colwise_placements,
+                colwise_placements if self.config.tensor_parallel_degree > 1 else replicate_placements,
             )
 
         self.o_proj = nn.Linear(
@@ -367,7 +368,7 @@ class LlamaAttentionAuto(nn.Layer):
         self.o_proj.weight = dist.shard_tensor(
             self.o_proj.weight,
             get_mesh(self.ipp),
-            rowise_placement,
+            rowise_placement if self.config.tensor_parallel_degree > 1 else replicate_placements,
         )
 
         if config.rope:
@@ -1219,7 +1220,7 @@ class LlamaLMHeadAuto(nn.Layer):
         self.weight = dist.shard_tensor(
             self.weight,
             get_mesh(-1),
-            colwise_placements,
+            colwise_placements if self.config.tensor_parallel_degree > 1 else replicate_placements,
         )
 
     def forward(self, hidden_states, tensor_parallel_output=None):
