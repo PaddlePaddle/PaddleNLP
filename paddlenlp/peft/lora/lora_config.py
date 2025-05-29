@@ -76,6 +76,8 @@ class LoRAConfig:
     do_qat: bool = field(default=False, metadata={"help": "Whether the lora model would do quant-aware training"})
     rslora: bool = field(default=False, metadata={"help": "Whether to use RsLoRA"})
     pissa: bool = field(default=False, metadata={"help": "Whether to use Pissa: https://arxiv.org/pdf/2404.02948.pdf"})
+    nola: bool = field(default=False, metadata={"help": "Whether to use Nola: https://arxiv.org/pdf/2310.02556"})
+    nola_basis_num: int = field(default=1, metadata={"help": "When use nola, the number of basis"})
     loraga: bool = field(default=False, metadata={"help": "Whether to LoRA-GA"})
     use_mora: bool = field(
         default=False, metadata={"help": "Whether to use MoRA: https://arxiv.org/pdf/2405.12130.pdf"}
@@ -94,7 +96,6 @@ class LoRAConfig:
         default=False,
         metadata={"help": "Whether to use mos lora."},
     )
-    lorapro: bool = field(default=False, metadata={"help": "Whether to use LoRA-PRO"})
 
     def __post_init__(self):
         if self.use_quick_lora and self.lora_dropout > 0:
