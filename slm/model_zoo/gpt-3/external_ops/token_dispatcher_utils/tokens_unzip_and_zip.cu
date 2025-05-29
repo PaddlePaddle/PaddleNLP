@@ -94,8 +94,8 @@ __global__ void token_unzip_kernel(
       // 这个syncthread可能并不必要，但尽可能为了不让线程间差太多，还是这样吧。
       __syncthreads();
       // 处理完增广事务，对位搬搬移第一次出现的数据,可用inplace优化
-      vectorized_memcpy(&X[row_idx * token_length],
-                        &X_unzipped[row_idx * token_length],
+      vectorized_memcpy(&X[(int64_t)row_idx * (int64_t)token_length],
+                        &X_unzipped[(int64_t)row_idx * (int64_t)token_length],
                         token_length);
     } else {  // 线程组1， 忙等、并发处理数据搬移
       if (threadIdx.x == 0) {
@@ -111,8 +111,8 @@ __global__ void token_unzip_kernel(
       __syncthreads();  // 所有该组线程都等0号取任务，再搬移数据
       int original_row = shared_original_row;
       // 搬
-      vectorized_memcpy(&X[original_row * token_length],
-                        &X_unzipped[row_idx * token_length],
+      vectorized_memcpy(&X[(int64_t)original_row * (int64_t)token_length],
+                        &X_unzipped[(int64_t)row_idx * (int64_t)token_length],
                         token_length);
     }
   }
@@ -164,7 +164,7 @@ __global__ void tokens_weighted_zip_kernel(
          x_offset += thread_stride) {
       float2 sum = {0.0f, 0.0f};
       __nv_bfloat162 *out_ptr = reinterpret_cast<__nv_bfloat162 *>(
-          &weighted_zipped_tokens[this_row * token_length + x_offset]);
+          &weighted_zipped_tokens[(int64_t)this_row * (int64_t)token_length + x_offset]);
 #pragma unroll
       for (int expert = 0; expert < num_experts; ++expert) {
         const int fetch_row = local_row_fetchlist[expert];
@@ -199,7 +199,7 @@ __global__ void tokens_weighted_zip_kernel(
                          : 0.0f;
         sum += prob * token_val;
       }
-      weighted_zipped_tokens[this_row * token_length + i] =
+      weighted_zipped_tokens[(int64_t)this_row * (int64_t)token_length + i] =
           __float2bfloat16_rn(sum);
     }
   } else {
@@ -239,7 +239,7 @@ __global__ void tokens_weighted_zip_kernel(
             fetch_row >= 0 ? local_expert_problist[expert] : (__nv_bfloat16)0;
         sum += prob * token_val;
       }
-      weighted_zipped_tokens[this_row * token_length + i] = sum;
+      weighted_zipped_tokens[(int64_t)this_row * (int64_t)token_length + i] = sum;
     }
   }
 }
@@ -299,7 +299,7 @@ __global__ void tokens_zip_kernel(
       __nv_bfloat162 raw = {0,0};
       int aggreg_cnt = 0;
       __nv_bfloat162 *out_ptr = reinterpret_cast<__nv_bfloat162 *>(
-          &zipped_tokens[this_row * token_length + x_offset]);
+          &zipped_tokens[(int64_t)this_row * (int64_t)token_length + x_offset]);
 #pragma unroll
       for (int expert = 0; expert < num_experts; ++expert) {
         const int fetch_row = local_row_fetchlist[expert];
@@ -307,7 +307,7 @@ __global__ void tokens_zip_kernel(
         aggreg_cnt ++;
         // 手动类型提升
         raw = *reinterpret_cast<const __nv_bfloat162 *>(
-            &unzipped_tokens[fetch_row * token_length + x_offset]);
+            &unzipped_tokens[(int64_t)fetch_row * (int64_t)token_length + x_offset]);
         float2 token_vec =
             __bfloat1622float2(raw);
         sum.x = __fadd_rn(token_vec.x, sum.x);
@@ -328,11 +328,11 @@ __global__ void tokens_zip_kernel(
         int fetch_row = local_row_fetchlist[expert];
         if (fetch_row < 0) continue;
         aggreg_cnt ++;
-        raw = unzipped_tokens[fetch_row * token_length + i];
+        raw = unzipped_tokens[(int64_t)fetch_row * (int64_t)token_length + i];
         float token_val = __bfloat162float(raw);
         sum = __fadd_rn(token_val, sum);
       }
-      zipped_tokens[this_row * token_length + i] = (aggreg_cnt > 1)? __float2bfloat16_rn(sum) : raw;
+      zipped_tokens[(int64_t)this_row * (int64_t)token_length + i] = (aggreg_cnt > 1)? __float2bfloat16_rn(sum) : raw;
     }
   } else {
     // ------------------------ BF16 intrinsics 加权累加 -----------------------
@@ -342,13 +342,13 @@ __global__ void tokens_zip_kernel(
          x_offset += thread_stride) {
       __nv_bfloat162 sum = {0, 0};
       __nv_bfloat162 *out_ptr = reinterpret_cast<__nv_bfloat162 *>(
-          &zipped_tokens[this_row * token_length + x_offset]);
+          &zipped_tokens[(int64_t)this_row * (int64_t)token_length + x_offset]);
 #pragma unroll
       for (int expert = 0; expert < num_experts; ++expert) {
         const int fetch_row = local_row_fetchlist[expert];
         if (fetch_row < 0) continue;
         __nv_bfloat162 token_vec = *reinterpret_cast<const __nv_bfloat162 *>(
-            &unzipped_tokens[fetch_row * token_length + x_offset]);
+            &unzipped_tokens[(int64_t)fetch_row * (int64_t)token_length + x_offset]);
         sum = __hadd2(sum, token_vec);
       }
       *out_ptr = sum;
@@ -362,10 +362,10 @@ __global__ void tokens_zip_kernel(
       for (int expert = 0; expert < num_experts; ++expert) {
         int fetch_row = local_row_fetchlist[expert];
         if (fetch_row < 0) continue;
-        __nv_bfloat16 token_val = unzipped_tokens[fetch_row * token_length + i];
+        __nv_bfloat16 token_val = unzipped_tokens[(int64_t)fetch_row * (int64_t)token_length + i];
         sum = __hadd(sum, token_val);
       }
-      zipped_tokens[this_row * token_length + i] = sum;
+      zipped_tokens[(int64_t)this_row * (int64_t)token_length + i] = sum;
     }
   }
 }
@@ -425,7 +425,7 @@ __global__ void tokens_zip_kernel(
       __nv_bfloat162 raw = {0, 0};
       int aggreg_cnt = 0;
       __nv_bfloat162 *out_ptr = reinterpret_cast<__nv_bfloat162 *>(
-          &zipped_tokens[this_row * token_length + x_offset]);
+          &zipped_tokens[(int64_t)this_row * (int64_t)token_length + x_offset]);
 #pragma unroll
       for (int expert = 0; expert < num_experts; ++expert) {
         const int fetch_row = local_row_fetchlist[expert];
@@ -433,7 +433,7 @@ __global__ void tokens_zip_kernel(
         aggreg_cnt++;
         // 手动类型提升
         raw = *reinterpret_cast<const __nv_bfloat162 *>(
-            &unzipped_tokens[fetch_row * token_length + x_offset]);
+            &unzipped_tokens[(int64_t)fetch_row * (int64_t)token_length + x_offset]);
         float2 token_vec = __bfloat1622float2(raw);
         sum.x = __fadd_rn(token_vec.x, sum.x);
         sum.y = __fadd_rn(token_vec.y, sum.y);
@@ -453,11 +453,11 @@ __global__ void tokens_zip_kernel(
         int fetch_row = local_row_fetchlist[expert];
         if (fetch_row < 0) continue;
         aggreg_cnt++;
-        raw = unzipped_tokens[fetch_row * token_length + i];
+        raw = unzipped_tokens[(int64_t)fetch_row * (int64_t)token_length + i];
         float token_val = __bfloat162float(raw);
         sum = __fadd_rn(token_val, sum);
       }
-      zipped_tokens[this_row * token_length + i] =
+      zipped_tokens[(int64_t)this_row * (int64_t)token_length + i] =
           (aggreg_cnt > 1) ? __float2bfloat16_rn(sum) : raw;
     }
   } else {
@@ -468,13 +468,13 @@ __global__ void tokens_zip_kernel(
          x_offset += thread_stride) {
       __nv_bfloat162 sum = {0, 0};
       __nv_bfloat162 *out_ptr = reinterpret_cast<__nv_bfloat162 *>(
-          &zipped_tokens[this_row * token_length + x_offset]);
+          &zipped_tokens[(int64_t)this_row * (int64_t)token_length + x_offset]);
 #pragma unroll
       for (int expert = 0; expert < num_experts; ++expert) {
         const int fetch_row = local_row_fetchlist[expert];
         if (fetch_row < 0) continue;
         __nv_bfloat162 token_vec = *reinterpret_cast<const __nv_bfloat162 *>(
-            &unzipped_tokens[fetch_row * token_length + x_offset]);
+            &unzipped_tokens[(int64_t)fetch_row * (int64_t)token_length + x_offset]);
         sum = __hadd2(sum, token_vec);
       }
       *out_ptr = sum;
@@ -488,10 +488,10 @@ __global__ void tokens_zip_kernel(
       for (int expert = 0; expert < num_experts; ++expert) {
         int fetch_row = local_row_fetchlist[expert];
         if (fetch_row < 0) continue;
-        __nv_bfloat16 token_val = unzipped_tokens[fetch_row * token_length + i];
+        __nv_bfloat16 token_val = unzipped_tokens[(int64_t)fetch_row * (int64_t)token_length + i];
         sum = __hadd(sum, token_val);
       }
-      zipped_tokens[this_row * token_length + i] = sum;
+      zipped_tokens[(int64_t)this_row * (int64_t)token_length + i] = sum;
     }
   }
 }
@@ -540,9 +540,9 @@ __global__ void tokens_zip_kernel(
       const int fetch_row = local_row_fetchlist[expert];
       if (fetch_row < 0) continue;
       // 手动类型提升
-      sum += unzipped_tokens[fetch_row * token_length + x_offset];
+      sum += unzipped_tokens[(int64_t)fetch_row * (int64_t)token_length + x_offset];
     }
-    zipped_tokens[this_row * token_length + x_offset] = sum;
+    zipped_tokens[(int64_t)this_row * (int64_t)token_length + x_offset] = sum;
   }
 }
 
