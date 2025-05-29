@@ -14,7 +14,7 @@
 
 from typing import Optional
 
-from aistudio_sdk.hub import download
+from aistudio_sdk.file_download import model_file_download as download
 
 
 class UnauthorizedError(Exception):
@@ -46,7 +46,7 @@ def aistudio_download(
     if revision is not None:
         download_kwargs["revision"] = revision
     if cache_dir is not None:
-        download_kwargs["cache_dir"] = cache_dir
+        download_kwargs["local_dir"] = cache_dir
     res = download(
         repo_id=repo_id,
         filename=filename,
