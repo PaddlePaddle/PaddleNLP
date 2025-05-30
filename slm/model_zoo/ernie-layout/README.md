@@ -180,7 +180,7 @@ Default to use PaddleOCR, you can also use your own OCR result via ``word_boxes`
   | --------- | ---------- | --- | ---- |
   | FUNSD     | Key Information Extraction | English | - |
   | XFUND-ZH  | Key Information Extraction | Chinese | - |
-  | DocVQA-ZH | Document Question Answering | Chinese | The submission of the competition of [DocVQA-ZH](http://ailab.aiwin.org.cn/competitions/49) is now closed so we split original dataset into three parts for model evluation. There are 4,187 training images, 500 validation images, and 500 test images.|
+  | DocVQA-ZH | Document Question Answering | Chinese | The submission of the competition of [DocVQA-ZH](http://ailab.aiwin.org.cn/competitions/49) is now closed so we split original dataset into three parts for model evaluation. There are 4,187 training images, 500 validation images, and 500 test images.|
   | RVL-CDIP (sampled)  | Document Image Classification | English | The RVL-CDIP dataset consists of 400,000 grayscale images in 16 classes, with 25,000 images per class. Because of the original dataset is large and slow for training, so we downsampling from it. The sampled dataset consist of 6,400 training images, 800 validation images, and 800 test images. |
 
 - Results

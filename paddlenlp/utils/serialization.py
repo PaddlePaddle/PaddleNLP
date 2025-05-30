@@ -182,7 +182,7 @@ class SafeUnpickler(pickle.Unpickler):
 def _rebuild_tensor_stage(storage, storage_offset, size, stride, requires_grad, backward_hooks):
     # if a tensor has shape [M, N] and stride is [1, N], it's column-wise / fortran-style
     # if a tensor has shape [M, N] and stride is [M, 1], it's row-wise / C-style
-    # defautls to C-style
+    # defaults to C-style
     if stride is not None and len(stride) > 1 and stride[0] == 1 and stride[1] > 1:
         order = "F"
     else:

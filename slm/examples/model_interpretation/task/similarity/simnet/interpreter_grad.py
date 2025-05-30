@@ -104,7 +104,7 @@ if __name__ == "__main__":
     tokenizer = CharTokenizer(vocab, args.language)
     label_map = {0: "dissimilar", 1: "similar"}
 
-    # Constructs the newtork.
+    # Constructs the network.
     model = SimNet(network=args.network, vocab_size=len(vocab), num_classes=len(label_map))
 
     # Loads model parameters.

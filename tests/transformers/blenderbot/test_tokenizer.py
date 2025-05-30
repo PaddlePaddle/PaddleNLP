@@ -96,7 +96,7 @@ class TestTokenizationBlenderbot(TokenizerTesterMixin, unittest.TestCase):
                 lambda t: t[0]
                 == tokenizer.encode(t[1], return_token_type_ids=None, add_special_tokens=False)["input_ids"][
                     1
-                ],  # frist is add_prefix
+                ],  # first is add_prefix
                 toks,
             )
         )

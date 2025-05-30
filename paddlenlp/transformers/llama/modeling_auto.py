@@ -191,6 +191,7 @@ def scaled_dot_product_attention(
 
 colwise_placements = [dist.Replicate(), dist.Shard(1)]
 rowise_placement = [dist.Replicate(), dist.Shard(0)]
+replicate_placements = [dist.Replicate(), dist.Replicate()]
 
 
 class LlamaRMSNormAuto(nn.Layer):
@@ -241,28 +242,28 @@ class LlamaMLPAuto(nn.Layer):
             self.gate_up_fused_proj.weight = dist.shard_tensor(
                 self.gate_up_fused_proj.weight,
                 get_mesh(self.ipp),
-                colwise_placements,
+                colwise_placements if self.config.tensor_parallel_degree > 1 else replicate_placements,
             )
         else:
             self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
             self.gate_proj.weight = dist.shard_tensor(
                 self.gate_proj.weight,
                 get_mesh(self.ipp),
-                colwise_placements,
+                colwise_placements if self.config.tensor_parallel_degree > 1 else replicate_placements,
             )
 
             self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
             self.up_proj.weight = dist.shard_tensor(
                 self.up_proj.weight,
                 get_mesh(self.ipp),
-                colwise_placements,
+                colwise_placements if self.config.tensor_parallel_degree > 1 else replicate_placements,
             )
 
         self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
         self.down_proj.weight = dist.shard_tensor(
             self.down_proj.weight,
             get_mesh(self.ipp),
-            rowise_placement,
+            rowise_placement if self.config.tensor_parallel_degree > 1 else replicate_placements,
         )
 
     def forward(self, x):
@@ -322,7 +323,7 @@ class LlamaAttentionAuto(nn.Layer):
             self.qkv_proj.weight = dist.shard_tensor(
                 self.qkv_proj.weight,
                 get_mesh(self.ipp),
-                colwise_placements,
+                colwise_placements if self.config.tensor_parallel_degree > 1 else replicate_placements,
             )
 
         else:
@@ -334,7 +335,7 @@ class LlamaAttentionAuto(nn.Layer):
             self.q_proj.weight = dist.shard_tensor(
                 self.q_proj.weight,
                 get_mesh(self.ipp),
-                colwise_placements,
+                colwise_placements if self.config.tensor_parallel_degree > 1 else replicate_placements,
             )
 
             self.k_proj = nn.Linear(
@@ -345,7 +346,7 @@ class LlamaAttentionAuto(nn.Layer):
             self.k_proj.weight = dist.shard_tensor(
                 self.k_proj.weight,
                 get_mesh(self.ipp),
-                colwise_placements,
+                colwise_placements if self.config.tensor_parallel_degree > 1 else replicate_placements,
             )
 
             self.v_proj = nn.Linear(
@@ -356,7 +357,7 @@ class LlamaAttentionAuto(nn.Layer):
             self.v_proj.weight = dist.shard_tensor(
                 self.v_proj.weight,
                 get_mesh(self.ipp),
-                colwise_placements,
+                colwise_placements if self.config.tensor_parallel_degree > 1 else replicate_placements,
             )
 
         self.o_proj = nn.Linear(
@@ -367,7 +368,7 @@ class LlamaAttentionAuto(nn.Layer):
         self.o_proj.weight = dist.shard_tensor(
             self.o_proj.weight,
             get_mesh(self.ipp),
-            rowise_placement,
+            rowise_placement if self.config.tensor_parallel_degree > 1 else replicate_placements,
         )
 
         if config.rope:
@@ -1178,26 +1179,24 @@ class LlamaPretrainingCriterion3DAuto(paddle.nn.Layer):
                     masked_lm_labels.unsqueeze(2),
                 )
 
-            # XPU dose not support allgather mask with bool dtype, so we use LocalLayer here.
+            # XPU dose not support allgather mask with bool dtype, so we use local_map here.
             if get_env_device() == "xpu":
 
-                class LocalLossLayer(paddle.distributed.LocalLayer):
-                    def __init__(self, out_dist_attrs, grad_dist_attrs):
-                        super().__init__(out_dist_attrs, grad_dist_attrs)
-
-                    def forward(self, x, mask):
-                        masked_lm_loss = paddle.masked_select(x, mask).astype("float32")
-                        loss = paddle.mean(masked_lm_loss).unsqueeze(0)
-                        return loss.unsqueeze(0)
+                def coculate_loss(x, mask):
+                    masked_lm_loss = paddle.masked_select(x, mask).astype("float32")
+                    loss = paddle.mean(masked_lm_loss).unsqueeze(0)
+                    return loss.unsqueeze(0)
 
                 out_dist_attrs = [
-                    (masked_lm_loss.process_mesh, [dist.Shard(0), dist.Replicate()]),
+                    [dist.Shard(0), dist.Replicate()],
                 ]
                 grad_dist_attrs = [
-                    (masked_lm_loss.process_mesh, [dist.Shard(0), dist.Replicate()]),
+                    [dist.Shard(0), dist.Replicate()],
                     None,
                 ]
-                loss_func = LocalLossLayer(out_dist_attrs, grad_dist_attrs)
+                loss_func = dist.local_map(
+                    coculate_loss, out_dist_attrs, grad_dist_attrs, masked_lm_loss.process_mesh, reshard_inputs=True
+                )
 
                 loss = loss_func(masked_lm_loss, masked_lm_loss > 0)
                 loss = loss.mean()
@@ -1221,7 +1220,7 @@ class LlamaLMHeadAuto(nn.Layer):
         self.weight = dist.shard_tensor(
             self.weight,
             get_mesh(-1),
-            colwise_placements,
+            colwise_placements if self.config.tensor_parallel_degree > 1 else replicate_placements,
         )
 
     def forward(self, hidden_states, tensor_parallel_output=None):
@@ -1356,7 +1355,7 @@ class LlamaForCausalLM3DAuto(LlamaPretrainedModelAuto):
             hidden_states = paddle.transpose(hidden_states, [1, 0, 2])
 
         # if labels is None，means we need full output, instead of tensor_parallel_output
-        # tensor_parallel_output is togather with ParallelCrossEntropy
+        # tensor_parallel_output is together with ParallelCrossEntropy
         tensor_parallel_output = (
             self.config.tensor_parallel_output and labels is not None and self.config.tensor_parallel_degree > 1
         )

@@ -488,6 +488,7 @@ class LoRAModel(nn.Layer):
                 use_mora=lora_config.use_mora,
                 mp_moe=getattr(module.weight, "mp_moe", False),
                 is_distributed=getattr(module.weight, "is_distributed", False),
+                lorapro=lora_config.lorapro,
             )
         elif isinstance(module, nn.Conv2D):
             lora_module = LoRAConv2D(

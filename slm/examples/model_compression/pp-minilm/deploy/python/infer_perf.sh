@@ -14,7 +14,7 @@
 
 export task=TNEWS
 
-echo Inference of orgin FP32 model
+echo Inference of origin FP32 model
 for ((i=0;i<=4;i++));
 do
     python infer.py  --task_name ${task} --model_path  ../finetuning/ppminilm-6l-768h/models/${task}/1e-4_64/inference  --use_trt --perf

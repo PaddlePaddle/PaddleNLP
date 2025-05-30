@@ -513,7 +513,7 @@ class MLP(nn.Layer):
     def forward(self, hidden_states):
         # [s, b, 4hp]
         intermediate_parallel = self.dense_h_to_4h(hidden_states)
-        # Special Slicing to accomodate Tensor Parallel
+        # Special Slicing to accommodate Tensor Parallel
         # Even channels is ffc_fc, odd channels is gate
         dim_size = intermediate_parallel.shape[-1]
         ffn_fc = intermediate_parallel[..., : dim_size // 2]

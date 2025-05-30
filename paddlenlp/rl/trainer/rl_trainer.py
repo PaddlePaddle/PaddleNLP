@@ -49,7 +49,7 @@ from ...transformers import PretrainedModel, PretrainedTokenizer
 from ...utils.env import TRAINER_STATE_NAME
 from ..models.ppo_model_utils import create_loss
 from ..utils.comm_utils import create_data_trans_group
-from ..utils.reshard_utils import init_rollout_env
+from ..utils.reshard_utils import ReshardController
 
 # ########## patches for Trianer ##########
 
@@ -537,6 +537,7 @@ class RLTrainer(RLTrainerBase):
         callbacks: Optional[List[TrainerCallback]] = None,
         optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
         preprocess_logits_for_metrics: Optional[Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor]] = None,
+        reshard_controller: Optional[ReshardController] = None,
     ):
         super().__init__(
             model,
@@ -565,6 +566,7 @@ class RLTrainer(RLTrainerBase):
         self.ema_beta = getattr(args, "ema_beta", 0.992)
         # if self.timers:
         #     self.timers.log = types.MethodType(new_timer_log, self.timers)
+        self.reshard_controller = reshard_controller
 
     def create_criterion(self):
         """
@@ -595,12 +597,15 @@ class RLTrainer(RLTrainerBase):
         dp_group = hcg.get_data_parallel_group()
         global_rank = dist.get_rank()
         old_dp_workers = self.args.world_size // (max(sd_group.nranks, 1) * max(dp_group.nranks, 1))
-        with init_rollout_env(self.args.rollout_tensor_parallel_degree):
-            hcg = fleet.get_hybrid_communicate_group()
-            tensor_parallel_degree = hcg.get_model_parallel_world_size()
-            tensor_parallel_rank = hcg.get_model_parallel_rank()
-            eval_tp_size = max(tensor_parallel_degree, 1)
-            eval_tp_rank = max(tensor_parallel_rank, 0)
+        if self.reshard_controller is not None:
+            self.reshard_controller.set_rollout_env("[set eval model]")
+        hcg = fleet.get_hybrid_communicate_group()
+        tensor_parallel_degree = hcg.get_model_parallel_world_size()
+        tensor_parallel_rank = hcg.get_model_parallel_rank()
+        if self.reshard_controller is not None:
+            self.reshard_controller.set_train_env("[after set eval model]")
+        eval_tp_size = max(tensor_parallel_degree, 1)
+        eval_tp_rank = max(tensor_parallel_rank, 0)
         group_nums = self.args.logical_process_index // old_dp_workers * eval_tp_size + eval_tp_rank
         self._data_trans_group = create_data_trans_group(global_rank, group_nums)
         # just for compatible with old code
@@ -656,7 +661,7 @@ class RLTrainer(RLTrainerBase):
             if paddle.distributed.get_world_size() > 1:
                 assert self.model is not self.model_wrapped
             self.train_step_vars = {
-                # meaningless vars can pass from outter, dummy value is enough
+                # meaningless vars can pass from outer, dummy value is enough
                 "epoch": 0,  # meaningless for step training
                 "step": 0,  # meaningless for step training
                 "steps_in_epoch": 100000,  # meaningless for step training
@@ -700,15 +705,15 @@ class RLTrainer(RLTrainerBase):
         # trainer.train use `tr_loss` as loss var to accumulate loss.
         # NOTE: `tr_loss` in trainer.train not only accumulate mean loss for
         # steps in one `gradient_accumulation_steps`, but also accumulate for
-        # one logging intervel which may contains more than one accumulated steps.
+        # one logging interval which may contains more than one accumulated steps.
         # However, in RLTrainer we only want to use `tr_loss` to accumulate
         # mean loss for steps in a `gradient_accumulation_steps` range. As for
-        # logging intervel loss accumulation is not take into account here and
-        # should be considered in outter.
+        # logging interval loss accumulation is not take into account here and
+        # should be considered in outer.
         if loss_var is None:  # the first step of current loss type
             loss_var = paddle.to_tensor(0.0)
             train_step_vars[loss_name] = loss_var
-        elif self.is_accumulation_step:  # begin a new accumulation step intervel
+        elif self.is_accumulation_step:  # begin a new accumulation step interval
             for name in self.loss_names:
                 train_step_vars[name] = paddle.to_tensor(0.0)
             loss_var = train_step_vars[loss_name]

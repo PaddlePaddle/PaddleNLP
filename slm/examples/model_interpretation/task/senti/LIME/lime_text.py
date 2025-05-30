@@ -371,7 +371,7 @@ class LimeTextExplainer(object):
                 generate random numbers. If None, the random state will be
                 initialized using the internal numpy seed.
             char_level: an boolean identifying that we treat each character
-                as an independent occurence in the string
+                as an independent occurrence in the string
         """
 
         if kernel is None:

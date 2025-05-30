@@ -640,7 +640,7 @@ if __name__ == "__main__":
                 )
 
             else:
-                raise KeyError(f"Unkonwn interpretable mode: {args.inter_mode}")
+                raise KeyError(f"Unknown interpretable mode: {args.inter_mode}")
 
         if args.inter_mode == "lime":
             print(np.average(np.array(lime_relative_err_total)))

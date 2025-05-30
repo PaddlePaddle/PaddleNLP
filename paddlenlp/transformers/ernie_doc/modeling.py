@@ -152,7 +152,7 @@ class MultiHeadAttention(nn.Layer):
             == len(rel_task.shape)
             == 3
         ):
-            raise ValueError("Inputs: quries, keys, values, rel_pos and rel_task should all be 3-D tensors.")
+            raise ValueError("Inputs: queries, keys, values, rel_pos and rel_task should all be 3-D tensors.")
 
         q, k, v, r, t = self.__compute_qkv(queries, keys, values, rel_pos, rel_task)
 

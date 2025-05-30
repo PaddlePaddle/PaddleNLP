@@ -135,13 +135,10 @@ Tensor(shape=[1, 2], dtype=float32, place=Place(gpu:0), stop_gradient=True,
 ```shell
 mkdir -p data/datasets
 wget https://paddlenlp.bj.bcebos.com/datasets/Flickr30k-CN.tar.gz
-tar -xzvf Flickr30k-CN.tar.gz -d data/datasets/
+tar -xzvf Flickr30k-CN.tar.gz -C data/datasets/
+mv data/datasets/Flickr30k-CN_copy data/datasets/Flickr30k-CN
 
-python preprocess/create_arrow_dataset.py \
-    --data_dir data/datasets/Flickr30k-CN \
-    --splits train,valid,test \
-    --image_dir data/datasets/Flickr30k-CN/image \
-    --t2i_type   jsonl
+python preprocess/create_arrow_dataset.py   --data_dir data/datasets/Flickr30k-CN  --image_dir data/datasets/Flickr30k-CN/image   --splits train,valid,test
 ```
 执行完后，data 目录应是如下结构：
 
@@ -337,19 +334,21 @@ python predict.py --resume output_pd/checkpoint-600/ --image_path examples/21285
 
 ```
 ......
-         -0.15448952,  0.72006893,  0.36882138, -0.84108782,  0.37967119,
-          0.12349987, -1.02212155, -0.58292383,  1.48998547, -0.46960664,
-          0.30193087, -0.56355256, -0.30767381, -0.34489608,  0.59651250,
-         -0.49545336, -0.95961350,  0.68815416,  0.47264558, -0.25057256,
-         -0.61301452,  0.09002528, -0.03568697]])
+          0.30446628, -0.40303054, -0.44902760, -0.20834517,  0.61418092,
+         -0.47503090, -0.90602577,  0.61230117,  0.31328726, -0.30551922,
+         -0.70518905,  0.02921746, -0.06500954]])
 Text features
-Tensor(shape=[2, 768], dtype=float32, place=Place(cpu), stop_gradient=True,
-       [[ 0.04250492, -0.41429815,  0.26164034, ...,  0.26221907,
-          0.34387457,  0.18779679],
-        [ 0.06672275, -0.41456315,  0.13787840, ...,  0.21791621,
-          0.36693257,  0.34208682]])
-Label probs: Tensor(shape=[1, 2], dtype=float32, place=Place(cpu), stop_gradient=True,
-       [[0.99110782, 0.00889216]])
+Tensor(shape=[2, 768], dtype=float32, place=Place(gpu:0), stop_gradient=True,
+       [[ 0.04464678, -0.43012181,  0.25478637, ...,  0.27861869,
+          0.36597741,  0.20715161],
+        [ 0.06647702, -0.43343985,  0.12268012, ...,  0.23637798,
+          0.38784462,  0.36298674]])
+model temperature
+Parameter containing:
+Tensor(shape=[1], dtype=float32, place=Place(gpu:0), stop_gradient=False,
+       [4.29992294])
+Label probs: Tensor(shape=[1, 2], dtype=float32, place=Place(gpu:0), stop_gradient=True,
+       [[0.99257678, 0.00742322]])
 ```
 可以看到`猫的照片`的相似度更高，结果符合预期。
 
@@ -357,10 +356,8 @@ Label probs: Tensor(shape=[1, 2], dtype=float32, place=Place(cpu), stop_gradient
 
 ## 模型导出预测
 
-上一节是动态图的示例，下面提供了简单的导出静态图预测的示例，帮助用户将预训练模型导出成预测部署的参数。首先安装[FastDeploy](https://github.com/PaddlePaddle/FastDeploy):
+上一节是动态图的示例，下面提供了简单的导出静态图预测的示例，帮助用户将预训练模型导出成预测部署的参数。
 
-```
-pip install fastdeploy-gpu-python -f https://www.paddlepaddle.org.cn/whl/fastdeploy.html
 ```
 然后运行下面的命令：
 
@@ -372,15 +369,11 @@ python export_model.py --model_path=output_pd/checkpoint-600/ \
 
 对于导出的模型，我们提供了 Python 的 infer 脚本，调用预测库对简单的例子进行预测。
 ```shell
-python deploy/python/infer.py --model_dir ./infer_model/
+python deploy/python/infer.py --model_dir ./infer_model/ --image_path examples/212855663-c0a54707-e14c-4450-b45d-0162ae76aeb8.jpeg --device gpu
 ```
 可以得到如下输出：
 ```
-......
-  -5.63553333e-01 -3.07674855e-01 -3.44897419e-01  5.96513569e-01
-  -4.95454431e-01 -9.59614694e-01  6.88151956e-01  4.72645760e-01
-  -2.50571519e-01 -6.13013864e-01  9.00242254e-02 -3.56860608e-02]]
-[[0.99110764 0.00889209]]
+[[0.9925795  0.00742046]]
 ```
 可以看到输出的概率值跟前面的预测结果几乎是一致的
 

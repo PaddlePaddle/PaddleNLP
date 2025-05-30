@@ -24,7 +24,7 @@ from .dataset import DatasetBuilder
 class THUCNews(DatasetBuilder):
     """
     A subset of THUCNews dataset. THUCNews is a text classification dataset.
-    See descrition about this subset version at https://github.com/gaussic/text-classification-cnn-rnn#%E6%95%B0%E6%8D%AE%E9%9B%86
+    See description about this subset version at https://github.com/gaussic/text-classification-cnn-rnn#%E6%95%B0%E6%8D%AE%E9%9B%86
     The whole dataset can be downloaded at https://thunlp.oss-cn-qingdao.aliyuncs.com/THUCNews.zip
     """
 

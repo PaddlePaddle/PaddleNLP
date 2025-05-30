@@ -53,14 +53,14 @@ pip install -r requirements.txt
 ```
 (
   (Spot Name: Info Span
-    (Assocation Name: Info Span)
-    (Assocation Name: Info Span)
+    (Association Name: Info Span)
+    (Association Name: Info Span)
   )
 )
 ```
 其中，
 - Spot Name: 信息点类别，如实体类型；
-- Assocation Name (asoc/asso): 信息点关联类别，如关系类型、事件论元类型；
+- Association Name (asoc/asso): 信息点关联类别，如关系类型、事件论元类型；
 - Info Span: 信息点所对应的文本片段。
 
 以`2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！`中的信息结构为例：

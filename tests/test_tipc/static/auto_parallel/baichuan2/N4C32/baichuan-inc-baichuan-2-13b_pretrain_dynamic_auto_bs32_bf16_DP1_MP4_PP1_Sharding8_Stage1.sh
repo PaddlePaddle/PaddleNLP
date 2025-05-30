@@ -21,6 +21,8 @@ param+="model_type=baichuan2_13b "
 param+='dynamic_auto=_dynamic_auto '
 
 export FLAGS_fuse_reducescatter_in_opt=1
+export FLAGS_enable_sharding_overlap=1
+export FLAGS_enable_tensor_fusion=1
 
 cd ./tests
 bash ./test_tipc/static/auto_parallel/baichuan2/benchmark_common/prepare.sh

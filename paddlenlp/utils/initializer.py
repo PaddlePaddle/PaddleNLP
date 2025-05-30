@@ -14,7 +14,7 @@
 
 """
 This code is based on https://github.com/pytorch/pytorch/blob/master/torch/nn/init.py
-Ths copyright of pytorch/pytorch is a BSD-style license, as found in the LICENSE file.
+This copyright of pytorch/pytorch is a BSD-style license, as found in the LICENSE file.
 """
 
 import math
@@ -42,7 +42,7 @@ __all__ = [
 def _no_grad_uniform_(tensor, a, b):
     with paddle.no_grad():
         nn.initializer.Uniform(a, b)(tensor)
-        # tensor.uniform_(min=a, max=b)  # NOTE uniform_ ops donot suprort on cpu
+        # tensor.uniform_(min=a, max=b)  # NOTE uniform_ ops do not suprort on cpu
     return tensor
 
 

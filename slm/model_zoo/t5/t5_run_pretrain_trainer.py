@@ -376,7 +376,7 @@ def main():
             attention_probs_dropout_prob=model_args.attention_probs_dropout_prob,
         )
 
-    # Create the learning_rate sheduler and optimizer
+    # Create the learning_rate scheduler and optimizer
     if training_args.decay_steps is None:
         training_args.decay_steps = training_args.max_steps
     warmup_steps = training_args.warmup_ratio * training_args.max_steps

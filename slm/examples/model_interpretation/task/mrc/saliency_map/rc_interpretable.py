@@ -480,7 +480,7 @@ if __name__ == "__main__":
                     out_handle,
                 )
             else:
-                raise KeyError(f"Unkonwn interpretable mode: {args.inter_mode}")
+                raise KeyError(f"Unknown interpretable mode: {args.inter_mode}")
 
         # Deal with last example
         if args.language == "ch":

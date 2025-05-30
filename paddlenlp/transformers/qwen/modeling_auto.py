@@ -538,7 +538,7 @@ class QWenModelAuto(QWenPretrainedModelAuto):
         self.recompute_granularity = config.recompute_granularity
 
         self.wte = nn.Embedding(self.vocab_size, self.embed_dim)
-        self.wte.weight = dist.shard_tensor(self.wte.weight, get_mesh(), [dist.Replicate(), dist.Shard(0)])
+        self.wte.weight = dist.shard_tensor(self.wte.weight, get_mesh(), [dist.Replicate(), dist.Shard(1)])
         self.drop = nn.Dropout(config.emb_dropout_prob)
 
         self.h = nn.LayerList(
@@ -879,7 +879,7 @@ class QWenForCausalLM3DAuto(QWenPretrainedModelAuto):
         hidden_states = transformer_outputs[0]
 
         # if labels is None，means we need full output, instead of tensor_parallel_output
-        # tensor_parallel_output is togather with ParallelCrossEntropy
+        # tensor_parallel_output is together with ParallelCrossEntropy
         tensor_parallel_output = (
             self.config.tensor_parallel_output and labels is not None and self.config.tensor_parallel_degree > 1
         )
