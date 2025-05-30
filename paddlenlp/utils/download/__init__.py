@@ -195,7 +195,7 @@ def resolve_file_path(
                     else:
                         print(f"please make sure one of the {filenames} under the repo {repo_id}")
                         return None
-                    
+
         elif from_hf_hub:
             log_endpoint = "Huggingface Hub"
             for filename in filenames:

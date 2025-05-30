@@ -13,9 +13,9 @@
 # limitations under the License.
 
 from typing import Optional
-from requests import HTTPError
 
 from aistudio_sdk.file_download import model_file_download as download
+from requests import HTTPError
 
 
 class UnauthorizedError(Exception):
@@ -48,16 +48,22 @@ def aistudio_download(
         download_kwargs["revision"] = revision
     if cache_dir is not None:
         download_kwargs["local_dir"] = cache_dir
-    
+
     try:
-        return download(repo_id=repo_id, file_path=filename, **download_kwargs,)
+        return download(
+            repo_id=repo_id,
+            file_path=filename,
+            **download_kwargs,
+        )
     except ValueError:
         raise EnvironmentError(
             f"Cannot find {filename} in the cached files and it looks like {repo_id} is not the path to a directory containing the {filename} or"
             " \nCheckout your internet connection or see how to run the library in offline mode."
         )
     except EntryNotFoundError:
-        raise EnvironmentError(f"Cannot find the requested file {filename} in {repo_id}, please make sure the {filename} under the repo {repo_id}")
+        raise EnvironmentError(
+            f"Cannot find the requested file {filename} in {repo_id}, please make sure the {filename} under the repo {repo_id}"
+        )
     except HTTPError as err:
         raise EnvironmentError(f"There was a specific connection error when trying to load {repo_id}:\n{err}")
     except Exception:
