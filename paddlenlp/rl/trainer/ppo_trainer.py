@@ -1471,8 +1471,19 @@ class PPOTrainer(RLTrainerBase):
                             # generate for multi batches and then disable FuseMT model
                             generated_batches: List[DataProto] = self.actor_trainer.generate_sequences(micro_prompt_batch)
                             # NOTE(drownfish19): do process for each micro_batch, prepare for split mode
-                            micro_ret = self.remove_pad_tokens_after_generate(generated_batches)
-                            micro_cleanup_batches, micro_indices, micro_label_ids_batches = micro_ret
+                            # micro_ret = self.remove_pad_tokens_after_generate(generated_batches)
+                            # micro_cleanup_batches, micro_indices, micro_label_ids_batches = micro_ret
+                            # cleanup_batches.extend(micro_cleanup_batches)
+                            # indices.extend(micro_indices)
+                            # label_ids_batches.extend(micro_label_ids_batches)
+
+                            micro_ret = [generated_batch.remove_pad_tokens_after_generate(self.tokenizer, self.args) for generated_batch in generated_batches]
+                            micro_cleanup_batches, micro_indices, micro_label_ids_batches = [], [], []
+
+                            for cleanup_batch, index, label_ids_batch in micro_ret:
+                                micro_cleanup_batches.extend(cleanup_batch)
+                                micro_indices.append(index)
+                                micro_label_ids_batches.extend(label_ids_batch)
                             cleanup_batches.extend(micro_cleanup_batches)
                             indices.extend(micro_indices)
                             label_ids_batches.extend(micro_label_ids_batches)
@@ -1651,6 +1662,29 @@ class PPOTrainer(RLTrainerBase):
                             #         dtype=gathered_and_padded_tensor[0].dtype,      # 这里可能需要加外括号变成List才能获取[0]
                             #         padding_side=padding_side
                             #     )
+
+                            total_batch[key] = gathered_and_padded_tensor
+
+                            # 解耦 gather 和 pad 后剩余的 concat 部分
+                            if not pad:
+                                from ...utils.nested import flatten_list
+                                if (data_parallel_group is None and sharding_parallel_group is None) or (data_parallel_group.nranks == 1 and sharding_parallel_group.nranks == 1):
+                                    if isinstance(gathered_and_padded_tensor[0], paddle.Tensor):
+                                        gathered_and_padded_tensor =  paddle.concat(gathered_and_padded_tensor, axis=0)
+                                    else:
+                                        gathered_and_padded_tensor =  np.concatenate(gathered_and_padded_tensor, axis=0)
+                                else:
+                                    if isinstance(gathered_and_padded_tensor[0], paddle.Tensor):
+                                        gathered_and_padded_tensor =  paddle.concat(gathered_and_padded_tensor, axis=0)
+                                    else:
+                                        gathered_and_padded_tensor =  np.concatenate(flatten_list(gathered_and_padded_tensor), axis=0)
+                            else:
+                                gathered_and_padded_tensor = DataProto.pad_tensor(  # 默认 dtype="bfloat16"
+                                    gathered_and_padded_tensor,
+                                    pad_index=pad_index,
+                                    dtype=gathered_and_padded_tensor[0].dtype,      # 这里可能需要加外括号
+                                    padding_side=padding_side
+                                )
 
                             total_batch[key] = gathered_and_padded_tensor
 
