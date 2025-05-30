@@ -14,6 +14,7 @@
 # import inspect
 import json
 import logging
+import math
 import os
 import sys
 from functools import partial
@@ -76,6 +77,7 @@ from paddlenlp.trl.llm_utils import (
     init_chat_template,
 )
 from paddlenlp.utils.log import logger
+from paddlenlp.utils.optimizer import AdamWLoRAPro
 from paddlenlp.utils.tools import get_env_device
 
 # Fine-tune Environment Variables to support sharding stage1 overlap optimization.
@@ -447,6 +449,15 @@ def main():
     )
     trainable_parameters = [p for p in model.parameters() if not p.stop_gradient]
     trainer.set_optimizer_grouped_parameters(trainable_parameters)
+    if model_args.lorapro:
+        optimizer = AdamWLoRAPro(
+            learning_rate=training_args.learning_rate,
+            parameters=trainable_parameters,
+            weight_decay=training_args.weight_decay,
+            scaling_factor=model_args.lorapro_scaling_factor,
+            x_mode=model_args.lorapro_x_mode,
+        )
+        trainer.optimizer = optimizer
 
     # Train
     if training_args.do_train:
@@ -560,7 +571,13 @@ def create_peft_model(model_args, reft_args, training_args, dtype, model_config,
                 use_quick_lora=model_args.use_quick_lora,
                 lora_use_mixer=model_args.lora_use_mixer,
                 use_mora=model_args.use_mora,
+                lorapro=model_args.lorapro,
             )
+            if model_args.lorapro:
+                if model_args.rslora:
+                    model_args.lorapro_scaling_factor = lora_config.lora_alpha / math.sqrt(lora_config.r)
+                else:
+                    model_args.lorapro_scaling_factor = lora_config.lora_alpha / lora_config.r
             model = LoRAModel(model, lora_config)
         else:
             model = LoRAModel.from_pretrained(model=model, lora_path=model_args.lora_path)

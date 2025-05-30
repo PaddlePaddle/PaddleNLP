@@ -151,7 +151,7 @@ def main():
             if returncode is not None:
                 if returncode != 0:
                     retry[runs[i]["ts"]] += 1
-                    print(f"> {runs[i]['ts']} task failed, will retried, tryed {retry[runs[i]['ts']]} times.")
+                    print(f"> {runs[i]['ts']} task failed, will retried, tried {retry[runs[i]['ts']]} times.")
                     output = runs[i]["ps"].communicate()[0]
                     for line in output.decode("utf-8").split("\n"):
                         print(line)

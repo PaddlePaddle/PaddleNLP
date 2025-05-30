@@ -376,7 +376,7 @@ class TrainingArguments:
             instance of `Dataset`.
         report_to (`str` or `List[str]`, *optional*, defaults to `"visualdl"`):
             The list of integrations to report the results and logs to.
-            Supported platforms are `"visualdl"`/`"wandb"`/`"tensorboard"`.
+            Supported platforms are `"visualdl"`/`"wandb"`/`"tensorboard"`/`"swanlab"`.
             `"none"` for no integrations.
         ddp_find_unused_parameters (`bool`, *optional*):
             When using distributed training, the value of the flag `find_unused_parameters` passed to

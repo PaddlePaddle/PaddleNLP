@@ -95,7 +95,7 @@ class ErnieSageV2Encoder(Encoder):
         """Gather the final feature.
 
         Args:
-            feature (Tensor): the total featue tensor.
+            feature (Tensor): the total feature tensor.
             index (Tensor): the index to gather.
 
         Returns:

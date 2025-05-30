@@ -86,6 +86,17 @@ class ModelConfig:
     use_mora: bool = field(
         default=False, metadata={"help": "Whether to use MoRA: https://arxiv.org/pdf/2405.12130.pdf"}
     )
+    lorapro: bool = field(
+        default=False, metadata={"help": "Whether to use LoRA-Pro: https://arxiv.org/pdf/2407.18242"}
+    )
+    lorapro_x_mode: str = field(
+        default="zero",
+        metadata={"help": "X mode for AdamWLoRAPro optimizer (zero, sylvester, symmetry)."},
+    )
+    lorapro_scaling_factor: float = field(
+        default=2.0,
+        metadata={"help": "Scaling factor for AdamWLoRAPro optimizer."},
+    )
 
     # vera related parameters
     vera: bool = field(default=False, metadata={"help": "Whether to use vera technique"})

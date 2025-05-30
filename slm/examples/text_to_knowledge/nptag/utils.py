@@ -113,7 +113,7 @@ def levenstein_distance(s1: str, s2: str) -> int:
 
 
 class BurkhardKellerNode(object):
-    """Node implementatation for BK-Tree. A BK-Tree node stores the information of current word, and its approximate words calculated by levenstein distance.
+    """Node implementation for BK-Tree. A BK-Tree node stores the information of current word, and its approximate words calculated by levenstein distance.
 
     Args:
         word (str): word of current node.

@@ -158,7 +158,7 @@ def prepare_flashmask_inputs(
     input_ids_rmpad, indices, *_ = unpad_input(input_ids.unsqueeze(-1), attn_mask)  # input_ids_rmpad (total_nnz, ...)
     input_ids_rmpad = input_ids_rmpad.transpose([1, 0])
 
-    # positon ids rmpad
+    # position ids rmpad
     position_ids_rmpad = index_first_axis(
         rearrange(position_ids.unsqueeze(-1), "b s ... -> (b s) ..."), indices
     ).transpose([1, 0])
