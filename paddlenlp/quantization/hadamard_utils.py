@@ -33,12 +33,6 @@ def matmul_hadU(X):
     return input.reshape(X.shape)
 
 
-def random_hadamard_matrix(block_size, dtype):
-    Q = paddle.diag(paddle.ones((block_size), dtype=dtype))
-    block = matmul_hadU(Q)
-    return block
-
-
 def create_hadamard_matrix(block_size, dtype):
     Q = paddle.diag(paddle.ones((block_size), dtype=dtype))
     block = matmul_hadU(Q)

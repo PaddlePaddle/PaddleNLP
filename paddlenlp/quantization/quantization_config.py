@@ -41,6 +41,7 @@ class QuantizationConfig:
         qlora_weight_double_quant_block_size: Block size for quant_scale of weight quant_scale.
         weight_quant_method: The method for weight quantization.
         act_quant_method: The method for activation quantization.
+        apply_online_actscale_step: Use online (per-step) activation scales for the first N steps. During these steps, activation scales are also collected to compute their mean for later use.
     """
 
     def __init__(
