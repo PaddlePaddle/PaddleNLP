@@ -1338,6 +1338,8 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         repeat_num=1,
         **kwargs
     ):
+        # The output of the ultra-long truncation does not return an eos_token
+        os.environ["INFERENCE_TRUNCATED_RETURN_EOS"] = "0"
         assert repeat_num >= 1
         flag_current_rank_run = self.tensor_parallel_rank == 0 or all_rank_return
         self.input_ids = []

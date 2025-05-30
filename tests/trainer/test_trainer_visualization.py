@@ -22,6 +22,7 @@ from visualdl import LogReader
 
 from paddlenlp.trainer import TrainerControl, TrainerState, TrainingArguments
 from paddlenlp.trainer.integrations import (
+    SwanLabCallback,
     TensorBoardCallback,
     VisualDLCallback,
     WandbCallback,
@@ -63,6 +64,36 @@ class TestWandbCallback(unittest.TestCase):
         wandbcallback._wandb.finish()
         os.environ.pop("WANDB_LOG_MODEL", None)
         os.environ.pop("WANDB_MODE", None)
+        shutil.rmtree(output_dir)
+
+
+class TestSwanlabCallback(unittest.TestCase):
+    def test_swanlabcallback(self):
+        output_dir = tempfile.mkdtemp()
+        args = TrainingArguments(
+            output_dir=output_dir,
+            max_steps=200,
+            logging_steps=20,
+            run_name="test_swanlabcallback",
+            logging_dir=output_dir,
+        )
+        state = TrainerState(trial_name="PaddleNLP")
+        control = TrainerControl()
+        config = RegressionModelConfig(a=1, b=1)
+        model = RegressionPretrainedModel(config)
+        os.environ["SWANLAB_MODE"] = "disabled"
+        swanlabcallback = SwanLabCallback()
+        self.assertFalse(swanlabcallback._initialized)
+        swanlabcallback.on_train_begin(args, state, control)
+        self.assertTrue(swanlabcallback._initialized)
+        for global_step in range(args.max_steps):
+            state.global_step = global_step
+            if global_step % args.logging_steps == 0:
+                log = {"loss": 100 - 0.4 * global_step, "learning_rate": 0.1, "global_step": global_step}
+                swanlabcallback.on_log(args, state, control, logs=log)
+        swanlabcallback.on_train_end(args, state, control, model=model)
+        swanlabcallback._swanlab.finish()
+        os.environ.pop("SWANLAB_MODE", None)
         shutil.rmtree(output_dir)
 
 

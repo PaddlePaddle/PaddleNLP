@@ -1526,7 +1526,7 @@ class PPOTrainer(RLTrainerBase):
                             if self.args.rl_algorithm == "ppo":
                                 batch["reward_values"] = self.critic_trainer.compute_value(**batch)
 
-                # danamic sampling: filter generated samples by rewards, keep generating until valid samples are enough
+                # dynamic sampling: filter generated samples by rewards, keep generating until valid samples are enough
                 if self.args.dynamic_sampling:
                     local_valid_prompt = 0
                     # combined_batch = combine_micro_batches_into_batch(micro_batches, pad_token_id=self.tokenizer.pad_token_id)
@@ -1601,7 +1601,7 @@ class PPOTrainer(RLTrainerBase):
                         total_batch = defaultdict(list)
                         total_valid_prompt = 0
                         num_gen_batches = 0
-                        logger.info("Danymic sampling completed. \n")
+                        logger.info("Dynamic sampling completed. \n")
 
                     else:
                         if self.args.max_gen_batches > 0 and num_gen_batches > self.args.max_gen_batches:
@@ -1664,7 +1664,7 @@ class PPOTrainer(RLTrainerBase):
                                 paddle.device.cuda.empty_cache()
 
                                 if self.args.rl_algorithm == "ppo":
-                                    rl_info["train_value_loss"] = self.critic_trainer.update_critc(micro_batch)
+                                    rl_info["train_value_loss"] = self.critic_trainer.update_critic(micro_batch)
                                 if self.is_step_end():
                                     self.state.global_step += 1
                                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
@@ -1701,7 +1701,6 @@ class PPOTrainer(RLTrainerBase):
 
             if self.control.should_training_stop:
                 break
-        # TODO(guosheng): add epilogue of training
         logger.info("\nTraining completed. \n")
         if args.load_best_model_at_end and self.state.best_model_checkpoint is not None:
             if args.local_rank != -1:

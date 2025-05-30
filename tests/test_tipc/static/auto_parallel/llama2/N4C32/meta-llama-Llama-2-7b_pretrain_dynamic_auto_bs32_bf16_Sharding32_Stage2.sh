@@ -23,6 +23,10 @@ param+='dynamic_auto=_dynamic_auto '
 # This optimization currently only runs in the dynamic automatic parallelism of Llama7B.
 export FLAGS_fuse_reducescatter_in_opt=1
 
+# Enable tensor fusion and sharding overlap optimization
+export FLAGS_enable_tensor_fusion=1
+export FLAGS_enable_sharding_overlap=1
+
 cd ./tests
 bash ./test_tipc/static/auto_parallel/llama2/benchmark_common/prepare.sh
 

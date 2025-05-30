@@ -62,7 +62,7 @@ PaddleNLP 提供了丰富的预训练模型，并且可以便捷地获取 Paddle
 
 ```text
 sentence_transformers/
-├── model.py # Sentence Transfomer 组网文件
+├── model.py # Sentence Transformer 组网文件
 ├── README.md # 文本说明
 └── train.py # 模型训练评估
 ```

@@ -74,7 +74,7 @@ def get_parser():
         help="Whether to use flash attention",
     )
     # load autodist name files, eg: bloom-176b
-    parser.add_argument("--load_autodist", action="store_true", help="whether load auto-dist wieght file")
+    parser.add_argument("--load_autodist", action="store_true", help="whether load auto-dist weight file")
 
     return parser
 

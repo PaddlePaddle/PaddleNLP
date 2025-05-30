@@ -755,7 +755,7 @@ class TextSimilarityProcessor(Processor):
         # Take the dict and insert into our basket structure, this stages also adds an internal IDs
         baskets = self._fill_baskets(dicts, indices)
 
-        # Separat conversion of query
+        # Separate conversion of query
         baskets = self._convert_queries(baskets=baskets)
 
         # and context passages. When converting the context the label is also assigned.

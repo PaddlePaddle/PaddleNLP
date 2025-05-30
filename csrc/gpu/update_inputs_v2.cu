@@ -42,8 +42,10 @@ __global__ void update_inputs_kernel_v2(
     const int bsz,
     const int max_bsz,
     const int input_ids_stride,
-    const int end_length) {
+    const int end_length,
+    const int Flag_truncated_return_eos) {
   int thread_idx = threadIdx.x;
+  bool output_len_truncated = false;
   // update step_idx and stop_flags
   if (thread_idx < max_bsz) {
     bool stop_flag = stop_flags[thread_idx];
@@ -52,6 +54,7 @@ __global__ void update_inputs_kernel_v2(
     }
     if (step_idx[thread_idx] >= max_dec_len[thread_idx]) {
       stop_flags[thread_idx] = true;
+      output_len_truncated = true;
     }
   }
   __syncthreads();
@@ -60,11 +63,15 @@ __global__ void update_inputs_kernel_v2(
     if (stop_flags[thread_idx]) {
       if (seq_lens_this_time[thread_idx] == 0) {
         next_tokens[thread_idx] = -1;
+      } else {
+        if (!Flag_truncated_return_eos && output_len_truncated) {
+          // output len truncated will not return eos for rl.
+          kwargs_next_tokens[thread_idx] = next_tokens[thread_idx];
+        }else{
+          next_tokens[thread_idx] = end_ids[0];
+          kwargs_next_tokens[thread_idx] = end_ids[0];
+        }
       }
-      // else {
-      //   next_tokens[thread_idx] = end_ids[0];
-      //   kwargs_next_tokens[thread_idx] = end_ids[0];
-      // }
     } else {
       kwargs_next_tokens[thread_idx] = next_tokens[thread_idx];
     }
@@ -128,6 +135,15 @@ void UpdateInputesV2(const paddle::Tensor& stop_flags,
   const int end_length = end_ids.shape()[0];
 
   auto not_need_stop_gpu = not_need_stop.copy_to(stop_flags.place(), false);
+  int Flag_truncated_return_eos = 1;
+  if (const char* inference_truncated_return_eos_env_p =
+          std::getenv("INFERENCE_TRUNCATED_RETURN_EOS")) {
+      std::string inference_truncated_return_eos_env_str(
+          inference_truncated_return_eos_env_p);
+      int inference_truncated_return_eos_from_env =
+          std::stoi(inference_truncated_return_eos_env_str);
+      Flag_truncated_return_eos = inference_truncated_return_eos_from_env;
+  }
 
   update_inputs_kernel_v2<1024><<<1, 1024, 0, input_ids.stream()>>>(
     const_cast<bool*>(not_need_stop_gpu.data<bool>()),
@@ -146,7 +162,8 @@ void UpdateInputesV2(const paddle::Tensor& stop_flags,
     now_bsz,
     max_bsz,
     input_ids_stride,
-    end_length
+    end_length,
+    Flag_truncated_return_eos
   );
 
   auto not_need_stop_cpu = not_need_stop_gpu.copy_to(not_need_stop.place(), false);
