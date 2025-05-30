@@ -37,7 +37,7 @@ class ActorReferenceTrainerBase(RLTrainer):
     loss_identifier = lambda self, inputs: "actor_loss"
 
     @paddle.no_grad()
-    def compute_logprob(self, input_ids: paddle.Tensor, position_ids: paddle.Tensor = None, **kwargs) -> paddle.Tensor:
+    def compute_logprob(self, batch: DataProto, key) -> DataProto:
         """
         Computes the log probability of each token during the rollout process.
 
@@ -61,11 +61,15 @@ class ActorReferenceTrainerBase(RLTrainer):
         Raises:
             None.
         """
+        input_ids = batch.batch['input_ids']
+        position_ids = batch.batch['position_ids']
+        prompt = batch.batch.get('prompt', None)
         if self.args.use_fused_head_and_loss_fn:
             return self.compute_fused_logprob(
                 input_ids=input_ids,
+                key=key,
                 position_ids=position_ids,
-                **kwargs,
+                prompt=prompt,
             )
 
         log_probs_list = []
@@ -76,7 +80,7 @@ class ActorReferenceTrainerBase(RLTrainer):
         # Pipe model outputs a logits tensor with LMHead, while non-pipe model
         # outputs a tuple with logits tensor as the only one element.
         startend_row_indices = create_startend_row_indices(input_ids, self.tokenizer.pad_token_id)
-        response_start = kwargs["prompt"].shape[-1] - 1 if "prompt" in kwargs else 0
+        response_start = prompt.shape[-1] - 1 if prompt is not None else 0
 
         for i in range(num_batches):
             # Calculate the start and end indices for the current batch
@@ -156,11 +160,11 @@ class ActorReferenceTrainerBase(RLTrainer):
             logits = None
             paddle.device.cuda.empty_cache()
 
-        return paddle.concat(log_probs_list, axis=0)
+        return DataProto.from_single_dict({key:paddle.concat(log_probs_list, axis=0)}, meta_info={'temperature':self.args.temperature})
 
     def compute_fused_logprob(
-        self, input_ids: paddle.Tensor, position_ids: paddle.Tensor = None, loop_chunk_size=1024, **kwargs
-    ):
+        self, input_ids: paddle.Tensor, key, position_ids: paddle.Tensor = None, prompt = None, loop_chunk_size=1024
+    ) -> DataProto:
         log_probs_list = []
         batch_size, sequence_length = input_ids.shape
         per_device_logprob_batch_size = self.args.per_device_logprob_batch_size
@@ -169,7 +173,7 @@ class ActorReferenceTrainerBase(RLTrainer):
         # Pipe model outputs a logits tensor with LMHead, while non-pipe model
         # outputs a tuple with logits tensor as the only one element.
         startend_row_indices = create_startend_row_indices(input_ids, self.tokenizer.pad_token_id)
-        response_start = kwargs["prompt"].shape[-1] - 1 if "prompt" in kwargs else 0
+        response_start = (prompt.shape[-1] - 1) if prompt is not None else 0
 
         num_embeddings = self.model.config.vocab_size
         tensor_parallel_degree = self.model.config.tensor_parallel_degree
@@ -303,9 +307,10 @@ class ActorReferenceTrainerBase(RLTrainer):
             log_prob_chunks = None
             paddle.device.cuda.empty_cache()
 
-        return paddle.concat(log_probs_list, axis=0)
+        return DataProto.from_single_dict({key:paddle.concat(log_probs_list, axis=0)}, meta_info={'temperature':self.args.temperature})
 
-    def update_actor(self, rl_batch: Dict[str, paddle.Tensor]) -> Dict[str, Any]:
+    # 这个函数之前是按自己的理解写的，实际上这些变量是作为字典放在meta_info的metrics字典里的
+    def update_actor(self, rl_batch: DataProto) -> DataProto:
         # inputs shared by policy and value trainer
         input_ids = rl_batch.batch["input_ids"].contiguous()  # length: src+tgt
         position_ids = rl_batch.batch["position_ids"]  # length: src+tgt
@@ -353,42 +358,40 @@ class ActorReferenceTrainerBase(RLTrainer):
             max_generated_length = mask_cast.sum(axis=-1).max()
             min_generated_length = mask_cast.sum(axis=-1).min()
 
-        # [1] 一维张量 和 [] 标量也不能放在一起
-        return DataProto.from_single_dict(
-            {
-                # when using PipelienParallel, the loss returned is 0 when not reach
-                # accumulated step and the loss returned at accumulated step is a
-                # mixed loss.
-                "train_policy_loss": actor_loss,
-                **(
-                    {
-                        "train_pure_policy_loss": self.info_buffer.get("pure_policy_loss"),
-                        "train_kl_loss": self.info_buffer.get("kl_loss"),
-                        "train_entropy_loss": self.info_buffer.get("entropy_loss"),
-                    }
-                    if self.args.rl_algorithm == "grpo"
-                    else {}
-                ),
-                "train_reward": ori_rewards.reshape([1]),  # use original reward to log
-                **(
-                    {
-                        "train_norm_reward": rewards,
-                        "train_kl_reward": kl_rewards,
-                        "train_norm_reward_with_kl": rewards_with_kl,
-                        "train_pure_policy_loss": self.info_buffer.get("pure_policy_loss"),
-                        "train_entropy_loss": self.info_buffer.get("entropy_loss"),
-                        **({"train_values": values} if self.args.rl_algorithm == "ppo" else {}),
-                        "train_returns": returns,
-                    }
-                    if self.args.rl_algorithm in ["ppo", "reinforce_plus_plus"]
-                    else {}
-                ),
-                "train_kl_divergence": kl_divergence.reshape([1]),
-                "train_mean_generated_length": mean_generated_length.reshape([1]),
-                "train_max_generated_length": max_generated_length.reshape([1]),
-                "train_min_generated_length": min_generated_length.reshape([1]),
-            }
-        )
+        # [1] 一维张量 和 [] 标量不能放在batch里，可以.reshape([1])，verl是放在了metrics中
+        return DataProto(meta_info={'metrics':{
+            # when using PipelienParallel, the loss returned is 0 when not reach
+            # accumulated step and the loss returned at accumulated step is a
+            # mixed loss.
+            "train_policy_loss": actor_loss,
+            **(
+                {
+                    "train_pure_policy_loss": self.info_buffer.get("pure_policy_loss"),
+                    "train_kl_loss": self.info_buffer.get("kl_loss"),
+                    "train_entropy_loss": self.info_buffer.get("entropy_loss"),
+                }
+                if self.args.rl_algorithm == "grpo"
+                else {}
+            ),
+            "train_reward": ori_rewards,  # use original reward to log
+            **(
+                {
+                    "train_norm_reward": rewards,
+                    "train_kl_reward": kl_rewards,
+                    "train_norm_reward_with_kl": rewards_with_kl,
+                    "train_pure_policy_loss": self.info_buffer.get("pure_policy_loss"),
+                    "train_entropy_loss": self.info_buffer.get("entropy_loss"),
+                    **({"train_values": values} if self.args.rl_algorithm == "ppo" else {}),
+                    "train_returns": returns,
+                }
+                if self.args.rl_algorithm in ["ppo", "reinforce_plus_plus"]
+                else {}
+            ),
+            "train_kl_divergence": kl_divergence,
+            "train_mean_generated_length": mean_generated_length,
+            "train_max_generated_length": max_generated_length,
+            "train_min_generated_length": min_generated_length,
+        }})
 
 
 class ActorReferenceTrainer(ActorReferenceTrainerBase):
@@ -432,7 +435,7 @@ class ActorReferenceTrainer(ActorReferenceTrainerBase):
                     ),  # tgt response
                     "index": np.array(
                         [str(uuid.uuid4())] * len(seq), dtype=object
-                    ),  # 每个 response 的唯一标识，这个存储到 non_tensor_batch 里了
+                    ),  # 每个 response 的唯一标识（这不都一样吗？），这个存储到 non_tensor_batch 里了
                 }
             )
             for idx, seq in enumerate(sequences)

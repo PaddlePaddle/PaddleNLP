@@ -25,6 +25,10 @@ import numpy as np
 import paddle
 import pandas as pd
 from paddle.io import DataLoader
+import paddle.distributed as dist
+
+from ...utils import logger
+
 
 original_concat = paddle.concat
 __all__ = [
@@ -76,6 +80,7 @@ class TensorDict:
         if isinstance(other, TensorDict):
             other = other._tensors
         for key, value in other.items():
+            # 这个还没有一致性检查
             self._tensors[key] = value
 
     def keys(self):
@@ -179,6 +184,15 @@ class TensorDict:
             : tensordict_list[0].num_batch_dims
         ]
         return cls(concatenated_tensors, batch_size=batch_size, num_batch_dims=tensordict_list[0].num_batch_dims)
+    
+    def get(self, key, default=None):
+        """
+        获取 key 对应的张量，如果不存在则返回默认值。
+        :param key: str，键名
+        :param default: 如果键不存在时返回的默认值
+        :return: 对应的张量或默认值
+        """
+        return self._tensors.get(key, default)
 
 
 def tensordict_concat(
@@ -344,6 +358,25 @@ def collate_fn(x: list["DataProtoItem"]):
         non_tensor_batch[key] = np.array(val, dtype=object)
     return DataProto(batch=batch, non_tensor_batch=non_tensor_batch)
 
+def make_eos_mask(response_id, eos_token_ids=0, dtype=paddle.int64):
+    """
+    end of sentence token can be int or list: 1 or [1, 2]
+    e.g. eos_token=1
+    response_id: [0, 0, 2, 42, 3, 5, 1, 0, 0]
+    eos_mask:     [1, 1, 1, 1,  1, 1, 1, 0, 0]
+    """
+    if isinstance(eos_token_ids, int):
+        eos_token_ids = [eos_token_ids]
+
+    eos_mask = paddle.zeros_like(response_id, dtype=paddle.bool)
+    for token_id in eos_token_ids:
+        eos_mask |= response_id == token_id
+
+    eos_mask = eos_mask.to("int64")
+    eos_mask = (paddle.cumsum(eos_mask, axis=1) - eos_mask).to("bool")
+    eos_mask = paddle.logical_not(eos_mask).to(dtype)
+    return eos_mask
+
 
 @dataclass
 class DataProtoItem:
@@ -503,6 +536,257 @@ class DataProto:
 
         tensor_dict = TensorDict(source=tensors, batch_size=batch_size, num_batch_dims=num_batch_dims)
         return cls(batch=tensor_dict, non_tensor_batch=non_tensors, meta_info=meta_info)
+    
+    @staticmethod
+    def gather_tensor(tensor, dp_group=None, sd_group=None):
+        from ...utils.nested import flatten_list
+        """Gather tensor from all devices."""
+
+        if not isinstance(tensor, list):
+            tensor = [tensor]
+
+        if isinstance(tensor[0], paddle.Tensor):
+            type = "tensor"
+        elif isinstance(tensor[0], np.ndarray):
+            type = "numpy"
+        else:
+            raise TypeError(f"{type(tensor[0])} is not supported for gather and pad")
+
+        dtype = tensor[0].dtype
+
+        if (dp_group is None and sd_group is None) or (dp_group.nranks == 1 and sd_group.nranks == 1):
+            return tensor
+            
+        def map_func(weight):
+            if isinstance(weight, paddle.Tensor):
+                weight = weight.numpy()
+            return weight
+
+        tensor = [map_func(i) for i in tensor]
+
+        sd_gathered_tensor = []
+        if sd_group.nranks > 1:
+            dist.all_gather_object(sd_gathered_tensor, tensor, group=sd_group)
+
+        dp_gathered_tensor = []
+        if dp_group.nranks > 1:
+            if len(sd_gathered_tensor) > 0:
+                tensor = sd_gathered_tensor
+            dist.all_gather_object(dp_gathered_tensor, tensor, group=dp_group)
+
+        if len(dp_gathered_tensor) > 0:
+            gathered_tensor = dp_gathered_tensor
+        else:
+            gathered_tensor = sd_gathered_tensor
+
+        if type == "tensor":
+            gathered_tensor = [paddle.to_tensor(i, dtype=dtype) for i in flatten_list(gathered_tensor)]
+
+        return gathered_tensor
+
+    @staticmethod
+    def concatenate_tensors(
+        gathered_list: List[Union[paddle.Tensor, np.ndarray, List]],
+        data_parallel_group=None,
+        sharding_parallel_group=None
+    ) -> Union[paddle.Tensor, np.ndarray]:
+        """
+        Concatenates a list of tensors/arrays that have been gathered from
+        different distributed ranks. Handles both Paddle Tensors and NumPy arrays,
+        and accounts for nested lists from `all_gather_object` with multiple ranks.
+
+        Args:
+            gathered_list (List[Union[paddle.Tensor, np.ndarray, List]]):
+                A list containing tensors or arrays gathered from all ranks.
+                This list might be nested if `all_gather_object` was used with
+                multiple groups (e.g., sharding then data parallel).
+            data_parallel_group (Optional[paddle.distributed.collective.Group]):
+                The data parallel communication group.
+            sharding_parallel_group (Optional[paddle.distributed.collective.Group]):
+                The sharding parallel communication group.
+
+        Returns:
+            Union[paddle.Tensor, np.ndarray]: The concatenated tensor/array.
+                                              If the input was Paddle Tensor, returns Paddle Tensor.
+                                              If the input was NumPy array, returns NumPy array.
+        """
+        from ...utils.nested import flatten_list
+
+        if not gathered_list:
+            raise ValueError("Input gathered_list cannot be empty.")
+
+        # 后续检验一下是否真的需要 numpy 输入，既然是 concat_tensor 了应该都是 paddle.Tensor
+        is_paddle_tensor = isinstance(gathered_list[0], paddle.Tensor)
+
+        # is_single_rank_env = ((data_parallel_group is None or data_parallel_group.nranks == 1) and 
+        #                       (sharding_parallel_group is None or sharding_parallel_group.nranks == 1))
+
+        # if is_single_rank_env:
+        #     final_list_to_concat = gathered_list
+        # else:
+        #     final_list_to_concat = flatten_list(gathered_list)  # 这里逻辑可能不太一样，因为我看原始代码在 Tensor 分支没有使用 flatten_list 函数
+
+        # if is_paddle_tensor:
+        #     return paddle.concat(final_list_to_concat, axis=0)
+        # else:
+        #     return np.concatenate(final_list_to_concat, axis=0)
+
+        if is_paddle_tensor:
+            return paddle.concat(gathered_list, axis=0)
+        else:
+            return np.concatenate(flatten_list(gathered_list), axis=0)
+
+    # 这个后面要改，从meta_info获取 pad_index
+    @staticmethod
+    def pad_tensor(tensor_list, pad_index, dtype, padding_side):
+        # pad = False if len(tensor_list[0].shape) == 1 else True
+        # pad_index = tokenizer.pad_token_id
+        # padding_side = "left" if (key == "prompt" or key == "label_ids") else "right"
+
+        # dtype = tensor_list[0].dtype
+
+        max_size = max([i.shape[-1] for i in tensor_list])
+        data_num = sum([i.shape[0] for i in tensor_list])
+        if isinstance(tensor_list[0], paddle.Tensor):
+            new_tensor = paddle.full((data_num, max_size), pad_index, dtype=dtype)
+        elif isinstance(tensor_list[0], np.ndarray):
+            new_tensor = np.full((data_num, max_size), pad_index, dtype=dtype)
+
+        offset = 0
+        for idx, i in enumerate(tensor_list):
+            # new_tensor[offset : offset + i.shape[0], : i.shape[-1]] = i
+            data_length = i.shape[-1]
+
+            if padding_side == "right":
+                new_tensor[offset : offset + i.shape[0], :data_length] = i
+            elif padding_side == "left":
+                new_tensor[offset : offset + i.shape[0], -data_length:] = i
+            else:
+                raise ValueError("padding_side must be 'right' or 'left'")
+            offset += i.shape[0]
+        return new_tensor
+    
+    @staticmethod
+    def pad_or_concat_tensor_list(tensor_list, pad_index, key):
+        from ...utils.nested import flatten_list
+        left_padding_key = ("prompt", "label_ids")
+        # 由于在 gather 后判断是否 pad，所以要用到 flatten_list
+        pad = False if len(flatten_list(tensor_list)[0].shape) == 1 else True
+        # pad = False if len(tensor_list[0].shape) == 1 else True
+        padding_side = "left" if (key in left_padding_key) else "right"
+        dtype = flatten_list(tensor_list)[0].dtype
+        if not pad:
+            return DataProto.concatenate_tensors(tensor_list)
+        else:
+            return DataProto.pad_tensor(tensor_list, pad_index, dtype, padding_side)
+
+    @staticmethod
+    def pad_batch_data(
+        tensor_list: List[paddle.Tensor] = None,
+        tokenizer = None
+    ) -> List[paddle.Tensor]:
+        
+        tensor_list = [paddle.unsqueeze(v, axis=0) if v.ndim == 1 else v for v in tensor_list]
+        padded_tensors = DataProto.pad_tensor(
+            tensor_list,
+            pad_index=tokenizer.pad_token_id,
+            dtype=tensor_list[0].dtype,
+            padding_side="right",
+        )
+        return padded_tensors
+
+    # 这个方法本来该去掉的，但是 distribute_gather_and_pad_data 大量复用这个方法，还是先留着吧但是不暴露
+    @staticmethod
+    def gather_and_pad(tensor, dp_group=None, sd_group=None, pad_index=0.0, pad=True, padding_side="right"):
+        """Gather tensor from all devices."""
+        from ...utils.nested import flatten_list
+
+        if not isinstance(tensor, list):
+            tensor = [tensor]
+
+        if isinstance(tensor[0], paddle.Tensor):
+            type = "tensor"
+        elif isinstance(tensor[0], np.ndarray):
+            type = "numpy"
+        else:
+            raise TypeError(f"{type(tensor[0])} is not supported for gather and pad")
+
+        dtype = tensor[0].dtype
+
+        if (dp_group is None and sd_group is None) or (dp_group.nranks == 1 and sd_group.nranks == 1):
+            if not pad:
+                if isinstance(tensor[0], paddle.Tensor):
+                    return paddle.concat(tensor, axis=0)
+                else:
+                    return np.concatenate(tensor, axis=0)
+            else:
+                return DataProto.pad_tensor(tensor, pad_index=pad_index, dtype=dtype, padding_side=padding_side)
+
+        def map_func(weight):
+            if isinstance(weight, paddle.Tensor):
+                weight = weight.numpy()
+            return weight
+
+        tensor = [map_func(i) for i in tensor]
+
+        sd_gathered_tensor = []
+        if sd_group.nranks > 1:
+            dist.all_gather_object(sd_gathered_tensor, tensor, group=sd_group)
+
+        dp_gathered_tensor = []
+        if dp_group.nranks > 1:
+            if len(sd_gathered_tensor) > 0:
+                tensor = sd_gathered_tensor
+            dist.all_gather_object(dp_gathered_tensor, tensor, group=dp_group)
+
+        if len(dp_gathered_tensor) > 0:
+            gathered_tensor = dp_gathered_tensor
+        else:
+            gathered_tensor = sd_gathered_tensor
+
+        if type == "tensor":
+            gathered_tensor = [paddle.to_tensor(i, dtype=dtype) for i in flatten_list(gathered_tensor)]
+
+        if not pad:
+            if type == "tensor":
+                return paddle.concat(gathered_tensor, axis=0)
+            else:
+                return np.concatenate(flatten_list(gathered_tensor), axis=0)
+        else:
+            return DataProto.pad_tensor(gathered_tensor, pad_index=pad_index, dtype=dtype, padding_side=padding_side)
+
+    # def distribute_gather_and_pad_data(self, tokenizer, generation_config) -> "DataProto":
+    #     from ...trl import llm_utils
+    #     from paddle.distributed import fleet
+    #     # group index for grpo
+    #     eos_mask = make_eos_mask(
+    #         self.batch["input_ids"][:, self.batch["prompt"].shape[-1] :],
+    #         eos_token_ids=llm_utils.get_eos_token_id(tokenizer, generation_config),
+    #     ).to(
+    #         self.batch["log_probs"].dtype  # fix dtype
+    #     )
+    #     try:
+    #         hcg = fleet.get_hybrid_communicate_group()
+    #         sd_group = hcg.get_sharding_parallel_group()
+    #         dp_group = hcg.get_data_parallel_group()
+    #     except AttributeError:
+    #         sd_group = None
+    #         dp_group = None
+
+    #     new_batch = {
+    #         "index": DataProto.gather_and_pad(self.non_tensor_batch["index"], dp_group, sd_group, pad=False),
+    #         "rewards": DataProto.gather_and_pad(self.batch["rewards"], dp_group, sd_group, pad=False),
+    #         "eos_mask": DataProto.gather_and_pad(eos_mask, dp_group, sd_group),
+    #     }
+
+    #     if "log_probs" in self.batch:
+    #         new_batch["log_probs"] = DataProto.gather_and_pad(self.batch["log_probs"], dp_group, sd_group)
+    #     if "ref_log_probs" in self.batch:
+    #         new_batch["ref_log_probs"] = DataProto.gather_and_pad(self.batch["ref_log_probs"], dp_group, sd_group)
+
+    #     return DataProto.from_single_dict(new_batch)
+    
+   
 
     def to(self, device) -> "DataProto":
         """move the batch to device
@@ -857,3 +1141,184 @@ class DataProto:
             non_tensor_batch=repeated_non_tensor_batch,
             meta_info=self.meta_info,
         )
+    
+    @staticmethod
+    def process_row(row, remove_value=0, remove_side="both", eos_token_id=None):
+        """
+        Remove leading/trailing specific values from a tensor.
+
+        Args:
+            row (paddle.Tensor): The 1D tensor to be processed.
+            remove_value (int, optional): The value to be removed, default is 0.
+            remove_side (str, optional): The side to remove values from, can be "left" (remove leading only), "right" (remove trailing only),
+                or "both" (remove both leading and trailing), default is "both".
+
+        Returns:
+            paddle.Tensor: The processed 1D tensor.
+        """
+        if eos_token_id is not None and remove_value == eos_token_id:
+            # 特殊处理：保留最后一个 eos_token_id 的 index
+            is_not_remove_value = row != remove_value
+            last_eos_idx = paddle.nonzero(row == eos_token_id).flatten()
+            if last_eos_idx.shape[0] > 0:
+                last_eos_idx = last_eos_idx[-1]
+                is_not_remove_value[last_eos_idx] = True  # 保留 eos
+        else:
+            is_not_remove_value = row != remove_value
+
+        non_zero_indices = paddle.nonzero(is_not_remove_value).flatten()
+        if non_zero_indices.shape[0] == 0:
+            # If the row is all zeros, log a warning and return the original row.
+            logger.warning("Row is all zeros, no trimming will be performed.")
+            return row
+        start_index = non_zero_indices[0]
+        end_index = non_zero_indices[-1]
+        # Slice the middle non-zero part.
+        if remove_side == "left":
+            trimmed_row = row[start_index:]
+        elif remove_side == "right":
+            trimmed_row = row[: end_index + 1]
+        elif remove_side == "both":
+            trimmed_row = row[start_index : end_index + 1]
+        else:
+            # If an unknown remove_side is provided, log a warning and use "both".
+            logger.warning("Unknown remove_side, using 'both' remove_side.")
+            trimmed_row = row[start_index : end_index + 1]
+
+        return trimmed_row
+    
+    def remove_pad_tokens_after_generate(self, tokenizer, args):
+        cleanup_batch = [
+                DataProto.process_row(
+                    row,
+                    remove_value=tokenizer.pad_token_id,
+                    remove_side="right",
+                    eos_token_id=tokenizer.eos_token_id,
+                )
+                for row in self.batch["input_ids"]
+            ]
+        if args.use_rm_server:
+            label_ids_batch = [
+                    DataProto.process_row(
+                        row,
+                        remove_value=tokenizer.pad_token_id,
+                        remove_side="left",
+                        eos_token_id=tokenizer.eos_token_id,
+                    )
+                    for row in self.batch["label_ids"]
+                ]
+        index = self.non_tensor_batch["index"]
+
+        return cleanup_batch, index, label_ids_batch
+
+    # 这样写函数也有问题，因为是 pad_batch_data，所以即使把 rollout_n 个 tensor 成功放入 DataProto 中，
+    # 但是由于后面 List[DataProto] 的长度不一样，还要在进行一次 pad，目前看来确实是把 Tensor 全装入 List 里整体 pad 再生成 DataProto 比较好
+    def repad(self, tokenizer, args):
+        # input_ids: remove_pad -> truncate -> pad
+        cleanup_batch = [
+            DataProto.process_row(
+                row,
+                remove_value=tokenizer.pad_token_id,
+                remove_side="right",
+                eos_token_id=tokenizer.eos_token_id,
+            )
+            for row in self.batch["input_ids"]
+        ]
+        truncate_input_ids = [
+            self.truncate_batch_data(batch, truncate_max_len=self._model_config.max_position_embeddings)
+            for batch in cleanup_batch
+        ]
+        input_ids = DataProto.pad_batch_data(truncate_input_ids, tokenizer = self.tokenizer)
+
+
+        if args.use_rm_server:
+            label_ids_batch = [
+                DataProto.process_row(
+                    row,
+                    remove_value=tokenizer.pad_token_id,
+                    remove_side="left",
+                    eos_token_id=tokenizer.eos_token_id,
+                )
+                for row in self.batch["label_ids"]
+            ]
+            label_ids = DataProto.pad_batch_data(label_ids_batch, tokenizer = self.tokenizer)
+        index = self.non_tensor_batch["index"]
+
+    def split_batch_into_micro_batches(self, batch_size, pad_token_id=0) -> List['DataProto']:
+        """
+        Splits total_batch into micro-batches of size `batch_size`.
+
+        Args:
+            total_batch (dict): Dictionary containing full batched tensors.
+            batch_size (int): Micro batch size per device.
+
+        Returns:
+            list of dict: A list of micro-batches.
+        """
+        micro_batches = []
+        num_micro_batches = self.batch["input_ids"].shape[0] // batch_size
+        if self.batch["input_ids"].shape[0] % batch_size != 0:
+            num_micro_batches += 1
+        if num_micro_batches <= 0:
+            logger.warning(
+                "The total batch size is smaller than the batch size, please consider using a smaller batch size or a larger global_batch_size."
+            )
+            num_micro_batches = 1
+
+        for i in range(num_micro_batches):
+            micro_batch = {}
+            for key, data in self.batch.items():
+                if isinstance(data, paddle.Tensor):
+                    micro_batch[key] = data[i * batch_size : (i + 1) * batch_size]
+                elif isinstance(data, np.ndarray):
+                    micro_batch[key] = data[i * batch_size : (i + 1) * batch_size]
+                elif isinstance(data, list):
+                    micro_batch[key] = data[i * batch_size : (i + 1) * batch_size]
+                else:
+                    raise TypeError(f"Unsupported data type for key {key}: {type(data)}")
+
+            # if os.getenv("PROCESS_PROMPT_AND_RESPONSE", "1").lower() in ["1", "t", "true", "yes", "y"]:
+            #     micro_batch = process_prompt_and_response(micro_batch=micro_batch, pad_token_id=pad_token_id)
+
+            micro_batches.append(DataProto.from_single_dict(micro_batch))
+
+        return micro_batches
+
+    @staticmethod
+    def combine_micro_batches_into_batch(micro_batches, pad_token_id=0) -> 'DataProto':
+        """combine micro batches to get a complete batch"""
+        if not isinstance(micro_batches, list):
+            return micro_batches
+        combined_batch = {}
+
+        for micro_batch in micro_batches:
+            for key, value in micro_batch.items():
+                if isinstance(value, list):
+                    if isinstance(value[0], paddle.Tensor):
+                        if key == "label_ids":
+                            value = [paddle.unsqueeze(v, axis=0) if v.ndim == 1 else v for v in value]
+                            concat_value = DataProto.pad_tensor(
+                                value,
+                                pad_index=pad_token_id,
+                                dtype=value[0].dtype,
+                                padding_side="left",
+                            )
+                        else:
+                            concat_value = paddle.concat(value, axis=0)
+                    elif isinstance(value[0], np.ndarray):
+                        concat_value = np.concatenate(value, axis=0)
+                    combined_batch.setdefault(key, []).append(concat_value)
+                else:
+                    combined_batch.setdefault(key, []).append(value)
+
+        for key, values in combined_batch.items():
+            if len(combined_batch[key][0].shape) > 1:
+                pad_index = pad_token_id
+                padding_side = "left" if (key == "prompt" or key == "label_ids") else "right"
+                combined_batch[key] = DataProto.gather_and_pad(values, pad_index=pad_index, padding_side=padding_side)
+            elif isinstance(values[0], paddle.Tensor):
+                combined_batch[key] = paddle.concat(values, axis=0)
+            elif isinstance(values[0], np.ndarray):
+                combined_batch[key] = np.concatenate(values, axis=0)
+
+        return DataProto.from_single_dict(combined_batch)
