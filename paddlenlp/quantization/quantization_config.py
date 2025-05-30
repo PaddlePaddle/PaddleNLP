@@ -72,6 +72,7 @@ class QuantizationConfig:
         apply_online_actscale_step=200,
         actscale_moving_rate=0.01,
         fp8_format_type="hybrid",
+        scale_epsilon=1e-8,
         **kwargs,
     ):
         if weight_quantize_algo is not None:
@@ -146,6 +147,7 @@ class QuantizationConfig:
         self.apply_online_actscale_step = apply_online_actscale_step
         self.actscale_moving_rate = actscale_moving_rate
         self.fp8_format_type = fp8_format_type
+        self.scale_epsilon = scale_epsilon
 
     @property
     def fp8_format(self):

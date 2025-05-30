@@ -66,7 +66,7 @@ def quantize(
     if tensor_type == "activation":
         if act_scale is not None:
             if training:
-                scale = paddle.max(paddle.abs(target_x)) / qmax
+                scale = paddle.max(paddle.abs(target_x)) / qmax + quantization_config.scale_epsilon
                 if group is not None:
                     paddle.distributed.all_reduce(scale, op=paddle.distributed.ReduceOp.MAX, group=group, sync_op=True)
                 if state < quantization_config.apply_online_actscale_step:
@@ -79,7 +79,7 @@ def quantize(
             else:
                 scale = act_scale
         else:
-            scale = paddle.max(paddle.abs(target_x)) / qmax
+            scale = paddle.max(paddle.abs(target_x)) / qmax + quantization_config.scale_epsilon
         if weight_quantize_algo in ["a8w8linear", "a8w4linear"]:
             quant_x = paddle.clip((target_x / scale).round(), qmin, qmax).astype("int8")
         elif weight_quantize_algo in ["fp8linear"]:
@@ -89,13 +89,13 @@ def quantize(
     elif tensor_type == "weight":
         if weight_quantize_algo in ["a8w8linear", "a8w4linear"]:
             # channelwise
-            scale = paddle.max(paddle.abs(target_x), axis=0, keepdim=True) / qmax
+            scale = paddle.max(paddle.abs(target_x), axis=0, keepdim=True) / qmax + quantization_config.scale_epsilon
             if group is not None:
                 paddle.distributed.all_reduce(scale, op=paddle.distributed.ReduceOp.MAX, group=group, sync_op=True)
             quant_x = paddle.clip((target_x / scale).round(), qmin, qmax).astype("int8").T
             scale = scale.squeeze(0) / hadamard_scale
         elif weight_quantize_algo in ["fp8linear"]:
-            scale = paddle.max(paddle.abs(target_x)) / qmax
+            scale = paddle.max(paddle.abs(target_x)) / qmax + quantization_config.scale_epsilon
             if group is not None:
                 paddle.distributed.all_reduce(scale, op=paddle.distributed.ReduceOp.MAX, group=group, sync_op=True)
             quant_x = (target_x / scale).astype(quantization_config.fp8_format[tensor_type]).view("int8").T
@@ -104,7 +104,7 @@ def quantize(
             raise NotImplementedError(f"Unknown {weight_quantize_algo}.")
     elif tensor_type == "grad_output":
         if weight_quantize_algo in ["fp8linear"]:
-            scale = paddle.max(paddle.abs(target_x)) / qmax
+            scale = paddle.max(paddle.abs(target_x)) / qmax + quantization_config.scale_epsilon
             quant_x = (target_x / scale).astype(quantization_config.fp8_format[tensor_type])
             scale = scale / hadamard_scale
         else:
