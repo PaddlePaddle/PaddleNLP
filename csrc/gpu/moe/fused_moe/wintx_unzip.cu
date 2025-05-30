@@ -56,7 +56,8 @@ std::vector<paddle::Tensor> WintXUnzip(const paddle::Tensor& weight,
     } else {
         PD_THROW("Unsupported data type for WintxUnzip");
     }
-    auto output_tensor = paddle::empty(output_shape, super_scale.dtype());
+    auto place = super_scale.place();
+    auto output_tensor = paddle::empty(output_shape, super_scale.dtype(), place);
 
     switch (super_scale.dtype()) {
         case paddle::DataType::BFLOAT16:

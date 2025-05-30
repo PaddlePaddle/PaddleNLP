@@ -24,11 +24,11 @@
 template<typename TYPE>
 struct WintXPreProcessFunctor {
     struct Arguments {
-      const uint16_t* in_ptr;
-      const TYPE* supper_scale_ptr;
-      const int* b_shift_bits;
-      TYPE * out_ptr;
-      const int n;
+      const uint16_t* zipped_weight_ptr; 
+      const TYPE* super_scale_ptr; 
+      const int* b_shift_bits; 
+      TYPE * weight_share_ptr; 
+      const int n; 
       const int k;
       const int in_stride;
       const int group_num;
@@ -42,13 +42,14 @@ struct WintXPreProcessFunctor {
     __device__ void operator()(const Arguments& args, const int tid, const int total_threads) {
       for(int col = tid; col < args.n; col += total_threads) {
         for(int row = 0; row < args.k; row++) {
-          int local_scale_row = (row / args.group_num + 1) * args.group_num - 1;
-          uint16_t local_scale = args.in_ptr[local_scale_row / args.pack_num * args.in_stride + col] &
+          int local_scale_row = ((row / args.group_num + 1) * args.group_num - 1) / args.pack_num;
+          int zipped_weight_row = row / args.pack_num;
+          uint16_t local_scale = args.zipped_weight_ptr[local_scale_row * args.in_stride + col] &
                                  args.local_scale_mask;
-          int16_t unzip_value = args.in_ptr[row / args.pack_num * args.in_stride + col] >>
+          int16_t unzip_value = args.zipped_weight_ptr[row / args.pack_num * args.in_stride + col] >>
                                 args.b_shift_bits[row % args.pack_num] &
                                 args.weight_mask - args.bbzip;
-          args.out_ptr[row * args.n + col] = static_cast<TYPE>(unzip_value * local_scale) * args.supper_scale_ptr[col];
+          args.weight_share_ptr[row * args.n + col] = static_cast<TYPE>(unzip_value * local_scale) * args.super_scale_ptr[col];
         }
       }
       __syncthreads();
@@ -58,10 +59,10 @@ struct WintXPreProcessFunctor {
 
 template<typename T>
 __global__ void wintx_unzip_quantization_kernel(
-    const uint16_t* in_ptr,
-    const T* supper_scale_ptr,
+    const uint16_t* zipped_weight_ptr,
+    const T* super_scale_ptr,
     const int* b_shift_bits,
-    T* out_ptr,
+    T* unzipped_weight_ptr,
     const int64_t n,
     const int64_t k,
     const int num_n_per_block,
@@ -72,37 +73,46 @@ __global__ void wintx_unzip_quantization_kernel(
     const int local_scale_mask,
     const int bbzip,
     const int total_threads) {
-    extern __shared__ uint16_t shared_b[];
+    extern __shared__ uint16_t uint16_shared_b[];
+    T* shared_b = reinterpret_cast<T*>(uint16_shared_b);
     const int tid = threadIdx.x;
     const int block_id = blockIdx.x;
     const int idx_expert = block_id / num_blocks_per_expert;
-    const int current_block_id = block_id % num_blocks_per_expert;
+    const int block_id_per_expert = block_id % num_blocks_per_expert;
 
-    const int in_offset_n = idx_expert * n * ((k / 64) * 10) +  current_block_id * num_n_per_block;
-    const int out_offset_n = idx_expert * n * k + current_block_id * num_n_per_block;
-    const int scale_offset_n = idx_expert * n;
+    const int in_offset_n = idx_expert * n * ((k / 64) * 10) +  block_id_per_expert * num_n_per_block;
+    const int out_offset_n = idx_expert * n * k + block_id_per_expert * num_n_per_block;
+    const int scale_offset_n = idx_expert * n + block_id_per_expert * num_n_per_block;
 
     for(int i = 0; i < k; i += group_num) {
-        const uint16_t* in_offset = in_ptr + in_offset_n + (i / 64 * 10) * n;
-        const T* scale_offset = supper_scale_ptr + scale_offset_n;
+        const uint16_t* in_offset = zipped_weight_ptr + in_offset_n + (i / 64 * 10) * n;
+        const T* scale_offset = super_scale_ptr + scale_offset_n;
 
         // wintx process deal with shareMemory
         typename WintXPreProcessFunctor<T>::Arguments args{
-            in_offset, scale_offset, b_shift_bits, reinterpret_cast<T*>(shared_b),
-            group_num, num_n_per_block, n, 
-            pack_num, weight_mask, 
-            local_scale_mask, bbzip};
+            in_offset, 
+            scale_offset, 
+            b_shift_bits, 
+            shared_b,
+            num_n_per_block,
+            group_num,
+            n,
+            group_num,
+            pack_num,
+            weight_mask,
+            local_scale_mask,
+            bbzip};
         WintXPreProcessFunctor<T> winx_process;
         winx_process(args, tid, total_threads);
 
-        T* out_offset = out_ptr + out_offset_n + i * n;
-        // after winx process
-        for(int row = 0; row < group_num; row++) {
-            for(int col = 0; col < num_n_per_block; col++) {
-                out_offset[row * n + col] = 
-                shared_b[row * num_n_per_block + col];
-            }
+        T* out_ptr = unzipped_weight_ptr + out_offset_n + i * n;
+
+        for(int col = 0; col < num_n_per_block; col++) {
+          for(int row = 0; row < group_num; row++) {
+            out_ptr[row * n + col] = shared_b[row * num_n_per_block + col];
+          }
         }
+        __syncthreads();
     }
     return;
 }
@@ -121,8 +131,9 @@ void wintx_unzip_quantization_kernel_Launcher(
     const int weight_mask,
     const int local_scale_mask,
     const int bbzip) {
-    const int num_threads = 128;
-    const int num_blocks_per_expert = (n +  num_threads - 1) / num_threads;
+    const int num_threads = n < 128 ? n : 128;
+    // const int num_blocks_per_expert = (n +  num_threads - 1) / num_threads;
+    const int num_blocks_per_expert = (n + num_threads - 1) / num_threads;
     const int num_blocks = num_blocks_per_expert * num_experts;
     size_t sharedMemSize = group_num * num_threads * sizeof(T);
     wintx_unzip_quantization_kernel<T><<<num_blocks, num_threads, sharedMemSize>>>(
