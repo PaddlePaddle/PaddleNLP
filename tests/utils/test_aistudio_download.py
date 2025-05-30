@@ -37,6 +37,7 @@ class TestAistudioDownload(unittest.TestCase):
 
         # 验证结果
         print(result)
+        self.assertEqual(result, f"{local_dir}/{filename}")
 
     def test_aistudio_download_transformer(self):
         # 设置测试数据
@@ -55,6 +56,7 @@ class TestAistudioDownload(unittest.TestCase):
 
         # 验证结果
         print(result)
+        self.assertEqual(result, f"{cache_dir}/{filename}")
 
 
 if __name__ == "__main__":
