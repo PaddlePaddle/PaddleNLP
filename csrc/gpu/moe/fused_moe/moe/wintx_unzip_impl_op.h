@@ -1,19 +1,16 @@
-// /*
-//  * SPDX-FileCopyrightText: Copyright (c) 1993-2023 NVIDIA CORPORATION &
-//  * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
-//  *
-//  * Licensed under the Apache License, Version 2.0 (the "License");
-//  * you may not use this file except in compliance with the License.
-//  * You may obtain a copy of the License at
-//  *
-//  * http://www.apache.org/licenses/LICENSE-2.0
-//  *
-//  * Unless required by applicable law or agreed to in writing, software
-//  * distributed under the License is distributed on an "AS IS" BASIS,
-//  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//  * See the License for the specific language governing permissions and
-//  * limitations under the License.
-//  */
+// Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 #pragma once
 
@@ -21,164 +18,121 @@
 #include <cuda_fp16.h>
 #include <stdio.h>
 
-template<typename TYPE>
-struct WintXPreProcessFunctor {
-    struct Arguments {
-      const uint16_t* zipped_weight_ptr; 
-      const TYPE* super_scale_ptr; 
-      const int* b_shift_bits; 
-      TYPE * weight_share_ptr; 
-      const int n; 
-      const int k;
-      const int in_stride;
-      const int group_num;
-      const int pack_num;
-      const int weight_mask;
-      const int local_scale_mask;
-      const int bbzip;
-    };
+struct WeightOnlyTraits {
+  using ZippedT = uint16_t;
 
-    // Note: need to support vectorized operation
-    __device__ void operator()(const Arguments& args, const int tid, const int total_threads) {
-      for(int col = tid; col < args.n; col += total_threads) {
-        for(int row = 0; row < args.k; row++) {
-          int local_scale_row = ((row / args.group_num + 1) * args.group_num - 1) / args.pack_num;
-          int zipped_weight_row = row / args.pack_num;
-          uint16_t local_scale = args.zipped_weight_ptr[local_scale_row * args.in_stride + col] &
-                                 args.local_scale_mask;
-          int16_t unzip_value = args.zipped_weight_ptr[row / args.pack_num * args.in_stride + col] >>
-                                args.b_shift_bits[row % args.pack_num] &
-                                args.weight_mask - args.bbzip;
-          args.weight_share_ptr[row * args.n + col] = static_cast<TYPE>(unzip_value * local_scale) * args.super_scale_ptr[col];
-        }
-      }
-      __syncthreads();
-    }
+  static constexpr int32_t kGroupSize = 64;
+  static constexpr int32_t kZippedGroupSize = 10;
+  static constexpr int32_t kNumPackedValues = 7;
+
+  static constexpr int32_t kWeightMask = 0x7;
+  static constexpr int32_t kLocalScaleMask = 0x1FFF;
+  static constexpr int32_t kBBZip = 4;
 };
 
+template <typename T, int64_t TileRows, int64_t TileColumns>
+struct WintXUnzipFunctor {
+  using ScaleComputeT = float;
 
-template<typename T>
-__global__ void wintx_unzip_quantization_kernel(
+  static constexpr int64_t kTileRows = TileRows;
+  static constexpr int64_t kTileColumns = TileColumns;
+
+  struct Arguments {
+    const uint16_t* in_ptr;
+    const T* supper_scale_ptr;
+    T* out_ptr;
+    const int in_stride;
+  };
+
+  __device__ void operator()(const Arguments& args, const int tid, const int num_threads) {
+    using ZippedT = typename WeightOnlyTraits::ZippedT;
+    int32_t shift_bits[7] = {13, 11, 9, 6, 4, 2, 0};
+
+    for (int col = tid; col < kTileColumns; col += num_threads) {
+      for (int row = 0; row < kTileRows; ++row) {
+        int row_in_group = row % 64;
+        int group_id = row / 64;
+
+        int zipped_local_scale_row = (group_id + 1) * 10 - 1;
+        int zipped_local_scale_offset = zipped_local_scale_row * args.in_stride + col;
+        ZippedT zipped_local_scale = args.in_ptr[zipped_local_scale_offset];
+        int32_t local_scale = static_cast<int32_t>(zipped_local_scale) & WeightOnlyTraits::kLocalScaleMask;
+
+        int shift_bit_id = row_in_group % 7;
+        ZippedT shift_bit = shift_bits[shift_bit_id];
+
+        int zipped_row = group_id * 10 + (row_in_group / 7);
+        int zipped_offset = zipped_row * args.in_stride + col;
+        ZippedT zipped_value = args.in_ptr[zipped_offset];
+        int32_t shifted_value = (static_cast<int32_t>(zipped_value) >> shift_bit) & WeightOnlyTraits::kWeightMask;
+        int32_t value = static_cast<int32_t>(shifted_value) - WeightOnlyTraits::kBBZip;
+
+        ScaleComputeT super_scale = static_cast<ScaleComputeT>(args.supper_scale_ptr[col]);
+        ScaleComputeT scaled_value = static_cast<ScaleComputeT>(value) * static_cast<ScaleComputeT>(local_scale) * super_scale;
+
+        args.out_ptr[row * kTileColumns + col] = static_cast<T>(scaled_value);
+      }
+    }
+    __syncthreads();
+  }
+};
+
+template <typename T, int64_t TileRows, int64_t TileColumns>
+__global__ void WintxUnzipKernel(
     const uint16_t* zipped_weight_ptr,
     const T* super_scale_ptr,
-    const int* b_shift_bits,
-    T* unzipped_weight_ptr,
-    const int64_t n,
-    const int64_t k,
-    const int num_n_per_block,
-    const int num_blocks_per_expert,
-    const int group_num,
-    const int pack_num,
-    const int weight_mask,
-    const int local_scale_mask,
-    const int bbzip,
-    const int total_threads) {
-    extern __shared__ uint16_t uint16_shared_b[];
-    T* shared_b = reinterpret_cast<T*>(uint16_shared_b);
-    const int tid = threadIdx.x;
-    const int block_id = blockIdx.x;
-    const int idx_expert = block_id / num_blocks_per_expert;
-    const int block_id_per_expert = block_id % num_blocks_per_expert;
+    T* weight_ptr,
+    const int64_t batch,
+    const int64_t num_rows,
+    const int64_t num_columns) {
+  __shared__ T smem[TileRows * TileColumns];
 
-    const int in_offset_n = idx_expert * n * ((k / 64) * 10) +  block_id_per_expert * num_n_per_block;
-    const int out_offset_n = idx_expert * n * k + block_id_per_expert * num_n_per_block;
-    const int scale_offset_n = idx_expert * n + block_id_per_expert * num_n_per_block;
+  int64_t block_start_column = blockIdx.x * TileColumns;
 
-    for(int i = 0; i < k; i += group_num) {
-        const uint16_t* in_offset = zipped_weight_ptr + in_offset_n + (i / 64 * 10) * n;
-        const T* scale_offset = super_scale_ptr + scale_offset_n;
+  int64_t block_start_row = blockIdx.z * num_rows + blockIdx.y * TileRows;
+  int64_t block_start_zipped_row = block_start_row * 10 / 64;
 
-        // wintx process deal with shareMemory
-        typename WintXPreProcessFunctor<T>::Arguments args{
-            in_offset, 
-            scale_offset, 
-            b_shift_bits, 
-            shared_b,
-            num_n_per_block,
-            group_num,
-            n,
-            group_num,
-            pack_num,
-            weight_mask,
-            local_scale_mask,
-            bbzip};
-        WintXPreProcessFunctor<T> winx_process;
-        winx_process(args, tid, total_threads);
+  int64_t block_zipped_offset = block_start_zipped_row * num_columns + block_start_column;
+  const uint16_t *block_zipped_weight_ptr = zipped_weight_ptr + block_zipped_offset;
 
-        T* out_ptr = unzipped_weight_ptr + out_offset_n + i * n;
+  const T* block_super_scale_ptr = super_scale_ptr + blockIdx.z * num_columns + block_start_column;
 
-        for(int col = 0; col < num_n_per_block; col++) {
-          for(int row = 0; row < group_num; row++) {
-            out_ptr[row * n + col] = shared_b[row * num_n_per_block + col];
-          }
-        }
-        __syncthreads();
+  // unzip to shared memory
+  typename WintXUnzipFunctor<T, TileRows, TileColumns>::Arguments args{
+      block_zipped_weight_ptr, block_super_scale_ptr, smem, num_columns};
+
+  WintXUnzipFunctor<T, TileRows, TileColumns> winx_unzipper;
+  winx_unzipper(args, threadIdx.x, blockDim.x);
+
+  // write back to global memory
+  for (int row = 0; row < TileRows; ++row) {
+    for (int col = 0; col < TileColumns; ++col) {
+      int64_t global_row = block_start_row + row;
+      int64_t global_col = block_start_column + col;
+      weight_ptr[global_row * num_columns + global_col] = smem[row * TileColumns + col];
     }
-    return;
+  }
 }
 
-template<typename T>
-void wintx_unzip_quantization_kernel_Launcher(
-    const uint16_t* weight,
+template <typename T>
+void WintxUnzipKernelLauncher(
+    const uint16_t* zipped_weight,
     const T* supper_scale,
-    const int* b_shift_bits,
-    T* out_weight,
-    const int64_t n,
-    const int64_t k,
-    const int num_experts,
-    const int group_num,
-    const int pack_num,
-    const int weight_mask,
-    const int local_scale_mask,
-    const int bbzip) {
-    const int num_threads = n < 128 ? n : 128;
-    // const int num_blocks_per_expert = (n +  num_threads - 1) / num_threads;
-    const int num_blocks_per_expert = (n + num_threads - 1) / num_threads;
-    const int num_blocks = num_blocks_per_expert * num_experts;
-    size_t sharedMemSize = group_num * num_threads * sizeof(T);
-    wintx_unzip_quantization_kernel<T><<<num_blocks, num_threads, sharedMemSize>>>(
-        weight,
-        supper_scale,
-        b_shift_bits,
-        out_weight,
-        n,
-        k,
-        num_threads,
-        num_blocks_per_expert,
-        group_num,
-        pack_num,
-        weight_mask,
-        local_scale_mask,
-        bbzip,
-        num_threads);
-    return;
+    T* weight,
+    const int64_t batch,
+    const int64_t num_rows,
+    const int64_t num_columns) {
+  constexpr int kTileRows = 64;
+  constexpr int kTileColumns = 128;
+
+  const int num_threads = 128;
+  const int block_dim_x = (num_columns + kTileColumns - 1) / kTileColumns;
+  const int block_dim_y = (num_rows + kTileRows - 1) / kTileRows;
+
+  dim3 block_dim(num_threads, 1, 1); 
+  dim3 grid_dim(block_dim_x, block_dim_y, batch);
+  // printf("Launch config: grid_dim={%d, %d, %d}, block_dim={%d, 1, 1}\n", block_dim_x, block_dim_y, batch, num_threads);
+
+  WintxUnzipKernel<T, kTileRows, kTileColumns><<<grid_dim, block_dim>>>(
+      zipped_weight, supper_scale, weight, batch, num_rows, num_columns);
 }
-
-template void wintx_unzip_quantization_kernel_Launcher<half>(const uint16_t*,
-                                                            const half*,
-                                                            const int*,
-                                                            half*,
-                                                            const int64_t,
-                                                            const int64_t,
-                                                            const int,
-                                                            const int, 
-                                                            const int,
-                                                            const int,
-                                                            const int,
-                                                            const int);
-
-
-#ifdef PADDLE_CUDA_BF16
-template void wintx_unzip_quantization_kernel_Launcher<__nv_bfloat16>(const uint16_t*,
-                                                                        const __nv_bfloat16*,
-                                                                        const int*,
-                                                                        __nv_bfloat16*,
-                                                                        const int64_t,
-                                                                        const int64_t,
-                                                                        const int,
-                                                                        const int, 
-                                                                        const int,
-                                                                        const int,
-                                                                        const int,
-                                                                        const int);
-#endif
