@@ -192,6 +192,7 @@ from .funnel.configuration import *
 from .funnel.modeling import *
 from .funnel.tokenizer import *
 from .gemma import *
+from .gemma2 import *
 from .glm.configuration import *
 from .glm.modeling import *
 from .glm.tokenizer import *
