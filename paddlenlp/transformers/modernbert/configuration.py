@@ -1,10 +1,23 @@
+# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
 #
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""ModernBERT model configuration"""
 
-from paddlenlp.transformers.configuration_utils import PretrainedConfig
+from __future__ import annotations
 
-__all__ = ["ModernBertConfig"]
+from typing import Dict
+
+from ..configuration_utils import PretrainedConfig
 
 MODERNBERT_PRETRAINED_INIT_CONFIGURATION = {
     "modernbert-base": {
@@ -56,8 +69,10 @@ MODERNBERT_PRETRAINED_RESOURCE_FILES_MAP = {
 
 
 class ModernBertConfig(PretrainedConfig):
+    """Configuration class for ModernBERT model."""
+
     model_type = "modernbert"
-    attribute_map: dict = {"dropout": "classifier_dropout", "num_classes": "num_labels"}
+    attribute_map: Dict[str, str] = {"dropout": "classifier_dropout", "num_classes": "num_labels"}
     pretrained_init_configuration = MODERNBERT_PRETRAINED_INIT_CONFIGURATION
 
     def __init__(
@@ -76,19 +91,45 @@ class ModernBertConfig(PretrainedConfig):
         layer_norm_eps: float = 1e-12,
         pad_token_id: int = 0,
         sliding_window_size: int = 512,
+        position_embedding_type: str = "rotary",
+        use_cache: bool = True,
+        classifier_dropout: float | None = None,
         tie_word_embeddings: bool = True,
         tensor_parallel_degree: int = 1,
         rope_theta: float = 10000.0,
-        use_cache: bool = False,
-        **kwargs
-    ):
+        **kwargs,
+    ) -> None:
+        """Initialize the ModernBERT configuration.
+
+        Args:
+            vocab_size: Vocabulary size of the ModernBERT model.
+            hidden_size: Size of the encoder layers and the pooler layer.
+            num_hidden_layers: Number of hidden layers in the Transformer encoder.
+            num_attention_heads: Number of attention heads for each attention layer.
+            intermediate_size: The size of the "intermediate" (i.e., feed-forward) layer.
+            hidden_act: The non-linear activation function in the encoder and pooler.
+            hidden_dropout_prob: The dropout probability for all fully connected layers.
+            attention_probs_dropout_prob: The dropout ratio for the attention probabilities.
+            max_position_embeddings: The maximum sequence length that this model might ever be used with.
+            type_vocab_size: The vocabulary size of the `token_type_ids`.
+            initializer_range: The standard deviation of the truncated_normal_initializer.
+            layer_norm_eps: The epsilon used by the layer normalization layers.
+            pad_token_id: The value used to pad input_ids.
+            sliding_window_size: Size of the sliding window for attention computation.
+            position_embedding_type: Type of position embedding. Choose from "absolute" or "rotary".
+            use_cache: Whether to use the model cache to speed up decoding.
+            classifier_dropout: Dropout probability for the classification head.
+            tie_word_embeddings: Whether to tie input and output embeddings.
+            tensor_parallel_degree: Degree of tensor parallelism for distributed training.
+            rope_theta: Base value for rotary position embedding.
+        """
         super().__init__(pad_token_id=pad_token_id, **kwargs)
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
         self.num_hidden_layers = num_hidden_layers
         self.num_attention_heads = num_attention_heads
-        self.intermediate_size = intermediate_size
         self.hidden_act = hidden_act
+        self.intermediate_size = intermediate_size
         self.hidden_dropout_prob = hidden_dropout_prob
         self.attention_probs_dropout_prob = attention_probs_dropout_prob
         self.max_position_embeddings = max_position_embeddings
@@ -96,7 +137,9 @@ class ModernBertConfig(PretrainedConfig):
         self.initializer_range = initializer_range
         self.layer_norm_eps = layer_norm_eps
         self.sliding_window_size = sliding_window_size
+        self.position_embedding_type = position_embedding_type
+        self.use_cache = use_cache
+        self.classifier_dropout = classifier_dropout
         self.tie_word_embeddings = tie_word_embeddings
         self.tensor_parallel_degree = tensor_parallel_degree
         self.rope_theta = rope_theta
-        self.use_cache = use_cache
