@@ -192,6 +192,9 @@ from .funnel.configuration import *
 from .funnel.modeling import *
 from .funnel.tokenizer import *
 from .gemma import *
+from .modernbert.configuration import *
+from .modernbert.modeling import *
+from .modernbert.tokenizer import *
 from .glm.configuration import *
 from .glm.modeling import *
 from .glm.tokenizer import *

@@ -103,6 +103,7 @@ MAPPING_NAMES = OrderedDict(
         ("MT5", "mt5"),
         ("T5", "t5"),
         ("Bert", "bert"),
+        ("ModernBert", "modernbert"),
         ("Bart", "bart"),
         ("CodeGen", "codegen"),
         ("CLIPVision", "clip"),
