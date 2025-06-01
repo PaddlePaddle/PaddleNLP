@@ -108,7 +108,7 @@ def softmax(x, axis=None):
 
 class TextClassificationTask(Task):
     """
-    The text classfication model to classify text.
+    The text classification model to classify text.
     NOTE: This task is different from all other tasks that it has no out-of-box zero-shot capabilities.
     Instead, it's used as a simple inference pipeline.
 
@@ -122,7 +122,7 @@ class TextClassificationTask(Task):
             multilabel_threshold (float): The probability threshold used for the multi_label setup. Only effective if model = "multi_label". Defaults to 0.5.
             max_length (int): Maximum number of tokens for the model.
             precision (int): Select among ["fp32", "fp16"]. Default to "fp32".
-            plm_model_name (str): Pretrained langugae model name for PromptModel.
+            plm_model_name (str): Pretrained language model name for PromptModel.
             input_spec [list]: Specify the tensor information for each input parameter of the forward function.
             id2label(dict(int,string)): The dictionary to map the predictions from class ids to class names.
             batch_size(int): The sample number of a mini-batch.
@@ -171,7 +171,7 @@ class TextClassificationTask(Task):
                     init_class = json.load(fb)["architectures"].pop()
             else:
                 raise IOError(
-                    f"Model configuration file dosen't exist.[task_path] should inclue {LEGACY_CONFIG_NAME} or {CONFIG_NAME}"
+                    f"Model configuration file doesn't exist.[task_path] should include {LEGACY_CONFIG_NAME} or {CONFIG_NAME}"
                 )
 
             if init_class in ["ErnieMForSequenceClassification"]:
@@ -286,7 +286,7 @@ class TextClassificationTask(Task):
         """
         Run the task model from the outputs of the `_tokenize` function.
         """
-        # TODO: support hierachical classification
+        # TODO: support hierarchical classification
         outputs = {}
         outputs["text"] = inputs["text"]
         outputs["batch_logits"] = []
@@ -326,7 +326,7 @@ class TextClassificationTask(Task):
         """
         This function converts the model logits output to class score and predictions
         """
-        # TODO: support hierachical classification
+        # TODO: support hierarchical classification
         postprocessed_outputs = []
         for logits in inputs["batch_logits"]:
             if self.problem_type == "multi_class":

@@ -185,7 +185,7 @@ class QAFilter(BaseComponent):
                         invalid_num += 1
             i += 1
         print("valid synthetic question-answer pairs number:", valid_num)
-        print("invalid sythetic question-answer pairs numbewr:", invalid_num)
+        print("invalid synthetic question-answer pairs number:", invalid_num)
         return result
 
     def run(self, cqa_triples, is_filter=True):

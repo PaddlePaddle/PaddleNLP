@@ -24,7 +24,7 @@ from paddlenlp.utils.log import logger
 from .model_base import BenchmarkBase
 
 
-# Data pre-process function for clue benchmark datatset
+# Data pre-process function for clue benchmark dataset
 def seq_convert_example(example, label_list, tokenizer=None, max_seq_length=512, **kwargs):
     """convert a glue example into necessary features"""
     is_test = False
@@ -139,13 +139,13 @@ class Ernie3ForSequenceClassificationBenchmark(BenchmarkBase):
         train_batch_sampler = DistributedBatchSampler(
             train_ds, batch_size=args.batch_size, shuffle=False, drop_last=True
         )
-        # fix develop bug, we donot use DataCollatorWithPadding.
+        # fix develop bug, we do not use DataCollatorWithPadding.
         # batchify_fn = DataCollatorWithPadding(tokenizer)
 
         train_loader = DataLoader(
             dataset=train_ds,
             batch_sampler=train_batch_sampler,
-            num_workers=args.num_workers,  # when paddlepaddle<=2.4.1, if we use dynamicTostatic mode, we need set num_workeks > 0
+            num_workers=args.num_workers,  # when paddlepaddle<=2.4.1, if we use dynamicToStatic mode, we need set num_workers > 0
         )
 
         self.num_batch = len(train_loader)

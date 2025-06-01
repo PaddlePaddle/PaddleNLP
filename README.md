@@ -33,16 +33,19 @@
 
 ## News 📢
 
-* **2025.03.17 《DeepSeek-R1满血版单机部署实测》** 🔥🔥🔥 飞桨框架3.0大模型推理部署全面升级，支持多款主流大模型，DeepSeek-R1满血版实现单机部署，吞吐提升一倍！欢迎广大用户开箱体验～现已开启有奖活动：完成 DeepSeek-R1-MTP 单机部署任务、提交高质量测评 blog，即可实时赢取奖金！💰💰💰
-报名[地址](https://www.wjx.top/vm/OlzzmbG.aspx#)， 活动详情：https://github.com/PaddlePaddle/PaddleNLP/issues/10166 ， 参考文档：https://github.com/PaddlePaddle/PaddleNLP/issues/10157 。
+* **2025.04.29 PaddleNLP 现已支持 Qwen3 系列模型**: Qwen3 系列模型支持持两种思考模式，预训练约 36 万亿个 token、119 种语言和方言。包括六个 Dense 模型, Qwen3-32B、Qwen3-14B、Qwen3-8B、Qwen3-4B、Qwen3-1.7B 和 Qwen3-0.6B。两个 MoE 模型的权重：Qwen3-235B-A22B，Qwen3-30B-A3B。
 
 * **2025.03.12 [PaddleNLP v3.0 Beta4](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v3.0.0-beta4)**：全面支持 DeepSeek V3/R1/R1-Distill, 及 QwQ-32B 等热门思考模型。**DeepSeek V3/R1完整版支持 FP8、INT8、4-bit 量化推理，MTP 投机解码**。单机 FP8推理输出超**1000 tokens/s**; 4-bit 推理输出超**2100 tokens/s**! 发布新版推理部署镜像，热门模型[一键部署](https://paddlenlp.readthedocs.io/zh/latest/llm/server/docs/general_model_inference.html)。推理部署[使用文档](https://paddlenlp.readthedocs.io/zh/latest/llm/docs/predict/index.html)全面更新，体验全面提升！自研下一代通用信息抽取模型 PP-UIE [全新发布](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/application/information_extraction)，支持8K 长度信息抽取。新增大模型 Embedding 训练，支持 INF-CL 超大 batch size 训练。新增[MergeKit](https://paddlenlp.readthedocs.io/zh/latest/llm/docs/mergekit.html)模型融合工具，缓解对齐代价。低资源训练全面优化，16G 小显存可以流畅训练。
 
-* **2025.03.06 PaddleNLP 现已支持 Qwen/QwQ-32B 模型**: 其模型参数仅有 32B，但其数学推理、编程能力和通用能力可与具备 671B 参数（其中 37B 被激活）的 DeepSeek-R1 媲美。借助 PaddleNLP 3.0套件，现可实现多种并行策略[微调训练](./llm/README.md)、[高性能推理、低比特量化](./llm/docs/predict/qwen.md)和[服务化部署](./llm/server/README.md)。
 
 * **2025.02.10 PaddleNLP 现已支持 DeepSeek-R1系列模型，[在线使用](https://aistudio.baidu.com/projectdetail/8775758)**：依托全新的 PaddleNLP 3.0套件，DeepSeek-R1系列模型现已全面支持。凭借数据并行、数据分组切分并行、模型并行、流水线并行以及专家并行等一系列先进的分布式训练能力，结合 Paddle 框架独有的列稀疏注意力掩码表示技术——FlashMask 方法，DeepSeek-R1系列模型在训练过程中显著降低了显存消耗，同时取得了卓越的训练性能提升。
 
 <details><summary> <b>点击展开</b> </summary><div>
+
+* **2025.03.17 《DeepSeek-R1满血版单机部署实测》** 🔥🔥🔥 飞桨框架3.0大模型推理部署全面升级，支持多款主流大模型，DeepSeek-R1满血版实现单机部署，吞吐提升一倍！欢迎广大用户开箱体验～现已开启有奖活动：完成 DeepSeek-R1-MTP 单机部署任务、提交高质量测评 blog，即可实时赢取奖金！💰💰💰
+报名[地址](https://www.wjx.top/vm/OlzzmbG.aspx#)， 活动详情：https://github.com/PaddlePaddle/PaddleNLP/issues/10166 ， 参考文档：https://github.com/PaddlePaddle/PaddleNLP/issues/10157 。
+
+* **2025.03.06 PaddleNLP 现已支持 Qwen/QwQ-32B 模型**: 其模型参数仅有 32B，但其数学推理、编程能力和通用能力可与具备 671B 参数（其中 37B 被激活）的 DeepSeek-R1 媲美。借助 PaddleNLP 3.0套件，现可实现多种并行策略[微调训练](./llm/README.md)、[高性能推理、低比特量化](./llm/docs/predict/qwen.md)和[服务化部署](./llm/server/README.md)。
 
 * **2025.02.20 🔥🔥《PP-UIE 信息抽取智能引擎全新升级》** 强化零样本学习能力，支持极少甚至零标注数据实现高效冷启动与迁移学习，显著降低数据标注成本；具备处理长文本能力，支持 8192 个 Token 长度文档信息抽取，实现跨段落识别关键信息，形成完整理解；提供完整可定制化的训练和推理全流程，训练效率相较于 LLama-Factory 实现了1.8倍的提升。
 2月26日（周三）19：00为您深度解析全新 PP-UIE 技术方案及在部署方面的功能、优势与技巧。报名链接：https://www.wjx.top/vm/mBKC6pb.aspx?udsid=606418
@@ -119,6 +122,7 @@
 |           [Qwen2.5](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/qwen/)            | Qwen/Qwen2.5-0.5B, Qwen/Qwen2.5-0.5B-Instruct, Qwen/Qwen2.5-1.5B, Qwen/Qwen2.5-1.5B-Instruct, Qwen/Qwen2.5-3B, Qwen/Qwen2.5-3B-Instruct, Qwen/Qwen2.5-7B, Qwen/Qwen2.5-7B-Instruct, Qwen/Qwen2.5-7B-Instruct-1M, Qwen/Qwen2.5-14B, Qwen/Qwen2.5-14B-Instruct, Qwen/Qwen2.5-14B-Instruct-1M, Qwen/Qwen2.5-32B, Qwen/Qwen2.5-32B-Instruct, Qwen/Qwen2.5-72B, Qwen/Qwen2.5-72B-Instruct          |
 |         [Qwen2.5-Math](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/qwen/)         | Qwen/Qwen2.5-Math-1.5B, Qwen/Qwen2.5-Math-1.5B-Instruct, Qwen/Qwen2.5-Math-7B, Qwen/Qwen2.5-Math-7B-Instruct, Qwen/Qwen2.5-Math-72B, Qwen/Qwen2.5-Math-72B-Instruct, Qwen/Qwen2.5-Math-RM-72B                                                                                                                                                                                                 |
 |        [Qwen2.5-Coder](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/qwen/)         | Qwen/Qwen2.5-Coder-1.5B, Qwen/Qwen2.5-Coder-1.5B-Instruct, Qwen/Qwen2.5-Coder-7B, Qwen/Qwen2.5-Coder-7B-Instruct                                                                                                                                                                                                                                                                              |
+|           [Qwen3](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/qwen/)              | Qwen/Qwen3-0.6B, Qwen/Qwen3-1.7B, Qwen/Qwen3-4B, Qwen/Qwen3-8B, Qwen/Qwen3-14B, Qwen/Qwen3-32B, Qwen/Qwen3-30B-A3B, Qwen/Qwen3-235B-A22B, Qwen/Qwen3-0.6B-Base, Qwen/Qwen3-1.7B-Base, Qwen/Qwen3-4B-Base, Qwen/Qwen3-8B-Base, Qwen/Qwen3-14B-Base, Qwen/Qwen3-30B-A3B-Base                                                                                                                    |
 |             [QwQ](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/qwen/)              | Qwen/QwQ-32B, Qwen/QwQ-32B-Preview                                                                                                                                                                                                                                                                                                                                                            |
 |            [Yuan2](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/yuan/)             | IEITYuan/Yuan2-2B, IEITYuan/Yuan2-51B, IEITYuan/Yuan2-102B                                                                                                                                                                                                                                                                                                                                    |
 

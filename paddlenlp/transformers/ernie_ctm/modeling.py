@@ -419,7 +419,7 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
             return_dict=return_dict,
         )
 
-        # when `output_attentions` and `output_hidden_states` are False, it wll return tensor object.
+        # when `output_attentions` and `output_hidden_states` are False, it will return tensor object.
         encoder_output = (encoder_output,) if paddle.is_tensor(encoder_output) else encoder_output
 
         sequence_output = encoder_output[0]

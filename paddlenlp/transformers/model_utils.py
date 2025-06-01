@@ -360,7 +360,12 @@ def _split_keys_evenly(keys: list, n: int) -> list:
 
 
 def _load_part_state_dict(
-    keys, checkpoint_file: Union[str, os.PathLike], tensor_parallel_split_mapping, fliter_dict_keys, device
+    keys,
+    checkpoint_file: Union[str, os.PathLike],
+    tensor_parallel_split_mapping,
+    fliter_dict_keys,
+    device,
+    return_numpy=False,
 ):
     """load part state dict from checkpoint file.
 
@@ -395,7 +400,7 @@ def _load_part_state_dict(
                 weight = tensor_parallel_split_mapping[key](py_safe_slice_)
             else:
                 weight = py_safe_slice_[:]
-            if device == "expected":
+            if not return_numpy and device == "expected":
                 with device_guard():
                     weight = paddle.Tensor.__call__(weight, zero_copy=True)
                 weight = weight._copy_to(paddle.framework._current_expected_place(), False)
@@ -407,9 +412,10 @@ def _load_part_state_dict(
                 or key.endswith(ASYMMETRY_QUANT_SCALE_MAX)
             ):
                 scale = f.get_tensor(key)
-                with device_guard():
-                    scale = paddle.Tensor.__call__(scale, zero_copy=True)
-                scale = scale._copy_to(paddle.framework._current_expected_place(), False)
+                if not return_numpy and device == "expected":
+                    with device_guard():
+                        scale = paddle.Tensor.__call__(scale, zero_copy=True)
+                    scale = scale._copy_to(paddle.framework._current_expected_place(), False)
                 scale_dict[key] = scale
     return part_state_dict, scale_dict
 
@@ -420,6 +426,7 @@ def load_state_dict(
     fliter_dict_keys=None,
     device="cpu",
     ckpt_quant_stage="O0",
+    return_numpy=False,
 ):
     """
     Reads a PaddlePaddle checkpoint file, returning properly formatted errors if they arise.
@@ -455,6 +462,7 @@ def load_state_dict(
                         tensor_parallel_split_mapping,
                         fliter_dict_keys,
                         device,
+                        return_numpy,
                     )
             else:
                 # Load state dict in multi-thread to speed up loading
@@ -469,6 +477,7 @@ def load_state_dict(
                             tensor_parallel_split_mapping,
                             fliter_dict_keys,
                             device,
+                            return_numpy,
                         ): keys
                         for keys in keys_groups
                     }
@@ -477,7 +486,7 @@ def load_state_dict(
                         state_dict.update(res_state_dict)
                         scale_dict.update(res_scale_dict)
 
-            if device == "cpu":
+            if not return_numpy and device == "cpu":
                 for k in list(state_dict.keys()):
                     with device_guard():
                         state_dict[k] = paddle.Tensor.__call__(state_dict.pop(k), zero_copy=True)
@@ -807,12 +816,14 @@ def load_sharded_checkpoint(model, folder, variant=None, strict=True, prefer_saf
     return missing_keys, unexpected_keys
 
 
-def faster_set_state_dict(model, state_dict, strict_dtype=True):
+def faster_set_state_dict(model, state_dict, model_state_dict=None, strict_dtype=True):
+    if model_state_dict is None:
+        model_state_dict = model.state_dict()
     # the state_dict will be destroyed.
     unused_keys = set(state_dict.keys())
-    unset_keys = set(model.state_dict().keys())
+    unset_keys = set(model_state_dict.keys())
     with paddle.no_grad():
-        for k, v in model.state_dict().items():
+        for k, v in model_state_dict.items():
             if k in state_dict:
                 v_new = state_dict.pop(k)
                 if not isinstance(v_new, paddle.Tensor):
@@ -857,14 +868,14 @@ def faster_set_state_dict(model, state_dict, strict_dtype=True):
     return error_msgs
 
 
-def _load_state_dict_into_model(model_to_load, state_dict, start_prefix):
+def _load_state_dict_into_model(model_to_load, state_dict, start_prefix, model_to_load_state_dict):
     # torch will cast dtype in load_state_dict, but paddle strictly check dtype
     if len(start_prefix) > 0:
         for key in list(state_dict.keys()):
             if key.startswith(start_prefix):
                 state_dict[key.replace(start_prefix, "")] = state_dict.pop(key)
 
-    _convert_state_dict_dtype_and_shape(state_dict, model_to_load)
+    _convert_state_dict_dtype_and_shape(state_dict, model_to_load_state_dict)
 
     error_msgs = []
 
@@ -874,7 +885,15 @@ def _load_state_dict_into_model(model_to_load, state_dict, start_prefix):
         # paddlenlp hold  missing_keys , just ignore not found warnings.
         warnings.filterwarnings("ignore", message=r".*is not found in the provided dict.*")
         warnings.filterwarnings("ignore", message=r".*paddle.to_tensor.*")
-        model_to_load.set_state_dict(state_dict)
+        if len(model_to_load_state_dict) > 4000 and os.getenv("DISABLE_FASTER_SET_STATE_DICT", None) is None:
+            logger.warning_once(
+                "The model contains an excessive number of tensors, so we utilize the faster_set_state_dict method to load tensors into the model efficiently."
+                " If any issues arise during the loading process, you can disable this feature by setting the environment variable DISABLE_FASTER_SET_STATE_DICT=1."
+            )
+            faster_set_state_dict(model_to_load, state_dict, model_to_load_state_dict)
+        else:
+            model_to_load.set_state_dict(state_dict)
+
         error_msgs.extend([str(x.message) for x in w])
 
     del state_dict
@@ -882,12 +901,12 @@ def _load_state_dict_into_model(model_to_load, state_dict, start_prefix):
     return error_msgs
 
 
-def _convert_state_dict_dtype_and_shape(state_dict, model_to_load):
+def _convert_state_dict_dtype_and_shape(state_dict, model_to_load_state_dict):
     # convert the dtype of state dict
     def is_0d_or_1d(tensor):
         return len(tensor.shape) == 0 or list(tensor.shape) == [1]
 
-    for key, value in model_to_load.state_dict().items():
+    for key, value in model_to_load_state_dict.items():
         if key in list(state_dict.keys()):
             if isinstance(state_dict[key], np.ndarray):
                 raise ValueError(
@@ -1999,7 +2018,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
             resolved_archive_file = new_archive_file
             if len(skip_archive_file) > 0:
-                logger.info(f"Skip load files for not contrains expected key, {skip_archive_file}")
+                logger.info(f"Skip load files for not contains expected key, {skip_archive_file}")
 
         # Some models may have keys that are not in the state by design, removing them before needlessly warning
         # the user.
@@ -2034,12 +2053,15 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             start_prefix = cls.base_model_prefix + "."
         if len(cls.base_model_prefix) > 0 and hasattr(model, cls.base_model_prefix) and not has_prefix_module:
             model_to_load = getattr(model, cls.base_model_prefix)
-            base_model_expected_keys = list(model_to_load.state_dict().keys())
+            base_model_expected_keys = list(model_state_dict.keys())
             if any(key in expected_keys_not_prefixed and key not in base_model_expected_keys for key in loaded_keys):
                 raise ValueError(
                     "The state dictionary of the model you are trying to load is corrupted. Are you sure it was "
                     "properly saved?"
                 )
+            model_to_load_state_dict = model_to_load.state_dict()
+        else:
+            model_to_load_state_dict = model_state_dict
 
         def _find_mismatched_keys(
             state_dict,
@@ -2143,7 +2165,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     keep_in_fp32_modules=keep_in_fp32_modules,
                 )
             else:
-                error_msgs = _load_state_dict_into_model(model_to_load, state_dict, start_prefix)
+                error_msgs = _load_state_dict_into_model(
+                    model_to_load,
+                    state_dict,
+                    start_prefix,
+                    model_to_load_state_dict,
+                )
         else:
             # Sharded checkpoint or whole but low_cpu_mem_usage==True
 
@@ -2156,9 +2183,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             resume_state_dict = {}
             if len(resolved_archive_file) > 1:
                 resolved_archive_file = tqdm(resolved_archive_file, desc="Loading checkpoint shards")
-            if low_cpu_mem_usage or quantization_linear_list is not None:
-                # model.state_dict() takes a long time
-                model_to_load_state_dict = model_to_load.state_dict()
+
             for shard_file in resolved_archive_file:
                 pre_tensor_parallel_split = False
                 if quantization_linear_list is not None:
@@ -2237,7 +2262,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     missing_keys = list(set(missing_keys) - set(new_keys))
                     unexpected_keys = list(set(unexpected_keys) - set(fused_keys))
 
-                # Mistmatched keys contains tuples key/shape1/shape2 of weights in the checkpoint that have a shape not
+                # Mismatched keys contains tuples key/shape1/shape2 of weights in the checkpoint that have a shape not
                 # matching the weights in the model.
                 mismatched_keys += _find_mismatched_keys(
                     state_dict,
@@ -2270,7 +2295,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     )
                     error_msgs += new_error_msgs
                 else:
-                    error_msgs += _load_state_dict_into_model(model_to_load, state_dict, start_prefix)
+                    error_msgs += _load_state_dict_into_model(
+                        model_to_load, state_dict, start_prefix, model_to_load_state_dict
+                    )
 
                 # force memory release
                 del state_dict
@@ -2360,7 +2387,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 initialization. If the keyword is in `__init__` argument names of
                 base model, update argument values of the base model; else update
                 argument values of derived model.
-            load_state_as_np (bool, optional): The weights read in can be choosed
+            load_state_as_np (bool, optional): The weights read in can be chose
                 to place on CPU or GPU though the model is on the default device.
                 If `True`, load the model weights as `numpy.ndarray` on CPU.
                 Otherwise, weights would be loaded as tensors on the default
@@ -2581,6 +2608,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 for key in model.state_dict().keys():
                     if "quant_weight" in key:
                         quantization_linear_list.append(key[:-13])
+
         model, missing_keys, unexpected_keys, mismatched_keys = cls._load_pretrained_model(
             model=model,
             state_dict=state_dict,
@@ -2749,7 +2777,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
             # make sure that file to be deleted matches format of sharded file, e.g. paddle_model-00001-of-00005
             filename_no_suffix = filename.replace(".pdparams", "").replace(".safetensors", "")
-            reg = re.compile("(.*?)-\d{5}-of-\d{5}")
+            reg = re.compile(r"(.*?)-\d{5}-of-\d{5}")
 
             if (
                 filename.startswith(weights_no_suffix)
@@ -3155,7 +3183,7 @@ def load_tp_checkpoint(folder, cls, config, return_numpy=False):
             with safe_open(safe_model_path, framework="np", device="cpu") as f:
                 loaded_keys = f.keys()
             tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys)
-            state_dict = load_state_dict(safe_model_path, tp_actions)
+            state_dict = load_state_dict(safe_model_path, tp_actions, return_numpy=return_numpy)
         else:  # shard files safetensors
             resolved_archive_file, resolved_sharded_files, sharded_metadata, is_sharded = cls._resolve_model_file_path(
                 pretrained_model_name_or_path=folder,
@@ -3171,10 +3199,7 @@ def load_tp_checkpoint(folder, cls, config, return_numpy=False):
                     shard_file,
                     tp_actions,
                     loaded_state_dict_keys,
+                    return_numpy=return_numpy,
                 )
                 state_dict.update(shard_state_dict)
-        if return_numpy:
-            for k in list(state_dict.keys()):
-                if not isinstance(state_dict[k], np.ndarray):
-                    state_dict[k] = state_dict.pop(k).cpu().numpy()
     return state_dict

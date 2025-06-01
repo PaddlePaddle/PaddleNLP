@@ -51,7 +51,7 @@ class BlenderbotTokenizer(GPTTokenizer):
         add_prefix (bool): Whether or not to add an initial space to the input.
             This allows to treat the leading word just as any other word.
             (Blenderbot adds an initial space when tokenizes input text, which
-             is differnt from BlenderbotSmall)
+             is different from BlenderbotSmall)
     Examples:
         .. code-block:: python
             from paddlenlp.transformers import BlenderbotTokenizer

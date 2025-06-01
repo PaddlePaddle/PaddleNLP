@@ -248,7 +248,7 @@ class XLNetTokenizer(PretrainedTokenizer):
             token_ids_0 (List[int]):
                 List of IDs for the first sequence.
             token_ids_1 (List[int], optional):
-                Optional second list of IDs for the second sequenze. Defaults to `None`.
+                Optional second list of IDs for the second sequence. Defaults to `None`.
 
         Returns:
             List[int]: List of input IDs with the appropriate special tokens.

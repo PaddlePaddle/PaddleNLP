@@ -72,12 +72,14 @@ void all_reduce(fptr_t _fa, paddle::Tensor& inp, paddle::Tensor& out,
                           reinterpret_cast<half*>(out.data()), out.numel());
       break;
     }
+#if (!defined(__CUDA_ARCH__) || __CUDA_ARCH__ >= 800)
     case phi::DataType::BFLOAT16: {
       fa->allreduce<nv_bfloat16>(
           stream, reinterpret_cast<nv_bfloat16*>(reg_buffer),
           reinterpret_cast<nv_bfloat16*>(out.data()), out.numel());
       break;
     }
+#endif
     default:
       throw std::runtime_error(
           "custom allreduce only supports float32, float16 and bfloat16");

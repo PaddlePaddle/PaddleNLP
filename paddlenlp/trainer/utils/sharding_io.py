@@ -97,7 +97,7 @@ def filter_sharded_params(state_dict, optimizer, sharding_group):
     return filtered_state_dict
 
 
-def exclude_paramters_in_state_dict(
+def exclude_parameters_in_state_dict(
     model_state_dict, param_names_in_master_weights, sharding_group, should_save_sharding_stage1_model=True
 ):
     assert sharding_group is not None
@@ -399,7 +399,7 @@ class ShardingIO:
             optimzier_state_dict = self.optimizer.state_dict()
             assert "master_weights" in optimzier_state_dict
             param_names_in_master_weights = list(optimzier_state_dict["master_weights"].keys())
-            state_dict = exclude_paramters_in_state_dict(
+            state_dict = exclude_parameters_in_state_dict(
                 state_dict, param_names_in_master_weights, self.sharding_group
             )
             logger.info(

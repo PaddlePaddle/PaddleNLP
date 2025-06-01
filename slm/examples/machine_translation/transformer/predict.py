@@ -126,7 +126,7 @@ def do_predict(args):
 
     # Define model
     # `TransformerGenerator` automatically chioces using `FastGeneration`
-    # (with jit building) or the slower verison `InferTransformerModel`.
+    # (with jit building) or the slower version `InferTransformerModel`.
     transformer = TransformerGenerator(
         src_vocab_size=args.src_vocab_size,
         trg_vocab_size=args.trg_vocab_size,

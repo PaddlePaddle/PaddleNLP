@@ -33,6 +33,7 @@ from rich.console import Console
 from rich.table import Table
 
 from ...data import DataCollator
+from ...generation import GenerationConfig
 from ...trainer.trainer import (
     EvalLoopOutput,
     EvalPrediction,
@@ -53,6 +54,7 @@ from ...transformers import (
     PretrainedTokenizer,
 )
 from ...transformers.model_utils import _add_variant
+from ...trl import llm_utils
 from ...utils.env import PADDLE_WEIGHTS_NAME
 from ..algos.advantage import (
     add_kl_divergence_regularization,
@@ -71,6 +73,7 @@ from ..utils.comm_utils import (
     filter_valid_reward_groups,
     gather_and_pad,
     get_timer_label,
+    make_eos_mask,
     new_timer_log,
     pad_tensor,
     split_batch_by_rank,
@@ -78,10 +81,12 @@ from ..utils.comm_utils import (
 )
 from ..utils.infer_utils import infer_guard
 from ..utils.offload_utils import reload_and_offload_scope, reload_tensor_to_gpu
+from ..utils.reshard_utils import ReshardController
 from ..utils.timer_utils import TimerScope, TimerScopeManualLabel
 from .actor_trainer import ActorReferenceTrainer
 from .critic_trainer import CriticTrainer
 from .reward_trainer import RewardTrainer
+from .rl_trainer import RLTrainerBase
 from .trainer_utils import (
     MuteDefaultFlowCallback,
     batch_retokenize,
@@ -205,7 +210,7 @@ class PPOMetric:
             return out_metrics
 
 
-class PPOTrainer(Trainer):
+class PPOTrainer(RLTrainerBase):
     def __init__(
         self,
         actor_model: Union[PretrainedModel, nn.Layer],
@@ -227,6 +232,8 @@ class PPOTrainer(Trainer):
         callbacks: Optional[List[TrainerCallback]] = None,
         optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
         preprocess_logits_for_metrics: Optional[Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor]] = None,
+        generation_config: Optional[GenerationConfig] = None,
+        reshard_controller: Optional[ReshardController] = None,
     ):
         """
         Args:
@@ -260,7 +267,7 @@ class PPOTrainer(Trainer):
                 "pipeline_parallel_degree": 1,  # workaround for pipeline parallel model check
             },
         ):
-            # just used to create trival attrs might be used in the training
+            # just used to create trivial attrs might be used in the training
             # process of trainer, while changing some args to avoid model usage
             # in __init__ such as recompute and AMP-O2
             super().__init__(
@@ -277,6 +284,7 @@ class PPOTrainer(Trainer):
                 preprocess_logits_for_metrics,
             )
 
+        self.reshard_controller = reshard_controller
         trainer_agrs = {
             # "model": None,
             "criterion": criterion,
@@ -295,6 +303,7 @@ class PPOTrainer(Trainer):
             model=actor_model,
             model_eval=actor_model_eval,
             tokenizer=actor_tokenizer,
+            reshard_controller=reshard_controller,
             **trainer_agrs,
         )
 
@@ -358,6 +367,7 @@ class PPOTrainer(Trainer):
         self.model = self.model_wrapped = self.DummyPPOModel()
         if self.timers:
             self.timers.log = types.MethodType(new_timer_log, self.timers)
+        self.generation_config = generation_config
 
     def create_actor_trainer(
         self,
@@ -373,6 +383,7 @@ class PPOTrainer(Trainer):
         callbacks: Optional[List[TrainerCallback]] = None,
         optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
         preprocess_logits_for_metrics: Optional[Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor]] = None,
+        reshard_controller: Optional[ReshardController] = None,
     ):
         policy_training_args = copy.deepcopy(args)
         lr_scheduler = self.get_scheduler(policy_training_args)
@@ -388,6 +399,7 @@ class PPOTrainer(Trainer):
             callbacks,
             [None, lr_scheduler],
             preprocess_logits_for_metrics,
+            reshard_controller,
         )
         actor_trainer.set_eval_model(model_eval)
         actor_trainer.timers = self.timers
@@ -682,6 +694,8 @@ class PPOTrainer(Trainer):
                 }
                 generated_seq = self.actor_trainer.generate_sequences(prompt_only_batch, do_eval=True)[0]["input_ids"]
 
+            if self.reshard_controller is not None:
+                self.reshard_controller.set_train_env("[after prediction_step]")
             if not self.args.use_rm_server:
                 if self._model_config.sequence_parallel:
                     # pad to max_sequence_length
@@ -1141,12 +1155,15 @@ class PPOTrainer(Trainer):
             dtype=label_ids[0].dtype,
             padding_side="right",
         )
-        position_ids = make_position_ids_from_input_ids(input_ids)
+        position_ids = make_position_ids_from_input_ids(input_ids, pad_token_id=self.tokenizer.pad_token_id)
         return input_ids, label_ids, position_ids
 
     def distribute_gather_and_pad_data(self, batch):
         # group index for grpo
-        eos_mask = (batch["input_ids"] != self.tokenizer.pad_token_id)[:, batch["prompt"].shape[-1] :].to(
+        eos_mask = make_eos_mask(
+            batch["input_ids"][:, batch["prompt"].shape[-1] :],
+            eos_token_ids=llm_utils.get_eos_token_id(self.tokenizer, self.generation_config),
+        ).to(
             batch["log_probs"].dtype  # fix dtype
         )
         try:
@@ -1377,7 +1394,6 @@ class PPOTrainer(Trainer):
                 self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
                 # step 1-1: rollout data with actor model (eval) and reward model
                 self.set_eval()
-
                 data_trans_group = getattr(self.actor_trainer, "_data_trans_group", None)
                 prompt_only_batch = data_group_split(prompt_only_batch, group=data_trans_group)
 
@@ -1406,6 +1422,7 @@ class PPOTrainer(Trainer):
                     RolloutStages.ACTOR_MODEL_ENABLE_DISABLE,
                     minus_names=[RolloutStages.GENERATE],
                 )
+
                 timer_scope_actor_model.start()
                 with reload_and_offload_scope(self, self.actor_model):
                     timer_scope_rollout = TimerScope(self.timers, RolloutStages.GENERATE)
@@ -1429,6 +1446,8 @@ class PPOTrainer(Trainer):
                     self.timers and (dist.get_world_size() > 1) and dist.barrier()
                     timer_scope_rollout.stop()
                 timer_scope_actor_model.stop()
+                if self.reshard_controller is not None:
+                    self.reshard_controller.set_train_env("[after rollout]")
 
                 # step 2-1: truncate data
                 truncate_input_ids = [
@@ -1460,19 +1479,23 @@ class PPOTrainer(Trainer):
                     ),
                 }
 
+                batch = data_group_merge(batch, group=data_trans_group)
+
                 # step 2-2: balance batches based on batch tokens
                 if self.args.balance_batch:
                     batch = self._balance_batch(batch)
 
                 # step 2-3: compute logprob for rollout data
-                with TimerScope(self.timers, RolloutStages.ROLLOUT_LOGPROB):
-                    with reload_and_offload_scope(self, self.reference_model):
-                        with TimerScope(self.timers, RolloutStages.ROLLOUT_REF_LOGPROB):
-                            batch["ref_log_probs"] = self.reference_trainer.compute_logprob(**batch)
+                with self.autocast_smart_context_manager():
+                    with TimerScope(self.timers, RolloutStages.ROLLOUT_LOGPROB):
+                        with reload_and_offload_scope(self, self.reference_model):
+                            with TimerScope(self.timers, RolloutStages.ROLLOUT_REF_LOGPROB):
+                                batch["ref_log_probs"] = self.reference_trainer.compute_logprob(**batch)
 
-                    with reload_and_offload_scope(self, self.actor_model):
-                        with TimerScope(self.timers, RolloutStages.ROLLOUT_OLD_LOGPROB):
-                            batch["log_probs"] = self.actor_trainer.compute_logprob(**batch)
+                        with reload_and_offload_scope(self, self.actor_model):
+                            with TimerScope(self.timers, RolloutStages.ROLLOUT_OLD_LOGPROB):
+                                self.actor_trainer.model.eval()
+                                batch["log_probs"] = self.actor_trainer.compute_logprob(**batch)
 
                 # step 2-2: compute reward for rollout data
                 with TimerScope(
@@ -1503,7 +1526,7 @@ class PPOTrainer(Trainer):
                             if self.args.rl_algorithm == "ppo":
                                 batch["reward_values"] = self.critic_trainer.compute_value(**batch)
 
-                # danamic sampling: filter generated samples by rewards, keep generating until valid samples are enough
+                # dynamic sampling: filter generated samples by rewards, keep generating until valid samples are enough
                 if self.args.dynamic_sampling:
                     local_valid_prompt = 0
                     # combined_batch = combine_micro_batches_into_batch(micro_batches, pad_token_id=self.tokenizer.pad_token_id)
@@ -1578,7 +1601,7 @@ class PPOTrainer(Trainer):
                         total_batch = defaultdict(list)
                         total_valid_prompt = 0
                         num_gen_batches = 0
-                        logger.info("Danymic sampling completed. \n")
+                        logger.info("Dynamic sampling completed. \n")
 
                     else:
                         if self.args.max_gen_batches > 0 and num_gen_batches > self.args.max_gen_batches:
@@ -1619,8 +1642,6 @@ class PPOTrainer(Trainer):
                 else:
                     batch = batch
 
-                batch = data_group_merge(batch, group=data_trans_group)
-
                 # step 3: train actor model and critic model with rollout data
                 self.set_train()
                 with TimerScope(self.timers, ActorStages.MODEL_ENABLE_DISABLE, minus_names=[ActorStages.RL_STEP]):
@@ -1643,7 +1664,7 @@ class PPOTrainer(Trainer):
                                 paddle.device.cuda.empty_cache()
 
                                 if self.args.rl_algorithm == "ppo":
-                                    rl_info["train_value_loss"] = self.critic_trainer.update_critc(micro_batch)
+                                    rl_info["train_value_loss"] = self.critic_trainer.update_critic(micro_batch)
                                 if self.is_step_end():
                                     self.state.global_step += 1
                                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
@@ -1680,7 +1701,6 @@ class PPOTrainer(Trainer):
 
             if self.control.should_training_stop:
                 break
-        # TODO(guosheng): add epilogue of training
         logger.info("\nTraining completed. \n")
         if args.load_best_model_at_end and self.state.best_model_checkpoint is not None:
             if args.local_rank != -1:

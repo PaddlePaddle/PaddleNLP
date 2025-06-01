@@ -146,7 +146,7 @@ usage = r"""
 class WordTagTask(Task):
     """
     This the NER(Named Entity Recognition) task that convert the raw text to entities. And the task with the `wordtag`
-    model will link the more meesage with the entity.
+    model will link the more message with the entity.
     Args:
         task(string): The name of task.
         model(string): The model name in the task.

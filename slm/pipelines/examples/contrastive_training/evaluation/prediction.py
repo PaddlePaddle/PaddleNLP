@@ -86,7 +86,7 @@ class Eval_modle:
             )
             return tokenized_inputs
 
-        # Seperates data into some batches.
+        # Separates data into some batches.
         if max_seq_len is None:
             max_seq_len = self.max_seq_len
         one_batch = []

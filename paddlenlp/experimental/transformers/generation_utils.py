@@ -533,9 +533,6 @@ class GenerationBlockInferenceModel(GenerationMixin):
             cache_v_dequant_scales,
             tgt_mask_spec,
         ]
-        input_spec.extend(
-            [paddle.static.InputSpec(shape=[1], dtype="int32", name="msg_queue_id")]
-        )  # msg_queue_id for save_output
         if config.get("speculate_method", None) is not None:
             speculate_spec = [
                 paddle.static.InputSpec(shape=[None, None], dtype="int64", name="draft_tokens"),
@@ -612,7 +609,6 @@ class GenerationBlockInferenceModel(GenerationMixin):
         k_dequant_scales=None,
         v_dequant_scales=None,
         tgt_mask=None,
-        msg_queue_id=None,
         draft_tokens=None,
         accept_tokens=None,
         accept_num=None,
@@ -621,7 +617,6 @@ class GenerationBlockInferenceModel(GenerationMixin):
     ):
 
         model_kwargs["input_ids"] = input_ids
-        model_kwargs["msg_queue_id"] = msg_queue_id
         model_kwargs["penalty_score"] = penalty_score
         model_kwargs["frequency_score"] = frequency_score
         model_kwargs["presence_score"] = presence_score
@@ -774,7 +769,6 @@ class GenerationBlockInferenceModel(GenerationMixin):
                 save_output(
                     next_tokens,
                     model_kwargs["not_need_stop"],
-                    model_kwargs["msg_queue_id"],
                     self.config.tensor_parallel_rank,
                 )
             return next_tokens

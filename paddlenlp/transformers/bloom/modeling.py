@@ -203,7 +203,7 @@ def pre_process_alibi_for_pad(alibi, attention_mask, num_heads):
     index_x1, index_y1 = paddle.where(attention_mask == 1.0)
 
     # Clone the embeddings  - we can detach because the embeddings are not learned
-    # Get a refence tensor
+    # Get a reference tensor
     slice_reference_alibi = build_alibi_tensor(attention_mask, num_heads, alibi.dtype)
 
     # Loop over the batch where the padding is and replace the alibi tensor by the reference tensor

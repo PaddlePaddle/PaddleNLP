@@ -100,6 +100,7 @@ class LoRAConfig:
             "help": "Num of mixer matrices. Mixer matrices will be added between the LoRA_A and LoRA_B matrices, as referenced in the paper https://arxiv.org/abs/2411.00039."
         },
     )
+    lorapro: bool = field(default=False, metadata={"help": "Whether to use LoRA-PRO"})
 
     def __post_init__(self):
         if self.use_quick_lora and self.lora_dropout > 0:

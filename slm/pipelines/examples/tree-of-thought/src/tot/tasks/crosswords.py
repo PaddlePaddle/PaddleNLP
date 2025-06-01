@@ -183,7 +183,7 @@ class MiniCrosswordsEnv:
 
 class MiniCrosswordsTask(Task):
     """
-    Input (x)   : Decription of a 5x5 mini crossword
+    Input (x)   : Description of a 5x5 mini crossword
     Output (y)  : List of 10 words to fill in the crossword
     Reward (r)  : word level and game level
     Input Example:
