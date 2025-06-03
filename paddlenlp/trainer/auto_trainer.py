@@ -102,10 +102,6 @@ def manual_model_split(model, stage_idx, group, mode, pp_degree):
     chunk_size = num_hidden_layers // virtual_pp_degree // pp_degree
     chunk_num = virtual_pp_degree * pp_degree
     layer_lists = None
-    # 删除不在本卡上的layer
-    for i in range(num_hidden_layers):
-        if model.layers[num_hidden_layers - i - 1].ipp != group.rank:
-            del model.layers[num_hidden_layers - i - 1]
 
     layer_lists = model.layers
     # 构建stages
@@ -134,7 +130,7 @@ def manual_model_split(model, stage_idx, group, mode, pp_degree):
                 return outputs
             new_model.forward = forward0.__get__(new_model)
         else:
-            new_model = _Pipeline_model_chunk(layer_lists[local_chunk_id * chunk_size : (local_chunk_id + 1) * chunk_size])
+            new_model = _Pipeline_model_chunk(layer_lists[stage_idx * chunk_size : (stage_idx + 1) * chunk_size])
             def forward1(self, *args, **kwargs):
                 outputs = args
                 # decoder layers
