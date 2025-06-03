@@ -526,8 +526,18 @@ class ChatTemplate:
         def raise_exception(message):
             raise TemplateError(message)
 
+        def regex_findall(s, pattern, multiline=False, dotall=False):
+            flags = 0
+            if multiline:
+                flags |= re.MULTILINE
+            if dotall:
+                flags |= re.DOTALL
+            return re.findall(pattern, s, flags)
+
         jinja_env = ImmutableSandboxedEnvironment(trim_blocks=True, lstrip_blocks=True, keep_trailing_newline=True)
         jinja_env.globals["raise_exception"] = raise_exception
+        jinja_env.filters["regex_findall"] = regex_findall
+        jinja_env.globals.update(regex_findall=regex_findall)
         return jinja_env.from_string(chat_template)
 
     def render_conversation(

@@ -1848,6 +1848,9 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         for file_id in self.resource_files_names.keys():
             tokenizer_config.pop(file_id, None)
 
+        if hasattr(self, "chat_template") and isinstance(self.chat_template, str):
+            tokenizer_config["chat_template"] = self.chat_template
+
         # Sanitize AddedTokens
         def convert_added_tokens(obj: Union[AddedToken, Any], add_type_field=True):
             if isinstance(obj, AddedToken):
