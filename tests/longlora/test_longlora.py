@@ -21,7 +21,7 @@ import paddle
 from parameterized import parameterized_class
 
 from paddlenlp.transformers.longlora import (
-    set_group_size,
+    replace_llama_attn,
     ssa_scaled_dot_product_attention,
 )
 
@@ -31,7 +31,7 @@ from .testing_utils import LLMTest
 @parameterized_class(
     ["model_dir"],
     [
-        ["llama"],  # 可以根据需要添加更多的模型目录
+        ["llama"],
     ],
 )
 class TestSSA(LLMTest, unittest.TestCase):
@@ -42,17 +42,14 @@ class TestSSA(LLMTest, unittest.TestCase):
         LLMTest.setUp(self)
         sys.path.insert(0, self.model_dir)
 
-        # 设置 group size ratio
         self.ssa_group_size_ratio = 1 / 4
-        set_group_size(self.ssa_group_size_ratio)
+        replace_llama_attn(self.ssa_group_size_ratio, use_ssa=True)
 
-        # 创建输入张量的配置
         self.bsz = 2
         self.q_len = 16
         self.num_heads = 8
         self.head_dim = 64
 
-        # 模拟查询、键、值状态
         self.query_states = paddle.randn([self.bsz, self.q_len, self.num_heads, self.head_dim])
         self.key_states = paddle.randn([self.bsz, self.q_len, self.num_heads, self.head_dim])
         self.value_states = paddle.randn([self.bsz, self.q_len, self.num_heads, self.head_dim])
@@ -64,7 +61,6 @@ class TestSSA(LLMTest, unittest.TestCase):
         LLMTest.tearDown(self)
 
     def test_ssa_attention_output_shape(self):
-        # 运行SSA注意力机制
         attn_output = ssa_scaled_dot_product_attention(
             self.query_states,
             self.config,
@@ -72,9 +68,8 @@ class TestSSA(LLMTest, unittest.TestCase):
             self.value_states,
             self.attention_mask,
             output_attentions=False,
+            ssa_group_size_ratio=self.ssa_group_size_ratio,
         )
-        print(attn_output.shape)
-        # 验证输出形状是否符合预期
         self.assertEqual(attn_output.shape, [self.bsz, self.q_len, self.num_heads * self.head_dim])
 
     def test_ssa_attention_values_reasonable(self):
@@ -85,9 +80,8 @@ class TestSSA(LLMTest, unittest.TestCase):
             self.value_states,
             self.attention_mask,
             output_attentions=False,
+            ssa_group_size_ratio=self.ssa_group_size_ratio,
         )
-        print(attn_output.shape)
 
-        # 确保输出数值在合理范围内
         self.assertFalse(paddle.isnan(attn_output).any().item())  # 无NaN
         self.assertFalse(paddle.isinf(attn_output).any().item())  # 无无穷值

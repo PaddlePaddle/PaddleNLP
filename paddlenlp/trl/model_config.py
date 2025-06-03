@@ -134,3 +134,17 @@ class ModelConfig:
     rope_scaling_factor: float = field(default=1.0, metadata={"help": "Rope extension scaling factor"})
     strategy_type: str = field(default=None, metadata={"help": "Long sequence strategy type"})
     strategy_name: str = field(default=None, metadata={"help": "Long sequence strategy name"})
+
+    # longlora related parameter
+    use_ssa: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to use Shifted Sparse Attention (SSA), an efficient attention mechanism introduced in the LongLoRA paper."
+        },
+    )
+    ssa_group_size_ratio: float = field(
+        default=0.25,
+        metadata={
+            "help": "The ratio parameter for grouping in SSA, controlling the number of tokens considered in each group for sparse attention calculation."
+        },
+    )

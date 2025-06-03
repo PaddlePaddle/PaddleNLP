@@ -83,14 +83,12 @@ def tokenize_unsupervised_example(tokenizer, example, data_args, is_test=True, z
     tokenized_source = tokenizer(
         source,
         truncation=False,
-        padding=True,
+        padding="max_length",
         max_length=data_args.src_length,
         add_special_tokens=True,
     )
-
     if data_args.use_pose_convert:
         tokenized_source = get_example_pose(tokenized_source, tokenizer, data_args)
-
     return tokenized_source
 
 

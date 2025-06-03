@@ -67,7 +67,7 @@ from paddlenlp.transformers import (
     Qwen2MoeForCausalLMPipe,
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig
-from paddlenlp.transformers.longlora import replace_llama_attn, set_group_size
+from paddlenlp.transformers.longlora import replace_llama_attn
 from paddlenlp.trl import DataConfig, ModelConfig, SFTConfig, SFTTrainer
 from paddlenlp.trl.llm_utils import (
     ZeroPaddingIterDatasetCallback,
@@ -122,7 +122,6 @@ def main():
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
     training_args.print_config(gen_args, "Generation")
-
     # Setup GPU & distributed training
     paddle.set_device(training_args.device)
     set_seed(seed=training_args.seed)
@@ -175,12 +174,11 @@ def main():
         quantization_config=quantization_config,
     )
 
-    if training_args.use_ssa:
+    if model_args.use_ssa:
         assert (
-            training_args.ssa_group_size_ratio is not None
+            model_args.ssa_group_size_ratio is not None
         ), "ssa_group_size_ratio must be specified when use_ssa is True"
-        set_group_size(training_args.ssa_group_size_ratio)
-        replace_llama_attn()
+        replace_llama_attn(model_args.ssa_group_size_ratio, model_args.use_ssa)
 
     architectures_to_check = {"Qwen2Moe", "DeepseekV2", "DeepseekV3"}
     if (
@@ -485,7 +483,6 @@ def main():
                 trainer.log_metrics("train", train_result.metrics)
                 trainer.save_metrics("train", train_result.metrics)
                 trainer.save_state()
-
     # Evaluation test set
     if training_args.do_predict:
         eval_result = trainer.predict(test_ds).metrics

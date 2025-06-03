@@ -354,7 +354,6 @@ def load_test_config(config_file: str, key: str, sub_key: str = None) -> dict | 
     for key in list(config.keys()):
         if isinstance(config[key], dict):
             config.pop(key)
-
     return config
 
 
