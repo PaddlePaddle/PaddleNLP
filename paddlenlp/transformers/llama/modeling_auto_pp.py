@@ -369,21 +369,21 @@ class LlamaDecoderLayerAutoPP(nn.Layer):
         super(LlamaDecoderLayerAutoPP, self).__init__()
         self.config = config
         self.layer_id = idx
-        self.layer = LlamaDecoderLayerAuto(config, layerwise_recompute, ipp)
-        self.ipp = ipp
-        self.enable_recompute = False
-        self.recompute_granularity = config.recompute_granularity
-        self.no_recompute_layers = config.no_recompute_layers if config.no_recompute_layers is not None else []
         self.embed_tokens = None
         self.norm = None
         self.lm_head = None
         if self.layer_id == 0:
             self.embed_tokens = LlamaEmbeddingAutoPP(config)
+
+        self.layer = LlamaDecoderLayerAuto(config, layerwise_recompute, ipp)
+        self.ipp = ipp
+        self.enable_recompute = False
+        self.recompute_granularity = config.recompute_granularity
+        self.no_recompute_layers = config.no_recompute_layers if config.no_recompute_layers is not None else []
         
         if self.layer_id == self.config.num_hidden_layers - 1:
             self.norm = LlamaRMSNormAutoPP(config, ipp)
             self.lm_head = LlamaLMHeadAutoPP(config)
-            
 
     def forward(self, args):
         if self.embed_tokens is not None:
