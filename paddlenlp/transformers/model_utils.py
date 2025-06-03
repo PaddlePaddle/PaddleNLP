@@ -360,7 +360,12 @@ def _split_keys_evenly(keys: list, n: int) -> list:
 
 
 def _load_part_state_dict(
-    keys, checkpoint_file: Union[str, os.PathLike], tensor_parallel_split_mapping, fliter_dict_keys, device
+    keys,
+    checkpoint_file: Union[str, os.PathLike],
+    tensor_parallel_split_mapping,
+    fliter_dict_keys,
+    device,
+    return_numpy=False,
 ):
     """load part state dict from checkpoint file.
 
@@ -395,7 +400,7 @@ def _load_part_state_dict(
                 weight = tensor_parallel_split_mapping[key](py_safe_slice_)
             else:
                 weight = py_safe_slice_[:]
-            if device == "expected":
+            if not return_numpy and device == "expected":
                 with device_guard():
                     weight = paddle.Tensor.__call__(weight, zero_copy=True)
                 weight = weight._copy_to(paddle.framework._current_expected_place(), False)
@@ -407,9 +412,10 @@ def _load_part_state_dict(
                 or key.endswith(ASYMMETRY_QUANT_SCALE_MAX)
             ):
                 scale = f.get_tensor(key)
-                with device_guard():
-                    scale = paddle.Tensor.__call__(scale, zero_copy=True)
-                scale = scale._copy_to(paddle.framework._current_expected_place(), False)
+                if not return_numpy and device == "expected":
+                    with device_guard():
+                        scale = paddle.Tensor.__call__(scale, zero_copy=True)
+                    scale = scale._copy_to(paddle.framework._current_expected_place(), False)
                 scale_dict[key] = scale
     return part_state_dict, scale_dict
 
@@ -420,6 +426,7 @@ def load_state_dict(
     fliter_dict_keys=None,
     device="cpu",
     ckpt_quant_stage="O0",
+    return_numpy=False,
 ):
     """
     Reads a PaddlePaddle checkpoint file, returning properly formatted errors if they arise.
@@ -455,6 +462,7 @@ def load_state_dict(
                         tensor_parallel_split_mapping,
                         fliter_dict_keys,
                         device,
+                        return_numpy,
                     )
             else:
                 # Load state dict in multi-thread to speed up loading
@@ -469,6 +477,7 @@ def load_state_dict(
                             tensor_parallel_split_mapping,
                             fliter_dict_keys,
                             device,
+                            return_numpy,
                         ): keys
                         for keys in keys_groups
                     }
@@ -477,7 +486,7 @@ def load_state_dict(
                         state_dict.update(res_state_dict)
                         scale_dict.update(res_scale_dict)
 
-            if device == "cpu":
+            if not return_numpy and device == "cpu":
                 for k in list(state_dict.keys()):
                     with device_guard():
                         state_dict[k] = paddle.Tensor.__call__(state_dict.pop(k), zero_copy=True)
@@ -3174,7 +3183,7 @@ def load_tp_checkpoint(folder, cls, config, return_numpy=False):
             with safe_open(safe_model_path, framework="np", device="cpu") as f:
                 loaded_keys = f.keys()
             tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys)
-            state_dict = load_state_dict(safe_model_path, tp_actions)
+            state_dict = load_state_dict(safe_model_path, tp_actions, return_numpy=return_numpy)
         else:  # shard files safetensors
             resolved_archive_file, resolved_sharded_files, sharded_metadata, is_sharded = cls._resolve_model_file_path(
                 pretrained_model_name_or_path=folder,
@@ -3190,10 +3199,7 @@ def load_tp_checkpoint(folder, cls, config, return_numpy=False):
                     shard_file,
                     tp_actions,
                     loaded_state_dict_keys,
+                    return_numpy=return_numpy,
                 )
                 state_dict.update(shard_state_dict)
-        if return_numpy:
-            for k in list(state_dict.keys()):
-                if not isinstance(state_dict[k], np.ndarray):
-                    state_dict[k] = state_dict.pop(k).cpu().numpy()
     return state_dict

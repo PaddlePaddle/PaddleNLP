@@ -2119,6 +2119,7 @@ class Trainer:
             optimizer_kwargs.update(adam_kwargs)
         else:
             raise ValueError(f"Trainer cannot instantiate unsupported optimizer: {args.optim}")
+
         return optimizer_cls, optimizer_kwargs
 
     def create_scheduler(self, num_training_steps: int):
