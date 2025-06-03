@@ -298,13 +298,14 @@ struct dispatch_stages<T,
 
 template <typename T,
           typename WeightType,
+          typename arch,
           typename EpilogueTag,
           typename ThreadblockShape,
           typename WarpShape,
           int Stages>
 struct dispatch_stages<T,
                        WeightType,
-                       cutlass::arch::Sm80,
+                       arch,
                        EpilogueTag,
                        ThreadblockShape,
                        WarpShape,
@@ -323,9 +324,14 @@ struct dispatch_stages<T,
                        int multi_processor_count,
                        cudaStream_t stream,
                        int* occupancy = nullptr) {
+    using moe_gemm_arch = std::conditional_t<
+        std::is_same_v<arch, cutlass::arch::Sm90>,
+        cutlass::arch::Sm90,
+        cutlass::arch::Sm80>;
+
     generic_moe_gemm_kernelLauncher<T,
                                     WeightType,
-                                    cutlass::arch::Sm80,
+                                    moe_gemm_arch,
                                     EpilogueTag,
                                     ThreadblockShape,
                                     WarpShape,
@@ -634,8 +640,10 @@ void MoeGemmRunner<T, WeightType>::dispatch_to_arch<EpilogueTag>(
     dispatch_moe_gemm_to_cutlass_macro(cutlass::arch::Sm70);
   } else if (sm_ >= 75 && sm_ < 80) {
     dispatch_moe_gemm_to_cutlass_macro(cutlass::arch::Sm75);
-  } else if (sm_ >= 80 && sm_ < 91) {
+  } else if (sm_ >= 80 && sm_ < 90) {
     dispatch_moe_gemm_to_cutlass_macro(cutlass::arch::Sm80);
+  } else if (sm_ >= 90 && sm_ < 91) {
+    dispatch_moe_gemm_to_cutlass_macro(cutlass::arch::Sm90);
   } else {
     PADDLE_FATAL("[MoE][GEMM Dispatch] Arch unsupported for MoE GEMM");
   }
