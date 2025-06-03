@@ -29,7 +29,7 @@ __global__ void FusedActDequant(
 
   for (int vec_idx = tid; vec_idx < num_vectors; vec_idx += blockDim.x) {
     int x_offset = vec_idx * vector_size;
-    int X_idx = this_row_idx * cols + x_offset;
+    int64_t X_idx = (int64_t)this_row_idx * (int64_t)cols + (int64_t)x_offset;
 
     // 加载16个 __nv_fp8_e4m3 元素到向量中
     const VectorType<__nv_fp8_e4m3, vector_size>* X_vec_ptr =
@@ -37,7 +37,7 @@ __global__ void FusedActDequant(
     VectorType<__nv_fp8_e4m3, vector_size> X_vec = X_vec_ptr[0];
 
     // 获取对应的缩放因子
-    int scale_idx = this_row_idx * Xscale_stride + (x_offset / 128);
+    int64_t scale_idx = (int64_t)this_row_idx * (int64_t)Xscale_stride + (x_offset / 128);
     float this_scale = Xscale[scale_idx];
 
     // 初始化输出向量
@@ -63,11 +63,11 @@ __global__ void FusedActDequant(
   // 处理剩余不能被向量化的元素
   if (remaining_elements > 0) {
     int x_offset = num_vectors * vector_size;
-    int X_idx = this_row_idx * cols + x_offset;
-    int idx = X_idx + tid;
+    int64_t X_idx = (int64_t)this_row_idx * (int64_t)cols + (int64_t)x_offset;
+    int64_t idx = X_idx + tid;
     if (tid < remaining_elements) {
       float X_value = static_cast<float>(Xin[idx]);
-      X_value *= Xscale[this_row_idx * Xscale_stride + (x_offset / 128)];
+      X_value *= Xscale[(int64_t)this_row_idx * (int64_t)Xscale_stride + (x_offset / 128)];
       out[idx] = __float2bfloat16(X_value);
     }
   }
