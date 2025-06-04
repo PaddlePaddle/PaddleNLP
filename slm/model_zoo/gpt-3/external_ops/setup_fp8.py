@@ -61,7 +61,7 @@ def setup_fused_quant_ops():
                     "-lineinfo",
                     "-DCUTLASS_DEBUG_TRACE_LEVEL=0",
                     "-maxrregcount=50",
-                    "-gencode=arch=compute_80,code=sm_80",
+                    "-gencode=arch=compute_90a,code=sm_90a",
                     "-DNDEBUG",
                 ]
             },
@@ -101,7 +101,7 @@ def setup_token_dispatcher_utils():
                     "-maxrregcount=32",
                     "-lineinfo",
                     "-DCUTLASS_DEBUG_TRACE_LEVEL=0",
-                    "-gencode=arch=compute_80,code=sm_80",
+                    "-gencode=arch=compute_90a,code=sm_90a",
                     "-DNDEBUG",
                 ],
             },
