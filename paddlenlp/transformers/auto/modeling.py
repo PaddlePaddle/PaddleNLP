@@ -22,7 +22,7 @@ from copy import deepcopy
 from ...utils.download import resolve_file_path
 from ...utils.log import logger
 from .. import *  # noqa
-from .configuration import AutoConfig, CONFIG_MAPPING_NAMES, MODEL_NAMES_MAPPING, config_class_to_model_type
+from .configuration import PretrainedConfig, AutoConfig, CONFIG_MAPPING_NAMES, MODEL_NAMES_MAPPING
 from ..configuration_utils import is_standard_config
 from .factory import _LazyAutoMapping
 
