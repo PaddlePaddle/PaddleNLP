@@ -58,7 +58,6 @@ def setup_fused_quant_ops():
                     "-DCUTE_ARCH_MMA_SM90A_ENABLE",
                     "--expt-relaxed-constexpr",
                     "--expt-extended-lambda",
-                    "--use_fast_math",
                     "-lineinfo",
                     "-DCUTLASS_DEBUG_TRACE_LEVEL=0",
                     "-maxrregcount=50",
