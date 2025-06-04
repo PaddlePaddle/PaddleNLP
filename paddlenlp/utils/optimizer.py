@@ -11,8 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import re
-import warnings
 
 import paddle
 from paddle import pir
@@ -20,20 +20,18 @@ from paddle.base import core, framework
 from paddle.base.dygraph import base as imperative_base
 from paddle.base.framework import Variable, in_dynamic_or_pir_mode, in_pir_mode
 from paddle.base.libpaddle import DataType
+from paddle.distributed import fleet
 from paddle.optimizer.adamw import AdamW
 from paddle.pir import Value
 
 try:
-    from paddlenlp_kernel.triton.optimizer import adamw_16bit_moment
+    from .adamw_triton import adamw_triton
 except:
-    adamw_16bit_moment = None
+    adamw_triton = None
+    print("Please install triton to use faster optimizer")
 
-from ..quantization.qat_utils import (
-    dequantize_channelwise,
-    fp8_dequantize_tensorwise,
-    fp8_quantize_tensorwise,
-    quantize_channelwise,
-)
+
+from ..quantization.qat_utils import dequantize, quantize
 
 
 class AdamWMini(AdamW):
@@ -166,108 +164,19 @@ class AdamWMini(AdamW):
 
 
 class AdamWCustom(AdamW):
-    def _append_optimize_op(self, block, param_and_grad):
-        assert isinstance(block, (framework.Block, pir.Block))
-        if isinstance(param_and_grad, dict):
-            param_and_grad = self._update_param_group(param_and_grad)
-        param, grad = param_and_grad
+    def __init__(self, quantization_config, tensorwise_offload_optimizer, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.quant_scale_mapping = {}
+        for p in self._param_groups:
+            if "quantization_linear" in p.name and "w_1" in p.name:
+                self.quant_scale_mapping[p.name.replace("w_1", "w_0")] = p
+        self.quantization_config = quantization_config
+        self._hcg = fleet.get_hybrid_communicate_group()
+        self.mp_group = self._hcg.get_model_parallel_group()
+        self.tensorwise_offload_optimizer = tensorwise_offload_optimizer
 
-        # Whether we should do weight decay for the parameter.
-        with_decay = True
-        if self._apply_decay_param_fun is not None and not self._apply_decay_param_fun(param.name):
-            with_decay = False
-
-        moment1 = self._get_accumulator_master(self._moment1_acc_str, param_and_grad[0])
-        moment2 = self._get_accumulator_master(self._moment2_acc_str, param_and_grad[0])
-        beta1_pow_acc = self._get_accumulator_master(self._beta1_pow_acc_str, param_and_grad[0])
-        beta2_pow_acc = self._get_accumulator_master(self._beta2_pow_acc_str, param_and_grad[0])
-        find_master = self._multi_precision and self._is_dtype_fp16_or_bf16(param_and_grad[0].dtype)
-        master_weight = self._master_weights[param_and_grad[0].name] if find_master else None
-        lr = self._create_param_lr(param_and_grad)
-        # create the adamw optimize op
-        if in_dynamic_or_pir_mode():
-            lr_ratio_ = 1.0 if self._lr_ratio is None else self._lr_ratio(param_and_grad[0])
-
-            _beta1 = self._beta1 if not isinstance(self._beta1, Variable) else self._beta1.item(0)
-            _beta2 = self._beta2 if not isinstance(self._beta2, Variable) else self._beta2.item(0)
-
-            found_inf = self._get_auxiliary_var("found_inf") if in_pir_mode() else None
-            self.adamw_custom(
-                param_and_grad[0],
-                param_and_grad[1],
-                lr,
-                moment1,
-                moment2,
-                beta1_pow_acc,
-                beta2_pow_acc,
-                master_weight,
-                found_inf,
-                _beta1,
-                _beta2,
-                self._epsilon,
-                lr_ratio_,
-                self._weight_decay,
-                with_decay,
-                find_master,
-            )
-            return None
-        else:
-            raise NotImplementedError("Not implemented yet.")
-
-    def adamw_custom(
-        self,
-        param,
-        grad,
-        learning_rate,
-        moment1,
-        moment2,
-        beta1_pow,
-        beta2_pow,
-        master_weight,
-        skip_update,
-        beta1,
-        beta2,
-        epsilon,
-        lr_ratio,
-        coeff,
-        with_decay,
-        multi_precision,
-    ):
-        if skip_update:
-            return
-        if not with_decay:
-            coeff = 0.0
-        if not multi_precision:
-            master_weight = None
-        lr = learning_rate * lr_ratio
-        if master_weight is not None:
-            p = master_weight
-        else:
-            p = param
-        p *= 1.0 - lr * coeff
-        mom1 = moment1
-        mom2 = moment2
-
-        mom1 = beta1 * mom1 + (1.0 - beta1) * grad
-        mom2 = beta2 * mom2 + (1.0 - beta2) * grad * grad
-        denom = mom2.sqrt() / (1.0 - beta2_pow).sqrt() + epsilon
-        p += (mom1 / denom) * (-(lr / (1.0 - beta1_pow)))
-        if master_weight is not None:
-            master_weight[:] = p
-            param[:] = p.astype(param.dtype)
-        else:
-            param[:] = p
-        moment1[:] = mom1
-        moment2[:] = mom2
-        beta1_pow[:], beta2_pow[:] = beta1 * beta1_pow[:], beta2 * beta2_pow[:]
-        return
-
-
-class AdamW_16Bit(AdamW):
     def _add_moments_pows(self, p, moment_dtype=core.VarDesc.VarType.FP32):
         acc_dtype = p.dtype
-        if self._is_dtype_fp16_or_bf16(acc_dtype):
-            acc_dtype = DataType.FLOAT32 if in_pir_mode() else core.VarDesc.VarType.FP32
 
         self._add_accumulator(self._moment1_acc_str, p, dtype=moment_dtype)
         self._add_accumulator(self._moment2_acc_str, p, dtype=moment_dtype)
@@ -303,130 +212,31 @@ class AdamW_16Bit(AdamW):
                 continue
             if self._multi_precision and self._is_dtype_fp16_or_bf16(p.dtype):
                 master_p = self._create_master_weight(p)
-                if str(p.dtype) == "paddle.float16":
-                    moment_dtype = core.VarDesc.VarType.FP16
-                elif str(p.dtype) == "paddle.bfloat16":
-                    moment_dtype = core.VarDesc.VarType.BF16
+                if self._use_lowprecision_moment:
+                    if p.name in self.quant_scale_mapping:
+                        p_scale = self.quant_scale_mapping[p.name]
+                        if str(p_scale.dtype) == "paddle.float16":
+                            moment_dtype = core.VarDesc.VarType.FP16
+                        elif str(p_scale.dtype) == "paddle.bfloat16":
+                            moment_dtype = core.VarDesc.VarType.BF16
+                    else:
+                        if str(p.dtype) == "paddle.float16":
+                            moment_dtype = core.VarDesc.VarType.FP16
+                        elif str(p.dtype) == "paddle.bfloat16":
+                            moment_dtype = core.VarDesc.VarType.BF16
+                else:
+                    moment_dtype = core.VarDesc.VarType.FP32
 
                 self._add_moments_pows(master_p, moment_dtype)
                 self._already_create_accumulator.add(p.name)
-                continue
-            if self._is_dtype_fp16_or_bf16(p.dtype) and not self._multi_precision:
-                warnings.warn(
-                    "Accumulating with FP16 or BF16 in optimizer can lead to poor accuracy or slow convergence."
-                    "Consider using multi_precision=True option of the Adam optimizer."
-                )
-            self._add_moments_pows(p)
-            self._already_create_accumulator.add(p.name)
 
-    def _append_optimize_op(self, block, param_and_grad):
-        assert isinstance(block, (framework.Block, pir.Block))
-        if isinstance(param_and_grad, dict):
-            param_and_grad = self._update_param_group(param_and_grad)
-        param, grad = param_and_grad
-
-        # Whether we should do weight decay for the parameter.
-        with_decay = True
-        if self._apply_decay_param_fun is not None and not self._apply_decay_param_fun(param.name):
-            with_decay = False
-
-        moment1 = self._get_accumulator_master(self._moment1_acc_str, param_and_grad[0])
-        moment2 = self._get_accumulator_master(self._moment2_acc_str, param_and_grad[0])
-        beta1_pow_acc = self._get_accumulator_master(self._beta1_pow_acc_str, param_and_grad[0])
-        beta2_pow_acc = self._get_accumulator_master(self._beta2_pow_acc_str, param_and_grad[0])
-        find_master = self._multi_precision and self._is_dtype_fp16_or_bf16(param_and_grad[0].dtype)
-        master_weight = self._master_weights[param_and_grad[0].name] if find_master else None
-        lr = self._create_param_lr(param_and_grad)
-        # create the adamw optimize op
-        if in_dynamic_or_pir_mode():
-            lr_ratio_ = 1.0 if self._lr_ratio is None else self._lr_ratio(param_and_grad[0])
-
-            _beta1 = self._beta1 if not isinstance(self._beta1, Variable) else self._beta1.item(0)
-            _beta2 = self._beta2 if not isinstance(self._beta2, Variable) else self._beta2.item(0)
-
-            found_inf = self._get_auxiliary_var("found_inf") if in_pir_mode() else None
-            apply_adamw = self.adamw_16bit_moment if adamw_16bit_moment is None else adamw_16bit_moment
-            apply_adamw(
-                param_and_grad[0],
-                param_and_grad[1],
-                lr,
-                moment1,
-                moment2,
-                beta1_pow_acc,
-                beta2_pow_acc,
-                master_weight,
-                found_inf,
-                _beta1,
-                _beta2,
-                self._epsilon,
-                lr_ratio_,
-                self._weight_decay,
-                with_decay,
-                find_master,
-            )
-            return None
-        else:
-            raise NotImplementedError("Not implemented yet.")
-
-    def adamw_16bit_moment(
-        self,
-        param,
-        grad,
-        learning_rate,
-        moment1,
-        moment2,
-        beta1_pow,
-        beta2_pow,
-        master_weight,
-        skip_update,
-        beta1,
-        beta2,
-        epsilon,
-        lr_ratio,
-        coeff,
-        with_decay,
-        multi_precision,
-    ):
-        if skip_update:
-            return
-        if not with_decay:
-            coeff = 0.0
-        if not multi_precision:
-            master_weight = None
-        lr = learning_rate * lr_ratio
-        if master_weight is not None:
-            p = master_weight
-        else:
-            p = param
-        p *= 1.0 - lr * coeff
-        moment_dtype = moment1.dtype
-        mom1 = moment1
-        mom2 = moment2
-
-        mom1 = beta1 * mom1 + (1.0 - beta1) * grad
-        mom2 = beta2 * mom2 + (1.0 - beta2) * grad * grad
-        denom = mom2.sqrt() / (1.0 - beta2_pow).sqrt() + epsilon
-        p += (mom1 / denom) * (-(lr / (1.0 - beta1_pow))).astype("float32")
-        if master_weight is not None:
-            master_weight[:] = p
-            param[:] = p.astype(param.dtype)
-        else:
-            param[:] = p
-        moment1[:] = mom1.astype(moment_dtype)
-        moment2[:] = mom2.astype(moment_dtype)
-        beta1_pow[:], beta2_pow[:] = beta1 * beta1_pow[:], beta2 * beta2_pow[:]
-        return
-
-
-class AdamWQweight(AdamW):
-    def __init__(self, quantization_config, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.quant_scale_mapping = {}
-        for p in self._param_groups:
-            if "quantization_linear" in p.name and "w_1" in p.name:
-                self.quant_scale_mapping[p.name.replace("w_1", "w_0")] = p
-
-        self.quantization_config = quantization_config
+            elif self._is_dtype_fp16_or_bf16(p.dtype) and not self._multi_precision:
+                raise NotImplementedError("AdamWCustom only support AMP training")
+            else:
+                self._add_moments_pows(p)
+                self._already_create_accumulator.add(p.name)
+            if self.tensorwise_offload_optimizer:
+                self.offload_optim(p)
 
     def _create_master_weight(self, param):
         if param.name in self._master_weights:
@@ -435,14 +245,20 @@ class AdamWQweight(AdamW):
             var_name = self._gen_master_weight_var_name(param)
             if param.name in self.quant_scale_mapping:
                 quant_scale = self.quant_scale_mapping[param.name]
-                if self.quantization_config.weight_quantize_algo in ["fp8linear"]:
-                    var = fp8_dequantize_tensorwise(
-                        param, quant_scale, tensor_type="weight", quantization_config=self.quantization_config
+                if self.quantization_config.weight_quantize_algo in ["a8w8linear", "a8w4linear", "fp8linear"]:
+                    var = dequantize(
+                        param,
+                        quant_scale,
+                        "weight",
+                        self.quantization_config.weight_quantize_algo,
+                        self.quantization_config,
+                        apply_hadamard=self.quantization_config.apply_hadamard,
+                        side="left",
                     ).astype("float32")
                 else:
-                    var = dequantize_channelwise(
-                        param, quant_scale, apply_hadamard=self.quantization_config.apply_hadamard
-                    ).astype("float32")
+                    raise NotImplementedError(
+                        f"Unknown weight_quantize_algo {self.quantization_config.weight_quantize_algo}"
+                    )
             else:
                 var = paddle.cast(param, "float32")
             var.name = var_name
@@ -476,6 +292,9 @@ class AdamWQweight(AdamW):
         if self._apply_decay_param_fun is not None and not self._apply_decay_param_fun(param.name):
             with_decay = False
 
+        if self.tensorwise_offload_optimizer:
+            self.reload_optim(param)
+
         moment1 = self._get_accumulator_master(self._moment1_acc_str, param_and_grad[0])
         moment2 = self._get_accumulator_master(self._moment2_acc_str, param_and_grad[0])
         beta1_pow_acc = self._get_accumulator_master(self._beta1_pow_acc_str, param_and_grad[0])
@@ -495,7 +314,9 @@ class AdamWQweight(AdamW):
             _beta2 = self._beta2 if not isinstance(self._beta2, Variable) else self._beta2.item(0)
 
             found_inf = self._get_auxiliary_var("found_inf") if in_pir_mode() else None
-            self.adamw_custom(
+            skip_update_param = quant_scale is not None
+            apply_adamw = self.adamw_custom if adamw_triton is None else adamw_triton
+            apply_adamw(
                 param_and_grad[0],
                 param_and_grad[1],
                 lr,
@@ -512,8 +333,32 @@ class AdamWQweight(AdamW):
                 self._weight_decay,
                 with_decay,
                 find_master,
-                quant_scale,
+                skip_update_param,
             )
+            if skip_update_param:
+                if param.weight_quantize_algo in ["a8w8linear", "a8w4linear", "fp8linear"]:
+                    if "parallel_quantization_linear" not in param.name:
+                        group = None
+                    elif param.weight_quantize_algo in ["a8w8linear", "a8w4linear"] and "row" in param.name:
+                        group = None
+                    else:
+                        group = self.mp_group
+                    param[:], quant_scale[:] = quantize(
+                        x=master_weight.astype(quant_scale.dtype),
+                        weight_quantize_algo=self.quantization_config.weight_quantize_algo,
+                        tensor_type="weight",
+                        quantization_config=self.quantization_config,
+                        side="left",
+                        apply_hadamard=self.quantization_config.apply_hadamard,
+                        group=group,
+                    )
+                else:
+                    raise NotImplementedError(
+                        f"Please check your weight_quantize_algo {self.quantization_config.weight_quantize_algo}."
+                    )
+            if self.tensorwise_offload_optimizer:
+                self.offload_optim(param)
+
             return None
         else:
             raise NotImplementedError("Not implemented yet.")
@@ -536,7 +381,7 @@ class AdamWQweight(AdamW):
         coeff,
         with_decay,
         multi_precision,
-        quant_scale,
+        skip_update_param,
     ):
         if skip_update:
             return
@@ -551,8 +396,9 @@ class AdamWQweight(AdamW):
             p = param
 
         p *= 1.0 - lr * coeff
-        mom1 = moment1
-        mom2 = moment2
+        moment_dtype = moment1.dtype
+        mom1 = moment1.astype("float32")
+        mom2 = moment2.astype("float32")
 
         mom1 = beta1 * mom1 + (1.0 - beta1) * grad
         mom2 = beta2 * mom2 + (1.0 - beta2) * grad * grad
@@ -561,30 +407,38 @@ class AdamWQweight(AdamW):
 
         if master_weight is not None:
             master_weight[:] = p
-            if quant_scale is None:
+            if not skip_update_param:
                 param[:] = p.astype(param.dtype)
-            else:
-                if self.quantization_config.weight_quantize_algo in ["fp8linear"]:
-                    param[:], new_quant_scale = fp8_quantize_tensorwise(
-                        p.astype("bfloat16"), tensor_type="weight", quantization_config=self.quantization_config
-                    )
-                    quant_scale.set_value(new_quant_scale)
-                else:
-                    if p.shape[1] == param.shape[0]:
-                        bit_length = 8
-                    elif p.shape[1] / 2 == param.shape[0]:
-                        bit_length = 4
-                    param[:], quant_scale[:] = quantize_channelwise(
-                        p.astype("bfloat16"),
-                        apply_hadamard=self.quantization_config.apply_hadamard,
-                        bit_length=bit_length,
-                    )
         else:
             param[:] = p
-        moment1[:] = mom1
-        moment2[:] = mom2
+        moment1[:] = mom1.astype(moment_dtype)
+        moment2[:] = mom2.astype(moment_dtype)
         beta1_pow[:], beta2_pow[:] = beta1 * beta1_pow[:], beta2 * beta2_pow[:]
         return
+
+    def offload_optim(self, p):
+        find_master = self._multi_precision and self._is_dtype_fp16_or_bf16(p.dtype)
+        if find_master:
+            self._master_weights[p.name] = self._master_weights[p.name].pin_memory()
+            target_name = self._master_weights[p.name].name
+        else:
+            target_name = p.name
+        for name in [self._moment1_acc_str, self._moment2_acc_str]:
+            if self._name is not None:
+                name = self._name + "_" + name
+            self._accumulators[name][target_name] = self._accumulators[name][target_name].pin_memory()
+
+    def reload_optim(self, p):
+        find_master = self._multi_precision and self._is_dtype_fp16_or_bf16(p.dtype)
+        if find_master:
+            self._master_weights[p.name] = self._master_weights[p.name].cuda()
+            target_name = self._master_weights[p.name].name
+        else:
+            target_name = p.name
+        for name in [self._moment1_acc_str, self._moment2_acc_str]:
+            if self._name is not None:
+                name = self._name + "_" + name
+            self._accumulators[name][target_name] = self._accumulators[name][target_name].cuda()
 
 
 class AdamWLoRAPro(AdamW):

@@ -37,6 +37,7 @@ dtype_mapping = {
     paddle.int32: np.int32,
     paddle.int64: np.int64,
     paddle.uint8: np.uint8,
+    paddle.int8: np.int8,
     paddle.bool: np.bool_,
     paddle.float16: np.float16,
     paddle.bfloat16: np.uint16,
