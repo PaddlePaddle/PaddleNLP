@@ -22,7 +22,9 @@ from copy import deepcopy
 from ...utils.download import resolve_file_path
 from ...utils.log import logger
 from .. import *  # noqa
+from .configuration import AutoConfig, CONFIG_MAPPING_NAMES, MODEL_NAMES_MAPPING, config_class_to_model_type
 from ..configuration_utils import is_standard_config
+from .factory import _LazyAutoMapping
 
 __all__ = [
     "AutoBackbone",
@@ -165,6 +167,8 @@ MODEL_FOR_CAUSAL_LM_INFERENCE_MAPPING_NAMES = OrderedDict(
     [("llama-img2txt", "LlamaForMiniGPT4"), ("qwen-img2txt", "QWenForQWenVL"), ("opt-img2txt", "OPTForBlip2")]
 )
 
+MODEL_MAPPING = _LazyAutoMapping(CONFIG_MAPPING_NAMES, MODEL_NAMES_MAPPING)
+
 
 def get_name_mapping(task="Model"):
     """
@@ -220,9 +224,19 @@ class _BaseAutoModelClass:
     # TODO: Refactor into AutoConfig when available
     @classmethod
     def _get_model_class_from_config(cls, pretrained_model_name_or_path, config_file_path, config=None):
+        model_config = config
         if config is None:
             with io.open(config_file_path, encoding="utf-8") as f:
                 config = json.load(f)
+
+        # Try to get model class from config class before attempting to fetch model class from default modules
+        # since custom models may not locate in paddlenlp.transformers.{name}.modeling
+        if not isinstance(model_config, PretrainedConfig) and pretrained_model_name_or_path is not None:
+            model_config = AutoConfig.from_pretrained(pretrained_model_name_or_path)
+        if type(model_config) in MODEL_MAPPING.keys():
+            model_class = MODEL_MAPPING[type(model_config)]
+            if not isinstance(model_class, (list, tuple)):
+                return model_class
 
         # Get class name corresponds to this configuration
         if is_standard_config(config):
@@ -354,6 +368,24 @@ class _BaseAutoModelClass:
                 "- or the correct path to a directory containing relevant model files.\n"
             )
 
+    @classmethod
+    def register(cls, config_class, model_class, exist_ok=False):
+        """
+        Register a new model for this class.
+
+        Args:
+            config_class ([`PretrainedConfig`]):
+                The configuration corresponding to the model to register.
+            model_class ([`PreTrainedModel`]):
+                The model to register.
+        """
+        if hasattr(model_class, "config_class") and model_class.config_class.__name__ != config_class.__name__:
+            raise ValueError(
+                "The model class you are passing has a `config_class` attribute that is not consistent with the "
+                f"config class you passed (model has {model_class.config_class} and you passed {config_class}. Fix "
+                "one of those so they match!"
+            )
+        MODEL_MAPPING.register(config_class, model_class, exist_ok=exist_ok)
 
 class AutoBackbone(_BaseAutoModelClass):
     """

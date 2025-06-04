@@ -19,7 +19,24 @@ import os
 import tempfile
 import unittest
 
-from paddlenlp.transformers import AutoModel, BertModel
+from paddlenlp.transformers import (
+    AutoModel,
+    AutoModelForCausalLM,
+    AutoModelForMaskedLM,
+    AutoModelForPretraining,
+    AutoModelForQuestionAnswering,
+    AutoModelForSequenceClassification,
+    AutoModelForTokenClassification,
+    AutoConfig,
+    BertConfig,
+    BertModel
+)
+from paddlenlp.transformers.auto.configuration import CONFIG_MAPPING
+from paddlenlp.transformers.auto.modeling import MODEL_MAPPING
+
+from ...utils.test_module.custom_configuration import CustomConfig
+from ...utils.test_module.custom_model import CustomModel
+from ..bert.test_modeling import BertModelTester
 from paddlenlp.utils.env import CONFIG_NAME, PADDLE_WEIGHTS_NAME
 
 
@@ -76,3 +93,48 @@ class AutoModelTest(unittest.TestCase):
     def test_from_aistudio(self):
         model = AutoModel.from_pretrained("PaddleNLP/tiny-random-bert", from_aistudio=True)
         self.assertIsInstance(model, BertModel)
+
+    def test_new_model_registration(self):
+        AutoConfig.register("custom", CustomConfig)
+
+        auto_classes = [
+            AutoModel,
+            AutoModelForCausalLM,
+            AutoModelForMaskedLM,
+            AutoModelForPretraining,
+            AutoModelForQuestionAnswering,
+            AutoModelForSequenceClassification,
+            AutoModelForTokenClassification,
+        ]
+
+        try:
+            for auto_class in auto_classes:
+                with self.subTest(auto_class.__name__):
+                    # Wrong config class will raise an error
+                    with self.assertRaises(ValueError):
+                        auto_class.register(BertConfig, CustomModel)
+                    auto_class.register(CustomConfig, CustomModel)
+                    # Trying to register something existing in the Transformers library will raise an error
+                    with self.assertRaises(ValueError):
+                        auto_class.register(BertConfig, BertModel)
+
+                    # Now that the config is registered, it can be used as any other config with the auto-API
+                    tiny_config = BertModelTester(self).get_config()
+                    config = CustomConfig(**tiny_config.to_dict())
+                    model = auto_class.from_config(config)
+                    self.assertIsInstance(model, CustomModel)
+
+                    with tempfile.TemporaryDirectory() as tmp_dir:
+                        model.save_pretrained(tmp_dir)
+                        new_model = auto_class.from_pretrained(tmp_dir)
+                        # The model is a CustomModel but from the new dynamically imported class.
+                        self.assertIsInstance(new_model, CustomModel)
+
+        finally:
+            if "custom" in CONFIG_MAPPING._extra_content:
+                del CONFIG_MAPPING._extra_content["custom"]
+            for mapping in (
+                MODEL_MAPPING,
+            ):
+                if CustomConfig in mapping._extra_content:
+                    del mapping._extra_content[CustomConfig]
