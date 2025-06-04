@@ -28,7 +28,7 @@ from paddle.profiler.utils import switch_job_schedule_profiler
 from tqdm.auto import tqdm
 
 from paddlenlp.trainer import Trainer
-from paddlenlp.galvatron.profiler.runtime_profiler import RuntimeProfiler
+from paddlenlp.experimental.galvatron.profiler.runtime_profiler import RuntimeProfiler
 
 from ..transformers.model_utils import unwrap_model
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
