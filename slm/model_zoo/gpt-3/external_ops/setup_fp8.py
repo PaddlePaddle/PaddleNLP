@@ -97,7 +97,6 @@ def setup_token_dispatcher_utils():
                     "-DCUTE_ARCH_MMA_SM90A_ENABLE",
                     "--expt-relaxed-constexpr",
                     "--expt-extended-lambda",
-                    "--use_fast_math",
                     "-maxrregcount=32",
                     "-lineinfo",
                     "-DCUTLASS_DEBUG_TRACE_LEVEL=0",
