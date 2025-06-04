@@ -26,6 +26,7 @@ from .memory_utils import empty_device_cache
 
 try:
     from .optimizer import *
+    from .block_adam_mini import BlockAdamMini
 except:
     logger.info("Not support custom optimizer")
 
