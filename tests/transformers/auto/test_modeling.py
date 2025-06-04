@@ -20,6 +20,7 @@ import tempfile
 import unittest
 
 from paddlenlp.transformers import (
+    AutoConfig,
     AutoModel,
     AutoModelForCausalLM,
     AutoModelForMaskedLM,
@@ -27,17 +28,16 @@ from paddlenlp.transformers import (
     AutoModelForQuestionAnswering,
     AutoModelForSequenceClassification,
     AutoModelForTokenClassification,
-    AutoConfig,
     BertConfig,
-    BertModel
+    BertModel,
 )
 from paddlenlp.transformers.auto.configuration import CONFIG_MAPPING
 from paddlenlp.transformers.auto.modeling import MODEL_MAPPING
+from paddlenlp.utils.env import CONFIG_NAME, PADDLE_WEIGHTS_NAME
 
 from ...utils.test_module.custom_configuration import CustomConfig
 from ...utils.test_module.custom_model import CustomModel
 from ..bert.test_modeling import BertModelTester
-from paddlenlp.utils.env import CONFIG_NAME, PADDLE_WEIGHTS_NAME
 
 
 class AutoModelTest(unittest.TestCase):
@@ -133,8 +133,6 @@ class AutoModelTest(unittest.TestCase):
         finally:
             if "custom" in CONFIG_MAPPING._extra_content:
                 del CONFIG_MAPPING._extra_content["custom"]
-            for mapping in (
-                MODEL_MAPPING,
-            ):
+            for mapping in (MODEL_MAPPING,):
                 if CustomConfig in mapping._extra_content:
                     del mapping._extra_content[CustomConfig]

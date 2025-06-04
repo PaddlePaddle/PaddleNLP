@@ -22,8 +22,13 @@ from copy import deepcopy
 from ...utils.download import resolve_file_path
 from ...utils.log import logger
 from .. import *  # noqa
-from .configuration import PretrainedConfig, AutoConfig, CONFIG_MAPPING_NAMES, MODEL_NAMES_MAPPING
 from ..configuration_utils import is_standard_config
+from .configuration import (
+    CONFIG_MAPPING_NAMES,
+    MODEL_NAMES_MAPPING,
+    AutoConfig,
+    PretrainedConfig,
+)
 from .factory import _LazyAutoMapping
 
 __all__ = [
@@ -386,6 +391,7 @@ class _BaseAutoModelClass:
                 "one of those so they match!"
             )
         MODEL_MAPPING.register(config_class, model_class, exist_ok=exist_ok)
+
 
 class AutoBackbone(_BaseAutoModelClass):
     """
