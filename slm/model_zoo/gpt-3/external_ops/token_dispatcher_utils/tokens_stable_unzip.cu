@@ -18,7 +18,7 @@
 #define CUMSUM_BLOCK_SIZE 48   // cumsum开销和并行度之间的tradeoff的结果，勿动
 #define CUMSUM_INVALID_TAG -1  // 用于标记无效的cumsum，尝试过-114514但失败了
 #ifndef MAX_NUM_EXPERTS
-#define MAX_NUM_EXPERTS 32
+#define MAX_NUM_EXPERTS 8
 #endif
 
 typedef struct __align__(16){
@@ -162,7 +162,7 @@ void dispatch_tokens_unzip_stable(
     paddle::Tensor &global_expertwise_block_cumsum,
     const int total_zipped_tokens_num,
     const int token_length,
-    const int topk,
+    const int topk, // deprecated
     const int num_experts,
     const int scale_length) {
   dim3 grid, block;
@@ -264,6 +264,7 @@ std::vector<paddle::Tensor> tokens_unzip_stable(
   }
 
   const int output_rows = tokens_cumulated;
+  const int topk_calculated = expert_routemap_topk.shape()[1];
   //------------------------ 输出缓冲区分配  ------------------------
   paddle::Tensor X_unzipped, XScale_unzipped, zipped_expertwise_rowmap,
       token_prob_unzipped;
@@ -345,7 +346,7 @@ std::vector<paddle::Tensor> tokens_unzip_stable(
                                global_expertwise_block_cumsum,
                                rows,
                                cols,
-                               topk,
+                               topk_calculated,
                                num_experts,
                                quanted_cols);
   return {X_unzipped,
@@ -368,3 +369,4 @@ PD_BUILD_OP(tokens_unzip_stable)
 
 
 #undef CUMSUM_BLOCK_SIZE
+#undef MAX_NUM_EXPERTS 

@@ -15,7 +15,7 @@
 #include "utils.h"
 
 #ifndef MAX_NUM_EXPERTS
-#define MAX_NUM_EXPERTS 32
+#define MAX_NUM_EXPERTS 8
 #endif
 template <typename X_T,
           typename routemap_T,
@@ -877,3 +877,4 @@ PD_BUILD_OP(tokens_weighted_zip)
 #undef DISPATCH_CASE
 #undef DISPATCH_TOKEN_TYPE
 #undef DISPATCH_PROB_TYPE
+#undef MAX_NUM_EXPERTS
