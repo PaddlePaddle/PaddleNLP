@@ -209,7 +209,6 @@ def resolve_file_path(
                     token=token,
                     endpoint=endpoint,
                     from_bos=from_bos,
-                    from_aistudio=from_aistudio,
                     from_hf_hub=from_hf_hub,
                 )
                 if is_available:
