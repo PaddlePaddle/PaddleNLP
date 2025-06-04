@@ -157,7 +157,6 @@ class AvxConfig:
 class SpeculateConfig:
     speculate_max_draft_token_num: int = 5
     speculate_method: str = None
-    return_full_hidden_states: bool = False
 
 
 @dataclass
@@ -1589,7 +1588,7 @@ class FusedMultiTransformerBase(Layer):
         kwargs["input_ids"] = input_ids
 
         out = self.post_process(**kwargs)
-        return out, caches
+        return out, kwargs["multi_block_output"]
 
 
 class FusedMultiTransformerPostLayernorm(FusedMultiTransformerBase):
