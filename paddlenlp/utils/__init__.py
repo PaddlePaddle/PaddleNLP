@@ -26,6 +26,7 @@ from .memory_utils import empty_device_cache
 
 try:
     from .optimizer import *
+    from .apollo_optimizer import ApolloAdamW, ApolloMiniAdamW
 except:
     logger.info("Not support custom optimizer")
 
