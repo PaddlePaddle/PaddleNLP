@@ -150,7 +150,7 @@ class AdamWMini(AdamW):
         mom1 = beta1 * mom1 + (1.0 - beta1) * grad
         mom2 = beta2 * mom2 + (1.0 - beta2) * (grad * grad).mean()
         denom = mom2.sqrt() / (1.0 - beta2_pow).sqrt() + epsilon
-        p += (moment1 / denom) * (-(lr / (1.0 - beta1_pow)))
+        p += (mom1 / denom) * (-(lr / (1.0 - beta1_pow)))
         if master_weight is not None:
             master_weight[:] = p
             param[:] = p.astype(param.dtype)
