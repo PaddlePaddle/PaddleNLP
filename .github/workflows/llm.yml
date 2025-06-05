@@ -13,7 +13,7 @@ jobs:
       options: >-
         --gpus all
         --shm-size=128G
-        --net=host
+        --network=host
         -v /ssd1/paddlenlp:/ssd1/paddlenlp
         -v /home/.cache/pip:/home/.cache/pip
 
