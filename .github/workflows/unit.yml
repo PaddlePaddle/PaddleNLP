@@ -7,7 +7,7 @@ on:
 
 jobs:
   llm-ci:
-    runs-on: [self-hosted, gpu]  # 打标签:./config.sh --labels "self-hosted,gpu,gpu-0-3"
+    runs-on: [self-hosted, 4gpu]
     container:
       image: iregistry.baidu-int.com/paddlecloud/base-images:paddlecloud-ubuntu18.04-gcc8.2-cuda11.8-cudnn8.6-nccl2.15.5-20250311
       options: >-
