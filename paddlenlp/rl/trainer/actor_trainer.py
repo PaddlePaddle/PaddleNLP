@@ -216,6 +216,8 @@ class ActorReferenceTrainerBase(RLTrainer):
                 position_ids=current_position_ids,
                 attn_mask_startend_row_indices=current_startend_row_indices,
             )
+            # print(f'{lm_head_weight._md5sum()=}\t{lm_head_weight.dtype=}\t{lm_head_weight.shape=}')
+
             self.model.training = False
 
             if self.args.use_remove_padding:
@@ -281,7 +283,12 @@ class ActorReferenceTrainerBase(RLTrainer):
                 labels_chunk = labels[token_start_idx:token_end_idx]
 
                 # Calculate the current logits_chunk,  not fused linear
-                logits_chunk_cast = paddle.matmul(hidden_states_chunk, lm_head_weight_cast, transpose_y=transpose_y)
+                # print(f'{hidden_states_chunk._md5sum()=}\t{hidden_states_chunk.dtype=}\t{hidden_states_chunk.shape=}')
+                # print(f'{lm_head_weight_cast._md5sum()=}\t{lm_head_weight_cast.dtype=}\t{lm_head_weight_cast.shape=}')
+                # 与引入 DataProto 前的版本精度对齐
+                with paddle.amp.auto_cast(enable=True, dtype='bfloat16'):
+                    logits_chunk_cast = paddle.matmul(hidden_states_chunk, lm_head_weight_cast, transpose_y=transpose_y)
+                # print(f'{logits_chunk_cast._md5sum()=}\t{logits_chunk_cast.dtype=}\t{logits_chunk_cast.shape=}')
                 if lm_head_bias is not None:
                     logits_chunk_cast += lm_head_bias_cast
 

@@ -461,6 +461,24 @@ class DataProto:
             message = f"{prefix}, " + message
         print(message)
 
+    def check_info(self, checks: List[str] = ['shape', 'dtype', 'md5sum', 'sum']):
+        logger.debug("--- Checking START ---")
+        logger.debug("--- Checking Tensor Batch ---")
+        for key in self.batch.keys():
+            logger.debug(f"--- Checking Tensor: {key} ---")
+            if "shape" in checks:   logger.debug(f'  self.batch[{key}].shape:\t{self.batch[key].shape}')
+            if "dtype" in checks:   logger.debug(f'  self.batch[{key}].dtype:\t{self.batch[key].dtype}')
+            if "md5sum" in checks:  logger.debug(f'  self.batch[{key}]._md5sum():\t{self.batch[key]._md5sum()}')
+            if "sum" in checks:     logger.debug(f'  self.batch[{key}].sum().item():\t{self.batch[key].sum().item()}')
+            logger.debug('')
+        logger.debug("--- Checking Non-Tensor Batch ---")
+        for key, value in self.non_tensor_batch.items():
+            if "type" in checks:    logger.debug(f'  {key}: {type(value)=}')
+            if "value" in checks:   logger.debug(f'  {key}: {value=}')
+        # for key, value in self.meta_info:
+        #     pass
+        logger.debug("--- Checking END ---")
+    
     def check_consistency(self):
         """Check the consistency of the DataProto. Mainly for batch and non_tensor_batch
         We expose this function as a public one so that user can call themselves directly
@@ -683,77 +701,78 @@ class DataProto:
     @staticmethod
     def pad_batch_data(
         tensor_list: List[paddle.Tensor] = None,
-        tokenizer = None
+        pad_token_id = None
     ) -> List[paddle.Tensor]:
         
         tensor_list = [paddle.unsqueeze(v, axis=0) if v.ndim == 1 else v for v in tensor_list]
         padded_tensors = DataProto.pad_tensor(
             tensor_list,
-            pad_index=tokenizer.pad_token_id,
+            pad_index=pad_token_id,
             dtype=tensor_list[0].dtype,
             padding_side="right",
         )
         return padded_tensors
 
     # 这个方法本来该去掉的，但是 distribute_gather_and_pad_data 大量复用这个方法，还是先留着吧但是不暴露
-    @staticmethod
-    def gather_and_pad(tensor, dp_group=None, sd_group=None, pad_index=0.0, pad=True, padding_side="right"):
-        """Gather tensor from all devices."""
-        from ...utils.nested import flatten_list
+    # 更新：现在除了 combine_micro_batches_into_batch 彻底用不上了
+    # @staticmethod
+    # def gather_and_pad(tensor, dp_group=None, sd_group=None, pad_index=0.0, pad=True, padding_side="right"):
+    #     """Gather tensor from all devices."""
+    #     from ...utils.nested import flatten_list
 
-        if not isinstance(tensor, list):
-            tensor = [tensor]
+    #     if not isinstance(tensor, list):
+    #         tensor = [tensor]
 
-        if isinstance(tensor[0], paddle.Tensor):
-            type = "tensor"
-        elif isinstance(tensor[0], np.ndarray):
-            type = "numpy"
-        else:
-            raise TypeError(f"{type(tensor[0])} is not supported for gather and pad")
+    #     if isinstance(tensor[0], paddle.Tensor):
+    #         type = "tensor"
+    #     elif isinstance(tensor[0], np.ndarray):
+    #         type = "numpy"
+    #     else:
+    #         raise TypeError(f"{type(tensor[0])} is not supported for gather and pad")
 
-        dtype = tensor[0].dtype
+    #     dtype = tensor[0].dtype
 
-        if (dp_group is None and sd_group is None) or (dp_group.nranks == 1 and sd_group.nranks == 1):
-            if not pad:
-                if isinstance(tensor[0], paddle.Tensor):
-                    return paddle.concat(tensor, axis=0)
-                else:
-                    return np.concatenate(tensor, axis=0)
-            else:
-                return DataProto.pad_tensor(tensor, pad_index=pad_index, dtype=dtype, padding_side=padding_side)
+    #     if (dp_group is None and sd_group is None) or (dp_group.nranks == 1 and sd_group.nranks == 1):
+    #         if not pad:
+    #             if isinstance(tensor[0], paddle.Tensor):
+    #                 return paddle.concat(tensor, axis=0)
+    #             else:
+    #                 return np.concatenate(tensor, axis=0)
+    #         else:
+    #             return DataProto.pad_tensor(tensor, pad_index=pad_index, dtype=dtype, padding_side=padding_side)
 
-        def map_func(weight):
-            if isinstance(weight, paddle.Tensor):
-                weight = weight.numpy()
-            return weight
+    #     def map_func(weight):
+    #         if isinstance(weight, paddle.Tensor):
+    #             weight = weight.numpy()
+    #         return weight
 
-        tensor = [map_func(i) for i in tensor]
+    #     tensor = [map_func(i) for i in tensor]
 
-        sd_gathered_tensor = []
-        if sd_group.nranks > 1:
-            dist.all_gather_object(sd_gathered_tensor, tensor, group=sd_group)
+    #     sd_gathered_tensor = []
+    #     if sd_group.nranks > 1:
+    #         dist.all_gather_object(sd_gathered_tensor, tensor, group=sd_group)
 
-        dp_gathered_tensor = []
-        if dp_group.nranks > 1:
-            if len(sd_gathered_tensor) > 0:
-                tensor = sd_gathered_tensor
-            dist.all_gather_object(dp_gathered_tensor, tensor, group=dp_group)
+    #     dp_gathered_tensor = []
+    #     if dp_group.nranks > 1:
+    #         if len(sd_gathered_tensor) > 0:
+    #             tensor = sd_gathered_tensor
+    #         dist.all_gather_object(dp_gathered_tensor, tensor, group=dp_group)
 
-        if len(dp_gathered_tensor) > 0:
-            gathered_tensor = dp_gathered_tensor
-        else:
-            gathered_tensor = sd_gathered_tensor
+    #     if len(dp_gathered_tensor) > 0:
+    #         gathered_tensor = dp_gathered_tensor
+    #     else:
+    #         gathered_tensor = sd_gathered_tensor
 
-        if type == "tensor":
-            gathered_tensor = [paddle.to_tensor(i, dtype=dtype) for i in flatten_list(gathered_tensor)]
+    #     if type == "tensor":
+    #         gathered_tensor = [paddle.to_tensor(i, dtype=dtype) for i in flatten_list(gathered_tensor)]
 
-        if not pad:
-            if type == "tensor":
-                return paddle.concat(gathered_tensor, axis=0)
-            else:
-                return np.concatenate(flatten_list(gathered_tensor), axis=0)
-        else:
-            return DataProto.pad_tensor(gathered_tensor, pad_index=pad_index, dtype=dtype, padding_side=padding_side)
+    #     if not pad:
+    #         if type == "tensor":
+    #             return paddle.concat(gathered_tensor, axis=0)
+    #         else:
+    #             return np.concatenate(flatten_list(gathered_tensor), axis=0)
+    #     else:
+    #         return DataProto.pad_tensor(gathered_tensor, pad_index=pad_index, dtype=dtype, padding_side=padding_side)
 
     # def distribute_gather_and_pad_data(self, tokenizer, generation_config) -> "DataProto":
     #     from ...trl import llm_utils
@@ -1213,36 +1232,36 @@ class DataProto:
 
     # 这样写函数也有问题，因为是 pad_batch_data，所以即使把 rollout_n 个 tensor 成功放入 DataProto 中，
     # 但是由于后面 List[DataProto] 的长度不一样，还要在进行一次 pad，目前看来确实是把 Tensor 全装入 List 里整体 pad 再生成 DataProto 比较好
-    def repad(self, tokenizer, args):
-        # input_ids: remove_pad -> truncate -> pad
-        cleanup_batch = [
-            DataProto.process_row(
-                row,
-                remove_value=tokenizer.pad_token_id,
-                remove_side="right",
-                eos_token_id=tokenizer.eos_token_id,
-            )
-            for row in self.batch["input_ids"]
-        ]
-        truncate_input_ids = [
-            self.truncate_batch_data(batch, truncate_max_len=self._model_config.max_position_embeddings)
-            for batch in cleanup_batch
-        ]
-        input_ids = DataProto.pad_batch_data(truncate_input_ids, tokenizer = self.tokenizer)
+    # def repad(self, tokenizer, args):
+    #     # input_ids: remove_pad -> truncate -> pad
+    #     cleanup_batch = [
+    #         DataProto.process_row(
+    #             row,
+    #             remove_value=tokenizer.pad_token_id,
+    #             remove_side="right",
+    #             eos_token_id=tokenizer.eos_token_id,
+    #         )
+    #         for row in self.batch["input_ids"]
+    #     ]
+    #     truncate_input_ids = [
+    #         self.truncate_batch_data(batch, truncate_max_len=self._model_config.max_position_embeddings)
+    #         for batch in cleanup_batch
+    #     ]
+    #     input_ids = DataProto.pad_batch_data(truncate_input_ids, tokenizer = self.tokenizer)
 
 
-        if args.use_rm_server:
-            label_ids_batch = [
-                DataProto.process_row(
-                    row,
-                    remove_value=tokenizer.pad_token_id,
-                    remove_side="left",
-                    eos_token_id=tokenizer.eos_token_id,
-                )
-                for row in self.batch["label_ids"]
-            ]
-            label_ids = DataProto.pad_batch_data(label_ids_batch, tokenizer = self.tokenizer)
-        index = self.non_tensor_batch["index"]
+    #     if args.use_rm_server:
+    #         label_ids_batch = [
+    #             DataProto.process_row(
+    #                 row,
+    #                 remove_value=tokenizer.pad_token_id,
+    #                 remove_side="left",
+    #                 eos_token_id=tokenizer.eos_token_id,
+    #             )
+    #             for row in self.batch["label_ids"]
+    #         ]
+    #         label_ids = DataProto.pad_batch_data(label_ids_batch, tokenizer = self.tokenizer)
+    #     index = self.non_tensor_batch["index"]
 
     def split_batch_into_micro_batches(self, batch_size, pad_token_id=0) -> List['DataProto']:
         """
@@ -1284,41 +1303,41 @@ class DataProto:
 
         return micro_batches
 
-    @staticmethod
-    def combine_micro_batches_into_batch(micro_batches, pad_token_id=0) -> 'DataProto':
-        """combine micro batches to get a complete batch"""
-        if not isinstance(micro_batches, list):
-            return micro_batches
-        combined_batch = {}
+    # @staticmethod
+    # def combine_micro_batches_into_batch(micro_batches, pad_token_id=0) -> 'DataProto':
+    #     """combine micro batches to get a complete batch"""
+    #     if not isinstance(micro_batches, list):
+    #         return micro_batches
+    #     combined_batch = {}
 
-        for micro_batch in micro_batches:
-            for key, value in micro_batch.items():
-                if isinstance(value, list):
-                    if isinstance(value[0], paddle.Tensor):
-                        if key == "label_ids":
-                            value = [paddle.unsqueeze(v, axis=0) if v.ndim == 1 else v for v in value]
-                            concat_value = DataProto.pad_tensor(
-                                value,
-                                pad_index=pad_token_id,
-                                dtype=value[0].dtype,
-                                padding_side="left",
-                            )
-                        else:
-                            concat_value = paddle.concat(value, axis=0)
-                    elif isinstance(value[0], np.ndarray):
-                        concat_value = np.concatenate(value, axis=0)
-                    combined_batch.setdefault(key, []).append(concat_value)
-                else:
-                    combined_batch.setdefault(key, []).append(value)
+    #     for micro_batch in micro_batches:
+    #         for key, value in micro_batch.items():
+    #             if isinstance(value, list):
+    #                 if isinstance(value[0], paddle.Tensor):
+    #                     if key == "label_ids":
+    #                         value = [paddle.unsqueeze(v, axis=0) if v.ndim == 1 else v for v in value]
+    #                         concat_value = DataProto.pad_tensor(
+    #                             value,
+    #                             pad_index=pad_token_id,
+    #                             dtype=value[0].dtype,
+    #                             padding_side="left",
+    #                         )
+    #                     else:
+    #                         concat_value = paddle.concat(value, axis=0)
+    #                 elif isinstance(value[0], np.ndarray):
+    #                     concat_value = np.concatenate(value, axis=0)
+    #                 combined_batch.setdefault(key, []).append(concat_value)
+    #             else:
+    #                 combined_batch.setdefault(key, []).append(value)
 
-        for key, values in combined_batch.items():
-            if len(combined_batch[key][0].shape) > 1:
-                pad_index = pad_token_id
-                padding_side = "left" if (key == "prompt" or key == "label_ids") else "right"
-                combined_batch[key] = DataProto.gather_and_pad(values, pad_index=pad_index, padding_side=padding_side)
-            elif isinstance(values[0], paddle.Tensor):
-                combined_batch[key] = paddle.concat(values, axis=0)
-            elif isinstance(values[0], np.ndarray):
-                combined_batch[key] = np.concatenate(values, axis=0)
+    #     for key, values in combined_batch.items():
+    #         if len(combined_batch[key][0].shape) > 1:
+    #             pad_index = pad_token_id
+    #             padding_side = "left" if (key == "prompt" or key == "label_ids") else "right"
+    #             combined_batch[key] = DataProto.gather_and_pad(values, pad_index=pad_index, padding_side=padding_side)
+    #         elif isinstance(values[0], paddle.Tensor):
+    #             combined_batch[key] = paddle.concat(values, axis=0)
+    #         elif isinstance(values[0], np.ndarray):
+    #             combined_batch[key] = np.concatenate(values, axis=0)
 
-        return DataProto.from_single_dict(combined_batch)
+    #     return DataProto.from_single_dict(combined_batch)
