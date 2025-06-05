@@ -722,7 +722,9 @@ class ChatTemplateMixin:
         )
         return query
 
-    def encode_chat_inputs(self, conversations: List[List[str, str]], context_data: Dict[str, Any] = {}, **kwargs):
+    def encode_chat_inputs(
+        self, conversations: List[List[str, str]] | Dict[str, Any], context_data: Dict[str, Any] = {}, **kwargs
+    ):
         """Encodes conversation to pairs of token ids.
         Turn 0: bos + system + sep + user     bot + eos
         Turn t: sep + bot + query             bot + eos
@@ -738,7 +740,13 @@ class ChatTemplateMixin:
             raise ValueError("chat_template is not set, please set chat_template first.")
         elif isinstance(self.chat_template, Template):
             add_generation_prompt = kwargs.pop("add_generation_prompt", True)
-            query = self._encode_chat_inputs(conversations, context_data, add_generation_prompt=add_generation_prompt)
+            if not isinstance(conversations, dict):
+                query = self._encode_chat_inputs(
+                    conversations, context_data, add_generation_prompt=add_generation_prompt
+                )
+            else:
+                conversations.update(add_generation_prompt=add_generation_prompt)
+                query = self._encode_chat_inputs_openai_format(conversations)
         elif isinstance(self.chat_template, ChatTemplate):
             query = self._encode_chat_inputs_paddle(conversations, context_data)
         return query
@@ -767,6 +775,50 @@ class ChatTemplateMixin:
 
         result["conversations"] = conversation_ids
         return result
+
+    def _encode_chat_inputs_openai_format(
+        self,
+        conversations: Dict[str, Any],
+        add_generation_prompt=True,
+    ):
+        conversation_dict = {} if "tools" not in conversations else {"tools": conversations["tools"]}
+        conversation_dict["messages"] = (
+            [conversations["messages"][0]] if conversations["messages"][0]["role"] == "system" else []
+        )
+
+        if conversations["messages"][0]["role"] == "system":
+            conversations["messages"] = conversations["messages"][1:]
+
+        cur_str = ""
+        conversation_ids = []
+        for idx in range(0, len(conversations["messages"]), 2):
+            conversation_id = []
+            conversation_dict["messages"].append(conversations["messages"][idx])
+            round_str = self.chat_template.render(
+                conversation_dict, add_generation_prompt=False, **self.special_tokens_map
+            )
+            conversation_id.append(
+                self.encode(round_str[len(cur_str) :], split_special_tokens=False, add_special_tokens=False)[
+                    "input_ids"
+                ]
+            )
+            cur_str = round_str
+
+            if idx + 1 < len(conversations["messages"]):
+                conversation_dict["messages"].append(conversations["messages"][idx + 1])
+                round_str = self.chat_template.render(
+                    conversation_dict, add_generation_prompt=False, **self.special_tokens_map
+                )
+                conversation_id.append(
+                    self.encode(round_str[len(cur_str) :], split_special_tokens=False, add_special_tokens=False)[
+                        "input_ids"
+                    ]
+                )
+                cur_str = round_str
+
+            conversation_ids.append(conversation_id)
+
+        return conversation_ids
 
     def _encode_chat_inputs(
         self,
