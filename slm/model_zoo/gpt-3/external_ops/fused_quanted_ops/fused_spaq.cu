@@ -23,8 +23,8 @@
         out.data<phi::float8_e4m3fn>(),                           \
         scale.data<float>(),                                      \
         rows,                                                     \
-        cols,\
-        scale_cols);                                                    \
+        cols,                                                     \
+        scale_cols);                                              \
   } while (0)
 
 
@@ -90,76 +90,91 @@ __global__ void FusedSPAQKernelVec4(const phi::bfloat16 *__restrict__ Xin,
                                     const float *__restrict__ prob,
                                     phi::float8_e4m3fn *__restrict__ out,
                                     float *__restrict__ scales,
-                                    const int rows,
-                                    const int cols,
-                                    const int scale_cols) {
+                                    const int64_t rows,
+                                    const int64_t cols,
+                                    const int64_t scale_cols) {
   constexpr int elements_per_thread = 4;
   constexpr int warp_size = 32;
   constexpr int warp_num = thread_per_block / warp_size;
-  const int scale_stride = scale_cols;
+  const int64_t scale_stride = scale_cols;
   const int lane = threadIdx.x % warp_size;
-  const int x_offset = threadIdx.x * elements_per_thread;
-  const int in_y_idx = blockIdx.y;
-  const int in_x_idx = blockIdx.x * blockDim.x * elements_per_thread + x_offset;
-  const int src_idx = in_y_idx * cols + in_x_idx;
-  const unsigned int mask = 0xffffffff; // whole warp mask
-  float p_t0;
-  if (in_x_idx >= cols / 2 || in_y_idx > rows) [[unlikely]]
-    return;
-  
-  if constexpr(with_prob){
-    // Prefetch prob
-    if(lane==0) p_t0 = prob[in_y_idx];
+  const int64_t x_offset =
+      static_cast<int64_t>(threadIdx.x) * elements_per_thread;
+  const unsigned int mask = 0xffffffff;  // whole warp mask
+
+  // 使用grid stride循环处理所有行
+  for (int64_t base_y = blockIdx.y; base_y < rows; base_y += gridDim.y) {
+    const int64_t in_y_idx = base_y;
+    const int64_t in_x_idx = static_cast<int64_t>(blockIdx.x) *
+                                 static_cast<int64_t>(blockDim.x) *
+                                 elements_per_thread +
+                             x_offset;
+    const int64_t src_idx = in_y_idx * cols + in_x_idx;
+
+    float p_t0;
+
+    // 边界检查
+    if (in_x_idx >= cols / 2) [[unlikely]]
+      continue;
+
+    if constexpr (with_prob) {
+      // Prefetch prob
+      if (lane == 0) p_t0 = prob[in_y_idx];
+    }
+
+    const __nv_bfloat16 *X = reinterpret_cast<const __nv_bfloat16 *>(Xin);
+
+    // Initialize activation storage
+    float4 act_f32x4;
+    bfloat16x4_t lhs_bf16x4, rhs_bf16x4;
+
+    // Reinterpret input pointer as bfloat16x4_t* for vectorized loading
+    const bfloat16x4_t *X_lhs_vec =
+        reinterpret_cast<const bfloat16x4_t *>(X + src_idx);
+    const bfloat16x4_t *X_rhs_vec =
+        reinterpret_cast<const bfloat16x4_t *>(X + src_idx + cols / 2);
+
+    lhs_bf16x4 = *X_lhs_vec;
+    rhs_bf16x4 = *X_rhs_vec;
+
+    act_f32x4 = fast_swiglu_vec4(lhs_bf16x4, rhs_bf16x4);
+
+    if constexpr (with_prob) {
+      // Warp level sync to avoid syncthreads
+      const float p = __shfl_sync(mask, p_t0, 0);
+      act_f32x4.x *= p;
+      act_f32x4.y *= p;
+      act_f32x4.z *= p;
+      act_f32x4.w *= p;
+    }
+
+    // Phase 2: Block Reduction to find per-quant block absolute maxima
+    // Compute absolute values
+    float thread_amax = amax_float4(act_f32x4);
+
+// All-Reduce within the warp
+#pragma unroll
+    for (int offset = 16; offset > 0; offset /= 2) {
+      const float val = __shfl_down_sync(mask, thread_amax, offset);
+      thread_amax = fmaxf(thread_amax, val);
+    }
+    const float final_amax = __shfl_sync(mask, thread_amax, 0);
+
+    // Phase 3: Compute scales and quantize the outputs
+    const float scale = ComputeScale<float, __nv_fp8_e4m3, using_pow2_scaling>(
+        final_amax, 0.0f);
+    const float inv_scale = __frcp_rn(scale);
+
+    const fp8_e4m3x4_t act_fp8x4 = scale_fp32x4_to_fp8x4(act_f32x4, scale);
+    fp8_e4m3x4_t *const out_vec_addr =
+        reinterpret_cast<fp8_e4m3x4_t *>(out + in_y_idx * cols / 2 + in_x_idx);
+    *out_vec_addr = act_fp8x4;
+
+    if (lane == 0) {
+      const int64_t scale_idx = in_y_idx * scale_stride + in_x_idx / 128;
+      scales[scale_idx] = inv_scale;
+    }
   }
-
-  const __nv_bfloat16 *X = reinterpret_cast<const __nv_bfloat16 *>(Xin);
-
-  // Initialize activation storage
-  float4 act_f32x4;
-  bfloat16x4_t lhs_bf16x4, rhs_bf16x4;
-
-  // Reinterpret input pointer as bfloat16x4_t* for vectorized loading
-  const bfloat16x4_t *X_lhs_vec =
-      reinterpret_cast<const bfloat16x4_t *>(X + src_idx);
-  const bfloat16x4_t *X_rhs_vec =
-      reinterpret_cast<const bfloat16x4_t *>(X + src_idx + cols / 2);
-
-  lhs_bf16x4 = *X_lhs_vec;
-  rhs_bf16x4 = *X_rhs_vec;
-
-  act_f32x4 = fast_swiglu_vec4(lhs_bf16x4, rhs_bf16x4);
-
-  if constexpr (with_prob) {
-    // Warp level sync to avoid syncthreads
-    const float p = __shfl_sync(mask, p_t0, 0);
-    act_f32x4.x *= p;
-    act_f32x4.y *= p;
-    act_f32x4.z *= p;
-    act_f32x4.w *= p;
-  }
-
-  // Phase 2: Block Reduction to find per-quant block absolute maxima
-  // Compute absolute values
-  float thread_amax = amax_float4(act_f32x4);
-
-  // All-Reduce within the warp
-  #pragma unroll
-  for (int offset = 16; offset > 0; offset /= 2) {
-    const float val = __shfl_down_sync(mask, thread_amax, offset);
-    thread_amax = fmaxf(thread_amax, val);
-  }
-  const float final_amax = __shfl_sync(mask, thread_amax, 0);
-
-  // Phase 3: Compute scales and quantize the outputs
-  const float scale =
-      ComputeScale<float, __nv_fp8_e4m3, using_pow2_scaling>(final_amax, 0.0f);
-  const float inv_scale = __frcp_rn(scale);
-
-  const fp8_e4m3x4_t act_fp8x4 = scale_fp32x4_to_fp8x4(act_f32x4, scale);
-  fp8_e4m3x4_t *const out_vec_addr =
-      reinterpret_cast<fp8_e4m3x4_t *>(out + in_y_idx * cols / 2 + in_x_idx);
-  *out_vec_addr = act_fp8x4;
-  if (lane == 0) scales[in_y_idx * scale_stride + in_x_idx / 128] = inv_scale;
 }
 
 template <bool using_pow2_scaling, bool with_prob>
@@ -288,7 +303,7 @@ void dispatch_fused_spaq(const paddle::Tensor &X,
         using_pow2_scaling,
         k_using_pow2_scaling,
         DISPATCH_BOOL(
-            with_prob, k_with_prob, grid.y = rows;
+            with_prob, k_with_prob, grid.y = rows > 65535 ? 65535 : rows;
             grid.x =
                 ((cols / 2) + block.x * vec_numel - 1) / (block.x * vec_numel);
             LAUNCH_FUSED_SPAQ_VEC4(k_using_pow2_scaling, k_with_prob);))
@@ -300,9 +315,10 @@ void dispatch_fused_spaq(const paddle::Tensor &X,
     DISPATCH_BOOL(
         using_pow2_scaling,
         k_using_pow2_scaling,
-        DISPATCH_BOOL(with_prob, k_with_prob, grid.y = rows;
-                      grid.x = ((cols / 2) + block.x - 1) / block.x;
-                      LAUNCH_FUSED_SPAQ(k_using_pow2_scaling, k_with_prob);))
+        DISPATCH_BOOL(
+            with_prob, k_with_prob, grid.y = rows > 65535 ? 65535 : rows;
+            grid.x = ((cols / 2) + block.x - 1) / block.x;
+            LAUNCH_FUSED_SPAQ(k_using_pow2_scaling, k_with_prob);))
   }
 }
 
