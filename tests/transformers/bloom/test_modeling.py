@@ -423,6 +423,7 @@ class BloomModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase)
     test_missing_keys = False
     test_tie_weights = False
     test_model_parallel = True
+    use_test_inputs_embeds = False
 
     # special case for DoubleHeads model
     def _prepare_for_class(self, inputs_dict, model_class):
