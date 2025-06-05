@@ -28,7 +28,6 @@ try:
     from .adamw_triton import adamw_triton
 except:
     adamw_triton = None
-    print("Please install triton to use faster optimizer")
 
 
 from ..quantization.qat_utils import dequantize, quantize
