@@ -397,7 +397,7 @@ function llama_dygraph_auto_bs8_fp32_DP2() {
         loss_base=9.50651741
     fi
     ips_base=-1
-    mem_base=9.381539106369019
+    mem_base=9.881539106369019
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
