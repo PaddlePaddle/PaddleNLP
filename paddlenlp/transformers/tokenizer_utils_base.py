@@ -1700,7 +1700,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         # Set max length if needed
         if pretrained_model_name_or_path in cls.max_model_input_sizes:
             # if we're using a pretrained model, ensure the tokenizer
-            # wont index sequences longer than the number of positional embeddings
+            # won't index sequences longer than the number of positional embeddings
             model_max_length = cls.max_model_input_sizes[pretrained_model_name_or_path]
             if model_max_length is not None and isinstance(model_max_length, (int, float)):
                 init_kwargs["model_max_length"] = min(init_kwargs.get("model_max_length", int(1e30)), model_max_length)
@@ -1722,7 +1722,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             elif not os.path.isfile(init_kwargs[args_name] or "") and os.path.isfile(file_path):
                 init_kwargs[args_name] = file_path
 
-        # TODO(zhoushunjie): It's not supportted to load tokenizer.json of hf so far.
+        # TODO(zhoushunjie): It's not supported to load tokenizer.json of hf so far.
         if from_hf_hub and "tokenizer_file" in init_kwargs:
             init_kwargs.pop("tokenizer_file")
 
@@ -1864,7 +1864,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         # add_type_field=True to allow dicts in the kwargs / differentiate from AddedToken serialization
         tokenizer_config = convert_added_tokens(tokenizer_config, add_type_field=True)
 
-        # Process added tokens seperatly: allows previous versions to ignore it!
+        # Process added tokens separately: allows previous versions to ignore it!
         added_tokens = {}
         for key, value in self.added_tokens_decoder.items():
             if isinstance(value, AddedToken):
@@ -2898,9 +2898,10 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         )
 
         required_input = encoded_inputs[self.model_input_names[0]]
+        support_padding_side = "padding_side" in set(inspect.signature(self._pad).parameters.keys())
         if required_input and not isinstance(required_input[0], (list, tuple)):
             # some tokenizers might not have the padding_side attribute
-            if "padding_side" in set(inspect.signature(self._pad).parameters.keys()):
+            if support_padding_side:
                 encoded_inputs = self._pad(
                     encoded_inputs,
                     max_length=max_length,
@@ -2937,7 +2938,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         batch_outputs = {}
         for i in range(batch_size):
             inputs = dict((k, v[i]) for k, v in encoded_inputs.items())
-            if "padding_side" in set(inspect.signature(self._pad).parameters.keys()):
+            if support_padding_side:
                 outputs = self._pad(
                     inputs,
                     max_length=max_length,
@@ -3466,7 +3467,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         prefix_offset: int = 0,
         read_offset: int = 0,
     ) -> Tuple[str, int, int]:
-        """tokenizer decoding for the streaming generation use case. This method can be overrided for tokenizer that doesn't follow this API"""
+        """tokenizer decoding for the streaming generation use case. This method can be overridden for tokenizer that doesn't follow this API"""
         # The prefix text is necessary only to defeat cleanup algorithms in the decode
         # which decide to add a space or not depending on the surrounding ids.
         prefix_text = self.decode(

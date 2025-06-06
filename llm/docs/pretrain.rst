@@ -85,7 +85,7 @@ git clone 代码到本地，即可开始。
 7. 若数据集文件夹中存在默认缓存文件夹 ``index-cache/`` ，则额外指定的 ``--data_cache`` 不生效，训练时优先加载默认缓存文件夹中的内容。
 
 
-预训练使用了PaddleNLP的Trainer模块，相关分布式策略使用，请参考 `大模型 Trainer 混合并行训练教程 <./llm_trainer.rst>` 
+预训练使用了PaddleNLP的Trainer模块，相关分布式策略使用，请参考 `大模型 Trainer 混合并行训练教程 <./llm_trainer.rst>`_
 
 
 .. _model_capability:

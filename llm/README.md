@@ -13,27 +13,9 @@
 - **大模型无损量化**。大模型套件预先集成了 PaddleSlim LLM.PTQ 量化算法，以及业界广泛采用的 GPTQ 和 AWQ 的 W4量化方法，成功实现了对主流大模型的无损量化处理，显著加速了模型的推理速度。
 - **高性能推理**。大模型套件的高性能推理模块内置了动态插入和全环节算子融合的高级策略，这极大地提升了并行推理的速度。同时，该模块隐藏了底层技术细节，为用户提供了开箱即用的高性能并行推理功能。
 
-
 ## 🛠️ 支持模型列表 🛠️
 
-| Model                                  | Pretrain | SFT | LoRA | Prefix Tuning | DPO/SimPO/ORPO/KTO | RLHF | Mergekit | Quantization | Torch convert |
-|----------------------------------------|----------|-----|------|---------------|----------------|------|-------|--------------|---------------|
-| [LLaMA](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/llama)                | ✅        | ✅   | ✅    | ✅             | ✅             | ✅    | ✅    | ✅            | ✅             |
-| [Qwen](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/qwen)                  | ✅        | ✅   | ✅    | ✅             | ✅             | 🚧   | ✅    | 🚧           | ✅             |
-| [Mixtral](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/mixtral)            | ✅        | ✅   | ✅    | ❌             | ✅             | 🚧   | ✅    | 🚧           | 🚧            |
-| [Mistral](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/mistral)            | ✅         | ✅   | ✅    | ✅             | ✅             | 🚧   | ✅    | 🚧           | ✅             |
-| [Baichuan/Baichuan2](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/llama)   | ✅        | ✅   | ✅    | ✅             | ✅             | 🚧   | ✅    | ✅            | ✅             |
-| [ChatGLM-6B](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/chatglm)         | ✅        | ✅   | ✅    | ✅             | 🚧            | 🚧   | ✅    | ✅            | ❌             |
-| [ChatGLM2/ChatGLM3](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/chatglm2) | ✅        | ✅   | ✅    | ✅             | ✅             | 🚧   | ✅    | ✅            | ✅             |
-| [Bloom](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/bloom)                | ✅        | ✅   | ✅    | ✅             | 🚧            | 🚧   | ✅    | ✅            | ✅             |
-| [GPT-3](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/gpt-3)                | ✅        | ✅   | 🚧   | 🚧            | 🚧            | 🚧   | ✅    | 🚧           | ✅             |
-| [OPT](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/opt)                    | ✅       | ✅   | ✅    | 🚧            | 🚧            | 🚧   | ✅    | 🚧           | ✅             |
-| [Gemma](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/gemma)                | ✅       | ✅   | ✅    | 🚧            | ✅            | 🚧   | ✅    | 🚧           | 🚧             |
-| [Yuan](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/yuan)                  | ✅       | ✅   | ✅    | 🚧            | ✅            | 🚧   | ✅    | 🚧           | 🚧             |
-
-- ✅: Supported
-- 🚧: In Progress
-- ❌: Not Supported
+参考 [PaddleNLP 支持模型列表](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/README.md#模型支持)
 
 ## 🚀 快速开始 🚀
 
@@ -186,7 +168,7 @@ python run_finetune.py ./config/qwen/pt_argument.json
 
 ### 3. 对齐
 
-我们支持 DPO、KTO、RLHF 等偏好对齐策略。DPO、KTO 策略采用 zero_padding 策略，结合 FlashMask 策略，有效提升模型训练效率。
+我们支持 DPO、KTO、RL 等偏好对齐策略。DPO、KTO 策略采用 zero_padding 策略，结合 FlashMask 策略，有效提升模型训练效率。
 
 #### 3.1 DPO
 
@@ -272,8 +254,8 @@ python -u  ./alignment/dpo/run_dpo.py ./config/llama/dpo_lora_argument.json
 为了方便测试，我们也提供了偏好数据集可以直接使用：
 
 ```bash
-wget https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized_pointwise.tar.gz
-tar -zxvf ultrafeedback_binarized_pointwise.tar.gz
+wget https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized_pointwise.tar
+tar -xvf ultrafeedback_binarized_pointwise.tar.gz
 ```
 
 ##### 全参 KTO
@@ -289,20 +271,18 @@ python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" ./alignment/
 python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" ./alignment/kto/run_kto.py ./config/llama/kto_lora_argument.json
 ```
 
-#### 3.3 RLHF
+#### 3.3 RL
 
-飞桨大模型套件提供了提供了基于强化学习 PPO 算法对 LLM 进行人类偏好对齐的代码及完整使用示例，支持**3D 分布式并行训练以及 rollout 阶段使用预测优化进行生成加速**。详细使用教程详见[RLHF 文档](./docs/rlhf.md)。
+飞桨大模型套件提供了提供了基于强化学习 GRPO、Reinforce++、PPO 等 算法对 LLM 进行人类偏好对齐的代码及完整使用示例，支持**3D 分布式并行训练以及 rollout 阶段使用预测优化进行生成加速**。详细使用教程详见[RL 文档](./alignment/rl/README.md)。
 
 ### 4. 模型融合
 PadlleNLP 支持多种模型融合方法，包括**Linear、Slerp、Ties、DARE、DELLA**，并支持模型参数稀疏化方法与模型融合算法的灵活组合使用。
 ```shell
 # 模型融合启动命令参考
-# cd PaddleNLP/llm/tools
-python mergekit.py \
-    --tensor_type np \
-    --n_process 2 \
+python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" ./llm/tools/mergekit.py \
+    --tensor_type pd \
     --merge_method linear \
-    --model_path_list ../checkpoints/model1 ../checkpoints/model \
+    --model_path_str "../checkpoints/model1,../checkpoints/model2" \
     --output_path ../checkpoints/model_merge
 
 ```

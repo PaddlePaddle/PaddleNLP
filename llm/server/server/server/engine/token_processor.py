@@ -47,7 +47,6 @@ class TokenProcessor(object):
         self.tokens_counter = Counter()
 
         self.is_speculate_decoding = self.cfg.get_speculate_config().speculate_method != "None"
-        self.msg_queue_id = paddle.full(shape=[1], fill_value=1, dtype="int32")
         if self.is_speculate_decoding:
             self.output_tokens = paddle.full(
                 shape=[SPECULATE_MAX_BSZ * MAX_DRAFT_TOKENS + SPECULATE_MAX_BSZ + 2, 1], fill_value=2, dtype="int64"
@@ -97,7 +96,7 @@ class TokenProcessor(object):
                 if self.is_speculate_decoding:
                     speculate_get_output(self.output_tokens, rank_id, is_blocking)
                 else:
-                    get_output(self.output_tokens, self.msg_queue_id, rank_id, is_blocking)
+                    get_output(self.output_tokens, rank_id, is_blocking)
 
                 if self.output_tokens[0, 0] == -2:
                     continue
@@ -281,7 +280,7 @@ class WarmUpTokenProcessor(TokenProcessor):
                 if self.is_speculate_decoding:
                     speculate_get_output(self.output_tokens, rank_id, self._is_blocking)
                 else:
-                    get_output(self.output_tokens, self.msg_queue_id, rank_id, self._is_blocking)
+                    get_output(self.output_tokens, rank_id, self._is_blocking)
 
                 if self.output_tokens[0, 0] == -2:
                     continue

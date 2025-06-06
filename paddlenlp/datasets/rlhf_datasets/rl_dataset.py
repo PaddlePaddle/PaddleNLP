@@ -40,7 +40,7 @@ def padding_batch_data(
     input_dict = {}
 
     input_ids = [sample["input_ids"] for sample in samples]
-    # TODO(drownfish19): confim if this is correct
+    # TODO(drownfish19): confirm if this is correct
     # attention_mask = [np.ones(input_id.shape, dtype=bool) for input_id in input_ids]
     input_dict["input_ids"] = left_padding(input_ids, padding_value=pad_token_id, max_length=max_prompt_len)
     # input_dict["attention_mask"] = left_padding(attention_mask, padding_value=0)
@@ -94,9 +94,11 @@ class RLHFDataset(Dataset):
         chat_template_func=None,
         splits=None,
         filter_overlong_prompts=True,
+        apply_chat_template=False,
     ):
         self.dataset_name_or_path = dataset_name_or_path
         self.tokenizer = tokenizer
+        self.apply_chat_template = apply_chat_template
 
         self.max_prompt_len = max_prompt_len
         self.filter_prompts = filter_prompts
@@ -154,7 +156,7 @@ class RLHFDataset(Dataset):
             data = {}
             raw_sample = self.rawdata[index]
             prompt = raw_sample[self.prompt_key]
-            if self.tokenizer.chat_template:
+            if self.apply_chat_template and self.tokenizer.chat_template:
                 prompt = self.tokenizer.apply_chat_template(prompt, add_generation_prompt=True, tokenize=False)
 
             data["input_ids"] = self.tokenize(text=prompt, max_length=self.max_prompt_len, truncation=True)

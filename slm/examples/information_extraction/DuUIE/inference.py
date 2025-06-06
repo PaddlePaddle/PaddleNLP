@@ -109,7 +109,7 @@ def main():
         "-c",
         "--config",
         dest="map_config",
-        help="Offset mapping config, maping generated sel to offset record",
+        help="Offset mapping config, mapping generated sel to offset record",
         default="longer_first_zh",
     )
     parser.add_argument("--verbose", action="store_true")

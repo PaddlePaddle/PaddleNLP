@@ -355,7 +355,7 @@ python export_model.py --params_path ./checkpoint/ --output_path ./export --mult
 export/
 ├── float32.pdiparams
 ├── float32.pdiparams.info
-└── float32.pdmodel
+└── float32.json(PIR enabled)/float32.pdmodel(PIR disabled)
 ```
  导出模型之后用于部署，项目提供了基于 ONNXRuntime 的 [离线部署方案](./deploy/predictor/README.md) 和基于 Paddle Serving 的 [在线服务化部署方案](./deploy/predictor/README.md)。
 

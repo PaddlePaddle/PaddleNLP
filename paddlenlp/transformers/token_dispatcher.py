@@ -52,7 +52,7 @@ class _DispatchManager(ABC):
         pass
 
     @abstractmethod
-    def get_dispached_metadata(self) -> paddle.Tensor:
+    def get_dispatched_metadata(self) -> paddle.Tensor:
         """Get the metadata of the dispatched hidden_states."""
         pass
 
@@ -154,7 +154,7 @@ class _DeepepManager(_DispatchManager):
         multihot_probs[row_indices, valid_indices] = probs[mask]
         return multihot_routing_map.cast(paddle.bool), multihot_probs
 
-    def get_dispached_metadata(self) -> paddle.Tensor:
+    def get_dispatched_metadata(self) -> paddle.Tensor:
         return self.dispatched_indices, self.dispatched_probs
 
     def get_number_of_tokens_per_expert(self) -> paddle.Tensor:

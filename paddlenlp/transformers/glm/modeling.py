@@ -343,7 +343,7 @@ class GLMStack(nn.Layer):
             is_scalar = bool(paddle.numel(attention_mask) == 1)
             scalar_sep = attention_mask[0] if is_scalar else attention_mask
 
-            # attention mask is the beginning postion of B region in [0, query_len)
+            # attention mask is the beginning position of B region in [0, query_len)
             def build_mask_matrix(seq_length, sep, memory_length=0):
                 mask = paddle.ones([1, seq_length, seq_length])
                 mask = paddle.tril(mask)
@@ -854,7 +854,7 @@ class GLMForConditionalGeneration(GLMPretrainedModel):
         # lm_logits [bs, seq_length, vocab_size]
         loss = None
         if labels is not None:
-            # Since ParallelCrossEntropy not support -100 ingore index.
+            # Since ParallelCrossEntropy not support -100 ignore index.
             # we use pad_token_id
             if self.glm.config.tensor_parallel_degree > 1 and self.glm.config.tensor_parallel_output:
                 self.parallel_loss_func = fleet.meta_parallel.ParallelCrossEntropy()

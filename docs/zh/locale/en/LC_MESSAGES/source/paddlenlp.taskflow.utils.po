@@ -276,7 +276,7 @@ msgid "word of current node."
 msgstr ""
 
 #: of paddlenlp.taskflow.utils.BurkhardKellerTree:1
-msgid "Implementataion of BK-Tree"
+msgid "Implementation of BK-Tree"
 msgstr ""
 
 #: of paddlenlp.taskflow.utils.BurkhardKellerTree.add:1
@@ -300,7 +300,7 @@ msgid "similar words."
 msgstr ""
 
 #: of paddlenlp.taskflow.utils.TriedTree:1
-msgid "Implementataion of TriedTree"
+msgid "Implementation of TriedTree"
 msgstr ""
 
 #: of paddlenlp.taskflow.utils.TriedTree.add_word:1

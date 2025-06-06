@@ -340,6 +340,10 @@ class Qwen2RotaryEmbedding(nn.Layer):
 
     def _set_cos_sin_cache(self, seq_len):
         self.max_seq_len_cached = seq_len
+        if self.inv_freq.dtype != paddle.float32:
+            self.inv_freq = 1.0 / (
+                self.base ** (paddle.cast(paddle.arange(0, self.dim, 2), dtype="float32") / self.dim)
+            )
         # [seq_len]
         t = paddle.arange(seq_len, dtype="float32")
         # [seq_len, dim/2]
@@ -505,8 +509,9 @@ class Qwen2Attention(nn.Layer):
         self.skip_recompute_ops = skip_recompute_ops
         self.hidden_size = config.hidden_size
         self.num_heads = config.num_attention_heads
+        self.num_attention_heads = config.num_attention_heads
 
-        self.head_dim = self.hidden_size // config.num_attention_heads
+        self.head_dim = getattr(config, "head_dim", config.hidden_size // config.num_attention_heads)
 
         self.num_key_value_heads = config.num_key_value_heads
         assert config.num_attention_heads // config.num_key_value_heads
@@ -517,9 +522,9 @@ class Qwen2Attention(nn.Layer):
         self.is_causal = True
         self.attention_dropout = config.attention_dropout
 
-        self.seq_length = config.seq_length
+        # self.seq_length = config.seq_length
         self.sequence_parallel = config.sequence_parallel
-
+        self.has_bias = config.attention_bias
         self.fuse_attention_qkv = config.fuse_attention_qkv
 
         # Note that we will actually perform a recompute only if both enable_recompute and layerwise_recompute are set to True
@@ -572,27 +577,37 @@ class Qwen2Attention(nn.Layer):
             if self.fuse_attention_qkv:
                 self.qkv_proj = ColumnParallelLinear(
                     self.hidden_size,
-                    self.hidden_size + 2 * self.config.num_key_value_heads * self.head_dim,
-                    has_bias=True,
+                    self.num_attention_heads * self.head_dim + 2 * self.config.num_key_value_heads * self.head_dim,
+                    has_bias=self.has_bias,
                     gather_output=False,
                 )
             else:
                 self.q_proj = ColumnParallelLinear(
-                    self.hidden_size, self.hidden_size, has_bias=True, gather_output=False
+                    self.hidden_size,
+                    self.num_attention_heads * self.head_dim,
+                    has_bias=self.has_bias,
+                    gather_output=False,
                 )
-                self.k_proj = ColumnParallelLinear(self.hidden_size, self.config.num_key_value_heads * self.head_dim, has_bias=True, gather_output=False)  # fmt:skip
-                self.v_proj = ColumnParallelLinear(self.hidden_size, self.config.num_key_value_heads * self.head_dim, has_bias=True, gather_output=False)  # fmt:skip
+                self.k_proj = ColumnParallelLinear(self.hidden_size, self.config.num_key_value_heads * self.head_dim, has_bias=self.has_bias, gather_output=False)  # fmt:skip
+                self.v_proj = ColumnParallelLinear(self.hidden_size, self.config.num_key_value_heads * self.head_dim, has_bias=self.has_bias, gather_output=False)  # fmt:skip
             self.o_proj = RowParallelLinear(self.hidden_size, self.hidden_size, has_bias=False, input_is_parallel=True)
         else:
             if self.fuse_attention_qkv:
                 self.qkv_proj = Linear(
-                    self.hidden_size, self.hidden_size + 2 * self.config.num_key_value_heads * self.head_dim
+                    self.hidden_size,
+                    self.num_attention_heads * self.head_dim + 2 * self.config.num_key_value_heads * self.head_dim,
                 )
             else:
-                self.q_proj = Linear(self.hidden_size, self.hidden_size, bias_attr=True)
-                self.k_proj = Linear(self.hidden_size, self.config.num_key_value_heads * self.head_dim, bias_attr=True)
-                self.v_proj = Linear(self.hidden_size, self.config.num_key_value_heads * self.head_dim, bias_attr=True)
-            self.o_proj = Linear(self.hidden_size, self.hidden_size, bias_attr=False)
+                self.q_proj = Linear(
+                    self.hidden_size, self.num_attention_heads * self.head_dim, bias_attr=self.has_bias
+                )
+                self.k_proj = Linear(
+                    self.hidden_size, self.config.num_key_value_heads * self.head_dim, bias_attr=self.has_bias
+                )
+                self.v_proj = Linear(
+                    self.hidden_size, self.config.num_key_value_heads * self.head_dim, bias_attr=self.has_bias
+                )
+            self.o_proj = Linear(self.num_attention_heads * self.head_dim, self.hidden_size, bias_attr=False)
 
         self.rotary_emb = Qwen2RotaryEmbedding(
             self.head_dim,
@@ -655,9 +670,12 @@ class Qwen2Attention(nn.Layer):
             key_states = key_states.reshape(shape=target_key_value_shape)
             value_states = value_states.reshape(shape=target_key_value_shape)
 
-        kv_seq_len = key_states.shape[-3]
-        if past_key_value is not None:
-            kv_seq_len += past_key_value[0].shape[-3]
+        if position_ids is not None and not self.use_fused_rope:
+            kv_seq_len = position_ids.max().item() + 1
+        else:
+            kv_seq_len = key_states.shape[-3]
+            if past_key_value is not None:
+                kv_seq_len += past_key_value[0].shape[-3]
         if self.use_fused_rope:
             assert past_key_value is None, "fuse rotary not support cache kv for now"
             cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)

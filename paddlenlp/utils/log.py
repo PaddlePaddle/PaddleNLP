@@ -41,7 +41,7 @@ log_config = {
 
 class Logger(object):
     """
-    Deafult logger in PaddleNLP
+    Default logger in PaddleNLP
 
     Args:
         name(str) : Logger name, default is 'PaddleNLP'
@@ -88,7 +88,7 @@ class Logger(object):
         if not self.is_enable:
             return
 
-        self.logger.log(log_level, msg)
+        self.logger.log(log_level, msg, stacklevel=2)
 
     @contextlib.contextmanager
     def use_terminator(self, terminator: str):
@@ -137,7 +137,7 @@ class Logger(object):
 
 class MetricsDumper(object):
     """
-    Deafult JSONDumper in PaddleNLP
+    Default JSONDumper in PaddleNLP
 
     Args:
         name(str) : Logger name, default is 'PaddleNLP'

@@ -677,7 +677,7 @@ def _build_sample_idx(sizes, doc_idx, seq_length, num_epochs, tokens_per_epoch):
                 doc_offset += remaining_seq_length + doc_length - 1
                 remaining_seq_length = 0
             else:
-                # Otherwise, start from the begining of the next document.
+                # Otherwise, start from the beginning of the next document.
                 doc_idx_index += 1
                 doc_offset = 0
         # Record the sequence.

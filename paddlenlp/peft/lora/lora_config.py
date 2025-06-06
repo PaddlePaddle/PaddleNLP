@@ -94,6 +94,7 @@ class LoRAConfig:
         default=False,
         metadata={"help": "Whether to use mos lora."},
     )
+    lorapro: bool = field(default=False, metadata={"help": "Whether to use LoRA-PRO"})
 
     def __post_init__(self):
         if self.use_quick_lora and self.lora_dropout > 0:

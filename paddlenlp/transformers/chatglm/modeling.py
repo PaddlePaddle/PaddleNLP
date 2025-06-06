@@ -749,7 +749,7 @@ class ChatGLMModel(ChatGLMPretrainedModel):
             assert attention_mask is not None, "`attention_mask` must be explicitly specified when input_ids is None."
 
         if attention_mask is None or len(attention_mask.shape) != 4:
-            raise ValueError(f"attention mask should'nt be None or has size other than 4Dim. Found {attention_mask}")
+            raise ValueError(f"attention mask shouldn't be None or has size other than 4Dim. Found {attention_mask}")
 
         attention_mask = attention_mask.astype("bool")
 

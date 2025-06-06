@@ -286,7 +286,7 @@ class LogitsProcessorTest(unittest.TestCase):
         scores = self._get_uniform_logits(batch_size, vocab_size)
         scores = logits_processor(input_ids, scores)
         self.assertTrue((scores[:, bos_token_id + 1 :] == paddle.finfo(scores.dtype).min).all())
-        self.assertListEqual(scores[:, bos_token_id].tolist(), 4 * [0])  # score for bos_token_id shold be zero
+        self.assertListEqual(scores[:, bos_token_id].tolist(), 4 * [0])  # score for bos_token_id should be zero
 
         # check that bos_token_id is not forced if current length is greater than 1
         input_ids = ids_tensor((batch_size, 4), vocab_size=20)

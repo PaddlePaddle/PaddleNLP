@@ -121,7 +121,7 @@ def _num_tokens(documents, lens):
 
 
 def _num_epochs(tokens_per_epoch, seq_length, num_samples):
-    """Based on number of samples and sequence lenght, calculate how many
+    """Based on number of samples and sequence length, calculate how many
     epochs will be needed."""
     num_epochs = 0
     total_tokens = 0
@@ -247,7 +247,7 @@ def create_pretrained_dataset(
     )
 
     process_data = np.load(input_path, mmap_mode="r+", allow_pickle=True)
-    # All documment ids, extend as 1-D array.
+    # All document ids, extend as 1-D array.
     sample_ids = process_data["ids"]
     # The len(sample_lens) num of docs
     # The sum(sample_lens) should equal len(sample_ids)
@@ -295,7 +295,7 @@ def create_pretrained_dataset(
         )
         return data_loader
 
-    # Note, data should be broardcast to all devices.
+    # Note, data should be broadcast to all devices.
     # for train, valid, test, the distinct data num is data_world_size
     train_data_loader = build_dataset(0, "train", args.local_batch_size * args.max_steps * data_world_size)
 

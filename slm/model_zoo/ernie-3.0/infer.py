@@ -30,6 +30,10 @@ from paddlenlp.metrics import ChunkEvaluator
 from paddlenlp.metrics.squad import compute_prediction, squad_evaluate
 from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.transformers import AutoTokenizer
+from paddlenlp.utils.env import (
+    PADDLE_INFERENCE_MODEL_SUFFIX,
+    PADDLE_INFERENCE_WEIGHTS_SUFFIX,
+)
 
 METRIC_CLASSES = {
     "afqmc": Accuracy,
@@ -183,8 +187,8 @@ class Predictor(object):
                 import paddle2onnx
 
                 onnx_model = paddle2onnx.command.c_paddle_to_onnx(
-                    model_file=args.model_path + ".pdmodel",
-                    params_file=args.model_path + ".pdiparams",
+                    model_file=args.model_path + f"model{PADDLE_INFERENCE_MODEL_SUFFIX}",
+                    params_file=args.model_path + f"model{PADDLE_INFERENCE_WEIGHTS_SUFFIX}",
                     opset_version=13,
                     enable_onnx_checker=True,
                 )
@@ -210,7 +214,10 @@ class Predictor(object):
             input_handles = [input_name1, input_name2]
             return cls(predictor, input_handles, [])
 
-        config = paddle.inference.Config(args.model_path + ".pdmodel", args.model_path + ".pdiparams")
+        config = paddle.inference.Config(
+            args.model_path + f"model{PADDLE_INFERENCE_MODEL_SUFFIX}",
+            args.model_path + f"model{PADDLE_INFERENCE_WEIGHTS_SUFFIX}",
+        )
         if args.device == "gpu":
             # set GPU configs accordingly
             config.enable_use_gpu(100, 0)

@@ -42,7 +42,7 @@ class DistributedBatchSampler(paddle.io.BatchSampler):
         rank(int, optional): the rank of the current process among :attr:`num_replicas`
             processes. If :attr:`rank` is None, :attr:`rank` is retrieved from
             :code:`paddle.distributed.ParallenEnv`. Default None.
-        shuffle(bool): whther to shuffle indices order before genrating
+        shuffle(bool): whether to shuffle indices order before generating
             batch indices. Default False.
         drop_last(bool): whether drop the last incomplete batch dataset size
             is not divisible by the batch size. Default False

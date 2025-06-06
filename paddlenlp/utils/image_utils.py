@@ -281,7 +281,7 @@ class Bbox(object):
     """
     The inner store format of `Bbox` is (left, top, width, height).
 
-    The user may instance plenty of `Bbox`, thats why we insist the `Bbox` only contains four variables.
+    The user may instance plenty of `Bbox`, that's why we insist the `Bbox` only contains four variables.
     """
 
     __slots__ = ["_c_left", "_c_top", "_c_width", "_c_height"]

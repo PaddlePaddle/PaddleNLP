@@ -1588,9 +1588,9 @@ class MiniGPT4ForConditionalGeneration(MiniGPT4PretrainedModel):
             second_input_ids (`paddle.Tensor` of shape (batch_size, sequence_length), *optional*):
                 The second input prompt after the tag `<ImageHere>`, it's embeddings will concat with image embeddings and the embeddings of the first_input_ids for the generation.
             first_attention_mask (`paddle.Tensor` of shape (batch_size, sequence_length), *optional*):
-                The attention mask corresponding with the first_input_ids, whill will mask to avoid performing attention on padding token indices.
+                The attention mask corresponding with the first_input_ids, which will mask to avoid performing attention on padding token indices.
             second_attention_mask (`paddle.Tensor` of shape (batch_size, sequence_length), *optional*):
-                The attention mask corresponding with the second_input_ids, whill will mask to avoid performing attention on padding token indices.
+                The attention mask corresponding with the second_input_ids, which will mask to avoid performing attention on padding token indices.
         Returns:
             captions (list): A list of strings of length batch_size * num_captions.
 

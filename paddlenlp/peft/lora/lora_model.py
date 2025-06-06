@@ -488,6 +488,7 @@ class LoRAModel(nn.Layer):
                 use_mora=lora_config.use_mora,
                 mp_moe=getattr(module.weight, "mp_moe", False),
                 is_distributed=getattr(module.weight, "is_distributed", False),
+                lorapro=lora_config.lorapro,
             )
         elif isinstance(module, nn.Conv2D):
             lora_module = LoRAConv2D(
@@ -607,8 +608,12 @@ class LoRAModel(nn.Layer):
             lora_module = QuantizationLoRALinear(module, lora_config)
         elif isinstance(module, ColumnParallelQuantizationLinear):
             lora_module = ColumnParallelQuantizationLoRALinear(module, lora_config)
+            # Lora column parallel will spilt lora B matrix
+            self.add_lora_split_mapping(module_name + ".lora_B", is_column=True)
         elif isinstance(module, RowParallelQuantizationLinear):
             lora_module = RowParallelQuantizationLoRALinear(module, lora_config)
+            # Lora row parallel will spilt lora A matrix
+            self.add_lora_split_mapping(module_name + ".lora_A", is_column=False)
         if lora_module is None:
             raise ValueError(
                 f"LoRA strategy only supports paddle.nn.Linear or paddle.distributed.fleet.meta_parallel.ColumnParallelLinear or paddlenlp.transformers.sequence_utils. {module}({module_name} {type(module).__name__}) is not supported。"
