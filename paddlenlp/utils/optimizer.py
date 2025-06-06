@@ -32,11 +32,11 @@ from ..quantization.qat_utils import dequantize_channelwise, quantize_channelwis
 class AdamWMini(AdamW):
     def __init__(
         self,
+        named_parameters=None,
         learning_rate=0.001,
         beta1=0.9,
         beta2=0.999,
         epsilon=1e-8,
-        parameters=None,
         weight_decay=0.0,
         use_lowprecision_moment=False,
         lr_ratio=None,
@@ -78,6 +78,12 @@ class AdamWMini(AdamW):
         if not self.n_heads % self.n_kv_heads == 0:
             raise ValueError(f"n_heads {self.n_heads} must be divisible by n_kv_heads {self.n_kv_heads}")
 
+        parameters = []
+        for param_name, param in named_parameters:
+            param_name = param_name.lower()
+            param.name = param_name
+            parameters.append(param)
+
         super().__init__(
             learning_rate=learning_rate,
             beta1=beta1,
@@ -105,12 +111,13 @@ class AdamWMini(AdamW):
             acc_dtype = DataType.FLOAT32 if in_pir_mode() else core.VarDesc.VarType.FP32
 
         # Add accumulators based on block type
-        if any(adam_block_name in name.lower() for adam_block_name in self.adam_block_names):
+        if any(adam_block_name in name for adam_block_name in self.adam_block_names):
             # Standard Adam for bias terms
             super()._add_moments_pows(p)
-        elif any(wqk_name in name.lower() for wqk_name in self.wqk_names):
+        elif any(wqk_name in name for wqk_name in self.wqk_names):
             # One accumulator per head for Q/K blocks
-            shape = [-1, self.head_numel]
+            total_size = paddle.numel(p)
+            shape = [total_size // self.head_numel, self.head_numel]
             self._add_accumulator(self._moment1_acc_str, p, dtype=acc_dtype, shape=shape)
             self._add_accumulator(self._moment2_acc_str, p, dtype=acc_dtype, shape=shape)
             self._add_accumulator(
@@ -132,11 +139,11 @@ class AdamWMini(AdamW):
                 device="cpu",
             )
         elif (
-            any(embd_name in name.lower() for embd_name in self.embd_names)
-            or any(output_name in name.lower() for output_name in self.output_names)
-            or any(wv_name in name.lower() for wv_name in self.wv_names)
-            or any(mlp_name in name.lower() for mlp_name in self.mlp_names)
-            or any(attn_proj_name in name.lower() for attn_proj_name in self.attn_proj_names)
+            any(embd_name in name for embd_name in self.embd_names)
+            or any(output_name in name for output_name in self.output_names)
+            or any(wv_name in name for wv_name in self.wv_names)
+            or any(mlp_name in name for mlp_name in self.mlp_names)
+            or any(attn_proj_name in name for attn_proj_name in self.attn_proj_names)
         ):
             # One accumulator per neuron for other blocks
             shape = [p.shape[0], 1] if len(p.shape) > 1 else [1]
@@ -260,10 +267,12 @@ class AdamWMini(AdamW):
             return
         if not with_decay:
             coeff = 0.0
+        if "norm" in name or "ln" in name or "bias" in name:
+            coeff = 0.0
         if not multi_precision:
             master_weight = None
 
-        if any(adam_block_name in name.lower() for adam_block_name in self.adam_block_names):
+        if any(adam_block_name in name for adam_block_name in self.adam_block_names):
             _, _, _, _, _, _, _ = _C_ops.adamw_(
                 param,
                 grad,
@@ -297,7 +306,7 @@ class AdamWMini(AdamW):
             p *= 1.0 - lr * coeff
 
             # Block-specific updates with per-block learning rates
-            if any(wqk_name in name.lower() for wqk_name in self.wqk_names):
+            if any(wqk_name in name for wqk_name in self.wqk_names):
                 # Q/K blocks: reshape and compute per-head learning rates
                 grad_reshaped = paddle.reshape(grad, [-1, self.head_numel])
                 mom1 = paddle.reshape(moment1, [-1, self.head_numel])
@@ -313,7 +322,7 @@ class AdamWMini(AdamW):
                 denom = mom2.sqrt() / ((1.0 - beta2_pow).sqrt()) + epsilon
 
                 # Apply updates
-                update = (mom1 / denom.reshape([-1, 1])) * (-(lr / (1.0 - beta1_pow)))
+                update = (mom1 / denom) * (-(lr / (1.0 - beta1_pow)))
                 p += paddle.reshape(update, param.shape)
 
             else:
@@ -322,7 +331,7 @@ class AdamWMini(AdamW):
                 mom2 = moment2  # Already shaped correctly
 
                 mom1 = mom1 * beta1 + (1.0 - beta1) * grad
-                mom2 = mom2 * beta2 + (1.0 - beta2) * (grad * grad).mean()
+                mom2 = mom2 * beta2 + (1.0 - beta2) * (grad * grad).mean(axis=1, keepdim=True)
 
                 denom = mom2.sqrt() / ((1.0 - beta2_pow).sqrt()) + epsilon
                 p += (mom1 / denom) * (-(lr / (1.0 - beta1_pow)))
@@ -357,7 +366,6 @@ class AdamWMini(AdamW):
         }
 
         for name in self._already_create_accumulator:
-            name = name.lower()
             if "bias" in name:
                 continue
             if any(embd_name in name for embd_name in self.embd_names):
