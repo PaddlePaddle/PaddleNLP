@@ -258,6 +258,10 @@ class MBartModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest
 
             with paddle.no_grad():
                 embeds_output = model(**inputs)
+            if isinstance(ids_output, tuple):
+                ids_output = ids_output[0]
+            if isinstance(embeds_output, tuple):
+                embeds_output = embeds_output[0]
 
             self.assertTrue(paddle.allclose(ids_output, embeds_output, rtol=1e-4, atol=1e-4))
 
