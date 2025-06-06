@@ -242,7 +242,7 @@ std::vector<paddle::Tensor> LnFwd(const paddle::Tensor &x,
 std::vector<paddle::Tensor> RMSLnFwd(const paddle::Tensor &x,
                                      const paddle::Tensor &scale,
                                      const float epsilon) {
-    auto input_type = x.type();
+  auto input_type = x.type();
   auto weight_type = scale.type();
   auto output_type = weight_type;
   auto compute_type = paddle::DataType::FLOAT32;
@@ -251,7 +251,7 @@ std::vector<paddle::Tensor> RMSLnFwd(const paddle::Tensor &x,
   PD_CHECK(!scale.is_cpu());
 
   auto sizes = x.shape();
-    PD_CHECK(sizes.size() >= 2);
+  PD_CHECK(sizes.size() >= 2);
 
   std::vector<int> row_sizes(sizes.begin(), sizes.begin() + sizes.size() - 1);
 
