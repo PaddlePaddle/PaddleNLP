@@ -1,15 +1,16 @@
 set -x
 unset CUDA_VISIBLE_DEVICES
+export FLAGS_log_level=DEBUG
 
 # task_name="A100_1_4_1_none_FALSE_64_16_4_4_O1_TRUE_16"
-task_name="ddp"
+task_name="train_dist_random_fine_grained"
 rm -rf output/$task_name/
 rm -rf "output/$task_name""_log"
 
 export SOT_LOG_LEVEL=4
 export PYTHONPATH=../../../:$PYTHONPATH
 
-TRAINER="./train_dist_random.py"
+TRAINER="./train_dist_random_fine_grained.py"
 LAUNCHER="python -u -m paddle.distributed.launch"
 LAUNCHER="${LAUNCHER} --gpus 0,1,2,3,4,5,6,7"  # 设置需要使用的GPU
 LAUNCHER="${LAUNCHER} --log_dir output/$task_name""_log ${TRAINER} --output_dir "./output""
@@ -21,7 +22,7 @@ TRAIN_ARGS="
     --max_grad_norm 1.0 \
     --learning_rate 3e-05 \
     --min_learning_rate 3e-06 \
-    --max_steps 25 \
+    --max_steps 5 \
     --logging_steps 1 \
     --continue_training 0 \
     --do_train true \
@@ -37,8 +38,9 @@ TRAIN_ARGS="
 
 # [seq_length] [num_hidden_layers]
 MODEL_ARGS="
+    --model_type "llama_fine_grained" \
     --model_name_or_path "llama" \
-    --num_hidden_layers 4 \
+    --num_hidden_layers 8 \
     --intermediate_size 11008 \
     --vocab_size 32000 \
     --hidden_size 4096 \
@@ -48,14 +50,14 @@ MODEL_ARGS="
 
 # [mbsz, accumulation_steps] [recompute] [amp]
 CONFIG_ARGS="
-    --per_device_train_batch_size 1 \
+    --per_device_train_batch_size 2 \
     --gradient_accumulation_steps 4 \
     --recompute false \
     --recompute_use_reentrant true \
     --recompute_granularity full \
     --pp_recompute_interval 0 \
     --bf16 true \
-    --fp16_opt_level "O2" \
+    --fp16_opt_level "O1" \
     --amp_master_grad false \
     --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
     --amp_custom_white_list "lookup_table" "lookup_table_v2" \
@@ -64,9 +66,9 @@ CONFIG_ARGS="
 # [dp_deg, dp_type] [tp_deg, megatron-sp] [pp_deg, 1F1B] [parallel_configs]
 PARALLEL_ARGS=(
     --to_static 1
-    --sharding_parallel_degree 8
-    --sharding ""
-    --tensor_parallel_degree 1
+    --sharding_parallel_degree 2
+    --sharding "stage2"
+    --tensor_parallel_degree 4
     --sequence_parallel true
     --pipeline_parallel_degree 1
     --virtual_pp_degree 1

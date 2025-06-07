@@ -1,8 +1,11 @@
 set -x
 unset CUDA_VISIBLE_DEVICES
 
+LOCAL_IPS=$(hostname -I)
+FORMATTED_IP=$(echo "$LOCAL_IPS" | xargs | tr '.' '_')
+
 # task_name="A100_1_4_1_none_FALSE_64_16_4_4_O1_TRUE_16"
-task_name="ddp"
+task_name="multi_node_${FORMATTED_IP}"
 rm -rf output/$task_name/
 rm -rf "output/$task_name""_log"
 
@@ -12,6 +15,9 @@ export PYTHONPATH=../../../:$PYTHONPATH
 TRAINER="./train_dist_random.py"
 LAUNCHER="python -u -m paddle.distributed.launch"
 LAUNCHER="${LAUNCHER} --gpus 0,1,2,3,4,5,6,7"  # 设置需要使用的GPU
+LAUNCHER="${LAUNCHER} --ips 172.24.27.210,172.24.73.63"
+LAUNCHER="${LAUNCHER} --nnodes 2"
+LAUNCHER="${LAUNCHER} --nproc_per_node 8"
 LAUNCHER="${LAUNCHER} --log_dir output/$task_name""_log ${TRAINER} --output_dir "./output""
 
 # [max_steps] [logging_steps] [enable_auto_parallel]
@@ -38,7 +44,7 @@ TRAIN_ARGS="
 # [seq_length] [num_hidden_layers]
 MODEL_ARGS="
     --model_name_or_path "llama" \
-    --num_hidden_layers 4 \
+    --num_hidden_layers 16 \
     --intermediate_size 11008 \
     --vocab_size 32000 \
     --hidden_size 4096 \
@@ -48,8 +54,8 @@ MODEL_ARGS="
 
 # [mbsz, accumulation_steps] [recompute] [amp]
 CONFIG_ARGS="
-    --per_device_train_batch_size 1 \
-    --gradient_accumulation_steps 4 \
+    --per_device_train_batch_size 4 \
+    --gradient_accumulation_steps 8 \
     --recompute false \
     --recompute_use_reentrant true \
     --recompute_granularity full \
@@ -64,11 +70,11 @@ CONFIG_ARGS="
 # [dp_deg, dp_type] [tp_deg, megatron-sp] [pp_deg, 1F1B] [parallel_configs]
 PARALLEL_ARGS=(
     --to_static 1
-    --sharding_parallel_degree 8
+    --sharding_parallel_degree 2
     --sharding ""
-    --tensor_parallel_degree 1
+    --tensor_parallel_degree 2
     --sequence_parallel true
-    --pipeline_parallel_degree 1
+    --pipeline_parallel_degree 2
     --virtual_pp_degree 1
     --pipeline_schedule_mode "1F1B"
     --sep_parallel_degree 1

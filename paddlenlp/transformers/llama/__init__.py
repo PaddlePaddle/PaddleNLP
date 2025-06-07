@@ -19,3 +19,4 @@ from .modeling_network import *
 from .modeling_pp import *
 from .tokenizer import *
 from .tokenizer_fast import *
+from .modeling_fine_grained import *
