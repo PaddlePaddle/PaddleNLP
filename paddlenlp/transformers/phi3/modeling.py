@@ -16,21 +16,47 @@
 from __future__ import annotations
 
 import math
-from typing import Optional, Tuple, Union, List, Dict, Any
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
+from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
 
+try:
+    from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+        GatherOp,
+        ScatterOp,
+        mark_as_sequence_parallel_parameter,
+    )
+except ImportError:
+    # For older Paddle versions that might not have these
+    class ScatterOp:
+        @staticmethod
+        def apply(x):
+            return x
+
+    class GatherOp:
+        @staticmethod
+        def apply(x):
+            return x
+
+    def mark_as_sequence_parallel_parameter(x):
+        pass
+
+
+from paddlenlp.transformers import linear_utils  # Added
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     CausalLMOutputWithCrossAttentions,
 )
 from paddlenlp.transformers.model_utils import PretrainedModel
-from paddlenlp.utils.log import logger
 
 from .configuration import Phi3Config
+
+# from paddlenlp.utils.log import logger # Removed logger import
+
 
 __all__ = [
     "Phi3Model",
@@ -116,11 +142,11 @@ class Phi3RMSNorm(nn.Layer):
 class Phi3RotaryEmbedding(nn.Layer):
     def __init__(self, dim: int, max_position_embeddings: int = 2048, base: int = 10000):
         super().__init__()
-        
+
         self.dim = dim
         self.max_position_embeddings = max_position_embeddings
         self.base = base
-        
+
         # Create position embeddings
         inv_freq = 1.0 / (self.base ** (paddle.arange(0, self.dim, 2).astype("float32") / self.dim))
         self.register_buffer("inv_freq", inv_freq, persistable=False)
@@ -143,31 +169,63 @@ class Phi3RotaryEmbedding(nn.Layer):
 class Phi3Attention(nn.Layer):
     """Multi-head attention with rotary position embeddings."""
 
-    def __init__(self, config: Phi3Config):
+    def __init__(self, config: Phi3Config, layerwise_recompute: bool = False):
         super().__init__()
         self.config = config
         self.hidden_size = config.hidden_size
-        self.num_attention_heads = config.num_attention_heads
-        self.num_key_value_heads = config.num_key_value_heads
-        self.head_dim = self.hidden_size // self.num_attention_heads
+
+        self.tensor_parallel_degree = getattr(config, "tensor_parallel_degree", 1)
+        # num_attention_heads and num_key_value_heads in config are global/total heads
+        # We need to divide them by TP degree for local use in linear layers if TP is active
+        self.num_attention_heads = config.num_attention_heads // self.tensor_parallel_degree
+        self.num_key_value_heads = config.num_key_value_heads // self.tensor_parallel_degree
+
+        self.head_dim = self.hidden_size // config.num_attention_heads  # head_dim uses global num_attention_heads
         self.max_position_embeddings = config.max_position_embeddings
 
-        if (self.head_dim * self.num_attention_heads) != self.hidden_size:
+        self.sequence_parallel = getattr(config, "sequence_parallel", False)
+        self.layerwise_recompute = layerwise_recompute
+        self.recompute_granularity = getattr(config, "recompute_granularity", "full")
+        self.enable_recompute = False  # Controlled by DecoderLayer/Model
+        self.recompute_use_reentrant = getattr(config, "recompute_use_reentrant", True)
+
+        if (self.head_dim * config.num_attention_heads) != self.hidden_size:  # Check with global num_attention_heads
             raise ValueError(
                 f"hidden_size must be divisible by num_attention_heads (got `hidden_size`: {self.hidden_size} "
-                f"and `num_attention_heads`: {self.num_attention_heads})."
+                f"and `num_attention_heads`: {config.num_attention_heads})."
             )
 
-        # Layer-wise attention scaling
         self.inv_norm_factor = 1.0 / math.sqrt(self.head_dim)
+        self.num_key_value_groups = config.num_attention_heads // config.num_key_value_heads  # Global ratio
 
-        self.q_proj = nn.Linear(self.hidden_size, self.num_attention_heads * self.head_dim, bias_attr=True)
-        self.k_proj = nn.Linear(self.hidden_size, self.num_key_value_heads * self.head_dim, bias_attr=True)
-        self.v_proj = nn.Linear(self.hidden_size, self.num_key_value_heads * self.head_dim, bias_attr=True)
-        self.o_proj = nn.Linear(self.num_attention_heads * self.head_dim, self.hidden_size, bias_attr=True)
+        # Determine correct Linear layer type
+        if self.sequence_parallel:
+            ColumnParallelLinear = linear_utils.ColumnSequenceParallelLinear
+            RowParallelLinear = linear_utils.RowSequenceParallelLinear
+        elif self.tensor_parallel_degree > 1:
+            ColumnParallelLinear = linear_utils.ColumnParallelLinear
+            RowParallelLinear = linear_utils.RowParallelLinear
+        else:
+            ColumnParallelLinear = nn.Linear
+            RowParallelLinear = nn.Linear
+
+        # Linear layers use local head counts (already divided by TP degree)
+        q_inner_dim = self.num_attention_heads * self.head_dim
+        kv_inner_dim = self.num_key_value_heads * self.head_dim
+
+        self.q_proj = ColumnParallelLinear(self.hidden_size, q_inner_dim, bias_attr=True)
+        self.k_proj = ColumnParallelLinear(self.hidden_size, kv_inner_dim, bias_attr=True)
+        self.v_proj = ColumnParallelLinear(self.hidden_size, kv_inner_dim, bias_attr=True)
+        # o_proj input dim is also based on local num_attention_heads
+        self.o_proj = RowParallelLinear(
+            q_inner_dim,
+            self.hidden_size,
+            bias_attr=True,
+            input_is_parallel=(self.tensor_parallel_degree > 1 or self.sequence_parallel),
+        )
 
         self.rotary_emb = Phi3RotaryEmbedding(
-            self.head_dim,
+            self.head_dim,  # head_dim is universal
             max_position_embeddings=self.max_position_embeddings,
             base=config.rope_theta,
         )
@@ -182,28 +240,29 @@ class Phi3Attention(nn.Layer):
         past_key_value: Optional[Tuple[paddle.Tensor, paddle.Tensor]] = None,
         output_attentions: bool = False,
         use_cache: bool = False,
+        # batch_size might be needed if SP and hidden_states is [bs*seq/TP, dim]
+        # For now, assume hidden_states is [bs, seq_dim_rank, dim] if SP, or [bs, seq_dim, dim] if not.
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor, paddle.Tensor]]]:
-        bsz, q_len, _ = hidden_states.shape
 
-        # Project input to queries, keys, and values
+        bsz, q_len, _ = hidden_states.shape  # If SP, q_len is seq_len_this_rank
+
         query_states = self.q_proj(hidden_states)
         key_states = self.k_proj(hidden_states)
         value_states = self.v_proj(hidden_states)
 
-        # Reshape and transpose for multi-head attention
+        # Reshape for multi-head attention. self.num_attention_heads and self.num_key_value_heads are TP-local.
         query_states = query_states.reshape([bsz, q_len, self.num_attention_heads, self.head_dim])
         key_states = key_states.reshape([bsz, q_len, self.num_key_value_heads, self.head_dim])
         value_states = value_states.reshape([bsz, q_len, self.num_key_value_heads, self.head_dim])
 
-        kv_seq_len = key_states.shape[1]
+        kv_seq_len = key_states.shape[1]  # This is q_len for current states
         if past_key_value is not None:
-            kv_seq_len += past_key_value[0].shape[1]
+            # past_key_value[0] shape is [bsz, num_key_value_heads_local, past_kv_seq_len, head_dim]
+            kv_seq_len += past_key_value[0].shape[2]
 
         # Compute rotary embeddings
         cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
-        query_states, key_states = apply_rotary_pos_emb(
-            query_states, key_states, cos, sin, position_ids
-        )
+        query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
 
         # Transpose for attention computation
         query_states = query_states.transpose([0, 2, 1, 3])
@@ -219,30 +278,74 @@ class Phi3Attention(nn.Layer):
         if use_cache:
             past_key_value = (key_states, value_states)
 
-        # Handle Grouped Query Attention
-        if self.num_key_value_heads != self.num_attention_heads:
-            key_states = paddle.repeat_interleave(key_states, self.num_attention_heads // self.num_key_value_heads, axis=1)
-            value_states = paddle.repeat_interleave(value_states, self.num_attention_heads // self.num_key_value_heads, axis=1)
+        # Handle Grouped Query Attention (GQA)
+        # self.num_key_value_groups is global Q_heads / global_KV_heads
+        # For local TP rank, if local_Q_heads / local_KV_heads > 1, then repeat.
+        # This is equivalent to self.num_key_value_groups if Q and KV heads are divided by TP proportionally.
+        # Or, more simply, local_q_heads / local_kv_heads.
+        local_num_kv_groups = self.num_attention_heads // self.num_key_value_heads
+        if local_num_kv_groups > 1:
+            key_states = paddle.repeat_interleave(
+                key_states, repeats=local_num_kv_groups, axis=1
+            )  # Repeat along head dimension
+            value_states = paddle.repeat_interleave(value_states, repeats=local_num_kv_groups, axis=1)
 
-        # Compute attention scores
-        attn_weights = paddle.matmul(query_states, key_states.transpose([0, 1, 3, 2])) * self.inv_norm_factor
+        # Core attention computation logic including recompute for "core_attn"
+        has_gradient = not query_states.stop_gradient or not key_states.stop_gradient or not value_states.stop_gradient
+        should_recompute_core_attn = (
+            self.enable_recompute
+            and self.layerwise_recompute
+            and has_gradient
+            and self.recompute_granularity == "core_attn"
+        )
 
-        if attention_mask is not None:
-            attn_weights = attn_weights + attention_mask
+        attn_output = None
+        attn_weights_for_output = None  # Separate variable for clarity
 
-        # Convert scores to probabilities
-        attn_weights = F.softmax(attn_weights, axis=-1)
-        attn_weights = self.attention_dropout(attn_weights)
+        if should_recompute_core_attn:
 
-        # Compute attention output
-        attn_output = paddle.matmul(attn_weights, value_states)
-        attn_output = attn_output.transpose([0, 2, 1, 3])
-        attn_output = attn_output.reshape([bsz, q_len, self.hidden_size])
-        attn_output = self.o_proj(attn_output)
+            def core_attention_computation(q, k, v, mask, inv_norm_factor, dropout_fn):
+                attn_weights_core = paddle.matmul(q, k.transpose([0, 1, 3, 2])) * inv_norm_factor
+                if mask is not None:
+                    attn_weights_core = attn_weights_core + mask
+                attn_weights_core = F.softmax(attn_weights_core, axis=-1).astype(v.dtype)
+                attn_weights_core = dropout_fn(attn_weights_core)
+                return paddle.matmul(attn_weights_core, v), attn_weights_core  # Return weights for output if needed
 
-        outputs = (attn_output, past_key_value)
+            attn_output, attn_weights_for_output = recompute(
+                core_attention_computation,
+                query_states,
+                key_states,
+                value_states,
+                attention_mask,
+                self.inv_norm_factor,
+                self.attention_dropout,  # Pass the dropout layer itself
+                use_reentrant=self.recompute_use_reentrant,
+            )
+        else:
+            # Compute attention scores
+            attn_weights = paddle.matmul(query_states, key_states.transpose([0, 1, 3, 2])) * self.inv_norm_factor
+            if attention_mask is not None:
+                attn_weights = attn_weights + attention_mask
+            # Convert scores to probabilities
+            attn_weights = F.softmax(attn_weights, axis=-1).astype(value_states.dtype)
+            attn_weights_for_output = attn_weights  # Save for potential output
+            attn_weights = self.attention_dropout(attn_weights)
+            # Compute attention output
+            attn_output = paddle.matmul(attn_weights, value_states)
+
+        # Transpose and reshape output
+        attn_output = attn_output.transpose([0, 2, 1, 3])  # [bsz, q_len, num_attention_heads_local, head_dim]
+        # Reshape to [bsz, q_len, num_attention_heads_local * head_dim]
+        # This is the input to o_proj, which is hidden_size / TP_degree if TP > 1
+        attn_output = attn_output.reshape([bsz, q_len, self.num_attention_heads * self.head_dim])
+        attn_output = self.o_proj(attn_output)  # o_proj is RowParallelLinear, gathers if TP/SP
+
+        outputs = (attn_output,)
+        if use_cache:
+            outputs += (past_key_value,)
         if output_attentions:
-            outputs += (attn_weights,)
+            outputs += (attn_weights_for_output,)  # Use the saved attn_weights before dropout
 
         return outputs
 
@@ -250,27 +353,83 @@ class Phi3Attention(nn.Layer):
 class Phi3MLP(nn.Layer):
     def __init__(self, config: Phi3Config):
         super().__init__()
+        self.config = config
         hidden_size = config.hidden_size
-        intermediate_size = config.intermediate_size
 
-        self.gate_proj = nn.Linear(hidden_size, intermediate_size, bias_attr=True)
-        self.up_proj = nn.Linear(hidden_size, intermediate_size, bias_attr=True)
-        self.down_proj = nn.Linear(intermediate_size, hidden_size, bias_attr=True)
+        self.sequence_parallel = getattr(config, "sequence_parallel", False)
+        self.tensor_parallel_degree = getattr(config, "tensor_parallel_degree", 1)
+
+        # intermediate_size in config is global. For TP, it needs to be divided.
+        intermediate_size = config.intermediate_size
+        if self.tensor_parallel_degree > 1 and not self.sequence_parallel:  # TP only
+            intermediate_size = intermediate_size // self.tensor_parallel_degree
+        # For SP, ColumnSequenceParallelLinear handles splitting internally if tensor_parallel_degree > 1.
+        # So, pass the global intermediate_size if SP is on and TP > 1, or just intermediate_size if TP=1.
+        # If SP and TP > 1, the nn.Linear inside ColumnSequenceParallelLinear will use intermediate_size / TP.
+        # If only SP (TP=1), it uses intermediate_size.
+
+        # Determine correct Linear layer type
+        if self.sequence_parallel:
+            ColumnParallelLinear = linear_utils.ColumnSequenceParallelLinear
+            RowParallelLinear = linear_utils.RowSequenceParallelLinear
+        elif self.tensor_parallel_degree > 1:
+            ColumnParallelLinear = linear_utils.ColumnParallelLinear
+            RowParallelLinear = linear_utils.RowParallelLinear
+        else:
+            ColumnParallelLinear = nn.Linear
+            RowParallelLinear = nn.Linear
+
+        self.gate_proj = ColumnParallelLinear(hidden_size, intermediate_size, bias_attr=True)
+        self.up_proj = ColumnParallelLinear(hidden_size, intermediate_size, bias_attr=True)
+        # For RowParallelLinear, input_dim is the TP-split intermediate_size
+        # For RowSequenceParallelLinear, input_dim is also TP-split if TP > 1
+        # So, if TP > 1, down_proj input is intermediate_size / TP degree.
+        # Otherwise, it's the full intermediate_size.
+        down_proj_input_dim = (
+            config.intermediate_size // self.tensor_parallel_degree
+            if self.tensor_parallel_degree > 1
+            else config.intermediate_size
+        )
+        self.down_proj = RowParallelLinear(
+            down_proj_input_dim,
+            hidden_size,
+            bias_attr=True,
+            input_is_parallel=(self.tensor_parallel_degree > 1 or self.sequence_parallel),
+        )
         self.act_fn = F.gelu
 
     def forward(self, x: paddle.Tensor) -> paddle.Tensor:
-        return self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
+        # x is [bs, seq_len, hidden_size] or [bs*seq_len/TP, hidden_size] if SP
+        gate_out = self.gate_proj(x)  # Output is [..., intermediate_size/TP] if TP
+        up_out = self.up_proj(x)  # Output is [..., intermediate_size/TP] if TP
+
+        activated_gate = self.act_fn(gate_out)
+        fused_out = activated_gate * up_out  # Element-wise on TP-split dimension
+
+        # down_proj takes [..., intermediate_size/TP] and outputs [..., hidden_size] (gathered)
+        return self.down_proj(fused_out)
 
 
 class Phi3DecoderLayer(nn.Layer):
-    def __init__(self, config: Phi3Config):
+    def __init__(self, config: Phi3Config, layerwise_recompute: bool = False):
         super().__init__()
         self.hidden_size = config.hidden_size
+        self.config = config
+        self.layerwise_recompute = layerwise_recompute
+        # Default recompute_granularity to "full" if not in config, layer might override with "full_attn"
+        self.recompute_granularity = getattr(config, "recompute_granularity", "full")
+        self.enable_recompute = False  # Controlled by Phi3Model, which is controlled by Trainer
+        # Default recompute_use_reentrant to True if not in config
+        self.recompute_use_reentrant = getattr(config, "recompute_use_reentrant", True)
 
-        self.self_attn = Phi3Attention(config)
+        self.self_attn = Phi3Attention(config, layerwise_recompute=self.layerwise_recompute)
         self.mlp = Phi3MLP(config)
         self.input_layernorm = Phi3RMSNorm(config.hidden_size, eps=config.layer_norm_eps)
         self.post_attention_layernorm = Phi3RMSNorm(config.hidden_size, eps=config.layer_norm_eps)
+
+        if getattr(config, "sequence_parallel", False):  # Check sequence_parallel from config
+            mark_as_sequence_parallel_parameter(self.input_layernorm.weight)
+            mark_as_sequence_parallel_parameter(self.post_attention_layernorm.weight)
 
     def forward(
         self,
@@ -280,33 +439,82 @@ class Phi3DecoderLayer(nn.Layer):
         past_key_value: Optional[Tuple[paddle.Tensor, paddle.Tensor]] = None,
         output_attentions: Optional[bool] = False,
         use_cache: Optional[bool] = False,
+        # batch_size is not explicitly taken by Phi3's original DecoderLayer/Attention/MLP forward
+        # If SP is used, hidden_states might be [token_num_this_rank, dim]
+        # The attention_mask and position_ids must align with this.
     ) -> Tuple[paddle.Tensor, Optional[Tuple[paddle.Tensor, paddle.Tensor]], Optional[paddle.Tensor]]:
-        # Self Attention
+
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
 
-        self_attn_outputs = self.self_attn(
-            hidden_states=hidden_states,
-            attention_mask=attention_mask,
-            position_ids=position_ids,
-            past_key_value=past_key_value,
-            output_attentions=output_attentions,
-            use_cache=use_cache,
+        # Self Attention
+        has_gradient = not hidden_states.stop_gradient
+
+        # Set recompute flag for self_attn module if it has one
+        if hasattr(self.self_attn, "enable_recompute"):
+            self.self_attn.enable_recompute = self.enable_recompute
+            if hasattr(self.self_attn, "recompute_use_reentrant"):
+                self.self_attn.recompute_use_reentrant = self.recompute_use_reentrant
+
+        # Recompute for 'full_attn' granularity, if enabled at this layer
+        # The 'full' layer recompute is handled by Phi3Model
+        should_recompute_attn = (
+            self.enable_recompute
+            and self.layerwise_recompute
+            and has_gradient
+            and self.recompute_granularity == "full_attn"
         )
-        hidden_states = residual + self_attn_outputs[0]
+        if should_recompute_attn:
+            self_attn_outputs = recompute(
+                self.self_attn,
+                hidden_states,
+                attention_mask,
+                position_ids,
+                past_key_value,
+                output_attentions,
+                use_cache,
+                use_reentrant=self.recompute_use_reentrant,
+            )
+        else:
+            self_attn_outputs = self.self_attn(
+                hidden_states=hidden_states,
+                attention_mask=attention_mask,
+                position_ids=position_ids,
+                past_key_value=past_key_value,
+                output_attentions=output_attentions,
+                use_cache=use_cache,
+            )
+
+        attn_output = self_attn_outputs[0]
+        hidden_states = residual + attn_output
 
         # MLP
         residual = hidden_states
         hidden_states = self.post_attention_layernorm(hidden_states)
+
+        # Pass recompute flags to MLP if it supports internal recompute
+        if hasattr(self.mlp, "enable_recompute"):
+            self.mlp.enable_recompute = self.enable_recompute
+            if hasattr(self.mlp, "recompute_use_reentrant"):
+                self.mlp.recompute_use_reentrant = self.recompute_use_reentrant
+
         hidden_states = self.mlp(hidden_states)
         hidden_states = residual + hidden_states
 
         outputs = (hidden_states,)
 
+        # Correctly append past_key_value and attentions based on what self_attn_outputs contains
+        next_output_idx = 1
         if use_cache:
-            outputs += (self_attn_outputs[1],)  # past_key_value
+            if len(self_attn_outputs) > next_output_idx:
+                outputs += (self_attn_outputs[next_output_idx],)
+                next_output_idx += 1
+            # else: outputs += (None,) # Or handle error: cache expected but not received
+
         if output_attentions:
-            outputs += (self_attn_outputs[2],)  # self_attn_weights
+            if len(self_attn_outputs) > next_output_idx:
+                outputs += (self_attn_outputs[next_output_idx],)
+            # else: outputs += (None,) # Or handle error: attention expected but not received
 
         return outputs
 
@@ -321,31 +529,99 @@ class Phi3PreTrainedModel(PretrainedModel):
 
     def _init_weights(self, layer):
         """Initialize the weights."""
-        if isinstance(layer, (nn.Linear, nn.Embedding)):
-            layer.weight.set_value(
-                paddle.tensor.normal(
-                    mean=0.0,
-                    std=self.config.initializer_range,
-                    shape=layer.weight.shape,
-                )
-            )
-            if isinstance(layer, nn.Linear) and layer.bias is not None:
-                layer.bias.set_value(paddle.zeros_like(layer.bias))
+        # Consider tensor parallel degree from config, defaulting to 1 if not present
+        tensor_parallel_degree = getattr(self.config, "tensor_parallel_degree", 1)
+        if tensor_parallel_degree > 1:
+            rng_tracker = get_rng_state_tracker().rng_state
+
+        # Check for specific linear layer types once they are integrated
+        # For now, using nn.Linear and nn.Embedding as placeholders
+        if isinstance(
+            layer,
+            (
+                nn.Linear,
+                nn.Embedding,
+                linear_utils.ColumnParallelLinear,
+                linear_utils.RowParallelLinear,
+                linear_utils.ColumnSequenceParallelLinear,
+                linear_utils.RowSequenceParallelLinear,
+            ),
+        ):
+            if isinstance(layer.weight, paddle.Tensor):
+                is_distributed = getattr(layer.weight, "is_distributed", False)
+                if is_distributed and tensor_parallel_degree > 1:  # Check is_distributed only if TP > 1
+                    with rng_tracker():
+                        layer.weight.set_value(
+                            paddle.tensor.normal(
+                                mean=0.0,
+                                std=self.config.initializer_range,
+                                shape=layer.weight.shape,
+                            )
+                        )
+                else:  # Not distributed or TP degree is 1
+                    layer.weight.set_value(
+                        paddle.tensor.normal(
+                            mean=0.0,
+                            std=self.config.initializer_range,
+                            shape=layer.weight.shape,
+                        )
+                    )
+            if hasattr(layer, "bias") and isinstance(layer.bias, paddle.Tensor) and layer.bias is not None:
+                # Check if bias is distributed (e.g. ColumnParallelLinear bias)
+                is_bias_distributed = getattr(layer.bias, "is_distributed", False)
+                if is_bias_distributed and tensor_parallel_degree > 1:
+                    with rng_tracker():  # Should biases be initialized differently for TP? Usually zeros.
+                        layer.bias.set_value(paddle.zeros_like(layer.bias))
+                else:
+                    layer.bias.set_value(paddle.zeros_like(layer.bias))
+
+        # TODO: Add scaling for RowParallelLinear weights like in Qwen2 if applicable,
+        # after sequence parallel linear layers are integrated.
+        # Example:
+        # with paddle.no_grad():
+        #     if isinstance(layer, Phi3MLP): # or specific linear layer type
+        #         factor = 1 / math.sqrt(2 * self.config.num_hidden_layers) # Example factor
+        #         if hasattr(layer, "down_proj"): # Or specific weight
+        #             layer.down_proj.weight.scale_(factor)
+        #     if isinstance(layer, Phi3Attention):
+        #         factor = 1 / math.sqrt(2 * self.config.num_hidden_layers) # Example factor
+        #         if hasattr(layer, "o_proj"):
+        #             layer.o_proj.weight.scale_(factor)
 
     def _set_gradient_checkpointing(self, module, value=False):
-        if isinstance(module, Phi3Model):
-            module.gradient_checkpointing = value
+        if isinstance(module, Phi3Model):  # Or relevant submodules like Phi3DecoderLayer
+            module.gradient_checkpointing = value  # Keep for backward compatibility
+            module.enable_recompute = value
 
 
 class Phi3Model(Phi3PreTrainedModel):
     def __init__(self, config: Phi3Config):
         super().__init__(config)
+        self.config = config
+        self.vocab_size = config.vocab_size
+        self.hidden_size = config.hidden_size
+
+        self.sequence_parallel = getattr(config, "sequence_parallel", False)
+        # Default recompute_granularity to "full" if not specified
+        self.recompute_granularity = getattr(config, "recompute_granularity", "full")
+        self.no_recompute_layers = getattr(config, "no_recompute_layers", [])
+        # Ensure recompute_use_reentrant defaults to True if not in config
+        self.recompute_use_reentrant = getattr(config, "recompute_use_reentrant", True)
 
         self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size)
-        self.layers = nn.LayerList([Phi3DecoderLayer(config) for _ in range(config.num_hidden_layers)])
-        self.norm = Phi3RMSNorm(config.hidden_size, eps=config.layer_norm_eps)
 
-        self.gradient_checkpointing = False
+        self.layers = nn.LayerList(
+            [
+                Phi3DecoderLayer(config, layerwise_recompute=(idx not in self.no_recompute_layers))
+                for idx in range(config.num_hidden_layers)
+            ]
+        )
+        self.norm = Phi3RMSNorm(config.hidden_size, eps=config.layer_norm_eps)
+        if self.sequence_parallel:
+            mark_as_sequence_parallel_parameter(self.norm.weight)
+
+        self.enable_recompute = False  # To be controlled by Trainer
+        self.gradient_checkpointing = False  # Kept for backward compatibility, prefer enable_recompute
 
         # Initialize weights and apply final processing
         self.post_init()
@@ -418,6 +694,23 @@ class Phi3Model(Phi3PreTrainedModel):
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
 
+        # Scatter inputs_embeds if sequence_parallel is enabled
+        if self.sequence_parallel:
+            # inputs_embeds: [bs, seq_len, dim] -> [bs * seq_len, dim]
+            # Need to store original batch_size and seq_length for GatherOp later
+            # This was done near the start of the original forward method
+            # batch_size, seq_length are already defined if input_ids is not None
+            # If only inputs_embeds is provided, batch_size, seq_length are derived from its shape
+            # This logic should be fine.
+            current_batch_size, current_seq_length, _ = inputs_embeds.shape
+            inputs_embeds_reshaped = paddle.reshape_(
+                inputs_embeds, [current_batch_size * current_seq_length, inputs_embeds.shape[-1]]
+            )
+            inputs_embeds = ScatterOp.apply(inputs_embeds_reshaped)
+        else:
+            # Store batch_size and seq_length if not SP for potential GatherOp if only norm is SP (not typical)
+            current_batch_size, current_seq_length = batch_size, seq_length
+
         hidden_states = inputs_embeds
 
         # Decoder layers
@@ -427,17 +720,37 @@ class Phi3Model(Phi3PreTrainedModel):
 
         for idx, (decoder_layer, past_key_value) in enumerate(zip(self.layers, past_key_values)):
             if output_hidden_states:
+                # If SP, hidden_states is [bs*seq/TP, dim]. Need to gather before appending if want full hs.
+                # Qwen2 appends the scattered hidden_states. Let's follow that for now.
                 all_hidden_states += (hidden_states,)
 
-            if self.gradient_checkpointing and self.training:
+            if hasattr(decoder_layer, "enable_recompute"):  # Set recompute flag for the layer
+                decoder_layer.enable_recompute = self.enable_recompute
+                # Also pass recompute_use_reentrant if the layer uses it
+                if hasattr(decoder_layer, "recompute_use_reentrant"):
+                    decoder_layer.recompute_use_reentrant = self.recompute_use_reentrant
+
+            has_gradient = not hidden_states.stop_gradient
+
+            # Check for recompute conditions
+            should_recompute = (
+                self.enable_recompute
+                and (idx not in self.no_recompute_layers)
+                and has_gradient
+                and self.recompute_granularity == "full"
+            )
+
+            if should_recompute:
                 layer_outputs = recompute(
-                    decoder_layer,
-                    hidden_states,
-                    expanded_mask,
+                    decoder_layer,  # The function to recompute
+                    hidden_states,  # Input hidden_states
+                    expanded_mask,  # attention_mask
                     position_ids,
                     past_key_value,
                     output_attentions,
                     use_cache,
+                    # Phi3DecoderLayer.forward doesn't take batch_size, so not passing it here
+                    use_reentrant=self.recompute_use_reentrant,
                 )
             else:
                 layer_outputs = decoder_layer(
@@ -455,9 +768,17 @@ class Phi3Model(Phi3PreTrainedModel):
                 next_decoder_cache += (layer_outputs[1],)
 
             if output_attentions:
-                all_self_attns += (layer_outputs[2 if use_cache else 1],)
+                attn_output_idx = 2 if use_cache else 1
+                if len(layer_outputs) > attn_output_idx:
+                    all_self_attns += (layer_outputs[attn_output_idx],)
 
-        hidden_states = self.norm(hidden_states)
+        hidden_states = self.norm(hidden_states)  # norm is applied on [bs*seq_len/TP, dim] if SP
+
+        if self.sequence_parallel:
+            hidden_states = GatherOp.apply(hidden_states)
+            # Reshape back to [bs, seq_len, dim] using stored original batch_size and seq_length
+            # batch_size, seq_length were defined at the start of the forward method
+            hidden_states = paddle.reshape_(hidden_states, [batch_size, seq_length, self.hidden_size])
 
         # Add hidden states from the last decoder layer
         if output_hidden_states:
