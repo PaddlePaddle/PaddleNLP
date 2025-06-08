@@ -13,10 +13,11 @@
 # limitations under the License.
 """Tokenization classes for Phi3."""
 
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple  # Removed Union
 
 from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
-from paddlenlp.transformers.tokenizer_utils_base import PaddingStrategy, TensorType
+
+# Removed PaddingStrategy, TensorType
 
 __all__ = ["Phi3Tokenizer"]
 
@@ -27,24 +28,6 @@ class Phi3Tokenizer(PretrainedTokenizer):
     """
 
     resource_files_names = {"vocab_file": "vocab.model", "tokenizer_config_file": "tokenizer_config.json"}
-    pretrained_resource_files_map = {
-        "vocab_file": {
-            "phi3-small": "https://bj.bcebos.com/paddlenlp/models/transformers/phi3/phi3-small-vocab.model",
-            "phi3-base": "https://bj.bcebos.com/paddlenlp/models/transformers/phi3/phi3-base-vocab.model",
-        },
-        "tokenizer_config_file": {
-            "phi3-small": "https://bj.bcebos.com/paddlenlp/models/transformers/phi3/phi3-small-tokenizer_config.json",
-            "phi3-base": "https://bj.bcebos.com/paddlenlp/models/transformers/phi3/phi3-base-tokenizer_config.json",
-        },
-    }
-    pretrained_init_configuration = {
-        "phi3-small": {"do_lower_case": True},
-        "phi3-base": {"do_lower_case": True},
-    }
-    max_model_input_sizes = {
-        "phi3-small": 2048,
-        "phi3-base": 2048,
-    }
     model_input_names = ["input_ids", "attention_mask"]
 
     def __init__(
@@ -81,6 +64,7 @@ class Phi3Tokenizer(PretrainedTokenizer):
         )
 
         import sentencepiece as spm
+
         self.sp_model = spm.SentencePieceProcessor()
         self.sp_model.Load(vocab_file)
         self.vocab_file = vocab_file
