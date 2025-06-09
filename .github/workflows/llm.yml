@@ -21,11 +21,7 @@ env:
   NLP_DIR: /workspace/PaddleNLP
   HF_DATASETS_CACHE: /ssd1/paddlenlp/huggingface/datasets
   TRANSFORMERS_CACHE: /ssd1/paddlenlp/huggingface
-  REPORT_SERVER_USERNAME: ${{ secrets.REPORT_SERVER_USERNAME }}
-  REPORT_SERVER_PASSWORD: ${{ secrets.REPORT_SERVER_PASSWORD }}
-  REPORT_SERVER: ${{ secrets.REPORT_SERVER }}
-  proxy: ${{ secrets.HTTP_PROXY }}
-  no_proxy: ${{ secrets.NO_PROXY }}
+  no_proxy: "localhost,bj.bcebos.com,su.bcebos.com,bcebos.com,apiin.im.baidu.com,gitee.com,aliyun.com,.baidu.com,.tuna.tsinghua.edu.cn"
 
 defaults:
   run:
