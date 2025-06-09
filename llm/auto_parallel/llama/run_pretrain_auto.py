@@ -100,6 +100,7 @@ class PreTrainingArguments(AutoTrainingArguments):
         default=1,
         metadata={"help": "Control the num of microbatches in one pp step."},
     )
+
     def __post_init__(self):
         super().__post_init__()
         assert self.enable_auto_parallel
@@ -455,14 +456,8 @@ def main():
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
-    do_enable_sp_async_reduce_scatter = (
-        training_args.enable_auto_parallel
-        and training_args.tensor_parallel_degree > 1
-        and training_args.sequence_parallel
-        and "enable_sp_async_reduce_scatter" in training_args.tensor_parallel_config
-    )
-    if training_args.enable_linear_fused_grad_add and not do_enable_sp_async_reduce_scatter:
-        from llm.utils.fused_layers import mock_layers
+    if training_args.enable_linear_fused_grad_add:
+        from fused_layers import mock_layers
 
         mock_layers()
 
@@ -597,13 +592,6 @@ def main():
                 layer.enable_recompute = True
 
         model.apply(fn)
-
-    if do_enable_sp_async_reduce_scatter:
-        from llm.utils.sp_async_reduce_scatter import (
-            mock_layers_sp_async_reduce_scatter,
-        )
-
-        mock_layers_sp_async_reduce_scatter(model)
 
     # Create the learning_rate scheduler and optimizer
     if training_args.decay_steps is None:

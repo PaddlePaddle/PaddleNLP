@@ -65,9 +65,10 @@ DIST_CKPT_PATH = "dist_ckpt"
 DIST_MODEL_PATH = "dist_model"
 FREE_SVAE_LOAD_KEY_PATTERNS = ["learning_rate_", "gradient_merge_", "@GRAD@MERG", "eager_tmp"]
 
-class AutoTrainer(Trainer):
 
+class AutoTrainer(Trainer):
     def __init__(self, *args, **kwargs):
+
         if kwargs.get("args", None) is not None and kwargs["args"].to_static:
             if kwargs.get("criterion", None) is None:
 
@@ -95,7 +96,7 @@ class AutoTrainer(Trainer):
         kwargs["model"] = model
         super().__init__(*args, **kwargs)
         assert self.args.enable_auto_parallel
-    
+
         self.global_mesh = fleet.auto.get_mesh()
         self.comm_group_in_pp = fleet.get_hybrid_communicate_group().get_pipe_parallel_group()
         if self.args.pipeline_parallel_degree > 1:
@@ -751,7 +752,7 @@ class AutoTrainer(Trainer):
             return self.dynamic_pipeline_training(model, inputs)  
         with self.autocast_smart_context_manager():
             loss = self.compute_loss(model, inputs)
-        
+
         if loss is not None and self.args.gradient_accumulation_steps > 1 and not self._enable_delay_scale_loss():
             loss = loss / self.args.gradient_accumulation_steps
 
