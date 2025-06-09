@@ -402,8 +402,6 @@ class QATFunc(PyLayer):
             ctx.quantization_config = quantization_config
             ctx.save_for_backward(x, quant_weight, bias, quant_scale)
         ctx.weight_quantize_algo = weight_quantize_algo
-                group=group,
-            )
         ctx.quantization_config = quantization_config
         ctx.weight_quantize_algo = weight_quantize_algo
         ctx.dtype = dtype
